@@ -1,3 +1,5 @@
+import { SettingsPanelClient } from "@/components/settings/settings-panel-client";
+
 export default function SettingsPage() {
   return (
     <div className="page">
@@ -10,20 +12,7 @@ export default function SettingsPage() {
         </p>
       </section>
 
-      <section className="grid">
-        <article className="card span-4">
-          <h2>Model</h2>
-          <p className="muted">Default text and workflow execution model settings.</p>
-        </article>
-        <article className="card span-4">
-          <h2>Revision</h2>
-          <p className="muted">Maximum revision rounds and runtime retry policy.</p>
-        </article>
-        <article className="card span-4">
-          <h2>Evaluator</h2>
-          <p className="muted">Thresholds, routing decisions, and scoring behavior.</p>
-        </article>
-      </section>
+      <SettingsPanelClient />
     </div>
   );
 }

@@ -1,7 +1,4 @@
-const memories = [
-  { type: "success_pattern", summary: "Keep planner output concise and observable." },
-  { type: "failure_reason", summary: "Revision required when evaluation score falls too low." },
-];
+import { MemoryListClient } from "@/components/memories/memory-list-client";
 
 export default function MemoriesPage() {
   return (
@@ -22,14 +19,7 @@ export default function MemoriesPage() {
       </section>
 
       <section className="card">
-        <div className="list">
-          {memories.map((memory, index) => (
-            <div className="list-item" key={`${memory.type}-${index}`}>
-              <strong>{memory.type}</strong>
-              <div className="muted">{memory.summary}</div>
-            </div>
-          ))}
-        </div>
+        <MemoryListClient />
       </section>
     </div>
   );

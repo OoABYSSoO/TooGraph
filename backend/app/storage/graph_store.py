@@ -33,5 +33,13 @@ def load_graph(graph_id: str) -> GraphDocument:
     return GraphDocument.model_validate_json(graph_path.read_text(encoding="utf-8"))
 
 
+def list_graphs() -> list[GraphDocument]:
+    GRAPH_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    graphs: list[GraphDocument] = []
+    for path in sorted(GRAPH_DATA_DIR.glob("graph_*.json"), reverse=True):
+        graphs.append(GraphDocument.model_validate_json(path.read_text(encoding="utf-8")))
+    return graphs
+
+
 def _generate_graph_id() -> str:
     return f"graph_{uuid4().hex[:10]}"

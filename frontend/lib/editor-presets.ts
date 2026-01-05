@@ -35,6 +35,9 @@ export function createStarterGraph(graphId: string): GraphCanvasNode[] {
         kind: "input",
         description: "Provide task input for the workflow.",
         status: "idle",
+        config: {
+          taskInput: "Describe the workflow task here.",
+        },
       },
     },
     {
@@ -46,6 +49,9 @@ export function createStarterGraph(graphId: string): GraphCanvasNode[] {
         kind: "planner",
         description: "Create a plan using available context.",
         status: "idle",
+        config: {
+          plannerMode: "default",
+        },
       },
     },
     {
@@ -57,6 +63,10 @@ export function createStarterGraph(graphId: string): GraphCanvasNode[] {
         kind: "evaluator",
         description: "Evaluate output and choose next route.",
         status: "idle",
+        config: {
+          evaluatorDecision: "pass",
+          score: 8.5,
+        },
       },
     },
     {
@@ -68,8 +78,10 @@ export function createStarterGraph(graphId: string): GraphCanvasNode[] {
         kind: "finalizer",
         description: "Return final result and wrap the run.",
         status: "idle",
+        config: {
+          finalMessage: "Finalize workflow output.",
+        },
       },
     },
   ];
 }
-

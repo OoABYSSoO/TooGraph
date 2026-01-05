@@ -4,7 +4,15 @@ import { addEdge, applyEdgeChanges, applyNodeChanges, type Connection, type Edge
 import { create } from "zustand";
 
 import { createStarterGraph, NODE_PRESETS } from "@/lib/editor-presets";
-import type { GraphCanvasEdge, GraphCanvasNode, GraphDocument, GraphNodeType } from "@/types/editor";
+import type {
+  GraphCanvasEdge,
+  GraphCanvasNode,
+  GraphDocument,
+  GraphNodeConfig,
+  GraphNodeType,
+  NodeExecutionSummary,
+  RunDetailPayload,
+} from "@/types/editor";
 
 type ValidationIssue = {
   code: string;
@@ -22,7 +30,17 @@ type EditorState = {
   validationIssues: ValidationIssue[];
   runtimeLabel: string;
   configDraft: string;
+  validationPassed: boolean | null;
+  currentRunId: string | null;
+  currentRunStatus: string | null;
+  currentNodeId: string | null;
+  nodeExecutionMap: Record<string, NodeExecutionSummary>;
   initGraph: (graphId: string) => void;
+  hydrateGraph: (graph: GraphDocument, sourceLabel: string) => void;
+  updateGraphIdentity: (graphId: string, graphName?: string) => void;
+  updateGraphName: (graphName: string) => void;
+  applyRunDetail: (runDetail: RunDetailPayload) => void;
+  setCurrentRunId: (runId: string | null) => void;
   onNodesChange: (changes: NodeChange<GraphCanvasNode>[]) => void;
   onEdgesChange: (changes: EdgeChange<GraphCanvasEdge>[]) => void;
   onConnect: (connection: Connection) => void;
@@ -31,6 +49,7 @@ type EditorState = {
   selectEdge: (edgeId: string | null) => void;
   updateSelectedNodeLabel: (label: string) => void;
   updateSelectedNodeDescription: (description: string) => void;
+  updateSelectedNodeConfig: (config: Partial<GraphNodeConfig>) => void;
   updateSelectedNodeConfigDraft: (draft: string) => void;
   saveGraphLocally: () => void;
   validateGraph: () => void;
@@ -52,6 +71,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   validationIssues: [],
   runtimeLabel: "Idle",
   configDraft: "",
+  validationPassed: null,
+  currentRunId: null,
+  currentRunStatus: null,
+  currentNodeId: null,
+  nodeExecutionMap: {},
 
   initGraph: (graphId) => {
     const storage = typeof window !== "undefined" ? window.localStorage.getItem(toStorageKey(graphId)) : null;
@@ -68,6 +92,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         runtimeLabel: "Loaded from local draft",
         lastSavedAt: parsed.updatedAt,
         configDraft: "",
+        validationPassed: null,
+        currentRunId: null,
+        currentRunStatus: null,
+        currentNodeId: null,
+        nodeExecutionMap: {},
       });
       return;
     }
@@ -93,7 +122,78 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       validationIssues: [],
       runtimeLabel: "Starter graph ready",
       configDraft: "",
+      validationPassed: null,
+      currentRunId: null,
+      currentRunStatus: null,
+      currentNodeId: null,
+      nodeExecutionMap: {},
     });
+  },
+
+  hydrateGraph: (graph, sourceLabel) => {
+    set({
+      graphId: graph.graphId,
+      graphName: graph.name,
+      nodes: graph.nodes,
+      edges: graph.edges,
+      selectedNodeId: null,
+      selectedEdgeId: null,
+      validationIssues: [],
+      runtimeLabel: sourceLabel,
+      lastSavedAt: graph.updatedAt,
+      configDraft: "",
+      validationPassed: null,
+      currentRunId: null,
+      currentRunStatus: null,
+      currentNodeId: null,
+      nodeExecutionMap: {},
+    });
+  },
+
+  updateGraphIdentity: (graphId, graphName) => {
+    set((state) => ({
+      graphId,
+      graphName: graphName ?? state.graphName,
+    }));
+  },
+
+  updateGraphName: (graphName) => {
+    set({ graphName });
+  },
+
+  setCurrentRunId: (runId) => {
+    set({ currentRunId: runId });
+  },
+
+  applyRunDetail: (runDetail) => {
+    const nodeExecutionMap = Object.fromEntries(
+      runDetail.node_executions.map((execution) => [execution.node_id, execution]),
+    );
+    set((state) => ({
+      currentRunId: runDetail.run_id,
+      currentRunStatus: runDetail.status,
+      currentNodeId: runDetail.current_node_id ?? null,
+      nodeExecutionMap,
+      runtimeLabel:
+        runDetail.status === "completed"
+          ? `Run ${runDetail.run_id} completed`
+          : `Run ${runDetail.run_id} ${runDetail.status}`,
+      nodes: state.nodes.map((node) => {
+        const rawStatus = runDetail.node_status_map[node.id];
+        const nodeStatus =
+          rawStatus === "running" || rawStatus === "success" || rawStatus === "failed"
+            ? rawStatus
+            : "idle";
+        return {
+          ...node,
+          className: `graph-node status-${nodeStatus}`,
+          data: {
+            ...node.data,
+            status: nodeStatus,
+          },
+        };
+      }),
+    }));
   },
 
   onNodesChange: (changes) => {
@@ -131,6 +231,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const nextNode: GraphCanvasNode = {
         id: nodeId,
         type: "default",
+        className: "graph-node status-idle",
         position: {
           x: 160 + (state.nodes.length % 3) * 220,
           y: 120 + Math.floor(state.nodes.length / 3) * 140,
@@ -140,13 +241,27 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           kind: preset.kind,
           description: preset.description,
           status: "idle",
+          config:
+            preset.kind === "input"
+              ? { taskInput: "Describe the workflow task here." }
+              : preset.kind === "knowledge"
+                ? { query: "" }
+                : preset.kind === "memory"
+                  ? { memoryType: "success_pattern" }
+                  : preset.kind === "planner"
+                    ? { plannerMode: "default" }
+                    : preset.kind === "skill_executor"
+                      ? { selectedSkills: ["search_docs"] }
+                      : preset.kind === "evaluator"
+                        ? { evaluatorDecision: "pass", score: 8.5 }
+                        : { finalMessage: "Finalize workflow output." },
         },
       };
       return {
         nodes: [...state.nodes, nextNode],
         selectedNodeId: nodeId,
         selectedEdgeId: null,
-        configDraft: JSON.stringify({}, null, 2),
+        configDraft: JSON.stringify(nextNode.data, null, 2),
       };
     });
   },
@@ -185,6 +300,30 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }));
   },
 
+  updateSelectedNodeConfig: (config) => {
+    set((state) => {
+      const nodes = state.nodes.map((node) =>
+        node.id === state.selectedNodeId
+          ? {
+              ...node,
+              data: {
+                ...node.data,
+                config: {
+                  ...node.data.config,
+                  ...config,
+                },
+              },
+            }
+          : node,
+      );
+      const updatedNode = nodes.find((node) => node.id === state.selectedNodeId);
+      return {
+        nodes,
+        configDraft: updatedNode ? JSON.stringify(updatedNode.data, null, 2) : state.configDraft,
+      };
+    });
+  },
+
   updateSelectedNodeConfigDraft: (draft) => {
     set({ configDraft: draft });
     try {
@@ -202,6 +341,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
                     typeof parsed.description === "string"
                       ? parsed.description
                       : node.data.description,
+                  config:
+                    parsed.config && typeof parsed.config === "object"
+                      ? {
+                          ...node.data.config,
+                          ...parsed.config,
+                        }
+                      : node.data.config,
                 },
               }
             : node,
@@ -252,14 +398,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     set({
       validationIssues: issues,
+      validationPassed: issues.length === 0,
       runtimeLabel: issues.length === 0 ? "Local validation passed" : `Validation found ${issues.length} issue(s)`,
     });
   },
 
   simulateRun: () => {
     set((state) => ({
+      currentRunStatus: "completed",
+      currentNodeId: state.nodes.at(-1)?.id ?? null,
       nodes: state.nodes.map((node, index) => ({
         ...node,
+        className: "graph-node status-success",
         data: {
           ...node.data,
           status: index === state.nodes.length - 1 ? "success" : "success",

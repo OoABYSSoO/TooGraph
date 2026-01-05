@@ -13,10 +13,15 @@ from app.schemas.graph import (
     GraphSaveResponse,
     GraphValidationResponse,
 )
-from app.storage.graph_store import load_graph, save_graph
+from app.storage.graph_store import list_graphs, load_graph, save_graph
 
 
 router = APIRouter(prefix="/api/graphs", tags=["graphs"])
+
+
+@router.get("", response_model=list[GraphDocument])
+def list_graphs_endpoint() -> list[GraphDocument]:
+    return list_graphs()
 
 
 @router.post("/save", response_model=GraphSaveResponse)

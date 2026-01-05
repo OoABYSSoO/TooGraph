@@ -1,7 +1,4 @@
-const docs = [
-  { title: "GraphiteUI Overview", source: "graphiteui_overview.md" },
-  { title: "Workflow Visibility Notes", source: "kb_02.md" },
-];
+import { KnowledgeListClient } from "@/components/knowledge/knowledge-list-client";
 
 export default function KnowledgePage() {
   return (
@@ -23,14 +20,7 @@ export default function KnowledgePage() {
       </section>
 
       <section className="card">
-        <div className="list">
-          {docs.map((doc) => (
-            <div className="list-item" key={doc.title}>
-              <strong>{doc.title}</strong>
-              <div className="muted">{doc.source}</div>
-            </div>
-          ))}
-        </div>
+        <KnowledgeListClient />
       </section>
     </div>
   );

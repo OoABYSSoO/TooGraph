@@ -340,6 +340,37 @@ button {
   gap: 10px;
 }
 
+.execution-box {
+  display: grid;
+  gap: 10px;
+}
+
+.graph-node {
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: rgba(255, 250, 241, 0.95);
+  box-shadow: 0 10px 20px rgba(60, 41, 20, 0.08);
+}
+
+.graph-node.status-idle {
+  border-color: var(--line);
+}
+
+.graph-node.status-running {
+  border-color: #b45309;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18);
+}
+
+.graph-node.status-success {
+  border-color: var(--success);
+  box-shadow: 0 0 0 3px rgba(31, 111, 80, 0.16);
+}
+
+.graph-node.status-failed {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px rgba(159, 18, 57, 0.16);
+}
+
 @media (max-width: 960px) {
   .shell {
     grid-template-columns: 1fr;
