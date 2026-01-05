@@ -1,0 +1,8 @@
+{
+  "memory_id": "memory_example_success",
+  "memory_type": "success_pattern",
+  "summary": "Short successful workflows should preserve clear planner output before evaluation.",
+  "content": {
+    "note": "Keep planner output concise and observable."
+  }
+}
