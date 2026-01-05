@@ -1,0 +1,375 @@
+:root {
+  --bg: #f4f1ea;
+  --surface: #fffaf1;
+  --surface-strong: #efe5d2;
+  --text: #1f2937;
+  --muted: #5b6470;
+  --line: #d4c6aa;
+  --accent: #9a3412;
+  --accent-strong: #7c2d12;
+  --accent-soft: #f6d3b8;
+  --success: #1f6f50;
+  --danger: #9f1239;
+  --shadow: rgba(60, 41, 20, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at top left, rgba(154, 52, 18, 0.08), transparent 28%),
+    linear-gradient(180deg, #f8f4ec 0%, #efe7d8 100%);
+  color: var(--text);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font: inherit;
+}
+
+.shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 240px 1fr;
+}
+
+.sidebar {
+  border-right: 1px solid var(--line);
+  background: rgba(255, 250, 241, 0.88);
+  backdrop-filter: blur(12px);
+  padding: 28px 20px;
+}
+
+.brand {
+  display: block;
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+
+.brand-note {
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.5;
+  margin-bottom: 28px;
+}
+
+.nav {
+  display: grid;
+  gap: 10px;
+}
+
+.nav a {
+  padding: 10px 12px;
+  border-radius: 12px;
+  color: var(--muted);
+}
+
+.nav a:hover,
+.nav a[data-active="true"] {
+  background: var(--surface-strong);
+  color: var(--text);
+}
+
+.content {
+  padding: 32px;
+}
+
+.page {
+  display: grid;
+  gap: 24px;
+}
+
+.hero {
+  background: linear-gradient(135deg, rgba(255, 250, 241, 0.92), rgba(246, 211, 184, 0.8));
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  padding: 28px;
+  box-shadow: 0 20px 60px var(--shadow);
+}
+
+.eyebrow {
+  display: inline-flex;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(154, 52, 18, 0.18);
+  color: var(--accent-strong);
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.hero h1,
+.page-title {
+  margin: 14px 0 10px;
+  font-size: clamp(2rem, 4vw, 3.4rem);
+  line-height: 1.05;
+}
+
+.hero p,
+.page-subtitle {
+  color: var(--muted);
+  font-size: 1.02rem;
+  line-height: 1.7;
+  max-width: 68ch;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 22px;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 18px;
+  border-radius: 14px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: white;
+  transition: transform 160ms ease, background 160ms ease;
+}
+
+.button.secondary {
+  background: transparent;
+  color: var(--accent-strong);
+}
+
+.button:hover {
+  transform: translateY(-1px);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.card {
+  background: rgba(255, 250, 241, 0.86);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  padding: 20px;
+  box-shadow: 0 10px 30px var(--shadow);
+}
+
+.card h2,
+.card h3 {
+  margin: 0 0 10px;
+}
+
+.span-4 {
+  grid-column: span 4;
+}
+
+.span-6 {
+  grid-column: span 6;
+}
+
+.span-8 {
+  grid-column: span 8;
+}
+
+.span-12 {
+  grid-column: span 12;
+}
+
+.list {
+  display: grid;
+  gap: 12px;
+}
+
+.list-item {
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(212, 198, 170, 0.9);
+  background: rgba(255, 255, 255, 0.65);
+}
+
+.kpi {
+  font-size: 2rem;
+  margin: 8px 0 2px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.status-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.empty-editor {
+  min-height: 520px;
+  display: grid;
+  grid-template-columns: 260px 1fr 320px;
+  gap: 16px;
+}
+
+.editor-layout {
+  min-height: 620px;
+  display: grid;
+  grid-template-columns: 270px minmax(0, 1fr) 340px;
+  gap: 16px;
+}
+
+.editor-toolbar-card {
+  padding: 16px 20px;
+}
+
+.panel {
+  min-height: 100%;
+  border: 1px dashed rgba(154, 52, 18, 0.25);
+  border-radius: 22px;
+  padding: 18px;
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.toolbar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.toolbar .pill {
+  background: var(--surface);
+}
+
+.editor-side {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+}
+
+.editor-summary {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.node-palette-item {
+  display: grid;
+  gap: 6px;
+  text-align: left;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(212, 198, 170, 0.9);
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.node-palette-item:hover {
+  border-color: rgba(154, 52, 18, 0.45);
+  transform: translateY(-1px);
+}
+
+.editor-canvas {
+  min-height: 620px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.editor-canvas .react-flow {
+  background:
+    radial-gradient(circle at 20% 20%, rgba(154, 52, 18, 0.08), transparent 18%),
+    linear-gradient(180deg, rgba(255, 250, 241, 0.85), rgba(250, 245, 236, 0.95));
+}
+
+.config-form {
+  display: grid;
+  gap: 14px;
+}
+
+.field {
+  display: grid;
+  gap: 8px;
+  font-size: 0.94rem;
+}
+
+.text-input,
+.text-area {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--text);
+}
+
+.text-area {
+  resize: vertical;
+}
+
+.code-area {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.88rem;
+}
+
+.validation-box {
+  display: grid;
+  gap: 10px;
+}
+
+@media (max-width: 960px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .content {
+    padding: 20px;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .span-4,
+  .span-6,
+  .span-8,
+  .span-12 {
+    grid-column: span 1;
+  }
+
+  .empty-editor {
+    grid-template-columns: 1fr;
+  }
+
+  .editor-layout {
+    grid-template-columns: 1fr;
+  }
+}
