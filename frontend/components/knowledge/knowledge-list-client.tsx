@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { apiGet } from "@/lib/api";
+import { useLanguage } from "@/components/providers/language-provider";
 
 type KnowledgeItem = {
   title: string;
@@ -12,6 +13,7 @@ type KnowledgeItem = {
 };
 
 export function KnowledgeListClient() {
+  const { t } = useLanguage();
   const [items, setItems] = useState<KnowledgeItem[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,11 +39,11 @@ export function KnowledgeListClient() {
   }, []);
 
   if (error) {
-    return <div className="list-item">Failed to load knowledge: {error}</div>;
+    return <div className="list-item">{t("common.failed")}: {error}</div>;
   }
 
   if (items.length === 0) {
-    return <div className="list-item">No knowledge items available yet.</div>;
+    return <div className="list-item">{t("common.no_data")}</div>;
   }
 
   return (
@@ -56,4 +58,3 @@ export function KnowledgeListClient() {
     </div>
   );
 }
-

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 import { LayoutShell } from "@/components/layout-shell";
+import { LanguageProvider } from "@/components/providers/language-provider";
 
 import "./globals.css";
 
@@ -12,9 +13,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="zh">
       <body>
-        <LayoutShell>{children}</LayoutShell>
+        <LanguageProvider>
+          <LayoutShell>{children}</LayoutShell>
+        </LanguageProvider>
       </body>
     </html>
   );

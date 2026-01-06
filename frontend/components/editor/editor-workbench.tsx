@@ -17,10 +17,12 @@ import "@xyflow/react/dist/style.css";
 import { apiGet, apiPost } from "@/lib/api";
 import { fromBackendGraphDocument, toBackendGraphPayload, type BackendGraphDocument } from "@/lib/graph-api";
 import { NODE_PRESETS } from "@/lib/editor-presets";
+import { useLanguage } from "@/components/providers/language-provider";
 import { useEditorStore } from "@/stores/editor-store";
 import type { GraphCanvasNode, GraphNodeConfig, RunDetailPayload } from "@/types/editor";
 
 function EditorWorkbenchInner({ graphId }: { graphId: string }) {
+  const { t } = useLanguage();
   const {
     initGraph,
     hydrateGraph,
@@ -184,28 +186,25 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
       <section>
         <div className="eyebrow">Editor</div>
         <h1 className="page-title">{graphName}</h1>
-        <p className="page-subtitle">
-          This editor now supports node creation, connection, movement, selection, local save,
-          and local graph validation. Backend save and run wiring comes next.
-        </p>
+        <p className="page-subtitle">{t("editor.desc")}</p>
       </section>
 
       <section className="card editor-toolbar-card">
         <div className="toolbar">
           <button className="button secondary" onClick={handleValidateBackend} type="button">
-            Validate Graph
+            {t("editor.validate")}
           </button>
           <button className="button secondary" onClick={handleSaveBackend} type="button">
-            Save Graph
+            {t("editor.save")}
           </button>
           <button className="button" onClick={handleRunBackend} type="button">
-            Run Graph
+            {t("editor.run")}
           </button>
           <button className="button secondary" onClick={saveGraphLocally} type="button">
-            Save Local Draft
+            {t("editor.save_local")}
           </button>
           <button className="button secondary" onClick={simulateRun} type="button">
-            Simulate Run
+            {t("editor.simulate")}
           </button>
           <span className="pill">{runtimeLabel}</span>
           {validationPassed !== null ? (
@@ -217,7 +216,7 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
 
       <section className="editor-layout">
         <aside className="panel editor-side">
-          <h2>Node Palette</h2>
+          <h2>{t("editor.palette")}</h2>
           <div className="list">
             {NODE_PRESETS.map((preset) => (
               <button
@@ -256,14 +255,14 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
 
           {currentRunId ? (
             <div className="validation-box">
-              <h3>Latest Run</h3>
+              <h3>{t("editor.latest_run")}</h3>
               <div className="list">
                 <div className="list-item">
                   <strong>{currentRunId}</strong>
                   <div className="muted">Status: {currentRunStatus ?? "unknown"}</div>
                 </div>
                 <button className="button secondary" onClick={() => router.push(`/runs/${currentRunId}`)} type="button">
-                  Open Run Detail
+                  {t("editor.open_run")}
                 </button>
               </div>
             </div>
@@ -292,11 +291,11 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
         </div>
 
         <aside className="panel editor-side">
-          <h2>Config Panel</h2>
+          <h2>{t("editor.config")}</h2>
           {selectedNode ? (
             <div className="config-form">
               <label className="field">
-                <span>Graph Name</span>
+                <span>{t("editor.graph_name")}</span>
                 <input
                   className="text-input"
                   value={graphName}
@@ -305,7 +304,7 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
               </label>
 
               <label className="field">
-                <span>Name</span>
+                <span>{t("editor.node_name")}</span>
                 <input
                   className="text-input"
                   value={selectedNode.data.label}
@@ -314,7 +313,7 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
               </label>
 
               <label className="field">
-                <span>Description</span>
+                <span>{t("editor.description")}</span>
                 <textarea
                   className="text-area"
                   rows={4}
@@ -437,7 +436,7 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
               ) : null}
 
               <label className="field">
-                <span>Advanced Node Data JSON</span>
+                <span>{t("editor.advanced")}</span>
                 <textarea
                   className="text-area code-area"
                   rows={12}
@@ -453,7 +452,7 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
 
               {selectedNodeExecution ? (
                 <div className="execution-box">
-                  <h3>Latest Execution</h3>
+                  <h3>{t("editor.latest_execution")}</h3>
                   <div className="list">
                     <div className="list-item">
                       <strong>{selectedNodeExecution.status}</strong>

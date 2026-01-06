@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { apiGet } from "@/lib/api";
+import { useLanguage } from "@/components/providers/language-provider";
 
 type RunSummary = {
   run_id: string;
@@ -19,6 +20,7 @@ type RunSummary = {
 };
 
 export function RunsListClient() {
+  const { t } = useLanguage();
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -53,10 +55,10 @@ export function RunsListClient() {
       return <div className="list-item">Loading runs...</div>;
     }
     if (error) {
-      return <div className="list-item">Failed to load runs: {error}</div>;
+      return <div className="list-item">{t("common.failed")}: {error}</div>;
     }
     if (runs.length === 0) {
-      return <div className="list-item">No runs yet. Trigger one from the editor.</div>;
+      return <div className="list-item">{t("common.no_data")}</div>;
     }
     return runs.map((run) => (
       <Link className="list-item" key={run.run_id} href={`/runs/${run.run_id}`}>
@@ -74,4 +76,3 @@ export function RunsListClient() {
 
   return <div className="list">{content}</div>;
 }
-

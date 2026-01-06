@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { apiGet } from "@/lib/api";
+import { useLanguage } from "@/components/providers/language-provider";
 
 type GraphSummary = {
   graph_id: string;
@@ -20,6 +21,7 @@ type RunSummary = {
 };
 
 export function WorkspaceDashboardClient() {
+  const { t } = useLanguage();
   const [graphs, setGraphs] = useState<GraphSummary[]>([]);
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -53,32 +55,33 @@ export function WorkspaceDashboardClient() {
   const failedCount = useMemo(() => runs.filter((run) => run.status === "failed").length, [runs]);
 
   if (error) {
-    return <section className="card">Failed to load workspace data: {error}</section>;
+    return <section className="card">{t("common.failed")}: {error}</section>;
   }
 
   return (
     <section className="grid">
       <article className="card span-4">
         <div className="muted">Recent Graphs</div>
+        <div className="muted">{t("common.recent_graphs")}</div>
         <div className="kpi">{graphs.length}</div>
         <p className="muted">Saved workflow definitions available from backend storage.</p>
       </article>
       <article className="card span-4">
-        <div className="muted">Running Jobs</div>
+        <div className="muted">{t("common.running_jobs")}</div>
         <div className="kpi">{runningCount}</div>
         <p className="muted">Live workflow runs currently moving through runtime.</p>
       </article>
       <article className="card span-4">
-        <div className="muted">Failed Runs</div>
+        <div className="muted">{t("common.failed_runs")}</div>
         <div className="kpi">{failedCount}</div>
         <p className="muted">Runs that need inspection or another validation pass.</p>
       </article>
 
       <article className="card span-6">
-        <h2>Recent Graphs</h2>
+        <h2>{t("common.recent_graphs")}</h2>
         <div className="list">
           {graphs.length === 0 ? (
-            <div className="list-item">No saved graphs yet. Save one from the editor.</div>
+            <div className="list-item">{t("common.no_data")}</div>
           ) : (
             graphs.slice(0, 6).map((graph) => (
               <Link className="list-item" href={`/editor/${graph.graph_id}`} key={graph.graph_id}>
@@ -94,10 +97,10 @@ export function WorkspaceDashboardClient() {
       </article>
 
       <article className="card span-6">
-        <h2>Recent Runs</h2>
+        <h2>{t("common.recent_runs")}</h2>
         <div className="list">
           {runs.length === 0 ? (
-            <div className="list-item">No runs yet. Trigger one from the editor.</div>
+            <div className="list-item">{t("common.no_data")}</div>
           ) : (
             runs.slice(0, 6).map((run) => (
               <Link className="list-item" href={`/runs/${run.run_id}`} key={run.run_id}>
@@ -114,7 +117,7 @@ export function WorkspaceDashboardClient() {
       </article>
 
       <article className="card span-12">
-        <h2>Quick Actions</h2>
+        <h2>{t("common.quick_actions")}</h2>
         <div className="actions">
           <Link className="button" href="/editor/demo-graph">
             Create Graph
@@ -130,4 +133,3 @@ export function WorkspaceDashboardClient() {
     </section>
   );
 }
-

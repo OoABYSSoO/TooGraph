@@ -1,11 +1,11 @@
+"use client";
+
+import { useParams } from "next/navigation";
+
 import { EditorWorkbench } from "@/components/editor/editor-workbench";
 
-export default async function EditorPage({
-  params,
-}: {
-  params: Promise<{ graphId: string }>;
-}) {
-  const { graphId } = await params;
+export default function EditorPage() {
+  const params = useParams<{ graphId: string }>();
 
-  return <EditorWorkbench graphId={graphId} />;
+  return <EditorWorkbench graphId={params.graphId} />;
 }

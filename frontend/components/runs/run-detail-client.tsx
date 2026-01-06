@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { apiGet } from "@/lib/api";
+import { useLanguage } from "@/components/providers/language-provider";
 
 type RunDetail = {
   run_id: string;
@@ -24,6 +25,7 @@ type RunDetail = {
 };
 
 export function RunDetailClient({ runId }: { runId: string }) {
+  const { t } = useLanguage();
   const [run, setRun] = useState<RunDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,45 +51,53 @@ export function RunDetailClient({ runId }: { runId: string }) {
   }, [runId]);
 
   if (error) {
-    return <div className="card">Failed to load run detail: {error}</div>;
+    return <div className="card">{t("common.failed")}: {error}</div>;
   }
 
   if (!run) {
-    return <div className="card">Loading run detail...</div>;
+    return <div className="card">{t("common.loading")}</div>;
   }
 
   return (
     <section className="grid">
       <article className="card span-4">
-        <h2>Status</h2>
+        <h2>{t("run_detail.status")}</h2>
         <div className="status-row">
           <span className="pill">{run.status}</span>
-          <span className="pill">current node {run.current_node_id ?? "completed"}</span>
-          <span className="pill">revisions {run.revision_round}</span>
-          {run.final_score ? <span className="pill">score {run.final_score}</span> : null}
+          <span className="pill">
+            {t("run_detail.current_node")} {run.current_node_id ?? t("run_detail.completed")}
+          </span>
+          <span className="pill">
+            {t("run_detail.revisions")} {run.revision_round}
+          </span>
+          {run.final_score ? (
+            <span className="pill">
+              {t("run_detail.score")} {run.final_score}
+            </span>
+          ) : null}
         </div>
       </article>
 
       <article className="card span-8">
-        <h2>Artifacts Summary</h2>
+        <h2>{t("run_detail.artifacts")}</h2>
         <div className="list">
           <div className="list-item">
-            <strong>Knowledge</strong>
-            <div className="muted">{run.knowledge_summary || "No knowledge summary available."}</div>
+            <strong>{t("run_detail.knowledge")}</strong>
+            <div className="muted">{run.knowledge_summary || t("run_detail.no_knowledge")}</div>
           </div>
           <div className="list-item">
-            <strong>Memory</strong>
-            <div className="muted">{run.memory_summary || "No memory summary available."}</div>
+            <strong>{t("run_detail.memory")}</strong>
+            <div className="muted">{run.memory_summary || t("run_detail.no_memory")}</div>
           </div>
           <div className="list-item">
-            <strong>Final Result</strong>
-            <div className="muted">{run.final_result || "No final result yet."}</div>
+            <strong>{t("run_detail.final_result")}</strong>
+            <div className="muted">{run.final_result || t("run_detail.no_result")}</div>
           </div>
         </div>
       </article>
 
       <article className="card span-12">
-        <h2>Node Timeline</h2>
+        <h2>{t("run_detail.timeline")}</h2>
         <div className="list">
           {run.node_executions.map((execution) => (
             <div className="list-item" key={execution.node_id}>
@@ -105,4 +115,3 @@ export function RunDetailClient({ runId }: { runId: string }) {
     </section>
   );
 }
-

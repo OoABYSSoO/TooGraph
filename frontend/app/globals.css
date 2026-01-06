@@ -66,6 +66,22 @@ button {
   margin-bottom: 28px;
 }
 
+.language-switcher {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 18px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.language-select {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--text);
+  padding: 10px 12px;
+}
+
 .nav {
   display: grid;
   gap: 10px;

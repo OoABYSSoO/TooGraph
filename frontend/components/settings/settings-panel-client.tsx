@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { apiGet } from "@/lib/api";
+import { useLanguage } from "@/components/providers/language-provider";
 
 type SettingsPayload = {
   model: {
@@ -19,6 +20,7 @@ type SettingsPayload = {
 };
 
 export function SettingsPanelClient() {
+  const { t } = useLanguage();
   const [settings, setSettings] = useState<SettingsPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,11 +46,11 @@ export function SettingsPanelClient() {
   }, []);
 
   if (error) {
-    return <section className="card">Failed to load settings: {error}</section>;
+    return <section className="card">{t("common.failed")}: {error}</section>;
   }
 
   if (!settings) {
-    return <section className="card">Loading settings...</section>;
+    return <section className="card">{t("common.loading")}</section>;
   }
 
   return (
@@ -70,4 +72,3 @@ export function SettingsPanelClient() {
     </section>
   );
 }
-

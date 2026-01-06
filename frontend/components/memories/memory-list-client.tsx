@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { apiGet } from "@/lib/api";
+import { useLanguage } from "@/components/providers/language-provider";
 
 type MemoryItem = {
   memory_id: string;
@@ -11,6 +12,7 @@ type MemoryItem = {
 };
 
 export function MemoryListClient() {
+  const { t } = useLanguage();
   const [items, setItems] = useState<MemoryItem[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,11 +38,11 @@ export function MemoryListClient() {
   }, []);
 
   if (error) {
-    return <div className="list-item">Failed to load memories: {error}</div>;
+    return <div className="list-item">{t("common.failed")}: {error}</div>;
   }
 
   if (items.length === 0) {
-    return <div className="list-item">No memories available yet.</div>;
+    return <div className="list-item">{t("common.no_data")}</div>;
   }
 
   return (
@@ -54,4 +56,3 @@ export function MemoryListClient() {
     </div>
   );
 }
-

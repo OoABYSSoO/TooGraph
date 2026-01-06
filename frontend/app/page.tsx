@@ -1,43 +1,40 @@
+"use client";
+
 import Link from "next/link";
 
+import { useLanguage } from "@/components/providers/language-provider";
+
 export default function HomePage() {
+  const { t } = useLanguage();
+
   return (
     <div className="page">
       <section className="hero">
-        <span className="eyebrow">Graph Editing + Runtime Visibility</span>
-        <h1>Build workflows that people can actually inspect.</h1>
-        <p>
-          GraphiteUI turns LangGraph agent logic into a visual workspace with an editor,
-          runtime observation, run history, and asset views for knowledge and memory.
-        </p>
+        <span className="eyebrow">{t("home.eyebrow")}</span>
+        <h1>{t("home.title")}</h1>
+        <p>{t("home.desc")}</p>
         <div className="actions">
           <Link className="button" href="/workspace">
-            Enter Workspace
+            {t("home.enter")}
           </Link>
           <Link className="button secondary" href="/editor/demo-graph">
-            Open Editor
+            {t("home.open_editor")}
           </Link>
         </div>
       </section>
 
       <section className="grid">
         <article className="card span-4">
-          <h2>Workspace</h2>
-          <p className="muted">
-            Review recent graphs, recent runs, quick actions, and overall system status.
-          </p>
+          <h2>{t("home.workspace")}</h2>
+          <p className="muted">{t("home.workspace_desc")}</p>
         </article>
         <article className="card span-4">
-          <h2>Editor</h2>
-          <p className="muted">
-            Compose node-based workflows with palette, canvas, config panel, and toolbar.
-          </p>
+          <h2>{t("home.editor")}</h2>
+          <p className="muted">{t("home.editor_desc")}</p>
         </article>
         <article className="card span-4">
-          <h2>Runtime</h2>
-          <p className="muted">
-            Track current node, node execution summaries, revisions, and final outputs.
-          </p>
+          <h2>{t("home.runtime")}</h2>
+          <p className="muted">{t("home.runtime_desc")}</p>
         </article>
       </section>
     </div>

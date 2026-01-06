@@ -4,18 +4,20 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
-const navItems = [
-  { href: "/", label: "Home" },
-  { href: "/workspace", label: "Workspace" },
-  { href: "/editor/demo-graph", label: "Editor" },
-  { href: "/runs", label: "Runs" },
-  { href: "/knowledge", label: "Knowledge" },
-  { href: "/memories", label: "Memories" },
-  { href: "/settings", label: "Settings" },
-];
+import { useLanguage } from "@/components/providers/language-provider";
 
 export function LayoutShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const { language, setLanguage, t } = useLanguage();
+  const navItems = [
+    { href: "/", label: t("nav.home") },
+    { href: "/workspace", label: t("nav.workspace") },
+    { href: "/editor/demo-graph", label: t("nav.editor") },
+    { href: "/runs", label: t("nav.runs") },
+    { href: "/knowledge", label: t("nav.knowledge") },
+    { href: "/memories", label: t("nav.memories") },
+    { href: "/settings", label: t("nav.settings") },
+  ];
 
   return (
     <div className="shell">
@@ -23,9 +25,18 @@ export function LayoutShell({ children }: { children: ReactNode }) {
         <Link className="brand" href="/">
           GraphiteUI
         </Link>
-        <div className="brand-note">
-          Visual orchestration workspace for LangGraph workflows.
-        </div>
+        <div className="brand-note">{t("layout.note")}</div>
+        <label className="language-switcher">
+          <span>{t("lang.label")}</span>
+          <select
+            className="language-select"
+            value={language}
+            onChange={(event) => setLanguage(event.target.value as "zh" | "en")}
+          >
+            <option value="zh">{t("lang.zh")}</option>
+            <option value="en">{t("lang.en")}</option>
+          </select>
+        </label>
         <nav className="nav" aria-label="Main navigation">
           {navItems.map((item) => (
             <Link
