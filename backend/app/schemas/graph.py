@@ -30,10 +30,6 @@ class NodeType(str, Enum):
     EVALUATOR = "evaluator"
     TOOL = "tool"
     TRANSFORM = "transform"
-    # Transitional legacy nodes still kept in enum so current code can import safely.
-    INPUT = "input"
-    SKILL_EXECUTOR = "skill_executor"
-    FINALIZER = "finalizer"
 
 
 class EdgeKind(str, Enum):
@@ -144,20 +140,9 @@ class GraphEdge(BaseModel):
     flow_keys: list[str] = Field(default_factory=list)
     edge_kind: EdgeKind = EdgeKind.NORMAL
     branch_label: ConditionLabel | None = None
-    # Transitional aliases for the old protocol.
-    type: EdgeKind | None = None
-    condition_label: ConditionLabel | None = None
 
     @model_validator(mode="after")
     def normalize_edge_fields(self) -> "GraphEdge":
-        if self.type is not None:
-            self.edge_kind = self.type
-        if self.condition_label is not None:
-            self.branch_label = self.condition_label
-
-        self.type = self.edge_kind
-        self.condition_label = self.branch_label
-
         if self.edge_kind == EdgeKind.BRANCH and self.branch_label is None:
             raise ValueError("Branch edges must include branch_label.")
         if self.edge_kind == EdgeKind.NORMAL and self.branch_label is not None:

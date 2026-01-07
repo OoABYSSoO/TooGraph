@@ -4,22 +4,6 @@ from collections.abc import Callable
 from typing import Any
 
 from app.knowledge.loader import search_knowledge
-from app.skills.slg_creative_factory import (
-    slg_analyze_videos,
-    slg_build_brief,
-    slg_clean_news,
-    slg_extract_patterns,
-    slg_fetch_ads,
-    slg_fetch_rss,
-    slg_generate_storyboards,
-    slg_generate_variants,
-    slg_generate_video_prompts,
-    slg_normalize_assets,
-    slg_prepare_image_todo,
-    slg_prepare_video_todo,
-    slg_review_variants,
-    slg_select_top_videos,
-)
 from app.tools.registry import get_tool_registry
 
 
@@ -47,20 +31,6 @@ def get_skill_registry() -> dict[str, SkillFunc]:
         "review_creative_variants": tools["review_creative_variants"],
         "prepare_image_generation_todo": tools["prepare_image_generation_todo"],
         "prepare_video_generation_todo": tools["prepare_video_generation_todo"],
-        "slg_fetch_rss": slg_fetch_rss,
-        "slg_clean_news": slg_clean_news,
-        "slg_fetch_ads": slg_fetch_ads,
-        "slg_normalize_assets": slg_normalize_assets,
-        "slg_select_top_videos": slg_select_top_videos,
-        "slg_analyze_videos": slg_analyze_videos,
-        "slg_extract_patterns": slg_extract_patterns,
-        "slg_build_brief": slg_build_brief,
-        "slg_generate_variants": slg_generate_variants,
-        "slg_generate_storyboards": slg_generate_storyboards,
-        "slg_generate_video_prompts": slg_generate_video_prompts,
-        "slg_review_variants": slg_review_variants,
-        "slg_prepare_image_todo": slg_prepare_image_todo,
-        "slg_prepare_video_todo": slg_prepare_video_todo,
     }
 
 

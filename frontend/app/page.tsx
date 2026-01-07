@@ -17,7 +17,7 @@ export default function HomePage() {
           <Link className="button" href="/workspace">
             {t("home.enter")}
           </Link>
-          <Link className="button secondary" href="/editor/demo-graph">
+          <Link className="button secondary" href="/editor/creative-factory">
             {t("home.open_editor")}
           </Link>
         </div>

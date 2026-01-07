@@ -404,7 +404,7 @@ function createCreativeFactoryTemplate(graphId: string, themePresetId?: string):
 }
 
 export function createStarterGraphDocument(graphId: string, themePresetId?: string): GraphDocument {
-  if (graphId === "creative-factory" || graphId === "slg-creative-factory" || graphId === "template-creative-factory") {
+  if (graphId === "creative-factory" || graphId === "template-creative-factory") {
     return createCreativeFactoryTemplate(graphId, themePresetId);
   }
   return createCreativeFactoryTemplate(graphId, themePresetId);

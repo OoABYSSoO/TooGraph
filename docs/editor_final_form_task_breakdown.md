@@ -111,37 +111,28 @@
 验收方式：
 
 - 准备 2 个新版 graph 样例
-- 准备 2 个旧版 graph 样例
-- 四者都能成功解析
+- 均能成功解析
+- 旧协议残留字段会被拒绝
 
 ---
 
-## Task 1.2 建立旧协议到新协议的兼容转换
+## Task 1.2 清理旧协议与旧图残留
 
 优先级：`P0`
 
 目标：
 
-避免一次性打断当前 editor 和已有 graph。
-
-后端目标文件：
-
-- 新增 [graph_adapter.py](/home/abyss/GraphiteUI/backend/app/compiler/graph_adapter.py)
-
-职责：
-
-- 将旧版节点转换为 `reads/writes/params`
-- 将旧版 conditional edge 转为 `branch_label`
-- 自动生成缺省 `state_schema`
+让仓库运行时、编辑器入口和本地数据全部只围绕标准模型工作。
 
 完成标准：
 
-- 旧版 `demo-graph`、`slg-creative-factory` 都能被升级到内部统一模型
+- 旧节点类型、旧边别名、旧图入口全部清理
+- graph 列表与 run 列表不再被旧数据污染
 
 验收方式：
 
-- 对旧 graph 执行 adapter
-- 输出结构中必须包含 `state_schema` 和 `reads/writes`
+- `/api/graphs` 可正常列出标准图
+- 首页、工作台、导航只指向 `/editor/creative-factory`
 
 ---
 
@@ -185,7 +176,7 @@
 
 目标：
 
-解析新版 graph 协议，而不再只关心旧版 `input/planner/evaluator/finalizer`。
+解析新版 graph 协议，不再保留旧阶段式节点模型的前提假设。
 
 后端目标文件：
 
@@ -291,7 +282,7 @@
 
 目标：
 
-把当前 `slg_*` 和其他 helper 能力下沉成工具层。
+把当前主题相关 helper 能力统一下沉成工具层。
 
 后端目标文件：
 
@@ -599,7 +590,7 @@
 
 目标：
 
-不再依赖过渡版 `skill_executor + slg_*` 作为主要表达方式。
+不再依赖过渡版技能串联表达方式作为主要运行模型。
 
 迁移后的目标节点链：
 
@@ -628,18 +619,19 @@
 
 ---
 
-## Task 5.2 保留过渡兼容层
+## Task 5.2 清理过渡兼容层
 
 优先级：`P1`
 
 目标：
 
-避免已有 `demo-graph` 和 `slg-creative-factory` 立刻失效。
+彻底移除 legacy runtime、`slg_*` 包装层和旧模板入口。
 
 完成标准：
 
-- 旧模板仍能打开
-- 打开时自动提示“可升级到新版节点模型”
+- 运行时注册表只保留标准节点
+- 仓库里不再保留旧模板入口
+- 设置页技能列表不再暴露 `slg_*`
 
 ---
 
@@ -698,7 +690,7 @@
 如果马上开始实现，建议只按下面 6 步推进：
 
 1. 扩展后端 graph schema
-2. 建立旧协议到新协议的 adapter
+2. 清理旧协议与旧数据残留
 3. 扩展前端 graph 类型和 store
 4. 做 `State Panel`
 5. 做 `Inputs / Outputs / Params`
@@ -711,7 +703,7 @@
 ### Milestone A：协议 ready
 
 - 新版 graph schema 完成
-- 旧协议兼容完成
+- 旧协议残留已清理
 
 ### Milestone B：编译器 ready
 

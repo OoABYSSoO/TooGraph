@@ -119,7 +119,7 @@ export function WorkspaceDashboardClient() {
       <article className="card span-12">
         <h2>{t("common.quick_actions")}</h2>
         <div className="actions">
-          <Link className="button" href="/editor/demo-graph">
+          <Link className="button" href="/editor/creative-factory">
             Create Graph
           </Link>
           <Link className="button secondary" href="/runs">

@@ -302,8 +302,7 @@ make frontend-dev
 
 ```bash
 http://localhost:3477/workspace
-http://localhost:3477/editor/demo-graph
-http://localhost:3477/editor/slg-creative-factory
+http://localhost:3477/editor/creative-factory
 http://localhost:3477/runs
 ```
 
@@ -369,11 +368,10 @@ http://localhost:8765
 - 示例图目录：`examples/`
 - 验收手册：[acceptance_runbook.md](/home/abyss/GraphiteUI/docs/acceptance_runbook.md)
 
-建议先用以下三个文件做验证：
+建议先用以下两个文件做验证：
 
 - [graph_minimal_pass.json](/home/abyss/GraphiteUI/examples/graph_minimal_pass.json)
 - [graph_revise.json](/home/abyss/GraphiteUI/examples/graph_revise.json)
-- [slg_creative_factory_graph.json](/home/abyss/GraphiteUI/examples/slg_creative_factory_graph.json)
 
 ### 健康检查
 ```bash

@@ -12,7 +12,7 @@ export function LayoutShell({ children }: { children: ReactNode }) {
   const navItems = [
     { href: "/", label: t("nav.home") },
     { href: "/workspace", label: t("nav.workspace") },
-    { href: "/editor/demo-graph", label: t("nav.editor") },
+    { href: "/editor/creative-factory", label: t("nav.editor") },
     { href: "/runs", label: t("nav.runs") },
     { href: "/knowledge", label: t("nav.knowledge") },
     { href: "/memories", label: t("nav.memories") },

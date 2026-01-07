@@ -18,6 +18,7 @@
 - 标准 graph 协议：`template_id / theme_config / state_schema / reads / writes / params / flow_keys`
 - graph 的 `validate / save / load / run`
 - 基于 LangGraph 的标准节点执行链
+- legacy runtime、旧节点类型和旧图入口正在被清理出主线
 - creative factory 默认模板
 - 编辑器中的 `State Panel`
 - 节点左入右出、自定义节点卡片
@@ -26,7 +27,7 @@
 
 当前项目最准确的状态应理解为：
 
-**“标准编排模型已经落地，主链路可运行，正在从可用走向更强的可视化表达和更完整的资产管理体验。”**
+**“标准编排模型已经落地，旧兼容包袱正在被剥离，主链路可运行，正在从可用走向更强的可视化表达和更完整的资产管理体验。”**
 
 ---
 
