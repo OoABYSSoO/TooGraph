@@ -2,13 +2,14 @@
 
 ## 1. 文档目的
 
-这份文档用于把当前仓库中的实现能力，映射到验收文档中的可执行验证步骤。
+这份文档用于基于当前最新实现执行本地验收、演示前检查与交接说明。
 
-适用场景：
+当前验收重点已经从“最小骨架能不能启动”升级为：
 
-- 本地自测
-- Demo 演示前检查
-- 向他人交接当前阶段能力
+- 标准 graph 协议是否可用
+- editor 是否能完成 state 驱动编排
+- creative factory 模板是否能跑通
+- run detail 与产物是否可回看
 
 ---
 
@@ -19,7 +20,13 @@
 - 前端：`3477`
 - 后端：`8765`
 
-启动命令：
+推荐启动方式：
+
+```bash
+./scripts/dev_up.sh
+```
+
+也可以手动启动：
 
 ```bash
 make backend-install
@@ -34,56 +41,51 @@ make frontend-dev
 make backend-health
 ```
 
-前端地址：
+访问地址：
 
 ```bash
-http://localhost:3477
-```
-
-后端地址：
-
-```bash
-http://localhost:8765
+http://127.0.0.1:3477
+http://127.0.0.1:8765
 ```
 
 ---
 
-## 3. 建议使用的示例图
+## 3. 推荐验收入口
 
-当前仓库提供三份示例图：
+当前最推荐直接使用标准模板入口：
 
-- [graph_minimal_pass.json](/home/abyss/GraphiteUI/examples/graph_minimal_pass.json)
-- [graph_revise.json](/home/abyss/GraphiteUI/examples/graph_revise.json)
-- [slg_creative_factory_graph.json](/home/abyss/GraphiteUI/examples/slg_creative_factory_graph.json)
+- `http://127.0.0.1:3477/editor/creative-factory`
 
-用途：
+这个入口已经预置：
 
-- `graph_minimal_pass.json`：验证正常路径
-- `graph_revise.json`：验证 revise 路由
-- `slg_creative_factory_graph.json`：验证多节点 skill 编排、创意生成与 TODO 产物链路
+- `theme_config`
+- `state_schema`
+- creative factory 标准节点链
+- condition 路由
+- 图片 / 视频 TODO 产物链
 
 ---
 
-## 4. 环境与启动验收
+## 4. 基础环境验收
 
 ### AC-ENV-1 前端可启动
 
 验证：
 
-1. 执行 `make frontend-dev`
-2. 打开 `http://localhost:3477`
+1. 运行 `./scripts/dev_up.sh`
+2. 打开 `http://127.0.0.1:3477`
 
 通过标准：
 
-- 首页可以访问
-- 能看到产品名称和入口按钮
+- 首页可访问
+- 左侧导航正常
+- 默认语言为中文
 
 ### AC-ENV-2 后端可启动
 
 验证：
 
-1. 执行 `make backend-dev`
-2. 访问 `http://localhost:8765/health`
+1. 访问 `http://127.0.0.1:8765/health`
 
 通过标准：
 
@@ -101,172 +103,195 @@ http://localhost:8765
 通过标准：
 
 - 目录存在
-- 启动和运行时不因目录缺失报错
+- 运行时不会因目录缺失报错
 
 ---
 
-## 5. Graph 与 Runtime 验收
+## 5. Editor 标准协议验收
 
 ### AC-GRAPH-1 / AC-GRAPH-2 / AC-GRAPH-3
 
-可通过 Editor 页面验证：
+验证：
 
-1. 打开 `http://localhost:3477/editor/demo-graph`
-2. 调整节点后点击 `Validate Graph`
-3. 点击 `Save Graph`
-4. 观察地址是否切换到真实 `/editor/{graphId}`
-5. 刷新页面，确认 graph 仍能加载
+1. 打开 `http://127.0.0.1:3477/editor/creative-factory`
+2. 检查左侧 `State Panel`
+3. 选中任意节点，检查右侧 `Inputs / Outputs / Structured Params`
+4. 点击 `Validate Graph`
+5. 点击 `Save Graph`
+6. 保存后确认路由切换到真实 `/editor/{graphId}`
+7. 刷新页面，确认 graph 能从后端重新加载
 
 通过标准：
 
-- `Validate Graph` 成功返回
-- `Save Graph` 成功
-- 保存后刷新仍能打开 graph
+- 校验通过
+- graph 能保存
+- graph 刷新后仍可读取
 
-补充演示入口：
+---
 
-- 打开 `http://localhost:3477/editor/slg-creative-factory`
-- 该模板已预置 `SLG creative factory` 所需的 skill 节点链路
+## 6. 编排交互验收
 
-### AC-GRAPH-4 / AC-RUNTIME-1
+### AC-FE-3 / AC-FE-4 / AC-FE-5
+
+检查：
+
+- 左侧存在 `State Panel`
+- 节点为自定义卡片而不是默认方块
+- 节点左侧为输入、右侧为输出
+- 可新增节点
+- 可拖拽节点
+- 可连线
+- 选中节点后可以勾选 `reads / writes`
+
+附加检查：
+
+- 在节点右侧的 `Inputs` 或 `Outputs` 区域输入新 key，点击 `+ Add`
+- 新 state key 应自动加入全局 `State Panel`
+- 同时绑定到当前节点
+
+通过标准：
+
+- 编排与 state 编辑联动正常
+
+---
+
+## 7. Theme 与模板验收
 
 验证：
 
-1. 在 Editor 中点击 `Run Graph`
-2. 观察 editor 左侧和画布节点状态
-3. 打开 Runs 页面或自动进入 run detail
+1. 在 `creative-factory` 编辑器顶部修改：
+   - `Domain`
+   - `Genre`
+   - `Market`
+   - `Platform`
+   - `Language`
+   - `Creative Style`
+   - `Tone`
+2. 点击 `Save Graph`
+3. 点击 `Run Graph`
+4. 打开对应 run detail
+
+通过标准：
+
+- `theme_config` 可保存
+- run detail 的 `artifacts.theme_config` 中能看到主题配置
+
+---
+
+## 8. Runtime 验收
+
+### AC-RUNTIME-1 标准模板可运行
+
+验证：
+
+1. 在 `creative-factory` 页面点击 `Run Graph`
+2. 等待 editor 更新当前 run
+3. 打开 `/runs/{runId}`
 
 通过标准：
 
 - 返回 `run_id`
-- run 可查询
-- run 终态为 `completed` 或 `failed`
+- run 状态为 `completed` 或 `failed`
+- 画布节点状态发生变化
 
-### AC-RUNTIME-2 revise 路由
+### AC-RUNTIME-2 条件路由
 
-验证方式一：
+验证：
 
-- 使用 [graph_revise.json](/home/abyss/GraphiteUI/examples/graph_revise.json) 通过接口保存后运行
-
-验证方式二：
-
-- 在 editor 中把 evaluator 的 `Decision` 改为 `revise`
-- 给 evaluator 增加 `revise` 和 `fail` 条件边
-- 再次运行
+1. 选中 `Condition` 节点
+2. 检查其分支边是否存在：
+   - `pass`
+   - `revise`
+   - `fail`
+3. 运行 graph
 
 通过标准：
 
-- `revision_round` 增加
-- workflow 回到 planner 路径
-- 最终 run detail 中能看见多次节点执行
+- graph 可以通过 condition 路由完成收束或回修
+
+备注：
+
+- 当前标准 runtime 要求普通节点只有一个主后继
+- 如需分支，必须使用 `condition` 节点
 
 ### AC-RUNTIME-3 / AC-RUNTIME-4 / AC-RUNTIME-5
 
 验证：
 
-1. 打开 Runs 页面
-2. 进入某次 run detail
-3. 检查：
+1. 打开 run detail
+2. 检查：
    - `current_node_id`
    - `node_status_map`
-   - `knowledge_summary`
-   - `memory_summary`
-   - `plan`
-   - `skill_outputs`
-   - `evaluation`
+   - `evaluation_result`
    - `final_result`
-4. 在 Editor 中点击某个已执行节点，查看右侧 `Latest Execution`
+   - `artifacts`
+3. 在 editor 中点击已执行节点，查看 `Latest Execution`
 
 通过标准：
 
-- node execution 至少显示 `node_id`、`node_type`、`status`、`duration_ms`
-- editor 右侧可看 `input_summary`、`output_summary`
-- run detail 页面可看 artifacts 摘要
+- node execution 至少包含：
+  - `node_id`
+  - `node_type`
+  - `status`
+  - `duration_ms`
+  - `input_summary`
+  - `output_summary`
 
 ---
 
-## 6. 前端页面与交互验收
+## 9. Creative Factory 全链路验收
 
-### AC-FE-1 首页
+当前标准 creative factory 主链应覆盖：
 
-检查：
+`start -> research -> collect_assets -> normalize_assets -> select_assets -> analyze_assets -> extract_patterns -> build_brief -> generate_variants -> generate_storyboards -> generate_video_prompts -> review_variants -> condition -> prepare_image_todo -> prepare_video_todo -> finalize -> end`
 
-- 能看到 GraphiteUI 名称
-- 能看到产品定位
-- 能看到进入 Workspace 按钮
+验证：
 
-### AC-FE-2 Workspace
+1. 打开 `creative-factory`
+2. 直接运行
+3. 打开 run detail
+4. 检查 artifacts 中是否存在：
+   - `creative_brief`
+   - `best_variant`
+   - `storyboard_packages`
+   - `video_prompt_packages`
+   - `image_generation_todo`
+   - `video_generation_todo`
+   - `final_package`
 
-检查：
+通过标准：
 
-- Recent Graphs
-- Recent Runs
-- Quick Actions
-
-### AC-FE-3 Editor
-
-检查：
-
-- Node Palette
-- Canvas
-- Config Panel
-- Toolbar
-
-### AC-FE-4 / AC-FE-5
-
-检查：
-
-- 可新增节点
-- 可拖拽节点
-- 可创建边
-- 选中节点后可修改显式字段
-
-### AC-FE-6 / AC-FE-7 / AC-FE-8
-
-检查：
-
-- Validate / Save / Run 按钮可用
-- 运行后节点状态颜色变化
-- 点击节点后可看执行摘要
-
-### AC-FE-9 / AC-FE-10 / AC-FE-11 / AC-FE-12
-
-检查：
-
-- Runs 页面读取真实 runs
-- Run Detail 页面读取真实 run detail
-- Knowledge 页面读取真实知识条目
-- Memories 页面读取真实记忆条目
-- Settings 页面读取真实只读配置
+- 上述字段存在
+- `best_variant` 非空
+- `final_package` 非空
 
 ---
 
-## 7. 全链路演示建议
+## 10. 页面联通验收
 
-建议演示顺序：
+检查：
 
-1. 打开首页
-2. 进入 Workspace
-3. 进入 `demo-graph` Editor
-4. 添加一个 `knowledge` 或 `memory` 节点
-5. 修改 evaluator 配置
-6. `Validate Graph`
-7. `Save Graph`
-8. `Run Graph`
-9. 在 editor 中查看节点状态与执行摘要
-10. 打开 Runs 页面
-11. 打开对应 Run Detail
-12. 打开 Knowledge / Memories / Settings 页面
+- `/workspace`
+- `/runs`
+- `/runs/[runId]`
+- `/knowledge`
+- `/memories`
+- `/settings`
+
+通过标准：
+
+- 页面都可访问
+- 数据源来自真实后端接口
 
 ---
 
-## 8. 当前已知仍可继续增强的点
+## 11. 当前未完成项提示
 
-当前阶段已经具备主闭环，但仍有这些后续增强空间：
+当前仍未完全补齐的体验项：
 
-- Runs 页面搜索和筛选还未完成
-- Knowledge / Memories 页面仍缺搜索和详情抽屉
-- Editor 运行状态目前是单次回读，不是持续轮询
-- 持久化仍使用本地 JSON，而不是 SQLite
+- Runs 搜索与筛选
+- Knowledge / Memories 搜索与详情
+- 持续轮询与更强调试体验
+- 更完整的 edge bus 表达
 
-这些不会阻断当前主链路演示，但属于下一阶段优先事项。
+所以这份 runbook 的目标是验证“标准主链可用”，而不是验证所有增强项都已经完成。

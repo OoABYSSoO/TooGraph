@@ -4,20 +4,13 @@ from collections import Counter, defaultdict
 
 from app.schemas.graph import (
     ConditionLabel,
-    EdgeType,
+    EdgeKind,
     GraphDocument,
     GraphValidationResponse,
     NodeType,
+    StateField,
     ValidationIssue,
 )
-
-
-REQUIRED_NODE_TYPES = {
-    NodeType.INPUT,
-    NodeType.PLANNER,
-    NodeType.EVALUATOR,
-    NodeType.FINALIZER,
-}
 
 
 def validate_graph(graph: GraphDocument) -> GraphValidationResponse:
@@ -26,38 +19,26 @@ def validate_graph(graph: GraphDocument) -> GraphValidationResponse:
     node_ids = [node.id for node in graph.nodes]
     edge_ids = [edge.id for edge in graph.edges]
     node_id_set = set(node_ids)
-    edge_id_set = set(edge_ids)
 
     issues.extend(_find_duplicate_ids(node_ids, "node"))
     issues.extend(_find_duplicate_ids(edge_ids, "edge"))
+    issues.extend(_find_duplicate_state_fields(graph.state_schema))
 
-    node_type_counts = Counter(node.type for node in graph.nodes)
-    for node_type in REQUIRED_NODE_TYPES:
-        if node_type_counts[node_type] == 0:
-            issues.append(
-                ValidationIssue(
-                    code="missing_required_node_type",
-                    message=f"Graph must include at least one '{node_type.value}' node.",
-                    path="nodes",
-                )
-            )
-
-    input_nodes = [node for node in graph.nodes if node.type == NodeType.INPUT]
-    if len(input_nodes) != 1:
+    start_nodes = [node for node in graph.nodes if node.type == NodeType.START]
+    end_nodes = [node for node in graph.nodes if node.type == NodeType.END]
+    if len(start_nodes) != 1:
         issues.append(
             ValidationIssue(
-                code="invalid_input_node_count",
-                message="Graph must include exactly one input node.",
+                code="invalid_start_node_count",
+                message="Graph must include exactly one start node.",
                 path="nodes",
             )
         )
-
-    finalizer_nodes = [node for node in graph.nodes if node.type == NodeType.FINALIZER]
-    if len(finalizer_nodes) != 1:
+    if len(end_nodes) != 1:
         issues.append(
             ValidationIssue(
-                code="invalid_finalizer_node_count",
-                message="Graph must include exactly one finalizer node.",
+                code="invalid_end_node_count",
+                message="Graph must include exactly one end node.",
                 path="nodes",
             )
         )
@@ -65,6 +46,9 @@ def validate_graph(graph: GraphDocument) -> GraphValidationResponse:
     outgoing_by_source: dict[str, list[str]] = defaultdict(list)
     incoming_by_target: dict[str, list[str]] = defaultdict(list)
     conditional_by_source: dict[str, set[ConditionLabel]] = defaultdict(set)
+    normal_outgoing_by_source: dict[str, list[str]] = defaultdict(list)
+    state_field_keys = {field.key for field in graph.state_schema}
+    writes_by_node = {node.id: set(node.writes) for node in graph.nodes}
 
     for edge in graph.edges:
         if edge.source not in node_id_set:
@@ -87,22 +71,35 @@ def validate_graph(graph: GraphDocument) -> GraphValidationResponse:
         if edge.source in node_id_set and edge.target in node_id_set:
             outgoing_by_source[edge.source].append(edge.id)
             incoming_by_target[edge.target].append(edge.id)
+            if edge.edge_kind == EdgeKind.NORMAL:
+                normal_outgoing_by_source[edge.source].append(edge.id)
 
-        if edge.type == EdgeType.CONDITIONAL:
-            conditional_by_source[edge.source].add(edge.condition_label)
+        if edge.edge_kind == EdgeKind.BRANCH:
+            conditional_by_source[edge.source].add(edge.branch_label)
 
             source_node = next((node for node in graph.nodes if node.id == edge.source), None)
-            if source_node and source_node.type != NodeType.EVALUATOR:
+            if source_node and source_node.type != NodeType.CONDITION:
                 issues.append(
                     ValidationIssue(
-                        code="conditional_edge_invalid_source",
-                        message="Conditional edges may only originate from evaluator nodes.",
+                        code="branch_edge_invalid_source",
+                        message="Branch edges may only originate from condition nodes.",
                         path=f"edges.{edge.id}",
                     )
                 )
 
+        source_writes = writes_by_node.get(edge.source, set())
+        for flow_key in edge.flow_keys:
+            if flow_key not in source_writes and flow_key not in state_field_keys:
+                issues.append(
+                    ValidationIssue(
+                        code="edge_flow_key_unknown",
+                        message=f"Edge '{edge.id}' uses unknown flow key '{flow_key}'.",
+                        path=f"edges.{edge.id}.flow_keys",
+                    )
+                )
+
     for node in graph.nodes:
-        if node.type != NodeType.FINALIZER and len(outgoing_by_source[node.id]) == 0:
+        if node.type != NodeType.END and len(outgoing_by_source[node.id]) == 0:
             issues.append(
                 ValidationIssue(
                     code="node_missing_outgoing_edge",
@@ -110,7 +107,7 @@ def validate_graph(graph: GraphDocument) -> GraphValidationResponse:
                     path=f"nodes.{node.id}",
                 )
             )
-        if node.type != NodeType.INPUT and len(incoming_by_target[node.id]) == 0:
+        if node.type != NodeType.START and len(incoming_by_target[node.id]) == 0:
             issues.append(
                 ValidationIssue(
                     code="node_missing_incoming_edge",
@@ -119,33 +116,56 @@ def validate_graph(graph: GraphDocument) -> GraphValidationResponse:
                 )
             )
 
-        if node.type == NodeType.EVALUATOR:
-            labels = conditional_by_source.get(node.id, set())
-            if not labels:
+        for read_key in node.reads:
+            if read_key not in state_field_keys:
                 issues.append(
                     ValidationIssue(
-                        code="evaluator_missing_conditional_edges",
-                        message=f"Evaluator node '{node.id}' must define conditional edges.",
+                        code="node_read_key_unknown",
+                        message=f"Node '{node.id}' reads undefined state key '{read_key}'.",
+                        path=f"nodes.{node.id}.reads",
+                    )
+                )
+        for write_key in node.writes:
+            if write_key not in state_field_keys:
+                issues.append(
+                    ValidationIssue(
+                        code="node_write_key_unknown",
+                        message=f"Node '{node.id}' writes undefined state key '{write_key}'.",
+                        path=f"nodes.{node.id}.writes",
+                    )
+                )
+
+        if node.type == NodeType.CONDITION:
+            labels = conditional_by_source.get(node.id, set())
+            if len(labels) < 2:
+                issues.append(
+                    ValidationIssue(
+                        code="condition_missing_branch_edges",
+                        message=f"Condition node '{node.id}' must define at least two branch edges.",
                         path=f"nodes.{node.id}",
                     )
                 )
             elif ConditionLabel.PASS not in labels:
                 issues.append(
                     ValidationIssue(
-                        code="evaluator_missing_pass_route",
-                        message=f"Evaluator node '{node.id}' must define a 'pass' route.",
+                        code="condition_missing_pass_route",
+                        message=f"Condition node '{node.id}' must define a 'pass' route.",
                         path=f"nodes.{node.id}",
                     )
                 )
-
-    if graph.edges and not edge_id_set:
-        issues.append(
-            ValidationIssue(
-                code="edge_registration_failure",
-                message="Graph edges could not be indexed correctly.",
-                path="edges",
+        elif len(normal_outgoing_by_source[node.id]) > 1:
+            issues.append(
+                ValidationIssue(
+                    code="multiple_normal_outgoing_edges_not_supported",
+                    message=(
+                        f"Node '{node.id}' has multiple normal outgoing edges. "
+                        "Current standard runtime requires a single normal successor; use a condition node for branching."
+                    ),
+                    path=f"nodes.{node.id}",
+                )
             )
-        )
+
+    issues.extend(_validate_business_dependencies(graph))
 
     return GraphValidationResponse(valid=len(issues) == 0, issues=issues)
 
@@ -161,3 +181,40 @@ def _find_duplicate_ids(ids: list[str], resource_name: str) -> list[ValidationIs
         for item_id in duplicates
     ]
 
+
+def _find_duplicate_state_fields(state_schema: list[StateField]) -> list[ValidationIssue]:
+    field_keys = [field.key for field in state_schema]
+    duplicates = [item_key for item_key, count in Counter(field_keys).items() if count > 1]
+    return [
+        ValidationIssue(
+            code="duplicate_state_field_key",
+            message=f"Duplicate state field key '{item_key}' detected.",
+            path="state_schema",
+        )
+        for item_key in duplicates
+    ]
+
+
+def _validate_business_dependencies(graph: GraphDocument) -> list[ValidationIssue]:
+    issues: list[ValidationIssue] = []
+    node_types = {node.type for node in graph.nodes}
+
+    if NodeType.REVIEW_VARIANTS in node_types and NodeType.GENERATE_VARIANTS not in node_types:
+        issues.append(
+            ValidationIssue(
+                code="missing_generate_variants_before_review",
+                message="Graphs with review_variants must include generate_variants.",
+                path="nodes",
+            )
+        )
+
+    if NodeType.PREPARE_VIDEO_TODO in node_types and NodeType.GENERATE_VIDEO_PROMPTS not in node_types:
+        issues.append(
+            ValidationIssue(
+                code="missing_video_prompt_generation",
+                message="Graphs with prepare_video_todo must include generate_video_prompts.",
+                path="nodes",
+            )
+        )
+
+    return issues

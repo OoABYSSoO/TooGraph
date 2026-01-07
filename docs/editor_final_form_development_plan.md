@@ -15,6 +15,32 @@
 
 ---
 
+## 1.1 当前实现状态
+
+截至当前版本，以下最终形态能力已经落地：
+
+- 标准 graph 协议
+- `theme_config`
+- `state_schema`
+- 节点 `reads / writes / params`
+- 边的 `flow_keys / edge_kind / branch_label`
+- `Condition Node`
+- `State Panel`
+- 自定义节点卡片
+- 左入右出节点交互
+- creative factory 标准模板
+- 基于标准节点链的 runtime 执行
+
+当前仍在继续推进的部分：
+
+- 更强的边 bus 表达
+- `Start / End` 语义深化
+- Handler Registry / Tool Registry 正式拆分
+- 模板与主题系统继续抽象
+- 顺序调整与插入体验继续增强
+
+---
+
 ## 2. 目标问题
 
 当前系统已经具备基础可视化编排能力，但距离真正适合复杂 LangGraph 工作流的编辑器还有明显差距。

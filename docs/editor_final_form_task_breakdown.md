@@ -27,8 +27,33 @@
 执行原则：
 
 - 先改协议，再改编译器，再改前端
-- 先兼容旧图，再推广新图
-- 先让 Creative Factory 模板跑通，再扩到更多主题
+- 不再以旧图兼容为前提，优先推进标准模型
+- 先让 Creative Factory 标准模板跑通，再扩到更多主题
+
+---
+
+## 2.1 当前进度快照
+
+截至当前版本，以下任务已经完成或基本完成：
+
+- `Task 1.1` 新版 Graph Schema：`已完成`
+- `Task 2.1` Graph Parser：`已完成`
+- `Task 2.2` Validator：`已完成`
+- `Task 2.3` Node Handler Registry：`已完成`
+- `Task 2.4` Tool Registry 下沉：`已完成基础版本`
+- `Task 2.5` Condition Node 编译与执行：`已完成`
+- `Task 3.1` 前端类型系统升级：`已完成`
+- `Task 3.2` State Panel：`已完成`
+- `Task 3.3` 左入右出节点与输入输出绑定：`已完成`
+- `Task 4.2` 主题模板系统抽象：`已完成基础版本`
+- `Task 4.3` 主题策略画像与参数策略：`已完成基础版本`
+- `Task 4.x` Creative Factory 模板主链：`已完成`
+
+当前最值得继续推进的任务：
+
+- `Task 3.4` Edge bus / flow 可视化增强
+- `Task 3.5` Start / End 特殊节点语义强化
+- `Task 4.4` 主题策略字段编辑器与更细粒度 preset 可视化
 
 ---
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Background,
@@ -9,29 +9,52 @@ import {
   Panel,
   ReactFlow,
   ReactFlowProvider,
-  type NodeMouseHandler,
   type EdgeMouseHandler,
+  type NodeMouseHandler,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
-import { apiGet, apiPost } from "@/lib/api";
-import { fromBackendGraphDocument, toBackendGraphPayload, type BackendGraphDocument } from "@/lib/graph-api";
-import { NODE_PRESETS } from "@/lib/editor-presets";
+import { NodeParamsForm } from "@/components/editor/node-params-form";
+import { WorkflowEdge } from "@/components/editor/workflow-edge";
+import { StatePanel } from "@/components/editor/state-panel";
+import { WorkflowNode } from "@/components/editor/workflow-node";
 import { useLanguage } from "@/components/providers/language-provider";
+import { apiGet, apiPost } from "@/lib/api";
+import { NODE_PRESETS, THEME_PRESETS } from "@/lib/editor-presets";
+import { fromBackendGraphDocument, toBackendGraphPayload, type BackendGraphDocument } from "@/lib/graph-api";
 import { useEditorStore } from "@/stores/editor-store";
-import type { GraphCanvasNode, GraphNodeConfig, RunDetailPayload } from "@/types/editor";
+import type { GraphCanvasNode, GraphDocument, RunDetailPayload, StateFieldRole, StateFieldType } from "@/types/editor";
+
+const nodeTypes = {
+  workflow: WorkflowNode,
+};
+
+const edgeTypes = {
+  workflow: WorkflowEdge,
+};
 
 function EditorWorkbenchInner({ graphId }: { graphId: string }) {
   const { t } = useLanguage();
+  const router = useRouter();
+  const [newReadKey, setNewReadKey] = useState("");
+  const [newWriteKey, setNewWriteKey] = useState("");
   const {
     initGraph,
     hydrateGraph,
     updateGraphIdentity,
     updateGraphName,
+    updateThemeConfig,
+    applyThemePreset,
+    updateStateField,
+    addStateField,
+    removeStateField,
     applyRunDetail,
     setCurrentRunId,
     graphId: activeGraphId,
     graphName,
+    templateId,
+    themeConfig,
+    stateSchema,
     nodes,
     edges,
     selectedNodeId,
@@ -53,13 +76,18 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
     selectEdge,
     updateSelectedNodeLabel,
     updateSelectedNodeDescription,
-    updateSelectedNodeConfig,
+    toggleSelectedNodeRead,
+    toggleSelectedNodeWrite,
+    updateSelectedNodeParam,
+    replaceSelectedNodeParams,
+    updateSelectedEdgeFlowKeys,
+    updateSelectedEdgeKind,
+    updateSelectedEdgeBranchLabel,
     updateSelectedNodeConfigDraft,
     saveGraphLocally,
     validateGraph,
     simulateRun,
   } = useEditorStore();
-  const router = useRouter();
 
   useEffect(() => {
     initGraph(graphId);
@@ -69,29 +97,19 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
     let cancelled = false;
 
     async function loadGraphFromBackend() {
-      if (graphId === "demo-graph") {
+      if (graphId === "creative-factory" || graphId === "slg-creative-factory" || graphId.startsWith("template-")) {
         return;
       }
       try {
         const document = await apiGet<BackendGraphDocument>(`/api/graphs/${graphId}`);
         if (!cancelled) {
           const hydrated = fromBackendGraphDocument(document);
-          hydrateGraph(
-            {
-              graphId: hydrated.graphId,
-              name: hydrated.graphName,
-              nodes: hydrated.nodes,
-              edges: hydrated.edges,
-              updatedAt: new Date().toISOString(),
-            },
-            "Loaded from backend",
-          );
+          hydrateGraph(hydrated, "Loaded from backend");
         }
       } catch (error) {
         if (!cancelled) {
           useEditorStore.setState({
-            runtimeLabel:
-              error instanceof Error ? `Backend load failed: ${error.message}` : "Backend load failed.",
+            runtimeLabel: error instanceof Error ? `Backend load failed: ${error.message}` : "Backend load failed.",
           });
         }
       }
@@ -103,28 +121,69 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
     };
   }, [graphId, hydrateGraph]);
 
-  const selectedNode = useMemo(
-    () => nodes.find((node) => node.id === selectedNodeId) ?? null,
-    [nodes, selectedNodeId],
+  const selectedNode = useMemo(() => nodes.find((node) => node.id === selectedNodeId) ?? null, [nodes, selectedNodeId]);
+  const selectedEdge = useMemo(() => edges.find((edge) => edge.id === selectedEdgeId) ?? null, [edges, selectedEdgeId]);
+  const selectedNodeExecution = selectedNode ? nodeExecutionMap[selectedNode.id] ?? null : null;
+  const selectedThemePreset = useMemo(
+    () => THEME_PRESETS.find((preset) => preset.id === themeConfig.themePreset) ?? null,
+    [themeConfig.themePreset],
   );
 
-  const onNodeClick: NodeMouseHandler<GraphCanvasNode> = (_, node) => {
-    selectNode(node.id);
-  };
+  useEffect(() => {
+    setNewReadKey("");
+    setNewWriteKey("");
+  }, [selectedNodeId]);
 
-  const onEdgeClick: EdgeMouseHandler = (_, edge) => {
-    selectEdge(edge.id);
-  };
+  const graphDocument: GraphDocument = useMemo(
+    () => ({
+      graphId: activeGraphId,
+      name: graphName,
+      templateId,
+      themeConfig,
+      stateSchema,
+      nodes,
+      edges,
+      updatedAt: lastSavedAt ?? new Date().toISOString(),
+    }),
+    [activeGraphId, edges, graphName, lastSavedAt, nodes, stateSchema, templateId, themeConfig],
+  );
 
-  const selectedNodeExecution = selectedNode ? nodeExecutionMap[selectedNode.id] ?? null : null;
+  const onNodeClick: NodeMouseHandler<GraphCanvasNode> = (_, node) => selectNode(node.id);
+  const onEdgeClick: EdgeMouseHandler = (_, edge) => selectEdge(edge.id);
 
-  function updateNodeConfig(config: Partial<GraphNodeConfig>) {
-    updateSelectedNodeConfig(config);
+  function handleQuickAddState(
+    nextKey: string,
+    bindMode: "read" | "write",
+    type: StateFieldType = "string",
+    role: StateFieldRole = bindMode === "read" ? "input" : "artifact",
+  ) {
+    const key = nextKey.trim();
+    if (!key || !selectedNode) return;
+    const exists = stateSchema.some((field) => field.key === key);
+    if (!exists) {
+      addStateField({
+        key,
+        type,
+        role,
+        title: key,
+        description: "",
+      });
+    }
+    const alreadyBound = bindMode === "read" ? selectedNode.data.reads.includes(key) : selectedNode.data.writes.includes(key);
+    if (!alreadyBound) {
+      if (bindMode === "read") {
+        toggleSelectedNodeRead(key);
+      } else {
+        toggleSelectedNodeWrite(key);
+      }
+    }
+    if (bindMode === "read") setNewReadKey("");
+    if (bindMode === "write") setNewWriteKey("");
   }
 
   async function handleValidateBackend() {
     try {
-      const payload = toBackendGraphPayload(activeGraphId, graphName, nodes, edges);
+      const payload = toBackendGraphPayload(graphDocument);
       const response = await apiPost<{ valid: boolean; issues: Array<{ code: string; message: string }> }>(
         "/api/graphs/validate",
         payload,
@@ -147,14 +206,12 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
 
   async function handleSaveBackend() {
     try {
-      const payload = toBackendGraphPayload(activeGraphId, graphName, nodes, edges);
+      const payload = toBackendGraphPayload(graphDocument);
       const response = await apiPost<{ graph_id: string }>("/api/graphs/save", payload);
       updateGraphIdentity(response.graph_id);
       saveGraphLocally();
-      useEditorStore.setState({
-        runtimeLabel: `Saved graph ${response.graph_id}`,
-      });
-      if (graphId === "demo-graph" || graphId !== response.graph_id) {
+      useEditorStore.setState({ runtimeLabel: `Saved graph ${response.graph_id}` });
+      if (graphId !== response.graph_id) {
         router.replace(`/editor/${response.graph_id}`);
       }
     } catch (error) {
@@ -166,12 +223,10 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
 
   async function handleRunBackend() {
     try {
-      const payload = toBackendGraphPayload(activeGraphId, graphName, nodes, edges);
+      const payload = toBackendGraphPayload(graphDocument);
       const response = await apiPost<{ run_id: string; status: string }>("/api/graphs/run", payload);
       setCurrentRunId(response.run_id);
-      useEditorStore.setState({
-        runtimeLabel: `Run started: ${response.run_id}`,
-      });
+      useEditorStore.setState({ runtimeLabel: `Run started: ${response.run_id}` });
       const runDetail = await apiGet<RunDetailPayload>(`/api/runs/${response.run_id}`);
       applyRunDetail(runDetail);
     } catch (error) {
@@ -207,35 +262,99 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
             {t("editor.simulate")}
           </button>
           <span className="pill">{runtimeLabel}</span>
-          {validationPassed !== null ? (
-            <span className="pill">{validationPassed ? "Backend valid" : "Needs fixes"}</span>
-          ) : null}
+          <span className="pill">Template {templateId}</span>
+          {validationPassed !== null ? <span className="pill">{validationPassed ? "Schema valid" : "Needs fixes"}</span> : null}
           {lastSavedAt ? <span className="pill">Saved {new Date(lastSavedAt).toLocaleTimeString()}</span> : null}
         </div>
       </section>
 
-      <section className="editor-layout">
-        <aside className="panel editor-side">
-          <h2>{t("editor.palette")}</h2>
-          <div className="list">
-            {NODE_PRESETS.map((preset) => (
-              <button
-                key={preset.kind}
-                className="node-palette-item"
-                onClick={() => addNode(preset.kind)}
-                type="button"
-              >
-                <strong>{preset.label}</strong>
-                <span className="muted">{preset.description}</span>
-              </button>
-            ))}
+      <section className="card editor-theme-card">
+        <div className="theme-grid">
+          <label className="field">
+            <span>{t("editor.graph_name")}</span>
+            <input className="text-input" value={graphName} onChange={(event) => updateGraphName(event.target.value)} />
+          </label>
+          <label className="field">
+            <span>Theme Preset</span>
+            <select
+              className="text-input"
+              value={themeConfig.themePreset}
+              onChange={(event) => applyThemePreset(event.target.value)}
+            >
+              {THEME_PRESETS.map((preset) => (
+                <option key={preset.id} value={preset.id}>
+                  {preset.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>Domain</span>
+            <input className="text-input" value={themeConfig.domain} onChange={(event) => updateThemeConfig({ domain: event.target.value })} />
+          </label>
+          <label className="field">
+            <span>Genre</span>
+            <input className="text-input" value={themeConfig.genre} onChange={(event) => updateThemeConfig({ genre: event.target.value })} />
+          </label>
+          <label className="field">
+            <span>Market</span>
+            <input className="text-input" value={themeConfig.market} onChange={(event) => updateThemeConfig({ market: event.target.value })} />
+          </label>
+          <label className="field">
+            <span>Platform</span>
+            <input className="text-input" value={themeConfig.platform} onChange={(event) => updateThemeConfig({ platform: event.target.value })} />
+          </label>
+          <label className="field">
+            <span>Language</span>
+            <input className="text-input" value={themeConfig.language} onChange={(event) => updateThemeConfig({ language: event.target.value })} />
+          </label>
+          <label className="field">
+            <span>Creative Style</span>
+            <input
+              className="text-input"
+              value={themeConfig.creativeStyle}
+              onChange={(event) => updateThemeConfig({ creativeStyle: event.target.value })}
+            />
+          </label>
+          <label className="field">
+            <span>Tone</span>
+            <input className="text-input" value={themeConfig.tone} onChange={(event) => updateThemeConfig({ tone: event.target.value })} />
+          </label>
+        </div>
+        {selectedThemePreset ? (
+          <div className="preset-banner">
+            <strong>{selectedThemePreset.label}</strong>
+            <span>{selectedThemePreset.description}</span>
+            <span>Hook: {themeConfig.strategyProfile.hookTheme}</span>
+            <span>Payoff: {themeConfig.strategyProfile.payoffTheme}</span>
+            <span>Visual: {themeConfig.strategyProfile.visualPattern}</span>
+            <span>Focus: {themeConfig.strategyProfile.evaluationFocus.join(" / ") || "None"}</span>
+          </div>
+        ) : null}
+      </section>
+
+      <section className="editor-layout editor-layout-v2">
+        <aside className="panel editor-side editor-left-stack">
+          <StatePanel stateSchema={stateSchema} onAddField={addStateField} onUpdateField={updateStateField} onRemoveField={removeStateField} />
+
+          <div className="editor-palette-box">
+            <h2>{t("editor.palette")}</h2>
+            <div className="list">
+              {NODE_PRESETS.map((preset) => (
+                <button key={preset.kind} className="node-palette-item" onClick={() => addNode(preset.kind)} type="button">
+                  <strong>{preset.label}</strong>
+                  <span className="muted">{preset.description}</span>
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="editor-summary">
             <div className="pill">Nodes {nodes.length}</div>
             <div className="pill">Edges {edges.length}</div>
+            <div className="pill">State {stateSchema.length}</div>
             {currentRunStatus ? <div className="pill">Run {currentRunStatus}</div> : null}
-            {currentNodeId ? <div className="pill">Current node {currentNodeId}</div> : null}
+            {currentNodeId ? <div className="pill">Current {currentNodeId}</div> : null}
             {selectedEdgeId ? <div className="pill">Selected edge {selectedEdgeId}</div> : null}
           </div>
 
@@ -244,7 +363,7 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
               <h3>Validation Issues</h3>
               <div className="list">
                 {validationIssues.map((issue) => (
-                  <div className="list-item" key={issue.code}>
+                  <div className="list-item" key={`${issue.code}-${issue.message}`}>
                     <strong>{issue.code}</strong>
                     <div className="muted">{issue.message}</div>
                   </div>
@@ -274,6 +393,8 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
             nodes={nodes}
             edges={edges}
             fitView
+            edgeTypes={edgeTypes}
+            nodeTypes={nodeTypes}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
@@ -285,167 +406,111 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
             <Controls />
             <Background gap={18} size={1} />
             <Panel position="top-left">
-              <div className="pill">Click nodes to edit, drag to move, connect handles to link.</div>
+              <div className="pill">Edges represent execution flow and carry major state keys.</div>
             </Panel>
           </ReactFlow>
         </div>
 
         <aside className="panel editor-side">
           <h2>{t("editor.config")}</h2>
+
           {selectedNode ? (
             <div className="config-form">
               <label className="field">
-                <span>{t("editor.graph_name")}</span>
-                <input
-                  className="text-input"
-                  value={graphName}
-                  onChange={(event) => updateGraphName(event.target.value)}
-                />
-              </label>
-
-              <label className="field">
                 <span>{t("editor.node_name")}</span>
-                <input
-                  className="text-input"
-                  value={selectedNode.data.label}
-                  onChange={(event) => updateSelectedNodeLabel(event.target.value)}
-                />
+                <input className="text-input" value={selectedNode.data.label} onChange={(event) => updateSelectedNodeLabel(event.target.value)} />
               </label>
 
               <label className="field">
                 <span>{t("editor.description")}</span>
                 <textarea
                   className="text-area"
-                  rows={4}
+                  rows={3}
                   value={selectedNode.data.description}
                   onChange={(event) => updateSelectedNodeDescription(event.target.value)}
                 />
               </label>
 
-              {selectedNode.data.kind === "input" ? (
-                <label className="field">
-                  <span>Task Input</span>
-                  <textarea
-                    className="text-area"
-                    rows={4}
-                    value={selectedNode.data.config.taskInput ?? ""}
-                    onChange={(event) => updateNodeConfig({ taskInput: event.target.value })}
-                  />
-                </label>
-              ) : null}
-
-              {selectedNode.data.kind === "knowledge" ? (
-                <label className="field">
-                  <span>Knowledge Query</span>
+              <div className="field">
+                <span>Inputs</span>
+                <div className="inline-input-row">
                   <input
                     className="text-input"
-                    value={selectedNode.data.config.query ?? ""}
-                    onChange={(event) => updateNodeConfig({ query: event.target.value })}
+                    placeholder="new_input_key"
+                    value={newReadKey}
+                    onChange={(event) => setNewReadKey(event.target.value)}
                   />
-                </label>
-              ) : null}
+                  <button className="button secondary small" onClick={() => handleQuickAddState(newReadKey, "read")} type="button">
+                    + Add
+                  </button>
+                </div>
+                <div className="toggle-grid">
+                  {stateSchema.map((field) => (
+                    <label className="toggle-card" key={`read-${field.key}`}>
+                      <input
+                        type="checkbox"
+                        checked={selectedNode.data.reads.includes(field.key)}
+                        onChange={() => toggleSelectedNodeRead(field.key)}
+                      />
+                      <span>{field.key}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
 
-              {selectedNode.data.kind === "memory" ? (
-                <label className="field">
-                  <span>Memory Type</span>
-                  <select
+              <div className="field">
+                <span>Outputs</span>
+                <div className="inline-input-row">
+                  <input
                     className="text-input"
-                    value={selectedNode.data.config.memoryType ?? "success_pattern"}
-                    onChange={(event) => updateNodeConfig({ memoryType: event.target.value })}
-                  >
-                    <option value="success_pattern">success_pattern</option>
-                    <option value="failure_reason">failure_reason</option>
-                  </select>
-                </label>
-              ) : null}
-
-              {selectedNode.data.kind === "planner" ? (
-                <label className="field">
-                  <span>Planner Mode</span>
-                  <select
-                    className="text-input"
-                    value={selectedNode.data.config.plannerMode ?? "default"}
-                    onChange={(event) => updateNodeConfig({ plannerMode: event.target.value })}
-                  >
-                    <option value="default">default</option>
-                    <option value="fast">fast</option>
-                    <option value="careful">careful</option>
-                  </select>
-                </label>
-              ) : null}
-
-              {selectedNode.data.kind === "skill_executor" ? (
-                <>
-                  <label className="field">
-                    <span>Selected Skills</span>
-                    <input
-                      className="text-input"
-                      value={(selectedNode.data.config.selectedSkills ?? ["search_docs"]).join(", ")}
-                      onChange={(event) =>
-                        updateNodeConfig({
-                          selectedSkills: event.target.value
-                            .split(",")
-                            .map((item) => item.trim())
-                            .filter(Boolean),
-                        })
-                      }
-                    />
-                  </label>
-                  <p className="muted">
-                    Examples: `search_docs`, `generate_draft`, `slg_fetch_rss`, `slg_build_brief`,
-                    `slg_generate_variants`, `slg_review_variants`
-                  </p>
-                </>
-              ) : null}
-
-              {selectedNode.data.kind === "evaluator" ? (
-                <>
-                  <label className="field">
-                    <span>Decision</span>
-                    <select
-                      className="text-input"
-                      value={selectedNode.data.config.evaluatorDecision ?? "pass"}
-                      onChange={(event) =>
-                        updateNodeConfig({
-                          evaluatorDecision: event.target.value as "pass" | "revise" | "fail",
-                        })
-                      }
-                    >
-                      <option value="pass">pass</option>
-                      <option value="revise">revise</option>
-                      <option value="fail">fail</option>
-                    </select>
-                  </label>
-                  <label className="field">
-                    <span>Score</span>
-                    <input
-                      className="text-input"
-                      type="number"
-                      step="0.1"
-                      value={selectedNode.data.config.score ?? 8.5}
-                      onChange={(event) => updateNodeConfig({ score: Number(event.target.value) })}
-                    />
-                  </label>
-                </>
-              ) : null}
-
-              {selectedNode.data.kind === "finalizer" ? (
-                <label className="field">
-                  <span>Final Message</span>
-                  <textarea
-                    className="text-area"
-                    rows={3}
-                    value={selectedNode.data.config.finalMessage ?? ""}
-                    onChange={(event) => updateNodeConfig({ finalMessage: event.target.value })}
+                    placeholder="new_output_key"
+                    value={newWriteKey}
+                    onChange={(event) => setNewWriteKey(event.target.value)}
                   />
-                </label>
-              ) : null}
+                  <button className="button secondary small" onClick={() => handleQuickAddState(newWriteKey, "write")} type="button">
+                    + Add
+                  </button>
+                </div>
+                <div className="toggle-grid">
+                  {stateSchema.map((field) => (
+                    <label className="toggle-card" key={`write-${field.key}`}>
+                      <input
+                        type="checkbox"
+                        checked={selectedNode.data.writes.includes(field.key)}
+                        onChange={() => toggleSelectedNodeWrite(field.key)}
+                      />
+                      <span>{field.key}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="field">
+                <span>Structured Params</span>
+                <NodeParamsForm node={selectedNode} onParamChange={updateSelectedNodeParam} />
+              </div>
+
+              <label className="field">
+                <span>Params JSON</span>
+                <textarea
+                  className="text-area code-area"
+                  rows={8}
+                  value={JSON.stringify(selectedNode.data.params, null, 2)}
+                  onChange={(event) => {
+                    try {
+                      replaceSelectedNodeParams(JSON.parse(event.target.value) as Record<string, unknown>);
+                    } catch {
+                      // noop while typing invalid JSON
+                    }
+                  }}
+                />
+              </label>
 
               <label className="field">
                 <span>{t("editor.advanced")}</span>
                 <textarea
                   className="text-area code-area"
-                  rows={12}
+                  rows={10}
                   value={configDraft}
                   onChange={(event) => updateSelectedNodeConfigDraft(event.target.value)}
                 />
@@ -453,6 +518,8 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
 
               <div className="status-row">
                 <span className="pill">Type {selectedNode.data.kind}</span>
+                <span className="pill">Reads {selectedNode.data.reads.length}</span>
+                <span className="pill">Writes {selectedNode.data.writes.length}</span>
                 <span className="pill">Status {selectedNode.data.status ?? "idle"}</span>
               </div>
 
@@ -470,23 +537,72 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
                     </div>
                     <div className="status-row">
                       <span className="pill">{selectedNodeExecution.duration_ms}ms</span>
-                      {(selectedNodeExecution.warnings ?? []).length > 0 ? (
-                        <span className="pill">warnings {(selectedNodeExecution.warnings ?? []).length}</span>
-                      ) : null}
-                      {(selectedNodeExecution.errors ?? []).length > 0 ? (
-                        <span className="pill">errors {(selectedNodeExecution.errors ?? []).length}</span>
-                      ) : null}
                     </div>
                   </div>
                 </div>
               ) : null}
             </div>
-          ) : (
-            <p className="muted">
-              Select a node to edit its label, description, and node data. Selecting an edge clears
-              the node editor and shows edge focus on the left panel.
-            </p>
-          )}
+          ) : null}
+
+          {selectedEdge ? (
+            <div className="config-form">
+              <div className="field">
+                <span>Edge Kind</span>
+                <select
+                  className="text-input"
+                  value={selectedEdge.data?.edgeKind ?? "normal"}
+                  onChange={(event) => updateSelectedEdgeKind(event.target.value as "normal" | "branch")}
+                >
+                  <option value="normal">normal</option>
+                  <option value="branch">branch</option>
+                </select>
+              </div>
+
+              {(selectedEdge.data?.edgeKind ?? "normal") === "branch" ? (
+                <div className="field">
+                  <span>Branch Label</span>
+                  <select
+                    className="text-input"
+                    value={selectedEdge.data?.branchLabel ?? ""}
+                    onChange={(event) => updateSelectedEdgeBranchLabel(event.target.value as "pass" | "revise" | "fail" | "")}
+                  >
+                    <option value="">select branch</option>
+                    <option value="pass">pass</option>
+                    <option value="revise">revise</option>
+                    <option value="fail">fail</option>
+                  </select>
+                </div>
+              ) : null}
+
+              <div className="field">
+                <span>Flow Keys</span>
+                <div className="toggle-grid">
+                  {stateSchema.map((field) => {
+                    const flowKeys = selectedEdge.data?.flowKeys ?? [];
+                    const checked = flowKeys.includes(field.key);
+                    return (
+                      <label className="toggle-card" key={`edge-${field.key}`}>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() =>
+                            updateSelectedEdgeFlowKeys(
+                              checked ? flowKeys.filter((value) => value !== field.key) : [...flowKeys, field.key],
+                            )
+                          }
+                        />
+                        <span>{field.key}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {!selectedNode && !selectedEdge ? (
+            <p className="muted">Select a node to edit reads/writes/params, or select an edge to edit flow keys and branch metadata.</p>
+          ) : null}
         </aside>
       </section>
     </div>

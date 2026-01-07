@@ -16,6 +16,7 @@ def execute_graph(graph: GraphDocument) -> dict:
         max_revision_round=int(graph.metadata.get("max_revision_round", 1)),
     )
     initial_state["status"] = "running"
+    initial_state["theme_config"] = graph.theme_config.model_dump(mode="json")
     initial_state["node_status_map"] = {node.id: "idle" for node in graph.nodes}
     result = app.invoke(initial_state)
 
@@ -27,12 +28,15 @@ def execute_graph(graph: GraphDocument) -> dict:
     result["knowledge_summary"] = " | ".join(result.get("retrieved_knowledge", [])[:3])
     result["memory_summary"] = " | ".join(result.get("matched_memories", [])[:3])
     result["artifacts"] = {
+        "theme_config": result.get("theme_config", {}),
+        "market_inputs": result.get("market_inputs", []),
         "knowledge_summary": result.get("retrieved_knowledge", []),
         "memory_summary": result.get("matched_memories", []),
         "plan": result.get("plan", ""),
         "skill_outputs": result.get("skill_outputs", []),
         "evaluation": result.get("evaluation_result", {}),
         "final_result": result.get("final_result", ""),
+        "final_package": result.get("final_package", {}),
         "rss_items": result.get("rss_items", []),
         "clean_news_items": result.get("clean_news_items", []),
         "ad_items": result.get("ad_items", []),
