@@ -248,7 +248,6 @@ export function fromBackendGraphDocument(document: BackendGraphDocument): GraphD
     nodes: document.nodes.map((node) => ({
       id: node.id,
       type: "workflow",
-      className: "graph-node status-idle",
       position: {
         x: node.position.x,
         y: node.position.y,

@@ -2,27 +2,26 @@
 
 import { useLanguage } from "@/components/providers/language-provider";
 import { KnowledgeListClient } from "@/components/knowledge/knowledge-list-client";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import { SectionHeader } from "@/components/ui/section-header";
 
 export default function KnowledgePage() {
   const { t } = useLanguage();
   return (
-    <div className="page">
-      <section>
-        <div className="eyebrow">{t("knowledge.eyebrow")}</div>
-        <h1 className="page-title">{t("knowledge.title")}</h1>
-        <p className="page-subtitle">{t("knowledge.desc")}</p>
-      </section>
+    <div className="grid gap-6">
+      <SectionHeader eyebrow={t("knowledge.eyebrow")} title={t("knowledge.title")} description={t("knowledge.desc")} />
 
-      <section className="card">
-        <div className="toolbar">
-          <span className="pill">{t("common.search_docs")}</span>
-          <span className="pill">{t("common.open_detail")}</span>
+      <Card>
+        <div className="flex flex-wrap gap-2.5">
+          <Badge>{t("common.search_docs")}</Badge>
+          <Badge>{t("common.open_detail")}</Badge>
         </div>
-      </section>
+      </Card>
 
-      <section className="card">
+      <Card>
         <KnowledgeListClient />
-      </section>
+      </Card>
     </div>
   );
 }

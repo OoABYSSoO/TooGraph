@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="zh">
-      <body>
+      <body className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(154,52,18,0.08),transparent_28%),linear-gradient(180deg,#f8f4ec_0%,#efe7d8_100%)] text-[var(--text)] antialiased">
         <LanguageProvider>
           <LayoutShell>{children}</LayoutShell>
         </LanguageProvider>

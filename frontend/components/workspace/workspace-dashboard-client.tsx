@@ -3,6 +3,10 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
+import { Badge } from "@/components/ui/badge";
+import { Card, SubtleCard } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { MetricCard } from "@/components/ui/metric-card";
 import { apiGet } from "@/lib/api";
 import { useLanguage } from "@/components/providers/language-provider";
 
@@ -55,81 +59,87 @@ export function WorkspaceDashboardClient() {
   const failedCount = useMemo(() => runs.filter((run) => run.status === "failed").length, [runs]);
 
   if (error) {
-    return <section className="card">{t("common.failed")}: {error}</section>;
+    return <Card>{t("common.failed")}: {error}</Card>;
   }
 
   return (
-    <section className="grid">
-      <article className="card span-4">
-        <div className="muted">Recent Graphs</div>
-        <div className="muted">{t("common.recent_graphs")}</div>
-        <div className="kpi">{graphs.length}</div>
-        <p className="muted">Saved workflow definitions available from backend storage.</p>
-      </article>
-      <article className="card span-4">
-        <div className="muted">{t("common.running_jobs")}</div>
-        <div className="kpi">{runningCount}</div>
-        <p className="muted">Live workflow runs currently moving through runtime.</p>
-      </article>
-      <article className="card span-4">
-        <div className="muted">{t("common.failed_runs")}</div>
-        <div className="kpi">{failedCount}</div>
-        <p className="muted">Runs that need inspection or another validation pass.</p>
-      </article>
+    <section className="grid grid-cols-12 gap-[18px] max-[960px]:grid-cols-1">
+      <MetricCard
+        className="col-span-4 max-[960px]:col-span-1"
+        label={t("common.recent_graphs")}
+        value={graphs.length}
+        description="Saved workflow definitions available from backend storage."
+      />
+      <MetricCard
+        className="col-span-4 max-[960px]:col-span-1"
+        label={t("common.running_jobs")}
+        value={runningCount}
+        description="Live workflow runs currently moving through runtime."
+      />
+      <MetricCard
+        className="col-span-4 max-[960px]:col-span-1"
+        label={t("common.failed_runs")}
+        value={failedCount}
+        description="Runs that need inspection or another validation pass."
+      />
 
-      <article className="card span-6">
-        <h2>{t("common.recent_graphs")}</h2>
-        <div className="list">
+      <Card className="col-span-6 max-[960px]:col-span-1">
+        <h2 className="mb-2.5">{t("common.recent_graphs")}</h2>
+        <div className="grid gap-3">
           {graphs.length === 0 ? (
-            <div className="list-item">{t("common.no_data")}</div>
+            <EmptyState>{t("common.no_data")}</EmptyState>
           ) : (
             graphs.slice(0, 6).map((graph) => (
-              <Link className="list-item" href={`/editor/${graph.graph_id}`} key={graph.graph_id}>
+              <Link className="block" href={`/editor/${graph.graph_id}`} key={graph.graph_id}>
+                <SubtleCard>
                 <strong>{graph.name}</strong>
-                <div className="status-row">
-                  <span className="pill">nodes {graph.nodes.length}</span>
-                  <span className="pill">edges {graph.edges.length}</span>
+                <div className="mt-2 flex flex-wrap gap-2.5">
+                  <Badge>nodes {graph.nodes.length}</Badge>
+                  <Badge>edges {graph.edges.length}</Badge>
                 </div>
+                </SubtleCard>
               </Link>
             ))
           )}
         </div>
-      </article>
+      </Card>
 
-      <article className="card span-6">
-        <h2>{t("common.recent_runs")}</h2>
-        <div className="list">
+      <Card className="col-span-6 max-[960px]:col-span-1">
+        <h2 className="mb-2.5">{t("common.recent_runs")}</h2>
+        <div className="grid gap-3">
           {runs.length === 0 ? (
-            <div className="list-item">{t("common.no_data")}</div>
+            <EmptyState>{t("common.no_data")}</EmptyState>
           ) : (
             runs.slice(0, 6).map((run) => (
-              <Link className="list-item" href={`/runs/${run.run_id}`} key={run.run_id}>
+              <Link className="block" href={`/runs/${run.run_id}`} key={run.run_id}>
+                <SubtleCard>
                 <strong>{run.run_id}</strong>
-                <div className="muted">{run.graph_name}</div>
-                <div className="status-row">
-                  <span className="pill">{run.status}</span>
-                  <span className="pill">revisions {run.revision_round}</span>
+                <div className="text-[var(--muted)]">{run.graph_name}</div>
+                <div className="mt-2 flex flex-wrap gap-2.5">
+                  <Badge>{run.status}</Badge>
+                  <Badge>revisions {run.revision_round}</Badge>
                 </div>
+                </SubtleCard>
               </Link>
             ))
           )}
         </div>
-      </article>
+      </Card>
 
-      <article className="card span-12">
-        <h2>{t("common.quick_actions")}</h2>
-        <div className="actions">
-          <Link className="button" href="/editor/creative-factory">
+      <Card className="col-span-12">
+        <h2 className="mb-2.5">{t("common.quick_actions")}</h2>
+        <div className="mt-[22px] flex flex-wrap gap-3">
+          <Link className="inline-flex items-center justify-center rounded-[14px] border border-[var(--accent)] bg-[var(--accent)] px-[18px] py-3 text-white transition-transform duration-150 hover:-translate-y-px" href="/editor/creative-factory">
             Create Graph
           </Link>
-          <Link className="button secondary" href="/runs">
+          <Link className="inline-flex items-center justify-center rounded-[14px] border border-[var(--accent)] bg-transparent px-[18px] py-3 text-[var(--accent-strong)] transition-transform duration-150 hover:-translate-y-px" href="/runs">
             View Run History
           </Link>
-          <Link className="button secondary" href="/knowledge">
+          <Link className="inline-flex items-center justify-center rounded-[14px] border border-[var(--accent)] bg-transparent px-[18px] py-3 text-[var(--accent-strong)] transition-transform duration-150 hover:-translate-y-px" href="/knowledge">
             Open Knowledge
           </Link>
         </div>
-      </article>
+      </Card>
     </section>
   );
 }

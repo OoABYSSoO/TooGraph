@@ -20,16 +20,16 @@ export function LayoutShell({ children }: { children: ReactNode }) {
   ];
 
   return (
-    <div className="shell">
-      <aside className="sidebar">
-        <Link className="brand" href="/">
+    <div className="grid min-h-screen grid-cols-[240px_minmax(0,1fr)]">
+      <aside className="border-r border-[var(--line)] bg-[rgba(255,250,241,0.88)] p-7 backdrop-blur-xl">
+        <Link className="mb-1 block text-[1.4rem] font-bold tracking-[0.04em]" href="/">
           GraphiteUI
         </Link>
-        <div className="brand-note">{t("layout.note")}</div>
-        <label className="language-switcher">
+        <div className="mb-7 text-[0.92rem] leading-[1.5] text-[var(--muted)]">{t("layout.note")}</div>
+        <label className="mb-[18px] grid gap-1.5 text-[0.9rem] text-[var(--muted)]">
           <span>{t("lang.label")}</span>
           <select
-            className="language-select"
+            className="rounded-xl border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3 py-2.5 text-[var(--text)]"
             value={language}
             onChange={(event) => setLanguage(event.target.value as "zh" | "en")}
           >
@@ -37,11 +37,12 @@ export function LayoutShell({ children }: { children: ReactNode }) {
             <option value="en">{t("lang.en")}</option>
           </select>
         </label>
-        <nav className="nav" aria-label="Main navigation">
+        <nav aria-label="Main navigation" className="grid gap-2.5">
           {navItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
+              className="rounded-xl px-3 py-2.5 text-[var(--muted)] transition-colors hover:bg-[var(--surface-strong)] hover:text-[var(--text)] data-[active=true]:bg-[var(--surface-strong)] data-[active=true]:text-[var(--text)]"
               data-active={pathname === item.href || pathname.startsWith(`${item.href}/`)}
             >
               {item.label}
@@ -49,7 +50,7 @@ export function LayoutShell({ children }: { children: ReactNode }) {
           ))}
         </nav>
       </aside>
-      <main className="content">{children}</main>
+      <main className="p-8">{children}</main>
     </div>
   );
 }

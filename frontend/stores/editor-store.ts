@@ -310,7 +310,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           rawStatus === "running" || rawStatus === "success" || rawStatus === "failed" ? rawStatus : "idle";
         return {
           ...node,
-          className: `graph-node status-${nodeStatus}`,
           data: {
             ...node.data,
             status: nodeStatus,
@@ -347,7 +346,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const nextNode: GraphCanvasNode = {
         id: nodeId,
         type: "workflow",
-        className: "graph-node status-idle",
         position: {
           x: 160 + (state.nodes.length % 3) * 240,
           y: 120 + Math.floor(state.nodes.length / 3) * 150,
@@ -639,7 +637,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       currentNodeId: state.nodes.at(-1)?.id ?? null,
       nodes: state.nodes.map((node) => ({
         ...node,
-        className: "graph-node status-success",
         data: { ...node.data, status: "success" },
       })),
       runtimeLabel: "Simulated run completed",

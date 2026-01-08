@@ -13,27 +13,54 @@ function summarizeKeys(keys: string[]) {
 export function WorkflowNode(props: NodeProps) {
   const data = props.data as GraphNodeData;
   const selected = props.selected;
-  return (
-    <div className={`workflow-node kind-${data.kind} status-${data.status ?? "idle"}${selected ? " is-selected" : ""}`}>
-      <Handle className="workflow-handle workflow-handle-in" position={Position.Left} type="target" />
-      <Handle className="workflow-handle workflow-handle-out" position={Position.Right} type="source" />
+  const status = data.status ?? "idle";
+  const toneClass =
+    data.kind === "start"
+      ? "border-[rgba(31,111,80,0.35)] bg-[linear-gradient(180deg,rgba(237,253,245,0.98),rgba(231,247,238,0.9))]"
+      : data.kind === "end"
+        ? "border-[rgba(159,18,57,0.28)] bg-[linear-gradient(180deg,rgba(255,244,247,0.98),rgba(250,234,239,0.9))]"
+        : data.kind === "condition"
+          ? "border-[rgba(154,52,18,0.36)] bg-[linear-gradient(180deg,rgba(255,246,238,0.98),rgba(249,232,215,0.92))]"
+          : "border-[var(--line)] bg-[linear-gradient(180deg,rgba(255,250,241,0.96),rgba(249,242,230,0.92))]";
+  const statusClass =
+    status === "running"
+      ? "border-amber-700 shadow-[0_0_0_3px_rgba(245,158,11,0.18),0_12px_30px_var(--shadow)]"
+      : status === "success"
+        ? "border-[var(--success)] shadow-[0_0_0_3px_rgba(31,111,80,0.16),0_12px_30px_var(--shadow)]"
+        : status === "failed"
+          ? "border-[var(--danger)] shadow-[0_0_0_3px_rgba(159,18,57,0.16),0_12px_30px_var(--shadow)]"
+          : "shadow-[0_12px_30px_var(--shadow)]";
+  const selectedClass = selected ? "shadow-[0_0_0_2px_rgba(154,52,18,0.28),0_16px_34px_var(--shadow)]" : "";
 
-      <div className="workflow-node-head">
-        <div className="workflow-node-kind">{data.kind.replaceAll("_", " ")}</div>
-        <div className="workflow-node-status">{data.status ?? "idle"}</div>
+  return (
+    <div className={`min-w-[260px] max-w-[300px] rounded-[20px] border px-4 py-3.5 ${toneClass} ${selected ? selectedClass : statusClass}`}>
+      <Handle
+        className="!left-[-7px] !h-3 !w-3 !border-2 !border-[rgba(255,250,241,0.95)] !bg-[var(--accent)]"
+        position={Position.Left}
+        type="target"
+      />
+      <Handle
+        className="!right-[-7px] !h-3 !w-3 !border-2 !border-[rgba(255,250,241,0.95)] !bg-[var(--accent)]"
+        position={Position.Right}
+        type="source"
+      />
+
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="text-[0.74rem] uppercase tracking-[0.05em] text-[var(--muted)]">{data.kind.replaceAll("_", " ")}</div>
+        <div className="text-[0.74rem] uppercase tracking-[0.05em] text-[var(--muted)]">{status}</div>
       </div>
 
-      <div className="workflow-node-title">{data.label}</div>
-      {data.description ? <div className="workflow-node-desc">{data.description}</div> : null}
+      <div className="mb-1.5 text-[1.05rem] font-bold">{data.label}</div>
+      {data.description ? <div className="min-h-[2.5em] text-[0.88rem] leading-[1.45] text-[var(--muted)]">{data.description}</div> : null}
 
-      <div className="workflow-node-io">
-        <div className="workflow-io-col">
-          <span className="workflow-io-label">In</span>
-          <span className="workflow-io-value">{summarizeKeys(data.reads)}</span>
+      <div className="mt-3 grid grid-cols-2 gap-2.5">
+        <div className="rounded-[14px] border border-[rgba(212,198,170,0.9)] bg-[rgba(255,255,255,0.7)] p-2.5">
+          <span className="mb-1 block text-[0.72rem] uppercase tracking-[0.05em] text-[var(--muted)]">In</span>
+          <span className="block text-[0.88rem] font-semibold text-[var(--text)]">{summarizeKeys(data.reads)}</span>
         </div>
-        <div className="workflow-io-col workflow-io-col-right">
-          <span className="workflow-io-label">Out</span>
-          <span className="workflow-io-value">{summarizeKeys(data.writes)}</span>
+        <div className="rounded-[14px] border border-[rgba(212,198,170,0.9)] bg-[rgba(255,255,255,0.7)] p-2.5 text-right">
+          <span className="mb-1 block text-[0.72rem] uppercase tracking-[0.05em] text-[var(--muted)]">Out</span>
+          <span className="block text-[0.88rem] font-semibold text-[var(--text)]">{summarizeKeys(data.writes)}</span>
         </div>
       </div>
     </div>

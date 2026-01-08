@@ -2,27 +2,26 @@
 
 import { useLanguage } from "@/components/providers/language-provider";
 import { RunsListClient } from "@/components/runs/runs-list-client";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import { SectionHeader } from "@/components/ui/section-header";
 
 export default function RunsPage() {
   const { t } = useLanguage();
   return (
-    <div className="page">
-      <section>
-        <div className="eyebrow">{t("runs.eyebrow")}</div>
-        <h1 className="page-title">{t("runs.title")}</h1>
-        <p className="page-subtitle">{t("runs.desc")}</p>
-      </section>
+    <div className="grid gap-6">
+      <SectionHeader eyebrow={t("runs.eyebrow")} title={t("runs.title")} description={t("runs.desc")} />
 
-      <section className="card">
-        <div className="toolbar">
-          <span className="pill">{t("runs.search")}</span>
-          <span className="pill">{t("runs.filter")}</span>
+      <Card>
+        <div className="flex flex-wrap gap-2.5">
+          <Badge>{t("runs.search")}</Badge>
+          <Badge>{t("runs.filter")}</Badge>
         </div>
-      </section>
+      </Card>
 
-      <section className="card">
+      <Card>
         <RunsListClient />
-      </section>
+      </Card>
     </div>
   );
 }

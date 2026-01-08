@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import { Input } from "@/components/ui/input";
+import { SubtleCard } from "@/components/ui/card";
 import { apiGet } from "@/lib/api";
 import { useLanguage } from "@/components/providers/language-provider";
 
@@ -43,34 +45,36 @@ export function KnowledgeListClient() {
   }, [query]);
 
   if (error) {
-    return <div className="list-item">{t("common.failed")}: {error}</div>;
+    return <SubtleCard>{t("common.failed")}: {error}</SubtleCard>;
   }
 
   if (items.length === 0) {
-    return <div className="list-item">{t("common.no_data")}</div>;
+    return <SubtleCard>{t("common.no_data")}</SubtleCard>;
   }
 
   return (
-    <div className="list">
-      <div className="list-item">
-        <div className="field">
+    <div className="grid gap-3">
+      <SubtleCard>
+        <div className="grid gap-2 text-[0.94rem]">
           <span>{t("common.search_docs")}</span>
-          <input className="text-input" value={query} onChange={(event) => setQuery(event.target.value)} />
+          <Input value={query} onChange={(event) => setQuery(event.target.value)} />
         </div>
-      </div>
+      </SubtleCard>
       {items.map((item) => (
         <button
-          className="list-item"
+          className="text-left"
           key={`${item.source}-${item.title}`}
           onClick={() =>
             setExpandedKey((current) => (current === `${item.source}-${item.title}` ? null : `${item.source}-${item.title}`))
           }
           type="button"
         >
+          <SubtleCard className="grid gap-2">
           <strong>{item.title}</strong>
-          <div className="muted">{item.source}</div>
-          <p className="muted">{item.summary}</p>
-          {expandedKey === `${item.source}-${item.title}` ? <pre className="muted">{item.content}</pre> : null}
+          <div className="text-[var(--muted)]">{item.source}</div>
+          <p className="text-[var(--muted)]">{item.summary}</p>
+          {expandedKey === `${item.source}-${item.title}` ? <pre className="overflow-x-auto whitespace-pre-wrap text-sm text-[var(--muted)]">{item.content}</pre> : null}
+          </SubtleCard>
         </button>
       ))}
     </div>

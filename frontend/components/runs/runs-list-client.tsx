@@ -3,6 +3,10 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { SubtleCard } from "@/components/ui/card";
 import { apiGet } from "@/lib/api";
 import { useLanguage } from "@/components/providers/language-provider";
 
@@ -57,46 +61,50 @@ export function RunsListClient() {
 
   const content = useMemo(() => {
     if (loading) {
-      return <div className="list-item">Loading runs...</div>;
+      return <SubtleCard>Loading runs...</SubtleCard>;
     }
     if (error) {
-      return <div className="list-item">{t("common.failed")}: {error}</div>;
+      return <SubtleCard>{t("common.failed")}: {error}</SubtleCard>;
     }
     if (runs.length === 0) {
-      return <div className="list-item">{t("common.no_data")}</div>;
+      return <SubtleCard>{t("common.no_data")}</SubtleCard>;
     }
     return runs.map((run) => (
-      <Link className="list-item" key={run.run_id} href={`/runs/${run.run_id}`}>
+      <Link className="block" key={run.run_id} href={`/runs/${run.run_id}`}>
+        <SubtleCard>
         <strong>{run.run_id}</strong>
-        <div className="muted">{run.graph_name}</div>
-        <div className="status-row">
-          <span className="pill">{run.status}</span>
-          <span className="pill">revisions {run.revision_round}</span>
-          {run.duration_ms ? <span className="pill">duration {run.duration_ms}ms</span> : null}
-          {run.final_score ? <span className="pill">score {run.final_score}</span> : null}
+        <div className="text-[var(--muted)]">{run.graph_name}</div>
+        <div className="mt-2 flex flex-wrap gap-2.5">
+          <Badge>{run.status}</Badge>
+          <Badge>revisions {run.revision_round}</Badge>
+          {run.duration_ms ? <Badge>duration {run.duration_ms}ms</Badge> : null}
+          {run.final_score ? <Badge>score {run.final_score}</Badge> : null}
         </div>
+        </SubtleCard>
       </Link>
     ));
   }, [error, loading, runs]);
 
   return (
-    <div className="list">
-      <div className="list-item">
-        <div className="field">
+    <div className="grid gap-3">
+      <SubtleCard>
+        <div className="grid gap-4">
+          <div className="grid gap-2 text-[0.94rem]">
           <span>{t("runs.search")}</span>
-          <input className="text-input" value={graphNameQuery} onChange={(event) => setGraphNameQuery(event.target.value)} />
-        </div>
-        <div className="field">
+          <Input value={graphNameQuery} onChange={(event) => setGraphNameQuery(event.target.value)} />
+          </div>
+          <div className="grid gap-2 text-[0.94rem]">
           <span>{t("runs.filter")}</span>
-          <select className="text-input" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+          <Select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
             <option value="">all</option>
             <option value="pending">pending</option>
             <option value="running">running</option>
             <option value="completed">completed</option>
             <option value="failed">failed</option>
-          </select>
+          </Select>
+          </div>
         </div>
-      </div>
+      </SubtleCard>
       {content}
     </div>
   );
