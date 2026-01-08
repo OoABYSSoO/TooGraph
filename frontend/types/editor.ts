@@ -69,6 +69,7 @@ export type TemplateDefinition = {
   supportedNodeTypes: GraphNodeType[];
   stateKeys: string[];
   themePresets: ThemePreset[];
+  defaultGraph?: GraphDocument;
 };
 
 export type StateField = {

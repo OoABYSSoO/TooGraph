@@ -30,9 +30,9 @@
 
 当前最明显的问题：
 
-1. `creative_factory` 仍然散落在多个文件中
-2. 后端尚未形成 `core/` 与 `templates/` 的目录分层
-3. 主题 preset 仍主要停留在前端 preset 文件
+1. `creative_factory` 的前后端模板源已经开始集中，但前后端仍是双份定义
+2. 后端 `core/` 与 `templates/` 的第一轮目录分层已经完成，但导出边界还可继续收紧
+3. 前端模板源已经开始抽离，但模板主题与默认图仍需继续向统一注册源收拢
 4. theme panel 还不是完整结构化策略编辑器
 5. runtime handler 仍偏单文件集中
 
@@ -99,6 +99,13 @@ backend/app/templates/creative_factory/
 - `python -m compileall backend/app` 通过
 - 所有 API import 正常
 
+当前状态：
+
+- `schemas / compiler / runtime / storage` 已迁入 `backend/app/core/`
+- API 已改为从 `app.core.*` 引用
+- 旧目录 `backend/app/compiler`、`backend/app/runtime`、`backend/app/schemas`、`backend/app/storage` 已删除
+- 下一步可选项是继续补 `core` 层的导出边界和更细的 handler/tool 划分
+
 ---
 
 ## Task A2 抽出模板注册系统
@@ -134,6 +141,16 @@ backend/app/templates/creative_factory/
 `handlers.py`
 - 返回模板节点和具体 handler 的绑定关系
 
+当前状态：
+
+- `backend/app/templates/creative_factory/template.py` 已创建
+- `backend/app/templates/creative_factory/state.py` 已创建
+- `backend/app/templates/creative_factory/themes.py` 已创建
+- `backend/app/templates/creative_factory/handlers.py` 已创建
+- 注册表已改为从新模板目录装配 `creative_factory`
+- `default_graph` 已开始由后端模板层返回，editor 模板路由优先使用后端模板图
+- 下一步需要继续减少前端 fallback 和后端模板图的双份维护
+
 ### A2.3 前端对应抽离
 
 新增：
@@ -148,6 +165,13 @@ backend/app/templates/creative_factory/
 - 节点链定义
 
 保留在 `editor-presets.ts` 的只应是轻量入口或兼容导出。
+
+当前状态：
+
+- `frontend/lib/templates/creative-factory.ts` 已创建
+- 默认 graph 构造和 theme preset 已从通用 preset 文件中抽离
+- editor 模板路由已优先使用后端 `default_graph`
+- 下一步需要继续把前端 fallback 压缩到最小，而不是继续双份维护完整模板图
 
 完成标准：
 

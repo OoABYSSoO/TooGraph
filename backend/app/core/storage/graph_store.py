@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from uuid import uuid4
 
-from app.schemas.graph import GraphDocument, GraphPayload
+from app.core.schemas.graph import GraphDocument, GraphPayload
 
 
 BASE_DIR = Path(__file__).resolve().parents[2]

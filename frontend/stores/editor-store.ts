@@ -10,7 +10,8 @@ import {
 } from "@xyflow/react";
 import { create } from "zustand";
 
-import { createStarterGraphDocument, getThemePresetById, NODE_PRESETS } from "@/lib/editor-presets";
+import { NODE_PRESETS } from "@/lib/editor-presets";
+import { createStarterGraphDocument, createTemplateGraphDocument, getTemplateThemePresetById } from "@/lib/templates";
 import type {
   EdgeKind,
   GraphCanvasEdge,
@@ -226,10 +227,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   applyThemePreset: (themePresetId) => {
-    const preset = getThemePresetById(themePresetId);
+    const { templateId } = get();
+    const preset = getTemplateThemePresetById(templateId, themePresetId);
     if (!preset) return;
     set((state) => {
-      const starter = createStarterGraphDocument(state.graphId || "creative-factory", themePresetId);
+      const starter = createTemplateGraphDocument(state.templateId, state.graphId || "creative-factory", themePresetId);
       return {
         graphName: starter.name,
         themeConfig: preset.themeConfig,

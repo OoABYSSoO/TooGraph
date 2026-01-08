@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 
-from app.schemas.run import NodeExecutionDetail, RunDetail, RunSummary
-from app.storage.run_store import list_runs, load_run
+from app.core.schemas.run import NodeExecutionDetail, RunDetail, RunSummary
+from app.core.storage.run_store import list_runs, load_run
 
 
 router = APIRouter(prefix="/api/runs", tags=["runs"])

@@ -21,8 +21,16 @@ import { ThemeConfigPanel } from "@/components/editor/theme-config-panel";
 import { WorkflowNode } from "@/components/editor/workflow-node";
 import { useLanguage } from "@/components/providers/language-provider";
 import { apiGet, apiPost } from "@/lib/api";
-import { NODE_PRESETS, THEME_PRESETS } from "@/lib/editor-presets";
-import { fromBackendGraphDocument, toBackendGraphPayload, type BackendGraphDocument } from "@/lib/graph-api";
+import { NODE_PRESETS } from "@/lib/editor-presets";
+import {
+  fromBackendGraphDocument,
+  fromBackendThemePreset,
+  fromBackendTemplateDefaultGraph,
+  toBackendGraphPayload,
+  type BackendGraphDocument,
+  type BackendTemplateDefinition,
+} from "@/lib/graph-api";
+import { getTemplateThemePresets } from "@/lib/templates";
 import { useEditorStore } from "@/stores/editor-store";
 import type { GraphCanvasNode, GraphDocument, RunDetailPayload, StateFieldRole, StateFieldType, TemplateDefinition, ThemePreset } from "@/types/editor";
 
@@ -39,7 +47,7 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
   const router = useRouter();
   const [newReadKey, setNewReadKey] = useState("");
   const [newWriteKey, setNewWriteKey] = useState("");
-  const [templatePresets, setTemplatePresets] = useState<ThemePreset[]>(THEME_PRESETS);
+  const [templatePresets, setTemplatePresets] = useState<ThemePreset[]>(getTemplateThemePresets("creative_factory"));
   const {
     initGraph,
     hydrateGraph,
@@ -128,76 +136,19 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
 
     async function loadTemplateDefinition() {
       try {
-        const payload = await apiGet<{
-          template_id: string;
-          label: string;
-          description: string;
-          default_graph_name: string;
-          default_theme_preset: string;
-          supported_node_types: string[];
-          state_keys: string[];
-          theme_presets: Array<{
-            id: string;
-            label: string;
-            description: string;
-            graph_name?: string;
-            node_param_overrides?: Record<string, Record<string, unknown>>;
-            theme_config: {
-              theme_preset: string;
-              domain: string;
-              genre: string;
-              market: string;
-              platform: string;
-              language: string;
-              creative_style: string;
-              tone: string;
-              language_constraints: string[];
-              evaluation_policy: Record<string, unknown>;
-              asset_source_policy: Record<string, unknown>;
-              strategy_profile: {
-                hookTheme?: string;
-                payoffTheme?: string;
-                visualPattern?: string;
-                pacingPattern?: string;
-                evaluationFocus?: string[];
-              };
-            };
-          }>;
-        }>(`/api/templates/${templateId}`);
+        const payload = await apiGet<BackendTemplateDefinition>(`/api/templates/${templateId}`);
         if (cancelled) return;
-        const nextPresets: ThemePreset[] = payload.theme_presets.map((preset) => ({
-          id: preset.id,
-          label: preset.label,
-          description: preset.description,
-          graphName: preset.graph_name,
-          nodeParamOverrides: preset.node_param_overrides ?? {},
-          themeConfig: {
-            themePreset: preset.theme_config.theme_preset,
-            domain: preset.theme_config.domain,
-            genre: preset.theme_config.genre,
-            market: preset.theme_config.market,
-            platform: preset.theme_config.platform,
-            language: preset.theme_config.language,
-            creativeStyle: preset.theme_config.creative_style,
-            tone: preset.theme_config.tone,
-            languageConstraints: preset.theme_config.language_constraints ?? [],
-            evaluationPolicy: preset.theme_config.evaluation_policy ?? {},
-            assetSourcePolicy: preset.theme_config.asset_source_policy ?? {},
-            strategyProfile: {
-              hookTheme: preset.theme_config.strategy_profile?.hookTheme ?? "",
-              payoffTheme: preset.theme_config.strategy_profile?.payoffTheme ?? "",
-              visualPattern: preset.theme_config.strategy_profile?.visualPattern ?? "",
-              pacingPattern: preset.theme_config.strategy_profile?.pacingPattern ?? "",
-              evaluationFocus: preset.theme_config.strategy_profile?.evaluationFocus ?? [],
-            },
-          },
-        }));
+        if ((graphId === "creative-factory" || graphId.startsWith("template-")) && payload.default_graph) {
+          const hydrated = fromBackendTemplateDefaultGraph(templateId, graphId, payload.default_graph);
+          hydrateGraph(hydrated, "Loaded from template registry");
+        }
+        const nextPresets: ThemePreset[] = payload.theme_presets.map(fromBackendThemePreset);
         if (nextPresets.length > 0) {
           setTemplatePresets(nextPresets);
         }
       } catch {
         if (!cancelled) {
-          setTemplatePresets(THEME_PRESETS);
+          setTemplatePresets(getTemplateThemePresets(templateId));
         }
       }
     }

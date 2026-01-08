@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 
-from app.schemas.graph import (
+from app.core.schemas.graph import (
     ConditionLabel,
     EdgeKind,
     GraphDocument,

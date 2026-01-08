@@ -5,15 +5,15 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import ValidationError
 
-from app.compiler.validator import validate_graph
-from app.runtime.executor import execute_graph
-from app.schemas.graph import (
+from app.core.compiler.validator import validate_graph
+from app.core.runtime.executor import execute_graph
+from app.core.schemas.graph import (
     GraphDocument,
     GraphPayload,
     GraphSaveResponse,
     GraphValidationResponse,
 )
-from app.storage.graph_store import list_graphs, load_graph, save_graph
+from app.core.storage.graph_store import list_graphs, load_graph, save_graph
 
 
 router = APIRouter(prefix="/api/graphs", tags=["graphs"])

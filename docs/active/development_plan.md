@@ -22,6 +22,10 @@
 - creative factory 默认模板
 - `demo/slg_langgraph_single_file_modified_v2.py` 继续作为独立参考实现保留，主程序不依赖它
 - 模板注册与模板查询 API 已落地
+- 前端模板源已开始独立化，`creative_factory` 默认图定义已从通用 preset 文件中抽离
+- 后端 `creative_factory` 模板已拆成 `template / state / themes / handlers` 模块
+- 后端模板 API 已开始直接返回 `default_graph`，editor 模板路由优先使用后端模板图初始化
+- 后端 `core/` 分层已落地，`schemas / compiler / runtime / storage` 已迁入 `backend/app/core/`
 - 编辑器中的 `State Panel`
 - 节点左入右出、自定义节点卡片
 - 节点输入输出绑定、结构化参数面板、快速新增 state key
@@ -30,7 +34,7 @@
 
 当前项目最准确的状态应理解为：
 
-**“标准编排模型已经落地，旧兼容包袱正在被剥离，主链路可运行，正在从可用走向更强的可视化表达和更完整的资产管理体验。”**
+**“标准编排模型已经落地，后端 core/template 分层已经开始成形，主链路可运行，正在从可用走向更强的模板统一和调试体验。”**
 
 ---
 
@@ -170,14 +174,16 @@
 - creative factory 模板
 - preset 驱动的节点默认参数覆盖
 - preset 驱动的主题策略画像：`hook / payoff / visual / pacing / evaluation focus`
+- 后端 `core/` 目录重组
 
 仍在推进中的能力：
 
 - 更强的边可视化与 bus 表达
 - Start / End 特殊节点语义增强
 - 节点顺序重排体验
-- Tool Registry / Handler Registry 正式拆分
+- Tool Registry / Handler Registry 继续细分
 - 模板系统与主题系统继续抽象
+- 前后端模板源继续收拢，减少本地 fallback 维护量
 
 ---
 

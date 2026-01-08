@@ -66,6 +66,26 @@ export type BackendGraphDocument = BackendGraphPayload & {
   graph_id: string;
 };
 
+export type BackendTemplateDefinition = {
+  template_id: string;
+  label: string;
+  description: string;
+  default_graph_name: string;
+  default_theme_preset: string;
+  supported_node_types: string[];
+  state_keys: string[];
+  state_schema: BackendGraphPayload["state_schema"];
+  theme_presets: Array<{
+    id: string;
+    label: string;
+    description: string;
+    graph_name?: string;
+    node_param_overrides?: Record<string, Record<string, unknown>>;
+    theme_config: BackendGraphPayload["theme_config"];
+  }>;
+  default_graph?: BackendGraphPayload;
+};
+
 function toBackendThemeConfig(themeConfig: ThemeConfig): BackendGraphPayload["theme_config"] {
   return {
     theme_preset: themeConfig.themePreset,
@@ -83,7 +103,7 @@ function toBackendThemeConfig(themeConfig: ThemeConfig): BackendGraphPayload["th
   };
 }
 
-function fromBackendThemeConfig(themeConfig: BackendGraphDocument["theme_config"]): ThemeConfig {
+export function fromBackendThemeConfig(themeConfig: BackendGraphDocument["theme_config"]): ThemeConfig {
   return {
     themePreset: themeConfig.theme_preset ?? "",
     domain: themeConfig.domain ?? "",
@@ -259,5 +279,28 @@ export function fromBackendGraphDocument(document: BackendGraphDocument): GraphD
       },
     })),
     updatedAt: new Date().toISOString(),
+  };
+}
+
+export function fromBackendTemplateDefaultGraph(
+  templateId: string,
+  graphId: string,
+  document: BackendGraphPayload,
+): GraphDocument {
+  return fromBackendGraphDocument({
+    ...document,
+    graph_id: graphId,
+    template_id: document.template_id || templateId,
+  });
+}
+
+export function fromBackendThemePreset(preset: BackendTemplateDefinition["theme_presets"][number]) {
+  return {
+    id: preset.id,
+    label: preset.label,
+    description: preset.description,
+    graphName: preset.graph_name,
+    nodeParamOverrides: preset.node_param_overrides ?? {},
+    themeConfig: fromBackendThemeConfig(preset.theme_config),
   };
 }

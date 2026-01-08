@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from app.schemas.graph import GraphNode
-from app.runtime.state import RunState
+from app.core.schemas.graph import GraphNode
+from app.core.runtime.state import RunState
 
 
 def route_after_evaluator(state: RunState) -> str:

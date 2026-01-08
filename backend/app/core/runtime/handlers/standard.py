@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import Any
 
 from app.memory.store import save_memory
-from app.runtime.state import RunState, utc_now_iso
-from app.schemas.graph import NodeType
+from app.core.runtime.state import RunState, utc_now_iso
+from app.core.schemas.graph import NodeType
 from app.tools.registry import get_tool_registry
 
 

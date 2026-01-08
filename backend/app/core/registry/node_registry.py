@@ -3,8 +3,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from app.runtime.handlers import STANDARD_HANDLER_MAP
-from app.schemas.graph import NodeType
+from app.core.runtime.handlers import STANDARD_HANDLER_MAP
+from app.core.schemas.graph import NodeType
 
 
 NodeHandler = Callable[[dict[str, Any], dict[str, Any]], dict[str, Any]]
