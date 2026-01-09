@@ -9,11 +9,11 @@ import { useLanguage } from "@/components/providers/language-provider";
 export function LayoutShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { language, setLanguage, t } = useLanguage();
-  const isEditorRoute = pathname.startsWith("/editor/");
+  const isEditorRoute = pathname === "/editor" || pathname.startsWith("/editor/");
   const navItems = [
     { href: "/", label: t("nav.home") },
     { href: "/workspace", label: t("nav.workspace") },
-    { href: "/editor/creative-factory", label: t("nav.editor") },
+    { href: "/editor", label: t("nav.editor") },
     { href: "/runs", label: t("nav.runs") },
     { href: "/knowledge", label: t("nav.knowledge") },
     { href: "/memories", label: t("nav.memories") },
