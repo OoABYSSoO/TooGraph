@@ -19,7 +19,6 @@ async function loadTemplates() {
         state_schema: Array<{
           key: string;
           type: string;
-          role: string;
           title: string;
           description: string;
         }>;
@@ -43,7 +42,6 @@ async function loadTemplates() {
           state_schema: Array<{
             key: string;
             type: string;
-            role: string;
             title: string;
             description: string;
           }>;
@@ -96,7 +94,6 @@ async function loadGraph(graphId: string) {
       state_schema: Array<{
         key: string;
         type: string;
-        role: string;
         title: string;
         description: string;
       }>;

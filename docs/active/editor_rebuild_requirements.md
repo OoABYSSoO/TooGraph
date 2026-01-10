@@ -66,7 +66,6 @@ GraphiteUI editor 的目标不是做通用流程图工具。
 
 - `key`
 - `type`
-- `role`
 - `title`
 - `description`
 - `color`

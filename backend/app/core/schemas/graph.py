@@ -55,14 +55,6 @@ class StateFieldType(str, Enum):
     FILE_LIST = "file_list"
 
 
-class StateFieldRole(str, Enum):
-    INPUT = "input"
-    INTERMEDIATE = "intermediate"
-    DECISION = "decision"
-    ARTIFACT = "artifact"
-    FINAL = "final"
-
-
 class Position(BaseModel):
     x: float
     y: float
@@ -86,7 +78,6 @@ class ThemeConfig(BaseModel):
 class StateField(BaseModel):
     key: str = Field(..., min_length=1)
     type: StateFieldType = StateFieldType.STRING
-    role: StateFieldRole = StateFieldRole.INTERMEDIATE
     title: str = ""
     description: str = ""
     example: Any = None
