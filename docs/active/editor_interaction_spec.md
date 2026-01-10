@@ -1,151 +1,260 @@
-# Editor Interaction Spec
+# State-Aware Editor Interaction Spec
 
-## 1. 文档目的
+## 1. Purpose
 
-这份文档定义 GraphiteUI 下一轮 editor 改造的交互目标。
+本文件定义新 editor 的具体交互规则。
 
-重点不是新增后端能力，而是把当前 editor 从“页面驱动”进一步升级为“画布驱动”的编排体验。
+它服务于 [editor_rebuild_requirements.md](/home/abyss/GraphiteUI/docs/active/editor_rebuild_requirements.md)，回答的是：
 
-本文档基于当前代码状态和讨论结果整理，不追溯历史方案。
+- 页面上具体怎么呈现
+- 用户具体怎么操作
+- 哪些对象在何时出现什么反馈
 
----
+## 2. Design Principles
 
-## 2. 当前问题
+新 editor 必须遵守以下交互原则：
 
-当前 editor 虽然已经具备：
+1. 用户看到的不是抽象图，而是 state 处理链
+2. state 必须是可见对象，而不是隐藏在 JSON 里的字段
+3. 节点必须表达“读取什么、产出什么”
+4. 边只做单线，但必须通过标签表达当前流动的重点 state
+5. condition 是节点，不是边特效
+6. 节点运行结果必须能在 editor 内直接查看
 
-- 画布编辑
-- `State Panel`
-- 结构化节点配置
-- Validate / Save / Run
-- 运行轮询
-- 节点执行摘要
+## 3. Layout
 
-但交互上仍有几个明显问题：
+## 3.1 Top Toolbar
 
-1. 画布不是绝对主视图
-- 左右区域仍然占据较多固定空间
-- 节点编排时画布空间不够集中
+顶部工具栏包含：
 
-2. 节点创建路径偏慢
-- 当前主路径仍偏向“先找节点库，再拖入画布”
-- 从已有节点继续往下扩展时，操作不够顺手
+- graph name
+- template / graph meta
+- Save
+- Validate
+- Run
+- Fit View
+- 当前运行状态
 
-3. 节点运行结果展示不够聚焦
-- 当前可以看到执行摘要
-- 但还不够强调“这个节点实际改了哪些 state 项”
+要求：
 
-4. 面板行为还不够编辑器化
-- `State Panel`、运行信息、主题配置、节点配置还没有完全转成浮动工作区组件
+- 高度压薄
+- 操作优先级明显
+- 运行中状态不能太隐蔽
 
----
+## 3.2 Left Rail
 
-## 3. 改造目标
+左侧栏分成两个区块：
 
-本轮 editor 改造目标如下：
+1. `State Panel`
+2. `Node Palette`
 
-1. 采用 `canvas-first` 布局
-2. `State Panel` 支持折叠
-3. 运行、主题、状态、节点配置改为浮动面板
-4. 支持从连线动作直接创建新节点
-5. 节点库支持搜索
-6. 选中节点时，右侧除了配置，还要显示该节点运行结果
-7. 运行结果重点显示该节点“非空的修改项”
+要求：
 
----
+- 默认都可见
+- 可以滚动
+- 二者区分清楚，不混成一个列表
 
-## 4. 布局模型
+## 3.3 Canvas
 
-### 4.1 总体原则
+中央是主画布。
 
-editor 主界面应以画布为中心。
+要求：
 
-不优先做浏览器原生 fullscreen API，而是先实现视觉上的全屏编排工作区：
+- 占据主工作区
+- 背景有明显网格或点阵
+- 支持平移和缩放
+- 空画布状态有引导
 
-- 画布占据主要空间
-- 其他信息通过浮动面板覆盖在画布周围
+## 3.4 Right Inspector
 
-### 4.2 布局区域
+右侧 inspector 负责展示当前选中对象。
 
-建议布局如下：
+支持对象：
 
-- 中央：Graph Canvas
-- 左侧浮动：`State Panel`
-- 右上浮动：`Theme / Graph Actions / Run Status`
-- 右侧浮动：`Node Inspector`
-- 左上或顶部轻量区域：graph 名称、template、运行 badge
+- graph
+- node
+- edge
+- state
 
-### 4.3 面板要求
+第一阶段可先实现：
 
-所有浮动面板都应满足：
+- graph
+- node
+- edge
 
-- 不阻断画布的主操作
-- 可折叠
-- 视觉层级明确
-- 在中等分辨率下不压缩画布到不可用
+如果选中 state，允许后续在第二阶段补完整。
 
----
+## 4. State Panel
 
-## 5. State Panel
+## 4.1 List View
 
-### 5.1 行为要求
+每个 state 条目至少显示：
 
-`State Panel` 需要支持：
+- color swatch
+- key
+- type
+- role
+- 简短描述
 
-- 默认展开
-- 手动折叠
-- 折叠后保留贴边入口
-- 再次点击可恢复展开
+## 4.2 Edit Actions
 
-### 5.2 状态持久化
+每个 state 支持：
 
-建议记住用户选择：
+- 新增
+- 编辑
+- 删除
+- 修改颜色
 
-- 使用本地存储保存展开/折叠状态
+第一阶段若删除会影响读写绑定，可先使用保守策略：
 
-### 5.3 内容保持
+- 有引用时禁止删除
+- 或删除前给出明确警告
 
-折叠仅影响显示，不影响当前已有能力：
+## 4.3 Relationship Display
 
-- state 列表查看
-- state 新增/编辑
-- state 与节点读写绑定联动
+选中一个 state 时，应尽量看到：
 
----
+- 写入它的节点
+- 读取它的节点
+- 包含它的边标签
 
-## 6. Node Inspector
+第一阶段至少在 inspector 中显示“writers / readers”文本列表。
 
-### 6.1 显示规则
+## 5. Node Palette
 
-右侧 `Node Inspector` 的显示规则明确如下：
+## 5.1 Palette Cards
 
-- 选中节点时展开
-- 没选中节点时自动收起
-
-不要求无节点选中时显示 graph 级配置。
-
-### 6.2 面板结构
-
-`Node Inspector` 分为两个主区：
-
-1. `Config`
-2. `Execution`
-
-### 6.3 Config 区
-
-`Config` 区保留当前能力，并继续作为节点配置入口：
+节点卡片至少显示：
 
 - label
-- description
+- node type
+- one-line description
+
+## 5.2 Create Actions
+
+支持两种方式：
+
+- 点击建点
+- 拖拽建点
+
+拖拽时要求：
+
+- 光标有明确 grab 反馈
+- 画布 drag over 有高亮反馈
+- 落点创建后自动选中新节点
+
+## 6. Node Presentation
+
+## 6.1 Card Structure
+
+节点卡片结构建议分为三层：
+
+1. Header
+   - 节点类型
+   - 节点标题
+2. Body
+   - 节点职责摘要
+3. IO Bands
+   - 左：Inputs
+   - 右：Outputs
+
+## 6.2 Inputs and Outputs
+
+输入输出应至少用文本 chip 或列表表达：
+
+- 输入在左侧
+- 输出在右侧
+- state 名称带颜色提示
+
+第一阶段不强制每个 state 都有独立 handle。
+
+第一阶段必须做到：
+
+- 人眼能快速区分输入和输出
+- 选中节点时可以编辑 `reads / writes`
+
+## 6.3 Special Nodes
+
+`start`：
+
+- 重点展示初始 state 入口
+- 输出侧应清晰可见
+
+`condition`：
+
+- 重点展示判断性质
+- 分支去向要清晰
+
+`end`：
+
+- 重点展示最终汇总
+- 让用户感知 graph 最终收口到了哪些 state
+
+## 7. Edge Presentation
+
+## 7.1 Visual Rule
+
+边统一使用单线。
+
+要求：
+
+- 线条足够清楚
+- 不走复杂多通道视觉
+- 标签不遮挡主要连线关系
+
+## 7.2 Label Rule
+
+边标签显示规则：
+
+- 优先显示 `flow_keys`
+- 多个 key 时可逗号分隔或折叠显示数量
+- condition 分支边应优先显示 branch label
+
+若同时需要 branch label 和 flow keys：
+
+- 第一阶段建议格式：
+  - `pass · greeting, final_result`
+  - `revise · score, issues`
+
+## 7.3 Color Rule
+
+state 的颜色来自 state 定义。
+
+边使用颜色的原则：
+
+- 颜色仅辅助理解
+- 不让颜色本身承担全部语义
+- 文本标签仍是主表达
+
+第一阶段推荐：
+
+- 边主线保持统一基础色
+- 标签内小色块或 key 文本可使用 state 色彩
+
+## 8. Inspector Behavior
+
+## 8.1 Graph Inspector
+
+无节点或边选中时，右侧显示 graph 级信息：
+
+- graph name
+- template
+- node count
+- edge count
+- state count
+- run summary
+
+## 8.2 Node Inspector
+
+选中节点时，显示：
+
+- 基本信息
 - `reads`
 - `writes`
-- `params`
+- params
+- 最近一次执行结果
 
-### 6.4 Execution 区
-
-`Execution` 区用于展示当前节点最近一次运行结果。
-
-至少包括：
+最近一次执行结果至少包含：
 
 - `status`
 - `duration`
@@ -155,195 +264,74 @@ editor 主界面应以画布为中心。
 - `errors`
 - `artifacts`
 
-### 6.5 非空修改项展示规则
-
-这是本轮的关键要求。
-
-右侧 `Execution` 中需要新增一个重点区块：
+建议新增一个重点区：
 
 - `Changed Outputs`
 
-展示规则：
+规则：
 
-1. 只考虑当前节点 `writes` 中声明的 state keys
-2. 只展示本次运行结果里实际存在且非空的项
-3. 不展示空字符串、空数组、空对象、`null`、`undefined`
-4. 展示方式按值类型区分：
-   - 字符串：展示摘要
-   - 数组：展示数量和前几项摘要
-   - 对象：展示关键字段或 JSON 摘要
-5. 如果没有非空写入，显示：
-   - `No non-empty outputs`
+- 只看该节点 `writes`
+- 只显示最近 run 中非空输出
+- 用于回答“这个节点实际写出了什么”
 
-目的：
+## 8.3 Edge Inspector
 
-- 让用户一眼看到“这个节点改了什么”
-- 避免被整份 run state 淹没
+选中边时，显示：
 
----
+- source
+- target
+- `flow_keys`
+- `edge_kind`
+- `branch_label`
 
-## 7. 节点创建体验
+## 9. Runtime Feedback
 
-### 7.1 当前问题
+## 9.1 Run Status
 
-当前节点创建主要依赖：
+点击 `Run` 后，editor 内必须有持续可见的运行状态反馈：
 
-- 节点库选择
-- 手动放置
-- 再连线
+- running
+- completed
+- failed
 
-这不适合高频扩展流程。
+## 9.2 Node-Level Result
 
-### 7.2 新的主创建路径
+点击某个已执行节点时，必须能查看该节点最近一次运行结果。
 
-新的主创建路径定义为：
+这是新 editor 的关键要求，不允许只在 run detail 页面可见。
 
-1. 从某个节点的输出端口拖出一条线
-2. 将线拖到画布空白位置
-3. 在落点弹出 `Node Picker`
-4. 选择目标节点类型
-5. 系统自动：
-   - 创建节点
-   - 放在落点附近
-   - 创建与 source 的连线
-   - 选中新节点
+## 9.3 Final Result
 
-### 7.3 拖到已有节点
+运行完成后，用户至少需要在 editor 内看到：
 
-如果拖线目标是已有节点：
+- run 是否成功
+- 最终结果摘要
+- `hello_world` 的 greeting
 
-- 按正常连线逻辑处理
-- 不弹 `Node Picker`
+## 10. Hello World Flow
 
----
+第一阶段唯一必须跑通的交互流：
 
-## 8. Node Picker
+1. 打开 `/editor/new`
+2. 定义或确认所需 state
+3. 创建 `start`
+4. 创建 `hello_model`
+5. 创建 `end`
+6. 连接边并设置 `flow_keys`
+7. 配置名字参数
+8. Save
+9. Validate
+10. Run
+11. 点击 `hello_model` 查看节点结果
+12. 在最终结果中看到 greeting
 
-### 8.1 触发方式
+## 11. Non-Goals
 
-`Node Picker` 的第一优先触发方式：
+第一阶段交互明确不做：
 
-- 从节点拖线到空白处后自动弹出
-
-后续可扩展为：
-
-- 快捷键打开
-- 工具栏按钮打开
-
-### 8.2 功能要求
-
-`Node Picker` 需要支持：
-
-- 搜索
-- 分类分组
-- 鼠标点击选择
-- 键盘回车选择
-
-### 8.3 分组规则
-
-当前先按以下分组：
-
-- `Flow`
-  - `start`
-  - `end`
-  - `condition`
-- `Research`
-  - `research`
-  - `collect_assets`
-  - `normalize_assets`
-  - `select_assets`
-  - `analyze_assets`
-  - `extract_patterns`
-- `Creative`
-  - `build_brief`
-  - `generate_variants`
-  - `generate_storyboards`
-  - `generate_video_prompts`
-  - `review_variants`
-- `Output`
-  - `prepare_image_todo`
-  - `prepare_video_todo`
-  - `finalize`
-
-### 8.4 第一阶段范围
-
-第一阶段只支持：
-
-- 选择当前已有的标准节点类型
-
-暂不引入：
-
-- 模板片段
-- 推荐节点
-- 节点宏
-
----
-
-## 9. 节点库
-
-### 9.1 保留节点库
-
-左侧或辅助入口仍保留节点库，不取消。
-
-原因：
-
-- 首个节点创建仍可能依赖节点库
-- 某些用户仍习惯从 palette 开始
-
-### 9.2 节点库增强
-
-节点库应新增：
-
-- 搜索能力
-- 分组展示
-
-节点库与 `Node Picker` 的分组口径保持一致。
-
----
-
-## 10. 实现优先级
-
-建议按下面顺序实现：
-
-### Phase 1
-
-- `State Panel` 折叠
-- `Node Inspector` 自动收起
-- editor 改成 `canvas-first` 布局
-- 运行、主题、状态、节点配置改成浮动面板
-
-### Phase 2
-
-- 节点库搜索
-- `Node Picker` 组件
-- 拖线到空白处弹出 `Node Picker`
-- 选择节点后自动创建并连线
-
-### Phase 3
-
-- `Node Inspector.Execution` 增强
-- 节点级运行结果整理
-- `Changed Outputs` 非空修改项展示
-
----
-
-## 11. 非目标
-
-本轮不包含以下内容：
-
-- 浏览器原生 fullscreen API
-- 复杂的多窗口拖拽布局系统
-- 模板片段插入
-- 节点推荐引擎
-- 完整 state diff 可视化
-- 多人协作
-
----
-
-## 12. 当前结论
-
-这轮 editor 改造的核心不是新增更多节点类型，而是把现有能力变成更顺手的编排体验。
-
-一句话概括：
-
-**GraphiteUI editor 要从“能编辑 graph”继续升级为“以画布为中心、通过连线自然扩展 graph 的可视化编排器”。**
+- 从空白连线处弹 Node Picker
+- 子图
+- 协作编辑
+- 高级时序调试
+- 自动布局
+- 复杂的端口级多线 state routing

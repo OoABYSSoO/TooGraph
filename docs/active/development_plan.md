@@ -1,268 +1,185 @@
-# GraphiteUI Development Plan
+# State-Aware Editor Development Plan
 
-## 1. 文档目的
+## 1. Purpose
 
-这份文档记录 **当前代码已经实现的能力**、**当前真实存在的缺口** 和 **接下来应该继续推进的事项**。
+本文件定义当前 editor 的执行计划。
 
-这不是历史规划复述，而是基于当前仓库代码的状态同步文档。
+它不再复述旧 editor 已实现什么，而是围绕新的 state-aware editor 目标，给出清晰的开发顺序、阶段目标和验收标准。
 
----
+## 2. Current Baseline
 
-## 2. 当前代码状态
+当前代码已具备的基础：
 
-截至当前版本，GraphiteUI 已进入：
+- 前后端开发环境可启动
+- graph 保存、校验、运行接口可用
+- `hello_world` 模板存在
+- `/editor`、`/editor/new`、`/editor/[graphId]` 路由已接回
+- 画布、缩放、平移、Mini Map、基础建点、基础连线已存在
 
-**标准协议 + creative factory 模板 + 可执行运行链 + Tailwind/语义组件化前端**
+当前代码与新目标之间的主要差距：
 
-当前代码中已经明确实现的能力：
+- 左侧尚未形成真正的 `State Panel + Node Palette`
+- state 还不是 editor 的一等对象
+- 节点输入输出表达还不够强
+- 边标签还没有形成稳定的 state flow 语义
+- 节点运行结果展示还不够完整
+- `hello_world` 闭环需要按新心智再收紧一次
 
-- 前后端均可启动，开发脚本可用，默认端口：
-  - 前端 `3477`
-  - 后端 `8765`
-- 后端 API 已包含：
-  - `/health`
-  - `/api/graphs`
-  - `/api/runs`
-  - `/api/knowledge`
-  - `/api/memories`
-  - `/api/settings`
-  - `/api/templates`
-- 标准 graph 协议已落地，核心字段包括：
-  - `template_id`
-  - `theme_config`
-  - `state_schema`
-  - 节点 `reads / writes / params`
-  - 边 `flow_keys / edge_kind / branch_label`
-- graph 已支持：
-  - `validate`
-  - `save`
-  - `load`
-  - `list`
-  - `run`
-- 后端已使用 SQLite 持久化 `graphs / runs`
-  - 数据库文件：`backend/data/graphiteui.db`
-  - 历史 `graphs/*.json`、`runs/*.json` 会自动导入
-- 后端 `core/` 分层已建立：
-  - `compiler`
-  - `runtime`
-  - `schemas`
-  - `storage`
-- 模板系统已存在，当前模板注册表里实际只有一个模板：
-  - `creative_factory`
-  - `hello_world`
-- 模板 API 已能返回：
-  - 模板元数据
-  - `theme_presets`
-  - `state_schema`
-  - `default_graph`
-- editor 已具备：
-  - `State Panel`
-  - `State Panel` 折叠
-  - 自定义节点卡片
-  - 左入右出
-  - `reads / writes` 绑定
-  - 结构化参数编辑
-  - 快速新增 state key
-  - 画布优先的浮动面板布局
-  - 节点库搜索
-  - Validate / Save / Run
-  - 节点执行摘要展示
-- 前端模板路由已优先按后端模板 `default_graph` 初始化
-- 主题系统已支持多个 preset，并能影响：
-  - `theme_config`
-  - 节点默认参数
-  - creative factory 产出策略
-- 页面已全部可访问：
-  - `/`
-  - `/workspace`
-  - `/editor/[graphId]`
-  - `/runs`
-  - `/runs/[runId]`
-  - `/knowledge`
-  - `/memories`
-  - `/settings`
-- Tailwind 迁移已完成大半，且已建立两层前端 UI 抽象：
-  - 基础组件：`Button / Input / Select / Textarea / Card / Badge`
-  - 语义组件：`SectionHeader / EmptyState / InfoBlock / MetricCard`
-- `demo/slg_langgraph_single_file_modified_v2.py` 仍保留，且主程序不依赖它
+## 3. Strategy
 
----
+执行策略：
 
-## 3. 代码核对后确认的事实
+1. 先把编辑器语义做对
+2. 再把 `hello_world` 跑通
+3. 最后再做扩展体验
 
-### 3.1 已完成
+明确禁止：
 
-- editor 点击 `Run` 后会立即请求一次 `/api/runs/{run_id}`，并把结果映射回节点状态
-- editor 已具备持续轮询
-  - run 未进入终态前，会周期性刷新 `/api/runs/{run_id}`
-- editor 已具备基础运行观测增强
-  - 顶部会显示轮询中的 run 状态
-  - run 级 `warnings / errors` 会在编辑器内展示
-  - 选中节点后会请求 `/api/runs/{run_id}/nodes/{node_id}` 查看节点级执行明细
-- editor 已进入第一阶段 `canvas-first` 交互
-  - `State Panel` 为左侧浮动面板，可折叠
-  - `Theme / Run / Node Inspector` 已改为画布上的浮动面板
-  - `Node Inspector` 仅在选中节点或边时显示
-- 节点库已支持搜索
-- `runs` 页面已支持按 `graph_name` 搜索、按 `status` 过滤
-- `knowledge` 页面已支持搜索和展开详情
-- `memories` 页面已支持按 `memory_type` 过滤和展开详情
-- `/api/settings` 目前同时返回：
-  - `tools`
-  - `skills`
-  - `templates`
-- `creative_factory` 默认图已由后端模板层生成
-- editor 模板主路径已优先依赖后端 `default_graph`
-  - 前端异常兜底已降级为最小 shell graph + 本地 theme presets
-  - 前端不再维护完整默认图副本
+- 在核心语义没稳定前，优先做大量样式微调
+- 在 state model 没定清楚前，继续堆复杂交互
+- 在 `hello_world` 没闭环前，继续扩模板能力
 
-### 3.2 尚未完成
+## 4. Phases
 
-- 第二个模板已存在：
-  - `hello_world`
-  - 当前已可用于验证前端到本地 OpenAI-compatible 模型服务的调用链
-- 前端和后端的模板定义虽然已收拢很多，但仍不是完全单一来源
-  - 前端仍保留 fallback shell 与本地 preset 逻辑，但已不再维护完整图结构
-- `settings` 里仍保留 `skills` 字段
-  - 说明 skill 层还没有完全退出主概念层
-- 前端已建立 primitives 与语义组件，但还没有形成完整设计系统
+## Phase 1 State Model and Left Rail
 
----
+目标：
 
-## 4. 里程碑状态
+- 让 state 成为一等对象
+- 左侧形成真正的 `State Panel + Node Palette`
 
-## M1 工程骨架
+任务：
 
-状态：`已完成`
+- 为 state 补齐颜色定义
+- 增加 state 列表、搜索、编辑入口
+- 展示 state 的 readers / writers
+- 保持节点库搜索和建点入口稳定
 
-已完成内容：
+完成标准：
 
-- `frontend/` 和 `backend/` 正式工程存在
-- `Makefile`
-- `scripts/dev_up.sh`
-- `/health`
-- 固定开发端口
+- 左侧能同时查看 state 和 nodes
+- state 不再只作为节点配置里的附属字段存在
 
-## M2 Graph 基础能力
+## Phase 2 Node and Edge Semantics
 
-状态：`已完成`
+目标：
 
-已完成内容：
+- 让画布更像 state processing graph，而不是普通流程图
 
-- graph schema
-- save / load / validate / list / run
-- 前后端 graph 协议映射
+任务：
 
-## M3 Runtime 主流程
+- 强化节点输入输出布局
+- 区分 `start` / `condition` / `end`
+- 收紧边标签显示规则
+- 让 `flow_keys` 表达稳定可读
 
-状态：`已完成`
+完成标准：
 
-已完成内容：
+- 用户能一眼看懂某节点读什么、写什么
+- 用户能通过边标签读懂主要 state flow
 
-- graph 校验与编译
-- condition 路由
-- run 落盘
-- node execution 落盘
-- creative factory 主链可执行
+## Phase 3 Inspector and Runtime Visibility
 
-备注：
+目标：
 
-- 当前普通节点仍要求单一主后继
-- 分支必须通过 `condition` 节点
+- 点击节点就能理解这个节点最近一次运行做了什么
 
-## M4 Editor 基础交互
+任务：
 
-状态：`已完成`
+- 完善 node inspector
+- 接入节点级执行结果
+- 增加 `Changed Outputs`
+- 显示 run 状态、错误、警告和最终结果
 
-已完成内容：
+完成标准：
 
-- 画布交互
-- 节点拖拽
-- 连线
-- State Panel
-- 节点输入输出绑定
-- 结构化参数编辑
+- editor 内即可查看节点级执行结果
+- 不需要跳出到 run detail 才知道节点产出
+
+## Phase 4 Hello World Closure
+
+目标：
+
+- 用 `hello_world` 验证整条链路
+
+任务：
+
+- 建最小图
+- 配置输入参数
 - Save / Validate / Run
+- 在 editor 内查看 greeting
+- 检查 `end` 汇总状态
 
-## M5 页面闭环
+完成标准：
 
-状态：`已完成`
+- `hello_world` 能稳定跑通
+- editor 与后端模型调用闭环明确
 
-已完成内容：
+## Phase 5 Cleanup and Expansion
 
-- Workspace
-- Runs / Run Detail
-- Knowledge
-- Memories
-- Settings
+目标：
 
-## M6 模板化与标准化
+- 在闭环稳定后再考虑扩展能力
 
-状态：`已完成第一轮`
+任务：
 
-已完成内容：
+- 收口 state color 的正式持久化位置
+- 收口 template 与 graph 初始化逻辑
+- 继续梳理 settings 中的旧概念
+- 评估后续 Node Picker / advanced debugger / subgraph
 
-- `core/` 目录分层
-- `creative_factory` 模板目录拆分
-- 模板注册 API
-- 主题 preset 体系
-- SQLite 持久化
+## 5. Priority Order
 
-## M7 设计系统与前端收口
+当前推荐顺序：
 
-状态：`进行中`
+1. Phase 1 State Model and Left Rail
+2. Phase 2 Node and Edge Semantics
+3. Phase 3 Inspector and Runtime Visibility
+4. Phase 4 Hello World Closure
+5. Phase 5 Cleanup and Expansion
 
-已完成内容：
+## 6. Milestone Definition
 
-- Tailwind 基础设施
-- 基础 UI primitives
-- 语义组件第一轮
+## M1 State-Aware Shell
 
-仍待推进：
+完成条件：
 
-- 继续减少页面中散落的重复布局 class
-- 形成更完整的前端 UI 约定
+- 左侧存在清晰的 `State Panel`
+- state 可见、可编辑、可着色
+- 节点库与 state 面板分区明确
 
----
+## M2 Readable Processing Graph
 
-## 5. 当前 Todo
+完成条件：
 
-### P0
+- 节点输入输出表达明确
+- 边标签可读
+- `condition` 和 `end` 语义明确
 
-- 继续收拢模板单一来源
-  - 继续减少前端 fallback 模板图维护量
-  - 让后端模板定义成为更明确的源头
+## M3 Observable Runtime
 
-### 已完成的近期增量
+完成条件：
 
-- editor 运行轮询已完成
-- editor run 级 `warnings / errors` 展示已完成
-- editor 节点级执行明细查看已完成
+- 节点运行结果可在 editor 内查看
+- run 状态和错误可见
 
-### P1
+## M4 Hello World Pass
 
-- 增加第二个模板
-  - 用来验证 `Core / Template / Theme` 分层不是只适配 creative factory
-- 继续清理主概念层中的 `skills`
-  - 至少在 UI 和 settings 语义上弱化 skill 暴露
-- 增强模板系统
-  - 更细的 preset 可视化
-  - 更清晰的 theme strategy 编辑
+完成条件：
 
-### P2
+- 新 editor 创建的 `hello_world` 图可保存、校验、运行
+- greeting 在 editor 内可见
 
-- 建立更完整的前端设计系统约定
-  - `FormField`
-  - `DataList`
-  - `Dialog/Popover`
-- 更细的 state diff / run debug 可视化
+## 7. Risks
 
----
+当前主要风险：
 
-## 6. 当前最重要的判断
+1. 过度把 edge 当成数据实体，导致 editor 语义偏离 LangGraph
+2. state color 若只做前端临时字段，后续可能出现持久化断层
+3. 若节点 IO 表达做得太复杂，会把第一阶段拖进“端口系统设计”泥潭
 
-GraphiteUI 当前已经不是“能不能跑起来”的阶段。
+对应策略：
 
-当前最准确的判断是：
-
-**主链路已完成，模板系统和 UI 体系已建立第一轮基础，接下来应优先补运行观察与模板抽象，而不是继续扩散零散功能。**
+- 明确 edge 只是 route + visual hint
+- 尽早确定 state color 的正式承载位置
+- 第一阶段先做清晰可读，不做复杂端口拓扑

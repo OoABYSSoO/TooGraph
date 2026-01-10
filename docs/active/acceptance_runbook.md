@@ -1,31 +1,16 @@
-# GraphiteUI Acceptance Runbook
+# State-Aware Editor Acceptance Runbook
 
-## 1. 文档目的
+## 1. Purpose
 
-这份文档用于基于当前最新实现执行本地验收、演示前检查与交接说明。
+本文件定义当前 editor 的本地验收方式。
 
-当前验收重点已经从“最小骨架能不能启动”升级为：
+本轮验收重点不再是旧版 `creative_factory` 体验，而是：
 
-- 标准 graph 协议是否可用
-- editor 是否能完成 state 驱动编排
-- creative factory 模板是否能跑通
-- run detail 与产物是否可回看
+- state-aware editor 语义是否成立
+- `hello_world` 是否能完成保存、校验、运行闭环
+- 节点级结果是否能在 editor 内直接查看
 
-补充说明：
-
-- 当前 editor 在点击 `Run` 后会持续轮询 run detail，直到 run 进入终态
-- 当前 editor 会在运行期间展示 run 级 `warnings / errors`
-- 当前 editor 选中节点后会请求节点级执行明细
-- 当前模板注册表中实际只有一个模板：`creative_factory`
-
----
-
-## 2. 启动准备
-
-默认开发端口：
-
-- 前端：`3477`
-- 后端：`8765`
+## 2. Startup
 
 推荐启动方式：
 
@@ -33,286 +18,195 @@
 ./scripts/dev_up.sh
 ```
 
-也可以手动启动：
+默认地址：
 
-```bash
-make backend-install
-make frontend-install
-make backend-dev
-make frontend-dev
-```
+- Frontend: `http://127.0.0.1:3477`
+- Backend: `http://127.0.0.1:8765`
 
 健康检查：
 
 ```bash
-make backend-health
+curl --noproxy '*' -fsS http://127.0.0.1:8765/health
 ```
 
-访问地址：
+## 3. Entry Routes
 
-```bash
-http://127.0.0.1:3477
-http://127.0.0.1:8765
-```
+优先验收入口：
 
----
+- `/editor`
+- `/editor/new`
+- `/editor/{graphId}`
 
-## 3. 推荐验收入口
+第一阶段不再把旧 `creative_factory` editor 作为主验收入口。
 
-当前最推荐直接使用标准模板入口：
+## 4. Core Acceptance Cases
 
-- `http://127.0.0.1:3477/editor/creative-factory`
+## AC-1 Editor Shell
 
-这个入口已经预置：
+步骤：
 
-- `theme_config`
-- 模板接口正常时返回的 `state_schema`
-- creative factory 标准节点链
-- condition 路由
-- 图片 / 视频 TODO 产物链
-
-补充说明：
-
-- 如果模板接口异常，editor 会退回最小 shell graph，而不是使用前端本地完整默认图
-
----
-
-## 4. 基础环境验收
-
-### AC-ENV-1 前端可启动
-
-验证：
-
-1. 运行 `./scripts/dev_up.sh`
-2. 打开 `http://127.0.0.1:3477`
+1. 打开 `/editor`
+2. 确认能看到：
+   - 新建图入口
+   - 已有图列表
+   - 模板信息
 
 通过标准：
 
-- 首页可访问
-- 左侧导航正常
-- 默认语言为中文
+- 页面可访问
+- 可跳转到 `/editor/new`
 
-### AC-ENV-2 后端可启动
+## AC-2 Canvas Base
 
-验证：
+步骤：
 
-1. 访问 `http://127.0.0.1:8765/health`
-
-通过标准：
-
-- 返回 `{"status":"ok"}`
-
-### AC-ENV-3 本地数据目录可用
-
-检查目录：
-
-- `backend/data/graphs/`
-- `backend/data/kb/`
-- `backend/data/memories/`
-- `backend/data/runs/`
+1. 打开 `/editor/new`
+2. 检查画布背景
+3. 使用鼠标滚轮缩放
+4. 拖动画布
+5. 点击 `Fit View`
 
 通过标准：
 
-- 目录存在
-- 运行时不会因目录缺失报错
+- 网格或点阵背景清晰
+- 缩放正常
+- 平移正常
+- Fit View 生效
 
----
+## AC-3 Left Rail
 
-## 5. Editor 标准协议验收
+步骤：
 
-### AC-GRAPH-1 / AC-GRAPH-2 / AC-GRAPH-3
-
-验证：
-
-1. 打开 `http://127.0.0.1:3477/editor/creative-factory`
-2. 检查左侧 `State Panel`
-3. 选中任意节点，检查右侧 `Inputs / Outputs / Structured Params`
-4. 点击 `Validate Graph`
-5. 点击 `Save Graph`
-6. 保存后确认路由切换到真实 `/editor/{graphId}`
-7. 刷新页面，确认 graph 能从后端重新加载
+1. 打开 `/editor/new`
+2. 检查左侧是否存在：
+   - `State Panel`
+   - `Node Palette`
 
 通过标准：
 
-- 校验通过
-- graph 能保存
-- graph 刷新后仍可读取
+- 两个区块清晰分开
+- state 列表可见
+- 节点库可搜索
 
----
+## AC-4 Node Creation
 
-## 6. 编排交互验收
+步骤：
 
-### AC-FE-3 / AC-FE-4 / AC-FE-5
-
-检查：
-
-- 左侧存在 `State Panel`
-- 节点为自定义卡片而不是默认方块
-- 节点左侧为输入、右侧为输出
-- 可新增节点
-- 可拖拽节点
-- 可连线
-- 选中节点后可以勾选 `reads / writes`
-
-附加检查：
-
-- 在节点右侧的 `Inputs` 或 `Outputs` 区域输入新 key，点击 `+ Add`
-- 新 state key 应自动加入全局 `State Panel`
-- 同时绑定到当前节点
+1. 在节点库中点击一个节点
+2. 再拖拽一个节点到画布
 
 通过标准：
 
-- 编排与 state 编辑联动正常
+- 点击建点成功
+- 拖拽建点成功
+- 新节点自动选中
 
----
+## AC-5 Node Semantics
 
-## 7. Theme 与模板验收
+步骤：
 
-验证：
-
-1. 在 `creative-factory` 编辑器顶部修改：
-   - `Domain`
-   - `Genre`
-   - `Market`
-   - `Platform`
-   - `Language`
-   - `Creative Style`
-   - `Tone`
-2. 点击 `Save Graph`
-3. 点击 `Run Graph`
-4. 打开对应 run detail
+1. 创建 `start`
+2. 创建 `hello_model`
+3. 创建 `end`
+4. 观察节点呈现
 
 通过标准：
 
-- `theme_config` 可保存
-- run detail 的 `artifacts.theme_config` 中能看到主题配置
+- 节点能区分输入和输出
+- `start`、`hello_model`、`end` 视觉语义明确
 
----
+## AC-6 Edge Semantics
 
-## 8. Runtime 验收
+步骤：
 
-### AC-RUNTIME-1 标准模板可运行
-
-验证：
-
-1. 在 `creative-factory` 页面点击 `Run Graph`
-2. 等待 editor 更新当前 run
-3. 打开 `/runs/{runId}`
+1. 连线 `start -> hello_model`
+2. 连线 `hello_model -> end`
+3. 为边配置 `flow_keys`
 
 通过标准：
 
-- 返回 `run_id`
-- run 状态为 `completed` 或 `failed`
-- 画布节点状态发生变化
+- 边为单线
+- 线上有小标签
+- 标签能表达当前边代表的 state 内容
 
-当前实现说明：
+## AC-7 Save and Reload
 
-- 当前节点状态会在运行期间持续刷新
-- 终态后轮询会自动停止
-- 运行中的整体警告与错误会在 editor 中同步显示
+步骤：
 
-### AC-RUNTIME-2 条件路由
-
-验证：
-
-1. 选中 `Condition` 节点
-2. 检查其分支边是否存在：
-   - `pass`
-   - `revise`
-   - `fail`
-3. 运行 graph
+1. 在 `/editor/new` 搭建最小 `hello_world` 图
+2. 点击 `Save`
+3. 记录跳转后的 `graphId`
+4. 刷新页面
 
 通过标准：
 
-- graph 可以通过 condition 路由完成收束或回修
+- graph 成功保存
+- 跳转到 `/editor/{graphId}`
+- 刷新后仍能加载原图
 
-备注：
+## AC-8 Validate
 
-- 当前标准 runtime 要求普通节点只有一个主后继
-- 如需分支，必须使用 `condition` 节点
+步骤：
 
-### AC-RUNTIME-3 / AC-RUNTIME-4 / AC-RUNTIME-5
-
-验证：
-
-1. 打开 run detail
-2. 检查：
-   - `current_node_id`
-   - `node_status_map`
-   - `evaluation_result`
-   - `final_result`
-   - `artifacts`
-3. 在 editor 中点击已执行节点，查看 `Latest Execution`
+1. 点击 `Validate`
+2. 观察 inspector 中的反馈
 
 通过标准：
 
-- node execution 至少包含：
-  - `node_id`
-  - `node_type`
+- 合法图返回通过
+- 非法图能看到明确 issue
+
+## AC-9 Hello World Run
+
+步骤：
+
+1. 使用最小 `hello_world` 图
+2. 在 `hello_model` 中设置名字参数
+3. 点击 `Run`
+4. 等待运行结束
+
+通过标准：
+
+- run 状态可见
+- 运行成功或失败状态明确
+- 最终结果区域可见 greeting 或错误信息
+
+## AC-10 Node Result Inspection
+
+步骤：
+
+1. 完成一次 run
+2. 点击 `hello_model`
+
+通过标准：
+
+- 可看到节点最近一次运行结果
+- 至少包含：
   - `status`
-  - `duration_ms`
   - `input_summary`
   - `output_summary`
-- 如果节点详情存在，还应能看到：
   - `warnings`
   - `errors`
   - `artifacts`
 
----
+## AC-11 End Summary Semantics
 
-## 9. Creative Factory 全链路验收
+步骤：
 
-当前标准 creative factory 主链应覆盖：
-
-`start -> research -> collect_assets -> normalize_assets -> select_assets -> analyze_assets -> extract_patterns -> build_brief -> generate_variants -> generate_storyboards -> generate_video_prompts -> review_variants -> condition -> prepare_image_todo -> prepare_video_todo -> finalize -> end`
-
-验证：
-
-1. 打开 `creative-factory`
-2. 直接运行
-3. 打开 run detail
-4. 检查 artifacts 中是否存在：
-   - `creative_brief`
-   - `best_variant`
-   - `storyboard_packages`
-   - `video_prompt_packages`
-   - `image_generation_todo`
-   - `video_generation_todo`
-   - `final_package`
+1. 完成一次 `hello_world` run
+2. 观察 `end` 节点和最终结果表达
 
 通过标准：
 
-- 上述字段存在
-- `best_variant` 非空
-- `final_package` 非空
+- 用户能理解最终 state 在 `end` 收口
+- greeting 或最终结果能被明确读取
 
----
+## 5. Exit Criteria
 
-## 10. 页面联通验收
+当前阶段可认为通过验收的条件：
 
-检查：
-
-- `/workspace`
-- `/runs`
-- `/runs/[runId]`
-- `/knowledge`
-- `/memories`
-- `/settings`
-
-通过标准：
-
-- 页面都可访问
-- 数据源来自真实后端接口
-
----
-
-## 11. 当前未完成项提示
-
-当前仍未完全补齐的体验项：
-
-- Runs 搜索与筛选
-- Knowledge / Memories 搜索与详情
-- 持续轮询与更强调试体验
-- 更完整的 edge bus 表达
-
-所以这份 runbook 的目标是验证“标准主链可用”，而不是验证所有增强项都已经完成。
+- 新 editor 路由可用
+- state-aware 基本心智成立
+- 节点输入输出和边标签可读
+- 节点运行结果可在 editor 内查看
+- `hello_world` 可保存、校验、运行
