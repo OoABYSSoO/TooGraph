@@ -177,6 +177,50 @@ GraphiteUI editor 的目标不是做通用流程图工具。
 - `hello_world` 的真实输出是 `greeting / final_result`
 - `greeting / final_result / llm_response` 不应被错误表达成初始输入
 
+第一阶段已确定的边界节点范围：
+
+- `Text Input`
+- `Text Output`
+
+`Text Input` 第一阶段要求：
+
+- 节点本体内直接存在文本输入控件
+- 节点没有输入，只有输出
+- 输出的 state key 由边界配置决定
+- 未连接时左侧不常驻显示输入 socket，保持“本地输入即默认来源”的心智
+- 当用户进入拖线中的连线态时，可被覆盖的输入位置允许临时浮现高亮接入点
+- 一旦接入外部输入，本地文本框进入置灰禁用态，明确表达本地值当前不参与运行
+
+`Text Output` 第一阶段要求：
+
+- 节点只有输入，没有输出
+- 在未连接前，输入类型按 `any` 理解
+- 连接后根据接入的 state 决定展示内容
+- 节点本体或 inspector 至少有一处可直接查看输出预览
+- 保存能力通过节点配置开关控制，而不是拆成独立 save 节点
+- 输出节点不按内容类型拆成多个节点类型，优先走统一输出节点 + 自适应预览模型
+- 第一阶段先把文本预览做好，并支持普通文本、Markdown、JSON 的合适展示方式
+
+## 4.6 Parameter Input Model
+
+第一阶段开始引入 ComfyUI 风格的参数输入模型：
+
+- 参数既可以来自本地 widget
+- 也可以来自上游连接
+- 若参数 socket 已连接，则上游值覆盖本地 widget 值
+- 若参数 socket 未连接，则使用本地 widget 值
+- 参数 widget 默认不必常驻显示输入 socket，但在拖线中的连线态应暴露可接入位置
+- 参数 socket 接入后，本地 widget 保留可见但切换为禁用态，用于表达“当前值被上游覆盖”
+- 前端节点外观应优先展示通用端口语义，例如 `text`，而不是直接暴露某个 graph 的具体 state key
+- 前端节点定义建议采用 `inputs / outputs / widgets` 的配置式结构，再在编译阶段映射到后端真实 `reads / writes / params`
+
+该规则属于 editor 交互模型，不改变后端 LangGraph 的基本运行语义。
+
+第一阶段至少要求：
+
+- `hello_model.name` 支持参数 socket
+- 保存后重新打开图时，参数绑定关系可被还原
+
 ## 5. Scope
 
 ## 5.1 Phase 1 Required Scope
@@ -411,6 +455,7 @@ GraphiteUI editor 的目标不是做通用流程图工具。
 
 - 输入边界提供 `name`
 - `hello_model` 节点读取 `name`
+- `hello_model.name` 可以来自本地文本框，也可以由上游连接覆盖
 - `hello_model` 节点写出 `greeting / final_result / llm_response`
 - 后端调用本地 OpenAI-compatible 模型服务
 - 前端可见 `greeting`

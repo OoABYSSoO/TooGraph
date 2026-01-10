@@ -42,6 +42,13 @@ curl --noproxy '*' -fsS http://127.0.0.1:8765/health
 
 ## 4. Core Acceptance Cases
 
+当前验收重点：
+
+- 边界节点是否已经替代显式 `start / end`
+- 逐项 state 连线是否足够清晰
+- 参数 socket 覆盖本地值是否符合 ComfyUI 心智
+- `hello_world` 是否能按新边界模型闭环运行
+
 ## AC-1 Editor Shell
 
 步骤：
@@ -117,6 +124,23 @@ curl --noproxy '*' -fsS http://127.0.0.1:8765/health
 - `hello_model` 只显示真实 `reads / writes`
 - 用户不需要依赖显式 `start/end` 才能理解图
 
+## AC-5.1 Parameter Socket Override
+
+步骤：
+
+1. 创建 `hello_model`
+2. 观察节点中间的 `name` 输入框
+3. 确认输入框左侧存在参数 socket
+4. 将某个 state 连到 `name` 参数 socket
+5. 再断开连接并直接修改本地文本
+
+通过标准：
+
+- `hello_model` 只有一个 `name` 参数输入位
+- 不会同时出现重复的 `name` 输入 state chip
+- 已连接时，用户能看出上游值覆盖本地值
+- 未连接时，本地文本参与运行
+
 ## AC-6 Edge Semantics
 
 步骤：
@@ -162,7 +186,7 @@ curl --noproxy '*' -fsS http://127.0.0.1:8765/health
 步骤：
 
 1. 使用最小 `hello_world` 图
-2. 在输入边界中设置名字参数
+2. 在输入边界中设置名字参数，或将输入 state 连到 `hello_model.name`
 3. 点击 `Run`
 4. 等待运行结束
 
@@ -171,6 +195,7 @@ curl --noproxy '*' -fsS http://127.0.0.1:8765/health
 - run 状态可见
 - 运行成功或失败状态明确
 - 最终结果区域可见 greeting 或错误信息
+- 若使用参数连接覆盖，本地名字字段不会阻断运行
 
 ## AC-10 Node Result Inspection
 

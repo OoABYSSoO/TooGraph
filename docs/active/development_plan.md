@@ -15,16 +15,54 @@
 - `hello_world` 模板存在
 - `/editor`、`/editor/new`、`/editor/[graphId]` 路由已接回
 - 画布、缩放、平移、Mini Map、基础建点、基础连线已存在
+- 左侧已有 `State Panel + Node Palette`
+- state 支持新增、搜索、颜色配置、readers / writers 展示
+- 节点已切到单行横向布局
+- 前端已用 `Text Input / Text Output` 替代显式 `start / end`
+- 每个 state 项已支持独立连接线，并在保存时折叠回后端 `flow_keys`
+- `hello_model` 已支持参数级连接覆盖本地值
+- `Text Output` 已支持预览和可选保存
+- Save / Validate / Run 已接通
 
 当前代码与新目标之间的主要差距：
 
-- 左侧尚未形成真正的 `State Panel + Node Palette`
-- state 还不是 editor 的一等对象
-- 前端边界模型还没有从 `start/end` 彻底切到 `Input/Output`
-- 节点输入输出表达还需要与边界模型统一
-- 逐项 state 连线还需要与后端编译映射正式收口
-- 节点运行结果展示还不够完整
-- `hello_world` 闭环需要按新心智再收紧一次
+- `Text Input` 还没有在节点本体内直接提供可编辑文本框
+- `Text Output` 还需要更明确的“未连接 / 已连接 / 预览 / 保存”终端语义
+- 参数级 socket 目前只在 `hello_model.name` 上落地，尚未成为通用能力
+- 节点运行结果仍以 run 级结果为主，节点级结果视图还不完整
+- `condition` 节点仍未按新心智重建
+- `hello_world` 闭环还需要按边界节点语义再做一次收口验收
+
+## 2.1 Current Progress
+
+当前阶段已经完成的里程碑：
+
+- `M1 State-Aware Shell` 已基本完成
+- `M2 Readable Processing Graph` 已完成大部分
+
+已经稳定落地的部分：
+
+- state 是 editor 的一等对象
+- 输入输出按 state 项逐条连线
+- 前端边界模型与后端 `START / END` 存在可运行映射
+- `hello_model` 不再错误输出 `name`
+- `hello_model.name` 已具备 ComfyUI 风格的“连接覆盖本地值”能力
+
+## 2.2 Current Focus
+
+当前开发聚焦，不再继续发散：
+
+1. 收紧边界节点交互
+2. 把 ComfyUI 风格的“widget + socket fallback”推广成通用规则
+3. 补全节点内直接编辑体验
+4. 补强节点级运行结果可视化
+
+当前最优先的具体事项：
+
+- `Text Input` 节点内嵌文本框
+- `Text Output` 节点内嵌终端预览
+- 参数 socket 通用化
+- 节点结果 inspector 收口
 
 ## 3. Strategy
 
@@ -74,12 +112,14 @@
 - 强化节点输入输出布局
 - 收紧逐项 state 连线规则
 - 定义前后端编译映射
+- 为关键参数补 socket 覆盖本地值规则
 
 完成标准：
 
 - 用户能一眼看懂某节点读什么、写什么
 - 用户能通过逐项连线读懂主要 state flow
 - 用户不必直接理解 `START / END`
+- 关键节点参数可通过连接覆盖 widget 本地值
 
 ## Phase 3 Inspector and Runtime Visibility
 
@@ -93,6 +133,7 @@
 - 接入节点级执行结果
 - 增加 `Changed Outputs`
 - 显示 run 状态、错误、警告和最终结果
+- 把输出边界预览与保存信息整理进节点级视图
 
 完成标准：
 
@@ -136,11 +177,10 @@
 
 当前推荐顺序：
 
-1. Phase 1 State Model and Left Rail
-2. Phase 2 Boundary Model and Graph Semantics
-3. Phase 3 Inspector and Runtime Visibility
-4. Phase 4 Hello World Closure
-5. Phase 5 Cleanup and Expansion
+1. Phase 2 Boundary Model and Graph Semantics
+2. Phase 3 Inspector and Runtime Visibility
+3. Phase 4 Hello World Closure
+4. Phase 5 Cleanup and Expansion
 
 ## 6. Milestone Definition
 

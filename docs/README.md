@@ -19,6 +19,7 @@
 - `editor_interaction_spec.md`
 - `development_plan.md`
 - `acceptance_runbook.md`
+- `node_definition_spec.md`
 
 ## `docs/architecture/`
 
@@ -53,7 +54,8 @@
 2. `docs/active/editor_interaction_spec.md`
 3. `docs/active/development_plan.md`
 4. `docs/active/acceptance_runbook.md`
-5. `docs/architecture/framework_positioning.md`
+5. `docs/active/node_definition_spec.md`
+6. `docs/architecture/framework_positioning.md`
 
 ## 3. Current Source of Truth
 
@@ -63,6 +65,7 @@
 - [editor_interaction_spec.md](/home/abyss/GraphiteUI/docs/active/editor_interaction_spec.md)
 - [development_plan.md](/home/abyss/GraphiteUI/docs/active/development_plan.md)
 - [acceptance_runbook.md](/home/abyss/GraphiteUI/docs/active/acceptance_runbook.md)
+- [node_definition_spec.md](/home/abyss/GraphiteUI/docs/active/node_definition_spec.md)
 
 这些文档共同定义：
 
@@ -70,3 +73,13 @@
 - 为什么它和 LangGraph 兼容但不完全等同
 - 现在应该先做什么
 - 怎么验收第一阶段
+
+## 4. Current Focus
+
+当前 editor 文档聚焦这几个点：
+
+- `Text Input / Text Output` 边界节点
+- 逐项 state 连线
+- ComfyUI 风格的参数 socket 覆盖本地 widget
+- `hello_world` 的真实闭环验收
+- 节点定义驱动渲染与 runtime mapping
