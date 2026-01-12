@@ -2,15 +2,17 @@ from __future__ import annotations
 
 from uuid import uuid4
 
-from app.core.schemas.graph import GraphDocument, GraphPayload
+from app.core.schemas.graph_family import AnyGraphDocument, AnyGraphPayload, parse_graph_document
 from app.core.storage.database import get_connection, row_payload
 
 
-def save_graph(graph_payload: GraphPayload) -> GraphDocument:
+def save_graph(graph_payload: AnyGraphPayload) -> AnyGraphDocument:
     graph_id = graph_payload.graph_id or _generate_graph_id()
-    graph = GraphDocument(
-        **graph_payload.model_dump(exclude={"graph_id"}),
-        graph_id=graph_id,
+    graph = parse_graph_document(
+        {
+            **graph_payload.model_dump(exclude={"graph_id"}, by_alias=True),
+            "graph_id": graph_id,
+        }
     )
     with get_connection() as connection:
         connection.execute(
@@ -34,7 +36,7 @@ def save_graph(graph_payload: GraphPayload) -> GraphDocument:
     return graph
 
 
-def load_graph(graph_id: str) -> GraphDocument:
+def load_graph(graph_id: str) -> AnyGraphDocument:
     with get_connection() as connection:
         row = connection.execute(
             "SELECT payload_json FROM graphs WHERE graph_id = ?",
@@ -43,19 +45,19 @@ def load_graph(graph_id: str) -> GraphDocument:
     payload = row_payload(row)
     if payload is None:
         raise FileNotFoundError(f"Graph '{graph_id}' does not exist.")
-    return GraphDocument.model_validate(payload)
+    return parse_graph_document(payload)
 
 
-def list_graphs() -> list[GraphDocument]:
+def list_graphs() -> list[AnyGraphDocument]:
     with get_connection() as connection:
         rows = connection.execute(
             "SELECT payload_json FROM graphs ORDER BY updated_at DESC, graph_id DESC"
         ).fetchall()
-    graphs: list[GraphDocument] = []
+    graphs: list[AnyGraphDocument] = []
     for row in rows:
         payload = row_payload(row)
         if payload is not None:
-            graphs.append(GraphDocument.model_validate(payload))
+            graphs.append(parse_graph_document(payload))
     return graphs
 
 

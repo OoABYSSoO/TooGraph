@@ -23,6 +23,7 @@ import "@xyflow/react/dist/style.css";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { apiGet } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { EMPTY_AGENT_PRESET, getNodePresetById, NODE_PRESETS_MOCK } from "@/lib/node-presets-mock";
 import {
@@ -96,6 +97,24 @@ type FlowNodeData = {
 };
 
 type FlowNode = Node<FlowNodeData>;
+
+type SkillDefinitionField = {
+  key: string;
+  label: string;
+  valueType: string;
+  required: boolean;
+  description: string;
+};
+
+type SkillDefinition = {
+  skillKey: string;
+  label: string;
+  description: string;
+  inputSchema: SkillDefinitionField[];
+  outputSchema: SkillDefinitionField[];
+  supportedValueTypes: string[];
+  sideEffects: string[];
+};
 
 const HELLO_WORLD_TEMPLATE_ID = "hello_world";
 const TYPE_COLORS: Record<ValueType, string> = {
@@ -468,34 +487,87 @@ function MappingEditor({
 function SkillEditorList({
   skills,
   onChange,
+  definitions,
+  definitionsLoading,
+  definitionsError,
 }: {
   skills: SkillAttachment[];
   onChange: (nextSkills: SkillAttachment[]) => void;
+  definitions: SkillDefinition[];
+  definitionsLoading: boolean;
+  definitionsError: string | null;
 }) {
+  const definitionOptions = definitions.map((definition) => definition.skillKey);
+
+  function updateSkill(index: number, updater: (skill: SkillAttachment) => SkillAttachment) {
+    onChange(skills.map((item, skillIndex) => (skillIndex === index ? updater(item) : item)));
+  }
+
   return (
     <PanelSection title="Skills" description="以结构化方式编辑技能挂载与映射。">
+      <div className="rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,250,241,0.64)] px-3 py-2 text-sm leading-6 text-[var(--muted)]">
+        {definitionsLoading ? "Loading skill definitions..." : definitionsError ? `Skill definitions unavailable: ${definitionsError}` : `Loaded ${definitions.length} skill definitions.`}
+      </div>
       {skills.map((skill, index) => (
         <div key={`${skill.name}-${index}`} className="grid gap-3 rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,250,241,0.72)] p-3">
+          {(() => {
+            const definition = definitions.find((item) => item.skillKey === skill.skillKey);
+            const skillKeyOptions = skill.skillKey && !definitionOptions.includes(skill.skillKey) ? [skill.skillKey, ...definitionOptions] : definitionOptions;
+
+            return (
+              <>
           <div className="grid grid-cols-2 gap-3">
             <label className="grid gap-1.5 text-sm text-[var(--muted)]">
               <span>Name</span>
               <Input
                 value={skill.name}
-                onChange={(event) =>
-                  onChange(skills.map((item, skillIndex) => (skillIndex === index ? { ...item, name: event.target.value } : item)))
-                }
+                onChange={(event) => updateSkill(index, (currentSkill) => ({ ...currentSkill, name: event.target.value }))}
               />
             </label>
             <label className="grid gap-1.5 text-sm text-[var(--muted)]">
               <span>Skill Key</span>
-              <Input
+              <select
+                className="rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3 py-3 text-[var(--text)]"
                 value={skill.skillKey}
                 onChange={(event) =>
-                  onChange(skills.map((item, skillIndex) => (skillIndex === index ? { ...item, skillKey: event.target.value } : item)))
+                  updateSkill(index, (currentSkill) => {
+                    const selectedDefinition = definitions.find((item) => item.skillKey === event.target.value);
+                    return {
+                      ...currentSkill,
+                      skillKey: event.target.value,
+                      name:
+                        currentSkill.name === "" ||
+                        currentSkill.name === currentSkill.skillKey ||
+                        currentSkill.name.startsWith("skill_")
+                          ? selectedDefinition?.label ?? event.target.value
+                          : currentSkill.name,
+                    };
+                  })
                 }
-              />
+              >
+                <option value="">Select a skill</option>
+                {skillKeyOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
             </label>
           </div>
+          {definition ? (
+            <div className="rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,255,255,0.72)] px-3 py-3 text-sm leading-6 text-[var(--muted)]">
+              <div className="font-medium text-[var(--text)]">{definition.label}</div>
+              <div>{definition.description}</div>
+              <div className="mt-2">Supported Value Types: {definition.supportedValueTypes.join(", ") || "n/a"}</div>
+              <div>Side Effects: {definition.sideEffects.join(", ") || "none"}</div>
+              <div className="mt-2">Inputs: {definition.inputSchema.map((field) => `${field.key}:${field.valueType}`).join(", ") || "none"}</div>
+              <div>Outputs: {definition.outputSchema.map((field) => `${field.key}:${field.valueType}`).join(", ") || "none"}</div>
+            </div>
+          ) : skill.skillKey ? (
+            <div className="rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,255,255,0.72)] px-3 py-3 text-sm leading-6 text-[var(--muted)]">
+              No registered definition found for `{skill.skillKey}`. You can still keep editing mappings, or use Advanced JSON as fallback.
+            </div>
+          ) : null}
           <div className="grid grid-cols-2 gap-3">
             <label className="grid gap-1.5 text-sm text-[var(--muted)]">
               <span>Usage</span>
@@ -503,11 +575,7 @@ function SkillEditorList({
                 className="rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3 py-3 text-[var(--text)]"
                 value={skill.usage ?? "optional"}
                 onChange={(event) =>
-                  onChange(
-                    skills.map((item, skillIndex) =>
-                      skillIndex === index ? { ...item, usage: event.target.value as SkillAttachment["usage"] } : item,
-                    ),
-                  )
+                  updateSkill(index, (currentSkill) => ({ ...currentSkill, usage: event.target.value as SkillAttachment["usage"] }))
                 }
               >
                 {["required", "optional"].map((option) => (
@@ -522,23 +590,22 @@ function SkillEditorList({
             title="Input Mapping"
             value={skill.inputMapping}
             addLabel="Add Input Mapping"
-            onChange={(nextValue) =>
-              onChange(skills.map((item, skillIndex) => (skillIndex === index ? { ...item, inputMapping: nextValue } : item)))
-            }
+            onChange={(nextValue) => updateSkill(index, (currentSkill) => ({ ...currentSkill, inputMapping: nextValue }))}
           />
           <MappingEditor
             title="Context Binding"
             value={skill.contextBinding}
             addLabel="Add Context Binding"
-            onChange={(nextValue) =>
-              onChange(skills.map((item, skillIndex) => (skillIndex === index ? { ...item, contextBinding: nextValue } : item)))
-            }
+            onChange={(nextValue) => updateSkill(index, (currentSkill) => ({ ...currentSkill, contextBinding: nextValue }))}
           />
           <div className="flex justify-end">
             <Button variant="ghost" onClick={() => onChange(skills.filter((_, skillIndex) => skillIndex !== index))}>
               Remove Skill
             </Button>
           </div>
+              </>
+            );
+          })()}
         </div>
       ))}
       <div className="flex justify-start">
@@ -839,8 +906,11 @@ function NodeSystemCanvas({ initialGraph }: { initialGraph: GraphPayload }) {
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [statusMessage, setStatusMessage] = useState("Node system phase 2.5: structured inspector editing.");
+  const [statusMessage, setStatusMessage] = useState("Node system phase 4: skill definitions connected.");
   const [localPresets, setLocalPresets] = useState<NodePresetDefinition[]>([]);
+  const [skillDefinitions, setSkillDefinitions] = useState<SkillDefinition[]>([]);
+  const [skillDefinitionsLoading, setSkillDefinitionsLoading] = useState(true);
+  const [skillDefinitionsError, setSkillDefinitionsError] = useState<string | null>(null);
   const [creationMenu, setCreationMenu] = useState<{
     clientX: number;
     clientY: number;
@@ -900,6 +970,33 @@ function NodeSystemCanvas({ initialGraph }: { initialGraph: GraphPayload }) {
   const previewTextByNode = useMemo(() => {
     return Object.fromEntries(nodes.map((node) => [node.id, createPreviewText(node, nodes, edges)]));
   }, [edges, nodes]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadSkillDefinitions() {
+      try {
+        setSkillDefinitionsLoading(true);
+        setSkillDefinitionsError(null);
+        const payload = await apiGet<SkillDefinition[]>("/api/skills/definitions");
+        if (!active) return;
+        setSkillDefinitions(payload);
+      } catch (error) {
+        if (!active) return;
+        setSkillDefinitionsError(error instanceof Error ? error.message : "Unknown error");
+      } finally {
+        if (active) {
+          setSkillDefinitionsLoading(false);
+        }
+      }
+    }
+
+    void loadSkillDefinitions();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const openCreationMenuAtClientPoint = useCallback(
     (clientX: number, clientY: number, sourceValueType: ValueType | null = null) => {
@@ -1290,6 +1387,7 @@ function createNodeFromPreset(preset: NodePresetDefinition, position: { x: numbe
                     <div>Structured inspector editing</div>
                     <div>Type-aware creation suggestions</div>
                     <div>Advanced JSON kept as fallback</div>
+                    <div>Skill definitions connected</div>
                     <div>Runtime migration pending</div>
                   </div>
                 </section>
@@ -1456,6 +1554,9 @@ function createNodeFromPreset(preset: NodePresetDefinition, position: { x: numbe
                     <SkillEditorList
                       skills={selectedNode.data.config.skills}
                       onChange={(nextSkills) => updateSelectedNode((config) => ({ ...(config as AgentNode), skills: nextSkills }))}
+                      definitions={skillDefinitions}
+                      definitionsLoading={skillDefinitionsLoading}
+                      definitionsError={skillDefinitionsError}
                     />
                     <MappingEditor
                       title="Output Binding"

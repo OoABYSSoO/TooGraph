@@ -404,6 +404,15 @@
 
 后端已经能“理解”新模型，但还不需要完整运行。
 
+### Status
+
+基础接入已完成：
+
+- 后端新增了 `node_system` graph schema
+- `/api/graphs/save` 与 `/api/graphs/validate` 已支持新旧 payload 双通道解析
+- 存储层已能保存和读取新 graph family
+- 运行时仍保持旧协议执行，`node_system` 仅完成“理解与保存”，尚未进入执行阶段
+
 ---
 
 ## Phase 4: Introduce Skill Registry Schema
@@ -453,6 +462,16 @@
 ### Exit Criteria
 
 agent node 的 skill attachment 已经有可依赖的数据源。
+
+### Status
+
+基础定义链路已完成：
+
+- 后端新增了 `skill definition schema`
+- 已提供 `/api/skills/definitions`
+- 当前已有一批正式 machine-readable skill definitions 可供前端读取
+- 前端 `NodeSystemEditor` 已接入 definitions，用于 skill 选择与 contract 展示
+- 现阶段 definitions 先覆盖代表性 skills，后续再扩展到完整 skill 集
 
 ---
 
