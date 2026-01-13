@@ -5,7 +5,7 @@ from typing import Any
 
 from app.knowledge.loader import search_knowledge
 from app.core.schemas.skills import SkillCatalogStatus
-from app.core.storage.skill_store import get_skill_status_map
+from app.core.storage.skill_store import get_skill_status_map, list_managed_skill_keys
 from app.tools.registry import get_tool_registry
 
 
@@ -37,12 +37,14 @@ def get_skill_registry(*, include_disabled: bool = False) -> dict[str, SkillFunc
         "extract_creative_patterns": tools["extract_creative_patterns"],
     }
     if include_disabled:
-        return registry
+        allowed_keys = list_managed_skill_keys()
+        return {key: value for key, value in registry.items() if key in allowed_keys}
+    allowed_keys = list_managed_skill_keys()
     status_map = get_skill_status_map()
     return {
         key: value
         for key, value in registry.items()
-        if status_map.get(key, SkillCatalogStatus.ACTIVE) == SkillCatalogStatus.ACTIVE
+        if key in allowed_keys and status_map.get(key, SkillCatalogStatus.ACTIVE) == SkillCatalogStatus.ACTIVE
     }
 
 

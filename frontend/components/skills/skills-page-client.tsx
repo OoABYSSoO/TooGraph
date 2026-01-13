@@ -20,7 +20,7 @@ type SkillField = {
 };
 
 type SkillCompatibilityReport = {
-  target: "claude_code" | "codex";
+  target: "claude_code" | "openclaw" | "codex";
   status: "native" | "partial" | "incompatible";
   summary: string;
   missingCapabilities: string[];
@@ -34,9 +34,13 @@ type SkillDefinition = {
   outputSchema: SkillField[];
   supportedValueTypes: string[];
   sideEffects: string[];
-  sourceFormat: "graphite_definition" | "claude_code" | "codex";
+  sourceFormat: "graphite_definition" | "claude_code" | "openclaw" | "codex";
+  sourceScope: "graphite_managed" | "external";
+  sourcePath: string;
   runtimeRegistered: boolean;
   status: "active" | "disabled" | "deleted";
+  canManage: boolean;
+  canImport: boolean;
   compatibility: SkillCompatibilityReport[];
 };
 
@@ -49,6 +53,7 @@ const COMPATIBILITY_LABELS: Record<SkillCompatibilityReport["status"], string> =
 const FORMAT_LABELS: Record<SkillDefinition["sourceFormat"], string> = {
   graphite_definition: "Graphite 定义",
   claude_code: "Claude Code",
+  openclaw: "OpenClaw",
   codex: "Codex",
 };
 
@@ -64,7 +69,7 @@ export function SkillsPageClient() {
     let cancelled = false;
     async function loadSkills() {
       try {
-        const payload = await apiGet<SkillDefinition[]>("/api/skills/definitions?include_disabled=true");
+        const payload = await apiGet<SkillDefinition[]>("/api/skills/catalog?include_disabled=true");
         if (!cancelled) {
           setSkills(payload);
           setSelectedSkillKey((current) => current ?? payload[0]?.skillKey ?? null);
@@ -83,7 +88,7 @@ export function SkillsPageClient() {
   }, []);
 
   async function refreshSkills(preferredSkillKey?: string | null) {
-    const payload = await apiGet<SkillDefinition[]>("/api/skills/definitions?include_disabled=true");
+    const payload = await apiGet<SkillDefinition[]>("/api/skills/catalog?include_disabled=true");
     setSkills(payload);
     const nextKey = preferredSkillKey && payload.some((item) => item.skillKey === preferredSkillKey)
       ? preferredSkillKey
@@ -127,6 +132,18 @@ export function SkillsPageClient() {
     }
   }
 
+  async function handleImport(skillKey: string) {
+    setPendingActionKey(skillKey);
+    try {
+      await apiPost<SkillDefinition>(`/api/skills/${skillKey}/import`, {});
+      await refreshSkills(skillKey);
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : "Failed to import skill.");
+    } finally {
+      setPendingActionKey(null);
+    }
+  }
+
   async function handleEnable(skillKey: string) {
     setPendingActionKey(skillKey);
     try {
@@ -164,22 +181,32 @@ export function SkillsPageClient() {
 
   return (
     <div className="grid gap-6">
-      <section className="grid grid-cols-4 gap-[18px] max-[1100px]:grid-cols-2 max-[720px]:grid-cols-1">
+      <section className="grid grid-cols-5 gap-[18px] max-[1280px]:grid-cols-3 max-[900px]:grid-cols-2 max-[720px]:grid-cols-1">
         <MetricCard title="技能总数" value={String(skills.length)} detail="当前后端已登记的 skill definitions" />
+        <MetricCard
+          title="已导入"
+          value={String(skills.filter((skill) => skill.sourceScope === "graphite_managed").length)}
+          detail="已经复制进 GraphiteUI 本地 skill 仓库"
+        />
+        <MetricCard
+          title="外部源"
+          value={String(skills.filter((skill) => skill.sourceScope === "external").length)}
+          detail="只能先导入，不能直接管理外部 skill 源"
+        />
         <MetricCard
           title="已注册运行时"
           value={String(skills.filter((skill) => skill.runtimeRegistered).length)}
           detail="具备后端实际可执行实现"
         />
         <MetricCard
-          title="已禁用"
-          value={String(skills.filter((skill) => skill.status === "disabled").length)}
-          detail="暂时不出现在默认可用 skill 列表里"
+          title="Claude 原生"
+          value={String(skills.filter((skill) => skill.compatibility.some((item) => item.target === "claude_code" && item.status === "native")).length)}
+          detail="当前已经以 Claude Code 文件作为定义源"
         />
         <MetricCard
-          title="Claude 部分兼容"
-          value={String(skills.filter((skill) => skill.compatibility.some((item) => item.target === "claude_code" && item.status === "partial")).length)}
-          detail="已接近 Claude Code skill 语义"
+          title="OpenClaw 部分兼容"
+          value={String(skills.filter((skill) => skill.compatibility.some((item) => item.target === "openclaw" && item.status === "partial")).length)}
+          detail="和 OpenClaw 的 SKILL.md 目录格式只差包装层"
         />
       </section>
 
@@ -189,7 +216,7 @@ export function SkillsPageClient() {
             <div className="text-[0.76rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">Skill Registry</div>
             <h2 className="mt-2 text-2xl font-semibold">已登记技能</h2>
             <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-              先把当前 skill 看清楚，再决定哪些要原生支持 Claude Code 或 Codex 格式。
+              外部 skill 源只负责被发现。只有导入到 GraphiteUI 自己的 skill 仓库后，才允许启用、禁用或删除。
             </p>
           </div>
 
@@ -215,14 +242,15 @@ export function SkillsPageClient() {
                       <div className="truncate text-base font-semibold text-[var(--text)]">{skill.label}</div>
                       <div className="mt-1 truncate text-xs uppercase tracking-[0.08em] text-[var(--muted)]">{skill.skillKey}</div>
                     </div>
-                    <Badge className={cn(skill.runtimeRegistered ? "text-[var(--success)]" : "text-[var(--danger)]")}>
-                      {skill.runtimeRegistered ? "已注册" : "未注册"}
+                    <Badge className={cn(skill.sourceScope === "graphite_managed" ? "text-[var(--success)]" : "text-[var(--accent-strong)]")}>
+                      {skill.sourceScope === "graphite_managed" ? "已导入" : "外部源"}
                     </Badge>
                   </div>
                   <div className="mt-2 line-clamp-2 text-sm leading-6 text-[var(--muted)]">{skill.description}</div>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Badge>{FORMAT_LABELS[skill.sourceFormat]}</Badge>
-                    <Badge>{skill.status === "active" ? "启用中" : "已禁用"}</Badge>
+                    <Badge>{skill.sourceScope === "graphite_managed" ? "Graphite 本地" : "外部只读"}</Badge>
+                    {skill.sourceScope === "graphite_managed" ? <Badge>{skill.status === "active" ? "启用中" : "已禁用"}</Badge> : null}
                     {skill.sideEffects.slice(0, 2).map((item) => (
                       <Badge key={item}>{item}</Badge>
                     ))}
@@ -244,7 +272,8 @@ export function SkillsPageClient() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Badge>{FORMAT_LABELS[selectedSkill.sourceFormat]}</Badge>
-                  <Badge>{selectedSkill.status === "active" ? "启用中" : "已禁用"}</Badge>
+                  <Badge>{selectedSkill.sourceScope === "graphite_managed" ? "Graphite 本地" : "外部源"}</Badge>
+                  {selectedSkill.sourceScope === "graphite_managed" ? <Badge>{selectedSkill.status === "active" ? "启用中" : "已禁用"}</Badge> : null}
                   <Badge className={cn(selectedSkill.runtimeRegistered ? "text-[var(--success)]" : "text-[var(--danger)]")}>
                     {selectedSkill.runtimeRegistered ? "Runtime 已注册" : "Runtime 未注册"}
                   </Badge>
@@ -253,8 +282,23 @@ export function SkillsPageClient() {
 
               <p className="text-[0.98rem] leading-7 text-[var(--muted)]">{selectedSkill.description}</p>
 
+              <div className="rounded-[18px] border border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.72)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">
+                <div>来源路径: {selectedSkill.sourcePath}</div>
+                <div>管理方式: {selectedSkill.canManage ? "已导入，可在 GraphiteUI 内管理" : "外部只读，需先导入"}</div>
+              </div>
+
               <div className="flex flex-wrap gap-3">
-                {selectedSkill.status === "active" ? (
+                {selectedSkill.canImport ? (
+                  <Button
+                    type="button"
+                    variant="primary"
+                    disabled={pendingActionKey === selectedSkill.skillKey}
+                    onClick={() => handleImport(selectedSkill.skillKey)}
+                  >
+                    导入到 GraphiteUI
+                  </Button>
+                ) : null}
+                {selectedSkill.canManage && selectedSkill.status === "active" ? (
                   <Button
                     type="button"
                     variant="secondary"
@@ -263,7 +307,8 @@ export function SkillsPageClient() {
                   >
                     禁用
                   </Button>
-                ) : (
+                ) : null}
+                {selectedSkill.canManage && selectedSkill.status !== "active" ? (
                   <Button
                     type="button"
                     variant="secondary"
@@ -272,15 +317,17 @@ export function SkillsPageClient() {
                   >
                     启用
                   </Button>
-                )}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  disabled={pendingActionKey === selectedSkill.skillKey}
-                  onClick={() => handleDelete(selectedSkill.skillKey)}
-                >
-                  删除
-                </Button>
+                ) : null}
+                {selectedSkill.canManage ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    disabled={pendingActionKey === selectedSkill.skillKey}
+                    onClick={() => handleDelete(selectedSkill.skillKey)}
+                  >
+                    删除
+                  </Button>
+                ) : null}
               </div>
 
               <div className="grid grid-cols-3 gap-4 max-[960px]:grid-cols-1">
@@ -330,7 +377,11 @@ export function SkillsPageClient() {
                   <div key={report.target} className="rounded-[20px] border border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.72)] p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div className="text-lg font-semibold text-[var(--text)]">
-                        {report.target === "claude_code" ? "Claude Code" : "Codex"}
+                        {report.target === "claude_code"
+                          ? "Claude Code"
+                          : report.target === "openclaw"
+                            ? "OpenClaw"
+                            : "Codex"}
                       </div>
                       <Badge>{COMPATIBILITY_LABELS[report.status]}</Badge>
                     </div>

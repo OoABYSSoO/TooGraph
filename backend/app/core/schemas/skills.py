@@ -16,7 +16,13 @@ class SkillSideEffect(str, Enum):
 class SkillSourceFormat(str, Enum):
     GRAPHITE = "graphite_definition"
     CLAUDE_CODE = "claude_code"
+    OPENCLAW = "openclaw"
     CODEX = "codex"
+
+
+class SkillSourceScope(str, Enum):
+    GRAPHITE_MANAGED = "graphite_managed"
+    EXTERNAL = "external"
 
 
 class SkillCompatibilityStatus(str, Enum):
@@ -27,6 +33,7 @@ class SkillCompatibilityStatus(str, Enum):
 
 class SkillCompatibilityTarget(str, Enum):
     CLAUDE_CODE = "claude_code"
+    OPENCLAW = "openclaw"
     CODEX = "codex"
 
 
@@ -64,8 +71,12 @@ class SkillDefinition(BaseModel):
     supported_value_types: list[str] = Field(default_factory=list, alias="supportedValueTypes")
     side_effects: list[SkillSideEffect] = Field(default_factory=list, alias="sideEffects")
     source_format: SkillSourceFormat = Field(default=SkillSourceFormat.GRAPHITE, alias="sourceFormat")
+    source_scope: SkillSourceScope = Field(default=SkillSourceScope.GRAPHITE_MANAGED, alias="sourceScope")
+    source_path: str = Field(default="", alias="sourcePath")
     runtime_registered: bool = Field(default=False, alias="runtimeRegistered")
     status: SkillCatalogStatus = Field(default=SkillCatalogStatus.ACTIVE)
+    can_manage: bool = Field(default=False, alias="canManage")
+    can_import: bool = Field(default=False, alias="canImport")
     compatibility: list[SkillCompatibilityReport] = Field(default_factory=list)
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
