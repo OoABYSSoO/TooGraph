@@ -267,7 +267,7 @@ def _execute_agent_node(
     selected_skills: list[str] = []
     skill_outputs: list[dict[str, Any]] = []
     skill_context: dict[str, Any] = {}
-    registry = get_skill_registry()
+    registry = get_skill_registry(include_disabled=False)
 
     for skill in config.skills:
         skill_func = registry.get(skill.skill_key)

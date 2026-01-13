@@ -38,5 +38,18 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export { API_BASE_URL };
+export async function apiDelete<T>(path: string): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: "DELETE",
+  });
 
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    const detail = payload?.detail || response.statusText;
+    throw new Error(typeof detail === "string" ? detail : `DELETE ${path} failed.`);
+  }
+
+  return response.json() as Promise<T>;
+}
+
+export { API_BASE_URL };

@@ -4,15 +4,17 @@ from collections.abc import Callable
 from typing import Any
 
 from app.knowledge.loader import search_knowledge
+from app.core.schemas.skills import SkillCatalogStatus
+from app.core.storage.skill_store import get_skill_status_map
 from app.tools.registry import get_tool_registry
 
 
 SkillFunc = Callable[..., dict[str, Any]]
 
 
-def get_skill_registry() -> dict[str, SkillFunc]:
+def get_skill_registry(*, include_disabled: bool = False) -> dict[str, SkillFunc]:
     tools = get_tool_registry()
-    return {
+    registry = {
         "search_docs": search_docs,
         "analyze_assets": analyze_assets,
         "generate_draft": generate_draft,
@@ -33,6 +35,14 @@ def get_skill_registry() -> dict[str, SkillFunc]:
         "select_top_video_assets": tools["select_top_video_assets"],
         "analyze_video_assets": tools["analyze_video_assets"],
         "extract_creative_patterns": tools["extract_creative_patterns"],
+    }
+    if include_disabled:
+        return registry
+    status_map = get_skill_status_map()
+    return {
+        key: value
+        for key, value in registry.items()
+        if status_map.get(key, SkillCatalogStatus.ACTIVE) == SkillCatalogStatus.ACTIVE
     }
 
 

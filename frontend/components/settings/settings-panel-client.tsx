@@ -22,7 +22,6 @@ type SettingsPayload = {
     routes: string[];
   };
   tools: string[];
-  skills: string[];
   templates: Array<{
     template_id: string;
     label: string;

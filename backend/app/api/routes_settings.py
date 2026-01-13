@@ -35,7 +35,7 @@ def get_settings_endpoint() -> dict:
             "routes": ["pass", "revise", "fail"],
         },
         "tools": sorted(get_tool_registry().keys()),
-        "skill_definitions": sorted(get_skill_definition_registry().keys()),
+        "skill_definitions": sorted(get_skill_definition_registry(include_disabled=False).keys()),
         "templates": [
             {
                 "template_id": template["template_id"],
