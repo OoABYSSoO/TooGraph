@@ -81,8 +81,7 @@ type TemplateRecord = {
   default_graph_name: string;
   supported_node_types: string[];
   state_schema: StateField[];
-  default_graph: Omit<GraphPayload, "graph_id">;
-  default_node_system_graph?: Omit<GraphPayload, "graph_id"> | null;
+  default_node_system_graph: Omit<GraphPayload, "graph_id">;
 };
 
 type EditorClientProps = {
@@ -145,7 +144,7 @@ function createEditorDefaults(templates: TemplateRecord[], defaultTemplateId?: s
     templates.find((item) => item.template_id === defaultTemplateId) ??
     templates.find((item) => item.template_id === HELLO_WORLD_TEMPLATE_ID) ??
     templates[0];
-  if (preferredTemplate?.default_node_system_graph) {
+  if (preferredTemplate) {
     return {
       ...preferredTemplate.default_node_system_graph,
       graph_id: null,
@@ -155,24 +154,23 @@ function createEditorDefaults(templates: TemplateRecord[], defaultTemplateId?: s
   return {
     graph_family: "node_system",
     graph_id: null,
-    name: preferredTemplate?.default_graph_name ?? "Node System Playground",
-    template_id: preferredTemplate?.template_id ?? HELLO_WORLD_TEMPLATE_ID,
-    theme_config:
-      preferredTemplate?.default_graph.theme_config ?? {
-        theme_preset: "node_system",
-        domain: "workflow",
-        genre: "agent_framework",
-        market: "local",
-        platform: "openai_compatible",
-        language: "zh",
-        creative_style: "minimal",
-        tone: "plain",
-        language_constraints: [],
-        evaluation_policy: {},
-        asset_source_policy: {},
-        strategy_profile: {},
-      },
-    state_schema: preferredTemplate?.state_schema ?? [],
+    name: "Node System Playground",
+    template_id: defaultTemplateId ?? HELLO_WORLD_TEMPLATE_ID,
+    theme_config: {
+      theme_preset: "node_system",
+      domain: "workflow",
+      genre: "agent_framework",
+      market: "local",
+      platform: "openai_compatible",
+      language: "zh",
+      creative_style: "minimal",
+      tone: "plain",
+      language_constraints: [],
+      evaluation_policy: {},
+      asset_source_policy: {},
+      strategy_profile: {},
+    },
+    state_schema: [],
     nodes: [],
     edges: [],
     metadata: {},

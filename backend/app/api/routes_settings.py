@@ -4,7 +4,6 @@ import os
 
 from fastapi import APIRouter
 
-from app.skills.registry import get_skill_registry
 from app.skills.definitions import get_skill_definition_registry
 from app.templates.registry import list_templates
 from app.tools.registry import get_tool_registry
@@ -36,7 +35,6 @@ def get_settings_endpoint() -> dict:
             "routes": ["pass", "revise", "fail"],
         },
         "tools": sorted(get_tool_registry().keys()),
-        "skills": sorted(get_skill_registry().keys()),
         "skill_definitions": sorted(get_skill_definition_registry().keys()),
         "templates": [
             {

@@ -2,266 +2,22 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.templates.creative_factory.handlers import get_creative_factory_supported_node_types
 from app.templates.creative_factory.state import get_creative_factory_state_keys, get_creative_factory_state_schema
 from app.templates.creative_factory.themes import get_creative_factory_theme_presets
 
 
-def _create_node(
-    *,
-    node_id: str,
-    node_type: str,
-    label: str,
-    x: int,
-    y: int,
-    reads: list[str] | None = None,
-    writes: list[str] | None = None,
-    params: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    params = params or {}
-    return {
-        "id": node_id,
-        "type": node_type,
-        "label": label,
-        "position": {"x": x, "y": y},
-        "reads": reads or [],
-        "writes": writes or [],
-        "params": params,
-        "config": dict(params),
-        "implementation": {
-            "executor": "node_handler",
-            "handler_key": node_type,
-            "tool_keys": [],
-        },
-    }
-
-
-def _create_edge(
-    *,
-    edge_id: str,
-    source: str,
-    target: str,
-    flow_keys: list[str],
-    edge_kind: str = "normal",
-    branch_label: str | None = None,
-) -> dict[str, Any]:
-    payload: dict[str, Any] = {
-        "id": edge_id,
-        "source": source,
-        "target": target,
-        "flow_keys": flow_keys,
-        "edge_kind": edge_kind,
-    }
-    if branch_label is not None:
-        payload["branch_label"] = branch_label
-    return payload
-
-
-def _apply_node_param_overrides(nodes: list[dict[str, Any]], overrides: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
-    next_nodes: list[dict[str, Any]] = []
-    for node in nodes:
-        node_overrides = overrides.get(node["id"], {})
-        if not node_overrides:
-            next_nodes.append(node)
-            continue
-        merged_params = {**node["params"], **node_overrides}
-        next_nodes.append(
-            {
-                **node,
-                "params": merged_params,
-                "config": dict(merged_params),
-            }
-        )
-    return next_nodes
-
-
-def _create_default_graph(theme_preset: dict[str, Any]) -> dict[str, Any]:
-    base_nodes = [
-        _create_node(node_id="start_1", node_type="start", label="Start", x=40, y=220, writes=["theme_config"]),
-        _create_node(
-            node_id="research_1",
-            node_type="research",
-            label="Research",
-            x=240,
-            y=80,
-            reads=["theme_config"],
-            writes=["market_inputs"],
-            params={"sources": ["rss", "ad_library"]},
-        ),
-        _create_node(
-            node_id="collect_assets_1",
-            node_type="collect_assets",
-            label="Collect Assets",
-            x=240,
-            y=260,
-            reads=["theme_config"],
-            writes=["market_inputs"],
-            params={"sourcePreset": "ad_library"},
-        ),
-        _create_node(
-            node_id="normalize_assets_1",
-            node_type="normalize_assets",
-            label="Normalize Assets",
-            x=460,
-            y=260,
-            reads=["market_inputs"],
-            writes=["market_inputs"],
-        ),
-        _create_node(
-            node_id="select_assets_1",
-            node_type="select_assets",
-            label="Select Assets",
-            x=680,
-            y=260,
-            reads=["market_inputs"],
-            writes=["selected_video_items"],
-            params={"top_n": 2},
-        ),
-        _create_node(
-            node_id="analyze_assets_1",
-            node_type="analyze_assets",
-            label="Analyze Assets",
-            x=900,
-            y=260,
-            reads=["selected_video_items"],
-            writes=["video_analysis_results"],
-        ),
-        _create_node(
-            node_id="extract_patterns_1",
-            node_type="extract_patterns",
-            label="Extract Patterns",
-            x=1120,
-            y=260,
-            reads=["video_analysis_results"],
-            writes=["pattern_summary"],
-        ),
-        _create_node(
-            node_id="build_brief_1",
-            node_type="build_brief",
-            label="Build Brief",
-            x=1340,
-            y=260,
-            reads=["theme_config", "market_inputs", "pattern_summary"],
-            writes=["creative_brief"],
-        ),
-        _create_node(
-            node_id="generate_variants_1",
-            node_type="generate_variants",
-            label="Generate Variants",
-            x=1580,
-            y=260,
-            reads=["theme_config", "creative_brief"],
-            writes=["script_variants"],
-            params={"variantCount": 3},
-        ),
-        _create_node(
-            node_id="generate_storyboards_1",
-            node_type="generate_storyboards",
-            label="Storyboards",
-            x=1800,
-            y=180,
-            reads=["script_variants"],
-            writes=["storyboard_packages"],
-        ),
-        _create_node(
-            node_id="generate_video_prompts_1",
-            node_type="generate_video_prompts",
-            label="Video Prompts",
-            x=1800,
-            y=340,
-            reads=["script_variants", "storyboard_packages"],
-            writes=["video_prompt_packages"],
-        ),
-        _create_node(
-            node_id="review_variants_1",
-            node_type="review_variants",
-            label="Review",
-            x=2020,
-            y=260,
-            reads=["creative_brief", "script_variants"],
-            writes=["best_variant", "evaluation_result"],
-            params={"scoreThreshold": 7.8},
-        ),
-        _create_node(
-            node_id="condition_1",
-            node_type="condition",
-            label="Condition",
-            x=2240,
-            y=260,
-            reads=["evaluation_result"],
-            params={"decision_key": "evaluation_result.decision"},
-        ),
-        _create_node(
-            node_id="prepare_image_todo_1",
-            node_type="prepare_image_todo",
-            label="Image TODO",
-            x=2460,
-            y=180,
-            reads=["best_variant", "storyboard_packages"],
-            writes=["image_generation_todo"],
-        ),
-        _create_node(
-            node_id="prepare_video_todo_1",
-            node_type="prepare_video_todo",
-            label="Video TODO",
-            x=2460,
-            y=340,
-            reads=["best_variant", "video_prompt_packages"],
-            writes=["video_generation_todo"],
-        ),
-        _create_node(
-            node_id="finalize_1",
-            node_type="finalize",
-            label="Finalize",
-            x=2680,
-            y=260,
-            reads=["evaluation_result", "best_variant", "storyboard_packages", "video_prompt_packages", "image_generation_todo", "video_generation_todo"],
-            writes=["final_package"],
-        ),
-        _create_node(
-            node_id="end_1",
-            node_type="end",
-            label="End",
-            x=2900,
-            y=260,
-            reads=["final_package", "evaluation_result"],
-        ),
-    ]
-    nodes = _apply_node_param_overrides(base_nodes, theme_preset.get("node_param_overrides", {}))
-    return {
-        "name": theme_preset.get("graph_name") or "Creative Factory",
-        "template_id": "creative_factory",
-        "theme_config": theme_preset["theme_config"],
-        "state_schema": get_creative_factory_state_schema(),
-        "nodes": nodes,
-        "edges": [
-            _create_edge(edge_id="edge_1", source="start_1", target="research_1", flow_keys=["theme_config"]),
-            _create_edge(edge_id="edge_2", source="research_1", target="collect_assets_1", flow_keys=["market_inputs"]),
-            _create_edge(edge_id="edge_3", source="collect_assets_1", target="normalize_assets_1", flow_keys=["market_inputs"]),
-            _create_edge(edge_id="edge_4", source="normalize_assets_1", target="select_assets_1", flow_keys=["market_inputs"]),
-            _create_edge(edge_id="edge_5", source="select_assets_1", target="analyze_assets_1", flow_keys=["selected_video_items"]),
-            _create_edge(edge_id="edge_6", source="analyze_assets_1", target="extract_patterns_1", flow_keys=["video_analysis_results"]),
-            _create_edge(edge_id="edge_7", source="extract_patterns_1", target="build_brief_1", flow_keys=["pattern_summary"]),
-            _create_edge(edge_id="edge_8", source="build_brief_1", target="generate_variants_1", flow_keys=["creative_brief"]),
-            _create_edge(edge_id="edge_9", source="generate_variants_1", target="generate_storyboards_1", flow_keys=["script_variants"]),
-            _create_edge(edge_id="edge_10", source="generate_storyboards_1", target="generate_video_prompts_1", flow_keys=["storyboard_packages"]),
-            _create_edge(edge_id="edge_11", source="generate_video_prompts_1", target="review_variants_1", flow_keys=["video_prompt_packages"]),
-            _create_edge(edge_id="edge_12", source="review_variants_1", target="condition_1", flow_keys=["evaluation_result", "best_variant"]),
-            _create_edge(edge_id="edge_13", source="condition_1", target="prepare_image_todo_1", flow_keys=["evaluation_result", "best_variant"], edge_kind="branch", branch_label="pass"),
-            _create_edge(edge_id="edge_14", source="prepare_image_todo_1", target="prepare_video_todo_1", flow_keys=["image_generation_todo"]),
-            _create_edge(edge_id="edge_15", source="prepare_video_todo_1", target="finalize_1", flow_keys=["video_generation_todo"]),
-            _create_edge(edge_id="edge_16", source="condition_1", target="generate_variants_1", flow_keys=["evaluation_result"], edge_kind="branch", branch_label="revise"),
-            _create_edge(edge_id="edge_17", source="condition_1", target="end_1", flow_keys=["evaluation_result"], edge_kind="branch", branch_label="fail"),
-            _create_edge(edge_id="edge_18", source="finalize_1", target="end_1", flow_keys=["final_package"]),
-        ],
-        "metadata": {},
-    }
+NODE_SYSTEM_SUPPORTED_NODE_TYPES = [
+    "input_boundary",
+    "agent_node",
+    "condition_node",
+    "output_boundary",
+]
 
 
 def _create_default_node_system_graph(theme_preset: dict[str, Any]) -> dict[str, Any]:
     return {
         "graph_family": "node_system",
-        "name": f"{theme_preset.get('graph_name') or 'Creative Factory'} Review Flow",
+        "name": f"{theme_preset.get('graph_name') or 'Creative Factory'} Final Package Flow",
         "template_id": "creative_factory",
         "theme_config": theme_preset["theme_config"],
         "state_schema": get_creative_factory_state_schema(),
@@ -630,6 +386,237 @@ def _create_default_node_system_graph(theme_preset: dict[str, Any]) -> dict[str,
                     "previewText": "",
                 },
             },
+            {
+                "id": "agent_storyboards_1",
+                "type": "default",
+                "position": {"x": 2820, "y": 140},
+                "data": {
+                    "nodeId": "agent_storyboards_1",
+                    "config": {
+                        "presetId": "preset.agent.generate_storyboard_packages.v1",
+                        "label": "Generate Storyboards",
+                        "description": "Generate storyboard packages from the current creative variants.",
+                        "family": "agent",
+                        "inputs": [
+                            {"key": "script_variants", "label": "Script Variants", "valueType": "json", "required": True},
+                        ],
+                        "outputs": [
+                            {"key": "storyboard_packages", "label": "Storyboard Packages", "valueType": "json"},
+                        ],
+                        "systemInstruction": "You are a storyboard generation agent.",
+                        "taskInstruction": "Generate storyboard packages from the provided variants.",
+                        "skills": [
+                            {
+                                "name": "generate_storyboard_packages",
+                                "skillKey": "generate_storyboard_packages",
+                                "inputMapping": {
+                                    "script_variants": "$inputs.script_variants",
+                                },
+                                "contextBinding": {},
+                                "usage": "required",
+                            }
+                        ],
+                        "responseMode": "json",
+                        "outputBinding": {
+                            "storyboard_packages": "$skills.generate_storyboard_packages.storyboard_packages",
+                        },
+                    },
+                    "previewText": "",
+                },
+            },
+            {
+                "id": "agent_video_prompts_1",
+                "type": "default",
+                "position": {"x": 3280, "y": 140},
+                "data": {
+                    "nodeId": "agent_video_prompts_1",
+                    "config": {
+                        "presetId": "preset.agent.generate_video_prompt_packages.v1",
+                        "label": "Generate Video Prompts",
+                        "description": "Generate video prompt packages from variants and storyboard packages.",
+                        "family": "agent",
+                        "inputs": [
+                            {"key": "script_variants", "label": "Script Variants", "valueType": "json", "required": True},
+                            {"key": "storyboard_packages", "label": "Storyboard Packages", "valueType": "json", "required": True},
+                        ],
+                        "outputs": [
+                            {"key": "video_prompt_packages", "label": "Video Prompt Packages", "valueType": "json"},
+                        ],
+                        "systemInstruction": "You are a video prompt generation agent.",
+                        "taskInstruction": "Generate video prompt packages from variants and storyboard packages.",
+                        "skills": [
+                            {
+                                "name": "generate_video_prompt_packages",
+                                "skillKey": "generate_video_prompt_packages",
+                                "inputMapping": {
+                                    "script_variants": "$inputs.script_variants",
+                                    "storyboard_packages": "$inputs.storyboard_packages",
+                                },
+                                "contextBinding": {},
+                                "usage": "required",
+                            }
+                        ],
+                        "responseMode": "json",
+                        "outputBinding": {
+                            "video_prompt_packages": "$skills.generate_video_prompt_packages.video_prompt_packages",
+                        },
+                    },
+                    "previewText": "",
+                },
+            },
+            {
+                "id": "agent_image_todo_1",
+                "type": "default",
+                "position": {"x": 3740, "y": 80},
+                "data": {
+                    "nodeId": "agent_image_todo_1",
+                    "config": {
+                        "presetId": "preset.agent.prepare_image_generation_todo.v1",
+                        "label": "Prepare Image TODO",
+                        "description": "Prepare image generation todo payload from review outputs.",
+                        "family": "agent",
+                        "inputs": [
+                            {"key": "best_variant", "label": "Best Variant", "valueType": "json", "required": True},
+                            {"key": "storyboard_packages", "label": "Storyboard Packages", "valueType": "json", "required": True},
+                        ],
+                        "outputs": [
+                            {"key": "image_generation_todo", "label": "Image Generation TODO", "valueType": "json"},
+                        ],
+                        "systemInstruction": "You are an image production prep agent.",
+                        "taskInstruction": "Prepare image generation todo payload from the current review outputs.",
+                        "skills": [
+                            {
+                                "name": "prepare_image_generation_todo",
+                                "skillKey": "prepare_image_generation_todo",
+                                "inputMapping": {
+                                    "best_variant": "$inputs.best_variant",
+                                    "storyboard_packages": "$inputs.storyboard_packages",
+                                },
+                                "contextBinding": {},
+                                "usage": "required",
+                            }
+                        ],
+                        "responseMode": "json",
+                        "outputBinding": {
+                            "image_generation_todo": "$skills.prepare_image_generation_todo.image_generation_todo",
+                        },
+                    },
+                    "previewText": "",
+                },
+            },
+            {
+                "id": "agent_video_todo_1",
+                "type": "default",
+                "position": {"x": 3740, "y": 240},
+                "data": {
+                    "nodeId": "agent_video_todo_1",
+                    "config": {
+                        "presetId": "preset.agent.prepare_video_generation_todo.v1",
+                        "label": "Prepare Video TODO",
+                        "description": "Prepare video generation todo payload from review outputs.",
+                        "family": "agent",
+                        "inputs": [
+                            {"key": "best_variant", "label": "Best Variant", "valueType": "json", "required": True},
+                            {"key": "video_prompt_packages", "label": "Video Prompt Packages", "valueType": "json", "required": True},
+                        ],
+                        "outputs": [
+                            {"key": "video_generation_todo", "label": "Video Generation TODO", "valueType": "json"},
+                        ],
+                        "systemInstruction": "You are a video production prep agent.",
+                        "taskInstruction": "Prepare video generation todo payload from the current review outputs.",
+                        "skills": [
+                            {
+                                "name": "prepare_video_generation_todo",
+                                "skillKey": "prepare_video_generation_todo",
+                                "inputMapping": {
+                                    "best_variant": "$inputs.best_variant",
+                                    "video_prompt_packages": "$inputs.video_prompt_packages",
+                                },
+                                "contextBinding": {},
+                                "usage": "required",
+                            }
+                        ],
+                        "responseMode": "json",
+                        "outputBinding": {
+                            "video_generation_todo": "$skills.prepare_video_generation_todo.video_generation_todo",
+                        },
+                    },
+                    "previewText": "",
+                },
+            },
+            {
+                "id": "agent_finalize_1",
+                "type": "default",
+                "position": {"x": 4200, "y": 160},
+                "data": {
+                    "nodeId": "agent_finalize_1",
+                    "config": {
+                        "presetId": "preset.agent.finalize_creative_package.v1",
+                        "label": "Finalize Creative Package",
+                        "description": "Assemble the final creative package artifact from downstream production inputs.",
+                        "family": "agent",
+                        "inputs": [
+                            {"key": "creative_brief", "label": "Creative Brief", "valueType": "text", "required": True},
+                            {"key": "best_variant", "label": "Best Variant", "valueType": "json", "required": True},
+                            {"key": "storyboard_packages", "label": "Storyboard Packages", "valueType": "json", "required": True},
+                            {"key": "video_prompt_packages", "label": "Video Prompt Packages", "valueType": "json", "required": True},
+                            {"key": "image_generation_todo", "label": "Image Generation TODO", "valueType": "json", "required": True},
+                            {"key": "video_generation_todo", "label": "Video Generation TODO", "valueType": "json", "required": True},
+                            {"key": "evaluation_result", "label": "Evaluation Result", "valueType": "json", "required": True},
+                        ],
+                        "outputs": [
+                            {"key": "final_package", "label": "Final Package", "valueType": "json"},
+                            {"key": "final_result", "label": "Final Result", "valueType": "text"},
+                        ],
+                        "systemInstruction": "You are a creative packaging agent.",
+                        "taskInstruction": "Assemble the final creative package from reviewed and prepared outputs.",
+                        "skills": [
+                            {
+                                "name": "finalize_creative_package",
+                                "skillKey": "finalize_creative_package",
+                                "inputMapping": {
+                                    "creative_brief": "$inputs.creative_brief",
+                                    "best_variant": "$inputs.best_variant",
+                                    "storyboard_packages": "$inputs.storyboard_packages",
+                                    "video_prompt_packages": "$inputs.video_prompt_packages",
+                                    "image_generation_todo": "$inputs.image_generation_todo",
+                                    "video_generation_todo": "$inputs.video_generation_todo",
+                                    "evaluation_result": "$inputs.evaluation_result",
+                                    "theme_config": "$graph.theme_config",
+                                },
+                                "contextBinding": {},
+                                "usage": "required",
+                            }
+                        ],
+                        "responseMode": "json",
+                        "outputBinding": {
+                            "final_package": "$skills.finalize_creative_package.final_package",
+                            "final_result": "$skills.finalize_creative_package.final_result",
+                        },
+                    },
+                    "previewText": "",
+                },
+            },
+            {
+                "id": "output_final_1",
+                "type": "default",
+                "position": {"x": 4660, "y": 160},
+                "data": {
+                    "nodeId": "output_final_1",
+                    "config": {
+                        "presetId": "preset.output.final_package.v1",
+                        "label": "Final Package Output",
+                        "description": "Preview the assembled final creative package.",
+                        "family": "output",
+                        "input": {"key": "value", "label": "Final Package", "valueType": "json", "required": True},
+                        "displayMode": "json",
+                        "persistEnabled": False,
+                        "persistFormat": "json",
+                        "fileNameTemplate": "final_package",
+                    },
+                    "previewText": "",
+                },
+            },
         ],
         "edges": [
             {
@@ -723,6 +710,111 @@ def _create_default_node_system_graph(theme_preset: dict[str, Any]) -> dict[str,
                 "sourceHandle": "output:revise",
                 "targetHandle": "input:value",
             },
+            {
+                "id": "edge_14",
+                "source": "agent_variants_1",
+                "target": "agent_storyboards_1",
+                "sourceHandle": "output:script_variants",
+                "targetHandle": "input:script_variants",
+            },
+            {
+                "id": "edge_15",
+                "source": "agent_variants_1",
+                "target": "agent_video_prompts_1",
+                "sourceHandle": "output:script_variants",
+                "targetHandle": "input:script_variants",
+            },
+            {
+                "id": "edge_16",
+                "source": "agent_storyboards_1",
+                "target": "agent_video_prompts_1",
+                "sourceHandle": "output:storyboard_packages",
+                "targetHandle": "input:storyboard_packages",
+            },
+            {
+                "id": "edge_17",
+                "source": "agent_review_1",
+                "target": "agent_image_todo_1",
+                "sourceHandle": "output:best_variant",
+                "targetHandle": "input:best_variant",
+            },
+            {
+                "id": "edge_18",
+                "source": "agent_storyboards_1",
+                "target": "agent_image_todo_1",
+                "sourceHandle": "output:storyboard_packages",
+                "targetHandle": "input:storyboard_packages",
+            },
+            {
+                "id": "edge_19",
+                "source": "agent_review_1",
+                "target": "agent_video_todo_1",
+                "sourceHandle": "output:best_variant",
+                "targetHandle": "input:best_variant",
+            },
+            {
+                "id": "edge_20",
+                "source": "agent_video_prompts_1",
+                "target": "agent_video_todo_1",
+                "sourceHandle": "output:video_prompt_packages",
+                "targetHandle": "input:video_prompt_packages",
+            },
+            {
+                "id": "edge_21",
+                "source": "agent_brief_1",
+                "target": "agent_finalize_1",
+                "sourceHandle": "output:creative_brief",
+                "targetHandle": "input:creative_brief",
+            },
+            {
+                "id": "edge_22",
+                "source": "agent_review_1",
+                "target": "agent_finalize_1",
+                "sourceHandle": "output:best_variant",
+                "targetHandle": "input:best_variant",
+            },
+            {
+                "id": "edge_23",
+                "source": "agent_review_1",
+                "target": "agent_finalize_1",
+                "sourceHandle": "output:evaluation_result",
+                "targetHandle": "input:evaluation_result",
+            },
+            {
+                "id": "edge_24",
+                "source": "agent_storyboards_1",
+                "target": "agent_finalize_1",
+                "sourceHandle": "output:storyboard_packages",
+                "targetHandle": "input:storyboard_packages",
+            },
+            {
+                "id": "edge_25",
+                "source": "agent_video_prompts_1",
+                "target": "agent_finalize_1",
+                "sourceHandle": "output:video_prompt_packages",
+                "targetHandle": "input:video_prompt_packages",
+            },
+            {
+                "id": "edge_26",
+                "source": "agent_image_todo_1",
+                "target": "agent_finalize_1",
+                "sourceHandle": "output:image_generation_todo",
+                "targetHandle": "input:image_generation_todo",
+            },
+            {
+                "id": "edge_27",
+                "source": "agent_video_todo_1",
+                "target": "agent_finalize_1",
+                "sourceHandle": "output:video_generation_todo",
+                "targetHandle": "input:video_generation_todo",
+            },
+            {
+                "id": "edge_28",
+                "source": "agent_finalize_1",
+                "target": "output_final_1",
+                "sourceHandle": "output:final_package",
+                "targetHandle": "input:value",
+            },
         ],
         "metadata": {},
     }
@@ -738,10 +830,9 @@ def get_creative_factory_template() -> dict[str, Any]:
         "description": "Research, analyze, generate, review, and export a creative package.",
         "default_graph_name": "Creative Factory",
         "default_theme_preset": default_theme_preset,
-        "supported_node_types": get_creative_factory_supported_node_types(),
+        "supported_node_types": NODE_SYSTEM_SUPPORTED_NODE_TYPES,
         "state_keys": get_creative_factory_state_keys(),
         "state_schema": get_creative_factory_state_schema(),
         "theme_presets": theme_presets,
-        "default_graph": _create_default_graph(default_theme),
         "default_node_system_graph": _create_default_node_system_graph(default_theme),
     }

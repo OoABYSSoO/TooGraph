@@ -367,6 +367,177 @@ export const REVIEW_VARIANTS_AGENT_PRESET = {
   },
 } satisfies NodePresetDefinition;
 
+export const GENERATE_STORYBOARD_PACKAGES_AGENT_PRESET = {
+  presetId: "preset.agent.generate_storyboard_packages.v1",
+  label: "Generate Storyboards",
+  description: "Generate storyboard packages from creative variants.",
+  family: "agent",
+  inputs: [
+    { key: "script_variants", label: "Script Variants", valueType: "json", required: true },
+  ],
+  outputs: [
+    { key: "storyboard_packages", label: "Storyboard Packages", valueType: "json" },
+  ],
+  systemInstruction: "You are a storyboard generation agent.",
+  taskInstruction: "Generate storyboard packages from the provided variants.",
+  skills: [
+    {
+      name: "generate_storyboard_packages",
+      skillKey: "generate_storyboard_packages",
+      inputMapping: {
+        script_variants: "$inputs.script_variants",
+      },
+      contextBinding: {},
+      usage: "required",
+    },
+  ],
+  responseMode: "json",
+  outputBinding: {
+    storyboard_packages: "$skills.generate_storyboard_packages.storyboard_packages",
+  },
+} satisfies NodePresetDefinition;
+
+export const GENERATE_VIDEO_PROMPT_PACKAGES_AGENT_PRESET = {
+  presetId: "preset.agent.generate_video_prompt_packages.v1",
+  label: "Generate Video Prompts",
+  description: "Generate video prompt packages from variants and storyboard packages.",
+  family: "agent",
+  inputs: [
+    { key: "script_variants", label: "Script Variants", valueType: "json", required: true },
+    { key: "storyboard_packages", label: "Storyboard Packages", valueType: "json", required: true },
+  ],
+  outputs: [
+    { key: "video_prompt_packages", label: "Video Prompt Packages", valueType: "json" },
+  ],
+  systemInstruction: "You are a video prompt generation agent.",
+  taskInstruction: "Generate video prompt packages from variants and storyboard packages.",
+  skills: [
+    {
+      name: "generate_video_prompt_packages",
+      skillKey: "generate_video_prompt_packages",
+      inputMapping: {
+        script_variants: "$inputs.script_variants",
+        storyboard_packages: "$inputs.storyboard_packages",
+      },
+      contextBinding: {},
+      usage: "required",
+    },
+  ],
+  responseMode: "json",
+  outputBinding: {
+    video_prompt_packages: "$skills.generate_video_prompt_packages.video_prompt_packages",
+  },
+} satisfies NodePresetDefinition;
+
+export const PREPARE_IMAGE_TODO_AGENT_PRESET = {
+  presetId: "preset.agent.prepare_image_generation_todo.v1",
+  label: "Prepare Image TODO",
+  description: "Prepare image generation todo payload from review outputs.",
+  family: "agent",
+  inputs: [
+    { key: "best_variant", label: "Best Variant", valueType: "json", required: true },
+    { key: "storyboard_packages", label: "Storyboard Packages", valueType: "json", required: true },
+  ],
+  outputs: [
+    { key: "image_generation_todo", label: "Image Generation TODO", valueType: "json" },
+  ],
+  systemInstruction: "You are an image production prep agent.",
+  taskInstruction: "Prepare image generation todo payload from the current review outputs.",
+  skills: [
+    {
+      name: "prepare_image_generation_todo",
+      skillKey: "prepare_image_generation_todo",
+      inputMapping: {
+        best_variant: "$inputs.best_variant",
+        storyboard_packages: "$inputs.storyboard_packages",
+      },
+      contextBinding: {},
+      usage: "required",
+    },
+  ],
+  responseMode: "json",
+  outputBinding: {
+    image_generation_todo: "$skills.prepare_image_generation_todo.image_generation_todo",
+  },
+} satisfies NodePresetDefinition;
+
+export const PREPARE_VIDEO_TODO_AGENT_PRESET = {
+  presetId: "preset.agent.prepare_video_generation_todo.v1",
+  label: "Prepare Video TODO",
+  description: "Prepare video generation todo payload from review outputs.",
+  family: "agent",
+  inputs: [
+    { key: "best_variant", label: "Best Variant", valueType: "json", required: true },
+    { key: "video_prompt_packages", label: "Video Prompt Packages", valueType: "json", required: true },
+  ],
+  outputs: [
+    { key: "video_generation_todo", label: "Video Generation TODO", valueType: "json" },
+  ],
+  systemInstruction: "You are a video production prep agent.",
+  taskInstruction: "Prepare video generation todo payload from the current review outputs.",
+  skills: [
+    {
+      name: "prepare_video_generation_todo",
+      skillKey: "prepare_video_generation_todo",
+      inputMapping: {
+        best_variant: "$inputs.best_variant",
+        video_prompt_packages: "$inputs.video_prompt_packages",
+      },
+      contextBinding: {},
+      usage: "required",
+    },
+  ],
+  responseMode: "json",
+  outputBinding: {
+    video_generation_todo: "$skills.prepare_video_generation_todo.video_generation_todo",
+  },
+} satisfies NodePresetDefinition;
+
+export const FINALIZE_CREATIVE_PACKAGE_AGENT_PRESET = {
+  presetId: "preset.agent.finalize_creative_package.v1",
+  label: "Finalize Creative Package",
+  description: "Assemble the final creative package artifact from downstream production inputs.",
+  family: "agent",
+  inputs: [
+    { key: "creative_brief", label: "Creative Brief", valueType: "text", required: true },
+    { key: "best_variant", label: "Best Variant", valueType: "json", required: true },
+    { key: "storyboard_packages", label: "Storyboard Packages", valueType: "json", required: true },
+    { key: "video_prompt_packages", label: "Video Prompt Packages", valueType: "json", required: true },
+    { key: "image_generation_todo", label: "Image Generation TODO", valueType: "json", required: true },
+    { key: "video_generation_todo", label: "Video Generation TODO", valueType: "json", required: true },
+    { key: "evaluation_result", label: "Evaluation Result", valueType: "json", required: true },
+  ],
+  outputs: [
+    { key: "final_package", label: "Final Package", valueType: "json" },
+    { key: "final_result", label: "Final Result", valueType: "text" },
+  ],
+  systemInstruction: "You are a creative packaging agent.",
+  taskInstruction: "Assemble the final creative package from reviewed and prepared outputs.",
+  skills: [
+    {
+      name: "finalize_creative_package",
+      skillKey: "finalize_creative_package",
+      inputMapping: {
+        creative_brief: "$inputs.creative_brief",
+        best_variant: "$inputs.best_variant",
+        storyboard_packages: "$inputs.storyboard_packages",
+        video_prompt_packages: "$inputs.video_prompt_packages",
+        image_generation_todo: "$inputs.image_generation_todo",
+        video_generation_todo: "$inputs.video_generation_todo",
+        evaluation_result: "$inputs.evaluation_result",
+        theme_config: "$graph.theme_config",
+      },
+      contextBinding: {},
+      usage: "required",
+    },
+  ],
+  responseMode: "json",
+  outputBinding: {
+    final_package: "$skills.finalize_creative_package.final_package",
+    final_result: "$skills.finalize_creative_package.final_result",
+  },
+} satisfies NodePresetDefinition;
+
 export const REVIEW_GATE_PRESET = {
   presetId: "preset.condition.review_gate.v1",
   label: "Review Gate",
@@ -447,6 +618,23 @@ export const DECISION_SIGNAL_OUTPUT_PRESET = {
   fileNameTemplate: "decision_signal",
 } satisfies NodePresetDefinition;
 
+export const FINAL_PACKAGE_OUTPUT_PRESET = {
+  presetId: "preset.output.final_package.v1",
+  label: "Final Package Output",
+  description: "Preview and optionally persist the assembled final creative package.",
+  family: "output",
+  input: {
+    key: "value",
+    label: "Final Package",
+    valueType: "json",
+    required: true,
+  },
+  displayMode: "json",
+  persistEnabled: false,
+  persistFormat: "json",
+  fileNameTemplate: "final_package",
+} satisfies NodePresetDefinition;
+
 export const NODE_PRESETS_MOCK = [
   EMPTY_AGENT_PRESET,
   NAME_INPUT_PRESET,
@@ -459,11 +647,17 @@ export const NODE_PRESETS_MOCK = [
   BUILD_CREATIVE_BRIEF_AGENT_PRESET,
   GENERATE_CREATIVE_VARIANTS_AGENT_PRESET,
   REVIEW_VARIANTS_AGENT_PRESET,
+  GENERATE_STORYBOARD_PACKAGES_AGENT_PRESET,
+  GENERATE_VIDEO_PROMPT_PACKAGES_AGENT_PRESET,
+  PREPARE_IMAGE_TODO_AGENT_PRESET,
+  PREPARE_VIDEO_TODO_AGENT_PRESET,
+  FINALIZE_CREATIVE_PACKAGE_AGENT_PRESET,
   REVIEW_GATE_PRESET,
   GREETING_OUTPUT_PRESET,
   NEWS_CONTEXT_OUTPUT_PRESET,
   CREATIVE_BRIEF_OUTPUT_PRESET,
   DECISION_SIGNAL_OUTPUT_PRESET,
+  FINAL_PACKAGE_OUTPUT_PRESET,
   TEXT_OUTPUT_PRESET,
 ] satisfies NodePresetDefinition[];
 
@@ -473,7 +667,7 @@ export function getNodePresetById(presetId: string) {
 
 export function getSuggestedPresets(valueType?: ValueType | null) {
   if (!valueType) {
-    return [EMPTY_AGENT_PRESET, NAME_INPUT_PRESET, TASK_INPUT_PRESET, TEXT_INPUT_PRESET, HELLO_GREETING_AGENT_PRESET, SUMMARY_AGENT_PRESET, FETCH_NEWS_AGENT_PRESET, CLEAN_MARKET_NEWS_AGENT_PRESET, BUILD_CREATIVE_BRIEF_AGENT_PRESET, GENERATE_CREATIVE_VARIANTS_AGENT_PRESET, REVIEW_VARIANTS_AGENT_PRESET, REVIEW_GATE_PRESET, GREETING_OUTPUT_PRESET, NEWS_CONTEXT_OUTPUT_PRESET, CREATIVE_BRIEF_OUTPUT_PRESET, DECISION_SIGNAL_OUTPUT_PRESET, TEXT_OUTPUT_PRESET];
+    return [EMPTY_AGENT_PRESET, NAME_INPUT_PRESET, TASK_INPUT_PRESET, TEXT_INPUT_PRESET, HELLO_GREETING_AGENT_PRESET, SUMMARY_AGENT_PRESET, FETCH_NEWS_AGENT_PRESET, CLEAN_MARKET_NEWS_AGENT_PRESET, BUILD_CREATIVE_BRIEF_AGENT_PRESET, GENERATE_CREATIVE_VARIANTS_AGENT_PRESET, REVIEW_VARIANTS_AGENT_PRESET, GENERATE_STORYBOARD_PACKAGES_AGENT_PRESET, GENERATE_VIDEO_PROMPT_PACKAGES_AGENT_PRESET, PREPARE_IMAGE_TODO_AGENT_PRESET, PREPARE_VIDEO_TODO_AGENT_PRESET, FINALIZE_CREATIVE_PACKAGE_AGENT_PRESET, REVIEW_GATE_PRESET, GREETING_OUTPUT_PRESET, NEWS_CONTEXT_OUTPUT_PRESET, CREATIVE_BRIEF_OUTPUT_PRESET, DECISION_SIGNAL_OUTPUT_PRESET, FINAL_PACKAGE_OUTPUT_PRESET, TEXT_OUTPUT_PRESET];
   }
 
   const supportsType = (preset: NodePresetDefinition) => {

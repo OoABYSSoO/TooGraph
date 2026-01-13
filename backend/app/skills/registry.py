@@ -22,18 +22,17 @@ def get_skill_registry() -> dict[str, SkillFunc]:
         "build_creative_brief": build_creative_brief_skill,
         "generate_creative_variants": generate_creative_variants_skill,
         "review_creative_variants": review_creative_variants_skill,
+        "generate_storyboard_packages": generate_storyboard_packages_skill,
+        "generate_video_prompt_packages": generate_video_prompt_packages_skill,
+        "prepare_image_generation_todo": prepare_image_generation_todo_skill,
+        "prepare_video_generation_todo": prepare_video_generation_todo_skill,
+        "finalize_creative_package": finalize_creative_package_skill,
         "generate_hello_greeting": tools["generate_hello_greeting"],
         "fetch_benchmark_assets": tools["fetch_benchmark_assets"],
         "normalize_asset_records": tools["normalize_asset_records"],
         "select_top_video_assets": tools["select_top_video_assets"],
         "analyze_video_assets": tools["analyze_video_assets"],
         "extract_creative_patterns": tools["extract_creative_patterns"],
-        "generate_creative_variants": tools["generate_creative_variants"],
-        "generate_storyboard_packages": tools["generate_storyboard_packages"],
-        "generate_video_prompt_packages": tools["generate_video_prompt_packages"],
-        "review_creative_variants": tools["review_creative_variants"],
-        "prepare_image_generation_todo": tools["prepare_image_generation_todo"],
-        "prepare_video_generation_todo": tools["prepare_video_generation_todo"],
     }
 
 
@@ -138,3 +137,66 @@ def review_creative_variants_skill(**skill_inputs: Any) -> dict[str, Any]:
             "pass_threshold": float(skill_inputs.get("pass_threshold", 7.8) or 7.8),
         },
     )
+
+
+def generate_storyboard_packages_skill(**skill_inputs: Any) -> dict[str, Any]:
+    tools = get_tool_registry()
+    return tools["generate_storyboard_packages"](
+        {
+            "script_variants": skill_inputs.get("script_variants") or [],
+        },
+        None,
+    )
+
+
+def generate_video_prompt_packages_skill(**skill_inputs: Any) -> dict[str, Any]:
+    tools = get_tool_registry()
+    return tools["generate_video_prompt_packages"](
+        {
+            "script_variants": skill_inputs.get("script_variants") or [],
+            "storyboard_packages": skill_inputs.get("storyboard_packages") or [],
+        },
+        None,
+    )
+
+
+def prepare_image_generation_todo_skill(**skill_inputs: Any) -> dict[str, Any]:
+    tools = get_tool_registry()
+    return tools["prepare_image_generation_todo"](
+        {
+            "best_variant": skill_inputs.get("best_variant") or {},
+            "storyboard_packages": skill_inputs.get("storyboard_packages") or [],
+        },
+        None,
+    )
+
+
+def prepare_video_generation_todo_skill(**skill_inputs: Any) -> dict[str, Any]:
+    tools = get_tool_registry()
+    return tools["prepare_video_generation_todo"](
+        {
+            "best_variant": skill_inputs.get("best_variant") or {},
+            "video_prompt_packages": skill_inputs.get("video_prompt_packages") or [],
+        },
+        None,
+    )
+
+
+def finalize_creative_package_skill(**skill_inputs: Any) -> dict[str, Any]:
+    evaluation_result = skill_inputs.get("evaluation_result") or {}
+    final_package = {
+        "theme_config": skill_inputs.get("theme_config") or {},
+        "creative_brief": skill_inputs.get("creative_brief", ""),
+        "best_variant": skill_inputs.get("best_variant") or {},
+        "storyboard_packages": skill_inputs.get("storyboard_packages") or [],
+        "video_prompt_packages": skill_inputs.get("video_prompt_packages") or [],
+        "image_generation_todo": skill_inputs.get("image_generation_todo") or {},
+        "video_generation_todo": skill_inputs.get("video_generation_todo") or {},
+        "evaluation_result": evaluation_result,
+    }
+    decision = str(evaluation_result.get("decision") or "pass")
+    final_result = f"Finalized creative package with decision '{decision}'."
+    return {
+        "final_package": final_package,
+        "final_result": final_result,
+    }

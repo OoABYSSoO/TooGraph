@@ -694,7 +694,7 @@ agent node 的 skill attachment 已经有可依赖的数据源。
 
 ### Status
 
-进行中：
+已完成：
 
 - `hello_world` 模板已开始提供 `default_node_system_graph`
 - 新默认图已改为 `Input Boundary -> Agent Node -> Output Boundary`
@@ -704,8 +704,10 @@ agent node 的 skill attachment 已经有可依赖的数据源。
 - `creative_factory` 已扩展到 `research -> brief` 第二阶段闭环
 - `creative_factory` 已扩展到 `review + condition` 第三阶段闭环
 - `creative_factory` 第三阶段模板已通过 validate/run，并能正确命中 `pass / revise` 分支
+- `creative_factory` 已扩展到 `storyboards / prompts / todo / finalize` 主链原型
+- 模板默认入口已收口到 `default_node_system_graph`，不再继续维护旧 `default_graph` 默认图
 - `/editor/new` 已支持按模板创建新节点系统图
-- 旧 `hello_model` 图仍作为兼容路径保留，尚未完全退出主验证链路
+- `hello_world` 默认验证链路已不再依赖旧 `hello_model`
 
 ### Changes
 
@@ -742,6 +744,10 @@ agent node 的 skill attachment 已经有可依赖的数据源。
 
 新节点系统已经不是纸面设计，而能承接 demo 的核心阶段。
 
+### Conclusion
+
+本阶段已满足退出条件。
+
 ---
 
 ## Phase 10: Remove Legacy Transitional Node Path
@@ -776,6 +782,19 @@ agent node 的 skill attachment 已经有可依赖的数据源。
 ### Exit Criteria
 
 系统默认路径已切到新节点模型。
+
+### Status
+
+已完成：
+
+- 前端 `EditorClient` 已收口为 `NodeSystemEditor` 薄包装，旧三节点编辑器 registry 不再作为主实现保留
+- 模板元数据 `supported_node_types` 已切到 node system 节点族，不再暴露旧业务节点枚举
+- `/api/settings` 不再把 `skills` 作为主能力列表暴露给界面，仅保留 `skill_definitions`
+- editor 默认创建路径与模板默认图均已切到 node system
+
+### Conclusion
+
+本阶段已满足退出条件，当前编排器默认开发路径已经完成切换。
 
 ---
 
