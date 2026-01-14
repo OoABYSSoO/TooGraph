@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -18,6 +19,8 @@ def _env_first(*keys: str, default: str) -> str:
 LOCAL_LLM_BASE_URL = _env_first("LOCAL_BASE_URL", "OPENAI_BASE_URL", "LOCAL_LLM_BASE_URL", default="http://127.0.0.1:8888/v1").rstrip("/")
 LOCAL_LLM_MODEL = _env_first("LOCAL_TEXT_MODEL", "TEXT_MODEL", "LOCAL_MODEL_NAME", "UPSTREAM_MODEL_NAME", "LOCAL_LLM_MODEL", default="qwen-local")
 LOCAL_LLM_API_KEY = _env_first("LOCAL_API_KEY", "OPENAI_API_KEY", "LITELLM_MASTER_KEY", "LOCAL_LLM_API_KEY", default="sk-local")
+ROOT_DIR = Path(__file__).resolve().parents[3]
+LOCAL_USAGE_GUIDE_PATH = ROOT_DIR / "使用介绍.md"
 
 
 def _chat_with_local_model(
@@ -26,7 +29,7 @@ def _chat_with_local_model(
     user_prompt: str,
     model: str | None = None,
     temperature: float = 0.2,
-    max_tokens: int = 80,
+    max_tokens: int | None = None,
 ) -> str:
     client = OpenAI(
         base_url=LOCAL_LLM_BASE_URL,
@@ -34,15 +37,17 @@ def _chat_with_local_model(
         http_client=httpx.Client(trust_env=False),
     )
     try:
-        response = client.chat.completions.create(
-            model=model or LOCAL_LLM_MODEL,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            messages=[
+        request_payload: dict[str, Any] = {
+            "model": model or LOCAL_LLM_MODEL,
+            "temperature": temperature,
+            "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-        )
+        }
+        if max_tokens is not None:
+            request_payload["max_tokens"] = max_tokens
+        response = client.chat.completions.create(**request_payload)
     except Exception as exc:  # pragma: no cover - network path
         raise RuntimeError(f"Local LLM request failed: {exc}") from exc
     content = (response.choices[0].message.content or "").strip()
@@ -54,8 +59,13 @@ def _chat_with_local_model(
 def generate_hello_greeting(state: dict[str, Any], params: dict[str, Any] | None = None) -> dict[str, Any]:
     params = params or {}
     name = str(state.get("name") or params.get("name") or "World").strip() or "World"
-    system_prompt = "You are a precise assistant. Return only a short greeting in the format: Hello, <name>."
-    user_prompt = f"Name: {name}"
+    system_prompt = (
+        "You are a product onboarding assistant for GraphiteUI. "
+        "Return only a short usage introduction in Chinese for a new user. "
+        "Keep it within 3 sentences, mention that the user can inspect nodes, edit configuration, save the graph, "
+        "and run the flow. Personalize it with the provided name when natural."
+    )
+    user_prompt = f"User name: {name}"
     model_name = str(params.get("model") or LOCAL_LLM_MODEL)
     try:
         greeting = _chat_with_local_model(
@@ -63,14 +73,17 @@ def generate_hello_greeting(state: dict[str, Any], params: dict[str, Any] | None
             user_prompt=user_prompt,
             model=model_name,
             temperature=float(params.get("temperature", 0.2)),
-            max_tokens=int(params.get("max_tokens", 40)),
+            max_tokens=int(params.get("max_tokens", 120)),
         )
         llm_response: dict[str, Any] = {
             "base_url": LOCAL_LLM_BASE_URL,
             "model": model_name,
         }
     except RuntimeError as exc:  # pragma: no cover - fallback path depends on local model availability
-        greeting = f"Hello, {name}."
+        greeting = (
+            f"{name}，欢迎使用 GraphiteUI。你可以先点选节点查看配置，再尝试修改参数、保存图，"
+            "最后运行整条流程观察输出结果。"
+        )
         llm_response = {
             "base_url": LOCAL_LLM_BASE_URL,
             "model": model_name,
@@ -82,4 +95,38 @@ def generate_hello_greeting(state: dict[str, Any], params: dict[str, Any] | None
         "greeting": greeting,
         "final_result": greeting,
         "llm_response": llm_response,
+    }
+
+
+def output_usage_introduction(state: dict[str, Any], params: dict[str, Any] | None = None) -> dict[str, Any]:
+    _ = state
+    _ = params
+    if not LOCAL_USAGE_GUIDE_PATH.exists():
+        raise RuntimeError(f"Local usage guide file not found: {LOCAL_USAGE_GUIDE_PATH}")
+    content = LOCAL_USAGE_GUIDE_PATH.read_text(encoding="utf-8").strip()
+    if not content:
+        raise RuntimeError(f"Local usage guide file is empty: {LOCAL_USAGE_GUIDE_PATH}")
+    return {
+        "greeting": content,
+        "final_result": content,
+        "source_path": str(LOCAL_USAGE_GUIDE_PATH),
+    }
+
+
+def append_usage_introduction(state: dict[str, Any], params: dict[str, Any] | None = None) -> dict[str, Any]:
+    _ = state
+    params = params or {}
+    greeting = str(params.get("greeting") or "").strip()
+    if not greeting:
+        raise RuntimeError("append_usage_introduction requires a non-empty greeting input.")
+    if not LOCAL_USAGE_GUIDE_PATH.exists():
+        raise RuntimeError(f"Local usage guide file not found: {LOCAL_USAGE_GUIDE_PATH}")
+    guide = LOCAL_USAGE_GUIDE_PATH.read_text(encoding="utf-8").strip()
+    if not guide:
+        raise RuntimeError(f"Local usage guide file is empty: {LOCAL_USAGE_GUIDE_PATH}")
+    combined = f"{greeting}\n\n{guide}"
+    return {
+        "greeting": combined,
+        "final_result": combined,
+        "source_path": str(LOCAL_USAGE_GUIDE_PATH),
     }

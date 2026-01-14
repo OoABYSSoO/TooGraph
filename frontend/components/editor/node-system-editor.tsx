@@ -118,6 +118,30 @@ type SkillDefinition = {
   sideEffects: string[];
 };
 
+type RunOutputPreview = {
+  node_id?: string;
+  state_key?: string;
+  label?: string;
+  value?: unknown;
+};
+
+type RunNodeExecution = {
+  node_id: string;
+  status: string;
+  errors?: string[];
+};
+
+type RunDetail = {
+  run_id: string;
+  status: string;
+  final_result?: string | null;
+  errors?: string[];
+  artifacts: {
+    exported_outputs?: RunOutputPreview[];
+  };
+  node_executions: RunNodeExecution[];
+};
+
 type PresetDocument = {
   presetId: string;
   sourcePresetId?: string | null;
@@ -308,6 +332,16 @@ function createPreviewText(node: FlowNode, nodes: FlowNode[], edges: Edge[]) {
   }
 
   return `Connected to ${config.label}.${sourcePortKey ?? "value"}`;
+}
+
+function formatPreviewValue(value: unknown) {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
 }
 
 function JsonTextArea({
@@ -926,12 +960,24 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                 ))}
               </div>
             ) : null}
+            {data.previewText ? (
+              <div className="whitespace-pre-wrap rounded-[16px] border border-[rgba(154,52,18,0.18)] bg-[rgba(255,244,240,0.9)] px-3 py-3 text-sm leading-6 text-[var(--text)]">
+                {data.previewText}
+              </div>
+            ) : null}
           </div>
         ) : null}
 
         {config.family === "condition" ? (
-          <div className="rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,255,255,0.78)] px-3 py-3 text-sm leading-6 text-[var(--text)]">
-            {summarizeNode(config)}
+          <div className="grid gap-3">
+            <div className="rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,255,255,0.78)] px-3 py-3 text-sm leading-6 text-[var(--text)]">
+              {summarizeNode(config)}
+            </div>
+            {data.previewText ? (
+              <div className="whitespace-pre-wrap rounded-[16px] border border-[rgba(154,52,18,0.18)] bg-[rgba(255,244,240,0.9)] px-3 py-3 text-sm leading-6 text-[var(--text)]">
+                {data.previewText}
+              </div>
+            ) : null}
           </div>
         ) : null}
 
@@ -1036,6 +1082,96 @@ function NodeSystemCanvas({ initialGraph }: { initialGraph: GraphPayload }) {
   const previewTextByNode = useMemo(() => {
     return Object.fromEntries(nodes.map((node) => [node.id, createPreviewText(node, nodes, edges)]));
   }, [edges, nodes]);
+
+  const hydrateRunResult = useCallback(
+    (run: RunDetail) => {
+      const outputPreviewMap = new Map<string, string>();
+      for (const output of run.artifacts.exported_outputs ?? []) {
+        if (!output.node_id) continue;
+        outputPreviewMap.set(output.node_id, formatPreviewValue(output.value));
+      }
+
+      const failedNodeMap = new Map<string, string>();
+      for (const execution of run.node_executions) {
+        if (execution.status !== "failed") continue;
+        const errorText = execution.errors?.filter(Boolean).join("\n") || "Run failed on this node.";
+        failedNodeMap.set(execution.node_id, errorText);
+      }
+
+      setNodes((current) =>
+        current.map((node) => {
+          const failedText = failedNodeMap.get(node.id);
+          if (failedText) {
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                previewText: `Latest run failed here:\n${failedText}`,
+              },
+            };
+          }
+
+          if (node.data.config.family === "output") {
+            const outputText = outputPreviewMap.get(node.id);
+            let nextPreviewText = outputText ?? "";
+            if (!nextPreviewText && run.status === "failed") {
+              nextPreviewText = "Latest run failed before this output was produced.";
+            } else if (!nextPreviewText && run.status === "completed") {
+              nextPreviewText = "Latest run completed, but this output did not produce a value.";
+            }
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                previewText: nextPreviewText,
+              },
+            };
+          }
+
+          if (node.data.config.family === "agent" || node.data.config.family === "condition") {
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                previewText: "",
+              },
+            };
+          }
+
+          return node;
+        }),
+      );
+    },
+    [setNodes],
+  );
+
+  const loadRunResult = useCallback(
+    async (runId: string) => {
+      let latestError: Error | null = null;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          const run = await apiGet<RunDetail>(`/api/runs/${runId}`);
+          hydrateRunResult(run);
+          const runErrors = run.errors?.filter(Boolean) ?? [];
+          if (run.status === "failed" && runErrors.length > 0) {
+            setStatusMessage(`Run ${runId} failed: ${runErrors.join("; ")}`);
+          } else {
+            setStatusMessage(`Run ${runId} ${run.status}`);
+          }
+          return;
+        } catch (error) {
+          latestError = error instanceof Error ? error : new Error("Failed to load run detail.");
+          await new Promise((resolve) => {
+            window.setTimeout(resolve, 250 * (attempt + 1));
+          });
+        }
+      }
+      if (latestError) {
+        setStatusMessage(latestError.message);
+      }
+    },
+    [hydrateRunResult],
+  );
 
   useEffect(() => {
     let active = true;
@@ -1249,7 +1385,7 @@ function createNodeFromPreset(preset: NodePresetDefinition, position: { x: numbe
         data: {
           nodeId: node.data.nodeId,
           config: node.data.config,
-          previewText: previewTextByNode[node.id] ?? node.data.previewText ?? "",
+          previewText: node.data.previewText || previewTextByNode[node.id] || "",
         },
       })),
       edges: edges.map((edge) => ({
@@ -1286,7 +1422,7 @@ function createNodeFromPreset(preset: NodePresetDefinition, position: { x: numbe
     try {
       const response = await apiPost<{ run_id: string; status: string }>("/api/graphs/run", buildPayload());
       setActiveRunId(response.run_id);
-      setStatusMessage(`Run ${response.run_id} ${response.status}`);
+      await loadRunResult(response.run_id);
     } catch (error) {
       setStatusMessage(error instanceof Error ? error.message : "Failed to run graph.");
     }
@@ -1365,7 +1501,7 @@ function createNodeFromPreset(preset: NodePresetDefinition, position: { x: numbe
                 ...node,
                 data: {
                   ...node.data,
-                  previewText: previewTextByNode[node.id] ?? "",
+                  previewText: node.data.previewText || previewTextByNode[node.id] || "",
                 },
               }))}
               edges={edges}

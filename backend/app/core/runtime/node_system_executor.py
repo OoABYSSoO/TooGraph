@@ -268,6 +268,14 @@ def _execute_agent_node(
     skill_outputs: list[dict[str, Any]] = []
     skill_context: dict[str, Any] = {}
     registry = get_skill_registry(include_disabled=False)
+    response_payload: dict[str, Any] = {}
+
+    requires_response_before_skills = any(
+        _skill_uses_response(skill.input_mapping) or _skill_uses_response(skill.context_binding)
+        for skill in config.skills
+    )
+    if requires_response_before_skills:
+        response_payload = _generate_agent_response(config, input_values, skill_context)
 
     for skill in config.skills:
         skill_func = registry.get(skill.skill_key)
@@ -277,7 +285,7 @@ def _execute_agent_node(
             target_key: _resolve_reference(
                 source_ref,
                 inputs=input_values,
-                response={},
+                response=response_payload,
                 skills=skill_context,
                 context=skill_context,
                 graph=graph_context,
@@ -291,7 +299,7 @@ def _execute_agent_node(
             skill_context[context_key] = _resolve_reference(
                 source_ref,
                 inputs=input_values,
-                response={},
+                response=response_payload,
                 skills=skill_context,
                 context=skill_context,
                 graph=graph_context,
@@ -305,12 +313,11 @@ def _execute_agent_node(
             }
         )
 
-    response_payload: dict[str, Any] = {}
     bound_output_values = {
         output.key: _resolve_reference(
             config.output_binding.get(output.key, f"$response.{output.key}"),
             inputs=input_values,
-            response={},
+            response=response_payload,
             skills=skill_context,
             context=skill_context,
             graph=graph_context,
@@ -342,6 +349,10 @@ def _execute_agent_node(
     }
 
 
+def _skill_uses_response(mapping: dict[str, str]) -> bool:
+    return any(isinstance(source_ref, str) and source_ref.startswith("$response.") for source_ref in mapping.values())
+
+
 def _generate_agent_response(
     config: AgentNodeConfig,
     input_values: dict[str, Any],
@@ -364,7 +375,6 @@ def _generate_agent_response(
         system_prompt=config.system_instruction or "You are a precise workflow agent.",
         user_prompt=user_prompt,
         temperature=0.2,
-        max_tokens=160,
     )
 
     response_payload: dict[str, Any] = {"summary": content}

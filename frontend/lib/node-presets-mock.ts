@@ -110,8 +110,8 @@ export const SUMMARY_AGENT_PRESET = {
 
 export const HELLO_GREETING_AGENT_PRESET = {
   presetId: "preset.agent.hello_greeting.v1",
-  label: "Hello Greeting",
-  description: "Generate a short greeting by calling the hello greeting skill.",
+  label: "Greeting With Guide",
+  description: "Let the agent greet the user, then append the local usage guide with a skill.",
   family: "agent",
   inputs: [
     {
@@ -124,18 +124,18 @@ export const HELLO_GREETING_AGENT_PRESET = {
   outputs: [
     {
       key: "greeting",
-      label: "Greeting",
+      label: "Greeting With Guide",
       valueType: "text",
     },
   ],
-  systemInstruction: "You are a precise assistant.",
-  taskInstruction: "Return a short greeting for the provided name.",
+  systemInstruction: "You are a friendly GraphiteUI onboarding assistant.",
+  taskInstruction: "Write one short Chinese greeting for the provided name only. Do not include usage instructions.",
   skills: [
     {
-      name: "generate_greeting",
-      skillKey: "generate_hello_greeting",
+      name: "append_usage_introduction",
+      skillKey: "append_usage_introduction",
       inputMapping: {
-        name: "$inputs.name",
+        greeting: "$response.greeting",
       },
       contextBinding: {},
       usage: "required",
@@ -143,25 +143,25 @@ export const HELLO_GREETING_AGENT_PRESET = {
   ],
   responseMode: "json",
   outputBinding: {
-    greeting: "$skills.generate_greeting.greeting",
+    greeting: "$skills.append_usage_introduction.greeting",
   },
 } satisfies NodePresetDefinition;
 
 export const GREETING_OUTPUT_PRESET = {
   presetId: "preset.output.greeting.v1",
-  label: "Greeting Output",
-  description: "Preview and optionally persist the generated greeting.",
+  label: "Greeting With Guide Output",
+  description: "Preview and optionally persist the greeting followed by the local usage guide.",
   family: "output",
   input: {
     key: "value",
-    label: "Greeting",
+    label: "Greeting With Guide",
     valueType: "text",
     required: true,
   },
   displayMode: "auto",
   persistEnabled: false,
   persistFormat: "txt",
-  fileNameTemplate: "greeting",
+  fileNameTemplate: "usage-introduction",
 } satisfies NodePresetDefinition;
 
 export const FETCH_NEWS_AGENT_PRESET = {

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from pathlib import Path
 
 import yaml
@@ -21,9 +22,23 @@ from app.skills.registry import get_skill_registry
 
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
-CLAUDE_EXTERNAL_DIR = ROOT_DIR / ".claude" / "agents"
-OPENCLAW_EXTERNAL_DIR = ROOT_DIR / ".openclaw" / "workspace" / "skills"
-CODEX_EXTERNAL_DIR = ROOT_DIR / ".codex" / "skills"
+HOME_DIR = Path.home()
+CLAUDE_EXTERNAL_DIRS = [
+    ROOT_DIR / ".claude" / "skills",
+    HOME_DIR / ".claude" / "skills",
+]
+OPENCLAW_EXTERNAL_DIRS = [
+    ROOT_DIR / "skills",
+    ROOT_DIR / ".agents" / "skills",
+    HOME_DIR / ".agents" / "skills",
+    HOME_DIR / ".openclaw" / "skills",
+    HOME_DIR / ".openclaw" / "workspace" / "skills",
+]
+CODEX_EXTERNAL_DIRS = [
+    Path(os.environ["CODEX_HOME"]) / "skills"
+    for _ in [0]
+    if os.environ.get("CODEX_HOME")
+]
 
 
 @dataclass
@@ -99,7 +114,7 @@ def get_external_skill_catalog_registry() -> dict[str, SkillDefinition]:
 
 def _load_managed_skill_records() -> list[SkillDefinitionRecord]:
     records: list[SkillDefinitionRecord] = []
-    for path in sorted((GRAPHITE_SKILLS_DIR / "claude_code").glob("*.md")):
+    for path in sorted((GRAPHITE_SKILLS_DIR / "claude_code").glob("*/SKILL.md")):
         records.append(_parse_skill_file(path, SkillSourceFormat.CLAUDE_CODE, SkillSourceScope.GRAPHITE_MANAGED))
     for root, format_name in [
         (GRAPHITE_SKILLS_DIR / "openclaw", SkillSourceFormat.OPENCLAW),
@@ -116,18 +131,24 @@ def _load_managed_skill_records() -> list[SkillDefinitionRecord]:
 def _load_external_skill_records() -> list[SkillDefinitionRecord]:
     records: list[SkillDefinitionRecord] = []
     managed_keys = list_managed_skill_keys()
-    if CLAUDE_EXTERNAL_DIR.exists():
-        for path in sorted(CLAUDE_EXTERNAL_DIR.glob("*.md")):
+    for root in CLAUDE_EXTERNAL_DIRS:
+        if not root.exists():
+            continue
+        for path in sorted(root.glob("*/SKILL.md")):
             record = _parse_skill_file(path, SkillSourceFormat.CLAUDE_CODE, SkillSourceScope.EXTERNAL)
             if record.definition.skill_key not in managed_keys:
                 records.append(record)
-    if OPENCLAW_EXTERNAL_DIR.exists():
-        for path in sorted(OPENCLAW_EXTERNAL_DIR.glob("*/SKILL.md")):
+    for root in OPENCLAW_EXTERNAL_DIRS:
+        if not root.exists():
+            continue
+        for path in sorted(root.glob("*/SKILL.md")):
             record = _parse_skill_file(path, SkillSourceFormat.OPENCLAW, SkillSourceScope.EXTERNAL)
             if record.definition.skill_key not in managed_keys:
                 records.append(record)
-    if CODEX_EXTERNAL_DIR.exists():
-        for path in sorted(CODEX_EXTERNAL_DIR.glob("*/SKILL.md")):
+    for root in CODEX_EXTERNAL_DIRS:
+        if not root.exists():
+            continue
+        for path in sorted(root.glob("*/SKILL.md")):
             record = _parse_skill_file(path, SkillSourceFormat.CODEX, SkillSourceScope.EXTERNAL)
             if record.definition.skill_key not in managed_keys:
                 records.append(record)

@@ -13,7 +13,7 @@ GRAPHITE_SKILLS_DIR = ROOT_DIR / ".graphite" / "skills"
 
 def graphite_skill_path_for(skill_key: str, source_format: SkillSourceFormat) -> Path:
     if source_format == SkillSourceFormat.CLAUDE_CODE:
-        return GRAPHITE_SKILLS_DIR / "claude_code" / f"{skill_key}.md"
+        return GRAPHITE_SKILLS_DIR / "claude_code" / skill_key / "SKILL.md"
     if source_format == SkillSourceFormat.OPENCLAW:
         return GRAPHITE_SKILLS_DIR / "openclaw" / skill_key / "SKILL.md"
     if source_format == SkillSourceFormat.CODEX:
@@ -25,7 +25,7 @@ def list_managed_skill_keys() -> set[str]:
     keys: set[str] = set()
     claude_root = GRAPHITE_SKILLS_DIR / "claude_code"
     if claude_root.exists():
-        keys.update(path.stem for path in claude_root.glob("*.md"))
+        keys.update(path.parent.name for path in claude_root.glob("*/SKILL.md"))
     for root in [GRAPHITE_SKILLS_DIR / "openclaw", GRAPHITE_SKILLS_DIR / "codex", GRAPHITE_SKILLS_DIR / "graphite"]:
         if not root.exists():
             continue
@@ -65,7 +65,7 @@ def clear_skill_status(skill_key: str) -> None:
 
 def delete_skill(skill_key: str) -> None:
     for root in [
-        GRAPHITE_SKILLS_DIR / "claude_code" / f"{skill_key}.md",
+        GRAPHITE_SKILLS_DIR / "claude_code" / skill_key,
         GRAPHITE_SKILLS_DIR / "openclaw" / skill_key,
         GRAPHITE_SKILLS_DIR / "codex" / skill_key,
         GRAPHITE_SKILLS_DIR / "graphite" / skill_key,
@@ -89,10 +89,7 @@ def import_skill_from_source(skill_key: str, source_format: SkillSourceFormat, s
     source = Path(source_path)
     destination = graphite_skill_path_for(skill_key, source_format)
     destination.parent.mkdir(parents=True, exist_ok=True)
-    if source_format == SkillSourceFormat.CLAUDE_CODE:
-        shutil.copy2(source, destination)
-    else:
-        source_dir = source.parent if source.is_file() else source
-        shutil.copytree(source_dir, destination.parent, dirs_exist_ok=True)
+    source_dir = source.parent if source.is_file() else source
+    shutil.copytree(source_dir, destination.parent, dirs_exist_ok=True)
     enable_skill(skill_key)
     return destination
