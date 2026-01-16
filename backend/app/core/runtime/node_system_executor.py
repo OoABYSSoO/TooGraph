@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import inspect
 import time
 from collections import defaultdict, deque
@@ -353,6 +354,22 @@ def _skill_uses_response(mapping: dict[str, str]) -> bool:
     return any(isinstance(source_ref, str) and source_ref.startswith("$response.") for source_ref in mapping.values())
 
 
+def _parse_llm_json_response(content: str, output_keys: list[str]) -> dict[str, Any]:
+    """清理 LLM 返回的 markdown 代码块标记，尝试解析 JSON，按 output_keys 提取字段值。
+    解析失败时，将原始字符串作为每个 key 的 fallback 值。"""
+    if not content:
+        return {key: "" for key in output_keys}
+    cleaned = re.sub(r"^\s*```(?:json)?\s*\n?", "", content)
+    cleaned = re.sub(r"\n?\s*```\s*$", "", cleaned).strip()
+    try:
+        parsed = json.loads(cleaned)
+        if isinstance(parsed, dict):
+            return {key: parsed.get(key) for key in output_keys}
+    except json.JSONDecodeError:
+        pass
+    return {key: cleaned for key in output_keys}
+
+
 def _generate_agent_response(
     config: AgentNodeConfig,
     input_values: dict[str, Any],
@@ -377,13 +394,8 @@ def _generate_agent_response(
         temperature=0.2,
     )
 
-    response_payload: dict[str, Any] = {"summary": content}
-    if len(output_keys) == 1:
-        response_payload[output_keys[0]] = content
-        return response_payload
-
-    for key in output_keys:
-        response_payload[key] = content
+    parsed_fields = _parse_llm_json_response(content, output_keys)
+    response_payload: dict[str, Any] = {"summary": content, **parsed_fields}
     return response_payload
 
 

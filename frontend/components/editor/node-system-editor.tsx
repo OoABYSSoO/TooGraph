@@ -8,10 +8,12 @@ import {
   Handle,
   MiniMap,
   MarkerType,
+  NodeResizer,
   Position,
   ReactFlow,
   ReactFlowProvider,
   useEdgesState,
+  useNodesInitialized,
   useNodesState,
   useReactFlow,
   type Connection,
@@ -97,6 +99,7 @@ type FlowNodeData = {
   config: NodePresetDefinition;
   previewText: string;
   onConfigChange?: (updater: (config: NodePresetDefinition) => NodePresetDefinition) => void;
+  onResizeEnd?: (width: number, height: number) => void;
 };
 
 type FlowNode = Node<FlowNodeData>;
@@ -203,6 +206,7 @@ function createEditorDefaults(templates: TemplateRecord[], defaultTemplateId?: s
 }
 
 function createFlowNodeFromGraphNode(node: any): FlowNode {
+  const hasExplicitSize = typeof node.style?.width === "number" && typeof node.style?.height === "number";
   return {
     id: node.id,
     type: node.type ?? "default",
@@ -214,12 +218,9 @@ function createFlowNodeFromGraphNode(node: any): FlowNode {
     },
     sourcePosition: Position.Right,
     targetPosition: Position.Left,
-    style: {
-      background: "transparent",
-      border: "none",
-      padding: 0,
-      width: "auto",
-    },
+    style: hasExplicitSize
+      ? { background: "transparent", border: "none", padding: 0, width: node.style.width, height: node.style.height }
+      : { background: "transparent", border: "none", padding: 0, width: "auto" },
   } satisfies FlowNode;
 }
 
@@ -895,13 +896,22 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
   const outputs = listOutputPorts(config);
 
   return (
-    <div
-      data-node-card="true"
-      className={cn(
-        "min-w-[280px] rounded-[18px] border bg-[linear-gradient(180deg,rgba(255,250,241,0.98)_0%,rgba(248,237,219,0.96)_100%)] shadow-[0_18px_36px_rgba(60,41,20,0.1)]",
-        selected ? "border-[var(--accent)]" : "border-[rgba(154,52,18,0.25)]",
-      )}
-    >
+    <>
+      <NodeResizer
+        isVisible={selected}
+        minWidth={160}
+        minHeight={48}
+        handleStyle={{ width: 8, height: 8, borderRadius: 4, background: "var(--accent)", border: "none" }}
+        lineStyle={{ borderColor: "var(--accent)", borderWidth: 1 }}
+        onResizeEnd={(_event, params) => data.onResizeEnd?.(params.width, params.height)}
+      />
+      <div
+        data-node-card="true"
+        className={cn(
+          "h-full min-w-[160px] rounded-[18px] border bg-[linear-gradient(180deg,rgba(255,250,241,0.98)_0%,rgba(248,237,219,0.96)_100%)] shadow-[0_18px_36px_rgba(60,41,20,0.1)]",
+          selected ? "border-[var(--accent)]" : "border-[rgba(154,52,18,0.25)]",
+        )}
+      >
       <div className="flex items-center justify-between border-b border-[rgba(154,52,18,0.12)] px-4 py-2.5">
         <div className="flex min-w-0 items-center gap-2">
           <span className="h-2.5 w-2.5 rounded-full bg-[rgba(154,52,18,0.55)]" />
@@ -1002,6 +1012,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
 
       </div>
     </div>
+    </>
   );
 }
 
@@ -1009,7 +1020,7 @@ const nodeTypes = {
   default: NodeCard,
 };
 
-function NodeSystemCanvas({ initialGraph }: { initialGraph: GraphPayload }) {
+function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: GraphPayload; isNewFromTemplate: boolean }) {
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const reactFlow = useReactFlow<FlowNode, Edge>();
   const [graphName, setGraphName] = useState(initialGraph.name);
@@ -1019,6 +1030,8 @@ function NodeSystemCanvas({ initialGraph }: { initialGraph: GraphPayload }) {
   const [stateSchema] = useState(initialGraph.state_schema);
   const [metadata] = useState(initialGraph.metadata);
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
+  const nodesInitialized = useNodesInitialized();
+  const autoLayoutDoneRef = useRef(false);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -1213,9 +1226,33 @@ function NodeSystemCanvas({ initialGraph }: { initialGraph: GraphPayload }) {
     const initialEdges = Array.isArray(initialGraph.edges)
       ? initialGraph.edges.map((edge) => createFlowEdgeFromGraphEdge(edge, nodesById))
       : [];
+    autoLayoutDoneRef.current = false;
     setNodes(initialNodes);
     setEdges(initialEdges);
   }, [initialGraph.edges, initialGraph.nodes, setEdges, setNodes]);
+
+  useEffect(() => {
+    if (!isNewFromTemplate) return;
+    if (!nodesInitialized) return;
+    if (autoLayoutDoneRef.current) return;
+
+    setNodes((current) => {
+      if (current.length === 0) return current;
+      autoLayoutDoneRef.current = true;
+
+      const sorted = [...current].sort((a, b) => a.position.x - b.position.x);
+      const GAP = 80;
+      let nextX = sorted[0].position.x;
+      const centerY = sorted.reduce((sum, n) => sum + n.position.y, 0) / sorted.length;
+
+      return sorted.map((node) => {
+        const width = node.measured?.width ?? (typeof node.style?.width === "number" ? node.style.width : 280);
+        const updatedNode = { ...node, position: { x: nextX, y: centerY } };
+        nextX += width + GAP;
+        return updatedNode;
+      });
+    });
+  }, [isNewFromTemplate, nodesInitialized, setNodes]);
 
   useEffect(() => {
     let active = true;
@@ -1389,6 +1426,7 @@ function createNodeFromPreset(preset: NodePresetDefinition, position: { x: numbe
         id: node.id,
         type: "default",
         position: node.position,
+        style: node.style,
         data: {
           nodeId: node.data.nodeId,
           config: node.data.config,
@@ -1521,6 +1559,15 @@ function createNodeFromPreset(preset: NodePresetDefinition, position: { x: numbe
                               },
                             }
                           : candidate,
+                      ),
+                    );
+                  },
+                  onResizeEnd: (width: number, height: number) => {
+                    setNodes((current) =>
+                      current.map((n) =>
+                        n.id === node.id
+                          ? { ...n, style: { ...n.style, width, height } }
+                          : n,
                       ),
                     );
                   },
@@ -2173,10 +2220,11 @@ function createNodeFromPreset(preset: NodePresetDefinition, position: { x: numbe
 
 export function NodeSystemEditor(props: EditorClientProps) {
   const graph = props.initialGraph ?? createEditorDefaults(props.templates, props.defaultTemplateId);
+  const isNewFromTemplate = props.mode === "new" && props.initialGraph == null;
 
   return (
     <ReactFlowProvider>
-      <NodeSystemCanvas initialGraph={graph} />
+      <NodeSystemCanvas initialGraph={graph} isNewFromTemplate={isNewFromTemplate} />
     </ReactFlowProvider>
   );
 }
