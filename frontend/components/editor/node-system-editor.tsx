@@ -27,7 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiGet, apiPost } from "@/lib/api";
 import { cn } from "@/lib/cn";
-import { EMPTY_AGENT_PRESET, getNodePresetById, NODE_PRESETS_MOCK } from "@/lib/node-presets-mock";
+import { EMPTY_AGENT_PRESET, getNodePresetById, NODE_PRESETS_MOCK, TEXT_INPUT_PRESET } from "@/lib/node-presets-mock";
 import {
   isValueTypeCompatible,
   type AgentNode,
@@ -343,18 +343,24 @@ function renderUploadedAssetPreview(asset: UploadedAssetEnvelope, actions?: Reac
   );
 }
 
-function openUploadedAsset(asset: UploadedAssetEnvelope) {
-  if (typeof window === "undefined") return;
-
-  if (asset.encoding === "data_url") {
-    window.open(asset.content, "_blank", "noopener,noreferrer");
-    return;
+function formatValueTypeLabel(valueType: ValueType) {
+  switch (valueType) {
+    case "image":
+      return "Image";
+    case "audio":
+      return "Audio";
+    case "video":
+      return "Video";
+    case "file":
+      return "File";
+    case "json":
+      return "JSON";
+    case "any":
+      return "Any";
+    case "text":
+    default:
+      return "Text";
   }
-
-  const blob = new Blob([asset.content], { type: asset.mimeType || "text/plain" });
-  const url = URL.createObjectURL(blob);
-  window.open(url, "_blank", "noopener,noreferrer");
-  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 async function fileToEnvelope(file: File): Promise<UploadedAssetEnvelope> {
@@ -1189,6 +1195,8 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [draftLabel, setDraftLabel] = useState(config.label);
   const [draftDescription, setDraftDescription] = useState(config.description);
+  const [isDeleteConfirmActive, setIsDeleteConfirmActive] = useState(false);
+  const deleteConfirmTimeoutRef = useRef<number | null>(null);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const uploadedAsset = config.family === "input" ? tryParseUploadedAssetEnvelope(config.defaultValue) : null;
 
@@ -1199,6 +1207,38 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
   useEffect(() => {
     setDraftDescription(config.description);
   }, [config.description]);
+
+  useEffect(() => {
+    if (selected) return;
+    setIsDeleteConfirmActive(false);
+  }, [selected]);
+
+  useEffect(() => {
+    return () => {
+      if (deleteConfirmTimeoutRef.current) {
+        window.clearTimeout(deleteConfirmTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  function clearDeleteConfirmState() {
+    if (deleteConfirmTimeoutRef.current) {
+      window.clearTimeout(deleteConfirmTimeoutRef.current);
+      deleteConfirmTimeoutRef.current = null;
+    }
+    setIsDeleteConfirmActive(false);
+  }
+
+  function startDeleteConfirmWindow() {
+    if (deleteConfirmTimeoutRef.current) {
+      window.clearTimeout(deleteConfirmTimeoutRef.current);
+    }
+    setIsDeleteConfirmActive(true);
+    deleteConfirmTimeoutRef.current = window.setTimeout(() => {
+      deleteConfirmTimeoutRef.current = null;
+      setIsDeleteConfirmActive(false);
+    }, 2000);
+  }
 
   function commitLabelEdit() {
     const nextLabel = draftLabel.trim();
@@ -1243,11 +1283,60 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
       <div
         data-node-card="true"
         className={cn(
-          "h-full min-w-[160px] rounded-[18px] border bg-[linear-gradient(180deg,rgba(255,250,241,0.98)_0%,rgba(248,237,219,0.96)_100%)] shadow-[0_18px_36px_rgba(60,41,20,0.1)]",
+          "group/node relative h-full min-w-[160px] rounded-[18px] border bg-[linear-gradient(180deg,rgba(255,250,241,0.98)_0%,rgba(248,237,219,0.96)_100%)] shadow-[0_18px_36px_rgba(60,41,20,0.1)]",
           selected ? "border-[var(--accent)]" : "border-[rgba(154,52,18,0.25)]",
         )}
+        onClickCapture={(event) => {
+          const target = event.target as HTMLElement | null;
+          if (target?.closest("[data-delete-surface='true']")) return;
+          if (isDeleteConfirmActive) {
+            clearDeleteConfirmState();
+          }
+        }}
       >
-        <div className="flex items-start justify-between gap-3 border-b border-[rgba(154,52,18,0.12)] px-4 py-3">
+        <button
+          type="button"
+          aria-label={isDeleteConfirmActive ? "确认删除节点" : "删除节点"}
+          title={isDeleteConfirmActive ? "确认删除节点" : "删除节点"}
+          data-delete-surface="true"
+          className={cn(
+            "absolute right-3 top-3 z-20 grid h-8 w-8 place-items-center rounded-full border border-[rgba(154,52,18,0.14)] bg-[rgba(255,252,247,0.92)] text-[var(--muted)] shadow-[0_10px_24px_rgba(60,41,20,0.08)] transition",
+            selected || isDeleteConfirmActive ? "opacity-100" : "opacity-0 group-hover/node:opacity-100",
+            isDeleteConfirmActive
+              ? "border-[rgba(185,28,28,0.28)] bg-[rgb(185,28,28)] text-white"
+              : "hover:border-[rgba(154,52,18,0.24)] hover:text-[var(--accent)]",
+          )}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (isDeleteConfirmActive) {
+              clearDeleteConfirmState();
+              data.onDelete?.();
+              return;
+            }
+            startDeleteConfirmWindow();
+          }}
+        >
+          {isDeleteConfirmActive ? (
+            <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.7">
+              <path d="m4.5 8 2.25 2.25L11.5 5.5" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.5">
+              <path d="M3.5 4.5h9" />
+              <path d="M6.5 2.75h3" />
+              <path d="M5 4.5V12a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1V4.5" />
+              <path d="M6.75 6.5v4" />
+              <path d="M9.25 6.5v4" />
+            </svg>
+          )}
+        </button>
+        {isDeleteConfirmActive ? (
+          <div className="pointer-events-none absolute right-3 top-3 z-30 -translate-y-[calc(100%+8px)] whitespace-nowrap rounded-full border border-[rgba(185,28,28,0.16)] bg-[rgba(255,248,248,0.96)] px-2.5 py-1 text-[0.68rem] uppercase tracking-[0.12em] text-[rgb(153,27,27)] shadow-[0_10px_24px_rgba(127,29,29,0.12)]">
+            Delete node?
+          </div>
+        ) : null}
+        <div className="flex items-start justify-between gap-3 border-b border-[rgba(154,52,18,0.12)] pl-4 pr-14 py-3">
           <div className="min-w-0 flex-1">
             <div className="relative flex min-w-0 items-center gap-2">
               <span className="h-2.5 w-2.5 rounded-full bg-[rgba(154,52,18,0.55)]" />
@@ -1424,7 +1513,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                       </button>
                     ) : (
                       <div
-                        className="grid min-h-[120px] gap-3 rounded-[16px] border border-dashed border-[rgba(154,52,18,0.24)] bg-[rgba(255,255,255,0.82)] px-4 py-5 text-left"
+                        className="grid min-h-[120px] gap-3 text-left"
                         onDragOver={(event) => {
                           event.preventDefault();
                           event.dataTransfer.dropEffect = "copy";
@@ -1438,13 +1527,6 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                         {renderUploadedAssetPreview(
                           uploadedAsset,
                           <>
-                            <UploadedAssetActionButton label="打开本地文件" onClick={() => openUploadedAsset(uploadedAsset)}>
-                              <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.5">
-                                <path d="M6 4.5h-1A1.5 1.5 0 0 0 3.5 6v5A1.5 1.5 0 0 0 5 12.5h5A1.5 1.5 0 0 0 11.5 11v-1" />
-                                <path d="M8.5 3.5h4v4" />
-                                <path d="m12.5 3.5-5 5" />
-                              </svg>
-                            </UploadedAssetActionButton>
                             <UploadedAssetActionButton label="替换文件" onClick={() => uploadInputRef.current?.click()}>
                               <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.5">
                                 <path d="M11.5 6.5A3.5 3.5 0 0 0 5.7 4L4.5 5" />
@@ -1757,9 +1839,6 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
               <Button variant="ghost" onClick={() => void data.onSavePreset?.()}>
                 Save As Preset
               </Button>
-              <Button variant="ghost" onClick={() => data.onDelete?.()}>
-                Delete Node
-              </Button>
             </div>
           ) : null}
         </div>
@@ -2045,11 +2124,10 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
     [reactFlow],
   );
 
-function createNodeFromPreset(preset: NodePresetDefinition, position: { x: number; y: number }) {
-  const config = deepClonePreset(preset);
-  const id = `${config.family}_${crypto.randomUUID().slice(0, 8)}`;
-  return {
-    id,
+  function createNodeFromConfig(config: NodePresetDefinition, position: { x: number; y: number }) {
+    const id = `${config.family}_${crypto.randomUUID().slice(0, 8)}`;
+    return {
+      id,
       type: "default",
       position,
       data: {
@@ -2067,6 +2145,35 @@ function createNodeFromPreset(preset: NodePresetDefinition, position: { x: numbe
         width: "auto",
       },
     } satisfies FlowNode;
+  }
+
+function createNodeFromPreset(preset: NodePresetDefinition, position: { x: number; y: number }) {
+  const config = deepClonePreset(preset);
+  return createNodeFromConfig(config, position);
+}
+
+  async function addInputNodeFromFile(file: File, position: { x: number; y: number }) {
+    const envelope = await fileToEnvelope(file);
+    const typeLabel = formatValueTypeLabel(envelope.detectedType);
+    const inputConfig = {
+      ...deepClonePreset(TEXT_INPUT_PRESET),
+      label: `${typeLabel} Input`,
+      description: `Uploaded ${typeLabel.toLowerCase()} asset from ${file.name}.`,
+      valueType: envelope.detectedType,
+      output: {
+        ...deepClonePreset(TEXT_INPUT_PRESET).output,
+        key: envelope.detectedType,
+        label: typeLabel,
+        valueType: envelope.detectedType,
+      },
+      defaultValue: JSON.stringify(envelope),
+      placeholder: "",
+    } satisfies InputBoundaryNode;
+
+    const nextNode = createNodeFromConfig(inputConfig, position);
+    setNodes((current) => current.concat(nextNode));
+    setSelectedNodeId(nextNode.id);
+    setStatusMessage(`Added ${inputConfig.label} from ${file.name}`);
   }
 
   function addNodeFromPresetId(presetId: string, position: { x: number; y: number }, connectionSource?: { sourceNodeId?: string; sourceHandle?: string; sourceValueType?: ValueType | null }) {
@@ -2212,7 +2319,7 @@ function createNodeFromPreset(preset: NodePresetDefinition, position: { x: numbe
     <div className="grid h-screen grid-rows-[56px_minmax(0,1fr)_36px] bg-[radial-gradient(circle_at_top,rgba(154,52,18,0.1),transparent_22%),linear-gradient(180deg,#f5efe2_0%,#ede4d2_100%)]">
       <header className="grid grid-cols-[minmax(220px,320px)_1fr_auto] items-center gap-3 border-b border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.82)] px-4 backdrop-blur-xl">
         <Input className="h-10" value={graphName} onChange={(event) => setGraphName(event.target.value)} placeholder="Graph name" />
-        <div className="text-sm text-[var(--muted)]">Double click canvas to create nodes. Drag from an output handle into empty space for type-aware suggestions.</div>
+        <div className="text-sm text-[var(--muted)]">Double click canvas to create nodes. Drop files on empty canvas to create input nodes. Drag from an output handle into empty space for type-aware suggestions.</div>
         <div className="flex items-center gap-2">
           <Button size="sm" onClick={() => void handleSave()}>
             Save
@@ -2374,14 +2481,21 @@ function createNodeFromPreset(preset: NodePresetDefinition, position: { x: numbe
               }}
               onDragOver={(event) => {
                 event.preventDefault();
-                event.dataTransfer.dropEffect = "move";
+                event.dataTransfer.dropEffect = event.dataTransfer.files.length > 0 ? "copy" : "move";
               }}
               onDrop={(event) => {
                 event.preventDefault();
                 const presetId = event.dataTransfer.getData("application/graphiteui-node-preset");
-                if (!presetId) return;
+                if (presetId) {
+                  const position = reactFlow.screenToFlowPosition({ x: event.clientX, y: event.clientY });
+                  addNodeFromPresetId(presetId, position);
+                  return;
+                }
+
+                const droppedFile = event.dataTransfer.files?.[0] ?? null;
+                if (!droppedFile) return;
                 const position = reactFlow.screenToFlowPosition({ x: event.clientX, y: event.clientY });
-                addNodeFromPresetId(presetId, position);
+                void addInputNodeFromFile(droppedFile, position);
               }}
               fitView
               minZoom={0.35}
