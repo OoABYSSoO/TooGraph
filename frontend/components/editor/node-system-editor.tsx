@@ -1201,6 +1201,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
   const isExpanded = config.family === "input" ? true : Boolean(data.isExpanded);
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [isHoveringNode, setIsHoveringNode] = useState(false);
   const [draftLabel, setDraftLabel] = useState(config.label);
   const [draftDescription, setDraftDescription] = useState(config.description);
   const [isDeleteConfirmActive, setIsDeleteConfirmActive] = useState(false);
@@ -1281,7 +1282,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
   return (
     <>
       <NodeResizer
-        isVisible={selected}
+        isVisible={selected || isHoveringNode}
         minWidth={160}
         minHeight={minHeight}
         handleStyle={{ width: 8, height: 8, borderRadius: 4, background: "var(--accent)", border: "none" }}
@@ -1294,6 +1295,16 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
           "group/node relative h-full min-w-[160px] rounded-[18px] border bg-[linear-gradient(180deg,rgba(255,250,241,0.98)_0%,rgba(248,237,219,0.96)_100%)] shadow-[0_18px_36px_rgba(60,41,20,0.1)]",
           selected ? "border-[var(--accent)]" : "border-[rgba(154,52,18,0.25)]",
         )}
+        onPointerEnter={() => setIsHoveringNode(true)}
+        onPointerLeave={() => setIsHoveringNode(false)}
+        onDoubleClickCapture={(event) => {
+          if (!isCollapsible || isExpanded) return;
+          const target = event.target as HTMLElement | null;
+          if (target?.closest("button, input, textarea, select, summary, [data-delete-surface='true']")) return;
+          event.preventDefault();
+          event.stopPropagation();
+          data.onToggleExpanded?.();
+        }}
         onClickCapture={(event) => {
           const target = event.target as HTMLElement | null;
           if (target?.closest("[data-delete-surface='true']")) return;
@@ -1308,7 +1319,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
           title={isDeleteConfirmActive ? "确认删除节点" : "删除节点"}
           data-delete-surface="true"
           className={cn(
-            "absolute right-3 top-3 z-20 grid h-8 w-8 place-items-center rounded-full shadow-[0_10px_24px_rgba(60,41,20,0.08)] transition",
+            "absolute right-3 top-3 z-20 grid h-8 w-8 place-items-center rounded-full shadow-[0_10px_24px_rgba(60,41,20,0.08)] transition hover:border-[rgba(154,52,18,0.28)] hover:bg-[rgba(255,248,240,0.92)]",
             selected || isDeleteConfirmActive ? "opacity-100" : "opacity-0 group-hover/node:opacity-100",
             isDeleteConfirmActive
               ? "border border-[rgba(185,28,28,0.28)] bg-[rgb(185,28,28)] text-white"
@@ -1412,7 +1423,10 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                 type="button"
                 aria-label={isExpanded ? "折叠节点" : "展开节点"}
                 title={isExpanded ? "折叠节点" : "展开节点"}
-                className="grid h-8 w-8 place-items-center rounded-full border border-[rgba(154,52,18,0.16)] bg-[rgba(255,255,255,0.72)] text-[var(--accent-strong)] transition hover:border-[rgba(154,52,18,0.28)] hover:bg-[rgba(255,248,240,0.92)]"
+                className={cn(
+                  "grid h-8 w-8 place-items-center rounded-full border border-[rgba(154,52,18,0.14)] bg-[rgba(255,252,247,0.92)] text-[var(--muted)] shadow-[0_10px_24px_rgba(60,41,20,0.08)] transition hover:border-[rgba(154,52,18,0.24)] hover:bg-[rgba(255,248,240,0.92)] hover:text-[var(--accent)]",
+                  selected ? "opacity-100" : "opacity-0 group-hover/node:opacity-100",
+                )}
                 onClick={() => data.onToggleExpanded?.()}
               >
                 <svg
@@ -1609,16 +1623,14 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                 </div>
               ) : (
                 <>
-                  <details className="rounded-[20px] border border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.7)] p-4">
-                    <summary className="cursor-pointer text-sm font-semibold text-[var(--text)]">Task Introduction</summary>
-                    <div className="mt-4 grid gap-1.5 text-sm text-[var(--muted)]">
-                      <textarea
-                        className="min-h-24 rounded-[16px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]"
-                        value={config.description}
-                        onChange={(event) => data.onConfigChange?.((currentConfig) => ({ ...(currentConfig as AgentNode), description: event.target.value }))}
-                      />
-                    </div>
-                  </details>
+                  <label className="grid gap-1.5 text-sm text-[var(--muted)]">
+                    <span>Task Introduction</span>
+                    <textarea
+                      className="min-h-24 rounded-[16px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]"
+                      value={config.description}
+                      onChange={(event) => data.onConfigChange?.((currentConfig) => ({ ...(currentConfig as AgentNode), description: event.target.value }))}
+                    />
+                  </label>
                   <label className="grid gap-1.5 text-sm text-[var(--muted)]">
                     <span>System Instruction</span>
                     <textarea
