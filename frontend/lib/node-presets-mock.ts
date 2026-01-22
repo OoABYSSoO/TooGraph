@@ -10,7 +10,6 @@ export const EMPTY_AGENT_PRESET = {
   systemInstruction: "",
   taskInstruction: "",
   skills: [],
-  responseMode: "json",
   outputBinding: {},
 } satisfies NodePresetDefinition;
 
@@ -42,6 +41,21 @@ export const NAME_INPUT_PRESET = {
   },
   defaultValue: "Abyss",
   placeholder: "Enter a name",
+} satisfies NodePresetDefinition;
+
+export const QUESTION_INPUT_PRESET = {
+  presetId: "preset.input.question.v1",
+  label: "Question Input",
+  description: "Ask a question about GraphiteUI and route it into the workflow.",
+  family: "input",
+  valueType: "text",
+  output: {
+    key: "question",
+    label: "Question",
+    valueType: "text",
+  },
+  defaultValue: "什么是 GraphiteUI？你能做些什么？我该如何开始使用？",
+  placeholder: "Ask about GraphiteUI",
 } satisfies NodePresetDefinition;
 
 export const TASK_INPUT_PRESET = {
@@ -99,66 +113,67 @@ export const SUMMARY_AGENT_PRESET = {
   systemInstruction: "You are a concise workflow summarization agent.",
   taskInstruction: "Read the source text and return a concise summary.",
   skills: [],
-  responseMode: "json",
   outputBinding: {
     summary: "$response.summary",
   },
 } satisfies NodePresetDefinition;
 
-export const HELLO_GREETING_AGENT_PRESET = {
-  presetId: "preset.agent.hello_greeting.v1",
-  label: "Greeting With Guide",
-  description: "Let the agent greet the user, then append the local usage guide with a skill.",
+export const ONBOARDING_HELPER_AGENT_PRESET = {
+  presetId: "preset.agent.onboarding_helper.v1",
+  label: "GraphiteUI Onboarding Helper",
+  description: "Search the official GraphiteUI knowledge base and answer onboarding questions.",
   family: "agent",
   inputs: [
     {
-      key: "name",
-      label: "Name",
+      key: "question",
+      label: "Question",
       valueType: "text",
       required: true,
     },
   ],
   outputs: [
     {
-      key: "greeting",
-      label: "Greeting With Guide",
+      key: "answer",
+      label: "Onboarding Answer",
       valueType: "text",
     },
   ],
-  systemInstruction: "You are a friendly GraphiteUI onboarding assistant.",
-  taskInstruction: "Write one short Chinese greeting for the provided name only. Do not include usage instructions.",
+  systemInstruction:
+    "You are the official GraphiteUI onboarding assistant. Answer only with information grounded in the provided skill context. If the knowledge is insufficient, say so directly.",
+  taskInstruction:
+    "Use the retrieved official knowledge to answer the user's question. Explain what GraphiteUI is, what it can do, and how to get started when relevant. Keep the answer practical, concise, and in the same language as the question.",
   skills: [
     {
-      name: "append_usage_introduction",
-      skillKey: "append_usage_introduction",
+      name: "official_docs",
+      skillKey: "search_knowledge_base",
       inputMapping: {
-        greeting: "$response.greeting",
+        query: "$inputs.question",
+        knowledge_base: "GraphiteUI-official",
       },
       contextBinding: {},
       usage: "required",
     },
   ],
-  responseMode: "json",
   outputBinding: {
-    greeting: "$skills.append_usage_introduction.greeting",
+    answer: "$response.answer",
   },
 } satisfies NodePresetDefinition;
 
-export const GREETING_OUTPUT_PRESET = {
-  presetId: "preset.output.greeting.v1",
-  label: "Greeting With Guide Output",
-  description: "Preview and optionally persist the greeting followed by the local usage guide.",
+export const ONBOARDING_ANSWER_OUTPUT_PRESET = {
+  presetId: "preset.output.onboarding_answer.v1",
+  label: "Onboarding Answer Output",
+  description: "Preview and optionally persist the grounded onboarding answer.",
   family: "output",
   input: {
     key: "value",
-    label: "Greeting With Guide",
+    label: "Onboarding Answer",
     valueType: "text",
     required: true,
   },
   displayMode: "auto",
   persistEnabled: false,
   persistFormat: "txt",
-  fileNameTemplate: "usage-introduction",
+  fileNameTemplate: "graphiteui_onboarding_answer",
 } satisfies NodePresetDefinition;
 
 export const FETCH_NEWS_AGENT_PRESET = {
@@ -194,7 +209,6 @@ export const FETCH_NEWS_AGENT_PRESET = {
       usage: "required",
     },
   ],
-  responseMode: "json",
   outputBinding: {
     rss_items: "$skills.fetch_market_news.rss_items",
   },
@@ -238,7 +252,6 @@ export const CLEAN_MARKET_NEWS_AGENT_PRESET = {
       usage: "required",
     },
   ],
-  responseMode: "json",
   outputBinding: {
     clean_news_items: "$skills.clean_market_news.clean_news_items",
     news_context: "$skills.clean_market_news.news_context",
@@ -286,7 +299,6 @@ export const BUILD_CREATIVE_BRIEF_AGENT_PRESET = {
       usage: "required",
     },
   ],
-  responseMode: "json",
   outputBinding: {
     creative_brief: "$skills.build_creative_brief.creative_brief",
   },
@@ -319,7 +331,6 @@ export const GENERATE_CREATIVE_VARIANTS_AGENT_PRESET = {
       usage: "required",
     },
   ],
-  responseMode: "json",
   outputBinding: {
     script_variants: "$skills.generate_creative_variants.script_variants",
   },
@@ -356,7 +367,6 @@ export const REVIEW_VARIANTS_AGENT_PRESET = {
       usage: "required",
     },
   ],
-  responseMode: "json",
   outputBinding: {
     evaluation_result: "$skills.review_creative_variants.evaluation_result",
     best_variant: "$skills.review_creative_variants.best_variant",
@@ -388,7 +398,6 @@ export const GENERATE_STORYBOARD_PACKAGES_AGENT_PRESET = {
       usage: "required",
     },
   ],
-  responseMode: "json",
   outputBinding: {
     storyboard_packages: "$skills.generate_storyboard_packages.storyboard_packages",
   },
@@ -420,7 +429,6 @@ export const GENERATE_VIDEO_PROMPT_PACKAGES_AGENT_PRESET = {
       usage: "required",
     },
   ],
-  responseMode: "json",
   outputBinding: {
     video_prompt_packages: "$skills.generate_video_prompt_packages.video_prompt_packages",
   },
@@ -452,7 +460,6 @@ export const PREPARE_IMAGE_TODO_AGENT_PRESET = {
       usage: "required",
     },
   ],
-  responseMode: "json",
   outputBinding: {
     image_generation_todo: "$skills.prepare_image_generation_todo.image_generation_todo",
   },
@@ -484,7 +491,6 @@ export const PREPARE_VIDEO_TODO_AGENT_PRESET = {
       usage: "required",
     },
   ],
-  responseMode: "json",
   outputBinding: {
     video_generation_todo: "$skills.prepare_video_generation_todo.video_generation_todo",
   },
@@ -528,7 +534,6 @@ export const FINALIZE_CREATIVE_PACKAGE_AGENT_PRESET = {
       usage: "required",
     },
   ],
-  responseMode: "json",
   outputBinding: {
     final_package: "$skills.finalize_creative_package.final_package",
     final_result: "$skills.finalize_creative_package.final_result",
@@ -635,9 +640,10 @@ export const FINAL_PACKAGE_OUTPUT_PRESET = {
 export const NODE_PRESETS_MOCK = [
   EMPTY_AGENT_PRESET,
   NAME_INPUT_PRESET,
+  QUESTION_INPUT_PRESET,
   TASK_INPUT_PRESET,
   TEXT_INPUT_PRESET,
-  HELLO_GREETING_AGENT_PRESET,
+  ONBOARDING_HELPER_AGENT_PRESET,
   SUMMARY_AGENT_PRESET,
   FETCH_NEWS_AGENT_PRESET,
   CLEAN_MARKET_NEWS_AGENT_PRESET,
@@ -650,7 +656,7 @@ export const NODE_PRESETS_MOCK = [
   PREPARE_VIDEO_TODO_AGENT_PRESET,
   FINALIZE_CREATIVE_PACKAGE_AGENT_PRESET,
   REVIEW_GATE_PRESET,
-  GREETING_OUTPUT_PRESET,
+  ONBOARDING_ANSWER_OUTPUT_PRESET,
   NEWS_CONTEXT_OUTPUT_PRESET,
   CREATIVE_BRIEF_OUTPUT_PRESET,
   DECISION_SIGNAL_OUTPUT_PRESET,
@@ -664,7 +670,7 @@ export function getNodePresetById(presetId: string) {
 
 export function getSuggestedPresets(valueType?: ValueType | null) {
   if (!valueType) {
-    return [EMPTY_AGENT_PRESET, NAME_INPUT_PRESET, TASK_INPUT_PRESET, TEXT_INPUT_PRESET, HELLO_GREETING_AGENT_PRESET, SUMMARY_AGENT_PRESET, FETCH_NEWS_AGENT_PRESET, CLEAN_MARKET_NEWS_AGENT_PRESET, BUILD_CREATIVE_BRIEF_AGENT_PRESET, GENERATE_CREATIVE_VARIANTS_AGENT_PRESET, REVIEW_VARIANTS_AGENT_PRESET, GENERATE_STORYBOARD_PACKAGES_AGENT_PRESET, GENERATE_VIDEO_PROMPT_PACKAGES_AGENT_PRESET, PREPARE_IMAGE_TODO_AGENT_PRESET, PREPARE_VIDEO_TODO_AGENT_PRESET, FINALIZE_CREATIVE_PACKAGE_AGENT_PRESET, REVIEW_GATE_PRESET, GREETING_OUTPUT_PRESET, NEWS_CONTEXT_OUTPUT_PRESET, CREATIVE_BRIEF_OUTPUT_PRESET, DECISION_SIGNAL_OUTPUT_PRESET, FINAL_PACKAGE_OUTPUT_PRESET, TEXT_OUTPUT_PRESET];
+    return [EMPTY_AGENT_PRESET, NAME_INPUT_PRESET, QUESTION_INPUT_PRESET, TASK_INPUT_PRESET, TEXT_INPUT_PRESET, ONBOARDING_HELPER_AGENT_PRESET, SUMMARY_AGENT_PRESET, FETCH_NEWS_AGENT_PRESET, CLEAN_MARKET_NEWS_AGENT_PRESET, BUILD_CREATIVE_BRIEF_AGENT_PRESET, GENERATE_CREATIVE_VARIANTS_AGENT_PRESET, REVIEW_VARIANTS_AGENT_PRESET, GENERATE_STORYBOARD_PACKAGES_AGENT_PRESET, GENERATE_VIDEO_PROMPT_PACKAGES_AGENT_PRESET, PREPARE_IMAGE_TODO_AGENT_PRESET, PREPARE_VIDEO_TODO_AGENT_PRESET, FINALIZE_CREATIVE_PACKAGE_AGENT_PRESET, REVIEW_GATE_PRESET, ONBOARDING_ANSWER_OUTPUT_PRESET, NEWS_CONTEXT_OUTPUT_PRESET, CREATIVE_BRIEF_OUTPUT_PRESET, DECISION_SIGNAL_OUTPUT_PRESET, FINAL_PACKAGE_OUTPUT_PRESET, TEXT_OUTPUT_PRESET];
   }
 
   const supportsType = (preset: NodePresetDefinition) => {

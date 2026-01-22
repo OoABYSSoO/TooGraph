@@ -84,7 +84,6 @@ def _create_default_node_system_graph(theme_preset: dict[str, Any]) -> dict[str,
                                 "usage": "required",
                             }
                         ],
-                        "responseMode": "json",
                         "outputBinding": {
                             "rss_items": "$skills.fetch_market_news.rss_items",
                         },
@@ -136,7 +135,6 @@ def _create_default_node_system_graph(theme_preset: dict[str, Any]) -> dict[str,
                                 "usage": "required",
                             }
                         ],
-                        "responseMode": "json",
                         "outputBinding": {
                             "clean_news_items": "$skills.clean_market_news.clean_news_items",
                             "news_context": "$skills.clean_market_news.news_context",
@@ -192,7 +190,6 @@ def _create_default_node_system_graph(theme_preset: dict[str, Any]) -> dict[str,
                                 "usage": "required",
                             }
                         ],
-                        "responseMode": "json",
                         "outputBinding": {
                             "creative_brief": "$skills.build_creative_brief.creative_brief",
                         },
@@ -258,7 +255,6 @@ def _create_default_node_system_graph(theme_preset: dict[str, Any]) -> dict[str,
                                 "usage": "required",
                             }
                         ],
-                        "responseMode": "json",
                         "outputBinding": {
                             "script_variants": "$skills.generate_creative_variants.script_variants",
                         },
@@ -303,7 +299,6 @@ def _create_default_node_system_graph(theme_preset: dict[str, Any]) -> dict[str,
                                 "usage": "required",
                             }
                         ],
-                        "responseMode": "json",
                         "outputBinding": {
                             "evaluation_result": "$skills.review_creative_variants.evaluation_result",
                             "best_variant": "$skills.review_creative_variants.best_variant",
@@ -415,7 +410,6 @@ def _create_default_node_system_graph(theme_preset: dict[str, Any]) -> dict[str,
                                 "usage": "required",
                             }
                         ],
-                        "responseMode": "json",
                         "outputBinding": {
                             "storyboard_packages": "$skills.generate_storyboard_packages.storyboard_packages",
                         },
@@ -455,7 +449,6 @@ def _create_default_node_system_graph(theme_preset: dict[str, Any]) -> dict[str,
                                 "usage": "required",
                             }
                         ],
-                        "responseMode": "json",
                         "outputBinding": {
                             "video_prompt_packages": "$skills.generate_video_prompt_packages.video_prompt_packages",
                         },
@@ -495,7 +488,6 @@ def _create_default_node_system_graph(theme_preset: dict[str, Any]) -> dict[str,
                                 "usage": "required",
                             }
                         ],
-                        "responseMode": "json",
                         "outputBinding": {
                             "image_generation_todo": "$skills.prepare_image_generation_todo.image_generation_todo",
                         },
@@ -535,7 +527,6 @@ def _create_default_node_system_graph(theme_preset: dict[str, Any]) -> dict[str,
                                 "usage": "required",
                             }
                         ],
-                        "responseMode": "json",
                         "outputBinding": {
                             "video_generation_todo": "$skills.prepare_video_generation_todo.video_generation_todo",
                         },
@@ -587,7 +578,6 @@ def _create_default_node_system_graph(theme_preset: dict[str, Any]) -> dict[str,
                                 "usage": "required",
                             }
                         ],
-                        "responseMode": "json",
                         "outputBinding": {
                             "final_package": "$skills.finalize_creative_package.final_package",
                             "final_result": "$skills.finalize_creative_package.final_result",

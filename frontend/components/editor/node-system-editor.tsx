@@ -33,6 +33,8 @@ import { EMPTY_AGENT_PRESET, getNodePresetById, NODE_PRESETS_MOCK, TEXT_INPUT_PR
 import {
   isValueTypeCompatible,
   type AgentNode,
+  type AgentModelSource,
+  type AgentThinkingMode,
   type BranchDefinition,
   type ConditionNode,
   type ConditionRule,
@@ -110,6 +112,9 @@ type FlowNodeData = {
   skillDefinitions?: SkillDefinition[];
   skillDefinitionsLoading?: boolean;
   skillDefinitionsError?: string | null;
+  globalTextModel?: string;
+  globalThinkingEnabled?: boolean;
+  defaultAgentTemperature?: number;
 };
 
 type FlowNode = Node<FlowNodeData>;
@@ -130,6 +135,18 @@ type SkillDefinition = {
   outputSchema: SkillDefinitionField[];
   supportedValueTypes: string[];
   sideEffects: string[];
+};
+
+type EditorSettingsPayload = {
+  model: {
+    text_model: string;
+    video_model: string;
+  };
+  agent_runtime_defaults?: {
+    model: string;
+    thinking_enabled: boolean;
+    temperature: number;
+  };
 };
 
 type RunOutputPreview = {
@@ -165,6 +182,9 @@ type PresetDocument = {
 };
 
 const HELLO_WORLD_TEMPLATE_ID = "hello_world";
+const DEFAULT_EDITOR_TEXT_MODEL = "qwen-local";
+const DEFAULT_AGENT_THINKING_ENABLED = false;
+const DEFAULT_AGENT_TEMPERATURE = 0.2;
 const TYPE_COLORS: Record<ValueType, string> = {
   text: "#d97706",
   json: "#2563eb",
@@ -199,6 +219,67 @@ const INPUT_VALUE_TYPE_OPTIONS: Array<{ value: ValueType; label: string; icon: R
     ),
   },
 ];
+
+function normalizeAgentTemperature(value: number | undefined) {
+  const numeric = typeof value === "number" && Number.isFinite(value) ? value : DEFAULT_AGENT_TEMPERATURE;
+  return Math.min(2, Math.max(0, numeric));
+}
+
+function normalizeNodeConfig<T extends NodePresetDefinition>(config: T): T {
+  if (config.family !== "agent") {
+    return config;
+  }
+
+  const normalizedConfig = {
+    ...config,
+    modelSource: config.modelSource ?? "global",
+    model: config.model ?? "",
+    thinkingMode: config.thinkingMode ?? "inherit",
+    temperature: normalizeAgentTemperature(config.temperature),
+  } satisfies AgentNode;
+  return normalizedConfig as T;
+}
+
+function resolveAgentRuntimeConfig(
+  config: AgentNode,
+  defaults?: {
+    globalTextModel?: string;
+    globalThinkingEnabled?: boolean;
+    defaultAgentTemperature?: number;
+  },
+) {
+  const normalizedConfig = normalizeNodeConfig(config) as AgentNode;
+  const globalTextModel = defaults?.globalTextModel || DEFAULT_EDITOR_TEXT_MODEL;
+  const globalThinkingEnabled = defaults?.globalThinkingEnabled ?? DEFAULT_AGENT_THINKING_ENABLED;
+  const defaultAgentTemperature = normalizeAgentTemperature(defaults?.defaultAgentTemperature);
+  const overrideModel = normalizedConfig.model?.trim() ?? "";
+  const resolvedModel =
+    normalizedConfig.modelSource === "override" && overrideModel ? overrideModel : globalTextModel;
+  const resolvedThinking =
+    normalizedConfig.thinkingMode === "inherit"
+      ? globalThinkingEnabled
+      : normalizedConfig.thinkingMode === "on";
+  const resolvedTemperature = normalizeAgentTemperature(normalizedConfig.temperature ?? defaultAgentTemperature);
+
+  return {
+    ...normalizedConfig,
+    globalTextModel,
+    globalThinkingEnabled,
+    defaultAgentTemperature,
+    resolvedModel,
+    resolvedThinking,
+    resolvedTemperature,
+  };
+}
+
+function RuntimeBadge({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.78)] px-2.5 py-1 text-[0.7rem] leading-none text-[var(--muted)] shadow-[0_8px_18px_rgba(60,41,20,0.05)]">
+      <span className="uppercase tracking-[0.14em] text-[var(--accent-strong)]">{label}</span>
+      <span className="truncate text-[var(--text)]">{value}</span>
+    </div>
+  );
+}
 
 function UploadedAssetActionButton({
   label,
@@ -430,7 +511,7 @@ function createEditorDefaults(templates: TemplateRecord[], defaultTemplateId?: s
 
 function createFlowNodeFromGraphNode(node: any): FlowNode {
   const hasExplicitSize = typeof node.style?.width === "number" && typeof node.style?.height === "number";
-  const config = deepClonePreset(node.data?.config as NodePresetDefinition);
+  const config = normalizeNodeConfig(deepClonePreset(node.data?.config as NodePresetDefinition));
   const defaultWidth = getDefaultNodeWidth(config);
   return {
     id: node.id,
@@ -751,14 +832,25 @@ function SkillEditorList({
   definitionsLoading: boolean;
   definitionsError: string | null;
 }) {
-  const definitionOptions = definitions.map((definition) => definition.skillKey);
+  const attachedSkillKeys = useMemo(() => new Set(skills.map((skill) => skill.skillKey)), [skills]);
+  const availableDefinitions = useMemo(
+    () => definitions.filter((definition) => !attachedSkillKeys.has(definition.skillKey)),
+    [attachedSkillKeys, definitions],
+  );
+  const [selectedSkillKey, setSelectedSkillKey] = useState("");
 
-  function updateSkill(index: number, updater: (skill: SkillAttachment) => SkillAttachment) {
-    onChange(skills.map((item, skillIndex) => (skillIndex === index ? updater(item) : item)));
-  }
+  useEffect(() => {
+    if (!availableDefinitions.length) {
+      setSelectedSkillKey("");
+      return;
+    }
+    if (!availableDefinitions.some((definition) => definition.skillKey === selectedSkillKey)) {
+      setSelectedSkillKey(availableDefinitions[0]?.skillKey ?? "");
+    }
+  }, [availableDefinitions, selectedSkillKey]);
 
   return (
-    <PanelSection title="Skills" description="以结构化方式编辑技能挂载与映射。">
+    <PanelSection title="Skills" description="这里只负责挂载或移除已有 skill，不在这里编辑 skill 配置。">
       <div className="rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,250,241,0.64)] px-3 py-2 text-sm leading-6 text-[var(--muted)]">
         {definitionsLoading ? "Loading skill definitions..." : definitionsError ? `Skill definitions unavailable: ${definitionsError}` : `Loaded ${definitions.length} skill definitions.`}
       </div>
@@ -766,120 +858,74 @@ function SkillEditorList({
         <div key={`${skill.name}-${index}`} className="grid gap-3 rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,250,241,0.72)] p-3">
           {(() => {
             const definition = definitions.find((item) => item.skillKey === skill.skillKey);
-            const skillKeyOptions = skill.skillKey && !definitionOptions.includes(skill.skillKey) ? [skill.skillKey, ...definitionOptions] : definitionOptions;
-
-            return (
+            return definition ? (
               <>
-          <div className="grid grid-cols-2 gap-3">
-            <label className="grid gap-1.5 text-sm text-[var(--muted)]">
-              <span>Name</span>
-              <Input
-                value={skill.name}
-                onChange={(event) => updateSkill(index, (currentSkill) => ({ ...currentSkill, name: event.target.value }))}
-              />
-            </label>
-            <label className="grid gap-1.5 text-sm text-[var(--muted)]">
-              <span>Skill Key</span>
-              <select
-                className="rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3 py-3 text-[var(--text)]"
-                value={skill.skillKey}
-                onChange={(event) =>
-                  updateSkill(index, (currentSkill) => {
-                    const selectedDefinition = definitions.find((item) => item.skillKey === event.target.value);
-                    return {
-                      ...currentSkill,
-                      skillKey: event.target.value,
-                      name:
-                        currentSkill.name === "" ||
-                        currentSkill.name === currentSkill.skillKey ||
-                        currentSkill.name.startsWith("skill_")
-                          ? selectedDefinition?.label ?? event.target.value
-                          : currentSkill.name,
-                    };
-                  })
-                }
-              >
-                <option value="">Select a skill</option>
-                {skillKeyOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          {definition ? (
-            <div className="rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,255,255,0.72)] px-3 py-3 text-sm leading-6 text-[var(--muted)]">
-              <div className="font-medium text-[var(--text)]">{definition.label}</div>
-              <div>{definition.description}</div>
-              <div className="mt-2">Supported Value Types: {definition.supportedValueTypes.join(", ") || "n/a"}</div>
-              <div>Side Effects: {definition.sideEffects.join(", ") || "none"}</div>
-              <div className="mt-2">Inputs: {definition.inputSchema.map((field) => `${field.key}:${field.valueType}`).join(", ") || "none"}</div>
-              <div>Outputs: {definition.outputSchema.map((field) => `${field.key}:${field.valueType}`).join(", ") || "none"}</div>
-            </div>
-          ) : skill.skillKey ? (
-            <div className="rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,255,255,0.72)] px-3 py-3 text-sm leading-6 text-[var(--muted)]">
-              No registered definition found for `{skill.skillKey}`. You can still keep editing mappings, or use Advanced JSON as fallback.
-            </div>
-          ) : null}
-          <div className="grid grid-cols-2 gap-3">
-            <label className="grid gap-1.5 text-sm text-[var(--muted)]">
-              <span>Usage</span>
-              <select
-                className="rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3 py-3 text-[var(--text)]"
-                value={skill.usage ?? "optional"}
-                onChange={(event) =>
-                  updateSkill(index, (currentSkill) => ({ ...currentSkill, usage: event.target.value as SkillAttachment["usage"] }))
-                }
-              >
-                {["required", "optional"].map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <MappingEditor
-            title="Input Mapping"
-            value={skill.inputMapping}
-            addLabel="Add Input Mapping"
-            onChange={(nextValue) => updateSkill(index, (currentSkill) => ({ ...currentSkill, inputMapping: nextValue }))}
-          />
-          <MappingEditor
-            title="Context Binding"
-            value={skill.contextBinding}
-            addLabel="Add Context Binding"
-            onChange={(nextValue) => updateSkill(index, (currentSkill) => ({ ...currentSkill, contextBinding: nextValue }))}
-          />
-          <div className="flex justify-end">
-            <Button variant="ghost" onClick={() => onChange(skills.filter((_, skillIndex) => skillIndex !== index))}>
-              Remove Skill
-            </Button>
-          </div>
+                <div className="rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,255,255,0.72)] px-3 py-3 text-sm leading-6 text-[var(--muted)]">
+                  <div className="font-medium text-[var(--text)]">{definition.label}</div>
+                  <div>{definition.description}</div>
+                  <div className="mt-2">Skill Key: {definition.skillKey}</div>
+                  <div>Supported Value Types: {definition.supportedValueTypes.join(", ") || "n/a"}</div>
+                  <div>Side Effects: {definition.sideEffects.join(", ") || "none"}</div>
+                  <div className="mt-2">Inputs: {definition.inputSchema.map((field) => `${field.key}:${field.valueType}`).join(", ") || "none"}</div>
+                  <div>Outputs: {definition.outputSchema.map((field) => `${field.key}:${field.valueType}`).join(", ") || "none"}</div>
+                </div>
+                <div className="flex justify-end">
+                  <Button variant="ghost" onClick={() => onChange(skills.filter((_, skillIndex) => skillIndex !== index))}>
+                    Remove Skill
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,255,255,0.72)] px-3 py-3 text-sm leading-6 text-[var(--muted)]">
+                  No registered definition found for `{skill.skillKey}`. This skill can be removed here, but not edited.
+                </div>
+                <div className="flex justify-end">
+                  <Button variant="ghost" onClick={() => onChange(skills.filter((_, skillIndex) => skillIndex !== index))}>
+                    Remove Skill
+                  </Button>
+                </div>
               </>
             );
           })()}
         </div>
       ))}
-      <div className="flex justify-start">
-        <Button
-          variant="ghost"
-          onClick={() =>
-            onChange(
-              skills.concat({
-                name: `skill_${skills.length + 1}`,
-                skillKey: "",
-                inputMapping: {},
-                contextBinding: {},
-                usage: "optional",
-              }),
-            )
-          }
-        >
-          Add Skill
-        </Button>
-      </div>
+      {availableDefinitions.length ? (
+        <div className="grid gap-3 rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,250,241,0.64)] p-3">
+          <label className="grid gap-1.5 text-sm text-[var(--muted)]">
+            <span>Add Existing Skill</span>
+            <select
+              className="rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3 py-3 text-[var(--text)]"
+              value={selectedSkillKey}
+              onChange={(event) => setSelectedSkillKey(event.target.value)}
+            >
+              {availableDefinitions.map((definition) => (
+                <option key={definition.skillKey} value={definition.skillKey}>
+                  {definition.label} ({definition.skillKey})
+                </option>
+              ))}
+            </select>
+          </label>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              const nextDefinition = availableDefinitions.find((definition) => definition.skillKey === selectedSkillKey) ?? availableDefinitions[0];
+              if (!nextDefinition) return;
+              onChange(
+                skills.concat({
+                  name: nextDefinition.skillKey,
+                  skillKey: nextDefinition.skillKey,
+                  inputMapping: {},
+                  contextBinding: {},
+                  usage: "optional",
+                }),
+              );
+            }}
+          >
+            Add Skill
+          </Button>
+        </div>
+      ) : null}
     </PanelSection>
   );
 }
@@ -1512,6 +1558,14 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
   const labelAnchorRef = useRef<HTMLDivElement | null>(null);
   const descriptionAnchorRef = useRef<HTMLDivElement | null>(null);
   const uploadedAsset = config.family === "input" ? tryParseUploadedAssetEnvelope(config.defaultValue) : null;
+  const agentRuntime =
+    config.family === "agent"
+      ? resolveAgentRuntimeConfig(config, {
+          globalTextModel: data.globalTextModel,
+          globalThinkingEnabled: data.globalThinkingEnabled,
+          defaultAgentTemperature: data.defaultAgentTemperature,
+        })
+      : null;
 
   useEffect(() => {
     setDraftLabel(config.label);
@@ -1810,6 +1864,13 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col gap-3 px-4 py-3">
+          {config.family === "agent" && !isExpanded && agentRuntime ? (
+            <div className="flex flex-wrap gap-2">
+              <RuntimeBadge label="Model" value={agentRuntime.resolvedModel} />
+              <RuntimeBadge label="Thinking" value={agentRuntime.resolvedThinking ? "On" : "Off"} />
+            </div>
+          ) : null}
+
           {config.family === "input" ? (
             <>
               <div className={cn("grid items-center gap-3", uploadedAsset ? "grid-cols-[1fr_auto]" : "grid-cols-[minmax(0,1fr)_auto]")}>
@@ -2084,22 +2145,82 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                     addLabel="Add Output Binding"
                     onChange={(nextValue) => data.onConfigChange?.((currentConfig) => ({ ...(currentConfig as AgentNode), outputBinding: nextValue }))}
                   />
-                  <label className="grid gap-1.5 text-sm text-[var(--muted)]">
-                    <span>Response Mode</span>
-                    <select
-                      className="rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3 py-3 text-[var(--text)]"
-                      value={config.responseMode}
-                      onChange={(event) =>
-                        data.onConfigChange?.((currentConfig) => ({ ...(currentConfig as AgentNode), responseMode: event.target.value as AgentNode["responseMode"] }))
-                      }
+                  {agentRuntime ? (
+                    <PanelSection
+                      title="Advanced Runtime"
+                      description={`Global model: ${agentRuntime.globalTextModel} · Default thinking: ${agentRuntime.globalThinkingEnabled ? "on" : "off"}`}
                     >
-                      {["json", "text"].map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <label className="grid gap-1.5 text-sm text-[var(--muted)]">
+                          <span>Model Source</span>
+                          <select
+                            className="rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3 py-3 text-[var(--text)]"
+                            value={agentRuntime.modelSource}
+                            onChange={(event) =>
+                              data.onConfigChange?.((currentConfig) => ({
+                                ...(currentConfig as AgentNode),
+                                modelSource: event.target.value as AgentModelSource,
+                              }))
+                            }
+                          >
+                            <option value="global">global</option>
+                            <option value="override">override</option>
+                          </select>
+                        </label>
+                        <label className="grid gap-1.5 text-sm text-[var(--muted)]">
+                          <span>Thinking</span>
+                          <select
+                            className="rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3 py-3 text-[var(--text)]"
+                            value={agentRuntime.thinkingMode}
+                            onChange={(event) =>
+                              data.onConfigChange?.((currentConfig) => ({
+                                ...(currentConfig as AgentNode),
+                                thinkingMode: event.target.value as AgentThinkingMode,
+                              }))
+                            }
+                          >
+                            <option value="inherit">inherit</option>
+                            <option value="off">off</option>
+                            <option value="on">on</option>
+                          </select>
+                        </label>
+                      </div>
+                      {agentRuntime.modelSource === "override" ? (
+                        <label className="grid gap-1.5 text-sm text-[var(--muted)]">
+                          <span>Model</span>
+                          <Input
+                            value={agentRuntime.model}
+                            placeholder={agentRuntime.globalTextModel}
+                            onChange={(event) =>
+                              data.onConfigChange?.((currentConfig) => ({
+                                ...(currentConfig as AgentNode),
+                                model: event.target.value,
+                              }))
+                            }
+                          />
+                        </label>
+                      ) : null}
+                      <label className="grid gap-1.5 text-sm text-[var(--muted)]">
+                        <span>Temperature</span>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={2}
+                          step={0.1}
+                          value={String(agentRuntime.temperature)}
+                          onChange={(event) => {
+                            const nextValue =
+                              event.target.value === "" ? DEFAULT_AGENT_TEMPERATURE : Number(event.target.value);
+                            if (!Number.isFinite(nextValue)) return;
+                            data.onConfigChange?.((currentConfig) => ({
+                              ...(currentConfig as AgentNode),
+                              temperature: normalizeAgentTemperature(nextValue),
+                            }));
+                          }}
+                        />
+                      </label>
+                    </PanelSection>
+                  ) : null}
                   <AdvancedJsonSection
                     sections={[
                       {
@@ -2111,11 +2232,6 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                         label: "Outputs JSON",
                         value: config.outputs,
                         onChange: (nextValue) => data.onConfigChange?.((currentConfig) => ({ ...(currentConfig as AgentNode), outputs: nextValue as PortDefinition[] })),
-                      },
-                      {
-                        label: "Skills JSON",
-                        value: config.skills,
-                        onChange: (nextValue) => data.onConfigChange?.((currentConfig) => ({ ...(currentConfig as AgentNode), skills: nextValue as AgentNode["skills"] })),
                       },
                       {
                         label: "Output Binding JSON",
@@ -2331,6 +2447,7 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
   const [skillDefinitions, setSkillDefinitions] = useState<SkillDefinition[]>([]);
   const [skillDefinitionsLoading, setSkillDefinitionsLoading] = useState(true);
   const [skillDefinitionsError, setSkillDefinitionsError] = useState<string | null>(null);
+  const [editorSettings, setEditorSettings] = useState<EditorSettingsPayload | null>(null);
   const [connectingSourceType, setConnectingSourceType] = useState<ValueType | null>(null);
   const [creationMenu, setCreationMenu] = useState<{
     clientX: number;
@@ -2389,6 +2506,17 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
   const previewTextByNode = useMemo(() => {
     return Object.fromEntries(nodes.map((node) => [node.id, createPreviewText(node, nodes, edges)]));
   }, [edges, nodes]);
+  const agentRuntimeDefaults = useMemo(
+    () => ({
+      globalTextModel:
+        editorSettings?.agent_runtime_defaults?.model || editorSettings?.model.text_model || DEFAULT_EDITOR_TEXT_MODEL,
+      globalThinkingEnabled:
+        editorSettings?.agent_runtime_defaults?.thinking_enabled ?? DEFAULT_AGENT_THINKING_ENABLED,
+      defaultAgentTemperature:
+        editorSettings?.agent_runtime_defaults?.temperature ?? DEFAULT_AGENT_TEMPERATURE,
+    }),
+    [editorSettings],
+  );
 
   const hydrateRunResult = useCallback(
     (run: RunDetail) => {
@@ -2508,6 +2636,27 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
   }, []);
 
   useEffect(() => {
+    let active = true;
+
+    async function loadEditorSettings() {
+      try {
+        const payload = await apiGet<EditorSettingsPayload>("/api/settings");
+        if (!active) return;
+        setEditorSettings(payload);
+      } catch {
+        if (!active) return;
+        setEditorSettings(null);
+      }
+    }
+
+    void loadEditorSettings();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
     const initialNodes = Array.isArray(initialGraph.nodes) ? initialGraph.nodes.map((node) => createFlowNodeFromGraphNode(node)) : [];
     const nodesById = new Map(initialNodes.map((node) => [node.id, node]));
     const initialEdges = Array.isArray(initialGraph.edges)
@@ -2583,15 +2732,16 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
   );
 
   function createNodeFromConfig(config: NodePresetDefinition, position: { x: number; y: number }) {
+    const normalizedConfig = normalizeNodeConfig(config);
     const id = `${config.family}_${crypto.randomUUID().slice(0, 8)}`;
-    const defaultWidth = getDefaultNodeWidth(config);
+    const defaultWidth = getDefaultNodeWidth(normalizedConfig);
     return {
       id,
       type: "default",
       position,
       data: {
         nodeId: id,
-        config,
+        config: normalizedConfig,
         previewText: "",
         isExpanded: false,
       },
@@ -2606,10 +2756,10 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
     } satisfies FlowNode;
   }
 
-function createNodeFromPreset(preset: NodePresetDefinition, position: { x: number; y: number }) {
-  const config = deepClonePreset(preset);
-  return createNodeFromConfig(config, position);
-}
+  function createNodeFromPreset(preset: NodePresetDefinition, position: { x: number; y: number }) {
+    const config = deepClonePreset(preset);
+    return createNodeFromConfig(config, position);
+  }
 
   async function addInputNodeFromFile(file: File, position: { x: number; y: number }) {
     const envelope = await fileToEnvelope(file);
@@ -2818,7 +2968,7 @@ function createNodeFromPreset(preset: NodePresetDefinition, position: { x: numbe
                               ...candidate,
                               data: {
                                 ...candidate.data,
-                                config: updater(candidate.data.config),
+                                config: normalizeNodeConfig(updater(candidate.data.config)),
                               },
                             }
                           : candidate,
@@ -2863,6 +3013,9 @@ function createNodeFromPreset(preset: NodePresetDefinition, position: { x: numbe
                   skillDefinitions,
                   skillDefinitionsLoading,
                   skillDefinitionsError,
+                  globalTextModel: agentRuntimeDefaults.globalTextModel,
+                  globalThinkingEnabled: agentRuntimeDefaults.globalThinkingEnabled,
+                  defaultAgentTemperature: agentRuntimeDefaults.defaultAgentTemperature,
                 },
               }))}
               edges={edges}

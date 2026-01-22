@@ -87,3 +87,6 @@ outputs/
 tmp/
 temp/
 .superpowers/
+
+# Local gateway/proxy experiment files
+scripts/lm_core.py

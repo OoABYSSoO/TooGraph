@@ -7,7 +7,7 @@ graphite:
   supported_value_types:
     - text
   side_effects:
-    - local_file_read
+    - file_read
   input_schema:
     - key: greeting
       label: Greeting
