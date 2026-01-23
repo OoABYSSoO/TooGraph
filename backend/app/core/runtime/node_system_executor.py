@@ -387,6 +387,42 @@ def _parse_llm_json_response(content: str, output_keys: list[str]) -> dict[str, 
         return {key: "" for key in output_keys}
     cleaned = re.sub(r"^\s*```(?:json)?\s*\n?", "", content)
     cleaned = re.sub(r"\n?\s*```\s*$", "", cleaned).strip()
+
+    candidate_payloads = [cleaned]
+    json_start = cleaned.find("{")
+    json_end = cleaned.rfind("}")
+    if json_start != -1 and json_end > json_start:
+        candidate_payloads.append(cleaned[json_start : json_end + 1].strip())
+
+    for candidate in candidate_payloads:
+        try:
+            parsed = json.loads(candidate)
+            if isinstance(parsed, dict):
+                return {key: parsed.get(key) for key in output_keys}
+        except json.JSONDecodeError:
+            continue
+
+    key_value_matches: dict[str, str] = {}
+    for line in cleaned.splitlines():
+        match = re.match(r'^\s*["\']?([A-Za-z0-9_\-]+)["\']?\s*[:：]\s*(.+?)\s*$', line)
+        if not match:
+            continue
+        key, value = match.groups()
+        if key in output_keys:
+            key_value_matches[key] = value.strip().strip('"').strip("'")
+
+    if key_value_matches:
+        return {
+            key: key_value_matches.get(key, "")
+            for key in output_keys
+        }
+
+    if len(output_keys) == 1:
+        key = output_keys[0]
+        single_match = re.match(rf'^\s*{re.escape(key)}\s*[:：]\s*(.+?)\s*$', cleaned, flags=re.IGNORECASE | re.DOTALL)
+        if single_match:
+            return {key: single_match.group(1).strip()}
+
     try:
         parsed = json.loads(cleaned)
         if isinstance(parsed, dict):
@@ -408,15 +444,22 @@ def _generate_agent_response(
 
     user_prompt = "\n".join(
         [
-            f"Task instruction: {config.task_instruction or 'Complete the workflow task.'}",
+            f"Task instruction: {config.task_instruction or 'Use the provided inputs and skill context to complete the workflow task.'}",
             f"Inputs: {input_values}",
             f"Skill context: {skill_context}",
-            f"Return a concise response that fills these keys: {', '.join(output_keys)}.",
+            f"Return only a valid JSON object with exactly these keys: {', '.join(output_keys)}.",
+            "Do not use markdown fences.",
+            "Do not add any prefix like answer: before or after the JSON.",
+            "Each key should contain the most appropriate JSON value for that output.",
+            f"Example shape: {json.dumps({key: '' for key in output_keys}, ensure_ascii=False)}",
         ]
     )
 
     content, llm_meta = _chat_with_local_model_with_meta(
-        system_prompt=config.system_instruction or "You are a precise workflow agent.",
+        system_prompt=(
+            config.system_instruction
+            or "You are a structured workflow agent. Follow the requested output schema exactly and return only valid JSON."
+        ),
         user_prompt=user_prompt,
         model=runtime_config["runtime_model_name"],
         provider_id=runtime_config["resolved_provider_id"],

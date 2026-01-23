@@ -35,7 +35,7 @@ LOCAL_LLM_REQUEST_TIMEOUT_SEC = _parse_float_env("LOCAL_LLM_REQUEST_TIMEOUT_SEC"
 ROOT_DIR = Path(__file__).resolve().parents[3]
 LOCAL_USAGE_GUIDE_PATH = ROOT_DIR / "使用介绍.md"
 DEFAULT_AGENT_TEMPERATURE = 0.2
-DEFAULT_AGENT_THINKING_ENABLED = False
+DEFAULT_AGENT_THINKING_ENABLED = True
 DEFAULT_LOCAL_MODEL_ALIAS = "lm-local"
 LOCAL_RUNTIME_CONFIG_CACHE_TTL_SEC = 5.0
 _LOCAL_RUNTIME_CONFIG_CACHE: tuple[float, dict[str, Any] | None] | None = None
@@ -259,6 +259,11 @@ def _chat_with_local_model_with_meta(
         used_thinking = False
         warnings.append(
             "Thinking mode was requested, but the local gateway returned reasoning without final content. Retried without local thinking fields."
+        )
+
+    if used_thinking and not reasoning:
+        warnings.append(
+            "Thinking mode was requested and the local gateway accepted the request, but this response did not include any reasoning text."
         )
 
     if not content:

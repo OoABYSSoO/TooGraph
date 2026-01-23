@@ -16,7 +16,7 @@ export type SkillAttachment = {
 };
 
 export type AgentModelSource = "global" | "override";
-export type AgentThinkingMode = "inherit" | "off" | "on";
+export type AgentThinkingMode = "off" | "on";
 
 export type InputBoundaryNode = {
   presetId: string;

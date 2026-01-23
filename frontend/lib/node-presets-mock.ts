@@ -7,8 +7,10 @@ export const EMPTY_AGENT_PRESET = {
   family: "agent",
   inputs: [],
   outputs: [],
-  systemInstruction: "",
-  taskInstruction: "",
+  systemInstruction:
+    "You are a structured workflow agent. Follow the requested output schema exactly and prefer precise JSON values over free-form prose.",
+  taskInstruction:
+    "Use the provided inputs and skill context to complete the workflow task. Return only the requested output keys.",
   skills: [],
   outputBinding: {},
 } satisfies NodePresetDefinition;
