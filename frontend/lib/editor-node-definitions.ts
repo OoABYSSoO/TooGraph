@@ -352,7 +352,7 @@ export const EDITOR_NODE_DEFINITIONS: Record<string, EditorNodeDefinition> = {
         source_state_key: "final_result",
         display_mode: "auto",
         persist_enabled: false,
-        persist_format: "txt",
+        persist_format: "auto",
         file_name_template: "result",
       },
     },

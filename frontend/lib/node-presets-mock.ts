@@ -71,8 +71,8 @@ export const TEXT_OUTPUT_PRESET = {
   },
   displayMode: "auto",
   persistEnabled: false,
-  persistFormat: "txt",
-  fileNameTemplate: "result",
+  persistFormat: "auto",
+  fileNameTemplate: "",
 } satisfies NodePresetDefinition;
 
 export const NODE_PRESETS_MOCK = [

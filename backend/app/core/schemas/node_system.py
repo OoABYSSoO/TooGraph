@@ -152,8 +152,8 @@ class OutputBoundaryNodeConfig(BaseModel):
     input: PortDefinition
     display_mode: DisplayMode = Field(default=DisplayMode.AUTO, alias="displayMode")
     persist_enabled: bool = Field(default=False, alias="persistEnabled")
-    persist_format: PersistFormat = Field(default=PersistFormat.TXT, alias="persistFormat")
-    file_name_template: str = Field(default="result", alias="fileNameTemplate")
+    persist_format: PersistFormat = Field(default=PersistFormat.AUTO, alias="persistFormat")
+    file_name_template: str = Field(default="", alias="fileNameTemplate")
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
