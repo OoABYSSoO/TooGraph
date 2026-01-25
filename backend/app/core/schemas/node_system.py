@@ -61,6 +61,7 @@ class PersistFormat(str, Enum):
     TXT = "txt"
     MD = "md"
     JSON = "json"
+    AUTO = "auto"
 
 
 class PortDefinition(BaseModel):

@@ -77,7 +77,7 @@ export type OutputBoundaryNode = {
   input: PortDefinition;
   displayMode: "auto" | "plain" | "markdown" | "json";
   persistEnabled: boolean;
-  persistFormat: "txt" | "md" | "json";
+  persistFormat: "txt" | "md" | "json" | "auto";
   fileNameTemplate: string;
 };
 

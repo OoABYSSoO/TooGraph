@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.memory.store import save_memory
-from app.core.runtime.output_boundary_utils import save_output_value
+from app.core.runtime.output_boundary_utils import resolve_display_mode, resolve_format, save_output_value
 from app.core.runtime.state import RunState, utc_now_iso
 from app.core.schemas.graph import NodeType
 from app.tools.registry import get_tool_registry
@@ -157,10 +157,14 @@ def handle_end(state: RunState, params: dict[str, Any]) -> dict[str, Any]:
             continue
 
         value = state.get(state_key)
-        display_mode = str(output.get("display_mode") or "auto")
+        display_mode_raw = str(output.get("display_mode") or "auto")
         persist_enabled = bool(output.get("persist_enabled"))
-        persist_format = str(output.get("persist_format") or "txt")
+        persist_format_raw = str(output.get("persist_format") or "txt")
         label = str(output.get("label") or state_key)
+
+        # Auto-detect formats from content
+        display_mode = resolve_display_mode(display_mode_raw, value)
+        persist_format = resolve_format(persist_format_raw, value)
 
         output_previews.append(
             {

@@ -25,6 +25,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
+import Markdown from "react-markdown";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiGet, apiPost } from "@/lib/api";
@@ -103,6 +104,7 @@ type FlowNodeData = {
   nodeId: string;
   config: NodePresetDefinition;
   previewText: string;
+  resolvedDisplayMode?: string;
   isExpanded?: boolean;
   collapsedSize?: NodeViewportSize | null;
   expandedSize?: NodeViewportSize | null;
@@ -291,8 +293,7 @@ const OUTPUT_DISPLAY_MODE_BUTTONS: Array<{ value: OutputBoundaryNode["displayMod
     label: "Auto",
     icon: (
       <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 fill-none stroke-current" strokeWidth="1.5">
-        <circle cx="8" cy="8" r="5" />
-        <path d="M8 5.5v5M5.5 8h5" />
+        <path d="M9 2.5L10.5 6L14 6.5L11.5 9L12 12.5L9 10.5L6 12.5L6.5 9L4 6.5L7.5 6L9 2.5Z" />
       </svg>
     ),
   },
@@ -326,6 +327,7 @@ const OUTPUT_DISPLAY_MODE_BUTTONS: Array<{ value: OutputBoundaryNode["displayMod
 ];
 
 const OUTPUT_SAVE_FORMAT_BUTTONS: Array<{ value: OutputBoundaryNode["persistFormat"]; label: string }> = [
+  { value: "auto", label: "AUTO" },
   { value: "txt", label: "TXT" },
   { value: "md", label: "MD" },
   { value: "json", label: "JSON" },
@@ -1089,6 +1091,76 @@ function formatPreviewValue(value: unknown) {
   } catch {
     return String(value);
   }
+}
+
+function detectDisplayMode(text: string): "plain" | "markdown" | "json" {
+  const trimmed = text.trim();
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+    try { JSON.parse(trimmed); return "json"; } catch { /* not json */ }
+  }
+  if (/^#{1,6}\s/m.test(trimmed) || /\*\*.*?\*\*/.test(trimmed) || /```/.test(trimmed) || /^\*\s/m.test(trimmed) || /^\d+\.\s/m.test(trimmed) || /\[.*?\]\(.*?\)/.test(trimmed) || /^\|.*\|$/m.test(trimmed)) {
+    return "markdown";
+  }
+  return "plain";
+}
+
+function resolveDisplayMode(displayMode: string, text: string): string {
+  if (displayMode === "auto") return detectDisplayMode(text);
+  return displayMode;
+}
+
+function OutputPreviewContent({ text, displayMode }: { text: string; displayMode: string }) {
+  if (!text) {
+    return <span className="text-[var(--muted)]">Connect an upstream output to preview/export it.</span>;
+  }
+
+  const resolved = resolveDisplayMode(displayMode, text);
+
+  if (resolved === "json") {
+    let formatted = text;
+    try {
+      const parsed = JSON.parse(text);
+      formatted = JSON.stringify(parsed, null, 2);
+    } catch { /* keep original */ }
+    return (
+      <pre className="whitespace-pre-wrap break-words font-mono text-[0.82rem] leading-6">
+        <code>
+          {formatted.split("\n").map((line, i) => (
+            <span key={i}>
+              {i > 0 && "\n"}
+              {line.split(/("(?:[^"\\]|\\.)*")\s*(:?)/).map((part, j) => {
+                if (j % 3 === 1) {
+                  // string token
+                  const isKey = line.split(/("(?:[^"\\]|\\.)*")\s*(:?)/)[j + 1] === ":";
+                  return <span key={j} className={isKey ? "text-[#9a3412]" : "text-[#16a34a]"}>{part}</span>;
+                }
+                // numbers, booleans, null
+                return part.split(/\b(true|false|null|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\b/).map((token, k) => {
+                  if (k % 2 === 1) {
+                    if (token === "true" || token === "false") return <span key={`${j}-${k}`} className="text-[#2563eb]">{token}</span>;
+                    if (token === "null") return <span key={`${j}-${k}`} className="text-[#64748b]">{token}</span>;
+                    return <span key={`${j}-${k}`} className="text-[#d97706]">{token}</span>;
+                  }
+                  return <span key={`${j}-${k}`}>{token}</span>;
+                });
+              })}
+            </span>
+          ))}
+        </code>
+      </pre>
+    );
+  }
+
+  if (resolved === "markdown") {
+    return (
+      <div className="graphite-md text-sm leading-7 [&_h1]:mb-2 [&_h1]:mt-3 [&_h1]:text-lg [&_h1]:font-bold [&_h2]:mb-2 [&_h2]:mt-3 [&_h2]:text-base [&_h2]:font-semibold [&_h3]:mb-1 [&_h3]:mt-2 [&_h3]:text-sm [&_h3]:font-semibold [&_p]:mb-2 [&_ul]:mb-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:mb-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:mb-0.5 [&_code]:rounded [&_code]:bg-[rgba(154,52,18,0.08)] [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[0.82rem] [&_pre]:mb-2 [&_pre]:overflow-auto [&_pre]:rounded-lg [&_pre]:bg-[rgba(154,52,18,0.06)] [&_pre]:p-3 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_blockquote]:mb-2 [&_blockquote]:border-l-2 [&_blockquote]:border-[var(--accent)] [&_blockquote]:pl-3 [&_blockquote]:text-[var(--muted)] [&_strong]:font-semibold [&_a]:text-[var(--accent)] [&_a]:underline [&_hr]:my-3 [&_hr]:border-[rgba(154,52,18,0.12)]">
+        <Markdown>{text}</Markdown>
+      </div>
+    );
+  }
+
+  // plain / fallback
+  return <span className="whitespace-pre-wrap break-words">{text}</span>;
 }
 
 function JsonTextArea({
@@ -2807,9 +2879,9 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
 
           {config.family === "output" ? (
             <>
-              {/* Display Mode */}
-              <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
-                <span className="text-xs text-[var(--muted)]">Display</span>
+              {/* Display */}
+              <div className="flex items-center gap-3">
+                <span className="flex-shrink-0 text-xs text-[var(--muted)]">Display</span>
                 <div className="flex gap-1.5">
                   {OUTPUT_DISPLAY_MODE_BUTTONS.map((option) => {
                     const active = config.displayMode === option.value;
@@ -2837,8 +2909,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                     );
                   })}
                 </div>
-                {/* Save toggle */}
-                <div className="flex items-center gap-2">
+                <div className="ml-auto flex items-center gap-2">
                   <span className="text-xs text-[var(--muted)]">Save</span>
                   <button
                     type="button"
@@ -2846,7 +2917,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                     role="switch"
                     aria-checked={config.persistEnabled}
                     className={cn(
-                      "relative h-5 w-9 rounded-full transition-colors",
+                      "relative inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full transition-colors",
                       config.persistEnabled ? "bg-[var(--accent)]" : "bg-[rgba(154,52,18,0.2)]",
                     )}
                     onClick={() =>
@@ -2858,16 +2929,16 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                   >
                     <span
                       className={cn(
-                        "absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.15)] transition-transform",
-                        config.persistEnabled ? "translate-x-4" : "translate-x-0.5",
+                        "inline-block h-5 w-5 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.2)] transition-transform",
+                        config.persistEnabled ? "translate-x-6" : "translate-x-1",
                       )}
                     />
                   </button>
                 </div>
               </div>
-              {/* Save Format + File Name */}
-              <div className="grid grid-cols-[auto_1fr] items-center gap-3">
-                <span className="text-xs text-[var(--muted)]">Format</span>
+              {/* Format */}
+              <div className="flex items-center gap-3">
+                <span className="flex-shrink-0 text-xs text-[var(--muted)]">Format</span>
                 <div className="flex items-center gap-2">
                   {OUTPUT_SAVE_FORMAT_BUTTONS.map((option) => {
                     const active = config.persistFormat === option.value;
@@ -2878,7 +2949,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                         title={option.label}
                         aria-label={option.label}
                         className={cn(
-                          "inline-flex h-7 items-center rounded-full border px-3 text-[0.68rem] font-medium transition-colors",
+                          "inline-flex h-7 items-center rounded-full border px-2.5 text-[0.68rem] font-medium transition-colors",
                           active
                             ? "border-[var(--accent)] bg-[rgba(154,52,18,0.1)] text-[var(--accent-strong)]"
                             : "border-[rgba(154,52,18,0.16)] bg-[rgba(255,255,255,0.72)] text-[var(--muted)] hover:bg-[rgba(255,248,240,0.92)]",
@@ -2894,22 +2965,26 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                       </button>
                     );
                   })}
-                  <Input
-                    value={config.fileNameTemplate}
-                    onChange={(event) => data.onConfigChange?.((currentConfig) => ({ ...(currentConfig as OutputBoundaryNode), fileNameTemplate: event.target.value }))}
-                    placeholder="File name template"
-                    className="h-7 flex-1 text-xs"
-                  />
                 </div>
+              </div>
+              {/* FileName */}
+              <div className="flex items-center gap-3">
+                <span className="flex-shrink-0 text-xs text-[var(--muted)]">FileName</span>
+                <Input
+                  value={config.fileNameTemplate}
+                  onChange={(event) => data.onConfigChange?.((currentConfig) => ({ ...(currentConfig as OutputBoundaryNode), fileNameTemplate: event.target.value }))}
+                  placeholder="File name template"
+                  className="h-8 min-w-0 flex-1 text-xs"
+                />
               </div>
               {/* Preview */}
               <div className="flex min-h-[160px] flex-1 flex-col rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,255,255,0.82)] p-3">
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <div className="text-[0.68rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">Preview</div>
-                  <div className="text-[0.68rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">{config.displayMode}</div>
+                  <div className="text-[0.68rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">{resolveDisplayMode(data.resolvedDisplayMode ?? config.displayMode, data.previewText)}</div>
                 </div>
-                <div className="min-h-[120px] flex-1 overflow-auto whitespace-pre-wrap break-words rounded-[12px] bg-[rgba(248,242,234,0.8)] px-3 py-3 text-sm leading-6 text-[var(--text)]">
-                  {data.previewText || "Connect an upstream output to preview/export it."}
+                <div className="min-h-[120px] flex-1 overflow-auto rounded-[12px] bg-[rgba(248,242,234,0.8)] px-3 py-3 text-sm leading-6 text-[var(--text)]">
+                  <OutputPreviewContent text={data.previewText} displayMode={config.displayMode} />
                 </div>
               </div>
             </>
@@ -3098,9 +3173,13 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
   const hydrateRunResult = useCallback(
     (run: RunDetail) => {
       const outputPreviewMap = new Map<string, string>();
+      const resolvedDisplayModeMap = new Map<string, string>();
       for (const output of run.artifacts.exported_outputs ?? []) {
         if (!output.node_id) continue;
         outputPreviewMap.set(output.node_id, formatPreviewValue(output.value));
+        if (output.display_mode) {
+          resolvedDisplayModeMap.set(output.node_id, output.display_mode);
+        }
       }
 
       const failedNodeMap = new Map<string, string>();
@@ -3125,6 +3204,7 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
 
           if (node.data.config.family === "output") {
             const outputText = outputPreviewMap.get(node.id);
+            const resolvedDisplayMode = resolvedDisplayModeMap.get(node.id);
             let nextPreviewText = outputText ?? "";
             if (!nextPreviewText && run.status === "failed") {
               nextPreviewText = "Latest run failed before this output was produced.";
@@ -3136,6 +3216,7 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
               data: {
                 ...node.data,
                 previewText: nextPreviewText,
+                resolvedDisplayMode,
               },
             };
           }
