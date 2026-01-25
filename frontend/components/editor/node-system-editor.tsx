@@ -285,6 +285,52 @@ const INPUT_TYPE_BUTTONS: Array<{ value: ValueType; label: string; icon: ReactNo
   },
 ];
 
+const OUTPUT_DISPLAY_MODE_BUTTONS: Array<{ value: OutputBoundaryNode["displayMode"]; label: string; icon: ReactNode }> = [
+  {
+    value: "auto",
+    label: "Auto",
+    icon: (
+      <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 fill-none stroke-current" strokeWidth="1.5">
+        <circle cx="8" cy="8" r="5" />
+        <path d="M8 5.5v5M5.5 8h5" />
+      </svg>
+    ),
+  },
+  {
+    value: "plain",
+    label: "Plain",
+    icon: (
+      <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 fill-none stroke-current" strokeWidth="1.5">
+        <path d="M3 4.5h10M8 4.5v7M5.5 11.5h5" />
+      </svg>
+    ),
+  },
+  {
+    value: "markdown",
+    label: "Markdown",
+    icon: (
+      <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 fill-none stroke-current" strokeWidth="1.5">
+        <path d="M3 11.5V4.5l3.5 4.5 3.5-4.5v7M9.5 7h2.5" />
+      </svg>
+    ),
+  },
+  {
+    value: "json",
+    label: "JSON",
+    icon: (
+      <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 fill-none stroke-current" strokeWidth="1.5">
+        <path d="M5 4.5C4 5.5 3.5 7 4 8s1.5 1.5 2.5 2.5M11 4.5C12 5.5 12.5 7 12 8s-1.5 1.5-2.5 2.5" />
+      </svg>
+    ),
+  },
+];
+
+const OUTPUT_SAVE_FORMAT_BUTTONS: Array<{ value: OutputBoundaryNode["persistFormat"]; label: string }> = [
+  { value: "txt", label: "TXT" },
+  { value: "md", label: "MD" },
+  { value: "json", label: "JSON" },
+];
+
 function normalizeAgentTemperature(value: number | undefined) {
   const numeric = typeof value === "number" && Number.isFinite(value) ? value : DEFAULT_AGENT_TEMPERATURE;
   return Math.min(2, Math.max(0, numeric));
@@ -1908,9 +1954,12 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
   const [draftLabel, setDraftLabel] = useState(config.label);
   const [draftDescription, setDraftDescription] = useState(config.description);
   const [isDeleteConfirmActive, setIsDeleteConfirmActive] = useState(false);
+  const [isPresetConfirmActive, setIsPresetConfirmActive] = useState(false);
   const deleteConfirmTimeoutRef = useRef<number | null>(null);
+  const presetConfirmTimeoutRef = useRef<number | null>(null);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const deleteButtonRef = useRef<HTMLButtonElement | null>(null);
+  const presetButtonRef = useRef<HTMLButtonElement | null>(null);
   const labelAnchorRef = useRef<HTMLDivElement | null>(null);
   const descriptionAnchorRef = useRef<HTMLDivElement | null>(null);
   const uploadedAsset = config.family === "input" ? tryParseUploadedAssetEnvelope(config.defaultValue) : null;
@@ -1934,12 +1983,16 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
   useEffect(() => {
     if (selected) return;
     setIsDeleteConfirmActive(false);
+    setIsPresetConfirmActive(false);
   }, [selected]);
 
   useEffect(() => {
     return () => {
       if (deleteConfirmTimeoutRef.current) {
         window.clearTimeout(deleteConfirmTimeoutRef.current);
+      }
+      if (presetConfirmTimeoutRef.current) {
+        window.clearTimeout(presetConfirmTimeoutRef.current);
       }
     };
   }, []);
@@ -1969,6 +2022,25 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
     deleteConfirmTimeoutRef.current = window.setTimeout(() => {
       deleteConfirmTimeoutRef.current = null;
       setIsDeleteConfirmActive(false);
+    }, 2000);
+  }
+
+  function clearPresetConfirmState() {
+    if (presetConfirmTimeoutRef.current) {
+      window.clearTimeout(presetConfirmTimeoutRef.current);
+      presetConfirmTimeoutRef.current = null;
+    }
+    setIsPresetConfirmActive(false);
+  }
+
+  function startPresetConfirmWindow() {
+    if (presetConfirmTimeoutRef.current) {
+      window.clearTimeout(presetConfirmTimeoutRef.current);
+    }
+    setIsPresetConfirmActive(true);
+    presetConfirmTimeoutRef.current = window.setTimeout(() => {
+      presetConfirmTimeoutRef.current = null;
+      setIsPresetConfirmActive(false);
     }, 2000);
   }
 
@@ -2084,24 +2156,49 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
         >
         {isPresetEligibleFamily(config.family) ? (
           <button
+            ref={presetButtonRef}
             type="button"
             aria-label="Save as Preset"
             title="Save as Preset"
+            data-delete-surface="true"
             className={cn(
-              "absolute right-[52px] top-3 z-20 grid h-8 w-8 place-items-center rounded-full shadow-[0_10px_24px_rgba(60,41,20,0.08)] transition border border-[rgba(154,52,18,0.14)] bg-[rgba(255,252,247,0.92)] text-[var(--muted)]",
-              selected || isDeleteConfirmActive ? "opacity-100" : "opacity-0 group-hover/node:opacity-100 group-hover/node:border-[rgba(154,52,18,0.24)] group-hover/node:text-[var(--accent)]",
+              "absolute right-[52px] top-3 z-20 grid h-8 w-8 place-items-center rounded-full shadow-[0_10px_24px_rgba(60,41,20,0.08)] transition",
+              selected || isPresetConfirmActive ? "opacity-100" : "opacity-0 group-hover/node:opacity-100",
+              isPresetConfirmActive
+                ? "border border-[rgba(34,197,94,0.3)] bg-[rgb(34,197,94)] text-white hover:border-[rgba(34,197,94,0.4)] hover:bg-[rgb(22,163,74)]"
+                : "border border-[rgba(154,52,18,0.14)] bg-[rgba(255,252,247,0.92)] text-[var(--muted)] hover:border-[rgba(154,52,18,0.24)] hover:text-[var(--accent)]",
             )}
             onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); }}
             onMouseDown={(event) => { event.preventDefault(); event.stopPropagation(); }}
-            onClick={(event) => { event.preventDefault(); event.stopPropagation(); void data.onSavePreset?.(); }}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              if (isPresetConfirmActive) {
+                clearPresetConfirmState();
+                void data.onSavePreset?.();
+                return;
+              }
+              startPresetConfirmWindow();
+            }}
           >
-            <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.5">
-              <path d="M2.5 10.5V13a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V6.5L11 3.5H3.5a1 1 0 0 0-1 1v6z" />
-              <path d="M5 10.5V8h6v2.5" />
-              <path d="M5 3.5V2.5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1" />
-            </svg>
+            {isPresetConfirmActive ? (
+              <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.7">
+                <path d="m4.5 8 2.25 2.25L11.5 5.5" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.5">
+                <path d="M2.5 10.5V13a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V6.5L11 3.5H3.5a1 1 0 0 0-1 1v6z" />
+                <path d="M5 10.5V8h6v2.5" />
+                <path d="M5 3.5V2.5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1" />
+              </svg>
+            )}
           </button>
         ) : null}
+        <FloatingLayer anchorRef={presetButtonRef} open={isPresetConfirmActive} placement="top-center" className="pointer-events-none">
+          <div className="whitespace-nowrap rounded-full border border-[rgba(34,197,94,0.16)] bg-[rgba(220,252,231,0.98)] px-3.5 py-1.5 text-[0.76rem] font-medium uppercase tracking-[0.16em] text-[rgb(22,163,74)] shadow-[0_14px_32px_rgba(21,128,61,0.14)]">
+            Save preset?
+          </div>
+        </FloatingLayer>
         <button
           ref={deleteButtonRef}
           type="button"
@@ -2282,7 +2379,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
             </div>
           ) : null}
 
-          {config.family !== "input" && (inputs.length > 0 || outputs.length > 0) ? (
+          {config.family !== "input" && config.family !== "output" && (inputs.length > 0 || outputs.length > 0) ? (
             <div className="grid grid-cols-2 items-start gap-x-6">
               <div className="grid gap-1">
                 {inputs.map((port, index) => (
@@ -2710,51 +2807,102 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
 
           {config.family === "output" ? (
             <>
-                  <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-3">
-                    <label className="grid gap-1.5 text-sm text-[var(--muted)]">
-                      <span>Display Mode</span>
-                      <select
-                        className="rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3 py-3 text-[var(--text)]"
-                        value={config.displayMode}
-                        onChange={(event) => data.onConfigChange?.((currentConfig) => ({ ...(currentConfig as OutputBoundaryNode), displayMode: event.target.value as OutputBoundaryNode["displayMode"] }))}
+              {/* Display Mode */}
+              <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
+                <span className="text-xs text-[var(--muted)]">Display</span>
+                <div className="flex gap-1.5">
+                  {OUTPUT_DISPLAY_MODE_BUTTONS.map((option) => {
+                    const active = config.displayMode === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        title={option.label}
+                        aria-label={option.label}
+                        className={cn(
+                          "inline-flex h-9 w-9 items-center justify-center rounded-full border transition-colors",
+                          active
+                            ? "border-[var(--accent)] bg-[rgba(154,52,18,0.12)] text-[var(--accent-strong)]"
+                            : "border-[rgba(154,52,18,0.16)] bg-[rgba(255,255,255,0.72)] text-[var(--muted)] hover:bg-[rgba(255,248,240,0.92)]",
+                        )}
+                        onClick={() =>
+                          data.onConfigChange?.((currentConfig) => ({
+                            ...(currentConfig as OutputBoundaryNode),
+                            displayMode: option.value,
+                          }))
+                        }
                       >
-                        {["auto", "plain", "markdown", "json"].map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="mt-7 flex items-center gap-2 text-sm text-[var(--muted)]">
-                      <input
-                        checked={config.persistEnabled}
-                        type="checkbox"
-                        onChange={(event) => data.onConfigChange?.((currentConfig) => ({ ...(currentConfig as OutputBoundaryNode), persistEnabled: event.target.checked }))}
-                      />
-                      <span>Persist</span>
-                    </label>
-                    <label className="grid gap-1.5 text-sm text-[var(--muted)]">
-                      <span>Persist Format</span>
-                      <select
-                        className="rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3 py-3 text-[var(--text)]"
-                        value={config.persistFormat}
-                        onChange={(event) => data.onConfigChange?.((currentConfig) => ({ ...(currentConfig as OutputBoundaryNode), persistFormat: event.target.value as OutputBoundaryNode["persistFormat"] }))}
-                      >
-                        {["txt", "md", "json"].map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-                  <div className="grid gap-2">
-                    <Input
-                      value={config.fileNameTemplate}
-                      onChange={(event) => data.onConfigChange?.((currentConfig) => ({ ...(currentConfig as OutputBoundaryNode), fileNameTemplate: event.target.value }))}
-                      placeholder="File name template"
+                        {option.icon}
+                      </button>
+                    );
+                  })}
+                </div>
+                {/* Save toggle */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-[var(--muted)]">Save</span>
+                  <button
+                    type="button"
+                    aria-label="Toggle auto-save"
+                    role="switch"
+                    aria-checked={config.persistEnabled}
+                    className={cn(
+                      "relative h-5 w-9 rounded-full transition-colors",
+                      config.persistEnabled ? "bg-[var(--accent)]" : "bg-[rgba(154,52,18,0.2)]",
+                    )}
+                    onClick={() =>
+                      data.onConfigChange?.((currentConfig) => ({
+                        ...(currentConfig as OutputBoundaryNode),
+                        persistEnabled: !currentConfig.persistEnabled,
+                      }))
+                    }
+                  >
+                    <span
+                      className={cn(
+                        "absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.15)] transition-transform",
+                        config.persistEnabled ? "translate-x-4" : "translate-x-0.5",
+                      )}
                     />
-                  </div>
+                  </button>
+                </div>
+              </div>
+              {/* Save Format + File Name */}
+              <div className="grid grid-cols-[auto_1fr] items-center gap-3">
+                <span className="text-xs text-[var(--muted)]">Format</span>
+                <div className="flex items-center gap-2">
+                  {OUTPUT_SAVE_FORMAT_BUTTONS.map((option) => {
+                    const active = config.persistFormat === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        title={option.label}
+                        aria-label={option.label}
+                        className={cn(
+                          "inline-flex h-7 items-center rounded-full border px-3 text-[0.68rem] font-medium transition-colors",
+                          active
+                            ? "border-[var(--accent)] bg-[rgba(154,52,18,0.1)] text-[var(--accent-strong)]"
+                            : "border-[rgba(154,52,18,0.16)] bg-[rgba(255,255,255,0.72)] text-[var(--muted)] hover:bg-[rgba(255,248,240,0.92)]",
+                        )}
+                        onClick={() =>
+                          data.onConfigChange?.((currentConfig) => ({
+                            ...(currentConfig as OutputBoundaryNode),
+                            persistFormat: option.value,
+                          }))
+                        }
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                  <Input
+                    value={config.fileNameTemplate}
+                    onChange={(event) => data.onConfigChange?.((currentConfig) => ({ ...(currentConfig as OutputBoundaryNode), fileNameTemplate: event.target.value }))}
+                    placeholder="File name template"
+                    className="h-7 flex-1 text-xs"
+                  />
+                </div>
+              </div>
+              {/* Preview */}
               <div className="flex min-h-[160px] flex-1 flex-col rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,255,255,0.82)] p-3">
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <div className="text-[0.68rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">Preview</div>
@@ -3332,7 +3480,7 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
     const nextPreset = {
       ...deepClonePreset(targetNode.data.config),
       presetId: `preset.local.${slug}.${crypto.randomUUID().slice(0, 6)}`,
-      label: `${targetNode.data.config.label} Copy`,
+      label: targetNode.data.config.label,
     } satisfies NodePresetDefinition;
     try {
       await apiPost<{ presetId: string; updatedAt?: string | null }>("/api/presets", {
