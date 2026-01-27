@@ -44,6 +44,8 @@ type SkillDefinition = {
   compatibility: SkillCompatibilityReport[];
 };
 
+type SkillScopeFilter = "all" | "managed" | "external";
+
 const COMPATIBILITY_LABELS: Record<SkillCompatibilityReport["status"], string> = {
   native: "原生",
   partial: "部分兼容",
@@ -57,11 +59,46 @@ const FORMAT_LABELS: Record<SkillDefinition["sourceFormat"], string> = {
   codex: "Codex",
 };
 
+const SCOPE_FILTER_LABELS: Record<SkillScopeFilter, string> = {
+  all: "全部",
+  managed: "已导入",
+  external: "外部待导入",
+};
+
+function matchesScopeFilter(skill: SkillDefinition, scopeFilter: SkillScopeFilter) {
+  if (scopeFilter === "managed") return skill.sourceScope === "graphite_managed";
+  if (scopeFilter === "external") return skill.sourceScope === "external";
+  return true;
+}
+
+function summarizeSchemaFields(fields: SkillField[]) {
+  if (fields.length === 0) return "未声明";
+  const labels = fields.slice(0, 3).map((field) => field.label || field.key);
+  return fields.length > 3 ? `${labels.join("、")} +${fields.length - 3}` : labels.join("、");
+}
+
+function compareSkills(left: SkillDefinition, right: SkillDefinition) {
+  const leftScopeRank = left.sourceScope === "graphite_managed" ? 0 : 1;
+  const rightScopeRank = right.sourceScope === "graphite_managed" ? 0 : 1;
+  if (leftScopeRank !== rightScopeRank) {
+    return leftScopeRank - rightScopeRank;
+  }
+
+  const leftStatusRank = left.status === "active" ? 0 : 1;
+  const rightStatusRank = right.status === "active" ? 0 : 1;
+  if (leftStatusRank !== rightStatusRank) {
+    return leftStatusRank - rightStatusRank;
+  }
+
+  return left.label.localeCompare(right.label, "zh-Hans-CN");
+}
+
 export function SkillsPageClient() {
   const { t } = useLanguage();
   const [skills, setSkills] = useState<SkillDefinition[]>([]);
   const [selectedSkillKey, setSelectedSkillKey] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [scopeFilter, setScopeFilter] = useState<SkillScopeFilter>("all");
   const [error, setError] = useState<string | null>(null);
   const [pendingActionKey, setPendingActionKey] = useState<string | null>(null);
 
@@ -98,27 +135,35 @@ export function SkillsPageClient() {
 
   const filteredSkills = useMemo(() => {
     const keyword = search.trim().toLowerCase();
-    if (!keyword) {
-      return skills;
-    }
-    return skills.filter((skill) =>
-      [skill.skillKey, skill.label, skill.description, ...skill.sideEffects, ...skill.supportedValueTypes]
-        .join(" ")
-        .toLowerCase()
-        .includes(keyword),
-    );
-  }, [search, skills]);
+    return skills
+      .filter((skill) => {
+        if (!matchesScopeFilter(skill, scopeFilter)) {
+          return false;
+        }
+        if (!keyword) {
+          return true;
+        }
+        return [
+          skill.skillKey,
+          skill.label,
+          skill.description,
+          ...skill.sideEffects,
+          ...skill.supportedValueTypes,
+          ...skill.inputSchema.map((field) => `${field.label} ${field.key} ${field.description}`),
+          ...skill.outputSchema.map((field) => `${field.label} ${field.key} ${field.description}`),
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(keyword);
+      })
+      .sort(compareSkills);
+  }, [scopeFilter, search, skills]);
 
   const selectedSkill =
     filteredSkills.find((skill) => skill.skillKey === selectedSkillKey) ??
-    skills.find((skill) => skill.skillKey === selectedSkillKey) ??
     filteredSkills[0] ??
+    skills.find((skill) => skill.skillKey === selectedSkillKey) ??
     null;
-
-  const totalCompatibilityGaps = selectedSkill?.compatibility.reduce(
-    (count, report) => count + report.missingCapabilities.length,
-    0,
-  ) ?? 0;
 
   async function handleDisable(skillKey: string) {
     setPendingActionKey(skillKey);
@@ -181,46 +226,63 @@ export function SkillsPageClient() {
 
   return (
     <div className="grid gap-6">
-      <section className="grid grid-cols-5 gap-[18px] max-[1280px]:grid-cols-3 max-[900px]:grid-cols-2 max-[720px]:grid-cols-1">
-        <MetricCard title="技能总数" value={String(skills.length)} detail="当前后端已登记的 skill definitions" />
-        <MetricCard
-          title="已导入"
-          value={String(skills.filter((skill) => skill.sourceScope === "graphite_managed").length)}
-          detail="已经复制进 GraphiteUI 本地 skill 仓库"
-        />
-        <MetricCard
-          title="外部源"
-          value={String(skills.filter((skill) => skill.sourceScope === "external").length)}
-          detail="只能先导入，不能直接管理外部 skill 源"
-        />
-        <MetricCard
-          title="已注册运行时"
-          value={String(skills.filter((skill) => skill.runtimeRegistered).length)}
-          detail="具备后端实际可执行实现"
-        />
-        <MetricCard
-          title="Claude 原生"
-          value={String(skills.filter((skill) => skill.compatibility.some((item) => item.target === "claude_code" && item.status === "native")).length)}
-          detail="当前已经以 Claude Code 文件作为定义源"
-        />
-        <MetricCard
-          title="OpenClaw 部分兼容"
-          value={String(skills.filter((skill) => skill.compatibility.some((item) => item.target === "openclaw" && item.status === "partial")).length)}
-          detail="和 OpenClaw 的 SKILL.md 目录格式只差包装层"
-        />
-      </section>
-
-      <section className="grid grid-cols-[360px_minmax(0,1fr)] gap-6 max-[1100px]:grid-cols-1">
-        <Card className="grid gap-4">
-          <div>
+      <Card className="grid gap-5">
+        <div className="flex flex-wrap items-start justify-between gap-5">
+          <div className="max-w-3xl">
             <div className="text-[0.76rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">Skill Registry</div>
-            <h2 className="mt-2 text-2xl font-semibold">已登记技能</h2>
+            <h2 className="mt-2 text-2xl font-semibold">Skill 管理</h2>
             <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-              外部 skill 源只负责被发现。只有导入到 GraphiteUI 自己的 skill 仓库后，才允许启用、禁用或删除。
+              这里优先按 Claude Code 风格展示每个 skill 的作用、输入和输出。已导入的 skill 可以直接启用、禁用和运行；外部发现的 skill
+              会先作为候选源展示，导入后再纳入本地 skill 仓库。
             </p>
           </div>
+          <div className="flex flex-wrap gap-2">
+            <SummaryStat title="总数" value={String(skills.length)} />
+            <SummaryStat
+              title="已导入"
+              value={String(skills.filter((skill) => skill.sourceScope === "graphite_managed").length)}
+            />
+            <SummaryStat
+              title="外部待导入"
+              value={String(skills.filter((skill) => skill.sourceScope === "external").length)}
+            />
+            <SummaryStat title="可直接运行" value={String(skills.filter((skill) => skill.runtimeRegistered).length)} />
+          </div>
+        </div>
+      </Card>
 
-          <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索 skill key、描述、side effect" />
+      <section className="grid grid-cols-[380px_minmax(0,1fr)] gap-6 max-[1180px]:grid-cols-1">
+        <Card className="grid gap-4 self-start">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="text-[0.76rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">Skill List</div>
+              <h3 className="mt-1 text-xl font-semibold">已登记技能</h3>
+            </div>
+            <Badge>{filteredSkills.length} 项</Badge>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {(["all", "managed", "external"] as const).map((filter) => (
+              <button
+                key={filter}
+                type="button"
+                onClick={() => setScopeFilter(filter)}
+                className={cn(
+                  "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition",
+                  scopeFilter === filter
+                    ? "border-[rgba(154,52,18,0.3)] bg-[rgba(154,52,18,0.08)] text-[var(--accent-strong)]"
+                    : "border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.7)] text-[var(--muted)] hover:bg-[rgba(255,250,241,0.92)]",
+                )}
+              >
+                <span>{SCOPE_FILTER_LABELS[filter]}</span>
+                <span className="rounded-full bg-white/80 px-2 py-0.5 text-[0.72rem] text-[var(--text)]">
+                  {skills.filter((skill) => matchesScopeFilter(skill, filter)).length}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索名称、作用、输入、输出" />
 
           <div className="grid gap-3">
             {filteredSkills.map((skill) => {
@@ -237,54 +299,65 @@ export function SkillsPageClient() {
                       : "border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.72)] hover:bg-[rgba(255,250,241,0.92)]",
                   )}
                 >
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="truncate text-base font-semibold text-[var(--text)]">{skill.label}</div>
                       <div className="mt-1 truncate text-xs uppercase tracking-[0.08em] text-[var(--muted)]">{skill.skillKey}</div>
                     </div>
-                    <Badge className={cn(skill.sourceScope === "graphite_managed" ? "text-[var(--success)]" : "text-[var(--accent-strong)]")}>
-                      {skill.sourceScope === "graphite_managed" ? "已导入" : "外部源"}
-                    </Badge>
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <Badge className={cn(skill.sourceScope === "graphite_managed" ? "text-[var(--success)]" : "text-[var(--accent-strong)]")}>
+                        {skill.sourceScope === "graphite_managed" ? "已导入" : "外部发现"}
+                      </Badge>
+                      {skill.sourceScope === "graphite_managed" ? <Badge>{skill.status === "active" ? "启用中" : "已禁用"}</Badge> : null}
+                    </div>
                   </div>
                   <div className="mt-2 line-clamp-2 text-sm leading-6 text-[var(--muted)]">{skill.description}</div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Badge>{FORMAT_LABELS[skill.sourceFormat]}</Badge>
-                    <Badge>{skill.sourceScope === "graphite_managed" ? "Graphite 本地" : "外部只读"}</Badge>
-                    {skill.sourceScope === "graphite_managed" ? <Badge>{skill.status === "active" ? "启用中" : "已禁用"}</Badge> : null}
-                    {skill.sideEffects.slice(0, 2).map((item) => (
-                      <Badge key={item}>{item}</Badge>
-                    ))}
+                  <div className="mt-3 grid gap-1.5 rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,255,255,0.74)] px-3 py-2 text-xs leading-5 text-[var(--muted)]">
+                    <div className="flex items-start gap-2">
+                      <span className="min-w-[32px] font-semibold uppercase tracking-[0.08em] text-[var(--accent-strong)]">输入</span>
+                      <span className="min-w-0 flex-1">{summarizeSchemaFields(skill.inputSchema)}</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="min-w-[32px] font-semibold uppercase tracking-[0.08em] text-[var(--accent-strong)]">输出</span>
+                      <span className="min-w-0 flex-1">{summarizeSchemaFields(skill.outputSchema)}</span>
+                    </div>
                   </div>
                 </button>
               );
             })}
+            {filteredSkills.length === 0 ? <EmptyState>没有匹配的 skill。</EmptyState> : null}
           </div>
         </Card>
 
         {selectedSkill ? (
           <div className="grid gap-6">
-            <Card className="grid gap-4">
+            <Card className="grid gap-5">
               <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
+                <div className="min-w-0">
                   <div className="text-[0.76rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">Skill Detail</div>
                   <h2 className="mt-2 text-2xl font-semibold">{selectedSkill.label}</h2>
                   <div className="mt-1 text-sm uppercase tracking-[0.08em] text-[var(--muted)]">{selectedSkill.skillKey}</div>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Badge>{FORMAT_LABELS[selectedSkill.sourceFormat]}</Badge>
-                  <Badge>{selectedSkill.sourceScope === "graphite_managed" ? "Graphite 本地" : "外部源"}</Badge>
+                  <Badge className={cn(selectedSkill.sourceScope === "graphite_managed" ? "text-[var(--success)]" : "text-[var(--accent-strong)]")}>
+                    {selectedSkill.sourceScope === "graphite_managed" ? "已导入" : "外部发现"}
+                  </Badge>
                   {selectedSkill.sourceScope === "graphite_managed" ? <Badge>{selectedSkill.status === "active" ? "启用中" : "已禁用"}</Badge> : null}
                   <Badge className={cn(selectedSkill.runtimeRegistered ? "text-[var(--success)]" : "text-[var(--danger)]")}>
-                    {selectedSkill.runtimeRegistered ? "Runtime 已注册" : "Runtime 未注册"}
+                    {selectedSkill.runtimeRegistered ? "可直接运行" : "未接运行时"}
                   </Badge>
+                  <Badge>{FORMAT_LABELS[selectedSkill.sourceFormat]}</Badge>
                 </div>
               </div>
 
-              <p className="text-[0.98rem] leading-7 text-[var(--muted)]">{selectedSkill.description}</p>
+              <div className="rounded-[20px] border border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.72)] p-5">
+                <div className="text-[0.76rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">作用</div>
+                <p className="mt-2 text-[0.98rem] leading-7 text-[var(--muted)]">{selectedSkill.description}</p>
+              </div>
 
-              <div className="rounded-[18px] border border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.72)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">
-                <div>来源路径: {selectedSkill.sourcePath}</div>
-                <div>管理方式: {selectedSkill.canManage ? "已导入，可在 GraphiteUI 内管理" : "外部只读，需先导入"}</div>
+              <div className="grid grid-cols-2 gap-4 max-[960px]:grid-cols-1">
+                <SchemaPreviewCard title="输入" fields={selectedSkill.inputSchema} emptyLabel="未声明输入字段。" />
+                <SchemaPreviewCard title="输出" fields={selectedSkill.outputSchema} emptyLabel="未声明输出字段。" />
               </div>
 
               <div className="flex flex-wrap gap-3">
@@ -329,21 +402,6 @@ export function SkillsPageClient() {
                   </Button>
                 ) : null}
               </div>
-
-              <div className="grid grid-cols-3 gap-4 max-[960px]:grid-cols-1">
-                <SubtleCard>
-                  <div className="text-sm font-semibold text-[var(--text)]">输入字段</div>
-                  <div className="mt-2 text-3xl font-semibold">{selectedSkill.inputSchema.length}</div>
-                </SubtleCard>
-                <SubtleCard>
-                  <div className="text-sm font-semibold text-[var(--text)]">输出字段</div>
-                  <div className="mt-2 text-3xl font-semibold">{selectedSkill.outputSchema.length}</div>
-                </SubtleCard>
-                <SubtleCard>
-                  <div className="text-sm font-semibold text-[var(--text)]">兼容缺口</div>
-                  <div className="mt-2 text-3xl font-semibold">{totalCompatibilityGaps}</div>
-                </SubtleCard>
-              </div>
             </Card>
 
             <section className="grid grid-cols-2 gap-6 max-[960px]:grid-cols-1">
@@ -351,49 +409,64 @@ export function SkillsPageClient() {
               <SchemaCard title="Output Schema" emptyLabel="当前没有输出字段。" fields={selectedSkill.outputSchema} />
             </section>
 
-            <section className="grid grid-cols-2 gap-6 max-[960px]:grid-cols-1">
-              <Card className="grid gap-3">
-                <div className="text-[0.76rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">Value Types</div>
-                <div className="flex flex-wrap gap-2">
-                  {selectedSkill.supportedValueTypes.map((item) => (
-                    <Badge key={item}>{item}</Badge>
-                  ))}
-                </div>
-              </Card>
-              <Card className="grid gap-3">
-                <div className="text-[0.76rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">Side Effects</div>
-                <div className="flex flex-wrap gap-2">
-                  {selectedSkill.sideEffects.map((item) => (
-                    <Badge key={item}>{item}</Badge>
-                  ))}
-                </div>
-              </Card>
-            </section>
-
             <Card className="grid gap-4">
-              <div className="text-[0.76rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">Compatibility</div>
-              <div className="grid gap-4">
-                {selectedSkill.compatibility.map((report) => (
-                  <div key={report.target} className="rounded-[20px] border border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.72)] p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="text-lg font-semibold text-[var(--text)]">
-                        {report.target === "claude_code"
-                          ? "Claude Code"
-                          : report.target === "openclaw"
-                            ? "OpenClaw"
-                            : "Codex"}
-                      </div>
-                      <Badge>{COMPATIBILITY_LABELS[report.status]}</Badge>
-                    </div>
-                    <div className="mt-2 text-sm leading-6 text-[var(--muted)]">{report.summary}</div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {report.missingCapabilities.map((item) => (
-                        <Badge key={item}>{item}</Badge>
-                      ))}
-                    </div>
+              <div className="grid grid-cols-2 gap-4 max-[960px]:grid-cols-1">
+                <SubtleCard>
+                  <div className="text-[0.76rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">Value Types</div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {selectedSkill.supportedValueTypes.length > 0 ? (
+                      selectedSkill.supportedValueTypes.map((item) => <Badge key={item}>{item}</Badge>)
+                    ) : (
+                      <span className="text-sm text-[var(--muted)]">未声明</span>
+                    )}
                   </div>
-                ))}
+                </SubtleCard>
+                <SubtleCard>
+                  <div className="text-[0.76rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">Side Effects</div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {selectedSkill.sideEffects.length > 0 ? (
+                      selectedSkill.sideEffects.map((item) => <Badge key={item}>{item}</Badge>)
+                    ) : (
+                      <span className="text-sm text-[var(--muted)]">无额外副作用</span>
+                    )}
+                  </div>
+                </SubtleCard>
               </div>
+
+              <details className="rounded-[20px] border border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.72)] p-4">
+                <summary className="cursor-pointer select-none text-sm font-semibold text-[var(--text)]">Advanced</summary>
+                <div className="mt-4 grid gap-4">
+                  <div className="rounded-[18px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,250,241,0.75)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">
+                    <div>来源路径: {selectedSkill.sourcePath}</div>
+                    <div>管理方式: {selectedSkill.canManage ? "已导入，可在 GraphiteUI 内管理" : "外部只读，需先导入"}</div>
+                  </div>
+
+                  <div className="grid gap-4">
+                    {selectedSkill.compatibility.map((report) => (
+                      <div key={report.target} className="rounded-[18px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,250,241,0.75)] p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div className="text-base font-semibold text-[var(--text)]">
+                            {report.target === "claude_code"
+                              ? "Claude Code"
+                              : report.target === "openclaw"
+                                ? "OpenClaw"
+                                : "Codex"}
+                          </div>
+                          <Badge>{COMPATIBILITY_LABELS[report.status]}</Badge>
+                        </div>
+                        <div className="mt-2 text-sm leading-6 text-[var(--muted)]">{report.summary}</div>
+                        {report.missingCapabilities.length > 0 ? (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {report.missingCapabilities.map((item) => (
+                              <Badge key={item}>{item}</Badge>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </details>
             </Card>
           </div>
         ) : (
@@ -404,13 +477,42 @@ export function SkillsPageClient() {
   );
 }
 
-function MetricCard({ title, value, detail }: { title: string; value: string; detail: string }) {
+function SummaryStat({ title, value }: { title: string; value: string }) {
   return (
-    <Card>
-      <div className="text-sm text-[var(--muted)]">{title}</div>
-      <div className="mt-2 text-3xl font-semibold text-[var(--text)]">{value}</div>
-      <div className="mt-2 text-sm leading-6 text-[var(--muted)]">{detail}</div>
-    </Card>
+    <div className="rounded-[18px] border border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.72)] px-4 py-3">
+      <div className="text-xs uppercase tracking-[0.08em] text-[var(--muted)]">{title}</div>
+      <div className="mt-1 text-2xl font-semibold text-[var(--text)]">{value}</div>
+    </div>
+  );
+}
+
+function SchemaPreviewCard({ title, emptyLabel, fields }: { title: string; emptyLabel: string; fields: SkillField[] }) {
+  return (
+    <div className="rounded-[20px] border border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.72)] p-4">
+      <div className="text-[0.76rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">{title}</div>
+      {fields.length > 0 ? (
+        <div className="mt-3 grid gap-2.5">
+          {fields.slice(0, 4).map((field) => (
+            <div
+              key={field.key}
+              className="rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,250,241,0.76)] px-3 py-2.5"
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-semibold text-[var(--text)]">{field.label}</span>
+                <Badge>{field.valueType}</Badge>
+                {field.required ? <Badge className="text-[var(--danger)]">required</Badge> : null}
+              </div>
+              <div className="mt-1 text-sm leading-6 text-[var(--muted)]">{field.description || field.key}</div>
+            </div>
+          ))}
+          {fields.length > 4 ? (
+            <div className="text-sm text-[var(--muted)]">还有 {fields.length - 4} 个字段，展开下方 schema 可查看完整定义。</div>
+          ) : null}
+        </div>
+      ) : (
+        <div className="mt-3 text-sm leading-6 text-[var(--muted)]">{emptyLabel}</div>
+      )}
+    </div>
   );
 }
 

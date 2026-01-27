@@ -21,6 +21,7 @@
 - `development_plan.md`
 - `acceptance_runbook.md`
 - `node_system_design.md`
+- `skill_management_and_agent_direction.md`
 
 ## `docs/architecture/`
 
@@ -62,7 +63,8 @@
 4. `docs/active/development_plan.md`
 5. `docs/active/acceptance_runbook.md`
 6. `docs/active/node_system_design.md`
-7. `docs/architecture/framework_positioning.md`
+7. `docs/active/skill_management_and_agent_direction.md`
+8. `docs/architecture/framework_positioning.md`
 
 ## 3. Current Source of Truth
 
@@ -72,6 +74,7 @@
 - [development_plan.md](/home/abyss/GraphiteUI/docs/active/development_plan.md)
 - [acceptance_runbook.md](/home/abyss/GraphiteUI/docs/active/acceptance_runbook.md)
 - [node_system_design.md](/home/abyss/GraphiteUI/docs/active/node_system_design.md)
+- [skill_management_and_agent_direction.md](/home/abyss/GraphiteUI/docs/active/skill_management_and_agent_direction.md)
 - [FUTURE_WORK.md](/home/abyss/GraphiteUI/docs/FUTURE_WORK.md)
 
 其中：

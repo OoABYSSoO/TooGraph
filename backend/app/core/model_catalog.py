@@ -60,13 +60,47 @@ def get_default_video_model_ref() -> str:
     return normalize_model_ref(get_default_video_model_name(), default_provider="local")
 
 
+def _dedupe_local_provider_models(
+    models: list[dict[str, Any]],
+    *,
+    preferred_model_ref: str | None = None,
+) -> list[dict[str, Any]]:
+    deduped: list[dict[str, Any]] = []
+    index_by_identity: dict[str, int] = {}
+    normalized_preferred = normalize_model_ref(preferred_model_ref, default_provider="local") if preferred_model_ref else ""
+
+    for model in models:
+        route_target = str(model.get("route_target") or "").strip().lower()
+        label = str(model.get("label") or "").strip().lower()
+        runtime_model = str(model.get("model") or "").strip().lower()
+        model_ref = normalize_model_ref(str(model.get("model_ref") or ""), default_provider="local")
+        identity = route_target or label or runtime_model or model_ref.lower()
+        existing_index = index_by_identity.get(identity)
+
+        if existing_index is None:
+            index_by_identity[identity] = len(deduped)
+            deduped.append(model)
+            continue
+
+        if normalized_preferred and model_ref == normalized_preferred:
+            current_ref = normalize_model_ref(str(deduped[existing_index].get("model_ref") or ""), default_provider="local")
+            if current_ref != normalized_preferred:
+                deduped[existing_index] = model
+
+    return deduped
+
+
 def build_model_catalog() -> dict[str, Any]:
     runtime_config = get_local_gateway_runtime_config()
     llama_config = runtime_config.get("llama") if isinstance(runtime_config, dict) else {}
     cloud_config = runtime_config.get("cloud") if isinstance(runtime_config, dict) else {}
 
     local_route_models = get_local_route_model_names()
-    local_text_model = local_route_models[0] if local_route_models else get_default_text_model()
+    preferred_local_text_model = get_default_text_model()
+    if local_route_models and preferred_local_text_model in local_route_models:
+        local_text_model = preferred_local_text_model
+    else:
+        local_text_model = local_route_models[0] if local_route_models else preferred_local_text_model
     local_video_model = get_default_video_model_name()
     local_context_window = llama_config.get("ctx_size") if isinstance(llama_config, dict) else None
     local_max_tokens = llama_config.get("n_predict") if isinstance(llama_config, dict) else None
@@ -88,6 +122,10 @@ def build_model_catalog() -> dict[str, Any]:
         }
         for model_name in local_route_models
     ]
+    local_provider_models = _dedupe_local_provider_models(
+        local_provider_models,
+        preferred_model_ref=build_model_ref("local", local_text_model),
+    )
     if not local_provider_models:
         local_provider_models = [
             {
