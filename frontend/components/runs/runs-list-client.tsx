@@ -9,19 +9,7 @@ import { Select } from "@/components/ui/select";
 import { SubtleCard } from "@/components/ui/card";
 import { apiGet } from "@/lib/api";
 import { useLanguage } from "@/components/providers/language-provider";
-
-type RunSummary = {
-  run_id: string;
-  graph_id: string;
-  graph_name: string;
-  status: string;
-  current_node_id?: string | null;
-  revision_round: number;
-  started_at: string;
-  completed_at?: string | null;
-  duration_ms?: number | null;
-  final_score?: number | null;
-};
+import type { RunSummary } from "@/lib/types";
 
 export function RunsListClient() {
   const { t } = useLanguage();

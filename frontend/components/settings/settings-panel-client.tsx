@@ -48,11 +48,6 @@ type SettingsPayload = {
     routes: string[];
   };
   tools: string[];
-  templates: Array<{
-    template_id: string;
-    label: string;
-    default_theme_preset: string;
-  }>;
 };
 
 type SettingsDraft = {
@@ -339,16 +334,6 @@ export function SettingsPanelClient() {
                   : null}
               </div>
             </div>
-          ))}
-        </div>
-      </Card>
-      <Card className="col-span-12">
-        <h2 className="mb-2.5">Templates</h2>
-        <div className="flex flex-wrap gap-2.5">
-          {settings.templates.map((template) => (
-            <Badge key={template.template_id}>
-              {template.label} · {template.default_theme_preset}
-            </Badge>
           ))}
         </div>
       </Card>

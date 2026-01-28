@@ -14,9 +14,10 @@ export default function MemoriesPage() {
 
       <Card>
         <div className="flex flex-wrap gap-2.5">
-          <Badge>{t("common.filter_memory")}</Badge>
+          <Badge>{t("memories.experimental")}</Badge>
           <Badge>{t("common.open_detail")}</Badge>
         </div>
+        <p className="mt-3 text-sm leading-6 text-[var(--muted)]">{t("memories.future_note")}</p>
       </Card>
 
       <Card>

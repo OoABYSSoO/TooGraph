@@ -50,7 +50,7 @@ export function MemoryListClient() {
   }
 
   if (items.length === 0) {
-    return <SubtleCard>{t("common.no_data")}</SubtleCard>;
+    return <SubtleCard>{t("memories.empty")}</SubtleCard>;
   }
 
   return (
@@ -69,9 +69,9 @@ export function MemoryListClient() {
           type="button"
         >
           <SubtleCard className="grid gap-2">
-          <strong>{item.memory_type}</strong>
-          <div className="text-[var(--muted)]">{item.summary || "No summary provided."}</div>
-          {expandedId === item.memory_id && item.details ? <RichContent className="mt-2 text-sm" text={item.details} displayMode="auto" /> : null}
+            <strong>{item.memory_type}</strong>
+            <div className="text-[var(--muted)]">{item.summary || "No summary provided."}</div>
+            {expandedId === item.memory_id && item.details ? <RichContent className="mt-2 text-sm" text={item.details} displayMode="auto" /> : null}
           </SubtleCard>
         </button>
       ))}

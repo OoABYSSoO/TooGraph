@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import heapq
 import json
+import logging
 import re
 import inspect
 import time
@@ -28,6 +29,43 @@ from app.tools.local_llm import (
     get_default_agent_thinking_enabled,
 )
 
+logger = logging.getLogger(__name__)
+
+
+# ─── Cycle Detection ────────────────────────────────────────────────────────────────
+
+class CycleDetector:
+    """
+    Detects cycles in a directed graph using DFS (white/gray/black coloring).
+    Call detect() to get (has_cycle, back_edges).
+    """
+
+    def __init__(self, edges: list[NodeSystemGraphEdge]) -> None:
+        self.edges = edges
+        self.graph: dict[str, list[str]] = defaultdict(list)
+        for edge in edges:
+            self.graph[edge.source].append(edge.target)
+
+    def detect(self) -> tuple[bool, list[tuple[str, str]]]:
+        WHITE, GRAY, BLACK = 0, 1, 2
+        color: dict[str, int] = defaultdict(lambda: WHITE)
+        back_edges: list[tuple[str, str]] = []
+
+        def dfs(node: str) -> None:
+            color[node] = GRAY
+            for neighbor in self.graph.get(node, []):
+                if color[neighbor] == GRAY:
+                    back_edges.append((node, neighbor))
+                elif color[neighbor] == WHITE:
+                    dfs(neighbor)
+            color[node] = BLACK
+
+        nodes = list(self.graph.keys())
+        for node in nodes:
+            if color[node] == WHITE:
+                dfs(node)
+        return len(back_edges) > 0, back_edges
+
 
 def execute_node_system_graph(
     graph: NodeSystemGraphDocument,
@@ -35,6 +73,11 @@ def execute_node_system_graph(
     *,
     persist_progress: bool = False,
 ) -> dict[str, Any]:
+    """
+    Execute a node_system graph. Automatically detects cycles and handles them:
+    - Acyclic graph → topological single-pass execution
+    - Cyclic graph → multi-pass iteration (future: controlled via max_iterations)
+    """
     started_perf = time.perf_counter()
     state = initial_state or create_initial_run_state(
         graph_id=graph.graph_id,
@@ -47,7 +90,31 @@ def execute_node_system_graph(
 
     nodes_by_id = {node.id: node for node in graph.nodes}
     incoming_edges, outgoing_edges = _index_edges(graph.edges)
-    execution_order = _topological_order(graph.nodes, graph.edges)
+
+    has_cycle, back_edges = CycleDetector(graph.edges).detect()
+    if has_cycle:
+        back_edge_samples = [f"{s}→{t}" for s, t in back_edges[:3]]
+        logger.warning(
+            "Graph %s contains cycles (back edges: %s). "
+            "Multi-pass execution is not yet implemented — graph must be acyclic.",
+            graph.graph_id,
+            back_edge_samples,
+        )
+        state["status"] = "failed"
+        state["errors"] = [
+            f"Graph contains cycles and cannot be executed yet: {back_edge_samples}"
+        ]
+        state["completed_at"] = utc_now_iso()
+        save_run(state)
+        return state
+
+    try:
+        execution_order = _topological_order(graph.nodes, graph.edges)
+    except ValueError:
+        raise ValueError(
+            f"Graph '{graph.graph_id}' contains cycles and cannot be executed. "
+            "Use a directed acyclic graph (DAG) for now."
+        ) from None
     node_outputs: dict[str, dict[str, Any]] = {}
     active_edge_ids: set[str] = set()
     if persist_progress:
@@ -607,11 +674,7 @@ def _resolve_agent_runtime_config(config: AgentNodeConfig) -> dict[str, Any]:
         if config.model_source.value == "override" and override_model_ref
         else global_model_ref
     )
-    resolved_thinking = (
-        global_thinking_enabled
-        if config.thinking_mode.value == "inherit"
-        else config.thinking_mode.value == "on"
-    )
+    resolved_thinking = config.thinking_mode.value == "on"
     resolved_temperature = max(0.0, min(float(config.temperature), 2.0))
     resolved_provider_id, _resolved_model_name = resolved_model.split("/", 1) if "/" in resolved_model else ("local", resolved_model)
     runtime_model_name = resolve_runtime_model_name(resolved_model)

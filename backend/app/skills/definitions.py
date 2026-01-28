@@ -18,7 +18,7 @@ from app.core.schemas.skills import (
     SkillSourceScope,
 )
 from app.core.storage.skill_store import GRAPHITE_SKILLS_DIR, get_skill_status_map, list_managed_skill_keys
-from app.skills.registry import get_skill_registry
+from app.skills.registry import get_skill_registry, list_runtime_skill_keys
 
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
@@ -50,11 +50,12 @@ class SkillDefinitionRecord:
 
 def list_skill_definitions(*, include_disabled: bool = False) -> list[SkillDefinition]:
     catalog = list_skill_catalog(include_disabled=include_disabled)
-    return [item for item in catalog if item.source_scope == SkillSourceScope.GRAPHITE_MANAGED]
+    return [item for item in catalog if item.runtime_registered]
 
 
 def list_skill_catalog(*, include_disabled: bool = True) -> list[SkillDefinition]:
     registry_keys = set(get_skill_registry(include_disabled=include_disabled).keys())
+    runtime_supported_keys = list_runtime_skill_keys()
     status_map = get_skill_status_map()
     managed_records = {record.definition.skill_key: record for record in _load_managed_skill_records()}
     external_records = {record.definition.skill_key: record for record in _load_external_skill_records()}
@@ -87,7 +88,7 @@ def list_skill_catalog(*, include_disabled: bool = True) -> list[SkillDefinition
                     "runtime_registered": runtime_registered,
                     "status": status if record.source_scope == SkillSourceScope.GRAPHITE_MANAGED else SkillCatalogStatus.ACTIVE,
                     "can_manage": record.source_scope == SkillSourceScope.GRAPHITE_MANAGED,
-                    "can_import": record.source_scope == SkillSourceScope.EXTERNAL,
+                    "can_import": record.source_scope == SkillSourceScope.EXTERNAL and skill_key in runtime_supported_keys,
                     "compatibility": _build_compatibility_reports(record.source_format, record.source_scope, record.definition),
                 },
             )
@@ -115,6 +116,12 @@ def _load_managed_skill_records() -> list[SkillDefinitionRecord]:
     records: list[SkillDefinitionRecord] = []
     for path in sorted((GRAPHITE_SKILLS_DIR / "claude_code").glob("*/SKILL.md")):
         records.append(_parse_skill_file(path, SkillSourceFormat.CLAUDE_CODE, SkillSourceScope.GRAPHITE_MANAGED))
+    return records
+
+
+def _load_external_skill_records() -> list[SkillDefinitionRecord]:
+    records: list[SkillDefinitionRecord] = []
+    managed_keys = list_managed_skill_keys()
     for root, format_name in [
         (GRAPHITE_SKILLS_DIR / "openclaw", SkillSourceFormat.OPENCLAW),
         (GRAPHITE_SKILLS_DIR / "codex", SkillSourceFormat.CODEX),
@@ -123,13 +130,9 @@ def _load_managed_skill_records() -> list[SkillDefinitionRecord]:
         if not root.exists():
             continue
         for path in sorted(root.glob("*/SKILL.md")):
-            records.append(_parse_skill_file(path, format_name, SkillSourceScope.GRAPHITE_MANAGED))
-    return records
-
-
-def _load_external_skill_records() -> list[SkillDefinitionRecord]:
-    records: list[SkillDefinitionRecord] = []
-    managed_keys = list_managed_skill_keys()
+            record = _parse_skill_file(path, format_name, SkillSourceScope.EXTERNAL)
+            if record.definition.skill_key not in managed_keys:
+                records.append(record)
     for root in CLAUDE_EXTERNAL_DIRS:
         if not root.exists():
             continue
@@ -220,7 +223,7 @@ def _build_compatibility_reports(
     definition: SkillDefinition,
 ) -> list[SkillCompatibilityReport]:
     shared_missing_capabilities = ["缺少标准 JSON Schema 输入定义"]
-    if definition.output_schema:
+    if not definition.output_schema:
         shared_missing_capabilities.append("缺少标准化输出 schema 导出")
 
     claude_status = SkillCompatibilityStatus.NATIVE if source_format == SkillSourceFormat.CLAUDE_CODE else SkillCompatibilityStatus.PARTIAL

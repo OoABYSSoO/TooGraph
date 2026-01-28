@@ -66,7 +66,21 @@
 - 继续收口 skill 在产品中的暴露方式
 - 减少“用户先理解 skill，再理解节点”的心智负担
 
-## 6. 新节点系统与旧 graph schema 双轨收口
+## 6. Memory 正式能力建设
+
+当前代码现状：
+
+- `/memories` 页面和 `/api/memories` 只保留只读占位与示例数据
+- 当前没有正式的 memory 写入链路、召回策略、生命周期管理和运行时集成
+
+后续要做：
+
+- 定义 memory 的写入时机、读取时机和淘汰策略
+- 明确 memory schema、来源、作用域和权限边界
+- 决定 memory 是挂在 run、graph、workspace 还是 project 维度
+- 再决定是否恢复独立 memory 管理流
+
+## 7. 新节点系统与旧 graph schema 双轨收口
 
 当前代码现状：
 

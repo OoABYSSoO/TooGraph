@@ -8,7 +8,7 @@
 
 结论先行：
 
-**GraphiteUI 应该被定位为一个可扩展的 agent workflow framework，而 `creative factory` 只是当前第一套正式模板。**
+**GraphiteUI 应该被定位为一个可扩展的 agent workflow framework，而 `hello_world` 是当前唯一稳定保留的正式模板。**
 
 也就是说：
 
@@ -117,17 +117,12 @@ GraphiteUI 后续应明确分成三层。
 当前模板：
 
 - `hello_world`
-- `research_pipeline`
-- `content_pipeline`
-- `analysis_pipeline`
-- `review_pipeline`
 
 模板应定义：
 
 - 默认节点链
 - 默认 state schema
 - 默认边结构
-- 默认主题配置
 - 默认评审策略
 - 默认产物结构
 
@@ -135,28 +130,19 @@ GraphiteUI 后续应明确分成三层。
 
 - 这类任务通常由哪些阶段组成
 
-### 4.3 Theme / Policy Layer
+### 4.3 Optional Policy Layer
 
-这一层负责配置同一模板在不同语境下如何运行。
+如果未来要恢复“模板策略包”能力，它应该被定义成可选扩展层，而不是当前默认存在的产品层。
 
-例如当前已经有雏形的内容：
+这一层未来可以回答：
 
-- `theme_preset`
-- `genre`
-- `market`
-- `platform`
-- `creative_style`
-- `tone`
-- `evaluation_policy`
-- `strategy_profile`
+- 同一条模板流水线，在不同场景下的默认参数和策略如何变化
 
-这一层回答的是：
+当前状态：
 
-- 同一条流水线，在不同主题、市场、风格下应该如何变化
-
-这一层不应该决定：
-
-- 是否需要一整套新的底层节点系统
+- 主题预设系统已移除
+- 当前代码没有稳定运行中的 policy preset 机制
+- 因此这层只属于未来扩展方向，不属于当前已交付能力
 
 ---
 
@@ -164,7 +150,7 @@ GraphiteUI 后续应明确分成三层。
 
 当前状态更适合定义为：
 
-**“一个已经具备 framework 雏形的标准工作流系统，正在从创意工厂模板出发往通用化延伸。”**
+**“一个已经具备 framework 雏形的标准工作流系统，正在以 `hello_world` 模板为基线往通用化延伸。”**
 
 也就是说：
 
@@ -178,15 +164,12 @@ GraphiteUI 后续应明确分成三层。
 - 标准节点执行链
 - `Node Handler Registry`
 - `Tool Registry`
-- 主题配置与主题预设
 - 可视化编排器
 - run detail / artifacts / state snapshot
 
 当前仍然偏向首个模板的部分：
 
-- 默认节点命名仍偏 `creative factory`
-- 默认 state key 仍偏创意生产链
-- 默认工具仍偏创意分析与生成
+- 默认模板仍然只有 `hello_world`
 - editor 的默认心智仍围绕当前模板
 
 这很正常，因为当前系统仍在用第一个模板校准框架抽象。
@@ -322,7 +305,7 @@ GraphiteUI 后续应明确分成三层。
 
 - `hello_world` 模板
 
-**注**：`creative_factory` 和 `themeConfig` 已在 2026-04-12 的清理中被移除，主题预设系统也随之删除。未来模板扩展请参考 `backend/app/templates/hello_world/` 的结构。
+**注**：当前稳定模板只保留 `hello_world`。未来模板扩展请参考 `backend/app/templates/hello_world/` 的结构。
 
 ---
 
@@ -387,21 +370,16 @@ Template State：
 - 模板升级提示
 - 模板版本管理
 
-### 9.4 主题策略编辑器
+### 9.4 可选策略包编辑器（未来）
 
-当前 `theme_preset` 已经开始驱动：
-
-- 节点默认参数
-- brief 策略
-- variants 风格
-- review 重点
-
-后续应进一步提供：
+如果未来重新引入模板策略包，应进一步提供：
 
 - 可视化策略字段编辑器
 - preset 复制
 - preset 对比
 - policy 覆盖关系展示
+
+但在当前代码中，这仍然只是未来方向，不应被描述为已落地能力。
 
 ---
 

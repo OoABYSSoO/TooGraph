@@ -30,11 +30,12 @@ def import_skill_endpoint(skill_key: str) -> SkillDefinition:
     definition = get_external_skill_catalog_registry().get(skill_key)
     if definition is None:
         raise HTTPException(status_code=404, detail=f"External skill '{skill_key}' does not exist.")
-    import_skill_from_source(
-        skill_key=skill_key,
-        source_format=definition.source_format,
-        source_path=definition.source_path,
-    )
+    if not definition.can_import:
+        raise HTTPException(
+            status_code=400,
+            detail="This skill is discoverable only. Import is available only for runtime-supported skills.",
+        )
+    import_skill_from_source(skill_key=skill_key, source_path=definition.source_path)
     return get_skill_catalog_registry(include_disabled=True)[skill_key]
 
 

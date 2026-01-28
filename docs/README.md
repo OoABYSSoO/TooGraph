@@ -19,6 +19,7 @@
 - `editor_rebuild_requirements.md`
 - `editor_interaction_spec.md`
 - `development_plan.md`
+- `legacy_cleanup_execution_plan.md`
 - `acceptance_runbook.md`
 - `node_system_design.md`
 - `skill_management_and_agent_direction.md`
@@ -60,19 +61,21 @@
 如果现在继续开发 editor，建议按这个顺序阅读：
 
 1. `docs/FUTURE_WORK.md`
-2. `docs/active/editor_rebuild_requirements.md`
-3. `docs/active/editor_interaction_spec.md`
-4. `docs/active/development_plan.md`
-5. `docs/active/acceptance_runbook.md`
-6. `docs/active/node_system_design.md`
-7. `docs/active/skill_management_and_agent_direction.md`
-8. `docs/architecture/framework_positioning.md`
+2. `docs/active/legacy_cleanup_execution_plan.md`
+3. `docs/active/editor_rebuild_requirements.md`
+4. `docs/active/editor_interaction_spec.md`
+5. `docs/active/development_plan.md`
+6. `docs/active/acceptance_runbook.md`
+7. `docs/active/node_system_design.md`
+8. `docs/active/skill_management_and_agent_direction.md`
+9. `docs/architecture/framework_positioning.md`
 
 ## 3. Current Source of Truth
 
 当前应以这几类信息共同作为依据：
 
 - 代码实现本身
+- [legacy_cleanup_execution_plan.md](/home/abyss/GraphiteUI/docs/active/legacy_cleanup_execution_plan.md)
 - [development_plan.md](/home/abyss/GraphiteUI/docs/active/development_plan.md)
 - [acceptance_runbook.md](/home/abyss/GraphiteUI/docs/active/acceptance_runbook.md)
 - [node_system_design.md](/home/abyss/GraphiteUI/docs/active/node_system_design.md)

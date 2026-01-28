@@ -13,14 +13,22 @@ from app.tools.local_llm import _chat_with_local_model
 SkillFunc = Callable[..., dict[str, Any]]
 
 
-def get_skill_registry(*, include_disabled: bool = False) -> dict[str, SkillFunc]:
-    registry: dict[str, SkillFunc] = {
+def _build_runtime_skill_registry() -> dict[str, SkillFunc]:
+    return {
         "search_knowledge_base": search_knowledge_base_skill,
         "summarize_text": summarize_text_skill,
         "extract_json_fields": extract_json_fields_skill,
         "translate_text": translate_text_skill,
         "rewrite_text": rewrite_text_skill,
     }
+
+
+def list_runtime_skill_keys() -> set[str]:
+    return set(_build_runtime_skill_registry().keys())
+
+
+def get_skill_registry(*, include_disabled: bool = False) -> dict[str, SkillFunc]:
+    registry = _build_runtime_skill_registry()
     if include_disabled:
         allowed_keys = list_managed_skill_keys()
         return {key: value for key, value in registry.items() if key in allowed_keys}

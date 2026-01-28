@@ -43,9 +43,9 @@ const messages = {
     "knowledge.eyebrow": "知识库",
     "knowledge.title": "运行时可读取的知识源。",
     "knowledge.desc": "这个页面展示后端知识存储中的真实文档条目。",
-    "memories.eyebrow": "记忆",
-    "memories.title": "运行时可回看的历史模式。",
-    "memories.desc": "这个页面展示当前存储中的真实记忆条目。",
+    "memories.eyebrow": "未来能力",
+    "memories.title": "Memory 仍处于预留阶段。",
+    "memories.desc": "当前页面只保留只读占位与示例数据，不代表完整 memory 产品能力已经上线。",
     "settings.eyebrow": "设置",
     "settings.title": "运行与模型默认配置。",
     "settings.desc": "这里可以配置全局默认模型、thinking 和温度，新建 agent 节点会从这里起步。",
@@ -100,7 +100,10 @@ const messages = {
     "common.failed_runs": "失败运行",
     "common.search_docs": "搜索文档",
     "common.open_detail": "查看详情",
-    "common.filter_memory": "按 memory_type 过滤"
+    "common.filter_memory": "按 memory_type 过滤",
+    "memories.experimental": "实验占位页",
+    "memories.future_note": "Memory 写入、召回、生命周期与运行时集成仍属于未来功能。当前只保留只读示例，避免把占位页误解为完整能力。 ",
+    "memories.empty": "当前没有可展示的示例 memory 记录。"
   },
   en: {
     "nav.home": "Home",
@@ -132,9 +135,9 @@ const messages = {
     "knowledge.eyebrow": "Knowledge",
     "knowledge.title": "Knowledge sources available to runtime.",
     "knowledge.desc": "This page shows real documents from backend knowledge storage.",
-    "memories.eyebrow": "Memories",
-    "memories.title": "Historical patterns the runtime can revisit.",
-    "memories.desc": "This page shows real memory entries currently stored.",
+    "memories.eyebrow": "Future Work",
+    "memories.title": "Memory is still a reserved capability.",
+    "memories.desc": "This page remains a read-only placeholder with sample entries. It does not mean a full memory product capability is already shipped.",
     "settings.eyebrow": "Settings",
     "settings.title": "Runtime and model defaults.",
     "settings.desc": "Configure global default model, thinking, and temperature. New agent nodes start from these values.",
@@ -189,7 +192,10 @@ const messages = {
     "common.failed_runs": "Failed Runs",
     "common.search_docs": "Search documents",
     "common.open_detail": "Open detail",
-    "common.filter_memory": "Filter by memory_type"
+    "common.filter_memory": "Filter by memory_type",
+    "memories.experimental": "Experimental placeholder",
+    "memories.future_note": "Memory write paths, retrieval, lifecycle, and runtime integration are future work. The current page is intentionally read-only.",
+    "memories.empty": "There are no sample memory records to show right now."
   }
 } as const;
 

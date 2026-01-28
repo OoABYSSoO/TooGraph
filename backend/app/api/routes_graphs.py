@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-import threading
+import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import ValidationError
 
 from app.core.compiler.validator import validate_graph
 from app.core.runtime.node_system_executor import execute_node_system_graph
-from app.core.runtime.state import create_initial_run_state
+from app.core.runtime.state import create_initial_run_state, utc_now_iso
 from app.core.schemas.node_system import (
     GraphSaveResponse,
     GraphValidationResponse,
@@ -18,6 +18,7 @@ from app.core.schemas.node_system import (
 from app.core.storage.graph_store import list_graphs, load_graph, save_graph
 from app.core.storage.run_store import save_run
 
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/graphs", tags=["graphs"])
 
@@ -74,7 +75,7 @@ def validate_graph_endpoint(payload: dict[str, Any]) -> GraphValidationResponse:
 
 
 @router.post("/run")
-def run_graph_endpoint(payload: dict[str, Any]) -> dict[str, str]:
+def run_graph_endpoint(payload: dict[str, Any], background_tasks: BackgroundTasks) -> dict[str, str]:
     try:
         graph_payload = NodeSystemGraphPayload.model_validate(payload)
     except ValidationError as exc:
@@ -96,17 +97,16 @@ def run_graph_endpoint(payload: dict[str, Any]) -> dict[str, str]:
     run_state["node_status_map"] = {node.id: "idle" for node in executed_graph.nodes}
     save_run(run_state)
 
-    worker = threading.Thread(
-        target=_run_graph_worker,
-        args=(executed_graph, run_state),
-        daemon=True,
-    )
-    worker.start()
+    background_tasks.add_task(_run_graph_worker, executed_graph, run_state)
     return {"run_id": run_state["run_id"], "status": run_state["status"]}
 
 
 def _run_graph_worker(graph: NodeSystemGraphDocument, run_state: dict[str, Any]) -> None:
     try:
         execute_node_system_graph(graph, run_state, persist_progress=True)
-    except Exception:
-        pass
+    except Exception as exc:  # pragma: no cover - defensive runtime path
+        logger.exception("Graph run %s failed: %s", run_state.get("run_id"), exc)
+        run_state["status"] = "failed"
+        run_state["completed_at"] = utc_now_iso()
+        run_state.setdefault("errors", []).append(str(exc))
+        save_run(run_state)

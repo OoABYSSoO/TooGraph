@@ -79,7 +79,6 @@ class AgentModelSource(str, Enum):
 
 
 class AgentThinkingMode(str, Enum):
-    INHERIT = "inherit"
     OFF = "off"
     ON = "on"
 
@@ -264,7 +263,6 @@ class NodeSystemGraphPayload(BaseModel):
     graph_id: str | None = None
     name: str = Field(..., min_length=1)
     template_id: str = ""
-    theme_config: dict[str, Any] = Field(default_factory=dict)
     state_schema: list[StateField] = Field(default_factory=list)
     nodes: list[NodeSystemGraphNode] = Field(default_factory=list)
     edges: list[NodeSystemGraphEdge] = Field(default_factory=list)

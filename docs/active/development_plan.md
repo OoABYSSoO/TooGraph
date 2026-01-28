@@ -25,7 +25,7 @@
 - agent 节点执行后 LLM JSON 响应被正确解析，按 output key 分字段提取
 - Save / Validate / Run 已接通
 - preset 持久化已接通（前端可另存为 preset，后端 `/api/presets` 可用）
-- skill definitions API（`/api/skills/definitions`）已接通
+- attachable skill API（`/api/skills/definitions`）已接通，当前只返回可直接运行的 skill
 
 当前代码与新目标之间的主要差距：
 

@@ -17,7 +17,6 @@ export function LayoutShell({ children }: { children: ReactNode }) {
     { href: "/skills", label: t("nav.skills") },
     { href: "/runs", label: t("nav.runs") },
     { href: "/knowledge", label: t("nav.knowledge") },
-    { href: "/memories", label: t("nav.memories") },
     { href: "/settings", label: t("nav.settings") },
   ];
 

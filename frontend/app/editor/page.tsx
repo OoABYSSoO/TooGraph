@@ -1,20 +1,7 @@
 import Link from "next/link";
 
 import { apiGet } from "@/lib/api";
-
-type GraphSummary = {
-  graph_id: string;
-  name: string;
-  template_id: string;
-  nodes: unknown[];
-  edges: unknown[];
-};
-
-type TemplateSummary = {
-  template_id: string;
-  label: string;
-  description: string;
-};
+import type { GraphSummary, TemplateSummary } from "@/lib/types";
 
 async function loadEditorLandingData() {
   try {

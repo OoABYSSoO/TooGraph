@@ -8,6 +8,7 @@ from app.core.schemas.node_system import (
     StateField,
     ValidationIssue,
 )
+from app.skills.registry import get_skill_registry
 
 
 def validate_graph(graph: NodeSystemGraphDocument) -> GraphValidationResponse:
@@ -16,6 +17,7 @@ def validate_graph(graph: NodeSystemGraphDocument) -> GraphValidationResponse:
 
 def _validate_node_system_graph(graph: NodeSystemGraphDocument) -> GraphValidationResponse:
     issues: list[ValidationIssue] = []
+    runtime_skill_keys = set(get_skill_registry().keys())
 
     node_ids = [node.id for node in graph.nodes]
     edge_ids = [edge.id for edge in graph.edges]
@@ -39,6 +41,18 @@ def _validate_node_system_graph(graph: NodeSystemGraphDocument) -> GraphValidati
                                 "but the key does not exist in outputs."
                             ),
                             path=f"nodes.{node.id}.data.config.outputBinding",
+                        )
+                    )
+            for index, skill in enumerate(config.skills):
+                if skill.skill_key not in runtime_skill_keys:
+                    issues.append(
+                        ValidationIssue(
+                            code="agent_skill_not_runtime_registered",
+                            message=(
+                                f"Agent node '{node.id}' attaches skill '{skill.skill_key}', "
+                                "but the skill is not runtime-registered."
+                            ),
+                            path=f"nodes.{node.id}.data.config.skills.{index}",
                         )
                     )
         elif config.family == "condition":

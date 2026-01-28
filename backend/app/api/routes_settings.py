@@ -12,8 +12,6 @@ from app.core.model_catalog import (
     resolve_runtime_model_name,
 )
 from app.core.storage.settings_store import save_app_settings
-from app.skills.definitions import get_skill_definition_registry
-from app.templates.registry import list_templates
 from app.tools.local_llm import (
     get_default_agent_temperature,
     get_default_agent_thinking_enabled,
@@ -71,15 +69,6 @@ def _build_settings_payload() -> dict:
             "routes": ["pass", "revise", "fail"],
         },
         "tools": sorted(get_tool_registry().keys()),
-        "skill_definitions": sorted(get_skill_definition_registry(include_disabled=False).keys()),
-        "templates": [
-            {
-                "template_id": template["template_id"],
-                "label": template["label"],
-                "default_theme_preset": template["default_theme_preset"],
-            }
-            for template in list_templates()
-        ],
     }
 
 

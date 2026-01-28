@@ -11,15 +11,33 @@ DATA_DIR = BASE_DIR / "data"
 GRAPH_DATA_DIR = DATA_DIR / "graphs"
 RUN_DATA_DIR = DATA_DIR / "runs"
 DB_PATH = DATA_DIR / "graphiteui.db"
+_JSON_STORAGE_MIGRATED = False
 
 
 def get_connection() -> sqlite3.Connection:
+    initialize_storage()
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(DB_PATH)
     connection.row_factory = sqlite3.Row
     ensure_schema(connection)
-    migrate_json_storage(connection)
     return connection
+
+
+def initialize_storage() -> None:
+    global _JSON_STORAGE_MIGRATED
+
+    if _JSON_STORAGE_MIGRATED:
+        return
+
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    connection = sqlite3.connect(DB_PATH)
+    connection.row_factory = sqlite3.Row
+    try:
+        ensure_schema(connection)
+        migrate_json_storage(connection)
+    finally:
+        connection.close()
+    _JSON_STORAGE_MIGRATED = True
 
 
 def ensure_schema(connection: sqlite3.Connection) -> None:

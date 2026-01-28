@@ -131,7 +131,7 @@ skill 管理页应该优先回答这四个问题：
 我的结论是：
 
 - 应该把 Claude Code 风格设成默认目标格式
-- 但当前后端还没有真正完成“统一规范化导入”
+- 当前后端已经把“可导入 skill”收口到运行时支持集合，并在导入时规范化到 GraphiteUI 的 Claude Code 管理目录
 
 ### 4.1 现在已经有的基础
 
@@ -146,9 +146,15 @@ GraphiteUI 已经支持把 `SKILL.md` 解析成统一 catalog 结构，并且能
 
 - [backend/app/skills/definitions.py](/home/abyss/GraphiteUI/backend/app/skills/definitions.py:101)
 
-### 4.2 现在还没做到的地方
+### 4.2 当前已经明确的约束
 
-当前导入逻辑是“按源格式原样复制到对应目录”，不是“统一转成 Claude Code 格式”。
+当前系统并不尝试让所有外部 skill 都可导入。
+
+当前约束是：
+
+- 只有具备 GraphiteUI runtime adapter 的 skill 才允许导入
+- 导入成功的 skill 会被规范化纳入 GraphiteUI 管理目录
+- 对没有运行时适配的外部 skill，只保留“发现”能力，不进入“导入即可运行”的主链
 
 代码依据：
 
@@ -158,7 +164,8 @@ GraphiteUI 已经支持把 `SKILL.md` 解析成统一 catalog 结构，并且能
 所以现阶段更准确的说法是：
 
 - 页面可以优先按 Claude 风格去展示和理解 skill
-- 但底层仓库还没有统一规范化成 Claude Code-only
+- 运行主链已经采用 Claude Code-first 的 managed store
+- 外部 skill 的“被发现”与“可导入”已被明确区分
 
 ### 4.3 推荐目标
 
@@ -171,9 +178,9 @@ GraphiteUI 已经支持把 `SKILL.md` 解析成统一 catalog 结构，并且能
 
 - 把外部 skill 解析成统一中间结构
 - 再写回 GraphiteUI 的标准 `SKILL.md`
-- 默认落到 `.graphite/skills/claude_code/<skill_key>/SKILL.md`
+- 默认落到 `skill/claude_code/<skill_key>/SKILL.md`
 
-这样页面、运行时、后续导出器都会更简单。
+这样页面、运行时、校验器和后续导出器都会更简单。
 
 ## 5. `claude-code-source` 能做到什么
 

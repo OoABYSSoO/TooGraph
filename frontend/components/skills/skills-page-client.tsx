@@ -438,7 +438,13 @@ export function SkillsPageClient() {
                 <div className="mt-4 grid gap-4">
                   <div className="rounded-[18px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,250,241,0.75)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">
                     <div>来源路径: {selectedSkill.sourcePath}</div>
-                    <div>管理方式: {selectedSkill.canManage ? "已导入，可在 GraphiteUI 内管理" : "外部只读，需先导入"}</div>
+                    <div>
+                      管理方式: {selectedSkill.canManage
+                        ? "已导入，可在 GraphiteUI 内管理"
+                        : selectedSkill.canImport
+                          ? "外部发现，可导入后直接接入运行时"
+                          : "外部只读，当前缺少 GraphiteUI 运行时适配，暂不可导入"}
+                    </div>
                   </div>
 
                   <div className="grid gap-4">

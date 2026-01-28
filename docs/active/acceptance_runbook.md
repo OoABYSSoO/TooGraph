@@ -38,8 +38,6 @@ curl --noproxy '*' -fsS http://127.0.0.1:8765/health
 - `/editor/new`
 - `/editor/{graphId}`
 
-验收入口为 `/editor/new` 和 `/editor/{graphId}`，`creative_factory` 模板已下线。
-
 ## 4. Core Acceptance Cases
 
 当前验收重点：

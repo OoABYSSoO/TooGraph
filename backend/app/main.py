@@ -9,6 +9,7 @@ from app.api.routes_runs import router as runs_router
 from app.api.routes_settings import router as settings_router
 from app.api.routes_skills import router as skills_router
 from app.api.routes_templates import router as templates_router
+from app.core.storage.database import initialize_storage
 
 app = FastAPI(
     title="GraphiteUI Backend",
@@ -32,6 +33,11 @@ app.include_router(runs_router)
 app.include_router(settings_router)
 app.include_router(skills_router)
 app.include_router(templates_router)
+
+
+@app.on_event("startup")
+def startup() -> None:
+    initialize_storage()
 
 
 @app.get("/health")

@@ -9,20 +9,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { MetricCard } from "@/components/ui/metric-card";
 import { apiGet } from "@/lib/api";
 import { useLanguage } from "@/components/providers/language-provider";
-
-type GraphSummary = {
-  graph_id: string;
-  name: string;
-  nodes: Array<unknown>;
-  edges: Array<unknown>;
-};
-
-type RunSummary = {
-  run_id: string;
-  graph_name: string;
-  status: string;
-  revision_round: number;
-};
+import type { GraphSummary, RunSummary } from "@/lib/types";
 
 export function WorkspaceDashboardClient() {
   const { t } = useLanguage();
