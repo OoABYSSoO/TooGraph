@@ -114,9 +114,9 @@ GraphiteUI 后续应明确分成三层。
 
 这一层负责提供可直接使用的工作流模板。
 
-当前第一批模板可以从这里开始：
+当前模板：
 
-- `creative_factory`
+- `hello_world`
 - `research_pipeline`
 - `content_pipeline`
 - `analysis_pipeline`
@@ -320,26 +320,9 @@ GraphiteUI 后续应明确分成三层。
 
 它应该沉淀成：
 
-- `creative_factory` 模板
+- `hello_world` 模板
 
-### `SLG` 不属于 Template 名称本身
-
-`SLG` 更适合属于：
-
-- 主题预设
-- 策略画像
-- 默认参数组合
-
-也就是说更合理的表达是：
-
-- 模板：`creative_factory`
-- 主题预设：`slg_launch`
-
-而不是：
-
-- 模板：`slg_creative_factory`
-
-这会让系统更容易横向扩展。
+**注**：`creative_factory` 和 `themeConfig` 已在 2026-04-12 的清理中被移除，主题预设系统也随之删除。未来模板扩展请参考 `backend/app/templates/hello_world/` 的结构。
 
 ---
 

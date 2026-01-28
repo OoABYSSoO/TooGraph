@@ -64,7 +64,7 @@ export type ConditionNode = {
   family: "condition";
   inputs: PortDefinition[];
   branches: BranchDefinition[];
-  conditionMode: "rule" | "model";
+  conditionMode: "rule"; // "model" | "cycle" — planned for future versions
   rule: ConditionRule;
   branchMapping: Record<string, string>;
 };
@@ -92,3 +92,22 @@ export type NodeFamily = NodePresetDefinition["family"];
 export function isValueTypeCompatible(source: ValueType, target: ValueType) {
   return source === "any" || target === "any" || source === target;
 }
+
+// ─── Shared State Schema ────────────────────────────────────────────────────────
+
+export type StateFieldType =
+  | "string"
+  | "number"
+  | "boolean"
+  | "object"
+  | "array"
+  | "markdown"
+  | "json"
+  | "file_list";
+
+export type StateField = {
+  key: string;
+  type: StateFieldType;
+  title: string;
+  description: string;
+};

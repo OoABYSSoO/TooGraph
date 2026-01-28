@@ -4,7 +4,7 @@
 
 本文件定义当前 editor 的本地验收方式。
 
-本轮验收重点不再是旧版 `creative_factory` 体验，而是：
+本轮验收重点是验证新 node_system 架构：
 
 - 当前 preset-driven editor 是否已为 state-aware editor 打下可运行基础
 - 前端边界模型与后端 LangGraph 编译模型是否一致
@@ -38,7 +38,7 @@ curl --noproxy '*' -fsS http://127.0.0.1:8765/health
 - `/editor/new`
 - `/editor/{graphId}`
 
-第一阶段不再把旧 `creative_factory` editor 作为主验收入口。
+验收入口为 `/editor/new` 和 `/editor/{graphId}`，`creative_factory` 模板已下线。
 
 ## 4. Core Acceptance Cases
 

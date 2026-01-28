@@ -56,13 +56,7 @@ import {
   type PortDefinition,
   type ValueType,
 } from "@/lib/node-system-schema";
-
-type StateField = {
-  key: string;
-  type: string;
-  title: string;
-  description: string;
-};
+import type { StateField } from "@/lib/node-system-schema";
 
 type GraphPayload = {
   graph_family?: "node_system";
@@ -1237,7 +1231,8 @@ const RULE_OPERATOR_SELECT_OPTIONS: FieldSelectOption[] = RULE_OPERATOR_OPTIONS.
 
 const CONDITION_MODE_SELECT_OPTIONS: FieldSelectOption[] = [
   { value: "rule", label: "Rule", detail: "Evaluate an explicit source/operator/value rule." },
-  { value: "model", label: "Model", detail: "Let the model decide the branch from context." },
+  // TODO: Enable "model" and "cycle" modes once backend supports them.
+  // { value: "model", label: "Model", detail: "Let the model decide the branch from context." },
 ];
 
 function normalizeViewportSize(size: unknown): NodeViewportSize | null {

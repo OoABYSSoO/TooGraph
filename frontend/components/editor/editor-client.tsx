@@ -1,6 +1,7 @@
 "use client";
 
 import { NodeSystemEditor } from "@/components/editor/node-system-editor";
+import type { StateField } from "@/lib/node-system-schema";
 
 export type EditorClientGraphPayload = {
   graph_family?: "node_system";

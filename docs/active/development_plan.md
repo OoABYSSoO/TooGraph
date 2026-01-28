@@ -12,7 +12,7 @@
 
 - 前后端开发环境可启动（`./scripts/start.sh`，前端 3477 / 后端 8765）
 - graph 保存、校验、运行接口可用
-- `hello_world` 与 `creative_factory` 两个模板存在，均由后端 `default_node_system_graph` 提供
+- `hello_world` 模板存在，由后端 `default_node_system_graph` 提供
 - `/editor`、`/editor/new`、`/editor/[graphId]` 路由已接回
 - 画布、缩放、平移、Mini Map、基础建点、基础连线已存在
 - 左侧已有 `Node Palette`
@@ -51,7 +51,7 @@
 - LLM JSON 响应解析层已修复，输出节点展示提取后的字段值
 - 节点可手动 resize 并持久化，各类型有合理的 minHeight 约束
 - 模板新建时节点自动按实际宽度排列，视觉间距一致
-- `hello_world` 与 `creative_factory` 两个模板都可由后端模板 API 提供
+- `hello_world` 模板可由后端模板 API 提供
 
 ## 2.2 Current Focus
 
