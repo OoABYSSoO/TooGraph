@@ -77,6 +77,8 @@ backend/data/*.sqlite3
 backend/data/graphs/*.json
 backend/data/memories/runtime/
 backend/data/runs/
+backend/data/kb/_downloads/
+backend/data/kb/*/
 
 # Demo files to exclude
 demo/

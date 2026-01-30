@@ -60,7 +60,8 @@ def resolve_display_mode(display_mode: str, value: Any) -> str:
 def save_output_value(
     *,
     run_id: str,
-    state_key: str,
+    node_id: str,
+    source_key: str,
     value: Any,
     persist_format: str,
     file_name_template: str,
@@ -69,12 +70,13 @@ def save_output_value(
     output_root = Path(__file__).resolve().parents[4] / "backend" / "data" / "outputs" / run_id
     output_root.mkdir(parents=True, exist_ok=True)
 
-    safe_file_name = "".join(char if char.isalnum() or char in {"-", "_"} else "_" for char in file_name_template).strip("_") or state_key
+    safe_file_name = "".join(char if char.isalnum() or char in {"-", "_"} else "_" for char in file_name_template).strip("_") or source_key
     file_path = output_root / f"{safe_file_name}.{extension}"
     file_path.write_text(serialize_output_value(value, extension), encoding="utf-8")
 
     return {
-        "state_key": state_key,
+        "node_id": node_id,
+        "source_key": source_key,
         "path": str(file_path.relative_to(output_root.parents[2])),
         "format": extension,
         "file_name": file_path.name,

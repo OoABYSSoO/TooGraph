@@ -22,14 +22,21 @@ class StateFieldType(str, Enum):
     FILE_LIST = "file_list"
 
 
+class StateFieldUi(BaseModel):
+    color: str = ""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
 class StateField(BaseModel):
     key: str = Field(..., min_length=1)
     type: StateFieldType = StateFieldType.STRING
     title: str = ""
     description: str = ""
-    example: Any = None
-    source_nodes: list[str] = Field(default_factory=list)
-    target_nodes: list[str] = Field(default_factory=list)
+    default_value: Any = Field(default=None, alias="defaultValue")
+    ui: StateFieldUi = Field(default_factory=StateFieldUi)
+
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
     @field_validator("key")
     @classmethod
@@ -73,6 +80,10 @@ class SkillUsage(str, Enum):
     OPTIONAL = "optional"
 
 
+class StateWriteMode(str, Enum):
+    REPLACE = "replace"
+
+
 class AgentModelSource(str, Enum):
     GLOBAL = "global"
     OVERRIDE = "override"
@@ -95,8 +106,8 @@ class ConditionOperator(str, Enum):
 
 class ConditionMode(str, Enum):
     RULE = "rule"
+    CYCLE = "cycle"
     # MODEL = "model"  # planned: LLM-driven branch routing
-    # CYCLE = "cycle"  # planned: LangGraph cycle support
 
 
 class DisplayMode(str, Enum):
@@ -132,6 +143,22 @@ class SkillAttachment(BaseModel):
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
 
+class NodeStateReadBinding(BaseModel):
+    state_key: str = Field(..., alias="stateKey", min_length=1)
+    input_key: str = Field(..., alias="inputKey", min_length=1)
+    required: bool = False
+
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
+
+
+class NodeStateWriteBinding(BaseModel):
+    state_key: str = Field(..., alias="stateKey", min_length=1)
+    output_key: str = Field(..., alias="outputKey", min_length=1)
+    mode: StateWriteMode = StateWriteMode.REPLACE
+
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
+
+
 class InputBoundaryNodeConfig(BaseModel):
     preset_id: str = Field(..., alias="presetId", min_length=1)
     label: str = Field(..., min_length=1)
@@ -141,6 +168,8 @@ class InputBoundaryNodeConfig(BaseModel):
     output: PortDefinition
     default_value: str = Field(default="", alias="defaultValue")
     placeholder: str = ""
+    state_reads: list[NodeStateReadBinding] = Field(default_factory=list, alias="stateReads")
+    state_writes: list[NodeStateWriteBinding] = Field(default_factory=list, alias="stateWrites")
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
@@ -160,6 +189,8 @@ class AgentNodeConfig(BaseModel):
     model: str = ""
     thinking_mode: AgentThinkingMode = Field(default=AgentThinkingMode.ON, alias="thinkingMode")
     temperature: float = Field(default=0.2, ge=0, le=2)
+    state_reads: list[NodeStateReadBinding] = Field(default_factory=list, alias="stateReads")
+    state_writes: list[NodeStateWriteBinding] = Field(default_factory=list, alias="stateWrites")
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
@@ -189,6 +220,8 @@ class ConditionNodeConfig(BaseModel):
     condition_mode: ConditionMode = Field(default=ConditionMode.RULE, alias="conditionMode")
     rule: ConditionRule
     branch_mapping: dict[str, str] = Field(default_factory=dict, alias="branchMapping")
+    state_reads: list[NodeStateReadBinding] = Field(default_factory=list, alias="stateReads")
+    state_writes: list[NodeStateWriteBinding] = Field(default_factory=list, alias="stateWrites")
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
@@ -203,6 +236,8 @@ class OutputBoundaryNodeConfig(BaseModel):
     persist_enabled: bool = Field(default=False, alias="persistEnabled")
     persist_format: PersistFormat = Field(default=PersistFormat.AUTO, alias="persistFormat")
     file_name_template: str = Field(default="", alias="fileNameTemplate")
+    state_reads: list[NodeStateReadBinding] = Field(default_factory=list, alias="stateReads")
+    state_writes: list[NodeStateWriteBinding] = Field(default_factory=list, alias="stateWrites")
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 

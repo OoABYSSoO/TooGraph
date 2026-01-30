@@ -51,33 +51,25 @@ import {
   type ConditionRule,
   type InputBoundaryNode,
   type NodeFamily,
+  type NodeSystemGraphEdge,
+  type NodeSystemGraphNode,
+  type NodeSystemGraphPayload,
+  type NodeSystemRunDetail,
+  type NodeSystemTemplateRecord,
   type NodePresetDefinition,
+  type NodeViewportSize,
   type OutputBoundaryNode,
   type PortDefinition,
+  type RunNodeStatus,
+  type RunStatus,
+  type SkillAttachment,
+  type StateField,
+  type StateFieldType,
   type ValueType,
 } from "@/lib/node-system-schema";
-import type { StateField } from "@/lib/node-system-schema";
 
-type GraphPayload = {
-  graph_family?: "node_system";
-  graph_id?: string | null;
-  name: string;
-  template_id: string;
-  state_schema: StateField[];
-  nodes: unknown[];
-  edges: unknown[];
-  metadata: Record<string, unknown>;
-};
-
-type TemplateRecord = {
-  template_id: string;
-  label: string;
-  description: string;
-  default_graph_name: string;
-  supported_node_types: string[];
-  state_schema: StateField[];
-  default_node_system_graph: Omit<GraphPayload, "graph_id">;
-};
+type GraphPayload = NodeSystemGraphPayload;
+type TemplateRecord = NodeSystemTemplateRecord;
 
 type EditorClientProps = {
   mode: "new" | "existing";
@@ -111,7 +103,9 @@ type FlowNodeData = {
   defaultAgentTemperature?: number;
   availableModelRefs?: string[];
   modelDisplayLookup?: Record<string, string>;
-  knowledgeBases?: Array<{ name: string }>;
+  knowledgeBases?: KnowledgeBaseOption[];
+  stateFieldLookup?: Record<string, string>;
+  onOpenStatePanel?: () => void;
 };
 
 type FlowNode = Node<FlowNodeData>;
@@ -132,6 +126,15 @@ type SkillDefinition = {
   outputSchema: SkillDefinitionField[];
   supportedValueTypes: string[];
   sideEffects: string[];
+};
+
+type KnowledgeBaseOption = {
+  name: string;
+  label?: string;
+  version?: string;
+  description?: string;
+  documentCount?: number;
+  chunkCount?: number;
 };
 
 type EditorSettingsPayload = {
@@ -171,35 +174,7 @@ type EditorSettingsPayload = {
   };
 };
 
-type RunOutputPreview = {
-  node_id?: string;
-  state_key?: string;
-  label?: string;
-  display_mode?: string;
-  value?: unknown;
-};
-
-type RunStatus = "queued" | "running" | "completed" | "failed";
-type RunNodeStatus = "idle" | "running" | "success" | "failed";
-
-type RunNodeExecution = {
-  node_id: string;
-  status: string;
-  errors?: string[];
-};
-
-type RunDetail = {
-  run_id: string;
-  status: RunStatus;
-  current_node_id?: string | null;
-  final_result?: string | null;
-  errors?: string[];
-  node_status_map?: Record<string, RunNodeStatus>;
-  artifacts: {
-    exported_outputs?: RunOutputPreview[];
-  };
-  node_executions: RunNodeExecution[];
-};
+type RunDetail = NodeSystemRunDetail;
 
 type PresetDocument = {
   presetId: string;
@@ -219,9 +194,22 @@ type CreationMenuEntry = {
   nodeKind?: "input" | "output";
 };
 
-type NodeViewportSize = {
-  width?: number;
-  height?: number;
+type StateBindingSummary = {
+  id: string;
+  nodeId: string;
+  nodeLabel: string;
+  nodeFamily: NodeFamily;
+  portKey: string;
+  portLabel: string;
+  valid: boolean;
+};
+
+type StateBindingNodeOption = {
+  id: string;
+  label: string;
+  family: NodeFamily;
+  inputs: PortDefinition[];
+  outputs: PortDefinition[];
 };
 
 const CREATION_MENU_FAMILY_PRIORITY: Record<NodeFamily, number> = {
@@ -235,6 +223,8 @@ const HELLO_WORLD_TEMPLATE_ID = "hello_world";
 const DEFAULT_EDITOR_TEXT_MODEL_REF = "local/lm-local";
 const DEFAULT_AGENT_THINKING_ENABLED = true;
 const DEFAULT_AGENT_TEMPERATURE = 0.2;
+const KNOWLEDGE_BASE_SKILL_KEY = "search_knowledge_base";
+const KNOWLEDGE_BASE_SKILL_LIMIT = "4";
 const TYPE_COLORS: Record<ValueType, string> = {
   text: "#d97706",
   json: "#2563eb",
@@ -247,6 +237,7 @@ const TYPE_COLORS: Record<ValueType, string> = {
 };
 
 const VALUE_TYPE_OPTIONS: ValueType[] = ["text", "json", "image", "audio", "video", "file", "knowledge_base", "any"];
+const STATE_FIELD_TYPE_OPTIONS: StateFieldType[] = ["string", "number", "boolean", "object", "array", "markdown", "json", "file_list"];
 const RULE_OPERATOR_OPTIONS: ConditionRule["operator"][] = ["==", "!=", ">=", "<=", ">", "<", "exists"];
 
 const INPUT_TYPE_BUTTONS: Array<{ value: ValueType; label: string; icon: ReactNode }> = [
@@ -301,19 +292,96 @@ function normalizeAgentTemperature(value: number | undefined) {
   return Math.min(2, Math.max(0, numeric));
 }
 
+function defaultStateValueForType(type: StateFieldType): unknown {
+  switch (type) {
+    case "number":
+      return 0;
+    case "boolean":
+      return false;
+    case "object":
+    case "json":
+      return {};
+    case "array":
+    case "file_list":
+      return [];
+    case "markdown":
+    case "string":
+    default:
+      return "";
+  }
+}
+
+function createDefaultStateField(existingKeys: string[]): StateField {
+  const existing = new Set(existingKeys);
+  let index = existing.size + 1;
+  let key = `state_${index}`;
+  while (existing.has(key)) {
+    index += 1;
+    key = `state_${index}`;
+  }
+
+  return {
+    key,
+    type: "string",
+    title: `State ${index}`,
+    description: "",
+    defaultValue: "",
+    ui: {
+      color: "",
+    },
+  };
+}
+
+function isStructuredStateType(type: StateFieldType) {
+  return type === "object" || type === "array" || type === "json" || type === "file_list";
+}
+
+function stringifyStateValue(value: unknown, type: StateFieldType) {
+  if (!isStructuredStateType(type)) {
+    return String(value ?? "");
+  }
+
+  const fallback = type === "array" || type === "file_list" ? [] : {};
+  return JSON.stringify(value ?? fallback, null, 2);
+}
+
 function normalizeNodeConfig<T extends NodePresetDefinition>(config: T): T {
+  const normalizedStateReads = config.stateReads ?? [];
+  const normalizedStateWrites = (config.stateWrites ?? []).map((binding) => ({
+    ...binding,
+    mode: binding.mode ?? "replace",
+  }));
+
   if (config.family !== "agent") {
-    return config;
+    return {
+      ...config,
+      stateReads: normalizedStateReads,
+      stateWrites: normalizedStateWrites,
+    } as T;
   }
 
   const normalizedConfig = {
     ...config,
+    stateReads: normalizedStateReads,
+    stateWrites: normalizedStateWrites,
     modelSource: config.modelSource ?? "global",
     model: config.model ?? "",
     thinkingMode: config.thinkingMode === "off" ? "off" : "on",
     temperature: normalizeAgentTemperature(config.temperature),
   } satisfies AgentNode;
   return normalizedConfig as T;
+}
+
+function withNodeStateBindings(
+  config: NodePresetDefinition,
+  stateReads: NodePresetDefinition["stateReads"],
+  stateWrites: NodePresetDefinition["stateWrites"],
+) {
+  return normalizeNodeConfig({
+    ...config,
+    stateReads,
+    stateWrites,
+  } as NodePresetDefinition);
 }
 
 function resolveAgentRuntimeConfig(
@@ -1231,7 +1299,7 @@ const RULE_OPERATOR_SELECT_OPTIONS: FieldSelectOption[] = RULE_OPERATOR_OPTIONS.
 
 const CONDITION_MODE_SELECT_OPTIONS: FieldSelectOption[] = [
   { value: "rule", label: "Rule", detail: "Evaluate an explicit source/operator/value rule." },
-  // TODO: Enable "model" and "cycle" modes once backend supports them.
+  { value: "cycle", label: "Cycle", detail: "Use the rule as a loop gate inside a cyclic graph." },
   // { value: "model", label: "Model", detail: "Let the model decide the branch from context." },
 ];
 
@@ -1394,14 +1462,12 @@ function createEditorDefaults(templates: TemplateRecord[], defaultTemplateId?: s
   };
 }
 
-function createFlowNodeFromGraphNode(node: any): FlowNode {
+function createFlowNodeFromGraphNode(node: NodeSystemGraphNode): FlowNode {
   const config = normalizeNodeConfig(deepClonePreset(node.data?.config as NodePresetDefinition));
   const isExpanded = config.family === "input" ? true : Boolean(node.data?.isExpanded);
   const collapsedSize = normalizeViewportSize(node.data?.collapsedSize);
   const expandedSize = normalizeViewportSize(node.data?.expandedSize);
   const activeSize = isExpanded ? expandedSize : collapsedSize;
-  const fallbackWidth = typeof node.style?.width === "number" ? node.style.width : undefined;
-  const fallbackHeight = typeof node.style?.height === "number" ? node.style.height : undefined;
   const defaultWidth = getDefaultNodeWidth(config);
   return {
     id: node.id,
@@ -1417,11 +1483,11 @@ function createFlowNodeFromGraphNode(node: any): FlowNode {
     },
     sourcePosition: Position.Right,
     targetPosition: Position.Left,
-    style: buildNodeStyleFromState(config, isExpanded, activeSize, fallbackWidth ?? defaultWidth, fallbackHeight),
+    style: buildNodeStyleFromState(config, isExpanded, activeSize, defaultWidth),
   } satisfies FlowNode;
 }
 
-function createFlowEdgeFromGraphEdge(edge: any, nodesById: Map<string, FlowNode>): Edge {
+function createFlowEdgeFromGraphEdge(edge: NodeSystemGraphEdge, nodesById: Map<string, FlowNode>): Edge {
   const sourceNode = nodesById.get(edge.source);
   const sourceType = sourceNode ? getPortType(sourceNode.data.config, edge.sourceHandle) : "any";
   const color = TYPE_COLORS[sourceType ?? "any"];
@@ -1494,6 +1560,13 @@ function listOutputPorts(config: NodePresetDefinition) {
   return [] as PortDefinition[];
 }
 
+function listStateWritablePorts(config: NodePresetDefinition) {
+  if (config.family === "output") {
+    return [config.input];
+  }
+  return listOutputPorts(config);
+}
+
 function findFirstCompatibleInputHandle(config: NodePresetDefinition, sourceType: ValueType) {
   const inputPort = listInputPorts(config).find((port) => isValueTypeCompatible(sourceType, port.valueType));
   return inputPort ? buildHandleId("input", inputPort.key) : null;
@@ -1519,6 +1592,104 @@ function createAutoInputPort(existingPorts: PortDefinition[], sourceType: ValueT
     valueType: sourceType,
     required: true,
   };
+}
+
+function isKnowledgeBaseSkill(skill: SkillAttachment) {
+  return skill.skillKey === KNOWLEDGE_BASE_SKILL_KEY;
+}
+
+function areSkillAttachmentsEqual(left: SkillAttachment[], right: SkillAttachment[]) {
+  if (left.length !== right.length) return false;
+  return left.every((skill, index) => JSON.stringify(skill) === JSON.stringify(right[index]));
+}
+
+function pickAgentKnowledgeQueryInputKey(config: AgentNode, knowledgeBaseInputKey: string) {
+  const candidateInputs = config.inputs.filter((port) => port.key !== knowledgeBaseInputKey && port.valueType !== "knowledge_base");
+  const preferredKeys = ["question", "query", "input"];
+  for (const key of preferredKeys) {
+    const matched = candidateInputs.find((port) => port.key === key);
+    if (matched) {
+      return matched.key;
+    }
+  }
+
+  const preferredTextInput =
+    candidateInputs.find((port) => port.required && (port.valueType === "text" || port.valueType === "any")) ??
+    candidateInputs.find((port) => port.valueType === "text" || port.valueType === "any");
+  if (preferredTextInput) {
+    return preferredTextInput.key;
+  }
+
+  return candidateInputs.find((port) => port.required)?.key ?? candidateInputs[0]?.key ?? null;
+}
+
+function createKnowledgeBaseSkillAttachment(knowledgeBaseInputKey: string, queryInputKey: string): SkillAttachment {
+  return {
+    name: KNOWLEDGE_BASE_SKILL_KEY,
+    skillKey: KNOWLEDGE_BASE_SKILL_KEY,
+    inputMapping: {
+      knowledge_base: `$inputs.${knowledgeBaseInputKey}`,
+      query: `$inputs.${queryInputKey}`,
+      limit: KNOWLEDGE_BASE_SKILL_LIMIT,
+    },
+    contextBinding: {},
+    usage: "optional",
+  };
+}
+
+function collectAgentKnowledgeBaseBindings(agentNode: FlowNode, nodesById: Map<string, FlowNode>, edges: Edge[]) {
+  const connectedInputKeys = new Set<string>();
+
+  for (const edge of edges) {
+    if (edge.target !== agentNode.id) continue;
+    const sourceNode = nodesById.get(edge.source);
+    if (!sourceNode) continue;
+    if (getPortType(sourceNode.data.config, edge.sourceHandle) !== "knowledge_base") continue;
+    const inputKey = getPortKeyFromHandle(edge.targetHandle);
+    if (!inputKey) continue;
+    connectedInputKeys.add(inputKey);
+  }
+
+  return Array.from(connectedInputKeys);
+}
+
+function syncKnowledgeBaseSkillOnAgent(agentNode: FlowNode, nodesById: Map<string, FlowNode>, edges: Edge[]) {
+  if (agentNode.data.config.family !== "agent") {
+    return agentNode.data.config;
+  }
+
+  const config = agentNode.data.config as AgentNode;
+  const knowledgeBaseInputKeys = collectAgentKnowledgeBaseBindings(agentNode, nodesById, edges);
+  const skillsWithoutKnowledgeBase = config.skills.filter((skill) => !isKnowledgeBaseSkill(skill));
+
+  if (knowledgeBaseInputKeys.length !== 1) {
+    return areSkillAttachmentsEqual(skillsWithoutKnowledgeBase, config.skills)
+      ? config
+      : normalizeNodeConfig({
+          ...config,
+          skills: skillsWithoutKnowledgeBase,
+        } satisfies AgentNode);
+  }
+
+  const knowledgeBaseInputKey = knowledgeBaseInputKeys[0];
+  const queryInputKey = pickAgentKnowledgeQueryInputKey(config, knowledgeBaseInputKey);
+  if (!queryInputKey) {
+    return areSkillAttachmentsEqual(skillsWithoutKnowledgeBase, config.skills)
+      ? config
+      : normalizeNodeConfig({
+          ...config,
+          skills: skillsWithoutKnowledgeBase,
+        } satisfies AgentNode);
+  }
+
+  const nextKnowledgeBaseSkill = createKnowledgeBaseSkillAttachment(knowledgeBaseInputKey, queryInputKey);
+  const nextSkills = [...skillsWithoutKnowledgeBase, nextKnowledgeBaseSkill];
+  return areSkillAttachmentsEqual(nextSkills, config.skills)
+    ? config
+    : normalizeNodeConfig({
+        ...config,
+        skills: nextSkills,
+      } satisfies AgentNode);
 }
 
 function createDefaultPort(side: "input" | "output", existingPorts: PortDefinition[]): PortDefinition {
@@ -3094,6 +3265,12 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
           className="flex min-h-0 flex-1 flex-col gap-3 px-4 pb-3 overflow-y-auto overscroll-contain"
           onWheelCapture={(event) => event.stopPropagation()}
         >
+          <NodeStateBindingSummary
+            config={config}
+            stateFieldLookup={data.stateFieldLookup}
+            onOpenStatePanel={data.onOpenStatePanel}
+          />
+
           {config.family === "input" ? (
             <>
               <div className="flex flex-1 flex-col gap-2">
@@ -3108,7 +3285,11 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                         }))
                       }
                       className="min-h-[48px] rounded-[16px] px-3 py-3 text-sm"
-                      options={(data.knowledgeBases ?? []).map((kb) => ({ value: kb.name, label: kb.name }))}
+                      options={(data.knowledgeBases ?? []).map((kb) => ({
+                        value: kb.name,
+                        label: kb.label || kb.name,
+                        detail: kb.version || (typeof kb.chunkCount === "number" ? `${kb.chunkCount} chunks` : undefined),
+                      }))}
                     />
                   ) : (
                     <div className="grid min-h-[60px] place-items-center rounded-[16px] border border-dashed border-[rgba(154,52,18,0.18)] bg-[rgba(255,255,255,0.82)] px-4 py-4 text-center text-sm text-[var(--muted)]">
@@ -3495,20 +3676,744 @@ const nodeTypes = {
   default: NodeCard,
 };
 
+function StateDefaultValueEditor({
+  field,
+  onChange,
+}: {
+  field: StateField;
+  onChange: (nextValue: unknown) => void;
+}) {
+  const [draft, setDraft] = useState(() => stringifyStateValue(field.defaultValue, field.type));
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setDraft(stringifyStateValue(field.defaultValue, field.type));
+    setError(null);
+  }, [field.defaultValue, field.type]);
+
+  if (field.type === "boolean") {
+    return <EditorSwitchRow label="Default Value" checked={Boolean(field.defaultValue)} onCheckedChange={onChange} />;
+  }
+
+  if (field.type === "number") {
+    return (
+      <label className="grid gap-1.5 text-sm text-[var(--muted)]">
+        <span>Default Value</span>
+        <Input
+          type="number"
+          value={typeof field.defaultValue === "number" ? String(field.defaultValue) : ""}
+          placeholder="0"
+          onChange={(event) => {
+            const nextValue = event.target.value.trim();
+            onChange(nextValue === "" ? null : Number(nextValue));
+          }}
+        />
+      </label>
+    );
+  }
+
+  if (isStructuredStateType(field.type)) {
+    const applyDraft = () => {
+      try {
+        const parsed = draft.trim() === "" ? defaultStateValueForType(field.type) : JSON.parse(draft);
+        if ((field.type === "array" || field.type === "file_list") && !Array.isArray(parsed)) {
+          setError("This state type requires a JSON array.");
+          return;
+        }
+        if (field.type === "object" && (parsed === null || Array.isArray(parsed) || typeof parsed !== "object")) {
+          setError("This state type requires a JSON object.");
+          return;
+        }
+        setError(null);
+        onChange(parsed);
+      } catch {
+        setError("Default value must be valid JSON.");
+      }
+    };
+
+    return (
+      <div className="grid gap-2">
+        <label className="grid gap-1.5 text-sm text-[var(--muted)]">
+          <span>Default Value</span>
+          <FieldTextarea
+            rows={5}
+            value={draft}
+            onChange={(event) => {
+              setDraft(event.target.value);
+              if (error) {
+                setError(null);
+              }
+            }}
+            placeholder={field.type === "array" || field.type === "file_list" ? "[]" : "{}"}
+          />
+        </label>
+        <div className="flex items-center justify-between gap-3">
+          <div className={cn("text-xs leading-5", error ? "text-[rgb(153,27,27)]" : "text-[var(--muted)]")}>
+            {error ?? "Apply JSON to sync the structured default value."}
+          </div>
+          <button
+            type="button"
+            className="inline-flex items-center rounded-full border border-[rgba(154,52,18,0.18)] bg-[rgba(255,255,255,0.9)] px-3 py-1.5 text-[0.7rem] font-medium uppercase tracking-[0.12em] text-[var(--accent-strong)] transition hover:bg-white"
+            onClick={applyDraft}
+          >
+            Apply JSON
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <label className="grid gap-1.5 text-sm text-[var(--muted)]">
+      <span>Default Value</span>
+      <FieldTextarea
+        rows={field.type === "markdown" ? 5 : 3}
+        value={typeof field.defaultValue === "string" ? field.defaultValue : String(field.defaultValue ?? "")}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={field.type === "markdown" ? "Write markdown..." : "Value"}
+      />
+    </label>
+  );
+}
+
+function StateBindingChip({
+  binding,
+  selected,
+  label,
+  onFocus,
+  onRemove,
+}: {
+  binding: StateBindingSummary;
+  selected: boolean;
+  label: string;
+  onFocus: () => void;
+  onRemove: () => void;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-2 rounded-[16px] border px-3 py-2 shadow-[0_10px_24px_rgba(60,41,20,0.06)]",
+        binding.valid
+          ? selected
+            ? "border-[rgba(154,52,18,0.28)] bg-[rgba(255,244,240,0.96)]"
+            : "border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.86)]"
+          : "border-[rgba(185,28,28,0.18)] bg-[rgba(255,248,248,0.96)]",
+      )}
+    >
+      <button type="button" className="min-w-0 flex-1 text-left" onClick={onFocus}>
+        <div className="flex items-center gap-2">
+          <span className="rounded-full border border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.92)] px-2 py-0.5 text-[0.62rem] uppercase tracking-[0.14em] text-[var(--accent-strong)]">
+            {binding.nodeFamily}
+          </span>
+          <span className="truncate text-sm font-medium text-[var(--text)]">{binding.nodeLabel}</span>
+        </div>
+        <div className={cn("mt-1 text-xs leading-5", binding.valid ? "text-[var(--muted)]" : "text-[rgb(153,27,27)]")}>
+          {label}: <span className="font-medium text-[var(--text)]">{binding.portLabel}</span>
+          {binding.valid ? null : " · missing port"}
+        </div>
+      </button>
+      <button
+        type="button"
+        className="grid h-8 w-8 flex-shrink-0 place-items-center rounded-full border border-[rgba(154,52,18,0.14)] bg-[rgba(255,252,247,0.92)] text-[var(--muted)] transition hover:border-[rgba(185,28,28,0.22)] hover:text-[rgb(153,27,27)]"
+        title="Remove binding"
+        aria-label="Remove binding"
+        onClick={onRemove}
+      >
+        <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 fill-none stroke-current" strokeWidth="1.8">
+          <path d="m5 5 6 6" />
+          <path d="m11 5-6 6" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
+function NodeStateBindingSummary({
+  config,
+  stateFieldLookup,
+  onOpenStatePanel,
+}: {
+  config: NodePresetDefinition;
+  stateFieldLookup?: Record<string, string>;
+  onOpenStatePanel?: () => void;
+}) {
+  const reads = config.stateReads ?? [];
+  const writes = config.stateWrites ?? [];
+
+  if (reads.length === 0 && writes.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="rounded-[18px] border border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.78)] px-3.5 py-3 shadow-[0_10px_24px_rgba(60,41,20,0.06)]">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-[0.7rem] uppercase tracking-[0.14em] text-[var(--accent-strong)]">State</div>
+          <div className="mt-1 text-xs leading-5 text-[var(--muted)]">This node is already bound to graph state.</div>
+        </div>
+        {onOpenStatePanel ? (
+          <button
+            type="button"
+            className="inline-flex items-center rounded-full border border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.92)] px-2.5 py-1 text-[0.62rem] font-medium uppercase tracking-[0.12em] text-[var(--accent-strong)] transition hover:bg-white"
+            onClick={onOpenStatePanel}
+          >
+            Open Panel
+          </button>
+        ) : null}
+      </div>
+
+      {reads.length > 0 ? (
+        <div className="mt-3">
+          <div className="mb-1 text-[0.64rem] uppercase tracking-[0.14em] text-[var(--muted)]">Reads</div>
+          <div className="flex flex-wrap gap-1.5">
+            {reads.map((binding) => (
+              <span
+                key={`read-${binding.stateKey}-${binding.inputKey}`}
+                className="inline-flex items-center gap-1 rounded-full border border-[rgba(37,99,235,0.16)] bg-[rgba(239,246,255,0.82)] px-2.5 py-1 text-[0.68rem] font-medium text-[#1d4ed8]"
+              >
+                <span>{stateFieldLookup?.[binding.stateKey] ?? binding.stateKey}</span>
+                <span className="opacity-70">→</span>
+                <span>{binding.inputKey}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {writes.length > 0 ? (
+        <div className={cn("mt-3", reads.length > 0 ? "pt-0" : null)}>
+          <div className="mb-1 text-[0.64rem] uppercase tracking-[0.14em] text-[var(--muted)]">Writes</div>
+          <div className="flex flex-wrap gap-1.5">
+            {writes.map((binding) => (
+              <span
+                key={`write-${binding.stateKey}-${binding.outputKey}`}
+                className="inline-flex items-center gap-1 rounded-full border border-[rgba(21,128,61,0.16)] bg-[rgba(240,253,244,0.88)] px-2.5 py-1 text-[0.68rem] font-medium text-[#15803d]"
+              >
+                <span>{binding.outputKey}</span>
+                <span className="opacity-70">→</span>
+                <span>{stateFieldLookup?.[binding.stateKey] ?? binding.stateKey}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function StateBindingCreateForm({
+  mode,
+  nodeOptions,
+  onAdd,
+  onCancel,
+}: {
+  mode: "read" | "write";
+  nodeOptions: StateBindingNodeOption[];
+  onAdd: (nodeId: string, portKey: string) => boolean;
+  onCancel: () => void;
+}) {
+  const eligibleNodes = useMemo(
+    () => nodeOptions.filter((node) => (mode === "read" ? node.inputs.length > 0 : node.outputs.length > 0)),
+    [mode, nodeOptions],
+  );
+  const [nodeId, setNodeId] = useState(eligibleNodes[0]?.id ?? "");
+  const selectedNode = eligibleNodes.find((node) => node.id === nodeId) ?? eligibleNodes[0] ?? null;
+  const availablePorts = selectedNode ? (mode === "read" ? selectedNode.inputs : selectedNode.outputs) : [];
+  const [portKey, setPortKey] = useState(availablePorts[0]?.key ?? "");
+
+  useEffect(() => {
+    if (!eligibleNodes.some((node) => node.id === nodeId)) {
+      setNodeId(eligibleNodes[0]?.id ?? "");
+    }
+  }, [eligibleNodes, nodeId]);
+
+  useEffect(() => {
+    if (!availablePorts.some((port) => port.key === portKey)) {
+      setPortKey(availablePorts[0]?.key ?? "");
+    }
+  }, [availablePorts, portKey]);
+
+  if (eligibleNodes.length === 0) {
+    return (
+      <div className="rounded-[16px] border border-dashed border-[rgba(154,52,18,0.18)] bg-[rgba(255,255,255,0.78)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">
+        No eligible nodes are available for this binding type.
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-3 rounded-[18px] border border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.82)] p-3 shadow-[0_10px_24px_rgba(60,41,20,0.06)]">
+      <label className="grid gap-1.5 text-sm text-[var(--muted)]">
+        <span>{mode === "read" ? "Reader Node" : "Writer Node"}</span>
+        <FieldSelect
+          value={selectedNode?.id ?? ""}
+          onValueChange={setNodeId}
+          options={eligibleNodes.map((node) => ({
+            value: node.id,
+            label: node.label,
+            detail: node.family,
+          }))}
+        />
+      </label>
+      <label className="grid gap-1.5 text-sm text-[var(--muted)]">
+        <span>{mode === "read" ? "Input Port" : "Output Port"}</span>
+        <FieldSelect
+          value={portKey}
+          onValueChange={setPortKey}
+          options={availablePorts.map((port) => ({
+            value: port.key,
+            label: port.label,
+            detail: port.key,
+          }))}
+          disabled={availablePorts.length === 0}
+        />
+      </label>
+      <div className="flex items-center justify-end gap-2">
+        <button
+          type="button"
+          className="inline-flex items-center rounded-full border border-[rgba(154,52,18,0.14)] bg-[rgba(255,252,247,0.92)] px-3 py-1.5 text-[0.7rem] font-medium uppercase tracking-[0.12em] text-[var(--muted)] transition hover:bg-white"
+          onClick={onCancel}
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          className="inline-flex items-center rounded-full border border-[rgba(154,52,18,0.18)] bg-[rgba(255,244,240,0.94)] px-3 py-1.5 text-[0.7rem] font-medium uppercase tracking-[0.12em] text-[var(--accent-strong)] transition hover:bg-[rgba(255,248,240,1)]"
+          disabled={!selectedNode || !portKey}
+          onClick={() => {
+            if (!selectedNode || !portKey) return;
+            if (onAdd(selectedNode.id, portKey)) {
+              onCancel();
+            }
+          }}
+        >
+          {mode === "read" ? "Add Reader" : "Add Writer"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function StateFieldCard({
+  field,
+  readers,
+  writers,
+  nodeOptions,
+  selectedNodeId,
+  onRenameState,
+  onUpdateState,
+  onDeleteState,
+  onAddReader,
+  onRemoveReader,
+  onAddWriter,
+  onRemoveWriter,
+  onFocusNode,
+}: {
+  field: StateField;
+  readers: StateBindingSummary[];
+  writers: StateBindingSummary[];
+  nodeOptions: StateBindingNodeOption[];
+  selectedNodeId: string | null;
+  onRenameState: (currentKey: string, nextKey: string) => boolean;
+  onUpdateState: (stateKey: string, updater: (current: StateField) => StateField) => void;
+  onDeleteState: (stateKey: string) => void;
+  onAddReader: (stateKey: string, nodeId: string, inputKey: string) => boolean;
+  onRemoveReader: (stateKey: string, nodeId: string, inputKey: string) => void;
+  onAddWriter: (stateKey: string, nodeId: string, outputKey: string) => boolean;
+  onRemoveWriter: (stateKey: string, nodeId: string, outputKey: string) => void;
+  onFocusNode: (nodeId: string) => void;
+}) {
+  const [draftKey, setDraftKey] = useState(field.key);
+  const [showReaderForm, setShowReaderForm] = useState(false);
+  const [showWriterForm, setShowWriterForm] = useState(false);
+
+  useEffect(() => {
+    setDraftKey(field.key);
+  }, [field.key]);
+
+  const commitKey = () => {
+    const nextKey = draftKey.trim();
+    if (!nextKey) {
+      setDraftKey(field.key);
+      return;
+    }
+    if (nextKey === field.key) {
+      return;
+    }
+    const renamed = onRenameState(field.key, nextKey);
+    if (!renamed) {
+      setDraftKey(field.key);
+    }
+  };
+
+  return (
+    <div className="rounded-[24px] border border-[rgba(154,52,18,0.16)] bg-[linear-gradient(180deg,rgba(255,250,241,0.96)_0%,rgba(248,237,219,0.94)_100%)] p-4 shadow-[0_18px_36px_rgba(60,41,20,0.08)]">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="rounded-full border border-[rgba(154,52,18,0.16)] bg-[rgba(255,255,255,0.72)] px-2 py-0.5 text-[0.62rem] uppercase tracking-[0.14em] text-[var(--accent-strong)]">
+              state
+            </span>
+            <div className="truncate text-sm font-semibold text-[var(--text)]">{field.title || field.key}</div>
+          </div>
+          <div className="mt-1 text-xs leading-5 text-[var(--muted)]">
+            {readers.length} readers · {writers.length} writers
+          </div>
+        </div>
+        <button
+          type="button"
+          className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-full border border-[rgba(154,52,18,0.14)] bg-[rgba(255,252,247,0.92)] text-[var(--muted)] transition hover:border-[rgba(185,28,28,0.22)] hover:text-[rgb(153,27,27)]"
+          title="Delete state"
+          aria-label="Delete state"
+          onClick={() => onDeleteState(field.key)}
+        >
+          <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.7">
+            <path d="M3.5 4.5h9" />
+            <path d="M6.5 2.75h3" />
+            <path d="M5 4.5V12a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1V4.5" />
+            <path d="M6.75 6.5v4" />
+            <path d="M9.25 6.5v4" />
+          </svg>
+        </button>
+      </div>
+
+      <div className="mt-4 grid gap-3">
+        <label className="grid gap-1.5 text-sm text-[var(--muted)]">
+          <span>Key</span>
+          <Input
+            value={draftKey}
+            onChange={(event) => setDraftKey(event.target.value)}
+            onBlur={commitKey}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                commitKey();
+              }
+              if (event.key === "Escape") {
+                setDraftKey(field.key);
+              }
+            }}
+          />
+        </label>
+
+        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_148px]">
+          <label className="grid gap-1.5 text-sm text-[var(--muted)]">
+            <span>Title</span>
+            <Input
+              value={field.title}
+              onChange={(event) =>
+                onUpdateState(field.key, (current) => ({
+                  ...current,
+                  title: event.target.value,
+                }))
+              }
+            />
+          </label>
+          <label className="grid gap-1.5 text-sm text-[var(--muted)]">
+            <span>Type</span>
+            <FieldSelect
+              value={field.type}
+              onValueChange={(nextValue) =>
+                onUpdateState(field.key, (current) => ({
+                  ...current,
+                  type: nextValue as StateFieldType,
+                  defaultValue: defaultStateValueForType(nextValue as StateFieldType),
+                }))
+              }
+              options={STATE_FIELD_TYPE_OPTIONS.map((type) => ({
+                value: type,
+                label: type,
+              }))}
+            />
+          </label>
+        </div>
+
+        <label className="grid gap-1.5 text-sm text-[var(--muted)]">
+          <span>Description</span>
+          <FieldTextarea
+            rows={3}
+            value={field.description}
+            onChange={(event) =>
+              onUpdateState(field.key, (current) => ({
+                ...current,
+                description: event.target.value,
+              }))
+            }
+          />
+        </label>
+
+        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_88px]">
+          <label className="grid gap-1.5 text-sm text-[var(--muted)]">
+            <span>Color</span>
+            <Input
+              value={field.ui?.color ?? ""}
+              placeholder="#d97706"
+              onChange={(event) =>
+                onUpdateState(field.key, (current) => ({
+                  ...current,
+                  ui: {
+                    ...(current.ui ?? {}),
+                    color: event.target.value,
+                  },
+                }))
+              }
+            />
+          </label>
+          <div className="grid gap-1.5 text-sm text-[var(--muted)]">
+            <span>Swatch</span>
+            <div
+              className="h-11 rounded-[16px] border border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.78)] shadow-[inset_0_1px_0_rgba(255,255,255,0.45)]"
+              style={{ backgroundColor: field.ui?.color?.trim() || "rgba(255,255,255,0.78)" }}
+            />
+          </div>
+        </div>
+
+        <StateDefaultValueEditor
+          field={field}
+          onChange={(nextValue) =>
+            onUpdateState(field.key, (current) => ({
+              ...current,
+              defaultValue: nextValue,
+            }))
+          }
+        />
+      </div>
+
+      <div className="mt-4 grid gap-4">
+        <div className="grid gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-[0.72rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">Readers</div>
+              <div className="mt-1 text-xs leading-5 text-[var(--muted)]">State values injected into node inputs.</div>
+            </div>
+            <button
+              type="button"
+              className="inline-flex items-center rounded-full border border-[rgba(154,52,18,0.18)] bg-[rgba(255,244,240,0.94)] px-3 py-1.5 text-[0.7rem] font-medium uppercase tracking-[0.12em] text-[var(--accent-strong)] transition hover:bg-[rgba(255,248,240,1)]"
+              onClick={() => setShowReaderForm((current) => !current)}
+            >
+              {showReaderForm ? "Close" : "Add Reader"}
+            </button>
+          </div>
+          {readers.length > 0 ? (
+            <div className="grid gap-2">
+              {readers.map((binding) => (
+                <StateBindingChip
+                  key={binding.id}
+                  binding={binding}
+                  selected={selectedNodeId === binding.nodeId}
+                  label="Input"
+                  onFocus={() => onFocusNode(binding.nodeId)}
+                  onRemove={() => onRemoveReader(field.key, binding.nodeId, binding.portKey)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-[16px] border border-dashed border-[rgba(154,52,18,0.18)] bg-[rgba(255,255,255,0.78)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">
+              No readers yet.
+            </div>
+          )}
+          {showReaderForm ? (
+            <StateBindingCreateForm
+              mode="read"
+              nodeOptions={nodeOptions}
+              onAdd={(nodeId, inputKey) => onAddReader(field.key, nodeId, inputKey)}
+              onCancel={() => setShowReaderForm(false)}
+            />
+          ) : null}
+        </div>
+
+        <div className="grid gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-[0.72rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">Writers</div>
+              <div className="mt-1 text-xs leading-5 text-[var(--muted)]">Node outputs that write back into this state.</div>
+            </div>
+            <button
+              type="button"
+              className="inline-flex items-center rounded-full border border-[rgba(154,52,18,0.18)] bg-[rgba(255,244,240,0.94)] px-3 py-1.5 text-[0.7rem] font-medium uppercase tracking-[0.12em] text-[var(--accent-strong)] transition hover:bg-[rgba(255,248,240,1)]"
+              onClick={() => setShowWriterForm((current) => !current)}
+            >
+              {showWriterForm ? "Close" : "Add Writer"}
+            </button>
+          </div>
+          {writers.length > 0 ? (
+            <div className="grid gap-2">
+              {writers.map((binding) => (
+                <StateBindingChip
+                  key={binding.id}
+                  binding={binding}
+                  selected={selectedNodeId === binding.nodeId}
+                  label="Output"
+                  onFocus={() => onFocusNode(binding.nodeId)}
+                  onRemove={() => onRemoveWriter(field.key, binding.nodeId, binding.portKey)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-[16px] border border-dashed border-[rgba(154,52,18,0.18)] bg-[rgba(255,255,255,0.78)] px-4 py-3 text-sm leading-6 text-[var(--muted)]">
+              No writers yet.
+            </div>
+          )}
+          {showWriterForm ? (
+            <StateBindingCreateForm
+              mode="write"
+              nodeOptions={nodeOptions}
+              onAdd={(nodeId, outputKey) => onAddWriter(field.key, nodeId, outputKey)}
+              onCancel={() => setShowWriterForm(false)}
+            />
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatePanel({
+  open,
+  stateSchema,
+  readersByKey,
+  writersByKey,
+  nodeOptions,
+  selectedNodeId,
+  onToggle,
+  onAddState,
+  onRenameState,
+  onUpdateState,
+  onDeleteState,
+  onAddReader,
+  onRemoveReader,
+  onAddWriter,
+  onRemoveWriter,
+  onFocusNode,
+}: {
+  open: boolean;
+  stateSchema: StateField[];
+  readersByKey: Record<string, StateBindingSummary[]>;
+  writersByKey: Record<string, StateBindingSummary[]>;
+  nodeOptions: StateBindingNodeOption[];
+  selectedNodeId: string | null;
+  onToggle: () => void;
+  onAddState: () => void;
+  onRenameState: (currentKey: string, nextKey: string) => boolean;
+  onUpdateState: (stateKey: string, updater: (current: StateField) => StateField) => void;
+  onDeleteState: (stateKey: string) => void;
+  onAddReader: (stateKey: string, nodeId: string, inputKey: string) => boolean;
+  onRemoveReader: (stateKey: string, nodeId: string, inputKey: string) => void;
+  onAddWriter: (stateKey: string, nodeId: string, outputKey: string) => boolean;
+  onRemoveWriter: (stateKey: string, nodeId: string, outputKey: string) => void;
+  onFocusNode: (nodeId: string) => void;
+}) {
+  if (!open) {
+    return (
+      <aside className="flex h-full min-h-0 items-center justify-center border-l border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.72)] px-2 backdrop-blur-xl">
+        <button
+          type="button"
+          className="flex h-full min-h-[220px] w-full flex-col items-center justify-center gap-4 rounded-[22px] border border-[rgba(154,52,18,0.16)] bg-[linear-gradient(180deg,rgba(255,250,241,0.92)_0%,rgba(248,237,219,0.92)_100%)] px-2 py-4 text-[var(--text)] shadow-[0_18px_36px_rgba(60,41,20,0.08)] transition hover:bg-[linear-gradient(180deg,rgba(255,252,247,0.96)_0%,rgba(249,239,223,0.96)_100%)]"
+          onClick={onToggle}
+        >
+          <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current text-[var(--accent-strong)]" strokeWidth="1.7">
+            <path d="M4 4.5h8v7H4z" />
+            <path d="M6.5 6.5h3M6.5 9h3" />
+          </svg>
+          <span className="[writing-mode:vertical-rl] rotate-180 text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+            State Panel
+          </span>
+          <span className="rounded-full border border-[rgba(154,52,18,0.16)] bg-[rgba(255,255,255,0.82)] px-2 py-0.5 text-[0.68rem] font-medium text-[var(--muted)]">
+            {stateSchema.length}
+          </span>
+        </button>
+      </aside>
+    );
+  }
+
+  return (
+    <aside className="flex h-full min-h-0 flex-col border-l border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.78)] backdrop-blur-xl">
+      <div className="border-b border-[rgba(154,52,18,0.14)] px-4 py-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-[0.72rem] uppercase tracking-[0.16em] text-[var(--accent-strong)]">Graph State</div>
+            <div className="mt-2 text-xl font-semibold text-[var(--text)]">State Panel</div>
+            <div className="mt-1 text-sm leading-6 text-[var(--muted)]">
+              Edit graph-level state and sync reader or writer bindings back to nodes.
+            </div>
+          </div>
+          <button
+            type="button"
+            className="grid h-10 w-10 place-items-center rounded-full border border-[rgba(154,52,18,0.14)] bg-[rgba(255,252,247,0.92)] text-[var(--muted)] transition hover:bg-white"
+            title="Collapse state panel"
+            aria-label="Collapse state panel"
+            onClick={onToggle}
+          >
+            <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
+              <path d="M10.5 3.5 5.5 8l5 4.5" />
+            </svg>
+          </button>
+        </div>
+        <div className="mt-4 flex items-center justify-between gap-3 rounded-[18px] border border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 shadow-[0_10px_24px_rgba(60,41,20,0.06)]">
+          <div>
+            <div className="text-sm font-medium text-[var(--text)]">{stateSchema.length} state objects</div>
+            <div className="mt-1 text-xs leading-5 text-[var(--muted)]">These objects are persisted with the graph and restored during editing.</div>
+          </div>
+          <Button size="sm" onClick={onAddState}>
+            Add State
+          </Button>
+        </div>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+        {stateSchema.length > 0 ? (
+          <div className="grid gap-4">
+            {stateSchema.map((field) => (
+              <StateFieldCard
+                key={field.key}
+                field={field}
+                readers={readersByKey[field.key] ?? []}
+                writers={writersByKey[field.key] ?? []}
+                nodeOptions={nodeOptions}
+                selectedNodeId={selectedNodeId}
+                onRenameState={onRenameState}
+                onUpdateState={onUpdateState}
+                onDeleteState={onDeleteState}
+                onAddReader={onAddReader}
+                onRemoveReader={onRemoveReader}
+                onAddWriter={onAddWriter}
+                onRemoveWriter={onRemoveWriter}
+                onFocusNode={onFocusNode}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="grid min-h-full place-items-center rounded-[28px] border border-dashed border-[rgba(154,52,18,0.24)] bg-[rgba(255,250,241,0.72)] px-6 py-8 text-center shadow-[0_18px_40px_rgba(60,41,20,0.08)]">
+            <div className="max-w-[280px]">
+              <div className="text-[0.72rem] uppercase tracking-[0.16em] text-[var(--accent-strong)]">No State Yet</div>
+              <div className="mt-3 text-lg font-semibold text-[var(--text)]">Create the first graph state object</div>
+              <div className="mt-2 text-sm leading-6 text-[var(--muted)]">
+                State definitions live with the graph and can be wired into node inputs or outputs from this panel.
+              </div>
+              <Button size="sm" className="mt-4" onClick={onAddState}>
+                Add State
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </aside>
+  );
+}
+
 function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: GraphPayload; isNewFromTemplate: boolean }) {
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const reactFlow = useReactFlow<FlowNode, Edge>();
   const updateNodeInternals = useUpdateNodeInternals();
   const [graphName, setGraphName] = useState(initialGraph.name);
   const [graphId, setGraphId] = useState<string | null>(initialGraph.graph_id ?? null);
-  const [templateId] = useState(initialGraph.template_id);
-  const [stateSchema] = useState(initialGraph.state_schema);
-  const [metadata] = useState(initialGraph.metadata);
+  const [templateId, setTemplateId] = useState(initialGraph.template_id);
+  const [stateSchema, setStateSchema] = useState(initialGraph.state_schema);
+  const [metadata, setMetadata] = useState(initialGraph.metadata);
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
   const nodesInitialized = useNodesInitialized();
   const autoLayoutDoneRef = useRef(false);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [isStatePanelOpen, setIsStatePanelOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [statusMessage, setStatusMessage] = useState("Node system phase 4: skill definitions connected.");
   const [persistedPresets, setPersistedPresets] = useState<NodePresetDefinition[]>([]);
@@ -3521,7 +4426,7 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
   const [skillDefinitions, setSkillDefinitions] = useState<SkillDefinition[]>([]);
   const [skillDefinitionsLoading, setSkillDefinitionsLoading] = useState(true);
   const [skillDefinitionsError, setSkillDefinitionsError] = useState<string | null>(null);
-  const [knowledgeBases, setKnowledgeBases] = useState<Array<{ name: string }>>([]);
+  const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBaseOption[]>([]);
   const [editorSettings, setEditorSettings] = useState<EditorSettingsPayload | null>(null);
   const [connectingSourceType, setConnectingSourceType] = useState<ValueType | null>(null);
   const [creationMenu, setCreationMenu] = useState<{
@@ -3631,8 +4536,84 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
     () => new Map(nodes.map((node) => [node.id, node.data.config.label || node.id])),
     [nodes],
   );
+  const stateFieldLookup = useMemo(
+    () =>
+      Object.fromEntries(
+        stateSchema.map((field) => [field.key, field.title?.trim() ? `${field.title} (${field.key})` : field.key]),
+      ),
+    [stateSchema],
+  );
+  const stateBindingNodeOptions = useMemo<StateBindingNodeOption[]>(
+    () =>
+      nodes.map((node) => ({
+        id: node.id,
+        label: node.data.config.label || node.id,
+        family: node.data.config.family,
+        inputs: listInputPorts(node.data.config),
+        outputs: listStateWritablePorts(node.data.config),
+      })),
+    [nodes],
+  );
+  const stateBindingsByKey = useMemo(() => {
+    const readersByKey: Record<string, StateBindingSummary[]> = {};
+    const writersByKey: Record<string, StateBindingSummary[]> = {};
+
+    for (const node of nodes) {
+      const nodeLabel = node.data.config.label || node.id;
+      const inputPorts = listInputPorts(node.data.config);
+      const outputPorts = listStateWritablePorts(node.data.config);
+
+      for (const binding of node.data.config.stateReads ?? []) {
+        const matchedPort = inputPorts.find((port) => port.key === binding.inputKey);
+        const summary: StateBindingSummary = {
+          id: `${node.id}:read:${binding.inputKey}:${binding.stateKey}`,
+          nodeId: node.id,
+          nodeLabel,
+          nodeFamily: node.data.config.family,
+          portKey: binding.inputKey,
+          portLabel: matchedPort?.label ?? binding.inputKey,
+          valid: Boolean(matchedPort),
+        };
+        readersByKey[binding.stateKey] = [...(readersByKey[binding.stateKey] ?? []), summary];
+      }
+
+      for (const binding of node.data.config.stateWrites ?? []) {
+        const matchedPort = outputPorts.find((port) => port.key === binding.outputKey);
+        const summary: StateBindingSummary = {
+          id: `${node.id}:write:${binding.outputKey}:${binding.stateKey}`,
+          nodeId: node.id,
+          nodeLabel,
+          nodeFamily: node.data.config.family,
+          portKey: binding.outputKey,
+          portLabel: matchedPort?.label ?? binding.outputKey,
+          valid: Boolean(matchedPort),
+        };
+        writersByKey[binding.stateKey] = [...(writersByKey[binding.stateKey] ?? []), summary];
+      }
+    }
+
+    return {
+      readersByKey,
+      writersByKey,
+    };
+  }, [nodes]);
   const runNodeSummary = useMemo(() => summarizeRunNodeStates(nodeIds, runNodeStatusMap), [nodeIds, runNodeStatusMap]);
   const suppressOutputPreviewFallback = activeRunStatus === "queued" || activeRunStatus === "running";
+  const knowledgeSkillSyncSignature = useMemo(
+    () =>
+      nodes
+        .map((node) => {
+          const inputs = listInputPorts(node.data.config)
+            .map((port) => `${port.key}:${port.valueType}:${port.required ? "1" : "0"}`)
+            .join(",");
+          const outputs = listOutputPorts(node.data.config)
+            .map((port) => `${port.key}:${port.valueType}`)
+            .join(",");
+          return `${node.id}|${node.data.config.family}|${inputs}|${outputs}`;
+        })
+        .join("::"),
+    [nodes],
+  );
 
   const previewTextByNode = useMemo(() => {
     return Object.fromEntries(nodes.map((node) => [node.id, createPreviewText(node, nodes, edges)]));
@@ -3672,19 +4653,24 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
     (run: RunDetail) => {
       const summary = summarizeRunNodeStates(nodeIds, run.node_status_map ?? {});
       const currentNodeLabel = run.current_node_id ? nodeLabelLookup.get(run.current_node_id) ?? run.current_node_id : null;
+      const cycleSummaryText =
+        run.cycle_summary?.has_cycle
+          ? ` Iterations ${run.cycle_summary.iteration_count}/${run.cycle_summary.max_iterations || run.cycle_summary.iteration_count}.`
+          : "";
       if (run.status === "queued") {
-        return `Run ${run.run_id} queued. Pending ${summary.idle} nodes.`;
+        return `Run ${run.run_id} queued. Pending ${summary.idle} nodes.${cycleSummaryText}`;
       }
       if (run.status === "running") {
         const currentLabelText = currentNodeLabel ? `Running ${currentNodeLabel}. ` : "";
-        return `${currentLabelText}Done ${summary.success} · Active ${summary.running} · Pending ${summary.idle} · Failed ${summary.failed}`;
+        return `${currentLabelText}Done ${summary.success} · Active ${summary.running} · Pending ${summary.idle} · Failed ${summary.failed}.${cycleSummaryText}`;
       }
       if (run.status === "failed") {
         const runErrors = run.errors?.filter(Boolean) ?? [];
         const baseText = currentNodeLabel ? `Run failed at ${currentNodeLabel}.` : `Run ${run.run_id} failed.`;
-        return runErrors.length > 0 ? `${baseText} ${runErrors.join("; ")}` : baseText;
+        const detailText = runErrors.length > 0 ? `${baseText} ${runErrors.join("; ")}` : baseText;
+        return `${detailText}${cycleSummaryText}`;
       }
-      return `Run completed. OK ${summary.success} · Pending ${summary.idle} · Failed ${summary.failed}`;
+      return `Run completed. OK ${summary.success} · Pending ${summary.idle} · Failed ${summary.failed}.${cycleSummaryText}`;
     },
     [nodeIds, nodeLabelLookup],
   );
@@ -3817,7 +4803,7 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
     }
 
     void loadSkillDefinitions();
-    apiGet<Array<{ name: string }>>("/api/knowledge/bases").then(setKnowledgeBases).catch(() => {});
+    apiGet<KnowledgeBaseOption[]>("/api/knowledge/bases").then(setKnowledgeBases).catch(() => {});
 
     return () => {
       active = false;
@@ -3852,13 +4838,45 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
       ? initialGraph.edges.map((edge) => createFlowEdgeFromGraphEdge(edge, nodesById))
       : [];
     autoLayoutDoneRef.current = false;
+    setGraphName(initialGraph.name);
+    setGraphId(initialGraph.graph_id ?? null);
+    setTemplateId(initialGraph.template_id);
+    setStateSchema(initialGraph.state_schema);
+    setMetadata(initialGraph.metadata);
     setActiveRunId(null);
     setActiveRunStatus(null);
     setCurrentRunNodeId(null);
     setRunNodeStatusMap({});
+    setSelectedNodeId(null);
     setNodes(initialNodes);
     setEdges(initialEdges);
-  }, [initialGraph.edges, initialGraph.nodes, setEdges, setNodes]);
+  }, [initialGraph, setEdges, setNodes]);
+
+  useEffect(() => {
+    setNodes((current) => {
+      const nodesById = new Map(current.map((node) => [node.id, node]));
+      let changed = false;
+      const nextNodes = current.map((node) => {
+        if (node.data.config.family !== "agent") {
+          return node;
+        }
+        const nextConfig = syncKnowledgeBaseSkillOnAgent(node, nodesById, edges);
+        if (nextConfig === node.data.config) {
+          return node;
+        }
+        changed = true;
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            config: nextConfig,
+          },
+        };
+      });
+
+      return changed ? nextNodes : current;
+    });
+  }, [edges, knowledgeSkillSyncSignature, setNodes]);
 
   useEffect(() => {
     if (!isNewFromTemplate) return;
@@ -4139,7 +5157,6 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
         id: node.id,
         type: "default",
         position: node.position,
-        style: node.style,
         data: {
           nodeId: node.data.nodeId,
           config: node.data.config,
@@ -4203,12 +5220,272 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
     }
   }
 
+  const focusNode = useCallback(
+    (nodeId: string) => {
+      const targetNode = nodes.find((node) => node.id === nodeId);
+      if (!targetNode) return;
+
+      const width =
+        targetNode.data.expandedSize?.width
+        ?? targetNode.data.collapsedSize?.width
+        ?? (typeof targetNode.style?.width === "number" ? targetNode.style.width : undefined)
+        ?? getDefaultNodeWidth(targetNode.data.config);
+      const height =
+        targetNode.data.expandedSize?.height
+        ?? targetNode.data.collapsedSize?.height
+        ?? (typeof targetNode.style?.height === "number" ? targetNode.style.height : undefined)
+        ?? getNodeMinHeight(targetNode.data.config);
+
+      setSelectedNodeId(nodeId);
+      setNodes((current) =>
+        current.map((node) => ({
+          ...node,
+          selected: node.id === nodeId,
+        })),
+      );
+      reactFlow.setCenter(targetNode.position.x + width / 2, targetNode.position.y + height / 2, {
+        zoom: Math.max(reactFlow.getZoom(), 0.95),
+        duration: 260,
+      });
+    },
+    [nodes, reactFlow, setNodes],
+  );
+
+  const updateStateField = useCallback(
+    (stateKey: string, updater: (current: StateField) => StateField) => {
+      setStateSchema((current) => current.map((field) => (field.key === stateKey ? updater(field) : field)));
+    },
+    [],
+  );
+
+  const renameStateField = useCallback(
+    (currentKey: string, nextKey: string) => {
+      const normalizedKey = nextKey.trim();
+      if (!normalizedKey) {
+        setStatusMessage("State key cannot be empty.");
+        return false;
+      }
+      if (stateSchema.some((field) => field.key === normalizedKey && field.key !== currentKey)) {
+        setStatusMessage(`State key '${normalizedKey}' already exists.`);
+        return false;
+      }
+
+      setStateSchema((current) =>
+        current.map((field) =>
+          field.key === currentKey
+            ? {
+                ...field,
+                key: normalizedKey,
+              }
+            : field,
+        ),
+      );
+      setNodes((current) =>
+        current.map((node) => ({
+          ...node,
+          data: {
+            ...node.data,
+            config: withNodeStateBindings(
+              node.data.config,
+              (node.data.config.stateReads ?? []).map((binding) =>
+                binding.stateKey === currentKey
+                  ? {
+                      ...binding,
+                      stateKey: normalizedKey,
+                    }
+                  : binding,
+              ),
+              (node.data.config.stateWrites ?? []).map((binding) =>
+                binding.stateKey === currentKey
+                  ? {
+                      ...binding,
+                      stateKey: normalizedKey,
+                    }
+                  : binding,
+              ),
+            ),
+          },
+        })),
+      );
+      setStatusMessage(`Renamed state ${currentKey} -> ${normalizedKey}`);
+      return true;
+    },
+    [setNodes, stateSchema],
+  );
+
+  const addStateField = useCallback(() => {
+    const nextField = createDefaultStateField(stateSchema.map((field) => field.key));
+    setStateSchema((current) => [...current, nextField]);
+    setStatusMessage(`Added state ${nextField.key}`);
+    setIsStatePanelOpen(true);
+  }, [stateSchema]);
+
+  const deleteStateField = useCallback(
+    (stateKey: string) => {
+      setStateSchema((current) => current.filter((field) => field.key !== stateKey));
+      setNodes((current) =>
+        current.map((node) => ({
+          ...node,
+          data: {
+            ...node.data,
+            config: withNodeStateBindings(
+              node.data.config,
+              (node.data.config.stateReads ?? []).filter((binding) => binding.stateKey !== stateKey),
+              (node.data.config.stateWrites ?? []).filter((binding) => binding.stateKey !== stateKey),
+            ),
+          },
+        })),
+      );
+      setStatusMessage(`Deleted state ${stateKey}`);
+    },
+    [setNodes],
+  );
+
+  const addStateReadBinding = useCallback(
+    (stateKey: string, nodeId: string, inputKey: string) => {
+      const targetNode = nodes.find((node) => node.id === nodeId);
+      if (!targetNode) return false;
+      const inputHandleId = buildHandleId("input", inputKey);
+      const hasIncomingEdge = edges.some((edge) => edge.target === nodeId && edge.targetHandle === inputHandleId);
+      if (hasIncomingEdge) {
+        setStatusMessage(`Node '${targetNode.data.config.label}' input '${inputKey}' is already connected by an edge.`);
+        return false;
+      }
+      const existingBinding = (targetNode.data.config.stateReads ?? []).find((binding) => binding.inputKey === inputKey);
+      if (existingBinding) {
+        setStatusMessage(`Node '${targetNode.data.config.label}' input '${inputKey}' already reads state '${existingBinding.stateKey}'.`);
+        return false;
+      }
+
+      setNodes((current) =>
+        current.map((node) =>
+          node.id === nodeId
+            ? {
+                ...node,
+                data: {
+                  ...node.data,
+                  config: withNodeStateBindings(
+                    node.data.config,
+                    [...(node.data.config.stateReads ?? []), { stateKey, inputKey, required: false }],
+                    node.data.config.stateWrites ?? [],
+                  ),
+                },
+              }
+            : node,
+        ),
+      );
+      setStatusMessage(`Bound state ${stateKey} to ${targetNode.data.config.label}.${inputKey}`);
+      return true;
+    },
+    [edges, nodes, setNodes],
+  );
+
+  const removeStateReadBinding = useCallback(
+    (stateKey: string, nodeId: string, inputKey: string) => {
+      setNodes((current) =>
+        current.map((node) =>
+          node.id === nodeId
+            ? {
+                ...node,
+                data: {
+                  ...node.data,
+                  config: withNodeStateBindings(
+                    node.data.config,
+                    (node.data.config.stateReads ?? []).filter(
+                      (binding) => !(binding.stateKey === stateKey && binding.inputKey === inputKey),
+                    ),
+                    node.data.config.stateWrites ?? [],
+                  ),
+                },
+              }
+            : node,
+        ),
+      );
+      setStatusMessage(`Removed reader ${nodeLabelLookup.get(nodeId) ?? nodeId}.${inputKey} from state ${stateKey}`);
+    },
+    [nodeLabelLookup, setNodes],
+  );
+
+  const addStateWriteBinding = useCallback(
+    (stateKey: string, nodeId: string, outputKey: string) => {
+      const targetNode = nodes.find((node) => node.id === nodeId);
+      if (!targetNode) return false;
+      const existingBinding = (targetNode.data.config.stateWrites ?? []).find((binding) => binding.outputKey === outputKey);
+      if (existingBinding) {
+        setStatusMessage(`Node '${targetNode.data.config.label}' output '${outputKey}' already writes state '${existingBinding.stateKey}'.`);
+        return false;
+      }
+
+      setNodes((current) =>
+        current.map((node) =>
+          node.id === nodeId
+            ? {
+                ...node,
+                data: {
+                  ...node.data,
+                  config: withNodeStateBindings(
+                    node.data.config,
+                    node.data.config.stateReads ?? [],
+                    [...(node.data.config.stateWrites ?? []), { stateKey, outputKey, mode: "replace" }],
+                  ),
+                },
+              }
+            : node,
+        ),
+      );
+      setStatusMessage(`Bound ${targetNode.data.config.label}.${outputKey} to state ${stateKey}`);
+      return true;
+    },
+    [nodes, setNodes],
+  );
+
+  const removeStateWriteBinding = useCallback(
+    (stateKey: string, nodeId: string, outputKey: string) => {
+      setNodes((current) =>
+        current.map((node) =>
+          node.id === nodeId
+            ? {
+                ...node,
+                data: {
+                  ...node.data,
+                  config: withNodeStateBindings(
+                    node.data.config,
+                    node.data.config.stateReads ?? [],
+                    (node.data.config.stateWrites ?? []).filter(
+                      (binding) => !(binding.stateKey === stateKey && binding.outputKey === outputKey),
+                    ),
+                  ),
+                },
+              }
+            : node,
+        ),
+      );
+      setStatusMessage(`Removed writer ${nodeLabelLookup.get(nodeId) ?? nodeId}.${outputKey} from state ${stateKey}`);
+    },
+    [nodeLabelLookup, setNodes],
+  );
+
   return (
     <div className="grid h-screen grid-rows-[56px_minmax(0,1fr)_36px] bg-[radial-gradient(circle_at_top,rgba(154,52,18,0.1),transparent_22%),linear-gradient(180deg,#f5efe2_0%,#ede4d2_100%)]">
       <header className="grid grid-cols-[minmax(220px,320px)_1fr_auto] items-center gap-3 border-b border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.82)] px-4 backdrop-blur-xl">
         <Input className="h-10" value={graphName} onChange={(event) => setGraphName(event.target.value)} placeholder="Graph name" />
         <div className="text-sm text-[var(--muted)]">Double click canvas to create nodes. Drop files on empty canvas to create input nodes. Drag from an output handle into empty space for type-aware suggestions.</div>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className={cn(
+              "inline-flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-medium transition",
+              isStatePanelOpen
+                ? "border-[var(--accent)] bg-[rgba(255,244,240,0.94)] text-[var(--accent-strong)]"
+                : "border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.82)] text-[var(--text)] hover:bg-white",
+            )}
+            onClick={() => setIsStatePanelOpen((current) => !current)}
+          >
+            <span>State</span>
+            <span className="rounded-full border border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.92)] px-2 py-0.5 text-[0.68rem] text-[var(--muted)]">
+              {stateSchema.length}
+            </span>
+          </button>
           <Button size="sm" onClick={() => void handleSave()}>
             Save
           </Button>
@@ -4221,7 +5498,12 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
         </div>
       </header>
 
-      <div className="relative min-w-0 min-h-0 h-full">
+      <div
+        className="grid min-w-0 min-h-0 h-full transition-[grid-template-columns] duration-300"
+        style={{
+          gridTemplateColumns: isStatePanelOpen ? "minmax(0,1fr) 380px" : "minmax(0,1fr) 56px",
+        }}
+      >
         <div
           className="relative min-w-0 min-h-0 h-full"
           ref={wrapperRef}
@@ -4351,6 +5633,8 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
                   availableModelRefs,
                   modelDisplayLookup,
                   knowledgeBases,
+                  stateFieldLookup,
+                  onOpenStatePanel: () => setIsStatePanelOpen(true),
                 },
               }))}
               edges={edges}
@@ -4573,9 +5857,7 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
                       )
                     }
                   >
-                    <div className="text-[0.7rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">
-                      {entry.family}
-                    </div>
+                    <div className="text-[0.7rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">{entry.family}</div>
                     <div className="mt-0.5 text-sm font-semibold text-[var(--text)]">{entry.label}</div>
                     <div className="mt-1 text-xs leading-5 text-[var(--muted)]">{entry.description}</div>
                   </button>
@@ -4612,11 +5894,33 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
             ) : null}
             {activeRunId ? (
               <span className="pointer-events-auto ml-2">
-                Latest run: <a className="text-[var(--accent-strong)] underline" href={`/runs/${activeRunId}`}>{activeRunId}</a>
+                Latest run:{" "}
+                <a className="text-[var(--accent-strong)] underline" href={`/runs/${activeRunId}`}>
+                  {activeRunId}
+                </a>
               </span>
             ) : null}
           </div>
         </div>
+
+        <StatePanel
+          open={isStatePanelOpen}
+          stateSchema={stateSchema}
+          readersByKey={stateBindingsByKey.readersByKey}
+          writersByKey={stateBindingsByKey.writersByKey}
+          nodeOptions={stateBindingNodeOptions}
+          selectedNodeId={selectedNodeId}
+          onToggle={() => setIsStatePanelOpen((current) => !current)}
+          onAddState={addStateField}
+          onRenameState={renameStateField}
+          onUpdateState={updateStateField}
+          onDeleteState={deleteStateField}
+          onAddReader={addStateReadBinding}
+          onRemoveReader={removeStateReadBinding}
+          onAddWriter={addStateWriteBinding}
+          onRemoveWriter={removeStateWriteBinding}
+          onFocusNode={focusNode}
+        />
       </div>
 
       <footer className="flex items-center justify-between border-t border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.82)] px-4 text-sm text-[var(--muted)]">

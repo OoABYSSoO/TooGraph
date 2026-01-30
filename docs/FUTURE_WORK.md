@@ -9,86 +9,43 @@
 
 当前优先级：
 
-1. `node_system` 单轨协议收口
-2. State Panel 与 state 一等对象表达
-3. Cycles 正式支持
-4. Knowledge Base 正式能力建设
-5. Memory 正式能力建设
-6. 人类在环与断点
+1. Cycles 交互与高级策略
+2. Knowledge Base 正式能力建设
+3. Memory 正式能力建设
+4. 人类在环与断点
 
-## 1. `node_system` 单轨协议收口
+## 1. Cycles 交互与高级策略
 
 当前代码现状：
 
-- 当前前后端主链已经只使用 `node_system`
-- 但 graph payload、node config、runtime run detail、editor 可视化之间还没有完全收成一套明确契约
-- 前后端 schema 仍然是手工镜像维护，还不是单一 source of truth
+- runtime 已支持 cycles 的多轮执行
+- condition 已支持 `cycle` 模式，循环图会返回结构化的 `cycle_summary / cycle_iterations`
+- 当前循环停止条件只覆盖：
+  - 显式退出分支
+  - 命中最大轮次保护
 
 后续要做：
 
-- 明确 graph payload 的正式边界，目标是“只靠保存下来的图文件就能完整还原编辑图”
-- 收紧 payload 中真正应该持久化的内容，只保留恢复编辑与运行必需的信息
-- 明确 node 保存与 graph 保存的边界：
-  - graph 保存的是当前画布中的节点实例
-  - node / preset 保存的是可复用模板
-  - 未单独保存为节点或 preset 的 graph 内节点，不进入节点选择列表
-- 建立前后端单一 source of truth，避免继续手写维护两份近似 schema
-- 把 runtime 输出、state readers / writers、editor 可视化之间的正式契约写清楚，至少包括：
-  - `state_schema` 只描述 state 本体，不持久化 readers / writers 聚合结果
-  - node 上持久化 `stateReads / stateWrites`
-  - runtime 必须返回结构化的 `state_snapshot / state_events / node_executions`
-  - editor 的 `State Panel` 基于这些正式结构做聚合展示与反向编辑
-  - 需要明确 state 读取时机、state 写回时机、端口输入与 state 读取的冲突规则
-
-## 2. State Panel 与 state 一等对象表达
-
-当前代码现状：
-
-- editor 已有画布、建点、连线、运行、输出预览
-- `state_schema` 已经存在于 graph payload 中，但 editor 里没有真正可编辑的 `State Panel`
-- 当前 state 既不是 graph 内的一等编辑对象，也没有和 node 上的读写关系形成正式契约
-
-后续要做：
-
-- 在 editor 右侧增加默认折叠的 `State Panel`
-- 明确 `State Panel` 不是只读展示，而是 graph 级 state 的主编辑入口
-- 让 `state_schema` 成为 graph 内可编辑的正式对象，至少支持：
-  - 新增 / 删除 state
-  - 编辑 `key / type / title / description / defaultValue / ui`
-  - 按 state 聚合查看 readers / writers
-- 让 `State Panel` 的编辑同步修改 node 上的正式配置，而不是引入第三套持久化结构
-- 把 node 的 state 关系收敛为结构化字段，而不是继续依赖隐式约定或自由文本：
-  - `stateReads`
-  - `stateWrites`
-- 明确 node 才是 readers / writers 的持久化 source of truth：
-  - graph 保存后可以完整还原编辑状态
-  - node 被单独保存、复制、另存为 preset 时不丢失 state 行为
-  - 只保存 graph、不保存节点模板时，该节点不会自动进入节点选择列表
-
-## 3. Cycles 正式支持
-
-当前代码现状：
-
-- runtime 会检测 cycles，但检测到后直接失败退出
-- condition 的 `cycle` 模式仍然只是注释中的计划项
-- 当前系统实际只支持 DAG 单次执行
-
-后续要做：
-
-- 定义 cycles 的正式执行语义，而不是只做检测：
-  - 多轮执行
-  - 退出条件
-  - 最大轮次
+- 增加更完整的停止策略：
   - 无变化停止
-- 明确 cycles 和 state 的关系：
-  - 循环中哪些 state 可以被反复读写
-  - 每轮执行后如何持久化快照
-- 明确 cycles 和 interrupt 的关系：
+  - 空轮次停止
+  - 按 state 或输出变化量停止
+- 给 editor 增加正式的循环配置入口：
+  - `cycle_max_iterations`
+  - 终止策略
+  - 循环回边高亮
+- 在 editor 和 run detail 中进一步可视化：
+  - 每轮执行路径
+  - 回边
+  - 终止原因
+- 明确 cycles 和 state 的正式约束：
+  - 循环中哪些 state 适合做 loop-carried state
+  - 边上传值和 state 读写的组合方式
+- 明确 cycles 和 interrupt 的衔接方式：
   - 是否允许在循环中暂停
   - 恢复后从哪一轮、哪个节点继续
-- 在 editor 和 run detail 中可视化循环轮次、回边和终止原因
 
-## 4. Knowledge Base 正式能力建设
+## 2. Knowledge Base 正式能力建设
 
 当前代码现状：
 
@@ -107,7 +64,7 @@
   - runtime 如何返回检索命中、来源、摘要与引用
 - 决定第一版是否先做全文检索正式化，还是直接进入分块检索 / 向量检索
 
-## 5. Memory 正式能力建设
+## 3. Memory 正式能力建设
 
 当前代码现状：
 
@@ -126,7 +83,7 @@
   - run detail 返回哪些 memory 相关结构化字段
 - 决定是否保留独立 memory 页面；如果保留，至少要支持真实记录、检索、来源追踪和详情查看
 
-## 6. 人类在环与断点
+## 4. 人类在环与断点
 
 当前代码现状：
 

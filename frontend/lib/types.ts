@@ -1,3 +1,5 @@
+import type { NodeSystemGraphEdge, NodeSystemGraphNode, RunStatus } from "@/lib/node-system-schema";
+
 // ─── Shared API Types ─────────────────────────────────────────────────────────────
 
 /**
@@ -9,8 +11,8 @@ export type GraphSummary = {
   graph_id: string;
   name: string;
   template_id?: string;
-  nodes: unknown[];
-  edges: unknown[];
+  nodes: NodeSystemGraphNode[];
+  edges: NodeSystemGraphEdge[];
 };
 
 /**
@@ -22,7 +24,7 @@ export type RunSummary = {
   run_id: string;
   graph_id?: string;
   graph_name: string;
-  status: string;
+  status: RunStatus;
   current_node_id?: string | null;
   revision_round: number;
   started_at: string;

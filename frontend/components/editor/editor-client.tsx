@@ -1,28 +1,10 @@
 "use client";
 
 import { NodeSystemEditor } from "@/components/editor/node-system-editor";
-import type { StateField } from "@/lib/node-system-schema";
+import type { NodeSystemGraphPayload, NodeSystemTemplateRecord } from "@/lib/node-system-schema";
 
-export type EditorClientGraphPayload = {
-  graph_family?: "node_system";
-  graph_id?: string | null;
-  name: string;
-  template_id: string;
-  state_schema: StateField[];
-  nodes: unknown[];
-  edges: unknown[];
-  metadata: Record<string, unknown>;
-};
-
-export type EditorClientTemplateRecord = {
-  template_id: string;
-  label: string;
-  description: string;
-  default_graph_name: string;
-  supported_node_types: string[];
-  state_schema: StateField[];
-  default_node_system_graph: Omit<EditorClientGraphPayload, "graph_id">;
-};
+export type EditorClientGraphPayload = NodeSystemGraphPayload;
+export type EditorClientTemplateRecord = NodeSystemTemplateRecord;
 
 type EditorClientProps = {
   mode: "new" | "existing";

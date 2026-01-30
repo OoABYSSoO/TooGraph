@@ -2,24 +2,21 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Query
 
-from app.knowledge.loader import KNOWLEDGE_ROOT, search_knowledge
+from app.knowledge.loader import list_knowledge_bases as load_knowledge_bases
+from app.knowledge.loader import search_knowledge
 
 
 router = APIRouter(prefix="/api/knowledge", tags=["knowledge"])
 
 
 @router.get("")
-def list_knowledge_endpoint(query: str = Query(default="")) -> list[dict[str, str]]:
-    return search_knowledge(query, limit=20)
+def list_knowledge_endpoint(
+    query: str = Query(default=""),
+    knowledge_base: str | None = Query(default=None, alias="knowledge_base"),
+) -> list[dict[str, object]]:
+    return search_knowledge(query, knowledge_base=knowledge_base, limit=20)
 
 
 @router.get("/bases")
-def list_knowledge_bases() -> list[dict[str, str]]:
-    """List available knowledge base directories."""
-    KNOWLEDGE_ROOT.mkdir(parents=True, exist_ok=True)
-    return [
-        {"name": path.name}
-        for path in sorted(KNOWLEDGE_ROOT.iterdir())
-        if path.is_dir() and not path.name.startswith(".")
-    ]
-
+def list_knowledge_bases() -> list[dict[str, object]]:
+    return load_knowledge_bases()

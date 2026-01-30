@@ -19,15 +19,36 @@ graphite:
       label: Knowledge Base
       valueType: knowledge_base
       required: false
-      description: Name of the knowledge base directory to search.
+      description: Stable knowledge base id to search.
+    - key: limit
+      label: Result Limit
+      valueType: text
+      required: false
+      description: Maximum number of retrieved passages to include.
   output_schema:
+    - key: knowledge_base
+      label: Knowledge Base
+      valueType: text
+      description: Resolved knowledge base id used for retrieval.
+    - key: query
+      label: Query
+      valueType: text
+      description: Final query string used for retrieval.
+    - key: result_count
+      label: Result Count
+      valueType: text
+      description: Number of matched passages returned by the search.
     - key: context
       label: Context
       valueType: text
-      description: Combined document excerpts for grounded reasoning.
+      description: Ranked grounded excerpts formatted for direct agent reasoning.
     - key: results
       label: Results
       valueType: json
-      description: Array of matched documents with title, summary, and source.
+      description: Structured retrieval results with section, url, summary, and score.
+    - key: citations
+      label: Citations
+      valueType: json
+      description: Compact source list suitable for run detail and answer citations.
 ---
-Search a local knowledge base by query and return ranked document excerpts as grounded context.
+Search a formal indexed knowledge base by query and return grounded context plus citations.
