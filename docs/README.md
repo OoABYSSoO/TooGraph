@@ -1,10 +1,11 @@
 # Docs Index
 
-当前 `docs/` 只保留四份核心文档：
+当前 `docs/` 只保留五份核心文档：
 
 - [FUTURE_WORK.md](/home/abyss/GraphiteUI/docs/FUTURE_WORK.md)
 - [knowledge_base_strategy.md](/home/abyss/GraphiteUI/docs/knowledge_base_strategy.md)
 - [node_system_design.md](/home/abyss/GraphiteUI/docs/node_system_design.md)
+- [node_system_native_migration_plan.md](/home/abyss/GraphiteUI/docs/node_system_native_migration_plan.md)
 - [README.md](/home/abyss/GraphiteUI/docs/README.md)
 
 使用原则：

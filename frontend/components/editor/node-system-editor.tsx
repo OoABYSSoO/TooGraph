@@ -41,6 +41,7 @@ import { Input } from "@/components/ui/input";
 import { RichContent, formatRichContentValue, resolveRichContentDisplayMode } from "@/components/ui/rich-content";
 import { apiGet, apiPost } from "@/lib/api";
 import { cn } from "@/lib/cn";
+import { buildCanonicalGraphFromLegacyGraph, type CanonicalGraphPayload } from "@/lib/node-system-canonical";
 import { EMPTY_AGENT_PRESET, getNodePresetById, NODE_PRESETS_MOCK, TEXT_INPUT_PRESET } from "@/lib/node-presets-mock";
 import {
   isValueTypeCompatible,
@@ -82,6 +83,8 @@ type EditorClientProps = {
 type FlowNodeData = {
   nodeId: string;
   config: NodePresetDefinition;
+  displayName?: string;
+  displayDescription?: string;
   previewText: string;
   resolvedDisplayMode?: string;
   executionStatus?: RunNodeStatus;
@@ -175,6 +178,7 @@ type EditorSettingsPayload = {
 };
 
 type RunDetail = NodeSystemRunDetail;
+type CanonicalGraph = CanonicalGraphPayload;
 
 type PresetDocument = {
   presetId: string;
@@ -325,7 +329,7 @@ function createDefaultStateField(existingKeys: string[]): StateField {
     type: "string",
     title: `State ${index}`,
     description: "",
-    defaultValue: "",
+    value: "",
     ui: {
       color: "",
     },
@@ -346,15 +350,31 @@ function stringifyStateValue(value: unknown, type: StateFieldType) {
 }
 
 function normalizeNodeConfig<T extends NodePresetDefinition>(config: T): T {
+  const normalizedName =
+    String((config as { name?: string }).name ?? "").trim() ||
+    String((config as { label?: string }).label ?? "").trim() ||
+    "Node";
   const normalizedStateReads = config.stateReads ?? [];
   const normalizedStateWrites = (config.stateWrites ?? []).map((binding) => ({
     ...binding,
     mode: binding.mode ?? "replace",
   }));
 
+  if (config.family === "input") {
+    const legacyConfig = config as InputBoundaryNode & { defaultValue?: string };
+    return {
+      ...legacyConfig,
+      name: normalizedName,
+      value: legacyConfig.value ?? legacyConfig.defaultValue ?? "",
+      stateReads: normalizedStateReads,
+      stateWrites: normalizedStateWrites,
+    } as T;
+  }
+
   if (config.family !== "agent") {
     return {
       ...config,
+      name: normalizedName,
       stateReads: normalizedStateReads,
       stateWrites: normalizedStateWrites,
     } as T;
@@ -362,6 +382,7 @@ function normalizeNodeConfig<T extends NodePresetDefinition>(config: T): T {
 
   const normalizedConfig = {
     ...config,
+    name: normalizedName,
     stateReads: normalizedStateReads,
     stateWrites: normalizedStateWrites,
     modelSource: config.modelSource ?? "global",
@@ -370,6 +391,19 @@ function normalizeNodeConfig<T extends NodePresetDefinition>(config: T): T {
     temperature: normalizeAgentTemperature(config.temperature),
   } satisfies AgentNode;
   return normalizedConfig as T;
+}
+
+function getNodeDisplayName(config: NodePresetDefinition, nodeId?: string) {
+  return (
+    String((config as { name?: string }).name ?? "").trim() ||
+    String((config as { label?: string }).label ?? "").trim() ||
+    nodeId ||
+    "node"
+  );
+}
+
+function getCanonicalNodeDisplayName(canonicalGraph: CanonicalGraphPayload, nodeId: string) {
+  return canonicalGraph.nodes[nodeId]?.name?.trim() || nodeId;
 }
 
 function withNodeStateBindings(
@@ -1382,7 +1416,7 @@ function createGenericInputNodeConfig(): InputBoundaryNode {
   return {
     ...baseConfig,
     presetId: "node.input.generic",
-    label: "Input",
+    name: "Input",
     description: "Provide a value to the current workflow.",
     output: {
       ...baseConfig.output,
@@ -1391,14 +1425,13 @@ function createGenericInputNodeConfig(): InputBoundaryNode {
       valueType: "text",
     },
     valueType: "text",
-    placeholder: "Enter value",
   } satisfies InputBoundaryNode;
 }
 
 function createGenericOutputNodeConfig(sourceType: ValueType | null = null): OutputBoundaryNode {
   return {
     presetId: "node.output.generic",
-    label: "Output",
+    name: "Output",
     description: "Preview or persist the current workflow result.",
     family: "output",
     input: {
@@ -1454,7 +1487,6 @@ function createEditorDefaults(templates: TemplateRecord[], defaultTemplateId?: s
     graph_family: "node_system",
     graph_id: null,
     name: "Node System Playground",
-    template_id: defaultTemplateId ?? HELLO_WORLD_TEMPLATE_ID,
     state_schema: [],
     nodes: [],
     edges: [],
@@ -1703,19 +1735,6 @@ function createDefaultPort(side: "input" | "output", existingPorts: PortDefiniti
   };
 }
 
-function summarizeNode(config: NodePresetDefinition) {
-  if (config.family === "input") {
-    return config.placeholder || "Inline input boundary";
-  }
-  if (config.family === "agent") {
-    return config.description || config.taskInstruction || "Configure this agent node.";
-  }
-  if (config.family === "condition") {
-    return `${config.rule.source} ${config.rule.operator} ${String(config.rule.value)}`;
-  }
-  return "Preview or persist an upstream output.";
-}
-
 function createPreviewText(node: FlowNode, nodes: FlowNode[], edges: Edge[]) {
   if (node.data.config.family !== "output") {
     return "";
@@ -1735,10 +1754,10 @@ function createPreviewText(node: FlowNode, nodes: FlowNode[], edges: Edge[]) {
   const config = sourceNode.data.config;
 
   if (config.family === "input" && sourcePortKey === config.output.key) {
-    return config.defaultValue;
+    return config.value;
   }
 
-  return `Connected to ${config.label}.${sourcePortKey ?? "value"}`;
+  return `Connected to ${getNodeDisplayName(config)}.${sourcePortKey ?? "value"}`;
 }
 
 function OutputPreviewContent({ text, displayMode }: { text: string; displayMode: string }) {
@@ -2658,6 +2677,8 @@ function getDefaultNodeWidth(_config: NodePresetDefinition) {
 
 function NodeCard({ data, selected }: NodeProps<FlowNode>) {
   const config = data.config;
+  const displayName = data.displayName ?? getNodeDisplayName(config, data.nodeId);
+  const displayDescription = data.displayDescription?.trim() || config.description;
   const inputs = listInputPorts(config);
   const outputs = listOutputPorts(config);
   const isInputNode = config.family === "input";
@@ -2667,8 +2688,8 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [isHoveringNode, setIsHoveringNode] = useState(false);
   const [isResizingNode, setIsResizingNode] = useState(false);
-  const [draftLabel, setDraftLabel] = useState(config.label);
-  const [draftDescription, setDraftDescription] = useState(config.description);
+  const [draftLabel, setDraftLabel] = useState(displayName);
+  const [draftDescription, setDraftDescription] = useState(displayDescription);
   const [isDeleteConfirmActive, setIsDeleteConfirmActive] = useState(false);
   const [isPresetConfirmActive, setIsPresetConfirmActive] = useState(false);
   const deleteConfirmTimeoutRef = useRef<number | null>(null);
@@ -2679,7 +2700,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
   const skillPickerButtonRef = useRef<HTMLButtonElement | null>(null);
   const labelAnchorRef = useRef<HTMLDivElement | null>(null);
   const descriptionAnchorRef = useRef<HTMLDivElement | null>(null);
-  const uploadedAsset = config.family === "input" ? tryParseUploadedAssetEnvelope(config.defaultValue) : null;
+  const uploadedAsset = config.family === "input" ? tryParseUploadedAssetEnvelope(config.value) : null;
   const agentRuntime =
     config.family === "agent"
       ? resolveAgentRuntimeConfig(config, {
@@ -2696,12 +2717,12 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
   );
 
   useEffect(() => {
-    setDraftLabel(config.label);
-  }, [config.label]);
+    setDraftLabel(displayName);
+  }, [displayName]);
 
   useEffect(() => {
-    setDraftDescription(config.description);
-  }, [config.description]);
+    setDraftDescription(displayDescription);
+  }, [displayDescription]);
 
   useEffect(() => {
     if (selected) return;
@@ -2770,15 +2791,15 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
 
   function commitLabelEdit() {
     const nextLabel = draftLabel.trim();
-    if (nextLabel && nextLabel !== config.label) {
-      data.onConfigChange?.((currentConfig) => ({ ...currentConfig, label: nextLabel }));
+    if (nextLabel && nextLabel !== displayName) {
+      data.onConfigChange?.((currentConfig) => ({ ...currentConfig, name: nextLabel }));
     }
     setIsEditingLabel(false);
   }
 
   function commitDescriptionEdit() {
     const nextDescription = draftDescription.trim();
-    if (nextDescription !== config.description) {
+    if (nextDescription !== displayDescription) {
       data.onConfigChange?.((currentConfig) => ({ ...currentConfig, description: nextDescription }));
     }
     setIsEditingDescription(false);
@@ -2791,10 +2812,10 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
       ...(currentConfig as InputBoundaryNode),
       valueType: envelope.detectedType,
       output: {
-        ...(currentConfig as InputBoundaryNode).output,
-        valueType: envelope.detectedType,
+      ...(currentConfig as InputBoundaryNode).output,
+      valueType: envelope.detectedType,
       },
-      defaultValue: JSON.stringify(envelope),
+      value: JSON.stringify(envelope),
     }));
   }
 
@@ -2988,7 +3009,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                 {config.family}
               </span>
               <div ref={labelAnchorRef} className="truncate cursor-text text-left text-sm font-semibold text-[var(--text)]" onDoubleClick={() => setIsEditingLabel(true)}>
-                {config.label}
+                {displayName}
               </div>
               <FloatingEditorCard
                 anchorRef={labelAnchorRef}
@@ -3005,7 +3026,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                   onKeyDown={(event) => {
                     if (event.key === "Enter") commitLabelEdit();
                     if (event.key === "Escape") {
-                      setDraftLabel(config.label);
+                      setDraftLabel(displayName);
                       setIsEditingLabel(false);
                     }
                   }}
@@ -3014,7 +3035,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                   <PanelIconButton
                     label="Cancel"
                     onClick={() => {
-                      setDraftLabel(config.label);
+                      setDraftLabel(displayName);
                       setIsEditingLabel(false);
                     }}
                   >
@@ -3034,7 +3055,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
             {config.family ? (
               <div className="relative mt-1">
                 <div ref={descriptionAnchorRef} className="line-clamp-2 cursor-text text-left text-xs leading-5 text-[var(--muted)]" onDoubleClick={() => setIsEditingDescription(true)}>
-                  {config.description || summarizeNode(config)}
+                  {displayDescription}
                 </div>
                 <FloatingEditorCard
                   anchorRef={descriptionAnchorRef}
@@ -3053,7 +3074,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                     <PanelIconButton
                       label="Cancel"
                       onClick={() => {
-                        setDraftDescription(config.description);
+                        setDraftDescription(displayDescription);
                         setIsEditingDescription(false);
                       }}
                     >
@@ -3101,14 +3122,14 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                               return {
                                 ...prev,
                                 valueType: option.value,
-                                defaultValue: (data.knowledgeBases ?? [])[0]?.name ?? "",
+                                value: (data.knowledgeBases ?? [])[0]?.name ?? "",
                                 output: { ...prev.output, key: "knowledge_base", label: "Knowledge Base", valueType: option.value },
                               };
                             }
                             return {
                               ...prev,
                               valueType: option.value,
-                              defaultValue: option.value === "file" ? "" : (prev.valueType === "knowledge_base" ? "" : prev.defaultValue),
+                              value: option.value === "file" ? "" : (prev.valueType === "knowledge_base" ? "" : prev.value),
                               output: { ...prev.output, valueType: option.value },
                             };
                           })
@@ -3277,11 +3298,11 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                 {config.valueType === "knowledge_base" ? (
                   (data.knowledgeBases ?? []).length > 0 ? (
                     <FieldSelect
-                      value={config.defaultValue}
+                      value={config.value}
                       onValueChange={(nextValue) =>
                         data.onConfigChange?.((currentConfig) => ({
                           ...(currentConfig as InputBoundaryNode),
-                          defaultValue: nextValue,
+                          value: nextValue,
                         }))
                       }
                       className="min-h-[48px] rounded-[16px] px-3 py-3 text-sm"
@@ -3298,13 +3319,12 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                   )
                 ) : config.valueType === "text" || config.valueType === "json" ? (
                   <FieldTextarea
-                    value={config.defaultValue}
+                    value={config.value}
                     rows={6}
-                    placeholder={config.placeholder}
                     onChange={(event) =>
                       data.onConfigChange?.((currentConfig) => ({
                         ...(currentConfig as InputBoundaryNode),
-                        defaultValue: event.target.value,
+                        value: event.target.value,
                       }))
                     }
                     className="min-h-[132px] h-full flex-1"
@@ -3370,7 +3390,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                               onClick={() =>
                                 data.onConfigChange?.((currentConfig) => ({
                                   ...(currentConfig as InputBoundaryNode),
-                                  defaultValue: "",
+                                  value: "",
                                 }))
                               }
                             >
@@ -3651,7 +3671,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                     <Input
                       value={config.fileNameTemplate}
                       onChange={(event) => data.onConfigChange?.((currentConfig) => ({ ...(currentConfig as OutputBoundaryNode), fileNameTemplate: event.target.value }))}
-                      placeholder={config.label || "Output"}
+                      placeholder={getNodeDisplayName(config) || "Output"}
                       className="h-8 min-w-0 flex-1 text-xs"
                     />
                   </div>
@@ -3683,25 +3703,25 @@ function StateDefaultValueEditor({
   field: StateField;
   onChange: (nextValue: unknown) => void;
 }) {
-  const [draft, setDraft] = useState(() => stringifyStateValue(field.defaultValue, field.type));
+  const [draft, setDraft] = useState(() => stringifyStateValue(field.value, field.type));
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setDraft(stringifyStateValue(field.defaultValue, field.type));
+    setDraft(stringifyStateValue(field.value, field.type));
     setError(null);
-  }, [field.defaultValue, field.type]);
+  }, [field.value, field.type]);
 
   if (field.type === "boolean") {
-    return <EditorSwitchRow label="Default Value" checked={Boolean(field.defaultValue)} onCheckedChange={onChange} />;
+    return <EditorSwitchRow label="Value" checked={Boolean(field.value)} onCheckedChange={onChange} />;
   }
 
   if (field.type === "number") {
     return (
       <label className="grid gap-1.5 text-sm text-[var(--muted)]">
-        <span>Default Value</span>
+        <span>Value</span>
         <Input
           type="number"
-          value={typeof field.defaultValue === "number" ? String(field.defaultValue) : ""}
+          value={typeof field.value === "number" ? String(field.value) : ""}
           placeholder="0"
           onChange={(event) => {
             const nextValue = event.target.value.trim();
@@ -3734,7 +3754,7 @@ function StateDefaultValueEditor({
     return (
       <div className="grid gap-2">
         <label className="grid gap-1.5 text-sm text-[var(--muted)]">
-          <span>Default Value</span>
+          <span>Value</span>
           <FieldTextarea
             rows={5}
             value={draft}
@@ -3749,7 +3769,7 @@ function StateDefaultValueEditor({
         </label>
         <div className="flex items-center justify-between gap-3">
           <div className={cn("text-xs leading-5", error ? "text-[rgb(153,27,27)]" : "text-[var(--muted)]")}>
-            {error ?? "Apply JSON to sync the structured default value."}
+            {error ?? "Apply JSON to sync the structured value."}
           </div>
           <button
             type="button"
@@ -3765,10 +3785,10 @@ function StateDefaultValueEditor({
 
   return (
     <label className="grid gap-1.5 text-sm text-[var(--muted)]">
-      <span>Default Value</span>
+      <span>Value</span>
       <FieldTextarea
         rows={field.type === "markdown" ? 5 : 3}
-        value={typeof field.defaultValue === "string" ? field.defaultValue : String(field.defaultValue ?? "")}
+        value={typeof field.value === "string" ? field.value : String(field.value ?? "")}
         onChange={(event) => onChange(event.target.value)}
         placeholder={field.type === "markdown" ? "Write markdown..." : "Value"}
       />
@@ -4058,7 +4078,7 @@ function StateFieldCard({
                 onUpdateState(field.key, (current) => ({
                   ...current,
                   type: nextValue as StateFieldType,
-                  defaultValue: defaultStateValueForType(nextValue as StateFieldType),
+                  value: defaultStateValueForType(nextValue as StateFieldType),
                 }))
               }
               options={STATE_FIELD_TYPE_OPTIONS.map((type) => ({
@@ -4114,7 +4134,7 @@ function StateFieldCard({
           onChange={(nextValue) =>
             onUpdateState(field.key, (current) => ({
               ...current,
-              defaultValue: nextValue,
+              value: nextValue,
             }))
           }
         />
@@ -4347,7 +4367,6 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
   const updateNodeInternals = useUpdateNodeInternals();
   const [graphName, setGraphName] = useState(initialGraph.name);
   const [graphId, setGraphId] = useState<string | null>(initialGraph.graph_id ?? null);
-  const [templateId, setTemplateId] = useState(initialGraph.template_id);
   const [stateSchema, setStateSchema] = useState(initialGraph.state_schema);
   const [metadata, setMetadata] = useState(initialGraph.metadata);
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
@@ -4453,7 +4472,7 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
     const presetEntries: CreationMenuEntry[] = getRecommendedPresets(sourceType).map((preset) => ({
       id: `preset-${preset.presetId}`,
       family: preset.family,
-      label: preset.label,
+      label: getNodeDisplayName(preset, preset.presetId),
       description: preset.description,
       mode: "preset",
       presetId: preset.presetId,
@@ -4474,9 +4493,48 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
   }, [creationMenu?.sourceValueType, getRecommendedPresets, search]);
 
   const nodeIds = useMemo(() => nodes.map((node) => node.id), [nodes]);
+  const previewTextByNode = useMemo(() => {
+    return Object.fromEntries(nodes.map((node) => [node.id, createPreviewText(node, nodes, edges)]));
+  }, [edges, nodes]);
+  const legacyGraphSnapshot = useMemo<GraphPayload>(
+    () => ({
+      graph_family: "node_system",
+      graph_id: graphId,
+      name: graphName,
+      state_schema: stateSchema,
+      nodes: nodes.map((node) => ({
+        id: node.id,
+        type: "default",
+        position: node.position,
+        data: {
+          nodeId: node.data.nodeId,
+          config: node.data.config,
+          previewText: node.data.previewText || previewTextByNode[node.id] || "",
+          isExpanded: node.data.config.family === "input" ? true : Boolean(node.data.isExpanded),
+          collapsedSize: node.data.collapsedSize ?? null,
+          expandedSize: node.data.expandedSize ?? null,
+        },
+      })),
+      edges: edges.map((edge) => ({
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        sourceHandle: edge.sourceHandle ?? null,
+        targetHandle: edge.targetHandle ?? null,
+      })),
+      metadata,
+    }),
+    [edges, graphId, graphName, metadata, nodes, previewTextByNode, stateSchema],
+  );
+  const canonicalGraph = useMemo<CanonicalGraph>(
+    () => buildCanonicalGraphFromLegacyGraph(legacyGraphSnapshot),
+    [legacyGraphSnapshot],
+  );
+  const canonicalNodeKeys = useMemo(() => Object.keys(canonicalGraph.nodes), [canonicalGraph]);
+  const canonicalStateCount = useMemo(() => Object.keys(canonicalGraph.state_schema).length, [canonicalGraph]);
   const nodeLabelLookup = useMemo(
-    () => new Map(nodes.map((node) => [node.id, node.data.config.label || node.id])),
-    [nodes],
+    () => new Map(Object.keys(canonicalGraph.nodes).map((nodeId) => [nodeId, getCanonicalNodeDisplayName(canonicalGraph, nodeId)])),
+    [canonicalGraph],
   );
   const stateFieldLookup = useMemo(
     () =>
@@ -4489,19 +4547,19 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
     () =>
       nodes.map((node) => ({
         id: node.id,
-        label: node.data.config.label || node.id,
+        label: getCanonicalNodeDisplayName(canonicalGraph, node.id),
         family: node.data.config.family,
         inputs: listInputPorts(node.data.config),
         outputs: listStateWritablePorts(node.data.config),
       })),
-    [nodes],
+    [canonicalGraph, nodes],
   );
   const stateBindingsByKey = useMemo(() => {
     const readersByKey: Record<string, StateBindingSummary[]> = {};
     const writersByKey: Record<string, StateBindingSummary[]> = {};
 
     for (const node of nodes) {
-      const nodeLabel = node.data.config.label || node.id;
+      const nodeLabel = getCanonicalNodeDisplayName(canonicalGraph, node.id);
       const inputPorts = listInputPorts(node.data.config);
       const outputPorts = listStateWritablePorts(node.data.config);
 
@@ -4538,7 +4596,7 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
       readersByKey,
       writersByKey,
     };
-  }, [nodes]);
+  }, [canonicalGraph, nodes]);
   const runNodeSummary = useMemo(() => summarizeRunNodeStates(nodeIds, runNodeStatusMap), [nodeIds, runNodeStatusMap]);
   const suppressOutputPreviewFallback = activeRunStatus === "queued" || activeRunStatus === "running";
   const knowledgeSkillSyncSignature = useMemo(
@@ -4556,10 +4614,6 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
         .join("::"),
     [nodes],
   );
-
-  const previewTextByNode = useMemo(() => {
-    return Object.fromEntries(nodes.map((node) => [node.id, createPreviewText(node, nodes, edges)]));
-  }, [edges, nodes]);
   const agentRuntimeDefaults = useMemo(
     () => ({
       globalTextModelRef:
@@ -4782,7 +4836,6 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
     autoLayoutDoneRef.current = false;
     setGraphName(initialGraph.name);
     setGraphId(initialGraph.graph_id ?? null);
-    setTemplateId(initialGraph.template_id);
     setStateSchema(initialGraph.state_schema);
     setMetadata(initialGraph.metadata);
     setActiveRunId(null);
@@ -4934,7 +4987,7 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
     const typeLabel = formatValueTypeLabel(envelope.detectedType);
     const inputConfig = {
       ...deepClonePreset(TEXT_INPUT_PRESET),
-      label: `${typeLabel} Input`,
+      name: `${typeLabel} Input`,
       description: `Uploaded ${typeLabel.toLowerCase()} asset from ${file.name}.`,
       valueType: envelope.detectedType,
       output: {
@@ -4943,14 +4996,13 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
         label: typeLabel,
         valueType: envelope.detectedType,
       },
-      defaultValue: JSON.stringify(envelope),
-      placeholder: "",
+      value: JSON.stringify(envelope),
     } satisfies InputBoundaryNode;
 
     const nextNode = createNodeFromConfig(inputConfig, position);
     setNodes((current) => current.concat(nextNode));
     setSelectedNodeId(nextNode.id);
-    setStatusMessage(`Added ${inputConfig.label} from ${file.name}`);
+    setStatusMessage(`Added ${getNodeDisplayName(inputConfig)} from ${file.name}`);
   }
 
   function addGenericBoundaryNode(
@@ -4986,7 +5038,7 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
       }
     }
 
-    setStatusMessage(`Added ${config.label}`);
+    setStatusMessage(`Added ${getNodeDisplayName(config)}`);
     setCreationMenu(null);
   }
 
@@ -5023,7 +5075,7 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
     }
     setNodes((current) => current.concat(nextNode));
     setSelectedNodeId(nextNode.id);
-    setStatusMessage(`Added ${preset.label}`);
+    setStatusMessage(`Added ${getNodeDisplayName(preset, preset.presetId)}`);
 
     if (connectionSource?.sourceNodeId && connectionSource.sourceHandle && connectionSource.sourceValueType) {
       const targetHandle = findFirstCompatibleInputHandle(nextNode.data.config, connectionSource.sourceValueType);
@@ -5069,11 +5121,12 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
       setStatusMessage("Only agent and condition nodes can be saved as presets.");
       return;
     }
-    const slug = targetNode.data.config.label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "custom";
+    const displayName = getNodeDisplayName(targetNode.data.config, targetNode.id);
+    const slug = displayName.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "custom";
     const nextPreset = {
       ...deepClonePreset(targetNode.data.config),
       presetId: `preset.local.${slug}.${crypto.randomUUID().slice(0, 6)}`,
-      label: targetNode.data.config.label,
+      name: displayName,
     } satisfies NodePresetDefinition;
     try {
       await apiPost<{ presetId: string; updatedAt?: string | null }>("/api/presets", {
@@ -5089,34 +5142,7 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
   }
 
   function buildPayload(): GraphPayload {
-    return {
-      graph_family: "node_system",
-      graph_id: graphId,
-      name: graphName,
-      template_id: templateId,
-      state_schema: stateSchema,
-      nodes: nodes.map((node) => ({
-        id: node.id,
-        type: "default",
-        position: node.position,
-        data: {
-          nodeId: node.data.nodeId,
-          config: node.data.config,
-          previewText: node.data.previewText || previewTextByNode[node.id] || "",
-          isExpanded: node.data.config.family === "input" ? true : Boolean(node.data.isExpanded),
-          collapsedSize: node.data.collapsedSize ?? null,
-          expandedSize: node.data.expandedSize ?? null,
-        },
-      })),
-      edges: edges.map((edge) => ({
-        id: edge.id,
-        source: edge.source,
-        target: edge.target,
-        sourceHandle: edge.sourceHandle ?? null,
-        targetHandle: edge.targetHandle ?? null,
-      })),
-      metadata,
-    };
+    return legacyGraphSnapshot;
   }
 
   async function handleSave() {
@@ -5141,7 +5167,7 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
   async function handleRun() {
     try {
       const response = await apiPost<{ run_id: string; status: string }>("/api/graphs/run", buildPayload());
-      const queuedStatusMap = Object.fromEntries(nodes.map((node) => [node.id, "idle"])) as Record<string, RunNodeStatus>;
+      const queuedStatusMap = Object.fromEntries(canonicalNodeKeys.map((nodeKey) => [nodeKey, "idle"])) as Record<string, RunNodeStatus>;
       setRunNodeStatusMap(queuedStatusMap);
       setActiveRunStatus(response.status as RunStatus);
       setCurrentRunNodeId(null);
@@ -5290,12 +5316,12 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
       const inputHandleId = buildHandleId("input", inputKey);
       const hasIncomingEdge = edges.some((edge) => edge.target === nodeId && edge.targetHandle === inputHandleId);
       if (hasIncomingEdge) {
-        setStatusMessage(`Node '${targetNode.data.config.label}' input '${inputKey}' is already connected by an edge.`);
+        setStatusMessage(`Node '${getNodeDisplayName(targetNode.data.config, targetNode.id)}' input '${inputKey}' is already connected by an edge.`);
         return false;
       }
       const existingBinding = (targetNode.data.config.stateReads ?? []).find((binding) => binding.inputKey === inputKey);
       if (existingBinding) {
-        setStatusMessage(`Node '${targetNode.data.config.label}' input '${inputKey}' already reads state '${existingBinding.stateKey}'.`);
+        setStatusMessage(`Node '${getNodeDisplayName(targetNode.data.config, targetNode.id)}' input '${inputKey}' already reads state '${existingBinding.stateKey}'.`);
         return false;
       }
 
@@ -5316,7 +5342,7 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
             : node,
         ),
       );
-      setStatusMessage(`Bound state ${stateKey} to ${targetNode.data.config.label}.${inputKey}`);
+      setStatusMessage(`Bound state ${stateKey} to ${getNodeDisplayName(targetNode.data.config, targetNode.id)}.${inputKey}`);
       return true;
     },
     [edges, nodes, setNodes],
@@ -5354,7 +5380,7 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
       if (!targetNode) return false;
       const existingBinding = (targetNode.data.config.stateWrites ?? []).find((binding) => binding.outputKey === outputKey);
       if (existingBinding) {
-        setStatusMessage(`Node '${targetNode.data.config.label}' output '${outputKey}' already writes state '${existingBinding.stateKey}'.`);
+        setStatusMessage(`Node '${getNodeDisplayName(targetNode.data.config, targetNode.id)}' output '${outputKey}' already writes state '${existingBinding.stateKey}'.`);
         return false;
       }
 
@@ -5375,7 +5401,7 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
             : node,
         ),
       );
-      setStatusMessage(`Bound ${targetNode.data.config.label}.${outputKey} to state ${stateKey}`);
+      setStatusMessage(`Bound ${getNodeDisplayName(targetNode.data.config, targetNode.id)}.${outputKey} to state ${stateKey}`);
       return true;
     },
     [nodes, setNodes],
@@ -5425,7 +5451,7 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
           >
             <span>State</span>
             <span className="rounded-full border border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.92)] px-2 py-0.5 text-[0.68rem] text-[var(--muted)]">
-              {stateSchema.length}
+              {canonicalStateCount}
             </span>
           </button>
           <Button size="sm" onClick={() => void handleSave()}>
@@ -5461,6 +5487,8 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
                 ...node,
                 data: {
                   ...node.data,
+                  displayName: canonicalGraph.nodes[node.id]?.name?.trim() || getNodeDisplayName(node.data.config, node.id),
+                  displayDescription: canonicalGraph.nodes[node.id]?.description ?? node.data.config.description,
                   previewText:
                     node.data.config.family === "output" && suppressOutputPreviewFallback
                       ? node.data.previewText
@@ -5698,7 +5726,7 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
                       },
                     }),
                 );
-                setStatusMessage(`Connected ${sourceNode.data.config.label} -> ${targetNode.data.config.label}`);
+                setStatusMessage(`Connected ${getNodeDisplayName(sourceNode.data.config, sourceNode.id)} -> ${getNodeDisplayName(targetNode.data.config, targetNode.id)}`);
               }}
               onConnectEnd={(event) => {
                 const pending = pendingConnectRef.current;
@@ -5866,7 +5894,7 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
       </div>
 
       <footer className="flex items-center justify-between border-t border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.82)] px-4 text-sm text-[var(--muted)]">
-        <span>{nodes.length} nodes / {edges.length} edges</span>
+        <span>{canonicalNodeKeys.length} nodes / {edges.length} edges</span>
         <span>Double click canvas or drag from an output handle to open preset suggestions.</span>
       </footer>
     </div>

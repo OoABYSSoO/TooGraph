@@ -1,37 +1,46 @@
 from __future__ import annotations
 
-import json
+import sqlite3
 from typing import Any
 
-from app.core.storage.database import get_connection, row_payload
+from app.core.storage.database import SETTINGS_DATA_DIR, get_connection, row_payload
+from app.core.storage.json_file_utils import read_json_file, write_json_file
 
 
-GLOBAL_SETTINGS_KEY = "global"
+APP_SETTINGS_PATH = SETTINGS_DATA_DIR / "app_settings.json"
+_SETTINGS_MIGRATED = False
 
 
 def load_app_settings() -> dict[str, Any]:
-    with get_connection() as connection:
-        row = connection.execute(
-            "SELECT payload_json FROM app_settings WHERE setting_key = ?",
-            (GLOBAL_SETTINGS_KEY,),
-        ).fetchone()
-    return row_payload(row) or {}
+    _initialize_settings_storage()
+    return read_json_file(APP_SETTINGS_PATH, default={}) or {}
 
 
 def save_app_settings(payload: dict[str, Any]) -> dict[str, Any]:
-    with get_connection() as connection:
-        connection.execute(
-            """
-            INSERT INTO app_settings (setting_key, payload_json, created_at, updated_at)
-            VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-            ON CONFLICT(setting_key) DO UPDATE SET
-                payload_json = excluded.payload_json,
-                updated_at = CURRENT_TIMESTAMP
-            """,
-            (
-                GLOBAL_SETTINGS_KEY,
-                json.dumps(payload, ensure_ascii=False),
-            ),
-        )
-        connection.commit()
+    _initialize_settings_storage()
+    write_json_file(APP_SETTINGS_PATH, payload)
     return load_app_settings()
+
+
+def _initialize_settings_storage() -> None:
+    global _SETTINGS_MIGRATED
+    SETTINGS_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    if _SETTINGS_MIGRATED:
+        return
+    if not APP_SETTINGS_PATH.exists():
+        _migrate_settings_from_database()
+    _SETTINGS_MIGRATED = True
+
+
+def _migrate_settings_from_database() -> None:
+    try:
+        with get_connection() as connection:
+            row = connection.execute(
+                "SELECT payload_json FROM app_settings WHERE setting_key = ?",
+                ("global",),
+            ).fetchone()
+    except sqlite3.OperationalError:
+        return
+    payload = row_payload(row) or {}
+    if payload:
+        write_json_file(APP_SETTINGS_PATH, payload)

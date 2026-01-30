@@ -74,9 +74,12 @@ backend/*.sqlite3
 backend/data/*.db
 backend/data/*.sqlite
 backend/data/*.sqlite3
-backend/data/graphs/*.json
+backend/data/graphs/
 backend/data/memories/runtime/
+backend/data/presets/
 backend/data/runs/
+backend/data/settings/
+backend/data/skills/
 backend/data/kb/_downloads/
 backend/data/kb/*/
 
