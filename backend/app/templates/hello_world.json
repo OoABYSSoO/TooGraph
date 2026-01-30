@@ -35,9 +35,7 @@
       "kind": "input",
       "ui": {
         "position": { "x": 80, "y": 160 },
-        "collapsed": false,
-        "expandedSize": { "width": 300, "height": 220 },
-        "collapsedSize": { "width": 300, "height": 72 }
+        "collapsed": false
       },
       "writes": [
         { "state": "question", "mode": "replace" }
@@ -52,9 +50,7 @@
       "kind": "input",
       "ui": {
         "position": { "x": 80, "y": 540 },
-        "collapsed": false,
-        "expandedSize": { "width": 300, "height": 220 },
-        "collapsedSize": { "width": 300, "height": 72 }
+        "collapsed": false
       },
       "writes": [
         { "state": "knowledge_base", "mode": "replace" }
@@ -69,9 +65,7 @@
       "kind": "agent",
       "ui": {
         "position": { "x": 560, "y": 80 },
-        "collapsed": false,
-        "expandedSize": { "width": 340, "height": 520 },
-        "collapsedSize": { "width": 340, "height": 72 }
+        "collapsed": false
       },
       "reads": [
         { "state": "question", "required": true },
@@ -90,9 +84,7 @@
       "kind": "agent",
       "ui": {
         "position": { "x": 560, "y": 480 },
-        "collapsed": false,
-        "expandedSize": { "width": 340, "height": 520 },
-        "collapsedSize": { "width": 340, "height": 72 }
+        "collapsed": false
       },
       "reads": [
         { "state": "question", "required": true },
@@ -111,9 +103,7 @@
       "kind": "output",
       "ui": {
         "position": { "x": 1040, "y": 80 },
-        "collapsed": false,
-        "expandedSize": { "width": 320, "height": 360 },
-        "collapsedSize": { "width": 320, "height": 72 }
+        "collapsed": false
       },
       "reads": [
         { "state": "raw_answer", "required": true }
@@ -129,9 +119,7 @@
       "kind": "output",
       "ui": {
         "position": { "x": 1040, "y": 480 },
-        "collapsed": false,
-        "expandedSize": { "width": 320, "height": 360 },
-        "collapsedSize": { "width": 320, "height": 72 }
+        "collapsed": false
       },
       "reads": [
         { "state": "formatted_answer", "required": true }

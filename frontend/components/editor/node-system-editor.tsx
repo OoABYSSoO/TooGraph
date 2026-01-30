@@ -2643,7 +2643,7 @@ function PortCreateButton({
 }
 
 function getNodeMinHeight(config: NodePresetDefinition) {
-  if (config.family === "input") return 320;
+  if (config.family === "input") return 260;
   if (config.family === "output") return 280;
   if (config.family === "agent") return 360;
   if (config.family === "condition") return 300;
@@ -3299,15 +3299,15 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                 ) : config.valueType === "text" || config.valueType === "json" ? (
                   <FieldTextarea
                     value={config.defaultValue}
-                    rows={5}
+                    rows={6}
                     placeholder={config.placeholder}
                     onChange={(event) =>
                       data.onConfigChange?.((currentConfig) => ({
-                          ...(currentConfig as InputBoundaryNode),
-                          defaultValue: event.target.value,
+                        ...(currentConfig as InputBoundaryNode),
+                        defaultValue: event.target.value,
                       }))
                     }
-                    className="min-h-[160px] h-full flex-1"
+                    className="min-h-[132px] h-full flex-1"
                   />
                 ) : (
                   <>
@@ -3837,68 +3837,10 @@ function NodeStateBindingSummary({
   stateFieldLookup?: Record<string, string>;
   onOpenStatePanel?: () => void;
 }) {
-  const reads = config.stateReads ?? [];
-  const writes = config.stateWrites ?? [];
-
-  if (reads.length === 0 && writes.length === 0) {
-    return null;
-  }
-
-  return (
-    <div className="rounded-[18px] border border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.78)] px-3.5 py-3 shadow-[0_10px_24px_rgba(60,41,20,0.06)]">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-[0.7rem] uppercase tracking-[0.14em] text-[var(--accent-strong)]">State</div>
-          <div className="mt-1 text-xs leading-5 text-[var(--muted)]">This node is already bound to graph state.</div>
-        </div>
-        {onOpenStatePanel ? (
-          <button
-            type="button"
-            className="inline-flex items-center rounded-full border border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.92)] px-2.5 py-1 text-[0.62rem] font-medium uppercase tracking-[0.12em] text-[var(--accent-strong)] transition hover:bg-white"
-            onClick={onOpenStatePanel}
-          >
-            Open Panel
-          </button>
-        ) : null}
-      </div>
-
-      {reads.length > 0 ? (
-        <div className="mt-3">
-          <div className="mb-1 text-[0.64rem] uppercase tracking-[0.14em] text-[var(--muted)]">Reads</div>
-          <div className="flex flex-wrap gap-1.5">
-            {reads.map((binding) => (
-              <span
-                key={`read-${binding.stateKey}-${binding.inputKey}`}
-                className="inline-flex items-center gap-1 rounded-full border border-[rgba(37,99,235,0.16)] bg-[rgba(239,246,255,0.82)] px-2.5 py-1 text-[0.68rem] font-medium text-[#1d4ed8]"
-              >
-                <span>{stateFieldLookup?.[binding.stateKey] ?? binding.stateKey}</span>
-                <span className="opacity-70">→</span>
-                <span>{binding.inputKey}</span>
-              </span>
-            ))}
-          </div>
-        </div>
-      ) : null}
-
-      {writes.length > 0 ? (
-        <div className={cn("mt-3", reads.length > 0 ? "pt-0" : null)}>
-          <div className="mb-1 text-[0.64rem] uppercase tracking-[0.14em] text-[var(--muted)]">Writes</div>
-          <div className="flex flex-wrap gap-1.5">
-            {writes.map((binding) => (
-              <span
-                key={`write-${binding.stateKey}-${binding.outputKey}`}
-                className="inline-flex items-center gap-1 rounded-full border border-[rgba(21,128,61,0.16)] bg-[rgba(240,253,244,0.88)] px-2.5 py-1 text-[0.68rem] font-medium text-[#15803d]"
-              >
-                <span>{binding.outputKey}</span>
-                <span className="opacity-70">→</span>
-                <span>{stateFieldLookup?.[binding.stateKey] ?? binding.stateKey}</span>
-              </span>
-            ))}
-          </div>
-        </div>
-      ) : null}
-    </div>
-  );
+  void config;
+  void stateFieldLookup;
+  void onOpenStatePanel;
+  return null;
 }
 
 function StateBindingCreateForm({
