@@ -19,10 +19,10 @@ frontend-install:
 	cd frontend && npm install
 
 frontend-dev:
-	cd frontend && NEXT_PUBLIC_API_BASE_URL=http://localhost:$(BACKEND_PORT) npm run dev -- --port $(FRONTEND_PORT)
+	cd frontend && INTERNAL_API_BASE_URL=http://localhost:$(BACKEND_PORT) npm run dev -- --port $(FRONTEND_PORT)
 
 frontend-build:
-	cd frontend && NEXT_PUBLIC_API_BASE_URL=http://localhost:$(BACKEND_PORT) npm run build
+	cd frontend && INTERNAL_API_BASE_URL=http://localhost:$(BACKEND_PORT) npm run build
 
 backend-install:
 	cd backend && $(PIP) install -r requirements.txt

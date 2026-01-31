@@ -381,7 +381,6 @@ def graph_to_legacy_payload(graph: NodeSystemGraphDocument | NodeSystemGraphPayl
             )
 
     return {
-        "graph_family": "node_system",
         "graph_id": getattr(graph_document, "graph_id", None),
         "name": getattr(graph_document, "name", ""),
         "state_schema": state_schema,
@@ -396,7 +395,6 @@ def template_to_legacy_record(template: NodeSystemTemplate | dict[str, Any]) -> 
     graph_payload = graph_to_legacy_payload(
         NodeSystemGraphPayload.model_validate(
             {
-                "graph_family": "node_system",
                 "graph_id": None,
                 "name": template_document.default_graph_name,
                 "state_schema": template_document.state_schema,
@@ -892,7 +890,6 @@ def legacy_graph_payload_to_canonical(payload: dict[str, Any]) -> NodeSystemGrap
 
     return NodeSystemGraphPayload.model_validate(
         {
-            "graph_family": "node_system",
             "graph_id": payload.get("graph_id"),
             "name": _strip_string(payload.get("name")) or "Untitled Graph",
             "state_schema": {

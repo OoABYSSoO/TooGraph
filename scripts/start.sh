@@ -118,7 +118,7 @@ python3 -m uvicorn app.main:app --reload --port "$BACKEND_PORT" >"$BACKEND_LOG" 
 backend_pid=$!
 
 cd "$ROOT_DIR/frontend"
-NEXT_PUBLIC_API_BASE_URL="http://127.0.0.1:$BACKEND_PORT" \
+INTERNAL_API_BASE_URL="http://127.0.0.1:$BACKEND_PORT" \
   npm run dev -- --port "$FRONTEND_PORT" >"$FRONTEND_LOG" 2>&1 &
 frontend_pid=$!
 

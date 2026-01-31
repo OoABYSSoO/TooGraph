@@ -130,7 +130,6 @@ export type CanonicalConditionalEdge = {
 };
 
 export type CanonicalGraphPayload = {
-  graph_family: "node_system";
   graph_id?: string | null;
   name: string;
   state_schema: Record<string, CanonicalStateDefinition>;
@@ -447,7 +446,6 @@ export function buildCanonicalGraphFromLegacyGraph(graph: NodeSystemGraphPayload
   }
 
   return {
-    graph_family: "node_system",
     graph_id: graph.graph_id ?? null,
     name: graph.name,
     state_schema: stateSchema,

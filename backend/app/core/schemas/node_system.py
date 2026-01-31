@@ -302,7 +302,6 @@ class NodeSystemConditionalEdge(BaseModel):
 
 
 class NodeSystemGraphCore(BaseModel):
-    graph_family: Literal["node_system"] = "node_system"
     state_schema: dict[str, NodeSystemStateDefinition] = Field(default_factory=dict)
     nodes: dict[str, NodeSystemNode] = Field(default_factory=dict)
     edges: list[NodeSystemGraphEdge] = Field(default_factory=list)

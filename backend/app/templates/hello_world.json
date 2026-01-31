@@ -3,7 +3,6 @@
   "label": "Hello World",
   "description": "Ask GraphiteUI onboarding questions, retrieve grounded knowledge, and generate a concise guided answer.",
   "default_graph_name": "Hello World",
-  "graph_family": "node_system",
   "state_schema": {
     "question": {
       "description": "User question for the workflow.",
@@ -133,7 +132,7 @@
         { "state": "formatted_answer", "required": true }
       ],
       "config": {
-        "displayMode": "markdown",
+        "displayMode": "auto",
         "persistEnabled": false,
         "persistFormat": "auto",
         "fileNameTemplate": ""
