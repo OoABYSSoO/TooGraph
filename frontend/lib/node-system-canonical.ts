@@ -1,15 +1,16 @@
 import type {
   AgentNode,
+  BranchDefinition,
   ConditionNode,
   GraphPosition,
   InputBoundaryNode,
   NodePresetDefinition,
-  NodeSystemGraphNode,
-  NodeSystemGraphPayload,
   NodeViewportSize,
   OutputBoundaryNode,
+  PortDefinition,
   StateField,
   StateFieldType,
+  ValueType,
 } from "@/lib/node-system-schema";
 
 export type CanonicalStateType =
@@ -28,6 +29,7 @@ export type CanonicalStateType =
   | "knowledge_base";
 
 export type CanonicalStateDefinition = {
+  name: string;
   description: string;
   type: CanonicalStateType;
   value?: unknown;
@@ -139,47 +141,52 @@ export type CanonicalGraphPayload = {
   metadata: Record<string, unknown>;
 };
 
-const LEGACY_GENERIC_PORT_KEYS = new Set(["value", "input", "output", "result", "text"]);
+export type CanonicalTemplateRecord = {
+  template_id: string;
+  label: string;
+  description: string;
+  default_graph_name: string;
+  state_schema: Record<string, CanonicalStateDefinition>;
+  nodes: Record<string, CanonicalNode>;
+  edges: CanonicalEdge[];
+  conditional_edges: CanonicalConditionalEdge[];
+  metadata: Record<string, unknown>;
+};
+
+export type CanonicalPresetDefinition = {
+  label: string;
+  description: string;
+  state_schema: Record<string, CanonicalStateDefinition>;
+  node: CanonicalNode;
+};
+
+export type CanonicalPresetDocument = {
+  presetId: string;
+  sourcePresetId?: string | null;
+  definition: CanonicalPresetDefinition;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+};
+
+export type EditorPresetRecord = {
+  presetId: string;
+  sourcePresetId?: string | null;
+  definition: NodePresetDefinition;
+  stateSchema: StateField[];
+  createdAt?: string | null;
+  updatedAt?: string | null;
+};
 
 function stripString(value: unknown): string {
   return String(value ?? "").trim();
 }
 
-function canonicalStateTypeFromLegacy(stateType: StateFieldType | string | undefined): CanonicalStateType {
+function legacyStateTypeFromCanonical(stateType: CanonicalStateType): StateFieldType {
+  return stateType === "text" ? "string" : stateType;
+}
+
+function valueTypeFromCanonicalState(stateType: CanonicalStateType): ValueType {
   switch (stateType) {
-    case "number":
-      return "number";
-    case "boolean":
-      return "boolean";
-    case "object":
-      return "object";
-    case "array":
-      return "array";
-    case "markdown":
-      return "markdown";
-    case "json":
-      return "json";
-    case "file_list":
-      return "file_list";
-    case "image":
-      return "image";
-    case "audio":
-      return "audio";
-    case "video":
-      return "video";
-    case "file":
-      return "file";
-    case "knowledge_base":
-      return "knowledge_base";
-    case "string":
-    case "text":
-    default:
-      return "text";
-  }
-}
-
-function canonicalStateTypeFromValueType(valueType: string | undefined): CanonicalStateType {
-  switch (valueType) {
     case "json":
       return "json";
     case "image":
@@ -192,53 +199,9 @@ function canonicalStateTypeFromValueType(valueType: string | undefined): Canonic
       return "file";
     case "knowledge_base":
       return "knowledge_base";
-    case "text":
-    case "any":
     default:
       return "text";
   }
-}
-
-function ensureStateDefinition(
-  stateSchema: Record<string, CanonicalStateDefinition>,
-  stateKey: string,
-  preferredType?: CanonicalStateType,
-): void {
-  if (!stateSchema[stateKey]) {
-    stateSchema[stateKey] = {
-      description: "",
-      type: preferredType ?? "text",
-      value: preferredType === "number" ? 0 : preferredType === "boolean" ? false : preferredType === "json" || preferredType === "object" ? {} : preferredType === "array" || preferredType === "file_list" ? [] : "",
-      color: "",
-    };
-    return;
-  }
-
-  if (
-    preferredType &&
-    stateSchema[stateKey].type === "text" &&
-    preferredType !== "text"
-  ) {
-    stateSchema[stateKey] = {
-      ...stateSchema[stateKey],
-      type: preferredType,
-    };
-  }
-}
-
-function chooseConnectedStateName(sourceState: string, targetState: string): string {
-  if (sourceState === targetState) return sourceState;
-  const sourceGeneric = LEGACY_GENERIC_PORT_KEYS.has(sourceState);
-  const targetGeneric = LEGACY_GENERIC_PORT_KEYS.has(targetState);
-  if (sourceGeneric && !targetGeneric) return targetState;
-  if (targetGeneric && !sourceGeneric) return sourceState;
-  return sourceState;
-}
-
-function getPortKeyFromHandle(handleId?: string | null): string {
-  if (!handleId) return "";
-  const [, key] = handleId.split(":", 2);
-  return stripString(key);
 }
 
 function extractLegacyStateReads(config: NodePresetDefinition): Record<string, { stateKey: string; required?: boolean }> {
@@ -290,20 +253,28 @@ function extractLegacyStateWrites(config: NodePresetDefinition): Record<string, 
   return result;
 }
 
-function toCanonicalNode(node: NodeSystemGraphNode): CanonicalNode {
-  const config = node.data.config;
+export function buildCanonicalNodeFromEditorConfig(params: {
+  nodeId: string;
+  position: GraphPosition;
+  isExpanded: boolean;
+  collapsedSize?: NodeViewportSize | null;
+  expandedSize?: NodeViewportSize | null;
+  config: NodePresetDefinition;
+}): CanonicalNode {
+  const { nodeId, position, isExpanded, collapsedSize, expandedSize } = params;
+  const config = params.config;
   const readsByPort = extractLegacyStateReads(config);
   const writesByPort = extractLegacyStateWrites(config);
   const ui: CanonicalNodeUi = {
-    position: node.position,
-    collapsed: config.family === "input" ? false : !Boolean(node.data.isExpanded),
-    expandedSize: node.data.expandedSize ?? null,
-    collapsedSize: node.data.collapsedSize ?? null,
+    position,
+    collapsed: config.family === "input" ? false : !isExpanded,
+    expandedSize: expandedSize ?? null,
+    collapsedSize: collapsedSize ?? null,
   };
   const name =
     stripString((config as { name?: string }).name) ||
     stripString((config as { label?: string }).label) ||
-    node.id;
+    nodeId;
   const description = stripString((config as { description?: string }).description);
 
   if (config.family === "input") {
@@ -375,86 +346,179 @@ function toCanonicalNode(node: NodeSystemGraphNode): CanonicalNode {
   };
 }
 
-export function buildCanonicalGraphFromLegacyGraph(graph: NodeSystemGraphPayload): CanonicalGraphPayload {
-  const stateSchema: Record<string, CanonicalStateDefinition> = {};
-  for (const field of graph.state_schema) {
-    const legacyField = field as StateField & { defaultValue?: unknown };
-    stateSchema[field.key] = {
-      description: field.description,
-      type: canonicalStateTypeFromLegacy(field.type),
-      value: legacyField.value ?? legacyField.defaultValue,
-      color: field.ui?.color ?? "",
-    };
-  }
+export function buildEditorStateFieldsFromCanonicalGraph(graph: CanonicalGraphPayload): StateField[] {
+  return Object.entries(graph.state_schema).map(([key, definition]) => ({
+    key,
+    name: stripString(definition.name) || key,
+    description: definition.description,
+    type: legacyStateTypeFromCanonical(definition.type),
+    value: definition.value,
+    ui: {
+      color: definition.color,
+    },
+  }));
+}
 
-  const nodes = Object.fromEntries(
-    graph.nodes.map((node) => [node.id, toCanonicalNode(node)]),
-  );
-  const nodesById = new Map(graph.nodes.map((node) => [node.id, node]));
-  const conditionalEdgesBySource: Record<string, Record<string, string>> = {};
-  const edges: CanonicalEdge[] = [];
-
-  for (const edge of graph.edges) {
-    const sourceNode = nodesById.get(edge.source);
-    const targetNode = nodesById.get(edge.target);
-    if (!sourceNode || !targetNode) continue;
-
-    const sourceConfig = sourceNode.data.config;
-    const targetConfig = targetNode.data.config;
-    const sourcePortKey = getPortKeyFromHandle(edge.sourceHandle);
-    const targetPortKey = getPortKeyFromHandle(edge.targetHandle);
-
-    if (sourceConfig.family === "condition") {
-      if (sourcePortKey) {
-        conditionalEdgesBySource[edge.source] = {
-          ...(conditionalEdgesBySource[edge.source] ?? {}),
-          [sourcePortKey]: edge.target,
-        };
-      }
-      continue;
-    }
-
-    if (!sourcePortKey || !targetPortKey) continue;
-
-    const sourceBindings = extractLegacyStateWrites(sourceConfig);
-    const targetBindings = extractLegacyStateReads(targetConfig);
-    const sourceState = sourceBindings[sourcePortKey]?.stateKey ?? sourcePortKey;
-    const targetState = targetBindings[targetPortKey]?.stateKey ?? targetPortKey;
-    const stateKey = chooseConnectedStateName(sourceState, targetState);
-
-    const sourcePreferredType =
-      sourceConfig.family === "input"
-        ? canonicalStateTypeFromValueType(sourceConfig.output.valueType)
-        : sourceConfig.family === "agent"
-          ? canonicalStateTypeFromValueType(sourceConfig.outputs.find((item) => item.key === sourcePortKey)?.valueType)
-          : "text";
-    const targetPreferredType =
-      targetConfig.family === "output"
-        ? canonicalStateTypeFromValueType(targetConfig.input.valueType)
-        : targetConfig.family === "agent" || targetConfig.family === "condition"
-          ? canonicalStateTypeFromValueType(targetConfig.inputs.find((item) => item.key === targetPortKey)?.valueType)
-          : "text";
-    ensureStateDefinition(stateSchema, stateKey, sourcePreferredType);
-    ensureStateDefinition(stateSchema, stateKey, targetPreferredType);
-
-    edges.push({
-      source: edge.source,
-      target: edge.target,
-      sourceHandle: `write:${stateKey}`,
-      targetHandle: `read:${stateKey}`,
-    });
-  }
-
+function buildEditorPort(
+  stateKey: string,
+  stateSchema: Record<string, CanonicalStateDefinition>,
+  required = false,
+): PortDefinition {
+  const definition = stateSchema[stateKey];
+  const label = stripString(definition?.name) || stateKey;
   return {
-    graph_id: graph.graph_id ?? null,
-    name: graph.name,
-    state_schema: stateSchema,
-    nodes,
-    edges,
-    conditional_edges: Object.entries(conditionalEdgesBySource).map(([source, branches]) => ({
-      source,
-      branches,
-    })),
-    metadata: graph.metadata,
+    key: stateKey,
+    label,
+    valueType: valueTypeFromCanonicalState(definition?.type ?? "text"),
+    required,
+  };
+}
+
+function buildEditorConditionBranches(branches: string[]): BranchDefinition[] {
+  return branches.map((branch) => ({
+    key: branch,
+    label: "",
+  }));
+}
+
+function createEditorSkillAttachment(skillKey: string) {
+  return {
+    name: skillKey,
+    skillKey,
+    inputMapping: {},
+    contextBinding: {},
+    usage: "optional" as const,
+  };
+}
+
+export function buildEditorNodeConfigFromCanonicalNode(
+  nodeId: string,
+  node: CanonicalNode,
+  stateSchema: Record<string, CanonicalStateDefinition>,
+): NodePresetDefinition {
+  if (node.kind === "input") {
+    const outputState = node.writes[0]?.state ?? "value";
+    const outputPort = buildEditorPort(outputState, stateSchema, false);
+    return {
+      presetId: `node.input.${nodeId}`,
+      name: stripString(node.name) || nodeId,
+      description: node.description ?? "",
+      family: "input",
+      valueType: outputPort.valueType,
+      output: outputPort,
+      value: String(node.config.value ?? ""),
+      stateReads: [],
+        stateWrites: node.writes.map((binding) => ({
+          stateKey: binding.state,
+          outputKey: binding.state,
+          mode: binding.mode,
+        })),
+    } satisfies InputBoundaryNode;
+  }
+
+  if (node.kind === "agent") {
+    return {
+      presetId: `node.agent.${nodeId}`,
+      name: stripString(node.name) || nodeId,
+      description: node.description ?? "",
+      family: "agent",
+      inputs: node.reads.map((binding) => buildEditorPort(binding.state, stateSchema, binding.required)),
+      outputs: node.writes.map((binding) => buildEditorPort(binding.state, stateSchema, false)),
+      systemInstruction: node.config.systemInstruction,
+      taskInstruction: node.config.taskInstruction,
+      skills: node.config.skills.map((skillKey) => createEditorSkillAttachment(skillKey)),
+      outputBinding: {},
+      modelSource: node.config.modelSource,
+      model: node.config.model,
+      thinkingMode: node.config.thinkingMode,
+      temperature: node.config.temperature,
+      stateReads: node.reads.map((binding) => ({
+        stateKey: binding.state,
+        inputKey: binding.state,
+        required: binding.required,
+      })),
+        stateWrites: node.writes.map((binding) => ({
+          stateKey: binding.state,
+          outputKey: binding.state,
+          mode: binding.mode,
+        })),
+    } satisfies AgentNode;
+  }
+
+  if (node.kind === "condition") {
+    return {
+      presetId: `node.condition.${nodeId}`,
+      name: stripString(node.name) || nodeId,
+      description: node.description ?? "",
+      family: "condition",
+      inputs: node.reads.map((binding) => buildEditorPort(binding.state, stateSchema, binding.required)),
+      branches: buildEditorConditionBranches(node.config.branches),
+      conditionMode: node.config.conditionMode,
+      rule: node.config.rule,
+      branchMapping: node.config.branchMapping,
+      stateReads: node.reads.map((binding) => ({
+        stateKey: binding.state,
+        inputKey: binding.state,
+        required: binding.required,
+      })),
+        stateWrites: node.writes.map((binding) => ({
+          stateKey: binding.state,
+          outputKey: binding.state,
+          mode: binding.mode,
+        })),
+    } satisfies ConditionNode;
+  }
+
+  const inputState = node.reads[0]?.state ?? "value";
+  return {
+    presetId: `node.output.${nodeId}`,
+    name: stripString(node.name) || nodeId,
+    description: node.description ?? "",
+    family: "output",
+    input: buildEditorPort(inputState, stateSchema, node.reads[0]?.required ?? true),
+    displayMode: node.config.displayMode,
+    persistEnabled: node.config.persistEnabled,
+    persistFormat: node.config.persistFormat,
+    fileNameTemplate: node.config.fileNameTemplate,
+    stateReads: node.reads.map((binding) => ({
+      stateKey: binding.state,
+      inputKey: binding.state,
+      required: binding.required,
+      })),
+    stateWrites: [],
+  } satisfies OutputBoundaryNode;
+}
+
+export function buildEditorPresetRecordFromCanonicalPreset(preset: CanonicalPresetDocument): EditorPresetRecord {
+  const nodeId = "preset_node";
+  const presetNode = {
+    ...preset.definition.node,
+    ui: {
+      ...preset.definition.node.ui,
+      position: preset.definition.node.ui.position ?? { x: 0, y: 0 },
+    },
+  } satisfies CanonicalNode;
+  return {
+    presetId: preset.presetId,
+    sourcePresetId: preset.sourcePresetId ?? null,
+    definition: {
+      ...buildEditorNodeConfigFromCanonicalNode(nodeId, presetNode, preset.definition.state_schema),
+      presetId: preset.presetId,
+      name: preset.definition.node.name || nodeId,
+      description: preset.definition.description || preset.definition.node.description,
+    },
+    stateSchema: buildEditorStateFieldsFromCanonicalGraph({
+      graph_id: null,
+      name: preset.definition.label || preset.definition.node.name || preset.presetId,
+      state_schema: preset.definition.state_schema,
+      nodes: {
+        [nodeId]: presetNode,
+      },
+      edges: [],
+      conditional_edges: [],
+      metadata: {},
+    }),
+    createdAt: preset.createdAt ?? null,
+    updatedAt: preset.updatedAt ?? null,
   };
 }

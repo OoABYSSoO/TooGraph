@@ -1,15 +1,30 @@
 import Link from "next/link";
 
 import { apiGet } from "@/lib/api";
+import type { CanonicalGraphPayload, CanonicalTemplateRecord } from "@/lib/node-system-canonical";
 import type { GraphSummary, TemplateSummary } from "@/lib/types";
 
 async function loadEditorLandingData() {
   try {
     const [graphs, templates] = await Promise.all([
-      apiGet<GraphSummary[]>("/api/graphs"),
-      apiGet<TemplateSummary[]>("/api/templates"),
+      apiGet<CanonicalGraphPayload[]>("/api/graphs"),
+      apiGet<CanonicalTemplateRecord[]>("/api/templates"),
     ]);
-    return { graphs, templates };
+    return {
+      graphs: graphs.map((graph) => {
+        return {
+          graph_id: graph.graph_id ?? "",
+          name: graph.name,
+          node_count: Object.keys(graph.nodes).length,
+          edge_count: graph.edges.length + graph.conditional_edges.reduce((count, entry) => count + Object.keys(entry.branches).length, 0),
+        } satisfies GraphSummary;
+      }),
+      templates: templates.map((template) => ({
+        template_id: template.template_id,
+        label: template.label,
+        description: template.description,
+      }) satisfies TemplateSummary),
+    };
   } catch {
     return { graphs: [] as GraphSummary[], templates: [] as TemplateSummary[] };
   }
@@ -89,7 +104,7 @@ export default async function EditorPage() {
                       <div className="text-sm text-[var(--muted)]">{graph.graph_id}</div>
                     </div>
                     <div className="text-right text-sm text-[var(--muted)]">
-                      <div>{graph.nodes.length} nodes / {graph.edges.length} edges</div>
+                      <div>{graph.node_count} nodes / {graph.edge_count} edges</div>
                     </div>
                   </div>
                 </Link>

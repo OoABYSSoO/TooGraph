@@ -97,8 +97,9 @@ Graph 中使用两类边命名：
 
 ### 约束
 
-- state 名称全局唯一
-- state 名称本身就是身份，不再额外维护 `id / key / title`
+- state key 全局唯一
+- state 正式保存 `key + name`
+- `key` 是机器身份，`name` 是显示名
 - 同一个 state 在任何地方显示的名称、解释、类型都一致
 
 ### `nodes`

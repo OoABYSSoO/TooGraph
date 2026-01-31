@@ -1,4 +1,4 @@
-import type { NodePresetDefinition, ValueType } from "@/lib/node-system-schema";
+import type { NodePresetDefinition } from "@/lib/node-system-schema";
 
 export const EMPTY_AGENT_PRESET = {
   presetId: "preset.agent.empty.v0",
@@ -87,22 +87,4 @@ const STATIC_NODE_DEFINITIONS = [
 
 export function getNodePresetById(presetId: string) {
   return STATIC_NODE_DEFINITIONS.find((preset) => preset.presetId === presetId);
-}
-
-export function getSuggestedPresets(valueType?: ValueType | null) {
-  if (!valueType) {
-    return NODE_PRESETS_MOCK;
-  }
-
-  const supportsType = (preset: NodePresetDefinition) => {
-    if (preset.family === "agent") {
-      return preset.inputs.some((input) => input.valueType === "any" || input.valueType === valueType);
-    }
-    if (preset.family === "condition") {
-      return preset.inputs.some((input) => input.valueType === "any" || input.valueType === valueType);
-    }
-    return false;
-  };
-
-  return [EMPTY_AGENT_PRESET, ...NODE_PRESETS_MOCK.filter((preset) => preset.presetId !== EMPTY_AGENT_PRESET.presetId && supportsType(preset))];
 }

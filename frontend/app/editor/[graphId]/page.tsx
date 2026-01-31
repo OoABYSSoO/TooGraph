@@ -6,6 +6,7 @@ import {
   type EditorClientTemplateRecord,
 } from "@/components/editor/editor-client";
 import { apiGet } from "@/lib/api";
+import type { CanonicalGraphPayload, CanonicalTemplateRecord } from "@/lib/node-system-canonical";
 
 type EditorGraphPageProps = {
   params: Promise<{ graphId: string }>;
@@ -13,7 +14,7 @@ type EditorGraphPageProps = {
 
 async function loadTemplates() {
   try {
-    return await apiGet<EditorClientTemplateRecord[]>("/api/templates");
+    return await apiGet<CanonicalTemplateRecord[]>("/api/templates");
   } catch {
     return [] as EditorClientTemplateRecord[];
   }
@@ -21,7 +22,7 @@ async function loadTemplates() {
 
 async function loadGraph(graphId: string) {
   try {
-    return await apiGet<EditorClientGraphPayload>(`/api/graphs/${graphId}`);
+    return await apiGet<CanonicalGraphPayload>(`/api/graphs/${graphId}`);
   } catch {
     return null;
   }

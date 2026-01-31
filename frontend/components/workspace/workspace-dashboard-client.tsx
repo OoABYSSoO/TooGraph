@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { MetricCard } from "@/components/ui/metric-card";
 import { apiGet } from "@/lib/api";
 import { useLanguage } from "@/components/providers/language-provider";
+import type { CanonicalGraphPayload } from "@/lib/node-system-canonical";
 import type { GraphSummary, RunSummary } from "@/lib/types";
 
 export function WorkspaceDashboardClient() {
@@ -22,11 +23,20 @@ export function WorkspaceDashboardClient() {
     async function loadDashboard() {
       try {
         const [graphPayload, runPayload] = await Promise.all([
-          apiGet<GraphSummary[]>("/api/graphs"),
+          apiGet<CanonicalGraphPayload[]>("/api/graphs"),
           apiGet<RunSummary[]>("/api/runs"),
         ]);
         if (!cancelled) {
-          setGraphs(graphPayload);
+          setGraphs(
+            graphPayload.map((graph) => {
+              return {
+                graph_id: graph.graph_id ?? "",
+                name: graph.name,
+                node_count: Object.keys(graph.nodes).length,
+                edge_count: graph.edges.length + graph.conditional_edges.reduce((count, entry) => count + Object.keys(entry.branches).length, 0),
+              } satisfies GraphSummary;
+            }),
+          );
           setRuns(runPayload);
           setError(null);
         }
@@ -81,8 +91,8 @@ export function WorkspaceDashboardClient() {
                 <SubtleCard>
                 <strong>{graph.name}</strong>
                 <div className="mt-2 flex flex-wrap gap-2.5">
-                  <Badge>nodes {graph.nodes.length}</Badge>
-                  <Badge>edges {graph.edges.length}</Badge>
+                  <Badge>nodes {graph.node_count}</Badge>
+                  <Badge>edges {graph.edge_count}</Badge>
                 </div>
                 </SubtleCard>
               </Link>

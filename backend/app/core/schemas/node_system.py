@@ -104,6 +104,7 @@ class PersistFormat(str, Enum):
 
 
 class NodeSystemStateDefinition(BaseModel):
+    name: str = ""
     description: str = ""
     type: NodeSystemStateType = NodeSystemStateType.TEXT
     value: Any = Field(default=None, validation_alias=AliasChoices("value", "defaultValue"), serialization_alias="value")
@@ -313,8 +314,9 @@ class NodeSystemGraphCore(BaseModel):
     @model_validator(mode="after")
     def validate_references(self) -> "NodeSystemGraphCore":
         state_names: set[str] = set()
-        for state_name in self.state_schema:
+        for state_name, definition in self.state_schema.items():
             state_names.add(_validate_identifier(state_name, label="State name"))
+            definition.name = str(getattr(definition, "name", "") or "").strip() or state_name
 
         node_names: set[str] = set()
         for node_name, node in self.nodes.items():

@@ -1,5 +1,6 @@
 import { EditorClient, type EditorClientTemplateRecord } from "@/components/editor/editor-client";
 import { apiGet } from "@/lib/api";
+import type { CanonicalTemplateRecord } from "@/lib/node-system-canonical";
 
 type EditorNewPageProps = {
   searchParams?: Promise<{ template?: string }>;
@@ -7,7 +8,7 @@ type EditorNewPageProps = {
 
 async function loadTemplates() {
   try {
-    return await apiGet<EditorClientTemplateRecord[]>("/api/templates");
+    return await apiGet<CanonicalTemplateRecord[]>("/api/templates");
   } catch {
     return [] as EditorClientTemplateRecord[];
   }

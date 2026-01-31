@@ -39,7 +39,12 @@ export type StateFieldType =
   | "array"
   | "markdown"
   | "json"
-  | "file_list";
+  | "file_list"
+  | "image"
+  | "audio"
+  | "video"
+  | "file"
+  | "knowledge_base";
 
 export type StateFieldUi = {
   color?: string;
@@ -48,7 +53,7 @@ export type StateFieldUi = {
 export type StateField = {
   key: string;
   type: StateFieldType;
-  title: string;
+  name: string;
   description: string;
   value?: unknown;
   ui?: StateFieldUi;
@@ -137,49 +142,6 @@ export type NodeViewportSize = {
 export type GraphPosition = {
   x: number;
   y: number;
-};
-
-export type NodeSystemGraphNodeData = {
-  nodeId: string;
-  config: NodePresetDefinition;
-  previewText?: string;
-  isExpanded?: boolean;
-  collapsedSize?: NodeViewportSize | null;
-  expandedSize?: NodeViewportSize | null;
-};
-
-export type NodeSystemGraphNode = {
-  id: string;
-  type?: string;
-  position: GraphPosition;
-  data: NodeSystemGraphNodeData;
-};
-
-export type NodeSystemGraphEdge = {
-  id: string;
-  source: string;
-  target: string;
-  sourceHandle?: string | null;
-  targetHandle?: string | null;
-};
-
-export type NodeSystemGraphPayload = {
-  graph_id?: string | null;
-  name: string;
-  state_schema: StateField[];
-  nodes: NodeSystemGraphNode[];
-  edges: NodeSystemGraphEdge[];
-  metadata: Record<string, unknown>;
-};
-
-export type NodeSystemTemplateRecord = {
-  template_id: string;
-  label: string;
-  description: string;
-  default_graph_name: string;
-  supported_node_types: string[];
-  state_schema: StateField[];
-  default_node_system_graph: Omit<NodeSystemGraphPayload, "graph_id">;
 };
 
 export type SavedOutputArtifact = {

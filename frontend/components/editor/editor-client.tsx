@@ -1,10 +1,10 @@
 "use client";
 
 import { NodeSystemEditor } from "@/components/editor/node-system-editor";
-import type { NodeSystemGraphPayload, NodeSystemTemplateRecord } from "@/lib/node-system-schema";
+import type { CanonicalGraphPayload, CanonicalTemplateRecord } from "@/lib/node-system-canonical";
 
-export type EditorClientGraphPayload = NodeSystemGraphPayload;
-export type EditorClientTemplateRecord = NodeSystemTemplateRecord;
+export type EditorClientGraphPayload = CanonicalGraphPayload;
+export type EditorClientTemplateRecord = CanonicalTemplateRecord;
 
 type EditorClientProps = {
   mode: "new" | "existing";

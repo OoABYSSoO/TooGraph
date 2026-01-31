@@ -5,24 +5,28 @@
   "default_graph_name": "Hello World",
   "state_schema": {
     "question": {
+      "name": "question",
       "description": "User question for the workflow.",
       "type": "text",
       "value": "什么是 GraphiteUI？你能做些什么？我该如何开始使用？",
       "color": "#d97706"
     },
     "knowledge_base": {
+      "name": "knowledge_base",
       "description": "Selected knowledge base for grounded answers.",
       "type": "knowledge_base",
       "value": "graphiteui-official",
       "color": "#0f766e"
     },
     "raw_answer": {
+      "name": "raw_answer",
       "description": "Raw onboarding answer produced by the helper agent.",
       "type": "text",
       "value": "",
       "color": "#9f1239"
     },
     "formatted_answer": {
+      "name": "formatted_answer",
       "description": "Markdown-formatted answer produced by the formatter agent.",
       "type": "text",
       "value": "",
