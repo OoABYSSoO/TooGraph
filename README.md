@@ -181,7 +181,7 @@ GraphiteUI/
 1. 源文件层
 
 - GraphiteUI 项目知识库的源文件主要在 [knowledge/GraphiteUI-official](knowledge/GraphiteUI-official)。
-- 另外还会合并项目内的 [README.md](README.md) 和 [FUTURE_WORK.md](docs/FUTURE_WORK.md)。
+- 另外还会合并项目内的 [README.md](README.md) 和 [current_engineering_backlog.md](docs/current_engineering_backlog.md)。
 - Python 和 LangGraph 的知识库源不是仓库里手写的文档，而是在导入时从官方站点抓取或下载。
 
 2. 导入后的正式存储层

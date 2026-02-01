@@ -10,7 +10,6 @@ export const EMPTY_AGENT_PRESET = {
   systemInstruction: "",
   taskInstruction: "",
   skills: [],
-  outputBinding: {},
 } satisfies NodePresetDefinition;
 
 export const TEXT_INPUT_PRESET = {

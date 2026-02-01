@@ -65,31 +65,37 @@ export function WorkspaceDashboardClient() {
         className="col-span-4 max-[960px]:col-span-1"
         label={t("common.recent_graphs")}
         value={graphs.length}
-        description="Saved workflow definitions available from backend storage."
+        description={t("workspace.graphs_desc")}
       />
       <MetricCard
         className="col-span-4 max-[960px]:col-span-1"
         label={t("common.running_jobs")}
         value={runningCount}
-        description="Live workflow runs currently moving through runtime."
+        description={t("workspace.runs_desc")}
       />
       <MetricCard
         className="col-span-4 max-[960px]:col-span-1"
         label={t("common.failed_runs")}
         value={failedCount}
-        description="Runs that need inspection or another validation pass."
+        description={t("workspace.actions_desc")}
       />
 
       <Card className="col-span-6 max-[960px]:col-span-1">
-        <h2 className="mb-2.5">{t("common.recent_graphs")}</h2>
+        <div className="mb-4">
+          <h2 className="mb-2.5">{t("common.recent_graphs")}</h2>
+          <p className="text-sm leading-6 text-[var(--muted)]">{t("workspace.graphs_desc")}</p>
+        </div>
         <div className="grid gap-3">
           {graphs.length === 0 ? (
             <EmptyState>{t("common.no_data")}</EmptyState>
           ) : (
             graphs.slice(0, 6).map((graph) => (
-              <Link className="block" href={`/editor/${graph.graph_id}`} key={graph.graph_id}>
-                <SubtleCard>
-                <strong>{graph.name}</strong>
+              <Link className="block cursor-pointer" href={`/editor/${graph.graph_id}`} key={graph.graph_id}>
+                <SubtleCard className="transition-all duration-200 ease-out hover:-translate-y-px hover:border-[rgba(154,52,18,0.28)] hover:bg-[rgba(255,255,255,0.82)]">
+                <div className="flex items-start justify-between gap-3">
+                  <strong>{graph.name}</strong>
+                  <span className="text-xs uppercase tracking-[0.08em] text-[var(--accent-strong)]">{t("common.open_detail")}</span>
+                </div>
                 <div className="mt-2 flex flex-wrap gap-2.5">
                   <Badge>nodes {graph.node_count}</Badge>
                   <Badge>edges {graph.edge_count}</Badge>
@@ -102,15 +108,21 @@ export function WorkspaceDashboardClient() {
       </Card>
 
       <Card className="col-span-6 max-[960px]:col-span-1">
-        <h2 className="mb-2.5">{t("common.recent_runs")}</h2>
+        <div className="mb-4">
+          <h2 className="mb-2.5">{t("common.recent_runs")}</h2>
+          <p className="text-sm leading-6 text-[var(--muted)]">{t("workspace.runs_desc")}</p>
+        </div>
         <div className="grid gap-3">
           {runs.length === 0 ? (
             <EmptyState>{t("common.no_data")}</EmptyState>
           ) : (
             runs.slice(0, 6).map((run) => (
-              <Link className="block" href={`/runs/${run.run_id}`} key={run.run_id}>
-                <SubtleCard>
-                <strong>{run.run_id}</strong>
+              <Link className="block cursor-pointer" href={`/runs/${run.run_id}`} key={run.run_id}>
+                <SubtleCard className="transition-all duration-200 ease-out hover:-translate-y-px hover:border-[rgba(154,52,18,0.28)] hover:bg-[rgba(255,255,255,0.82)]">
+                <div className="flex items-start justify-between gap-3">
+                  <strong>{run.run_id}</strong>
+                  <span className="text-xs uppercase tracking-[0.08em] text-[var(--accent-strong)]">{t("common.open_detail")}</span>
+                </div>
                 <div className="text-[var(--muted)]">{run.graph_name}</div>
                 <div className="mt-2 flex flex-wrap gap-2.5">
                   <Badge>{run.status}</Badge>
@@ -124,16 +136,34 @@ export function WorkspaceDashboardClient() {
       </Card>
 
       <Card className="col-span-12">
-        <h2 className="mb-2.5">{t("common.quick_actions")}</h2>
-        <div className="mt-[22px] flex flex-wrap gap-3">
-          <Link className="inline-flex items-center justify-center rounded-[14px] border border-[var(--accent)] bg-[var(--accent)] px-[18px] py-3 text-white transition-transform duration-150 hover:-translate-y-px" href="/editor">
-            Create Graph
+        <div className="mb-4">
+          <h2 className="mb-2.5">{t("common.quick_actions")}</h2>
+          <p className="text-sm leading-6 text-[var(--muted)]">{t("workspace.actions_desc")}</p>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <Link className="block cursor-pointer" href="/editor/new">
+            <SubtleCard className="h-full transition-all duration-200 ease-out hover:-translate-y-px hover:border-[rgba(154,52,18,0.28)] hover:bg-[rgba(255,255,255,0.82)]">
+              <strong>{t("workspace.create_graph")}</strong>
+              <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{t("home.editor_desc")}</p>
+            </SubtleCard>
           </Link>
-          <Link className="inline-flex items-center justify-center rounded-[14px] border border-[var(--accent)] bg-transparent px-[18px] py-3 text-[var(--accent-strong)] transition-transform duration-150 hover:-translate-y-px" href="/runs">
-            View Run History
+          <Link className="block cursor-pointer" href="/editor">
+            <SubtleCard className="h-full transition-all duration-200 ease-out hover:-translate-y-px hover:border-[rgba(154,52,18,0.28)] hover:bg-[rgba(255,255,255,0.82)]">
+              <strong>{t("workspace.open_editor")}</strong>
+              <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{t("home.workspace_desc")}</p>
+            </SubtleCard>
           </Link>
-          <Link className="inline-flex items-center justify-center rounded-[14px] border border-[var(--accent)] bg-transparent px-[18px] py-3 text-[var(--accent-strong)] transition-transform duration-150 hover:-translate-y-px" href="/knowledge">
-            Open Knowledge
+          <Link className="block cursor-pointer" href="/runs">
+            <SubtleCard className="h-full transition-all duration-200 ease-out hover:-translate-y-px hover:border-[rgba(154,52,18,0.28)] hover:bg-[rgba(255,255,255,0.82)]">
+              <strong>{t("workspace.view_runs")}</strong>
+              <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{t("home.runtime_desc")}</p>
+            </SubtleCard>
+          </Link>
+          <Link className="block cursor-pointer" href="/knowledge">
+            <SubtleCard className="h-full transition-all duration-200 ease-out hover:-translate-y-px hover:border-[rgba(154,52,18,0.28)] hover:bg-[rgba(255,255,255,0.82)]">
+              <strong>{t("workspace.open_knowledge")}</strong>
+              <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{t("knowledge.desc")}</p>
+            </SubtleCard>
           </Link>
         </div>
       </Card>

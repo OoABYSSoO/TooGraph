@@ -427,7 +427,6 @@ export function buildEditorNodeConfigFromCanonicalNode(
       systemInstruction: node.config.systemInstruction,
       taskInstruction: node.config.taskInstruction,
       skills: node.config.skills.map((skillKey) => createEditorSkillAttachment(skillKey)),
-      outputBinding: {},
       modelSource: node.config.modelSource,
       model: node.config.model,
       thinkingMode: node.config.thinkingMode,

@@ -4187,7 +4187,6 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                     sections={[
                       { label: "Inputs JSON", value: config.inputs, onChange: (v) => data.onConfigChange?.((c) => ({ ...(c as AgentNode), inputs: v as PortDefinition[] })) },
                       { label: "Outputs JSON", value: config.outputs, onChange: (v) => data.onConfigChange?.((c) => ({ ...(c as AgentNode), outputs: v as PortDefinition[] })) },
-                      { label: "Output Binding JSON", value: config.outputBinding, onChange: (v) => data.onConfigChange?.((c) => ({ ...(c as AgentNode), outputBinding: v as Record<string, string> })), minHeight: "min-h-24" },
                     ]}
                   />
                 </div>

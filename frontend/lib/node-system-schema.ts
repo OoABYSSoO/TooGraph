@@ -84,7 +84,6 @@ export type AgentNode = NodeStateBindings & {
   systemInstruction: string;
   taskInstruction: string;
   skills: SkillAttachment[];
-  outputBinding: Record<string, string>;
   modelSource?: AgentModelSource;
   model?: string;
   thinkingMode?: AgentThinkingMode;
