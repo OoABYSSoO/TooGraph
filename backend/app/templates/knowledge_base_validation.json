@@ -182,7 +182,5 @@
     }
   ],
   "conditional_edges": [],
-  "metadata": {
-    "runtime_backend": "langgraph"
-  }
+  "metadata": {}
 }

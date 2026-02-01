@@ -1598,6 +1598,7 @@ function summarizeRunNodeStates(nodeIds: string[], nodeStatusMap: Record<string,
     {
       idle: 0,
       running: 0,
+      paused: 0,
       success: 0,
       failed: 0,
     } satisfies Record<RunNodeStatus, number>,
@@ -5327,7 +5328,7 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
       if (run.status === "queued") {
         return `Run ${run.run_id} queued. Pending ${summary.idle} nodes.${cycleSummaryText}`;
       }
-      if (run.status === "running") {
+      if (run.status === "running" || run.status === "resuming") {
         const currentLabelText = currentNodeLabel ? `Running ${currentNodeLabel}. ` : "";
         return `${currentLabelText}Done ${summary.success} · Active ${summary.running} · Pending ${summary.idle} · Failed ${summary.failed}.${cycleSummaryText}`;
       }
@@ -5425,7 +5426,7 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
         if (cancelled) return;
         hydrateRunResult(run);
         setStatusMessage(formatRunStatusText(run));
-        if (run.status === "queued" || run.status === "running") {
+        if (run.status === "queued" || run.status === "running" || run.status === "resuming") {
           pollTimer = window.setTimeout(() => {
             void pollRun();
           }, 500);

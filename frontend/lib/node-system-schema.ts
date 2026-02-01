@@ -210,8 +210,8 @@ export type NodeExecutionArtifacts = {
   }>;
 };
 
-export type RunStatus = "queued" | "running" | "completed" | "failed";
-export type RunNodeStatus = "idle" | "running" | "success" | "failed";
+export type RunStatus = "queued" | "running" | "paused" | "awaiting_human" | "resuming" | "completed" | "failed";
+export type RunNodeStatus = "idle" | "running" | "paused" | "success" | "failed";
 
 export type RunNodeExecution = {
   node_id: string;
@@ -244,11 +244,32 @@ export type CycleSummary = {
   stop_reason?: string | null;
 };
 
+export type CheckpointMetadata = {
+  available: boolean;
+  checkpoint_id?: string | null;
+  thread_id?: string | null;
+  checkpoint_ns?: string | null;
+  saver?: string | null;
+  resume_source?: string | null;
+};
+
+export type RunLifecycleRecord = {
+  updated_at: string;
+  paused_at?: string | null;
+  resumed_at?: string | null;
+  pause_reason?: string | null;
+  resume_count: number;
+  resumed_from_run_id?: string | null;
+};
+
 export type NodeSystemRunDetail = {
   run_id: string;
   graph_id: string;
   graph_name: string;
   status: RunStatus;
+  runtime_backend?: string;
+  lifecycle?: RunLifecycleRecord;
+  checkpoint_metadata?: CheckpointMetadata;
   current_node_id?: string | null;
   revision_round: number;
   started_at: string;
@@ -275,6 +296,7 @@ export type NodeSystemRunDetail = {
   };
   state_snapshot?: StateSnapshot;
   cycle_summary?: CycleSummary;
+  metadata?: Record<string, unknown>;
 };
 
 export function isValueTypeCompatible(source: ValueType, target: ValueType) {

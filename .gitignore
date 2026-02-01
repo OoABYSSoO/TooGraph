@@ -75,6 +75,7 @@ backend/data/*.db
 backend/data/*.sqlite
 backend/data/*.sqlite3
 backend/data/graphs/
+backend/data/checkpoints/
 backend/data/memories/runtime/
 backend/data/presets/
 backend/data/runs/

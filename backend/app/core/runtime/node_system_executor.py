@@ -13,7 +13,7 @@ from typing import Any
 
 from app.core.model_catalog import get_default_text_model_ref, normalize_model_ref, resolve_runtime_model_name
 from app.core.runtime.output_boundary_utils import save_output_value
-from app.core.runtime.state import create_initial_run_state, utc_now_iso
+from app.core.runtime.state import create_initial_run_state, set_run_status, touch_run_lifecycle, utc_now_iso
 from app.core.schemas.node_system import (
     NodeSystemAgentNode,
     NodeSystemConditionNode,
@@ -89,10 +89,12 @@ def execute_node_system_graph(
         graph_name=graph.name,
         max_revision_round=int(graph.metadata.get("max_revision_round", 1)),
     )
-    state["status"] = "running"
+    set_run_status(state, "running")
+    state["runtime_backend"] = "legacy"
     state["started_at"] = utc_now_iso()
     state["node_status_map"] = {node_name: "idle" for node_name in graph.nodes}
     state["metadata"] = dict(graph.metadata)
+    state["metadata"]["resolved_runtime_backend"] = "legacy"
     _initialize_graph_state(graph, state)
 
     execution_edges = _build_execution_edges(graph)
@@ -149,9 +151,8 @@ def execute_node_system_graph(
         )
 
     if state.get("status") != "failed":
-        state["status"] = "completed"
+        set_run_status(state, "completed")
     state["current_node_id"] = None
-    state["completed_at"] = utc_now_iso()
     _refresh_run_artifacts(state, node_outputs, active_edge_ids, started_perf=started_perf)
     save_run(state)
     return state
@@ -324,7 +325,7 @@ def _execute_cyclic_graph(
 
         pending_cycle_edge_ids = next_iteration_edge_ids
 
-    state["status"] = "failed"
+    set_run_status(state, "failed")
     state["errors"] = [
         *state.get("errors", []),
         f"Cycle execution exceeded max iterations ({cycle_max_iterations}). Add an exit branch or raise cycle_max_iterations.",
@@ -361,6 +362,7 @@ def _execute_runtime_node(
     node_started_perf = time.perf_counter()
     state["current_node_id"] = node_name
     state["node_status_map"][node_name] = "running"
+    touch_run_lifecycle(state)
     if persist_progress:
         _persist_run_progress(state, node_outputs, active_edge_ids, started_perf=started_perf)
 
@@ -418,7 +420,7 @@ def _execute_runtime_node(
     except Exception as exc:  # pragma: no cover - defensive runtime path
         duration_ms = int((time.perf_counter() - node_started_perf) * 1000)
         state["node_status_map"][node_name] = "failed"
-        state["status"] = "failed"
+        set_run_status(state, "failed")
         state["errors"] = [*state.get("errors", []), str(exc)]
         state["node_executions"] = [
             *state.get("node_executions", []),
@@ -464,6 +466,7 @@ def _persist_run_progress(
     started_perf: float,
 ) -> None:
     _refresh_run_artifacts(state, node_outputs, active_edge_ids, started_perf=started_perf)
+    touch_run_lifecycle(state)
     save_run(state)
 
 

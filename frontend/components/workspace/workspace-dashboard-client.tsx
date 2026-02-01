@@ -52,7 +52,7 @@ export function WorkspaceDashboardClient() {
     };
   }, []);
 
-  const runningCount = useMemo(() => runs.filter((run) => run.status === "running").length, [runs]);
+  const runningCount = useMemo(() => runs.filter((run) => run.status === "running" || run.status === "resuming").length, [runs]);
   const failedCount = useMemo(() => runs.filter((run) => run.status === "failed").length, [runs]);
 
   if (error) {

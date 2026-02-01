@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from typing import Literal
 
 from app.core.langgraph.build_plan import (
     LangGraphBuildPlan,
@@ -9,17 +10,28 @@ from app.core.langgraph.build_plan import (
     LangGraphNodePlan,
     LangGraphRuntimeRequirements,
 )
-from app.core.runtime.node_system_executor import execution_edges_from_graph
 from app.core.schemas.node_system import (
     NodeSystemAgentNode,
-    NodeSystemConditionNode,
     NodeSystemGraphPayload,
     NodeSystemStateType,
 )
 
 
-def graph_requests_langgraph_runtime(graph: NodeSystemGraphPayload) -> bool:
-    return str(graph.metadata.get("runtime_backend", "")).strip().lower() == "langgraph"
+RuntimeBackend = Literal["langgraph", "legacy"]
+
+
+def resolve_graph_runtime_backend(
+    graph: NodeSystemGraphPayload,
+) -> tuple[RuntimeBackend, list[str]]:
+    requested_backend = str(graph.metadata.get("runtime_backend", "")).strip().lower()
+    if requested_backend == "legacy":
+        return "legacy", ["graph metadata requested legacy runtime"]
+
+    build_plan = compile_graph_to_langgraph_plan(graph)
+    unsupported_reasons = list(build_plan.requirements.unsupported_reasons)
+    if unsupported_reasons:
+        return "legacy", unsupported_reasons
+    return "langgraph", []
 
 
 def compile_graph_to_langgraph_plan(graph: NodeSystemGraphPayload) -> LangGraphBuildPlan:
@@ -34,12 +46,6 @@ def compile_graph_to_langgraph_plan(graph: NodeSystemGraphPayload) -> LangGraphB
             outgoing_counts[conditional_edge.source] += 1
 
     unsupported_reasons: list[str] = []
-    if graph.conditional_edges:
-        unsupported_reasons.append("conditional_edges are not supported by the current LangGraph runtime adapter yet.")
-
-    runtime_edges = execution_edges_from_graph(graph)
-    if any(edge.kind == "conditional" for edge in runtime_edges):
-        unsupported_reasons.append("conditional execution edges are not supported by the current LangGraph runtime adapter yet.")
 
     graph_edges: list[LangGraphEdgePlan] = []
     for edge in graph.edges:
@@ -62,8 +68,6 @@ def compile_graph_to_langgraph_plan(graph: NodeSystemGraphPayload) -> LangGraphB
     graph_nodes: dict[str, LangGraphNodePlan] = {}
     skill_keys: set[str] = set()
     for node_name, node in graph.nodes.items():
-        if isinstance(node, NodeSystemConditionNode):
-            unsupported_reasons.append(f"condition node '{node_name}' is not supported by the current LangGraph runtime adapter yet.")
         if any(binding.mode.value != "replace" for binding in node.writes):
             unsupported_reasons.append(f"node '{node_name}' uses a non-replace state write mode.")
 
@@ -124,4 +128,3 @@ def _parse_handle_state(handle: str) -> str | None:
         return None
     _prefix, state_name = handle.split(":", 1)
     return state_name.strip() or None
-

@@ -26,7 +26,7 @@ export function RunDetailClient({ runId }: { runId: string }) {
         if (!cancelled) {
           setRun(payload);
           setError(null);
-          if (payload.status === "queued" || payload.status === "running") {
+          if (payload.status === "queued" || payload.status === "running" || payload.status === "resuming") {
             pollTimer = window.setTimeout(() => {
               void loadRun();
             }, 750);
