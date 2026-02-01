@@ -387,6 +387,8 @@
 
 ## Phase 8：知识库与技能执行语义重构
 
+状态：已完成
+
 ### 目标
 
 把当前“自定义 skill runtime”逐步收成更接近 LangGraph-native 的 tool / retriever 模型。
@@ -415,6 +417,8 @@
 
 ## Phase 9：退役旧 executor
 
+状态：已完成
+
 ### 目标
 
 当 LangGraph runtime 已覆盖主链能力后，正式退役旧 executor。
@@ -438,6 +442,8 @@
 ---
 
 ## Phase 10：导出可执行的 LangGraph Python 文件
+
+状态：已完成
 
 ### 目标
 

@@ -9,9 +9,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.compiler.validator import validate_graph
 from app.core.langgraph.compiler import compile_graph_to_langgraph_plan, resolve_graph_runtime_backend
+from app.core.langgraph.codegen import generate_langgraph_python_source
 from app.core.langgraph.runtime import execute_node_system_graph_langgraph
 from app.core.runtime.state import create_initial_run_state, set_run_status
-from app.core.runtime.node_system_executor import execute_node_system_graph
 from app.core.schemas.node_system import NodeSystemGraphPayload, NodeSystemTemplate
 from app.templates.loader import load_template_record
 
@@ -87,6 +87,34 @@ def _fake_generate_agent_response_increment(node, input_values, skill_context, r
         for binding in node.writes
     }
     return outputs, "", [], runtime_config
+
+
+def _fake_retrieve_knowledge_base_context(*, knowledge_base, query, limit=3):
+    return {
+        "knowledge_base": knowledge_base or "graphiteui-official",
+        "query": query or "",
+        "result_count": min(int(limit or 3), 1),
+        "context": "stubbed knowledge context",
+        "results": [
+            {
+                "title": "Stub Document",
+                "section": "Overview",
+                "summary": "Stub summary",
+                "source": "stub://graphiteui",
+                "url": "stub://graphiteui",
+                "score": 1.0,
+            }
+        ],
+        "citations": [
+            {
+                "index": 1,
+                "title": "Stub Document",
+                "section": "Overview",
+                "source": "stub://graphiteui",
+                "url": "stub://graphiteui",
+            }
+        ],
+    }
 
 
 def _build_cycle_graph() -> NodeSystemGraphPayload:
@@ -204,21 +232,6 @@ class LangGraphMigrationTests(unittest.TestCase):
         backend, reasons = resolve_graph_runtime_backend(graph)
         self.assertEqual(backend, "langgraph")
         self.assertEqual(reasons, [])
-
-    @patch("app.core.runtime.node_system_executor.save_run", lambda state: None)
-    @patch("app.core.runtime.node_system_executor._generate_agent_response", _fake_generate_agent_response)
-    @patch("app.core.runtime.node_system_executor._invoke_skill", _fake_invoke_skill)
-    @patch("app.core.runtime.node_system_executor.get_skill_registry", _fake_skill_registry)
-    def test_hello_world_custom_executor_baseline(self):
-        graph = _load_hello_world_graph()
-        result = execute_node_system_graph(graph, persist_progress=False)
-        self.assertEqual(result["status"], "completed")
-        self.assertEqual(result["runtime_backend"], "legacy")
-        self.assertTrue(result["lifecycle"]["updated_at"])
-        self.assertEqual(result["checkpoint_metadata"]["available"], False)
-        self.assertEqual(result["checkpoint_metadata"]["thread_id"], result["run_id"])
-        self.assertEqual(len(result["node_executions"]), 3)
-        self.assertIn("answer", result["state_snapshot"]["values"])
 
     @patch("app.core.langgraph.runtime.save_run", lambda state: None)
     @patch("app.core.runtime.node_system_executor.save_run", lambda state: None)
@@ -348,6 +361,26 @@ class LangGraphMigrationTests(unittest.TestCase):
         validation = validate_graph(graph)
         self.assertTrue(validation.valid, validation.model_dump())
 
+    def test_knowledge_base_validation_resolves_langgraph_backend(self):
+        graph = _load_knowledge_base_validation_graph()
+        backend, reasons = resolve_graph_runtime_backend(graph)
+        self.assertEqual(backend, "langgraph")
+        self.assertEqual(reasons, [])
+
+    @patch("app.core.runtime.node_system_executor._generate_agent_response", _fake_generate_agent_response)
+    @patch("app.core.runtime.node_system_executor._invoke_skill", _fake_invoke_skill)
+    @patch("app.core.runtime.node_system_executor.get_skill_registry", _fake_skill_registry)
+    def test_exported_langgraph_python_source_is_executable(self):
+        graph = _load_hello_world_graph()
+        source = generate_langgraph_python_source(graph)
+        self.assertIn("def build_graph()", source)
+        self.assertIn("def invoke_graph", source)
+
+        namespace: dict[str, object] = {}
+        exec(source, namespace, namespace)
+        result = namespace["invoke_graph"]()
+        self.assertIn("answer", result)
+
     @patch("app.core.langgraph.runtime.save_run", lambda state: None)
     @patch("app.core.runtime.node_system_executor.save_run", lambda state: None)
     @patch("app.core.runtime.node_system_executor._generate_agent_response", _fake_generate_agent_response_increment)
@@ -370,3 +403,20 @@ class LangGraphMigrationTests(unittest.TestCase):
         self.assertEqual(len(result["cycle_iterations"]), 3)
         self.assertEqual(result["cycle_iterations"][0]["stop_reason"], None)
         self.assertEqual(result["cycle_iterations"][-1]["stop_reason"], "completed")
+
+    @patch("app.core.langgraph.runtime.save_run", lambda state: None)
+    @patch("app.core.runtime.node_system_executor.save_run", lambda state: None)
+    @patch("app.core.runtime.node_system_executor._generate_agent_response", _fake_generate_agent_response)
+    @patch("app.core.runtime.node_system_executor.retrieve_knowledge_base_context", _fake_retrieve_knowledge_base_context)
+    def test_knowledge_base_validation_langgraph_runtime(self):
+        graph = _load_knowledge_base_validation_graph()
+        result = execute_node_system_graph_langgraph(graph, persist_progress=False)
+
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(result["runtime_backend"], "langgraph")
+        self.assertEqual(len(result["node_executions"]), 6)
+        self.assertIn("search_knowledge_base", result["selected_skills"])
+        self.assertEqual(len(result["skill_outputs"]), 2)
+        self.assertTrue(result["knowledge_summary"])
+        self.assertIn("raw_answer", result["state_snapshot"]["values"])
+        self.assertIn("formatted_answer", result["state_snapshot"]["values"])

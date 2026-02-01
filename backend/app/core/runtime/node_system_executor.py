@@ -1,19 +1,18 @@
 from __future__ import annotations
 
 import copy
-import heapq
 import inspect
 import json
-import logging
 import re
 import time
-from collections import defaultdict, deque
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any
 
 from app.core.model_catalog import get_default_text_model_ref, normalize_model_ref, resolve_runtime_model_name
 from app.core.runtime.output_boundary_utils import save_output_value
-from app.core.runtime.state import create_initial_run_state, set_run_status, touch_run_lifecycle, utc_now_iso
+from app.core.runtime.knowledge_retrieval import retrieve_knowledge_base_context
+from app.core.runtime.state import touch_run_lifecycle, utc_now_iso
 from app.core.schemas.node_system import (
     NodeSystemAgentNode,
     NodeSystemConditionNode,
@@ -31,8 +30,6 @@ from app.tools.local_llm import (
     get_default_agent_temperature,
     get_default_agent_thinking_enabled,
 )
-
-logger = logging.getLogger(__name__)
 
 KNOWLEDGE_BASE_SKILL_KEY = "search_knowledge_base"
 
@@ -75,378 +72,6 @@ class CycleDetector:
                 dfs(node_name)
 
         return len(back_edges) > 0, back_edges
-
-
-def execute_node_system_graph(
-    graph: NodeSystemGraphDocument,
-    initial_state: dict[str, Any] | None = None,
-    *,
-    persist_progress: bool = False,
-) -> dict[str, Any]:
-    started_perf = time.perf_counter()
-    state = initial_state or create_initial_run_state(
-        graph_id=graph.graph_id,
-        graph_name=graph.name,
-        max_revision_round=int(graph.metadata.get("max_revision_round", 1)),
-    )
-    set_run_status(state, "running")
-    state["runtime_backend"] = "legacy"
-    state["started_at"] = utc_now_iso()
-    state["node_status_map"] = {node_name: "idle" for node_name in graph.nodes}
-    state["metadata"] = dict(graph.metadata)
-    state["metadata"]["resolved_runtime_backend"] = "legacy"
-    _initialize_graph_state(graph, state)
-
-    execution_edges = _build_execution_edges(graph)
-    incoming_edges, outgoing_edges = _index_edges(execution_edges)
-
-    has_cycle, back_edges = CycleDetector(execution_edges).detect()
-    back_edge_id_set = {edge.id for edge in back_edges}
-    back_edge_labels = [f"{edge.source}→{edge.target}" for edge in back_edges]
-    cycle_max_iterations = _resolve_cycle_max_iterations(graph.metadata)
-    state["cycle_summary"] = {
-        "has_cycle": has_cycle,
-        "back_edges": back_edge_labels,
-        "iteration_count": 0,
-        "max_iterations": cycle_max_iterations if has_cycle else 0,
-        "stop_reason": "acyclic" if not has_cycle else None,
-    }
-    state["cycle_iterations"] = []
-
-    try:
-        execution_order = _topological_order(graph.nodes, execution_edges, ignored_edge_ids=back_edge_id_set if has_cycle else None)
-    except ValueError as exc:
-        raise ValueError(f"Graph '{graph.graph_id}' cannot derive an execution order: {exc}.") from None
-
-    node_outputs: dict[str, dict[str, Any]] = {}
-    active_edge_ids: set[str] = set()
-    if persist_progress:
-        _persist_run_progress(state, node_outputs, active_edge_ids, started_perf=started_perf)
-
-    if has_cycle:
-        _execute_cyclic_graph(
-            graph=graph,
-            state=state,
-            incoming_edges=incoming_edges,
-            outgoing_edges=outgoing_edges,
-            execution_order=execution_order,
-            back_edge_id_set=back_edge_id_set,
-            cycle_max_iterations=cycle_max_iterations,
-            node_outputs=node_outputs,
-            active_edge_ids=active_edge_ids,
-            persist_progress=persist_progress,
-            started_perf=started_perf,
-        )
-    else:
-        _execute_acyclic_graph(
-            graph=graph,
-            state=state,
-            incoming_edges=incoming_edges,
-            outgoing_edges=outgoing_edges,
-            execution_order=execution_order,
-            node_outputs=node_outputs,
-            active_edge_ids=active_edge_ids,
-            persist_progress=persist_progress,
-            started_perf=started_perf,
-        )
-
-    if state.get("status") != "failed":
-        set_run_status(state, "completed")
-    state["current_node_id"] = None
-    _refresh_run_artifacts(state, node_outputs, active_edge_ids, started_perf=started_perf)
-    save_run(state)
-    return state
-
-
-def _execute_acyclic_graph(
-    *,
-    graph: NodeSystemGraphDocument,
-    state: dict[str, Any],
-    incoming_edges: dict[str, list[ExecutionEdge]],
-    outgoing_edges: dict[str, list[ExecutionEdge]],
-    execution_order: list[str],
-    node_outputs: dict[str, dict[str, Any]],
-    active_edge_ids: set[str],
-    persist_progress: bool,
-    started_perf: float,
-) -> None:
-    for node_name in execution_order:
-        incoming_for_node = incoming_edges.get(node_name, [])
-        is_root_node = len(incoming_for_node) == 0
-        is_active_node = is_root_node or any(edge.id in active_edge_ids for edge in incoming_for_node)
-        if not is_active_node:
-            continue
-
-        execution_result = _execute_runtime_node(
-            graph=graph,
-            node_name=node_name,
-            state=state,
-            incoming_for_node=incoming_for_node,
-            outgoing_for_node=outgoing_edges.get(node_name, []),
-            node_outputs=node_outputs,
-            active_edge_ids=active_edge_ids,
-            iteration=1,
-            persist_progress=persist_progress,
-            started_perf=started_perf,
-        )
-        if execution_result["failed"]:
-            break
-
-        active_edge_ids.update(execution_result["selected_edge_ids"])
-
-    state["cycle_summary"] = {
-        "has_cycle": False,
-        "back_edges": [],
-        "iteration_count": 1 if state.get("node_executions") else 0,
-        "max_iterations": 0,
-        "stop_reason": "completed",
-    }
-    state["cycle_iterations"] = [
-        {
-            "iteration": 1,
-            "executed_node_ids": [item["node_id"] for item in state.get("node_executions", [])],
-            "incoming_edge_ids": [],
-            "activated_edge_ids": sorted(active_edge_ids),
-            "next_iteration_edge_ids": [],
-            "stop_reason": "completed",
-        }
-    ] if state.get("node_executions") else []
-
-
-def _execute_cyclic_graph(
-    *,
-    graph: NodeSystemGraphDocument,
-    state: dict[str, Any],
-    incoming_edges: dict[str, list[ExecutionEdge]],
-    outgoing_edges: dict[str, list[ExecutionEdge]],
-    execution_order: list[str],
-    back_edge_id_set: set[str],
-    cycle_max_iterations: int,
-    node_outputs: dict[str, dict[str, Any]],
-    active_edge_ids: set[str],
-    persist_progress: bool,
-    started_perf: float,
-) -> None:
-    non_back_incoming_edges = {
-        node_name: [edge for edge in incoming_edges.get(node_name, []) if edge.id not in back_edge_id_set]
-        for node_name in graph.nodes
-    }
-    start_node_names = {
-        node_name
-        for node_name, node_incoming_edges in non_back_incoming_edges.items()
-        if len(node_incoming_edges) == 0
-    }
-    pending_cycle_edge_ids: set[str] = set()
-
-    if not start_node_names and graph.nodes:
-        raise ValueError("Cycle execution requires at least one node to remain reachable after removing back edges.")
-
-    for iteration_index in range(cycle_max_iterations):
-        incoming_cycle_edge_ids = set(pending_cycle_edge_ids)
-        current_round_active_edge_ids = set(incoming_cycle_edge_ids)
-        next_iteration_edge_ids: set[str] = set()
-        executed_node_names: list[str] = []
-
-        for node_name in execution_order:
-            incoming_for_node = incoming_edges.get(node_name, [])
-            is_start_node = iteration_index == 0 and node_name in start_node_names
-            is_triggered_by_cycle = any(edge.id in current_round_active_edge_ids for edge in incoming_for_node)
-            if not is_start_node and not is_triggered_by_cycle:
-                continue
-
-            execution_result = _execute_runtime_node(
-                graph=graph,
-                node_name=node_name,
-                state=state,
-                incoming_for_node=incoming_for_node,
-                outgoing_for_node=outgoing_edges.get(node_name, []),
-                node_outputs=node_outputs,
-                active_edge_ids=current_round_active_edge_ids,
-                iteration=iteration_index + 1,
-                persist_progress=persist_progress,
-                started_perf=started_perf,
-            )
-            executed_node_names.append(node_name)
-            if execution_result["failed"]:
-                state["cycle_summary"] = {
-                    "has_cycle": True,
-                    "back_edges": [f"{edge.source}→{edge.target}" for edge in execution_edges_from_graph(graph) if edge.id in back_edge_id_set],
-                    "iteration_count": iteration_index + 1,
-                    "max_iterations": cycle_max_iterations,
-                    "stop_reason": "failed",
-                }
-                state["cycle_iterations"] = [
-                    *state.get("cycle_iterations", []),
-                    {
-                        "iteration": iteration_index + 1,
-                        "executed_node_ids": executed_node_names,
-                        "incoming_edge_ids": sorted(incoming_cycle_edge_ids),
-                        "activated_edge_ids": sorted(current_round_active_edge_ids),
-                        "next_iteration_edge_ids": sorted(next_iteration_edge_ids),
-                        "stop_reason": "failed",
-                    },
-                ]
-                return
-
-            selected_edge_ids = execution_result["selected_edge_ids"]
-            for edge_id in selected_edge_ids:
-                if edge_id in back_edge_id_set:
-                    next_iteration_edge_ids.add(edge_id)
-                else:
-                    current_round_active_edge_ids.add(edge_id)
-
-        stop_reason = None
-        if not next_iteration_edge_ids:
-            stop_reason = "completed"
-
-        state["cycle_iterations"] = [
-            *state.get("cycle_iterations", []),
-            {
-                "iteration": iteration_index + 1,
-                "executed_node_ids": executed_node_names,
-                "incoming_edge_ids": sorted(incoming_cycle_edge_ids),
-                "activated_edge_ids": sorted(current_round_active_edge_ids),
-                "next_iteration_edge_ids": sorted(next_iteration_edge_ids),
-                "stop_reason": stop_reason,
-            },
-        ]
-        active_edge_ids.clear()
-        active_edge_ids.update(current_round_active_edge_ids)
-
-        if stop_reason == "completed":
-            state["cycle_summary"] = {
-                "has_cycle": True,
-                "back_edges": [f"{edge.source}→{edge.target}" for edge in execution_edges_from_graph(graph) if edge.id in back_edge_id_set],
-                "iteration_count": iteration_index + 1,
-                "max_iterations": cycle_max_iterations,
-                "stop_reason": "completed",
-            }
-            return
-
-        pending_cycle_edge_ids = next_iteration_edge_ids
-
-    set_run_status(state, "failed")
-    state["errors"] = [
-        *state.get("errors", []),
-        f"Cycle execution exceeded max iterations ({cycle_max_iterations}). Add an exit branch or raise cycle_max_iterations.",
-    ]
-    state["cycle_summary"] = {
-        "has_cycle": True,
-        "back_edges": [f"{edge.source}→{edge.target}" for edge in execution_edges_from_graph(graph) if edge.id in back_edge_id_set],
-        "iteration_count": cycle_max_iterations,
-        "max_iterations": cycle_max_iterations,
-        "stop_reason": "max_iterations_exceeded",
-    }
-    if state.get("cycle_iterations"):
-        state["cycle_iterations"][-1]["stop_reason"] = "max_iterations_exceeded"
-
-
-def execution_edges_from_graph(graph: NodeSystemGraphDocument) -> list[ExecutionEdge]:
-    return _build_execution_edges(graph)
-
-
-def _execute_runtime_node(
-    *,
-    graph: NodeSystemGraphDocument,
-    node_name: str,
-    state: dict[str, Any],
-    incoming_for_node: list[ExecutionEdge],
-    outgoing_for_node: list[ExecutionEdge],
-    node_outputs: dict[str, dict[str, Any]],
-    active_edge_ids: set[str],
-    iteration: int,
-    persist_progress: bool,
-    started_perf: float,
-) -> dict[str, Any]:
-    node = graph.nodes[node_name]
-    node_started_perf = time.perf_counter()
-    state["current_node_id"] = node_name
-    state["node_status_map"][node_name] = "running"
-    touch_run_lifecycle(state)
-    if persist_progress:
-        _persist_run_progress(state, node_outputs, active_edge_ids, started_perf=started_perf)
-
-    try:
-        input_values, state_reads = _collect_node_inputs(node, state)
-        body = _execute_node(graph, node_name, node, input_values, state)
-        duration_ms = int((time.perf_counter() - node_started_perf) * 1000)
-        node_outputs[node_name] = body.get("outputs", {})
-        state_writes = _apply_state_writes(node_name, node.writes, body.get("outputs", {}), state)
-        state["node_status_map"][node_name] = "success"
-        if body.get("selected_skills"):
-            state["selected_skills"] = [*state.get("selected_skills", []), *body["selected_skills"]]
-        if body.get("skill_outputs"):
-            state["skill_outputs"] = [*state.get("skill_outputs", []), *body["skill_outputs"]]
-        if body.get("output_previews"):
-            state["output_previews"] = [*state.get("output_previews", []), *body["output_previews"]]
-        if body.get("saved_outputs"):
-            state["saved_outputs"] = [*state.get("saved_outputs", []), *body["saved_outputs"]]
-        if body.get("final_result"):
-            state["final_result"] = str(body["final_result"])
-        state["node_executions"] = [
-            *state.get("node_executions", []),
-            {
-                "node_id": node_name,
-                "node_type": node.kind,
-                "status": "success",
-                "started_at": utc_now_iso(),
-                "finished_at": utc_now_iso(),
-                "duration_ms": duration_ms,
-                "input_summary": _summarize_inputs(input_values),
-                "output_summary": _summarize_outputs(body.get("outputs", {}), body.get("final_result")),
-                "artifacts": {
-                    "inputs": input_values,
-                    "outputs": body.get("outputs", {}),
-                    "family": node.kind,
-                    "iteration": iteration,
-                    "selected_branch": body.get("selected_branch"),
-                    "response": body.get("response"),
-                    "reasoning": body.get("reasoning"),
-                    "runtime_config": body.get("runtime_config"),
-                    "state_reads": state_reads,
-                    "state_writes": state_writes,
-                },
-                "warnings": body.get("warnings", []),
-                "errors": [],
-            },
-        ]
-        selected_edge_ids = _select_active_outgoing_edges(outgoing_for_node, body)
-        if persist_progress:
-            _persist_run_progress(state, node_outputs, active_edge_ids | selected_edge_ids, started_perf=started_perf)
-        return {
-            "failed": False,
-            "selected_edge_ids": selected_edge_ids,
-        }
-    except Exception as exc:  # pragma: no cover - defensive runtime path
-        duration_ms = int((time.perf_counter() - node_started_perf) * 1000)
-        state["node_status_map"][node_name] = "failed"
-        set_run_status(state, "failed")
-        state["errors"] = [*state.get("errors", []), str(exc)]
-        state["node_executions"] = [
-            *state.get("node_executions", []),
-            {
-                "node_id": node_name,
-                "node_type": node.kind,
-                "status": "failed",
-                "started_at": utc_now_iso(),
-                "finished_at": utc_now_iso(),
-                "duration_ms": duration_ms,
-                "input_summary": "",
-                "output_summary": "",
-                "artifacts": {
-                    "family": node.kind,
-                    "iteration": iteration,
-                },
-                "warnings": [],
-                "errors": [str(exc)],
-            },
-        ]
-        if persist_progress:
-            _persist_run_progress(state, node_outputs, active_edge_ids, started_perf=started_perf)
-        return {
-            "failed": True,
-            "selected_edge_ids": set(),
-        }
 
 
 def _resolve_cycle_max_iterations(metadata: dict[str, Any]) -> int:
@@ -624,80 +249,6 @@ def _build_execution_edges(graph: NodeSystemGraphDocument) -> list[ExecutionEdge
     return execution_edges
 
 
-def _index_edges(edges: list[ExecutionEdge]) -> tuple[dict[str, list[ExecutionEdge]], dict[str, list[ExecutionEdge]]]:
-    incoming_edges: dict[str, list[ExecutionEdge]] = defaultdict(list)
-    outgoing_edges: dict[str, list[ExecutionEdge]] = defaultdict(list)
-    for edge in edges:
-        incoming_edges[edge.target].append(edge)
-        outgoing_edges[edge.source].append(edge)
-    return incoming_edges, outgoing_edges
-
-
-def _topological_order(
-    nodes: dict[str, Any],
-    edges: list[ExecutionEdge],
-    *,
-    ignored_edge_ids: set[str] | None = None,
-) -> list[str]:
-    node_priority = _build_output_priority(nodes, edges)
-    node_order_lookup = {node_name: index for index, node_name in enumerate(nodes.keys())}
-    indegree = {node_name: 0 for node_name in nodes}
-    adjacency: dict[str, list[str]] = defaultdict(list)
-    for edge in edges:
-        if ignored_edge_ids and edge.id in ignored_edge_ids:
-            continue
-        adjacency[edge.source].append(edge.target)
-        indegree[edge.target] = indegree.get(edge.target, 0) + 1
-
-    queue: list[tuple[int, int, str]] = []
-    for node_name, degree in indegree.items():
-        if degree != 0:
-            continue
-        heapq.heappush(queue, (node_priority[node_name], node_order_lookup[node_name], node_name))
-
-    order: list[str] = []
-    while queue:
-        _, _, node_name = heapq.heappop(queue)
-        order.append(node_name)
-        for target in adjacency.get(node_name, []):
-            indegree[target] -= 1
-            if indegree[target] == 0:
-                heapq.heappush(queue, (node_priority[target], node_order_lookup[target], target))
-
-    if len(order) != len(nodes):
-        raise ValueError("Node system graph currently requires an acyclic topology once back-edges are ignored.")
-    return order
-
-
-def _build_output_priority(nodes: dict[str, Any], edges: list[ExecutionEdge]) -> dict[str, int]:
-    reverse_adjacency: dict[str, list[str]] = defaultdict(list)
-    for edge in edges:
-        reverse_adjacency[edge.target].append(edge.source)
-
-    distances: dict[str, int] = {}
-    queue = deque(node_name for node_name, node in nodes.items() if isinstance(node, NodeSystemOutputNode))
-
-    for node_name in queue:
-        distances[node_name] = 0
-
-    while queue:
-        node_name = queue.popleft()
-        distance = distances[node_name]
-        for parent_name in reverse_adjacency.get(node_name, []):
-            next_distance = distance + 1
-            current_distance = distances.get(parent_name)
-            if current_distance is not None and current_distance <= next_distance:
-                continue
-            distances[parent_name] = next_distance
-            queue.append(parent_name)
-
-    fallback_priority = len(nodes) + len(edges) + 1
-    return {
-        node_name: distances.get(node_name, fallback_priority)
-        for node_name in nodes
-    }
-
-
 def _execute_node(
     graph: NodeSystemGraphDocument,
     node_name: str,
@@ -782,10 +333,14 @@ def _execute_agent_node(
                 "knowledge_base": input_values.get(knowledge_read) if knowledge_read else None,
                 "query": input_values.get(query_read) if query_read else None,
             }
+            skill_result = retrieve_knowledge_base_context(
+                knowledge_base=skill_inputs.get("knowledge_base"),
+                query=skill_inputs.get("query"),
+                limit=3,
+            )
         else:
             skill_inputs = dict(input_values)
-
-        skill_result = _invoke_skill(skill_func, skill_inputs)
+            skill_result = _invoke_skill(skill_func, skill_inputs)
         selected_skills.append(skill_key)
         skill_context[skill_key] = skill_result
         skill_outputs.append(
