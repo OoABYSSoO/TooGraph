@@ -1,27 +1,22 @@
 "use client";
 
-import { NodeSystemEditor } from "@/components/editor/node-system-editor";
+import { EditorWorkspaceShell } from "@/components/editor/editor-workspace-shell";
 import type { CanonicalGraphPayload, CanonicalTemplateRecord } from "@/lib/node-system-canonical";
+import type { GraphSummary } from "@/lib/types";
 
 export type EditorClientGraphPayload = CanonicalGraphPayload;
 export type EditorClientTemplateRecord = CanonicalTemplateRecord;
+export type EditorClientRouteMode = "root" | "new" | "existing";
 
 type EditorClientProps = {
-  mode: "new" | "existing";
-  initialGraph?: EditorClientGraphPayload | null;
-  graphId?: string;
+  routeMode: EditorClientRouteMode;
+  routeGraph?: EditorClientGraphPayload | null;
+  routeGraphId?: string;
   templates: EditorClientTemplateRecord[];
-  defaultTemplateId?: string;
+  graphs: GraphSummary[];
+  defaultTemplateId?: string | null;
 };
 
-export function EditorClient({ mode, initialGraph, graphId, templates, defaultTemplateId }: EditorClientProps) {
-  return (
-    <NodeSystemEditor
-      mode={mode}
-      initialGraph={initialGraph}
-      graphId={graphId}
-      templates={templates}
-      defaultTemplateId={defaultTemplateId}
-    />
-  );
+export function EditorClient(props: EditorClientProps) {
+  return <EditorWorkspaceShell {...props} />;
 }

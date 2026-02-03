@@ -50,6 +50,33 @@
   - `frontend/components/providers/language-provider.tsx`（modified）
   - `frontend/components/layout-shell.tsx`（modified）
 
+### Phase 6: `/editor` Tab 工作区收口
+
+- **Status:** in_progress
+- **Started:** 2026-04-15
+- Actions taken:
+  - 读取并执行已有的 editor tab workspace 设计与实施计划
+  - 为 `editor-workspace` 状态模型先写 `node:test` 测试，并确认先失败后通过
+  - 新增 `frontend/lib/editor-workspace.ts`，收口 tab 持久化、URL 映射和关闭逻辑
+  - 为 `NodeSystemEditor` 增加文档元信息回调、保存完成回调和可注册保存动作
+  - 将 `NodeSystemCanvas` 根高度从 `h-screen` 改为 `h-full`，以便嵌入工作区壳层
+  - 新增 `EditorWorkspaceShell`、`EditorTabBar`、`EditorWelcomeState`、`EditorCloseConfirmDialog`
+  - 删除旧的 `/editor`、`/editor/new`、`/editor/[graphId]` 页面，改为单一 catch-all 路由
+  - 将 `/editor` 根路由重新归类为编辑器工作区布局
+  - 清理前端 `.next` 缓存后重新完成 TypeScript 检查
+- Files created/modified:
+  - `frontend/lib/editor-workspace.ts`（created）
+  - `frontend/lib/editor-workspace.test.ts`（created）
+  - `frontend/components/editor/editor-workspace-shell.tsx`（created）
+  - `frontend/components/editor/editor-tab-bar.tsx`（created）
+  - `frontend/components/editor/editor-welcome-state.tsx`（created）
+  - `frontend/components/editor/editor-close-confirm-dialog.tsx`（created）
+  - `frontend/components/editor/editor-client.tsx`（modified）
+  - `frontend/components/editor/node-system-editor.tsx`（modified）
+  - `frontend/components/layout-shell.tsx`（modified）
+  - `frontend/app/editor/[[...slug]]/page.tsx`（created）
+  - `frontend/tsconfig.json`（modified）
+
 ## Test Results
 
 | Test | Input | Expected | Actual | Status |
@@ -66,12 +93,15 @@
 | 工作台路由验证 | `curl -I http://127.0.0.1:3477/workspace` | 返回重定向到 `/` | `307 Temporary Redirect` + `location: /` | ✓ |
 | 首页内容探测 | `curl -s http://127.0.0.1:3477 | rg '模板选择|更多模板'` | 输出首页三列相关文案 | 通过 | ✓ |
 | 编排器入口内容探测 | `curl -s http://127.0.0.1:3477/editor | rg '从模板开始，或继续已有图。|返回首页|全部模板|已有图'` | 输出新版 `/editor` 文案 | 通过 | ✓ |
+| workspace 纯函数测试 | `node --test --experimental-strip-types frontend/lib/editor-workspace.test.ts` | tab/workspace 规则测试通过 | 通过 | ✓ |
+| 前端编译 | `rm -rf frontend/.next && cd frontend && npx tsc --noEmit` | 新工作区改动通过类型检查 | 通过 | ✓ |
 
 ## Error Log
 
 | Timestamp | Error | Attempt | Resolution |
 |-----------|-------|---------|------------|
 | 2026-04-15 | 无 | 1 | 当前仅完成计划初始化 |
+| 2026-04-15 | `.next/types` 仍引用已删除的旧 editor 页面 | 1 | 删除 `frontend/.next` 后重新执行 `tsc`，错误消失 |
 
 ## 5-Question Reboot Check
 

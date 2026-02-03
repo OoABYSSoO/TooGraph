@@ -13,7 +13,7 @@ export function LayoutShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { language, setLanguage, t } = useLanguage();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const isEditorCanvasRoute = pathname.startsWith("/editor/") && pathname !== "/editor";
+  const isEditorCanvasRoute = pathname === "/editor" || pathname.startsWith("/editor/");
   const navItems = [
     { href: "/", label: t("nav.home") },
     { href: "/editor", label: t("nav.editor") },
@@ -116,7 +116,7 @@ export function LayoutShell({ children }: { children: ReactNode }) {
           {systemItems.map(renderNavLink)}
         </nav>
       </aside>
-      <main className={cn("relative", isEditorCanvasRoute ? "min-h-screen overflow-hidden" : "p-8")}>
+      <main className={cn("relative", isEditorCanvasRoute ? "h-screen overflow-hidden" : "p-8")}>
         {isSidebarCollapsed ? (
           <button
             type="button"

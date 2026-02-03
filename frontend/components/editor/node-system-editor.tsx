@@ -78,12 +78,45 @@ import {
 type GraphPayload = CanonicalGraphPayload;
 type TemplateRecord = CanonicalTemplateRecord;
 
-type EditorClientProps = {
+export type NodeSystemEditorDocumentMeta = {
+  title: string;
+  dirty: boolean;
+  graphId: string | null;
+};
+
+export type NodeSystemEditorGraphSavedPayload = {
+  graphId: string;
+  title: string;
+};
+
+export type NodeSystemEditorSaveAction = () => Promise<boolean>;
+
+export type NodeSystemEditorChromeState = {
+  graphName: string;
+  stateCount: number;
+  isStatePanelOpen: boolean;
+};
+
+export type NodeSystemEditorActionSet = {
+  save: NodeSystemEditorSaveAction;
+  validate: () => Promise<void>;
+  run: () => Promise<void>;
+  toggleStatePanel: () => void;
+  setGraphName: (name: string) => void;
+};
+
+export type NodeSystemEditorProps = {
   mode: "new" | "existing";
   initialGraph?: GraphPayload | null;
   graphId?: string;
   templates: TemplateRecord[];
   defaultTemplateId?: string;
+  documentKey?: string;
+  onDocumentMetaChange?: (meta: NodeSystemEditorDocumentMeta) => void;
+  onGraphSaved?: (payload: NodeSystemEditorGraphSavedPayload) => void;
+  onSaveActionReady?: (action: NodeSystemEditorSaveAction | null) => void;
+  onChromeStateChange?: (state: NodeSystemEditorChromeState) => void;
+  onActionSetReady?: (actions: NodeSystemEditorActionSet | null) => void;
 };
 
 type FlowNodeData = {
@@ -1695,6 +1728,17 @@ function createEditorDefaults(templates: TemplateRecord[], defaultTemplateId?: s
     conditional_edges: [],
     metadata: {},
   };
+}
+
+function buildInitialFlowState(initialGraph: GraphPayload) {
+  const nodes = Object.entries(initialGraph.nodes).map(([nodeId, node]) => createFlowNodeFromCanonicalNode(nodeId, node, initialGraph.state_schema));
+  const nodesById = new Map(nodes.map((node) => [node.id, node]));
+  const edges = createFlowEdgesFromCanonicalGraph(initialGraph, nodesById);
+  return { nodes, edges };
+}
+
+function serializeCanonicalGraph(graph: CanonicalGraph) {
+  return JSON.stringify(graph);
 }
 
 function createFlowNodeFromCanonicalNode(
@@ -5024,15 +5068,35 @@ function StatePanel({
   );
 }
 
-function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: GraphPayload; isNewFromTemplate: boolean }) {
+function NodeSystemCanvas({
+  initialGraph,
+  isNewFromTemplate,
+  onDocumentMetaChange,
+  onGraphSaved,
+  onSaveActionReady,
+  onChromeStateChange,
+  onActionSetReady,
+}: {
+  initialGraph: GraphPayload;
+  isNewFromTemplate: boolean;
+  onDocumentMetaChange?: (meta: NodeSystemEditorDocumentMeta) => void;
+  onGraphSaved?: (payload: NodeSystemEditorGraphSavedPayload) => void;
+  onSaveActionReady?: (action: NodeSystemEditorSaveAction | null) => void;
+  onChromeStateChange?: (state: NodeSystemEditorChromeState) => void;
+  onActionSetReady?: (actions: NodeSystemEditorActionSet | null) => void;
+}) {
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const reactFlow = useReactFlow<FlowNode, Edge>();
   const updateNodeInternals = useUpdateNodeInternals();
+  const initialFlowState = useMemo(() => buildInitialFlowState(initialGraph), [initialGraph]);
   const [canonicalGraphState, setCanonicalGraphState] = useState<CanonicalGraph>(() => JSON.parse(JSON.stringify(initialGraph)) as CanonicalGraph);
-  const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>(initialFlowState.nodes);
   const nodesInitialized = useNodesInitialized();
   const autoLayoutDoneRef = useRef(false);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialFlowState.edges);
+  const [savedBaselineSignature, setSavedBaselineSignature] = useState(() =>
+    serializeCanonicalGraph(JSON.parse(JSON.stringify(initialGraph)) as CanonicalGraph),
+  );
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [isStatePanelOpen, setIsStatePanelOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -5195,6 +5259,8 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
       metadata: canonicalGraphState.metadata,
     };
   }, [canonicalGraphState, derivedCanonicalGraph]);
+  const documentSignature = useMemo(() => serializeCanonicalGraph(canonicalGraphForSubmission), [canonicalGraphForSubmission]);
+  const isDirty = documentSignature !== savedBaselineSignature;
   const canonicalNodeKeys = useMemo(() => Object.keys(canonicalGraph.nodes), [canonicalGraph]);
   const canonicalStateCount = useMemo(() => Object.keys(canonicalGraph.state_schema).length, [canonicalGraph]);
   const nodeLabelLookup = useMemo(
@@ -5499,21 +5565,33 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
   }, []);
 
   useEffect(() => {
-    const initialNodes = Object.entries(initialGraph.nodes).map(([nodeId, node]) =>
-      createFlowNodeFromCanonicalNode(nodeId, node, initialGraph.state_schema),
-    );
-    const nodesById = new Map(initialNodes.map((node) => [node.id, node]));
-    const initialEdges = createFlowEdgesFromCanonicalGraph(initialGraph, nodesById);
     autoLayoutDoneRef.current = false;
     setCanonicalGraphState(JSON.parse(JSON.stringify(initialGraph)) as CanonicalGraph);
+    setSavedBaselineSignature(serializeCanonicalGraph(JSON.parse(JSON.stringify(initialGraph)) as CanonicalGraph));
     setActiveRunId(null);
     setActiveRunStatus(null);
     setCurrentRunNodeId(null);
     setRunNodeStatusMap({});
     setSelectedNodeId(null);
-    setNodes(initialNodes);
-    setEdges(initialEdges);
-  }, [initialGraph, setEdges, setNodes]);
+    setNodes(initialFlowState.nodes);
+    setEdges(initialFlowState.edges);
+  }, [initialFlowState.edges, initialFlowState.nodes, initialGraph, setEdges, setNodes]);
+
+  useEffect(() => {
+    onDocumentMetaChange?.({
+      title: graphName,
+      dirty: isDirty,
+      graphId,
+    });
+  }, [graphId, graphName, isDirty, onDocumentMetaChange]);
+
+  useEffect(() => {
+    onChromeStateChange?.({
+      graphName,
+      stateCount: canonicalStateCount,
+      isStatePanelOpen,
+    });
+  }, [canonicalStateCount, graphName, isStatePanelOpen, onChromeStateChange]);
 
   useEffect(() => {
     const derivedCanonical = buildCanonicalFlowProjection(nodes, edges);
@@ -5942,33 +6020,49 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
     }
   }
 
-  function buildPayload(): CanonicalGraph {
-    return canonicalGraphForSubmission;
-  }
+  const buildPayload = useCallback((): CanonicalGraph => canonicalGraphForSubmission, [canonicalGraphForSubmission]);
 
-  async function handleSave() {
+  const handleSave = useCallback(async () => {
     try {
       const response = await apiPost<{ graph_id: string; validation: { valid: boolean; issues: Array<{ message: string }> } }>("/api/graphs/save", buildPayload());
+      const savedPayload: CanonicalGraph = {
+        ...buildPayload(),
+        graph_id: response.graph_id,
+      };
       setCanonicalGraphState((current) => ({
         ...current,
         graph_id: response.graph_id,
       }));
+      setSavedBaselineSignature(serializeCanonicalGraph(savedPayload));
       setStatusMessage(`Saved graph ${response.graph_id}`);
+      onGraphSaved?.({
+        graphId: response.graph_id,
+        title: graphName,
+      });
+      return true;
     } catch (error) {
       setStatusMessage(error instanceof Error ? error.message : "Failed to save graph.");
+      return false;
     }
-  }
+  }, [buildPayload, graphName, onGraphSaved]);
 
-  async function handleValidate() {
+  useEffect(() => {
+    onSaveActionReady?.(handleSave);
+    return () => {
+      onSaveActionReady?.(null);
+    };
+  }, [handleSave, onSaveActionReady]);
+
+  const handleValidate = useCallback(async () => {
     try {
       const response = await apiPost<{ valid: boolean; issues: Array<{ message: string }> }>("/api/graphs/validate", buildPayload());
       setStatusMessage(response.valid ? "Validation passed." : response.issues.map((issue) => issue.message).join("; "));
     } catch (error) {
       setStatusMessage(error instanceof Error ? error.message : "Failed to validate graph.");
     }
-  }
+  }, [buildPayload]);
 
-  async function handleRun() {
+  const handleRun = useCallback(async () => {
     try {
       const response = await apiPost<{ run_id: string; status: string }>("/api/graphs/run", buildPayload());
       const queuedStatusMap = Object.fromEntries(canonicalNodeKeys.map((nodeKey) => [nodeKey, "idle"])) as Record<string, RunNodeStatus>;
@@ -5990,7 +6084,30 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
     } catch (error) {
       setStatusMessage(error instanceof Error ? error.message : "Failed to run graph.");
     }
-  }
+  }, [buildPayload, canonicalNodeKeys, nodes.length, setNodes]);
+
+  const setGraphName = useCallback((name: string) => {
+    setCanonicalGraphState((current) => (current.name === name ? current : { ...current, name }));
+  }, []);
+
+  const toggleStatePanel = useCallback(() => {
+    setIsStatePanelOpen((current) => !current);
+  }, []);
+
+  useEffect(() => {
+    const actionSet: NodeSystemEditorActionSet = {
+      save: handleSave,
+      validate: handleValidate,
+      run: handleRun,
+      toggleStatePanel,
+      setGraphName,
+    };
+
+    onActionSetReady?.(actionSet);
+    return () => {
+      onActionSetReady?.(null);
+    };
+  }, [handleRun, handleSave, handleValidate, onActionSetReady, setGraphName, toggleStatePanel]);
 
   const focusNode = useCallback(
     (nodeId: string) => {
@@ -6522,48 +6639,7 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
   );
 
   return (
-    <div className="grid h-screen grid-rows-[56px_minmax(0,1fr)_36px] bg-[radial-gradient(circle_at_top,rgba(154,52,18,0.1),transparent_22%),linear-gradient(180deg,#f5efe2_0%,#ede4d2_100%)]">
-      <header className="grid grid-cols-[minmax(220px,320px)_1fr_auto] items-center gap-3 border-b border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.82)] px-4 backdrop-blur-xl">
-        <Input
-          className="h-10"
-          value={graphName}
-          onChange={(event) =>
-            setCanonicalGraphState((current) => ({
-              ...current,
-              name: event.target.value,
-            }))
-          }
-          placeholder="Graph name"
-        />
-        <div className="text-sm text-[var(--muted)]">Double click canvas to create nodes. Drop files on empty canvas to create input nodes. Drag from an output handle into empty space for type-aware suggestions.</div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            className={cn(
-              "inline-flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-medium transition",
-              isStatePanelOpen
-                ? "border-[var(--accent)] bg-[rgba(255,244,240,0.94)] text-[var(--accent-strong)]"
-                : "border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.82)] text-[var(--text)] hover:bg-white",
-            )}
-            onClick={() => setIsStatePanelOpen((current) => !current)}
-          >
-            <span>State</span>
-            <span className="rounded-full border border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.92)] px-2 py-0.5 text-[0.68rem] text-[var(--muted)]">
-              {canonicalStateCount}
-            </span>
-          </button>
-          <Button size="sm" onClick={() => void handleSave()}>
-            Save
-          </Button>
-          <Button size="sm" onClick={() => void handleValidate()}>
-            Validate
-          </Button>
-          <Button size="sm" variant="primary" onClick={() => void handleRun()}>
-            Run
-          </Button>
-        </div>
-      </header>
-
+    <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_36px] bg-[radial-gradient(circle_at_top,rgba(154,52,18,0.1),transparent_22%),linear-gradient(180deg,#f5efe2_0%,#ede4d2_100%)]">
       <div
         className="grid min-w-0 min-h-0 h-full transition-[grid-template-columns] duration-300"
         style={{
@@ -7033,13 +7109,21 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
   );
 }
 
-export function NodeSystemEditor(props: EditorClientProps) {
+export function NodeSystemEditor(props: NodeSystemEditorProps) {
   const graph = props.initialGraph ?? createEditorDefaults(props.templates, props.defaultTemplateId);
   const isNewFromTemplate = props.mode === "new" && props.initialGraph == null;
 
   return (
-    <ReactFlowProvider>
-      <NodeSystemCanvas initialGraph={graph} isNewFromTemplate={isNewFromTemplate} />
+    <ReactFlowProvider key={props.documentKey ?? graph.graph_id ?? "editor-document"}>
+      <NodeSystemCanvas
+        initialGraph={graph}
+        isNewFromTemplate={isNewFromTemplate}
+        onDocumentMetaChange={props.onDocumentMetaChange}
+        onGraphSaved={props.onGraphSaved}
+        onSaveActionReady={props.onSaveActionReady}
+        onChromeStateChange={props.onChromeStateChange}
+        onActionSetReady={props.onActionSetReady}
+      />
     </ReactFlowProvider>
   );
 }
