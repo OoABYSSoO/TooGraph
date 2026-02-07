@@ -1,29 +1,22 @@
 {
   "name": "graphiteui-frontend",
-  "version": "0.1.0",
   "private": true,
+  "version": "0.0.0",
+  "type": "module",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
+    "dev": "vite --host 127.0.0.1 --port 3477",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 3477"
   },
   "dependencies": {
-    "@xyflow/react": "^12.8.5",
-    "next": "^15.3.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "react-markdown": "^10.1.0",
-    "remark-gfm": "^4.0.1",
-    "zustand": "^5.0.5"
+    "pinia": "^3.0.3",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.1"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.2.2",
-    "@types/node": "^22.15.3",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
-    "postcss": "^8.5.9",
-    "tailwindcss": "^4.2.2",
-    "typescript": "^5.8.3"
+    "@vitejs/plugin-vue": "^5.2.4",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
+    "vue-tsc": "^2.2.10"
   }
 }
