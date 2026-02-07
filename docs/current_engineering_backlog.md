@@ -1,42 +1,39 @@
 # Current Engineering Backlog
 
-这份文件是当前仓库唯一的工程待办文档。
+这份文件只保留当前仍未完成、并且从主分支代码现状出发依然成立的事项。
 
 使用原则：
 
-- 只记录仍未完成、且从当前代码出发仍然成立的事项
-- 已完成的迁移、设计稿、阶段性方案不再单独保留
-- 以代码现状为准，不重复记录已经进入主链的能力
+- 已完成的迁移、阶段计划、讨论稿不再保留
+- 以主分支代码和当前测试结果为准
+- 只记录还需要继续做的工作
 
 ## 当前优先级
 
-1. Cycles 交互与高级策略
+1. Cycles 高级策略与终止语义
 2. Knowledge Base 收尾与增强
 3. Memory 正式能力建设
 4. 人类在环前端与审计闭环
 5. LangGraph Python 导出前端入口
 
-## 1. Cycles 交互与高级策略
+## 1. Cycles 高级策略与终止语义
 
 当前代码现状：
 
-- LangGraph runtime 已支持条件边和 cycles 执行
+- LangGraph runtime 已支持 cycles 执行
 - 运行结果会返回 `cycle_summary / cycle_iterations`
-- editor 已有 `cycle_max_iterations` 图级配置入口、回边高亮和运行中 active edge 强调
-- run detail 已可展示循环摘要、回边和逐轮 iteration 明细
-- 当前循环停止条件只覆盖显式退出分支和最大轮次保护
+- 回边高亮、active edge 强调、逐轮 iteration 详情已经具备
+- 当前循环上限已收口到 `condition.config.loopLimit`
+- 当前已支持一类安全停止策略：
+  - 无状态变化停止（`no_state_change`）
+  - 空轮次停止（`empty_iteration`）
+- run detail 已能展示更明确的终止原因说明
 
 后续要做：
 
 - 增加更完整的停止策略：
-  - 无变化停止
-  - 空轮次停止
   - 按 state 或输出变化量停止
-- 给 editor 增加剩余的循环配置入口：
-  - 终止策略
-- 在 editor 和 run detail 中继续增强可视化：
-  - 更明确的终止原因展示
-- 明确 cycles 和 interrupt 的衔接方式
+- 明确 cycles 与 interrupt 的衔接方式
 
 ## 2. Knowledge Base 收尾与增强
 

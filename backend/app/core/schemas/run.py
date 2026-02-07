@@ -95,6 +95,7 @@ class NodeStateWriteRecord(BaseModel):
     output_key: str
     mode: str = "replace"
     value: Any = None
+    changed: bool = False
 
 
 class NodeExecutionArtifacts(BaseModel):

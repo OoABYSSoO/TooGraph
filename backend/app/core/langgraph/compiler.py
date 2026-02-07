@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from app.core.control_flow_state_analysis import find_ambiguous_state_reads
 from app.core.langgraph.build_plan import (
     LangGraphBuildPlan,
     LangGraphConditionalEdgePlan,
@@ -8,7 +9,6 @@ from app.core.langgraph.build_plan import (
     LangGraphNodePlan,
     LangGraphRuntimeRequirements,
 )
-from app.core.ordinary_edge_resolution import resolve_ordinary_edge_shared_state
 from app.core.schemas.node_system import (
     NodeSystemAgentNode,
     NodeSystemGraphPayload,
@@ -35,23 +35,10 @@ def compile_graph_to_langgraph_plan(graph: NodeSystemGraphPayload) -> LangGraphB
 
     unsupported_reasons: list[str] = []
 
-    graph_edges: list[LangGraphEdgePlan] = []
-    for edge in graph.edges:
-        state_name = resolve_ordinary_edge_shared_state(graph, edge.source, edge.target)
-        if not state_name:
-            unsupported_reasons.append(
-                f"edge {edge.source} -> {edge.target} does not resolve to a single shared state."
-            )
-            continue
-        graph_edges.append(
-            LangGraphEdgePlan(
-                source=edge.source,
-                target=edge.target,
-                state=state_name,
-                sourceHandle=f"write:{state_name}",
-                targetHandle=f"read:{state_name}",
-            )
-        )
+    graph_edges = [
+        LangGraphEdgePlan(source=edge.source, target=edge.target)
+        for edge in graph.edges
+    ]
 
     graph_nodes: dict[str, LangGraphNodePlan] = {}
     skill_keys: set[str] = set()
@@ -87,6 +74,11 @@ def compile_graph_to_langgraph_plan(graph: NodeSystemGraphPayload) -> LangGraphB
         for state_name, definition in graph.state_schema.items()
         if definition.type == NodeSystemStateType.KNOWLEDGE_BASE
     ]
+
+    for ambiguous_read in find_ambiguous_state_reads(graph):
+        unsupported_reasons.append(
+            f"state '{ambiguous_read.state_key}' reaches reader '{ambiguous_read.node_id}' from multiple unordered writers."
+        )
 
     return LangGraphBuildPlan(
         graph_id=graph.graph_id or "",

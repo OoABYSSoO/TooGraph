@@ -1,14 +1,15 @@
 import type { CanonicalEdge, CanonicalGraphPayload } from "./node-system-canonical.ts";
 import { listEditorInputPortsFromCanonicalNode, listEditorOutputPortsFromCanonicalNode } from "./node-system-canonical.ts";
+import { FLOW_SOURCE_HANDLE, FLOW_TARGET_HANDLE } from "./node-system-route-handles.ts";
 
 export type CanonicalOrdinaryEdgePresentation = {
   id: string;
   sourceHandle: string | null;
   targetHandle: string | null;
-  sharedState: string | null;
+  projectedState: string | null;
 };
 
-export function resolveCanonicalOrdinaryEdgeSharedState(
+export function resolveCanonicalOrdinaryEdgeProjectedState(
   graph: CanonicalGraphPayload,
   edge: Pick<CanonicalEdge, "source" | "target">,
 ): string | null {
@@ -24,39 +25,39 @@ export function resolveCanonicalOrdinaryEdgeSharedState(
   const targetStates = new Set(
     listEditorInputPortsFromCanonicalNode(targetNode, graph.state_schema).map((port) => port.key),
   );
-  const sharedStates = [...sourceStates].filter((stateKey) => targetStates.has(stateKey));
-  return sharedStates.length === 1 ? sharedStates[0] : null;
+  const projectedStates = [...sourceStates].filter((stateKey) => targetStates.has(stateKey));
+  return projectedStates.length === 1 ? projectedStates[0] : null;
 }
 
 export function resolveCanonicalOrdinaryEdgePresentation(
   graph: CanonicalGraphPayload,
   edge: Pick<CanonicalEdge, "source" | "target">,
 ): CanonicalOrdinaryEdgePresentation {
-  const sharedState = resolveCanonicalOrdinaryEdgeSharedState(graph, edge);
-  if (!sharedState) {
+  const projectedState = resolveCanonicalOrdinaryEdgeProjectedState(graph, edge);
+  if (!projectedState) {
     return {
-      id: buildCanonicalOrdinaryEdgeIdFromState(edge.source, edge.target, null),
-      sourceHandle: null,
-      targetHandle: null,
-      sharedState: null,
+      id: buildCanonicalOrdinaryEdgeIdFromNodes(edge.source, edge.target),
+      sourceHandle: FLOW_SOURCE_HANDLE,
+      targetHandle: FLOW_TARGET_HANDLE,
+      projectedState: null,
     };
   }
 
   return {
-    id: buildCanonicalOrdinaryEdgeIdFromState(edge.source, edge.target, sharedState),
-    sourceHandle: `output:${sharedState}`,
-    targetHandle: `input:${sharedState}`,
-    sharedState,
+    id: buildCanonicalOrdinaryEdgeIdFromNodes(edge.source, edge.target),
+    sourceHandle: FLOW_SOURCE_HANDLE,
+    targetHandle: FLOW_TARGET_HANDLE,
+    projectedState,
   };
 }
 
 export function buildCanonicalOrdinaryEdgeId(
-  graph: CanonicalGraphPayload,
+  _graph: CanonicalGraphPayload,
   edge: Pick<CanonicalEdge, "source" | "target">,
 ): string {
-  return buildCanonicalOrdinaryEdgeIdFromState(edge.source, edge.target, resolveCanonicalOrdinaryEdgeSharedState(graph, edge));
+  return buildCanonicalOrdinaryEdgeIdFromNodes(edge.source, edge.target);
 }
 
-function buildCanonicalOrdinaryEdgeIdFromState(source: string, target: string, state: string | null): string {
-  return state ? `edge:${source}:output:${state}->${target}:input:${state}` : `edge:${source}:${target}`;
+function buildCanonicalOrdinaryEdgeIdFromNodes(source: string, target: string): string {
+  return `edge:${source}:${target}`;
 }

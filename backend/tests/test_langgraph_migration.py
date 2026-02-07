@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.core.compiler.validator import validate_graph
 from app.core.langgraph.compiler import compile_graph_to_langgraph_plan, get_langgraph_runtime_unsupported_reasons
 from app.core.langgraph.codegen import generate_langgraph_python_source
-from app.core.langgraph.runtime import execute_node_system_graph_langgraph
+from app.core.langgraph.runtime import _finalize_langgraph_cycle_summary, execute_node_system_graph_langgraph
 from app.core.runtime import node_system_executor
 from app.core.runtime.state import create_initial_run_state, set_run_status
 from app.core.schemas.node_system import NodeSystemGraphPayload, NodeSystemTemplate
@@ -111,6 +111,16 @@ def _fake_generate_agent_response_fail_once(node, input_values, skill_context, r
 def _fake_generate_agent_response_increment(node, input_values, skill_context, runtime_config):
     _ = skill_context
     counter = int(input_values.get("counter") or 0) + 1
+    outputs = {
+        binding.state: counter
+        for binding in node.writes
+    }
+    return outputs, "", [], runtime_config
+
+
+def _fake_generate_agent_response_no_change(node, input_values, skill_context, runtime_config):
+    _ = skill_context
+    counter = int(input_values.get("counter") or 0)
     outputs = {
         binding.state: counter
         for binding in node.writes
@@ -451,9 +461,12 @@ class LangGraphMigrationTests(unittest.TestCase):
         validation = validate_graph(graph)
         self.assertTrue(validation.valid, validation.model_dump())
         plan = compile_graph_to_langgraph_plan(graph)
-        self.assertEqual([edge.state for edge in plan.edges], ["question"])
+        self.assertEqual(
+            [edge.model_dump(by_alias=True) for edge in plan.edges],
+            [{"source": "input_question", "target": "answer_helper"}],
+        )
 
-    def test_plain_edge_graph_rejects_zero_shared_states_cleanly(self):
+    def test_plain_edge_graph_accepts_zero_shared_states_as_control_flow(self):
         graph = NodeSystemGraphPayload.model_validate(
             {
                 "name": "Plain Edge Zero Shared States",
@@ -505,12 +518,15 @@ class LangGraphMigrationTests(unittest.TestCase):
         )
 
         validation = validate_graph(graph)
-        self.assertFalse(validation.valid)
-        self.assertTrue(any(issue.code == "edge_state_mismatch" for issue in validation.issues))
+        self.assertTrue(validation.valid, validation.model_dump())
         plan = compile_graph_to_langgraph_plan(graph)
-        self.assertTrue(any("does not resolve to a single shared state" in reason for reason in plan.requirements.unsupported_reasons))
+        self.assertEqual(plan.requirements.unsupported_reasons, [])
+        self.assertEqual(
+            [edge.model_dump(by_alias=True) for edge in plan.edges],
+            [{"source": "input_question", "target": "output_answer"}],
+        )
 
-    def test_plain_edge_graph_rejects_multiple_shared_states_cleanly(self):
+    def test_plain_edge_graph_accepts_multiple_shared_states_as_control_flow(self):
         graph = NodeSystemGraphPayload.model_validate(
             {
                 "name": "Plain Edge Multiple Shared States",
@@ -579,10 +595,178 @@ class LangGraphMigrationTests(unittest.TestCase):
         )
 
         validation = validate_graph(graph)
-        self.assertFalse(validation.valid)
-        self.assertTrue(any(issue.code == "edge_state_ambiguous" for issue in validation.issues))
+        self.assertTrue(validation.valid, validation.model_dump())
         plan = compile_graph_to_langgraph_plan(graph)
-        self.assertTrue(any("does not resolve to a single shared state" in reason for reason in plan.requirements.unsupported_reasons))
+        self.assertEqual(plan.requirements.unsupported_reasons, [])
+        self.assertEqual(
+            [edge.model_dump(by_alias=True) for edge in plan.edges],
+            [{"source": "source_node", "target": "target_node"}],
+        )
+
+    def test_same_state_sequential_writers_are_allowed(self):
+        graph = NodeSystemGraphPayload.model_validate(
+            {
+                "name": "Sequential Writers",
+                "state_schema": {
+                    "question": {"name": "Question", "description": "", "type": "text", "value": "", "color": ""},
+                    "answer": {"name": "Answer", "description": "", "type": "text", "value": "", "color": ""},
+                },
+                "nodes": {
+                    "input_question": {
+                        "kind": "input",
+                        "name": "Input",
+                        "description": "",
+                        "ui": {"position": {"x": 0, "y": 0}},
+                        "reads": [],
+                        "writes": [{"state": "question", "mode": "replace"}],
+                        "config": {"value": "hello"},
+                    },
+                    "draft_answer": {
+                        "kind": "agent",
+                        "name": "Draft Answer",
+                        "description": "",
+                        "ui": {"position": {"x": 240, "y": 0}},
+                        "reads": [{"state": "question", "required": True}],
+                        "writes": [{"state": "answer", "mode": "replace"}],
+                        "config": {
+                            "skills": [],
+                            "systemInstruction": "",
+                            "taskInstruction": "",
+                            "modelSource": "global",
+                            "model": "",
+                            "thinkingMode": "on",
+                            "temperature": 0.2,
+                        },
+                    },
+                    "final_answer": {
+                        "kind": "agent",
+                        "name": "Final Answer",
+                        "description": "",
+                        "ui": {"position": {"x": 480, "y": 0}},
+                        "reads": [{"state": "answer", "required": True}],
+                        "writes": [{"state": "answer", "mode": "replace"}],
+                        "config": {
+                            "skills": [],
+                            "systemInstruction": "",
+                            "taskInstruction": "",
+                            "modelSource": "global",
+                            "model": "",
+                            "thinkingMode": "on",
+                            "temperature": 0.2,
+                        },
+                    },
+                    "show_answer": {
+                        "kind": "output",
+                        "name": "Show Answer",
+                        "description": "",
+                        "ui": {"position": {"x": 720, "y": 0}},
+                        "reads": [{"state": "answer", "required": True}],
+                        "writes": [],
+                        "config": {
+                            "displayMode": "auto",
+                            "persistEnabled": False,
+                            "persistFormat": "auto",
+                            "fileNameTemplate": "",
+                        },
+                    },
+                },
+                "edges": [
+                    {"source": "input_question", "target": "draft_answer"},
+                    {"source": "draft_answer", "target": "final_answer"},
+                    {"source": "final_answer", "target": "show_answer"},
+                ],
+                "conditional_edges": [],
+                "metadata": {},
+            }
+        )
+
+        validation = validate_graph(graph)
+        self.assertTrue(validation.valid, validation.model_dump())
+        plan = compile_graph_to_langgraph_plan(graph)
+        self.assertEqual(plan.requirements.unsupported_reasons, [])
+
+    def test_same_state_parallel_writers_are_rejected(self):
+        graph = NodeSystemGraphPayload.model_validate(
+            {
+                "name": "Parallel Writers",
+                "state_schema": {
+                    "answer": {"name": "Answer", "description": "", "type": "text", "value": "", "color": ""},
+                },
+                "nodes": {
+                    "start": {
+                        "kind": "input",
+                        "name": "Start",
+                        "description": "",
+                        "ui": {"position": {"x": 0, "y": 0}},
+                        "reads": [],
+                        "writes": [],
+                        "config": {"value": ""},
+                    },
+                    "writer_a": {
+                        "kind": "agent",
+                        "name": "Writer A",
+                        "description": "",
+                        "ui": {"position": {"x": 220, "y": -120}},
+                        "reads": [],
+                        "writes": [{"state": "answer", "mode": "replace"}],
+                        "config": {
+                            "skills": [],
+                            "systemInstruction": "",
+                            "taskInstruction": "",
+                            "modelSource": "global",
+                            "model": "",
+                            "thinkingMode": "on",
+                            "temperature": 0.2,
+                        },
+                    },
+                    "writer_b": {
+                        "kind": "agent",
+                        "name": "Writer B",
+                        "description": "",
+                        "ui": {"position": {"x": 220, "y": 120}},
+                        "reads": [],
+                        "writes": [{"state": "answer", "mode": "replace"}],
+                        "config": {
+                            "skills": [],
+                            "systemInstruction": "",
+                            "taskInstruction": "",
+                            "modelSource": "global",
+                            "model": "",
+                            "thinkingMode": "on",
+                            "temperature": 0.2,
+                        },
+                    },
+                    "show_answer": {
+                        "kind": "output",
+                        "name": "Show Answer",
+                        "description": "",
+                        "ui": {"position": {"x": 520, "y": 0}},
+                        "reads": [{"state": "answer", "required": True}],
+                        "writes": [],
+                        "config": {
+                            "displayMode": "auto",
+                            "persistEnabled": False,
+                            "persistFormat": "auto",
+                            "fileNameTemplate": "",
+                        },
+                    },
+                },
+                "edges": [
+                    {"source": "start", "target": "writer_a"},
+                    {"source": "start", "target": "writer_b"},
+                    {"source": "writer_a", "target": "show_answer"},
+                    {"source": "writer_b", "target": "show_answer"},
+                ],
+                "conditional_edges": [],
+                "metadata": {},
+            }
+        )
+
+        validation = validate_graph(graph)
+        self.assertFalse(validation.valid)
+        self.assertTrue(any(issue.code == "state_writer_order_ambiguous" for issue in validation.issues))
+        plan = compile_graph_to_langgraph_plan(graph)
+        self.assertTrue(any("multiple unordered writers" in reason for reason in plan.requirements.unsupported_reasons))
 
     def test_explicit_system_instruction_still_keeps_graph_state_inputs_in_agent_prompt(self):
         graph = _load_cycle_counter_demo_graph()
@@ -705,6 +889,62 @@ class LangGraphMigrationTests(unittest.TestCase):
         self.assertEqual(result["cycle_summary"]["max_iterations"], 5)
         self.assertEqual(result["cycle_summary"]["iteration_count"], 3)
         self.assertEqual(result["state_snapshot"]["values"]["counter"], 3)
+
+    @patch("app.core.langgraph.runtime.save_run", lambda state: None)
+    @patch("app.core.runtime.node_system_executor.save_run", lambda state: None)
+    @patch("app.core.runtime.node_system_executor._generate_agent_response", _fake_generate_agent_response_no_change)
+    @patch("app.core.runtime.node_system_executor._invoke_skill", _fake_invoke_skill)
+    @patch("app.core.runtime.node_system_executor.get_skill_registry", _fake_skill_registry)
+    def test_cycle_runtime_stops_when_loop_makes_no_state_progress(self):
+        graph = _build_cycle_graph()
+        graph.nodes["continue_check"].config.loop_limit = -1
+        initial_state = create_initial_run_state(
+            graph_id=graph.graph_id or "cycle_graph",
+            graph_name=graph.name,
+            max_revision_round=1,
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "made no state progress"):
+            execute_node_system_graph_langgraph(graph, initial_state=initial_state, persist_progress=False)
+
+        self.assertEqual(initial_state["status"], "failed")
+        self.assertTrue(initial_state["cycle_summary"]["has_cycle"])
+        self.assertEqual(initial_state["cycle_summary"]["stop_reason"], "no_state_change")
+        self.assertEqual(initial_state["cycle_summary"]["iteration_count"], 1)
+        self.assertEqual(initial_state["cycle_iterations"][-1]["stop_reason"], "no_state_change")
+
+    def test_finalize_cycle_summary_marks_empty_iteration_when_last_pass_never_runs(self):
+        state = {"node_executions": []}
+        cycle_tracker = {
+            "has_cycle": True,
+            "back_edges": ["continue_check→increment_counter"],
+            "max_iterations": 5,
+            "records": {
+                1: {
+                    "iteration": 1,
+                    "executed_node_ids": ["increment_counter", "continue_check"],
+                    "incoming_edge_ids": [],
+                    "activated_edge_ids": ["edge:seed_counter:increment_counter", "edge:increment_counter:continue_check"],
+                    "next_iteration_edge_ids": ["conditional:continue_check:continue:increment_counter"],
+                    "stop_reason": None,
+                },
+                2: {
+                    "iteration": 2,
+                    "executed_node_ids": [],
+                    "incoming_edge_ids": ["conditional:continue_check:continue:increment_counter"],
+                    "activated_edge_ids": [],
+                    "next_iteration_edge_ids": [],
+                    "stop_reason": None,
+                },
+            },
+        }
+
+        _finalize_langgraph_cycle_summary(state, cycle_tracker, set())
+
+        self.assertTrue(state["cycle_summary"]["has_cycle"])
+        self.assertEqual(state["cycle_summary"]["stop_reason"], "empty_iteration")
+        self.assertEqual(state["cycle_summary"]["iteration_count"], 2)
+        self.assertEqual(state["cycle_iterations"][-1]["stop_reason"], "empty_iteration")
 
     @patch("app.core.langgraph.runtime.save_run", lambda state: None)
     @patch("app.core.runtime.node_system_executor.save_run", lambda state: None)

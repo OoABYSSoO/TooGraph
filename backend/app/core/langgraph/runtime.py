@@ -263,6 +263,7 @@ def _build_langgraph_node_callable(
                     iteration=iteration,
                     node_name=node_name,
                     selected_edge_ids=selected_edge_ids,
+                    state_writes=state_writes,
                 )
                 if persist_progress:
                     _persist_langgraph_progress(
@@ -608,6 +609,7 @@ def _ensure_cycle_iteration_record(
             "activated_edge_ids": [],
             "next_iteration_edge_ids": [],
             "stop_reason": None,
+            "_changed_state_keys": [],
         }
         return records[iteration]
 
@@ -625,6 +627,7 @@ def _record_cycle_activity(
     iteration: int,
     node_name: str,
     selected_edge_ids: set[str],
+    state_writes: list[dict[str, Any]],
 ) -> None:
     if not cycle_tracker.get("has_cycle"):
         return
@@ -632,6 +635,15 @@ def _record_cycle_activity(
     record = _ensure_cycle_iteration_record(cycle_tracker, iteration, [])
     record["executed_node_ids"] = [*record.get("executed_node_ids", []), node_name]
     record["activated_edge_ids"] = sorted(set(record.get("activated_edge_ids", [])) | set(selected_edge_ids))
+    changed_state_keys = {
+        str(write.get("state_key"))
+        for write in state_writes
+        if write.get("changed") and write.get("state_key")
+    }
+    if changed_state_keys:
+        record["_changed_state_keys"] = sorted(
+            set(record.get("_changed_state_keys", [])) | changed_state_keys
+        )
 
     back_edge_ids = set(cycle_tracker.get("back_edge_ids", set()))
     next_iteration_edge_ids = sorted(edge_id for edge_id in selected_edge_ids if edge_id in back_edge_ids)
@@ -641,6 +653,20 @@ def _record_cycle_activity(
     record["next_iteration_edge_ids"] = sorted(
         set(record.get("next_iteration_edge_ids", [])) | set(next_iteration_edge_ids)
     )
+    if not record.get("_changed_state_keys"):
+        record["stop_reason"] = "no_state_change"
+        state["cycle_summary"] = {
+            "has_cycle": True,
+            "back_edges": list(cycle_tracker.get("back_edges", [])),
+            "iteration_count": iteration,
+            "max_iterations": int(cycle_tracker.get("max_iterations", 0) or 0),
+            "stop_reason": "no_state_change",
+        }
+        state["cycle_iterations"] = _serialize_cycle_records(cycle_tracker, final_stop_reason="no_state_change")
+        raise RuntimeError(
+            f"Cycle execution made no state progress in iteration {iteration}. Add an exit branch or update a state value inside the loop."
+        )
+
     loop_limit_violation = _check_condition_loop_limit(cycle_tracker, next_iteration_edge_ids)
     if loop_limit_violation is not None:
         max_iterations, source_node = loop_limit_violation
@@ -678,7 +704,26 @@ def _serialize_cycle_records(
     ]
     if records and final_stop_reason:
         records[-1]["stop_reason"] = final_stop_reason
+    for record in records:
+        record.pop("_changed_state_keys", None)
     return records
+
+
+def _resolve_final_cycle_stop_reason(cycle_tracker: dict[str, Any]) -> str:
+    records = [
+        dict(cycle_tracker.get("records", {}).get(iteration) or {})
+        for iteration in sorted(cycle_tracker.get("records", {}))
+    ]
+    if not records:
+        return "completed"
+    last_record = records[-1]
+    if (
+        last_record.get("incoming_edge_ids")
+        and not last_record.get("executed_node_ids")
+        and not last_record.get("activated_edge_ids")
+    ):
+        return "empty_iteration"
+    return "completed"
 
 
 def _finalize_langgraph_cycle_summary(
@@ -706,12 +751,13 @@ def _finalize_langgraph_cycle_summary(
         ] if state.get("node_executions") else []
         return
 
-    cycle_iterations = _serialize_cycle_records(cycle_tracker, final_stop_reason="completed")
+    final_stop_reason = _resolve_final_cycle_stop_reason(cycle_tracker)
+    cycle_iterations = _serialize_cycle_records(cycle_tracker, final_stop_reason=final_stop_reason)
     state["cycle_summary"] = {
         "has_cycle": True,
         "back_edges": list(cycle_tracker.get("back_edges", [])),
         "iteration_count": len(cycle_iterations),
         "max_iterations": int(cycle_tracker.get("max_iterations", 0) or 0),
-        "stop_reason": "completed",
+        "stop_reason": final_stop_reason,
     }
     state["cycle_iterations"] = cycle_iterations
