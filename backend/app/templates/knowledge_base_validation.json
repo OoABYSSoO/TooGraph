@@ -81,7 +81,6 @@
       ],
       "config": {
         "skills": ["search_knowledge_base"],
-        "systemInstruction": "",
         "taskInstruction": ""
       }
     },
@@ -102,7 +101,6 @@
       ],
       "config": {
         "skills": ["search_knowledge_base"],
-        "systemInstruction": "",
         "taskInstruction": "使用markdown格式输出"
       }
     },

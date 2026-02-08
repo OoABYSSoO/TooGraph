@@ -43,7 +43,6 @@ test("buildStatePanelViewModel returns sorted state rows with readable values", 
         writes: [{ state: "beta", mode: "replace" }],
         config: {
           skills: [],
-          systemInstruction: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",

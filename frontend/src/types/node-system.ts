@@ -54,7 +54,6 @@ export type AgentNode = {
   writes: WriteBinding[];
   config: {
     skills: string[];
-    systemInstruction: string;
     taskInstruction: string;
     modelSource: "global" | "override";
     model: string;

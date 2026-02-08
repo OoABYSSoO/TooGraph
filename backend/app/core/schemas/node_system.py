@@ -165,7 +165,6 @@ class NodeSystemInputConfig(BaseModel):
 
 class NodeSystemAgentConfig(BaseModel):
     skills: list[str] = Field(default_factory=list)
-    system_instruction: str = Field(default="", alias="systemInstruction")
     task_instruction: str = Field(default="", alias="taskInstruction")
     model_source: AgentModelSource = Field(default=AgentModelSource.GLOBAL, alias="modelSource")
     model: str = ""

@@ -477,7 +477,6 @@ def _generate_agent_response(
         output_keys,
         input_values,
         skill_context,
-        node.config.system_instruction,
     )
     user_prompt = (
         node.config.task_instruction
@@ -516,19 +515,8 @@ def _build_effective_system_prompt(
     output_keys: list[str],
     input_values: dict[str, Any],
     skill_context: dict[str, Any],
-    custom_system_instruction: str,
 ) -> str:
-    base_prompt = _build_auto_system_prompt(output_keys, input_values, skill_context)
-    custom_instruction = str(custom_system_instruction or "").strip()
-    if not custom_instruction:
-        return base_prompt
-    return "\n".join(
-        [
-            base_prompt,
-            "\n== Node System Instruction ==",
-            custom_instruction,
-        ]
-    )
+    return _build_auto_system_prompt(output_keys, input_values, skill_context)
 
 
 def _build_auto_system_prompt(

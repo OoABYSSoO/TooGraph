@@ -112,7 +112,6 @@ test("buildNodeCardViewModel derives agent body, ports, and labels", () => {
     writes: [{ state: "answer", mode: "replace" }],
     config: {
       skills: [],
-      systemInstruction: "",
       taskInstruction: "请直接用中文回答用户问题。",
       modelSource: "global",
       model: "",
@@ -127,7 +126,7 @@ test("buildNodeCardViewModel derives agent body, ports, and labels", () => {
   assert.deepEqual(model.inputs.map((port) => port.label), ["question"]);
   assert.deepEqual(model.outputs.map((port) => port.label), ["answer"]);
   assert.equal(model.body.kind, "agent");
-  assert.equal(model.body.systemInstruction, "");
+  assert.ok(!("systemInstruction" in model.body));
   assert.equal(model.body.taskInstruction, "请直接用中文回答用户问题。");
   assert.equal(model.body.skillLabel, "No skills");
   assert.equal(model.body.primaryInput?.label, "question");
@@ -286,7 +285,6 @@ test("buildNodeCardViewModel exposes node-level latest run failure notes", () =>
     writes: [{ state: "answer", mode: "replace" }],
     config: {
       skills: [],
-      systemInstruction: "",
       taskInstruction: "请直接用中文回答用户问题。",
       modelSource: "global",
       model: "",
@@ -396,7 +394,6 @@ test("buildNodeCardViewModel derives unlimited loop label and multiple skills", 
     writes: [{ state: "answer", mode: "replace" }],
     config: {
       skills: ["kb.lookup", "browser.search"],
-      systemInstruction: "",
       taskInstruction: "",
       modelSource: "override",
       model: "gpt-5.4",
@@ -411,29 +408,4 @@ test("buildNodeCardViewModel derives unlimited loop label and multiple skills", 
   assert.equal(model.body.skillLabel, "2 skills");
   assert.equal(model.body.modelLabel, "gpt-5.4");
   assert.equal(model.body.thinkingLabel, "thinking off");
-});
-
-test("buildNodeCardViewModel keeps agent system instruction when present", () => {
-  const node: GraphNode = {
-    kind: "agent",
-    name: "guardrail_agent",
-    description: "Follow system constraints.",
-    ui: { position: { x: 0, y: 0 } },
-    reads: [{ state: "question", required: true }],
-    writes: [{ state: "answer", mode: "replace" }],
-    config: {
-      skills: [],
-      systemInstruction: "Always answer in Chinese.",
-      taskInstruction: "",
-      modelSource: "global",
-      model: "",
-      thinkingMode: "on",
-      temperature: 0.2,
-    },
-  };
-
-  const model = buildNodeCardViewModel("guardrail_agent", node, stateSchema);
-
-  assert.equal(model.body.kind, "agent");
-  assert.equal(model.body.systemInstruction, "Always answer in Chinese.");
 });

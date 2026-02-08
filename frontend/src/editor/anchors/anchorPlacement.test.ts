@@ -16,7 +16,6 @@ const agentNode: GraphNode = {
   writes: [{ state: "answer", mode: "replace" }],
   config: {
     skills: [],
-    systemInstruction: "",
     taskInstruction: "请直接回答。",
     modelSource: "global",
     model: "",

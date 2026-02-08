@@ -42,7 +42,6 @@ const graph: GraphPayload = {
       writes: [{ state: "answer", mode: "replace" }],
       config: {
         skills: [],
-        systemInstruction: "",
         taskInstruction: "请直接用中文回答用户问题。",
         modelSource: "global",
         model: "",

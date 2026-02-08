@@ -52,7 +52,6 @@ function buildDocument(): GraphPayload {
         writes: [{ state: "answer", mode: "replace" }],
         config: {
           skills: [],
-          systemInstruction: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",

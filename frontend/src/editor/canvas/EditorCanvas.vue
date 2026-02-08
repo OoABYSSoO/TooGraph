@@ -72,6 +72,8 @@
         class="editor-canvas__node"
         :class="resolveRunNodeClassList(nodeId)"
         :style="nodeStyle(node.ui.position)"
+        @pointerenter="setHoveredNode(nodeId)"
+        @pointerleave="clearHoveredNode(nodeId)"
         @pointerdown.stop="handleNodePointerDown(nodeId, $event)"
       >
         <div
@@ -115,23 +117,17 @@
           class="editor-canvas__flow-hotspot"
           :style="flowHotspotStyle(anchor)"
           :class="{
+            'editor-canvas__flow-hotspot--outbound': anchor.kind === 'flow-out',
+            'editor-canvas__flow-hotspot--inbound': anchor.kind === 'flow-in',
+            'editor-canvas__flow-hotspot--visible': isFlowHotspotVisible(anchor),
             'editor-canvas__flow-hotspot--connect-source': activeConnectionSourceAnchorId === anchor.id,
             'editor-canvas__flow-hotspot--connect-target': eligibleTargetAnchorIds.has(anchor.id),
             'editor-canvas__flow-hotspot--top': anchor.side === 'top',
           }"
+          @pointerenter="setHoveredFlowHandleNode(anchor.nodeId)"
+          @pointerleave="clearHoveredFlowHandleNode(anchor.nodeId)"
           @pointerdown.stop="handleAnchorPointerDown(anchor)"
         />
-      </div>
-      <div class="editor-canvas__edge-labels" aria-hidden="true">
-        <div
-          v-for="edge in projectedEdges.filter((candidate) => candidate.label)"
-          :key="`label-${edge.id}`"
-          class="editor-canvas__edge-label"
-          :style="edgeLabelStyle(edge)"
-        >
-          <span class="editor-canvas__edge-label-dot" />
-          <span class="editor-canvas__edge-label-text">{{ edge.label }}</span>
-        </div>
       </div>
       <svg class="editor-canvas__anchors" viewBox="0 0 4000 3000" preserveAspectRatio="none" aria-hidden="true">
         <circle
@@ -245,6 +241,8 @@ const nodeDrag = ref<{
 const pendingConnection = ref<PendingGraphConnection | null>(null);
 const pendingConnectionPoint = ref<{ x: number; y: number } | null>(null);
 const selectedEdgeId = ref<string | null>(null);
+const hoveredNodeId = ref<string | null>(null);
+const hoveredFlowHandleNodeId = ref<string | null>(null);
 const pendingAnchorMeasurementNodeIds = new Set<string>();
 let scheduledAnchorMeasurementFrame: number | null = null;
 
@@ -430,24 +428,28 @@ function edgeStyle(edge: ProjectedCanvasEdge) {
   };
 }
 
-function edgeLabelStyle(edge: ProjectedCanvasEdge) {
-  if (typeof edge.labelX !== "number" || typeof edge.labelY !== "number") {
-    return undefined;
-  }
-  return {
-    left: `${edge.labelX}px`,
-    top: `${edge.labelY}px`,
-    "--editor-edge-label-accent": edge.labelColor ?? edge.color ?? "rgba(217, 119, 6, 0.88)",
-  };
-}
-
 function flowHotspotStyle(anchor: ProjectedCanvasAnchor) {
   const isVertical = anchor.side === "left" || anchor.side === "right";
+  let left = anchor.x;
+  let top = anchor.y;
+  let width = isVertical ? 22 : 86;
+  let height = isVertical ? 86 : 22;
+
+  if (anchor.kind === "flow-out" && anchor.side === "right") {
+    left += 26;
+    width = 60;
+    height = 94;
+  } else if (anchor.kind === "flow-in" && anchor.side === "left") {
+    left -= 18;
+    width = 42;
+    height = 82;
+  }
+
   return {
-    left: `${anchor.x}px`,
-    top: `${anchor.y}px`,
-    width: `${isVertical ? 22 : 86}px`,
-    height: `${isVertical ? 86 : 22}px`,
+    left: `${left}px`,
+    top: `${top}px`,
+    width: `${width}px`,
+    height: `${height}px`,
   };
 }
 
@@ -679,6 +681,39 @@ function handleNodePointerDown(nodeId: string, event: PointerEvent) {
     originX: node.ui.position.x,
     originY: node.ui.position.y,
   };
+}
+
+function setHoveredNode(nodeId: string) {
+  hoveredNodeId.value = nodeId;
+}
+
+function clearHoveredNode(nodeId: string) {
+  if (hoveredNodeId.value === nodeId) {
+    hoveredNodeId.value = null;
+  }
+}
+
+function setHoveredFlowHandleNode(nodeId: string) {
+  hoveredFlowHandleNodeId.value = nodeId;
+}
+
+function clearHoveredFlowHandleNode(nodeId: string) {
+  if (hoveredFlowHandleNodeId.value === nodeId) {
+    hoveredFlowHandleNodeId.value = null;
+  }
+}
+
+function isFlowHotspotVisible(anchor: ProjectedCanvasAnchor) {
+  if (anchor.kind === "flow-out") {
+    return (
+      selection.selectedNodeId.value === anchor.nodeId ||
+      hoveredNodeId.value === anchor.nodeId ||
+      hoveredFlowHandleNodeId.value === anchor.nodeId ||
+      activeConnectionSourceAnchorId.value === anchor.id
+    );
+  }
+
+  return eligibleTargetAnchorIds.value.has(anchor.id);
 }
 
 function handleWheel(event: WheelEvent) {
@@ -987,13 +1022,6 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   pointer-events: none;
 }
 
-.editor-canvas__edge-labels {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  pointer-events: none;
-}
-
 .editor-canvas__edge {
   fill: none;
   stroke: var(--editor-edge-stroke, rgba(217, 119, 6, 0.88));
@@ -1020,35 +1048,6 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   stroke-dasharray: 10 10;
   animation: editor-canvas-ant-line 1.2s linear infinite;
   opacity: 0.94;
-}
-
-.editor-canvas__edge-label {
-  position: absolute;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  transform: translate(-50%, -100%) translateY(-4px);
-  border: 1px solid color-mix(in srgb, var(--editor-edge-label-accent) 22%, rgba(154, 52, 18, 0.08));
-  border-radius: 999px;
-  background: rgba(255, 250, 241, 0.96);
-  box-shadow: 0 10px 24px rgba(120, 53, 15, 0.12);
-  padding: 4px 10px;
-  white-space: nowrap;
-}
-
-.editor-canvas__edge-label-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: var(--editor-edge-label-accent, rgba(217, 119, 6, 0.88));
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--editor-edge-label-accent) 18%, transparent);
-}
-
-.editor-canvas__edge-label-text {
-  font-size: 0.76rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  color: rgba(60, 41, 20, 0.88);
 }
 
 .editor-canvas__edge--preview {
@@ -1084,7 +1083,6 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
 .editor-canvas__flow-hotspot {
   position: absolute;
   transform: translate(-50%, -50%);
-  border-radius: 999px;
   pointer-events: auto;
   cursor: crosshair;
 }
@@ -1092,29 +1090,104 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
 .editor-canvas__flow-hotspot::before {
   content: "";
   position: absolute;
-  inset: 0;
-  border-radius: inherit;
+  left: 50%;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
   background: rgba(190, 141, 72, 0);
-  box-shadow: inset 0 0 0 1px rgba(190, 141, 72, 0);
+  box-shadow:
+    inset 0 0 0 1px rgba(190, 141, 72, 0),
+    0 10px 20px rgba(120, 53, 15, 0);
+  opacity: 0;
   transition:
     background 120ms ease,
     box-shadow 120ms ease,
     opacity 120ms ease;
 }
 
+.editor-canvas__flow-hotspot::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  transition:
+    color 120ms ease,
+    opacity 120ms ease,
+    transform 120ms ease;
+}
+
+.editor-canvas__flow-hotspot--outbound::before {
+  width: 38px;
+  height: 56px;
+  border-radius: 999px;
+}
+
+.editor-canvas__flow-hotspot--outbound::after {
+  content: "+";
+  color: rgba(201, 107, 31, 0.92);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.editor-canvas__flow-hotspot--inbound::before {
+  width: 22px;
+  height: 52px;
+  border-radius: 999px;
+}
+
+.editor-canvas__flow-hotspot--visible::before {
+  background: rgba(255, 250, 241, 0.98);
+  box-shadow:
+    inset 0 0 0 1px rgba(201, 107, 31, 0.24),
+    0 12px 24px rgba(120, 53, 15, 0.14);
+  opacity: 1;
+}
+
+.editor-canvas__flow-hotspot--visible::after {
+  opacity: 1;
+}
+
 .editor-canvas__flow-hotspot:hover::before {
-  background: rgba(190, 141, 72, 0.16);
-  box-shadow: inset 0 0 0 1px rgba(190, 141, 72, 0.22);
+  background: rgba(255, 248, 242, 1);
+  box-shadow:
+    inset 0 0 0 1px rgba(201, 107, 31, 0.32),
+    0 14px 28px rgba(120, 53, 15, 0.18);
 }
 
 .editor-canvas__flow-hotspot--connect-source::before {
-  background: rgba(37, 99, 235, 0.18);
-  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.3);
+  background: rgba(239, 246, 255, 0.98);
+  box-shadow:
+    inset 0 0 0 1px rgba(37, 99, 235, 0.34),
+    0 14px 28px rgba(37, 99, 235, 0.14);
+  opacity: 1;
+}
+
+.editor-canvas__flow-hotspot--connect-source::after {
+  color: rgba(37, 99, 235, 0.96);
+  opacity: 1;
 }
 
 .editor-canvas__flow-hotspot--connect-target::before {
-  background: rgba(34, 197, 94, 0.18);
-  box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.3);
+  background: rgba(240, 253, 244, 0.98);
+  box-shadow:
+    inset 0 0 0 1px rgba(34, 197, 94, 0.34),
+    0 14px 28px rgba(34, 197, 94, 0.16);
+  opacity: 1;
+}
+
+.editor-canvas__flow-hotspot--connect-target::after {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(34, 197, 94, 0.86);
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.12);
+  opacity: 1;
 }
 
 .editor-canvas__flow-hotspot--top {

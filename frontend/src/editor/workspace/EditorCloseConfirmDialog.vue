@@ -1,35 +1,42 @@
 <template>
-  <AlertDialogRoot :open="Boolean(tab)" @update:open="handleOpenChange">
-    <AlertDialogPortal>
-      <AlertDialogOverlay class="editor-close-dialog__overlay" />
-      <AlertDialogContent class="editor-close-dialog__content">
+  <ElDialog
+    class="editor-close-dialog"
+    :model-value="Boolean(tab)"
+    :show-close="false"
+    :close-on-click-modal="!busy"
+    :close-on-press-escape="!busy"
+    :modal-class="'editor-close-dialog__overlay'"
+    width="520px"
+    append-to-body
+    @update:model-value="handleOpenChange"
+  >
+    <div class="editor-close-dialog__content">
         <div class="editor-close-dialog__eyebrow">Tab</div>
-        <AlertDialogTitle class="editor-close-dialog__title">关闭未保存的标签页？</AlertDialogTitle>
-        <AlertDialogDescription class="editor-close-dialog__body">
+        <h2 class="editor-close-dialog__title">关闭未保存的标签页？</h2>
+        <p class="editor-close-dialog__body">
           这个标签页有未保存修改。你可以先保存，再关闭；也可以直接丢弃。
           <span class="editor-close-dialog__tab-title">{{ tab?.title }}</span>
-        </AlertDialogDescription>
+        </p>
 
         <div v-if="error" class="editor-close-dialog__error">{{ error }}</div>
 
         <div class="editor-close-dialog__actions" :class="{ 'editor-close-dialog__actions--busy': busy }">
-          <button type="button" class="editor-close-dialog__button editor-close-dialog__button--ghost" @click="$emit('cancel')">
+          <ElButton class="editor-close-dialog__button editor-close-dialog__button--ghost" @click="$emit('cancel')">
             取消
-          </button>
+          </ElButton>
 
-          <button type="button" class="editor-close-dialog__button editor-close-dialog__button--ghost" @click="$emit('discard')">
+          <ElButton class="editor-close-dialog__button editor-close-dialog__button--ghost" @click="$emit('discard')">
             不保存，直接关闭
-          </button>
+          </ElButton>
 
-          <button type="button" class="editor-close-dialog__button" @click="$emit('save-and-close')">保存并关闭</button>
+          <ElButton class="editor-close-dialog__button" type="primary" @click="$emit('save-and-close')">保存并关闭</ElButton>
         </div>
-      </AlertDialogContent>
-    </AlertDialogPortal>
-  </AlertDialogRoot>
+      </div>
+  </ElDialog>
 </template>
 
 <script setup lang="ts">
-import { AlertDialogContent, AlertDialogDescription, AlertDialogOverlay, AlertDialogPortal, AlertDialogRoot, AlertDialogTitle } from "reka-ui";
+import { ElButton, ElDialog } from "element-plus";
 
 import type { EditorWorkspaceTab } from "@/lib/editor-workspace";
 
@@ -46,34 +53,37 @@ const emit = defineEmits<{
 }>();
 
 function handleOpenChange(open: boolean) {
-  if (!open && props.tab) {
+  if (!open && props.tab && !props.busy) {
     emit("cancel");
   }
 }
 </script>
 
 <style scoped>
-.editor-close-dialog__overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 80;
+:deep(.editor-close-dialog__overlay) {
   background: rgba(66, 31, 17, 0.18);
   backdrop-filter: blur(8px);
 }
 
+.editor-close-dialog :deep(.el-dialog) {
+  border-radius: 28px;
+  padding: 0;
+  background: rgba(255, 250, 241, 0.98);
+  box-shadow: 0 28px 80px rgba(66, 31, 17, 0.18);
+}
+
+.editor-close-dialog :deep(.el-dialog__header) {
+  display: none;
+}
+
+.editor-close-dialog :deep(.el-dialog__body) {
+  padding: 0;
+}
+
 .editor-close-dialog__content {
-  position: fixed;
-  left: 50%;
-  top: 50%;
-  z-index: 81;
-  width: min(calc(100vw - 32px), 520px);
-  transform: translate(-50%, -50%);
   border: 1px solid rgba(154, 52, 18, 0.18);
   border-radius: 28px;
   padding: 24px;
-  background: rgba(255, 250, 241, 0.98);
-  box-shadow: 0 28px 80px rgba(66, 31, 17, 0.18);
-  outline: none;
 }
 
 .editor-close-dialog__eyebrow {
@@ -87,6 +97,7 @@ function handleOpenChange(open: boolean) {
   margin: 10px 0 8px;
   font-size: 1.9rem;
   line-height: 1.15;
+  color: #1f2937;
 }
 
 .editor-close-dialog__body {
@@ -124,22 +135,34 @@ function handleOpenChange(open: boolean) {
 }
 
 .editor-close-dialog__button {
-  border: 1px solid rgba(154, 52, 18, 0.18);
+  --el-button-border-color: rgba(154, 52, 18, 0.18);
+  --el-button-bg-color: rgba(255, 248, 240, 0.96);
+  --el-button-text-color: rgb(154, 52, 18);
+  --el-button-hover-border-color: rgba(154, 52, 18, 0.24);
+  --el-button-hover-bg-color: rgba(255, 244, 240, 0.96);
+  --el-button-hover-text-color: rgb(154, 52, 18);
+  --el-button-active-border-color: rgba(154, 52, 18, 0.24);
+  --el-button-active-bg-color: rgba(255, 240, 232, 0.98);
+  --el-button-active-text-color: rgb(154, 52, 18);
   border-radius: 999px;
-  padding: 10px 16px;
-  background: rgba(255, 248, 240, 0.96);
-  color: rgb(154, 52, 18);
-  cursor: pointer;
-  transition: border-color 140ms ease, background-color 140ms ease, transform 140ms ease;
+  min-height: 40px;
+  padding: 0 16px;
+  transition: transform 140ms ease;
 }
 
 .editor-close-dialog__button:hover {
   transform: translateY(-1px);
-  border-color: rgba(154, 52, 18, 0.24);
 }
 
 .editor-close-dialog__button--ghost {
-  background: rgba(255, 255, 255, 0.72);
-  color: rgba(60, 41, 20, 0.82);
+  --el-button-border-color: rgba(154, 52, 18, 0.14);
+  --el-button-bg-color: rgba(255, 255, 255, 0.72);
+  --el-button-text-color: rgba(60, 41, 20, 0.82);
+  --el-button-hover-border-color: rgba(154, 52, 18, 0.18);
+  --el-button-hover-bg-color: rgba(255, 250, 241, 0.9);
+  --el-button-hover-text-color: rgba(60, 41, 20, 0.88);
+  --el-button-active-border-color: rgba(154, 52, 18, 0.18);
+  --el-button-active-bg-color: rgba(255, 248, 240, 0.92);
+  --el-button-active-text-color: rgba(60, 41, 20, 0.88);
 }
 </style>

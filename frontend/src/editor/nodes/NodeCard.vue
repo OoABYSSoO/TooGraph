@@ -8,11 +8,27 @@
     <p class="node-card__description">{{ view.description }}</p>
 
     <section v-if="view.body.kind === 'input'" class="node-card__body node-card__body--input">
-      <div class="node-card__port-row node-card__port-row--single">
-        <span class="node-card__port-spacer" />
+      <div class="node-card__port-row node-card__port-row--single node-card__port-row--input-boundary">
+        <ElSegmented
+          class="node-card__input-boundary-toggle"
+          :model-value="inputBoundarySelection"
+          :options="inputTypeOptions"
+          aria-label="Input boundary mode"
+          :disabled="Boolean(inputAssetEnvelope)"
+          @pointerdown.stop
+          @click.stop
+          @update:model-value="handleInputBoundarySelection"
+        >
+          <template #default="{ item }">
+            <span class="node-card__input-boundary-icon-wrap">
+              <component :is="item.icon" class="node-card__input-boundary-icon" aria-hidden="true" />
+              <span class="node-card__sr-only">{{ item.label }}</span>
+            </span>
+          </template>
+        </ElSegmented>
         <div v-if="view.body.primaryOutput" class="node-card__port-pill-row node-card__port-pill-row--right">
           <span
-            class="node-card__port-pill node-card__port-pill--output"
+            class="node-card__port-pill node-card__port-pill--output node-card__port-pill--dock-end"
             :style="{ '--node-card-port-accent': view.body.primaryOutput.stateColor }"
           >
             <span class="node-card__port-pill-label">{{ view.body.primaryOutput.label }}</span>
@@ -22,24 +38,6 @@
               aria-hidden="true"
             />
           </span>
-        </div>
-      </div>
-      <div class="node-card__input-toolbar">
-        <div v-if="!inputAssetEnvelope" class="node-card__control-list">
-          <button
-            v-for="option in inputTypeOptions"
-            :key="option.value"
-            type="button"
-            class="node-card__control-button"
-            :class="{ 'node-card__control-button--active': isInputTypeOptionActive(option.value) }"
-            @pointerdown.stop
-            @click.stop="updateInputBoundaryType(option.value)"
-          >
-            {{ option.label }}
-          </button>
-        </div>
-        <div v-else class="node-card__input-lock">
-          Uploaded asset locked this input as {{ inputAssetEnvelope.detectedType }}.
         </div>
       </div>
       <div v-if="showKnowledgeBaseInput" class="node-card__surface node-card__input-picker">
@@ -161,7 +159,7 @@
         <div class="node-card__port-column">
           <div v-for="port in view.inputs" :key="port.key" class="node-card__port-pill-row">
             <span
-              class="node-card__port-pill node-card__port-pill--input"
+              class="node-card__port-pill node-card__port-pill--input node-card__port-pill--dock-start"
               :style="{ '--node-card-port-accent': port.stateColor }"
             >
               <span
@@ -171,13 +169,12 @@
               />
               <span class="node-card__port-pill-label">{{ port.label }}</span>
             </span>
-            <span v-if="port.required" class="node-card__port-badge">Required</span>
           </div>
         </div>
         <div class="node-card__port-column node-card__port-column--right">
           <div v-for="port in view.outputs" :key="port.key" class="node-card__port-pill-row node-card__port-pill-row--right">
             <span
-              class="node-card__port-pill node-card__port-pill--output"
+              class="node-card__port-pill node-card__port-pill--output node-card__port-pill--dock-end"
               :style="{ '--node-card-port-accent': port.stateColor }"
             >
               <span class="node-card__port-pill-label">{{ port.label }}</span>
@@ -190,10 +187,45 @@
           </div>
         </div>
       </div>
-      <div class="node-card__chip-row">
-        <span class="node-card__chip">{{ view.body.modelLabel }}</span>
-        <span class="node-card__chip">{{ view.body.thinkingLabel }}</span>
-        <span class="node-card__chip node-card__chip--muted">{{ view.body.skillLabel }}</span>
+      <div class="node-card__agent-runtime-row">
+        <div class="node-card__agent-model-select-shell" @pointerdown.stop @click.stop>
+          <ElSelect
+            class="node-card__agent-model-select"
+            :model-value="agentResolvedModelValue || undefined"
+            :placeholder="agentModelOptions.length === 0 ? 'No configured models' : 'Select model'"
+            :disabled="agentModelOptions.length === 0"
+            popper-class="node-card__agent-model-popper"
+            @update:model-value="handleAgentModelValueChange"
+          >
+            <ElOption
+              v-for="option in agentModelOptions"
+              :key="option.value"
+              :label="option.value === trimmedGlobalTextModelRef ? `${option.label} (Global)` : option.label"
+              :value="option.value"
+            />
+          </ElSelect>
+        </div>
+        <div class="node-card__agent-thinking-card">
+          <span
+            class="node-card__agent-thinking-icon"
+            :class="{ 'node-card__agent-thinking-icon--enabled': agentThinkingEnabled }"
+            aria-hidden="true"
+          >
+            <Opportunity />
+          </span>
+          <ElSwitch
+            class="node-card__agent-thinking-switch"
+            :model-value="agentThinkingEnabled"
+            :width="56"
+            inline-prompt
+            active-text="ON"
+            inactive-text="OFF"
+            aria-label="Toggle thinking mode"
+            @pointerdown.stop
+            @click.stop
+            @update:model-value="handleAgentThinkingToggle"
+          />
+        </div>
       </div>
       <div class="node-card__action-row">
         <button
@@ -400,25 +432,6 @@
           </button>
         </span>
       </div>
-      <label class="node-card__control-row">
-        <span class="node-card__control-label">Model</span>
-        <select
-          class="node-card__control-select"
-          :value="agentResolvedModelValue"
-          :disabled="agentModelOptions.length === 0"
-          @pointerdown.stop
-          @click.stop
-          @change="handleAgentModelChange"
-        >
-          <option v-if="agentModelOptions.length === 0" value="">No configured models</option>
-          <option v-for="option in agentModelOptions" :key="option.value" :value="option.value">
-            {{ option.value === trimmedGlobalTextModelRef ? `${option.label} (Global)` : option.label }}
-          </option>
-        </select>
-      </label>
-      <div class="node-card__input-meta">
-        {{ agentModelSelectionDescription }}
-      </div>
       <textarea
         class="node-card__surface node-card__surface-textarea"
         :value="view.body.taskInstruction"
@@ -428,35 +441,14 @@
         @input="handleAgentTaskInstructionInput"
       />
       <details class="node-card__advanced-panel" @pointerdown.stop>
-        <summary class="node-card__advanced-summary">Advanced</summary>
+        <summary class="node-card__advanced-summary">
+          <span class="node-card__advanced-summary-copy">
+            <span class="node-card__advanced-summary-label">Advanced</span>
+            <span class="node-card__advanced-summary-meta">1 setting</span>
+          </span>
+          <span class="node-card__advanced-summary-icon" aria-hidden="true" />
+        </summary>
         <div class="node-card__advanced-content">
-          <label class="node-card__control-row">
-            <span class="node-card__control-label">System</span>
-            <textarea
-              class="node-card__control-textarea"
-              :value="view.body.systemInstruction"
-              placeholder="Add system guardrails or role guidance"
-              @pointerdown.stop
-              @click.stop
-              @input="handleAgentSystemInstructionInput"
-            />
-          </label>
-          <div class="node-card__control-row">
-            <span class="node-card__control-label">Thinking</span>
-            <div class="node-card__control-list">
-              <button
-                v-for="option in agentThinkingOptions"
-                :key="option.value"
-                type="button"
-                class="node-card__control-button"
-                :class="{ 'node-card__control-button--active': isAgentThinkingModeActive(option.value) }"
-                @pointerdown.stop
-                @click.stop="updateAgentThinkingMode(option.value)"
-              >
-                {{ option.label }}
-              </button>
-            </div>
-          </div>
           <label class="node-card__control-row">
             <span class="node-card__control-label">Temperature</span>
             <input
@@ -479,7 +471,7 @@
       <div class="node-card__output-toolbar">
         <span
           v-if="view.body.connectedStateKey && view.body.connectedStateLabel"
-          class="node-card__port-pill node-card__port-pill--input"
+          class="node-card__port-pill node-card__port-pill--input node-card__port-pill--dock-start"
           :style="{ '--node-card-port-accent': stateSchema[view.body.connectedStateKey]?.color ?? '#2563eb' }"
         >
           <span
@@ -513,7 +505,13 @@
         <div class="node-card__preview">{{ view.body.previewText || `Connected to ${view.body.connectedStateLabel ?? "state"}` }}</div>
       </div>
       <details class="node-card__advanced-panel" @pointerdown.stop>
-        <summary class="node-card__advanced-summary">Advanced</summary>
+        <summary class="node-card__advanced-summary">
+          <span class="node-card__advanced-summary-copy">
+            <span class="node-card__advanced-summary-label">Advanced</span>
+            <span class="node-card__advanced-summary-meta">3 settings</span>
+          </span>
+          <span class="node-card__advanced-summary-icon" aria-hidden="true" />
+        </summary>
         <div class="node-card__advanced-content">
           <div class="node-card__control-row">
             <span class="node-card__control-label">Display</span>
@@ -568,7 +566,7 @@
         <div class="node-card__port-column">
           <div v-for="port in view.inputs" :key="port.key" class="node-card__port-pill-row">
             <span
-              class="node-card__port-pill node-card__port-pill--input"
+              class="node-card__port-pill node-card__port-pill--input node-card__port-pill--dock-start"
               :style="{ '--node-card-port-accent': port.stateColor }"
             >
               <span
@@ -578,7 +576,6 @@
               />
               <span class="node-card__port-pill-label">{{ port.label }}</span>
             </span>
-            <span v-if="port.required" class="node-card__port-badge">Required</span>
           </div>
         </div>
         <label class="node-card__loop-control" @pointerdown.stop @click.stop>
@@ -717,6 +714,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { Collection, Document, FolderOpened, Opportunity } from "@element-plus/icons-vue";
 
 import StateDefaultValueEditor from "@/editor/workspace/StateDefaultValueEditor.vue";
 import { listConditionBranchMappingKeys, parseConditionBranchMappingDraft } from "@/lib/condition-branch-mapping";
@@ -778,14 +776,14 @@ const outputPersistFormatOptions: Array<{ value: OutputNode["config"]["persistFo
   { value: "md", label: "MD" },
   { value: "json", label: "JSON" },
 ];
-const agentThinkingOptions: Array<{ value: AgentNode["config"]["thinkingMode"]; label: string }> = [
-  { value: "on", label: "ON" },
-  { value: "off", label: "OFF" },
-];
-const inputTypeOptions: Array<{ value: "text" | "file" | "knowledge_base"; label: string }> = [
-  { value: "text", label: "Text" },
-  { value: "file", label: "File" },
-  { value: "knowledge_base", label: "KB" },
+const inputTypeOptions: Array<{
+  value: "text" | "file" | "knowledge_base";
+  label: string;
+  icon: typeof Document;
+}> = [
+  { value: "text", label: "Text", icon: Document },
+  { value: "file", label: "File", icon: FolderOpened },
+  { value: "knowledge_base", label: "Knowledge Base", icon: Collection },
 ];
 const stateTypeOptions = STATE_FIELD_TYPE_OPTIONS;
 const conditionRuleOperatorOptions = CONDITION_RULE_OPERATOR_OPTIONS;
@@ -841,6 +839,15 @@ const inputStateKey = computed(() => (view.value.body.kind === "input" ? view.va
 const inputStateType = computed(() => {
   const stateKey = inputStateKey.value;
   return stateKey ? String(props.stateSchema[stateKey]?.type ?? "text") : "text";
+});
+const inputBoundarySelection = computed<"text" | "file" | "knowledge_base">(() => {
+  if (showKnowledgeBaseInput.value) {
+    return "knowledge_base";
+  }
+  if (showAssetUploadInput.value) {
+    return "file";
+  }
+  return "text";
 });
 const inputAssetLabel = computed(() => {
   switch (inputAssetType.value) {
@@ -929,22 +936,10 @@ const agentResolvedModelValue = computed(() => {
   const overrideModel = props.node.config.model.trim();
   return props.node.config.modelSource === "override" && overrideModel ? overrideModel : trimmedGlobalTextModelRef.value;
 });
+const agentThinkingEnabled = computed(() => props.node.kind === "agent" ? props.node.config.thinkingMode === "on" : true);
 const agentModelOptions = computed(() =>
   buildAgentModelSelectOptions(agentResolvedModelValue.value, props.availableAgentModelRefs, props.agentModelDisplayLookup),
 );
-const agentModelSelectionDescription = computed(() => {
-  if (props.node.kind !== "agent") {
-    return "";
-  }
-  const resolvedModel = agentResolvedModelValue.value.trim();
-  if (!resolvedModel) {
-    return "Load settings to choose from configured models.";
-  }
-  const resolvedLabel = props.agentModelDisplayLookup[resolvedModel] || resolvedModel;
-  return props.node.config.modelSource === "global"
-    ? `Using workspace default model: ${resolvedLabel}.`
-    : `Overriding the workspace default with ${resolvedLabel}.`;
-});
 const attachedSkillBadges = computed(() =>
   props.node.kind === "agent" ? resolveAttachedSkillBadges(props.node.config.skills, props.skillDefinitions) : [],
 );
@@ -1117,14 +1112,6 @@ function handleAgentTaskInstructionInput(event: Event) {
     return;
   }
   emitAgentConfigPatch({ taskInstruction: target.value });
-}
-
-function handleAgentSystemInstructionInput(event: Event) {
-  const target = event.target;
-  if (!(target instanceof HTMLTextAreaElement)) {
-    return;
-  }
-  emitAgentConfigPatch({ systemInstruction: target.value });
 }
 
 function toggleSkillPicker() {
@@ -1309,24 +1296,26 @@ function commitPortStateCreate() {
   closePortPicker();
 }
 
-function handleAgentModelChange(event: Event) {
-  const target = event.target;
-  if (!(target instanceof HTMLSelectElement)) {
+function handleAgentModelValueChange(nextValue: string | number | boolean | undefined) {
+  if (typeof nextValue !== "string") {
     return;
   }
-  const nextValue = target.value.trim();
-  if (!nextValue) {
+  const normalizedValue = nextValue.trim();
+  if (!normalizedValue) {
     return;
   }
-  emitAgentConfigPatch(resolveAgentModelSelection(nextValue, trimmedGlobalTextModelRef.value));
+  emitAgentConfigPatch(resolveAgentModelSelection(normalizedValue, trimmedGlobalTextModelRef.value));
+}
+
+function handleAgentThinkingToggle(nextValue: string | number | boolean) {
+  if (typeof nextValue !== "boolean") {
+    return;
+  }
+  updateAgentThinkingMode(nextValue ? "on" : "off");
 }
 
 function updateAgentThinkingMode(thinkingMode: AgentNode["config"]["thinkingMode"]) {
   emitAgentConfigPatch({ thinkingMode });
-}
-
-function isAgentThinkingModeActive(thinkingMode: AgentNode["config"]["thinkingMode"]) {
-  return props.node.kind === "agent" && props.node.config.thinkingMode === thinkingMode;
 }
 
 function handleAgentTemperatureInput(event: Event) {
@@ -1357,8 +1346,11 @@ function handleInputKnowledgeBaseChange(event: Event) {
   emitInputConfigPatch({ value: target.value });
 }
 
-function isInputTypeOptionActive(type: "text" | "file" | "knowledge_base") {
-  return inputStateType.value === type;
+function handleInputBoundarySelection(nextType: string | number | boolean) {
+  if (typeof nextType !== "string" || !isSwitchableInputBoundaryType(nextType)) {
+    return;
+  }
+  updateInputBoundaryType(nextType);
 }
 
 function updateInputBoundaryType(nextType: "text" | "file" | "knowledge_base") {
@@ -1576,6 +1568,7 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
 
 <style scoped>
 .node-card {
+  --node-card-inline-padding: 24px;
   width: 460px;
   min-height: 260px;
   border: 1px solid rgba(154, 52, 18, 0.18);
@@ -1595,7 +1588,7 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 18px 24px 8px;
+  padding: 18px var(--node-card-inline-padding) 8px;
 }
 
 .node-card__eyebrow {
@@ -1618,7 +1611,7 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
 
 .node-card__description {
   margin: 0;
-  padding: 0 24px 20px;
+  padding: 0 var(--node-card-inline-padding) 20px;
   font-size: 0.98rem;
   line-height: 1.55;
   color: rgba(60, 41, 20, 0.74);
@@ -1675,7 +1668,7 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
 
 .node-card__body {
   border-top: 1px solid rgba(154, 52, 18, 0.14);
-  padding: 18px 24px 24px;
+  padding: 18px var(--node-card-inline-padding) 24px;
   display: grid;
   gap: 14px;
 }
@@ -1688,6 +1681,10 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
 
 .node-card__port-row--single {
   grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.node-card__port-row--input-boundary {
+  gap: 16px;
 }
 
 .node-card__port-grid {
@@ -1739,16 +1736,14 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 12px;
+  gap: 9px;
   min-height: 34px;
   max-width: 100%;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--node-card-port-accent) 22%, rgba(154, 52, 18, 0.1));
-  background: rgba(255, 250, 241, 0.9);
-  padding: 0 9px 0 16px;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.54),
-    0 8px 18px rgba(120, 53, 15, 0.07);
+  border-radius: 0;
+  border: none;
+  background: transparent;
+  padding: 0;
+  box-shadow: none;
 }
 
 .node-card__port-pill--output {
@@ -1758,12 +1753,19 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
 .node-card__port-pill--input {
   justify-content: flex-start;
   color: #1d4ed8;
-  padding: 0 16px 0 10px;
+}
+
+.node-card__port-pill--dock-start {
+  margin-left: calc(var(--node-card-inline-padding) * -1);
+}
+
+.node-card__port-pill--dock-end {
+  margin-right: calc(var(--node-card-inline-padding) * -1);
 }
 
 .node-card__port-pill-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow: visible;
+  text-overflow: clip;
   white-space: nowrap;
   font-size: 1.02rem;
   font-weight: 600;
@@ -1790,20 +1792,6 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-}
-
-.node-card__port-badge {
-  display: inline-flex;
-  align-items: center;
-  min-height: 22px;
-  border-radius: 999px;
-  border: 1px solid rgba(154, 52, 18, 0.16);
-  padding: 0 8px;
-  font-size: 0.72rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: rgba(154, 52, 18, 0.84);
-  background: rgba(255, 248, 240, 0.9);
 }
 
 .node-card__chip-row,
@@ -1842,6 +1830,140 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
   justify-content: flex-start;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.node-card__agent-runtime-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.node-card__agent-model-select {
+  --el-color-primary: #c96b1f;
+  --el-border-radius-base: 16px;
+  --el-border-color: rgba(154, 52, 18, 0.14);
+  --el-text-color-primary: #3c2914;
+}
+
+.node-card__agent-model-select-shell {
+  min-width: 0;
+}
+
+.node-card__agent-model-select :deep(.el-select__wrapper) {
+  min-height: 48px;
+  border-radius: 16px;
+  border: 1px solid rgba(154, 52, 18, 0.14);
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  padding: 0 14px;
+}
+
+.node-card__agent-model-select :deep(.el-select__wrapper:hover) {
+  border-color: rgba(154, 52, 18, 0.22);
+  background: rgba(255, 252, 247, 0.94);
+}
+
+.node-card__agent-model-select :deep(.el-select__wrapper.is-focused) {
+  border-color: rgba(201, 107, 31, 0.32);
+  box-shadow:
+    0 0 0 3px rgba(201, 107, 31, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.node-card__agent-model-select :deep(.el-select__placeholder) {
+  color: rgba(60, 41, 20, 0.48);
+}
+
+.node-card__agent-model-select :deep(.el-select__selected-item),
+.node-card__agent-model-select :deep(.el-select__input-text),
+.node-card__agent-model-select :deep(.el-select__selection .el-tag) {
+  color: #3c2914;
+  font-size: 0.92rem;
+}
+
+.node-card__agent-model-select :deep(.is-disabled .el-select__wrapper) {
+  opacity: 0.62;
+  background: rgba(250, 243, 231, 0.78);
+}
+
+:deep(.node-card__agent-model-popper.el-popper) {
+  border: 1px solid rgba(154, 52, 18, 0.16);
+  border-radius: 16px;
+  background: rgba(255, 250, 241, 0.98);
+  box-shadow: 0 20px 40px rgba(60, 41, 20, 0.12);
+}
+
+:deep(.node-card__agent-model-popper .el-select-dropdown__list) {
+  padding: 8px;
+}
+
+:deep(.node-card__agent-model-popper .el-select-dropdown__item) {
+  min-height: 38px;
+  border-radius: 12px;
+  color: #3c2914;
+}
+
+:deep(.node-card__agent-model-popper .el-select-dropdown__item.hover),
+:deep(.node-card__agent-model-popper .el-select-dropdown__item:hover) {
+  background: rgba(154, 52, 18, 0.08);
+}
+
+:deep(.node-card__agent-model-popper .el-select-dropdown__item.is-selected) {
+  color: #9a3412;
+  background: rgba(154, 52, 18, 0.12);
+}
+
+.node-card__agent-thinking-card {
+  display: grid;
+  grid-template-columns: 20px 56px;
+  align-items: center;
+  justify-self: end;
+  min-height: 48px;
+  gap: 10px;
+  border: 1px solid rgba(154, 52, 18, 0.14);
+  border-radius: 16px;
+  padding: 0 14px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.node-card__agent-thinking-card:hover {
+  border-color: rgba(154, 52, 18, 0.22);
+  background: rgba(255, 252, 247, 0.94);
+}
+
+.node-card__agent-thinking-card:focus-within {
+  border-color: rgba(201, 107, 31, 0.32);
+  box-shadow:
+    0 0 0 3px rgba(201, 107, 31, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.node-card__agent-thinking-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: rgba(111, 67, 30, 0.72);
+  transition: color 140ms ease;
+}
+
+.node-card__agent-thinking-icon :deep(svg) {
+  width: 18px;
+  height: 18px;
+}
+
+.node-card__agent-thinking-icon--enabled {
+  color: #b45309;
+}
+
+.node-card__agent-thinking-switch {
+  justify-self: end;
+  --el-switch-on-color: #c96b1f;
+  --el-switch-off-color: rgba(154, 52, 18, 0.24);
 }
 
 .node-card__action-pill {
@@ -2101,17 +2223,62 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
   gap: 10px;
 }
 
-.node-card__input-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+.node-card__input-boundary-toggle {
+  justify-self: start;
+  min-width: 136px;
+  --el-segmented-bg-color: rgba(255, 248, 240, 0.92);
+  --el-segmented-item-selected-bg-color: rgba(255, 255, 255, 0.98);
+  --el-segmented-item-selected-color: #8c4a14;
+  --el-segmented-color: rgba(90, 58, 28, 0.82);
+  --el-fill-color-light: rgba(255, 248, 240, 0.92);
+  --el-border-radius-base: 999px;
+  --el-border-radius-round: 999px;
+  --el-border-color: rgba(154, 52, 18, 0.14);
+  --el-color-primary: #c96b1f;
+  --el-text-color-primary: rgba(90, 58, 28, 0.88);
 }
 
-.node-card__input-lock {
-  font-size: 0.82rem;
-  line-height: 1.5;
-  color: rgba(60, 41, 20, 0.68);
+.node-card__input-boundary-toggle :deep(.el-segmented) {
+  padding: 4px;
+  border-radius: 999px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.58),
+    0 8px 18px rgba(120, 53, 15, 0.06);
+}
+
+.node-card__input-boundary-toggle :deep(.el-segmented__group) {
+  gap: 4px;
+}
+
+.node-card__input-boundary-toggle :deep(.el-segmented__item) {
+  min-height: 30px;
+  min-width: 38px;
+  border-radius: 999px;
+}
+
+.node-card__input-boundary-toggle :deep(.el-segmented__item-label) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 100%;
+  line-height: 1;
+}
+
+.node-card__input-boundary-toggle :deep(.el-segmented__item-selected) {
+  box-shadow: 0 6px 14px rgba(120, 53, 15, 0.1);
+}
+
+.node-card__input-boundary-icon-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+}
+
+.node-card__input-boundary-icon {
+  width: 18px;
+  height: 18px;
 }
 
 .node-card__input-select {
@@ -2350,20 +2517,92 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
 }
 
 .node-card__advanced-panel {
+  overflow: hidden;
   border: 1px solid rgba(154, 52, 18, 0.14);
   border-radius: 20px;
   background: rgba(255, 255, 255, 0.76);
-  padding: 12px 14px;
+  padding: 0;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.node-card__advanced-panel[open] {
+  border-color: rgba(154, 52, 18, 0.18);
+  background: rgba(255, 252, 247, 0.88);
+  box-shadow: 0 10px 22px rgba(120, 53, 15, 0.06);
 }
 
 .node-card__advanced-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  padding: 12px 16px;
   cursor: pointer;
   list-style: none;
+  user-select: none;
+}
+
+.node-card__advanced-summary-copy {
+  display: grid;
+  gap: 3px;
+}
+
+.node-card__advanced-summary-label {
   font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(60, 41, 20, 0.84);
+}
+
+.node-card__advanced-summary-meta {
+  font-size: 0.68rem;
+  line-height: 1;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(60, 41, 20, 0.8);
+  color: rgba(154, 52, 18, 0.56);
+}
+
+.node-card__advanced-summary-icon {
+  position: relative;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid rgba(154, 52, 18, 0.16);
+  background: rgba(255, 255, 255, 0.82);
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background-color 160ms ease;
+}
+
+.node-card__advanced-summary-icon::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid rgba(154, 52, 18, 0.74);
+  border-bottom: 2px solid rgba(154, 52, 18, 0.74);
+  transform: rotate(45deg) translateY(-1px);
+}
+
+.node-card__advanced-panel[open] .node-card__advanced-summary {
+  border-bottom: 1px solid rgba(154, 52, 18, 0.1);
+  background: rgba(255, 248, 240, 0.72);
+}
+
+.node-card__advanced-panel[open] .node-card__advanced-summary-icon {
+  border-color: rgba(201, 107, 31, 0.24);
+  background: rgba(255, 250, 242, 0.96);
+  transform: rotate(180deg);
 }
 
 .node-card__advanced-summary::-webkit-details-marker {
@@ -2373,7 +2612,7 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
 .node-card__advanced-content {
   display: grid;
   gap: 12px;
-  margin-top: 12px;
+  padding: 14px 16px 16px;
 }
 
 .node-card__control-row {

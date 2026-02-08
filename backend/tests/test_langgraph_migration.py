@@ -185,7 +185,7 @@ def _build_cycle_graph() -> NodeSystemGraphPayload:
                     "ui": {"position": {"x": 240, "y": 0}, "collapsed": False},
                     "reads": [{"state": "counter", "required": True}],
                     "writes": [{"state": "counter", "mode": "replace"}],
-                    "config": {"skills": [], "systemInstruction": "", "taskInstruction": ""},
+                    "config": {"skills": [], "taskInstruction": ""},
                 },
                 "continue_check": {
                     "kind": "condition",
@@ -443,7 +443,6 @@ class LangGraphMigrationTests(unittest.TestCase):
                         "writes": [{"state": "question", "mode": "replace"}],
                         "config": {
                             "skills": [],
-                            "systemInstruction": "",
                             "taskInstruction": "",
                             "modelSource": "global",
                             "model": "",
@@ -559,7 +558,6 @@ class LangGraphMigrationTests(unittest.TestCase):
                         ],
                         "config": {
                             "skills": [],
-                            "systemInstruction": "",
                             "taskInstruction": "",
                             "modelSource": "global",
                             "model": "",
@@ -579,7 +577,6 @@ class LangGraphMigrationTests(unittest.TestCase):
                         "writes": [],
                         "config": {
                             "skills": [],
-                            "systemInstruction": "",
                             "taskInstruction": "",
                             "modelSource": "global",
                             "model": "",
@@ -630,7 +627,6 @@ class LangGraphMigrationTests(unittest.TestCase):
                         "writes": [{"state": "answer", "mode": "replace"}],
                         "config": {
                             "skills": [],
-                            "systemInstruction": "",
                             "taskInstruction": "",
                             "modelSource": "global",
                             "model": "",
@@ -647,7 +643,6 @@ class LangGraphMigrationTests(unittest.TestCase):
                         "writes": [{"state": "answer", "mode": "replace"}],
                         "config": {
                             "skills": [],
-                            "systemInstruction": "",
                             "taskInstruction": "",
                             "modelSource": "global",
                             "model": "",
@@ -711,7 +706,6 @@ class LangGraphMigrationTests(unittest.TestCase):
                         "writes": [{"state": "answer", "mode": "replace"}],
                         "config": {
                             "skills": [],
-                            "systemInstruction": "",
                             "taskInstruction": "",
                             "modelSource": "global",
                             "model": "",
@@ -728,7 +722,6 @@ class LangGraphMigrationTests(unittest.TestCase):
                         "writes": [{"state": "answer", "mode": "replace"}],
                         "config": {
                             "skills": [],
-                            "systemInstruction": "",
                             "taskInstruction": "",
                             "modelSource": "global",
                             "model": "",
@@ -768,7 +761,7 @@ class LangGraphMigrationTests(unittest.TestCase):
         plan = compile_graph_to_langgraph_plan(graph)
         self.assertTrue(any("multiple unordered writers" in reason for reason in plan.requirements.unsupported_reasons))
 
-    def test_explicit_system_instruction_still_keeps_graph_state_inputs_in_agent_prompt(self):
+    def test_agent_prompt_ignores_legacy_system_instruction_and_keeps_graph_state_inputs(self):
         graph = _load_cycle_counter_demo_graph()
         node = graph.nodes["increment_counter"]
         captured: dict[str, str] = {}
@@ -782,10 +775,12 @@ class LangGraphMigrationTests(unittest.TestCase):
             runtime_config = node_system_executor._resolve_agent_runtime_config(node)
             node_system_executor._generate_agent_response(node, {"counter": 0}, {}, runtime_config)
 
+        self.assertFalse(hasattr(node.config, "system_instruction"))
         self.assertIn("== Graph State Inputs ==", captured["system_prompt"])
         self.assertIn("- counter: 0", captured["system_prompt"])
         self.assertIn('{"counter": "..."}', captured["system_prompt"])
-        self.assertIn("你是一个计数节点", captured["system_prompt"])
+        self.assertNotIn("== Node System Instruction ==", captured["system_prompt"])
+        self.assertNotIn("你是一个计数节点", captured["system_prompt"])
         self.assertEqual(
             captured["user_prompt"],
             "读取输入 counter，并严格只返回 JSON：{\"counter\": 当前 counter + 1}。不要输出任何解释。",

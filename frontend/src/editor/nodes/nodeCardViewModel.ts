@@ -57,7 +57,6 @@ export type NodeCardViewModel = {
       }
     | {
         kind: "agent";
-        systemInstruction: string;
         taskInstruction: string;
         modelLabel: string;
         thinkingLabel: string;
@@ -159,7 +158,6 @@ function buildBody(
   if (node.kind === "agent") {
     return {
       kind: "agent",
-      systemInstruction: node.config.systemInstruction?.trim() || "",
       taskInstruction: node.config.taskInstruction?.trim() || "",
       modelLabel: resolveAgentModelLabel(node),
       thinkingLabel: resolveThinkingLabel(node),

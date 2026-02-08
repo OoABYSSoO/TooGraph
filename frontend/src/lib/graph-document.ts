@@ -38,8 +38,39 @@ export function createEmptyDraftGraph(name = "Untitled Graph"): GraphPayload {
 }
 
 export function cloneGraphDocument<T extends GraphPayload | GraphDocument>(document: T): T {
-  const rawDocument = toRaw(document) as T;
-  return structuredClone(rawDocument);
+  return structuredClone(normalizeCloneValue(document));
+}
+
+function normalizeCloneValue<T>(value: T, seen = new WeakMap<object, unknown>()): T {
+  if (value === null || typeof value !== "object") {
+    return value;
+  }
+
+  const rawValue = toRaw(value) as T;
+  if (rawValue === null || typeof rawValue !== "object") {
+    return rawValue;
+  }
+
+  const existing = seen.get(rawValue as object);
+  if (existing) {
+    return existing as T;
+  }
+
+  if (Array.isArray(rawValue)) {
+    const normalizedArray: unknown[] = [];
+    seen.set(rawValue as object, normalizedArray);
+    for (const entry of rawValue) {
+      normalizedArray.push(normalizeCloneValue(entry, seen));
+    }
+    return normalizedArray as T;
+  }
+
+  const normalizedObject: Record<string, unknown> = {};
+  seen.set(rawValue as object, normalizedObject);
+  for (const [key, entry] of Object.entries(rawValue)) {
+    normalizedObject[key] = normalizeCloneValue(entry, seen);
+  }
+  return normalizedObject as T;
 }
 
 function areSkillKeyListsEqual(left: string[], right: string[]) {

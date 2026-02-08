@@ -44,7 +44,6 @@
       ],
       "config": {
         "skills": [],
-        "systemInstruction": "你是一个计数节点，必须严格返回 JSON。",
         "taskInstruction": "读取输入 counter，并严格只返回 JSON：{\"counter\": 当前 counter + 1}。不要输出任何解释。"
       }
     },

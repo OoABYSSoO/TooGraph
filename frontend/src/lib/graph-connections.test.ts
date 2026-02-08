@@ -33,7 +33,6 @@ const document: GraphPayload = {
       writes: [],
       config: {
         skills: [],
-        systemInstruction: "",
         taskInstruction: "",
         modelSource: "global",
         model: "",

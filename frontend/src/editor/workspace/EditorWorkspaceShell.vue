@@ -10,45 +10,37 @@
       />
     </div>
 
-    <TabsRoot
-      v-else
-      as-child
-      :model-value="workspace.activeTabId ?? undefined"
-      activation-mode="manual"
-      :unmount-on-hide="false"
-      @update:model-value="handleWorkspaceTabsValueChange"
-    >
-      <div class="editor-workspace-shell__workspace">
-        <div class="editor-workspace-shell__chrome">
-          <EditorTabBar
-            :tabs="workspace.tabs"
-            :active-tab-id="workspace.activeTabId"
-            :templates="templates"
-            :graphs="graphs"
-            :active-state-count="activeStateCount"
-            :is-state-panel-open="activeStatePanelOpen"
-            @activate-tab="activateTab"
-            @close-tab="requestCloseTab"
-            @reorder-tab="reorderTab"
-            @create-new="openNewTab(null)"
-            @create-from-template="openNewTab"
-            @open-graph="openExistingGraph"
-            @rename-active-graph="renameActiveGraph"
-            @toggle-state-panel="toggleActiveStatePanel"
-            @save-active-graph="saveActiveGraph"
-            @validate-active-graph="validateActiveGraph"
-            @run-active-graph="runActiveGraph"
-          />
-        </div>
+    <div v-else class="editor-workspace-shell__workspace">
+      <div class="editor-workspace-shell__chrome">
+        <EditorTabBar
+          :tabs="workspace.tabs"
+          :active-tab-id="workspace.activeTabId"
+          :templates="templates"
+          :graphs="graphs"
+          :active-state-count="activeStateCount"
+          :is-state-panel-open="activeStatePanelOpen"
+          @activate-tab="activateTab"
+          @close-tab="requestCloseTab"
+          @reorder-tab="reorderTab"
+          @create-new="openNewTab(null)"
+          @create-from-template="openNewTab"
+          @open-graph="openExistingGraph"
+          @rename-active-graph="renameActiveGraph"
+          @toggle-state-panel="toggleActiveStatePanel"
+          @save-active-graph="saveActiveGraph"
+          @validate-active-graph="validateActiveGraph"
+          @run-active-graph="runActiveGraph"
+        />
+      </div>
 
-        <div class="editor-workspace-shell__body">
-          <TabsContent
-            v-for="tab in workspace.tabs"
-            :key="tab.tabId"
-            :value="tab.tabId"
-            as-child
-          >
-            <div class="editor-workspace-shell__editor">
+      <div class="editor-workspace-shell__body">
+        <div
+          v-for="tab in workspace.tabs"
+          :key="tab.tabId"
+          v-show="tab.tabId === workspace.activeTabId"
+          class="editor-workspace-shell__editor"
+          :class="{ 'editor-workspace-shell__editor--active': tab.tabId === workspace.activeTabId }"
+        >
           <div class="editor-workspace-shell__editor-grid" :style="editorGridStyle(tab.tabId)">
             <div class="editor-workspace-shell__editor-main">
               <div v-if="loadingByTabId[tab.tabId]" class="editor-workspace-shell__status-card">
@@ -140,11 +132,9 @@
               @remove-writer="removeStateWriterBinding(tab.tabId, $event.stateKey, $event.nodeId)"
             />
           </div>
-            </div>
-          </TabsContent>
         </div>
       </div>
-    </TabsRoot>
+    </div>
 
     <EditorCloseConfirmDialog
       :tab="pendingCloseTab"
@@ -159,7 +149,6 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { TabsContent, TabsRoot } from "reka-ui";
 import { useRoute, useRouter } from "vue-router";
 
 import { fetchKnowledgeBases } from "@/api/knowledge";
@@ -654,12 +643,6 @@ function activateTab(tabId: string) {
     activeTabId: tabId,
   });
   syncRouteToTab(tab);
-}
-
-function handleWorkspaceTabsValueChange(value: string | number) {
-  if (typeof value === "string") {
-    activateTab(value);
-  }
 }
 
 function reorderTab(sourceTabId: string, targetTabId: string, placement: "before" | "after") {

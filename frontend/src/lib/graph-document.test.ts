@@ -97,6 +97,55 @@ test("cloneGraphDocument accepts Vue reactive graph documents", () => {
   assert.notEqual(clone, reactiveGraph);
 });
 
+test("cloneGraphDocument unwraps nested reactive arrays inside graph documents", () => {
+  const reactiveSkills = reactive(["search_knowledge_base"]) as unknown as string[];
+  const graph: GraphDocument = {
+    graph_id: "graph_nested_reactive",
+    name: "Nested Reactive",
+    state_schema: {
+      question: {
+        name: "question",
+        description: "",
+        type: "text",
+        value: "",
+        color: "#d97706",
+      },
+    },
+    nodes: {
+      answer_helper: {
+        kind: "agent",
+        name: "answer_helper",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [{ state: "question", required: true }],
+        writes: [],
+        config: {
+          skills: reactiveSkills,
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const reactiveGraph = reactive(graph) as GraphDocument;
+
+  const clone = cloneGraphDocument(reactiveGraph);
+  const clonedNode = clone.nodes.answer_helper;
+  const reactiveNode = reactiveGraph.nodes.answer_helper;
+
+  assert.equal(clonedNode.kind, "agent");
+  assert.equal(reactiveNode.kind, "agent");
+  assert.deepEqual(clonedNode.config.skills, ["search_knowledge_base"]);
+  assert.notEqual(clonedNode.config.skills, reactiveNode.config.skills);
+});
+
 test("createEmptyDraftGraph creates an empty backend-native payload", () => {
   const draft = createEmptyDraftGraph("Untitled Graph");
 
@@ -140,7 +189,6 @@ test("connectStateBindingInDocument rewires a target read binding to the source 
         writes: [],
         config: {
           skills: [],
-          systemInstruction: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -290,7 +338,6 @@ test("updateAgentNodeConfigInDocument patches agent config immutably", () => {
         writes: [],
         config: {
           skills: [],
-          systemInstruction: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -336,7 +383,6 @@ test("updateAgentNodeConfigInDocument returns original document for non-agent or
         writes: [],
         config: {
           skills: [],
-          systemInstruction: "",
           taskInstruction: "已有内容",
           modelSource: "global",
           model: "",
@@ -409,7 +455,6 @@ test("syncKnowledgeBaseSkillsInDocument derives search_knowledge_base from agent
         writes: [],
         config: {
           skills: ["markdown_formatter"],
-          systemInstruction: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -463,7 +508,6 @@ test("syncKnowledgeBaseSkillsInDocument prunes search_knowledge_base when agent 
         writes: [],
         config: {
           skills: ["markdown_formatter", "search_knowledge_base"],
-          systemInstruction: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -526,7 +570,6 @@ test("syncKnowledgeBaseSkillsInDocument prunes search_knowledge_base when agent 
         writes: [],
         config: {
           skills: ["search_knowledge_base"],
-          systemInstruction: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -632,7 +675,6 @@ test("updateConditionNodeConfigInDocument returns original document for non-cond
         writes: [],
         config: {
           skills: [],
-          systemInstruction: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -1116,7 +1158,6 @@ test("connectFlowNodesInDocument appends a control-flow edge immutably", () => {
         writes: [],
         config: {
           skills: [],
-          systemInstruction: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -1186,7 +1227,6 @@ test("connectFlowNodesInDocument rejects invalid or duplicate flow edges", () =>
         writes: [],
         config: {
           skills: [],
-          systemInstruction: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -1245,7 +1285,6 @@ test("connectConditionRouteInDocument upserts a branch route immutably", () => {
         writes: [],
         config: {
           skills: [],
-          systemInstruction: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -1340,7 +1379,6 @@ test("connectConditionRouteInDocument updates existing route targets and rejects
         writes: [],
         config: {
           skills: [],
-          systemInstruction: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -1429,7 +1467,6 @@ test("removeFlowEdgeFromDocument removes an existing control-flow edge immutably
         writes: [],
         config: {
           skills: [],
-          systemInstruction: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -1496,7 +1533,6 @@ test("removeFlowEdgeFromDocument returns original document when the edge is miss
         writes: [],
         config: {
           skills: [],
-          systemInstruction: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -1540,7 +1576,6 @@ test("reconnectFlowEdgeInDocument retargets an existing control-flow edge immuta
         writes: [],
         config: {
           skills: [],
-          systemInstruction: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -1601,7 +1636,6 @@ test("reconnectFlowEdgeInDocument rejects missing, duplicate, or invalid reconne
         writes: [],
         config: {
           skills: [],
-          systemInstruction: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -1827,7 +1861,6 @@ test("reconnectConditionRouteInDocument retargets an existing branch route immut
         writes: [],
         config: {
           skills: [],
-          systemInstruction: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -1918,7 +1951,6 @@ test("reconnectConditionRouteInDocument rejects missing, duplicate, or invalid r
         writes: [],
         config: {
           skills: [],
-          systemInstruction: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
