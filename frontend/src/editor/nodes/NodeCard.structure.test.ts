@@ -42,18 +42,18 @@ test("NodeCard docks state pills against the card edges", () => {
   assert.match(componentSource, /node-card__port-pill--dock-start/);
   assert.match(componentSource, /node-card__port-pill--dock-end/);
   assert.match(componentSource, /\.node-card \{[\s\S]*--node-card-inline-padding:\s*24px;/);
-  assert.match(componentSource, /\.node-card__port-pill--dock-start \{[\s\S]*margin-left:\s*calc\(var\(--node-card-inline-padding\) \* -1\);/);
-  assert.match(componentSource, /\.node-card__port-pill--dock-end \{[\s\S]*margin-right:\s*calc\(var\(--node-card-inline-padding\) \* -1\);/);
+  assert.match(componentSource, /\.node-card__port-pill--dock-start \{[\s\S]*margin-left:\s*calc\(var\(--node-card-inline-padding\) \* -1 - 10px\);/);
+  assert.match(componentSource, /\.node-card__port-pill--dock-end \{[\s\S]*margin-right:\s*calc\(var\(--node-card-inline-padding\) \* -1 - 10px\);/);
 });
 
 test("NodeCard keeps state pill geometry but hides the pill chrome visually", () => {
   assert.match(componentSource, /\.node-card__port-pill \{[\s\S]*display:\s*inline-flex;/);
   assert.match(componentSource, /\.node-card__port-pill \{[\s\S]*align-items:\s*center;/);
-  assert.match(componentSource, /\.node-card__port-pill \{[\s\S]*border:\s*none;/);
+  assert.match(componentSource, /\.node-card__port-pill \{[\s\S]*border:\s*1px solid transparent;/);
   assert.match(componentSource, /\.node-card__port-pill \{[\s\S]*background:\s*transparent;/);
   assert.match(componentSource, /\.node-card__port-pill \{[\s\S]*box-shadow:\s*none;/);
-  assert.match(componentSource, /\.node-card__port-pill \{[\s\S]*border-radius:\s*0;/);
-  assert.match(componentSource, /\.node-card__port-pill \{[\s\S]*padding:\s*0;/);
+  assert.match(componentSource, /\.node-card__port-pill \{[\s\S]*border-radius:\s*999px;/);
+  assert.match(componentSource, /\.node-card__port-pill \{[\s\S]*padding:\s*5px 10px;/);
   assert.match(componentSource, /\.node-card__port-pill-anchor-slot \{[\s\S]*width:\s*14px;/);
   assert.match(componentSource, /\.node-card__port-pill-anchor-slot \{[\s\S]*height:\s*14px;/);
 });
@@ -208,16 +208,39 @@ test("NodeCard moves node actions into hoverable top buttons built from Element 
   assert.doesNotMatch(componentSource, /<details class="node-card__advanced-panel"/);
 });
 
-test("NodeCard opens bound-state editing from a double click on the port label", () => {
+test("NodeCard reveals state pills on hover and opens state editing only after a confirm click", () => {
   assert.match(componentSource, /import StateEditorPopover from "\.\/StateEditorPopover\.vue";/);
-  assert.match(componentSource, /@dblclick\.stop="openStateEditor\(/);
+  assert.match(componentSource, /@click\.stop="handleStateEditorActionClick\(/);
   assert.match(componentSource, /const stateEditorDraft = ref<StateFieldDraft \| null>\(null\);/);
   assert.match(componentSource, /const activeStateEditorAnchorId = ref<string \| null>\(null\);/);
+  assert.match(componentSource, /const activeStateEditorConfirmAnchorId = ref<string \| null>\(null\);/);
+  assert.match(componentSource, /const stateEditorConfirmTimeoutRef = ref<number \| null>\(null\);/);
+  assert.match(componentSource, /function clearStateEditorConfirmState\(\)/);
+  assert.match(componentSource, /function startStateEditorConfirmWindow\(anchorId: string\)/);
+  assert.match(componentSource, /function handleStateEditorActionClick\(anchorId: string, stateKey: string \| null \| undefined\)/);
+  assert.match(componentSource, /if \(activeStateEditorConfirmAnchorId\.value === anchorId\) \{[\s\S]*openStateEditor\(anchorId, stateKey\);[\s\S]*return;/);
+  assert.match(componentSource, /startStateEditorConfirmWindow\(anchorId\);/);
   assert.match(componentSource, /emit\("rename-state", \{ currentKey:/);
   assert.match(componentSource, /emit\("update-state", \{[\s\S]*stateKey:/);
-  assert.match(componentSource, /<ElPopover[\s\S]*:visible="isStateEditorOpen\(/);
+  assert.match(
+    componentSource,
+    /<ElPopover[\s\S]*:visible="isStateEditorOpen\([^"]+\) \|\| isStateEditorConfirmOpen\([^"]+\)"/,
+  );
+  assert.match(
+    componentSource,
+    /:width="isStateEditorOpen\([^"]+\) \? 320 : undefined"/,
+  );
+  assert.match(
+    componentSource,
+    /:placement="isStateEditorOpen\([^"]+\) \? 'bottom-(start|end)' : 'top-(start|end)'"/,
+  );
   assert.match(componentSource, /<StateEditorPopover/);
-  assert.match(componentSource, /:width="320"/);
+  assert.match(componentSource, /Edit state\?/);
+  assert.match(componentSource, /node-card__port-pill--revealed/);
+  assert.match(componentSource, /node-card__port-pill--confirm/);
+  assert.match(componentSource, /node-card__port-pill-confirm-icon/);
+  assert.match(componentSource, /node-card__port-pill-label-text/);
+  assert.match(componentSource, /node-card__port-pill-label--confirm/);
   assert.match(componentSource, /:show-arrow="false"/);
   assert.match(componentSource, /:popper-style="stateEditorPopoverStyle"/);
   assert.doesNotMatch(componentSource, /@cancel="closeStateEditor"/);
@@ -236,6 +259,28 @@ test("NodeCard opens bound-state editing from a double click on the port label",
   assert.match(componentSource, /:deep\(.node-card__state-editor-popper\.el-popper\) \{[\s\S]*background:\s*transparent;/);
   assert.match(componentSource, /:deep\(.node-card__state-editor-popper\.el-popper\) \{[\s\S]*padding:\s*0;/);
   assert.match(componentSource, /:deep\(.node-card__state-editor-popper\.el-popper\) \{[\s\S]*box-shadow:\s*none;/);
+  assert.match(componentSource, /\.node-card__port-pill \{[\s\S]*position:\s*relative;/);
+  assert.match(componentSource, /\.node-card__port-pill \{[\s\S]*padding:\s*5px 10px;/);
+  assert.match(componentSource, /\.node-card__port-pill \{[\s\S]*border:\s*1px solid transparent;/);
+  assert.match(componentSource, /\.node-card__port-pill \{[\s\S]*border-radius:\s*999px;/);
+  assert.match(componentSource, /\.node-card__port-pill \{[\s\S]*min-width:\s*132px;/);
+  assert.match(componentSource, /\.node-card__port-pill-label \{[\s\S]*padding-inline:\s*0;/);
+  assert.match(componentSource, /\.node-card__port-pill--output \{[\s\S]*color:\s*#1f2937;/);
+  assert.match(componentSource, /\.node-card__port-pill--input \{[\s\S]*justify-content:\s*flex-start;[\s\S]*color:\s*#1f2937;/);
+  assert.doesNotMatch(componentSource, /\.node-card__port-pill--input \{[\s\S]*#1d4ed8/);
+  assert.match(componentSource, /\.node-card__port-pill--dock-start \{[\s\S]*margin-left:\s*calc\(var\(--node-card-inline-padding\) \* -1 - 10px\);/);
+  assert.match(componentSource, /\.node-card__port-pill--dock-end \{[\s\S]*margin-right:\s*calc\(var\(--node-card-inline-padding\) \* -1 - 10px\);/);
+  assert.match(
+    componentSource,
+    /\.node-card__port-pill:hover,\n\.node-card__port-pill:focus-visible,\n\.node-card__port-pill--revealed \{[\s\S]*border-color:\s*rgba\(154,\s*52,\s*18,\s*0\.14\);/,
+  );
+  assert.doesNotMatch(componentSource, /\.node-card__port-pill--confirm \{[\s\S]*min-width:/);
+  assert.match(componentSource, /\.node-card__port-pill-label--confirm .node-card__port-pill-label-text \{[\s\S]*opacity:\s*0;/);
+  assert.match(componentSource, /\.node-card__port-pill-label--confirm .node-card__port-pill-confirm-icon \{[\s\S]*opacity:\s*1;/);
+  assert.match(componentSource, /\.node-card__confirm-hint--state \{[\s\S]*padding:\s*5px 10px;/);
+  assert.match(componentSource, /\.node-card__confirm-hint--state \{[\s\S]*letter-spacing:\s*0\.12em;/);
+  assert.match(componentSource, /\.node-card__confirm-hint \{[\s\S]*display:\s*inline-flex;/);
+  assert.match(componentSource, /\.node-card__confirm-hint \{[\s\S]*width:\s*fit-content;/);
 });
 
 test("NodeCard opens dedicated warm popovers for title and description editing on double click", () => {
