@@ -92,7 +92,7 @@ test("resolveCanvasLayout prefers measured output slot offsets over formula-base
     },
   );
   assert.match(dataEdge?.path ?? "", /^M 472 361 C /);
-  assert.match(flowEdge?.path ?? "", /^M 534 254 C /);
+  assert.match(flowEdge?.path ?? "", /^M 534 254 L .* C .* L /);
 });
 
 test("resolveCanvasLayout also uses measured flow anchor offsets for card-to-card flow edges", () => {
@@ -109,5 +109,5 @@ test("resolveCanvasLayout also uses measured flow anchor offsets for card-to-car
 
   const flowEdge = layout.edges.find((edge) => edge.id === "flow:input_question->answer_helper");
 
-  assert.match(flowEdge?.path ?? "", /^M 540 330 C /);
+  assert.match(flowEdge?.path ?? "", /^M 540 330 L .* C .* L /);
 });

@@ -1,7 +1,13 @@
 import type { GraphDocument, GraphPayload } from "../../types/node-system.ts";
-import { type ProjectedCanvasAnchor, type ProjectedCanvasEdge, projectCanvasAnchors, projectCanvasEdges } from "./edgeProjection.ts";
+import {
+  type ProjectedCanvasAnchor,
+  type ProjectedCanvasEdge,
+  type ProjectedCanvasEdgeRouting,
+  projectCanvasAnchors,
+  projectCanvasEdges,
+} from "./edgeProjection.ts";
 import { buildConnectorCurvePath } from "./connectionCurvePath.ts";
-import { buildRouteEdgePath, resolveRouteEdgeSourceOffset } from "./routeEdgePath.ts";
+import { buildSequenceFlowPath } from "./flowEdgePath.ts";
 
 export type MeasuredAnchorOffset = {
   offsetX: number;
@@ -55,13 +61,17 @@ function resolveCanvasEdges(
 
       return {
         ...edge,
-        path: buildRouteEdgePath({
-          sourceX: sourceAnchor.x,
-          sourceY: sourceAnchor.y,
-          targetX: targetAnchor.x,
-          targetY: targetAnchor.y,
-          sourceOffset: resolveRouteSourceOffset(document, edge.source, edge.branch ?? ""),
-        }),
+        path: buildFlowPath(
+          sourceAnchor.x,
+          sourceAnchor.y,
+          targetAnchor.x,
+          targetAnchor.y,
+          document.nodes[edge.source]?.ui.position.x,
+          document.nodes[edge.source]?.ui.position.y,
+          document.nodes[edge.target]?.ui.position.x,
+          document.nodes[edge.target]?.ui.position.y,
+          edge.routing,
+        ),
       };
     }
 
@@ -78,7 +88,7 @@ function resolveCanvasEdges(
 
       return {
         ...edge,
-        path: buildFlowPath(sourceAnchor.x, sourceAnchor.y, targetAnchor.x, targetAnchor.y),
+        path: buildDataPath(sourceAnchor.x, sourceAnchor.y, targetAnchor.x, targetAnchor.y),
       };
     }
 
@@ -90,12 +100,49 @@ function resolveCanvasEdges(
 
     return {
       ...edge,
-      path: buildFlowPath(sourceAnchor.x, sourceAnchor.y, targetAnchor.x, targetAnchor.y),
+      path: buildFlowPath(
+        sourceAnchor.x,
+        sourceAnchor.y,
+        targetAnchor.x,
+        targetAnchor.y,
+        document.nodes[edge.source]?.ui.position.x,
+        document.nodes[edge.source]?.ui.position.y,
+        document.nodes[edge.target]?.ui.position.x,
+        document.nodes[edge.target]?.ui.position.y,
+        edge.routing,
+      ),
     };
   });
 }
 
-function buildFlowPath(startX: number, startY: number, endX: number, endY: number) {
+function buildFlowPath(
+  startX: number,
+  startY: number,
+  endX: number,
+  endY: number,
+  sourceNodeX?: number,
+  sourceNodeY?: number,
+  targetNodeX?: number,
+  targetNodeY?: number,
+  routing?: ProjectedCanvasEdgeRouting,
+) {
+  return buildSequenceFlowPath({
+    sourceX: startX,
+    sourceY: startY,
+    targetX: endX,
+    targetY: endY,
+    sourceNodeX,
+    sourceNodeY,
+    targetNodeX,
+    targetNodeY,
+    sourceLaneIndex: routing?.sourceLaneIndex,
+    sourceLaneCount: routing?.sourceLaneCount,
+    targetLaneIndex: routing?.targetLaneIndex,
+    targetLaneCount: routing?.targetLaneCount,
+  });
+}
+
+function buildDataPath(startX: number, startY: number, endX: number, endY: number) {
   return buildConnectorCurvePath({
     sourceX: startX,
     sourceY: startY,
@@ -104,14 +151,4 @@ function buildFlowPath(startX: number, startY: number, endX: number, endY: numbe
     sourceSide: "right",
     targetSide: "left",
   });
-}
-
-function resolveRouteSourceOffset(document: GraphPayload | GraphDocument, nodeId: string, branchKey: string) {
-  const node = document.nodes[nodeId];
-  if (!node || node.kind !== "condition") {
-    return 0;
-  }
-
-  const branchIndex = node.config.branches.indexOf(branchKey);
-  return resolveRouteEdgeSourceOffset(branchIndex >= 0 ? branchIndex : 0);
 }

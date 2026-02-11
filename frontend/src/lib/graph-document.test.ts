@@ -708,7 +708,7 @@ test("syncKnowledgeBaseSkillsInDocument prunes search_knowledge_base when agent 
   assert.deepEqual(nextMultiKnowledgeDocument.nodes.research_helper.config.skills, []);
 });
 
-test("updateConditionNodeConfigInDocument patches condition config immutably", () => {
+test("updateConditionNodeConfigInDocument patches condition config immutably and normalizes loop limits", () => {
   assert.equal(typeof graphDocument.updateConditionNodeConfigInDocument, "function");
 
   const document: GraphPayload = {
@@ -742,7 +742,7 @@ test("updateConditionNodeConfigInDocument patches condition config immutably", (
 
   const nextDocument = graphDocument.updateConditionNodeConfigInDocument(document, "continue_check", (config) => ({
     ...config,
-    loopLimit: -1,
+    loopLimit: 99,
   }));
 
   assert.notEqual(nextDocument, document);
@@ -751,7 +751,7 @@ test("updateConditionNodeConfigInDocument patches condition config immutably", (
   if (nextDocument.nodes.continue_check.kind !== "condition" || document.nodes.continue_check.kind !== "condition") {
     throw new Error("Expected continue_check to remain a condition node");
   }
-  assert.equal(nextDocument.nodes.continue_check.config.loopLimit, -1);
+  assert.equal(nextDocument.nodes.continue_check.config.loopLimit, 10);
   assert.equal(document.nodes.continue_check.config.loopLimit, 5);
 });
 

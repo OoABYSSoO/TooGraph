@@ -102,9 +102,15 @@
           <div class="editor-state-panel__field-grid">
             <label class="editor-state-panel__field">
               <span>Type</span>
-              <select class="editor-state-panel__select" :value="row.typeLabel" @change="handleStateTypeChange(row.key, ($event.target as HTMLSelectElement).value)">
-                <option v-for="typeOption in STATE_FIELD_TYPE_OPTIONS" :key="typeOption" :value="typeOption">{{ typeOption }}</option>
-              </select>
+              <ElSelect
+                class="editor-state-panel__select graphite-select"
+                :model-value="row.typeLabel"
+                :teleported="false"
+                popper-class="graphite-select-popper"
+                @update:model-value="handleStateTypeSelect(row.key, $event)"
+              >
+                <ElOption v-for="typeOption in STATE_FIELD_TYPE_OPTIONS" :key="typeOption" :label="typeOption" :value="typeOption" />
+              </ElSelect>
             </label>
 
             <label class="editor-state-panel__field">
@@ -245,6 +251,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { ElOption, ElSelect } from "element-plus";
 
 import StateDefaultValueEditor from "./StateDefaultValueEditor.vue";
 import StateBindingCreateForm from "./StateBindingCreateForm.vue";
@@ -326,7 +333,8 @@ function commitStateRename(currentKey: string, nextKey: string) {
   emit("rename-state", { currentKey, nextKey: normalizedNextKey });
 }
 
-function handleStateTypeChange(stateKey: string, nextType: string) {
+function handleStateTypeSelect(stateKey: string, value: string | number | boolean | undefined) {
+  const nextType = String(value ?? "text");
   emit("update-state", {
     stateKey,
     patch: {
@@ -562,7 +570,6 @@ function handleStateTypeChange(stateKey: string, nextType: string) {
 }
 
 .editor-state-panel__input,
-.editor-state-panel__select,
 .editor-state-panel__textarea {
   width: 100%;
   border: 1px solid rgba(154, 52, 18, 0.14);
@@ -572,6 +579,10 @@ function handleStateTypeChange(stateKey: string, nextType: string) {
   font-size: 0.9rem;
   color: #1f2937;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.editor-state-panel__select {
+  width: 100%;
 }
 
 .editor-state-panel__textarea {

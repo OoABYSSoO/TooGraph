@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { buildAnchorModel } from "./anchorModel.ts";
-import { placeAnchors } from "./anchorPlacement.ts";
+import { placeAnchors, resolveRouteOutputRowGap } from "./anchorPlacement.ts";
 import type { GraphNode } from "../../types/node-system.ts";
 
 const agentNode: GraphNode = {
@@ -21,6 +21,30 @@ const agentNode: GraphNode = {
     model: "",
     thinkingMode: "on",
     temperature: 0.2,
+  },
+};
+
+const conditionNode: GraphNode = {
+  kind: "condition",
+  name: "score_gate",
+  description: "Route based on score.",
+  ui: {
+    position: { x: 780, y: 220 },
+  },
+  reads: [{ state: "score", required: true }],
+  writes: [],
+  config: {
+    branches: ["true", "false", "exhausted"],
+    loopLimit: 3,
+    branchMapping: {
+      true: "true",
+      false: "false",
+    },
+    rule: {
+      source: "score",
+      operator: ">=",
+      value: 60,
+    },
   },
 };
 
@@ -61,4 +85,52 @@ test("placeAnchors projects model anchors onto canvas coordinates", () => {
     y: 341,
     side: "right",
   });
+});
+
+test("placeAnchors gives condition nodes a left flow entry and right-side route exits", () => {
+  const model = buildAnchorModel("score_gate", conditionNode);
+  const placement = placeAnchors(model, {
+    x: 780,
+    y: 220,
+    width: 460,
+    headerHeight: 68,
+    bodyTop: 116,
+    rowGap: 52,
+    footerTop: 148,
+  });
+
+  assert.deepEqual(placement.flowIn, {
+    id: "flow-in",
+    x: 786,
+    y: 254,
+    side: "left",
+  });
+  assert.equal(placement.flowOut, null);
+  assert.deepEqual(placement.stateInputs[0], {
+    id: "state-in:score",
+    stateKey: "score",
+    x: 786,
+    y: 365,
+    side: "left",
+  });
+  assert.deepEqual(
+    placement.routeOutputs.map((anchor) => ({
+      id: anchor.id,
+      branch: anchor.branch,
+      x: anchor.x,
+      y: anchor.y,
+      side: anchor.side,
+    })),
+    [
+      { id: "branch:true", branch: "true", x: 1234, y: 365, side: "right" },
+      { id: "branch:false", branch: "false", x: 1234, y: 459, side: "right" },
+      { id: "branch:exhausted", branch: "exhausted", x: 1234, y: 553, side: "right" },
+    ],
+  );
+});
+
+test("resolveRouteOutputRowGap derives wider branch spacing from row count instead of fixed offsets", () => {
+  assert.equal(resolveRouteOutputRowGap(0, 52), 52);
+  assert.equal(resolveRouteOutputRowGap(1, 52), 52);
+  assert.equal(resolveRouteOutputRowGap(3, 52), 94);
 });

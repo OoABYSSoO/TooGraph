@@ -10,7 +10,10 @@ from app.core.schemas.node_system import NodeSystemTemplate
 from app.templates.loader import list_template_records
 
 
-NODE_WIDTH = 460
+NODE_WIDTH_BY_KIND = {
+    "condition": 560,
+}
+DEFAULT_NODE_WIDTH = 460
 NODE_HEIGHT_BY_KIND = {
     "input": 320,
     "agent": 460,
@@ -18,6 +21,10 @@ NODE_HEIGHT_BY_KIND = {
     "condition": 380,
 }
 NODE_GUTTER = 32
+
+
+def _resolve_node_width(node_kind: str) -> int:
+    return NODE_WIDTH_BY_KIND.get(node_kind, DEFAULT_NODE_WIDTH)
 
 
 def _resolve_node_height(node_kind: str) -> int:
@@ -54,7 +61,7 @@ class TemplateLayoutTests(unittest.TestCase):
                         "kind": node.kind,
                         "x": node.ui.position.x,
                         "y": node.ui.position.y,
-                        "width": NODE_WIDTH,
+                        "width": _resolve_node_width(node.kind),
                         "height": _resolve_node_height(node.kind),
                     }
                 )
@@ -65,5 +72,40 @@ class TemplateLayoutTests(unittest.TestCase):
                         failures.append(
                             f"{template.template_id}: {left['node_id']} overlaps {right['node_id']}"
                         )
+
+        self.assertEqual(failures, [], "\n".join(failures))
+
+    def test_condition_templates_use_current_proxy_branch_shape(self):
+        failures: list[str] = []
+        expected_branches = ["true", "false", "exhausted"]
+
+        for record in list_template_records():
+            template = NodeSystemTemplate.model_validate(record)
+            conditional_edges_by_source = {edge.source: edge for edge in template.conditional_edges}
+
+            for node_id, node in template.nodes.items():
+                if node.kind != "condition":
+                    continue
+
+                if node.writes:
+                    failures.append(f"{template.template_id}.{node_id}: condition nodes should not write state")
+                if node.config.branches != expected_branches:
+                    failures.append(
+                        f"{template.template_id}.{node_id}: branches should be {expected_branches}, got {node.config.branches}"
+                    )
+                if node.config.branch_mapping.get("true") != "true":
+                    failures.append(f"{template.template_id}.{node_id}: true mapping should target true")
+                if node.config.branch_mapping.get("false") != "false":
+                    failures.append(f"{template.template_id}.{node_id}: false mapping should target false")
+
+                conditional_edge = conditional_edges_by_source.get(node_id)
+                if conditional_edge is None:
+                    failures.append(f"{template.template_id}.{node_id}: missing conditional_edges entry")
+                    continue
+                if list(conditional_edge.branches.keys()) != expected_branches:
+                    failures.append(
+                        f"{template.template_id}.{node_id}: conditional edge keys should be {expected_branches}, "
+                        f"got {list(conditional_edge.branches.keys())}"
+                    )
 
         self.assertEqual(failures, [], "\n".join(failures))

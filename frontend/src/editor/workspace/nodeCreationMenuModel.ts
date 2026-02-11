@@ -7,6 +7,7 @@ type BuildNodeCreationEntriesInput = {
   presets: PresetDocument[];
   query: string;
   sourceValueType: string | null;
+  sourceAnchorKind?: "flow-out" | "route-out" | "state-out" | null;
 };
 
 function normalizeSearchValue(value: string | undefined) {
@@ -54,13 +55,17 @@ function matchesNodeCreationQuery(entry: NodeCreationEntry, query: string) {
   return haystacks.some((value) => value.includes(query));
 }
 
-export function supportsCreationSourceType(entry: NodeCreationEntry, sourceValueType: string | null) {
-  if (!sourceValueType) {
-    return true;
+export function supportsCreationSourceType(
+  entry: NodeCreationEntry,
+  sourceValueType: string | null,
+  sourceAnchorKind: "flow-out" | "route-out" | "state-out" | null = null,
+) {
+  if (entry.family === "input") {
+    return !sourceValueType && !sourceAnchorKind;
   }
 
-  if (entry.family === "input") {
-    return false;
+  if (!sourceValueType) {
+    return true;
   }
 
   if (entry.family === "output") {
@@ -74,9 +79,18 @@ export function supportsCreationSourceType(entry: NodeCreationEntry, sourceValue
   return entry.acceptsValueTypes.includes(sourceValueType);
 }
 
-export function filterNodeCreationEntries(entries: NodeCreationEntry[], query: string, sourceValueType: string | null) {
+export function filterNodeCreationEntries(
+  entries: NodeCreationEntry[],
+  query: string,
+  sourceValueType: string | null,
+  sourceAnchorKind: "flow-out" | "route-out" | "state-out" | null = null,
+) {
   const normalizedQuery = normalizeSearchValue(query);
-  return entries.filter((entry) => matchesNodeCreationQuery(entry, normalizedQuery) && supportsCreationSourceType(entry, sourceValueType));
+  return entries.filter(
+    (entry) =>
+      matchesNodeCreationQuery(entry, normalizedQuery) &&
+      supportsCreationSourceType(entry, sourceValueType, sourceAnchorKind),
+  );
 }
 
 export function sortNodeCreationEntries(entries: NodeCreationEntry[]) {
@@ -97,5 +111,12 @@ export function sortNodeCreationEntries(entries: NodeCreationEntry[]) {
 
 export function buildNodeCreationEntries(input: BuildNodeCreationEntriesInput) {
   const presetEntries = input.presets.map(toPresetEntry);
-  return sortNodeCreationEntries(filterNodeCreationEntries([...input.builtins, ...presetEntries], input.query, input.sourceValueType));
+  return sortNodeCreationEntries(
+    filterNodeCreationEntries(
+      [...input.builtins, ...presetEntries],
+      input.query,
+      input.sourceValueType,
+      input.sourceAnchorKind ?? null,
+    ),
+  );
 }

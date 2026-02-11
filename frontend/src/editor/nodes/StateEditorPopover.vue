@@ -17,11 +17,11 @@
         <span class="node-state-editor__field-label">Type</span>
         <ElSelect
           ref="typeSelectRef"
-          class="node-state-editor__type-select"
+          class="node-state-editor__type-select graphite-select"
           aria-label="Type"
           :model-value="draft.definition.type"
           :teleported="false"
-          popper-class="node-state-editor__select-popper"
+          popper-class="graphite-select-popper node-state-editor__select-popper"
           @update:model-value="handleTypeSelect"
         >
           <ElOption v-for="typeOption in typeOptions" :key="typeOption" :label="typeOption" :value="typeOption" />
@@ -33,11 +33,11 @@
         <div class="node-state-editor__color-select-shell">
           <ElSelect
             ref="colorSelectRef"
-            class="node-state-editor__color-select"
+            class="node-state-editor__color-select graphite-select"
             aria-label="Color"
             :model-value="draft.definition.color"
             :teleported="false"
-            popper-class="node-state-editor__select-popper"
+            popper-class="graphite-select-popper node-state-editor__select-popper"
             @update:model-value="handleColorSelect"
           >
             <template #label>

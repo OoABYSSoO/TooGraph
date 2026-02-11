@@ -113,6 +113,12 @@ test("createNodeFromCreationEntry builds the builtin condition preset and auto-w
 
   assert.equal(result.createdNodeId, "condition_created");
   assert.equal(result.document.nodes.condition_created.kind, "condition");
+  assert.equal(
+    result.document.nodes.condition_created.kind === "condition"
+      ? result.document.nodes.condition_created.config.loopLimit
+      : null,
+    5,
+  );
   assert.deepEqual(result.document.conditional_edges, [
     {
       source: "branch_gate",

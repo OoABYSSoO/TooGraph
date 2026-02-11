@@ -50,7 +50,7 @@
     "continue_check": {
       "kind": "condition",
       "name": "continue_check",
-      "description": "Continue looping until the counter reaches three.",
+      "description": "Route true while the counter is below three, false when complete, or exhausted at the loop limit.",
       "ui": {
         "position": { "x": 1440, "y": 220 },
         "collapsed": false
@@ -59,9 +59,12 @@
         { "state": "counter", "required": true }
       ],
       "config": {
-        "branches": ["continue", "stop"],
+        "branches": ["true", "false", "exhausted"],
         "loopLimit": 5,
-        "branchMapping": {},
+        "branchMapping": {
+          "true": "true",
+          "false": "false"
+        },
         "rule": {
           "source": "counter",
           "operator": "<",
@@ -75,6 +78,24 @@
       "description": "Show the final counter value.",
       "ui": {
         "position": { "x": 2120, "y": 220 },
+        "collapsed": false
+      },
+      "reads": [
+        { "state": "counter", "required": true }
+      ],
+      "config": {
+        "displayMode": "auto",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    },
+    "output_loop_exhausted": {
+      "kind": "output",
+      "name": "output_loop_exhausted",
+      "description": "Show the counter value when the loop limit is exhausted.",
+      "ui": {
+        "position": { "x": 2120, "y": 700 },
         "collapsed": false
       },
       "reads": [
@@ -102,8 +123,9 @@
     {
       "source": "continue_check",
       "branches": {
-        "continue": "increment_counter",
-        "stop": "output_counter"
+        "true": "increment_counter",
+        "false": "output_counter",
+        "exhausted": "output_loop_exhausted"
       }
     }
   ]

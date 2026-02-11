@@ -60,14 +60,14 @@ export function buildAnchorModel(nodeId: string, node: GraphNode): NodeAnchorMod
   if (node.kind === "condition") {
     return {
       nodeId,
-      flowIn: { id: "flow-in", side: "top", lane: "header", row: 0 },
+      flowIn: { id: "flow-in", side: "left", lane: "header", row: 0 },
       flowOut: null,
       stateInputs,
       stateOutputs,
       routeOutputs: node.config.branches.map((branch, index) => ({
         id: `branch:${branch}`,
-        side: "bottom",
-        lane: "footer",
+        side: "right",
+        lane: "body",
         row: index,
         branch,
       })),

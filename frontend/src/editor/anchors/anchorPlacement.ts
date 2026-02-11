@@ -1,4 +1,5 @@
 import type { AnchorDescriptor, NodeAnchorModel } from "./anchorModel.ts";
+import { FLOW_OUT_HOTSPOT_GEOMETRY } from "../flowHandleGeometry.ts";
 
 export type NodeFrame = {
   x: number;
@@ -37,8 +38,23 @@ export function placeAnchors(model: NodeAnchorModel, frame: NodeFrame): PlacedAn
     flowOut: placeAnchor(model.flowOut, frame),
     stateInputs: model.stateInputs.map((anchor) => placeAnchor(anchor, frame)).filter(Boolean) as PlacedAnchor[],
     stateOutputs: model.stateOutputs.map((anchor) => placeAnchor(anchor, frame)).filter(Boolean) as PlacedAnchor[],
-    routeOutputs: model.routeOutputs.map((anchor) => placeAnchor(anchor, frame)).filter(Boolean) as PlacedAnchor[],
+    routeOutputs: placeRouteOutputs(model.routeOutputs, frame),
   };
+}
+
+export function resolveRouteOutputRowGap(routeOutputCount: number, bodyRowGap: number): number {
+  if (routeOutputCount <= 1) {
+    return bodyRowGap;
+  }
+  return Math.max((bodyRowGap * routeOutputCount) / (routeOutputCount - 1), FLOW_OUT_HOTSPOT_GEOMETRY.height);
+}
+
+function placeRouteOutputs(anchors: AnchorDescriptor[], frame: NodeFrame): PlacedAnchor[] {
+  const routeFrame = {
+    ...frame,
+    rowGap: resolveRouteOutputRowGap(anchors.length, frame.rowGap),
+  };
+  return anchors.map((anchor) => placeAnchor(anchor, routeFrame)).filter(Boolean) as PlacedAnchor[];
 }
 
 function placeAnchor(anchor: AnchorDescriptor | null, frame: NodeFrame): PlacedAnchor | null {
@@ -67,6 +83,9 @@ function resolveX(anchor: AnchorDescriptor, frame: NodeFrame): number {
     return frame.x + frame.width / 2;
   }
   if (anchor.side === "right") {
+    if (anchor.branch) {
+      return frame.x + frame.width - EDGE_PORT_INSET;
+    }
     return frame.x + frame.width - (anchor.lane === "body" ? BODY_OUTPUT_PORT_INSET : EDGE_PORT_INSET);
   }
   const count = Math.max(anchor.row + 2, 2);

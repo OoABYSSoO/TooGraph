@@ -1,5 +1,5 @@
 import { buildConnectorCurvePath } from "./connectionCurvePath.ts";
-import { buildRouteEdgePath, resolveRouteEdgeSourceOffset } from "./routeEdgePath.ts";
+import { buildSequenceFlowPath } from "./flowEdgePath.ts";
 
 export function buildPendingConnectionPreviewPath(input: {
   kind: "flow-out" | "route-out" | "state-out";
@@ -7,16 +7,9 @@ export function buildPendingConnectionPreviewPath(input: {
   sourceY: number;
   targetX: number;
   targetY: number;
-  routeSourceIndex?: number;
 }) {
-  if (input.kind === "route-out") {
-    return buildRouteEdgePath({
-      sourceX: input.sourceX,
-      sourceY: input.sourceY,
-      targetX: input.targetX,
-      targetY: input.targetY,
-      sourceOffset: resolveRouteEdgeSourceOffset(input.routeSourceIndex ?? 0),
-    });
+  if (input.kind === "flow-out" || input.kind === "route-out") {
+    return buildSequenceFlowPath(input);
   }
 
   return buildConnectorCurvePath({

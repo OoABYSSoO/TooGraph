@@ -184,7 +184,7 @@ class NodeSystemConditionRule(BaseModel):
 
 class NodeSystemConditionConfig(BaseModel):
     branches: list[str] = Field(default_factory=list)
-    loop_limit: int = Field(default=-1, alias="loopLimit")
+    loop_limit: int = Field(default=5, alias="loopLimit")
     branch_mapping: dict[str, str] = Field(default_factory=dict, alias="branchMapping")
     rule: NodeSystemConditionRule = Field(
         default_factory=lambda: NodeSystemConditionRule(source="result", operator=ConditionOperator.EXISTS, value=None)
@@ -227,9 +227,11 @@ class NodeSystemConditionConfig(BaseModel):
     @classmethod
     def validate_loop_limit(cls, value: int) -> int:
         if value == -1:
-            return -1
+            return 5
         if value < 1:
-            raise ValueError("Condition loop limit must be -1 or a positive integer.")
+            raise ValueError("Condition loop limit must be a positive integer.")
+        if value > 10:
+            raise ValueError("Condition loop limit cannot exceed 10.")
         return value
 
 

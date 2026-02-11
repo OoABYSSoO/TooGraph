@@ -1,5 +1,6 @@
 import { toRaw } from "vue";
 
+import { normalizeConditionLoopLimit } from "../editor/nodes/conditionLoopLimit.ts";
 import { applyConditionBranchMapping, createConditionBranchKey } from "./condition-branch-mapping.ts";
 import {
   canConnectConditionRoute,
@@ -225,6 +226,13 @@ export function updateOutputNodeConfigInDocument<T extends GraphPayload | GraphD
   return nextDocument;
 }
 
+function normalizeConditionConfig(config: ConditionNode["config"]): ConditionNode["config"] {
+  return {
+    ...config,
+    loopLimit: normalizeConditionLoopLimit(config.loopLimit),
+  };
+}
+
 export function updateNodeMetadataInDocument<T extends GraphPayload | GraphDocument>(
   document: T,
   nodeId: string,
@@ -284,7 +292,7 @@ export function updateConditionNodeConfigInDocument<T extends GraphPayload | Gra
     return document;
   }
 
-  const nextConfig = updater(node.config);
+  const nextConfig = normalizeConditionConfig(updater(node.config));
   if (JSON.stringify(nextConfig) === JSON.stringify(node.config)) {
     return document;
   }

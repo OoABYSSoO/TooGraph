@@ -309,7 +309,7 @@ test("buildNodeCardViewModel exposes node-level latest run failure notes", () =>
   });
 });
 
-test("buildNodeCardViewModel derives condition branches and rule summary", () => {
+test("buildNodeCardViewModel derives proxy-style condition routing controls", () => {
   const node: GraphNode = {
     kind: "condition",
     name: "continue_check",
@@ -336,18 +336,20 @@ test("buildNodeCardViewModel derives condition branches and rule summary", () =>
 
   assert.equal(model.body.kind, "condition");
   assert.deepEqual(model.branches.map((branch) => branch.label), ["continue", "retry"]);
-  assert.equal(model.body.ruleSummary, "answer exists");
-  assert.equal(model.body.loopLimitLabel, "Loop · 5");
+  assert.equal(model.body.sourceLabel, "answer");
+  assert.equal(model.body.operatorLabel, "exists");
+  assert.equal(model.body.valueLabel, "null");
+  assert.equal(model.body.maxLoopsLabel, "5");
   assert.equal(model.body.primaryInput?.label, "answer");
-  assert.deepEqual(model.body.branchMappings, [
-    { branch: "continue", matchValues: ["true"], matchValueLabel: "true", routeTargetLabel: null },
-    { branch: "retry", matchValues: ["false"], matchValueLabel: "false", routeTargetLabel: null },
+  assert.deepEqual(model.body.routeOutputs, [
+    { branch: "continue", routeTargetLabel: null, tone: "success" },
+    { branch: "retry", routeTargetLabel: null, tone: "danger" },
   ]);
   assert.deepEqual(model.stateSummary?.reads, ["answer"]);
   assert.deepEqual(model.stateSummary?.writes, []);
 });
 
-test("buildNodeCardViewModel derives condition route target labels", () => {
+test("buildNodeCardViewModel derives condition route target labels for proxy outputs", () => {
   const node: GraphNode = {
     kind: "condition",
     name: "continue_check",
@@ -378,9 +380,42 @@ test("buildNodeCardViewModel derives condition route target labels", () => {
   });
 
   assert.equal(model.body.kind, "condition");
-  assert.deepEqual(model.body.branchMappings, [
-    { branch: "continue", matchValues: ["true"], matchValueLabel: "true", routeTargetLabel: "next_agent" },
-    { branch: "retry", matchValues: ["false"], matchValueLabel: "false", routeTargetLabel: null },
+  assert.deepEqual(model.body.routeOutputs, [
+    { branch: "continue", routeTargetLabel: "next_agent", tone: "success" },
+    { branch: "retry", routeTargetLabel: null, tone: "danger" },
+  ]);
+});
+
+test("buildNodeCardViewModel marks exhausted condition routes as neutral", () => {
+  const node: GraphNode = {
+    kind: "condition",
+    name: "retry_guard",
+    description: "Stop retry loops.",
+    ui: { position: { x: 780, y: 220 } },
+    reads: [{ state: "answer", required: true }],
+    writes: [],
+    config: {
+      branches: ["true", "false", "exhausted"],
+      loopLimit: 5,
+      branchMapping: {
+        true: "true",
+        false: "false",
+      },
+      rule: {
+        source: "answer",
+        operator: "exists",
+        value: null,
+      },
+    },
+  };
+
+  const model = buildNodeCardViewModel("retry_guard", node, stateSchema);
+
+  assert.equal(model.body.kind, "condition");
+  assert.deepEqual(model.body.routeOutputs.map((output) => ({ branch: output.branch, tone: output.tone })), [
+    { branch: "true", tone: "success" },
+    { branch: "false", tone: "danger" },
+    { branch: "exhausted", tone: "neutral" },
   ]);
 });
 

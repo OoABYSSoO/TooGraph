@@ -1,22 +1,6 @@
 import type { SettingsPayload } from "@/types/settings";
 
-import { apiGet } from "./http";
-
-const API_BASE = "http://127.0.0.1:8765";
-
-async function apiPost<T>(path: string, payload: unknown): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-  if (!response.ok) {
-    throw new Error(`POST ${path} failed with status ${response.status}`);
-  }
-  return response.json() as Promise<T>;
-}
+import { apiGet, apiPost } from "./http.ts";
 
 export async function fetchSettings(): Promise<SettingsPayload> {
   return apiGet<SettingsPayload>("/api/settings");

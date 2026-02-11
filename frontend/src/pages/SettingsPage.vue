@@ -15,15 +15,25 @@
             <h3>Default Runtime</h3>
             <label>
               <span>Default model</span>
-              <select v-model="draft.text_model_ref">
-                <option v-for="option in configuredModelOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
-              </select>
+              <ElSelect
+                v-model="draft.text_model_ref"
+                class="settings-page__select graphite-select"
+                :teleported="false"
+                popper-class="graphite-select-popper"
+              >
+                <ElOption v-for="option in configuredModelOptions" :key="option.value" :label="option.label" :value="option.value" />
+              </ElSelect>
             </label>
             <label>
               <span>Default video model</span>
-              <select v-model="draft.video_model_ref">
-                <option v-for="option in configuredModelOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
-              </select>
+              <ElSelect
+                v-model="draft.video_model_ref"
+                class="settings-page__select graphite-select"
+                :teleported="false"
+                popper-class="graphite-select-popper"
+              >
+                <ElOption v-for="option in configuredModelOptions" :key="option.value" :label="option.label" :value="option.value" />
+              </ElSelect>
             </label>
           </article>
 
@@ -31,10 +41,15 @@
             <h3>Agent Runtime</h3>
             <label>
               <span>Default thinking</span>
-              <select v-model="thinkingMode">
-                <option value="off">off</option>
-                <option value="on">on</option>
-              </select>
+              <ElSelect
+                v-model="thinkingMode"
+                class="settings-page__select graphite-select"
+                :teleported="false"
+                popper-class="graphite-select-popper"
+              >
+                <ElOption label="off" value="off" />
+                <ElOption label="on" value="on" />
+              </ElSelect>
             </label>
             <label>
               <span>Default temperature</span>
@@ -96,6 +111,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { ElOption, ElSelect } from "element-plus";
 
 import { fetchSettings, updateSettings } from "@/api/settings";
 import AppShell from "@/layouts/AppShell.vue";
@@ -299,13 +315,16 @@ onMounted(loadSettings);
   color: rgba(60, 41, 20, 0.72);
 }
 
-.settings-page__panel select,
 .settings-page__panel input {
   min-height: 42px;
   border: 1px solid rgba(154, 52, 18, 0.16);
   border-radius: 16px;
   padding: 10px 14px;
   background: rgba(255, 255, 255, 0.82);
+}
+
+.settings-page__select {
+  width: 100%;
 }
 
 .settings-page__hint,

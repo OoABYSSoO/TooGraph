@@ -814,6 +814,7 @@ function nodeCreationEntriesForTab(tabId: string): NodeCreationEntry[] {
     presets: persistedPresets.value,
     query: menuState?.query ?? "",
     sourceValueType: menuState?.context?.sourceValueType ?? null,
+    sourceAnchorKind: menuState?.context?.sourceAnchorKind ?? null,
   });
 }
 

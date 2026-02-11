@@ -72,6 +72,59 @@ class NodeSystemSchemaLegacyFieldRejectionTests(unittest.TestCase):
 
         self.assertEqual(config.loop_limit, 5)
 
+    def test_condition_config_uses_bounded_loop_limits(self) -> None:
+        default_config = NodeSystemConditionConfig.model_validate(
+            {
+                "branches": ["continue", "retry"],
+                "branchMapping": {
+                    "true": "continue",
+                    "false": "retry",
+                },
+                "rule": {
+                    "source": "counter",
+                    "operator": "exists",
+                    "value": None,
+                },
+            }
+        )
+
+        self.assertEqual(default_config.loop_limit, 5)
+
+        legacy_unlimited_config = NodeSystemConditionConfig.model_validate(
+            {
+                "branches": ["continue", "retry"],
+                "loopLimit": -1,
+                "branchMapping": {
+                    "true": "continue",
+                    "false": "retry",
+                },
+                "rule": {
+                    "source": "counter",
+                    "operator": "exists",
+                    "value": None,
+                },
+            }
+        )
+
+        self.assertEqual(legacy_unlimited_config.loop_limit, 5)
+
+        with self.assertRaises(ValidationError):
+            NodeSystemConditionConfig.model_validate(
+                {
+                    "branches": ["continue", "retry"],
+                    "loopLimit": 11,
+                    "branchMapping": {
+                        "true": "continue",
+                        "false": "retry",
+                    },
+                    "rule": {
+                        "source": "counter",
+                        "operator": "exists",
+                        "value": None,
+                    },
+                }
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

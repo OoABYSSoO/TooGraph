@@ -14,15 +14,20 @@
         </label>
         <label>
           <span>状态筛选</span>
-          <select v-model="statusFilter">
-            <option value="">all</option>
-            <option value="pending">pending</option>
-            <option value="queued">queued</option>
-            <option value="running">running</option>
-            <option value="completed">completed</option>
-            <option value="failed">failed</option>
-            <option value="paused">paused</option>
-          </select>
+          <ElSelect
+            v-model="statusFilter"
+            class="runs-page__select graphite-select"
+            :teleported="false"
+            popper-class="graphite-select-popper"
+          >
+            <ElOption label="all" value="" />
+            <ElOption label="pending" value="pending" />
+            <ElOption label="queued" value="queued" />
+            <ElOption label="running" value="running" />
+            <ElOption label="completed" value="completed" />
+            <ElOption label="failed" value="failed" />
+            <ElOption label="paused" value="paused" />
+          </ElSelect>
         </label>
       </section>
 
@@ -53,6 +58,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref, watch } from "vue";
+import { ElOption, ElSelect } from "element-plus";
 
 import { fetchRuns } from "@/api/runs";
 import AppShell from "@/layouts/AppShell.vue";
@@ -139,13 +145,16 @@ watch([graphNameQuery, statusFilter], loadRuns);
   color: rgba(60, 41, 20, 0.72);
 }
 
-.runs-page__filters input,
-.runs-page__filters select {
+.runs-page__filters input {
   min-height: 42px;
   border: 1px solid rgba(154, 52, 18, 0.16);
   border-radius: 16px;
   padding: 10px 14px;
   background: rgba(255, 255, 255, 0.82);
+}
+
+.runs-page__select {
+  width: 100%;
 }
 
 .runs-page__list {

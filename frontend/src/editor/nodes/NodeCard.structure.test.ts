@@ -116,8 +116,8 @@ test("NodeCard restores the legacy agent runtime control order with Element Plus
   assert.match(agentSection, /@click\.stop/);
   assert.match(agentSection, /<ElSelect/);
   assert.match(agentSection, /ref="agentModelSelectRef"/);
-  assert.match(agentSection, /class="node-card__agent-model-select"/);
-  assert.match(agentSection, /popper-class="node-card__agent-model-popper"/);
+  assert.match(agentSection, /class="node-card__agent-model-select graphite-select"/);
+  assert.match(agentSection, /popper-class="graphite-select-popper node-card__agent-model-popper"/);
   assert.match(agentSection, /class="node-card__agent-thinking-card"/);
   assert.match(agentSection, /class="node-card__agent-thinking-icon"/);
   assert.match(agentSection, /<ElSwitch/);
@@ -307,7 +307,7 @@ test("NodeCard adds mirrored remove-binding buttons to non-output state pills", 
   assert.match(componentSource, /class="node-card__port-pill-remove node-card__port-pill-remove--leading"/);
   assert.match(componentSource, /@click\.stop="handleRemovePortStateClick\(`agent-input:\$\{port\.key\}`,\s*'input', port\.key\)"/);
   assert.match(componentSource, /@click\.stop="handleRemovePortStateClick\(`agent-output:\$\{port\.key\}`,\s*'output', port\.key\)"/);
-  assert.match(componentSource, /@click\.stop="handleRemovePortStateClick\(`condition-input:\$\{port\.key\}`,\s*'input', port\.key\)"/);
+  assert.match(componentSource, /@click\.stop="handleRemovePortStateClick\(`condition-input:\$\{view\.body\.primaryInput\.key\}`,\s*'input', view\.body\.primaryInput\.key\)"/);
   assert.match(componentSource, /Remove state\?/);
   const inputSectionMatch = componentSource.match(
     /<section v-if="view\.body\.kind === 'input'"[\s\S]*?<\/section>/,
@@ -335,14 +335,65 @@ test("NodeCard adds mirrored remove-binding buttons to non-output state pills", 
   assert.match(componentSource, /\.node-card__confirm-hint--remove \{[\s\S]*background:\s*rgba\(255,\s*248,\s*248,\s*0\.98\);/);
 });
 
+test("NodeCard renders condition nodes as clean control-flow proxies", () => {
+  const conditionSectionMatch = componentSource.match(
+    /<section v-else-if="view\.body\.kind === 'condition'"[\s\S]*?<\/section>/,
+  );
+  assert.ok(conditionSectionMatch, "expected to find the condition node section");
+  const conditionSection = conditionSectionMatch[0];
+
+  assert.match(conditionSection, /class="node-card__condition-source-row"/);
+  assert.match(conditionSection, /view\.body\.primaryInput/);
+  assert.match(conditionSection, /class="node-card__port-pill[\s\S]*node-card__port-pill--input/);
+  assert.match(conditionSection, /condition-input:\$\{view\.body\.primaryInput\.key\}/);
+  assert.match(conditionSection, /class="node-card__condition-controls-row"/);
+  assert.match(conditionSection, /<span class="node-card__control-label">Operator<\/span>/);
+  assert.match(conditionSection, /<span class="node-card__control-label">Value<\/span>/);
+  assert.match(conditionSection, /<span class="node-card__control-label">Max loops<\/span>/);
+  assert.match(conditionSection, /view\.body\.operatorLabel/);
+  assert.match(conditionSection, /view\.body\.valueLabel/);
+  assert.match(conditionSection, /conditionLoopLimitDraft/);
+  assert.match(conditionSection, /type="number"/);
+  assert.match(conditionSection, /:min="CONDITION_LOOP_LIMIT_MIN"/);
+  assert.match(conditionSection, /:max="CONDITION_LOOP_LIMIT_MAX"/);
+  assert.doesNotMatch(conditionSection, /class="node-card__condition-branch-rail"/);
+  assert.doesNotMatch(conditionSection, /v-for="branch in view\.body\.routeOutputs"/);
+  assert.doesNotMatch(conditionSection, /class="node-card__condition-branch-chip"/);
+  assert.doesNotMatch(conditionSection, /class="node-card__condition-branch-label"/);
+  assert.doesNotMatch(conditionSection, /branch\.tone/);
+  assert.match(componentSource, /\.node-card__condition-panel \{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\);/);
+  assert.match(componentSource, /\.node-card__condition-controls-row \{[\s\S]*--node-card-condition-loop-column:\s*clamp\(6\.5rem,\s*22%,\s*8rem\);/);
+  assert.match(componentSource, /\.node-card__condition-controls-row \{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\) minmax\(0,\s*1fr\) var\(--node-card-condition-loop-column\);/);
+  assert.match(componentSource, /\.node-card__condition-controls-row > \.node-card__control-row \{[\s\S]*min-width:\s*0;/);
+  assert.doesNotMatch(componentSource, /\.node-card__control-select \{[^}]*border:/);
+  assert.match(componentSource, /\.node-card__port-pill-row--condition-source \{[\s\S]*width:\s*100%;/);
+  assert.doesNotMatch(conditionSection, /node-card__branch-editor/);
+  assert.doesNotMatch(conditionSection, /node-card__branch-list/);
+  assert.doesNotMatch(conditionSection, /\+ branch/);
+  assert.doesNotMatch(conditionSection, /Matches/);
+  assert.doesNotMatch(conditionSection, /Route/);
+});
+
 test("NodeCard routes title and description editing through hoverable confirm triggers before opening warm popovers", () => {
   assert.match(componentSource, /class="node-card__text-trigger node-card__text-trigger--title"/);
   assert.match(componentSource, /class="node-card__text-trigger node-card__text-trigger--description"/);
   assert.match(componentSource, /:class="\{ 'node-card__text-trigger--confirm': isTextEditorConfirmOpen\('title'\) \}"/);
   assert.match(componentSource, /:class="\{ 'node-card__text-trigger--confirm': isTextEditorConfirmOpen\('description'\) \}"/);
   assert.match(componentSource, /data-text-editor-trigger="true"/);
-  assert.match(componentSource, /@click\.stop="handleTextEditorAction\('title'\)"/);
-  assert.match(componentSource, /@click\.stop="handleTextEditorAction\('description'\)"/);
+  assert.match(componentSource, /@pointerdown="handleTextTriggerPointerDown\('title', \$event\)"/);
+  assert.match(componentSource, /@pointermove="handleTextTriggerPointerMove\('title', \$event\)"/);
+  assert.match(componentSource, /@pointerup="handleTextTriggerPointerUp\('title', \$event\)"/);
+  assert.match(componentSource, /@pointercancel="clearTextTriggerPointerState"/);
+  assert.match(componentSource, /@click\.stop\.prevent/);
+  assert.match(componentSource, /@pointerdown="handleTextTriggerPointerDown\('description', \$event\)"/);
+  assert.match(componentSource, /@pointermove="handleTextTriggerPointerMove\('description', \$event\)"/);
+  assert.match(componentSource, /@pointerup="handleTextTriggerPointerUp\('description', \$event\)"/);
+  const titleTriggerIndex = componentSource.indexOf('class="node-card__text-trigger node-card__text-trigger--title"');
+  assert.notEqual(titleTriggerIndex, -1, "expected to find the title text trigger");
+  assert.doesNotMatch(componentSource.slice(titleTriggerIndex, titleTriggerIndex + 400), /@pointerdown\.stop/);
+  const descriptionTriggerIndex = componentSource.indexOf('class="node-card__text-trigger node-card__text-trigger--description"');
+  assert.notEqual(descriptionTriggerIndex, -1, "expected to find the description text trigger");
+  assert.doesNotMatch(componentSource.slice(descriptionTriggerIndex, descriptionTriggerIndex + 400), /@pointerdown\.stop/);
   assert.match(componentSource, /@keydown\.enter\.prevent="handleTextEditorAction\('title'\)"/);
   assert.match(componentSource, /@keydown\.enter\.prevent="handleTextEditorAction\('description'\)"/);
   assert.match(componentSource, /<h3 class="node-card__title">\{\{ view\.title \}\}<\/h3>/);
@@ -351,11 +402,18 @@ test("NodeCard routes title and description editing through hoverable confirm tr
   assert.match(componentSource, /type TextEditorField = "title" \| "description";/);
   assert.match(componentSource, /const activeTextEditor = ref<TextEditorField \| null>\(null\);/);
   assert.match(componentSource, /const activeTextEditorConfirmField = ref<TextEditorField \| null>\(null\);/);
+  assert.match(componentSource, /const textTriggerPointerState = ref<\{/);
   assert.match(componentSource, /const textEditorConfirmTimeoutRef = ref<number \| null>\(null\);/);
   assert.match(componentSource, /const titleEditorDraft = ref\(""\);/);
   assert.match(componentSource, /const descriptionEditorDraft = ref\(""\);/);
   assert.match(componentSource, /const titleEditorInputRef = ref<\{ focus\?: \(\) => void \} \| null>\(null\);/);
   assert.match(componentSource, /const descriptionEditorInputRef = ref<\{ focus\?: \(\) => void \} \| null>\(null\);/);
+  assert.match(componentSource, /function clearTextTriggerPointerState\(\)/);
+  assert.match(componentSource, /function handleTextTriggerPointerDown\(field: TextEditorField, event: PointerEvent\)/);
+  assert.match(componentSource, /function handleTextTriggerPointerMove\(field: TextEditorField, event: PointerEvent\)/);
+  assert.match(componentSource, /function handleTextTriggerPointerUp\(field: TextEditorField, event: PointerEvent\)/);
+  assert.match(componentSource, /if \(Math\.abs\(deltaX\) > 3 \|\| Math\.abs\(deltaY\) > 3\)/);
+  assert.match(componentSource, /if \(pointerState\.moved\) \{\s*return;\s*\}/);
   assert.match(componentSource, /function isTextEditorOpen\(field: TextEditorField\)/);
   assert.match(componentSource, /function isTextEditorConfirmOpen\(field: TextEditorField\)/);
   assert.match(componentSource, /function textEditorWidth\(field: TextEditorField\)/);
@@ -394,8 +452,9 @@ test("NodeCard routes title and description editing through hoverable confirm tr
   assert.doesNotMatch(componentSource, /autofocus/);
   assert.match(componentSource, /@update:model-value="handleTextEditorDraftInput\('title', \$event\)"/);
   assert.match(componentSource, /@update:model-value="handleTextEditorDraftInput\('description', \$event\)"/);
-  assert.match(componentSource, /@blur="commitTextEditor\('title'\)"/);
-  assert.match(componentSource, /@blur="commitTextEditor\('description'\)"/);
+  assert.doesNotMatch(componentSource, /@blur="commitTextEditor\('title'\)"/);
+  assert.doesNotMatch(componentSource, /@blur="commitTextEditor\('description'\)"/);
+  assert.match(componentSource, /window\.setTimeout\(\(\) => \{/);
   assert.match(componentSource, /Edit name\?/);
   assert.match(componentSource, /Edit description\?/);
   assert.match(componentSource, /class="node-card__confirm-hint node-card__confirm-hint--text"/);

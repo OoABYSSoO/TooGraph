@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import { buildSequenceFlowPath } from "./flowEdgePath.ts";
 import { projectCanvasAnchors, projectCanvasEdges } from "./edgeProjection.ts";
 import type { GraphPayload } from "../../types/node-system.ts";
 
@@ -85,8 +86,8 @@ test("projectCanvasEdges creates projected flow edges from graph edges", () => {
       { id: "data:answer_helper:answer->output_answer", kind: "data", source: "answer_helper", target: "output_answer", state: "answer" },
     ],
   );
-  assert.match(projected[0]!.path, /^M .* C /);
-  assert.match(projected[1]!.path, /^M .* C /);
+  assert.match(projected[0]!.path, /^M .* L .* C .* L /);
+  assert.match(projected[1]!.path, /^M .* L .* C .* L /);
 });
 
 test("projectCanvasAnchors returns flow and state dots for visible nodes", () => {
@@ -195,7 +196,7 @@ test("projectCanvasEdges exposes branch metadata for condition routes", () => {
         writes: [],
         config: {
           branches: ["continue", "retry"],
-          loopLimit: -1,
+          loopLimit: 5,
           branchMapping: {
             true: "continue",
             false: "retry",
@@ -239,4 +240,94 @@ test("projectCanvasEdges exposes branch metadata for condition routes", () => {
 
   assert.ok(routeEdge);
   assert.equal(routeEdge?.branch, "retry");
+  assert.equal(
+    routeEdge?.path,
+    buildSequenceFlowPath({
+      sourceX: 554,
+      sourceY: 239,
+      targetX: 486,
+      targetY: 154,
+      sourceNodeX: 0,
+      sourceNodeY: 0,
+      targetNodeX: 480,
+      targetNodeY: 120,
+    }),
+  );
+});
+
+test("projectCanvasEdges assigns separate routing lanes to sibling outgoing flow edges", () => {
+  const fanoutGraph: GraphPayload = {
+    ...graph,
+    nodes: {
+      ...graph.nodes,
+      reviewer: {
+        kind: "agent",
+        name: "reviewer",
+        description: "",
+        ui: { position: { x: 980, y: 420 } },
+        reads: [{ state: "answer", required: true }],
+        writes: [],
+        config: {
+          skills: [],
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "off",
+          temperature: 0,
+        },
+      },
+    },
+    edges: [
+      { source: "answer_helper", target: "output_answer" },
+      { source: "answer_helper", target: "reviewer" },
+    ],
+  };
+
+  const projected = projectCanvasEdges(fanoutGraph).filter((edge) => edge.kind === "flow");
+
+  assert.equal(projected.length, 2);
+  const primary = projected.find((edge) => edge.target === "output_answer");
+  const secondary = projected.find((edge) => edge.target === "reviewer");
+  assert.ok(primary?.routing);
+  assert.ok(secondary?.routing);
+  assert.equal(primary?.routing?.sourceLaneCount, 2);
+  assert.equal(secondary?.routing?.sourceLaneCount, 2);
+  assert.notEqual(primary?.routing?.sourceLaneIndex, secondary?.routing?.sourceLaneIndex);
+});
+
+test("projectCanvasEdges routes upstream flow edges over the cards", () => {
+  const upstreamGraph: GraphPayload = {
+    ...graph,
+    nodes: {
+      ...graph.nodes,
+      input_question: {
+        ...graph.nodes.input_question!,
+        ui: { position: { x: 520, y: 220 } },
+      },
+      answer_helper: {
+        ...graph.nodes.answer_helper!,
+        ui: { position: { x: 80, y: 220 } },
+      },
+    },
+    edges: [{ source: "input_question", target: "answer_helper" }],
+  };
+
+  const projected = projectCanvasEdges(upstreamGraph);
+  const flowEdge = projected.find((edge) => edge.id === "flow:input_question->answer_helper");
+
+  assert.ok(flowEdge);
+  assert.equal(
+    flowEdge.path,
+    buildSequenceFlowPath({
+      sourceX: 974,
+      sourceY: 254,
+      targetX: 86,
+      targetY: 254,
+      sourceNodeX: 520,
+      sourceNodeY: 220,
+      targetNodeX: 80,
+      targetNodeY: 220,
+    }),
+  );
+  assert.match(flowEdge.path, /^M .* Q /);
 });

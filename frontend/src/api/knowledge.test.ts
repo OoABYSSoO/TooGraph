@@ -36,7 +36,7 @@ test("fetchKnowledgeBases requests the knowledge bases endpoint", async () => {
 
   const knowledgeBases = await fetchKnowledgeBases();
 
-  assert.equal(requestedUrl, "http://127.0.0.1:8765/api/knowledge/bases");
+  assert.equal(requestedUrl, "/api/knowledge/bases");
   assert.deepEqual(knowledgeBases, [
     {
       name: "graphiteui-official",
