@@ -293,6 +293,48 @@ test("NodeCard reveals state pills on hover and opens state editing only after a
   assert.match(componentSource, /\.node-card__confirm-hint \{[\s\S]*width:\s*fit-content;/);
 });
 
+test("NodeCard adds mirrored remove-binding buttons to non-output state pills", () => {
+  assert.match(componentSource, /import \{[\s\S]*Delete[\s\S]*\} from "@element-plus\/icons-vue";/);
+  assert.match(componentSource, /\(event: "remove-port-state", payload: \{ nodeId: string; side: "input" \| "output"; stateKey: string \}\): void;/);
+  assert.match(componentSource, /const activeRemovePortStateConfirmAnchorId = ref<string \| null>\(null\);/);
+  assert.match(componentSource, /const removePortStateConfirmTimeoutRef = ref<number \| null>\(null\);/);
+  assert.match(componentSource, /function clearRemovePortStateConfirmState\(\)/);
+  assert.match(componentSource, /function startRemovePortStateConfirmWindow\(anchorId: string\)/);
+  assert.match(componentSource, /function isRemovePortStateConfirmOpen\(anchorId: string\)/);
+  assert.match(componentSource, /function handleRemovePortStateClick\(anchorId: string, side: "input" \| "output", stateKey: string \| null \| undefined\)/);
+  assert.match(componentSource, /emit\("remove-port-state", \{[\s\S]*nodeId: props\.nodeId,[\s\S]*side,[\s\S]*stateKey,[\s\S]*\}\);/);
+  assert.match(componentSource, /class="node-card__port-pill-remove node-card__port-pill-remove--trailing"/);
+  assert.match(componentSource, /class="node-card__port-pill-remove node-card__port-pill-remove--leading"/);
+  assert.match(componentSource, /@click\.stop="handleRemovePortStateClick\(`agent-input:\$\{port\.key\}`,\s*'input', port\.key\)"/);
+  assert.match(componentSource, /@click\.stop="handleRemovePortStateClick\(`agent-output:\$\{port\.key\}`,\s*'output', port\.key\)"/);
+  assert.match(componentSource, /@click\.stop="handleRemovePortStateClick\(`condition-input:\$\{port\.key\}`,\s*'input', port\.key\)"/);
+  assert.match(componentSource, /Remove state\?/);
+  const inputSectionMatch = componentSource.match(
+    /<section v-if="view\.body\.kind === 'input'"[\s\S]*?<\/section>/,
+  );
+  assert.ok(inputSectionMatch, "expected to find the input node section");
+  assert.doesNotMatch(inputSectionMatch[0], /node-card__port-pill-remove/);
+  const outputSectionMatch = componentSource.match(
+    /<section v-else-if="view\.body\.kind === 'output'"[\s\S]*?<\/section>/,
+  );
+  assert.ok(outputSectionMatch, "expected to find the output node section");
+  assert.doesNotMatch(outputSectionMatch[0], /node-card__port-pill-remove/);
+  assert.match(componentSource, /\.node-card__port-pill-remove \{[\s\S]*width:\s*28px;/);
+  assert.match(componentSource, /\.node-card__port-pill-remove \{[\s\S]*height:\s*28px;/);
+  assert.match(componentSource, /\.node-card__port-pill-remove \{[\s\S]*position:\s*absolute;/);
+  assert.match(componentSource, /\.node-card__port-pill-remove \{[\s\S]*top:\s*50%;/);
+  assert.match(componentSource, /\.node-card__port-pill-remove \{[\s\S]*appearance:\s*none;/);
+  assert.match(componentSource, /\.node-card__port-pill-remove \{[\s\S]*transform:\s*translateY\(-50%\);/);
+  assert.match(componentSource, /\.node-card__port-pill-remove \{[\s\S]*border-radius:\s*999px;/);
+  assert.match(componentSource, /\.node-card__port-pill--removable\.node-card__port-pill--input \{[\s\S]*padding-right:\s*39px;/);
+  assert.match(componentSource, /\.node-card__port-pill--removable\.node-card__port-pill--output \{[\s\S]*padding-left:\s*39px;/);
+  assert.match(componentSource, /\.node-card__port-pill-remove--leading \{[\s\S]*left:\s*7px;/);
+  assert.match(componentSource, /\.node-card__port-pill-remove--trailing \{[\s\S]*right:\s*7px;/);
+  assert.match(componentSource, /\.node-card__port-pill-remove--confirm,\n\.node-card__port-pill-remove--confirm:hover,\n\.node-card__port-pill-remove--confirm:focus-visible \{/);
+  assert.match(componentSource, /\.node-card__port-pill--confirm \.node-card__port-pill-remove \{[\s\S]*opacity:\s*0;/);
+  assert.match(componentSource, /\.node-card__confirm-hint--remove \{[\s\S]*background:\s*rgba\(255,\s*248,\s*248,\s*0\.98\);/);
+});
+
 test("NodeCard routes title and description editing through hoverable confirm triggers before opening warm popovers", () => {
   assert.match(componentSource, /class="node-card__text-trigger node-card__text-trigger--title"/);
   assert.match(componentSource, /class="node-card__text-trigger node-card__text-trigger--description"/);
@@ -376,6 +418,7 @@ test("NodeCard declares top-action and state-edit events for canvas forwarding",
   assert.match(componentSource, /\(event: "update-node-metadata", payload: \{ nodeId: string; patch: Partial<Pick<GraphNode, "name" \| "description">> \}\): void;/);
   assert.match(componentSource, /\(event: "rename-state", payload: \{ currentKey: string; nextKey: string \}\): void;/);
   assert.match(componentSource, /\(event: "update-state", payload: \{ stateKey: string; patch: Partial<StateDefinition> \}\): void;/);
+  assert.match(componentSource, /\(event: "remove-port-state", payload: \{ nodeId: string; side: "input" \| "output"; stateKey: string \}\): void;/);
   assert.match(componentSource, /\(event: "delete-node", payload: \{ nodeId: string \}\): void;/);
   assert.match(componentSource, /\(event: "save-node-preset", payload: \{ nodeId: string \}\): void;/);
 });

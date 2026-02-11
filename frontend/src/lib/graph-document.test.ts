@@ -5,7 +5,7 @@ import { reactive } from "vue";
 import * as graphDocument from "./graph-document.ts";
 import type { GraphDocument, GraphPayload, TemplateRecord } from "../types/node-system.ts";
 
-const { cloneGraphDocument, createDraftFromTemplate, createEmptyDraftGraph } = graphDocument;
+const { cloneGraphDocument, createDraftFromTemplate, createEmptyDraftGraph, pruneUnreferencedStateSchemaInDocument } = graphDocument;
 
 const template: TemplateRecord = {
   template_id: "hello_world",
@@ -158,6 +158,78 @@ test("createEmptyDraftGraph creates an empty backend-native payload", () => {
     conditional_edges: [],
     metadata: {},
   });
+});
+
+test("pruneUnreferencedStateSchemaInDocument removes states that no node still references", () => {
+  assert.equal(typeof pruneUnreferencedStateSchemaInDocument, "function");
+
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Prune states",
+    state_schema: {
+      question: { name: "question", description: "", type: "text", value: "", color: "#d97706" },
+      answer: { name: "answer", description: "", type: "text", value: "", color: "#2563eb" },
+      orphaned: { name: "orphaned", description: "", type: "text", value: "", color: "#7c3aed" },
+      branch_source: { name: "branch_source", description: "", type: "text", value: "", color: "#10b981" },
+    },
+    nodes: {
+      input_question: {
+        kind: "input",
+        name: "input_question",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [{ state: "question", mode: "replace" }],
+        config: { value: "" },
+      },
+      answer_helper: {
+        kind: "agent",
+        name: "answer_helper",
+        description: "",
+        ui: { position: { x: 120, y: 0 } },
+        reads: [{ state: "question", required: true }],
+        writes: [{ state: "answer", mode: "replace" }],
+        config: {
+          skills: [],
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+      branch_gate: {
+        kind: "condition",
+        name: "branch_gate",
+        description: "",
+        ui: { position: { x: 240, y: 0 } },
+        reads: [],
+        writes: [],
+        config: {
+          branches: ["true", "false"],
+          loopLimit: 8,
+          branchMapping: {
+            true: "true",
+            false: "false",
+          },
+          rule: {
+            source: "branch_source",
+            operator: "equals",
+            value: "go",
+          },
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const nextDocument = pruneUnreferencedStateSchemaInDocument(document);
+
+  assert.notEqual(nextDocument, document);
+  assert.deepEqual(Object.keys(nextDocument.state_schema).sort(), ["answer", "branch_source", "question"]);
+  assert.equal(document.state_schema.orphaned.name, "orphaned");
 });
 
 test("connectStateBindingInDocument rewires a target read binding to the source state", () => {

@@ -77,7 +77,11 @@ function buildDocument(): GraphPayload {
         },
       },
     },
-    edges: [],
+    edges: [
+      { source: "input_question", target: "answer_helper" },
+      { source: "answer_helper", target: "score_gate" },
+      { source: "answer_helper", target: "output_answer" },
+    ],
     conditional_edges: [],
   };
 }
@@ -125,7 +129,19 @@ test("removeStateBindingFromDocument removes existing read and write relations",
 
   const nextReadDocument = removeStateBindingFromDocument(document, "answer", "score_gate", "read");
   assert.deepEqual(nextReadDocument.nodes.score_gate.reads, []);
+  assert.deepEqual(nextReadDocument.edges, [
+    { source: "input_question", target: "answer_helper" },
+    { source: "answer_helper", target: "output_answer" },
+  ]);
 
   const nextWriteDocument = removeStateBindingFromDocument(document, "answer", "answer_helper", "write");
   assert.deepEqual(nextWriteDocument.nodes.answer_helper.writes, []);
+  assert.deepEqual(nextWriteDocument.edges, [{ source: "input_question", target: "answer_helper" }]);
+
+  const nextInputWriteDocument = removeStateBindingFromDocument(document, "question", "input_question", "write");
+  assert.deepEqual(nextInputWriteDocument.nodes.input_question.writes, []);
+  assert.deepEqual(nextInputWriteDocument.edges, [
+    { source: "answer_helper", target: "score_gate" },
+    { source: "answer_helper", target: "output_answer" },
+  ]);
 });

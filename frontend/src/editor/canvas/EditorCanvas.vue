@@ -15,6 +15,7 @@
     @pointercancel="handleCanvasPointerUp"
     @keydown.delete.prevent="handleSelectedEdgeDelete"
     @keydown.backspace.prevent="handleSelectedEdgeDelete"
+    @keydown.escape.prevent="clearCanvasTransientState"
     @wheel.prevent="handleWheel"
     @dragover.prevent="handleCanvasDragOver"
     @drop.prevent="handleCanvasDrop"
@@ -30,9 +31,6 @@
       </div>
       <svg class="editor-canvas__edges" viewBox="0 0 4000 3000" preserveAspectRatio="none" aria-hidden="true">
         <defs>
-          <marker id="editor-canvas-arrow-flow" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto">
-            <path d="M 1 1 L 12 7 L 1 13 Z" fill="rgba(217, 119, 6, 0.88)" />
-          </marker>
           <marker id="editor-canvas-arrow-route" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto">
             <path d="M 1 1 L 12 7 L 1 13 Z" fill="rgba(124, 58, 237, 0.88)" />
           </marker>
@@ -48,10 +46,18 @@
           :d="connectionPreview.path"
           class="editor-canvas__edge editor-canvas__edge--preview"
           :class="{
+            'editor-canvas__edge--flow': connectionPreview.kind === 'flow',
             'editor-canvas__edge--route': connectionPreview.kind === 'route',
             'editor-canvas__edge--data': connectionPreview.kind === 'data',
           }"
-          :marker-end="connectionPreview.kind === 'data' ? undefined : 'url(#editor-canvas-arrow-preview)'"
+          :marker-end="connectionPreview.kind === 'route' ? 'url(#editor-canvas-arrow-preview)' : undefined"
+        />
+        <path
+          v-for="edge in projectedEdges.filter((edge) => edge.kind === 'flow')"
+          :key="`${edge.id}:highlight`"
+          :d="edge.path"
+          class="editor-canvas__edge-delete-highlight"
+          :class="{ 'editor-canvas__edge-delete-highlight--active': isFlowEdgeDeleteConfirmOpen(edge.id) }"
         />
         <path
           v-for="edge in projectedEdges"
@@ -60,23 +66,103 @@
           class="editor-canvas__edge"
           :style="edgeStyle(edge)"
           :class="{
+            'editor-canvas__edge--flow': edge.kind === 'flow',
             'editor-canvas__edge--route': edge.kind === 'route',
             'editor-canvas__edge--data': edge.kind === 'data',
             'editor-canvas__edge--selected': selectedEdgeId === edge.id,
             'editor-canvas__edge--active-run': resolveRunEdgePresentationForEdge(edge.id)?.edgeClass === 'editor-canvas__edge--active-run',
           }"
           :marker-end="
-            edge.kind === 'data'
-              ? undefined
-              : selectedEdgeId === edge.id
+            edge.kind === 'route'
+              ? selectedEdgeId === edge.id
                 ? 'url(#editor-canvas-arrow-selected)'
-                : edge.kind === 'route'
-                  ? 'url(#editor-canvas-arrow-route)'
-                  : 'url(#editor-canvas-arrow-flow)'
+                : 'url(#editor-canvas-arrow-route)'
+              : undefined
           "
-          @pointerdown.stop="handleEdgePointerDown(edge)"
+        />
+        <path
+          v-for="edge in projectedEdges"
+          :key="`${edge.id}:hitarea`"
+          :d="edge.path"
+          class="editor-canvas__edge-hitarea"
+          :class="{
+            'editor-canvas__edge-hitarea--flow': edge.kind === 'flow',
+            'editor-canvas__edge-hitarea--route': edge.kind === 'route',
+            'editor-canvas__edge-hitarea--data': edge.kind === 'data',
+          }"
+          @pointerdown.stop="handleEdgePointerDown(edge, $event)"
         />
       </svg>
+      <div
+        v-if="activeFlowEdgeDeleteConfirm"
+        class="editor-canvas__edge-delete-confirm"
+        :style="flowEdgeDeleteConfirmStyle"
+        aria-hidden="true"
+      >
+        <div class="editor-canvas__confirm-hint editor-canvas__confirm-hint--remove">Delete edge?</div>
+        <button
+          type="button"
+          class="editor-canvas__edge-delete-button"
+          @pointerdown.stop
+          @click.stop="confirmFlowEdgeDelete"
+        >
+          <ElIcon><Check /></ElIcon>
+        </button>
+      </div>
+      <div
+        v-if="activeDataEdgeStateConfirm"
+        class="editor-canvas__edge-state-confirm"
+        :style="dataEdgeStateConfirmStyle"
+        aria-hidden="true"
+        @pointerdown.stop
+      >
+        <div class="editor-canvas__confirm-hint editor-canvas__confirm-hint--state">Edit state?</div>
+        <button
+          type="button"
+          class="editor-canvas__edge-state-button"
+          @pointerdown.stop
+          @click.stop="openDataEdgeStateEditor"
+        >
+          <ElIcon><Check /></ElIcon>
+        </button>
+      </div>
+      <div
+        v-if="activeDataEdgeStateEditor && dataEdgeStateDraft"
+        class="editor-canvas__edge-state-editor-shell"
+        :style="dataEdgeStateEditorStyle"
+        @pointerdown.stop
+      >
+        <StateEditorPopover
+          :draft="dataEdgeStateDraft"
+          :error="dataEdgeStateError"
+          :type-options="stateTypeOptions"
+          :color-options="dataEdgeStateColorOptions"
+          @update:key="handleDataEdgeStateEditorKeyInput"
+          @update:name="handleDataEdgeStateEditorNameInput"
+          @update:type="handleDataEdgeStateEditorTypeValue"
+          @update:color="handleDataEdgeStateEditorColorInput"
+          @update:description="handleDataEdgeStateEditorDescriptionInput"
+        />
+        <div class="editor-canvas__edge-state-editor-actions">
+          <button type="button" class="editor-canvas__edge-state-editor-action" @pointerdown.stop @click.stop="removeDataEdgeSourceBinding">
+            <ElIcon><Delete /></ElIcon>
+            <span>Remove source ref</span>
+          </button>
+          <button type="button" class="editor-canvas__edge-state-editor-action" @pointerdown.stop @click.stop="removeDataEdgeTargetBinding">
+            <ElIcon><Delete /></ElIcon>
+            <span>Remove target ref</span>
+          </button>
+        </div>
+        <button
+          type="button"
+          class="editor-canvas__edge-state-editor-action editor-canvas__edge-state-editor-action--danger"
+          @pointerdown.stop
+          @click.stop="removeDataEdgeBindings"
+        >
+          <ElIcon><Delete /></ElIcon>
+          <span>Remove both refs</span>
+        </button>
+      </div>
       <div
         v-for="[nodeId, node] in nodeEntries"
         :key="nodeId"
@@ -115,6 +201,7 @@
           @update-input-state="emit('update-input-state', $event)"
           @rename-state="emit('rename-state', $event)"
           @update-state="emit('update-state', $event)"
+          @remove-port-state="emit('remove-port-state', $event)"
           @update-agent-config="emit('update-agent-config', $event)"
           @update-condition-config="emit('update-condition-config', $event)"
           @update-condition-branch="emit('update-condition-branch', $event)"
@@ -170,9 +257,11 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, toRef, watch } from "vue";
+import { Check, Delete } from "@element-plus/icons-vue";
 
 import { buildAnchorModel } from "@/editor/anchors/anchorModel";
 import NodeCard from "@/editor/nodes/NodeCard.vue";
+import StateEditorPopover from "@/editor/nodes/StateEditorPopover.vue";
 import { type ProjectedCanvasAnchor, type ProjectedCanvasEdge } from "@/editor/canvas/edgeProjection";
 import { buildPendingConnectionPreviewPath } from "@/editor/canvas/connectionPreviewPath";
 import { resolveFlowAnchorOffset } from "@/editor/canvas/flowAnchorLayout";
@@ -180,6 +269,13 @@ import { resolveEdgeRunPresentation } from "@/editor/canvas/runEdgePresentation"
 import { resolveNodeRunPresentation } from "@/editor/canvas/runNodePresentation";
 import { resolveCanvasLayout, type MeasuredAnchorOffset } from "@/editor/canvas/resolvedCanvasLayout";
 import { resolveCanvasSurfaceStyle } from "@/editor/canvas/canvasSurfaceStyle";
+import {
+  defaultValueForStateType,
+  resolveStateColorOptions,
+  STATE_FIELD_TYPE_OPTIONS,
+  type StateFieldDraft,
+  type StateFieldType,
+} from "@/editor/workspace/statePanelFields";
 import { canCompleteGraphConnection, canStartGraphConnection, type PendingGraphConnection } from "@/lib/graph-connections";
 import { resolveFocusedViewport } from "@/editor/canvas/focusNodeViewport";
 import { useNodeSelectionFocus, type NodeFocusRequest } from "./useNodeSelectionFocus";
@@ -215,6 +311,7 @@ const emit = defineEmits<{
   (event: "update-input-state", payload: { stateKey: string; patch: Partial<StateDefinition> }): void;
   (event: "rename-state", payload: { currentKey: string; nextKey: string }): void;
   (event: "update-state", payload: { stateKey: string; patch: Partial<StateDefinition> }): void;
+  (event: "remove-port-state", payload: { nodeId: string; side: "input" | "output"; stateKey: string }): void;
   (event: "update-agent-config", payload: { nodeId: string; patch: Partial<AgentNode["config"]> }): void;
   (event: "update-condition-config", payload: { nodeId: string; patch: Partial<ConditionNode["config"]> }): void;
   (event: "update-condition-branch", payload: { nodeId: string; currentKey: string; nextKey: string; mappingKeys: string[] }): void;
@@ -265,6 +362,32 @@ const nodeDrag = ref<{
 const pendingConnection = ref<PendingGraphConnection | null>(null);
 const pendingConnectionPoint = ref<{ x: number; y: number } | null>(null);
 const selectedEdgeId = ref<string | null>(null);
+const activeFlowEdgeDeleteConfirm = ref<{
+  id: string;
+  source: string;
+  target: string;
+  x: number;
+  y: number;
+} | null>(null);
+const flowEdgeDeleteConfirmTimeoutRef = ref<number | null>(null);
+const activeDataEdgeStateConfirm = ref<{
+  id: string;
+  source: string;
+  target: string;
+  stateKey: string;
+  x: number;
+  y: number;
+} | null>(null);
+const dataEdgeStateConfirmTimeoutRef = ref<number | null>(null);
+const activeDataEdgeStateEditor = ref<{
+  source: string;
+  target: string;
+  stateKey: string;
+  x: number;
+  y: number;
+} | null>(null);
+const dataEdgeStateDraft = ref<StateFieldDraft | null>(null);
+const dataEdgeStateError = ref<string | null>(null);
 const hoveredNodeId = ref<string | null>(null);
 const hoveredFlowHandleNodeId = ref<string | null>(null);
 const pendingAnchorMeasurementNodeIds = new Set<string>();
@@ -406,6 +529,54 @@ const canvasSurfaceStyle = computed(() => resolveCanvasSurfaceStyle(viewport.vie
 const viewportStyle = computed(() => ({
   transform: `translate(${viewport.viewport.x}px, ${viewport.viewport.y}px) scale(${viewport.viewport.scale})`,
 }));
+const stateTypeOptions = STATE_FIELD_TYPE_OPTIONS;
+const flowEdgeDeleteConfirmStyle = computed(() => {
+  if (!activeFlowEdgeDeleteConfirm.value) {
+    return undefined;
+  }
+
+  return {
+    left: `${activeFlowEdgeDeleteConfirm.value.x}px`,
+    top: `${activeFlowEdgeDeleteConfirm.value.y}px`,
+  };
+});
+const dataEdgeStateConfirmStyle = computed(() => {
+  if (!activeDataEdgeStateConfirm.value) {
+    return undefined;
+  }
+
+  return {
+    left: `${activeDataEdgeStateConfirm.value.x}px`,
+    top: `${activeDataEdgeStateConfirm.value.y}px`,
+  };
+});
+const dataEdgeStateEditorStyle = computed(() => {
+  if (!activeDataEdgeStateEditor.value) {
+    return undefined;
+  }
+
+  return {
+    left: `${activeDataEdgeStateEditor.value.x}px`,
+    top: `${activeDataEdgeStateEditor.value.y}px`,
+  };
+});
+const dataEdgeStateColorOptions = computed(() => resolveStateColorOptions(dataEdgeStateDraft.value?.definition.color ?? ""));
+
+function isFlowEdgeDeleteConfirmOpen(edgeId: string) {
+  return activeFlowEdgeDeleteConfirm.value?.id === edgeId;
+}
+
+function isActiveDataEdge(edge: Pick<ProjectedCanvasEdge, "kind" | "source" | "target" | "state">, dataState: {
+  source: string;
+  target: string;
+  stateKey: string;
+} | null) {
+  if (!dataState) {
+    return false;
+  }
+
+  return edge.kind === "data" && edge.source === dataState.source && edge.target === dataState.target && edge.state === dataState.stateKey;
+}
 
 watch(projectedEdges, (edges) => {
   if (selectedEdgeId.value && !edges.some((edge) => edge.id === selectedEdgeId.value)) {
@@ -413,6 +584,18 @@ watch(projectedEdges, (edges) => {
     if (!pendingConnection.value) {
       pendingConnectionPoint.value = null;
     }
+  }
+
+  if (activeFlowEdgeDeleteConfirm.value && !edges.some((edge) => edge.id === activeFlowEdgeDeleteConfirm.value?.id)) {
+    clearFlowEdgeDeleteConfirmState();
+  }
+
+  if (activeDataEdgeStateConfirm.value && !edges.some((edge) => isActiveDataEdge(edge, activeDataEdgeStateConfirm.value))) {
+    clearDataEdgeStateConfirmState();
+  }
+
+  if (activeDataEdgeStateEditor.value && !edges.some((edge) => isActiveDataEdge(edge, activeDataEdgeStateEditor.value))) {
+    closeDataEdgeStateEditor();
   }
 });
 
@@ -435,7 +618,290 @@ onBeforeUnmount(() => {
     window.cancelAnimationFrame(scheduledAnchorMeasurementFrame);
     scheduledAnchorMeasurementFrame = null;
   }
+
+  clearFlowEdgeDeleteConfirmState();
+  clearDataEdgeStateInteraction();
 });
+
+function clearFlowEdgeDeleteConfirmTimeout() {
+  if (flowEdgeDeleteConfirmTimeoutRef.value !== null) {
+    window.clearTimeout(flowEdgeDeleteConfirmTimeoutRef.value);
+    flowEdgeDeleteConfirmTimeoutRef.value = null;
+  }
+}
+
+function clearFlowEdgeDeleteConfirmState() {
+  clearFlowEdgeDeleteConfirmTimeout();
+  activeFlowEdgeDeleteConfirm.value = null;
+}
+
+function clearDataEdgeStateConfirmTimeout() {
+  if (dataEdgeStateConfirmTimeoutRef.value !== null) {
+    window.clearTimeout(dataEdgeStateConfirmTimeoutRef.value);
+    dataEdgeStateConfirmTimeoutRef.value = null;
+  }
+}
+
+function clearDataEdgeStateConfirmState() {
+  clearDataEdgeStateConfirmTimeout();
+  activeDataEdgeStateConfirm.value = null;
+}
+
+function closeDataEdgeStateEditor() {
+  activeDataEdgeStateEditor.value = null;
+  dataEdgeStateDraft.value = null;
+  dataEdgeStateError.value = null;
+}
+
+function clearDataEdgeStateInteraction() {
+  clearDataEdgeStateConfirmState();
+  closeDataEdgeStateEditor();
+}
+
+function clearCanvasTransientState() {
+  clearFlowEdgeDeleteConfirmState();
+  clearDataEdgeStateInteraction();
+}
+
+function startFlowEdgeDeleteConfirm(edge: ProjectedCanvasEdge, event: PointerEvent) {
+  clearFlowEdgeDeleteConfirmTimeout();
+  const point = resolveCanvasPoint(event);
+  activeFlowEdgeDeleteConfirm.value = {
+    id: edge.id,
+    source: edge.source,
+    target: edge.target,
+    x: point.x,
+    y: point.y,
+  };
+  flowEdgeDeleteConfirmTimeoutRef.value = window.setTimeout(() => {
+    flowEdgeDeleteConfirmTimeoutRef.value = null;
+    if (activeFlowEdgeDeleteConfirm.value?.id === edge.id) {
+      activeFlowEdgeDeleteConfirm.value = null;
+    }
+  }, 2000);
+}
+
+function confirmFlowEdgeDelete() {
+  if (!activeFlowEdgeDeleteConfirm.value) {
+    return;
+  }
+
+  emit("remove-flow", {
+    sourceNodeId: activeFlowEdgeDeleteConfirm.value.source,
+    targetNodeId: activeFlowEdgeDeleteConfirm.value.target,
+  });
+  clearFlowEdgeDeleteConfirmState();
+}
+
+function startDataEdgeStateConfirm(edge: ProjectedCanvasEdge, event: PointerEvent) {
+  if (edge.kind !== "data" || !edge.state) {
+    return;
+  }
+
+  clearDataEdgeStateConfirmTimeout();
+  const point = resolveCanvasPoint(event);
+  activeDataEdgeStateConfirm.value = {
+    id: edge.id,
+    source: edge.source,
+    target: edge.target,
+    stateKey: edge.state,
+    x: point.x,
+    y: point.y,
+  };
+  dataEdgeStateConfirmTimeoutRef.value = window.setTimeout(() => {
+    dataEdgeStateConfirmTimeoutRef.value = null;
+    if (activeDataEdgeStateConfirm.value?.id === edge.id) {
+      activeDataEdgeStateConfirm.value = null;
+    }
+  }, 2000);
+}
+
+function buildStateDraftFromSchema(stateKey: string): StateFieldDraft | null {
+  const definition = props.document.state_schema[stateKey];
+  if (!definition) {
+    return null;
+  }
+
+  return {
+    key: stateKey,
+    definition: {
+      name: definition.name,
+      description: definition.description,
+      type: definition.type,
+      value: definition.value,
+      color: definition.color,
+    },
+  };
+}
+
+function openDataEdgeStateEditor() {
+  if (!activeDataEdgeStateConfirm.value) {
+    return;
+  }
+
+  const nextDraft = buildStateDraftFromSchema(activeDataEdgeStateConfirm.value.stateKey);
+  if (!nextDraft) {
+    clearDataEdgeStateConfirmState();
+    return;
+  }
+
+  activeDataEdgeStateEditor.value = {
+    source: activeDataEdgeStateConfirm.value.source,
+    target: activeDataEdgeStateConfirm.value.target,
+    stateKey: activeDataEdgeStateConfirm.value.stateKey,
+    x: activeDataEdgeStateConfirm.value.x,
+    y: activeDataEdgeStateConfirm.value.y,
+  };
+  dataEdgeStateDraft.value = nextDraft;
+  dataEdgeStateError.value = null;
+  clearDataEdgeStateConfirmState();
+}
+
+function syncDataEdgeStateDraft(nextDraft: StateFieldDraft) {
+  const currentEditor = activeDataEdgeStateEditor.value;
+  if (!currentEditor || !dataEdgeStateDraft.value) {
+    return;
+  }
+
+  dataEdgeStateDraft.value = nextDraft;
+
+  const currentStateKey = currentEditor.stateKey;
+  const nextKey = nextDraft.key.trim();
+  if (!nextKey) {
+    dataEdgeStateError.value = "State key cannot be empty.";
+    return;
+  }
+  if (nextKey !== currentStateKey && props.document.state_schema[nextKey]) {
+    dataEdgeStateError.value = `State key '${nextKey}' already exists.`;
+    return;
+  }
+
+  dataEdgeStateError.value = null;
+
+  if (nextKey !== currentStateKey) {
+    emit("rename-state", { currentKey: currentStateKey, nextKey });
+    activeDataEdgeStateEditor.value = {
+      ...currentEditor,
+      stateKey: nextKey,
+    };
+  }
+
+  emit("update-state", {
+    stateKey: nextKey,
+    patch: {
+      name: nextDraft.definition.name.trim() || nextKey,
+      description: nextDraft.definition.description,
+      type: nextDraft.definition.type,
+      value: nextDraft.definition.value,
+      color: nextDraft.definition.color,
+    },
+  });
+}
+
+function handleDataEdgeStateEditorKeyInput(value: string | number) {
+  if (typeof value !== "string" || !dataEdgeStateDraft.value) {
+    return;
+  }
+  syncDataEdgeStateDraft({
+    ...dataEdgeStateDraft.value,
+    key: value,
+  });
+}
+
+function handleDataEdgeStateEditorNameInput(value: string | number) {
+  if (typeof value !== "string" || !dataEdgeStateDraft.value) {
+    return;
+  }
+  syncDataEdgeStateDraft({
+    ...dataEdgeStateDraft.value,
+    definition: {
+      ...dataEdgeStateDraft.value.definition,
+      name: value,
+    },
+  });
+}
+
+function handleDataEdgeStateEditorDescriptionInput(value: string | number) {
+  if (typeof value !== "string" || !dataEdgeStateDraft.value) {
+    return;
+  }
+  syncDataEdgeStateDraft({
+    ...dataEdgeStateDraft.value,
+    definition: {
+      ...dataEdgeStateDraft.value.definition,
+      description: value,
+    },
+  });
+}
+
+function handleDataEdgeStateEditorColorInput(value: string | number) {
+  if (typeof value !== "string" || !dataEdgeStateDraft.value) {
+    return;
+  }
+  syncDataEdgeStateDraft({
+    ...dataEdgeStateDraft.value,
+    definition: {
+      ...dataEdgeStateDraft.value.definition,
+      color: value,
+    },
+  });
+}
+
+function handleDataEdgeStateEditorTypeValue(value: string | number | boolean | undefined) {
+  if (typeof value !== "string" || !dataEdgeStateDraft.value) {
+    return;
+  }
+  syncDataEdgeStateDraft({
+    ...dataEdgeStateDraft.value,
+    definition: {
+      ...dataEdgeStateDraft.value.definition,
+      type: value,
+      value: defaultValueForStateType(value as StateFieldType),
+    },
+  });
+}
+
+function removeDataEdgeSourceBinding() {
+  if (!activeDataEdgeStateEditor.value) {
+    return;
+  }
+  emit("remove-port-state", {
+    nodeId: activeDataEdgeStateEditor.value.source,
+    side: "output",
+    stateKey: activeDataEdgeStateEditor.value.stateKey,
+  });
+  clearDataEdgeStateInteraction();
+}
+
+function removeDataEdgeTargetBinding() {
+  if (!activeDataEdgeStateEditor.value) {
+    return;
+  }
+  emit("remove-port-state", {
+    nodeId: activeDataEdgeStateEditor.value.target,
+    side: "input",
+    stateKey: activeDataEdgeStateEditor.value.stateKey,
+  });
+  clearDataEdgeStateInteraction();
+}
+
+function removeDataEdgeBindings() {
+  if (!activeDataEdgeStateEditor.value) {
+    return;
+  }
+
+  emit("remove-port-state", {
+    nodeId: activeDataEdgeStateEditor.value.source,
+    side: "output",
+    stateKey: activeDataEdgeStateEditor.value.stateKey,
+  });
+  emit("remove-port-state", {
+    nodeId: activeDataEdgeStateEditor.value.target,
+    side: "input",
+    stateKey: activeDataEdgeStateEditor.value.stateKey,
+  });
+  clearDataEdgeStateInteraction();
+}
 
 function nodeStyle(position: GraphPosition) {
   return {
@@ -657,6 +1123,7 @@ function handleCanvasPointerDown(event: PointerEvent) {
   event.preventDefault();
   window.getSelection()?.removeAllRanges();
   canvasRef.value?.setPointerCapture(event.pointerId);
+  clearCanvasTransientState();
   pendingConnection.value = null;
   pendingConnectionPoint.value = null;
   selectedEdgeId.value = null;
@@ -743,6 +1210,7 @@ function handleNodePointerDown(nodeId: string, event: PointerEvent) {
     return;
   }
   canvasRef.value?.focus();
+  clearCanvasTransientState();
   pendingConnection.value = null;
   pendingConnectionPoint.value = null;
   selectedEdgeId.value = null;
@@ -794,9 +1262,24 @@ function handleWheel(event: WheelEvent) {
   viewport.zoomBy(event.deltaY);
 }
 
-function handleEdgePointerDown(edge: ProjectedCanvasEdge) {
+function handleEdgePointerDown(edge: ProjectedCanvasEdge, event: PointerEvent) {
   canvasRef.value?.focus();
+  clearCanvasTransientState();
   pendingConnection.value = null;
+  if (edge.kind === "flow") {
+    pendingConnectionPoint.value = null;
+    selectedEdgeId.value = null;
+    selection.clearSelection();
+    startFlowEdgeDeleteConfirm(edge, event);
+    return;
+  }
+  if (edge.kind === "data") {
+    pendingConnectionPoint.value = null;
+    selectedEdgeId.value = null;
+    selection.clearSelection();
+    startDataEdgeStateConfirm(edge, event);
+    return;
+  }
   if (selectedEdgeId.value === edge.id) {
     selectedEdgeId.value = null;
     pendingConnectionPoint.value = null;
@@ -809,6 +1292,7 @@ function handleEdgePointerDown(edge: ProjectedCanvasEdge) {
 
 function handleAnchorPointerDown(anchor: ProjectedCanvasAnchor) {
   canvasRef.value?.focus();
+  clearCanvasTransientState();
   selection.selectNode(anchor.nodeId);
 
   if (
@@ -847,6 +1331,7 @@ function openCreationMenuFromPendingConnection(event: PointerEvent) {
   if (!activeConnection.value) {
     return;
   }
+  clearCanvasTransientState();
   const isStateCreationSource = activeConnection.value.sourceKind === "state-out";
   const isFlowCreationSource = activeConnection.value.sourceKind === "flow-out";
   const isRouteCreationSource = activeConnection.value.sourceKind === "route-out";
@@ -1157,6 +1642,149 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   pointer-events: none;
 }
 
+.editor-canvas__edge-delete-confirm {
+  position: absolute;
+  z-index: 12;
+  pointer-events: none;
+}
+
+.editor-canvas__edge-state-confirm {
+  position: absolute;
+  z-index: 12;
+  pointer-events: none;
+}
+
+.editor-canvas__confirm-hint {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-width: max-content;
+  padding: 5px 10px;
+  border: 1px solid rgba(185, 28, 28, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 248, 248, 0.98);
+  box-shadow: 0 10px 24px rgba(120, 53, 15, 0.12);
+  color: rgba(127, 29, 29, 0.9);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+.editor-canvas__confirm-hint--remove {
+  border-color: rgba(185, 28, 28, 0.16);
+  background: rgba(255, 248, 248, 0.98);
+  color: rgba(127, 29, 29, 0.9);
+}
+
+.editor-canvas__confirm-hint--state {
+  border-color: rgba(37, 99, 235, 0.16);
+  background: rgba(245, 249, 255, 0.98);
+  color: rgba(29, 78, 216, 0.92);
+}
+
+.editor-canvas__edge-delete-button {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(185, 28, 28, 0.2);
+  border-radius: 999px;
+  background: rgb(185, 28, 28);
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(120, 53, 15, 0.16);
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+}
+
+.editor-canvas__edge-delete-button :deep(.el-icon) {
+  font-size: 1rem;
+}
+
+.editor-canvas__edge-state-button {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(37, 99, 235, 0.18);
+  border-radius: 999px;
+  background: rgb(37, 99, 235);
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.18);
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+}
+
+.editor-canvas__edge-state-button :deep(.el-icon) {
+  font-size: 1rem;
+}
+
+.editor-canvas__edge-state-editor-shell {
+  position: absolute;
+  z-index: 12;
+  width: 320px;
+  display: grid;
+  gap: 10px;
+  transform: translate(-50%, calc(-100% - 18px));
+  pointer-events: auto;
+}
+
+.editor-canvas__edge-state-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.editor-canvas__edge-state-editor-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid rgba(185, 28, 28, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 248, 248, 0.96);
+  color: rgba(127, 29, 29, 0.92);
+  font-size: 0.76rem;
+  font-weight: 600;
+  box-shadow: 0 10px 20px rgba(120, 53, 15, 0.08);
+}
+
+.editor-canvas__edge-state-editor-action:hover {
+  border-color: rgba(185, 28, 28, 0.22);
+  background: rgba(255, 242, 242, 0.98);
+}
+
+.editor-canvas__edge-state-editor-action--danger {
+  width: 100%;
+  justify-content: center;
+  min-height: 38px;
+  margin-top: 2px;
+  border-color: rgba(185, 28, 28, 0.18);
+  background: rgba(255, 241, 241, 0.98);
+  color: rgba(127, 29, 29, 0.94);
+  font-size: 0.8rem;
+}
+
+.editor-canvas__edge-state-editor-action--danger:hover {
+  border-color: rgba(185, 28, 28, 0.28);
+  background: rgba(254, 226, 226, 0.98);
+}
+
 .editor-canvas__anchors {
   position: absolute;
   inset: 0;
@@ -1183,12 +1811,47 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   stroke-width: 4.6;
   stroke-linecap: round;
   stroke-linejoin: round;
-  pointer-events: stroke;
-  cursor: pointer;
+  pointer-events: none;
   transition:
     stroke 120ms ease,
     stroke-width 120ms ease,
     opacity 120ms ease;
+}
+
+.editor-canvas__edge-hitarea {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 18px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.editor-canvas__edge-delete-highlight {
+  fill: none;
+  stroke: rgba(201, 107, 31, 0.16);
+  stroke-width: 7px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+  transition:
+    stroke 120ms ease,
+    stroke-width 120ms ease,
+    opacity 120ms ease;
+}
+
+.editor-canvas__edge-delete-highlight--active {
+  stroke: rgba(220, 38, 38, 0.34);
+  stroke-width: 12px;
+}
+
+.editor-canvas__edge--flow {
+  stroke: rgba(201, 107, 31, 0.9);
+  stroke-width: 4.4;
+  stroke-dasharray: 18 22;
+  animation: editor-canvas-flow-line 1.8s linear infinite;
+  opacity: 0.94;
 }
 
 .editor-canvas__edge--route {
@@ -1212,6 +1875,13 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   pointer-events: none;
 }
 
+.editor-canvas__edge--preview.editor-canvas__edge--flow {
+  stroke: rgba(201, 107, 31, 0.76);
+  stroke-width: 3.8;
+  stroke-dasharray: 16 18;
+  animation: editor-canvas-flow-line 1.8s linear infinite;
+}
+
 .editor-canvas__edge--selected {
   stroke: rgba(37, 99, 235, 0.96);
   stroke-width: 3.4;
@@ -1232,6 +1902,16 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
 
   to {
     stroke-dashoffset: -20;
+  }
+}
+
+@keyframes editor-canvas-flow-line {
+  from {
+    stroke-dashoffset: 0;
+  }
+
+  to {
+    stroke-dashoffset: -40;
   }
 }
 

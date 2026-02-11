@@ -76,6 +76,7 @@
                 @update-input-state="updateStateField(tab.tabId, $event.stateKey, $event.patch)"
                 @rename-state="renameStateField(tab.tabId, $event.currentKey, $event.nextKey)"
                 @update-state="updateStateField(tab.tabId, $event.stateKey, $event.patch)"
+                @remove-port-state="removeNodePortStateForTab(tab.tabId, $event.nodeId, $event.side, $event.stateKey)"
                 @update-agent-config="updateAgentConfigForTab(tab.tabId, $event.nodeId, $event.patch)"
                 @update-condition-config="updateConditionConfigForTab(tab.tabId, $event.nodeId, $event.patch)"
                 @update-condition-branch="updateConditionBranchForTab(tab.tabId, $event.nodeId, $event.currentKey, $event.nextKey, $event.mappingKeys)"
@@ -195,6 +196,7 @@ import {
   removeConditionBranchFromDocument,
   removeFlowEdgeFromDocument,
   removeNodeFromDocument,
+  pruneUnreferencedStateSchemaInDocument,
   syncKnowledgeBaseSkillsInDocument,
   updateAgentNodeConfigInDocument,
   updateConditionBranchInDocument,
@@ -992,6 +994,21 @@ function bindNodePortStateForTab(tabId: string, nodeId: string, side: "input" | 
   focusNodeForTab(tabId, nodeId);
 }
 
+function removeNodePortStateForTab(tabId: string, nodeId: string, side: "input" | "output", stateKey: string) {
+  const document = documentsByTabId.value[tabId];
+  if (!document) {
+    return;
+  }
+
+  const nextDocument = removeStateBindingFromDocument(document, stateKey, nodeId, side === "input" ? "read" : "write");
+  if (nextDocument === document) {
+    return;
+  }
+
+  markDocumentDirty(tabId, nextDocument);
+  focusNodeForTab(tabId, nodeId);
+}
+
 function createNodePortStateForTab(tabId: string, nodeId: string, side: "input" | "output", field: StateFieldDraft) {
   const document = documentsByTabId.value[tabId];
   if (!document) {
@@ -1434,7 +1451,8 @@ async function saveTab(tabId: string) {
   }
 
   try {
-    const response = await saveGraph(document);
+    const documentToSave = pruneUnreferencedStateSchemaInDocument(document);
+    const response = await saveGraph(documentToSave);
     const savedGraph = await fetchGraph(response.graph_id);
     registerDocumentForTab(tabId, savedGraph);
 

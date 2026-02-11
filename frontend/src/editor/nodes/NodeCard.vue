@@ -229,7 +229,11 @@
         </ElSegmented>
         <div v-if="view.body.primaryOutput" class="node-card__port-pill-row node-card__port-pill-row--right">
           <ElPopover
-            :visible="isStateEditorOpen(`input-primary-output:${view.body.primaryOutput.key}`) || isStateEditorConfirmOpen(`input-primary-output:${view.body.primaryOutput.key}`)"
+            :visible="
+              isStateEditorOpen(`input-primary-output:${view.body.primaryOutput.key}`) ||
+              isStateEditorConfirmOpen(`input-primary-output:${view.body.primaryOutput.key}`) ||
+              isRemovePortStateConfirmOpen(`input-primary-output:${view.body.primaryOutput.key}`)
+            "
             :placement="isStateEditorOpen(`input-primary-output:${view.body.primaryOutput.key}`) ? 'bottom-end' : 'top-end'"
             :width="isStateEditorOpen(`input-primary-output:${view.body.primaryOutput.key}`) ? 320 : undefined"
             :show-arrow="false"
@@ -265,7 +269,13 @@
               </span>
             </template>
             <div
-              v-if="isStateEditorConfirmOpen(`input-primary-output:${view.body.primaryOutput.key}`)"
+              v-if="isRemovePortStateConfirmOpen(`input-primary-output:${view.body.primaryOutput.key}`)"
+              class="node-card__confirm-hint node-card__confirm-hint--remove"
+            >
+              Remove state?
+            </div>
+            <div
+              v-else-if="isStateEditorConfirmOpen(`input-primary-output:${view.body.primaryOutput.key}`)"
               class="node-card__confirm-hint node-card__confirm-hint--state"
             >
               Edit state?
@@ -405,7 +415,11 @@
         <div class="node-card__port-column">
           <div v-for="port in view.inputs" :key="port.key" class="node-card__port-pill-row">
             <ElPopover
-              :visible="isStateEditorOpen(`agent-input:${port.key}`) || isStateEditorConfirmOpen(`agent-input:${port.key}`)"
+              :visible="
+                isStateEditorOpen(`agent-input:${port.key}`) ||
+                isStateEditorConfirmOpen(`agent-input:${port.key}`) ||
+                isRemovePortStateConfirmOpen(`agent-input:${port.key}`)
+              "
               :placement="isStateEditorOpen(`agent-input:${port.key}`) ? 'bottom-start' : 'top-start'"
               :width="isStateEditorOpen(`agent-input:${port.key}`) ? 320 : undefined"
               :show-arrow="false"
@@ -414,7 +428,7 @@
             >
               <template #reference>
                 <span
-                  class="node-card__port-pill node-card__port-pill--input node-card__port-pill--dock-start"
+                  class="node-card__port-pill node-card__port-pill--input node-card__port-pill--dock-start node-card__port-pill--removable"
                   :class="{
                     'node-card__port-pill--revealed': isStateEditorPillRevealed(`agent-input:${port.key}`),
                     'node-card__port-pill--confirm': isStateEditorConfirmOpen(`agent-input:${port.key}`),
@@ -438,9 +452,21 @@
                     <span class="node-card__port-pill-label-text">{{ port.label }}</span>
                     <ElIcon class="node-card__port-pill-confirm-icon"><Check /></ElIcon>
                   </span>
+                  <button
+                    type="button"
+                    class="node-card__port-pill-remove node-card__port-pill-remove--trailing"
+                    :class="{ 'node-card__port-pill-remove--confirm': isRemovePortStateConfirmOpen(`agent-input:${port.key}`) }"
+                    aria-label="Remove state binding"
+                    @pointerdown.stop
+                    @click.stop="handleRemovePortStateClick(`agent-input:${port.key}`, 'input', port.key)"
+                  >
+                    <ElIcon v-if="isRemovePortStateConfirmOpen(`agent-input:${port.key}`)"><Check /></ElIcon>
+                    <ElIcon v-else><Delete /></ElIcon>
+                  </button>
                 </span>
               </template>
-              <div v-if="isStateEditorConfirmOpen(`agent-input:${port.key}`)" class="node-card__confirm-hint node-card__confirm-hint--state">Edit state?</div>
+              <div v-if="isRemovePortStateConfirmOpen(`agent-input:${port.key}`)" class="node-card__confirm-hint node-card__confirm-hint--remove">Remove state?</div>
+              <div v-else-if="isStateEditorConfirmOpen(`agent-input:${port.key}`)" class="node-card__confirm-hint node-card__confirm-hint--state">Edit state?</div>
               <StateEditorPopover
                 v-else-if="stateEditorDraft"
                 class="node-card__state-editor"
@@ -460,7 +486,11 @@
         <div class="node-card__port-column node-card__port-column--right">
           <div v-for="port in view.outputs" :key="port.key" class="node-card__port-pill-row node-card__port-pill-row--right">
             <ElPopover
-              :visible="isStateEditorOpen(`agent-output:${port.key}`) || isStateEditorConfirmOpen(`agent-output:${port.key}`)"
+              :visible="
+                isStateEditorOpen(`agent-output:${port.key}`) ||
+                isStateEditorConfirmOpen(`agent-output:${port.key}`) ||
+                isRemovePortStateConfirmOpen(`agent-output:${port.key}`)
+              "
               :placement="isStateEditorOpen(`agent-output:${port.key}`) ? 'bottom-end' : 'top-end'"
               :width="isStateEditorOpen(`agent-output:${port.key}`) ? 320 : undefined"
               :show-arrow="false"
@@ -469,7 +499,7 @@
             >
               <template #reference>
                 <span
-                  class="node-card__port-pill node-card__port-pill--output node-card__port-pill--dock-end"
+                  class="node-card__port-pill node-card__port-pill--output node-card__port-pill--dock-end node-card__port-pill--removable"
                   :class="{
                     'node-card__port-pill--revealed': isStateEditorPillRevealed(`agent-output:${port.key}`),
                     'node-card__port-pill--confirm': isStateEditorConfirmOpen(`agent-output:${port.key}`),
@@ -481,6 +511,17 @@
                   @pointerdown.stop
                   @click.stop="handleStateEditorActionClick(`agent-output:${port.key}`, port.key)"
                 >
+                  <button
+                    type="button"
+                    class="node-card__port-pill-remove node-card__port-pill-remove--leading"
+                    :class="{ 'node-card__port-pill-remove--confirm': isRemovePortStateConfirmOpen(`agent-output:${port.key}`) }"
+                    aria-label="Remove state binding"
+                    @pointerdown.stop
+                    @click.stop="handleRemovePortStateClick(`agent-output:${port.key}`, 'output', port.key)"
+                  >
+                    <ElIcon v-if="isRemovePortStateConfirmOpen(`agent-output:${port.key}`)"><Check /></ElIcon>
+                    <ElIcon v-else><Delete /></ElIcon>
+                  </button>
                   <span
                     class="node-card__port-pill-label"
                     :class="{ 'node-card__port-pill-label--confirm': isStateEditorConfirmOpen(`agent-output:${port.key}`) }"
@@ -493,9 +534,10 @@
                     :data-anchor-slot-id="`${nodeId}:state-out:${port.key}`"
                     aria-hidden="true"
                   />
-                </span>
-              </template>
-              <div v-if="isStateEditorConfirmOpen(`agent-output:${port.key}`)" class="node-card__confirm-hint node-card__confirm-hint--state">Edit state?</div>
+              </span>
+            </template>
+              <div v-if="isRemovePortStateConfirmOpen(`agent-output:${port.key}`)" class="node-card__confirm-hint node-card__confirm-hint--remove">Remove state?</div>
+              <div v-else-if="isStateEditorConfirmOpen(`agent-output:${port.key}`)" class="node-card__confirm-hint node-card__confirm-hint--state">Edit state?</div>
               <StateEditorPopover
                 v-else-if="stateEditorDraft"
                 class="node-card__state-editor"
@@ -853,7 +895,11 @@
         <div class="node-card__port-column">
           <div v-for="port in view.inputs" :key="port.key" class="node-card__port-pill-row">
             <ElPopover
-              :visible="isStateEditorOpen(`condition-input:${port.key}`) || isStateEditorConfirmOpen(`condition-input:${port.key}`)"
+              :visible="
+                isStateEditorOpen(`condition-input:${port.key}`) ||
+                isStateEditorConfirmOpen(`condition-input:${port.key}`) ||
+                isRemovePortStateConfirmOpen(`condition-input:${port.key}`)
+              "
               :placement="isStateEditorOpen(`condition-input:${port.key}`) ? 'bottom-start' : 'top-start'"
               :width="isStateEditorOpen(`condition-input:${port.key}`) ? 320 : undefined"
               :show-arrow="false"
@@ -862,7 +908,7 @@
             >
               <template #reference>
                 <span
-                  class="node-card__port-pill node-card__port-pill--input node-card__port-pill--dock-start"
+                  class="node-card__port-pill node-card__port-pill--input node-card__port-pill--dock-start node-card__port-pill--removable"
                   :class="{
                     'node-card__port-pill--revealed': isStateEditorPillRevealed(`condition-input:${port.key}`),
                     'node-card__port-pill--confirm': isStateEditorConfirmOpen(`condition-input:${port.key}`),
@@ -886,9 +932,21 @@
                     <span class="node-card__port-pill-label-text">{{ port.label }}</span>
                     <ElIcon class="node-card__port-pill-confirm-icon"><Check /></ElIcon>
                   </span>
+                  <button
+                    type="button"
+                    class="node-card__port-pill-remove node-card__port-pill-remove--trailing"
+                    :class="{ 'node-card__port-pill-remove--confirm': isRemovePortStateConfirmOpen(`condition-input:${port.key}`) }"
+                    aria-label="Remove state binding"
+                    @pointerdown.stop
+                    @click.stop="handleRemovePortStateClick(`condition-input:${port.key}`, 'input', port.key)"
+                  >
+                    <ElIcon v-if="isRemovePortStateConfirmOpen(`condition-input:${port.key}`)"><Check /></ElIcon>
+                    <ElIcon v-else><Delete /></ElIcon>
+                  </button>
                 </span>
               </template>
-              <div v-if="isStateEditorConfirmOpen(`condition-input:${port.key}`)" class="node-card__confirm-hint node-card__confirm-hint--state">Edit state?</div>
+              <div v-if="isRemovePortStateConfirmOpen(`condition-input:${port.key}`)" class="node-card__confirm-hint node-card__confirm-hint--remove">Remove state?</div>
+              <div v-else-if="isStateEditorConfirmOpen(`condition-input:${port.key}`)" class="node-card__confirm-hint node-card__confirm-hint--state">Edit state?</div>
               <StateEditorPopover
                 v-else-if="stateEditorDraft"
                 class="node-card__state-editor"
@@ -1094,6 +1152,7 @@ const emit = defineEmits<{
   (event: "update-input-state", payload: { stateKey: string; patch: Partial<StateDefinition> }): void;
   (event: "rename-state", payload: { currentKey: string; nextKey: string }): void;
   (event: "update-state", payload: { stateKey: string; patch: Partial<StateDefinition> }): void;
+  (event: "remove-port-state", payload: { nodeId: string; side: "input" | "output"; stateKey: string }): void;
   (event: "update-output-config", payload: { nodeId: string; patch: Partial<OutputNode["config"]> }): void;
   (event: "update-agent-config", payload: { nodeId: string; patch: Partial<AgentNode["config"]> }): void;
   (event: "update-condition-config", payload: { nodeId: string; patch: Partial<ConditionNode["config"]> }): void;
@@ -1187,8 +1246,10 @@ const descriptionEditorDraft = ref("");
 const titleEditorInputRef = ref<{ focus?: () => void } | null>(null);
 const descriptionEditorInputRef = ref<{ focus?: () => void } | null>(null);
 const activeStateEditorConfirmAnchorId = ref<string | null>(null);
+const activeRemovePortStateConfirmAnchorId = ref<string | null>(null);
 const hoveredStateEditorPillAnchorId = ref<string | null>(null);
 const stateEditorConfirmTimeoutRef = ref<number | null>(null);
+const removePortStateConfirmTimeoutRef = ref<number | null>(null);
 const activeStateEditorAnchorId = ref<string | null>(null);
 const stateEditorDraft = ref<StateFieldDraft | null>(null);
 const stateEditorError = ref<string | null>(null);
@@ -1383,6 +1444,7 @@ const hasFloatingPanelOpen = computed(
     activeTextEditorConfirmField.value !== null ||
     activeTextEditor.value !== null ||
     activeStateEditorConfirmAnchorId.value !== null ||
+    activeRemovePortStateConfirmAnchorId.value !== null ||
     activeStateEditorAnchorId.value !== null ||
     activePortPickerSide.value !== null ||
     isSkillPickerOpen.value,
@@ -1421,6 +1483,7 @@ watch(
     clearTextEditorConfirmState();
     hoveredStateEditorPillAnchorId.value = null;
     clearStateEditorConfirmState();
+    clearRemovePortStateConfirmState();
     closeStateEditor();
   },
 );
@@ -1430,6 +1493,7 @@ onBeforeUnmount(() => {
   clearTopActionTimeout();
   clearTextEditorConfirmTimeout();
   clearStateEditorConfirmTimeout();
+  clearRemovePortStateConfirmTimeout();
 });
 
 onMounted(() => {
@@ -1563,6 +1627,7 @@ function toggleSkillPicker() {
   activeTopAction.value = null;
   clearTextEditorConfirmState();
   clearStateEditorConfirmState();
+  clearRemovePortStateConfirmState();
   commitOpenTextEditorIfNeeded();
   closeStateEditor();
   activePortPickerSide.value = null;
@@ -1592,6 +1657,7 @@ function openPortPicker(side: "input" | "output") {
   activeTopAction.value = null;
   clearTextEditorConfirmState();
   clearStateEditorConfirmState();
+  clearRemovePortStateConfirmState();
   commitOpenTextEditorIfNeeded();
   closeStateEditor();
   isSkillPickerOpen.value = false;
@@ -1841,6 +1907,7 @@ function handleTextEditorAction(field: TextEditorField) {
   }
   const wasConfirmOpen = isTextEditorConfirmOpen(field);
   clearTextEditorConfirmState();
+  clearRemovePortStateConfirmState();
   if (wasConfirmOpen) {
     openTextEditor(field);
     return;
@@ -1854,6 +1921,7 @@ function openTextEditor(field: TextEditorField) {
   activeTopAction.value = null;
   clearTextEditorConfirmState();
   clearStateEditorConfirmState();
+  clearRemovePortStateConfirmState();
   closeStateEditor();
   closePortPicker();
   isSkillPickerOpen.value = false;
@@ -1906,6 +1974,29 @@ function clearStateEditorConfirmState() {
   activeStateEditorConfirmAnchorId.value = null;
 }
 
+function clearRemovePortStateConfirmTimeout() {
+  if (removePortStateConfirmTimeoutRef.value !== null) {
+    window.clearTimeout(removePortStateConfirmTimeoutRef.value);
+    removePortStateConfirmTimeoutRef.value = null;
+  }
+}
+
+function clearRemovePortStateConfirmState() {
+  clearRemovePortStateConfirmTimeout();
+  activeRemovePortStateConfirmAnchorId.value = null;
+}
+
+function startRemovePortStateConfirmWindow(anchorId: string) {
+  clearRemovePortStateConfirmTimeout();
+  activeRemovePortStateConfirmAnchorId.value = anchorId;
+  removePortStateConfirmTimeoutRef.value = window.setTimeout(() => {
+    removePortStateConfirmTimeoutRef.value = null;
+    if (activeRemovePortStateConfirmAnchorId.value === anchorId) {
+      activeRemovePortStateConfirmAnchorId.value = null;
+    }
+  }, 2000);
+}
+
 function startStateEditorConfirmWindow(anchorId: string) {
   clearStateEditorConfirmTimeout();
   activeStateEditorConfirmAnchorId.value = anchorId;
@@ -1925,8 +2016,17 @@ function isStateEditorConfirmOpen(anchorId: string) {
   return activeStateEditorConfirmAnchorId.value === anchorId;
 }
 
+function isRemovePortStateConfirmOpen(anchorId: string) {
+  return activeRemovePortStateConfirmAnchorId.value === anchorId;
+}
+
 function isStateEditorPillRevealed(anchorId: string) {
-  return hoveredStateEditorPillAnchorId.value === anchorId || isStateEditorOpen(anchorId) || isStateEditorConfirmOpen(anchorId);
+  return (
+    hoveredStateEditorPillAnchorId.value === anchorId ||
+    isStateEditorOpen(anchorId) ||
+    isStateEditorConfirmOpen(anchorId) ||
+    isRemovePortStateConfirmOpen(anchorId)
+  );
 }
 
 function handleStateEditorPillPointerEnter(anchorId: string) {
@@ -1946,6 +2046,7 @@ function handleStateEditorActionClick(anchorId: string, stateKey: string | null 
   if (isStateEditorOpen(anchorId)) {
     return;
   }
+  clearRemovePortStateConfirmState();
   if (activeStateEditorConfirmAnchorId.value === anchorId) {
     clearStateEditorConfirmState();
     openStateEditor(anchorId, stateKey);
@@ -1953,6 +2054,25 @@ function handleStateEditorActionClick(anchorId: string, stateKey: string | null 
   }
   closeStateEditor();
   startStateEditorConfirmWindow(anchorId);
+}
+
+function handleRemovePortStateClick(anchorId: string, side: "input" | "output", stateKey: string | null | undefined) {
+  if (!stateKey) {
+    return;
+  }
+  clearStateEditorConfirmState();
+  if (activeRemovePortStateConfirmAnchorId.value === anchorId) {
+    clearRemovePortStateConfirmState();
+    closeStateEditor();
+    emit("remove-port-state", {
+      nodeId: props.nodeId,
+      side,
+      stateKey,
+    });
+    return;
+  }
+  closeStateEditor();
+  startRemovePortStateConfirmWindow(anchorId);
 }
 
 function openStateEditor(anchorId: string, stateKey: string | null | undefined) {
@@ -1967,6 +2087,7 @@ function openStateEditor(anchorId: string, stateKey: string | null | undefined) 
   activeTopAction.value = null;
   clearTextEditorConfirmState();
   clearStateEditorConfirmState();
+  clearRemovePortStateConfirmState();
   commitOpenTextEditorIfNeeded();
   activePortPickerSide.value = null;
   isSkillPickerOpen.value = false;
@@ -2092,6 +2213,7 @@ function toggleAdvancedPanel() {
   clearTopActionConfirmState();
   clearTextEditorConfirmState();
   clearStateEditorConfirmState();
+  clearRemovePortStateConfirmState();
   isSkillPickerOpen.value = false;
   closePortPicker();
   closeStateEditor();
@@ -2129,6 +2251,7 @@ function closeFloatingPanels(options?: { commitTextEditor?: boolean }) {
   clearTopActionConfirmState();
   clearTextEditorConfirmState();
   clearStateEditorConfirmState();
+  clearRemovePortStateConfirmState();
   if (activeTopAction.value === "advanced") {
     activeTopAction.value = null;
   }
@@ -2208,6 +2331,7 @@ function handlePresetActionClick() {
   closeStateEditor();
   clearTextEditorConfirmState();
   clearStateEditorConfirmState();
+  clearRemovePortStateConfirmState();
   commitOpenTextEditorIfNeeded();
   if (activeTopAction.value === "preset") {
     confirmSavePreset();
@@ -2222,6 +2346,7 @@ function handleDeleteActionClick() {
   closeStateEditor();
   clearTextEditorConfirmState();
   clearStateEditorConfirmState();
+  clearRemovePortStateConfirmState();
   commitOpenTextEditorIfNeeded();
   if (activeTopAction.value === "delete") {
     confirmDeleteNode();
@@ -2942,6 +3067,14 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
   color: #1f2937;
 }
 
+.node-card__port-pill--removable.node-card__port-pill--input {
+  padding-right: 39px;
+}
+
+.node-card__port-pill--removable.node-card__port-pill--output {
+  padding-left: 39px;
+}
+
 .node-card__port-pill--dock-start {
   margin-left: calc(var(--node-card-inline-padding) * -1 - 10px);
 }
@@ -2959,6 +3092,64 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
 
 .node-card__port-pill--confirm .node-card__port-pill-anchor-slot {
   opacity: 0;
+}
+
+.node-card__port-pill-remove {
+  position: absolute;
+  top: 50%;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(154, 52, 18, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 250, 241, 0.88);
+  color: rgba(154, 52, 18, 0.74);
+  opacity: 0;
+  pointer-events: none;
+  appearance: none;
+  transform: translateY(-50%);
+  transition:
+    opacity 140ms ease,
+    border-color 140ms ease,
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.node-card__port-pill-remove--leading {
+  left: 7px;
+}
+
+.node-card__port-pill-remove--trailing {
+  right: 7px;
+}
+
+.node-card__port-pill--revealed .node-card__port-pill-remove,
+.node-card__port-pill:focus-visible .node-card__port-pill-remove {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.node-card__port-pill-remove:hover,
+.node-card__port-pill-remove:focus-visible {
+  border-color: rgba(185, 28, 28, 0.24);
+  background: rgba(254, 242, 242, 0.98);
+  color: rgba(185, 28, 28, 0.88);
+}
+
+.node-card__port-pill-remove--confirm,
+.node-card__port-pill-remove--confirm:hover,
+.node-card__port-pill-remove--confirm:focus-visible {
+  border-color: rgba(185, 28, 28, 0.28);
+  background: rgb(185, 28, 28);
+  color: #fff;
+}
+
+.node-card__port-pill--confirm .node-card__port-pill-remove {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .node-card__port-pill-label {
@@ -3467,6 +3658,12 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
   border-color: rgba(37, 99, 235, 0.16);
   background: rgba(239, 246, 255, 0.98);
   color: rgb(37, 99, 235);
+}
+
+.node-card__confirm-hint--remove {
+  border-color: rgba(185, 28, 28, 0.16);
+  background: rgba(255, 248, 248, 0.98);
+  color: rgb(153, 27, 27);
 }
 
 .node-card__confirm-hint--text {

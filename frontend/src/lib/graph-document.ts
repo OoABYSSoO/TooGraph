@@ -37,6 +37,31 @@ export function createEmptyDraftGraph(name = "Untitled Graph"): GraphPayload {
   };
 }
 
+export function pruneUnreferencedStateSchemaInDocument<T extends GraphPayload | GraphDocument>(document: T): T {
+  const referencedStateKeys = new Set<string>();
+
+  for (const node of Object.values(document.nodes)) {
+    for (const binding of node.reads) {
+      referencedStateKeys.add(binding.state);
+    }
+    for (const binding of node.writes) {
+      referencedStateKeys.add(binding.state);
+    }
+    if (node.kind === "condition" && node.config.rule.source) {
+      referencedStateKeys.add(node.config.rule.source);
+    }
+  }
+
+  const nextStateEntries = Object.entries(document.state_schema).filter(([stateKey]) => referencedStateKeys.has(stateKey));
+  if (nextStateEntries.length === Object.keys(document.state_schema).length) {
+    return document;
+  }
+
+  const nextDocument = cloneGraphDocument(document);
+  nextDocument.state_schema = Object.fromEntries(nextStateEntries);
+  return nextDocument;
+}
+
 export function cloneGraphDocument<T extends GraphPayload | GraphDocument>(document: T): T {
   return structuredClone(normalizeCloneValue(document));
 }
