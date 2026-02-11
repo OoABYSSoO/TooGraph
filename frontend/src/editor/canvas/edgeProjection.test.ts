@@ -86,8 +86,32 @@ test("projectCanvasEdges creates projected flow edges from graph edges", () => {
       { id: "data:answer_helper:answer->output_answer", kind: "data", source: "answer_helper", target: "output_answer", state: "answer" },
     ],
   );
-  assert.match(projected[0]!.path, /^M .* L .* C .* L /);
-  assert.match(projected[1]!.path, /^M .* L .* C .* L /);
+  assert.equal(
+    projected[0]!.path,
+    buildSequenceFlowPath({
+      sourceX: 534,
+      sourceY: 254,
+      targetX: 526,
+      targetY: 254,
+      sourceNodeX: 80,
+      sourceNodeY: 220,
+      targetNodeX: 520,
+      targetNodeY: 220,
+    }),
+  );
+  assert.equal(
+    projected[1]!.path,
+    buildSequenceFlowPath({
+      sourceX: 974,
+      sourceY: 254,
+      targetX: 986,
+      targetY: 254,
+      sourceNodeX: 520,
+      sourceNodeY: 220,
+      targetNodeX: 980,
+      targetNodeY: 220,
+    }),
+  );
 });
 
 test("projectCanvasAnchors returns flow and state dots for visible nodes", () => {

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import type { GraphPayload } from "../../types/node-system.ts";
 import { resolveCanvasLayout } from "./resolvedCanvasLayout.ts";
+import { buildSequenceFlowPath } from "./flowEdgePath.ts";
 
 const graph: GraphPayload = {
   graph_id: null,
@@ -92,7 +93,19 @@ test("resolveCanvasLayout prefers measured output slot offsets over formula-base
     },
   );
   assert.match(dataEdge?.path ?? "", /^M 472 361 C /);
-  assert.match(flowEdge?.path ?? "", /^M 534 254 L .* C .* L /);
+  assert.equal(
+    flowEdge?.path ?? "",
+    buildSequenceFlowPath({
+      sourceX: 534,
+      sourceY: 254,
+      targetX: 526,
+      targetY: 254,
+      sourceNodeX: 80,
+      sourceNodeY: 220,
+      targetNodeX: 520,
+      targetNodeY: 220,
+    }),
+  );
 });
 
 test("resolveCanvasLayout also uses measured flow anchor offsets for card-to-card flow edges", () => {
@@ -109,5 +122,17 @@ test("resolveCanvasLayout also uses measured flow anchor offsets for card-to-car
 
   const flowEdge = layout.edges.find((edge) => edge.id === "flow:input_question->answer_helper");
 
-  assert.match(flowEdge?.path ?? "", /^M 540 330 L .* C .* L /);
+  assert.equal(
+    flowEdge?.path ?? "",
+    buildSequenceFlowPath({
+      sourceX: 540,
+      sourceY: 330,
+      targetX: 520,
+      targetY: 330,
+      sourceNodeX: 80,
+      sourceNodeY: 220,
+      targetNodeX: 520,
+      targetNodeY: 220,
+    }),
+  );
 });

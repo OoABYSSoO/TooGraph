@@ -15,8 +15,20 @@ test("buildSequenceFlowPath keeps downstream targets on a bezier middle segment 
   );
 });
 
-test("buildSequenceFlowPath uses node positions to avoid misrouting close downstream cards", () => {
-  assert.match(
+test("buildSequenceFlowPath keeps the normal rightward path while the real target anchor is still to the right", () => {
+  assert.equal(
+    buildSequenceFlowPath({
+      sourceX: 552,
+      sourceY: 254,
+      targetX: 596,
+      targetY: 254,
+    }),
+    "M 552 254 C 574 254 574 254 596 254",
+  );
+});
+
+test("buildSequenceFlowPath switches to the return path once the real target anchor moves left of the source anchor", () => {
+  assert.equal(
     buildSequenceFlowPath({
       sourceX: 534,
       sourceY: 254,
@@ -25,7 +37,20 @@ test("buildSequenceFlowPath uses node positions to avoid misrouting close downst
       sourceNodeX: 80,
       targetNodeX: 520,
     }),
-    /^M 534 254(?: L .*?)? C .*$/,
+    [
+      "M 534 254",
+      "L 562 254",
+      "L 588 254",
+      "Q 606 254 606 236",
+      "L 606 112",
+      "Q 606 94 588 94",
+      "L 472 94",
+      "Q 454 94 454 112",
+      "L 454 236",
+      "Q 454 254 472 254",
+      "L 498 254",
+      "L 526 254",
+    ].join(" "),
   );
 });
 
@@ -124,6 +149,57 @@ test("buildSequenceFlowPath staggers upstream source exits and target entries be
       "Q 114 180 132 180",
       "L 172 180",
       "L 200 180",
+    ].join(" "),
+  );
+});
+
+test("buildSequenceFlowPath keeps the return descent outside the source corridor for lower right targets", () => {
+  assert.equal(
+    buildSequenceFlowPath({
+      sourceX: 552,
+      sourceY: 332,
+      targetX: 523,
+      targetY: 738,
+      sourceNodeX: 80,
+      targetNodeX: 520,
+    }),
+    [
+      "M 552 332",
+      "L 580 332",
+      "L 606 332",
+      "Q 624 332 624 314",
+      "L 624 172",
+      "L 624 720",
+      "Q 624 738 606 738",
+      "L 495 738",
+      "L 523 738",
+    ].join(" "),
+  );
+});
+
+test("buildSequenceFlowPath keeps true leftward targets on the target-side drop rail even when they sit lower", () => {
+  assert.equal(
+    buildSequenceFlowPath({
+      sourceX: 1286,
+      sourceY: 362,
+      targetX: 636,
+      targetY: 529,
+      sourceNodeX: 780,
+      targetNodeX: 120,
+    }),
+    [
+      "M 1286 362",
+      "L 1314 362",
+      "L 1340 362",
+      "Q 1358 362 1358 344",
+      "L 1358 220",
+      "Q 1358 202 1340 202",
+      "L 582 202",
+      "Q 564 202 564 220",
+      "L 564 511",
+      "Q 564 529 582 529",
+      "L 608 529",
+      "L 636 529",
     ].join(" "),
   );
 });
