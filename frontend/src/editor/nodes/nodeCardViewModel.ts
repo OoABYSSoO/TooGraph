@@ -76,6 +76,7 @@ export type NodeCardViewModel = {
     | {
         kind: "output";
         previewTitle: string;
+        displayMode: string;
         displayModeLabel: string;
         persistFormatLabel: string;
         connectedStateKey: string | null;
@@ -183,10 +184,12 @@ function buildBody(
 
   const connectedState = inputs[0]?.key ?? null;
   const runtime = options.runtime;
+  const displayMode = runtime?.outputDisplayMode?.trim() || node.config.displayMode;
   return {
     kind: "output",
     previewTitle: "Preview",
-    displayModeLabel: formatOutputDisplayModeLabel(runtime?.outputDisplayMode?.trim() || node.config.displayMode),
+    displayMode,
+    displayModeLabel: formatOutputDisplayModeLabel(displayMode),
     persistFormatLabel: formatOutputPersistFormatLabel(node.config.persistFormat),
     connectedStateKey: connectedState,
     connectedStateLabel: connectedState ? getStateLabel(connectedState, stateSchema) : null,
@@ -246,9 +249,13 @@ function resolveOutputPreviewText(input: {
     return "Latest run completed, but this output did not produce a value.";
   }
   if (input.connectedState) {
-    return stringifyValue(input.stateSchema[input.connectedState]?.value ?? "");
+    const stateValueText = stringifyValue(input.stateSchema[input.connectedState]?.value ?? "");
+    if (stateValueText.trim()) {
+      return stateValueText;
+    }
+    return `Connected to ${getStateLabel(input.connectedState, input.stateSchema)}. Run the graph to preview/export it.`;
   }
-  return "Connect a state to preview output.";
+  return "Connect an upstream output to preview/export it.";
 }
 
 function resolveInputEditorModel(node: Extract<GraphNode, { kind: "input" }>, stateSchema: Record<string, StateDefinition>) {

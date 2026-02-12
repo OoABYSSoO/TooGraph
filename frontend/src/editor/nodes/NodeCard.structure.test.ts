@@ -482,6 +482,24 @@ test("NodeCard declares top-action and state-edit events for canvas forwarding",
   assert.match(componentSource, /\(event: "save-node-preset", payload: \{ nodeId: string \}\): void;/);
 });
 
+test("NodeCard renders output previews through a rich content presenter while keeping Advanced in the top popover", () => {
+  const outputSectionMatch = componentSource.match(
+    /<section v-else-if="view\.body\.kind === 'output'"[\s\S]*?<\/section>/,
+  );
+  assert.ok(outputSectionMatch, "expected to find the output node section");
+  const outputSection = outputSectionMatch[0];
+
+  assert.match(componentSource, /import \{ resolveOutputPreviewContent \} from "\.\/outputPreviewContentModel";/);
+  assert.match(componentSource, /const outputPreviewContent = computed\(/);
+  assert.match(outputSection, /node-card__preview--markdown/);
+  assert.match(outputSection, /v-html="outputPreviewContent\.html"/);
+  assert.match(outputSection, /node-card__preview--json/);
+  assert.match(outputSection, /<pre v-else class="node-card__preview-text">\{\{ outputPreviewContent\.text \}\}<\/pre>/);
+  assert.match(outputSection, /node-card__preview--empty/);
+  assert.doesNotMatch(outputSection, /Connected to \$\{view\.body\.connectedStateLabel/);
+  assert.match(componentSource, /view\.body\.kind === 'output' \? 340 : 280/);
+});
+
 test("NodeCard closes floating panels on focus loss and keeps popup surfaces on the warm theme", () => {
   assert.match(componentSource, /import \{ computed, nextTick, onBeforeUnmount, onMounted, ref, watch \} from "vue";/);
   assert.match(componentSource, /const hasFloatingPanelOpen = computed\(/);

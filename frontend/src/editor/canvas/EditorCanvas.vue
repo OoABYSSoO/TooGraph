@@ -264,6 +264,14 @@
         />
       </svg>
     </div>
+    <EditorMinimap
+      class="editor-canvas__minimap"
+      :nodes="minimapNodes"
+      :edges="minimapEdges"
+      :viewport="viewport.viewport"
+      :canvas-size="canvasSize"
+      @center-view="handleMinimapCenterView"
+    />
   </section>
 </template>
 
@@ -272,6 +280,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, toRef, watch } fro
 import { Check, Delete } from "@element-plus/icons-vue";
 
 import { buildAnchorModel } from "@/editor/anchors/anchorModel";
+import EditorMinimap from "./EditorMinimap.vue";
 import NodeCard from "@/editor/nodes/NodeCard.vue";
 import StateEditorPopover from "@/editor/nodes/StateEditorPopover.vue";
 import { type ProjectedCanvasAnchor, type ProjectedCanvasEdge } from "@/editor/canvas/edgeProjection";
@@ -291,11 +300,12 @@ import {
 } from "@/editor/workspace/statePanelFields";
 import { canCompleteGraphConnection, canStartGraphConnection, type PendingGraphConnection } from "@/lib/graph-connections";
 import { resolveFocusedViewport } from "@/editor/canvas/focusNodeViewport";
+import { resolveViewportForMinimapCenter } from "./minimapModel";
 import { useNodeSelectionFocus, type NodeFocusRequest } from "./useNodeSelectionFocus";
 import { useViewport } from "./useViewport";
 import type { KnowledgeBaseRecord } from "@/types/knowledge";
 import type { SkillDefinition } from "@/types/skills";
-import type { AgentNode, ConditionNode, GraphDocument, GraphPayload, GraphPosition, InputNode, OutputNode, StateDefinition } from "@/types/node-system";
+import type { AgentNode, ConditionNode, GraphDocument, GraphNode, GraphPayload, GraphPosition, InputNode, OutputNode, StateDefinition } from "@/types/node-system";
 
 const props = defineProps<{
   document: GraphPayload | GraphDocument;
@@ -351,6 +361,12 @@ const nodeElementMap = new Map<string, HTMLElement>();
 const nodeResizeObserverMap = new Map<string, ResizeObserver>();
 const nodeMutationObserverMap = new Map<string, MutationObserver>();
 const measuredAnchorOffsets = ref<Record<string, MeasuredAnchorOffset>>({});
+type MeasuredNodeSize = {
+  width: number;
+  height: number;
+};
+const measuredNodeSizes = ref<Record<string, MeasuredNodeSize>>({});
+const canvasSize = ref({ width: 0, height: 0 });
 const viewport = useViewport();
 const selection = useNodeSelectionFocus({
   externalSelectedNodeId: toRef(props, "selectedNodeId"),
@@ -411,8 +427,33 @@ const hoveredNodeId = ref<string | null>(null);
 const hoveredFlowHandleNodeId = ref<string | null>(null);
 const pendingAnchorMeasurementNodeIds = new Set<string>();
 let scheduledAnchorMeasurementFrame: number | null = null;
+let canvasResizeObserver: ResizeObserver | null = null;
 
 const nodeEntries = computed(() => Object.entries(props.document.nodes));
+const minimapNodes = computed(() =>
+  nodeEntries.value.map(([nodeId, node]) => {
+    const measuredSize = measuredNodeSizes.value[nodeId];
+    const fallbackSize = resolveFallbackNodeSize(node);
+    return {
+      id: nodeId,
+      kind: node.kind,
+      x: node.ui.position.x,
+      y: node.ui.position.y,
+      width: measuredSize?.width ?? fallbackSize.width,
+      height: measuredSize?.height ?? fallbackSize.height,
+      selected: selection.selectedNodeId.value === nodeId,
+      runState: resolveMinimapRunState(props.runNodeStatusByNodeId?.[nodeId]),
+    };
+  }),
+);
+const minimapEdges = computed(() =>
+  projectedEdges.value.map((edge) => ({
+    id: edge.id,
+    kind: edge.kind,
+    path: edge.path,
+    color: edge.kind === "route" ? resolveRouteHandlePalette(edge.branch).accent : edge.color,
+  })),
+);
 const conditionRouteTargetsByNodeId = computed(() =>
   Object.fromEntries(
     Object.entries(props.document.nodes)
@@ -617,6 +658,8 @@ watch(projectedEdges, (edges) => {
 });
 
 onMounted(() => {
+  updateCanvasSize();
+  attachCanvasResizeObserver();
   scheduleAnchorMeasurement();
 });
 
@@ -636,9 +679,39 @@ onBeforeUnmount(() => {
     scheduledAnchorMeasurementFrame = null;
   }
 
+  canvasResizeObserver?.disconnect();
+  canvasResizeObserver = null;
+
   clearFlowEdgeDeleteConfirmState();
   clearDataEdgeStateInteraction();
 });
+
+function updateCanvasSize() {
+  const element = canvasRef.value;
+  if (!element) {
+    return;
+  }
+
+  const nextSize = {
+    width: element.clientWidth,
+    height: element.clientHeight,
+  };
+  if (canvasSize.value.width !== nextSize.width || canvasSize.value.height !== nextSize.height) {
+    canvasSize.value = nextSize;
+  }
+}
+
+function attachCanvasResizeObserver() {
+  if (typeof ResizeObserver === "undefined" || !canvasRef.value) {
+    return;
+  }
+
+  canvasResizeObserver?.disconnect();
+  canvasResizeObserver = new ResizeObserver(() => {
+    updateCanvasSize();
+  });
+  canvasResizeObserver.observe(canvasRef.value);
+}
 
 function clearFlowEdgeDeleteConfirmTimeout() {
   if (flowEdgeDeleteConfirmTimeoutRef.value !== null) {
@@ -938,6 +1011,50 @@ function nodeStyle(position: GraphPosition) {
   };
 }
 
+function resolveFallbackNodeSize(node: GraphNode): MeasuredNodeSize {
+  if (node.kind === "condition") {
+    return { width: 560, height: 280 };
+  }
+  if (node.kind === "output") {
+    return { width: 460, height: 340 };
+  }
+  if (node.kind === "input") {
+    return { width: 460, height: 320 };
+  }
+  return { width: 460, height: 360 };
+}
+
+function resolveMinimapRunState(status: string | undefined) {
+  if (status === "running" || status === "resuming") {
+    return "running";
+  }
+  if (status === "success" || status === "completed") {
+    return "success";
+  }
+  if (status === "failed") {
+    return "failed";
+  }
+  return null;
+}
+
+function handleMinimapCenterView(point: { worldX: number; worldY: number }) {
+  updateCanvasSize();
+  if (canvasSize.value.width <= 0 || canvasSize.value.height <= 0) {
+    return;
+  }
+
+  viewport.setViewport(
+    resolveViewportForMinimapCenter({
+      worldX: point.worldX,
+      worldY: point.worldY,
+      viewportScale: viewport.viewport.scale,
+      canvasWidth: canvasSize.value.width,
+      canvasHeight: canvasSize.value.height,
+    }),
+  );
+  canvasRef.value?.focus();
+}
+
 function edgeStyle(edge: ProjectedCanvasEdge) {
   if (edge.kind === "route" && edge.branch) {
     const accent = resolveRouteHandlePalette(edge.branch).accent;
@@ -1175,6 +1292,12 @@ function clearNodeAnchorOffsets(nodeId: string) {
   if (didChange) {
     measuredAnchorOffsets.value = nextAnchorOffsets;
   }
+
+  if (measuredNodeSizes.value[nodeId]) {
+    const nextNodeSizes = { ...measuredNodeSizes.value };
+    delete nextNodeSizes[nodeId];
+    measuredNodeSizes.value = nextNodeSizes;
+  }
 }
 
 function scheduleAnchorMeasurement(nodeId?: string) {
@@ -1201,8 +1324,10 @@ function scheduleAnchorMeasurement(nodeId?: string) {
 
 function measureAnchorOffsets(nodeIds?: string[]) {
   const nextAnchorOffsets = { ...measuredAnchorOffsets.value };
+  const nextNodeSizes = { ...measuredNodeSizes.value };
   const measuredNodeIds = new Set(nodeIds ?? nodeElementMap.keys());
   let didChange = false;
+  let didNodeSizeChange = false;
 
   for (const nodeId of measuredNodeIds) {
     for (const anchorId of Object.keys(nextAnchorOffsets)) {
@@ -1221,6 +1346,19 @@ function measureAnchorOffsets(nodeIds?: string[]) {
 
     const nodeRect = nodeElement.getBoundingClientRect();
     const scale = viewport.viewport.scale || 1;
+    const measuredNodeSize = {
+      width: Math.round(nodeElement.offsetWidth),
+      height: Math.round(nodeElement.offsetHeight),
+    };
+    const currentNodeSize = nextNodeSizes[nodeId];
+    if (
+      !currentNodeSize ||
+      currentNodeSize.width !== measuredNodeSize.width ||
+      currentNodeSize.height !== measuredNodeSize.height
+    ) {
+      nextNodeSizes[nodeId] = measuredNodeSize;
+      didNodeSizeChange = true;
+    }
 
     for (const slotElement of nodeElement.querySelectorAll("[data-anchor-slot-id]")) {
       if (!(slotElement instanceof HTMLElement)) {
@@ -1276,6 +1414,9 @@ function measureAnchorOffsets(nodeIds?: string[]) {
 
   if (didChange || Object.keys(nextAnchorOffsets).length !== Object.keys(measuredAnchorOffsets.value).length) {
     measuredAnchorOffsets.value = nextAnchorOffsets;
+  }
+  if (didNodeSizeChange || Object.keys(nextNodeSizes).length !== Object.keys(measuredNodeSizes.value).length) {
+    measuredNodeSizes.value = nextNodeSizes;
   }
 }
 

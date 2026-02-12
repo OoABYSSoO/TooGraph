@@ -159,7 +159,61 @@ test("buildNodeCardViewModel derives output preview source from state schema", (
   assert.equal(model.body.previewTitle, "Preview");
   assert.equal(model.body.connectedStateLabel, "answer");
   assert.equal(model.body.displayModeLabel, "AUTO");
+  assert.equal(model.body.displayMode, "auto");
+  assert.equal(model.body.previewText, "Connected to answer. Run the graph to preview/export it.");
   assert.equal(model.body.persistLabel, "Save off");
+});
+
+test("buildNodeCardViewModel uses the legacy output empty state when no upstream state is connected", () => {
+  const node: GraphNode = {
+    kind: "output",
+    name: "output_answer",
+    description: "Preview the final answer.",
+    ui: { position: { x: 980, y: 220 } },
+    reads: [],
+    writes: [],
+    config: {
+      displayMode: "auto",
+      persistEnabled: false,
+      persistFormat: "auto",
+      fileNameTemplate: "",
+    },
+  };
+
+  const model = buildNodeCardViewModel("output_answer", node, stateSchema);
+
+  assert.equal(model.body.kind, "output");
+  assert.equal(model.body.connectedStateLabel, null);
+  assert.equal(model.body.previewText, "Connect an upstream output to preview/export it.");
+});
+
+test("buildNodeCardViewModel previews connected state values before a run result exists", () => {
+  const node: GraphNode = {
+    kind: "output",
+    name: "output_answer",
+    description: "Preview the final answer.",
+    ui: { position: { x: 980, y: 220 } },
+    reads: [{ state: "answer", required: true }],
+    writes: [],
+    config: {
+      displayMode: "markdown",
+      persistEnabled: false,
+      persistFormat: "auto",
+      fileNameTemplate: "",
+    },
+  };
+
+  const model = buildNodeCardViewModel("output_answer", node, {
+    ...stateSchema,
+    answer: {
+      ...stateSchema.answer,
+      value: "# 最终答案\n\nGraphiteUI 已迁移完成。",
+    },
+  });
+
+  assert.equal(model.body.kind, "output");
+  assert.equal(model.body.displayMode, "markdown");
+  assert.equal(model.body.previewText, "# 最终答案\n\nGraphiteUI 已迁移完成。");
 });
 
 test("buildNodeCardViewModel uses legacy shorthand label for markdown output display mode", () => {

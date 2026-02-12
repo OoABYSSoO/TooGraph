@@ -899,7 +899,22 @@
           <span>{{ view.body.previewTitle.toUpperCase() }}</span>
           <span>{{ view.body.displayModeLabel }}</span>
         </div>
-        <div class="node-card__preview">{{ view.body.previewText || `Connected to ${view.body.connectedStateLabel ?? "state"}` }}</div>
+        <div
+          class="node-card__preview"
+          :class="{
+            'node-card__preview--plain': outputPreviewContent.kind === 'plain',
+            'node-card__preview--markdown': outputPreviewContent.kind === 'markdown',
+            'node-card__preview--json': outputPreviewContent.kind === 'json',
+            'node-card__preview--empty': outputPreviewContent.isEmpty,
+          }"
+        >
+          <div
+            v-if="outputPreviewContent.kind === 'markdown'"
+            class="node-card__preview-markdown"
+            v-html="outputPreviewContent.html"
+          />
+          <pre v-else class="node-card__preview-text">{{ outputPreviewContent.text }}</pre>
+        </div>
       </div>
     </section>
 
@@ -1063,6 +1078,7 @@ import {
 import { CONDITION_RULE_OPERATOR_OPTIONS } from "./conditionRuleEditorModel";
 import { isSwitchableInputBoundaryType, resolveNextInputValueForBoundaryType, resolveStateTypeForInputBoundary } from "./inputValueTypeModel";
 import { buildNodeCardViewModel } from "./nodeCardViewModel";
+import { resolveOutputPreviewContent } from "./outputPreviewContentModel";
 import { listAttachableSkillDefinitions, resolveAttachedSkillBadges } from "./skillPickerModel";
 import { createStateDraftFromQuery, matchesStatePortSearch } from "./statePortCreateModel";
 import { createUploadedAssetEnvelope, resolveUploadedAssetInputAccept, tryParseUploadedAssetEnvelope } from "./uploadedAssetModel";
@@ -1175,6 +1191,12 @@ const view = computed(() =>
     },
   }),
 );
+const outputPreviewContent = computed(() => {
+  if (view.value.body.kind !== "output") {
+    return resolveOutputPreviewContent("", "plain");
+  }
+  return resolveOutputPreviewContent(view.value.body.previewText, view.value.body.displayMode);
+});
 const conditionLoopLimitDraft = ref("");
 const inputAssetInputRef = ref<HTMLInputElement | null>(null);
 const isSkillPickerOpen = ref(false);
@@ -3932,13 +3954,77 @@ function handleConditionRuleValueInput(event: Event) {
 
 .node-card__preview {
   min-height: 146px;
-  display: grid;
-  place-items: center;
+  display: block;
+  overflow: auto;
   border-radius: 20px;
   background: rgba(248, 242, 234, 0.84);
   padding: 18px;
+  text-align: left;
+  font-size: 0.95rem;
+  line-height: 1.62;
+  color: #1f2937;
+}
+
+.node-card__preview--empty {
+  display: grid;
+  place-items: center;
   text-align: center;
-  font-size: 1.1rem;
+  color: rgba(31, 41, 55, 0.82);
+}
+
+.node-card__preview-text {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font: inherit;
+}
+
+.node-card__preview--json .node-card__preview-text {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
+.node-card__preview-markdown {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.node-card__preview-markdown :deep(h1),
+.node-card__preview-markdown :deep(h2),
+.node-card__preview-markdown :deep(h3),
+.node-card__preview-markdown :deep(p),
+.node-card__preview-markdown :deep(ul) {
+  margin: 0;
+}
+
+.node-card__preview-markdown :deep(h1) {
+  font-size: 1.22rem;
+  line-height: 1.25;
+}
+
+.node-card__preview-markdown :deep(h2) {
+  font-size: 1.08rem;
+  line-height: 1.3;
+}
+
+.node-card__preview-markdown :deep(h3) {
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+.node-card__preview-markdown :deep(ul) {
+  display: grid;
+  gap: 0.35rem;
+  padding-left: 1.1rem;
+}
+
+.node-card__preview-markdown :deep(code) {
+  border-radius: 6px;
+  background: rgba(154, 52, 18, 0.08);
+  padding: 0.08rem 0.28rem;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.88em;
 }
 
 .node-card__runtime-note {

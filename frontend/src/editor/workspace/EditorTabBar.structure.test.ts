@@ -49,6 +49,14 @@ test("EditorTabBar keeps Element Plus card tabs on a single toolbar row", () => 
   assert.match(componentSource, /\.editor-tab-bar__controls \{[\s\S]*flex-wrap:\s*nowrap;/);
 });
 
+test("EditorTabBar adapts to narrow viewports by moving controls below the tab strip", () => {
+  assert.match(componentSource, /\.editor-tab-bar__inner \{[\s\S]*flex-wrap:\s*wrap;/);
+  assert.match(componentSource, /\.editor-tab-bar__tabs-shell \{[\s\S]*flex:\s*1 1 520px;/);
+  assert.match(componentSource, /\.editor-tab-bar__controls \{[\s\S]*flex:\s*0 1 auto;/);
+  assert.match(componentSource, /@media \(max-width:\s*920px\) \{[\s\S]*\.editor-tab-bar__tabs-shell \{[\s\S]*flex-basis:\s*100%;/);
+  assert.match(componentSource, /@media \(max-width:\s*920px\) \{[\s\S]*\.editor-tab-bar__controls \{[\s\S]*width:\s*100%;/);
+});
+
 test("EditorTabBar normalizes Element Plus tab spacing with shared size variables", () => {
   assert.match(componentSource, /--editor-tab-width:\s*\d+px;/);
   assert.match(componentSource, /--editor-tab-height:\s*\d+px;/);
