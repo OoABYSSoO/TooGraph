@@ -799,7 +799,9 @@ function toggleActiveStatePanel() {
 
 function editorGridStyle(tabId: string) {
   return {
-    gridTemplateColumns: isStatePanelOpen(tabId) ? "minmax(0, 1fr) 380px" : "minmax(0,1fr) 56px",
+    gridTemplateColumns: isStatePanelOpen(tabId)
+      ? "minmax(0, 1fr) var(--editor-state-panel-open-width)"
+      : "minmax(0, 1fr) 56px",
   };
 }
 
@@ -1710,11 +1712,14 @@ onMounted(() => {
 
 <style scoped>
 .editor-workspace-shell {
+  --editor-state-panel-open-width: clamp(280px, 28vw, 380px);
   position: relative;
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100%;
+  min-width: 0;
   min-height: 0;
+  overflow: hidden;
   background: radial-gradient(circle at top, rgba(154, 52, 18, 0.1), transparent 22%),
     linear-gradient(180deg, #f5efe2 0%, #ede4d2 100%);
 }
@@ -1727,33 +1732,43 @@ onMounted(() => {
 }
 
 .editor-workspace-shell__chrome {
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: 100%;
   padding: 0;
 }
 
 .editor-workspace-shell__workspace {
   display: flex;
   flex: 1;
+  min-width: 0;
   min-height: 0;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .editor-workspace-shell__body {
   display: flex;
   flex: 1;
+  min-width: 0;
   min-height: 0;
   padding: 0;
+  overflow: hidden;
 }
 
 .editor-workspace-shell__editor {
   flex: 1;
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
 }
 
 .editor-workspace-shell__editor-grid {
   display: grid;
   height: 100%;
+  min-width: 0;
   min-height: 0;
+  overflow: hidden;
   transition: grid-template-columns 220ms ease;
 }
 
@@ -1761,6 +1776,7 @@ onMounted(() => {
   position: relative;
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
 }
 
 .editor-workspace-shell__feedback {
@@ -1868,5 +1884,11 @@ onMounted(() => {
   margin: 0;
   line-height: 1.6;
   color: rgba(60, 41, 20, 0.74);
+}
+
+@media (max-width: 760px) {
+  .editor-workspace-shell {
+    --editor-state-panel-open-width: min(320px, calc(100vw - var(--app-sidebar-width) - 24px));
+  }
 }
 </style>

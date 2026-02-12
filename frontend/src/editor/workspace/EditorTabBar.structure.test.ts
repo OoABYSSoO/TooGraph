@@ -27,6 +27,19 @@ test("EditorTabBar keeps the workspace controls on a single horizontal row", () 
   assert.match(componentSource, /\.editor-tab-bar__controls \{[\s\S]*overflow-x: auto;/);
 });
 
+test("EditorTabBar constrains the top chrome to the available editor width", () => {
+  assert.match(componentSource, /\.editor-tab-bar \{[\s\S]*width:\s*100%;[\s\S]*max-width:\s*100%;[\s\S]*min-width:\s*0;/);
+  assert.match(componentSource, /\.editor-tab-bar__inner \{[\s\S]*box-sizing:\s*border-box;[\s\S]*width:\s*100%;[\s\S]*max-width:\s*100%;/);
+  assert.match(componentSource, /\.editor-tab-bar__tabs-shell \{[\s\S]*max-width:\s*100%;/);
+});
+
+test("EditorTabBar presents controls as a quiet grouped action dock", () => {
+  assert.match(componentSource, /class="editor-tab-bar__controls-dock"/);
+  assert.match(componentSource, /\.editor-tab-bar__controls-dock \{[\s\S]*border-radius:\s*18px;[\s\S]*background:\s*rgba\(255,\s*250,\s*242,\s*0\.76\);/);
+  assert.match(componentSource, /\.editor-tab-bar__action \{[\s\S]*border:\s*1px solid transparent;/);
+  assert.match(componentSource, /\.editor-tab-bar__action--primary \{[\s\S]*background:\s*rgba\(154,\s*52,\s*18,\s*0\.9\);/);
+});
+
 test("EditorTabBar exposes browser-like tab interactions", () => {
   assert.match(componentSource, /draggable="true"/);
   assert.match(componentSource, /@auxclick="handleTabAuxClick\(tab, \$event\)"/);
@@ -55,6 +68,19 @@ test("EditorTabBar adapts to narrow viewports by moving controls below the tab s
   assert.match(componentSource, /\.editor-tab-bar__controls \{[\s\S]*flex:\s*0 1 auto;/);
   assert.match(componentSource, /@media \(max-width:\s*920px\) \{[\s\S]*\.editor-tab-bar__tabs-shell \{[\s\S]*flex-basis:\s*100%;/);
   assert.match(componentSource, /@media \(max-width:\s*920px\) \{[\s\S]*\.editor-tab-bar__controls \{[\s\S]*width:\s*100%;/);
+});
+
+test("EditorTabBar wraps the action dock on phone-width editor surfaces instead of clipping controls", () => {
+  assert.match(componentSource, /@media \(max-width:\s*640px\) \{[\s\S]*\.editor-tab-bar__controls-dock \{[\s\S]*display:\s*grid;/);
+  assert.match(componentSource, /@media \(max-width:\s*640px\) \{[\s\S]*\.editor-tab-bar__controls-dock \{[\s\S]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);/);
+  assert.match(componentSource, /@media \(max-width:\s*640px\) \{[\s\S]*\.editor-tab-bar__select \{[\s\S]*width:\s*100%;[\s\S]*min-width:\s*0;/);
+});
+
+test("EditorTabBar keeps the wrapped phone action dock inside its content column", () => {
+  assert.match(componentSource, /\.editor-tab-bar__controls-dock \{[\s\S]*box-sizing:\s*border-box;/);
+  assert.match(componentSource, /@media \(max-width:\s*640px\) \{[\s\S]*\.editor-tab-bar__controls \{[\s\S]*flex:\s*1 1 100%;[\s\S]*max-width:\s*100%;/);
+  assert.match(componentSource, /@media \(max-width:\s*640px\) \{[\s\S]*\.editor-tab-bar__state-pill,\n\s*\.editor-tab-bar__action \{[\s\S]*width:\s*100%;[\s\S]*min-width:\s*0;/);
+  assert.match(componentSource, /@media \(max-width:\s*640px\) \{[\s\S]*\.editor-tab-bar__action--primary \{[\s\S]*grid-column:\s*3;/);
 });
 
 test("EditorTabBar normalizes Element Plus tab spacing with shared size variables", () => {

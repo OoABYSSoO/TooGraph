@@ -20,6 +20,29 @@
     @dragover.prevent="handleCanvasDragOver"
     @drop.prevent="handleCanvasDrop"
   >
+    <div
+      class="editor-canvas__edge-view-toolbar"
+      role="toolbar"
+      aria-label="线条显示模式"
+      @pointerdown.stop
+      @pointerup.stop
+      @dblclick.stop
+      @click.stop
+      @wheel.stop
+    >
+      <button
+        v-for="option in EDGE_VISIBILITY_MODE_OPTIONS"
+        :key="option.mode"
+        type="button"
+        class="editor-canvas__edge-view-button"
+        :class="{ 'editor-canvas__edge-view-button--active': edgeVisibilityMode === option.mode }"
+        :title="option.title"
+        :aria-pressed="edgeVisibilityMode === option.mode"
+        @click.stop="setEdgeVisibilityMode(option.mode)"
+      >
+        {{ option.label }}
+      </button>
+    </div>
     <div class="editor-canvas__viewport" :style="viewportStyle">
       <div v-if="nodeEntries.length === 0" class="editor-canvas__empty-state">
         <div class="editor-canvas__empty-eyebrow">Empty Canvas</div>
@@ -41,6 +64,7 @@
         <path
           v-for="edge in projectedEdges.filter((edge) => edge.kind === 'flow' || edge.kind === 'route')"
           :key="`${edge.id}:highlight`"
+          v-show="isProjectedEdgeVisible(edge)"
           :d="edge.path"
           class="editor-canvas__edge-delete-highlight"
           :style="edgeStyle(edge)"
@@ -49,6 +73,7 @@
         <path
           v-for="edge in projectedEdges.filter((edge) => edge.kind === 'data')"
           :key="`${edge.id}:data-highlight`"
+          v-show="isProjectedEdgeVisible(edge)"
           :d="edge.path"
           class="editor-canvas__edge-data-highlight"
           :style="edgeStyle(edge)"
@@ -57,6 +82,7 @@
         <path
           v-for="edge in projectedEdges"
           :key="edge.id"
+          v-show="isProjectedEdgeVisible(edge)"
           :d="edge.path"
           class="editor-canvas__edge"
           :style="edgeStyle(edge)"
@@ -71,6 +97,7 @@
         <path
           v-for="edge in projectedEdges"
           :key="`${edge.id}:hitarea`"
+          v-show="isProjectedEdgeVisible(edge)"
           :d="edge.path"
           class="editor-canvas__edge-hitarea"
           :class="{
@@ -132,7 +159,13 @@
           @update:description="handleDataEdgeStateEditorDescriptionInput"
         />
         <div class="editor-canvas__edge-state-editor-actions">
-          <button type="button" class="editor-canvas__edge-state-editor-action" @pointerdown.stop @click.stop="removeDataEdgeSourceBinding">
+          <button
+            v-if="canRemoveDataEdgeSourceBinding()"
+            type="button"
+            class="editor-canvas__edge-state-editor-action"
+            @pointerdown.stop
+            @click.stop="removeDataEdgeSourceBinding"
+          >
             <ElIcon><Delete /></ElIcon>
             <span>Remove source ref</span>
           </button>
@@ -185,6 +218,7 @@
           :run-output-preview-text="runOutputPreviewByNodeId?.[nodeId]?.text ?? null"
           :run-output-display-mode="runOutputPreviewByNodeId?.[nodeId]?.displayMode ?? null"
           :run-failure-message="runFailureMessageByNodeId?.[nodeId] ?? null"
+          :pending-state-input-source="pendingAgentInputSourceByNodeId[nodeId] ?? null"
           :selected="selection.selectedNodeId.value === nodeId"
           @update-node-metadata="emit('update-node-metadata', $event)"
           @update-input-config="emit('update-input-config', $event)"
@@ -292,6 +326,11 @@ import { resolveNodeRunPresentation } from "@/editor/canvas/runNodePresentation"
 import { resolveCanvasLayout, type MeasuredAnchorOffset } from "@/editor/canvas/resolvedCanvasLayout";
 import { resolveCanvasSurfaceStyle } from "@/editor/canvas/canvasSurfaceStyle";
 import {
+  EDGE_VISIBILITY_MODE_OPTIONS,
+  filterProjectedEdgesForVisibilityMode,
+  type EdgeVisibilityMode,
+} from "./edgeVisibilityModel";
+import {
   defaultValueForStateType,
   resolveStateColorOptions,
   STATE_FIELD_TYPE_OPTIONS,
@@ -299,6 +338,7 @@ import {
   type StateFieldType,
 } from "@/editor/workspace/statePanelFields";
 import { canCompleteGraphConnection, canStartGraphConnection, type PendingGraphConnection } from "@/lib/graph-connections";
+import { CREATE_AGENT_INPUT_STATE_KEY } from "@/lib/virtual-any-input";
 import { resolveFocusedViewport } from "@/editor/canvas/focusNodeViewport";
 import { resolveViewportForMinimapCenter } from "./minimapModel";
 import { useNodeSelectionFocus, type NodeFocusRequest } from "./useNodeSelectionFocus";
@@ -365,6 +405,12 @@ type MeasuredNodeSize = {
   width: number;
   height: number;
 };
+type PendingStateInputSource = {
+  stateKey: string;
+  label: string;
+  stateColor: string;
+};
+const STATE_INPUT_HIT_PADDING = 8;
 const measuredNodeSizes = ref<Record<string, MeasuredNodeSize>>({});
 const canvasSize = ref({ width: 0, height: 0 });
 const viewport = useViewport();
@@ -387,6 +433,7 @@ const nodeDrag = ref<{
   startClientY: number;
   originX: number;
   originY: number;
+  captureElement: HTMLElement | null;
   moved: boolean;
 } | null>(null);
 const suppressedNodeClickId = ref<string | null>(null);
@@ -395,6 +442,7 @@ const pendingConnection = ref<PendingGraphConnection | null>(null);
 const pendingConnectionPoint = ref<{ x: number; y: number } | null>(null);
 const autoSnappedTargetAnchor = ref<ProjectedCanvasAnchor | null>(null);
 const selectedEdgeId = ref<string | null>(null);
+const edgeVisibilityMode = ref<EdgeVisibilityMode>("smart");
 const activeFlowEdgeDeleteConfirm = ref<{
   id: string;
   kind: "flow" | "route";
@@ -427,6 +475,8 @@ const hoveredNodeId = ref<string | null>(null);
 const hoveredFlowHandleNodeId = ref<string | null>(null);
 const pendingAnchorMeasurementNodeIds = new Set<string>();
 let scheduledAnchorMeasurementFrame: number | null = null;
+let scheduledDragFrame: number | null = null;
+let pendingDragFrameCallback: (() => void) | null = null;
 let canvasResizeObserver: ResizeObserver | null = null;
 
 const nodeEntries = computed(() => Object.entries(props.document.nodes));
@@ -463,7 +513,77 @@ const conditionRouteTargetsByNodeId = computed(() =>
 );
 const resolvedCanvasLayout = computed(() => resolveCanvasLayout(props.document, measuredAnchorOffsets.value));
 const projectedEdges = computed(() => resolvedCanvasLayout.value.edges);
-const projectedAnchors = computed(() => resolvedCanvasLayout.value.anchors);
+const edgeVisibilityRelatedNodeIds = computed(() => {
+  const nodeIds = new Set<string>();
+  if (selection.selectedNodeId.value) {
+    nodeIds.add(selection.selectedNodeId.value);
+  }
+  if (hoveredNodeId.value) {
+    nodeIds.add(hoveredNodeId.value);
+  }
+  return nodeIds;
+});
+const visibleProjectedEdgeIds = computed(
+  () =>
+    new Set(
+      filterProjectedEdgesForVisibilityMode(projectedEdges.value, {
+        mode: edgeVisibilityMode.value,
+        relatedNodeIds: edgeVisibilityRelatedNodeIds.value,
+      }).map((edge) => edge.id),
+    ),
+);
+const pendingAgentInputSourceByNodeId = computed<Record<string, PendingStateInputSource>>(() => {
+  const connection = pendingConnection.value;
+  if (connection?.sourceKind !== "state-out" || !connection.sourceStateKey) {
+    return {};
+  }
+
+  const sourceStateKey = connection.sourceStateKey;
+  const sourceState = props.document.state_schema[sourceStateKey];
+  const pendingSource = {
+    stateKey: sourceStateKey,
+    label: sourceState?.name?.trim() || sourceStateKey,
+    stateColor: sourceState?.color?.trim() || "#d97706",
+  };
+
+  return Object.fromEntries(
+    Object.entries(props.document.nodes)
+      .filter(([, node]) => node.kind === "agent")
+      .filter(([nodeId]) =>
+        canCompleteGraphConnection(props.document, connection, {
+          nodeId,
+          kind: "state-in",
+          stateKey: CREATE_AGENT_INPUT_STATE_KEY,
+        }),
+      )
+      .map(([nodeId]) => [nodeId, pendingSource]),
+  );
+});
+const baseProjectedAnchors = computed(() => resolvedCanvasLayout.value.anchors);
+const transientAgentInputAnchors = computed<ProjectedCanvasAnchor[]>(() =>
+  Object.entries(pendingAgentInputSourceByNodeId.value).flatMap(([nodeId, source]) => {
+    const node = props.document.nodes[nodeId];
+    const anchorId = `${nodeId}:state-in:${CREATE_AGENT_INPUT_STATE_KEY}`;
+    const measuredOffset = measuredAnchorOffsets.value[anchorId];
+    if (!node || !measuredOffset) {
+      return [];
+    }
+
+    return [
+      {
+        id: anchorId,
+        nodeId,
+        kind: "state-in" as const,
+        x: node.ui.position.x + measuredOffset.offsetX,
+        y: node.ui.position.y + measuredOffset.offsetY,
+        side: "left" as const,
+        color: source.stateColor,
+        stateKey: CREATE_AGENT_INPUT_STATE_KEY,
+      },
+    ];
+  }),
+);
+const projectedAnchors = computed(() => [...baseProjectedAnchors.value, ...transientAgentInputAnchors.value]);
 const flowAnchors = computed(() =>
   projectedAnchors.value.filter((anchor) => anchor.kind === "flow-in" || anchor.kind === "flow-out"),
 );
@@ -636,6 +756,22 @@ function isDataEdgeStateInteractionOpen(edge: Pick<ProjectedCanvasEdge, "kind" |
   return isActiveDataEdge(edge, activeDataEdgeStateConfirm.value) || isActiveDataEdge(edge, activeDataEdgeStateEditor.value);
 }
 
+function isProjectedEdgeVisible(edge: ProjectedCanvasEdge) {
+  return visibleProjectedEdgeIds.value.has(edge.id);
+}
+
+function setEdgeVisibilityMode(mode: EdgeVisibilityMode) {
+  if (edgeVisibilityMode.value === mode) {
+    return;
+  }
+
+  edgeVisibilityMode.value = mode;
+  selectedEdgeId.value = null;
+  pendingConnection.value = null;
+  pendingConnectionPoint.value = null;
+  clearCanvasTransientState();
+}
+
 watch(projectedEdges, (edges) => {
   if (selectedEdgeId.value && !edges.some((edge) => edge.id === selectedEdgeId.value)) {
     selectedEdgeId.value = null;
@@ -655,6 +791,12 @@ watch(projectedEdges, (edges) => {
   if (activeDataEdgeStateEditor.value && !edges.some((edge) => isActiveDataEdge(edge, activeDataEdgeStateEditor.value))) {
     closeDataEdgeStateEditor();
   }
+});
+
+watch(pendingAgentInputSourceByNodeId, () => {
+  void nextTick().then(() => {
+    scheduleAnchorMeasurement();
+  });
 });
 
 onMounted(() => {
@@ -678,6 +820,7 @@ onBeforeUnmount(() => {
     window.cancelAnimationFrame(scheduledAnchorMeasurementFrame);
     scheduledAnchorMeasurementFrame = null;
   }
+  cancelScheduledDragFrame();
 
   canvasResizeObserver?.disconnect();
   canvasResizeObserver = null;
@@ -963,8 +1106,18 @@ function handleDataEdgeStateEditorTypeValue(value: string | number | boolean | u
   });
 }
 
+function canRemoveDataEdgeSourceBinding() {
+  if (!activeDataEdgeStateEditor.value) {
+    return false;
+  }
+  return props.document.nodes[activeDataEdgeStateEditor.value.source]?.kind === "agent";
+}
+
 function removeDataEdgeSourceBinding() {
   if (!activeDataEdgeStateEditor.value) {
+    return;
+  }
+  if (!canRemoveDataEdgeSourceBinding()) {
     return;
   }
   emit("remove-port-state", {
@@ -992,11 +1145,13 @@ function removeDataEdgeBindings() {
     return;
   }
 
-  emit("remove-port-state", {
-    nodeId: activeDataEdgeStateEditor.value.source,
-    side: "output",
-    stateKey: activeDataEdgeStateEditor.value.stateKey,
-  });
+  if (canRemoveDataEdgeSourceBinding()) {
+    emit("remove-port-state", {
+      nodeId: activeDataEdgeStateEditor.value.source,
+      side: "output",
+      stateKey: activeDataEdgeStateEditor.value.stateKey,
+    });
+  }
   emit("remove-port-state", {
     nodeId: activeDataEdgeStateEditor.value.target,
     side: "input",
@@ -1322,6 +1477,41 @@ function scheduleAnchorMeasurement(nodeId?: string) {
   });
 }
 
+function scheduleDragFrame(callback: () => void) {
+  pendingDragFrameCallback = callback;
+
+  if (scheduledDragFrame !== null) {
+    return;
+  }
+
+  scheduledDragFrame = window.requestAnimationFrame(() => {
+    scheduledDragFrame = null;
+    const pendingCallback = pendingDragFrameCallback;
+    pendingDragFrameCallback = null;
+    pendingCallback?.();
+  });
+}
+
+function flushScheduledDragFrame() {
+  if (scheduledDragFrame === null) {
+    return;
+  }
+
+  window.cancelAnimationFrame(scheduledDragFrame);
+  scheduledDragFrame = null;
+  const pendingCallback = pendingDragFrameCallback;
+  pendingDragFrameCallback = null;
+  pendingCallback?.();
+}
+
+function cancelScheduledDragFrame() {
+  if (scheduledDragFrame !== null) {
+    window.cancelAnimationFrame(scheduledDragFrame);
+    scheduledDragFrame = null;
+  }
+  pendingDragFrameCallback = null;
+}
+
 function measureAnchorOffsets(nodeIds?: string[]) {
   const nextAnchorOffsets = { ...measuredAnchorOffsets.value };
   const nextNodeSizes = { ...measuredNodeSizes.value };
@@ -1429,6 +1619,7 @@ function handleCanvasPointerDown(event: PointerEvent) {
   event.preventDefault();
   window.getSelection()?.removeAllRanges();
   canvasRef.value?.setPointerCapture(event.pointerId);
+  cancelScheduledDragFrame();
   clearCanvasTransientState();
   pendingConnection.value = null;
   pendingConnectionPoint.value = null;
@@ -1439,10 +1630,13 @@ function handleCanvasPointerDown(event: PointerEvent) {
 
 function handleCanvasPointerMove(event: PointerEvent) {
   if (activeConnection.value) {
-    autoSnappedTargetAnchor.value = resolveAutoSnappedTargetAnchor(event);
-    pendingConnectionPoint.value = autoSnappedTargetAnchor.value
-      ? { x: autoSnappedTargetAnchor.value.x, y: autoSnappedTargetAnchor.value.y }
-      : resolveCanvasPoint(event);
+    scheduleDragFrame(() => {
+      autoSnappedTargetAnchor.value = resolveAutoSnappedTargetAnchor(event);
+      pendingConnectionPoint.value = autoSnappedTargetAnchor.value
+        ? { x: autoSnappedTargetAnchor.value.x, y: autoSnappedTargetAnchor.value.y }
+        : resolveCanvasPoint(event);
+    });
+    return;
   }
   if (nodeDrag.value && nodeDrag.value.pointerId === event.pointerId) {
     const pointerDeltaX = event.clientX - nodeDrag.value.startClientX;
@@ -1455,21 +1649,33 @@ function handleCanvasPointerMove(event: PointerEvent) {
     }
     const deltaX = pointerDeltaX / viewport.viewport.scale;
     const deltaY = pointerDeltaY / viewport.viewport.scale;
-    emit("update:node-position", {
-      nodeId: nodeDrag.value.nodeId,
-      position: {
-        x: Math.round(nodeDrag.value.originX + deltaX),
-        y: Math.round(nodeDrag.value.originY + deltaY),
-      },
+    const nextPosition = {
+      x: Math.round(nodeDrag.value.originX + deltaX),
+      y: Math.round(nodeDrag.value.originY + deltaY),
+    };
+    const nodeId = nodeDrag.value.nodeId;
+    scheduleDragFrame(() => {
+      emit("update:node-position", {
+        nodeId,
+        position: nextPosition,
+      });
     });
     return;
   }
-  viewport.movePan(event);
+  if (viewport.isPanning.value) {
+    scheduleDragFrame(() => {
+      viewport.movePan(event);
+    });
+  }
 }
 
 function handleCanvasPointerUp(event: PointerEvent) {
+  flushScheduledDragFrame();
   if (canvasRef.value?.hasPointerCapture(event.pointerId)) {
     canvasRef.value.releasePointerCapture(event.pointerId);
+  }
+  if (nodeDrag.value?.captureElement?.hasPointerCapture(event.pointerId)) {
+    nodeDrag.value.captureElement.releasePointerCapture(event.pointerId);
   }
   if (activeConnection.value) {
     if (autoSnappedTargetAnchor.value) {
@@ -1534,8 +1740,12 @@ function handleCanvasDoubleClick(event: MouseEvent) {
 }
 
 function resolveAutoSnappedTargetAnchor(event: PointerEvent) {
-  if (!activeConnection.value || activeConnection.value.sourceKind === "state-out") {
+  if (!activeConnection.value) {
     return null;
+  }
+
+  if (activeConnection.value.sourceKind === "state-out") {
+    return resolveAutoSnappedStateTargetAnchor(event);
   }
 
   for (const anchor of flowAnchors.value) {
@@ -1560,6 +1770,44 @@ function resolveAutoSnappedTargetAnchor(event: PointerEvent) {
   }
 
   return null;
+}
+
+function resolveAutoSnappedStateTargetAnchor(event: PointerEvent) {
+  for (const anchor of pointAnchors.value) {
+    if (anchor.kind !== "state-in" || !eligibleTargetAnchorIds.value.has(anchor.id)) {
+      continue;
+    }
+    if (isPointerWithinAnchorHitElement(anchor, event)) {
+      return anchor;
+    }
+  }
+
+  return null;
+}
+
+function isPointerWithinAnchorHitElement(anchor: ProjectedCanvasAnchor, event: PointerEvent) {
+  const nodeElement = nodeElementMap.get(anchor.nodeId);
+  if (!nodeElement) {
+    return false;
+  }
+
+  for (const slotElement of nodeElement.querySelectorAll("[data-anchor-slot-id]")) {
+    if (!(slotElement instanceof HTMLElement) || slotElement.dataset.anchorSlotId !== anchor.id) {
+      continue;
+    }
+
+    const hitElement = slotElement.closest("[data-anchor-hitarea='true']");
+    const element = hitElement instanceof HTMLElement ? hitElement : slotElement;
+    const rect = element.getBoundingClientRect();
+    return (
+      event.clientX >= rect.left - STATE_INPUT_HIT_PADDING &&
+      event.clientX <= rect.right + STATE_INPUT_HIT_PADDING &&
+      event.clientY >= rect.top - STATE_INPUT_HIT_PADDING &&
+      event.clientY <= rect.bottom + STATE_INPUT_HIT_PADDING
+    );
+  }
+
+  return false;
 }
 
 function isPointerWithinFlowHotspot(anchor: ProjectedCanvasAnchor, event: PointerEvent) {
@@ -1620,6 +1868,7 @@ function handleNodePointerDown(nodeId: string, event: PointerEvent) {
   if (activeConnection.value) {
     const snappedAnchor = resolveEligibleTargetAnchorForNodeBody(nodeId);
     if (snappedAnchor) {
+      event.preventDefault();
       if (!preserveInlineEditorFocus) {
         canvasRef.value?.focus();
       }
@@ -1630,9 +1879,16 @@ function handleNodePointerDown(nodeId: string, event: PointerEvent) {
   if (!preserveInlineEditorFocus) {
     canvasRef.value?.focus();
   }
+  event.preventDefault();
+  let captureElement: HTMLElement | null = null;
+  if (event.currentTarget instanceof HTMLElement) {
+    event.currentTarget.setPointerCapture(event.pointerId);
+    captureElement = event.currentTarget;
+  }
   clearCanvasTransientState();
   pendingConnection.value = null;
   pendingConnectionPoint.value = null;
+  cancelScheduledDragFrame();
   selectedEdgeId.value = null;
   selection.selectNode(nodeId);
   nodeDrag.value = {
@@ -1642,6 +1898,7 @@ function handleNodePointerDown(nodeId: string, event: PointerEvent) {
     startClientY: event.clientY,
     originX: node.ui.position.x,
     originY: node.ui.position.y,
+    captureElement,
     moved: false,
   };
 }
@@ -1971,6 +2228,9 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
     linear-gradient(180deg, rgba(255, 250, 241, 0.98) 0%, rgba(248, 237, 219, 0.96) 100%);
   cursor: grab;
   outline: none;
+  overscroll-behavior: none;
+  touch-action: none;
+  -webkit-touch-callout: none;
 }
 
 .editor-canvas--connecting,
@@ -1985,6 +2245,61 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   -webkit-user-select: none;
 }
 
+.editor-canvas__edge-view-toolbar {
+  position: absolute;
+  left: 18px;
+  top: 18px;
+  z-index: 24;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px;
+  border: 1px solid rgba(154, 52, 18, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 250, 241, 0.88);
+  box-shadow: 0 12px 26px rgba(120, 53, 15, 0.1);
+  backdrop-filter: blur(14px);
+  cursor: default;
+  pointer-events: auto;
+}
+
+.editor-canvas__edge-view-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(73, 52, 34, 0.72);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.editor-canvas__edge-view-button:hover {
+  background: rgba(154, 52, 18, 0.08);
+  color: rgba(75, 42, 18, 0.92);
+}
+
+.editor-canvas__edge-view-button--active {
+  background: rgba(154, 52, 18, 0.9);
+  color: rgba(255, 250, 242, 0.98);
+}
+
+.editor-canvas__edge-view-button--active:hover {
+  background: rgba(154, 52, 18, 0.9);
+  color: rgba(255, 250, 242, 0.98);
+}
+
 .editor-canvas__viewport {
   position: absolute;
   inset: 0;
@@ -1995,8 +2310,10 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   position: absolute;
   inset: 0;
   z-index: 1;
+  box-sizing: border-box;
   display: grid;
   place-items: center;
+  padding-inline: clamp(16px, 6vw, 56px);
   pointer-events: none;
 }
 
@@ -2019,15 +2336,28 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
 
 .editor-canvas__empty-title {
   margin-top: 12px;
-  font-size: 2rem;
+  max-width: min(100%, 34rem);
+  font-size: clamp(1.35rem, 5vw, 2rem);
   font-weight: 600;
+  line-height: 1.22;
+  overflow-wrap: anywhere;
   color: rgba(35, 25, 18, 0.94);
 }
 
 .editor-canvas__empty-copy {
   margin-top: 8px;
-  max-width: 34rem;
+  max-width: min(100%, 34rem);
   color: rgba(60, 41, 20, 0.74);
+}
+
+@media (max-width: 640px) {
+  .editor-canvas__empty-title {
+    max-width: min(100%, 18rem);
+  }
+
+  .editor-canvas__empty-copy {
+    max-width: min(100%, 18rem);
+  }
 }
 
 .editor-canvas__edges {
@@ -2347,6 +2677,7 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   transform: translate(-50%, -50%);
   pointer-events: auto;
   cursor: crosshair;
+  touch-action: none;
 }
 
 .editor-canvas__route-handle {
@@ -2537,6 +2868,7 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   stroke-width: 2;
   cursor: crosshair;
   pointer-events: auto;
+  touch-action: none;
   filter: drop-shadow(0 4px 8px rgba(120, 53, 15, 0.18));
   transition:
     transform 120ms ease,
@@ -2570,6 +2902,8 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   z-index: 1;
   isolation: isolate;
   transition: filter 180ms ease;
+  touch-action: none;
+  -webkit-touch-callout: none;
 }
 
 .editor-canvas__node:hover,

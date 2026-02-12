@@ -148,6 +148,54 @@ test("NodeCard restores the legacy agent runtime control order with Element Plus
   assert.match(componentSource, /collapseAgentModelSelect\(\);/);
 });
 
+test("NodeCard opens agent add skill and port actions in themed popovers instead of inline panels", () => {
+  const agentSectionMatch = componentSource.match(
+    /<section v-else-if="view\.body\.kind === 'agent'"[\s\S]*?<\/section>/,
+  );
+  assert.ok(agentSectionMatch, "expected to find the agent node section");
+  const agentSection = agentSectionMatch[0];
+
+  assert.match(agentSection, /<ElPopover[\s\S]*:visible="isSkillPickerOpen"[\s\S]*popper-class="node-card__agent-add-popover-popper"/);
+  assert.match(agentSection, /v-for="picker in agentPortPickerActions"/);
+  assert.match(agentSection, /:visible="activePortPickerSide === picker\.side"[\s\S]*popper-class="node-card__agent-add-popover-popper"/);
+  assert.match(agentSection, /class="node-card__agent-add-popover node-card__skill-picker"/);
+  assert.match(agentSection, /class="node-card__agent-add-popover node-card__port-picker"/);
+  assert.match(agentSection, /@click\.stop="toggleSkillPicker"/);
+  assert.match(agentSection, /@click\.stop="openPortPicker\(picker\.side\)"/);
+  assert.match(componentSource, /const agentPortPickerActions: Array<\{ side: "input" \| "output"; label: string; toneClass: string; placement: "bottom-start" \| "bottom-end" \}> = \[/);
+  assert.match(componentSource, /\{ side: "input", label: "\+ input", toneClass: "node-card__action-pill--input", placement: "bottom-start" \}/);
+  assert.match(componentSource, /\{ side: "output", label: "\+ output", toneClass: "node-card__action-pill--output", placement: "bottom-end" \}/);
+  assert.match(agentSection, /<ElSelect[\s\S]*class="node-card__control-select graphite-select"[\s\S]*popper-class="graphite-select-popper node-card__port-picker-select-popper"/);
+  assert.match(agentSection, /class="node-card__port-picker-color-option"/);
+  assert.match(agentSection, /class="node-card__port-picker-color-dot"/);
+  assert.match(componentSource, /const portStateColorOptions = computed\(\(\) => resolveStateColorOptions\(portStateDraft\.value\?\.definition\.color \?\? ""\)\);/);
+  assert.match(componentSource, /const agentAddPopoverStyle = \{/);
+  assert.match(componentSource, /"--el-popover-bg-color":\s*"transparent"/);
+  assert.match(componentSource, /\.node-card__agent-add-popover \{[\s\S]*background:\s*rgba\(255,\s*244,\s*232,\s*0\.96\);/);
+  assert.match(componentSource, /:deep\(\.node-card__agent-add-popover-popper\.el-popper\) \{[\s\S]*background:\s*transparent;/);
+  assert.doesNotMatch(agentSection, /<div v-if="activePortPickerSide" class="node-card__port-picker"/);
+  assert.doesNotMatch(agentSection, /<div v-if="isSkillPickerOpen" class="node-card__skill-picker"/);
+});
+
+test("NodeCard renders a visible transient new agent input capsule while state dragging", () => {
+  const agentSectionMatch = componentSource.match(
+    /<section v-else-if="view\.body\.kind === 'agent'"[\s\S]*?<\/section>/,
+  );
+  assert.ok(agentSectionMatch, "expected to find the agent node section");
+  const agentSection = agentSectionMatch[0];
+
+  assert.match(componentSource, /import \{ CREATE_AGENT_INPUT_STATE_KEY \} from "@\/lib\/virtual-any-input";/);
+  assert.match(componentSource, /pendingStateInputSource\?: \{ stateKey: string; label: string; stateColor: string \} \| null;/);
+  assert.match(agentSection, /v-if="pendingStateInputSource"/);
+  assert.match(agentSection, /node-card__port-pill--create/);
+  assert.match(agentSection, /node-card__port-pill-create-badge/);
+  assert.match(agentSection, />NEW</);
+  assert.match(agentSection, /\{\{ pendingStateInputSource\.label \}\}/);
+  assert.match(agentSection, /:data-anchor-slot-id="\`\$\{nodeId\}:state-in:\$\{CREATE_AGENT_INPUT_STATE_KEY\}\`"/);
+  assert.match(componentSource, /\.node-card__port-pill--create \{[\s\S]*background:/);
+  assert.match(componentSource, /\.node-card__port-pill-create-badge \{[\s\S]*letter-spacing:\s*0\.12em;/);
+});
+
 test("NodeCard moves node actions into hoverable top buttons built from Element Plus icons and overlays", () => {
   assert.match(componentSource, /import \{[\s\S]*ElButton,[\s\S]*ElPopover[\s\S]*\} from "element-plus";/);
   assert.match(componentSource, /import \{[\s\S]*CollectionTag[\s\S]*Delete[\s\S]*Operation[\s\S]*\} from "@element-plus\/icons-vue";/);
@@ -498,6 +546,35 @@ test("NodeCard renders output previews through a rich content presenter while ke
   assert.match(outputSection, /node-card__preview--empty/);
   assert.doesNotMatch(outputSection, /Connected to \$\{view\.body\.connectedStateLabel/);
   assert.match(componentSource, /view\.body\.kind === 'output' \? 340 : 280/);
+});
+
+test("NodeCard uses an Element Plus switch card for output persistence like the agent thinking control", () => {
+  const outputSectionMatch = componentSource.match(
+    /<section v-else-if="view\.body\.kind === 'output'"[\s\S]*?<\/section>/,
+  );
+  assert.ok(outputSectionMatch, "expected to find the output node section");
+  const outputSection = outputSectionMatch[0];
+
+  assert.match(componentSource, /import \{[\s\S]*DocumentChecked[\s\S]*Opportunity[\s\S]*\} from "@element-plus\/icons-vue";/);
+  assert.match(outputSection, /class="node-card__output-persist-card"/);
+  assert.match(outputSection, /class="node-card__output-persist-icon"/);
+  assert.match(outputSection, /<DocumentChecked \/>/);
+  assert.match(outputSection, /<ElSwitch/);
+  assert.match(outputSection, /class="node-card__output-persist-switch"/);
+  assert.match(outputSection, /:model-value="view\.body\.persistEnabled"/);
+  assert.match(outputSection, /:width="56"/);
+  assert.match(outputSection, /inline-prompt/);
+  assert.match(outputSection, /active-text="ON"/);
+  assert.match(outputSection, /inactive-text="OFF"/);
+  assert.match(outputSection, /@update:model-value="handleOutputPersistToggle"/);
+  assert.doesNotMatch(outputSection, /node-card__persist-button/);
+  assert.doesNotMatch(outputSection, /node-card__toggle/);
+  assert.match(componentSource, /function handleOutputPersistToggle\(value: string \| number \| boolean\)/);
+  assert.match(componentSource, /\.node-card__output-persist-card \{[\s\S]*grid-template-columns:\s*auto 56px;/);
+  assert.match(componentSource, /\.node-card__output-persist-card \{[\s\S]*min-height:\s*48px;/);
+  assert.match(componentSource, /\.node-card__output-persist-card \{[\s\S]*border-radius:\s*16px;/);
+  assert.match(componentSource, /\.node-card__output-persist-card \{[\s\S]*background:\s*rgba\(255,\s*255,\s*255,\s*0\.88\);/);
+  assert.match(componentSource, /\.node-card__output-persist-switch \{[\s\S]*--el-switch-on-color:\s*#c96b1f;/);
 });
 
 test("NodeCard closes floating panels on focus loss and keeps popup surfaces on the warm theme", () => {

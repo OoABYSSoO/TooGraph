@@ -89,7 +89,7 @@ export function removeStateBindingFromDocument<T extends GraphPayload | GraphDoc
     return nextDocument;
   }
 
-  if (node.kind !== "agent" && node.kind !== "input") {
+  if (node.kind !== "agent") {
     return document;
   }
   if (!node.writes.some((binding) => binding.state === stateKey)) {

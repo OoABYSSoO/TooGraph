@@ -48,6 +48,20 @@ test("EditorWorkspaceShell wires node top-action events into state updates, node
   assert.match(componentSource, /persistedPresets\.value = \[savedPreset, \.\.\.persistedPresets\.value\.filter/);
 });
 
+test("EditorWorkspaceShell inherits editor height and adapts the state side panel width", () => {
+  assert.match(componentSource, /\.editor-workspace-shell \{[\s\S]*--editor-state-panel-open-width:\s*clamp\(280px,\s*28vw,\s*380px\);/);
+  assert.match(componentSource, /\.editor-workspace-shell \{[\s\S]*height:\s*100%;/);
+  assert.doesNotMatch(componentSource, /\.editor-workspace-shell \{[\s\S]*height:\s*100vh;/);
+  assert.match(componentSource, /gridTemplateColumns:\s*isStatePanelOpen\(tabId\)\s*\? "minmax\(0, 1fr\) var\(--editor-state-panel-open-width\)"/);
+  assert.match(componentSource, /@media \(max-width:\s*760px\) \{[\s\S]*\.editor-workspace-shell \{[\s\S]*--editor-state-panel-open-width:\s*min\(320px,\s*calc\(100vw - var\(--app-sidebar-width\) - 24px\)\);/);
+});
+
+test("EditorWorkspaceShell keeps top chrome and editor body from overflowing their container", () => {
+  assert.match(componentSource, /\.editor-workspace-shell__chrome \{[\s\S]*min-width:\s*0;[\s\S]*max-width:\s*100%;/);
+  assert.match(componentSource, /\.editor-workspace-shell__body \{[\s\S]*min-width:\s*0;[\s\S]*overflow:\s*hidden;/);
+  assert.match(componentSource, /\.editor-workspace-shell__editor-grid \{[\s\S]*min-width:\s*0;[\s\S]*overflow:\s*hidden;/);
+});
+
 test("EditorWorkspaceShell routes menu selections and dropped files through the node-creation execution helpers", () => {
   assert.match(componentSource, /import \{ createNodeFromCreationEntry, createNodeFromDroppedFile \} from "\.\/nodeCreationExecution\.ts";/);
   assert.match(componentSource, /const result = createNodeFromCreationEntry\(document, \{/);

@@ -151,6 +151,23 @@ test("EditorCanvas renders hover-only flow hotspots and distinguishes flowing fl
   assert.match(componentSource, /\.editor-canvas__edge \{[\s\S]*pointer-events:\s*none;/);
 });
 
+test("EditorCanvas exposes a top-left capsule toolbar for edge visibility modes", () => {
+  assert.match(componentSource, /import \{[\s\S]*EDGE_VISIBILITY_MODE_OPTIONS,[\s\S]*filterProjectedEdgesForVisibilityMode,[\s\S]*type EdgeVisibilityMode[\s\S]*\} from "\.\/edgeVisibilityModel";/);
+  assert.match(componentSource, /const edgeVisibilityMode = ref<EdgeVisibilityMode>\("smart"\);/);
+  assert.match(componentSource, /const edgeVisibilityRelatedNodeIds = computed\(\(\) =>/);
+  assert.match(componentSource, /const visibleProjectedEdgeIds = computed\(/);
+  assert.match(componentSource, /filterProjectedEdgesForVisibilityMode\(projectedEdges\.value,/);
+  assert.match(componentSource, /function isProjectedEdgeVisible\(edge: ProjectedCanvasEdge\)/);
+  assert.match(componentSource, /class="editor-canvas__edge-view-toolbar"/);
+  assert.match(componentSource, /v-for="option in EDGE_VISIBILITY_MODE_OPTIONS"/);
+  assert.match(componentSource, /setEdgeVisibilityMode\(option\.mode\)/);
+  assert.match(componentSource, /\{\{ option\.label \}\}/);
+  assert.match(componentSource, /v-show="isProjectedEdgeVisible\(edge\)"/);
+  assert.match(componentSource, /\.editor-canvas__edge-view-toolbar \{[\s\S]*position:\s*absolute;[\s\S]*left:\s*18px;[\s\S]*top:\s*18px;/);
+  assert.match(componentSource, /\.editor-canvas__edge-view-button \{[\s\S]*border-radius:\s*999px;/);
+  assert.match(componentSource, /\.editor-canvas__edge-view-button--active \{[\s\S]*background:\s*rgba\(154,\s*52,\s*18,\s*0\.9\);/);
+});
+
 test("EditorCanvas shows a clicked-position delete confirm for flow edges before removing them", () => {
   assert.match(componentSource, /@pointerdown\.stop="handleEdgePointerDown\(edge, \$event\)"/);
   assert.match(componentSource, /const activeFlowEdgeDeleteConfirm = ref<\{/);
@@ -192,6 +209,7 @@ test("EditorCanvas gives data edges the same two-step state editing entry patter
   assert.match(componentSource, /function startDataEdgeStateConfirm\(edge: ProjectedCanvasEdge, event: PointerEvent\)/);
   assert.match(componentSource, /function openDataEdgeStateEditor\(\)/);
   assert.match(componentSource, /function syncDataEdgeStateDraft\(nextDraft: StateFieldDraft\)/);
+  assert.match(componentSource, /function canRemoveDataEdgeSourceBinding\(\)/);
   assert.match(componentSource, /function removeDataEdgeSourceBinding\(\)/);
   assert.match(componentSource, /function removeDataEdgeTargetBinding\(\)/);
   assert.match(componentSource, /if \(edge\.kind === "data"\) \{[\s\S]*startDataEdgeStateConfirm\(edge, event\);[\s\S]*return;/);
@@ -206,13 +224,15 @@ test("EditorCanvas gives data edges the same two-step state editing entry patter
   assert.match(componentSource, /@update:type="handleDataEdgeStateEditorTypeValue"/);
   assert.match(componentSource, /@update:color="handleDataEdgeStateEditorColorInput"/);
   assert.match(componentSource, /@update:description="handleDataEdgeStateEditorDescriptionInput"/);
+  assert.match(componentSource, /v-if="canRemoveDataEdgeSourceBinding\(\)"/);
   assert.match(componentSource, /class="editor-canvas__edge-state-editor-action"/);
   assert.match(componentSource, /Remove source ref/);
   assert.match(componentSource, /Remove target ref/);
   assert.match(componentSource, /class="editor-canvas__edge-state-editor-action editor-canvas__edge-state-editor-action--danger"/);
   assert.match(componentSource, /Remove both refs/);
   assert.match(componentSource, /function removeDataEdgeBindings\(\)/);
-  assert.match(componentSource, /emit\("remove-port-state", \{[\s\S]*nodeId: activeDataEdgeStateEditor\.value\.source,[\s\S]*side: "output",[\s\S]*stateKey: activeDataEdgeStateEditor\.value\.stateKey,[\s\S]*\}\);/);
+  assert.match(componentSource, /if \(!canRemoveDataEdgeSourceBinding\(\)\) \{[\s\S]*return;[\s\S]*\}/);
+  assert.match(componentSource, /if \(canRemoveDataEdgeSourceBinding\(\)\) \{[\s\S]*emit\("remove-port-state", \{[\s\S]*nodeId: activeDataEdgeStateEditor\.value\.source,[\s\S]*side: "output",[\s\S]*stateKey: activeDataEdgeStateEditor\.value\.stateKey,[\s\S]*\}\);[\s\S]*\}/);
   assert.match(componentSource, /emit\("remove-port-state", \{[\s\S]*nodeId: activeDataEdgeStateEditor\.value\.target,[\s\S]*side: "input",[\s\S]*stateKey: activeDataEdgeStateEditor\.value\.stateKey,[\s\S]*\}\);/);
 });
 
@@ -232,6 +252,15 @@ test("EditorCanvas restores empty-canvas onboarding copy for node creation", () 
   assert.match(componentSource, /Double click to create your first node/);
   assert.match(componentSource, /Drag from an output handle into empty space to get type-aware preset suggestions\./);
   assert.doesNotMatch(componentSource, /class="editor-canvas__connect-hint"/);
+});
+
+test("EditorCanvas constrains empty-canvas onboarding text inside narrow canvas widths", () => {
+  assert.match(componentSource, /\.editor-canvas__empty-state \{[\s\S]*padding-inline:\s*clamp\(16px,\s*6vw,\s*56px\);/);
+  assert.match(componentSource, /\.editor-canvas__empty-title \{[\s\S]*max-width:\s*min\(100%,\s*34rem\);/);
+  assert.match(componentSource, /\.editor-canvas__empty-title \{[\s\S]*overflow-wrap:\s*anywhere;/);
+  assert.match(componentSource, /\.editor-canvas__empty-title \{[\s\S]*font-size:\s*clamp\(1\.35rem,\s*5vw,\s*2rem\);/);
+  assert.match(componentSource, /@media \(max-width:\s*640px\) \{[\s\S]*\.editor-canvas__empty-title \{[\s\S]*max-width:\s*min\(100%,\s*18rem\);/);
+  assert.match(componentSource, /@media \(max-width:\s*640px\) \{[\s\S]*\.editor-canvas__empty-copy \{[\s\S]*max-width:\s*min\(100%,\s*18rem\);/);
 });
 
 test("EditorCanvas emits node-creation intents for empty-canvas double click and dropped files", () => {
@@ -287,6 +316,27 @@ test("EditorCanvas snaps flow drags to eligible target node bodies before mouseu
   assert.match(componentSource, /event\.clientY <= rect\.bottom/);
 });
 
+test("EditorCanvas exposes transient new agent input anchors while state dragging", () => {
+  assert.match(componentSource, /import \{ CREATE_AGENT_INPUT_STATE_KEY \} from "@\/lib\/virtual-any-input";/);
+  assert.match(componentSource, /const pendingAgentInputSourceByNodeId = computed<Record<string, PendingStateInputSource>>\(\(\) =>/);
+  assert.match(componentSource, /canCompleteGraphConnection\(props\.document, connection, \{[\s\S]*stateKey: CREATE_AGENT_INPUT_STATE_KEY/);
+  assert.match(componentSource, /:pending-state-input-source="pendingAgentInputSourceByNodeId\[nodeId\] \?\? null"/);
+  assert.match(componentSource, /const transientAgentInputAnchors = computed<ProjectedCanvasAnchor\[\]>\(\(\) =>/);
+  assert.match(componentSource, /const anchorId = `\$\{nodeId\}:state-in:\$\{CREATE_AGENT_INPUT_STATE_KEY\}`;/);
+  assert.match(componentSource, /id: anchorId/);
+  assert.match(componentSource, /stateKey: CREATE_AGENT_INPUT_STATE_KEY/);
+  assert.match(componentSource, /const projectedAnchors = computed\(\(\) => \[\.\.\.baseProjectedAnchors\.value, \.\.\.transientAgentInputAnchors\.value\]\);/);
+});
+
+test("EditorCanvas lets state drags snap to state input capsule hit areas", () => {
+  assert.match(componentSource, /const STATE_INPUT_HIT_PADDING = 8;/);
+  assert.match(componentSource, /if \(activeConnection\.value\.sourceKind === "state-out"\) \{[\s\S]*return resolveAutoSnappedStateTargetAnchor\(event\);[\s\S]*\}/);
+  assert.match(componentSource, /function resolveAutoSnappedStateTargetAnchor\(event: PointerEvent\)/);
+  assert.match(componentSource, /function isPointerWithinAnchorHitElement\(anchor: ProjectedCanvasAnchor, event: PointerEvent\)/);
+  assert.match(componentSource, /querySelectorAll\("\[data-anchor-slot-id\]"\)/);
+  assert.match(componentSource, /closest\("\[data-anchor-hitarea='true'\]"\)/);
+});
+
 test("EditorCanvas disables text selection while a connection drag is active", () => {
   assert.match(componentSource, /'editor-canvas--connecting': Boolean\(pendingConnection\)/);
   assert.match(componentSource, /window\.getSelection\(\)\?\.removeAllRanges\(\)/);
@@ -300,6 +350,30 @@ test("EditorCanvas keeps canvas panning alive outside the viewport and disables 
   assert.match(componentSource, /canvasRef\.value\?\.setPointerCapture\(event\.pointerId\)/);
   assert.match(componentSource, /releasePointerCapture\(event\.pointerId\)/);
   assert.match(componentSource, /\.editor-canvas--panning,\n\.editor-canvas--panning \* \{[\s\S]*user-select:\s*none;/);
+});
+
+test("EditorCanvas opts mobile touch drags out of browser gestures", () => {
+  const canvasCssBlock = componentSource.match(/\.editor-canvas \{[^}]*\}/)?.[0] ?? "";
+  const nodeCssBlock = componentSource.match(/\.editor-canvas__node \{[^}]*\}/)?.[0] ?? "";
+  const flowHotspotCssBlock = componentSource.match(/\.editor-canvas__flow-hotspot \{[^}]*\}/)?.[0] ?? "";
+
+  assert.match(canvasCssBlock, /touch-action:\s*none;/);
+  assert.match(canvasCssBlock, /overscroll-behavior:\s*none;/);
+  assert.match(canvasCssBlock, /-webkit-touch-callout:\s*none;/);
+  assert.match(nodeCssBlock, /touch-action:\s*none;/);
+  assert.match(nodeCssBlock, /-webkit-touch-callout:\s*none;/);
+  assert.match(flowHotspotCssBlock, /touch-action:\s*none;/);
+});
+
+test("EditorCanvas captures node drags and batches drag writes with animation frames", () => {
+  assert.match(componentSource, /event\.preventDefault\(\);[\s\S]*event\.currentTarget\.setPointerCapture\(event\.pointerId\);[\s\S]*nodeDrag\.value = \{/);
+  assert.match(componentSource, /let scheduledDragFrame: number \| null = null;/);
+  assert.match(componentSource, /function scheduleDragFrame/);
+  assert.match(componentSource, /window\.requestAnimationFrame\(\(\) => \{/);
+  assert.match(componentSource, /scheduleDragFrame\(\(\) => \{[\s\S]*emit\("update:node-position"/);
+  assert.match(componentSource, /scheduleDragFrame\(\(\) => \{[\s\S]*viewport\.movePan\(event\);/);
+  assert.match(componentSource, /function cancelScheduledDragFrame\(\)/);
+  assert.match(componentSource, /window\.cancelAnimationFrame\(scheduledDragFrame\);/);
 });
 
 test("EditorCanvas suppresses the residual click after a node drag so inline editors do not open on release", () => {

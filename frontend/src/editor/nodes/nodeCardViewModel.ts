@@ -1,6 +1,7 @@
 import type { UploadedAssetType } from "./uploadedAssetModel.ts";
 import { isUploadedAssetStateType } from "./uploadedAssetModel.ts";
 import { normalizeConditionLoopLimit } from "./conditionLoopLimit.ts";
+import { buildVirtualAnyInputPort, shouldExposeVirtualAnyInput } from "../../lib/virtual-any-input.ts";
 import type { GraphNode, StateDefinition } from "../../types/node-system.ts";
 
 export type NodePortViewModel = {
@@ -9,6 +10,7 @@ export type NodePortViewModel = {
   required?: boolean;
   typeLabel: string;
   stateColor: string;
+  virtual?: boolean;
 };
 
 export type NodeConditionRouteOutputViewModel = {
@@ -79,6 +81,7 @@ export type NodeCardViewModel = {
         displayMode: string;
         displayModeLabel: string;
         persistFormatLabel: string;
+        primaryInput: NodePortViewModel | null;
         connectedStateKey: string | null;
         connectedStateLabel: string | null;
         previewText: string;
@@ -94,13 +97,15 @@ export function buildNodeCardViewModel(
   stateSchema: Record<string, StateDefinition>,
   options: BuildNodeCardViewModelOptions = {},
 ): NodeCardViewModel {
-  const inputs = node.reads.map((binding) => ({
-    key: binding.state,
-    label: getStateLabel(binding.state, stateSchema),
-    required: binding.required,
-    typeLabel: getStateTypeLabel(binding.state, stateSchema),
-    stateColor: stateSchema[binding.state]?.color ?? "#d97706",
-  }));
+  const inputs = shouldExposeVirtualAnyInput(node)
+    ? [buildVirtualAnyInputPort()]
+    : node.reads.map((binding) => ({
+        key: binding.state,
+        label: getStateLabel(binding.state, stateSchema),
+        required: binding.required,
+        typeLabel: getStateTypeLabel(binding.state, stateSchema),
+        stateColor: stateSchema[binding.state]?.color ?? "#d97706",
+      }));
 
   const outputs =
     node.kind === "condition"
@@ -182,7 +187,7 @@ function buildBody(
     };
   }
 
-  const connectedState = inputs[0]?.key ?? null;
+  const connectedState = node.reads[0]?.state ?? null;
   const runtime = options.runtime;
   const displayMode = runtime?.outputDisplayMode?.trim() || node.config.displayMode;
   return {
@@ -191,6 +196,7 @@ function buildBody(
     displayMode,
     displayModeLabel: formatOutputDisplayModeLabel(displayMode),
     persistFormatLabel: formatOutputPersistFormatLabel(node.config.persistFormat),
+    primaryInput: inputs[0] ?? null,
     connectedStateKey: connectedState,
     connectedStateLabel: connectedState ? getStateLabel(connectedState, stateSchema) : null,
     previewText: resolveOutputPreviewText({
