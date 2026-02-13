@@ -1,15 +1,25 @@
 from __future__ import annotations
 
-import json
 from pprint import pformat
 from typing import Any
 
-from app.core.schemas.node_system import NodeSystemGraphDocument
+from app.core.schemas.node_system import (
+    AgentModelSource,
+    AgentThinkingMode,
+    ConditionOperator,
+    NodeSystemAgentNode,
+    NodeSystemConditionNode,
+    NodeSystemGraphPayload,
+    NodeSystemInputNode,
+    NodeSystemOutputNode,
+    NodeSystemStateDefinition,
+    NodeSystemStateType,
+    StateWriteMode,
+)
 
 
-def generate_langgraph_python_source(graph: NodeSystemGraphDocument) -> str:
-    payload = graph.model_dump(mode="json", by_alias=True)
-    payload["graph_id"] = payload.get("graph_id") or "exported_graph"
+def generate_langgraph_python_source(graph: NodeSystemGraphPayload) -> str:
+    payload = _build_export_graph_payload(graph)
     interrupt_before = _normalize_interrupt_config(graph.metadata.get("interrupt_before") or graph.metadata.get("interruptBefore"))
     interrupt_after = _normalize_interrupt_config(graph.metadata.get("interrupt_after") or graph.metadata.get("interruptAfter"))
     payload_literal = pformat(payload, sort_dicts=False, width=100)
@@ -31,15 +41,36 @@ from app.core.runtime.node_system_executor import (
     _initialize_graph_state,
 )
 from app.core.runtime.state import create_initial_run_state
-from app.core.schemas.node_system import NodeSystemGraphDocument
+from app.core.schemas.node_system import NodeSystemGraphPayload
 
 
 GRAPH_PAYLOAD = {payload_literal}
-GRAPH = NodeSystemGraphDocument.model_validate(GRAPH_PAYLOAD)
+INTERRUPT_BEFORE_CONFIG = {interrupt_before_literal}
+INTERRUPT_AFTER_CONFIG = {interrupt_after_literal}
+
+
+def _inflate_graph_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    inflated = dict(payload)
+    inflated["metadata"] = dict(payload.get("metadata", {{}}))
+    inflated["state_schema"] = dict(payload.get("state_schema", {{}}))
+    inflated["edges"] = list(payload.get("edges", []))
+    inflated["conditional_edges"] = list(payload.get("conditional_edges", []))
+    inflated_nodes: dict[str, dict[str, Any]] = {{}}
+    for node_name, node_payload in dict(payload.get("nodes", {{}})).items():
+        inflated_node = dict(node_payload)
+        inflated_node.setdefault("ui", {{"position": {{"x": 0, "y": 0}}}})
+        inflated_node.setdefault("reads", [])
+        inflated_node.setdefault("writes", [])
+        inflated_nodes[node_name] = inflated_node
+    inflated["nodes"] = inflated_nodes
+    return inflated
+
+
+GRAPH = NodeSystemGraphPayload.model_validate(_inflate_graph_payload(GRAPH_PAYLOAD))
 BUILD_PLAN = compile_graph_to_langgraph_plan(GRAPH)
 RUNTIME_NODES = list(BUILD_PLAN.runtime_nodes)
-INTERRUPT_BEFORE = [node_name for node_name in {interrupt_before_literal} if node_name in RUNTIME_NODES]
-INTERRUPT_AFTER = [node_name for node_name in {interrupt_after_literal} if node_name in RUNTIME_NODES]
+INTERRUPT_BEFORE = [node_name for node_name in INTERRUPT_BEFORE_CONFIG if node_name in RUNTIME_NODES]
+INTERRUPT_AFTER = [node_name for node_name in INTERRUPT_AFTER_CONFIG if node_name in RUNTIME_NODES]
 
 
 def _replace(_current: Any, update: Any) -> Any:
@@ -148,6 +179,115 @@ if __name__ == "__main__":
     result = invoke_graph()
     print(result)
 """
+
+
+def _build_export_graph_payload(graph: NodeSystemGraphPayload) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "name": graph.name,
+        "nodes": {
+            node_name: _build_export_node_payload(node)
+            for node_name, node in graph.nodes.items()
+        },
+    }
+
+    state_schema = {
+        state_name: _build_export_state_definition(definition)
+        for state_name, definition in graph.state_schema.items()
+    }
+    if state_schema:
+        payload["state_schema"] = state_schema
+    if graph.edges:
+        payload["edges"] = [edge.model_dump(mode="json", by_alias=True) for edge in graph.edges]
+    if graph.conditional_edges:
+        payload["conditional_edges"] = [
+            edge.model_dump(mode="json", by_alias=True)
+            for edge in graph.conditional_edges
+        ]
+    if graph.metadata:
+        payload["metadata"] = dict(graph.metadata)
+
+    return payload
+
+
+def _build_export_state_definition(definition: NodeSystemStateDefinition) -> dict[str, Any]:
+    payload: dict[str, Any] = {}
+    if definition.type != NodeSystemStateType.TEXT:
+        payload["type"] = definition.type.value
+    if definition.value is not None:
+        payload["value"] = definition.value
+    return payload
+
+
+def _build_export_node_payload(
+    node: NodeSystemInputNode | NodeSystemAgentNode | NodeSystemConditionNode | NodeSystemOutputNode,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {"kind": node.kind}
+    if node.reads:
+        payload["reads"] = [{"state": binding.state} for binding in node.reads]
+    if node.writes:
+        payload["writes"] = [_build_export_write_binding(binding) for binding in node.writes]
+
+    config = _build_export_node_config(node)
+    if config:
+        payload["config"] = config
+    return payload
+
+
+def _build_export_write_binding(binding: Any) -> dict[str, Any]:
+    payload = {"state": binding.state}
+    if binding.mode != StateWriteMode.REPLACE:
+        payload["mode"] = binding.mode.value
+    return payload
+
+
+def _build_export_node_config(
+    node: NodeSystemInputNode | NodeSystemAgentNode | NodeSystemConditionNode | NodeSystemOutputNode,
+) -> dict[str, Any]:
+    if isinstance(node, NodeSystemAgentNode):
+        return _build_export_agent_config(node)
+    if isinstance(node, NodeSystemConditionNode):
+        return _build_export_condition_config(node)
+    return {}
+
+
+def _build_export_agent_config(node: NodeSystemAgentNode) -> dict[str, Any]:
+    config: dict[str, Any] = {}
+    if node.config.skills:
+        config["skills"] = list(node.config.skills)
+    if node.config.task_instruction:
+        config["taskInstruction"] = node.config.task_instruction
+    if node.config.model_source == AgentModelSource.OVERRIDE:
+        config["modelSource"] = node.config.model_source.value
+        if node.config.model:
+            config["model"] = node.config.model
+    if node.config.thinking_mode != AgentThinkingMode.ON:
+        config["thinkingMode"] = node.config.thinking_mode.value
+    if node.config.temperature != 0.2:
+        config["temperature"] = node.config.temperature
+    return config
+
+
+def _build_export_condition_config(node: NodeSystemConditionNode) -> dict[str, Any]:
+    config: dict[str, Any] = {}
+    if node.config.branches:
+        config["branches"] = list(node.config.branches)
+    if node.config.loop_limit != 5:
+        config["loopLimit"] = node.config.loop_limit
+    if node.config.branch_mapping:
+        config["branchMapping"] = dict(node.config.branch_mapping)
+
+    rule = node.config.rule
+    rule_payload: dict[str, Any] = {}
+    if rule.source != "result":
+        rule_payload["source"] = rule.source
+    if rule.operator != ConditionOperator.EXISTS:
+        rule_payload["operator"] = rule.operator.value
+    if rule.value is not None:
+        rule_payload["value"] = rule.value
+    if rule_payload:
+        rule_payload.setdefault("source", rule.source)
+        config["rule"] = rule_payload
+    return config
 
 
 def _normalize_interrupt_config(value: Any) -> list[str]:

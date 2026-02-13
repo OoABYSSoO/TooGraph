@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.compiler.validator import validate_graph
 from app.core.langgraph.compiler import compile_graph_to_langgraph_plan, get_langgraph_runtime_unsupported_reasons
-from app.core.langgraph.codegen import generate_langgraph_python_source
+from app.core.langgraph.codegen import _build_export_graph_payload, generate_langgraph_python_source
 from app.core.langgraph.runtime import _finalize_langgraph_cycle_summary, execute_node_system_graph_langgraph
 from app.core.runtime import node_system_executor
 from app.core.runtime.state import create_initial_run_state, set_run_status
@@ -879,6 +879,52 @@ class LangGraphMigrationTests(unittest.TestCase):
         exec(source, namespace, namespace)
         result = namespace["invoke_graph"]()
         self.assertIn("answer", result)
+
+    def test_exported_langgraph_payload_keeps_only_runtime_fields(self):
+        graph = _load_hello_world_graph()
+        payload = _build_export_graph_payload(graph)
+
+        self.assertNotIn("graph_id", payload)
+        self.assertNotIn("metadata", payload)
+        self.assertEqual(payload["state_schema"]["question"], {"value": "什么是 GraphiteUI？"})
+        self.assertEqual(payload["state_schema"]["answer"], {"value": ""})
+        self.assertEqual(
+            payload["nodes"]["input_question"],
+            {
+                "kind": "input",
+                "writes": [{"state": "question"}],
+            },
+        )
+        self.assertEqual(
+            payload["nodes"]["answer_helper"],
+            {
+                "kind": "agent",
+                "reads": [{"state": "question"}],
+                "writes": [{"state": "answer"}],
+                "config": {"taskInstruction": "请直接用中文回答用户问题。"},
+            },
+        )
+        self.assertEqual(
+            payload["nodes"]["output_answer"],
+            {
+                "kind": "output",
+                "reads": [{"state": "answer"}],
+            },
+        )
+
+    def test_exported_langgraph_python_source_omits_editor_only_payload_fields(self):
+        graph = _load_hello_world_graph()
+        source = generate_langgraph_python_source(graph)
+        payload_source = source.split("GRAPH = ", 1)[0]
+
+        self.assertIn("NodeSystemGraphPayload.model_validate(_inflate_graph_payload(GRAPH_PAYLOAD))", source)
+        self.assertNotIn("NodeSystemGraphDocument", source)
+        self.assertNotIn("'ui':", payload_source)
+        self.assertNotIn("'description':", payload_source)
+        self.assertNotIn("'color':", payload_source)
+        self.assertNotIn("'required':", payload_source)
+        self.assertNotIn("'modelSource': 'global'", payload_source)
+        self.assertNotIn("'graph_id': 'exported_graph'", payload_source)
 
     @patch("app.core.langgraph.runtime.save_run", lambda state: None)
     @patch("app.core.runtime.node_system_executor.save_run", lambda state: None)
