@@ -22,6 +22,7 @@ from app.core.runtime.node_system_executor import (
     _refresh_run_artifacts,
     _select_active_outgoing_edges,
     _build_execution_edges,
+    collect_output_boundaries,
 )
 from app.core.runtime.state import create_initial_run_state, set_run_status, touch_run_lifecycle, utc_now_iso
 from app.core.schemas.node_system import NodeSystemGraphDocument
@@ -57,14 +58,17 @@ def execute_node_system_graph_langgraph(
     state["metadata"] = dict(graph.metadata)
     state["metadata"]["resolved_runtime_backend"] = "langgraph"
     _initialize_graph_state(graph, state)
+    _mark_input_boundaries_success(graph, state)
     checkpoint_saver, runtime_config, checkpoint_lookup_config = _build_checkpoint_runtime(graph=graph, state=state)
 
     execution_edges = _build_execution_edges(graph)
     outgoing_edges_by_source: dict[str, list[Any]] = defaultdict(list)
+    conditional_edge_ids: dict[tuple[str, str | None, str], str] = {}
     for edge in execution_edges:
         outgoing_edges_by_source[edge.source].append(edge)
+        if edge.kind == "conditional":
+            conditional_edge_ids[(edge.source, edge.branch, edge.target)] = edge.id
     cycle_tracker = _build_langgraph_cycle_tracker(graph, execution_edges)
-    selected_branches: dict[str, str] = {}
     active_edge_ids: set[str] = set()
     node_outputs: dict[str, dict[str, Any]] = {}
     run_lock = threading.Lock()
@@ -79,8 +83,19 @@ def execute_node_system_graph_langgraph(
             checkpoint_lookup_config=checkpoint_lookup_config,
         )
 
+    if not build_plan.runtime_nodes and not build_plan.runtime_condition_routes:
+        _clear_pending_interrupt_metadata(state)
+        set_run_status(state, "completed")
+        state["current_node_id"] = None
+        collect_output_boundaries(graph, state, active_edge_ids)
+        _finalize_langgraph_cycle_summary(state, cycle_tracker, active_edge_ids)
+        _sync_checkpoint_metadata(state, checkpoint_saver, checkpoint_lookup_config)
+        _refresh_run_artifacts(state, node_outputs, active_edge_ids, started_perf=started_perf)
+        save_run(state)
+        return state
+
     workflow = StateGraph(_build_langgraph_state_schema(graph))
-    for node_name, node in graph.nodes.items():
+    for node_name in build_plan.runtime_nodes:
         workflow.add_node(
             node_name,
             _build_langgraph_node_callable(
@@ -90,7 +105,6 @@ def execute_node_system_graph_langgraph(
                 node_outputs=node_outputs,
                 active_edge_ids=active_edge_ids,
                 outgoing_edges=outgoing_edges_by_source.get(node_name, []),
-                selected_branches=selected_branches,
                 cycle_tracker=cycle_tracker,
                 persist_progress=persist_progress,
                 started_perf=started_perf,
@@ -100,24 +114,33 @@ def execute_node_system_graph_langgraph(
             ),
         )
 
-    for node_name in build_plan.requirements.entry_nodes:
+    for node_name in build_plan.requirements.runtime_entry_nodes:
         workflow.add_edge(START, node_name)
-    for edge in graph.edges:
+    for edge in build_plan.runtime_edges:
         workflow.add_edge(edge.source, edge.target)
-    for conditional_edge in graph.conditional_edges:
+    for route in build_plan.runtime_condition_routes:
         workflow.add_conditional_edges(
-            conditional_edge.source,
+            _runtime_graph_endpoint(route.source),
             _build_langgraph_route_callable(
-                source_node=conditional_edge.source,
-                selected_branches=selected_branches,
+                graph=graph,
+                route=route,
+                state=state,
+                node_outputs=node_outputs,
+                active_edge_ids=active_edge_ids,
+                conditional_edge_ids=conditional_edge_ids,
+                cycle_tracker=cycle_tracker,
+                persist_progress=persist_progress,
+                started_perf=started_perf,
                 run_lock=run_lock,
+                checkpoint_saver=checkpoint_saver,
+                checkpoint_lookup_config=checkpoint_lookup_config,
             ),
-            path_map=dict(conditional_edge.branches),
+            path_map={branch: _runtime_graph_endpoint(target) for branch, target in route.branches.items()},
         )
-    for node_name in build_plan.requirements.terminal_nodes:
+    for node_name in build_plan.requirements.runtime_terminal_nodes:
         workflow.add_edge(node_name, END)
 
-    interrupt_before, interrupt_after = _resolve_interrupt_configuration(graph)
+    interrupt_before, interrupt_after = _resolve_interrupt_configuration(graph, allowed_nodes=set(build_plan.runtime_nodes))
     compiled = workflow.compile(
         checkpointer=checkpoint_saver,
         interrupt_before=interrupt_before,
@@ -155,6 +178,7 @@ def execute_node_system_graph_langgraph(
         _clear_pending_interrupt_metadata(state)
         set_run_status(state, "completed")
         state["current_node_id"] = None
+        collect_output_boundaries(graph, state, active_edge_ids)
         _finalize_langgraph_cycle_summary(state, cycle_tracker, active_edge_ids)
         _sync_checkpoint_metadata(state, checkpoint_saver, checkpoint_lookup_config)
         _refresh_run_artifacts(state, node_outputs, active_edge_ids, started_perf=started_perf)
@@ -177,7 +201,6 @@ def _build_langgraph_node_callable(
     node_outputs: dict[str, dict[str, Any]],
     active_edge_ids: set[str],
     outgoing_edges: list[Any],
-    selected_branches: dict[str, str],
     cycle_tracker: dict[str, Any],
     persist_progress: bool,
     started_perf: float,
@@ -217,8 +240,6 @@ def _build_langgraph_node_callable(
                 node_outputs[node_name] = outputs
                 state_writes = _apply_state_writes(node_name, node.writes, outputs, state)
                 state["node_status_map"][node_name] = "success"
-                if body.get("selected_branch"):
-                    selected_branches[node_name] = str(body["selected_branch"])
                 if body.get("selected_skills"):
                     state["selected_skills"] = [*state.get("selected_skills", []), *body["selected_skills"]]
                 if body.get("skill_outputs"):
@@ -313,20 +334,81 @@ def _build_langgraph_node_callable(
     return _call
 
 
+def _runtime_graph_endpoint(node_name: str) -> str:
+    if node_name == "__start__":
+        return START
+    if node_name == "__end__":
+        return END
+    return node_name
+
+
 def _build_langgraph_route_callable(
     *,
-    source_node: str,
-    selected_branches: dict[str, str],
+    graph: NodeSystemGraphDocument,
+    route: Any,
+    state: dict[str, Any],
+    node_outputs: dict[str, dict[str, Any]],
+    active_edge_ids: set[str],
+    conditional_edge_ids: dict[tuple[str, str | None, str], str],
+    cycle_tracker: dict[str, Any],
+    persist_progress: bool,
+    started_perf: float,
     run_lock: threading.Lock,
+    checkpoint_saver: JsonCheckpointSaver,
+    checkpoint_lookup_config: dict[str, Any],
 ):
-    def _route(_current_values: dict[str, Any]) -> str:
+    condition_name = route.condition
+    condition_node = graph.nodes[condition_name]
+
+    def _route(current_values: dict[str, Any]) -> str:
         with run_lock:
-            selected_branch = str(selected_branches.pop(source_node, "") or "").strip()
+            state["node_status_map"][condition_name] = "running"
+            state["state_values"] = {
+                **dict(state.get("state_values", {})),
+                **dict(current_values or {}),
+            }
+            try:
+                input_values, _state_reads = _collect_node_inputs(condition_node, state)
+                body = _execute_node(graph, condition_name, condition_node, input_values, state)
+            except Exception:
+                state["node_status_map"][condition_name] = "failed"
+                raise
+            selected_branch = str(body.get("selected_branch") or "").strip()
             if not selected_branch:
-                raise ValueError(f"Condition node '{source_node}' did not produce a selected branch.")
+                state["node_status_map"][condition_name] = "failed"
+                raise ValueError(f"Condition node '{condition_name}' did not produce a selected branch.")
+            state["node_status_map"][condition_name] = "success"
+            visual_target = route.branch_targets.get(selected_branch, "")
+            selected_edge_ids: set[str] = set()
+            edge_id = conditional_edge_ids.get((condition_name, selected_branch, visual_target))
+            if edge_id:
+                selected_edge_ids.add(edge_id)
+                active_edge_ids.add(edge_id)
+            _record_cycle_route_activity(
+                state=state,
+                cycle_tracker=cycle_tracker,
+                iteration=_current_cycle_iteration(cycle_tracker),
+                selected_edge_ids=selected_edge_ids,
+            )
+            if persist_progress:
+                _persist_langgraph_progress(
+                    state,
+                    node_outputs,
+                    active_edge_ids,
+                    started_perf=started_perf,
+                    checkpoint_saver=checkpoint_saver,
+                    checkpoint_lookup_config=checkpoint_lookup_config,
+                )
             return selected_branch
 
     return _route
+
+
+def _mark_input_boundaries_success(graph: NodeSystemGraphDocument, state: dict[str, Any]) -> None:
+    node_status_map = state.setdefault("node_status_map", {})
+    for node_name, node in graph.nodes.items():
+        if node.kind == "input":
+            node_status_map[node_name] = "success"
 
 
 def _summarize_values(values: dict[str, Any], final_result: Any | None = None) -> str:
@@ -421,7 +503,11 @@ def _persist_langgraph_progress(
     _persist_run_progress(state, node_outputs, active_edge_ids, started_perf=started_perf)
 
 
-def _resolve_interrupt_configuration(graph: NodeSystemGraphDocument) -> tuple[list[str] | None, list[str] | None]:
+def _resolve_interrupt_configuration(
+    graph: NodeSystemGraphDocument,
+    *,
+    allowed_nodes: set[str] | None = None,
+) -> tuple[list[str] | None, list[str] | None]:
     metadata = dict(graph.metadata or {})
 
     def _normalize(value: Any) -> list[str] | None:
@@ -433,7 +519,7 @@ def _resolve_interrupt_configuration(graph: NodeSystemGraphDocument) -> tuple[li
             items = [str(item).strip() for item in value]
         else:
             return None
-        normalized = [item for item in items if item]
+        normalized = [item for item in items if item and (allowed_nodes is None or item in allowed_nodes)]
         return normalized or None
 
     interrupt_before = _normalize(metadata.get("interrupt_before"))
@@ -644,6 +730,62 @@ def _record_cycle_activity(
         record["_changed_state_keys"] = sorted(
             set(record.get("_changed_state_keys", [])) | changed_state_keys
         )
+
+    back_edge_ids = set(cycle_tracker.get("back_edge_ids", set()))
+    next_iteration_edge_ids = sorted(edge_id for edge_id in selected_edge_ids if edge_id in back_edge_ids)
+    if not next_iteration_edge_ids:
+        return
+
+    record["next_iteration_edge_ids"] = sorted(
+        set(record.get("next_iteration_edge_ids", [])) | set(next_iteration_edge_ids)
+    )
+    if not record.get("_changed_state_keys"):
+        record["stop_reason"] = "no_state_change"
+        state["cycle_summary"] = {
+            "has_cycle": True,
+            "back_edges": list(cycle_tracker.get("back_edges", [])),
+            "iteration_count": iteration,
+            "max_iterations": int(cycle_tracker.get("max_iterations", 0) or 0),
+            "stop_reason": "no_state_change",
+        }
+        state["cycle_iterations"] = _serialize_cycle_records(cycle_tracker, final_stop_reason="no_state_change")
+        raise RuntimeError(
+            f"Cycle execution made no state progress in iteration {iteration}. Add an exit branch or update a state value inside the loop."
+        )
+
+    loop_limit_violation = _check_condition_loop_limit(cycle_tracker, next_iteration_edge_ids)
+    if loop_limit_violation is not None:
+        max_iterations, source_node = loop_limit_violation
+        record["stop_reason"] = "max_iterations_exceeded"
+        state["cycle_summary"] = {
+            "has_cycle": True,
+            "back_edges": list(cycle_tracker.get("back_edges", [])),
+            "iteration_count": iteration,
+            "max_iterations": max_iterations,
+            "stop_reason": "max_iterations_exceeded",
+        }
+        state["cycle_iterations"] = _serialize_cycle_records(cycle_tracker, final_stop_reason="max_iterations_exceeded")
+        raise ValueError(
+            f"Cycle execution exceeded loopLimit ({max_iterations}) for condition '{source_node}'. Add an exit branch or raise loopLimit."
+        )
+
+    next_iteration = iteration + 1
+    cycle_tracker["current_iteration"] = next_iteration
+    _ensure_cycle_iteration_record(cycle_tracker, next_iteration, next_iteration_edge_ids)
+
+
+def _record_cycle_route_activity(
+    *,
+    state: dict[str, Any],
+    cycle_tracker: dict[str, Any],
+    iteration: int,
+    selected_edge_ids: set[str],
+) -> None:
+    if not cycle_tracker.get("has_cycle"):
+        return
+
+    record = _ensure_cycle_iteration_record(cycle_tracker, iteration, [])
+    record["activated_edge_ids"] = sorted(set(record.get("activated_edge_ids", [])) | set(selected_edge_ids))
 
     back_edge_ids = set(cycle_tracker.get("back_edge_ids", set()))
     next_iteration_edge_ids = sorted(edge_id for edge_id in selected_edge_ids if edge_id in back_edge_ids)

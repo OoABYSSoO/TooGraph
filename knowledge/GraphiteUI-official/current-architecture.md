@@ -1,29 +1,40 @@
 # GraphiteUI 当前架构
 
-GraphiteUI 当前是一个前后端分离的工作台：
+GraphiteUI 当前是一个前后端分离的 LangGraph 风格工作流工作台。
 
-- 前端：Vue 3 + Vite，负责首页、编辑器、运行记录、运行详情和设置页。
-- 交互：Vue Router + Pinia + Reka UI；画布、节点和连线继续走自定义实现。
-- 后端：FastAPI，负责图校验、运行时执行、知识库检索、导出接口和数据持久化。
-- 存储：
-  - graphs、runs、presets、settings、skills：JSON 文件
-  - knowledge base：SQLite + FTS 索引
+## 前端
+
+- Vue 3 + Vite + TypeScript
+- Vue Router 负责页面路由
+- Pinia 负责前端状态
+- Element Plus 和 `@element-plus/icons-vue` 提供通用 UI 控件
+- 画布、节点、端口、线条、minimap 和运行反馈由 GraphiteUI 自定义编辑器实现
+
+主要页面包括：
+
+- `/`：工作台首页
+- `/editor`、`/editor/new`、`/editor/:graphId`：图编辑器
+- `/runs`、`/runs/:runId`：运行记录和详情
+- `/settings`：模型和运行配置
+
+## 后端
+
+- FastAPI 提供 API
+- Pydantic 定义 graph、run、preset、settings、skill 等 schema
+- LangGraph runtime 执行当前 node_system graph
+- validator 负责保存和运行前的结构校验
+- JSON 文件保存 graph / preset / run / settings / skill state
+- SQLite + FTS 保存 knowledge base 索引
+
+## 图协议
 
 当前主链已经收口到 `node_system`：
 
-- graph 保存和运行都围绕同一套协议
-- `state_schema` 已经是唯一正式数据源
-- `nodes` 使用对象映射保存，键名就是全图唯一节点名
+- `state_schema` 是唯一正式数据源
+- `nodes` 是以节点名为 key 的对象映射
 - 节点只声明读取哪些 state、写入哪些 state
-- agent skill 已经是显式挂载
-- knowledge base 已经是正式资源，而不是临时目录名
+- `edges` 表达普通顺序流
+- `conditional_edges` 表达条件分支目标
+- 四类核心节点是 `input`、`agent`、`condition`、`output`
 
-现在的运行链路大致是：
-
-1. 前端编辑并保存 graph
-2. 后端做 schema + validator 校验
-3. runtime 执行节点图
-4. run 结果写入 JSON 存储
-5. 前端轮询 run detail，展示节点状态、skill 输出、知识库摘要和输出产物
-
-从调试角度看，GraphiteUI 现在已经不仅是一个画图工具，而是一个带运行态、知识库和观察能力的 workflow workspace。
+从调试角度看，GraphiteUI 不是单纯画图工具，而是一个带运行态、知识库、技能和可观测能力的 workflow workspace。

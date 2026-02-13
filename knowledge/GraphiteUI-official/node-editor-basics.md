@@ -1,41 +1,46 @@
 # 节点编排基础
 
-GraphiteUI 画布的基本单位是节点、state 和边。当前正式的心智是：
+GraphiteUI 画布的基本单位是节点、state 和边。当前正式心智是：
 
-- `state` 是唯一数据源
+- `state_schema` 是唯一数据源
 - 节点只负责读写 state
-- `edges` 和 `conditional_edges` 负责表达执行关系与条件分支
+- `edges` 表达普通执行顺序
+- `conditional_edges` 表达条件分支目标
 
-当前最重要的几类节点是：
+## 节点类型
 
-- `input`：把文本、文件或 knowledge base 引入图中。
-- `agent`：配置任务说明、skills，并读取或写入 state。
-- `condition`：在规则判断或循环分支之间做选择。
-- `output`：显示最终结果，也可以承担保存产物的职责。
+- `input`：把文本、文件或 knowledge base 引入图中；有且只有一个 state 输出。
+- `agent`：配置任务说明、模型、thinking、skills，并读取或写入 state。
+- `condition`：作为条件边的可视化代理，根据 source、判断符号、输入值和循环上限决定分支。
+- `output`：显示最终结果，也可以持久化产物。
 
-当前画布里几个很关键的交互是：
+## 当前关键交互
 
 - 拖拽节点调整画布布局。
-- 从节点 handle 拉线建立普通控制流和 condition route 连接。
-- 选中已有边后删除或重新指定目标。
-- 在 agent 节点上新增输入或输出引用，并绑定已有 state 或即时新建 state。
-- 通过右侧 `State Panel` 直接编辑唯一的 `state_schema` 数据源。
-- 在节点卡片内部直接编辑 input / agent / condition / output 的核心配置。
+- 双击空白画布打开节点创建菜单。
+- 从节点手柄拖到空白处，打开带上下文的节点创建菜单。
+- 从 state 输出拖到 agent 节点时，可以生成新的输入引用胶囊。
+- 从流程手柄拖到目标节点或目标手柄时，会自动吸附。
+- 点击数据线或端口后，通过确认胶囊打开 state 编辑小窗。
+- 点击流程线后，通过确认按钮删除边。
+- 右下角 minimap 可辅助定位画布。
+- 左上角线条显示工具条可以切换智能 / 数据 / 顺序 / 全量模式。
 
-关于 state 和节点的关系，现在需要按这套心智理解：
+## State 与节点引用
 
-- 同一个 state 在任何地方显示的名称、说明、类型都一致
-- 节点上看到的输入和输出只是对 state 的引用视图
-- 新增一个输入或输出，本质上是在给节点新增一个 state 引用
-- 如果选择了一个当前不存在的 state，编辑器会先创建这条 state，再把节点绑定上去
+- 同一个 state 在任何地方显示的名称、说明、类型和颜色都来自 `state_schema`。
+- 节点上看到的输入和输出只是对 state 的引用视图。
+- 新增一个输入或输出，本质上是在给节点新增一个 state 引用。
+- input 节点的 state 输出不能被删除；如果需要改变输入语义，应编辑 input 节点本身。
+- 保存图时，没有被任何节点引用的 state 会被清理。
 
-关于 skill 和知识库，有两个当前实现上的重点：
+## Skills 与知识库
 
 - skill 是显式挂在 agent 上的，不是隐藏能力。
 - 当 knowledge base input 接到 agent 时，编辑器会自动把 `search_knowledge_base` 加到 agent 的 skill 列表里。
 
-关于 cycles，当前已经有基础执行支持：
+## 条件与循环
 
-- `condition` 节点可以切到 `cycle` 模式
-- runtime 会记录循环轮次和终止原因
-- 但更高级的停止策略和回边可视化还在后续计划里
+- condition 节点默认有 true / false / exhausted 三类分支。
+- exhausted 表达超过循环上限后的出口。
+- 循环上限默认 5，允许范围是 1 到 10。

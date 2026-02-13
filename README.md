@@ -1,254 +1,209 @@
-# 💎 GraphiteUI
+# GraphiteUI
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.11+](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)](https://www.typescriptlang.org/)
+GraphiteUI 是一个面向 LangGraph 风格 Agent 工作流的可视化编排与运行工作台。它把 graph、state、节点、数据流、顺序流、条件分支和运行反馈统一到一套可保存、可校验、可运行的 `node_system` 协议里。
 
-> A Visual Node-Based Editor & Runtime Workspace for LangGraph-style Agent Workflows
+当前项目已经完成 Vue 前端迁移，正式主链是：
 
-GraphiteUI 是一款面向 AI Agent 工作流开发的可视化编排工作台。它把接近 LangGraph 心智的 graph、state、skills、cycles 和 runtime 执行过程，收敛成一套可编辑、可校验、可运行的节点系统。
+- 前端：Vue 3 + Vite + TypeScript + Pinia + Element Plus
+- 后端：FastAPI + Pydantic + LangGraph
+- 协议：`node_system` 是唯一正式图协议，`state_schema` 是唯一正式数据源
+- 存储：graph / preset / run / settings / skill state 使用 JSON 文件，knowledge base 使用 SQLite + FTS
 
-在 GraphiteUI 中，开发者可以通过拖拽节点、连线、配置 state、挂载 skills 和知识库，清楚地看到一个 agent graph 是如何被保存、校验、运行和追踪的。当前正式心智是：`state` 是唯一数据源，节点只负责读写 state，`edges` 和 `conditional_edges` 负责表达执行依赖与分支关系。
+## 当前能力
 
-> 当前状态：`node_system` 已经是唯一正式协议，Vue 前端迁移也已经完成；首页、编辑器、运行记录、运行详情和设置页都已经回到正式主链。当前还在继续推进的是产品路线图层的 WebSocket 推送、人类在环前端、导出入口、memory 和更强的 knowledge base 管理，而不是这次迁移本身。
+### 可视化编排
 
----
+- 四类核心节点：`input`、`agent`、`condition`、`output`
+- 数据流：节点通过 state 引用读写同一份 `state_schema`
+- 顺序流：普通执行边和条件节点分支边都能在画布上编辑
+- 条件节点：作为 LangGraph 条件边的具象化入口，支持 true / false / exhausted 分支和 1-10 次循环上限
+- 节点创建：支持空画布双击创建、从输出/流程手柄拖出创建、文件拖入生成 input 节点、保存并复用 agent preset
+- 画布交互：节点拖拽、线条吸附、边删除确认、状态端口编辑、右下角缩略图、线条显示模式工具条
+- UI 策略：优先使用 Element Plus 和 `@element-plus/icons-vue`，自定义 UI 主要集中在画布、节点和连线这些编辑器专属区域
 
-## ✨ 核心特性 (Key Features)
+### 运行与观察
 
-### 🔷 可视化 Graph 与 State 编排
+- graph 保存、校验、运行
+- run 列表和 run detail
+- 节点级执行状态、active path 高亮和 output preview
+- LangGraph runtime 只把 agent 编译为真实节点；input / output / condition 作为视觉边界和条件边代理
+- state snapshot、state events、skill outputs、knowledge summary
+- cycle summary / cycle iterations
+- 后端具备 LangGraph Python 源码导出接口
+- 后端具备 interrupt / checkpoint / resume 主链，前端人类在环闭环仍在路线图中
 
-将复杂的 Agent 工作流转化为所见即所得的节点拓扑图，并用统一的 `node_system` 协议保存 graph、nodes、edges、state 和运行配置。
+### Skills 与知识库
 
-| 功能 | 状态 |
-|------|------|
-| 节点拖拽与放置 | ✅ 已完成 |
-| 节点连线与 state 引用 | ✅ 已完成 |
-| 条件分支 (Conditional Edges) | ✅ 已完成 |
-| 循环逻辑 (Cycles) | ✅ 已完成基础执行主链 |
-| 节点参数配置面板 | ✅ 已完成 |
-| State Panel 图内编辑 | ✅ 已完成 |
-| JSON 模板单一来源 | ✅ 已完成 |
-| 图 / 预设 / 运行记录 JSON 存储 | ✅ 已完成 |
+- agent 节点显式挂载 skills
+- knowledge base 可以通过 input 节点进入图
+- 当 agent 读取 knowledge base state 时，编辑器会同步 `search_knowledge_base` skill
+- 项目内置 GraphiteUI / Python / LangGraph 三类正式知识库导入路径
+- 技能定义会从 `skill/`、`backend/app/skills` 和兼容的外部 skill 目录中解析
 
-### 🔷 白盒化可观测性 (Full Observability)
-
-运行 graph 时，系统会记录结构化运行结果，包括节点执行信息、state snapshot、state events、skills 输出、knowledge summary 和 cycles 轮次信息。
-
-| 功能 | 状态 |
-|------|------|
-| 节点执行状态高亮 | ✅ 已完成 |
-| 节点级执行明细 | ✅ 已完成 |
-| State Snapshot / Events | ✅ 已完成 |
-| Knowledge Summary | ✅ 已完成 |
-| Cycle Summary / Iterations | ✅ 已完成 |
-| WebSocket 实时推送 | 🔜 计划中 |
-
-### 🔷 知识库与技能驱动执行
-
-GraphiteUI 当前支持正式知识库资源和显式技能挂载。用户仍通过 input 节点把 knowledge base 传给 agent，运行时由 `search_knowledge_base` skill 执行真实检索。
-
-| 功能 | 状态 |
-|------|------|
-| 显式 skills 挂载 | ✅ 已完成 |
-| knowledge base 输入到 agent | ✅ 已完成 |
-| SQLite FTS 检索 | ✅ 已完成 |
-| Python 官方文档库 | ✅ 已导入 |
-| LangGraph 官方文档库 | ✅ 已导入 |
-| GraphiteUI 项目知识库 | ✅ 已导入 |
-
-### 🔷 意图驱动开发 (Meta-Agent Architect) | 🔜 计划中
-
-> 仍在规划中。目标是基于自然语言需求自动辅助生成 graph、state schema 和节点配置，但目前还不是正式能力。
-
-### 🔷 人类在环 (Human-in-the-Loop) | 🔜 计划中（后端主链已具备）
-
-> 后端已经具备 LangGraph 的 interrupt / checkpoint / resume 主链，并支持等待人工输入后的恢复执行；但前端断点配置、恢复面板和人工介入审计闭环还没有产品化完成。
-
-### 🔷 代码双向同步 (Zero-Friction Compilation) | 🔜 计划中（后端接口已具备）
-
-> 后端已经支持将图导出为可执行的 LangGraph Python 源码；前端的导出入口、源码预览和下载交互仍在路线图中。
-
----
-
-## 🛠️ 技术选型 (Tech Stack)
-
-### 前端 (Frontend)
-
-- **核心框架**: Vue 3 + Vite + TypeScript
-- **路由**: Vue Router
-- **状态管理**: Pinia
-- **交互基元**: Reka UI
-- **画布与节点系统**: 自定义实现
-
-### 后端 (Backend)
-
-- **核心语言**: Python 3.11+
-- **Web 框架**: FastAPI
-- **数据校验**: Pydantic
-- **Agent 底层框架**: LangGraph + LangChain
-- **持久化**:
-  - Knowledge Base: SQLite + FTS5
-  - Graph / Preset / Run / Settings / Skill State: JSON Files
-
----
-
-## 🚀 快速开始 (Quick Start)
+## 快速开始
 
 ### 环境要求
 
 - Node.js 20.9+
 - Python 3.11+
-- (可选) OpenAI-compatible API 或本地 LLM
+- 可选：OpenAI-compatible API、本地 LLM 或 Ollama 类服务
 
-### 安装与启动
+### 启动
 
 ```bash
-# 克隆仓库
 git clone https://github.com/AbyssBadger0/GraphiteUI.git
 cd GraphiteUI
-
-# 一键启动前后端
 ./scripts/start.sh
 ```
 
-或者手动启动：
+默认端口：
+
+- 前端：http://127.0.0.1:3477
+- 后端：http://127.0.0.1:8765
+- 健康检查：http://127.0.0.1:8765/health
+
+`scripts/start.sh` 会释放已占用的前后端端口，并把日志写入：
+
+- `.dev_frontend.log`
+- `.dev_backend.log`
+
+### 手动命令
 
 ```bash
-# 后端
-make backend-install
-make backend-dev
-
-# 前端
 make frontend-install
 make frontend-dev
+make frontend-build
+
+make backend-install
+make backend-dev
+make backend-health
 ```
 
-启动后访问：
+### 模型配置
 
-- 前端: http://localhost:3477
-- 后端 API: http://localhost:8765
-- 健康检查: http://localhost:8765/health
+```bash
+LOCAL_BASE_URL=http://localhost:11434
+LOCAL_API_KEY=sk-xxx
+LOCAL_TEXT_MODEL=gpt-4o
+```
 
-如需重新导入正式知识库：
+也兼容这些别名：
+
+- `OPENAI_BASE_URL`
+- `OPENAI_API_KEY`
+- `TEXT_MODEL`
+
+### 导入官方知识库
 
 ```bash
 python scripts/import_official_knowledge_bases.py
 ```
 
-### 环境变量 (可选)
+## 项目结构
 
-```bash
-# 本地 LLM 配置
-LOCAL_BASE_URL=http://localhost:11434  # 或 OpenAI 地址
-LOCAL_API_KEY=sk-xxx
-LOCAL_TEXT_MODEL=gpt-4o  # 或 ollama 模型名
-```
-
----
-
-## 📁 项目结构 (Project Structure)
-
-```
+```text
 GraphiteUI/
-├── frontend/                 # Vue + Vite 前端
-│   ├── src/
-│   │   ├── api/              # 前端 API 封装
-│   │   ├── editor/           # 画布、节点、状态面板与工作区
-│   │   ├── layouts/          # 页面壳层
-│   │   ├── pages/            # 首页 / 编辑器 / runs / settings
-│   │   ├── router/           # Vue Router 配置
-│   │   ├── stores/           # Pinia stores
-│   │   └── types/            # 协议与运行态类型
-├── backend/                  # FastAPI 后端
+├── frontend/
+│   ├── src/api/              # 前端 API 封装
+│   ├── src/editor/           # 画布、节点、状态面板、工作区
+│   ├── src/layouts/          # 应用壳层和侧栏
+│   ├── src/pages/            # Home / Editor / Runs / Run Detail / Settings
+│   ├── src/router/           # Vue Router
+│   ├── src/stores/           # Pinia stores
+│   ├── src/styles/           # 全局样式和 Element Plus 主题覆盖
+│   └── src/types/            # 图协议和运行态类型
+├── backend/
 │   └── app/
-│       ├── api/              # API 路由
-│       ├── core/             # 核心模块
-│       │   ├── compiler/     # Graph 校验与编译前处理
-│       │   ├── runtime/      # 工作流执行器
-│       │   ├── schemas/      # Pydantic 模型
-│       │   └── storage/      # JSON 与知识库存储
-│       ├── knowledge/        # 知识库导入与检索
-│       └── templates/        # 工作流模板
-├── knowledge/                # GraphiteUI 项目知识库源文件
-├── docs/                     # 开发文档
-└── demo/                     # 参考示例
+│       ├── api/              # graphs / runs / templates / presets / settings / skills / knowledge
+│       ├── core/compiler/    # node_system 校验
+│       ├── core/langgraph/   # LangGraph runtime 与 codegen
+│       ├── core/runtime/     # 执行状态、state、输出边界工具
+│       ├── core/schemas/     # Pydantic schemas
+│       ├── core/storage/     # JSON 和 SQLite 存储
+│       ├── knowledge/        # 知识库导入、切分、检索
+│       └── templates/        # 内置 graph 模板
+├── knowledge/GraphiteUI-official/
+│   └── *.md                  # GraphiteUI 项目知识库源文档
+├── docs/
+│   ├── current_project_status.md
+│   └── future/
+├── skill/                    # 可挂载 skill 定义
+└── scripts/
 ```
 
----
+## 核心 API
 
-## 📚 知识库在哪里
+| API | 作用 |
+| --- | --- |
+| `GET /health` | 后端健康检查 |
+| `GET /api/graphs` | 列出已保存 graph |
+| `POST /api/graphs/save` | 保存 graph |
+| `POST /api/graphs/validate` | 校验 graph |
+| `POST /api/graphs/run` | 运行 graph |
+| `POST /api/graphs/export/langgraph-python` | 导出 LangGraph Python 源码 |
+| `GET /api/runs` | 列出运行记录 |
+| `GET /api/runs/{run_id}` | 查看运行详情 |
+| `POST /api/runs/{run_id}/resume` | 从 failed / paused / awaiting_human 状态恢复运行 |
+| `GET /api/templates` | 列出内置模板 |
+| `GET /api/presets` | 列出 agent presets |
+| `GET /api/knowledge/bases` | 列出知识库 |
+| `GET /api/skills/definitions` | 列出可用 skills |
+| `GET /api/settings` / `POST /api/settings` | 读取和更新设置 |
 
-知识库有两个层次：
+## 内置模板
 
-1. 源文件层
+当前内置模板位于 `backend/app/templates/`：
 
-- GraphiteUI 项目知识库的源文件主要在 [knowledge/GraphiteUI-official](knowledge/GraphiteUI-official)。
-- 另外还会合并项目内的 [README.md](README.md) 和 [current_project_status.md](docs/current_project_status.md)。
-- Python 和 LangGraph 的知识库源不是仓库里手写的文档，而是在导入时从官方站点抓取或下载。
+- `hello_world.json`
+- `knowledge_base_validation.json`
+- `conditional_edge_validation.json`
+- `cycle_counter_demo.json`
 
-2. 导入后的正式存储层
+这些模板都使用当前 `node_system` 协议，不再保留旧协议兼容模板。
 
-- 三个知识库导入后都统一落到 [backend/data/kb](backend/data/kb) 这一层。
-- 每个知识库各自有一个目录保存 `manifest.json`，例如：
-  - [backend/data/kb/graphiteui-official/manifest.json](backend/data/kb/graphiteui-official/manifest.json)
-  - [backend/data/kb/python-official-3.14/manifest.json](backend/data/kb/python-official-3.14/manifest.json)
-  - [backend/data/kb/langgraph-official-v1/manifest.json](backend/data/kb/langgraph-official-v1/manifest.json)
-- 真正用于检索的数据索引在 SQLite 里，由后端统一管理。
+## 文档策略
 
-除知识库外，其余运行态数据当前都走 JSON 文件存储：
+当前文档只保留仍有维护价值的内容：
 
-- graph: [backend/data/graphs](backend/data/graphs)
-- presets: [backend/data/presets](backend/data/presets)
-- runs: [backend/data/runs](backend/data/runs)
-- settings: [backend/data/settings](backend/data/settings)
-- skill registry state: [backend/data/skills](backend/data/skills)
+- `README.md`：项目主入口和当前能力说明
+- `docs/current_project_status.md`：当前状态快照，也是知识库导入源之一
+- `docs/future/`：仍然有效的长期设想
+- `knowledge/GraphiteUI-official/`：项目知识库源文档
+- `CLAUDE.md` / `AGENTS.md`：协作代理工作说明
 
-结论很简单：
+已经完成使命的迁移计划、临时进度记录、一次性分析报告和偏离当前实现的设计稿不再保留。
 
-- 源文件层不完全一样
-- 导入后的正式知识库位置是一样的
-- GraphiteUI、Python、LangGraph 三个库在运行时属于同一套知识库系统
+## 未来方向
 
----
+### 近期路线图
 
-## 📖 当前阶段与路线图
+- WebSocket 实时运行推送
+- 更完整的人类在环前端：断点配置、恢复输入、暂停审计
+- LangGraph Python 导出 UI：源码预览、下载、运行说明
+- memory 的写入、召回、展示和调试
+- cycles 更高级的终止策略和可视化
+- 知识库管理：更新、删除、重建索引、检索质量评估
 
-| 阶段 | 功能 | 状态 |
-|------|------|------|
-| v0.1 | 可视化节点编排基础 | ✅ 已完成 |
-| v0.2 | Graph 保存/加载/校验 | ✅ 已完成 |
-| v0.3 | 运行时主链与 skills | ✅ 已完成 |
-| v0.4 | 执行状态与 run detail | ✅ 已完成 |
-| v0.5 | State Panel 与 state 编辑 | ✅ 已完成 |
-| v0.6 | 正式协议原生化与兼容层删除 | ✅ 已完成 |
-| v0.7 | LangGraph-native 后端迁移 | ✅ 已完成 |
-| v0.8 | Vue 前端迁移与旧前端主逻辑恢复 | ✅ 已完成 |
-| v0.9 | Cycles / Knowledge Base 增强 | ⚙️ 进行中 |
-| v1.0 | Memory / 人类在环前端 / 导出入口 / WebSocket 推送 | 🔜 计划中 |
+### 桌宠 Agent 与自动编排图
 
----
+GraphiteUI 的长期方向不是只提供一个画布，而是提供一个可见、可控、可验证的 Agent 协作层。
 
-## 🎯 快速演示路径
+未来可以引入一个桌宠 Agent 作为交互入口。它可以用轻量 HTML/CSS、SVG 或前端动画能力绘制，停靠在画布或侧栏附近，具备待机、观察、思考、建议、执行、等待确认、完成和失败等状态。它不应该模拟 DOM 点击，而应该通过明确的图编辑命令操作 GraphiteUI，例如创建节点、连接 state、连接流程线、打开面板、校验图、运行图和保存图。
 
-1. **Home** (`/`) — 工作台入口，查看最近 graphs、templates 和 runs
-2. **Editor** (`/editor`) — 选择模板或新建 graph
-3. **Editor 画布** — 拖拽节点、连线、配置参数
-4. **Validate** — 校验 graph 合法性
-5. **Run** — 触发执行，查看节点执行状态
-6. **Runs** (`/runs`) — 查看历史运行记录与结果
+自动编排图分两种模式：
 
----
+1. 规划后等待人类确认：Agent 根据任务生成 graph 草案，用户检查和调整后手动运行。
+2. 边走边画的自主编排：Agent 在授权后逐步创建节点、连接线、运行校验、根据反馈继续生长图，直到认为图能完成任务，再保存和运行。
 
-## 📝 许可证 (License)
+这条路线的硬性边界是：所有修改必须可见、可撤销、可审计；删除、覆盖、运行和可能产生费用的操作必须确认；Agent 不能绕过 GraphiteUI 的校验器，也不能直接写不可见状态。
 
-本项目基于 [MIT License](LICENSE) 开源。
+## License
 
----
+MIT License
 
-## 🙏 致谢 (Acknowledgments)
+## Acknowledgments
 
-- [LangGraph](https://github.com/langchain-ai/langgraph) — Agent 执行框架
-- [Vue](https://vuejs.org/) — 前端框架
-- [Reka UI](https://www.reka-ui.com/) — 交互基元
-- [ComfyUI](https://github.com/comfy-org/ComfyUI) — 节点式工作流设计灵感
+- LangGraph
+- Vue
+- Element Plus
+- ComfyUI

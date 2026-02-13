@@ -1,29 +1,35 @@
-# Docs Index
+# GraphiteUI Docs
 
-`docs/` 现在只保留当前仍然有效的正式项目文档，不再继续保留已经完成使命的迁移计划、设计稿和阶段 backlog。
-
-## 当前状态
-
-Vue 前端迁移已经完成，因此原先那批“为迁移服务”的设计 / 计划 / backlog 文档都已经从 `docs/` 中移除。后续如果继续迭代，优先维护这里列出的当前状态文档，以及仓库根目录里的闭环记录。
+`docs/` 只保留当前仍然有效的正式文档和长期设想，不再保存迁移计划、临时进度记录、一次性分析报告或已经落地的设计稿。
 
 ## 当前保留
 
-- [current_project_status.md](/home/abyss/GraphiteUI/docs/current_project_status.md)
+- [current_project_status.md](current_project_status.md)
   - 当前正式能力
   - 当前技术栈
-  - 当前产品路线图
-  - 同时也是项目知识库导入会读取的一份正式状态文档
+  - 当前仍在路线图中的事项
+  - 也是 GraphiteUI 项目知识库导入源之一
 
-## 根目录闭环记录
+- [future/2026-04-21-agent-companion-graph-orchestration.md](future/2026-04-21-agent-companion-graph-orchestration.md)
+  - 桌宠 Agent
+  - 自动编排图
+  - 规划后确认与边走边画两种未来模式
 
-- [task_plan.md](/home/abyss/GraphiteUI/task_plan.md)
-- [findings.md](/home/abyss/GraphiteUI/findings.md)
-- [progress.md](/home/abyss/GraphiteUI/progress.md)
+- [future/2026-04-22-agent-only-langgraph-runtime.md](future/2026-04-22-agent-only-langgraph-runtime.md)
+  - 只让 agent 成为 LangGraph 真实节点
+  - input / output / condition 作为 GraphiteUI 视觉边界和编排辅助
+  - 对人类在环断点、output preview 和 runtime 编译层的影响
 
-这些文件保留本次迁移和收尾审计的闭环过程，但它们不再是“当前还要继续执行的计划”。
+## 已清理
 
-## 清理原则
+- 迁移闭环记录：`task_plan.md`、`findings.md`、`progress.md`
+- 已完成的节点创建方式对齐报告
+- 已完成的 node top actions / state popover 计划和规格
+- 过期或偏离当前 Vue + Element Plus + node_system 主线的文档
 
-- 已完成的阶段计划删除
-- 已完成迁移后不再承担指导作用的设计稿删除
-- 只保留当前仍然描述“项目真实状态”的文档
+## 维护原则
+
+- README 是项目主入口。
+- 当前状态写在 `docs/current_project_status.md`。
+- 长期设想保留在 `docs/future/`，并在 README 中保留摘要。
+- 如果某份文档只是某个阶段的临时计划，阶段结束后应删除或折叠进当前状态文档。

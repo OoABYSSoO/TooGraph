@@ -8,7 +8,7 @@ BACKEND_PORT ?= 8765
 help:
 	@echo "Available commands:"
 	@echo "  make frontend-install Install frontend dependencies"
-	@echo "  make frontend-dev     Run Next.js frontend in dev mode"
+	@echo "  make frontend-dev     Run Vite frontend in dev mode"
 	@echo "  make frontend-build   Build the frontend"
 	@echo "  make backend-install  Install backend dependencies"
 	@echo "  make backend-dev      Run FastAPI backend in dev mode"

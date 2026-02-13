@@ -244,6 +244,18 @@ class LangGraphMigrationTests(unittest.TestCase):
         self.assertEqual(plan.name, "Hello World")
         self.assertEqual(set(plan.requirements.entry_nodes), {"input_question"})
         self.assertEqual(set(plan.requirements.terminal_nodes), {"output_answer"})
+        self.assertEqual(set(plan.requirements.runtime_entry_nodes), {"answer_helper"})
+        self.assertEqual(set(plan.requirements.runtime_terminal_nodes), {"answer_helper"})
+        self.assertEqual(set(plan.runtime_nodes), {"answer_helper"})
+        self.assertEqual([edge.model_dump(by_alias=True) for edge in plan.runtime_edges], [])
+        self.assertEqual(
+            [boundary.model_dump(by_alias=True) for boundary in plan.input_boundaries],
+            [{"node": "input_question", "state": "question"}],
+        )
+        self.assertEqual(
+            [boundary.model_dump(by_alias=True) for boundary in plan.output_boundaries],
+            [{"node": "output_answer", "state": "answer"}],
+        )
         self.assertEqual(plan.requirements.skill_keys, [])
         self.assertEqual(plan.requirements.unsupported_reasons, [])
 
@@ -287,9 +299,15 @@ class LangGraphMigrationTests(unittest.TestCase):
         self.assertEqual(result["checkpoint_metadata"]["available"], True)
         self.assertTrue(result["checkpoint_metadata"]["checkpoint_id"])
         self.assertEqual(result["checkpoint_metadata"]["thread_id"], result["run_id"])
-        self.assertEqual(len(result["node_executions"]), 3)
+        self.assertEqual(len(result["node_executions"]), 1)
+        self.assertEqual({item["node_id"] for item in result["node_executions"]}, {"answer_helper"})
+        self.assertEqual({item["node_type"] for item in result["node_executions"]}, {"agent"})
         self.assertEqual(result["cycle_summary"]["has_cycle"], False)
-        self.assertIn("output_answer", {item["node_id"] for item in result["node_executions"]})
+        self.assertEqual(result["output_previews"][0]["node_id"], "output_answer")
+        self.assertEqual(result["output_previews"][0]["source_key"], "answer")
+        self.assertEqual(result["output_previews"][0]["value"], "answer_helper:来自 state_schema 的问题")
+        self.assertEqual(result["node_status_map"]["input_question"], "success")
+        self.assertEqual(result["node_status_map"]["output_answer"], "success")
         self.assertIn("answer", result["state_snapshot"]["values"])
 
     @patch("app.core.langgraph.runtime.save_run", lambda state: None)
@@ -524,6 +542,61 @@ class LangGraphMigrationTests(unittest.TestCase):
             [edge.model_dump(by_alias=True) for edge in plan.edges],
             [{"source": "input_question", "target": "output_answer"}],
         )
+
+    @patch("app.core.langgraph.runtime.save_run", lambda state: None)
+    @patch("app.core.runtime.node_system_executor.save_run", lambda state: None)
+    def test_input_output_only_runtime_collects_output_without_node_executions(self):
+        graph = NodeSystemGraphPayload.model_validate(
+            {
+                "name": "Input Output Only",
+                "state_schema": {
+                    "answer": {
+                        "name": "Answer",
+                        "description": "",
+                        "type": "text",
+                        "value": "hello",
+                        "color": "",
+                    },
+                },
+                "nodes": {
+                    "input_answer": {
+                        "kind": "input",
+                        "name": "Input Answer",
+                        "description": "",
+                        "ui": {"position": {"x": 0, "y": 0}},
+                        "reads": [],
+                        "writes": [{"state": "answer", "mode": "replace"}],
+                        "config": {"value": "ignored"},
+                    },
+                    "output_answer": {
+                        "kind": "output",
+                        "name": "Output Answer",
+                        "description": "",
+                        "ui": {"position": {"x": 240, "y": 0}},
+                        "reads": [{"state": "answer", "required": True}],
+                        "writes": [],
+                        "config": {
+                            "displayMode": "auto",
+                            "persistEnabled": False,
+                            "persistFormat": "auto",
+                            "fileNameTemplate": "",
+                        },
+                    },
+                },
+                "edges": [{"source": "input_answer", "target": "output_answer"}],
+                "conditional_edges": [],
+                "metadata": {},
+            }
+        )
+
+        result = execute_node_system_graph_langgraph(graph, persist_progress=False)
+
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(result["node_executions"], [])
+        self.assertEqual(result["final_result"], "hello")
+        self.assertEqual(result["node_status_map"]["input_answer"], "success")
+        self.assertEqual(result["node_status_map"]["output_answer"], "success")
+        self.assertEqual([preview["node_id"] for preview in result["output_previews"]], ["output_answer"])
 
     def test_plain_edge_graph_accepts_multiple_shared_states_as_control_flow(self):
         graph = NodeSystemGraphPayload.model_validate(
@@ -799,6 +872,8 @@ class LangGraphMigrationTests(unittest.TestCase):
         source = generate_langgraph_python_source(graph)
         self.assertIn("def build_graph()", source)
         self.assertIn("def invoke_graph", source)
+        self.assertNotIn("for node_name in GRAPH.nodes:", source)
+        self.assertIn("for node_name in RUNTIME_NODES:", source)
 
         namespace: dict[str, object] = {}
         exec(source, namespace, namespace)
@@ -828,7 +903,10 @@ class LangGraphMigrationTests(unittest.TestCase):
         self.assertEqual(len(result["cycle_iterations"]), 3)
         self.assertEqual(result["cycle_iterations"][0]["stop_reason"], None)
         self.assertEqual(result["cycle_iterations"][-1]["stop_reason"], "completed")
-        self.assertEqual(result["cycle_iterations"][-1]["executed_node_ids"], ["increment_counter", "continue_check", "output_counter"])
+        self.assertEqual(result["cycle_iterations"][-1]["executed_node_ids"], ["increment_counter"])
+        execution_ids = {item["node_id"] for item in result["node_executions"]}
+        self.assertNotIn("continue_check", execution_ids)
+        self.assertNotIn("output_counter", execution_ids)
 
     @patch("app.core.langgraph.runtime.save_run", lambda state: None)
     @patch("app.core.runtime.node_system_executor.save_run", lambda state: None)
@@ -848,7 +926,10 @@ class LangGraphMigrationTests(unittest.TestCase):
         self.assertEqual(result["cycle_summary"]["stop_reason"], "completed")
         self.assertEqual(result["cycle_summary"]["back_edges"], ["continue_check→increment_counter"])
         self.assertEqual(result["final_result"], "3")
-        self.assertEqual(result["cycle_iterations"][-1]["executed_node_ids"], ["increment_counter", "continue_check", "output_counter"])
+        self.assertEqual(result["cycle_iterations"][-1]["executed_node_ids"], ["increment_counter"])
+        execution_ids = {item["node_id"] for item in result["node_executions"]}
+        self.assertNotIn("continue_check", execution_ids)
+        self.assertNotIn("output_counter", execution_ids)
 
     @patch("app.core.langgraph.runtime.save_run", lambda state: None)
     @patch("app.core.runtime.node_system_executor.save_run", lambda state: None)
@@ -951,7 +1032,8 @@ class LangGraphMigrationTests(unittest.TestCase):
 
         self.assertEqual(result["status"], "completed")
         self.assertEqual(result["runtime_backend"], "langgraph")
-        self.assertEqual(len(result["node_executions"]), 6)
+        self.assertEqual(len(result["node_executions"]), 2)
+        self.assertEqual({item["node_type"] for item in result["node_executions"]}, {"agent"})
         self.assertIn("search_knowledge_base", result["selected_skills"])
         self.assertEqual(len(result["skill_outputs"]), 2)
         self.assertTrue(result["knowledge_summary"])
@@ -968,5 +1050,8 @@ class LangGraphMigrationTests(unittest.TestCase):
         self.assertEqual(result["runtime_backend"], "langgraph")
         self.assertEqual(result["final_result"], "通过分支命中：score >= 60")
         self.assertEqual(result["state_snapshot"]["values"]["score"], 80)
-        self.assertIn("output_pass", {item["node_id"] for item in result["node_executions"]})
-        self.assertNotIn("output_fail", {item["node_id"] for item in result["node_executions"]})
+        self.assertEqual(result["node_executions"], [])
+        self.assertEqual(result["node_status_map"]["score_gate"], "success")
+        self.assertEqual(result["node_status_map"]["output_pass"], "success")
+        self.assertEqual(result["node_status_map"]["output_fail"], "idle")
+        self.assertEqual([preview["node_id"] for preview in result["output_previews"]], ["output_pass"])

@@ -3,17 +3,26 @@ from __future__ import annotations
 from collections import Counter
 from app.core.control_flow_state_analysis import find_ambiguous_state_reads
 from app.core.langgraph.build_plan import (
+    LangGraphBoundaryPlan,
     LangGraphBuildPlan,
     LangGraphConditionalEdgePlan,
     LangGraphEdgePlan,
     LangGraphNodePlan,
+    LangGraphRuntimeConditionRoutePlan,
     LangGraphRuntimeRequirements,
 )
 from app.core.schemas.node_system import (
     NodeSystemAgentNode,
+    NodeSystemConditionNode,
     NodeSystemGraphPayload,
+    NodeSystemInputNode,
+    NodeSystemOutputNode,
     NodeSystemStateType,
 )
+
+RUNTIME_START = "__start__"
+RUNTIME_END = "__end__"
+
 
 def get_langgraph_runtime_unsupported_reasons(
     graph: NodeSystemGraphPayload,
@@ -39,6 +48,10 @@ def compile_graph_to_langgraph_plan(graph: NodeSystemGraphPayload) -> LangGraphB
         LangGraphEdgePlan(source=edge.source, target=edge.target)
         for edge in graph.edges
     ]
+    conditional_edges_by_source = {
+        edge.source: edge
+        for edge in graph.conditional_edges
+    }
 
     graph_nodes: dict[str, LangGraphNodePlan] = {}
     skill_keys: set[str] = set()
@@ -58,6 +71,103 @@ def compile_graph_to_langgraph_plan(graph: NodeSystemGraphPayload) -> LangGraphB
             config=node.config.model_dump(by_alias=True),
         )
 
+    runtime_nodes = {
+        node_name: graph_nodes[node_name]
+        for node_name, node in graph.nodes.items()
+        if isinstance(node, NodeSystemAgentNode)
+    }
+    input_boundaries = [
+        LangGraphBoundaryPlan(node=node_name, state=node.writes[0].state)
+        for node_name, node in graph.nodes.items()
+        if isinstance(node, NodeSystemInputNode) and node.writes
+    ]
+    output_boundaries = [
+        LangGraphBoundaryPlan(node=node_name, state=node.reads[0].state)
+        for node_name, node in graph.nodes.items()
+        if isinstance(node, NodeSystemOutputNode) and node.reads
+    ]
+
+    runtime_edges: list[LangGraphEdgePlan] = []
+    runtime_condition_routes: list[LangGraphRuntimeConditionRoutePlan] = []
+    runtime_incoming_counts = Counter()
+    runtime_outgoing_counts = Counter()
+    runtime_entry_candidates: set[str] = set()
+    route_sources: set[str] = set()
+
+    def _runtime_target_for_visual_node(target: str) -> str | None:
+        target_node = graph.nodes.get(target)
+        if isinstance(target_node, NodeSystemAgentNode):
+            return target
+        if isinstance(target_node, NodeSystemOutputNode):
+            return RUNTIME_END
+        if isinstance(target_node, NodeSystemConditionNode):
+            unsupported_reasons.append(
+                f"condition '{target}' cannot be used as a condition branch target in agent-only runtime."
+            )
+            return None
+        if target_node is not None:
+            unsupported_reasons.append(
+                f"node '{target}' with kind '{target_node.kind}' cannot be used as a runtime branch target."
+            )
+        return None
+
+    def _add_runtime_condition_route(source: str, condition_name: str) -> None:
+        route_key = f"{source}:{condition_name}"
+        if route_key in route_sources:
+            return
+        route_sources.add(route_key)
+        conditional_edge = conditional_edges_by_source.get(condition_name)
+        if conditional_edge is None:
+            unsupported_reasons.append(
+                f"condition '{condition_name}' is missing conditional edge branch targets."
+            )
+            return
+
+        branches: dict[str, str] = {}
+        branch_targets: dict[str, str] = {}
+        for branch, visual_target in conditional_edge.branches.items():
+            runtime_target = _runtime_target_for_visual_node(visual_target)
+            if runtime_target is None:
+                continue
+            branches[branch] = runtime_target
+            branch_targets[branch] = visual_target
+            if runtime_target != RUNTIME_END:
+                runtime_incoming_counts[runtime_target] += 1
+
+        if not branches:
+            unsupported_reasons.append(
+                f"condition '{condition_name}' has no branch target compatible with agent-only runtime."
+            )
+            return
+        if source != RUNTIME_START:
+            runtime_outgoing_counts[source] += 1
+        runtime_condition_routes.append(
+            LangGraphRuntimeConditionRoutePlan(
+                source=source,
+                condition=condition_name,
+                branches=branches,
+                branch_targets=branch_targets,
+            )
+        )
+
+    for edge in graph.edges:
+        source_node = graph.nodes.get(edge.source)
+        target_node = graph.nodes.get(edge.target)
+        if isinstance(source_node, NodeSystemAgentNode) and isinstance(target_node, NodeSystemAgentNode):
+            runtime_edges.append(LangGraphEdgePlan(source=edge.source, target=edge.target))
+            runtime_outgoing_counts[edge.source] += 1
+            runtime_incoming_counts[edge.target] += 1
+            continue
+        if isinstance(source_node, NodeSystemAgentNode) and isinstance(target_node, NodeSystemConditionNode):
+            _add_runtime_condition_route(edge.source, edge.target)
+            continue
+        if isinstance(source_node, NodeSystemInputNode) and isinstance(target_node, NodeSystemAgentNode):
+            runtime_entry_candidates.add(edge.target)
+            continue
+        if isinstance(source_node, NodeSystemInputNode) and isinstance(target_node, NodeSystemConditionNode):
+            _add_runtime_condition_route(RUNTIME_START, edge.target)
+            continue
+
     entry_nodes = [
         node_name
         for node_name in graph.nodes
@@ -67,6 +177,21 @@ def compile_graph_to_langgraph_plan(graph: NodeSystemGraphPayload) -> LangGraphB
         node_name
         for node_name in graph.nodes
         if outgoing_counts.get(node_name, 0) == 0
+    ]
+    runtime_entry_nodes = sorted(
+        {
+            *runtime_entry_candidates,
+            *[
+                node_name
+                for node_name in runtime_nodes
+                if runtime_incoming_counts.get(node_name, 0) == 0
+            ],
+        }
+    )
+    runtime_terminal_nodes = [
+        node_name
+        for node_name in runtime_nodes
+        if runtime_outgoing_counts.get(node_name, 0) == 0
     ]
 
     knowledge_base_states = [
@@ -93,9 +218,16 @@ def compile_graph_to_langgraph_plan(graph: NodeSystemGraphPayload) -> LangGraphB
             LangGraphConditionalEdgePlan(source=edge.source, branches=edge.branches)
             for edge in graph.conditional_edges
         ],
+        runtime_nodes=runtime_nodes,
+        runtime_edges=runtime_edges,
+        runtime_condition_routes=runtime_condition_routes,
+        input_boundaries=input_boundaries,
+        output_boundaries=output_boundaries,
         requirements=LangGraphRuntimeRequirements(
             entry_nodes=entry_nodes,
             terminal_nodes=terminal_nodes,
+            runtime_entry_nodes=runtime_entry_nodes,
+            runtime_terminal_nodes=runtime_terminal_nodes,
             skill_keys=sorted(skill_keys),
             knowledge_base_states=knowledge_base_states,
             unsupported_reasons=list(dict.fromkeys(unsupported_reasons)),
