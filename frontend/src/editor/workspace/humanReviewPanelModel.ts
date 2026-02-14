@@ -7,6 +7,7 @@ import {
   STATE_FIELD_TYPE_OPTIONS,
   type StateFieldType,
 } from "./statePanelFields.ts";
+import { sortHumanReviewStateKeys } from "./stateOrdering.ts";
 
 export type HumanReviewRow = {
   key: string;
@@ -38,7 +39,7 @@ export function formatHumanReviewDraftValue(type: string | undefined, value: unk
 
 export function buildHumanReviewRows(run: RunDetail | null, document: GraphPayload | GraphDocument): HumanReviewRow[] {
   const values = resolveHumanReviewStateValues(run);
-  return Object.keys(values).map((key) => {
+  return sortHumanReviewStateKeys(Object.keys(values), document).map((key) => {
     const definition = document.state_schema[key];
     const type = resolveHumanReviewStateType(definition?.type);
     const label = definition?.name?.trim() || key;

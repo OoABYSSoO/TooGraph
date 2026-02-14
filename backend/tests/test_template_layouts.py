@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.core.schemas.node_system import NodeSystemTemplate
+from app.core.schemas.node_system import NodeSystemInputNode, NodeSystemTemplate
 from app.templates.loader import list_template_records
 
 
@@ -109,3 +109,30 @@ class TemplateLayoutTests(unittest.TestCase):
                     )
 
         self.assertEqual(failures, [], "\n".join(failures))
+
+    def test_human_review_template_keeps_feedback_in_review_panel(self):
+        template = next(
+            NodeSystemTemplate.model_validate(record)
+            for record in list_template_records()
+            if record["template_id"] == "human_review_demo"
+        )
+
+        self.assertIn("human_feedback", template.state_schema)
+        self.assertIn("revision_writer", template.nodes)
+        self.assertIn(
+            "human_feedback",
+            [binding.state for binding in template.nodes["revision_writer"].reads],
+        )
+
+        input_feedback_writers = [
+            node_id
+            for node_id, node in template.nodes.items()
+            if isinstance(node, NodeSystemInputNode)
+            for binding in node.writes
+            if binding.state == "human_feedback"
+        ]
+        self.assertEqual(
+            input_feedback_writers,
+            [],
+            "Human review feedback should be edited from the review panel after pause, not from an Input node.",
+        )

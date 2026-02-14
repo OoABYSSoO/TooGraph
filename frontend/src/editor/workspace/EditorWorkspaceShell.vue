@@ -149,8 +149,7 @@
             </div>
 
             <EditorHumanReviewPanel
-              v-if="sidePanelMode(tab.tabId) === 'human-review' && documentsByTabId[tab.tabId]"
-              :open="isStatePanelOpen(tab.tabId)"
+              v-if="isStatePanelOpen(tab.tabId) && sidePanelMode(tab.tabId) === 'human-review' && documentsByTabId[tab.tabId]"
               :document="documentsByTabId[tab.tabId]!"
               :run="latestRunDetailByTabId[tab.tabId] ?? null"
               :focused-node-id="focusedNodeIdByTabId[tab.tabId] ?? null"
@@ -162,8 +161,7 @@
             />
 
             <EditorStatePanel
-              v-else-if="documentsByTabId[tab.tabId]"
-              :open="isStatePanelOpen(tab.tabId)"
+              v-else-if="isStatePanelOpen(tab.tabId) && documentsByTabId[tab.tabId]"
               :document="documentsByTabId[tab.tabId]!"
               :focused-node-id="focusedNodeIdByTabId[tab.tabId] ?? null"
               @toggle="toggleStatePanel(tab.tabId)"
@@ -939,9 +937,15 @@ function toggleActiveStatePanel() {
 function editorGridStyle(tabId: string) {
   return {
     gridTemplateColumns: isStatePanelOpen(tabId)
-      ? "minmax(0, 1fr) var(--editor-state-panel-open-width)"
-      : "minmax(0, 1fr) 56px",
+      ? `minmax(0, 1fr) ${sidePanelOpenWidth(tabId)}`
+      : "minmax(0, 1fr)",
   };
+}
+
+function sidePanelOpenWidth(tabId: string) {
+  return sidePanelMode(tabId) === "human-review"
+    ? "var(--editor-human-review-panel-open-width)"
+    : "var(--editor-state-panel-open-width)";
 }
 
 function nodeCreationMenuState(tabId: string) {
@@ -2035,7 +2039,8 @@ onMounted(() => {
 
 <style scoped>
 .editor-workspace-shell {
-  --editor-state-panel-open-width: clamp(280px, 28vw, 380px);
+  --editor-state-panel-open-width: clamp(340px, 32vw, 480px);
+  --editor-human-review-panel-open-width: clamp(360px, 34vw, 520px);
   position: relative;
   display: flex;
   flex-direction: column;
@@ -2216,6 +2221,7 @@ onMounted(() => {
 @media (max-width: 760px) {
   .editor-workspace-shell {
     --editor-state-panel-open-width: min(320px, calc(100vw - var(--app-sidebar-width) - 24px));
+    --editor-human-review-panel-open-width: min(360px, calc(100vw - var(--app-sidebar-width) - 24px));
   }
 }
 </style>

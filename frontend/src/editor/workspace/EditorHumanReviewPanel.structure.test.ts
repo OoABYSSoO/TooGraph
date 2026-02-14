@@ -10,6 +10,7 @@ const componentSource = readFileSync(resolve(currentDirectory, "EditorHumanRevie
 
 test("EditorHumanReviewPanel renders paused run context and editable state drafts", () => {
   assert.match(componentSource, /class="editor-human-review-panel"/);
+  assert.doesNotMatch(componentSource, /editor-human-review-panel__collapsed/);
   assert.match(componentSource, /Human Review/);
   assert.match(componentSource, /run\?: RunDetail \| null;/);
   assert.match(componentSource, /document: GraphPayload \| GraphDocument;/);

@@ -111,6 +111,7 @@ function numberValue(input: string) {
 .state-default-value-editor__field,
 .state-default-value-editor__structured {
   display: grid;
+  min-width: 0;
   gap: 6px;
 }
 
@@ -121,6 +122,8 @@ function numberValue(input: string) {
 
 .state-default-value-editor__input,
 .state-default-value-editor__textarea {
+  box-sizing: border-box;
+  min-width: 0;
   width: 100%;
   border: 1px solid rgba(154, 52, 18, 0.14);
   border-radius: 14px;
@@ -139,6 +142,7 @@ function numberValue(input: string) {
 
 .state-default-value-editor__toggle {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
@@ -179,6 +183,7 @@ function numberValue(input: string) {
 
 .state-default-value-editor__structured-footer {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px;

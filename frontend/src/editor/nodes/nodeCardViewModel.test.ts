@@ -44,6 +44,31 @@ test("buildNodeCardViewModel derives input body and output label", () => {
   assert.equal(model.body.primaryOutput?.typeLabel, "text");
 });
 
+test("buildNodeCardViewModel treats input node state schema value as the visible input value", () => {
+  const node: GraphNode = {
+    kind: "input",
+    name: "input_question",
+    description: "Provide the user question.",
+    ui: { position: { x: 80, y: 220 } },
+    reads: [],
+    writes: [{ state: "question", mode: "replace" }],
+    config: {
+      value: "旧的节点 config 值",
+    },
+  };
+
+  const model = buildNodeCardViewModel("input_question", node, {
+    ...stateSchema,
+    question: {
+      ...stateSchema.question,
+      value: "来自 state_schema 的新值",
+    },
+  });
+
+  assert.equal(model.body.kind, "input");
+  assert.equal(model.body.valueText, "来自 state_schema 的新值");
+});
+
 test("buildNodeCardViewModel derives knowledge-base input editor mode from primary output state type", () => {
   const node: GraphNode = {
     kind: "input",

@@ -107,6 +107,34 @@ class RunGraphSnapshotTest(unittest.TestCase):
             "saver": "json_checkpoint_saver",
         }
         set_run_status(previous_run, "awaiting_human", pause_reason="breakpoint")
+        previous_run["node_status_map"] = {
+            "input_name": "success",
+            "greeting_agent": "success",
+            "output_greeting": "success",
+        }
+        previous_run["output_previews"] = [
+            {
+                "node_id": "output_greeting",
+                "label": "greeting",
+                "source_kind": "state",
+                "source_key": "greeting",
+                "display_mode": "markdown",
+                "persist_enabled": False,
+                "persist_format": "auto",
+                "value": "上一轮输出",
+            }
+        ]
+        previous_run["artifacts"] = {
+            **previous_run.get("artifacts", {}),
+            "output_previews": list(previous_run["output_previews"]),
+            "exported_outputs": [
+                {
+                    **previous_run["output_previews"][0],
+                    "saved_file": None,
+                }
+            ],
+            "active_edge_ids": ["edge:greeting_agent:output_greeting"],
+        }
         touch_run_lifecycle(previous_run)
 
         captured: dict[str, object] = {}
@@ -116,6 +144,7 @@ class RunGraphSnapshotTest(unittest.TestCase):
             captured["graph_name"] = graph.name
             captured["state_keys"] = sorted(graph.state_schema.keys())
             captured["resume_command"] = resume_command
+            captured["initial_state"] = initial_state
             return initial_state
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -149,6 +178,12 @@ class RunGraphSnapshotTest(unittest.TestCase):
                 self.assertEqual(captured["graph_name"], "Hello World")
                 self.assertEqual(captured["state_keys"], ["greeting", "name"])
                 self.assertEqual(captured["resume_command"], {"name": "人工确认"})
+                initial_state = captured["initial_state"]
+                self.assertIsInstance(initial_state, dict)
+                self.assertEqual(initial_state["node_status_map"]["greeting_agent"], "success")
+                self.assertEqual(initial_state["output_previews"][0]["node_id"], "output_greeting")
+                self.assertEqual(initial_state["artifacts"]["exported_outputs"][0]["node_id"], "output_greeting")
+                self.assertEqual(initial_state["artifacts"]["active_edge_ids"], ["edge:greeting_agent:output_greeting"])
 
 
 if __name__ == "__main__":

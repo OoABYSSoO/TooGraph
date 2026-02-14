@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import logging
 from typing import Any
 
@@ -114,7 +115,7 @@ def resume_run_endpoint(
     resumed_run["runtime_backend"] = "langgraph"
     resumed_run["metadata"] = dict(graph.metadata)
     resumed_run["metadata"]["resolved_runtime_backend"] = "langgraph"
-    resumed_run["node_status_map"] = {node_name: "idle" for node_name in graph.nodes}
+    _carry_resume_visual_state(resumed_run, previous_run, graph)
     resumed_run["checkpoint_metadata"] = {
         "available": bool(checkpoint_metadata.get("checkpoint_id")),
         "checkpoint_id": checkpoint_metadata.get("checkpoint_id"),
@@ -129,6 +130,32 @@ def resume_run_endpoint(
 
     background_tasks.add_task(_resume_run_worker, graph, resumed_run, payload.get("resume") if payload else None)
     return {"run_id": resumed_run["run_id"], "status": resumed_run["status"]}
+
+
+def _carry_resume_visual_state(resumed_run: dict[str, Any], previous_run: dict[str, Any], graph: NodeSystemGraphDocument) -> None:
+    previous_status_map = dict(previous_run.get("node_status_map") or {})
+    resumed_run["node_status_map"] = {
+        node_name: previous_status_map.get(node_name, "idle")
+        for node_name in graph.nodes
+    }
+
+    for key in (
+        "node_executions",
+        "output_previews",
+        "saved_outputs",
+        "selected_skills",
+        "skill_outputs",
+        "state_events",
+        "state_last_writers",
+        "state_values",
+        "final_result",
+    ):
+        if key in previous_run:
+            resumed_run[key] = copy.deepcopy(previous_run[key])
+
+    previous_artifacts = previous_run.get("artifacts")
+    if isinstance(previous_artifacts, dict):
+        resumed_run["artifacts"] = copy.deepcopy(previous_artifacts)
 
 
 def _resume_run_worker(graph, resumed_run: dict, resume_payload: Any | None = None) -> None:

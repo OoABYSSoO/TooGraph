@@ -1,162 +1,201 @@
 <template>
-  <aside class="editor-state-panel" :class="{ 'editor-state-panel--open': open }">
-    <button
-      v-if="!open"
-      type="button"
-      class="editor-state-panel__collapsed"
-      aria-label="Open state panel"
-      @click="$emit('toggle')"
-    >
-      <span class="editor-state-panel__collapsed-label">State</span>
-      <span class="editor-state-panel__collapsed-count">{{ view.count }}</span>
-    </button>
-
-    <template v-else>
-      <header class="editor-state-panel__inspector-header">
-        <div>
-          <div class="editor-state-panel__eyebrow">Graph State</div>
-          <h2 class="editor-state-panel__title">Graph Inspector</h2>
-          <p class="editor-state-panel__body">Track state objects, bindings, and defaults in one compact panel.</p>
-        </div>
-        <div class="editor-state-panel__header-tools">
-          <span class="editor-state-panel__header-count">{{ view.count }}</span>
-          <button type="button" class="editor-state-panel__collapse" aria-label="Collapse state panel" @click="$emit('toggle')">
-            <ElIcon class="editor-state-panel__collapse-icon" aria-hidden="true"><ArrowRight /></ElIcon>
-          </button>
-        </div>
-      </header>
-
-      <div class="editor-state-panel__summary">
-        <div class="editor-state-panel__summary-stats" aria-label="State summary">
-          <div class="editor-state-panel__summary-stat">
-            <span>States</span>
-            <strong>{{ view.count }}</strong>
-          </div>
-          <div class="editor-state-panel__summary-stat">
-            <span>Reads</span>
-            <strong>{{ readerTotal }}</strong>
-          </div>
-          <div class="editor-state-panel__summary-stat">
-            <span>Writes</span>
-            <strong>{{ writerTotal }}</strong>
-          </div>
-        </div>
-        <button type="button" class="editor-state-panel__quick-action" @click="$emit('add-state')">
-          <ElIcon aria-hidden="true"><CirclePlus /></ElIcon>
-          <span>Add</span>
+  <aside class="editor-state-panel" @pointerdown.capture="handleStatePanelPointerDown">
+    <header class="editor-state-panel__inspector-header">
+      <div>
+        <div class="editor-state-panel__eyebrow">Graph State</div>
+        <h2 class="editor-state-panel__title">Graph Inspector</h2>
+        <p class="editor-state-panel__body">Track state objects, bindings, and defaults in one compact panel.</p>
+      </div>
+      <div class="editor-state-panel__header-tools">
+        <span class="editor-state-panel__header-count">{{ view.count }}</span>
+        <button type="button" class="editor-state-panel__collapse" aria-label="Collapse state panel" @click="$emit('toggle')">
+          <ElIcon class="editor-state-panel__collapse-icon" aria-hidden="true"><ArrowRight /></ElIcon>
         </button>
       </div>
+    </header>
 
-      <div class="editor-state-panel__content">
-        <div v-if="view.rows.length === 0" class="editor-state-panel__empty">
-          <div class="editor-state-panel__empty-title">{{ view.emptyTitle }}</div>
-          <div class="editor-state-panel__empty-body">{{ view.emptyBody }}</div>
+    <div class="editor-state-panel__summary">
+      <div class="editor-state-panel__summary-stats" aria-label="State summary">
+        <div class="editor-state-panel__summary-stat">
+          <span>States</span>
+          <strong>{{ view.count }}</strong>
         </div>
+        <div class="editor-state-panel__summary-stat">
+          <span>Reads</span>
+          <strong>{{ readerTotal }}</strong>
+        </div>
+        <div class="editor-state-panel__summary-stat">
+          <span>Writes</span>
+          <strong>{{ writerTotal }}</strong>
+        </div>
+      </div>
+      <button type="button" class="editor-state-panel__quick-action" @click="$emit('add-state')">
+        <ElIcon aria-hidden="true"><CirclePlus /></ElIcon>
+        <span>Add</span>
+      </button>
+    </div>
 
-        <article
-          v-for="row in view.rows"
-          :key="row.key"
-          class="editor-state-panel__state-row"
-          :style="{ '--state-panel-row-accent': stateDefinition(row.key)?.color ?? '#d97706' }"
+    <div class="editor-state-panel__content">
+      <div v-if="view.rows.length === 0" class="editor-state-panel__empty">
+        <div class="editor-state-panel__empty-title">{{ view.emptyTitle }}</div>
+        <div class="editor-state-panel__empty-body">{{ view.emptyBody }}</div>
+      </div>
+
+      <article
+        v-for="row in view.rows"
+        :key="row.key"
+        class="editor-state-panel__state-row"
+        :style="{ '--state-panel-row-accent': stateDefinition(row.key)?.color ?? '#d97706' }"
+      >
+        <div
+          class="editor-state-panel__state-row-head"
+          role="button"
+          tabindex="0"
+          :aria-expanded="isStateRowExpanded(row.key)"
+          @click="toggleStateRow(row.key)"
+          @keydown.enter.prevent="toggleStateRow(row.key)"
+          @keydown.space.prevent="toggleStateRow(row.key)"
         >
-          <div class="editor-state-panel__state-row-head">
-            <div class="editor-state-panel__state-main">
-              <span class="editor-state-panel__state-dot" aria-hidden="true" />
-              <div class="editor-state-panel__state-copy">
-                <div class="editor-state-panel__card-title">{{ row.title }}</div>
-                <div class="editor-state-panel__card-key">{{ row.key }}</div>
-              </div>
-            </div>
-            <div class="editor-state-panel__state-actions">
-              <span class="editor-state-panel__card-type">{{ row.typeLabel }}</span>
-              <button
-                type="button"
-                class="editor-state-panel__card-delete"
-                aria-label="Delete state"
-                @click="$emit('delete-state', row.key)"
-              >
-                <ElIcon aria-hidden="true"><Delete /></ElIcon>
-              </button>
+          <ElIcon
+            class="editor-state-panel__expand-indicator"
+            :class="{ 'editor-state-panel__expand-indicator--open': isStateRowExpanded(row.key) }"
+            aria-hidden="true"
+          >
+            <ArrowDown />
+          </ElIcon>
+          <div class="editor-state-panel__state-main">
+            <span class="editor-state-panel__state-dot" aria-hidden="true" />
+            <div class="editor-state-panel__state-copy">
+              <div class="editor-state-panel__card-title">{{ row.title }}</div>
             </div>
           </div>
+          <div class="editor-state-panel__state-counts">
+            <span class="editor-state-panel__binding-chip editor-state-panel__binding-chip--readers">{{ row.readerCount }}r</span>
+            <span class="editor-state-panel__binding-chip editor-state-panel__binding-chip--writers">{{ row.writerCount }}w</span>
+          </div>
+          <div class="editor-state-panel__state-actions">
+            <span class="editor-state-panel__card-type">{{ row.typeLabel }}</span>
+            <ElPopover
+              :visible="isStateDeleteConfirmOpen(row.key)"
+              placement="top"
+              :show-arrow="false"
+              :popper-style="stateConfirmPopoverStyle"
+              popper-class="editor-state-panel__confirm-popover editor-state-panel__confirm-popover--delete"
+            >
+              <template #reference>
+                <button
+                  type="button"
+                  data-state-delete-surface="true"
+                  class="editor-state-panel__card-delete"
+                  :class="{ 'editor-state-panel__card-delete--confirm': isStateDeleteConfirmOpen(row.key) }"
+                  :aria-label="isStateDeleteConfirmOpen(row.key) ? 'Confirm delete state' : 'Delete state'"
+                  @pointerdown.stop
+                  @click.stop="handleStateDeleteActionClick(row.key)"
+                >
+                  <ElIcon v-if="isStateDeleteConfirmOpen(row.key)" aria-hidden="true"><Check /></ElIcon>
+                  <ElIcon v-else aria-hidden="true"><Delete /></ElIcon>
+                </button>
+              </template>
+              <div class="editor-state-panel__confirm-hint editor-state-panel__confirm-hint--delete">Delete state?</div>
+            </ElPopover>
+          </div>
+        </div>
 
-          <div class="editor-state-panel__details-card">
+        <div v-if="isStateRowExpanded(row.key)" class="editor-state-panel__details-card">
             <div class="editor-state-panel__details-title">Definition</div>
 
             <div class="editor-state-panel__field-grid">
-              <label class="editor-state-panel__field">
-                <span>Key</span>
-                <input
-                  class="editor-state-panel__input"
-                  :value="row.key"
-                  @blur="commitStateRename(row.key, ($event.target as HTMLInputElement).value)"
-                  @keydown.enter="commitStateRename(row.key, ($event.target as HTMLInputElement).value)"
+              <div class="editor-state-panel__field">
+                <span class="editor-state-panel__field-label">Key</span>
+                <ElInput
+                  aria-label="State key"
+                  :model-value="row.key"
+                  @change="commitStateRename(row.key, String($event ?? ''))"
                 />
-              </label>
+              </div>
 
-              <label class="editor-state-panel__field">
-                <span>Name</span>
-                <input
-                  class="editor-state-panel__input"
-                  :value="stateDefinition(row.key)?.name ?? ''"
-                  @input="
+              <div class="editor-state-panel__field">
+                <span class="editor-state-panel__field-label">Name</span>
+                <ElInput
+                  aria-label="State name"
+                  :model-value="stateDefinition(row.key)?.name ?? ''"
+                  @update:model-value="
                     $emit('update-state', {
                       stateKey: row.key,
-                      patch: { name: ($event.target as HTMLInputElement).value },
+                      patch: { name: String($event ?? '') },
                     })
                   "
                 />
-              </label>
+              </div>
             </div>
 
-            <label class="editor-state-panel__field">
-              <span>Description</span>
-              <textarea
-                class="editor-state-panel__textarea"
-                rows="2"
-                :value="stateDefinition(row.key)?.description ?? ''"
-                @input="
-                  $emit('update-state', {
-                    stateKey: row.key,
-                    patch: { description: ($event.target as HTMLTextAreaElement).value },
-                  })
-                "
-              />
-            </label>
-
             <div class="editor-state-panel__field-grid">
-              <label class="editor-state-panel__field">
-                <span>Type</span>
+              <div class="editor-state-panel__field">
+                <span class="editor-state-panel__field-label">Type</span>
                 <ElSelect
                   class="editor-state-panel__select graphite-select"
-                  :model-value="row.typeLabel"
+                  aria-label="State type"
+                  :model-value="stateDefinition(row.key)?.type ?? 'text'"
                   :teleported="false"
-                  popper-class="graphite-select-popper"
+                  popper-class="graphite-select-popper editor-state-panel__select-popper"
                   @update:model-value="handleStateTypeSelect(row.key, $event)"
                 >
                   <ElOption v-for="typeOption in STATE_FIELD_TYPE_OPTIONS" :key="typeOption" :label="typeOption" :value="typeOption" />
                 </ElSelect>
-              </label>
+              </div>
 
-              <label class="editor-state-panel__field">
-                <span>Color</span>
-                <input
-                  class="editor-state-panel__input"
-                  :value="stateDefinition(row.key)?.color ?? ''"
-                  placeholder="#d97706"
-                  @input="
-                    $emit('update-state', {
-                      stateKey: row.key,
-                      patch: { color: ($event.target as HTMLInputElement).value },
-                    })
-                  "
-                />
-              </label>
+              <div class="editor-state-panel__field">
+                <span class="editor-state-panel__field-label">Color</span>
+                <ElSelect
+                  class="editor-state-panel__color-select graphite-select"
+                  aria-label="State color"
+                  :model-value="stateDefinition(row.key)?.color ?? ''"
+                  :teleported="false"
+                  popper-class="graphite-select-popper editor-state-panel__select-popper"
+                  @update:model-value="handleStateColorSelect(row.key, $event)"
+                >
+                  <template #label>
+                    <span class="editor-state-panel__color-select-value">
+                      <span class="editor-state-panel__color-dot" :style="selectedStateColorStyle(row.key)" />
+                    </span>
+                  </template>
+                  <ElOption v-for="option in stateColorOptions(row.key)" :key="option.value || option.label" :label="option.label" :value="option.value">
+                    <div class="editor-state-panel__color-option">
+                      <span class="editor-state-panel__color-dot" :style="{ backgroundColor: option.swatch }" />
+                      <span class="editor-state-panel__color-option-label">{{ option.label }}</span>
+                    </div>
+                  </ElOption>
+                </ElSelect>
+              </div>
             </div>
 
-            <div class="editor-state-panel__card-bindings">
-              <span class="editor-state-panel__binding-chip editor-state-panel__binding-chip--readers">{{ row.readerCount }} readers</span>
-              <span class="editor-state-panel__binding-chip editor-state-panel__binding-chip--writers">{{ row.writerCount }} writers</span>
+            <div class="editor-state-panel__field editor-state-panel__field--full">
+              <span class="editor-state-panel__field-label">Description</span>
+              <ElInput
+                aria-label="State description"
+                type="textarea"
+                :rows="2"
+                :model-value="stateDefinition(row.key)?.description ?? ''"
+                @update:model-value="
+                  $emit('update-state', {
+                    stateKey: row.key,
+                    patch: { description: String($event ?? '') },
+                  })
+                "
+              />
+            </div>
+
+            <div class="editor-state-panel__card-value">
+              <StateDefaultValueEditor
+                v-if="stateDefinition(row.key)"
+                :field="stateDefinition(row.key)!"
+                @update-value="
+                  $emit('update-state', {
+                    stateKey: row.key,
+                    patch: { value: $event },
+                  })
+                "
+              />
             </div>
 
             <div class="editor-state-panel__binding-groups">
@@ -254,41 +293,30 @@
                 />
               </div>
             </div>
-
-            <div class="editor-state-panel__card-value">
-              <div class="editor-state-panel__card-value-label">Value</div>
-              <StateDefaultValueEditor
-                v-if="stateDefinition(row.key)"
-                :field="stateDefinition(row.key)!"
-                @update-value="
-                  $emit('update-state', {
-                    stateKey: row.key,
-                    patch: { value: $event },
-                  })
-                "
-              />
-            </div>
           </div>
         </article>
       </div>
-    </template>
   </aside>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
-import { ElIcon, ElOption, ElSelect } from "element-plus";
-import { ArrowRight, CirclePlus, Delete } from "@element-plus/icons-vue";
+import { computed, onBeforeUnmount, ref } from "vue";
+import { ElIcon, ElInput, ElOption, ElPopover, ElSelect } from "element-plus";
+import { ArrowDown, ArrowRight, Check, CirclePlus, Delete } from "@element-plus/icons-vue";
 
 import StateDefaultValueEditor from "./StateDefaultValueEditor.vue";
 import StateBindingCreateForm from "./StateBindingCreateForm.vue";
 import { listStateBindingNodeOptions, type StateBindingMode } from "./statePanelBindings.ts";
-import { defaultValueForStateType, STATE_FIELD_TYPE_OPTIONS, type StateFieldType } from "./statePanelFields.ts";
+import {
+  defaultValueForStateType,
+  resolveStateColorOptions,
+  STATE_FIELD_TYPE_OPTIONS,
+  type StateFieldType,
+} from "./statePanelFields.ts";
 import { buildStatePanelViewModel } from "./statePanelViewModel";
 import type { GraphDocument, GraphPayload, StateDefinition } from "@/types/node-system";
 
 const props = defineProps<{
-  open: boolean;
   document: GraphPayload | GraphDocument;
   focusedNodeId?: string | null;
 }>();
@@ -309,8 +337,83 @@ const emit = defineEmits<{
 const view = computed(() => buildStatePanelViewModel(props.document));
 const readerTotal = computed(() => view.value.rows.reduce((total, row) => total + row.readerCount, 0));
 const writerTotal = computed(() => view.value.rows.reduce((total, row) => total + row.writerCount, 0));
+const expandedStateKeys = ref<Record<string, boolean>>({});
 const readerFormOpenByKey = ref<Record<string, boolean>>({});
 const writerFormOpenByKey = ref<Record<string, boolean>>({});
+const activeStateDeleteKey = ref<string | null>(null);
+const stateDeleteConfirmTimeoutRef = ref<number | null>(null);
+const stateConfirmPopoverStyle = {
+  padding: "0",
+  border: "none",
+  background: "transparent",
+  boxShadow: "none",
+};
+
+onBeforeUnmount(() => {
+  clearStateDeleteConfirmTimeout();
+});
+
+function isStateRowExpanded(stateKey: string) {
+  return expandedStateKeys.value[stateKey] ?? false;
+}
+
+function toggleStateRow(stateKey: string) {
+  expandedStateKeys.value = {
+    ...expandedStateKeys.value,
+    [stateKey]: !isStateRowExpanded(stateKey),
+  };
+}
+
+function isStateDeleteConfirmOpen(stateKey: string) {
+  return activeStateDeleteKey.value === stateKey;
+}
+
+function clearStateDeleteConfirmTimeout() {
+  if (stateDeleteConfirmTimeoutRef.value !== null) {
+    window.clearTimeout(stateDeleteConfirmTimeoutRef.value);
+    stateDeleteConfirmTimeoutRef.value = null;
+  }
+}
+
+function clearStateDeleteConfirmState() {
+  clearStateDeleteConfirmTimeout();
+  activeStateDeleteKey.value = null;
+}
+
+function startStateDeleteConfirmWindow(stateKey: string) {
+  clearStateDeleteConfirmTimeout();
+  activeStateDeleteKey.value = stateKey;
+  stateDeleteConfirmTimeoutRef.value = window.setTimeout(() => {
+    stateDeleteConfirmTimeoutRef.value = null;
+    if (activeStateDeleteKey.value === stateKey) {
+      activeStateDeleteKey.value = null;
+    }
+  }, 2000);
+}
+
+function handleStateDeleteActionClick(stateKey: string) {
+  if (activeStateDeleteKey.value === stateKey) {
+    confirmStateDelete(stateKey);
+    return;
+  }
+  startStateDeleteConfirmWindow(stateKey);
+}
+
+function confirmStateDelete(stateKey: string) {
+  clearStateDeleteConfirmState();
+  emit("delete-state", stateKey);
+}
+
+function handleStatePanelPointerDown(event: PointerEvent) {
+  if (!activeStateDeleteKey.value) {
+    return;
+  }
+  const target = event.target;
+  if (target instanceof HTMLElement && target.closest("[data-state-delete-surface='true']")) {
+    return;
+  }
+  clearStateDeleteConfirmState();
+}
 
 function isBindingFormOpen(stateKey: string, mode: StateBindingMode) {
   return mode === "read" ? readerFormOpenByKey.value[stateKey] ?? false : writerFormOpenByKey.value[stateKey] ?? false;
@@ -354,6 +457,18 @@ function stateDefinition(stateKey: string) {
   return props.document.state_schema[stateKey];
 }
 
+function stateColorOptions(stateKey: string) {
+  return resolveStateColorOptions(stateDefinition(stateKey)?.color ?? "");
+}
+
+function selectedStateColorStyle(stateKey: string) {
+  const definition = stateDefinition(stateKey);
+  const matchedOption = stateColorOptions(stateKey).find((option) => option.value === definition?.color);
+  return {
+    backgroundColor: matchedOption?.swatch || definition?.color || "#d97706",
+  };
+}
+
 function commitStateRename(currentKey: string, nextKey: string) {
   const normalizedNextKey = nextKey.trim();
   if (!normalizedNextKey || normalizedNextKey === currentKey) {
@@ -372,6 +487,15 @@ function handleStateTypeSelect(stateKey: string, value: string | number | boolea
     },
   });
 }
+
+function handleStateColorSelect(stateKey: string, value: string | number | boolean | undefined) {
+  emit("update-state", {
+    stateKey,
+    patch: {
+      color: String(value ?? ""),
+    },
+  });
+}
 </script>
 
 <style scoped>
@@ -385,47 +509,8 @@ function handleStateTypeSelect(stateKey: string, value: string | number | boolea
   background: rgba(255, 250, 241, 0.78);
   backdrop-filter: blur(20px);
   overflow: hidden;
-}
-
-.editor-state-panel--open {
   display: flex;
   flex-direction: column;
-}
-
-.editor-state-panel__collapsed {
-  display: flex;
-  height: 100%;
-  width: 100%;
-  min-height: 220px;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-}
-
-.editor-state-panel__collapsed-label {
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: rgba(154, 52, 18, 0.84);
-}
-
-.editor-state-panel__collapsed-count {
-  display: inline-flex;
-  min-width: 24px;
-  justify-content: center;
-  border: 1px solid rgba(154, 52, 18, 0.16);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.82);
-  padding: 2px 8px;
-  font-size: 0.68rem;
-  color: rgba(60, 41, 20, 0.72);
 }
 
 .editor-state-panel__inspector-header {
@@ -550,6 +635,8 @@ function handleStateTypeSelect(stateKey: string, value: string | number | boolea
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
   padding: 0 12px 14px;
   display: grid;
   gap: 10px;
@@ -581,32 +668,63 @@ function handleStateTypeSelect(stateKey: string, value: string | number | boolea
 }
 
 .editor-state-panel__state-row {
-  border: 1px solid transparent;
+  box-sizing: border-box;
+  min-width: 0;
+  border: 1px solid rgba(154, 52, 18, 0.18);
   border-radius: 24px;
-  background: rgba(255, 252, 247, 0.66);
+  background: rgba(255, 252, 247, 0.92);
   padding: 8px;
   display: grid;
   gap: 8px;
-  transition: background-color 160ms ease, border-color 160ms ease;
+  box-shadow:
+    0 14px 30px rgba(60, 41, 20, 0.08),
+    0 1px 0 rgba(255, 255, 255, 0.72) inset;
+  transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
 }
 
 .editor-state-panel__state-row:hover {
-  border-color: rgba(154, 52, 18, 0.1);
-  background: rgba(255, 252, 247, 0.88);
+  border-color: rgba(154, 52, 18, 0.26);
+  background: rgba(255, 252, 247, 0.98);
+  box-shadow:
+    0 16px 34px rgba(60, 41, 20, 0.1),
+    0 1px 0 rgba(255, 255, 255, 0.76) inset;
 }
 
 .editor-state-panel__state-row-head {
   display: flex;
+  flex-wrap: nowrap;
   justify-content: space-between;
   gap: 12px;
   align-items: center;
   min-height: 40px;
   padding: 0 2px 0 4px;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.editor-state-panel__expand-indicator {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(154, 52, 18, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 250, 241, 0.86);
+  color: rgba(154, 52, 18, 0.8);
+  transition: transform 160ms ease, background-color 160ms ease, border-color 160ms ease;
+}
+
+.editor-state-panel__expand-indicator--open {
+  transform: rotate(180deg);
+  border-color: rgba(217, 119, 6, 0.24);
+  background: rgba(255, 247, 237, 0.96);
 }
 
 .editor-state-panel__state-main {
   display: flex;
   align-items: center;
+  flex: 1 1 160px;
   min-width: 0;
   gap: 10px;
 }
@@ -622,37 +740,39 @@ function handleStateTypeSelect(stateKey: string, value: string | number | boolea
 }
 
 .editor-state-panel__state-copy {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
   min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.editor-state-panel__state-counts {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
 }
 
 .editor-state-panel__state-actions {
   display: flex;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 6px;
-  opacity: 0;
-  transition: opacity 140ms ease;
-}
-
-.editor-state-panel__state-row:hover .editor-state-panel__state-actions {
-  opacity: 1;
-}
-
-@media (hover: none) {
-  .editor-state-panel__state-actions {
-    opacity: 1;
-  }
 }
 
 .editor-state-panel__card-title {
+  min-width: 0;
   font-size: 1rem;
   font-weight: 600;
   color: #1f2937;
-}
-
-.editor-state-panel__card-key {
-  margin-top: 4px;
-  font-size: 0.82rem;
-  color: rgba(60, 41, 20, 0.62);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .editor-state-panel__card-bindings {
@@ -662,12 +782,15 @@ function handleStateTypeSelect(stateKey: string, value: string | number | boolea
 }
 
 .editor-state-panel__details-card {
-  border: 1px solid rgba(154, 52, 18, 0.1);
+  box-sizing: border-box;
+  min-width: 0;
+  border: 1px solid rgba(154, 52, 18, 0.16);
   border-radius: 22px;
-  background: rgba(255, 250, 241, 0.72);
+  background: rgba(255, 252, 247, 0.94);
   padding: 12px;
   display: grid;
   gap: 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
 }
 
 .editor-state-panel__details-title {
@@ -681,7 +804,7 @@ function handleStateTypeSelect(stateKey: string, value: string | number | boolea
 .editor-state-panel__field-grid {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
 }
 
 .editor-state-panel__field {
@@ -691,8 +814,21 @@ function handleStateTypeSelect(stateKey: string, value: string | number | boolea
   color: rgba(60, 41, 20, 0.72);
 }
 
+.editor-state-panel__field--full {
+  min-width: 0;
+}
+
+.editor-state-panel__field-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(154, 52, 18, 0.78);
+}
+
 .editor-state-panel__input,
 .editor-state-panel__textarea {
+  box-sizing: border-box;
+  min-width: 0;
   width: 100%;
   border: 1px solid rgba(154, 52, 18, 0.14);
   border-radius: 14px;
@@ -703,8 +839,34 @@ function handleStateTypeSelect(stateKey: string, value: string | number | boolea
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
-.editor-state-panel__select {
+.editor-state-panel__select,
+.editor-state-panel__color-select {
+  min-width: 0;
   width: 100%;
+}
+
+.editor-state-panel__color-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.editor-state-panel__color-option-label {
+  font-size: 0.84rem;
+  color: #3c2914;
+}
+
+.editor-state-panel__color-select-value {
+  display: inline-flex;
+  align-items: center;
+}
+
+.editor-state-panel__color-dot {
+  width: 10px;
+  height: 10px;
+  border: 1px solid rgba(60, 41, 20, 0.16);
+  border-radius: 999px;
+  flex: none;
 }
 
 .editor-state-panel__textarea {
@@ -718,6 +880,7 @@ function handleStateTypeSelect(stateKey: string, value: string | number | boolea
 }
 
 .editor-state-panel__binding-chip {
+  box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   min-height: 28px;
@@ -753,6 +916,7 @@ function handleStateTypeSelect(stateKey: string, value: string | number | boolea
 
 .editor-state-panel__binding-group-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
@@ -787,6 +951,7 @@ function handleStateTypeSelect(stateKey: string, value: string | number | boolea
 
 .editor-state-panel__binding-item {
   display: flex;
+  min-width: 0;
   align-items: center;
   gap: 8px;
 }
@@ -821,6 +986,7 @@ function handleStateTypeSelect(stateKey: string, value: string | number | boolea
 
 .editor-state-panel__binding-token-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   min-width: 0;
@@ -841,9 +1007,7 @@ function handleStateTypeSelect(stateKey: string, value: string | number | boolea
 
 .editor-state-panel__binding-node-label {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
   font-size: 0.84rem;
   font-weight: 600;
   color: #1f2937;
@@ -888,6 +1052,8 @@ function handleStateTypeSelect(stateKey: string, value: string | number | boolea
 }
 
 .editor-state-panel__card-delete {
+  display: inline-grid;
+  place-items: center;
   width: 28px;
   height: 28px;
   border: 1px solid rgba(154, 52, 18, 0.14);
@@ -896,6 +1062,55 @@ function handleStateTypeSelect(stateKey: string, value: string | number | boolea
   color: rgba(60, 41, 20, 0.62);
   font-size: 1rem;
   line-height: 1;
+  cursor: pointer;
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.editor-state-panel__card-delete:hover {
+  border-color: rgba(185, 28, 28, 0.22);
+  background: rgba(255, 248, 248, 0.98);
+  color: rgb(185, 28, 28);
+}
+
+.editor-state-panel__card-delete--confirm,
+.editor-state-panel__card-delete--confirm:hover,
+.editor-state-panel__card-delete--confirm:focus-visible {
+  border-color: rgba(185, 28, 28, 0.3);
+  background: rgb(185, 28, 28);
+  color: #fff;
+}
+
+.editor-state-panel__confirm-hint {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  white-space: nowrap;
+  border-radius: 999px;
+  border: 1px solid rgba(185, 28, 28, 0.16);
+  background: rgba(255, 248, 248, 0.98);
+  padding: 6px 14px;
+  color: rgb(153, 27, 27);
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  box-shadow: 0 14px 32px rgba(60, 41, 20, 0.14);
+}
+
+:deep(.editor-state-panel__confirm-popover.el-popper) {
+  min-width: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+:deep(.editor-state-panel__confirm-popover .el-popover) {
+  min-width: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
 }
 
 .editor-state-panel__card-description {
@@ -914,13 +1129,6 @@ function handleStateTypeSelect(stateKey: string, value: string | number | boolea
   gap: 10px;
 }
 
-.editor-state-panel__card-value-label {
-  font-size: 0.72rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: rgba(154, 52, 18, 0.8);
-}
-
 .editor-state-panel__card-value-preview {
   margin: 8px 0 0;
   white-space: pre-wrap;
@@ -928,5 +1136,69 @@ function handleStateTypeSelect(stateKey: string, value: string | number | boolea
   font-family: inherit;
   line-height: 1.55;
   color: #1f2937;
+}
+
+:deep(.editor-state-panel .el-input__wrapper),
+:deep(.editor-state-panel .el-select__wrapper) {
+  min-height: 36px;
+  border-radius: 12px;
+  border: 1px solid rgba(154, 52, 18, 0.16);
+  background: rgba(255, 251, 246, 0.88);
+  box-shadow: none;
+}
+
+:deep(.editor-state-panel .el-input__wrapper.is-focus),
+:deep(.editor-state-panel .el-select__wrapper.is-focused) {
+  border-color: rgba(201, 107, 31, 0.28);
+  box-shadow: 0 0 0 3px rgba(201, 107, 31, 0.08);
+}
+
+:deep(.editor-state-panel .el-select__wrapper) {
+  padding-right: 28px;
+}
+
+:deep(.editor-state-panel__color-select .el-select__wrapper) {
+  padding-left: 14px;
+}
+
+:deep(.editor-state-panel__color-select .el-select__selected-item),
+:deep(.editor-state-panel__color-select .el-select__selection-text) {
+  display: inline-flex;
+  align-items: center;
+}
+
+:deep(.editor-state-panel .el-textarea__inner) {
+  min-height: 84px;
+  border-radius: 12px;
+  border: 1px solid rgba(154, 52, 18, 0.16);
+  background: rgba(255, 251, 246, 0.88);
+  box-shadow: none;
+}
+
+:deep(.editor-state-panel__select-popper.el-popper) {
+  border: 1px solid rgba(154, 52, 18, 0.16);
+  border-radius: 16px;
+  background: rgba(255, 248, 240, 0.98);
+  box-shadow: 0 16px 34px rgba(60, 41, 20, 0.12);
+}
+
+:deep(.editor-state-panel__select-popper .el-select-dropdown__list) {
+  padding: 8px;
+}
+
+:deep(.editor-state-panel__select-popper .el-select-dropdown__item) {
+  min-height: 36px;
+  border-radius: 12px;
+  color: #3c2914;
+}
+
+:deep(.editor-state-panel__select-popper .el-select-dropdown__item.hover),
+:deep(.editor-state-panel__select-popper .el-select-dropdown__item:hover) {
+  background: rgba(154, 52, 18, 0.08);
+}
+
+:deep(.editor-state-panel__select-popper .el-select-dropdown__item.is-selected) {
+  background: rgba(201, 107, 31, 0.1);
+  color: #9a3412;
 }
 </style>

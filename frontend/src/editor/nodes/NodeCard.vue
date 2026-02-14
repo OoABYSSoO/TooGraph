@@ -1400,25 +1400,26 @@ const showKnowledgeBaseInput = computed(() => view.value.body.kind === "input" &
 const showAssetUploadInput = computed(() => view.value.body.kind === "input" && view.value.body.editorMode === "asset");
 const isInputValueEditable = computed(() => view.value.body.kind === "input" && view.value.body.editorMode === "text");
 const inputValueText = computed(() => {
+  return view.value.body.kind === "input" ? view.value.body.valueText : "";
+});
+const inputStateValue = computed(() => {
   if (props.node.kind !== "input") {
     return "";
   }
-  if (typeof props.node.config.value === "string") {
-    return props.node.config.value;
+  const stateKey = inputStateKey.value;
+  if (stateKey && Object.prototype.hasOwnProperty.call(props.stateSchema[stateKey] ?? {}, "value")) {
+    return props.stateSchema[stateKey]?.value;
   }
-  if (props.node.config.value === null || props.node.config.value === undefined) {
-    return "";
-  }
-  return view.value.body.kind === "input" ? view.value.body.valueText : "";
+  return props.node.config.value;
 });
 const inputKnowledgeBaseValue = computed(() => {
   if (props.node.kind !== "input") {
     return "";
   }
-  return typeof props.node.config.value === "string" ? props.node.config.value : "";
+  return typeof inputStateValue.value === "string" ? inputStateValue.value : "";
 });
 const inputAssetType = computed(() => (view.value.body.kind === "input" ? view.value.body.assetType : null));
-const inputAssetEnvelope = computed(() => (props.node.kind === "input" ? tryParseUploadedAssetEnvelope(props.node.config.value) : null));
+const inputAssetEnvelope = computed(() => (props.node.kind === "input" ? tryParseUploadedAssetEnvelope(inputStateValue.value) : null));
 const inputAssetAccept = computed(() => resolveUploadedAssetInputAccept(inputAssetType.value));
 const inputStateKey = computed(() => (view.value.body.kind === "input" ? view.value.body.primaryOutput?.key ?? null : null));
 const inputStateType = computed(() => {
@@ -1657,6 +1658,14 @@ function emitInputConfigPatch(patch: Partial<InputNode["config"]>) {
 
 function emitInputStatePatch(stateKey: string, patch: Partial<StateDefinition>) {
   emit("update-input-state", { stateKey, patch });
+}
+
+function emitInputValuePatch(value: unknown) {
+  const stateKey = inputStateKey.value;
+  if (stateKey) {
+    emitInputStatePatch(stateKey, { value });
+  }
+  emitInputConfigPatch({ value });
 }
 
 function emitAgentConfigPatch(patch: Partial<AgentNode["config"]>) {
@@ -2708,11 +2717,11 @@ function handleInputValueInput(event: Event) {
   if (!(target instanceof HTMLTextAreaElement)) {
     return;
   }
-  emitInputConfigPatch({ value: target.value });
+  emitInputValuePatch(target.value);
 }
 
 function handleInputKnowledgeBaseSelect(value: string | number | boolean | undefined) {
-  emitInputConfigPatch({ value: typeof value === "string" ? value : "" });
+  emitInputValuePatch(typeof value === "string" ? value : "");
 }
 
 function handleInputBoundarySelection(nextType: string | number | boolean) {
@@ -2731,18 +2740,18 @@ function updateInputBoundaryType(nextType: "text" | "file" | "knowledge_base") {
     return;
   }
 
+  const nextStateType = resolveStateTypeForInputBoundary(nextType) as StateFieldType;
+  const nextValue = resolveNextInputValueForBoundaryType({
+    nextType,
+    currentType: inputStateType.value,
+    currentValue: inputStateValue.value,
+    knowledgeBaseNames: props.knowledgeBases.map((knowledgeBase) => knowledgeBase.name),
+  });
   emitInputStatePatch(stateKey, {
-    type: resolveStateTypeForInputBoundary(nextType),
-    value: defaultValueForStateType(resolveStateTypeForInputBoundary(nextType) as StateFieldType),
+    type: nextStateType,
+    value: nextValue ?? defaultValueForStateType(nextStateType),
   });
-  emitInputConfigPatch({
-    value: resolveNextInputValueForBoundaryType({
-      nextType,
-      currentType: inputStateType.value,
-      currentValue: props.node.kind === "input" ? props.node.config.value : "",
-      knowledgeBaseNames: props.knowledgeBases.map((knowledgeBase) => knowledgeBase.name),
-    }),
-  });
+  emitInputConfigPatch({ value: nextValue });
 }
 
 function openInputAssetPicker() {
@@ -2750,7 +2759,7 @@ function openInputAssetPicker() {
 }
 
 function clearInputAsset() {
-  emitInputConfigPatch({ value: "" });
+  emitInputValuePatch("");
 }
 
 async function commitInputAssetFile(file: File | null) {
@@ -2765,7 +2774,7 @@ async function commitInputAssetFile(file: File | null) {
       type: resolveStateTypeForInputBoundary(envelope.detectedType),
       value: defaultValueForStateType(resolveStateTypeForInputBoundary(envelope.detectedType) as StateFieldType),
     });
-    emitInputConfigPatch({ value: JSON.stringify(envelope) });
+    emitInputValuePatch(JSON.stringify(envelope));
   } catch (error) {
     console.error("Failed to read uploaded asset", error);
   }

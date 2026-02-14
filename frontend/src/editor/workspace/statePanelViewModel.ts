@@ -1,4 +1,5 @@
 import type { GraphDocument, GraphPayload } from "@/types/node-system";
+import { sortStateKeysByFirstAppearance } from "./stateOrdering.ts";
 
 export type StatePanelRowViewModel = {
   key: string;
@@ -30,21 +31,23 @@ export type StatePanelViewModel = {
 
 export function buildStatePanelViewModel(document: GraphPayload | GraphDocument): StatePanelViewModel {
   const bindingsByState = summarizeBindingsByState(document);
-  const rows = Object.entries(document.state_schema)
-    .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
-    .map(([key, state]) => ({
-      key,
-      title: state.name.trim() || key,
-      description: state.description.trim(),
-      typeLabel: state.type.trim() || "unknown",
-      valuePreview: formatStateValue(state.value),
-      color: state.color,
-      readerCount: bindingsByState[key]?.readerCount ?? 0,
-      writerCount: bindingsByState[key]?.writerCount ?? 0,
-      bindingSummary: formatBindingSummary(bindingsByState[key]?.readerCount ?? 0, bindingsByState[key]?.writerCount ?? 0),
-      readers: bindingsByState[key]?.readers ?? [],
-      writers: bindingsByState[key]?.writers ?? [],
-    }));
+  const rows = sortStateKeysByFirstAppearance(Object.keys(document.state_schema), document)
+    .map((key) => {
+      const state = document.state_schema[key];
+      return {
+        key,
+        title: state.name.trim() || key,
+        description: state.description.trim(),
+        typeLabel: state.type.trim() || "unknown",
+        valuePreview: formatStateValue(state.value),
+        color: state.color,
+        readerCount: bindingsByState[key]?.readerCount ?? 0,
+        writerCount: bindingsByState[key]?.writerCount ?? 0,
+        bindingSummary: formatBindingSummary(bindingsByState[key]?.readerCount ?? 0, bindingsByState[key]?.writerCount ?? 0),
+        readers: bindingsByState[key]?.readers ?? [],
+        writers: bindingsByState[key]?.writers ?? [],
+      };
+    });
 
   return {
     count: rows.length,

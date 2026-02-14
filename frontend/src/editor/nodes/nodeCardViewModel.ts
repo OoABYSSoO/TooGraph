@@ -154,9 +154,11 @@ function buildBody(
 ): NodeCardViewModel["body"] {
   if (node.kind === "input") {
     const editorModel = resolveInputEditorModel(node, stateSchema);
+    const inputStateKey = outputs[0]?.key ?? node.writes[0]?.state ?? "";
+    const inputStateValue = resolveInputStateValue(node, stateSchema, inputStateKey);
     return {
       kind: "input",
-      valueText: stringifyValue(node.config.value),
+      valueText: stringifyValue(inputStateValue ?? node.config.value),
       editorMode: editorModel.editorMode,
       assetType: editorModel.assetType,
       primaryOutput: outputs[0] ?? null,
@@ -267,6 +269,7 @@ function resolveOutputPreviewText(input: {
 function resolveInputEditorModel(node: Extract<GraphNode, { kind: "input" }>, stateSchema: Record<string, StateDefinition>) {
   const primaryOutputStateKey = node.writes[0]?.state ?? "";
   const primaryOutputType = stateSchema[primaryOutputStateKey]?.type?.trim() || "";
+  const primaryOutputValue = resolveInputStateValue(node, stateSchema, primaryOutputStateKey);
 
   if (primaryOutputType === "knowledge_base") {
     return {
@@ -282,7 +285,7 @@ function resolveInputEditorModel(node: Extract<GraphNode, { kind: "input" }>, st
     };
   }
 
-  if (typeof node.config.value === "string" || node.config.value === null || node.config.value === undefined) {
+  if (typeof primaryOutputValue === "string" || primaryOutputValue === null || primaryOutputValue === undefined) {
     return {
       editorMode: "text" as const,
       assetType: null,
@@ -293,6 +296,18 @@ function resolveInputEditorModel(node: Extract<GraphNode, { kind: "input" }>, st
     editorMode: "readonly" as const,
     assetType: null,
   };
+}
+
+function resolveInputStateValue(
+  node: Extract<GraphNode, { kind: "input" }>,
+  stateSchema: Record<string, StateDefinition>,
+  stateKey: string,
+) {
+  const definition = stateKey ? stateSchema[stateKey] : null;
+  if (definition && Object.prototype.hasOwnProperty.call(definition, "value")) {
+    return definition.value;
+  }
+  return node.config.value;
 }
 
 function resolveAgentModelLabel(node: Extract<GraphNode, { kind: "agent" }>) {

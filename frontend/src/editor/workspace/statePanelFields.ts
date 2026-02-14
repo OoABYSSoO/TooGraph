@@ -119,6 +119,13 @@ export function updateStateFieldInDocument<T extends GraphPayload | GraphDocumen
   }
   const nextDocument = cloneGraphDocument(document);
   nextDocument.state_schema[stateKey] = nextDefinition;
+  if (JSON.stringify(nextDefinition.value) !== JSON.stringify(current.value)) {
+    for (const node of Object.values(nextDocument.nodes)) {
+      if (node.kind === "input" && node.writes.some((binding) => binding.state === stateKey)) {
+        node.config.value = nextDefinition.value;
+      }
+    }
+  }
   return nextDocument;
 }
 

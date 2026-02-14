@@ -90,6 +90,20 @@ test("NodeCard uses Element Plus segmented control on the same row as the input 
   assert.doesNotMatch(inputSection, /class="node-card__control-button"/);
 });
 
+test("NodeCard routes input value editing through the output state schema value", () => {
+  assert.match(componentSource, /const inputStateValue = computed\(\(\) =>/);
+  assert.match(componentSource, /props\.stateSchema\[stateKey\]\?\.value/);
+  assert.match(componentSource, /return view\.value\.body\.kind === "input" \? view\.value\.body\.valueText : "";/);
+  assert.match(componentSource, /function emitInputValuePatch\(value: unknown\)/);
+  assert.match(componentSource, /emitInputStatePatch\(stateKey, \{ value \}\);/);
+  assert.match(componentSource, /emitInputConfigPatch\(\{ value \}\);/);
+  assert.match(componentSource, /function handleInputValueInput\(event: Event\) \{[\s\S]*emitInputValuePatch\(target\.value\);/);
+  assert.match(componentSource, /function handleInputKnowledgeBaseSelect\(value: string \| number \| boolean \| undefined\) \{[\s\S]*emitInputValuePatch\(typeof value === "string" \? value : ""\);/);
+  assert.match(componentSource, /function clearInputAsset\(\) \{[\s\S]*emitInputValuePatch\(""\);/);
+  assert.match(componentSource, /emitInputValuePatch\(JSON\.stringify\(envelope\)\);/);
+  assert.doesNotMatch(componentSource, /return typeof props\.node\.config\.value === "string" \? props\.node\.config\.value : "";/);
+});
+
 test("NodeCard does not expose manual system instruction editing for agent nodes", () => {
   const agentSectionMatch = componentSource.match(
     /<section v-else-if="view\.body\.kind === 'agent'"[\s\S]*?<\/section>/,

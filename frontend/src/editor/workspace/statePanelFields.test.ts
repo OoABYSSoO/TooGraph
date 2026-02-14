@@ -153,6 +153,21 @@ test("updateStateFieldInDocument applies updater to existing definition", () => 
   assert.equal(nextDocument.state_schema.answer.description, "Updated");
 });
 
+test("updateStateFieldInDocument keeps input node config value in sync with its written state value", () => {
+  const document = buildDocument();
+  const nextDocument = updateStateFieldInDocument(document, "question", (current) => ({
+    ...current,
+    value: "Updated from state schema",
+  }));
+
+  assert.equal(nextDocument.state_schema.question.value, "Updated from state schema");
+  assert.equal(nextDocument.nodes.input_question.kind, "input");
+  if (nextDocument.nodes.input_question.kind !== "input") {
+    return;
+  }
+  assert.equal(nextDocument.nodes.input_question.config.value, "Updated from state schema");
+});
+
 test("parseStateValueInput coerces values by state type", () => {
   assert.equal(parseStateValueInput("number", "42"), 42);
   assert.equal(parseStateValueInput("boolean", "true"), true);

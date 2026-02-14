@@ -114,6 +114,115 @@ test("buildStatePanelViewModel returns sorted state rows with readable values", 
   assert.equal(view.rows[0].bindingSummary, "1 reader · 1 writer");
 });
 
+test("buildStatePanelViewModel orders rows by first state appearance in node execution order", () => {
+  const view = buildStatePanelViewModel({
+    graph_id: "graph-1",
+    name: "Execution Order",
+    metadata: {},
+    state_schema: {
+      final_answer: {
+        name: "Final Answer",
+        description: "Final output.",
+        type: "text",
+        value: "",
+        color: "#d97706",
+      },
+      draft_answer: {
+        name: "Draft Answer",
+        description: "Draft output.",
+        type: "text",
+        value: "",
+        color: "#2563eb",
+      },
+      question: {
+        name: "Question",
+        description: "Original question.",
+        type: "text",
+        value: "",
+        color: "#10b981",
+      },
+      manual_feedback: {
+        name: "Manual Feedback",
+        description: "Human feedback.",
+        type: "text",
+        value: "",
+        color: "#7c3aed",
+      },
+    },
+    nodes: {
+      input_question: {
+        kind: "input",
+        name: "input_question",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [{ state: "question", mode: "replace" }],
+        config: { value: "" },
+      },
+      draft_writer: {
+        kind: "agent",
+        name: "draft_writer",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [{ state: "question", required: true }],
+        writes: [{ state: "draft_answer", mode: "replace" }],
+        config: {
+          skills: [],
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+      revision_writer: {
+        kind: "agent",
+        name: "revision_writer",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [
+          { state: "draft_answer", required: true },
+          { state: "manual_feedback", required: true },
+        ],
+        writes: [{ state: "final_answer", mode: "replace" }],
+        config: {
+          skills: [],
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+      output_answer: {
+        kind: "output",
+        name: "output_answer",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [{ state: "final_answer", required: true }],
+        writes: [],
+        config: {
+          displayMode: "auto",
+          persistEnabled: false,
+          persistFormat: "auto",
+          fileNameTemplate: "",
+        },
+      },
+    },
+    edges: [
+      { source: "input_question", target: "draft_writer" },
+      { source: "draft_writer", target: "revision_writer" },
+      { source: "revision_writer", target: "output_answer" },
+    ],
+    conditional_edges: [],
+  });
+
+  assert.deepEqual(
+    view.rows.map((row) => row.key),
+    ["question", "draft_answer", "manual_feedback", "final_answer"],
+  );
+});
+
 test("buildStatePanelViewModel reports empty state cleanly", () => {
   const view = buildStatePanelViewModel({
     graph_id: "graph-1",

@@ -6,6 +6,13 @@ export function resolveNodeRunPresentation(status: string | undefined, isCurrent
     };
   }
 
+  if (status === "paused") {
+    return {
+      haloClass: isCurrentRunNode ? "editor-canvas__node-halo--paused-current" : "editor-canvas__node-halo--paused",
+      shellClass: isCurrentRunNode ? "editor-canvas__node--paused-current" : "editor-canvas__node--paused",
+    };
+  }
+
   if (status === "success" || status === "completed") {
     return {
       haloClass: null,

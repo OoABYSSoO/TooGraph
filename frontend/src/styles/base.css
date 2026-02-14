@@ -1,3 +1,9 @@
+:root {
+  --graphite-scrollbar-track: rgba(255, 250, 241, 0.72);
+  --graphite-scrollbar-thumb: rgba(180, 83, 9, 0.46);
+  --graphite-scrollbar-thumb-hover: rgba(154, 52, 18, 0.62);
+}
+
 html,
 body,
 #app {
@@ -13,4 +19,33 @@ body,
 
 body {
   margin: 0;
+}
+
+:where(*) {
+  scrollbar-width: thin;
+  scrollbar-color: var(--graphite-scrollbar-thumb) var(--graphite-scrollbar-track);
+}
+
+:where(*)::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+:where(*)::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: var(--graphite-scrollbar-track);
+}
+
+:where(*)::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(217, 119, 6, 0.58), rgba(154, 52, 18, 0.46));
+  background-clip: content-box;
+}
+
+:where(*)::-webkit-scrollbar-thumb:hover {
+  background:
+    linear-gradient(180deg, rgba(217, 119, 6, 0.72), var(--graphite-scrollbar-thumb-hover));
+  background-clip: content-box;
 }

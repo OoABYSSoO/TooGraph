@@ -28,9 +28,72 @@ function createDocument(): GraphPayload {
         value: 0,
         color: "#2563eb",
       },
+      draft: {
+        name: "draft",
+        description: "Draft answer",
+        type: "text",
+        value: "",
+        color: "#10b981",
+      },
+      manual_feedback: {
+        name: "manual_feedback",
+        description: "Human feedback",
+        type: "text",
+        value: "",
+        color: "#7c3aed",
+      },
     },
-    nodes: {},
-    edges: [],
+    nodes: {
+      input_question: {
+        kind: "input",
+        name: "input_question",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [{ state: "question", mode: "replace" }],
+        config: { value: "" },
+      },
+      draft_writer: {
+        kind: "agent",
+        name: "draft_writer",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [{ state: "question", required: true }],
+        writes: [{ state: "draft", mode: "replace" }],
+        config: {
+          skills: [],
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+      revision_writer: {
+        kind: "agent",
+        name: "revision_writer",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [
+          { state: "draft", required: true },
+          { state: "manual_feedback", required: true },
+          { state: "score", required: true },
+        ],
+        writes: [],
+        config: {
+          skills: [],
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+    },
+    edges: [
+      { source: "input_question", target: "draft_writer" },
+      { source: "draft_writer", target: "revision_writer" },
+    ],
     conditional_edges: [],
     metadata: {},
   };
@@ -63,7 +126,9 @@ function createRun(): RunDetail {
     artifacts: {
       state_values: {
         question: "What is GraphiteUI?",
+        draft: "GraphiteUI is a visual graph editor.",
         score: 0.8,
+        manual_feedback: "",
       },
     },
     state_snapshot: {
@@ -80,8 +145,10 @@ test("buildHumanReviewRows lists runtime state values with graph metadata", () =
   assert.deepEqual(
     rows.map((row) => [row.key, row.label, row.type, row.color, row.draft]),
     [
-      ["question", "question", "text", "#d97706", "What is GraphiteUI?"],
+      ["manual_feedback", "manual_feedback", "text", "#7c3aed", ""],
       ["score", "score", "number", "#2563eb", "0.8"],
+      ["question", "question", "text", "#d97706", "What is GraphiteUI?"],
+      ["draft", "draft", "text", "#10b981", "GraphiteUI is a visual graph editor."],
     ],
   );
 });

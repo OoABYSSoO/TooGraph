@@ -1,17 +1,5 @@
 <template>
-  <aside class="editor-human-review-panel" :class="{ 'editor-human-review-panel--open': open }">
-    <button
-      v-if="!open"
-      type="button"
-      class="editor-human-review-panel__collapsed"
-      aria-label="Open human review panel"
-      @click="$emit('toggle')"
-    >
-      <span class="editor-human-review-panel__collapsed-label">Review</span>
-      <span class="editor-human-review-panel__collapsed-count">{{ reviewRows.length }}</span>
-    </button>
-
-    <template v-else>
+  <aside class="editor-human-review-panel">
       <header class="editor-human-review-panel__header">
         <div>
           <div class="editor-human-review-panel__eyebrow">Human Review</div>
@@ -70,7 +58,6 @@
           {{ busy ? "Continuing..." : "Continue Run" }}
         </button>
       </footer>
-    </template>
   </aside>
 </template>
 
@@ -88,7 +75,6 @@ import {
 } from "./humanReviewPanelModel.ts";
 
 const props = defineProps<{
-  open: boolean;
   run?: RunDetail | null;
   document: GraphPayload | GraphDocument;
   focusedNodeId?: string | null;
@@ -141,29 +127,6 @@ function buildResumePayload() {
 .editor-human-review-panel {
   min-width: 0;
   height: 100%;
-}
-
-.editor-human-review-panel__collapsed {
-  width: 100%;
-  height: 100%;
-  border: 1px solid rgba(154, 52, 18, 0.12);
-  border-radius: 24px;
-  background: rgba(255, 250, 241, 0.72);
-  color: rgba(120, 53, 15, 0.92);
-  cursor: pointer;
-  writing-mode: vertical-rl;
-}
-
-.editor-human-review-panel__collapsed-label {
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-}
-
-.editor-human-review-panel__collapsed-count {
-  margin-top: 10px;
-  font-weight: 800;
 }
 
 .editor-human-review-panel__header,

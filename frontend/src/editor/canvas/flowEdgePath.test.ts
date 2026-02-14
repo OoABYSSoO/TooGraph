@@ -124,6 +124,35 @@ test("buildSequenceFlowPath places upstream rails above measured node tops when 
   );
 });
 
+test("buildSequenceFlowPath routes vertically stacked downstream nodes through the gap between cards", () => {
+  assert.equal(
+    buildSequenceFlowPath({
+      sourceX: 580,
+      sourceY: 210,
+      targetX: 120,
+      targetY: 650,
+      sourceNodeX: 120,
+      sourceNodeY: 100,
+      targetNodeX: 120,
+      targetNodeY: 540,
+    }),
+    [
+      "M 580 210",
+      "L 608 210",
+      "L 634 210",
+      "Q 652 210 652 228",
+      "L 652 412",
+      "Q 652 430 634 430",
+      "L 66 430",
+      "Q 48 430 48 448",
+      "L 48 632",
+      "Q 48 650 66 650",
+      "L 92 650",
+      "L 120 650",
+    ].join(" "),
+  );
+});
+
 test("buildSequenceFlowPath staggers upstream source exits and target entries before the shared short leads", () => {
   assert.equal(
     buildSequenceFlowPath({
@@ -153,7 +182,7 @@ test("buildSequenceFlowPath staggers upstream source exits and target entries be
   );
 });
 
-test("buildSequenceFlowPath keeps the return descent outside the source corridor for lower right targets", () => {
+test("buildSequenceFlowPath routes lower right targets around the target card when the input anchor is still left of the output", () => {
   assert.equal(
     buildSequenceFlowPath({
       sourceX: 552,
@@ -161,16 +190,21 @@ test("buildSequenceFlowPath keeps the return descent outside the source corridor
       targetX: 523,
       targetY: 738,
       sourceNodeX: 80,
+      sourceNodeY: 220,
       targetNodeX: 520,
+      targetNodeY: 620,
     }),
     [
       "M 552 332",
       "L 580 332",
-      "L 606 332",
-      "Q 624 332 624 314",
-      "L 624 172",
-      "L 624 720",
-      "Q 624 738 606 738",
+      "L 1046 332",
+      "Q 1064 332 1064 350",
+      "L 1064 517",
+      "Q 1064 535 1046 535",
+      "L 469 535",
+      "Q 451 535 451 553",
+      "L 451 720",
+      "Q 451 738 469 738",
       "L 495 738",
       "L 523 738",
     ].join(" "),

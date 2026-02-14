@@ -86,21 +86,6 @@
         "fileNameTemplate": ""
       }
     },
-    "input_human_feedback": {
-      "kind": "input",
-      "name": "input_human_feedback",
-      "description": "Edit this feedback while the graph is paused, then resume.",
-      "ui": {
-        "position": { "x": 80, "y": 620 },
-        "collapsed": false
-      },
-      "writes": [
-        { "state": "human_feedback", "mode": "replace" }
-      ],
-      "config": {
-        "value": "请让语气更适合新用户，并强调可视化编排能力。"
-      }
-    },
     "revision_writer": {
       "kind": "agent",
       "name": "revision_writer",
