@@ -94,6 +94,9 @@ export function buildHumanReviewPanelModel(
     if (!node) {
       continue;
     }
+    if (node.kind !== "agent" && node.kind !== "condition") {
+      continue;
+    }
     for (const binding of node.reads) {
       if (binding.required === false) {
         continue;

@@ -214,6 +214,54 @@ test("buildHumanReviewPanelModel returns the no-input summary when nothing is re
   assert.equal(panel.summaryText, "当前断点后没有需要人工补充的输入");
 });
 
+test("buildHumanReviewPanelModel ignores required reads on downstream output nodes", () => {
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Output Node Review",
+    state_schema: {
+      question: { name: "question", description: "User question", type: "text", value: "", color: "#d97706" },
+      output_note: { name: "output_note", description: "Output-only note", type: "text", value: "", color: "#1d4ed8" },
+    },
+    nodes: {
+      input_question: {
+        kind: "input",
+        name: "input_question",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [{ state: "question", mode: "replace" }],
+        config: { value: "" },
+      },
+      output_writer: {
+        kind: "output",
+        name: "output_writer",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [{ state: "output_note", required: true }],
+        writes: [],
+        config: { value: "" },
+      },
+    },
+    edges: [{ source: "input_question", target: "output_writer" }],
+    conditional_edges: [],
+    metadata: {},
+  };
+  const run: RunDetail = {
+    ...createRun(),
+    current_node_id: "input_question",
+    node_status_map: { input_question: "paused" },
+    artifacts: {
+      state_values: {
+        question: "What is GraphiteUI?",
+      },
+    },
+  };
+
+  const panel = buildHumanReviewPanelModel(run, document);
+
+  assert.equal(panel.requiredNow.some((row) => row.key === "output_note"), false);
+});
+
 function createBranchingDocument(): GraphPayload {
   return {
     graph_id: null,
