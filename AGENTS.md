@@ -8,9 +8,11 @@ These instructions apply to all work in this repository and should persist acros
 
 ## Dev Restart Workflow
 
-- After making code changes, restart the local dev environment by running `scripts/start.sh`.
-- Treat `scripts/start.sh` as the standard restart command for this repository.
-- If a task only involves documentation or other non-runtime changes, use judgment; for code changes, default to restarting with `scripts/start.sh`.
+- After making code changes, restart the local dev environment with the repository's standard cross-platform restart command: `npm run dev`.
+- Treat `node scripts/start.mjs` as the underlying standard restart command for this repository; `npm run dev` should resolve to it.
+- On Windows PowerShell, if execution policy blocks `npm.ps1`, use `npm.cmd run dev`.
+- `scripts/start.sh` remains the standard Bash wrapper for Linux, macOS, Git Bash, and WSL, and should stay behaviorally aligned with `scripts/start.mjs`.
+- If a task only involves documentation or other non-runtime changes, use judgment; for code changes, default to restarting with the standard restart flow above.
 
 ## UI Implementation Policy
 
@@ -20,4 +22,4 @@ These instructions apply to all work in this repository and should persist acros
 
 ## Notes
 
-- `scripts/start.sh` already handles restarting by releasing occupied frontend/backend ports before starting services again.
+- `scripts/start.mjs` and `scripts/start.sh` should both release occupied frontend/backend ports before starting services again.

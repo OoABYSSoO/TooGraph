@@ -48,11 +48,53 @@ GraphiteUI 是一个面向 LangGraph 风格 Agent 工作流的可视化编排与
 - Python 3.11+
 - 可选：OpenAI-compatible API、本地 LLM 或 Ollama 类服务
 
-### 启动
+### 安装依赖
+
+首次运行前先安装前后端依赖：
 
 ```bash
 git clone https://github.com/AbyssBadger0/GraphiteUI.git
 cd GraphiteUI
+npm --prefix frontend install
+python -m pip install -r backend/requirements.txt
+```
+
+如果系统里的 Python 命令是 `python3`，可以把最后一行换成：
+
+```bash
+python3 -m pip install -r backend/requirements.txt
+```
+
+### 启动
+
+推荐使用 Node 跨平台启动器，Windows / macOS / Linux / WSL 都可以走同一套流程：
+
+```bash
+npm run dev
+```
+
+这条命令等价于：
+
+```bash
+node scripts/start.mjs
+```
+
+Windows PowerShell 如果拦截 `npm.ps1`，使用 `npm.cmd` 即可绕过执行策略限制：
+
+```powershell
+npm.cmd run dev
+```
+
+如果 Python 安装在 Conda 环境中，或没有加入 PATH，可以显式指定解释器后再启动：
+
+```powershell
+$env:PYTHON = "C:\ProgramData\miniconda3\python.exe"
+npm.cmd run dev
+```
+
+类 Unix 环境也可以继续使用 Bash 启动脚本：
+
+```bash
 ./scripts/start.sh
 ```
 
@@ -62,7 +104,9 @@ cd GraphiteUI
 - 后端：http://127.0.0.1:8765
 - 健康检查：http://127.0.0.1:8765/health
 
-`scripts/start.sh` 会释放已占用的前后端端口，并把日志写入：
+Node 启动器和 `scripts/start.sh` 都会释放已占用的前后端端口，并把日志写入：
+
+在 macOS / Linux 上，Node 启动器会优先使用 `lsof` 查找端口占用，其次尝试 `fuser`；Windows 下会使用 `netstat` / `taskkill`。
 
 - `.dev_frontend.log`
 - `.dev_backend.log`
