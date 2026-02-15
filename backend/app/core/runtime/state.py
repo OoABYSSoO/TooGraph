@@ -27,6 +27,22 @@ class RunLifecycle(TypedDict, total=False):
     resumed_from_run_id: str | None
 
 
+class RunSnapshot(TypedDict, total=False):
+    snapshot_id: str
+    kind: str
+    label: str
+    created_at: str
+    status: str
+    current_node_id: str | None
+    checkpoint_metadata: RunCheckpointMetadata
+    state_snapshot: dict[str, Any]
+    graph_snapshot: dict[str, Any]
+    artifacts: dict[str, Any]
+    node_status_map: dict[str, NodeStatus]
+    output_previews: list[dict[str, Any]]
+    final_result: str
+
+
 class RunState(TypedDict, total=False):
     """Runtime state for node_system graph execution."""
     run_id: str
@@ -59,6 +75,7 @@ class RunState(TypedDict, total=False):
     artifacts: dict[str, Any]
     state_snapshot: dict[str, Any]
     graph_snapshot: dict[str, Any]
+    run_snapshots: list[RunSnapshot]
     cycle_summary: dict[str, Any]
     cycle_iterations: list[dict[str, Any]]
 
@@ -182,6 +199,7 @@ def create_initial_run_state(graph_id: str, graph_name: str, max_revision_round:
         state_values={},
         state_last_writers={},
         state_events=[],
+        run_snapshots=[],
         cycle_summary={},
         cycle_iterations=[],
         started_at=utc_now_iso(),

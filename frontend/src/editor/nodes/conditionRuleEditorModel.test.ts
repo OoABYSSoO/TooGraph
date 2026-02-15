@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import type { StateDefinition } from "@/types/node-system";
 
-import { buildConditionRuleEditorModel } from "./conditionRuleEditorModel.ts";
+import { buildConditionRuleEditorModel, CONDITION_RULE_OPERATOR_OPTIONS } from "./conditionRuleEditorModel.ts";
 
 const stateSchema: Record<string, StateDefinition> = {
   question: {
@@ -52,4 +52,25 @@ test("buildConditionRuleEditorModel disables value input for exists operator", (
 
   assert.equal(model.resolvedSource, "answer");
   assert.equal(model.isValueDisabled, true);
+});
+
+test("condition rule operator options include string contains checks", () => {
+  assert.ok(CONDITION_RULE_OPERATOR_OPTIONS.some((option) => option.value === "contains" && option.label === "contains"));
+  assert.ok(
+    CONDITION_RULE_OPERATOR_OPTIONS.some((option) => option.value === "not_contains" && option.label === "not contains"),
+  );
+});
+
+test("buildConditionRuleEditorModel keeps value input enabled for contains operators", () => {
+  const model = buildConditionRuleEditorModel(
+    {
+      source: "answer",
+      operator: "contains",
+      value: "正确",
+    },
+    stateSchema,
+  );
+
+  assert.equal(model.resolvedSource, "answer");
+  assert.equal(model.isValueDisabled, false);
 });

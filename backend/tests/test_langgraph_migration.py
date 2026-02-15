@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import sys
 import unittest
 from pathlib import Path
@@ -499,6 +500,12 @@ class LangGraphMigrationTests(unittest.TestCase):
         self.assertEqual(result["output_previews"][0]["node_id"], "output_draft_answer")
         self.assertEqual(result["output_previews"][0]["source_key"], "draft_answer")
         self.assertEqual(result["output_previews"][0]["value"], "draft_writer:请给 GraphiteUI 写一段简短的欢迎介绍。")
+        self.assertEqual(len(result["run_snapshots"]), 1)
+        self.assertEqual(result["run_snapshots"][0]["kind"], "pause")
+        self.assertEqual(result["run_snapshots"][0]["current_node_id"], "draft_writer")
+        self.assertEqual(result["run_snapshots"][0]["state_snapshot"]["values"]["draft_answer"], "draft_writer:请给 GraphiteUI 写一段简短的欢迎介绍。")
+        self.assertTrue(result["run_snapshots"][0]["checkpoint_metadata"]["available"])
+        self.assertTrue(result["run_snapshots"][0]["checkpoint_metadata"]["checkpoint_id"])
 
     @patch("app.core.langgraph.runtime.save_run", lambda state: None)
     @patch("app.core.runtime.node_system_executor.save_run", lambda state: None)
@@ -511,17 +518,8 @@ class LangGraphMigrationTests(unittest.TestCase):
         interrupted = execute_node_system_graph_langgraph(graph, persist_progress=False)
         self.assertEqual(interrupted["status"], "awaiting_human")
 
-        resumed_state = create_initial_run_state(
-            graph_id=graph.graph_id or "test_graph",
-            graph_name=graph.name,
-            max_revision_round=1,
-        )
-        resumed_state["checkpoint_metadata"] = dict(interrupted["checkpoint_metadata"])
-        resumed_state["metadata"] = {"resolved_runtime_backend": "langgraph"}
-        resumed_state["node_status_map"] = dict(interrupted["node_status_map"])
-        resumed_state["output_previews"] = list(interrupted["output_previews"])
-        resumed_state["saved_outputs"] = list(interrupted.get("saved_outputs", []))
-        set_run_status(resumed_state, "resuming", resumed_from_run_id=interrupted["run_id"])
+        resumed_state = copy.deepcopy(interrupted)
+        set_run_status(resumed_state, "resuming")
 
         result = execute_node_system_graph_langgraph(
             graph,
@@ -532,6 +530,7 @@ class LangGraphMigrationTests(unittest.TestCase):
         )
 
         self.assertEqual(result["status"], "completed")
+        self.assertEqual(result["run_id"], interrupted["run_id"])
         self.assertEqual(result["node_status_map"]["draft_writer"], "success")
         self.assertEqual(result["node_status_map"]["output_draft_answer"], "success")
         self.assertEqual(result["node_status_map"]["revision_writer"], "success")
@@ -540,6 +539,7 @@ class LangGraphMigrationTests(unittest.TestCase):
             [preview["node_id"] for preview in result["output_previews"]],
             ["output_draft_answer", "output_final_answer"],
         )
+        self.assertEqual([snapshot["kind"] for snapshot in result["run_snapshots"]], ["pause", "completed"])
 
     def test_plain_edge_graph_validates_without_handle_fields(self):
         graph = NodeSystemGraphPayload.model_validate(
@@ -1114,6 +1114,26 @@ class LangGraphMigrationTests(unittest.TestCase):
         execution_ids = {item["node_id"] for item in result["node_executions"]}
         self.assertNotIn("continue_check", execution_ids)
         self.assertNotIn("output_counter", execution_ids)
+
+    @patch("app.core.langgraph.runtime.save_run", lambda state: None)
+    @patch("app.core.runtime.node_system_executor.save_run", lambda state: None)
+    @patch("app.core.runtime.node_system_executor._generate_agent_response", _fake_generate_agent_response_increment)
+    @patch("app.core.runtime.node_system_executor._invoke_skill", _fake_invoke_skill)
+    @patch("app.core.runtime.node_system_executor.get_skill_registry", _fake_skill_registry)
+    def test_cycle_counter_demo_routes_to_exhausted_branch_when_loop_limit_is_hit(self):
+        graph = _load_cycle_counter_demo_graph()
+        graph.nodes["continue_check"].config.loop_limit = 1
+
+        result = execute_node_system_graph_langgraph(graph, persist_progress=False)
+
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(result["state_snapshot"]["values"]["counter"], 1)
+        self.assertEqual(result["cycle_summary"]["stop_reason"], "max_iterations_exceeded")
+        self.assertEqual(result["cycle_summary"]["iteration_count"], 1)
+        self.assertEqual(result["final_result"], "循环已达上限，最新的结果是：1")
+        self.assertEqual(len(result["output_previews"]), 1)
+        self.assertEqual(result["output_previews"][0]["node_id"], "output_loop_exhausted")
+        self.assertEqual(result["output_previews"][0]["value"], "循环已达上限，最新的结果是：1")
 
     @patch("app.core.langgraph.runtime.save_run", lambda state: None)
     @patch("app.core.runtime.node_system_executor.save_run", lambda state: None)

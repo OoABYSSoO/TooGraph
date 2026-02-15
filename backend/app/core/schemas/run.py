@@ -75,6 +75,22 @@ class CheckpointMetadata(BaseModel):
     resume_source: str | None = None
 
 
+class RunSnapshot(BaseModel):
+    snapshot_id: str
+    kind: str
+    label: str
+    created_at: str
+    status: str
+    current_node_id: str | None = None
+    checkpoint_metadata: CheckpointMetadata = Field(default_factory=CheckpointMetadata)
+    state_snapshot: StateSnapshot = Field(default_factory=StateSnapshot)
+    graph_snapshot: dict[str, Any] = Field(default_factory=dict)
+    artifacts: dict[str, Any] = Field(default_factory=dict)
+    node_status_map: dict[str, str] = Field(default_factory=dict)
+    output_previews: list[OutputPreview] = Field(default_factory=list)
+    final_result: str = ""
+
+
 class RunLifecycleRecord(BaseModel):
     updated_at: str = ""
     paused_at: str | None = None
@@ -130,6 +146,7 @@ class RunSummary(BaseModel):
     graph_id: str | None = None
     graph_name: str
     status: str
+    restorable_snapshot_available: bool = False
     runtime_backend: str = ""
     lifecycle: RunLifecycleRecord = Field(default_factory=RunLifecycleRecord)
     checkpoint_metadata: CheckpointMetadata = Field(default_factory=CheckpointMetadata)
@@ -158,6 +175,7 @@ class RunDetail(RunSummary):
     artifacts: RunArtifacts = Field(default_factory=RunArtifacts)
     state_snapshot: StateSnapshot = Field(default_factory=StateSnapshot)
     graph_snapshot: dict[str, Any] = Field(default_factory=dict)
+    run_snapshots: list[RunSnapshot] = Field(default_factory=list)
     cycle_summary: CycleSummary = Field(default_factory=CycleSummary)
 
 

@@ -8,6 +8,7 @@ import SettingsPage from "@/pages/SettingsPage.vue";
 
 export const router = createRouter({
   history: createWebHistory(),
+  scrollBehavior: (_to, _from, savedPosition) => savedPosition ?? { left: 0, top: 0 },
   routes: [
     { path: "/", component: HomePage },
     { path: "/editor", component: EditorPage },

@@ -8,7 +8,7 @@ from fastapi import APIRouter, BackgroundTasks, Body, HTTPException, Query
 from pydantic import ValidationError
 
 from app.core.langgraph import execute_node_system_graph_langgraph, get_langgraph_runtime_unsupported_reasons
-from app.core.runtime.state import create_initial_run_state, set_run_status, touch_run_lifecycle
+from app.core.runtime.state import set_run_status, touch_run_lifecycle
 from app.core.schemas.node_system import NodeSystemGraphDocument
 from app.core.schemas.run import NodeExecutionDetail, RunDetail, RunSummary
 from app.core.storage.run_store import list_runs, load_run
@@ -24,7 +24,15 @@ def list_runs_endpoint(
     graph_name: str = Query(default=""),
     status: str = Query(default=""),
 ) -> list[RunSummary]:
-    runs = [RunSummary.model_validate(run) for run in list_runs()]
+    runs = [
+        RunSummary.model_validate(
+            {
+                **run,
+                "restorable_snapshot_available": _has_restorable_graph_snapshot(run.get("graph_snapshot")),
+            }
+        )
+        for run in list_runs()
+    ]
     graph_name_query = graph_name.strip().lower()
     status_query = status.strip().lower()
 
@@ -39,7 +47,13 @@ def list_runs_endpoint(
 @router.get("/{run_id}", response_model=RunDetail)
 def get_run_endpoint(run_id: str) -> RunDetail:
     try:
-        return RunDetail.model_validate(load_run(run_id))
+        run = load_run(run_id)
+        return RunDetail.model_validate(
+            {
+                **run,
+                "restorable_snapshot_available": _has_restorable_graph_snapshot(run.get("graph_snapshot")),
+            }
+        )
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -75,14 +89,20 @@ def resume_run_endpoint(
     if previous_run.get("runtime_backend") != "langgraph":
         raise HTTPException(status_code=409, detail=f"Run '{run_id}' is not resumable because it did not use LangGraph runtime.")
 
-    checkpoint_metadata = dict(previous_run.get("checkpoint_metadata") or {})
+    requested_snapshot_id = str((payload or {}).get("snapshot_id") or "").strip() or None
+    resume_snapshot = _resolve_resume_snapshot(previous_run, requested_snapshot_id)
+    checkpoint_metadata = _resolve_resume_checkpoint_metadata(previous_run, resume_snapshot)
     if not checkpoint_metadata.get("available") or not checkpoint_metadata.get("thread_id"):
         raise HTTPException(status_code=409, detail=f"Run '{run_id}' does not have an available checkpoint.")
 
-    if previous_run.get("status") not in {"failed", "paused", "awaiting_human"}:
+    if previous_run.get("status") not in {"failed", "paused", "awaiting_human"} and resume_snapshot is None:
         raise HTTPException(status_code=409, detail=f"Run '{run_id}' cannot be resumed from status '{previous_run.get('status')}'.")
 
-    graph_snapshot = previous_run.get("graph_snapshot")
+    graph_snapshot = (
+        resume_snapshot.get("graph_snapshot")
+        if isinstance(resume_snapshot, dict) and isinstance(resume_snapshot.get("graph_snapshot"), dict)
+        else previous_run.get("graph_snapshot")
+    )
     if not isinstance(graph_snapshot, dict):
         raise HTTPException(status_code=409, detail=f"Run '{run_id}' cannot be resumed because its graph snapshot is missing.")
 
@@ -107,15 +127,22 @@ def resume_run_endpoint(
             },
         )
 
-    resumed_run = create_initial_run_state(
-        graph_id=graph.graph_id,
-        graph_name=graph.name,
-        max_revision_round=int(graph.metadata.get("max_revision_round", 1)),
-    )
+    resumed_run = copy.deepcopy(previous_run)
+    if resume_snapshot is not None:
+        resumed_run["status"] = str(resume_snapshot.get("status") or resumed_run.get("status") or "")
+        resumed_run["current_node_id"] = resume_snapshot.get("current_node_id")
+        resumed_run["checkpoint_metadata"] = copy.deepcopy(checkpoint_metadata)
+        resumed_run["state_snapshot"] = copy.deepcopy(resume_snapshot.get("state_snapshot", resumed_run.get("state_snapshot", {})))
+        resumed_run["graph_snapshot"] = copy.deepcopy(graph_snapshot)
+        resumed_run["artifacts"] = copy.deepcopy(resume_snapshot.get("artifacts", resumed_run.get("artifacts", {})))
+        resumed_run["node_status_map"] = copy.deepcopy(resume_snapshot.get("node_status_map", resumed_run.get("node_status_map", {})))
+        resumed_run["output_previews"] = copy.deepcopy(resume_snapshot.get("output_previews", resumed_run.get("output_previews", [])))
+        resumed_run["final_result"] = str(resume_snapshot.get("final_result", resumed_run.get("final_result", "")) or "")
+    resumed_run["graph_id"] = graph.graph_id
+    resumed_run["graph_name"] = graph.name
     resumed_run["runtime_backend"] = "langgraph"
     resumed_run["metadata"] = dict(graph.metadata)
     resumed_run["metadata"]["resolved_runtime_backend"] = "langgraph"
-    _carry_resume_visual_state(resumed_run, previous_run, graph)
     resumed_run["checkpoint_metadata"] = {
         "available": bool(checkpoint_metadata.get("checkpoint_id")),
         "checkpoint_id": checkpoint_metadata.get("checkpoint_id"),
@@ -124,38 +151,15 @@ def resume_run_endpoint(
         "saver": checkpoint_metadata.get("saver") or "json_checkpoint_saver",
         "resume_source": run_id,
     }
-    set_run_status(resumed_run, "resuming", resumed_from_run_id=run_id)
+    resumed_run["completed_at"] = None
+    resumed_run["errors"] = []
+    resumed_run["warnings"] = []
+    set_run_status(resumed_run, "resuming")
     touch_run_lifecycle(resumed_run)
     save_run(resumed_run)
 
     background_tasks.add_task(_resume_run_worker, graph, resumed_run, payload.get("resume") if payload else None)
     return {"run_id": resumed_run["run_id"], "status": resumed_run["status"]}
-
-
-def _carry_resume_visual_state(resumed_run: dict[str, Any], previous_run: dict[str, Any], graph: NodeSystemGraphDocument) -> None:
-    previous_status_map = dict(previous_run.get("node_status_map") or {})
-    resumed_run["node_status_map"] = {
-        node_name: previous_status_map.get(node_name, "idle")
-        for node_name in graph.nodes
-    }
-
-    for key in (
-        "node_executions",
-        "output_previews",
-        "saved_outputs",
-        "selected_skills",
-        "skill_outputs",
-        "state_events",
-        "state_last_writers",
-        "state_values",
-        "final_result",
-    ):
-        if key in previous_run:
-            resumed_run[key] = copy.deepcopy(previous_run[key])
-
-    previous_artifacts = previous_run.get("artifacts")
-    if isinstance(previous_artifacts, dict):
-        resumed_run["artifacts"] = copy.deepcopy(previous_artifacts)
 
 
 def _resume_run_worker(graph, resumed_run: dict, resume_payload: Any | None = None) -> None:
@@ -172,3 +176,34 @@ def _resume_run_worker(graph, resumed_run: dict, resume_payload: Any | None = No
         set_run_status(resumed_run, "failed")
         resumed_run.setdefault("errors", []).append(str(exc))
         save_run(resumed_run)
+
+
+def _has_restorable_graph_snapshot(snapshot: Any) -> bool:
+    if not isinstance(snapshot, dict):
+        return False
+
+    try:
+        NodeSystemGraphDocument.model_validate(snapshot)
+    except ValidationError:
+        return False
+    return True
+
+
+def _resolve_resume_snapshot(previous_run: dict[str, Any], snapshot_id: str | None) -> dict[str, Any] | None:
+    if not snapshot_id:
+        return None
+    snapshots = previous_run.get("run_snapshots")
+    if not isinstance(snapshots, list):
+        raise HTTPException(status_code=409, detail=f"Run '{previous_run.get('run_id')}' does not contain resumable snapshots.")
+    snapshot = next((item for item in snapshots if isinstance(item, dict) and item.get("snapshot_id") == snapshot_id), None)
+    if snapshot is None:
+        raise HTTPException(status_code=404, detail=f"Snapshot '{snapshot_id}' does not exist in run '{previous_run.get('run_id')}'.")
+    if str(snapshot.get("kind") or "").strip() != "pause":
+        raise HTTPException(status_code=409, detail=f"Snapshot '{snapshot_id}' is not a pause checkpoint and cannot be resumed.")
+    return snapshot
+
+
+def _resolve_resume_checkpoint_metadata(previous_run: dict[str, Any], resume_snapshot: dict[str, Any] | None) -> dict[str, Any]:
+    if resume_snapshot is None:
+        return dict(previous_run.get("checkpoint_metadata") or {})
+    return dict(resume_snapshot.get("checkpoint_metadata") or {})

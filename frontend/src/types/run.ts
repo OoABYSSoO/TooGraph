@@ -118,6 +118,22 @@ export type StateEvent = {
   created_at: string;
 };
 
+export type RunSnapshot = {
+  snapshot_id: string;
+  kind: string;
+  label: string;
+  created_at: string;
+  status: string;
+  current_node_id?: string | null;
+  checkpoint_metadata?: CheckpointMetadata;
+  state_snapshot: StateSnapshot;
+  graph_snapshot: Record<string, unknown>;
+  artifacts: RunArtifacts;
+  node_status_map: Record<string, string>;
+  output_previews: OutputPreview[];
+  final_result?: string;
+};
+
 export type RunArtifacts = {
   skill_outputs?: Array<Record<string, unknown>>;
   output_previews?: OutputPreview[];
@@ -136,6 +152,7 @@ export type RunSummary = {
   graph_id?: string | null;
   graph_name: string;
   status: string;
+  restorable_snapshot_available?: boolean;
   runtime_backend: string;
   lifecycle: RunLifecycleRecord;
   checkpoint_metadata: CheckpointMetadata;
@@ -163,5 +180,6 @@ export type RunDetail = RunSummary & {
   artifacts: RunArtifacts;
   state_snapshot: StateSnapshot;
   graph_snapshot: Record<string, unknown>;
+  run_snapshots?: RunSnapshot[];
   cycle_summary?: CycleSummary;
 };

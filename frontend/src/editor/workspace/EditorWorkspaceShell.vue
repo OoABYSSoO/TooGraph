@@ -9,6 +9,11 @@
     />
 
     <div v-if="workspace.tabs.length === 0" class="editor-workspace-shell__welcome">
+      <div v-if="routeRestoreError" class="editor-workspace-shell__status-card editor-workspace-shell__status-card--danger">
+        <div class="editor-workspace-shell__status-eyebrow">Restore</div>
+        <h2>无法恢复运行快照</h2>
+        <p>{{ routeRestoreError }}</p>
+      </div>
       <EditorWelcomeState
         :templates="templates"
         :graphs="graphs"
@@ -20,6 +25,10 @@
     </div>
 
     <div v-else class="editor-workspace-shell__workspace">
+      <div v-if="routeRestoreError" class="editor-workspace-shell__route-error">
+        <span class="editor-workspace-shell__route-error-label">Restore</span>
+        <span>{{ routeRestoreError }}</span>
+      </div>
       <div class="editor-workspace-shell__chrome">
         <EditorTabBar
           :tabs="workspace.tabs"
@@ -163,6 +172,7 @@
             <EditorStatePanel
               v-else-if="isStatePanelOpen(tab.tabId) && documentsByTabId[tab.tabId]"
               :document="documentsByTabId[tab.tabId]!"
+              :run="latestRunDetailByTabId[tab.tabId] ?? null"
               :focused-node-id="focusedNodeIdByTabId[tab.tabId] ?? null"
               @toggle="toggleStatePanel(tab.tabId)"
               @focus-node="requestNodeFocusForTab(tab.tabId, $event)"
@@ -246,6 +256,7 @@ import {
   type EditorWorkspaceTab,
   type PersistedEditorWorkspace,
 } from "@/lib/editor-workspace";
+import { buildRestoredGraphFromRun, buildSnapshotScopedRun, canRestoreRunDetail, resolveRestoredRunTabTitle } from "@/lib/run-restore";
 import { useGraphDocumentStore } from "@/stores/graphDocument";
 import type { KnowledgeBaseRecord } from "@/types/knowledge";
 import type { RunDetail } from "@/types/run";
@@ -284,6 +295,8 @@ const props = defineProps<{
   routeMode: "root" | "new" | "existing";
   routeGraphId?: string | null;
   defaultTemplateId?: string | null;
+  restoreRunId?: string | null;
+  restoreSnapshotId?: string | null;
   templates: TemplateRecord[];
   graphs: GraphDocument[];
 }>();
@@ -312,12 +325,14 @@ const focusRequestByTabId = ref<Record<string, NodeFocusRequest | null>>({});
 const runNodeStatusByTabId = ref<Record<string, Record<string, string>>>({});
 const currentRunNodeIdByTabId = ref<Record<string, string | null>>({});
 const latestRunDetailByTabId = ref<Record<string, RunDetail | null>>({});
+const restoredRunSnapshotIdByTabId = ref<Record<string, string | null>>({});
 const humanReviewBusyByTabId = ref<Record<string, boolean>>({});
 const humanReviewErrorByTabId = ref<Record<string, string | null>>({});
 const runOutputPreviewByTabId = ref<Record<string, Record<string, { text: string; displayMode: string | null }>>>({});
 const runFailureMessageByTabId = ref<Record<string, Record<string, string>>>({});
 const activeRunEdgeIdsByTabId = ref<Record<string, string[]>>({});
 const feedbackByTabId = ref<Record<string, (RunFeedback & { activeRunId?: string | null; activeRunStatus?: string | null }) | null>>({});
+const routeRestoreError = ref<string | null>(null);
 const knowledgeBases = ref<KnowledgeBaseRecord[]>([]);
 const settings = ref<SettingsPayload | null>(null);
 const skillDefinitions = ref<SkillDefinition[]>([]);
@@ -377,6 +392,9 @@ const routeSignature = computed(() => {
     return `existing:${props.routeGraphId ?? ""}`;
   }
   if (props.routeMode === "new") {
+    if (props.restoreRunId) {
+      return `restore:${props.restoreRunId ?? ""}:${props.restoreSnapshotId ?? ""}`;
+    }
     return `new:${props.defaultTemplateId ?? ""}`;
   }
   return "root";
@@ -384,6 +402,50 @@ const routeSignature = computed(() => {
 
 function feedbackForTab(tabId: string) {
   return feedbackByTabId.value[tabId] ?? null;
+}
+
+function applyRunVisualStateToTab(
+  tabId: string,
+  run: RunDetail,
+  document: GraphPayload | GraphDocument,
+  visualRun: RunDetail = run,
+) {
+  const nodeIds = Object.keys(document.nodes);
+  const nodeLabelLookup = Object.fromEntries(Object.entries(document.nodes).map(([nodeId, node]) => [nodeId, node.name.trim() || nodeId]));
+  const feedback = formatRunFeedback(visualRun, {
+    nodeIds,
+    nodeLabelLookup,
+  });
+  const runArtifactsModel = buildRunNodeArtifactsModel(visualRun);
+  latestRunDetailByTabId.value = {
+    ...latestRunDetailByTabId.value,
+    [tabId]: visualRun,
+  };
+  runNodeStatusByTabId.value = {
+    ...runNodeStatusByTabId.value,
+    [tabId]: visualRun.node_status_map ?? {},
+  };
+  currentRunNodeIdByTabId.value = {
+    ...currentRunNodeIdByTabId.value,
+    [tabId]: visualRun.current_node_id ?? null,
+  };
+  runOutputPreviewByTabId.value = {
+    ...runOutputPreviewByTabId.value,
+    [tabId]: runArtifactsModel.outputPreviewByNodeId,
+  };
+  runFailureMessageByTabId.value = {
+    ...runFailureMessageByTabId.value,
+    [tabId]: runArtifactsModel.failedMessageByNodeId,
+  };
+  activeRunEdgeIdsByTabId.value = {
+    ...activeRunEdgeIdsByTabId.value,
+    [tabId]: runArtifactsModel.activeEdgeIds,
+  };
+  setFeedbackForTab(tabId, {
+    ...feedback,
+    activeRunId: run.run_id,
+    activeRunStatus: visualRun.status,
+  });
 }
 
 function setFeedbackForTab(
@@ -465,6 +527,10 @@ async function pollRunForTab(tabId: string, runId: string, generation = runPollG
       ...latestRunDetailByTabId.value,
       [tabId]: run,
     };
+    restoredRunSnapshotIdByTabId.value = {
+      ...restoredRunSnapshotIdByTabId.value,
+      [tabId]: null,
+    };
     runNodeStatusByTabId.value = {
       ...runNodeStatusByTabId.value,
       [tabId]: run.node_status_map ?? {},
@@ -521,17 +587,26 @@ function applyCurrentRouteInstruction() {
     routeMode: props.routeMode,
     routeGraphId: props.routeGraphId ?? null,
     defaultTemplateId: props.defaultTemplateId ?? null,
+    restoreRunId: props.restoreRunId ?? null,
+    restoreSnapshotId: props.restoreSnapshotId ?? null,
     activeTabRouteSignature: activeTabRouteSignature.value,
     routeSignature: routeSignature.value,
     handledRouteSignature: handledRouteSignature.value,
   });
 
+  if (instruction.type === "restore-run") {
+    void openRestoredRunTab(instruction.runId, instruction.snapshotId ?? null, instruction.navigation);
+    return;
+  }
+
   if (instruction.type === "open-new") {
+    routeRestoreError.value = null;
     openNewTab(instruction.templateId, instruction.navigation);
     return;
   }
 
   if (instruction.type === "open-existing") {
+    routeRestoreError.value = null;
     openExistingGraph(instruction.graphId, instruction.navigation);
     return;
   }
@@ -614,6 +689,8 @@ function clearTabRuntime(tabId: string) {
   delete nextCurrentRunNode[tabId];
   const nextLatestRuns = { ...latestRunDetailByTabId.value };
   delete nextLatestRuns[tabId];
+  const nextRestoredRunSnapshots = { ...restoredRunSnapshotIdByTabId.value };
+  delete nextRestoredRunSnapshots[tabId];
   const nextHumanReviewBusy = { ...humanReviewBusyByTabId.value };
   delete nextHumanReviewBusy[tabId];
   const nextHumanReviewErrors = { ...humanReviewErrorByTabId.value };
@@ -635,6 +712,7 @@ function clearTabRuntime(tabId: string) {
   runNodeStatusByTabId.value = nextRunNodeStatus;
   currentRunNodeIdByTabId.value = nextCurrentRunNode;
   latestRunDetailByTabId.value = nextLatestRuns;
+  restoredRunSnapshotIdByTabId.value = nextRestoredRunSnapshots;
   humanReviewBusyByTabId.value = nextHumanReviewBusy;
   humanReviewErrorByTabId.value = nextHumanReviewErrors;
   runOutputPreviewByTabId.value = nextOutputPreviews;
@@ -684,6 +762,49 @@ function openNewTab(templateId: string | null, navigation: "push" | "replace" | 
     syncRouteToTab(tab, navigation === "replace" ? "replace" : "push");
   }
   handledRouteSignature.value = templateId ? `new:${templateId}` : "new:";
+}
+
+async function openRestoredRunTab(runId: string, snapshotId: string | null = props.restoreSnapshotId ?? null, navigation: "push" | "replace" | "none" = "push") {
+  routeRestoreError.value = null;
+
+  try {
+    const run = await fetchRun(runId);
+    if (!canRestoreRunDetail(run)) {
+      throw new Error(`Run ${runId} cannot be restored into the editor.`);
+    }
+    const visualRun = buildSnapshotScopedRun(run, snapshotId);
+    const restoredGraph = buildRestoredGraphFromRun(run, snapshotId);
+    const tab = {
+      ...createUnsavedWorkspaceTab({
+        kind: "new",
+        title: resolveRestoredRunTabTitle(run),
+      }),
+      dirty: true,
+    };
+
+    registerDocumentForTab(tab.tabId, restoredGraph);
+    updateWorkspace({
+      activeTabId: tab.tabId,
+      tabs: [...workspace.value.tabs, tab],
+    });
+    restoredRunSnapshotIdByTabId.value = {
+      ...restoredRunSnapshotIdByTabId.value,
+      [tab.tabId]: snapshotId,
+    };
+    applyRunVisualStateToTab(tab.tabId, run, restoredGraph, visualRun);
+    handledRouteSignature.value = routeSignature.value;
+
+    if (visualRun.status === "awaiting_human" && visualRun.current_node_id) {
+      openHumanReviewPanelForTab(tab.tabId, visualRun.current_node_id);
+    }
+
+    if (navigation !== "none") {
+      syncRouteToTab(tab, navigation === "replace" ? "replace" : "push");
+    }
+  } catch (error) {
+    routeRestoreError.value = error instanceof Error ? error.message : `Failed to restore run ${runId}.`;
+    handledRouteSignature.value = routeSignature.value;
+  }
 }
 
 function openImportedGraphTab(graph: GraphPayload, fileName: string) {
@@ -1907,7 +2028,7 @@ async function resumeHumanReviewRun(tabId: string, payload: Record<string, unkno
   };
 
   try {
-    const response = await resumeRun(run.run_id, payload);
+    const response = await resumeRun(run.run_id, payload, restoredRunSnapshotIdByTabId.value[tabId] ?? null);
     cancelRunPolling(tabId);
     const generation = runPollGenerationByTabId.get(tabId) ?? 0;
     latestRunDetailByTabId.value = {
@@ -1917,6 +2038,10 @@ async function resumeHumanReviewRun(tabId: string, payload: Record<string, unkno
         run_id: response.run_id,
         status: response.status,
       },
+    };
+    restoredRunSnapshotIdByTabId.value = {
+      ...restoredRunSnapshotIdByTabId.value,
+      [tabId]: null,
     };
     setMessageFeedbackForTab(tabId, {
       tone: "warning",
@@ -2216,6 +2341,31 @@ onMounted(() => {
   margin: 0;
   line-height: 1.6;
   color: rgba(60, 41, 20, 0.74);
+}
+
+.editor-workspace-shell__status-card--danger,
+.editor-workspace-shell__route-error {
+  border-color: rgba(185, 28, 28, 0.18);
+  background: rgba(254, 242, 242, 0.94);
+}
+
+.editor-workspace-shell__route-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 16px 0;
+  border: 1px solid rgba(185, 28, 28, 0.18);
+  border-radius: 18px;
+  padding: 10px 14px;
+  color: rgba(127, 29, 29, 0.9);
+}
+
+.editor-workspace-shell__route-error-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
 }
 
 @media (max-width: 760px) {

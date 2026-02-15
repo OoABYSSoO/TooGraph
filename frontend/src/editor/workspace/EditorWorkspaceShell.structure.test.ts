@@ -41,6 +41,23 @@ test("EditorWorkspaceShell seeds plain new tabs from the baseline default templa
   assert.match(componentSource, /const draft = createEditorSeedDraftGraph\(props\.templates, template\?\.template_id \?\? null\);/);
 });
 
+test("EditorWorkspaceShell can restore a past run into a new unsaved tab", () => {
+  assert.match(componentSource, /restoreRunId\?: string \| null;/);
+  assert.match(componentSource, /restoreSnapshotId\?: string \| null;/);
+  assert.match(componentSource, /const routeRestoreError = ref<string \| null>\(null\);/);
+  assert.match(componentSource, /const restoredRunSnapshotIdByTabId = ref<Record<string, string \| null>>\(\{\}\);/);
+  assert.match(componentSource, /async function openRestoredRunTab\(runId: string, snapshotId: string \| null = props\.restoreSnapshotId \?\? null, navigation: "push" \| "replace" \| "none" = "push"\)/);
+  assert.match(componentSource, /const run = await fetchRun\(runId\);/);
+  assert.match(componentSource, /const visualRun = buildSnapshotScopedRun\(run, snapshotId\);/);
+  assert.match(componentSource, /const restoredGraph = buildRestoredGraphFromRun\(run, snapshotId\);/);
+  assert.match(componentSource, /title: resolveRestoredRunTabTitle\(run\),/);
+  assert.match(componentSource, /restoredRunSnapshotIdByTabId\.value = \{[\s\S]*\[tab\.tabId\]: snapshotId,/);
+  assert.match(componentSource, /if \(instruction\.type === "restore-run"\) \{/);
+  assert.match(componentSource, /openRestoredRunTab\(instruction\.runId, instruction\.snapshotId \?\? null, instruction\.navigation\);/);
+  assert.match(componentSource, /restoreSnapshotId: props\.restoreSnapshotId \?\? null,/);
+  assert.match(componentSource, /return `restore:\$\{props\.restoreRunId \?\? ""\}:\$\{props\.restoreSnapshotId \?\? ""\}`;/);
+});
+
 test("EditorWorkspaceShell wires node top-action events into state updates, node deletion, and preset persistence", () => {
   assert.match(componentSource, /import \{ fetchPreset, fetchPresets, savePreset \} from "@\/api\/presets";/);
   assert.match(componentSource, /@update-node-metadata="updateNodeMetadataForTab\(tab\.tabId, \$event\.nodeId, \$event\.patch\)"/);
@@ -104,6 +121,14 @@ test("EditorWorkspaceShell opens the right sidebar in Human Review mode for awai
   assert.match(componentSource, /:run="latestRunDetailByTabId\[tab\.tabId\] \?\? null"/);
   assert.match(componentSource, /if \(run\.status === "awaiting_human" && run\.current_node_id\) \{/);
   assert.match(componentSource, /openHumanReviewPanelForTab\(tabId, run\.current_node_id\);/);
+  assert.match(componentSource, /if \(visualRun\.status === "awaiting_human" && visualRun\.current_node_id\) \{/);
+  assert.match(componentSource, /openHumanReviewPanelForTab\(tab\.tabId, visualRun\.current_node_id\);/);
+  assert.match(componentSource, /<EditorStatePanel[\s\S]*:run="latestRunDetailByTabId\[tab\.tabId\] \?\? null"/);
+});
+
+test("EditorWorkspaceShell resumes restored pause snapshots against their original snapshot checkpoint", () => {
+  assert.match(componentSource, /resumeRun\(run\.run_id, payload, restoredRunSnapshotIdByTabId\.value\[tabId\] \?\? null\)/);
+  assert.match(componentSource, /restoredRunSnapshotIdByTabId\.value = \{[\s\S]*\[tabId\]: null,/);
 });
 
 test("EditorWorkspaceShell locks graph editing while a run is awaiting human review", () => {

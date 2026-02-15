@@ -142,6 +142,91 @@ LOCAL_TEXT_MODEL=your-local-model
 - `OPENAI_API_KEY`
 - `TEXT_MODEL`
 
+### 怎么用（第一次上手）
+
+如果你是第一次把 GraphiteUI 跑起来，最短路径可以按下面走：
+
+1. 安装前后端依赖
+2. 准备一个模型入口
+   - 本地模型：推荐用 EZLLM
+   - 云端或其他 OpenAI-compatible 网关：设置 `LOCAL_BASE_URL`、`LOCAL_API_KEY`、`LOCAL_TEXT_MODEL`
+3. 启动 GraphiteUI
+4. 打开编辑器，新建一张最小 graph
+5. 保存、校验、运行，然后到 Runs 页面看结果
+
+#### 方案 A：用 EZLLM 作为本地 runtime
+
+先启动 EZLLM，再启动 GraphiteUI。
+
+PowerShell 示例：
+
+```powershell
+pipx install ezllm
+ezllm start
+$env:LOCAL_BASE_URL = "http://127.0.0.1:8888/v1"
+$env:LOCAL_TEXT_MODEL = "lm-local"
+npm.cmd run dev
+```
+
+Bash 示例：
+
+```bash
+pipx install ezllm
+ezllm start
+export LOCAL_BASE_URL=http://127.0.0.1:8888/v1
+export LOCAL_TEXT_MODEL=lm-local
+npm run dev
+```
+
+启动后打开：
+
+- 编辑器：http://127.0.0.1:3477
+- 后端健康检查：http://127.0.0.1:8765/health
+- EZLLM 日志页：http://127.0.0.1:8888/logs
+
+#### 方案 B：接现有 OpenAI-compatible 网关
+
+如果你已经有可用的网关，只要在启动 GraphiteUI 前设置这些环境变量：
+
+```bash
+LOCAL_BASE_URL=https://your-gateway.example.com/v1
+LOCAL_API_KEY=your-api-key
+LOCAL_TEXT_MODEL=your-model-name
+```
+
+然后启动：
+
+```bash
+npm run dev
+```
+
+如果你修改了这些环境变量，需要重启 GraphiteUI 后端；直接重新执行 `npm run dev` 即可。
+
+### 一个最小可运行流程
+
+第一次进入后，推荐先跑通一张最小图：
+
+1. 打开首页，进入 Editor
+2. 新建一个 graph
+3. 在画布上放 3 个节点：`input -> agent -> output`
+4. 在 `input` 节点里提供一段文本输入
+5. 在 `agent` 节点里选择模型，并填写一个简单提示词
+6. 把 `agent` 的输出接到 `output`
+7. 点击保存、校验，再点击运行
+
+运行完成后可以在这些地方看结果：
+
+- Editor 里的节点状态和 output preview
+- Runs 页面里的运行记录
+- Run Detail 页面里的执行细节
+
+### 常见用法
+
+- 想检查后端是否正常：访问 `http://127.0.0.1:8765/health`
+- 想看 EZLLM 当前 runtime 和日志：访问 `http://127.0.0.1:8888/logs`
+- 想导入项目自带知识库：运行 `python scripts/import_official_knowledge_bases.py`
+- 想切换模型入口：修改 `LOCAL_BASE_URL` / `LOCAL_TEXT_MODEL` 后重新执行 `npm run dev`
+
 ### 导入官方知识库
 
 ```bash

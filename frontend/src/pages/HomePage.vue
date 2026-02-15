@@ -24,10 +24,10 @@
           </div>
           <RouterLink v-for="run in runs.slice(0, 5)" :key="run.run_id" class="home-card" :to="`/runs/${run.run_id}`">
             <div class="home-card__header">
-              <strong>{{ run.run_id }}</strong>
+              <strong>{{ formatRunDisplayName(run) }}</strong>
               <span class="home-card__detail">{{ runCardDetail }}</span>
             </div>
-            <p>{{ run.graph_name }}</p>
+            <p>{{ run.run_id }}</p>
             <div class="home-badges">
               <span>{{ run.status }}</span>
               <span>revisions {{ run.revision_round }}</span>
@@ -93,6 +93,7 @@ import { onMounted, ref } from "vue";
 
 import { fetchGraphs, fetchTemplates } from "@/api/graphs";
 import { fetchRuns } from "@/api/runs";
+import { formatRunDisplayName } from "@/lib/run-display-name";
 import AppShell from "@/layouts/AppShell.vue";
 import type { GraphDocument, TemplateRecord } from "@/types/node-system";
 import type { RunSummary } from "@/types/run";

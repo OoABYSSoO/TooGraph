@@ -1147,12 +1147,14 @@
               <input
                 class="node-card__control-input"
                 type="text"
-                :value="conditionRuleValueText"
+                :value="conditionRuleValueDraft"
                 :placeholder="view.body.valueLabel"
                 :disabled="conditionRuleValueDisabled"
                 @pointerdown.stop
                 @click.stop
                 @input="handleConditionRuleValueInput"
+                @blur="commitConditionRuleValue"
+                @keydown.enter.prevent="handleConditionRuleValueEnter"
               />
             </label>
             <label class="node-card__control-row">
@@ -1351,6 +1353,7 @@ const outputPreviewContent = computed(() => {
   }
   return resolveOutputPreviewContent(view.value.body.previewText, view.value.body.displayMode);
 });
+const conditionRuleValueDraft = ref("");
 const conditionLoopLimitDraft = ref("");
 const inputAssetInputRef = ref<HTMLInputElement | null>(null);
 const isSkillPickerOpen = ref(false);
@@ -1564,12 +1567,6 @@ const portPickerTitle = computed(() => {
   }
   return activePortPickerSide.value === "input" ? "Select Input State" : "Select Output State";
 });
-const conditionRuleValueText = computed(() => {
-  if (props.node.kind !== "condition") {
-    return "";
-  }
-  return props.node.config.rule.value === null ? "" : String(props.node.config.rule.value);
-});
 const conditionRuleValueDisabled = computed(
   () => props.node.kind === "condition" && props.node.config.rule.operator === "exists",
 );
@@ -1592,6 +1589,14 @@ const hasFloatingPanelOpen = computed(
     activeStateEditorAnchorId.value !== null ||
     activePortPickerSide.value !== null ||
     isSkillPickerOpen.value,
+);
+
+watch(
+  () => (props.node.kind === "condition" ? props.node.config.rule.value : null),
+  (ruleValue) => {
+    conditionRuleValueDraft.value = ruleValue === null || ruleValue === undefined ? "" : String(ruleValue);
+  },
+  { immediate: true },
 );
 
 watch(
@@ -2849,7 +2854,27 @@ function handleConditionRuleValueInput(event: Event) {
   if (!(target instanceof HTMLInputElement)) {
     return;
   }
-  updateConditionRule({ value: target.value });
+  conditionRuleValueDraft.value = target.value;
+}
+
+function commitConditionRuleValue() {
+  if (props.node.kind !== "condition") {
+    return;
+  }
+  const nextValue = conditionRuleValueDraft.value;
+  const currentValue =
+    props.node.config.rule.value === null || props.node.config.rule.value === undefined ? "" : String(props.node.config.rule.value);
+  if (nextValue === currentValue) {
+    return;
+  }
+  updateConditionRule({ value: conditionRuleValueDraft.value });
+}
+
+function handleConditionRuleValueEnter(event: KeyboardEvent) {
+  const target = event.currentTarget;
+  if (target instanceof HTMLInputElement) {
+    target.blur();
+  }
 }
 
 </script>
