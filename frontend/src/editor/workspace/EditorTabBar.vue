@@ -1,114 +1,102 @@
 <template>
   <header class="editor-tab-bar">
     <div class="editor-tab-bar__inner">
-      <div class="editor-tab-bar__tabs-shell" @wheel.prevent="handleTabsWheel" @dragleave="handleTabsShellDragLeave">
-        <ElTabs
-          class="editor-tab-bar__tabs"
-          type="card"
-          :model-value="activeTabId ?? undefined"
-          @tab-change="handleTabChange"
-        >
-          <ElTabPane v-for="tab in tabs" :key="tab.tabId" :name="tab.tabId">
-            <template #label>
-              <div
-                class="editor-tab-bar__tab-shell"
-                :ref="(element) => setTabShellRef(tab.tabId, element)"
-                :class="{
-                  'editor-tab-bar__tab-shell--active': tab.tabId === activeTabId,
-                  'editor-tab-bar__tab-shell--dragging': tab.tabId === draggedTabId,
-                  'editor-tab-bar__tab-shell--drop-before': tab.tabId === dropTargetTabId && dropPlacement === 'before',
-                  'editor-tab-bar__tab-shell--drop-after': tab.tabId === dropTargetTabId && dropPlacement === 'after',
-                }"
-                draggable="true"
-                @auxclick="handleTabAuxClick(tab, $event)"
-                @dragstart="handleTabDragStart(tab, $event)"
-                @dragover.prevent="handleTabDragOver(tab, $event)"
-                @drop.prevent="handleTabDrop(tab, $event)"
-                @dragend="handleTabDragEnd"
-              >
-                <input
-                  v-if="editingTabId === tab.tabId"
-                  :ref="setTabNameInput"
-                  v-model="draftGraphName"
-                  class="editor-tab-bar__tab-name-input"
-                  :aria-label="`重命名 ${tab.title}`"
-                  @click.stop
-                  @blur="commitGraphName"
-                  @keydown.enter.prevent="commitGraphName"
-                  @keydown.esc.prevent="cancelGraphNameEdit"
-                />
-
-                <div v-else class="editor-tab-bar__tab-activate" :title="buildEditorTabHint(tab, copy)" @dblclick.stop="startTabRename(tab)">
-                  <span class="editor-tab-bar__tab-title">{{ tab.title }}</span>
-                </div>
-
-                <span class="editor-tab-bar__tab-status">
-                  <span v-if="tab.dirty" class="editor-tab-bar__dirty-dot" />
-                  <button
-                    type="button"
-                    class="editor-tab-bar__close"
-                    :class="{ 'editor-tab-bar__close--visible': tab.tabId === activeTabId }"
-                    aria-label="关闭标签页"
-                    @mousedown.stop.prevent
-                    @click.stop="$emit('close-tab', tab.tabId)"
-                  >
-                    ×
-                  </button>
-                </span>
-              </div>
-            </template>
-          </ElTabPane>
-        </ElTabs>
-      </div>
-
-      <div class="editor-tab-bar__controls">
-        <div class="editor-tab-bar__controls-dock">
-          <button
-            type="button"
-            class="editor-tab-bar__state-pill"
-            :class="{ 'editor-tab-bar__state-pill--active': isStatePanelOpen }"
-            @click="$emit('toggle-state-panel')"
+      <div class="editor-tab-bar__strip">
+        <div class="editor-tab-bar__tabs-shell" @wheel.prevent="handleTabsWheel" @dragleave="handleTabsShellDragLeave">
+          <ElTabs
+            class="editor-tab-bar__tabs"
+            type="card"
+            :model-value="activeTabId ?? undefined"
+            @tab-change="handleTabChange"
           >
-            <span>{{ copy.state }}</span>
-            <span class="editor-tab-bar__state-count">{{ activeStateCount }}</span>
-          </button>
+            <ElTabPane v-for="tab in tabs" :key="tab.tabId" :name="tab.tabId">
+              <template #label>
+                <div
+                  class="editor-tab-bar__tab-shell"
+                  :ref="(element) => setTabShellRef(tab.tabId, element)"
+                  :class="{
+                    'editor-tab-bar__tab-shell--active': tab.tabId === activeTabId,
+                    'editor-tab-bar__tab-shell--dragging': tab.tabId === draggedTabId,
+                    'editor-tab-bar__tab-shell--drop-before': tab.tabId === dropTargetTabId && dropPlacement === 'before',
+                    'editor-tab-bar__tab-shell--drop-after': tab.tabId === dropTargetTabId && dropPlacement === 'after',
+                  }"
+                  draggable="true"
+                  @auxclick="handleTabAuxClick(tab, $event)"
+                  @dragstart="handleTabDragStart(tab, $event)"
+                  @dragover.prevent="handleTabDragOver(tab, $event)"
+                  @drop.prevent="handleTabDrop(tab, $event)"
+                  @dragend="handleTabDragEnd"
+                >
+                  <input
+                    v-if="editingTabId === tab.tabId"
+                    :ref="setTabNameInput"
+                    v-model="draftGraphName"
+                    class="editor-tab-bar__tab-name-input"
+                    :aria-label="`重命名 ${tab.title}`"
+                    @click.stop
+                    @blur="commitGraphName"
+                    @keydown.enter.prevent="commitGraphName"
+                    @keydown.esc.prevent="cancelGraphNameEdit"
+                  />
 
-          <button type="button" class="editor-tab-bar__action" @click="$emit('create-new')">{{ copy.newGraph }}</button>
+                  <div
+                    v-else
+                    class="editor-tab-bar__tab-activate"
+                    :title="buildEditorTabHint(tab, copy)"
+                    @dblclick.stop="startTabRename(tab)"
+                  >
+                    <span class="editor-tab-bar__tab-title">{{ tab.title }}</span>
+                  </div>
 
-          <WorkspaceSelect
-            v-model="selectedTemplateId"
-            :options="templateOptions"
-            :placeholder="selectPlaceholders.template"
-            min-width-class-name="editor-tab-bar__select"
-          />
-
-          <WorkspaceSelect
-            v-model="selectedGraphId"
-            :options="graphOptions"
-            :placeholder="selectPlaceholders.graph"
-            min-width-class-name="editor-tab-bar__select editor-tab-bar__select--wide"
-          />
-
-          <button type="button" class="editor-tab-bar__action" @click="$emit('save-active-graph')">{{ copy.save }}</button>
-          <button type="button" class="editor-tab-bar__action" @click="$emit('validate-active-graph')">{{ copy.validate }}</button>
-          <button type="button" class="editor-tab-bar__action" @click="$emit('import-python-graph')">{{ copy.importPython }}</button>
-          <button type="button" class="editor-tab-bar__action" @click="$emit('export-active-graph')">{{ copy.exportPython }}</button>
-          <button type="button" class="editor-tab-bar__action editor-tab-bar__action--primary" @click="$emit('run-active-graph')">
-            {{ copy.run }}
-          </button>
+                  <span class="editor-tab-bar__tab-status">
+                    <span v-if="tab.dirty" class="editor-tab-bar__dirty-dot" />
+                    <button
+                      type="button"
+                      class="editor-tab-bar__close"
+                      :class="{ 'editor-tab-bar__close--visible': tab.tabId === activeTabId }"
+                      aria-label="关闭标签页"
+                      @mousedown.stop.prevent
+                      @click.stop="$emit('close-tab', tab.tabId)"
+                    >
+                      ×
+                    </button>
+                  </span>
+                </div>
+              </template>
+            </ElTabPane>
+          </ElTabs>
         </div>
+
+        <ElPopover trigger="click" placement="bottom-start" :width="352" popper-class="editor-tab-bar__launcher-popper">
+          <template #reference>
+            <button type="button" class="editor-tab-bar__add-tab" aria-label="新建或打开图">
+              <ElIcon aria-hidden="true"><Plus /></ElIcon>
+            </button>
+          </template>
+
+          <EditorTabLauncherPanel
+            :template-options="templateOptions"
+            :graph-options="graphOptions"
+            :template-placeholder="selectPlaceholders.template"
+            :graph-placeholder="selectPlaceholders.graph"
+            @create-new="$emit('create-new')"
+            @create-from-template="$emit('create-from-template', $event)"
+            @open-graph="$emit('open-graph', $event)"
+          />
+        </ElPopover>
       </div>
     </div>
   </header>
 </template>
 
 <script setup lang="ts">
-import { ElTabPane, ElTabs } from "element-plus";
+import { Plus } from "@element-plus/icons-vue";
+import { ElIcon, ElPopover, ElTabPane, ElTabs } from "element-plus";
 import { computed, nextTick, ref, watch, type ComponentPublicInstance } from "vue";
 
 import type { EditorWorkspaceTab } from "@/lib/editor-workspace";
 import type { GraphDocument, TemplateRecord } from "@/types/node-system";
-import WorkspaceSelect from "./WorkspaceSelect.vue";
+import EditorTabLauncherPanel from "./EditorTabLauncherPanel.vue";
 import {
   buildEditorTabHint,
   resolveEditorTabBarSelectPlaceholders,
@@ -122,8 +110,6 @@ const props = defineProps<{
   activeTabId: string | null;
   templates: TemplateRecord[];
   graphs: GraphDocument[];
-  activeStateCount: number;
-  isStatePanelOpen: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -134,16 +120,8 @@ const emit = defineEmits<{
   (event: "create-from-template", templateId: string): void;
   (event: "open-graph", graphId: string): void;
   (event: "rename-active-graph", name: string): void;
-  (event: "toggle-state-panel"): void;
-  (event: "save-active-graph"): void;
-  (event: "validate-active-graph"): void;
-  (event: "import-python-graph"): void;
-  (event: "export-active-graph"): void;
-  (event: "run-active-graph"): void;
 }>();
 
-const selectedTemplateId = ref("");
-const selectedGraphId = ref("");
 const editingTabId = ref<string | null>(null);
 const draftGraphName = ref("");
 const tabNameInput = ref<HTMLInputElement | null>(null);
@@ -179,22 +157,6 @@ const selectPlaceholders = computed(() =>
     copy,
   }),
 );
-
-watch(selectedTemplateId, (nextValue) => {
-  if (!nextValue) {
-    return;
-  }
-  emit("create-from-template", nextValue);
-  selectedTemplateId.value = "";
-});
-
-watch(selectedGraphId, (nextValue) => {
-  if (!nextValue) {
-    return;
-  }
-  emit("open-graph", nextValue);
-  selectedGraphId.value = "";
-});
 
 watch(
   () => props.activeTabId,
@@ -381,34 +343,47 @@ function handleTabsWheel(event: WheelEvent) {
   --editor-tab-width: 176px;
   --editor-tab-height: 40px;
   --editor-tab-gap: 12px;
-  --editor-control-gap: 8px;
+  --editor-tab-bar-paper: rgba(244, 237, 225, 0.98);
   position: relative;
   box-sizing: border-box;
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  background: linear-gradient(180deg, rgba(244, 237, 225, 0.98) 0%, rgba(255, 248, 236, 0.98) 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.64),
-    0 8px 22px rgba(92, 58, 28, 0.06);
+  background: transparent;
+  box-shadow: none;
 }
 
 .editor-tab-bar__inner {
   box-sizing: border-box;
-  display: flex;
+  display: block;
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  flex-wrap: wrap;
+  padding: 12px 12px 0;
+}
+
+.editor-tab-bar__strip {
+  display: flex;
   align-items: center;
-  gap: 10px 14px;
-  padding: 10px clamp(10px, 1.4vw, 16px) 12px;
+  gap: 10px;
+  min-width: 0;
 }
 
 .editor-tab-bar__tabs-shell {
   min-width: 0;
   max-width: 100%;
-  flex: 1 1 520px;
+  flex: 1 1 auto;
+}
+
+.editor-tab-bar__add-tab {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(208, 177, 138, 0.88);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255, 250, 242, 0.98) 0%, rgba(245, 233, 212, 0.95) 100%);
+  color: rgba(111, 52, 22, 0.94);
+  cursor: pointer;
 }
 
 .editor-tab-bar__tabs {
@@ -647,114 +622,6 @@ function handleTabsWheel(event: WheelEvent) {
   background: rgba(246, 211, 184, 0.56);
 }
 
-.editor-tab-bar__controls {
-  box-sizing: border-box;
-  display: flex;
-  min-width: 0;
-  max-width: 100%;
-  flex: 0 1 auto;
-  flex-wrap: nowrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--editor-control-gap);
-  overflow-x: auto;
-  padding: 0;
-  scrollbar-width: none;
-}
-
-.editor-tab-bar__controls::-webkit-scrollbar {
-  display: none;
-}
-
-.editor-tab-bar__controls-dock {
-  box-sizing: border-box;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-width: 0;
-  max-width: 100%;
-  border: 1px solid rgba(193, 151, 106, 0.2);
-  border-radius: 18px;
-  background: rgba(255, 250, 242, 0.76);
-  padding: 4px;
-  scrollbar-width: none;
-}
-
-.editor-tab-bar__controls-dock::-webkit-scrollbar {
-  display: none;
-}
-
-.editor-tab-bar__state-pill,
-.editor-tab-bar__action {
-  flex: 0 0 auto;
-  min-height: 36px;
-  border: 1px solid transparent;
-  border-radius: 14px;
-  background: transparent;
-  padding: 8px 13px;
-  color: rgba(90, 58, 34, 0.96);
-  box-shadow: none;
-}
-
-.editor-tab-bar__state-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.92rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease;
-}
-
-.editor-tab-bar__state-pill:hover,
-.editor-tab-bar__action:hover {
-  border-color: rgba(154, 52, 18, 0.12);
-  background: rgba(255, 250, 242, 0.99);
-}
-
-.editor-tab-bar__state-pill--active {
-  border-color: rgba(154, 52, 18, 0.24);
-  background: rgba(246, 211, 184, 0.42);
-  color: rgba(124, 45, 18, 0.98);
-}
-
-.editor-tab-bar__state-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 24px;
-  padding: 2px 8px;
-  border: 1px solid rgba(208, 177, 138, 0.7);
-  border-radius: 999px;
-  background: rgba(255, 247, 235, 0.96);
-  color: rgba(120, 88, 58, 0.9);
-  font-size: 0.68rem;
-}
-
-.editor-tab-bar__select {
-  min-width: clamp(132px, 14vw, 180px);
-}
-
-.editor-tab-bar__select--wide {
-  min-width: clamp(148px, 16vw, 200px);
-}
-
-.editor-tab-bar__action {
-  cursor: pointer;
-  transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease;
-}
-
-.editor-tab-bar__action--primary {
-  border-color: rgba(154, 52, 18, 0.9);
-  background: rgba(154, 52, 18, 0.9);
-  color: rgba(255, 250, 242, 0.98);
-  box-shadow: none;
-}
-
-.editor-tab-bar__action--primary:hover {
-  background: rgba(124, 45, 18, 0.92);
-}
-
 @media (max-width: 1100px) {
   .editor-tab-bar {
     --editor-tab-width: 156px;
@@ -762,23 +629,8 @@ function handleTabsWheel(event: WheelEvent) {
 }
 
 @media (max-width: 920px) {
-  .editor-tab-bar__inner {
-    align-items: stretch;
+  .editor-tab-bar__strip {
     gap: 8px;
-  }
-
-  .editor-tab-bar__tabs-shell {
-    flex-basis: 100%;
-  }
-
-  .editor-tab-bar__controls {
-    width: 100%;
-    justify-content: flex-start;
-    padding-bottom: 2px;
-  }
-
-  .editor-tab-bar__controls-dock {
-    overflow-x: auto;
   }
 }
 
@@ -787,51 +639,10 @@ function handleTabsWheel(event: WheelEvent) {
     --editor-tab-width: 132px;
     --editor-tab-height: 36px;
     --editor-tab-gap: 8px;
-    --editor-control-gap: 6px;
   }
 
-  .editor-tab-bar__state-pill,
-  .editor-tab-bar__action {
-    min-height: 34px;
-    border-radius: 12px;
-    padding: 7px 10px;
-    font-size: 0.82rem;
-  }
-
-  .editor-tab-bar__controls {
-    flex: 1 1 100%;
-    min-width: 0;
-    max-width: 100%;
-    overflow: visible;
-  }
-
-  .editor-tab-bar__controls-dock {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    width: 100%;
-    align-items: stretch;
-    overflow: visible;
-  }
-
-  .editor-tab-bar__state-pill,
-  .editor-tab-bar__action {
-    width: 100%;
-    min-width: 0;
-    padding-inline: 8px;
-    justify-content: center;
-  }
-
-  .editor-tab-bar__select {
-    width: 100%;
-    min-width: 0;
-  }
-
-  .editor-tab-bar__select--wide {
-    min-width: 0;
-  }
-
-  .editor-tab-bar__action--primary {
-    grid-column: 3;
+  .editor-tab-bar__strip {
+    gap: 6px;
   }
 }
 </style>

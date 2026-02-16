@@ -22,34 +22,36 @@ test("EditorTabBar renames graphs inline from the tab strip instead of a separat
   assert.match(componentSource, /@dblclick(?:\.stop)?="startTabRename\(tab\)"/);
 });
 
-test("EditorTabBar keeps the workspace controls on a single horizontal row", () => {
-  assert.match(componentSource, /\.editor-tab-bar__controls \{[\s\S]*flex-wrap: nowrap;/);
-  assert.match(componentSource, /\.editor-tab-bar__controls \{[\s\S]*overflow-x: auto;/);
-});
-
 test("EditorTabBar constrains the top chrome to the available editor width", () => {
   assert.match(componentSource, /\.editor-tab-bar \{[\s\S]*width:\s*100%;[\s\S]*max-width:\s*100%;[\s\S]*min-width:\s*0;/);
   assert.match(componentSource, /\.editor-tab-bar__inner \{[\s\S]*box-sizing:\s*border-box;[\s\S]*width:\s*100%;[\s\S]*max-width:\s*100%;/);
   assert.match(componentSource, /\.editor-tab-bar__tabs-shell \{[\s\S]*max-width:\s*100%;/);
 });
 
-test("EditorTabBar presents controls as a quiet grouped action dock", () => {
-  assert.match(componentSource, /class="editor-tab-bar__controls-dock"/);
-  assert.match(componentSource, /\.editor-tab-bar__controls-dock \{[\s\S]*border-radius:\s*18px;[\s\S]*background:\s*rgba\(255,\s*250,\s*242,\s*0\.76\);/);
-  assert.match(componentSource, /\.editor-tab-bar__action \{[\s\S]*border:\s*1px solid transparent;/);
-  assert.match(componentSource, /\.editor-tab-bar__action--primary \{[\s\S]*background:\s*rgba\(154,\s*52,\s*18,\s*0\.9\);/);
+test("EditorTabBar keeps only the tab strip and a browser-style plus launcher in the top row", () => {
+  assert.match(componentSource, /import \{ ElIcon, ElPopover, ElTabPane, ElTabs \} from "element-plus";/);
+  assert.match(componentSource, /import \{ Plus \} from "@element-plus\/icons-vue";/);
+  assert.match(componentSource, /import EditorTabLauncherPanel from "\.\/EditorTabLauncherPanel\.vue";/);
+  assert.match(componentSource, /class="editor-tab-bar__strip"/);
+  assert.match(componentSource, /class="editor-tab-bar__add-tab"/);
+  assert.match(componentSource, /<ElPopover[\s\S]*trigger="click"[\s\S]*placement="bottom-start"/);
+  assert.match(componentSource, /<EditorTabLauncherPanel[\s\S]*@create-new="\$emit\('create-new'\)"/);
+  assert.doesNotMatch(componentSource, /editor-tab-bar__controls-dock/);
+  assert.doesNotMatch(componentSource, /copy\.run/);
+  assert.doesNotMatch(componentSource, /copy\.save/);
 });
 
-test("EditorTabBar exposes a Python export action beside validation and run controls", () => {
-  assert.match(componentSource, /export-active-graph/);
-  assert.match(componentSource, /copy\.exportPython/);
-  assert.match(componentSource, /@click="\$emit\('export-active-graph'\)"/);
-});
-
-test("EditorTabBar exposes a Python import action beside export", () => {
-  assert.match(componentSource, /import-python-graph/);
-  assert.match(componentSource, /copy\.importPython/);
-  assert.match(componentSource, /@click="\$emit\('import-python-graph'\)"/);
+test("EditorTabBar does not declare or reference the retired toolbar boundary", () => {
+  assert.doesNotMatch(componentSource, /activeStateCount/);
+  assert.doesNotMatch(componentSource, /isStatePanelOpen/);
+  assert.doesNotMatch(componentSource, /toggle-state-panel/);
+  assert.doesNotMatch(componentSource, /save-active-graph/);
+  assert.doesNotMatch(componentSource, /validate-active-graph/);
+  assert.doesNotMatch(componentSource, /import-python-graph/);
+  assert.doesNotMatch(componentSource, /export-active-graph/);
+  assert.doesNotMatch(componentSource, /run-active-graph/);
+  assert.doesNotMatch(componentSource, /selectedTemplateId/);
+  assert.doesNotMatch(componentSource, /selectedGraphId/);
 });
 
 test("EditorTabBar exposes browser-like tab interactions", () => {
@@ -68,31 +70,10 @@ test("EditorTabBar is built on Element Plus tabs instead of reka-ui primitives",
   assert.doesNotMatch(componentSource, /from "reka-ui"/);
 });
 
-test("EditorTabBar keeps Element Plus card tabs on a single toolbar row", () => {
-  assert.match(componentSource, /\.editor-tab-bar__tabs \{[\s\S]*flex:\s*1 1 auto;/);
-  assert.match(componentSource, /\.editor-tab-bar__inner \{[\s\S]*align-items:\s*center;/);
-  assert.match(componentSource, /\.editor-tab-bar__controls \{[\s\S]*flex-wrap:\s*nowrap;/);
-});
-
-test("EditorTabBar adapts to narrow viewports by moving controls below the tab strip", () => {
-  assert.match(componentSource, /\.editor-tab-bar__inner \{[\s\S]*flex-wrap:\s*wrap;/);
-  assert.match(componentSource, /\.editor-tab-bar__tabs-shell \{[\s\S]*flex:\s*1 1 520px;/);
-  assert.match(componentSource, /\.editor-tab-bar__controls \{[\s\S]*flex:\s*0 1 auto;/);
-  assert.match(componentSource, /@media \(max-width:\s*920px\) \{[\s\S]*\.editor-tab-bar__tabs-shell \{[\s\S]*flex-basis:\s*100%;/);
-  assert.match(componentSource, /@media \(max-width:\s*920px\) \{[\s\S]*\.editor-tab-bar__controls \{[\s\S]*width:\s*100%;/);
-});
-
-test("EditorTabBar wraps the action dock on phone-width editor surfaces instead of clipping controls", () => {
-  assert.match(componentSource, /@media \(max-width:\s*640px\) \{[\s\S]*\.editor-tab-bar__controls-dock \{[\s\S]*display:\s*grid;/);
-  assert.match(componentSource, /@media \(max-width:\s*640px\) \{[\s\S]*\.editor-tab-bar__controls-dock \{[\s\S]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);/);
-  assert.match(componentSource, /@media \(max-width:\s*640px\) \{[\s\S]*\.editor-tab-bar__select \{[\s\S]*width:\s*100%;[\s\S]*min-width:\s*0;/);
-});
-
-test("EditorTabBar keeps the wrapped phone action dock inside its content column", () => {
-  assert.match(componentSource, /\.editor-tab-bar__controls-dock \{[\s\S]*box-sizing:\s*border-box;/);
-  assert.match(componentSource, /@media \(max-width:\s*640px\) \{[\s\S]*\.editor-tab-bar__controls \{[\s\S]*flex:\s*1 1 100%;[\s\S]*max-width:\s*100%;/);
-  assert.match(componentSource, /@media \(max-width:\s*640px\) \{[\s\S]*\.editor-tab-bar__state-pill,\n\s*\.editor-tab-bar__action \{[\s\S]*width:\s*100%;[\s\S]*min-width:\s*0;/);
-  assert.match(componentSource, /@media \(max-width:\s*640px\) \{[\s\S]*\.editor-tab-bar__action--primary \{[\s\S]*grid-column:\s*3;/);
+test("EditorTabBar keeps the plus launcher on the same visual strip as the tabs instead of a second toolbar row", () => {
+  assert.match(componentSource, /\.editor-tab-bar__strip \{[\s\S]*display:\s*flex;[\s\S]*align-items:\s*center;/);
+  assert.match(componentSource, /\.editor-tab-bar__tabs-shell \{[\s\S]*flex:\s*1 1 auto;/);
+  assert.match(componentSource, /\.editor-tab-bar__add-tab \{[\s\S]*flex:\s*0 0 auto;/);
 });
 
 test("EditorTabBar normalizes Element Plus tab spacing with shared size variables", () => {
