@@ -2199,13 +2199,15 @@ onMounted(() => {
 }
 
 .editor-workspace-shell__chrome {
-  position: relative;
+  position: absolute;
+  inset: 0;
+  z-index: 40;
   display: block;
-  flex: 0 0 auto;
   min-width: 0;
   max-width: 100%;
   padding: 0;
   background: transparent;
+  pointer-events: none;
 }
 
 .editor-workspace-shell__action-capsule-row {
@@ -2223,6 +2225,7 @@ onMounted(() => {
 }
 
 .editor-workspace-shell__workspace {
+  position: relative;
   display: flex;
   flex: 1;
   min-width: 0;
@@ -2258,6 +2261,7 @@ onMounted(() => {
 }
 
 .editor-workspace-shell__editor-main {
+  --editor-canvas-floating-top-clearance: 72px;
   position: relative;
   min-width: 0;
   min-height: 0;
@@ -2416,7 +2420,9 @@ onMounted(() => {
 @media (max-width: 920px) {
   .editor-workspace-shell__chrome {
     display: grid;
+    align-content: start;
     gap: 12px;
+    padding: 12px;
   }
 
   .editor-workspace-shell__action-capsule-row {
@@ -2424,7 +2430,11 @@ onMounted(() => {
     display: flex;
     justify-content: flex-end;
     pointer-events: auto;
-    padding: 0 12px 12px;
+    padding: 0;
+  }
+
+  .editor-workspace-shell__editor-main {
+    --editor-canvas-floating-top-clearance: 124px;
   }
 }
 

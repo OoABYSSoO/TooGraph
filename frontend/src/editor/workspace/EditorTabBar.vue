@@ -340,40 +340,44 @@ function handleTabsWheel(event: WheelEvent) {
 
 <style scoped>
 .editor-tab-bar {
+  --editor-tab-strip-max-width: min(1320px, calc(100vw - var(--app-sidebar-width) - 360px));
   --editor-tab-width: 176px;
   --editor-tab-height: 40px;
   --editor-tab-gap: 12px;
-  --editor-action-capsule-desktop-reserve: clamp(320px, 30vw, 368px);
   --editor-tab-bar-paper: rgba(244, 237, 225, 0.98);
   position: relative;
+  display: inline-flex;
   box-sizing: border-box;
-  width: 100%;
-  max-width: 100%;
+  width: auto;
+  max-width: min(100%, var(--editor-tab-strip-max-width));
   min-width: 0;
   background: transparent;
   box-shadow: none;
+  pointer-events: auto;
 }
 
 .editor-tab-bar__inner {
   box-sizing: border-box;
-  display: block;
-  width: 100%;
+  display: inline-flex;
+  width: auto;
   max-width: 100%;
   min-width: 0;
-  padding: 12px calc(var(--editor-action-capsule-desktop-reserve) + 12px) 0 12px;
+  padding: 12px 0 0 12px;
 }
 
 .editor-tab-bar__strip {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 10px;
   min-width: 0;
+  max-width: 100%;
 }
 
 .editor-tab-bar__tabs-shell {
   min-width: 0;
-  max-width: 100%;
-  flex: 1 1 auto;
+  width: fit-content;
+  max-width: min(100%, var(--editor-tab-strip-max-width));
+  flex: 0 1 auto;
 }
 
 .editor-tab-bar__add-tab {
@@ -388,13 +392,16 @@ function handleTabsWheel(event: WheelEvent) {
 }
 
 .editor-tab-bar__tabs {
-  flex: 1 1 auto;
+  width: fit-content;
+  flex: 0 1 auto;
   min-width: 0;
+  max-width: 100%;
 }
 
 .editor-tab-bar__tabs :deep(.el-tabs__header) {
   margin: 0;
   border-bottom: none;
+  max-width: 100%;
 }
 
 .editor-tab-bar__tabs :deep(.el-tabs__content) {
@@ -403,7 +410,10 @@ function handleTabsWheel(event: WheelEvent) {
 
 .editor-tab-bar__tabs :deep(.el-tabs__nav-wrap),
 .editor-tab-bar__tabs :deep(.el-tabs__nav-wrap.is-scrollable) {
-  overflow: auto;
+  width: fit-content;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
   padding: 8px var(--editor-tab-gap);
   border: 1px solid rgba(208, 177, 138, 0.88);
   border-radius: 20px;
@@ -411,11 +421,23 @@ function handleTabsWheel(event: WheelEvent) {
   box-shadow:
     inset 0 1px 0 rgba(255, 252, 247, 0.58),
     0 1px 0 rgba(255, 255, 255, 0.2);
-  scrollbar-width: none;
+  scrollbar-color: rgba(154, 52, 18, 0.28) transparent;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
 }
 
 .editor-tab-bar__tabs :deep(.el-tabs__nav-wrap::-webkit-scrollbar) {
-  display: none;
+  height: 8px;
+}
+
+.editor-tab-bar__tabs :deep(.el-tabs__nav-wrap::-webkit-scrollbar-track) {
+  background: transparent;
+}
+
+.editor-tab-bar__tabs :deep(.el-tabs__nav-wrap::-webkit-scrollbar-thumb) {
+  border: 2px solid rgba(236, 219, 190, 0.95);
+  border-radius: 999px;
+  background: rgba(154, 52, 18, 0.28);
 }
 
 .editor-tab-bar__tabs :deep(.el-tabs__nav-wrap::after),
@@ -426,6 +448,7 @@ function handleTabsWheel(event: WheelEvent) {
 
 .editor-tab-bar__tabs :deep(.el-tabs__nav-scroll) {
   overflow: visible;
+  max-width: 100%;
 }
 
 .editor-tab-bar__tabs :deep(.el-tabs__nav) {
@@ -630,8 +653,12 @@ function handleTabsWheel(event: WheelEvent) {
 }
 
 @media (max-width: 920px) {
+  .editor-tab-bar {
+    max-width: 100%;
+  }
+
   .editor-tab-bar__inner {
-    padding-right: 12px;
+    padding: 0;
   }
 
   .editor-tab-bar__strip {

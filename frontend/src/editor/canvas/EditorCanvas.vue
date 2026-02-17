@@ -2424,7 +2424,7 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
 
 .editor-canvas__lock-banner {
   position: absolute;
-  top: 18px;
+  top: var(--editor-canvas-floating-top-clearance, 18px);
   left: 50%;
   z-index: 25;
   transform: translateX(-50%);
@@ -2444,7 +2444,7 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
 .editor-canvas__edge-view-toolbar {
   position: absolute;
   left: 18px;
-  top: 18px;
+  top: var(--editor-canvas-floating-top-clearance, 18px);
   z-index: 24;
   display: inline-flex;
   align-items: center;

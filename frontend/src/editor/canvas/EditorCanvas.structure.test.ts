@@ -95,6 +95,11 @@ test("EditorCanvas keeps paused human-review graphs viewable but read-only", () 
   assert.match(componentSource, /function handleAnchorPointerDown\(anchor: ProjectedCanvasAnchor\)[\s\S]*if \(isGraphEditingLocked\(\)\) \{/);
 });
 
+test("EditorCanvas lets top-left floating tools respect workspace overlay clearance", () => {
+  assert.match(componentSource, /\.editor-canvas__lock-banner \{[\s\S]*top:\s*var\(--editor-canvas-floating-top-clearance,\s*18px\);/);
+  assert.match(componentSource, /\.editor-canvas__edge-view-toolbar \{[\s\S]*top:\s*var\(--editor-canvas-floating-top-clearance,\s*18px\);/);
+});
+
 test("EditorCanvas renders condition route outputs as right-side floating branch handles", () => {
   assert.match(componentSource, /const routeHandles = computed\(\(\) => projectedAnchors\.value\.filter\(\(anchor\) => anchor\.kind === "route-out"\)\);/);
   assert.match(componentSource, /<div class="editor-canvas__route-handles" aria-hidden="true">/);
@@ -194,7 +199,10 @@ test("EditorCanvas exposes a top-left capsule toolbar for edge visibility modes"
   assert.match(componentSource, /setEdgeVisibilityMode\(option\.mode\)/);
   assert.match(componentSource, /\{\{ option\.label \}\}/);
   assert.match(componentSource, /v-show="isProjectedEdgeVisible\(edge\)"/);
-  assert.match(componentSource, /\.editor-canvas__edge-view-toolbar \{[\s\S]*position:\s*absolute;[\s\S]*left:\s*18px;[\s\S]*top:\s*18px;/);
+  assert.match(
+    componentSource,
+    /\.editor-canvas__edge-view-toolbar \{[\s\S]*position:\s*absolute;[\s\S]*left:\s*18px;[\s\S]*top:\s*var\(--editor-canvas-floating-top-clearance,\s*18px\);/,
+  );
   assert.match(componentSource, /\.editor-canvas__edge-view-button \{[\s\S]*border-radius:\s*999px;/);
   assert.match(componentSource, /\.editor-canvas__edge-view-button--active \{[\s\S]*background:\s*rgba\(154,\s*52,\s*18,\s*0\.9\);/);
 });
