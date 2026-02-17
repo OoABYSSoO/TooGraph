@@ -147,3 +147,26 @@ test("EditorWorkspaceShell locks graph editing while a run is awaiting human rev
   assert.match(componentSource, /function guardGraphEditForTab\(tabId: string\)/);
   assert.match(componentSource, /if \(guardGraphEditForTab\(tabId\)\) \{/);
 });
+
+test("EditorWorkspaceShell renders the graph action controls as a detached capsule instead of passing them through EditorTabBar", () => {
+  const editorTabBarUsage = componentSource.match(/<EditorTabBar[\s\S]*?\/>/)?.[0] ?? "";
+
+  assert.match(componentSource, /import EditorActionCapsule from "\.\/EditorActionCapsule\.vue";/);
+  assert.match(componentSource, /<EditorActionCapsule[\s\S]*:active-state-count="activeStateCount"[\s\S]*:is-state-panel-open="activeStatePanelOpen"/);
+  assert.match(componentSource, /@save-active-graph="saveActiveGraph"/);
+  assert.match(componentSource, /@validate-active-graph="validateActiveGraph"/);
+  assert.match(componentSource, /@import-python-graph="openPythonGraphImportDialog"/);
+  assert.match(componentSource, /@export-active-graph="exportActiveGraph"/);
+  assert.match(componentSource, /@run-active-graph="runActiveGraph"/);
+  assert.match(editorTabBarUsage, /<EditorTabBar/);
+  assert.doesNotMatch(editorTabBarUsage, /@save-active-graph=/);
+  assert.doesNotMatch(editorTabBarUsage, /@run-active-graph=/);
+});
+
+test("EditorWorkspaceShell pins the full action capsule to the desktop top-right and moves it onto a right-aligned second row on narrow screens", () => {
+  assert.match(componentSource, /class="editor-workspace-shell__action-capsule-row"/);
+  assert.match(componentSource, /\.editor-workspace-shell__action-capsule-row \{[\s\S]*position:\s*absolute;[\s\S]*top:\s*12px;[\s\S]*right:\s*12px;[\s\S]*z-index:\s*35;/);
+  assert.match(componentSource, /@media \(max-width:\s*920px\) \{[\s\S]*\.editor-workspace-shell__chrome \{[\s\S]*display:\s*grid;/);
+  assert.match(componentSource, /@media \(max-width:\s*920px\) \{[\s\S]*\.editor-workspace-shell__action-capsule-row \{[\s\S]*position:\s*static;[\s\S]*display:\s*flex;[\s\S]*justify-content:\s*flex-end;/);
+  assert.doesNotMatch(componentSource, /@media \(max-width:\s*920px\) \{[\s\S]*\.editor-workspace-shell__action-capsule-row \{[\s\S]*display:\s*none;/);
+});

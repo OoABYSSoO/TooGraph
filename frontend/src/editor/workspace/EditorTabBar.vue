@@ -343,6 +343,7 @@ function handleTabsWheel(event: WheelEvent) {
   --editor-tab-width: 176px;
   --editor-tab-height: 40px;
   --editor-tab-gap: 12px;
+  --editor-action-capsule-desktop-reserve: clamp(320px, 30vw, 368px);
   --editor-tab-bar-paper: rgba(244, 237, 225, 0.98);
   position: relative;
   box-sizing: border-box;
@@ -359,7 +360,7 @@ function handleTabsWheel(event: WheelEvent) {
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  padding: 12px 12px 0;
+  padding: 12px calc(var(--editor-action-capsule-desktop-reserve) + 12px) 0 12px;
 }
 
 .editor-tab-bar__strip {
@@ -629,6 +630,10 @@ function handleTabsWheel(event: WheelEvent) {
 }
 
 @media (max-width: 920px) {
+  .editor-tab-bar__inner {
+    padding-right: 12px;
+  }
+
   .editor-tab-bar__strip {
     gap: 8px;
   }

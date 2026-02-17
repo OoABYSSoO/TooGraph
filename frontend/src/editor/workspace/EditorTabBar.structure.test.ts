@@ -76,6 +76,15 @@ test("EditorTabBar keeps the plus launcher on the same visual strip as the tabs 
   assert.match(componentSource, /\.editor-tab-bar__add-tab \{[\s\S]*flex:\s*0 0 auto;/);
 });
 
+test("EditorTabBar reserves desktop room for the detached action capsule and releases it on the two-row breakpoint", () => {
+  assert.match(componentSource, /--editor-action-capsule-desktop-reserve:\s*clamp\(320px,\s*30vw,\s*368px\);/);
+  assert.match(
+    componentSource,
+    /\.editor-tab-bar__inner \{[\s\S]*padding:\s*12px calc\(var\(--editor-action-capsule-desktop-reserve\) \+ 12px\) 0 12px;/,
+  );
+  assert.match(componentSource, /@media \(max-width:\s*920px\) \{[\s\S]*\.editor-tab-bar__inner \{[\s\S]*padding-right:\s*12px;/);
+});
+
 test("EditorTabBar normalizes Element Plus tab spacing with shared size variables", () => {
   assert.match(componentSource, /--editor-tab-width:\s*\d+px;/);
   assert.match(componentSource, /--editor-tab-height:\s*\d+px;/);

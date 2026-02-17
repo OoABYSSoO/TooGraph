@@ -35,8 +35,6 @@
           :active-tab-id="workspace.activeTabId"
           :templates="templates"
           :graphs="graphs"
-          :active-state-count="activeStateCount"
-          :is-state-panel-open="activeStatePanelOpen"
           @activate-tab="activateTab"
           @close-tab="requestCloseTab"
           @reorder-tab="reorderTab"
@@ -44,13 +42,20 @@
           @create-from-template="openNewTab"
           @open-graph="openExistingGraph"
           @rename-active-graph="renameActiveGraph"
-          @toggle-state-panel="toggleActiveStatePanel"
-          @save-active-graph="saveActiveGraph"
-          @validate-active-graph="validateActiveGraph"
-          @import-python-graph="openPythonGraphImportDialog"
-          @export-active-graph="exportActiveGraph"
-          @run-active-graph="runActiveGraph"
         />
+
+        <div class="editor-workspace-shell__action-capsule-row">
+          <EditorActionCapsule
+            :active-state-count="activeStateCount"
+            :is-state-panel-open="activeStatePanelOpen"
+            @toggle-state-panel="toggleActiveStatePanel"
+            @save-active-graph="saveActiveGraph"
+            @validate-active-graph="validateActiveGraph"
+            @import-python-graph="openPythonGraphImportDialog"
+            @export-active-graph="exportActiveGraph"
+            @run-active-graph="runActiveGraph"
+          />
+        </div>
       </div>
 
       <div class="editor-workspace-shell__body">
@@ -284,6 +289,7 @@ import type {
   TemplateRecord,
 } from "@/types/node-system";
 
+import EditorActionCapsule from "./EditorActionCapsule.vue";
 import EditorCloseConfirmDialog from "./EditorCloseConfirmDialog.vue";
 import EditorHumanReviewPanel from "./EditorHumanReviewPanel.vue";
 import EditorNodeCreationMenu from "./EditorNodeCreationMenu.vue";
@@ -2193,10 +2199,27 @@ onMounted(() => {
 }
 
 .editor-workspace-shell__chrome {
+  position: relative;
+  display: block;
   flex: 0 0 auto;
   min-width: 0;
   max-width: 100%;
   padding: 0;
+  background: transparent;
+}
+
+.editor-workspace-shell__action-capsule-row {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 35;
+  display: flex;
+  min-width: 0;
+  pointer-events: none;
+}
+
+.editor-workspace-shell__action-capsule-row > :deep(*) {
+  pointer-events: auto;
 }
 
 .editor-workspace-shell__workspace {
@@ -2388,6 +2411,21 @@ onMounted(() => {
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
+}
+
+@media (max-width: 920px) {
+  .editor-workspace-shell__chrome {
+    display: grid;
+    gap: 12px;
+  }
+
+  .editor-workspace-shell__action-capsule-row {
+    position: static;
+    display: flex;
+    justify-content: flex-end;
+    pointer-events: auto;
+    padding: 0 12px 12px;
+  }
 }
 
 @media (max-width: 760px) {
