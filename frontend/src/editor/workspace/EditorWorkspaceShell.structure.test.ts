@@ -97,6 +97,7 @@ test("EditorWorkspaceShell floats the right side panel above the canvas while pr
 test("EditorWorkspaceShell keeps top chrome and editor body from overflowing their container", () => {
   assert.match(componentSource, /\.editor-workspace-shell__workspace \{[\s\S]*position:\s*relative;/);
   assert.match(componentSource, /\.editor-workspace-shell__chrome \{[\s\S]*position:\s*absolute;[\s\S]*inset:\s*0;[\s\S]*z-index:\s*40;/);
+  assert.match(componentSource, /\.editor-workspace-shell__chrome \{[\s\S]*display:\s*grid;[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\) auto;[\s\S]*gap:\s*12px;/);
   assert.match(componentSource, /\.editor-workspace-shell__chrome \{[\s\S]*pointer-events:\s*none;/);
   assert.match(componentSource, /\.editor-workspace-shell__body \{[\s\S]*min-width:\s*0;[\s\S]*overflow:\s*hidden;/);
   assert.match(componentSource, /\.editor-workspace-shell__editor-grid \{[\s\S]*min-width:\s*0;[\s\S]*overflow:\s*hidden;/);
@@ -165,12 +166,13 @@ test("EditorWorkspaceShell renders the graph action controls as a detached capsu
   assert.doesNotMatch(editorTabBarUsage, /@run-active-graph=/);
 });
 
-test("EditorWorkspaceShell pins the full action capsule to the desktop top-right and moves it onto a right-aligned second row on narrow screens", () => {
+test("EditorWorkspaceShell lays out the tab strip tight to the right action capsule", () => {
   assert.match(componentSource, /class="editor-workspace-shell__action-capsule-row"/);
-  assert.match(componentSource, /\.editor-workspace-shell__action-capsule-row \{[\s\S]*position:\s*absolute;[\s\S]*top:\s*12px;[\s\S]*right:\s*12px;[\s\S]*z-index:\s*35;/);
+  assert.match(componentSource, /\.editor-workspace-shell__chrome \{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\) auto;[\s\S]*gap:\s*12px;[\s\S]*padding:\s*0 12px 0 0;/);
+  assert.match(componentSource, /\.editor-workspace-shell__action-capsule-row \{[\s\S]*z-index:\s*35;[\s\S]*display:\s*flex;[\s\S]*justify-content:\s*flex-end;[\s\S]*padding:\s*12px 0 0;/);
   assert.match(componentSource, /\.editor-workspace-shell__editor-main \{[\s\S]*--editor-canvas-floating-top-clearance:\s*72px;/);
-  assert.match(componentSource, /@media \(max-width:\s*920px\) \{[\s\S]*\.editor-workspace-shell__chrome \{[\s\S]*display:\s*grid;[\s\S]*padding:\s*12px;/);
+  assert.match(componentSource, /@media \(max-width:\s*920px\) \{[\s\S]*\.editor-workspace-shell__chrome \{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\);[\s\S]*padding:\s*12px;/);
   assert.match(componentSource, /@media \(max-width:\s*920px\) \{[\s\S]*\.editor-workspace-shell__editor-main \{[\s\S]*--editor-canvas-floating-top-clearance:\s*124px;/);
-  assert.match(componentSource, /@media \(max-width:\s*920px\) \{[\s\S]*\.editor-workspace-shell__action-capsule-row \{[\s\S]*position:\s*static;[\s\S]*display:\s*flex;[\s\S]*justify-content:\s*flex-end;/);
+  assert.match(componentSource, /@media \(max-width:\s*920px\) \{[\s\S]*\.editor-workspace-shell__action-capsule-row \{[\s\S]*display:\s*flex;[\s\S]*justify-content:\s*flex-end;[\s\S]*padding:\s*0;/);
   assert.doesNotMatch(componentSource, /@media \(max-width:\s*920px\) \{[\s\S]*\.editor-workspace-shell__action-capsule-row \{[\s\S]*display:\s*none;/);
 });

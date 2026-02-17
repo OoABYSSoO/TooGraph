@@ -2202,21 +2202,23 @@ onMounted(() => {
   position: absolute;
   inset: 0;
   z-index: 40;
-  display: block;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
   min-width: 0;
   max-width: 100%;
-  padding: 0;
+  padding: 0 12px 0 0;
   background: transparent;
   pointer-events: none;
 }
 
 .editor-workspace-shell__action-capsule-row {
-  position: absolute;
-  top: 12px;
-  right: 12px;
   z-index: 35;
   display: flex;
+  justify-content: flex-end;
   min-width: 0;
+  padding: 12px 0 0;
   pointer-events: none;
 }
 
@@ -2419,14 +2421,13 @@ onMounted(() => {
 
 @media (max-width: 920px) {
   .editor-workspace-shell__chrome {
-    display: grid;
+    grid-template-columns: minmax(0, 1fr);
     align-content: start;
     gap: 12px;
     padding: 12px;
   }
 
   .editor-workspace-shell__action-capsule-row {
-    position: static;
     display: flex;
     justify-content: flex-end;
     pointer-events: auto;

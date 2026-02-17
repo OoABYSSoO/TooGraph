@@ -2,69 +2,76 @@
   <header class="editor-tab-bar">
     <div class="editor-tab-bar__inner">
       <div class="editor-tab-bar__strip">
-        <div class="editor-tab-bar__tabs-shell" @wheel.prevent="handleTabsWheel" @dragleave="handleTabsShellDragLeave">
-          <ElTabs
-            class="editor-tab-bar__tabs"
-            type="card"
-            :model-value="activeTabId ?? undefined"
-            @tab-change="handleTabChange"
-          >
-            <ElTabPane v-for="tab in tabs" :key="tab.tabId" :name="tab.tabId">
-              <template #label>
-                <div
-                  class="editor-tab-bar__tab-shell"
-                  :ref="(element) => setTabShellRef(tab.tabId, element)"
-                  :class="{
-                    'editor-tab-bar__tab-shell--active': tab.tabId === activeTabId,
-                    'editor-tab-bar__tab-shell--dragging': tab.tabId === draggedTabId,
-                    'editor-tab-bar__tab-shell--drop-before': tab.tabId === dropTargetTabId && dropPlacement === 'before',
-                    'editor-tab-bar__tab-shell--drop-after': tab.tabId === dropTargetTabId && dropPlacement === 'after',
-                  }"
-                  draggable="true"
-                  @auxclick="handleTabAuxClick(tab, $event)"
-                  @dragstart="handleTabDragStart(tab, $event)"
-                  @dragover.prevent="handleTabDragOver(tab, $event)"
-                  @drop.prevent="handleTabDrop(tab, $event)"
-                  @dragend="handleTabDragEnd"
-                >
-                  <input
-                    v-if="editingTabId === tab.tabId"
-                    :ref="setTabNameInput"
-                    v-model="draftGraphName"
-                    class="editor-tab-bar__tab-name-input"
-                    :aria-label="`重命名 ${tab.title}`"
-                    @click.stop
-                    @blur="commitGraphName"
-                    @keydown.enter.prevent="commitGraphName"
-                    @keydown.esc.prevent="cancelGraphNameEdit"
-                  />
-
+        <div
+          ref="tabsShell"
+          class="editor-tab-bar__tabs-shell"
+          @wheel="handleTabsWheel"
+          @dragleave="handleTabsShellDragLeave"
+        >
+          <div ref="tabsScroller" class="editor-tab-bar__tabs-scroller">
+            <ElTabs
+              class="editor-tab-bar__tabs"
+              type="card"
+              :model-value="activeTabId ?? undefined"
+              @tab-change="handleTabChange"
+            >
+              <ElTabPane v-for="tab in tabs" :key="tab.tabId" :name="tab.tabId">
+                <template #label>
                   <div
-                    v-else
-                    class="editor-tab-bar__tab-activate"
-                    :title="buildEditorTabHint(tab, copy)"
-                    @dblclick.stop="startTabRename(tab)"
+                    class="editor-tab-bar__tab-shell"
+                    :ref="(element) => setTabShellRef(tab.tabId, element)"
+                    :class="{
+                      'editor-tab-bar__tab-shell--active': tab.tabId === activeTabId,
+                      'editor-tab-bar__tab-shell--dragging': tab.tabId === draggedTabId,
+                      'editor-tab-bar__tab-shell--drop-before': tab.tabId === dropTargetTabId && dropPlacement === 'before',
+                      'editor-tab-bar__tab-shell--drop-after': tab.tabId === dropTargetTabId && dropPlacement === 'after',
+                    }"
+                    draggable="true"
+                    @auxclick="handleTabAuxClick(tab, $event)"
+                    @dragstart="handleTabDragStart(tab, $event)"
+                    @dragover.prevent="handleTabDragOver(tab, $event)"
+                    @drop.prevent="handleTabDrop(tab, $event)"
+                    @dragend="handleTabDragEnd"
                   >
-                    <span class="editor-tab-bar__tab-title">{{ tab.title }}</span>
-                  </div>
+                    <input
+                      v-if="editingTabId === tab.tabId"
+                      :ref="setTabNameInput"
+                      v-model="draftGraphName"
+                      class="editor-tab-bar__tab-name-input"
+                      :aria-label="`重命名 ${tab.title}`"
+                      @click.stop
+                      @blur="commitGraphName"
+                      @keydown.enter.prevent="commitGraphName"
+                      @keydown.esc.prevent="cancelGraphNameEdit"
+                    />
 
-                  <span class="editor-tab-bar__tab-status">
-                    <span v-if="tab.dirty" class="editor-tab-bar__dirty-dot" />
-                    <button
-                      type="button"
-                      class="editor-tab-bar__close"
-                      :class="{ 'editor-tab-bar__close--visible': tab.tabId === activeTabId }"
-                      aria-label="关闭标签页"
-                      @mousedown.stop.prevent
-                      @click.stop="$emit('close-tab', tab.tabId)"
+                    <div
+                      v-else
+                      class="editor-tab-bar__tab-activate"
+                      :title="buildEditorTabHint(tab, copy)"
+                      @dblclick.stop="startTabRename(tab)"
                     >
-                      ×
-                    </button>
-                  </span>
-                </div>
-              </template>
-            </ElTabPane>
-          </ElTabs>
+                      <span class="editor-tab-bar__tab-title">{{ tab.title }}</span>
+                    </div>
+
+                    <span class="editor-tab-bar__tab-status">
+                      <span v-if="tab.dirty" class="editor-tab-bar__dirty-dot" />
+                      <button
+                        type="button"
+                        class="editor-tab-bar__close"
+                        :class="{ 'editor-tab-bar__close--visible': tab.tabId === activeTabId }"
+                        aria-label="关闭标签页"
+                        @mousedown.stop.prevent
+                        @click.stop="$emit('close-tab', tab.tabId)"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  </div>
+                </template>
+              </ElTabPane>
+            </ElTabs>
+          </div>
         </div>
 
         <ElPopover trigger="click" placement="bottom-start" :width="352" popper-class="editor-tab-bar__launcher-popper">
@@ -125,6 +132,8 @@ const emit = defineEmits<{
 const editingTabId = ref<string | null>(null);
 const draftGraphName = ref("");
 const tabNameInput = ref<HTMLInputElement | null>(null);
+const tabsShell = ref<HTMLElement | null>(null);
+const tabsScroller = ref<HTMLElement | null>(null);
 const draggedTabId = ref<string | null>(null);
 const dropTargetTabId = ref<string | null>(null);
 const dropPlacement = ref<"before" | "after" | null>(null);
@@ -329,27 +338,51 @@ function handleTabsWheel(event: WheelEvent) {
     return;
   }
 
-  const scrollContainer = currentTarget.querySelector(".el-tabs__nav-wrap");
-  if (!(scrollContainer instanceof HTMLElement)) {
+  const scrollContainer = resolveTabsScrollContainer(currentTarget);
+  if (!scrollContainer) {
     return;
   }
 
-  scrollContainer.scrollLeft += Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+  const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+  if (!delta) {
+    return;
+  }
+
+  const nextScrollLeft = clampTabsScrollLeft(scrollContainer.scrollLeft + delta, scrollContainer);
+  if (Math.abs(nextScrollLeft - scrollContainer.scrollLeft) < 1) {
+    return;
+  }
+
+  event.preventDefault();
+  scrollContainer.scrollLeft = nextScrollLeft;
+}
+
+function resolveTabsScrollContainer(root: HTMLElement | null) {
+  const scrollContainer = root?.querySelector(".editor-tab-bar__tabs-scroller") ?? tabsScroller.value;
+  return scrollContainer instanceof HTMLElement ? scrollContainer : null;
+}
+
+function clampTabsScrollLeft(value: number, scrollContainer: HTMLElement) {
+  return Math.min(Math.max(value, 0), resolveTabsMaxScrollLeft(scrollContainer));
+}
+
+function resolveTabsMaxScrollLeft(scrollContainer: HTMLElement) {
+  return Math.max(0, scrollContainer.scrollWidth - scrollContainer.clientWidth);
 }
 </script>
 
 <style scoped>
 .editor-tab-bar {
-  --editor-tab-strip-max-width: min(1320px, calc(100vw - var(--app-sidebar-width) - 360px));
+  --editor-tab-strip-max-width: 100%;
   --editor-tab-width: 176px;
   --editor-tab-height: 40px;
   --editor-tab-gap: 12px;
   --editor-tab-bar-paper: rgba(244, 237, 225, 0.98);
   position: relative;
-  display: inline-flex;
+  display: flex;
   box-sizing: border-box;
-  width: auto;
-  max-width: min(100%, var(--editor-tab-strip-max-width));
+  width: 100%;
+  max-width: 100%;
   min-width: 0;
   background: transparent;
   box-shadow: none;
@@ -358,26 +391,61 @@ function handleTabsWheel(event: WheelEvent) {
 
 .editor-tab-bar__inner {
   box-sizing: border-box;
-  display: inline-flex;
-  width: auto;
+  display: flex;
+  width: 100%;
   max-width: 100%;
   min-width: 0;
   padding: 12px 0 0 12px;
 }
 
 .editor-tab-bar__strip {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 10px;
+  width: 100%;
   min-width: 0;
   max-width: 100%;
 }
 
 .editor-tab-bar__tabs-shell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   min-width: 0;
-  width: fit-content;
-  max-width: min(100%, var(--editor-tab-strip-max-width));
-  flex: 0 1 auto;
+  width: auto;
+  max-width: var(--editor-tab-strip-max-width);
+  flex: 1 1 auto;
+  border: 1px solid rgba(208, 177, 138, 0.88);
+  border-radius: 20px;
+  background: rgba(236, 219, 190, 0.95);
+  padding: 6px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 252, 247, 0.58),
+    0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.editor-tab-bar__tabs-scroller {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-color: rgba(154, 52, 18, 0.28) transparent;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+
+.editor-tab-bar__tabs-scroller::-webkit-scrollbar {
+  height: 8px;
+}
+
+.editor-tab-bar__tabs-scroller::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.editor-tab-bar__tabs-scroller::-webkit-scrollbar-thumb {
+  border: 2px solid rgba(236, 219, 190, 0.95);
+  border-radius: 999px;
+  background: rgba(154, 52, 18, 0.28);
 }
 
 .editor-tab-bar__add-tab {
@@ -392,16 +460,17 @@ function handleTabsWheel(event: WheelEvent) {
 }
 
 .editor-tab-bar__tabs {
-  width: fit-content;
-  flex: 0 1 auto;
-  min-width: 0;
-  max-width: 100%;
+  width: max-content;
+  min-width: 100%;
+  max-width: none;
 }
 
 .editor-tab-bar__tabs :deep(.el-tabs__header) {
   margin: 0;
   border-bottom: none;
-  max-width: 100%;
+  width: max-content;
+  min-width: 100%;
+  max-width: none;
 }
 
 .editor-tab-bar__tabs :deep(.el-tabs__content) {
@@ -410,34 +479,10 @@ function handleTabsWheel(event: WheelEvent) {
 
 .editor-tab-bar__tabs :deep(.el-tabs__nav-wrap),
 .editor-tab-bar__tabs :deep(.el-tabs__nav-wrap.is-scrollable) {
-  width: fit-content;
-  max-width: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
+  width: max-content;
+  max-width: none;
+  overflow: visible;
   padding: 8px var(--editor-tab-gap);
-  border: 1px solid rgba(208, 177, 138, 0.88);
-  border-radius: 20px;
-  background: rgba(236, 219, 190, 0.95);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 252, 247, 0.58),
-    0 1px 0 rgba(255, 255, 255, 0.2);
-  scrollbar-color: rgba(154, 52, 18, 0.28) transparent;
-  scrollbar-gutter: stable;
-  scrollbar-width: thin;
-}
-
-.editor-tab-bar__tabs :deep(.el-tabs__nav-wrap::-webkit-scrollbar) {
-  height: 8px;
-}
-
-.editor-tab-bar__tabs :deep(.el-tabs__nav-wrap::-webkit-scrollbar-track) {
-  background: transparent;
-}
-
-.editor-tab-bar__tabs :deep(.el-tabs__nav-wrap::-webkit-scrollbar-thumb) {
-  border: 2px solid rgba(236, 219, 190, 0.95);
-  border-radius: 999px;
-  background: rgba(154, 52, 18, 0.28);
 }
 
 .editor-tab-bar__tabs :deep(.el-tabs__nav-wrap::after),
@@ -448,13 +493,15 @@ function handleTabsWheel(event: WheelEvent) {
 
 .editor-tab-bar__tabs :deep(.el-tabs__nav-scroll) {
   overflow: visible;
-  max-width: 100%;
+  width: max-content;
+  max-width: none;
 }
 
 .editor-tab-bar__tabs :deep(.el-tabs__nav) {
   display: flex;
   align-items: center;
   gap: var(--editor-tab-gap);
+  width: max-content;
   border: none;
   padding: 0;
 }
