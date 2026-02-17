@@ -2396,9 +2396,7 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   overflow: hidden;
   height: 100%;
   min-height: 0;
-  background:
-    radial-gradient(circle at 1px 1px, rgba(217, 119, 6, 0.16) 1px, transparent 0) 0 0 / 28px 28px,
-    linear-gradient(180deg, rgba(255, 250, 241, 0.98) 0%, rgba(248, 237, 219, 0.96) 100%);
+  background: var(--graphite-canvas-bg);
   cursor: grab;
   outline: none;
   overscroll-behavior: none;
@@ -2431,35 +2429,54 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   padding: 7px 14px;
   border: 1px solid rgba(154, 52, 18, 0.16);
   border-radius: 999px;
-  background: rgba(255, 250, 241, 0.92);
+  background: var(--graphite-glass-bg);
   color: #9a3412;
   font-size: 0.76rem;
   font-weight: 800;
   letter-spacing: 0.06em;
-  box-shadow: 0 12px 28px rgba(120, 53, 15, 0.1);
-  backdrop-filter: blur(14px);
+  box-shadow: var(--graphite-glass-shadow), var(--graphite-glass-highlight);
+  backdrop-filter: blur(18px) saturate(1.4);
   pointer-events: none;
 }
 
 .editor-canvas__edge-view-toolbar {
   position: absolute;
   left: 18px;
-  top: var(--editor-canvas-floating-top-clearance, 18px);
+  top: calc(var(--editor-canvas-floating-top-clearance, 18px) + 18px);
   z-index: 24;
+  isolation: isolate;
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  overflow: hidden;
   padding: 5px;
-  border: 1px solid rgba(154, 52, 18, 0.14);
+  border: 1px solid var(--graphite-glass-border);
   border-radius: 999px;
-  background: rgba(255, 250, 241, 0.88);
-  box-shadow: 0 12px 26px rgba(120, 53, 15, 0.1);
-  backdrop-filter: blur(14px);
+  background: var(--graphite-glass-bg);
+  box-shadow:
+    0 8px 20px rgba(31, 28, 24, 0.045),
+    var(--graphite-glass-highlight),
+    var(--graphite-glass-rim);
+  backdrop-filter: blur(20px) saturate(1.45) contrast(1.01);
   cursor: default;
   pointer-events: auto;
 }
 
+.editor-canvas__edge-view-toolbar::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 1px;
+  z-index: 0;
+  border-radius: inherit;
+  background: var(--graphite-glass-specular), var(--graphite-glass-lens);
+  mix-blend-mode: screen;
+  opacity: 0.36;
+}
+
 .editor-canvas__edge-view-button {
+  position: relative;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;

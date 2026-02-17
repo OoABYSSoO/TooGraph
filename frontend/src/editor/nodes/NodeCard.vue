@@ -2888,7 +2888,7 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
   border: 1px solid rgba(154, 52, 18, 0.18);
   border-radius: 28px;
   overflow: visible;
-  background: linear-gradient(180deg, rgba(255, 250, 241, 0.98) 0%, rgba(248, 237, 219, 0.96) 100%);
+  background: var(--graphite-surface-card);
   box-shadow: 0 22px 40px rgba(60, 41, 20, 0.08);
   user-select: none;
 }
@@ -2907,18 +2907,32 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
   top: 0;
   right: 18px;
   z-index: 12;
+  isolation: isolate;
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 8px;
   border: 1px solid rgba(154, 52, 18, 0.14);
   border-radius: 999px;
-  background: rgba(255, 250, 241, 0.94);
-  box-shadow: none;
+  background: var(--graphite-glass-bg);
+  box-shadow: var(--graphite-glass-shadow), var(--graphite-glass-highlight), var(--graphite-glass-rim);
+  backdrop-filter: blur(24px) saturate(1.6) contrast(1.02);
   opacity: 0;
   pointer-events: none;
   transform: translateY(calc(-100% - 8px));
   transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.node-card__top-actions::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 1px;
+  z-index: 0;
+  border-radius: inherit;
+  background: var(--graphite-glass-specular), var(--graphite-glass-lens);
+  mix-blend-mode: screen;
+  opacity: 0.5;
 }
 
 .node-card__top-actions::after {
@@ -2944,6 +2958,8 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
 
 .node-card__top-action-button {
   --el-color-primary: #c96b1f;
+  position: relative;
+  z-index: 1;
   width: 56px;
   height: 40px;
   border: 1px solid rgba(154, 52, 18, 0.14);
@@ -3020,6 +3036,7 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
   border: 1px solid rgba(154, 52, 18, 0.18);
   border-radius: 999px;
   padding: 4px 14px;
+  font-family: var(--graphite-font-mono);
   font-size: 0.86rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -3098,7 +3115,8 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
 
 .node-card__title {
   margin: 0;
-  font-size: 2rem;
+  font-family: var(--graphite-font-display);
+  font-size: 1.72rem;
   line-height: 1.15;
   color: #1f2937;
   cursor: inherit;

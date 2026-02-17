@@ -237,9 +237,9 @@ function handleResumeClick() {
   gap: 12px;
   overflow: auto;
   padding: 14px;
-  border: 1px solid rgba(154, 52, 18, 0.14);
+  border: 1px solid var(--graphite-border);
   border-radius: 28px;
-  background: rgba(255, 252, 247, 0.98);
+  background: var(--graphite-surface-panel);
   box-shadow: none;
   backdrop-filter: none;
 }
@@ -326,7 +326,7 @@ function handleResumeClick() {
 .editor-human-review-panel__state-card {
   border: 1px solid rgba(154, 52, 18, 0.14);
   border-radius: 22px;
-  background: rgba(255, 250, 241, 0.82);
+  background: var(--graphite-surface-card);
   padding: 12px;
 }
 

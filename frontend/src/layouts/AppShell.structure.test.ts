@@ -46,7 +46,8 @@ test("AppShell uses a low-noise ChatGPT-style brand rail with library icons", ()
   assert.match(componentSource, /<ElIcon class="app-shell__link-icon"><EditPen \/><\/ElIcon>/);
   assert.match(componentSource, /<ElIcon class="app-shell__link-icon"><Clock \/><\/ElIcon>/);
   assert.match(componentSource, /<ElIcon class="app-shell__link-icon"><Setting \/><\/ElIcon>/);
-  assert.match(componentSource, /\.app-shell__sidebar \{[\s\S]*background:\s*rgba\(250,\s*246,\s*239,\s*0\.72\);/);
+  assert.match(componentSource, /\.app-shell__sidebar \{[\s\S]*background:\s*var\(--graphite-glass-bg\);/);
+  assert.match(componentSource, /\.app-shell__sidebar \{[\s\S]*backdrop-filter:\s*blur\(24px\) saturate\(1\.35\);/);
   assert.match(componentSource, /\.app-shell__link \{[\s\S]*border:\s*1px solid transparent;/);
   assert.match(componentSource, /\.app-shell__link\.router-link-active,[\s\S]*\.app-shell__link\.app-shell__link--active \{[\s\S]*box-shadow:\s*inset 3px 0 0 rgba\(154,\s*52,\s*18,\s*0\.7\);/);
 });

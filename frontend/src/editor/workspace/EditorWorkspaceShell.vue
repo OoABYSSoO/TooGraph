@@ -67,7 +67,7 @@
           :class="{ 'editor-workspace-shell__editor--active': tab.tabId === workspace.activeTabId }"
         >
           <div class="editor-workspace-shell__editor-grid">
-            <div class="editor-workspace-shell__editor-main">
+            <div class="editor-workspace-shell__editor-main" :style="editorMainStyle(tab.tabId)">
               <div v-if="loadingByTabId[tab.tabId]" class="editor-workspace-shell__status-card">
                 <div class="editor-workspace-shell__status-eyebrow">Graph</div>
                 <h2>Loading saved graph…</h2>
@@ -1065,6 +1065,16 @@ function toggleActiveStatePanel() {
     [tabId]: "state",
   };
   toggleStatePanel(tabId);
+}
+
+function editorMainStyle(tabId: string) {
+  if (!isStatePanelOpen(tabId)) {
+    return {};
+  }
+
+  return {
+    "--editor-canvas-minimap-right-clearance": `calc(${sidePanelOpenWidth(tabId)} + 12px)`,
+  };
 }
 
 function sidePanelLayerStyle(tabId: string) {
@@ -2176,6 +2186,7 @@ onMounted(() => {
 .editor-workspace-shell {
   --editor-state-panel-open-width: clamp(340px, 32vw, 480px);
   --editor-human-review-panel-open-width: clamp(360px, 34vw, 520px);
+  --editor-workspace-floating-top-clearance: 72px;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -2183,8 +2194,7 @@ onMounted(() => {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: radial-gradient(circle at top, rgba(154, 52, 18, 0.1), transparent 22%),
-    linear-gradient(180deg, #f5efe2 0%, #ede4d2 100%);
+  background: var(--graphite-page-bg);
 }
 
 .editor-workspace-shell__file-input {
@@ -2263,7 +2273,7 @@ onMounted(() => {
 }
 
 .editor-workspace-shell__editor-main {
-  --editor-canvas-floating-top-clearance: 72px;
+  --editor-canvas-floating-top-clearance: var(--editor-workspace-floating-top-clearance);
   position: relative;
   min-width: 0;
   min-height: 0;
@@ -2272,7 +2282,7 @@ onMounted(() => {
 
 .editor-workspace-shell__side-panel-layer {
   position: absolute;
-  top: 12px;
+  top: var(--editor-workspace-floating-top-clearance);
   right: 12px;
   bottom: 12px;
   z-index: 30;
@@ -2300,9 +2310,9 @@ onMounted(() => {
   border: 1px solid rgba(154, 52, 18, 0.16);
   border-radius: 20px;
   padding: 10px 14px;
-  background: rgba(255, 250, 241, 0.94);
-  box-shadow: 0 18px 32px rgba(60, 41, 20, 0.12);
-  backdrop-filter: blur(12px);
+  background: var(--graphite-glass-bg);
+  box-shadow: var(--graphite-glass-shadow), var(--graphite-glass-highlight);
+  backdrop-filter: blur(18px) saturate(1.35);
 }
 
 .editor-workspace-shell__feedback--success {
@@ -2420,6 +2430,10 @@ onMounted(() => {
 }
 
 @media (max-width: 920px) {
+  .editor-workspace-shell {
+    --editor-workspace-floating-top-clearance: 124px;
+  }
+
   .editor-workspace-shell__chrome {
     grid-template-columns: minmax(0, 1fr);
     align-content: start;
@@ -2434,9 +2448,6 @@ onMounted(() => {
     padding: 0;
   }
 
-  .editor-workspace-shell__editor-main {
-    --editor-canvas-floating-top-clearance: 124px;
-  }
 }
 
 @media (max-width: 760px) {

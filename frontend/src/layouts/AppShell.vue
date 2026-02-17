@@ -118,8 +118,9 @@ watch(isSidebarCollapsed, (nextValue) => {
   min-height: 100dvh;
   display: grid;
   grid-template-columns: var(--app-sidebar-width) minmax(0, 1fr);
-  background: linear-gradient(180deg, rgba(255, 250, 241, 0.98) 0%, rgba(248, 237, 219, 0.96) 100%);
-  color: #3c2914;
+  background: var(--graphite-page-bg);
+  color: var(--graphite-text);
+  font-family: var(--graphite-font-ui);
   transition: grid-template-columns 180ms ease;
 }
 
@@ -135,13 +136,14 @@ watch(isSidebarCollapsed, (nextValue) => {
 }
 
 .app-shell__sidebar {
-  border-right: 1px solid rgba(154, 52, 18, 0.12);
+  border-right: 1px solid rgba(154, 52, 18, 0.1);
   padding: 18px 12px;
   display: grid;
   align-content: start;
   gap: 18px;
-  background: rgba(250, 246, 239, 0.72);
-  backdrop-filter: blur(10px);
+  background: var(--graphite-glass-bg);
+  box-shadow: var(--graphite-glass-highlight);
+  backdrop-filter: blur(24px) saturate(1.35);
   min-height: 0;
   overflow: hidden;
   overflow-y: auto;
@@ -172,10 +174,11 @@ watch(isSidebarCollapsed, (nextValue) => {
   justify-content: center;
   border: 1px solid rgba(154, 52, 18, 0.14);
   border-radius: 12px;
-  background: rgba(255, 250, 242, 0.9);
-  color: rgba(154, 52, 18, 0.96);
+  background: var(--graphite-glass-bg-strong);
+  color: var(--graphite-accent);
   font-weight: 700;
   letter-spacing: 0.08em;
+  box-shadow: var(--graphite-glass-highlight);
 }
 
 .app-shell__brand-copy {
@@ -194,6 +197,8 @@ watch(isSidebarCollapsed, (nextValue) => {
 
 .app-shell__title {
   margin: 0;
+  color: var(--graphite-text-strong);
+  font-family: var(--graphite-font-display);
   font-size: 1rem;
   line-height: 1.15;
 }
@@ -202,7 +207,7 @@ watch(isSidebarCollapsed, (nextValue) => {
   margin: 4px 0 0;
   font-size: 0.72rem;
   line-height: 1.2;
-  color: rgba(60, 41, 20, 0.68);
+  color: var(--graphite-text-muted);
 }
 
 .app-shell__nav {
@@ -229,13 +234,13 @@ watch(isSidebarCollapsed, (nextValue) => {
 
 .app-shell__link:hover {
   border-color: rgba(154, 52, 18, 0.1);
-  background: rgba(255, 250, 242, 0.82);
+  background: rgba(255, 250, 242, 0.6);
 }
 
 .app-shell__link.router-link-active,
 .app-shell__link.app-shell__link--active {
   border-color: rgba(154, 52, 18, 0.12);
-  background: rgba(255, 248, 240, 0.9);
+  background: rgba(255, 248, 240, 0.72);
   color: rgb(154, 52, 18);
   box-shadow: inset 3px 0 0 rgba(154, 52, 18, 0.7);
 }
@@ -277,14 +282,14 @@ watch(isSidebarCollapsed, (nextValue) => {
   border-radius: 12px;
   border: 1px solid transparent;
   background: transparent;
-  color: #3c2914;
+  color: var(--graphite-text);
   cursor: pointer;
   transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease;
 }
 
 .app-shell__collapse:hover {
   border-color: rgba(154, 52, 18, 0.1);
-  background: rgba(255, 250, 242, 0.82);
+  background: rgba(255, 250, 242, 0.6);
 }
 
 .app-shell__collapse-icon {

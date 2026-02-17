@@ -28,7 +28,7 @@
           <article class="run-detail__panel">
             <h3>Status</h3>
             <div class="run-detail__badges">
-              <span>{{ viewedRun?.status ?? run.status }}</span>
+              <span :class="statusBadgeClass(viewedRun?.status ?? run.status)">{{ viewedRun?.status ?? run.status }}</span>
               <span>{{ viewedRun?.current_node_id ?? "completed" }}</span>
               <span>revisions {{ viewedRun?.revision_round ?? run.revision_round }}</span>
               <span v-if="viewedRun?.final_score">score {{ viewedRun.final_score }}</span>
@@ -243,6 +243,10 @@ function snapshotStatusLabel(status: string) {
   }
   return status;
 }
+
+function statusBadgeClass(status: string) {
+  return `graphite-status-badge graphite-status-badge--${status.replaceAll("_", "-")}`;
+}
 </script>
 
 <style scoped>
@@ -254,10 +258,10 @@ function snapshotStatusLabel(status: string) {
 .run-detail__hero,
 .run-detail__panel,
 .run-detail__empty {
-  border: 1px solid rgba(154, 52, 18, 0.14);
+  border: 1px solid var(--graphite-border);
   border-radius: 24px;
-  background: rgba(255, 252, 247, 0.88);
-  box-shadow: 0 18px 36px rgba(60, 41, 20, 0.08);
+  background: var(--graphite-surface-panel);
+  box-shadow: var(--graphite-shadow-panel);
 }
 
 .run-detail__hero,
@@ -266,6 +270,7 @@ function snapshotStatusLabel(status: string) {
 }
 
 .run-detail__panel {
+  background: var(--graphite-surface-card);
   padding: 20px;
 }
 
@@ -278,6 +283,8 @@ function snapshotStatusLabel(status: string) {
 
 .run-detail__title {
   margin: 8px 0 10px;
+  color: var(--graphite-text-strong);
+  font-family: var(--graphite-font-display);
   font-size: 2rem;
 }
 
@@ -349,10 +356,12 @@ function snapshotStatusLabel(status: string) {
 }
 
 .run-detail__badges span {
+  border: 1px solid var(--graphite-status-border, transparent);
   border-radius: 999px;
   padding: 4px 10px;
-  background: rgba(255, 248, 240, 0.92);
-  color: rgb(154, 52, 18);
+  background: var(--graphite-status-bg, rgba(255, 248, 240, 0.92));
+  color: var(--graphite-status-fg, rgb(154, 52, 18));
+  font-family: var(--graphite-font-mono);
   font-size: 0.84rem;
 }
 
@@ -374,6 +383,11 @@ function snapshotStatusLabel(status: string) {
   justify-content: space-between;
   gap: 12px;
   margin-top: 10px;
+}
+
+.run-detail__content {
+  font-family: var(--graphite-font-mono);
+  font-size: 0.86rem;
 }
 
 @media (max-width: 960px) {

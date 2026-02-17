@@ -22,3 +22,10 @@ test("RunDetailPage exposes a restore editor action when the loaded run can be r
   assert.match(componentSource, /run-detail__snapshot-switcher/);
   assert.match(componentSource, /v-for="option in snapshotOptions"/);
 });
+
+test("RunDetailPage uses semantic status styling for the primary run badge", () => {
+  assert.match(componentSource, /function statusBadgeClass\(status: string\)/);
+  assert.match(componentSource, /:class="statusBadgeClass\(viewedRun\?\.status \?\? run\.status\)"/);
+  assert.match(componentSource, /\.run-detail__badges span \{[\s\S]*background:\s*var\(--graphite-status-bg,/);
+  assert.match(componentSource, /\.run-detail__content \{[\s\S]*font-family:\s*var\(--graphite-font-mono\);/);
+});

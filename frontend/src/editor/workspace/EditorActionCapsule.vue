@@ -58,14 +58,35 @@ defineEmits<{
 
 <style scoped>
 .editor-action-capsule {
+  position: relative;
+  isolation: isolate;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  border: 1px solid rgba(193, 151, 106, 0.22);
+  overflow: hidden;
+  border: 1px solid var(--graphite-glass-border);
   border-radius: 999px;
-  background: rgba(255, 250, 242, 0.88);
+  background: var(--graphite-glass-bg);
   padding: 6px;
-  box-shadow: 0 10px 24px rgba(92, 58, 28, 0.1);
+  box-shadow: var(--graphite-glass-shadow), var(--graphite-glass-highlight), var(--graphite-glass-rim);
+  backdrop-filter: blur(28px) saturate(1.65) contrast(1.02);
+}
+
+.editor-action-capsule::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 1px;
+  z-index: 0;
+  border-radius: inherit;
+  background: var(--graphite-glass-specular), var(--graphite-glass-lens);
+  mix-blend-mode: screen;
+  opacity: 0.62;
+}
+
+.editor-action-capsule > * {
+  position: relative;
+  z-index: 1;
 }
 
 .editor-action-capsule__tools {

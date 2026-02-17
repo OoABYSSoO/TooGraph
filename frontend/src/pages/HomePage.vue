@@ -27,9 +27,9 @@
               <strong>{{ formatRunDisplayName(run) }}</strong>
               <span class="home-card__detail">{{ runCardDetail }}</span>
             </div>
-            <p>{{ run.run_id }}</p>
+            <p class="home-card__identifier">{{ run.run_id }}</p>
             <div class="home-badges">
-              <span>{{ run.status }}</span>
+              <span :class="statusBadgeClass(run.status)">{{ run.status }}</span>
               <span>revisions {{ run.revision_round }}</span>
             </div>
           </RouterLink>
@@ -76,7 +76,7 @@
               <strong>{{ graph.name }}</strong>
               <span class="home-card__detail">{{ graphCardDetail }}</span>
             </div>
-            <p>{{ graph.graph_id }}</p>
+            <p class="home-card__identifier">{{ graph.graph_id }}</p>
             <div class="home-badges">
               <span>{{ Object.keys(graph.nodes).length }} nodes</span>
               <span>{{ countGraphEdgeTotal(graph) }} edges</span>
@@ -121,18 +121,23 @@ onMounted(async () => {
     error.value = fetchError instanceof Error ? fetchError.message : "Failed to load workspace data.";
   }
 });
+
+function statusBadgeClass(status: string) {
+  return `graphite-status-badge graphite-status-badge--${status.replaceAll("_", "-")}`;
+}
 </script>
 
 <style scoped>
 .home-hero,
 .home-panel {
-  border: 1px solid rgba(154, 52, 18, 0.14);
+  border: 1px solid var(--graphite-border);
   border-radius: 28px;
-  background: rgba(255, 252, 247, 0.88);
-  box-shadow: 0 18px 36px rgba(60, 41, 20, 0.08);
+  background: var(--graphite-surface-panel);
+  box-shadow: var(--graphite-shadow-panel);
 }
 
 .home-hero {
+  background: var(--graphite-surface-hero);
   padding: 24px;
 }
 
@@ -146,6 +151,8 @@ onMounted(async () => {
 
 .home-hero__title {
   margin: 8px 0 10px;
+  color: var(--graphite-text-strong);
+  font-family: var(--graphite-font-display);
   font-size: 2rem;
 }
 
@@ -215,10 +222,10 @@ onMounted(async () => {
 
 .home-card,
 .home-empty {
-  border: 1px solid rgba(154, 52, 18, 0.12);
+  border: 1px solid rgba(154, 52, 18, 0.1);
   border-radius: 18px;
   padding: 16px;
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--graphite-surface-card);
 }
 
 .home-card {
@@ -247,6 +254,11 @@ onMounted(async () => {
   line-height: 1.5;
 }
 
+.home-card__identifier {
+  font-family: var(--graphite-font-mono);
+  font-size: 0.84rem;
+}
+
 .home-empty {
   display: grid;
   gap: 14px;
@@ -272,10 +284,12 @@ onMounted(async () => {
 }
 
 .home-badges span {
+  border: 1px solid var(--graphite-status-border, transparent);
   border-radius: 999px;
   padding: 4px 10px;
-  background: rgba(255, 248, 240, 0.92);
-  color: rgb(154, 52, 18);
+  background: var(--graphite-status-bg, rgba(255, 248, 240, 0.92));
+  color: var(--graphite-status-fg, rgb(154, 52, 18));
+  font-family: var(--graphite-font-mono);
   font-size: 0.84rem;
 }
 

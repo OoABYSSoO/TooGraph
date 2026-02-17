@@ -59,7 +59,6 @@
                       <button
                         type="button"
                         class="editor-tab-bar__close"
-                        :class="{ 'editor-tab-bar__close--visible': tab.tabId === activeTabId }"
                         aria-label="关闭标签页"
                         @mousedown.stop.prevent
                         @click.stop="$emit('close-tab', tab.tabId)"
@@ -377,7 +376,7 @@ function resolveTabsMaxScrollLeft(scrollContainer: HTMLElement) {
   --editor-tab-width: 176px;
   --editor-tab-height: 40px;
   --editor-tab-gap: 12px;
-  --editor-tab-bar-paper: rgba(244, 237, 225, 0.98);
+  --editor-tab-bar-paper: var(--graphite-glass-bg);
   position: relative;
   display: flex;
   box-sizing: border-box;
@@ -415,20 +414,25 @@ function resolveTabsMaxScrollLeft(scrollContainer: HTMLElement) {
   width: auto;
   max-width: var(--editor-tab-strip-max-width);
   flex: 1 1 auto;
-  border: 1px solid rgba(208, 177, 138, 0.88);
+  border: 1px solid var(--graphite-glass-border);
   border-radius: 20px;
-  background: rgba(236, 219, 190, 0.95);
-  padding: 6px;
+  background: var(--graphite-glass-specular), var(--graphite-glass-lens), var(--editor-tab-bar-paper);
+  background-blend-mode: screen, screen, normal;
+  padding: 8px;
   box-shadow:
-    inset 0 1px 0 rgba(255, 252, 247, 0.58),
-    0 1px 0 rgba(255, 255, 255, 0.2);
+    var(--graphite-glass-shadow),
+    var(--graphite-glass-highlight),
+    var(--graphite-glass-rim);
+  backdrop-filter: blur(28px) saturate(1.65) contrast(1.02);
 }
 
 .editor-tab-bar__tabs-scroller {
   flex: 1 1 auto;
   min-width: 0;
+  margin: -6px 0;
   overflow-x: auto;
   overflow-y: hidden;
+  padding: 6px 0;
   scrollbar-color: rgba(154, 52, 18, 0.28) transparent;
   scrollbar-gutter: stable;
   scrollbar-width: thin;
@@ -452,11 +456,25 @@ function resolveTabsMaxScrollLeft(scrollContainer: HTMLElement) {
   flex: 0 0 auto;
   width: 40px;
   height: 40px;
-  border: 1px solid rgba(208, 177, 138, 0.88);
+  border: 1px solid var(--graphite-glass-border);
   border-radius: 14px;
-  background: linear-gradient(180deg, rgba(255, 250, 242, 0.98) 0%, rgba(245, 233, 212, 0.95) 100%);
+  background: var(--graphite-glass-specular), var(--graphite-glass-lens), var(--graphite-glass-bg-strong);
+  background-blend-mode: screen, screen, normal;
   color: rgba(111, 52, 22, 0.94);
+  box-shadow: var(--graphite-glass-highlight), var(--graphite-glass-rim);
+  backdrop-filter: blur(24px) saturate(1.55) contrast(1.02);
   cursor: pointer;
+}
+
+:global(.editor-tab-bar__launcher-popper.el-popper) {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+}
+
+:global(.editor-tab-bar__launcher-popper .el-popper__arrow) {
+  display: none;
 }
 
 .editor-tab-bar__tabs {
@@ -482,7 +500,7 @@ function resolveTabsMaxScrollLeft(scrollContainer: HTMLElement) {
   width: max-content;
   max-width: none;
   overflow: visible;
-  padding: 8px var(--editor-tab-gap);
+  padding: 10px var(--editor-tab-gap);
 }
 
 .editor-tab-bar__tabs :deep(.el-tabs__nav-wrap::after),
@@ -549,13 +567,13 @@ function resolveTabsMaxScrollLeft(scrollContainer: HTMLElement) {
   align-items: center;
   gap: 10px;
   padding: 0 14px 0 16px;
-  border: 1px solid rgba(208, 177, 138, 0.88);
+  border: 1px solid rgba(213, 184, 146, 0.62);
   border-radius: 14px;
-  background: linear-gradient(180deg, rgba(250, 242, 228, 0.98) 0%, rgba(245, 233, 212, 0.95) 100%);
-  color: rgba(96, 63, 36, 0.92);
+  background: rgba(255, 255, 255, 0.28);
+  color: rgba(88, 61, 39, 0.82);
   box-shadow:
-    inset 0 1px 0 rgba(255, 251, 244, 0.58),
-    0 1px 0 rgba(92, 58, 28, 0.04);
+    inset 0 1px 0 rgba(255, 251, 244, 0.48),
+    0 1px 1px rgba(92, 58, 28, 0.03);
   transition:
     background-color 160ms ease,
     border-color 160ms ease,
@@ -566,21 +584,26 @@ function resolveTabsMaxScrollLeft(scrollContainer: HTMLElement) {
 }
 
 .editor-tab-bar__tab-shell:hover {
-  background: linear-gradient(180deg, rgba(255, 248, 237, 0.99) 0%, rgba(249, 237, 218, 0.97) 100%);
-  border-color: rgba(177, 105, 46, 0.22);
+  background: rgba(255, 255, 255, 0.38);
+  border-color: rgba(177, 105, 46, 0.32);
   color: rgba(104, 55, 24, 0.98);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.66),
+    0 4px 10px rgba(92, 58, 28, 0.08);
   transform: none;
 }
 
 .editor-tab-bar__tab-shell--active {
-  z-index: 1;
-  border-color: rgba(154, 52, 18, 0.3);
-  background: linear-gradient(180deg, rgba(255, 250, 242, 1) 0%, rgba(250, 236, 214, 1) 100%);
+  z-index: 2;
+  border-color: rgba(154, 52, 18, 0.52);
+  background: rgba(255, 255, 255, 0.5);
   color: rgba(111, 52, 22, 1);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    0 8px 18px rgba(154, 52, 18, 0.13),
-    0 0 0 1px rgba(255, 242, 224, 0.55);
+    inset 0 3px 0 rgba(154, 52, 18, 0.72),
+    inset 0 1px 0 rgba(255, 255, 255, 0.94),
+    inset 0 -1px 0 rgba(154, 52, 18, 0.06),
+    inset 0 0 0 1px rgba(154, 52, 18, 0.12);
+  transform: none;
 }
 
 .editor-tab-bar__tab-shell--active:hover {
@@ -635,7 +658,7 @@ function resolveTabsMaxScrollLeft(scrollContainer: HTMLElement) {
 }
 
 .editor-tab-bar__tab-shell--active .editor-tab-bar__tab-title {
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .editor-tab-bar__tab-status {
@@ -663,7 +686,7 @@ function resolveTabsMaxScrollLeft(scrollContainer: HTMLElement) {
 }
 
 .editor-tab-bar__tab-shell:hover .editor-tab-bar__dirty-dot,
-.editor-tab-bar__tab-shell--active .editor-tab-bar__dirty-dot {
+.editor-tab-bar__tab-shell:focus-within .editor-tab-bar__dirty-dot {
   opacity: 0;
 }
 
@@ -679,18 +702,21 @@ function resolveTabsMaxScrollLeft(scrollContainer: HTMLElement) {
   color: rgba(124, 45, 18, 0.76);
   cursor: pointer;
   opacity: 0;
+  pointer-events: none;
   transform: scale(0.92);
-  transition: opacity 150ms ease, transform 150ms ease, background-color 150ms ease;
+  transition: opacity 150ms ease, transform 150ms ease, background-color 150ms ease, color 150ms ease;
 }
 
 .editor-tab-bar__tab-shell:hover .editor-tab-bar__close,
-.editor-tab-bar__close--visible {
+.editor-tab-bar__tab-shell:focus-within .editor-tab-bar__close {
   opacity: 1;
+  pointer-events: auto;
   transform: scale(1);
 }
 
 .editor-tab-bar__close:hover {
   background: rgba(246, 211, 184, 0.56);
+  color: rgba(124, 45, 18, 0.96);
 }
 
 @media (max-width: 1100px) {

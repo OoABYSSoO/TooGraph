@@ -1,4 +1,49 @@
 :root {
+  --graphite-font-ui: "Aptos", "Avenir Next", "SF Pro Text", "Segoe UI", sans-serif;
+  --graphite-font-display: "Aptos Display", "Aptos", "Avenir Next", "SF Pro Display", "Segoe UI", sans-serif;
+  --graphite-font-mono: "Cascadia Code", "SFMono-Regular", "Fira Code", "JetBrains Mono", monospace;
+  --graphite-text-strong: #20170f;
+  --graphite-text: rgba(60, 41, 20, 0.86);
+  --graphite-text-muted: rgba(60, 41, 20, 0.66);
+  --graphite-accent: #9a3412;
+  --graphite-accent-strong: #7c2d12;
+  --graphite-border: rgba(154, 52, 18, 0.14);
+  --graphite-border-strong: rgba(154, 52, 18, 0.24);
+  --graphite-page-bg:
+    radial-gradient(circle at 18% -10%, rgba(255, 255, 255, 0.88), transparent 28rem),
+    radial-gradient(circle at 84% 8%, rgba(232, 190, 128, 0.2), transparent 30rem),
+    linear-gradient(180deg, rgba(255, 251, 244, 0.98) 0%, rgba(242, 231, 211, 0.96) 100%);
+  --graphite-canvas-bg:
+    radial-gradient(circle at 1px 1px, rgba(217, 119, 6, 0.13) 1px, transparent 0) 0 0 / 28px 28px,
+    linear-gradient(180deg, rgba(255, 250, 241, 0.98) 0%, rgba(248, 237, 219, 0.96) 100%);
+  --graphite-surface-hero:
+    linear-gradient(180deg, rgba(255, 253, 249, 0.96), rgba(255, 249, 240, 0.9));
+  --graphite-surface-panel:
+    linear-gradient(180deg, rgba(255, 252, 247, 0.9), rgba(255, 248, 240, 0.82));
+  --graphite-surface-card:
+    linear-gradient(180deg, rgba(255, 253, 249, 0.96), rgba(249, 240, 224, 0.92));
+  --graphite-surface-flat: rgba(255, 252, 247, 0.76);
+  --graphite-shadow-panel: 0 20px 52px rgba(61, 43, 24, 0.08);
+  --graphite-shadow-card: 0 14px 30px rgba(61, 43, 24, 0.07);
+  --graphite-shadow-hover: 0 18px 42px rgba(61, 43, 24, 0.1);
+  --graphite-glass-bg: rgba(255, 255, 255, 0.34);
+  --graphite-glass-bg-strong: rgba(255, 255, 255, 0.48);
+  --graphite-glass-border: rgba(255, 255, 255, 0.72);
+  --graphite-glass-shadow:
+    0 14px 34px rgba(31, 28, 24, 0.06),
+    0 4px 12px rgba(31, 28, 24, 0.025);
+  --graphite-glass-highlight:
+    inset 0 1px 0 rgba(255, 255, 255, 0.88),
+    inset 0 -1px 0 rgba(31, 28, 24, 0.032);
+  --graphite-glass-rim:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.5),
+    inset 0 -10px 22px rgba(31, 28, 24, 0.018),
+    0 0 0 1px rgba(31, 28, 24, 0.014);
+  --graphite-glass-specular:
+    linear-gradient(115deg, rgba(255, 255, 255, 0.86) 0%, rgba(255, 255, 255, 0.42) 18%, rgba(255, 255, 255, 0) 44%);
+  --graphite-glass-lens:
+    radial-gradient(80% 120% at 18% 0%, rgba(255, 255, 255, 0.34), transparent 48%),
+    radial-gradient(110% 90% at 100% 100%, rgba(31, 28, 24, 0.02), transparent 56%);
   --graphite-scrollbar-track: rgba(255, 250, 241, 0.72);
   --graphite-scrollbar-thumb: rgba(180, 83, 9, 0.46);
   --graphite-scrollbar-thumb-hover: rgba(154, 52, 18, 0.62);
@@ -19,6 +64,64 @@ body,
 
 body {
   margin: 0;
+  background: var(--graphite-page-bg);
+  color: var(--graphite-text);
+  font-family: var(--graphite-font-ui);
+  font-size: 16px;
+  font-synthesis-weight: none;
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+.graphite-status-badge {
+  --graphite-status-bg: rgba(255, 248, 240, 0.92);
+  --graphite-status-border: rgba(154, 52, 18, 0.1);
+  --graphite-status-fg: rgb(154, 52, 18);
+}
+
+.graphite-status-badge--completed {
+  --graphite-status-bg: rgba(236, 253, 245, 0.9);
+  --graphite-status-border: rgba(5, 150, 105, 0.16);
+  --graphite-status-fg: rgb(4, 120, 87);
+}
+
+.graphite-status-badge--failed {
+  --graphite-status-bg: rgba(254, 242, 242, 0.92);
+  --graphite-status-border: rgba(220, 38, 38, 0.16);
+  --graphite-status-fg: rgb(185, 28, 28);
+}
+
+.graphite-status-badge--awaiting-human {
+  --graphite-status-bg: rgba(255, 247, 237, 0.96);
+  --graphite-status-border: rgba(217, 119, 6, 0.2);
+  --graphite-status-fg: rgb(180, 83, 9);
+}
+
+.graphite-status-badge--running {
+  --graphite-status-bg: rgba(239, 246, 255, 0.92);
+  --graphite-status-border: rgba(37, 99, 235, 0.16);
+  --graphite-status-fg: rgb(29, 78, 216);
+}
+
+.graphite-status-badge--queued,
+.graphite-status-badge--pending,
+.graphite-status-badge--resuming {
+  --graphite-status-bg: rgba(245, 243, 255, 0.9);
+  --graphite-status-border: rgba(124, 58, 237, 0.14);
+  --graphite-status-fg: rgb(109, 40, 217);
+}
+
+.graphite-status-badge--paused {
+  --graphite-status-bg: rgba(255, 251, 235, 0.94);
+  --graphite-status-border: rgba(217, 119, 6, 0.18);
+  --graphite-status-fg: rgb(146, 64, 14);
 }
 
 :where(*) {

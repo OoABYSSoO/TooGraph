@@ -13,3 +13,11 @@ test("HomePage renders every loaded template instead of truncating the template 
   assert.match(componentSource, /v-for="template in templates"/);
   assert.doesNotMatch(componentSource, /templates\.slice\(0,\s*3\)/);
 });
+
+test("HomePage uses semantic status styling for run badges", () => {
+  assert.match(componentSource, /function statusBadgeClass\(status: string\)/);
+  assert.match(componentSource, /:class="statusBadgeClass\(run\.status\)"/);
+  assert.match(componentSource, /\.home-badges span \{[\s\S]*background:\s*var\(--graphite-status-bg,/);
+  assert.match(componentSource, /class="home-card__identifier"/);
+  assert.match(componentSource, /\.home-card__identifier \{[\s\S]*font-family:\s*var\(--graphite-font-mono\);/);
+});
