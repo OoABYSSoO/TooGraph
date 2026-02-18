@@ -10,8 +10,8 @@
 
     <div v-if="workspace.tabs.length === 0" class="editor-workspace-shell__welcome">
       <div v-if="routeRestoreError" class="editor-workspace-shell__status-card editor-workspace-shell__status-card--danger">
-        <div class="editor-workspace-shell__status-eyebrow">Restore</div>
-        <h2>无法恢复运行快照</h2>
+        <div class="editor-workspace-shell__status-eyebrow">{{ t("common.restore") }}</div>
+        <h2>{{ t("runDetail.restoreSnapshotFailed") }}</h2>
         <p>{{ routeRestoreError }}</p>
       </div>
       <EditorWelcomeState
@@ -26,7 +26,7 @@
 
     <div v-else class="editor-workspace-shell__workspace">
       <div v-if="routeRestoreError" class="editor-workspace-shell__route-error">
-        <span class="editor-workspace-shell__route-error-label">Restore</span>
+        <span class="editor-workspace-shell__route-error-label">{{ t("common.restore") }}</span>
         <span>{{ routeRestoreError }}</span>
       </div>
       <div class="editor-workspace-shell__chrome">
@@ -69,11 +69,11 @@
           <div class="editor-workspace-shell__editor-grid">
             <div class="editor-workspace-shell__editor-main" :style="editorMainStyle(tab.tabId)">
               <div v-if="loadingByTabId[tab.tabId]" class="editor-workspace-shell__status-card">
-                <div class="editor-workspace-shell__status-eyebrow">Graph</div>
-                <h2>Loading saved graph…</h2>
+                <div class="editor-workspace-shell__status-eyebrow">{{ t("common.graph") }}</div>
+                <h2>{{ t("common.loadingGraph") }}</h2>
               </div>
               <div v-else-if="errorByTabId[tab.tabId]" class="editor-workspace-shell__status-card">
-                <div class="editor-workspace-shell__status-eyebrow">Graph</div>
+                <div class="editor-workspace-shell__status-eyebrow">{{ t("common.graph") }}</div>
                 <h2>{{ tab.title }}</h2>
                 <p>{{ errorByTabId[tab.tabId] }}</p>
               </div>
@@ -146,7 +146,7 @@
               :style="sidePanelLayerStyle(tab.tabId)"
             >
               <EditorHumanReviewPanel
-                v-if="sidePanelMode(tab.tabId) === 'human-review'"
+                v-if="shouldShowHumanReviewPanel(tab.tabId)"
                 :document="documentsByTabId[tab.tabId]!"
                 :run="latestRunDetailByTabId[tab.tabId] ?? null"
                 :focused-node-id="focusedNodeIdByTabId[tab.tabId] ?? null"
@@ -194,6 +194,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
+import { useI18n } from "vue-i18n";
 
 import { fetchPreset, fetchPresets, savePreset } from "@/api/presets";
 import { fetchKnowledgeBases } from "@/api/knowledge";
@@ -295,6 +296,7 @@ const props = defineProps<{
 const router = useRouter();
 const route = useRoute();
 const graphStore = useGraphDocumentStore();
+const { t } = useI18n();
 
 const workspace = ref<PersistedEditorWorkspace>({
   activeTabId: null,
@@ -958,7 +960,23 @@ function sidePanelMode(tabId: string) {
   return sidePanelModeByTabId.value[tabId] ?? "state";
 }
 
+function canShowHumanReviewPanel(tabId: string) {
+  return latestRunDetailByTabId.value[tabId]?.status === "awaiting_human";
+}
+
+function shouldShowHumanReviewPanel(tabId: string) {
+  return sidePanelMode(tabId) === "human-review" && canShowHumanReviewPanel(tabId);
+}
+
+function isHumanReviewPanelLockedOpen(tabId: string) {
+  return canShowHumanReviewPanel(tabId) && sidePanelMode(tabId) === "human-review";
+}
+
 function toggleStatePanel(tabId: string) {
+  if (isHumanReviewPanelLockedOpen(tabId)) {
+    showGraphLockedEditToast();
+    return;
+  }
   statePanelOpenByTabId.value = {
     ...statePanelOpenByTabId.value,
     [tabId]: !isStatePanelOpen(tabId),
@@ -966,6 +984,9 @@ function toggleStatePanel(tabId: string) {
 }
 
 function openHumanReviewPanelForTab(tabId: string, nodeId: string | null) {
+  if (!canShowHumanReviewPanel(tabId)) {
+    return;
+  }
   closeNodeCreationMenu(tabId);
   sidePanelModeByTabId.value = {
     ...sidePanelModeByTabId.value,
@@ -990,7 +1011,7 @@ function showGraphLockedEditToast() {
     grouping: true,
     placement: "top",
     showClose: false,
-    message: "图已锁定。请在右侧 Human Review 面板填写需要的输入，然后点击 Continue Run 继续。",
+    message: t("editor.lockedToast"),
   });
 }
 
@@ -1034,6 +1055,11 @@ function toggleActiveStatePanel() {
     return;
   }
   const tabId = activeTab.value.tabId;
+  if (isHumanReviewPanelLockedOpen(tabId)) {
+    openHumanReviewPanelForTab(tabId, latestRunDetailByTabId.value[tabId]?.current_node_id ?? null);
+    showGraphLockedEditToast();
+    return;
+  }
   if (sidePanelMode(tabId) !== "state") {
     sidePanelModeByTabId.value = {
       ...sidePanelModeByTabId.value,
@@ -1890,14 +1916,14 @@ async function saveAndClosePendingTab() {
   try {
     const success = await saveTab(pendingCloseTabId.value);
     if (!success) {
-      closeError.value = "保存失败，标签页已保留。";
+      closeError.value = t("closeDialog.saveFailed");
       return;
     }
     finalizeTabClose(pendingCloseTabId.value);
     pendingCloseTabId.value = null;
     closeError.value = null;
   } catch (error) {
-    closeError.value = error instanceof Error ? error.message : "保存失败，标签页已保留。";
+    closeError.value = error instanceof Error ? error.message : t("closeDialog.saveFailed");
   } finally {
     closeBusy.value = false;
   }
@@ -1996,7 +2022,7 @@ async function runActiveGraph() {
     };
     setFeedbackForTab(tab.tabId, {
       tone: "warning",
-      message: `Run ${response.run_id} queued. Pending ${Object.keys(document.nodes).length} nodes.`,
+      message: t("feedback.runQueued", { runId: response.run_id, pending: Object.keys(document.nodes).length, cycle: "" }),
       activeRunId: response.run_id,
       activeRunStatus: response.status,
       summary: {
@@ -2012,7 +2038,7 @@ async function runActiveGraph() {
   } catch (error) {
     setMessageFeedbackForTab(tab.tabId, {
       tone: "danger",
-      message: error instanceof Error ? error.message : "Failed to run graph.",
+      message: error instanceof Error ? error.message : t("feedback.runFailed", { runId: "" }),
     });
   }
 }
@@ -2050,7 +2076,7 @@ async function resumeHumanReviewRun(tabId: string, payload: Record<string, unkno
     };
     setMessageFeedbackForTab(tabId, {
       tone: "warning",
-      message: `Run ${response.run_id} resuming.`,
+      message: t("feedback.runResuming", { runId: response.run_id }),
       activeRunId: response.run_id,
       activeRunStatus: response.status,
     });
@@ -2058,7 +2084,7 @@ async function resumeHumanReviewRun(tabId: string, payload: Record<string, unkno
   } catch (error) {
     humanReviewErrorByTabId.value = {
       ...humanReviewErrorByTabId.value,
-      [tabId]: error instanceof Error ? error.message : "Failed to resume run.",
+      [tabId]: error instanceof Error ? error.message : t("humanReview.resumeFailed"),
     };
   } finally {
     humanReviewBusyByTabId.value = {

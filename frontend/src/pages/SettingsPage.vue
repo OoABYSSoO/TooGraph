@@ -2,19 +2,19 @@
   <AppShell>
     <section class="settings-page">
       <header class="settings-page__hero">
-        <div class="settings-page__eyebrow">Settings</div>
-        <h2 class="settings-page__title">系统设置</h2>
-        <p class="settings-page__body">这里先恢复旧前端最关键的设置逻辑：默认模型、Agent 运行默认值、Provider 摘要和工具列表。</p>
+        <div class="settings-page__eyebrow">{{ t("settings.eyebrow") }}</div>
+        <h2 class="settings-page__title">{{ t("settings.title") }}</h2>
+        <p class="settings-page__body">{{ t("settings.body") }}</p>
       </header>
 
-      <div v-if="error" class="settings-page__empty">加载失败：{{ error }}</div>
-      <div v-else-if="!settings || !draft" class="settings-page__empty">Loading settings…</div>
+      <div v-if="error" class="settings-page__empty">{{ t("common.failedToLoad", { error }) }}</div>
+      <div v-else-if="!settings || !draft" class="settings-page__empty">{{ t("common.loadingSettings") }}</div>
       <template v-else>
         <section class="settings-page__grid">
           <article class="settings-page__panel">
-            <h3>Default Runtime</h3>
+            <h3>{{ t("settings.defaultRuntime") }}</h3>
             <label>
-              <span>Default model</span>
+              <span>{{ t("settings.defaultModel") }}</span>
               <ElSelect
                 v-model="draft.text_model_ref"
                 class="settings-page__select graphite-select"
@@ -25,7 +25,7 @@
               </ElSelect>
             </label>
             <label>
-              <span>Default video model</span>
+              <span>{{ t("settings.defaultVideoModel") }}</span>
               <ElSelect
                 v-model="draft.video_model_ref"
                 class="settings-page__select graphite-select"
@@ -38,42 +38,42 @@
           </article>
 
           <article class="settings-page__panel">
-            <h3>Agent Runtime</h3>
+            <h3>{{ t("settings.agentRuntime") }}</h3>
             <label>
-              <span>Default thinking</span>
+              <span>{{ t("settings.defaultThinking") }}</span>
               <ElSelect
                 v-model="thinkingMode"
                 class="settings-page__select graphite-select"
                 :teleported="false"
                 popper-class="graphite-select-popper"
               >
-                <ElOption label="off" value="off" />
-                <ElOption label="on" value="on" />
+                <ElOption :label="t('common.off')" value="off" />
+                <ElOption :label="t('common.on')" value="on" />
               </ElSelect>
             </label>
             <label>
-              <span>Default temperature</span>
+              <span>{{ t("settings.defaultTemperature") }}</span>
               <input v-model.number="draft.temperature" type="number" min="0" max="2" step="0.1" />
             </label>
-            <div class="settings-page__hint">New agent nodes start from this default value. Existing nodes can still be changed per node.</div>
+            <div class="settings-page__hint">{{ t("settings.hint") }}</div>
             <div class="settings-page__actions">
               <button type="button" class="settings-page__button" :disabled="!isDirty || isSaving" @click="handleSave">
-                {{ isSaving ? "Saving…" : "Save Settings" }}
+                {{ isSaving ? t("settings.saving") : t("settings.saveSettings") }}
               </button>
               <span v-if="saveMessage" class="settings-page__save-message">{{ saveMessage }}</span>
             </div>
           </article>
 
           <article class="settings-page__panel">
-            <h3>Revision & Evaluator</h3>
-            <div class="settings-page__info"><span>Max revision rounds</span><strong>{{ settings.revision.max_revision_round }}</strong></div>
-            <div class="settings-page__info"><span>Threshold</span><strong>{{ settings.evaluator.default_score_threshold }}</strong></div>
-            <div class="settings-page__info"><span>Routes</span><strong>{{ settings.evaluator.routes.join(", ") }}</strong></div>
+            <h3>{{ t("settings.revisionEvaluator") }}</h3>
+            <div class="settings-page__info"><span>{{ t("settings.maxRevisionRounds") }}</span><strong>{{ settings.revision.max_revision_round }}</strong></div>
+            <div class="settings-page__info"><span>{{ t("settings.threshold") }}</span><strong>{{ settings.evaluator.default_score_threshold }}</strong></div>
+            <div class="settings-page__info"><span>{{ t("settings.routes") }}</span><strong>{{ settings.evaluator.routes.join(", ") }}</strong></div>
           </article>
         </section>
 
         <article class="settings-page__panel">
-          <h3>Model Providers</h3>
+          <h3>{{ t("settings.modelProviders") }}</h3>
           <div class="settings-page__providers">
             <div v-for="provider in settings.model_catalog?.providers ?? []" :key="provider.provider_id" class="settings-page__provider-card">
               <div class="settings-page__provider-header">
@@ -81,11 +81,11 @@
                 <div class="settings-page__badges">
                   <span>{{ provider.provider_id }}</span>
                   <span>{{ provider.transport }}</span>
-                  <span>{{ provider.configured ? "configured" : "planned" }}</span>
+                  <span>{{ provider.configured ? t("common.configured") : t("common.planned") }}</span>
                 </div>
               </div>
               <p>{{ provider.description }}</p>
-              <div class="settings-page__provider-url">Base URL: {{ provider.base_url }}</div>
+              <div class="settings-page__provider-url">{{ t("common.baseUrl") }}: {{ provider.base_url }}</div>
               <div class="settings-page__badges">
                 <span
                   v-for="modelLabel in listProviderModelBadges(provider, modelDisplayLookup)"
@@ -99,7 +99,7 @@
         </article>
 
         <article class="settings-page__panel">
-          <h3>Tools</h3>
+          <h3>{{ t("settings.tools") }}</h3>
           <div class="settings-page__badges">
             <span v-for="tool in settings.tools" :key="tool">{{ tool }}</span>
           </div>
@@ -112,6 +112,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { ElOption, ElSelect } from "element-plus";
+import { useI18n } from "vue-i18n";
 
 import { fetchSettings, updateSettings } from "@/api/settings";
 import AppShell from "@/layouts/AppShell.vue";
@@ -131,6 +132,7 @@ const draft = ref<SettingsDraft | null>(null);
 const error = ref<string | null>(null);
 const saveMessage = ref<string | null>(null);
 const isSaving = ref(false);
+const { t } = useI18n();
 
 function buildDraftFromSettings(payload: SettingsPayload): SettingsDraft {
   return {
@@ -221,7 +223,7 @@ async function loadSettings() {
     draft.value = buildDraftFromSettings(settings.value);
     error.value = null;
   } catch (fetchError) {
-    error.value = fetchError instanceof Error ? fetchError.message : "Failed to load settings.";
+    error.value = fetchError instanceof Error ? fetchError.message : t("common.loadingSettings");
   }
 }
 
@@ -244,10 +246,10 @@ async function handleSave() {
       },
     });
     draft.value = buildDraftFromSettings(settings.value);
-    saveMessage.value = "设置已保存。";
+    saveMessage.value = t("settings.saved");
     error.value = null;
   } catch (saveError) {
-    error.value = saveError instanceof Error ? saveError.message : "Failed to save settings.";
+    error.value = saveError instanceof Error ? saveError.message : t("settings.saved");
   } finally {
     isSaving.value = false;
   }

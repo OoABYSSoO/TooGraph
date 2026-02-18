@@ -10,18 +10,22 @@
   >
     <div class="editor-node-creation-menu__header">
       <div>
-        <div class="editor-node-creation-menu__eyebrow">Create Node</div>
+        <div class="editor-node-creation-menu__eyebrow">{{ t("nodeCreation.menuTitle") }}</div>
         <p class="editor-node-creation-menu__summary">
-          {{ context?.sourceValueType ? `Choose a node for ${context.sourceValueType} output` : "Choose a node to create" }}
+          {{
+            context?.sourceValueType
+              ? t("nodeCreation.chooseForType", { type: context.sourceValueType })
+              : t("nodeCreation.chooseAny")
+          }}
         </p>
       </div>
-      <button type="button" class="editor-node-creation-menu__close" @click="$emit('close')">Close</button>
+      <button type="button" class="editor-node-creation-menu__close" @click="$emit('close')">{{ t("common.close") }}</button>
     </div>
 
     <ElInput
       class="editor-node-creation-menu__search"
       :model-value="query"
-      placeholder="Search nodes and presets"
+      :placeholder="t('nodeCreation.search')"
       @update:model-value="$emit('update:query', String($event ?? ''))"
     />
 
@@ -37,7 +41,7 @@
         <strong>{{ entry.label }}</strong>
         <p>{{ entry.description }}</p>
       </button>
-      <div v-if="entries.length === 0" class="editor-node-creation-menu__empty">No matching nodes or presets.</div>
+      <div v-if="entries.length === 0" class="editor-node-creation-menu__empty">{{ t("nodeCreation.empty") }}</div>
     </div>
   </div>
 </template>
@@ -45,6 +49,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { ElInput } from "element-plus";
+import { useI18n } from "vue-i18n";
 
 import type { NodeCreationContext, NodeCreationEntry } from "@/types/node-system";
 
@@ -62,6 +67,7 @@ const emit = defineEmits<{
   (event: "close"): void;
 }>();
 
+const { t } = useI18n();
 const menuRef = ref<HTMLElement | null>(null);
 
 const menuStyle = computed(() => {

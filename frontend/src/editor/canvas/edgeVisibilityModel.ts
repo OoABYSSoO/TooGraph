@@ -1,4 +1,5 @@
 import type { ProjectedCanvasEdge } from "./edgeProjection.ts";
+import { translate } from "../../i18n/index.ts";
 
 export type EdgeVisibilityMode = "smart" | "data" | "flow" | "all";
 
@@ -8,28 +9,32 @@ export type EdgeVisibilityModeOption = {
   title: string;
 };
 
-export const EDGE_VISIBILITY_MODE_OPTIONS: EdgeVisibilityModeOption[] = [
-  {
-    mode: "smart",
-    label: "智能",
-    title: "默认只显示数据流线和条件分支线；悬浮或选中节点时显示相关线",
-  },
-  {
-    mode: "data",
-    label: "数据",
-    title: "只显示数据流线",
-  },
-  {
-    mode: "flow",
-    label: "顺序",
-    title: "只显示普通顺序流线和条件分支线",
-  },
-  {
-    mode: "all",
-    label: "全量",
-    title: "显示全部线条",
-  },
-];
+export function buildEdgeVisibilityModeOptions(): EdgeVisibilityModeOption[] {
+  return [
+    {
+      mode: "smart",
+      label: translate("edgeMode.smart"),
+      title: translate("edgeMode.smartTitle"),
+    },
+    {
+      mode: "data",
+      label: translate("edgeMode.data"),
+      title: translate("edgeMode.dataTitle"),
+    },
+    {
+      mode: "flow",
+      label: translate("edgeMode.sequence"),
+      title: translate("edgeMode.sequenceTitle"),
+    },
+    {
+      mode: "all",
+      label: translate("edgeMode.all"),
+      title: translate("edgeMode.allTitle"),
+    },
+  ];
+}
+
+export const EDGE_VISIBILITY_MODE_OPTIONS: EdgeVisibilityModeOption[] = buildEdgeVisibilityModeOptions();
 
 export function filterProjectedEdgesForVisibilityMode(
   edges: ProjectedCanvasEdge[],

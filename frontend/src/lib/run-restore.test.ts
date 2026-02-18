@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { reactive } from "vue";
 
 import type { RunDetail, RunSummary } from "@/types/run";
 
@@ -149,6 +150,30 @@ test("buildSnapshotScopedRun projects the selected snapshot into the run detail 
       }),
     ],
   });
+
+  const scoped = buildSnapshotScopedRun(run, "pause_1");
+
+  assert.equal(scoped.status, "awaiting_human");
+  assert.equal(scoped.current_node_id, "writer");
+  assert.equal(scoped.state_snapshot.values.answer, "draft");
+  assert.equal(scoped.final_result, "draft");
+});
+
+test("buildSnapshotScopedRun accepts Vue reactive run snapshots", () => {
+  const run = reactive(
+    createRunDetail({
+      status: "awaiting_human",
+      run_snapshots: [
+        createRunSnapshot("pause_1", "pause", "awaiting_human", {
+          current_node_id: "writer",
+          values: {
+            answer: "draft",
+          },
+          final_result: "draft",
+        }),
+      ],
+    }),
+  ) as RunDetail;
 
   const scoped = buildSnapshotScopedRun(run, "pause_1");
 

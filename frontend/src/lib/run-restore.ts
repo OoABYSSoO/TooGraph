@@ -1,4 +1,4 @@
-import { cloneGraphDocument } from "./graph-document.ts";
+import { cloneGraphDocument, clonePlainValue } from "./graph-document.ts";
 
 import type { GraphPayload } from "@/types/node-system";
 import type { RunDetail, RunSnapshot, RunSummary } from "@/types/run";
@@ -82,12 +82,12 @@ export function buildSnapshotScopedRun(run: RunDetail, snapshotId?: string | nul
     ...run,
     status: snapshot.status,
     current_node_id: snapshot.current_node_id ?? null,
-    checkpoint_metadata: structuredClone(snapshot.checkpoint_metadata ?? run.checkpoint_metadata),
-    state_snapshot: structuredClone(snapshot.state_snapshot),
-    graph_snapshot: structuredClone(snapshot.graph_snapshot),
-    artifacts: structuredClone(snapshot.artifacts),
-    node_status_map: structuredClone(snapshot.node_status_map),
-    output_previews: structuredClone(snapshot.output_previews),
+    checkpoint_metadata: clonePlainValue(snapshot.checkpoint_metadata ?? run.checkpoint_metadata),
+    state_snapshot: clonePlainValue(snapshot.state_snapshot),
+    graph_snapshot: clonePlainValue(snapshot.graph_snapshot),
+    artifacts: clonePlainValue(snapshot.artifacts),
+    node_status_map: clonePlainValue(snapshot.node_status_map),
+    output_previews: clonePlainValue(snapshot.output_previews),
     final_result: snapshot.final_result ?? run.final_result,
   };
 }
@@ -107,7 +107,7 @@ export function buildRestoredGraphFromRun(run: RunDetail, snapshotId?: string | 
     if (!stateDefinition) {
       continue;
     }
-    stateDefinition.value = structuredClone(value);
+    stateDefinition.value = clonePlainValue(value);
   }
 
   return restored;

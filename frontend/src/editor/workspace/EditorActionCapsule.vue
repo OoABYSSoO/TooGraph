@@ -1,23 +1,23 @@
 <template>
   <div class="editor-action-capsule">
     <div class="editor-action-capsule__tools">
-      <ElTooltip content="保存图" placement="bottom">
-        <button type="button" class="editor-action-capsule__icon-button" aria-label="保存图" @click="$emit('save-active-graph')">
+      <ElTooltip :content="t('editor.saveGraph')" placement="bottom">
+        <button type="button" class="editor-action-capsule__icon-button" :aria-label="t('editor.saveGraph')" @click="$emit('save-active-graph')">
           <ElIcon aria-hidden="true"><CollectionTag /></ElIcon>
         </button>
       </ElTooltip>
-      <ElTooltip content="校验图" placement="bottom">
-        <button type="button" class="editor-action-capsule__icon-button" aria-label="校验图" @click="$emit('validate-active-graph')">
+      <ElTooltip :content="t('editor.validateGraph')" placement="bottom">
+        <button type="button" class="editor-action-capsule__icon-button" :aria-label="t('editor.validateGraph')" @click="$emit('validate-active-graph')">
           <ElIcon aria-hidden="true"><CircleCheck /></ElIcon>
         </button>
       </ElTooltip>
-      <ElTooltip content="导入 Python 图" placement="bottom">
-        <button type="button" class="editor-action-capsule__icon-button" aria-label="导入 Python 图" @click="$emit('import-python-graph')">
+      <ElTooltip :content="t('editor.importPythonGraph')" placement="bottom">
+        <button type="button" class="editor-action-capsule__icon-button" :aria-label="t('editor.importPythonGraph')" @click="$emit('import-python-graph')">
           <ElIcon aria-hidden="true"><Upload /></ElIcon>
         </button>
       </ElTooltip>
-      <ElTooltip content="导出 Python 图" placement="bottom">
-        <button type="button" class="editor-action-capsule__icon-button" aria-label="导出 Python 图" @click="$emit('export-active-graph')">
+      <ElTooltip :content="t('editor.exportPythonGraph')" placement="bottom">
+        <button type="button" class="editor-action-capsule__icon-button" :aria-label="t('editor.exportPythonGraph')" @click="$emit('export-active-graph')">
           <ElIcon aria-hidden="true"><Download /></ElIcon>
         </button>
       </ElTooltip>
@@ -29,17 +29,21 @@
       :class="{ 'editor-action-capsule__state-pill--active': isStatePanelOpen }"
       @click="$emit('toggle-state-panel')"
     >
-      <span>State</span>
+      <span>{{ t("editor.statePanel") }}</span>
       <span class="editor-action-capsule__state-count">{{ activeStateCount }}</span>
     </button>
 
-    <button type="button" class="editor-action-capsule__run" @click="$emit('run-active-graph')">Run</button>
+    <button type="button" class="editor-action-capsule__run" @click="$emit('run-active-graph')">
+      <ElIcon class="editor-action-capsule__run-icon" aria-hidden="true"><VideoPlay /></ElIcon>
+      <span>{{ t("editor.runGraph") }}</span>
+    </button>
   </div>
 </template>
 
 <script setup lang="ts">
-import { CircleCheck, CollectionTag, Download, Upload } from "@element-plus/icons-vue";
+import { CircleCheck, CollectionTag, Download, Upload, VideoPlay } from "@element-plus/icons-vue";
 import { ElIcon, ElTooltip } from "element-plus";
+import { useI18n } from "vue-i18n";
 
 defineProps<{
   activeStateCount: number;
@@ -54,6 +58,8 @@ defineEmits<{
   (event: "export-active-graph"): void;
   (event: "run-active-graph"): void;
 }>();
+
+const { t } = useI18n();
 </script>
 
 <style scoped>
@@ -144,12 +150,19 @@ defineEmits<{
 }
 
 .editor-action-capsule__run {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   border: 1px solid rgba(154, 52, 18, 0.9);
   background: rgba(154, 52, 18, 0.92);
   color: rgba(255, 250, 242, 0.98);
   padding: 0 16px;
   font-weight: 700;
   cursor: pointer;
+}
+
+.editor-action-capsule__run-icon {
+  font-size: 0.95rem;
 }
 
 .editor-action-capsule__icon-button:hover {

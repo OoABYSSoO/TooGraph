@@ -217,6 +217,7 @@ test("EditorTabBar lets the plus launcher popover use the panel glass surface in
 test("EditorTabBar closes the plus launcher popover after a terminal launcher action", () => {
   assert.match(componentSource, /<ElPopover[\s\S]*v-model:visible="launcherPopoverOpen"[\s\S]*trigger="click"/);
   assert.match(componentSource, /const launcherPopoverOpen = ref\(false\);/);
+  assert.match(componentSource, /<EditorTabLauncherPanel[\s\S]*:open="launcherPopoverOpen"/);
   assert.match(componentSource, /@create-new="handleLauncherCreateNew"/);
   assert.match(componentSource, /@create-from-template="handleLauncherCreateFromTemplate"/);
   assert.match(componentSource, /@open-graph="handleLauncherOpenGraph"/);

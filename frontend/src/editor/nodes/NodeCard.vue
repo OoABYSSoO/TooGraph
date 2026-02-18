@@ -24,7 +24,7 @@
         class="node-card__human-review-button"
         @click.stop="handleHumanReviewActionClick"
       >
-        Human Review
+        {{ t("nodeCard.humanReview") }}
       </ElButton>
       <ElPopover
         v-if="hasAdvancedSettings"
@@ -41,10 +41,10 @@
           </ElButton>
         </template>
         <div class="node-card__top-popover" data-node-popup-surface="true">
-          <div class="node-card__top-popover-title">Advanced</div>
+          <div class="node-card__top-popover-title">{{ t("nodeCard.advanced") }}</div>
           <div v-if="view.body.kind === 'agent'" class="node-card__advanced-popover-content">
             <label class="node-card__control-row">
-              <span class="node-card__control-label">Temperature</span>
+              <span class="node-card__control-label">{{ t("nodeCard.temperature") }}</span>
               <ElInput
                 :model-value="agentTemperatureInput"
                 type="number"
@@ -53,21 +53,21 @@
               />
             </label>
             <label class="node-card__control-row">
-              <span class="node-card__control-label">Breakpoint</span>
+              <span class="node-card__control-label">{{ t("nodeCard.breakpoint") }}</span>
               <ElSelect
                 class="node-card__breakpoint-timing-select graphite-select"
                 :model-value="agentBreakpointTimingValue"
                 popper-class="graphite-select-popper node-card__breakpoint-timing-popper"
                 @update:model-value="handleAgentBreakpointTimingSelect"
               >
-                <ElOption label="Run after" value="after" />
-                <ElOption label="Run before" value="before" />
+                <ElOption :label="t('nodeCard.runAfter')" value="after" />
+                <ElOption :label="t('nodeCard.runBefore')" value="before" />
               </ElSelect>
             </label>
           </div>
           <div v-else-if="view.body.kind === 'output'" class="node-card__advanced-popover-content">
             <div class="node-card__control-row">
-              <span class="node-card__control-label">Display</span>
+              <span class="node-card__control-label">{{ t("nodeCard.display") }}</span>
               <div class="node-card__control-list">
                 <button
                   v-for="option in outputDisplayModeOptions"
@@ -83,7 +83,7 @@
               </div>
             </div>
             <div class="node-card__control-row">
-              <span class="node-card__control-label">Format</span>
+              <span class="node-card__control-label">{{ t("nodeCard.format") }}</span>
               <div class="node-card__control-list">
                 <button
                   v-for="option in outputPersistFormatOptions"
@@ -99,10 +99,10 @@
               </div>
             </div>
             <label class="node-card__control-row">
-              <span class="node-card__control-label">FileName</span>
+              <span class="node-card__control-label">{{ t("nodeCard.fileName") }}</span>
               <ElInput
                 :model-value="view.body.fileNameTemplate"
-                :placeholder="view.title || 'Output'"
+                :placeholder="view.title || t('nodeCard.outputFallback')"
                 @update:model-value="handleOutputFileNameInputValue"
               />
             </label>
@@ -129,7 +129,7 @@
             <ElIcon v-else><CollectionTag /></ElIcon>
           </ElButton>
         </template>
-        <div class="node-card__confirm-hint node-card__confirm-hint--preset">Save preset?</div>
+        <div class="node-card__confirm-hint node-card__confirm-hint--preset">{{ t("nodeCard.savePresetQuestion") }}</div>
       </ElPopover>
       <ElPopover
         :visible="activeTopAction === 'delete'"
@@ -150,7 +150,7 @@
             <ElIcon v-else><Delete /></ElIcon>
           </ElButton>
         </template>
-        <div class="node-card__confirm-hint node-card__confirm-hint--delete">Delete node?</div>
+        <div class="node-card__confirm-hint node-card__confirm-hint--delete">{{ t("nodeCard.deleteNodeQuestion") }}</div>
       </ElPopover>
     </div>
     <header class="node-card__header">
@@ -184,7 +184,7 @@
             </span>
           </span>
         </template>
-        <div v-if="isTextEditorConfirmOpen('title')" class="node-card__confirm-hint node-card__confirm-hint--text">Edit name?</div>
+        <div v-if="isTextEditorConfirmOpen('title')" class="node-card__confirm-hint node-card__confirm-hint--text">{{ t("nodeCard.editNameQuestion") }}</div>
         <div v-else-if="isTextEditorOpen('title')" class="node-card__text-editor" data-node-popup-surface="true">
           <div class="node-card__text-editor-title">{{ textEditorTitle('title') }}</div>
           <ElInput
@@ -227,7 +227,7 @@
           </div>
         </div>
       </template>
-      <div v-if="isTextEditorConfirmOpen('description')" class="node-card__confirm-hint node-card__confirm-hint--text">Edit description?</div>
+      <div v-if="isTextEditorConfirmOpen('description')" class="node-card__confirm-hint node-card__confirm-hint--text">{{ t("nodeCard.editDescriptionQuestion") }}</div>
       <div v-else-if="isTextEditorOpen('description')" class="node-card__text-editor" data-node-popup-surface="true">
         <div class="node-card__text-editor-title">{{ textEditorTitle('description') }}</div>
         <ElInput
@@ -249,7 +249,7 @@
           class="node-card__input-boundary-toggle"
           :model-value="inputBoundarySelection"
           :options="inputTypeOptions"
-          aria-label="Input boundary mode"
+          :aria-label="t('nodeCard.inputBoundaryMode')"
           :disabled="Boolean(inputAssetEnvelope)"
           @pointerdown.stop
           @click.stop
@@ -307,13 +307,13 @@
               v-if="isRemovePortStateConfirmOpen(`input-primary-output:${view.body.primaryOutput.key}`)"
               class="node-card__confirm-hint node-card__confirm-hint--remove"
             >
-              Remove state?
+              {{ t("nodeCard.removeStateQuestion") }}
             </div>
             <div
               v-else-if="isStateEditorConfirmOpen(`input-primary-output:${view.body.primaryOutput.key}`)"
               class="node-card__confirm-hint node-card__confirm-hint--state"
             >
-              Edit state?
+              {{ t("nodeCard.editStateQuestion") }}
             </div>
             <StateEditorPopover
               v-else-if="stateEditorDraft"
@@ -333,11 +333,11 @@
       </div>
       <div v-if="showKnowledgeBaseInput" class="node-card__surface node-card__input-picker">
         <label class="node-card__control-row">
-          <span class="node-card__control-label">Knowledge Base</span>
+          <span class="node-card__control-label">{{ t("nodeCard.knowledgeBase") }}</span>
           <ElSelect
             class="node-card__control-select node-card__input-select graphite-select"
             :model-value="inputKnowledgeBaseValue || undefined"
-            :placeholder="inputKnowledgeBaseOptions.length === 0 ? 'No knowledge bases found' : 'Select knowledge base'"
+            :placeholder="inputKnowledgeBaseOptions.length === 0 ? t('nodeCard.noKnowledgeBases') : t('nodeCard.selectKnowledgeBase')"
             :disabled="inputKnowledgeBaseOptions.length === 0"
             :teleported="false"
             popper-class="graphite-select-popper"
@@ -430,19 +430,19 @@
           </div>
         </div>
         <div v-if="showLegacyUploadedAssetHint" class="node-card__input-meta">
-          Current value is raw text. Uploading a file will replace it with an uploaded asset envelope.
+          {{ t("nodeCard.rawTextUploadHint") }}
         </div>
       </div>
       <textarea
         v-else-if="isInputValueEditable"
         class="node-card__surface node-card__surface-textarea"
         :value="inputValueText"
-        placeholder="Enter input value"
+        :placeholder="t('nodeCard.enterInputValue')"
         @pointerdown.stop
         @click.stop
         @input="handleInputValueInput"
       />
-      <div v-else class="node-card__surface node-card__surface--tall">{{ view.body.valueText || "Empty input" }}</div>
+      <div v-else class="node-card__surface node-card__surface--tall">{{ view.body.valueText || t("nodeCard.emptyInput") }}</div>
     </section>
 
     <section v-else-if="view.body.kind === 'agent'" class="node-card__body node-card__body--agent">
@@ -494,7 +494,7 @@
                     type="button"
                     class="node-card__port-pill-remove node-card__port-pill-remove--trailing"
                     :class="{ 'node-card__port-pill-remove--confirm': isRemovePortStateConfirmOpen(`agent-input:${port.key}`) }"
-                    aria-label="Remove state binding"
+                    :aria-label="t('nodeCard.removeStateBinding')"
                     @pointerdown.stop
                     @click.stop="handleRemovePortStateClick(`agent-input:${port.key}`, 'input', port.key)"
                   >
@@ -503,8 +503,8 @@
                   </button>
                 </span>
               </template>
-              <div v-if="isRemovePortStateConfirmOpen(`agent-input:${port.key}`)" class="node-card__confirm-hint node-card__confirm-hint--remove">Remove state?</div>
-              <div v-else-if="isStateEditorConfirmOpen(`agent-input:${port.key}`)" class="node-card__confirm-hint node-card__confirm-hint--state">Edit state?</div>
+              <div v-if="isRemovePortStateConfirmOpen(`agent-input:${port.key}`)" class="node-card__confirm-hint node-card__confirm-hint--remove">{{ t("nodeCard.removeStateQuestion") }}</div>
+              <div v-else-if="isStateEditorConfirmOpen(`agent-input:${port.key}`)" class="node-card__confirm-hint node-card__confirm-hint--state">{{ t("nodeCard.editStateQuestion") }}</div>
               <StateEditorPopover
                 v-else-if="stateEditorDraft"
                 class="node-card__state-editor"
@@ -532,7 +532,7 @@
                 :data-anchor-slot-id="`${nodeId}:state-in:${CREATE_AGENT_INPUT_STATE_KEY}`"
                 aria-hidden="true"
               />
-              <span class="node-card__port-pill-create-badge">NEW</span>
+              <span class="node-card__port-pill-create-badge">{{ t("common.new") }}</span>
               <span class="node-card__port-pill-label">
                 <span class="node-card__port-pill-label-text">{{ pendingStateInputSource.label }}</span>
               </span>
@@ -571,7 +571,7 @@
                     type="button"
                     class="node-card__port-pill-remove node-card__port-pill-remove--leading"
                     :class="{ 'node-card__port-pill-remove--confirm': isRemovePortStateConfirmOpen(`agent-output:${port.key}`) }"
-                    aria-label="Remove state binding"
+                    :aria-label="t('nodeCard.removeStateBinding')"
                     @pointerdown.stop
                     @click.stop="handleRemovePortStateClick(`agent-output:${port.key}`, 'output', port.key)"
                   >
@@ -592,8 +592,8 @@
                   />
               </span>
             </template>
-              <div v-if="isRemovePortStateConfirmOpen(`agent-output:${port.key}`)" class="node-card__confirm-hint node-card__confirm-hint--remove">Remove state?</div>
-              <div v-else-if="isStateEditorConfirmOpen(`agent-output:${port.key}`)" class="node-card__confirm-hint node-card__confirm-hint--state">Edit state?</div>
+              <div v-if="isRemovePortStateConfirmOpen(`agent-output:${port.key}`)" class="node-card__confirm-hint node-card__confirm-hint--remove">{{ t("nodeCard.removeStateQuestion") }}</div>
+              <div v-else-if="isStateEditorConfirmOpen(`agent-output:${port.key}`)" class="node-card__confirm-hint node-card__confirm-hint--state">{{ t("nodeCard.editStateQuestion") }}</div>
               <StateEditorPopover
                 v-else-if="stateEditorDraft"
                 class="node-card__state-editor"
@@ -617,7 +617,7 @@
             ref="agentModelSelectRef"
             class="node-card__agent-model-select graphite-select"
             :model-value="agentResolvedModelValue || undefined"
-            :placeholder="agentModelOptions.length === 0 ? 'No configured models' : 'Select model'"
+            :placeholder="agentModelOptions.length === 0 ? t('nodeCard.noConfiguredModels') : t('nodeCard.selectModel')"
             :disabled="agentModelOptions.length === 0"
             popper-class="graphite-select-popper node-card__agent-model-popper"
             @update:model-value="handleAgentModelValueChange"
@@ -625,7 +625,7 @@
             <ElOption
               v-for="option in agentModelOptions"
               :key="option.value"
-              :label="option.value === trimmedGlobalTextModelRef ? `${option.label} (Global)` : option.label"
+              :label="option.value === trimmedGlobalTextModelRef ? `${option.label} (${t('nodeCard.globalModelSuffix')})` : option.label"
               :value="option.value"
             />
           </ElSelect>
@@ -658,14 +658,14 @@
                 inline-prompt
                 active-text="ON"
                 inactive-text="OFF"
-                aria-label="Toggle thinking mode"
+                :aria-label="t('nodeCard.toggleThinking')"
                 @pointerdown.stop
                 @click.stop
                 @update:model-value="handleAgentThinkingToggle"
               />
             </div>
           </template>
-          <div class="node-card__confirm-hint node-card__confirm-hint--toggle">思考模式</div>
+          <div class="node-card__confirm-hint node-card__confirm-hint--toggle">{{ t("nodeCard.thinkingMode") }}</div>
         </ElPopover>
         <ElPopover
           trigger="hover"
@@ -694,14 +694,14 @@
                 inline-prompt
                 active-text="ON"
                 inactive-text="OFF"
-                aria-label="Toggle breakpoint"
+                :aria-label="t('nodeCard.toggleBreakpoint')"
                 @pointerdown.stop
                 @click.stop
                 @update:model-value="handleAgentBreakpointToggleValue"
               />
             </div>
           </template>
-          <div class="node-card__confirm-hint node-card__confirm-hint--toggle">设置断点</div>
+          <div class="node-card__confirm-hint node-card__confirm-hint--toggle">{{ t("nodeCard.setBreakpoint") }}</div>
         </ElPopover>
       </div>
       <div class="node-card__action-row">
@@ -725,16 +725,16 @@
             </button>
           </template>
           <div class="node-card__agent-add-popover node-card__skill-picker" data-node-popup-surface="true" @pointerdown.stop @click.stop>
-            <div class="node-card__skill-picker-title">Add Skill</div>
-            <div class="node-card__skill-picker-copy">这里只负责附加已有 skill，不在编排界面里编辑 skill 内容。</div>
+            <div class="node-card__skill-picker-title">{{ t("nodeCard.addSkill") }}</div>
+            <div class="node-card__skill-picker-copy">{{ t("nodeCard.skillCopy") }}</div>
             <div v-if="skillDefinitionsLoading" class="node-card__skill-panel-message">
-              Loading skills...
+              {{ t("nodeCard.loadingSkills") }}
             </div>
             <div v-else-if="skillDefinitionsError" class="node-card__skill-panel-message node-card__skill-panel-message--error">
               {{ skillDefinitionsError }}
             </div>
             <div v-else-if="availableSkillDefinitions.length === 0" class="node-card__skill-panel-message">
-              No available skills to attach.
+              {{ t("nodeCard.noSkills") }}
             </div>
             <button
               v-for="definition in availableSkillDefinitions"
@@ -748,8 +748,8 @@
               <div class="node-card__skill-option-title">{{ definition.label }}</div>
               <div class="node-card__skill-option-copy">{{ definition.description }}</div>
               <div class="node-card__skill-option-meta">
-                <span v-if="definition.inputSchema.length > 0">In {{ definition.inputSchema.length }}</span>
-                <span v-if="definition.outputSchema.length > 0">Out {{ definition.outputSchema.length }}</span>
+                <span v-if="definition.inputSchema.length > 0">{{ t("nodeCard.inputCount", { count: definition.inputSchema.length }) }}</span>
+                <span v-if="definition.outputSchema.length > 0">{{ t("nodeCard.outputCount", { count: definition.outputSchema.length }) }}</span>
               </div>
             </button>
           </div>
@@ -787,23 +787,23 @@
             <div v-if="portStateDraft" class="node-card__port-picker-form">
               <div class="node-card__port-picker-grid">
                 <label class="node-card__control-row">
-                  <span class="node-card__control-label">Key</span>
+                  <span class="node-card__control-label">{{ t("nodeCard.key") }}</span>
                   <ElInput
-                    aria-label="Key"
+                    :aria-label="t('nodeCard.key')"
                     :model-value="portStateDraft.key"
                     @update:model-value="handlePortDraftKeyValue"
                   />
                 </label>
                 <label class="node-card__control-row">
-                  <span class="node-card__control-label">Name</span>
+                  <span class="node-card__control-label">{{ t("nodeCard.name") }}</span>
                   <ElInput
-                    aria-label="Name"
+                    :aria-label="t('nodeCard.name')"
                     :model-value="portStateDraft.definition.name"
                     @update:model-value="handlePortDraftNameValue"
                   />
                 </label>
                 <label class="node-card__control-row">
-                  <span class="node-card__control-label">Type</span>
+                  <span class="node-card__control-label">{{ t("nodeCard.type") }}</span>
                   <ElSelect
                     ref="portDraftTypeSelectRef"
                     class="node-card__control-select graphite-select"
@@ -816,7 +816,7 @@
                   </ElSelect>
                 </label>
                 <label class="node-card__control-row">
-                  <span class="node-card__control-label">Color</span>
+                  <span class="node-card__control-label">{{ t("nodeCard.color") }}</span>
                   <ElSelect
                     ref="portDraftColorSelectRef"
                     class="node-card__control-select graphite-select"
@@ -840,9 +840,9 @@
                 </label>
               </div>
               <label class="node-card__control-row">
-                <span class="node-card__control-label">Description</span>
+                <span class="node-card__control-label">{{ t("nodeCard.description") }}</span>
                 <ElInput
-                  aria-label="Description"
+                  :aria-label="t('nodeCard.description')"
                   type="textarea"
                   :rows="2"
                   :model-value="portStateDraft.definition.description"
@@ -854,7 +854,7 @@
                 @update-value="updatePortDraftValue"
               />
               <div class="node-card__port-picker-hint" :class="{ 'node-card__port-picker-hint--error': Boolean(portStateError) }">
-                {{ portStateError ?? "Create the state and bind this port to it immediately." }}
+                {{ portStateError ?? t("nodeCard.createStateBindHint") }}
               </div>
               <div class="node-card__port-picker-actions">
                 <button
@@ -863,7 +863,7 @@
                   @pointerdown.stop
                   @click.stop="backPortDraft"
                 >
-                  Back
+                  {{ t("nodeCard.back") }}
                 </button>
                 <button
                   type="button"
@@ -871,7 +871,7 @@
                   @pointerdown.stop
                   @click.stop="commitPortStateCreate"
                 >
-                  Create
+                  {{ t("nodeCard.create") }}
                 </button>
               </div>
             </div>
@@ -879,7 +879,7 @@
               <ElInput
                 class="node-card__port-picker-search"
                 :model-value="portStateSearch"
-                :placeholder="activePortPickerSide === 'input' ? 'Search or create input state' : 'Search or create output state'"
+                :placeholder="activePortPickerSide === 'input' ? t('nodeCard.searchInputState') : t('nodeCard.searchOutputState')"
                 @update:model-value="handlePortStateSearchValue"
               />
               <button
@@ -889,8 +889,8 @@
                 @pointerdown.stop
                 @click.stop="beginPortStateCreate"
               >
-                <span class="node-card__port-create-label">Create</span>
-                <span class="node-card__port-create-title">新增 “{{ portStateSearch.trim() }}”</span>
+                <span class="node-card__port-create-label">{{ t("nodeCard.create") }}</span>
+                <span class="node-card__port-create-title">{{ t("nodeCard.createStateNamed", { name: portStateSearch.trim() }) }}</span>
               </button>
               <button
                 v-for="stateRow in portPickerMatchingStates"
@@ -911,7 +911,7 @@
                   @pointerdown.stop
                   @click.stop="closePortPicker"
                 >
-                  Cancel
+                  {{ t("common.cancel") }}
                 </button>
               </div>
             </div>
@@ -929,7 +929,7 @@
           <button
             type="button"
             class="node-card__skill-badge-remove"
-            title="Remove skill"
+            :title="t('nodeCard.removeSkill')"
             @pointerdown.stop
             @click.stop="removeAgentSkill(badge.skillKey)"
           >
@@ -940,7 +940,7 @@
       <textarea
         class="node-card__surface node-card__surface-textarea"
         :value="view.body.taskInstruction"
-        placeholder="Describe what this node should do"
+        :placeholder="t('nodeCard.nodePromptPlaceholder')"
         @pointerdown.stop
         @click.stop
         @input="handleAgentTaskInstructionInput"
@@ -987,7 +987,7 @@
               </span>
             </span>
           </template>
-          <div v-if="isStateEditorConfirmOpen(`output-input:${view.body.primaryInput.key}`)" class="node-card__confirm-hint node-card__confirm-hint--state">Edit state?</div>
+          <div v-if="isStateEditorConfirmOpen(`output-input:${view.body.primaryInput.key}`)" class="node-card__confirm-hint node-card__confirm-hint--state">{{ t("nodeCard.editStateQuestion") }}</div>
           <StateEditorPopover
             v-else-if="stateEditorDraft"
             class="node-card__state-editor"
@@ -1002,7 +1002,7 @@
             @update:description="handleStateEditorDescriptionInput"
           />
         </ElPopover>
-        <span v-else class="node-card__port-label">Unbound</span>
+        <span v-else class="node-card__port-label">{{ t("nodeCard.unbound") }}</span>
         <div class="node-card__output-persist-card">
           <span
             class="node-card__output-persist-icon"
@@ -1018,7 +1018,7 @@
             inline-prompt
             active-text="ON"
             inactive-text="OFF"
-            aria-label="Toggle output persistence"
+            :aria-label="t('nodeCard.toggleOutputPersistence')"
             @pointerdown.stop
             @click.stop
             @update:model-value="handleOutputPersistToggle"
@@ -1053,7 +1053,7 @@
       <div class="node-card__surface node-card__surface--condition">
         <div class="node-card__condition-panel">
           <div class="node-card__condition-source-row">
-            <span class="node-card__control-label">Source</span>
+            <span class="node-card__control-label">{{ t("nodeCard.source") }}</span>
             <div v-if="view.body.primaryInput" class="node-card__port-pill-row node-card__port-pill-row--condition-source">
               <ElPopover
                 :visible="
@@ -1100,7 +1100,7 @@
                       type="button"
                       class="node-card__port-pill-remove node-card__port-pill-remove--trailing"
                       :class="{ 'node-card__port-pill-remove--confirm': isRemovePortStateConfirmOpen(`condition-input:${view.body.primaryInput.key}`) }"
-                      aria-label="Remove source binding"
+                      :aria-label="t('nodeCard.removeSourceBinding')"
                       @pointerdown.stop
                       @click.stop="handleRemovePortStateClick(`condition-input:${view.body.primaryInput.key}`, 'input', view.body.primaryInput.key)"
                     >
@@ -1109,8 +1109,8 @@
                     </button>
                   </span>
                 </template>
-                <div v-if="isRemovePortStateConfirmOpen(`condition-input:${view.body.primaryInput.key}`)" class="node-card__confirm-hint node-card__confirm-hint--remove">Remove state?</div>
-                <div v-else-if="isStateEditorConfirmOpen(`condition-input:${view.body.primaryInput.key}`)" class="node-card__confirm-hint node-card__confirm-hint--state">Edit state?</div>
+                <div v-if="isRemovePortStateConfirmOpen(`condition-input:${view.body.primaryInput.key}`)" class="node-card__confirm-hint node-card__confirm-hint--remove">{{ t("nodeCard.removeStateQuestion") }}</div>
+                <div v-else-if="isStateEditorConfirmOpen(`condition-input:${view.body.primaryInput.key}`)" class="node-card__confirm-hint node-card__confirm-hint--state">{{ t("nodeCard.editStateQuestion") }}</div>
                 <StateEditorPopover
                   v-else-if="stateEditorDraft"
                   class="node-card__state-editor"
@@ -1126,11 +1126,11 @@
                 />
               </ElPopover>
             </div>
-            <div v-else class="node-card__condition-source-empty">Connect source state</div>
+            <div v-else class="node-card__condition-source-empty">{{ t("nodeCard.connectSourceState") }}</div>
           </div>
           <div class="node-card__condition-controls-row">
             <label class="node-card__control-row">
-              <span class="node-card__control-label">Operator</span>
+              <span class="node-card__control-label">{{ t("nodeCard.operator") }}</span>
               <ElSelect
                 class="node-card__control-select node-card__condition-operator-select graphite-select"
                 :model-value="node.kind === 'condition' ? node.config.rule.operator : ''"
@@ -1145,7 +1145,7 @@
               </ElSelect>
             </label>
             <label class="node-card__control-row">
-              <span class="node-card__control-label">Value</span>
+              <span class="node-card__control-label">{{ t("nodeCard.value") }}</span>
               <input
                 class="node-card__control-input"
                 type="text"
@@ -1160,7 +1160,7 @@
               />
             </label>
             <label class="node-card__control-row">
-              <span class="node-card__control-label">Max loops</span>
+              <span class="node-card__control-label">{{ t("nodeCard.maxLoops") }}</span>
               <input
                 class="node-card__loop-input node-card__loop-input--condition"
                 type="number"
@@ -1196,6 +1196,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { ElButton, ElIcon, ElInput, ElOption, ElPopover, ElSelect } from "element-plus";
 import { Check, Collection, CollectionTag, Delete, Document, DocumentChecked, Flag, FolderOpened, Operation, Opportunity } from "@element-plus/icons-vue";
+import { useI18n } from "vue-i18n";
 
 import StateDefaultValueEditor from "@/editor/workspace/StateDefaultValueEditor.vue";
 import StateEditorPopover from "./StateEditorPopover.vue";
@@ -1276,6 +1277,8 @@ const emit = defineEmits<{
   (event: "locked-edit-attempt"): void;
 }>();
 
+const { t } = useI18n();
+
 const outputDisplayModeOptions: Array<{ value: OutputNode["config"]["displayMode"]; label: string }> = [
   { value: "auto", label: "AUTO" },
   { value: "plain", label: "PLAIN" },
@@ -1288,15 +1291,15 @@ const outputPersistFormatOptions: Array<{ value: OutputNode["config"]["persistFo
   { value: "md", label: "MD" },
   { value: "json", label: "JSON" },
 ];
-const inputTypeOptions: Array<{
+const inputTypeOptions = computed<Array<{
   value: "text" | "file" | "knowledge_base";
   label: string;
   icon: typeof Document;
-}> = [
-  { value: "text", label: "Text", icon: Document },
-  { value: "file", label: "File", icon: FolderOpened },
-  { value: "knowledge_base", label: "Knowledge Base", icon: Collection },
-];
+}>>(() => [
+  { value: "text", label: t("nodeCard.inputTypeText"), icon: Document },
+  { value: "file", label: t("nodeCard.inputTypeFile"), icon: FolderOpened },
+  { value: "knowledge_base", label: t("nodeCard.inputTypeKnowledgeBase"), icon: Collection },
+]);
 const confirmPopoverStyle = {
   padding: "0",
   border: "none",
@@ -1517,9 +1520,9 @@ const selectedKnowledgeBaseDescription = computed(() => {
     return selectedOption.description;
   }
   if (inputKnowledgeBaseOptions.value.length === 0) {
-    return "Import or sync knowledge bases to make this input selectable.";
+    return t("nodeCard.importKnowledgeHint");
   }
-  return "Pick the knowledge base that should ground this workflow.";
+  return t("nodeCard.pickKnowledgeHint");
 });
 const trimmedGlobalTextModelRef = computed(() => props.globalTextModelRef.trim());
 const agentResolvedModelValue = computed(() => {
@@ -1567,9 +1570,9 @@ const portPickerTitle = computed(() => {
     return "";
   }
   if (portStateDraft.value) {
-    return activePortPickerSide.value === "input" ? "Create Input State" : "Create Output State";
+    return activePortPickerSide.value === "input" ? t("nodeCard.createInputState") : t("nodeCard.createOutputState");
   }
-  return activePortPickerSide.value === "input" ? "Select Input State" : "Select Output State";
+  return activePortPickerSide.value === "input" ? t("nodeCard.selectInputState") : t("nodeCard.selectOutputState");
 });
 const conditionRuleValueDisabled = computed(
   () => props.node.kind === "condition" && props.node.config.rule.operator === "exists",
@@ -2148,11 +2151,11 @@ function commitPortStateCreate() {
   const nextKey = portStateDraft.value.key.trim();
   const nextName = portStateDraft.value.definition.name.trim() || nextKey;
   if (!nextKey) {
-    portStateError.value = "State key cannot be empty.";
+    portStateError.value = t("nodeCard.stateKeyEmpty");
     return;
   }
   if (props.stateSchema[nextKey]) {
-    portStateError.value = `State key '${nextKey}' already exists.`;
+    portStateError.value = t("nodeCard.stateKeyExists", { key: nextKey });
     return;
   }
 
@@ -2561,11 +2564,11 @@ function syncStateEditorDraft(nextDraft: StateFieldDraft, options?: { allowInval
   const currentStateKey = currentAnchorId.split(":").at(-1) ?? "";
   const nextKey = nextDraft.key.trim();
   if (!nextKey) {
-    stateEditorError.value = "State key cannot be empty.";
+    stateEditorError.value = t("nodeCard.stateKeyEmpty");
     return;
   }
   if (nextKey !== currentStateKey && props.stateSchema[nextKey]) {
-    stateEditorError.value = `State key '${nextKey}' already exists.`;
+    stateEditorError.value = t("nodeCard.stateKeyExists", { key: nextKey });
     return;
   }
 

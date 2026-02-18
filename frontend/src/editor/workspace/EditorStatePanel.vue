@@ -3,36 +3,36 @@
     <div class="editor-state-panel__surface">
       <header class="editor-state-panel__inspector-header">
         <div>
-          <div class="editor-state-panel__eyebrow">Graph State</div>
-          <h2 class="editor-state-panel__title">Graph Inspector</h2>
-          <p class="editor-state-panel__body">Track state objects, bindings, and defaults in one compact panel.</p>
+          <div class="editor-state-panel__eyebrow">{{ t("statePanel.eyebrow") }}</div>
+          <h2 class="editor-state-panel__title">{{ t("statePanel.title") }}</h2>
+          <p class="editor-state-panel__body">{{ t("statePanel.body") }}</p>
         </div>
         <div class="editor-state-panel__header-tools">
           <span class="editor-state-panel__header-count">{{ view.count }}</span>
-          <button type="button" class="editor-state-panel__collapse" aria-label="Collapse state panel" @click="$emit('toggle')">
+          <button type="button" class="editor-state-panel__collapse" :aria-label="t('statePanel.collapse')" @click="$emit('toggle')">
             <ElIcon class="editor-state-panel__collapse-icon" aria-hidden="true"><ArrowRight /></ElIcon>
           </button>
         </div>
       </header>
 
       <div class="editor-state-panel__summary">
-        <div class="editor-state-panel__summary-stats" aria-label="State summary">
+        <div class="editor-state-panel__summary-stats" :aria-label="t('statePanel.summary')">
           <div class="editor-state-panel__summary-stat">
-            <span>States</span>
+            <span>{{ t("statePanel.states") }}</span>
             <strong>{{ view.count }}</strong>
           </div>
           <div class="editor-state-panel__summary-stat">
-            <span>Reads</span>
+            <span>{{ t("statePanel.reads") }}</span>
             <strong>{{ readerTotal }}</strong>
           </div>
           <div class="editor-state-panel__summary-stat">
-            <span>Writes</span>
+            <span>{{ t("statePanel.writes") }}</span>
             <strong>{{ writerTotal }}</strong>
           </div>
         </div>
         <button type="button" class="editor-state-panel__quick-action" @click="$emit('add-state')">
           <ElIcon aria-hidden="true"><CirclePlus /></ElIcon>
-          <span>Add</span>
+          <span>{{ t("statePanel.add") }}</span>
         </button>
       </div>
 
@@ -89,7 +89,7 @@
                   data-state-delete-surface="true"
                   class="editor-state-panel__card-delete"
                   :class="{ 'editor-state-panel__card-delete--confirm': isStateDeleteConfirmOpen(row.key) }"
-                  :aria-label="isStateDeleteConfirmOpen(row.key) ? 'Confirm delete state' : 'Delete state'"
+                  :aria-label="isStateDeleteConfirmOpen(row.key) ? t('statePanel.confirmDeleteState') : t('statePanel.deleteState')"
                   @pointerdown.stop
                   @click.stop="handleStateDeleteActionClick(row.key)"
                 >
@@ -97,28 +97,28 @@
                   <ElIcon v-else aria-hidden="true"><Delete /></ElIcon>
                 </button>
               </template>
-              <div class="editor-state-panel__confirm-hint editor-state-panel__confirm-hint--delete">Delete state?</div>
+              <div class="editor-state-panel__confirm-hint editor-state-panel__confirm-hint--delete">{{ t("statePanel.deleteStateQuestion") }}</div>
             </ElPopover>
           </div>
         </div>
 
         <div v-if="isStateRowExpanded(row.key)" class="editor-state-panel__details-card">
-            <div class="editor-state-panel__details-title">Definition</div>
+            <div class="editor-state-panel__details-title">{{ t("statePanel.definition") }}</div>
 
             <div class="editor-state-panel__field-grid">
               <div class="editor-state-panel__field">
-                <span class="editor-state-panel__field-label">Key</span>
+                <span class="editor-state-panel__field-label">{{ t("nodeCard.key") }}</span>
                 <ElInput
-                  aria-label="State key"
+                  :aria-label="t('nodeCard.key')"
                   :model-value="row.key"
                   @change="commitStateRename(row.key, String($event ?? ''))"
                 />
               </div>
 
               <div class="editor-state-panel__field">
-                <span class="editor-state-panel__field-label">Name</span>
+                <span class="editor-state-panel__field-label">{{ t("nodeCard.name") }}</span>
                 <ElInput
-                  aria-label="State name"
+                  :aria-label="t('nodeCard.name')"
                   :model-value="stateDefinition(row.key)?.name ?? ''"
                   @update:model-value="
                     $emit('update-state', {
@@ -132,10 +132,10 @@
 
             <div class="editor-state-panel__field-grid">
               <div class="editor-state-panel__field">
-                <span class="editor-state-panel__field-label">Type</span>
+                <span class="editor-state-panel__field-label">{{ t("nodeCard.type") }}</span>
                 <ElSelect
                   class="editor-state-panel__select graphite-select"
-                  aria-label="State type"
+                  :aria-label="t('nodeCard.type')"
                   :model-value="stateDefinition(row.key)?.type ?? 'text'"
                   :teleported="false"
                   popper-class="graphite-select-popper editor-state-panel__select-popper"
@@ -146,10 +146,10 @@
               </div>
 
               <div class="editor-state-panel__field">
-                <span class="editor-state-panel__field-label">Color</span>
+                <span class="editor-state-panel__field-label">{{ t("nodeCard.color") }}</span>
                 <ElSelect
                   class="editor-state-panel__color-select graphite-select"
-                  aria-label="State color"
+                  :aria-label="t('nodeCard.color')"
                   :model-value="stateDefinition(row.key)?.color ?? ''"
                   :teleported="false"
                   popper-class="graphite-select-popper editor-state-panel__select-popper"
@@ -171,9 +171,9 @@
             </div>
 
             <div class="editor-state-panel__field editor-state-panel__field--full">
-              <span class="editor-state-panel__field-label">Description</span>
+              <span class="editor-state-panel__field-label">{{ t("nodeCard.description") }}</span>
               <ElInput
-                aria-label="State description"
+                :aria-label="t('nodeCard.description')"
                 type="textarea"
                 :rows="2"
                 :model-value="stateDefinition(row.key)?.description ?? ''"
@@ -202,9 +202,9 @@
             <div class="editor-state-panel__binding-groups">
               <div class="editor-state-panel__binding-group">
                 <div class="editor-state-panel__binding-group-head">
-                  <div class="editor-state-panel__binding-group-title">Readers</div>
+                  <div class="editor-state-panel__binding-group-title">{{ t("statePanel.reads") }}</div>
                   <button type="button" class="editor-state-panel__binding-group-action" @click="toggleBindingForm(row.key, 'read')">
-                    {{ isBindingFormOpen(row.key, 'read') ? "Close" : "Add Reader" }}
+                    {{ isBindingFormOpen(row.key, 'read') ? t("common.close") : t("statePanel.addReader") }}
                   </button>
                 </div>
 
@@ -220,12 +220,12 @@
                         <span class="editor-state-panel__binding-kind">{{ binding.nodeKindLabel }}</span>
                         <span class="editor-state-panel__binding-node-label">{{ binding.nodeLabel }}</span>
                       </span>
-                      <span class="editor-state-panel__binding-port-detail">Input: {{ binding.portLabel }}</span>
+                      <span class="editor-state-panel__binding-port-detail">{{ t("statePanel.inputPort", { port: binding.portLabel }) }}</span>
                     </button>
                     <button
                       type="button"
                       class="editor-state-panel__binding-remove"
-                      aria-label="Remove reader"
+                      :aria-label="t('statePanel.removeReader')"
                       @click="$emit('remove-reader', { stateKey: row.key, nodeId: binding.nodeId })"
                     >
                       ×
@@ -233,7 +233,7 @@
                   </div>
                 </div>
 
-                <div v-else class="editor-state-panel__binding-empty">No readers yet.</div>
+                <div v-else class="editor-state-panel__binding-empty">{{ t("statePanel.noReaders") }}</div>
 
                 <StateBindingCreateForm
                   v-if="isBindingFormOpen(row.key, 'read')"
@@ -249,9 +249,9 @@
 
               <div class="editor-state-panel__binding-group">
                 <div class="editor-state-panel__binding-group-head">
-                  <div class="editor-state-panel__binding-group-title">Writers</div>
+                  <div class="editor-state-panel__binding-group-title">{{ t("statePanel.writes") }}</div>
                   <button type="button" class="editor-state-panel__binding-group-action" @click="toggleBindingForm(row.key, 'write')">
-                    {{ isBindingFormOpen(row.key, 'write') ? "Close" : "Add Writer" }}
+                    {{ isBindingFormOpen(row.key, 'write') ? t("common.close") : t("statePanel.addWriter") }}
                   </button>
                 </div>
 
@@ -267,12 +267,12 @@
                         <span class="editor-state-panel__binding-kind">{{ binding.nodeKindLabel }}</span>
                         <span class="editor-state-panel__binding-node-label">{{ binding.nodeLabel }}</span>
                       </span>
-                      <span class="editor-state-panel__binding-port-detail">Output: {{ binding.portLabel }}</span>
+                      <span class="editor-state-panel__binding-port-detail">{{ t("statePanel.outputPort", { port: binding.portLabel }) }}</span>
                     </button>
                     <button
                       type="button"
                       class="editor-state-panel__binding-remove"
-                      aria-label="Remove writer"
+                      :aria-label="t('statePanel.removeWriter')"
                       @click="$emit('remove-writer', { stateKey: row.key, nodeId: binding.nodeId })"
                     >
                       ×
@@ -280,7 +280,7 @@
                   </div>
                 </div>
 
-                <div v-else class="editor-state-panel__binding-empty">No writers yet.</div>
+                <div v-else class="editor-state-panel__binding-empty">{{ t("statePanel.noWriters") }}</div>
 
                 <StateBindingCreateForm
                   v-if="isBindingFormOpen(row.key, 'write')"
@@ -303,7 +303,7 @@
                 @click="toggleTimelineSection(row.key)"
               >
                 <div class="editor-state-panel__timeline-toggle-copy">
-                  <span class="editor-state-panel__timeline-title">运行轨迹</span>
+                  <span class="editor-state-panel__timeline-title">{{ t("statePanel.timeline") }}</span>
                   <span class="editor-state-panel__timeline-summary">{{ row.timelineSummary }}</span>
                 </div>
                 <ElIcon
@@ -343,13 +343,15 @@
                     <div class="editor-state-panel__timeline-entry-value-change">
                       <template v-if="entry.previousValuePreview !== null">
                         <div class="editor-state-panel__timeline-value-block">
-                          <span class="editor-state-panel__timeline-value-label">Before</span>
+                          <span class="editor-state-panel__timeline-value-label">{{ t("statePanel.before") }}</span>
                           <span class="editor-state-panel__timeline-value">{{ entry.previousValuePreview }}</span>
                         </div>
                         <span class="editor-state-panel__timeline-arrow" aria-hidden="true">→</span>
                       </template>
                       <div class="editor-state-panel__timeline-value-block">
-                        <span class="editor-state-panel__timeline-value-label">{{ entry.previousValuePreview !== null ? "After" : "Set to" }}</span>
+                        <span class="editor-state-panel__timeline-value-label">
+                          {{ entry.previousValuePreview !== null ? t("statePanel.after") : t("statePanel.setTo") }}
+                        </span>
                         <span class="editor-state-panel__timeline-value">{{ entry.valuePreview }}</span>
                       </div>
                     </div>
@@ -368,6 +370,7 @@
 import { computed, onBeforeUnmount, ref } from "vue";
 import { ElIcon, ElInput, ElOption, ElPopover, ElSelect } from "element-plus";
 import { ArrowDown, ArrowRight, Check, CirclePlus, Delete } from "@element-plus/icons-vue";
+import { useI18n } from "vue-i18n";
 
 import StateDefaultValueEditor from "./StateDefaultValueEditor.vue";
 import StateBindingCreateForm from "./StateBindingCreateForm.vue";
@@ -401,7 +404,11 @@ const emit = defineEmits<{
   (event: "remove-writer", payload: { stateKey: string; nodeId: string }): void;
 }>();
 
-const view = computed(() => buildStatePanelViewModel(props.document, props.run ?? null));
+const { t, locale } = useI18n();
+const view = computed(() => {
+  locale.value;
+  return buildStatePanelViewModel(props.document, props.run ?? null);
+});
 const readerTotal = computed(() => view.value.rows.reduce((total, row) => total + row.readerCount, 0));
 const writerTotal = computed(() => view.value.rows.reduce((total, row) => total + row.writerCount, 0));
 const expandedStateKeys = ref<Record<string, boolean>>({});

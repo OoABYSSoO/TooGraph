@@ -2,44 +2,85 @@
   <AppShell>
     <section class="run-detail">
       <header class="run-detail__hero">
-        <div class="run-detail__eyebrow">Run Detail</div>
-        <h2 class="run-detail__title">运行详情 {{ runDisplayName }}</h2>
-        <p class="run-detail__body">这里保留旧前端的运行详情结构：状态、循环摘要、节点时间线和最终产出。</p>
-        <div v-if="snapshotOptions.length > 0" class="run-detail__snapshot-switcher">
-          <button
-            v-for="option in snapshotOptions"
-            :key="option.snapshotId"
-            class="run-detail__snapshot-chip"
-            :class="{ 'run-detail__snapshot-chip--active': option.snapshotId === selectedSnapshotId }"
-            type="button"
-            @click="selectSnapshot(option.snapshotId)"
-          >
-            <span>{{ option.label }}</span>
-            <small>{{ option.statusLabel }}</small>
-          </button>
+        <div class="run-detail__hero-top">
+          <div>
+            <div class="run-detail__eyebrow">{{ t("runDetail.eyebrow") }}</div>
+            <h2 class="run-detail__title">{{ runDisplayName }}</h2>
+            <p class="run-detail__body">{{ t("runDetail.body") }}</p>
+          </div>
         </div>
-        <RouterLink v-if="canRestore" class="run-detail__restore-link" :to="restoreEditorHref">恢复编辑</RouterLink>
+
+        <div v-if="viewedRun" class="run-detail__status-console" :aria-label="t('runDetail.statusSummary')">
+          <article v-for="fact in runStatusFacts" :key="fact.key" class="run-detail__metric">
+            <span>{{ fact.label }}</span>
+            <strong
+              class="run-detail__metric-value"
+              :class="fact.tone === 'status' ? statusBadgeClass(fact.value) : undefined"
+            >
+              {{ fact.value }}
+            </strong>
+          </article>
+          <article class="run-detail__metric">
+            <span>{{ t("common.startedAt") }}</span>
+            <strong class="run-detail__metric-value">{{ viewedRun ? formatRunDisplayTimestamp(viewedRun.started_at) : "—" }}</strong>
+          </article>
+        </div>
+
+        <div v-if="snapshotOptions.length > 0 || canRestore" class="run-detail__restore-toolbar">
+          <div v-if="snapshotOptions.length > 0" class="run-detail__snapshot-switcher">
+            <button
+              v-for="option in snapshotOptions"
+              :key="option.snapshotId"
+              class="run-detail__snapshot-chip"
+              :class="{ 'run-detail__snapshot-chip--active': option.snapshotId === selectedSnapshotId }"
+              type="button"
+              @click="selectSnapshot(option.snapshotId)"
+            >
+              <span>{{ option.label }}</span>
+              <small>{{ option.statusLabel }}</small>
+            </button>
+          </div>
+          <RouterLink v-if="canRestore" class="run-detail__restore-link" :to="restoreEditorHref">
+            <ElIcon class="run-detail__restore-icon" aria-hidden="true"><Promotion /></ElIcon>
+            <span>{{ t("common.restoreEdit") }}</span>
+          </RouterLink>
+        </div>
       </header>
 
-      <article v-if="error" class="run-detail__empty">加载失败：{{ error }}</article>
-      <article v-else-if="!run" class="run-detail__empty">Loading run…</article>
+      <article v-if="error" class="run-detail__empty">
+        <p>{{ t("common.failedToLoad", { error }) }}</p>
+        <button type="button" class="run-detail__retry" @click="loadRun(runId)">{{ t("common.retry") }}</button>
+      </article>
+      <article v-else-if="loading" class="run-detail__empty">{{ t("common.loadingRun") }}</article>
+      <article v-else-if="!run" class="run-detail__empty">{{ t("runDetail.noRun") }}</article>
       <template v-else>
-        <section class="run-detail__grid">
-          <article class="run-detail__panel">
-            <h3>Status</h3>
-            <div class="run-detail__badges">
-              <span :class="statusBadgeClass(viewedRun?.status ?? run.status)">{{ viewedRun?.status ?? run.status }}</span>
-              <span>{{ viewedRun?.current_node_id ?? "completed" }}</span>
-              <span>revisions {{ viewedRun?.revision_round ?? run.revision_round }}</span>
-              <span v-if="viewedRun?.final_score">score {{ viewedRun.final_score }}</span>
+        <article class="run-detail__panel run-detail__panel--result">
+          <div class="run-detail__panel-heading">
+            <div>
+              <span class="run-detail__section-kicker">{{ t("runDetail.primaryOutput") }}</span>
+              <h3>{{ t("runDetail.finalResult") }}</h3>
             </div>
-          </article>
+            <button type="button" class="run-detail__content-toggle" @click="toggleContentExpansion('final-result')">
+              {{ isContentExpanded("final-result") ? t("common.collapse") : t("common.expandAll") }}
+            </button>
+          </div>
+          <pre
+            class="run-detail__content run-detail__content--result"
+            :class="{ 'run-detail__content--expanded': isContentExpanded('final-result') }"
+          >{{ viewedRun?.final_result || t("common.none") }}</pre>
+        </article>
 
+        <section class="run-detail__grid">
           <article v-if="cycleVisualization.hasCycle" class="run-detail__panel">
-            <h3>Cycle Summary</h3>
+            <div class="run-detail__panel-heading">
+              <div>
+                <span class="run-detail__section-kicker">{{ t("runDetail.loop") }}</span>
+                <h3>{{ t("runDetail.cycleSummary") }}</h3>
+              </div>
+            </div>
             <div class="run-detail__badges">
-              <span>{{ cycleVisualization.summary?.iteration_count ?? cycleVisualization.iterations.length }} iterations</span>
-              <span>max {{ cycleVisualization.summary?.max_iterations === -1 ? "unlimited" : cycleVisualization.summary?.max_iterations }}</span>
+                <span>{{ t("common.iterations", { count: cycleVisualization.summary?.iteration_count ?? cycleVisualization.iterations.length }) }}</span>
+                <span>{{ t("common.max", { value: cycleVisualization.summary?.max_iterations === -1 ? t("common.unlimited") : cycleVisualization.summary?.max_iterations }) }}</span>
               <span v-if="cycleVisualization.summary?.stop_reason">{{ formatCycleStopReason(cycleVisualization.summary.stop_reason) }}</span>
               <span v-for="edge in cycleVisualization.backEdges" :key="edge">{{ edge }}</span>
             </div>
@@ -47,61 +88,45 @@
               {{ describeCycleStopReason(cycleVisualization.summary?.stop_reason) }}
             </p>
           </article>
-        </section>
 
-        <article v-if="cycleVisualization.hasCycle && cycleVisualization.iterations.length > 0" class="run-detail__panel">
-          <h3>Cycle Iterations</h3>
-          <div class="run-detail__list">
-            <div v-for="iteration in cycleVisualization.iterations" :key="iteration.iteration" class="run-detail__subcard">
-              <strong>Iteration {{ iteration.iteration }}</strong>
-              <div class="run-detail__badges">
-                <span>{{ iteration.executedNodeIds.length }} nodes</span>
-                <span>{{ iteration.activatedEdgeIds.length }} edges</span>
-                <span v-if="iteration.stopReason">{{ formatCycleStopReason(iteration.stopReason) }}</span>
-              </div>
-              <div class="run-detail__meta-groups">
-                <div class="run-detail__meta-group">
-                  <span class="run-detail__meta-title">Executed</span>
-                  <div class="run-detail__badges">
-                    <span v-if="iteration.executedNodeIds.length === 0">None</span>
-                    <span v-for="nodeId in iteration.executedNodeIds" v-else :key="`executed-${iteration.iteration}-${nodeId}`">{{ nodeId }}</span>
-                  </div>
-                </div>
-                <div class="run-detail__meta-group">
-                  <span class="run-detail__meta-title">Activated edges</span>
-                  <div class="run-detail__badges">
-                    <span v-if="iteration.activatedEdgeIds.length === 0">None</span>
-                    <span v-for="edgeId in iteration.activatedEdgeIds" v-else :key="`edge-${iteration.iteration}-${edgeId}`">{{ edgeId }}</span>
-                  </div>
-                </div>
-                <div class="run-detail__meta-group">
-                  <span class="run-detail__meta-title">Incoming edges</span>
-                  <div class="run-detail__badges">
-                    <span v-if="iteration.incomingEdgeIds.length === 0">None</span>
-                    <span v-for="edgeId in iteration.incomingEdgeIds" v-else :key="`incoming-${iteration.iteration}-${edgeId}`">{{ edgeId }}</span>
-                  </div>
-                </div>
-                <div class="run-detail__meta-group">
-                  <span class="run-detail__meta-title">Next iteration</span>
-                  <div class="run-detail__badges">
-                    <span v-if="iteration.nextIterationEdgeIds.length === 0">Loop exits here</span>
-                    <span v-for="edgeId in iteration.nextIterationEdgeIds" v-else :key="`next-${iteration.iteration}-${edgeId}`">{{ edgeId }}</span>
-                  </div>
-                </div>
+          <article class="run-detail__panel">
+            <div class="run-detail__panel-heading">
+              <div>
+                <span class="run-detail__section-kicker">{{ t("runDetail.context") }}</span>
+                <h3>{{ t("runDetail.supportingArtifacts") }}</h3>
               </div>
             </div>
-          </div>
-        </article>
+            <div class="run-detail__info-grid">
+              <div class="run-detail__info">
+                <span>{{ t("runDetail.knowledge") }}</span>
+                <strong class="run-detail__content">{{ viewedRun?.knowledge_summary || t("common.none") }}</strong>
+              </div>
+              <div class="run-detail__info">
+                <span>{{ t("runDetail.memory") }}</span>
+                <strong class="run-detail__content">{{ viewedRun?.memory_summary || t("common.none") }}</strong>
+              </div>
+            </div>
+          </article>
+        </section>
 
-        <article class="run-detail__panel">
-          <h3>Artifacts</h3>
-          <div class="run-detail__info"><span>Knowledge</span><strong class="run-detail__content">{{ viewedRun?.knowledge_summary || "None" }}</strong></div>
-          <div class="run-detail__info"><span>Memory</span><strong class="run-detail__content">{{ viewedRun?.memory_summary || "None" }}</strong></div>
-          <div class="run-detail__info"><span>Final Result</span><strong class="run-detail__content">{{ viewedRun?.final_result || "None" }}</strong></div>
-          <div v-if="outputArtifacts.length > 0" class="run-detail__artifacts">
+        <article v-if="outputArtifacts.length > 0" class="run-detail__panel">
+          <div class="run-detail__panel-heading">
+            <div>
+              <span class="run-detail__section-kicker">{{ t("runDetail.exports") }}</span>
+              <h3>{{ t("runDetail.outputArtifacts") }}</h3>
+            </div>
+          </div>
+          <div class="run-detail__artifacts">
             <div v-for="artifact in outputArtifacts" :key="artifact.key" class="run-detail__subcard">
-              <strong>{{ artifact.title }}</strong>
-              <pre class="run-detail__artifact-text">{{ artifact.text || "None" }}</pre>
+              <div class="run-detail__subcard-heading">
+                <strong>{{ artifact.title }}</strong>
+                <button type="button" class="run-detail__content-toggle" @click="toggleContentExpansion(artifact.key)">
+                  {{ isContentExpanded(artifact.key) ? t("common.collapse") : t("common.expand") }}
+                </button>
+              </div>
+              <pre class="run-detail__content" :class="{ 'run-detail__content--expanded': isContentExpanded(artifact.key) }">{{
+                artifact.text || t("common.none")
+              }}</pre>
               <div class="run-detail__badges">
                 <span>{{ artifact.displayMode }}</span>
                 <span>{{ artifact.persistLabel }}</span>
@@ -111,16 +136,78 @@
           </div>
         </article>
 
-        <article class="run-detail__panel">
-          <h3>Timeline</h3>
+        <article v-if="cycleVisualization.hasCycle && cycleVisualization.iterations.length > 0" class="run-detail__panel">
+          <div class="run-detail__panel-heading">
+            <div>
+              <span class="run-detail__section-kicker">{{ t("runDetail.loopDetail") }}</span>
+              <h3>{{ t("runDetail.cycleIterations") }}</h3>
+            </div>
+          </div>
           <div class="run-detail__list">
-            <div v-for="execution in run.node_executions" :key="`${execution.node_id}-${execution.artifacts.iteration ?? 1}-${execution.status}`" class="run-detail__subcard">
-              <strong>{{ execution.node_id }} → {{ execution.status }}</strong>
-              <p>{{ execution.output_summary }}</p>
-              <div class="run-detail__badges">
-                <span>{{ execution.duration_ms }}ms</span>
-                <span v-if="execution.artifacts.iteration">iteration {{ execution.artifacts.iteration }}</span>
-                <span v-if="execution.artifacts.selected_branch">{{ execution.artifacts.selected_branch }}</span>
+            <details v-for="iteration in cycleVisualization.iterations" :key="iteration.iteration" class="run-detail__subcard">
+              <summary>
+                <strong>{{ t("common.iteration", { value: iteration.iteration }) }}</strong>
+                <span>{{ t("common.nodesCount", { count: iteration.executedNodeIds.length }) }} · {{ t("common.edgesCount", { count: iteration.activatedEdgeIds.length }) }}</span>
+              </summary>
+              <div class="run-detail__meta-groups">
+                <div class="run-detail__meta-group">
+                  <span class="run-detail__meta-title">{{ t("runDetail.executed") }}</span>
+                  <div class="run-detail__badges">
+                    <span v-if="iteration.executedNodeIds.length === 0">{{ t("common.none") }}</span>
+                    <span v-for="nodeId in iteration.executedNodeIds" v-else :key="`executed-${iteration.iteration}-${nodeId}`">{{ nodeId }}</span>
+                  </div>
+                </div>
+                <div class="run-detail__meta-group">
+                  <span class="run-detail__meta-title">{{ t("runDetail.activatedEdges") }}</span>
+                  <div class="run-detail__badges">
+                    <span v-if="iteration.activatedEdgeIds.length === 0">{{ t("common.none") }}</span>
+                    <span v-for="edgeId in iteration.activatedEdgeIds" v-else :key="`edge-${iteration.iteration}-${edgeId}`">{{ edgeId }}</span>
+                  </div>
+                </div>
+                <div class="run-detail__meta-group">
+                  <span class="run-detail__meta-title">{{ t("runDetail.incomingEdges") }}</span>
+                  <div class="run-detail__badges">
+                    <span v-if="iteration.incomingEdgeIds.length === 0">{{ t("common.none") }}</span>
+                    <span v-for="edgeId in iteration.incomingEdgeIds" v-else :key="`incoming-${iteration.iteration}-${edgeId}`">{{ edgeId }}</span>
+                  </div>
+                </div>
+                <div class="run-detail__meta-group">
+                  <span class="run-detail__meta-title">{{ t("runDetail.nextIteration") }}</span>
+                  <div class="run-detail__badges">
+                    <span v-if="iteration.nextIterationEdgeIds.length === 0">{{ t("runDetail.loopExitsHere") }}</span>
+                    <span v-for="edgeId in iteration.nextIterationEdgeIds" v-else :key="`next-${iteration.iteration}-${edgeId}`">{{ edgeId }}</span>
+                  </div>
+                </div>
+              </div>
+            </details>
+          </div>
+        </article>
+
+        <article class="run-detail__panel">
+          <div class="run-detail__panel-heading">
+            <div>
+              <span class="run-detail__section-kicker">{{ t("runDetail.nodeTimeline") }}</span>
+              <h3>{{ t("runDetail.timeline") }}</h3>
+            </div>
+          </div>
+          <div class="run-detail__timeline">
+            <div
+              v-for="execution in run.node_executions"
+              :key="`${execution.node_id}-${execution.artifacts.iteration ?? 1}-${execution.status}`"
+              class="run-detail__timeline-item"
+            >
+              <span class="run-detail__timeline-rail" :class="statusBadgeClass(execution.status)" aria-hidden="true"></span>
+              <div class="run-detail__timeline-body">
+                <div class="run-detail__timeline-heading">
+                  <strong>{{ execution.node_id }}</strong>
+                  <span :class="statusBadgeClass(execution.status)">{{ execution.status }}</span>
+                </div>
+                <p>{{ execution.output_summary || execution.input_summary || t("common.noSummary") }}</p>
+                <div class="run-detail__badges">
+                  <span>{{ t("common.ms", { value: execution.duration_ms }) }}</span>
+                  <span v-if="execution.artifacts.iteration">{{ t("common.iteration", { value: execution.artifacts.iteration }) }}</span>
+                  <span v-if="execution.artifacts.selected_branch">{{ execution.artifacts.selected_branch }}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -131,23 +218,30 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { Promotion } from "@element-plus/icons-vue";
+import { ElIcon } from "element-plus";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute } from "vue-router";
+import { useI18n } from "vue-i18n";
 
 import { fetchRun } from "@/api/runs";
-import { formatRunDisplayName } from "@/lib/run-display-name";
+import { formatRunDisplayName, formatRunDisplayTimestamp } from "@/lib/run-display-name";
 import AppShell from "@/layouts/AppShell.vue";
 import { buildCycleVisualization, describeCycleStopReason, formatCycleStopReason } from "@/lib/run-cycle-visualization";
 import { buildSnapshotScopedRun, canRestoreRunDetail, resolveRunRestoreUrl, resolveRunSnapshot } from "@/lib/run-restore";
 import type { RunDetail } from "@/types/run";
 
-import { listRunOutputArtifacts, shouldPollRunStatus } from "./runDetailModel.ts";
+import { buildRunStatusFacts, listRunOutputArtifacts, shouldPollRunStatus } from "./runDetailModel.ts";
 
 const route = useRoute();
+const { t, locale } = useI18n();
 const run = ref<RunDetail | null>(null);
+const loading = ref(false);
 const error = ref<string | null>(null);
 const selectedSnapshotIdDraft = ref<string | null>(null);
+const expandedContentKeys = ref<Set<string>>(new Set());
 const runId = computed(() => String(route.params.runId ?? ""));
+const runDetailRequestTimeoutMs = 10_000;
 const snapshotOptions = computed(() => {
   const snapshots = Array.isArray(run.value?.run_snapshots) ? run.value.run_snapshots : [];
   if (snapshots.length <= 1) {
@@ -171,6 +265,10 @@ const selectedSnapshotId = computed(() => {
 });
 const runDisplayName = computed(() => (run.value ? formatRunDisplayName(run.value) : runId.value));
 const viewedRun = computed(() => (run.value ? buildSnapshotScopedRun(run.value, selectedSnapshotId.value) : null));
+const runStatusFacts = computed(() => {
+  locale.value;
+  return viewedRun.value ? buildRunStatusFacts(viewedRun.value) : [];
+});
 const cycleVisualization = computed(() =>
   viewedRun.value ? buildCycleVisualization(viewedRun.value) : { hasCycle: false, summary: null, backEdges: [], iterations: [] },
 );
@@ -178,68 +276,151 @@ const outputArtifacts = computed(() => (viewedRun.value ? listRunOutputArtifacts
 const canRestore = computed(() => (run.value ? canRestoreRunDetail(run.value) : false));
 const restoreEditorHref = computed(() => (run.value ? resolveRunRestoreUrl(run.value.run_id, selectedSnapshotId.value) : "/editor/new"));
 let pollTimer: number | null = null;
+let activeRunRequestId = 0;
+let activeRunController: AbortController | null = null;
+let activeRunTimeout: number | null = null;
 
 function selectSnapshot(snapshotId: string) {
   selectedSnapshotIdDraft.value = snapshotId;
+  expandedContentKeys.value = new Set();
 }
 
-async function loadRun() {
+function toggleContentExpansion(key: string) {
+  const nextKeys = new Set(expandedContentKeys.value);
+  if (nextKeys.has(key)) {
+    nextKeys.delete(key);
+  } else {
+    nextKeys.add(key);
+  }
+  expandedContentKeys.value = nextKeys;
+}
+
+function isContentExpanded(key: string) {
+  return expandedContentKeys.value.has(key);
+}
+
+function clearRunPollTimer() {
   if (pollTimer !== null) {
     window.clearTimeout(pollTimer);
     pollTimer = null;
   }
-  try {
-    run.value = await fetchRun(runId.value);
-    error.value = null;
-    if (shouldPollRunStatus(run.value.status)) {
-      pollTimer = window.setTimeout(() => {
-        void loadRun();
-      }, 750);
-    }
-  } catch (fetchError) {
-    error.value = fetchError instanceof Error ? fetchError.message : "Failed to load run detail.";
+}
+
+function clearPendingRunRequest() {
+  activeRunController?.abort();
+  activeRunController = null;
+  if (activeRunTimeout !== null) {
+    window.clearTimeout(activeRunTimeout);
+    activeRunTimeout = null;
   }
 }
 
-onMounted(() => {
-  void loadRun();
+function resolveRunFetchErrorMessage(fetchError: unknown) {
+  if (fetchError instanceof Error && fetchError.name === "AbortError") {
+    return t("runDetail.loadTimeout");
+  }
+  return fetchError instanceof Error ? fetchError.message : t("common.loadingRun");
+}
+
+async function loadRun(nextRunId = runId.value) {
+  const requestId = activeRunRequestId + 1;
+  activeRunRequestId = requestId;
+  clearRunPollTimer();
+  clearPendingRunRequest();
+
+  const normalizedRunId = nextRunId.trim();
+  if (!normalizedRunId) {
+    run.value = null;
+    loading.value = false;
+    error.value = t("runDetail.missingRunId");
+    return;
+  }
+
+  const controller = new AbortController();
+  activeRunController = controller;
+  activeRunTimeout = window.setTimeout(() => {
+    controller.abort();
+  }, runDetailRequestTimeoutMs);
+
+  loading.value = !run.value;
+  error.value = null;
+
+  try {
+    const nextRun = await fetchRun(normalizedRunId, { signal: controller.signal });
+    if (requestId !== activeRunRequestId) {
+      return;
+    }
+    run.value = nextRun;
+    error.value = null;
+    if (shouldPollRunStatus(nextRun.status)) {
+      pollTimer = window.setTimeout(() => {
+        void loadRun(normalizedRunId);
+      }, 750);
+    }
+  } catch (fetchError) {
+    if (requestId !== activeRunRequestId) {
+      return;
+    }
+    run.value = null;
+    error.value = resolveRunFetchErrorMessage(fetchError);
+  } finally {
+    if (requestId === activeRunRequestId) {
+      loading.value = false;
+      if (activeRunController === controller) {
+        activeRunController = null;
+      }
+      if (activeRunTimeout !== null) {
+        window.clearTimeout(activeRunTimeout);
+        activeRunTimeout = null;
+      }
+    }
+  }
+}
+
+watch(
+  runId,
+  (nextRunId) => {
+    resetRunView();
+    void loadRun(nextRunId);
+  },
+  { immediate: true },
+);
+
+onBeforeUnmount(() => {
+  activeRunRequestId += 1;
+  clearRunPollTimer();
+  clearPendingRunRequest();
 });
 
-watch(runId, () => {
+function resetRunView() {
   run.value = null;
   error.value = null;
   selectedSnapshotIdDraft.value = null;
-  void loadRun();
-});
-
-onBeforeUnmount(() => {
-  if (pollTimer !== null) {
-    window.clearTimeout(pollTimer);
-  }
-});
+  expandedContentKeys.value = new Set();
+}
 
 function snapshotLabel(kind: string, order: number) {
   if (kind === "pause") {
-    return `暂停结果 ${order}`;
+    return t("runDetail.pauseResult", { order });
   }
   if (kind === "completed") {
-    return "最终结果";
+    return t("runDetail.finalResult");
   }
   if (kind === "failed") {
-    return "失败结果";
+    return t("runDetail.failedResult");
   }
-  return `快照 ${order}`;
+  return t("runDetail.snapshot", { order });
 }
 
 function snapshotStatusLabel(status: string) {
   if (status === "awaiting_human") {
-    return "等待人工";
+    return t("runDetail.waitingHuman");
   }
   if (status === "completed") {
-    return "已完成";
+    return t("status.completed");
   }
   if (status === "failed") {
-    return "失败";
+    return t("status.failed");
   }
   return status;
 }
@@ -269,12 +450,54 @@ function statusBadgeClass(status: string) {
   padding: 24px;
 }
 
+.run-detail__empty {
+  display: grid;
+  gap: 12px;
+}
+
+.run-detail__empty p {
+  margin: 0;
+}
+
+.run-detail__hero {
+  display: grid;
+  gap: 18px;
+}
+
+.run-detail__hero-top,
+.run-detail__panel-heading,
+.run-detail__subcard-heading,
+.run-detail__timeline-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.run-detail__restore-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid rgba(154, 52, 18, 0.1);
+  border-radius: 22px;
+  background: rgba(255, 252, 247, 0.68);
+  padding: 8px;
+}
+
 .run-detail__panel {
-  background: var(--graphite-surface-card);
+  display: grid;
+  gap: 16px;
+  background: rgba(255, 253, 249, 0.86);
   padding: 20px;
 }
 
-.run-detail__eyebrow {
+.run-detail__panel--result {
+  background: rgba(255, 253, 249, 0.94);
+}
+
+.run-detail__eyebrow,
+.run-detail__section-kicker {
   font-size: 0.72rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -288,38 +511,122 @@ function statusBadgeClass(status: string) {
   font-size: 2rem;
 }
 
-.run-detail__restore-link {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: fit-content;
-  margin-top: 16px;
+.run-detail__body,
+.run-detail__muted,
+.run-detail__timeline-body p,
+.run-detail__empty {
+  margin: 0;
+  line-height: 1.6;
+  color: rgba(60, 41, 20, 0.72);
+}
+
+.run-detail__restore-link,
+.run-detail__snapshot-chip,
+.run-detail__content-toggle,
+.run-detail__retry {
   border: 1px solid rgba(154, 52, 18, 0.18);
   border-radius: 999px;
-  padding: 10px 14px;
   color: rgb(154, 52, 18);
   background: rgba(255, 248, 240, 0.9);
   text-decoration: none;
+  cursor: pointer;
+  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.run-detail__restore-link,
+.run-detail__content-toggle,
+.run-detail__retry {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 14px;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.run-detail__restore-link {
+  flex: none;
+  border-color: rgba(154, 52, 18, 0.76);
+  background: rgba(154, 52, 18, 0.92);
+  color: rgba(255, 250, 242, 0.98);
+  box-shadow: 0 12px 22px rgba(120, 53, 15, 0.13);
+}
+
+.run-detail__restore-icon {
+  margin-right: 7px;
+  font-size: 0.96rem;
+}
+
+.run-detail__restore-link:hover,
+.run-detail__snapshot-chip:hover,
+.run-detail__content-toggle:hover,
+.run-detail__retry:hover {
+  border-color: rgba(154, 52, 18, 0.3);
+  background: rgba(255, 244, 232, 0.98);
+  transform: translateY(-1px);
+}
+
+.run-detail__restore-link:hover {
+  border-color: rgba(131, 43, 13, 0.96);
+  background: rgba(131, 43, 13, 0.96);
+  color: rgba(255, 250, 242, 0.98);
+}
+
+.run-detail__status-console {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.run-detail__metric {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid rgba(154, 52, 18, 0.1);
+  border-radius: 18px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.run-detail__metric span {
+  color: rgba(60, 41, 20, 0.58);
+  font-size: 0.76rem;
+}
+
+.run-detail__metric-value {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--graphite-text-strong);
+  font-family: var(--graphite-font-mono);
+  font-size: 0.95rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.run-detail__metric-value.graphite-status-badge {
+  width: fit-content;
+  border: 1px solid var(--graphite-status-border, transparent);
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: var(--graphite-status-bg, rgba(255, 248, 240, 0.92));
+  color: var(--graphite-status-fg, rgb(154, 52, 18));
 }
 
 .run-detail__snapshot-switcher {
   display: flex;
   flex-wrap: wrap;
+  flex: 1;
   gap: 10px;
-  margin-top: 18px;
 }
 
 .run-detail__snapshot-chip {
   display: inline-flex;
   flex-direction: column;
   gap: 2px;
-  border: 1px solid rgba(154, 52, 18, 0.16);
   border-radius: 18px;
   padding: 10px 14px;
-  background: rgba(255, 248, 240, 0.82);
-  color: rgba(60, 41, 20, 0.84);
   text-align: left;
-  cursor: pointer;
 }
 
 .run-detail__snapshot-chip small {
@@ -333,19 +640,17 @@ function statusBadgeClass(status: string) {
   box-shadow: 0 12px 22px rgba(60, 41, 20, 0.08);
 }
 
-.run-detail__body,
-.run-detail__muted,
-.run-detail__subcard p,
-.run-detail__empty {
-  margin: 0;
-  line-height: 1.6;
-  color: rgba(60, 41, 20, 0.76);
-}
-
 .run-detail__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 18px;
+}
+
+.run-detail__panel-heading h3 {
+  margin: 4px 0 0;
+  color: var(--graphite-text-strong);
+  font-family: var(--graphite-font-display);
+  font-size: 1.18rem;
 }
 
 .run-detail__badges {
@@ -365,33 +670,131 @@ function statusBadgeClass(status: string) {
   font-size: 0.84rem;
 }
 
-.run-detail__list {
+.run-detail__timeline-heading span {
+  border: 1px solid var(--graphite-status-border, transparent);
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: var(--graphite-status-bg, rgba(255, 248, 240, 0.92));
+  color: var(--graphite-status-fg, rgb(154, 52, 18));
+  font-family: var(--graphite-font-mono);
+  font-size: 0.84rem;
+}
+
+.run-detail__list,
+.run-detail__artifacts,
+.run-detail__timeline,
+.run-detail__info-grid,
+.run-detail__meta-groups {
   display: grid;
   gap: 12px;
 }
 
 .run-detail__subcard,
-.run-detail__info {
+.run-detail__info,
+.run-detail__timeline-item {
   border: 1px solid rgba(154, 52, 18, 0.12);
   border-radius: 18px;
   padding: 16px;
-  background: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.72);
 }
 
 .run-detail__info {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.run-detail__info span,
+.run-detail__meta-title {
+  color: rgba(60, 41, 20, 0.58);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .run-detail__content {
+  max-height: 180px;
+  overflow: hidden;
+  margin: 0;
+  color: rgba(60, 41, 20, 0.78);
   font-family: var(--graphite-font-mono);
   font-size: 0.86rem;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.run-detail__content--result {
+  border: 1px solid rgba(154, 52, 18, 0.1);
+  border-radius: 18px;
+  padding: 18px;
+  background: rgba(255, 255, 255, 0.74);
+  color: rgba(32, 23, 15, 0.9);
+  font-size: 0.92rem;
+}
+
+.run-detail__content--expanded {
+  max-height: none;
+}
+
+.run-detail__subcard summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.run-detail__subcard summary span {
+  color: rgba(60, 41, 20, 0.6);
+  font-size: 0.82rem;
+}
+
+.run-detail__meta-groups {
+  margin-top: 14px;
+}
+
+.run-detail__timeline-item {
+  display: grid;
+  grid-template-columns: 5px minmax(0, 1fr);
+  gap: 14px;
+}
+
+.run-detail__timeline-rail {
+  width: 5px;
+  border-radius: 999px;
+  background: var(--graphite-status-fg, rgb(154, 52, 18));
+}
+
+.run-detail__timeline-body {
+  min-width: 0;
+}
+
+.run-detail__timeline-heading strong {
+  color: var(--graphite-text-strong);
+}
+
+@media (max-width: 1120px) {
+  .run-detail__status-console {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 960px) {
   .run-detail__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .run-detail__hero-top,
+  .run-detail__restore-toolbar,
+  .run-detail__panel-heading,
+  .run-detail__subcard-heading,
+  .run-detail__timeline-heading {
+    display: grid;
+  }
+
+  .run-detail__status-console {
     grid-template-columns: 1fr;
   }
 }

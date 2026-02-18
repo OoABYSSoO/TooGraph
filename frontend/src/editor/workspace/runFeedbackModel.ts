@@ -1,6 +1,7 @@
 import { buildCycleVisualization } from "../../lib/run-cycle-visualization.ts";
 import type { GraphValidationResponse } from "../../types/node-system.ts";
 import type { RunDetail } from "../../types/run.ts";
+import { translate } from "../../i18n/index.ts";
 
 export type RunNodeSummary = {
   idle: number;
@@ -50,7 +51,7 @@ export function formatValidationFeedback(response: GraphValidationResponse): Pic
   return response.valid
     ? {
         tone: "success",
-        message: "Validation passed.",
+        message: translate("feedback.validationPassed"),
       }
     : {
         tone: "danger",
@@ -69,23 +70,35 @@ export function formatRunFeedback(
   const currentNodeLabel = run.current_node_id ? input.nodeLabelLookup[run.current_node_id] ?? run.current_node_id : null;
   const cycleVisualization = buildCycleVisualization(run);
   const cycleSummaryText = cycleVisualization.summary?.has_cycle
-    ? ` Iterations ${cycleVisualization.summary.iteration_count}/${cycleVisualization.summary.max_iterations === -1 ? "unlimited" : (cycleVisualization.summary.max_iterations || cycleVisualization.summary.iteration_count)}.`
+    ? translate("feedback.iterations", {
+        count: cycleVisualization.summary.iteration_count,
+        max: cycleVisualization.summary.max_iterations === -1
+          ? translate("common.unlimited")
+          : (cycleVisualization.summary.max_iterations || cycleVisualization.summary.iteration_count),
+      })
     : "";
 
   if (run.status === "queued") {
     return {
       tone: "warning",
-      message: `Run ${run.run_id} queued. Pending ${summary.idle} nodes.${cycleSummaryText}`,
+      message: translate("feedback.runQueued", { runId: run.run_id, pending: summary.idle, cycle: cycleSummaryText }),
       summary,
       currentNodeLabel,
     };
   }
 
   if (run.status === "running" || run.status === "resuming") {
-    const currentLabelText = currentNodeLabel ? `Running ${currentNodeLabel}. ` : "";
+    const currentLabelText = currentNodeLabel ? translate("feedback.runningNode", { node: currentNodeLabel }) : "";
     return {
       tone: "warning",
-      message: `${currentLabelText}Done ${summary.success} · Active ${summary.running} · Pending ${summary.idle} · Failed ${summary.failed}.${cycleSummaryText}`,
+      message: translate("feedback.runProgress", {
+        current: currentLabelText,
+        done: summary.success,
+        active: summary.running,
+        pending: summary.idle,
+        failed: summary.failed,
+        cycle: cycleSummaryText,
+      }),
       summary,
       currentNodeLabel,
     };
@@ -93,7 +106,9 @@ export function formatRunFeedback(
 
   if (run.status === "failed") {
     const runErrors = run.errors?.filter(Boolean) ?? [];
-    const baseText = currentNodeLabel ? `Run failed at ${currentNodeLabel}.` : `Run ${run.run_id} failed.`;
+    const baseText = currentNodeLabel
+      ? translate("feedback.runFailedAt", { node: currentNodeLabel })
+      : translate("feedback.runFailed", { runId: run.run_id });
     return {
       tone: "danger",
       message: `${runErrors.length > 0 ? `${baseText} ${runErrors.join("; ")}` : baseText}${cycleSummaryText}`,
@@ -104,7 +119,7 @@ export function formatRunFeedback(
 
   return {
     tone: "success",
-    message: `Run completed. OK ${summary.success} · Pending ${summary.idle} · Failed ${summary.failed}.${cycleSummaryText}`,
+    message: translate("feedback.runCompleted", { ok: summary.success, pending: summary.idle, failed: summary.failed, cycle: cycleSummaryText }),
     summary,
     currentNodeLabel,
   };

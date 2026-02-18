@@ -7,15 +7,13 @@ from textwrap import dedent
 
 MESSAGE = dedent(
     """\
-    [GraphiteUI] Legacy model download has moved to EZLLM.
+    [GraphiteUI] Legacy bundled model download is retired.
 
-    Use EZLLM instead:
-      pipx install ezllm
-      ezllm start
-      ezllm models download
+    Use the model manager for your OpenAI-compatible gateway, then point GraphiteUI at it:
 
-    Then point GraphiteUI at:
-      LOCAL_BASE_URL=http://127.0.0.1:8888/v1
+      LOCAL_BASE_URL=http://127.0.0.1:8000/v1
+      LOCAL_API_KEY=<optional api key>
+      LOCAL_TEXT_MODEL=<model name exposed by your gateway>
 
     This wrapper only exists to guide migration and exits without downloading models.
     """

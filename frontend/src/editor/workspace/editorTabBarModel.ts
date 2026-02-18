@@ -1,4 +1,5 @@
 import type { EditorTabKind, EditorWorkspaceTab } from "@/lib/editor-workspace";
+import { translate } from "../../i18n/index.ts";
 
 export type EditorTabBarCopy = {
   newGraph: string;
@@ -15,20 +16,24 @@ export type EditorTabBarCopy = {
   run: string;
 };
 
-export const ZH_EDITOR_TAB_BAR_COPY: EditorTabBarCopy = {
-  newGraph: "新建图",
-  fromTemplate: "从模板创建",
-  openGraph: "打开已有图",
-  noTemplates: "暂无模板",
-  noGraphs: "暂无已保存图",
-  dirty: "未保存",
-  state: "State",
-  save: "Save",
-  validate: "Validate",
-  importPython: "导入 Py",
-  exportPython: "导出 Py",
-  run: "Run",
-};
+export function buildEditorTabBarCopy(): EditorTabBarCopy {
+  return {
+    newGraph: translate("tab.newGraph"),
+    fromTemplate: translate("tab.fromTemplate"),
+    openGraph: translate("tab.openGraph"),
+    noTemplates: translate("tab.noTemplates"),
+    noGraphs: translate("tab.noGraphs"),
+    dirty: translate("tab.dirty"),
+    state: translate("common.state"),
+    save: translate("common.save"),
+    validate: translate("editor.validateGraph"),
+    importPython: translate("editor.importPythonGraph"),
+    exportPython: translate("editor.exportPythonGraph"),
+    run: translate("editor.runGraph"),
+  };
+}
+
+export const ZH_EDITOR_TAB_BAR_COPY: EditorTabBarCopy = buildEditorTabBarCopy();
 
 export function resolveEditorTabBadge(kind: EditorTabKind) {
   switch (kind) {

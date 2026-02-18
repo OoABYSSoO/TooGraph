@@ -14,8 +14,8 @@ export async function fetchRuns(params?: { graphName?: string; status?: string }
   return apiGet<RunSummary[]>(`/api/runs${query ? `?${query}` : ""}`);
 }
 
-export async function fetchRun(runId: string): Promise<RunDetail> {
-  return apiGet<RunDetail>(`/api/runs/${runId}`);
+export async function fetchRun(runId: string, init?: Pick<RequestInit, "signal">): Promise<RunDetail> {
+  return apiGet<RunDetail>(`/api/runs/${runId}`, init);
 }
 
 export async function resumeRun(

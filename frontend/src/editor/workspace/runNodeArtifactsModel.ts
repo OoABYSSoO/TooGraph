@@ -1,4 +1,5 @@
 import type { RunDetail } from "../../types/run.ts";
+import { translate } from "../../i18n/index.ts";
 
 export type RunOutputPreviewEntry = {
   text: string;
@@ -33,7 +34,7 @@ export function buildRunNodeArtifactsModel(run: RunDetail): RunNodeArtifactsMode
     if (!nodeId) {
       continue;
     }
-    failedMessageByNodeId[nodeId] = execution.errors?.filter(Boolean).join("\n").trim() || "Run failed on this node.";
+    failedMessageByNodeId[nodeId] = execution.errors?.filter(Boolean).join("\n").trim() || translate("feedback.nodeFailed");
   }
 
   return {

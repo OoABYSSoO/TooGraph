@@ -1,4 +1,5 @@
 import { defaultValueForStateType, type StateFieldType } from "./statePanelFields.ts";
+import { translate } from "../../i18n/index.ts";
 
 export type StateDefaultValueEditorMode = "boolean" | "number" | "structured" | "text";
 
@@ -36,7 +37,7 @@ export function resolveStateDefaultValueEditorConfig(type: StateFieldType): Stat
   return {
     mode: "text",
     rows: type === "markdown" ? 5 : 3,
-    placeholder: type === "markdown" ? "Write markdown..." : "Value",
+    placeholder: type === "markdown" ? translate("nodeCard.markdownPlaceholder") : translate("common.value"),
   };
 }
 
@@ -46,13 +47,13 @@ export function parseStructuredStateDraft(type: StateFieldType, draft: string): 
     if ((type === "array" || type === "file_list") && !Array.isArray(parsed)) {
       return {
         ok: false,
-        error: "This state type requires a JSON array.",
+        error: translate("nodeCard.jsonArrayRequired"),
       };
     }
     if (type === "object" && (parsed === null || Array.isArray(parsed) || typeof parsed !== "object")) {
       return {
         ok: false,
-        error: "This state type requires a JSON object.",
+        error: translate("nodeCard.jsonObjectRequired"),
       };
     }
     return {
@@ -62,7 +63,7 @@ export function parseStructuredStateDraft(type: StateFieldType, draft: string): 
   } catch {
     return {
       ok: false,
-      error: "Default value must be valid JSON.",
+      error: translate("nodeCard.jsonRequired"),
     };
   }
 }

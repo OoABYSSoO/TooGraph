@@ -9,6 +9,7 @@ const currentDirectory = dirname(currentFilePath);
 const componentSource = readFileSync(resolve(currentDirectory, "EditorActionCapsule.vue"), "utf8");
 
 test("EditorActionCapsule keeps graph tools compact while preserving Run as the only primary action", () => {
+  assert.match(componentSource, /import \{ CircleCheck, CollectionTag, Download, Upload, VideoPlay \} from "@element-plus\/icons-vue";/);
   assert.match(componentSource, /import \{ ElIcon, ElTooltip \} from "element-plus";/);
   assert.match(
     componentSource,
@@ -16,6 +17,7 @@ test("EditorActionCapsule keeps graph tools compact while preserving Run as the 
   );
   assert.match(componentSource, /:class="\{ 'editor-action-capsule__state-pill--active': isStatePanelOpen \}"/);
   assert.match(componentSource, /<span class="editor-action-capsule__state-count">\{\{ activeStateCount \}\}<\/span>/);
+  assert.match(componentSource, /class="editor-action-capsule__run-icon"[\s\S]*<VideoPlay \/>/);
   assert.match(componentSource, /@click="\$emit\('toggle-state-panel'\)"/);
   assert.match(componentSource, /@click="\$emit\('run-active-graph'\)"/);
 });
@@ -23,19 +25,19 @@ test("EditorActionCapsule keeps graph tools compact while preserving Run as the 
 test("EditorActionCapsule renders non-primary graph actions as icon buttons with tooltips", () => {
   assert.match(
     componentSource,
-    /<ElTooltip content="保存图" placement="bottom">[\s\S]*aria-label="保存图"[\s\S]*@click="\$emit\('save-active-graph'\)"/,
+    /<ElTooltip :content="t\('editor\.saveGraph'\)" placement="bottom">[\s\S]*:aria-label="t\('editor\.saveGraph'\)"[\s\S]*@click="\$emit\('save-active-graph'\)"/,
   );
   assert.match(
     componentSource,
-    /<ElTooltip content="校验图" placement="bottom">[\s\S]*aria-label="校验图"[\s\S]*@click="\$emit\('validate-active-graph'\)"/,
+    /<ElTooltip :content="t\('editor\.validateGraph'\)" placement="bottom">[\s\S]*:aria-label="t\('editor\.validateGraph'\)"[\s\S]*@click="\$emit\('validate-active-graph'\)"/,
   );
   assert.match(
     componentSource,
-    /<ElTooltip content="导入 Python 图" placement="bottom">[\s\S]*aria-label="导入 Python 图"[\s\S]*@click="\$emit\('import-python-graph'\)"/,
+    /<ElTooltip :content="t\('editor\.importPythonGraph'\)" placement="bottom">[\s\S]*:aria-label="t\('editor\.importPythonGraph'\)"[\s\S]*@click="\$emit\('import-python-graph'\)"/,
   );
   assert.match(
     componentSource,
-    /<ElTooltip content="导出 Python 图" placement="bottom">[\s\S]*aria-label="导出 Python 图"[\s\S]*@click="\$emit\('export-active-graph'\)"/,
+    /<ElTooltip :content="t\('editor\.exportPythonGraph'\)" placement="bottom">[\s\S]*:aria-label="t\('editor\.exportPythonGraph'\)"[\s\S]*@click="\$emit\('export-active-graph'\)"/,
   );
   assert.doesNotMatch(componentSource, /copy\.newGraph/);
 });

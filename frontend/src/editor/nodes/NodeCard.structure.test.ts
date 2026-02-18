@@ -145,13 +145,13 @@ test("NodeCard restores the legacy agent runtime control order with Element Plus
   assert.match(agentSection, /:width="56"/);
   assert.match(agentSection, /active-text="ON"/);
   assert.match(agentSection, /inactive-text="OFF"/);
-  assert.match(agentSection, /class="node-card__confirm-hint node-card__confirm-hint--toggle">思考模式<\/div>/);
+  assert.match(agentSection, /class="node-card__confirm-hint node-card__confirm-hint--toggle">\{\{ t\("nodeCard\.thinkingMode"\) \}\}<\/div>/);
   assert.match(agentSection, /class="node-card__agent-toggle-card node-card__agent-toggle-card--breakpoint"/);
   assert.match(agentSection, /class="node-card__agent-breakpoint-icon"/);
   assert.match(agentSection, /class="node-card__agent-toggle-switch node-card__agent-breakpoint-switch"/);
   assert.match(agentSection, /:model-value="agentBreakpointEnabled"/);
   assert.match(agentSection, /@update:model-value="handleAgentBreakpointToggleValue"/);
-  assert.match(agentSection, /class="node-card__confirm-hint node-card__confirm-hint--toggle">设置断点<\/div>/);
+  assert.match(agentSection, /class="node-card__confirm-hint node-card__confirm-hint--toggle">\{\{ t\("nodeCard\.setBreakpoint"\) \}\}<\/div>/);
   assert.doesNotMatch(agentSection, /class="node-card__agent-breakpoint-button"/);
   assert.doesNotMatch(agentSection, /node-card__agent-thinking-inline/);
   assert.doesNotMatch(agentSection, /node-card__agent-thinking-shell/);
@@ -182,8 +182,8 @@ test("NodeCard restores the legacy agent runtime control order with Element Plus
   assert.match(componentSource, /class="node-card__breakpoint-timing-select graphite-select"/);
   assert.match(componentSource, /:model-value="agentBreakpointTimingValue"/);
   assert.match(componentSource, /@update:model-value="handleAgentBreakpointTimingSelect"/);
-  assert.match(componentSource, /Run after/);
-  assert.match(componentSource, /Run before/);
+  assert.match(componentSource, /t\('nodeCard\.runAfter'\)/);
+  assert.match(componentSource, /t\('nodeCard\.runBefore'\)/);
   assert.match(componentSource, /const agentModelSelectRef = ref<\{ blur\?: \(\) => void; toggleMenu\?: \(\) => void; expanded\?: boolean \} \| null>\(null\);/);
   assert.match(componentSource, /function collapseAgentModelSelect\(\) \{[\s\S]*if \(agentModelSelectRef\.value\?\.expanded\) \{[\s\S]*agentModelSelectRef\.value\.toggleMenu\?\.\(\);[\s\S]*\}[\s\S]*agentModelSelectRef\.value\?\.blur\?\.\(\);[\s\S]*\}/);
   assert.match(componentSource, /collapseAgentModelSelect\(\);/);
@@ -230,7 +230,7 @@ test("NodeCard renders a visible transient new agent input capsule while state d
   assert.match(agentSection, /v-if="pendingStateInputSource"/);
   assert.match(agentSection, /node-card__port-pill--create/);
   assert.match(agentSection, /node-card__port-pill-create-badge/);
-  assert.match(agentSection, />NEW</);
+  assert.match(agentSection, /t\("common\.new"\)/);
   assert.match(agentSection, /\{\{ pendingStateInputSource\.label \}\}/);
   assert.match(agentSection, /:data-anchor-slot-id="\`\$\{nodeId\}:state-in:\$\{CREATE_AGENT_INPUT_STATE_KEY\}\`"/);
   assert.match(componentSource, /\.node-card__port-pill--create \{[\s\S]*background:/);
@@ -259,9 +259,9 @@ test("NodeCard moves node actions into hoverable top buttons built from Element 
   assert.match(componentSource, /:visible="activeTopAction === 'preset'"/);
   assert.match(componentSource, /placement="top"/);
   assert.match(componentSource, /:popper-style="confirmPopoverStyle"/);
-  assert.match(componentSource, /Save preset\?/);
+  assert.match(componentSource, /t\("nodeCard\.savePresetQuestion"\)/);
   assert.match(componentSource, /:visible="activeTopAction === 'delete'"/);
-  assert.match(componentSource, /Delete node\?/);
+  assert.match(componentSource, /t\("nodeCard\.deleteNodeQuestion"\)/);
   assert.match(componentSource, /const confirmPopoverStyle = \{/);
   assert.match(componentSource, /const actionPopoverStyle = \{/);
   assert.match(componentSource, /"--el-popover-bg-color":\s*"transparent"/);
@@ -312,7 +312,7 @@ test("NodeCard shows a persistent human review capsule in the top action dock", 
   assert.match(componentSource, /class="node-card__human-review-button"/);
   assert.match(componentSource, /@click\.stop="handleHumanReviewActionClick"/);
   assert.match(componentSource, /function handleHumanReviewActionClick\(\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
-  assert.match(componentSource, /Human Review/);
+  assert.match(componentSource, /t\("nodeCard\.humanReview"\)/);
   assert.match(componentSource, /const isTopActionVisible = computed\(\(\) => props\.humanReviewPending \|\| props\.selected \|\| activeTopAction\.value !== null\);/);
   assert.match(componentSource, /\.node-card__human-review-button \{[\s\S]*background:\s*rgba\(217,\s*119,\s*6,\s*0\.12\);/);
 });
@@ -378,7 +378,7 @@ test("NodeCard reveals state pills on hover and opens state editing only after a
     /:placement="isStateEditorOpen\([^"]+\) \? 'bottom-(start|end)' : 'top-(start|end)'"/,
   );
   assert.match(componentSource, /<StateEditorPopover/);
-  assert.match(componentSource, /Edit state\?/);
+  assert.match(componentSource, /t\("nodeCard\.editStateQuestion"\)/);
   assert.match(componentSource, /node-card__port-pill--revealed/);
   assert.match(componentSource, /node-card__port-pill--confirm/);
   assert.match(componentSource, /node-card__port-pill-confirm-icon/);
@@ -447,7 +447,7 @@ test("NodeCard adds mirrored remove-binding buttons to non-output state pills", 
   assert.match(componentSource, /@click\.stop="handleRemovePortStateClick\(`agent-input:\$\{port\.key\}`,\s*'input', port\.key\)"/);
   assert.match(componentSource, /@click\.stop="handleRemovePortStateClick\(`agent-output:\$\{port\.key\}`,\s*'output', port\.key\)"/);
   assert.match(componentSource, /@click\.stop="handleRemovePortStateClick\(`condition-input:\$\{view\.body\.primaryInput\.key\}`,\s*'input', view\.body\.primaryInput\.key\)"/);
-  assert.match(componentSource, /Remove state\?/);
+  assert.match(componentSource, /t\("nodeCard\.removeStateQuestion"\)/);
   const inputSectionMatch = componentSource.match(
     /<section v-if="view\.body\.kind === 'input'"[\s\S]*?<\/section>/,
   );
@@ -486,9 +486,9 @@ test("NodeCard renders condition nodes as clean control-flow proxies", () => {
   assert.match(conditionSection, /class="node-card__port-pill[\s\S]*node-card__port-pill--input/);
   assert.match(conditionSection, /condition-input:\$\{view\.body\.primaryInput\.key\}/);
   assert.match(conditionSection, /class="node-card__condition-controls-row"/);
-  assert.match(conditionSection, /<span class="node-card__control-label">Operator<\/span>/);
-  assert.match(conditionSection, /<span class="node-card__control-label">Value<\/span>/);
-  assert.match(conditionSection, /<span class="node-card__control-label">Max loops<\/span>/);
+  assert.match(conditionSection, /<span class="node-card__control-label">\{\{ t\("nodeCard\.operator"\) \}\}<\/span>/);
+  assert.match(conditionSection, /<span class="node-card__control-label">\{\{ t\("nodeCard\.value"\) \}\}<\/span>/);
+  assert.match(conditionSection, /<span class="node-card__control-label">\{\{ t\("nodeCard\.maxLoops"\) \}\}<\/span>/);
   assert.match(conditionSection, /view\.body\.operatorLabel/);
   assert.match(conditionSection, /view\.body\.valueLabel/);
   assert.match(conditionSection, /:value="conditionRuleValueDraft"/);
@@ -602,8 +602,8 @@ test("NodeCard routes title and description editing through hoverable confirm tr
   assert.doesNotMatch(componentSource, /@blur="commitTextEditor\('title'\)"/);
   assert.doesNotMatch(componentSource, /@blur="commitTextEditor\('description'\)"/);
   assert.match(componentSource, /window\.setTimeout\(\(\) => \{/);
-  assert.match(componentSource, /Edit name\?/);
-  assert.match(componentSource, /Edit description\?/);
+  assert.match(componentSource, /t\("nodeCard\.editNameQuestion"\)/);
+  assert.match(componentSource, /t\("nodeCard\.editDescriptionQuestion"\)/);
   assert.match(componentSource, /class="node-card__confirm-hint node-card__confirm-hint--text"/);
   assert.match(componentSource, /popper-class="node-card__text-editor-popper"/);
   assert.match(componentSource, /class="node-card__text-editor"/);

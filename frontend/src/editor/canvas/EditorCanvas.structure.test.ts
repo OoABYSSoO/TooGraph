@@ -123,7 +123,7 @@ test("EditorCanvas keeps paused human-review graphs viewable but read-only", () 
   assert.match(componentSource, /@click\.stop="handleLockBannerClick"/);
   assert.match(componentSource, /@keydown\.enter\.prevent="handleLockBannerClick"/);
   assert.match(componentSource, /@keydown\.space\.prevent="handleLockBannerClick"/);
-  assert.match(componentSource, /Human Review Paused · Graph Locked/);
+  assert.match(componentSource, /t\("editor\.lockBanner"\)/);
   assert.match(componentSource, /@keyframes editor-canvas-lock-banner-breathe/);
   assert.match(componentSource, /function handleLockBannerClick\(\)[\s\S]*emit\("open-human-review", \{ nodeId: props\.currentRunNodeId \}\);/);
   assert.match(componentSource, /\.editor-canvas__lock-banner \{[\s\S]*top:\s*calc\(var\(--editor-canvas-floating-top-clearance,\s*18px\) \+ 64px\);/);
@@ -254,14 +254,15 @@ test("EditorCanvas renders hover-only flow hotspots and distinguishes flowing fl
 });
 
 test("EditorCanvas exposes a top-left capsule toolbar for edge visibility modes", () => {
-  assert.match(componentSource, /import \{[\s\S]*EDGE_VISIBILITY_MODE_OPTIONS,[\s\S]*filterProjectedEdgesForVisibilityMode,[\s\S]*type EdgeVisibilityMode[\s\S]*\} from "\.\/edgeVisibilityModel";/);
+  assert.match(componentSource, /import \{[\s\S]*buildEdgeVisibilityModeOptions,[\s\S]*filterProjectedEdgesForVisibilityMode,[\s\S]*type EdgeVisibilityMode[\s\S]*\} from "\.\/edgeVisibilityModel";/);
+  assert.match(componentSource, /const edgeVisibilityModeOptions = computed\(\(\) => \{[\s\S]*return buildEdgeVisibilityModeOptions\(\);/);
   assert.match(componentSource, /const edgeVisibilityMode = ref<EdgeVisibilityMode>\("smart"\);/);
   assert.match(componentSource, /const edgeVisibilityRelatedNodeIds = computed\(\(\) =>/);
   assert.match(componentSource, /const visibleProjectedEdgeIds = computed\(/);
   assert.match(componentSource, /filterProjectedEdgesForVisibilityMode\(projectedEdges\.value,/);
   assert.match(componentSource, /function isProjectedEdgeVisible\(edge: ProjectedCanvasEdge\)/);
   assert.match(componentSource, /class="editor-canvas__edge-view-toolbar"/);
-  assert.match(componentSource, /v-for="option in EDGE_VISIBILITY_MODE_OPTIONS"/);
+  assert.match(componentSource, /v-for="option in edgeVisibilityModeOptions"/);
   assert.match(componentSource, /handleEdgeVisibilityModeClick\(option\.mode\)/);
   assert.match(componentSource, /\{\{ option\.label \}\}/);
   assert.match(componentSource, /v-show="isProjectedEdgeVisible\(edge\)"/);
@@ -336,7 +337,7 @@ test("EditorCanvas gives data edges the same two-step state editing entry patter
   assert.match(componentSource, /activeDataEdgeStateEditor\.value = \{[\s\S]*id: activeDataEdgeStateConfirm\.value\.id,/);
   assert.match(componentSource, /if \(edge\.kind === "data"\) \{[\s\S]*startDataEdgeStateConfirm\(edge, event\);[\s\S]*return;/);
   assert.match(componentSource, /<div[\s\S]*v-if="activeDataEdgeStateConfirm"[\s\S]*class="editor-canvas__edge-state-confirm"/);
-  assert.match(componentSource, /<div class="editor-canvas__confirm-hint editor-canvas__confirm-hint--state">Edit state\?<\/div>/);
+  assert.match(componentSource, /<div class="editor-canvas__confirm-hint editor-canvas__confirm-hint--state">\{\{ t\("nodeCard\.editStateQuestion"\) \}\}<\/div>/);
   assert.match(componentSource, /class="editor-canvas__edge-state-button"/);
   assert.match(componentSource, /@click\.stop="openDataEdgeStateEditor"/);
   assert.match(componentSource, /<div[\s\S]*v-if="activeDataEdgeStateEditor && dataEdgeStateDraft"[\s\S]*class="editor-canvas__edge-state-editor-shell"/);
@@ -370,8 +371,8 @@ test("EditorCanvas tints data edge outlines from the data edge state color", () 
 });
 
 test("EditorCanvas restores empty-canvas onboarding copy for node creation", () => {
-  assert.match(componentSource, /Double click to create your first node/);
-  assert.match(componentSource, /Drag from an output handle into empty space to get type-aware preset suggestions\./);
+  assert.match(componentSource, /t\("editor\.createFirstNode"\)/);
+  assert.match(componentSource, /t\("editor\.emptyCanvasHint"\)/);
   assert.doesNotMatch(componentSource, /class="editor-canvas__connect-hint"/);
 });
 

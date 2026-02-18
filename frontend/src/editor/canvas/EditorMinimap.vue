@@ -4,7 +4,7 @@
     ref="containerRef"
     class="editor-minimap"
     :class="{ 'editor-minimap--dragging': isDragging }"
-    aria-label="Canvas minimap"
+    :aria-label="t('editor.minimap')"
     @dblclick.stop
     @pointerdown.stop.prevent="handlePointerDown"
     @pointermove.stop.prevent="handlePointerMove"
@@ -59,6 +59,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 
 import {
   buildEditorMinimapModel,
@@ -88,6 +89,7 @@ const emit = defineEmits<{
   (event: "center-view", payload: { worldX: number; worldY: number }): void;
 }>();
 
+const { t } = useI18n();
 const containerRef = ref<HTMLElement | null>(null);
 const isDragging = ref(false);
 

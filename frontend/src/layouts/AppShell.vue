@@ -16,7 +16,7 @@
         <div class="app-shell__brand-mark" aria-hidden="true">C</div>
         <div class="app-shell__brand-copy">
           <h1 class="app-shell__title">GraphiteUI</h1>
-          <p class="app-shell__subtitle">Workflow Studio</p>
+          <p class="app-shell__subtitle">{{ t("app.subtitle") }}</p>
         </div>
       </div>
 
@@ -25,52 +25,53 @@
           to="/"
           class="app-shell__link"
           :class="{ 'app-shell__link--active': activeNavigationSection === 'home' }"
-          title="首页"
+          :title="t('nav.home')"
         >
           <ElIcon class="app-shell__link-icon"><House /></ElIcon>
-          <span class="app-shell__link-label">首页</span>
+          <span class="app-shell__link-label">{{ t("nav.home") }}</span>
         </RouterLink>
         <RouterLink
           to="/editor"
           class="app-shell__link"
           :class="{ 'app-shell__link--active': activeNavigationSection === 'editor' }"
-          title="编辑器"
+          :title="t('nav.editor')"
         >
           <ElIcon class="app-shell__link-icon"><EditPen /></ElIcon>
-          <span class="app-shell__link-label">编辑器</span>
+          <span class="app-shell__link-label">{{ t("nav.editor") }}</span>
         </RouterLink>
         <RouterLink
           to="/runs"
           class="app-shell__link"
           :class="{ 'app-shell__link--active': activeNavigationSection === 'runs' }"
-          title="运行记录"
+          :title="t('nav.runs')"
         >
           <ElIcon class="app-shell__link-icon"><Clock /></ElIcon>
-          <span class="app-shell__link-label">运行记录</span>
+          <span class="app-shell__link-label">{{ t("nav.runs") }}</span>
         </RouterLink>
         <RouterLink
           to="/settings"
           class="app-shell__link"
           :class="{ 'app-shell__link--active': activeNavigationSection === 'settings' }"
-          title="设置"
+          :title="t('nav.settings')"
         >
           <ElIcon class="app-shell__link-icon"><Setting /></ElIcon>
-          <span class="app-shell__link-label">设置</span>
+          <span class="app-shell__link-label">{{ t("nav.settings") }}</span>
         </RouterLink>
       </nav>
 
       <button
         type="button"
         class="app-shell__collapse"
-        :aria-label="isSidebarCollapsed ? '展开侧栏' : '收起侧栏'"
+        :aria-label="isSidebarCollapsed ? t('nav.expandSidebar') : t('nav.collapseSidebar')"
         @click="setSidebarCollapsed(!isSidebarCollapsed)"
       >
         <ElIcon class="app-shell__collapse-icon" aria-hidden="true">
           <Expand v-if="isSidebarCollapsed" />
           <Fold v-else />
         </ElIcon>
-        <span class="app-shell__collapse-label">{{ isSidebarCollapsed ? "展开" : "收起侧栏" }}</span>
+        <span class="app-shell__collapse-label">{{ isSidebarCollapsed ? t("nav.expand") : t("nav.collapseSidebar") }}</span>
       </button>
+      <LanguageSwitcher :collapsed="isSidebarCollapsed" />
     </aside>
 
     <main class="app-shell__content" :class="{ 'app-shell__content--editor': isEditorCanvasMode }">
@@ -83,13 +84,16 @@
 import { ElIcon } from "element-plus";
 import { House, EditPen, Clock, Setting, Fold, Expand } from "@element-plus/icons-vue";
 import { computed, onMounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 
+import LanguageSwitcher from "./LanguageSwitcher.vue";
 import { resolvePrimaryNavigationSection, resolveShellLayoutMode } from "@/lib/layout-mode";
 
 const SIDEBAR_STORAGE_KEY = "graphiteui:sidebar-collapsed";
 
 const route = useRoute();
+const { t } = useI18n();
 const isSidebarCollapsed = ref(false);
 
 const activeNavigationSection = computed(() => resolvePrimaryNavigationSection(route.path));

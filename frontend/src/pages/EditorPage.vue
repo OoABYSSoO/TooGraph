@@ -1,6 +1,6 @@
 <template>
   <AppShell>
-    <div v-if="!initialListsReady" class="editor-page__loading">正在同步模板和图列表…</div>
+    <div v-if="!initialListsReady" class="editor-page__loading">{{ t("app.loadingWorkspace") }}</div>
     <EditorWorkspaceShell
       v-else
       :route-mode="routeMode"
@@ -17,6 +17,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
+import { useI18n } from "vue-i18n";
 
 import EditorWorkspaceShell from "@/editor/workspace/EditorWorkspaceShell.vue";
 import AppShell from "@/layouts/AppShell.vue";
@@ -25,6 +26,7 @@ import { useGraphDocumentStore } from "@/stores/graphDocument";
 const route = useRoute();
 const graphStore = useGraphDocumentStore();
 const initialListsReady = ref(false);
+const { t } = useI18n();
 
 const routeMode = computed<"root" | "new" | "existing">(() => {
   if (route.path === "/editor") {

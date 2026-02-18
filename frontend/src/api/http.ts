@@ -8,8 +8,8 @@ function buildApiUrl(path: string): string {
   return `${API_BASE.replace(/\/$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
-export async function apiGet<T>(path: string): Promise<T> {
-  const response = await fetch(buildApiUrl(path));
+export async function apiGet<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(buildApiUrl(path), init);
   if (!response.ok) {
     throw new Error(`GET ${path} failed with status ${response.status}`);
   }

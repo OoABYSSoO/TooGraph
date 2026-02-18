@@ -46,7 +46,7 @@ GraphiteUI 是一个面向 LangGraph 风格 Agent 工作流的可视化编排与
 
 - Node.js 20.9+
 - Python 3.11+
-- 可选：OpenAI-compatible API 或 EZLLM 本地 runtime
+- 可选：OpenAI-compatible API、本地网关或私有网关
 
 ### 安装依赖
 
@@ -123,18 +123,16 @@ make backend-dev
 make backend-health
 ```
 
-### 本地 runtime（EZLLM）
+### OpenAI-compatible 自定义 Provider
 
-推荐把本地模型 runtime 交给 EZLLM 管理：
+GraphiteUI 默认把本地或私有模型入口视为 OpenAI 协议兼容的自定义 provider。先启动你自己的网关，再用环境变量指向它：
 
 ```bash
-pipx install ezllm
-ezllm start
-LOCAL_BASE_URL=http://127.0.0.1:8888/v1
+LOCAL_BASE_URL=http://127.0.0.1:8000/v1
 LOCAL_TEXT_MODEL=your-local-model
 ```
 
-如果你的 EZLLM 网关需要鉴权，再额外设置 `LOCAL_API_KEY`。GraphiteUI 自身的开发环境仍然使用上面的 `npm run dev` 或 `node scripts/start.mjs` 启动。
+如果你的网关需要鉴权，再额外设置 `LOCAL_API_KEY`。GraphiteUI 自身的开发环境仍然使用上面的 `npm run dev` 或 `node scripts/start.mjs` 启动。
 
 也兼容这些别名：
 
@@ -148,22 +146,20 @@ LOCAL_TEXT_MODEL=your-local-model
 
 1. 安装前后端依赖
 2. 准备一个模型入口
-   - 本地模型：推荐用 EZLLM
-   - 云端或其他 OpenAI-compatible 网关：设置 `LOCAL_BASE_URL`、`LOCAL_API_KEY`、`LOCAL_TEXT_MODEL`
+   - 本地模型或私有网关：设置 `LOCAL_BASE_URL`、`LOCAL_API_KEY`、`LOCAL_TEXT_MODEL`
+   - 云端 OpenAI-compatible 网关：同样使用这组变量
 3. 启动 GraphiteUI
 4. 打开编辑器，新建一张最小 graph
 5. 保存、校验、运行，然后到 Runs 页面看结果
 
-#### 方案 A：用 EZLLM 作为本地 runtime
+#### 方案 A：接本地 OpenAI-compatible 网关
 
-先启动 EZLLM，再启动 GraphiteUI。
+先启动你的本地模型网关，再启动 GraphiteUI。
 
 PowerShell 示例：
 
 ```powershell
-pipx install ezllm
-ezllm start
-$env:LOCAL_BASE_URL = "http://127.0.0.1:8888/v1"
+$env:LOCAL_BASE_URL = "http://127.0.0.1:8000/v1"
 $env:LOCAL_TEXT_MODEL = "lm-local"
 npm.cmd run dev
 ```
@@ -171,9 +167,7 @@ npm.cmd run dev
 Bash 示例：
 
 ```bash
-pipx install ezllm
-ezllm start
-export LOCAL_BASE_URL=http://127.0.0.1:8888/v1
+export LOCAL_BASE_URL=http://127.0.0.1:8000/v1
 export LOCAL_TEXT_MODEL=lm-local
 npm run dev
 ```
@@ -182,7 +176,7 @@ npm run dev
 
 - 编辑器：http://127.0.0.1:3477
 - 后端健康检查：http://127.0.0.1:8765/health
-- EZLLM 日志页：http://127.0.0.1:8888/logs
+- 本地网关日志页：以你所使用的网关为准
 
 #### 方案 B：接现有 OpenAI-compatible 网关
 
@@ -223,7 +217,7 @@ npm run dev
 ### 常见用法
 
 - 想检查后端是否正常：访问 `http://127.0.0.1:8765/health`
-- 想看 EZLLM 当前 runtime 和日志：访问 `http://127.0.0.1:8888/logs`
+- 想看模型网关当前 runtime 和日志：访问你所使用网关提供的管理页面
 - 想导入项目自带知识库：运行 `python scripts/import_official_knowledge_bases.py`
 - 想切换模型入口：修改 `LOCAL_BASE_URL` / `LOCAL_TEXT_MODEL` 后重新执行 `npm run dev`
 

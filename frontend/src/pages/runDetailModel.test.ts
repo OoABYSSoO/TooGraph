@@ -3,7 +3,7 @@ import test from "node:test";
 
 import type { RunDetail } from "../types/run.ts";
 
-import { formatRunArtifactValue, listRunOutputArtifacts, shouldPollRunStatus } from "./runDetailModel.ts";
+import { buildRunStatusFacts, formatRunArtifactValue, listRunOutputArtifacts, shouldPollRunStatus } from "./runDetailModel.ts";
 
 function createRunDetail(overrides: Partial<RunDetail> = {}): RunDetail {
   return {
@@ -137,5 +137,23 @@ test("listRunOutputArtifacts maps exported outputs into renderable cards", () =>
       persistLabel: "persist md",
       fileName: "answer.md",
     },
+  ]);
+});
+
+test("buildRunStatusFacts keeps the primary run facts compact and status-first", () => {
+  const facts = buildRunStatusFacts(
+    createRunDetail({
+      status: "awaiting_human",
+      current_node_id: "draft_writer",
+      duration_ms: 125_000,
+      revision_round: 2,
+    }),
+  );
+
+  assert.deepEqual(facts, [
+    { key: "status", label: "状态", value: "awaiting_human", tone: "status" },
+    { key: "current", label: "当前节点", value: "draft_writer", tone: "default" },
+    { key: "duration", label: "耗时", value: "2m 5s", tone: "default" },
+    { key: "revision", label: "修订", value: "2", tone: "default" },
   ]);
 });

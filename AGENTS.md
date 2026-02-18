@@ -16,11 +16,12 @@ These instructions apply to all work in this repository and should persist acros
 
 ## Local LLM Runtime
 
-- Standardize local LLM/runtime guidance on EZLLM.
-- Preferred local runtime flow:
-  - `pipx install ezllm`
-  - `ezllm start`
-  - `LOCAL_BASE_URL=http://127.0.0.1:8888/v1`
+- Standardize local LLM/runtime guidance on an OpenAI-compatible custom provider.
+- Preferred local or private gateway flow:
+  - Start the OpenAI-compatible gateway you want to use.
+  - `LOCAL_BASE_URL=http://127.0.0.1:8000/v1`
+  - `LOCAL_API_KEY=<optional api key>`
+  - `LOCAL_TEXT_MODEL=<model name exposed by your gateway>`
 - Keep GraphiteUI's own dev startup guidance on `npm run dev` and `node scripts/start.mjs`; those commands are not replaced by local runtime instructions.
 
 ## UI Implementation Policy

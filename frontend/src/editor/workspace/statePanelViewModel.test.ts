@@ -236,8 +236,8 @@ test("buildStatePanelViewModel reports empty state cleanly", () => {
     conditional_edges: [],
   });
   assert.equal(view.count, 0);
-  assert.equal(view.emptyTitle, "No State Yet");
-  assert.equal(view.emptyBody, "Graph state objects will appear here once the graph defines them.");
+  assert.equal(view.emptyTitle, "还没有 State");
+  assert.equal(view.emptyBody, "Graph State 对象会在图定义后出现在这里。");
 });
 
 test("buildStatePanelViewModel groups the latest run state timeline per state row", () => {

@@ -134,6 +134,14 @@ export type RunSnapshot = {
   final_result?: string;
 };
 
+export type RunSnapshotOption = {
+  snapshot_id: string | null;
+  kind: string;
+  label: string;
+  status: string;
+  current_node_id?: string | null;
+};
+
 export type RunArtifacts = {
   skill_outputs?: Array<Record<string, unknown>>;
   output_previews?: OutputPreview[];
@@ -153,6 +161,7 @@ export type RunSummary = {
   graph_name: string;
   status: string;
   restorable_snapshot_available?: boolean;
+  run_snapshot_options?: RunSnapshotOption[];
   runtime_backend: string;
   lifecycle: RunLifecycleRecord;
   checkpoint_metadata: CheckpointMetadata;

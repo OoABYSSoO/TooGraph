@@ -94,7 +94,11 @@ export function pruneUnreferencedStateSchemaInDocument<T extends GraphPayload | 
 }
 
 export function cloneGraphDocument<T extends GraphPayload | GraphDocument>(document: T): T {
-  return structuredClone(normalizeCloneValue(document));
+  return clonePlainValue(document);
+}
+
+export function clonePlainValue<T>(value: T): T {
+  return structuredClone(normalizeCloneValue(value));
 }
 
 function normalizeCloneValue<T>(value: T, seen = new WeakMap<object, unknown>()): T {
