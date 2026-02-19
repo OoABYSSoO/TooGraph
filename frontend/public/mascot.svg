@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="560" viewBox="-260 -180 640 560" role="img" aria-labelledby="title desc">
+  <title id="title">GraphiteUI cat mascot</title>
+  <desc id="desc">A borderless black cat mascot with warm gold eyes, a gold sparkle, and a curled tail.</desc>
+  <defs>
+    <radialGradient id="sparkleGold" cx="0" cy="-106" r="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#f2c968"/>
+      <stop offset="62%" stop-color="#dfad50"/>
+      <stop offset="100%" stop-color="#c89136"/>
+    </radialGradient>
+    <linearGradient id="eyeGold" x1="-104" y1="32" x2="104" y2="136" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#efbd61"/>
+      <stop offset="52%" stop-color="#d8a650"/>
+      <stop offset="100%" stop-color="#cf963d"/>
+    </linearGradient>
+    <radialGradient id="catBlack" cx="-44" cy="-132" r="360" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#282928"/>
+      <stop offset="44%" stop-color="#222222"/>
+      <stop offset="100%" stop-color="#171818"/>
+    </radialGradient>
+    <filter id="mascotSoftness" x="-280" y="-210" width="700" height="640" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#000000" flood-opacity="0.12"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#mascotSoftness)">
+    <path
+      id="mascotTail"
+      fill="none"
+      stroke="url(#catBlack)"
+      stroke-width="30"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      d="M204 154
+         C260 156 314 112 322 48
+         C330 -18 282 -58 238 -42
+         C210 -30 216 2 250 8"
+    />
+    <path
+      id="mascotSparkle"
+      fill="url(#sparkleGold)"
+      d="M0-150
+         C5-124 18-111 44-106
+         C18-101 5-88 0-62
+         C-5-88 -18-101 -44-106
+         C-18-111 -5-124 0-150Z"
+    />
+    <path
+      id="mascotHead"
+      fill="url(#catBlack)"
+      d="M-146-143
+         C-116-135-82-106-55-61
+         C-25-66 25-66 55-61
+         C82-106 116-135 146-143
+         C164-106 174-52 168-4
+         C196 22 214 66 218 116
+         C226 208 145 264 0 264
+         C-145 264-226 208-218 116
+         C-214 66-196 22-168-4
+         C-174-52-164-106-146-143Z"
+    />
+    <ellipse cx="-80" cy="82" rx="24" ry="52" fill="url(#eyeGold)"/>
+    <ellipse cx="80" cy="82" rx="24" ry="52" fill="url(#eyeGold)"/>
+  </g>
+</svg>
