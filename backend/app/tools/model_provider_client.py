@@ -7,16 +7,26 @@ import httpx
 
 from app.core.model_provider_templates import (
     TRANSPORT_ANTHROPIC_MESSAGES,
+    TRANSPORT_CODEX_RESPONSES,
     TRANSPORT_GEMINI_GENERATE_CONTENT,
     TRANSPORT_OPENAI_COMPATIBLE,
     get_provider_template,
     normalize_transport,
 )
 from app.core.storage.settings_store import load_app_settings
+from app.tools.openai_codex_client import (
+    DEFAULT_CODEX_MODEL_IDS,
+    refresh_codex_access_token,
+    resolve_codex_access_token,
+)
 
 
 ANTHROPIC_VERSION = "2023-06-01"
 DEFAULT_REQUEST_TIMEOUT_SEC = 180.0
+
+
+class CodexAuthExpiredError(RuntimeError):
+    pass
 
 
 def _normalize_base_url(base_url: str) -> str:
@@ -189,6 +199,31 @@ def _parse_gemini_model_ids(payload: dict[str, Any]) -> list[str]:
     return _dedupe_strings(model_ids)
 
 
+def _parse_codex_model_ids(payload: dict[str, Any]) -> list[str]:
+    models = payload.get("models")
+    if not isinstance(models, list):
+        raise RuntimeError("Model discovery returned an unexpected payload shape.")
+
+    sortable: list[tuple[int, str]] = []
+    for item in models:
+        if not isinstance(item, dict):
+            continue
+        if item.get("supported_in_api") is False:
+            continue
+        visibility = item.get("visibility")
+        if isinstance(visibility, str) and visibility.strip().lower() in {"hide", "hidden"}:
+            continue
+        slug = str(item.get("slug") or item.get("id") or item.get("name") or "").strip()
+        if not slug:
+            continue
+        priority = item.get("priority")
+        rank = int(priority) if isinstance(priority, (int, float)) else 10_000
+        sortable.append((rank, slug))
+
+    sortable.sort(key=lambda entry: (entry[0], entry[1]))
+    return _dedupe_strings([slug for _rank, slug in sortable])
+
+
 def discover_provider_models(
     *,
     provider_id: str,
@@ -232,6 +267,33 @@ def discover_provider_models(
             error_label="Model discovery failed",
         )
         return _parse_gemini_model_ids(payload)
+
+    if normalized_transport == TRANSPORT_CODEX_RESPONSES:
+        access_token = resolve_codex_access_token()
+        try:
+            payload = _request_json(
+                method="GET",
+                url=f"{normalized_base_url}/models",
+                timeout_sec=timeout_sec,
+                headers=_build_auth_headers(api_key=access_token),
+                params={"client_version": "1.0.0"},
+                error_label="Model discovery failed",
+            )
+        except RuntimeError as exc:
+            if "HTTP 401" in str(exc):
+                access_token = refresh_codex_access_token()
+                payload = _request_json(
+                    method="GET",
+                    url=f"{normalized_base_url}/models",
+                    timeout_sec=timeout_sec,
+                    headers=_build_auth_headers(api_key=access_token),
+                    params={"client_version": "1.0.0"},
+                    error_label="Model discovery failed",
+                )
+            else:
+                return list(DEFAULT_CODEX_MODEL_IDS)
+        model_ids = _parse_codex_model_ids(payload)
+        return model_ids or list(DEFAULT_CODEX_MODEL_IDS)
 
     raise RuntimeError(f"Unsupported provider transport: {normalized_transport}")  # pragma: no cover
 
@@ -368,6 +430,117 @@ def _chat_gemini(
     }
 
 
+def _extract_codex_responses_text(response_payload: dict[str, Any]) -> tuple[str, str]:
+    output_text = _normalize_message_text(response_payload.get("output_text")).strip()
+    if output_text:
+        return output_text, _normalize_message_text(response_payload.get("reasoning")).strip()
+
+    text_parts: list[str] = []
+    reasoning_parts: list[str] = []
+    output = response_payload.get("output")
+    if isinstance(output, list):
+        for item in output:
+            if not isinstance(item, dict):
+                continue
+            item_type = str(item.get("type") or "").strip()
+            content = item.get("content")
+            if item_type == "reasoning":
+                summary = item.get("summary")
+                reasoning_text = _normalize_message_text(summary or item.get("text")).strip()
+                if reasoning_text:
+                    reasoning_parts.append(reasoning_text)
+                continue
+            if isinstance(content, list):
+                for part in content:
+                    if not isinstance(part, dict):
+                        continue
+                    part_text = _normalize_message_text(part.get("text") or part.get("content")).strip()
+                    if part_text:
+                        text_parts.append(part_text)
+            else:
+                item_text = _normalize_message_text(content or item.get("text")).strip()
+                if item_text:
+                    text_parts.append(item_text)
+
+    return "\n".join(text_parts).strip(), "\n".join(reasoning_parts).strip()
+
+
+def _post_codex_responses_once(
+    *,
+    base_url: str,
+    access_token: str,
+    request_payload: dict[str, Any],
+    provider_id: str,
+) -> dict[str, Any]:
+    try:
+        with httpx.Client(timeout=DEFAULT_REQUEST_TIMEOUT_SEC, trust_env=False) as client:
+            response = client.post(
+                f"{base_url}/responses",
+                headers=_build_auth_headers(api_key=access_token),
+                json=request_payload,
+            )
+            response.raise_for_status()
+            payload = response.json()
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code == 401:
+            raise CodexAuthExpiredError("Codex access token expired.") from exc
+        detail = exc.response.text.strip()
+        raise RuntimeError(f"{provider_id} request failed: HTTP {exc.response.status_code} {detail[:600]}") from exc
+    except httpx.HTTPError as exc:
+        raise RuntimeError(f"{provider_id} request failed: {exc}") from exc
+    except ValueError as exc:
+        raise RuntimeError(f"{provider_id} request failed: invalid JSON: {exc}") from exc
+
+    if not isinstance(payload, dict):
+        raise RuntimeError(f"{provider_id} request failed: unexpected payload shape.")
+    return payload
+
+
+def _chat_codex_responses(
+    *,
+    provider_id: str,
+    base_url: str,
+    model: str,
+    system_prompt: str,
+    user_prompt: str,
+    temperature: float,
+) -> tuple[str, dict[str, Any]]:
+    request_payload: dict[str, Any] = {
+        "model": model,
+        "instructions": system_prompt,
+        "input": [{"role": "user", "content": user_prompt}],
+        "store": False,
+        "temperature": temperature,
+    }
+
+    access_token = resolve_codex_access_token()
+    try:
+        response_payload = _post_codex_responses_once(
+            base_url=base_url,
+            access_token=access_token,
+            request_payload=request_payload,
+            provider_id=provider_id,
+        )
+    except CodexAuthExpiredError:
+        response_payload = _post_codex_responses_once(
+            base_url=base_url,
+            access_token=refresh_codex_access_token(),
+            request_payload=request_payload,
+            provider_id=provider_id,
+        )
+
+    content, reasoning = _extract_codex_responses_text(response_payload)
+    return content, {
+        "model": response_payload.get("model") or model,
+        "provider_id": provider_id,
+        "temperature": temperature,
+        "reasoning": reasoning,
+        "usage": response_payload.get("usage"),
+        "timings": None,
+        "response_id": response_payload.get("id"),
+    }
+
+
 def chat_with_model_provider(
     *,
     provider_id: str,
@@ -425,6 +598,15 @@ def chat_with_model_provider(
             user_prompt=user_prompt,
             temperature=temperature,
             max_tokens=max_tokens,
+        )
+    elif normalized_transport == TRANSPORT_CODEX_RESPONSES:
+        content, meta = _chat_codex_responses(
+            provider_id=provider_id,
+            base_url=normalized_base_url,
+            model=model,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            temperature=temperature,
         )
     else:  # pragma: no cover - guarded by normalize_transport
         raise RuntimeError(f"Unsupported provider transport: {normalized_transport}")

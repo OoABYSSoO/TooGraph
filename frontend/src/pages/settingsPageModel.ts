@@ -1,5 +1,10 @@
 import type { SettingsModelProviderUpdate } from "../api/settings.ts";
-import type { ModelProviderTransport, SettingsModelProvider, SettingsPayload } from "../types/settings.ts";
+import type {
+  ModelProviderTransport,
+  OpenAICodexAuthStatus,
+  SettingsModelProvider,
+  SettingsPayload,
+} from "../types/settings.ts";
 
 const DEFAULT_AGENT_TEMPERATURE = 0.2;
 type SettingsProvider = SettingsModelProvider;
@@ -10,8 +15,12 @@ export type ProviderDraft = {
   transport: ModelProviderTransport;
   base_url: string;
   enabled: boolean;
+  saved?: boolean;
   auth_header: string;
   auth_scheme: string;
+  auth_mode?: string;
+  requires_login?: boolean;
+  auth_status?: OpenAICodexAuthStatus;
   api_key: string;
   api_key_configured: boolean;
   discovered_models: string[];
@@ -57,7 +66,7 @@ export function buildProviderDraftsFromSettings(payload: SettingsPayload): Recor
   const providers = payload.model_catalog?.providers ?? [];
   return Object.fromEntries(
     providers
-      .filter((provider) => provider.configured || provider.provider_id === "local")
+      .filter((provider) => provider.configured || provider.saved || provider.provider_id === "local")
       .map((provider) => [
         provider.provider_id,
         {
@@ -66,8 +75,12 @@ export function buildProviderDraftsFromSettings(payload: SettingsPayload): Recor
           transport: provider.transport,
           base_url: provider.base_url,
           enabled: provider.enabled,
+          saved: Boolean(provider.saved),
           auth_header: provider.auth_header ?? "Authorization",
           auth_scheme: provider.auth_scheme ?? "Bearer",
+          auth_mode: provider.auth_mode ?? (provider.requires_login ? "chatgpt" : "api_key"),
+          requires_login: Boolean(provider.requires_login),
+          auth_status: provider.auth_status,
           api_key: "",
           api_key_configured: Boolean(provider.api_key_configured),
           discovered_models: dedupeStrings(provider.models.map((model) => model.model)),
@@ -85,10 +98,11 @@ export function buildProviderSavePayload(drafts: Record<string, ProviderDraft>):
         label: draft.label,
         transport: draft.transport,
         base_url: draft.base_url,
-        api_key: draft.api_key.trim() || undefined,
+        api_key: draft.requires_login ? undefined : draft.api_key.trim() || undefined,
         enabled: draft.enabled,
         auth_header: draft.auth_header,
         auth_scheme: draft.auth_scheme,
+        auth_mode: draft.auth_mode ?? (draft.requires_login ? "chatgpt" : "api_key"),
         models: dedupeStrings(draft.selected_models).map((model) => ({ model, label: model, modalities: ["text"] })),
       },
     ]),

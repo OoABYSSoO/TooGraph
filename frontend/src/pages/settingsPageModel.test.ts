@@ -99,6 +99,70 @@ test("buildProviderSavePayload includes enabled providers and omits blank api ke
   assert.equal(payload.openai.transport, "openai-compatible");
 });
 
+test("buildProviderDraftsFromSettings keeps saved Codex login providers visible before auth completes", () => {
+  const drafts = buildProviderDraftsFromSettings({
+    model: {
+      text_model: "gpt-5.5",
+      text_model_ref: "local/gpt-5.5",
+      video_model: "gpt-5.5",
+      video_model_ref: "local/gpt-5.5",
+    },
+    model_catalog: {
+      provider_templates: [],
+      providers: [
+        {
+          provider_id: "openai-codex",
+          label: "OpenAI Codex / ChatGPT Login",
+          description: "ChatGPT sign-in",
+          transport: "codex-responses",
+          configured: false,
+          enabled: true,
+          saved: true,
+          requires_login: true,
+          auth_mode: "chatgpt",
+          base_url: "https://chatgpt.com/backend-api/codex",
+          api_key_configured: false,
+          auth_status: { configured: false, authenticated: false, auth_mode: "chatgpt" },
+          models: [],
+          example_model_refs: ["openai-codex/gpt-5.5"],
+        },
+      ],
+    },
+    revision: { max_revision_round: 1 },
+    evaluator: { default_score_threshold: 7.8, routes: [] },
+    tools: [],
+  });
+
+  assert.equal(drafts["openai-codex"].requires_login, true);
+  assert.equal(drafts["openai-codex"].auth_mode, "chatgpt");
+  assert.equal(drafts["openai-codex"].auth_status?.authenticated, false);
+});
+
+test("buildProviderSavePayload omits api key fields for Codex login providers", () => {
+  const payload = buildProviderSavePayload({
+    "openai-codex": {
+      provider_id: "openai-codex",
+      label: "OpenAI Codex / ChatGPT Login",
+      transport: "codex-responses",
+      base_url: "https://chatgpt.com/backend-api/codex",
+      enabled: true,
+      auth_mode: "chatgpt",
+      requires_login: true,
+      auth_header: "Authorization",
+      auth_scheme: "Bearer",
+      api_key: "should-not-be-sent",
+      api_key_configured: false,
+      auth_status: { configured: false, authenticated: false, auth_mode: "chatgpt" },
+      discovered_models: ["gpt-5.5"],
+      selected_models: ["gpt-5.5"],
+    },
+  });
+
+  assert.equal(payload["openai-codex"].api_key, undefined);
+  assert.equal(payload["openai-codex"].auth_mode, "chatgpt");
+  assert.equal(payload["openai-codex"].transport, "codex-responses");
+});
+
 test("listAddableProviderTemplates hides existing drafts", () => {
   const addable = listAddableProviderTemplates(
     {

@@ -7,13 +7,15 @@ from typing import Any
 TRANSPORT_OPENAI_COMPATIBLE = "openai-compatible"
 TRANSPORT_ANTHROPIC_MESSAGES = "anthropic-messages"
 TRANSPORT_GEMINI_GENERATE_CONTENT = "gemini-generate-content"
+TRANSPORT_CODEX_RESPONSES = "codex-responses"
 SUPPORTED_TRANSPORTS = {
     TRANSPORT_OPENAI_COMPATIBLE,
     TRANSPORT_ANTHROPIC_MESSAGES,
     TRANSPORT_GEMINI_GENERATE_CONTENT,
+    TRANSPORT_CODEX_RESPONSES,
 }
 
-DIRECT_PROVIDER_IDS = ("openai", "openrouter", "anthropic", "gemini", "local")
+DIRECT_PROVIDER_IDS = ("openai", "openai-codex", "openrouter", "anthropic", "gemini", "local")
 
 
 def _openai_template(provider_id: str, label: str, base_url: str, *, group: str = "compatible") -> dict[str, Any]:
@@ -41,6 +43,21 @@ PROVIDER_TEMPLATES: dict[str, dict[str, Any]] = {
         **_openai_template("openai", "OpenAI", "https://api.openai.com/v1", group="direct"),
         "enabled": False,
         "example_model_refs": ["openai/gpt-4.1", "openai/gpt-4.1-mini"],
+    },
+    "openai-codex": {
+        "provider_id": "openai-codex",
+        "label": "OpenAI Codex / ChatGPT Login",
+        "description": "Use a ChatGPT/Codex subscription through OpenAI Codex sign-in.",
+        "transport": TRANSPORT_CODEX_RESPONSES,
+        "base_url": "https://chatgpt.com/backend-api/codex",
+        "auth_header": "Authorization",
+        "auth_scheme": "Bearer",
+        "auth_mode": "chatgpt",
+        "requires_login": True,
+        "enabled": False,
+        "template_group": "direct",
+        "models": [],
+        "example_model_refs": ["openai-codex/gpt-5.5", "openai-codex/gpt-5.4-mini"],
     },
     "openrouter": {
         **_openai_template("openrouter", "OpenRouter", "https://openrouter.ai/api/v1", group="direct"),

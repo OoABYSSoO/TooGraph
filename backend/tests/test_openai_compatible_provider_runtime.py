@@ -77,11 +77,13 @@ class OpenAiCompatibleProviderRuntimeTests(unittest.TestCase):
             _local_llm, model_catalog = self._reload_target_modules()
 
             with patch.object(model_catalog, "get_local_gateway_runtime_config", return_value=runtime_config):
-                with patch.object(model_catalog, "get_local_route_model_names", return_value=["llama-3.1-8b"]):
-                    with patch.object(model_catalog, "get_default_text_model", return_value="llama-3.1-8b"):
+                with patch.object(model_catalog, "get_local_route_model_names", return_value=["llama-3.1-8b"]) as route_models:
+                    with patch.object(model_catalog, "get_default_text_model", return_value="llama-3.1-8b") as default_text_model:
                         with patch.object(model_catalog, "get_default_video_model_name", return_value="llava-1.6"):
                             catalog = model_catalog.build_model_catalog()
 
+        route_models.assert_called_once_with(force_refresh=False, runtime_config=runtime_config)
+        default_text_model.assert_not_called()
         local_provider = next(provider for provider in catalog["providers"] if provider["provider_id"] == "local")
 
         self.assertEqual(local_provider["label"], "OpenAI-compatible Custom Provider")
@@ -144,6 +146,27 @@ class OpenAiCompatibleProviderRuntimeTests(unittest.TestCase):
 
         self.assertEqual(models, ["gemma-4-26b-a4b-it", "huihui-gemma-4-26b-a4b-it-abliterated"])
         discover.assert_called_once_with(base_url="http://127.0.0.1:8888/v1", api_key="sk-local", timeout_sec=2.0)
+
+    def test_non_forced_runtime_config_does_not_probe_local_gateway(self) -> None:
+        with self._patched_local_provider_env(LOCAL_BASE_URL="http://127.0.0.1:8888/v1"):
+            local_llm, _model_catalog = self._reload_target_modules()
+
+            with patch.object(local_llm.httpx, "Client", side_effect=RuntimeError("network probe")) as client_factory:
+                runtime_config = local_llm.get_local_gateway_runtime_config(force_refresh=False)
+
+        self.assertIsNone(runtime_config)
+        client_factory.assert_not_called()
+
+    def test_non_forced_local_model_names_do_not_probe_local_gateway(self) -> None:
+        with self._patched_local_provider_env(LOCAL_BASE_URL="http://127.0.0.1:8888/v1"):
+            local_llm, _model_catalog = self._reload_target_modules()
+
+            with patch.object(local_llm, "load_app_settings", return_value={}):
+                with patch.object(local_llm, "get_local_gateway_runtime_config", return_value=None):
+                    with patch.object(local_llm, "discover_openai_compatible_models", side_effect=AssertionError("network probe")):
+                        models = local_llm.get_local_route_model_names(force_refresh=False)
+
+        self.assertEqual(models, ["lm-local"])
 
     def test_build_model_catalog_prefers_current_discovered_models_over_stale_saved_models(self) -> None:
         saved_settings = {

@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from "vue-router";
 
 import EditorPage from "@/pages/EditorPage.vue";
 import HomePage from "@/pages/HomePage.vue";
+import ModelProvidersPage from "@/pages/ModelProvidersPage.vue";
 import PresetsPage from "@/pages/PresetsPage.vue";
 import RunDetailPage from "@/pages/RunDetailPage.vue";
 import RunsPage from "@/pages/RunsPage.vue";
@@ -18,6 +19,7 @@ export const router = createRouter({
     { path: "/editor/:graphId", component: EditorPage },
     { path: "/presets", component: PresetsPage },
     { path: "/skills", component: SkillsPage },
+    { path: "/models", component: ModelProvidersPage },
     { path: "/runs", component: RunsPage },
     { path: "/runs/:runId", component: RunDetailPage },
     { path: "/settings", component: SettingsPage },

@@ -77,3 +77,9 @@ test("AppShell exposes preset node and skill management as primary sidebar desti
   assert.match(componentSource, /to="\/skills"[\s\S]*activeNavigationSection === 'skills'[\s\S]*t\("nav\.skills"\)/);
   assert.match(componentSource, /<ElIcon class="app-shell__link-icon"><Opportunity \/><\/ElIcon>/);
 });
+
+test("AppShell exposes model provider management as a primary sidebar destination", () => {
+  assert.match(componentSource, /import \{[\s\S]*DataLine[\s\S]*\} from "@element-plus\/icons-vue";/);
+  assert.match(componentSource, /to="\/models"[\s\S]*activeNavigationSection === 'models'[\s\S]*t\("nav\.models"\)/);
+  assert.match(componentSource, /<ElIcon class="app-shell__link-icon"><DataLine \/><\/ElIcon>/);
+});

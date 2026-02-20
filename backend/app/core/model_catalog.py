@@ -13,6 +13,7 @@ from app.tools.local_llm import (
     has_local_llm_api_key_configured,
 )
 from app.tools.model_provider_client import discover_provider_models
+from app.tools.openai_codex_client import get_codex_auth_status
 
 
 LOCAL_PROVIDER_LABEL = "OpenAI-compatible Custom Provider"
@@ -171,6 +172,9 @@ def _normalize_provider_config(
         "auth_header": auth_header,
         "auth_scheme": auth_scheme,
         "api_key": str(saved_provider.get("api_key") or "").strip(),
+        "auth_mode": str(saved_provider.get("auth_mode") or template.get("auth_mode") or "api_key"),
+        "requires_login": bool(template.get("requires_login") or saved_provider.get("requires_login")),
+        "saved": existing_saved_provider,
         "models": _normalize_provider_models(saved_provider.get("models") or template.get("models")),
         "example_model_refs": list(template.get("example_model_refs") or []),
         "template_group": str(template.get("template_group") or "custom"),
@@ -179,6 +183,8 @@ def _normalize_provider_config(
 
 def _provider_requires_api_key(provider: dict[str, Any]) -> bool:
     if provider["provider_id"] == "local":
+        return False
+    if provider.get("auth_mode") == "chatgpt":
         return False
     if _is_local_base_url(str(provider.get("base_url") or "")):
         return False
@@ -190,6 +196,8 @@ def _is_provider_configured(provider: dict[str, Any]) -> bool:
         return False
     if not str(provider.get("base_url") or "").strip():
         return False
+    if provider["provider_id"] == "openai-codex":
+        return bool(get_codex_auth_status().get("authenticated"))
     if _provider_requires_api_key(provider) and not str(provider.get("api_key") or "").strip():
         return False
     return True
@@ -229,14 +237,19 @@ def _build_local_provider_models(
     force_refresh: bool,
 ) -> tuple[list[dict[str, Any]], str]:
     llama_config = _dict_or_empty(runtime_config.get("llama")) if isinstance(runtime_config, dict) else {}
-    local_route_models = get_local_route_model_names(force_refresh=force_refresh)
+    local_route_models = get_local_route_model_names(force_refresh=force_refresh, runtime_config=runtime_config)
     saved_local_models = list(provider.get("models") or [])
     saved_text_model_ref = str(saved_settings.get("text_model_ref") or "").strip()
-    saved_text_provider, saved_text_model = split_model_ref(saved_text_model_ref, default_provider="local")
+    if saved_text_model_ref:
+        saved_text_provider, saved_text_model = split_model_ref(saved_text_model_ref, default_provider="local")
+    else:
+        saved_text_provider, saved_text_model = "local", ""
     preferred_local_text_model = (
         saved_text_model
         if saved_text_model_ref and saved_text_provider == "local"
-        else get_default_text_model(force_refresh=force_refresh)
+        else local_route_models[0]
+        if local_route_models
+        else get_default_text_model(force_refresh=False)
     )
 
     if local_route_models:
@@ -341,8 +354,12 @@ def _build_provider_entry(
     runtime_config: dict[str, Any] | None,
 ) -> dict[str, Any]:
     api_key_configured = bool(str(provider.get("api_key") or "").strip())
+    auth_status = None
     if provider["provider_id"] == "local":
         api_key_configured = api_key_configured or has_local_llm_api_key_configured()
+    if provider["provider_id"] == "openai-codex":
+        auth_status = get_codex_auth_status()
+        api_key_configured = bool(auth_status.get("configured"))
 
     entry = {
         "provider_id": provider["provider_id"],
@@ -354,6 +371,9 @@ def _build_provider_entry(
         "base_url": provider["base_url"],
         "auth_header": provider.get("auth_header") or "Authorization",
         "auth_scheme": provider.get("auth_scheme") if provider.get("auth_scheme") is not None else "Bearer",
+        "auth_mode": provider.get("auth_mode") or "api_key",
+        "requires_login": bool(provider.get("requires_login")),
+        "saved": bool(provider.get("saved")),
         "api_key_configured": api_key_configured,
         "models": models,
         "example_model_refs": provider.get("example_model_refs") or [],
@@ -361,6 +381,8 @@ def _build_provider_entry(
     }
     if provider["provider_id"] == "local":
         entry["gateway"] = runtime_config or {}
+    if auth_status is not None:
+        entry["auth_status"] = auth_status
     return entry
 
 
@@ -417,7 +439,7 @@ def build_model_catalog(*, force_refresh: bool = False) -> dict[str, Any]:
             provider_ids.append(provider_id)
 
     provider_entries: list[dict[str, Any]] = []
-    local_text_model = get_default_text_model(force_refresh=force_refresh)
+    local_text_model = ""
     for provider_id in provider_ids:
         provider = _normalize_provider_config(provider_id, saved_providers.get(provider_id), runtime_config=runtime_config)
         if provider_id == "local":
@@ -432,6 +454,8 @@ def build_model_catalog(*, force_refresh: bool = False) -> dict[str, Any]:
             catalog_models = [_build_catalog_model(provider_id, model) for model in model_items]
         provider_entries.append(_build_provider_entry(provider, models=catalog_models, runtime_config=runtime_config))
 
+    if not local_text_model:
+        local_text_model = get_default_text_model(force_refresh=False)
     fallback_text_ref = build_model_ref("local", local_text_model)
     saved_text_model_ref = str(saved_settings.get("text_model_ref") or "").strip()
     saved_video_model_ref = str(saved_settings.get("video_model_ref") or "").strip()

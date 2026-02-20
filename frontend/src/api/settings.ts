@@ -1,4 +1,4 @@
-import type { ModelProviderTransport, SettingsPayload } from "@/types/settings";
+import type { ModelProviderTransport, OpenAICodexAuthStatus, SettingsPayload } from "@/types/settings";
 
 import { apiGet, apiPost } from "./http.ts";
 
@@ -10,6 +10,7 @@ export type SettingsModelProviderUpdate = {
   enabled: boolean;
   auth_header?: string;
   auth_scheme?: string;
+  auth_mode?: string;
   models: Array<{
     model: string;
     label?: string;
@@ -51,4 +52,37 @@ export async function discoverModelProviderModels(payload: {
   auth_scheme?: string;
 }): Promise<{ models: string[] }> {
   return apiPost<{ models: string[] }>("/api/settings/model-providers/discover", payload);
+}
+
+export type OpenAICodexAuthStartResponse = {
+  verification_url: string;
+  user_code: string;
+  device_auth_id: string;
+  expires_in?: number;
+  interval?: number;
+};
+
+export type OpenAICodexAuthPollPayload = {
+  device_auth_id: string;
+  user_code: string;
+};
+
+export type OpenAICodexAuthPollResponse = OpenAICodexAuthStatus & {
+  status?: "pending" | "authenticated" | string;
+};
+
+export async function startOpenAICodexAuth(): Promise<OpenAICodexAuthStartResponse> {
+  return apiPost<OpenAICodexAuthStartResponse>("/api/settings/model-providers/openai-codex/auth/start", null);
+}
+
+export async function pollOpenAICodexAuth(payload: OpenAICodexAuthPollPayload): Promise<OpenAICodexAuthPollResponse> {
+  return apiPost<OpenAICodexAuthPollResponse>("/api/settings/model-providers/openai-codex/auth/poll", payload);
+}
+
+export async function fetchOpenAICodexAuthStatus(): Promise<OpenAICodexAuthStatus> {
+  return apiGet<OpenAICodexAuthStatus>("/api/settings/model-providers/openai-codex/auth/status");
+}
+
+export async function logoutOpenAICodexAuth(): Promise<OpenAICodexAuthStatus> {
+  return apiPost<OpenAICodexAuthStatus>("/api/settings/model-providers/openai-codex/auth/logout", null);
 }

@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.main import app
+from app.api import routes_settings
 
 
 class SettingsModelProviderTests(unittest.TestCase):
@@ -128,6 +129,34 @@ class SettingsModelProviderTests(unittest.TestCase):
         self.assertEqual(saved_payload["model_providers"]["openai"]["api_key"], "sk-existing")
         self.assertTrue(saved_payload["model_providers"]["openai"]["enabled"])
         self.assertEqual(saved_payload["model_providers"]["openai"]["transport"], "openai-compatible")
+
+    def test_build_settings_payload_refreshes_catalog_once(self) -> None:
+        catalog = {
+            "default_text_model_ref": "local/current-text",
+            "default_video_model_ref": "local/current-video",
+            "providers": [],
+            "provider_templates": [],
+        }
+
+        with patch("app.api.routes_settings.build_model_catalog", return_value=catalog) as build_catalog:
+            with patch("app.api.routes_settings.get_default_agent_thinking_enabled", return_value=True):
+                with patch("app.api.routes_settings.get_default_agent_temperature", return_value=0.2):
+                    with patch("app.api.routes_settings.get_tool_registry", return_value={}):
+                        payload = routes_settings._build_settings_payload(force_refresh_models=True)
+
+        build_catalog.assert_called_once_with(force_refresh=True)
+        self.assertEqual(payload["model"]["text_model_ref"], "local/current-text")
+        self.assertEqual(payload["model"]["video_model_ref"], "local/current-video")
+        self.assertEqual(payload["agent_runtime_defaults"]["model"], "local/current-text")
+
+    def test_get_settings_uses_cached_catalog_for_fast_page_loads(self) -> None:
+        with patch("app.api.routes_settings._build_settings_payload", return_value={"ok": True}) as build_payload:
+            with TestClient(app) as client:
+                response = client.get("/api/settings")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"ok": True})
+        build_payload.assert_called_once_with(force_refresh_models=False)
 
 
 if __name__ == "__main__":

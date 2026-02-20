@@ -57,7 +57,7 @@
             </label>
             <div class="settings-page__hint">{{ t("settings.hint") }}</div>
             <div class="settings-page__actions">
-              <button type="button" class="settings-page__button" :disabled="!canSave" @click="handleSave">
+              <button type="button" class="settings-page__button settings-page__button--primary" :disabled="!canSave" @click="handleSave">
                 {{ isSaving ? t("settings.saving") : t("settings.saveSettings") }}
               </button>
               <span v-if="saveMessage" class="settings-page__save-message">{{ saveMessage }}</span>
@@ -67,175 +67,43 @@
           <article class="settings-page__panel settings-page__panel--wide">
             <div class="settings-page__panel-heading">
               <h3>{{ t("settings.modelProviders") }}</h3>
+              <RouterLink to="/models" class="settings-page__button settings-page__button--primary">
+                {{ t("settings.openModelProviders") }}
+              </RouterLink>
             </div>
-            <div class="settings-page__add-provider">
-              <ElSelect
-                v-model="selectedTemplateId"
-                class="settings-page__select graphite-select"
-                :teleported="false"
-                popper-class="graphite-select-popper"
-                :placeholder="t('settings.providerTemplate')"
-              >
-                <ElOption
-                  v-for="provider in addableProviderTemplates"
-                  :key="provider.provider_id"
-                  :label="provider.label"
-                  :value="provider.provider_id"
-                />
-              </ElSelect>
-              <button
-                type="button"
-                class="settings-page__button settings-page__button--primary"
-                :disabled="!selectedTemplateId"
-                @click="handleAddProvider"
-              >
-                {{ t("settings.addProvider") }}
-              </button>
-            </div>
-
-            <div class="settings-page__provider-editor-list">
-              <section v-for="provider in providerDraftList" :key="provider.provider_id" class="settings-page__provider-editor">
-                <div class="settings-page__provider-editor-header">
-                  <div>
-                    <strong>{{ provider.label || provider.provider_id }}</strong>
-                    <div class="settings-page__badges">
-                      <span>{{ provider.provider_id }}</span>
-                      <span>{{ provider.transport }}</span>
-                      <span>{{ provider.enabled ? t("settings.enabledProvider") : t("settings.disabledProvider") }}</span>
-                      <span v-if="provider.api_key_configured">{{ t("settings.apiKeyStored") }}</span>
-                    </div>
-                  </div>
-                  <label class="settings-page__toggle">
-                    <input v-model="provider.enabled" type="checkbox" @change="alignDefaultModelsToProviderSelection" />
-                    <span>{{ provider.enabled ? t("common.on") : t("common.off") }}</span>
-                  </label>
-                </div>
-
-                <div class="settings-page__provider-fields">
-                  <label>
-                    <span>{{ t("settings.providerLabel") }}</span>
-                    <input v-model.trim="provider.label" type="text" />
-                  </label>
-                  <label>
-                    <span>{{ t("settings.providerId") }}</span>
-                    <input :value="provider.provider_id" type="text" disabled />
-                  </label>
-                  <label>
-                    <span>{{ t("settings.providerTransport") }}</span>
-                    <ElSelect
-                      v-model="provider.transport"
-                      class="settings-page__select graphite-select"
-                      :teleported="false"
-                      popper-class="graphite-select-popper"
-                    >
-                      <ElOption label="OpenAI-compatible" value="openai-compatible" />
-                      <ElOption label="Anthropic Messages" value="anthropic-messages" />
-                      <ElOption label="Gemini generateContent" value="gemini-generate-content" />
-                    </ElSelect>
-                  </label>
-                  <label>
-                    <span>{{ t("settings.providerBaseUrl") }}</span>
-                    <input v-model.trim="provider.base_url" type="url" />
-                  </label>
-                  <label>
-                    <span>{{ t("settings.providerApiKey") }}</span>
-                    <input
-                      v-model.trim="provider.api_key"
-                      type="password"
-                      autocomplete="off"
-                      :placeholder="provider.api_key_configured ? t('settings.keepExistingApiKey') : t('settings.optionalApiKey')"
-                    />
-                  </label>
-                  <label>
-                    <span>{{ t("settings.providerAuthHeader") }}</span>
-                    <input v-model.trim="provider.auth_header" type="text" />
-                  </label>
-                  <label>
-                    <span>{{ t("settings.providerAuthScheme") }}</span>
-                    <input v-model.trim="provider.auth_scheme" type="text" />
-                  </label>
-                  <label>
-                    <span>{{ t("settings.enabledModels") }}</span>
-                    <ElSelect
-                      v-model="provider.selected_models"
-                      class="settings-page__select graphite-select"
-                      multiple
-                      filterable
-                      allow-create
-                      default-first-option
-                      :reserve-keyword="false"
-                      :teleported="false"
-                      popper-class="graphite-select-popper"
-                      @change="alignDefaultModelsToProviderSelection"
-                    >
-                      <ElOption
-                        v-for="modelName in providerModelOptions(provider.provider_id)"
-                        :key="`${provider.provider_id}-${modelName}`"
-                        :label="modelName"
-                        :value="modelName"
-                      />
-                    </ElSelect>
-                  </label>
-                </div>
-
-                <div class="settings-page__provider-actions">
-                  <button
-                    type="button"
-                    class="settings-page__button settings-page__button--primary"
-                    :disabled="discoveringProviderId === provider.provider_id"
-                    @click="handleDiscoverModels(provider.provider_id)"
-                  >
-                    {{ discoveringProviderId === provider.provider_id ? t("settings.discoveringModels") : t("settings.discoverModels") }}
-                  </button>
-                  <button
-                    v-if="provider.provider_id !== 'local'"
-                    type="button"
-                    class="settings-page__button"
-                    @click="handleRemoveProvider(provider.provider_id)"
-                  >
-                    {{ t("settings.removeProvider") }}
-                  </button>
-                  <span v-if="providerMessages[provider.provider_id]" class="settings-page__provider-message">
-                    {{ providerMessages[provider.provider_id] }}
-                  </span>
-                </div>
-              </section>
+            <p class="settings-page__hint">{{ t("settings.modelProvidersSummary") }}</p>
+            <div class="settings-page__summary-grid">
+              <div class="settings-page__info">
+                <span>{{ t("settings.configuredProviders") }}</span>
+                <strong>{{ configuredProviderCount }}</strong>
+              </div>
+              <div class="settings-page__info">
+                <span>{{ t("settings.enabledProviders") }}</span>
+                <strong>{{ enabledProviderCount }}</strong>
+              </div>
+              <div class="settings-page__info">
+                <span>{{ t("settings.availableModels") }}</span>
+                <strong>{{ configuredModelOptions.length }}</strong>
+              </div>
             </div>
           </article>
 
           <article class="settings-page__panel">
             <h3>{{ t("settings.revisionEvaluator") }}</h3>
-            <div class="settings-page__info"><span>{{ t("settings.maxRevisionRounds") }}</span><strong>{{ settings.revision.max_revision_round }}</strong></div>
-            <div class="settings-page__info"><span>{{ t("settings.threshold") }}</span><strong>{{ settings.evaluator.default_score_threshold }}</strong></div>
-            <div class="settings-page__info"><span>{{ t("settings.routes") }}</span><strong>{{ settings.evaluator.routes.join(", ") }}</strong></div>
+            <div class="settings-page__info">
+              <span>{{ t("settings.maxRevisionRounds") }}</span>
+              <strong>{{ settings.revision.max_revision_round }}</strong>
+            </div>
+            <div class="settings-page__info">
+              <span>{{ t("settings.threshold") }}</span>
+              <strong>{{ settings.evaluator.default_score_threshold }}</strong>
+            </div>
+            <div class="settings-page__info">
+              <span>{{ t("settings.routes") }}</span>
+              <strong>{{ settings.evaluator.routes.join(", ") }}</strong>
+            </div>
           </article>
         </section>
-
-        <article class="settings-page__panel">
-          <h3>{{ t("settings.modelProviders") }}</h3>
-          <div class="settings-page__providers">
-            <div v-for="provider in settings.model_catalog?.providers ?? []" :key="provider.provider_id" class="settings-page__provider-card">
-              <div class="settings-page__provider-header">
-                <strong>{{ provider.label }}</strong>
-                <div class="settings-page__badges">
-                  <span>{{ provider.provider_id }}</span>
-                  <span>{{ provider.transport }}</span>
-                  <span>{{ provider.configured ? t("common.configured") : t("common.planned") }}</span>
-                </div>
-              </div>
-              <p>{{ provider.description }}</p>
-              <div class="settings-page__provider-url">{{ t("common.baseUrl") }}: {{ provider.base_url }}</div>
-              <div class="settings-page__badges">
-                <span
-                  v-for="modelLabel in listProviderModelBadges(provider, modelDisplayLookup)"
-                  :key="`${provider.provider_id}-${modelLabel}`"
-                >
-                  {{ modelLabel }}
-                </span>
-              </div>
-            </div>
-          </div>
-        </article>
 
         <article class="settings-page__panel">
           <h3>{{ t("settings.tools") }}</h3>
@@ -252,20 +120,13 @@
 import { computed, onMounted, ref } from "vue";
 import { ElOption, ElSelect } from "element-plus";
 import { useI18n } from "vue-i18n";
+import { RouterLink } from "vue-router";
 
-import { discoverModelProviderModels, fetchSettings, updateSettings } from "@/api/settings";
+import { fetchSettings, updateSettings } from "@/api/settings";
 import AppShell from "@/layouts/AppShell.vue";
-import type { SettingsModelProvider, SettingsPayload } from "@/types/settings";
+import type { SettingsPayload, SettingsProviderModel } from "@/types/settings";
 
-import {
-  buildProviderDraftsFromSettings,
-  buildProviderSavePayload,
-  clampSettingsTemperature,
-  listAddableProviderTemplates,
-  listProviderModelBadges,
-  providerDraftsFingerprint,
-  type ProviderDraft,
-} from "./settingsPageModel.ts";
+import { clampSettingsTemperature } from "./settingsPageModel.ts";
 
 type SettingsDraft = {
   text_model_ref: string;
@@ -273,50 +134,13 @@ type SettingsDraft = {
   thinking_enabled: boolean;
   temperature: number;
 };
-type LocalProviderDraft = {
-  label: string;
-  base_url: string;
-  api_key: string;
-  api_key_configured: boolean;
-  discovered_models: string[];
-  selected_models: string[];
-};
-type SettingsModel = NonNullable<SettingsPayload["model_catalog"]>["providers"][number]["models"][number];
-
-const DEFAULT_LOCAL_PROVIDER_LABEL = "OpenAI-compatible Custom Provider";
-const DEFAULT_LOCAL_PROVIDER_BASE_URL = "http://127.0.0.1:8888/v1";
 
 const settings = ref<SettingsPayload | null>(null);
 const draft = ref<SettingsDraft | null>(null);
-const providerDraft = ref<LocalProviderDraft | null>(null);
-const providerDrafts = ref<Record<string, ProviderDraft>>({});
-const selectedTemplateId = ref("");
 const error = ref<string | null>(null);
 const saveMessage = ref<string | null>(null);
-const providerMessage = ref<string | null>(null);
-const providerMessages = ref<Record<string, string>>({});
 const isSaving = ref(false);
-const isDiscoveringModels = ref(false);
-const discoveringProviderId = ref<string | null>(null);
 const { t } = useI18n();
-
-function dedupeStrings(values: string[]) {
-  const items: string[] = [];
-  const seen = new Set<string>();
-  for (const rawValue of values) {
-    const value = rawValue.trim();
-    if (!value) {
-      continue;
-    }
-    const identity = value.toLowerCase();
-    if (seen.has(identity)) {
-      continue;
-    }
-    seen.add(identity);
-    items.push(value);
-  }
-  return items;
-}
 
 function buildDraftFromSettings(payload: SettingsPayload): SettingsDraft {
   return {
@@ -327,10 +151,6 @@ function buildDraftFromSettings(payload: SettingsPayload): SettingsDraft {
   };
 }
 
-function getLocalProvider(payload: SettingsPayload) {
-  return payload.model_catalog?.providers.find((provider) => provider.provider_id === "local") ?? null;
-}
-
 function formatModelChoiceLabel(modelRef: string) {
   const trimmed = modelRef.trim();
   if (!trimmed) return "";
@@ -338,68 +158,11 @@ function formatModelChoiceLabel(modelRef: string) {
   return parts[parts.length - 1] || trimmed;
 }
 
-function getConcreteModelName(model: {
-  model_ref: string;
-  model: string;
-  label: string;
-  route_target?: string | null;
-}) {
+function getConcreteModelName(model: SettingsProviderModel) {
   return model.route_target?.trim() || model.label?.trim() || model.model?.trim() || formatModelChoiceLabel(model.model_ref);
 }
 
-function getModelName(model: Pick<SettingsModel, "model" | "model_ref">) {
-  return model.model?.trim() || formatModelChoiceLabel(model.model_ref);
-}
-
-function buildProviderDraftFromSettings(payload: SettingsPayload): LocalProviderDraft {
-  const localProvider = getLocalProvider(payload);
-  const modelNames = dedupeStrings((localProvider?.models ?? []).map((model) => getModelName(model)));
-  return {
-    label: localProvider?.label ?? DEFAULT_LOCAL_PROVIDER_LABEL,
-    base_url: localProvider?.base_url ?? DEFAULT_LOCAL_PROVIDER_BASE_URL,
-    api_key: "",
-    api_key_configured: Boolean(localProvider?.api_key_configured),
-    discovered_models: modelNames,
-    selected_models: modelNames,
-  };
-}
-
-function buildProviderDraftFromTemplate(provider: SettingsModelProvider): ProviderDraft {
-  const modelNames = dedupeStrings(provider.models.map((model) => model.model));
-  return {
-    provider_id: provider.provider_id,
-    label: provider.label,
-    transport: provider.transport,
-    base_url: provider.base_url,
-    enabled: true,
-    auth_header: provider.auth_header ?? "Authorization",
-    auth_scheme: provider.auth_scheme ?? (provider.transport === "openai-compatible" ? "Bearer" : ""),
-    api_key: "",
-    api_key_configured: Boolean(provider.api_key_configured),
-    discovered_models: modelNames,
-    selected_models: modelNames,
-  };
-}
-
-function providerDraftFingerprint(value: LocalProviderDraft | null) {
-  if (!value) {
-    return "";
-  }
-  return JSON.stringify({
-    label: value.label.trim() || DEFAULT_LOCAL_PROVIDER_LABEL,
-    base_url: value.base_url.trim().replace(/\/+$/, ""),
-    selected_models: dedupeStrings(value.selected_models),
-  });
-}
-
-function buildModelDisplayLookup(
-  models: Array<{
-    model_ref: string;
-    model: string;
-    label: string;
-    route_target?: string | null;
-  }>,
-) {
+function buildModelDisplayLookup(models: SettingsProviderModel[]) {
   const baseLabels = models.map((model) => getConcreteModelName(model));
   const duplicateCount = new Map<string, number>();
   for (const label of baseLabels) {
@@ -411,55 +174,37 @@ function buildModelDisplayLookup(
       const baseLabel = baseLabels[index];
       const alias = model.model?.trim() || formatModelChoiceLabel(model.model_ref);
       const label =
-        (duplicateCount.get(baseLabel) ?? 0) > 1 && alias && alias !== baseLabel ? `${baseLabel} · ${alias}` : baseLabel;
+        (duplicateCount.get(baseLabel) ?? 0) > 1 && alias && alias !== baseLabel ? `${baseLabel} / ${alias}` : baseLabel;
       return [model.model_ref, label];
     }),
   ) as Record<string, string>;
 }
 
-const providerDraftList = computed(() =>
-  Object.values(providerDrafts.value).sort((left, right) => {
-    if (left.provider_id === "local") return -1;
-    if (right.provider_id === "local") return 1;
-    return left.label.localeCompare(right.label);
-  }),
+const configuredProviders = computed(() =>
+  (settings.value?.model_catalog?.providers ?? []).filter((provider) => provider.configured || provider.saved),
 );
-const addableProviderTemplates = computed(() =>
-  settings.value ? listAddableProviderTemplates(settings.value, providerDrafts.value) : [],
-);
-const configuredModels = computed(() =>
-  providerDraftList.value
-    .filter((provider) => provider.enabled)
-    .flatMap((provider) =>
-      provider.selected_models.map((modelName) => ({
-        model_ref: `${provider.provider_id}/${modelName}`,
-        model: modelName,
-        label: modelName,
-        route_target: null,
-      })),
-    ),
-);
+const enabledProviders = computed(() => configuredProviders.value.filter((provider) => provider.enabled));
+const configuredProviderCount = computed(() => configuredProviders.value.length);
+const enabledProviderCount = computed(() => enabledProviders.value.length);
+const configuredModels = computed(() => enabledProviders.value.flatMap((provider) => provider.models));
 const modelDisplayLookup = computed(() => buildModelDisplayLookup(configuredModels.value));
-const configuredModelOptions = computed(() =>
-  Array.from(
-    new Map(
-      configuredModels.value.map((model) => [
-        model.model_ref,
-        {
-          value: model.model_ref,
-          label: modelDisplayLookup.value[model.model_ref] || model.model_ref,
-        },
-      ]),
-    ).values(),
-  ),
-);
-function providerModelOptions(providerId: string) {
-  const provider = providerDrafts.value[providerId];
-  if (!provider) {
-    return [];
+const configuredModelOptions = computed(() => {
+  const options = new Map(
+    configuredModels.value.map((model) => [
+      model.model_ref,
+      {
+        value: model.model_ref,
+        label: modelDisplayLookup.value[model.model_ref] || model.model_ref,
+      },
+    ]),
+  );
+  for (const modelRef of [draft.value?.text_model_ref, draft.value?.video_model_ref]) {
+    if (modelRef && !options.has(modelRef)) {
+      options.set(modelRef, { value: modelRef, label: formatModelChoiceLabel(modelRef) || modelRef });
+    }
   }
-  return dedupeStrings([...provider.discovered_models, ...provider.selected_models]);
-}
+  return Array.from(options.values());
+});
 const thinkingMode = computed({
   get: () => (draft.value?.thinking_enabled ? "on" : "off"),
   set: (value: string) => {
@@ -473,26 +218,11 @@ const isDirty = computed(() => {
   if (!settings.value || !draft.value) {
     return false;
   }
-  const runtimeChanged = JSON.stringify(draft.value) !== JSON.stringify(buildDraftFromSettings(settings.value));
-  const providerChanged =
-    providerDraftsFingerprint(providerDrafts.value) !== providerDraftsFingerprint(buildProviderDraftsFromSettings(settings.value)) ||
-    Object.values(providerDrafts.value).some((provider) => Boolean(provider.api_key.trim()));
-  return runtimeChanged || providerChanged;
+  return JSON.stringify(draft.value) !== JSON.stringify(buildDraftFromSettings(settings.value));
 });
 const canSave = computed(() => isDirty.value && !isSaving.value && configuredModelOptions.value.length > 0);
 
-function extractLocalModelName(modelRef: string) {
-  const trimmed = modelRef.trim();
-  if (!trimmed) {
-    return "";
-  }
-  if (trimmed.includes("/") && !trimmed.startsWith("local/")) {
-    return "";
-  }
-  return trimmed.includes("/") ? trimmed.split("/").slice(1).join("/") : trimmed;
-}
-
-function alignDefaultModelsToProviderSelection() {
+function alignDefaultModelsToAvailableOptions() {
   if (!draft.value || configuredModelOptions.value.length === 0) {
     return;
   }
@@ -506,102 +236,13 @@ function alignDefaultModelsToProviderSelection() {
   }
 }
 
-function buildLocalProviderModelsForSave() {
-  if (!providerDraft.value || !draft.value) {
-    return [];
-  }
-  return dedupeStrings([
-    ...providerDraft.value.selected_models,
-    extractLocalModelName(draft.value.text_model_ref),
-    extractLocalModelName(draft.value.video_model_ref),
-  ]).map((modelName) => ({
-    model: modelName,
-    label: modelName,
-  }));
-}
-
 async function loadSettings() {
   try {
     settings.value = await fetchSettings();
     draft.value = buildDraftFromSettings(settings.value);
-    providerDraft.value = buildProviderDraftFromSettings(settings.value);
-    providerDrafts.value = buildProviderDraftsFromSettings(settings.value);
     error.value = null;
   } catch (fetchError) {
     error.value = fetchError instanceof Error ? fetchError.message : t("common.loadingSettings");
-  }
-}
-
-function setProviderMessage(providerId: string, message: string | null) {
-  providerMessages.value = {
-    ...providerMessages.value,
-    [providerId]: message ?? "",
-  };
-}
-
-function handleAddProvider() {
-  if (!settings.value || !selectedTemplateId.value) {
-    return;
-  }
-  const template = addableProviderTemplates.value.find((provider) => provider.provider_id === selectedTemplateId.value);
-  if (!template) {
-    return;
-  }
-  providerDrafts.value = {
-    ...providerDrafts.value,
-    [template.provider_id]: buildProviderDraftFromTemplate(template),
-  };
-  selectedTemplateId.value = "";
-  alignDefaultModelsToProviderSelection();
-}
-
-function handleRemoveProvider(providerId: string) {
-  const nextDrafts = { ...providerDrafts.value };
-  delete nextDrafts[providerId];
-  providerDrafts.value = nextDrafts;
-  alignDefaultModelsToProviderSelection();
-}
-
-async function handleDiscoverModels(providerId: string) {
-  const provider = providerDrafts.value[providerId];
-  if (!provider) {
-    return;
-  }
-  if (!provider.base_url.trim()) {
-    setProviderMessage(providerId, t("settings.baseUrlRequired"));
-    return;
-  }
-
-  try {
-    discoveringProviderId.value = providerId;
-    setProviderMessage(providerId, null);
-    const result = await discoverModelProviderModels({
-      provider_id: provider.provider_id,
-      transport: provider.transport,
-      base_url: provider.base_url,
-      api_key: provider.api_key,
-      auth_header: provider.auth_header,
-      auth_scheme: provider.auth_scheme,
-    });
-    const discoveredModels = dedupeStrings(result.models);
-    provider.discovered_models = discoveredModels;
-    provider.selected_models = dedupeStrings([...provider.selected_models, ...discoveredModels]);
-    alignDefaultModelsToProviderSelection();
-    setProviderMessage(
-      providerId,
-      discoveredModels.length > 0
-        ? t("settings.discoveredModelCount", { count: discoveredModels.length })
-        : t("settings.noModelsDiscovered"),
-    );
-  } catch (discoverError) {
-    setProviderMessage(
-      providerId,
-      t("settings.providerDiscoveryFailed", {
-        error: discoverError instanceof Error ? discoverError.message : "",
-      }),
-    );
-  } finally {
-    discoveringProviderId.value = null;
   }
 }
 
@@ -612,7 +253,7 @@ async function handleSave() {
   try {
     isSaving.value = true;
     saveMessage.value = null;
-    alignDefaultModelsToProviderSelection();
+    alignDefaultModelsToAvailableOptions();
     settings.value = await updateSettings({
       model: {
         text_model_ref: draft.value.text_model_ref,
@@ -623,11 +264,8 @@ async function handleSave() {
         thinking_enabled: draft.value.thinking_enabled,
         temperature: clampSettingsTemperature(draft.value.temperature),
       },
-      model_providers: buildProviderSavePayload(providerDrafts.value),
     });
     draft.value = buildDraftFromSettings(settings.value);
-    providerDraft.value = buildProviderDraftFromSettings(settings.value);
-    providerDrafts.value = buildProviderDraftsFromSettings(settings.value);
     saveMessage.value = t("settings.saved");
     error.value = null;
   } catch (saveError) {
@@ -679,10 +317,12 @@ onMounted(loadSettings);
   font-size: 2rem;
 }
 
-.settings-page__body {
+.settings-page__body,
+.settings-page__hint,
+.settings-page__empty {
   margin: 0;
+  color: rgba(60, 41, 20, 0.72);
   line-height: 1.6;
-  color: rgba(60, 41, 20, 0.76);
 }
 
 .settings-page__grid {
@@ -725,26 +365,8 @@ onMounted(loadSettings);
   background: rgba(255, 255, 255, 0.82);
 }
 
-.settings-page__panel input:disabled {
-  color: rgba(60, 41, 20, 0.58);
-  background: rgba(255, 248, 240, 0.58);
-}
-
 .settings-page__select {
   width: 100%;
-}
-
-.settings-page__hint,
-.settings-page__provider-card p,
-.settings-page__provider-url,
-.settings-page__empty {
-  color: rgba(60, 41, 20, 0.72);
-  line-height: 1.6;
-}
-
-.settings-page__provider-url {
-  font-family: var(--graphite-font-mono);
-  font-size: 0.84rem;
 }
 
 .settings-page__actions {
@@ -754,70 +376,17 @@ onMounted(loadSettings);
   margin-top: 14px;
 }
 
-.settings-page__provider-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  margin-top: 14px;
-}
-
-.settings-page__add-provider {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
-  margin-top: 14px;
-}
-
-.settings-page__provider-editor-list {
-  display: grid;
-  margin-top: 16px;
-}
-
-.settings-page__provider-editor {
-  border-top: 1px solid rgba(154, 52, 18, 0.12);
-  padding: 16px 0;
-}
-
-.settings-page__provider-editor:first-child {
-  border-top: 0;
-}
-
-.settings-page__provider-editor-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.settings-page__provider-fields {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4px 14px;
-}
-
-.settings-page__toggle {
-  display: inline-flex !important;
-  grid-template-columns: none !important;
-  align-items: center;
-  min-height: 42px;
-  margin-top: 0 !important;
-  white-space: nowrap;
-}
-
-.settings-page__toggle input {
-  min-height: auto;
-  width: 18px;
-  height: 18px;
-  padding: 0;
-}
-
 .settings-page__button {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
   border: 1px solid rgba(154, 52, 18, 0.2);
   border-radius: 14px;
   padding: 10px 14px;
   background: rgba(255, 248, 240, 0.96);
   color: rgb(154, 52, 18);
+  text-decoration: none;
   cursor: pointer;
 }
 
@@ -835,18 +404,11 @@ onMounted(loadSettings);
   color: rgba(60, 41, 20, 0.72);
 }
 
-.settings-page__provider-message,
-.settings-page__provider-status {
-  color: rgba(60, 41, 20, 0.72);
-  font-size: 0.86rem;
-}
-
-.settings-page__provider-status {
-  border: 1px solid rgba(154, 52, 18, 0.12);
-  border-radius: 999px;
-  padding: 4px 10px;
-  background: rgba(255, 248, 240, 0.92);
-  white-space: nowrap;
+.settings-page__summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
 }
 
 .settings-page__info {
@@ -858,25 +420,6 @@ onMounted(loadSettings);
   padding: 12px 14px;
   background: rgba(255, 255, 255, 0.62);
   margin-top: 10px;
-}
-
-.settings-page__providers {
-  display: grid;
-  gap: 12px;
-}
-
-.settings-page__provider-card {
-  border: 1px solid rgba(154, 52, 18, 0.12);
-  border-radius: 18px;
-  padding: 16px;
-  background: rgba(255, 255, 255, 0.64);
-}
-
-.settings-page__provider-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
 }
 
 .settings-page__badges {
@@ -897,7 +440,8 @@ onMounted(loadSettings);
 }
 
 @media (max-width: 1100px) {
-  .settings-page__grid {
+  .settings-page__grid,
+  .settings-page__summary-grid {
     grid-template-columns: 1fr;
   }
 
@@ -905,12 +449,7 @@ onMounted(loadSettings);
     grid-column: auto;
   }
 
-  .settings-page__add-provider,
-  .settings-page__provider-fields {
-    grid-template-columns: 1fr;
-  }
-
-  .settings-page__provider-editor-header {
+  .settings-page__panel-heading {
     display: grid;
   }
 }

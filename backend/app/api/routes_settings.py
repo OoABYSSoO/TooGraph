@@ -18,6 +18,12 @@ from app.tools.local_llm import (
     get_default_agent_thinking_enabled,
 )
 from app.tools.model_provider_client import discover_provider_models
+from app.tools.openai_codex_client import (
+    clear_codex_auth_state,
+    get_codex_auth_status,
+    poll_codex_device_login,
+    start_codex_device_login,
+)
 from app.tools.registry import get_tool_registry
 
 
@@ -59,6 +65,7 @@ class SettingsModelProviderPayload(BaseModel):
     enabled: bool = True
     auth_header: str | None = Field(default=None, alias="auth_header")
     auth_scheme: str | None = Field(default=None, alias="auth_scheme")
+    auth_mode: str | None = Field(default=None, alias="auth_mode")
     models: list[SettingsProviderModelPayload] = Field(default_factory=list)
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
@@ -79,6 +86,13 @@ class ModelDiscoveryPayload(BaseModel):
     api_key: str = Field(default="", alias="api_key")
     auth_header: str | None = Field(default=None, alias="auth_header")
     auth_scheme: str | None = Field(default=None, alias="auth_scheme")
+
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
+
+
+class CodexAuthPollPayload(BaseModel):
+    device_auth_id: str = Field(alias="device_auth_id", min_length=1)
+    user_code: str = Field(alias="user_code", min_length=1)
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
@@ -117,6 +131,7 @@ def _merge_model_providers(
             "transport": transport,
             "base_url": str(provider_payload.base_url).strip().rstrip("/"),
             "enabled": bool(provider_payload.enabled),
+            "auth_mode": provider_payload.auth_mode or existing_provider.get("auth_mode") or template.get("auth_mode") or "api_key",
             "auth_header": provider_payload.auth_header
             or existing_provider.get("auth_header")
             or template.get("auth_header")
@@ -148,9 +163,9 @@ def _merge_model_providers(
 
 
 def _build_settings_payload(*, force_refresh_models: bool = False) -> dict:
-    text_model_ref = get_default_text_model_ref(force_refresh=force_refresh_models)
-    video_model_ref = get_default_video_model_ref(force_refresh=force_refresh_models)
     model_catalog = build_model_catalog(force_refresh=force_refresh_models)
+    text_model_ref = str(model_catalog.get("default_text_model_ref") or get_default_text_model_ref(force_refresh=False))
+    video_model_ref = str(model_catalog.get("default_video_model_ref") or get_default_video_model_ref(force_refresh=False))
     return {
         "model": {
             "text_model": resolve_runtime_model_name(text_model_ref),
@@ -177,7 +192,7 @@ def _build_settings_payload(*, force_refresh_models: bool = False) -> dict:
 
 @router.get("")
 def get_settings_endpoint() -> dict:
-    return _build_settings_payload(force_refresh_models=True)
+    return _build_settings_payload(force_refresh_models=False)
 
 
 @router.post("")
@@ -220,3 +235,30 @@ def discover_model_provider_models_endpoint(payload: ModelDiscoveryPayload) -> d
     except RuntimeError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"models": models}
+
+
+@router.get("/model-providers/openai-codex/auth/status")
+def get_openai_codex_auth_status_endpoint() -> dict:
+    return get_codex_auth_status()
+
+
+@router.post("/model-providers/openai-codex/auth/start")
+def start_openai_codex_auth_endpoint() -> dict:
+    try:
+        return start_codex_device_login()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/model-providers/openai-codex/auth/poll")
+def poll_openai_codex_auth_endpoint(payload: CodexAuthPollPayload) -> dict:
+    try:
+        return poll_codex_device_login(device_auth_id=payload.device_auth_id, user_code=payload.user_code)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/model-providers/openai-codex/auth/logout")
+def logout_openai_codex_auth_endpoint() -> dict:
+    clear_codex_auth_state()
+    return {"configured": False, "authenticated": False}

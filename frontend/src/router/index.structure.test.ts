@@ -14,6 +14,8 @@ test("router resets page scroll on route navigation while preserving browser bac
 test("router exposes first-class management pages for presets and skills", () => {
   assert.match(routerSource, /import PresetsPage from "@\/pages\/PresetsPage\.vue";/);
   assert.match(routerSource, /import SkillsPage from "@\/pages\/SkillsPage\.vue";/);
+  assert.match(routerSource, /import ModelProvidersPage from "@\/pages\/ModelProvidersPage\.vue";/);
   assert.match(routerSource, /\{ path: "\/presets", component: PresetsPage \}/);
   assert.match(routerSource, /\{ path: "\/skills", component: SkillsPage \}/);
+  assert.match(routerSource, /\{ path: "\/models", component: ModelProvidersPage \}/);
 });

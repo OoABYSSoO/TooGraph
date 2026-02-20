@@ -1,0 +1,234 @@
+from __future__ import annotations
+
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+from typing import Any
+from unittest.mock import patch
+
+import httpx
+from fastapi.testclient import TestClient
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from app.main import app
+
+
+class FakeResponse:
+    def __init__(self, payload: dict[str, Any], status_code: int = 200, text: str = "") -> None:
+        self._payload = payload
+        self.status_code = status_code
+        self.text = text or str(payload)
+        self.request = httpx.Request("POST", "https://example.test")
+
+    def json(self) -> dict[str, Any]:
+        return self._payload
+
+    def raise_for_status(self) -> None:
+        if self.status_code >= 400:
+            raise httpx.HTTPStatusError(
+                f"HTTP {self.status_code}",
+                request=self.request,
+                response=httpx.Response(self.status_code, text=self.text, request=self.request),
+            )
+
+
+class FakeHttpClient:
+    def __init__(self, responses: list[FakeResponse]) -> None:
+        self.responses = responses
+        self.get_calls: list[dict[str, Any]] = []
+        self.post_calls: list[dict[str, Any]] = []
+
+    def __enter__(self) -> "FakeHttpClient":
+        return self
+
+    def __exit__(self, *_args: Any) -> None:
+        return None
+
+    def _next(self) -> FakeResponse:
+        if not self.responses:
+            raise AssertionError("No fake response queued")
+        return self.responses.pop(0)
+
+    def get(self, url: str, **kwargs: Any) -> FakeResponse:
+        self.get_calls.append({"url": url, **kwargs})
+        return self._next()
+
+    def post(self, url: str, **kwargs: Any) -> FakeResponse:
+        self.post_calls.append({"url": url, **kwargs})
+        return self._next()
+
+
+class OpenAICodexProviderTests(unittest.TestCase):
+    def test_codex_auth_status_masks_stored_tokens(self) -> None:
+        from app.tools.openai_codex_client import get_codex_auth_status, save_codex_auth_state
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            auth_path = Path(temp_dir) / "openai_codex_auth.json"
+            with patch("app.tools.openai_codex_client.CODEX_AUTH_PATH", auth_path):
+                save_codex_auth_state(
+                    {
+                        "tokens": {
+                            "access_token": "access-secret",
+                            "refresh_token": "refresh-secret",
+                        },
+                        "last_refresh": "2026-04-26T00:00:00Z",
+                        "auth_mode": "chatgpt",
+                        "source": "device-code",
+                    }
+                )
+
+                status = get_codex_auth_status()
+
+        self.assertTrue(status["authenticated"])
+        self.assertTrue(status["configured"])
+        self.assertEqual(status["auth_mode"], "chatgpt")
+        self.assertNotIn("access-secret", str(status))
+        self.assertNotIn("refresh-secret", str(status))
+
+    def test_codex_auth_routes_start_poll_status_and_logout(self) -> None:
+        with patch(
+            "app.api.routes_settings.start_codex_device_login",
+            return_value={
+                "verification_url": "https://auth.openai.com/codex/device",
+                "user_code": "ABCD-EFGH",
+                "device_auth_id": "device-1",
+                "expires_in": 900,
+                "interval": 5,
+            },
+        ) as start_login:
+            with patch(
+                "app.api.routes_settings.poll_codex_device_login",
+                return_value={"authenticated": True, "status": "authenticated"},
+            ) as poll_login:
+                with patch(
+                    "app.api.routes_settings.get_codex_auth_status",
+                    return_value={"configured": True, "authenticated": True, "auth_mode": "chatgpt"},
+                ):
+                    with patch("app.api.routes_settings.clear_codex_auth_state") as clear_auth:
+                        with TestClient(app) as client:
+                            start_response = client.post("/api/settings/model-providers/openai-codex/auth/start")
+                            poll_response = client.post(
+                                "/api/settings/model-providers/openai-codex/auth/poll",
+                                json={"device_auth_id": "device-1", "user_code": "ABCD-EFGH"},
+                            )
+                            status_response = client.get("/api/settings/model-providers/openai-codex/auth/status")
+                            logout_response = client.post("/api/settings/model-providers/openai-codex/auth/logout")
+
+        self.assertEqual(start_response.status_code, 200)
+        self.assertEqual(start_response.json()["user_code"], "ABCD-EFGH")
+        self.assertEqual(poll_response.status_code, 200)
+        self.assertEqual(poll_response.json()["authenticated"], True)
+        self.assertEqual(status_response.json()["auth_mode"], "chatgpt")
+        self.assertEqual(logout_response.json(), {"configured": False, "authenticated": False})
+        start_login.assert_called_once_with()
+        poll_login.assert_called_once_with(device_auth_id="device-1", user_code="ABCD-EFGH")
+        clear_auth.assert_called_once_with()
+
+    def test_discovers_codex_models_with_stored_chatgpt_token(self) -> None:
+        from app.tools.model_provider_client import discover_provider_models
+
+        fake_client = FakeHttpClient(
+            [
+                FakeResponse(
+                    {
+                        "models": [
+                            {"slug": "gpt-5.5", "priority": 1},
+                            {"slug": "hidden-model", "visibility": "hidden", "priority": 2},
+                            {"slug": "api-disabled", "supported_in_api": False, "priority": 3},
+                        ]
+                    }
+                )
+            ]
+        )
+        with patch("app.tools.model_provider_client.resolve_codex_access_token", return_value="codex-access-token"):
+            with patch("app.tools.model_provider_client.httpx.Client", return_value=fake_client):
+                models = discover_provider_models(
+                    provider_id="openai-codex",
+                    transport="codex-responses",
+                    base_url="https://chatgpt.com/backend-api/codex",
+                )
+
+        self.assertEqual(models, ["gpt-5.5"])
+        request = fake_client.get_calls[0]
+        self.assertEqual(
+            request["url"],
+            "https://chatgpt.com/backend-api/codex/models",
+        )
+        self.assertEqual(request["params"], {"client_version": "1.0.0"})
+        self.assertEqual(request["headers"]["Authorization"], "Bearer codex-access-token")
+
+    def test_chat_codex_responses_posts_responses_payload(self) -> None:
+        from app.tools.model_provider_client import chat_with_model_provider
+
+        fake_client = FakeHttpClient(
+            [
+                FakeResponse(
+                    {
+                        "id": "resp_1",
+                        "model": "gpt-5.5",
+                        "output_text": "hello from codex",
+                        "usage": {"input_tokens": 4, "output_tokens": 3},
+                    }
+                )
+            ]
+        )
+        with patch("app.tools.model_provider_client.resolve_codex_access_token", return_value="codex-access-token"):
+            with patch("app.tools.model_provider_client.httpx.Client", return_value=fake_client):
+                content, meta = chat_with_model_provider(
+                    provider_id="openai-codex",
+                    transport="codex-responses",
+                    base_url="https://chatgpt.com/backend-api/codex",
+                    api_key="",
+                    model="gpt-5.5",
+                    system_prompt="You are helpful.",
+                    user_prompt="Say hello",
+                    temperature=0.2,
+                    max_tokens=64,
+                )
+
+        request = fake_client.post_calls[0]
+        self.assertEqual(content, "hello from codex")
+        self.assertEqual(meta["response_id"], "resp_1")
+        self.assertEqual(meta["usage"], {"input_tokens": 4, "output_tokens": 3})
+        self.assertEqual(request["url"], "https://chatgpt.com/backend-api/codex/responses")
+        self.assertEqual(request["headers"]["Authorization"], "Bearer codex-access-token")
+        self.assertEqual(request["json"]["model"], "gpt-5.5")
+        self.assertEqual(request["json"]["instructions"], "You are helpful.")
+        self.assertEqual(request["json"]["input"], [{"role": "user", "content": "Say hello"}])
+        self.assertEqual(request["json"]["store"], False)
+        self.assertNotIn("max_output_tokens", request["json"])
+
+    def test_chat_codex_responses_refreshes_once_after_unauthorized(self) -> None:
+        from app.tools.model_provider_client import chat_with_model_provider
+
+        fake_client = FakeHttpClient(
+            [
+                FakeResponse({"error": "expired"}, status_code=401, text="expired"),
+                FakeResponse({"id": "resp_2", "model": "gpt-5.5", "output_text": "retried"}),
+            ]
+        )
+        with patch("app.tools.model_provider_client.resolve_codex_access_token", return_value="old-token"):
+            with patch("app.tools.model_provider_client.refresh_codex_access_token", return_value="new-token") as refresh:
+                with patch("app.tools.model_provider_client.httpx.Client", return_value=fake_client):
+                    content, _meta = chat_with_model_provider(
+                        provider_id="openai-codex",
+                        transport="codex-responses",
+                        base_url="https://chatgpt.com/backend-api/codex",
+                        api_key="",
+                        model="gpt-5.5",
+                        system_prompt="sys",
+                        user_prompt="user",
+                        temperature=0.2,
+                    )
+
+        self.assertEqual(content, "retried")
+        self.assertEqual(len(fake_client.post_calls), 2)
+        self.assertEqual(fake_client.post_calls[0]["headers"]["Authorization"], "Bearer old-token")
+        self.assertEqual(fake_client.post_calls[1]["headers"]["Authorization"], "Bearer new-token")
+        refresh.assert_called_once_with()
+
+
+if __name__ == "__main__":
+    unittest.main()
