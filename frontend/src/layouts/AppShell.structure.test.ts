@@ -37,6 +37,13 @@ test("AppShell uses dynamic viewport height and keeps editor chrome inside the v
   assert.doesNotMatch(componentSource, /\.app-shell__content--editor \{[\s\S]*height:\s*100vh;/);
 });
 
+test("AppShell keeps the sidebar fixed while normal pages scroll in the content pane", () => {
+  assert.match(componentSource, /\.app-shell \{[\s\S]*height:\s*100dvh;[\s\S]*overflow:\s*hidden;/);
+  assert.match(componentSource, /\.app-shell__sidebar \{[\s\S]*height:\s*100dvh;[\s\S]*max-height:\s*100dvh;/);
+  assert.match(componentSource, /\.app-shell__content \{[\s\S]*height:\s*100%;[\s\S]*overflow-y:\s*auto;[\s\S]*overscroll-behavior:\s*contain;/);
+  assert.match(componentSource, /\.app-shell__content--editor \{[\s\S]*overflow:\s*hidden;/);
+});
+
 test("AppShell uses a low-noise ChatGPT-style brand rail with library icons", () => {
   assert.match(componentSource, /import \{[\s\S]*ElIcon[\s\S]*\} from "element-plus";/);
   assert.match(componentSource, /import \{[\s\S]*House[\s\S]*EditPen[\s\S]*Clock[\s\S]*Setting[\s\S]*\} from "@element-plus\/icons-vue";/);

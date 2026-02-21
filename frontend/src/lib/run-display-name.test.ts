@@ -7,16 +7,16 @@ test("formatRunDisplayTimestamp formats started_at into a stable local date-time
   assert.equal(formatRunDisplayTimestamp("2026-04-24T09:30:45Z", { timeZone: "UTC" }), "2026-04-24 09:30");
 });
 
-test("formatRunDisplayName combines graph name with formatted time", () => {
+test("formatRunDisplayName returns the graph name without duplicating the timestamp", () => {
   assert.equal(
     formatRunDisplayName(
       {
-        graph_name: "知识库验证",
+        graph_name: "Knowledge Run",
         started_at: "2026-04-24T09:30:45Z",
       },
       { timeZone: "UTC" },
     ),
-    "知识库验证 · 2026-04-24 09:30",
+    "Knowledge Run",
   );
 });
 
@@ -29,12 +29,12 @@ test("formatRunDisplayName falls back when graph name is blank", () => {
       },
       { timeZone: "UTC" },
     ),
-    "Untitled Graph · 2026-04-24 09:30",
+    "Untitled Graph",
   );
 });
 
 test("formatRunDuration uses compact human readable units", () => {
-  assert.equal(formatRunDuration(null), "—");
+  assert.equal(formatRunDuration(0), formatRunDuration(null));
   assert.equal(formatRunDuration(480), "480ms");
   assert.equal(formatRunDuration(1240), "1.2s");
   assert.equal(formatRunDuration(12_400), "12s");

@@ -38,7 +38,7 @@
           <RouterLink class="runs-page__empty-action" :to="runsEmptyAction.href">{{ runsEmptyAction.label }}</RouterLink>
         </article>
         <article
-          v-for="run in runs"
+          v-for="run in paginatedRuns"
           v-else
           :key="run.run_id"
           class="runs-page__run-row"
@@ -54,13 +54,13 @@
               <strong>{{ formatRunDisplayName(run) }}</strong>
               <span :class="statusBadgeClass(run.status)">{{ run.status }}</span>
             </div>
+            <p class="runs-page__run-meta">
+              <span>{{ formatRunDisplayTimestamp(run.started_at) }}</span>
+              <span>{{ t("runs.elapsed", { duration: formatRunDuration(run.duration_ms) }) }}</span>
+              <span v-if="run.revision_round > 0">{{ t("runs.revision", { revision: run.revision_round }) }}</span>
+              <span v-if="run.final_score">{{ t("common.score") }} {{ run.final_score }}</span>
+            </p>
             <p class="runs-page__run-id">{{ run.run_id }}</p>
-          </div>
-          <div class="runs-page__run-meta">
-            <span>{{ formatRunDisplayTimestamp(run.started_at) }}</span>
-            <span>{{ t("runs.elapsed", { duration: formatRunDuration(run.duration_ms) }) }}</span>
-            <span>{{ t("runs.revision", { revision: run.revision_round }) }}</span>
-            <span v-if="run.final_score">{{ t("common.score") }} {{ run.final_score }}</span>
           </div>
           <div class="runs-page__card-actions">
             <button type="button" class="runs-page__detail-link" @click.stop="openRunDetail(run.run_id)">{{ runCardDetail }}</button>
@@ -84,6 +84,18 @@
           </div>
         </article>
       </section>
+
+      <section v-if="runs.length > RUNS_PAGE_SIZE" class="runs-page__pagination" :aria-label="t('runs.paginationLabel')">
+        <ElPagination
+          v-model:current-page="currentPage"
+          background
+          layout="prev, pager, next"
+          :page-size="RUNS_PAGE_SIZE"
+          :total="runs.length"
+          :pager-count="7"
+          :hide-on-single-page="true"
+        />
+      </section>
     </section>
   </AppShell>
 </template>
@@ -92,7 +104,7 @@
 import { Promotion } from "@element-plus/icons-vue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { ElIcon, ElInput, ElSegmented } from "element-plus";
+import { ElIcon, ElInput, ElPagination, ElSegmented } from "element-plus";
 import { useI18n } from "vue-i18n";
 
 import { fetchRuns } from "@/api/runs";
@@ -102,9 +114,12 @@ import AppShell from "@/layouts/AppShell.vue";
 import type { RunSummary } from "@/types/run";
 
 import {
+  RUNS_PAGE_SIZE,
   buildRunStatusFilterOptions,
   buildRunRestoreTargets,
   buildRunStatusOverview,
+  clampRunsPage,
+  paginateRuns,
   resolveRunsCardDetail,
   resolveRunsEmptyAction,
 } from "./runsPageModel.ts";
@@ -116,6 +131,7 @@ const loading = ref(true);
 const error = ref<string | null>(null);
 const graphNameQuery = ref("");
 const statusFilter = ref("");
+const currentPage = ref(1);
 const statusOptions = computed(() => {
   locale.value;
   return buildRunStatusFilterOptions();
@@ -133,21 +149,28 @@ const runOverview = computed(() => {
   locale.value;
   return buildRunStatusOverview(runs.value);
 });
+const paginatedRuns = computed(() => paginateRuns(runs.value, currentPage.value));
 let searchTimer: number | null = null;
 
 async function loadRuns() {
   loading.value = true;
   try {
-    runs.value = await fetchRuns({
+    const fetchedRuns = await fetchRuns({
       graphName: graphNameQuery.value,
       status: statusFilter.value,
     });
+    runs.value = fetchedRuns;
+    currentPage.value = clampRunsPage(currentPage.value, fetchedRuns.length);
     error.value = null;
   } catch (fetchError) {
     error.value = fetchError instanceof Error ? fetchError.message : t("common.loadingRuns");
   } finally {
     loading.value = false;
   }
+}
+
+function resetRunsPagination() {
+  currentPage.value = 1;
 }
 
 function scheduleRunsLoad() {
@@ -199,8 +222,14 @@ function restoreUrlForRun(run: RunSummary) {
 }
 
 onMounted(loadRuns);
-watch(graphNameQuery, scheduleRunsLoad);
-watch(statusFilter, loadRuns);
+watch(graphNameQuery, () => {
+  resetRunsPagination();
+  scheduleRunsLoad();
+});
+watch(statusFilter, () => {
+  resetRunsPagination();
+  void loadRuns();
+});
 
 onBeforeUnmount(() => {
   if (searchTimer !== null) {
@@ -406,10 +435,39 @@ function statusBadgeClass(status: string) {
   gap: 10px;
 }
 
+.runs-page__pagination {
+  display: flex;
+  justify-content: center;
+  padding: 2px 0 8px;
+}
+
+.runs-page__pagination :deep(.el-pagination) {
+  --el-pagination-button-bg-color: rgba(255, 248, 240, 0.9);
+  --el-pagination-button-disabled-bg-color: rgba(255, 252, 247, 0.72);
+  --el-pagination-hover-color: rgb(154, 52, 18);
+  --el-color-primary: rgb(154, 52, 18);
+  gap: 6px;
+}
+
+.runs-page__pagination :deep(.btn-prev),
+.runs-page__pagination :deep(.btn-next),
+.runs-page__pagination :deep(.el-pager li) {
+  min-width: 32px;
+  border: 1px solid rgba(154, 52, 18, 0.12);
+  border-radius: 999px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.62);
+}
+
+.runs-page__pagination :deep(.el-pager li.is-active) {
+  border-color: rgba(154, 52, 18, 0.72);
+  color: rgba(255, 250, 242, 0.98);
+  box-shadow: 0 8px 16px rgba(120, 53, 15, 0.12);
+}
+
 .runs-page__run-row {
   position: relative;
   display: grid;
-  grid-template-columns: 5px minmax(0, 1.25fr) minmax(260px, 0.9fr) auto;
+  grid-template-columns: 5px minmax(0, 1fr) auto;
   gap: 16px;
   align-items: center;
   min-height: 96px;
@@ -471,7 +529,7 @@ function statusBadgeClass(status: string) {
 }
 
 .runs-page__run-id {
-  margin: 8px 0 0;
+  margin: 6px 0 0;
   overflow: hidden;
   color: rgba(60, 41, 20, 0.58);
   font-family: var(--graphite-font-mono);
@@ -483,16 +541,15 @@ function statusBadgeClass(status: string) {
 .runs-page__run-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  color: rgba(60, 41, 20, 0.64);
-  font-size: 0.82rem;
+  gap: 6px 12px;
+  margin: 7px 0 0;
+  color: rgba(60, 41, 20, 0.6);
+  font-size: 0.8rem;
+  line-height: 1.4;
 }
 
 .runs-page__run-meta span {
-  border: 1px solid rgba(154, 52, 18, 0.08);
-  border-radius: 999px;
-  padding: 5px 9px;
-  background: rgba(255, 248, 240, 0.68);
+  min-width: 0;
 }
 
 .runs-page__card-actions {
@@ -586,7 +643,6 @@ function statusBadgeClass(status: string) {
     grid-template-columns: 5px minmax(0, 1fr);
   }
 
-  .runs-page__run-meta,
   .runs-page__card-actions {
     grid-column: 2;
   }

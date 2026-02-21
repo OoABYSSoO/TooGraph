@@ -4,9 +4,12 @@ import test from "node:test";
 import type { RunSummary } from "../types/run.ts";
 
 import {
+  RUNS_PAGE_SIZE,
   RUN_STATUS_FILTER_OPTIONS,
   buildRunRestoreTargets,
   buildRunStatusOverview,
+  clampRunsPage,
+  paginateRuns,
   resolveRunsCardDetail,
   resolveRunsEmptyAction,
 } from "./runsPageModel.ts";
@@ -45,6 +48,25 @@ test("buildRunStatusOverview summarizes total, attention, active, and completed 
     { key: "active", label: "进行中", value: 2 },
     { key: "completed", label: "已完成", value: 1 },
   ]);
+});
+
+test("paginateRuns limits run history to the requested page", () => {
+  const runs = Array.from({ length: RUNS_PAGE_SIZE + 3 }, (_, index) => createRun(`run_${index + 1}`, "completed"));
+
+  assert.equal(paginateRuns(runs, 1).length, RUNS_PAGE_SIZE);
+  assert.deepEqual(
+    paginateRuns(runs, 2).map((run) => run.run_id),
+    ["run_13", "run_14", "run_15"],
+  );
+});
+
+test("clampRunsPage keeps pagination inside available pages", () => {
+  const totalRuns = RUNS_PAGE_SIZE * 2 + 1;
+
+  assert.equal(clampRunsPage(0, totalRuns), 1);
+  assert.equal(clampRunsPage(Number.NaN, totalRuns), 1);
+  assert.equal(clampRunsPage(9, totalRuns), 3);
+  assert.equal(clampRunsPage(2, 0), 1);
 });
 
 test("buildRunRestoreTargets exposes all breakpoints with node names before final result restore choices", () => {

@@ -43,6 +43,12 @@ test("RunsPage uses semantic status styling and keeps run identifiers monospace"
   assert.match(componentSource, /\.runs-page__run-id \{[\s\S]*font-family:\s*var\(--graphite-font-mono\);/);
 });
 
+test("RunsPage keeps timing metadata under the graph title without duplicating the title date", () => {
+  assert.match(componentSource, /<p class="runs-page__run-meta">[\s\S]*formatRunDisplayTimestamp\(run\.started_at\)[\s\S]*formatRunDuration\(run\.duration_ms\)[\s\S]*v-if="run\.revision_round > 0"/);
+  assert.doesNotMatch(componentSource, /grid-template-columns:\s*5px minmax\(0,\s*1\.25fr\) minmax\(260px,\s*0\.9fr\) auto/);
+  assert.match(componentSource, /\.runs-page__run-meta span \{\s*min-width:\s*0;\s*\}/);
+});
+
 test("RunsPage presents a restrained dashboard toolbar with status segments and overview metrics", () => {
   assert.match(componentSource, /const statusOptions = computed\(\(\) => \{[\s\S]*return buildRunStatusFilterOptions\(\);/);
   assert.match(componentSource, /const runOverview = computed\(\(\) => \{[\s\S]*return buildRunStatusOverview\(runs\.value\);/);
@@ -52,6 +58,22 @@ test("RunsPage presents a restrained dashboard toolbar with status segments and 
   assert.match(componentSource, /v-for="item in runOverview"/);
   assert.match(componentSource, /\.runs-page__toolbar \{[\s\S]*background:\s*var\(--graphite-glass-specular\),\s*var\(--graphite-glass-lens\),\s*var\(--graphite-glass-bg-strong\);/);
   assert.match(componentSource, /\.runs-page__overview-card \{[\s\S]*background:\s*rgba\(255,\s*255,\s*255,\s*0\.62\);/);
+});
+
+test("RunsPage paginates run history instead of rendering every run at once", () => {
+  assert.match(componentSource, /import \{[\s\S]*ElPagination[\s\S]*\} from "element-plus";/);
+  assert.match(componentSource, /RUNS_PAGE_SIZE/);
+  assert.match(componentSource, /const currentPage = ref\(1\);/);
+  assert.match(componentSource, /const paginatedRuns = computed\(\(\) => paginateRuns\(runs\.value, currentPage\.value\)\);/);
+  assert.match(componentSource, /v-for="run in paginatedRuns"/);
+  assert.doesNotMatch(componentSource, /v-for="run in runs"/);
+  assert.match(componentSource, /<ElPagination[\s\S]*v-model:current-page="currentPage"[\s\S]*:page-size="RUNS_PAGE_SIZE"[\s\S]*:total="runs\.length"/);
+  assert.match(componentSource, /v-if="runs\.length > RUNS_PAGE_SIZE"/);
+  assert.match(componentSource, /class="runs-page__pagination"/);
+  assert.match(componentSource, /function resetRunsPagination\(\)/);
+  assert.match(componentSource, /watch\(graphNameQuery[\s\S]*resetRunsPagination\(\);[\s\S]*scheduleRunsLoad\(\);/);
+  assert.match(componentSource, /watch\(statusFilter[\s\S]*resetRunsPagination\(\);[\s\S]*loadRuns\(\);/);
+  assert.match(componentSource, /\.runs-page__pagination \{[\s\S]*justify-content:\s*center;/);
 });
 
 test("RunsPage gives status segments warm hover and selected states instead of Element Plus defaults", () => {

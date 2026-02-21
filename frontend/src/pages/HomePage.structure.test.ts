@@ -8,11 +8,12 @@ const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const componentSource = readFileSync(resolve(currentDirectory, "HomePage.vue"), "utf8");
 
 test("HomePage keeps dashboard panels paginated instead of letting template lists grow indefinitely", () => {
-  assert.match(componentSource, /import \{ formatRunDisplayName \} from "@\/lib\/run-display-name";/);
+  assert.match(componentSource, /import \{ formatRunDisplayName, formatRunDisplayTimestamp \} from "@\/lib\/run-display-name";/);
   assert.match(componentSource, /import \{[\s\S]*paginateWorkspacePanelItems[\s\S]*\} from "\.\/workspaceDashboardModel\.ts";/);
   assert.match(componentSource, /const templatePage = ref\(0\);/);
   assert.match(componentSource, /const visibleTemplatePage = computed\(\(\) => paginateWorkspacePanelItems\(templates\.value,\s*templatePage\.value\)\);/);
   assert.match(componentSource, /\{\{ formatRunDisplayName\(run\) \}\}/);
+  assert.match(componentSource, /\{\{ formatRunDisplayTimestamp\(run\.started_at\) \}\}/);
   assert.match(componentSource, /v-for="template in visibleTemplatePage\.items"/);
   assert.match(componentSource, /class="home-panel__pager"/);
   assert.match(componentSource, /@click="setTemplatePage\(visibleTemplatePage\.page - 1\)"/);

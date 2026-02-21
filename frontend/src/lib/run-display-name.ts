@@ -42,9 +42,8 @@ export function formatRunDisplayTimestamp(startedAt: string, options: RunDisplay
   return `${partMap.year ?? "0000"}-${partMap.month ?? "00"}-${partMap.day ?? "00"} ${partMap.hour ?? "00"}:${partMap.minute ?? "00"}`;
 }
 
-export function formatRunDisplayName(run: RunDisplayNameSource, options: RunDisplayNameOptions = {}) {
-  const graphName = run.graph_name?.trim() || "Untitled Graph";
-  return `${graphName} · ${formatRunDisplayTimestamp(run.started_at, options)}`;
+export function formatRunDisplayName(run: RunDisplayNameSource, _options: RunDisplayNameOptions = {}) {
+  return run.graph_name?.trim() || "Untitled Graph";
 }
 
 export function formatRunDuration(durationMs: number | null | undefined) {

@@ -30,7 +30,8 @@
             <p class="home-card__identifier">{{ run.run_id }}</p>
             <div class="home-badges">
               <span :class="statusBadgeClass(run.status)">{{ run.status }}</span>
-              <span>{{ t("common.revisionsCount", { count: run.revision_round }) }}</span>
+              <span>{{ formatRunDisplayTimestamp(run.started_at) }}</span>
+              <span v-if="run.revision_round > 0">{{ t("common.revisionsCount", { count: run.revision_round }) }}</span>
             </div>
           </RouterLink>
           <div v-if="visibleRunPage.hasPagination" class="home-panel__pager">
@@ -123,7 +124,7 @@ import { useI18n } from "vue-i18n";
 
 import { fetchGraphs, fetchTemplates } from "@/api/graphs";
 import { fetchRuns } from "@/api/runs";
-import { formatRunDisplayName } from "@/lib/run-display-name";
+import { formatRunDisplayName, formatRunDisplayTimestamp } from "@/lib/run-display-name";
 import AppShell from "@/layouts/AppShell.vue";
 import type { GraphDocument, TemplateRecord } from "@/types/node-system";
 import type { RunSummary } from "@/types/run";

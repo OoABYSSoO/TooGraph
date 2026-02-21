@@ -141,10 +141,13 @@ watch(isSidebarCollapsed, (nextValue) => {
 <style scoped>
 .app-shell {
   --app-sidebar-width: 240px;
+  height: 100vh;
+  height: 100dvh;
   min-height: 100vh;
   min-height: 100dvh;
   display: grid;
   grid-template-columns: var(--app-sidebar-width) minmax(0, 1fr);
+  overflow: hidden;
   background: var(--graphite-page-bg);
   color: var(--graphite-text);
   font-family: var(--graphite-font-ui);
@@ -172,6 +175,11 @@ watch(isSidebarCollapsed, (nextValue) => {
   box-shadow: var(--graphite-glass-highlight);
   backdrop-filter: blur(24px) saturate(1.35);
   min-height: 0;
+  height: 100vh;
+  height: 100dvh;
+  max-height: 100vh;
+  max-height: 100dvh;
+  box-sizing: border-box;
   overflow: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -323,6 +331,9 @@ watch(isSidebarCollapsed, (nextValue) => {
 .app-shell__content {
   min-width: 0;
   min-height: 0;
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 28px;
 }
 

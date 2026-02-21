@@ -24,6 +24,8 @@ export type RunsRestoreTarget = {
   snapshotId: string | null;
 };
 
+export const RUNS_PAGE_SIZE = 12;
+
 export function buildRunStatusFilterOptions(): RunsStatusFilterOption[] {
   return [
     { label: translate("status.all"), value: "" },
@@ -58,6 +60,28 @@ export function buildRunStatusOverview(runs: RunSummary[]): RunsStatusOverviewIt
     { key: "active", label: translate("runs.activeRuns"), value: runs.filter((run) => activeStatuses.has(run.status)).length },
     { key: "completed", label: translate("runs.completedRuns"), value: runs.filter((run) => run.status === "completed").length },
   ];
+}
+
+function normalizeRunsPageSize(pageSize: number) {
+  return Number.isFinite(pageSize) && pageSize > 0 ? Math.floor(pageSize) : RUNS_PAGE_SIZE;
+}
+
+export function clampRunsPage(page: number, totalRuns: number, pageSize = RUNS_PAGE_SIZE) {
+  const normalizedPageSize = normalizeRunsPageSize(pageSize);
+  const normalizedTotalRuns = Math.max(0, Math.floor(Number.isFinite(totalRuns) ? totalRuns : 0));
+  const totalPages = Math.max(1, Math.ceil(normalizedTotalRuns / normalizedPageSize));
+  if (!Number.isFinite(page)) {
+    return 1;
+  }
+
+  return Math.min(Math.max(1, Math.floor(page)), totalPages);
+}
+
+export function paginateRuns(runs: RunSummary[], page: number, pageSize = RUNS_PAGE_SIZE) {
+  const normalizedPageSize = normalizeRunsPageSize(pageSize);
+  const currentPage = clampRunsPage(page, runs.length, normalizedPageSize);
+  const start = (currentPage - 1) * normalizedPageSize;
+  return runs.slice(start, start + normalizedPageSize);
 }
 
 export function buildRunRestoreTargets(run: RunSummary): RunsRestoreTarget[] {
