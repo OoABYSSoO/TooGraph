@@ -8,6 +8,12 @@ from typing import Any
 
 import httpx
 
+from app.core.thinking_levels import (
+    THINKING_LEVEL_MEDIUM,
+    THINKING_LEVEL_OFF,
+    normalize_thinking_level,
+)
+from app.core.storage.model_log_store import append_model_request_log
 from app.core.storage.settings_store import load_app_settings
 from app.tools.model_provider_client import discover_provider_models
 
@@ -41,11 +47,38 @@ LOCAL_LLM_REQUEST_TIMEOUT_SEC = _parse_float_env("LOCAL_LLM_REQUEST_TIMEOUT_SEC"
 ROOT_DIR = Path(__file__).resolve().parents[3]
 LOCAL_ONBOARDING_GUIDE_PATH = ROOT_DIR / "knowledge" / "GraphiteUI-official" / "getting-started.md"
 DEFAULT_AGENT_TEMPERATURE = 0.2
+DEFAULT_AGENT_THINKING_LEVEL = "auto"
 DEFAULT_AGENT_THINKING_ENABLED = True
 DEFAULT_LOCAL_MODEL_ALIAS = "lm-local"
 LOCAL_RUNTIME_CONFIG_CACHE_TTL_SEC = 5.0
 _LOCAL_RUNTIME_CONFIG_CACHE: tuple[float, dict[str, Any] | None] | None = None
 _LOCAL_MODEL_DISCOVERY_CACHE: tuple[float, list[str]] | None = None
+
+
+def _append_local_model_request_log_safely(
+    *,
+    provider_id: str,
+    model: str,
+    request_raw: dict[str, Any],
+    response_raw: dict[str, Any],
+    started_at: float,
+    status_code: int | None = 200,
+    error: str | None = None,
+) -> None:
+    try:
+        append_model_request_log(
+            provider_id=provider_id,
+            transport="openai-compatible",
+            model=model,
+            path="/chat/completions",
+            request_raw=request_raw,
+            response_raw=response_raw,
+            duration_ms=int((time.monotonic() - started_at) * 1000),
+            status_code=status_code,
+            error=error,
+        )
+    except Exception:
+        return
 
 
 def _get_saved_local_provider_config() -> dict[str, Any]:
@@ -218,11 +251,19 @@ def get_default_agent_temperature() -> float:
 
 
 def get_default_agent_thinking_enabled() -> bool:
+    return get_default_agent_thinking_level() != THINKING_LEVEL_OFF
+
+
+def get_default_agent_thinking_level() -> str:
     saved_settings = load_app_settings()
     runtime_defaults = saved_settings.get("agent_runtime_defaults")
-    if isinstance(runtime_defaults, dict) and isinstance(runtime_defaults.get("thinking_enabled"), bool):
-        return bool(runtime_defaults["thinking_enabled"])
-    return DEFAULT_AGENT_THINKING_ENABLED
+    if isinstance(runtime_defaults, dict):
+        saved_level = runtime_defaults.get("thinking_level")
+        if isinstance(saved_level, str):
+            return normalize_thinking_level(saved_level, fallback=DEFAULT_AGENT_THINKING_LEVEL)
+        if isinstance(runtime_defaults.get("thinking_enabled"), bool):
+            return DEFAULT_AGENT_THINKING_LEVEL if bool(runtime_defaults["thinking_enabled"]) else THINKING_LEVEL_OFF
+    return DEFAULT_AGENT_THINKING_LEVEL
 
 
 def _normalize_message_text(value: Any) -> str:
@@ -295,6 +336,7 @@ def _chat_with_local_model_with_meta(
     temperature: float = DEFAULT_AGENT_TEMPERATURE,
     max_tokens: int | None = None,
     thinking_enabled: bool = False,
+    thinking_level: str | None = None,
 ) -> tuple[str, dict[str, Any]]:
     request_payload: dict[str, Any] = {
         "model": model or get_default_text_model(),
@@ -309,7 +351,11 @@ def _chat_with_local_model_with_meta(
         request_payload["max_tokens"] = max_tokens
 
     warnings: list[str] = []
-    used_thinking = bool(thinking_enabled and provider_id == "local")
+    resolved_thinking_level = normalize_thinking_level(
+        thinking_level if thinking_level is not None else (THINKING_LEVEL_MEDIUM if thinking_enabled else THINKING_LEVEL_OFF),
+        fallback=THINKING_LEVEL_OFF,
+    )
+    used_thinking = bool(resolved_thinking_level != THINKING_LEVEL_OFF and provider_id == "local")
     if used_thinking:
         request_payload["return_progress"] = True
         request_payload["reasoning_format"] = "auto"
@@ -319,37 +365,65 @@ def _chat_with_local_model_with_meta(
             f"Thinking mode was requested for provider '{provider_id}', but GraphiteUI currently only maps provider-specific thinking fields for the local gateway."
         )
 
-    response_payload = _request_local_chat_completion(request_payload)
-    content, reasoning = _extract_chat_completion_text(response_payload)
-
-    if not content and max_tokens is not None:
-        retry_payload = dict(request_payload)
-        retry_payload.pop("max_tokens", None)
-        response_payload = _request_local_chat_completion(retry_payload)
+    started_at = time.monotonic()
+    logged_request_payload = request_payload
+    response_payload: dict[str, Any] = {}
+    try:
+        response_payload = _request_local_chat_completion(request_payload)
         content, reasoning = _extract_chat_completion_text(response_payload)
-        warnings.append(
-            "The provider exhausted max_tokens before returning final content. Retried once without a max_tokens limit."
-        )
 
-    if not content and used_thinking:
-        retry_payload = dict(request_payload)
-        retry_payload.pop("return_progress", None)
-        retry_payload.pop("reasoning_format", None)
-        retry_payload.pop("timings_per_token", None)
-        response_payload = _request_local_chat_completion(retry_payload)
-        content, reasoning = _extract_chat_completion_text(response_payload)
-        used_thinking = False
-        warnings.append(
-            "Thinking mode was requested, but the local gateway returned reasoning without final content. Retried without local thinking fields."
-        )
+        if not content and max_tokens is not None:
+            retry_payload = dict(request_payload)
+            retry_payload.pop("max_tokens", None)
+            logged_request_payload = retry_payload
+            response_payload = _request_local_chat_completion(retry_payload)
+            content, reasoning = _extract_chat_completion_text(response_payload)
+            warnings.append(
+                "The provider exhausted max_tokens before returning final content. Retried once without a max_tokens limit."
+            )
 
-    if used_thinking and not reasoning:
-        warnings.append(
-            "Thinking mode was requested and the local gateway accepted the request, but this response did not include any reasoning text."
-        )
+        if not content and used_thinking:
+            retry_payload = dict(request_payload)
+            retry_payload.pop("return_progress", None)
+            retry_payload.pop("reasoning_format", None)
+            retry_payload.pop("timings_per_token", None)
+            logged_request_payload = retry_payload
+            response_payload = _request_local_chat_completion(retry_payload)
+            content, reasoning = _extract_chat_completion_text(response_payload)
+            used_thinking = False
+            warnings.append(
+                "Thinking mode was requested, but the local gateway returned reasoning without final content. Retried without local thinking fields."
+            )
 
-    if not content:
-        raise RuntimeError("Local LLM returned an empty response.")
+        if used_thinking and not reasoning:
+            warnings.append(
+                "Thinking mode was requested and the local gateway accepted the request, but this response did not include any reasoning text."
+            )
+
+        if not content:
+            raise RuntimeError("Local LLM returned an empty response.")
+    except Exception as exc:
+        error_payload = dict(response_payload) if response_payload else {}
+        error_payload["error"] = str(exc)
+        _append_local_model_request_log_safely(
+            provider_id=provider_id,
+            model=str(logged_request_payload.get("model") or model or get_default_text_model()),
+            request_raw=logged_request_payload,
+            response_raw=error_payload,
+            started_at=started_at,
+            status_code=None,
+            error=str(exc),
+        )
+        raise
+
+    _append_local_model_request_log_safely(
+        provider_id=provider_id,
+        model=str(response_payload.get("model") or logged_request_payload["model"]),
+        request_raw=logged_request_payload,
+        response_raw=response_payload,
+        started_at=started_at,
+        status_code=200,
+    )
 
     return content, {
         "base_url": get_local_llm_base_url(),
@@ -357,6 +431,7 @@ def _chat_with_local_model_with_meta(
         "provider_id": provider_id,
         "temperature": temperature,
         "thinking_enabled": used_thinking,
+        "thinking_level": resolved_thinking_level,
         "reasoning_format": "auto" if used_thinking and provider_id == "local" else None,
         "reasoning": reasoning,
         "usage": response_payload.get("usage"),

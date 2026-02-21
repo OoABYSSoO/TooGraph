@@ -176,17 +176,18 @@ class OpenAICodexProviderTests(unittest.TestCase):
         )
         with patch("app.tools.model_provider_client.resolve_codex_access_token", return_value="codex-access-token"):
             with patch("app.tools.model_provider_client.httpx.Client", return_value=fake_client):
-                content, meta = chat_with_model_provider(
-                    provider_id="openai-codex",
-                    transport="codex-responses",
-                    base_url="https://chatgpt.com/backend-api/codex",
-                    api_key="",
-                    model="gpt-5.5",
-                    system_prompt="You are helpful.",
-                    user_prompt="Say hello",
-                    temperature=0.2,
-                    max_tokens=64,
-                )
+                with patch("app.tools.model_provider_client.append_model_request_log"):
+                    content, meta = chat_with_model_provider(
+                        provider_id="openai-codex",
+                        transport="codex-responses",
+                        base_url="https://chatgpt.com/backend-api/codex",
+                        api_key="",
+                        model="gpt-5.5",
+                        system_prompt="You are helpful.",
+                        user_prompt="Say hello",
+                        temperature=0.2,
+                        max_tokens=64,
+                    )
 
         request = fake_client.post_calls[0]
         self.assertEqual(content, "hello from codex")
@@ -212,16 +213,17 @@ class OpenAICodexProviderTests(unittest.TestCase):
         with patch("app.tools.model_provider_client.resolve_codex_access_token", return_value="old-token"):
             with patch("app.tools.model_provider_client.refresh_codex_access_token", return_value="new-token") as refresh:
                 with patch("app.tools.model_provider_client.httpx.Client", return_value=fake_client):
-                    content, _meta = chat_with_model_provider(
-                        provider_id="openai-codex",
-                        transport="codex-responses",
-                        base_url="https://chatgpt.com/backend-api/codex",
-                        api_key="",
-                        model="gpt-5.5",
-                        system_prompt="sys",
-                        user_prompt="user",
-                        temperature=0.2,
-                    )
+                    with patch("app.tools.model_provider_client.append_model_request_log"):
+                        content, _meta = chat_with_model_provider(
+                            provider_id="openai-codex",
+                            transport="codex-responses",
+                            base_url="https://chatgpt.com/backend-api/codex",
+                            api_key="",
+                            model="gpt-5.5",
+                            system_prompt="sys",
+                            user_prompt="user",
+                            temperature=0.2,
+                        )
 
         self.assertEqual(content, "retried")
         self.assertEqual(len(fake_client.post_calls), 2)

@@ -321,7 +321,8 @@ function resolveAgentModelLabel(node: Extract<GraphNode, { kind: "agent" }>) {
 }
 
 function resolveThinkingLabel(node: Extract<GraphNode, { kind: "agent" }>) {
-  return node.config.thinkingMode === "on" ? "thinking on" : "thinking off";
+  const mode = node.config.thinkingMode === "on" ? "medium" : node.config.thinkingMode || "auto";
+  return `thinking ${mode}`;
 }
 
 function buildRuntimeNote(node: GraphNode, options: BuildNodeCardViewModelOptions) {

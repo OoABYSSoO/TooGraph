@@ -1,4 +1,4 @@
-import type { ModelProviderTransport, OpenAICodexAuthStatus, SettingsPayload } from "@/types/settings";
+import type { AgentThinkingLevel, ModelProviderTransport, OpenAICodexAuthStatus, SettingsPayload } from "@/types/settings";
 
 import { apiGet, apiPost } from "./http.ts";
 
@@ -30,6 +30,7 @@ export type SettingsUpdatePayload = {
   agent_runtime_defaults: {
     model: string;
     thinking_enabled: boolean;
+    thinking_level: AgentThinkingLevel;
     temperature: number;
   };
   model_providers?: Record<string, SettingsModelProviderUpdate>;

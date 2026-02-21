@@ -36,6 +36,15 @@ test("RunsPage lets each restorable card choose breakpoint or final-result resto
   assert.match(componentSource, /@click\.stop="selectRestoreTarget\(run\.run_id, target\.key\)"/);
 });
 
+test("RunsPage keeps the detail action immediately before restore edit after restore target choices", () => {
+  const actionsMatch = componentSource.match(/<div class="runs-page__card-actions">([\s\S]*?)<\/div>\s*<\/article>/);
+  assert.ok(actionsMatch, "expected to find run card actions");
+  assert.match(
+    actionsMatch[1],
+    /class="runs-page__restore-switch"[\s\S]*class="runs-page__detail-link"[\s\S]*class="runs-page__restore-link"/,
+  );
+});
+
 test("RunsPage uses semantic status styling and keeps run identifiers monospace", () => {
   assert.match(componentSource, /function statusBadgeClass\(status: string\)/);
   assert.match(componentSource, /:class="statusBadgeClass\(run\.status\)"/);
@@ -74,6 +83,27 @@ test("RunsPage paginates run history instead of rendering every run at once", ()
   assert.match(componentSource, /watch\(graphNameQuery[\s\S]*resetRunsPagination\(\);[\s\S]*scheduleRunsLoad\(\);/);
   assert.match(componentSource, /watch\(statusFilter[\s\S]*resetRunsPagination\(\);[\s\S]*loadRuns\(\);/);
   assert.match(componentSource, /\.runs-page__pagination \{[\s\S]*justify-content:\s*center;/);
+});
+
+test("RunsPage uses a two-column run card grid on wide screens and returns to one column below desktop", () => {
+  assert.match(
+    componentSource,
+    /\.runs-page__list \{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);[\s\S]*align-items:\s*stretch;/
+  );
+  assert.match(
+    componentSource,
+    /\.runs-page__run-row \{[\s\S]*grid-template-columns:\s*5px minmax\(0,\s*1fr\) auto;[\s\S]*align-items:\s*center;/
+  );
+  assert.doesNotMatch(componentSource, /min-height:\s*172px;/);
+  assert.match(componentSource, /\.runs-page__card-actions \{[\s\S]*align-self:\s*center;[\s\S]*justify-content:\s*flex-end;/);
+  assert.match(
+    componentSource,
+    /@media \(max-width:\s*980px\) \{[\s\S]*\.runs-page__list \{[\s\S]*grid-template-columns:\s*1fr;/
+  );
+  assert.match(
+    componentSource,
+    /@media \(max-width:\s*1120px\) \{[\s\S]*\.runs-page__run-row \{[\s\S]*grid-template-columns:\s*5px minmax\(0,\s*1fr\);/
+  );
 });
 
 test("RunsPage gives status segments warm hover and selected states instead of Element Plus defaults", () => {

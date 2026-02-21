@@ -24,7 +24,7 @@ export type RunsRestoreTarget = {
   snapshotId: string | null;
 };
 
-export const RUNS_PAGE_SIZE = 12;
+export const RUNS_PAGE_SIZE = 24;
 
 export function buildRunStatusFilterOptions(): RunsStatusFilterOption[] {
   return [

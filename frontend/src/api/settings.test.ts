@@ -28,6 +28,7 @@ test("updateSettings posts through the frontend api proxy", async () => {
         agent_runtime_defaults: {
           model: "model",
           thinking_enabled: true,
+          thinking_level: "auto",
           temperature: 0.2,
         },
       }),
@@ -48,6 +49,7 @@ test("updateSettings posts through the frontend api proxy", async () => {
     agent_runtime_defaults: {
       model: "model",
       thinking_enabled: true,
+      thinking_level: "auto",
       temperature: 0.2,
     },
     model_providers: {
@@ -79,6 +81,7 @@ test("updateSettings posts through the frontend api proxy", async () => {
     agent_runtime_defaults: {
       model: "model",
       thinking_enabled: true,
+      thinking_level: "auto",
       temperature: 0.2,
     },
     model_providers: {

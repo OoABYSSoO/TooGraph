@@ -77,7 +77,7 @@ const BUILTIN_EMPTY_AGENT_PRESET: PresetDocument = {
         taskInstruction: "",
         modelSource: "global",
         model: "",
-        thinkingMode: "on",
+        thinkingMode: "auto",
         temperature: 0.2,
       },
     },

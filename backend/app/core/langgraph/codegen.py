@@ -305,7 +305,7 @@ def _build_export_agent_config(node: NodeSystemAgentNode) -> dict[str, Any]:
         config["modelSource"] = node.config.model_source.value
         if node.config.model:
             config["model"] = node.config.model
-    if node.config.thinking_mode != AgentThinkingMode.ON:
+    if node.config.thinking_mode != AgentThinkingMode.AUTO:
         config["thinkingMode"] = node.config.thinking_mode.value
     if node.config.temperature != 0.2:
         config["temperature"] = node.config.temperature

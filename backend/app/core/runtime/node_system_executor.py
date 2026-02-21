@@ -25,9 +25,12 @@ from app.core.schemas.node_system import (
 from app.core.storage.run_store import save_run
 from app.skills.registry import get_skill_registry
 from app.tools.local_llm import (
+    _chat_with_local_model_with_meta,
     get_default_agent_temperature,
     get_default_agent_thinking_enabled,
+    get_default_agent_thinking_level,
 )
+from app.core.thinking_levels import normalize_thinking_level, resolve_effective_thinking_level
 from app.tools.model_provider_client import chat_with_model_ref_with_meta
 
 KNOWLEDGE_BASE_SKILL_KEY = "search_knowledge_base"
@@ -621,13 +624,29 @@ def _generate_agent_response(
         else "根据输入和技能结果完成输出。"
     )
 
-    content, llm_meta = chat_with_model_ref_with_meta(
-        model_ref=runtime_config["resolved_model_ref"],
-        system_prompt=system_prompt,
-        user_prompt=user_prompt,
-        temperature=runtime_config["resolved_temperature"],
-        thinking_enabled=runtime_config["resolved_thinking"],
-    )
+    thinking_level = runtime_config.get("resolved_thinking_level")
+    if not isinstance(thinking_level, str):
+        thinking_level = "medium" if runtime_config.get("resolved_thinking") else "off"
+
+    if runtime_config.get("resolved_provider_id") == "local":
+        content, llm_meta = _chat_with_local_model_with_meta(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            model=runtime_config["runtime_model_name"],
+            provider_id="local",
+            temperature=runtime_config["resolved_temperature"],
+            thinking_enabled=runtime_config["resolved_thinking"],
+            thinking_level=thinking_level,
+        )
+    else:
+        content, llm_meta = chat_with_model_ref_with_meta(
+            model_ref=runtime_config["resolved_model_ref"],
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            temperature=runtime_config["resolved_temperature"],
+            thinking_enabled=runtime_config["resolved_thinking"],
+            thinking_level=thinking_level,
+        )
 
     parsed_fields = _parse_llm_json_response(content, output_keys)
     response_payload: dict[str, Any] = {"summary": content, **parsed_fields}
@@ -639,6 +658,7 @@ def _generate_agent_response(
         "provider_temperature": llm_meta.get("temperature", runtime_config["resolved_temperature"]),
         "provider_reasoning_format": llm_meta.get("reasoning_format"),
         "provider_thinking_enabled": bool(llm_meta.get("thinking_enabled")),
+        "provider_thinking_level": llm_meta.get("thinking_level", thinking_level),
         "provider_reasoning_captured": bool(reasoning),
         "provider_response_id": llm_meta.get("response_id"),
         "provider_usage": llm_meta.get("usage"),
@@ -696,6 +716,7 @@ def _build_auto_system_prompt(
 def _resolve_agent_runtime_config(node: NodeSystemAgentNode) -> dict[str, Any]:
     global_model_ref = get_default_text_model_ref(force_refresh=True)
     global_thinking_enabled = get_default_agent_thinking_enabled()
+    global_thinking_level = get_default_agent_thinking_level()
     default_temperature = get_default_agent_temperature()
     override_model_ref = normalize_model_ref(node.config.model) if node.config.model.strip() else ""
 
@@ -704,22 +725,33 @@ def _resolve_agent_runtime_config(node: NodeSystemAgentNode) -> dict[str, Any]:
         if node.config.model_source.value == "override" and override_model_ref
         else global_model_ref
     )
-    resolved_thinking = node.config.thinking_mode.value == "on"
     resolved_temperature = max(0.0, min(float(node.config.temperature), 2.0))
     resolved_provider_id, _resolved_model_name = resolved_model.split("/", 1) if "/" in resolved_model else ("local", resolved_model)
     runtime_model_name = resolve_runtime_model_name(resolved_model)
+    configured_thinking_level = normalize_thinking_level(node.config.thinking_mode.value)
+    if configured_thinking_level == "auto" and global_thinking_level != "auto":
+        configured_thinking_level = normalize_thinking_level(global_thinking_level)
+    resolved_thinking_level = resolve_effective_thinking_level(
+        configured_level=configured_thinking_level,
+        provider_id=resolved_provider_id,
+        model=runtime_model_name,
+    )
+    resolved_thinking = resolved_thinking_level != "off"
 
     return {
         "model_source": node.config.model_source.value,
         "configured_model_ref": override_model_ref,
         "thinking_mode": node.config.thinking_mode.value,
+        "configured_thinking_level": normalize_thinking_level(node.config.thinking_mode.value),
         "configured_temperature": node.config.temperature,
         "global_model_ref": global_model_ref,
         "global_thinking_enabled": global_thinking_enabled,
+        "global_thinking_level": global_thinking_level,
         "default_temperature": default_temperature,
         "resolved_model_ref": resolved_model,
         "resolved_provider_id": resolved_provider_id,
         "resolved_thinking": resolved_thinking,
+        "resolved_thinking_level": resolved_thinking_level,
         "resolved_temperature": resolved_temperature,
         "runtime_model_name": runtime_model_name,
         "request_return_progress": resolved_thinking and resolved_provider_id == "local",

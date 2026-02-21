@@ -5,6 +5,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.core.thinking_levels import normalize_thinking_level
+
 
 def _validate_identifier(value: str, *, label: str) -> str:
     normalized = value.strip()
@@ -76,8 +78,13 @@ class AgentModelSource(str, Enum):
 
 
 class AgentThinkingMode(str, Enum):
+    AUTO = "auto"
     OFF = "off"
-    ON = "on"
+    MINIMAL = "minimal"
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    XHIGH = "xhigh"
 
 
 class ConditionOperator(str, Enum):
@@ -170,10 +177,15 @@ class NodeSystemAgentConfig(BaseModel):
     task_instruction: str = Field(default="", alias="taskInstruction")
     model_source: AgentModelSource = Field(default=AgentModelSource.GLOBAL, alias="modelSource")
     model: str = ""
-    thinking_mode: AgentThinkingMode = Field(default=AgentThinkingMode.ON, alias="thinkingMode")
+    thinking_mode: AgentThinkingMode = Field(default=AgentThinkingMode.AUTO, alias="thinkingMode")
     temperature: float = Field(default=0.2, ge=0, le=2)
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
+
+    @field_validator("thinking_mode", mode="before")
+    @classmethod
+    def normalize_thinking_mode(cls, value: Any) -> str:
+        return normalize_thinking_level(value)
 
 
 class NodeSystemConditionRule(BaseModel):

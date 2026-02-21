@@ -16,7 +16,9 @@ from app.core.storage.settings_store import load_app_settings, save_app_settings
 from app.tools.local_llm import (
     get_default_agent_temperature,
     get_default_agent_thinking_enabled,
+    get_default_agent_thinking_level,
 )
+from app.core.thinking_levels import THINKING_LEVEL_OFF, normalize_thinking_level
 from app.tools.model_provider_client import discover_provider_models
 from app.tools.openai_codex_client import (
     clear_codex_auth_state,
@@ -39,10 +41,19 @@ class SettingsModelPayload(BaseModel):
 
 class AgentRuntimeDefaultsPayload(BaseModel):
     model: str = Field(min_length=1)
-    thinking_enabled: bool = Field(alias="thinking_enabled")
+    thinking_enabled: bool | None = Field(default=None, alias="thinking_enabled")
+    thinking_level: str | None = Field(default=None, alias="thinking_level")
     temperature: float = Field(ge=0, le=2)
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
+
+    @property
+    def normalized_thinking_level(self) -> str:
+        if self.thinking_level is not None:
+            return normalize_thinking_level(self.thinking_level)
+        if self.thinking_enabled is not None:
+            return "auto" if self.thinking_enabled else THINKING_LEVEL_OFF
+        return "auto"
 
 
 class SettingsProviderModelPayload(BaseModel):
@@ -176,6 +187,7 @@ def _build_settings_payload(*, force_refresh_models: bool = False) -> dict:
         "agent_runtime_defaults": {
             "model": text_model_ref,
             "thinking_enabled": get_default_agent_thinking_enabled(),
+            "thinking_level": get_default_agent_thinking_level(),
             "temperature": get_default_agent_temperature(),
         },
         "model_catalog": model_catalog,
@@ -211,7 +223,8 @@ def update_settings_endpoint(payload: SettingsUpdatePayload) -> dict:
             "text_model_ref": normalized_text_model_ref,
             "video_model_ref": normalized_video_model_ref,
             "agent_runtime_defaults": {
-                "thinking_enabled": payload.agent_runtime_defaults.thinking_enabled,
+                "thinking_enabled": payload.agent_runtime_defaults.normalized_thinking_level != THINKING_LEVEL_OFF,
+                "thinking_level": payload.agent_runtime_defaults.normalized_thinking_level,
                 "temperature": float(payload.agent_runtime_defaults.temperature),
             },
         }

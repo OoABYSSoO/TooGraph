@@ -141,14 +141,16 @@ class SettingsModelProviderTests(unittest.TestCase):
 
         with patch("app.api.routes_settings.build_model_catalog", return_value=catalog) as build_catalog:
             with patch("app.api.routes_settings.get_default_agent_thinking_enabled", return_value=True):
-                with patch("app.api.routes_settings.get_default_agent_temperature", return_value=0.2):
-                    with patch("app.api.routes_settings.get_tool_registry", return_value={}):
-                        payload = routes_settings._build_settings_payload(force_refresh_models=True)
+                with patch("app.api.routes_settings.get_default_agent_thinking_level", return_value="auto"):
+                    with patch("app.api.routes_settings.get_default_agent_temperature", return_value=0.2):
+                        with patch("app.api.routes_settings.get_tool_registry", return_value={}):
+                            payload = routes_settings._build_settings_payload(force_refresh_models=True)
 
         build_catalog.assert_called_once_with(force_refresh=True)
         self.assertEqual(payload["model"]["text_model_ref"], "local/current-text")
         self.assertEqual(payload["model"]["video_model_ref"], "local/current-video")
         self.assertEqual(payload["agent_runtime_defaults"]["model"], "local/current-text")
+        self.assertEqual(payload["agent_runtime_defaults"]["thinking_level"], "auto")
 
     def test_get_settings_uses_cached_catalog_for_fast_page_loads(self) -> None:
         with patch("app.api.routes_settings._build_settings_payload", return_value={"ok": True}) as build_payload:

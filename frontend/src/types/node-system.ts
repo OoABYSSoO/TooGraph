@@ -28,6 +28,8 @@ export type WriteBinding = {
   mode?: "replace";
 };
 
+export type AgentThinkingMode = "auto" | "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "on";
+
 export type NodeUi = {
   position: GraphPosition;
   collapsed?: boolean;
@@ -59,7 +61,7 @@ export type AgentNode = {
     taskInstruction: string;
     modelSource: "global" | "override";
     model: string;
-    thinkingMode: "off" | "on";
+    thinkingMode: AgentThinkingMode;
     temperature: number;
   };
 };

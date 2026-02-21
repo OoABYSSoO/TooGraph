@@ -50,13 +50,17 @@ test("buildRunStatusOverview summarizes total, attention, active, and completed 
   ]);
 });
 
+test("RUNS_PAGE_SIZE fills a two-column run history page with twelve rows", () => {
+  assert.equal(RUNS_PAGE_SIZE, 24);
+});
+
 test("paginateRuns limits run history to the requested page", () => {
   const runs = Array.from({ length: RUNS_PAGE_SIZE + 3 }, (_, index) => createRun(`run_${index + 1}`, "completed"));
 
   assert.equal(paginateRuns(runs, 1).length, RUNS_PAGE_SIZE);
   assert.deepEqual(
     paginateRuns(runs, 2).map((run) => run.run_id),
-    ["run_13", "run_14", "run_15"],
+    [`run_${RUNS_PAGE_SIZE + 1}`, `run_${RUNS_PAGE_SIZE + 2}`, `run_${RUNS_PAGE_SIZE + 3}`],
   );
 });
 

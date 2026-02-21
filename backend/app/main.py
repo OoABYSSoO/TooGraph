@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes_graphs import router as graphs_router
 from app.api.routes_knowledge import router as knowledge_router
 from app.api.routes_memories import router as memories_router
+from app.api.routes_model_logs import router as model_logs_router
 from app.api.routes_presets import router as presets_router
 from app.api.routes_runs import router as runs_router
 from app.api.routes_settings import router as settings_router
@@ -28,6 +29,7 @@ app.add_middleware(
 app.include_router(graphs_router)
 app.include_router(knowledge_router)
 app.include_router(memories_router)
+app.include_router(model_logs_router)
 app.include_router(presets_router)
 app.include_router(runs_router)
 app.include_router(settings_router)

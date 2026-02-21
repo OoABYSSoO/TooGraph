@@ -47,8 +47,7 @@
                 :teleported="false"
                 popper-class="graphite-select-popper"
               >
-                <ElOption :label="t('common.off')" value="off" />
-                <ElOption :label="t('common.on')" value="on" />
+                <ElOption v-for="option in thinkingLevelOptions" :key="option.value" :label="option.label" :value="option.value" />
               </ElSelect>
             </label>
             <label>
@@ -124,7 +123,7 @@ import { RouterLink } from "vue-router";
 
 import { fetchSettings, updateSettings } from "@/api/settings";
 import AppShell from "@/layouts/AppShell.vue";
-import type { SettingsPayload, SettingsProviderModel } from "@/types/settings";
+import type { AgentThinkingLevel, SettingsPayload, SettingsProviderModel } from "@/types/settings";
 
 import { clampSettingsTemperature } from "./settingsPageModel.ts";
 
@@ -132,6 +131,7 @@ type SettingsDraft = {
   text_model_ref: string;
   video_model_ref: string;
   thinking_enabled: boolean;
+  thinking_level: AgentThinkingLevel;
   temperature: number;
 };
 
@@ -147,8 +147,16 @@ function buildDraftFromSettings(payload: SettingsPayload): SettingsDraft {
     text_model_ref: payload.agent_runtime_defaults?.model ?? payload.model.text_model_ref,
     video_model_ref: payload.model.video_model_ref,
     thinking_enabled: payload.agent_runtime_defaults?.thinking_enabled ?? true,
+    thinking_level: normalizeThinkingLevel(payload.agent_runtime_defaults?.thinking_level),
     temperature: payload.agent_runtime_defaults?.temperature ?? 0.2,
   };
+}
+
+function normalizeThinkingLevel(value: string | null | undefined): AgentThinkingLevel {
+  if (value === "off" || value === "minimal" || value === "low" || value === "medium" || value === "high" || value === "xhigh") {
+    return value;
+  }
+  return "auto";
 }
 
 function formatModelChoiceLabel(modelRef: string) {
@@ -205,13 +213,22 @@ const configuredModelOptions = computed(() => {
   }
   return Array.from(options.values());
 });
+const thinkingLevelOptions = computed<Array<{ value: AgentThinkingLevel; label: string }>>(() => [
+  { value: "off", label: t("settings.thinkingOff") },
+  { value: "auto", label: t("settings.thinkingAuto") },
+  { value: "low", label: t("settings.thinkingFast") },
+  { value: "medium", label: t("settings.thinkingBalanced") },
+  { value: "high", label: t("settings.thinkingDeep") },
+  { value: "xhigh", label: t("settings.thinkingExtreme") },
+]);
 const thinkingMode = computed({
-  get: () => (draft.value?.thinking_enabled ? "on" : "off"),
+  get: () => draft.value?.thinking_level ?? "auto",
   set: (value: string) => {
     if (!draft.value) {
       return;
     }
-    draft.value.thinking_enabled = value === "on";
+    draft.value.thinking_level = normalizeThinkingLevel(value);
+    draft.value.thinking_enabled = draft.value.thinking_level !== "off";
   },
 });
 const isDirty = computed(() => {
@@ -262,6 +279,7 @@ async function handleSave() {
       agent_runtime_defaults: {
         model: draft.value.text_model_ref,
         thinking_enabled: draft.value.thinking_enabled,
+        thinking_level: draft.value.thinking_level,
         temperature: clampSettingsTemperature(draft.value.temperature),
       },
     });

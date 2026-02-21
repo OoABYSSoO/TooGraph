@@ -4,6 +4,8 @@ export type ModelProviderTransport =
   | "gemini-generate-content"
   | "codex-responses";
 
+export type AgentThinkingLevel = "auto" | "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+
 export type OpenAICodexAuthStatus = {
   provider_id?: string;
   configured: boolean;
@@ -57,6 +59,7 @@ export type SettingsPayload = {
   agent_runtime_defaults?: {
     model: string;
     thinking_enabled: boolean;
+    thinking_level?: AgentThinkingLevel;
     temperature: number;
   };
   model_catalog?: {

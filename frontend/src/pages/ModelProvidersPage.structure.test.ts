@@ -27,6 +27,17 @@ test("ModelProvidersPage owns provider editing while Settings links to it", () =
   assert.match(settingsSource, /to="\/models"/);
 });
 
+test("runtime thinking selectors list off before auto and then stronger levels", () => {
+  for (const source of [pageSource, settingsSource]) {
+    const thinkingOptions = source.match(/const thinkingLevelOptions = computed[\s\S]*?\]\);/);
+    assert.ok(thinkingOptions, "expected runtime thinking options");
+    assert.match(
+      thinkingOptions[0],
+      /value:\s*"off"[\s\S]*value:\s*"auto"[\s\S]*value:\s*"low"[\s\S]*value:\s*"medium"[\s\S]*value:\s*"high"[\s\S]*value:\s*"xhigh"/,
+    );
+  }
+});
+
 test("ModelProvidersPage presents providers as cards before editing", () => {
   assert.match(pageSource, /class="model-providers-page__provider-cards"/);
   assert.match(pageSource, /v-for="provider in providerCardList"/);
