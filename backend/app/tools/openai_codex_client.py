@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 import time
 from datetime import datetime, timezone
 from typing import Any
@@ -32,6 +33,35 @@ DEFAULT_CODEX_MODEL_IDS = [
     "gpt-5.1-codex-max",
     "gpt-5.1-codex-mini",
 ]
+CODEX_HTTPS_PROXY_ENV_KEYS = ("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy")
+CODEX_FALLBACK_PROXY_ENV_KEYS = ("ALL_PROXY", "all_proxy")
+
+
+def _normalize_http_proxy_url(value: Any) -> str | None:
+    proxy_url = str(value or "").strip()
+    if not proxy_url:
+        return None
+    if "://" not in proxy_url:
+        return f"http://{proxy_url}"
+    if proxy_url.lower().startswith(("http://", "https://")):
+        return proxy_url
+    return None
+
+
+def get_codex_http_proxy_url() -> str | None:
+    for key in (*CODEX_HTTPS_PROXY_ENV_KEYS, *CODEX_FALLBACK_PROXY_ENV_KEYS):
+        proxy_url = _normalize_http_proxy_url(os.environ.get(key))
+        if proxy_url:
+            return proxy_url
+    return None
+
+
+def codex_http_client_kwargs(*, timeout: float) -> dict[str, Any]:
+    client_kwargs: dict[str, Any] = {"timeout": timeout, "trust_env": False}
+    proxy_url = get_codex_http_proxy_url()
+    if proxy_url:
+        client_kwargs["proxy"] = proxy_url
+    return client_kwargs
 
 
 def _as_dict(value: Any) -> dict[str, Any]:
@@ -123,7 +153,7 @@ def _store_token_payload(token_payload: dict[str, Any], *, source: str) -> dict[
 
 def start_codex_device_login() -> dict[str, Any]:
     try:
-        with httpx.Client(timeout=15.0, trust_env=False) as client:
+        with httpx.Client(**codex_http_client_kwargs(timeout=15.0)) as client:
             response = client.post(
                 CODEX_DEVICE_USER_CODE_URL,
                 json={"client_id": CODEX_OAUTH_CLIENT_ID},
@@ -153,7 +183,7 @@ def start_codex_device_login() -> dict[str, Any]:
 
 def _exchange_codex_authorization_code(*, authorization_code: str, code_verifier: str) -> dict[str, Any]:
     try:
-        with httpx.Client(timeout=15.0, trust_env=False) as client:
+        with httpx.Client(**codex_http_client_kwargs(timeout=15.0)) as client:
             response = client.post(
                 CODEX_OAUTH_TOKEN_URL,
                 data={
@@ -182,7 +212,7 @@ def poll_codex_device_login(*, device_auth_id: str, user_code: str) -> dict[str,
         raise RuntimeError("Codex login polling requires device_auth_id and user_code.")
 
     try:
-        with httpx.Client(timeout=15.0, trust_env=False) as client:
+        with httpx.Client(**codex_http_client_kwargs(timeout=15.0)) as client:
             response = client.post(
                 CODEX_DEVICE_TOKEN_URL,
                 json={"device_auth_id": trimmed_device_auth_id, "user_code": trimmed_user_code},
@@ -222,7 +252,7 @@ def refresh_codex_access_token() -> str:
         raise RuntimeError("Codex auth is missing a refresh token. Please sign in again.")
 
     try:
-        with httpx.Client(timeout=20.0, trust_env=False) as client:
+        with httpx.Client(**codex_http_client_kwargs(timeout=20.0)) as client:
             response = client.post(
                 CODEX_OAUTH_TOKEN_URL,
                 data={
