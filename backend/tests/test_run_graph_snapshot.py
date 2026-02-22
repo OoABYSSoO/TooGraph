@@ -185,6 +185,7 @@ class RunGraphSnapshotTest(unittest.TestCase):
                     **template["nodes"]["increment_counter"],
                     "config": {
                         **template["nodes"]["increment_counter"]["config"],
+                        "thinkingMode": "low",
                         "taskInstruction": "读取输入 counter，并严格只返回 JSON：{\"counter\": 当前 counter + 9}。不要输出任何解释。",
                     },
                 },
@@ -226,6 +227,7 @@ class RunGraphSnapshotTest(unittest.TestCase):
                     graph_snapshot = run_detail.get("graph_snapshot")
                     self.assertIsInstance(graph_snapshot, dict)
                     self.assertEqual(graph_snapshot["state_schema"]["counter"]["value"], 9)
+                    self.assertEqual(graph_snapshot["nodes"]["increment_counter"]["config"]["thinkingMode"], "low")
                     self.assertEqual(
                         graph_snapshot["nodes"]["increment_counter"]["config"]["taskInstruction"],
                         "读取输入 counter，并严格只返回 JSON：{\"counter\": 当前 counter + 9}。不要输出任何解释。",

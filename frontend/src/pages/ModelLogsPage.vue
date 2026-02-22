@@ -78,6 +78,16 @@
             <span>{{ selectedLog.path }}</span>
           </div>
 
+          <section v-if="formatRequestThinking(selectedLog)" class="model-logs-page__section">
+            <div class="model-logs-page__section-heading">
+              <h4>{{ t("modelLogs.requestThinking") }}</h4>
+            </div>
+            <pre
+              class="model-logs-page__text-block model-logs-page__json-block model-logs-page__request-thinking"
+              v-html="highlightJson(formatRequestThinking(selectedLog))"
+            ></pre>
+          </section>
+
           <section class="model-logs-page__section">
             <h4>{{ t("modelLogs.messages") }}</h4>
             <div v-if="selectedLog.messages.length > 0" class="model-logs-page__messages">
@@ -133,35 +143,20 @@
           </section>
 
           <section class="model-logs-page__raw-grid">
-            <details open class="model-logs-page__raw-panel model-logs-page__request-raw">
-              <summary class="model-logs-page__raw-summary">
+            <button type="button" class="model-logs-page__raw-panel model-logs-page__request-raw" @click="openRawDialog('request')">
+              <span class="model-logs-page__raw-summary">
                 <span>{{ t("modelLogs.rawRequest") }}</span>
                 <small>{{ t("modelLogs.rawRequestHint") }}</small>
-              </summary>
-              <pre v-html="highlightJson(formatRequestRaw(selectedLog))"></pre>
-            </details>
-            <details open class="model-logs-page__raw-panel model-logs-page__response-raw">
-              <summary class="model-logs-page__raw-summary">
+                <ElIcon aria-hidden="true"><View /></ElIcon>
+              </span>
+            </button>
+            <button type="button" class="model-logs-page__raw-panel model-logs-page__response-raw" @click="openRawDialog('response')">
+              <span class="model-logs-page__raw-summary">
                 <span>{{ t("modelLogs.rawResponse") }}</span>
                 <small>{{ t("modelLogs.rawResponseHint") }}</small>
-              </summary>
-              <div v-if="hasStreamRaw(selectedLog)" class="model-logs-page__stream-raw">
-                <div v-if="selectedStreamSummary?.events.length" class="model-logs-page__stream-events">
-                  <article v-for="(event, eventIndex) in selectedStreamSummary.events" :key="eventIndex" class="model-logs-page__stream-event">
-                    <header class="model-logs-page__stream-event-header">
-                      <span>{{ formatStreamEventLabel(event, eventIndex) }}</span>
-                      <small>#{{ eventIndex + 1 }}</small>
-                    </header>
-                    <pre v-html="highlightJson(formatStreamEvent(event))"></pre>
-                  </article>
-                </div>
-                <section class="model-logs-page__stream-source">
-                  <h4>{{ t("modelLogs.rawStreamSource") }}</h4>
-                  <pre class="model-logs-page__raw-text">{{ formatResponseRaw(selectedLog) }}</pre>
-                </section>
-              </div>
-              <pre v-else v-html="highlightJson(formatResponseRaw(selectedLog))"></pre>
-            </details>
+                <ElIcon aria-hidden="true"><View /></ElIcon>
+              </span>
+            </button>
           </section>
         </section>
 
@@ -181,13 +176,49 @@
           :hide-on-single-page="true"
         />
       </section>
+
+      <ElDialog
+        v-model="rawDialogVisible"
+        class="model-logs-page__raw-dialog"
+        :modal-class="'model-logs-page__raw-dialog-overlay'"
+        width="min(1080px, calc(100vw - 40px))"
+        append-to-body
+        align-center
+      >
+        <template #header>
+          <div class="model-logs-page__raw-dialog-header">
+            <span class="model-logs-page__detail-eyebrow">{{ selectedLog?.provider_id }}</span>
+            <h3>{{ rawDialogTitle }}</h3>
+            <p>{{ rawDialogHint }}</p>
+          </div>
+        </template>
+
+        <div v-if="selectedLog" class="model-logs-page__raw-dialog-body">
+          <div v-if="rawDialogKind === 'response' && hasStreamRaw(selectedLog)" class="model-logs-page__stream-raw">
+            <div v-if="selectedStreamSummary?.events.length" class="model-logs-page__stream-events">
+              <article v-for="(event, eventIndex) in selectedStreamSummary.events" :key="eventIndex" class="model-logs-page__stream-event">
+                <header class="model-logs-page__stream-event-header">
+                  <span>{{ formatStreamEventLabel(event, eventIndex) }}</span>
+                  <small>#{{ eventIndex + 1 }}</small>
+                </header>
+                <pre class="model-logs-page__json-block" v-html="highlightJson(formatStreamEvent(event))"></pre>
+              </article>
+            </div>
+            <section class="model-logs-page__stream-source">
+              <h4>{{ t("modelLogs.rawStreamSource") }}</h4>
+              <pre class="model-logs-page__raw-text">{{ formatResponseRaw(selectedLog) }}</pre>
+            </section>
+          </div>
+          <pre v-else class="model-logs-page__raw-dialog-code model-logs-page__json-block" v-html="highlightJson(rawDialogContent)"></pre>
+        </div>
+      </ElDialog>
     </section>
   </AppShell>
 </template>
 
 <script setup lang="ts">
-import { Refresh } from "@element-plus/icons-vue";
-import { ElIcon, ElInput, ElPagination } from "element-plus";
+import { Refresh, View } from "@element-plus/icons-vue";
+import { ElDialog, ElIcon, ElInput, ElPagination } from "element-plus";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
@@ -207,6 +238,8 @@ const query = ref("");
 const loading = ref(true);
 const error = ref<string | null>(null);
 const outputDisplayMode = ref<"normal" | "chunks">("normal");
+const rawDialogVisible = ref(false);
+const rawDialogKind = ref<"request" | "response">("request");
 let searchTimer: number | null = null;
 
 const selectedLog = computed(() => {
@@ -218,6 +251,18 @@ const selectedLog = computed(() => {
 
 const errorCount = computed(() => logs.value.filter((entry) => Boolean(entry.error)).length);
 const selectedStreamSummary = computed(() => (selectedLog.value ? getStreamSummary(selectedLog.value) : null));
+const rawDialogTitle = computed(() =>
+  rawDialogKind.value === "request" ? t("modelLogs.rawRequest") : t("modelLogs.rawResponse"),
+);
+const rawDialogHint = computed(() =>
+  rawDialogKind.value === "request" ? t("modelLogs.rawRequestHint") : t("modelLogs.rawResponseHint"),
+);
+const rawDialogContent = computed(() => {
+  if (!selectedLog.value) {
+    return "";
+  }
+  return rawDialogKind.value === "request" ? formatRequestRaw(selectedLog.value) : formatResponseRaw(selectedLog.value);
+});
 
 type StreamSummary = {
   eventCount: number;
@@ -260,6 +305,21 @@ function formatReadableReasoning(log: ModelLogEntry) {
 
 function formatReadableContent(log: ModelLogEntry) {
   return log.content || getStreamSummary(log)?.outputChunks.join("") || "";
+}
+
+function formatRequestThinking(log: ModelLogEntry) {
+  const raw = log.request_raw;
+  const requestThinking: Record<string, unknown> = {};
+  for (const key of ["reasoning", "reasoning_effort", "thinking", "return_progress", "reasoning_format", "timings_per_token"]) {
+    if (Object.prototype.hasOwnProperty.call(raw, key)) {
+      requestThinking[key] = raw[key];
+    }
+  }
+  const generationConfig = raw.generationConfig;
+  if (isRecord(generationConfig) && Object.prototype.hasOwnProperty.call(generationConfig, "thinkingConfig")) {
+    requestThinking.generationConfig = { thinkingConfig: generationConfig.thinkingConfig };
+  }
+  return Object.keys(requestThinking).length > 0 ? JSON.stringify(requestThinking, null, 2) : "";
 }
 
 function hasStreamRaw(log: ModelLogEntry) {
@@ -308,6 +368,11 @@ async function loadLogs() {
 
 function selectLog(logId: string) {
   selectedLogId.value = logId;
+}
+
+function openRawDialog(kind: "request" | "response") {
+  rawDialogKind.value = kind;
+  rawDialogVisible.value = true;
 }
 
 function scheduleLogsLoad() {
@@ -367,6 +432,7 @@ watch(currentPage, () => {
 
 watch(selectedLogId, () => {
   outputDisplayMode.value = "normal";
+  rawDialogVisible.value = false;
 });
 
 onMounted(loadLogs);
@@ -387,8 +453,7 @@ onBeforeUnmount(() => {
 .model-logs-page__header,
 .model-logs-page__toolbar,
 .model-logs-page__entry-list,
-.model-logs-page__detail,
-.model-logs-page__pagination {
+.model-logs-page__detail {
   border: 1px solid var(--graphite-border);
   border-radius: 24px;
   box-shadow: var(--graphite-shadow-card);
@@ -494,13 +559,15 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .model-logs-page__entry-list {
   display: grid;
+  align-content: start;
   gap: 10px;
-  max-height: calc(100vh - 260px);
+  height: 100%;
+  max-height: none;
   min-height: 420px;
   overflow: auto;
   padding: 12px;
@@ -749,14 +816,11 @@ onBeforeUnmount(() => {
 }
 
 .model-logs-page__message p {
-  display: -webkit-box;
-  max-height: 5.7em;
+  max-height: 220px;
   margin: 0;
-  overflow: hidden;
+  overflow: auto;
   color: rgba(60, 41, 20, 0.78);
   line-height: 1.45;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 4;
   white-space: pre-wrap;
 }
 
@@ -765,8 +829,7 @@ onBeforeUnmount(() => {
   color: rgba(60, 41, 20, 0.58);
 }
 
-.model-logs-page__text-block,
-.model-logs-page__raw-panel pre {
+.model-logs-page__text-block {
   overflow: auto;
   border: 1px solid rgba(154, 52, 18, 0.1);
   border-radius: 14px;
@@ -782,6 +845,11 @@ onBeforeUnmount(() => {
 .model-logs-page__text-block {
   max-height: 260px;
   padding: 12px;
+}
+
+.model-logs-page__request-thinking {
+  max-height: 170px;
+  background: rgba(239, 246, 255, 0.58);
 }
 
 .model-logs-page__chunk-block {
@@ -813,45 +881,32 @@ onBeforeUnmount(() => {
 
 .model-logs-page__raw-panel {
   display: grid;
-  max-height: 560px;
   min-width: 0;
   overflow: hidden;
   border: 1px solid rgba(154, 52, 18, 0.1);
   border-radius: 14px;
   background: rgba(255, 253, 249, 0.6);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.model-logs-page__raw-panel:hover {
+  border-color: rgba(37, 99, 235, 0.22);
+  background: rgba(255, 255, 255, 0.76);
+  box-shadow: 0 12px 28px rgba(61, 43, 24, 0.08);
+  transform: translateY(-1px);
 }
 
 .model-logs-page__raw-summary {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto 20px;
+  grid-template-columns: minmax(0, 1fr) auto 32px;
   gap: 10px;
   align-items: center;
-  padding: 12px 14px;
-  cursor: pointer;
-  list-style: none;
-}
-
-.model-logs-page__raw-summary::-webkit-details-marker {
-  display: none;
-}
-
-.model-logs-page__raw-summary::after {
-  display: inline-grid;
-  width: 20px;
-  height: 20px;
-  place-items: center;
-  border: 1px solid rgba(154, 52, 18, 0.16);
-  border-radius: 999px;
-  color: rgb(154, 52, 18);
-  content: "+";
-  font-family: var(--graphite-font-mono);
-  font-size: 0.8rem;
-  font-weight: 800;
-}
-
-.model-logs-page__raw-panel[open] .model-logs-page__raw-summary::after {
-  content: "-";
+  min-height: 72px;
+  padding: 14px 16px;
 }
 
 .model-logs-page__raw-summary small {
@@ -860,27 +915,101 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
-.model-logs-page__raw-panel pre {
-  border: 0;
-  border-top: 1px solid rgba(154, 52, 18, 0.1);
-  border-radius: 0;
-  max-height: 460px;
-  min-height: 0;
+.model-logs-page__raw-summary .el-icon {
+  display: inline-grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid rgba(37, 99, 235, 0.14);
+  border-radius: 999px;
+  background: rgba(239, 246, 255, 0.8);
+  color: rgb(37, 99, 235);
+}
+
+:global(.model-logs-page__raw-dialog-overlay.el-overlay) {
+  background: rgba(42, 24, 14, 0.28);
+  backdrop-filter: blur(9px) saturate(0.96);
+}
+
+:global(.model-logs-page__raw-dialog.el-dialog) {
+  overflow: hidden;
+  border: 1px solid var(--graphite-glass-border);
+  border-radius: 24px;
+  padding: 0;
+  background: var(--graphite-glass-specular), var(--graphite-glass-lens), var(--graphite-glass-bg-strong);
+  background-blend-mode: screen, screen, normal;
+  box-shadow:
+    0 28px 80px rgba(66, 31, 17, 0.18),
+    var(--graphite-glass-highlight),
+    var(--graphite-glass-rim);
+  backdrop-filter: blur(30px) saturate(1.55) contrast(1.02);
+}
+
+:global(.model-logs-page__raw-dialog.el-dialog .el-dialog__header) {
+  margin: 0;
+  padding: 22px 24px 14px;
+}
+
+:global(.model-logs-page__raw-dialog.el-dialog .el-dialog__body) {
+  padding: 0 24px 24px;
+}
+
+.model-logs-page__raw-dialog-header {
+  display: grid;
+  gap: 6px;
+  padding-right: 34px;
+}
+
+.model-logs-page__raw-dialog-header h3 {
+  margin: 0;
+  color: var(--graphite-text-strong);
+  font-family: var(--graphite-font-display);
+  font-size: 1.35rem;
+}
+
+.model-logs-page__raw-dialog-header p {
+  margin: 0;
+  color: rgba(60, 41, 20, 0.62);
+}
+
+.model-logs-page__raw-dialog-body {
+  min-width: 0;
+}
+
+.model-logs-page__raw-dialog-code,
+.model-logs-page__raw-text,
+.model-logs-page__stream-event pre {
   overflow: auto;
-  padding: 12px;
+  border: 1px solid rgba(154, 52, 18, 0.1);
+  border-radius: 14px;
+  margin: 0;
+  background: rgba(255, 253, 249, 0.82);
+  color: rgba(31, 23, 15, 0.84);
+  font-family: var(--graphite-font-mono);
+  font-size: 0.8rem;
+  line-height: 1.58;
+  white-space: pre-wrap;
+}
+
+.model-logs-page__raw-dialog-code {
+  min-height: 420px;
+  max-height: 70vh;
+  overflow: auto;
+  padding: 16px;
 }
 
 .model-logs-page__raw-text {
-  color: rgba(31, 23, 15, 0.82);
+  max-height: 320px;
+  padding: 12px;
 }
 
 .model-logs-page__stream-raw {
   display: grid;
   gap: 12px;
+  max-height: 70vh;
   min-height: 0;
   overflow: auto;
-  border-top: 1px solid rgba(154, 52, 18, 0.1);
-  padding: 12px;
+  padding-right: 4px;
 }
 
 .model-logs-page__stream-events {
@@ -936,16 +1065,16 @@ onBeforeUnmount(() => {
   font-size: 0.78rem;
 }
 
-.model-logs-page__raw-panel pre :deep(.model-logs-page__json-key) {
+.model-logs-page__json-block :deep(.model-logs-page__json-key) {
   color: rgb(37, 99, 235);
   font-weight: 800;
 }
 
-.model-logs-page__raw-panel pre :deep(.model-logs-page__json-string) {
+.model-logs-page__json-block :deep(.model-logs-page__json-string) {
   color: rgb(4, 120, 87);
 }
 
-.model-logs-page__raw-panel pre :deep(.model-logs-page__json-string--multiline) {
+.model-logs-page__json-block :deep(.model-logs-page__json-string--multiline) {
   display: inline-grid;
   max-width: min(100%, 78ch);
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -953,12 +1082,12 @@ onBeforeUnmount(() => {
   vertical-align: top;
 }
 
-.model-logs-page__raw-panel pre :deep(.model-logs-page__json-string-quote) {
+.model-logs-page__json-block :deep(.model-logs-page__json-string-quote) {
   color: rgba(4, 120, 87, 0.62);
   font-weight: 700;
 }
 
-.model-logs-page__raw-panel pre :deep(.model-logs-page__json-string-lines) {
+.model-logs-page__json-block :deep(.model-logs-page__json-string-lines) {
   display: grid;
   min-width: 0;
   border-left: 1px solid rgba(4, 120, 87, 0.18);
@@ -966,23 +1095,23 @@ onBeforeUnmount(() => {
   padding-left: 8px;
 }
 
-.model-logs-page__raw-panel pre :deep(.model-logs-page__json-string-line) {
+.model-logs-page__json-block :deep(.model-logs-page__json-string-line) {
   display: block;
   min-height: 1.45em;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
 
-.model-logs-page__raw-panel pre :deep(.model-logs-page__json-number) {
+.model-logs-page__json-block :deep(.model-logs-page__json-number) {
   color: rgb(147, 51, 234);
 }
 
-.model-logs-page__raw-panel pre :deep(.model-logs-page__json-boolean) {
+.model-logs-page__json-block :deep(.model-logs-page__json-boolean) {
   color: rgb(194, 65, 12);
   font-weight: 800;
 }
 
-.model-logs-page__raw-panel pre :deep(.model-logs-page__json-null) {
+.model-logs-page__json-block :deep(.model-logs-page__json-null) {
   color: rgba(60, 41, 20, 0.48);
   font-style: italic;
 }
@@ -990,8 +1119,30 @@ onBeforeUnmount(() => {
 .model-logs-page__pagination {
   display: flex;
   justify-content: center;
-  padding: 14px;
-  background: rgba(255, 255, 255, 0.52);
+  padding: 2px 0 8px;
+}
+
+.model-logs-page__pagination :deep(.el-pagination) {
+  --el-pagination-button-bg-color: rgba(255, 248, 240, 0.9);
+  --el-pagination-button-disabled-bg-color: rgba(255, 252, 247, 0.72);
+  --el-pagination-hover-color: rgb(154, 52, 18);
+  --el-color-primary: rgb(154, 52, 18);
+  gap: 6px;
+}
+
+.model-logs-page__pagination :deep(.btn-prev),
+.model-logs-page__pagination :deep(.btn-next),
+.model-logs-page__pagination :deep(.el-pager li) {
+  min-width: 32px;
+  border: 1px solid rgba(154, 52, 18, 0.12);
+  border-radius: 999px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.62);
+}
+
+.model-logs-page__pagination :deep(.el-pager li.is-active) {
+  border-color: rgba(154, 52, 18, 0.72);
+  color: rgba(255, 250, 242, 0.98);
+  box-shadow: 0 8px 16px rgba(120, 53, 15, 0.12);
 }
 
 @media (max-width: 1180px) {

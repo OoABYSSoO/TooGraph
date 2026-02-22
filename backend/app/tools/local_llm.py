@@ -4,16 +4,14 @@ import json
 import os
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import httpx
 
 from app.core.thinking_levels import (
-    THINKING_LEVEL_AUTO,
     THINKING_LEVEL_HIGH,
     THINKING_LEVEL_LOW,
     THINKING_LEVEL_MEDIUM,
-    THINKING_LEVEL_MINIMAL,
     THINKING_LEVEL_OFF,
     THINKING_LEVEL_XHIGH,
     normalize_thinking_level,
@@ -22,6 +20,7 @@ from app.core.storage.model_log_store import append_model_request_log
 from app.core.storage.settings_store import load_app_settings
 from app.tools.model_provider_client import (
     _coalesce_openai_chat_stream_response,
+    _extract_openai_chat_stream_delta,
     discover_provider_models,
     post_streaming_json_with_fallback,
 )
@@ -56,8 +55,8 @@ LOCAL_LLM_REQUEST_TIMEOUT_SEC = _parse_float_env("LOCAL_LLM_REQUEST_TIMEOUT_SEC"
 ROOT_DIR = Path(__file__).resolve().parents[3]
 LOCAL_ONBOARDING_GUIDE_PATH = ROOT_DIR / "knowledge" / "GraphiteUI-official" / "getting-started.md"
 DEFAULT_AGENT_TEMPERATURE = 0.2
-DEFAULT_AGENT_THINKING_LEVEL = "auto"
-DEFAULT_AGENT_THINKING_ENABLED = True
+DEFAULT_AGENT_THINKING_LEVEL = THINKING_LEVEL_OFF
+DEFAULT_AGENT_THINKING_ENABLED = False
 DEFAULT_LOCAL_MODEL_ALIAS = "lm-local"
 LOCAL_RUNTIME_CONFIG_CACHE_TTL_SEC = 5.0
 _LOCAL_RUNTIME_CONFIG_CACHE: tuple[float, dict[str, Any] | None] | None = None
@@ -274,7 +273,7 @@ def get_default_agent_thinking_level() -> str:
         if isinstance(saved_level, str):
             return normalize_thinking_level(saved_level, fallback=DEFAULT_AGENT_THINKING_LEVEL)
         if isinstance(runtime_defaults.get("thinking_enabled"), bool):
-            return DEFAULT_AGENT_THINKING_LEVEL if bool(runtime_defaults["thinking_enabled"]) else THINKING_LEVEL_OFF
+            return THINKING_LEVEL_MEDIUM if bool(runtime_defaults["thinking_enabled"]) else THINKING_LEVEL_OFF
     return DEFAULT_AGENT_THINKING_LEVEL
 
 
@@ -419,10 +418,8 @@ def _get_lm_studio_model_reasoning_metadata(model: str) -> dict[str, Any] | None
 
 def _map_lm_studio_reasoning_effort(level: str) -> str | None:
     normalized = normalize_thinking_level(level, fallback=THINKING_LEVEL_OFF)
-    if normalized in {THINKING_LEVEL_AUTO, THINKING_LEVEL_OFF}:
+    if normalized == THINKING_LEVEL_OFF:
         return None
-    if normalized == THINKING_LEVEL_MINIMAL:
-        return THINKING_LEVEL_LOW
     if normalized == THINKING_LEVEL_XHIGH:
         return THINKING_LEVEL_HIGH
     return normalized
@@ -434,12 +431,15 @@ def _build_local_thinking_request_payload(
     thinking_level: str,
     warnings: list[str],
 ) -> tuple[dict[str, Any], str | None]:
+    normalized_level = normalize_thinking_level(thinking_level, fallback=THINKING_LEVEL_OFF)
+    codex_style_reasoning = {"reasoning": {"effort": normalized_level}} if normalized_level != THINKING_LEVEL_OFF else {}
     runtime_config = _get_runtime_config_for_local_thinking()
     llama_config = runtime_config.get("llama") if isinstance(runtime_config, dict) else None
     if isinstance(llama_config, dict):
         reasoning_format = str(llama_config.get("reasoning_format") or "auto").strip() or "auto"
         return (
             {
+                **codex_style_reasoning,
                 "return_progress": True,
                 "reasoning_format": reasoning_format,
                 "timings_per_token": True,
@@ -459,6 +459,7 @@ def _build_local_thinking_request_payload(
 
     return (
         {
+            **codex_style_reasoning,
             "return_progress": True,
             "reasoning_format": "auto",
             "timings_per_token": True,
@@ -467,7 +468,11 @@ def _build_local_thinking_request_payload(
     )
 
 
-def _request_local_chat_completion(request_payload: dict[str, Any]) -> dict[str, Any]:
+def _request_local_chat_completion(
+    request_payload: dict[str, Any],
+    *,
+    on_delta: Callable[[str], None] | None = None,
+) -> dict[str, Any]:
     headers = {
         "Authorization": f"Bearer {get_local_llm_api_key()}",
         "Content-Type": "application/json",
@@ -486,6 +491,8 @@ def _request_local_chat_completion(request_payload: dict[str, Any]) -> dict[str,
             fallback_payload=fallback_payload,
             parse_stream=_coalesce_openai_chat_stream_response,
             error_label="Local LLM request failed",
+            on_delta=on_delta,
+            extract_stream_delta=_extract_openai_chat_stream_delta,
         )
         request_payload.clear()
         request_payload.update(sent_payload)
@@ -516,6 +523,7 @@ def _chat_with_local_model_with_meta(
     max_tokens: int | None = None,
     thinking_enabled: bool = False,
     thinking_level: str | None = None,
+    on_delta: Callable[[str], None] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     request_payload: dict[str, Any] = {
         "model": model or get_default_text_model(),
@@ -553,7 +561,11 @@ def _chat_with_local_model_with_meta(
     logged_request_payload = request_payload
     response_payload: dict[str, Any] = {}
     try:
-        response_payload = _request_local_chat_completion(request_payload)
+        response_payload = (
+            _request_local_chat_completion(request_payload, on_delta=on_delta)
+            if on_delta is not None
+            else _request_local_chat_completion(request_payload)
+        )
         content, reasoning = _extract_chat_completion_text(response_payload)
         stream_fallback = response_payload.get("_stream_fallback")
         if isinstance(stream_fallback, dict) and stream_fallback.get("error"):

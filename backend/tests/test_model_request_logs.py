@@ -78,10 +78,15 @@ class ModelRequestLogTests(unittest.TestCase):
     def test_provider_chat_records_raw_request_and_response(self) -> None:
         from app.tools.model_provider_client import chat_with_model_provider
 
-        with patch(
-            "app.tools.model_provider_client._request_json",
-            return_value={"id": "chatcmpl_1", "model": "gpt-4.1", "choices": [{"message": {"content": "hello"}}]},
-        ):
+        def fake_streaming_request(**kwargs):
+            return (
+                {"id": "chatcmpl_1", "model": "gpt-4.1", "choices": [{"message": {"content": "hello"}}]},
+                kwargs["stream_payload"],
+                None,
+                True,
+            )
+
+        with patch("app.tools.model_provider_client.post_streaming_json_with_fallback", side_effect=fake_streaming_request):
             with patch("app.tools.model_provider_client.append_model_request_log") as append_log:
                 content, _meta = chat_with_model_provider(
                     provider_id="openai",

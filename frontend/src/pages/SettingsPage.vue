@@ -146,17 +146,20 @@ function buildDraftFromSettings(payload: SettingsPayload): SettingsDraft {
   return {
     text_model_ref: payload.agent_runtime_defaults?.model ?? payload.model.text_model_ref,
     video_model_ref: payload.model.video_model_ref,
-    thinking_enabled: payload.agent_runtime_defaults?.thinking_enabled ?? true,
+    thinking_enabled: payload.agent_runtime_defaults?.thinking_enabled ?? false,
     thinking_level: normalizeThinkingLevel(payload.agent_runtime_defaults?.thinking_level),
     temperature: payload.agent_runtime_defaults?.temperature ?? 0.2,
   };
 }
 
 function normalizeThinkingLevel(value: string | null | undefined): AgentThinkingLevel {
-  if (value === "off" || value === "minimal" || value === "low" || value === "medium" || value === "high" || value === "xhigh") {
+  if (value === "off" || value === "low" || value === "medium" || value === "high" || value === "xhigh") {
     return value;
   }
-  return "auto";
+  if (value === "minimal") {
+    return "low";
+  }
+  return "off";
 }
 
 function formatModelChoiceLabel(modelRef: string) {
@@ -215,14 +218,13 @@ const configuredModelOptions = computed(() => {
 });
 const thinkingLevelOptions = computed<Array<{ value: AgentThinkingLevel; label: string }>>(() => [
   { value: "off", label: t("settings.thinkingOff") },
-  { value: "auto", label: t("settings.thinkingAuto") },
-  { value: "low", label: t("settings.thinkingFast") },
-  { value: "medium", label: t("settings.thinkingBalanced") },
-  { value: "high", label: t("settings.thinkingDeep") },
-  { value: "xhigh", label: t("settings.thinkingExtreme") },
+  { value: "low", label: t("settings.thinkingLow") },
+  { value: "medium", label: t("settings.thinkingMedium") },
+  { value: "high", label: t("settings.thinkingHigh") },
+  { value: "xhigh", label: t("settings.thinkingExtraHigh") },
 ]);
 const thinkingMode = computed({
-  get: () => draft.value?.thinking_level ?? "auto",
+  get: () => draft.value?.thinking_level ?? "off",
   set: (value: string) => {
     if (!draft.value) {
       return;

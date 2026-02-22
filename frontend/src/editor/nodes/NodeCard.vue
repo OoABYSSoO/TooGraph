@@ -1340,14 +1340,13 @@ const agentAddPopoverStyle = {
 } as const;
 const stateTypeOptions = STATE_FIELD_TYPE_OPTIONS;
 const conditionRuleOperatorOptions = CONDITION_RULE_OPERATOR_OPTIONS;
-type AgentThinkingControlMode = Exclude<AgentNode["config"]["thinkingMode"], "on">;
+type AgentThinkingControlMode = "off" | "low" | "medium" | "high" | "xhigh";
 const agentThinkingOptions = computed<Array<{ value: AgentThinkingControlMode; label: string }>>(() => [
   { value: "off", label: t("nodeCard.thinkingOff") },
-  { value: "auto", label: t("nodeCard.thinkingAuto") },
-  { value: "low", label: t("nodeCard.thinkingFast") },
-  { value: "medium", label: t("nodeCard.thinkingBalanced") },
-  { value: "high", label: t("nodeCard.thinkingDeep") },
-  { value: "xhigh", label: t("nodeCard.thinkingExtreme") },
+  { value: "low", label: t("nodeCard.thinkingLow") },
+  { value: "medium", label: t("nodeCard.thinkingMedium") },
+  { value: "high", label: t("nodeCard.thinkingHigh") },
+  { value: "xhigh", label: t("nodeCard.thinkingExtraHigh") },
 ]);
 const agentPortPickerActions: Array<{ side: "input" | "output"; label: string; toneClass: string; placement: "bottom-start" | "bottom-end" }> = [
   { side: "input", label: "+ input", toneClass: "node-card__action-pill--input", placement: "bottom-start" },
@@ -1544,7 +1543,7 @@ const agentResolvedModelValue = computed(() => {
   return props.node.config.modelSource === "override" && overrideModel ? overrideModel : trimmedGlobalTextModelRef.value;
 });
 const agentThinkingModeValue = computed<AgentThinkingControlMode>(() =>
-  props.node.kind === "agent" ? normalizeAgentThinkingMode(props.node.config.thinkingMode) : "auto",
+  props.node.kind === "agent" ? normalizeAgentThinkingMode(props.node.config.thinkingMode) : "off",
 );
 const agentThinkingEnabled = computed(() => props.node.kind === "agent" ? agentThinkingModeValue.value !== "off" : true);
 const agentBreakpointTimingValue = computed(() => props.agentBreakpointTiming ?? "after");
@@ -2892,13 +2891,16 @@ function collapseAgentModelSelect() {
 }
 
 function normalizeAgentThinkingMode(value: string | null | undefined): AgentThinkingControlMode {
-  if (value === "off" || value === "minimal" || value === "low" || value === "medium" || value === "high" || value === "xhigh") {
+  if (value === "off" || value === "low" || value === "medium" || value === "high" || value === "xhigh") {
     return value;
+  }
+  if (value === "minimal") {
+    return "low";
   }
   if (value === "on") {
     return "medium";
   }
-  return "auto";
+  return "off";
 }
 
 function handleAgentThinkingModeSelect(nextValue: string | number | boolean | undefined) {

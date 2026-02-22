@@ -5,9 +5,11 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Body, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from pydantic import ValidationError
 
 from app.core.langgraph import execute_node_system_graph_langgraph, get_langgraph_runtime_unsupported_reasons
+from app.core.runtime.run_events import publish_run_event, subscribe_run_events
 from app.core.runtime.state import set_run_status, touch_run_lifecycle
 from app.core.schemas.node_system import NodeSystemGraphDocument
 from app.core.schemas.run import NodeExecutionDetail, RunDetail, RunSummary
@@ -57,6 +59,24 @@ def get_run_endpoint(run_id: str) -> RunDetail:
         )
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/{run_id}/events")
+def stream_run_events_endpoint(run_id: str) -> StreamingResponse:
+    try:
+        load_run(run_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    return StreamingResponse(
+        subscribe_run_events(run_id),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.get("/{run_id}/nodes/{node_id}", response_model=NodeExecutionDetail)
@@ -177,6 +197,11 @@ def _resume_run_worker(graph, resumed_run: dict, resume_payload: Any | None = No
         set_run_status(resumed_run, "failed")
         resumed_run.setdefault("errors", []).append(str(exc))
         save_run(resumed_run)
+        publish_run_event(
+            str(resumed_run.get("run_id") or ""),
+            "run.failed",
+            {"status": "failed", "error": str(exc)},
+        )
 
 
 def _has_restorable_graph_snapshot(snapshot: Any) -> bool:

@@ -7,16 +7,23 @@ import {
   closeWorkspaceTabTransition,
   createNewTabId,
   createUnsavedWorkspaceTab,
+  EDITOR_WORKSPACE_DOCUMENTS_STORAGE_KEY,
   EDITOR_WORKSPACE_STORAGE_KEY,
   ensureSavedGraphTab,
   isSameSavedGraph,
+  prunePersistedEditorDocumentDrafts,
+  readPersistedEditorDocumentDraft,
   readPersistedEditorWorkspace,
   reorderWorkspaceTab,
+  removePersistedEditorDocumentDraft,
   resolveEditorUrl,
   resolveWorkspaceTabUrl,
+  writePersistedEditorDocumentDraft,
   writePersistedEditorWorkspace,
   type PersistedEditorWorkspace,
 } from "./editor-workspace.ts";
+
+import type { GraphPayload } from "../types/node-system.ts";
 
 function createStorageMock() {
   const store = new Map<string, string>();
@@ -62,6 +69,71 @@ test("writePersistedEditorWorkspace round-trips workspace metadata", () => {
   writePersistedEditorWorkspace(workspace);
 
   assert.deepEqual(readPersistedEditorWorkspace(), workspace);
+});
+
+test("persisted editor document drafts preserve agent thinking level exactly", () => {
+  const storage = createStorageMock();
+  Object.assign(globalThis, { localStorage: storage });
+  const draft: GraphPayload = {
+    graph_id: "graph_a",
+    name: "Draft Graph",
+    state_schema: {},
+    nodes: {
+      agent_1: {
+        kind: "agent",
+        name: "agent",
+        description: "",
+        ui: { position: { x: 10, y: 20 } },
+        reads: [],
+        writes: [],
+        config: {
+          skills: [],
+          taskInstruction: "Say hi",
+          modelSource: "global",
+          model: "gpt-5.5",
+          thinkingMode: "low",
+          temperature: 0.2,
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  writePersistedEditorDocumentDraft("tab_a", draft);
+
+  assert.deepEqual(readPersistedEditorDocumentDraft("tab_a"), draft);
+  assert.match(storage.getItem(EDITOR_WORKSPACE_DOCUMENTS_STORAGE_KEY) ?? "", /"thinkingMode":"low"/);
+});
+
+test("persisted editor document drafts can be pruned and removed by tab id", () => {
+  const storage = createStorageMock();
+  Object.assign(globalThis, { localStorage: storage });
+  const firstDraft: GraphPayload = {
+    graph_id: null,
+    name: "First",
+    state_schema: {},
+    nodes: {},
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+  const secondDraft: GraphPayload = {
+    ...firstDraft,
+    name: "Second",
+  };
+
+  writePersistedEditorDocumentDraft("tab_a", firstDraft);
+  writePersistedEditorDocumentDraft("tab_b", secondDraft);
+  prunePersistedEditorDocumentDrafts(["tab_b"]);
+
+  assert.equal(readPersistedEditorDocumentDraft("tab_a"), null);
+  assert.deepEqual(readPersistedEditorDocumentDraft("tab_b"), secondDraft);
+
+  removePersistedEditorDocumentDraft("tab_b");
+
+  assert.equal(readPersistedEditorDocumentDraft("tab_b"), null);
 });
 
 test("resolveEditorUrl only uses graph id for saved graphs", () => {

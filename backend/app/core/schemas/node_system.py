@@ -78,9 +78,7 @@ class AgentModelSource(str, Enum):
 
 
 class AgentThinkingMode(str, Enum):
-    AUTO = "auto"
     OFF = "off"
-    MINIMAL = "minimal"
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
@@ -177,7 +175,7 @@ class NodeSystemAgentConfig(BaseModel):
     task_instruction: str = Field(default="", alias="taskInstruction")
     model_source: AgentModelSource = Field(default=AgentModelSource.GLOBAL, alias="modelSource")
     model: str = ""
-    thinking_mode: AgentThinkingMode = Field(default=AgentThinkingMode.AUTO, alias="thinkingMode")
+    thinking_mode: AgentThinkingMode = Field(default=AgentThinkingMode.OFF, alias="thinkingMode")
     temperature: float = Field(default=0.2, ge=0, le=2)
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)

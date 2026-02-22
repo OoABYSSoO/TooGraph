@@ -151,6 +151,7 @@ export type RunArtifacts = {
   active_edge_ids?: string[];
   state_events?: StateEvent[];
   state_values?: Record<string, unknown>;
+  streaming_outputs?: Record<string, Record<string, unknown>>;
   cycle_iterations?: CycleIterationRecord[];
   cycle_summary?: CycleSummary;
 };

@@ -70,6 +70,28 @@
           >{{ viewedRun?.final_result || t("common.none") }}</pre>
         </article>
 
+        <article v-if="liveStreamingOutputItems.length > 0" class="run-detail__panel run-detail__panel--live">
+          <div class="run-detail__panel-heading">
+            <div>
+              <span class="run-detail__section-kicker">{{ t("runDetail.liveOutput") }}</span>
+              <h3>{{ t("runDetail.liveOutputTitle") }}</h3>
+            </div>
+          </div>
+          <div class="run-detail__live-list">
+            <section v-for="stream in liveStreamingOutputItems" :key="stream.nodeId" class="run-detail__live-card">
+              <div class="run-detail__live-heading">
+                <strong>{{ stream.nodeId }}</strong>
+                <span>{{ stream.completed ? t("runDetail.liveOutputComplete") : t("runDetail.liveOutputStreaming") }}</span>
+              </div>
+              <pre class="run-detail__live-content">{{ stream.text || t("common.none") }}</pre>
+              <div class="run-detail__badges">
+                <span>{{ t("runDetail.liveOutputChunks", { count: stream.chunkCount }) }}</span>
+                <span v-for="key in stream.outputKeys" :key="`${stream.nodeId}-${key}`">{{ key }}</span>
+              </div>
+            </section>
+          </div>
+        </article>
+
         <section class="run-detail__grid">
           <article v-if="cycleVisualization.hasCycle" class="run-detail__panel">
             <div class="run-detail__panel-heading">
@@ -240,6 +262,15 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 const selectedSnapshotIdDraft = ref<string | null>(null);
 const expandedContentKeys = ref<Set<string>>(new Set());
+type LiveStreamingOutput = {
+  nodeId: string;
+  text: string;
+  chunkCount: number;
+  outputKeys: string[];
+  completed: boolean;
+  updatedAt: string;
+};
+const liveStreamingOutputs = ref<Record<string, LiveStreamingOutput>>({});
 const runId = computed(() => String(route.params.runId ?? ""));
 const runDetailRequestTimeoutMs = 10_000;
 const snapshotOptions = computed(() => {
@@ -273,12 +304,16 @@ const cycleVisualization = computed(() =>
   viewedRun.value ? buildCycleVisualization(viewedRun.value) : { hasCycle: false, summary: null, backEdges: [], iterations: [] },
 );
 const outputArtifacts = computed(() => (viewedRun.value ? listRunOutputArtifacts(viewedRun.value) : []));
+const liveStreamingOutputItems = computed(() =>
+  Object.values(liveStreamingOutputs.value).sort((left, right) => left.nodeId.localeCompare(right.nodeId)),
+);
 const canRestore = computed(() => (run.value ? canRestoreRunDetail(run.value) : false));
 const restoreEditorHref = computed(() => (run.value ? resolveRunRestoreUrl(run.value.run_id, selectedSnapshotId.value) : "/editor/new"));
 let pollTimer: number | null = null;
 let activeRunRequestId = 0;
 let activeRunController: AbortController | null = null;
 let activeRunTimeout: number | null = null;
+let runEventSource: EventSource | null = null;
 
 function selectSnapshot(snapshotId: string) {
   selectedSnapshotIdDraft.value = snapshotId;
@@ -313,6 +348,84 @@ function clearPendingRunRequest() {
     window.clearTimeout(activeRunTimeout);
     activeRunTimeout = null;
   }
+}
+
+function closeRunEventStream() {
+  runEventSource?.close();
+  runEventSource = null;
+}
+
+function parseRunEventPayload(event: Event) {
+  if (!(event instanceof MessageEvent)) {
+    return null;
+  }
+  try {
+    const payload = JSON.parse(String(event.data ?? ""));
+    return typeof payload === "object" && payload !== null ? (payload as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+function updateLiveStreamingOutput(payload: Record<string, unknown>, completed = false) {
+  const nodeId = String(payload.node_id ?? "").trim();
+  if (!nodeId) {
+    return;
+  }
+  const current = liveStreamingOutputs.value[nodeId];
+  const text = typeof payload.text === "string"
+    ? payload.text
+    : `${current?.text ?? ""}${typeof payload.delta === "string" ? payload.delta : ""}`;
+  const outputKeys = Array.isArray(payload.output_keys)
+    ? payload.output_keys.map((key) => String(key)).filter(Boolean)
+    : current?.outputKeys ?? [];
+  liveStreamingOutputs.value = {
+    ...liveStreamingOutputs.value,
+    [nodeId]: {
+      nodeId,
+      text,
+      chunkCount: Number(payload.chunk_count ?? payload.chunk_index ?? current?.chunkCount ?? 0),
+      outputKeys,
+      completed: completed || Boolean(payload.completed) || current?.completed === true,
+      updatedAt: String(payload.updated_at ?? payload.created_at ?? current?.updatedAt ?? ""),
+    },
+  };
+}
+
+function startRunEventStream(nextRunId: string) {
+  closeRunEventStream();
+  const normalizedRunId = nextRunId.trim();
+  if (!normalizedRunId || typeof EventSource === "undefined") {
+    return;
+  }
+
+  const source = new EventSource(`/api/runs/${normalizedRunId}/events`);
+  runEventSource = source;
+  source.addEventListener("node.output.delta", (event) => {
+    const payload = parseRunEventPayload(event);
+    if (payload) {
+      updateLiveStreamingOutput(payload);
+    }
+  });
+  source.addEventListener("node.output.completed", (event) => {
+    const payload = parseRunEventPayload(event);
+    if (payload) {
+      updateLiveStreamingOutput(payload, true);
+    }
+  });
+  source.addEventListener("run.completed", () => {
+    void loadRun(normalizedRunId);
+    closeRunEventStream();
+  });
+  source.addEventListener("run.failed", () => {
+    void loadRun(normalizedRunId);
+    closeRunEventStream();
+  });
+  source.onerror = () => {
+    if (runEventSource === source) {
+      closeRunEventStream();
+    }
+  };
 }
 
 function resolveRunFetchErrorMessage(fetchError: unknown) {
@@ -356,6 +469,8 @@ async function loadRun(nextRunId = runId.value) {
       pollTimer = window.setTimeout(() => {
         void loadRun(normalizedRunId);
       }, 750);
+    } else {
+      closeRunEventStream();
     }
   } catch (fetchError) {
     if (requestId !== activeRunRequestId) {
@@ -381,6 +496,7 @@ watch(
   runId,
   (nextRunId) => {
     resetRunView();
+    startRunEventStream(nextRunId);
     void loadRun(nextRunId);
   },
   { immediate: true },
@@ -390,6 +506,7 @@ onBeforeUnmount(() => {
   activeRunRequestId += 1;
   clearRunPollTimer();
   clearPendingRunRequest();
+  closeRunEventStream();
 });
 
 function resetRunView() {
@@ -397,6 +514,7 @@ function resetRunView() {
   error.value = null;
   selectedSnapshotIdDraft.value = null;
   expandedContentKeys.value = new Set();
+  liveStreamingOutputs.value = {};
 }
 
 function snapshotLabel(kind: string, order: number) {
@@ -494,6 +612,11 @@ function statusBadgeClass(status: string) {
 
 .run-detail__panel--result {
   background: rgba(255, 253, 249, 0.94);
+}
+
+.run-detail__panel--live {
+  border-color: rgba(37, 99, 235, 0.22);
+  background: rgba(247, 251, 255, 0.92);
 }
 
 .run-detail__eyebrow,
@@ -682,6 +805,7 @@ function statusBadgeClass(status: string) {
 
 .run-detail__list,
 .run-detail__artifacts,
+.run-detail__live-list,
 .run-detail__timeline,
 .run-detail__info-grid,
 .run-detail__meta-groups {
@@ -690,12 +814,39 @@ function statusBadgeClass(status: string) {
 }
 
 .run-detail__subcard,
+.run-detail__live-card,
 .run-detail__info,
 .run-detail__timeline-item {
   border: 1px solid rgba(154, 52, 18, 0.12);
   border-radius: 18px;
   padding: 16px;
   background: rgba(255, 255, 255, 0.72);
+}
+
+.run-detail__live-card {
+  border-color: rgba(37, 99, 235, 0.16);
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.run-detail__live-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.run-detail__live-heading strong {
+  color: var(--graphite-text-strong);
+}
+
+.run-detail__live-heading span {
+  border: 1px solid rgba(37, 99, 235, 0.18);
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: rgba(219, 234, 254, 0.72);
+  color: rgb(29, 78, 216);
+  font-family: var(--graphite-font-mono);
+  font-size: 0.78rem;
 }
 
 .run-detail__info {
@@ -730,6 +881,22 @@ function statusBadgeClass(status: string) {
   background: rgba(255, 255, 255, 0.74);
   color: rgba(32, 23, 15, 0.9);
   font-size: 0.92rem;
+}
+
+.run-detail__live-content {
+  max-height: 260px;
+  overflow: auto;
+  margin: 14px 0 0;
+  border: 1px solid rgba(37, 99, 235, 0.12);
+  border-left: 4px solid rgba(37, 99, 235, 0.72);
+  border-radius: 16px;
+  background: rgba(248, 250, 252, 0.9);
+  color: rgba(17, 24, 39, 0.9);
+  font-family: var(--graphite-font-mono);
+  font-size: 0.9rem;
+  line-height: 1.7;
+  padding: 16px;
+  white-space: pre-wrap;
 }
 
 .run-detail__content--expanded {

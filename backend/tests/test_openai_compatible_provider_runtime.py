@@ -199,6 +199,7 @@ class OpenAiCompatibleProviderRuntimeTests(unittest.TestCase):
                     )
 
         self.assertEqual(sent_payloads[0]["reasoning_format"], "deepseek")
+        self.assertEqual(sent_payloads[0]["reasoning"], {"effort": "medium"})
         self.assertEqual(sent_payloads[0]["stream"], True)
         self.assertEqual(meta["reasoning_format"], "local-gateway:deepseek")
 

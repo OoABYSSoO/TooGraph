@@ -4,7 +4,7 @@ export type ModelProviderTransport =
   | "gemini-generate-content"
   | "codex-responses";
 
-export type AgentThinkingLevel = "auto" | "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+export type AgentThinkingLevel = "off" | "low" | "medium" | "high" | "xhigh";
 
 export type OpenAICodexAuthStatus = {
   provider_id?: string;

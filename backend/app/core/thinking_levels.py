@@ -10,17 +10,13 @@ from app.core.model_provider_templates import (
 )
 
 
-THINKING_LEVEL_AUTO = "auto"
 THINKING_LEVEL_OFF = "off"
-THINKING_LEVEL_MINIMAL = "minimal"
 THINKING_LEVEL_LOW = "low"
 THINKING_LEVEL_MEDIUM = "medium"
 THINKING_LEVEL_HIGH = "high"
 THINKING_LEVEL_XHIGH = "xhigh"
 THINKING_LEVELS = {
-    THINKING_LEVEL_AUTO,
     THINKING_LEVEL_OFF,
-    THINKING_LEVEL_MINIMAL,
     THINKING_LEVEL_LOW,
     THINKING_LEVEL_MEDIUM,
     THINKING_LEVEL_HIGH,
@@ -33,13 +29,14 @@ LEGACY_THINKING_LEVELS = {
     "enabled": THINKING_LEVEL_MEDIUM,
     "true": THINKING_LEVEL_MEDIUM,
     "yes": THINKING_LEVEL_MEDIUM,
-    "default": THINKING_LEVEL_AUTO,
-    "inherit": THINKING_LEVEL_AUTO,
-    "": THINKING_LEVEL_AUTO,
+    "auto": THINKING_LEVEL_OFF,
+    "default": THINKING_LEVEL_OFF,
+    "inherit": THINKING_LEVEL_OFF,
+    "minimal": THINKING_LEVEL_LOW,
+    "": THINKING_LEVEL_OFF,
 }
 
 THINKING_BUDGET_TOKENS = {
-    THINKING_LEVEL_MINIMAL: 100,
     THINKING_LEVEL_LOW: 400,
     THINKING_LEVEL_MEDIUM: 1024,
     THINKING_LEVEL_HIGH: 4096,
@@ -47,7 +44,7 @@ THINKING_BUDGET_TOKENS = {
 }
 
 
-def normalize_thinking_level(raw: Any, *, fallback: str = THINKING_LEVEL_AUTO) -> str:
+def normalize_thinking_level(raw: Any, *, fallback: str = THINKING_LEVEL_OFF) -> str:
     value = str(raw or "").strip().lower().replace("_", "-")
     compact = value.replace("-", "")
     if compact in {"xhigh", "extrahigh"}:
@@ -56,7 +53,7 @@ def normalize_thinking_level(raw: Any, *, fallback: str = THINKING_LEVEL_AUTO) -
         return value
     if value in LEGACY_THINKING_LEVELS:
         return LEGACY_THINKING_LEVELS[value]
-    return fallback if fallback in THINKING_LEVELS else THINKING_LEVEL_AUTO
+    return fallback if fallback in THINKING_LEVELS else THINKING_LEVEL_OFF
 
 
 def is_openai_reasoning_model(model: str) -> bool:
@@ -82,31 +79,6 @@ def is_gemini_thinking_model(model: str) -> bool:
     return "gemini-2.5" in model_id or "gemini-3" in model_id
 
 
-def resolve_auto_thinking_level(
-    *,
-    provider_id: str,
-    model: str,
-    model_reasoning: bool | None = None,
-) -> str:
-    if isinstance(model_reasoning, bool):
-        return THINKING_LEVEL_MEDIUM if model_reasoning else THINKING_LEVEL_OFF
-
-    provider = str(provider_id or "").strip().lower()
-    if provider == "local":
-        return THINKING_LEVEL_MEDIUM
-    if provider in {"openai", "openai-codex"} and is_openai_reasoning_model(model):
-        return THINKING_LEVEL_MEDIUM
-    if provider == "anthropic" and is_anthropic_thinking_model(model):
-        return THINKING_LEVEL_MEDIUM
-    if provider == "gemini" and is_gemini_thinking_model(model):
-        return THINKING_LEVEL_MEDIUM
-    if provider == "openrouter":
-        route_model = str(model or "").split("/")[-1]
-        if is_openai_reasoning_model(route_model) or is_anthropic_thinking_model(route_model) or is_gemini_thinking_model(route_model):
-            return THINKING_LEVEL_MEDIUM
-    return THINKING_LEVEL_OFF
-
-
 def resolve_effective_thinking_level(
     *,
     configured_level: Any,
@@ -114,15 +86,12 @@ def resolve_effective_thinking_level(
     model: str,
     model_reasoning: bool | None = None,
 ) -> str:
-    level = normalize_thinking_level(configured_level)
-    if level == THINKING_LEVEL_AUTO:
-        return resolve_auto_thinking_level(provider_id=provider_id, model=model, model_reasoning=model_reasoning)
-    return level
+    return normalize_thinking_level(configured_level)
 
 
 def _map_openai_reasoning_effort(level: str, model: str) -> str | None:
     normalized = normalize_thinking_level(level, fallback=THINKING_LEVEL_OFF)
-    if normalized in {THINKING_LEVEL_AUTO, THINKING_LEVEL_OFF}:
+    if normalized == THINKING_LEVEL_OFF:
         return None
     if normalized == THINKING_LEVEL_XHIGH and not is_openai_reasoning_model(model):
         return THINKING_LEVEL_HIGH
@@ -131,10 +100,8 @@ def _map_openai_reasoning_effort(level: str, model: str) -> str | None:
 
 def _map_openai_compatible_reasoning_effort(level: str) -> str | None:
     normalized = normalize_thinking_level(level, fallback=THINKING_LEVEL_OFF)
-    if normalized in {THINKING_LEVEL_AUTO, THINKING_LEVEL_OFF}:
+    if normalized == THINKING_LEVEL_OFF:
         return None
-    if normalized == THINKING_LEVEL_MINIMAL:
-        return THINKING_LEVEL_LOW
     if normalized == THINKING_LEVEL_XHIGH:
         return THINKING_LEVEL_HIGH
     return normalized
@@ -148,7 +115,7 @@ def build_native_thinking_payload(
     thinking_level: Any,
 ) -> dict[str, Any]:
     level = normalize_thinking_level(thinking_level, fallback=THINKING_LEVEL_OFF)
-    if level in {THINKING_LEVEL_AUTO, THINKING_LEVEL_OFF}:
+    if level == THINKING_LEVEL_OFF:
         return {}
 
     provider = str(provider_id or "").strip().lower()
@@ -168,8 +135,6 @@ def build_native_thinking_payload(
 
     if normalized_transport == TRANSPORT_OPENAI_COMPATIBLE and provider == "mistral" and str(model).lower().startswith("mistral-small"):
         effort = THINKING_LEVEL_HIGH if level == THINKING_LEVEL_XHIGH else level
-        if effort == THINKING_LEVEL_MINIMAL:
-            effort = THINKING_LEVEL_LOW
         return {"reasoning_effort": effort}
 
     if normalized_transport == TRANSPORT_ANTHROPIC_MESSAGES and is_anthropic_thinking_model(model):

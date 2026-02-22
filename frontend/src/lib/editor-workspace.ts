@@ -1,3 +1,5 @@
+import type { GraphDocument, GraphPayload } from "../types/node-system.ts";
+
 export type EditorTabKind = "existing" | "new" | "template";
 
 export type EditorWorkspaceTab = {
@@ -18,6 +20,7 @@ export type PersistedEditorWorkspace = {
 type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
 export const EDITOR_WORKSPACE_STORAGE_KEY = "graphiteui:editor-workspace";
+export const EDITOR_WORKSPACE_DOCUMENTS_STORAGE_KEY = "graphiteui:editor-document-drafts";
 
 const EMPTY_EDITOR_WORKSPACE: PersistedEditorWorkspace = {
   activeTabId: null,
@@ -35,6 +38,31 @@ function getLocalStorage(): StorageLike | null {
 
 function normalizeNullableString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value : null;
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function normalizeGraphDocumentDraft(value: unknown): GraphPayload | GraphDocument | null {
+  if (!isPlainRecord(value)) {
+    return null;
+  }
+
+  const graphId = value.graph_id;
+  if (
+    !(graphId === undefined || graphId === null || typeof graphId === "string") ||
+    typeof value.name !== "string" ||
+    !isPlainRecord(value.state_schema) ||
+    !isPlainRecord(value.nodes) ||
+    !Array.isArray(value.edges) ||
+    !Array.isArray(value.conditional_edges) ||
+    !isPlainRecord(value.metadata)
+  ) {
+    return null;
+  }
+
+  return JSON.parse(JSON.stringify(value)) as GraphPayload | GraphDocument;
 }
 
 function normalizeEditorWorkspaceTab(value: unknown): EditorWorkspaceTab | null {
@@ -132,6 +160,99 @@ export function writePersistedEditorWorkspace(workspace: PersistedEditorWorkspac
   }
 
   storage.setItem(EDITOR_WORKSPACE_STORAGE_KEY, JSON.stringify(normalizePersistedEditorWorkspace(workspace)));
+}
+
+function readPersistedEditorDocumentDrafts(): Record<string, GraphPayload | GraphDocument> {
+  const storage = getLocalStorage();
+  if (!storage) {
+    return {};
+  }
+
+  const raw = storage.getItem(EDITOR_WORKSPACE_DOCUMENTS_STORAGE_KEY);
+  if (!raw) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (!isPlainRecord(parsed)) {
+      return {};
+    }
+
+    const drafts: Record<string, GraphPayload | GraphDocument> = {};
+    for (const [tabId, value] of Object.entries(parsed)) {
+      const normalizedTabId = normalizeNullableString(tabId);
+      const draft = normalizeGraphDocumentDraft(value);
+      if (normalizedTabId && draft) {
+        drafts[normalizedTabId] = draft;
+      }
+    }
+    return drafts;
+  } catch {
+    return {};
+  }
+}
+
+function writePersistedEditorDocumentDrafts(drafts: Record<string, GraphPayload | GraphDocument>): void {
+  const storage = getLocalStorage();
+  if (!storage) {
+    return;
+  }
+
+  try {
+    storage.setItem(EDITOR_WORKSPACE_DOCUMENTS_STORAGE_KEY, JSON.stringify(drafts));
+  } catch {
+    // Draft persistence should never interrupt an editing gesture.
+  }
+}
+
+export function readPersistedEditorDocumentDraft(tabId: string): GraphPayload | GraphDocument | null {
+  const normalizedTabId = normalizeNullableString(tabId);
+  if (!normalizedTabId) {
+    return null;
+  }
+  return readPersistedEditorDocumentDrafts()[normalizedTabId] ?? null;
+}
+
+export function writePersistedEditorDocumentDraft(tabId: string, document: GraphPayload | GraphDocument): void {
+  const normalizedTabId = normalizeNullableString(tabId);
+  const normalizedDraft = normalizeGraphDocumentDraft(document);
+  if (!normalizedTabId || !normalizedDraft) {
+    return;
+  }
+
+  writePersistedEditorDocumentDrafts({
+    ...readPersistedEditorDocumentDrafts(),
+    [normalizedTabId]: normalizedDraft,
+  });
+}
+
+export function removePersistedEditorDocumentDraft(tabId: string): void {
+  const normalizedTabId = normalizeNullableString(tabId);
+  if (!normalizedTabId) {
+    return;
+  }
+
+  const drafts = readPersistedEditorDocumentDrafts();
+  if (!(normalizedTabId in drafts)) {
+    return;
+  }
+
+  const nextDrafts = { ...drafts };
+  delete nextDrafts[normalizedTabId];
+  writePersistedEditorDocumentDrafts(nextDrafts);
+}
+
+export function prunePersistedEditorDocumentDrafts(tabIds: string[]): void {
+  const keepTabIds = new Set(tabIds.map(normalizeNullableString).filter((tabId): tabId is string => Boolean(tabId)));
+  const drafts = readPersistedEditorDocumentDrafts();
+  const nextDrafts: Record<string, GraphPayload | GraphDocument> = {};
+  for (const [tabId, draft] of Object.entries(drafts)) {
+    if (keepTabIds.has(tabId)) {
+      nextDrafts[tabId] = draft;
+    }
+  }
+  writePersistedEditorDocumentDrafts(nextDrafts);
 }
 
 export function resolveEditorUrl(graphId: string | null): string {

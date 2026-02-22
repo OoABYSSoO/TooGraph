@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 import tempfile
 import unittest
@@ -26,10 +27,19 @@ class FakeResponse:
     ) -> None:
         self._payload = payload
         self.status_code = status_code
-        self.text = text or str(payload)
+        self.text = text or json.dumps(payload or {}, ensure_ascii=False)
         self.headers = headers or {}
         self._json_error = json_error
         self.request = httpx.Request("POST", "https://example.test")
+
+    def __enter__(self) -> "FakeResponse":
+        return self
+
+    def __exit__(self, *_args: Any) -> None:
+        return None
+
+    def iter_lines(self) -> list[str]:
+        return self.text.splitlines()
 
     def json(self) -> dict[str, Any]:
         if self._json_error:
@@ -70,6 +80,10 @@ class FakeHttpClient:
 
     def post(self, url: str, **kwargs: Any) -> FakeResponse:
         self.post_calls.append({"url": url, **kwargs})
+        return self._next()
+
+    def stream(self, method: str, url: str, **kwargs: Any) -> FakeResponse:
+        self.post_calls.append({"method": method, "url": url, **kwargs})
         return self._next()
 
 
@@ -229,6 +243,52 @@ class OpenAICodexProviderTests(unittest.TestCase):
         self.assertEqual(logged_response["_stream"]["event_count"], 5)
         self.assertEqual(logged_response["_stream"]["output_chunks"], ["hello from ", "codex"])
         self.assertIn("event: response.output_text.delta", logged_response["_stream"]["raw_text"])
+
+    def test_chat_codex_responses_requests_reasoning_effort_without_summary(self) -> None:
+        from app.tools.model_provider_client import chat_with_model_provider
+
+        fake_client = FakeHttpClient(
+            [
+                FakeResponse(
+                    None,
+                    text=(
+                        'event: response.created\n'
+                        'data: {"type":"response.created","response":{"id":"resp_1","model":"gpt-5.5"}}\n\n'
+                        'event: response.output_text.delta\n'
+                        'data: {"type":"response.output_text.delta","delta":"hello"}\n\n'
+                        'event: response.completed\n'
+                        'data: {"type":"response.completed","response":{"id":"resp_1","model":"gpt-5.5","usage":{"input_tokens":4,"output_tokens":3}}}\n\n'
+                    ),
+                    headers={"content-type": "text/event-stream"},
+                    json_error=ValueError("stream"),
+                )
+            ]
+        )
+        with patch("app.tools.model_provider_client.resolve_codex_access_token", return_value="codex-access-token"):
+            with patch("app.tools.model_provider_client.httpx.Client", return_value=fake_client):
+                with patch("app.tools.model_provider_client.append_model_request_log") as append_log:
+                    content, meta = chat_with_model_provider(
+                        provider_id="openai-codex",
+                        transport="codex-responses",
+                        base_url="https://chatgpt.com/backend-api/codex",
+                        api_key="",
+                        model="gpt-5.5",
+                        system_prompt="You are helpful.",
+                        user_prompt="Say hello",
+                        temperature=0.2,
+                        max_tokens=64,
+                        thinking_level="medium",
+                    )
+
+        request = fake_client.post_calls[0]
+        self.assertEqual(content, "hello")
+        self.assertEqual(request["json"]["reasoning"], {"effort": "medium"})
+        self.assertNotIn("summary", request["json"]["reasoning"])
+        self.assertEqual(meta["reasoning"], "")
+        self.assertEqual(meta["reasoning_format"], "responses-reasoning")
+        logged_response = append_log.call_args.kwargs["response_raw"]
+        self.assertNotIn("reasoning", logged_response)
+        self.assertEqual(logged_response["_stream"]["reasoning_chunks"], [])
 
     def test_chat_codex_responses_refreshes_once_after_unauthorized(self) -> None:
         from app.tools.model_provider_client import chat_with_model_provider

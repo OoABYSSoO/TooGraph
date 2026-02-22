@@ -207,6 +207,39 @@ test("EditorWorkspaceShell removes the persistent bottom-left status feedback ov
   assert.match(componentSource, /:latest-run-status="feedbackForTab\(tab\.tabId\)\?\.activeRunStatus \?\? null"/);
 });
 
+test("EditorWorkspaceShell subscribes to run events for live output previews", () => {
+  assert.match(componentSource, /const runEventSourceByTabId = new Map<string, EventSource>\(\);/);
+  assert.match(componentSource, /function startRunEventStreamForTab\(tabId: string, runId: string\)/);
+  assert.match(componentSource, /new EventSource\(`\/api\/runs\/\$\{runId\}\/events`\)/);
+  assert.match(componentSource, /addEventListener\("node\.output\.delta"/);
+  assert.match(componentSource, /function applyStreamingOutputPreviewToTab/);
+  assert.match(componentSource, /resolveStreamingOutputNodeIds/);
+  assert.match(componentSource, /startRunEventStreamForTab\(tab\.tabId, response\.run_id\);/);
+});
+
+test("EditorWorkspaceShell runs the latest document after async model refresh", () => {
+  const runActiveGraphSource = componentSource.match(/async function runActiveGraph\(\) \{[\s\S]*?\n\}/)?.[0] ?? "";
+
+  assert.match(runActiveGraphSource, /await refreshAgentModels\(\);/);
+  assert.match(runActiveGraphSource, /const latestDocument = documentsByTabId\.value\[tab\.tabId\];/);
+  assert.match(runActiveGraphSource, /if \(!latestDocument\) \{[\s\S]*?return;[\s\S]*?\}/);
+  assert.match(runActiveGraphSource, /const response = await runGraph\(latestDocument\);/);
+  assert.doesNotMatch(runActiveGraphSource, /const response = await runGraph\(document\);/);
+});
+
+test("EditorWorkspaceShell persists graph document drafts across route changes and app restarts", () => {
+  assert.match(componentSource, /readPersistedEditorDocumentDraft/);
+  assert.match(componentSource, /writePersistedEditorDocumentDraft/);
+  assert.match(componentSource, /removePersistedEditorDocumentDraft/);
+  assert.match(componentSource, /prunePersistedEditorDocumentDrafts/);
+  assert.match(componentSource, /const persistedDraft = readPersistedEditorDocumentDraft\(tab\.tabId\);/);
+  assert.match(componentSource, /registerDocumentForTab\(tab\.tabId, persistedDraft \?\? createDraftForTab\(tab\)\);/);
+  assert.match(componentSource, /const persistedDraft = readPersistedEditorDocumentDraft\(tabId\);[\s\S]*if \(persistedDraft\) \{[\s\S]*registerDocumentForTab\(tabId, persistedDraft\);[\s\S]*return;/);
+  assert.match(componentSource, /writePersistedEditorDocumentDraft\(tabId, syncedDocument\);/);
+  assert.match(componentSource, /removePersistedEditorDocumentDraft\(tabId\);/);
+  assert.match(componentSource, /prunePersistedEditorDocumentDrafts\(nextWorkspace\.tabs\.map\(\(tab\) => tab\.tabId\)\);/);
+});
+
 test("EditorWorkspaceShell renders the graph action controls as a detached capsule instead of passing them through EditorTabBar", () => {
   const editorTabBarUsage = componentSource.match(/<EditorTabBar[\s\S]*?\/>/)?.[0] ?? "";
 

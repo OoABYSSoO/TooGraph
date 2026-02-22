@@ -28,7 +28,7 @@ export type WriteBinding = {
   mode?: "replace";
 };
 
-export type AgentThinkingMode = "auto" | "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "on";
+export type AgentThinkingMode = "off" | "low" | "medium" | "high" | "xhigh" | "on";
 
 export type NodeUi = {
   position: GraphPosition;

@@ -12,6 +12,7 @@ from typing_extensions import TypedDict
 
 from app.core.langgraph.checkpoints import JsonCheckpointSaver
 from app.core.langgraph.compiler import compile_graph_to_langgraph_plan
+from app.core.runtime.run_events import publish_run_event
 from app.core.runtime.node_system_executor import (
     CycleDetector,
     _apply_state_writes,
@@ -120,6 +121,7 @@ def execute_node_system_graph_langgraph(
         _sync_checkpoint_metadata(state, checkpoint_saver, checkpoint_lookup_config)
         _refresh_run_artifacts(state, node_outputs, active_edge_ids, started_perf=started_perf)
         save_run(state)
+        publish_run_event(str(state.get("run_id") or ""), "run.completed", {"status": "completed"})
         return state
 
     workflow = StateGraph(_build_langgraph_state_schema(graph))
@@ -229,6 +231,7 @@ def execute_node_system_graph_langgraph(
             label="Completed",
         )
         save_run(state)
+        publish_run_event(str(state.get("run_id") or ""), "run.completed", {"status": "completed"})
         return state
     except Exception as exc:  # pragma: no cover - defensive runtime path
         set_run_status(state, "failed")
@@ -242,6 +245,11 @@ def execute_node_system_graph_langgraph(
             label="Failed",
         )
         save_run(state)
+        publish_run_event(
+            str(state.get("run_id") or ""),
+            "run.failed",
+            {"status": "failed", "error": str(exc)},
+        )
         raise
 
 

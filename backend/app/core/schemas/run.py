@@ -144,6 +144,7 @@ class RunArtifacts(BaseModel):
     active_edge_ids: list[str] = Field(default_factory=list)
     state_events: list[StateEvent] = Field(default_factory=list)
     state_values: dict[str, Any] = Field(default_factory=dict)
+    streaming_outputs: dict[str, dict[str, Any]] = Field(default_factory=dict)
     cycle_iterations: list[CycleIterationRecord] = Field(default_factory=list)
     cycle_summary: CycleSummary = Field(default_factory=CycleSummary)
 

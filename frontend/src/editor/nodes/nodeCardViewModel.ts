@@ -321,8 +321,17 @@ function resolveAgentModelLabel(node: Extract<GraphNode, { kind: "agent" }>) {
 }
 
 function resolveThinkingLabel(node: Extract<GraphNode, { kind: "agent" }>) {
-  const mode = node.config.thinkingMode === "on" ? "medium" : node.config.thinkingMode || "auto";
-  return `thinking ${mode}`;
+  const mode = String(node.config.thinkingMode === "on" ? "medium" : node.config.thinkingMode || "off");
+  if (mode === "xhigh") {
+    return "thinking Extra High";
+  }
+  if (mode === "minimal") {
+    return "thinking low";
+  }
+  if (mode === "off" || mode === "low" || mode === "medium" || mode === "high") {
+    return `thinking ${mode}`;
+  }
+  return "thinking off";
 }
 
 function buildRuntimeNote(node: GraphNode, options: BuildNodeCardViewModelOptions) {

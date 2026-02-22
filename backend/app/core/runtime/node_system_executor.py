@@ -12,6 +12,7 @@ from typing import Any
 from app.core.model_catalog import get_default_text_model_ref, normalize_model_ref, resolve_runtime_model_name
 from app.core.runtime.output_boundary_utils import save_output_value
 from app.core.runtime.knowledge_retrieval import retrieve_knowledge_base_context
+from app.core.runtime.run_events import publish_run_event
 from app.core.runtime.state import touch_run_lifecycle, utc_now_iso
 from app.core.schemas.node_system import (
     NodeSystemAgentNode,
@@ -94,6 +95,16 @@ def _persist_run_progress(
     _refresh_run_artifacts(state, node_outputs, active_edge_ids, started_perf=started_perf)
     touch_run_lifecycle(state)
     save_run(state)
+    publish_run_event(
+        str(state.get("run_id") or ""),
+        "run.updated",
+        {
+            "status": state.get("status"),
+            "current_node_id": state.get("current_node_id"),
+            "duration_ms": state.get("duration_ms"),
+            "updated_at": state.get("lifecycle", {}).get("updated_at") if isinstance(state.get("lifecycle"), dict) else None,
+        },
+    )
 
 
 def _refresh_run_artifacts(
@@ -139,6 +150,7 @@ def _refresh_run_artifacts(
         "active_edge_ids": sorted(active_edge_ids),
         "state_events": state_events,
         "state_values": state_values,
+        "streaming_outputs": dict(state.get("streaming_outputs", {})),
         "cycle_iterations": list(state.get("cycle_iterations", [])),
         "cycle_summary": dict(state.get("cycle_summary", {})),
     }
@@ -294,7 +306,7 @@ def _execute_node(
     if isinstance(node, NodeSystemInputNode):
         return _execute_input_node(graph.state_schema, node, state)
     if isinstance(node, NodeSystemAgentNode):
-        return _execute_agent_node(graph.state_schema, node, input_values, graph_context)
+        return _execute_agent_node(graph.state_schema, node, input_values, graph_context, node_name=node_name, state=state)
     if isinstance(node, NodeSystemOutputNode):
         return _execute_output_node(node_name, node, input_values, state)
     if isinstance(node, NodeSystemConditionNode):
@@ -326,6 +338,9 @@ def _execute_agent_node(
     node: NodeSystemAgentNode,
     input_values: dict[str, Any],
     graph_context: dict[str, Any],
+    *,
+    node_name: str,
+    state: dict[str, Any],
 ) -> dict[str, Any]:
     selected_skills: list[str] = []
     skill_outputs: list[dict[str, Any]] = []
@@ -382,19 +397,36 @@ def _execute_agent_node(
             }
         )
 
+    output_keys = [binding.state for binding in node.writes]
+    stream_delta_callback = _build_agent_stream_delta_callback(
+        state=state,
+        node_name=node_name,
+        output_keys=output_keys,
+    )
+
+    generate_kwargs = (
+        {"on_delta": stream_delta_callback}
+        if _callable_accepts_keyword(_generate_agent_response, "on_delta")
+        else {}
+    )
     response_payload, response_reasoning, response_warnings, runtime_config = _generate_agent_response(
         node,
         input_values,
         skill_context,
         runtime_config,
+        **generate_kwargs,
     )
     warnings.extend(response_warnings)
 
-    output_keys = [binding.state for binding in node.writes]
     output_values = {
         state_name: response_payload.get(state_name)
         for state_name in output_keys
     }
+    _finalize_agent_stream_delta(
+        state=state,
+        node_name=node_name,
+        output_values=output_values,
+    )
 
     return {
         "outputs": output_values,
@@ -406,6 +438,79 @@ def _execute_agent_node(
         "warnings": list(dict.fromkeys(warnings)),
         "final_result": _first_truthy(output_values.values()) or response_payload.get("summary") or "",
     }
+
+
+def _callable_accepts_keyword(func: Any, keyword: str) -> bool:
+    try:
+        parameters = inspect.signature(func).parameters
+    except (TypeError, ValueError):
+        return True
+    return keyword in parameters or any(parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values())
+
+
+def _build_agent_stream_delta_callback(
+    *,
+    state: dict[str, Any],
+    node_name: str,
+    output_keys: list[str],
+):
+    run_id = str(state.get("run_id") or "").strip()
+    if not run_id:
+        return None
+
+    text_parts: list[str] = []
+    chunk_count = 0
+
+    def _on_delta(delta: str) -> None:
+        nonlocal chunk_count
+        chunk_text = str(delta or "")
+        if not chunk_text:
+            return
+        chunk_count += 1
+        text_parts.append(chunk_text)
+        full_text = "".join(text_parts)
+        stream_record = {
+            "node_id": node_name,
+            "output_keys": list(output_keys),
+            "text": full_text,
+            "chunk_count": chunk_count,
+            "completed": False,
+            "updated_at": utc_now_iso(),
+        }
+        state.setdefault("streaming_outputs", {})[node_name] = stream_record
+        publish_run_event(
+            run_id,
+            "node.output.delta",
+            {
+                **stream_record,
+                "delta": chunk_text,
+                "chunk_index": chunk_count,
+            },
+        )
+
+    return _on_delta
+
+
+def _finalize_agent_stream_delta(
+    *,
+    state: dict[str, Any],
+    node_name: str,
+    output_values: dict[str, Any],
+) -> None:
+    stream_record = state.setdefault("streaming_outputs", {}).get(node_name)
+    if not isinstance(stream_record, dict):
+        return
+    stream_record["completed"] = True
+    stream_record["updated_at"] = utc_now_iso()
+    stream_record["output_values"] = copy.deepcopy(output_values)
+    publish_run_event(
+        str(state.get("run_id") or ""),
+        "node.output.completed",
+        {
+            **stream_record,
+            "output_values": copy.deepcopy(output_values),
+        },
+    )
 
 
 def _execute_output_node(
@@ -608,6 +713,8 @@ def _generate_agent_response(
     input_values: dict[str, Any],
     skill_context: dict[str, Any],
     runtime_config: dict[str, Any],
+    *,
+    on_delta: Any | None = None,
 ) -> tuple[dict[str, Any], str, list[str], dict[str, Any]]:
     output_keys = [binding.state for binding in node.writes]
     if not output_keys:
@@ -637,6 +744,7 @@ def _generate_agent_response(
             temperature=runtime_config["resolved_temperature"],
             thinking_enabled=runtime_config["resolved_thinking"],
             thinking_level=thinking_level,
+            on_delta=on_delta,
         )
     else:
         content, llm_meta = chat_with_model_ref_with_meta(
@@ -646,6 +754,7 @@ def _generate_agent_response(
             temperature=runtime_config["resolved_temperature"],
             thinking_enabled=runtime_config["resolved_thinking"],
             thinking_level=thinking_level,
+            on_delta=on_delta,
         )
 
     parsed_fields = _parse_llm_json_response(content, output_keys)
@@ -729,8 +838,6 @@ def _resolve_agent_runtime_config(node: NodeSystemAgentNode) -> dict[str, Any]:
     resolved_provider_id, _resolved_model_name = resolved_model.split("/", 1) if "/" in resolved_model else ("local", resolved_model)
     runtime_model_name = resolve_runtime_model_name(resolved_model)
     configured_thinking_level = normalize_thinking_level(node.config.thinking_mode.value)
-    if configured_thinking_level == "auto" and global_thinking_level != "auto":
-        configured_thinking_level = normalize_thinking_level(global_thinking_level)
     resolved_thinking_level = resolve_effective_thinking_level(
         configured_level=configured_thinking_level,
         provider_id=resolved_provider_id,

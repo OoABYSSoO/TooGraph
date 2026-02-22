@@ -152,6 +152,72 @@ def _format_request_error(error_label: str, exc: Exception) -> str:
     return f"{error_label}: {exc}"
 
 
+def _parse_json_or_stream_text(stream_text: str, parse_stream: Callable[[str], dict[str, Any]]) -> dict[str, Any]:
+    try:
+        payload = json.loads(stream_text)
+    except ValueError:
+        return parse_stream(stream_text)
+    if isinstance(payload, dict):
+        return payload
+    raise ValueError("unexpected JSON payload shape")
+
+
+def _coerce_stream_line(raw_line: str | bytes) -> str:
+    if isinstance(raw_line, bytes):
+        return raw_line.decode("utf-8", errors="replace").rstrip("\r\n")
+    return str(raw_line).rstrip("\r\n")
+
+
+def _parse_sse_payload(event_name: str, data_lines: list[str]) -> dict[str, Any] | None:
+    data = "\n".join(data_lines).strip()
+    if not data or data == "[DONE]":
+        return None
+    try:
+        payload = json.loads(data)
+    except ValueError:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    if event_name and "_event" not in payload:
+        payload["_event"] = event_name
+    return payload
+
+
+def _read_streaming_response_text(
+    response: Any,
+    *,
+    on_event: Callable[[dict[str, Any]], None] | None = None,
+) -> str:
+    text_lines: list[str] = []
+    event_name = ""
+    data_lines: list[str] = []
+
+    def flush_event() -> None:
+        nonlocal event_name, data_lines
+        if not data_lines:
+            event_name = ""
+            return
+        payload = _parse_sse_payload(event_name, data_lines)
+        event_name = ""
+        data_lines = []
+        if payload is not None and on_event is not None:
+            on_event(payload)
+
+    for raw_line in response.iter_lines():
+        line = _coerce_stream_line(raw_line)
+        text_lines.append(line)
+        if not line:
+            flush_event()
+            continue
+        if line.startswith("event:"):
+            event_name = line[len("event:") :].strip()
+            continue
+        if line.startswith("data:"):
+            data_lines.append(line[len("data:") :].lstrip())
+    flush_event()
+    return "\n".join(text_lines)
+
+
 def post_streaming_json_with_fallback(
     *,
     stream_url: str,
@@ -164,22 +230,34 @@ def post_streaming_json_with_fallback(
     fallback_payload: dict[str, Any],
     parse_stream: Callable[[str], dict[str, Any]],
     error_label: str,
+    on_delta: Callable[[str], None] | None = None,
+    extract_stream_delta: Callable[[dict[str, Any]], str] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any], str | None, bool]:
     try:
         with httpx.Client(timeout=timeout_sec, trust_env=False) as client:
             stream_headers = dict(headers or {})
             stream_headers.setdefault("Accept", "text/event-stream")
-            response = client.post(
+            def handle_stream_event(event_payload: dict[str, Any]) -> None:
+                if on_delta is None or extract_stream_delta is None:
+                    return
+                delta = extract_stream_delta(event_payload)
+                if delta:
+                    on_delta(delta)
+
+            with client.stream(
+                "POST",
                 stream_url,
                 headers=stream_headers or None,
                 params=stream_params,
                 json=stream_payload,
-            )
-            response.raise_for_status()
-            try:
-                payload = response.json()
-            except ValueError:
-                payload = parse_stream(response.text)
+            ) as response:
+                if getattr(response, "status_code", 0) >= 400 and hasattr(response, "read"):
+                    response.read()
+                response.raise_for_status()
+                payload = _parse_json_or_stream_text(
+                    _read_streaming_response_text(response, on_event=handle_stream_event),
+                    parse_stream,
+                )
     except Exception as exc:
         stream_error = _format_request_error(error_label, exc)
     else:
@@ -406,6 +484,7 @@ def _chat_openai_compatible(
     auth_header: str,
     auth_scheme: str,
     thinking_level: str,
+    on_delta: Callable[[str], None] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     request_payload: dict[str, Any] = {
         "model": model,
@@ -440,6 +519,8 @@ def _chat_openai_compatible(
             fallback_payload=fallback_payload,
             parse_stream=_coalesce_openai_chat_stream_response,
             error_label=f"{provider_id} request failed",
+            on_delta=on_delta,
+            extract_stream_delta=_extract_openai_chat_stream_delta,
         )
     except Exception as exc:
         _append_model_request_log_safely(
@@ -491,6 +572,7 @@ def _chat_anthropic(
     temperature: float,
     max_tokens: int | None,
     thinking_level: str,
+    on_delta: Callable[[str], None] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     native_thinking_payload = build_native_thinking_payload(
         provider_id=provider_id,
@@ -525,6 +607,8 @@ def _chat_anthropic(
             fallback_payload=fallback_payload,
             parse_stream=_coalesce_anthropic_stream_response,
             error_label=f"{provider_id} request failed",
+            on_delta=on_delta,
+            extract_stream_delta=_extract_anthropic_stream_delta,
         )
     except Exception as exc:
         _append_model_request_log_safely(
@@ -575,6 +659,7 @@ def _chat_gemini(
     temperature: float,
     max_tokens: int | None,
     thinking_level: str,
+    on_delta: Callable[[str], None] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     request_payload: dict[str, Any] = {
         "system_instruction": {
@@ -623,6 +708,8 @@ def _chat_gemini(
             fallback_payload=request_payload,
             parse_stream=_coalesce_gemini_stream_response,
             error_label=f"{provider_id} request failed",
+            on_delta=on_delta,
+            extract_stream_delta=_extract_gemini_stream_delta,
         )
     except Exception as exc:
         _append_model_request_log_safely(
@@ -735,6 +822,58 @@ def _parse_sse_json_events(stream_text: str) -> list[dict[str, Any]]:
             data_lines.append(line[len("data:") :].lstrip())
     flush_event()
     return events
+
+
+def _extract_openai_chat_stream_delta(event: dict[str, Any]) -> str:
+    choices = event.get("choices")
+    if not isinstance(choices, list) or not choices:
+        return ""
+    first_choice = choices[0] if isinstance(choices[0], dict) else {}
+    source = first_choice.get("delta") or first_choice.get("message") or {}
+    if not isinstance(source, dict):
+        return ""
+    return _normalize_message_text(source.get("content"))
+
+
+def _extract_anthropic_stream_delta(event: dict[str, Any]) -> str:
+    delta = event.get("delta")
+    if not isinstance(delta, dict):
+        return ""
+    delta_type = str(delta.get("type") or "").strip()
+    if delta_type != "text_delta":
+        return ""
+    return _normalize_message_text(delta.get("text"))
+
+
+def _extract_gemini_stream_delta(event: dict[str, Any]) -> str:
+    candidates = event.get("candidates")
+    if not isinstance(candidates, list):
+        return ""
+    text_parts: list[str] = []
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            continue
+        content = candidate.get("content")
+        parts = content.get("parts") if isinstance(content, dict) else None
+        if not isinstance(parts, list):
+            continue
+        for part in parts:
+            if isinstance(part, dict):
+                text = _normalize_message_text(part.get("text"))
+                if text:
+                    text_parts.append(text)
+    return "".join(text_parts)
+
+
+def _extract_codex_stream_delta(event: dict[str, Any]) -> str:
+    event_type = str(event.get("type") or event.get("_event") or "").strip()
+    delta = event.get("delta")
+    if isinstance(delta, str) and delta and ("output_text" in event_type or event_type.endswith(".delta")):
+        return delta
+    text = event.get("text")
+    if isinstance(text, str) and text and "output_text" in event_type:
+        return text
+    return ""
 
 
 def _coalesce_openai_chat_stream_response(stream_text: str) -> dict[str, Any]:
@@ -954,21 +1093,32 @@ def _post_codex_responses_once(
     access_token: str,
     request_payload: dict[str, Any],
     provider_id: str,
+    on_delta: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     try:
         with httpx.Client(timeout=DEFAULT_REQUEST_TIMEOUT_SEC, trust_env=False) as client:
             headers = _build_auth_headers(api_key=access_token)
             headers["Accept"] = "text/event-stream"
-            response = client.post(
+            def handle_stream_event(event_payload: dict[str, Any]) -> None:
+                if on_delta is None:
+                    return
+                delta = _extract_codex_stream_delta(event_payload)
+                if delta:
+                    on_delta(delta)
+
+            with client.stream(
+                "POST",
                 f"{base_url}/responses",
                 headers=headers,
                 json=request_payload,
-            )
-            response.raise_for_status()
-            try:
-                payload = response.json()
-            except ValueError:
-                payload = _coalesce_codex_stream_response(response.text)
+            ) as response:
+                if getattr(response, "status_code", 0) >= 400 and hasattr(response, "read"):
+                    response.read()
+                response.raise_for_status()
+                payload = _parse_json_or_stream_text(
+                    _read_streaming_response_text(response, on_event=handle_stream_event),
+                    _coalesce_codex_stream_response,
+                )
     except httpx.HTTPStatusError as exc:
         if exc.response.status_code == 401:
             raise CodexAuthExpiredError("Codex access token expired.") from exc
@@ -993,6 +1143,7 @@ def _chat_codex_responses(
     user_prompt: str,
     temperature: float,
     thinking_level: str,
+    on_delta: Callable[[str], None] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     request_payload: dict[str, Any] = {
         "model": model,
@@ -1019,6 +1170,7 @@ def _chat_codex_responses(
                 access_token=access_token,
                 request_payload=request_payload,
                 provider_id=provider_id,
+                on_delta=on_delta,
             )
         except CodexAuthExpiredError:
             response_payload = _post_codex_responses_once(
@@ -1026,6 +1178,7 @@ def _chat_codex_responses(
                 access_token=refresh_codex_access_token(),
                 request_payload=request_payload,
                 provider_id=provider_id,
+                on_delta=on_delta,
             )
     except Exception as exc:
         _append_model_request_log_safely(
@@ -1081,6 +1234,7 @@ def chat_with_model_provider(
     thinking_level: str | None = None,
     auth_header: str = "Authorization",
     auth_scheme: str = "Bearer",
+    on_delta: Callable[[str], None] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     normalized_transport = normalize_transport(transport)
     normalized_base_url = _normalize_base_url(base_url)
@@ -1103,6 +1257,7 @@ def chat_with_model_provider(
             auth_header=auth_header,
             auth_scheme=auth_scheme,
             thinking_level=resolved_thinking_level,
+            on_delta=on_delta,
         )
     elif normalized_transport == TRANSPORT_ANTHROPIC_MESSAGES:
         content, meta = _chat_anthropic(
@@ -1115,6 +1270,7 @@ def chat_with_model_provider(
             temperature=temperature,
             max_tokens=max_tokens,
             thinking_level=resolved_thinking_level,
+            on_delta=on_delta,
         )
     elif normalized_transport == TRANSPORT_GEMINI_GENERATE_CONTENT:
         content, meta = _chat_gemini(
@@ -1127,6 +1283,7 @@ def chat_with_model_provider(
             temperature=temperature,
             max_tokens=max_tokens,
             thinking_level=resolved_thinking_level,
+            on_delta=on_delta,
         )
     elif normalized_transport == TRANSPORT_CODEX_RESPONSES:
         content, meta = _chat_codex_responses(
@@ -1137,6 +1294,7 @@ def chat_with_model_provider(
             user_prompt=user_prompt,
             temperature=temperature,
             thinking_level=resolved_thinking_level,
+            on_delta=on_delta,
         )
     else:  # pragma: no cover - guarded by normalize_transport
         raise RuntimeError(f"Unsupported provider transport: {normalized_transport}")
@@ -1167,6 +1325,7 @@ def chat_with_model_ref_with_meta(
     max_tokens: int | None = None,
     thinking_enabled: bool = False,
     thinking_level: str | None = None,
+    on_delta: Callable[[str], None] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     provider_id, model_name = model_ref.split("/", 1) if "/" in model_ref else ("local", model_ref)
     provider_id = provider_id.strip() or "local"
@@ -1184,6 +1343,7 @@ def chat_with_model_ref_with_meta(
             max_tokens=max_tokens,
             thinking_enabled=thinking_enabled,
             thinking_level=thinking_level,
+            on_delta=on_delta,
         )
 
     saved_settings = load_app_settings()
@@ -1212,4 +1372,5 @@ def chat_with_model_ref_with_meta(
         thinking_level=thinking_level,
         auth_header=str(provider_config.get("auth_header") or template.get("auth_header") or "Authorization"),
         auth_scheme=str(auth_scheme or ""),
+        on_delta=on_delta,
     )

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -21,9 +22,18 @@ class FakeResponse:
     ) -> None:
         self._payload = payload
         self.status_code = status_code
-        self.text = text or str(payload)
+        self.text = text or json.dumps(payload or {}, ensure_ascii=False)
         self._json_error = json_error
         self.request = httpx.Request("POST", "https://example.test")
+
+    def __enter__(self) -> "FakeResponse":
+        return self
+
+    def __exit__(self, *_args: Any) -> None:
+        return None
+
+    def iter_lines(self) -> list[str]:
+        return self.text.splitlines()
 
     def json(self) -> dict[str, Any]:
         if self._json_error:
@@ -64,6 +74,10 @@ class FakeHttpClient:
 
     def post(self, url: str, **kwargs: Any) -> FakeResponse:
         self.post_calls.append({"url": url, **kwargs})
+        return self._next()
+
+    def stream(self, method: str, url: str, **kwargs: Any) -> FakeResponse:
+        self.post_calls.append({"method": method, "url": url, **kwargs})
         return self._next()
 
 
@@ -192,6 +206,38 @@ class ModelProviderClientTests(unittest.TestCase):
         self.assertEqual(requested["json"]["stream"], True)
         self.assertEqual(logged["request_raw"]["stream"], True)
         self.assertEqual(logged["response_raw"]["_stream"]["output_chunks"], ["hello ", "stream"])
+
+    def test_chat_openai_compatible_emits_stream_deltas_while_coalescing(self) -> None:
+        from app.tools.model_provider_client import chat_with_model_provider
+
+        fake_client, client_patch = self._patched_client(
+            FakeResponse(
+                None,
+                text=(
+                    'data: {"id":"chatcmpl_stream","model":"gpt-4.1","choices":[{"delta":{"content":"hello "}}]}\n\n'
+                    'data: {"choices":[{"delta":{"content":"stream"}}]}\n\n'
+                    'data: [DONE]\n\n'
+                ),
+                json_error=ValueError("stream"),
+            )
+        )
+        emitted_chunks: list[str] = []
+        with client_patch, patch("app.tools.model_provider_client.append_model_request_log"):
+            content, meta = chat_with_model_provider(
+                provider_id="openai",
+                transport="openai-compatible",
+                base_url="https://api.openai.com/v1",
+                api_key="sk-openai",
+                model="gpt-4.1",
+                system_prompt="sys",
+                user_prompt="user",
+                temperature=0.2,
+                on_delta=emitted_chunks.append,
+            )
+
+        self.assertEqual(content, "hello stream")
+        self.assertEqual(meta["response_id"], "chatcmpl_stream")
+        self.assertEqual(emitted_chunks, ["hello ", "stream"])
 
     def test_chat_openai_compatible_falls_back_to_non_streaming_request(self) -> None:
         from app.tools.model_provider_client import chat_with_model_provider

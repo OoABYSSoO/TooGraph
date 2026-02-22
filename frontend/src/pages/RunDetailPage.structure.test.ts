@@ -90,3 +90,15 @@ test("RunDetailPage cancels stale detail requests and exposes retry after failur
   assert.match(componentSource, /return t\("runDetail\.loadTimeout"\);/);
   assert.match(componentSource, /class="run-detail__retry"[\s\S]*@click="loadRun\(runId\)"/);
 });
+
+test("RunDetailPage subscribes to run events and renders live streamed output", () => {
+  assert.match(componentSource, /let runEventSource: EventSource \| null = null;/);
+  assert.match(componentSource, /const liveStreamingOutputs = ref/);
+  assert.match(componentSource, /new EventSource\(`\/api\/runs\/\$\{normalizedRunId\}\/events`\)/);
+  assert.match(componentSource, /addEventListener\("node\.output\.delta"/);
+  assert.match(componentSource, /addEventListener\("run\.completed"/);
+  assert.match(componentSource, /function closeRunEventStream\(\)/);
+  assert.match(componentSource, /class="run-detail__panel run-detail__panel--live"/);
+  assert.match(componentSource, /v-for="stream in liveStreamingOutputItems"/);
+  assert.match(componentSource, /class="run-detail__live-content"/);
+});

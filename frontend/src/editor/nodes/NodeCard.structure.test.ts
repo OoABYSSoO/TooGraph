@@ -180,8 +180,9 @@ test("NodeCard restores the legacy agent runtime control order with Element Plus
   assert.ok(thinkingOptions, "expected agent thinking options");
   assert.match(
     thinkingOptions[0],
-    /value:\s*"off"[\s\S]*value:\s*"auto"[\s\S]*value:\s*"low"[\s\S]*value:\s*"medium"[\s\S]*value:\s*"high"[\s\S]*value:\s*"xhigh"/,
+    /value:\s*"off"[\s\S]*label:\s*t\("nodeCard\.thinkingOff"\)[\s\S]*value:\s*"low"[\s\S]*label:\s*t\("nodeCard\.thinkingLow"\)[\s\S]*value:\s*"medium"[\s\S]*label:\s*t\("nodeCard\.thinkingMedium"\)[\s\S]*value:\s*"high"[\s\S]*label:\s*t\("nodeCard\.thinkingHigh"\)[\s\S]*value:\s*"xhigh"[\s\S]*label:\s*t\("nodeCard\.thinkingExtraHigh"\)/,
   );
+  assert.doesNotMatch(thinkingOptions[0], /value:\s*"auto"/);
   assert.match(componentSource, /function normalizeAgentThinkingMode/);
   assert.match(componentSource, /agentBreakpointEnabled\?:\s*boolean;/);
   assert.match(componentSource, /agentBreakpointTiming\?:\s*"before" \| "after";/);

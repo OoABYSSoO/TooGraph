@@ -590,3 +590,27 @@ test("buildNodeCardViewModel derives unlimited loop label and multiple skills", 
   assert.equal(model.body.modelLabel, "gpt-5.4");
   assert.equal(model.body.thinkingLabel, "thinking off");
 });
+
+test("buildNodeCardViewModel presents xhigh thinking as Extra High", () => {
+  const node: GraphNode = {
+    kind: "agent",
+    name: "deep_agent",
+    description: "",
+    ui: { position: { x: 320, y: 160 } },
+    reads: [],
+    writes: [],
+    config: {
+      skills: [],
+      taskInstruction: "",
+      modelSource: "override",
+      model: "gpt-5.5",
+      thinkingMode: "xhigh",
+      temperature: 0.3,
+    },
+  };
+
+  const model = buildNodeCardViewModel("deep_agent", node, stateSchema);
+
+  assert.equal(model.body.kind, "agent");
+  assert.equal(model.body.thinkingLabel, "thinking Extra High");
+});

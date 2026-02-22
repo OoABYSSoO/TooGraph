@@ -15,10 +15,9 @@ from app.core.model_provider_templates import get_provider_template, normalize_t
 from app.core.storage.settings_store import load_app_settings, save_app_settings
 from app.tools.local_llm import (
     get_default_agent_temperature,
-    get_default_agent_thinking_enabled,
     get_default_agent_thinking_level,
 )
-from app.core.thinking_levels import THINKING_LEVEL_OFF, normalize_thinking_level
+from app.core.thinking_levels import THINKING_LEVEL_MEDIUM, THINKING_LEVEL_OFF, normalize_thinking_level
 from app.tools.model_provider_client import discover_provider_models
 from app.tools.openai_codex_client import (
     clear_codex_auth_state,
@@ -52,8 +51,8 @@ class AgentRuntimeDefaultsPayload(BaseModel):
         if self.thinking_level is not None:
             return normalize_thinking_level(self.thinking_level)
         if self.thinking_enabled is not None:
-            return "auto" if self.thinking_enabled else THINKING_LEVEL_OFF
-        return "auto"
+            return THINKING_LEVEL_MEDIUM if self.thinking_enabled else THINKING_LEVEL_OFF
+        return THINKING_LEVEL_OFF
 
 
 class SettingsProviderModelPayload(BaseModel):
@@ -177,6 +176,7 @@ def _build_settings_payload(*, force_refresh_models: bool = False) -> dict:
     model_catalog = build_model_catalog(force_refresh=force_refresh_models)
     text_model_ref = str(model_catalog.get("default_text_model_ref") or get_default_text_model_ref(force_refresh=False))
     video_model_ref = str(model_catalog.get("default_video_model_ref") or get_default_video_model_ref(force_refresh=False))
+    agent_thinking_level = normalize_thinking_level(get_default_agent_thinking_level())
     return {
         "model": {
             "text_model": resolve_runtime_model_name(text_model_ref),
@@ -186,8 +186,8 @@ def _build_settings_payload(*, force_refresh_models: bool = False) -> dict:
         },
         "agent_runtime_defaults": {
             "model": text_model_ref,
-            "thinking_enabled": get_default_agent_thinking_enabled(),
-            "thinking_level": get_default_agent_thinking_level(),
+            "thinking_enabled": agent_thinking_level != THINKING_LEVEL_OFF,
+            "thinking_level": agent_thinking_level,
             "temperature": get_default_agent_temperature(),
         },
         "model_catalog": model_catalog,
