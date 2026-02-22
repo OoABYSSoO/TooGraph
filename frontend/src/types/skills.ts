@@ -17,6 +17,12 @@ export type SkillDefinition = {
   skillKey: string;
   label: string;
   description: string;
+  version: string;
+  targets: string[];
+  kind: string;
+  mode: string;
+  scope: string;
+  permissions: string[];
   inputSchema: SkillIoField[];
   outputSchema: SkillIoField[];
   supportedValueTypes: string[];
@@ -24,7 +30,10 @@ export type SkillDefinition = {
   sourceFormat: string;
   sourceScope: string;
   sourcePath: string;
+  runtimeReady: boolean;
   runtimeRegistered: boolean;
+  configured: boolean;
+  healthy: boolean;
   status: string;
   canManage: boolean;
   canImport: boolean;

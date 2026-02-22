@@ -46,12 +46,20 @@
           <strong>{{ overview.active }}</strong>
         </article>
         <article class="skills-page__metric">
-          <span>{{ t("skills.runtimeRegistered") }}</span>
-          <strong>{{ overview.runtimeRegistered }}</strong>
+          <span>{{ t("skills.agentSkills") }}</span>
+          <strong>{{ overview.agentSkills }}</strong>
         </article>
         <article class="skills-page__metric">
-          <span>{{ t("skills.manageableCount") }} / {{ t("skills.importableCount") }}</span>
-          <strong>{{ overview.manageable }} / {{ overview.importable }}</strong>
+          <span>{{ t("skills.companionSkills") }}</span>
+          <strong>{{ overview.companionSkills }}</strong>
+        </article>
+        <article class="skills-page__metric">
+          <span>{{ t("skills.runtimeReady") }}</span>
+          <strong>{{ overview.runtimeReady }}</strong>
+        </article>
+        <article class="skills-page__metric">
+          <span>{{ t("skills.needsAttention") }}</span>
+          <strong>{{ overview.needsAttention }}</strong>
         </article>
       </section>
 
@@ -94,13 +102,39 @@
               </div>
               <div class="skills-page__status">
                 <span>{{ t(`skills.${skill.status}`) }}</span>
-                <span>{{ skill.runtimeRegistered ? t("skills.runtime") : t("common.off") }}</span>
+                <span>{{ skill.runtimeReady ? t("skills.runtimeReady") : t("skills.runtimePending") }}</span>
+                <span>{{ skill.runtimeRegistered ? t("skills.runtimeRegistered") : t("skills.runtimeNotRegistered") }}</span>
+                <span v-if="!skill.configured" class="skills-page__status-warning">{{ t("skills.notConfigured") }}</span>
+                <span v-if="!skill.healthy" class="skills-page__status-warning">{{ t("skills.unhealthy") }}</span>
                 <span v-if="skill.canManage">{{ t("skills.manageable") }}</span>
                 <span v-if="skill.canImport">{{ t("skills.importable") }}</span>
               </div>
             </div>
 
             <p>{{ skill.description }}</p>
+
+            <div class="skills-page__taxonomy">
+              <section>
+                <h4>{{ t("skills.targets") }}</h4>
+                <div class="skills-page__badges">
+                  <span v-for="target in skill.targets" :key="target">{{ target }}</span>
+                </div>
+              </section>
+              <section>
+                <h4>{{ t("skills.kind") }}</h4>
+                <div class="skills-page__badges">
+                  <span>{{ skill.kind }}</span>
+                  <span>{{ skill.mode }}</span>
+                  <span>{{ skill.scope }}</span>
+                </div>
+              </section>
+              <section>
+                <h4>{{ t("skills.version") }}</h4>
+                <div class="skills-page__badges">
+                  <span>{{ skill.version || t("common.none") }}</span>
+                </div>
+              </section>
+            </div>
 
             <div class="skills-page__actions" :aria-label="t('skills.actions')">
               <button
@@ -178,6 +212,13 @@
                 <div class="skills-page__badges">
                   <span v-for="effect in skill.sideEffects" :key="effect">{{ effect }}</span>
                   <span v-if="skill.sideEffects.length === 0">{{ t("skills.noSideEffects") }}</span>
+                </div>
+              </section>
+              <section>
+                <h4>{{ t("skills.permissions") }}</h4>
+                <div class="skills-page__badges">
+                  <span v-for="permission in skill.permissions" :key="permission">{{ permission }}</span>
+                  <span v-if="skill.permissions.length === 0">{{ t("common.none") }}</span>
                 </div>
               </section>
             </div>
@@ -353,6 +394,7 @@ onMounted(loadSkills);
 .skills-page__status-filter,
 .skills-page__hero-actions,
 .skills-page__card-heading > *,
+.skills-page__taxonomy section,
 .skills-page__columns section,
 .skills-page__compatibility {
   min-width: 0;
@@ -451,7 +493,7 @@ onMounted(loadSkills);
 
 .skills-page__overview {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 12px;
 }
 
@@ -588,6 +630,12 @@ onMounted(loadSkills);
   margin-top: -4px;
 }
 
+.skills-page__taxonomy {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .skills-page__status span,
 .skills-page__badges span,
 .skills-page__schema-list span {
@@ -598,6 +646,12 @@ onMounted(loadSkills);
   color: rgb(154, 52, 18);
   font-family: var(--graphite-font-mono);
   font-size: 0.82rem;
+}
+
+.skills-page__status .skills-page__status-warning {
+  border-color: rgba(185, 28, 28, 0.16);
+  background: rgba(255, 245, 242, 0.96);
+  color: rgb(153, 27, 27);
 }
 
 .skills-page__source {
@@ -613,10 +667,11 @@ onMounted(loadSkills);
 
 .skills-page__columns {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 12px;
 }
 
+.skills-page__taxonomy section,
 .skills-page__columns section,
 .skills-page__schema-list,
 .skills-page__compatibility {
@@ -643,7 +698,7 @@ onMounted(loadSkills);
 }
 
 @media (max-width: 1100px) {
-  .skills-page__overview,
+  .skills-page__taxonomy,
   .skills-page__columns {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -657,6 +712,7 @@ onMounted(loadSkills);
   .skills-page__hero,
   .skills-page__card-heading {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .skills-page__hero-actions,
@@ -665,11 +721,13 @@ onMounted(loadSkills);
   }
 
   .skills-page__hero-actions {
+    display: grid;
+    grid-template-columns: 1fr;
     justify-content: stretch;
   }
 
   .skills-page__action {
-    flex: 1 1 120px;
+    width: 100%;
   }
 
   .skills-page__title {
@@ -677,10 +735,11 @@ onMounted(loadSkills);
   }
 
   .skills-page {
-    max-width: calc(100vw - var(--app-sidebar-width) - 56px);
+    max-width: calc(100vw - 112px);
   }
 
   .skills-page__overview,
+  .skills-page__taxonomy,
   .skills-page__columns {
     grid-template-columns: 1fr;
   }

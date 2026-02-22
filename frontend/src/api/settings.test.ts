@@ -4,8 +4,11 @@ import assert from "node:assert/strict";
 import {
   discoverModelProviderModels,
   fetchOpenAICodexAuthStatus,
+  importOpenAICodexCliAuth,
   logoutOpenAICodexAuth,
   pollOpenAICodexAuth,
+  pollOpenAICodexBrowserAuth,
+  startOpenAICodexBrowserAuth,
   startOpenAICodexAuth,
   updateSettings,
 } from "./settings.ts";
@@ -154,6 +157,24 @@ test("OpenAI Codex auth helpers call login endpoints", async () => {
       url,
       body: init?.body ? JSON.parse(String(init.body)) : null,
     });
+    if (url.endsWith("/auth/browser/start")) {
+      return new Response(JSON.stringify({ authorization_url: "https://auth.openai.com/oauth/authorize", state: "state-1" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    if (url.endsWith("/auth/browser/poll")) {
+      return new Response(JSON.stringify({ authenticated: true, status: "authenticated", source: "browser-oauth" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    if (url.endsWith("/auth/codex-cli/import")) {
+      return new Response(JSON.stringify({ authenticated: true, status: "authenticated", source: "codex-cli" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     if (url.endsWith("/auth/start")) {
       return new Response(JSON.stringify({ verification_url: "https://auth.openai.com/codex/device", user_code: "ABCD" }), {
         status: 200,
@@ -178,12 +199,18 @@ test("OpenAI Codex auth helpers call login endpoints", async () => {
     });
   }) as typeof fetch;
 
+  await startOpenAICodexBrowserAuth();
+  await pollOpenAICodexBrowserAuth({ state: "state-1" });
+  await importOpenAICodexCliAuth();
   await startOpenAICodexAuth();
   await pollOpenAICodexAuth({ device_auth_id: "device-1", user_code: "ABCD" });
   await fetchOpenAICodexAuthStatus();
   await logoutOpenAICodexAuth();
 
   assert.deepEqual(requested, [
+    { url: "/api/settings/model-providers/openai-codex/auth/browser/start", body: null },
+    { url: "/api/settings/model-providers/openai-codex/auth/browser/poll", body: { state: "state-1" } },
+    { url: "/api/settings/model-providers/openai-codex/auth/codex-cli/import", body: null },
     { url: "/api/settings/model-providers/openai-codex/auth/start", body: null },
     { url: "/api/settings/model-providers/openai-codex/auth/poll", body: { device_auth_id: "device-1", user_code: "ABCD" } },
     { url: "/api/settings/model-providers/openai-codex/auth/status", body: null },

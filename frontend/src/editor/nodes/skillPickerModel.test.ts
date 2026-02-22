@@ -13,10 +13,19 @@ const skillDefinitions: SkillDefinition[] = [
     outputSchema: [],
     supportedValueTypes: ["text", "knowledge_base"],
     sideEffects: ["knowledge_read"],
+    version: "1.0.0",
+    targets: ["agent_node"],
+    kind: "atomic",
+    mode: "tool",
+    scope: "node",
+    permissions: ["knowledge_read"],
     sourceFormat: "graphite_definition",
     sourceScope: "graphite_managed",
     sourcePath: "/skills/search_knowledge_base",
+    runtimeReady: true,
     runtimeRegistered: true,
+    configured: true,
+    healthy: true,
     status: "active",
     canManage: true,
     canImport: false,
@@ -30,10 +39,19 @@ const skillDefinitions: SkillDefinition[] = [
     outputSchema: [],
     supportedValueTypes: ["text"],
     sideEffects: ["none"],
+    version: "1.0.0",
+    targets: ["agent_node"],
+    kind: "atomic",
+    mode: "tool",
+    scope: "node",
+    permissions: [],
     sourceFormat: "graphite_definition",
     sourceScope: "graphite_managed",
     sourcePath: "/skills/append_usage_introduction",
+    runtimeReady: true,
     runtimeRegistered: true,
+    configured: true,
+    healthy: true,
     status: "active",
     canManage: true,
     canImport: false,
@@ -41,10 +59,54 @@ const skillDefinitions: SkillDefinition[] = [
   },
 ];
 
+const unavailableSkillDefinitions: SkillDefinition[] = [
+  skillDefinitions[0],
+  {
+    ...skillDefinitions[1],
+    skillKey: "desktop_companion_profile",
+    label: "Desktop Companion Profile",
+    targets: ["companion"],
+    kind: "profile",
+    mode: "context",
+    scope: "global",
+  },
+  {
+    ...skillDefinitions[1],
+    skillKey: "needs_configuration",
+    label: "Needs Configuration",
+    configured: false,
+  },
+  {
+    ...skillDefinitions[1],
+    skillKey: "unhealthy_skill",
+    label: "Unhealthy Skill",
+    healthy: false,
+  },
+  {
+    ...skillDefinitions[1],
+    skillKey: "runtime_pending",
+    label: "Runtime Pending",
+    runtimeRegistered: false,
+  },
+  {
+    ...skillDefinitions[1],
+    skillKey: "disabled_skill",
+    label: "Disabled Skill",
+    status: "disabled",
+  },
+];
+
 test("listAttachableSkillDefinitions filters already attached skill keys", () => {
   assert.deepEqual(
     listAttachableSkillDefinitions(skillDefinitions, ["search_knowledge_base"]),
     [skillDefinitions[1]],
+  );
+});
+
+test("listAttachableSkillDefinitions only exposes active healthy agent runtime skills", () => {
+  assert.deepEqual(
+    listAttachableSkillDefinitions(unavailableSkillDefinitions, []).map((definition) => definition.skillKey),
+    ["search_knowledge_base"],
   );
 });
 

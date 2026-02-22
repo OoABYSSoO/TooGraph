@@ -11,7 +11,7 @@ const settingsSource = readFileSync(resolve(currentDirectory, "SettingsPage.vue"
 test("ModelProvidersPage makes ChatGPT Codex sign-in the first provider card", () => {
   assert.match(pageSource, /settings\.codexLogin/);
   assert.match(pageSource, /settings\.codexLoginStatus/);
-  assert.match(pageSource, /handleStartCodexLogin/);
+  assert.match(pageSource, /handleStartCodexBrowserLogin/);
   assert.match(pageSource, /model-providers-page__provider-card--codex/);
   assert.match(pageSource, /v-if="isLoginProvider\(provider\)"/);
   assert.match(pageSource, /discoverModelProviderModels/);
@@ -22,7 +22,7 @@ test("ModelProvidersPage owns provider editing while Settings links to it", () =
   assert.match(pageSource, /settings\.modelProviders/);
   assert.match(pageSource, /settings\.addProvider/);
   assert.match(pageSource, /buildProviderSavePayload/);
-  assert.doesNotMatch(settingsSource, /handleStartCodexLogin/);
+  assert.doesNotMatch(settingsSource, /handleStartCodexBrowserLogin/);
   assert.doesNotMatch(settingsSource, /settings-page__provider-editor-list/);
   assert.match(settingsSource, /to="\/models"/);
 });
@@ -191,18 +191,32 @@ test("ModelProvidersPage hides engineering provider fields inside advanced setti
   assert.match(pageSource, /v-else[\s\S]*settings\.providerBaseUrl/);
 });
 
-test("ModelProvidersPage shows ChatGPT device-code entry as part of the normal login flow", () => {
-  assert.match(pageSource, /openCodexVerificationWindow\(\)/);
-  assert.match(pageSource, /const authWindow = openCodexVerificationWindow\(\);[\s\S]*codexLoginSession\.value = await startOpenAICodexAuth\(\);[\s\S]*handleOpenCodexVerification\(authWindow\)/);
+test("ModelProvidersPage makes browser OAuth the normal ChatGPT login flow", () => {
+  assert.match(pageSource, /handleStartCodexBrowserLogin/);
+  assert.match(pageSource, /startOpenAICodexBrowserAuth/);
+  assert.match(pageSource, /pollOpenAICodexBrowserAuth/);
+  assert.match(pageSource, /codexBrowserLoginSession/);
+  assert.match(pageSource, /openCodexAuthorizationWindow\(\)/);
+  assert.match(pageSource, /codexBrowserLoginSession\.value = await startOpenAICodexBrowserAuth\(\);[\s\S]*handleOpenCodexAuthorization\(authWindow\)/);
   assert.match(pageSource, /class="model-providers-page__login-steps"/);
-  assert.match(pageSource, /class="model-providers-page__device-code"/);
-  assert.match(pageSource, /\{\{ codexLoginSession\.user_code \}\}/);
-  assert.match(pageSource, /<ElIcon aria-hidden="true"><CopyDocument \/><\/ElIcon>/);
-  assert.match(pageSource, /:aria-label="t\('settings\.codexCopyDeviceCode'\)"/);
-  assert.match(pageSource, /settings\.codexFallbackLogin/);
+  assert.match(pageSource, /settings\.codexBrowserCallbackStep/);
+  assert.match(pageSource, /settings\.codexCopyAuthorizationUrl/);
   assert.match(pageSource, /settings\.codexLoginWaiting/);
+  assert.doesNotMatch(pageSource, /codexLoginSession\s*\?\s*t\("settings\.codexLoginWaiting"\)/);
   assert.doesNotMatch(pageSource, /<input :value="codexLoginSession\.verification_url"/);
   assert.doesNotMatch(pageSource, /<input :value="codexLoginSession\.user_code"/);
+});
+
+test("ModelProvidersPage hides device-code and Codex CLI fallback login behind advanced options", () => {
+  assert.match(pageSource, /settings\.codexAdvancedLoginOptions/);
+  assert.match(pageSource, /settings\.codexUseCodexCliLogin/);
+  assert.match(pageSource, /settings\.codexUseDeviceCodeLogin/);
+  assert.match(pageSource, /handleImportCodexCliAuth/);
+  assert.match(pageSource, /handleStartCodexDeviceLogin/);
+  assert.match(pageSource, /codexDeviceLoginSession/);
+  assert.match(pageSource, /class="model-providers-page__device-code"/);
+  assert.match(pageSource, /\{\{ codexDeviceLoginSession\.user_code \}\}/);
+  assert.match(pageSource, /:aria-label="t\('settings\.codexCopyDeviceCode'\)"/);
 });
 
 test("ModelProvidersPage uses toast feedback for ChatGPT copy attempts", () => {
@@ -212,7 +226,7 @@ test("ModelProvidersPage uses toast feedback for ChatGPT copy attempts", () => {
   assert.match(pageSource, /ElMessage\(\{[\s\S]*customClass:\s*"model-providers-page__copy-toast"[\s\S]*message,[\s\S]*\}\);/);
   assert.match(pageSource, /settings\.codexCodeCopyFailed/);
   assert.match(pageSource, /showCodexToast\("success", t\("settings\.codexCodeCopied"\)\);/);
-  assert.match(pageSource, /try \{[\s\S]*navigator\.clipboard\.writeText\(codexLoginSession\.value\.user_code\);[\s\S]*\} catch/);
+  assert.match(pageSource, /try \{[\s\S]*navigator\.clipboard\.writeText\(codexDeviceLoginSession\.value\.user_code\);[\s\S]*\} catch/);
 });
 
 test("ModelProvidersPage hides the ChatGPT login action after sign-in", () => {
@@ -239,10 +253,10 @@ test("ModelProvidersPage confirms ChatGPT logout with the same popover pattern a
 
 test("ModelProvidersPage keeps ChatGPT authorization usable in embedded browsers", () => {
   assert.doesNotMatch(pageSource, /authWindow\.opener\s*=/);
-  assert.match(pageSource, /const verificationOpened = handleOpenCodexVerification\(authWindow\);/);
-  assert.match(pageSource, /verificationOpened \? "settings\.codexLoginStarted" : "settings\.codexPopupBlocked"/);
-  assert.match(pageSource, /try \{[\s\S]*authWindow\.location\.href = codexLoginSession\.value\.verification_url;[\s\S]*\} catch/);
-  assert.match(pageSource, /const openedWindow = window\.open\(codexLoginSession\.value\.verification_url, "_blank", "noopener,noreferrer"\);/);
-  assert.match(pageSource, /settings\.codexCopyVerificationUrl/);
-  assert.match(pageSource, /navigator\.clipboard\.writeText\(codexLoginSession\.value\.verification_url\)/);
+  assert.match(pageSource, /const authorizationOpened = handleOpenCodexAuthorization\(authWindow\);/);
+  assert.match(pageSource, /authorizationOpened \? "settings\.codexLoginStarted" : "settings\.codexPopupBlocked"/);
+  assert.match(pageSource, /try \{[\s\S]*authWindow\.location\.href = codexBrowserLoginSession\.value\.authorization_url;[\s\S]*\} catch/);
+  assert.match(pageSource, /const openedWindow = window\.open\(codexBrowserLoginSession\.value\.authorization_url, "_blank", "noopener,noreferrer"\);/);
+  assert.match(pageSource, /settings\.codexCopyAuthorizationUrl/);
+  assert.match(pageSource, /navigator\.clipboard\.writeText\(codexBrowserLoginSession\.value\.authorization_url\)/);
 });

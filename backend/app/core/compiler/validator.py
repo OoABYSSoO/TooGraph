@@ -14,6 +14,8 @@ from app.core.schemas.node_system import (
     NodeSystemStateType,
     ValidationIssue,
 )
+from app.core.schemas.skills import SkillCatalogStatus, SkillDefinition, SkillTarget
+from app.skills.definitions import get_skill_catalog_registry
 from app.skills.registry import get_skill_registry
 
 KNOWLEDGE_BASE_SKILL_KEY = "search_knowledge_base"
@@ -22,6 +24,7 @@ KNOWLEDGE_BASE_SKILL_KEY = "search_knowledge_base"
 def validate_graph(graph: NodeSystemGraphDocument) -> GraphValidationResponse:
     issues: list[ValidationIssue] = []
     runtime_skill_keys = set(get_skill_registry().keys())
+    skill_catalog = get_skill_catalog_registry(include_disabled=True)
 
     nodes_by_name = graph.nodes
     state_schema = graph.state_schema
@@ -42,7 +45,7 @@ def validate_graph(graph: NodeSystemGraphDocument) -> GraphValidationResponse:
     for node_name, node in nodes_by_name.items():
         issues.extend(_validate_node_shape(node_name, node))
         if isinstance(node, NodeSystemAgentNode):
-            issues.extend(_validate_agent_node(node_name, node, state_schema, runtime_skill_keys))
+            issues.extend(_validate_agent_node(node_name, node, state_schema, runtime_skill_keys, skill_catalog))
         elif isinstance(node, NodeSystemConditionNode):
             issues.extend(_validate_condition_node(node_name, node, graph))
 
@@ -136,6 +139,7 @@ def _validate_agent_node(
     node: NodeSystemAgentNode,
     state_schema: dict[str, object],
     runtime_skill_keys: set[str],
+    skill_catalog: dict[str, SkillDefinition],
 ) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
     knowledge_reads = [
@@ -153,7 +157,61 @@ def _validate_agent_node(
         )
 
     for index, skill_key in enumerate(node.config.skills):
-        if skill_key not in runtime_skill_keys:
+        definition = skill_catalog.get(skill_key)
+        if definition is None:
+            issues.append(
+                ValidationIssue(
+                    code="agent_skill_not_runtime_registered",
+                    message=(
+                        f"Agent node '{node_name}' attaches skill '{skill_key}', "
+                        "but the skill is not runtime-registered."
+                    ),
+                    path=f"nodes.{node_name}.config.skills.{index}",
+                )
+            )
+            continue
+
+        if definition.status != SkillCatalogStatus.ACTIVE:
+            issues.append(
+                ValidationIssue(
+                    code="agent_skill_disabled",
+                    message=f"Agent node '{node_name}' attaches skill '{skill_key}', but the skill is disabled.",
+                    path=f"nodes.{node_name}.config.skills.{index}",
+                )
+            )
+            continue
+
+        if SkillTarget.AGENT_NODE not in definition.targets:
+            issues.append(
+                ValidationIssue(
+                    code="agent_skill_target_not_agent_node",
+                    message=(
+                        f"Agent node '{node_name}' attaches skill '{skill_key}', "
+                        "but the skill is not available for agent nodes."
+                    ),
+                    path=f"nodes.{node_name}.config.skills.{index}",
+                )
+            )
+
+        if not definition.configured:
+            issues.append(
+                ValidationIssue(
+                    code="agent_skill_not_configured",
+                    message=f"Agent node '{node_name}' attaches skill '{skill_key}', but the skill is not configured.",
+                    path=f"nodes.{node_name}.config.skills.{index}",
+                )
+            )
+
+        if not definition.healthy:
+            issues.append(
+                ValidationIssue(
+                    code="agent_skill_unhealthy",
+                    message=f"Agent node '{node_name}' attaches skill '{skill_key}', but the skill health check is failing.",
+                    path=f"nodes.{node_name}.config.skills.{index}",
+                )
+            )
+
+        if skill_key not in runtime_skill_keys or not definition.runtime_registered:
             issues.append(
                 ValidationIssue(
                     code="agent_skill_not_runtime_registered",

@@ -958,6 +958,12 @@ class LangGraphMigrationTests(unittest.TestCase):
 
         with patch("app.core.runtime.node_system_executor._chat_with_local_model_with_meta", _fake_chat_with_local_model_with_meta):
             runtime_config = node_system_executor._resolve_agent_runtime_config(node)
+            runtime_config = {
+                **runtime_config,
+                "resolved_model_ref": "local/test-model",
+                "resolved_provider_id": "local",
+                "runtime_model_name": "test-model",
+            }
             node_system_executor._generate_agent_response(node, {"counter": 0}, {}, runtime_config)
 
         self.assertFalse(hasattr(node.config, "system_instruction"))

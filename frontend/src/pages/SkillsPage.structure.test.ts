@@ -20,6 +20,23 @@ test("SkillsPage loads the full skill catalog into a searchable management surfa
   assert.match(componentSource, /skill\.compatibility/);
 });
 
+test("SkillsPage surfaces native Skill taxonomy and readiness metadata", () => {
+  assert.match(componentSource, /overview\.agentSkills/);
+  assert.match(componentSource, /overview\.companionSkills/);
+  assert.match(componentSource, /overview\.runtimeReady/);
+  assert.match(componentSource, /overview\.needsAttention/);
+  assert.match(componentSource, /skill\.targets/);
+  assert.match(componentSource, /skill\.kind/);
+  assert.match(componentSource, /skill\.mode/);
+  assert.match(componentSource, /skill\.scope/);
+  assert.match(componentSource, /skill\.permissions/);
+  assert.match(componentSource, /skill\.runtimeReady/);
+  assert.match(componentSource, /skill\.configured/);
+  assert.match(componentSource, /skill\.healthy/);
+  assert.match(componentSource, /t\("skills\.targets"\)/);
+  assert.match(componentSource, /t\("skills\.permissions"\)/);
+});
+
 test("SkillsPage exposes import, status, and delete management actions with local button styling", () => {
   assert.match(componentSource, /const confirmingSkillDeleteKey = ref<string \| null>\(null\);/);
   assert.match(componentSource, /async function importSkillIntoCatalog/);

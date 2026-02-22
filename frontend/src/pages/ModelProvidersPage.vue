@@ -199,11 +199,11 @@
                     v-if="!provider.auth_status?.authenticated"
                     type="button"
                     class="model-providers-page__button model-providers-page__button--primary"
-                    :disabled="codexAuthBusy || Boolean(codexLoginSession)"
-                    @click="handleStartCodexLogin"
+                    :disabled="codexAuthBusy || Boolean(codexBrowserLoginSession) || Boolean(codexDeviceLoginSession)"
+                    @click="handleStartCodexBrowserLogin"
                   >
                     {{
-                      codexLoginSession
+                      codexBrowserLoginSession
                         ? t("settings.codexLoginWaiting")
                         : codexAuthBusy
                           ? t("settings.codexChecking")
@@ -436,7 +436,7 @@
                 <span v-if="providerMessages[provider.provider_id]" class="model-providers-page__provider-message">
                   {{ providerMessages[provider.provider_id] }}
                 </span>
-                <div v-if="isLoginProvider(provider) && codexLoginSession" class="model-providers-page__login-progress" role="status">
+                <div v-if="isLoginProvider(provider) && codexBrowserLoginSession" class="model-providers-page__login-progress" role="status">
                   <div class="model-providers-page__login-progress-heading">
                     <span class="model-providers-page__spinner" aria-hidden="true"></span>
                     <div>
@@ -454,43 +454,80 @@
                     </div>
                     <div class="model-providers-page__login-step">
                       <span class="model-providers-page__step-index">2</span>
-                      <div class="model-providers-page__device-code-content">
-                        <strong>{{ t("settings.codexDeviceCodeStep") }}</strong>
-                        <p>{{ t("settings.codexDeviceCodeStepBody") }}</p>
-                        <div class="model-providers-page__device-code-row">
-                          <span class="model-providers-page__device-code">{{ codexLoginSession.user_code }}</span>
-                          <button
-                            type="button"
-                            class="model-providers-page__icon-button"
-                            :aria-label="t('settings.codexCopyDeviceCode')"
-                            :title="t('settings.codexCopyDeviceCode')"
-                            @click="handleCopyCodexCode"
-                          >
-                            <ElIcon aria-hidden="true"><CopyDocument /></ElIcon>
-                          </button>
-                        </div>
+                      <div>
+                        <strong>{{ t("settings.codexBrowserCallbackStep") }}</strong>
+                        <p>{{ t("settings.codexBrowserCallbackStepBody") }}</p>
                       </div>
                     </div>
                   </div>
                   <div class="model-providers-page__login-progress-footer">
                     <span>{{ t("settings.codexAutoDetectHint") }}</span>
-                    <button type="button" class="model-providers-page__button" :disabled="codexAuthBusy" @click="() => handlePollCodexLogin()">
+                    <button type="button" class="model-providers-page__button" :disabled="codexAuthBusy" @click="() => handlePollCodexBrowserLogin()">
                       {{ t("settings.codexCheckLogin") }}
                     </button>
+                    <button type="button" class="model-providers-page__button" @click="handleCopyCodexAuthorizationUrl">
+                      {{ t("settings.codexCopyAuthorizationUrl") }}
+                    </button>
                   </div>
-                  <details class="model-providers-page__fallback-login">
-                    <summary>{{ t("settings.codexFallbackLogin") }}</summary>
-                    <p>{{ t("settings.codexFallbackLoginHint") }}</p>
-                    <div class="model-providers-page__provider-actions model-providers-page__provider-actions--compact">
+                </div>
+                <details
+                  v-if="isLoginProvider(provider) && !provider.auth_status?.authenticated"
+                  class="model-providers-page__fallback-login"
+                  :open="Boolean(codexDeviceLoginSession)"
+                >
+                  <summary>{{ t("settings.codexAdvancedLoginOptions") }}</summary>
+                  <p>{{ t("settings.codexAdvancedLoginOptionsHint") }}</p>
+                  <div class="model-providers-page__provider-actions model-providers-page__provider-actions--compact">
+                    <button type="button" class="model-providers-page__button" :disabled="codexAuthBusy" @click="handleImportCodexCliAuth">
+                      {{ t("settings.codexUseCodexCliLogin") }}
+                    </button>
+                    <button
+                      type="button"
+                      class="model-providers-page__button"
+                      :disabled="codexAuthBusy || Boolean(codexDeviceLoginSession)"
+                      @click="handleStartCodexDeviceLogin"
+                    >
+                      {{ t("settings.codexUseDeviceCodeLogin") }}
+                    </button>
+                  </div>
+                  <div v-if="codexDeviceLoginSession" class="model-providers-page__login-progress model-providers-page__login-progress--fallback" role="status">
+                    <div class="model-providers-page__login-progress-heading">
+                      <span class="model-providers-page__spinner" aria-hidden="true"></span>
+                      <div>
+                        <strong>{{ t("settings.codexLoginWaiting") }}</strong>
+                        <p>{{ t("settings.codexDeviceLoginWaitingBody") }}</p>
+                      </div>
+                    </div>
+                    <div class="model-providers-page__device-code-content">
+                      <strong>{{ t("settings.codexDeviceCodeStep") }}</strong>
+                      <p>{{ t("settings.codexDeviceCodeStepBody") }}</p>
+                      <div class="model-providers-page__device-code-row">
+                        <span class="model-providers-page__device-code">{{ codexDeviceLoginSession.user_code }}</span>
+                        <button
+                          type="button"
+                          class="model-providers-page__icon-button"
+                          :aria-label="t('settings.codexCopyDeviceCode')"
+                          :title="t('settings.codexCopyDeviceCode')"
+                          @click="handleCopyCodexCode"
+                        >
+                          <ElIcon aria-hidden="true"><CopyDocument /></ElIcon>
+                        </button>
+                      </div>
+                    </div>
+                    <div class="model-providers-page__login-progress-footer">
+                      <span>{{ t("settings.codexFallbackLoginHint") }}</span>
                       <button type="button" class="model-providers-page__button" @click="() => handleOpenCodexVerification()">
                         {{ t("settings.codexOpenVerification") }}
                       </button>
                       <button type="button" class="model-providers-page__button" @click="handleCopyCodexVerificationUrl">
                         {{ t("settings.codexCopyVerificationUrl") }}
                       </button>
+                      <button type="button" class="model-providers-page__button" :disabled="codexAuthBusy" @click="() => handlePollCodexDeviceLogin()">
+                        {{ t("settings.codexCheckLogin") }}
+                      </button>
                     </div>
-                  </details>
-                </div>
+                  </div>
+                </details>
               </article>
               <div v-if="providerCardList.length === 0" class="model-providers-page__provider-empty">
                 {{ t("settings.noConfiguredProviders") }}
@@ -675,9 +712,13 @@ import {
   discoverModelProviderModels,
   fetchOpenAICodexAuthStatus,
   fetchSettings,
+  importOpenAICodexCliAuth,
   logoutOpenAICodexAuth,
   pollOpenAICodexAuth,
+  pollOpenAICodexBrowserAuth,
+  startOpenAICodexBrowserAuth,
   startOpenAICodexAuth,
+  type OpenAICodexBrowserAuthStartResponse,
   updateSettings,
   type OpenAICodexAuthStartResponse,
 } from "@/api/settings";
@@ -717,9 +758,11 @@ const refreshingModelPickerProviderId = ref<string | null>(null);
 const activeProviderConfigProviderId = ref<string | null>(null);
 const activeLogoutConfirmProviderId = ref<string | null>(null);
 const logoutConfirmTimeoutRef = ref<number | null>(null);
-const codexLoginSession = ref<OpenAICodexAuthStartResponse | null>(null);
+const codexBrowserLoginSession = ref<OpenAICodexBrowserAuthStartResponse | null>(null);
+const codexDeviceLoginSession = ref<OpenAICodexAuthStartResponse | null>(null);
 const codexAuthBusy = ref(false);
-let codexPollTimer: number | null = null;
+let codexBrowserPollTimer: number | null = null;
+let codexDevicePollTimer: number | null = null;
 let saveMessageTimer: number | null = null;
 const { t } = useI18n();
 const manualPopoverTrigger = [] as [];
@@ -1083,11 +1126,23 @@ async function loadSettings() {
   }
 }
 
-function stopCodexAutoPoll() {
-  if (codexPollTimer !== null) {
-    window.clearInterval(codexPollTimer);
-    codexPollTimer = null;
+function stopCodexBrowserAutoPoll() {
+  if (codexBrowserPollTimer !== null) {
+    window.clearInterval(codexBrowserPollTimer);
+    codexBrowserPollTimer = null;
   }
+}
+
+function stopCodexDeviceAutoPoll() {
+  if (codexDevicePollTimer !== null) {
+    window.clearInterval(codexDevicePollTimer);
+    codexDevicePollTimer = null;
+  }
+}
+
+function stopCodexAutoPoll() {
+  stopCodexBrowserAutoPoll();
+  stopCodexDeviceAutoPoll();
 }
 
 function applyCodexAuthStatus(status: NonNullable<ProviderDraft["auth_status"]>) {
@@ -1346,30 +1401,106 @@ async function handleDiscoverModels(providerId: string, options: { selectDiscove
   }
 }
 
-function startCodexAutoPoll() {
-  stopCodexAutoPoll();
-  const intervalSeconds = Math.max(3, codexLoginSession.value?.interval ?? 5);
-  codexPollTimer = window.setInterval(() => {
-    void handlePollCodexLogin(false);
+function startCodexBrowserAutoPoll() {
+  stopCodexBrowserAutoPoll();
+  const intervalSeconds = Math.max(2, codexBrowserLoginSession.value?.interval ?? 2);
+  codexBrowserPollTimer = window.setInterval(() => {
+    void handlePollCodexBrowserLogin(false);
   }, intervalSeconds * 1000);
 }
 
-function openCodexVerificationWindow() {
+function startCodexDeviceAutoPoll() {
+  stopCodexDeviceAutoPoll();
+  const intervalSeconds = Math.max(3, codexDeviceLoginSession.value?.interval ?? 5);
+  codexDevicePollTimer = window.setInterval(() => {
+    void handlePollCodexDeviceLogin(false);
+  }, intervalSeconds * 1000);
+}
+
+function openCodexAuthorizationWindow() {
   return window.open("about:blank", "_blank");
 }
 
-async function handleStartCodexLogin() {
+async function handleStartCodexBrowserLogin() {
   if (!ensureCodexProviderDraft()) {
     setProviderMessage("openai-codex", t("settings.codexProviderUnavailable"));
     return;
   }
-  const authWindow = openCodexVerificationWindow();
+  const authWindow = openCodexAuthorizationWindow();
   try {
     codexAuthBusy.value = true;
+    codexDeviceLoginSession.value = null;
     setProviderMessage("openai-codex", null);
-    codexLoginSession.value = await startOpenAICodexAuth();
+    codexBrowserLoginSession.value = await startOpenAICodexBrowserAuth();
+    const authorizationOpened = handleOpenCodexAuthorization(authWindow);
+    startCodexBrowserAutoPoll();
+    setProviderMessage(
+      "openai-codex",
+      t(authorizationOpened ? "settings.codexLoginStarted" : "settings.codexPopupBlocked"),
+    );
+  } catch (authError) {
+    if (authWindow && !authWindow.closed) {
+      authWindow.close();
+    }
+    setProviderMessage(
+      "openai-codex",
+      t("settings.codexLoginFailed", { error: authError instanceof Error ? authError.message : "" }),
+    );
+  } finally {
+    codexAuthBusy.value = false;
+  }
+}
+
+async function handlePollCodexBrowserLogin(showPendingMessage = true) {
+  if (!codexBrowserLoginSession.value) {
+    await refreshCodexAuthStatus();
+    return;
+  }
+  try {
+    codexAuthBusy.value = true;
+    const status = await pollOpenAICodexBrowserAuth({ state: codexBrowserLoginSession.value.state });
+    if (status.authenticated) {
+      stopCodexBrowserAutoPoll();
+      codexBrowserLoginSession.value = null;
+      applyCodexAuthStatus(status);
+      setProviderMessage("openai-codex", t("settings.codexLoginComplete"));
+      await handleDiscoverModels("openai-codex");
+      await persistSettings();
+      return;
+    }
+    if (status.status === "failed" || status.status === "expired") {
+      stopCodexBrowserAutoPoll();
+      codexBrowserLoginSession.value = null;
+      setProviderMessage("openai-codex", t("settings.codexLoginFailed", { error: status.error || status.status }));
+      return;
+    }
+    if (showPendingMessage) {
+      setProviderMessage("openai-codex", t("settings.codexLoginPending"));
+    }
+  } catch (authError) {
+    stopCodexBrowserAutoPoll();
+    setProviderMessage(
+      "openai-codex",
+      t("settings.codexLoginFailed", { error: authError instanceof Error ? authError.message : "" }),
+    );
+  } finally {
+    codexAuthBusy.value = false;
+  }
+}
+
+async function handleStartCodexDeviceLogin() {
+  if (!ensureCodexProviderDraft()) {
+    setProviderMessage("openai-codex", t("settings.codexProviderUnavailable"));
+    return;
+  }
+  const authWindow = openCodexAuthorizationWindow();
+  try {
+    codexAuthBusy.value = true;
+    codexBrowserLoginSession.value = null;
+    setProviderMessage("openai-codex", null);
+    codexDeviceLoginSession.value = await startOpenAICodexAuth();
     const verificationOpened = handleOpenCodexVerification(authWindow);
-    startCodexAutoPoll();
+    startCodexDeviceAutoPoll();
     setProviderMessage(
       "openai-codex",
       t(verificationOpened ? "settings.codexLoginStarted" : "settings.codexPopupBlocked"),
@@ -1387,20 +1518,20 @@ async function handleStartCodexLogin() {
   }
 }
 
-async function handlePollCodexLogin(showPendingMessage = true) {
-  if (!codexLoginSession.value) {
+async function handlePollCodexDeviceLogin(showPendingMessage = true) {
+  if (!codexDeviceLoginSession.value) {
     await refreshCodexAuthStatus();
     return;
   }
   try {
     codexAuthBusy.value = true;
     const status = await pollOpenAICodexAuth({
-      device_auth_id: codexLoginSession.value.device_auth_id,
-      user_code: codexLoginSession.value.user_code,
+      device_auth_id: codexDeviceLoginSession.value.device_auth_id,
+      user_code: codexDeviceLoginSession.value.user_code,
     });
     if (status.authenticated) {
-      stopCodexAutoPoll();
-      codexLoginSession.value = null;
+      stopCodexDeviceAutoPoll();
+      codexDeviceLoginSession.value = null;
       applyCodexAuthStatus(status);
       setProviderMessage("openai-codex", t("settings.codexLoginComplete"));
       await handleDiscoverModels("openai-codex");
@@ -1411,7 +1542,7 @@ async function handlePollCodexLogin(showPendingMessage = true) {
       setProviderMessage("openai-codex", t("settings.codexLoginPending"));
     }
   } catch (authError) {
-    stopCodexAutoPoll();
+    stopCodexDeviceAutoPoll();
     setProviderMessage(
       "openai-codex",
       t("settings.codexLoginFailed", { error: authError instanceof Error ? authError.message : "" }),
@@ -1421,8 +1552,8 @@ async function handlePollCodexLogin(showPendingMessage = true) {
   }
 }
 
-function handleOpenCodexVerification(authWindow: Window | null = null) {
-  if (!codexLoginSession.value?.verification_url) {
+function handleOpenCodexAuthorization(authWindow: Window | null = null) {
+  if (!codexBrowserLoginSession.value?.authorization_url) {
     if (authWindow && !authWindow.closed) {
       authWindow.close();
     }
@@ -1430,13 +1561,32 @@ function handleOpenCodexVerification(authWindow: Window | null = null) {
   }
   if (authWindow && !authWindow.closed) {
     try {
-      authWindow.location.href = codexLoginSession.value.verification_url;
+      authWindow.location.href = codexBrowserLoginSession.value.authorization_url;
       return true;
     } catch {
       authWindow.close();
     }
   }
-  const openedWindow = window.open(codexLoginSession.value.verification_url, "_blank", "noopener,noreferrer");
+  const openedWindow = window.open(codexBrowserLoginSession.value.authorization_url, "_blank", "noopener,noreferrer");
+  return Boolean(openedWindow);
+}
+
+function handleOpenCodexVerification(authWindow: Window | null = null) {
+  if (!codexDeviceLoginSession.value?.verification_url) {
+    if (authWindow && !authWindow.closed) {
+      authWindow.close();
+    }
+    return false;
+  }
+  if (authWindow && !authWindow.closed) {
+    try {
+      authWindow.location.href = codexDeviceLoginSession.value.verification_url;
+      return true;
+    } catch {
+      authWindow.close();
+    }
+  }
+  const openedWindow = window.open(codexDeviceLoginSession.value.verification_url, "_blank", "noopener,noreferrer");
   return Boolean(openedWindow);
 }
 
@@ -1452,13 +1602,49 @@ function showCodexToast(type: "success" | "error", message: string) {
   });
 }
 
-async function handleCopyCodexVerificationUrl() {
-  if (!codexLoginSession.value?.verification_url || !navigator.clipboard) {
+async function handleImportCodexCliAuth() {
+  try {
+    codexAuthBusy.value = true;
+    stopCodexAutoPoll();
+    codexBrowserLoginSession.value = null;
+    codexDeviceLoginSession.value = null;
+    const status = await importOpenAICodexCliAuth();
+    applyCodexAuthStatus(status);
+    setProviderMessage("openai-codex", t(status.authenticated ? "settings.codexLoginComplete" : "settings.codexCliLoginImported"));
+    if (status.authenticated) {
+      await handleDiscoverModels("openai-codex");
+      await persistSettings();
+    }
+  } catch (authError) {
+    setProviderMessage(
+      "openai-codex",
+      t("settings.codexLoginFailed", { error: authError instanceof Error ? authError.message : "" }),
+    );
+  } finally {
+    codexAuthBusy.value = false;
+  }
+}
+
+async function handleCopyCodexAuthorizationUrl() {
+  if (!codexBrowserLoginSession.value?.authorization_url || !navigator.clipboard) {
     showCodexToast("error", t("settings.codexVerificationUrlCopyFailed"));
     return;
   }
   try {
-    await navigator.clipboard.writeText(codexLoginSession.value.verification_url);
+    await navigator.clipboard.writeText(codexBrowserLoginSession.value.authorization_url);
+    showCodexToast("success", t("settings.codexVerificationUrlCopied"));
+  } catch {
+    showCodexToast("error", t("settings.codexVerificationUrlCopyFailed"));
+  }
+}
+
+async function handleCopyCodexVerificationUrl() {
+  if (!codexDeviceLoginSession.value?.verification_url || !navigator.clipboard) {
+    showCodexToast("error", t("settings.codexVerificationUrlCopyFailed"));
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(codexDeviceLoginSession.value.verification_url);
     showCodexToast("success", t("settings.codexVerificationUrlCopied"));
   } catch {
     showCodexToast("error", t("settings.codexVerificationUrlCopyFailed"));
@@ -1466,12 +1652,12 @@ async function handleCopyCodexVerificationUrl() {
 }
 
 async function handleCopyCodexCode() {
-  if (!codexLoginSession.value?.user_code || !navigator.clipboard) {
+  if (!codexDeviceLoginSession.value?.user_code || !navigator.clipboard) {
     showCodexToast("error", t("settings.codexCodeCopyFailed"));
     return;
   }
   try {
-    await navigator.clipboard.writeText(codexLoginSession.value.user_code);
+    await navigator.clipboard.writeText(codexDeviceLoginSession.value.user_code);
     showCodexToast("success", t("settings.codexCodeCopied"));
   } catch {
     showCodexToast("error", t("settings.codexCodeCopyFailed"));
@@ -1514,7 +1700,8 @@ async function handleLogoutCodex() {
     codexAuthBusy.value = true;
     clearLogoutConfirmState();
     stopCodexAutoPoll();
-    codexLoginSession.value = null;
+    codexBrowserLoginSession.value = null;
+    codexDeviceLoginSession.value = null;
     const status = await logoutOpenAICodexAuth();
     applyCodexAuthStatus(status);
     setProviderMessage("openai-codex", t("settings.codexLoggedOut"));

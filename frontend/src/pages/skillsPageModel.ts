@@ -1,6 +1,6 @@
 import type { SkillDefinition } from "../types/skills.ts";
 
-export type SkillStatusFilter = "all" | "active" | "runtime" | "manageable" | "importable";
+export type SkillStatusFilter = "all" | "active" | "agent" | "companion" | "runtime" | "attention";
 
 export type SkillManagementFilters = {
   query: string;
@@ -10,13 +10,15 @@ export type SkillManagementFilters = {
 export type SkillOverview = {
   total: number;
   active: number;
+  agentSkills: number;
+  companionSkills: number;
+  runtimeReady: number;
   runtimeRegistered: number;
-  manageable: number;
-  importable: number;
+  needsAttention: number;
 };
 
 export function buildSkillStatusOptions(): SkillStatusFilter[] {
-  return ["all", "active", "runtime", "manageable", "importable"];
+  return ["all", "active", "agent", "companion", "runtime", "attention"];
 }
 
 export function filterSkillsForManagement(
@@ -40,9 +42,11 @@ export function buildSkillOverview(skills: SkillDefinition[]): SkillOverview {
   return {
     total: skills.length,
     active: skills.filter((skill) => skill.status === "active").length,
+    agentSkills: skills.filter((skill) => skill.targets.includes("agent_node")).length,
+    companionSkills: skills.filter((skill) => skill.targets.includes("companion")).length,
+    runtimeReady: skills.filter((skill) => skill.runtimeReady).length,
     runtimeRegistered: skills.filter((skill) => skill.runtimeRegistered).length,
-    manageable: skills.filter((skill) => skill.canManage).length,
-    importable: skills.filter((skill) => skill.canImport).length,
+    needsAttention: skills.filter((skill) => skillNeedsAttention(skill)).length,
   };
 }
 
@@ -51,15 +55,22 @@ function matchesSkillStatus(skill: SkillDefinition, filter: SkillStatusFilter): 
     return skill.status === "active";
   }
   if (filter === "runtime") {
-    return skill.runtimeRegistered;
+    return skill.runtimeReady;
   }
-  if (filter === "manageable") {
-    return skill.canManage;
+  if (filter === "agent") {
+    return skill.targets.includes("agent_node");
   }
-  if (filter === "importable") {
-    return skill.canImport;
+  if (filter === "companion") {
+    return skill.targets.includes("companion");
+  }
+  if (filter === "attention") {
+    return skillNeedsAttention(skill);
   }
   return true;
+}
+
+function skillNeedsAttention(skill: SkillDefinition): boolean {
+  return skill.status !== "active" || !skill.configured || !skill.healthy;
 }
 
 function buildSkillSearchText(skill: SkillDefinition): string {
@@ -67,10 +78,16 @@ function buildSkillSearchText(skill: SkillDefinition): string {
     skill.skillKey,
     skill.label,
     skill.description,
+    skill.version,
+    skill.kind,
+    skill.mode,
+    skill.scope,
     skill.sourceFormat,
     skill.sourceScope,
     skill.sourcePath,
     skill.status,
+    ...skill.targets,
+    ...skill.permissions,
     ...skill.supportedValueTypes,
     ...skill.sideEffects,
     ...skill.inputSchema.map((field) => `${field.key} ${field.label} ${field.valueType} ${field.description}`),

@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "graphite.skill/v1",
+  "skillKey": "rewrite_text",
+  "label": "Rewrite Text",
+  "description": "Rewrite text with a specified style, tone, or constraint.",
+  "version": "1.0.0",
+  "targets": ["agent_node"],
+  "kind": "atomic",
+  "mode": "tool",
+  "scope": "node",
+  "permissions": ["model_text"],
+  "inputSchema": [
+    {
+      "key": "text",
+      "label": "Text",
+      "valueType": "text",
+      "required": true,
+      "description": "The original text to rewrite."
+    },
+    {
+      "key": "instruction",
+      "label": "Instruction",
+      "valueType": "text",
+      "required": true,
+      "description": "How to rewrite the text."
+    }
+  ],
+  "outputSchema": [
+    {
+      "key": "rewritten",
+      "label": "Rewritten",
+      "valueType": "text",
+      "description": "The rewritten text."
+    }
+  ],
+  "supportedValueTypes": ["text"],
+  "sideEffects": ["model_call"],
+  "configured": true,
+  "healthy": true
+}

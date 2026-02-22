@@ -5,6 +5,7 @@ import os
 import sys
 import tempfile
 import unittest
+from urllib.parse import parse_qs, urlparse
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
@@ -95,6 +96,104 @@ class FakeHttpClient:
 
 
 class OpenAICodexProviderTests(unittest.TestCase):
+    def test_codex_browser_auth_start_builds_pkce_authorize_url(self) -> None:
+        from app.tools.openai_codex_client import poll_codex_browser_login, start_codex_browser_login
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            auth_path = Path(temp_dir) / "openai_codex_auth.json"
+            with patch("app.tools.openai_codex_client.CODEX_AUTH_PATH", auth_path):
+                with patch("app.tools.openai_codex_client._start_codex_browser_callback_server") as callback_server:
+                    session = start_codex_browser_login()
+                    pending = poll_codex_browser_login(state=session["state"])
+
+        callback_server.assert_called_once()
+        self.assertEqual(session["callback_url"], "http://localhost:1455/auth/callback")
+        self.assertGreaterEqual(session["expires_in"], 300)
+        self.assertGreaterEqual(session["interval"], 2)
+        parsed = urlparse(session["authorization_url"])
+        query = parse_qs(parsed.query)
+        self.assertEqual(f"{parsed.scheme}://{parsed.netloc}{parsed.path}", "https://auth.openai.com/oauth/authorize")
+        self.assertEqual(query["response_type"], ["code"])
+        self.assertEqual(query["client_id"], ["app_EMoamEEZ73f0CkXaXp7hrann"])
+        self.assertEqual(query["redirect_uri"], ["http://localhost:1455/auth/callback"])
+        self.assertEqual(query["scope"], ["openid profile email offline_access"])
+        self.assertEqual(query["code_challenge_method"], ["S256"])
+        self.assertEqual(query["state"], [session["state"]])
+        self.assertEqual(query["id_token_add_organizations"], ["true"])
+        self.assertEqual(query["codex_cli_simplified_flow"], ["true"])
+        self.assertEqual(query["originator"], ["graphiteui"])
+        self.assertEqual(pending["status"], "pending")
+        self.assertFalse(pending["authenticated"])
+
+    def test_codex_browser_callback_exchanges_code_and_stores_token(self) -> None:
+        from app.tools.openai_codex_client import complete_codex_browser_login_callback, start_codex_browser_login
+
+        fake_client = FakeHttpClient(
+            [
+                FakeResponse(
+                    {
+                        "access_token": "access-token",
+                        "refresh_token": "refresh-token",
+                        "expires_in": 3600,
+                    }
+                )
+            ]
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            auth_path = Path(temp_dir) / "openai_codex_auth.json"
+            with patch("app.tools.openai_codex_client.CODEX_AUTH_PATH", auth_path):
+                with patch("app.tools.openai_codex_client._start_codex_browser_callback_server"):
+                    session = start_codex_browser_login()
+                with patch.dict(os.environ, PROXY_ENV, clear=False):
+                    with patch("app.tools.openai_codex_client.httpx.Client", return_value=fake_client) as client_factory:
+                        status = complete_codex_browser_login_callback(state=session["state"], code="auth-code")
+
+                stored = json.loads(auth_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(status["status"], "authenticated")
+        self.assertTrue(status["authenticated"])
+        self.assertEqual(status["source"], "browser-oauth")
+        self.assertEqual(stored["source"], "browser-oauth")
+        self.assertEqual(stored["tokens"]["access_token"], "access-token")
+        self.assertEqual(stored["tokens"]["refresh_token"], "refresh-token")
+        self.assertEqual(client_factory.call_args.kwargs.get("proxy"), "http://127.0.0.1:7897")
+        self.assertEqual(fake_client.post_calls[0]["url"], "https://auth.openai.com/oauth/token")
+        self.assertEqual(fake_client.post_calls[0]["data"]["grant_type"], "authorization_code")
+        self.assertEqual(fake_client.post_calls[0]["data"]["code"], "auth-code")
+        self.assertEqual(fake_client.post_calls[0]["data"]["redirect_uri"], "http://localhost:1455/auth/callback")
+
+    def test_codex_cli_auth_import_copies_existing_codex_login(self) -> None:
+        from app.tools.openai_codex_client import import_codex_cli_auth_state
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            auth_path = Path(temp_dir) / "openai_codex_auth.json"
+            cli_auth_path = Path(temp_dir) / "codex_auth.json"
+            cli_auth_path.write_text(
+                json.dumps(
+                    {
+                        "auth_mode": "chatgpt",
+                        "tokens": {
+                            "access_token": "cli-access-token",
+                            "refresh_token": "cli-refresh-token",
+                            "account_id": "acct-1",
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch("app.tools.openai_codex_client.CODEX_AUTH_PATH", auth_path):
+                status = import_codex_cli_auth_state(auth_path=cli_auth_path)
+                stored = json.loads(auth_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(status["status"], "authenticated")
+        self.assertTrue(status["authenticated"])
+        self.assertEqual(status["source"], "codex-cli")
+        self.assertNotIn(str(cli_auth_path), str(status))
+        self.assertEqual(stored["source"], "codex-cli")
+        self.assertEqual(stored["tokens"]["access_token"], "cli-access-token")
+        self.assertEqual(stored["tokens"]["refresh_token"], "cli-refresh-token")
+
     def test_codex_auth_start_honors_environment_proxy_settings(self) -> None:
         from app.tools.openai_codex_client import start_codex_device_login
 
@@ -203,6 +302,43 @@ class OpenAICodexProviderTests(unittest.TestCase):
         start_login.assert_called_once_with()
         poll_login.assert_called_once_with(device_auth_id="device-1", user_code="ABCD-EFGH")
         clear_auth.assert_called_once_with()
+
+    def test_codex_browser_auth_routes_start_poll_and_import_cli(self) -> None:
+        with patch(
+            "app.api.routes_settings.start_codex_browser_login",
+            return_value={
+                "authorization_url": "https://auth.openai.com/oauth/authorize?state=state-1",
+                "callback_url": "http://localhost:1455/auth/callback",
+                "state": "state-1",
+                "expires_in": 600,
+                "interval": 2,
+            },
+        ) as start_login:
+            with patch(
+                "app.api.routes_settings.poll_codex_browser_login",
+                return_value={"authenticated": True, "status": "authenticated", "source": "browser-oauth"},
+            ) as poll_login:
+                with patch(
+                    "app.api.routes_settings.import_codex_cli_auth_state",
+                    return_value={"authenticated": True, "status": "authenticated", "source": "codex-cli"},
+                ) as import_cli:
+                    with TestClient(app) as client:
+                        start_response = client.post("/api/settings/model-providers/openai-codex/auth/browser/start")
+                        poll_response = client.post(
+                            "/api/settings/model-providers/openai-codex/auth/browser/poll",
+                            json={"state": "state-1"},
+                        )
+                        import_response = client.post("/api/settings/model-providers/openai-codex/auth/codex-cli/import")
+
+        self.assertEqual(start_response.status_code, 200)
+        self.assertEqual(start_response.json()["state"], "state-1")
+        self.assertEqual(poll_response.status_code, 200)
+        self.assertEqual(poll_response.json()["source"], "browser-oauth")
+        self.assertEqual(import_response.status_code, 200)
+        self.assertEqual(import_response.json()["source"], "codex-cli")
+        start_login.assert_called_once_with()
+        poll_login.assert_called_once_with(state="state-1")
+        import_cli.assert_called_once_with()
 
     def test_discovers_codex_models_with_stored_chatgpt_token(self) -> None:
         from app.tools.model_provider_client import discover_provider_models

@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "graphite.skill/v1",
+  "skillKey": "translate_text",
+  "label": "Translate Text",
+  "description": "Translate text between languages while preserving tone and meaning.",
+  "version": "1.0.0",
+  "targets": ["agent_node"],
+  "kind": "atomic",
+  "mode": "tool",
+  "scope": "node",
+  "permissions": ["model_text"],
+  "inputSchema": [
+    {
+      "key": "text",
+      "label": "Text",
+      "valueType": "text",
+      "required": true,
+      "description": "The text to translate."
+    },
+    {
+      "key": "target_language",
+      "label": "Target Language",
+      "valueType": "text",
+      "required": true,
+      "description": "Target language code or name."
+    }
+  ],
+  "outputSchema": [
+    {
+      "key": "translated",
+      "label": "Translated",
+      "valueType": "text",
+      "description": "The translated text."
+    },
+    {
+      "key": "source_language",
+      "label": "Source Language",
+      "valueType": "text",
+      "description": "Detected source language."
+    }
+  ],
+  "supportedValueTypes": ["text"],
+  "sideEffects": ["model_call"],
+  "configured": true,
+  "healthy": true
+}

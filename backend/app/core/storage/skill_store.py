@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import shutil
 import zipfile
 from pathlib import Path, PurePosixPath
@@ -20,11 +21,19 @@ def graphite_managed_skill_path_for(skill_key: str) -> Path:
     return GRAPHITE_SKILLS_DIR / "claude_code" / skill_key / "SKILL.md"
 
 
+def graphite_native_skill_path_for(skill_key: str) -> Path:
+    return GRAPHITE_SKILLS_DIR / "graphite" / skill_key / "skill.json"
+
+
 def list_managed_skill_keys() -> set[str]:
     claude_root = GRAPHITE_SKILLS_DIR / "claude_code"
-    if not claude_root.exists():
-        return set()
-    return {path.parent.name for path in claude_root.glob("*/SKILL.md")}
+    graphite_root = GRAPHITE_SKILLS_DIR / "graphite"
+    keys: set[str] = set()
+    if claude_root.exists():
+        keys.update(path.parent.name for path in claude_root.glob("*/SKILL.md"))
+    if graphite_root.exists():
+        keys.update(path.parent.name for path in graphite_root.glob("*/skill.json"))
+    return keys
 
 
 def get_skill_status_map() -> dict[str, SkillCatalogStatus]:
@@ -75,7 +84,7 @@ def enable_skill(skill_key: str) -> None:
 
 def import_skill_from_source(skill_key: str, source_path: str) -> Path:
     source = Path(source_path)
-    destination = graphite_managed_skill_path_for(skill_key)
+    destination = graphite_native_skill_path_for(skill_key) if source.name == "skill.json" else graphite_managed_skill_path_for(skill_key)
     destination.parent.mkdir(parents=True, exist_ok=True)
     source_dir = source.parent if source.is_file() else source
     shutil.copytree(source_dir, destination.parent, dirs_exist_ok=True)
@@ -99,9 +108,9 @@ def extract_skill_archive(archive_path: Path, destination: Path) -> Path:
 
 
 def import_skill_from_directory(source_root: Path) -> str:
-    skill_file = _find_single_skill_file(source_root)
+    skill_file = _find_single_skill_manifest(source_root)
     skill_key = _derive_skill_key(skill_file)
-    destination = graphite_managed_skill_path_for(skill_key).parent
+    destination = _managed_skill_directory_for(skill_key, skill_file)
     if destination.exists():
         shutil.rmtree(destination)
     shutil.copytree(skill_file.parent, destination)
@@ -109,27 +118,53 @@ def import_skill_from_directory(source_root: Path) -> str:
     return skill_key
 
 
-def _find_single_skill_file(source_root: Path) -> Path:
+def _find_single_skill_manifest(source_root: Path) -> Path:
     if not source_root.exists():
         raise ValueError("Uploaded Skill source does not exist.")
-    candidates = [
+    native_candidates = [
+        path
+        for path in source_root.rglob("skill.json")
+        if path.is_file() and "__MACOSX" not in path.relative_to(source_root).parts
+    ]
+    if len(native_candidates) > 1:
+        raise ValueError("Uploaded Skill must contain exactly one skill.json file.")
+    if native_candidates:
+        return native_candidates[0]
+    legacy_candidates = [
         path
         for path in source_root.rglob("SKILL.md")
         if path.is_file() and "__MACOSX" not in path.relative_to(source_root).parts
     ]
-    if not candidates:
-        raise ValueError("Uploaded Skill must contain one SKILL.md file.")
-    if len(candidates) > 1:
+    if not legacy_candidates:
+        raise ValueError("Uploaded Skill must contain one skill.json or SKILL.md file.")
+    if len(legacy_candidates) > 1:
         raise ValueError("Uploaded Skill must contain exactly one SKILL.md file.")
-    return candidates[0]
+    return legacy_candidates[0]
 
 
 def _derive_skill_key(skill_file: Path) -> str:
+    if skill_file.name == "skill.json":
+        try:
+            payload = json.loads(skill_file.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Skill manifest '{skill_file}' must be valid JSON.") from exc
+        skill_key = str(payload.get("skillKey") or payload.get("skill_key") or skill_file.parent.name).strip()
+        return _validate_skill_key(skill_key)
     raw = skill_file.read_text(encoding="utf-8")
     frontmatter = _read_frontmatter(raw, skill_file)
     payload = yaml.safe_load(frontmatter) or {}
     graphite = payload.get("graphite") or {}
     skill_key = str(graphite.get("skill_key") or skill_file.parent.name).strip()
+    return _validate_skill_key(skill_key)
+
+
+def _managed_skill_directory_for(skill_key: str, skill_file: Path) -> Path:
+    if skill_file.name == "skill.json":
+        return graphite_native_skill_path_for(skill_key).parent
+    return graphite_managed_skill_path_for(skill_key).parent
+
+
+def _validate_skill_key(skill_key: str) -> str:
     if not skill_key or skill_key in {".", ".."} or "/" in skill_key or "\\" in skill_key:
         raise ValueError("Uploaded Skill has an invalid skill key.")
     return skill_key

@@ -1,0 +1,77 @@
+{
+  "schemaVersion": "graphite.skill/v1",
+  "skillKey": "search_knowledge_base",
+  "label": "Search Knowledge Base",
+  "description": "Search a knowledge base and return grounded context for the agent to reason over.",
+  "version": "1.0.0",
+  "targets": ["agent_node"],
+  "kind": "atomic",
+  "mode": "tool",
+  "scope": "node",
+  "permissions": ["knowledge_read"],
+  "inputSchema": [
+    {
+      "key": "query",
+      "label": "Query",
+      "valueType": "text",
+      "required": true,
+      "description": "Search query or question to retrieve relevant documents."
+    },
+    {
+      "key": "knowledge_base",
+      "label": "Knowledge Base",
+      "valueType": "knowledge_base",
+      "required": false,
+      "description": "Stable knowledge base id to search."
+    },
+    {
+      "key": "limit",
+      "label": "Result Limit",
+      "valueType": "text",
+      "required": false,
+      "description": "Maximum number of retrieved passages to include."
+    }
+  ],
+  "outputSchema": [
+    {
+      "key": "knowledge_base",
+      "label": "Knowledge Base",
+      "valueType": "text",
+      "description": "Resolved knowledge base id used for retrieval."
+    },
+    {
+      "key": "query",
+      "label": "Query",
+      "valueType": "text",
+      "description": "Final query string used for retrieval."
+    },
+    {
+      "key": "result_count",
+      "label": "Result Count",
+      "valueType": "text",
+      "description": "Number of matched passages returned by the search."
+    },
+    {
+      "key": "context",
+      "label": "Context",
+      "valueType": "text",
+      "description": "Ranked grounded excerpts formatted for direct agent reasoning."
+    },
+    {
+      "key": "results",
+      "label": "Results",
+      "valueType": "json",
+      "description": "Structured retrieval results with section, url, summary, and score."
+    },
+    {
+      "key": "citations",
+      "label": "Citations",
+      "valueType": "json",
+      "description": "Compact source list suitable for run detail and answer citations."
+    }
+  ],
+  "supportedValueTypes": ["text", "knowledge_base"],
+  "sideEffects": ["knowledge_read"],
+  "configured": true,
+  "healthy": true
+}
