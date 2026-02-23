@@ -93,6 +93,16 @@ test("EditorWorkspaceShell wires node top-action events into state updates, node
   assert.match(componentSource, /showPresetSaveToast\("error", error instanceof Error \? error\.message : t\("feedback\.presetSaveFailed"\)\)/);
 });
 
+test("EditorWorkspaceShell blocks deleting State definitions that are still referenced by nodes", () => {
+  assert.match(componentSource, /import \{[\s\S]*deleteStateFieldFromDocument[\s\S]*listStateFieldUsageLabels[\s\S]*\} from "\.\/statePanelFields\.ts";/);
+  assert.match(componentSource, /function deleteStateField\(tabId: string, stateKey: string\)/);
+  assert.match(componentSource, /const usageLabels = listStateFieldUsageLabels\(document, stateKey\);/);
+  assert.match(componentSource, /if \(usageLabels\.length > 0\) \{/);
+  assert.match(componentSource, /t\("statePanel\.deleteStateBlocked", \{ nodes: formatStateUsageLabelList\(usageLabels\) \}\)/);
+  assert.match(componentSource, /showStateDeleteBlockedToast\(message\);/);
+  assert.match(componentSource, /t\("statePanel\.deleteStateDeleted", \{ state: formatStateDefinitionLabel\(document, stateKey\) \}\)/);
+});
+
 test("EditorWorkspaceShell floats the right side panel above the canvas while preserving responsive panel widths", () => {
   assert.match(componentSource, /\.editor-workspace-shell \{[\s\S]*--editor-state-panel-open-width:\s*clamp\(340px,\s*32vw,\s*480px\);/);
   assert.match(componentSource, /\.editor-workspace-shell \{[\s\S]*--editor-human-review-panel-open-width:\s*var\(--editor-state-panel-open-width\);/);

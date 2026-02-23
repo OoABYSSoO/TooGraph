@@ -6,6 +6,7 @@ import {
   buildDefaultStateField,
   deleteStateFieldFromDocument,
   insertStateFieldIntoDocument,
+  listStateFieldUsageLabels,
   parseStateValueInput,
   renameStateFieldInDocument,
   updateStateFieldInDocument,
@@ -104,16 +105,41 @@ test("renameStateFieldInDocument updates bindings and condition rule source", ()
   assert.ok(!nextDocument.state_schema.answer);
 });
 
-test("deleteStateFieldFromDocument removes bindings and clears dependent rule source", () => {
+test("listStateFieldUsageLabels returns unique node labels using a state", () => {
+  const document = buildDocument();
+
+  assert.deepEqual(listStateFieldUsageLabels(document, "answer"), ["answer_helper", "score_gate"]);
+});
+
+test("deleteStateFieldFromDocument refuses to delete states still referenced by nodes", () => {
   const document = buildDocument();
   const nextDocument = deleteStateFieldFromDocument(document, "answer");
   const scoreGate = nextDocument.nodes.score_gate;
   assert.equal(scoreGate.kind, "condition");
 
-  assert.ok(!nextDocument.state_schema.answer);
-  assert.deepEqual(nextDocument.nodes.answer_helper.writes, []);
-  assert.deepEqual(scoreGate.reads, []);
-  assert.equal(scoreGate.config.rule.source, "");
+  assert.equal(nextDocument, document);
+  assert.ok(nextDocument.state_schema.answer);
+  assert.deepEqual(nextDocument.nodes.answer_helper.writes, [{ state: "answer", mode: "replace" }]);
+  assert.deepEqual(scoreGate.reads, [{ state: "answer", required: true }]);
+  assert.equal(scoreGate.config.rule.source, "answer");
+});
+
+test("deleteStateFieldFromDocument removes unreferenced state definitions immutably", () => {
+  const document = insertStateFieldIntoDocument(buildDocument(), {
+    key: "orphan",
+    definition: {
+      name: "Orphan",
+      description: "",
+      type: "text",
+      value: "",
+      color: "",
+    },
+  });
+  const nextDocument = deleteStateFieldFromDocument(document, "orphan");
+
+  assert.notEqual(nextDocument, document);
+  assert.equal(nextDocument.state_schema.orphan, undefined);
+  assert.ok(document.state_schema.orphan);
 });
 
 test("addStateFieldToDocument inserts a new default field", () => {
