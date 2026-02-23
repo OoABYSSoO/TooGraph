@@ -189,6 +189,17 @@ function bindCreatedStateToNode(node: GraphNode, stateKey: string) {
   }
 }
 
+function applyStateNameToCreatedOutputNode(
+  node: GraphNode,
+  stateKey: string,
+  stateSchema: Record<string, StateDefinition>,
+) {
+  if (node.kind !== "output") {
+    return;
+  }
+  node.name = stateSchema[stateKey]?.name?.trim() || stateKey;
+}
+
 function buildCreationFlowEdge<T extends GraphPayload | GraphDocument>(
   document: T,
   sourceNodeId: string,
@@ -236,6 +247,7 @@ export function applyNodeCreationResult<T extends GraphPayload | GraphDocument>(
   if (sourceStateKey && (input.createdNode.kind === "output" || input.createdNode.kind === "agent" || input.createdNode.kind === "condition")) {
     ensureStateDefinitionForCreation(nextDocument, sourceStateKey, sourceValueType);
     bindCreatedStateToNode(nextDocument.nodes[input.createdNodeId], sourceStateKey);
+    applyStateNameToCreatedOutputNode(nextDocument.nodes[input.createdNodeId], sourceStateKey, nextDocument.state_schema);
   }
 
   if (input.context?.sourceNodeId) {

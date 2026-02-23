@@ -40,7 +40,7 @@ export function matchesStatePortSearch(field: StatePortSearchField, query: strin
 
 export function createStateDraftFromQuery(query: string, existingKeys: string[]): StatePortDraft {
   const trimmedQuery = query.trim();
-  const key = createStateKey(trimmedQuery || "state", existingKeys);
+  const key = createIndexedStateKey("state", existingKeys);
 
   return {
     key,
@@ -54,17 +54,14 @@ export function createStateDraftFromQuery(query: string, existingKeys: string[])
   };
 }
 
-function createStateKey(base: string, existingKeys: string[]) {
-  const normalizedBase = base.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "state";
-  let nextKey = normalizedBase;
-  let index = 2;
+function createIndexedStateKey(prefix: string, existingKeys: string[]) {
   const existing = new Set(existingKeys);
-
+  let index = 1;
+  let nextKey = `${prefix}_${index}`;
   while (existing.has(nextKey)) {
-    nextKey = `${normalizedBase}_${index}`;
     index += 1;
+    nextKey = `${prefix}_${index}`;
   }
-
   return nextKey;
 }
 

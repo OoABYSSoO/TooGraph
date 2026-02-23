@@ -404,11 +404,11 @@ def _execute_agent_node(
         output_keys=output_keys,
     )
 
-    generate_kwargs = (
-        {"on_delta": stream_delta_callback}
-        if _callable_accepts_keyword(_generate_agent_response, "on_delta")
-        else {}
-    )
+    generate_kwargs: dict[str, Any] = {}
+    if _callable_accepts_keyword(_generate_agent_response, "on_delta"):
+        generate_kwargs["on_delta"] = stream_delta_callback
+    if _callable_accepts_keyword(_generate_agent_response, "state_schema"):
+        generate_kwargs["state_schema"] = state_schema
     response_payload, response_reasoning, response_warnings, runtime_config = _generate_agent_response(
         node,
         input_values,
@@ -714,6 +714,7 @@ def _generate_agent_response(
     skill_context: dict[str, Any],
     runtime_config: dict[str, Any],
     *,
+    state_schema: dict[str, NodeSystemStateDefinition] | None = None,
     on_delta: Any | None = None,
 ) -> tuple[dict[str, Any], str, list[str], dict[str, Any]]:
     output_keys = [binding.state for binding in node.writes]
@@ -724,6 +725,7 @@ def _generate_agent_response(
         output_keys,
         input_values,
         skill_context,
+        state_schema=state_schema,
     )
     user_prompt = (
         node.config.task_instruction
@@ -757,7 +759,11 @@ def _generate_agent_response(
             on_delta=on_delta,
         )
 
-    parsed_fields = _parse_llm_json_response(content, output_keys)
+    parsed_fields = _parse_llm_json_response(
+        content,
+        output_keys,
+        output_key_aliases=_build_output_key_aliases(output_keys, state_schema or {}),
+    )
     response_payload: dict[str, Any] = {"summary": content, **parsed_fields}
     reasoning = str(llm_meta.get("reasoning") or "").strip()
     updated_runtime_config = {
@@ -780,15 +786,20 @@ def _build_effective_system_prompt(
     output_keys: list[str],
     input_values: dict[str, Any],
     skill_context: dict[str, Any],
+    *,
+    state_schema: dict[str, NodeSystemStateDefinition] | None = None,
 ) -> str:
-    return _build_auto_system_prompt(output_keys, input_values, skill_context)
+    return _build_auto_system_prompt(output_keys, input_values, skill_context, state_schema=state_schema)
 
 
 def _build_auto_system_prompt(
     output_keys: list[str],
     input_values: dict[str, Any],
     skill_context: dict[str, Any],
+    *,
+    state_schema: dict[str, NodeSystemStateDefinition] | None = None,
 ) -> str:
+    resolved_state_schema = state_schema or {}
     parts = [
         "你是一个工作流处理节点。根据输入和技能结果完成用户的任务指令。",
         "严格返回一个 JSON 对象，不要加 markdown 围栏或任何前缀。",
@@ -800,7 +811,7 @@ def _build_auto_system_prompt(
             display = str(value)
             if len(display) > 200:
                 display = display[:200] + "..."
-            parts.append(f"- {key}: {display}")
+            parts.extend(_format_state_prompt_lines(key, resolved_state_schema.get(key), value=display))
 
     if skill_context:
         parts.append("\n== Skill Results ==")
@@ -816,10 +827,62 @@ def _build_auto_system_prompt(
                 parts.append(f"  {result}")
 
     example = json.dumps({key: "..." for key in output_keys}, ensure_ascii=False)
+    parts.append("\n== 必须返回的 JSON 字段 ==")
+    for key in output_keys:
+        parts.extend(_format_state_prompt_lines(key, resolved_state_schema.get(key)))
     parts.append("\n== 必须返回的 JSON 格式 ==")
     parts.append(example)
-    parts.append("每个字段填入最合适的值。")
+    parts.append("每个字段必须使用上方的 key；name 只用于理解字段语义。")
     return "\n".join(parts)
+
+
+def _format_state_prompt_lines(
+    key: str,
+    definition: NodeSystemStateDefinition | None,
+    *,
+    value: str | None = None,
+) -> list[str]:
+    if definition is None and value is not None:
+        return [f"- {key}: {value}"]
+
+    lines = [f"- key: {key}"]
+    if definition is not None:
+        name = definition.name.strip()
+        if name and name != key:
+            lines.append(f"  name: {name}")
+        lines.append(f"  type: {definition.type.value}")
+        description = definition.description.strip()
+        if description:
+            lines.append(f"  description: {description}")
+    if value is not None:
+        lines.append(f"  value: {value}")
+    return lines
+
+
+def _build_output_key_aliases(
+    output_keys: list[str],
+    state_schema: dict[str, NodeSystemStateDefinition],
+) -> dict[str, list[str]]:
+    name_counts: dict[str, int] = {}
+    aliases: dict[str, list[str]] = {}
+    candidate_names: list[str] = []
+    for key in output_keys:
+        definition = state_schema.get(key)
+        if definition is None:
+            continue
+        name = definition.name.strip()
+        if name and name != key:
+            candidate_names.append(name)
+    for name in candidate_names:
+        name_counts[name] = name_counts.get(name, 0) + 1
+    for key in output_keys:
+        definition = state_schema.get(key)
+        if definition is None:
+            continue
+        name = definition.name.strip()
+        if name and name != key and name_counts.get(name, 0) == 1:
+            aliases[key] = [name]
+    return aliases
 
 
 def _resolve_agent_runtime_config(node: NodeSystemAgentNode) -> dict[str, Any]:
@@ -993,7 +1056,13 @@ def _select_active_outgoing_edges(outgoing_edges: list[ExecutionEdge], body: dic
     return active_edges
 
 
-def _parse_llm_json_response(content: str, output_keys: list[str]) -> dict[str, Any]:
+def _parse_llm_json_response(
+    content: str,
+    output_keys: list[str],
+    *,
+    output_key_aliases: dict[str, list[str]] | None = None,
+) -> dict[str, Any]:
+    aliases = output_key_aliases or {}
     if not content:
         return {key: "" for key in output_keys}
     cleaned = re.sub(r"^\s*```(?:json)?\s*\n?", "", content)
@@ -1009,7 +1078,7 @@ def _parse_llm_json_response(content: str, output_keys: list[str]) -> dict[str, 
         try:
             parsed = json.loads(candidate)
             if isinstance(parsed, dict):
-                return {key: parsed.get(key) for key in output_keys}
+                return {key: _read_parsed_output_value(parsed, key, aliases) for key in output_keys}
         except json.JSONDecodeError:
             continue
 
@@ -1037,10 +1106,19 @@ def _parse_llm_json_response(content: str, output_keys: list[str]) -> dict[str, 
     try:
         parsed = json.loads(cleaned)
         if isinstance(parsed, dict):
-            return {key: parsed.get(key) for key in output_keys}
+            return {key: _read_parsed_output_value(parsed, key, aliases) for key in output_keys}
     except json.JSONDecodeError:
         pass
     return {key: cleaned for key in output_keys}
+
+
+def _read_parsed_output_value(parsed: dict[str, Any], output_key: str, aliases: dict[str, list[str]]) -> Any:
+    if output_key in parsed:
+        return parsed.get(output_key)
+    for alias in aliases.get(output_key, []):
+        if alias in parsed:
+            return parsed.get(alias)
+    return None
 
 
 def _build_regular_edge_id(source: str, target: str) -> str:

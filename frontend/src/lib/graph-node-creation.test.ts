@@ -71,7 +71,7 @@ test("applyNodeCreationResult auto-binds state outputs into a created output nod
     name: "Creation Graph",
     state_schema: {
       question: {
-        name: "question",
+        name: "用户问题",
         description: "",
         type: "text",
         value: "",
@@ -114,6 +114,7 @@ test("applyNodeCreationResult auto-binds state outputs into a created output nod
   });
 
   assert.deepEqual(result.document.nodes.output_created.reads, [{ state: "question", required: true }]);
+  assert.equal(result.document.nodes.output_created.name, "用户问题");
   assert.deepEqual(result.document.edges, [{ source: "input_question", target: "output_created" }]);
 });
 
