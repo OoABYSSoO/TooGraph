@@ -27,6 +27,8 @@ export type StateColorOption = {
   swatch: string;
 };
 
+const STATE_KEY_COUNTER_METADATA_KEY = "graphiteui_state_key_counter";
+
 export const STATE_FIELD_TYPE_OPTIONS: StateFieldType[] = [
   "text",
   "number",
@@ -55,6 +57,8 @@ export const STATE_COLOR_OPTIONS: StateColorOption[] = [
   { value: "#9a3412", label: "Walnut", swatch: "#9a3412" },
 ];
 
+const DEFAULT_STATE_COLOR_VALUES = STATE_COLOR_OPTIONS.map((option) => option.value).filter(Boolean);
+
 export function resolveStateColorOptions(currentColor: string): StateColorOption[] {
   const normalized = currentColor.trim();
   if (!normalized) {
@@ -71,8 +75,15 @@ export function resolveStateColorOptions(currentColor: string): StateColorOption
   ];
 }
 
-export function buildDefaultStateField(existingKeys: string[]) {
-  let index = 1;
+export function resolveDefaultStateColor(stateKey: string, existingKeys: string[] = []) {
+  const match = stateKey.match(/^state_(\d+)$/);
+  const seed = match ? Number(match[1]) - 1 : existingKeys.length;
+  const normalizedSeed = Number.isInteger(seed) && seed >= 0 ? seed : 0;
+  return DEFAULT_STATE_COLOR_VALUES[normalizedSeed % DEFAULT_STATE_COLOR_VALUES.length] ?? "#d97706";
+}
+
+export function buildDefaultStateField(existingKeys: string[], startIndex = 1) {
+  let index = Math.max(1, Math.floor(startIndex));
   while (existingKeys.includes(`state_${index}`)) {
     index += 1;
   }
@@ -81,18 +92,47 @@ export function buildDefaultStateField(existingKeys: string[]) {
   return {
     key,
     definition: {
-      name: key,
+      name: `State ${index}`,
       description: "",
       type: "text" as const,
       value: defaultValueForStateType("text"),
-      color: "",
+      color: resolveDefaultStateColor(key, existingKeys),
+    },
+  };
+}
+
+export function buildNextDefaultStateField(
+  document: GraphPayload | GraphDocument,
+  definitionPatch: Partial<StateDefinition> = {},
+): StateFieldDraft {
+  const nextField = buildDefaultStateField(Object.keys(document.state_schema), resolveNextDefaultStateKeyIndex(document));
+  const nextType = (definitionPatch.type ?? nextField.definition.type) as StateFieldType;
+  const hasValuePatch = Object.prototype.hasOwnProperty.call(definitionPatch, "value");
+  const hasColorPatch = Object.prototype.hasOwnProperty.call(definitionPatch, "color");
+  const nextColor =
+    hasColorPatch && typeof definitionPatch.color === "string" && definitionPatch.color.trim()
+      ? definitionPatch.color
+      : nextField.definition.color;
+  return {
+    key: nextField.key,
+    definition: {
+      ...nextField.definition,
+      ...definitionPatch,
+      type: nextType,
+      value: hasValuePatch ? definitionPatch.value : defaultValueForStateType(nextType),
+      color: nextColor,
     },
   };
 }
 
 export function addStateFieldToDocument<T extends GraphPayload | GraphDocument>(document: T): T {
-  const nextField = buildDefaultStateField(Object.keys(document.state_schema));
-  return insertStateFieldIntoDocument(document, nextField);
+  const nextField = buildNextDefaultStateField(document);
+  const nextDocument = insertStateFieldIntoDocument(document, nextField);
+  if (nextDocument === document) {
+    return document;
+  }
+  rememberDefaultStateKeyIndex(nextDocument, nextField.key);
+  return nextDocument;
 }
 
 export function insertStateFieldIntoDocument<T extends GraphPayload | GraphDocument>(document: T, field: StateFieldDraft): T {
@@ -101,6 +141,7 @@ export function insertStateFieldIntoDocument<T extends GraphPayload | GraphDocum
   }
   const nextDocument = cloneGraphDocument(document);
   nextDocument.state_schema[field.key] = field.definition;
+  rememberDefaultStateKeyIndex(nextDocument, field.key);
   return nextDocument;
 }
 
@@ -185,6 +226,41 @@ export function listStateFieldUsageLabels(document: GraphPayload | GraphDocument
   }
 
   return labels;
+}
+
+function resolveNextDefaultStateKeyIndex(document: GraphPayload | GraphDocument) {
+  return Math.max(readDefaultStateKeyCounter(document), readHighestDefaultStateKeyIndex(Object.keys(document.state_schema))) + 1;
+}
+
+function readDefaultStateKeyCounter(document: GraphPayload | GraphDocument) {
+  const value = document.metadata[STATE_KEY_COUNTER_METADATA_KEY];
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
+}
+
+function readHighestDefaultStateKeyIndex(keys: string[]) {
+  return keys.reduce((highest, key) => {
+    const match = key.match(/^state_(\d+)$/);
+    if (!match) {
+      return highest;
+    }
+    const index = Number(match[1]);
+    return Number.isInteger(index) && index > highest ? index : highest;
+  }, 0);
+}
+
+export function rememberDefaultStateKeyIndex(document: GraphPayload | GraphDocument, stateKey: string) {
+  const match = stateKey.match(/^state_(\d+)$/);
+  if (!match) {
+    return;
+  }
+  const index = Number(match[1]);
+  if (!Number.isInteger(index) || index <= 0) {
+    return;
+  }
+  document.metadata = {
+    ...document.metadata,
+    [STATE_KEY_COUNTER_METADATA_KEY]: Math.max(readDefaultStateKeyCounter(document), index),
+  };
 }
 
 export function deleteStateFieldFromDocument<T extends GraphPayload | GraphDocument>(document: T, stateKey: string): T {

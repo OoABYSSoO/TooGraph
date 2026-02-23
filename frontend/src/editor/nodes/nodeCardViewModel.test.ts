@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { buildNodeCardViewModel } from "./nodeCardViewModel.ts";
-import { VIRTUAL_ANY_INPUT_STATE_KEY } from "../../lib/virtual-any-input.ts";
+import { VIRTUAL_ANY_INPUT_STATE_KEY, VIRTUAL_ANY_OUTPUT_STATE_KEY } from "../../lib/virtual-any-input.ts";
 import type { GraphNode, StateDefinition } from "../../types/node-system.ts";
 
 const stateSchema: Record<string, StateDefinition> = {
@@ -228,6 +228,40 @@ test("buildNodeCardViewModel exposes a virtual any input for empty non-input nod
   assert.deepEqual(inputModel.inputs, []);
 });
 
+test("buildNodeCardViewModel exposes a virtual any output for empty agent outputs", () => {
+  const emptyAgent: GraphNode = {
+    kind: "agent",
+    name: "empty_agent",
+    description: "Agent without state outputs.",
+    ui: { position: { x: 520, y: 220 } },
+    reads: [{ state: "question", required: true }],
+    writes: [],
+    config: {
+      skills: [],
+      taskInstruction: "",
+      modelSource: "global",
+      model: "",
+      thinkingMode: "on",
+      temperature: 0.2,
+    },
+  };
+
+  const model = buildNodeCardViewModel("empty_agent", emptyAgent, stateSchema);
+
+  assert.deepEqual(model.outputs, [
+    {
+      key: VIRTUAL_ANY_OUTPUT_STATE_KEY,
+      label: "any",
+      typeLabel: "any",
+      stateColor: "#9a3412",
+      virtual: true,
+    },
+  ]);
+  assert.equal(model.body.kind, "agent");
+  assert.equal(model.body.primaryOutput?.key, VIRTUAL_ANY_OUTPUT_STATE_KEY);
+  assert.equal(model.body.primaryOutput?.virtual, true);
+});
+
 test("buildNodeCardViewModel derives output preview source from state schema", () => {
   const node: GraphNode = {
     kind: "output",
@@ -250,10 +284,39 @@ test("buildNodeCardViewModel derives output preview source from state schema", (
   assert.equal(model.body.kind, "output");
   assert.equal(model.body.previewTitle, "Preview");
   assert.equal(model.body.connectedStateLabel, "answer");
-  assert.equal(model.body.displayModeLabel, "AUTO");
-  assert.equal(model.body.displayMode, "auto");
+  assert.equal(model.body.displayModeLabel, "PLAIN");
+  assert.equal(model.body.displayMode, "plain");
   assert.equal(model.body.previewText, "Connected to answer. Run the graph to preview/export it.");
   assert.equal(model.body.persistLabel, "Save off");
+});
+
+test("buildNodeCardViewModel shows the auto-detected output display format", () => {
+  const node: GraphNode = {
+    kind: "output",
+    name: "output_answer",
+    description: "Preview the final answer.",
+    ui: { position: { x: 980, y: 220 } },
+    reads: [{ state: "answer", required: true }],
+    writes: [],
+    config: {
+      displayMode: "auto",
+      persistEnabled: false,
+      persistFormat: "auto",
+      fileNameTemplate: "",
+    },
+  };
+
+  const model = buildNodeCardViewModel("output_answer", node, {
+    ...stateSchema,
+    answer: {
+      ...stateSchema.answer,
+      value: '{"answer":"GraphiteUI","ok":true}',
+    },
+  });
+
+  assert.equal(model.body.kind, "output");
+  assert.equal(model.body.displayMode, "json");
+  assert.equal(model.body.displayModeLabel, "JSON");
 });
 
 test("buildNodeCardViewModel uses the legacy output empty state when no upstream state is connected", () => {
@@ -361,6 +424,66 @@ test("buildNodeCardViewModel prefers latest run output preview and display mode 
   assert.equal(model.body.kind, "output");
   assert.equal(model.body.previewText, "# 最终答案\n\nGraphiteUI 已迁移完成。");
   assert.equal(model.body.displayModeLabel, "MD");
+});
+
+test("buildNodeCardViewModel lets manual output display mode override detected runtime format", () => {
+  const node: GraphNode = {
+    kind: "output",
+    name: "output_answer",
+    description: "Preview the final answer.",
+    ui: { position: { x: 980, y: 220 } },
+    reads: [{ state: "answer", required: true }],
+    writes: [],
+    config: {
+      displayMode: "plain",
+      persistEnabled: false,
+      persistFormat: "auto",
+      fileNameTemplate: "",
+    },
+  };
+
+  const model = buildNodeCardViewModel("output_answer", node, stateSchema, {
+    runtime: {
+      latestRunStatus: "completed",
+      outputPreviewText: "# 最终答案\n\nGraphiteUI 已迁移完成。",
+      outputDisplayMode: "markdown",
+      failedMessage: null,
+    },
+  });
+
+  assert.equal(model.body.kind, "output");
+  assert.equal(model.body.previewText, "# 最终答案\n\nGraphiteUI 已迁移完成。");
+  assert.equal(model.body.displayMode, "plain");
+  assert.equal(model.body.displayModeLabel, "PLAIN");
+});
+
+test("buildNodeCardViewModel keeps active output runs in a stable pending preview state", () => {
+  const node: GraphNode = {
+    kind: "output",
+    name: "output_answer",
+    description: "Preview the final answer.",
+    ui: { position: { x: 980, y: 220 } },
+    reads: [{ state: "answer", required: true }],
+    writes: [],
+    config: {
+      displayMode: "auto",
+      persistEnabled: false,
+      persistFormat: "auto",
+      fileNameTemplate: "",
+    },
+  };
+
+  const model = buildNodeCardViewModel("output_answer", node, stateSchema, {
+    runtime: {
+      latestRunStatus: "running",
+      outputPreviewText: null,
+      outputDisplayMode: null,
+      failedMessage: null,
+    },
+  });
+
+  assert.equal(model.body.kind, "output");
+  assert.equal(model.body.previewText, "Waiting for output...");
 });
 
 test("buildNodeCardViewModel reports missing output preview after a completed run", () => {

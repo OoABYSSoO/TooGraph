@@ -12,6 +12,21 @@ export type RunNodeArtifactsModel = {
   activeEdgeIds: string[];
 };
 
+export function mergeRunOutputPreviewByNodeId(
+  currentPreviewByNodeId: Record<string, RunOutputPreviewEntry>,
+  nextPreviewByNodeId: Record<string, RunOutputPreviewEntry>,
+  options: { preserveMissing?: boolean } = {},
+) {
+  if (!options.preserveMissing) {
+    return { ...nextPreviewByNodeId };
+  }
+
+  return {
+    ...currentPreviewByNodeId,
+    ...nextPreviewByNodeId,
+  };
+}
+
 export function buildRunNodeArtifactsModel(run: RunDetail): RunNodeArtifactsModel {
   const outputPreviewByNodeId: Record<string, RunOutputPreviewEntry> = {};
   for (const output of run.artifacts.exported_outputs ?? []) {

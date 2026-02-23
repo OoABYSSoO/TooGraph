@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { buildAnchorModel } from "./anchorModel.ts";
-import { VIRTUAL_ANY_INPUT_STATE_KEY } from "../../lib/virtual-any-input.ts";
+import { VIRTUAL_ANY_INPUT_STATE_KEY, VIRTUAL_ANY_OUTPUT_STATE_KEY } from "../../lib/virtual-any-input.ts";
 import type { GraphNode } from "../../types/node-system.ts";
 
 test("buildAnchorModel creates flow and state anchors for agent nodes", () => {
@@ -120,4 +120,43 @@ test("buildAnchorModel exposes a virtual any state input for non-input nodes wit
   assert.deepEqual(agentModel.stateInputs.map((anchor) => anchor.stateKey), [VIRTUAL_ANY_INPUT_STATE_KEY]);
   assert.deepEqual(outputModel.stateInputs.map((anchor) => anchor.stateKey), [VIRTUAL_ANY_INPUT_STATE_KEY]);
   assert.deepEqual(inputModel.stateInputs, []);
+});
+
+test("buildAnchorModel exposes a virtual any state output for agent nodes without writes", () => {
+  const emptyAgent: GraphNode = {
+    kind: "agent",
+    name: "empty_agent",
+    description: "Blank agent.",
+    ui: { position: { x: 520, y: 220 } },
+    reads: [{ state: "question", required: true }],
+    writes: [],
+    config: {
+      skills: [],
+      taskInstruction: "",
+      modelSource: "global",
+      model: "",
+      thinkingMode: "on",
+      temperature: 0.2,
+    },
+  };
+  const outputNode: GraphNode = {
+    kind: "output",
+    name: "output",
+    description: "Preview output.",
+    ui: { position: { x: 920, y: 220 } },
+    reads: [{ state: "question", required: true }],
+    writes: [],
+    config: {
+      displayMode: "auto",
+      persistEnabled: false,
+      persistFormat: "auto",
+      fileNameTemplate: "",
+    },
+  };
+
+  const agentModel = buildAnchorModel("empty_agent", emptyAgent);
+  const outputModel = buildAnchorModel("output", outputNode);
+
+  assert.deepEqual(agentModel.stateOutputs.map((anchor) => anchor.stateKey), [VIRTUAL_ANY_OUTPUT_STATE_KEY]);
+  assert.deepEqual(outputModel.stateOutputs, []);
 });

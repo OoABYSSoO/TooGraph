@@ -4,14 +4,18 @@ import assert from "node:assert/strict";
 import {
   addStateFieldToDocument,
   buildDefaultStateField,
+  buildNextDefaultStateField,
   deleteStateFieldFromDocument,
   insertStateFieldIntoDocument,
   listStateFieldUsageLabels,
   parseStateValueInput,
   renameStateFieldInDocument,
+  STATE_COLOR_OPTIONS,
   updateStateFieldInDocument,
 } from "./statePanelFields.ts";
 import type { GraphPayload } from "@/types/node-system";
+
+const defaultStateColorValues = STATE_COLOR_OPTIONS.map((option) => option.value).filter(Boolean);
 
 function buildDocument(): GraphPayload {
   return {
@@ -87,8 +91,32 @@ function buildDocument(): GraphPayload {
 test("buildDefaultStateField returns a unique text state", () => {
   const field = buildDefaultStateField(["state_1", "state_2"]);
   assert.equal(field.key, "state_3");
+  assert.equal(field.definition.name, "State 3");
   assert.equal(field.definition.type, "text");
   assert.equal(field.definition.value, "");
+  assert.ok(defaultStateColorValues.includes(field.definition.color));
+});
+
+test("buildNextDefaultStateField assigns a non-empty default color unless one is provided", () => {
+  const document = buildDocument();
+  const defaultField = buildNextDefaultStateField(document, {
+    name: "Review Notes",
+    type: "markdown",
+  });
+  const explicitColorField = buildNextDefaultStateField(document, {
+    name: "Scored Answer",
+    type: "text",
+    color: "#10b981",
+  });
+  const emptyColorPatchField = buildNextDefaultStateField(document, {
+    name: "Empty Color Patch",
+    type: "text",
+    color: "",
+  });
+
+  assert.ok(defaultStateColorValues.includes(defaultField.definition.color));
+  assert.equal(explicitColorField.definition.color, "#10b981");
+  assert.ok(defaultStateColorValues.includes(emptyColorPatchField.definition.color));
 });
 
 test("renameStateFieldInDocument updates bindings and condition rule source", () => {
@@ -148,6 +176,17 @@ test("addStateFieldToDocument inserts a new default field", () => {
 
   assert.ok(nextDocument.state_schema.state_1);
   assert.equal(nextDocument.state_schema.state_1.type, "text");
+  assert.ok(defaultStateColorValues.includes(nextDocument.state_schema.state_1.color));
+});
+
+test("addStateFieldToDocument does not reuse deleted default state keys in the same graph", () => {
+  const document = buildDocument();
+  const firstDocument = addStateFieldToDocument(document);
+  const deletedDocument = deleteStateFieldFromDocument(firstDocument, "state_1");
+  const secondDocument = addStateFieldToDocument(deletedDocument);
+
+  assert.equal(secondDocument.state_schema.state_1, undefined);
+  assert.ok(secondDocument.state_schema.state_2);
 });
 
 test("insertStateFieldIntoDocument adds an explicit state definition immutably", () => {
@@ -167,6 +206,22 @@ test("insertStateFieldIntoDocument adds an explicit state definition immutably",
   assert.equal(nextDocument.state_schema.review_notes.type, "markdown");
   assert.equal(nextDocument.state_schema.review_notes.name, "Review Notes");
   assert.equal(document.state_schema.review_notes, undefined);
+});
+
+test("insertStateFieldIntoDocument advances the neutral state key counter for explicit state keys", () => {
+  const document = buildDocument();
+  const nextDocument = insertStateFieldIntoDocument(document, {
+    key: "state_9",
+    definition: {
+      name: "Uploaded image",
+      description: "",
+      type: "image",
+      value: "",
+      color: "",
+    },
+  });
+
+  assert.equal(nextDocument.metadata.graphiteui_state_key_counter, 9);
 });
 
 test("updateStateFieldInDocument applies updater to existing definition", () => {

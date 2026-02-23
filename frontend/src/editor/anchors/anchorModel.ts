@@ -1,5 +1,10 @@
 import type { GraphNode } from "../../types/node-system.ts";
-import { shouldExposeVirtualAnyInput, VIRTUAL_ANY_INPUT_STATE_KEY } from "../../lib/virtual-any-input.ts";
+import {
+  shouldExposeVirtualAnyInput,
+  shouldExposeVirtualAnyOutput,
+  VIRTUAL_ANY_INPUT_STATE_KEY,
+  VIRTUAL_ANY_OUTPUT_STATE_KEY,
+} from "../../lib/virtual-any-input.ts";
 
 export type AnchorDescriptor = {
   id: string;
@@ -38,13 +43,23 @@ export function buildAnchorModel(nodeId: string, node: GraphNode): NodeAnchorMod
         stateKey: binding.state,
       }));
 
-  const stateOutputs = node.writes.map((binding, index) => ({
-    id: `state-out:${binding.state}`,
-    side: "right" as const,
-    lane: "body" as const,
-    row: index,
-    stateKey: binding.state,
-  }));
+  const stateOutputs = shouldExposeVirtualAnyOutput(node)
+    ? [
+        {
+          id: `state-out:${VIRTUAL_ANY_OUTPUT_STATE_KEY}`,
+          side: "right" as const,
+          lane: "body" as const,
+          row: 0,
+          stateKey: VIRTUAL_ANY_OUTPUT_STATE_KEY,
+        },
+      ]
+    : node.writes.map((binding, index) => ({
+        id: `state-out:${binding.state}`,
+        side: "right" as const,
+        lane: "body" as const,
+        row: index,
+        stateKey: binding.state,
+      }));
 
   if (node.kind === "input") {
     return {

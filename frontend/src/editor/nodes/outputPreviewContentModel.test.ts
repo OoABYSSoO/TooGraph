@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { resolveOutputPreviewContent } from "./outputPreviewContentModel.ts";
+import { resolveOutputPreviewContent, resolveOutputPreviewDisplayMode } from "./outputPreviewContentModel.ts";
 
 test("resolveOutputPreviewContent formats auto-detected JSON previews", () => {
   const preview = resolveOutputPreviewContent('{"answer":"GraphiteUI","ok":true}', "auto");
@@ -26,4 +26,17 @@ test("resolveOutputPreviewContent keeps ordinary previews as plain text", () => 
 
   assert.equal(preview.kind, "plain");
   assert.equal(preview.text, "Connected to answer. Run the graph to preview/export it.");
+});
+
+test("resolveOutputPreviewContent treats active waiting output as an empty preview state", () => {
+  const preview = resolveOutputPreviewContent("Waiting for output...", "auto");
+
+  assert.equal(preview.kind, "plain");
+  assert.equal(preview.isEmpty, true);
+});
+
+test("resolveOutputPreviewDisplayMode exposes the effective auto-detected format", () => {
+  assert.equal(resolveOutputPreviewDisplayMode('{"answer":"GraphiteUI"}', "auto"), "json");
+  assert.equal(resolveOutputPreviewDisplayMode("# Final answer", "auto"), "markdown");
+  assert.equal(resolveOutputPreviewDisplayMode("# Final answer", "plain"), "plain");
 });

@@ -1,7 +1,13 @@
 import type { UploadedAssetType } from "./uploadedAssetModel.ts";
 import { isUploadedAssetStateType } from "./uploadedAssetModel.ts";
 import { normalizeConditionLoopLimit } from "./conditionLoopLimit.ts";
-import { buildVirtualAnyInputPort, shouldExposeVirtualAnyInput } from "../../lib/virtual-any-input.ts";
+import { OUTPUT_WAITING_TEXT, resolveOutputPreviewDisplayMode } from "./outputPreviewContentModel.ts";
+import {
+  buildVirtualAnyInputPort,
+  buildVirtualAnyOutputPort,
+  shouldExposeVirtualAnyInput,
+  shouldExposeVirtualAnyOutput,
+} from "../../lib/virtual-any-input.ts";
 import type { GraphNode, StateDefinition } from "../../types/node-system.ts";
 
 export type NodePortViewModel = {
@@ -107,8 +113,9 @@ export function buildNodeCardViewModel(
         stateColor: stateSchema[binding.state]?.color ?? "#d97706",
       }));
 
-  const outputs =
-    node.kind === "condition"
+  const outputs = shouldExposeVirtualAnyOutput(node)
+    ? [buildVirtualAnyOutputPort()]
+    : node.kind === "condition"
       ? []
       : node.writes.map((binding) => ({
           key: binding.state,
@@ -191,7 +198,19 @@ function buildBody(
 
   const connectedState = node.reads[0]?.state ?? null;
   const runtime = options.runtime;
-  const displayMode = runtime?.outputDisplayMode?.trim() || node.config.displayMode;
+  const configuredDisplayMode =
+    node.config.displayMode === "auto"
+      ? runtime?.outputDisplayMode?.trim() || node.config.displayMode
+      : node.config.displayMode;
+  const previewText = resolveOutputPreviewText({
+    connectedState,
+    stateSchema,
+    runtimeStatus: runtime?.latestRunStatus ?? null,
+    runtimeOutputPreviewText:
+      runtime?.outputPreviewText === null || runtime?.outputPreviewText === undefined ? null : runtime.outputPreviewText,
+    runtimeFailedMessage: runtime?.failedMessage?.trim() || "",
+  });
+  const displayMode = resolveOutputPreviewDisplayMode(previewText, configuredDisplayMode);
   return {
     kind: "output",
     previewTitle: "Preview",
@@ -201,14 +220,7 @@ function buildBody(
     primaryInput: inputs[0] ?? null,
     connectedStateKey: connectedState,
     connectedStateLabel: connectedState ? getStateLabel(connectedState, stateSchema) : null,
-    previewText: resolveOutputPreviewText({
-      connectedState,
-      stateSchema,
-      runtimeStatus: runtime?.latestRunStatus ?? null,
-      runtimeOutputPreviewText:
-        runtime?.outputPreviewText === null || runtime?.outputPreviewText === undefined ? null : runtime.outputPreviewText,
-      runtimeFailedMessage: runtime?.failedMessage?.trim() || "",
-    }),
+    previewText,
     persistEnabled: node.config.persistEnabled,
     persistLabel: node.config.persistEnabled ? "Save on" : "Save off",
     fileNameTemplate: node.config.fileNameTemplate,
@@ -256,6 +268,9 @@ function resolveOutputPreviewText(input: {
   if (input.runtimeStatus === "completed") {
     return "Latest run completed, but this output did not produce a value.";
   }
+  if (isActiveRunStatus(input.runtimeStatus)) {
+    return OUTPUT_WAITING_TEXT;
+  }
   if (input.connectedState) {
     const stateValueText = stringifyValue(input.stateSchema[input.connectedState]?.value ?? "");
     if (stateValueText.trim()) {
@@ -264,6 +279,10 @@ function resolveOutputPreviewText(input: {
     return `Connected to ${getStateLabel(input.connectedState, input.stateSchema)}. Run the graph to preview/export it.`;
   }
   return "Connect an upstream output to preview/export it.";
+}
+
+function isActiveRunStatus(status: string | null) {
+  return status === "queued" || status === "running" || status === "resuming";
 }
 
 function resolveInputEditorModel(node: Extract<GraphNode, { kind: "input" }>, stateSchema: Record<string, StateDefinition>) {

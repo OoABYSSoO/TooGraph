@@ -48,6 +48,18 @@ def _rectangles_overlap_with_gutter(left: dict, right: dict) -> bool:
 
 
 class TemplateLayoutTests(unittest.TestCase):
+    def test_templates_use_neutral_state_keys(self):
+        failures: list[str] = []
+
+        for record in list_template_records():
+            template = NodeSystemTemplate.model_validate(record)
+            for index, state_key in enumerate(template.state_schema.keys(), start=1):
+                expected_key = f"state_{index}"
+                if state_key != expected_key:
+                    failures.append(f"{template.template_id}: expected {expected_key}, got {state_key}")
+
+        self.assertEqual(failures, [], "\n".join(failures))
+
     def test_templates_have_non_overlapping_initial_node_layouts(self):
         failures: list[str] = []
 
@@ -117,10 +129,18 @@ class TemplateLayoutTests(unittest.TestCase):
             if record["template_id"] == "human_review_demo"
         )
 
-        self.assertIn("human_feedback", template.state_schema)
+        human_feedback_key = next(
+            (
+                state_key
+                for state_key, definition in template.state_schema.items()
+                if definition.name == "human_feedback"
+            ),
+            None,
+        )
+        self.assertIsNotNone(human_feedback_key)
         self.assertIn("revision_writer", template.nodes)
         self.assertIn(
-            "human_feedback",
+            human_feedback_key,
             [binding.state for binding in template.nodes["revision_writer"].reads],
         )
 
@@ -129,7 +149,7 @@ class TemplateLayoutTests(unittest.TestCase):
             for node_id, node in template.nodes.items()
             if isinstance(node, NodeSystemInputNode)
             for binding in node.writes
-            if binding.state == "human_feedback"
+            if binding.state == human_feedback_key
         ]
         self.assertEqual(
             input_feedback_writers,

@@ -4,28 +4,28 @@
   "description": "Generate a draft, pause after the first agent for human feedback, then let a second agent revise the final answer.",
   "default_graph_name": "人类在环示例",
   "state_schema": {
-    "request": {
+    "state_1": {
       "name": "request",
       "description": "The task that should be drafted first.",
       "type": "text",
       "value": "请给 GraphiteUI 写一段简短的欢迎介绍。",
       "color": "#d97706"
     },
-    "draft_answer": {
+    "state_2": {
       "name": "draft_answer",
       "description": "Initial answer generated before human review.",
       "type": "text",
       "value": "",
       "color": "#2563eb"
     },
-    "human_feedback": {
+    "state_3": {
       "name": "human_feedback",
       "description": "Human guidance applied while the run is paused.",
       "type": "text",
       "value": "请让语气更适合新用户，并强调可视化编排能力。",
       "color": "#0f766e"
     },
-    "final_answer": {
+    "state_4": {
       "name": "final_answer",
       "description": "Final answer revised from the draft and human feedback.",
       "type": "text",
@@ -43,7 +43,7 @@
         "collapsed": false
       },
       "writes": [
-        { "state": "request", "mode": "replace" }
+        { "state": "state_1", "mode": "replace" }
       ],
       "config": {
         "value": "请给 GraphiteUI 写一段简短的欢迎介绍。"
@@ -58,10 +58,10 @@
         "collapsed": false
       },
       "reads": [
-        { "state": "request", "required": true }
+        { "state": "state_1", "required": true }
       ],
       "writes": [
-        { "state": "draft_answer", "mode": "replace" }
+        { "state": "state_2", "mode": "replace" }
       ],
       "config": {
         "skills": [],
@@ -77,7 +77,7 @@
         "collapsed": false
       },
       "reads": [
-        { "state": "draft_answer", "required": true }
+        { "state": "state_2", "required": true }
       ],
       "config": {
         "displayMode": "markdown",
@@ -95,11 +95,11 @@
         "collapsed": false
       },
       "reads": [
-        { "state": "draft_answer", "required": true },
-        { "state": "human_feedback", "required": true }
+        { "state": "state_2", "required": true },
+        { "state": "state_3", "required": true }
       ],
       "writes": [
-        { "state": "final_answer", "mode": "replace" }
+        { "state": "state_4", "mode": "replace" }
       ],
       "config": {
         "skills": [],
@@ -115,7 +115,7 @@
         "collapsed": false
       },
       "reads": [
-        { "state": "final_answer", "required": true }
+        { "state": "state_4", "required": true }
       ],
       "config": {
         "displayMode": "markdown",
@@ -146,6 +146,7 @@
   "conditional_edges": [],
   "metadata": {
     "interrupt_after": ["draft_writer"],
+    "graphiteui_state_key_counter": 4,
     "agent_breakpoint_timing": {
       "draft_writer": "after"
     }

@@ -16,6 +16,7 @@ import type {
 } from "../../types/node-system.ts";
 
 import { resolveBuiltinNodeCreationPreset } from "./nodeCreationBuiltins.ts";
+import { buildNextDefaultStateField, rememberDefaultStateKeyIndex } from "./statePanelFields.ts";
 
 type CreateNodeFromCreationEntryInput = {
   entry: NodeCreationEntry;
@@ -57,16 +58,25 @@ export function createNodeFromCreationEntry<T extends GraphPayload | GraphDocume
     createGraphNodeId(input.entry.nodeKind ?? input.entry.family ?? (input.entry.mode === "preset" ? "preset" : "node"));
 
   if (input.entry.mode === "node" && input.entry.nodeKind === "input") {
+    const stateField = buildNextDefaultStateField(document, {
+      name: "Input",
+      type: "text",
+    });
     const created = buildGenericInputNode({
       id: createdNodeId,
       position: input.context?.position ?? { x: 0, y: 0 },
+      stateKey: stateField.key,
     });
-    return applyNodeCreationResult(document, {
+    const result = applyNodeCreationResult(document, {
       createdNodeId,
       createdNode: created.node,
-      mergedStateSchema: created.state_schema,
+      mergedStateSchema: {
+        [stateField.key]: stateField.definition,
+      },
       context: input.context ?? null,
     });
+    rememberDefaultStateKeyIndex(result.document, stateField.key);
+    return result;
   }
 
   if (input.entry.mode === "node" && input.entry.nodeKind === "output") {
@@ -105,9 +115,14 @@ export async function createNodeFromDroppedFile<T extends GraphPayload | GraphDo
 ) {
   const createdNodeId = input.createdNodeId ?? createGraphNodeId("input");
   const envelope = await createUploadedAssetEnvelope(input.file);
+  const stateField = buildNextDefaultStateField(document, {
+    name: envelope.name,
+    type: envelope.detectedType,
+  });
   const created = buildInputNodeFromFile({
     id: createdNodeId,
     position: input.position,
+    stateKey: stateField.key,
     fileName: envelope.name,
     mimeType: envelope.mimeType,
     size: envelope.size,
@@ -115,10 +130,12 @@ export async function createNodeFromDroppedFile<T extends GraphPayload | GraphDo
     detectedType: envelope.detectedType,
     encoding: envelope.encoding,
   });
-  return applyNodeCreationResult(document, {
+  const result = applyNodeCreationResult(document, {
     createdNodeId,
     createdNode: created.node,
     mergedStateSchema: created.state_schema,
     context: null,
   });
+  rememberDefaultStateKeyIndex(result.document, stateField.key);
+  return result;
 }

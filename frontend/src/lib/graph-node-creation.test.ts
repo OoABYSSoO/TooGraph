@@ -7,12 +7,14 @@ import {
   buildGenericOutputNode,
   buildNodeFromPreset,
 } from "./graph-node-creation.ts";
+import { VIRTUAL_ANY_OUTPUT_STATE_KEY } from "./virtual-any-input.ts";
 import type { GraphPayload, PresetDocument } from "../types/node-system.ts";
 
 test("buildGenericInputNode creates an expanded input node that writes a default value state", () => {
   const result = buildGenericInputNode({
     id: "input_created",
     position: { x: 120, y: 240 },
+    stateKey: "state_3",
   });
 
   assert.equal(result.node.kind, "input");
@@ -20,13 +22,13 @@ test("buildGenericInputNode creates an expanded input node that writes a default
   assert.equal(result.node.ui.collapsed, false);
   assert.equal("expandedSize" in result.node.ui, false);
   assert.equal("collapsedSize" in result.node.ui, false);
-  assert.deepEqual(result.node.writes, [{ state: "input_created_value", mode: "replace" }]);
-  assert.deepEqual(result.state_schema.input_created_value, {
+  assert.deepEqual(result.node.writes, [{ state: "state_3", mode: "replace" }]);
+  assert.deepEqual(result.state_schema.state_3, {
     name: "Input",
     description: "",
     type: "text",
     value: "",
-    color: "",
+    color: "#7c3aed",
   });
 });
 
@@ -211,4 +213,74 @@ test("applyNodeCreationResult auto-creates a read binding for blank agent preset
 
   assert.deepEqual(result.document.nodes.agent_created.reads, [{ state: "answer", required: true }]);
   assert.deepEqual(result.document.edges, [{ source: "answer_source", target: "agent_created" }]);
+});
+
+test("applyNodeCreationResult materializes a virtual agent any output when it spawns a target node", () => {
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Creation Graph",
+    state_schema: {
+      question: {
+        name: "question",
+        description: "",
+        type: "text",
+        value: "",
+        color: "#d97706",
+      },
+    },
+    nodes: {
+      empty_agent: {
+        kind: "agent",
+        name: "Empty Agent",
+        description: "",
+        ui: { position: { x: 0, y: 0 }, collapsed: false },
+        reads: [{ state: "question", required: true }],
+        writes: [],
+        config: {
+          skills: [],
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {
+      graphiteui_state_key_counter: 2,
+    },
+  };
+
+  const createdOutput = buildGenericOutputNode({
+    id: "output_created",
+    position: { x: 260, y: 0 },
+  });
+  const result = applyNodeCreationResult(document, {
+    createdNodeId: createdOutput.id,
+    createdNode: createdOutput.node,
+    mergedStateSchema: createdOutput.state_schema,
+    context: {
+      position: { x: 260, y: 0 },
+      sourceNodeId: "empty_agent",
+      sourceAnchorKind: "state-out",
+      sourceStateKey: VIRTUAL_ANY_OUTPUT_STATE_KEY,
+      sourceValueType: "markdown",
+    },
+  });
+
+  assert.equal(result.createdStateKey, "state_3");
+  assert.deepEqual(result.document.nodes.empty_agent.writes, [{ state: "state_3", mode: "replace" }]);
+  assert.deepEqual(result.document.nodes.output_created.reads, [{ state: "state_3", required: true }]);
+  assert.equal(result.document.nodes.output_created.name, "Empty Agent output");
+  assert.deepEqual(result.document.state_schema.state_3, {
+    name: "Empty Agent output",
+    description: "",
+    type: "markdown",
+    value: "",
+    color: "#7c3aed",
+  });
+  assert.equal(result.document.metadata.graphiteui_state_key_counter, 3);
+  assert.deepEqual(result.document.edges, [{ source: "empty_agent", target: "output_created" }]);
 });

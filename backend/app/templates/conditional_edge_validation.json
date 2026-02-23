@@ -4,28 +4,28 @@
   "description": "Route a score through true, false, or exhausted conditional branches.",
   "default_graph_name": "条件分支",
   "state_schema": {
-    "score": {
+    "state_1": {
       "name": "score",
       "description": "Numeric score used by the condition node.",
       "type": "number",
       "value": 80,
       "color": "#d97706"
     },
-    "pass_message": {
+    "state_2": {
       "name": "pass_message",
       "description": "Message shown when the score passes the threshold.",
       "type": "text",
       "value": "通过：score >= 60，进入 true 分支。",
       "color": "#15803d"
     },
-    "fail_message": {
+    "state_3": {
       "name": "fail_message",
       "description": "Message shown when the score misses the threshold.",
       "type": "text",
       "value": "未通过：score < 60，进入 false 分支。",
       "color": "#b91c1c"
     },
-    "exhausted_message": {
+    "state_4": {
       "name": "exhausted_message",
       "description": "Message shown when the loop limit is exhausted.",
       "type": "text",
@@ -43,7 +43,7 @@
         "collapsed": false
       },
       "writes": [
-        { "state": "score", "mode": "replace" }
+        { "state": "state_1", "mode": "replace" }
       ],
       "config": {
         "value": 80
@@ -58,7 +58,7 @@
         "collapsed": false
       },
       "writes": [
-        { "state": "pass_message", "mode": "replace" }
+        { "state": "state_2", "mode": "replace" }
       ],
       "config": {
         "value": "通过：score >= 60，进入 true 分支。"
@@ -73,7 +73,7 @@
         "collapsed": false
       },
       "writes": [
-        { "state": "fail_message", "mode": "replace" }
+        { "state": "state_3", "mode": "replace" }
       ],
       "config": {
         "value": "未通过：score < 60，进入 false 分支。"
@@ -88,7 +88,7 @@
         "collapsed": false
       },
       "writes": [
-        { "state": "exhausted_message", "mode": "replace" }
+        { "state": "state_4", "mode": "replace" }
       ],
       "config": {
         "value": "循环次数已耗尽，进入 exhausted 分支。"
@@ -103,7 +103,7 @@
         "collapsed": false
       },
       "reads": [
-        { "state": "score", "required": true }
+        { "state": "state_1", "required": true }
       ],
       "config": {
         "branches": ["true", "false", "exhausted"],
@@ -113,7 +113,7 @@
           "false": "false"
         },
         "rule": {
-          "source": "score",
+          "source": "state_1",
           "operator": ">=",
           "value": 60
         }
@@ -128,7 +128,7 @@
         "collapsed": false
       },
       "reads": [
-        { "state": "pass_message", "required": true }
+        { "state": "state_2", "required": true }
       ],
       "config": {
         "displayMode": "auto",
@@ -146,7 +146,7 @@
         "collapsed": false
       },
       "reads": [
-        { "state": "fail_message", "required": true }
+        { "state": "state_3", "required": true }
       ],
       "config": {
         "displayMode": "auto",
@@ -164,7 +164,7 @@
         "collapsed": false
       },
       "reads": [
-        { "state": "exhausted_message", "required": true }
+        { "state": "state_4", "required": true }
       ],
       "config": {
         "displayMode": "auto",
@@ -190,5 +190,7 @@
       }
     }
   ],
-  "metadata": {}
+  "metadata": {
+    "graphiteui_state_key_counter": 4
+  }
 }

@@ -61,16 +61,21 @@ test("EditorStatePanel uses low-noise state rows with hover-revealed actions", (
 });
 
 test("EditorStatePanel deletes states through the same two-click confirm pattern as node actions", () => {
+  assert.match(componentSource, /import \{ computed, onBeforeUnmount, ref, watch \} from "vue";/);
   assert.match(componentSource, /import \{ ElIcon, ElInput, ElOption, ElPopover, ElSelect \} from "element-plus";/);
   assert.match(componentSource, /import \{[\s\S]*Check[\s\S]*Delete[\s\S]*\} from "@element-plus\/icons-vue";/);
   assert.match(componentSource, /const activeStateDeleteKey = ref<string \| null>\(null\);/);
   assert.match(componentSource, /const stateDeleteConfirmTimeoutRef = ref<number \| null>\(null\);/);
+  assert.match(componentSource, /watch\(\s*\(\) => Object\.keys\(props\.document\.state_schema\)\.join\("\\u0000"\)/);
+  assert.match(componentSource, /if \(activeStateDeleteKey\.value && !props\.document\.state_schema\[activeStateDeleteKey\.value\]\) \{/);
+  assert.match(componentSource, /clearStateDeleteConfirmState\(\);/);
   assert.match(componentSource, /function startStateDeleteConfirmWindow\(stateKey: string\)/);
   assert.match(componentSource, /function clearStateDeleteConfirmState\(\)/);
   assert.match(componentSource, /function handleStateDeleteActionClick\(stateKey: string\)/);
   assert.match(componentSource, /function confirmStateDelete\(stateKey: string\)/);
   assert.match(componentSource, /activeStateDeleteKey\.value === stateKey[\s\S]*confirmStateDelete\(stateKey\);/);
   assert.match(componentSource, /data-state-delete-surface="true"/);
+  assert.match(componentSource, /target instanceof Element && target\.closest\("\[data-state-delete-surface='true'\]"\)/);
   assert.match(componentSource, /:class="\{ 'editor-state-panel__card-delete--confirm': isStateDeleteConfirmOpen\(row\.key\) \}"/);
   assert.match(componentSource, /placement="top-end"/);
   assert.match(componentSource, /@click\.stop="handleStateDeleteActionClick\(row\.key\)"/);
@@ -82,7 +87,10 @@ test("EditorStatePanel deletes states through the same two-click confirm pattern
 test("EditorStatePanel keeps detailed editing inside a soft inspector card", () => {
   assert.match(componentSource, /editor-state-panel__details-card/);
   assert.match(componentSource, /editor-state-panel__details-title/);
-  assert.match(componentSource, /<ElInput[\s\S]*:aria-label="t\('nodeCard\.key'\)"[\s\S]*<ElInput[\s\S]*:aria-label="t\('nodeCard\.name'\)"[\s\S]*<ElSelect[\s\S]*:aria-label="t\('nodeCard\.type'\)"[\s\S]*<ElSelect[\s\S]*:aria-label="t\('nodeCard\.color'\)"[\s\S]*<ElInput[\s\S]*:aria-label="t\('nodeCard\.description'\)"[\s\S]*<StateDefaultValueEditor/);
+  assert.match(componentSource, /<ElInput[\s\S]*:aria-label="t\('nodeCard\.name'\)"[\s\S]*<ElSelect[\s\S]*:aria-label="t\('nodeCard\.type'\)"[\s\S]*<ElSelect[\s\S]*:aria-label="t\('nodeCard\.color'\)"[\s\S]*<ElInput[\s\S]*:aria-label="t\('nodeCard\.description'\)"[\s\S]*<StateDefaultValueEditor/);
+  assert.doesNotMatch(componentSource, /:aria-label="t\('nodeCard\.key'\)"/);
+  assert.doesNotMatch(componentSource, /commitStateRename/);
+  assert.doesNotMatch(componentSource, /@change="commitStateRename/);
   assert.match(componentSource, /function stateColorOptions\(stateKey: string\) \{[\s\S]*resolveStateColorOptions\(stateDefinition\(stateKey\)\?\.color \?\? ""\)/);
   assert.match(componentSource, /class="editor-state-panel__color-select graphite-select"/);
   assert.match(componentSource, /popper-class="graphite-select-popper editor-state-panel__select-popper"/);

@@ -829,7 +829,7 @@ def _build_auto_system_prompt(
     example = json.dumps({key: "..." for key in output_keys}, ensure_ascii=False)
     parts.append("\n== 必须返回的 JSON 字段 ==")
     for key in output_keys:
-        parts.extend(_format_state_prompt_lines(key, resolved_state_schema.get(key)))
+        parts.extend(_format_state_prompt_lines(key, resolved_state_schema.get(key), include_output_contract=True))
     parts.append("\n== 必须返回的 JSON 格式 ==")
     parts.append(example)
     parts.append("每个字段必须使用上方的 key；name 只用于理解字段语义。")
@@ -841,6 +841,7 @@ def _format_state_prompt_lines(
     definition: NodeSystemStateDefinition | None,
     *,
     value: str | None = None,
+    include_output_contract: bool = False,
 ) -> list[str]:
     if definition is None and value is not None:
         return [f"- {key}: {value}"]
@@ -854,9 +855,34 @@ def _format_state_prompt_lines(
         description = definition.description.strip()
         if description:
             lines.append(f"  description: {description}")
+        if include_output_contract:
+            lines.extend(_format_state_output_contract_lines(definition.type))
     if value is not None:
         lines.append(f"  value: {value}")
     return lines
+
+
+def _format_state_output_contract_lines(state_type: NodeSystemStateType) -> list[str]:
+    if state_type == NodeSystemStateType.MARKDOWN:
+        return [
+            "  output_format: markdown string inside the JSON value",
+            "  output_rule: 这个字段的值必须是 Markdown 内容字符串；不要把整个 JSON 包进 Markdown 代码块。",
+        ]
+    if state_type in {NodeSystemStateType.JSON, NodeSystemStateType.OBJECT}:
+        return [
+            "  output_format: JSON object inside the JSON value",
+            "  output_rule: 这个字段的值必须是对象；不要把对象再序列化成字符串。",
+        ]
+    if state_type in {NodeSystemStateType.ARRAY, NodeSystemStateType.FILE_LIST}:
+        return [
+            "  output_format: JSON array inside the JSON value",
+            "  output_rule: 这个字段的值必须是数组；不要把数组再序列化成字符串。",
+        ]
+    if state_type == NodeSystemStateType.NUMBER:
+        return ["  output_format: JSON number"]
+    if state_type == NodeSystemStateType.BOOLEAN:
+        return ["  output_format: JSON boolean"]
+    return ["  output_format: JSON string"]
 
 
 def _build_output_key_aliases(

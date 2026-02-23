@@ -4,11 +4,6 @@
 
     <div class="node-state-editor__grid">
       <div class="node-state-editor__field">
-        <span class="node-state-editor__field-label">{{ t("nodeCard.key") }}</span>
-        <ElInput :aria-label="t('nodeCard.key')" :model-value="draft.key" @update:model-value="$emit('update:key', String($event ?? ''))" />
-      </div>
-
-      <div class="node-state-editor__field">
         <span class="node-state-editor__field-label">{{ t("nodeCard.name") }}</span>
         <ElInput :aria-label="t('nodeCard.name')" :model-value="draft.definition.name" @update:model-value="$emit('update:name', String($event ?? ''))" />
       </div>
@@ -86,7 +81,6 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (event: "update:key", value: string): void;
   (event: "update:name", value: string): void;
   (event: "update:type", value: string): void;
   (event: "update:color", value: string): void;

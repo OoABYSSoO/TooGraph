@@ -4,6 +4,7 @@
     :class="{
       'node-card--selected': selected,
       'node-card--condition': view.body.kind === 'condition',
+      'node-card--floating-panel-open': hasFloatingPanelOpen,
     }"
     @pointerdown.capture="handleLockedNodeCardInteractionCapture"
     @click.capture="handleLockedNodeCardInteractionCapture"
@@ -322,7 +323,6 @@
               :error="stateEditorError"
               :type-options="stateTypeOptions"
               :color-options="stateColorOptions"
-              @update:key="handleStateEditorKeyInput"
               @update:name="handleStateEditorNameInput"
               @update:type="handleStateEditorTypeValue"
               @update:color="handleStateEditorColorInput"
@@ -466,11 +466,10 @@
                   class="node-card__port-pill node-card__port-pill--input node-card__port-pill--dock-start"
                   :class="{
                     'node-card__port-pill--removable': !port.virtual,
-                    'node-card__port-pill--create': shouldReplaceVirtualAnyInput(port),
                     'node-card__port-pill--revealed': isStateEditorPillRevealed(`agent-input:${port.key}`),
                     'node-card__port-pill--confirm': isStateEditorConfirmOpen(`agent-input:${port.key}`),
                   }"
-                  :style="resolveAgentInputPortStyle(port)"
+                  :style="{ '--node-card-port-accent': port.stateColor }"
                   data-state-editor-trigger="true"
                   data-anchor-hitarea="true"
                   @pointerenter="handleStateEditorPillPointerEnter(`agent-input:${port.key}`)"
@@ -480,15 +479,14 @@
                 >
                   <span
                     class="node-card__port-pill-anchor-slot node-card__port-pill-anchor-slot--leading"
-                    :data-anchor-slot-id="resolveAgentInputPortAnchorSlotId(port)"
+                    :data-anchor-slot-id="`${nodeId}:state-in:${port.key}`"
                     aria-hidden="true"
                   />
-                  <span v-if="shouldReplaceVirtualAnyInput(port)" class="node-card__port-pill-create-badge">{{ t("common.new") }}</span>
                   <span
                     class="node-card__port-pill-label"
                     :class="{ 'node-card__port-pill-label--confirm': isStateEditorConfirmOpen(`agent-input:${port.key}`) }"
                   >
-                    <span class="node-card__port-pill-label-text">{{ resolveAgentInputPortLabel(port) }}</span>
+                    <span class="node-card__port-pill-label-text">{{ port.label }}</span>
                     <ElIcon class="node-card__port-pill-confirm-icon"><Check /></ElIcon>
                   </span>
                   <button
@@ -514,7 +512,6 @@
                 :error="stateEditorError"
                 :type-options="stateTypeOptions"
                 :color-options="stateColorOptions"
-                @update:key="handleStateEditorKeyInput"
                 @update:name="handleStateEditorNameInput"
                 @update:type="handleStateEditorTypeValue"
                 @update:color="handleStateEditorColorInput"
@@ -522,27 +519,131 @@
               />
             </ElPopover>
           </div>
-          <div v-if="shouldRenderPendingStateInputCapsule" class="node-card__port-pill-row">
-            <span
-              class="node-card__port-pill node-card__port-pill--input node-card__port-pill--dock-start node-card__port-pill--create"
-              :style="{ '--node-card-port-accent': pendingStateInputSource?.stateColor }"
-              data-anchor-hitarea="true"
+          <ElPopover
+            :visible="isPortCreateOpen('input')"
+            placement="bottom-start"
+            :width="376"
+            :show-arrow="false"
+            :popper-style="agentAddPopoverStyle"
+            popper-class="node-card__agent-add-popover-popper"
+          >
+            <template #reference>
+              <div class="node-card__port-pill-row node-card__port-pill-row--create">
+                <span
+                  class="node-card__port-pill node-card__port-pill--input node-card__port-pill--dock-start node-card__port-pill--create"
+                  :style="{ '--node-card-port-accent': pendingStateInputSource?.stateColor ?? '#16a34a' }"
+                  data-agent-create-port="input"
+                  data-anchor-hitarea="true"
+                  @pointerdown.stop
+                  @click.stop="openPortStateCreate('input')"
+                >
+                  <span
+                    class="node-card__port-pill-anchor-slot node-card__port-pill-anchor-slot--leading"
+                    :data-anchor-slot-id="`${nodeId}:state-in:${CREATE_AGENT_INPUT_STATE_KEY}`"
+                    aria-hidden="true"
+                  />
+                  <span class="node-card__port-pill-label">
+                    <span class="node-card__port-pill-label-text">+ input</span>
+                  </span>
+                </span>
+              </div>
+            </template>
+            <div
+              v-if="isPortCreateOpen('input') && portStateDraft"
+              class="node-card__agent-create-port-popover node-card__port-picker"
+              data-node-popup-surface="true"
               @pointerdown.stop
+              @click.stop
             >
-              <span
-                class="node-card__port-pill-anchor-slot node-card__port-pill-anchor-slot--leading"
-                :data-anchor-slot-id="`${nodeId}:state-in:${CREATE_AGENT_INPUT_STATE_KEY}`"
-                aria-hidden="true"
-              />
-              <span class="node-card__port-pill-create-badge">{{ t("common.new") }}</span>
-              <span class="node-card__port-pill-label">
-                <span class="node-card__port-pill-label-text">{{ pendingStateInputSource?.label }}</span>
-              </span>
-            </span>
-          </div>
+              <div class="node-card__port-picker-title">{{ portPickerTitle }}</div>
+              <div class="node-card__port-picker-form">
+                <div class="node-card__port-picker-grid">
+                  <label class="node-card__control-row">
+                    <span class="node-card__control-label">{{ t("nodeCard.name") }}</span>
+                    <ElInput
+                      :aria-label="t('nodeCard.name')"
+                      :model-value="portStateDraft.definition.name"
+                      @update:model-value="handlePortDraftNameValue"
+                    />
+                  </label>
+                  <label class="node-card__control-row">
+                    <span class="node-card__control-label">{{ t("nodeCard.type") }}</span>
+                    <ElSelect
+                      ref="portDraftTypeSelectRef"
+                      class="node-card__control-select graphite-select"
+                      :model-value="portStateDraft.definition.type"
+                      :teleported="false"
+                      popper-class="graphite-select-popper node-card__port-picker-select-popper"
+                      @update:model-value="handlePortDraftTypeSelect"
+                    >
+                      <ElOption v-for="typeOption in stateTypeOptions" :key="typeOption" :label="typeOption" :value="typeOption" />
+                    </ElSelect>
+                  </label>
+                  <label class="node-card__control-row">
+                    <span class="node-card__control-label">{{ t("nodeCard.color") }}</span>
+                    <ElSelect
+                      ref="portDraftColorSelectRef"
+                      class="node-card__control-select graphite-select"
+                      :model-value="portStateDraft.definition.color"
+                      :teleported="false"
+                      popper-class="graphite-select-popper node-card__port-picker-select-popper"
+                      @update:model-value="handlePortDraftColorSelect"
+                    >
+                      <template #label>
+                        <span class="node-card__port-picker-color-value">
+                          <span class="node-card__port-picker-color-dot" :style="portStateSelectedColorStyle" />
+                        </span>
+                      </template>
+                      <ElOption v-for="option in portStateColorOptions" :key="option.value || option.label" :label="option.label" :value="option.value">
+                        <div class="node-card__port-picker-color-option">
+                          <span class="node-card__port-picker-color-dot" :style="{ backgroundColor: option.swatch }" />
+                          <span>{{ option.label }}</span>
+                        </div>
+                      </ElOption>
+                    </ElSelect>
+                  </label>
+                </div>
+                <label class="node-card__control-row">
+                  <span class="node-card__control-label">{{ t("nodeCard.description") }}</span>
+                  <ElInput
+                    :aria-label="t('nodeCard.description')"
+                    type="textarea"
+                    :rows="2"
+                    :model-value="portStateDraft.definition.description"
+                    @update:model-value="handlePortDraftDescriptionValue"
+                  />
+                </label>
+                <StateDefaultValueEditor
+                  :field="portStateDraft.definition"
+                  @update-value="updatePortDraftValue"
+                />
+                <div class="node-card__port-picker-hint" :class="{ 'node-card__port-picker-hint--error': Boolean(portStateError) }">
+                  {{ portStateError ?? t("nodeCard.createStateBindHint") }}
+                </div>
+                <div class="node-card__port-picker-actions">
+                  <button
+                    type="button"
+                    class="node-card__port-picker-button"
+                    @pointerdown.stop
+                    @click.stop="closePortPicker"
+                  >
+                    {{ t("common.cancel") }}
+                  </button>
+                  <button
+                    type="button"
+                    class="node-card__port-picker-button node-card__port-picker-button--primary"
+                    @pointerdown.stop
+                    @click.stop="commitPortStateCreate"
+                  >
+                    {{ t("nodeCard.create") }}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </ElPopover>
         </div>
         <div class="node-card__port-column node-card__port-column--right">
-          <div v-for="port in view.outputs" :key="port.key" class="node-card__port-pill-row node-card__port-pill-row--right">
+          <div v-for="port in agentOutputPorts" :key="port.key" class="node-card__port-pill-row node-card__port-pill-row--right">
             <ElPopover
               :visible="
                 isStateEditorOpen(`agent-output:${port.key}`) ||
@@ -557,8 +658,9 @@
             >
               <template #reference>
                 <span
-                  class="node-card__port-pill node-card__port-pill--output node-card__port-pill--dock-end node-card__port-pill--removable"
+                  class="node-card__port-pill node-card__port-pill--output node-card__port-pill--dock-end"
                   :class="{
+                    'node-card__port-pill--removable': !port.virtual,
                     'node-card__port-pill--revealed': isStateEditorPillRevealed(`agent-output:${port.key}`),
                     'node-card__port-pill--confirm': isStateEditorConfirmOpen(`agent-output:${port.key}`),
                   }"
@@ -567,9 +669,10 @@
                   @pointerenter="handleStateEditorPillPointerEnter(`agent-output:${port.key}`)"
                   @pointerleave="handleStateEditorPillPointerLeave(`agent-output:${port.key}`)"
                   @pointerdown.stop
-                  @click.stop="handleStateEditorActionClick(`agent-output:${port.key}`, port.key)"
+                  @click.stop="!port.virtual && handleStateEditorActionClick(`agent-output:${port.key}`, port.key)"
                 >
                   <button
+                    v-if="!port.virtual"
                     type="button"
                     class="node-card__port-pill-remove node-card__port-pill-remove--leading"
                     :class="{ 'node-card__port-pill-remove--confirm': isRemovePortStateConfirmOpen(`agent-output:${port.key}`) }"
@@ -603,7 +706,6 @@
                 :error="stateEditorError"
                 :type-options="stateTypeOptions"
                 :color-options="stateColorOptions"
-                @update:key="handleStateEditorKeyInput"
                 @update:name="handleStateEditorNameInput"
                 @update:type="handleStateEditorTypeValue"
                 @update:color="handleStateEditorColorInput"
@@ -611,6 +713,128 @@
               />
             </ElPopover>
           </div>
+          <ElPopover
+            :visible="isPortCreateOpen('output')"
+            placement="bottom-end"
+            :width="376"
+            :show-arrow="false"
+            :popper-style="agentAddPopoverStyle"
+            popper-class="node-card__agent-add-popover-popper"
+          >
+            <template #reference>
+              <div class="node-card__port-pill-row node-card__port-pill-row--right node-card__port-pill-row--create">
+                <span
+                  class="node-card__port-pill node-card__port-pill--output node-card__port-pill--dock-end node-card__port-pill--create"
+                  :style="{ '--node-card-port-accent': '#d97706' }"
+                  data-agent-create-port="output"
+                  data-anchor-hitarea="true"
+                  @pointerdown.stop
+                  @click.stop="openPortStateCreate('output')"
+                >
+                  <span class="node-card__port-pill-label">
+                    <span class="node-card__port-pill-label-text">+ output</span>
+                  </span>
+                  <span
+                    class="node-card__port-pill-anchor-slot"
+                    :data-anchor-slot-id="resolveAgentCreateOutputAnchorSlotId()"
+                    aria-hidden="true"
+                  />
+                </span>
+              </div>
+            </template>
+            <div
+              v-if="isPortCreateOpen('output') && portStateDraft"
+              class="node-card__agent-create-port-popover node-card__port-picker"
+              data-node-popup-surface="true"
+              @pointerdown.stop
+              @click.stop
+            >
+              <div class="node-card__port-picker-title">{{ portPickerTitle }}</div>
+              <div class="node-card__port-picker-form">
+                <div class="node-card__port-picker-grid">
+                  <label class="node-card__control-row">
+                    <span class="node-card__control-label">{{ t("nodeCard.name") }}</span>
+                    <ElInput
+                      :aria-label="t('nodeCard.name')"
+                      :model-value="portStateDraft.definition.name"
+                      @update:model-value="handlePortDraftNameValue"
+                    />
+                  </label>
+                  <label class="node-card__control-row">
+                    <span class="node-card__control-label">{{ t("nodeCard.type") }}</span>
+                    <ElSelect
+                      ref="portDraftTypeSelectRef"
+                      class="node-card__control-select graphite-select"
+                      :model-value="portStateDraft.definition.type"
+                      :teleported="false"
+                      popper-class="graphite-select-popper node-card__port-picker-select-popper"
+                      @update:model-value="handlePortDraftTypeSelect"
+                    >
+                      <ElOption v-for="typeOption in stateTypeOptions" :key="typeOption" :label="typeOption" :value="typeOption" />
+                    </ElSelect>
+                  </label>
+                  <label class="node-card__control-row">
+                    <span class="node-card__control-label">{{ t("nodeCard.color") }}</span>
+                    <ElSelect
+                      ref="portDraftColorSelectRef"
+                      class="node-card__control-select graphite-select"
+                      :model-value="portStateDraft.definition.color"
+                      :teleported="false"
+                      popper-class="graphite-select-popper node-card__port-picker-select-popper"
+                      @update:model-value="handlePortDraftColorSelect"
+                    >
+                      <template #label>
+                        <span class="node-card__port-picker-color-value">
+                          <span class="node-card__port-picker-color-dot" :style="portStateSelectedColorStyle" />
+                        </span>
+                      </template>
+                      <ElOption v-for="option in portStateColorOptions" :key="option.value || option.label" :label="option.label" :value="option.value">
+                        <div class="node-card__port-picker-color-option">
+                          <span class="node-card__port-picker-color-dot" :style="{ backgroundColor: option.swatch }" />
+                          <span>{{ option.label }}</span>
+                        </div>
+                      </ElOption>
+                    </ElSelect>
+                  </label>
+                </div>
+                <label class="node-card__control-row">
+                  <span class="node-card__control-label">{{ t("nodeCard.description") }}</span>
+                  <ElInput
+                    :aria-label="t('nodeCard.description')"
+                    type="textarea"
+                    :rows="2"
+                    :model-value="portStateDraft.definition.description"
+                    @update:model-value="handlePortDraftDescriptionValue"
+                  />
+                </label>
+                <StateDefaultValueEditor
+                  :field="portStateDraft.definition"
+                  @update-value="updatePortDraftValue"
+                />
+                <div class="node-card__port-picker-hint" :class="{ 'node-card__port-picker-hint--error': Boolean(portStateError) }">
+                  {{ portStateError ?? t("nodeCard.createStateBindHint") }}
+                </div>
+                <div class="node-card__port-picker-actions">
+                  <button
+                    type="button"
+                    class="node-card__port-picker-button"
+                    @pointerdown.stop
+                    @click.stop="closePortPicker"
+                  >
+                    {{ t("common.cancel") }}
+                  </button>
+                  <button
+                    type="button"
+                    class="node-card__port-picker-button node-card__port-picker-button--primary"
+                    @pointerdown.stop
+                    @click.stop="commitPortStateCreate"
+                  >
+                    {{ t("nodeCard.create") }}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </ElPopover>
         </div>
       </div>
       <div class="node-card__agent-runtime-row">
@@ -761,168 +985,6 @@
           </div>
         </ElPopover>
         <span v-else class="node-card__action-pill node-card__action-pill--skill node-card__action-pill--disabled">+ skill</span>
-        <ElPopover
-          v-for="picker in agentPortPickerActions"
-          :key="picker.side"
-          :visible="activePortPickerSide === picker.side"
-          :placement="picker.placement"
-          :width="portStateDraft ? 376 : 340"
-          :show-arrow="false"
-          :popper-style="agentAddPopoverStyle"
-          popper-class="node-card__agent-add-popover-popper"
-        >
-          <template #reference>
-            <button
-              type="button"
-              class="node-card__action-pill node-card__action-pill-button"
-              :class="picker.toneClass"
-              @pointerdown.stop
-              @click.stop="openPortPicker(picker.side)"
-            >
-              {{ picker.label }}
-            </button>
-          </template>
-          <div
-            v-if="activePortPickerSide === picker.side"
-            class="node-card__agent-add-popover node-card__port-picker"
-            data-node-popup-surface="true"
-            @pointerdown.stop
-            @click.stop
-          >
-            <div class="node-card__port-picker-title">{{ portPickerTitle }}</div>
-            <div v-if="portStateDraft" class="node-card__port-picker-form">
-              <div class="node-card__port-picker-grid">
-                <label class="node-card__control-row">
-                  <span class="node-card__control-label">{{ t("nodeCard.key") }}</span>
-                  <ElInput
-                    :aria-label="t('nodeCard.key')"
-                    :model-value="portStateDraft.key"
-                    @update:model-value="handlePortDraftKeyValue"
-                  />
-                </label>
-                <label class="node-card__control-row">
-                  <span class="node-card__control-label">{{ t("nodeCard.name") }}</span>
-                  <ElInput
-                    :aria-label="t('nodeCard.name')"
-                    :model-value="portStateDraft.definition.name"
-                    @update:model-value="handlePortDraftNameValue"
-                  />
-                </label>
-                <label class="node-card__control-row">
-                  <span class="node-card__control-label">{{ t("nodeCard.type") }}</span>
-                  <ElSelect
-                    ref="portDraftTypeSelectRef"
-                    class="node-card__control-select graphite-select"
-                    :model-value="portStateDraft.definition.type"
-                    :teleported="false"
-                    popper-class="graphite-select-popper node-card__port-picker-select-popper"
-                    @update:model-value="handlePortDraftTypeSelect"
-                  >
-                    <ElOption v-for="typeOption in stateTypeOptions" :key="typeOption" :label="typeOption" :value="typeOption" />
-                  </ElSelect>
-                </label>
-                <label class="node-card__control-row">
-                  <span class="node-card__control-label">{{ t("nodeCard.color") }}</span>
-                  <ElSelect
-                    ref="portDraftColorSelectRef"
-                    class="node-card__control-select graphite-select"
-                    :model-value="portStateDraft.definition.color"
-                    :teleported="false"
-                    popper-class="graphite-select-popper node-card__port-picker-select-popper"
-                    @update:model-value="handlePortDraftColorSelect"
-                  >
-                    <template #label>
-                      <span class="node-card__port-picker-color-value">
-                        <span class="node-card__port-picker-color-dot" :style="portStateSelectedColorStyle" />
-                      </span>
-                    </template>
-                    <ElOption v-for="option in portStateColorOptions" :key="option.value || option.label" :label="option.label" :value="option.value">
-                      <div class="node-card__port-picker-color-option">
-                        <span class="node-card__port-picker-color-dot" :style="{ backgroundColor: option.swatch }" />
-                        <span>{{ option.label }}</span>
-                      </div>
-                    </ElOption>
-                  </ElSelect>
-                </label>
-              </div>
-              <label class="node-card__control-row">
-                <span class="node-card__control-label">{{ t("nodeCard.description") }}</span>
-                <ElInput
-                  :aria-label="t('nodeCard.description')"
-                  type="textarea"
-                  :rows="2"
-                  :model-value="portStateDraft.definition.description"
-                  @update:model-value="handlePortDraftDescriptionValue"
-                />
-              </label>
-              <StateDefaultValueEditor
-                :field="portStateDraft.definition"
-                @update-value="updatePortDraftValue"
-              />
-              <div class="node-card__port-picker-hint" :class="{ 'node-card__port-picker-hint--error': Boolean(portStateError) }">
-                {{ portStateError ?? t("nodeCard.createStateBindHint") }}
-              </div>
-              <div class="node-card__port-picker-actions">
-                <button
-                  type="button"
-                  class="node-card__port-picker-button"
-                  @pointerdown.stop
-                  @click.stop="backPortDraft"
-                >
-                  {{ t("nodeCard.back") }}
-                </button>
-                <button
-                  type="button"
-                  class="node-card__port-picker-button node-card__port-picker-button--primary"
-                  @pointerdown.stop
-                  @click.stop="commitPortStateCreate"
-                >
-                  {{ t("nodeCard.create") }}
-                </button>
-              </div>
-            </div>
-            <div v-else class="node-card__port-picker-form">
-              <ElInput
-                class="node-card__port-picker-search"
-                :model-value="portStateSearch"
-                :placeholder="activePortPickerSide === 'input' ? t('nodeCard.searchInputState') : t('nodeCard.searchOutputState')"
-                @update:model-value="handlePortStateSearchValue"
-              />
-              <button
-                v-if="portStateSearch.trim()"
-                type="button"
-                class="node-card__port-create-option"
-                @pointerdown.stop
-                @click.stop="beginPortStateCreate"
-              >
-                <span class="node-card__port-create-label">{{ t("nodeCard.create") }}</span>
-                <span class="node-card__port-create-title">{{ t("nodeCard.createStateNamed", { name: portStateSearch.trim() }) }}</span>
-              </button>
-              <button
-                v-for="stateRow in portPickerMatchingStates"
-                :key="stateRow.key"
-                type="button"
-                class="node-card__port-state-option"
-                @pointerdown.stop
-                @click.stop="bindStateToPort(stateRow.key)"
-              >
-                <span class="node-card__port-state-type">{{ stateRow.definition.type }}</span>
-                <span class="node-card__port-state-title">{{ stateRow.label }}</span>
-                <span class="node-card__port-state-key">{{ stateRow.key }}</span>
-              </button>
-              <div class="node-card__port-picker-actions">
-                <button
-                  type="button"
-                  class="node-card__port-picker-button"
-                  @pointerdown.stop
-                  @click.stop="closePortPicker"
-                >
-                  {{ t("common.cancel") }}
-                </button>
-              </div>
-            </div>
-          </div>
-        </ElPopover>
       </div>
       <div v-if="attachedSkillBadges.length > 0" class="node-card__skill-badges">
         <span
@@ -1001,7 +1063,6 @@
             :error="stateEditorError"
             :type-options="stateTypeOptions"
             :color-options="stateColorOptions"
-            @update:key="handleStateEditorKeyInput"
             @update:name="handleStateEditorNameInput"
             @update:type="handleStateEditorTypeValue"
             @update:color="handleStateEditorColorInput"
@@ -1124,7 +1185,6 @@
                   :error="stateEditorError"
                   :type-options="stateTypeOptions"
                   :color-options="stateColorOptions"
-                  @update:key="handleStateEditorKeyInput"
                   @update:name="handleStateEditorNameInput"
                   @update:type="handleStateEditorTypeValue"
                   @update:color="handleStateEditorColorInput"
@@ -1209,7 +1269,7 @@ import StateEditorPopover from "./StateEditorPopover.vue";
 import type { KnowledgeBaseRecord } from "@/types/knowledge";
 import type { AgentNode, ConditionNode, GraphNode, InputNode, OutputNode, StateDefinition } from "@/types/node-system";
 import type { SkillDefinition } from "@/types/skills";
-import { CREATE_AGENT_INPUT_STATE_KEY } from "@/lib/virtual-any-input";
+import { CREATE_AGENT_INPUT_STATE_KEY, VIRTUAL_ANY_OUTPUT_STATE_KEY } from "@/lib/virtual-any-input";
 
 import { DEFAULT_AGENT_TEMPERATURE, buildAgentModelSelectOptions, normalizeAgentTemperature, resolveAgentModelSelection } from "./agentConfigModel";
 import {
@@ -1224,7 +1284,7 @@ import { isSwitchableInputBoundaryType, resolveNextInputValueForBoundaryType, re
 import { buildNodeCardViewModel, type NodePortViewModel } from "./nodeCardViewModel";
 import { resolveOutputPreviewContent } from "./outputPreviewContentModel";
 import { listAttachableSkillDefinitions, resolveAttachedSkillBadges } from "./skillPickerModel";
-import { createStateDraftFromQuery, matchesStatePortSearch } from "./statePortCreateModel";
+import { createStateDraftFromQuery } from "./statePortCreateModel";
 import { createUploadedAssetEnvelope, resolveUploadedAssetInputAccept, tryParseUploadedAssetEnvelope } from "./uploadedAssetModel";
 import {
   defaultValueForStateType,
@@ -1264,7 +1324,6 @@ const emit = defineEmits<{
   (event: "update-node-metadata", payload: { nodeId: string; patch: Partial<Pick<GraphNode, "name" | "description">> }): void;
   (event: "update-input-config", payload: { nodeId: string; patch: Partial<InputNode["config"]> }): void;
   (event: "update-input-state", payload: { stateKey: string; patch: Partial<StateDefinition> }): void;
-  (event: "rename-state", payload: { currentKey: string; nextKey: string }): void;
   (event: "update-state", payload: { stateKey: string; patch: Partial<StateDefinition> }): void;
   (event: "remove-port-state", payload: { nodeId: string; side: "input" | "output"; stateKey: string }): void;
   (event: "update-output-config", payload: { nodeId: string; patch: Partial<OutputNode["config"]> }): void;
@@ -1353,11 +1412,6 @@ const agentThinkingOptions = computed<Array<{ value: AgentThinkingControlMode; l
   { value: "high", label: t("nodeCard.thinkingHigh") },
   { value: "xhigh", label: t("nodeCard.thinkingExtraHigh") },
 ]);
-const agentPortPickerActions: Array<{ side: "input" | "output"; label: string; toneClass: string; placement: "bottom-start" | "bottom-end" }> = [
-  { side: "input", label: "+ input", toneClass: "node-card__action-pill--input", placement: "bottom-start" },
-  { side: "output", label: "+ output", toneClass: "node-card__action-pill--output", placement: "bottom-end" },
-];
-
 const view = computed(() =>
   buildNodeCardViewModel(props.nodeId, props.node, props.stateSchema, {
     conditionRouteTargets: props.conditionRouteTargets,
@@ -1369,14 +1423,13 @@ const view = computed(() =>
     },
   }),
 );
-const agentInputPorts = computed(() => (view.value.body.kind === "agent" ? view.value.inputs : []));
-const shouldRenderPendingStateInputCapsule = computed(() => {
-  if (!props.pendingStateInputSource || view.value.body.kind !== "agent") {
-    return false;
-  }
-
-  return !(view.value.inputs.length === 1 && Boolean(view.value.inputs[0]?.virtual));
-});
+const agentInputPorts = computed<NodePortViewModel[]>(() =>
+  view.value.body.kind === "agent" ? view.value.inputs.filter((port) => !port.virtual) : [],
+);
+const agentOutputPorts = computed<NodePortViewModel[]>(() =>
+  view.value.body.kind === "agent" ? view.value.outputs.filter((port) => !port.virtual) : [],
+);
+const agentHasVirtualOutputPort = computed(() => view.value.body.kind === "agent" && view.value.outputs.some((port) => port.virtual));
 const outputPreviewContent = computed(() => {
   if (view.value.body.kind !== "output") {
     return resolveOutputPreviewContent("", "plain");
@@ -1388,7 +1441,6 @@ const conditionLoopLimitDraft = ref("");
 const inputAssetInputRef = ref<HTMLInputElement | null>(null);
 const isSkillPickerOpen = ref(false);
 const activePortPickerSide = ref<"input" | "output" | null>(null);
-const portStateSearch = ref("");
 const portStateDraft = ref<StateFieldDraft | null>(null);
 const portStateError = ref<string | null>(null);
 const agentModelSelectRef = ref<{ blur?: () => void; toggleMenu?: () => void; expanded?: boolean } | null>(null);
@@ -1572,33 +1624,11 @@ const availableSkillDefinitions = computed(() =>
 const showSkillPickerTrigger = computed(
   () => availableSkillDefinitions.value.length > 0 || props.skillDefinitionsLoading || Boolean(props.skillDefinitionsError),
 );
-const portPickerMatchingStates = computed(() =>
-  Object.entries(props.stateSchema)
-    .map(([key, definition]) => ({
-      key,
-      definition,
-      label: definition.name.trim() || key,
-    }))
-    .filter(({ key, definition }) =>
-      matchesStatePortSearch(
-        {
-          key,
-          name: definition.name,
-          description: definition.description,
-        },
-        portStateSearch.value,
-      ),
-    )
-    .sort((left, right) => left.label.localeCompare(right.label) || left.key.localeCompare(right.key)),
-);
 const portPickerTitle = computed(() => {
   if (!activePortPickerSide.value) {
     return "";
   }
-  if (portStateDraft.value) {
-    return activePortPickerSide.value === "input" ? t("nodeCard.createInputState") : t("nodeCard.createOutputState");
-  }
-  return activePortPickerSide.value === "input" ? t("nodeCard.selectInputState") : t("nodeCard.selectOutputState");
+  return activePortPickerSide.value === "input" ? t("nodeCard.createInputState") : t("nodeCard.createOutputState");
 });
 const conditionRuleValueDisabled = computed(
   () => props.node.kind === "condition" && props.node.config.rule.operator === "exists",
@@ -1624,25 +1654,12 @@ const hasFloatingPanelOpen = computed(
     isSkillPickerOpen.value,
 );
 
-function shouldReplaceVirtualAnyInput(port: NodePortViewModel) {
-  return Boolean(port.virtual && props.pendingStateInputSource);
+function isPortCreateOpen(side: "input" | "output") {
+  return activePortPickerSide.value === side && Boolean(portStateDraft.value);
 }
 
-function resolveAgentInputPortAnchorSlotId(port: NodePortViewModel) {
-  const stateKey = shouldReplaceVirtualAnyInput(port) ? CREATE_AGENT_INPUT_STATE_KEY : port.key;
-  return `${props.nodeId}:state-in:${stateKey}`;
-}
-
-function resolveAgentInputPortLabel(port: NodePortViewModel) {
-  return shouldReplaceVirtualAnyInput(port) ? props.pendingStateInputSource?.label ?? port.label : port.label;
-}
-
-function resolveAgentInputPortStyle(port: NodePortViewModel) {
-  return {
-    "--node-card-port-accent": shouldReplaceVirtualAnyInput(port)
-      ? props.pendingStateInputSource?.stateColor ?? port.stateColor
-      : port.stateColor,
-  };
+function resolveAgentCreateOutputAnchorSlotId() {
+  return agentHasVirtualOutputPort.value ? `${props.nodeId}:state-out:${VIRTUAL_ANY_OUTPUT_STATE_KEY}` : undefined;
 }
 
 watch(
@@ -1882,7 +1899,7 @@ function updateOutputDisplayMode(displayMode: OutputNode["config"]["displayMode"
 }
 
 function isOutputDisplayModeActive(displayMode: OutputNode["config"]["displayMode"]) {
-  return props.node.kind === "output" && props.node.config.displayMode === displayMode;
+  return view.value.body.kind === "output" && view.value.body.displayMode === displayMode;
 }
 
 function updateOutputPersistFormat(persistFormat: OutputNode["config"]["persistFormat"]) {
@@ -1932,7 +1949,6 @@ function toggleSkillPicker() {
   closeStateEditor();
   activePortPickerSide.value = null;
   portStateDraft.value = null;
-  portStateSearch.value = "";
   portStateError.value = null;
   isSkillPickerOpen.value = !isSkillPickerOpen.value;
 }
@@ -1958,7 +1974,7 @@ function removeAgentSkill(skillKey: string) {
   emitAgentConfigPatch({ skills: props.node.config.skills.filter((candidateKey) => candidateKey !== skillKey) });
 }
 
-function openPortPicker(side: "input" | "output") {
+function openPortStateCreate(side: "input" | "output") {
   if (guardLockedGraphInteraction()) {
     return;
   }
@@ -1970,46 +1986,13 @@ function openPortPicker(side: "input" | "output") {
   commitOpenTextEditorIfNeeded();
   closeStateEditor();
   isSkillPickerOpen.value = false;
-  portStateSearch.value = "";
-  portStateDraft.value = null;
   portStateError.value = null;
-  activePortPickerSide.value = activePortPickerSide.value === side ? null : side;
+  activePortPickerSide.value = side;
+  portStateDraft.value = createStateDraftFromQuery(side === "input" ? "Input" : "Output", Object.keys(props.stateSchema));
 }
 
 function closePortPicker() {
   activePortPickerSide.value = null;
-  portStateSearch.value = "";
-  portStateDraft.value = null;
-  portStateError.value = null;
-}
-
-function handlePortStateSearchInput(event: Event) {
-  const target = event.target;
-  if (!(target instanceof HTMLInputElement)) {
-    return;
-  }
-  portStateSearch.value = target.value;
-}
-
-function handlePortStateSearchValue(value: string | number) {
-  if (guardLockedGraphInteraction()) {
-    return;
-  }
-  portStateSearch.value = String(value ?? "");
-}
-
-function beginPortStateCreate() {
-  if (guardLockedGraphInteraction()) {
-    return;
-  }
-  portStateDraft.value = createStateDraftFromQuery(portStateSearch.value, Object.keys(props.stateSchema));
-  portStateError.value = null;
-}
-
-function backPortDraft() {
-  if (guardLockedGraphInteraction()) {
-    return;
-  }
   portStateDraft.value = null;
   portStateError.value = null;
 }
@@ -2035,27 +2018,6 @@ function handlePortDraftNameValue(value: string | number) {
       ...portStateDraft.value.definition,
       name: String(value ?? ""),
     },
-  };
-}
-
-function handlePortDraftKeyInput(event: Event) {
-  const target = event.target;
-  if (!(target instanceof HTMLInputElement) || !portStateDraft.value) {
-    return;
-  }
-  handlePortDraftKeyValue(target.value);
-}
-
-function handlePortDraftKeyValue(value: string | number) {
-  if (guardLockedGraphInteraction()) {
-    return;
-  }
-  if (!portStateDraft.value) {
-    return;
-  }
-  portStateDraft.value = {
-    ...portStateDraft.value,
-    key: String(value ?? ""),
   };
 }
 
@@ -2170,21 +2132,6 @@ function updatePortDraftValue(value: unknown) {
       value,
     },
   };
-}
-
-function bindStateToPort(stateKey: string) {
-  if (guardLockedGraphInteraction()) {
-    return;
-  }
-  if (!activePortPickerSide.value) {
-    return;
-  }
-  emit("bind-port-state", {
-    nodeId: props.nodeId,
-    side: activePortPickerSide.value,
-    stateKey,
-  });
-  closePortPicker();
 }
 
 function commitPortStateCreate() {
@@ -2596,7 +2543,7 @@ function guardLockedStateEditAttempt() {
   return guardLockedGraphInteraction();
 }
 
-function syncStateEditorDraft(nextDraft: StateFieldDraft, options?: { allowInvalidKey?: boolean }) {
+function syncStateEditorDraft(nextDraft: StateFieldDraft) {
   if (guardLockedGraphInteraction()) {
     return;
   }
@@ -2609,28 +2556,17 @@ function syncStateEditorDraft(nextDraft: StateFieldDraft, options?: { allowInval
   stateEditorDraft.value = nextDraft;
 
   const currentStateKey = currentAnchorId.split(":").at(-1) ?? "";
-  const nextKey = nextDraft.key.trim();
-  if (!nextKey) {
+  if (!currentStateKey) {
     stateEditorError.value = t("nodeCard.stateKeyEmpty");
-    return;
-  }
-  if (nextKey !== currentStateKey && props.stateSchema[nextKey]) {
-    stateEditorError.value = t("nodeCard.stateKeyExists", { key: nextKey });
     return;
   }
 
   stateEditorError.value = null;
 
-  if (nextKey !== currentStateKey) {
-    emit("rename-state", { currentKey: currentStateKey, nextKey });
-    activeStateEditorAnchorId.value = [...currentAnchorId.split(":").slice(0, -1), nextKey].join(":");
-  }
-
-  void options;
   emit("update-state", {
-    stateKey: nextKey,
+    stateKey: currentStateKey,
     patch: {
-      name: nextDraft.definition.name.trim() || nextKey,
+      name: nextDraft.definition.name.trim() || currentStateKey,
       description: nextDraft.definition.description,
       type: nextDraft.definition.type,
       value: nextDraft.definition.value,
@@ -2649,17 +2585,7 @@ function handleStateEditorNameInput(value: string | number) {
       ...stateEditorDraft.value.definition,
       name: value,
     },
-  }, { allowInvalidKey: true });
-}
-
-function handleStateEditorKeyInput(value: string | number) {
-  if (!stateEditorDraft.value || typeof value !== "string") {
-    return;
-  }
-  syncStateEditorDraft({
-    ...stateEditorDraft.value,
-    key: value,
-  }, { allowInvalidKey: true });
+  });
 }
 
 function handleStateEditorDescriptionInput(value: string | number) {
@@ -2672,7 +2598,7 @@ function handleStateEditorDescriptionInput(value: string | number) {
       ...stateEditorDraft.value.definition,
       description: value,
     },
-  }, { allowInvalidKey: true });
+  });
 }
 
 function handleStateEditorColorInput(value: string | number) {
@@ -2685,7 +2611,7 @@ function handleStateEditorColorInput(value: string | number) {
       ...stateEditorDraft.value.definition,
       color: value,
     },
-  }, { allowInvalidKey: true });
+  });
 }
 
 function handleStateEditorTypeValue(value: string | number | boolean | undefined) {
@@ -2699,7 +2625,7 @@ function handleStateEditorTypeValue(value: string | number | boolean | undefined
       type: value,
       value: defaultValueForStateType(value as StateFieldType),
     },
-  }, { allowInvalidKey: true });
+  });
 }
 
 function toggleAdvancedPanel() {
@@ -3597,6 +3523,24 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
   justify-content: flex-end;
 }
 
+.node-card__port-pill-row--create {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    max-height 140ms ease,
+    opacity 140ms ease;
+}
+
+.node-card:hover .node-card__port-pill-row--create,
+.node-card--selected .node-card__port-pill-row--create,
+.node-card--floating-panel-open .node-card__port-pill-row--create {
+  max-height: 40px;
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .node-card__port-stack {
   display: grid;
   gap: 3px;
@@ -3654,20 +3598,6 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
   background: color-mix(in srgb, var(--node-card-port-accent) 10%, rgba(255, 250, 241, 0.96));
   color: #1f2937;
   box-shadow: 0 10px 20px rgba(60, 41, 20, 0.08);
-}
-
-.node-card__port-pill-create-badge {
-  display: inline-flex;
-  align-items: center;
-  min-height: 18px;
-  border-radius: 999px;
-  padding: 0 7px;
-  background: color-mix(in srgb, var(--node-card-port-accent) 16%, rgba(255, 255, 255, 0.92));
-  color: var(--node-card-port-accent);
-  font-size: 0.62rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  line-height: 1;
 }
 
 .node-card__port-pill--output {
@@ -4089,23 +4019,12 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
   background: rgba(239, 246, 255, 0.84);
 }
 
-.node-card__action-pill--input {
-  color: #16a34a;
-  border-color: rgba(34, 197, 94, 0.3);
-  background: rgba(220, 252, 231, 0.72);
-}
-
-.node-card__action-pill--output {
-  color: #d97706;
-  border-color: rgba(217, 119, 6, 0.3);
-  background: rgba(254, 243, 199, 0.72);
-}
-
 .node-card__action-pill--disabled {
   opacity: 0.58;
 }
 
-.node-card__agent-add-popover {
+.node-card__agent-add-popover,
+.node-card__agent-create-port-popover {
   display: grid;
   gap: 12px;
   border: 1px solid rgba(154, 52, 18, 0.14);
@@ -4125,7 +4044,9 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
 }
 
 :deep(.node-card__agent-add-popover .el-input__wrapper),
-:deep(.node-card__agent-add-popover .el-select__wrapper) {
+:deep(.node-card__agent-add-popover .el-select__wrapper),
+:deep(.node-card__agent-create-port-popover .el-input__wrapper),
+:deep(.node-card__agent-create-port-popover .el-select__wrapper) {
   min-height: 36px;
   border-radius: 12px;
   border: 1px solid rgba(154, 52, 18, 0.16);
@@ -4134,12 +4055,15 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
 }
 
 :deep(.node-card__agent-add-popover .el-input__wrapper.is-focus),
-:deep(.node-card__agent-add-popover .el-select__wrapper.is-focused) {
+:deep(.node-card__agent-add-popover .el-select__wrapper.is-focused),
+:deep(.node-card__agent-create-port-popover .el-input__wrapper.is-focus),
+:deep(.node-card__agent-create-port-popover .el-select__wrapper.is-focused) {
   border-color: rgba(201, 107, 31, 0.28);
   box-shadow: 0 0 0 2px rgba(201, 107, 31, 0.1);
 }
 
-:deep(.node-card__agent-add-popover .el-textarea__inner) {
+:deep(.node-card__agent-add-popover .el-textarea__inner),
+:deep(.node-card__agent-create-port-popover .el-textarea__inner) {
   border-radius: 12px;
   border: 1px solid rgba(154, 52, 18, 0.16);
   background: rgba(255, 251, 246, 0.88);
@@ -4147,7 +4071,8 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
   color: #3c2914;
 }
 
-:deep(.node-card__agent-add-popover .el-textarea__inner:focus) {
+:deep(.node-card__agent-add-popover .el-textarea__inner:focus),
+:deep(.node-card__agent-create-port-popover .el-textarea__inner:focus) {
   border-color: rgba(201, 107, 31, 0.28);
   box-shadow: 0 0 0 2px rgba(201, 107, 31, 0.1);
 }
@@ -4345,7 +4270,8 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
 }
 
 .node-card__agent-add-popover.node-card__skill-picker,
-.node-card__agent-add-popover.node-card__port-picker {
+.node-card__agent-add-popover.node-card__port-picker,
+.node-card__agent-create-port-popover.node-card__port-picker {
   border-radius: 16px;
   padding: 12px;
   background: rgba(255, 244, 232, 0.96);
@@ -4538,12 +4464,6 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
   font-size: 0.9rem;
   font-weight: 600;
   color: #1f2937;
-}
-
-.node-card__port-state-key {
-  font-size: 0.78rem;
-  line-height: 1.5;
-  color: rgba(60, 41, 20, 0.68);
 }
 
 .node-card__surface {

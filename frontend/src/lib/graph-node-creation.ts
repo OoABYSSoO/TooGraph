@@ -1,4 +1,6 @@
 import { cloneGraphDocument } from "./graph-document.ts";
+import { buildNextDefaultStateField, rememberDefaultStateKeyIndex, resolveDefaultStateColor } from "../editor/workspace/statePanelFields.ts";
+import { isVirtualAnyOutputStateKey } from "./virtual-any-input.ts";
 
 import type {
   AgentNode,
@@ -27,13 +29,19 @@ type ApplyNodeCreationResultInput = {
   context?: NodeCreationContext | null;
 };
 
+type ApplyNodeCreationResultOutput<T extends GraphPayload | GraphDocument> = {
+  document: T;
+  createdNodeId: string;
+  createdStateKey: string | null;
+};
+
 function defaultStateDefinitionForType(stateKey: string, type: string): StateDefinition {
   return {
     name: stateKey,
     description: "",
     type,
     value: defaultValueForStateType(type),
-    color: "",
+    color: resolveDefaultStateColor(stateKey),
   };
 }
 
@@ -65,8 +73,7 @@ function buildTextInputStateKey(id: string) {
   return `${id}_value`;
 }
 
-function buildTextInputNode(id: string, position: GraphPosition): InputNode {
-  const stateKey = buildTextInputStateKey(id);
+function buildTextInputNode(id: string, position: GraphPosition, stateKey = buildTextInputStateKey(id)): InputNode {
   return {
     kind: "input",
     name: "Input",
@@ -97,11 +104,11 @@ function buildOutputNode(id: string, position: GraphPosition): OutputNode {
   };
 }
 
-export function buildGenericInputNode(params: { id: string; position: GraphPosition }): CreatedNodeResult {
-  const stateKey = buildTextInputStateKey(params.id);
+export function buildGenericInputNode(params: { id: string; position: GraphPosition; stateKey?: string }): CreatedNodeResult {
+  const stateKey = params.stateKey ?? buildTextInputStateKey(params.id);
   return {
     id: params.id,
-    node: buildTextInputNode(params.id, params.position),
+    node: buildTextInputNode(params.id, params.position, stateKey),
     state_schema: {
       [stateKey]: {
         ...defaultStateDefinitionForType(stateKey, "text"),
@@ -133,6 +140,7 @@ export function buildNodeFromPreset(preset: PresetDocument, params: { id: string
 export function buildInputNodeFromFile(params: {
   id: string;
   position: GraphPosition;
+  stateKey: string;
   fileName: string;
   mimeType: string;
   size: number;
@@ -140,7 +148,16 @@ export function buildInputNodeFromFile(params: {
   detectedType: string;
   encoding: "text" | "data_url";
 }): CreatedNodeResult {
-  const stateKey = params.detectedType === "knowledge_base" ? "knowledge_base" : params.detectedType === "text" ? "value" : params.detectedType;
+  const stateKey = params.stateKey;
+  const uploadedValue = JSON.stringify({
+    kind: "uploaded_file",
+    name: params.fileName,
+    mimeType: params.mimeType || "application/octet-stream",
+    size: params.size,
+    detectedType: params.detectedType,
+    content: params.content,
+    encoding: params.encoding,
+  });
   return {
     id: params.id,
     node: {
@@ -151,19 +168,15 @@ export function buildInputNodeFromFile(params: {
       reads: [],
       writes: [{ state: stateKey, mode: "replace" }],
       config: {
-        value: JSON.stringify({
-          kind: "uploaded_file",
-          name: params.fileName,
-          mimeType: params.mimeType || "application/octet-stream",
-          size: params.size,
-          detectedType: params.detectedType,
-          content: params.content,
-          encoding: params.encoding,
-        }),
+        value: uploadedValue,
       },
     },
     state_schema: {
-      [stateKey]: defaultStateDefinitionForType(stateKey, params.detectedType),
+      [stateKey]: {
+        ...defaultStateDefinitionForType(stateKey, params.detectedType),
+        name: params.fileName,
+        value: uploadedValue,
+      },
     },
   };
 }
@@ -189,6 +202,15 @@ function bindCreatedStateToNode(node: GraphNode, stateKey: string) {
     if (node.kind === "condition" && !node.config.rule.source.trim()) {
       node.config.rule.source = stateKey;
     }
+  }
+}
+
+function bindCreatedStateToSourceNode(node: GraphNode | undefined, stateKey: string) {
+  if (!node || node.kind !== "agent") {
+    return;
+  }
+  if (!node.writes.some((binding) => binding.state === stateKey)) {
+    node.writes = [...node.writes, { state: stateKey, mode: "replace" }];
   }
 }
 
@@ -232,10 +254,16 @@ function buildCreationFlowEdge<T extends GraphPayload | GraphDocument>(
   }
 }
 
+function resolveVirtualAnyOutputStateName(document: GraphPayload | GraphDocument, sourceNodeId: string | undefined) {
+  const sourceNode = sourceNodeId ? document.nodes[sourceNodeId] : null;
+  const sourceName = sourceNode?.name.trim();
+  return sourceName ? `${sourceName} output` : "Agent output";
+}
+
 export function applyNodeCreationResult<T extends GraphPayload | GraphDocument>(
   document: T,
   input: ApplyNodeCreationResultInput,
-): { document: T; createdNodeId: string } {
+): ApplyNodeCreationResultOutput<T> {
   const nextDocument = cloneGraphDocument(document);
   nextDocument.nodes[input.createdNodeId] = input.createdNode;
 
@@ -245,8 +273,26 @@ export function applyNodeCreationResult<T extends GraphPayload | GraphDocument>(
     }
   }
 
-  const sourceStateKey = input.context?.sourceStateKey?.trim();
+  const rawSourceStateKey = input.context?.sourceStateKey?.trim();
   const sourceValueType = input.context?.sourceValueType?.trim() || "text";
+  let sourceStateKey = rawSourceStateKey;
+  let createdStateKey: string | null = null;
+
+  if (isVirtualAnyOutputStateKey(rawSourceStateKey)) {
+    const sourceStateField = buildNextDefaultStateField(nextDocument, {
+      name: resolveVirtualAnyOutputStateName(nextDocument, input.context?.sourceNodeId),
+      type: sourceValueType,
+    });
+    nextDocument.state_schema[sourceStateField.key] = sourceStateField.definition;
+    rememberDefaultStateKeyIndex(nextDocument, sourceStateField.key);
+    bindCreatedStateToSourceNode(
+      input.context?.sourceNodeId ? nextDocument.nodes[input.context.sourceNodeId] : undefined,
+      sourceStateField.key,
+    );
+    sourceStateKey = sourceStateField.key;
+    createdStateKey = sourceStateField.key;
+  }
+
   if (sourceStateKey && (input.createdNode.kind === "output" || input.createdNode.kind === "agent" || input.createdNode.kind === "condition")) {
     ensureStateDefinitionForCreation(nextDocument, sourceStateKey, sourceValueType);
     bindCreatedStateToNode(nextDocument.nodes[input.createdNodeId], sourceStateKey);
@@ -260,6 +306,7 @@ export function applyNodeCreationResult<T extends GraphPayload | GraphDocument>(
   return {
     document: nextDocument,
     createdNodeId: input.createdNodeId,
+    createdStateKey,
   };
 }
 

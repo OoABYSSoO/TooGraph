@@ -4,7 +4,7 @@
   "description": "Start from an initial counter, increment it in a loop, and stop when counter reaches three or the loop limit is exhausted.",
   "default_graph_name": "循环计数",
   "state_schema": {
-    "counter": {
+    "state_1": {
       "name": "counter",
       "description": "Current loop counter value.",
       "type": "number",
@@ -22,7 +22,7 @@
         "collapsed": false
       },
       "writes": [
-        { "state": "counter", "mode": "replace" }
+        { "state": "state_1", "mode": "replace" }
       ],
       "config": {
         "value": 0
@@ -37,10 +37,10 @@
         "collapsed": false
       },
       "reads": [
-        { "state": "counter", "required": true }
+        { "state": "state_1", "required": true }
       ],
       "writes": [
-        { "state": "counter", "mode": "replace" }
+        { "state": "state_1", "mode": "replace" }
       ],
       "config": {
         "skills": [],
@@ -56,7 +56,7 @@
         "collapsed": false
       },
       "reads": [
-        { "state": "counter", "required": true }
+        { "state": "state_1", "required": true }
       ],
       "config": {
         "branches": ["true", "false", "exhausted"],
@@ -66,7 +66,7 @@
           "false": "false"
         },
         "rule": {
-          "source": "counter",
+          "source": "state_1",
           "operator": "<",
           "value": 3
         }
@@ -81,7 +81,7 @@
         "collapsed": false
       },
       "reads": [
-        { "state": "counter", "required": true }
+        { "state": "state_1", "required": true }
       ],
       "config": {
         "displayMode": "auto",
@@ -99,7 +99,7 @@
         "collapsed": false
       },
       "reads": [
-        { "state": "counter", "required": true }
+        { "state": "state_1", "required": true }
       ],
       "config": {
         "displayMode": "auto",
@@ -129,5 +129,7 @@
       }
     }
   ],
-  "metadata": {}
+  "metadata": {
+    "graphiteui_state_key_counter": 1
+  }
 }

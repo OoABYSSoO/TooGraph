@@ -97,11 +97,11 @@
                 :active-run-edge-ids="activeRunEdgeIdsByTabId[tab.tabId] ?? undefined"
                 :interaction-locked="isGraphInteractionLocked(tab.tabId)"
                 :initial-viewport="viewportByTabId[tab.tabId] ?? null"
+                :state-editor-request="dataEdgeStateEditorRequestByTabId[tab.tabId] ?? null"
                 @select-node="focusNodeForTab(tab.tabId, $event)"
                 @update-node-metadata="updateNodeMetadataForTab(tab.tabId, $event.nodeId, $event.patch)"
                 @update-input-config="updateInputConfigForTab(tab.tabId, $event.nodeId, $event.patch)"
                 @update-input-state="updateStateField(tab.tabId, $event.stateKey, $event.patch)"
-                @rename-state="renameStateField(tab.tabId, $event.currentKey, $event.nextKey)"
                 @update-state="updateStateField(tab.tabId, $event.stateKey, $event.patch)"
                 @remove-port-state="removeNodePortStateForTab(tab.tabId, $event.nodeId, $event.side, $event.stateKey)"
                 @disconnect-data-edge="disconnectDataEdgeForTab(tab.tabId, $event.sourceNodeId, $event.targetNodeId, $event.stateKey, $event.mode)"
@@ -171,7 +171,6 @@
                 @focus-node="requestNodeFocusForTab(tab.tabId, $event)"
                 @add-state="addStateField(tab.tabId)"
                 @delete-state="deleteStateField(tab.tabId, $event)"
-                @rename-state="renameStateField(tab.tabId, $event.currentKey, $event.nextKey)"
                 @update-state="updateStateField(tab.tabId, $event.stateKey, $event.patch)"
                 @add-reader="addStateReaderBinding(tab.tabId, $event.stateKey, $event.nodeId)"
                 @remove-reader="removeStateReaderBinding(tab.tabId, $event.stateKey, $event.nodeId)"
@@ -292,20 +291,29 @@ import EditorStatePanel from "./EditorStatePanel.vue";
 import EditorTabBar from "./EditorTabBar.vue";
 import EditorWelcomeState from "./EditorWelcomeState.vue";
 import { formatRunFeedback, formatValidationFeedback, type RunFeedback, type WorkspaceFeedbackTone } from "./runFeedbackModel.ts";
-import { buildRunNodeArtifactsModel } from "./runNodeArtifactsModel.ts";
+import { buildRunNodeArtifactsModel, mergeRunOutputPreviewByNodeId } from "./runNodeArtifactsModel.ts";
+import { applyRunWrittenStateValuesToDocument } from "./runStatePersistence.ts";
 import { addStateBindingToDocument, removeStateBindingFromDocument } from "./statePanelBindings.ts";
 import {
   addStateFieldToDocument,
+  buildNextDefaultStateField,
   deleteStateFieldFromDocument,
   insertStateFieldIntoDocument,
   listStateFieldUsageLabels,
-  renameStateFieldInDocument,
   updateStateFieldInDocument,
   type StateFieldDraft,
 } from "./statePanelFields.ts";
 import { buildPythonExportFileName, downloadPythonSource } from "./pythonExportModel.ts";
 import { isGraphiteUiPythonExportFile, isGraphiteUiPythonExportSource } from "./pythonImportModel.ts";
 import { buildPresetPayloadForNode } from "./presetPersistence.ts";
+
+type DataEdgeStateEditorRequest = {
+  requestId: string;
+  sourceNodeId: string;
+  targetNodeId: string;
+  stateKey: string;
+  position: GraphPosition;
+};
 
 const props = defineProps<{
   routeMode: "root" | "new" | "existing";
@@ -340,6 +348,7 @@ const sidePanelModeByTabId = ref<Record<string, "state" | "human-review">>({});
 const focusedNodeIdByTabId = ref<Record<string, string | null>>({});
 const focusRequestByTabId = ref<Record<string, NodeFocusRequest | null>>({});
 const viewportByTabId = ref<Record<string, CanvasViewport>>({});
+const dataEdgeStateEditorRequestByTabId = ref<Record<string, DataEdgeStateEditorRequest | null>>({});
 const runNodeStatusByTabId = ref<Record<string, Record<string, string>>>({});
 const currentRunNodeIdByTabId = ref<Record<string, string | null>>({});
 const latestRunDetailByTabId = ref<Record<string, RunDetail | null>>({});
@@ -448,10 +457,7 @@ function applyRunVisualStateToTab(
     ...currentRunNodeIdByTabId.value,
     [tabId]: visualRun.current_node_id ?? null,
   };
-  runOutputPreviewByTabId.value = {
-    ...runOutputPreviewByTabId.value,
-    [tabId]: runArtifactsModel.outputPreviewByNodeId,
-  };
+  applyRunOutputPreviewForTab(tabId, runArtifactsModel.outputPreviewByNodeId);
   runFailureMessageByTabId.value = {
     ...runFailureMessageByTabId.value,
     [tabId]: runArtifactsModel.failedMessageByNodeId,
@@ -570,6 +576,21 @@ function applyStreamingOutputPreviewToTab(tabId: string, payload: Record<string,
   };
 }
 
+function applyRunOutputPreviewForTab(
+  tabId: string,
+  nextPreviewByNodeId: Record<string, { text: string; displayMode: string | null }>,
+  options: { preserveMissing?: boolean } = {},
+) {
+  runOutputPreviewByTabId.value = {
+    ...runOutputPreviewByTabId.value,
+    [tabId]: mergeRunOutputPreviewByNodeId(runOutputPreviewByTabId.value[tabId] ?? {}, nextPreviewByNodeId, options),
+  };
+}
+
+function isActiveRunStatus(status: string | null | undefined) {
+  return status === "queued" || status === "running" || status === "resuming";
+}
+
 function startRunEventStreamForTab(tabId: string, runId: string) {
   cancelRunEventStreamForTab(tabId);
   if (!runId || typeof EventSource === "undefined") {
@@ -648,10 +669,7 @@ async function pollRunForTab(tabId: string, runId: string, generation = runPollG
       ...currentRunNodeIdByTabId.value,
       [tabId]: run.current_node_id ?? null,
     };
-    runOutputPreviewByTabId.value = {
-      ...runOutputPreviewByTabId.value,
-      [tabId]: runArtifactsModel.outputPreviewByNodeId,
-    };
+    applyRunOutputPreviewForTab(tabId, runArtifactsModel.outputPreviewByNodeId, { preserveMissing: isActiveRunStatus(run.status) });
     runFailureMessageByTabId.value = {
       ...runFailureMessageByTabId.value,
       [tabId]: runArtifactsModel.failedMessageByNodeId,
@@ -675,6 +693,7 @@ async function pollRunForTab(tabId: string, runId: string, generation = runPollG
       return;
     }
 
+    persistRunStateValuesForTab(tabId, run);
     runPollTimerByTabId.delete(tabId);
     cancelRunEventStreamForTab(tabId);
   } catch (error) {
@@ -1125,6 +1144,18 @@ function setDocumentForTab(tabId: string, nextDocument: GraphPayload | GraphDocu
   writePersistedEditorDocumentDraft(tabId, syncedDocument);
 }
 
+function persistRunStateValuesForTab(tabId: string, run: RunDetail) {
+  const document = documentsByTabId.value[tabId];
+  if (!document) {
+    return;
+  }
+
+  const nextDocument = applyRunWrittenStateValuesToDocument(document, run);
+  if (nextDocument !== document) {
+    setDocumentForTab(tabId, nextDocument);
+  }
+}
+
 function isStatePanelOpen(tabId: string) {
   return statePanelOpenByTabId.value[tabId] ?? false;
 }
@@ -1350,6 +1381,7 @@ function createNodeFromMenuForTab(tabId: string, _entry: NodeCreationEntry) {
       persistedPresets: persistedPresets.value,
     });
     markDocumentDirty(tabId, result.document);
+    openCreatedStateEdgeEditorForTab(tabId, menuState.context, result);
     setMessageFeedbackForTab(tabId, {
       tone: "neutral",
       message: `Created ${result.document.nodes[result.createdNodeId]?.name ?? _entry.label}.`,
@@ -1361,6 +1393,27 @@ function createNodeFromMenuForTab(tabId: string, _entry: NodeCreationEntry) {
       message: error instanceof Error ? error.message : "Failed to create node.",
     });
   }
+}
+
+function openCreatedStateEdgeEditorForTab(
+  tabId: string,
+  context: NodeCreationContext,
+  result: { createdNodeId: string; createdStateKey: string | null },
+) {
+  if (!context.sourceNodeId || !result.createdStateKey) {
+    return;
+  }
+
+  dataEdgeStateEditorRequestByTabId.value = {
+    ...dataEdgeStateEditorRequestByTabId.value,
+    [tabId]: {
+      requestId: `${result.createdNodeId}:${result.createdStateKey}:${Date.now()}`,
+      sourceNodeId: context.sourceNodeId,
+      targetNodeId: result.createdNodeId,
+      stateKey: result.createdStateKey,
+      position: context.position,
+    },
+  };
 }
 
 async function createNodeFromFileForTab(tabId: string, _payload: { file: File; position: GraphPosition }) {
@@ -1596,12 +1649,13 @@ function createNodePortStateForTab(tabId: string, nodeId: string, side: "input" 
     return;
   }
 
-  const nextDocumentWithState = insertStateFieldIntoDocument(document, field);
+  const stateField = buildNextDefaultStateField(document, field.definition);
+  const nextDocumentWithState = insertStateFieldIntoDocument(document, stateField);
   if (nextDocumentWithState === document) {
     return;
   }
 
-  const nextDocument = addStateBindingToDocument(nextDocumentWithState, field.key, nodeId, side === "input" ? "read" : "write");
+  const nextDocument = addStateBindingToDocument(nextDocumentWithState, stateField.key, nodeId, side === "input" ? "read" : "write");
   if (nextDocument === nextDocumentWithState) {
     return;
   }
@@ -1961,18 +2015,6 @@ function updateOutputConfigForTab(tabId: string, nodeId: string, patch: Partial<
   focusNodeForTab(tabId, nodeId);
 }
 
-function renameStateField(tabId: string, currentKey: string, nextKey: string) {
-  const document = documentsByTabId.value[tabId];
-  if (!document) {
-    return;
-  }
-  const nextDocument = renameStateFieldInDocument(document, currentKey, nextKey);
-  if (nextDocument === document) {
-    return;
-  }
-  markDocumentDirty(tabId, nextDocument);
-}
-
 function updateStateField(tabId: string, stateKey: string, patch: Partial<StateDefinition>) {
   const document = documentsByTabId.value[tabId];
   if (!document) {
@@ -2013,6 +2055,15 @@ function showStateDeleteBlockedToast(message: string) {
 function deleteStateField(tabId: string, stateKey: string) {
   const document = documentsByTabId.value[tabId];
   if (!document) {
+    return;
+  }
+  if (!document.state_schema[stateKey]) {
+    const message = t("statePanel.deleteStateMissing");
+    setMessageFeedbackForTab(tabId, {
+      tone: "warning",
+      message,
+    });
+    showStateDeleteBlockedToast(message);
     return;
   }
   const usageLabels = listStateFieldUsageLabels(document, stateKey);

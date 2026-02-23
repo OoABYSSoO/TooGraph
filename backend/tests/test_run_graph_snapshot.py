@@ -16,6 +16,13 @@ from app.core.storage.run_store import save_run
 from app.templates.loader import load_template_record
 
 
+def _state_key_by_name(template: dict, state_name: str) -> str:
+    for state_key, definition in template["state_schema"].items():
+        if definition.get("name") == state_name:
+            return state_key
+    raise AssertionError(f"State named {state_name!r} not found")
+
+
 class RunGraphSnapshotTest(unittest.TestCase):
     def test_run_list_exposes_restore_flag_only_for_valid_graph_snapshots(self) -> None:
         restorable_run = create_initial_run_state(
@@ -169,13 +176,14 @@ class RunGraphSnapshotTest(unittest.TestCase):
 
     def test_run_uses_request_payload_without_auto_saving_main_graph(self) -> None:
         template = load_template_record("cycle_counter_demo")
+        counter_key = _state_key_by_name(template, "counter")
         payload = {
             "graph_id": None,
             "name": template["default_graph_name"],
             "state_schema": {
                 **template["state_schema"],
-                "counter": {
-                    **template["state_schema"]["counter"],
+                counter_key: {
+                    **template["state_schema"][counter_key],
                     "value": 9,
                 },
             },
@@ -226,7 +234,7 @@ class RunGraphSnapshotTest(unittest.TestCase):
                     run_detail = detail_response.json()
                     graph_snapshot = run_detail.get("graph_snapshot")
                     self.assertIsInstance(graph_snapshot, dict)
-                    self.assertEqual(graph_snapshot["state_schema"]["counter"]["value"], 9)
+                    self.assertEqual(graph_snapshot["state_schema"][counter_key]["value"], 9)
                     self.assertEqual(graph_snapshot["nodes"]["increment_counter"]["config"]["thinkingMode"], "low")
                     self.assertEqual(
                         graph_snapshot["nodes"]["increment_counter"]["config"]["taskInstruction"],
@@ -235,6 +243,8 @@ class RunGraphSnapshotTest(unittest.TestCase):
 
     def test_resume_uses_saved_run_snapshot_instead_of_current_graph_store(self) -> None:
         template = load_template_record("hello_world")
+        name_key = _state_key_by_name(template, "name")
+        greeting_key = _state_key_by_name(template, "greeting")
         graph_snapshot = {
             "graph_id": "runtime_snapshot_graph",
             "name": template["default_graph_name"],
@@ -269,7 +279,7 @@ class RunGraphSnapshotTest(unittest.TestCase):
                 "node_id": "output_greeting",
                 "label": "greeting",
                 "source_kind": "state",
-                "source_key": "greeting",
+                "source_key": greeting_key,
                 "display_mode": "markdown",
                 "persist_enabled": False,
                 "persist_format": "auto",
@@ -322,15 +332,15 @@ class RunGraphSnapshotTest(unittest.TestCase):
                 with TestClient(app) as client:
                     response = client.post(
                         f"/api/runs/{previous_run['run_id']}/resume",
-                        json={"resume": {"name": "人工确认"}},
+                        json={"resume": {name_key: "人工确认"}},
                     )
 
                 self.assertEqual(response.status_code, 200, response.text)
                 self.assertEqual(response.json()["run_id"], previous_run["run_id"])
                 self.assertEqual(captured["graph_id"], "runtime_snapshot_graph")
                 self.assertEqual(captured["graph_name"], "Hello World")
-                self.assertEqual(captured["state_keys"], ["greeting", "name"])
-                self.assertEqual(captured["resume_command"], {"name": "人工确认"})
+                self.assertEqual(captured["state_keys"], sorted([greeting_key, name_key]))
+                self.assertEqual(captured["resume_command"], {name_key: "人工确认"})
                 initial_state = captured["initial_state"]
                 self.assertIsInstance(initial_state, dict)
                 self.assertEqual(initial_state["node_status_map"]["greeting_agent"], "success")
@@ -340,6 +350,8 @@ class RunGraphSnapshotTest(unittest.TestCase):
 
     def test_resume_can_target_a_historical_pause_snapshot(self) -> None:
         template = load_template_record("hello_world")
+        name_key = _state_key_by_name(template, "name")
+        greeting_key = _state_key_by_name(template, "greeting")
         graph_snapshot = {
             "graph_id": "runtime_snapshot_graph",
             "name": template["default_graph_name"],
@@ -380,8 +392,8 @@ class RunGraphSnapshotTest(unittest.TestCase):
                 },
                 "state_snapshot": {
                     "values": {
-                        "name": "GraphiteUI",
-                        "greeting": "draft",
+                        name_key: "GraphiteUI",
+                        greeting_key: "draft",
                     },
                     "last_writers": {},
                 },
@@ -392,7 +404,7 @@ class RunGraphSnapshotTest(unittest.TestCase):
                             "node_id": "output_greeting",
                             "label": "Greeting",
                             "source_kind": "state",
-                            "source_key": "greeting",
+                            "source_key": greeting_key,
                             "display_mode": "text",
                             "persist_enabled": False,
                             "persist_format": "auto",
@@ -411,7 +423,7 @@ class RunGraphSnapshotTest(unittest.TestCase):
                         "node_id": "output_greeting",
                         "label": "Greeting",
                         "source_kind": "state",
-                        "source_key": "greeting",
+                        "source_key": greeting_key,
                         "display_mode": "text",
                         "persist_enabled": False,
                         "persist_format": "auto",
@@ -428,7 +440,7 @@ class RunGraphSnapshotTest(unittest.TestCase):
                 "node_id": "output_greeting",
                 "label": "Greeting",
                 "source_kind": "state",
-                "source_key": "greeting",
+                "source_key": greeting_key,
                 "display_mode": "text",
                 "persist_enabled": False,
                 "persist_format": "auto",
@@ -472,7 +484,7 @@ class RunGraphSnapshotTest(unittest.TestCase):
                 with TestClient(app) as client:
                     response = client.post(
                         f"/api/runs/{previous_run['run_id']}/resume",
-                        json={"snapshot_id": "pause_1", "resume": {"name": "人工确认"}},
+                        json={"snapshot_id": "pause_1", "resume": {name_key: "人工确认"}},
                     )
 
                 self.assertEqual(response.status_code, 200, response.text)
@@ -483,7 +495,7 @@ class RunGraphSnapshotTest(unittest.TestCase):
                 self.assertEqual(initial_state["checkpoint_metadata"]["checkpoint_id"], "checkpoint-pause")
                 self.assertEqual(initial_state["output_previews"][0]["value"], "draft")
                 self.assertEqual(initial_state["final_result"], "draft")
-                self.assertEqual(captured["resume_command"], {"name": "人工确认"})
+                self.assertEqual(captured["resume_command"], {name_key: "人工确认"})
 
 
 if __name__ == "__main__":

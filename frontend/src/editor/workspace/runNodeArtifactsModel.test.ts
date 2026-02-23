@@ -3,7 +3,7 @@ import test from "node:test";
 
 import type { RunDetail } from "../../types/run.ts";
 
-import { buildRunNodeArtifactsModel } from "./runNodeArtifactsModel.ts";
+import { buildRunNodeArtifactsModel, mergeRunOutputPreviewByNodeId } from "./runNodeArtifactsModel.ts";
 
 function createRunDetail(overrides: Partial<RunDetail> = {}): RunDetail {
   return {
@@ -140,4 +140,34 @@ test("buildRunNodeArtifactsModel extracts output previews and failed node messag
     answer_helper: "Tool execution crashed.",
   });
   assert.deepEqual(model.activeEdgeIds, ["answer_helper->output_answer"]);
+});
+
+test("mergeRunOutputPreviewByNodeId preserves streaming previews when active polling has no preview yet", () => {
+  const current = {
+    output_answer: {
+      text: "partial streamed answer",
+      displayMode: "plain",
+    },
+  };
+
+  assert.deepEqual(mergeRunOutputPreviewByNodeId(current, {}, { preserveMissing: true }), current);
+  assert.deepEqual(mergeRunOutputPreviewByNodeId(current, {}, { preserveMissing: false }), {});
+  assert.deepEqual(
+    mergeRunOutputPreviewByNodeId(
+      current,
+      {
+        output_answer: {
+          text: "final answer",
+          displayMode: "markdown",
+        },
+      },
+      { preserveMissing: true },
+    ),
+    {
+      output_answer: {
+        text: "final answer",
+        displayMode: "markdown",
+      },
+    },
+  );
 });

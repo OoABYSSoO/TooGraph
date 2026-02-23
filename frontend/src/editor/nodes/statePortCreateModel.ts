@@ -1,4 +1,5 @@
 import type { StateDefinition } from "../../types/node-system.ts";
+import { resolveDefaultStateColor } from "../workspace/statePanelFields.ts";
 
 export type StatePortSearchField = {
   key: string;
@@ -18,17 +19,16 @@ export function matchesStatePortSearch(field: StatePortSearchField, query: strin
   }
 
   const haystacks = [
-    normalizeStateSearchText(field.name.trim() || field.key),
-    normalizeStateSearchText(field.key),
+    normalizeStateSearchText(field.name.trim()),
     normalizeStateSearchText(field.description),
-  ];
+  ].filter(Boolean);
 
   if (haystacks.some((value) => value.includes(normalizedQuery))) {
     return true;
   }
 
   const queryTerms = normalizedQuery.split(" ").filter(Boolean);
-  const words = normalizeStateSearchText(`${field.name} ${field.key}`).split(" ").filter(Boolean);
+  const words = normalizeStateSearchText(field.name).split(" ").filter(Boolean);
   if (queryTerms.length > 0 && queryTerms.every((term) => words.some((word) => word.startsWith(term)))) {
     return true;
   }
@@ -45,11 +45,11 @@ export function createStateDraftFromQuery(query: string, existingKeys: string[])
   return {
     key,
     definition: {
-      name: trimmedQuery || key,
+      name: trimmedQuery || buildDefaultStateName(key),
       description: "",
       type: "text",
       value: "",
-      color: "",
+      color: resolveDefaultStateColor(key, existingKeys),
     },
   };
 }
@@ -63,6 +63,11 @@ function createIndexedStateKey(prefix: string, existingKeys: string[]) {
     nextKey = `${prefix}_${index}`;
   }
   return nextKey;
+}
+
+function buildDefaultStateName(stateKey: string) {
+  const match = stateKey.match(/^state_(\d+)$/);
+  return match ? `State ${match[1]}` : "State";
 }
 
 function normalizeStateSearchText(value: string) {

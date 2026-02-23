@@ -76,7 +76,8 @@ test("EditorWorkspaceShell wires node top-action events into state updates, node
   assert.match(componentSource, /import \{ fetchPreset, fetchPresets, savePreset \} from "@\/api\/presets";/);
   assert.match(componentSource, /import \{ buildPresetPayloadForNode \} from "\.\/presetPersistence\.ts";/);
   assert.match(componentSource, /@update-node-metadata="updateNodeMetadataForTab\(tab\.tabId, \$event\.nodeId, \$event\.patch\)"/);
-  assert.match(componentSource, /@rename-state="renameStateField\(tab\.tabId, \$event\.currentKey, \$event\.nextKey\)"/);
+  assert.doesNotMatch(componentSource, /@rename-state="renameStateField/);
+  assert.doesNotMatch(componentSource, /function renameStateField/);
   assert.match(componentSource, /@update-state="updateStateField\(tab\.tabId, \$event\.stateKey, \$event\.patch\)"/);
   assert.match(componentSource, /@remove-port-state="removeNodePortStateForTab\(tab\.tabId, \$event\.nodeId, \$event\.side, \$event\.stateKey\)"/);
   assert.match(componentSource, /@disconnect-data-edge="disconnectDataEdgeForTab\(tab\.tabId, \$event\.sourceNodeId, \$event\.targetNodeId, \$event\.stateKey, \$event\.mode\)"/);
@@ -96,6 +97,8 @@ test("EditorWorkspaceShell wires node top-action events into state updates, node
 test("EditorWorkspaceShell blocks deleting State definitions that are still referenced by nodes", () => {
   assert.match(componentSource, /import \{[\s\S]*deleteStateFieldFromDocument[\s\S]*listStateFieldUsageLabels[\s\S]*\} from "\.\/statePanelFields\.ts";/);
   assert.match(componentSource, /function deleteStateField\(tabId: string, stateKey: string\)/);
+  assert.match(componentSource, /if \(!document\.state_schema\[stateKey\]\) \{/);
+  assert.match(componentSource, /t\("statePanel\.deleteStateMissing"\)/);
   assert.match(componentSource, /const usageLabels = listStateFieldUsageLabels\(document, stateKey\);/);
   assert.match(componentSource, /if \(usageLabels\.length > 0\) \{/);
   assert.match(componentSource, /t\("statePanel\.deleteStateBlocked", \{ nodes: formatStateUsageLabelList\(usageLabels\) \}\)/);
@@ -139,9 +142,14 @@ test("EditorWorkspaceShell keeps top chrome and editor body from overflowing the
 
 test("EditorWorkspaceShell routes menu selections and dropped files through the node-creation execution helpers", () => {
   assert.match(componentSource, /import \{ createNodeFromCreationEntry, createNodeFromDroppedFile \} from "\.\/nodeCreationExecution\.ts";/);
+  assert.match(componentSource, /const dataEdgeStateEditorRequestByTabId = ref<Record<string, DataEdgeStateEditorRequest \| null>>\(\{\}\);/);
+  assert.match(componentSource, /:state-editor-request="dataEdgeStateEditorRequestByTabId\[tab\.tabId\] \?\? null"/);
   assert.match(componentSource, /const result = createNodeFromCreationEntry\(document, \{/);
   assert.match(componentSource, /const result = await createNodeFromDroppedFile\(document, \{/);
   assert.match(componentSource, /markDocumentDirty\(tabId, result\.document\)/);
+  assert.match(componentSource, /openCreatedStateEdgeEditorForTab\(tabId, menuState\.context, result\)/);
+  assert.match(componentSource, /function openCreatedStateEdgeEditorForTab/);
+  assert.match(componentSource, /createdStateKey: string \| null/);
   assert.doesNotMatch(componentSource, /focusNodeForTab\(tabId, result\.createdNodeId\)/);
   assert.doesNotMatch(componentSource, /requestNodeFocusForTab\(tabId, result\.createdNodeId\)/);
   assert.match(componentSource, /closeNodeCreationMenu\(tabId\)/);
@@ -271,6 +279,14 @@ test("EditorWorkspaceShell persists graph document drafts across route changes a
   assert.match(componentSource, /writePersistedEditorDocumentDraft\(tabId, syncedDocument\);/);
   assert.match(componentSource, /removePersistedEditorDocumentDraft\(tabId\);/);
   assert.match(componentSource, /prunePersistedEditorDocumentDrafts\(nextWorkspace\.tabs\.map\(\(tab\) => tab\.tabId\)\);/);
+});
+
+test("EditorWorkspaceShell persists terminal run state values into the graph draft", () => {
+  assert.match(componentSource, /import \{ applyRunWrittenStateValuesToDocument \} from "\.\/runStatePersistence\.ts";/);
+  assert.match(componentSource, /function persistRunStateValuesForTab\(tabId: string, run: RunDetail\)/);
+  assert.match(componentSource, /const nextDocument = applyRunWrittenStateValuesToDocument\(document, run\);/);
+  assert.match(componentSource, /if \(nextDocument !== document\) \{[\s\S]*setDocumentForTab\(tabId, nextDocument\);[\s\S]*\}/);
+  assert.match(componentSource, /persistRunStateValuesForTab\(tabId, run\);/);
 });
 
 test("EditorWorkspaceShell renders the graph action controls as a detached capsule instead of passing them through EditorTabBar", () => {
