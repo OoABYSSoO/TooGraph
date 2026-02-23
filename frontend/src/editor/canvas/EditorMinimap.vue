@@ -143,11 +143,8 @@ function emitWorldPointFromEvent(event: PointerEvent) {
 
 <style scoped>
 .editor-minimap {
-  position: absolute;
-  right: calc(22px + var(--editor-canvas-minimap-right-clearance, 0px));
-  bottom: 22px;
-  z-index: 30;
-  width: 224px;
+  position: relative;
+  width: var(--editor-canvas-navigation-width, 224px);
   height: 160px;
   isolation: isolate;
   overflow: hidden;
@@ -157,8 +154,8 @@ function emitWorldPointFromEvent(event: PointerEvent) {
   box-shadow: var(--graphite-glass-shadow), var(--graphite-glass-highlight), var(--graphite-glass-rim);
   backdrop-filter: blur(24px) saturate(1.6) contrast(1.02);
   cursor: grab;
+  pointer-events: auto;
   touch-action: none;
-  transition: right 180ms ease;
 }
 
 .editor-minimap::before {

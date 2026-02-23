@@ -28,11 +28,9 @@ class Position(BaseModel):
     y: float
 
 
-class NodeViewportSize(BaseModel):
-    width: float | None = None
-    height: float | None = None
-
-    model_config = ConfigDict(extra="ignore")
+class NodeSystemNodeSize(BaseModel):
+    width: float = Field(gt=0)
+    height: float = Field(gt=0)
 
 
 class ValidationIssue(BaseModel):
@@ -153,10 +151,9 @@ class NodeSystemWriteBinding(BaseModel):
 class NodeSystemNodeUi(BaseModel):
     position: Position
     collapsed: bool = False
-    expanded_size: NodeViewportSize | None = Field(default=None, alias="expandedSize")
-    collapsed_size: NodeViewportSize | None = Field(default=None, alias="collapsedSize")
+    size: NodeSystemNodeSize | None = None
 
-    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
 
 class NodeSystemInputConfig(BaseModel):

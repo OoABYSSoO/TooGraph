@@ -14,8 +14,8 @@
     @pointermove="handleCanvasPointerMove"
     @pointerup="handleCanvasPointerUp"
     @pointercancel="handleCanvasPointerUp"
-    @keydown.delete.prevent="handleSelectedEdgeDelete"
-    @keydown.backspace.prevent="handleSelectedEdgeDelete"
+    @keydown.delete="handleSelectedEdgeDelete"
+    @keydown.backspace="handleSelectedEdgeDelete"
     @keydown.escape.prevent="clearCanvasTransientState"
     @wheel.prevent="handleWheel"
     @dragover.prevent="handleCanvasDragOver"
@@ -179,7 +179,10 @@
         :key="nodeId"
         :ref="(element) => registerNodeRef(nodeId, element)"
         class="editor-canvas__node"
-        :class="{ 'editor-canvas__node--selected': isNodeVisuallySelected(nodeId) }"
+        :class="{
+          'editor-canvas__node--selected': isNodeVisuallySelected(nodeId),
+          'editor-canvas__node--resizing': nodeResizeDrag?.nodeId === nodeId,
+        }"
         :style="nodeStyle(node.ui.position)"
         @pointerenter="setHoveredNode(nodeId)"
         @pointerleave="clearHoveredNode(nodeId)"
@@ -194,6 +197,7 @@
         />
         <NodeCard
           :class="resolveRunNodeClassList(nodeId)"
+          :style="nodeCardSizeStyle(node)"
           :node-id="nodeId"
           :node="node"
           :state-schema="document.state_schema"
@@ -237,6 +241,17 @@
           @refresh-agent-models="emit('refresh-agent-models')"
           @update-output-config="emit('update-output-config', $event)"
         />
+        <div v-if="isNodeResizeHotzoneEnabled()" class="editor-canvas__resize-hotzones">
+          <div
+            v-for="handle in NODE_RESIZE_HANDLES"
+            :key="handle"
+            data-node-resize-hotzone="true"
+            class="editor-canvas__resize-hotzone"
+            :class="`editor-canvas__resize-hotzone--${handle}`"
+            aria-hidden="true"
+            @pointerdown.stop.prevent="handleNodeResizePointerDown(nodeId, handle, $event)"
+          ></div>
+        </div>
       </div>
       <div class="editor-canvas__flow-hotspots" aria-hidden="true">
         <div
@@ -298,20 +313,43 @@
         />
       </svg>
     </div>
-    <EditorMinimap
-      class="editor-canvas__minimap"
-      :nodes="minimapNodes"
-      :edges="minimapEdges"
-      :viewport="viewport.viewport"
-      :canvas-size="canvasSize"
-      @center-view="handleMinimapCenterView"
-    />
+    <div class="editor-canvas__navigation-stack">
+      <div
+        class="editor-canvas__zoom-toolbar"
+        role="toolbar"
+        :aria-label="t('canvasZoom.toolbar')"
+        @pointerdown.stop
+        @pointerup.stop
+        @dblclick.stop
+        @click.stop
+        @wheel.stop
+      >
+        <button type="button" class="editor-canvas__zoom-button" :aria-label="t('canvasZoom.zoomOut')" :title="t('canvasZoom.zoomOut')" @click.stop="handleZoomOut">
+          <ElIcon aria-hidden="true"><Minus /></ElIcon>
+        </button>
+        <span class="editor-canvas__zoom-label" aria-live="polite">{{ zoomPercentLabel }}</span>
+        <button type="button" class="editor-canvas__zoom-button" :aria-label="t('canvasZoom.zoomIn')" :title="t('canvasZoom.zoomIn')" @click.stop="handleZoomIn">
+          <ElIcon aria-hidden="true"><Plus /></ElIcon>
+        </button>
+        <button type="button" class="editor-canvas__zoom-button" :aria-label="t('canvasZoom.reset')" :title="t('canvasZoom.reset')" @click.stop="handleZoomReset">
+          <ElIcon aria-hidden="true"><RefreshLeft /></ElIcon>
+        </button>
+      </div>
+      <EditorMinimap
+        class="editor-canvas__minimap"
+        :nodes="minimapNodes"
+        :edges="minimapEdges"
+        :viewport="viewport.viewport"
+        :canvas-size="canvasSize"
+        @center-view="handleMinimapCenterView"
+      />
+    </div>
   </section>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, toRef, watch } from "vue";
-import { Check } from "@element-plus/icons-vue";
+import { Check, Minus, Plus, RefreshLeft } from "@element-plus/icons-vue";
 import { useI18n } from "vue-i18n";
 
 import { buildAnchorModel } from "@/editor/anchors/anchorModel";
@@ -326,9 +364,18 @@ import { resolveEdgeRunPresentation } from "@/editor/canvas/runEdgePresentation"
 import { resolveNodeRunPresentation } from "@/editor/canvas/runNodePresentation";
 import { resolveCanvasLayout, type MeasuredAnchorOffset } from "@/editor/canvas/resolvedCanvasLayout";
 import { resolveCanvasSurfaceStyle } from "@/editor/canvas/canvasSurfaceStyle";
+import { isEditableKeyboardEventTarget } from "@/editor/canvas/canvasKeyboard";
+import { DEFAULT_CANVAS_VIEWPORT, type CanvasViewport } from "@/editor/canvas/canvasViewport";
+import {
+  NODE_RESIZE_HANDLES,
+  normalizeNodeSize,
+  resolveNodeResize,
+  type NodeResizeHandle,
+} from "./nodeResize.ts";
 import {
   buildEdgeVisibilityModeOptions,
   filterProjectedEdgesForVisibilityMode,
+  shouldShowOutputFlowHandle,
   type EdgeVisibilityMode,
 } from "./edgeVisibilityModel";
 import {
@@ -347,7 +394,7 @@ import { useViewport } from "./useViewport";
 import { isAgentBreakpointEnabledInDocument, resolveAgentBreakpointTimingInDocument } from "@/lib/graph-document";
 import type { KnowledgeBaseRecord } from "@/types/knowledge";
 import type { SkillDefinition } from "@/types/skills";
-import type { AgentNode, ConditionNode, GraphDocument, GraphNode, GraphPayload, GraphPosition, InputNode, OutputNode, StateDefinition } from "@/types/node-system";
+import type { AgentNode, ConditionNode, GraphDocument, GraphNode, GraphNodeSize, GraphPayload, GraphPosition, InputNode, OutputNode, StateDefinition } from "@/types/node-system";
 
 const props = defineProps<{
   document: GraphPayload | GraphDocument;
@@ -367,6 +414,7 @@ const props = defineProps<{
   runFailureMessageByNodeId?: Record<string, string>;
   activeRunEdgeIds?: string[];
   interactionLocked?: boolean;
+  initialViewport?: CanvasViewport | null;
 }>();
 
 const { t, locale } = useI18n();
@@ -377,6 +425,7 @@ const edgeVisibilityModeOptions = computed(() => {
 
 const emit = defineEmits<{
   (event: "update:node-position", payload: { nodeId: string; position: GraphPosition }): void;
+  (event: "update:node-size", payload: { nodeId: string; position: GraphPosition; size: GraphNodeSize }): void;
   (event: "select-node", nodeId: string | null): void;
   (event: "update-node-metadata", payload: { nodeId: string; patch: Partial<Pick<InputNode | AgentNode | ConditionNode | OutputNode, "name" | "description">> }): void;
   (event: "update-input-config", payload: { nodeId: string; patch: Partial<InputNode["config"]> }): void;
@@ -408,6 +457,7 @@ const emit = defineEmits<{
   (event: "remove-route", payload: { sourceNodeId: string; branchKey: string }): void;
   (event: "open-node-creation-menu", payload: { position: GraphPosition; sourceNodeId?: string; sourceAnchorKind?: "flow-out" | "route-out" | "state-out"; sourceBranchKey?: string; sourceStateKey?: string; sourceValueType?: string | null; clientX: number; clientY: number }): void;
   (event: "create-node-from-file", payload: { file: File; position: GraphPosition; clientX: number; clientY: number }): void;
+  (event: "update:viewport", payload: CanvasViewport): void;
 }>();
 
 const canvasRef = ref<HTMLElement | null>(null);
@@ -427,7 +477,7 @@ type PendingStateInputSource = {
 const STATE_INPUT_HIT_PADDING = 8;
 const measuredNodeSizes = ref<Record<string, MeasuredNodeSize>>({});
 const canvasSize = ref({ width: 0, height: 0 });
-const viewport = useViewport();
+const viewport = useViewport(props.initialViewport ?? undefined);
 const selection = useNodeSelectionFocus({
   externalSelectedNodeId: toRef(props, "selectedNodeId"),
   externalFocusRequest: toRef(props, "focusRequest"),
@@ -447,6 +497,17 @@ const nodeDrag = ref<{
   startClientY: number;
   originX: number;
   originY: number;
+  captureElement: HTMLElement | null;
+  moved: boolean;
+} | null>(null);
+const nodeResizeDrag = ref<{
+  nodeId: string;
+  pointerId: number;
+  handle: NodeResizeHandle;
+  startClientX: number;
+  startClientY: number;
+  originPosition: GraphPosition;
+  originSize: GraphNodeSize;
   captureElement: HTMLElement | null;
   moved: boolean;
 } | null>(null);
@@ -506,14 +567,15 @@ const nodeEntries = computed(() => Object.entries(props.document.nodes));
 const minimapNodes = computed(() =>
   nodeEntries.value.map(([nodeId, node]) => {
     const measuredSize = measuredNodeSizes.value[nodeId];
+    const storedSize = normalizeNodeSize(node.ui.size);
     const fallbackSize = resolveFallbackNodeSize(node);
     return {
       id: nodeId,
       kind: node.kind,
       x: node.ui.position.x,
       y: node.ui.position.y,
-      width: measuredSize?.width ?? fallbackSize.width,
-      height: measuredSize?.height ?? fallbackSize.height,
+      width: measuredSize?.width ?? storedSize?.width ?? fallbackSize.width,
+      height: measuredSize?.height ?? storedSize?.height ?? fallbackSize.height,
       selected: selection.selectedNodeId.value === nodeId,
       runState: resolveMinimapRunState(props.runNodeStatusByNodeId?.[nodeId]),
     };
@@ -536,16 +598,6 @@ const conditionRouteTargetsByNodeId = computed(() =>
 );
 const resolvedCanvasLayout = computed(() => resolveCanvasLayout(props.document, measuredAnchorOffsets.value));
 const projectedEdges = computed(() => resolvedCanvasLayout.value.edges);
-const edgeVisibilityRelatedNodeIds = computed(() => {
-  const nodeIds = new Set<string>();
-  if (selection.selectedNodeId.value) {
-    nodeIds.add(selection.selectedNodeId.value);
-  }
-  if (hoveredNodeId.value) {
-    nodeIds.add(hoveredNodeId.value);
-  }
-  return nodeIds;
-});
 const forceVisibleProjectedEdgeIds = computed(() => {
   const edgeIds = new Set<string>();
   if (selectedEdgeId.value) {
@@ -567,7 +619,6 @@ const visibleProjectedEdgeIds = computed(
     new Set(
       filterProjectedEdgesForVisibilityMode(projectedEdges.value, {
         mode: edgeVisibilityMode.value,
-        relatedNodeIds: edgeVisibilityRelatedNodeIds.value,
         forceVisibleEdgeIds: forceVisibleProjectedEdgeIds.value,
       }).map((edge) => edge.id),
     ),
@@ -747,6 +798,7 @@ const canvasSurfaceStyle = computed(() => resolveCanvasSurfaceStyle(viewport.vie
 const viewportStyle = computed(() => ({
   transform: `translate(${viewport.viewport.x}px, ${viewport.viewport.y}px) scale(${viewport.viewport.scale})`,
 }));
+const zoomPercentLabel = computed(() => `${Math.round(viewport.viewport.scale * 100)}%`);
 const stateTypeOptions = STATE_FIELD_TYPE_OPTIONS;
 const flowEdgeDeleteConfirmStyle = computed(() => {
   if (!activeFlowEdgeDeleteConfirm.value) {
@@ -779,6 +831,18 @@ const dataEdgeStateEditorStyle = computed(() => {
   };
 });
 const dataEdgeStateColorOptions = computed(() => resolveStateColorOptions(dataEdgeStateDraft.value?.definition.color ?? ""));
+
+watch(
+  () => ({
+    x: viewport.viewport.x,
+    y: viewport.viewport.y,
+    scale: viewport.viewport.scale,
+  }),
+  (nextViewport) => {
+    emit("update:viewport", nextViewport);
+  },
+  { immediate: true },
+);
 
 function isFlowEdgeDeleteConfirmOpen(edgeId: string) {
   return activeFlowEdgeDeleteConfirm.value?.id === edgeId;
@@ -1210,6 +1274,21 @@ function nodeStyle(position: GraphPosition) {
   return {
     transform: `translate(${position.x}px, ${position.y}px)`,
   };
+}
+
+function nodeCardSizeStyle(node: GraphNode) {
+  const size = normalizeNodeSize(node.ui.size);
+  if (!size) {
+    return undefined;
+  }
+  return {
+    "--node-card-width": `${size.width}px`,
+    "--node-card-min-height": `${size.height}px`,
+  };
+}
+
+function resolveNodeRenderedSize(nodeId: string, node: GraphNode): GraphNodeSize {
+  return measuredNodeSizes.value[nodeId] ?? normalizeNodeSize(node.ui.size) ?? resolveFallbackNodeSize(node);
 }
 
 function resolveFallbackNodeSize(node: GraphNode): MeasuredNodeSize {
@@ -1791,6 +1870,34 @@ function handleCanvasPointerMove(event: PointerEvent) {
     });
     return;
   }
+  if (nodeResizeDrag.value && nodeResizeDrag.value.pointerId === event.pointerId) {
+    const pointerDeltaX = event.clientX - nodeResizeDrag.value.startClientX;
+    const pointerDeltaY = event.clientY - nodeResizeDrag.value.startClientY;
+    if (!nodeResizeDrag.value.moved) {
+      if (Math.abs(pointerDeltaX) <= 3 && Math.abs(pointerDeltaY) <= 3) {
+        return;
+      }
+      nodeResizeDrag.value.moved = true;
+      if (nodeResizeDrag.value.captureElement && !nodeResizeDrag.value.captureElement.hasPointerCapture(event.pointerId)) {
+        nodeResizeDrag.value.captureElement.setPointerCapture(event.pointerId);
+      }
+    }
+    const resizeResult = resolveNodeResize({
+      handle: nodeResizeDrag.value.handle,
+      originPosition: nodeResizeDrag.value.originPosition,
+      originSize: nodeResizeDrag.value.originSize,
+      deltaX: pointerDeltaX / viewport.viewport.scale,
+      deltaY: pointerDeltaY / viewport.viewport.scale,
+    });
+    const nodeId = nodeResizeDrag.value.nodeId;
+    scheduleDragFrame(() => {
+      emit("update:node-size", {
+        nodeId,
+        ...resizeResult,
+      });
+    });
+    return;
+  }
   if (nodeDrag.value && nodeDrag.value.pointerId === event.pointerId) {
     const pointerDeltaX = event.clientX - nodeDrag.value.startClientX;
     const pointerDeltaY = event.clientY - nodeDrag.value.startClientY;
@@ -1839,6 +1946,9 @@ function handleCanvasPointerUp(event: PointerEvent) {
   if (nodeDrag.value?.captureElement?.hasPointerCapture(event.pointerId)) {
     nodeDrag.value.captureElement.releasePointerCapture(event.pointerId);
   }
+  if (nodeResizeDrag.value?.captureElement?.hasPointerCapture(event.pointerId)) {
+    nodeResizeDrag.value.captureElement.releasePointerCapture(event.pointerId);
+  }
   if (activeConnection.value) {
     if (isGraphEditingLocked()) {
       pendingConnection.value = null;
@@ -1857,6 +1967,12 @@ function handleCanvasPointerUp(event: PointerEvent) {
       startSuppressedNodeClickWindow(nodeDrag.value.nodeId);
     }
     nodeDrag.value = null;
+  }
+  if (nodeResizeDrag.value && nodeResizeDrag.value.pointerId === event.pointerId) {
+    if (nodeResizeDrag.value.moved) {
+      startSuppressedNodeClickWindow(nodeResizeDrag.value.nodeId);
+    }
+    nodeResizeDrag.value = null;
   }
   viewport.endPan(event);
 }
@@ -2092,6 +2208,51 @@ function handleNodePointerDown(nodeId: string, event: PointerEvent) {
   };
 }
 
+function handleNodeResizePointerDown(nodeId: string, handle: NodeResizeHandle, event: PointerEvent) {
+  const node = props.document.nodes[nodeId];
+  if (!node) {
+    return;
+  }
+  if (isGraphEditingLocked()) {
+    event.preventDefault();
+    emit("locked-edit-attempt");
+    return;
+  }
+  if (activeConnection.value) {
+    return;
+  }
+
+  canvasRef.value?.focus();
+  let captureElement: HTMLElement | null = null;
+  if (event.currentTarget instanceof HTMLElement) {
+    captureElement = event.currentTarget;
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  clearCanvasTransientState();
+  pendingConnection.value = null;
+  pendingConnectionPoint.value = null;
+  cancelScheduledDragFrame();
+  selectedEdgeId.value = null;
+  nodeDrag.value = null;
+  selection.selectNode(nodeId);
+  nodeResizeDrag.value = {
+    nodeId,
+    pointerId: event.pointerId,
+    handle,
+    startClientX: event.clientX,
+    startClientY: event.clientY,
+    originPosition: { ...node.ui.position },
+    originSize: resolveNodeRenderedSize(nodeId, node),
+    captureElement,
+    moved: false,
+  };
+}
+
+function isNodeResizeHotzoneEnabled() {
+  return !isGraphEditingLocked() && !activeConnection.value;
+}
+
 function setHoveredNode(nodeId: string) {
   hoveredNodeId.value = nodeId;
 }
@@ -2112,17 +2273,56 @@ function clearHoveredFlowHandleNode(nodeId: string) {
   }
 }
 
+function isOutputFlowHandleNodeInteracted(nodeId: string) {
+  return (
+    selection.selectedNodeId.value === nodeId ||
+    hoveredNodeId.value === nodeId ||
+    hoveredFlowHandleNodeId.value === nodeId
+  );
+}
+
 function isFlowHotspotVisible(anchor: ProjectedCanvasAnchor) {
   if (anchor.kind === "flow-out" || anchor.kind === "route-out") {
-    return (
-      selection.selectedNodeId.value === anchor.nodeId ||
-      hoveredNodeId.value === anchor.nodeId ||
-      hoveredFlowHandleNodeId.value === anchor.nodeId ||
-      activeConnectionSourceAnchorId.value === anchor.id
-    );
+    return shouldShowOutputFlowHandle({
+      mode: edgeVisibilityMode.value,
+      anchorKind: anchor.kind,
+      isNodeInteracted: isOutputFlowHandleNodeInteracted(anchor.nodeId),
+      isActiveConnectionSource: activeConnectionSourceAnchorId.value === anchor.id,
+    });
   }
 
   return eligibleTargetAnchorIds.value.has(anchor.id);
+}
+
+function zoomViewportAroundCanvasCenter(nextScale: number) {
+  const rect = canvasRef.value?.getBoundingClientRect();
+  if (!rect) {
+    viewport.setViewport({
+      ...viewport.viewport,
+      scale: nextScale,
+    });
+    return;
+  }
+
+  viewport.zoomAt({
+    clientX: rect.left + rect.width / 2,
+    clientY: rect.top + rect.height / 2,
+    canvasLeft: rect.left,
+    canvasTop: rect.top,
+    nextScale,
+  });
+}
+
+function handleZoomOut() {
+  zoomViewportAroundCanvasCenter(viewport.viewport.scale - 0.1);
+}
+
+function handleZoomIn() {
+  zoomViewportAroundCanvasCenter(viewport.viewport.scale + 0.1);
+}
+
+function handleZoomReset() {
+  viewport.setViewport(DEFAULT_CANVAS_VIEWPORT);
 }
 
 function handleWheel(event: WheelEvent) {
@@ -2361,14 +2561,19 @@ function completePendingConnection(targetAnchor: ProjectedCanvasAnchor) {
   selectedEdgeId.value = null;
 }
 
-function handleSelectedEdgeDelete() {
+function handleSelectedEdgeDelete(event: KeyboardEvent) {
+  if (isEditableKeyboardEventTarget(event.target)) {
+    return;
+  }
   if (guardLockedCanvasInteraction()) {
+    event.preventDefault();
     return;
   }
   const edge = selectedEdgeId.value ? projectedEdges.value.find((candidate) => candidate.id === selectedEdgeId.value) : null;
   if (!edge) {
     return;
   }
+  event.preventDefault();
 
   if (edge.kind === "flow") {
     emit("remove-flow", {
@@ -2651,6 +2856,95 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
 .editor-canvas__edge-view-button--active:hover {
   background: rgba(154, 52, 18, 0.9);
   color: rgba(255, 250, 242, 0.98);
+}
+
+.editor-canvas__navigation-stack {
+  --editor-canvas-navigation-width: 224px;
+  position: absolute;
+  right: calc(22px + var(--editor-canvas-minimap-right-clearance, 0px));
+  bottom: 22px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  width: var(--editor-canvas-navigation-width);
+  pointer-events: none;
+  transition: right 180ms ease;
+}
+
+.editor-canvas__zoom-toolbar {
+  box-sizing: border-box;
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  overflow: hidden;
+  padding: 5px;
+  border: 1px solid var(--graphite-glass-border);
+  border-radius: 999px;
+  background: var(--graphite-glass-bg);
+  box-shadow:
+    0 8px 20px rgba(31, 28, 24, 0.045),
+    var(--graphite-glass-highlight),
+    var(--graphite-glass-rim);
+  backdrop-filter: blur(20px) saturate(1.45) contrast(1.01);
+  cursor: default;
+  pointer-events: auto;
+}
+
+.editor-canvas__zoom-toolbar::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 1px;
+  z-index: 0;
+  border-radius: inherit;
+  background: var(--graphite-glass-specular), var(--graphite-glass-lens);
+  mix-blend-mode: screen;
+  opacity: 0.36;
+}
+
+.editor-canvas__zoom-button,
+.editor-canvas__zoom-label {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  border-radius: 999px;
+  color: rgba(73, 52, 34, 0.72);
+  font-size: 0.76rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.editor-canvas__zoom-button {
+  width: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.editor-canvas__zoom-button:hover {
+  background: rgba(154, 52, 18, 0.08);
+  color: rgba(75, 42, 18, 0.92);
+}
+
+.editor-canvas__zoom-label {
+  min-width: 48px;
+  padding: 0 8px;
+  background: rgba(255, 250, 242, 0.42);
+  font-variant-numeric: tabular-nums;
 }
 
 .editor-canvas__viewport {
@@ -2995,9 +3289,15 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
 .editor-canvas__flow-hotspot {
   position: absolute;
   transform: translate(-50%, -50%);
-  pointer-events: auto;
+  pointer-events: none;
   cursor: crosshair;
   touch-action: none;
+}
+
+.editor-canvas__flow-hotspot--visible,
+.editor-canvas__flow-hotspot--connect-source,
+.editor-canvas__flow-hotspot--connect-target {
+  pointer-events: auto;
 }
 
 .editor-canvas__route-handle {
@@ -3230,6 +3530,58 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
 .editor-canvas__node:focus-within,
 .editor-canvas__node--selected {
   z-index: 8;
+}
+
+.editor-canvas__node--resizing {
+  z-index: 9;
+}
+
+.editor-canvas__resize-hotzones {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+}
+
+.editor-canvas__resize-hotzone {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.editor-canvas__resize-hotzone--nw {
+  top: -6px;
+  left: -6px;
+}
+
+.editor-canvas__resize-hotzone--ne {
+  top: -6px;
+  right: -6px;
+}
+
+.editor-canvas__resize-hotzone--sw {
+  bottom: -6px;
+  left: -6px;
+}
+
+.editor-canvas__resize-hotzone--se {
+  right: -6px;
+  bottom: -6px;
+}
+
+.editor-canvas__resize-hotzone--nw,
+.editor-canvas__resize-hotzone--se {
+  cursor: nwse-resize;
+}
+
+.editor-canvas__resize-hotzone--ne,
+.editor-canvas__resize-hotzone--sw {
+  cursor: nesw-resize;
 }
 
 @keyframes editor-canvas-lock-banner-breathe {

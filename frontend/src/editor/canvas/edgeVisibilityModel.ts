@@ -40,7 +40,7 @@ export function filterProjectedEdgesForVisibilityMode(
   edges: ProjectedCanvasEdge[],
   options: {
     mode: EdgeVisibilityMode;
-    relatedNodeIds: ReadonlySet<string>;
+    relatedNodeIds?: ReadonlySet<string>;
     forceVisibleEdgeIds?: ReadonlySet<string>;
   },
 ) {
@@ -62,7 +62,7 @@ export function filterProjectedEdgesForVisibilityMode(
       if (edge.kind === "data" || edge.kind === "route") {
         return true;
       }
-      return options.relatedNodeIds.has(edge.source) || options.relatedNodeIds.has(edge.target);
+      return false;
     });
   })();
 
@@ -72,4 +72,32 @@ export function filterProjectedEdgesForVisibilityMode(
 
   const visibleEdgeIds = new Set(visibleEdges.map((edge) => edge.id));
   return edges.filter((edge) => visibleEdgeIds.has(edge.id) || forceVisibleEdgeIds.has(edge.id));
+}
+
+export function isOutputFlowHandleAllowedForEdgeMode(options: {
+  mode: EdgeVisibilityMode;
+  anchorKind: "flow-out" | "route-out";
+}) {
+  if (options.mode === "all" || options.mode === "flow") {
+    return true;
+  }
+  if (options.mode === "smart") {
+    return options.anchorKind === "route-out";
+  }
+  return false;
+}
+
+export function shouldShowOutputFlowHandle(options: {
+  mode: EdgeVisibilityMode;
+  anchorKind: "flow-out" | "route-out";
+  isNodeInteracted: boolean;
+  isActiveConnectionSource: boolean;
+}) {
+  return (
+    isOutputFlowHandleAllowedForEdgeMode({
+      mode: options.mode,
+      anchorKind: options.anchorKind,
+    }) &&
+    (options.isNodeInteracted || options.isActiveConnectionSource)
+  );
 }

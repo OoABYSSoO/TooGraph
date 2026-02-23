@@ -18,6 +18,8 @@ test("buildGenericInputNode creates an expanded input node that writes a default
   assert.equal(result.node.kind, "input");
   assert.equal(result.node.ui.position.x, 120);
   assert.equal(result.node.ui.collapsed, false);
+  assert.equal("expandedSize" in result.node.ui, false);
+  assert.equal("collapsedSize" in result.node.ui, false);
   assert.deepEqual(result.node.writes, [{ state: "value", mode: "replace" }]);
 });
 

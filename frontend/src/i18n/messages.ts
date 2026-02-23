@@ -567,13 +567,19 @@ const baseMessages = {
     edgeMode: {
       toolbar: "线条显示模式",
       smart: "智能",
-      smartTitle: "默认只显示数据流线和条件分支线；悬浮或选中节点时显示相关线",
+      smartTitle: "显示数据流线，并显示条件节点的输出分支线",
       data: "数据",
       dataTitle: "只显示数据流线",
       sequence: "顺序",
       sequenceTitle: "只显示普通顺序流线和条件分支线",
       all: "全量",
       allTitle: "显示全部线条",
+    },
+    canvasZoom: {
+      toolbar: "画布缩放",
+      zoomOut: "缩小",
+      zoomIn: "放大",
+      reset: "重置为 100%",
     },
     nodeCreation: {
       input: "Input",
@@ -1241,13 +1247,19 @@ const baseMessages = {
     edgeMode: {
       toolbar: "Edge display mode",
       smart: "Smart",
-      smartTitle: "Show data edges and condition branches by default; show related edges on hover or selection",
+      smartTitle: "Show data edges and condition-node outgoing branch edges",
       data: "Data",
       dataTitle: "Show data flow edges only",
       sequence: "Sequence",
       sequenceTitle: "Show sequence flow and condition branch edges only",
       all: "All",
       allTitle: "Show all edges",
+    },
+    canvasZoom: {
+      toolbar: "Canvas zoom",
+      zoomOut: "Zoom out",
+      zoomIn: "Zoom in",
+      reset: "Reset to 100%",
     },
     nodeCreation: {
       input: "Input",

@@ -27,8 +27,6 @@ type ApplyNodeCreationResultInput = {
   context?: NodeCreationContext | null;
 };
 
-const DEFAULT_NODE_WIDTH = 320;
-
 function defaultStateDefinitionForType(stateKey: string, type: string): StateDefinition {
   return {
     name: stateKey,
@@ -56,12 +54,10 @@ function defaultValueForStateType(type: string): unknown {
   }
 }
 
-function normalizeCreatedNodeUi(position: GraphPosition, collapsedSize?: GraphNode["ui"]["collapsedSize"], expandedSize?: GraphNode["ui"]["expandedSize"]) {
+function normalizeCreatedNodeUi(position: GraphPosition) {
   return {
     position,
     collapsed: false,
-    collapsedSize: collapsedSize ?? null,
-    expandedSize: expandedSize ?? { width: DEFAULT_NODE_WIDTH },
   };
 }
 
@@ -117,11 +113,7 @@ export function buildNodeFromPreset(preset: PresetDocument, params: { id: string
     id: params.id,
     node: {
       ...preset.definition.node,
-      ui: normalizeCreatedNodeUi(
-        params.position,
-        preset.definition.node.ui.collapsedSize,
-        preset.definition.node.ui.expandedSize,
-      ),
+      ui: normalizeCreatedNodeUi(params.position),
     } as GraphNode,
     state_schema: preset.definition.state_schema,
   };

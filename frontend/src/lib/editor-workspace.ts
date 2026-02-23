@@ -1,3 +1,4 @@
+import { normalizeCanvasViewport, type CanvasViewport } from "../editor/canvas/canvasViewport.ts";
 import type { GraphDocument, GraphPayload } from "../types/node-system.ts";
 
 export type EditorTabKind = "existing" | "new" | "template";
@@ -21,6 +22,7 @@ type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
 export const EDITOR_WORKSPACE_STORAGE_KEY = "graphiteui:editor-workspace";
 export const EDITOR_WORKSPACE_DOCUMENTS_STORAGE_KEY = "graphiteui:editor-document-drafts";
+export const EDITOR_WORKSPACE_VIEWPORTS_STORAGE_KEY = "graphiteui:editor-viewport-drafts";
 
 const EMPTY_EDITOR_WORKSPACE: PersistedEditorWorkspace = {
   activeTabId: null,
@@ -63,6 +65,10 @@ function normalizeGraphDocumentDraft(value: unknown): GraphPayload | GraphDocume
   }
 
   return JSON.parse(JSON.stringify(value)) as GraphPayload | GraphDocument;
+}
+
+function normalizeCanvasViewportDraft(value: unknown): CanvasViewport | null {
+  return normalizeCanvasViewport(value);
 }
 
 function normalizeEditorWorkspaceTab(value: unknown): EditorWorkspaceTab | null {
@@ -206,6 +212,50 @@ function writePersistedEditorDocumentDrafts(drafts: Record<string, GraphPayload 
   }
 }
 
+function readPersistedEditorViewportDrafts(): Record<string, CanvasViewport> {
+  const storage = getLocalStorage();
+  if (!storage) {
+    return {};
+  }
+
+  const raw = storage.getItem(EDITOR_WORKSPACE_VIEWPORTS_STORAGE_KEY);
+  if (!raw) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (!isPlainRecord(parsed)) {
+      return {};
+    }
+
+    const drafts: Record<string, CanvasViewport> = {};
+    for (const [tabId, value] of Object.entries(parsed)) {
+      const normalizedTabId = normalizeNullableString(tabId);
+      const viewport = normalizeCanvasViewportDraft(value);
+      if (normalizedTabId && viewport) {
+        drafts[normalizedTabId] = viewport;
+      }
+    }
+    return drafts;
+  } catch {
+    return {};
+  }
+}
+
+function writePersistedEditorViewportDrafts(drafts: Record<string, CanvasViewport>): void {
+  const storage = getLocalStorage();
+  if (!storage) {
+    return;
+  }
+
+  try {
+    storage.setItem(EDITOR_WORKSPACE_VIEWPORTS_STORAGE_KEY, JSON.stringify(drafts));
+  } catch {
+    // Viewport persistence should never interrupt an editing gesture.
+  }
+}
+
 export function readPersistedEditorDocumentDraft(tabId: string): GraphPayload | GraphDocument | null {
   const normalizedTabId = normalizeNullableString(tabId);
   if (!normalizedTabId) {
@@ -243,6 +293,43 @@ export function removePersistedEditorDocumentDraft(tabId: string): void {
   writePersistedEditorDocumentDrafts(nextDrafts);
 }
 
+export function readPersistedEditorViewportDraft(tabId: string): CanvasViewport | null {
+  const normalizedTabId = normalizeNullableString(tabId);
+  if (!normalizedTabId) {
+    return null;
+  }
+  return readPersistedEditorViewportDrafts()[normalizedTabId] ?? null;
+}
+
+export function writePersistedEditorViewportDraft(tabId: string, viewport: CanvasViewport): void {
+  const normalizedTabId = normalizeNullableString(tabId);
+  const normalizedViewport = normalizeCanvasViewportDraft(viewport);
+  if (!normalizedTabId || !normalizedViewport) {
+    return;
+  }
+
+  writePersistedEditorViewportDrafts({
+    ...readPersistedEditorViewportDrafts(),
+    [normalizedTabId]: normalizedViewport,
+  });
+}
+
+export function removePersistedEditorViewportDraft(tabId: string): void {
+  const normalizedTabId = normalizeNullableString(tabId);
+  if (!normalizedTabId) {
+    return;
+  }
+
+  const drafts = readPersistedEditorViewportDrafts();
+  if (!(normalizedTabId in drafts)) {
+    return;
+  }
+
+  const nextDrafts = { ...drafts };
+  delete nextDrafts[normalizedTabId];
+  writePersistedEditorViewportDrafts(nextDrafts);
+}
+
 export function prunePersistedEditorDocumentDrafts(tabIds: string[]): void {
   const keepTabIds = new Set(tabIds.map(normalizeNullableString).filter((tabId): tabId is string => Boolean(tabId)));
   const drafts = readPersistedEditorDocumentDrafts();
@@ -253,6 +340,18 @@ export function prunePersistedEditorDocumentDrafts(tabIds: string[]): void {
     }
   }
   writePersistedEditorDocumentDrafts(nextDrafts);
+}
+
+export function prunePersistedEditorViewportDrafts(tabIds: string[]): void {
+  const keepTabIds = new Set(tabIds.map(normalizeNullableString).filter((tabId): tabId is string => Boolean(tabId)));
+  const drafts = readPersistedEditorViewportDrafts();
+  const nextDrafts: Record<string, CanvasViewport> = {};
+  for (const [tabId, draft] of Object.entries(drafts)) {
+    if (keepTabIds.has(tabId)) {
+      nextDrafts[tabId] = draft;
+    }
+  }
+  writePersistedEditorViewportDrafts(nextDrafts);
 }
 
 export function resolveEditorUrl(graphId: string | null): string {

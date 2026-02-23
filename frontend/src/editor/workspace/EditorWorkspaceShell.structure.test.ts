@@ -32,6 +32,14 @@ test("EditorWorkspaceShell refreshes settings when an agent model menu opens", (
   assert.match(componentSource, /settings\.value = await fetchSettings\(\)/);
 });
 
+test("EditorWorkspaceShell persists node resize updates into the graph draft", () => {
+  assert.match(componentSource, /import type \{[\s\S]*GraphNodeSize[\s\S]*\} from "@\/types\/node-system";/);
+  assert.match(componentSource, /@update:node-size="handleNodeSizeUpdate\(tab\.tabId, \$event\)"/);
+  assert.match(componentSource, /function handleNodeSizeUpdate\(tabId: string, payload: \{ nodeId: string; position: GraphPosition; size: GraphNodeSize \}\)/);
+  assert.match(componentSource, /nextDocument\.nodes\[payload\.nodeId\]\.ui\.position = payload\.position;/);
+  assert.match(componentSource, /nextDocument\.nodes\[payload\.nodeId\]\.ui\.size = payload\.size;/);
+});
+
 test("EditorWorkspaceShell loads persisted presets for the node creation menu", () => {
   assert.match(componentSource, /import \{[\s\S]*fetchPresets[\s\S]*\} from "@\/api\/presets";/);
   assert.match(componentSource, /const persistedPresets = ref<PresetDocument\[\]>\(\[\]\);/);
@@ -125,6 +133,19 @@ test("EditorWorkspaceShell routes menu selections and dropped files through the 
   assert.doesNotMatch(componentSource, /focusNodeForTab\(tabId, result\.createdNodeId\)/);
   assert.doesNotMatch(componentSource, /requestNodeFocusForTab\(tabId, result\.createdNodeId\)/);
   assert.match(componentSource, /closeNodeCreationMenu\(tabId\)/);
+});
+
+test("EditorWorkspaceShell keeps canvas viewport state in local editor drafts", () => {
+  assert.match(componentSource, /readPersistedEditorViewportDraft/);
+  assert.match(componentSource, /writePersistedEditorViewportDraft/);
+  assert.match(componentSource, /prunePersistedEditorViewportDrafts/);
+  assert.match(componentSource, /removePersistedEditorViewportDraft/);
+  assert.match(componentSource, /const viewportByTabId = ref<Record<string, CanvasViewport>>\(\{\}\);/);
+  assert.match(componentSource, /:initial-viewport="viewportByTabId\[tab\.tabId\] \?\? null"/);
+  assert.match(componentSource, /@update:viewport="updateCanvasViewportForTab\(tab\.tabId, \$event\)"/);
+  assert.match(componentSource, /function ensureTabViewportDrafts\(\)/);
+  assert.match(componentSource, /function updateCanvasViewportForTab\(tabId: string, viewport: CanvasViewport\)/);
+  assert.match(componentSource, /writePersistedEditorViewportDraft\(tabId, viewport\)/);
 });
 
 test("EditorWorkspaceShell imports marked GraphiteUI Python files as new graph tabs", () => {

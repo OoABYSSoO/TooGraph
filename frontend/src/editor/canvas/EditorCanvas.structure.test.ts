@@ -25,9 +25,20 @@ test("EditorCanvas mounts a right-bottom minimap backed by measured node geometr
   assert.match(componentSource, /resolveViewportForMinimapCenter\(/);
 });
 
-test("EditorMinimap can be displaced by workspace side panels", () => {
-  assert.match(minimapSource, /\.editor-minimap \{[\s\S]*right:\s*calc\(22px \+ var\(--editor-canvas-minimap-right-clearance,\s*0px\)\);/);
-  assert.match(minimapSource, /\.editor-minimap \{[\s\S]*transition:\s*right 180ms ease;/);
+test("EditorCanvas stacks zoom controls above the minimap at the bottom right", () => {
+  assert.match(
+    componentSource,
+    /class="editor-canvas__navigation-stack"[\s\S]*class="editor-canvas__zoom-toolbar"[\s\S]*<EditorMinimap[\s\S]*class="editor-canvas__minimap"/,
+  );
+  assert.match(componentSource, /\.editor-canvas__navigation-stack \{[\s\S]*--editor-canvas-navigation-width:\s*224px;/);
+  assert.match(componentSource, /\.editor-canvas__navigation-stack \{[\s\S]*right:\s*calc\(22px \+ var\(--editor-canvas-minimap-right-clearance,\s*0px\)\);/);
+  assert.match(componentSource, /\.editor-canvas__navigation-stack \{[\s\S]*bottom:\s*22px;/);
+  assert.match(componentSource, /\.editor-canvas__navigation-stack \{[\s\S]*width:\s*var\(--editor-canvas-navigation-width\);/);
+  assert.match(componentSource, /\.editor-canvas__navigation-stack \{[\s\S]*transition:\s*right 180ms ease;/);
+  assert.match(componentSource, /\.editor-canvas__zoom-toolbar \{[\s\S]*width:\s*100%;/);
+  assert.match(componentSource, /\.editor-canvas__zoom-toolbar \{[\s\S]*box-sizing:\s*border-box;/);
+  assert.match(minimapSource, /\.editor-minimap \{[\s\S]*width:\s*var\(--editor-canvas-navigation-width,\s*224px\);/);
+  assert.match(minimapSource, /\.editor-minimap \{[\s\S]*height:\s*160px;/);
   assert.match(minimapSource, /\.editor-minimap \{[\s\S]*background:\s*var\(--graphite-glass-bg\);/);
   assert.match(minimapSource, /\.editor-minimap \{[\s\S]*box-shadow:\s*var\(--graphite-glass-shadow\),\s*var\(--graphite-glass-highlight\),\s*var\(--graphite-glass-rim\);/);
   assert.match(minimapSource, /\.editor-minimap \{[\s\S]*backdrop-filter:\s*blur\(24px\) saturate\(1\.6\) contrast\(1\.02\);/);
@@ -42,14 +53,57 @@ test("EditorCanvas does not animate node transforms while dragging", () => {
 });
 
 test("EditorCanvas raises hovered and selected nodes above sibling cards", () => {
-  assert.match(componentSource, /:class="\{ 'editor-canvas__node--selected': isNodeVisuallySelected\(nodeId\) \}"/);
+  assert.match(componentSource, /'editor-canvas__node--selected': isNodeVisuallySelected\(nodeId\)/);
   assert.match(componentSource, /<NodeCard[\s\S]*:class="resolveRunNodeClassList\(nodeId\)"/);
   assert.match(componentSource, /\.editor-canvas__node:hover,\n\.editor-canvas__node:focus-within,\n\.editor-canvas__node--selected \{[\s\S]*z-index:\s*8;/);
+});
+
+test("EditorCanvas exposes invisible corner hotzones for real node resizing", () => {
+  assert.match(componentSource, /import \{[\s\S]*NODE_RESIZE_HANDLES,[\s\S]*normalizeNodeSize,[\s\S]*resolveNodeResize,[\s\S]*type NodeResizeHandle[\s\S]*\} from "\.\/nodeResize\.ts";/);
+  assert.match(componentSource, /\(event: "update:node-size", payload: \{ nodeId: string; position: GraphPosition; size: GraphNodeSize \}\): void;/);
+  assert.match(componentSource, /const nodeResizeDrag = ref<\{/);
+  assert.match(componentSource, /:style="nodeCardSizeStyle\(node\)"/);
+  assert.match(componentSource, /v-if="isNodeResizeHotzoneEnabled\(\)"/);
+  assert.match(componentSource, /v-for="handle in NODE_RESIZE_HANDLES"/);
+  assert.match(componentSource, /data-node-resize-hotzone="true"/);
+  assert.match(componentSource, /aria-hidden="true"/);
+  assert.match(componentSource, /@pointerdown\.stop\.prevent="handleNodeResizePointerDown\(nodeId, handle, \$event\)"/);
+  assert.match(componentSource, /function handleNodeResizePointerDown\(nodeId: string, handle: NodeResizeHandle, event: PointerEvent\)/);
+  assert.match(componentSource, /function isNodeResizeHotzoneEnabled\(\) \{[\s\S]*return !isGraphEditingLocked\(\) && !activeConnection\.value;/);
+  assert.doesNotMatch(componentSource, /function isNodeResizeHotzoneEnabled\(nodeId: string\)/);
+  assert.doesNotMatch(componentSource, /nodeResizeDrag\.value\?\.nodeId === nodeId \|\| isNodeVisuallySelected\(nodeId\) \|\| hoveredNodeId\.value === nodeId/);
+  assert.match(componentSource, /resolveNodeResize\(\{[\s\S]*handle: nodeResizeDrag\.value\.handle,/);
+  assert.match(componentSource, /emit\("update:node-size"/);
+  assert.match(componentSource, /\.editor-canvas__resize-hotzones \{[\s\S]*inset:\s*0;/);
+  assert.match(componentSource, /\.editor-canvas__resize-hotzone \{[\s\S]*width:\s*40px;[\s\S]*height:\s*40px;/);
+  assert.match(componentSource, /\.editor-canvas__resize-hotzone \{[\s\S]*background:\s*transparent;/);
+  assert.match(componentSource, /\.editor-canvas__resize-hotzone \{[\s\S]*border:\s*0;/);
+  assert.doesNotMatch(componentSource, /editor-canvas__resize-handle/);
+  assert.doesNotMatch(componentSource, /data-node-resize-handle/);
+  assert.doesNotMatch(componentSource, /:title="t\('canvasResize\.resizeNode'\)"/);
+  assert.match(componentSource, /\.editor-canvas__resize-hotzone--nw \{[\s\S]*top:\s*-6px;[\s\S]*left:\s*-6px;/);
+  assert.match(componentSource, /\.editor-canvas__resize-hotzone--ne \{[\s\S]*top:\s*-6px;[\s\S]*right:\s*-6px;/);
+  assert.match(componentSource, /\.editor-canvas__resize-hotzone--sw \{[\s\S]*bottom:\s*-6px;[\s\S]*left:\s*-6px;/);
+  assert.match(componentSource, /\.editor-canvas__resize-hotzone--se \{[\s\S]*right:\s*-6px;[\s\S]*bottom:\s*-6px;/);
+  assert.match(componentSource, /\.editor-canvas__resize-hotzone--nw,[\s\S]*\.editor-canvas__resize-hotzone--se \{[\s\S]*cursor:\s*nwse-resize;/);
+  assert.match(componentSource, /\.editor-canvas__resize-hotzone--ne,[\s\S]*\.editor-canvas__resize-hotzone--sw \{[\s\S]*cursor:\s*nesw-resize;/);
+  const northwestHotzoneCssBlock = componentSource.match(/\.editor-canvas__resize-hotzone--nw \{([\s\S]*?)\n\}/)?.[1] ?? "";
+  assert.doesNotMatch(northwestHotzoneCssBlock, /transform:/);
 });
 
 test("EditorCanvas forwards node model refresh requests to the workspace", () => {
   assert.match(componentSource, /\(event: "refresh-agent-models"\): void;/);
   assert.match(componentSource, /@refresh-agent-models="emit\('refresh-agent-models'\)"/);
+});
+
+test("EditorCanvas lets editable node fields handle Backspace and Delete normally", () => {
+  assert.doesNotMatch(componentSource, /@keydown\.delete\.prevent=/);
+  assert.doesNotMatch(componentSource, /@keydown\.backspace\.prevent=/);
+  assert.match(componentSource, /@keydown\.delete="handleSelectedEdgeDelete"/);
+  assert.match(componentSource, /@keydown\.backspace="handleSelectedEdgeDelete"/);
+  assert.match(componentSource, /function handleSelectedEdgeDelete\(event: KeyboardEvent\)/);
+  assert.match(componentSource, /isEditableKeyboardEventTarget\(event\.target\)/);
+  assert.match(componentSource, /event\.preventDefault\(\);/);
 });
 
 test("EditorCanvas keeps state anchors and flow hotspots above hovered nodes", () => {
@@ -109,7 +163,7 @@ test("EditorCanvas restores legacy runtime feedback styling on node cards and ac
 });
 
 test("EditorCanvas treats awaiting-human current node as a persistent review node", () => {
-  assert.match(componentSource, /:class="\{ 'editor-canvas__node--selected': isNodeVisuallySelected\(nodeId\) \}"/);
+  assert.match(componentSource, /'editor-canvas__node--selected': isNodeVisuallySelected\(nodeId\)/);
   assert.match(componentSource, /:human-review-pending="isHumanReviewNode\(nodeId\)"/);
   assert.match(componentSource, /@open-human-review="emit\('open-human-review', \$event\)"/);
   assert.match(componentSource, /function isHumanReviewNode\(nodeId: string\)/);
@@ -163,7 +217,7 @@ test("EditorCanvas keeps paused human-review graphs viewable but read-only", () 
   assert.match(componentSource, /function handleCanvasDrop\(event: DragEvent\)[\s\S]*if \(isGraphEditingLocked\(\)\) \{[\s\S]*emit\("locked-edit-attempt"\);/);
   assert.match(componentSource, /function handleEdgePointerDown\(edge: ProjectedCanvasEdge, event: PointerEvent\)[\s\S]*if \(isGraphEditingLocked\(\)\) \{[\s\S]*emit\("locked-edit-attempt"\);/);
   assert.match(componentSource, /function handleAnchorPointerDown\(anchor: ProjectedCanvasAnchor\)[\s\S]*if \(isGraphEditingLocked\(\)\) \{[\s\S]*emit\("locked-edit-attempt"\);/);
-  assert.match(componentSource, /function handleSelectedEdgeDelete\(\)[\s\S]*if \(guardLockedCanvasInteraction\(\)\) \{[\s\S]*return;/);
+  assert.match(componentSource, /function handleSelectedEdgeDelete\(event: KeyboardEvent\)[\s\S]*if \(guardLockedCanvasInteraction\(\)\) \{[\s\S]*return;/);
 });
 
 test("EditorCanvas lets top-left floating tools respect workspace overlay clearance", () => {
@@ -216,7 +270,7 @@ test("EditorCanvas resolves rendered anchor geometry from measured node slot off
   assert.match(componentSource, /querySelectorAll\("\[data-anchor-slot-id\]"\)/);
 });
 
-test("EditorCanvas renders hover-only flow hotspots and distinguishes flowing flow edges from data ant lines", () => {
+test("EditorCanvas renders output flow hotspots only for allowed modes and interacted nodes", () => {
   assert.match(componentSource, /v-for="anchor in flowAnchors"/);
   assert.match(componentSource, /class="editor-canvas__flow-hotspot"/);
   assert.match(componentSource, /:style="\[flowHotspotStyle\(anchor\), flowHotspotConnectStyle\(anchor\)\]"/);
@@ -226,6 +280,12 @@ test("EditorCanvas renders hover-only flow hotspots and distinguishes flowing fl
   assert.match(componentSource, /'editor-canvas__flow-hotspot--outbound': anchor\.kind === 'flow-out'/);
   assert.match(componentSource, /'editor-canvas__flow-hotspot--visible': isFlowHotspotVisible\(anchor\)/);
   assert.match(componentSource, /anchor\.kind === "flow-out" \|\| anchor\.kind === "route-out"/);
+  assert.match(componentSource, /shouldShowOutputFlowHandle\(\{[\s\S]*mode: edgeVisibilityMode\.value,[\s\S]*anchorKind: anchor\.kind,[\s\S]*isNodeInteracted: isOutputFlowHandleNodeInteracted\(anchor\.nodeId\),[\s\S]*isActiveConnectionSource: activeConnectionSourceAnchorId\.value === anchor\.id,[\s\S]*\}\)/);
+  const flowHotspotVisibleBlock = componentSource.match(/function isFlowHotspotVisible\(anchor: ProjectedCanvasAnchor\) \{([\s\S]*?)\n\}/)?.[1] ?? "";
+  assert.match(componentSource, /function isOutputFlowHandleNodeInteracted\(nodeId: string\) \{[\s\S]*selection\.selectedNodeId\.value === nodeId[\s\S]*hoveredNodeId\.value === nodeId[\s\S]*hoveredFlowHandleNodeId\.value === nodeId/);
+  assert.doesNotMatch(flowHotspotVisibleBlock, /selection\.selectedNodeId\.value === anchor\.nodeId/);
+  assert.doesNotMatch(flowHotspotVisibleBlock, /hoveredNodeId\.value === anchor\.nodeId/);
+  assert.doesNotMatch(flowHotspotVisibleBlock, /hoveredFlowHandleNodeId\.value === anchor\.nodeId/);
   assert.match(componentSource, /\.editor-canvas__flow-hotspot--outbound::after \{[\s\S]*content:\s*"\+";/);
   assert.match(componentSource, /\.editor-canvas__flow-hotspot--visible::before \{[\s\S]*opacity:\s*1;/);
   assert.match(componentSource, /'editor-canvas__edge--flow': connectionPreview\.kind === 'flow'/);
@@ -244,6 +304,8 @@ test("EditorCanvas renders hover-only flow hotspots and distinguishes flowing fl
   assert.match(componentSource, /\.editor-canvas__edge--preview\.editor-canvas__edge--flow,\n\.editor-canvas__edge--preview\.editor-canvas__edge--route \{[\s\S]*stroke-dasharray:\s*16 18;/);
   assert.match(componentSource, /\.editor-canvas__flow-hotspot--connect-source::before \{[\s\S]*background:\s*var\(--editor-connection-source-fill,/);
   assert.match(componentSource, /\.editor-canvas__flow-hotspot--connect-target::before \{[\s\S]*background:\s*var\(--editor-connection-target-fill,/);
+  assert.match(componentSource, /\.editor-canvas__flow-hotspot \{[\s\S]*pointer-events:\s*none;/);
+  assert.match(componentSource, /\.editor-canvas__flow-hotspot--visible,[\s\S]*\.editor-canvas__flow-hotspot--connect-source,[\s\S]*\.editor-canvas__flow-hotspot--connect-target \{[\s\S]*pointer-events:\s*auto;/);
   assert.match(componentSource, /\.editor-canvas__anchor--connect-source \{[\s\S]*--editor-anchor-fill:\s*var\(--editor-connection-source-anchor,/);
   assert.match(componentSource, /\.editor-canvas__anchor--connect-target \{[\s\S]*--editor-anchor-fill:\s*var\(--editor-connection-target-anchor,/);
   assert.match(componentSource, /@keyframes editor-canvas-ant-line/);
@@ -259,12 +321,13 @@ test("EditorCanvas renders hover-only flow hotspots and distinguishes flowing fl
 });
 
 test("EditorCanvas exposes a top-left capsule toolbar for edge visibility modes", () => {
-  assert.match(componentSource, /import \{[\s\S]*buildEdgeVisibilityModeOptions,[\s\S]*filterProjectedEdgesForVisibilityMode,[\s\S]*type EdgeVisibilityMode[\s\S]*\} from "\.\/edgeVisibilityModel";/);
+  assert.match(componentSource, /import \{[\s\S]*buildEdgeVisibilityModeOptions,[\s\S]*filterProjectedEdgesForVisibilityMode,[\s\S]*shouldShowOutputFlowHandle,[\s\S]*type EdgeVisibilityMode[\s\S]*\} from "\.\/edgeVisibilityModel";/);
   assert.match(componentSource, /const edgeVisibilityModeOptions = computed\(\(\) => \{[\s\S]*return buildEdgeVisibilityModeOptions\(\);/);
   assert.match(componentSource, /const edgeVisibilityMode = ref<EdgeVisibilityMode>\("smart"\);/);
-  assert.match(componentSource, /const edgeVisibilityRelatedNodeIds = computed\(\(\) =>/);
+  assert.doesNotMatch(componentSource, /const edgeVisibilityRelatedNodeIds = computed\(\(\) =>/);
   assert.match(componentSource, /const visibleProjectedEdgeIds = computed\(/);
   assert.match(componentSource, /filterProjectedEdgesForVisibilityMode\(projectedEdges\.value,/);
+  assert.doesNotMatch(componentSource, /relatedNodeIds:/);
   assert.match(componentSource, /function isProjectedEdgeVisible\(edge: ProjectedCanvasEdge\)/);
   assert.match(componentSource, /class="editor-canvas__edge-view-toolbar"/);
   assert.match(componentSource, /v-for="option in edgeVisibilityModeOptions"/);
@@ -283,6 +346,23 @@ test("EditorCanvas exposes a top-left capsule toolbar for edge visibility modes"
   assert.match(componentSource, /\.editor-canvas__edge-view-toolbar::before \{[\s\S]*background:\s*var\(--graphite-glass-specular\),\s*var\(--graphite-glass-lens\);/);
   assert.match(componentSource, /\.editor-canvas__edge-view-toolbar::before \{[\s\S]*opacity:\s*0\.36;/);
   assert.match(componentSource, /\.editor-canvas__edge-view-button \{[\s\S]*position:\s*relative;[\s\S]*z-index:\s*1;/);
+});
+
+test("EditorCanvas exposes page zoom controls and emits viewport draft updates", () => {
+  assert.match(componentSource, /initialViewport\?: CanvasViewport \| null;/);
+  assert.match(componentSource, /\(event: "update:viewport", payload: CanvasViewport\): void;/);
+  assert.match(componentSource, /const viewport = useViewport\(props\.initialViewport \?\? undefined\);/);
+  assert.match(componentSource, /watch\(\s*\(\) => \(\{[\s\S]*scale: viewport\.viewport\.scale,[\s\S]*emit\("update:viewport"/);
+  assert.match(componentSource, /class="editor-canvas__zoom-toolbar"/);
+  assert.match(componentSource, /@click\.stop="handleZoomOut"/);
+  assert.match(componentSource, /@click\.stop="handleZoomIn"/);
+  assert.match(componentSource, /@click\.stop="handleZoomReset"/);
+  assert.match(componentSource, /\{\{ zoomPercentLabel \}\}/);
+  assert.match(componentSource, /function handleZoomOut\(\)/);
+  assert.match(componentSource, /function handleZoomIn\(\)/);
+  assert.match(componentSource, /function handleZoomReset\(\)/);
+  assert.match(componentSource, /function zoomViewportAroundCanvasCenter\(nextScale: number\)/);
+  assert.doesNotMatch(componentSource, /\.editor-canvas__zoom-toolbar \{[\s\S]*position:\s*absolute;[\s\S]*left:\s*18px;/);
 });
 
 test("EditorCanvas shows a clicked-position delete confirm for flow edges before removing them", () => {
