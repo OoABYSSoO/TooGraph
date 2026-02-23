@@ -406,7 +406,7 @@ test("EditorCanvas tints route edge outlines from the branch palette", () => {
   assert.match(componentSource, /\.editor-canvas__edge-delete-highlight \{[\s\S]*stroke:\s*var\(--editor-edge-outline, rgba\(201,\s*107,\s*31,\s*0\.16\)\);/);
 });
 
-test("EditorCanvas gives data edges the same two-step state editing entry pattern as state ports without binding deletion actions", () => {
+test("EditorCanvas gives data edges the same two-step state editing entry pattern as state ports with disconnect actions", () => {
   assert.match(componentSource, /import StateEditorPopover from "@\/editor\/nodes\/StateEditorPopover\.vue";/);
   assert.match(componentSource, /const activeDataEdgeStateConfirm = ref<\{/);
   assert.match(componentSource, /const activeDataEdgeStateEditor = ref<\{/);
@@ -432,15 +432,18 @@ test("EditorCanvas gives data edges the same two-step state editing entry patter
   assert.match(componentSource, /@update:type="handleDataEdgeStateEditorTypeValue"/);
   assert.match(componentSource, /@update:color="handleDataEdgeStateEditorColorInput"/);
   assert.match(componentSource, /@update:description="handleDataEdgeStateEditorDescriptionInput"/);
-  assert.doesNotMatch(componentSource, /v-if="canRemoveDataEdgeSourceBinding\(\)"/);
-  assert.doesNotMatch(componentSource, /class="editor-canvas__edge-state-editor-action"/);
-  assert.doesNotMatch(componentSource, /Remove source ref/);
-  assert.doesNotMatch(componentSource, /Remove target ref/);
-  assert.doesNotMatch(componentSource, /Remove both refs/);
-  assert.doesNotMatch(componentSource, /function canRemoveDataEdgeSourceBinding\(\)/);
-  assert.doesNotMatch(componentSource, /function removeDataEdgeSourceBinding\(\)/);
-  assert.doesNotMatch(componentSource, /function removeDataEdgeTargetBinding\(\)/);
-  assert.doesNotMatch(componentSource, /function removeDataEdgeBindings\(\)/);
+  assert.match(componentSource, /\(event: "disconnect-data-edge", payload: \{ sourceNodeId: string; targetNodeId: string; stateKey: string; mode: "state" \| "flow" \}\): void;/);
+  assert.match(componentSource, /class="editor-canvas__edge-state-disconnect"/);
+  assert.match(componentSource, /v-if="shouldOfferDataEdgeFlowDisconnect\(\)"/);
+  assert.match(componentSource, /@click\.stop="disconnectActiveDataEdgeStateReference"/);
+  assert.match(componentSource, /@click\.stop="disconnectActiveDataEdgeFlow"/);
+  assert.match(componentSource, /function shouldOfferDataEdgeFlowDisconnect\(\)/);
+  assert.match(componentSource, /canDisconnectSequenceEdgeForDataConnection\(props\.document, editor\.source, editor\.target\)/);
+  assert.doesNotMatch(componentSource, /sourceNode\?\.kind === "agent"/);
+  assert.doesNotMatch(componentSource, /targetNode\?\.kind === "agent"/);
+  assert.doesNotMatch(componentSource, /activeDataEdgePairStateCount\(\) > 1/);
+  assert.match(componentSource, /function disconnectActiveDataEdgeStateReference\(\)/);
+  assert.match(componentSource, /function disconnectActiveDataEdgeFlow\(\)/);
 });
 
 test("EditorCanvas tints data edge outlines from the data edge state color", () => {
@@ -525,7 +528,7 @@ test("EditorCanvas snaps flow drags to eligible target node bodies before mouseu
 });
 
 test("EditorCanvas exposes transient new agent input anchors while state dragging", () => {
-  assert.match(componentSource, /import \{ CREATE_AGENT_INPUT_STATE_KEY \} from "@\/lib\/virtual-any-input";/);
+  assert.match(componentSource, /import \{ CREATE_AGENT_INPUT_STATE_KEY, VIRTUAL_ANY_INPUT_STATE_KEY \} from "@\/lib\/virtual-any-input";/);
   assert.match(componentSource, /const pendingAgentInputSourceByNodeId = computed<Record<string, PendingStateInputSource>>\(\(\) =>/);
   assert.match(componentSource, /canCompleteGraphConnection\(props\.document, connection, \{[\s\S]*stateKey: CREATE_AGENT_INPUT_STATE_KEY/);
   assert.match(componentSource, /:pending-state-input-source="pendingAgentInputSourceByNodeId\[nodeId\] \?\? null"/);
@@ -533,16 +536,24 @@ test("EditorCanvas exposes transient new agent input anchors while state draggin
   assert.match(componentSource, /const anchorId = `\$\{nodeId\}:state-in:\$\{CREATE_AGENT_INPUT_STATE_KEY\}`;/);
   assert.match(componentSource, /id: anchorId/);
   assert.match(componentSource, /stateKey: CREATE_AGENT_INPUT_STATE_KEY/);
-  assert.match(componentSource, /const projectedAnchors = computed\(\(\) => \[\.\.\.baseProjectedAnchors\.value, \.\.\.transientAgentInputAnchors\.value\]\);/);
+  assert.match(componentSource, /const baseProjectedAnchorsWithoutReplacedAnyInputs = computed\(\(\) =>/);
+  assert.match(componentSource, /anchor\.stateKey === VIRTUAL_ANY_INPUT_STATE_KEY &&[\s\S]*pendingAgentInputSourceByNodeId\.value\[anchor\.nodeId\]/);
+  assert.match(componentSource, /const projectedAnchors = computed\(\(\) => \[\.\.\.baseProjectedAnchorsWithoutReplacedAnyInputs\.value, \.\.\.transientAgentInputAnchors\.value\]\);/);
 });
 
-test("EditorCanvas lets state drags snap to state input capsule hit areas", () => {
-  assert.match(componentSource, /const STATE_INPUT_HIT_PADDING = 8;/);
+test("EditorCanvas snaps state drags to transient or matching state inputs from the whole target node body", () => {
   assert.match(componentSource, /if \(activeConnection\.value\.sourceKind === "state-out"\) \{[\s\S]*return resolveAutoSnappedStateTargetAnchor\(event\);[\s\S]*\}/);
   assert.match(componentSource, /function resolveAutoSnappedStateTargetAnchor\(event: PointerEvent\)/);
-  assert.match(componentSource, /function isPointerWithinAnchorHitElement\(anchor: ProjectedCanvasAnchor, event: PointerEvent\)/);
-  assert.match(componentSource, /querySelectorAll\("\[data-anchor-slot-id\]"\)/);
-  assert.match(componentSource, /closest\("\[data-anchor-hitarea='true'\]"\)/);
+  assert.match(componentSource, /function resolveEligibleStateTargetAnchorForNodeBody\(nodeId: string\)/);
+  assert.match(componentSource, /function isStateTargetAnchorAllowedForActiveConnection\(anchor: ProjectedCanvasAnchor\)/);
+  assert.match(componentSource, /anchor\.stateKey === CREATE_AGENT_INPUT_STATE_KEY \|\| anchor\.stateKey === activeConnection\.value\?\.sourceStateKey/);
+  assert.match(componentSource, /for \(const \[nodeId, nodeElement\] of nodeElementMap\.entries\(\)\) \{[\s\S]*if \(isPointerWithinNodeElement\(nodeElement, event\)\) \{[\s\S]*const snappedAnchor = resolveEligibleStateTargetAnchorForNodeBody\(nodeId\);[\s\S]*return snappedAnchor;/);
+  assert.match(componentSource, /function isPointerWithinNodeElement\(nodeElement: HTMLElement, event: PointerEvent\)/);
+  assert.match(componentSource, /if \(activeConnection\.value\?\.sourceKind === "state-out"\) \{[\s\S]*return resolveEligibleStateTargetAnchorForNodeBody\(nodeId\);[\s\S]*\}/);
+  assert.match(componentSource, /if \(activeConnection\.value\?\.sourceKind === "state-out" && !isStateTargetAnchorAllowedForActiveConnection\(anchor\)\) \{[\s\S]*return false;/);
+  assert.doesNotMatch(componentSource, /function isPointerWithinAnchorHitElement/);
+  assert.doesNotMatch(componentSource, /STATE_INPUT_HIT_PADDING/);
+  assert.doesNotMatch(componentSource, /closest\("\[data-anchor-hitarea='true'\]"\)/);
 });
 
 test("EditorCanvas disables text selection while a connection drag is active", () => {

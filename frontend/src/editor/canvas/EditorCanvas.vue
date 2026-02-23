@@ -173,6 +173,33 @@
           @update:color="handleDataEdgeStateEditorColorInput"
           @update:description="handleDataEdgeStateEditorDescriptionInput"
         />
+        <div class="editor-canvas__edge-state-disconnect">
+          <div class="editor-canvas__edge-state-disconnect-title">{{ t("edgeState.disconnectTitle") }}</div>
+          <p class="editor-canvas__edge-state-disconnect-copy">
+            {{
+              shouldOfferDataEdgeFlowDisconnect()
+                ? t("edgeState.disconnectMultiStateHint")
+                : t("edgeState.disconnectSingleStateHint")
+            }}
+          </p>
+          <div class="editor-canvas__edge-state-disconnect-actions">
+            <button type="button" class="editor-canvas__edge-state-disconnect-button" @click.stop="disconnectActiveDataEdgeStateReference">
+              {{
+                shouldOfferDataEdgeFlowDisconnect()
+                  ? t("edgeState.removeStateReference")
+                  : t("edgeState.disconnectState")
+              }}
+            </button>
+            <button
+              v-if="shouldOfferDataEdgeFlowDisconnect()"
+              type="button"
+              class="editor-canvas__edge-state-disconnect-button editor-canvas__edge-state-disconnect-button--flow"
+              @click.stop="disconnectActiveDataEdgeFlow"
+            >
+              {{ t("edgeState.disconnectFlow") }}
+            </button>
+          </div>
+        </div>
       </div>
       <div
         v-for="[nodeId, node] in nodeEntries"
@@ -385,8 +412,13 @@ import {
   type StateFieldDraft,
   type StateFieldType,
 } from "@/editor/workspace/statePanelFields";
-import { canCompleteGraphConnection, canStartGraphConnection, type PendingGraphConnection } from "@/lib/graph-connections";
-import { CREATE_AGENT_INPUT_STATE_KEY } from "@/lib/virtual-any-input";
+import {
+  canCompleteGraphConnection,
+  canDisconnectSequenceEdgeForDataConnection,
+  canStartGraphConnection,
+  type PendingGraphConnection,
+} from "@/lib/graph-connections";
+import { CREATE_AGENT_INPUT_STATE_KEY, VIRTUAL_ANY_INPUT_STATE_KEY } from "@/lib/virtual-any-input";
 import { resolveFocusedViewport } from "@/editor/canvas/focusNodeViewport";
 import { resolveViewportForMinimapCenter } from "./minimapModel";
 import { useNodeSelectionFocus, type NodeFocusRequest } from "./useNodeSelectionFocus";
@@ -454,6 +486,7 @@ const emit = defineEmits<{
   (event: "reconnect-flow", payload: { sourceNodeId: string; currentTargetNodeId: string; nextTargetNodeId: string }): void;
   (event: "reconnect-route", payload: { sourceNodeId: string; branchKey: string; nextTargetNodeId: string }): void;
   (event: "remove-flow", payload: { sourceNodeId: string; targetNodeId: string }): void;
+  (event: "disconnect-data-edge", payload: { sourceNodeId: string; targetNodeId: string; stateKey: string; mode: "state" | "flow" }): void;
   (event: "remove-route", payload: { sourceNodeId: string; branchKey: string }): void;
   (event: "open-node-creation-menu", payload: { position: GraphPosition; sourceNodeId?: string; sourceAnchorKind?: "flow-out" | "route-out" | "state-out"; sourceBranchKey?: string; sourceStateKey?: string; sourceValueType?: string | null; clientX: number; clientY: number }): void;
   (event: "create-node-from-file", payload: { file: File; position: GraphPosition; clientX: number; clientY: number }): void;
@@ -474,7 +507,6 @@ type PendingStateInputSource = {
   label: string;
   stateColor: string;
 };
-const STATE_INPUT_HIT_PADDING = 8;
 const measuredNodeSizes = ref<Record<string, MeasuredNodeSize>>({});
 const canvasSize = ref({ width: 0, height: 0 });
 const viewport = useViewport(props.initialViewport ?? undefined);
@@ -651,6 +683,16 @@ const pendingAgentInputSourceByNodeId = computed<Record<string, PendingStateInpu
   );
 });
 const baseProjectedAnchors = computed(() => resolvedCanvasLayout.value.anchors);
+const baseProjectedAnchorsWithoutReplacedAnyInputs = computed(() =>
+  baseProjectedAnchors.value.filter(
+    (anchor) =>
+      !(
+        anchor.kind === "state-in" &&
+        anchor.stateKey === VIRTUAL_ANY_INPUT_STATE_KEY &&
+        pendingAgentInputSourceByNodeId.value[anchor.nodeId]
+      ),
+  ),
+);
 const transientAgentInputAnchors = computed<ProjectedCanvasAnchor[]>(() =>
   Object.entries(pendingAgentInputSourceByNodeId.value).flatMap(([nodeId, source]) => {
     const node = props.document.nodes[nodeId];
@@ -674,7 +716,7 @@ const transientAgentInputAnchors = computed<ProjectedCanvasAnchor[]>(() =>
     ];
   }),
 );
-const projectedAnchors = computed(() => [...baseProjectedAnchors.value, ...transientAgentInputAnchors.value]);
+const projectedAnchors = computed(() => [...baseProjectedAnchorsWithoutReplacedAnyInputs.value, ...transientAgentInputAnchors.value]);
 const flowAnchors = computed(() =>
   projectedAnchors.value.filter((anchor) => anchor.kind === "flow-in" || anchor.kind === "flow-out"),
 );
@@ -727,13 +769,7 @@ const activeConnectionSourceAnchorId = computed(() => {
 const eligibleTargetAnchorIds = computed(() =>
   new Set(
     projectedAnchors.value
-      .filter((anchor) =>
-        canCompleteGraphConnection(props.document, activeConnection.value, {
-          nodeId: anchor.nodeId,
-          kind: anchor.kind,
-          stateKey: anchor.stateKey,
-        }),
-      )
+      .filter((anchor) => canCompleteCanvasConnection(anchor))
       .map((anchor) => anchor.id),
   ),
 );
@@ -1149,6 +1185,51 @@ function openDataEdgeStateEditor() {
   dataEdgeStateDraft.value = nextDraft;
   dataEdgeStateError.value = null;
   clearDataEdgeStateConfirmState();
+}
+
+function shouldOfferDataEdgeFlowDisconnect() {
+  const editor = activeDataEdgeStateEditor.value;
+  if (!editor) {
+    return false;
+  }
+
+  return canDisconnectSequenceEdgeForDataConnection(props.document, editor.source, editor.target);
+}
+
+function disconnectActiveDataEdgeStateReference() {
+  if (guardLockedCanvasInteraction()) {
+    return;
+  }
+  const editor = activeDataEdgeStateEditor.value;
+  if (!editor) {
+    return;
+  }
+
+  emit("disconnect-data-edge", {
+    sourceNodeId: editor.source,
+    targetNodeId: editor.target,
+    stateKey: editor.stateKey,
+    mode: "state",
+  });
+  closeDataEdgeStateEditor();
+}
+
+function disconnectActiveDataEdgeFlow() {
+  if (guardLockedCanvasInteraction()) {
+    return;
+  }
+  const editor = activeDataEdgeStateEditor.value;
+  if (!editor) {
+    return;
+  }
+
+  emit("disconnect-data-edge", {
+    sourceNodeId: editor.source,
+    targetNodeId: editor.target,
+    stateKey: editor.stateKey,
+    mode: "flow",
+  });
+  closeDataEdgeStateEditor();
 }
 
 function syncDataEdgeStateDraft(nextDraft: StateFieldDraft) {
@@ -2043,13 +2124,7 @@ function resolveAutoSnappedTargetAnchor(event: PointerEvent) {
   }
 
   for (const [nodeId, nodeElement] of nodeElementMap.entries()) {
-    const rect = nodeElement.getBoundingClientRect();
-    if (
-      event.clientX >= rect.left &&
-      event.clientX <= rect.right &&
-      event.clientY >= rect.top &&
-      event.clientY <= rect.bottom
-    ) {
+    if (isPointerWithinNodeElement(nodeElement, event)) {
       const snappedAnchor = resolveEligibleTargetAnchorForNodeBody(nodeId);
       if (snappedAnchor) {
         return snappedAnchor;
@@ -2061,41 +2136,26 @@ function resolveAutoSnappedTargetAnchor(event: PointerEvent) {
 }
 
 function resolveAutoSnappedStateTargetAnchor(event: PointerEvent) {
-  for (const anchor of pointAnchors.value) {
-    if (anchor.kind !== "state-in" || !eligibleTargetAnchorIds.value.has(anchor.id)) {
-      continue;
-    }
-    if (isPointerWithinAnchorHitElement(anchor, event)) {
-      return anchor;
+  for (const [nodeId, nodeElement] of nodeElementMap.entries()) {
+    if (isPointerWithinNodeElement(nodeElement, event)) {
+      const snappedAnchor = resolveEligibleStateTargetAnchorForNodeBody(nodeId);
+      if (snappedAnchor) {
+        return snappedAnchor;
+      }
     }
   }
 
   return null;
 }
 
-function isPointerWithinAnchorHitElement(anchor: ProjectedCanvasAnchor, event: PointerEvent) {
-  const nodeElement = nodeElementMap.get(anchor.nodeId);
-  if (!nodeElement) {
-    return false;
-  }
-
-  for (const slotElement of nodeElement.querySelectorAll("[data-anchor-slot-id]")) {
-    if (!(slotElement instanceof HTMLElement) || slotElement.dataset.anchorSlotId !== anchor.id) {
-      continue;
-    }
-
-    const hitElement = slotElement.closest("[data-anchor-hitarea='true']");
-    const element = hitElement instanceof HTMLElement ? hitElement : slotElement;
-    const rect = element.getBoundingClientRect();
-    return (
-      event.clientX >= rect.left - STATE_INPUT_HIT_PADDING &&
-      event.clientX <= rect.right + STATE_INPUT_HIT_PADDING &&
-      event.clientY >= rect.top - STATE_INPUT_HIT_PADDING &&
-      event.clientY <= rect.bottom + STATE_INPUT_HIT_PADDING
-    );
-  }
-
-  return false;
+function isPointerWithinNodeElement(nodeElement: HTMLElement, event: PointerEvent) {
+  const rect = nodeElement.getBoundingClientRect();
+  return (
+    event.clientX >= rect.left &&
+    event.clientX <= rect.right &&
+    event.clientY >= rect.top &&
+    event.clientY <= rect.bottom
+  );
 }
 
 function isPointerWithinFlowHotspot(anchor: ProjectedCanvasAnchor, event: PointerEvent) {
@@ -2115,11 +2175,58 @@ function isPointerWithinFlowHotspot(anchor: ProjectedCanvasAnchor, event: Pointe
 }
 
 function resolveEligibleTargetAnchorForNodeBody(nodeId: string) {
+  if (activeConnection.value?.sourceKind === "state-out") {
+    return resolveEligibleStateTargetAnchorForNodeBody(nodeId);
+  }
+
   const candidateAnchor = projectedAnchors.value.find((anchor) => anchor.nodeId === nodeId && anchor.kind === "flow-in");
   if (!candidateAnchor || !eligibleTargetAnchorIds.value.has(candidateAnchor.id)) {
     return null;
   }
   return candidateAnchor;
+}
+
+function resolveEligibleStateTargetAnchorForNodeBody(nodeId: string) {
+  const createInputAnchor = projectedAnchors.value.find(
+    (anchor) =>
+      anchor.nodeId === nodeId &&
+      anchor.kind === "state-in" &&
+      anchor.stateKey === CREATE_AGENT_INPUT_STATE_KEY,
+  );
+  if (createInputAnchor && eligibleTargetAnchorIds.value.has(createInputAnchor.id)) {
+    return createInputAnchor;
+  }
+
+  const candidateAnchor = projectedAnchors.value.find(
+    (anchor) =>
+      anchor.nodeId === nodeId &&
+      anchor.kind === "state-in" &&
+      isStateTargetAnchorAllowedForActiveConnection(anchor),
+  );
+  if (!candidateAnchor || !eligibleTargetAnchorIds.value.has(candidateAnchor.id)) {
+    return null;
+  }
+  return candidateAnchor;
+}
+
+function isStateTargetAnchorAllowedForActiveConnection(anchor: ProjectedCanvasAnchor) {
+  if (activeConnection.value?.sourceKind !== "state-out") {
+    return true;
+  }
+
+  return anchor.stateKey === CREATE_AGENT_INPUT_STATE_KEY || anchor.stateKey === activeConnection.value?.sourceStateKey;
+}
+
+function canCompleteCanvasConnection(anchor: ProjectedCanvasAnchor) {
+  if (activeConnection.value?.sourceKind === "state-out" && !isStateTargetAnchorAllowedForActiveConnection(anchor)) {
+    return false;
+  }
+
+  return canCompleteGraphConnection(props.document, activeConnection.value, {
+    nodeId: anchor.nodeId,
+    kind: anchor.kind,
+    stateKey: anchor.stateKey,
+  });
 }
 
 function handleCanvasDragOver(event: DragEvent) {
@@ -2371,13 +2478,7 @@ function handleAnchorPointerDown(anchor: ProjectedCanvasAnchor) {
   clearCanvasTransientState();
   selection.selectNode(anchor.nodeId);
 
-  if (
-    canCompleteGraphConnection(props.document, activeConnection.value, {
-      nodeId: anchor.nodeId,
-      kind: anchor.kind,
-      stateKey: anchor.stateKey,
-    })
-  ) {
+  if (canCompleteCanvasConnection(anchor)) {
     completePendingConnection(anchor);
     return;
   }
@@ -3121,6 +3222,71 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   gap: 10px;
   transform: translate(-50%, calc(-100% - 18px));
   pointer-events: auto;
+}
+
+.editor-canvas__edge-state-disconnect {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(220, 38, 38, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 247, 237, 0.94);
+  box-shadow: 0 14px 28px rgba(127, 29, 29, 0.12);
+  backdrop-filter: blur(18px);
+}
+
+.editor-canvas__edge-state-disconnect-title {
+  font-size: 0.78rem;
+  font-weight: 760;
+  color: rgba(127, 29, 29, 0.9);
+}
+
+.editor-canvas__edge-state-disconnect-copy {
+  margin: 0;
+  font-size: 0.74rem;
+  line-height: 1.45;
+  color: rgba(120, 53, 15, 0.76);
+}
+
+.editor-canvas__edge-state-disconnect-actions {
+  display: grid;
+  gap: 6px;
+}
+
+.editor-canvas__edge-state-disconnect-button {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid rgba(185, 28, 28, 0.2);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.86);
+  color: rgba(127, 29, 29, 0.9);
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 720;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.editor-canvas__edge-state-disconnect-button:hover {
+  border-color: rgba(185, 28, 28, 0.34);
+  background: rgba(254, 242, 242, 0.96);
+  color: rgb(127, 29, 29);
+  transform: translateY(-1px);
+}
+
+.editor-canvas__edge-state-disconnect-button--flow {
+  border-color: rgba(217, 119, 6, 0.24);
+  color: rgba(146, 64, 14, 0.92);
+}
+
+.editor-canvas__edge-state-disconnect-button--flow:hover {
+  border-color: rgba(217, 119, 6, 0.4);
+  background: rgba(255, 251, 235, 0.96);
+  color: rgb(146, 64, 14);
 }
 
 .editor-canvas__anchors {

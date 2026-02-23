@@ -448,7 +448,7 @@
     <section v-else-if="view.body.kind === 'agent'" class="node-card__body node-card__body--agent">
       <div class="node-card__port-grid">
         <div class="node-card__port-column">
-          <div v-for="port in view.inputs" :key="port.key" class="node-card__port-pill-row">
+          <div v-for="port in agentInputPorts" :key="port.key" class="node-card__port-pill-row">
             <ElPopover
               :visible="
                 isStateEditorOpen(`agent-input:${port.key}`) ||
@@ -466,10 +466,11 @@
                   class="node-card__port-pill node-card__port-pill--input node-card__port-pill--dock-start"
                   :class="{
                     'node-card__port-pill--removable': !port.virtual,
+                    'node-card__port-pill--create': shouldReplaceVirtualAnyInput(port),
                     'node-card__port-pill--revealed': isStateEditorPillRevealed(`agent-input:${port.key}`),
                     'node-card__port-pill--confirm': isStateEditorConfirmOpen(`agent-input:${port.key}`),
                   }"
-                  :style="{ '--node-card-port-accent': port.stateColor }"
+                  :style="resolveAgentInputPortStyle(port)"
                   data-state-editor-trigger="true"
                   data-anchor-hitarea="true"
                   @pointerenter="handleStateEditorPillPointerEnter(`agent-input:${port.key}`)"
@@ -479,14 +480,15 @@
                 >
                   <span
                     class="node-card__port-pill-anchor-slot node-card__port-pill-anchor-slot--leading"
-                    :data-anchor-slot-id="`${nodeId}:state-in:${port.key}`"
+                    :data-anchor-slot-id="resolveAgentInputPortAnchorSlotId(port)"
                     aria-hidden="true"
                   />
+                  <span v-if="shouldReplaceVirtualAnyInput(port)" class="node-card__port-pill-create-badge">{{ t("common.new") }}</span>
                   <span
                     class="node-card__port-pill-label"
                     :class="{ 'node-card__port-pill-label--confirm': isStateEditorConfirmOpen(`agent-input:${port.key}`) }"
                   >
-                    <span class="node-card__port-pill-label-text">{{ port.label }}</span>
+                    <span class="node-card__port-pill-label-text">{{ resolveAgentInputPortLabel(port) }}</span>
                     <ElIcon class="node-card__port-pill-confirm-icon"><Check /></ElIcon>
                   </span>
                   <button
@@ -520,10 +522,10 @@
               />
             </ElPopover>
           </div>
-          <div v-if="pendingStateInputSource" class="node-card__port-pill-row">
+          <div v-if="shouldRenderPendingStateInputCapsule" class="node-card__port-pill-row">
             <span
               class="node-card__port-pill node-card__port-pill--input node-card__port-pill--dock-start node-card__port-pill--create"
-              :style="{ '--node-card-port-accent': pendingStateInputSource.stateColor }"
+              :style="{ '--node-card-port-accent': pendingStateInputSource?.stateColor }"
               data-anchor-hitarea="true"
               @pointerdown.stop
             >
@@ -534,7 +536,7 @@
               />
               <span class="node-card__port-pill-create-badge">{{ t("common.new") }}</span>
               <span class="node-card__port-pill-label">
-                <span class="node-card__port-pill-label-text">{{ pendingStateInputSource.label }}</span>
+                <span class="node-card__port-pill-label-text">{{ pendingStateInputSource?.label }}</span>
               </span>
             </span>
           </div>
@@ -1219,7 +1221,7 @@ import {
 } from "./conditionLoopLimit";
 import { CONDITION_RULE_OPERATOR_OPTIONS } from "./conditionRuleEditorModel";
 import { isSwitchableInputBoundaryType, resolveNextInputValueForBoundaryType, resolveStateTypeForInputBoundary } from "./inputValueTypeModel";
-import { buildNodeCardViewModel } from "./nodeCardViewModel";
+import { buildNodeCardViewModel, type NodePortViewModel } from "./nodeCardViewModel";
 import { resolveOutputPreviewContent } from "./outputPreviewContentModel";
 import { listAttachableSkillDefinitions, resolveAttachedSkillBadges } from "./skillPickerModel";
 import { createStateDraftFromQuery, matchesStatePortSearch } from "./statePortCreateModel";
@@ -1367,6 +1369,14 @@ const view = computed(() =>
     },
   }),
 );
+const agentInputPorts = computed(() => (view.value.body.kind === "agent" ? view.value.inputs : []));
+const shouldRenderPendingStateInputCapsule = computed(() => {
+  if (!props.pendingStateInputSource || view.value.body.kind !== "agent") {
+    return false;
+  }
+
+  return !(view.value.inputs.length === 1 && Boolean(view.value.inputs[0]?.virtual));
+});
 const outputPreviewContent = computed(() => {
   if (view.value.body.kind !== "output") {
     return resolveOutputPreviewContent("", "plain");
@@ -1613,6 +1623,27 @@ const hasFloatingPanelOpen = computed(
     activePortPickerSide.value !== null ||
     isSkillPickerOpen.value,
 );
+
+function shouldReplaceVirtualAnyInput(port: NodePortViewModel) {
+  return Boolean(port.virtual && props.pendingStateInputSource);
+}
+
+function resolveAgentInputPortAnchorSlotId(port: NodePortViewModel) {
+  const stateKey = shouldReplaceVirtualAnyInput(port) ? CREATE_AGENT_INPUT_STATE_KEY : port.key;
+  return `${props.nodeId}:state-in:${stateKey}`;
+}
+
+function resolveAgentInputPortLabel(port: NodePortViewModel) {
+  return shouldReplaceVirtualAnyInput(port) ? props.pendingStateInputSource?.label ?? port.label : port.label;
+}
+
+function resolveAgentInputPortStyle(port: NodePortViewModel) {
+  return {
+    "--node-card-port-accent": shouldReplaceVirtualAnyInput(port)
+      ? props.pendingStateInputSource?.stateColor ?? port.stateColor
+      : port.stateColor,
+  };
+}
 
 watch(
   () => (props.node.kind === "condition" ? props.node.config.rule.value : null),

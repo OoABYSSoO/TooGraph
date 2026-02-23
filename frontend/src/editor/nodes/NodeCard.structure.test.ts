@@ -275,7 +275,7 @@ test("NodeCard opens agent add skill and port actions in themed popovers instead
   assert.doesNotMatch(agentSection, /<div v-if="isSkillPickerOpen" class="node-card__skill-picker"/);
 });
 
-test("NodeCard renders a visible transient new agent input capsule while state dragging", () => {
+test("NodeCard renders transient new agent input as a capsule or as the replacement for virtual any", () => {
   const agentSectionMatch = componentSource.match(
     /<section v-else-if="view\.body\.kind === 'agent'"[\s\S]*?<\/section>/,
   );
@@ -283,13 +283,24 @@ test("NodeCard renders a visible transient new agent input capsule while state d
   const agentSection = agentSectionMatch[0];
 
   assert.match(componentSource, /import \{ CREATE_AGENT_INPUT_STATE_KEY \} from "@\/lib\/virtual-any-input";/);
+  assert.match(componentSource, /import \{ buildNodeCardViewModel, type NodePortViewModel \} from "\.\/nodeCardViewModel";/);
   assert.match(componentSource, /pendingStateInputSource\?: \{ stateKey: string; label: string; stateColor: string \} \| null;/);
-  assert.match(agentSection, /v-if="pendingStateInputSource"/);
+  assert.match(componentSource, /const agentInputPorts = computed\(\(\) =>/);
+  assert.match(componentSource, /const shouldRenderPendingStateInputCapsule = computed\(\(\) =>/);
+  assert.match(componentSource, /function shouldReplaceVirtualAnyInput\(port: NodePortViewModel\)/);
+  assert.match(componentSource, /return Boolean\(port\.virtual && props\.pendingStateInputSource\);/);
+  assert.match(componentSource, /function resolveAgentInputPortAnchorSlotId\(port: NodePortViewModel\)/);
+  assert.match(componentSource, /shouldReplaceVirtualAnyInput\(port\) \? CREATE_AGENT_INPUT_STATE_KEY : port\.key/);
+  assert.match(componentSource, /function resolveAgentInputPortLabel\(port: NodePortViewModel\)/);
+  assert.match(componentSource, /props\.pendingStateInputSource\?\.label \?\? port\.label/);
+  assert.match(agentSection, /v-for="port in agentInputPorts"/);
+  assert.match(agentSection, /v-if="shouldReplaceVirtualAnyInput\(port\)"/);
+  assert.match(agentSection, /v-if="shouldRenderPendingStateInputCapsule"/);
   assert.match(agentSection, /node-card__port-pill--create/);
   assert.match(agentSection, /node-card__port-pill-create-badge/);
   assert.match(agentSection, /t\("common\.new"\)/);
-  assert.match(agentSection, /\{\{ pendingStateInputSource\.label \}\}/);
-  assert.match(agentSection, /:data-anchor-slot-id="\`\$\{nodeId\}:state-in:\$\{CREATE_AGENT_INPUT_STATE_KEY\}\`"/);
+  assert.match(agentSection, /\{\{ pendingStateInputSource\?\.label \}\}/);
+  assert.match(agentSection, /:data-anchor-slot-id="resolveAgentInputPortAnchorSlotId\(port\)"/);
   assert.match(componentSource, /\.node-card__port-pill--create \{[\s\S]*background:/);
   assert.match(componentSource, /\.node-card__port-pill-create-badge \{[\s\S]*letter-spacing:\s*0\.12em;/);
 });

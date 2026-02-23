@@ -104,6 +104,7 @@
                 @rename-state="renameStateField(tab.tabId, $event.currentKey, $event.nextKey)"
                 @update-state="updateStateField(tab.tabId, $event.stateKey, $event.patch)"
                 @remove-port-state="removeNodePortStateForTab(tab.tabId, $event.nodeId, $event.side, $event.stateKey)"
+                @disconnect-data-edge="disconnectDataEdgeForTab(tab.tabId, $event.sourceNodeId, $event.targetNodeId, $event.stateKey, $event.mode)"
                 @update-agent-config="updateAgentConfigForTab(tab.tabId, $event.nodeId, $event.patch)"
                 @toggle-agent-breakpoint="toggleAgentBreakpointForTab(tab.tabId, $event.nodeId, $event.enabled)"
                 @update-agent-breakpoint-timing="updateAgentBreakpointTimingForTab(tab.tabId, $event.nodeId, $event.timing)"
@@ -1561,6 +1562,24 @@ function removeNodePortStateForTab(tabId: string, nodeId: string, side: "input" 
 
   markDocumentDirty(tabId, nextDocument);
   focusNodeForTab(tabId, nodeId);
+}
+
+function disconnectDataEdgeForTab(tabId: string, sourceNodeId: string, targetNodeId: string, stateKey: string, mode: "state" | "flow") {
+  const document = documentsByTabId.value[tabId];
+  if (!document) {
+    return;
+  }
+
+  const nextDocument =
+    mode === "flow"
+      ? removeFlowEdgeFromDocument(document, sourceNodeId, targetNodeId)
+      : removeStateBindingFromDocument(document, stateKey, targetNodeId, "read");
+  if (nextDocument === document) {
+    return;
+  }
+
+  markDocumentDirty(tabId, nextDocument);
+  focusNodeForTab(tabId, targetNodeId);
 }
 
 function createNodePortStateForTab(tabId: string, nodeId: string, side: "input" | "output", field: StateFieldDraft) {

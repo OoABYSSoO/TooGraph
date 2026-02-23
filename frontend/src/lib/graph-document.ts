@@ -8,6 +8,7 @@ import {
   canConnectStateBinding,
   canReconnectConditionRoute,
   canReconnectFlowEdge,
+  shouldAddImplicitFlowEdgeForStateConnection,
 } from "./graph-connections.ts";
 import { isCreateAgentInputStateKey, isVirtualAnyInputStateKey } from "./virtual-any-input.ts";
 
@@ -648,6 +649,7 @@ export function connectStateBindingInDocument<T extends GraphPayload | GraphDocu
       return document;
     }
     nextTargetNode.reads = [...nextTargetNode.reads, { state: sourceStateKey, required: true }];
+    addImplicitFlowEdgeForStateConnection(nextDocument, sourceNodeId, targetNodeId);
     return syncKnowledgeBaseSkillsInDocument(nextDocument);
   }
 
@@ -656,6 +658,7 @@ export function connectStateBindingInDocument<T extends GraphPayload | GraphDocu
     if (nextTargetNode.kind === "condition" && !nextTargetNode.config.rule.source.trim()) {
       nextTargetNode.config.rule.source = sourceStateKey;
     }
+    addImplicitFlowEdgeForStateConnection(nextDocument, sourceNodeId, targetNodeId);
     return syncKnowledgeBaseSkillsInDocument(nextDocument);
   }
 
@@ -669,7 +672,19 @@ export function connectStateBindingInDocument<T extends GraphPayload | GraphDocu
     state: sourceStateKey,
   };
 
+  addImplicitFlowEdgeForStateConnection(nextDocument, sourceNodeId, targetNodeId);
   return syncKnowledgeBaseSkillsInDocument(nextDocument);
+}
+
+function addImplicitFlowEdgeForStateConnection<T extends GraphPayload | GraphDocument>(
+  document: T,
+  sourceNodeId: string,
+  targetNodeId: string,
+) {
+  if (!shouldAddImplicitFlowEdgeForStateConnection(document, sourceNodeId, targetNodeId)) {
+    return;
+  }
+  document.edges = [...document.edges, { source: sourceNodeId, target: targetNodeId }];
 }
 
 export function connectConditionRouteInDocument<T extends GraphPayload | GraphDocument>(
