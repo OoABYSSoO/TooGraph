@@ -3,6 +3,7 @@
     class="node-card"
     :class="{
       'node-card--selected': selected,
+      'node-card--hovered': hovered,
       'node-card--condition': view.body.kind === 'condition',
       'node-card--floating-panel-open': hasFloatingPanelOpen,
     }"
@@ -528,7 +529,10 @@
             popper-class="node-card__agent-add-popover-popper"
           >
             <template #reference>
-              <div class="node-card__port-pill-row node-card__port-pill-row--create">
+              <div
+                class="node-card__port-pill-row node-card__port-pill-row--create"
+                :class="{ 'node-card__port-pill-row--create-visible': shouldShowAgentCreateInputPort }"
+              >
                 <span
                   class="node-card__port-pill node-card__port-pill--input node-card__port-pill--dock-start node-card__port-pill--create"
                   :style="{ '--node-card-port-accent': pendingStateInputSource?.stateColor ?? '#16a34a' }"
@@ -539,7 +543,7 @@
                 >
                   <span
                     class="node-card__port-pill-anchor-slot node-card__port-pill-anchor-slot--leading"
-                    :data-anchor-slot-id="`${nodeId}:state-in:${CREATE_AGENT_INPUT_STATE_KEY}`"
+                    :data-anchor-slot-id="`${nodeId}:state-in:${agentCreateInputAnchorStateKey}`"
                     aria-hidden="true"
                   />
                   <span class="node-card__port-pill-label">
@@ -722,10 +726,13 @@
             popper-class="node-card__agent-add-popover-popper"
           >
             <template #reference>
-              <div class="node-card__port-pill-row node-card__port-pill-row--right node-card__port-pill-row--create">
+              <div
+                class="node-card__port-pill-row node-card__port-pill-row--right node-card__port-pill-row--create"
+                :class="{ 'node-card__port-pill-row--create-visible': shouldShowAgentCreateOutputPort }"
+              >
                 <span
                   class="node-card__port-pill node-card__port-pill--output node-card__port-pill--dock-end node-card__port-pill--create"
-                  :style="{ '--node-card-port-accent': '#d97706' }"
+                  :style="{ '--node-card-port-accent': VIRTUAL_ANY_OUTPUT_COLOR }"
                   data-agent-create-port="output"
                   data-anchor-hitarea="true"
                   @pointerdown.stop
@@ -736,7 +743,7 @@
                   </span>
                   <span
                     class="node-card__port-pill-anchor-slot"
-                    :data-anchor-slot-id="resolveAgentCreateOutputAnchorSlotId()"
+                    :data-anchor-slot-id="`${nodeId}:state-out:${VIRTUAL_ANY_OUTPUT_STATE_KEY}`"
                     aria-hidden="true"
                   />
                 </span>
@@ -1269,7 +1276,7 @@ import StateEditorPopover from "./StateEditorPopover.vue";
 import type { KnowledgeBaseRecord } from "@/types/knowledge";
 import type { AgentNode, ConditionNode, GraphNode, InputNode, OutputNode, StateDefinition } from "@/types/node-system";
 import type { SkillDefinition } from "@/types/skills";
-import { CREATE_AGENT_INPUT_STATE_KEY, VIRTUAL_ANY_OUTPUT_STATE_KEY } from "@/lib/virtual-any-input";
+import { CREATE_AGENT_INPUT_STATE_KEY, VIRTUAL_ANY_INPUT_STATE_KEY, VIRTUAL_ANY_OUTPUT_COLOR, VIRTUAL_ANY_OUTPUT_STATE_KEY } from "@/lib/virtual-any-input";
 
 import { DEFAULT_AGENT_TEMPERATURE, buildAgentModelSelectOptions, normalizeAgentTemperature, resolveAgentModelSelection } from "./agentConfigModel";
 import {
@@ -1317,6 +1324,7 @@ const props = defineProps<{
   pendingStateInputSource?: { stateKey: string; label: string; stateColor: string } | null;
   humanReviewPending: boolean;
   selected: boolean;
+  hovered?: boolean;
   interactionLocked?: boolean;
 }>();
 
@@ -1429,7 +1437,11 @@ const agentInputPorts = computed<NodePortViewModel[]>(() =>
 const agentOutputPorts = computed<NodePortViewModel[]>(() =>
   view.value.body.kind === "agent" ? view.value.outputs.filter((port) => !port.virtual) : [],
 );
-const agentHasVirtualOutputPort = computed(() => view.value.body.kind === "agent" && view.value.outputs.some((port) => port.virtual));
+const shouldShowAgentCreateInputPort = computed(() => agentInputPorts.value.length === 0);
+const shouldShowAgentCreateOutputPort = computed(() => agentOutputPorts.value.length === 0);
+const agentCreateInputAnchorStateKey = computed(() =>
+  props.pendingStateInputSource ? CREATE_AGENT_INPUT_STATE_KEY : VIRTUAL_ANY_INPUT_STATE_KEY,
+);
 const outputPreviewContent = computed(() => {
   if (view.value.body.kind !== "output") {
     return resolveOutputPreviewContent("", "plain");
@@ -1656,10 +1668,6 @@ const hasFloatingPanelOpen = computed(
 
 function isPortCreateOpen(side: "input" | "output") {
   return activePortPickerSide.value === side && Boolean(portStateDraft.value);
-}
-
-function resolveAgentCreateOutputAnchorSlotId() {
-  return agentHasVirtualOutputPort.value ? `${props.nodeId}:state-out:${VIRTUAL_ANY_OUTPUT_STATE_KEY}` : undefined;
 }
 
 watch(
@@ -3524,20 +3532,18 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
 }
 
 .node-card__port-pill-row--create {
-  max-height: 0;
-  overflow: hidden;
-  opacity: 0;
+  display: none;
+  min-height: 0;
   pointer-events: none;
-  transition:
-    max-height 140ms ease,
-    opacity 140ms ease;
 }
 
+.node-card__port-pill-row--create-visible,
 .node-card:hover .node-card__port-pill-row--create,
+.node-card--hovered .node-card__port-pill-row--create,
 .node-card--selected .node-card__port-pill-row--create,
 .node-card--floating-panel-open .node-card__port-pill-row--create {
-  max-height: 40px;
-  opacity: 1;
+  display: flex;
+  min-height: 34px;
   pointer-events: auto;
 }
 
@@ -3594,10 +3600,10 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
 }
 
 .node-card__port-pill--create {
-  border-color: color-mix(in srgb, var(--node-card-port-accent) 34%, transparent);
-  background: color-mix(in srgb, var(--node-card-port-accent) 10%, rgba(255, 250, 241, 0.96));
-  color: #1f2937;
-  box-shadow: 0 10px 20px rgba(60, 41, 20, 0.08);
+  border-color: color-mix(in srgb, var(--node-card-port-accent) 38%, transparent);
+  background: transparent;
+  color: var(--node-card-port-accent);
+  box-shadow: none;
 }
 
 .node-card__port-pill--output {
