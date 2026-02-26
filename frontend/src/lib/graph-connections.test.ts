@@ -8,7 +8,7 @@ import {
   canStartGraphConnection,
   type PendingGraphConnection,
 } from "./graph-connections.ts";
-import { CREATE_AGENT_INPUT_STATE_KEY, VIRTUAL_ANY_INPUT_STATE_KEY } from "./virtual-any-input.ts";
+import { CREATE_AGENT_INPUT_STATE_KEY, VIRTUAL_ANY_INPUT_STATE_KEY, VIRTUAL_ANY_OUTPUT_STATE_KEY } from "./virtual-any-input.ts";
 import type { GraphPayload } from "../types/node-system.ts";
 
 const document: GraphPayload = {
@@ -387,6 +387,151 @@ test("canCompleteGraphConnection allows state outputs to target a transient new 
       nodeId: "output_answer",
       kind: "state-in",
       stateKey: CREATE_AGENT_INPUT_STATE_KEY,
+    }),
+    false,
+  );
+});
+
+test("canCompleteGraphConnection allows virtual state outputs to materialize into eligible existing targets", () => {
+  const pending: PendingGraphConnection = {
+    sourceNodeId: "answer_helper",
+    sourceKind: "state-out",
+    sourceStateKey: VIRTUAL_ANY_OUTPUT_STATE_KEY,
+  };
+  const graphWithReviewAgent: GraphPayload = {
+    ...document,
+    nodes: {
+      ...document.nodes,
+      review_agent: {
+        kind: "agent",
+        name: "review_agent",
+        description: "",
+        ui: { position: { x: 480, y: 0 } },
+        reads: [{ state: "question", required: true }],
+        writes: [],
+        config: {
+          skills: [],
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "off",
+          temperature: 0,
+        },
+      },
+    },
+  };
+
+  assert.equal(
+    canCompleteGraphConnection(graphWithReviewAgent, pending, {
+      nodeId: "review_agent",
+      kind: "state-in",
+      stateKey: CREATE_AGENT_INPUT_STATE_KEY,
+    }),
+    true,
+  );
+  assert.equal(
+    canCompleteGraphConnection(graphWithReviewAgent, pending, {
+      nodeId: "route_result",
+      kind: "state-in",
+      stateKey: VIRTUAL_ANY_INPUT_STATE_KEY,
+    }),
+    true,
+  );
+  assert.equal(
+    canCompleteGraphConnection(graphWithReviewAgent, pending, {
+      nodeId: "output_answer",
+      kind: "state-in",
+      stateKey: VIRTUAL_ANY_INPUT_STATE_KEY,
+    }),
+    true,
+  );
+  assert.equal(
+    canCompleteGraphConnection(
+      {
+        ...graphWithReviewAgent,
+        nodes: {
+          ...graphWithReviewAgent.nodes,
+          output_answer: {
+            ...graphWithReviewAgent.nodes.output_answer,
+            reads: [{ state: "question", required: true }],
+          },
+        },
+      },
+      pending,
+      {
+        nodeId: "output_answer",
+        kind: "state-in",
+        stateKey: VIRTUAL_ANY_INPUT_STATE_KEY,
+      },
+    ),
+    false,
+  );
+});
+
+test("canCompleteGraphConnection allows virtual input outputs to target concrete state input bindings", () => {
+  const pending: PendingGraphConnection = {
+    sourceNodeId: "empty_input",
+    sourceKind: "state-out",
+    sourceStateKey: VIRTUAL_ANY_OUTPUT_STATE_KEY,
+  };
+  const graphWithConcreteInputs: GraphPayload = {
+    ...document,
+    state_schema: {
+      first: { name: "first", description: "", type: "text", value: "", color: "#d97706" },
+      second: { name: "second", description: "", type: "text", value: "", color: "#2563eb" },
+      third: { name: "third", description: "", type: "text", value: "", color: "#7c3aed" },
+      fourth: { name: "fourth", description: "", type: "text", value: "", color: "#10b981" },
+    },
+    nodes: {
+      ...document.nodes,
+      empty_input: {
+        kind: "input",
+        name: "empty_input",
+        description: "",
+        ui: { position: { x: -240, y: 0 } },
+        reads: [],
+        writes: [],
+        config: { value: "" },
+      },
+      multi_input_agent: {
+        kind: "agent",
+        name: "multi_input_agent",
+        description: "",
+        ui: { position: { x: 480, y: 0 } },
+        reads: [
+          { state: "first", required: true },
+          { state: "second", required: true },
+          { state: "third", required: true },
+          { state: "fourth", required: true },
+        ],
+        writes: [],
+        config: {
+          skills: [],
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "off",
+          temperature: 0,
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+  };
+
+  assert.equal(
+    canCompleteGraphConnection(graphWithConcreteInputs, pending, {
+      nodeId: "multi_input_agent",
+      kind: "state-in",
+      stateKey: "third",
+    }),
+    true,
+  );
+  assert.equal(
+    canCompleteGraphConnection(graphWithConcreteInputs, pending, {
+      nodeId: "multi_input_agent",
+      kind: "state-in",
+      stateKey: "missing",
     }),
     false,
   );

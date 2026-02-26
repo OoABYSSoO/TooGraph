@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { reactive } from "vue";
 
 import * as graphDocument from "./graph-document.ts";
-import { CREATE_AGENT_INPUT_STATE_KEY, VIRTUAL_ANY_INPUT_STATE_KEY } from "./virtual-any-input.ts";
+import { CREATE_AGENT_INPUT_STATE_KEY, VIRTUAL_ANY_INPUT_STATE_KEY, VIRTUAL_ANY_OUTPUT_STATE_KEY } from "./virtual-any-input.ts";
 import type { GraphDocument, GraphPayload, TemplateRecord } from "../types/node-system.ts";
 
 const {
@@ -13,6 +13,7 @@ const {
   createEmptyDraftGraph,
   isAgentBreakpointEnabledInDocument,
   pruneUnreferencedStateSchemaInDocument,
+  reorderNodePortStateInDocument,
   resolveEditorSeedTemplate,
   resolveAgentBreakpointTimingInDocument,
   updateAgentBreakpointInDocument,
@@ -78,6 +79,135 @@ test("createDraftFromTemplate deep clones nested template content", () => {
 
   assert.equal(template.state_schema.question.value, "什么是 GraphiteUI？");
   assert.equal(template.metadata.category, "demo");
+});
+
+test("reorderNodePortStateInDocument swaps input bindings within the same node", () => {
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Port ordering",
+    state_schema: {
+      first: { name: "first", description: "", type: "text", value: "", color: "#d97706" },
+      second: { name: "second", description: "", type: "text", value: "", color: "#2563eb" },
+      third: { name: "third", description: "", type: "text", value: "", color: "#7c3aed" },
+      answer: { name: "answer", description: "", type: "text", value: "", color: "#10b981" },
+    },
+    nodes: {
+      answer_agent: {
+        kind: "agent",
+        name: "Answer Agent",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [
+          { state: "first", required: true },
+          { state: "second", required: true },
+          { state: "third", required: true },
+        ],
+        writes: [{ state: "answer", mode: "replace" }],
+        config: {
+          skills: [],
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "off",
+          temperature: 0.2,
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const nextDocument = reorderNodePortStateInDocument(document, "answer_agent", "input", "second", 0);
+
+  assert.deepEqual(nextDocument.nodes.answer_agent.reads.map((binding) => binding.state), ["second", "first", "third"]);
+  assert.deepEqual(nextDocument.nodes.answer_agent.writes.map((binding) => binding.state), ["answer"]);
+  assert.deepEqual(document.nodes.answer_agent.reads.map((binding) => binding.state), ["first", "second", "third"]);
+});
+
+test("reorderNodePortStateInDocument swaps output bindings without crossing sides", () => {
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Output ordering",
+    state_schema: {
+      input: { name: "input", description: "", type: "text", value: "", color: "#d97706" },
+      draft: { name: "draft", description: "", type: "text", value: "", color: "#2563eb" },
+      summary: { name: "summary", description: "", type: "text", value: "", color: "#7c3aed" },
+    },
+    nodes: {
+      writer_agent: {
+        kind: "agent",
+        name: "Writer Agent",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [{ state: "input", required: true }],
+        writes: [
+          { state: "draft", mode: "replace" },
+          { state: "summary", mode: "replace" },
+        ],
+        config: {
+          skills: [],
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "off",
+          temperature: 0.2,
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const nextDocument = reorderNodePortStateInDocument(document, "writer_agent", "output", "summary", 0);
+  const unchangedDocument = reorderNodePortStateInDocument(document, "writer_agent", "input", "summary", 0);
+
+  assert.deepEqual(nextDocument.nodes.writer_agent.writes.map((binding) => binding.state), ["summary", "draft"]);
+  assert.deepEqual(nextDocument.nodes.writer_agent.reads.map((binding) => binding.state), ["input"]);
+  assert.equal(unchangedDocument, document);
+});
+
+test("reorderNodePortStateInDocument moves bindings to an insertion index for drag previews", () => {
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Move ordering",
+    state_schema: {
+      first: { name: "first", description: "", type: "text", value: "", color: "#d97706" },
+      second: { name: "second", description: "", type: "text", value: "", color: "#2563eb" },
+      third: { name: "third", description: "", type: "text", value: "", color: "#7c3aed" },
+      answer: { name: "answer", description: "", type: "text", value: "", color: "#10b981" },
+    },
+    nodes: {
+      answer_agent: {
+        kind: "agent",
+        name: "Answer Agent",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [
+          { state: "first", required: true },
+          { state: "second", required: true },
+          { state: "third", required: true },
+        ],
+        writes: [{ state: "answer", mode: "replace" }],
+        config: {
+          skills: [],
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "off",
+          temperature: 0.2,
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const nextDocument = reorderNodePortStateInDocument(document, "answer_agent", "input", "second", 2);
+
+  assert.deepEqual(nextDocument.nodes.answer_agent.reads.map((binding) => binding.state), ["first", "third", "second"]);
 });
 
 test("createDraftFromTemplate accepts Vue reactive template records", () => {
@@ -656,6 +786,196 @@ test("connectStateBindingInDocument appends source state through a transient new
   assert.deepEqual(nextAgentDocument.edges, [{ source: "input_question", target: "answer_helper" }]);
   assert.deepEqual(document.nodes.answer_helper.reads, [{ state: "draft_question", required: true }]);
   assert.equal(nextConditionDocument, document);
+});
+
+test("connectStateBindingInDocument materializes a virtual output before connecting existing targets", () => {
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Virtual output connect graph",
+    state_schema: {
+      question: { name: "question", description: "", type: "text", value: "", color: "#d97706" },
+    },
+    nodes: {
+      empty_agent: {
+        kind: "agent",
+        name: "empty_agent",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [{ state: "question", required: true }],
+        writes: [],
+        config: {
+          skills: [],
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+      review_agent: {
+        kind: "agent",
+        name: "review_agent",
+        description: "",
+        ui: { position: { x: 180, y: 0 } },
+        reads: [{ state: "question", required: true }],
+        writes: [],
+        config: {
+          skills: [],
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+      empty_output: {
+        kind: "output",
+        name: "empty_output",
+        description: "",
+        ui: { position: { x: 360, y: 0 } },
+        reads: [],
+        writes: [],
+        config: {
+          displayMode: "auto",
+          persistEnabled: false,
+          persistFormat: "auto",
+          fileNameTemplate: "",
+        },
+      },
+      empty_gate: {
+        kind: "condition",
+        name: "empty_gate",
+        description: "",
+        ui: { position: { x: 540, y: 0 } },
+        reads: [],
+        writes: [],
+        config: {
+          branches: ["true", "false"],
+          loopLimit: 5,
+          branchMapping: { true: "true", false: "false" },
+          rule: {
+            source: "",
+            operator: "exists",
+            value: null,
+          },
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {
+      graphiteui_state_key_counter: 2,
+    },
+  };
+
+  const nextAgentDocument = graphDocument.connectStateBindingInDocument(
+    document,
+    "empty_agent",
+    VIRTUAL_ANY_OUTPUT_STATE_KEY,
+    "review_agent",
+    CREATE_AGENT_INPUT_STATE_KEY,
+  );
+  assert.deepEqual(nextAgentDocument.nodes.empty_agent.writes, [{ state: "state_3", mode: "replace" }]);
+  assert.deepEqual(nextAgentDocument.nodes.review_agent.reads, [
+    { state: "question", required: true },
+    { state: "state_3", required: true },
+  ]);
+  assert.equal(nextAgentDocument.state_schema.state_3?.name, "state_3");
+  assert.equal(nextAgentDocument.metadata.graphiteui_state_key_counter, 3);
+  assert.deepEqual(nextAgentDocument.edges, [{ source: "empty_agent", target: "review_agent" }]);
+
+  const nextOutputDocument = graphDocument.connectStateBindingInDocument(
+    document,
+    "empty_agent",
+    VIRTUAL_ANY_OUTPUT_STATE_KEY,
+    "empty_output",
+    VIRTUAL_ANY_INPUT_STATE_KEY,
+  );
+  assert.deepEqual(nextOutputDocument.nodes.empty_agent.writes, [{ state: "state_3", mode: "replace" }]);
+  assert.deepEqual(nextOutputDocument.nodes.empty_output.reads, [{ state: "state_3", required: true }]);
+
+  const nextConditionDocument = graphDocument.connectStateBindingInDocument(
+    document,
+    "empty_agent",
+    VIRTUAL_ANY_OUTPUT_STATE_KEY,
+    "empty_gate",
+    VIRTUAL_ANY_INPUT_STATE_KEY,
+  );
+  assert.deepEqual(nextConditionDocument.nodes.empty_gate.reads, [{ state: "state_3", required: true }]);
+  assert.equal(nextConditionDocument.nodes.empty_gate.kind, "condition");
+  if (nextConditionDocument.nodes.empty_gate.kind === "condition") {
+    assert.equal(nextConditionDocument.nodes.empty_gate.config.rule.source, "state_3");
+  }
+});
+
+test("connectStateBindingInDocument materializes an empty input virtual output into a selected concrete input binding", () => {
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Virtual input output to concrete input graph",
+    state_schema: {
+      first: { name: "first", description: "", type: "text", value: "", color: "#d97706" },
+      second: { name: "second", description: "", type: "text", value: "", color: "#2563eb" },
+      third: { name: "third", description: "", type: "text", value: "", color: "#7c3aed" },
+      fourth: { name: "fourth", description: "", type: "text", value: "", color: "#10b981" },
+    },
+    nodes: {
+      empty_input: {
+        kind: "input",
+        name: "empty_input",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [],
+        config: { value: "" },
+      },
+      multi_input_agent: {
+        kind: "agent",
+        name: "multi_input_agent",
+        description: "",
+        ui: { position: { x: 220, y: 0 } },
+        reads: [
+          { state: "first", required: true },
+          { state: "second", required: true },
+          { state: "third", required: true },
+          { state: "fourth", required: true },
+        ],
+        writes: [],
+        config: {
+          skills: [],
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "off",
+          temperature: 0.2,
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {
+      graphiteui_state_key_counter: 4,
+    },
+  };
+
+  const nextDocument = graphDocument.connectStateBindingInDocument(
+    document,
+    "empty_input",
+    VIRTUAL_ANY_OUTPUT_STATE_KEY,
+    "multi_input_agent",
+    "third",
+  );
+
+  assert.deepEqual(nextDocument.nodes.empty_input.writes, [{ state: "state_5", mode: "replace" }]);
+  assert.deepEqual(nextDocument.nodes.multi_input_agent.reads, [
+    { state: "first", required: true },
+    { state: "second", required: true },
+    { state: "state_5", required: true },
+    { state: "fourth", required: true },
+  ]);
+  assert.equal(nextDocument.state_schema.state_5?.name, "state_5");
+  assert.deepEqual(nextDocument.edges, [{ source: "empty_input", target: "multi_input_agent" }]);
+  assert.deepEqual(document.nodes.empty_input.writes, []);
+  assert.deepEqual(document.nodes.multi_input_agent.reads.map((binding) => binding.state), ["first", "second", "third", "fourth"]);
 });
 
 test("connectStateBindingInDocument restores ordering for an existing matching state binding", () => {

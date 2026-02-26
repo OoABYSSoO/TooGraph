@@ -257,6 +257,7 @@
           @update-input-state="emit('update-input-state', $event)"
           @update-state="emit('update-state', $event)"
           @remove-port-state="emit('remove-port-state', $event)"
+          @reorder-port-state="emit('reorder-port-state', $event)"
           @update-agent-config="emit('update-agent-config', $event)"
           @toggle-agent-breakpoint="emit('toggle-agent-breakpoint', $event)"
           @update-agent-breakpoint-timing="emit('update-agent-breakpoint-timing', $event)"
@@ -481,6 +482,7 @@ const props = defineProps<{
 }>();
 
 const { t, locale } = useI18n();
+const STATE_TARGET_ROW_FALLBACK_GAP = 44;
 const edgeVisibilityModeOptions = computed(() => {
   locale.value;
   return buildEdgeVisibilityModeOptions();
@@ -495,6 +497,7 @@ const emit = defineEmits<{
   (event: "update-input-state", payload: { stateKey: string; patch: Partial<StateDefinition> }): void;
   (event: "update-state", payload: { stateKey: string; patch: Partial<StateDefinition> }): void;
   (event: "remove-port-state", payload: { nodeId: string; side: "input" | "output"; stateKey: string }): void;
+  (event: "reorder-port-state", payload: { nodeId: string; side: "input" | "output"; stateKey: string; targetIndex: number }): void;
   (event: "update-agent-config", payload: { nodeId: string; patch: Partial<AgentNode["config"]> }): void;
   (event: "toggle-agent-breakpoint", payload: { nodeId: string; enabled: boolean }): void;
   (event: "update-agent-breakpoint-timing", payload: { nodeId: string; timing: "before" | "after" }): void;
@@ -511,7 +514,7 @@ const emit = defineEmits<{
   (event: "locked-edit-attempt"): void;
   (event: "refresh-agent-models"): void;
   (event: "connect-flow", payload: { sourceNodeId: string; targetNodeId: string }): void;
-  (event: "connect-state", payload: { sourceNodeId: string; sourceStateKey: string; targetNodeId: string; targetStateKey: string }): void;
+  (event: "connect-state", payload: { sourceNodeId: string; sourceStateKey: string; targetNodeId: string; targetStateKey: string; position: GraphPosition }): void;
   (event: "connect-state-input-source", payload: { sourceNodeId: string; targetNodeId: string; targetStateKey: string; targetValueType?: string | null }): void;
   (event: "connect-route", payload: { sourceNodeId: string; branchKey: string; targetNodeId: string }): void;
   (event: "reconnect-flow", payload: { sourceNodeId: string; currentTargetNodeId: string; nextTargetNodeId: string }): void;
@@ -2365,6 +2368,11 @@ function resolveAutoSnappedStateInputSourceAnchor(event: PointerEvent) {
 function resolveAutoSnappedStateTargetAnchor(event: PointerEvent) {
   const nodeId = resolveNodeIdAtPointer(event);
   if (nodeId) {
+    const directStateTargetAnchor = resolveEligibleConcreteStateTargetAnchorAtPointer(nodeId, event);
+    if (directStateTargetAnchor) {
+      return directStateTargetAnchor;
+    }
+
     const snappedAnchor = resolveEligibleStateTargetAnchorForNodeBody(nodeId);
     if (snappedAnchor) {
       return snappedAnchor;
@@ -2468,6 +2476,40 @@ function resolveEligibleTargetAnchorForNodeBody(nodeId: string) {
   return candidateAnchor;
 }
 
+function resolveEligibleConcreteStateTargetAnchorAtPointer(nodeId: string, event: PointerEvent) {
+  const concreteStateInputAnchors = projectedAnchors.value
+    .filter(
+      (anchor) =>
+        anchor.nodeId === nodeId &&
+        anchor.kind === "state-in" &&
+        anchor.stateKey !== CREATE_AGENT_INPUT_STATE_KEY &&
+        anchor.stateKey !== VIRTUAL_ANY_INPUT_STATE_KEY &&
+        isStateTargetAnchorAllowedForActiveConnection(anchor) &&
+        eligibleTargetAnchorIds.value.has(anchor.id),
+    )
+    .sort((left, right) => left.y - right.y);
+  if (concreteStateInputAnchors.length === 0) {
+    return null;
+  }
+
+  const point = resolveCanvasPoint(event);
+  const createInputAnchor = resolveAgentCreateInputTargetAnchor(nodeId);
+  for (let index = 0; index < concreteStateInputAnchors.length; index += 1) {
+    const anchor = concreteStateInputAnchors[index];
+    const previousAnchor = concreteStateInputAnchors[index - 1];
+    const nextAnchor = concreteStateInputAnchors[index + 1];
+    const previousY = previousAnchor?.y ?? anchor.y - STATE_TARGET_ROW_FALLBACK_GAP;
+    const nextY = nextAnchor?.y ?? createInputAnchor?.y ?? anchor.y + STATE_TARGET_ROW_FALLBACK_GAP;
+    const upperBoundary = (previousY + anchor.y) / 2;
+    const lowerBoundary = (anchor.y + nextY) / 2;
+    if (point.y >= upperBoundary && point.y < lowerBoundary) {
+      return anchor;
+    }
+  }
+
+  return null;
+}
+
 function resolveEligibleStateTargetAnchorForNodeBody(nodeId: string) {
   const createInputAnchor = resolveAgentCreateInputTargetAnchor(nodeId);
   if (createInputAnchor && canCompleteCanvasConnection(createInputAnchor)) {
@@ -2537,6 +2579,10 @@ function resolveAgentCreateInputTargetAnchor(nodeId: string): ProjectedCanvasAnc
 function isStateTargetAnchorAllowedForActiveConnection(anchor: ProjectedCanvasAnchor) {
   if (activeConnection.value?.sourceKind !== "state-out") {
     return true;
+  }
+
+  if (activeConnection.value?.sourceStateKey === VIRTUAL_ANY_OUTPUT_STATE_KEY) {
+    return anchor.kind === "state-in" && typeof anchor.stateKey === "string";
   }
 
   return (
@@ -3049,6 +3095,7 @@ function completePendingConnection(targetAnchor: ProjectedCanvasAnchor) {
       sourceStateKey: connection.sourceStateKey,
       targetNodeId: targetAnchor.nodeId,
       targetStateKey: targetAnchor.stateKey,
+      position: { x: targetAnchor.x, y: targetAnchor.y },
     });
   } else if (connection.sourceKind === "state-in" && connection.sourceStateKey) {
     emit("connect-state-input-source", {

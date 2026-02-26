@@ -96,6 +96,11 @@ test("EditorCanvas forwards node model refresh requests to the workspace", () =>
   assert.match(componentSource, /@refresh-agent-models="emit\('refresh-agent-models'\)"/);
 });
 
+test("EditorCanvas forwards state pill reorder requests to the workspace", () => {
+  assert.match(componentSource, /\(event: "reorder-port-state", payload: \{ nodeId: string; side: "input" \| "output"; stateKey: string; targetIndex: number \}\): void;/);
+  assert.match(componentSource, /@reorder-port-state="emit\('reorder-port-state', \$event\)"/);
+});
+
 test("EditorCanvas lets editable node fields handle Backspace and Delete normally", () => {
   assert.doesNotMatch(componentSource, /@keydown\.delete\.prevent=/);
   assert.doesNotMatch(componentSource, /@keydown\.backspace\.prevent=/);
@@ -517,6 +522,7 @@ test("EditorCanvas forwards node-card state editing and top-action events", () =
   assert.match(componentSource, /\(event: "remove-port-state", payload: \{ nodeId: string; side: "input" \| "output"; stateKey: string \}\): void;/);
   assert.match(componentSource, /\(event: "delete-node", payload: \{ nodeId: string \}\): void;/);
   assert.match(componentSource, /\(event: "save-node-preset", payload: \{ nodeId: string \}\): void;/);
+  assert.match(componentSource, /\(event: "connect-state", payload: \{ sourceNodeId: string; sourceStateKey: string; targetNodeId: string; targetStateKey: string; position: GraphPosition \}\): void;/);
 });
 
 test("EditorCanvas opens the creation flow when output drags end on empty canvas", () => {
@@ -656,15 +662,19 @@ test("EditorCanvas opens node creation from the virtual agent any output", () =>
 test("EditorCanvas snaps state drags to transient or matching state inputs from the whole target node body", () => {
   assert.match(componentSource, /if \(activeConnection\.value\.sourceKind === "state-out"\) \{[\s\S]*return resolveAutoSnappedStateTargetAnchor\(event\);[\s\S]*\}/);
   assert.match(componentSource, /function resolveAutoSnappedStateTargetAnchor\(event: PointerEvent\)/);
+  assert.match(componentSource, /function resolveEligibleConcreteStateTargetAnchorAtPointer\(nodeId: string, event: PointerEvent\)/);
+  assert.match(componentSource, /const directStateTargetAnchor = resolveEligibleConcreteStateTargetAnchorAtPointer\(nodeId, event\);[\s\S]*if \(directStateTargetAnchor\) \{[\s\S]*return directStateTargetAnchor;/);
   assert.match(componentSource, /function resolveEligibleStateTargetAnchorForNodeBody\(nodeId: string\)/);
   assert.match(componentSource, /function resolveAgentCreateInputTargetAnchor\(nodeId: string\)/);
   assert.match(componentSource, /function isStateTargetAnchorAllowedForActiveConnection\(anchor: ProjectedCanvasAnchor\)/);
+  assert.match(componentSource, /activeConnection\.value\?\.sourceStateKey === VIRTUAL_ANY_OUTPUT_STATE_KEY/);
   assert.match(componentSource, /anchor\.stateKey === CREATE_AGENT_INPUT_STATE_KEY \|\|[\s\S]*anchor\.stateKey === VIRTUAL_ANY_INPUT_STATE_KEY \|\|[\s\S]*anchor\.stateKey === activeConnection\.value\?\.sourceStateKey/);
   assert.match(componentSource, /const createInputAnchor = resolveAgentCreateInputTargetAnchor\(nodeId\);[\s\S]*if \(createInputAnchor && canCompleteCanvasConnection\(createInputAnchor\)\) \{[\s\S]*return createInputAnchor;/);
   assert.match(componentSource, /const fallbackInputAnchor = baseProjectedAnchors\.value[\s\S]*anchor\.stateKey === VIRTUAL_ANY_INPUT_STATE_KEY/);
   assert.match(componentSource, /function isPointerWithinNodeElement\(nodeElement: HTMLElement, event: PointerEvent\)/);
   assert.match(componentSource, /if \(activeConnection\.value\?\.sourceKind === "state-out"\) \{[\s\S]*return resolveEligibleStateTargetAnchorForNodeBody\(nodeId\);[\s\S]*\}/);
   assert.match(componentSource, /if \(activeConnection\.value\?\.sourceKind === "state-out" && !isStateTargetAnchorAllowedForActiveConnection\(anchor\)\) \{[\s\S]*return false;/);
+  assert.match(componentSource, /emit\("connect-state", \{[\s\S]*sourceNodeId: connection\.sourceNodeId,[\s\S]*sourceStateKey: connection\.sourceStateKey,[\s\S]*targetNodeId: targetAnchor\.nodeId,[\s\S]*targetStateKey: targetAnchor\.stateKey,[\s\S]*position: \{ x: targetAnchor\.x, y: targetAnchor\.y \},/);
   assert.doesNotMatch(componentSource, /function isPointerWithinAnchorHitElement/);
   assert.doesNotMatch(componentSource, /STATE_INPUT_HIT_PADDING/);
   assert.doesNotMatch(componentSource, /closest\("\[data-anchor-hitarea='true'\]"\)/);

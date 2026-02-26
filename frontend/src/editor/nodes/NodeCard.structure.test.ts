@@ -7,6 +7,12 @@ import { fileURLToPath } from "node:url";
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDirectory = dirname(currentFilePath);
 const componentSource = readFileSync(resolve(currentDirectory, "NodeCard.vue"), "utf8").replace(/\r\n/g, "\n");
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const cssRuleBlock = (selector: string) => {
+  const match = componentSource.match(new RegExp(`${escapeRegExp(selector)} \\{[\\s\\S]*?\\n\\}`));
+  assert.ok(match, `expected to find CSS rule block for ${selector}`);
+  return match[0];
+};
 
 test("NodeCard does not render the reads and writes summary block", () => {
   assert.doesNotMatch(componentSource, /class="node-card__state-summary"/);
@@ -81,10 +87,15 @@ test("NodeCard keeps state pill geometry but hides the pill chrome visually", ()
 });
 
 test("NodeCard clips long state port labels inside the pill", () => {
-  assert.match(componentSource, /\.node-card__port-pill-label \{[\s\S]*overflow:\s*hidden;/);
-  assert.match(componentSource, /\.node-card__port-pill-label \{[\s\S]*text-overflow:\s*ellipsis;/);
-  assert.match(componentSource, /\.node-card__port-pill-label-text \{[\s\S]*text-overflow:\s*ellipsis;/);
-  assert.doesNotMatch(componentSource, /\.node-card__port-pill-label \{[\s\S]*overflow:\s*visible;/);
+  const labelBlock = cssRuleBlock(".node-card__port-pill-label");
+  const labelTextBlock = cssRuleBlock(".node-card__port-pill-label-text");
+  assert.match(labelBlock, /overflow:\s*hidden;/);
+  assert.match(labelBlock, /text-overflow:\s*ellipsis;/);
+  assert.match(labelBlock, /line-height:\s*1\.2;/);
+  assert.match(labelTextBlock, /text-overflow:\s*ellipsis;/);
+  assert.match(labelTextBlock, /line-height:\s*1\.2;/);
+  assert.doesNotMatch(labelBlock, /line-height:\s*1;/);
+  assert.doesNotMatch(labelBlock, /overflow:\s*visible;/);
 });
 
 test("NodeCard uses Element Plus segmented control on the same row as the input output pill", () => {
@@ -305,8 +316,8 @@ test("NodeCard renders plus input and plus output as virtual agent state port ro
   assert.match(componentSource, /VIRTUAL_ANY_OUTPUT_STATE_KEY/);
   assert.match(componentSource, /function openPortStateCreate\(side: "input" \| "output"\)/);
   assert.match(componentSource, /createStateDraftFromQuery\(side === "input" \? "Input" : "Output", Object\.keys\(props\.stateSchema\)\)/);
-  assert.match(agentSection, /v-for="port in agentInputPorts"/);
-  assert.match(agentSection, /v-for="port in agentOutputPorts"/);
+  assert.match(agentSection, /v-for="port in orderedAgentInputPorts"/);
+  assert.match(agentSection, /v-for="port in orderedAgentOutputPorts"/);
   assert.match(componentSource, /const shouldShowAgentCreateInputPort = computed\(\(\) => agentInputPorts\.value\.length === 0\);/);
   assert.match(componentSource, /const shouldShowAgentCreateOutputPort = computed\(\(\) => agentOutputPorts\.value\.length === 0\);/);
   assert.match(agentSection, /data-agent-create-port="input"/);
@@ -368,7 +379,7 @@ test("NodeCard hides virtual agent output any behind the plus output row", () =>
   assert.match(componentSource, /const agentOutputPorts = computed<NodePortViewModel\[\]>\(\(\) =>[\s\S]*filter\(\(port\) => !port\.virtual\)/);
   assert.match(agentOutputPortSection, /data-agent-create-port="output"/);
   assert.match(agentOutputPortSection, /:data-anchor-slot-id="\`\$\{nodeId\}:state-out:\$\{VIRTUAL_ANY_OUTPUT_STATE_KEY\}\`"/);
-  assert.match(agentOutputPortSection, /@click\.stop="!port\.virtual && handleStateEditorActionClick/);
+  assert.match(agentOutputPortSection, /@click\.stop="handlePortStatePillClick\(`agent-output:\$\{port\.key\}`, port\.key\)"/);
   assert.match(agentOutputPortSection, /v-if="!port\.virtual"[\s\S]*node-card__port-pill-remove/);
   assert.doesNotMatch(agentOutputPortSection, /node-card__port-pill-create-badge/);
 });
@@ -800,8 +811,41 @@ test("NodeCard declares top-action and state-edit events for canvas forwarding",
   assert.doesNotMatch(componentSource, /\(event: "rename-state"/);
   assert.match(componentSource, /\(event: "update-state", payload: \{ stateKey: string; patch: Partial<StateDefinition> \}\): void;/);
   assert.match(componentSource, /\(event: "remove-port-state", payload: \{ nodeId: string; side: "input" \| "output"; stateKey: string \}\): void;/);
+  assert.match(componentSource, /\(event: "reorder-port-state", payload: \{ nodeId: string; side: "input" \| "output"; stateKey: string; targetIndex: number \}\): void;/);
   assert.match(componentSource, /\(event: "delete-node", payload: \{ nodeId: string \}\): void;/);
   assert.match(componentSource, /\(event: "save-node-preset", payload: \{ nodeId: string \}\): void;/);
+});
+
+test("NodeCard lets real agent state pills drag-reorder within their own side", () => {
+  assert.match(componentSource, /const PORT_REORDER_DRAG_THRESHOLD = 6;/);
+  assert.match(componentSource, /const portReorderPointerState = ref<\{/);
+  assert.match(componentSource, /const orderedAgentInputPorts = computed<NodePortViewModel\[\]>\(\(\) =>/);
+  assert.match(componentSource, /const orderedAgentOutputPorts = computed<NodePortViewModel\[\]>\(\(\) =>/);
+  assert.match(componentSource, /function buildPortReorderPreviewPorts\(side: PortReorderSide, ports: NodePortViewModel\[\]\)/);
+  assert.match(componentSource, /function resolvePortReorderTargetIndex\(side: PortReorderSide, clientY: number\)/);
+  assert.match(componentSource, /const portReorderFloatingPort = computed/);
+  assert.match(componentSource, /const portReorderFloatingStyle = computed/);
+  assert.match(componentSource, /<Teleport to="body">/);
+  assert.match(componentSource, /data-port-reorder-node-id/);
+  assert.match(componentSource, /data-port-reorder-side="input"/);
+  assert.match(componentSource, /data-port-reorder-side="output"/);
+  assert.match(componentSource, /:data-port-reorder-state-key="port\.key"/);
+  assert.match(componentSource, /'node-card__port-pill--reorder-placeholder': isPortReorderPlaceholder\('input', port\.key\)/);
+  assert.match(componentSource, /'node-card__port-pill--reorder-placeholder': isPortReorderPlaceholder\('output', port\.key\)/);
+  assert.match(componentSource, /@pointerdown\.stop="handlePortReorderPointerDown\('input', port\.key, \$event\)"/);
+  assert.match(componentSource, /@pointerdown\.stop="handlePortReorderPointerDown\('output', port\.key, \$event\)"/);
+  assert.match(componentSource, /@click\.stop="handlePortStatePillClick\(`agent-input:\$\{port\.key\}`, port\.key\)"/);
+  assert.match(componentSource, /@click\.stop="handlePortStatePillClick\(`agent-output:\$\{port\.key\}`, port\.key\)"/);
+  assert.match(componentSource, /function handlePortReorderPointerDown\(side: "input" \| "output", stateKey: string, event: PointerEvent\)/);
+  assert.match(componentSource, /emit\("reorder-port-state", \{[\s\S]*nodeId: props\.nodeId,[\s\S]*side: pointerState\.side,[\s\S]*stateKey: pointerState\.stateKey,[\s\S]*targetIndex,[\s\S]*\}\);/);
+  assert.match(componentSource, /\.node-card-port-reorder-move \{/);
+  assert.match(componentSource, /\.node-card__port-pill--floating \{/);
+  assert.match(componentSource, /\.node-card__port-pill--reorder-placeholder \{/);
+  assert.match(componentSource, /\.node-card__port-pill--reordering \{/);
+  const createInputPill = componentSource.match(/data-agent-create-port="input"[\s\S]*?<\/span>/)?.[0] ?? "";
+  const createOutputPill = componentSource.match(/data-agent-create-port="output"[\s\S]*?<\/span>/)?.[0] ?? "";
+  assert.doesNotMatch(createInputPill, /data-port-reorder-state-key/);
+  assert.doesNotMatch(createOutputPill, /data-port-reorder-state-key/);
 });
 
 test("NodeCard renders output previews through a rich content presenter while keeping Advanced in the top popover", () => {

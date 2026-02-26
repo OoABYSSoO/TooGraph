@@ -104,6 +104,7 @@
                 @update-input-state="updateStateField(tab.tabId, $event.stateKey, $event.patch)"
                 @update-state="updateStateField(tab.tabId, $event.stateKey, $event.patch)"
                 @remove-port-state="removeNodePortStateForTab(tab.tabId, $event.nodeId, $event.side, $event.stateKey)"
+                @reorder-port-state="reorderNodePortStateForTab(tab.tabId, $event.nodeId, $event.side, $event.stateKey, $event.targetIndex)"
                 @disconnect-data-edge="disconnectDataEdgeForTab(tab.tabId, $event.sourceNodeId, $event.targetNodeId, $event.stateKey, $event.mode)"
                 @update-agent-config="updateAgentConfigForTab(tab.tabId, $event.nodeId, $event.patch)"
                 @toggle-agent-breakpoint="toggleAgentBreakpointForTab(tab.tabId, $event.nodeId, $event.enabled)"
@@ -116,7 +117,7 @@
                 @create-port-state="createNodePortStateForTab(tab.tabId, $event.nodeId, $event.side, $event.field)"
                 @delete-node="deleteNodeForTab(tab.tabId, $event.nodeId)"
                 @save-node-preset="saveNodePresetForTab(tab.tabId, $event.nodeId)"
-                @connect-state="connectStateBindingForTab(tab.tabId, $event.sourceNodeId, $event.sourceStateKey, $event.targetNodeId, $event.targetStateKey)"
+                @connect-state="connectStateBindingForTab(tab.tabId, $event)"
                 @connect-state-input-source="connectStateInputSourceForTab(tab.tabId, $event)"
                 @connect-flow="connectFlowNodesForTab(tab.tabId, $event.sourceNodeId, $event.targetNodeId)"
                 @connect-route="connectConditionRouteForTab(tab.tabId, $event.sourceNodeId, $event.branchKey, $event.targetNodeId)"
@@ -214,6 +215,7 @@ import { buildBuiltinNodeCreationEntries } from "@/editor/workspace/nodeCreation
 import { buildNodeCreationEntries } from "@/editor/workspace/nodeCreationMenuModel";
 import { createNodeFromCreationEntry, createNodeFromDroppedFile } from "./nodeCreationExecution.ts";
 import { connectStateInputSourceToTarget } from "@/lib/graph-node-creation";
+import { isVirtualAnyOutputStateKey } from "@/lib/virtual-any-input";
 import { resolveEditorRouteInstruction } from "@/lib/editor-route-sync";
 import {
   addConditionBranchToDocument,
@@ -229,6 +231,7 @@ import {
   removeFlowEdgeFromDocument,
   removeNodeFromDocument,
   pruneUnreferencedStateSchemaInDocument,
+  reorderNodePortStateInDocument,
   resolveEditorSeedTemplate,
   syncKnowledgeBaseSkillsInDocument,
   updateAgentBreakpointInDocument,
@@ -1634,6 +1637,21 @@ function removeNodePortStateForTab(tabId: string, nodeId: string, side: "input" 
   focusNodeForTab(tabId, nodeId);
 }
 
+function reorderNodePortStateForTab(tabId: string, nodeId: string, side: "input" | "output", stateKey: string, targetIndex: number) {
+  const document = documentsByTabId.value[tabId];
+  if (!document) {
+    return;
+  }
+
+  const nextDocument = reorderNodePortStateInDocument(document, nodeId, side, stateKey, targetIndex);
+  if (nextDocument === document) {
+    return;
+  }
+
+  markDocumentDirty(tabId, nextDocument);
+  focusNodeForTab(tabId, nodeId);
+}
+
 function disconnectDataEdgeForTab(tabId: string, sourceNodeId: string, targetNodeId: string, stateKey: string, mode: "state" | "flow") {
   const document = documentsByTabId.value[tabId];
   if (!document) {
@@ -1759,23 +1777,59 @@ function connectFlowNodesForTab(tabId: string, sourceNodeId: string, targetNodeI
 
 function connectStateBindingForTab(
   tabId: string,
-  sourceNodeId: string,
-  sourceStateKey: string,
-  targetNodeId: string,
-  targetStateKey: string,
+  payload: { sourceNodeId: string; sourceStateKey: string; targetNodeId: string; targetStateKey: string; position: GraphPosition },
 ) {
   const document = documentsByTabId.value[tabId];
   if (!document) {
     return;
   }
 
-  const nextDocument = connectStateBindingInDocument(document, sourceNodeId, sourceStateKey, targetNodeId, targetStateKey);
+  const nextDocument = connectStateBindingInDocument(
+    document,
+    payload.sourceNodeId,
+    payload.sourceStateKey,
+    payload.targetNodeId,
+    payload.targetStateKey,
+  );
   if (nextDocument === document) {
     return;
   }
 
+  const createdStateKey = resolveCreatedVirtualOutputStateKey(document, nextDocument, payload.sourceNodeId, payload.sourceStateKey);
   markDocumentDirty(tabId, nextDocument);
-  focusNodeForTab(tabId, targetNodeId);
+  if (createdStateKey) {
+    openCreatedStateEdgeEditorForTab(
+      tabId,
+      {
+        position: payload.position,
+        sourceNodeId: payload.sourceNodeId,
+        sourceAnchorKind: "state-out",
+        sourceStateKey: payload.sourceStateKey,
+        targetNodeId: payload.targetNodeId,
+        targetAnchorKind: "state-in",
+        targetStateKey: payload.targetStateKey,
+      },
+      {
+        createdNodeId: payload.sourceNodeId,
+        createdStateKey,
+      },
+    );
+  }
+  focusNodeForTab(tabId, payload.targetNodeId);
+}
+
+function resolveCreatedVirtualOutputStateKey(
+  previousDocument: GraphPayload | GraphDocument,
+  nextDocument: GraphPayload | GraphDocument,
+  sourceNodeId: string,
+  sourceStateKey: string,
+) {
+  if (!isVirtualAnyOutputStateKey(sourceStateKey)) {
+    return null;
+  }
+
+  const previousOutputKeys = new Set(previousDocument.nodes[sourceNodeId]?.writes.map((binding) => binding.state) ?? []);
+  return nextDocument.nodes[sourceNodeId]?.writes.find((binding) => !previousOutputKeys.has(binding.state))?.state ?? null;
 }
 
 function connectStateInputSourceForTab(

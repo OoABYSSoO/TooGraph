@@ -70,6 +70,45 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
         self.assertIn("output_format: JSON object inside the JSON value", prompt)
         self.assertIn("不要把对象再序列化成字符串", prompt)
 
+    def test_auto_prompt_preserves_input_and_output_state_order(self) -> None:
+        state_schema = {
+            "context": NodeSystemStateDefinition(
+                name="上下文",
+                description="",
+                type=NodeSystemStateType.TEXT,
+                value="",
+            ),
+            "question": NodeSystemStateDefinition(
+                name="问题",
+                description="",
+                type=NodeSystemStateType.TEXT,
+                value="",
+            ),
+            "summary": NodeSystemStateDefinition(
+                name="摘要",
+                description="",
+                type=NodeSystemStateType.MARKDOWN,
+                value="",
+            ),
+            "draft": NodeSystemStateDefinition(
+                name="草稿",
+                description="",
+                type=NodeSystemStateType.TEXT,
+                value="",
+            ),
+        }
+
+        prompt = _build_auto_system_prompt(
+            ["summary", "draft"],
+            {"context": "先读这个", "question": "再读这个"},
+            {},
+            state_schema=state_schema,
+        )
+
+        self.assertLess(prompt.index("key: context"), prompt.index("key: question"))
+        self.assertLess(prompt.index("key: summary"), prompt.index("key: draft"))
+        self.assertLess(prompt.index('"summary": "..."'), prompt.index('"draft": "..."'))
+
     def test_llm_json_response_can_map_unique_state_name_alias_back_to_output_key(self) -> None:
         parsed = _parse_llm_json_response(
             '{"最终答案": "这是中文语义字段返回的内容"}',
