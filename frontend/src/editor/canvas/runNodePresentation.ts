@@ -15,14 +15,14 @@ export function resolveNodeRunPresentation(status: string | undefined, isCurrent
 
   if (status === "success" || status === "completed") {
     return {
-      haloClass: "editor-canvas__node-halo--success",
+      haloClass: null,
       shellClass: "editor-canvas__node--success",
     };
   }
 
   if (status === "failed") {
     return {
-      haloClass: "editor-canvas__node-halo--failed",
+      haloClass: null,
       shellClass: "editor-canvas__node--failed",
     };
   }

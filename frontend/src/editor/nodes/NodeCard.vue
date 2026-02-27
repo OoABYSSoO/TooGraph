@@ -1,5 +1,6 @@
 <template>
   <article
+    v-bind="$attrs"
     class="node-card"
     :class="{
       'node-card--selected': selected,

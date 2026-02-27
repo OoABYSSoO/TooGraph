@@ -2961,8 +2961,36 @@ function handleZoomReset() {
   viewport.setViewport(DEFAULT_CANVAS_VIEWPORT);
 }
 
+function resolveWheelZoomDelta(event: WheelEvent) {
+  if (event.deltaY === 0) {
+    return 0;
+  }
+  const direction = event.deltaY > 0 ? -1 : 1;
+  return direction * 0.08;
+}
+
 function handleWheel(event: WheelEvent) {
-  viewport.zoomBy(event.deltaY);
+  const wheelZoomDelta = resolveWheelZoomDelta(event);
+  if (wheelZoomDelta === 0) {
+    return;
+  }
+
+  const rect = canvasRef.value?.getBoundingClientRect();
+  if (!rect) {
+    viewport.setViewport({
+      ...viewport.viewport,
+      scale: viewport.viewport.scale + wheelZoomDelta,
+    });
+    return;
+  }
+
+  viewport.zoomAt({
+    clientX: event.clientX,
+    clientY: event.clientY,
+    canvasLeft: rect.left,
+    canvasTop: rect.top,
+    nextScale: viewport.viewport.scale + wheelZoomDelta,
+  });
 }
 
 function handleEdgePointerDown(edge: ProjectedCanvasEdge, event: PointerEvent) {
@@ -4561,9 +4589,7 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
 .editor-canvas__node-halo--running,
 .editor-canvas__node-halo--running-current,
 .editor-canvas__node-halo--paused,
-.editor-canvas__node-halo--paused-current,
-.editor-canvas__node-halo--success,
-.editor-canvas__node-halo--failed {
+.editor-canvas__node-halo--paused-current {
   border-color: var(--editor-canvas-node-halo-border-rest);
   background: var(--editor-canvas-node-halo-background-rest);
 }
@@ -4700,31 +4726,7 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   animation: editor-canvas-paused-halo-breathe 2.05s ease-in-out infinite;
 }
 
-.editor-canvas__node-halo--success {
-  --editor-canvas-node-halo-blur-rest: 7px;
-  --editor-canvas-node-halo-border-rest: rgba(180, 83, 9, 0.48);
-  --editor-canvas-node-halo-ring-shadow: rgba(180, 83, 9, 0.08);
-  --editor-canvas-node-halo-ring-glow: rgba(180, 83, 9, 0.16);
-  --editor-canvas-node-halo-background-rest: rgba(180, 83, 9, 0.025);
-  --editor-canvas-node-halo-shadow-rest:
-    0 0 0 3px rgba(180, 83, 9, 0.08),
-    0 0 20px rgba(180, 83, 9, 0.18);
-  border: 1.5px solid var(--editor-canvas-node-halo-border-rest);
-}
-
-.editor-canvas__node-halo--failed {
-  --editor-canvas-node-halo-blur-rest: 8px;
-  --editor-canvas-node-halo-border-rest: rgba(239, 68, 68, 0.62);
-  --editor-canvas-node-halo-ring-shadow: rgba(239, 68, 68, 0.1);
-  --editor-canvas-node-halo-ring-glow: rgba(239, 68, 68, 0.2);
-  --editor-canvas-node-halo-background-rest: rgba(239, 68, 68, 0.035);
-  --editor-canvas-node-halo-shadow-rest:
-    0 0 0 4px rgba(239, 68, 68, 0.1),
-    0 0 24px rgba(239, 68, 68, 0.24);
-  border: 1.5px solid var(--editor-canvas-node-halo-border-rest);
-}
-
-:deep(.editor-canvas__node--running) {
+:global(.node-card.editor-canvas__node--running) {
   --editor-canvas-node-card-shadow-rest:
     0 18px 36px rgba(60, 41, 20, 0.1),
     0 0 0 1.5px rgba(16, 185, 129, 0.62),
@@ -4741,7 +4743,7 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   animation: editor-canvas-running-card-breathe 2.2s ease-in-out infinite;
 }
 
-:deep(.editor-canvas__node--running-current) {
+:global(.node-card.editor-canvas__node--running-current) {
   --editor-canvas-node-card-shadow-rest:
     0 20px 40px rgba(60, 41, 20, 0.12),
     0 0 0 1.5px rgba(16, 185, 129, 0.86),
@@ -4758,7 +4760,7 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   animation: editor-canvas-running-card-breathe 1.85s ease-in-out infinite;
 }
 
-:deep(.editor-canvas__node--paused) {
+:global(.node-card.editor-canvas__node--paused) {
   --editor-canvas-node-card-shadow-rest:
     0 18px 36px rgba(60, 41, 20, 0.1),
     0 0 0 1.5px rgba(245, 158, 11, 0.62),
@@ -4775,7 +4777,7 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   animation: editor-canvas-paused-card-breathe 2.45s ease-in-out infinite;
 }
 
-:deep(.editor-canvas__node--paused-current) {
+:global(.node-card.editor-canvas__node--paused-current) {
   --editor-canvas-node-card-shadow-rest:
     0 20px 40px rgba(60, 41, 20, 0.12),
     0 0 0 1.5px rgba(245, 158, 11, 0.86),
@@ -4798,10 +4800,10 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   .editor-canvas__node-halo--running-current::before,
   .editor-canvas__node-halo--paused::before,
   .editor-canvas__node-halo--paused-current::before,
-  :deep(.editor-canvas__node--running),
-  :deep(.editor-canvas__node--running-current),
-  :deep(.editor-canvas__node--paused),
-  :deep(.editor-canvas__node--paused-current),
+  :global(.node-card.editor-canvas__node--running),
+  :global(.node-card.editor-canvas__node--running-current),
+  :global(.node-card.editor-canvas__node--paused),
+  :global(.node-card.editor-canvas__node--paused-current),
   .editor-canvas__edge--active-run,
   .editor-canvas__edge--flow.editor-canvas__edge--active-run,
   .editor-canvas__edge--route.editor-canvas__edge--active-run,
@@ -4810,13 +4812,13 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   }
 }
 
-:deep(.editor-canvas__node--success) {
+:global(.node-card.editor-canvas__node--success) {
   box-shadow:
     0 18px 36px rgba(60, 41, 20, 0.1),
     0 0 0 1.5px rgba(180, 83, 9, 0.34);
 }
 
-:deep(.editor-canvas__node--failed) {
+:global(.node-card.editor-canvas__node--failed) {
   box-shadow:
     0 18px 36px rgba(60, 41, 20, 0.1),
     0 0 0 1.5px rgba(239, 68, 68, 0.56);

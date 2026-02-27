@@ -54,6 +54,7 @@ test("NodeCard docks state pills against the card edges", () => {
 });
 
 test("NodeCard accepts canvas-provided real dimensions through CSS variables", () => {
+  assert.match(componentSource, /<article[\s\S]*v-bind="\$attrs"[\s\S]*class="node-card"/);
   assert.match(componentSource, /\.node-card \{[\s\S]*width:\s*var\(--node-card-width,\s*460px\);/);
   assert.match(componentSource, /\.node-card \{[\s\S]*min-height:\s*var\(--node-card-min-height,\s*260px\);/);
   assert.match(componentSource, /\.node-card--condition \{[\s\S]*width:\s*var\(--node-card-width,\s*560px\);/);

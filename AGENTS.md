@@ -5,6 +5,7 @@ These instructions apply to all work in this repository and should persist acros
 ## Commit Messages
 
 - When creating git commits for this project, always write the commit message in Chinese.
+- After making repository changes, commit and push the changes unless the user explicitly asks not to.
 
 ## Dev Restart Workflow
 
