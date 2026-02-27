@@ -3206,7 +3206,7 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
   width: var(--node-card-width, 460px);
   min-height: var(--node-card-min-height, 260px);
   border: 1px solid rgba(154, 52, 18, 0.18);
-  border-radius: 28px;
+  border-radius: var(--node-card-radius, 28px);
   overflow: visible;
   background: var(--graphite-surface-card);
   box-shadow: 0 22px 40px rgba(60, 41, 20, 0.08);
