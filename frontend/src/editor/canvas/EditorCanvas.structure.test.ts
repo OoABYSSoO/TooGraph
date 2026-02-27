@@ -546,12 +546,10 @@ test("EditorCanvas opens reverse node creation when input drags end on empty can
 });
 
 test("EditorCanvas snaps reverse input drags to existing upstream writer node bodies", () => {
-  assert.match(componentSource, /canConnectStateInputSource/);
   assert.match(componentSource, /\(event: "connect-state-input-source", payload: \{ sourceNodeId: string; targetNodeId: string; targetStateKey: string; targetValueType\?: string \| null \}\): void;/);
   assert.match(componentSource, /if \(activeConnection\.value\.sourceKind === "state-in"\) \{[\s\S]*return resolveAutoSnappedStateInputSourceAnchor\(event\);[\s\S]*\}/);
   assert.match(componentSource, /function resolveAutoSnappedStateInputSourceAnchor\(event: PointerEvent\)/);
   assert.match(componentSource, /function resolveEligibleStateInputSourceAnchorForNodeBody\(nodeId: string\)/);
-  assert.match(componentSource, /canConnectStateInputSource\([\s\S]*props\.document,[\s\S]*nodeId,[\s\S]*activeConnection\.value\.sourceNodeId,[\s\S]*activeConnection\.value\.sourceStateKey/);
   assert.match(componentSource, /emit\("connect-state-input-source", \{[\s\S]*sourceNodeId: targetAnchor\.nodeId,[\s\S]*targetNodeId: connection\.sourceNodeId,[\s\S]*targetStateKey: connection\.sourceStateKey/);
 });
 
@@ -601,6 +599,19 @@ test("EditorCanvas previews concrete target state while dragging from a virtual 
   assert.match(componentSource, /:pending-state-output-target="pendingStateOutputTargetByNodeId\[nodeId\] \?\? null"/);
   assert.match(componentSource, /const previewStateKey = resolveConnectionPreviewStateKey\(\);/);
   assert.match(componentSource, /return props\.document\.state_schema\[previewStateKey\]\?\.color\?\.trim\(\) \|\| "#2563eb";/);
+});
+
+test("EditorCanvas snaps reverse virtual input drags to concrete state output pills with state preview", () => {
+  assert.match(componentSource, /const pendingStateInputSourceTargetByNodeId = computed<Record<string, PendingStatePortPreview>>\(\(\) =>/);
+  assert.match(componentSource, /connection\?\.sourceKind !== "state-in" \|\| connection\.sourceStateKey !== VIRTUAL_ANY_INPUT_STATE_KEY/);
+  assert.match(componentSource, /const sourcePreview = resolveStatePortPreview\(autoSnappedTargetAnchor\.value\?\.stateKey\);/);
+  assert.match(componentSource, /\[connection\.sourceNodeId\]: sourcePreview/);
+  assert.match(componentSource, /:pending-state-input-target="pendingStateInputSourceTargetByNodeId\[nodeId\] \?\? null"/);
+  assert.match(componentSource, /function resolveEligibleConcreteStateInputSourceAnchorAtPointer\(nodeId: string, event: PointerEvent\)/);
+  assert.match(componentSource, /const directStateInputSourceAnchor = resolveEligibleConcreteStateInputSourceAnchorAtPointer\(nodeId, event\);[\s\S]*if \(directStateInputSourceAnchor\) \{[\s\S]*return directStateInputSourceAnchor;/);
+  assert.match(componentSource, /anchor\.nodeId === nodeId &&[\s\S]*anchor\.kind === "state-out" &&[\s\S]*isConcreteStateConnectionKey\(anchor\.stateKey\) &&[\s\S]*canCompleteCanvasConnection\(anchor\)/);
+  assert.match(componentSource, /activeConnection\.value\?\.sourceKind === "state-in" &&[\s\S]*activeConnection\.value\.sourceStateKey === VIRTUAL_ANY_INPUT_STATE_KEY &&[\s\S]*isConcreteStateConnectionKey\(autoSnappedTargetAnchor\.value\?\.stateKey\)/);
+  assert.match(componentSource, /emit\("connect-state", \{[\s\S]*sourceNodeId: targetAnchor\.nodeId,[\s\S]*sourceStateKey: targetAnchor\.stateKey,[\s\S]*targetNodeId: connection\.sourceNodeId,[\s\S]*targetStateKey: connection\.sourceStateKey/);
 });
 
 test("EditorCanvas projects visible plus input anchors when existing inputs hide the virtual input from the anchor model", () => {

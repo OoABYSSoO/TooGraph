@@ -64,11 +64,11 @@ test("createStateDraftFromQuery creates a unique neutral state key from the whol
   assert.ok(defaultStateColorValues.includes(draft.definition.color));
 });
 
-test("createStateDraftFromQuery uses a neutral display name when the query is blank", () => {
+test("createStateDraftFromQuery uses the neutral state key as the default display name when the query is blank", () => {
   const draft = createStateDraftFromQuery("   ", ["state_1", "state_2"]);
 
   assert.equal(draft.key, "state_3");
-  assert.equal(draft.definition.name, "State 3");
+  assert.equal(draft.definition.name, "state_3");
   assert.equal(draft.definition.description, "");
   assert.equal(draft.definition.type, "text");
   assert.equal(draft.definition.value, "");

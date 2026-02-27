@@ -248,6 +248,7 @@
           :run-output-display-mode="runOutputPreviewByNodeId?.[nodeId]?.displayMode ?? null"
           :run-failure-message="runFailureMessageByNodeId?.[nodeId] ?? null"
           :pending-state-input-source="pendingAgentInputSourceByNodeId[nodeId] ?? null"
+          :pending-state-input-target="pendingStateInputSourceTargetByNodeId[nodeId] ?? null"
           :pending-state-output-target="pendingStateOutputTargetByNodeId[nodeId] ?? null"
           :human-review-pending="isHumanReviewNode(nodeId)"
           :selected="isNodeVisuallySelected(nodeId)"
@@ -423,7 +424,6 @@ import {
 } from "@/editor/workspace/statePanelFields";
 import {
   canCompleteGraphConnection,
-  canConnectStateInputSource,
   canDisconnectSequenceEdgeForDataConnection,
   canStartGraphConnection,
   type GraphConnectionAnchorKind,
@@ -753,6 +753,19 @@ const pendingAgentInputSourceByNodeId = computed<Record<string, PendingStateInpu
       .map(([nodeId]) => [nodeId, pendingSource]),
   );
 });
+const pendingStateInputSourceTargetByNodeId = computed<Record<string, PendingStatePortPreview>>(() => {
+  const connection = pendingConnection.value;
+  if (connection?.sourceKind !== "state-in" || connection.sourceStateKey !== VIRTUAL_ANY_INPUT_STATE_KEY) {
+    return {};
+  }
+
+  const sourcePreview = resolveStatePortPreview(autoSnappedTargetAnchor.value?.stateKey);
+  return sourcePreview
+    ? {
+        [connection.sourceNodeId]: sourcePreview,
+      }
+    : {};
+});
 const pendingStateOutputTargetByNodeId = computed<Record<string, PendingStatePortPreview>>(() => {
   const connection = pendingConnection.value;
   if (connection?.sourceKind !== "state-out" || connection.sourceStateKey !== VIRTUAL_ANY_OUTPUT_STATE_KEY) {
@@ -783,7 +796,12 @@ function isAgentCreateInputAnchorVisible(nodeId: string) {
     selection.selectedNodeId.value === nodeId ||
     hoveredNodeId.value === nodeId ||
     hoveredPointAnchorNodeId.value === nodeId ||
-    activeConnectionHoverNodeId.value === nodeId
+    activeConnectionHoverNodeId.value === nodeId ||
+    (
+      pendingConnection.value?.sourceNodeId === nodeId &&
+      pendingConnection.value?.sourceKind === "state-in" &&
+      pendingConnection.value?.sourceStateKey === VIRTUAL_ANY_INPUT_STATE_KEY
+    )
   );
 }
 
@@ -959,6 +977,13 @@ function resolveConnectionPreviewStateKey() {
   if (
     activeConnection.value?.sourceKind === "state-out" &&
     activeConnection.value.sourceStateKey === VIRTUAL_ANY_OUTPUT_STATE_KEY &&
+    isConcreteStateConnectionKey(autoSnappedTargetAnchor.value?.stateKey)
+  ) {
+    return autoSnappedTargetAnchor.value?.stateKey ?? null;
+  }
+  if (
+    activeConnection.value?.sourceKind === "state-in" &&
+    activeConnection.value.sourceStateKey === VIRTUAL_ANY_INPUT_STATE_KEY &&
     isConcreteStateConnectionKey(autoSnappedTargetAnchor.value?.stateKey)
   ) {
     return autoSnappedTargetAnchor.value?.stateKey ?? null;
@@ -1163,7 +1188,7 @@ watch(
   },
 );
 
-watch(pendingAgentInputSourceByNodeId, () => {
+watch([pendingAgentInputSourceByNodeId, pendingStateInputSourceTargetByNodeId], () => {
   void nextTick().then(() => {
     scheduleAnchorMeasurement();
   });
@@ -2421,6 +2446,11 @@ function resolveAutoSnappedStateInputSourceAnchor(event: PointerEvent) {
     return null;
   }
 
+  const directStateInputSourceAnchor = resolveEligibleConcreteStateInputSourceAnchorAtPointer(nodeId, event);
+  if (directStateInputSourceAnchor) {
+    return directStateInputSourceAnchor;
+  }
+
   return resolveEligibleStateInputSourceAnchorForNodeBody(nodeId);
 }
 
@@ -2445,16 +2475,6 @@ function resolveEligibleStateInputSourceAnchorForNodeBody(nodeId: string) {
   if (activeConnection.value?.sourceKind !== "state-in" || !activeConnection.value.sourceStateKey) {
     return null;
   }
-  if (
-    !canConnectStateInputSource(
-      props.document,
-      nodeId,
-      activeConnection.value.sourceNodeId,
-      activeConnection.value.sourceStateKey,
-    )
-  ) {
-    return null;
-  }
 
   const matchingOutputAnchor = projectedAnchors.value.find(
     (anchor) =>
@@ -2462,7 +2482,7 @@ function resolveEligibleStateInputSourceAnchorForNodeBody(nodeId: string) {
       anchor.kind === "state-out" &&
       anchor.stateKey === activeConnection.value?.sourceStateKey,
   );
-  if (matchingOutputAnchor) {
+  if (matchingOutputAnchor && canCompleteCanvasConnection(matchingOutputAnchor)) {
     return matchingOutputAnchor;
   }
 
@@ -2472,7 +2492,7 @@ function resolveEligibleStateInputSourceAnchorForNodeBody(nodeId: string) {
       anchor.kind === "state-out" &&
       anchor.stateKey === VIRTUAL_ANY_OUTPUT_STATE_KEY,
   );
-  if (createOutputAnchor) {
+  if (createOutputAnchor && canCompleteCanvasConnection(createOutputAnchor)) {
     return createOutputAnchor;
   }
 
@@ -2481,7 +2501,7 @@ function resolveEligibleStateInputSourceAnchorForNodeBody(nodeId: string) {
     return null;
   }
 
-  return {
+  const fallbackOutputAnchor = {
     id: `${nodeId}:state-out:${VIRTUAL_ANY_OUTPUT_STATE_KEY}:reverse`,
     nodeId,
     kind: "state-out" as const,
@@ -2491,6 +2511,45 @@ function resolveEligibleStateInputSourceAnchorForNodeBody(nodeId: string) {
     color: VIRTUAL_ANY_OUTPUT_COLOR,
     stateKey: VIRTUAL_ANY_OUTPUT_STATE_KEY,
   };
+  return canCompleteCanvasConnection(fallbackOutputAnchor) ? fallbackOutputAnchor : null;
+}
+
+function resolveEligibleConcreteStateInputSourceAnchorAtPointer(nodeId: string, event: PointerEvent) {
+  const concreteStateOutputAnchors = projectedAnchors.value
+    .filter(
+      (anchor) =>
+        anchor.nodeId === nodeId &&
+        anchor.kind === "state-out" &&
+        isConcreteStateConnectionKey(anchor.stateKey) &&
+        canCompleteCanvasConnection(anchor),
+    )
+    .sort((left, right) => left.y - right.y);
+  if (concreteStateOutputAnchors.length === 0) {
+    return null;
+  }
+
+  const point = resolveCanvasPoint(event);
+  const createOutputAnchor = projectedAnchors.value.find(
+    (anchor) =>
+      anchor.nodeId === nodeId &&
+      anchor.kind === "state-out" &&
+      anchor.stateKey === VIRTUAL_ANY_OUTPUT_STATE_KEY &&
+      canCompleteCanvasConnection(anchor),
+  );
+  for (let index = 0; index < concreteStateOutputAnchors.length; index += 1) {
+    const anchor = concreteStateOutputAnchors[index];
+    const previousAnchor = concreteStateOutputAnchors[index - 1];
+    const nextAnchor = concreteStateOutputAnchors[index + 1];
+    const previousY = previousAnchor?.y ?? anchor.y - STATE_TARGET_ROW_FALLBACK_GAP;
+    const nextY = nextAnchor?.y ?? createOutputAnchor?.y ?? anchor.y + STATE_TARGET_ROW_FALLBACK_GAP;
+    const upperBoundary = (previousY + anchor.y) / 2;
+    const lowerBoundary = (anchor.y + nextY) / 2;
+    if (point.y >= upperBoundary && point.y < lowerBoundary) {
+      return anchor;
+    }
+  }
+
+  return null;
 }
 
 function isPointerWithinNodeElement(nodeElement: HTMLElement, event: PointerEvent) {
@@ -3154,6 +3213,14 @@ function completePendingConnection(targetAnchor: ProjectedCanvasAnchor) {
       sourceStateKey: connection.sourceStateKey,
       targetNodeId: targetAnchor.nodeId,
       targetStateKey: targetAnchor.stateKey,
+      position: { x: targetAnchor.x, y: targetAnchor.y },
+    });
+  } else if (connection.sourceKind === "state-in" && connection.sourceStateKey && targetAnchor.kind === "state-out" && targetAnchor.stateKey) {
+    emit("connect-state", {
+      sourceNodeId: targetAnchor.nodeId,
+      sourceStateKey: targetAnchor.stateKey,
+      targetNodeId: connection.sourceNodeId,
+      targetStateKey: connection.sourceStateKey,
       position: { x: targetAnchor.x, y: targetAnchor.y },
     });
   } else if (connection.sourceKind === "state-in" && connection.sourceStateKey) {

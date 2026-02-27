@@ -1,60 +1,54 @@
-# Task Plan: Native Skill Refactor Continuation
+# Task Plan: Repository Architecture Audit
 
 ## Goal
-Continue the GraphiteUI native Skill refactor after the foundation merge, focusing on the next smallest production slice that makes Skills useful from Agent nodes without reintroducing automatic external discovery.
+Evaluate the GraphiteUI repository with an architect-level lens and identify redundant code, unused code, duplicated patterns, oversized modules, and candidates for safer extraction or refactor.
 
 ## Current Phase
 Complete
 
 ## Phases
 
-### Phase 1: Current State Alignment
-- [x] Re-read existing native Skill docs and implementation.
-- [x] Inspect backend Skill catalog/import/runtime code.
-- [x] Inspect frontend Skill management and Agent node Skill picker code.
-- [x] Identify the smallest missing end-to-end slice.
-- **Status:** complete
+### Phase 1: Repository Inventory
+- [x] Inspect package structure, scripts, and runtime boundaries.
+- [x] Identify largest and most frequently changed frontend/backend modules.
+- [x] Map major feature areas and ownership boundaries.
+- **Status:** completed
 
-### Phase 2: Lock Behavior With Tests
-- [x] Add or update backend tests for the selected Skill contract.
-- [x] Add or update frontend model/API/UI tests for the selected Skill flow.
-- [x] Confirm new tests fail for the intended missing behavior before implementation when feasible.
-- **Status:** complete
+### Phase 2: Redundancy and Dead-Code Signals
+- [x] Look for unused exports, duplicate helpers, stale wrappers, and orphaned assets/docs.
+- [x] Compare test coverage against suspected dead or duplicated areas.
+- [x] Separate safe cleanup candidates from behavior-sensitive refactors.
+- **Status:** completed
 
-### Phase 3: Implement Backend Contract
-- [x] Update backend schemas, catalog, validation, or runtime modules as required.
-- [x] Preserve manual import-only behavior and existing API compatibility.
-- [x] Keep permission/config/health distinctions explicit.
-- **Status:** complete
+### Phase 3: Abstraction Candidates
+- [x] Identify components/files that mix too many responsibilities.
+- [x] Find repeated UI, graph, API, and backend storage/runtime patterns.
+- [x] Propose extraction boundaries that match existing project style.
+- **Status:** completed
 
-### Phase 4: Implement Frontend Experience
-- [x] Update Skill management and/or Agent node UI using existing Element Plus patterns.
-- [x] Ensure Agent nodes only expose appropriate installed/enabled/configured Skills.
-- [x] Provide clear status and error/empty states.
-- **Status:** complete
+### Phase 4: Architecture Assessment
+- [x] Prioritize findings by risk, payoff, and implementation cost.
+- [x] Produce a concrete recommendation list.
+- [x] Note which changes should be implemented immediately versus planned.
+- **Status:** completed
 
-### Phase 5: Verify, Restart, Commit, Push
-- [x] Run targeted backend tests.
-- [x] Run targeted frontend tests.
-- [x] Run broader verification when touched surface warrants it.
-- [x] Restart dev environment with `npm run dev` after code changes.
-- [x] Commit all relevant tracked changes with a Chinese commit message.
-- [x] Push the current branch.
-- **Status:** complete
+### Phase 5: Wrap-Up
+- [x] Run relevant lightweight verification if files are modified.
+- [x] Commit and push any documentation or cleanup changes made during the audit.
+- **Status:** completed
 
 ## Key Questions
-1. What parts of the native Skill foundation are already implemented?
-2. Is Agent node Skill binding already present, or only catalog/import UI?
-3. Which missing slice gives the largest product value with limited risk?
-4. How should this slice preserve future Companion Skill Loadout support?
+1. Which areas are materially harder to maintain because files own too many responsibilities?
+2. Which duplicated patterns can be extracted without creating premature abstraction?
+3. Which suspected unused code is safe to delete, and which needs runtime confirmation?
+4. What should be the next refactor slice with the best risk/payoff ratio?
 
 ## Decisions Made
 | Decision | Rationale |
 |----------|-----------|
-| Continue from the merged native Skill foundation | It already establishes `skill.json`, manual import, taxonomy metadata, and no default external discovery. |
-| Use GraphiteUI native manifest as runtime truth | Matches the documented product direction and avoids treating `SKILL.md` as executable truth. |
-| Keep one Skill system with target-specific usage | Agent node and Companion should share installation/diagnostics but use different binding/loadout surfaces. |
-| First continuation slice is Agent attachability and native built-in manifests | This makes existing Agent nodes consume the native Skill catalog safely before structured binding/workflow mode is added. |
+| Start with an audit rather than broad refactoring | The request is architectural evaluation; large refactors should be justified by evidence first. |
+| Preserve existing product behavior during this pass | The repo is active and graph-editor behavior is sensitive. |
+| Treat frontend graph editor and backend runtime as separate architecture domains | They have different failure modes and refactor boundaries. |
 
 ## Errors Encountered
 | Error | Attempt | Resolution |
@@ -62,4 +56,4 @@ Complete
 
 ## Notes
 - Do not commit runtime artifacts such as `backend/data/settings`, `.dev_*`, `dist`, or `.worktrees`.
-- For code changes, restart using `npm run dev`.
+- If code changes are made, restart using `npm run dev`.

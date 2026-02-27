@@ -1,11 +1,9 @@
 import { cloneGraphDocument } from "./graph-document.ts";
 import { buildNextDefaultStateField, rememberDefaultStateKeyIndex, resolveDefaultStateColor } from "../editor/workspace/statePanelFields.ts";
 import { isCreateAgentInputStateKey, isVirtualAnyInputStateKey, isVirtualAnyOutputStateKey } from "./virtual-any-input.ts";
-import { canConnectStateInputSource } from "./graph-connections.ts";
+import { canConnectStateInputSource, filterReplacedStateInputSourceEdges } from "./graph-connections.ts";
 
 import type {
-  AgentNode,
-  ConditionNode,
   GraphDocument,
   GraphNode,
   GraphPayload,
@@ -98,7 +96,7 @@ function buildTextInputNode(position: GraphPosition): InputNode {
   };
 }
 
-function buildOutputNode(id: string, position: GraphPosition): OutputNode {
+function buildOutputNode(position: GraphPosition): OutputNode {
   return {
     kind: "output",
     name: "Output",
@@ -126,7 +124,7 @@ export function buildGenericInputNode(params: { id: string; position: GraphPosit
 export function buildGenericOutputNode(params: { id: string; position: GraphPosition }): CreatedNodeResult {
   return {
     id: params.id,
-    node: buildOutputNode(params.id, params.position),
+    node: buildOutputNode(params.position),
     state_schema: {},
   };
 }
@@ -303,6 +301,14 @@ function applyStateInputSourceConnection<T extends GraphPayload | GraphDocument>
 
   bindCreatedStateToSourceNode(document.nodes[input.sourceNodeId], targetStateKey);
   bindCreatedStateToNode(document.nodes[input.targetNodeId], targetStateKey);
+  if (!isVirtualAnyInputStateKey(rawTargetStateKey) && !isCreateAgentInputStateKey(rawTargetStateKey)) {
+    document.edges = filterReplacedStateInputSourceEdges(document, {
+      sourceNodeId: input.sourceNodeId,
+      targetNodeId: input.targetNodeId,
+      previousStateKey: rawTargetStateKey,
+      nextStateKey: targetStateKey,
+    });
+  }
   buildCreationFlowEdge(document, input.sourceNodeId, input.targetNodeId, null);
   return createdStateKey;
 }

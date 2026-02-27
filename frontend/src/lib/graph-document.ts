@@ -8,6 +8,7 @@ import {
   canConnectStateBinding,
   canReconnectConditionRoute,
   canReconnectFlowEdge,
+  filterReplacedStateInputSourceEdges,
   shouldAddImplicitFlowEdgeForStateConnection,
 } from "./graph-connections.ts";
 import { isCreateAgentInputStateKey, isVirtualAnyInputStateKey, isVirtualAnyOutputStateKey } from "./virtual-any-input.ts";
@@ -816,7 +817,10 @@ export function connectStateBindingInDocument<T extends GraphPayload | GraphDocu
   }
 
   if (isVirtualAnyInputStateKey(targetStateKey)) {
-    nextTargetNode.reads = [{ state: resolvedSourceStateKey, required: true }];
+    nextTargetNode.reads =
+      nextTargetNode.kind === "agent" && nextTargetNode.reads.length > 0
+        ? [...nextTargetNode.reads, { state: resolvedSourceStateKey, required: true }]
+        : [{ state: resolvedSourceStateKey, required: true }];
     if (nextTargetNode.kind === "condition") {
       nextTargetNode.config.rule.source = resolvedSourceStateKey;
     }
@@ -837,6 +841,12 @@ export function connectStateBindingInDocument<T extends GraphPayload | GraphDocu
     nextTargetNode.config.rule.source = resolvedSourceStateKey;
   }
 
+  nextDocument.edges = filterReplacedStateInputSourceEdges(nextDocument, {
+    sourceNodeId,
+    targetNodeId,
+    previousStateKey: targetStateKey,
+    nextStateKey: resolvedSourceStateKey,
+  });
   addImplicitFlowEdgeForStateConnection(nextDocument, sourceNodeId, targetNodeId);
   return syncKnowledgeBaseSkillsInDocument(nextDocument);
 }

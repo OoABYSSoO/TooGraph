@@ -45,7 +45,7 @@ export function createStateDraftFromQuery(query: string, existingKeys: string[])
   return {
     key,
     definition: {
-      name: trimmedQuery || buildDefaultStateName(key),
+      name: trimmedQuery || key,
       description: "",
       type: "text",
       value: "",
@@ -63,11 +63,6 @@ function createIndexedStateKey(prefix: string, existingKeys: string[]) {
     nextKey = `${prefix}_${index}`;
   }
   return nextKey;
-}
-
-function buildDefaultStateName(stateKey: string) {
-  const match = stateKey.match(/^state_(\d+)$/);
-  return match ? `State ${match[1]}` : "State";
 }
 
 function normalizeStateSearchText(value: string) {

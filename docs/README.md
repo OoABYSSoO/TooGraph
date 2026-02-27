@@ -20,6 +20,11 @@
   - input / output / condition 作为 GraphiteUI 视觉边界和编排辅助
   - 对人类在环断点、output preview 和 runtime 编译层的影响
 
+- [future/2026-04-28-architecture-refactor-roadmap.md](future/2026-04-28-architecture-refactor-roadmap.md)
+  - 仓库架构审计结论
+  - 冗余代码清理记录
+  - NodeCard / Canvas / WorkspaceShell / 后端 runtime 的阶段性拆分路线
+
 ## 已清理
 
 - 迁移闭环记录：`task_plan.md`、`findings.md`、`progress.md`

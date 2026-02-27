@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDirectory = dirname(currentFilePath);
 const componentSource = readFileSync(resolve(currentDirectory, "NodeCard.vue"), "utf8").replace(/\r\n/g, "\n");
+const createPopoverSource = readFileSync(resolve(currentDirectory, "StatePortCreatePopover.vue"), "utf8").replace(/\r\n/g, "\n");
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const cssRuleBlock = (selector: string) => {
   const match = componentSource.match(new RegExp(`${escapeRegExp(selector)} \\{[\\s\\S]*?\\n\\}`));
@@ -222,8 +223,8 @@ test("NodeCard restores the legacy agent runtime control order with Element Plus
   assert.match(componentSource, /agentBreakpointTiming\?:\s*"before" \| "after";/);
   assert.match(componentSource, /\(event: "toggle-agent-breakpoint", payload: \{ nodeId: string; enabled: boolean \}\): void;/);
   assert.match(componentSource, /\(event: "update-agent-breakpoint-timing", payload: \{ nodeId: string; timing: "before" \| "after" \}\): void;/);
-  assert.match(componentSource, /function handleAgentBreakpointToggle\(\) \{[\s\S]*emit\("toggle-agent-breakpoint", \{ nodeId: props\.nodeId, enabled: !props\.agentBreakpointEnabled \}\);[\s\S]*\}/);
   assert.match(componentSource, /function handleAgentBreakpointToggleValue\(value: string \| number \| boolean\) \{/);
+  assert.match(componentSource, /emit\("toggle-agent-breakpoint", \{ nodeId: props\.nodeId, enabled: value \}\);/);
   assert.match(componentSource, /class="node-card__breakpoint-timing-select graphite-select"/);
   assert.match(componentSource, /:model-value="agentBreakpointTimingValue"/);
   assert.match(componentSource, /@update:model-value="handleAgentBreakpointTimingSelect"/);
@@ -272,23 +273,26 @@ test("NodeCard keeps skill actions below the agent while creating ports from plu
   assert.match(agentSection, /@click\.stop="openPortStateCreate\('output'\)"/);
   assert.doesNotMatch(agentSection, /@dblclick\.stop="openPortStateCreate\('input'\)"/);
   assert.doesNotMatch(agentSection, /@dblclick\.stop="openPortStateCreate\('output'\)"/);
-  assert.match(agentSection, /class="node-card__agent-create-port-popover node-card__port-picker"/);
+  assert.match(componentSource, /import StatePortCreatePopover from "\.\/StatePortCreatePopover\.vue";/);
+  assert.match(agentSection, /<StatePortCreatePopover/);
   assert.match(agentSection, /class="node-card__port-pill node-card__port-pill--input node-card__port-pill--dock-start node-card__port-pill--create"/);
   assert.match(agentSection, /class="node-card__port-pill node-card__port-pill--output node-card__port-pill--dock-end node-card__port-pill--create"/);
-  assert.match(agentSection, />\+ input</);
+  assert.match(agentSection, /pendingStateInputTarget\?\.label \?\? pendingStateInputSource\?\.label \?\? '\+ input'/);
   assert.match(agentSection, /pendingStateOutputTarget\?\.label \?\? '\+ output'/);
-  assert.match(agentSection, /<ElSelect[\s\S]*class="node-card__control-select graphite-select"[\s\S]*popper-class="graphite-select-popper node-card__port-picker-select-popper"/);
+  assert.match(createPopoverSource, /<ElSelect[\s\S]*class="node-card__control-select graphite-select"[\s\S]*popper-class="graphite-select-popper node-card__port-picker-select-popper"/);
   assert.doesNotMatch(agentSection, /t\("nodeCard\.key"\)/);
   assert.doesNotMatch(agentSection, /portStateDraft\.key/);
   assert.doesNotMatch(agentSection, /class="node-card__port-state-key"/);
   assert.doesNotMatch(componentSource, /handlePortDraftKey/);
-  assert.match(agentSection, /class="node-card__port-picker-color-option"/);
-  assert.match(agentSection, /class="node-card__port-picker-color-dot"/);
-  assert.match(componentSource, /const portStateColorOptions = computed\(\(\) => resolveStateColorOptions\(portStateDraft\.value\?\.definition\.color \?\? ""\)\);/);
+  assert.match(createPopoverSource, /class="node-card__port-picker-color-option"/);
+  assert.match(createPopoverSource, /class="node-card__port-picker-color-dot"/);
+  assert.match(createPopoverSource, /const colorOptions = computed\(\(\) => resolveStateColorOptions\(props\.draft\.definition\.color \?\? ""\)\);/);
   assert.match(componentSource, /const agentAddPopoverStyle = \{/);
   assert.match(componentSource, /"--el-popover-bg-color":\s*"transparent"/);
-  assert.match(componentSource, /\.node-card__agent-add-popover,[\s\S]*\.node-card__agent-create-port-popover \{[\s\S]*background:\s*rgba\(255,\s*244,\s*232,\s*0\.96\);/);
+  assert.match(componentSource, /\.node-card__agent-add-popover \{[\s\S]*background:\s*rgba\(255,\s*244,\s*232,\s*0\.96\);/);
+  assert.match(createPopoverSource, /\.node-card__agent-create-port-popover \{[\s\S]*background:\s*rgba\(255,\s*244,\s*232,\s*0\.96\);/);
   assert.match(componentSource, /:deep\(\.node-card__agent-add-popover-popper\.el-popper\) \{[\s\S]*background:\s*transparent;/);
+  assert.equal((componentSource.match(/<StatePortCreatePopover/g) ?? []).length, 5);
   assert.doesNotMatch(agentSection, /v-for="picker in agentPortPickerActions"/);
   assert.doesNotMatch(agentSection, /@click\.stop="openPortPicker\(picker\.side\)"/);
   assert.doesNotMatch(componentSource, /const agentPortPickerActions/);
@@ -310,13 +314,14 @@ test("NodeCard renders plus input and plus output as virtual agent state port ro
   assert.match(componentSource, /hovered\?:\s*boolean;/);
   assert.match(componentSource, /'node-card--hovered': hovered/);
   assert.match(componentSource, /pendingStateInputSource\?: \{ stateKey: string; label: string; stateColor: string \} \| null;/);
+  assert.match(componentSource, /pendingStateInputTarget\?: \{ stateKey: string; label: string; stateColor: string \} \| null;/);
   assert.match(componentSource, /pendingStateOutputTarget\?: \{ stateKey: string; label: string; stateColor: string \} \| null;/);
   assert.match(componentSource, /const agentInputPorts = computed<NodePortViewModel\[\]>\(\(\) =>/);
   assert.match(componentSource, /const agentOutputPorts = computed<NodePortViewModel\[\]>\(\(\) =>/);
   assert.match(componentSource, /filter\(\(port\) => !port\.virtual\)/);
   assert.match(componentSource, /VIRTUAL_ANY_OUTPUT_STATE_KEY/);
   assert.match(componentSource, /function openPortStateCreate\(side: "input" \| "output"\)/);
-  assert.match(componentSource, /createStateDraftFromQuery\(side === "input" \? "Input" : "Output", Object\.keys\(props\.stateSchema\)\)/);
+  assert.match(componentSource, /createStateDraftFromQuery\("", Object\.keys\(props\.stateSchema\)\)/);
   assert.match(agentSection, /v-for="port in orderedAgentInputPorts"/);
   assert.match(agentSection, /v-for="port in orderedAgentOutputPorts"/);
   assert.match(componentSource, /const shouldShowAgentCreateInputPort = computed\(\(\) => agentInputPorts\.value\.length === 0\);/);
@@ -334,13 +339,13 @@ test("NodeCard renders plus input and plus output as virtual agent state port ro
   assert.match(agentSection, /:data-anchor-slot-id="\`\$\{nodeId\}:state-in:\$\{agentCreateInputAnchorStateKey\}\`"/);
   assert.match(agentSection, /:data-anchor-slot-id="\`\$\{nodeId\}:state-out:\$\{VIRTUAL_ANY_OUTPUT_STATE_KEY\}\`"/);
   assert.match(agentSection, /node-card__port-pill--create/);
-  assert.match(agentSection, /\+ input/);
+  assert.match(agentSection, /pendingStateInputTarget\?\.label \?\? pendingStateInputSource\?\.label \?\? '\+ input'/);
   assert.match(agentSection, /pendingStateOutputTarget\?\.label \?\? '\+ output'/);
   assert.match(agentSection, /pendingStateOutputTarget\?\.stateColor \?\? VIRTUAL_ANY_OUTPUT_COLOR/);
   assert.doesNotMatch(componentSource, /const shouldRenderPendingStateInputCapsule = computed/);
   assert.doesNotMatch(agentSection, /node-card__port-pill-create-badge/);
   assert.doesNotMatch(agentSection, /t\("common\.new"\)/);
-  assert.doesNotMatch(agentSection, /\{\{ pendingStateInputSource\?\.label \}\}/);
+  assert.match(agentSection, /pendingStateInputTarget\?\.stateColor \?\? pendingStateInputSource\?\.stateColor \?\? '#16a34a'/);
   assert.match(componentSource, /\.node-card__port-pill--create \{[^}]*border-style:\s*dashed;/);
   assert.match(componentSource, /\.node-card__port-pill--create \{[^}]*background:\s*color-mix\(in srgb,\s*var\(--node-card-port-accent\) 10%, transparent\);/);
   assert.match(componentSource, /\.node-card__port-pill--create \{[^}]*box-shadow:\s*none;/);
@@ -400,8 +405,14 @@ test("NodeCard renders condition and output virtual inputs as plus input create 
 
   assert.match(outputSection, /'node-card__port-pill--create': view\.body\.primaryInput\.virtual/);
   assert.match(conditionSection, /'node-card__port-pill--create': view\.body\.primaryInput\.virtual/);
+  assert.match(outputSection, /view\.body\.primaryInput\.virtual[\s\S]*isPortCreateOpen\('input'\)/);
+  assert.match(conditionSection, /view\.body\.primaryInput\.virtual[\s\S]*isPortCreateOpen\('input'\)/);
+  assert.match(outputSection, /@click\.stop="view\.body\.primaryInput\.virtual \? openPortStateCreate\('input'\) : handleStateEditorActionClick/);
+  assert.match(conditionSection, /@click\.stop="view\.body\.primaryInput\.virtual \? openPortStateCreate\('input'\) : handleStateEditorActionClick/);
   assert.match(outputSection, /:data-anchor-slot-id="\`\$\{nodeId\}:state-in:\$\{view\.body\.primaryInput\.key\}\`"/);
   assert.match(conditionSection, /:data-anchor-slot-id="\`\$\{nodeId\}:state-in:\$\{view\.body\.primaryInput\.key\}\`"/);
+  assert.match(outputSection, /view\.body\.primaryInput\.virtual && isPortCreateOpen\('input'\) && portStateDraft/);
+  assert.match(conditionSection, /view\.body\.primaryInput\.virtual && isPortCreateOpen\('input'\) && portStateDraft/);
   assert.doesNotMatch(outputSection, />any</);
   assert.doesNotMatch(conditionSection, />any</);
 });
@@ -419,7 +430,7 @@ test("NodeCard renders empty input outputs as virtual plus output create pills",
   assert.match(inputSection, /@click\.stop="view\.body\.primaryOutput\.virtual \? openPortStateCreate\('output'\) : handleStateEditorActionClick/);
   assert.match(inputSection, /:data-anchor-slot-id="\`\$\{nodeId\}:state-out:\$\{view\.body\.primaryOutput\.key\}\`"/);
   assert.match(inputSection, /view\.body\.primaryOutput\.virtual && isPortCreateOpen\('output'\) && portStateDraft/);
-  assert.match(inputSection, /class="node-card__agent-create-port-popover node-card__port-picker"/);
+  assert.match(inputSection, /<StatePortCreatePopover/);
   assert.doesNotMatch(inputSection, />any</);
 });
 
@@ -520,7 +531,7 @@ test("NodeCard blocks every in-canvas control while graph editing is locked", ()
   assert.match(componentSource, /function emitInputConfigPatch\(patch: Partial<InputNode\["config"\]>\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
   assert.match(componentSource, /function emitAgentConfigPatch\(patch: Partial<AgentNode\["config"\]>\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
   assert.match(componentSource, /function emitConditionConfigPatch\(patch: Partial<ConditionNode\["config"\]>\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
-  assert.match(componentSource, /function handleAgentBreakpointToggle\(\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
+  assert.match(componentSource, /function handleAgentBreakpointToggleValue\(value: string \| number \| boolean\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
   assert.match(componentSource, /function toggleAdvancedPanel\(\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
   assert.match(componentSource, /function toggleSkillPicker\(\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
   assert.match(componentSource, /function openPortStateCreate\(side: "input" \| "output"\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
@@ -555,7 +566,7 @@ test("NodeCard reveals state pills on hover and opens state editing only after a
   assert.doesNotMatch(componentSource, /emit\("rename-state"/);
   assert.match(
     componentSource,
-    /<ElPopover[\s\S]*:visible="isStateEditorOpen\([^"]+\) \|\| isStateEditorConfirmOpen\([^"]+\)"/,
+    /<ElPopover[\s\S]*:visible="[\s\S]*isStateEditorOpen\([^"]+\)[\s\S]*isStateEditorConfirmOpen\([^"]+\)/,
   );
   assert.match(
     componentSource,
@@ -579,7 +590,7 @@ test("NodeCard reveals state pills on hover and opens state editing only after a
   assert.doesNotMatch(componentSource, /function commitStateEditor\(\)/);
   assert.match(componentSource, /function syncStateEditorDraft\(nextDraft: StateFieldDraft\)/);
   assert.doesNotMatch(componentSource, /trigger="manual"/);
-  assert.match(componentSource, /StateDefaultValueEditor/);
+  assert.match(createPopoverSource, /StateDefaultValueEditor/);
   assert.match(componentSource, /class="node-card__state-editor"/);
   assert.match(componentSource, /const stateEditorPopoverStyle = \{/);
   assert.match(componentSource, /"--el-popover-bg-color":\s*"transparent"/);
@@ -914,7 +925,7 @@ test("NodeCard closes floating panels on focus loss and keeps popup surfaces on 
   assert.match(componentSource, /\.node-card__skill-picker \{[\s\S]*border:\s*1px solid rgba\(154,\s*52,\s*18,\s*0\.16\);/);
   assert.match(componentSource, /\.node-card__skill-picker \{[\s\S]*background:\s*rgba\(255,\s*250,\s*241,\s*0\.98\);/);
   assert.match(componentSource, /\.node-card__skill-picker \{[\s\S]*box-shadow:\s*0 20px 40px rgba\(60,\s*41,\s*20,\s*0\.12\);/);
-  assert.match(componentSource, /\.node-card__port-picker \{[\s\S]*border:\s*1px solid rgba\(154,\s*52,\s*18,\s*0\.16\);/);
-  assert.match(componentSource, /\.node-card__port-picker \{[\s\S]*background:\s*rgba\(255,\s*250,\s*241,\s*0\.98\);/);
-  assert.match(componentSource, /\.node-card__port-picker \{[\s\S]*box-shadow:\s*0 20px 40px rgba\(60,\s*41,\s*20,\s*0\.12\);/);
+  assert.match(createPopoverSource, /\.node-card__port-picker \{[\s\S]*border:\s*1px solid rgba\(154,\s*52,\s*18,\s*0\.16\);/);
+  assert.match(createPopoverSource, /\.node-card__port-picker \{[\s\S]*background:\s*rgba\(255,\s*244,\s*232,\s*0\.96\);/);
+  assert.match(createPopoverSource, /\.node-card__port-picker \{[\s\S]*box-shadow:\s*0 16px 34px rgba\(60,\s*41,\s*20,\s*0\.12\);/);
 });

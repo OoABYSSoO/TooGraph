@@ -788,6 +788,74 @@ test("connectStateBindingInDocument appends source state through a transient new
   assert.equal(nextConditionDocument, document);
 });
 
+test("connectStateBindingInDocument appends source state through an agent virtual input", () => {
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Agent virtual input append graph",
+    state_schema: {
+      question: { name: "question", description: "", type: "text", value: "", color: "#d97706" },
+      answer: { name: "answer", description: "", type: "text", value: "", color: "#2563eb" },
+    },
+    nodes: {
+      input_question: {
+        kind: "input",
+        name: "input_question",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [{ state: "question", mode: "replace" }],
+        config: { value: "" },
+      },
+      input_answer: {
+        kind: "input",
+        name: "input_answer",
+        description: "",
+        ui: { position: { x: 0, y: 120 } },
+        reads: [],
+        writes: [{ state: "answer", mode: "replace" }],
+        config: { value: "" },
+      },
+      answer_helper: {
+        kind: "agent",
+        name: "answer_helper",
+        description: "",
+        ui: { position: { x: 100, y: 0 } },
+        reads: [{ state: "question", required: true }],
+        writes: [],
+        config: {
+          skills: [],
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+    },
+    edges: [{ source: "input_question", target: "answer_helper" }],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const nextDocument = graphDocument.connectStateBindingInDocument(
+    document,
+    "input_answer",
+    "answer",
+    "answer_helper",
+    VIRTUAL_ANY_INPUT_STATE_KEY,
+  );
+
+  assert.deepEqual(nextDocument.nodes.answer_helper.reads, [
+    { state: "question", required: true },
+    { state: "answer", required: true },
+  ]);
+  assert.deepEqual(nextDocument.edges, [
+    { source: "input_question", target: "answer_helper" },
+    { source: "input_answer", target: "answer_helper" },
+  ]);
+  assert.deepEqual(document.nodes.answer_helper.reads, [{ state: "question", required: true }]);
+});
+
 test("connectStateBindingInDocument materializes a virtual output before connecting existing targets", () => {
   const document: GraphPayload = {
     graph_id: null,
@@ -1029,6 +1097,138 @@ test("connectStateBindingInDocument restores ordering for an existing matching s
   assert.deepEqual(nextDocument.nodes.answer_helper.reads, [{ state: "question", required: true }]);
   assert.deepEqual(nextDocument.edges, [{ source: "input_question", target: "answer_helper" }]);
   assert.deepEqual(document.edges, []);
+});
+
+test("connectStateBindingInDocument replaces the previous source edge for a concrete input binding", () => {
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Replace concrete state input graph",
+    state_schema: {
+      question: { name: "question", description: "", type: "text", value: "", color: "#d97706" },
+      revised_question: { name: "revised_question", description: "", type: "text", value: "", color: "#2563eb" },
+    },
+    nodes: {
+      original_input: {
+        kind: "input",
+        name: "original_input",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [{ state: "question", mode: "replace" }],
+        config: { value: "" },
+      },
+      revised_input: {
+        kind: "input",
+        name: "revised_input",
+        description: "",
+        ui: { position: { x: 0, y: 120 } },
+        reads: [],
+        writes: [{ state: "revised_question", mode: "replace" }],
+        config: { value: "" },
+      },
+      answer_helper: {
+        kind: "agent",
+        name: "answer_helper",
+        description: "",
+        ui: { position: { x: 260, y: 0 } },
+        reads: [{ state: "question", required: true }],
+        writes: [],
+        config: {
+          skills: [],
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+    },
+    edges: [
+      { source: "original_input", target: "answer_helper" },
+      { source: "original_input", target: "revised_input" },
+    ],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const nextDocument = graphDocument.connectStateBindingInDocument(
+    document,
+    "revised_input",
+    "revised_question",
+    "answer_helper",
+    "question",
+  );
+
+  assert.deepEqual(nextDocument.nodes.answer_helper.reads, [{ state: "revised_question", required: true }]);
+  assert.deepEqual(nextDocument.edges, [
+    { source: "original_input", target: "revised_input" },
+    { source: "revised_input", target: "answer_helper" },
+  ]);
+  assert.deepEqual(document.edges, [
+    { source: "original_input", target: "answer_helper" },
+    { source: "original_input", target: "revised_input" },
+  ]);
+});
+
+test("connectStateBindingInDocument lets a same-state writer replace the previous concrete input source", () => {
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Replace same state input graph",
+    state_schema: {
+      question: { name: "question", description: "", type: "text", value: "", color: "#d97706" },
+    },
+    nodes: {
+      original_input: {
+        kind: "input",
+        name: "original_input",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [{ state: "question", mode: "replace" }],
+        config: { value: "" },
+      },
+      replacement_input: {
+        kind: "input",
+        name: "replacement_input",
+        description: "",
+        ui: { position: { x: 0, y: 120 } },
+        reads: [],
+        writes: [{ state: "question", mode: "replace" }],
+        config: { value: "" },
+      },
+      answer_helper: {
+        kind: "agent",
+        name: "answer_helper",
+        description: "",
+        ui: { position: { x: 260, y: 0 } },
+        reads: [{ state: "question", required: true }],
+        writes: [],
+        config: {
+          skills: [],
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+    },
+    edges: [{ source: "original_input", target: "answer_helper" }],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const nextDocument = graphDocument.connectStateBindingInDocument(
+    document,
+    "replacement_input",
+    "question",
+    "answer_helper",
+    "question",
+  );
+
+  assert.notEqual(nextDocument, document);
+  assert.deepEqual(nextDocument.nodes.answer_helper.reads, [{ state: "question", required: true }]);
+  assert.deepEqual(nextDocument.edges, [{ source: "replacement_input", target: "answer_helper" }]);
 });
 
 test("updateOutputNodeConfigInDocument patches output config immutably", () => {

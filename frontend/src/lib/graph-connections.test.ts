@@ -300,6 +300,171 @@ test("canCompleteGraphConnection allows an existing state binding to restore a m
   );
 });
 
+test("canCompleteGraphConnection allows reverse virtual input drags to target concrete state outputs", () => {
+  const graphWithEmptyAgent: GraphPayload = {
+    ...document,
+    nodes: {
+      ...document.nodes,
+      empty_agent: {
+        kind: "agent",
+        name: "empty_agent",
+        description: "",
+        ui: { position: { x: 240, y: 120 } },
+        reads: [],
+        writes: [],
+        config: {
+          skills: [],
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "off",
+          temperature: 0,
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+  };
+
+  assert.equal(
+    canCompleteGraphConnection(
+      graphWithEmptyAgent,
+      {
+        sourceNodeId: "empty_agent",
+        sourceKind: "state-in",
+        sourceStateKey: VIRTUAL_ANY_INPUT_STATE_KEY,
+      },
+      {
+        nodeId: "input_question",
+        kind: "state-out",
+        stateKey: "question",
+      },
+    ),
+    true,
+  );
+});
+
+test("canCompleteGraphConnection lets an agent virtual input append a second concrete state", () => {
+  const graphWithSecondInputSource: GraphPayload = {
+    ...document,
+    state_schema: {
+      question: { name: "question", description: "", type: "text", value: "", color: "#d97706" },
+      answer: { name: "answer", description: "", type: "text", value: "", color: "#2563eb" },
+    },
+    nodes: {
+      ...document.nodes,
+      input_answer: {
+        kind: "input",
+        name: "input_answer",
+        description: "",
+        ui: { position: { x: 0, y: 120 } },
+        reads: [],
+        writes: [{ state: "answer", mode: "replace" }],
+        config: { value: "" },
+      },
+    },
+    edges: [{ source: "input_question", target: "answer_helper" }],
+    conditional_edges: [],
+  };
+
+  assert.equal(
+    canCompleteGraphConnection(
+      graphWithSecondInputSource,
+      {
+        sourceNodeId: "answer_helper",
+        sourceKind: "state-in",
+        sourceStateKey: VIRTUAL_ANY_INPUT_STATE_KEY,
+      },
+      {
+        nodeId: "input_answer",
+        kind: "state-out",
+        stateKey: "answer",
+      },
+    ),
+    true,
+  );
+});
+
+test("canCompleteGraphConnection allows a concrete state input source to be replaced", () => {
+  const replacementGraph: GraphPayload = {
+    ...document,
+    state_schema: {
+      question: { name: "question", description: "", type: "text", value: "", color: "#d97706" },
+    },
+    nodes: {
+      original_input: {
+        kind: "input",
+        name: "original_input",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [{ state: "question", mode: "replace" }],
+        config: { value: "" },
+      },
+      replacement_input: {
+        kind: "input",
+        name: "replacement_input",
+        description: "",
+        ui: { position: { x: 0, y: 120 } },
+        reads: [],
+        writes: [{ state: "question", mode: "replace" }],
+        config: { value: "" },
+      },
+      answer_helper: {
+        kind: "agent",
+        name: "answer_helper",
+        description: "",
+        ui: { position: { x: 260, y: 0 } },
+        reads: [{ state: "question", required: true }],
+        writes: [],
+        config: {
+          skills: [],
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+    },
+    edges: [{ source: "original_input", target: "answer_helper" }],
+    conditional_edges: [],
+  };
+
+  assert.equal(
+    canCompleteGraphConnection(
+      replacementGraph,
+      {
+        sourceNodeId: "replacement_input",
+        sourceKind: "state-out",
+        sourceStateKey: "question",
+      },
+      {
+        nodeId: "answer_helper",
+        kind: "state-in",
+        stateKey: "question",
+      },
+    ),
+    true,
+  );
+  assert.equal(
+    canCompleteGraphConnection(
+      replacementGraph,
+      {
+        sourceNodeId: "original_input",
+        sourceKind: "state-out",
+        sourceStateKey: "question",
+      },
+      {
+        nodeId: "answer_helper",
+        kind: "state-in",
+        stateKey: "question",
+      },
+    ),
+    false,
+  );
+});
+
 test("canCompleteGraphConnection allows state outputs to target virtual any inputs on empty non-input nodes", () => {
   const pending: PendingGraphConnection = {
     sourceNodeId: "input_question",
