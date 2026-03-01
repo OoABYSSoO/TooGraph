@@ -1,7 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { createStateDraftFromQuery, matchesStatePortSearch } from "./statePortCreateModel.ts";
+import {
+  createStateDraftFromQuery,
+  matchesStatePortSearch,
+  updateStatePortDraftColor,
+  updateStatePortDraftDescription,
+  updateStatePortDraftName,
+  updateStatePortDraftType,
+  updateStatePortDraftValue,
+} from "./statePortCreateModel.ts";
 import { STATE_COLOR_OPTIONS } from "../workspace/statePanelFields.ts";
 
 const defaultStateColorValues = STATE_COLOR_OPTIONS.map((option) => option.value).filter(Boolean);
@@ -86,4 +94,42 @@ test("createStateDraftFromQuery keeps Chinese names while using neutral machine 
   assert.ok(defaultStateColorValues.includes(draft.definition.color));
   assert.equal(createStateDraftFromQuery("最终答案", ["state_1"]).key, "state_2");
   assert.equal(createStateDraftFromQuery("用户问题", ["state_1", "state_2"]).key, "state_3");
+});
+
+test("state port draft helpers immutably update draft metadata fields", () => {
+  const draft = createStateDraftFromQuery("Review Notes", []);
+  const renamed = updateStatePortDraftName(draft, "Final Answer");
+  const described = updateStatePortDraftDescription(renamed, "Shown to the user.");
+  const colored = updateStatePortDraftColor(described, "#16a34a");
+
+  assert.notEqual(renamed, draft);
+  assert.notEqual(renamed.definition, draft.definition);
+  assert.equal(draft.definition.name, "Review Notes");
+  assert.equal(renamed.definition.name, "Final Answer");
+  assert.equal(described.definition.description, "Shown to the user.");
+  assert.equal(colored.definition.color, "#16a34a");
+});
+
+test("state port draft type helper resets the default value for the selected type", () => {
+  const draft = {
+    ...createStateDraftFromQuery("Asset", []),
+    definition: {
+      ...createStateDraftFromQuery("Asset", []).definition,
+      value: "stale",
+    },
+  };
+
+  const updated = updateStatePortDraftType(draft, "number");
+
+  assert.equal(updated.definition.type, "number");
+  assert.equal(updated.definition.value, 0);
+});
+
+test("state port draft value helper preserves the rest of the draft", () => {
+  const draft = createStateDraftFromQuery("Review Notes", []);
+  const updated = updateStatePortDraftValue(draft, { answer: "yes" });
+
+  assert.equal(updated.key, draft.key);
+  assert.equal(updated.definition.name, draft.definition.name);
+  assert.deepEqual(updated.definition.value, { answer: "yes" });
 });

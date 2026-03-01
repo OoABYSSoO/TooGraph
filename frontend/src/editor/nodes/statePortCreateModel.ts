@@ -1,5 +1,5 @@
 import type { StateDefinition } from "../../types/node-system.ts";
-import { resolveDefaultStateColor } from "../workspace/statePanelFields.ts";
+import { defaultValueForStateType, resolveDefaultStateColor, type StateFieldType } from "../workspace/statePanelFields.ts";
 
 export type StatePortSearchField = {
   key: string;
@@ -50,6 +50,40 @@ export function createStateDraftFromQuery(query: string, existingKeys: string[])
       type: "text",
       value: "",
       color: resolveDefaultStateColor(key, existingKeys),
+    },
+  };
+}
+
+export function updateStatePortDraftName(draft: StatePortDraft, name: string | number) {
+  return updateStatePortDraftDefinition(draft, { name: String(name ?? "") });
+}
+
+export function updateStatePortDraftDescription(draft: StatePortDraft, description: string | number) {
+  return updateStatePortDraftDefinition(draft, { description: String(description ?? "") });
+}
+
+export function updateStatePortDraftType(draft: StatePortDraft, type: string | number | boolean | undefined) {
+  const nextType = String(type ?? "text") as StateFieldType;
+  return updateStatePortDraftDefinition(draft, {
+    type: nextType,
+    value: defaultValueForStateType(nextType),
+  });
+}
+
+export function updateStatePortDraftColor(draft: StatePortDraft, color: string | number | boolean | undefined) {
+  return updateStatePortDraftDefinition(draft, { color: String(color ?? "") });
+}
+
+export function updateStatePortDraftValue(draft: StatePortDraft, value: unknown) {
+  return updateStatePortDraftDefinition(draft, { value });
+}
+
+function updateStatePortDraftDefinition(draft: StatePortDraft, patch: Partial<StateDefinition>): StatePortDraft {
+  return {
+    ...draft,
+    definition: {
+      ...draft.definition,
+      ...patch,
     },
   };
 }

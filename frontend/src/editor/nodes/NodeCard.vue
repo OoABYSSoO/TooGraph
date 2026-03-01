@@ -1252,7 +1252,23 @@ import {
   type PortReorderSide,
 } from "./portReorderModel";
 import { listAttachableSkillDefinitions, resolveAttachedSkillBadges } from "./skillPickerModel";
-import { createStateDraftFromQuery } from "./statePortCreateModel";
+import {
+  buildStateEditorDraftFromSchema,
+  resolveStateEditorAnchorStateKey,
+  resolveStateEditorUpdatePatch,
+  updateStateEditorDraftColor,
+  updateStateEditorDraftDescription,
+  updateStateEditorDraftName,
+  updateStateEditorDraftType,
+} from "./stateEditorModel";
+import {
+  createStateDraftFromQuery,
+  updateStatePortDraftColor,
+  updateStatePortDraftDescription,
+  updateStatePortDraftName,
+  updateStatePortDraftType,
+  updateStatePortDraftValue,
+} from "./statePortCreateModel";
 import {
   buildTextEditorDrafts,
   createTextTriggerPointerState,
@@ -1937,13 +1953,7 @@ function handlePortDraftNameValue(value: string | number) {
   if (!portStateDraft.value) {
     return;
   }
-  portStateDraft.value = {
-    ...portStateDraft.value,
-    definition: {
-      ...portStateDraft.value.definition,
-      name: String(value ?? ""),
-    },
-  };
+  portStateDraft.value = updateStatePortDraftName(portStateDraft.value, value);
 }
 
 function handlePortDraftTypeSelect(value: string | number | boolean | undefined) {
@@ -1953,15 +1963,7 @@ function handlePortDraftTypeSelect(value: string | number | boolean | undefined)
   if (!portStateDraft.value) {
     return;
   }
-  const nextType = String(value ?? "text");
-  portStateDraft.value = {
-    ...portStateDraft.value,
-    definition: {
-      ...portStateDraft.value.definition,
-      type: nextType,
-      value: defaultValueForStateType(nextType as StateFieldType),
-    },
-  };
+  portStateDraft.value = updateStatePortDraftType(portStateDraft.value, value);
 }
 
 function handlePortDraftDescriptionValue(value: string | number) {
@@ -1971,13 +1973,7 @@ function handlePortDraftDescriptionValue(value: string | number) {
   if (!portStateDraft.value) {
     return;
   }
-  portStateDraft.value = {
-    ...portStateDraft.value,
-    definition: {
-      ...portStateDraft.value.definition,
-      description: String(value ?? ""),
-    },
-  };
+  portStateDraft.value = updateStatePortDraftDescription(portStateDraft.value, value);
 }
 
 function handlePortDraftColorSelect(value: string | number | boolean | undefined) {
@@ -1994,13 +1990,7 @@ function updatePortDraftColor(color: string) {
   if (!portStateDraft.value) {
     return;
   }
-  portStateDraft.value = {
-    ...portStateDraft.value,
-    definition: {
-      ...portStateDraft.value.definition,
-      color,
-    },
-  };
+  portStateDraft.value = updateStatePortDraftColor(portStateDraft.value, color);
 }
 
 function updatePortDraftValue(value: unknown) {
@@ -2010,13 +2000,7 @@ function updatePortDraftValue(value: unknown) {
   if (!portStateDraft.value) {
     return;
   }
-  portStateDraft.value = {
-    ...portStateDraft.value,
-    definition: {
-      ...portStateDraft.value.definition,
-      value,
-    },
-  };
+  portStateDraft.value = updateStatePortDraftValue(portStateDraft.value, value);
 }
 
 function commitPortStateCreate() {
@@ -2050,24 +2034,6 @@ function commitPortStateCreate() {
     },
   });
   closePortPicker();
-}
-
-function buildStateDraftFromSchema(stateKey: string): StateFieldDraft | null {
-  const definition = props.stateSchema[stateKey];
-  if (!definition) {
-    return null;
-  }
-
-  return {
-    key: stateKey,
-    definition: {
-      name: definition.name,
-      description: definition.description,
-      type: definition.type,
-      value: definition.value,
-      color: definition.color,
-    },
-  };
 }
 
 function syncTextEditorDraftsFromNode() {
@@ -2531,7 +2497,7 @@ function openStateEditor(anchorId: string, stateKey: string | null | undefined) 
   if (!stateKey) {
     return;
   }
-  const nextDraft = buildStateDraftFromSchema(stateKey);
+  const nextDraft = buildStateEditorDraftFromSchema(stateKey, props.stateSchema);
   if (!nextDraft) {
     return;
   }
@@ -2571,7 +2537,7 @@ function syncStateEditorDraft(nextDraft: StateFieldDraft) {
 
   stateEditorDraft.value = nextDraft;
 
-  const currentStateKey = currentAnchorId.split(":").at(-1) ?? "";
+  const currentStateKey = resolveStateEditorAnchorStateKey(currentAnchorId);
   if (!currentStateKey) {
     stateEditorError.value = t("nodeCard.stateKeyEmpty");
     return;
@@ -2581,13 +2547,7 @@ function syncStateEditorDraft(nextDraft: StateFieldDraft) {
 
   emit("update-state", {
     stateKey: currentStateKey,
-    patch: {
-      name: nextDraft.definition.name.trim() || currentStateKey,
-      description: nextDraft.definition.description,
-      type: nextDraft.definition.type,
-      value: nextDraft.definition.value,
-      color: nextDraft.definition.color,
-    },
+    patch: resolveStateEditorUpdatePatch(nextDraft, currentStateKey),
   });
 }
 
@@ -2595,53 +2555,28 @@ function handleStateEditorNameInput(value: string | number) {
   if (!stateEditorDraft.value || typeof value !== "string") {
     return;
   }
-  syncStateEditorDraft({
-    ...stateEditorDraft.value,
-    definition: {
-      ...stateEditorDraft.value.definition,
-      name: value,
-    },
-  });
+  syncStateEditorDraft(updateStateEditorDraftName(stateEditorDraft.value, value));
 }
 
 function handleStateEditorDescriptionInput(value: string | number) {
   if (!stateEditorDraft.value || typeof value !== "string") {
     return;
   }
-  syncStateEditorDraft({
-    ...stateEditorDraft.value,
-    definition: {
-      ...stateEditorDraft.value.definition,
-      description: value,
-    },
-  });
+  syncStateEditorDraft(updateStateEditorDraftDescription(stateEditorDraft.value, value));
 }
 
 function handleStateEditorColorInput(value: string | number) {
   if (!stateEditorDraft.value || typeof value !== "string") {
     return;
   }
-  syncStateEditorDraft({
-    ...stateEditorDraft.value,
-    definition: {
-      ...stateEditorDraft.value.definition,
-      color: value,
-    },
-  });
+  syncStateEditorDraft(updateStateEditorDraftColor(stateEditorDraft.value, value));
 }
 
 function handleStateEditorTypeValue(value: string | number | boolean | undefined) {
   if (typeof value !== "string" || !stateEditorDraft.value) {
     return;
   }
-  syncStateEditorDraft({
-    ...stateEditorDraft.value,
-    definition: {
-      ...stateEditorDraft.value.definition,
-      type: value,
-      value: defaultValueForStateType(value as StateFieldType),
-    },
-  });
+  syncStateEditorDraft(updateStateEditorDraftType(stateEditorDraft.value, value));
 }
 
 function toggleAdvancedPanel() {

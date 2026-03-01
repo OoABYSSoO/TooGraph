@@ -8,6 +8,7 @@ const currentFilePath = fileURLToPath(import.meta.url);
 const currentDirectory = dirname(currentFilePath);
 const componentSource = readFileSync(resolve(currentDirectory, "NodeCard.vue"), "utf8").replace(/\r\n/g, "\n");
 const createPopoverSource = readFileSync(resolve(currentDirectory, "StatePortCreatePopover.vue"), "utf8").replace(/\r\n/g, "\n");
+const stateEditorModelSource = readFileSync(resolve(currentDirectory, "stateEditorModel.ts"), "utf8").replace(/\r\n/g, "\n");
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const cssRuleBlock = (selector: string) => {
   const match = componentSource.match(new RegExp(`${escapeRegExp(selector)} \\{[\\s\\S]*?\\n\\}`));
@@ -592,6 +593,18 @@ test("NodeCard reveals state pills on hover and opens state editing only after a
   assert.doesNotMatch(componentSource, /@save="commitStateEditor"/);
   assert.doesNotMatch(componentSource, /function commitStateEditor\(\)/);
   assert.match(componentSource, /function syncStateEditorDraft\(nextDraft: StateFieldDraft\)/);
+  assert.match(componentSource, /from "\.\/stateEditorModel";/);
+  assert.doesNotMatch(componentSource, /function buildStateDraftFromSchema/);
+  assert.doesNotMatch(componentSource, /currentAnchorId\.split\(":\"\)\.at\(-1\)/);
+  assert.match(componentSource, /buildStateEditorDraftFromSchema\(stateKey, props\.stateSchema\)/);
+  assert.match(componentSource, /resolveStateEditorAnchorStateKey\(currentAnchorId\)/);
+  assert.match(componentSource, /resolveStateEditorUpdatePatch\(nextDraft, currentStateKey\)/);
+  assert.match(componentSource, /updateStateEditorDraftName\(stateEditorDraft\.value, value\)/);
+  assert.match(componentSource, /updateStateEditorDraftDescription\(stateEditorDraft\.value, value\)/);
+  assert.match(componentSource, /updateStateEditorDraftColor\(stateEditorDraft\.value, value\)/);
+  assert.match(componentSource, /updateStateEditorDraftType\(stateEditorDraft\.value, value\)/);
+  assert.match(stateEditorModelSource, /export function buildStateEditorDraftFromSchema/);
+  assert.match(stateEditorModelSource, /export function resolveStateEditorUpdatePatch/);
   assert.doesNotMatch(componentSource, /trigger="manual"/);
   assert.match(createPopoverSource, /StateDefaultValueEditor/);
   assert.match(componentSource, /class="node-card__state-editor"/);

@@ -49,3 +49,4 @@
 - The safest immediate slice is the agent port reorder logic: preview ordering, target index calculation, selector escaping, source rect extraction, and floating pill style are pure or nearly pure and currently live inside the 5k-line component.
 - `actionPopoverStyle`, `stateEditorPopoverStyle`, and `agentAddPopoverStyle` are identical transparent Element Plus popover style objects in `NodeCard.vue`; they can share one constant while preserving the public template bindings.
 - Existing structure tests assert the previous in-component helper layout, so they must be updated alongside the extraction to verify the new module boundary instead of locking duplication in place.
+- Editing existing state fields has a clean pure-model boundary: schema-to-draft conversion, immutable field updates, anchor-key extraction, and update-patch construction can live outside `NodeCard.vue` while the component keeps lock guards, popover confirmation state, translated errors, and emits.
