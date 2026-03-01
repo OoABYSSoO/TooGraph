@@ -660,12 +660,14 @@ const minimapNodes = computed(() =>
   }),
 );
 const minimapEdges = computed(() =>
-  projectedEdges.value.map((edge) => ({
-    id: edge.id,
-    kind: edge.kind,
-    path: edge.path,
-    color: edge.kind === "route" ? resolveRouteHandlePalette(edge.branch).accent : edge.color,
-  })),
+  projectedEdges.value
+    .filter((edge) => visibleProjectedEdgeIds.value.has(edge.id))
+    .map((edge) => ({
+      id: edge.id,
+      kind: edge.kind,
+      path: edge.path,
+      color: edge.kind === "route" ? resolveRouteHandlePalette(edge.branch).accent : edge.color,
+    })),
 );
 const conditionRouteTargetsByNodeId = computed(() =>
   Object.fromEntries(

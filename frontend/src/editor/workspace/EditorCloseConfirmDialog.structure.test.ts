@@ -36,6 +36,25 @@ test("EditorCloseConfirmDialog lowers the modal pressure while keeping the tab i
   assert.match(componentSource, /\.editor-close-dialog__title \{[\s\S]*font-size:\s*1\.48rem;/);
 });
 
+test("EditorCloseConfirmDialog keeps glass material opacity stable during entry", () => {
+  assert.match(
+    componentSource,
+    /:global\(\.editor-close-dialog__overlay\.dialog-fade-enter-active\),[\s\S]*:global\(\.editor-close-dialog__overlay\.dialog-fade-leave-active\) \{[\s\S]*animation:\s*none;/,
+  );
+  assert.match(
+    componentSource,
+    /:global\(\.editor-close-dialog__overlay\.dialog-fade-enter-active \.el-overlay-dialog\),[\s\S]*:global\(\.editor-close-dialog__overlay\.dialog-fade-leave-active \.el-overlay-dialog\) \{[\s\S]*animation:\s*none;/,
+  );
+  assert.match(
+    componentSource,
+    /:global\(\.editor-close-dialog__overlay\.dialog-fade-enter-active \.editor-close-dialog\.el-dialog\),[\s\S]*:global\(\.editor-close-dialog__overlay\.dialog-fade-leave-active \.editor-close-dialog\.el-dialog\) \{[\s\S]*opacity:\s*1;[\s\S]*transition:\s*transform 180ms ease;/,
+  );
+  assert.match(
+    componentSource,
+    /:global\(\.editor-close-dialog__overlay\.dialog-fade-enter-from \.editor-close-dialog\.el-dialog\) \{[\s\S]*opacity:\s*1;[\s\S]*transform:\s*translateY\(10px\) scale\(0\.985\);/,
+  );
+});
+
 test("EditorCloseConfirmDialog gives save, discard, and cancel clear visual priority", () => {
   assert.match(componentSource, /editor-close-dialog__button--cancel/);
   assert.match(componentSource, /editor-close-dialog__button--discard/);

@@ -43,3 +43,9 @@
 - The third slice should be `EditorWorkspaceShell.vue` run stream and draft persistence extraction.
 - Backend refactor should begin with `model_provider_client.py` because its protocol boundaries are clearer than executor/runtime semantics.
 - Avoid a broad rewrite; move pure functions first, keep public APIs as thin compatibility facades, and preserve current tests during each extraction.
+
+## 2026-04-28 Cleanup Execution Findings
+- Current cleanup should begin with `NodeCard.vue`, matching the roadmap's P1 recommendation.
+- The safest immediate slice is the agent port reorder logic: preview ordering, target index calculation, selector escaping, source rect extraction, and floating pill style are pure or nearly pure and currently live inside the 5k-line component.
+- `actionPopoverStyle`, `stateEditorPopoverStyle`, and `agentAddPopoverStyle` are identical transparent Element Plus popover style objects in `NodeCard.vue`; they can share one constant while preserving the public template bindings.
+- Existing structure tests assert the previous in-component helper layout, so they must be updated alongside the extraction to verify the new module boundary instead of locking duplication in place.

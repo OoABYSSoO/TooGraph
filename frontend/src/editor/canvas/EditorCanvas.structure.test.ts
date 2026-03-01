@@ -26,6 +26,7 @@ test("EditorCanvas mounts a right-bottom minimap backed by measured node geometr
   assert.match(componentSource, /const canvasSize = ref\(\{ width: 0, height: 0 \}\);/);
   assert.match(componentSource, /const minimapNodes = computed\(\(\) =>/);
   assert.match(componentSource, /const minimapEdges = computed\(\(\) =>/);
+  assert.match(componentSource, /const minimapEdges = computed\(\(\) =>[\s\S]*projectedEdges\.value[\s\S]*\.filter\(\(edge\) => visibleProjectedEdgeIds\.value\.has\(edge\.id\)\)/);
   assert.match(componentSource, /<EditorMinimap[\s\S]*class="editor-canvas__minimap"[\s\S]*:nodes="minimapNodes"[\s\S]*:edges="minimapEdges"[\s\S]*:viewport="viewport\.viewport"[\s\S]*:canvas-size="canvasSize"[\s\S]*@center-view="handleMinimapCenterView"/);
   assert.match(componentSource, /function handleMinimapCenterView\(point: \{ worldX: number; worldY: number \}\)/);
   assert.match(componentSource, /resolveViewportForMinimapCenter\(/);

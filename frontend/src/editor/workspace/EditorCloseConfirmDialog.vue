@@ -73,6 +73,34 @@ function handleOpenChange(open: boolean) {
   backdrop-filter: blur(9px) saturate(0.95);
 }
 
+:global(.editor-close-dialog__overlay.dialog-fade-enter-active),
+:global(.editor-close-dialog__overlay.dialog-fade-leave-active) {
+  animation: none;
+}
+
+:global(.editor-close-dialog__overlay.dialog-fade-enter-active .el-overlay-dialog),
+:global(.editor-close-dialog__overlay.dialog-fade-leave-active .el-overlay-dialog) {
+  animation: none;
+}
+
+:global(.editor-close-dialog__overlay.dialog-fade-enter-active .editor-close-dialog.el-dialog),
+:global(.editor-close-dialog__overlay.dialog-fade-leave-active .editor-close-dialog.el-dialog) {
+  opacity: 1;
+  transition: transform 180ms ease;
+}
+
+:global(.editor-close-dialog__overlay.dialog-fade-enter-from .editor-close-dialog.el-dialog) {
+  opacity: 1;
+  transform: translateY(10px) scale(0.985);
+}
+
+:global(.editor-close-dialog__overlay.dialog-fade-enter-to .editor-close-dialog.el-dialog),
+:global(.editor-close-dialog__overlay.dialog-fade-leave-from .editor-close-dialog.el-dialog),
+:global(.editor-close-dialog__overlay.dialog-fade-leave-to .editor-close-dialog.el-dialog) {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
 :global(.editor-close-dialog.el-dialog) {
   overflow: hidden;
   border: 1px solid var(--graphite-glass-border);

@@ -1237,6 +1237,20 @@ import { CONDITION_RULE_OPERATOR_OPTIONS } from "./conditionRuleEditorModel";
 import { isSwitchableInputBoundaryType, resolveNextInputValueForBoundaryType, resolveStateTypeForInputBoundary } from "./inputValueTypeModel";
 import { buildNodeCardViewModel, type NodePortViewModel } from "./nodeCardViewModel";
 import { resolveOutputPreviewContent } from "./outputPreviewContentModel";
+import {
+  PORT_REORDER_DRAG_THRESHOLD,
+  buildPortReorderFloatingStyle,
+  buildPortReorderPreviewPorts,
+  buildPortReorderSelector,
+  isPortReorderPlaceholderState,
+  isPortReorderingState,
+  resolvePortReorderInitialTargetIndex as resolveInitialPortReorderTargetIndex,
+  resolvePortReorderSourceRectFromElement,
+  resolvePortReorderTargetIndexFromElements,
+  type PortReorderPointerState,
+  type PortReorderRect,
+  type PortReorderSide,
+} from "./portReorderModel";
 import { listAttachableSkillDefinitions, resolveAttachedSkillBadges } from "./skillPickerModel";
 import { createStateDraftFromQuery } from "./statePortCreateModel";
 import { createUploadedAssetEnvelope, resolveUploadedAssetInputAccept, tryParseUploadedAssetEnvelope } from "./uploadedAssetModel";
@@ -1249,15 +1263,6 @@ import {
 } from "@/editor/workspace/statePanelFields";
 
 type TextEditorField = "title" | "description";
-type PortReorderSide = "input" | "output";
-type PortReorderRect = {
-  left: number;
-  top: number;
-  width: number;
-  height: number;
-};
-
-const PORT_REORDER_DRAG_THRESHOLD = 6;
 
 const props = defineProps<{
   nodeId: string;
@@ -1339,7 +1344,7 @@ const confirmPopoverStyle = {
   background: "transparent",
   boxShadow: "none",
 };
-const actionPopoverStyle = {
+const transparentPopoverStyle = {
   "--el-popover-bg-color": "transparent",
   "--el-popover-border-color": "transparent",
   "--el-popover-padding": "0px",
@@ -1349,26 +1354,9 @@ const actionPopoverStyle = {
   padding: "0",
   "min-width": "0",
 } as const;
-const stateEditorPopoverStyle = {
-  "--el-popover-bg-color": "transparent",
-  "--el-popover-border-color": "transparent",
-  "--el-popover-padding": "0px",
-  background: "transparent",
-  border: "none",
-  boxShadow: "none",
-  padding: "0",
-  "min-width": "0",
-} as const;
-const agentAddPopoverStyle = {
-  "--el-popover-bg-color": "transparent",
-  "--el-popover-border-color": "transparent",
-  "--el-popover-padding": "0px",
-  background: "transparent",
-  border: "none",
-  boxShadow: "none",
-  padding: "0",
-  "min-width": "0",
-} as const;
+const actionPopoverStyle = transparentPopoverStyle;
+const stateEditorPopoverStyle = transparentPopoverStyle;
+const agentAddPopoverStyle = transparentPopoverStyle;
 const stateTypeOptions = STATE_FIELD_TYPE_OPTIONS;
 const conditionRuleOperatorOptions = CONDITION_RULE_OPERATOR_OPTIONS;
 type AgentThinkingControlMode = "off" | "low" | "medium" | "high" | "xhigh";
@@ -1396,8 +1384,12 @@ const agentInputPorts = computed<NodePortViewModel[]>(() =>
 const agentOutputPorts = computed<NodePortViewModel[]>(() =>
   view.value.body.kind === "agent" ? view.value.outputs.filter((port) => !port.virtual) : [],
 );
-const orderedAgentInputPorts = computed<NodePortViewModel[]>(() => buildPortReorderPreviewPorts("input", agentInputPorts.value));
-const orderedAgentOutputPorts = computed<NodePortViewModel[]>(() => buildPortReorderPreviewPorts("output", agentOutputPorts.value));
+const orderedAgentInputPorts = computed<NodePortViewModel[]>(() =>
+  buildPortReorderPreviewPorts("input", agentInputPorts.value, portReorderPointerState.value),
+);
+const orderedAgentOutputPorts = computed<NodePortViewModel[]>(() =>
+  buildPortReorderPreviewPorts("output", agentOutputPorts.value, portReorderPointerState.value),
+);
 const shouldShowAgentCreateInputPort = computed(() => agentInputPorts.value.length === 0);
 const shouldShowAgentCreateOutputPort = computed(() => agentOutputPorts.value.length === 0);
 const agentCreateInputAnchorStateKey = computed(() =>
@@ -1428,19 +1420,7 @@ const textTriggerPointerState = ref<{
   startClientY: number;
   moved: boolean;
 } | null>(null);
-const portReorderPointerState = ref<{
-  side: PortReorderSide;
-  stateKey: string;
-  pointerId: number;
-  startClientX: number;
-  startClientY: number;
-  currentClientX: number;
-  currentClientY: number;
-  pointerOffsetY: number;
-  sourceRect: PortReorderRect;
-  active: boolean;
-  targetIndex: number | null;
-} | null>(null);
+const portReorderPointerState = ref<PortReorderPointerState | null>(null);
 const suppressNextPortPillClick = ref(false);
 const textEditorConfirmTimeoutRef = ref<number | null>(null);
 const textEditorFocusTimeoutRef = ref<number | null>(null);
@@ -1474,14 +1454,7 @@ const portReorderFloatingStyle = computed(() => {
     return {};
   }
 
-  const top = pointerState.currentClientY - pointerState.pointerOffsetY;
-  return {
-    "--node-card-port-accent": floatingPort.port.stateColor,
-    left: `${pointerState.sourceRect.left}px`,
-    top: `${top}px`,
-    width: `${pointerState.sourceRect.width}px`,
-    height: `${pointerState.sourceRect.height}px`,
-  };
+  return buildPortReorderFloatingStyle(pointerState, floatingPort.port.stateColor);
 });
 const showKnowledgeBaseInput = computed(() => view.value.body.kind === "input" && view.value.body.editorMode === "knowledge_base");
 const showAssetUploadInput = computed(() => view.value.body.kind === "input" && view.value.body.editorMode === "asset");
@@ -2390,40 +2363,11 @@ function suppressNextPortPillClickOnce() {
 }
 
 function isPortReordering(side: PortReorderSide, stateKey: string) {
-  const pointerState = portReorderPointerState.value;
-  return Boolean(pointerState?.active && pointerState.side === side && pointerState.stateKey === stateKey);
+  return isPortReorderingState(portReorderPointerState.value, side, stateKey);
 }
 
 function isPortReorderPlaceholder(side: PortReorderSide, stateKey: string) {
-  const pointerState = portReorderPointerState.value;
-  return Boolean(pointerState?.active && pointerState.side === side && pointerState.stateKey === stateKey);
-}
-
-function buildPortReorderPreviewPorts(side: PortReorderSide, ports: NodePortViewModel[]) {
-  const pointerState = portReorderPointerState.value;
-  if (!pointerState?.active || pointerState.side !== side || pointerState.targetIndex === null) {
-    return ports;
-  }
-
-  const sourceIndex = ports.findIndex((port) => port.key === pointerState.stateKey);
-  if (sourceIndex === -1) {
-    return ports;
-  }
-
-  const sourcePort = ports[sourceIndex];
-  const remainingPorts = ports.filter((port) => port.key !== pointerState.stateKey);
-  const targetIndex = Math.max(0, Math.min(pointerState.targetIndex, remainingPorts.length));
-  return [
-    ...remainingPorts.slice(0, targetIndex),
-    sourcePort,
-    ...remainingPorts.slice(targetIndex),
-  ];
-}
-
-function escapePortReorderSelectorValue(value: string) {
-  return typeof CSS !== "undefined" && typeof CSS.escape === "function"
-    ? CSS.escape(value)
-    : value.replace(/["\\]/g, "\\$&");
+  return isPortReorderPlaceholderState(portReorderPointerState.value, side, stateKey);
 }
 
 function resolvePortReorderTargetIndex(side: PortReorderSide, clientY: number) {
@@ -2432,29 +2376,13 @@ function resolvePortReorderTargetIndex(side: PortReorderSide, clientY: number) {
     return null;
   }
 
-  const selector = [
-    `[data-port-reorder-node-id="${escapePortReorderSelectorValue(props.nodeId)}"]`,
-    `[data-port-reorder-side="${side}"]`,
-    "[data-port-reorder-state-key]",
-  ].join("");
-  const targetElements = Array.from(document.querySelectorAll<HTMLElement>(selector))
-    .filter((element) => element.dataset.portReorderStateKey !== pointerState.stateKey)
-    .sort((left, right) => left.getBoundingClientRect().top - right.getBoundingClientRect().top);
-  if (targetElements.length === 0) {
-    return 0;
-  }
-
-  const firstTargetAfterPointer = targetElements.findIndex((element) => {
-    const rect = element.getBoundingClientRect();
-    return clientY < rect.top + rect.height / 2;
-  });
-  return firstTargetAfterPointer === -1 ? targetElements.length : firstTargetAfterPointer;
+  const targetElements = Array.from(document.querySelectorAll<HTMLElement>(buildPortReorderSelector(props.nodeId, side)));
+  return resolvePortReorderTargetIndexFromElements(targetElements, pointerState.stateKey, clientY);
 }
 
 function resolvePortReorderInitialTargetIndex(side: PortReorderSide, stateKey: string) {
   const ports = side === "input" ? agentInputPorts.value : agentOutputPorts.value;
-  const sourceIndex = ports.findIndex((port) => port.key === stateKey);
-  return sourceIndex === -1 ? null : sourceIndex;
+  return resolveInitialPortReorderTargetIndex(ports, stateKey);
 }
 
 function resolvePortReorderSourceRect(event: PointerEvent): PortReorderRect | null {
@@ -2462,13 +2390,7 @@ function resolvePortReorderSourceRect(event: PointerEvent): PortReorderRect | nu
     return null;
   }
 
-  const rect = event.currentTarget.getBoundingClientRect();
-  return {
-    left: rect.left,
-    top: rect.top,
-    width: rect.width,
-    height: rect.height,
-  };
+  return resolvePortReorderSourceRectFromElement(event.currentTarget);
 }
 
 function handlePortReorderPointerDown(side: "input" | "output", stateKey: string, event: PointerEvent) {
