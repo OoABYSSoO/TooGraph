@@ -203,34 +203,75 @@
 | What have I learned? | Agent thinking-mode compatibility and temperature input parsing are pure agent config concerns and fit `agentConfigModel.ts`. |
 | What have I done? | Extracted agent runtime input normalization, added focused tests, updated NodeCard boundary assertions, and verified/restarted the app. |
 
+## Session: 2026-04-28 Round 7
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Ran planning session catchup and read the completed round 6 plan/progress/findings.
+  - Confirmed the worktree starts clean on `main...origin/main`.
+  - Inspected `uploadedAssetModel.ts`, its tests, and uploaded asset computed state in `NodeCard.vue`.
+
+### Phase 2: Select Safe Refactor Slice
+- **Status:** completed
+- Actions taken:
+  - Selected uploaded asset label, summary, text preview, and description helpers as the next low-risk NodeCard extraction.
+  - Decided to keep file input/drop handling and graph state emits inside `NodeCard.vue`.
+
+### Phase 3: Implement Cleanup
+- **Status:** completed
+- Actions taken:
+  - Updated `task_plan.md` for the seventh cleanup round.
+  - Added failing tests for uploaded asset presentation helpers before production code.
+  - Ran `uploadedAssetModel.test.ts` and verified it fails because `resolveUploadedAssetDescription` is not exported yet.
+  - Added uploaded asset label, summary, text preview, and description helpers to `uploadedAssetModel.ts`.
+  - Updated `NodeCard.vue` to call the uploaded asset model helpers.
+  - Updated `NodeCard.structure.test.ts` to assert the new model boundary.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran the focused uploaded asset model test after implementation.
+  - Ran the focused NodeCard structure test after implementation.
+  - Ran `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters`.
+  - Ran the full frontend node test suite.
+  - Ran the frontend production build; no large chunk warning was emitted.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend returned HTTP 200 at `http://127.0.0.1:3477`.
+  - Confirmed the backend health route returned HTTP 200 at `http://127.0.0.1:8765/health`.
+
+### Phase 5: Commit and Push
+- **Status:** completed
+- Actions taken:
+  - Checked git status after restart; only source/test/planning files are modified.
+  - Confirmed no untracked runtime or build artifacts are present.
+  - Ran `git diff --check` with no whitespace errors.
+  - Committed the cleanup as `16d739d` with Chinese message `抽取上传资产展示逻辑`.
+  - Pushed `main` to `origin/main`.
+
 ## Test Results
 | Test | Input | Expected | Actual | Status |
 |------|-------|----------|--------|--------|
-| Red test | `node --test frontend/src/editor/nodes/agentConfigModel.test.ts` before implementation | Fails because new agent config helpers are missing | Failed with missing `normalizeAgentThinkingMode` export | Passed |
-| Agent config model | `node --test frontend/src/editor/nodes/agentConfigModel.test.ts` | Model tests pass | 10 passed | Passed |
+| Red test | `node --test frontend/src/editor/nodes/uploadedAssetModel.test.ts` before implementation | Fails because new uploaded asset presentation helpers are missing | Failed with missing `resolveUploadedAssetDescription` export | Passed |
+| Uploaded asset model | `node --test frontend/src/editor/nodes/uploadedAssetModel.test.ts` | Model tests pass | 6 passed | Passed |
 | NodeCard structure | `node --test frontend/src/editor/nodes/NodeCard.structure.test.ts` | Structure constraints pass | 34 passed | Passed |
 | Unused symbol check | `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No unused-symbol diagnostics | Exit 0, no diagnostics | Passed |
-| Full frontend tests | `node --test $(rg --files frontend/src -g '*.test.ts') frontend/vite.config.structure.test.ts` | All frontend tests pass | 678 passed | Passed |
+| Full frontend tests | `node --test $(rg --files frontend/src -g '*.test.ts') frontend/vite.config.structure.test.ts` | All frontend tests pass | 680 passed | Passed |
 | Frontend production build | `npm run build` in `frontend` | Build succeeds without chunk warning regressions | Exit 0, no large chunk warning | Passed |
 | Dev restart | `npm run dev` | Services start and respond | Frontend 200, backend `/health` 200 | Passed |
-
-## Error Log
-| Timestamp | Error | Attempt | Resolution |
-|-----------|-------|---------|------------|
-| 2026-04-28 | Large chunk warning persisted after route-level lazy loading | `npm run build` | Add explicit vendor manual chunks and re-run build. |
-| 2026-04-28 | Element Plus vendor chunk remained above 500 kB and created a circular manual chunk | `npm run build` after coarse vendor chunks | Split Element Plus by component directory and remove the generic vendor bucket. |
-| 2026-04-28 | Element Plus component-level splitting produced many circular chunk warnings | `npm run build` after per-component chunks | Use stable coarse vendor chunks and raise the warning threshold for the cacheable UI vendor chunk. |
-| 2026-04-28 | Stable Element Plus vendor chunk exceeded the initial 900 kB warning threshold | `npm run build` | Raise threshold to 1000 kB while keeping app entry and route chunks split. |
-| 2026-04-28 | `StateFieldType` missing after import cleanup | `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` | Restored the type-only import in `NodeCard.vue`. |
 
 ## 5-Question Reboot Check
 | Question | Answer |
 |----------|--------|
-| Where am I? | Third cleanup implementation, verification, dev restart, commit, and push are complete. |
-| Where am I going? | Ready for final handoff. |
-| What's the goal? | Continue reducing NodeCard concentration without changing editor behavior. |
-| What have I learned? | `statePortCreateModel.ts` already owns create-port draft behavior and is the right place for draft patch helpers. |
-| What have I done? | Extracted state port draft helpers, fixed one type import issue, and ran focused checks. |
+| Where am I? | Seventh cleanup implementation, verification, dev restart, commit, and push are complete. |
+| Where am I going? | Ready for final handoff or the next cleanup slice. |
+| What's the goal? | Continue reducing `NodeCard.vue` concentration without changing editor behavior. |
+| What have I learned? | Uploaded asset label, summary, text preview, and empty-state copy are pure presentation concerns that fit `uploadedAssetModel.ts`. |
+| What have I done? | Extracted uploaded asset presentation helpers, added focused tests, ran full frontend checks, built, and restarted the app. |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
 
 ## Session: 2026-04-28 Round 4
 

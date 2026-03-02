@@ -1291,7 +1291,15 @@ import {
   type TextEditorField,
   type TextTriggerPointerState,
 } from "./textEditorModel";
-import { createUploadedAssetEnvelope, resolveUploadedAssetInputAccept, tryParseUploadedAssetEnvelope } from "./uploadedAssetModel";
+import {
+  createUploadedAssetEnvelope,
+  resolveUploadedAssetDescription,
+  resolveUploadedAssetInputAccept,
+  resolveUploadedAssetLabel,
+  resolveUploadedAssetSummary,
+  resolveUploadedAssetTextPreview,
+  tryParseUploadedAssetEnvelope,
+} from "./uploadedAssetModel";
 import {
   defaultValueForStateType,
   resolveStateColorOptions,
@@ -1526,48 +1534,10 @@ const inputBoundarySelection = computed<"text" | "file" | "knowledge_base">(() =
   }
   return "text";
 });
-const inputAssetLabel = computed(() => {
-  switch (inputAssetType.value) {
-    case "image":
-      return "image";
-    case "audio":
-      return "audio clip";
-    case "video":
-      return "video";
-    default:
-      return "file";
-  }
-});
-const inputAssetSummary = computed(() => {
-  const asset = inputAssetEnvelope.value;
-  if (!asset) {
-    return "";
-  }
-  return `${asset.mimeType} · ${Math.max(1, Math.round(asset.size / 1024))} KB`;
-});
-const inputAssetTextPreview = computed(() => {
-  const asset = inputAssetEnvelope.value;
-  if (!asset || asset.encoding !== "text") {
-    return "";
-  }
-  return asset.content.slice(0, 3000);
-});
-const inputAssetDescription = computed(() => {
-  const asset = inputAssetEnvelope.value;
-  if (asset) {
-    return `Stored as ${asset.detectedType} upload. ${inputAssetSummary.value}`;
-  }
-  switch (inputAssetType.value) {
-    case "image":
-      return "Upload a reference image for this workflow.";
-    case "audio":
-      return "Upload an audio clip that this workflow should read.";
-    case "video":
-      return "Upload a video asset that this workflow should inspect.";
-    default:
-      return "Upload a file to seed this workflow.";
-  }
-});
+const inputAssetLabel = computed(() => resolveUploadedAssetLabel(inputAssetType.value));
+const inputAssetSummary = computed(() => resolveUploadedAssetSummary(inputAssetEnvelope.value));
+const inputAssetTextPreview = computed(() => resolveUploadedAssetTextPreview(inputAssetEnvelope.value));
+const inputAssetDescription = computed(() => resolveUploadedAssetDescription(inputAssetEnvelope.value, inputAssetType.value));
 const showLegacyUploadedAssetHint = computed(
   () => showAssetUploadInput.value && !inputAssetEnvelope.value && inputValueText.value.trim().length > 0,
 );
