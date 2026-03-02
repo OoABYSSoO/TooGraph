@@ -59,6 +59,136 @@
 | Timestamp | Error | Attempt | Resolution |
 |-----------|-------|---------|------------|
 
+## Session: 2026-04-28 Round 9
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Ran planning session catchup and read the completed round 8 plan/progress/findings.
+  - Confirmed the worktree starts clean on `main...origin/main`.
+  - Inspected `NodeCard.vue` output advanced setting options and handlers.
+  - Inspected `nodeCardViewModel.ts` output display and persist label helpers.
+
+### Phase 2: Select Safe Refactor Slice
+- **Status:** completed
+- Actions taken:
+  - Selected output display/persist option lists, active-state helpers, file-name patching, and output label formatting.
+  - Decided to keep Element Plus controls, popover behavior, and emits inside `NodeCard.vue`.
+
+### Phase 3: Implement Cleanup
+- **Status:** completed
+- Actions taken:
+  - Added failing tests for output configuration model helpers before production code.
+  - Ran `outputConfigModel.test.ts` and verified it fails because `outputConfigModel.ts` does not exist yet.
+  - Updated `NodeCard.structure.test.ts` before component changes and verified it fails because `NodeCard.vue` does not import `outputConfigModel.ts` yet.
+  - Added `outputConfigModel.ts` with output option lists, label helpers, active-state helpers, and patch helpers.
+  - Updated `NodeCard.vue` to use the output config model helpers.
+  - Updated `nodeCardViewModel.ts` to reuse the output config label helpers.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused output config, NodeCard structure, and node card view-model tests after implementation.
+  - Ran `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters`.
+  - Ran the full frontend node test suite.
+  - Ran the frontend production build; no large chunk warning was emitted.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend returned HTTP 200 at `http://127.0.0.1:3477`.
+  - Confirmed the backend health route returned HTTP 200 at `http://127.0.0.1:8765/health`.
+
+### Phase 5: Commit and Push
+- **Status:** completed
+- Actions taken:
+  - Checked git status after restart; only source/test/planning files are modified.
+  - Confirmed untracked files are limited to the new output config model and test.
+  - Ran `git diff --check` with no whitespace errors.
+  - Committed the cleanup as `73a94e0` with Chinese message `抽取输出配置展示逻辑`.
+  - Pushed `main` to `origin/main`.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red test | `node --test frontend/src/editor/nodes/outputConfigModel.test.ts` before implementation | Fails because the new model file is missing | Failed with `ERR_MODULE_NOT_FOUND` for `outputConfigModel.ts` | Passed |
+| Red structure test | `node --test frontend/src/editor/nodes/NodeCard.structure.test.ts` before component implementation | Fails because `NodeCard.vue` still owns output config presentation rules | Failed on missing `./outputConfigModel` import | Passed |
+| Focused frontend tests | `node --test frontend/src/editor/nodes/outputConfigModel.test.ts frontend/src/editor/nodes/NodeCard.structure.test.ts frontend/src/editor/nodes/nodeCardViewModel.test.ts` | Touched surface tests pass | 62 passed | Passed |
+| Unused symbol check | `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No unused-symbol diagnostics | Exit 0, no diagnostics | Passed |
+| Full frontend tests | `node --test $(rg --files frontend/src -g '*.test.ts') frontend/vite.config.structure.test.ts` | All frontend tests pass | 688 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without chunk warning regressions | Exit 0, no large chunk warning | Passed |
+| Dev restart | `npm run dev` | Services start and respond | Frontend 200, backend `/health` 200 | Passed |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Ninth cleanup implementation, verification, dev restart, commit, and push are complete. |
+| Where am I going? | Ready for final handoff or the next cleanup slice. |
+| What's the goal? | Continue reducing `NodeCard.vue` concentration without changing editor behavior. |
+| What have I learned? | Output advanced-control options and output label formatting were duplicated between `NodeCard.vue` and `nodeCardViewModel.ts`; `outputConfigModel.ts` is a shared pure boundary. |
+| What have I done? | Extracted output configuration options, labels, active checks, and patch helpers; added focused tests; ran full frontend checks, built, and restarted the app. |
+
+## Session: 2026-04-28 Round 8
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Ran planning session catchup and read the completed round 7 plan/progress/findings.
+  - Confirmed the worktree starts clean on `main...origin/main`.
+  - Inspected `NodeCard.vue` knowledge-base input computed state, `inputValueTypeModel.ts`, and related structure tests.
+
+### Phase 2: Select Safe Refactor Slice
+- **Status:** completed
+- Actions taken:
+  - Selected knowledge-base option construction and selected-description resolution as the next low-risk extraction.
+  - Decided to keep select event handling, state patch emits, and input boundary switching inside `NodeCard.vue`.
+
+### Phase 3: Implement Cleanup
+- **Status:** completed
+- Actions taken:
+  - Added failing tests for knowledge-base input presentation helpers before production code.
+  - Ran `inputKnowledgeBaseModel.test.ts` and verified it fails because `inputKnowledgeBaseModel.ts` does not exist yet.
+  - Updated `NodeCard.structure.test.ts` before component changes and verified it fails because `NodeCard.vue` has not delegated knowledge-base input presentation yet.
+  - Added `inputKnowledgeBaseModel.ts` with pure option construction and selected-description helpers.
+  - Updated `NodeCard.vue` to call the model helpers.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused input knowledge-base model and NodeCard structure tests after implementation.
+  - Ran `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters`.
+  - Ran the full frontend node test suite.
+  - Ran the frontend production build; no large chunk warning was emitted.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend returned HTTP 200 at `http://127.0.0.1:3477`.
+  - Confirmed the backend health route returned HTTP 200 at `http://127.0.0.1:8765/health`.
+
+### Phase 5: Commit and Push
+- **Status:** completed
+- Actions taken:
+  - Checked git status after restart; only source/test/planning files are modified.
+  - Confirmed untracked files are limited to the new input knowledge-base model and test.
+  - Ran `git diff --check` with no whitespace errors.
+  - Committed the cleanup as `4c0cd28` with Chinese message `抽取知识库输入展示逻辑`.
+  - Pushed `main` to `origin/main`.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red test | `node --test frontend/src/editor/nodes/inputKnowledgeBaseModel.test.ts` before implementation | Fails because the new model file is missing | Failed with `ERR_MODULE_NOT_FOUND` for `inputKnowledgeBaseModel.ts` | Passed |
+| Red structure test | `node --test frontend/src/editor/nodes/NodeCard.structure.test.ts` before component implementation | Fails because `NodeCard.vue` still owns knowledge-base presentation rules | Failed on missing `./inputKnowledgeBaseModel` import | Passed |
+| Focused frontend tests | `node --test frontend/src/editor/nodes/inputKnowledgeBaseModel.test.ts frontend/src/editor/nodes/NodeCard.structure.test.ts` | Touched surface tests pass | 38 passed | Passed |
+| Unused symbol check | `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No unused-symbol diagnostics | Exit 0, no diagnostics | Passed |
+| Full frontend tests | `node --test $(rg --files frontend/src -g '*.test.ts') frontend/vite.config.structure.test.ts` | All frontend tests pass | 684 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without chunk warning regressions | Exit 0, no large chunk warning | Passed |
+| Dev restart | `npm run dev` | Services start and respond | Frontend 200, backend `/health` 200 | Passed |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Eighth cleanup implementation, verification, dev restart, commit, and push are complete. |
+| Where am I going? | Ready for final handoff or the next cleanup slice. |
+| What's the goal? | Continue reducing `NodeCard.vue` concentration without changing editor behavior. |
+| What have I learned? | Knowledge-base option construction and selected-description fallback are pure presentation concerns that fit a dedicated input knowledge-base model. |
+| What have I done? | Extracted knowledge-base input presentation helpers, added focused tests, ran full frontend checks, built, and restarted the app. |
+
 ## Session: 2026-04-28 Round 5
 
 ### Phase 1: Re-orientation

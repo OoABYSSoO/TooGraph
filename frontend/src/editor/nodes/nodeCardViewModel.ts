@@ -1,6 +1,7 @@
 import type { UploadedAssetType } from "./uploadedAssetModel.ts";
 import { isUploadedAssetStateType } from "./uploadedAssetModel.ts";
 import { normalizeConditionLoopLimit } from "./conditionLoopLimit.ts";
+import { formatOutputDisplayModeLabel, formatOutputPersistFormatLabel } from "./outputConfigModel.ts";
 import { OUTPUT_WAITING_TEXT, resolveOutputPreviewDisplayMode } from "./outputPreviewContentModel.ts";
 import {
   buildVirtualAnyInputPort,
@@ -394,30 +395,4 @@ function resolveConditionRouteTone(branch: string, index: number): NodeCondition
     return "danger";
   }
   return "warning";
-}
-
-function formatOutputDisplayModeLabel(displayMode: string) {
-  switch (displayMode) {
-    case "markdown":
-      return "MD";
-    case "plain":
-      return "PLAIN";
-    case "json":
-      return "JSON";
-    default:
-      return "AUTO";
-  }
-}
-
-function formatOutputPersistFormatLabel(persistFormat: Extract<GraphNode, { kind: "output" }>["config"]["persistFormat"]) {
-  switch (persistFormat) {
-    case "md":
-      return "MD";
-    case "txt":
-      return "TXT";
-    case "json":
-      return "JSON";
-    default:
-      return "AUTO";
-  }
 }

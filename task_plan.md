@@ -1,7 +1,7 @@
-# Task Plan: Repository Cleanup Execution Round 7
+# Task Plan: Repository Cleanup Execution Round 9
 
 ## Goal
-Continue conservative `NodeCard.vue` cleanup by moving uploaded asset presentation helpers into `uploadedAssetModel.ts` while preserving input upload behavior.
+Continue conservative `NodeCard.vue` cleanup by moving output-node advanced configuration options, labels, and patch helpers into a dedicated model while preserving output configuration behavior.
 
 ## Current Phase
 Complete
@@ -11,23 +11,23 @@ Complete
 ### Phase 1: Re-orientation
 - [x] Recover previous cleanup context.
 - [x] Confirm current git status.
-- [x] Inspect `uploadedAssetModel.ts`, its tests, and uploaded asset computed state in `NodeCard.vue`.
+- [x] Inspect `NodeCard.vue` output advanced settings and related view-model label helpers.
 - **Status:** completed
 
 ### Phase 2: Select Safe Refactor Slice
-- [x] Select uploaded asset label, summary, text preview, and description helpers.
-- [x] Keep file picking, drop handling, state patch emits, and error logging inside `NodeCard.vue`.
-- [x] Reuse the existing `uploadedAssetModel.ts` ownership boundary.
+- [x] Select output display/persist option lists, active-state checks, file-name patching, and output label formatting.
+- [x] Keep Element Plus controls, popover behavior, and emits inside `NodeCard.vue`.
+- [x] Add a small `outputConfigModel.ts` boundary reused by `NodeCard.vue` and `nodeCardViewModel.ts`.
 - **Status:** completed
 
 ### Phase 3: Implement Cleanup
-- [x] Add failing tests for uploaded asset presentation helpers.
-- [x] Move presentation helpers into `uploadedAssetModel.ts`.
-- [x] Update `NodeCard.vue` to call the model helpers.
+- [x] Add failing tests for output configuration model helpers.
+- [x] Move output option, label, active-state, and patch helpers into `outputConfigModel.ts`.
+- [x] Update `NodeCard.vue` and `nodeCardViewModel.ts` to call the model helpers.
 - **Status:** completed
 
 ### Phase 4: Verification
-- [x] Run focused uploaded asset and NodeCard structure tests.
+- [x] Run focused output config, node-card view-model, and NodeCard structure tests.
 - [x] Run TypeScript and meaningful frontend checks.
 - [x] Run the frontend production build.
 - [x] Restart the dev environment with `npm run dev`.
@@ -42,21 +42,21 @@ Complete
 ## Progress Estimate
 | Scope | Estimate |
 |-------|----------|
-| Overall roadmap cleanup before this round | About 17% complete. |
-| P1 `NodeCard.vue` cleanup before this round | About 41% complete. |
-| Low-risk model extraction subset before this round | About 82% complete. |
+| Overall roadmap cleanup before this round | About 19% complete. |
+| P1 `NodeCard.vue` cleanup before this round | About 45% complete. |
+| Low-risk model extraction subset before this round | About 92% complete. |
 | Build/chunk warning remediation before this round | About 80% complete. |
-| Overall roadmap cleanup after this round | About 18% complete. |
-| P1 `NodeCard.vue` cleanup after this round | About 43% complete. |
-| Low-risk model extraction subset after this round | About 88% complete. |
+| Overall roadmap cleanup after this round | About 20% complete. |
+| P1 `NodeCard.vue` cleanup after this round | About 46% complete. |
+| Low-risk model extraction subset after this round | About 95% complete. |
 | Build/chunk warning remediation after this round | About 80% complete. |
 
 ## Decisions Made
 | Decision | Rationale |
 |----------|-----------|
-| Continue `NodeCard.vue` P1 cleanup | The component still owns pure display logic that can move safely. |
-| Use `uploadedAssetModel.ts` | It already owns uploaded asset parsing, type detection, envelope creation, and input accept rules. |
-| Leave file IO and emits in `NodeCard.vue` | File input/drop handling and graph state updates are component responsibilities. |
+| Continue `NodeCard.vue` P1 cleanup | Output advanced settings still have pure configuration rules and duplicated labels. |
+| Add `outputConfigModel.ts` | Output config options and labels should be shared by the component and view-model instead of duplicated. |
+| Leave emits and controls in `NodeCard.vue` | The component should still own UI interaction and event dispatch. |
 
 ## Notes
 - Do not commit runtime artifacts such as `backend/data/settings`, `.dev_*`, `dist`, or `.worktrees`.

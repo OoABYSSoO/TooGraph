@@ -1242,8 +1242,17 @@ import {
   parseConditionLoopLimitDraft,
 } from "./conditionLoopLimit";
 import { CONDITION_RULE_OPERATOR_OPTIONS } from "./conditionRuleEditorModel";
+import { buildInputKnowledgeBaseOptions, resolveSelectedKnowledgeBaseDescription } from "./inputKnowledgeBaseModel";
 import { isSwitchableInputBoundaryType, resolveNextInputValueForBoundaryType, resolveStateTypeForInputBoundary } from "./inputValueTypeModel";
 import { buildNodeCardViewModel, type NodePortViewModel } from "./nodeCardViewModel";
+import {
+  OUTPUT_DISPLAY_MODE_OPTIONS,
+  OUTPUT_PERSIST_FORMAT_OPTIONS,
+  isOutputDisplayModeActive as resolveOutputDisplayModeActive,
+  isOutputPersistFormatActive as resolveOutputPersistFormatActive,
+  resolveOutputFileNameTemplatePatch,
+  resolveOutputPersistEnabledPatch,
+} from "./outputConfigModel";
 import { resolveOutputPreviewContent } from "./outputPreviewContentModel";
 import {
   PORT_REORDER_DRAG_THRESHOLD,
@@ -1361,18 +1370,8 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 
-const outputDisplayModeOptions: Array<{ value: OutputNode["config"]["displayMode"]; label: string }> = [
-  { value: "auto", label: "AUTO" },
-  { value: "plain", label: "PLAIN" },
-  { value: "markdown", label: "MD" },
-  { value: "json", label: "JSON" },
-];
-const outputPersistFormatOptions: Array<{ value: OutputNode["config"]["persistFormat"]; label: string }> = [
-  { value: "auto", label: "AUTO" },
-  { value: "txt", label: "TXT" },
-  { value: "md", label: "MD" },
-  { value: "json", label: "JSON" },
-];
+const outputDisplayModeOptions = OUTPUT_DISPLAY_MODE_OPTIONS;
+const outputPersistFormatOptions = OUTPUT_PERSIST_FORMAT_OPTIONS;
 const inputTypeOptions = computed<Array<{
   value: "text" | "file" | "knowledge_base";
   label: string;
@@ -1541,40 +1540,16 @@ const inputAssetDescription = computed(() => resolveUploadedAssetDescription(inp
 const showLegacyUploadedAssetHint = computed(
   () => showAssetUploadInput.value && !inputAssetEnvelope.value && inputValueText.value.trim().length > 0,
 );
-const inputKnowledgeBaseOptions = computed(() => {
-  const options = props.knowledgeBases.map((knowledgeBase) => ({
-    value: knowledgeBase.name,
-    label: knowledgeBase.label?.trim() || knowledgeBase.name,
-    description: knowledgeBase.description?.trim() || "",
-  }));
-
-  const currentValue = inputKnowledgeBaseValue.value.trim();
-  if (currentValue && !options.some((option) => option.value === currentValue)) {
-    return [
-      {
-        value: currentValue,
-        label: `${currentValue} (current)`,
-        description: "This knowledge base is no longer available in the imported catalog.",
-      },
-      ...options,
-    ];
-  }
-
-  return options;
-});
-const selectedKnowledgeBaseDescription = computed(() => {
-  if (!showKnowledgeBaseInput.value) {
-    return "";
-  }
-  const selectedOption = inputKnowledgeBaseOptions.value.find((option) => option.value === inputKnowledgeBaseValue.value);
-  if (selectedOption?.description) {
-    return selectedOption.description;
-  }
-  if (inputKnowledgeBaseOptions.value.length === 0) {
-    return t("nodeCard.importKnowledgeHint");
-  }
-  return t("nodeCard.pickKnowledgeHint");
-});
+const inputKnowledgeBaseOptions = computed(() => buildInputKnowledgeBaseOptions(props.knowledgeBases, inputKnowledgeBaseValue.value));
+const selectedKnowledgeBaseDescription = computed(() =>
+  resolveSelectedKnowledgeBaseDescription({
+    showKnowledgeBaseInput: showKnowledgeBaseInput.value,
+    selectedValue: inputKnowledgeBaseValue.value,
+    options: inputKnowledgeBaseOptions.value,
+    emptyOptionsDescription: t("nodeCard.importKnowledgeHint"),
+    fallbackDescription: t("nodeCard.pickKnowledgeHint"),
+  }),
+);
 const trimmedGlobalTextModelRef = computed(() => props.globalTextModelRef.trim());
 const agentResolvedModelValue = computed(() => {
   if (props.node.kind !== "agent") {
@@ -1825,7 +1800,7 @@ function handleOutputPersistToggle(value: string | number | boolean) {
   if (props.node.kind !== "output") {
     return;
   }
-  emitOutputConfigPatch({ persistEnabled: Boolean(value) });
+  emitOutputConfigPatch(resolveOutputPersistEnabledPatch(value));
 }
 
 function updateOutputDisplayMode(displayMode: OutputNode["config"]["displayMode"]) {
@@ -1833,7 +1808,7 @@ function updateOutputDisplayMode(displayMode: OutputNode["config"]["displayMode"
 }
 
 function isOutputDisplayModeActive(displayMode: OutputNode["config"]["displayMode"]) {
-  return view.value.body.kind === "output" && view.value.body.displayMode === displayMode;
+  return resolveOutputDisplayModeActive(view.value.body.kind === "output" ? view.value.body.displayMode : null, displayMode);
 }
 
 function updateOutputPersistFormat(persistFormat: OutputNode["config"]["persistFormat"]) {
@@ -1841,14 +1816,15 @@ function updateOutputPersistFormat(persistFormat: OutputNode["config"]["persistF
 }
 
 function isOutputPersistFormatActive(persistFormat: OutputNode["config"]["persistFormat"]) {
-  return props.node.kind === "output" && props.node.config.persistFormat === persistFormat;
+  return resolveOutputPersistFormatActive(props.node.kind === "output" ? props.node.config.persistFormat : null, persistFormat);
 }
 
 function handleOutputFileNameInputValue(value: string | number) {
-  if (typeof value !== "string") {
+  const patch = resolveOutputFileNameTemplatePatch(value);
+  if (!patch) {
     return;
   }
-  emitOutputConfigPatch({ fileNameTemplate: value });
+  emitOutputConfigPatch(patch);
 }
 
 function handleAgentTaskInstructionInput(event: Event) {

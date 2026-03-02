@@ -147,6 +147,16 @@ test("NodeCard routes input value editing through the output state schema value"
   assert.doesNotMatch(componentSource, /return typeof props\.node\.config\.value === "string" \? props\.node\.config\.value : "";/);
 });
 
+test("NodeCard delegates knowledge base input presentation to a model", () => {
+  assert.match(componentSource, /from "\.\/inputKnowledgeBaseModel";/);
+  assert.match(componentSource, /buildInputKnowledgeBaseOptions\(props\.knowledgeBases, inputKnowledgeBaseValue\.value\)/);
+  assert.match(componentSource, /resolveSelectedKnowledgeBaseDescription\(\{/);
+  assert.match(componentSource, /showKnowledgeBaseInput: showKnowledgeBaseInput\.value/);
+  assert.match(componentSource, /selectedValue: inputKnowledgeBaseValue\.value/);
+  assert.doesNotMatch(componentSource, /label: `\$\{currentValue\} \(current\)`/);
+  assert.doesNotMatch(componentSource, /This knowledge base is no longer available in the imported catalog\./);
+});
+
 test("NodeCard does not expose manual system instruction editing for agent nodes", () => {
   const agentSectionMatch = componentSource.match(
     /<section v-else-if="view\.body\.kind === 'agent'"[\s\S]*?<\/section>/,
@@ -904,8 +914,13 @@ test("NodeCard renders output previews through a rich content presenter while ke
   const outputSection = outputSectionMatch[0];
 
   assert.match(componentSource, /import \{ resolveOutputPreviewContent \} from "\.\/outputPreviewContentModel";/);
+  assert.match(componentSource, /from "\.\/outputConfigModel";/);
+  assert.match(componentSource, /const outputDisplayModeOptions = OUTPUT_DISPLAY_MODE_OPTIONS;/);
+  assert.match(componentSource, /const outputPersistFormatOptions = OUTPUT_PERSIST_FORMAT_OPTIONS;/);
   assert.match(componentSource, /const outputPreviewContent = computed\(/);
-  assert.match(componentSource, /function isOutputDisplayModeActive[\s\S]*view\.value\.body\.kind === "output" && view\.value\.body\.displayMode === displayMode/);
+  assert.match(componentSource, /resolveOutputDisplayModeActive\(view\.value\.body\.kind === "output" \? view\.value\.body\.displayMode : null, displayMode\)/);
+  assert.match(componentSource, /resolveOutputPersistFormatActive\(props\.node\.kind === "output" \? props\.node\.config\.persistFormat : null, persistFormat\)/);
+  assert.match(componentSource, /resolveOutputFileNameTemplatePatch\(value\)/);
   assert.match(outputSection, /node-card__preview--markdown/);
   assert.match(outputSection, /v-html="outputPreviewContent\.html"/);
   assert.match(outputSection, /node-card__preview--json/);
