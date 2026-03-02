@@ -1225,7 +1225,15 @@ import type { AgentNode, ConditionNode, GraphNode, InputNode, OutputNode, StateD
 import type { SkillDefinition } from "@/types/skills";
 import { CREATE_AGENT_INPUT_STATE_KEY, VIRTUAL_ANY_INPUT_STATE_KEY, VIRTUAL_ANY_OUTPUT_COLOR, VIRTUAL_ANY_OUTPUT_STATE_KEY } from "@/lib/virtual-any-input";
 
-import { DEFAULT_AGENT_TEMPERATURE, buildAgentModelSelectOptions, normalizeAgentTemperature, resolveAgentModelSelection } from "./agentConfigModel";
+import {
+  DEFAULT_AGENT_TEMPERATURE,
+  buildAgentModelSelectOptions,
+  normalizeAgentThinkingMode,
+  normalizeAgentTemperature,
+  resolveAgentTemperatureInputValue,
+  resolveAgentModelSelection,
+  type AgentThinkingControlMode,
+} from "./agentConfigModel";
 import {
   CONDITION_LOOP_LIMIT_DEFAULT,
   CONDITION_LOOP_LIMIT_MAX,
@@ -1387,7 +1395,6 @@ const stateEditorPopoverStyle = transparentPopoverStyle;
 const agentAddPopoverStyle = transparentPopoverStyle;
 const stateTypeOptions = STATE_FIELD_TYPE_OPTIONS;
 const conditionRuleOperatorOptions = CONDITION_RULE_OPERATOR_OPTIONS;
-type AgentThinkingControlMode = "off" | "low" | "medium" | "high" | "xhigh";
 const agentThinkingOptions = computed<Array<{ value: AgentThinkingControlMode; label: string }>>(() => [
   { value: "off", label: t("nodeCard.thinkingOff") },
   { value: "low", label: t("nodeCard.thinkingLow") },
@@ -2801,19 +2808,6 @@ function collapseAgentModelSelect() {
   agentModelSelectRef.value?.blur?.();
 }
 
-function normalizeAgentThinkingMode(value: string | null | undefined): AgentThinkingControlMode {
-  if (value === "off" || value === "low" || value === "medium" || value === "high" || value === "xhigh") {
-    return value;
-  }
-  if (value === "minimal") {
-    return "low";
-  }
-  if (value === "on") {
-    return "medium";
-  }
-  return "off";
-}
-
 function handleAgentThinkingModeSelect(nextValue: string | number | boolean | undefined) {
   if (typeof nextValue !== "string") {
     return;
@@ -2846,11 +2840,11 @@ function handleAgentBreakpointTimingSelect(nextValue: string | number | boolean 
 }
 
 function handleAgentTemperatureInputValue(value: string | number) {
-  const nextValue = typeof value === "number" ? value : value === "" ? DEFAULT_AGENT_TEMPERATURE : Number(value);
-  if (!Number.isFinite(nextValue)) {
+  const nextValue = resolveAgentTemperatureInputValue(value);
+  if (nextValue === null) {
     return;
   }
-  emitAgentConfigPatch({ temperature: normalizeAgentTemperature(nextValue) });
+  emitAgentConfigPatch({ temperature: nextValue });
 }
 
 function handleInputValueInput(event: Event) {

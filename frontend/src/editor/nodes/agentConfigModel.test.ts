@@ -5,8 +5,10 @@ import {
   DEFAULT_AGENT_TEMPERATURE,
   buildAgentModelDisplayLookup,
   buildAgentModelSelectOptions,
+  normalizeAgentThinkingMode,
   normalizeAgentTemperature,
   resolveAgentRuntimeCatalog,
+  resolveAgentTemperatureInputValue,
   resolveAgentModelSelection,
 } from "./agentConfigModel.ts";
 
@@ -20,6 +22,29 @@ test("normalizeAgentTemperature falls back to legacy default for invalid values"
   assert.equal(DEFAULT_AGENT_TEMPERATURE, 0.2);
   assert.equal(normalizeAgentTemperature(undefined), 0.2);
   assert.equal(normalizeAgentTemperature(Number.NaN), 0.2);
+});
+
+test("normalizeAgentThinkingMode preserves explicit levels and maps legacy values", () => {
+  assert.equal(normalizeAgentThinkingMode("off"), "off");
+  assert.equal(normalizeAgentThinkingMode("low"), "low");
+  assert.equal(normalizeAgentThinkingMode("medium"), "medium");
+  assert.equal(normalizeAgentThinkingMode("high"), "high");
+  assert.equal(normalizeAgentThinkingMode("xhigh"), "xhigh");
+  assert.equal(normalizeAgentThinkingMode("minimal"), "low");
+  assert.equal(normalizeAgentThinkingMode("on"), "medium");
+  assert.equal(normalizeAgentThinkingMode("auto"), "off");
+  assert.equal(normalizeAgentThinkingMode(null), "off");
+  assert.equal(normalizeAgentThinkingMode(undefined), "off");
+});
+
+test("resolveAgentTemperatureInputValue follows NodeCard input parsing behavior", () => {
+  assert.equal(resolveAgentTemperatureInputValue(""), DEFAULT_AGENT_TEMPERATURE);
+  assert.equal(resolveAgentTemperatureInputValue("0.8"), 0.8);
+  assert.equal(resolveAgentTemperatureInputValue("   "), 0);
+  assert.equal(resolveAgentTemperatureInputValue(-1), 0);
+  assert.equal(resolveAgentTemperatureInputValue(3), 2);
+  assert.equal(resolveAgentTemperatureInputValue("not-a-number"), null);
+  assert.equal(resolveAgentTemperatureInputValue(Number.NaN), null);
 });
 
 test("buildAgentModelDisplayLookup disambiguates duplicate concrete model labels", () => {
