@@ -335,8 +335,11 @@ test("EditorCanvas renders condition route outputs as right-side floating branch
   assert.match(componentSource, /@pointerenter="setHoveredFlowHandleNode\(anchor\.nodeId\)"/);
   assert.match(componentSource, /@pointerleave="clearHoveredFlowHandleNode\(anchor\.nodeId\)"/);
   assert.match(componentSource, /\.editor-canvas__route-handles \{[\s\S]*z-index:\s*12;/);
-  assert.match(componentSource, /import \{ FLOW_OUT_HOTSPOT_GEOMETRY \} from "@\/editor\/flowHandleGeometry";/);
-  assert.match(componentSource, /function resolveFlowOutHotspotStyle\(anchor: ProjectedCanvasAnchor\)/);
+  assert.match(componentSource, /import \{[\s\S]*buildFlowOutHotspotStyle,[\s\S]*buildRouteHandleStyle,[\s\S]*resolveRouteHandleTone,[\s\S]*\} from "\.\/routeHandleModel";/);
+  assert.match(componentSource, /const routeHandleStyle = buildRouteHandleStyle;/);
+  assert.match(componentSource, /return buildFlowOutHotspotStyle\(anchor\);/);
+  assert.doesNotMatch(componentSource, /FLOW_OUT_HOTSPOT_GEOMETRY/);
+  assert.doesNotMatch(componentSource, /function resolveFlowOutHotspotStyle\(anchor: ProjectedCanvasAnchor\)/);
   assert.match(componentSource, /\.editor-canvas__flow-hotspot--visible::before \{[\s\S]*var\(--editor-flow-handle-fill,/);
   assert.match(componentSource, /\.editor-canvas__route-handle-label \{[\s\S]*opacity:\s*0;/);
   assert.match(componentSource, /\.editor-canvas__flow-hotspot--visible \.editor-canvas__route-handle-label \{[\s\S]*opacity:\s*1;/);
@@ -347,9 +350,13 @@ test("EditorCanvas renders condition route outputs as right-side floating branch
 });
 
 test("EditorCanvas renders exhausted route handles with warm gray neutral colors", () => {
-  assert.match(componentSource, /if \(normalizedBranch === "exhausted" \|\| normalizedBranch === "exausted"\) \{[\s\S]*return "neutral" as const;/);
+  const routeHandleModelSource = readFileSync(resolve(currentDirectory, "routeHandleModel.ts"), "utf8").replace(/\r\n/g, "\n");
+
+  assert.match(routeHandleModelSource, /if \(normalizedBranch === "exhausted" \|\| normalizedBranch === "exausted"\) \{[\s\S]*return "neutral";/);
   assert.match(componentSource, /'editor-canvas__route-handle--neutral': resolveRouteHandleTone\(anchor\.branch\) === 'neutral'/);
-  assert.match(componentSource, /if \(tone === "neutral"\) \{[\s\S]*accent: "#78716c"/);
+  assert.match(routeHandleModelSource, /if \(tone === "neutral"\) \{[\s\S]*accent: "#78716c"/);
+  assert.doesNotMatch(componentSource, /function resolveRouteHandleTone\(branch: string \| undefined\)/);
+  assert.doesNotMatch(componentSource, /function resolveRouteHandlePalette\(branch: string \| undefined\)/);
   assert.match(componentSource, /\.editor-canvas__route-handle--neutral \{[\s\S]*--editor-flow-handle-accent:\s*#78716c;/);
 });
 

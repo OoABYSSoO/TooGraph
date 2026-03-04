@@ -1274,7 +1274,12 @@ import {
   type PortReorderRect,
   type PortReorderSide,
 } from "./portReorderModel";
-import { listAttachableSkillDefinitions, resolveAttachedSkillBadges } from "./skillPickerModel";
+import {
+  listAttachableSkillDefinitions,
+  resolveAttachAgentSkillPatch,
+  resolveAttachedSkillBadges,
+  resolveRemoveAgentSkillPatch,
+} from "./skillPickerModel";
 import {
   buildStateEditorDraftFromSchema,
   resolveStateEditorAnchorStateKey,
@@ -1865,10 +1870,14 @@ function attachAgentSkill(skillKey: string) {
   if (guardLockedGraphInteraction()) {
     return;
   }
-  if (props.node.kind !== "agent" || props.node.config.skills.includes(skillKey)) {
+  if (props.node.kind !== "agent") {
     return;
   }
-  emitAgentConfigPatch({ skills: [...props.node.config.skills, skillKey] });
+  const patch = resolveAttachAgentSkillPatch(props.node.config.skills, skillKey);
+  if (!patch) {
+    return;
+  }
+  emitAgentConfigPatch(patch);
   isSkillPickerOpen.value = false;
 }
 
@@ -1876,10 +1885,14 @@ function removeAgentSkill(skillKey: string) {
   if (guardLockedGraphInteraction()) {
     return;
   }
-  if (props.node.kind !== "agent" || !props.node.config.skills.includes(skillKey)) {
+  if (props.node.kind !== "agent") {
     return;
   }
-  emitAgentConfigPatch({ skills: props.node.config.skills.filter((candidateKey) => candidateKey !== skillKey) });
+  const patch = resolveRemoveAgentSkillPatch(props.node.config.skills, skillKey);
+  if (!patch) {
+    return;
+  }
+  emitAgentConfigPatch(patch);
 }
 
 function openPortStateCreate(side: "input" | "output") {

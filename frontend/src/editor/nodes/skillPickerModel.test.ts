@@ -1,7 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { listAttachableSkillDefinitions, resolveAttachedSkillBadges } from "./skillPickerModel.ts";
+import {
+  listAttachableSkillDefinitions,
+  resolveAttachAgentSkillPatch,
+  resolveAttachedSkillBadges,
+  resolveRemoveAgentSkillPatch,
+} from "./skillPickerModel.ts";
 import type { SkillDefinition } from "../../types/skills.ts";
 
 const skillDefinitions: SkillDefinition[] = [
@@ -126,4 +131,18 @@ test("resolveAttachedSkillBadges preserves attached order and falls back to raw 
       },
     ],
   );
+});
+
+test("resolveAttachAgentSkillPatch appends new skills and ignores duplicates", () => {
+  assert.deepEqual(resolveAttachAgentSkillPatch(["search_knowledge_base"], "append_usage_introduction"), {
+    skills: ["search_knowledge_base", "append_usage_introduction"],
+  });
+  assert.equal(resolveAttachAgentSkillPatch(["search_knowledge_base"], "search_knowledge_base"), null);
+});
+
+test("resolveRemoveAgentSkillPatch removes existing skills and ignores missing keys", () => {
+  assert.deepEqual(resolveRemoveAgentSkillPatch(["search_knowledge_base", "append_usage_introduction"], "search_knowledge_base"), {
+    skills: ["append_usage_introduction"],
+  });
+  assert.equal(resolveRemoveAgentSkillPatch(["search_knowledge_base"], "append_usage_introduction"), null);
 });

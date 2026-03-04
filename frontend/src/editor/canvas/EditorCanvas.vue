@@ -396,7 +396,6 @@ import StateEditorPopover from "@/editor/nodes/StateEditorPopover.vue";
 import { type ProjectedCanvasAnchor, type ProjectedCanvasEdge } from "@/editor/canvas/edgeProjection";
 import { buildPendingConnectionPreviewPath } from "@/editor/canvas/connectionPreviewPath";
 import { resolveFlowAnchorOffset } from "@/editor/canvas/flowAnchorLayout";
-import { FLOW_OUT_HOTSPOT_GEOMETRY } from "@/editor/flowHandleGeometry";
 import { resolveEdgeRunPresentation } from "@/editor/canvas/runEdgePresentation";
 import { resolveNodeRunPresentation } from "@/editor/canvas/runNodePresentation";
 import { resolveCanvasLayout, type MeasuredAnchorOffset } from "@/editor/canvas/resolvedCanvasLayout";
@@ -415,6 +414,12 @@ import {
   shouldShowOutputFlowHandle,
   type EdgeVisibilityMode,
 } from "./edgeVisibilityModel";
+import {
+  buildFlowOutHotspotStyle,
+  buildRouteHandleStyle,
+  resolveRouteHandlePalette,
+  resolveRouteHandleTone,
+} from "./routeHandleModel";
 import {
   defaultValueForStateType,
   resolveStateColorOptions,
@@ -1679,6 +1684,8 @@ function handleMinimapCenterView(point: { worldX: number; worldY: number }) {
   canvasRef.value?.focus();
 }
 
+const routeHandleStyle = buildRouteHandleStyle;
+
 function edgeStyle(edge: ProjectedCanvasEdge) {
   if (edge.kind === "route" && edge.branch) {
     const accent = resolveRouteHandlePalette(edge.branch).accent;
@@ -1710,78 +1717,6 @@ function withAlpha(hexColor: string, alpha: number) {
   return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
 }
 
-function resolveRouteHandleTone(branch: string | undefined) {
-  const normalizedBranch = branch?.trim().toLowerCase() ?? "";
-  if (normalizedBranch === "true") {
-    return "success" as const;
-  }
-  if (normalizedBranch === "false") {
-    return "danger" as const;
-  }
-  if (normalizedBranch === "exhausted" || normalizedBranch === "exausted") {
-    return "neutral" as const;
-  }
-  return "warning" as const;
-}
-
-function resolveRouteHandlePalette(branch: string | undefined) {
-  const tone = resolveRouteHandleTone(branch);
-  if (tone === "success") {
-    return {
-      fill: "rgba(240, 253, 244, 0.98)",
-      border: "rgba(34, 197, 94, 0.28)",
-      accent: "#16a34a",
-      glow: "rgba(34, 197, 94, 0.18)",
-      text: "rgba(21, 128, 61, 0.92)",
-    };
-  }
-  if (tone === "danger") {
-    return {
-      fill: "rgba(254, 242, 242, 0.98)",
-      border: "rgba(239, 68, 68, 0.24)",
-      accent: "#dc2626",
-      glow: "rgba(239, 68, 68, 0.18)",
-      text: "rgba(185, 28, 28, 0.92)",
-    };
-  }
-  if (tone === "neutral") {
-    return {
-      fill: "rgba(245, 241, 234, 0.98)",
-      border: "rgba(120, 113, 108, 0.24)",
-      accent: "#78716c",
-      glow: "rgba(120, 113, 108, 0.18)",
-      text: "rgba(87, 83, 78, 0.92)",
-    };
-  }
-  return {
-    fill: "rgba(255, 251, 235, 0.98)",
-    border: "rgba(245, 158, 11, 0.26)",
-    accent: "#d97706",
-    glow: "rgba(245, 158, 11, 0.18)",
-    text: "rgba(161, 98, 7, 0.92)",
-  };
-}
-
-function routeHandleStyle(anchor: ProjectedCanvasAnchor) {
-  const palette = resolveRouteHandlePalette(anchor.branch);
-  return {
-    ...resolveFlowOutHotspotStyle(anchor),
-    "--editor-flow-handle-fill": palette.fill,
-    "--editor-flow-handle-border": palette.border,
-    "--editor-flow-handle-accent": palette.accent,
-    "--editor-flow-handle-glow": palette.glow,
-  };
-}
-
-function resolveFlowOutHotspotStyle(anchor: ProjectedCanvasAnchor) {
-  return {
-    left: `${anchor.x + FLOW_OUT_HOTSPOT_GEOMETRY.offsetX}px`,
-    top: `${anchor.y}px`,
-    width: `${FLOW_OUT_HOTSPOT_GEOMETRY.width}px`,
-    height: `${FLOW_OUT_HOTSPOT_GEOMETRY.height}px`,
-  };
-}
-
 function flowHotspotStyle(anchor: ProjectedCanvasAnchor) {
   const isVertical = anchor.side === "left" || anchor.side === "right";
   let left = anchor.x;
@@ -1790,7 +1725,7 @@ function flowHotspotStyle(anchor: ProjectedCanvasAnchor) {
   let height = isVertical ? 86 : 22;
 
   if (anchor.kind === "flow-out" && anchor.side === "right") {
-    return resolveFlowOutHotspotStyle(anchor);
+    return buildFlowOutHotspotStyle(anchor);
   } else if (anchor.kind === "flow-in" && anchor.side === "left") {
     left -= 18;
     width = 42;
