@@ -19,6 +19,7 @@ import {
   resolveConnectionAccentColor,
   resolveConnectionPreviewStateKey,
   resolveConnectionSourceAnchorId,
+  resolveSelectedReconnectConnection,
 } from "./canvasConnectionModel.ts";
 
 const flowOutAnchor: ProjectedCanvasAnchor = {
@@ -242,5 +243,75 @@ test("canvas connection model builds preview models from source anchors and poin
         targetY: 300,
       }),
     },
+  );
+});
+
+test("canvas connection model projects selected flow and route edges into reconnect connections", () => {
+  const flowEdge = {
+    id: "flow:agent->output",
+    kind: "flow" as const,
+    source: "agent",
+    target: "output",
+    path: "M 0 0 L 1 1",
+  };
+  const routeEdge = {
+    id: "route:gate:true->output",
+    kind: "route" as const,
+    source: "gate",
+    target: "output",
+    branch: "true",
+    path: "M 0 0 L 1 1",
+  };
+  const dataEdge = {
+    id: "data:agent:answer->output",
+    kind: "data" as const,
+    source: "agent",
+    target: "output",
+    state: "answer",
+    path: "M 0 0 L 1 1",
+  };
+
+  assert.deepEqual(
+    resolveSelectedReconnectConnection({
+      selectedEdgeId: "flow:agent->output",
+      activeFlowEdgeDeleteConfirmId: null,
+      edges: [flowEdge, routeEdge, dataEdge],
+    }),
+    {
+      sourceNodeId: "agent",
+      sourceKind: "flow-out",
+      mode: "reconnect",
+      currentTargetNodeId: "output",
+    },
+  );
+  assert.deepEqual(
+    resolveSelectedReconnectConnection({
+      selectedEdgeId: "route:gate:true->output",
+      activeFlowEdgeDeleteConfirmId: null,
+      edges: [flowEdge, routeEdge, dataEdge],
+    }),
+    {
+      sourceNodeId: "gate",
+      sourceKind: "route-out",
+      branchKey: "true",
+      mode: "reconnect",
+      currentTargetNodeId: "output",
+    },
+  );
+  assert.equal(
+    resolveSelectedReconnectConnection({
+      selectedEdgeId: "data:agent:answer->output",
+      activeFlowEdgeDeleteConfirmId: null,
+      edges: [flowEdge, routeEdge, dataEdge],
+    }),
+    null,
+  );
+  assert.equal(
+    resolveSelectedReconnectConnection({
+      selectedEdgeId: "flow:agent->output",
+      activeFlowEdgeDeleteConfirmId: "flow:agent->output",
+      edges: [flowEdge, routeEdge],
+    }),
+    null,
   );
 });

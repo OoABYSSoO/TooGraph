@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   EDGE_VISIBILITY_MODE_OPTIONS,
+  buildForceVisibleProjectedEdgeIds,
   filterProjectedEdgesForVisibilityMode,
   isOutputFlowHandleAllowedForEdgeMode,
   shouldShowOutputFlowHandle,
@@ -128,6 +129,21 @@ test("selected edges remain visible even when the current mode would hide them",
     }).map((candidate) => candidate.id),
     ["data:input:question->agent", "flow:input->agent", "flow:agent->output", "route:branch:true->agent", "route:branch:false->output"],
   );
+});
+
+test("edge visibility model collects forced visible edge ids from active interactions", () => {
+  assert.deepEqual(
+    Array.from(
+      buildForceVisibleProjectedEdgeIds({
+        selectedEdgeId: "flow:input->agent",
+        dataEdgeStateConfirmId: "data:input:question->agent",
+        dataEdgeStateEditorId: "data:input:question->agent",
+        flowEdgeDeleteConfirmId: "route:branch:true->agent",
+      }),
+    ),
+    ["flow:input->agent", "data:input:question->agent", "route:branch:true->agent"],
+  );
+  assert.deepEqual(Array.from(buildForceVisibleProjectedEdgeIds({})), []);
 });
 
 test("all mode shows every projected edge", () => {

@@ -36,6 +36,26 @@ export function buildEdgeVisibilityModeOptions(): EdgeVisibilityModeOption[] {
 
 export const EDGE_VISIBILITY_MODE_OPTIONS: EdgeVisibilityModeOption[] = buildEdgeVisibilityModeOptions();
 
+export function buildForceVisibleProjectedEdgeIds(input: {
+  selectedEdgeId?: string | null;
+  dataEdgeStateConfirmId?: string | null;
+  dataEdgeStateEditorId?: string | null;
+  flowEdgeDeleteConfirmId?: string | null;
+}) {
+  const edgeIds = new Set<string>();
+  for (const edgeId of [
+    input.selectedEdgeId,
+    input.dataEdgeStateConfirmId,
+    input.dataEdgeStateEditorId,
+    input.flowEdgeDeleteConfirmId,
+  ]) {
+    if (edgeId) {
+      edgeIds.add(edgeId);
+    }
+  }
+  return edgeIds;
+}
+
 export function filterProjectedEdgesForVisibilityMode(
   edges: ProjectedCanvasEdge[],
   options: {

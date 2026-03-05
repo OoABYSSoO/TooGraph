@@ -26,6 +26,15 @@ export type DataEdgeStateEditorRequest = {
   position: GraphPosition;
 };
 
+export type DataEdgeStateDisconnectMode = "state" | "flow";
+
+export type DataEdgeStateDisconnectPayload = {
+  sourceNodeId: string;
+  targetNodeId: string;
+  stateKey: string;
+  mode: DataEdgeStateDisconnectMode;
+};
+
 export function buildDataEdgeId(sourceNodeId: string, stateKey: string, targetNodeId: string) {
   return `data:${sourceNodeId}:${stateKey}->${targetNodeId}`;
 }
@@ -97,4 +106,27 @@ export function isDataEdgeStateInteractionOpen(
   },
 ) {
   return isActiveDataEdge(edge, input.confirm) || isActiveDataEdge(edge, input.editor);
+}
+
+export function shouldOfferDataEdgeFlowDisconnect(input: {
+  editor: Pick<DataEdgeStateEditorTarget, "source" | "target"> | null | undefined;
+  canDisconnectFlow: (sourceNodeId: string, targetNodeId: string) => boolean;
+}) {
+  return input.editor ? input.canDisconnectFlow(input.editor.source, input.editor.target) : false;
+}
+
+export function buildDataEdgeStateDisconnectPayload(
+  editor: Pick<DataEdgeStateEditorTarget, "source" | "target" | "stateKey"> | null | undefined,
+  mode: DataEdgeStateDisconnectMode,
+): DataEdgeStateDisconnectPayload | null {
+  if (!editor) {
+    return null;
+  }
+
+  return {
+    sourceNodeId: editor.source,
+    targetNodeId: editor.target,
+    stateKey: editor.stateKey,
+    mode,
+  };
 }
