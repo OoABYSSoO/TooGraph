@@ -1297,6 +1297,7 @@ import {
   updateStatePortDraftType,
   updateStatePortDraftValue,
 } from "./statePortCreateModel";
+import { useNodeFloatingPanels } from "./useNodeFloatingPanels";
 import { useNodeCardTextEditor } from "./useNodeCardTextEditor";
 import {
   createUploadedAssetEnvelope,
@@ -1449,20 +1450,37 @@ const activePortPickerSide = ref<"input" | "output" | null>(null);
 const portStateDraft = ref<StateFieldDraft | null>(null);
 const portStateError = ref<string | null>(null);
 const agentModelSelectRef = ref<{ blur?: () => void; toggleMenu?: () => void; expanded?: boolean } | null>(null);
-const activeTopAction = ref<"advanced" | "delete" | "preset" | null>(null);
-const topActionTimeoutRef = ref<number | null>(null);
 const portReorderPointerState = ref<PortReorderPointerState | null>(null);
 const suppressNextPortPillClick = ref(false);
 const titleEditorInputRef = ref<{ focus?: () => void } | null>(null);
 const descriptionEditorInputRef = ref<{ focus?: () => void } | null>(null);
-const activeStateEditorConfirmAnchorId = ref<string | null>(null);
-const activeRemovePortStateConfirmAnchorId = ref<string | null>(null);
 const hoveredStateEditorPillAnchorId = ref<string | null>(null);
-const stateEditorConfirmTimeoutRef = ref<number | null>(null);
-const removePortStateConfirmTimeoutRef = ref<number | null>(null);
 const activeStateEditorAnchorId = ref<string | null>(null);
 const stateEditorDraft = ref<StateFieldDraft | null>(null);
 const stateEditorError = ref<string | null>(null);
+const {
+  activeRemovePortStateConfirmAnchorId,
+  activeStateEditorConfirmAnchorId,
+  activeTopAction,
+  addGlobalFloatingPanelListeners,
+  clearRemovePortStateConfirmState,
+  clearRemovePortStateConfirmTimeout,
+  clearStateEditorConfirmState,
+  clearStateEditorConfirmTimeout,
+  clearTopActionConfirmState,
+  clearTopActionTimeout,
+  isRemovePortStateConfirmOpen,
+  isStateEditorConfirmOpen,
+  removeGlobalFloatingPanelListeners,
+  startRemovePortStateConfirmWindow,
+  startStateEditorConfirmWindow,
+  startTopActionConfirmWindow,
+} = useNodeFloatingPanels({
+  isFloatingPanelOpen: () => hasFloatingPanelOpen.value,
+  closeFloatingPanels: (options) => {
+    closeFloatingPanels(options);
+  },
+});
 const {
   activeTextEditor,
   activeTextEditorConfirmField,
@@ -2035,62 +2053,8 @@ function commitPortStateCreate() {
 
 function noop() {}
 
-function clearStateEditorConfirmTimeout() {
-  if (stateEditorConfirmTimeoutRef.value !== null) {
-    window.clearTimeout(stateEditorConfirmTimeoutRef.value);
-    stateEditorConfirmTimeoutRef.value = null;
-  }
-}
-
-function clearStateEditorConfirmState() {
-  clearStateEditorConfirmTimeout();
-  activeStateEditorConfirmAnchorId.value = null;
-}
-
-function clearRemovePortStateConfirmTimeout() {
-  if (removePortStateConfirmTimeoutRef.value !== null) {
-    window.clearTimeout(removePortStateConfirmTimeoutRef.value);
-    removePortStateConfirmTimeoutRef.value = null;
-  }
-}
-
-function clearRemovePortStateConfirmState() {
-  clearRemovePortStateConfirmTimeout();
-  activeRemovePortStateConfirmAnchorId.value = null;
-}
-
-function startRemovePortStateConfirmWindow(anchorId: string) {
-  clearRemovePortStateConfirmTimeout();
-  activeRemovePortStateConfirmAnchorId.value = anchorId;
-  removePortStateConfirmTimeoutRef.value = window.setTimeout(() => {
-    removePortStateConfirmTimeoutRef.value = null;
-    if (activeRemovePortStateConfirmAnchorId.value === anchorId) {
-      activeRemovePortStateConfirmAnchorId.value = null;
-    }
-  }, 2000);
-}
-
-function startStateEditorConfirmWindow(anchorId: string) {
-  clearStateEditorConfirmTimeout();
-  activeStateEditorConfirmAnchorId.value = anchorId;
-  stateEditorConfirmTimeoutRef.value = window.setTimeout(() => {
-    stateEditorConfirmTimeoutRef.value = null;
-    if (activeStateEditorConfirmAnchorId.value === anchorId) {
-      activeStateEditorConfirmAnchorId.value = null;
-    }
-  }, 2000);
-}
-
 function isStateEditorOpen(anchorId: string) {
   return activeStateEditorAnchorId.value === anchorId;
-}
-
-function isStateEditorConfirmOpen(anchorId: string) {
-  return activeStateEditorConfirmAnchorId.value === anchorId;
-}
-
-function isRemovePortStateConfirmOpen(anchorId: string) {
-  return activeRemovePortStateConfirmAnchorId.value === anchorId;
 }
 
 function isStateEditorPillRevealed(anchorId: string) {
@@ -2404,34 +2368,6 @@ function toggleAdvancedPanel() {
   activeTopAction.value = activeTopAction.value === "advanced" ? null : "advanced";
 }
 
-function isFloatingPanelSurfaceTarget(target: EventTarget | null) {
-  if (!(target instanceof HTMLElement)) {
-    return false;
-  }
-
-  return Boolean(
-    target.closest(
-      [
-        "[data-top-action-surface='true']",
-        "[data-state-editor-trigger='true']",
-        "[data-text-editor-trigger='true']",
-        "[data-node-popup-surface='true']",
-        ".node-card__top-popover",
-        ".node-card__text-editor",
-        ".node-card__state-editor",
-        ".node-card__confirm-hint",
-        ".node-card__action-popover",
-        ".node-card__confirm-popover",
-        ".node-card__text-editor-popper",
-        ".node-card__state-editor-popper",
-        ".node-card__agent-add-popover-popper",
-        ".node-card__port-picker-select-popper",
-        ".node-card__agent-model-popper",
-      ].join(", "),
-    ),
-  );
-}
-
 function closeFloatingPanels(options?: { commitTextEditor?: boolean }) {
   clearTopActionConfirmState();
   clearTextEditorConfirmState();
@@ -2450,64 +2386,6 @@ function closeFloatingPanels(options?: { commitTextEditor?: boolean }) {
   closeStateEditor();
   closePortPicker();
   isSkillPickerOpen.value = false;
-}
-
-function handleGlobalFloatingPanelPointerDown(event: PointerEvent) {
-  if (!hasFloatingPanelOpen.value || isFloatingPanelSurfaceTarget(event.target)) {
-    return;
-  }
-  closeFloatingPanels({ commitTextEditor: true });
-}
-
-function handleGlobalFloatingPanelFocusIn(event: FocusEvent) {
-  if (!hasFloatingPanelOpen.value || isFloatingPanelSurfaceTarget(event.target)) {
-    return;
-  }
-  closeFloatingPanels({ commitTextEditor: true });
-}
-
-function handleGlobalFloatingPanelKeyDown(event: KeyboardEvent) {
-  if (!hasFloatingPanelOpen.value || event.key !== "Escape") {
-    return;
-  }
-  closeFloatingPanels({ commitTextEditor: false });
-}
-
-function addGlobalFloatingPanelListeners() {
-  document.addEventListener("pointerdown", handleGlobalFloatingPanelPointerDown);
-  document.addEventListener("focusin", handleGlobalFloatingPanelFocusIn);
-  document.addEventListener("keydown", handleGlobalFloatingPanelKeyDown);
-}
-
-function removeGlobalFloatingPanelListeners() {
-  document.removeEventListener("pointerdown", handleGlobalFloatingPanelPointerDown);
-  document.removeEventListener("focusin", handleGlobalFloatingPanelFocusIn);
-  document.removeEventListener("keydown", handleGlobalFloatingPanelKeyDown);
-}
-
-function clearTopActionTimeout() {
-  if (topActionTimeoutRef.value !== null) {
-    window.clearTimeout(topActionTimeoutRef.value);
-    topActionTimeoutRef.value = null;
-  }
-}
-
-function clearTopActionConfirmState() {
-  clearTopActionTimeout();
-  if (activeTopAction.value === "delete" || activeTopAction.value === "preset") {
-    activeTopAction.value = null;
-  }
-}
-
-function startTopActionConfirmWindow(action: "delete" | "preset") {
-  clearTopActionTimeout();
-  activeTopAction.value = action;
-  topActionTimeoutRef.value = window.setTimeout(() => {
-    topActionTimeoutRef.value = null;
-    if (activeTopAction.value === action) {
-      activeTopAction.value = null;
-    }
-  }, 2000);
 }
 
 function handlePresetActionClick() {
