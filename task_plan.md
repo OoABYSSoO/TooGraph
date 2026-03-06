@@ -4,7 +4,14 @@
 Run a ten-round conservative cleanup batch focused on `EditorCanvas.vue` pure projection and interaction-model helpers, then close the baseline interaction regressions in one larger pass while preserving graph editing behavior, runtime visuals, drag/connect workflows, deletion behavior, and dev startup health.
 
 ## Current Phase
-Phase 21 completed
+Phase 22 auto-continuation gate in progress because total roadmap cleanup is about 46%, below 100%.
+
+## Autonomous Continuation Gate
+- After every completed cleanup phase, re-read `docs/future/2026-04-28-architecture-refactor-roadmap.md`, `task_plan.md`, `findings.md`, and `progress.md`, then recalculate the total roadmap progress and the active area progress.
+- Record the recalculated total progress in the `Progress Estimate` table before ending the round.
+- If total roadmap progress is below 100%, automatically open the next phase in this plan, mark it as the current phase, choose the next safest roadmap slice, and continue with the same safety loop: red/focused tests, implementation, focused verification, full verification when needed, dev restart for code changes, commit, and push.
+- If total roadmap progress reaches 100%, switch the current phase to final completion, run the final verification suite, commit/push any remaining documentation updates, and stop the automatic cleanup loop.
+- If a blocker makes automatic continuation unsafe, document the blocker, the current progress estimate, and the reason continuation is paused in both `task_plan.md` and `progress.md`.
 
 ## Phases
 
@@ -182,6 +189,14 @@ Phase 21 completed
 - [x] Commit and push the cleanup.
 - **Status:** completed
 
+### Phase 22: Auto-Continuation Progress Gate
+- [ ] Re-read the formal roadmap and current planning memory.
+- [ ] Recalculate total roadmap progress after Phase 21 and record whether it reached 100%.
+- [ ] Because the current total roadmap estimate is about 46%, automatically keep the cleanup loop open.
+- [ ] Select the next safest roadmap slice and write the next concrete implementation phase before changing code.
+- [ ] Continue the standard safety loop for that slice: focused red tests, scoped implementation, focused verification, broader verification, dev restart for code changes, commit, push, and another progress judgment.
+- **Status:** in progress
+
 ## Progress Estimate
 | Scope | Estimate |
 |-------|----------|
@@ -207,6 +222,7 @@ Phase 21 completed
 | P1 `NodeCard.vue` cleanup after Phase 20 | About 65% complete after moving agent real state port list markup into `StatePortList.vue`. |
 | Overall roadmap cleanup after Phase 21 | About 46% complete after moving agent state port create entries into `StatePortList.vue`. |
 | P1 `NodeCard.vue` cleanup after Phase 21 | About 68% complete after moving agent create rows and create-popover wiring into `StatePortList.vue`. |
+| Current continuation gate after Phase 21 | Total roadmap progress is below 100%, so Phase 22 is automatically opened and must re-evaluate progress before selecting the next implementation slice. |
 
 ## Decisions Made
 | Decision | Rationale |
@@ -215,6 +231,7 @@ Phase 21 completed
 | Stay mostly inside `EditorCanvas.vue` | It remains a large mixed-responsibility component, and the selected helpers are pure enough to test without UI risk. |
 | Avoid backend runtime refactors in this batch | Backend executor/provider files need broader behavior fixtures and are higher risk than the current canvas projection helpers. |
 | Keep side effects local | DOM measurement, refs, timers, emits, lock guards, and viewport mutation stay in the component. |
+| Automatically continue below 100% total progress | The user explicitly asked that each completed round re-judge total optimization progress and open the next round when the roadmap is not yet complete. |
 
 ## Notes
 - Clean baseline: `main...origin/main` after `8017081 更新第十八至二十轮清理进度`.

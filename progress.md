@@ -406,6 +406,22 @@
 | What have I learned? | Agent create rows can move to `StatePortList.vue` safely if `NodeCard.vue` retains draft/validation/emit ownership and passes reveal state explicitly. |
 | What have I done? | Migrated agent state create rows and popover wiring into `StatePortList.vue`, verified tests/build/dev health, and kept the large chunk warning resolved. |
 
+## Session: 2026-04-29 Continuation Gate Plan Update
+
+### Phase 1: Plan Rule Update
+- **Status:** completed
+- Actions taken:
+  - Added an explicit autonomous continuation gate to `task_plan.md`.
+  - The rule requires every completed cleanup phase to re-read the roadmap/planning memory, recalculate total roadmap progress, and write the updated estimate before ending the round.
+  - The rule says that if total roadmap progress is below 100%, the next phase must be opened automatically, marked as current, and started with the same safety loop.
+  - Opened Phase 22 as the current auto-continuation progress gate because Phase 21 left total roadmap cleanup at about 46%, below 100%.
+  - No runtime source files changed, so dev restart and frontend test/build verification are not required for this documentation-only update.
+
+## Test Results: Continuation Gate Plan Update
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Plan diff check | `git diff --check` | No markdown whitespace errors | Exit 0 | Passed |
+
 ## Session: 2026-04-28 Baseline Interaction Repair and Large Connection Cleanup
 
 ### Phase 1: Baseline Regression Repair

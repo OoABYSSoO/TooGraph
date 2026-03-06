@@ -42,6 +42,7 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 - `useNodeFloatingPanels.ts` 已承接 roadmap 第 1 项中的 top action 确认定时器、全局 pointer/focus/keydown 外部关闭逻辑、state 编辑确认和删除绑定确认 active anchor/timer 状态。
 - `usePortReorder.ts` 已承接 roadmap 第 2 项中的端口排序 pointer 状态、window listener 生命周期、拖拽激活、目标 index 解析、浮动胶囊投影、释放提交和拖拽后点击抑制。
 - `StatePortList.vue` 已继续承接 roadmap 第 3 项中的 agent 真实 input/output state 胶囊列表、`+ input`/`+ output` 创建入口、状态创建/编辑弹层 wiring、删除绑定按钮、hover/click/reorder 事件转发和局部列表样式；`NodeCard.vue` 仍保留 state 草稿、校验、锁定态 guard 和 graph mutation emit。
+- `AgentSkillPicker.vue` 已作为 roadmap 第 4 项的低风险前置切片，承接 agent skill picker 触发器、弹层内容、可挂载 skill 列表、已挂载 badge 和局部样式；`NodeCard.vue` 仍保留 skill 派生数据、锁定态 guard、attach/remove patch 和 agent config emit。
 - roadmap 第 1 项剩余部分是进一步统一各类浮层的组件侧关闭编排；这部分跨 text editor、state editor、skill picker 和 port picker，后续应在更强 controller 覆盖下继续小步迁移，避免一次性改动 state 草稿和 graph mutation emit。
 
 不建议先做的事：

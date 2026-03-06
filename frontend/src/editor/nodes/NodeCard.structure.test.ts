@@ -12,6 +12,7 @@ const stateEditorModelSource = readFileSync(resolve(currentDirectory, "stateEdit
 const textEditorComposableSource = readFileSync(resolve(currentDirectory, "useNodeCardTextEditor.ts"), "utf8").replace(/\r\n/g, "\n");
 const floatingPanelsComposableSource = readFileSync(resolve(currentDirectory, "useNodeFloatingPanels.ts"), "utf8").replace(/\r\n/g, "\n");
 const portReorderComposableSource = readFileSync(resolve(currentDirectory, "usePortReorder.ts"), "utf8").replace(/\r\n/g, "\n");
+const agentSkillPickerSource = readFileSync(resolve(currentDirectory, "AgentSkillPicker.vue"), "utf8").replace(/\r\n/g, "\n");
 const statePortListSource = readFileSync(resolve(currentDirectory, "StatePortList.vue"), "utf8").replace(/\r\n/g, "\n");
 const portListSurfaceSource = `${componentSource}\n${statePortListSource}`;
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -293,9 +294,11 @@ test("NodeCard keeps skill actions below the agent while creating ports from plu
   assert.ok(agentSectionMatch, "expected to find the agent node section");
   const agentSection = agentSectionMatch[0];
 
-  assert.match(agentSection, /<ElPopover[\s\S]*:visible="isSkillPickerOpen"[\s\S]*popper-class="node-card__agent-add-popover-popper"/);
-  assert.match(agentSection, /class="node-card__agent-add-popover node-card__skill-picker"/);
-  assert.match(agentSection, /@click\.stop="toggleSkillPicker"/);
+  assert.match(componentSource, /import AgentSkillPicker from "\.\/AgentSkillPicker\.vue";/);
+  assert.match(agentSection, /<AgentSkillPicker[\s\S]*:open="isSkillPickerOpen"[\s\S]*:show-trigger="showSkillPickerTrigger"[\s\S]*:available-skill-definitions="availableSkillDefinitions"[\s\S]*:attached-skill-badges="attachedSkillBadges"[\s\S]*@toggle="toggleSkillPicker"[\s\S]*@attach="attachAgentSkill"[\s\S]*@remove="removeAgentSkill"/);
+  assert.match(agentSkillPickerSource, /<ElPopover[\s\S]*:visible="open"[\s\S]*popper-class="node-card__agent-add-popover-popper"/);
+  assert.match(agentSkillPickerSource, /class="node-card__agent-add-popover node-card__skill-picker"/);
+  assert.match(agentSkillPickerSource, /@click\.stop="emit\('toggle'\)"/);
   assert.match(componentSource, /from "\.\/skillPickerModel";/);
   assert.match(componentSource, /resolveAttachAgentSkillPatch/);
   assert.match(componentSource, /resolveRemoveAgentSkillPatch/);
@@ -327,7 +330,7 @@ test("NodeCard keeps skill actions below the agent while creating ports from plu
   assert.match(componentSource, /const transparentPopoverStyle = \{/);
   assert.match(componentSource, /const agentAddPopoverStyle = transparentPopoverStyle;/);
   assert.match(componentSource, /"--el-popover-bg-color":\s*"transparent"/);
-  assert.match(componentSource, /\.node-card__agent-add-popover \{[\s\S]*background:\s*rgba\(255,\s*244,\s*232,\s*0\.96\);/);
+  assert.match(agentSkillPickerSource, /\.node-card__agent-add-popover \{[\s\S]*background:\s*rgba\(255,\s*244,\s*232,\s*0\.96\);/);
   assert.match(createPopoverSource, /\.node-card__agent-create-port-popover \{[\s\S]*background:\s*rgba\(255,\s*244,\s*232,\s*0\.96\);/);
   assert.match(componentSource, /:deep\(\.node-card__agent-add-popover-popper\.el-popper\) \{[\s\S]*background:\s*transparent;/);
   assert.equal((componentSource.match(/<StatePortCreatePopover/g) ?? []).length, 3);
@@ -339,6 +342,7 @@ test("NodeCard keeps skill actions below the agent while creating ports from plu
   assert.doesNotMatch(agentSection, /node-card__action-pill--output/);
   assert.doesNotMatch(agentSection, /<div v-if="activePortPickerSide" class="node-card__port-picker"/);
   assert.doesNotMatch(agentSection, /<div v-if="isSkillPickerOpen" class="node-card__skill-picker"/);
+  assert.doesNotMatch(agentSection, /v-for="definition in availableSkillDefinitions"/);
 });
 
 test("NodeCard renders plus input and plus output as virtual agent state port rows", () => {
@@ -1028,9 +1032,9 @@ test("NodeCard closes floating panels on focus loss and keeps popup surfaces on 
   assert.match(floatingPanelsComposableSource, /options\.closeFloatingPanels\(\{ commitTextEditor: false \}\);/);
   assert.match(componentSource, /data-node-popup-surface="true"/);
   assert.match(componentSource, /\.node-card__text-editor-popper/);
-  assert.match(componentSource, /\.node-card__skill-picker \{[\s\S]*border:\s*1px solid rgba\(154,\s*52,\s*18,\s*0\.16\);/);
-  assert.match(componentSource, /\.node-card__skill-picker \{[\s\S]*background:\s*rgba\(255,\s*250,\s*241,\s*0\.98\);/);
-  assert.match(componentSource, /\.node-card__skill-picker \{[\s\S]*box-shadow:\s*0 20px 40px rgba\(60,\s*41,\s*20,\s*0\.12\);/);
+  assert.match(agentSkillPickerSource, /\.node-card__skill-picker \{[\s\S]*border:\s*1px solid rgba\(154,\s*52,\s*18,\s*0\.16\);/);
+  assert.match(agentSkillPickerSource, /\.node-card__skill-picker \{[\s\S]*background:\s*rgba\(255,\s*250,\s*241,\s*0\.98\);/);
+  assert.match(agentSkillPickerSource, /\.node-card__skill-picker \{[\s\S]*box-shadow:\s*0 20px 40px rgba\(60,\s*41,\s*20,\s*0\.12\);/);
   assert.match(createPopoverSource, /\.node-card__port-picker \{[\s\S]*border:\s*1px solid rgba\(154,\s*52,\s*18,\s*0\.16\);/);
   assert.match(createPopoverSource, /\.node-card__port-picker \{[\s\S]*background:\s*rgba\(255,\s*244,\s*232,\s*0\.96\);/);
   assert.match(createPopoverSource, /\.node-card__port-picker \{[\s\S]*box-shadow:\s*0 16px 34px rgba\(60,\s*41,\s*20,\s*0\.12\);/);
