@@ -424,8 +424,6 @@ import {
 } from "./canvasInteractionStyleModel";
 import {
   buildConnectionPreviewModel,
-  buildPendingConnectionFromAnchor,
-  isSamePendingConnection,
   resolveConnectionAccentColor,
   resolveConnectionPreviewStateKey,
   resolveConnectionSourceAnchorId,
@@ -462,20 +460,23 @@ import {
   resolveNodeRenderedSize,
 } from "./canvasNodePresentationModel";
 import { useCanvasEdgeInteractions } from "./useCanvasEdgeInteractions";
+import { useCanvasConnectionInteraction } from "./useCanvasConnectionInteraction";
 import { useCanvasNodeMeasurements } from "./useCanvasNodeMeasurements";
 import { buildPinchZoomStart, resolvePointerCenter, resolvePointerDistance } from "./canvasPinchZoomModel";
 import { buildCanvasViewportStyle, buildZoomPercentLabel } from "./canvasViewportDisplayModel";
 import {
-  buildCanvasNodeCreationMenuPayload,
   isCanvasStateTargetAnchorAllowedForConnection,
-  resolveCanvasConcreteStateInputSourceAnchorAtPointerY,
-  resolveCanvasConcreteStateTargetAnchorAtPointerY,
-  resolveCanvasConnectionStateValueType,
-  resolveCanvasEligibleStateInputSourceAnchorForNodeBody,
-  resolveCanvasEligibleStateTargetAnchorForNodeBody,
+  resolveCanvasAutoSnappedTargetAnchor as resolveCanvasAutoSnappedTargetAnchorModel,
   resolveCanvasEligibleTargetAnchorForNodeBody,
+  resolveCanvasConnectionPointerUpAction,
+  resolveCanvasNodePointerDownConnectionAction,
+  resolveCanvasPendingConnectionCreationMenuRequest,
   type CanvasNodeCreationMenuPayload,
 } from "./canvasConnectionInteractionModel";
+import {
+  resolveCanvasConnectionCompletionRequest,
+  type CanvasConnectionCompletionAction,
+} from "./canvasConnectionCompletionModel";
 import { STATE_FIELD_TYPE_OPTIONS } from "@/editor/workspace/statePanelFields";
 import {
   canCompleteGraphConnection,
@@ -612,6 +613,31 @@ const {
   handleNodeClickCapture,
   teardownNodeDragResize,
 } = nodeDragResize;
+const connectionInteraction = useCanvasConnectionInteraction({
+  onActiveConnectionHoverNodeChange: ({ previousNodeId, nextNodeId }) => {
+    if (previousNodeId) {
+      scheduleAnchorMeasurement(previousNodeId);
+    }
+    if (nextNodeId) {
+      void nextTick().then(() => {
+        scheduleAnchorMeasurement(nextNodeId);
+      });
+    }
+  },
+});
+const {
+  pendingConnection,
+  pendingConnectionPoint,
+  autoSnappedTargetAnchor,
+  activeConnectionHoverNodeId,
+  clearPendingConnection,
+  clearConnectionPreviewState,
+  clearConnectionInteractionState,
+  startOrTogglePendingConnectionFromAnchor,
+  updatePendingConnectionTarget,
+  setPendingConnectionPoint,
+  setActiveConnectionHoverNode,
+} = connectionInteraction;
 const activeCanvasPointers = new Map<number, { clientX: number; clientY: number; pointerType: string }>();
 const pinchZoom = ref<{
   pointerIds: [number, number];
@@ -620,10 +646,6 @@ const pinchZoom = ref<{
   centerClientX: number;
   centerClientY: number;
 } | null>(null);
-const pendingConnection = ref<PendingGraphConnection | null>(null);
-const pendingConnectionPoint = ref<{ x: number; y: number } | null>(null);
-const autoSnappedTargetAnchor = ref<ProjectedCanvasAnchor | null>(null);
-const activeConnectionHoverNodeId = ref<string | null>(null);
 const selectedEdgeId = ref<string | null>(null);
 const edgeVisibilityMode = ref<EdgeVisibilityMode>("smart");
 const NODE_HOVER_RELEASE_DELAY_MS = 2000;
@@ -874,8 +896,7 @@ function setEdgeVisibilityMode(mode: EdgeVisibilityMode) {
 
   edgeVisibilityMode.value = mode;
   selectedEdgeId.value = null;
-  pendingConnection.value = null;
-  pendingConnectionPoint.value = null;
+  clearPendingConnection();
   clearCanvasTransientState();
 }
 
@@ -890,7 +911,7 @@ watch(projectedEdges, (edges) => {
   if (selectedEdgeId.value && !edges.some((edge) => edge.id === selectedEdgeId.value)) {
     selectedEdgeId.value = null;
     if (!pendingConnection.value) {
-      pendingConnectionPoint.value = null;
+      setPendingConnectionPoint(null);
     }
   }
 
@@ -902,9 +923,7 @@ watch(
   (locked) => {
     if (locked) {
       clearCanvasTransientState();
-      pendingConnection.value = null;
-      pendingConnectionPoint.value = null;
-      autoSnappedTargetAnchor.value = null;
+      clearPendingConnection();
       selectedEdgeId.value = null;
     }
   },
@@ -965,8 +984,7 @@ function attachCanvasResizeObserver() {
 function clearCanvasTransientState() {
   clearFlowEdgeDeleteConfirmState();
   clearDataEdgeStateInteraction();
-  autoSnappedTargetAnchor.value = null;
-  setActiveConnectionHoverNode(null);
+  clearConnectionPreviewState();
   hoveredPointAnchorNodeId.value = null;
 }
 
@@ -1107,8 +1125,7 @@ function handleCanvasPointerDown(event: PointerEvent) {
       event.preventDefault();
       window.getSelection()?.removeAllRanges();
       clearCanvasTransientState();
-      pendingConnection.value = null;
-      pendingConnectionPoint.value = null;
+      clearPendingConnection();
       selectedEdgeId.value = null;
       selection.clearSelection();
       return;
@@ -1120,8 +1137,7 @@ function handleCanvasPointerDown(event: PointerEvent) {
   canvasRef.value?.setPointerCapture(event.pointerId);
   cancelScheduledDragFrame();
   clearCanvasTransientState();
-  pendingConnection.value = null;
-  pendingConnectionPoint.value = null;
+  clearPendingConnection();
   selectedEdgeId.value = null;
   selection.clearSelection();
   viewport.beginPan(event);
@@ -1145,10 +1161,10 @@ function handleCanvasPointerMove(event: PointerEvent) {
   if (activeConnection.value) {
     syncActiveConnectionHoverNode(event);
     scheduleDragFrame(() => {
-      autoSnappedTargetAnchor.value = resolveAutoSnappedTargetAnchor(event);
-      pendingConnectionPoint.value = autoSnappedTargetAnchor.value
-        ? { x: autoSnappedTargetAnchor.value.x, y: autoSnappedTargetAnchor.value.y }
-        : resolveCanvasPoint(event);
+      updatePendingConnectionTarget({
+        targetAnchor: resolveAutoSnappedTargetAnchor(event),
+        fallbackPoint: resolveCanvasPoint(event),
+      });
     });
     return;
   }
@@ -1175,18 +1191,22 @@ function handleCanvasPointerUp(event: PointerEvent) {
   }
   releaseNodeDragResizePointerCapture(event.pointerId);
   if (activeConnection.value) {
-    if (isGraphEditingLocked()) {
-      pendingConnection.value = null;
-      pendingConnectionPoint.value = null;
-      autoSnappedTargetAnchor.value = null;
-      setActiveConnectionHoverNode(null);
-      return;
+    const connectionPointerUpAction = resolveCanvasConnectionPointerUpAction({
+      connection: activeConnection.value,
+      interactionLocked: isGraphEditingLocked(),
+      autoSnappedTargetAnchor: autoSnappedTargetAnchor.value,
+    });
+    switch (connectionPointerUpAction?.type) {
+      case "clear-connection-interaction":
+        clearConnectionInteractionState();
+        return;
+      case "complete-connection":
+        completePendingConnection(connectionPointerUpAction.targetAnchor);
+        return;
+      case "open-creation-menu":
+        openCreationMenuFromPendingConnection(event);
+        break;
     }
-    if (autoSnappedTargetAnchor.value) {
-      completePendingConnection(autoSnappedTargetAnchor.value);
-      return;
-    }
-    openCreationMenuFromPendingConnection(event);
   }
   finishNodeDragResizePointer(event.pointerId);
   viewport.endPan(event);
@@ -1223,23 +1243,6 @@ function syncActiveConnectionHoverNode(event: PointerEvent) {
   setActiveConnectionHoverNode(resolveNodeIdAtPointer(event));
 }
 
-function setActiveConnectionHoverNode(nodeId: string | null) {
-  if (activeConnectionHoverNodeId.value === nodeId) {
-    return;
-  }
-
-  const previousNodeId = activeConnectionHoverNodeId.value;
-  activeConnectionHoverNodeId.value = nodeId;
-  if (previousNodeId) {
-    scheduleAnchorMeasurement(previousNodeId);
-  }
-  if (nodeId) {
-    void nextTick().then(() => {
-      scheduleAnchorMeasurement(nodeId);
-    });
-  }
-}
-
 function resolveNodeIdAtPointer(event: PointerEvent) {
   for (const [nodeId, nodeElement] of Array.from(nodeElementMap.entries()).reverse()) {
     if (isPointerWithinNodeElement(nodeElement, event)) {
@@ -1250,80 +1253,18 @@ function resolveNodeIdAtPointer(event: PointerEvent) {
 }
 
 function resolveAutoSnappedTargetAnchor(event: PointerEvent) {
-  if (!activeConnection.value) {
-    return null;
-  }
-
-  if (activeConnection.value.sourceKind === "state-in") {
-    return resolveAutoSnappedStateInputSourceAnchor(event);
-  }
-
-  if (activeConnection.value.sourceKind === "state-out") {
-    return resolveAutoSnappedStateTargetAnchor(event);
-  }
-
-  for (const anchor of flowAnchors.value) {
-    if (isPointerWithinFlowHotspot(anchor, event) && eligibleTargetAnchorIds.value.has(anchor.id)) {
-      return anchor;
-    }
-  }
-
-  const nodeId = resolveNodeIdAtPointer(event);
-  if (nodeId) {
-    const snappedAnchor = resolveEligibleTargetAnchorForNodeBody(nodeId);
-    if (snappedAnchor) {
-      return snappedAnchor;
-    }
-  }
-
-  return null;
-}
-
-function resolveAutoSnappedStateInputSourceAnchor(event: PointerEvent) {
-  const nodeId = resolveNodeIdAtPointer(event);
-  if (!nodeId) {
-    return null;
-  }
-
-  const point = resolveCanvasPoint(event);
-  const directStateInputSourceAnchor = resolveCanvasConcreteStateInputSourceAnchorAtPointerY({
+  return resolveCanvasAutoSnappedTargetAnchorModel({
     connection: activeConnection.value,
-    nodeId,
+    nodeIdAtPointer: resolveNodeIdAtPointer(event),
+    canvasPoint: resolveCanvasPoint(event),
+    flowAnchors: flowAnchors.value,
     projectedAnchors: projectedAnchors.value,
-    pointerY: point.y,
-    canComplete: canCompleteCanvasConnection,
-  });
-  if (directStateInputSourceAnchor) {
-    return directStateInputSourceAnchor;
-  }
-
-  return resolveEligibleStateInputSourceAnchorForNodeBody(nodeId);
-}
-
-function resolveAutoSnappedStateTargetAnchor(event: PointerEvent) {
-  const nodeId = resolveNodeIdAtPointer(event);
-  if (nodeId) {
-    const directStateTargetAnchor = resolveEligibleConcreteStateTargetAnchorAtPointer(nodeId, event);
-    if (directStateTargetAnchor) {
-      return directStateTargetAnchor;
-    }
-
-    const snappedAnchor = resolveEligibleStateTargetAnchorForNodeBody(nodeId);
-    if (snappedAnchor) {
-      return snappedAnchor;
-    }
-  }
-
-  return null;
-}
-
-function resolveEligibleStateInputSourceAnchorForNodeBody(nodeId: string) {
-  return resolveCanvasEligibleStateInputSourceAnchorForNodeBody({
-    connection: activeConnection.value,
-    nodeId,
-    node: props.document.nodes[nodeId],
-    projectedAnchors: projectedAnchors.value,
-    measuredNodeSize: measuredNodeSizes.value[nodeId],
+    baseProjectedAnchors: baseProjectedAnchors.value,
+    nodes: props.document.nodes,
+    measuredAnchorOffsets: measuredAnchorOffsets.value,
+    measuredNodeSizes: measuredNodeSizes.value,
+    eligibleTargetAnchorIds: eligibleTargetAnchorIds.value,
+    pendingAgentInputSourceByNodeId: pendingAgentInputSourceByNodeId.value,
     canComplete: canCompleteCanvasConnection,
   });
 }
@@ -1338,22 +1279,6 @@ function isPointerWithinNodeElement(nodeElement: HTMLElement, event: PointerEven
   );
 }
 
-function isPointerWithinFlowHotspot(anchor: ProjectedCanvasAnchor, event: PointerEvent) {
-  const hotspot = flowHotspotStyle(anchor);
-  const left = parseFloat(hotspot.left);
-  const top = parseFloat(hotspot.top);
-  const width = parseFloat(hotspot.width);
-  const height = parseFloat(hotspot.height);
-  const point = resolveCanvasPoint(event);
-
-  return (
-    point.x >= left - width / 2 &&
-    point.x <= left + width / 2 &&
-    point.y >= top - height / 2 &&
-    point.y <= top + height / 2
-  );
-}
-
 function resolveEligibleTargetAnchorForNodeBody(nodeId: string) {
   return resolveCanvasEligibleTargetAnchorForNodeBody({
     connection: activeConnection.value,
@@ -1365,35 +1290,6 @@ function resolveEligibleTargetAnchorForNodeBody(nodeId: string) {
     measuredNodeSize: measuredNodeSizes.value[nodeId],
     eligibleTargetAnchorIds: eligibleTargetAnchorIds.value,
     pendingAgentInputSource: pendingAgentInputSourceByNodeId.value[nodeId] ?? null,
-    canComplete: canCompleteCanvasConnection,
-  });
-}
-
-function resolveEligibleConcreteStateTargetAnchorAtPointer(nodeId: string, event: PointerEvent) {
-  const point = resolveCanvasPoint(event);
-  return resolveCanvasConcreteStateTargetAnchorAtPointerY({
-    connection: activeConnection.value,
-    nodeId,
-    node: props.document.nodes[nodeId],
-    projectedAnchors: projectedAnchors.value,
-    baseProjectedAnchors: baseProjectedAnchors.value,
-    measuredAnchorOffsets: measuredAnchorOffsets.value,
-    pendingAgentInputSource: pendingAgentInputSourceByNodeId.value[nodeId] ?? null,
-    eligibleTargetAnchorIds: eligibleTargetAnchorIds.value,
-    pointerY: point.y,
-  });
-}
-
-function resolveEligibleStateTargetAnchorForNodeBody(nodeId: string) {
-  return resolveCanvasEligibleStateTargetAnchorForNodeBody({
-    connection: activeConnection.value,
-    nodeId,
-    node: props.document.nodes[nodeId],
-    projectedAnchors: projectedAnchors.value,
-    baseProjectedAnchors: baseProjectedAnchors.value,
-    measuredAnchorOffsets: measuredAnchorOffsets.value,
-    pendingAgentInputSource: pendingAgentInputSourceByNodeId.value[nodeId] ?? null,
-    eligibleTargetAnchorIds: eligibleTargetAnchorIds.value,
     canComplete: canCompleteCanvasConnection,
   });
 }
@@ -1461,14 +1357,23 @@ function handleNodePointerDown(nodeId: string, event: PointerEvent) {
   const preserveInlineEditorFocus =
     target instanceof HTMLElement && Boolean(target.closest("[data-text-editor-trigger='true']"));
   if (activeConnection.value) {
-    const snappedAnchor = resolveEligibleTargetAnchorForNodeBody(nodeId);
-    if (snappedAnchor) {
-      event.preventDefault();
-      if (!preserveInlineEditorFocus) {
-        canvasRef.value?.focus();
-      }
-      completePendingConnection(snappedAnchor);
-      return;
+    const connectionNodePointerDownAction = resolveCanvasNodePointerDownConnectionAction({
+      connection: activeConnection.value,
+      targetAnchor: resolveEligibleTargetAnchorForNodeBody(nodeId),
+      preserveInlineEditorFocus,
+    });
+    switch (connectionNodePointerDownAction?.type) {
+      case "complete-connection":
+        if (connectionNodePointerDownAction.preventDefault) {
+          event.preventDefault();
+        }
+        if (connectionNodePointerDownAction.focusCanvas) {
+          canvasRef.value?.focus();
+        }
+        completePendingConnection(connectionNodePointerDownAction.targetAnchor);
+        return;
+      case "continue-node-pointer-down":
+        break;
     }
   }
   if (!preserveInlineEditorFocus) {
@@ -1483,8 +1388,7 @@ function handleNodePointerDown(nodeId: string, event: PointerEvent) {
     }
   }
   clearCanvasTransientState();
-  pendingConnection.value = null;
-  pendingConnectionPoint.value = null;
+  clearPendingConnection();
   cancelScheduledDragFrame();
   selectedEdgeId.value = null;
   selection.selectNode(nodeId);
@@ -1522,8 +1426,7 @@ function handleNodeResizePointerDown(nodeId: string, handle: NodeResizeHandle, e
   }
 
   clearCanvasTransientState();
-  pendingConnection.value = null;
-  pendingConnectionPoint.value = null;
+  clearPendingConnection();
   cancelScheduledDragFrame();
   selectedEdgeId.value = null;
   selection.selectNode(nodeId);
@@ -1696,16 +1599,14 @@ function handleEdgePointerDown(edge: ProjectedCanvasEdge, event: PointerEvent) {
   }
   canvasRef.value?.focus();
   clearCanvasTransientState();
-  pendingConnection.value = null;
+  clearPendingConnection();
   if (edge.kind === "flow" || edge.kind === "route") {
-    pendingConnectionPoint.value = null;
     selectedEdgeId.value = null;
     selection.clearSelection();
     startFlowEdgeDeleteConfirm(edge, event);
     return;
   }
   if (edge.kind === "data") {
-    pendingConnectionPoint.value = null;
     selectedEdgeId.value = null;
     selection.clearSelection();
     startDataEdgeStateConfirm(edge, event);
@@ -1713,10 +1614,10 @@ function handleEdgePointerDown(edge: ProjectedCanvasEdge, event: PointerEvent) {
   }
   if (selectedEdgeId.value === edge.id) {
     selectedEdgeId.value = null;
-    pendingConnectionPoint.value = null;
+    setPendingConnectionPoint(null);
   } else {
     selectedEdgeId.value = edge.id;
-    pendingConnectionPoint.value = resolveEdgeTargetPoint(edge);
+    setPendingConnectionPoint(resolveEdgeTargetPoint(edge));
   }
   selection.clearSelection();
 }
@@ -1740,20 +1641,10 @@ function handleAnchorPointerDown(anchor: ProjectedCanvasAnchor) {
   }
 
   window.getSelection()?.removeAllRanges();
-  const nextPendingConnection = buildPendingConnectionFromAnchor(anchor);
-  if (!nextPendingConnection) {
-    return;
+  const pendingConnectionResult = startOrTogglePendingConnectionFromAnchor(anchor);
+  if (pendingConnectionResult.status !== "ignored") {
+    selectedEdgeId.value = null;
   }
-
-  selectedEdgeId.value = null;
-  if (isSamePendingConnection(pendingConnection.value, nextPendingConnection)) {
-    pendingConnection.value = null;
-    pendingConnectionPoint.value = null;
-    return;
-  }
-
-  pendingConnection.value = nextPendingConnection;
-  pendingConnectionPoint.value = { x: anchor.x, y: anchor.y };
 }
 
 function openCreationMenuFromPendingConnection(event: PointerEvent) {
@@ -1765,24 +1656,25 @@ function openCreationMenuFromPendingConnection(event: PointerEvent) {
     return;
   }
   clearCanvasTransientState();
-  const payload = buildCanvasNodeCreationMenuPayload({
+  const creationMenuRequest = resolveCanvasPendingConnectionCreationMenuRequest({
     connection,
     position: resolveCanvasPoint(event),
     clientX: event.clientX,
     clientY: event.clientY,
     stateSchema: props.document.state_schema,
   });
-  if (!payload) {
+  if (!creationMenuRequest) {
     return;
   }
 
-  emit("open-node-creation-menu", payload);
+  emit("open-node-creation-menu", creationMenuRequest.payload);
 
-  pendingConnection.value = null;
-  pendingConnectionPoint.value = null;
-  autoSnappedTargetAnchor.value = null;
-  setActiveConnectionHoverNode(null);
-  selectedEdgeId.value = null;
+  if (creationMenuRequest.clearConnectionInteraction) {
+    clearConnectionInteractionState();
+  }
+  if (creationMenuRequest.clearSelectedEdge) {
+    selectedEdgeId.value = null;
+  }
 }
 
 function focusNode(nodeId: string) {
@@ -1817,60 +1709,49 @@ function completePendingConnection(targetAnchor: ProjectedCanvasAnchor) {
     return;
   }
 
-  if (connection.mode === "reconnect") {
-    if (connection.sourceKind === "route-out" && connection.branchKey) {
-      emit("reconnect-route", {
-        sourceNodeId: connection.sourceNodeId,
-        branchKey: connection.branchKey,
-        nextTargetNodeId: targetAnchor.nodeId,
-      });
-    } else if (connection.currentTargetNodeId) {
-      emit("reconnect-flow", {
-        sourceNodeId: connection.sourceNodeId,
-        currentTargetNodeId: connection.currentTargetNodeId,
-        nextTargetNodeId: targetAnchor.nodeId,
-      });
-    }
-  } else if (connection.sourceKind === "route-out" && connection.branchKey) {
-    emit("connect-route", {
-      sourceNodeId: connection.sourceNodeId,
-      branchKey: connection.branchKey,
-      targetNodeId: targetAnchor.nodeId,
-    });
-  } else if (connection.sourceKind === "state-out" && connection.sourceStateKey && targetAnchor.stateKey) {
-    emit("connect-state", {
-      sourceNodeId: connection.sourceNodeId,
-      sourceStateKey: connection.sourceStateKey,
-      targetNodeId: targetAnchor.nodeId,
-      targetStateKey: targetAnchor.stateKey,
-      position: { x: targetAnchor.x, y: targetAnchor.y },
-    });
-  } else if (connection.sourceKind === "state-in" && connection.sourceStateKey && targetAnchor.kind === "state-out" && targetAnchor.stateKey) {
-    emit("connect-state", {
-      sourceNodeId: targetAnchor.nodeId,
-      sourceStateKey: targetAnchor.stateKey,
-      targetNodeId: connection.sourceNodeId,
-      targetStateKey: connection.sourceStateKey,
-      position: { x: targetAnchor.x, y: targetAnchor.y },
-    });
-  } else if (connection.sourceKind === "state-in" && connection.sourceStateKey) {
-    emit("connect-state-input-source", {
-      sourceNodeId: targetAnchor.nodeId,
-      targetNodeId: connection.sourceNodeId,
-      targetStateKey: connection.sourceStateKey,
-      targetValueType: resolveCanvasConnectionStateValueType(connection.sourceStateKey, props.document.state_schema),
-    });
-  } else {
-    emit("connect-flow", {
-      sourceNodeId: connection.sourceNodeId,
-      targetNodeId: targetAnchor.nodeId,
-    });
+  const completionRequest = resolveCanvasConnectionCompletionRequest({
+    connection,
+    targetAnchor,
+    stateSchema: props.document.state_schema,
+  });
+  if (!completionRequest) {
+    return;
   }
 
-  pendingConnection.value = null;
-  pendingConnectionPoint.value = null;
-  autoSnappedTargetAnchor.value = null;
-  selectedEdgeId.value = null;
+  emitCanvasConnectionCompletionAction(completionRequest.action);
+
+  if (completionRequest.clearConnectionInteraction) {
+    clearConnectionInteractionState();
+  }
+  if (completionRequest.clearSelectedEdge) {
+    selectedEdgeId.value = null;
+  }
+}
+
+function emitCanvasConnectionCompletionAction(action: CanvasConnectionCompletionAction | null) {
+  if (!action) {
+    return;
+  }
+  switch (action.type) {
+    case "connect-flow":
+      emit("connect-flow", action.payload);
+      break;
+    case "connect-state":
+      emit("connect-state", action.payload);
+      break;
+    case "connect-state-input-source":
+      emit("connect-state-input-source", action.payload);
+      break;
+    case "connect-route":
+      emit("connect-route", action.payload);
+      break;
+    case "reconnect-flow":
+      emit("reconnect-flow", action.payload);
+      break;
+    case "reconnect-route":
+      emit("reconnect-route", action.payload);
+      break;
+  }
 }
 
 function handleSelectedEdgeDelete(event: KeyboardEvent) {
@@ -1901,7 +1782,7 @@ function handleSelectedEdgeDelete(event: KeyboardEvent) {
   }
 
   selectedEdgeId.value = null;
-  pendingConnectionPoint.value = null;
+  setPendingConnectionPoint(null);
 }
 
 function resolveCanvasPoint(event: { clientX: number; clientY: number }) {
@@ -1978,9 +1859,7 @@ function guardLockedCanvasInteraction() {
     return false;
   }
   clearCanvasTransientState();
-  pendingConnection.value = null;
-  pendingConnectionPoint.value = null;
-  autoSnappedTargetAnchor.value = null;
+  clearPendingConnection();
   selectedEdgeId.value = null;
   emit("locked-edit-attempt");
   return true;
@@ -2029,9 +1908,7 @@ function handleLockedNodePointerCapture(nodeId: string, event: PointerEvent) {
   event.stopPropagation();
   canvasRef.value?.focus();
   clearCanvasTransientState();
-  pendingConnection.value = null;
-  pendingConnectionPoint.value = null;
-  autoSnappedTargetAnchor.value = null;
+  clearPendingConnection();
   selectedEdgeId.value = null;
   selection.selectNode(nodeId);
 }

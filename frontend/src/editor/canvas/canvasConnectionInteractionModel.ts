@@ -10,6 +10,7 @@ import type { PendingStateInputSource } from "./canvasPendingStatePortModel.ts";
 import type { MeasuredNodeSize } from "./canvasNodePresentationModel.ts";
 import type { ProjectedCanvasAnchor } from "./edgeProjection.ts";
 import type { MeasuredAnchorOffset } from "./resolvedCanvasLayout.ts";
+import { buildFlowHotspotStyle } from "./canvasInteractionStyleModel.ts";
 
 const STATE_TARGET_ROW_FALLBACK_GAP = 44;
 
@@ -30,6 +31,49 @@ export type CanvasNodeCreationMenuPayload = {
 
 type StateSchemaLike = Record<string, Pick<StateDefinition, "type"> | undefined>;
 
+type CanvasNodeCreationMenuInput = {
+  connection: PendingGraphConnection | null;
+  position: GraphPosition;
+  clientX: number;
+  clientY: number;
+  stateSchema: StateSchemaLike;
+};
+
+export type CanvasPendingConnectionCreationMenuRequest = {
+  payload: CanvasNodeCreationMenuPayload;
+  clearConnectionInteraction: true;
+  clearSelectedEdge: true;
+};
+
+export type CanvasConnectionPointerUpAction =
+  | { type: "clear-connection-interaction" }
+  | { type: "complete-connection"; targetAnchor: ProjectedCanvasAnchor }
+  | { type: "open-creation-menu" };
+
+export type CanvasNodePointerDownConnectionAction =
+  | {
+      type: "complete-connection";
+      targetAnchor: ProjectedCanvasAnchor;
+      preventDefault: true;
+      focusCanvas: boolean;
+    }
+  | { type: "continue-node-pointer-down" };
+
+type CanvasAutoSnapResolverInput = {
+  connection: PendingGraphConnection | null;
+  nodeIdAtPointer: string | null;
+  canvasPoint: GraphPosition;
+  flowAnchors: readonly ProjectedCanvasAnchor[];
+  projectedAnchors: readonly ProjectedCanvasAnchor[];
+  baseProjectedAnchors: readonly ProjectedCanvasAnchor[];
+  nodes: Record<string, GraphNode | undefined>;
+  measuredAnchorOffsets: Record<string, MeasuredAnchorOffset>;
+  measuredNodeSizes: Record<string, MeasuredNodeSize | undefined>;
+  eligibleTargetAnchorIds: ReadonlySet<string>;
+  pendingAgentInputSourceByNodeId: Record<string, PendingStateInputSource | null | undefined>;
+  canComplete: (anchor: ProjectedCanvasAnchor) => boolean;
+};
+
 export function resolveCanvasConnectionStateValueType(
   stateKey: string | null | undefined,
   stateSchema: StateSchemaLike,
@@ -45,13 +89,7 @@ export function resolveCanvasConnectionStateValueType(
   return stateSchema[stateKey]?.type ?? null;
 }
 
-export function buildCanvasNodeCreationMenuPayload(input: {
-  connection: PendingGraphConnection | null;
-  position: GraphPosition;
-  clientX: number;
-  clientY: number;
-  stateSchema: StateSchemaLike;
-}): CanvasNodeCreationMenuPayload | null {
+export function buildCanvasNodeCreationMenuPayload(input: CanvasNodeCreationMenuInput): CanvasNodeCreationMenuPayload | null {
   const connection = input.connection;
   if (!connection) {
     return null;
@@ -85,6 +123,65 @@ export function buildCanvasNodeCreationMenuPayload(input: {
   return null;
 }
 
+export function resolveCanvasPendingConnectionCreationMenuRequest(
+  input: CanvasNodeCreationMenuInput,
+): CanvasPendingConnectionCreationMenuRequest | null {
+  const payload = buildCanvasNodeCreationMenuPayload(input);
+  if (!payload) {
+    return null;
+  }
+
+  return {
+    payload,
+    clearConnectionInteraction: true,
+    clearSelectedEdge: true,
+  };
+}
+
+export function resolveCanvasConnectionPointerUpAction(input: {
+  connection: PendingGraphConnection | null;
+  interactionLocked: boolean;
+  autoSnappedTargetAnchor: ProjectedCanvasAnchor | null;
+}): CanvasConnectionPointerUpAction | null {
+  if (!input.connection) {
+    return null;
+  }
+
+  if (input.interactionLocked) {
+    return { type: "clear-connection-interaction" };
+  }
+
+  if (input.autoSnappedTargetAnchor) {
+    return {
+      type: "complete-connection",
+      targetAnchor: input.autoSnappedTargetAnchor,
+    };
+  }
+
+  return { type: "open-creation-menu" };
+}
+
+export function resolveCanvasNodePointerDownConnectionAction(input: {
+  connection: PendingGraphConnection | null;
+  targetAnchor: ProjectedCanvasAnchor | null;
+  preserveInlineEditorFocus: boolean;
+}): CanvasNodePointerDownConnectionAction | null {
+  if (!input.connection) {
+    return null;
+  }
+
+  if (!input.targetAnchor) {
+    return { type: "continue-node-pointer-down" };
+  }
+
+  return {
+    type: "complete-connection",
+    targetAnchor: input.targetAnchor,
+    preventDefault: true,
+    focusCanvas: !input.preserveInlineEditorFocus,
+  };
+}
+
 export function isCanvasStateTargetAnchorAllowedForConnection(
   connection: PendingGraphConnection | null,
   anchor: Pick<ProjectedCanvasAnchor, "kind" | "stateKey">,
@@ -101,6 +198,127 @@ export function isCanvasStateTargetAnchorAllowedForConnection(
     anchor.stateKey === CREATE_AGENT_INPUT_STATE_KEY ||
     anchor.stateKey === VIRTUAL_ANY_INPUT_STATE_KEY ||
     anchor.stateKey === connection.sourceStateKey
+  );
+}
+
+export function resolveCanvasAutoSnappedTargetAnchor(
+  input: CanvasAutoSnapResolverInput,
+): ProjectedCanvasAnchor | null {
+  const connection = input.connection;
+  if (!connection) {
+    return null;
+  }
+
+  if (connection.sourceKind === "state-in") {
+    return resolveCanvasAutoSnappedStateInputSourceAnchor(input);
+  }
+
+  if (connection.sourceKind === "state-out") {
+    return resolveCanvasAutoSnappedStateTargetAnchor(input);
+  }
+
+  const hotspotAnchor = resolveCanvasFlowHotspotTargetAnchor({
+    anchors: input.flowAnchors,
+    canvasPoint: input.canvasPoint,
+    eligibleTargetAnchorIds: input.eligibleTargetAnchorIds,
+  });
+  if (hotspotAnchor) {
+    return hotspotAnchor;
+  }
+
+  if (!input.nodeIdAtPointer) {
+    return null;
+  }
+  return resolveCanvasEligibleTargetAnchorForNodeBody({
+    connection,
+    nodeId: input.nodeIdAtPointer,
+    node: input.nodes[input.nodeIdAtPointer],
+    projectedAnchors: input.projectedAnchors,
+    baseProjectedAnchors: input.baseProjectedAnchors,
+    measuredAnchorOffsets: input.measuredAnchorOffsets,
+    measuredNodeSize: input.measuredNodeSizes[input.nodeIdAtPointer],
+    eligibleTargetAnchorIds: input.eligibleTargetAnchorIds,
+    pendingAgentInputSource: input.pendingAgentInputSourceByNodeId[input.nodeIdAtPointer] ?? null,
+    canComplete: input.canComplete,
+  });
+}
+
+export function resolveCanvasAutoSnappedStateInputSourceAnchor(
+  input: CanvasAutoSnapResolverInput,
+): ProjectedCanvasAnchor | null {
+  const connection = input.connection;
+  if (connection?.sourceKind !== "state-in" || !input.nodeIdAtPointer) {
+    return null;
+  }
+
+  const directStateInputSourceAnchor = resolveCanvasConcreteStateInputSourceAnchorAtPointerY({
+    connection: input.connection,
+    nodeId: input.nodeIdAtPointer,
+    projectedAnchors: input.projectedAnchors,
+    pointerY: input.canvasPoint.y,
+    canComplete: input.canComplete,
+  });
+  if (directStateInputSourceAnchor) {
+    return directStateInputSourceAnchor;
+  }
+
+  return resolveCanvasEligibleStateInputSourceAnchorForNodeBody({
+    connection,
+    nodeId: input.nodeIdAtPointer,
+    node: input.nodes[input.nodeIdAtPointer],
+    projectedAnchors: input.projectedAnchors,
+    measuredNodeSize: input.measuredNodeSizes[input.nodeIdAtPointer],
+    canComplete: input.canComplete,
+  });
+}
+
+export function resolveCanvasAutoSnappedStateTargetAnchor(
+  input: CanvasAutoSnapResolverInput,
+): ProjectedCanvasAnchor | null {
+  const connection = input.connection;
+  if (connection?.sourceKind !== "state-out" || !input.nodeIdAtPointer) {
+    return null;
+  }
+
+  const directStateTargetAnchor = resolveCanvasConcreteStateTargetAnchorAtPointerY({
+    connection: input.connection,
+    nodeId: input.nodeIdAtPointer,
+    node: input.nodes[input.nodeIdAtPointer],
+    projectedAnchors: input.projectedAnchors,
+    baseProjectedAnchors: input.baseProjectedAnchors,
+    measuredAnchorOffsets: input.measuredAnchorOffsets,
+    pendingAgentInputSource: input.pendingAgentInputSourceByNodeId[input.nodeIdAtPointer] ?? null,
+    eligibleTargetAnchorIds: input.eligibleTargetAnchorIds,
+    pointerY: input.canvasPoint.y,
+  });
+  if (directStateTargetAnchor) {
+    return directStateTargetAnchor;
+  }
+
+  return resolveCanvasEligibleStateTargetAnchorForNodeBody({
+    connection,
+    nodeId: input.nodeIdAtPointer,
+    node: input.nodes[input.nodeIdAtPointer],
+    projectedAnchors: input.projectedAnchors,
+    baseProjectedAnchors: input.baseProjectedAnchors,
+    measuredAnchorOffsets: input.measuredAnchorOffsets,
+    pendingAgentInputSource: input.pendingAgentInputSourceByNodeId[input.nodeIdAtPointer] ?? null,
+    eligibleTargetAnchorIds: input.eligibleTargetAnchorIds,
+    canComplete: input.canComplete,
+  });
+}
+
+export function resolveCanvasFlowHotspotTargetAnchor(input: {
+  anchors: readonly ProjectedCanvasAnchor[];
+  canvasPoint: GraphPosition;
+  eligibleTargetAnchorIds: ReadonlySet<string>;
+}) {
+  return (
+    input.anchors.find(
+      (anchor) =>
+        input.eligibleTargetAnchorIds.has(anchor.id) &&
+        isCanvasPointWithinFlowHotspot(anchor, input.canvasPoint),
+    ) ?? null
   );
 }
 
@@ -355,6 +573,21 @@ function selectAnchorByPointerY(
     }
   }
   return null;
+}
+
+function isCanvasPointWithinFlowHotspot(anchor: ProjectedCanvasAnchor, point: GraphPosition) {
+  const hotspot = buildFlowHotspotStyle(anchor);
+  const left = parseFloat(hotspot.left);
+  const top = parseFloat(hotspot.top);
+  const width = parseFloat(hotspot.width);
+  const height = parseFloat(hotspot.height);
+
+  return (
+    point.x >= left - width / 2 &&
+    point.x <= left + width / 2 &&
+    point.y >= top - height / 2 &&
+    point.y <= top + height / 2
+  );
 }
 
 function isConcreteCanvasStateKey(stateKey: string | null | undefined) {
