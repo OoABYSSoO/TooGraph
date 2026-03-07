@@ -4,7 +4,7 @@
 Run a ten-round conservative cleanup batch focused on `EditorCanvas.vue` pure projection and interaction-model helpers, then close the baseline interaction regressions in one larger pass while preserving graph editing behavior, runtime visuals, drag/connect workflows, deletion behavior, and dev startup health.
 
 ## Current Phase
-Phase 22 auto-continuation gate in progress because total roadmap cleanup is about 46%, below 100%.
+Phase 25 in progress
 
 ## Autonomous Continuation Gate
 - After every completed cleanup phase, re-read `docs/future/2026-04-28-architecture-refactor-roadmap.md`, `task_plan.md`, `findings.md`, and `progress.md`, then recalculate the total roadmap progress and the active area progress.
@@ -190,11 +190,47 @@ Phase 22 auto-continuation gate in progress because total roadmap cleanup is abo
 - **Status:** completed
 
 ### Phase 22: Auto-Continuation Progress Gate
-- [ ] Re-read the formal roadmap and current planning memory.
-- [ ] Recalculate total roadmap progress after Phase 21 and record whether it reached 100%.
-- [ ] Because the current total roadmap estimate is about 46%, automatically keep the cleanup loop open.
-- [ ] Select the next safest roadmap slice and write the next concrete implementation phase before changing code.
-- [ ] Continue the standard safety loop for that slice: focused red tests, scoped implementation, focused verification, broader verification, dev restart for code changes, commit, push, and another progress judgment.
+- [x] Re-read the formal roadmap and current planning memory.
+- [x] Recalculate total roadmap progress after Phase 21 and record whether it reached 100%.
+- [x] Because the current total roadmap estimate is about 46%, automatically keep the cleanup loop open.
+- [x] Select the next safest roadmap slice and write the next concrete implementation phase before changing code.
+- [x] Continue the standard safety loop for that slice: focused red tests, scoped implementation, focused verification, broader verification, dev restart for code changes, commit, push, and another progress judgment.
+- **Status:** completed
+
+### Phase 23: Agent Skill Picker Component
+- [x] Continue P1 node body component extraction with a low-risk agent-body subcomponent.
+- [x] Add failing structure coverage for `AgentSkillPicker.vue` and `NodeCard.vue` delegation.
+- [x] Move the agent skill picker trigger, popover panel, available-skill list, attached-skill badges, and local skill-picker styles into `AgentSkillPicker.vue`.
+- [x] Keep skill list derivation, lock guards, attach/remove patch creation, and agent config emits in `NodeCard.vue`.
+- [x] Run focused AgentSkillPicker/NodeCard structure tests and relevant skill model tests.
+- [x] Run TypeScript unused-symbol verification, full frontend tests, and production build.
+- [x] Restart the dev environment with `npm run dev` and verify frontend/backend health.
+- [x] Recalculate total roadmap progress; if below 100%, automatically open the next phase.
+- [x] Commit and push the cleanup and planning updates.
+- **Status:** completed
+
+### Phase 24: Agent Runtime Controls Component
+- [x] Continue P1 node body component extraction with the next agent-body presentation boundary.
+- [x] Add failing structure coverage for `AgentRuntimeControls.vue` and `NodeCard.vue` delegation.
+- [x] Move the agent model select, thinking-mode select card, breakpoint switch card, and local runtime-control styles into `AgentRuntimeControls.vue`.
+- [x] Keep model option derivation, refresh-model emit, thinking/breakpoint handlers, locked guards, and agent config emits in `NodeCard.vue`.
+- [x] Run focused AgentRuntimeControls/NodeCard structure tests plus agent config model tests.
+- [x] Run TypeScript unused-symbol verification, full frontend tests, and production build.
+- [x] Restart the dev environment with `npm run dev` and verify frontend/backend health.
+- [x] Recalculate total roadmap progress; because it is still below 100%, automatically open the next phase.
+- [x] Commit and push the cleanup and planning updates.
+- **Status:** completed
+
+### Phase 25: Agent Node Body Component
+- [ ] Continue P1 node body component extraction with the full agent-body presentation wrapper.
+- [ ] Add failing structure coverage for `AgentNodeBody.vue` and `NodeCard.vue` delegation.
+- [ ] Move the agent input/output state port columns, `AgentRuntimeControls`, `AgentSkillPicker`, and task instruction textarea wiring into `AgentNodeBody.vue`.
+- [ ] Keep state port derivation, create/edit drafts, validation, lock guards, agent config emits, skill patch creation, and graph mutation emits in `NodeCard.vue`.
+- [ ] Run focused AgentNodeBody/NodeCard structure tests plus port reorder, skill picker, and agent config model tests.
+- [ ] Run TypeScript unused-symbol verification, full frontend tests, and production build.
+- [ ] Restart the dev environment with `npm run dev` and verify frontend/backend health.
+- [ ] Recalculate total roadmap progress; if below 100%, automatically open the next phase.
+- [ ] Commit and push the cleanup and planning updates.
 - **Status:** in progress
 
 ## Progress Estimate
@@ -223,6 +259,14 @@ Phase 22 auto-continuation gate in progress because total roadmap cleanup is abo
 | Overall roadmap cleanup after Phase 21 | About 46% complete after moving agent state port create entries into `StatePortList.vue`. |
 | P1 `NodeCard.vue` cleanup after Phase 21 | About 68% complete after moving agent create rows and create-popover wiring into `StatePortList.vue`. |
 | Current continuation gate after Phase 21 | Total roadmap progress is below 100%, so Phase 22 is automatically opened and must re-evaluate progress before selecting the next implementation slice. |
+| Overall roadmap cleanup after Phase 22 gate | About 46% complete; gate confirms automatic continuation into Phase 23. |
+| P1 `NodeCard.vue` cleanup target for Phase 23 | About 69-70% if agent skill picker presentation moves into a child component without changing config mutation behavior. |
+| Overall roadmap cleanup after Phase 23 | About 47% complete after moving agent skill picker presentation into `AgentSkillPicker.vue`. |
+| P1 `NodeCard.vue` cleanup after Phase 23 | About 70% complete after moving skill picker presentation and styles into a child component. |
+| Current continuation gate after Phase 23 | Total roadmap progress is below 100%, so Phase 24 is automatically opened for the next P1 agent runtime-controls slice. |
+| Overall roadmap cleanup after Phase 24 | About 48% complete after moving agent runtime-control presentation into `AgentRuntimeControls.vue`. |
+| P1 `NodeCard.vue` cleanup after Phase 24 | About 73% complete after moving runtime model/thinking/breakpoint controls and styles into a child component. |
+| Current continuation gate after Phase 24 | Total roadmap progress is below 100%, so Phase 25 is automatically opened for the `AgentNodeBody.vue` wrapper slice. |
 
 ## Decisions Made
 | Decision | Rationale |
@@ -246,6 +290,8 @@ Phase 22 auto-continuation gate in progress because total roadmap cleanup is abo
 - Phase 19 starts the roadmap `usePortReorder` step by moving pointer/listener/click-suppression state extraction from `NodeCard.vue`; `NodeCard.vue` drops to 4,652 lines before final verification.
 - Phase 20 starts the roadmap `StatePortList.vue` step with a conservative slice for agent real input/output state port rows only; create-port popovers remain in `NodeCard.vue`. `NodeCard.vue` drops to 4,544 lines before final verification.
 - Phase 21 continues the roadmap `StatePortList.vue` step by moving agent `+ input`/`+ output` create rows and create-popover wiring into the child component while leaving draft mutation, validation, locked guards, and graph emits in `NodeCard.vue`. `NodeCard.vue` drops to 4,472 lines before final verification.
+- Phase 23 starts the roadmap node-body component step with `AgentSkillPicker.vue`; `NodeCard.vue` drops to 4,231 lines before final verification while keeping skill config mutation behavior in the parent.
+- Phase 24 continues the roadmap node-body component step with `AgentRuntimeControls.vue`; `NodeCard.vue` drops to 3,954 lines before final verification while keeping model derivation, refresh-model emit, lock guards, and agent config mutation behavior in the parent.
 - Do not commit runtime artifacts such as `backend/data/settings`, `.dev_*`, `dist`, or `.worktrees`.
 - After code changes, restart using `npm run dev`.
 
