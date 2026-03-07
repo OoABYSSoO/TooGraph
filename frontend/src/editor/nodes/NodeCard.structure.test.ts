@@ -12,10 +12,15 @@ const stateEditorModelSource = readFileSync(resolve(currentDirectory, "stateEdit
 const textEditorComposableSource = readFileSync(resolve(currentDirectory, "useNodeCardTextEditor.ts"), "utf8").replace(/\r\n/g, "\n");
 const floatingPanelsComposableSource = readFileSync(resolve(currentDirectory, "useNodeFloatingPanels.ts"), "utf8").replace(/\r\n/g, "\n");
 const portReorderComposableSource = readFileSync(resolve(currentDirectory, "usePortReorder.ts"), "utf8").replace(/\r\n/g, "\n");
+const agentNodeBodySource = readFileSync(resolve(currentDirectory, "AgentNodeBody.vue"), "utf8").replace(/\r\n/g, "\n");
+const inputNodeBodySource = readFileSync(resolve(currentDirectory, "InputNodeBody.vue"), "utf8").replace(/\r\n/g, "\n");
+const outputNodeBodySource = readFileSync(resolve(currentDirectory, "OutputNodeBody.vue"), "utf8").replace(/\r\n/g, "\n");
+const conditionNodeBodySource = readFileSync(resolve(currentDirectory, "ConditionNodeBody.vue"), "utf8").replace(/\r\n/g, "\n");
+const topActionsSource = readFileSync(resolve(currentDirectory, "NodeCardTopActions.vue"), "utf8").replace(/\r\n/g, "\n");
 const agentSkillPickerSource = readFileSync(resolve(currentDirectory, "AgentSkillPicker.vue"), "utf8").replace(/\r\n/g, "\n");
 const agentRuntimeControlsSource = readFileSync(resolve(currentDirectory, "AgentRuntimeControls.vue"), "utf8").replace(/\r\n/g, "\n");
 const statePortListSource = readFileSync(resolve(currentDirectory, "StatePortList.vue"), "utf8").replace(/\r\n/g, "\n");
-const portListSurfaceSource = `${componentSource}\n${statePortListSource}`;
+const portListSurfaceSource = `${componentSource}\n${statePortListSource}\n${conditionNodeBodySource}`;
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const cssRuleBlock = (selector: string) => {
   const match = componentSource.match(new RegExp(`${escapeRegExp(selector)} \\{[\\s\\S]*?\\n\\}`));
@@ -35,10 +40,10 @@ test("NodeCard renders output state pills with an integrated anchor slot", () =>
   assert.match(componentSource, /data-anchor-slot-id=/);
   assert.doesNotMatch(componentSource, /class="node-card__port-pill-anchor"/);
   assert.doesNotMatch(componentSource, /view\.body\.primaryOutput\.typeLabel/);
-  const rightOutputColumnStart = componentSource.indexOf('<div class="node-card__port-column node-card__port-column--right">');
-  const agentRuntimeControlsStart = componentSource.indexOf("<AgentRuntimeControls", rightOutputColumnStart);
+  const rightOutputColumnStart = agentNodeBodySource.indexOf('<div class="node-card__port-column node-card__port-column--right">');
+  const agentRuntimeControlsStart = agentNodeBodySource.indexOf("<AgentRuntimeControls", rightOutputColumnStart);
   assert.ok(rightOutputColumnStart >= 0 && agentRuntimeControlsStart > rightOutputColumnStart, "expected to find the right-side output port column");
-  const rightOutputColumn = componentSource.slice(rightOutputColumnStart, agentRuntimeControlsStart);
+  const rightOutputColumn = agentNodeBodySource.slice(rightOutputColumnStart, agentRuntimeControlsStart);
   assert.doesNotMatch(rightOutputColumn, /port\.typeLabel/);
 });
 
@@ -75,13 +80,12 @@ test("NodeCard stretches primary editable surfaces when the canvas resizes the n
     componentSource,
     /\.node-card__body--input,[\s\S]*\.node-card__body--agent,[\s\S]*\.node-card__body--output \{[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*column;/,
   );
-  assert.match(
-    componentSource,
-    /\.node-card__body--input > \.node-card__surface-textarea,[\s\S]*\.node-card__body--agent > \.node-card__surface-textarea \{[\s\S]*flex:\s*1 1 auto;[\s\S]*min-height:\s*0;/,
-  );
-  assert.match(componentSource, /\.node-card__surface-textarea \{[\s\S]*width:\s*100%;[\s\S]*height:\s*100%;[\s\S]*resize:\s*none;/);
-  assert.match(componentSource, /\.node-card__surface--output \{[\s\S]*flex:\s*1 1 auto;[\s\S]*min-height:\s*0;/);
-  assert.match(componentSource, /\.node-card__preview \{[\s\S]*flex:\s*1 1 auto;[\s\S]*min-height:\s*0;/);
+  assert.match(inputNodeBodySource, /\.node-card__input-body \{[\s\S]*display:\s*flex;[\s\S]*flex:\s*1 1 auto;[\s\S]*min-height:\s*0;/);
+  assert.match(inputNodeBodySource, /\.node-card__surface-textarea \{[\s\S]*flex:\s*1 1 auto;[\s\S]*width:\s*100%;[\s\S]*height:\s*100%;[\s\S]*resize:\s*none;/);
+  assert.match(agentNodeBodySource, /\.node-card__surface-textarea \{[\s\S]*flex:\s*1 1 auto;[\s\S]*resize:\s*none;/);
+  assert.match(outputNodeBodySource, /\.node-card__output-body \{[\s\S]*display:\s*flex;[\s\S]*flex:\s*1 1 auto;[\s\S]*min-height:\s*0;/);
+  assert.match(outputNodeBodySource, /\.node-card__surface--output \{[\s\S]*flex:\s*1 1 auto;[\s\S]*min-height:\s*0;/);
+  assert.match(outputNodeBodySource, /\.node-card__preview \{[\s\S]*flex:\s*1 1 auto;[\s\S]*min-height:\s*0;/);
 });
 
 test("NodeCard keeps state pill geometry but hides the pill chrome visually", () => {
@@ -108,34 +112,38 @@ test("NodeCard clips long state port labels inside the pill", () => {
   assert.doesNotMatch(labelBlock, /overflow:\s*visible;/);
 });
 
-test("NodeCard uses Element Plus segmented control on the same row as the input output pill", () => {
+test("NodeCard delegates input body presentation while keeping the output state slot", () => {
   const inputSectionMatch = componentSource.match(
     /<section v-if="view\.body\.kind === 'input'"[\s\S]*?<\/section>/,
   );
   assert.ok(inputSectionMatch, "expected to find the input node section");
   const inputSection = inputSectionMatch[0];
 
-  assert.match(inputSection, /<div class="node-card__port-row node-card__port-row--single node-card__port-row--input-boundary">/);
-  assert.match(inputSection, /<ElSegmented/);
-  assert.match(inputSection, /class="node-card__input-boundary-toggle"/);
-  assert.match(inputSection, /:options="inputTypeOptions"/);
-  assert.match(inputSection, /:model-value="inputBoundarySelection"/);
-  assert.match(inputSection, /:disabled="Boolean\(inputAssetEnvelope\)"/);
+  assert.match(componentSource, /import InputNodeBody from "\.\/InputNodeBody\.vue";/);
+  assert.match(inputSection, /<InputNodeBody[\s\S]*:body="view\.body"[\s\S]*:input-boundary-selection="inputBoundarySelection"[\s\S]*:input-type-options="inputTypeOptions"[\s\S]*:input-asset-envelope="inputAssetEnvelope"[\s\S]*@update:boundary-selection="handleInputBoundarySelection"[\s\S]*@update:knowledge-base="handleInputKnowledgeBaseSelect"[\s\S]*@asset-file-change="handleInputAssetFileChange"[\s\S]*@asset-drop="handleInputAssetDrop"[\s\S]*@clear-asset="clearInputAsset"[\s\S]*@input-value="handleInputValueInput"/);
+  assert.match(inputSection, /<template #primary-output>/);
+  assert.match(inputNodeBodySource, /<slot name="primary-output" \/>/);
+  assert.match(inputNodeBodySource, /<ElSegmented/);
+  assert.match(inputNodeBodySource, /class="node-card__input-boundary-toggle"/);
+  assert.match(inputNodeBodySource, /:options="inputTypeOptions"/);
+  assert.match(inputNodeBodySource, /:model-value="inputBoundarySelection"/);
+  assert.match(inputNodeBodySource, /:disabled="Boolean\(inputAssetEnvelope\)"/);
   assert.match(componentSource, /from "\.\/uploadedAssetModel";/);
   assert.match(componentSource, /resolveUploadedAssetLabel\(inputAssetType\.value\)/);
   assert.match(componentSource, /resolveUploadedAssetSummary\(inputAssetEnvelope\.value\)/);
   assert.match(componentSource, /resolveUploadedAssetTextPreview\(inputAssetEnvelope\.value\)/);
   assert.match(componentSource, /resolveUploadedAssetDescription\(inputAssetEnvelope\.value, inputAssetType\.value\)/);
   assert.doesNotMatch(componentSource, /return `Stored as \$\{asset\.detectedType\} upload\. \$\{inputAssetSummary\.value\}`;/);
-  assert.match(inputSection, /<template #default="\{ item \}">/);
-  assert.match(inputSection, /class="node-card__input-boundary-icon-wrap"/);
-  assert.match(inputSection, /<component :is="item\.icon" class="node-card__input-boundary-icon" aria-hidden="true" \/>/);
-  assert.match(inputSection, /<span class="node-card__sr-only">\{\{ item\.label \}\}<\/span>/);
+  assert.match(inputNodeBodySource, /<template #default="\{ item \}">/);
+  assert.match(inputNodeBodySource, /class="node-card__input-boundary-icon-wrap"/);
+  assert.match(inputNodeBodySource, /<component :is="item\.icon" class="node-card__input-boundary-icon" aria-hidden="true" \/>/);
+  assert.match(inputNodeBodySource, /<span class="node-card__sr-only">\{\{ item\.label \}\}<\/span>/);
   assert.match(inputSection, /class="node-card__port-pill[\s\S]*node-card__port-pill--output/);
   assert.match(componentSource, /from "@element-plus\/icons-vue"/);
   assert.match(componentSource, /icon:\s*Document/);
   assert.match(componentSource, /icon:\s*FolderOpened/);
   assert.match(componentSource, /icon:\s*Collection/);
+  assert.doesNotMatch(inputSection, /<ElSegmented/);
   assert.doesNotMatch(inputSection, /v-for="option in inputTypeOptions"/);
   assert.doesNotMatch(inputSection, /class="node-card__control-button"/);
 });
@@ -184,8 +192,10 @@ test("NodeCard restores the legacy agent runtime control order with Element Plus
   assert.ok(agentSectionMatch, "expected to find the agent node section");
   const agentSection = agentSectionMatch[0];
 
-  assert.match(componentSource, /import AgentRuntimeControls from "\.\/AgentRuntimeControls\.vue";/);
-  assert.match(agentSection, /<AgentRuntimeControls[\s\S]*ref="agentRuntimeControlsRef"[\s\S]*:model-value="agentResolvedModelValue \|\| undefined"[\s\S]*:model-options="agentModelOptions"[\s\S]*:global-model-ref="trimmedGlobalTextModelRef"[\s\S]*:thinking-mode-value="agentThinkingModeValue"[\s\S]*:thinking-options="agentThinkingOptions"[\s\S]*:thinking-enabled="agentThinkingEnabled"[\s\S]*:breakpoint-enabled="Boolean\(agentBreakpointEnabled\)"[\s\S]*:confirm-popover-style="confirmPopoverStyle"[\s\S]*@model-visible-change="handleAgentModelSelectVisibleChange"[\s\S]*@update:model-value="handleAgentModelValueChange"[\s\S]*@update:thinking-mode="handleAgentThinkingModeSelect"[\s\S]*@update:breakpoint-enabled="handleAgentBreakpointToggleValue"/);
+  assert.match(componentSource, /import AgentNodeBody from "\.\/AgentNodeBody\.vue";/);
+  assert.match(agentSection, /<AgentNodeBody[\s\S]*ref="agentNodeBodyRef"[\s\S]*:model-value="agentResolvedModelValue \|\| undefined"[\s\S]*:model-options="agentModelOptions"[\s\S]*:global-model-ref="trimmedGlobalTextModelRef"[\s\S]*:thinking-mode-value="agentThinkingModeValue"[\s\S]*:thinking-options="agentThinkingOptions"[\s\S]*:thinking-enabled="agentThinkingEnabled"[\s\S]*:breakpoint-enabled="Boolean\(agentBreakpointEnabled\)"[\s\S]*@model-visible-change="handleAgentModelSelectVisibleChange"[\s\S]*@update:model-value="handleAgentModelValueChange"[\s\S]*@update:thinking-mode="handleAgentThinkingModeSelect"[\s\S]*@update:breakpoint-enabled="handleAgentBreakpointToggleValue"/);
+  assert.match(agentNodeBodySource, /import AgentRuntimeControls from "\.\/AgentRuntimeControls\.vue";/);
+  assert.match(agentNodeBodySource, /<AgentRuntimeControls[\s\S]*ref="runtimeControlsRef"[\s\S]*:model-value="modelValue"[\s\S]*:model-options="modelOptions"[\s\S]*:global-model-ref="globalModelRef"[\s\S]*:thinking-mode-value="thinkingModeValue"[\s\S]*:thinking-options="thinkingOptions"[\s\S]*:thinking-enabled="thinkingEnabled"[\s\S]*:breakpoint-enabled="breakpointEnabled"[\s\S]*:confirm-popover-style="confirmPopoverStyle"[\s\S]*@model-visible-change="emit\('model-visible-change', \$event\)"[\s\S]*@update:model-value="emit\('update:model-value', \$event\)"[\s\S]*@update:thinking-mode="emit\('update:thinking-mode', \$event\)"[\s\S]*@update:breakpoint-enabled="emit\('update:breakpoint-enabled', \$event\)"/);
   assert.match(agentRuntimeControlsSource, /class="node-card__agent-runtime-row"/);
   assert.match(agentRuntimeControlsSource, /class="node-card__agent-model-select-shell"/);
   assert.match(agentRuntimeControlsSource, /@pointerdown\.stop/);
@@ -256,13 +266,14 @@ test("NodeCard restores the legacy agent runtime control order with Element Plus
   assert.match(componentSource, /\(event: "update-agent-breakpoint-timing", payload: \{ nodeId: string; timing: "before" \| "after" \}\): void;/);
   assert.match(componentSource, /function handleAgentBreakpointToggleValue\(value: string \| number \| boolean\) \{/);
   assert.match(componentSource, /emit\("toggle-agent-breakpoint", \{ nodeId: props\.nodeId, enabled: value \}\);/);
-  assert.match(componentSource, /class="node-card__breakpoint-timing-select graphite-select"/);
-  assert.match(componentSource, /:model-value="agentBreakpointTimingValue"/);
-  assert.match(componentSource, /@update:model-value="handleAgentBreakpointTimingSelect"/);
-  assert.match(componentSource, /t\('nodeCard\.runAfter'\)/);
-  assert.match(componentSource, /t\('nodeCard\.runBefore'\)/);
-  assert.match(componentSource, /const agentRuntimeControlsRef = ref<\{ collapseModelSelect\?: \(\) => void \} \| null>\(null\);/);
-  assert.match(componentSource, /function collapseAgentModelSelect\(\) \{[\s\S]*agentRuntimeControlsRef\.value\?\.collapseModelSelect\?\.\(\);[\s\S]*\}/);
+  assert.match(componentSource, /@update:agent-breakpoint-timing="handleAgentBreakpointTimingSelect"/);
+  assert.match(topActionsSource, /class="node-card__breakpoint-timing-select graphite-select"/);
+  assert.match(topActionsSource, /:model-value="agentBreakpointTimingValue"/);
+  assert.match(topActionsSource, /@update:model-value="emit\('update:agent-breakpoint-timing', \$event\)"/);
+  assert.match(topActionsSource, /t\('nodeCard\.runAfter'\)/);
+  assert.match(topActionsSource, /t\('nodeCard\.runBefore'\)/);
+  assert.match(componentSource, /const agentNodeBodyRef = ref<\{ collapseModelSelect\?: \(\) => void \} \| null>\(null\);/);
+  assert.match(componentSource, /function collapseAgentModelSelect\(\) \{[\s\S]*agentNodeBodyRef\.value\?\.collapseModelSelect\?\.\(\);[\s\S]*\}/);
   assert.match(componentSource, /collapseAgentModelSelect\(\);/);
   assert.doesNotMatch(agentSection, /class="node-card__agent-runtime-row"/);
 });
@@ -280,7 +291,8 @@ test("NodeCard keeps agent model selection in the dropdown without rendering dup
   assert.ok(agentSectionMatch, "expected to find the agent node section");
   const agentSection = agentSectionMatch[0];
 
-  assert.match(agentSection, /<AgentRuntimeControls/);
+  assert.match(agentSection, /<AgentNodeBody/);
+  assert.match(agentNodeBodySource, /<AgentRuntimeControls/);
   assert.match(agentRuntimeControlsSource, /class="node-card__agent-model-select graphite-select"/);
   assert.match(agentRuntimeControlsSource, /v-for="option in modelOptions"/);
   assert.match(agentSection, /@update:model-value="handleAgentModelValueChange"/);
@@ -299,8 +311,9 @@ test("NodeCard keeps skill actions below the agent while creating ports from plu
   assert.ok(agentSectionMatch, "expected to find the agent node section");
   const agentSection = agentSectionMatch[0];
 
-  assert.match(componentSource, /import AgentSkillPicker from "\.\/AgentSkillPicker\.vue";/);
-  assert.match(agentSection, /<AgentSkillPicker[\s\S]*:open="isSkillPickerOpen"[\s\S]*:show-trigger="showSkillPickerTrigger"[\s\S]*:available-skill-definitions="availableSkillDefinitions"[\s\S]*:attached-skill-badges="attachedSkillBadges"[\s\S]*@toggle="toggleSkillPicker"[\s\S]*@attach="attachAgentSkill"[\s\S]*@remove="removeAgentSkill"/);
+  assert.match(agentNodeBodySource, /import AgentSkillPicker from "\.\/AgentSkillPicker\.vue";/);
+  assert.match(agentNodeBodySource, /<AgentSkillPicker[\s\S]*:open="skillPickerOpen"[\s\S]*:show-trigger="showSkillPickerTrigger"[\s\S]*:available-skill-definitions="availableSkillDefinitions"[\s\S]*:attached-skill-badges="attachedSkillBadges"[\s\S]*@toggle="emit\('toggle-skill-picker'\)"[\s\S]*@attach="emit\('attach-skill', \$event\)"[\s\S]*@remove="emit\('remove-skill', \$event\)"/);
+  assert.match(agentSection, /@toggle-skill-picker="toggleSkillPicker"[\s\S]*@attach-skill="attachAgentSkill"[\s\S]*@remove-skill="removeAgentSkill"/);
   assert.match(agentSkillPickerSource, /<ElPopover[\s\S]*:visible="open"[\s\S]*popper-class="node-card__agent-add-popover-popper"/);
   assert.match(agentSkillPickerSource, /class="node-card__agent-add-popover node-card__skill-picker"/);
   assert.match(agentSkillPickerSource, /@click\.stop="emit\('toggle'\)"/);
@@ -338,8 +351,9 @@ test("NodeCard keeps skill actions below the agent while creating ports from plu
   assert.match(agentSkillPickerSource, /\.node-card__agent-add-popover \{[\s\S]*background:\s*rgba\(255,\s*244,\s*232,\s*0\.96\);/);
   assert.match(createPopoverSource, /\.node-card__agent-create-port-popover \{[\s\S]*background:\s*rgba\(255,\s*244,\s*232,\s*0\.96\);/);
   assert.match(componentSource, /:deep\(\.node-card__agent-add-popover-popper\.el-popper\) \{[\s\S]*background:\s*transparent;/);
-  assert.equal((componentSource.match(/<StatePortCreatePopover/g) ?? []).length, 3);
+  assert.equal((componentSource.match(/<StatePortCreatePopover/g) ?? []).length, 2);
   assert.equal((statePortListSource.match(/<StatePortCreatePopover/g) ?? []).length, 1);
+  assert.equal((conditionNodeBodySource.match(/<StatePortCreatePopover/g) ?? []).length, 1);
   assert.doesNotMatch(agentSection, /v-for="picker in agentPortPickerActions"/);
   assert.doesNotMatch(agentSection, /@click\.stop="openPortPicker\(picker\.side\)"/);
   assert.doesNotMatch(componentSource, /const agentPortPickerActions/);
@@ -370,8 +384,10 @@ test("NodeCard renders plus input and plus output as virtual agent state port ro
   assert.match(componentSource, /VIRTUAL_ANY_OUTPUT_STATE_KEY/);
   assert.match(componentSource, /function openPortStateCreate\(side: "input" \| "output"\)/);
   assert.match(componentSource, /createStateDraftFromQuery\("", Object\.keys\(props\.stateSchema\)\)/);
-  assert.match(agentSection, /<StatePortList[\s\S]*side="input"[\s\S]*:ports="orderedAgentInputPorts"/);
-  assert.match(agentSection, /<StatePortList[\s\S]*side="output"[\s\S]*:ports="orderedAgentOutputPorts"/);
+  assert.match(agentNodeBodySource, /<StatePortList[\s\S]*side="input"[\s\S]*:ports="orderedInputPorts"/);
+  assert.match(agentNodeBodySource, /<StatePortList[\s\S]*side="output"[\s\S]*:ports="orderedOutputPorts"/);
+  assert.match(agentSection, /:ordered-input-ports="orderedAgentInputPorts"/);
+  assert.match(agentSection, /:ordered-output-ports="orderedAgentOutputPorts"/);
   assert.match(statePortListSource, /v-for="port in ports"/);
   assert.match(componentSource, /const shouldShowAgentCreateInputPort = computed\(\(\) => agentInputPorts\.value\.length === 0\);/);
   assert.match(componentSource, /const shouldShowAgentCreateOutputPort = computed\(\(\) => agentOutputPorts\.value\.length === 0\);/);
@@ -379,16 +395,16 @@ test("NodeCard renders plus input and plus output as virtual agent state port ro
   assert.match(componentSource, /const shouldRevealAgentCreateOutputPort = computed\(\(\) =>[\s\S]*shouldShowAgentCreateOutputPort\.value[\s\S]*props\.selected[\s\S]*props\.hovered[\s\S]*hasFloatingPanelOpen\.value/);
   assert.match(statePortListSource, /:data-agent-create-port="side"/);
   assert.match(statePortListSource, /'node-card__port-pill-row--create-visible': createVisible/);
-  assert.match(agentSection, /:create-visible="shouldRevealAgentCreateInputPort"/);
-  assert.match(agentSection, /:create-visible="shouldRevealAgentCreateOutputPort"/);
+  assert.match(agentSection, /:input-create-visible="shouldRevealAgentCreateInputPort"/);
+  assert.match(agentSection, /:output-create-visible="shouldRevealAgentCreateOutputPort"/);
   assert.match(agentSection, /@open-create="openPortStateCreate"/);
   assert.match(statePortListSource, /@click\.stop="emit\('open-create', side\)"/);
   assert.doesNotMatch(agentSection, /@dblclick\.stop="openPortStateCreate\('input'\)"/);
   assert.doesNotMatch(agentSection, /@dblclick\.stop="openPortStateCreate\('output'\)"/);
   assert.match(componentSource, /const agentCreateInputAnchorStateKey = computed\(\(\) =>/);
   assert.match(componentSource, /props\.pendingStateInputSource \? CREATE_AGENT_INPUT_STATE_KEY : VIRTUAL_ANY_INPUT_STATE_KEY/);
-  assert.match(agentSection, /:create-anchor-state-key="agentCreateInputAnchorStateKey"/);
-  assert.match(agentSection, /:create-anchor-state-key="VIRTUAL_ANY_OUTPUT_STATE_KEY"/);
+  assert.match(agentSection, /:input-create-anchor-state-key="agentCreateInputAnchorStateKey"/);
+  assert.match(agentSection, /:output-create-anchor-state-key="VIRTUAL_ANY_OUTPUT_STATE_KEY"/);
   assert.match(statePortListSource, /:data-anchor-slot-id="\`\$\{nodeId\}:state-in:\$\{createAnchorStateKey\}\`"/);
   assert.match(statePortListSource, /:data-anchor-slot-id="\`\$\{nodeId\}:state-out:\$\{createAnchorStateKey\}\`"/);
   assert.match(statePortListSource, /node-card__port-pill--create/);
@@ -425,15 +441,15 @@ test("NodeCard constrains long state port labels without pushing anchor slots ou
 });
 
 test("NodeCard hides virtual agent output any behind the plus output row", () => {
-  const rightOutputColumnStart = componentSource.indexOf('<div class="node-card__port-column node-card__port-column--right">');
-  const agentRuntimeControlsStart = componentSource.indexOf("<AgentRuntimeControls", rightOutputColumnStart);
+  const rightOutputColumnStart = agentNodeBodySource.indexOf('<div class="node-card__port-column node-card__port-column--right">');
+  const agentRuntimeControlsStart = agentNodeBodySource.indexOf("<AgentRuntimeControls", rightOutputColumnStart);
   assert.ok(rightOutputColumnStart >= 0 && agentRuntimeControlsStart > rightOutputColumnStart, "expected to find the agent output port column");
-  const agentOutputPortSection = componentSource.slice(rightOutputColumnStart, agentRuntimeControlsStart);
+  const agentOutputPortSection = agentNodeBodySource.slice(rightOutputColumnStart, agentRuntimeControlsStart);
 
   assert.match(statePortListSource, /'node-card__port-pill--removable': !port\.virtual/);
   assert.match(componentSource, /const agentOutputPorts = computed<NodePortViewModel\[\]>\(\(\) =>[\s\S]*filter\(\(port\) => !port\.virtual\)/);
   assert.match(statePortListSource, /:data-agent-create-port="side"/);
-  assert.match(agentOutputPortSection, /:create-anchor-state-key="VIRTUAL_ANY_OUTPUT_STATE_KEY"/);
+  assert.match(agentOutputPortSection, /:create-anchor-state-key="outputCreateAnchorStateKey"/);
   assert.match(statePortListSource, /:data-anchor-slot-id="\`\$\{nodeId\}:state-out:\$\{createAnchorStateKey\}\`"/);
   assert.match(componentSource, /@port-click="handlePortStatePillClick"/);
   assert.match(statePortListSource, /@click\.stop="emit\('port-click', anchorId\(port\.key\), port\.key\)"/);
@@ -453,18 +469,20 @@ test("NodeCard renders condition and output virtual inputs as plus input create 
   const outputSection = outputSectionMatch[0];
   const conditionSection = conditionSectionMatch[0];
 
+  assert.match(componentSource, /import ConditionNodeBody from "\.\/ConditionNodeBody\.vue";/);
+  assert.match(conditionSection, /<ConditionNodeBody[\s\S]*:body="view\.body"[\s\S]*:node-id="nodeId"/);
   assert.match(outputSection, /'node-card__port-pill--create': view\.body\.primaryInput\.virtual/);
-  assert.match(conditionSection, /'node-card__port-pill--create': view\.body\.primaryInput\.virtual/);
+  assert.match(conditionNodeBodySource, /'node-card__port-pill--create': body\.primaryInput\.virtual/);
   assert.match(outputSection, /view\.body\.primaryInput\.virtual[\s\S]*isPortCreateOpen\('input'\)/);
-  assert.match(conditionSection, /view\.body\.primaryInput\.virtual[\s\S]*isPortCreateOpen\('input'\)/);
+  assert.match(conditionNodeBodySource, /body\.primaryInput\.virtual[\s\S]*isPortCreateOpen\('input'\)/);
   assert.match(outputSection, /@click\.stop="view\.body\.primaryInput\.virtual \? openPortStateCreate\('input'\) : handleStateEditorActionClick/);
-  assert.match(conditionSection, /@click\.stop="view\.body\.primaryInput\.virtual \? openPortStateCreate\('input'\) : handleStateEditorActionClick/);
+  assert.match(conditionNodeBodySource, /@click\.stop="body\.primaryInput\.virtual \? emit\('open-create', 'input'\) : emit\('source-click', conditionInputAnchorId, body\.primaryInput\.key\)"/);
   assert.match(outputSection, /:data-anchor-slot-id="\`\$\{nodeId\}:state-in:\$\{view\.body\.primaryInput\.key\}\`"/);
-  assert.match(conditionSection, /:data-anchor-slot-id="\`\$\{nodeId\}:state-in:\$\{view\.body\.primaryInput\.key\}\`"/);
+  assert.match(conditionNodeBodySource, /:data-anchor-slot-id="\`\$\{nodeId\}:state-in:\$\{body\.primaryInput\.key\}\`"/);
   assert.match(outputSection, /view\.body\.primaryInput\.virtual && isPortCreateOpen\('input'\) && portStateDraft/);
-  assert.match(conditionSection, /view\.body\.primaryInput\.virtual && isPortCreateOpen\('input'\) && portStateDraft/);
+  assert.match(conditionNodeBodySource, /body\.primaryInput\.virtual && isPortCreateOpen\('input'\) && portStateDraft/);
   assert.doesNotMatch(outputSection, />any</);
-  assert.doesNotMatch(conditionSection, />any</);
+  assert.doesNotMatch(conditionNodeBodySource, />any</);
 });
 
 test("NodeCard renders empty input outputs as virtual plus output create pills", () => {
@@ -485,16 +503,22 @@ test("NodeCard renders empty input outputs as virtual plus output create pills",
 });
 
 test("NodeCard moves node actions into hoverable top buttons built from Element Plus icons and overlays", () => {
-  assert.match(componentSource, /import \{[\s\S]*ElButton,[\s\S]*ElPopover[\s\S]*\} from "element-plus";/);
-  assert.match(componentSource, /import \{[\s\S]*CollectionTag[\s\S]*Delete[\s\S]*Operation[\s\S]*\} from "@element-plus\/icons-vue";/);
-  assert.match(componentSource, /class="node-card__top-actions"/);
-  assert.match(componentSource, /node-card__top-action-button/);
-  assert.match(componentSource, /class="node-card__top-action-button node-card__top-action-button--advanced"/);
-  assert.match(componentSource, /class="node-card__top-action-button node-card__top-action-button--preset"/);
-  assert.match(componentSource, /class="node-card__top-action-button node-card__top-action-button--delete"/);
-  assert.match(componentSource, /@click\.stop="toggleAdvancedPanel"/);
-  assert.match(componentSource, /:show-arrow="false"/);
-  assert.match(componentSource, /:popper-style="actionPopoverStyle"/);
+  assert.match(componentSource, /import NodeCardTopActions from "\.\/NodeCardTopActions\.vue";/);
+  assert.match(componentSource, /<NodeCardTopActions[\s\S]*:active-top-action="activeTopAction"[\s\S]*:human-review-pending="humanReviewPending"/);
+  assert.match(componentSource, /@toggle-advanced="toggleAdvancedPanel"/);
+  assert.match(componentSource, /@delete-action="handleDeleteActionClick"/);
+  assert.match(componentSource, /@preset-action="handlePresetActionClick"/);
+  assert.match(componentSource, /@human-review="handleHumanReviewActionClick"/);
+  assert.match(topActionsSource, /import \{[\s\S]*ElButton,[\s\S]*ElPopover[\s\S]*\} from "element-plus";/);
+  assert.match(topActionsSource, /import \{[\s\S]*CollectionTag[\s\S]*Delete[\s\S]*Operation[\s\S]*\} from "@element-plus\/icons-vue";/);
+  assert.match(topActionsSource, /class="node-card__top-actions"/);
+  assert.match(topActionsSource, /node-card__top-action-button/);
+  assert.match(topActionsSource, /class="node-card__top-action-button node-card__top-action-button--advanced"/);
+  assert.match(topActionsSource, /class="node-card__top-action-button node-card__top-action-button--preset"/);
+  assert.match(topActionsSource, /class="node-card__top-action-button node-card__top-action-button--delete"/);
+  assert.match(topActionsSource, /@click\.stop="emit\('toggle-advanced'\)"/);
+  assert.match(topActionsSource, /:show-arrow="false"/);
+  assert.match(topActionsSource, /:popper-style="actionPopoverStyle"/);
   assert.match(componentSource, /import \{ useNodeFloatingPanels \} from "\.\/useNodeFloatingPanels";/);
   assert.match(componentSource, /const \{[\s\S]*activeTopAction,[\s\S]*addGlobalFloatingPanelListeners,[\s\S]*clearTopActionConfirmState,[\s\S]*clearTopActionTimeout,[\s\S]*removeGlobalFloatingPanelListeners,[\s\S]*startTopActionConfirmWindow,[\s\S]*\} = useNodeFloatingPanels\(\{/);
   assert.match(floatingPanelsComposableSource, /export type NodeTopAction = "advanced" \| "delete" \| "preset";/);
@@ -504,47 +528,47 @@ test("NodeCard moves node actions into hoverable top buttons built from Element 
   assert.match(floatingPanelsComposableSource, /function startTopActionConfirmWindow\(action: "delete" \| "preset"\)/);
   assert.match(componentSource, /if \(activeTopAction\.value === "delete"\) \{[\s\S]*confirmDeleteNode\(\);[\s\S]*return;/);
   assert.match(componentSource, /if \(activeTopAction\.value === "preset"\) \{[\s\S]*confirmSavePreset\(\);[\s\S]*return;/);
-  assert.match(componentSource, /@click\.stop="handleDeleteActionClick"/);
-  assert.match(componentSource, /@click\.stop="handlePresetActionClick"/);
-  assert.match(componentSource, /:visible="activeTopAction === 'preset'"/);
-  assert.match(componentSource, /placement="top"/);
-  assert.match(componentSource, /:popper-style="confirmPopoverStyle"/);
-  assert.match(componentSource, /t\("nodeCard\.savePresetQuestion"\)/);
+  assert.match(topActionsSource, /@click\.stop="emit\('delete-action'\)"/);
+  assert.match(topActionsSource, /@click\.stop="emit\('preset-action'\)"/);
+  assert.match(topActionsSource, /:visible="activeTopAction === 'preset'"/);
+  assert.match(topActionsSource, /placement="top"/);
+  assert.match(topActionsSource, /:popper-style="confirmPopoverStyle"/);
+  assert.match(topActionsSource, /t\("nodeCard\.savePresetQuestion"\)/);
   assert.match(componentSource, /const canSavePreset = computed\(\(\) => props\.node\.kind === "agent"\);/);
-  assert.match(componentSource, /:visible="activeTopAction === 'delete'"/);
-  assert.match(componentSource, /t\("nodeCard\.deleteNodeQuestion"\)/);
+  assert.match(topActionsSource, /:visible="activeTopAction === 'delete'"/);
+  assert.match(topActionsSource, /t\("nodeCard\.deleteNodeQuestion"\)/);
   assert.match(componentSource, /const confirmPopoverStyle = \{/);
   assert.match(componentSource, /const transparentPopoverStyle = \{/);
   assert.match(componentSource, /const actionPopoverStyle = transparentPopoverStyle;/);
   assert.match(componentSource, /"--el-popover-bg-color":\s*"transparent"/);
-  assert.match(componentSource, /node-card__top-action-button--confirm/);
+  assert.match(topActionsSource, /node-card__top-action-button--confirm/);
   assert.match(componentSource, /\.node-card \{[\s\S]*overflow:\s*visible;/);
-  assert.match(componentSource, /\.node-card__top-actions \{[\s\S]*top:\s*0;/);
-  assert.match(componentSource, /\.node-card__top-actions \{[\s\S]*right:\s*18px;/);
-  assert.match(componentSource, /\.node-card__top-actions \{[\s\S]*z-index:\s*12;/);
-  assert.match(componentSource, /\.node-card__top-actions \{[\s\S]*transform:\s*translateY\(calc\(-100% - 8px\)\);/);
-  assert.match(componentSource, /\.node-card__top-actions \{[\s\S]*gap:\s*8px;/);
-  assert.match(componentSource, /\.node-card__top-actions \{[\s\S]*padding:\s*8px;/);
-  assert.match(componentSource, /\.node-card__top-actions \{[\s\S]*border:\s*1px solid rgba\(154,\s*52,\s*18,\s*0\.14\);/);
-  assert.match(componentSource, /\.node-card__top-actions \{[\s\S]*border-radius:\s*999px;/);
-  assert.match(componentSource, /\.node-card__top-actions \{[\s\S]*background:\s*var\(--graphite-glass-bg\);/);
-  assert.match(componentSource, /\.node-card__top-actions \{[\s\S]*box-shadow:\s*var\(--graphite-glass-shadow\),\s*var\(--graphite-glass-highlight\),\s*var\(--graphite-glass-rim\);/);
-  assert.match(componentSource, /\.node-card__top-actions \{[\s\S]*backdrop-filter:\s*blur\(24px\) saturate\(1\.6\) contrast\(1\.02\);/);
-  assert.match(componentSource, /\.node-card__top-actions::before \{[\s\S]*background:\s*var\(--graphite-glass-specular\),\s*var\(--graphite-glass-lens\);/);
-  assert.match(componentSource, /\.node-card__top-actions::after \{[\s\S]*bottom:\s*-12px;/);
-  assert.match(componentSource, /\.node-card__top-actions::after \{[\s\S]*height:\s*12px;/);
-  assert.match(componentSource, /\.node-card__top-actions:hover \{[\s\S]*opacity:\s*1;/);
-  assert.match(componentSource, /\.node-card__top-actions:hover \{[\s\S]*pointer-events:\s*auto;/);
-  assert.match(componentSource, /\.node-card__top-action-button \{[\s\S]*width:\s*56px;/);
-  assert.match(componentSource, /\.node-card__top-action-button \{[\s\S]*height:\s*40px;/);
-  assert.match(componentSource, /\.node-card__top-action-button \{[\s\S]*border-radius:\s*999px;/);
-  assert.match(componentSource, /\.node-card__top-action-button \{[\s\S]*box-shadow:\s*none;/);
-  assert.match(componentSource, /\.node-card__top-action-button :deep\(\.el-icon\) \{[\s\S]*font-size:\s*1\.18rem;/);
-  assert.match(componentSource, /\.node-card__top-popover \{[\s\S]*padding:\s*12px;/);
-  assert.match(componentSource, /\.node-card__top-popover \{[\s\S]*border:\s*1px solid rgba\(154,\s*52,\s*18,\s*0\.14\);/);
-  assert.match(componentSource, /\.node-card__top-popover \{[\s\S]*border-radius:\s*14px;/);
-  assert.match(componentSource, /\.node-card__top-popover \{[\s\S]*background:\s*rgba\(255,\s*244,\s*232,\s*0\.96\);/);
-  assert.match(componentSource, /\.node-card__top-popover \{[\s\S]*box-shadow:\s*0 16px 34px rgba\(60,\s*41,\s*20,\s*0\.12\);/);
+  assert.match(topActionsSource, /\.node-card__top-actions \{[\s\S]*top:\s*0;/);
+  assert.match(topActionsSource, /\.node-card__top-actions \{[\s\S]*right:\s*18px;/);
+  assert.match(topActionsSource, /\.node-card__top-actions \{[\s\S]*z-index:\s*12;/);
+  assert.match(topActionsSource, /\.node-card__top-actions \{[\s\S]*transform:\s*translateY\(calc\(-100% - 8px\)\);/);
+  assert.match(topActionsSource, /\.node-card__top-actions \{[\s\S]*gap:\s*8px;/);
+  assert.match(topActionsSource, /\.node-card__top-actions \{[\s\S]*padding:\s*8px;/);
+  assert.match(topActionsSource, /\.node-card__top-actions \{[\s\S]*border:\s*1px solid rgba\(154,\s*52,\s*18,\s*0\.14\);/);
+  assert.match(topActionsSource, /\.node-card__top-actions \{[\s\S]*border-radius:\s*999px;/);
+  assert.match(topActionsSource, /\.node-card__top-actions \{[\s\S]*background:\s*var\(--graphite-glass-bg\);/);
+  assert.match(topActionsSource, /\.node-card__top-actions \{[\s\S]*box-shadow:\s*var\(--graphite-glass-shadow\),\s*var\(--graphite-glass-highlight\),\s*var\(--graphite-glass-rim\);/);
+  assert.match(topActionsSource, /\.node-card__top-actions \{[\s\S]*backdrop-filter:\s*blur\(24px\) saturate\(1\.6\) contrast\(1\.02\);/);
+  assert.match(topActionsSource, /\.node-card__top-actions::before \{[\s\S]*background:\s*var\(--graphite-glass-specular\),\s*var\(--graphite-glass-lens\);/);
+  assert.match(topActionsSource, /\.node-card__top-actions::after \{[\s\S]*bottom:\s*-12px;/);
+  assert.match(topActionsSource, /\.node-card__top-actions::after \{[\s\S]*height:\s*12px;/);
+  assert.match(topActionsSource, /\.node-card__top-actions:hover \{[\s\S]*opacity:\s*1;/);
+  assert.match(topActionsSource, /\.node-card__top-actions:hover \{[\s\S]*pointer-events:\s*auto;/);
+  assert.match(topActionsSource, /\.node-card__top-action-button \{[\s\S]*width:\s*56px;/);
+  assert.match(topActionsSource, /\.node-card__top-action-button \{[\s\S]*height:\s*40px;/);
+  assert.match(topActionsSource, /\.node-card__top-action-button \{[\s\S]*border-radius:\s*999px;/);
+  assert.match(topActionsSource, /\.node-card__top-action-button \{[\s\S]*box-shadow:\s*none;/);
+  assert.match(topActionsSource, /\.node-card__top-action-button :deep\(\.el-icon\) \{[\s\S]*font-size:\s*1\.18rem;/);
+  assert.match(topActionsSource, /\.node-card__top-popover \{[\s\S]*padding:\s*12px;/);
+  assert.match(topActionsSource, /\.node-card__top-popover \{[\s\S]*border:\s*1px solid rgba\(154,\s*52,\s*18,\s*0\.14\);/);
+  assert.match(topActionsSource, /\.node-card__top-popover \{[\s\S]*border-radius:\s*14px;/);
+  assert.match(topActionsSource, /\.node-card__top-popover \{[\s\S]*background:\s*rgba\(255,\s*244,\s*232,\s*0\.96\);/);
+  assert.match(topActionsSource, /\.node-card__top-popover \{[\s\S]*box-shadow:\s*0 16px 34px rgba\(60,\s*41,\s*20,\s*0\.12\);/);
   assert.match(componentSource, /\.node-card__header \{[\s\S]*padding:\s*18px var\(--node-card-inline-padding\) 8px var\(--node-card-inline-padding\);/);
   assert.doesNotMatch(componentSource, /type="primary" @click\.stop="confirmSavePreset"/);
   assert.doesNotMatch(componentSource, /type="danger" @click\.stop="confirmDeleteNode"/);
@@ -560,13 +584,14 @@ test("NodeCard uses a calmer display hierarchy on the canvas", () => {
 
 test("NodeCard shows a persistent human review capsule in the top action dock", () => {
   assert.match(componentSource, /humanReviewPending:\s*boolean;/);
-  assert.match(componentSource, /v-if="humanReviewPending"/);
-  assert.match(componentSource, /class="node-card__human-review-button"/);
-  assert.match(componentSource, /@click\.stop="handleHumanReviewActionClick"/);
+  assert.match(componentSource, /:human-review-pending="humanReviewPending"/);
+  assert.match(topActionsSource, /v-if="humanReviewPending"/);
+  assert.match(topActionsSource, /class="node-card__human-review-button"/);
+  assert.match(topActionsSource, /@click\.stop="emit\('human-review'\)"/);
   assert.match(componentSource, /function handleHumanReviewActionClick\(\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
-  assert.match(componentSource, /t\("nodeCard\.humanReview"\)/);
+  assert.match(topActionsSource, /t\("nodeCard\.humanReview"\)/);
   assert.match(componentSource, /const isTopActionVisible = computed\(\(\) => props\.humanReviewPending \|\| props\.selected \|\| activeTopAction\.value !== null\);/);
-  assert.match(componentSource, /\.node-card__human-review-button \{[\s\S]*background:\s*rgba\(217,\s*119,\s*6,\s*0\.12\);/);
+  assert.match(topActionsSource, /\.node-card__human-review-button \{[\s\S]*background:\s*rgba\(217,\s*119,\s*6,\s*0\.12\);/);
 });
 
 test("NodeCard blocks every in-canvas control while graph editing is locked", () => {
@@ -643,7 +668,7 @@ test("NodeCard reveals state pills on hover and opens state editing only after a
   assert.match(statePortListSource, /node-card__port-pill-label-text/);
   assert.match(statePortListSource, /node-card__port-pill-label--confirm/);
   assert.match(statePortListSource, /:show-arrow="false"/);
-  assert.match(componentSource, /:popover-style="stateEditorPopoverStyle"/);
+  assert.match(agentNodeBodySource, /:popover-style="stateEditorPopoverStyle"/);
   assert.doesNotMatch(componentSource, /@cancel="closeStateEditor"/);
   assert.doesNotMatch(componentSource, /@save="commitStateEditor"/);
   assert.doesNotMatch(componentSource, /function commitStateEditor\(\)/);
@@ -703,7 +728,7 @@ test("NodeCard reveals state pills on hover and opens state editing only after a
 });
 
 test("NodeCard adds mirrored remove-binding buttons to non-output state pills", () => {
-  assert.match(componentSource, /import \{[\s\S]*Delete[\s\S]*\} from "@element-plus\/icons-vue";/);
+  assert.match(portListSurfaceSource, /import \{[\s\S]*Delete[\s\S]*\} from "@element-plus\/icons-vue";/);
   assert.match(componentSource, /\(event: "remove-port-state", payload: \{ nodeId: string; side: "input" \| "output"; stateKey: string \}\): void;/);
   assert.match(componentSource, /activeRemovePortStateConfirmAnchorId,[\s\S]*activeStateEditorConfirmAnchorId,/);
   assert.match(floatingPanelsComposableSource, /const activeRemovePortStateConfirmAnchorId = ref<string \| null>\(null\);/);
@@ -718,7 +743,8 @@ test("NodeCard adds mirrored remove-binding buttons to non-output state pills", 
   assert.match(statePortListSource, /class="node-card__port-pill-remove node-card__port-pill-remove--leading"/);
   assert.match(componentSource, /@remove-click="handleRemovePortStateClick"/);
   assert.match(statePortListSource, /@click\.stop="emit\('remove-click', anchorId\(port\.key\), side, port\.key\)"/);
-  assert.match(componentSource, /@click\.stop="handleRemovePortStateClick\(`condition-input:\$\{view\.body\.primaryInput\.key\}`,\s*'input', view\.body\.primaryInput\.key\)"/);
+  assert.match(componentSource, /@remove-source-click="handleRemovePortStateClick"/);
+  assert.match(conditionNodeBodySource, /@click\.stop="emit\('remove-source-click', conditionInputAnchorId, 'input', body\.primaryInput\.key\)"/);
   assert.match(portListSurfaceSource, /t\("nodeCard\.removeStateQuestion"\)/);
   const inputSectionMatch = componentSource.match(
     /<section v-if="view\.body\.kind === 'input'"[\s\S]*?<\/section>/,
@@ -755,20 +781,33 @@ test("NodeCard renders condition nodes as clean control-flow proxies", () => {
   assert.ok(conditionSectionMatch, "expected to find the condition node section");
   const conditionSection = conditionSectionMatch[0];
 
-  assert.match(conditionSection, /class="node-card__condition-source-row"/);
-  assert.match(conditionSection, /view\.body\.primaryInput/);
-  assert.match(conditionSection, /class="node-card__port-pill[\s\S]*node-card__port-pill--input/);
-  assert.match(conditionSection, /condition-input:\$\{view\.body\.primaryInput\.key\}/);
-  assert.match(conditionSection, /class="node-card__condition-controls-row"/);
-  assert.match(conditionSection, /<span class="node-card__control-label">\{\{ t\("nodeCard\.operator"\) \}\}<\/span>/);
-  assert.match(conditionSection, /<span class="node-card__control-label">\{\{ t\("nodeCard\.value"\) \}\}<\/span>/);
-  assert.match(conditionSection, /<span class="node-card__control-label">\{\{ t\("nodeCard\.maxLoops"\) \}\}<\/span>/);
-  assert.match(conditionSection, /view\.body\.operatorLabel/);
-  assert.match(conditionSection, /view\.body\.valueLabel/);
-  assert.match(conditionSection, /:value="conditionRuleValueDraft"/);
-  assert.match(conditionSection, /@blur="commitConditionRuleValue"/);
-  assert.match(conditionSection, /@keydown\.enter\.prevent="handleConditionRuleValueEnter"/);
-  assert.match(conditionSection, /conditionLoopLimitDraft/);
+  assert.match(componentSource, /import ConditionNodeBody from "\.\/ConditionNodeBody\.vue";/);
+  assert.match(conditionSection, /<ConditionNodeBody[\s\S]*:body="view\.body"[\s\S]*:node-id="nodeId"/);
+  assert.match(conditionSection, /:rule-operator-value="node\.kind === 'condition' \? node\.config\.rule\.operator : ''"/);
+  assert.match(conditionSection, /:condition-rule-value-draft="conditionRuleValueDraft"/);
+  assert.match(conditionSection, /:condition-rule-value-disabled="conditionRuleValueDisabled"/);
+  assert.match(conditionSection, /:condition-loop-limit-draft="conditionLoopLimitDraft"/);
+  assert.match(conditionSection, /@update:operator="handleConditionRuleOperatorSelect"/);
+  assert.match(conditionSection, /@rule-value-input="handleConditionRuleValueInput"/);
+  assert.match(conditionSection, /@commit-rule-value="commitConditionRuleValue"/);
+  assert.match(conditionSection, /@rule-value-enter="handleConditionRuleValueEnter"/);
+  assert.match(conditionSection, /@loop-limit-input="handleConditionLoopLimitInput"/);
+  assert.match(conditionSection, /@commit-loop-limit="commitConditionLoopLimit"/);
+  assert.match(conditionSection, /@loop-limit-enter="handleConditionLoopLimitEnter"/);
+  assert.match(conditionNodeBodySource, /class="node-card__condition-source-row"/);
+  assert.match(conditionNodeBodySource, /body\.primaryInput/);
+  assert.match(conditionNodeBodySource, /class="node-card__port-pill[\s\S]*node-card__port-pill--input/);
+  assert.match(conditionNodeBodySource, /const conditionInputAnchorId = computed\(\(\) =>[\s\S]*`condition-input:\$\{props\.body\.primaryInput\.key\}`/);
+  assert.match(conditionNodeBodySource, /class="node-card__condition-controls-row"/);
+  assert.match(conditionNodeBodySource, /<span class="node-card__control-label">\{\{ t\("nodeCard\.operator"\) \}\}<\/span>/);
+  assert.match(conditionNodeBodySource, /<span class="node-card__control-label">\{\{ t\("nodeCard\.value"\) \}\}<\/span>/);
+  assert.match(conditionNodeBodySource, /<span class="node-card__control-label">\{\{ t\("nodeCard\.maxLoops"\) \}\}<\/span>/);
+  assert.match(conditionNodeBodySource, /body\.operatorLabel/);
+  assert.match(conditionNodeBodySource, /body\.valueLabel/);
+  assert.match(conditionNodeBodySource, /:value="conditionRuleValueDraft"/);
+  assert.match(conditionNodeBodySource, /@blur="emit\('commit-rule-value'\)"/);
+  assert.match(conditionNodeBodySource, /@keydown\.enter\.prevent="emit\('rule-value-enter', \$event\)"/);
+  assert.match(conditionNodeBodySource, /conditionLoopLimitDraft/);
   assert.match(componentSource, /from "\.\/conditionLoopLimit";/);
   assert.match(componentSource, /conditionLoopLimitDraft\.value = resolveConditionLoopLimitDraft\(loopLimit\);/);
   assert.match(componentSource, /const result = resolveConditionLoopLimitPatch\(conditionLoopLimitDraft\.value, props\.node\.config\.loopLimit\);/);
@@ -787,25 +826,27 @@ test("NodeCard renders condition nodes as clean control-flow proxies", () => {
   assert.match(componentSource, /function handleConditionRuleValueInput\(event: Event\) \{[\s\S]*conditionRuleValueDraft\.value = target\.value;/);
   assert.doesNotMatch(componentSource, /props\.node\.config\.rule\.value === null \|\| props\.node\.config\.rule\.value === undefined \? "" : String\(props\.node\.config\.rule\.value\)/);
   assert.match(componentSource, /function handleConditionRuleValueEnter\(event: KeyboardEvent\) \{[\s\S]*target\.blur\(\);/);
-  assert.match(conditionSection, /type="number"/);
-  assert.match(conditionSection, /:min="CONDITION_LOOP_LIMIT_MIN"/);
-  assert.match(conditionSection, /:max="CONDITION_LOOP_LIMIT_MAX"/);
-  assert.doesNotMatch(conditionSection, /class="node-card__condition-branch-rail"/);
-  assert.doesNotMatch(conditionSection, /v-for="branch in view\.body\.routeOutputs"/);
-  assert.doesNotMatch(conditionSection, /class="node-card__condition-branch-chip"/);
-  assert.doesNotMatch(conditionSection, /class="node-card__condition-branch-label"/);
-  assert.doesNotMatch(conditionSection, /branch\.tone/);
-  assert.match(componentSource, /\.node-card__condition-panel \{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\);/);
-  assert.match(componentSource, /\.node-card__condition-controls-row \{[\s\S]*--node-card-condition-loop-column:\s*clamp\(6\.5rem,\s*22%,\s*8rem\);/);
-  assert.match(componentSource, /\.node-card__condition-controls-row \{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\) minmax\(0,\s*1fr\) var\(--node-card-condition-loop-column\);/);
-  assert.match(componentSource, /\.node-card__condition-controls-row > \.node-card__control-row \{[\s\S]*min-width:\s*0;/);
+  assert.match(conditionNodeBodySource, /type="number"/);
+  assert.match(conditionNodeBodySource, /:min="CONDITION_LOOP_LIMIT_MIN"/);
+  assert.match(conditionNodeBodySource, /:max="CONDITION_LOOP_LIMIT_MAX"/);
+  assert.doesNotMatch(conditionNodeBodySource, /class="node-card__condition-branch-rail"/);
+  assert.doesNotMatch(conditionNodeBodySource, /v-for="branch in body\.routeOutputs"/);
+  assert.doesNotMatch(conditionNodeBodySource, /class="node-card__condition-branch-chip"/);
+  assert.doesNotMatch(conditionNodeBodySource, /class="node-card__condition-branch-label"/);
+  assert.doesNotMatch(conditionNodeBodySource, /branch\.tone/);
+  assert.match(conditionNodeBodySource, /\.node-card__condition-panel \{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\);/);
+  assert.match(conditionNodeBodySource, /\.node-card__condition-controls-row \{[\s\S]*--node-card-condition-loop-column:\s*clamp\(6\.5rem,\s*22%,\s*8rem\);/);
+  assert.match(conditionNodeBodySource, /\.node-card__condition-controls-row \{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\) minmax\(0,\s*1fr\) var\(--node-card-condition-loop-column\);/);
+  assert.match(conditionNodeBodySource, /\.node-card__condition-controls-row > \.node-card__control-row \{[\s\S]*min-width:\s*0;/);
   assert.doesNotMatch(componentSource, /\.node-card__control-select \{[^}]*border:/);
-  assert.match(componentSource, /\.node-card__port-pill-row--condition-source \{[\s\S]*width:\s*100%;/);
+  assert.match(conditionNodeBodySource, /\.node-card__port-pill-row--condition-source \{[\s\S]*width:\s*100%;/);
   assert.doesNotMatch(conditionSection, /node-card__branch-editor/);
   assert.doesNotMatch(conditionSection, /node-card__branch-list/);
   assert.doesNotMatch(conditionSection, /\+ branch/);
   assert.doesNotMatch(conditionSection, /Matches/);
   assert.doesNotMatch(conditionSection, /Route/);
+  assert.doesNotMatch(componentSource, /\.node-card__branch-editor/);
+  assert.doesNotMatch(componentSource, /\.node-card__branch-list/);
 });
 
 test("NodeCard routes title and description editing through hoverable confirm triggers before opening warm popovers", () => {
@@ -968,7 +1009,7 @@ test("NodeCard lets real agent state pills drag-reorder within their own side", 
   assert.doesNotMatch(createRow, /data-port-reorder-state-key/);
 });
 
-test("NodeCard renders output previews through a rich content presenter while keeping Advanced in the top popover", () => {
+test("NodeCard delegates output preview presentation while keeping Advanced in the top popover", () => {
   const outputSectionMatch = componentSource.match(
     /<section v-else-if="view\.body\.kind === 'output'"[\s\S]*?<\/section>/,
   );
@@ -983,12 +1024,17 @@ test("NodeCard renders output previews through a rich content presenter while ke
   assert.match(componentSource, /resolveOutputDisplayModeActive\(view\.value\.body\.kind === "output" \? view\.value\.body\.displayMode : null, displayMode\)/);
   assert.match(componentSource, /resolveOutputPersistFormatActive\(props\.node\.kind === "output" \? props\.node\.config\.persistFormat : null, persistFormat\)/);
   assert.match(componentSource, /resolveOutputFileNameTemplatePatch\(value\)/);
-  assert.match(outputSection, /node-card__preview--markdown/);
-  assert.match(outputSection, /v-html="outputPreviewContent\.html"/);
-  assert.match(outputSection, /node-card__preview--json/);
-  assert.match(outputSection, /<pre v-else class="node-card__preview-text">\{\{ outputPreviewContent\.text \}\}<\/pre>/);
-  assert.match(outputSection, /node-card__preview--empty/);
+  assert.match(componentSource, /import OutputNodeBody from "\.\/OutputNodeBody\.vue";/);
+  assert.match(outputSection, /<OutputNodeBody[\s\S]*:body="view\.body"[\s\S]*:output-preview-content="outputPreviewContent"[\s\S]*@update:persist-enabled="handleOutputPersistToggle"/);
+  assert.match(outputSection, /<template #primary-input>/);
+  assert.match(outputNodeBodySource, /<slot name="primary-input" \/>/);
+  assert.match(outputNodeBodySource, /node-card__preview--markdown/);
+  assert.match(outputNodeBodySource, /v-html="outputPreviewContent\.html"/);
+  assert.match(outputNodeBodySource, /node-card__preview--json/);
+  assert.match(outputNodeBodySource, /<pre v-else class="node-card__preview-text">\{\{ outputPreviewContent\.text \}\}<\/pre>/);
+  assert.match(outputNodeBodySource, /node-card__preview--empty/);
   assert.doesNotMatch(outputSection, /Connected to \$\{view\.body\.connectedStateLabel/);
+  assert.doesNotMatch(outputSection, /<pre v-else class="node-card__preview-text">/);
   assert.match(componentSource, /view\.body\.kind === 'output' \? 340 : 280/);
 });
 
@@ -999,27 +1045,28 @@ test("NodeCard uses an Element Plus switch card for output persistence like the 
   assert.ok(outputSectionMatch, "expected to find the output node section");
   const outputSection = outputSectionMatch[0];
 
-  assert.match(componentSource, /import \{[\s\S]*DocumentChecked[\s\S]*\} from "@element-plus\/icons-vue";/);
+  assert.doesNotMatch(componentSource, /DocumentChecked/);
+  assert.match(outputNodeBodySource, /import \{ DocumentChecked \} from "@element-plus\/icons-vue";/);
   assert.match(agentRuntimeControlsSource, /import \{ Flag, Opportunity \} from "@element-plus\/icons-vue";/);
-  assert.match(outputSection, /class="node-card__output-persist-card"/);
-  assert.match(outputSection, /class="node-card__output-persist-icon"/);
-  assert.match(outputSection, /<DocumentChecked \/>/);
-  assert.match(outputSection, /<ElSwitch/);
-  assert.match(outputSection, /class="node-card__output-persist-switch"/);
-  assert.match(outputSection, /:model-value="view\.body\.persistEnabled"/);
-  assert.match(outputSection, /:width="56"/);
-  assert.match(outputSection, /inline-prompt/);
-  assert.match(outputSection, /active-text="ON"/);
-  assert.match(outputSection, /inactive-text="OFF"/);
-  assert.match(outputSection, /@update:model-value="handleOutputPersistToggle"/);
+  assert.match(outputNodeBodySource, /class="node-card__output-persist-card"/);
+  assert.match(outputNodeBodySource, /class="node-card__output-persist-icon"/);
+  assert.match(outputNodeBodySource, /<DocumentChecked \/>/);
+  assert.match(outputNodeBodySource, /<ElSwitch/);
+  assert.match(outputNodeBodySource, /class="node-card__output-persist-switch"/);
+  assert.match(outputNodeBodySource, /:model-value="body\.persistEnabled"/);
+  assert.match(outputNodeBodySource, /:width="56"/);
+  assert.match(outputNodeBodySource, /inline-prompt/);
+  assert.match(outputNodeBodySource, /active-text="ON"/);
+  assert.match(outputNodeBodySource, /inactive-text="OFF"/);
+  assert.match(outputNodeBodySource, /@update:model-value="emit\('update:persist-enabled', \$event\)"/);
   assert.doesNotMatch(outputSection, /node-card__persist-button/);
   assert.doesNotMatch(outputSection, /node-card__toggle/);
   assert.match(componentSource, /function handleOutputPersistToggle\(value: string \| number \| boolean\)/);
-  assert.match(componentSource, /\.node-card__output-persist-card \{[\s\S]*grid-template-columns:\s*auto 56px;/);
-  assert.match(componentSource, /\.node-card__output-persist-card \{[\s\S]*min-height:\s*48px;/);
-  assert.match(componentSource, /\.node-card__output-persist-card \{[\s\S]*border-radius:\s*16px;/);
-  assert.match(componentSource, /\.node-card__output-persist-card \{[\s\S]*background:\s*rgba\(255,\s*255,\s*255,\s*0\.88\);/);
-  assert.match(componentSource, /\.node-card__output-persist-switch \{[\s\S]*--el-switch-on-color:\s*#c96b1f;/);
+  assert.match(outputNodeBodySource, /\.node-card__output-persist-card \{[\s\S]*grid-template-columns:\s*auto 56px;/);
+  assert.match(outputNodeBodySource, /\.node-card__output-persist-card \{[\s\S]*min-height:\s*48px;/);
+  assert.match(outputNodeBodySource, /\.node-card__output-persist-card \{[\s\S]*border-radius:\s*16px;/);
+  assert.match(outputNodeBodySource, /\.node-card__output-persist-card \{[\s\S]*background:\s*rgba\(255,\s*255,\s*255,\s*0\.88\);/);
+  assert.match(outputNodeBodySource, /\.node-card__output-persist-switch \{[\s\S]*--el-switch-on-color:\s*#c96b1f;/);
 });
 
 test("NodeCard closes floating panels on focus loss and keeps popup surfaces on the warm theme", () => {

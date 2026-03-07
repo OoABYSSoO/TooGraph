@@ -68,6 +68,134 @@
 | Timestamp | Error | Attempt | Resolution |
 |-----------|-------|---------|------------|
 
+## Session: 2026-04-29 Phase 26 Input Node Body Component
+
+### Phase 26: Input Node Body Component
+- **Status:** completed
+- Actions taken:
+  - Re-read `task_plan.md`, `findings.md`, `progress.md`, and `docs/future/2026-04-28-architecture-refactor-roadmap.md`.
+  - Added `InputNodeBody.structure.test.ts` and updated `NodeCard.structure.test.ts` before production code.
+  - Verified the red test failed because `InputNodeBody.vue` did not exist yet.
+  - Added `InputNodeBody.vue` for input boundary selection, knowledge-base selector, upload/dropzone/preview, editable textarea, read-only surface, and local input scoped styles.
+  - Updated `NodeCard.vue` to delegate input body presentation through `InputNodeBody` while keeping the output state pill popover in a parent-owned slot.
+  - Removed the input upload DOM ref/open-picker presentation helper and input-specific scoped styles from `NodeCard.vue`.
+  - `NodeCard.vue` line count moved from 3,895 after Phase 25 to 3,562 after Phase 26.
+  - Recalculated total roadmap cleanup as about 50% complete; because it remains below 100%, opened Phase 27 for the `OutputNodeBody.vue` slice.
+
+### Verification
+- **Status:** completed
+- Results:
+  - Red test: `node --test frontend/src/editor/nodes/InputNodeBody.structure.test.ts frontend/src/editor/nodes/NodeCard.structure.test.ts` failed with `ENOENT` for `InputNodeBody.vue` before implementation.
+  - Focused structure tests: `node --test frontend/src/editor/nodes/InputNodeBody.structure.test.ts frontend/src/editor/nodes/NodeCard.structure.test.ts` passed, 36 tests.
+  - Focused input tests: `node --test frontend/src/editor/nodes/InputNodeBody.structure.test.ts frontend/src/editor/nodes/NodeCard.structure.test.ts frontend/src/editor/nodes/uploadedAssetModel.test.ts frontend/src/editor/nodes/inputKnowledgeBaseModel.test.ts frontend/src/editor/nodes/inputValueTypeModel.test.ts` passed, 48 tests.
+  - Unused-symbol check: `./node_modules/.bin/vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` passed with exit 0 and no diagnostics.
+  - Full frontend tests: `node --test $(rg --files frontend/src -g '*.test.ts') frontend/vite.config.structure.test.ts` passed, 765 tests.
+  - Frontend production build: `npm run build` in `frontend` passed; the build completed without a Vite large chunk warning.
+  - Dev restart: root `npm run dev` started services on frontend `http://127.0.0.1:3477` and backend `http://127.0.0.1:8765`.
+  - Health checks: frontend `/` returned HTTP 200 and backend `/health` returned HTTP 200 with `{"status":"ok"}`.
+  - Visual check: captured `/tmp/graphiteui-editor-phase26.png` from `http://127.0.0.1:3477/editor/new`; the input node segmented controls, output state pill, and textarea surface render with the expected warm styling.
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Phase 26 implementation, verification, dev restart, visual check, and continuation planning are complete. |
+| Where am I going? | Phase 27 is open for the `OutputNodeBody.vue` extraction because total cleanup is still below 100%. |
+| What's the goal? | Keep reducing `NodeCard.vue` presentation concentration without changing graph editing or input upload/value semantics. |
+| What have I learned? | Input body presentation can move safely if the output state pill stays parent-owned through a slot and file/drop/value handlers remain in `NodeCard.vue`. |
+| What have I done? | Added `InputNodeBody.vue`, moved input-specific scoped styles with it, updated structure tests, and verified the editor visually. |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-29 | Root `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` printed TypeScript help instead of checking the Vue project. | First Phase 26 TypeScript verification attempt from the repository root. | Re-ran `./node_modules/.bin/vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` from `frontend`, which passed with exit 0 and no diagnostics. |
+
+## Session: 2026-04-29 Phase 27 Output Node Body Component
+
+### Phase 27: Output Node Body Component
+- **Status:** completed
+- Actions taken:
+  - Re-read `task_plan.md`, `findings.md`, `progress.md`, and `docs/future/2026-04-28-architecture-refactor-roadmap.md`.
+  - Added `OutputNodeBody.structure.test.ts` and updated `NodeCard.structure.test.ts` before production code.
+  - Verified the red test failed because `OutputNodeBody.vue` did not exist yet.
+  - Added `OutputNodeBody.vue` for the output primary-input slot host, persist card, preview metadata, rendered markdown/text preview, and local output scoped styles.
+  - Updated `NodeCard.vue` to delegate output body presentation through `OutputNodeBody` while keeping output preview/config derivation, persist lock guards, state pill popovers, and graph/state mutation emits in the parent.
+  - Removed output preview/persist scoped styles and the direct `DocumentChecked` icon import from `NodeCard.vue`.
+  - `NodeCard.vue` line count moved from 3,562 after Phase 26 to 3,373 after Phase 27.
+  - Recalculated total roadmap cleanup as about 51% complete and P1 NodeCard extraction as about 82% complete; because total cleanup remains below 100%, opened Phase 28 for the condition-node body slice.
+
+### Verification
+- **Status:** completed
+- Results:
+  - Red test: `node --test frontend/src/editor/nodes/OutputNodeBody.structure.test.ts frontend/src/editor/nodes/NodeCard.structure.test.ts` failed with `ENOENT` for `OutputNodeBody.vue` before implementation.
+  - Focused structure tests: `node --test frontend/src/editor/nodes/OutputNodeBody.structure.test.ts frontend/src/editor/nodes/NodeCard.structure.test.ts` passed, 36 tests.
+  - Focused output tests: `node --test frontend/src/editor/nodes/OutputNodeBody.structure.test.ts frontend/src/editor/nodes/NodeCard.structure.test.ts frontend/src/editor/nodes/outputPreviewContentModel.test.ts frontend/src/editor/nodes/outputConfigModel.test.ts` passed, 45 tests.
+  - Unused-symbol check: `./node_modules/.bin/vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` passed with exit 0 and no diagnostics.
+  - Full frontend tests: `node --test $(rg --files frontend/src -g '*.test.ts') frontend/vite.config.structure.test.ts` passed, 766 tests.
+  - Frontend production build: `npm run build` in `frontend` passed; the build completed without a Vite large chunk warning.
+  - Dev restart: root `npm run dev` started services on frontend `http://127.0.0.1:3477` and backend `http://127.0.0.1:8765`.
+  - Health checks: frontend `/` returned HTTP 200 and backend `/health` returned HTTP 200 with `{"status":"ok"}`.
+  - Visual check: captured `/tmp/graphiteui-editor-phase27.png` from `http://127.0.0.1:3477/editor/new`; the editor renders the input, agent, and output flow with the output preview surface visible at the right edge of the wide viewport.
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Phase 27 implementation, verification, dev restart, and visual check are complete; commit and push are the remaining closeout steps. |
+| Where am I going? | Phase 28 is open for the `ConditionNodeBody.vue` extraction because total cleanup is still below 100%. |
+| What's the goal? | Keep reducing `NodeCard.vue` presentation concentration without changing output preview, persistence, or state-port behavior. |
+| What have I learned? | Output presentation can move safely when preview/config derivation, persist guards, and the primary input state pill stay parent-owned. |
+| What have I done? | Added `OutputNodeBody.vue`, moved output-specific scoped styles with it, updated structure tests, and verified focused/full frontend checks. |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-29 | `OutputNodeBody.vue` was missing during the Phase 27 red test. | First focused test run before implementation. | Added `OutputNodeBody.vue` and reran focused structure/output tests successfully. |
+
+## Session: 2026-04-29 Phase 28 NodeCard Presentation Closeout
+
+### Phase 28: NodeCard Presentation Closeout
+- **Status:** completed
+- Actions taken:
+  - Re-read `task_plan.md`, `findings.md`, `progress.md`, and `docs/future/2026-04-28-architecture-refactor-roadmap.md`.
+  - Widened Phase 28 from only `ConditionNodeBody.vue` to a larger NodeCard presentation closeout covering both condition body presentation and top action/advanced popover presentation.
+  - Added `ConditionNodeBody.structure.test.ts`, `NodeCardTopActions.structure.test.ts`, and updated `NodeCard.structure.test.ts` before production code.
+  - Verified the red test failed because `ConditionNodeBody.vue` and `NodeCardTopActions.vue` did not exist yet.
+  - Added `ConditionNodeBody.vue` for condition source state pill presentation, state/create popover wiring, operator/value/loop controls, and local condition scoped styles.
+  - Added `NodeCardTopActions.vue` for the top action dock, human-review button, advanced agent/output popover controls, preset/delete confirm popovers, and local top-action scoped styles.
+  - Updated `NodeCard.vue` to delegate condition and top-action presentation while keeping condition rule draft synchronization, loop-limit commits, output/agent config patch handlers, action confirmations, lock guards, and graph/state mutation emits in the parent.
+  - Removed stale top-action, advanced-popover, condition-control, and old branch-editor scoped styles from `NodeCard.vue`.
+  - `NodeCard.vue` line count moved from 3,373 after Phase 27 to 2,577 after Phase 28.
+  - Recalculated total roadmap cleanup as about 54% complete and P1 NodeCard cleanup as about 91% complete; because total cleanup remains below 100%, opened Phase 29 for primary state-port and residual chrome cleanup.
+
+### Verification
+- **Status:** completed
+- Results:
+  - Red test: `node --test frontend/src/editor/nodes/ConditionNodeBody.structure.test.ts frontend/src/editor/nodes/NodeCardTopActions.structure.test.ts frontend/src/editor/nodes/NodeCard.structure.test.ts` failed with `ENOENT` for the two new component files before implementation.
+  - Focused structure tests: `node --test frontend/src/editor/nodes/ConditionNodeBody.structure.test.ts frontend/src/editor/nodes/NodeCardTopActions.structure.test.ts frontend/src/editor/nodes/NodeCard.structure.test.ts` passed, 40 tests.
+  - Focused related tests: `node --test frontend/src/editor/nodes/ConditionNodeBody.structure.test.ts frontend/src/editor/nodes/NodeCardTopActions.structure.test.ts frontend/src/editor/nodes/NodeCard.structure.test.ts frontend/src/editor/nodes/conditionRuleEditorModel.test.ts frontend/src/editor/nodes/conditionLoopLimit.test.ts frontend/src/editor/nodes/outputConfigModel.test.ts frontend/src/editor/nodes/agentConfigModel.test.ts` passed, 64 tests.
+  - Unused-symbol check: `./node_modules/.bin/vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` passed with exit 0 and no diagnostics.
+  - Whitespace check: `git diff --check` passed with exit 0.
+  - Full frontend tests: `node --test $(rg --files frontend/src -g '*.test.ts') frontend/vite.config.structure.test.ts` passed, 771 tests.
+  - Frontend production build: `npm run build` in `frontend` passed; the build completed without a Vite large chunk warning.
+  - Dev restart: root `npm run dev` started services on frontend `http://127.0.0.1:3477` and backend `http://127.0.0.1:8765`.
+  - Health checks: frontend `/` returned HTTP 200 and backend `/health` returned HTTP 200 with `{"status":"ok"}`.
+  - Visual checks: captured `/tmp/graphiteui-editor-phase28.png` for the default editor flow and `/tmp/graphiteui-editor-phase28-top-actions.png` for a selected node with the top action dock visible.
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Phase 28 implementation, verification, dev restart, visual checks, and continuation planning are complete. |
+| Where am I going? | Phase 29 is open for primary state-port and residual chrome cleanup because total roadmap progress is still below 100%. |
+| What's the goal? | Keep reducing `NodeCard.vue` responsibility while preserving state popover behavior, config mutation handlers, and graph editing behavior. |
+| What have I learned? | NodeCard condition and top-action presentation can move safely if the mutation handlers, confirmation windows, lock guards, and draft synchronization stay parent-owned. |
+| What have I done? | Added `ConditionNodeBody.vue` and `NodeCardTopActions.vue`, removed stale parent styles, verified focused/full checks, and visually checked the editor. |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-29 | `ConditionNodeBody.vue` and `NodeCardTopActions.vue` were missing during the Phase 28 red test. | First focused structure run before implementation. | Added both components and reran focused structure/model tests successfully. |
+| 2026-04-29 | Unescaped backticks in `rg` commands caused `/bin/bash: line 1: NodeCard.vue: command not found`. | Phase 28 source inspection and plan sanity-check commands. | Re-ran inspection with safer quoting; the failed shell interpolation had no code impact. |
+| 2026-04-29 | Fresh screenshot tooling probe found no `chromium`, `playwright`, or `puppeteer` available from the current shell. | Final visual-check refresh after dev restart. | Kept the Phase 28 screenshots already captured earlier in this round and used fresh HTTP health checks for final dev verification. |
+
 ## Session: 2026-04-28 Phase 16
 
 ### Phase 1: Re-orientation and Safety Scope
@@ -505,6 +633,46 @@
 | Frontend production build | `npm run build` in `frontend` | Build succeeds without large chunk warning | Exit 0, no large chunk warning | Passed |
 | Dev restart | `npm run dev` | Services start and respond | Frontend `/editor/new` 200, backend `/health` 200 | Passed |
 | Visual check | Headless Chrome screenshot of `/editor/new` | Editor route renders without obvious layout regression | Screenshot captured at `/tmp/graphiteui-editor-phase24-wait.png` | Passed |
+
+## Session: 2026-04-29 Phase 25
+
+### Phase 25: Agent Node Body Component
+- **Status:** completed
+- Actions taken:
+  - Continued the automatic cleanup loop because total roadmap progress after Phase 24 was still about 48%.
+  - Added `frontend/src/editor/nodes/AgentNodeBody.structure.test.ts` and updated `NodeCard.structure.test.ts` before production changes.
+  - Verified the expected red failure: `AgentNodeBody.vue` did not exist and `NodeCard.vue` still owned the agent body presentation.
+  - Added `AgentNodeBody.vue` to own the agent input/output state port columns, `AgentRuntimeControls`, `AgentSkillPicker`, and task instruction textarea wiring.
+  - Updated `NodeCard.vue` to pass derived state-port/runtime/skill data and parent-owned handlers into `AgentNodeBody.vue`.
+  - Kept state port derivation, create/edit drafts, validation, lock guards, agent config emits, skill patch creation, and graph mutation emits in `NodeCard.vue`.
+  - Caught a scoped-style visual regression where the moved prompt textarea lost the parent surface styling; moved the required surface/textarea styles into `AgentNodeBody.vue` and added structure coverage.
+  - Confirmed `NodeCard.vue` is down to 3,895 lines after this extraction.
+  - Recalculated total roadmap cleanup at about 49% and P1 `NodeCard.vue` cleanup at about 75%.
+  - Because total roadmap cleanup is still below 100%, opened Phase 26 automatically for the `InputNodeBody.vue` slice.
+
+### Phase 25 Verification
+- **Status:** completed
+- Actions taken:
+  - Ran `node --test frontend/src/editor/nodes/AgentNodeBody.structure.test.ts frontend/src/editor/nodes/NodeCard.structure.test.ts frontend/src/editor/nodes/AgentRuntimeControls.structure.test.ts frontend/src/editor/nodes/AgentSkillPicker.structure.test.ts frontend/src/editor/nodes/skillPickerModel.test.ts frontend/src/editor/nodes/agentConfigModel.test.ts frontend/src/editor/nodes/usePortReorder.test.ts`.
+  - Ran `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend`.
+  - Ran `node --test $(rg --files frontend/src -g '*.test.ts') frontend/vite.config.structure.test.ts`.
+  - Ran `npm run build` in `frontend`; no Vite large chunk warning was emitted.
+  - Restarted the dev environment with root `npm run dev`.
+  - Confirmed the frontend returned HTTP 200 at `http://127.0.0.1:3477/editor/new`.
+  - Confirmed the backend health route returned HTTP 200 at `http://127.0.0.1:8765/health`.
+  - Captured a headless Chrome screenshot of `http://127.0.0.1:3477/editor/new` and confirmed the agent prompt textarea retained its rounded surface styling.
+
+## Test Results: Phase 25
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red structure tests | `node --test frontend/src/editor/nodes/AgentNodeBody.structure.test.ts frontend/src/editor/nodes/NodeCard.structure.test.ts` before implementation | Fails because `AgentNodeBody.vue` is missing and NodeCard still owns agent body markup | Failed with `ENOENT` for `AgentNodeBody.vue` | Passed |
+| Focused agent body suite | `node --test frontend/src/editor/nodes/AgentNodeBody.structure.test.ts frontend/src/editor/nodes/NodeCard.structure.test.ts frontend/src/editor/nodes/AgentRuntimeControls.structure.test.ts frontend/src/editor/nodes/AgentSkillPicker.structure.test.ts frontend/src/editor/nodes/skillPickerModel.test.ts frontend/src/editor/nodes/agentConfigModel.test.ts frontend/src/editor/nodes/usePortReorder.test.ts` | Touched structure/composable/model tests pass | 55 passed | Passed |
+| Scoped style regression check | Headless Chrome screenshot before local style fix | Prompt textarea should keep rounded surface styling after extraction | Initial screenshot showed the textarea lost parent scoped styling; fixed by moving surface styles into `AgentNodeBody.vue` | Passed |
+| Unused symbol check | `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No unused-symbol diagnostics | Exit 0, no diagnostics | Passed |
+| Full frontend tests | `node --test $(rg --files frontend/src -g '*.test.ts') frontend/vite.config.structure.test.ts` | All frontend tests pass | 764 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without large chunk warning | Exit 0, no large chunk warning | Passed |
+| Dev restart | `npm run dev` | Services start and respond | Frontend `/editor/new` 200, backend `/health` 200 | Passed |
+| Visual check | Headless Chrome screenshot of `/editor/new` | Editor route renders without obvious layout regression | Screenshot captured at `/tmp/graphiteui-editor-phase25-after-style.png` | Passed |
 
 ## Session: 2026-04-28 Baseline Interaction Repair and Large Connection Cleanup
 
