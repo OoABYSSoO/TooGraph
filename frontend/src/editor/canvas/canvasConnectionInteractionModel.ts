@@ -45,6 +45,26 @@ export type CanvasPendingConnectionCreationMenuRequest = {
   clearSelectedEdge: true;
 };
 
+export type CanvasDoubleClickCreationAction =
+  | { type: "locked-edit-attempt" }
+  | { type: "ignore-target" }
+  | { type: "open-creation-menu"; payload: CanvasNodeCreationMenuPayload };
+
+export type CanvasFileDropCreationPayload = {
+  file: File;
+  position: GraphPosition;
+  clientX: number;
+  clientY: number;
+};
+
+export type CanvasDropCreationAction =
+  | { type: "locked-edit-attempt" }
+  | { type: "ignore-target" }
+  | { type: "ignore-missing-file" }
+  | { type: "create-from-file"; payload: CanvasFileDropCreationPayload };
+
+export type CanvasDragOverDropEffect = "copy" | "none";
+
 export type CanvasConnectionPointerUpAction =
   | { type: "clear-connection-interaction" }
   | { type: "complete-connection"; targetAnchor: ProjectedCanvasAnchor }
@@ -160,6 +180,73 @@ export function resolveCanvasPendingConnectionCreationMenuRequest(
     clearConnectionInteraction: true,
     clearSelectedEdge: true,
   };
+}
+
+export function resolveCanvasDoubleClickCreationAction(input: {
+  interactionLocked: boolean;
+  isIgnoredTarget: boolean;
+  position: GraphPosition;
+  clientX: number;
+  clientY: number;
+}): CanvasDoubleClickCreationAction {
+  if (input.interactionLocked) {
+    return { type: "locked-edit-attempt" };
+  }
+
+  if (input.isIgnoredTarget) {
+    return { type: "ignore-target" };
+  }
+
+  return {
+    type: "open-creation-menu",
+    payload: {
+      position: input.position,
+      clientX: input.clientX,
+      clientY: input.clientY,
+    },
+  };
+}
+
+export function resolveCanvasDropCreationAction(input: {
+  interactionLocked: boolean;
+  isIgnoredTarget: boolean;
+  file: File | null;
+  position: GraphPosition;
+  clientX: number;
+  clientY: number;
+}): CanvasDropCreationAction {
+  if (input.interactionLocked) {
+    return { type: "locked-edit-attempt" };
+  }
+
+  if (input.isIgnoredTarget) {
+    return { type: "ignore-target" };
+  }
+
+  if (!input.file) {
+    return { type: "ignore-missing-file" };
+  }
+
+  return {
+    type: "create-from-file",
+    payload: {
+      file: input.file,
+      position: input.position,
+      clientX: input.clientX,
+      clientY: input.clientY,
+    },
+  };
+}
+
+export function resolveCanvasDragOverDropEffect(input: {
+  interactionLocked: boolean;
+  hasDraggedFiles: boolean;
+}): CanvasDragOverDropEffect {
+  if (input.interactionLocked) {
+    return "none";
+  }
+
+  return input.hasDraggedFiles ? "copy" : "none";
 }
 
 export function resolveCanvasConnectionPointerUpAction(input: {

@@ -77,6 +77,10 @@ function readCanvasViewportDisplayModelSource() {
   return readFileSync(resolve(currentDirectory, "canvasViewportDisplayModel.ts"), "utf8").replace(/\r\n/g, "\n");
 }
 
+function readCanvasViewportInteractionModelSource() {
+  return readFileSync(resolve(currentDirectory, "canvasViewportInteractionModel.ts"), "utf8").replace(/\r\n/g, "\n");
+}
+
 function readCanvasNodeDragResizeModelSource() {
   return readFileSync(resolve(currentDirectory, "canvasNodeDragResizeModel.ts"), "utf8").replace(/\r\n/g, "\n");
 }
@@ -685,6 +689,8 @@ test("EditorCanvas exposes a top-left capsule toolbar for edge visibility modes"
 });
 
 test("EditorCanvas exposes page zoom controls and emits viewport draft updates", () => {
+  const canvasViewportInteractionModelSource = readCanvasViewportInteractionModelSource();
+
   assert.match(componentSource, /initialViewport\?: CanvasViewport \| null;/);
   assert.match(componentSource, /\(event: "update:viewport", payload: CanvasViewport\): void;/);
   assert.match(componentSource, /const viewport = useViewport\(props\.initialViewport \?\? undefined\);/);
@@ -699,11 +705,14 @@ test("EditorCanvas exposes page zoom controls and emits viewport draft updates",
   assert.match(componentSource, /function handleZoomReset\(\)/);
   assert.match(componentSource, /function zoomViewportAroundCanvasCenter\(nextScale: number\)/);
   assert.match(componentSource, /@wheel\.prevent="handleWheel"/);
-  assert.match(componentSource, /function resolveWheelZoomDelta\(event: WheelEvent\)/);
-  assert.match(componentSource, /function handleWheel\(event: WheelEvent\)[\s\S]*viewport\.zoomAt\(\{/);
-  assert.match(componentSource, /clientX:\s*event\.clientX/);
-  assert.match(componentSource, /clientY:\s*event\.clientY/);
-  assert.match(componentSource, /nextScale:\s*viewport\.viewport\.scale \+ wheelZoomDelta/);
+  assert.match(componentSource, /import \{ resolveCanvasWheelZoomRequest \} from "\.\/canvasViewportInteractionModel";/);
+  assert.match(canvasViewportInteractionModelSource, /export function resolveWheelZoomDelta/);
+  assert.match(canvasViewportInteractionModelSource, /export function resolveCanvasWheelZoomRequest/);
+  assert.match(componentSource, /const wheelZoomRequest = resolveCanvasWheelZoomRequest\(\{[\s\S]*deltaY: event\.deltaY,[\s\S]*currentScale: viewport\.viewport\.scale,[\s\S]*clientX: event\.clientX,[\s\S]*clientY: event\.clientY,[\s\S]*canvasRect: canvasRef\.value\?\.getBoundingClientRect\(\) \?\? null,[\s\S]*\}\);/);
+  assert.match(componentSource, /case "set-scale":[\s\S]*viewport\.setViewport\(\{[\s\S]*scale: wheelZoomRequest\.nextScale,[\s\S]*\}\);/);
+  assert.match(componentSource, /case "zoom-at":[\s\S]*viewport\.zoomAt\(\{[\s\S]*clientX: wheelZoomRequest\.clientX,[\s\S]*clientY: wheelZoomRequest\.clientY,[\s\S]*canvasLeft: wheelZoomRequest\.canvasLeft,[\s\S]*canvasTop: wheelZoomRequest\.canvasTop,[\s\S]*nextScale: wheelZoomRequest\.nextScale,[\s\S]*\}\);/);
+  assert.doesNotMatch(componentSource, /function resolveWheelZoomDelta\(event: WheelEvent\)/);
+  assert.doesNotMatch(componentSource, /const direction = event\.deltaY > 0 \? -1 : 1;/);
   assert.doesNotMatch(componentSource, /\.editor-canvas__zoom-toolbar \{[\s\S]*position:\s*absolute;[\s\S]*left:\s*18px;/);
 });
 
@@ -885,12 +894,30 @@ test("EditorCanvas constrains empty-canvas onboarding text inside narrow canvas 
 });
 
 test("EditorCanvas emits node-creation intents for empty-canvas double click and dropped files", () => {
+  const canvasConnectionInteractionModelSource = readCanvasConnectionInteractionModelSource();
+
   assert.match(componentSource, /\(event: "open-node-creation-menu", payload:/);
   assert.match(componentSource, /\(event: "create-node-from-file", payload:/);
   assert.match(componentSource, /@dblclick="handleCanvasDoubleClick"/);
+  assert.match(componentSource, /@dragover\.prevent="handleCanvasDragOver"/);
+  assert.match(componentSource, /@drop\.prevent="handleCanvasDrop"/);
+  assert.match(canvasConnectionInteractionModelSource, /export function resolveCanvasDoubleClickCreationAction/);
+  assert.match(canvasConnectionInteractionModelSource, /export function resolveCanvasDragOverDropEffect/);
+  assert.match(canvasConnectionInteractionModelSource, /export function resolveCanvasDropCreationAction/);
+  assert.match(componentSource, /import \{[\s\S]*resolveCanvasDoubleClickCreationAction,[\s\S]*\} from "\.\/canvasConnectionInteractionModel";/);
+  assert.match(componentSource, /import \{[\s\S]*resolveCanvasDragOverDropEffect,[\s\S]*\} from "\.\/canvasConnectionInteractionModel";/);
+  assert.match(componentSource, /import \{[\s\S]*resolveCanvasDropCreationAction,[\s\S]*\} from "\.\/canvasConnectionInteractionModel";/);
+  assert.match(componentSource, /event\.dataTransfer!\.dropEffect = resolveCanvasDragOverDropEffect\(\{[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*hasDraggedFiles: Boolean\(event\.dataTransfer\?\.files\?\.length\),[\s\S]*\}\);/);
   assert.match(componentSource, /function handleCanvasDoubleClick\(event: MouseEvent\)/);
-  assert.match(componentSource, /emit\("open-node-creation-menu",/);
-  assert.match(componentSource, /emit\("create-node-from-file",/);
+  assert.match(componentSource, /const doubleClickCreationAction = resolveCanvasDoubleClickCreationAction\(\{[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*isIgnoredTarget: isIgnoredCanvasDoubleClickTarget\(target\),[\s\S]*position: resolveCanvasPoint\(event\),[\s\S]*clientX: event\.clientX,[\s\S]*clientY: event\.clientY,[\s\S]*\}\);/);
+  assert.match(componentSource, /case "locked-edit-attempt":[\s\S]*emit\("locked-edit-attempt"\);[\s\S]*return;/);
+  assert.match(componentSource, /case "ignore-target":[\s\S]*return;/);
+  assert.match(componentSource, /case "open-creation-menu":[\s\S]*emit\("open-node-creation-menu", doubleClickCreationAction\.payload\);/);
+  assert.match(componentSource, /function isIgnoredCanvasDoubleClickTarget\(target: HTMLElement \| null\)/);
+  assert.doesNotMatch(componentSource, /if \(\s*target\?\.closest\([\s\S]*\)\s*\) \{\s*return;\s*\}\s*const position = resolveCanvasPoint\(event\);/);
+  assert.match(componentSource, /const dropCreationAction = resolveCanvasDropCreationAction\(\{[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*isIgnoredTarget: isIgnoredCanvasDropTarget\(target\),[\s\S]*file: event\.dataTransfer\?\.files\?\.\[0\] \?\? null,[\s\S]*position: resolveCanvasPoint\(event\),[\s\S]*clientX: event\.clientX,[\s\S]*clientY: event\.clientY,[\s\S]*\}\);/);
+  assert.match(componentSource, /case "create-from-file":[\s\S]*emit\("create-node-from-file", dropCreationAction\.payload\);/);
+  assert.match(componentSource, /function isIgnoredCanvasDropTarget\(target: HTMLElement \| null\)/);
 });
 
 test("EditorCanvas forwards node-card state editing and top-action events", () => {

@@ -21,6 +21,9 @@ import {
   resolveCanvasEligibleTargetAnchorForNodeBody,
   resolveCanvasConnectionPointerMoveRequest,
   resolveCanvasAnchorPointerDownAction,
+  resolveCanvasDragOverDropEffect,
+  resolveCanvasDoubleClickCreationAction,
+  resolveCanvasDropCreationAction,
   resolveCanvasNodePointerDownConnectionAction,
 } from "./canvasConnectionInteractionModel.ts";
 
@@ -62,6 +65,113 @@ test("canvas connection interaction model resolves creation payloads without dro
   });
   assert.equal(resolveCanvasConnectionStateValueType("answer", document.state_schema), "markdown");
   assert.equal(resolveCanvasConnectionStateValueType(VIRTUAL_ANY_OUTPUT_STATE_KEY, document.state_schema), null);
+});
+
+test("canvas connection interaction model resolves empty-canvas double-click creation actions", () => {
+  const payload = {
+    position: { x: 120, y: 80 },
+    clientX: 240,
+    clientY: 180,
+  };
+
+  assert.deepEqual(
+    resolveCanvasDoubleClickCreationAction({
+      interactionLocked: true,
+      isIgnoredTarget: false,
+      ...payload,
+    }),
+    { type: "locked-edit-attempt" },
+  );
+  assert.deepEqual(
+    resolveCanvasDoubleClickCreationAction({
+      interactionLocked: false,
+      isIgnoredTarget: true,
+      ...payload,
+    }),
+    { type: "ignore-target" },
+  );
+  assert.deepEqual(
+    resolveCanvasDoubleClickCreationAction({
+      interactionLocked: false,
+      isIgnoredTarget: false,
+      ...payload,
+    }),
+    {
+      type: "open-creation-menu",
+      payload,
+    },
+  );
+});
+
+test("canvas connection interaction model resolves file-drop creation actions", () => {
+  const file = { name: "workflow.md" } as File;
+  const payload = {
+    file,
+    position: { x: 160, y: 90 },
+    clientX: 260,
+    clientY: 190,
+  };
+
+  assert.deepEqual(
+    resolveCanvasDropCreationAction({
+      interactionLocked: true,
+      isIgnoredTarget: false,
+      ...payload,
+    }),
+    { type: "locked-edit-attempt" },
+  );
+  assert.deepEqual(
+    resolveCanvasDropCreationAction({
+      interactionLocked: false,
+      isIgnoredTarget: true,
+      ...payload,
+    }),
+    { type: "ignore-target" },
+  );
+  assert.deepEqual(
+    resolveCanvasDropCreationAction({
+      interactionLocked: false,
+      isIgnoredTarget: false,
+      ...payload,
+      file: null,
+    }),
+    { type: "ignore-missing-file" },
+  );
+  assert.deepEqual(
+    resolveCanvasDropCreationAction({
+      interactionLocked: false,
+      isIgnoredTarget: false,
+      ...payload,
+    }),
+    {
+      type: "create-from-file",
+      payload,
+    },
+  );
+});
+
+test("canvas connection interaction model resolves drag-over drop effects", () => {
+  assert.equal(
+    resolveCanvasDragOverDropEffect({
+      interactionLocked: true,
+      hasDraggedFiles: true,
+    }),
+    "none",
+  );
+  assert.equal(
+    resolveCanvasDragOverDropEffect({
+      interactionLocked: false,
+      hasDraggedFiles: false,
+    }),
+    "none",
+  );
+  assert.equal(
+    resolveCanvasDragOverDropEffect({
+      interactionLocked: false,
+      hasDraggedFiles: true,
+    }),
+    "copy",
+  );
 });
 
 test("canvas connection interaction model resolves forward creation menu requests with cleanup policy", () => {

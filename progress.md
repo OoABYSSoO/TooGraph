@@ -1,5 +1,282 @@
 # Progress Log
 
+## Session: 2026-04-30 Phase 46
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Confirmed Phase 45 was committed and pushed as `23990bc`.
+  - Re-read the formal roadmap, active plan, latest findings, and current drag-over/drop flow.
+  - Inspected `handleCanvasDragOver`, `handleCanvasDrop`, `canvasConnectionInteractionModel.ts`, and existing node-creation structure coverage.
+  - Selected the next P2 Canvas boundary: drag-over drop-effect selection.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `resolveCanvasDragOverDropEffect` model expectations before production code.
+  - Updated `EditorCanvas.structure.test.ts` to require the new drag-over drop-effect boundary.
+  - Verified the expected red failure: the model export was missing and the component still owned the inline locked / copy / none branch.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `CanvasDragOverDropEffect` and `resolveCanvasDragOverDropEffect` to `canvasConnectionInteractionModel.ts`.
+  - Updated `EditorCanvas.vue` so `handleCanvasDragOver` delegates copy/none selection to the model.
+  - Kept actual `event.dataTransfer.dropEffect` mutation and dragover event binding inside the component.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused connection interaction model and structure tests.
+  - Ran the broader Canvas creation, connection, viewport, drag/resize, edge, and graph regression set.
+  - Ran TypeScript unused-symbol verification from `frontend`.
+  - Ran the full frontend `node --test` suite.
+  - Ran the frontend production build; no large chunk warning was emitted.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed backend `/health` returned `{"status":"ok"}` and the frontend entry returned HTTP 200.
+  - Captured a headless Chrome screenshot after a virtual-time wait and confirmed the workspace rendered normally.
+
+### Phase 5: Continuation Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated overall roadmap cleanup at about 73%.
+  - Recalculated P2 `EditorCanvas.vue` cleanup at about 74%.
+  - Opened Phase 47 automatically because total roadmap progress is below 100%.
+  - Selected the next candidate boundary as selected-edge keyboard delete routing around editable targets, locked edit, missing/no-op edge, and flow/route delete payloads.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red focused tests | `node --test frontend/src/editor/canvas/canvasConnectionInteractionModel.test.ts frontend/src/editor/canvas/EditorCanvas.structure.test.ts` before implementation | Fails because drag-over drop-effect export and component wiring do not exist | Failed on missing export and structure assertions | Passed |
+| Focused model/structure tests | Same focused files after implementation | All focused tests pass | 76 passed | Passed |
+| Focused Canvas and graph regression | `node --test` over Canvas creation, connection, viewport, drag/resize, edge, and graph document tests | Related interaction tests pass | 187 passed | Passed |
+| Unused symbol check | `./node_modules/.bin/vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No diagnostics | Exit 0 | Passed |
+| Full frontend tests | `node --test $(rg --files src vite.config.structure.test.ts | rg '\.test\.ts$')` in `frontend` | All frontend tests pass | 807 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without a large chunk warning | Exit 0, no Vite chunk warning | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+| Browser smoke | Headless Chrome screenshot with virtual-time wait | Workspace renders normally | Workspace UI rendered | Passed |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Phase 46 implementation, verification, docs update, and dev restart are complete. |
+| Where am I going? | Phase 47 is open for selected-edge keyboard delete action extraction. |
+| What's the goal? | Continue reducing `EditorCanvas.vue` interaction ownership without changing drag, resize, snap, create-node, pan/zoom, edge deletion, or connection-completion behavior. |
+| What have I learned? | Drag-over drop-effect selection is pure; the component should only write the chosen effect back to the browser event. |
+| What have I done? | Extracted drag-over drop-effect selection, added focused tests, verified the full frontend suite, built, restarted, and visually smoked the app. |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+
+## Session: 2026-04-30 Phase 45
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Confirmed Phase 44 was committed and pushed as `8d988ff`.
+  - Re-read the formal roadmap, active plan, latest findings, and current file-drop creation flow.
+  - Inspected `handleCanvasDrop`, `canvasConnectionInteractionModel.ts`, and existing node-creation structure coverage.
+  - Selected the next P2 Canvas boundary: file-drop creation routing.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `resolveCanvasDropCreationAction` model expectations before production code.
+  - Updated `EditorCanvas.structure.test.ts` to require the new drop creation action boundary.
+  - Verified the expected red failure: the model export was missing and the component still owned the inline locked / ignored-target / missing-file / emit branch.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `CanvasDropCreationAction`, `CanvasFileDropCreationPayload`, and `resolveCanvasDropCreationAction` to `canvasConnectionInteractionModel.ts`.
+  - Updated `EditorCanvas.vue` to route file-drop creation through the returned action.
+  - Kept DOM target inspection, `dataTransfer` access, canvas coordinate conversion, and actual `create-node-from-file` / `locked-edit-attempt` emits inside the component.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused connection interaction model and structure tests.
+  - Ran the broader Canvas creation, connection, viewport, drag/resize, edge, and graph regression set.
+  - Ran TypeScript unused-symbol verification from `frontend`.
+  - Ran the full frontend `node --test` suite.
+  - Ran the frontend production build; no large chunk warning was emitted.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed backend `/health` returned `{"status":"ok"}` and the frontend entry returned HTTP 200.
+  - Captured a headless Chrome screenshot after a virtual-time wait and confirmed the workspace rendered normally.
+
+### Phase 5: Continuation Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated overall roadmap cleanup at about 72%.
+  - Recalculated P2 `EditorCanvas.vue` cleanup at about 73%.
+  - Opened Phase 46 automatically because total roadmap progress is below 100%.
+  - Selected the next candidate boundary as drag-over drop-effect routing around locked edit, dragged-file availability, and copy/none effect selection.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red focused tests | `node --test frontend/src/editor/canvas/canvasConnectionInteractionModel.test.ts frontend/src/editor/canvas/EditorCanvas.structure.test.ts` before implementation | Fails because drop creation action export and component wiring do not exist | Failed on missing export and structure assertions | Passed |
+| Focused model/structure tests | Same focused files after implementation | All focused tests pass | 75 passed | Passed |
+| Focused Canvas and graph regression | `node --test` over Canvas creation, connection, viewport, drag/resize, edge, and graph document tests | Related interaction tests pass | 186 passed | Passed |
+| Unused symbol check | `./node_modules/.bin/vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No diagnostics | Exit 0 | Passed |
+| Full frontend tests | `node --test $(rg --files src vite.config.structure.test.ts | rg '\.test\.ts$')` in `frontend` | All frontend tests pass | 806 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without a large chunk warning | Exit 0, no Vite chunk warning | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+| Browser smoke | Headless Chrome screenshot with virtual-time wait | Workspace renders normally | Workspace UI rendered | Passed |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Phase 45 implementation, verification, docs update, and dev restart are complete. |
+| Where am I going? | Phase 46 is open for drag-over drop-effect request extraction. |
+| What's the goal? | Continue reducing `EditorCanvas.vue` interaction ownership without changing drag, resize, snap, create-node, pan/zoom, or connection-completion behavior. |
+| What have I learned? | File-drop creation has a clean model boundary around branch selection, while DOM target inspection, file access, coordinate conversion, and emits should remain component-owned. |
+| What have I done? | Extracted file-drop creation routing, added focused tests, verified the full frontend suite, built, restarted, and visually smoked the app. |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+
+## Session: 2026-04-30 Phase 44
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Confirmed Phase 43 was committed and pushed as `10ee957`.
+  - Re-read the formal roadmap, active plan, latest findings, and current empty-canvas double-click creation flow.
+  - Inspected `handleCanvasDoubleClick`, `canvasConnectionInteractionModel.ts`, and existing node-creation structure coverage.
+  - Selected the next P2 Canvas boundary: empty-canvas double-click creation routing.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `resolveCanvasDoubleClickCreationAction` model expectations before production code.
+  - Updated `EditorCanvas.structure.test.ts` to require the new double-click creation action boundary.
+  - Verified the expected red failure: the model export was missing and the component still owned the inline locked / ignored-target / open-menu branch.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `CanvasDoubleClickCreationAction` and `resolveCanvasDoubleClickCreationAction` to `canvasConnectionInteractionModel.ts`.
+  - Updated `EditorCanvas.vue` to route double-click creation through the returned action.
+  - Kept DOM target inspection, canvas coordinate conversion, and actual `open-node-creation-menu` / `locked-edit-attempt` emits inside the component.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused connection interaction model and structure tests.
+  - Ran the broader Canvas creation, connection, viewport, drag/resize, edge, and graph regression set.
+  - Ran TypeScript unused-symbol verification from `frontend`.
+  - Ran the full frontend `node --test` suite.
+  - Ran the frontend production build; no large chunk warning was emitted.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed backend `/health` returned `{"status":"ok"}` and the frontend entry returned HTTP 200.
+  - Captured a headless Chrome screenshot after a virtual-time wait and confirmed the workspace rendered normally.
+
+### Phase 5: Continuation Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated overall roadmap cleanup at about 71%.
+  - Recalculated P2 `EditorCanvas.vue` cleanup at about 72%.
+  - Opened Phase 45 automatically because total roadmap progress is below 100%.
+  - Selected the next candidate boundary as file-drop creation routing around locked edit, node/card target ignore, missing file ignore, and create-from-file payload.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red focused tests | `node --test frontend/src/editor/canvas/canvasConnectionInteractionModel.test.ts frontend/src/editor/canvas/EditorCanvas.structure.test.ts` before implementation | Fails because double-click creation action export and component wiring do not exist | Failed on missing export and structure assertions | Passed |
+| Focused model/structure tests | Same focused files after implementation | All focused tests pass | 74 passed | Passed |
+| Focused Canvas and graph regression | `node --test` over Canvas creation, connection, viewport, drag/resize, edge, and graph document tests | Related interaction tests pass | 185 passed | Passed |
+| Unused symbol check | `./node_modules/.bin/vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No diagnostics | Exit 0 | Passed |
+| Full frontend tests | `node --test $(rg --files src vite.config.structure.test.ts | rg '\.test\.ts$')` in `frontend` | All frontend tests pass | 805 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without a large chunk warning | Exit 0, no Vite chunk warning | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+| Browser smoke | Headless Chrome screenshot with virtual-time wait | Workspace renders normally | Workspace UI rendered | Passed |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Phase 44 implementation, verification, docs update, and dev restart are complete. |
+| Where am I going? | Phase 45 is open for file-drop creation request extraction. |
+| What's the goal? | Continue reducing `EditorCanvas.vue` interaction ownership without changing drag, resize, snap, create-node, pan/zoom, or connection-completion behavior. |
+| What have I learned? | Empty-canvas double-click creation has a clean model boundary around branch selection, while DOM target inspection and emits should remain component-owned. |
+| What have I done? | Extracted empty-canvas double-click creation routing, added focused tests, verified the full frontend suite, built, restarted, and visually smoked the app. |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | Unescaped backticks in an `rg` shell command triggered `/bin/bash: line 1: EditorCanvas.vue: command not found` | Phase 44 progress/status inspection | The command was read-only, produced enough usable output, and no files were changed by the failed shell interpolation. |
+
+## Session: 2026-04-29 Phase 43
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Confirmed Phase 42 was committed and pushed as `519183e`.
+  - Re-read the formal roadmap, active plan, latest findings, and current wheel zoom flow.
+  - Inspected `handleWheel`, the existing viewport display model, and page zoom structure coverage.
+  - Selected the next P2 Canvas boundary: wheel zoom request projection.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `canvasViewportInteractionModel.test.ts` before the production model existed.
+  - Updated `EditorCanvas.structure.test.ts` to require the new wheel zoom request model boundary.
+  - Verified the expected red failure: the model file was missing and the component still owned inline wheel delta/request logic.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `canvasViewportInteractionModel.ts` with `resolveWheelZoomDelta` and `resolveCanvasWheelZoomRequest`.
+  - Updated `EditorCanvas.vue` to resolve wheel zoom requests before dispatching `viewport.setViewport` or `viewport.zoomAt`.
+  - Kept canvas DOM rect lookup, actual viewport mutation, wheel event binding, and viewport draft emits inside the component.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused viewport interaction model and structure tests.
+  - Ran the broader Canvas viewport, pinch, drag/resize, connection, edge, and graph regression set.
+  - Ran TypeScript unused-symbol verification from `frontend`.
+  - Ran the full frontend `node --test` suite.
+  - Ran the frontend production build; no large chunk warning was emitted.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed backend `/health` returned `{"status":"ok"}` and the frontend entry returned HTTP 200.
+  - Captured a headless Chrome screenshot after a virtual-time wait and confirmed the workspace rendered normally.
+
+### Phase 5: Continuation Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated overall roadmap cleanup at about 70%.
+  - Recalculated P2 `EditorCanvas.vue` cleanup at about 71%.
+  - Opened Phase 44 automatically because total roadmap progress is below 100%.
+  - Selected the next candidate boundary as empty-canvas double-click creation routing around locked edit, ignored targets, and menu opening.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red focused tests | `node --test frontend/src/editor/canvas/canvasViewportInteractionModel.test.ts frontend/src/editor/canvas/EditorCanvas.structure.test.ts` before implementation | Fails because viewport interaction model and component wiring do not exist | Failed on missing model file and structure assertions | Passed |
+| Focused model/structure tests | Same focused files after implementation | All focused tests pass | 62 passed | Passed |
+| Focused Canvas and graph regression | `node --test` over Canvas viewport, pinch, drag/resize, connection, edge, and graph document tests | Related interaction tests pass | 187 passed | Passed |
+| Unused symbol check | `./node_modules/.bin/vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No diagnostics | Exit 0 | Passed |
+| Full frontend tests | `node --test $(rg --files src vite.config.structure.test.ts | rg '\.test\.ts$')` in `frontend` | All frontend tests pass | 804 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without a large chunk warning | Exit 0, no Vite chunk warning | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+| Browser smoke | Headless Chrome screenshot with virtual-time wait | Workspace renders normally | Workspace UI rendered | Passed |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Phase 43 implementation, verification, docs update, and dev restart are complete. |
+| Where am I going? | Phase 44 is open for empty-canvas double-click creation request extraction. |
+| What's the goal? | Continue reducing `EditorCanvas.vue` interaction ownership without changing drag, resize, snap, create-node, pan/zoom, or connection-completion behavior. |
+| What have I learned? | Wheel zoom has a clean model boundary around request projection; viewport mutation should remain component/composable-owned. |
+| What have I done? | Extracted wheel zoom request projection, added focused tests, verified the full frontend suite, built, restarted, and visually smoked the app. |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+
 ## Session: 2026-04-29 Phase 42
 
 ### Phase 1: Re-orientation

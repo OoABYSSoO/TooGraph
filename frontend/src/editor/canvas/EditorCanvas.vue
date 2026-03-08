@@ -471,6 +471,7 @@ import { useCanvasNodeMeasurements } from "./useCanvasNodeMeasurements";
 import { buildPinchZoomStart, resolveCanvasPointerDownAction, resolvePointerCenter, resolvePointerDistance } from "./canvasPinchZoomModel";
 import type { CanvasPointerDownAction } from "./canvasPinchZoomModel";
 import { buildCanvasViewportStyle, buildZoomPercentLabel } from "./canvasViewportDisplayModel";
+import { resolveCanvasWheelZoomRequest } from "./canvasViewportInteractionModel";
 import {
   isCanvasStateTargetAnchorAllowedForConnection,
   resolveCanvasAutoSnappedTargetAnchor as resolveCanvasAutoSnappedTargetAnchorModel,
@@ -478,6 +479,9 @@ import {
   resolveCanvasAnchorPointerDownAction,
   resolveCanvasConnectionPointerMoveRequest,
   resolveCanvasConnectionPointerUpAction,
+  resolveCanvasDoubleClickCreationAction,
+  resolveCanvasDragOverDropEffect,
+  resolveCanvasDropCreationAction,
   resolveCanvasNodePointerDownConnectionAction,
   resolveCanvasPendingConnectionCreationMenuRequest,
   type CanvasAnchorPointerDownAction,
@@ -1252,25 +1256,31 @@ function handleCanvasPointerUp(event: PointerEvent) {
 }
 
 function handleCanvasDoubleClick(event: MouseEvent) {
-  if (isGraphEditingLocked()) {
-    emit("locked-edit-attempt");
-    return;
-  }
   const target = event.target as HTMLElement | null;
-  if (
-    target?.closest(
-      ".editor-canvas__node, .node-card, button, input, textarea, select, .el-input, .el-select, .el-switch",
-    )
-  ) {
-    return;
-  }
-
-  const position = resolveCanvasPoint(event);
-  emit("open-node-creation-menu", {
-    position,
+  const doubleClickCreationAction = resolveCanvasDoubleClickCreationAction({
+    interactionLocked: isGraphEditingLocked(),
+    isIgnoredTarget: isIgnoredCanvasDoubleClickTarget(target),
+    position: resolveCanvasPoint(event),
     clientX: event.clientX,
     clientY: event.clientY,
   });
+  switch (doubleClickCreationAction.type) {
+    case "locked-edit-attempt":
+      emit("locked-edit-attempt");
+      return;
+    case "ignore-target":
+      return;
+    case "open-creation-menu":
+      emit("open-node-creation-menu", doubleClickCreationAction.payload);
+  }
+}
+
+function isIgnoredCanvasDoubleClickTarget(target: HTMLElement | null) {
+  return Boolean(
+    target?.closest(
+      ".editor-canvas__node, .node-card, button, input, textarea, select, .el-input, .el-select, .el-switch",
+    ),
+  );
 }
 
 function resolveNodeIdAtPointer(event: PointerEvent) {
@@ -1341,34 +1351,36 @@ function canCompleteCanvasConnection(anchor: ProjectedCanvasAnchor) {
 }
 
 function handleCanvasDragOver(event: DragEvent) {
-  if (isGraphEditingLocked()) {
-    event.dataTransfer!.dropEffect = "none";
-    return;
-  }
-  event.dataTransfer!.dropEffect = event.dataTransfer?.files?.length ? "copy" : "none";
+  event.dataTransfer!.dropEffect = resolveCanvasDragOverDropEffect({
+    interactionLocked: isGraphEditingLocked(),
+    hasDraggedFiles: Boolean(event.dataTransfer?.files?.length),
+  });
 }
 
 function handleCanvasDrop(event: DragEvent) {
-  if (isGraphEditingLocked()) {
-    emit("locked-edit-attempt");
-    return;
-  }
   const target = event.target as HTMLElement | null;
-  if (target?.closest(".editor-canvas__node, .node-card")) {
-    return;
-  }
-
-  const file = event.dataTransfer?.files?.[0] ?? null;
-  if (!file) {
-    return;
-  }
-
-  emit("create-node-from-file", {
-    file,
+  const dropCreationAction = resolveCanvasDropCreationAction({
+    interactionLocked: isGraphEditingLocked(),
+    isIgnoredTarget: isIgnoredCanvasDropTarget(target),
+    file: event.dataTransfer?.files?.[0] ?? null,
     position: resolveCanvasPoint(event),
     clientX: event.clientX,
     clientY: event.clientY,
   });
+  switch (dropCreationAction.type) {
+    case "locked-edit-attempt":
+      emit("locked-edit-attempt");
+      return;
+    case "ignore-target":
+    case "ignore-missing-file":
+      return;
+    case "create-from-file":
+      emit("create-node-from-file", dropCreationAction.payload);
+  }
+}
+
+function isIgnoredCanvasDropTarget(target: HTMLElement | null) {
+  return Boolean(target?.closest(".editor-canvas__node, .node-card"));
 }
 
 function handleNodePointerDown(nodeId: string, event: PointerEvent) {
@@ -1651,36 +1663,32 @@ function handleZoomReset() {
   viewport.setViewport(DEFAULT_CANVAS_VIEWPORT);
 }
 
-function resolveWheelZoomDelta(event: WheelEvent) {
-  if (event.deltaY === 0) {
-    return 0;
-  }
-  const direction = event.deltaY > 0 ? -1 : 1;
-  return direction * 0.08;
-}
-
 function handleWheel(event: WheelEvent) {
-  const wheelZoomDelta = resolveWheelZoomDelta(event);
-  if (wheelZoomDelta === 0) {
-    return;
-  }
-
-  const rect = canvasRef.value?.getBoundingClientRect();
-  if (!rect) {
-    viewport.setViewport({
-      ...viewport.viewport,
-      scale: viewport.viewport.scale + wheelZoomDelta,
-    });
-    return;
-  }
-
-  viewport.zoomAt({
+  const wheelZoomRequest = resolveCanvasWheelZoomRequest({
+    deltaY: event.deltaY,
+    currentScale: viewport.viewport.scale,
     clientX: event.clientX,
     clientY: event.clientY,
-    canvasLeft: rect.left,
-    canvasTop: rect.top,
-    nextScale: viewport.viewport.scale + wheelZoomDelta,
+    canvasRect: canvasRef.value?.getBoundingClientRect() ?? null,
   });
+  switch (wheelZoomRequest.type) {
+    case "ignore":
+      return;
+    case "set-scale":
+      viewport.setViewport({
+        ...viewport.viewport,
+        scale: wheelZoomRequest.nextScale,
+      });
+      return;
+    case "zoom-at":
+      viewport.zoomAt({
+        clientX: wheelZoomRequest.clientX,
+        clientY: wheelZoomRequest.clientY,
+        canvasLeft: wheelZoomRequest.canvasLeft,
+        canvasTop: wheelZoomRequest.canvasTop,
+        nextScale: wheelZoomRequest.nextScale,
+      });
+  }
 }
 
 function handleEdgePointerDown(edge: ProjectedCanvasEdge, event: PointerEvent) {
