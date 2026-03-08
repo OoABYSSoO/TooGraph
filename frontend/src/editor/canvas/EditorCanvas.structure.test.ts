@@ -21,6 +21,10 @@ function readCanvasMinimapEdgeModelSource() {
   return readFileSync(resolve(currentDirectory, "canvasMinimapEdgeModel.ts"), "utf8").replace(/\r\n/g, "\n");
 }
 
+function readMinimapModelSource() {
+  return readFileSync(resolve(currentDirectory, "minimapModel.ts"), "utf8").replace(/\r\n/g, "\n");
+}
+
 function readCanvasDataEdgeStateModelSource() {
   return readFileSync(resolve(currentDirectory, "canvasDataEdgeStateModel.ts"), "utf8").replace(/\r\n/g, "\n");
 }
@@ -47,6 +51,10 @@ function readCanvasRunPresentationModelSource() {
 
 function readCanvasLockedInteractionModelSource() {
   return readFileSync(resolve(currentDirectory, "canvasLockedInteractionModel.ts"), "utf8").replace(/\r\n/g, "\n");
+}
+
+function readCanvasEdgePointerInteractionModelSource() {
+  return readFileSync(resolve(currentDirectory, "canvasEdgePointerInteractionModel.ts"), "utf8").replace(/\r\n/g, "\n");
 }
 
 function readFlowEdgeDeleteModelSource() {
@@ -124,6 +132,7 @@ test("EditorCanvas binds the canvas surface styling to the viewport state", () =
 test("EditorCanvas mounts a right-bottom minimap backed by measured node geometry", () => {
   const canvasNodePresentationModelSource = readCanvasNodePresentationModelSource();
   const canvasMinimapEdgeModelSource = readCanvasMinimapEdgeModelSource();
+  const minimapModelSource = readMinimapModelSource();
   const canvasNodeMeasurementsSource = readCanvasNodeMeasurementsSource();
 
   assert.match(componentSource, /import EditorMinimap from "\.\/EditorMinimap\.vue";/);
@@ -146,7 +155,12 @@ test("EditorCanvas mounts a right-bottom minimap backed by measured node geometr
   assert.doesNotMatch(componentSource, /const minimapEdges = computed\(\(\) =>[\s\S]*projectedEdges\.value[\s\S]*\.filter\(\(edge\) => visibleProjectedEdgeIds\.value\.has\(edge\.id\)\)/);
   assert.match(componentSource, /<EditorMinimap[\s\S]*class="editor-canvas__minimap"[\s\S]*:nodes="minimapNodes"[\s\S]*:edges="minimapEdges"[\s\S]*:viewport="viewport\.viewport"[\s\S]*:canvas-size="canvasSize"[\s\S]*@center-view="handleMinimapCenterView"/);
   assert.match(componentSource, /function handleMinimapCenterView\(point: \{ worldX: number; worldY: number \}\)/);
-  assert.match(componentSource, /resolveViewportForMinimapCenter\(/);
+  assert.match(minimapModelSource, /export function resolveMinimapCenterViewAction/);
+  assert.match(componentSource, /const minimapCenterViewAction = resolveMinimapCenterViewAction\(\{[\s\S]*worldX: point\.worldX,[\s\S]*worldY: point\.worldY,[\s\S]*viewportScale: viewport\.viewport\.scale,[\s\S]*canvasSize: canvasSize\.value,[\s\S]*\}\);/);
+  assert.match(componentSource, /case "ignore-empty-canvas-size":[\s\S]*return;/);
+  assert.match(componentSource, /case "set-viewport":[\s\S]*viewport\.setViewport\(minimapCenterViewAction\.viewport\);/);
+  assert.doesNotMatch(componentSource, /if \(canvasSize\.value\.width <= 0 \|\| canvasSize\.value\.height <= 0\) \{/);
+  assert.doesNotMatch(componentSource, /resolveViewportForMinimapCenter\(\{[\s\S]*canvasWidth: canvasSize\.value\.width,[\s\S]*canvasHeight: canvasSize\.value\.height/);
 });
 
 test("EditorCanvas stacks zoom controls above the minimap at the bottom right", () => {
@@ -453,6 +467,7 @@ test("EditorCanvas treats awaiting-human current node as a persistent review nod
 });
 
 test("EditorCanvas keeps paused human-review graphs viewable but read-only", () => {
+  const canvasEdgePointerInteractionModelSource = readCanvasEdgePointerInteractionModelSource();
   const canvasLockedInteractionModelSource = readCanvasLockedInteractionModelSource();
   const canvasConnectionInteractionModelSource = readCanvasConnectionInteractionModelSource();
   const canvasEdgeInteractionsSource = readCanvasEdgeInteractionsSource();
@@ -492,6 +507,10 @@ test("EditorCanvas keeps paused human-review graphs viewable but read-only", () 
   assert.match(componentSource, /@locked-edit-attempt="emit\('locked-edit-attempt'\)"/);
   assert.match(componentSource, /function isLockedNodeEditTarget\(target: EventTarget \| null\)/);
   assert.match(componentSource, /function guardLockedCanvasInteraction\(\)/);
+  assert.match(canvasLockedInteractionModelSource, /export function resolveLockedCanvasInteractionGuardAction/);
+  assert.match(componentSource, /const lockedCanvasInteractionGuardAction = resolveLockedCanvasInteractionGuardAction\(\{[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*\}\);/);
+  assert.match(componentSource, /case "block-locked-interaction":[\s\S]*if \(lockedCanvasInteractionGuardAction\.clearCanvasTransientState\) \{[\s\S]*clearCanvasTransientState\(\);/);
+  assert.match(componentSource, /if \(lockedCanvasInteractionGuardAction\.emitLockedEditAttempt\) \{[\s\S]*emit\("locked-edit-attempt"\);/);
   assert.match(canvasLockedInteractionModelSource, /export function resolveLockedNodePointerCaptureAction/);
   assert.match(componentSource, /const lockedNodePointerCaptureAction = resolveLockedNodePointerCaptureAction\(\{[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*nodeId,[\s\S]*shouldNotifyLockedAttempt,[\s\S]*\}\);/);
   assert.match(componentSource, /case "capture-locked-node":[\s\S]*if \(lockedNodePointerCaptureAction\.emitLockedEditAttempt\) \{[\s\S]*emit\("locked-edit-attempt"\);/);
@@ -504,13 +523,22 @@ test("EditorCanvas keeps paused human-review graphs viewable but read-only", () 
   assert.match(componentSource, /watch\(\s*\(\) => props\.interactionLocked,[\s\S]*clearCanvasTransientState\(\);/);
   assert.match(componentSource, /\[data-state-editor-trigger='true'\]/);
   assert.match(componentSource, /isLockedNodeEditTarget\(target\)[\s\S]*emit\("locked-edit-attempt"\);/);
-  assert.match(componentSource, /if \(isGraphEditingLocked\(\)\) \{/);
+  assert.match(componentSource, /interactionLocked: isGraphEditingLocked\(\)/);
   assert.match(componentSource, /guardLockedInteraction: guardLockedCanvasInteraction/);
   assert.match(canvasEdgeInteractionsSource, /function confirmFlowEdgeDelete\(\)[\s\S]*if \(input\.guardLockedInteraction\(\)\) \{[\s\S]*return;/);
   assert.match(canvasEdgeInteractionsSource, /function openDataEdgeStateEditor\(\)[\s\S]*if \(input\.guardLockedInteraction\(\)\) \{[\s\S]*return;/);
-  assert.match(componentSource, /function handleCanvasDoubleClick\(event: MouseEvent\)[\s\S]*if \(isGraphEditingLocked\(\)\) \{[\s\S]*emit\("locked-edit-attempt"\);/);
-  assert.match(componentSource, /function handleCanvasDrop\(event: DragEvent\)[\s\S]*if \(isGraphEditingLocked\(\)\) \{[\s\S]*emit\("locked-edit-attempt"\);/);
-  assert.match(componentSource, /function handleEdgePointerDown\(edge: ProjectedCanvasEdge, event: PointerEvent\)[\s\S]*if \(isGraphEditingLocked\(\)\) \{[\s\S]*emit\("locked-edit-attempt"\);/);
+  assert.match(canvasConnectionInteractionModelSource, /export function resolveCanvasDoubleClickCreationAction/);
+  assert.match(componentSource, /function handleCanvasDoubleClick\(event: MouseEvent\)[\s\S]*const doubleClickCreationAction = resolveCanvasDoubleClickCreationAction\(\{[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*\}\);/);
+  assert.match(componentSource, /case "locked-edit-attempt":[\s\S]*emit\("locked-edit-attempt"\);[\s\S]*return;/);
+  assert.match(canvasConnectionInteractionModelSource, /export function resolveCanvasDropCreationAction/);
+  assert.match(componentSource, /function handleCanvasDrop\(event: DragEvent\)[\s\S]*const dropCreationAction = resolveCanvasDropCreationAction\(\{[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*\}\);/);
+  assert.match(componentSource, /case "locked-edit-attempt":[\s\S]*emit\("locked-edit-attempt"\);[\s\S]*return;/);
+  assert.match(canvasEdgePointerInteractionModelSource, /export function resolveCanvasEdgePointerDownAction/);
+  assert.match(componentSource, /const edgePointerDownAction = resolveCanvasEdgePointerDownAction\(\{[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*edge,[\s\S]*selectedEdgeId: selectedEdgeId\.value,[\s\S]*\}\);/);
+  assert.match(componentSource, /case "locked-edit-attempt":[\s\S]*event\.preventDefault\(\);[\s\S]*emit\("locked-edit-attempt"\);[\s\S]*return;/);
+  assert.match(componentSource, /case "start-flow-edge-delete-confirm":[\s\S]*startFlowEdgeDeleteConfirm\(edge, event\);[\s\S]*return;/);
+  assert.match(componentSource, /case "start-data-edge-state-confirm":[\s\S]*startDataEdgeStateConfirm\(edge, event\);[\s\S]*return;/);
+  assert.match(componentSource, /case "select-edge":[\s\S]*selectedEdgeId\.value = edgePointerDownAction\.selectEdgeId;[\s\S]*setPendingConnectionPoint\(resolveEdgeTargetPoint\(edge\)\);/);
   assert.match(canvasConnectionInteractionModelSource, /export function resolveCanvasAnchorPointerDownAction/);
   assert.match(componentSource, /const anchorPointerDownAction = resolveCanvasAnchorPointerDownAction\(\{[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*anchor,[\s\S]*canComplete: canCompleteCanvasConnection\(anchor\),[\s\S]*canStart: canStartGraphConnection\(anchor\.kind\),[\s\S]*\}\);/);
   assert.match(componentSource, /case "locked-edit-attempt":[\s\S]*emit\("locked-edit-attempt"\);[\s\S]*return;/);
@@ -728,12 +756,23 @@ test("EditorCanvas exposes page zoom controls and emits viewport draft updates",
   assert.match(componentSource, /function handleZoomReset\(\)/);
   assert.match(componentSource, /function zoomViewportAroundCanvasCenter\(nextScale: number\)/);
   assert.match(componentSource, /@wheel\.prevent="handleWheel"/);
-  assert.match(componentSource, /import \{ resolveCanvasWheelZoomRequest \} from "\.\/canvasViewportInteractionModel";/);
+  assert.match(componentSource, /import \{[\s\S]*resolveCanvasWheelZoomRequest,[\s\S]*resolveCanvasZoomButtonAction,[\s\S]*type CanvasZoomButtonControl,[\s\S]*\} from "\.\/canvasViewportInteractionModel";/);
   assert.match(canvasViewportInteractionModelSource, /export function resolveWheelZoomDelta/);
   assert.match(canvasViewportInteractionModelSource, /export function resolveCanvasWheelZoomRequest/);
+  assert.match(canvasViewportInteractionModelSource, /export function resolveCanvasZoomButtonAction/);
+  assert.match(componentSource, /function handleZoomButton\(control: CanvasZoomButtonControl\)/);
+  assert.match(componentSource, /const zoomButtonAction = resolveCanvasZoomButtonAction\(\{[\s\S]*control,[\s\S]*currentScale: viewport\.viewport\.scale,[\s\S]*\}\);/);
+  assert.match(componentSource, /case "zoom-around-center":[\s\S]*zoomViewportAroundCanvasCenter\(zoomButtonAction\.nextScale\);[\s\S]*return;/);
+  assert.match(componentSource, /case "reset-viewport":[\s\S]*viewport\.setViewport\(zoomButtonAction\.viewport\);[\s\S]*return;/);
+  assert.match(componentSource, /function handleZoomOut\(\)[\s\S]*handleZoomButton\("zoom-out"\);/);
+  assert.match(componentSource, /function handleZoomIn\(\)[\s\S]*handleZoomButton\("zoom-in"\);/);
+  assert.match(componentSource, /function handleZoomReset\(\)[\s\S]*handleZoomButton\("reset"\);/);
   assert.match(componentSource, /const wheelZoomRequest = resolveCanvasWheelZoomRequest\(\{[\s\S]*deltaY: event\.deltaY,[\s\S]*currentScale: viewport\.viewport\.scale,[\s\S]*clientX: event\.clientX,[\s\S]*clientY: event\.clientY,[\s\S]*canvasRect: canvasRef\.value\?\.getBoundingClientRect\(\) \?\? null,[\s\S]*\}\);/);
   assert.match(componentSource, /case "set-scale":[\s\S]*viewport\.setViewport\(\{[\s\S]*scale: wheelZoomRequest\.nextScale,[\s\S]*\}\);/);
   assert.match(componentSource, /case "zoom-at":[\s\S]*viewport\.zoomAt\(\{[\s\S]*clientX: wheelZoomRequest\.clientX,[\s\S]*clientY: wheelZoomRequest\.clientY,[\s\S]*canvasLeft: wheelZoomRequest\.canvasLeft,[\s\S]*canvasTop: wheelZoomRequest\.canvasTop,[\s\S]*nextScale: wheelZoomRequest\.nextScale,[\s\S]*\}\);/);
+  assert.doesNotMatch(componentSource, /viewport\.viewport\.scale - 0\.1/);
+  assert.doesNotMatch(componentSource, /viewport\.viewport\.scale \+ 0\.1/);
+  assert.doesNotMatch(componentSource, /viewport\.setViewport\(DEFAULT_CANVAS_VIEWPORT\)/);
   assert.doesNotMatch(componentSource, /function resolveWheelZoomDelta\(event: WheelEvent\)/);
   assert.doesNotMatch(componentSource, /const direction = event\.deltaY > 0 \? -1 : 1;/);
   assert.doesNotMatch(componentSource, /\.editor-canvas__zoom-toolbar \{[\s\S]*position:\s*absolute;[\s\S]*left:\s*18px;/);
@@ -762,7 +801,7 @@ test("EditorCanvas shows a clicked-position delete confirm for flow edges before
   assert.match(componentSource, /<div class="editor-canvas__confirm-hint editor-canvas__confirm-hint--remove">Delete edge\?<\/div>/);
   assert.match(componentSource, /class="editor-canvas__edge-delete-button"/);
   assert.match(componentSource, /<ElIcon><Check \/><\/ElIcon>/);
-  assert.match(componentSource, /if \(edge\.kind === "flow" \|\| edge\.kind === "route"\) \{[\s\S]*startFlowEdgeDeleteConfirm\(edge, event\);[\s\S]*return;/);
+  assert.match(componentSource, /case "start-flow-edge-delete-confirm":[\s\S]*startFlowEdgeDeleteConfirm\(edge, event\);[\s\S]*return;/);
   assert.match(canvasEdgeInteractionsSource, /if \(action\.kind === "route"\) \{[\s\S]*input\.emitRemoveRoute\(\{[\s\S]*sourceNodeId: action\.sourceNodeId,[\s\S]*branchKey: action\.branchKey,[\s\S]*\}\);/);
   assert.match(canvasEdgeInteractionsSource, /input\.emitRemoveFlow\(\{[\s\S]*sourceNodeId: action\.sourceNodeId,[\s\S]*targetNodeId: action\.targetNodeId,[\s\S]*\}\);/);
   assert.match(flowEdgeDeleteModelSource, /export function buildFlowEdgeDeleteConfirmFromEdge/);
@@ -837,7 +876,7 @@ test("EditorCanvas gives data edges the same two-step state editing entry patter
   assert.match(canvasEdgeInteractionsSource, /const nextEditor = buildDataEdgeStateEditorFromRequest\(request\);/);
   assert.match(canvasEdgeInteractionsSource, /input\.setSelectedEdgeId\(nextEditor\.id\);/);
   assert.match(canvasEdgeInteractionsSource, /activeDataEdgeStateEditor\.value = nextEditor;/);
-  assert.match(componentSource, /if \(edge\.kind === "data"\) \{[\s\S]*startDataEdgeStateConfirm\(edge, event\);[\s\S]*return;/);
+  assert.match(componentSource, /case "start-data-edge-state-confirm":[\s\S]*startDataEdgeStateConfirm\(edge, event\);[\s\S]*return;/);
   assert.match(componentSource, /<div[\s\S]*v-if="activeDataEdgeStateConfirm"[\s\S]*class="editor-canvas__edge-state-confirm"/);
   assert.match(componentSource, /<div class="editor-canvas__confirm-hint editor-canvas__confirm-hint--state">\{\{ t\("nodeCard\.editStateQuestion"\) \}\}<\/div>/);
   assert.match(componentSource, /class="editor-canvas__edge-state-button"/);
@@ -963,7 +1002,8 @@ test("EditorCanvas opens the creation flow when output drags end on empty canvas
   const canvasConnectionInteractionModelSource = readCanvasConnectionInteractionModelSource();
 
   assert.match(componentSource, /function openCreationMenuFromPendingConnection/);
-  assert.match(componentSource, /const creationMenuRequest = resolveCanvasPendingConnectionCreationMenuRequest\(\{/);
+  assert.match(componentSource, /const creationMenuAction = resolveCanvasPendingConnectionCreationMenuAction\(\{/);
+  assert.match(componentSource, /case "open-creation-menu":[\s\S]*emit\("open-node-creation-menu", creationMenuAction\.payload\);/);
   assert.match(canvasConnectionInteractionModelSource, /connection\.sourceKind === "state-out"/);
   assert.match(canvasConnectionInteractionModelSource, /connection\.sourceKind === "flow-out"/);
   assert.match(canvasConnectionInteractionModelSource, /connection\.sourceKind === "route-out"/);
@@ -1013,20 +1053,21 @@ test("EditorCanvas snaps reverse input drags to existing upstream writer node bo
 test("EditorCanvas delegates connection completion action projection to a model", () => {
   const canvasConnectionCompletionModelSource = readCanvasConnectionCompletionModelSource();
 
-  assert.match(componentSource, /import \{[\s\S]*resolveCanvasConnectionCompletionRequest,[\s\S]*type CanvasConnectionCompletionAction,[\s\S]*\} from "\.\/canvasConnectionCompletionModel";/);
+  assert.match(componentSource, /import \{[\s\S]*resolveCanvasConnectionCompletionExecutionAction,[\s\S]*type CanvasConnectionCompletionAction,[\s\S]*\} from "\.\/canvasConnectionCompletionModel";/);
   assert.match(canvasConnectionCompletionModelSource, /export type CanvasConnectionCompletionAction/);
   assert.match(canvasConnectionCompletionModelSource, /export function resolveCanvasConnectionCompletionAction/);
   assert.match(canvasConnectionCompletionModelSource, /export function resolveCanvasConnectionCompletionRequest/);
+  assert.match(canvasConnectionCompletionModelSource, /export function resolveCanvasConnectionCompletionExecutionAction/);
   assert.match(canvasConnectionCompletionModelSource, /type: "connect-flow"/);
   assert.match(canvasConnectionCompletionModelSource, /type: "connect-route"/);
   assert.match(canvasConnectionCompletionModelSource, /type: "connect-state"/);
   assert.match(canvasConnectionCompletionModelSource, /type: "connect-state-input-source"/);
   assert.match(canvasConnectionCompletionModelSource, /type: "reconnect-flow"/);
   assert.match(canvasConnectionCompletionModelSource, /type: "reconnect-route"/);
-  assert.match(componentSource, /const completionRequest = resolveCanvasConnectionCompletionRequest\(\{/);
-  assert.match(componentSource, /emitCanvasConnectionCompletionAction\(completionRequest\.action\);/);
-  assert.match(componentSource, /if \(completionRequest\.clearConnectionInteraction\) \{[\s\S]*clearConnectionInteractionState\(\);[\s\S]*\}/);
-  assert.match(componentSource, /if \(completionRequest\.clearSelectedEdge\) \{[\s\S]*selectedEdgeId\.value = null;[\s\S]*\}/);
+  assert.match(componentSource, /const completionAction = resolveCanvasConnectionCompletionExecutionAction\(\{[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*connection: activeConnection\.value,[\s\S]*targetAnchor,[\s\S]*stateSchema: props\.document\.state_schema,[\s\S]*\}\);/);
+  assert.match(componentSource, /case "complete-connection":[\s\S]*emitCanvasConnectionCompletionAction\(completionAction\.action\);/);
+  assert.match(componentSource, /if \(completionAction\.clearConnectionInteraction\) \{[\s\S]*clearConnectionInteractionState\(\);[\s\S]*\}/);
+  assert.match(componentSource, /if \(completionAction\.clearSelectedEdge\) \{[\s\S]*selectedEdgeId\.value = null;[\s\S]*\}/);
   assert.match(componentSource, /function emitCanvasConnectionCompletionAction\(action: CanvasConnectionCompletionAction \| null\)/);
   assert.doesNotMatch(componentSource, /resolveCanvasConnectionCompletionAction/);
   assert.doesNotMatch(componentSource, /targetValueType: resolveCanvasConnectionStateValueType\(connection\.sourceStateKey, props\.document\.state_schema\)/);
@@ -1193,11 +1234,11 @@ test("EditorCanvas opens node creation from the virtual agent any output", () =>
   const canvasConnectionInteractionModelSource = readCanvasConnectionInteractionModelSource();
 
   assert.match(canvasConnectionModelSource, /connection\?\.sourceKind === "state-out" &&[\s\S]*connection\.sourceStateKey === VIRTUAL_ANY_OUTPUT_STATE_KEY/);
-  assert.match(componentSource, /import \{[\s\S]*resolveCanvasPendingConnectionCreationMenuRequest,[\s\S]*type CanvasNodeCreationMenuPayload,[\s\S]*\} from "\.\/canvasConnectionInteractionModel";/);
-  assert.match(componentSource, /const creationMenuRequest = resolveCanvasPendingConnectionCreationMenuRequest\(\{[\s\S]*connection,[\s\S]*position: resolveCanvasPoint\(event\),[\s\S]*stateSchema: props\.document\.state_schema,[\s\S]*\}\);/);
-  assert.match(componentSource, /emit\("open-node-creation-menu", creationMenuRequest\.payload\);/);
-  assert.match(componentSource, /if \(creationMenuRequest\.clearConnectionInteraction\) \{[\s\S]*clearConnectionInteractionState\(\);[\s\S]*\}/);
-  assert.match(componentSource, /if \(creationMenuRequest\.clearSelectedEdge\) \{[\s\S]*selectedEdgeId\.value = null;[\s\S]*\}/);
+  assert.match(componentSource, /import \{[\s\S]*resolveCanvasPendingConnectionCreationMenuAction,[\s\S]*type CanvasNodeCreationMenuPayload,[\s\S]*\} from "\.\/canvasConnectionInteractionModel";/);
+  assert.match(componentSource, /const creationMenuAction = resolveCanvasPendingConnectionCreationMenuAction\(\{[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*connection: activeConnection\.value,[\s\S]*position: resolveCanvasPoint\(event\),[\s\S]*stateSchema: props\.document\.state_schema,[\s\S]*\}\);/);
+  assert.match(componentSource, /emit\("open-node-creation-menu", creationMenuAction\.payload\);/);
+  assert.match(componentSource, /if \(creationMenuAction\.clearConnectionInteraction\) \{[\s\S]*clearConnectionInteractionState\(\);[\s\S]*\}/);
+  assert.match(componentSource, /if \(creationMenuAction\.clearSelectedEdge\) \{[\s\S]*selectedEdgeId\.value = null;[\s\S]*\}/);
   assert.doesNotMatch(componentSource, /buildCanvasNodeCreationMenuPayload/);
   assert.match(canvasConnectionInteractionModelSource, /sourceStateKey: connection\.sourceStateKey/);
   assert.match(canvasConnectionInteractionModelSource, /sourceValueType: resolveCanvasConnectionStateValueType\(connection\.sourceStateKey, input\.stateSchema\)/);

@@ -45,6 +45,15 @@ export type CanvasPendingConnectionCreationMenuRequest = {
   clearSelectedEdge: true;
 };
 
+export type CanvasPendingConnectionCreationMenuAction =
+  | { type: "ignore-locked" }
+  | { type: "ignore-missing-connection" }
+  | { type: "ignore-empty-request"; clearCanvasTransientState: true }
+  | ({
+      type: "open-creation-menu";
+      clearCanvasTransientState: true;
+    } & CanvasPendingConnectionCreationMenuRequest);
+
 export type CanvasDoubleClickCreationAction =
   | { type: "locked-edit-attempt" }
   | { type: "ignore-target" }
@@ -179,6 +188,35 @@ export function resolveCanvasPendingConnectionCreationMenuRequest(
     payload,
     clearConnectionInteraction: true,
     clearSelectedEdge: true,
+  };
+}
+
+export function resolveCanvasPendingConnectionCreationMenuAction(
+  input: CanvasNodeCreationMenuInput & { interactionLocked: boolean },
+): CanvasPendingConnectionCreationMenuAction {
+  if (input.interactionLocked) {
+    return { type: "ignore-locked" };
+  }
+
+  if (!input.connection) {
+    return { type: "ignore-missing-connection" };
+  }
+
+  const request = resolveCanvasPendingConnectionCreationMenuRequest({
+    connection: input.connection,
+    position: input.position,
+    clientX: input.clientX,
+    clientY: input.clientY,
+    stateSchema: input.stateSchema,
+  });
+  if (!request) {
+    return { type: "ignore-empty-request", clearCanvasTransientState: true };
+  }
+
+  return {
+    type: "open-creation-menu",
+    clearCanvasTransientState: true,
+    ...request,
   };
 }
 

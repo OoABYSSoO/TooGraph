@@ -6,6 +6,7 @@ import type { StateDefinition } from "../../types/node-system.ts";
 import type { ProjectedCanvasAnchor } from "./edgeProjection.ts";
 import {
   resolveCanvasConnectionCompletionAction,
+  resolveCanvasConnectionCompletionExecutionAction,
   resolveCanvasConnectionCompletionRequest,
 } from "./canvasConnectionCompletionModel.ts";
 
@@ -238,6 +239,56 @@ test("canvas connection completion model resolves completion requests with clean
       stateSchema,
     }),
     null,
+  );
+});
+
+test("canvas connection completion model resolves completion execution actions", () => {
+  const connection: PendingGraphConnection = {
+    sourceNodeId: "writer",
+    sourceKind: "state-out",
+    sourceStateKey: "answer",
+  };
+  const request = {
+    connection,
+    targetAnchor: stateAnchor("reader", "state-in", "answer", 240, 160),
+    stateSchema,
+  };
+
+  assert.deepEqual(
+    resolveCanvasConnectionCompletionExecutionAction({
+      ...request,
+      interactionLocked: true,
+    }),
+    { type: "ignore-locked" },
+  );
+  assert.deepEqual(
+    resolveCanvasConnectionCompletionExecutionAction({
+      ...request,
+      interactionLocked: false,
+      connection: null,
+    }),
+    { type: "ignore-missing-connection" },
+  );
+  assert.deepEqual(
+    resolveCanvasConnectionCompletionExecutionAction({
+      ...request,
+      interactionLocked: false,
+    }),
+    {
+      type: "complete-connection",
+      action: {
+        type: "connect-state",
+        payload: {
+          sourceNodeId: "writer",
+          sourceStateKey: "answer",
+          targetNodeId: "reader",
+          targetStateKey: "answer",
+          position: { x: 240, y: 160 },
+        },
+      },
+      clearConnectionInteraction: true,
+      clearSelectedEdge: true,
+    },
   );
 });
 

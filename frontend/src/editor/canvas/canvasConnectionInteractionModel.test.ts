@@ -13,6 +13,7 @@ import type { PendingStateInputSource } from "./canvasPendingStatePortModel.ts";
 import type { ProjectedCanvasAnchor } from "./edgeProjection.ts";
 import {
   buildCanvasNodeCreationMenuPayload,
+  resolveCanvasPendingConnectionCreationMenuAction,
   resolveCanvasPendingConnectionCreationMenuRequest,
   resolveCanvasAutoSnappedTargetAnchor,
   resolveCanvasAgentCreateInputTargetAnchor,
@@ -228,6 +229,58 @@ test("canvas connection interaction model resolves reverse creation menu request
     clearConnectionInteraction: true,
     clearSelectedEdge: true,
   });
+});
+
+test("canvas connection interaction model resolves pending creation menu actions", () => {
+  const connection: PendingGraphConnection = {
+    sourceNodeId: "writer",
+    sourceKind: "state-out",
+    sourceStateKey: VIRTUAL_ANY_OUTPUT_STATE_KEY,
+  };
+  const request = {
+    connection,
+    position: { x: 320, y: 180 },
+    clientX: 900,
+    clientY: 420,
+    stateSchema: document.state_schema,
+  };
+
+  assert.deepEqual(
+    resolveCanvasPendingConnectionCreationMenuAction({
+      ...request,
+      interactionLocked: true,
+    }),
+    { type: "ignore-locked" },
+  );
+  assert.deepEqual(
+    resolveCanvasPendingConnectionCreationMenuAction({
+      ...request,
+      interactionLocked: false,
+      connection: null,
+    }),
+    { type: "ignore-missing-connection" },
+  );
+  assert.deepEqual(
+    resolveCanvasPendingConnectionCreationMenuAction({
+      ...request,
+      interactionLocked: false,
+    }),
+    {
+      type: "open-creation-menu",
+      clearCanvasTransientState: true,
+      payload: {
+        position: { x: 320, y: 180 },
+        sourceNodeId: "writer",
+        sourceAnchorKind: "state-out",
+        sourceStateKey: VIRTUAL_ANY_OUTPUT_STATE_KEY,
+        sourceValueType: null,
+        clientX: 900,
+        clientY: 420,
+      },
+      clearConnectionInteraction: true,
+      clearSelectedEdge: true,
+    },
+  );
 });
 
 test("canvas connection interaction model ignores empty creation menu requests", () => {

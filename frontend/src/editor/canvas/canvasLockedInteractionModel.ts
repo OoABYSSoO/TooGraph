@@ -1,3 +1,13 @@
+export type LockedCanvasInteractionGuardAction =
+  | { type: "allow-interaction" }
+  | {
+      type: "block-locked-interaction";
+      clearCanvasTransientState: true;
+      clearPendingConnection: true;
+      clearSelectedEdge: true;
+      emitLockedEditAttempt: true;
+    };
+
 export type LockedNodePointerCaptureAction =
   | { type: "ignore-unlocked" }
   | {
@@ -11,6 +21,22 @@ export type LockedNodePointerCaptureAction =
       clearSelectedEdge: true;
       selectNodeId: string;
     };
+
+export function resolveLockedCanvasInteractionGuardAction(input: {
+  interactionLocked: boolean;
+}): LockedCanvasInteractionGuardAction {
+  if (!input.interactionLocked) {
+    return { type: "allow-interaction" };
+  }
+
+  return {
+    type: "block-locked-interaction",
+    clearCanvasTransientState: true,
+    clearPendingConnection: true,
+    clearSelectedEdge: true,
+    emitLockedEditAttempt: true,
+  };
+}
 
 export function resolveLockedNodePointerCaptureAction(input: {
   interactionLocked: boolean;

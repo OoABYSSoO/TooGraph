@@ -54,6 +54,13 @@ export type CanvasConnectionCompletionRequest = {
   clearSelectedEdge: true;
 };
 
+export type CanvasConnectionCompletionExecutionAction =
+  | { type: "ignore-locked" }
+  | { type: "ignore-missing-connection" }
+  | ({
+      type: "complete-connection";
+    } & CanvasConnectionCompletionRequest);
+
 export function resolveCanvasConnectionCompletionAction(
   input: CanvasConnectionCompletionInput,
 ): CanvasConnectionCompletionAction | null {
@@ -157,6 +164,25 @@ export function resolveCanvasConnectionCompletionRequest(
   }
 
   return {
+    action: resolveCanvasConnectionCompletionAction(input),
+    clearConnectionInteraction: true,
+    clearSelectedEdge: true,
+  };
+}
+
+export function resolveCanvasConnectionCompletionExecutionAction(
+  input: CanvasConnectionCompletionInput & { interactionLocked: boolean },
+): CanvasConnectionCompletionExecutionAction {
+  if (input.interactionLocked) {
+    return { type: "ignore-locked" };
+  }
+
+  if (!input.connection) {
+    return { type: "ignore-missing-connection" };
+  }
+
+  return {
+    type: "complete-connection",
     action: resolveCanvasConnectionCompletionAction(input),
     clearConnectionInteraction: true,
     clearSelectedEdge: true,

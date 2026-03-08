@@ -1,7 +1,15 @@
+import {
+  clampCanvasViewportScale,
+  DEFAULT_CANVAS_VIEWPORT,
+  type CanvasViewport,
+} from "./canvasViewport.ts";
+
 type CanvasRectSnapshot = {
   left: number;
   top: number;
 };
+
+const CANVAS_ZOOM_BUTTON_SCALE_STEP = 0.1;
 
 export type CanvasWheelZoomRequest =
   | { type: "ignore" }
@@ -14,6 +22,12 @@ export type CanvasWheelZoomRequest =
       canvasTop: number;
       nextScale: number;
     };
+
+export type CanvasZoomButtonControl = "zoom-out" | "zoom-in" | "reset";
+
+export type CanvasZoomButtonAction =
+  | { type: "zoom-around-center"; nextScale: number }
+  | { type: "reset-viewport"; viewport: CanvasViewport };
 
 export function resolveWheelZoomDelta(deltaY: number) {
   if (deltaY === 0) {
@@ -48,4 +62,31 @@ export function resolveCanvasWheelZoomRequest(input: {
     canvasTop: input.canvasRect.top,
     nextScale,
   };
+}
+
+export function resolveCanvasZoomButtonAction(input: {
+  control: CanvasZoomButtonControl;
+  currentScale: number;
+}): CanvasZoomButtonAction {
+  switch (input.control) {
+    case "zoom-out":
+      return {
+        type: "zoom-around-center",
+        nextScale: normalizeZoomButtonScale(input.currentScale - CANVAS_ZOOM_BUTTON_SCALE_STEP),
+      };
+    case "zoom-in":
+      return {
+        type: "zoom-around-center",
+        nextScale: normalizeZoomButtonScale(input.currentScale + CANVAS_ZOOM_BUTTON_SCALE_STEP),
+      };
+    case "reset":
+      return {
+        type: "reset-viewport",
+        viewport: DEFAULT_CANVAS_VIEWPORT,
+      };
+  }
+}
+
+function normalizeZoomButtonScale(scale: number) {
+  return clampCanvasViewportScale(Number(scale.toFixed(2)));
 }

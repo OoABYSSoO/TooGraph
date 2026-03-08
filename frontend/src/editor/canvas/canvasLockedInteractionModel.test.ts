@@ -1,7 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { resolveLockedNodePointerCaptureAction } from "./canvasLockedInteractionModel.ts";
+import {
+  resolveLockedCanvasInteractionGuardAction,
+  resolveLockedNodePointerCaptureAction,
+} from "./canvasLockedInteractionModel.ts";
 
 test("canvas locked interaction model resolves locked node pointer capture actions", () => {
   assert.deepEqual(
@@ -48,4 +51,17 @@ test("canvas locked interaction model resolves locked node pointer capture actio
       selectNodeId: "review",
     },
   );
+});
+
+test("canvas locked interaction model resolves generic locked guard actions", () => {
+  assert.deepEqual(resolveLockedCanvasInteractionGuardAction({ interactionLocked: false }), {
+    type: "allow-interaction",
+  });
+  assert.deepEqual(resolveLockedCanvasInteractionGuardAction({ interactionLocked: true }), {
+    type: "block-locked-interaction",
+    clearCanvasTransientState: true,
+    clearPendingConnection: true,
+    clearSelectedEdge: true,
+    emitLockedEditAttempt: true,
+  });
 });

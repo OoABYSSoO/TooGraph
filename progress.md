@@ -1,5 +1,422 @@
 # Progress Log
 
+## Session: 2026-04-30 Phase 56
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Confirmed Phase 55 was committed and pushed as `523386d`.
+  - Re-read the formal roadmap, active plan, latest findings, and current minimap center-view flow.
+  - Inspected `handleMinimapCenterView`, `minimapModel.ts`, and structure coverage around minimap event wiring.
+  - Selected the next P2 Canvas boundary: minimap center-view action projection.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `resolveMinimapCenterViewAction` expectations before production code.
+  - Updated `EditorCanvas.structure.test.ts` to require the new minimap center-view action model boundary.
+  - Verified the expected red failure: the minimap center-view action export and component wiring did not exist yet.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `MinimapCenterViewAction` and `resolveMinimapCenterViewAction` in `minimapModel.ts`.
+  - Updated `EditorCanvas.vue` so minimap center-view delegates empty canvas-size ignore and centered viewport projection to the model.
+  - Kept actual canvas size refresh, viewport mutation, canvas focus execution, and minimap event binding inside `EditorCanvas.vue`.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused minimap model and structure tests.
+  - Ran broader minimap, viewport display/interaction, pinch zoom, and structure regression tests.
+  - Ran TypeScript unused-symbol verification from `frontend`.
+  - Ran the full frontend `node --test` suite.
+  - Ran the frontend production build; no large chunk warning was emitted.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed backend `/health` returned `{"status":"ok"}` and the frontend entry returned HTTP 200.
+  - Captured a headless Chrome screenshot after a virtual-time wait and confirmed the workspace rendered normally.
+
+### Phase 5: Continuation Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated overall roadmap cleanup at about 83%.
+  - Recalculated P2 `EditorCanvas.vue` cleanup at about 84%.
+  - Opened Phase 57 automatically because total roadmap progress is below 100%.
+  - Selected the next candidate boundary as focus-node viewport action projection around missing target ignore and focused viewport calculation.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red focused tests | `node --test frontend/src/editor/canvas/minimapModel.test.ts frontend/src/editor/canvas/EditorCanvas.structure.test.ts` before implementation | Fails because minimap center-view action export and component wiring do not exist | Failed on missing export and structure assertions | Passed |
+| Focused model/structure tests | Same focused files after implementation | All focused tests pass | 65 passed | Passed |
+| Focused Canvas regression | `node --test` over minimap, viewport interaction/display, pinch zoom, and EditorCanvas structure tests | Related minimap/viewport tests pass | 73 passed | Passed |
+| Unused symbol check | `./node_modules/.bin/vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No diagnostics | Exit 0 | Passed |
+| Full frontend tests | `node --test $(rg --files src vite.config.structure.test.ts | rg '\.test\.ts$')` in `frontend` | All frontend tests pass | 817 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without a large chunk warning | Exit 0, no Vite chunk warning | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+| Browser smoke | Headless Chrome screenshot with virtual-time wait | Workspace renders normally | Workspace UI rendered | Passed |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Phase 56 implementation, verification, docs update, and dev restart are complete. |
+| Where am I going? | Phase 57 is open for focus-node viewport action projection. |
+| What's the goal? | Continue reducing `EditorCanvas.vue` viewport/minimap ownership without changing pan, zoom, pinch, minimap, focus, connection, or graph editing behavior. |
+| What have I learned? | Minimap center-view is a clean model action: empty-size ignore and viewport projection are pure, while focus and mutation should remain component-owned. |
+| What have I done? | Extracted minimap center-view action routing, added focused tests, verified the full frontend suite, built, restarted, and visually smoked the app. |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+
+## Session: 2026-04-30 Phase 55
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Confirmed Phase 54 was committed and pushed as `f4406f2`.
+  - Re-read the formal roadmap, active plan, latest findings, and current viewport zoom button flow.
+  - Inspected `handleZoomOut`, `handleZoomIn`, `handleZoomReset`, `zoomViewportAroundCanvasCenter`, and the existing viewport interaction model.
+  - Selected the next P2 Canvas boundary: zoom button scale/reset action projection.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `resolveCanvasZoomButtonAction` expectations before production code.
+  - Updated `EditorCanvas.structure.test.ts` to require the new zoom button action model boundary.
+  - Verified the expected red failure: the zoom button action export and component wiring did not exist yet.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `CanvasZoomButtonControl`, `CanvasZoomButtonAction`, and `resolveCanvasZoomButtonAction` in `canvasViewportInteractionModel.ts`.
+  - Updated `EditorCanvas.vue` so zoom out, zoom in, and reset delegate scale/reset action selection to the model.
+  - Kept actual center zoom execution, viewport reset mutation, wheel zoom execution, and viewport draft emits inside `EditorCanvas.vue`.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused viewport interaction model and structure tests.
+  - Ran broader viewport display, pinch zoom, minimap, and structure regression tests.
+  - Ran TypeScript unused-symbol verification from `frontend`.
+  - Ran the full frontend `node --test` suite.
+  - Ran the frontend production build; no large chunk warning was emitted.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed backend `/health` returned `{"status":"ok"}` and the frontend entry returned HTTP 200.
+  - Captured a headless Chrome screenshot after a virtual-time wait and confirmed the workspace rendered normally.
+
+### Phase 5: Continuation Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated overall roadmap cleanup at about 82%.
+  - Recalculated P2 `EditorCanvas.vue` cleanup at about 83%.
+  - Opened Phase 56 automatically because total roadmap progress is below 100%.
+  - Selected the next candidate boundary as minimap center-view action projection around empty canvas-size ignore and centered viewport calculation.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red focused tests | `node --test frontend/src/editor/canvas/canvasViewportInteractionModel.test.ts frontend/src/editor/canvas/EditorCanvas.structure.test.ts` before implementation | Fails because zoom button action export and component wiring do not exist | Failed on missing export and structure assertions | Passed |
+| Focused model/structure tests | Same focused files after implementation | All focused tests pass | 63 passed | Passed |
+| Focused Canvas regression | `node --test` over viewport interaction/display, pinch zoom, minimap, and EditorCanvas structure tests | Related viewport tests pass | 67 passed | Passed |
+| Unused symbol check | `./node_modules/.bin/vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No diagnostics | Exit 0 | Passed |
+| Full frontend tests | `node --test $(rg --files src vite.config.structure.test.ts | rg '\.test\.ts$')` in `frontend` | All frontend tests pass | 816 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without a large chunk warning | Exit 0, no Vite chunk warning | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+| Browser smoke | Headless Chrome screenshot with virtual-time wait | Workspace renders normally | Workspace UI rendered | Passed |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Phase 55 implementation, verification, docs update, and dev restart are complete. |
+| Where am I going? | Phase 56 is open for minimap center-view action projection. |
+| What's the goal? | Continue reducing `EditorCanvas.vue` viewport/minimap ownership without changing pan, zoom, pinch, minimap, connection, or graph editing behavior. |
+| What have I learned? | Zoom button scale/reset selection is pure enough for the viewport interaction model; component ownership should stay on actual viewport mutation. |
+| What have I done? | Extracted zoom button actions, added focused tests, verified the full frontend suite, built, restarted, and visually smoked the app. |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | An `rg` documentation-inspection command used unescaped backticks and failed with shell quoting error | Read-only planning inspection | Re-ran the search with single-quoted shell text; no files were changed by the failed command. |
+
+## Session: 2026-04-30 Phase 54
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Confirmed Phase 53 was committed and pushed as `214fcf5`.
+  - Re-read the formal roadmap, active plan, latest findings, and current pending-connection completion flow.
+  - Inspected `completePendingConnection`, `canvasConnectionCompletionModel.ts`, and structure coverage around locked/no-connection completion behavior.
+  - Selected the next P2 Canvas boundary: connection-completion execution routing.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `resolveCanvasConnectionCompletionExecutionAction` expectations before production code.
+  - Updated `EditorCanvas.structure.test.ts` to require the new completion execution model boundary.
+  - Verified the expected red failure: the execution action export and component wiring did not exist yet.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `CanvasConnectionCompletionExecutionAction` and `resolveCanvasConnectionCompletionExecutionAction` in `canvasConnectionCompletionModel.ts`.
+  - Updated `EditorCanvas.vue` so `completePendingConnection` delegates locked/no-connection/complete routing to the model.
+  - Kept actual typed connection emits, connection cleanup, selected-edge cleanup, and graph mutation behavior inside `EditorCanvas.vue`.
+  - Tightened an older locked-graph structure assertion so it verifies delegated locked routing instead of relying on a broad direct `if (isGraphEditingLocked())` substring.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused completion model and structure tests.
+  - Ran broader Canvas connection, graph connection, and graph document regression tests.
+  - Ran TypeScript unused-symbol verification from `frontend`.
+  - Ran the full frontend `node --test` suite.
+  - Ran the frontend production build; no large chunk warning was emitted.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed backend `/health` returned `{"status":"ok"}` and the frontend entry returned HTTP 200.
+  - Captured a headless Chrome screenshot after a virtual-time wait and confirmed the workspace rendered normally.
+
+### Phase 5: Continuation Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated overall roadmap cleanup at about 81%.
+  - Recalculated P2 `EditorCanvas.vue` cleanup at about 82%.
+  - Opened Phase 55 automatically because total roadmap progress is below 100%.
+  - Selected the next candidate boundary as viewport zoom-button scale calculation around zoom in/out/reset.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red focused tests | `node --test frontend/src/editor/canvas/canvasConnectionCompletionModel.test.ts frontend/src/editor/canvas/EditorCanvas.structure.test.ts` before implementation | Fails because completion execution export and component wiring do not exist | Failed on missing export and structure assertions | Passed |
+| Focused model/structure tests | Same focused files after implementation | All focused tests pass | 65 passed | Passed |
+| Focused Canvas regression | `node --test` over connection completion, connection interaction, connection composable, graph connections, and graph document tests | Related interaction tests pass | 159 passed | Passed |
+| Unused symbol check | `./node_modules/.bin/vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No diagnostics | Exit 0 | Passed |
+| Full frontend tests | `node --test $(rg --files src vite.config.structure.test.ts | rg '\.test\.ts$')` in `frontend` | All frontend tests pass | 815 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without a large chunk warning | Exit 0, no Vite chunk warning | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+| Browser smoke | Headless Chrome screenshot with virtual-time wait | Workspace renders normally | Workspace UI rendered | Passed |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Phase 54 implementation, verification, docs update, and dev restart are complete. |
+| Where am I going? | Phase 55 is open for viewport zoom-button scale calculation extraction. |
+| What's the goal? | Continue reducing `EditorCanvas.vue` interaction ownership without changing drag, resize, snap, create-node, pan/zoom, edge deletion, lock handling, or connection-completion behavior. |
+| What have I learned? | Connection completion can use the same explicit execution-action pattern as other Canvas flows; structure tests should assert model boundaries instead of incidental inline guard strings. |
+| What have I done? | Extracted completion execution routing, added focused tests, verified the full frontend suite, built, restarted, and visually smoked the app. |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | A structure test still required a direct `if (isGraphEditingLocked())` substring after lock handling had moved into action models | First focused green run | Updated the assertion to verify delegated locked routing for double-click/drop and connection-completion execution. |
+
+## Session: 2026-04-30 Phase 53
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Confirmed Phase 52 was committed and pushed as `cb290be`.
+  - Re-read the formal roadmap, active plan, latest findings, and current pending-connection creation menu flow.
+  - Inspected `openCreationMenuFromPendingConnection`, `resolveCanvasPendingConnectionCreationMenuRequest`, and structure coverage around virtual-output node creation.
+  - Selected the next P2 Canvas boundary: pending-connection creation-menu action routing.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `resolveCanvasPendingConnectionCreationMenuAction` expectations before production code.
+  - Updated `EditorCanvas.structure.test.ts` to require the new creation-menu action model boundary.
+  - Verified the expected red failure: the action export and component wiring did not exist yet.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `CanvasPendingConnectionCreationMenuAction` and `resolveCanvasPendingConnectionCreationMenuAction` in `canvasConnectionInteractionModel.ts`.
+  - Updated `EditorCanvas.vue` so `openCreationMenuFromPendingConnection` delegates locked/no-connection/open-menu cleanup policy to the model.
+  - Kept canvas point resolution, event coordinates, actual `open-node-creation-menu` emit, connection cleanup, and selected-edge cleanup inside the component.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused connection interaction model and structure tests.
+  - Ran the broader Canvas connection, edge pointer, locked interaction, graph connection, graph document, and node creation regression set.
+  - Ran TypeScript unused-symbol verification from `frontend`.
+  - Ran the full frontend `node --test` suite.
+  - Ran the frontend production build; no large chunk warning was emitted.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed backend `/health` returned `{"status":"ok"}` and the frontend entry returned HTTP 200.
+  - Captured a headless Chrome screenshot after a virtual-time wait and confirmed the workspace rendered normally.
+
+### Phase 5: Continuation Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated overall roadmap cleanup at about 80%.
+  - Recalculated P2 `EditorCanvas.vue` cleanup at about 81%.
+  - Opened Phase 54 automatically because total roadmap progress is below 100%.
+  - Selected the next candidate boundary as pending-connection completion routing around locked/no-connection ignore, completion emit action, and cleanup policy.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red focused tests | `node --test frontend/src/editor/canvas/canvasConnectionInteractionModel.test.ts frontend/src/editor/canvas/EditorCanvas.structure.test.ts` before implementation | Fails because pending creation menu action export and component wiring do not exist | Failed on missing export and structure assertions | Passed |
+| Focused model/structure tests | Same focused files after implementation | All focused tests pass | 77 passed | Passed |
+| Focused Canvas regression | `node --test` over connection interaction/completion, edge pointer, locked interaction, graph connections, graph document, and graph node creation tests | Related interaction tests pass | 172 passed | Passed |
+| Unused symbol check | `./node_modules/.bin/vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No diagnostics | Exit 0 | Passed |
+| Full frontend tests | `node --test $(rg --files src vite.config.structure.test.ts | rg '\.test\.ts$')` in `frontend` | All frontend tests pass | 814 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without a large chunk warning | Exit 0, no Vite chunk warning | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+| Browser smoke | Headless Chrome screenshot with virtual-time wait | Workspace renders normally | Workspace UI rendered | Passed |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Phase 53 implementation, verification, docs update, and dev restart are complete. |
+| Where am I going? | Phase 54 is open for connection-completion action extraction. |
+| What's the goal? | Continue reducing `EditorCanvas.vue` interaction ownership without changing drag, resize, snap, create-node, pan/zoom, edge deletion, lock handling, or connection-completion behavior. |
+| What have I learned? | Pending creation menu branching can be pure; the component should keep coordinate inputs, emits, and cleanup side effects. |
+| What have I done? | Extracted pending creation-menu routing, added focused tests, verified the full frontend suite, built, restarted, and visually smoked the app. |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+
+## Session: 2026-04-30 Phase 52
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Confirmed Phase 51 was committed and pushed as `7462cfb`.
+  - Re-read the formal roadmap, active plan, latest findings, and current edge pointer-down flow.
+  - Inspected `handleEdgePointerDown`, flow/route delete confirm wiring, data-edge state confirm wiring, and existing structure coverage.
+  - Selected the next P2 Canvas boundary: edge pointer-down action routing.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `canvasEdgePointerInteractionModel.test.ts` before production code.
+  - Updated `EditorCanvas.structure.test.ts` to require the new edge pointer-down model boundary.
+  - Verified the expected red failure: the new model file did not exist yet.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `CanvasEdgePointerDownAction` and `resolveCanvasEdgePointerDownAction` in `canvasEdgePointerInteractionModel.ts`.
+  - Updated `EditorCanvas.vue` so `handleEdgePointerDown` delegates locked, flow/route confirm, data confirm, and selected-edge fallback policy to the model.
+  - Kept actual event prevention, canvas focus, cleanup, edge confirm composable calls, selected-edge mutation, pending connection point updates, selection clearing, and emits inside the component.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused edge pointer model and structure tests.
+  - Ran the broader Canvas edge, locked interaction, connection, and graph document regression set.
+  - Ran TypeScript unused-symbol verification from `frontend`.
+  - Ran the full frontend `node --test` suite.
+  - Ran the frontend production build; no large chunk warning was emitted.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed backend `/health` returned `{"status":"ok"}` and the frontend entry returned HTTP 200.
+  - Captured a headless Chrome screenshot after a virtual-time wait and confirmed the workspace rendered normally.
+
+### Phase 5: Continuation Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated overall roadmap cleanup at about 79%.
+  - Recalculated P2 `EditorCanvas.vue` cleanup at about 80%.
+  - Opened Phase 53 automatically because total roadmap progress is below 100%.
+  - Selected the next candidate boundary as pending-connection creation menu routing around locked/no-connection ignore, empty-request ignore, open-menu payload, and cleanup policy.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red focused tests | `node --test frontend/src/editor/canvas/canvasEdgePointerInteractionModel.test.ts frontend/src/editor/canvas/EditorCanvas.structure.test.ts` before implementation | Fails because edge pointer model file does not exist | Failed on missing module/file | Passed |
+| Focused model/structure tests | Same focused files after implementation | All focused tests pass | 61 passed | Passed |
+| Focused Canvas regression | `node --test` over edge pointer, locked interaction, run presentation, edge/data models, connection, and graph document tests | Related interaction tests pass | 189 passed | Passed |
+| Unused symbol check | `./node_modules/.bin/vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No diagnostics | Exit 0 | Passed |
+| Full frontend tests | `node --test $(rg --files src vite.config.structure.test.ts | rg '\.test\.ts$')` in `frontend` | All frontend tests pass | 813 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without a large chunk warning | Exit 0, no Vite chunk warning | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+| Browser smoke | Headless Chrome screenshot with virtual-time wait | Workspace renders normally | Workspace UI rendered | Passed |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Phase 52 implementation, verification, docs update, and dev restart are complete. |
+| Where am I going? | Phase 53 is open for pending-connection creation-menu action extraction. |
+| What's the goal? | Continue reducing `EditorCanvas.vue` interaction ownership without changing drag, resize, snap, create-node, pan/zoom, edge deletion, lock handling, or connection-completion behavior. |
+| What have I learned? | Edge pointer-down routing can be pure; the component should keep all edge confirm and selection side effects. |
+| What have I done? | Extracted edge pointer-down routing, added focused tests, verified the full frontend suite, built, restarted, and visually smoked the app. |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+
+## Session: 2026-04-30 Phase 51
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Confirmed Phase 50 was committed and pushed as `1e90c9c`.
+  - Re-read the formal roadmap, active plan, latest findings, and current generic locked-canvas guard.
+  - Inspected `guardLockedCanvasInteraction`, its edge/toolbar callers, and existing structure coverage around locked human-review graphs.
+  - Selected the next P2 Canvas boundary: generic locked-interaction guard action policy.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `resolveLockedCanvasInteractionGuardAction` expectations before production code.
+  - Updated `EditorCanvas.structure.test.ts` to require the new generic locked guard model boundary.
+  - Verified the expected red failure: the model export and component wiring did not exist yet.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `LockedCanvasInteractionGuardAction` and `resolveLockedCanvasInteractionGuardAction` in `canvasLockedInteractionModel.ts`.
+  - Updated `EditorCanvas.vue` so `guardLockedCanvasInteraction` delegates allow/block and cleanup policy to the model.
+  - Kept actual cleanup calls, selected-edge mutation, and `locked-edit-attempt` emit inside the component.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused locked-interaction model and structure tests.
+  - Ran the broader Canvas connection, edge visibility, flow-edge delete, graph document, and locked interaction regression set.
+  - Ran TypeScript unused-symbol verification from `frontend`.
+  - Ran the full frontend `node --test` suite.
+  - Ran the frontend production build; no large chunk warning was emitted.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed backend `/health` returned `{"status":"ok"}` and the frontend entry returned HTTP 200.
+  - Captured a headless Chrome screenshot after a virtual-time wait and confirmed the workspace rendered normally.
+
+### Phase 5: Continuation Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated overall roadmap cleanup at about 78%.
+  - Recalculated P2 `EditorCanvas.vue` cleanup at about 79%.
+  - Opened Phase 52 automatically because total roadmap progress is below 100%.
+  - Selected the next candidate boundary as edge pointer-down routing around locked edit, edge confirm actions, selected-edge toggle, and pending edge preview policy.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red focused tests | `node --test frontend/src/editor/canvas/canvasLockedInteractionModel.test.ts frontend/src/editor/canvas/EditorCanvas.structure.test.ts` before implementation | Fails because locked guard model export and component wiring do not exist | Failed on missing export and structure assertions | Passed |
+| Focused model/structure tests | Same focused files after implementation | All focused tests pass | 62 passed | Passed |
+| Focused Canvas regression | `node --test` over locked interaction, run presentation, Canvas connection, edge visibility, flow-edge delete, and graph document tests | Related interaction tests pass | 180 passed | Passed |
+| Unused symbol check | `./node_modules/.bin/vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No diagnostics | Exit 0 | Passed |
+| Full frontend tests | `node --test $(rg --files src vite.config.structure.test.ts | rg '\.test\.ts$')` in `frontend` | All frontend tests pass | 812 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without a large chunk warning | Exit 0, no Vite chunk warning | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+| Browser smoke | Headless Chrome screenshot with virtual-time wait | Workspace renders normally | Workspace UI rendered | Passed |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Phase 51 implementation, verification, docs update, and dev restart are complete. |
+| Where am I going? | Phase 52 is open for edge pointer-down action extraction. |
+| What's the goal? | Continue reducing `EditorCanvas.vue` interaction ownership without changing drag, resize, snap, create-node, pan/zoom, edge deletion, lock handling, or connection-completion behavior. |
+| What have I learned? | Generic locked interaction cleanup can be expressed as a pure policy without moving the cleanup side effects out of the component. |
+| What have I done? | Extracted generic locked guard routing, added focused tests, verified the full frontend suite, built, restarted, and visually smoked the app. |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+
 ## Session: 2026-04-30 Phase 50
 
 ### Phase 1: Re-orientation

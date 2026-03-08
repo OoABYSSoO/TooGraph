@@ -397,7 +397,7 @@ import { resolveEdgeRunPresentation } from "@/editor/canvas/runEdgePresentation"
 import { resolveCanvasLayout } from "@/editor/canvas/resolvedCanvasLayout";
 import { resolveCanvasSurfaceStyle } from "@/editor/canvas/canvasSurfaceStyle";
 import { isEditableKeyboardEventTarget } from "@/editor/canvas/canvasKeyboard";
-import { DEFAULT_CANVAS_VIEWPORT, type CanvasViewport } from "@/editor/canvas/canvasViewport";
+import { type CanvasViewport } from "@/editor/canvas/canvasViewport";
 import {
   NODE_RESIZE_HANDLES,
   type NodeResizeHandle,
@@ -460,7 +460,11 @@ import {
   resolveRunNodeClassListForCanvasNode,
   resolveRunNodePresentationForCanvasNode,
 } from "./canvasRunPresentationModel";
-import { resolveLockedNodePointerCaptureAction } from "./canvasLockedInteractionModel";
+import {
+  resolveLockedCanvasInteractionGuardAction,
+  resolveLockedNodePointerCaptureAction,
+} from "./canvasLockedInteractionModel";
+import { resolveCanvasEdgePointerDownAction } from "./canvasEdgePointerInteractionModel";
 import { resolveSelectedEdgeKeyboardDeleteAction } from "./flowEdgeDeleteModel";
 import {
   buildMinimapNodeModel,
@@ -474,7 +478,11 @@ import { useCanvasNodeMeasurements } from "./useCanvasNodeMeasurements";
 import { buildPinchZoomStart, resolveCanvasPointerDownAction, resolvePointerCenter, resolvePointerDistance } from "./canvasPinchZoomModel";
 import type { CanvasPointerDownAction } from "./canvasPinchZoomModel";
 import { buildCanvasViewportStyle, buildZoomPercentLabel } from "./canvasViewportDisplayModel";
-import { resolveCanvasWheelZoomRequest } from "./canvasViewportInteractionModel";
+import {
+  resolveCanvasWheelZoomRequest,
+  resolveCanvasZoomButtonAction,
+  type CanvasZoomButtonControl,
+} from "./canvasViewportInteractionModel";
 import {
   isCanvasStateTargetAnchorAllowedForConnection,
   resolveCanvasAutoSnappedTargetAnchor as resolveCanvasAutoSnappedTargetAnchorModel,
@@ -486,12 +494,12 @@ import {
   resolveCanvasDragOverDropEffect,
   resolveCanvasDropCreationAction,
   resolveCanvasNodePointerDownConnectionAction,
-  resolveCanvasPendingConnectionCreationMenuRequest,
+  resolveCanvasPendingConnectionCreationMenuAction,
   type CanvasAnchorPointerDownAction,
   type CanvasNodeCreationMenuPayload,
 } from "./canvasConnectionInteractionModel";
 import {
-  resolveCanvasConnectionCompletionRequest,
+  resolveCanvasConnectionCompletionExecutionAction,
   type CanvasConnectionCompletionAction,
 } from "./canvasConnectionCompletionModel";
 import { STATE_FIELD_TYPE_OPTIONS } from "@/editor/workspace/statePanelFields";
@@ -505,7 +513,7 @@ import {
   CREATE_AGENT_INPUT_STATE_KEY,
 } from "@/lib/virtual-any-input";
 import { resolveFocusedViewport } from "@/editor/canvas/focusNodeViewport";
-import { resolveViewportForMinimapCenter } from "./minimapModel";
+import { resolveMinimapCenterViewAction } from "./minimapModel";
 import { useNodeSelectionFocus, type NodeFocusRequest } from "./useNodeSelectionFocus";
 import { useViewport } from "./useViewport";
 import { isAgentBreakpointEnabledInDocument, resolveAgentBreakpointTimingInDocument } from "@/lib/graph-document";
@@ -1023,19 +1031,19 @@ function startDataEdgeStateConfirm(edge: ProjectedCanvasEdge, event: PointerEven
 
 function handleMinimapCenterView(point: { worldX: number; worldY: number }) {
   updateCanvasSize();
-  if (canvasSize.value.width <= 0 || canvasSize.value.height <= 0) {
-    return;
+  const minimapCenterViewAction = resolveMinimapCenterViewAction({
+    worldX: point.worldX,
+    worldY: point.worldY,
+    viewportScale: viewport.viewport.scale,
+    canvasSize: canvasSize.value,
+  });
+  switch (minimapCenterViewAction.type) {
+    case "ignore-empty-canvas-size":
+      return;
+    case "set-viewport":
+      viewport.setViewport(minimapCenterViewAction.viewport);
+      break;
   }
-
-  viewport.setViewport(
-    resolveViewportForMinimapCenter({
-      worldX: point.worldX,
-      worldY: point.worldY,
-      viewportScale: viewport.viewport.scale,
-      canvasWidth: canvasSize.value.width,
-      canvasHeight: canvasSize.value.height,
-    }),
-  );
   canvasRef.value?.focus();
 }
 
@@ -1662,16 +1670,31 @@ function zoomViewportAroundCanvasCenter(nextScale: number) {
   });
 }
 
+function handleZoomButton(control: CanvasZoomButtonControl) {
+  const zoomButtonAction = resolveCanvasZoomButtonAction({
+    control,
+    currentScale: viewport.viewport.scale,
+  });
+  switch (zoomButtonAction.type) {
+    case "zoom-around-center":
+      zoomViewportAroundCanvasCenter(zoomButtonAction.nextScale);
+      return;
+    case "reset-viewport":
+      viewport.setViewport(zoomButtonAction.viewport);
+      return;
+  }
+}
+
 function handleZoomOut() {
-  zoomViewportAroundCanvasCenter(viewport.viewport.scale - 0.1);
+  handleZoomButton("zoom-out");
 }
 
 function handleZoomIn() {
-  zoomViewportAroundCanvasCenter(viewport.viewport.scale + 0.1);
+  handleZoomButton("zoom-in");
 }
 
 function handleZoomReset() {
-  viewport.setViewport(DEFAULT_CANVAS_VIEWPORT);
+  handleZoomButton("reset");
 }
 
 function handleWheel(event: WheelEvent) {
@@ -1703,34 +1726,77 @@ function handleWheel(event: WheelEvent) {
 }
 
 function handleEdgePointerDown(edge: ProjectedCanvasEdge, event: PointerEvent) {
-  if (isGraphEditingLocked()) {
-    event.preventDefault();
-    emit("locked-edit-attempt");
-    return;
+  const edgePointerDownAction = resolveCanvasEdgePointerDownAction({
+    interactionLocked: isGraphEditingLocked(),
+    edge,
+    selectedEdgeId: selectedEdgeId.value,
+  });
+  switch (edgePointerDownAction.type) {
+    case "locked-edit-attempt":
+      if (edgePointerDownAction.preventDefault) {
+        event.preventDefault();
+      }
+      emit("locked-edit-attempt");
+      return;
+    case "start-flow-edge-delete-confirm":
+      applyEdgePointerDownBaseAction(edgePointerDownAction);
+      if (edgePointerDownAction.clearSelectedEdge) {
+        selectedEdgeId.value = null;
+      }
+      if (edgePointerDownAction.clearSelection) {
+        selection.clearSelection();
+      }
+      startFlowEdgeDeleteConfirm(edge, event);
+      return;
+    case "start-data-edge-state-confirm":
+      applyEdgePointerDownBaseAction(edgePointerDownAction);
+      if (edgePointerDownAction.clearSelectedEdge) {
+        selectedEdgeId.value = null;
+      }
+      if (edgePointerDownAction.clearSelection) {
+        selection.clearSelection();
+      }
+      startDataEdgeStateConfirm(edge, event);
+      return;
+    case "clear-selected-edge":
+      applyEdgePointerDownBaseAction(edgePointerDownAction);
+      if (edgePointerDownAction.clearSelectedEdge) {
+        selectedEdgeId.value = null;
+      }
+      if (edgePointerDownAction.clearPendingConnectionPoint) {
+        setPendingConnectionPoint(null);
+      }
+      if (edgePointerDownAction.clearSelection) {
+        selection.clearSelection();
+      }
+      return;
+    case "select-edge":
+      applyEdgePointerDownBaseAction(edgePointerDownAction);
+      selectedEdgeId.value = edgePointerDownAction.selectEdgeId;
+      if (edgePointerDownAction.updatePendingConnectionPoint) {
+        setPendingConnectionPoint(resolveEdgeTargetPoint(edge));
+      }
+      if (edgePointerDownAction.clearSelection) {
+        selection.clearSelection();
+      }
+      return;
   }
-  canvasRef.value?.focus();
-  clearCanvasTransientState();
-  clearPendingConnection();
-  if (edge.kind === "flow" || edge.kind === "route") {
-    selectedEdgeId.value = null;
-    selection.clearSelection();
-    startFlowEdgeDeleteConfirm(edge, event);
-    return;
+}
+
+function applyEdgePointerDownBaseAction(action: {
+  focusCanvas?: true;
+  clearCanvasTransientState?: true;
+  clearPendingConnection?: true;
+}) {
+  if (action.focusCanvas) {
+    canvasRef.value?.focus();
   }
-  if (edge.kind === "data") {
-    selectedEdgeId.value = null;
-    selection.clearSelection();
-    startDataEdgeStateConfirm(edge, event);
-    return;
+  if (action.clearCanvasTransientState) {
+    clearCanvasTransientState();
   }
-  if (selectedEdgeId.value === edge.id) {
-    selectedEdgeId.value = null;
-    setPendingConnectionPoint(null);
-  } else {
-    selectedEdgeId.value = edge.id;
-    setPendingConnectionPoint(resolveEdgeTargetPoint(edge));
+  if (action.clearPendingConnection) {
+    clearPendingConnection();
   }
-  selection.clearSelection();
 }
 
 function handleAnchorPointerDown(anchor: ProjectedCanvasAnchor) {
@@ -1778,31 +1844,36 @@ function applyAnchorPointerDownSetup(
 }
 
 function openCreationMenuFromPendingConnection(event: PointerEvent) {
-  if (isGraphEditingLocked()) {
-    return;
-  }
-  const connection = activeConnection.value;
-  if (!connection) {
-    return;
-  }
-  clearCanvasTransientState();
-  const creationMenuRequest = resolveCanvasPendingConnectionCreationMenuRequest({
-    connection,
+  const creationMenuAction = resolveCanvasPendingConnectionCreationMenuAction({
+    interactionLocked: isGraphEditingLocked(),
+    connection: activeConnection.value,
     position: resolveCanvasPoint(event),
     clientX: event.clientX,
     clientY: event.clientY,
     stateSchema: props.document.state_schema,
   });
-  if (!creationMenuRequest) {
-    return;
+  switch (creationMenuAction.type) {
+    case "ignore-locked":
+    case "ignore-missing-connection":
+      return;
+    case "ignore-empty-request":
+      if (creationMenuAction.clearCanvasTransientState) {
+        clearCanvasTransientState();
+      }
+      return;
+    case "open-creation-menu":
+      break;
+  }
+  if (creationMenuAction.clearCanvasTransientState) {
+    clearCanvasTransientState();
   }
 
-  emit("open-node-creation-menu", creationMenuRequest.payload);
+  emit("open-node-creation-menu", creationMenuAction.payload);
 
-  if (creationMenuRequest.clearConnectionInteraction) {
+  if (creationMenuAction.clearConnectionInteraction) {
     clearConnectionInteractionState();
   }
-  if (creationMenuRequest.clearSelectedEdge) {
+  if (creationMenuAction.clearSelectedEdge) {
     selectedEdgeId.value = null;
   }
 }
@@ -1831,29 +1902,27 @@ function focusNode(nodeId: string) {
 }
 
 function completePendingConnection(targetAnchor: ProjectedCanvasAnchor) {
-  if (isGraphEditingLocked()) {
-    return;
-  }
-  const connection = activeConnection.value;
-  if (!connection) {
-    return;
-  }
-
-  const completionRequest = resolveCanvasConnectionCompletionRequest({
-    connection,
+  const completionAction = resolveCanvasConnectionCompletionExecutionAction({
+    interactionLocked: isGraphEditingLocked(),
+    connection: activeConnection.value,
     targetAnchor,
     stateSchema: props.document.state_schema,
   });
-  if (!completionRequest) {
-    return;
+
+  switch (completionAction.type) {
+    case "ignore-locked":
+    case "ignore-missing-connection":
+      return;
+    case "complete-connection":
+      break;
   }
 
-  emitCanvasConnectionCompletionAction(completionRequest.action);
+  emitCanvasConnectionCompletionAction(completionAction.action);
 
-  if (completionRequest.clearConnectionInteraction) {
+  if (completionAction.clearConnectionInteraction) {
     clearConnectionInteractionState();
   }
-  if (completionRequest.clearSelectedEdge) {
+  if (completionAction.clearSelectedEdge) {
     selectedEdgeId.value = null;
   }
 }
@@ -2001,13 +2070,27 @@ function handleLockBannerClick() {
 }
 
 function guardLockedCanvasInteraction() {
-  if (!isGraphEditingLocked()) {
-    return false;
+  const lockedCanvasInteractionGuardAction = resolveLockedCanvasInteractionGuardAction({
+    interactionLocked: isGraphEditingLocked(),
+  });
+  switch (lockedCanvasInteractionGuardAction.type) {
+    case "allow-interaction":
+      return false;
+    case "block-locked-interaction":
+      break;
   }
-  clearCanvasTransientState();
-  clearPendingConnection();
-  selectedEdgeId.value = null;
-  emit("locked-edit-attempt");
+  if (lockedCanvasInteractionGuardAction.clearCanvasTransientState) {
+    clearCanvasTransientState();
+  }
+  if (lockedCanvasInteractionGuardAction.clearPendingConnection) {
+    clearPendingConnection();
+  }
+  if (lockedCanvasInteractionGuardAction.clearSelectedEdge) {
+    selectedEdgeId.value = null;
+  }
+  if (lockedCanvasInteractionGuardAction.emitLockedEditAttempt) {
+    emit("locked-edit-attempt");
+  }
   return true;
 }
 
