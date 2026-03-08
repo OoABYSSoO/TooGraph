@@ -404,6 +404,12 @@ import {
 } from "./nodeResize.ts";
 import { useCanvasNodeDragResize } from "./useCanvasNodeDragResize.ts";
 import {
+  resolveNodePointerDownAction,
+  resolveNodeResizePointerDownAction,
+  type CanvasNodePointerDownAction,
+  type CanvasNodeResizePointerDownAction,
+} from "./canvasNodeDragResizeModel.ts";
+import {
   buildEdgeVisibilityModeOptions,
   buildForceVisibleProjectedEdgeIds,
   filterProjectedEdgesForVisibilityMode,
@@ -462,7 +468,8 @@ import {
 import { useCanvasEdgeInteractions } from "./useCanvasEdgeInteractions";
 import { useCanvasConnectionInteraction } from "./useCanvasConnectionInteraction";
 import { useCanvasNodeMeasurements } from "./useCanvasNodeMeasurements";
-import { buildPinchZoomStart, resolvePointerCenter, resolvePointerDistance } from "./canvasPinchZoomModel";
+import { buildPinchZoomStart, resolveCanvasPointerDownAction, resolvePointerCenter, resolvePointerDistance } from "./canvasPinchZoomModel";
+import type { CanvasPointerDownAction } from "./canvasPinchZoomModel";
 import { buildCanvasViewportStyle, buildZoomPercentLabel } from "./canvasViewportDisplayModel";
 import {
   isCanvasStateTargetAnchorAllowedForConnection,
@@ -1118,32 +1125,53 @@ function updatePinchZoom() {
 }
 
 function handleCanvasPointerDown(event: PointerEvent) {
+  let startedPinchZoom = false;
   if (event.pointerType === "touch") {
     activeCanvasPointers.set(event.pointerId, {
       clientX: event.clientX,
       clientY: event.clientY,
       pointerType: event.pointerType,
     });
-    if (beginPinchZoomIfReady()) {
-      event.preventDefault();
-      window.getSelection()?.removeAllRanges();
-      clearCanvasTransientState();
-      clearPendingConnection();
-      selectedEdgeId.value = null;
-      selection.clearSelection();
-      return;
-    }
+    startedPinchZoom = beginPinchZoomIfReady();
   }
-  canvasRef.value?.focus();
-  event.preventDefault();
-  window.getSelection()?.removeAllRanges();
-  canvasRef.value?.setPointerCapture(event.pointerId);
-  cancelScheduledDragFrame();
-  clearCanvasTransientState();
-  clearPendingConnection();
-  selectedEdgeId.value = null;
-  selection.clearSelection();
-  viewport.beginPan(event);
+  const canvasPointerDownAction = resolveCanvasPointerDownAction({ startedPinchZoom });
+  applyCanvasPointerDownSetup(canvasPointerDownAction, event);
+}
+
+function applyCanvasPointerDownSetup(
+  action: CanvasPointerDownAction,
+  event: PointerEvent,
+) {
+  if (action.focusCanvas) {
+    canvasRef.value?.focus();
+  }
+  if (action.preventDefault) {
+    event.preventDefault();
+  }
+  if (action.removeWindowSelection) {
+    window.getSelection()?.removeAllRanges();
+  }
+  if (action.setPointerCapture) {
+    canvasRef.value?.setPointerCapture(event.pointerId);
+  }
+  if (action.cancelScheduledDragFrame) {
+    cancelScheduledDragFrame();
+  }
+  if (action.clearCanvasTransientState) {
+    clearCanvasTransientState();
+  }
+  if (action.clearPendingConnection) {
+    clearPendingConnection();
+  }
+  if (action.clearSelectedEdge) {
+    selectedEdgeId.value = null;
+  }
+  if (action.clearSelection) {
+    selection.clearSelection();
+  }
+  if (action.beginPan) {
+    viewport.beginPan(event);
+  }
 }
 
 function handleCanvasPointerMove(event: PointerEvent) {
@@ -1345,19 +1373,33 @@ function handleCanvasDrop(event: DragEvent) {
 
 function handleNodePointerDown(nodeId: string, event: PointerEvent) {
   const node = props.document.nodes[nodeId];
-  if (!node) {
-    return;
-  }
-  if (isGraphEditingLocked()) {
-    event.preventDefault();
-    canvasRef.value?.focus();
-    clearCanvasTransientState();
-    selection.selectNode(nodeId);
-    return;
-  }
   const target = event.target;
   const preserveInlineEditorFocus =
     target instanceof HTMLElement && Boolean(target.closest("[data-text-editor-trigger='true']"));
+  const nodePointerDownAction = resolveNodePointerDownAction({
+    nodeId,
+    nodeExists: Boolean(node),
+    interactionLocked: isGraphEditingLocked(),
+    preserveInlineEditorFocus,
+  });
+  switch (nodePointerDownAction.type) {
+    case "ignore-missing-node":
+      return;
+    case "locked-edit-attempt":
+      if (nodePointerDownAction.preventDefault) {
+        event.preventDefault();
+      }
+      if (nodePointerDownAction.focusCanvas) {
+        canvasRef.value?.focus();
+      }
+      if (nodePointerDownAction.clearCanvasTransientState) {
+        clearCanvasTransientState();
+      }
+      selection.selectNode(nodePointerDownAction.selectNodeId);
+      return;
+    case "start-drag":
+      break;
+  }
   if (activeConnection.value) {
     const connectionNodePointerDownAction = resolveCanvasNodePointerDownConnectionAction({
       connection: activeConnection.value,
@@ -1378,22 +1420,10 @@ function handleNodePointerDown(nodeId: string, event: PointerEvent) {
         break;
     }
   }
-  if (!preserveInlineEditorFocus) {
-    canvasRef.value?.focus();
-    event.preventDefault();
+  if (!node) {
+    return;
   }
-  let captureElement: HTMLElement | null = null;
-  if (event.currentTarget instanceof HTMLElement) {
-    captureElement = event.currentTarget;
-    if (!preserveInlineEditorFocus) {
-      event.currentTarget.setPointerCapture(event.pointerId);
-    }
-  }
-  clearCanvasTransientState();
-  clearPendingConnection();
-  cancelScheduledDragFrame();
-  selectedEdgeId.value = null;
-  selection.selectNode(nodeId);
+  const captureElement = applyNodePointerDownDragSetup(nodePointerDownAction, event);
   startNodeDrag({
     nodeId,
     pointerId: event.pointerId,
@@ -1406,47 +1436,107 @@ function handleNodePointerDown(nodeId: string, event: PointerEvent) {
   });
 }
 
-function handleNodeResizePointerDown(nodeId: string, handle: NodeResizeHandle, event: PointerEvent) {
-  const node = props.document.nodes[nodeId];
-  if (!node) {
-    return;
+function applyNodePointerDownDragSetup(
+  action: Extract<CanvasNodePointerDownAction, { type: "start-drag" }>,
+  event: PointerEvent,
+) {
+  if (action.focusCanvas) {
+    canvasRef.value?.focus();
   }
-  if (isGraphEditingLocked()) {
+  if (action.preventDefault) {
     event.preventDefault();
-    emit("locked-edit-attempt");
-    return;
   }
-  if (activeConnection.value) {
-    return;
-  }
-
-  canvasRef.value?.focus();
   let captureElement: HTMLElement | null = null;
-  if (event.currentTarget instanceof HTMLElement) {
+  if (action.setPointerCapture && event.currentTarget instanceof HTMLElement) {
     captureElement = event.currentTarget;
     event.currentTarget.setPointerCapture(event.pointerId);
   }
+  if (action.clearCanvasTransientState) {
+    clearCanvasTransientState();
+  }
+  if (action.clearPendingConnection) {
+    clearPendingConnection();
+  }
+  if (action.cancelScheduledDragFrame) {
+    cancelScheduledDragFrame();
+  }
+  if (action.clearSelectedEdge) {
+    selectedEdgeId.value = null;
+  }
+  selection.selectNode(action.selectNodeId);
+  return captureElement;
+}
 
-  clearCanvasTransientState();
-  clearPendingConnection();
-  cancelScheduledDragFrame();
-  selectedEdgeId.value = null;
-  selection.selectNode(nodeId);
-  startNodeResizeDrag({
+function handleNodeResizePointerDown(nodeId: string, handle: NodeResizeHandle, event: PointerEvent) {
+  const node = props.document.nodes[nodeId];
+  const nodeResizePointerDownAction = resolveNodeResizePointerDownAction({
     nodeId,
-    pointerId: event.pointerId,
-    handle,
-    startClientX: event.clientX,
-    startClientY: event.clientY,
-    originPosition: { ...node.ui.position },
-    originSize: resolveNodeRenderedSize({
-      nodeId,
-      node,
-      measuredNodeSizes: measuredNodeSizes.value,
-    }),
-    captureElement,
-    moved: false,
+    nodeExists: Boolean(node),
+    interactionLocked: isGraphEditingLocked(),
+    hasActiveConnection: Boolean(activeConnection.value),
   });
+  switch (nodeResizePointerDownAction.type) {
+    case "ignore-missing-node":
+      return;
+    case "locked-edit-attempt":
+      if (nodeResizePointerDownAction.preventDefault) {
+        event.preventDefault();
+      }
+      emit("locked-edit-attempt");
+      return;
+    case "ignore-active-connection":
+      return;
+    case "start-resize": {
+      if (!node) {
+        return;
+      }
+      const captureElement = applyNodeResizePointerDownSetup(nodeResizePointerDownAction, event);
+      startNodeResizeDrag({
+        nodeId,
+        pointerId: event.pointerId,
+        handle,
+        startClientX: event.clientX,
+        startClientY: event.clientY,
+        originPosition: { ...node.ui.position },
+        originSize: resolveNodeRenderedSize({
+          nodeId,
+          node,
+          measuredNodeSizes: measuredNodeSizes.value,
+        }),
+        captureElement,
+        moved: false,
+      });
+      return;
+    }
+  }
+}
+
+function applyNodeResizePointerDownSetup(
+  action: Extract<CanvasNodeResizePointerDownAction, { type: "start-resize" }>,
+  event: PointerEvent,
+) {
+  if (action.focusCanvas) {
+    canvasRef.value?.focus();
+  }
+  let captureElement: HTMLElement | null = null;
+  if (action.setPointerCapture && event.currentTarget instanceof HTMLElement) {
+    captureElement = event.currentTarget;
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+  if (action.clearCanvasTransientState) {
+    clearCanvasTransientState();
+  }
+  if (action.clearPendingConnection) {
+    clearPendingConnection();
+  }
+  if (action.cancelScheduledDragFrame) {
+    cancelScheduledDragFrame();
+  }
+  if (action.clearSelectedEdge) {
+    selectedEdgeId.value = null;
+  }
+  selection.selectNode(action.selectNodeId);
+  return captureElement;
 }
 
 function isNodeResizeHotzoneEnabled() {

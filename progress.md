@@ -1,5 +1,212 @@
 # Progress Log
 
+## Session: 2026-04-29 Phase 42
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Confirmed Phase 41 was committed and pushed as `835278e`.
+  - Re-read the formal roadmap, active plan, latest findings, and current canvas pointer-down pan/pinch setup flow.
+  - Inspected `handleCanvasPointerDown`, `canvasPinchZoomModel.ts`, and existing pan/pinch structure coverage.
+  - Selected the next P2 Canvas boundary: canvas pointer-down setup routing between touch pinch start and normal pan start.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `resolveCanvasPointerDownAction` model expectations before production code.
+  - Updated `EditorCanvas.structure.test.ts` to require the new canvas pointer-down action boundary and setup helper.
+  - Verified the expected red failure: the model export was missing and the component still had inline pinch cleanup / pan startup setup.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `CanvasPointerDownAction` and `resolveCanvasPointerDownAction` to `canvasPinchZoomModel.ts`.
+  - Updated `EditorCanvas.vue` to compute `startedPinchZoom`, resolve the setup action, and execute the action through `applyCanvasPointerDownSetup`.
+  - Kept pointer snapshot storage, pinch startup, DOM focus/preventDefault, pointer capture, transient cleanup, selected-edge cleanup, selection clearing, and `viewport.beginPan` execution inside the component.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused pinch model and structure tests.
+  - Ran the broader Canvas viewport, pinch, drag/resize, connection, edge, and graph regression set.
+  - Ran TypeScript unused-symbol verification from `frontend`.
+  - Ran the full frontend `node --test` suite.
+  - Ran the frontend production build; no large chunk warning was emitted.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed backend `/health` returned `{"status":"ok"}` and the frontend entry returned HTTP 200.
+  - Captured a headless Chrome screenshot after a virtual-time wait and confirmed the workspace rendered normally.
+
+### Phase 5: Continuation Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated overall roadmap cleanup at about 69%.
+  - Recalculated P2 `EditorCanvas.vue` cleanup at about 70%.
+  - Opened Phase 43 automatically because total roadmap progress is below 100%.
+  - Selected the next candidate boundary as wheel zoom request projection around zero-delta ignore, scale delta, and pointer-centered zoom inputs.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red focused tests | `node --test frontend/src/editor/canvas/canvasPinchZoomModel.test.ts frontend/src/editor/canvas/EditorCanvas.structure.test.ts` before implementation | Fails because canvas pointer-down action export and component wiring do not exist | Failed on missing export and structure assertions | Passed |
+| Focused model/structure tests | Same focused files after implementation | All focused tests pass | 63 passed | Passed |
+| Focused Canvas and graph regression | `node --test` over Canvas viewport, pinch, drag/resize, connection, edge, and graph document tests | Related interaction tests pass | 185 passed | Passed |
+| Unused symbol check | `./node_modules/.bin/vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No diagnostics | Exit 0 | Passed |
+| Full frontend tests | `node --test $(rg --files src vite.config.structure.test.ts | rg '\.test\.ts$')` in `frontend` | All frontend tests pass | 802 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without a large chunk warning | Exit 0, no Vite chunk warning | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+| Browser smoke | Headless Chrome screenshot with virtual-time wait | Workspace renders normally | Workspace UI rendered | Passed |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Phase 42 implementation, verification, docs update, and dev restart are complete. |
+| Where am I going? | Phase 43 is open for wheel zoom request extraction. |
+| What's the goal? | Continue reducing `EditorCanvas.vue` interaction ownership without changing drag, resize, snap, create-node, pan/zoom, or connection-completion behavior. |
+| What have I learned? | Canvas pointer-down setup has a clean model boundary if the component still owns pointer snapshot storage and actual viewport/DOM side effects. |
+| What have I done? | Extracted canvas pointer-down pan/pinch setup decisions, added regression coverage, verified the full frontend suite, built, restarted, and visually smoked the app. |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+
+## Session: 2026-04-29 Phase 41
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Confirmed Phase 40 was committed and pushed as `41747b0`.
+  - Re-read the formal roadmap, active plan, latest findings, and current node pointer-down drag setup flow.
+  - Inspected `handleNodePointerDown`, `canvasNodeDragResizeModel.ts`, active-connection node pointer-down routing, and the existing node drag structure coverage.
+  - Selected the next P2 Canvas boundary: node pointer-down drag setup routing.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `resolveNodePointerDownAction` model expectations before production code.
+  - Updated `EditorCanvas.structure.test.ts` to require the new node pointer-down drag setup model boundary.
+  - Verified the expected red failure: the model export was missing and the component still had the old inline missing-node / locked-edit / focus-preservation / start-drag setup branch.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `CanvasNodePointerDownAction` and `resolveNodePointerDownAction` to `canvasNodeDragResizeModel.ts`.
+  - Updated `EditorCanvas.vue` to route missing nodes, locked edit attempts, inline-editor focus preservation, and drag startup setup through the returned action.
+  - Kept active-connection node-body completion, DOM focus/preventDefault, pointer capture, transient cleanup, pending connection cleanup, selected-edge cleanup, selection mutation, and `startNodeDrag` execution inside the component.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused model and structure tests.
+  - Ran the broader Canvas drag/resize, connection, edge, and graph regression set.
+  - Ran TypeScript unused-symbol verification from `frontend`.
+  - Ran the full frontend `node --test` suite.
+  - Ran the frontend production build; no large chunk warning was emitted.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed backend `/health` returned `{"status":"ok"}` and the frontend entry returned HTTP 200.
+  - Captured a headless Chrome screenshot after a virtual-time wait and confirmed the workspace rendered normally.
+
+### Phase 5: Continuation Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated overall roadmap cleanup at about 68%.
+  - Recalculated P2 `EditorCanvas.vue` cleanup at about 68%.
+  - Opened Phase 42 automatically because total roadmap progress is below 100%.
+  - Selected the next candidate boundary as canvas pointer-down pan/pinch setup routing around touch pinch start versus pan start setup policy.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red focused tests | `node --test frontend/src/editor/canvas/canvasNodeDragResizeModel.test.ts frontend/src/editor/canvas/EditorCanvas.structure.test.ts` before implementation | Fails because node pointer-down action export and component wiring do not exist | Failed on missing export and structure assertions | Passed |
+| Focused model/structure tests | Same focused files after implementation | All focused tests pass | 66 passed | Passed |
+| Focused Canvas and graph regression | `node --test` over Canvas drag/resize, connection, edge, and graph document tests | Related interaction tests pass | 179 passed | Passed |
+| Unused symbol check | `./node_modules/.bin/vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No diagnostics | Exit 0 | Passed |
+| Full frontend tests | `node --test $(rg --files src vite.config.structure.test.ts | rg '\.test\.ts$')` in `frontend` | All frontend tests pass | 801 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without a large chunk warning | Exit 0, no Vite chunk warning | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+| Browser smoke | Headless Chrome screenshot with virtual-time wait | Workspace renders normally | Workspace UI rendered | Passed |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Phase 41 implementation, verification, docs update, and dev restart are complete. |
+| Where am I going? | Phase 42 is open for canvas pointer-down pan/pinch setup action extraction. |
+| What's the goal? | Continue reducing `EditorCanvas.vue` interaction ownership without changing drag, resize, snap, create-node, pan/zoom, or connection-completion behavior. |
+| What have I learned? | Node pointer-down drag startup has a clean model boundary if active-connection completion remains separately resolved before drag execution. |
+| What have I done? | Extracted node pointer-down drag setup decisions, added regression coverage, verified the full frontend suite, built, restarted, and visually smoked the app. |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+
+## Session: 2026-04-29 Phase 40
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Confirmed Phase 39 was committed and pushed as `dd59e88`.
+  - Re-read the formal roadmap, active plan, latest findings, and current node-resize pointer-down flow.
+  - Inspected `handleNodeResizePointerDown`, `canvasNodeDragResizeModel.ts`, and the existing resize hotzone structure coverage.
+  - Selected the next P2 Canvas boundary: node-resize pointer-down action routing.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `resolveNodeResizePointerDownAction` model expectations before production code.
+  - Updated `EditorCanvas.structure.test.ts` to require the new resize pointer-down model boundary.
+  - Verified the expected red failure: the model export was missing and the component still had the old inline missing-node / locked-edit / active-connection branch.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `CanvasNodeResizePointerDownAction` and `resolveNodeResizePointerDownAction` to `canvasNodeDragResizeModel.ts`.
+  - Updated `EditorCanvas.vue` to route missing nodes, locked edit attempts, active-connection blocking, and resize startup through the returned action.
+  - Kept DOM focus, pointer capture, transient cleanup, pending connection cleanup, selected-edge cleanup, rendered-size lookup, and `startNodeResizeDrag` execution inside the component.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused model and structure tests.
+  - Ran the broader Canvas drag/resize, connection, edge, and graph regression set.
+  - Ran TypeScript unused-symbol verification from `frontend`.
+  - Ran the full frontend `node --test` suite.
+  - Ran the frontend production build; no large chunk warning was emitted.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed backend `/health` returned `{"status":"ok"}` and the frontend entry returned HTML.
+  - Captured a headless Chrome screenshot after a virtual-time wait and confirmed the workspace rendered normally.
+
+### Phase 5: Continuation Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated overall roadmap cleanup at about 67%.
+  - Recalculated P2 `EditorCanvas.vue` cleanup at about 66%.
+  - Opened Phase 41 automatically because total roadmap progress is below 100%.
+  - Selected the next candidate boundary as node pointer-down drag setup routing around missing node, locked edit, active connection, inline-editor focus preservation, and drag startup.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red focused tests | `node --test frontend/src/editor/canvas/canvasNodeDragResizeModel.test.ts frontend/src/editor/canvas/EditorCanvas.structure.test.ts` before implementation | Fails because resize pointer-down action export and component wiring do not exist | Failed on missing export and structure assertions | Passed |
+| Focused model/structure tests | Same focused files after implementation | All focused tests pass | 65 passed | Passed |
+| Focused Canvas and graph regression | `node --test` over Canvas drag/resize, connection, edge, and graph document tests | Related interaction tests pass | 178 passed | Passed |
+| Unused symbol check | `./node_modules/.bin/vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No diagnostics | Exit 0 | Passed |
+| Full frontend tests | `node --test $(rg --files src vite.config.structure.test.ts | rg '\.test\.ts$')` in `frontend` | All frontend tests pass | 800 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without a large chunk warning | Exit 0, no Vite chunk warning | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTML returned, backend `/health` ok | Passed |
+| Browser smoke | Headless Chrome screenshot with virtual-time wait | Workspace renders normally | Workspace UI rendered | Passed |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Phase 40 implementation, verification, docs update, and dev restart are complete. |
+| Where am I going? | Phase 41 is open for node pointer-down drag setup action extraction. |
+| What's the goal? | Continue reducing `EditorCanvas.vue` interaction ownership without changing drag, resize, snap, create-node, or connection-completion behavior. |
+| What have I learned? | Resize pointer-down has a clean model boundary if the component keeps pointer capture and rendered-size lookup. |
+| What have I done? | Extracted resize pointer-down route decisions, added regression coverage, verified the full frontend suite, built, restarted, and visually smoked the app. |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+
 ## Session: 2026-04-29 Phase 39
 
 ### Phase 1: Re-orientation

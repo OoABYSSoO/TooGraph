@@ -207,10 +207,16 @@ test("EditorCanvas exposes invisible corner hotzones for real node resizing", ()
   assert.match(componentSource, /aria-hidden="true"/);
   assert.match(componentSource, /@pointerdown\.stop\.prevent="handleNodeResizePointerDown\(nodeId, handle, \$event\)"/);
   assert.match(componentSource, /function handleNodeResizePointerDown\(nodeId: string, handle: NodeResizeHandle, event: PointerEvent\)/);
+  assert.match(componentSource, /const nodeResizePointerDownAction = resolveNodeResizePointerDownAction\(\{[\s\S]*nodeId,[\s\S]*nodeExists: Boolean\(node\),[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*hasActiveConnection: Boolean\(activeConnection\.value\),[\s\S]*\}\);/);
+  assert.match(componentSource, /case "locked-edit-attempt":[\s\S]*event\.preventDefault\(\);[\s\S]*emit\("locked-edit-attempt"\);[\s\S]*return;/);
+  assert.match(componentSource, /case "ignore-active-connection":[\s\S]*return;/);
+  assert.match(componentSource, /case "start-resize":[\s\S]*startNodeResizeDrag\(\{/);
   assert.match(componentSource, /function isNodeResizeHotzoneEnabled\(\) \{[\s\S]*return !isGraphEditingLocked\(\) && !activeConnection\.value;/);
   assert.match(componentSource, /if \(handleNodeDragResizePointerMove\(event\)\) \{[\s\S]*return;/);
   assert.match(canvasNodeDragResizeSource, /const resizeResult = resolveNodeResizeDragMove\(\{[\s\S]*drag: nodeResizeDrag\.value,[\s\S]*viewportScale: input\.viewportScale\(\),/);
   assert.match(canvasNodeDragResizeSource, /const dragResult = resolveNodeDragMove\(\{[\s\S]*drag: nodeDrag\.value,[\s\S]*viewportScale: input\.viewportScale\(\),/);
+  assert.match(canvasNodeDragResizeModelSource, /export type CanvasNodeResizePointerDownAction/);
+  assert.match(canvasNodeDragResizeModelSource, /export function resolveNodeResizePointerDownAction/);
   assert.match(canvasNodeDragResizeModelSource, /export function resolveNodeDragMove/);
   assert.match(canvasNodeDragResizeModelSource, /export function resolveNodeResizeDragMove/);
   assert.doesNotMatch(componentSource, /function isNodeResizeHotzoneEnabled\(nodeId: string\)/);
@@ -1219,7 +1225,7 @@ test("EditorCanvas opts mobile touch drags out of browser gestures", () => {
 test("EditorCanvas supports two-finger pinch zoom on mobile without changing single-pointer gestures", () => {
   const canvasPinchZoomModelSource = readCanvasPinchZoomModelSource();
 
-  assert.match(componentSource, /import \{ buildPinchZoomStart, resolvePointerCenter, resolvePointerDistance \} from "\.\/canvasPinchZoomModel";/);
+  assert.match(componentSource, /import \{ buildPinchZoomStart, resolveCanvasPointerDownAction, resolvePointerCenter, resolvePointerDistance \} from "\.\/canvasPinchZoomModel";/);
   assert.match(componentSource, /const activeCanvasPointers = new Map<number, \{ clientX: number; clientY: number; pointerType: string \}>\(\);/);
   assert.match(componentSource, /const pinchZoom = ref<\{/);
   assert.match(componentSource, /function beginPinchZoomIfReady\(\)/);
@@ -1230,20 +1236,31 @@ test("EditorCanvas supports two-finger pinch zoom on mobile without changing sin
   assert.match(componentSource, /viewport\.zoomAt\(\{/);
   assert.match(componentSource, /nextScale: pinch\.startScale \* \(nextDistance \/ pinch\.startDistance\)/);
   assert.match(canvasPinchZoomModelSource, /export function buildPinchZoomStart/);
+  assert.match(canvasPinchZoomModelSource, /export type CanvasPointerDownAction/);
+  assert.match(canvasPinchZoomModelSource, /export function resolveCanvasPointerDownAction/);
   assert.match(canvasPinchZoomModelSource, /export function resolvePointerDistance/);
   assert.match(canvasPinchZoomModelSource, /export function resolvePointerCenter/);
   assert.doesNotMatch(componentSource, /function resolvePointerDistance/);
   assert.doesNotMatch(componentSource, /function resolvePointerCenter/);
   assert.match(componentSource, /if \(event\.pointerType === "touch"\) \{/);
+  assert.match(componentSource, /const canvasPointerDownAction = resolveCanvasPointerDownAction\(\{ startedPinchZoom \}\);/);
+  assert.match(componentSource, /function applyCanvasPointerDownSetup\([\s\S]*action: CanvasPointerDownAction,[\s\S]*event: PointerEvent,[\s\S]*\)/);
+  assert.match(componentSource, /if \(action\.focusCanvas\) \{[\s\S]*canvasRef\.value\?\.focus\(\);/);
+  assert.match(componentSource, /if \(action\.setPointerCapture\) \{[\s\S]*canvasRef\.value\?\.setPointerCapture\(event\.pointerId\);/);
+  assert.match(componentSource, /if \(action\.beginPan\) \{[\s\S]*viewport\.beginPan\(event\);/);
   assert.match(componentSource, /if \(pinchZoom\.value\) \{[\s\S]*event\.preventDefault\(\);[\s\S]*scheduleDragFrame\(\(\) => \{[\s\S]*updatePinchZoom\(\);/);
   assert.match(componentSource, /if \(pinchZoom\.value\?\.pointerIds\.includes\(event\.pointerId\)\) \{[\s\S]*clearPinchZoom\(\);[\s\S]*viewport\.endPan\(\);[\s\S]*return;/);
 });
 
 test("EditorCanvas captures node drags and batches drag writes with animation frames", () => {
+  const canvasNodeDragResizeModelSource = readCanvasNodeDragResizeModelSource();
   const canvasNodeDragResizeSource = readCanvasNodeDragResizeSource();
 
-  assert.match(componentSource, /if \(!preserveInlineEditorFocus\) \{[\s\S]*event\.preventDefault\(\);[\s\S]*\}/);
-  assert.match(componentSource, /if \(!preserveInlineEditorFocus\) \{[\s\S]*event\.currentTarget\.setPointerCapture\(event\.pointerId\);[\s\S]*\}/);
+  assert.match(canvasNodeDragResizeModelSource, /export type CanvasNodePointerDownAction/);
+  assert.match(canvasNodeDragResizeModelSource, /export function resolveNodePointerDownAction/);
+  assert.match(componentSource, /const nodePointerDownAction = resolveNodePointerDownAction\(\{[\s\S]*nodeId,[\s\S]*nodeExists: Boolean\(node\),[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*preserveInlineEditorFocus,[\s\S]*\}\);/);
+  assert.match(componentSource, /case "locked-edit-attempt":[\s\S]*event\.preventDefault\(\);[\s\S]*canvasRef\.value\?\.focus\(\);[\s\S]*clearCanvasTransientState\(\);[\s\S]*selection\.selectNode\(nodePointerDownAction\.selectNodeId\);[\s\S]*return;/);
+  assert.match(componentSource, /function applyNodePointerDownDragSetup[\s\S]*if \(action\.preventDefault\) \{[\s\S]*event\.preventDefault\(\);[\s\S]*if \(action\.setPointerCapture && event\.currentTarget instanceof HTMLElement\) \{[\s\S]*event\.currentTarget\.setPointerCapture\(event\.pointerId\);/);
   assert.match(componentSource, /let scheduledDragFrame: number \| null = null;/);
   assert.match(componentSource, /function scheduleDragFrame/);
   assert.match(componentSource, /window\.requestAnimationFrame\(\(\) => \{/);
@@ -1287,6 +1304,7 @@ test("EditorCanvas suppresses the residual click after a node drag so inline edi
   assert.match(canvasNodeDragResizeSource, /event\.preventDefault\(\);/);
   assert.match(canvasNodeDragResizeSource, /event\.stopPropagation\(\);/);
   assert.match(componentSource, /const preserveInlineEditorFocus =[\s\S]*target\.closest\("\[data-text-editor-trigger='true'\]"\)/);
-  assert.match(componentSource, /if \(!preserveInlineEditorFocus\) \{\s*canvasRef\.value\?\.focus\(\);\s*event\.preventDefault\(\);\s*\}/);
+  assert.match(componentSource, /resolveNodePointerDownAction\(\{[\s\S]*preserveInlineEditorFocus,[\s\S]*\}\);/);
+  assert.match(componentSource, /function applyNodePointerDownDragSetup[\s\S]*if \(action\.focusCanvas\) \{[\s\S]*canvasRef\.value\?\.focus\(\);[\s\S]*if \(action\.preventDefault\) \{[\s\S]*event\.preventDefault\(\);/);
   assert.match(canvasNodeDragResizeSource, /if \(nodeDrag\.value\.captureElement && !nodeDrag\.value\.captureElement\.hasPointerCapture\(pointer\.pointerId\)\) \{[\s\S]*nodeDrag\.value\.captureElement\.setPointerCapture\(pointer\.pointerId\);[\s\S]*\}/);
 });
