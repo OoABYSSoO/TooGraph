@@ -11,6 +11,10 @@ export type CanvasNodeVisualSelectionInput = Pick<CanvasRunPresentationInput, "n
   selectedNodeId?: string | null;
 };
 
+export type CanvasLockBannerClickAction =
+  | { type: "locked-edit-attempt" }
+  | { type: "open-human-review"; nodeId: string };
+
 export function isHumanReviewRunNode(input: Pick<CanvasRunPresentationInput, "nodeId" | "currentRunNodeId" | "latestRunStatus">) {
   return input.latestRunStatus === "awaiting_human" && input.currentRunNodeId === input.nodeId;
 }
@@ -27,4 +31,17 @@ export function resolveRunNodeClassListForCanvasNode(input: CanvasRunPresentatio
 
 export function isCanvasNodeVisuallySelected(input: CanvasNodeVisualSelectionInput) {
   return input.selectedNodeId === input.nodeId || isHumanReviewRunNode(input);
+}
+
+export function resolveLockBannerClickAction(input: {
+  currentRunNodeId?: string | null;
+}): CanvasLockBannerClickAction {
+  if (!input.currentRunNodeId) {
+    return { type: "locked-edit-attempt" };
+  }
+
+  return {
+    type: "open-human-review",
+    nodeId: input.currentRunNodeId,
+  };
 }

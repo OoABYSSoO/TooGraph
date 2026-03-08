@@ -73,11 +73,12 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 当前执行进展：
 
 - `useCanvasNodeMeasurements.ts` 已承接节点 DOM 注册、ResizeObserver/MutationObserver、anchor slot 测量、flow anchor fallback 测量和 measured size 清理。
-- `useCanvasEdgeInteractions.ts` 已承接 flow/route 删除确认、data edge state 编辑请求、disconnect/update emits 和缺失 edge 清理。
+- `useCanvasEdgeInteractions.ts` 已承接 flow/route 删除确认、data edge state 编辑请求、disconnect/update emits 和缺失 edge 清理；`flowEdgeDeleteModel.ts` 已承接 selected-edge keyboard delete 的 editable-target / locked / missing / non-deletable / flow-route delete action projection；`edgeVisibilityModel.ts` 已承接 edge visibility toolbar click 的 locked / same-mode / change-mode cleanup policy。
 - `canvasConnectionInteractionModel.ts`、`canvasConnectionModel.ts`、`canvasPendingStatePortModel.ts` 等纯模型已承接连接预览、自动吸附候选、虚拟端口创建上下文和新节点创建 payload 的可测试决策。
 - `canvasNodeDragResizeModel.ts` 已承接节点拖拽/缩放 move 阶段的阈值判断、viewport-scale 投影、rounding、resize result projection，以及 node-resize/node pointer-down 的 missing-node / locked-edit / active-connection / inline-editor focus / start-resize / start-drag 路由；`EditorCanvas.vue` 仍保留 pointer capture、animation-frame batching、connection completion、rendered-size lookup、drag/resize execution 和 graph mutation emits。
 - `canvasPinchZoomModel.ts` 已承接双指缩放起点计算、pointer distance/center 计算，以及 canvas pointer-down 在 pinch cleanup 与 pan startup 之间的 setup action 决策；`EditorCanvas.vue` 仍保留 pointer snapshot storage、DOM focus/preventDefault、pointer capture、viewport pan/zoom execution 和 transient cleanup execution。
 - `canvasViewportInteractionModel.ts` 已承接 wheel zoom delta、zero-delta ignore、pointer-centered zoom request 和无 canvas rect 时的 set-scale fallback；`EditorCanvas.vue` 仍保留 DOM rect lookup、实际 viewport mutation、wheel event binding 和 viewport draft emits。
+- `canvasRunPresentationModel.ts` 已承接 awaiting-human run node presentation、human-review visual selection 和 lock-banner click action projection；`EditorCanvas.vue` 仍保留实际 button event binding、emit dispatch 和锁定态副作用。
 - `useCanvasNodeDragResize.ts` 已承接节点拖拽/缩放 refs、pointer capture release、scheduled update dispatch、拖拽后残留 click 抑制和 teardown；`EditorCanvas.vue` 仍保留 selection、active connection cleanup、auto-snap、connection completion、panning、DOM measurement 和 graph mutation emits。
 - `useCanvasConnectionInteraction.ts` 已承接 pending connection refs、preview point、auto-snapped target ref、active connection hover node ref、从 anchor 启停 pending connection、preview point 更新和 hover-change 通知；`EditorCanvas.vue` 仍保留 actual emits、panning、node drag/resize 和 DOM measurement。
 - `canvasConnectionCompletionModel.ts` 已承接 connection completion action projection 和 completion request cleanup policy：从 active connection 和 target anchor 纯计算 `connect-flow`、`connect-route`、`connect-state`、`connect-state-input-source`、`reconnect-flow`、`reconnect-route` payload，并明确完成后清理连接交互状态/已选边；`EditorCanvas.vue` 仍保留实际 `emit` dispatch 和 imperative cleanup execution。
@@ -154,6 +155,7 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 - `EventSource` 逻辑在 workspace 和 run detail 重复，应抽成运行事件流 composable。
 - `graph-document.ts` 是核心图变更库，虽然超过 1k 行，但已有大量测试。它适合按 domain 分文件，不适合轻率重写。
 - 结构测试能保护 UI 约束，但过多依赖源码字符串会让重构成本变高。后续拆组件时应把一部分结构测试替换成模型测试或组件行为测试。
+- 2026-04-30：`canvasLockedInteractionModel.ts` 已承担锁定节点 pointer capture 的 no-op/捕获策略，`EditorCanvas.vue` 仍保留 DOM 目标判断、事件副作用、focus、清理、选中和 emit 执行。
 
 ## 优先级路线
 

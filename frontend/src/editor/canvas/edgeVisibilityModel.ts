@@ -9,6 +9,17 @@ export type EdgeVisibilityModeOption = {
   title: string;
 };
 
+export type EdgeVisibilityModeClickAction =
+  | { type: "locked-edit-attempt" }
+  | { type: "ignore-same-mode" }
+  | {
+      type: "change-mode";
+      mode: EdgeVisibilityMode;
+      clearSelectedEdge: true;
+      clearPendingConnection: true;
+      clearCanvasTransientState: true;
+    };
+
 export function buildEdgeVisibilityModeOptions(): EdgeVisibilityModeOption[] {
   return [
     {
@@ -120,4 +131,26 @@ export function shouldShowOutputFlowHandle(options: {
     }) &&
     (options.isNodeInteracted || options.isActiveConnectionSource)
   );
+}
+
+export function resolveEdgeVisibilityModeClickAction(input: {
+  interactionLocked: boolean;
+  currentMode: EdgeVisibilityMode;
+  requestedMode: EdgeVisibilityMode;
+}): EdgeVisibilityModeClickAction {
+  if (input.interactionLocked) {
+    return { type: "locked-edit-attempt" };
+  }
+
+  if (input.currentMode === input.requestedMode) {
+    return { type: "ignore-same-mode" };
+  }
+
+  return {
+    type: "change-mode",
+    mode: input.requestedMode,
+    clearSelectedEdge: true,
+    clearPendingConnection: true,
+    clearCanvasTransientState: true,
+  };
 }

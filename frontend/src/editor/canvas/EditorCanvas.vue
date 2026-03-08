@@ -413,6 +413,7 @@ import {
   buildEdgeVisibilityModeOptions,
   buildForceVisibleProjectedEdgeIds,
   filterProjectedEdgesForVisibilityMode,
+  resolveEdgeVisibilityModeClickAction,
   shouldShowOutputFlowHandle,
   type EdgeVisibilityMode,
 } from "./edgeVisibilityModel";
@@ -455,10 +456,12 @@ import {
 import {
   isCanvasNodeVisuallySelected,
   isHumanReviewRunNode,
+  resolveLockBannerClickAction,
   resolveRunNodeClassListForCanvasNode,
   resolveRunNodePresentationForCanvasNode,
 } from "./canvasRunPresentationModel";
-import { resolveFlowEdgeDeleteActionFromEdge } from "./flowEdgeDeleteModel";
+import { resolveLockedNodePointerCaptureAction } from "./canvasLockedInteractionModel";
+import { resolveSelectedEdgeKeyboardDeleteAction } from "./flowEdgeDeleteModel";
 import {
   buildMinimapNodeModel,
   buildNodeCardSizeStyle,
@@ -903,22 +906,30 @@ function isProjectedEdgeVisible(edge: ProjectedCanvasEdge) {
   return visibleProjectedEdgeIds.value.has(edge.id);
 }
 
-function setEdgeVisibilityMode(mode: EdgeVisibilityMode) {
-  if (edgeVisibilityMode.value === mode) {
-    return;
-  }
-
-  edgeVisibilityMode.value = mode;
-  selectedEdgeId.value = null;
-  clearPendingConnection();
-  clearCanvasTransientState();
-}
-
 function handleEdgeVisibilityModeClick(mode: EdgeVisibilityMode) {
-  if (guardLockedCanvasInteraction()) {
-    return;
+  const edgeVisibilityModeClickAction = resolveEdgeVisibilityModeClickAction({
+    interactionLocked: isGraphEditingLocked(),
+    currentMode: edgeVisibilityMode.value,
+    requestedMode: mode,
+  });
+  switch (edgeVisibilityModeClickAction.type) {
+    case "locked-edit-attempt":
+      guardLockedCanvasInteraction();
+      return;
+    case "ignore-same-mode":
+      return;
+    case "change-mode":
+      edgeVisibilityMode.value = edgeVisibilityModeClickAction.mode;
+      if (edgeVisibilityModeClickAction.clearSelectedEdge) {
+        selectedEdgeId.value = null;
+      }
+      if (edgeVisibilityModeClickAction.clearPendingConnection) {
+        clearPendingConnection();
+      }
+      if (edgeVisibilityModeClickAction.clearCanvasTransientState) {
+        clearCanvasTransientState();
+      }
   }
-  setEdgeVisibilityMode(mode);
 }
 
 watch(projectedEdges, (edges) => {
@@ -1874,20 +1885,27 @@ function emitCanvasConnectionCompletionAction(action: CanvasConnectionCompletion
 }
 
 function handleSelectedEdgeDelete(event: KeyboardEvent) {
-  if (isEditableKeyboardEventTarget(event.target)) {
-    return;
+  const selectedEdgeKeyboardDeleteAction = resolveSelectedEdgeKeyboardDeleteAction({
+    isEditableTarget: isEditableKeyboardEventTarget(event.target),
+    interactionLocked: isGraphEditingLocked(),
+    selectedEdgeId: selectedEdgeId.value,
+    edges: projectedEdges.value,
+  });
+  switch (selectedEdgeKeyboardDeleteAction.type) {
+    case "ignore-editable-target":
+    case "ignore-missing-edge":
+    case "ignore-non-deletable-edge":
+      return;
+    case "locked-edit-attempt":
+      guardLockedCanvasInteraction();
+      event.preventDefault();
+      return;
+    case "delete-edge":
+      event.preventDefault();
+      break;
   }
-  if (guardLockedCanvasInteraction()) {
-    event.preventDefault();
-    return;
-  }
-  const edge = selectedEdgeId.value ? projectedEdges.value.find((candidate) => candidate.id === selectedEdgeId.value) : null;
-  const action = resolveFlowEdgeDeleteActionFromEdge(edge);
-  if (!action) {
-    return;
-  }
-  event.preventDefault();
 
+  const action = selectedEdgeKeyboardDeleteAction.action;
   if (action.kind === "route") {
     emit("remove-route", {
       sourceNodeId: action.sourceNodeId,
@@ -1900,8 +1918,12 @@ function handleSelectedEdgeDelete(event: KeyboardEvent) {
     });
   }
 
-  selectedEdgeId.value = null;
-  setPendingConnectionPoint(null);
+  if (selectedEdgeKeyboardDeleteAction.clearSelectedEdge) {
+    selectedEdgeId.value = null;
+  }
+  if (selectedEdgeKeyboardDeleteAction.clearPendingConnectionPoint) {
+    setPendingConnectionPoint(null);
+  }
 }
 
 function resolveCanvasPoint(event: { clientX: number; clientY: number }) {
@@ -1966,11 +1988,16 @@ function isGraphEditingLocked() {
 }
 
 function handleLockBannerClick() {
-  if (!props.currentRunNodeId) {
-    emit("locked-edit-attempt");
-    return;
+  const lockBannerClickAction = resolveLockBannerClickAction({
+    currentRunNodeId: props.currentRunNodeId,
+  });
+  switch (lockBannerClickAction.type) {
+    case "locked-edit-attempt":
+      emit("locked-edit-attempt");
+      return;
+    case "open-human-review":
+      emit("open-human-review", { nodeId: lockBannerClickAction.nodeId });
   }
-  emit("open-human-review", { nodeId: props.currentRunNodeId });
 }
 
 function guardLockedCanvasInteraction() {
@@ -2013,23 +2040,44 @@ function isLockedNodeEditTarget(target: EventTarget | null) {
 }
 
 function handleLockedNodePointerCapture(nodeId: string, event: PointerEvent) {
-  if (!isGraphEditingLocked()) {
-    return;
-  }
   const target = event.target;
-  if (
+  const shouldNotifyLockedAttempt = Boolean(
     (target instanceof HTMLElement && target.closest("[data-human-review-action='true']")) ||
-    isLockedNodeEditTarget(target)
-  ) {
+      isLockedNodeEditTarget(target),
+  );
+  const lockedNodePointerCaptureAction = resolveLockedNodePointerCaptureAction({
+    interactionLocked: isGraphEditingLocked(),
+    nodeId,
+    shouldNotifyLockedAttempt,
+  });
+  switch (lockedNodePointerCaptureAction.type) {
+    case "ignore-unlocked":
+      return;
+    case "capture-locked-node":
+      break;
+  }
+  if (lockedNodePointerCaptureAction.emitLockedEditAttempt) {
     emit("locked-edit-attempt");
   }
-  event.preventDefault();
-  event.stopPropagation();
-  canvasRef.value?.focus();
-  clearCanvasTransientState();
-  clearPendingConnection();
-  selectedEdgeId.value = null;
-  selection.selectNode(nodeId);
+  if (lockedNodePointerCaptureAction.preventDefault) {
+    event.preventDefault();
+  }
+  if (lockedNodePointerCaptureAction.stopPropagation) {
+    event.stopPropagation();
+  }
+  if (lockedNodePointerCaptureAction.focusCanvas) {
+    canvasRef.value?.focus();
+  }
+  if (lockedNodePointerCaptureAction.clearCanvasTransientState) {
+    clearCanvasTransientState();
+  }
+  if (lockedNodePointerCaptureAction.clearPendingConnection) {
+    clearPendingConnection();
+  }
+  if (lockedNodePointerCaptureAction.clearSelectedEdge) {
+    selectedEdgeId.value = null;
+  }
+  selection.selectNode(lockedNodePointerCaptureAction.selectNodeId);
 }
 
 function resolveRunEdgePresentationForEdge(edgeId: string) {

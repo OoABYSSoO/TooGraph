@@ -24,6 +24,19 @@ export type FlowEdgeDeleteAction =
       branchKey: string;
     };
 
+export type SelectedEdgeKeyboardDeleteAction =
+  | { type: "ignore-editable-target" }
+  | { type: "locked-edit-attempt"; preventDefault: true }
+  | { type: "ignore-missing-edge" }
+  | { type: "ignore-non-deletable-edge" }
+  | {
+      type: "delete-edge";
+      preventDefault: true;
+      clearSelectedEdge: true;
+      clearPendingConnectionPoint: true;
+      action: FlowEdgeDeleteAction;
+    };
+
 export function buildFlowEdgeDeleteConfirmFromEdge(
   edge: Pick<ProjectedCanvasEdge, "id" | "kind" | "source" | "target" | "branch">,
   point: FloatingCanvasPoint,
@@ -95,4 +108,39 @@ export function resolveFlowEdgeDeleteActionFromEdge(
   }
 
   return null;
+}
+
+export function resolveSelectedEdgeKeyboardDeleteAction(input: {
+  isEditableTarget: boolean;
+  interactionLocked: boolean;
+  selectedEdgeId: string | null | undefined;
+  edges: readonly ProjectedCanvasEdge[];
+}): SelectedEdgeKeyboardDeleteAction {
+  if (input.isEditableTarget) {
+    return { type: "ignore-editable-target" };
+  }
+
+  if (input.interactionLocked) {
+    return { type: "locked-edit-attempt", preventDefault: true };
+  }
+
+  const edge = input.selectedEdgeId
+    ? input.edges.find((candidate) => candidate.id === input.selectedEdgeId)
+    : null;
+  if (!edge) {
+    return { type: "ignore-missing-edge" };
+  }
+
+  const action = resolveFlowEdgeDeleteActionFromEdge(edge);
+  if (!action) {
+    return { type: "ignore-non-deletable-edge" };
+  }
+
+  return {
+    type: "delete-edge",
+    preventDefault: true,
+    clearSelectedEdge: true,
+    clearPendingConnectionPoint: true,
+    action,
+  };
 }

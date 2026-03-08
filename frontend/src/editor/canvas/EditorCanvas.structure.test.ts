@@ -45,6 +45,10 @@ function readCanvasRunPresentationModelSource() {
   return readFileSync(resolve(currentDirectory, "canvasRunPresentationModel.ts"), "utf8").replace(/\r\n/g, "\n");
 }
 
+function readCanvasLockedInteractionModelSource() {
+  return readFileSync(resolve(currentDirectory, "canvasLockedInteractionModel.ts"), "utf8").replace(/\r\n/g, "\n");
+}
+
 function readFlowEdgeDeleteModelSource() {
   return readFileSync(resolve(currentDirectory, "flowEdgeDeleteModel.ts"), "utf8").replace(/\r\n/g, "\n");
 }
@@ -266,11 +270,14 @@ test("EditorCanvas lets editable node fields handle Backspace and Delete normall
   assert.match(componentSource, /@keydown\.delete="handleSelectedEdgeDelete"/);
   assert.match(componentSource, /@keydown\.backspace="handleSelectedEdgeDelete"/);
   assert.match(componentSource, /function handleSelectedEdgeDelete\(event: KeyboardEvent\)/);
-  assert.match(componentSource, /isEditableKeyboardEventTarget\(event\.target\)/);
-  assert.match(componentSource, /const action = resolveFlowEdgeDeleteActionFromEdge\(edge\);/);
+  assert.match(flowEdgeDeleteModelSource, /export function resolveSelectedEdgeKeyboardDeleteAction/);
+  assert.match(componentSource, /const selectedEdgeKeyboardDeleteAction = resolveSelectedEdgeKeyboardDeleteAction\(\{[\s\S]*isEditableTarget: isEditableKeyboardEventTarget\(event\.target\),[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*selectedEdgeId: selectedEdgeId\.value,[\s\S]*edges: projectedEdges\.value,[\s\S]*\}\);/);
+  assert.match(componentSource, /case "locked-edit-attempt":[\s\S]*guardLockedCanvasInteraction\(\);[\s\S]*return;/);
+  assert.match(componentSource, /case "delete-edge":[\s\S]*const action = selectedEdgeKeyboardDeleteAction\.action;[\s\S]*event\.preventDefault\(\);/);
   assert.match(componentSource, /if \(action\.kind === "route"\) \{[\s\S]*emit\("remove-route", \{[\s\S]*branchKey: action\.branchKey/);
   assert.match(componentSource, /emit\("remove-flow", \{[\s\S]*sourceNodeId: action\.sourceNodeId,[\s\S]*targetNodeId: action\.targetNodeId/);
   assert.match(flowEdgeDeleteModelSource, /export function resolveFlowEdgeDeleteActionFromEdge/);
+  assert.doesNotMatch(componentSource, /const edge = selectedEdgeId\.value \? projectedEdges\.value\.find/);
   assert.doesNotMatch(componentSource, /if \(edge\.kind === "flow"\) \{[\s\S]*sourceNodeId: edge\.source,[\s\S]*targetNodeId: edge\.target/);
   assert.doesNotMatch(componentSource, /else if \(edge\.kind === "route" && edge\.branch\)/);
   assert.match(componentSource, /event\.preventDefault\(\);/);
@@ -430,7 +437,7 @@ test("EditorCanvas treats awaiting-human current node as a persistent review nod
   assert.match(componentSource, /'editor-canvas__node--selected': isNodeVisuallySelected\(nodeId\)/);
   assert.match(componentSource, /:human-review-pending="isHumanReviewNode\(nodeId\)"/);
   assert.match(componentSource, /@open-human-review="emit\('open-human-review', \$event\)"/);
-  assert.match(componentSource, /import \{[\s\S]*isCanvasNodeVisuallySelected,[\s\S]*isHumanReviewRunNode,[\s\S]*resolveRunNodeClassListForCanvasNode,[\s\S]*resolveRunNodePresentationForCanvasNode,[\s\S]*\} from "\.\/canvasRunPresentationModel";/);
+  assert.match(componentSource, /import \{[\s\S]*isCanvasNodeVisuallySelected,[\s\S]*isHumanReviewRunNode,[\s\S]*resolveLockBannerClickAction,[\s\S]*resolveRunNodeClassListForCanvasNode,[\s\S]*resolveRunNodePresentationForCanvasNode,[\s\S]*\} from "\.\/canvasRunPresentationModel";/);
   assert.match(componentSource, /function isHumanReviewNode\(nodeId: string\)/);
   assert.match(componentSource, /return isHumanReviewRunNode\(\{[\s\S]*nodeId,[\s\S]*currentRunNodeId: props\.currentRunNodeId,[\s\S]*latestRunStatus: props\.latestRunStatus,[\s\S]*\}\);/);
   assert.match(componentSource, /resolveRunNodePresentationForCanvasNode\(\{[\s\S]*nodeId,[\s\S]*currentRunNodeId: props\.currentRunNodeId,[\s\S]*latestRunStatus: props\.latestRunStatus,[\s\S]*runNodeStatusByNodeId: props\.runNodeStatusByNodeId,[\s\S]*\}\)/);
@@ -438,6 +445,7 @@ test("EditorCanvas treats awaiting-human current node as a persistent review nod
   assert.match(componentSource, /function isNodeVisuallySelected\(nodeId: string\)/);
   assert.match(componentSource, /return isCanvasNodeVisuallySelected\(\{[\s\S]*nodeId,[\s\S]*selectedNodeId: selection\.selectedNodeId\.value,[\s\S]*currentRunNodeId: props\.currentRunNodeId,[\s\S]*latestRunStatus: props\.latestRunStatus,[\s\S]*\}\);/);
   assert.match(canvasRunPresentationModelSource, /export function isHumanReviewRunNode/);
+  assert.match(canvasRunPresentationModelSource, /export function resolveLockBannerClickAction/);
   assert.match(canvasRunPresentationModelSource, /export function resolveRunNodePresentationForCanvasNode/);
   assert.doesNotMatch(componentSource, /props\.latestRunStatus === "awaiting_human" && props\.currentRunNodeId === nodeId/);
   assert.doesNotMatch(componentSource, /isHumanReviewNode\(nodeId\) \? "paused" : props\.runNodeStatusByNodeId\?\.\[nodeId\]/);
@@ -445,8 +453,11 @@ test("EditorCanvas treats awaiting-human current node as a persistent review nod
 });
 
 test("EditorCanvas keeps paused human-review graphs viewable but read-only", () => {
+  const canvasLockedInteractionModelSource = readCanvasLockedInteractionModelSource();
   const canvasConnectionInteractionModelSource = readCanvasConnectionInteractionModelSource();
   const canvasEdgeInteractionsSource = readCanvasEdgeInteractionsSource();
+  const edgeVisibilityModelSource = readEdgeVisibilityModelSource();
+  const flowEdgeDeleteModelSource = readFlowEdgeDeleteModelSource();
 
   assert.match(componentSource, /interactionLocked\?: boolean;/);
   assert.match(componentSource, /'editor-canvas--locked': interactionLocked/);
@@ -458,7 +469,9 @@ test("EditorCanvas keeps paused human-review graphs viewable but read-only", () 
   assert.match(componentSource, /@keydown\.space\.prevent="handleLockBannerClick"/);
   assert.match(componentSource, /t\("editor\.lockBanner"\)/);
   assert.match(componentSource, /@keyframes editor-canvas-lock-banner-breathe/);
-  assert.match(componentSource, /function handleLockBannerClick\(\)[\s\S]*emit\("open-human-review", \{ nodeId: props\.currentRunNodeId \}\);/);
+  assert.match(componentSource, /const lockBannerClickAction = resolveLockBannerClickAction\(\{[\s\S]*currentRunNodeId: props\.currentRunNodeId,[\s\S]*\}\);/);
+  assert.match(componentSource, /case "locked-edit-attempt":[\s\S]*emit\("locked-edit-attempt"\);[\s\S]*return;/);
+  assert.match(componentSource, /case "open-human-review":[\s\S]*emit\("open-human-review", \{ nodeId: lockBannerClickAction\.nodeId \}\);/);
   assert.match(componentSource, /\.editor-canvas__lock-banner \{[\s\S]*top:\s*calc\(var\(--editor-canvas-floating-top-clearance,\s*18px\) \+ 64px\);/);
   assert.match(componentSource, /\.editor-canvas__lock-banner \{[\s\S]*min-width:\s*min\(420px,\s*calc\(100vw - 56px\)\);/);
   assert.match(componentSource, /\.editor-canvas__lock-banner \{[\s\S]*justify-content:\s*center;/);
@@ -479,8 +492,15 @@ test("EditorCanvas keeps paused human-review graphs viewable but read-only", () 
   assert.match(componentSource, /@locked-edit-attempt="emit\('locked-edit-attempt'\)"/);
   assert.match(componentSource, /function isLockedNodeEditTarget\(target: EventTarget \| null\)/);
   assert.match(componentSource, /function guardLockedCanvasInteraction\(\)/);
+  assert.match(canvasLockedInteractionModelSource, /export function resolveLockedNodePointerCaptureAction/);
+  assert.match(componentSource, /const lockedNodePointerCaptureAction = resolveLockedNodePointerCaptureAction\(\{[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*nodeId,[\s\S]*shouldNotifyLockedAttempt,[\s\S]*\}\);/);
+  assert.match(componentSource, /case "capture-locked-node":[\s\S]*if \(lockedNodePointerCaptureAction\.emitLockedEditAttempt\) \{[\s\S]*emit\("locked-edit-attempt"\);/);
+  assert.match(componentSource, /if \(lockedNodePointerCaptureAction\.preventDefault\) \{[\s\S]*event\.preventDefault\(\);/);
+  assert.match(componentSource, /selection\.selectNode\(lockedNodePointerCaptureAction\.selectNodeId\);/);
   assert.match(componentSource, /@click\.stop="handleEdgeVisibilityModeClick\(option\.mode\)"/);
-  assert.match(componentSource, /function handleEdgeVisibilityModeClick\(mode: EdgeVisibilityMode\)[\s\S]*if \(guardLockedCanvasInteraction\(\)\) \{[\s\S]*return;/);
+  assert.match(edgeVisibilityModelSource, /export function resolveEdgeVisibilityModeClickAction/);
+  assert.match(componentSource, /const edgeVisibilityModeClickAction = resolveEdgeVisibilityModeClickAction\(\{[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*currentMode: edgeVisibilityMode\.value,[\s\S]*requestedMode: mode,[\s\S]*\}\);/);
+  assert.match(componentSource, /case "locked-edit-attempt":[\s\S]*guardLockedCanvasInteraction\(\);[\s\S]*return;/);
   assert.match(componentSource, /watch\(\s*\(\) => props\.interactionLocked,[\s\S]*clearCanvasTransientState\(\);/);
   assert.match(componentSource, /\[data-state-editor-trigger='true'\]/);
   assert.match(componentSource, /isLockedNodeEditTarget\(target\)[\s\S]*emit\("locked-edit-attempt"\);/);
@@ -494,7 +514,8 @@ test("EditorCanvas keeps paused human-review graphs viewable but read-only", () 
   assert.match(canvasConnectionInteractionModelSource, /export function resolveCanvasAnchorPointerDownAction/);
   assert.match(componentSource, /const anchorPointerDownAction = resolveCanvasAnchorPointerDownAction\(\{[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*anchor,[\s\S]*canComplete: canCompleteCanvasConnection\(anchor\),[\s\S]*canStart: canStartGraphConnection\(anchor\.kind\),[\s\S]*\}\);/);
   assert.match(componentSource, /case "locked-edit-attempt":[\s\S]*emit\("locked-edit-attempt"\);[\s\S]*return;/);
-  assert.match(componentSource, /function handleSelectedEdgeDelete\(event: KeyboardEvent\)[\s\S]*if \(guardLockedCanvasInteraction\(\)\) \{[\s\S]*return;/);
+  assert.match(flowEdgeDeleteModelSource, /type: "locked-edit-attempt"/);
+  assert.match(componentSource, /case "locked-edit-attempt":[\s\S]*guardLockedCanvasInteraction\(\);[\s\S]*return;/);
 });
 
 test("EditorCanvas lets top-left floating tools respect workspace overlay clearance", () => {
@@ -658,7 +679,7 @@ test("EditorCanvas renders output flow hotspots only for allowed modes and inter
 test("EditorCanvas exposes a top-left capsule toolbar for edge visibility modes", () => {
   const edgeVisibilityModelSource = readEdgeVisibilityModelSource();
 
-  assert.match(componentSource, /import \{[\s\S]*buildEdgeVisibilityModeOptions,[\s\S]*buildForceVisibleProjectedEdgeIds,[\s\S]*filterProjectedEdgesForVisibilityMode,[\s\S]*shouldShowOutputFlowHandle,[\s\S]*type EdgeVisibilityMode[\s\S]*\} from "\.\/edgeVisibilityModel";/);
+  assert.match(componentSource, /import \{[\s\S]*buildEdgeVisibilityModeOptions,[\s\S]*buildForceVisibleProjectedEdgeIds,[\s\S]*filterProjectedEdgesForVisibilityMode,[\s\S]*resolveEdgeVisibilityModeClickAction,[\s\S]*shouldShowOutputFlowHandle,[\s\S]*type EdgeVisibilityMode[\s\S]*\} from "\.\/edgeVisibilityModel";/);
   assert.match(componentSource, /const edgeVisibilityModeOptions = computed\(\(\) => \{[\s\S]*return buildEdgeVisibilityModeOptions\(\);/);
   assert.match(componentSource, /const edgeVisibilityMode = ref<EdgeVisibilityMode>\("smart"\);/);
   assert.doesNotMatch(componentSource, /const edgeVisibilityRelatedNodeIds = computed\(\(\) =>/);
@@ -672,6 +693,8 @@ test("EditorCanvas exposes a top-left capsule toolbar for edge visibility modes"
   assert.match(componentSource, /class="editor-canvas__edge-view-toolbar"/);
   assert.match(componentSource, /v-for="option in edgeVisibilityModeOptions"/);
   assert.match(componentSource, /handleEdgeVisibilityModeClick\(option\.mode\)/);
+  assert.match(componentSource, /case "change-mode":[\s\S]*edgeVisibilityMode\.value = edgeVisibilityModeClickAction\.mode;[\s\S]*selectedEdgeId\.value = null;[\s\S]*clearPendingConnection\(\);[\s\S]*clearCanvasTransientState\(\);/);
+  assert.doesNotMatch(componentSource, /function setEdgeVisibilityMode\(mode: EdgeVisibilityMode\)/);
   assert.match(componentSource, /\{\{ option\.label \}\}/);
   assert.match(componentSource, /v-show="isProjectedEdgeVisible\(edge\)"/);
   assert.match(
@@ -721,7 +744,7 @@ test("EditorCanvas shows a clicked-position delete confirm for flow edges before
   const canvasEdgeInteractionsSource = readCanvasEdgeInteractionsSource();
 
   assert.match(componentSource, /@pointerdown\.stop="handleEdgePointerDown\(edge, \$event\)"/);
-  assert.match(componentSource, /import \{ resolveFlowEdgeDeleteActionFromEdge \} from "\.\/flowEdgeDeleteModel";/);
+  assert.match(componentSource, /import \{ resolveSelectedEdgeKeyboardDeleteAction \} from "\.\/flowEdgeDeleteModel";/);
   assert.match(componentSource, /import \{ useCanvasEdgeInteractions \} from "\.\/useCanvasEdgeInteractions";/);
   assert.match(componentSource, /const edgeInteractions = useCanvasEdgeInteractions\(\{/);
   assert.match(componentSource, /activeFlowEdgeDeleteConfirm,[\s\S]*flowEdgeDeleteConfirmStyle,[\s\S]*clearFlowEdgeDeleteConfirmState,[\s\S]*confirmFlowEdgeDelete,[\s\S]*isFlowEdgeDeleteConfirmOpen,/);

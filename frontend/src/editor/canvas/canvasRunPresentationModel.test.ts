@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   isCanvasNodeVisuallySelected,
   isHumanReviewRunNode,
+  resolveLockBannerClickAction,
   resolveRunNodeClassListForCanvasNode,
   resolveRunNodePresentationForCanvasNode,
 } from "./canvasRunPresentationModel.ts";
@@ -95,4 +96,17 @@ test("canvas run presentation model builds class lists and visual selection", ()
     true,
   );
   assert.equal(isCanvasNodeVisuallySelected({ nodeId: "agent", selectedNodeId: "other" }), false);
+});
+
+test("canvas run presentation model resolves lock banner click actions", () => {
+  assert.deepEqual(resolveLockBannerClickAction({ currentRunNodeId: null }), {
+    type: "locked-edit-attempt",
+  });
+  assert.deepEqual(resolveLockBannerClickAction({ currentRunNodeId: "" }), {
+    type: "locked-edit-attempt",
+  });
+  assert.deepEqual(resolveLockBannerClickAction({ currentRunNodeId: "review" }), {
+    type: "open-human-review",
+    nodeId: "review",
+  });
 });

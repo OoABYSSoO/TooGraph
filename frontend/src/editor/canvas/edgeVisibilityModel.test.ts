@@ -6,6 +6,7 @@ import {
   buildForceVisibleProjectedEdgeIds,
   filterProjectedEdgesForVisibilityMode,
   isOutputFlowHandleAllowedForEdgeMode,
+  resolveEdgeVisibilityModeClickAction,
   shouldShowOutputFlowHandle,
   type EdgeVisibilityMode,
 } from "./edgeVisibilityModel.ts";
@@ -144,6 +145,39 @@ test("edge visibility model collects forced visible edge ids from active interac
     ["flow:input->agent", "data:input:question->agent", "route:branch:true->agent"],
   );
   assert.deepEqual(Array.from(buildForceVisibleProjectedEdgeIds({})), []);
+});
+
+test("edge visibility model resolves toolbar click actions", () => {
+  assert.deepEqual(
+    resolveEdgeVisibilityModeClickAction({
+      interactionLocked: true,
+      currentMode: "smart",
+      requestedMode: "flow",
+    }),
+    { type: "locked-edit-attempt" },
+  );
+  assert.deepEqual(
+    resolveEdgeVisibilityModeClickAction({
+      interactionLocked: false,
+      currentMode: "smart",
+      requestedMode: "smart",
+    }),
+    { type: "ignore-same-mode" },
+  );
+  assert.deepEqual(
+    resolveEdgeVisibilityModeClickAction({
+      interactionLocked: false,
+      currentMode: "smart",
+      requestedMode: "data",
+    }),
+    {
+      type: "change-mode",
+      mode: "data",
+      clearSelectedEdge: true,
+      clearPendingConnection: true,
+      clearCanvasTransientState: true,
+    },
+  );
 });
 
 test("all mode shows every projected edge", () => {
