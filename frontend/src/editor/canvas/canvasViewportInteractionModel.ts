@@ -29,6 +29,10 @@ export type CanvasZoomButtonAction =
   | { type: "zoom-around-center"; nextScale: number }
   | { type: "reset-viewport"; viewport: CanvasViewport };
 
+export type CanvasPanPointerMoveAction =
+  | { type: "continue-pointer-move" }
+  | { type: "schedule-pan-move" };
+
 export function resolveWheelZoomDelta(deltaY: number) {
   if (deltaY === 0) {
     return 0;
@@ -85,6 +89,14 @@ export function resolveCanvasZoomButtonAction(input: {
         viewport: DEFAULT_CANVAS_VIEWPORT,
       };
   }
+}
+
+export function resolveCanvasPanPointerMoveAction(input: { isPanning: boolean }): CanvasPanPointerMoveAction {
+  if (input.isPanning) {
+    return { type: "schedule-pan-move" };
+  }
+
+  return { type: "continue-pointer-move" };
 }
 
 function normalizeZoomButtonScale(scale: number) {

@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  resolveCanvasPanPointerMoveAction,
   resolveCanvasWheelZoomRequest,
   resolveCanvasZoomButtonAction,
   resolveWheelZoomDelta,
@@ -76,5 +77,14 @@ test("canvas viewport interaction model resolves zoom button actions", () => {
   assert.deepEqual(resolveCanvasZoomButtonAction({ control: "reset", currentScale: 1.4 }), {
     type: "reset-viewport",
     viewport: { x: 0, y: 0, scale: 1 },
+  });
+});
+
+test("canvas viewport interaction model resolves pan pointer-move actions", () => {
+  assert.deepEqual(resolveCanvasPanPointerMoveAction({ isPanning: false }), {
+    type: "continue-pointer-move",
+  });
+  assert.deepEqual(resolveCanvasPanPointerMoveAction({ isPanning: true }), {
+    type: "schedule-pan-move",
   });
 });

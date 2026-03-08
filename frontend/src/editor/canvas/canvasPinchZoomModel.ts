@@ -26,6 +26,19 @@ export type CanvasPinchZoomUpdateAction =
   | { type: "ignore-non-positive-distance" }
   | { type: "zoom-at"; request: CanvasPinchZoomUpdateRequest };
 
+export type CanvasPinchPointerReleaseAction =
+  | { type: "end-pinch-zoom" }
+  | { type: "continue-pointer-up" };
+
+export type CanvasTouchPointerMoveAction =
+  | { type: "continue-pointer-move" }
+  | {
+      type: "track-touch-pointer";
+      preventDefault: boolean;
+      schedulePinchZoomUpdate: boolean;
+      stopPointerMove: boolean;
+    };
+
 type CanvasPointerDownSetupPolicy = {
   focusCanvas?: true;
   preventDefault: true;
@@ -140,5 +153,33 @@ export function resolveCanvasPinchZoomUpdateAction(input: {
       canvasTop: input.canvasRect.top,
       nextScale: input.pinch.startScale * (nextDistance / input.pinch.startDistance),
     },
+  };
+}
+
+export function resolveCanvasPinchPointerReleaseAction(input: {
+  pinch: Pick<CanvasPinchZoomStart, "pointerIds"> | null;
+  pointerId: number;
+}): CanvasPinchPointerReleaseAction {
+  if (input.pinch?.pointerIds.includes(input.pointerId)) {
+    return { type: "end-pinch-zoom" };
+  }
+
+  return { type: "continue-pointer-up" };
+}
+
+export function resolveCanvasTouchPointerMoveAction(input: {
+  pointerType: string;
+  isTrackedPointer: boolean;
+  hasPinchZoom: boolean;
+}): CanvasTouchPointerMoveAction {
+  if (input.pointerType !== "touch" || !input.isTrackedPointer) {
+    return { type: "continue-pointer-move" };
+  }
+
+  return {
+    type: "track-touch-pointer",
+    preventDefault: input.hasPinchZoom,
+    schedulePinchZoomUpdate: input.hasPinchZoom,
+    stopPointerMove: input.hasPinchZoom,
   };
 }

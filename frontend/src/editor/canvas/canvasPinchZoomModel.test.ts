@@ -3,8 +3,10 @@ import assert from "node:assert/strict";
 
 import {
   buildPinchZoomStart,
+  resolveCanvasPinchPointerReleaseAction,
   resolveCanvasPinchZoomUpdateAction,
   resolveCanvasPointerDownAction,
+  resolveCanvasTouchPointerMoveAction,
   resolvePointerCenter,
   resolvePointerDistance,
 } from "./canvasPinchZoomModel.ts";
@@ -134,6 +136,71 @@ test("canvas pinch zoom model resolves update actions", () => {
         canvasTop: 20,
         nextScale: 2.5,
       },
+    },
+  );
+});
+
+test("canvas pinch zoom model resolves pointer release actions", () => {
+  const pinch = {
+    pointerIds: [1, 2] as [number, number],
+    startDistance: 10,
+    startScale: 1.25,
+    centerClientX: 0,
+    centerClientY: 5,
+  };
+
+  assert.deepEqual(resolveCanvasPinchPointerReleaseAction({ pinch: null, pointerId: 1 }), {
+    type: "continue-pointer-up",
+  });
+  assert.deepEqual(resolveCanvasPinchPointerReleaseAction({ pinch, pointerId: 1 }), {
+    type: "end-pinch-zoom",
+  });
+  assert.deepEqual(resolveCanvasPinchPointerReleaseAction({ pinch, pointerId: 3 }), {
+    type: "continue-pointer-up",
+  });
+});
+
+test("canvas pinch zoom model resolves touch pointer-move actions", () => {
+  assert.deepEqual(
+    resolveCanvasTouchPointerMoveAction({
+      pointerType: "mouse",
+      isTrackedPointer: true,
+      hasPinchZoom: true,
+    }),
+    { type: "continue-pointer-move" },
+  );
+  assert.deepEqual(
+    resolveCanvasTouchPointerMoveAction({
+      pointerType: "touch",
+      isTrackedPointer: false,
+      hasPinchZoom: true,
+    }),
+    { type: "continue-pointer-move" },
+  );
+  assert.deepEqual(
+    resolveCanvasTouchPointerMoveAction({
+      pointerType: "touch",
+      isTrackedPointer: true,
+      hasPinchZoom: false,
+    }),
+    {
+      type: "track-touch-pointer",
+      preventDefault: false,
+      schedulePinchZoomUpdate: false,
+      stopPointerMove: false,
+    },
+  );
+  assert.deepEqual(
+    resolveCanvasTouchPointerMoveAction({
+      pointerType: "touch",
+      isTrackedPointer: true,
+      hasPinchZoom: true,
+    }),
+    {
+      type: "track-touch-pointer",
+      preventDefault: true,
+      schedulePinchZoomUpdate: true,
+      stopPointerMove: true,
     },
   );
 });

@@ -475,10 +475,11 @@ import {
 import { useCanvasEdgeInteractions } from "./useCanvasEdgeInteractions";
 import { useCanvasConnectionInteraction } from "./useCanvasConnectionInteraction";
 import { useCanvasNodeMeasurements } from "./useCanvasNodeMeasurements";
-import { buildPinchZoomStart, resolveCanvasPinchZoomUpdateAction, resolveCanvasPointerDownAction } from "./canvasPinchZoomModel";
+import { buildPinchZoomStart, resolveCanvasPinchPointerReleaseAction, resolveCanvasPinchZoomUpdateAction, resolveCanvasPointerDownAction, resolveCanvasTouchPointerMoveAction } from "./canvasPinchZoomModel";
 import type { CanvasPointerDownAction } from "./canvasPinchZoomModel";
 import { buildCanvasViewportStyle, buildZoomPercentLabel } from "./canvasViewportDisplayModel";
 import {
+  resolveCanvasPanPointerMoveAction,
   resolveCanvasWheelZoomRequest,
   resolveCanvasZoomButtonAction,
   type CanvasZoomButtonControl,
@@ -1192,19 +1193,31 @@ function applyCanvasPointerDownSetup(
 }
 
 function handleCanvasPointerMove(event: PointerEvent) {
-  if (event.pointerType === "touch" && activeCanvasPointers.has(event.pointerId)) {
-    activeCanvasPointers.set(event.pointerId, {
-      clientX: event.clientX,
-      clientY: event.clientY,
-      pointerType: event.pointerType,
-    });
-    if (pinchZoom.value) {
-      event.preventDefault();
-      scheduleDragFrame(() => {
-        updatePinchZoom();
+  const touchPointerMoveAction = resolveCanvasTouchPointerMoveAction({
+    pointerType: event.pointerType,
+    isTrackedPointer: activeCanvasPointers.has(event.pointerId),
+    hasPinchZoom: Boolean(pinchZoom.value),
+  });
+  switch (touchPointerMoveAction.type) {
+    case "continue-pointer-move":
+      break;
+    case "track-touch-pointer":
+      activeCanvasPointers.set(event.pointerId, {
+        clientX: event.clientX,
+        clientY: event.clientY,
+        pointerType: event.pointerType,
       });
-      return;
-    }
+      if (touchPointerMoveAction.preventDefault) {
+        event.preventDefault();
+      }
+      if (touchPointerMoveAction.schedulePinchZoomUpdate) {
+        scheduleDragFrame(() => {
+          updatePinchZoom();
+        });
+      }
+      if (touchPointerMoveAction.stopPointerMove) {
+        return;
+      }
   }
   if (activeConnection.value) {
     const connectionPointerMoveRequest = resolveCanvasConnectionPointerMoveRequest({
@@ -1227,20 +1240,34 @@ function handleCanvasPointerMove(event: PointerEvent) {
   if (handleNodeDragResizePointerMove(event)) {
     return;
   }
-  if (viewport.isPanning.value) {
-    scheduleDragFrame(() => {
-      viewport.movePan(event);
-    });
+  const panPointerMoveAction = resolveCanvasPanPointerMoveAction({
+    isPanning: viewport.isPanning.value,
+  });
+  switch (panPointerMoveAction.type) {
+    case "continue-pointer-move":
+      return;
+    case "schedule-pan-move":
+      scheduleDragFrame(() => {
+        viewport.movePan(event);
+      });
+      return;
   }
 }
 
 function handleCanvasPointerUp(event: PointerEvent) {
   flushScheduledDragFrame();
   activeCanvasPointers.delete(event.pointerId);
-  if (pinchZoom.value?.pointerIds.includes(event.pointerId)) {
-    clearPinchZoom();
-    viewport.endPan();
-    return;
+  const pinchPointerReleaseAction = resolveCanvasPinchPointerReleaseAction({
+    pinch: pinchZoom.value,
+    pointerId: event.pointerId,
+  });
+  switch (pinchPointerReleaseAction.type) {
+    case "end-pinch-zoom":
+      clearPinchZoom();
+      viewport.endPan();
+      return;
+    case "continue-pointer-up":
+      break;
   }
   if (canvasRef.value?.hasPointerCapture(event.pointerId)) {
     canvasRef.value.releasePointerCapture(event.pointerId);
