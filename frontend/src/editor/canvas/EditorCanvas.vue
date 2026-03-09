@@ -79,7 +79,7 @@
         <path
           v-for="edge in projectedEdges.filter((edge) => edge.kind === 'flow' || edge.kind === 'route')"
           :key="`${edge.id}:highlight`"
-          v-show="isProjectedEdgeVisible(edge)"
+          v-show="isProjectedCanvasEdgeVisible(edge, visibleProjectedEdgeIds)"
           :d="edge.path"
           class="editor-canvas__edge-delete-highlight"
           :style="edgeStyle(edge)"
@@ -88,7 +88,7 @@
         <path
           v-for="edge in projectedEdges.filter((edge) => edge.kind === 'data')"
           :key="`${edge.id}:data-highlight`"
-          v-show="isProjectedEdgeVisible(edge)"
+          v-show="isProjectedCanvasEdgeVisible(edge, visibleProjectedEdgeIds)"
           :d="edge.path"
           class="editor-canvas__edge-data-highlight"
           :style="edgeStyle(edge)"
@@ -97,7 +97,7 @@
         <path
           v-for="edge in projectedEdges"
           :key="edge.id"
-          v-show="isProjectedEdgeVisible(edge)"
+          v-show="isProjectedCanvasEdgeVisible(edge, visibleProjectedEdgeIds)"
           :d="edge.path"
           class="editor-canvas__edge"
           :style="edgeStyle(edge)"
@@ -112,7 +112,7 @@
         <path
           v-for="edge in projectedEdges"
           :key="`${edge.id}:hitarea`"
-          v-show="isProjectedEdgeVisible(edge)"
+          v-show="isProjectedCanvasEdgeVisible(edge, visibleProjectedEdgeIds)"
           :d="edge.path"
           class="editor-canvas__edge-hitarea"
           :class="{
@@ -298,8 +298,8 @@
             'editor-canvas__flow-hotspot--outbound': anchor.kind === 'flow-out',
             'editor-canvas__flow-hotspot--inbound': anchor.kind === 'flow-in',
             'editor-canvas__flow-hotspot--visible': isFlowHotspotVisible(anchor),
-            'editor-canvas__flow-hotspot--connect-source': activeConnectionSourceAnchorId === anchor.id,
-            'editor-canvas__flow-hotspot--connect-target': eligibleTargetAnchorIds.has(anchor.id),
+            'editor-canvas__flow-hotspot--connect-source': isCanvasConnectionSourceAnchor(anchor, canvasInteractionStyleContext),
+            'editor-canvas__flow-hotspot--connect-target': isCanvasConnectionTargetAnchor(anchor, canvasInteractionStyleContext),
             'editor-canvas__flow-hotspot--top': anchor.side === 'top',
           }"
           @pointerenter="setHoveredFlowHandleNode(anchor.nodeId)"
@@ -318,8 +318,8 @@
             'editor-canvas__route-handle--danger': resolveRouteHandleTone(anchor.branch) === 'danger',
             'editor-canvas__route-handle--warning': resolveRouteHandleTone(anchor.branch) === 'warning',
             'editor-canvas__route-handle--neutral': resolveRouteHandleTone(anchor.branch) === 'neutral',
-            'editor-canvas__flow-hotspot--connect-source': activeConnectionSourceAnchorId === anchor.id,
-            'editor-canvas__route-handle--connect-source': activeConnectionSourceAnchorId === anchor.id,
+            'editor-canvas__flow-hotspot--connect-source': isCanvasConnectionSourceAnchor(anchor, canvasInteractionStyleContext),
+            'editor-canvas__route-handle--connect-source': isCanvasConnectionSourceAnchor(anchor, canvasInteractionStyleContext),
           }"
           :style="[routeHandleStyle(anchor), flowHotspotConnectStyle(anchor)]"
           @pointerenter="setHoveredFlowHandleNode(anchor.nodeId)"
@@ -340,8 +340,8 @@
           :class="{
             'editor-canvas__anchor--state': anchor.kind === 'state-in' || anchor.kind === 'state-out',
             'editor-canvas__anchor--route': anchor.kind === 'route-out',
-            'editor-canvas__anchor--connect-source': activeConnectionSourceAnchorId === anchor.id,
-            'editor-canvas__anchor--connect-target': eligibleTargetAnchorIds.has(anchor.id),
+            'editor-canvas__anchor--connect-source': isCanvasConnectionSourceAnchor(anchor, canvasInteractionStyleContext),
+            'editor-canvas__anchor--connect-target': isCanvasConnectionTargetAnchor(anchor, canvasInteractionStyleContext),
           }"
           r="5.5"
           @pointerenter="setHoveredPointAnchorNode(anchor.nodeId)"
@@ -392,7 +392,7 @@ import { useI18n } from "vue-i18n";
 import EditorMinimap from "./EditorMinimap.vue";
 import NodeCard from "@/editor/nodes/NodeCard.vue";
 import StateEditorPopover from "@/editor/nodes/StateEditorPopover.vue";
-import { type ProjectedCanvasAnchor, type ProjectedCanvasEdge } from "@/editor/canvas/edgeProjection";
+import { groupProjectedCanvasAnchors, type ProjectedCanvasAnchor, type ProjectedCanvasEdge } from "@/editor/canvas/edgeProjection";
 import { resolveEdgeRunPresentation } from "@/editor/canvas/runEdgePresentation";
 import { resolveCanvasLayout } from "@/editor/canvas/resolvedCanvasLayout";
 import { resolveCanvasSurfaceStyle } from "@/editor/canvas/canvasSurfaceStyle";
@@ -414,6 +414,7 @@ import {
   buildForceVisibleProjectedEdgeIds,
   filterProjectedEdgesForVisibilityMode,
   isCanvasFlowHotspotVisible,
+  isProjectedCanvasEdgeVisible,
   resolveEdgeVisibilityModeClickAction,
   type EdgeVisibilityMode,
 } from "./edgeVisibilityModel";
@@ -428,6 +429,8 @@ import {
   buildPointAnchorStyle,
   buildPointAnchorConnectStyle,
   buildProjectedEdgeStyle,
+  isCanvasConnectionSourceAnchor,
+  isCanvasConnectionTargetAnchor,
 } from "./canvasInteractionStyleModel";
 import {
   buildConnectionPreviewModel,
@@ -487,7 +490,7 @@ import {
   type CanvasZoomButtonControl,
 } from "./canvasViewportInteractionModel";
 import {
-  isCanvasStateTargetAnchorAllowedForConnection,
+  canCompleteCanvasAnchorConnection,
   resolveCanvasAutoSnappedTargetAnchor as resolveCanvasAutoSnappedTargetAnchorModel,
   resolveCanvasEligibleTargetAnchorForNodeBody,
   resolveCanvasAnchorPointerDownAction,
@@ -846,13 +849,10 @@ const transientAgentOutputAnchors = computed<ProjectedCanvasAnchor[]>(() =>
   }),
 );
 const projectedAnchors = computed(() => [...baseProjectedAnchorsWithoutVirtualCreatePorts.value, ...transientAgentCreateInputAnchors.value, ...transientAgentInputAnchors.value, ...transientAgentOutputAnchors.value]);
-const flowAnchors = computed(() =>
-  projectedAnchors.value.filter((anchor) => anchor.kind === "flow-in" || anchor.kind === "flow-out"),
-);
-const routeHandles = computed(() => projectedAnchors.value.filter((anchor) => anchor.kind === "route-out"));
-const pointAnchors = computed(() =>
-  projectedAnchors.value.filter((anchor) => anchor.kind === "state-in" || anchor.kind === "state-out"),
-);
+const projectedAnchorGroups = computed(() => groupProjectedCanvasAnchors(projectedAnchors.value));
+const flowAnchors = computed(() => projectedAnchorGroups.value.flowAnchors);
+const routeHandles = computed(() => projectedAnchorGroups.value.routeHandles);
+const pointAnchors = computed(() => projectedAnchorGroups.value.pointAnchors);
 const selectedReconnectConnection = computed<PendingGraphConnection | null>(() =>
   resolveSelectedReconnectConnection({
     selectedEdgeId: selectedEdgeId.value,
@@ -912,10 +912,6 @@ watch(
   },
   { immediate: true },
 );
-
-function isProjectedEdgeVisible(edge: ProjectedCanvasEdge) {
-  return visibleProjectedEdgeIds.value.has(edge.id);
-}
 
 function handleEdgeVisibilityModeClick(mode: EdgeVisibilityMode) {
   const edgeVisibilityModeClickAction = resolveEdgeVisibilityModeClickAction({
@@ -1383,19 +1379,12 @@ function resolveEligibleTargetAnchorForNodeBody(nodeId: string) {
   });
 }
 
-function isStateTargetAnchorAllowedForActiveConnection(anchor: ProjectedCanvasAnchor) {
-  return isCanvasStateTargetAnchorAllowedForConnection(activeConnection.value, anchor);
-}
-
 function canCompleteCanvasConnection(anchor: ProjectedCanvasAnchor) {
-  if (activeConnection.value?.sourceKind === "state-out" && !isStateTargetAnchorAllowedForActiveConnection(anchor)) {
-    return false;
-  }
-
-  return canCompleteGraphConnection(props.document, activeConnection.value, {
-    nodeId: anchor.nodeId,
-    kind: anchor.kind,
-    stateKey: anchor.stateKey,
+  return canCompleteCanvasAnchorConnection({
+    connection: activeConnection.value,
+    anchor,
+    canCompleteGraphConnection: (targetAnchor) =>
+      canCompleteGraphConnection(props.document, activeConnection.value, targetAnchor),
   });
 }
 

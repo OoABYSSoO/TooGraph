@@ -7,6 +7,7 @@ import {
   filterProjectedEdgesForVisibilityMode,
   isCanvasFlowHotspotVisible,
   isOutputFlowHandleAllowedForEdgeMode,
+  isProjectedCanvasEdgeVisible,
   resolveEdgeVisibilityModeClickAction,
   shouldShowOutputFlowHandle,
   type EdgeVisibilityMode,
@@ -173,6 +174,12 @@ test("edge visibility model resolves canvas flow hotspot visibility", () => {
     }),
     false,
   );
+});
+
+test("edge visibility model resolves projected canvas edge visibility", () => {
+  const visibleEdgeIds = new Set(["flow:agent->output"]);
+  assert.equal(isProjectedCanvasEdgeVisible(edges[2], visibleEdgeIds), true);
+  assert.equal(isProjectedCanvasEdgeVisible(edges[0], visibleEdgeIds), false);
 });
 
 test("data mode shows only data flow lines", () => {

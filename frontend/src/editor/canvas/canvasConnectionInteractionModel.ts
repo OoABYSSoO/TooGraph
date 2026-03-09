@@ -405,6 +405,21 @@ export function isCanvasStateTargetAnchorAllowedForConnection(
   );
 }
 
+export function canCompleteCanvasAnchorConnection(input: {
+  connection: PendingGraphConnection | null;
+  anchor: Pick<ProjectedCanvasAnchor, "nodeId" | "kind" | "stateKey">;
+  canCompleteGraphConnection: (targetAnchor: Pick<ProjectedCanvasAnchor, "nodeId" | "kind" | "stateKey">) => boolean;
+}) {
+  if (
+    input.connection?.sourceKind === "state-out" &&
+    !isCanvasStateTargetAnchorAllowedForConnection(input.connection, input.anchor)
+  ) {
+    return false;
+  }
+
+  return input.canCompleteGraphConnection(input.anchor);
+}
+
 export function resolveCanvasAutoSnappedTargetAnchor(
   input: CanvasAutoSnapResolverInput,
 ): ProjectedCanvasAnchor | null {

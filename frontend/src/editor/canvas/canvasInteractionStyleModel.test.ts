@@ -8,6 +8,8 @@ import {
   buildPointAnchorConnectStyle,
   buildPointAnchorStyle,
   buildProjectedEdgeStyle,
+  isCanvasConnectionSourceAnchor,
+  isCanvasConnectionTargetAnchor,
   withAlpha,
 } from "./canvasInteractionStyleModel.ts";
 
@@ -76,6 +78,10 @@ test("anchor style helpers preserve state colors and state-out connection variab
     "--editor-anchor-fill": "#abcdef",
   });
   assert.equal(buildPointAnchorStyle({}), undefined);
+  assert.equal(isCanvasConnectionSourceAnchor({ id: "source" }, context), true);
+  assert.equal(isCanvasConnectionSourceAnchor({ id: "target" }, context), false);
+  assert.equal(isCanvasConnectionTargetAnchor({ id: "target" }, context), true);
+  assert.equal(isCanvasConnectionTargetAnchor({ id: "source" }, context), false);
   assert.deepEqual(buildFlowHotspotConnectStyle({ id: "target" }, context), {
     "--editor-connection-source-fill": "rgba(18, 52, 86, 0.16)",
     "--editor-connection-source-border": "rgba(18, 52, 86, 0.34)",

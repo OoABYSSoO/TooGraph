@@ -13,6 +13,7 @@ import type { PendingStateInputSource } from "./canvasPendingStatePortModel.ts";
 import type { ProjectedCanvasAnchor } from "./edgeProjection.ts";
 import {
   buildCanvasNodeCreationMenuPayload,
+  canCompleteCanvasAnchorConnection,
   resolveCanvasPendingConnectionCreationMenuAction,
   resolveCanvasPendingConnectionCreationMenuRequest,
   resolveCanvasAutoSnappedTargetAnchor,
@@ -482,6 +483,53 @@ test("canvas connection interaction model resolves anchor pointer-down actions",
       clearWindowSelection: true,
       ...setupPolicy,
     },
+  );
+});
+
+test("canvas connection interaction model resolves canvas anchor completion eligibility", () => {
+  const flowTarget = flowAnchor("target", 440, 180);
+  const concreteInput = stateAnchor("target:answer", "target", "state-in", "answer", 206, 160);
+  const invalidFlowForVirtualState = flowAnchor("target", 240, 200);
+  const virtualOutputConnection: PendingGraphConnection = {
+    sourceNodeId: "writer",
+    sourceKind: "state-out",
+    sourceStateKey: VIRTUAL_ANY_OUTPUT_STATE_KEY,
+  };
+  let graphCompletionCalls = 0;
+
+  assert.equal(
+    canCompleteCanvasAnchorConnection({
+      connection: virtualOutputConnection,
+      anchor: invalidFlowForVirtualState,
+      canCompleteGraphConnection: () => {
+        graphCompletionCalls += 1;
+        return true;
+      },
+    }),
+    false,
+  );
+  assert.equal(graphCompletionCalls, 0);
+
+  assert.equal(
+    canCompleteCanvasAnchorConnection({
+      connection: virtualOutputConnection,
+      anchor: concreteInput,
+      canCompleteGraphConnection: () => {
+        graphCompletionCalls += 1;
+        return false;
+      },
+    }),
+    false,
+  );
+  assert.equal(graphCompletionCalls, 1);
+
+  assert.equal(
+    canCompleteCanvasAnchorConnection({
+      connection: { sourceNodeId: "writer", sourceKind: "flow-out" },
+      anchor: flowTarget,
+      canCompleteGraphConnection: () => true,
+    }),
+    true,
   );
 });
 

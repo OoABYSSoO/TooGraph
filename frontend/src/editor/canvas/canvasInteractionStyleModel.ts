@@ -96,6 +96,20 @@ export function buildPointAnchorStyle(anchor: Pick<ProjectedCanvasAnchor, "color
   };
 }
 
+export function isCanvasConnectionSourceAnchor(
+  anchor: Pick<ProjectedCanvasAnchor, "id">,
+  context: Pick<CanvasInteractionStyleContext, "activeConnectionSourceAnchorId">,
+) {
+  return context.activeConnectionSourceAnchorId === anchor.id;
+}
+
+export function isCanvasConnectionTargetAnchor(
+  anchor: Pick<ProjectedCanvasAnchor, "id">,
+  context: Pick<CanvasInteractionStyleContext, "eligibleTargetAnchorIds">,
+) {
+  return context.eligibleTargetAnchorIds.has(anchor.id);
+}
+
 export function buildFlowHotspotConnectStyle(
   anchor: Pick<ProjectedCanvasAnchor, "id">,
   context: CanvasInteractionStyleContext,
@@ -135,5 +149,6 @@ export function buildPointAnchorConnectStyle(
 }
 
 function isActiveConnectionEndpoint(anchorId: string, context: CanvasInteractionStyleContext) {
-  return context.activeConnectionSourceAnchorId === anchorId || context.eligibleTargetAnchorIds.has(anchorId);
+  const anchor = { id: anchorId };
+  return isCanvasConnectionSourceAnchor(anchor, context) || isCanvasConnectionTargetAnchor(anchor, context);
 }

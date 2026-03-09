@@ -36,8 +36,22 @@ export type ProjectedCanvasAnchor = {
   branch?: string;
 };
 
+export type ProjectedCanvasAnchorGroups = {
+  flowAnchors: ProjectedCanvasAnchor[];
+  routeHandles: ProjectedCanvasAnchor[];
+  pointAnchors: ProjectedCanvasAnchor[];
+};
+
 const DEFAULT_NODE_WIDTH = 460;
 const CONDITION_NODE_WIDTH = 560;
+
+export function groupProjectedCanvasAnchors(anchors: readonly ProjectedCanvasAnchor[]): ProjectedCanvasAnchorGroups {
+  return {
+    flowAnchors: anchors.filter((anchor) => anchor.kind === "flow-in" || anchor.kind === "flow-out"),
+    routeHandles: anchors.filter((anchor) => anchor.kind === "route-out"),
+    pointAnchors: anchors.filter((anchor) => anchor.kind === "state-in" || anchor.kind === "state-out"),
+  };
+}
 
 export function projectCanvasEdges(document: GraphPayload | GraphDocument): ProjectedCanvasEdge[] {
   const placements = buildNodePlacements(document);
