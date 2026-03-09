@@ -552,12 +552,16 @@ test("EditorCanvas keeps paused human-review graphs viewable but read-only", () 
   assert.match(canvasConnectionInteractionModelSource, /export function resolveCanvasDropCreationAction/);
   assert.match(componentSource, /function handleCanvasDrop\(event: DragEvent\)[\s\S]*const dropCreationAction = resolveCanvasDropCreationAction\(\{[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*\}\);/);
   assert.match(componentSource, /case "locked-edit-attempt":[\s\S]*emit\("locked-edit-attempt"\);[\s\S]*return;/);
+  assert.match(componentSource, /import \{ resolveCanvasEdgePointerDownAction, resolveCanvasEdgeTargetPoint \} from "\.\/canvasEdgePointerInteractionModel";/);
   assert.match(canvasEdgePointerInteractionModelSource, /export function resolveCanvasEdgePointerDownAction/);
+  assert.match(canvasEdgePointerInteractionModelSource, /export function resolveCanvasEdgeTargetPoint/);
   assert.match(componentSource, /const edgePointerDownAction = resolveCanvasEdgePointerDownAction\(\{[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*edge,[\s\S]*selectedEdgeId: selectedEdgeId\.value,[\s\S]*\}\);/);
   assert.match(componentSource, /case "locked-edit-attempt":[\s\S]*event\.preventDefault\(\);[\s\S]*emit\("locked-edit-attempt"\);[\s\S]*return;/);
   assert.match(componentSource, /case "start-flow-edge-delete-confirm":[\s\S]*startFlowEdgeDeleteConfirm\(edge, event\);[\s\S]*return;/);
   assert.match(componentSource, /case "start-data-edge-state-confirm":[\s\S]*startDataEdgeStateConfirm\(edge, event\);[\s\S]*return;/);
-  assert.match(componentSource, /case "select-edge":[\s\S]*selectedEdgeId\.value = edgePointerDownAction\.selectEdgeId;[\s\S]*setPendingConnectionPoint\(resolveEdgeTargetPoint\(edge\)\);/);
+  assert.match(componentSource, /case "select-edge":[\s\S]*selectedEdgeId\.value = edgePointerDownAction\.selectEdgeId;[\s\S]*setPendingConnectionPoint\(\s*resolveCanvasEdgeTargetPoint\(\{[\s\S]*edge,[\s\S]*anchors: projectedAnchors\.value,[\s\S]*\}\),?\s*\);/);
+  assert.doesNotMatch(componentSource, /function resolveEdgeTargetPoint\(edge: ProjectedCanvasEdge\)/);
+  assert.doesNotMatch(componentSource, /edge\.kind === "data" && edge\.state[\s\S]*projectedAnchors\.value\.find/);
   assert.match(canvasConnectionInteractionModelSource, /export function resolveCanvasAnchorPointerDownAction/);
   assert.match(componentSource, /const anchorPointerDownAction = resolveCanvasAnchorPointerDownAction\(\{[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*anchor,[\s\S]*canComplete: canCompleteCanvasConnection\(anchor\),[\s\S]*canStart: canStartGraphConnection\(anchor\.kind\),[\s\S]*\}\);/);
   assert.match(componentSource, /case "locked-edit-attempt":[\s\S]*emit\("locked-edit-attempt"\);[\s\S]*return;/);
@@ -647,6 +651,7 @@ test("EditorCanvas renders output flow hotspots only for allowed modes and inter
   const canvasInteractionStyleModelSource = readCanvasInteractionStyleModelSource();
   const canvasConnectionModelSource = readCanvasConnectionModelSource();
   const canvasConnectionInteractionsSource = readCanvasConnectionInteractionsSource();
+  const edgeVisibilityModelSource = readEdgeVisibilityModelSource();
 
   assert.match(componentSource, /v-for="anchor in flowAnchors"/);
   assert.match(componentSource, /class="editor-canvas__flow-hotspot"/);
@@ -656,10 +661,10 @@ test("EditorCanvas renders output flow hotspots only for allowed modes and inter
   assert.match(componentSource, /const hoveredNodeId = ref<string \| null>\(null\);/);
   assert.match(componentSource, /'editor-canvas__flow-hotspot--outbound': anchor\.kind === 'flow-out'/);
   assert.match(componentSource, /'editor-canvas__flow-hotspot--visible': isFlowHotspotVisible\(anchor\)/);
-  assert.match(componentSource, /anchor\.kind === "flow-out" \|\| anchor\.kind === "route-out"/);
-  assert.match(componentSource, /shouldShowOutputFlowHandle\(\{[\s\S]*mode: edgeVisibilityMode\.value,[\s\S]*anchorKind: anchor\.kind,[\s\S]*isNodeInteracted: isOutputFlowHandleNodeInteracted\(anchor\.nodeId\),[\s\S]*isActiveConnectionSource: activeConnectionSourceAnchorId\.value === anchor\.id,[\s\S]*\}\)/);
+  assert.match(edgeVisibilityModelSource, /input\.anchor\.kind === "flow-out" \|\| input\.anchor\.kind === "route-out"/);
+  assert.match(componentSource, /return isCanvasFlowHotspotVisible\(\{[\s\S]*mode: edgeVisibilityMode\.value,[\s\S]*anchor,[\s\S]*selectedNodeId: selection\.selectedNodeId\.value,[\s\S]*hoveredNodeId: hoveredNodeId\.value,[\s\S]*hoveredFlowHandleNodeId: hoveredFlowHandleNodeId\.value,[\s\S]*activeConnectionSourceAnchorId: activeConnectionSourceAnchorId\.value,[\s\S]*eligibleTargetAnchorIds: eligibleTargetAnchorIds\.value,[\s\S]*\}\);/);
   const flowHotspotVisibleBlock = componentSource.match(/function isFlowHotspotVisible\(anchor: ProjectedCanvasAnchor\) \{([\s\S]*?)\n\}/)?.[1] ?? "";
-  assert.match(componentSource, /function isOutputFlowHandleNodeInteracted\(nodeId: string\) \{[\s\S]*selection\.selectedNodeId\.value === nodeId[\s\S]*hoveredNodeId\.value === nodeId[\s\S]*hoveredFlowHandleNodeId\.value === nodeId/);
+  assert.doesNotMatch(componentSource, /function isOutputFlowHandleNodeInteracted\(nodeId: string\)/);
   assert.doesNotMatch(flowHotspotVisibleBlock, /selection\.selectedNodeId\.value === anchor\.nodeId/);
   assert.doesNotMatch(flowHotspotVisibleBlock, /hoveredNodeId\.value === anchor\.nodeId/);
   assert.doesNotMatch(flowHotspotVisibleBlock, /hoveredFlowHandleNodeId\.value === anchor\.nodeId/);
@@ -726,12 +731,13 @@ test("EditorCanvas renders output flow hotspots only for allowed modes and inter
 test("EditorCanvas exposes a top-left capsule toolbar for edge visibility modes", () => {
   const edgeVisibilityModelSource = readEdgeVisibilityModelSource();
 
-  assert.match(componentSource, /import \{[\s\S]*buildEdgeVisibilityModeOptions,[\s\S]*buildForceVisibleProjectedEdgeIds,[\s\S]*filterProjectedEdgesForVisibilityMode,[\s\S]*resolveEdgeVisibilityModeClickAction,[\s\S]*shouldShowOutputFlowHandle,[\s\S]*type EdgeVisibilityMode[\s\S]*\} from "\.\/edgeVisibilityModel";/);
+  assert.match(componentSource, /import \{[\s\S]*buildEdgeVisibilityModeOptions,[\s\S]*buildForceVisibleProjectedEdgeIds,[\s\S]*filterProjectedEdgesForVisibilityMode,[\s\S]*isCanvasFlowHotspotVisible,[\s\S]*resolveEdgeVisibilityModeClickAction,[\s\S]*type EdgeVisibilityMode[\s\S]*\} from "\.\/edgeVisibilityModel";/);
   assert.match(componentSource, /const edgeVisibilityModeOptions = computed\(\(\) => \{[\s\S]*return buildEdgeVisibilityModeOptions\(\);/);
   assert.match(componentSource, /const edgeVisibilityMode = ref<EdgeVisibilityMode>\("smart"\);/);
   assert.doesNotMatch(componentSource, /const edgeVisibilityRelatedNodeIds = computed\(\(\) =>/);
   assert.match(componentSource, /const forceVisibleProjectedEdgeIds = computed\(\(\) => buildForceVisibleProjectedEdgeIds\(\{[\s\S]*selectedEdgeId: selectedEdgeId\.value,[\s\S]*dataEdgeStateConfirmId: activeDataEdgeStateConfirm\.value\?\.id,[\s\S]*dataEdgeStateEditorId: activeDataEdgeStateEditor\.value\?\.id,[\s\S]*flowEdgeDeleteConfirmId: activeFlowEdgeDeleteConfirm\.value\?\.id,[\s\S]*\}\)\);/);
   assert.match(edgeVisibilityModelSource, /export function buildForceVisibleProjectedEdgeIds/);
+  assert.match(edgeVisibilityModelSource, /export function isCanvasFlowHotspotVisible/);
   assert.doesNotMatch(componentSource, /const forceVisibleProjectedEdgeIds = computed\(\(\) => \{[\s\S]*const edgeIds = new Set<string>\(\)/);
   assert.match(componentSource, /const visibleProjectedEdgeIds = computed\(/);
   assert.match(componentSource, /filterProjectedEdgesForVisibilityMode\(projectedEdges\.value,/);
@@ -775,11 +781,13 @@ test("EditorCanvas exposes page zoom controls and emits viewport draft updates",
   assert.match(componentSource, /function handleZoomReset\(\)/);
   assert.match(componentSource, /function zoomViewportAroundCanvasCenter\(nextScale: number\)/);
   assert.match(componentSource, /@wheel\.prevent="handleWheel"/);
-  assert.match(componentSource, /import \{[\s\S]*resolveCanvasPanPointerMoveAction,[\s\S]*resolveCanvasWheelZoomRequest,[\s\S]*resolveCanvasZoomButtonAction,[\s\S]*type CanvasZoomButtonControl,[\s\S]*\} from "\.\/canvasViewportInteractionModel";/);
+  assert.match(componentSource, /import \{[\s\S]*resolveCanvasPanPointerMoveAction,[\s\S]*resolveCanvasSizeUpdateAction,[\s\S]*resolveCanvasWheelZoomRequest,[\s\S]*resolveCanvasWorldPoint,[\s\S]*resolveCanvasZoomButtonAction,[\s\S]*type CanvasZoomButtonControl,[\s\S]*\} from "\.\/canvasViewportInteractionModel";/);
   assert.match(canvasViewportInteractionModelSource, /export function resolveWheelZoomDelta/);
   assert.match(canvasViewportInteractionModelSource, /export type CanvasPanPointerMoveAction/);
   assert.match(canvasViewportInteractionModelSource, /export function resolveCanvasPanPointerMoveAction/);
+  assert.match(canvasViewportInteractionModelSource, /export function resolveCanvasSizeUpdateAction/);
   assert.match(canvasViewportInteractionModelSource, /export function resolveCanvasWheelZoomRequest/);
+  assert.match(canvasViewportInteractionModelSource, /export function resolveCanvasWorldPoint/);
   assert.match(canvasViewportInteractionModelSource, /export function resolveCanvasZoomButtonAction/);
   assert.match(componentSource, /function handleZoomButton\(control: CanvasZoomButtonControl\)/);
   assert.match(componentSource, /const zoomButtonAction = resolveCanvasZoomButtonAction\(\{[\s\S]*control,[\s\S]*currentScale: viewport\.viewport\.scale,[\s\S]*\}\);/);
@@ -794,10 +802,22 @@ test("EditorCanvas exposes page zoom controls and emits viewport draft updates",
   assert.match(componentSource, /const panPointerMoveAction = resolveCanvasPanPointerMoveAction\(\{[\s\S]*isPanning: viewport\.isPanning\.value,[\s\S]*\}\);/);
   assert.match(componentSource, /case "schedule-pan-move":[\s\S]*scheduleDragFrame\(\(\) => \{[\s\S]*viewport\.movePan\(event\);/);
   assert.match(componentSource, /case "continue-pointer-move":[\s\S]*return;/);
+  assert.match(componentSource, /function resolveCanvasPoint\(event: \{ clientX: number; clientY: number \}\)/);
+  assert.match(componentSource, /const canvasRect = canvasRef\.value\?\.getBoundingClientRect\(\) \?\? null;/);
+  assert.match(componentSource, /return resolveCanvasWorldPoint\(\{[\s\S]*clientX: event\.clientX,[\s\S]*clientY: event\.clientY,[\s\S]*canvasRect,[\s\S]*viewport: viewport\.viewport,[\s\S]*fallbackPoint: pendingConnectionPoint\.value,[\s\S]*\}\);/);
+  assert.match(componentSource, /function updateCanvasSize\(\)/);
+  assert.match(componentSource, /const element = canvasRef\.value;/);
+  assert.match(componentSource, /const canvasSizeUpdateAction = resolveCanvasSizeUpdateAction\(\{[\s\S]*currentSize: canvasSize\.value,[\s\S]*nextSize: element[\s\S]*\? \{[\s\S]*width: element\.clientWidth,[\s\S]*height: element\.clientHeight,[\s\S]*\}[\s\S]*: null,[\s\S]*\}\);/);
+  assert.match(componentSource, /case "ignore-missing-element":[\s\S]*case "ignore-unchanged-size":[\s\S]*return;/);
+  assert.match(componentSource, /case "update-size":[\s\S]*canvasSize\.value = canvasSizeUpdateAction\.size;[\s\S]*return;/);
   assert.doesNotMatch(componentSource, /viewport\.viewport\.scale - 0\.1/);
   assert.doesNotMatch(componentSource, /viewport\.viewport\.scale \+ 0\.1/);
   assert.doesNotMatch(componentSource, /viewport\.setViewport\(DEFAULT_CANVAS_VIEWPORT\)/);
   assert.doesNotMatch(componentSource, /if \(viewport\.isPanning\.value\) \{/);
+  assert.doesNotMatch(componentSource, /if \(!canvas\) \{[\s\S]*pendingConnectionPoint\.value \?\? \{ x: 0, y: 0 \};[\s\S]*\}/);
+  assert.doesNotMatch(componentSource, /if \(!element\) \{[\s\S]*return;[\s\S]*\}/);
+  assert.doesNotMatch(componentSource, /\(event\.clientX - rect\.left - viewport\.viewport\.x\) \/ viewport\.viewport\.scale/);
+  assert.doesNotMatch(componentSource, /canvasSize\.value\.width !== nextSize\.width \|\| canvasSize\.value\.height !== nextSize\.height/);
   assert.doesNotMatch(componentSource, /function resolveWheelZoomDelta\(event: WheelEvent\)/);
   assert.doesNotMatch(componentSource, /const direction = event\.deltaY > 0 \? -1 : 1;/);
   assert.doesNotMatch(componentSource, /\.editor-canvas__zoom-toolbar \{[\s\S]*position:\s*absolute;[\s\S]*left:\s*18px;/);

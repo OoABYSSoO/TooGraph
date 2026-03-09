@@ -3,6 +3,25 @@ export type CanvasEdgePointerDownEdge = {
   kind: string;
 };
 
+export type CanvasEdgeTargetPointEdge = {
+  kind: string;
+  target: string;
+  state?: string | null;
+};
+
+export type CanvasEdgeTargetPointAnchor = {
+  nodeId: string;
+  kind: string;
+  stateKey?: string | null;
+  x: number;
+  y: number;
+};
+
+type CanvasEdgeTargetPoint = {
+  x: number;
+  y: number;
+};
+
 type CanvasEdgePointerDownBaseAction = {
   focusCanvas: true;
   clearCanvasTransientState: true;
@@ -84,4 +103,21 @@ export function resolveCanvasEdgePointerDownAction(input: {
     updatePendingConnectionPoint: true,
     clearSelection: true,
   };
+}
+
+export function resolveCanvasEdgeTargetPoint(input: {
+  edge: CanvasEdgeTargetPointEdge;
+  anchors: readonly CanvasEdgeTargetPointAnchor[];
+}): CanvasEdgeTargetPoint | null {
+  const targetAnchor =
+    input.edge.kind === "data" && input.edge.state
+      ? input.anchors.find(
+          (anchor) =>
+            anchor.nodeId === input.edge.target &&
+            anchor.kind === "state-in" &&
+            anchor.stateKey === input.edge.state,
+        )
+      : input.anchors.find((anchor) => anchor.nodeId === input.edge.target && anchor.kind === "flow-in");
+
+  return targetAnchor ? { x: targetAnchor.x, y: targetAnchor.y } : null;
 }

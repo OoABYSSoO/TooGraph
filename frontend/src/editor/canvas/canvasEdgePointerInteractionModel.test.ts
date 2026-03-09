@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { resolveCanvasEdgePointerDownAction } from "./canvasEdgePointerInteractionModel.ts";
+import { resolveCanvasEdgePointerDownAction, resolveCanvasEdgeTargetPoint } from "./canvasEdgePointerInteractionModel.ts";
 
 test("canvas edge pointer interaction model resolves edge pointer-down actions", () => {
   assert.deepEqual(
@@ -109,5 +109,42 @@ test("canvas edge pointer interaction model resolves edge pointer-down actions",
       updatePendingConnectionPoint: true,
       clearSelection: true,
     },
+  );
+});
+
+test("canvas edge pointer interaction model resolves edge target points", () => {
+  const anchors = [
+    { nodeId: "agent-a", kind: "flow-in", x: 10, y: 20 },
+    { nodeId: "agent-a", kind: "state-in", stateKey: "draft", x: 30, y: 40 },
+    { nodeId: "agent-a", kind: "state-in", stateKey: "final", x: 50, y: 60 },
+  ];
+
+  assert.deepEqual(
+    resolveCanvasEdgeTargetPoint({
+      edge: { kind: "data", target: "agent-a", state: "final" },
+      anchors,
+    }),
+    { x: 50, y: 60 },
+  );
+  assert.deepEqual(
+    resolveCanvasEdgeTargetPoint({
+      edge: { kind: "flow", target: "agent-a" },
+      anchors,
+    }),
+    { x: 10, y: 20 },
+  );
+  assert.deepEqual(
+    resolveCanvasEdgeTargetPoint({
+      edge: { kind: "data", target: "agent-a", state: null },
+      anchors,
+    }),
+    { x: 10, y: 20 },
+  );
+  assert.equal(
+    resolveCanvasEdgeTargetPoint({
+      edge: { kind: "data", target: "missing-node", state: "final" },
+      anchors,
+    }),
+    null,
   );
 });

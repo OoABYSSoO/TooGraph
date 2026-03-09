@@ -9,6 +9,16 @@ type CanvasRectSnapshot = {
   top: number;
 };
 
+type CanvasWorldPoint = {
+  x: number;
+  y: number;
+};
+
+type CanvasSizeSnapshot = {
+  width: number;
+  height: number;
+};
+
 const CANVAS_ZOOM_BUTTON_SCALE_STEP = 0.1;
 
 export type CanvasWheelZoomRequest =
@@ -32,6 +42,11 @@ export type CanvasZoomButtonAction =
 export type CanvasPanPointerMoveAction =
   | { type: "continue-pointer-move" }
   | { type: "schedule-pan-move" };
+
+export type CanvasSizeUpdateAction =
+  | { type: "ignore-missing-element" }
+  | { type: "ignore-unchanged-size" }
+  | { type: "update-size"; size: CanvasSizeSnapshot };
 
 export function resolveWheelZoomDelta(deltaY: number) {
   if (deltaY === 0) {
@@ -97,6 +112,38 @@ export function resolveCanvasPanPointerMoveAction(input: { isPanning: boolean })
   }
 
   return { type: "continue-pointer-move" };
+}
+
+export function resolveCanvasSizeUpdateAction(input: {
+  currentSize: CanvasSizeSnapshot;
+  nextSize: CanvasSizeSnapshot | null;
+}): CanvasSizeUpdateAction {
+  if (!input.nextSize) {
+    return { type: "ignore-missing-element" };
+  }
+
+  if (input.currentSize.width === input.nextSize.width && input.currentSize.height === input.nextSize.height) {
+    return { type: "ignore-unchanged-size" };
+  }
+
+  return { type: "update-size", size: input.nextSize };
+}
+
+export function resolveCanvasWorldPoint(input: {
+  clientX: number;
+  clientY: number;
+  canvasRect: CanvasRectSnapshot | null;
+  viewport: CanvasViewport;
+  fallbackPoint: CanvasWorldPoint | null;
+}): CanvasWorldPoint {
+  if (!input.canvasRect) {
+    return input.fallbackPoint ?? { x: 0, y: 0 };
+  }
+
+  return {
+    x: (input.clientX - input.canvasRect.left - input.viewport.x) / input.viewport.scale,
+    y: (input.clientY - input.canvasRect.top - input.viewport.y) / input.viewport.scale,
+  };
 }
 
 function normalizeZoomButtonScale(scale: number) {

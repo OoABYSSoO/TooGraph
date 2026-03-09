@@ -413,8 +413,8 @@ import {
   buildEdgeVisibilityModeOptions,
   buildForceVisibleProjectedEdgeIds,
   filterProjectedEdgesForVisibilityMode,
+  isCanvasFlowHotspotVisible,
   resolveEdgeVisibilityModeClickAction,
-  shouldShowOutputFlowHandle,
   type EdgeVisibilityMode,
 } from "./edgeVisibilityModel";
 import {
@@ -464,7 +464,7 @@ import {
   resolveLockedCanvasInteractionGuardAction,
   resolveLockedNodePointerCaptureAction,
 } from "./canvasLockedInteractionModel";
-import { resolveCanvasEdgePointerDownAction } from "./canvasEdgePointerInteractionModel";
+import { resolveCanvasEdgePointerDownAction, resolveCanvasEdgeTargetPoint } from "./canvasEdgePointerInteractionModel";
 import { resolveSelectedEdgeKeyboardDeleteAction } from "./flowEdgeDeleteModel";
 import {
   buildMinimapNodeModel,
@@ -480,7 +480,9 @@ import type { CanvasPointerDownAction } from "./canvasPinchZoomModel";
 import { buildCanvasViewportStyle, buildZoomPercentLabel } from "./canvasViewportDisplayModel";
 import {
   resolveCanvasPanPointerMoveAction,
+  resolveCanvasSizeUpdateAction,
   resolveCanvasWheelZoomRequest,
+  resolveCanvasWorldPoint,
   resolveCanvasZoomButtonAction,
   type CanvasZoomButtonControl,
 } from "./canvasViewportInteractionModel";
@@ -990,16 +992,23 @@ onBeforeUnmount(() => {
 
 function updateCanvasSize() {
   const element = canvasRef.value;
-  if (!element) {
-    return;
-  }
+  const canvasSizeUpdateAction = resolveCanvasSizeUpdateAction({
+    currentSize: canvasSize.value,
+    nextSize: element
+      ? {
+          width: element.clientWidth,
+          height: element.clientHeight,
+        }
+      : null,
+  });
 
-  const nextSize = {
-    width: element.clientWidth,
-    height: element.clientHeight,
-  };
-  if (canvasSize.value.width !== nextSize.width || canvasSize.value.height !== nextSize.height) {
-    canvasSize.value = nextSize;
+  switch (canvasSizeUpdateAction.type) {
+    case "ignore-missing-element":
+    case "ignore-unchanged-size":
+      return;
+    case "update-size":
+      canvasSize.value = canvasSizeUpdateAction.size;
+      return;
   }
 }
 
@@ -1651,25 +1660,16 @@ function clearHoveredFlowHandleNode(nodeId: string) {
   }
 }
 
-function isOutputFlowHandleNodeInteracted(nodeId: string) {
-  return (
-    selection.selectedNodeId.value === nodeId ||
-    hoveredNodeId.value === nodeId ||
-    hoveredFlowHandleNodeId.value === nodeId
-  );
-}
-
 function isFlowHotspotVisible(anchor: ProjectedCanvasAnchor) {
-  if (anchor.kind === "flow-out" || anchor.kind === "route-out") {
-    return shouldShowOutputFlowHandle({
-      mode: edgeVisibilityMode.value,
-      anchorKind: anchor.kind,
-      isNodeInteracted: isOutputFlowHandleNodeInteracted(anchor.nodeId),
-      isActiveConnectionSource: activeConnectionSourceAnchorId.value === anchor.id,
-    });
-  }
-
-  return eligibleTargetAnchorIds.value.has(anchor.id);
+  return isCanvasFlowHotspotVisible({
+    mode: edgeVisibilityMode.value,
+    anchor,
+    selectedNodeId: selection.selectedNodeId.value,
+    hoveredNodeId: hoveredNodeId.value,
+    hoveredFlowHandleNodeId: hoveredFlowHandleNodeId.value,
+    activeConnectionSourceAnchorId: activeConnectionSourceAnchorId.value,
+    eligibleTargetAnchorIds: eligibleTargetAnchorIds.value,
+  });
 }
 
 function zoomViewportAroundCanvasCenter(nextScale: number) {
@@ -1795,7 +1795,12 @@ function handleEdgePointerDown(edge: ProjectedCanvasEdge, event: PointerEvent) {
       applyEdgePointerDownBaseAction(edgePointerDownAction);
       selectedEdgeId.value = edgePointerDownAction.selectEdgeId;
       if (edgePointerDownAction.updatePendingConnectionPoint) {
-        setPendingConnectionPoint(resolveEdgeTargetPoint(edge));
+        setPendingConnectionPoint(
+          resolveCanvasEdgeTargetPoint({
+            edge,
+            anchors: projectedAnchors.value,
+          }),
+        );
       }
       if (edgePointerDownAction.clearSelection) {
         selection.clearSelection();
@@ -2015,25 +2020,14 @@ function handleSelectedEdgeDelete(event: KeyboardEvent) {
 }
 
 function resolveCanvasPoint(event: { clientX: number; clientY: number }) {
-  const canvas = canvasRef.value;
-  if (!canvas) {
-    return pendingConnectionPoint.value ?? { x: 0, y: 0 };
-  }
-  const rect = canvas.getBoundingClientRect();
-  return {
-    x: (event.clientX - rect.left - viewport.viewport.x) / viewport.viewport.scale,
-    y: (event.clientY - rect.top - viewport.viewport.y) / viewport.viewport.scale,
-  };
-}
-
-function resolveEdgeTargetPoint(edge: ProjectedCanvasEdge) {
-  const targetAnchor =
-    edge.kind === "data" && edge.state
-      ? projectedAnchors.value.find(
-          (anchor) => anchor.nodeId === edge.target && anchor.kind === "state-in" && anchor.stateKey === edge.state,
-        )
-      : projectedAnchors.value.find((anchor) => anchor.nodeId === edge.target && anchor.kind === "flow-in");
-  return targetAnchor ? { x: targetAnchor.x, y: targetAnchor.y } : null;
+  const canvasRect = canvasRef.value?.getBoundingClientRect() ?? null;
+  return resolveCanvasWorldPoint({
+    clientX: event.clientX,
+    clientY: event.clientY,
+    canvasRect,
+    viewport: viewport.viewport,
+    fallbackPoint: pendingConnectionPoint.value,
+  });
 }
 
 function resolveRunNodePresentationForNode(nodeId: string) {

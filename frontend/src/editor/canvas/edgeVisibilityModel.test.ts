@@ -5,6 +5,7 @@ import {
   EDGE_VISIBILITY_MODE_OPTIONS,
   buildForceVisibleProjectedEdgeIds,
   filterProjectedEdgesForVisibilityMode,
+  isCanvasFlowHotspotVisible,
   isOutputFlowHandleAllowedForEdgeMode,
   resolveEdgeVisibilityModeClickAction,
   shouldShowOutputFlowHandle,
@@ -105,6 +106,70 @@ test("output flow handles require an allowed mode and node interaction", () => {
       anchorKind: "route-out",
       isNodeInteracted: true,
       isActiveConnectionSource: true,
+    }),
+    false,
+  );
+});
+
+test("edge visibility model resolves canvas flow hotspot visibility", () => {
+  const eligibleTargetAnchorIds = new Set(["flow-in:agent-a"]);
+  assert.equal(
+    isCanvasFlowHotspotVisible({
+      mode: "smart",
+      anchor: { id: "flow-out:agent-a", nodeId: "agent-a", kind: "flow-out" },
+      selectedNodeId: "agent-a",
+      hoveredNodeId: null,
+      hoveredFlowHandleNodeId: null,
+      activeConnectionSourceAnchorId: null,
+      eligibleTargetAnchorIds,
+    }),
+    false,
+  );
+  assert.equal(
+    isCanvasFlowHotspotVisible({
+      mode: "smart",
+      anchor: { id: "route-out:agent-a", nodeId: "agent-a", kind: "route-out" },
+      selectedNodeId: "agent-a",
+      hoveredNodeId: null,
+      hoveredFlowHandleNodeId: null,
+      activeConnectionSourceAnchorId: null,
+      eligibleTargetAnchorIds,
+    }),
+    true,
+  );
+  assert.equal(
+    isCanvasFlowHotspotVisible({
+      mode: "flow",
+      anchor: { id: "flow-out:agent-a", nodeId: "agent-a", kind: "flow-out" },
+      selectedNodeId: null,
+      hoveredNodeId: null,
+      hoveredFlowHandleNodeId: null,
+      activeConnectionSourceAnchorId: "flow-out:agent-a",
+      eligibleTargetAnchorIds,
+    }),
+    true,
+  );
+  assert.equal(
+    isCanvasFlowHotspotVisible({
+      mode: "data",
+      anchor: { id: "flow-in:agent-a", nodeId: "agent-a", kind: "flow-in" },
+      selectedNodeId: null,
+      hoveredNodeId: null,
+      hoveredFlowHandleNodeId: null,
+      activeConnectionSourceAnchorId: null,
+      eligibleTargetAnchorIds,
+    }),
+    true,
+  );
+  assert.equal(
+    isCanvasFlowHotspotVisible({
+      mode: "data",
+      anchor: { id: "flow-in:agent-b", nodeId: "agent-b", kind: "flow-in" },
+      selectedNodeId: null,
+      hoveredNodeId: null,
+      hoveredFlowHandleNodeId: null,
+      activeConnectionSourceAnchorId: null,
+      eligibleTargetAnchorIds,
     }),
     false,
   );

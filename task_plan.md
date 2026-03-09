@@ -4,7 +4,7 @@
 Run a ten-round conservative cleanup batch focused on `EditorCanvas.vue` pure projection and interaction-model helpers, then close the baseline interaction regressions in one larger pass while preserving graph editing behavior, runtime visuals, drag/connect workflows, deletion behavior, and dev startup health.
 
 ## Current Phase
-Phase 62 in progress
+Phase 66 in progress
 
 ## Autonomous Continuation Gate
 - After every completed cleanup phase, re-read `docs/future/2026-04-28-architecture-refactor-roadmap.md`, `task_plan.md`, `findings.md`, and `progress.md`, then recalculate the total roadmap progress and the active area progress.
@@ -576,12 +576,48 @@ Phase 62 in progress
 - **Status:** completed
 
 ### Phase 62: EditorCanvas Canvas Point Projection Gate
-- [ ] Re-read the formal roadmap, Phase 61 findings, and current `resolveCanvasPoint` flow before changing code.
-- [ ] Inspect whether the next safest `EditorCanvas.vue` boundary is a canvas point projection model around missing-canvas fallback and viewport-relative world point projection.
-- [ ] Add focused red tests for the selected canvas point projection boundary before production changes.
-- [ ] Keep actual DOM canvas rect lookup, pending connection fallback point, event coordinate inputs, connection/menu/drop consumers, and graph interactions stable.
-- [ ] Run focused viewport/structure and Canvas interaction regression tests, TypeScript checks, full frontend tests or justified targeted regression, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
-- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 62.
+- [x] Re-read the formal roadmap, Phase 61 findings, and current `resolveCanvasPoint` flow before changing code.
+- [x] Inspect whether the next safest `EditorCanvas.vue` boundary is a canvas point projection model around missing-canvas fallback and viewport-relative world point projection.
+- [x] Add focused red tests for the selected canvas point projection boundary before production changes.
+- [x] Keep actual DOM canvas rect lookup, pending connection fallback point, event coordinate inputs, connection/menu/drop consumers, and graph interactions stable.
+- [x] Run focused viewport/structure and Canvas interaction regression tests, TypeScript checks, full frontend tests or justified targeted regression, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
+- [x] If total roadmap progress is below 100%, automatically open the next phase after Phase 62.
+- **Status:** completed
+
+### Phase 63: EditorCanvas Canvas Size Update Gate
+- [x] Re-read the formal roadmap, Phase 62 findings, and current `updateCanvasSize` flow before changing code.
+- [x] Inspect whether the next safest `EditorCanvas.vue` boundary is a canvas size update model around missing-element ignore and changed-size/no-op decisions.
+- [x] Add focused red tests for the selected canvas size update boundary before production changes.
+- [x] Keep actual DOM clientWidth/clientHeight reads, `ResizeObserver` lifecycle, `canvasSize` ref mutation, minimap consumers, and viewport interactions stable.
+- [x] Run focused viewport/structure and Canvas regression tests, TypeScript checks, full frontend tests or justified targeted regression, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
+- [x] If total roadmap progress is below 100%, automatically open the next phase after Phase 63.
+- **Status:** completed
+
+### Phase 64: EditorCanvas Edge Target Point Gate
+- [x] Re-read the formal roadmap, Phase 63 findings, and current `resolveEdgeTargetPoint` flow before changing code.
+- [x] Inspect whether the next safest `EditorCanvas.vue` boundary is edge target point projection for selected-edge pending connection points.
+- [x] Add focused red tests for the selected edge target point boundary before production changes.
+- [x] Keep actual projected anchor refs, selected-edge mutation, pending connection point mutation, edge pointer-down routing, and graph interactions stable.
+- [x] Run focused edge pointer/structure and Canvas regression tests, TypeScript checks, full frontend tests or justified targeted regression, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
+- [x] If total roadmap progress is below 100%, automatically open the next phase after Phase 64.
+- **Status:** completed
+
+### Phase 65: EditorCanvas Flow Hotspot Visibility Gate
+- [x] Re-read the formal roadmap, Phase 64 findings, and current `isFlowHotspotVisible` flow before changing code.
+- [x] Inspect whether the next safest `EditorCanvas.vue` boundary is flow/route hotspot visibility projection around node-interaction and active-source checks.
+- [x] Add focused red tests for the selected flow hotspot visibility boundary before production changes.
+- [x] Keep actual selected/hovered refs, edge visibility mode ref, active connection source ref, anchor overlay rendering, and graph interactions stable.
+- [x] Run focused edge visibility/structure and Canvas regression tests, TypeScript checks, full frontend tests or justified targeted regression, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
+- [x] If total roadmap progress is below 100%, automatically open the next phase after Phase 65.
+- **Status:** completed
+
+### Phase 66: EditorCanvas Projected Edge Visibility Gate
+- [ ] Re-read the formal roadmap, Phase 65 findings, and current projected-edge visibility flow before changing code.
+- [ ] Inspect whether the next safest `EditorCanvas.vue` boundary is the projected-edge visibility membership check around `visibleProjectedEdgeIds`.
+- [ ] Add focused red tests for the projected-edge visibility gate before production changes.
+- [ ] Keep `visibleProjectedEdgeIds` computation, edge projection, SVG rendering, selected edge state, and anchor overlay rendering stable.
+- [ ] Run focused edge visibility/structure and Canvas regression tests, TypeScript checks, full frontend tests or justified targeted regression, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
+- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 66.
 - **Status:** in progress
 
 ## Progress Estimate
@@ -739,6 +775,22 @@ Phase 62 in progress
 | P2 `EditorCanvas.vue` cleanup after Phase 61 | About 89% complete after extracting pan pointer-move schedule/no-op routing while preserving actual `viewport.movePan`, connection pointer move, node drag/resize, and touch pinch behavior in the component. |
 | Current continuation gate after Phase 61 | Total roadmap progress is below 100%, so Phase 62 is automatically opened for the next safe P2 Canvas point projection boundary. |
 | P2 `EditorCanvas.vue` cleanup target for Phase 62 | About 90% if missing-canvas fallback and viewport-relative world point projection move into `canvasViewportInteractionModel.ts` without changing DOM rect lookup, pending connection fallback, or connection/drop/menu consumers. |
+| Overall roadmap cleanup after Phase 62 | About 89% complete after moving canvas world-point projection into `canvasViewportInteractionModel.ts`. |
+| P2 `EditorCanvas.vue` cleanup after Phase 62 | About 90% complete after extracting missing-canvas fallback and viewport-relative world-coordinate projection while preserving DOM rect lookup and all connection/menu/drop consumers. |
+| Current continuation gate after Phase 62 | Total roadmap progress is below 100%, so Phase 63 is automatically opened for the next safe P2 Canvas size update boundary. |
+| P2 `EditorCanvas.vue` cleanup target for Phase 63 | About 91% if canvas size changed/no-op decisions move into `canvasViewportInteractionModel.ts` without changing DOM size reads, resize observer lifecycle, minimap consumers, or viewport behavior. |
+| Overall roadmap cleanup after Phase 63 | About 90% complete after moving canvas size update decisions into `canvasViewportInteractionModel.ts`. |
+| P2 `EditorCanvas.vue` cleanup after Phase 63 | About 91% complete after extracting missing-element, unchanged-size, and update-size routing while preserving DOM size reads, resize observer lifecycle, and minimap consumers. |
+| Current continuation gate after Phase 63 | Total roadmap progress is below 100%, so Phase 64 is automatically opened for the next safe P2 Canvas edge target point boundary. |
+| P2 `EditorCanvas.vue` cleanup target for Phase 64 | About 92% if edge target point projection moves into `canvasEdgePointerInteractionModel.ts` without changing projected anchor refs, selected-edge state, or pending connection point mutation. |
+| Overall roadmap cleanup after Phase 64 | About 91% complete after moving edge target point projection into `canvasEdgePointerInteractionModel.ts`. |
+| P2 `EditorCanvas.vue` cleanup after Phase 64 | About 92% complete after extracting selected-edge target point lookup while preserving projected anchor refs and actual pending connection point mutation. |
+| Current continuation gate after Phase 64 | Total roadmap progress is below 100%, so Phase 65 is automatically opened for the next safe P2 Canvas flow hotspot visibility boundary. |
+| P2 `EditorCanvas.vue` cleanup target for Phase 65 | About 93% if flow/route hotspot visibility projection moves into `edgeVisibilityModel.ts` without changing selected/hovered refs, active-source checks, or anchor overlay rendering. |
+| Overall roadmap cleanup after Phase 65 | About 92% complete after moving flow/route hotspot visibility projection into `edgeVisibilityModel.ts`. |
+| P2 `EditorCanvas.vue` cleanup after Phase 65 | About 93% complete after extracting selected/hovered/active-source hotspot decisions while preserving anchor overlay rendering. |
+| Current continuation gate after Phase 65 | Total roadmap progress is below 100%, so Phase 66 is automatically opened for the next safe P2 Canvas projected-edge visibility boundary. |
+| P2 `EditorCanvas.vue` cleanup target for Phase 66 | About 94% if projected-edge visibility membership moves into `edgeVisibilityModel.ts` without changing visible edge id computation or SVG rendering. |
 
 ## Decisions Made
 | Decision | Rationale |
@@ -796,6 +848,10 @@ Phase 62 in progress
 - Phase 59 moves pinch pointer-release action projection into `canvasPinchZoomModel.ts`; `EditorCanvas.vue` keeps active pointer deletion, actual pinch cleanup/end-pan execution, pointer capture release, connection pointer-up, and node drag/resize release.
 - Phase 60 moves touch pointer-move action projection into `canvasPinchZoomModel.ts`; `EditorCanvas.vue` keeps active pointer cache mutation, event `preventDefault`, scheduled `updatePinchZoom`, connection pointer move, node drag/resize, and panning execution.
 - Phase 61 moves pan pointer-move schedule/no-op routing into `canvasViewportInteractionModel.ts`; `EditorCanvas.vue` keeps actual `scheduleDragFrame` and `viewport.movePan(event)` execution.
+- Phase 62 moves canvas world-point projection into `canvasViewportInteractionModel.ts`; `EditorCanvas.vue` keeps DOM rect lookup, pending connection fallback input, and connection/menu/drop consumer wiring.
+- Phase 63 moves canvas size update action projection into `canvasViewportInteractionModel.ts`; `EditorCanvas.vue` keeps DOM client size reads, `ResizeObserver` lifecycle, and actual `canvasSize` ref mutation.
+- Phase 64 moves selected-edge target point projection into `canvasEdgePointerInteractionModel.ts`; `EditorCanvas.vue` keeps projected anchor ref access and actual pending connection point mutation.
+- Phase 65 moves flow/route hotspot visibility projection into `edgeVisibilityModel.ts`; `EditorCanvas.vue` keeps selected/hovered refs, active connection source ref, eligible target ids, and anchor overlay rendering.
 - Do not commit runtime artifacts such as `backend/data/settings`, `.dev_*`, `dist`, or `.worktrees`.
 - After code changes, restart using `npm run dev`.
 
