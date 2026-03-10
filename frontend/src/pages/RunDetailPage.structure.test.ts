@@ -94,7 +94,13 @@ test("RunDetailPage cancels stale detail requests and exposes retry after failur
 test("RunDetailPage subscribes to run events and renders live streamed output", () => {
   assert.match(componentSource, /let runEventSource: EventSource \| null = null;/);
   assert.match(componentSource, /const liveStreamingOutputs = ref/);
-  assert.match(componentSource, /new EventSource\(`\/api\/runs\/\$\{normalizedRunId\}\/events`\)/);
+  assert.match(componentSource, /import \{[\s\S]*buildLiveStreamingOutput,[\s\S]*buildRunEventStreamUrl,[\s\S]*parseRunEventPayloadData,[\s\S]*\} from "@\/lib\/run-event-stream";/);
+  assert.match(componentSource, /const streamUrl = buildRunEventStreamUrl\(nextRunId\);/);
+  assert.match(componentSource, /new EventSource\(streamUrl\)/);
+  assert.match(componentSource, /return event instanceof MessageEvent \? parseRunEventPayloadData\(event\.data\) : null;/);
+  assert.match(componentSource, /const nextOutput = buildLiveStreamingOutput\(/);
+  assert.doesNotMatch(componentSource, /JSON\.parse\(String\(event\.data \?\? ""\)\)/);
+  assert.doesNotMatch(componentSource, /new EventSource\(`\/api\/runs\/\$\{normalizedRunId\}\/events`\)/);
   assert.match(componentSource, /addEventListener\("node\.output\.delta"/);
   assert.match(componentSource, /addEventListener\("run\.completed"/);
   assert.match(componentSource, /function closeRunEventStream\(\)/);

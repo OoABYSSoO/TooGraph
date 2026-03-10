@@ -1,5 +1,279 @@
 # Progress Log
 
+## Session: 2026-04-30 Phase 73
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Confirmed Phase 72 was committed and pushed as `d42875d`.
+  - Re-read the formal roadmap and inspected `EditorWorkspaceShell.vue`, `RunDetailPage.vue`, run-detail model tests, run node artifact tests, and run API tests.
+  - Selected the first P3 shell boundary: shared run event stream URL, event payload parsing, and RunDetail live output merge semantics.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `run-event-stream.test.ts` to cover stream URL construction, payload parsing, and live output merge behavior.
+  - Updated `EditorWorkspaceShell.structure.test.ts` and `RunDetailPage.structure.test.ts` to require the shared run event stream model.
+  - Verified the expected red failure before implementation because `run-event-stream.ts` did not exist and both components still used local stream helpers.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `frontend/src/lib/run-event-stream.ts`.
+  - Updated `EditorWorkspaceShell.vue` to delegate run event stream URL construction and MessageEvent payload parsing to the shared model.
+  - Updated `RunDetailPage.vue` to delegate stream URL construction, MessageEvent payload parsing, and live output merge projection to the shared model.
+  - Kept EventSource lifecycle, polling timers, abort controllers, route/restore behavior, human-review behavior, and UI state mutations in the owning components.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused shared model, workspace structure, and run detail structure tests.
+  - Ran related run API, run detail model, run node artifact, run feedback, workspace structure, and run detail structure regression tests.
+  - Ran TypeScript unused-symbol verification from `frontend`.
+  - Ran the full frontend `node --test` suite.
+  - Ran the frontend production build; no large chunk warning was emitted.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed backend `/health` returned `{"status":"ok"}` and the frontend entry returned HTTP 200.
+  - Captured a headless Chrome screenshot and confirmed the workspace rendered normally.
+
+### Phase 5: Continuation Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated overall roadmap cleanup at about 99.2%.
+  - Recalculated P3 `EditorWorkspaceShell.vue` cleanup at about 10%.
+  - Opened Phase 74 automatically because total roadmap progress is still below 100%.
+  - Selected the next candidate boundary as shared queued/running/resuming run polling status semantics.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red focused tests | `node --test frontend/src/lib/run-event-stream.test.ts frontend/src/editor/workspace/EditorWorkspaceShell.structure.test.ts frontend/src/pages/RunDetailPage.structure.test.ts` before implementation | Fails because shared run-event model and component delegation do not exist | Failed on missing module and structure assertions | Passed |
+| Focused model/structure tests | Same focused files after implementation | All focused tests pass | 37 passed | Passed |
+| Focused run/workspace regression | `node --test` over run-event stream, run detail, run node artifacts, run feedback, workspace structure, run detail structure, and run API tests | Related run streaming and polling tests pass | 51 passed | Passed |
+| Unused symbol check | `./node_modules/.bin/vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No diagnostics | Exit 0 | Passed |
+| Full frontend tests | `node --test $(rg --files src vite.config.structure.test.ts | rg '\.test\.ts$')` in `frontend` | All frontend tests pass | 839 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without a large chunk warning | Exit 0, no Vite chunk warning | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+| Browser smoke | Headless Chrome screenshot with virtual-time wait | Workspace renders normally | Workspace UI rendered | Passed |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Phase 73 implementation, verification, docs update, and dev restart are complete. |
+| Where am I going? | Phase 74 is open for shared run polling status semantics. |
+| What's the goal? | Continue P3 shell cleanup while keeping route sync, restore behavior, human review, polling, and EventSource lifecycle stable. |
+| What have I learned? | The first safe shell slice is shared pure run event stream projection; lifecycle and state mutation should remain component-owned for now. |
+| What have I done? | Extracted stream URL/payload/live-output helpers, added focused tests, verified the full frontend suite, built, restarted, and visually smoked the app. |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+
+## Session: 2026-04-30 Phase 72
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Confirmed Phase 71 was committed and pushed as `f0bab07`.
+  - Re-read the formal roadmap, active plan, latest findings, and remaining flow/route hotspot class maps in `EditorCanvas.vue`.
+  - Selected the next P2 Canvas boundary: flow hotspot and route handle class projection.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `buildFlowHotspotClassState` and `buildRouteHandleClassState` coverage in `canvasInteractionStyleModel.test.ts`.
+  - Updated `EditorCanvas.structure.test.ts` to require delegated hotspot class helpers and reject old inline component class maps.
+  - Verified the expected red failure before implementation because the style-model exports and component delegation did not exist yet.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `buildFlowHotspotClassState` and `buildRouteHandleClassState` to `canvasInteractionStyleModel.ts`.
+  - Updated `EditorCanvas.vue` so flow hotspot and route handle class maps read from the style model.
+  - Kept hotspot visibility calculation, route tone resolution, overlay rendering, and pointer enter/leave/down handlers in `EditorCanvas.vue`.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused interaction-style and structure tests.
+  - Ran broader canvas style, edge visibility, route handle, edge projection, edge interaction, and structure regression tests.
+  - Ran TypeScript unused-symbol verification from `frontend`.
+  - Ran the full frontend `node --test` suite.
+  - Ran the frontend production build; no large chunk warning was emitted.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed backend `/health` returned `{"status":"ok"}` and the frontend entry returned HTTP 200.
+  - Captured a headless Chrome screenshot and confirmed the workspace rendered normally.
+
+### Phase 5: Continuation Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated overall roadmap cleanup at about 99%.
+  - Recalculated the current low-risk P2 `EditorCanvas.vue` projection pass at about 100%.
+  - Opened Phase 73 automatically because total roadmap progress is still below 100%.
+  - Selected the next candidate boundary as a small P3 `EditorWorkspaceShell.vue` run event stream or polling projection slice, pending source inspection.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red focused tests | `node --test frontend/src/editor/canvas/canvasInteractionStyleModel.test.ts frontend/src/editor/canvas/EditorCanvas.structure.test.ts` before implementation | Fails because hotspot class helpers and component wiring do not exist | Failed on missing export and structure assertions | Passed |
+| Focused model/structure tests | Same focused files after implementation | All focused tests pass | 70 passed | Passed |
+| Focused Canvas regression | `node --test` over canvas style, edge visibility, route handle, edge projection, edge interactions, and EditorCanvas structure tests | Related hotspot/route class tests pass | 98 passed | Passed |
+| Unused symbol check | `./node_modules/.bin/vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No diagnostics | Exit 0 | Passed |
+| Full frontend tests | `node --test $(rg --files src vite.config.structure.test.ts | rg '\.test\.ts$')` in `frontend` | All frontend tests pass | 835 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without a large chunk warning | Exit 0, no Vite chunk warning | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+| Browser smoke | Headless Chrome screenshot with virtual-time wait | Workspace renders normally | Workspace UI rendered | Passed |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Phase 72 implementation, verification, docs update, and dev restart are complete. |
+| Where am I going? | Phase 73 is open for a P3 `EditorWorkspaceShell.vue` run event stream or polling projection slice. |
+| What's the goal? | Continue reducing shell/runtime orchestration weight without changing route sync, draft persistence, restore behavior, human review, or graph mutation emits. |
+| What have I learned? | Flow hotspot and route handle class maps are pure style-state projection and fit the existing canvas interaction style model. |
+| What have I done? | Extracted hotspot class projection helpers, added focused tests, verified the full frontend suite, built, restarted, and visually smoked the app. |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | Structure test still expected old inline neutral route-handle class mapping | First Phase 72 focused green run | Updated the assertion to verify `routeHandleClassState` and the style-model neutral class boundary instead of the old component-local map. |
+
+## Session: 2026-04-30 Phase 71
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Confirmed Phase 70 was committed and pushed as `f291e9e`.
+  - Re-read the formal roadmap, active plan, latest findings, and remaining edge-kind class bindings in `EditorCanvas.vue`.
+  - Selected the next P2 Canvas boundary: projected edge class, hitarea class, and connection preview class projection.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added class projection coverage in `canvasInteractionStyleModel.test.ts`.
+  - Updated `EditorCanvas.structure.test.ts` to require delegated edge class helpers and reject direct template edge-kind class maps.
+  - Verified the expected red failure before implementation because the model exports and component delegation did not exist yet.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `buildConnectionPreviewClassState`, `buildProjectedEdgeClassState`, and `buildProjectedEdgeHitareaClassState` to `canvasInteractionStyleModel.ts`.
+  - Updated `EditorCanvas.vue` so connection preview, projected edge, and edge hitarea class maps read from the style model.
+  - Kept selected-edge state input, active-run edge lookup, SVG rendering, and pointer handlers in `EditorCanvas.vue`.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused interaction-style and structure tests.
+  - Ran broader canvas style, edge projection, edge visibility, data-edge state, flow-edge delete, edge interaction, and structure regression tests.
+  - Ran TypeScript unused-symbol verification from `frontend`.
+  - Ran the full frontend `node --test` suite.
+  - Ran the frontend production build; no large chunk warning was emitted.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed backend `/health` returned `{"status":"ok"}` and the frontend entry returned HTTP 200.
+  - Captured a headless Chrome screenshot and confirmed the workspace rendered normally.
+
+### Phase 5: Continuation Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated overall roadmap cleanup at about 98%.
+  - Recalculated P2 `EditorCanvas.vue` cleanup at about 99%.
+  - Opened Phase 72 automatically because total roadmap progress is below 100%.
+  - Selected the next candidate boundary as flow hotspot class projection.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red focused tests | `node --test frontend/src/editor/canvas/canvasInteractionStyleModel.test.ts frontend/src/editor/canvas/EditorCanvas.structure.test.ts` before implementation | Fails because edge class helpers and component wiring do not exist | Failed on missing export and structure assertions | Passed |
+| Focused model/structure tests | Same focused files after implementation | All focused tests pass | 68 passed | Passed |
+| Focused Canvas regression | `node --test` over canvas style, edge projection, edge visibility, data-edge state, flow-edge delete, edge interactions, and EditorCanvas structure tests | Related edge style tests pass | 103 passed | Passed |
+| Unused symbol check | `./node_modules/.bin/vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No diagnostics | Exit 0 | Passed |
+| Full frontend tests | `node --test $(rg --files src vite.config.structure.test.ts | rg '\.test\.ts$')` in `frontend` | All frontend tests pass | 833 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without a large chunk warning | Exit 0, no Vite chunk warning | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+| Browser smoke | Headless Chrome screenshot with virtual-time wait | Workspace renders normally | Workspace UI rendered | Passed |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Phase 71 implementation, verification, docs update, and dev restart are complete. |
+| Where am I going? | Phase 72 is open for flow hotspot class projection extraction. |
+| What's the goal? | Continue reducing `EditorCanvas.vue` projection ownership without changing selected-edge state, active-run styling, edge hitareas, or pointer behavior. |
+| What have I learned? | Edge kind, selected, active-run, preview, and hitarea class maps are pure view-state projection and fit the existing canvas interaction style model. |
+| What have I done? | Extracted edge class projection helpers, added focused tests, verified the full frontend suite, built, restarted, and visually smoked the app. |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+
+## Session: 2026-04-30 Phase 70
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Confirmed Phase 69 was committed and pushed as `0dc78df`.
+  - Re-read the formal roadmap, active plan, latest findings, and projected-edge SVG layer grouping in `EditorCanvas.vue`.
+  - Selected the next P2 Canvas boundary: projected edge grouping for flow/route delete highlights and data-edge state highlights.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `groupProjectedCanvasEdges` coverage in `edgeProjection.test.ts`.
+  - Updated `EditorCanvas.structure.test.ts` to require grouped edge projections and reject direct template `projectedEdges.filter(...)` grouping in `EditorCanvas.vue`.
+  - Verified the expected red failure before implementation because the model export and component delegation did not exist yet.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `ProjectedCanvasEdgeGroups` and `groupProjectedCanvasEdges` to `edgeProjection.ts`.
+  - Updated `EditorCanvas.vue` so flow/route and data highlight layers read from `flowRouteEdges` and `dataEdges`.
+  - Kept projected edge rendering, selected-edge state, hitarea handlers, and edge class bindings in `EditorCanvas.vue`.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused edge projection and structure tests.
+  - Ran broader edge projection, edge visibility, data-edge state, flow-edge delete, edge interaction, and structure regression tests.
+  - Ran TypeScript unused-symbol verification from `frontend`.
+  - Ran the full frontend `node --test` suite.
+  - Ran the frontend production build; no large chunk warning was emitted.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed backend `/health` returned `{"status":"ok"}` and the frontend entry returned HTTP 200.
+  - Captured a headless Chrome screenshot and confirmed the workspace rendered normally.
+
+### Phase 5: Continuation Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated overall roadmap cleanup at about 97%.
+  - Recalculated P2 `EditorCanvas.vue` cleanup at about 98%.
+  - Opened Phase 71 automatically because total roadmap progress is below 100%.
+  - Selected the next candidate boundary as projected edge class projection.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red focused tests | `node --test frontend/src/editor/canvas/edgeProjection.test.ts frontend/src/editor/canvas/EditorCanvas.structure.test.ts` before implementation | Fails because projected-edge grouping export and component wiring do not exist | Failed on missing export and structure assertions | Passed |
+| Focused model/structure tests | Same focused files after implementation | All focused tests pass | 71 passed | Passed |
+| Focused Canvas regression | `node --test` over edge projection, edge visibility, data-edge state, flow-edge delete, edge interactions, and EditorCanvas structure tests | Related edge tests pass | 97 passed | Passed |
+| Unused symbol check | `./node_modules/.bin/vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No diagnostics | Exit 0 | Passed |
+| Full frontend tests | `node --test $(rg --files src vite.config.structure.test.ts | rg '\.test\.ts$')` in `frontend` | All frontend tests pass | 832 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without a large chunk warning | Exit 0, no Vite chunk warning | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+| Browser smoke | Headless Chrome screenshot with virtual-time wait | Workspace renders normally | Workspace UI rendered | Passed |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Phase 70 implementation, verification, docs update, and dev restart are complete. |
+| Where am I going? | Phase 71 is open for projected edge class projection extraction. |
+| What's the goal? | Continue reducing `EditorCanvas.vue` projection ownership without changing SVG layer ordering, selected-edge state, edge hitareas, or edge interactions. |
+| What have I learned? | Flow/route versus data edge layer grouping is pure projection derived from `ProjectedCanvasEdge.kind`, so it belongs with `edgeProjection.ts`. |
+| What have I done? | Extracted projected edge grouping, added focused tests, verified the full frontend suite, built, restarted, and visually smoked the app. |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+
 ## Session: 2026-04-30 Phase 69
 
 ### Phase 1: Re-orientation

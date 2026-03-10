@@ -86,6 +86,9 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 - `canvasConnectionCompletionModel.ts` 已承接 connection completion action projection、completion request cleanup policy 和 completion execution routing：从 active connection、target anchor 和锁定态纯计算 locked/no-connection ignore、`connect-flow`、`connect-route`、`connect-state`、`connect-state-input-source`、`reconnect-flow`、`reconnect-route` payload，并明确完成后清理连接交互状态/已选边；`EditorCanvas.vue` 仍保留实际 `emit` dispatch 和 imperative cleanup execution。
 - `canvasConnectionInteractionModel.ts` 已进一步承接高层 auto-snap target resolution、pending connection creation-menu request、empty-canvas double-click creation request、file-drop creation request、drag-over drop-effect request、pointer-up route decision、active-connection node pointer-down route decision、pointer-move preview request 与 anchor pointer-down route decision：flow hotspot、node body fallback、reverse state input source、state output target、create-input fallback、node creation payload、打开菜单后的清理策略、empty-canvas locked/ignored/open-menu 分支、file-drop locked/ignored/missing-file/create-from-file 分支、drag-over copy/none drop-effect 分支、locked cleanup / snapped completion / creation-menu 分支选择、node body snap completion / continue pointer-down 分支、hover node / target anchor / fallback point 预览请求，以及 locked-edit / complete / ignore / start-toggle anchor 分支已可测试；`EditorCanvas.vue` 仍保留 DOM hit-test、pointer-to-canvas 坐标转换、dataTransfer 访问和 mutation、RAF 调度、actual emits、panning、node drag/resize 和 DOM measurement。
 - `edgeProjection.ts` 已继续承接 projected anchor 的 flow/route/point 分组；`EditorCanvas.vue` 仍保留 transient anchor construction、connection eligibility、overlay rendering 和 pointer handlers。
+- `edgeProjection.ts` 已继续承接 projected edge 的 flow/route 与 data 分层分组；`EditorCanvas.vue` 仍保留 SVG layer ordering、selected-edge state、hitarea handlers 和 edge class bindings。
+- `canvasInteractionStyleModel.ts` 已继续承接 connection preview、projected edge、selected/active-run edge 和 edge hitarea class projection；`EditorCanvas.vue` 仍保留 selected-edge state input、active-run edge lookup、SVG rendering 和 pointer handlers。
+- `canvasInteractionStyleModel.ts` 已继续承接 flow hotspot 与 route handle 的 outbound/visibility/tone/connect class projection；`EditorCanvas.vue` 仍保留 hotspot visibility 输入、route tone 输入、anchor overlay rendering 和 pointer handlers。
 
 ### 3. `EditorWorkspaceShell.vue`
 
@@ -99,6 +102,10 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 2. `useEditorDraftPersistence`：封装 tab document draft、viewport draft、workspace localStorage 写入节奏。
 3. `useGraphMutationActions`：把 state binding、node config、edge reconnect、state delete 等图操作从 shell 中移出。
 4. `useNodeCreationFlow`：节点创建菜单、拖拽文件创建、从连接创建节点、创建后打开 state 编辑面板。
+
+当前执行进展：
+
+- `run-event-stream.ts` 已承接 workspace 与 run detail 共用的 run event stream URL 构造、SSE payload JSON 解析，以及 RunDetail live output merge 规则；`EditorWorkspaceShell.vue` 和 `RunDetailPage.vue` 仍保留 EventSource 生命周期、polling timers、abort controller、restore/human-review behavior 和实际 UI state mutation。
 
 ## 后端重点
 
@@ -178,6 +185,10 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 - 2026-04-30：`canvasInteractionStyleModel.ts` 已继续承担 active-source 和 eligible-target anchor class-state checks，`EditorCanvas.vue` 仍保留 style context、overlay rendering 和 pointer handlers。
 - 2026-04-30：`canvasConnectionInteractionModel.ts` 已继续承担 connection completion eligibility routing，`EditorCanvas.vue` 仍保留 active connection refs、graph document input、auto-snap callers 和 completion emits。
 - 2026-04-30：`edgeProjection.ts` 已继续承担 projected anchor grouping，`EditorCanvas.vue` 仍保留 transient anchor construction、connection eligibility、anchor overlay rendering 和 pointer handlers。
+- 2026-04-30：`edgeProjection.ts` 已继续承担 projected edge layer grouping，`EditorCanvas.vue` 仍保留 SVG layer ordering、selected-edge state、edge hitarea handlers 和 edge class bindings。
+- 2026-04-30：`canvasInteractionStyleModel.ts` 已继续承担 edge class projection，`EditorCanvas.vue` 仍保留 selected-edge state input、active-run lookup、SVG rendering 和 pointer handlers。
+- 2026-04-30：`canvasInteractionStyleModel.ts` 已继续承担 flow hotspot 和 route handle class projection，`EditorCanvas.vue` 仍保留 hotspot visibility/tone 输入、overlay rendering 和 pointer handlers。
+- 2026-04-30：`run-event-stream.ts` 已承担 run event stream URL 构造、event payload 解析和 RunDetail live output 合并；workspace/run detail 仍保留 EventSource 生命周期、polling/abort 和 UI state mutation。
 
 ## 优先级路线
 

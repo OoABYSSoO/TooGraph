@@ -211,6 +211,15 @@ test("EditorWorkspaceShell opens the right sidebar in Human Review mode for awai
   assert.match(componentSource, /<EditorStatePanel[\s\S]*v-else[\s\S]*:run="latestRunDetailByTabId\[tab\.tabId\] \?\? null"/);
 });
 
+test("EditorWorkspaceShell delegates run event stream parsing and URL projection to the shared model", () => {
+  assert.match(componentSource, /import \{[\s\S]*buildRunEventStreamUrl,[\s\S]*parseRunEventPayloadData[\s\S]*\} from "@\/lib\/run-event-stream";/);
+  assert.match(componentSource, /const streamUrl = buildRunEventStreamUrl\(runId\);/);
+  assert.match(componentSource, /new EventSource\(streamUrl\)/);
+  assert.match(componentSource, /return event instanceof MessageEvent \? parseRunEventPayloadData\(event\.data\) : null;/);
+  assert.doesNotMatch(componentSource, /JSON\.parse\(String\(event\.data \?\? ""\)\)/);
+  assert.doesNotMatch(componentSource, /new EventSource\(`\/api\/runs\/\$\{runId\}\/events`\)/);
+});
+
 test("EditorWorkspaceShell keeps Human Review locked open while awaiting human input", () => {
   const toggleStatePanelSource = componentSource.match(/function toggleStatePanel\(tabId: string\) \{[\s\S]*?\n\}/)?.[0] ?? "";
   const toggleActiveStatePanelSource = componentSource.match(/function toggleActiveStatePanel\(\) \{[\s\S]*?function editorMainStyle/)?.[0] ?? "";
@@ -267,7 +276,7 @@ test("EditorWorkspaceShell removes the persistent bottom-left status feedback ov
 test("EditorWorkspaceShell subscribes to run events for live output previews", () => {
   assert.match(componentSource, /const runEventSourceByTabId = new Map<string, EventSource>\(\);/);
   assert.match(componentSource, /function startRunEventStreamForTab\(tabId: string, runId: string\)/);
-  assert.match(componentSource, /new EventSource\(`\/api\/runs\/\$\{runId\}\/events`\)/);
+  assert.match(componentSource, /new EventSource\(streamUrl\)/);
   assert.match(componentSource, /addEventListener\("node\.output\.delta"/);
   assert.match(componentSource, /function applyStreamingOutputPreviewToTab/);
   assert.match(componentSource, /resolveStreamingOutputNodeIds/);

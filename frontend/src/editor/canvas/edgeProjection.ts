@@ -24,6 +24,11 @@ export type ProjectedCanvasEdgeRouting = {
   targetLaneCount: number;
 };
 
+export type ProjectedCanvasEdgeGroups = {
+  flowRouteEdges: ProjectedCanvasEdge[];
+  dataEdges: ProjectedCanvasEdge[];
+};
+
 export type ProjectedCanvasAnchor = {
   id: string;
   nodeId: string;
@@ -44,6 +49,13 @@ export type ProjectedCanvasAnchorGroups = {
 
 const DEFAULT_NODE_WIDTH = 460;
 const CONDITION_NODE_WIDTH = 560;
+
+export function groupProjectedCanvasEdges(edges: readonly ProjectedCanvasEdge[]): ProjectedCanvasEdgeGroups {
+  return {
+    flowRouteEdges: edges.filter((edge) => edge.kind === "flow" || edge.kind === "route"),
+    dataEdges: edges.filter((edge) => edge.kind === "data"),
+  };
+}
 
 export function groupProjectedCanvasAnchors(anchors: readonly ProjectedCanvasAnchor[]): ProjectedCanvasAnchorGroups {
   return {

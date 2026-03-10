@@ -265,6 +265,7 @@ import {
   type PersistedEditorWorkspace,
 } from "@/lib/editor-workspace";
 import type { CanvasViewport } from "@/editor/canvas/canvasViewport";
+import { buildRunEventStreamUrl, parseRunEventPayloadData } from "@/lib/run-event-stream";
 import { buildRestoredGraphFromRun, buildSnapshotScopedRun, canRestoreRunDetail, resolveRestoredRunTabTitle } from "@/lib/run-restore";
 import { useGraphDocumentStore } from "@/stores/graphDocument";
 import type { KnowledgeBaseRecord } from "@/types/knowledge";
@@ -531,15 +532,7 @@ function cancelRunEventStreamForTab(tabId: string) {
 }
 
 function parseRunEventPayload(event: Event) {
-  if (!(event instanceof MessageEvent)) {
-    return null;
-  }
-  try {
-    const payload = JSON.parse(String(event.data ?? ""));
-    return typeof payload === "object" && payload !== null ? (payload as Record<string, unknown>) : null;
-  } catch {
-    return null;
-  }
+  return event instanceof MessageEvent ? parseRunEventPayloadData(event.data) : null;
 }
 
 function resolveStreamingOutputNodeIds(tabId: string, outputKeys: string[]) {
@@ -598,10 +591,11 @@ function isActiveRunStatus(status: string | null | undefined) {
 
 function startRunEventStreamForTab(tabId: string, runId: string) {
   cancelRunEventStreamForTab(tabId);
-  if (!runId || typeof EventSource === "undefined") {
+  const streamUrl = buildRunEventStreamUrl(runId);
+  if (!streamUrl || typeof EventSource === "undefined") {
     return;
   }
-  const source = new EventSource(`/api/runs/${runId}/events`);
+  const source = new EventSource(streamUrl);
   runEventSourceByTabId.set(tabId, source);
   source.addEventListener("node.output.delta", (event) => {
     const payload = parseRunEventPayload(event);

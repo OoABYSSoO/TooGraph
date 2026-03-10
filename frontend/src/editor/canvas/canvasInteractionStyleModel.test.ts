@@ -2,12 +2,17 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  buildConnectionPreviewClassState,
   buildConnectionPreviewStyle,
   buildFlowHotspotConnectStyle,
+  buildFlowHotspotClassState,
   buildFlowHotspotStyle,
   buildPointAnchorConnectStyle,
   buildPointAnchorStyle,
+  buildProjectedEdgeClassState,
+  buildProjectedEdgeHitareaClassState,
   buildProjectedEdgeStyle,
+  buildRouteHandleClassState,
   isCanvasConnectionSourceAnchor,
   isCanvasConnectionTargetAnchor,
   withAlpha,
@@ -30,6 +35,33 @@ test("buildConnectionPreviewStyle keeps per-connection preview opacity", () => {
     "--editor-connection-preview-stroke": "rgba(18, 52, 86, 0.76)",
   });
   assert.equal(buildConnectionPreviewStyle(null, "#123456"), undefined);
+});
+
+test("edge class helpers preserve preview, projected edge, and hitarea kind classes", () => {
+  assert.deepEqual(buildConnectionPreviewClassState("route"), {
+    "editor-canvas__edge--flow": false,
+    "editor-canvas__edge--route": true,
+    "editor-canvas__edge--data": false,
+  });
+  assert.deepEqual(
+    buildProjectedEdgeClassState({
+      edge: { id: "data:agent:answer->output", kind: "data" },
+      selectedEdgeId: "data:agent:answer->output",
+      activeRunEdgeClass: "editor-canvas__edge--active-run",
+    }),
+    {
+      "editor-canvas__edge--flow": false,
+      "editor-canvas__edge--route": false,
+      "editor-canvas__edge--data": true,
+      "editor-canvas__edge--selected": true,
+      "editor-canvas__edge--active-run": true,
+    },
+  );
+  assert.deepEqual(buildProjectedEdgeHitareaClassState({ kind: "flow" }), {
+    "editor-canvas__edge-hitarea--flow": true,
+    "editor-canvas__edge-hitarea--route": false,
+    "editor-canvas__edge-hitarea--data": false,
+  });
 });
 
 test("buildProjectedEdgeStyle preserves route and data edge variables", () => {
@@ -64,6 +96,58 @@ test("buildFlowHotspotStyle preserves directional hotspot geometry", () => {
     width: "86px",
     height: "22px",
   });
+});
+
+test("buildFlowHotspotClassState preserves direction, visibility, connection, and side classes", () => {
+  const context = {
+    activeConnectionSourceAnchorId: "source",
+    eligibleTargetAnchorIds: new Set(["target"]),
+    activeConnectionSourceKind: "state-out" as const,
+    activeConnectionAccentColor: "#123456",
+  };
+
+  assert.deepEqual(
+    buildFlowHotspotClassState({
+      anchor: { id: "source", kind: "flow-out", side: "top" },
+      isVisible: true,
+      context,
+    }),
+    {
+      "editor-canvas__flow-hotspot--outbound": true,
+      "editor-canvas__flow-hotspot--inbound": false,
+      "editor-canvas__flow-hotspot--visible": true,
+      "editor-canvas__flow-hotspot--connect-source": true,
+      "editor-canvas__flow-hotspot--connect-target": false,
+      "editor-canvas__flow-hotspot--top": true,
+    },
+  );
+});
+
+test("buildRouteHandleClassState preserves visibility, tone, and connection classes", () => {
+  const context = {
+    activeConnectionSourceAnchorId: "route:true",
+    eligibleTargetAnchorIds: new Set<string>(),
+    activeConnectionSourceKind: "route-out" as const,
+    activeConnectionAccentColor: "#123456",
+  };
+
+  assert.deepEqual(
+    buildRouteHandleClassState({
+      anchor: { id: "route:true" },
+      isVisible: true,
+      tone: "success",
+      context,
+    }),
+    {
+      "editor-canvas__flow-hotspot--visible": true,
+      "editor-canvas__route-handle--success": true,
+      "editor-canvas__route-handle--danger": false,
+      "editor-canvas__route-handle--warning": false,
+      "editor-canvas__route-handle--neutral": false,
+      "editor-canvas__flow-hotspot--connect-source": true,
+      "editor-canvas__route-handle--connect-source": true,
+    },
+  );
 });
 
 test("anchor style helpers preserve state colors and state-out connection variables", () => {

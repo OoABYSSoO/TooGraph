@@ -247,6 +247,7 @@ import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 
 import { fetchRun } from "@/api/runs";
+import { buildLiveStreamingOutput, buildRunEventStreamUrl, parseRunEventPayloadData, type LiveStreamingOutput } from "@/lib/run-event-stream";
 import { formatRunDisplayName, formatRunDisplayTimestamp } from "@/lib/run-display-name";
 import AppShell from "@/layouts/AppShell.vue";
 import { buildCycleVisualization, describeCycleStopReason, formatCycleStopReason } from "@/lib/run-cycle-visualization";
@@ -262,14 +263,6 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 const selectedSnapshotIdDraft = ref<string | null>(null);
 const expandedContentKeys = ref<Set<string>>(new Set());
-type LiveStreamingOutput = {
-  nodeId: string;
-  text: string;
-  chunkCount: number;
-  outputKeys: string[];
-  completed: boolean;
-  updatedAt: string;
-};
 const liveStreamingOutputs = ref<Record<string, LiveStreamingOutput>>({});
 const runId = computed(() => String(route.params.runId ?? ""));
 const runDetailRequestTimeoutMs = 10_000;
@@ -356,50 +349,30 @@ function closeRunEventStream() {
 }
 
 function parseRunEventPayload(event: Event) {
-  if (!(event instanceof MessageEvent)) {
-    return null;
-  }
-  try {
-    const payload = JSON.parse(String(event.data ?? ""));
-    return typeof payload === "object" && payload !== null ? (payload as Record<string, unknown>) : null;
-  } catch {
-    return null;
-  }
+  return event instanceof MessageEvent ? parseRunEventPayloadData(event.data) : null;
 }
 
 function updateLiveStreamingOutput(payload: Record<string, unknown>, completed = false) {
-  const nodeId = String(payload.node_id ?? "").trim();
-  if (!nodeId) {
+  const currentNodeId = String(payload.node_id ?? "").trim();
+  const nextOutput = buildLiveStreamingOutput(liveStreamingOutputs.value[currentNodeId], payload, completed);
+  if (!nextOutput) {
     return;
   }
-  const current = liveStreamingOutputs.value[nodeId];
-  const text = typeof payload.text === "string"
-    ? payload.text
-    : `${current?.text ?? ""}${typeof payload.delta === "string" ? payload.delta : ""}`;
-  const outputKeys = Array.isArray(payload.output_keys)
-    ? payload.output_keys.map((key) => String(key)).filter(Boolean)
-    : current?.outputKeys ?? [];
   liveStreamingOutputs.value = {
     ...liveStreamingOutputs.value,
-    [nodeId]: {
-      nodeId,
-      text,
-      chunkCount: Number(payload.chunk_count ?? payload.chunk_index ?? current?.chunkCount ?? 0),
-      outputKeys,
-      completed: completed || Boolean(payload.completed) || current?.completed === true,
-      updatedAt: String(payload.updated_at ?? payload.created_at ?? current?.updatedAt ?? ""),
-    },
+    [nextOutput.nodeId]: nextOutput,
   };
 }
 
 function startRunEventStream(nextRunId: string) {
   closeRunEventStream();
   const normalizedRunId = nextRunId.trim();
-  if (!normalizedRunId || typeof EventSource === "undefined") {
+  const streamUrl = buildRunEventStreamUrl(nextRunId);
+  if (!streamUrl || typeof EventSource === "undefined") {
     return;
   }
 
-  const source = new EventSource(`/api/runs/${normalizedRunId}/events`);
+  const source = new EventSource(streamUrl);
   runEventSource = source;
   source.addEventListener("node.output.delta", (event) => {
     const payload = parseRunEventPayload(event);
