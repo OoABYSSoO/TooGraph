@@ -265,7 +265,12 @@ import {
   type PersistedEditorWorkspace,
 } from "@/lib/editor-workspace";
 import type { CanvasViewport } from "@/editor/canvas/canvasViewport";
-import { buildRunEventStreamUrl, parseRunEventPayloadData } from "@/lib/run-event-stream";
+import {
+  buildRunEventOutputPreviewUpdate,
+  buildRunEventStreamUrl,
+  parseRunEventPayload,
+  shouldPollRunStatus,
+} from "@/lib/run-event-stream";
 import { buildRestoredGraphFromRun, buildSnapshotScopedRun, canRestoreRunDetail, resolveRestoredRunTabTitle } from "@/lib/run-restore";
 import { useGraphDocumentStore } from "@/stores/graphDocument";
 import type { KnowledgeBaseRecord } from "@/types/knowledge";
@@ -296,6 +301,7 @@ import EditorNodeCreationMenu from "./EditorNodeCreationMenu.vue";
 import EditorStatePanel from "./EditorStatePanel.vue";
 import EditorTabBar from "./EditorTabBar.vue";
 import EditorWelcomeState from "./EditorWelcomeState.vue";
+import { buildNextCanvasViewportDrafts, listTabsMissingViewportDrafts } from "./editorDraftPersistenceModel.ts";
 import { formatRunFeedback, formatValidationFeedback, type RunFeedback, type WorkspaceFeedbackTone } from "./runFeedbackModel.ts";
 import { buildRunNodeArtifactsModel, mergeRunOutputPreviewByNodeId } from "./runNodeArtifactsModel.ts";
 import { applyRunWrittenStateValuesToDocument } from "./runStatePersistence.ts";
@@ -531,42 +537,11 @@ function cancelRunEventStreamForTab(tabId: string) {
   runEventSourceByTabId.delete(tabId);
 }
 
-function parseRunEventPayload(event: Event) {
-  return event instanceof MessageEvent ? parseRunEventPayloadData(event.data) : null;
-}
-
-function resolveStreamingOutputNodeIds(tabId: string, outputKeys: string[]) {
-  const document = documentsByTabId.value[tabId];
-  if (!document || outputKeys.length === 0) {
-    return [];
-  }
-  const outputKeySet = new Set(outputKeys);
-  return Object.entries(document.nodes)
-    .filter(([, node]) => node.kind === "output" && node.reads.some((read) => outputKeySet.has(read.state)))
-    .map(([nodeId]) => nodeId);
-}
-
 function applyStreamingOutputPreviewToTab(tabId: string, payload: Record<string, unknown>) {
-  const text = typeof payload.text === "string" ? payload.text : "";
-  if (!text) {
-    return;
-  }
-  const outputKeys = Array.isArray(payload.output_keys)
-    ? payload.output_keys.map((key) => String(key)).filter(Boolean)
-    : [];
-  const fallbackNodeId = String(payload.node_id ?? "").trim();
-  const targetNodeIds = resolveStreamingOutputNodeIds(tabId, outputKeys);
-  const previewNodeIds = targetNodeIds.length > 0 ? targetNodeIds : fallbackNodeId ? [fallbackNodeId] : [];
-  if (previewNodeIds.length === 0) {
-    return;
-  }
   const currentPreview = runOutputPreviewByTabId.value[tabId] ?? {};
-  const nextPreview = { ...currentPreview };
-  for (const nodeId of previewNodeIds) {
-    nextPreview[nodeId] = {
-      text,
-      displayMode: "plain",
-    };
+  const nextPreview = buildRunEventOutputPreviewUpdate(documentsByTabId.value[tabId], currentPreview, payload);
+  if (!nextPreview) {
+    return;
   }
   runOutputPreviewByTabId.value = {
     ...runOutputPreviewByTabId.value,
@@ -583,10 +558,6 @@ function applyRunOutputPreviewForTab(
     ...runOutputPreviewByTabId.value,
     [tabId]: mergeRunOutputPreviewByNodeId(runOutputPreviewByTabId.value[tabId] ?? {}, nextPreviewByNodeId, options),
   };
-}
-
-function isActiveRunStatus(status: string | null | undefined) {
-  return status === "queued" || status === "running" || status === "resuming";
 }
 
 function startRunEventStreamForTab(tabId: string, runId: string) {
@@ -668,7 +639,7 @@ async function pollRunForTab(tabId: string, runId: string, generation = runPollG
       ...currentRunNodeIdByTabId.value,
       [tabId]: run.current_node_id ?? null,
     };
-    applyRunOutputPreviewForTab(tabId, runArtifactsModel.outputPreviewByNodeId, { preserveMissing: isActiveRunStatus(run.status) });
+    applyRunOutputPreviewForTab(tabId, runArtifactsModel.outputPreviewByNodeId, { preserveMissing: shouldPollRunStatus(run.status) });
     runFailureMessageByTabId.value = {
       ...runFailureMessageByTabId.value,
       [tabId]: runArtifactsModel.failedMessageByNodeId,
@@ -687,7 +658,7 @@ async function pollRunForTab(tabId: string, runId: string, generation = runPollG
       openHumanReviewPanelForTab(tabId, run.current_node_id);
     }
 
-    if (run.status === "queued" || run.status === "running" || run.status === "resuming") {
+    if (shouldPollRunStatus(run.status)) {
       scheduleRunPoll(tabId, runId, 500, generation);
       return;
     }
@@ -795,39 +766,27 @@ function registerDocumentForTab(tabId: string, graph: GraphPayload | GraphDocume
 }
 
 function ensureTabViewportDrafts() {
-  const nextViewports = { ...viewportByTabId.value };
-  let changed = false;
-  for (const tab of workspace.value.tabs) {
-    if (nextViewports[tab.tabId]) {
-      continue;
-    }
-    const persistedViewport = readPersistedEditorViewportDraft(tab.tabId);
+  let nextViewports = viewportByTabId.value;
+  for (const tabId of listTabsMissingViewportDrafts(workspace.value.tabs, viewportByTabId.value)) {
+    const persistedViewport = readPersistedEditorViewportDraft(tabId);
     if (!persistedViewport) {
       continue;
     }
-    nextViewports[tab.tabId] = persistedViewport;
-    changed = true;
+    nextViewports = buildNextCanvasViewportDrafts(nextViewports, tabId, persistedViewport) ?? nextViewports;
   }
-  if (changed) {
+
+  if (nextViewports !== viewportByTabId.value) {
     viewportByTabId.value = nextViewports;
   }
 }
 
 function updateCanvasViewportForTab(tabId: string, viewport: CanvasViewport) {
-  const previousViewport = viewportByTabId.value[tabId] ?? null;
-  if (
-    previousViewport &&
-    previousViewport.x === viewport.x &&
-    previousViewport.y === viewport.y &&
-    previousViewport.scale === viewport.scale
-  ) {
+  const nextViewports = buildNextCanvasViewportDrafts(viewportByTabId.value, tabId, viewport);
+  if (!nextViewports) {
     return;
   }
 
-  viewportByTabId.value = {
-    ...viewportByTabId.value,
-    [tabId]: viewport,
-  };
+  viewportByTabId.value = nextViewports;
   writePersistedEditorViewportDraft(tabId, viewport);
 }
 

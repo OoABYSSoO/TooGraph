@@ -247,14 +247,21 @@ import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 
 import { fetchRun } from "@/api/runs";
-import { buildLiveStreamingOutput, buildRunEventStreamUrl, parseRunEventPayloadData, type LiveStreamingOutput } from "@/lib/run-event-stream";
+import {
+  buildLiveStreamingOutput,
+  buildRunEventStreamUrl,
+  parseRunEventPayload,
+  resolveRunEventNodeId,
+  shouldPollRunStatus,
+  type LiveStreamingOutput,
+} from "@/lib/run-event-stream";
 import { formatRunDisplayName, formatRunDisplayTimestamp } from "@/lib/run-display-name";
 import AppShell from "@/layouts/AppShell.vue";
 import { buildCycleVisualization, describeCycleStopReason, formatCycleStopReason } from "@/lib/run-cycle-visualization";
 import { buildSnapshotScopedRun, canRestoreRunDetail, resolveRunRestoreUrl, resolveRunSnapshot } from "@/lib/run-restore";
 import type { RunDetail } from "@/types/run";
 
-import { buildRunStatusFacts, listRunOutputArtifacts, shouldPollRunStatus } from "./runDetailModel.ts";
+import { buildRunStatusFacts, listRunOutputArtifacts } from "./runDetailModel.ts";
 
 const route = useRoute();
 const { t, locale } = useI18n();
@@ -348,12 +355,8 @@ function closeRunEventStream() {
   runEventSource = null;
 }
 
-function parseRunEventPayload(event: Event) {
-  return event instanceof MessageEvent ? parseRunEventPayloadData(event.data) : null;
-}
-
 function updateLiveStreamingOutput(payload: Record<string, unknown>, completed = false) {
-  const currentNodeId = String(payload.node_id ?? "").trim();
+  const currentNodeId = resolveRunEventNodeId(payload);
   const nextOutput = buildLiveStreamingOutput(liveStreamingOutputs.value[currentNodeId], payload, completed);
   if (!nextOutput) {
     return;

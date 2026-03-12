@@ -172,6 +172,12 @@ test("EditorWorkspaceShell routes menu selections and dropped files through the 
 });
 
 test("EditorWorkspaceShell keeps canvas viewport state in local editor drafts", () => {
+  const ensureViewportSource =
+    componentSource.match(/function ensureTabViewportDrafts\(\) \{[\s\S]*?\n\}\n\nfunction updateCanvasViewportForTab/)?.[0] ?? "";
+  const updateViewportSource =
+    componentSource.match(/function updateCanvasViewportForTab\(tabId: string, viewport: CanvasViewport\) \{[\s\S]*?\n\}\n\nfunction clearTabRuntime/)?.[0] ?? "";
+
+  assert.match(componentSource, /import \{[\s\S]*buildNextCanvasViewportDrafts,[\s\S]*listTabsMissingViewportDrafts[\s\S]*\} from "\.\/editorDraftPersistenceModel\.ts";/);
   assert.match(componentSource, /readPersistedEditorViewportDraft/);
   assert.match(componentSource, /writePersistedEditorViewportDraft/);
   assert.match(componentSource, /prunePersistedEditorViewportDrafts/);
@@ -181,6 +187,10 @@ test("EditorWorkspaceShell keeps canvas viewport state in local editor drafts", 
   assert.match(componentSource, /@update:viewport="updateCanvasViewportForTab\(tab\.tabId, \$event\)"/);
   assert.match(componentSource, /function ensureTabViewportDrafts\(\)/);
   assert.match(componentSource, /function updateCanvasViewportForTab\(tabId: string, viewport: CanvasViewport\)/);
+  assert.match(ensureViewportSource, /for \(const tabId of listTabsMissingViewportDrafts\(workspace\.value\.tabs, viewportByTabId\.value\)\)/);
+  assert.doesNotMatch(ensureViewportSource, /for \(const tab of workspace\.value\.tabs\)/);
+  assert.match(updateViewportSource, /const nextViewports = buildNextCanvasViewportDrafts\(viewportByTabId\.value, tabId, viewport\);/);
+  assert.doesNotMatch(updateViewportSource, /previousViewport\.x === viewport\.x/);
   assert.match(componentSource, /writePersistedEditorViewportDraft\(tabId, viewport\)/);
 });
 
@@ -212,10 +222,24 @@ test("EditorWorkspaceShell opens the right sidebar in Human Review mode for awai
 });
 
 test("EditorWorkspaceShell delegates run event stream parsing and URL projection to the shared model", () => {
-  assert.match(componentSource, /import \{[\s\S]*buildRunEventStreamUrl,[\s\S]*parseRunEventPayloadData[\s\S]*\} from "@\/lib\/run-event-stream";/);
+  assert.match(componentSource, /import \{[\s\S]*buildRunEventOutputPreviewUpdate,[\s\S]*buildRunEventStreamUrl,[\s\S]*parseRunEventPayload,[\s\S]*shouldPollRunStatus[\s\S]*\} from "@\/lib\/run-event-stream";/);
   assert.match(componentSource, /const streamUrl = buildRunEventStreamUrl\(runId\);/);
   assert.match(componentSource, /new EventSource\(streamUrl\)/);
-  assert.match(componentSource, /return event instanceof MessageEvent \? parseRunEventPayloadData\(event\.data\) : null;/);
+  assert.doesNotMatch(componentSource, /function parseRunEventPayload\(event: Event\)/);
+  assert.doesNotMatch(componentSource, /parseRunEventPayloadData\(event\.data\)/);
+  assert.match(componentSource, /const nextPreview = buildRunEventOutputPreviewUpdate\(documentsByTabId\.value\[tabId\], currentPreview, payload\);/);
+  assert.match(componentSource, /preserveMissing: shouldPollRunStatus\(run\.status\)/);
+  assert.match(componentSource, /if \(shouldPollRunStatus\(run\.status\)\) \{/);
+  assert.doesNotMatch(componentSource, /function isActiveRunStatus\(status: string \| null \| undefined\)/);
+  assert.doesNotMatch(componentSource, /function resolveStreamingOutputNodeIds/);
+  assert.doesNotMatch(componentSource, /resolveRunEventText\(payload\)/);
+  assert.doesNotMatch(componentSource, /listRunEventOutputKeys\(payload\)/);
+  assert.doesNotMatch(componentSource, /resolveRunEventNodeId\(payload\)/);
+  assert.doesNotMatch(componentSource, /resolveRunEventPreviewNodeIds\(documentsByTabId\.value\[tabId\]/);
+  assert.doesNotMatch(componentSource, /buildRunEventOutputPreviewByNodeId\(currentPreview/);
+  assert.doesNotMatch(componentSource, /for \(const nodeId of previewNodeIds\)/);
+  assert.doesNotMatch(componentSource, /Array\.isArray\(payload\.output_keys\)/);
+  assert.doesNotMatch(componentSource, /String\(payload\.node_id \?\? ""\)\.trim\(\)/);
   assert.doesNotMatch(componentSource, /JSON\.parse\(String\(event\.data \?\? ""\)\)/);
   assert.doesNotMatch(componentSource, /new EventSource\(`\/api\/runs\/\$\{runId\}\/events`\)/);
 });
@@ -279,7 +303,7 @@ test("EditorWorkspaceShell subscribes to run events for live output previews", (
   assert.match(componentSource, /new EventSource\(streamUrl\)/);
   assert.match(componentSource, /addEventListener\("node\.output\.delta"/);
   assert.match(componentSource, /function applyStreamingOutputPreviewToTab/);
-  assert.match(componentSource, /resolveStreamingOutputNodeIds/);
+  assert.match(componentSource, /buildRunEventOutputPreviewUpdate/);
   assert.match(componentSource, /startRunEventStreamForTab\(tab\.tabId, response\.run_id\);/);
 });
 

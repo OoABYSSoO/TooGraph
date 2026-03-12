@@ -19,10 +19,6 @@ export type RunStatusFact = {
   tone: "default" | "status";
 };
 
-export function shouldPollRunStatus(status: string | null | undefined) {
-  return status === "queued" || status === "running" || status === "resuming";
-}
-
 export function formatRunArtifactValue(value: unknown) {
   if (value === null || value === undefined) {
     return "";

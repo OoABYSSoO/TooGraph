@@ -9,9 +9,22 @@ export type LiveStreamingOutput = {
   updatedAt: string;
 };
 
+export type RunEventPreviewDocument = {
+  nodes: Record<string, { kind?: string; reads?: Array<{ state?: string | null }> }>;
+};
+
+export type RunEventOutputPreviewEntry = {
+  text: string;
+  displayMode: string | null;
+};
+
 export function buildRunEventStreamUrl(runId: string) {
   const normalizedRunId = runId.trim();
   return normalizedRunId ? `/api/runs/${normalizedRunId}/events` : null;
+}
+
+export function shouldPollRunStatus(status: string | null | undefined) {
+  return status === "queued" || status === "running" || status === "resuming";
 }
 
 export function parseRunEventPayloadData(data: unknown): RunEventPayload | null {
@@ -23,23 +36,85 @@ export function parseRunEventPayloadData(data: unknown): RunEventPayload | null 
   }
 }
 
+export function parseRunEventPayload(event: Event) {
+  return event instanceof MessageEvent ? parseRunEventPayloadData(event.data) : null;
+}
+
+export function resolveRunEventNodeId(payload: RunEventPayload) {
+  return String(payload.node_id ?? "").trim();
+}
+
+export function resolveRunEventText(payload: RunEventPayload, fallback = "") {
+  return typeof payload.text === "string" ? payload.text : fallback;
+}
+
+export function listRunEventOutputKeys(payload: RunEventPayload, fallback: string[] = []) {
+  return Array.isArray(payload.output_keys) ? payload.output_keys.map((key) => String(key)).filter(Boolean) : fallback;
+}
+
+export function resolveRunEventPreviewNodeIds(
+  document: RunEventPreviewDocument | null | undefined,
+  outputKeys: string[],
+  fallbackNodeId: string,
+) {
+  const outputKeySet = new Set(outputKeys);
+  const targetNodeIds =
+    document && outputKeys.length > 0
+      ? Object.entries(document.nodes)
+          .filter(([, node]) => node.kind === "output" && node.reads?.some((read) => typeof read.state === "string" && outputKeySet.has(read.state)))
+          .map(([nodeId]) => nodeId)
+      : [];
+
+  return targetNodeIds.length > 0 ? targetNodeIds : fallbackNodeId ? [fallbackNodeId] : [];
+}
+
+export function buildRunEventOutputPreviewByNodeId(
+  currentPreviewByNodeId: Record<string, RunEventOutputPreviewEntry>,
+  previewNodeIds: string[],
+  text: string,
+) {
+  const nextPreviewByNodeId = { ...currentPreviewByNodeId };
+  for (const nodeId of previewNodeIds) {
+    nextPreviewByNodeId[nodeId] = {
+      text,
+      displayMode: "plain",
+    };
+  }
+  return nextPreviewByNodeId;
+}
+
+export function buildRunEventOutputPreviewUpdate(
+  document: RunEventPreviewDocument | null | undefined,
+  currentPreviewByNodeId: Record<string, RunEventOutputPreviewEntry>,
+  payload: RunEventPayload,
+) {
+  const text = resolveRunEventText(payload);
+  if (!text) {
+    return null;
+  }
+
+  const outputKeys = listRunEventOutputKeys(payload);
+  const fallbackNodeId = resolveRunEventNodeId(payload);
+  const previewNodeIds = resolveRunEventPreviewNodeIds(document, outputKeys, fallbackNodeId);
+  if (previewNodeIds.length === 0) {
+    return null;
+  }
+
+  return buildRunEventOutputPreviewByNodeId(currentPreviewByNodeId, previewNodeIds, text);
+}
+
 export function buildLiveStreamingOutput(
   current: LiveStreamingOutput | null | undefined,
   payload: RunEventPayload,
   completed = false,
 ): LiveStreamingOutput | null {
-  const nodeId = String(payload.node_id ?? "").trim();
+  const nodeId = resolveRunEventNodeId(payload);
   if (!nodeId) {
     return null;
   }
 
-  const text =
-    typeof payload.text === "string"
-      ? payload.text
-      : `${current?.text ?? ""}${typeof payload.delta === "string" ? payload.delta : ""}`;
-  const outputKeys = Array.isArray(payload.output_keys)
-    ? payload.output_keys.map((key) => String(key)).filter(Boolean)
-    : current?.outputKeys ?? [];
+  const text = resolveRunEventText(payload, `${current?.text ?? ""}${typeof payload.delta === "string" ? payload.delta : ""}`);
+  const outputKeys = listRunEventOutputKeys(payload, current?.outputKeys ?? []);
 
   return {
     nodeId,

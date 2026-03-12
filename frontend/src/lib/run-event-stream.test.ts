@@ -3,13 +3,30 @@ import test from "node:test";
 
 import {
   buildLiveStreamingOutput,
+  buildRunEventOutputPreviewByNodeId,
+  buildRunEventOutputPreviewUpdate,
   buildRunEventStreamUrl,
+  parseRunEventPayload,
+  listRunEventOutputKeys,
   parseRunEventPayloadData,
+  resolveRunEventNodeId,
+  resolveRunEventPreviewNodeIds,
+  resolveRunEventText,
+  shouldPollRunStatus,
 } from "./run-event-stream.ts";
 
 test("buildRunEventStreamUrl trims run ids and skips empty streams", () => {
   assert.equal(buildRunEventStreamUrl(" run_1 "), "/api/runs/run_1/events");
   assert.equal(buildRunEventStreamUrl(" "), null);
+});
+
+test("shouldPollRunStatus follows queued, running, and resuming semantics", () => {
+  assert.equal(shouldPollRunStatus("queued"), true);
+  assert.equal(shouldPollRunStatus("running"), true);
+  assert.equal(shouldPollRunStatus("resuming"), true);
+  assert.equal(shouldPollRunStatus("completed"), false);
+  assert.equal(shouldPollRunStatus("failed"), false);
+  assert.equal(shouldPollRunStatus(null), false);
 });
 
 test("parseRunEventPayloadData returns object payloads and ignores invalid event data", () => {
@@ -19,6 +36,146 @@ test("parseRunEventPayloadData returns object payloads and ignores invalid event
   });
   assert.equal(parseRunEventPayloadData("not json"), null);
   assert.equal(parseRunEventPayloadData('"string"'), null);
+});
+
+test("parseRunEventPayload reads MessageEvent payloads and ignores other events", () => {
+  assert.deepEqual(parseRunEventPayload(new MessageEvent("message", { data: '{"node_id":"output","text":"done"}' })), {
+    node_id: "output",
+    text: "done",
+  });
+  assert.equal(parseRunEventPayload(new MessageEvent("message", { data: "not json" })), null);
+  assert.equal(parseRunEventPayload(new Event("open")), null);
+});
+
+test("resolveRunEventNodeId trims node ids and skips missing ids", () => {
+  assert.equal(resolveRunEventNodeId({ node_id: " output_1 " }), "output_1");
+  assert.equal(resolveRunEventNodeId({ node_id: null }), "");
+  assert.equal(resolveRunEventNodeId({}), "");
+});
+
+test("resolveRunEventText preserves explicit text and only uses fallback when text is absent", () => {
+  assert.equal(resolveRunEventText({ text: "ready", delta: " ignored" }, "fallback"), "ready");
+  assert.equal(resolveRunEventText({ text: "", delta: " ignored" }, "fallback"), "");
+  assert.equal(resolveRunEventText({ delta: " chunk" }, "fallback"), "fallback");
+});
+
+test("listRunEventOutputKeys normalizes keys and preserves fallback when keys are absent", () => {
+  assert.deepEqual(listRunEventOutputKeys({ output_keys: ["answer", 2, "", null] }), ["answer", "2", "null"]);
+  assert.deepEqual(listRunEventOutputKeys({ output_keys: "answer" }, ["fallback"]), ["fallback"]);
+  assert.deepEqual(listRunEventOutputKeys({}, ["fallback"]), ["fallback"]);
+});
+
+test("resolveRunEventPreviewNodeIds maps output keys to output nodes and preserves fallback behavior", () => {
+  const document = {
+    nodes: {
+      agent_writer: {
+        kind: "agent",
+        reads: [{ state: "answer" }],
+      },
+      output_answer: {
+        kind: "output",
+        reads: [{ state: "answer" }],
+      },
+      output_summary: {
+        kind: "output",
+        reads: [{ state: "summary" }],
+      },
+    },
+  };
+
+  assert.deepEqual(resolveRunEventPreviewNodeIds(document, ["answer"], "fallback_node"), ["output_answer"]);
+  assert.deepEqual(resolveRunEventPreviewNodeIds(document, ["missing"], "fallback_node"), ["fallback_node"]);
+  assert.deepEqual(resolveRunEventPreviewNodeIds(null, ["answer"], "fallback_node"), ["fallback_node"]);
+  assert.deepEqual(resolveRunEventPreviewNodeIds(document, [], ""), []);
+});
+
+test("buildRunEventOutputPreviewByNodeId writes plain previews without mutating existing entries", () => {
+  const currentPreview = {
+    existing_output: {
+      text: "old",
+      displayMode: "markdown",
+    },
+  };
+
+  const nextPreview = buildRunEventOutputPreviewByNodeId(currentPreview, ["output_answer", "output_summary"], "new text");
+
+  assert.deepEqual(nextPreview, {
+    existing_output: {
+      text: "old",
+      displayMode: "markdown",
+    },
+    output_answer: {
+      text: "new text",
+      displayMode: "plain",
+    },
+    output_summary: {
+      text: "new text",
+      displayMode: "plain",
+    },
+  });
+  assert.notEqual(nextPreview, currentPreview);
+  assert.deepEqual(currentPreview, {
+    existing_output: {
+      text: "old",
+      displayMode: "markdown",
+    },
+  });
+});
+
+test("buildRunEventOutputPreviewUpdate projects payloads into next preview maps or skips no-op payloads", () => {
+  const document = {
+    nodes: {
+      output_answer: {
+        kind: "output",
+        reads: [{ state: "answer" }],
+      },
+    },
+  };
+  const currentPreview = {
+    existing_output: {
+      text: "old",
+      displayMode: "markdown",
+    },
+  };
+
+  assert.deepEqual(
+    buildRunEventOutputPreviewUpdate(document, currentPreview, {
+      text: "new text",
+      output_keys: ["answer"],
+      node_id: "fallback_node",
+    }),
+    {
+      existing_output: {
+        text: "old",
+        displayMode: "markdown",
+      },
+      output_answer: {
+        text: "new text",
+        displayMode: "plain",
+      },
+    },
+  );
+
+  assert.deepEqual(
+    buildRunEventOutputPreviewUpdate(document, currentPreview, {
+      text: "fallback text",
+      output_keys: ["missing"],
+      node_id: " fallback_node ",
+    }),
+    {
+      existing_output: {
+        text: "old",
+        displayMode: "markdown",
+      },
+      fallback_node: {
+        text: "fallback text",
+        displayMode: "plain",
+      },
+    },
+  );
+
+  assert.equal(buildRunEventOutputPreviewUpdate(document, currentPreview, { delta: "ignored", output_keys: ["answer"] }), null);
+  assert.equal(buildRunEventOutputPreviewUpdate(document, currentPreview, { text: "missing target" }), null);
 });
 
 test("buildLiveStreamingOutput preserves live output merge semantics", () => {

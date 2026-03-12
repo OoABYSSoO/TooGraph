@@ -3,7 +3,7 @@ import test from "node:test";
 
 import type { RunDetail } from "../types/run.ts";
 
-import { buildRunStatusFacts, formatRunArtifactValue, listRunOutputArtifacts, shouldPollRunStatus } from "./runDetailModel.ts";
+import { buildRunStatusFacts, formatRunArtifactValue, listRunOutputArtifacts } from "./runDetailModel.ts";
 
 function createRunDetail(overrides: Partial<RunDetail> = {}): RunDetail {
   return {
@@ -66,14 +66,6 @@ function createRunDetail(overrides: Partial<RunDetail> = {}): RunDetail {
     ...overrides,
   };
 }
-
-test("shouldPollRunStatus follows queued/running/resuming semantics", () => {
-  assert.equal(shouldPollRunStatus("queued"), true);
-  assert.equal(shouldPollRunStatus("running"), true);
-  assert.equal(shouldPollRunStatus("resuming"), true);
-  assert.equal(shouldPollRunStatus("completed"), false);
-  assert.equal(shouldPollRunStatus("failed"), false);
-});
 
 test("formatRunArtifactValue keeps strings and pretty prints structured payloads", () => {
   assert.equal(formatRunArtifactValue("hello"), "hello");
