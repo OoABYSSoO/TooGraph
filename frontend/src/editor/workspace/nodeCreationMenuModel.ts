@@ -1,8 +1,28 @@
 import { NODE_CREATION_FAMILY_PRIORITY } from "./nodeCreationBuiltins.ts";
 
-import type { NodeCreationEntry, PresetDocument } from "@/types/node-system";
+import type { NodeCreationContext, NodeCreationEntry, PresetDocument } from "@/types/node-system";
 
 type NodeCreationAnchorKind = "flow-out" | "route-out" | "state-out" | "state-in";
+
+export type NodeCreationMenuState = {
+  open: boolean;
+  context: NodeCreationContext | null;
+  position: { x: number; y: number } | null;
+  query: string;
+};
+
+export type CreatedStateEdgeEditorRequest = {
+  requestId: string;
+  sourceNodeId: string;
+  targetNodeId: string;
+  stateKey: string;
+  position: NodeCreationContext["position"];
+};
+
+type CreatedStateEdgeEditorResult = {
+  createdNodeId: string;
+  createdStateKey: string | null;
+};
 
 type BuildNodeCreationEntriesInput = {
   builtins: NodeCreationEntry[];
@@ -14,6 +34,66 @@ type BuildNodeCreationEntriesInput = {
 
 function normalizeSearchValue(value: string | undefined) {
   return (value ?? "").trim().toLowerCase();
+}
+
+function resolveNodeCreationMenuPosition(context: NodeCreationContext) {
+  return typeof context.clientX === "number" && typeof context.clientY === "number"
+    ? { x: context.clientX, y: context.clientY }
+    : null;
+}
+
+export function buildOpenNodeCreationMenuState(context: NodeCreationContext): NodeCreationMenuState {
+  return {
+    open: true,
+    context,
+    position: resolveNodeCreationMenuPosition(context),
+    query: "",
+  };
+}
+
+export function buildClosedNodeCreationMenuState(): NodeCreationMenuState {
+  return {
+    open: false,
+    context: null,
+    position: null,
+    query: "",
+  };
+}
+
+export function buildUpdatedNodeCreationMenuQuery(
+  currentState: NodeCreationMenuState | null,
+  query: string,
+): NodeCreationMenuState {
+  return {
+    open: currentState?.open ?? false,
+    context: currentState?.context ?? null,
+    position: currentState?.position ?? null,
+    query,
+  };
+}
+
+export function buildCreatedStateEdgeEditorRequest(
+  context: NodeCreationContext,
+  result: CreatedStateEdgeEditorResult,
+  timestamp: number,
+): CreatedStateEdgeEditorRequest | null {
+  if (!result.createdStateKey) {
+    return null;
+  }
+
+  const sourceNodeId = context.targetNodeId ? result.createdNodeId : context.sourceNodeId;
+  const targetNodeId = context.targetNodeId ?? result.createdNodeId;
+  if (!sourceNodeId || !targetNodeId) {
+    return null;
+  }
+
+  return {
+    requestId: `${sourceNodeId}:${result.createdStateKey}:${targetNodeId}:${timestamp}`,
+    sourceNodeId,
+    targetNodeId,
+    stateKey: result.createdStateKey,
+    position: context.position,
+  };
 }
 
 function listPresetAcceptedValueTypes(preset: PresetDocument) {

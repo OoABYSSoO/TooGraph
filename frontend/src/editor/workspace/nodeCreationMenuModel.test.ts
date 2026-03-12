@@ -1,8 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { buildNodeCreationEntries, supportsCreationSourceType } from "./nodeCreationMenuModel.ts";
-import type { NodeCreationEntry, PresetDocument } from "@/types/node-system";
+import {
+  buildCreatedStateEdgeEditorRequest,
+  buildClosedNodeCreationMenuState,
+  buildNodeCreationEntries,
+  buildOpenNodeCreationMenuState,
+  buildUpdatedNodeCreationMenuQuery,
+  supportsCreationSourceType,
+} from "./nodeCreationMenuModel.ts";
+import type { NodeCreationContext, NodeCreationEntry, PresetDocument } from "@/types/node-system";
 
 const builtins: NodeCreationEntry[] = [
   {
@@ -204,4 +211,144 @@ test("supportsCreationSourceType rejects text-only agent presets for knowledge b
   assert.equal(supportsCreationSourceType(builtins[0], null, "flow-out"), false);
   assert.equal(supportsCreationSourceType(builtins[0], "text", "state-in"), true);
   assert.equal(supportsCreationSourceType(builtins[1], "text", "state-in"), false);
+});
+
+test("buildOpenNodeCreationMenuState preserves creation context and pointer position", () => {
+  const context: NodeCreationContext = {
+    position: { x: 240, y: 120 },
+    clientX: 760,
+    clientY: 410,
+    sourceNodeId: "agent_a",
+    sourceAnchorKind: "state-out",
+    sourceStateKey: "answer",
+    sourceValueType: "text",
+  };
+
+  assert.deepEqual(buildOpenNodeCreationMenuState(context), {
+    open: true,
+    context,
+    position: { x: 760, y: 410 },
+    query: "",
+  });
+});
+
+test("buildOpenNodeCreationMenuState falls back to anchored menu positioning when client coordinates are absent", () => {
+  const context: NodeCreationContext = {
+    position: { x: 120, y: 80 },
+    targetNodeId: "agent_b",
+    targetAnchorKind: "state-in",
+    targetStateKey: "question",
+    targetValueType: "text",
+  };
+
+  assert.deepEqual(buildOpenNodeCreationMenuState(context), {
+    open: true,
+    context,
+    position: null,
+    query: "",
+  });
+});
+
+test("buildUpdatedNodeCreationMenuQuery keeps the current context and popup position", () => {
+  const context: NodeCreationContext = {
+    position: { x: 120, y: 80 },
+    sourceNodeId: "agent_a",
+    sourceAnchorKind: "flow-out",
+  };
+  const currentState = buildOpenNodeCreationMenuState({
+    ...context,
+    clientX: 440,
+    clientY: 300,
+  });
+
+  assert.deepEqual(buildUpdatedNodeCreationMenuQuery(currentState, "agent"), {
+    ...currentState,
+    query: "agent",
+  });
+});
+
+test("buildUpdatedNodeCreationMenuQuery creates a closed query state when no menu is active", () => {
+  assert.deepEqual(buildUpdatedNodeCreationMenuQuery(null, "input"), {
+    open: false,
+    context: null,
+    position: null,
+    query: "input",
+  });
+});
+
+test("buildClosedNodeCreationMenuState resets all transient creation menu context", () => {
+  assert.deepEqual(buildClosedNodeCreationMenuState(), {
+    open: false,
+    context: null,
+    position: null,
+    query: "",
+  });
+});
+
+test("buildCreatedStateEdgeEditorRequest opens a created downstream node from the source context", () => {
+  const context: NodeCreationContext = {
+    position: { x: 320, y: 180 },
+    sourceNodeId: "agent_a",
+    sourceAnchorKind: "state-out",
+    sourceStateKey: "answer",
+  };
+
+  assert.deepEqual(
+    buildCreatedStateEdgeEditorRequest(context, { createdNodeId: "created_output", createdStateKey: "generated_answer" }, 12345),
+    {
+      requestId: "agent_a:generated_answer:created_output:12345",
+      sourceNodeId: "agent_a",
+      targetNodeId: "created_output",
+      stateKey: "generated_answer",
+      position: { x: 320, y: 180 },
+    },
+  );
+});
+
+test("buildCreatedStateEdgeEditorRequest opens a created upstream node from the target context", () => {
+  const context: NodeCreationContext = {
+    position: { x: 140, y: 90 },
+    targetNodeId: "agent_b",
+    targetAnchorKind: "state-in",
+    targetStateKey: "question",
+  };
+
+  assert.deepEqual(
+    buildCreatedStateEdgeEditorRequest(context, { createdNodeId: "created_input", createdStateKey: "created_question" }, 67890),
+    {
+      requestId: "created_input:created_question:agent_b:67890",
+      sourceNodeId: "created_input",
+      targetNodeId: "agent_b",
+      stateKey: "created_question",
+      position: { x: 140, y: 90 },
+    },
+  );
+});
+
+test("buildCreatedStateEdgeEditorRequest ignores creations without an editable state edge", () => {
+  assert.equal(
+    buildCreatedStateEdgeEditorRequest(
+      {
+        position: { x: 10, y: 20 },
+        sourceNodeId: "agent_a",
+        sourceAnchorKind: "flow-out",
+      },
+      { createdNodeId: "agent_b", createdStateKey: null },
+      1,
+    ),
+    null,
+  );
+});
+
+test("buildCreatedStateEdgeEditorRequest ignores incomplete creation endpoints", () => {
+  assert.equal(
+    buildCreatedStateEdgeEditorRequest(
+      {
+        position: { x: 10, y: 20 },
+      },
+      { createdNodeId: "agent_b", createdStateKey: "answer" },
+      1,
+    ),
+    null,
+  );
 });

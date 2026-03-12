@@ -1,5 +1,136 @@
 # Progress Log
 
+## Session: 2026-04-30 Phase 91
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Continued automatically after commit `ae1541e` because total roadmap progress was still below 100%.
+  - Inspected remaining low-risk tab-scoped record spreads in `EditorWorkspaceShell.vue`.
+  - Chose document, side-panel, and focus state writes because they are immutable record updates and do not touch graph mutation algorithms, snapping, naming, route sync, or run streams.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added structure coverage requiring `setDocumentForTab`, side-panel state, focused-node state, and focus-request state to use `setTabScopedRecordEntry`.
+  - Verified the expected red failure because the shell still used inline record spreads.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Replaced remaining low-risk record spreads for `documentsByTabId`, `statePanelOpenByTabId`, `sidePanelModeByTabId`, `focusedNodeIdByTabId`, and `focusRequestByTabId`.
+  - Updated older structure assertions that still expected restored snapshot reset spreads to now lock the runtime helper boundary.
+  - Preserved call order, guard behavior, panel mode values, focus request sequencing, persisted document draft writes, and human-review restore checkpoint behavior.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused workspace structure and runtime helper tests.
+  - Ran related workspace/node-creation/run-state regression tests.
+  - Ran TypeScript unused-symbol verification from `frontend`.
+  - Ran the full frontend `node --test` suite.
+  - Ran the frontend production build; no large chunk warning was emitted.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed backend `/health` returned `{"status":"ok"}` and the frontend entry returned HTTP 200.
+  - Captured a headless Chrome screenshot and confirmed the app rendered normally.
+
+### Phase 5: Continuation Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated overall roadmap cleanup at about 99.993%.
+  - Recalculated P3 `EditorWorkspaceShell.vue` cleanup at about 72%.
+  - Opened Phase 92 automatically because total roadmap progress is still below 100%.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Focused runtime/structure tests | `node --test frontend/src/editor/workspace/EditorWorkspaceShell.structure.test.ts frontend/src/editor/workspace/editorTabRuntimeModel.test.ts` | All focused tests pass | 37 passed | Passed |
+| Related workspace regression | `node --test` over workspace structure, tab runtime, node creation menu/execution, run state persistence, run event stream, and run detail structure tests | Related workspace tests pass | 76 passed | Passed |
+| Unused symbol check | `./node_modules/.bin/vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No diagnostics | Exit 0 | Passed |
+| Full frontend tests | `node --test $(rg --files src vite.config.structure.test.ts | rg '\.test\.ts$')` in `frontend` | All frontend tests pass | 876 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without a large chunk warning | Exit 0, no Vite chunk warning | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+| Browser smoke | Headless Chrome screenshot with virtual-time wait | App renders normally | Home workspace UI rendered | Passed |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | Older restored-snapshot structure assertion still expected record spread after the runtime helper migration | Phase 91 focused green run | Updated it to assert `setTabScopedRecordEntry` for the restored snapshot reset. |
+| 2026-04-30 | New focus-request structure regex expected a trailing comma that the implementation did not need | Phase 91 focused green run | Relaxed the regex to match the actual multiline helper call. |
+
+## Session: 2026-04-30 Phases 87-90
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Continued P3 `EditorWorkspaceShell.vue` cleanup from Phase 87 with a clean baseline commit (`14ae562`) and uncommitted Phase87/88 work already in progress after context recovery.
+  - Re-read the formal roadmap, current plan, findings, progress log, and remaining shell orchestration code.
+  - Chose low-risk P3 slices that avoid automatic snapping, node naming, graph mutation payloads, route sync, draft persistence, run stream lifecycle, and visual layout changes.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added model and structure coverage for node creation menu open/close/query state projection.
+  - Added structure coverage for run invocation and human-review resume tab-state writes.
+  - Added model and structure coverage for created-state edge editor request projection.
+  - Added structure coverage for centralized dirty document commits.
+  - Verified expected red failures before each implementation slice because the model exports or delegated shell calls were not yet present.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Extended `nodeCreationMenuModel.ts` with `NodeCreationMenuState`, open/closed/query state builders, and created-state edge editor request projection.
+  - Replaced node creation menu state record spreads with `setTabScopedRecordEntry`.
+  - Replaced run-start reset and human-review resume tab-state record spreads with `setTabScopedRecordEntry`.
+  - Centralized repeated dirty document metadata updates behind `commitDirtyDocumentForTab`.
+  - Kept node creation execution, graph mutator calls, Date generation, state editor ref assignment, run/resume API calls, polling/EventSource lifecycle, route sync, local draft writes, and visual layout shell-owned.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused node creation model, workspace structure, and tab runtime tests.
+  - Ran related node creation, graph creation, run stream, run detail, and run state persistence regression tests.
+  - Ran TypeScript unused-symbol verification from `frontend`.
+  - Ran the full frontend `node --test` suite.
+  - Ran the frontend production build; no large chunk warning was emitted.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed backend `/health` returned `{"status":"ok"}` and the frontend entry returned HTTP 200.
+  - Captured a headless Chrome screenshot and confirmed the app rendered normally.
+
+### Phase 5: Continuation Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated overall roadmap cleanup at about 99.992%.
+  - Recalculated P3 `EditorWorkspaceShell.vue` cleanup at about 70%.
+  - Opened Phase 91 automatically because total roadmap progress is still below 100%.
+  - Next candidate should be selected from graph mutation helper consolidation, side-panel/human-review state routing, or narrow save/open routing.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Focused model/structure tests | `node --test frontend/src/editor/workspace/nodeCreationMenuModel.test.ts frontend/src/editor/workspace/EditorWorkspaceShell.structure.test.ts frontend/src/editor/workspace/editorTabRuntimeModel.test.ts` | All focused tests pass | 50 passed | Passed |
+| Related workspace regression | `node --test` over node creation menu/execution, workspace structure, tab runtime, graph node creation, run stream, run detail structure, and run state persistence tests | Related node creation, graph creation, run stream, and workspace tests pass | 86 passed | Passed |
+| Unused symbol check | `./node_modules/.bin/vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No diagnostics | Exit 0 | Passed |
+| Full frontend tests | `node --test $(rg --files src vite.config.structure.test.ts | rg '\.test\.ts$')` in `frontend` | All frontend tests pass | 875 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without a large chunk warning | Exit 0, no Vite chunk warning | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+| Browser smoke | Headless Chrome screenshot with virtual-time wait | App renders normally | Home workspace UI rendered | Passed |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Phases 87-90 implementation, verification, docs update, and dev restart are complete. |
+| Where am I going? | Phase 91 is open for the next P3 `EditorWorkspaceShell.vue` boundary. |
+| What's the goal? | Finish shell cleanup without regressing automatic snapping, new-node naming/context, graph mutation behavior, drafts, run streams, human-review resume, or visual layout. |
+| What have I learned? | Node creation menu state and created-state edge editor request projection are safe model boundaries; run invocation record writes and dirty document metadata commits can be centralized without moving API calls or graph mutators. |
+| What have I done? | Extracted node creation menu/request projection, consolidated run/human-review tab-state writes, centralized dirty document commits, verified the full frontend suite, built, restarted, and visually smoked the app. |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | First Phase 88 green run failed because a structure regex only matched one-line `humanReviewErrorByTabId` writes | Phase 88 focused green run | Widened the regex to match the intended multiline `setTabScopedRecordEntry` call. |
+| 2026-04-30 | An `rg` documentation-inspection command with backticks triggered `/bin/bash: line 1: EditorWorkspaceShell: command not found` | Phase 90 planning update | The command was read-only and no files were changed; re-read the needed document sections with safer quoting before updating the plan. |
+
 ## Session: 2026-04-30 Phases 82-86
 
 ### Phase 1: Re-orientation

@@ -19,6 +19,10 @@ test("EditorWorkspaceShell renders workspace panes without reka-ui tab primitive
 
 test("EditorWorkspaceShell wires canvas node-creation intents into a dedicated creation menu component", () => {
   assert.match(componentSource, /import EditorNodeCreationMenu from "\.\/EditorNodeCreationMenu\.vue";/);
+  assert.match(
+    componentSource,
+    /import \{[\s\S]*buildClosedNodeCreationMenuState,[\s\S]*buildCreatedStateEdgeEditorRequest,[\s\S]*buildOpenNodeCreationMenuState,[\s\S]*buildUpdatedNodeCreationMenuQuery[\s\S]*\} from "@\/editor\/workspace\/nodeCreationMenuModel";/,
+  );
   assert.match(componentSource, /@open-node-creation-menu="openNodeCreationMenuForTab\(tab\.tabId, \$event\)"/);
   assert.match(componentSource, /@create-node-from-file="createNodeFromFileForTab\(tab\.tabId, \$event\)"/);
   assert.match(componentSource, /<EditorNodeCreationMenu/);
@@ -153,6 +157,13 @@ test("EditorWorkspaceShell routes menu selections and dropped files through the 
   assert.match(componentSource, /@connect-state-input-source="connectStateInputSourceForTab\(tab\.tabId, \$event\)"/);
   assert.match(componentSource, /const result = createNodeFromCreationEntry\(document, \{/);
   assert.match(componentSource, /const result = await createNodeFromDroppedFile\(document, \{/);
+  assert.match(componentSource, /nodeCreationMenuByTabId\.value = setTabScopedRecordEntry\(nodeCreationMenuByTabId\.value, tabId, buildOpenNodeCreationMenuState\(context\)\);/);
+  assert.match(componentSource, /nodeCreationMenuByTabId\.value = setTabScopedRecordEntry\(nodeCreationMenuByTabId\.value, tabId, buildClosedNodeCreationMenuState\(\)\);/);
+  assert.match(
+    componentSource,
+    /nodeCreationMenuByTabId\.value = setTabScopedRecordEntry\(\s*nodeCreationMenuByTabId\.value,\s*tabId,\s*buildUpdatedNodeCreationMenuQuery\(currentState, query\),\s*\);/,
+  );
+  assert.doesNotMatch(componentSource, /typeof context\.clientX === "number" && typeof context\.clientY === "number"/);
   assert.match(componentSource, /function connectStateBindingForTab\(\s*tabId: string,\s*payload: \{ sourceNodeId: string; sourceStateKey: string; targetNodeId: string; targetStateKey: string; position: GraphPosition \},\s*\)/);
   assert.match(componentSource, /const createdStateKey = resolveCreatedVirtualOutputStateKey\(document, nextDocument, payload\.sourceNodeId, payload\.sourceStateKey\);/);
   assert.match(componentSource, /if \(createdStateKey\) \{[\s\S]*openCreatedStateEdgeEditorForTab\(\s*tabId,[\s\S]*sourceNodeId: payload\.sourceNodeId,[\s\S]*sourceStateKey: payload\.sourceStateKey,[\s\S]*createdStateKey,/);
@@ -164,8 +175,13 @@ test("EditorWorkspaceShell routes menu selections and dropped files through the 
   assert.match(componentSource, /openCreatedStateEdgeEditorForTab\(tabId, menuState\.context, result\)/);
   assert.match(componentSource, /function openCreatedStateEdgeEditorForTab/);
   assert.match(componentSource, /createdStateKey: string \| null/);
-  assert.match(componentSource, /const sourceNodeId = context\.targetNodeId \? result\.createdNodeId : context\.sourceNodeId;/);
-  assert.match(componentSource, /const targetNodeId = context\.targetNodeId \?\? result\.createdNodeId;/);
+  assert.match(componentSource, /const editorRequest = buildCreatedStateEdgeEditorRequest\(context, result, Date\.now\(\)\);/);
+  assert.match(
+    componentSource,
+    /dataEdgeStateEditorRequestByTabId\.value = setTabScopedRecordEntry\(\s*dataEdgeStateEditorRequestByTabId\.value,\s*tabId,\s*editorRequest,\s*\);/,
+  );
+  assert.doesNotMatch(componentSource, /const sourceNodeId = context\.targetNodeId \? result\.createdNodeId : context\.sourceNodeId;/);
+  assert.doesNotMatch(componentSource, /const targetNodeId = context\.targetNodeId \?\? result\.createdNodeId;/);
   assert.doesNotMatch(componentSource, /focusNodeForTab\(tabId, result\.createdNodeId\)/);
   assert.doesNotMatch(componentSource, /requestNodeFocusForTab\(tabId, result\.createdNodeId\)/);
   assert.match(componentSource, /closeNodeCreationMenu\(tabId\)/);
@@ -260,7 +276,10 @@ test("EditorWorkspaceShell keeps Human Review locked open while awaiting human i
 
 test("EditorWorkspaceShell resumes restored pause snapshots against their original snapshot checkpoint", () => {
   assert.match(componentSource, /resumeRun\(run\.run_id, payload, restoredRunSnapshotIdByTabId\.value\[tabId\] \?\? null\)/);
-  assert.match(componentSource, /restoredRunSnapshotIdByTabId\.value = \{[\s\S]*\[tabId\]: null,/);
+  assert.match(
+    componentSource,
+    /restoredRunSnapshotIdByTabId\.value = setTabScopedRecordEntry\(restoredRunSnapshotIdByTabId\.value, tabId, null\);/,
+  );
 });
 
 test("EditorWorkspaceShell locks graph editing while a run is awaiting human review", () => {
@@ -444,6 +463,87 @@ test("EditorWorkspaceShell delegates document load tab-state writes to the runti
   );
   assert.doesNotMatch(registerDocumentSource, /documentsByTabId\.value = \{/);
   assert.doesNotMatch(loadExistingSource, /loadingByTabId\.value = \{/);
+});
+
+test("EditorWorkspaceShell delegates run invocation tab-state writes to the runtime model", () => {
+  const runActiveGraphSource = componentSource.match(/async function runActiveGraph\(\) \{[\s\S]*?\n\}\n\nasync function resumeHumanReviewRun/)?.[0] ?? "";
+  const resumeHumanReviewSource =
+    componentSource.match(/async function resumeHumanReviewRun\(tabId: string, payload: Record<string, unknown>\) \{[\s\S]*?\n\}\n\nasync function loadKnowledgeBases/)?.[0] ?? "";
+
+  assert.match(runActiveGraphSource, /runNodeStatusByTabId\.value = setTabScopedRecordEntry\(runNodeStatusByTabId\.value, tab\.tabId, \{\}\);/);
+  assert.match(runActiveGraphSource, /currentRunNodeIdByTabId\.value = setTabScopedRecordEntry\(currentRunNodeIdByTabId\.value, tab\.tabId, null\);/);
+  assert.match(runActiveGraphSource, /runOutputPreviewByTabId\.value = setTabScopedRecordEntry\(runOutputPreviewByTabId\.value, tab\.tabId, \{\}\);/);
+  assert.match(runActiveGraphSource, /activeRunEdgeIdsByTabId\.value = setTabScopedRecordEntry\(activeRunEdgeIdsByTabId\.value, tab\.tabId, \[\]\);/);
+  assert.match(runActiveGraphSource, /humanReviewErrorByTabId\.value = setTabScopedRecordEntry\(humanReviewErrorByTabId\.value, tab\.tabId, null\);/);
+  assert.match(resumeHumanReviewSource, /humanReviewBusyByTabId\.value = setTabScopedRecordEntry\(humanReviewBusyByTabId\.value, tabId, true\);/);
+  assert.match(resumeHumanReviewSource, /humanReviewErrorByTabId\.value = setTabScopedRecordEntry\(humanReviewErrorByTabId\.value, tabId, null\);/);
+  assert.match(
+    resumeHumanReviewSource,
+    /latestRunDetailByTabId\.value = setTabScopedRecordEntry\(\s*latestRunDetailByTabId\.value,\s*tabId,\s*\{[\s\S]*\.\.\.run,[\s\S]*run_id: response\.run_id,[\s\S]*status: response\.status,[\s\S]*\},\s*\);/,
+  );
+  assert.match(resumeHumanReviewSource, /restoredRunSnapshotIdByTabId\.value = setTabScopedRecordEntry\(restoredRunSnapshotIdByTabId\.value, tabId, null\);/);
+  assert.match(
+    resumeHumanReviewSource,
+    /humanReviewErrorByTabId\.value = setTabScopedRecordEntry\(\s*humanReviewErrorByTabId\.value,\s*tabId,\s*error instanceof Error \? error\.message : t\("humanReview\.resumeFailed"\),\s*\);/,
+  );
+  assert.match(resumeHumanReviewSource, /humanReviewBusyByTabId\.value = setTabScopedRecordEntry\(humanReviewBusyByTabId\.value, tabId, false\);/);
+  assert.doesNotMatch(runActiveGraphSource, /\[tab\.tabId\]:/);
+  assert.doesNotMatch(resumeHumanReviewSource, /\[tabId\]:/);
+});
+
+test("EditorWorkspaceShell delegates panel and focus tab-state writes to the runtime model", () => {
+  const setDocumentSource =
+    componentSource.match(/function setDocumentForTab\(tabId: string, nextDocument: GraphPayload \| GraphDocument\) \{[\s\S]*?\n\}\n\nfunction persistRunStateValuesForTab/)?.[0] ??
+    "";
+  const panelFocusSource =
+    componentSource.match(/function toggleStatePanel\(tabId: string\) \{[\s\S]*?\n\}\n\nfunction editorMainStyle/)?.[0] ?? "";
+
+  assert.match(setDocumentSource, /documentsByTabId\.value = setTabScopedRecordEntry\(documentsByTabId\.value, tabId, syncedDocument\);/);
+  assert.match(
+    panelFocusSource,
+    /statePanelOpenByTabId\.value = setTabScopedRecordEntry\(statePanelOpenByTabId\.value, tabId, !isStatePanelOpen\(tabId\)\);/,
+  );
+  assert.match(panelFocusSource, /sidePanelModeByTabId\.value = setTabScopedRecordEntry\(sidePanelModeByTabId\.value, tabId, "human-review"\);/);
+  assert.match(panelFocusSource, /statePanelOpenByTabId\.value = setTabScopedRecordEntry\(statePanelOpenByTabId\.value, tabId, true\);/);
+  assert.match(panelFocusSource, /focusedNodeIdByTabId\.value = setTabScopedRecordEntry\(focusedNodeIdByTabId\.value, tabId, nodeId\);/);
+  assert.match(panelFocusSource, /focusRequestByTabId\.value = setTabScopedRecordEntry\(focusRequestByTabId\.value, tabId, null\);/);
+  assert.match(
+    panelFocusSource,
+    /focusRequestByTabId\.value = setTabScopedRecordEntry\(\s*focusRequestByTabId\.value,\s*tabId,\s*\{\s*nodeId,\s*sequence: previousSequence \+ 1,\s*\}\s*\);/,
+  );
+  assert.match(panelFocusSource, /sidePanelModeByTabId\.value = setTabScopedRecordEntry\(sidePanelModeByTabId\.value, tabId, "state"\);/);
+  assert.doesNotMatch(setDocumentSource, /documentsByTabId\.value = \{/);
+  assert.doesNotMatch(panelFocusSource, /statePanelOpenByTabId\.value = \{/);
+  assert.doesNotMatch(panelFocusSource, /sidePanelModeByTabId\.value = \{/);
+  assert.doesNotMatch(panelFocusSource, /focusedNodeIdByTabId\.value = \{/);
+  assert.doesNotMatch(panelFocusSource, /focusRequestByTabId\.value = \{/);
+});
+
+test("EditorWorkspaceShell centralizes dirty graph document commits", () => {
+  const commitSource =
+    componentSource.match(/function commitDirtyDocumentForTab\(tabId: string, nextDocument: GraphPayload \| GraphDocument\) \{[\s\S]*?\n\}\n\nfunction markDocumentDirty/)?.[0] ??
+    "";
+  const markDocumentDirtySource =
+    componentSource.match(/function markDocumentDirty\(tabId: string, nextDocument: GraphPayload \| GraphDocument\) \{[\s\S]*?\n\}\n\nfunction addStateReaderBinding/)?.[0] ??
+    "";
+  const positionSource =
+    componentSource.match(/function handleNodePositionUpdate\(tabId: string, payload: \{ nodeId: string; position: GraphPosition \}\) \{[\s\S]*?\n\}\n\nfunction handleNodeSizeUpdate/)?.[0] ??
+    "";
+  const sizeSource =
+    componentSource.match(/function handleNodeSizeUpdate\(tabId: string, payload: \{ nodeId: string; position: GraphPosition; size: GraphNodeSize \}\) \{[\s\S]*?\n\}\n\nfunction commitDirtyDocumentForTab/)?.[0] ??
+    "";
+  const renameSource = componentSource.match(/function renameActiveGraph\(name: string\) \{[\s\S]*?\n\}\n\nasync function saveTab/)?.[0] ?? "";
+
+  assert.match(commitSource, /setDocumentForTab\(tabId, nextDocument\);/);
+  assert.match(commitSource, /applyDocumentMetaToWorkspaceTab\(workspace\.value, tabId, \{/);
+  assert.match(commitSource, /dirty: true,/);
+  assert.match(markDocumentDirtySource, /commitDirtyDocumentForTab\(tabId, nextDocument\);/);
+  assert.match(positionSource, /commitDirtyDocumentForTab\(tabId, nextDocument\);/);
+  assert.match(sizeSource, /commitDirtyDocumentForTab\(tabId, nextDocument\);/);
+  assert.match(renameSource, /commitDirtyDocumentForTab\(tab\.tabId, nextDocument\);/);
+  assert.doesNotMatch(positionSource, /updateWorkspace\(/);
+  assert.doesNotMatch(sizeSource, /updateWorkspace\(/);
+  assert.doesNotMatch(renameSource, /updateWorkspace\(/);
 });
 
 test("EditorWorkspaceShell persists terminal run state values into the graph draft", () => {

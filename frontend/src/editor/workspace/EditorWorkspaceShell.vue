@@ -212,7 +212,15 @@ import { resolveAgentRuntimeCatalog } from "@/editor/nodes/agentConfigModel";
 import EditorCanvas from "@/editor/canvas/EditorCanvas.vue";
 import type { NodeFocusRequest } from "@/editor/canvas/useNodeSelectionFocus";
 import { buildBuiltinNodeCreationEntries } from "@/editor/workspace/nodeCreationBuiltins";
-import { buildNodeCreationEntries } from "@/editor/workspace/nodeCreationMenuModel";
+import {
+  buildClosedNodeCreationMenuState,
+  buildCreatedStateEdgeEditorRequest,
+  buildNodeCreationEntries,
+  buildOpenNodeCreationMenuState,
+  buildUpdatedNodeCreationMenuQuery,
+  type CreatedStateEdgeEditorRequest,
+  type NodeCreationMenuState,
+} from "@/editor/workspace/nodeCreationMenuModel";
 import { createNodeFromCreationEntry, createNodeFromDroppedFile } from "./nodeCreationExecution.ts";
 import { connectStateInputSourceToTarget } from "@/lib/graph-node-creation";
 import { isVirtualAnyOutputStateKey } from "@/lib/virtual-any-input";
@@ -329,13 +337,7 @@ import { buildPythonExportFileName, downloadPythonSource } from "./pythonExportM
 import { isGraphiteUiPythonExportFile, isGraphiteUiPythonExportSource } from "./pythonImportModel.ts";
 import { buildPresetPayloadForNode } from "./presetPersistence.ts";
 
-type DataEdgeStateEditorRequest = {
-  requestId: string;
-  sourceNodeId: string;
-  targetNodeId: string;
-  stateKey: string;
-  position: GraphPosition;
-};
+type DataEdgeStateEditorRequest = CreatedStateEdgeEditorRequest;
 
 const props = defineProps<{
   routeMode: "root" | "new" | "existing";
@@ -388,17 +390,7 @@ const skillDefinitions = ref<SkillDefinition[]>([]);
 const skillDefinitionsLoading = ref(true);
 const skillDefinitionsError = ref<string | null>(null);
 const persistedPresets = ref<PresetDocument[]>([]);
-const nodeCreationMenuByTabId = ref<
-  Record<
-    string,
-    {
-      open: boolean;
-      context: NodeCreationContext | null;
-      position: { x: number; y: number } | null;
-      query: string;
-    }
-  >
->({});
+const nodeCreationMenuByTabId = ref<Record<string, NodeCreationMenuState>>({});
 const runPollGenerationByTabId = new Map<string, number>();
 const runPollTimerByTabId = new Map<string, number>();
 const runEventSourceByTabId = new Map<string, EventSource>();
@@ -1010,10 +1002,7 @@ function discardPendingClose() {
 
 function setDocumentForTab(tabId: string, nextDocument: GraphPayload | GraphDocument) {
   const syncedDocument = syncKnowledgeBaseSkillsInDocument(nextDocument);
-  documentsByTabId.value = {
-    ...documentsByTabId.value,
-    [tabId]: syncedDocument,
-  };
+  documentsByTabId.value = setTabScopedRecordEntry(documentsByTabId.value, tabId, syncedDocument);
   writePersistedEditorDocumentDraft(tabId, syncedDocument);
 }
 
@@ -1054,10 +1043,7 @@ function toggleStatePanel(tabId: string) {
     showGraphLockedEditToast();
     return;
   }
-  statePanelOpenByTabId.value = {
-    ...statePanelOpenByTabId.value,
-    [tabId]: !isStatePanelOpen(tabId),
-  };
+  statePanelOpenByTabId.value = setTabScopedRecordEntry(statePanelOpenByTabId.value, tabId, !isStatePanelOpen(tabId));
 }
 
 function openHumanReviewPanelForTab(tabId: string, nodeId: string | null) {
@@ -1065,14 +1051,8 @@ function openHumanReviewPanelForTab(tabId: string, nodeId: string | null) {
     return;
   }
   closeNodeCreationMenu(tabId);
-  sidePanelModeByTabId.value = {
-    ...sidePanelModeByTabId.value,
-    [tabId]: "human-review",
-  };
-  statePanelOpenByTabId.value = {
-    ...statePanelOpenByTabId.value,
-    [tabId]: true,
-  };
+  sidePanelModeByTabId.value = setTabScopedRecordEntry(sidePanelModeByTabId.value, tabId, "human-review");
+  statePanelOpenByTabId.value = setTabScopedRecordEntry(statePanelOpenByTabId.value, tabId, true);
   focusNodeForTab(tabId, nodeId);
 }
 
@@ -1101,30 +1081,21 @@ function guardGraphEditForTab(tabId: string) {
 }
 
 function focusNodeForTab(tabId: string, nodeId: string | null) {
-  focusedNodeIdByTabId.value = {
-    ...focusedNodeIdByTabId.value,
-    [tabId]: nodeId,
-  };
+  focusedNodeIdByTabId.value = setTabScopedRecordEntry(focusedNodeIdByTabId.value, tabId, nodeId);
 }
 
 function requestNodeFocusForTab(tabId: string, nodeId: string | null) {
   focusNodeForTab(tabId, nodeId);
   if (!nodeId) {
-    focusRequestByTabId.value = {
-      ...focusRequestByTabId.value,
-      [tabId]: null,
-    };
+    focusRequestByTabId.value = setTabScopedRecordEntry(focusRequestByTabId.value, tabId, null);
     return;
   }
 
   const previousSequence = focusRequestByTabId.value[tabId]?.sequence ?? 0;
-  focusRequestByTabId.value = {
-    ...focusRequestByTabId.value,
-    [tabId]: {
-      nodeId,
-      sequence: previousSequence + 1,
-    },
-  };
+  focusRequestByTabId.value = setTabScopedRecordEntry(focusRequestByTabId.value, tabId, {
+    nodeId,
+    sequence: previousSequence + 1,
+  });
 }
 
 function toggleActiveStatePanel() {
@@ -1138,20 +1109,11 @@ function toggleActiveStatePanel() {
     return;
   }
   if (sidePanelMode(tabId) !== "state") {
-    sidePanelModeByTabId.value = {
-      ...sidePanelModeByTabId.value,
-      [tabId]: "state",
-    };
-    statePanelOpenByTabId.value = {
-      ...statePanelOpenByTabId.value,
-      [tabId]: true,
-    };
+    sidePanelModeByTabId.value = setTabScopedRecordEntry(sidePanelModeByTabId.value, tabId, "state");
+    statePanelOpenByTabId.value = setTabScopedRecordEntry(statePanelOpenByTabId.value, tabId, true);
     return;
   }
-  sidePanelModeByTabId.value = {
-    ...sidePanelModeByTabId.value,
-    [tabId]: "state",
-  };
+  sidePanelModeByTabId.value = setTabScopedRecordEntry(sidePanelModeByTabId.value, tabId, "state");
   toggleStatePanel(tabId);
 }
 
@@ -1197,43 +1159,20 @@ function openNodeCreationMenuForTab(tabId: string, context: NodeCreationContext)
   if (guardGraphEditForTab(tabId)) {
     return;
   }
-  nodeCreationMenuByTabId.value = {
-    ...nodeCreationMenuByTabId.value,
-    [tabId]: {
-      open: true,
-      context,
-      position:
-        typeof context.clientX === "number" && typeof context.clientY === "number"
-          ? { x: context.clientX, y: context.clientY }
-          : null,
-      query: "",
-    },
-  };
+  nodeCreationMenuByTabId.value = setTabScopedRecordEntry(nodeCreationMenuByTabId.value, tabId, buildOpenNodeCreationMenuState(context));
 }
 
 function closeNodeCreationMenu(tabId: string) {
-  nodeCreationMenuByTabId.value = {
-    ...nodeCreationMenuByTabId.value,
-    [tabId]: {
-      open: false,
-      context: null,
-      position: null,
-      query: "",
-    },
-  };
+  nodeCreationMenuByTabId.value = setTabScopedRecordEntry(nodeCreationMenuByTabId.value, tabId, buildClosedNodeCreationMenuState());
 }
 
 function updateNodeCreationQuery(tabId: string, query: string) {
   const currentState = nodeCreationMenuState(tabId);
-  nodeCreationMenuByTabId.value = {
-    ...nodeCreationMenuByTabId.value,
-    [tabId]: {
-      open: currentState?.open ?? false,
-      context: currentState?.context ?? null,
-      position: currentState?.position ?? null,
-      query,
-    },
-  };
+  nodeCreationMenuByTabId.value = setTabScopedRecordEntry(
+    nodeCreationMenuByTabId.value,
+    tabId,
+    buildUpdatedNodeCreationMenuQuery(currentState, query),
+  );
 }
 
 function createNodeFromMenuForTab(tabId: string, _entry: NodeCreationEntry) {
@@ -1274,26 +1213,16 @@ function openCreatedStateEdgeEditorForTab(
   context: NodeCreationContext,
   result: { createdNodeId: string; createdStateKey: string | null },
 ) {
-  if (!result.createdStateKey) {
+  const editorRequest = buildCreatedStateEdgeEditorRequest(context, result, Date.now());
+  if (!editorRequest) {
     return;
   }
 
-  const sourceNodeId = context.targetNodeId ? result.createdNodeId : context.sourceNodeId;
-  const targetNodeId = context.targetNodeId ?? result.createdNodeId;
-  if (!sourceNodeId || !targetNodeId) {
-    return;
-  }
-
-  dataEdgeStateEditorRequestByTabId.value = {
-    ...dataEdgeStateEditorRequestByTabId.value,
-    [tabId]: {
-      requestId: `${sourceNodeId}:${result.createdStateKey}:${targetNodeId}:${Date.now()}`,
-      sourceNodeId,
-      targetNodeId,
-      stateKey: result.createdStateKey,
-      position: context.position,
-    },
-  };
+  dataEdgeStateEditorRequestByTabId.value = setTabScopedRecordEntry(
+    dataEdgeStateEditorRequestByTabId.value,
+    tabId,
+    editorRequest,
+  );
 }
 
 async function createNodeFromFileForTab(tabId: string, _payload: { file: File; position: GraphPosition }) {
@@ -1389,15 +1318,7 @@ function handleNodePositionUpdate(tabId: string, payload: { nodeId: string; posi
 
   const nextDocument = cloneGraphDocument(document);
   nextDocument.nodes[payload.nodeId].ui.position = payload.position;
-  setDocumentForTab(tabId, nextDocument);
-
-  updateWorkspace(
-    applyDocumentMetaToWorkspaceTab(workspace.value, tabId, {
-      title: nextDocument.name,
-      dirty: true,
-      graphId: "graph_id" in nextDocument ? nextDocument.graph_id ?? null : null,
-    }),
-  );
+  commitDirtyDocumentForTab(tabId, nextDocument);
 }
 
 function handleNodeSizeUpdate(tabId: string, payload: { nodeId: string; position: GraphPosition; size: GraphNodeSize }) {
@@ -1412,8 +1333,11 @@ function handleNodeSizeUpdate(tabId: string, payload: { nodeId: string; position
   const nextDocument = cloneGraphDocument(document);
   nextDocument.nodes[payload.nodeId].ui.position = payload.position;
   nextDocument.nodes[payload.nodeId].ui.size = payload.size;
-  setDocumentForTab(tabId, nextDocument);
+  commitDirtyDocumentForTab(tabId, nextDocument);
+}
 
+function commitDirtyDocumentForTab(tabId: string, nextDocument: GraphPayload | GraphDocument) {
+  setDocumentForTab(tabId, nextDocument);
   updateWorkspace(
     applyDocumentMetaToWorkspaceTab(workspace.value, tabId, {
       title: nextDocument.name,
@@ -1427,14 +1351,7 @@ function markDocumentDirty(tabId: string, nextDocument: GraphPayload | GraphDocu
   if (guardGraphEditForTab(tabId)) {
     return;
   }
-  setDocumentForTab(tabId, nextDocument);
-  updateWorkspace(
-    applyDocumentMetaToWorkspaceTab(workspace.value, tabId, {
-      title: nextDocument.name,
-      dirty: true,
-      graphId: "graph_id" in nextDocument ? nextDocument.graph_id ?? null : null,
-    }),
-  );
+  commitDirtyDocumentForTab(tabId, nextDocument);
 }
 
 function addStateReaderBinding(tabId: string, stateKey: string, nodeId: string) {
@@ -2084,14 +2001,7 @@ function renameActiveGraph(name: string) {
 
   const nextDocument = cloneGraphDocument(document);
   nextDocument.name = name;
-  setDocumentForTab(tab.tabId, nextDocument);
-  updateWorkspace(
-    applyDocumentMetaToWorkspaceTab(workspace.value, tab.tabId, {
-      title: name,
-      dirty: true,
-      graphId: "graph_id" in nextDocument ? nextDocument.graph_id ?? null : null,
-    }),
-  );
+  commitDirtyDocumentForTab(tab.tabId, nextDocument);
 }
 
 async function saveTab(tabId: string) {
@@ -2248,34 +2158,13 @@ async function runActiveGraph() {
     const response = await runGraph(latestDocument);
     cancelRunPolling(tab.tabId);
     const generation = runPollGenerationByTabId.get(tab.tabId) ?? 0;
-    runNodeStatusByTabId.value = {
-      ...runNodeStatusByTabId.value,
-      [tab.tabId]: {},
-    };
-    currentRunNodeIdByTabId.value = {
-      ...currentRunNodeIdByTabId.value,
-      [tab.tabId]: null,
-    };
-    runOutputPreviewByTabId.value = {
-      ...runOutputPreviewByTabId.value,
-      [tab.tabId]: {},
-    };
-    runFailureMessageByTabId.value = {
-      ...runFailureMessageByTabId.value,
-      [tab.tabId]: {},
-    };
-    activeRunEdgeIdsByTabId.value = {
-      ...activeRunEdgeIdsByTabId.value,
-      [tab.tabId]: [],
-    };
-    latestRunDetailByTabId.value = {
-      ...latestRunDetailByTabId.value,
-      [tab.tabId]: null,
-    };
-    humanReviewErrorByTabId.value = {
-      ...humanReviewErrorByTabId.value,
-      [tab.tabId]: null,
-    };
+    runNodeStatusByTabId.value = setTabScopedRecordEntry(runNodeStatusByTabId.value, tab.tabId, {});
+    currentRunNodeIdByTabId.value = setTabScopedRecordEntry(currentRunNodeIdByTabId.value, tab.tabId, null);
+    runOutputPreviewByTabId.value = setTabScopedRecordEntry(runOutputPreviewByTabId.value, tab.tabId, {});
+    runFailureMessageByTabId.value = setTabScopedRecordEntry(runFailureMessageByTabId.value, tab.tabId, {});
+    activeRunEdgeIdsByTabId.value = setTabScopedRecordEntry(activeRunEdgeIdsByTabId.value, tab.tabId, []);
+    latestRunDetailByTabId.value = setTabScopedRecordEntry(latestRunDetailByTabId.value, tab.tabId, null);
+    humanReviewErrorByTabId.value = setTabScopedRecordEntry(humanReviewErrorByTabId.value, tab.tabId, null);
     setFeedbackForTab(tab.tabId, {
       tone: "warning",
       message: t("feedback.runQueued", { runId: response.run_id, pending: Object.keys(latestDocument.nodes).length, cycle: "" }),
@@ -2306,31 +2195,23 @@ async function resumeHumanReviewRun(tabId: string, payload: Record<string, unkno
     return;
   }
 
-  humanReviewBusyByTabId.value = {
-    ...humanReviewBusyByTabId.value,
-    [tabId]: true,
-  };
-  humanReviewErrorByTabId.value = {
-    ...humanReviewErrorByTabId.value,
-    [tabId]: null,
-  };
+  humanReviewBusyByTabId.value = setTabScopedRecordEntry(humanReviewBusyByTabId.value, tabId, true);
+  humanReviewErrorByTabId.value = setTabScopedRecordEntry(humanReviewErrorByTabId.value, tabId, null);
 
   try {
     const response = await resumeRun(run.run_id, payload, restoredRunSnapshotIdByTabId.value[tabId] ?? null);
     cancelRunPolling(tabId);
     const generation = runPollGenerationByTabId.get(tabId) ?? 0;
-    latestRunDetailByTabId.value = {
-      ...latestRunDetailByTabId.value,
-      [tabId]: {
+    latestRunDetailByTabId.value = setTabScopedRecordEntry(
+      latestRunDetailByTabId.value,
+      tabId,
+      {
         ...run,
         run_id: response.run_id,
         status: response.status,
       },
-    };
-    restoredRunSnapshotIdByTabId.value = {
-      ...restoredRunSnapshotIdByTabId.value,
-      [tabId]: null,
-    };
+    );
+    restoredRunSnapshotIdByTabId.value = setTabScopedRecordEntry(restoredRunSnapshotIdByTabId.value, tabId, null);
     setMessageFeedbackForTab(tabId, {
       tone: "warning",
       message: t("feedback.runResuming", { runId: response.run_id }),
@@ -2340,15 +2221,13 @@ async function resumeHumanReviewRun(tabId: string, payload: Record<string, unkno
     startRunEventStreamForTab(tabId, response.run_id);
     void pollRunForTab(tabId, response.run_id, generation);
   } catch (error) {
-    humanReviewErrorByTabId.value = {
-      ...humanReviewErrorByTabId.value,
-      [tabId]: error instanceof Error ? error.message : t("humanReview.resumeFailed"),
-    };
+    humanReviewErrorByTabId.value = setTabScopedRecordEntry(
+      humanReviewErrorByTabId.value,
+      tabId,
+      error instanceof Error ? error.message : t("humanReview.resumeFailed"),
+    );
   } finally {
-    humanReviewBusyByTabId.value = {
-      ...humanReviewBusyByTabId.value,
-      [tabId]: false,
-    };
+    humanReviewBusyByTabId.value = setTabScopedRecordEntry(humanReviewBusyByTabId.value, tabId, false);
   }
 }
 

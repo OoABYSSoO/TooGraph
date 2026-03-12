@@ -4,7 +4,7 @@
 Run a ten-round conservative cleanup batch focused on `EditorCanvas.vue` pure projection and interaction-model helpers, then close the baseline interaction regressions in one larger pass while preserving graph editing behavior, runtime visuals, drag/connect workflows, deletion behavior, and dev startup health.
 
 ## Current Phase
-Phase 87 in progress
+Phase 92 in progress
 
 ## Autonomous Continuation Gate
 - After every completed cleanup phase, re-read `docs/future/2026-04-28-architecture-refactor-roadmap.md`, `task_plan.md`, `findings.md`, and `progress.md`, then recalculate the total roadmap progress and the active area progress.
@@ -796,13 +796,52 @@ Phase 87 in progress
 - [x] If total roadmap progress is below 100%, automatically open the next phase after Phase 86 and re-judge total progress.
 - **Status:** completed
 
-### Phase 87: Workspace Shell Graph Mutation Boundary
-- [ ] Re-read the formal roadmap, Phase 86 findings, and remaining P3 shell orchestration code.
-- [ ] Inspect whether the next safest boundary is graph mutation action helpers, node creation flow helpers, or a narrow human-review controller slice.
-- [ ] Add focused red tests before production changes if a code slice is selected.
+### Phase 87: Node Creation Menu State Boundary
+- [x] Re-read the formal roadmap, Phase 86 findings, and remaining P3 shell orchestration code.
+- [x] Inspect graph mutation action helpers, node creation flow helpers, and human-review controller options.
+- [x] Select the safest first slice: node creation menu open/close/query state projection.
+- [x] Add focused red model and structure coverage before production changes.
+- [x] Move menu state projection into `nodeCreationMenuModel.ts` while preserving automatic snapping, new-node naming/context, graph mutation payloads, route sync, drafts, run streams, visual layout, and actual create execution.
+- [x] Run focused workspace/runtime tests and include the slice in broader verification.
+- **Status:** completed
+
+### Phase 88: Run Invocation Runtime Write Boundary
+- [x] Add focused red structure coverage for run invocation and human-review resume tab-state writes.
+- [x] Move run-start reset writes and human-review busy/error/detail writes onto `setTabScopedRecordEntry`.
+- [x] Preserve `runGraph`, `resumeRun`, polling generation, EventSource lifecycle, feedback formatting, restored checkpoint usage, and human-review resume behavior.
+- [x] Run focused workspace/runtime tests and include the slice in broader verification.
+- **Status:** completed
+
+### Phase 89: Created State Edge Editor Request Boundary
+- [x] Add focused red model and structure coverage for created-state edge editor request projection.
+- [x] Move source/target/request-id projection into `nodeCreationMenuModel.ts`.
+- [x] Keep Date generation, ref assignment, actual state editor opening, node creation execution, node naming, and graph mutation ownership in `EditorWorkspaceShell.vue`.
+- [x] Run focused workspace/node-creation tests and include the slice in broader verification.
+- **Status:** completed
+
+### Phase 90: Dirty Document Commit Boundary
+- [x] Add focused red structure coverage for centralized dirty document commits.
+- [x] Consolidate repeated `setDocumentForTab` plus dirty workspace metadata updates behind `commitDirtyDocumentForTab`.
+- [x] Keep graph mutator calls, edit guards, document draft writes, workspace route behavior, save behavior, node position/size updates, and graph rename behavior stable.
+- [x] Run focused workspace/runtime tests, related regression tests, TypeScript checks, full frontend tests, production build, dev restart, health checks, and browser smoke.
+- **Status:** completed
+
+### Phase 91: Next Workspace Shell Boundary Selection
+- [x] Re-read the formal roadmap, Phase 90 findings, and remaining P3 shell orchestration code.
+- [x] Choose the next safest boundary: tab-scoped document, side-panel, and node-focus state writes.
+- [x] Add focused red structure coverage before production changes.
+- [x] Replace remaining low-risk record spreads with `setTabScopedRecordEntry`.
+- [x] Preserve automatic snapping, new-node naming/context, graph mutation payloads, route sync, draft persistence, run stream behavior, human-review resume behavior, and visual layout.
+- [x] Run focused workspace/runtime tests, related tests, TypeScript checks, full frontend tests, production build, dev restart, health checks, and browser smoke.
+- **Status:** completed
+
+### Phase 92: Next Workspace Shell Boundary Selection
+- [ ] Re-read the formal roadmap, Phase 91 findings, and remaining P3 shell orchestration code.
+- [ ] Choose the next safest boundary from graph mutation helper consolidation, save/open routing, or a narrow human-review controller slice.
+- [ ] Add focused red tests before production changes.
 - [ ] Preserve automatic snapping, new-node naming/context, graph mutation payloads, route sync, draft persistence, run stream behavior, human-review resume behavior, and visual layout.
 - [ ] Run focused workspace/runtime tests, TypeScript checks, full frontend tests when needed, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
-- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 87 and re-judge total progress.
+- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 92 and re-judge total progress.
 - **Status:** in progress
 
 ## Progress Estimate
@@ -1056,6 +1095,20 @@ Phase 87 in progress
 | P3 `EditorWorkspaceShell.vue` cleanup after Phase 86 | About 60% complete after reducing repeated document/loading/error record writes while preserving storage reads, graph fetches, and visual state timing. |
 | Current continuation gate after Phase 86 | Total roadmap progress is still below 100%, so Phase 87 is automatically opened to inspect graph mutation, node creation, and human-review shell boundaries before selecting the next safe slice. |
 | P3 `EditorWorkspaceShell.vue` cleanup target for Phase 87 | About 64-68% of P3 if the next graph mutation or node creation helper boundary can move out without changing auto-snapping, node naming/context, graph mutation payloads, route sync, drafts, or run streams. |
+| Overall roadmap cleanup after Phase 87 | About 99.98% complete after moving node creation menu state projection into `nodeCreationMenuModel.ts`. |
+| P3 `EditorWorkspaceShell.vue` cleanup after Phase 87 | About 64% complete after removing inline menu open/close/query projection while preserving actual node creation execution. |
+| Overall roadmap cleanup after Phase 88 | About 99.985% complete after consolidating run invocation and human-review resume tab-state writes. |
+| P3 `EditorWorkspaceShell.vue` cleanup after Phase 88 | About 66% complete after replacing run-start and human-review resume record spreads with the runtime helper. |
+| Overall roadmap cleanup after Phase 89 | About 99.99% complete after moving created-state edge editor request projection into `nodeCreationMenuModel.ts`. |
+| P3 `EditorWorkspaceShell.vue` cleanup after Phase 89 | About 68% complete after removing node-creation request endpoint projection from the shell while keeping creation and graph mutation side effects in place. |
+| Overall roadmap cleanup after Phase 90 | About 99.992% complete after centralizing dirty graph document commits. |
+| P3 `EditorWorkspaceShell.vue` cleanup after Phase 90 | About 70% complete after consolidating repeated dirty document metadata writes while preserving graph mutation behavior. |
+| Current continuation gate after Phase 90 | Total roadmap progress is still below 100%, so Phase 91 is automatically opened for the next safe P3 shell boundary. |
+| P3 `EditorWorkspaceShell.vue` cleanup target for Phase 91 | About 72% of P3 if the next boundary can move out without changing automatic snapping, node naming/context, graph mutation payloads, route sync, drafts, run streams, human-review resume behavior, or visual layout. |
+| Overall roadmap cleanup after Phase 91 | About 99.993% complete after moving document, side-panel, and focus tab-state writes onto the runtime helper. |
+| P3 `EditorWorkspaceShell.vue` cleanup after Phase 91 | About 72% complete after removing more low-risk record spreads while preserving panel, focus, and document draft behavior. |
+| Current continuation gate after Phase 91 | Total roadmap progress is still below 100%, so Phase 92 is automatically opened for the next safe P3 shell boundary. |
+| P3 `EditorWorkspaceShell.vue` cleanup target for Phase 92 | About 74% of P3 if the next graph mutation, save/open, or human-review controller slice can move out without changing behavior. |
 
 ## Decisions Made
 | Decision | Rationale |
@@ -1164,3 +1217,4 @@ Phase 87 in progress
 | Structure test still expected a direct `if (isGraphEditingLocked())` guard after lock handling had moved into action models | Phase 54 focused green run | Updated the assertion to verify delegated locked action routing for double-click/drop and connection-completion execution instead of relying on a broad inline guard substring. |
 | Unescaped backticks in an `rg` shell command triggered `/bin/bash: -c: line 1: unexpected EOF while looking for matching ``` | Phase 55 documentation inspection | Re-ran the read-only search with single-quoted shell text; no files were changed by the failed command. |
 | Unescaped backticks in an `rg` shell command triggered `/bin/bash: line 1: EditorWorkspaceShell.vue: command not found` | Phase 79 documentation inspection | The command was read-only and no files were changed; re-read the needed document sections with safer quoting before updating the plan. |
+| Unescaped backticks in an `rg` shell command triggered `/bin/bash: line 1: EditorWorkspaceShell: command not found` | Phase 90 documentation inspection | The command was read-only and no files were changed; re-read the needed document sections with safer quoting before updating the plan. |
