@@ -1,5 +1,149 @@
 # Progress Log
 
+## Session: 2026-04-30 Phases 82-86
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Resumed from Phase 82 with uncommitted draft persistence watcher changes already in progress.
+  - Re-read the formal roadmap, current plan, findings, progress log, and remaining `EditorWorkspaceShell.vue` watcher/runtime record code.
+  - Selected a multi-round P3 shell cleanup batch that preserves route sync, graph fetches, draft storage side effects, tab close behavior, run streams, human-review flow, visual layout, automatic snapping, and node creation behavior.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added draft persistence model and workspace structure coverage for workspace watcher hydration/pruning decisions.
+  - Added runtime model and workspace structure coverage for tab-scoped clone/delete cleanup.
+  - Added runtime model and workspace structure coverage for tab-scoped set writes.
+  - Added workspace structure coverage for run visual/polling state writes and document loading state writes.
+  - Verified the expected red failures before each implementation slice because exports or delegated shell calls were not yet present.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Extended `editorDraftPersistenceModel.ts` with workspace draft persistence request and hydration gate helpers.
+  - Added `editorTabRuntimeModel.ts` with `omitTabScopedRecordEntry` and `setTabScopedRecordEntry`.
+  - Replaced repeated close-tab runtime clone/delete blocks in `clearTabRuntime`.
+  - Replaced repeated tab-scoped writes for feedback, streaming output previews, run visual state, polling state, document registration, and existing graph loading state.
+  - Kept actual localStorage reads/writes, graph fetches, route sync, polling generation checks, EventSource lifecycle, human-review opening, graph mutation emits, and UI layout in the shell.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused draft persistence, tab runtime, and workspace structure tests.
+  - Ran related workspace persistence, route sync, run event stream, run detail structure, run state persistence, and node creation execution regression tests.
+  - Ran TypeScript unused-symbol verification from `frontend`.
+  - Ran the full frontend `node --test` suite.
+  - Ran the frontend production build; no large chunk warning was emitted.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed backend `/health` returned `{"status":"ok"}` and the frontend entry returned HTTP 200.
+  - Captured a headless Chrome screenshot and confirmed the workspace rendered normally.
+
+### Phase 5: Continuation Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated overall roadmap cleanup at about 99.97%.
+  - Recalculated P3 `EditorWorkspaceShell.vue` cleanup at about 60%.
+  - Opened Phase 87 automatically because total roadmap progress is still below 100%.
+  - Selected the next inspection candidates as graph mutation action helpers, node creation flow helpers, or a narrow human-review controller slice.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Focused model/structure tests | `node --test frontend/src/editor/workspace/editorDraftPersistenceModel.test.ts frontend/src/editor/workspace/editorTabRuntimeModel.test.ts frontend/src/editor/workspace/EditorWorkspaceShell.structure.test.ts` | All focused tests pass | 44 passed | Passed |
+| Focused workspace regression | `node --test` over draft persistence model, tab runtime model, workspace structure, editor workspace, route sync, run event stream, run detail structure, run state persistence, and node creation execution tests | Related workspace, draft, route, run stream, and node creation tests pass | 94 passed | Passed |
+| Unused symbol check | `./node_modules/.bin/vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No diagnostics | Exit 0 | Passed |
+| Full frontend tests | `node --test $(rg --files src vite.config.structure.test.ts | rg '\.test\.ts$')` in `frontend` | All frontend tests pass | 864 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without a large chunk warning | Exit 0, no Vite chunk warning | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+| Browser smoke | Headless Chrome screenshot with virtual-time wait | Workspace renders normally | Workspace UI rendered | Passed |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Phases 82-86 implementation, verification, docs update, and dev restart are complete. |
+| Where am I going? | Phase 87 is open to inspect graph mutation, node creation, or human-review shell boundaries. |
+| What's the goal? | Continue P3 shell cleanup while preserving automatic snapping, new-node naming/context, route sync, drafts, graph mutation behavior, run streams, human-review flow, and visual layout. |
+| What have I learned? | Workspace watcher decisions and tab-scoped runtime record operations are safe model boundaries; actual storage, fetch, stream, route, and graph mutation side effects should remain shell-owned until stronger controller coverage exists. |
+| What have I done? | Extracted workspace watcher decisions plus shared tab-scoped set/delete helpers, removed repeated shell record write/delete blocks, verified the full frontend suite, built, restarted, and visually smoked the app. |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | First Phase 82 focused run kept one old structure assertion that still expected inline `nextWorkspace.tabs.map(...)` pruning | Phase 82 focused green run | Updated the assertion to verify `persistenceRequest.tabIds` from the draft persistence model. |
+| 2026-04-30 | First Phase 84 structure test source range stopped before `applyStreamingOutputPreviewToTab` and returned an empty snippet | Phase 84 focused structure run | Adjusted the source extraction to span through `startRunEventStreamForTab`, then reran focused tests successfully. |
+| 2026-04-30 | An `rg` status command with backticks in the query triggered `/bin/bash: line 1: EditorWorkspaceShell.vue: command not found` | Post-verification planning inspection | The command was read-only and produced enough usable output; no files were changed. Future searches should avoid unescaped backticks in shell strings. |
+
+## Session: 2026-04-30 Phase 81
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Confirmed Phase 80 was committed and pushed as `0dbbfc7`.
+  - Re-read the formal roadmap and latest P3 draft persistence findings.
+  - Inspected unsaved tab document hydration, existing graph loading, cached graph registration, and persisted draft recovery paths.
+  - Selected a broader document draft hydration slice while keeping actual storage reads, graph fetches, route sync, loading/error state, and registration in the shell.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added draft persistence model coverage for missing unsaved tab selection, persisted-vs-seed selection, existing graph hydrate gating, and persisted-vs-cached-vs-fetch source selection.
+  - Updated workspace structure tests to require the shell to use the document hydration model instead of inline persisted/fetch branching.
+  - Verified the expected red failure before implementation because the model exports did not exist and the shell still owned hydration decisions.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Extended `editorDraftPersistenceModel.ts` with document hydration routing helpers.
+  - Updated `ensureUnsavedTabDocuments`, `loadExistingGraphIntoTab`, and `openExistingGraph` to delegate pure routing decisions.
+  - Preserved actual localStorage reads, graph fetches, cached graph cloning, `registerDocumentForTab`, loading/error state writes, route sync, restore behavior, and run stream behavior.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused draft persistence model and workspace structure tests.
+  - Ran related workspace persistence, route sync, run event stream, run detail structure, run state persistence, and node creation execution regression tests.
+  - Ran TypeScript unused-symbol verification from `frontend`; fixed a test fixture type so cached graph sources use a real `GraphDocument`.
+  - Ran the full frontend `node --test` suite.
+  - Ran the frontend production build; no large chunk warning was emitted.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed backend `/health` returned `{"status":"ok"}` and the frontend entry returned HTTP 200.
+  - Captured a headless Chrome screenshot and confirmed the workspace rendered normally.
+
+### Phase 5: Continuation Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated overall roadmap cleanup at about 99.9%.
+  - Recalculated P3 `EditorWorkspaceShell.vue` cleanup at about 46%.
+  - Opened Phase 82 automatically because total roadmap progress is still below 100%.
+  - Selected the next candidate as draft persistence watcher/controller decisions.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red focused tests | `node --test frontend/src/editor/workspace/editorDraftPersistenceModel.test.ts frontend/src/editor/workspace/EditorWorkspaceShell.structure.test.ts` before implementation | Fails because document hydration model exports do not exist and shell still owns branching | Failed on missing exports and structure assertion | Passed |
+| Focused model/structure tests | Same focused files after implementation | All focused tests pass | 34 passed | Passed |
+| Focused workspace regression | `node --test` over draft persistence model, workspace structure, editor workspace, route sync, run event stream, run detail structure, run state persistence, and node creation execution tests | Related workspace persistence and run stream tests pass | 84 passed | Passed |
+| Unused symbol check | `./node_modules/.bin/vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No diagnostics | Exit 0 after fixing test fixture type | Passed |
+| Full frontend tests | `node --test $(rg --files src vite.config.structure.test.ts | rg '\.test\.ts$')` in `frontend` | All frontend tests pass | 854 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without a large chunk warning | Exit 0, no Vite chunk warning | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+| Browser smoke | Headless Chrome screenshot with virtual-time wait | Workspace renders normally | Workspace UI rendered | Passed |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Phase 81 implementation, verification, docs update, and dev restart are complete. |
+| Where am I going? | Phase 82 is open for draft persistence watcher/controller decisions. |
+| What's the goal? | Continue P3 shell cleanup with larger but still tested slices while preserving route sync, local draft persistence, graph open/save, restore, visual layout, and run stream behavior. |
+| What have I learned? | Document hydration branching is pure enough to model; storage reads/fetches/register side effects should stay shell-owned until a real `useEditorDraftPersistence` controller boundary is covered. |
+| What have I done? | Extracted document draft hydration routing, added focused tests, verified the full frontend suite, built, restarted, and visually smoked the app. |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | `vue-tsc` rejected a cached graph test fixture typed as `GraphPayload` | Phase 81 type verification | Added a saved graph fixture with non-null `graph_id` so cached graph source tests use a real `GraphDocument`. |
+
 ## Session: 2026-04-30 Phase 80
 
 ### Phase 1: Re-orientation

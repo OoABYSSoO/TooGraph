@@ -4,7 +4,7 @@
 Run a ten-round conservative cleanup batch focused on `EditorCanvas.vue` pure projection and interaction-model helpers, then close the baseline interaction regressions in one larger pass while preserving graph editing behavior, runtime visuals, drag/connect workflows, deletion behavior, and dev startup health.
 
 ## Current Phase
-Phase 81 in progress
+Phase 87 in progress
 
 ## Autonomous Continuation Gate
 - After every completed cleanup phase, re-read `docs/future/2026-04-28-architecture-refactor-roadmap.md`, `task_plan.md`, `findings.md`, and `progress.md`, then recalculate the total roadmap progress and the active area progress.
@@ -747,12 +747,62 @@ Phase 81 in progress
 - **Status:** completed
 
 ### Phase 81: Document Draft Hydration Boundary
-- [ ] Re-read the formal roadmap, Phase 80 findings, and remaining draft persistence code paths.
-- [ ] Inspect whether unsaved/saved graph document draft hydration decisions can move out without changing actual storage reads or fetch behavior.
+- [x] Re-read the formal roadmap, Phase 80 findings, and remaining draft persistence code paths.
+- [x] Inspect whether unsaved/saved graph document draft hydration decisions can move out without changing actual storage reads or fetch behavior.
+- [x] Add focused red tests before production changes if a code slice is selected.
+- [x] Keep route sync, tab registration, localStorage reads/writes, graph fetches, save/open/close behavior, restore behavior, and run-event stream behavior stable.
+- [x] Run focused workspace/persistence tests, TypeScript checks, full frontend tests when needed, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
+- [x] If total roadmap progress is below 100%, automatically open the next phase after Phase 81 and re-judge total progress.
+- **Status:** completed
+
+### Phase 82: Draft Persistence Controller Boundary
+- [x] Re-read the formal roadmap, Phase 81 findings, and remaining draft persistence/watch code paths.
+- [x] Inspect whether workspace persistence watcher decisions and tab-id pruning inputs can move out without changing actual storage writes or route behavior.
+- [x] Add focused red tests before production changes if a code slice is selected.
+- [x] Keep route sync, tab registration, localStorage reads/writes, graph fetches, save/open/close behavior, restore behavior, visual layout, and run-event stream behavior stable.
+- [x] Run focused workspace/persistence tests, TypeScript checks, full frontend tests when needed, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
+- [x] If total roadmap progress is below 100%, automatically open the next phase after Phase 82 and re-judge total progress.
+- **Status:** completed
+
+### Phase 83: Tab Runtime Cleanup Boundary
+- [x] Add focused red model and structure tests for tab-scoped runtime record cleanup.
+- [x] Extract clone-and-delete runtime record cleanup into `editorTabRuntimeModel.ts`.
+- [x] Keep tab close behavior, persisted draft removal, run polling cancellation, EventSource cancellation, route sync, graph data, and visual layout stable.
+- [x] Run focused workspace runtime tests and include the slice in broader verification.
+- [x] If total roadmap progress is below 100%, automatically open the next phase after Phase 83 and re-judge total progress.
+- **Status:** completed
+
+### Phase 84: Tab Runtime Write Helper Boundary
+- [x] Add focused red model and structure tests for tab-scoped runtime record writes.
+- [x] Extract immutable set-by-tab helper into `editorTabRuntimeModel.ts`.
+- [x] Move feedback and run-output preview writes onto the helper without changing preview merge semantics or stream lifecycle.
+- [x] Run focused workspace runtime tests and include the slice in broader verification.
+- [x] If total roadmap progress is below 100%, automatically open the next phase after Phase 84 and re-judge total progress.
+- **Status:** completed
+
+### Phase 85: Run Visual State Write Boundary
+- [x] Add focused red structure coverage for run visual state and polling tab-state writes.
+- [x] Move run detail, node status, current node, failure messages, active edges, and restored snapshot writes onto the tab runtime helper.
+- [x] Keep polling generation, EventSource lifecycle, human-review opening, terminal run persistence, and feedback formatting stable.
+- [x] Run focused workspace runtime tests and include the slice in broader verification.
+- [x] If total roadmap progress is below 100%, automatically open the next phase after Phase 85 and re-judge total progress.
+- **Status:** completed
+
+### Phase 86: Document Load State Write Boundary
+- [x] Add focused red structure coverage for document registration and existing graph load tab-state writes.
+- [x] Move document, loading, and error tab-state writes onto the tab runtime helper.
+- [x] Keep actual localStorage reads/writes, graph fetches, `registerDocumentForTab`, loading/error timing, route sync, and visual layout stable.
+- [x] Run focused workspace tests, related regression tests, TypeScript checks, full frontend tests, production build, dev restart, health checks, browser smoke, commit, push, and progress re-evaluation.
+- [x] If total roadmap progress is below 100%, automatically open the next phase after Phase 86 and re-judge total progress.
+- **Status:** completed
+
+### Phase 87: Workspace Shell Graph Mutation Boundary
+- [ ] Re-read the formal roadmap, Phase 86 findings, and remaining P3 shell orchestration code.
+- [ ] Inspect whether the next safest boundary is graph mutation action helpers, node creation flow helpers, or a narrow human-review controller slice.
 - [ ] Add focused red tests before production changes if a code slice is selected.
-- [ ] Keep route sync, tab registration, localStorage reads/writes, graph fetches, save/open/close behavior, restore behavior, and run-event stream behavior stable.
-- [ ] Run focused workspace/persistence tests, TypeScript checks, full frontend tests when needed, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
-- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 81 and re-judge total progress.
+- [ ] Preserve automatic snapping, new-node naming/context, graph mutation payloads, route sync, draft persistence, run stream behavior, human-review resume behavior, and visual layout.
+- [ ] Run focused workspace/runtime tests, TypeScript checks, full frontend tests when needed, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
+- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 87 and re-judge total progress.
 - **Status:** in progress
 
 ## Progress Estimate
@@ -986,6 +1036,26 @@ Phase 81 in progress
 | P3 `EditorWorkspaceShell.vue` cleanup after Phase 80 | About 42% complete after extracting missing viewport draft tab selection and immutable viewport draft updates while preserving actual storage reads/writes in the shell. |
 | Current continuation gate after Phase 80 | Total roadmap progress is still below 100%, so Phase 81 is automatically opened for document draft hydration decisions. |
 | P3 `EditorWorkspaceShell.vue` cleanup target for Phase 81 | About 46% of P3 if document draft hydration decisions move out without changing route sync, tab registration, localStorage reads/writes, graph fetches, restore behavior, or run stream behavior. |
+| Overall roadmap cleanup after Phase 81 | About 99.9% complete after moving unsaved/saved document draft hydration decisions into `editorDraftPersistenceModel.ts`. |
+| P3 `EditorWorkspaceShell.vue` cleanup after Phase 81 | About 46% complete after extracting persisted-vs-seed and persisted-vs-cached-vs-fetch document hydration routing while preserving actual storage reads, fetches, and registration in the shell. |
+| Current continuation gate after Phase 81 | Total roadmap progress is still below 100%, so Phase 82 is automatically opened for draft persistence watcher/controller decisions. |
+| P3 `EditorWorkspaceShell.vue` cleanup target for Phase 82 | About 50% of P3 if workspace persistence watcher decisions and tab-id pruning inputs move out without changing actual storage writes, route sync, graph fetches, save/open/close behavior, restore behavior, visual layout, or run stream behavior. |
+| Overall roadmap cleanup after Phase 82 | About 99.92% complete after moving workspace draft watcher hydration/pruning decisions into `editorDraftPersistenceModel.ts`. |
+| P3 `EditorWorkspaceShell.vue` cleanup after Phase 82 | About 50% complete after extracting workspace persistence requests while keeping actual localStorage writes and pruning side effects in the shell. |
+| Current continuation gate after Phase 82 | Total roadmap progress is still below 100%, so Phase 83 is automatically opened for tab runtime record cleanup. |
+| Overall roadmap cleanup after Phase 83 | About 99.94% complete after moving tab-scoped runtime clone/delete cleanup into `editorTabRuntimeModel.ts`. |
+| P3 `EditorWorkspaceShell.vue` cleanup after Phase 83 | About 54% complete after replacing repeated close-tab runtime cleanup blocks while preserving cancellation and close behavior. |
+| Current continuation gate after Phase 83 | Total roadmap progress is still below 100%, so Phase 84 is automatically opened for tab runtime write helper extraction. |
+| Overall roadmap cleanup after Phase 84 | About 99.95% complete after moving feedback and run-output preview tab writes onto a shared runtime helper. |
+| P3 `EditorWorkspaceShell.vue` cleanup after Phase 84 | About 56% complete after removing the first repeated tab-scoped write blocks from feedback and streaming preview code. |
+| Current continuation gate after Phase 84 | Total roadmap progress is still below 100%, so Phase 85 is automatically opened for run visual state write cleanup. |
+| Overall roadmap cleanup after Phase 85 | About 99.96% complete after consolidating run visual and polling tab-state writes. |
+| P3 `EditorWorkspaceShell.vue` cleanup after Phase 85 | About 58% complete after replacing repeated run detail/status/current-node/failure/edge writes while preserving polling and human-review behavior. |
+| Current continuation gate after Phase 85 | Total roadmap progress is still below 100%, so Phase 86 is automatically opened for document load state write cleanup. |
+| Overall roadmap cleanup after Phase 86 | About 99.97% complete after consolidating document registration and existing-graph loading tab-state writes. |
+| P3 `EditorWorkspaceShell.vue` cleanup after Phase 86 | About 60% complete after reducing repeated document/loading/error record writes while preserving storage reads, graph fetches, and visual state timing. |
+| Current continuation gate after Phase 86 | Total roadmap progress is still below 100%, so Phase 87 is automatically opened to inspect graph mutation, node creation, and human-review shell boundaries before selecting the next safe slice. |
+| P3 `EditorWorkspaceShell.vue` cleanup target for Phase 87 | About 64-68% of P3 if the next graph mutation or node creation helper boundary can move out without changing auto-snapping, node naming/context, graph mutation payloads, route sync, drafts, or run streams. |
 
 ## Decisions Made
 | Decision | Rationale |
@@ -1062,7 +1132,13 @@ Phase 81 in progress
 - Phase 78 moves full streaming preview payload/document/current-preview projection into `run-event-stream.ts`; `EditorWorkspaceShell.vue` keeps EventSource lifecycle, run output preview ref assignment, graph mutation, polling timers, restore behavior, human-review opening, and live display state.
 - Phase 79 moves the shared Event-to-payload wrapper into `run-event-stream.ts`; `EditorWorkspaceShell.vue` and `RunDetailPage.vue` keep EventSource lifecycle, listener registration, polling timers, restore/human-review behavior, and UI state writes.
 - Phase 80 moves viewport draft tab selection and immutable viewport draft updates into `editorDraftPersistenceModel.ts`; `EditorWorkspaceShell.vue` keeps actual `readPersistedEditorViewportDraft` / `writePersistedEditorViewportDraft` calls and ref assignment.
-- Phase 81 should evaluate document draft hydration decisions because actual storage reads and graph fetches are side-effectful but their choose-persisted-versus-seed/fetch routing can be covered separately.
+- Phase 81 moves unsaved document persisted-vs-seed routing and existing graph persisted-vs-cached-vs-fetch routing into `editorDraftPersistenceModel.ts`; `EditorWorkspaceShell.vue` keeps actual localStorage reads, graph fetches, `registerDocumentForTab`, route sync, and UI loading/error state writes.
+- Phase 82 moves workspace persistence watcher hydration/pruning requests into `editorDraftPersistenceModel.ts`; `EditorWorkspaceShell.vue` keeps actual `writePersistedEditorWorkspace`, document draft pruning, viewport draft pruning, and hydration calls.
+- Phase 83 adds `editorTabRuntimeModel.ts` for tab-scoped clone/delete cleanup; `EditorWorkspaceShell.vue` keeps close-tab transition, persisted draft removal, run polling cancellation, and EventSource cancellation.
+- Phase 84 expands `editorTabRuntimeModel.ts` with immutable tab-scoped set writes and moves feedback plus run-output preview writes onto it; preview merge semantics and stream lifecycle stay in the shell.
+- Phase 85 moves run visual state and polling status tab-record writes onto the runtime helper while preserving polling generation checks, human-review opening, feedback formatting, and run artifact projection.
+- Phase 86 moves document registration and existing graph load `documents/loading/error` tab-record writes onto the runtime helper while preserving actual storage reads/writes, fetch behavior, loading/error timing, route sync, and visual layout.
+- Phase 87 should evaluate graph mutation action helpers, node creation flow helpers, or a narrow human-review controller slice; avoid any broad move that could disturb automatic snapping, new-node naming/context, route sync, draft persistence, or run streams.
 - Do not commit runtime artifacts such as `backend/data/settings`, `.dev_*`, `dist`, or `.worktrees`.
 - After code changes, restart using `npm run dev`.
 

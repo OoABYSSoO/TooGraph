@@ -301,7 +301,17 @@ import EditorNodeCreationMenu from "./EditorNodeCreationMenu.vue";
 import EditorStatePanel from "./EditorStatePanel.vue";
 import EditorTabBar from "./EditorTabBar.vue";
 import EditorWelcomeState from "./EditorWelcomeState.vue";
-import { buildNextCanvasViewportDrafts, listTabsMissingViewportDrafts } from "./editorDraftPersistenceModel.ts";
+import {
+  buildNextCanvasViewportDrafts,
+  listTabsMissingDocumentDrafts,
+  listTabsMissingViewportDrafts,
+  resolveExistingGraphDocumentHydrationSource,
+  resolveUnsavedGraphDocumentHydrationSource,
+  resolveWorkspaceDraftPersistenceRequest,
+  shouldHydrateExistingGraphDocument,
+  shouldRunWorkspaceDraftHydration,
+} from "./editorDraftPersistenceModel.ts";
+import { omitTabScopedRecordEntry, setTabScopedRecordEntry } from "./editorTabRuntimeModel.ts";
 import { formatRunFeedback, formatValidationFeedback, type RunFeedback, type WorkspaceFeedbackTone } from "./runFeedbackModel.ts";
 import { buildRunNodeArtifactsModel, mergeRunOutputPreviewByNodeId } from "./runNodeArtifactsModel.ts";
 import { applyRunWrittenStateValuesToDocument } from "./runStatePersistence.ts";
@@ -457,27 +467,12 @@ function applyRunVisualStateToTab(
     nodeLabelLookup,
   });
   const runArtifactsModel = buildRunNodeArtifactsModel(visualRun);
-  latestRunDetailByTabId.value = {
-    ...latestRunDetailByTabId.value,
-    [tabId]: visualRun,
-  };
-  runNodeStatusByTabId.value = {
-    ...runNodeStatusByTabId.value,
-    [tabId]: visualRun.node_status_map ?? {},
-  };
-  currentRunNodeIdByTabId.value = {
-    ...currentRunNodeIdByTabId.value,
-    [tabId]: visualRun.current_node_id ?? null,
-  };
+  latestRunDetailByTabId.value = setTabScopedRecordEntry(latestRunDetailByTabId.value, tabId, visualRun);
+  runNodeStatusByTabId.value = setTabScopedRecordEntry(runNodeStatusByTabId.value, tabId, visualRun.node_status_map ?? {});
+  currentRunNodeIdByTabId.value = setTabScopedRecordEntry(currentRunNodeIdByTabId.value, tabId, visualRun.current_node_id ?? null);
   applyRunOutputPreviewForTab(tabId, runArtifactsModel.outputPreviewByNodeId);
-  runFailureMessageByTabId.value = {
-    ...runFailureMessageByTabId.value,
-    [tabId]: runArtifactsModel.failedMessageByNodeId,
-  };
-  activeRunEdgeIdsByTabId.value = {
-    ...activeRunEdgeIdsByTabId.value,
-    [tabId]: runArtifactsModel.activeEdgeIds,
-  };
+  runFailureMessageByTabId.value = setTabScopedRecordEntry(runFailureMessageByTabId.value, tabId, runArtifactsModel.failedMessageByNodeId);
+  activeRunEdgeIdsByTabId.value = setTabScopedRecordEntry(activeRunEdgeIdsByTabId.value, tabId, runArtifactsModel.activeEdgeIds);
   setFeedbackForTab(tabId, {
     ...feedback,
     activeRunId: run.run_id,
@@ -492,10 +487,7 @@ function setFeedbackForTab(
     activeRunStatus?: string | null;
   },
 ) {
-  feedbackByTabId.value = {
-    ...feedbackByTabId.value,
-    [tabId]: feedback,
-  };
+  feedbackByTabId.value = setTabScopedRecordEntry(feedbackByTabId.value, tabId, feedback);
 }
 
 function setMessageFeedbackForTab(
@@ -543,10 +535,7 @@ function applyStreamingOutputPreviewToTab(tabId: string, payload: Record<string,
   if (!nextPreview) {
     return;
   }
-  runOutputPreviewByTabId.value = {
-    ...runOutputPreviewByTabId.value,
-    [tabId]: nextPreview,
-  };
+  runOutputPreviewByTabId.value = setTabScopedRecordEntry(runOutputPreviewByTabId.value, tabId, nextPreview);
 }
 
 function applyRunOutputPreviewForTab(
@@ -554,10 +543,11 @@ function applyRunOutputPreviewForTab(
   nextPreviewByNodeId: Record<string, { text: string; displayMode: string | null }>,
   options: { preserveMissing?: boolean } = {},
 ) {
-  runOutputPreviewByTabId.value = {
-    ...runOutputPreviewByTabId.value,
-    [tabId]: mergeRunOutputPreviewByNodeId(runOutputPreviewByTabId.value[tabId] ?? {}, nextPreviewByNodeId, options),
-  };
+  runOutputPreviewByTabId.value = setTabScopedRecordEntry(
+    runOutputPreviewByTabId.value,
+    tabId,
+    mergeRunOutputPreviewByNodeId(runOutputPreviewByTabId.value[tabId] ?? {}, nextPreviewByNodeId, options),
+  );
 }
 
 function startRunEventStreamForTab(tabId: string, runId: string) {
@@ -623,31 +613,13 @@ async function pollRunForTab(tabId: string, runId: string, generation = runPollG
       nodeLabelLookup,
     });
     const runArtifactsModel = buildRunNodeArtifactsModel(run);
-    latestRunDetailByTabId.value = {
-      ...latestRunDetailByTabId.value,
-      [tabId]: run,
-    };
-    restoredRunSnapshotIdByTabId.value = {
-      ...restoredRunSnapshotIdByTabId.value,
-      [tabId]: null,
-    };
-    runNodeStatusByTabId.value = {
-      ...runNodeStatusByTabId.value,
-      [tabId]: run.node_status_map ?? {},
-    };
-    currentRunNodeIdByTabId.value = {
-      ...currentRunNodeIdByTabId.value,
-      [tabId]: run.current_node_id ?? null,
-    };
+    latestRunDetailByTabId.value = setTabScopedRecordEntry(latestRunDetailByTabId.value, tabId, run);
+    restoredRunSnapshotIdByTabId.value = setTabScopedRecordEntry(restoredRunSnapshotIdByTabId.value, tabId, null);
+    runNodeStatusByTabId.value = setTabScopedRecordEntry(runNodeStatusByTabId.value, tabId, run.node_status_map ?? {});
+    currentRunNodeIdByTabId.value = setTabScopedRecordEntry(currentRunNodeIdByTabId.value, tabId, run.current_node_id ?? null);
     applyRunOutputPreviewForTab(tabId, runArtifactsModel.outputPreviewByNodeId, { preserveMissing: shouldPollRunStatus(run.status) });
-    runFailureMessageByTabId.value = {
-      ...runFailureMessageByTabId.value,
-      [tabId]: runArtifactsModel.failedMessageByNodeId,
-    };
-    activeRunEdgeIdsByTabId.value = {
-      ...activeRunEdgeIdsByTabId.value,
-      [tabId]: runArtifactsModel.activeEdgeIds,
-    };
+    runFailureMessageByTabId.value = setTabScopedRecordEntry(runFailureMessageByTabId.value, tabId, runArtifactsModel.failedMessageByNodeId);
+    activeRunEdgeIdsByTabId.value = setTabScopedRecordEntry(activeRunEdgeIdsByTabId.value, tabId, runArtifactsModel.activeEdgeIds);
     setFeedbackForTab(tabId, {
       ...feedback,
       activeRunId: run.run_id,
@@ -744,19 +716,10 @@ function updateWorkspaceTab(tabId: string, updater: (tab: EditorWorkspaceTab) =>
 
 function registerDocumentForTab(tabId: string, graph: GraphPayload | GraphDocument) {
   const syncedDocument = syncKnowledgeBaseSkillsInDocument(graph);
-  documentsByTabId.value = {
-    ...documentsByTabId.value,
-    [tabId]: syncedDocument,
-  };
+  documentsByTabId.value = setTabScopedRecordEntry(documentsByTabId.value, tabId, syncedDocument);
   writePersistedEditorDocumentDraft(tabId, syncedDocument);
-  loadingByTabId.value = {
-    ...loadingByTabId.value,
-    [tabId]: false,
-  };
-  errorByTabId.value = {
-    ...errorByTabId.value,
-    [tabId]: null,
-  };
+  loadingByTabId.value = setTabScopedRecordEntry(loadingByTabId.value, tabId, false);
+  errorByTabId.value = setTabScopedRecordEntry(errorByTabId.value, tabId, null);
   if (!feedbackByTabId.value[tabId]) {
     setMessageFeedbackForTab(tabId, {
       tone: "neutral",
@@ -793,60 +756,24 @@ function updateCanvasViewportForTab(tabId: string, viewport: CanvasViewport) {
 function clearTabRuntime(tabId: string) {
   cancelRunPolling(tabId);
   cancelRunEventStreamForTab(tabId);
-  const nextDocuments = { ...documentsByTabId.value };
-  const nextLoading = { ...loadingByTabId.value };
-  const nextErrors = { ...errorByTabId.value };
-  const nextFeedback = { ...feedbackByTabId.value };
-  delete nextDocuments[tabId];
-  delete nextLoading[tabId];
-  delete nextErrors[tabId];
-  delete nextFeedback[tabId];
-  const nextPanels = { ...statePanelOpenByTabId.value };
-  delete nextPanels[tabId];
-  const nextSidePanelModes = { ...sidePanelModeByTabId.value };
-  delete nextSidePanelModes[tabId];
-  const nextFocusedNodes = { ...focusedNodeIdByTabId.value };
-  delete nextFocusedNodes[tabId];
-  const nextFocusRequests = { ...focusRequestByTabId.value };
-  delete nextFocusRequests[tabId];
-  const nextViewports = { ...viewportByTabId.value };
-  delete nextViewports[tabId];
-  const nextRunNodeStatus = { ...runNodeStatusByTabId.value };
-  delete nextRunNodeStatus[tabId];
-  const nextCurrentRunNode = { ...currentRunNodeIdByTabId.value };
-  delete nextCurrentRunNode[tabId];
-  const nextLatestRuns = { ...latestRunDetailByTabId.value };
-  delete nextLatestRuns[tabId];
-  const nextRestoredRunSnapshots = { ...restoredRunSnapshotIdByTabId.value };
-  delete nextRestoredRunSnapshots[tabId];
-  const nextHumanReviewBusy = { ...humanReviewBusyByTabId.value };
-  delete nextHumanReviewBusy[tabId];
-  const nextHumanReviewErrors = { ...humanReviewErrorByTabId.value };
-  delete nextHumanReviewErrors[tabId];
-  const nextOutputPreviews = { ...runOutputPreviewByTabId.value };
-  delete nextOutputPreviews[tabId];
-  const nextFailureMessages = { ...runFailureMessageByTabId.value };
-  delete nextFailureMessages[tabId];
-  const nextActiveEdges = { ...activeRunEdgeIdsByTabId.value };
-  delete nextActiveEdges[tabId];
-  documentsByTabId.value = nextDocuments;
-  loadingByTabId.value = nextLoading;
-  errorByTabId.value = nextErrors;
-  feedbackByTabId.value = nextFeedback;
-  statePanelOpenByTabId.value = nextPanels;
-  sidePanelModeByTabId.value = nextSidePanelModes;
-  focusedNodeIdByTabId.value = nextFocusedNodes;
-  focusRequestByTabId.value = nextFocusRequests;
-  viewportByTabId.value = nextViewports;
-  runNodeStatusByTabId.value = nextRunNodeStatus;
-  currentRunNodeIdByTabId.value = nextCurrentRunNode;
-  latestRunDetailByTabId.value = nextLatestRuns;
-  restoredRunSnapshotIdByTabId.value = nextRestoredRunSnapshots;
-  humanReviewBusyByTabId.value = nextHumanReviewBusy;
-  humanReviewErrorByTabId.value = nextHumanReviewErrors;
-  runOutputPreviewByTabId.value = nextOutputPreviews;
-  runFailureMessageByTabId.value = nextFailureMessages;
-  activeRunEdgeIdsByTabId.value = nextActiveEdges;
+  documentsByTabId.value = omitTabScopedRecordEntry(documentsByTabId.value, tabId);
+  loadingByTabId.value = omitTabScopedRecordEntry(loadingByTabId.value, tabId);
+  errorByTabId.value = omitTabScopedRecordEntry(errorByTabId.value, tabId);
+  feedbackByTabId.value = omitTabScopedRecordEntry(feedbackByTabId.value, tabId);
+  statePanelOpenByTabId.value = omitTabScopedRecordEntry(statePanelOpenByTabId.value, tabId);
+  sidePanelModeByTabId.value = omitTabScopedRecordEntry(sidePanelModeByTabId.value, tabId);
+  focusedNodeIdByTabId.value = omitTabScopedRecordEntry(focusedNodeIdByTabId.value, tabId);
+  focusRequestByTabId.value = omitTabScopedRecordEntry(focusRequestByTabId.value, tabId);
+  viewportByTabId.value = omitTabScopedRecordEntry(viewportByTabId.value, tabId);
+  runNodeStatusByTabId.value = omitTabScopedRecordEntry(runNodeStatusByTabId.value, tabId);
+  currentRunNodeIdByTabId.value = omitTabScopedRecordEntry(currentRunNodeIdByTabId.value, tabId);
+  latestRunDetailByTabId.value = omitTabScopedRecordEntry(latestRunDetailByTabId.value, tabId);
+  restoredRunSnapshotIdByTabId.value = omitTabScopedRecordEntry(restoredRunSnapshotIdByTabId.value, tabId);
+  humanReviewBusyByTabId.value = omitTabScopedRecordEntry(humanReviewBusyByTabId.value, tabId);
+  humanReviewErrorByTabId.value = omitTabScopedRecordEntry(humanReviewErrorByTabId.value, tabId);
+  runOutputPreviewByTabId.value = omitTabScopedRecordEntry(runOutputPreviewByTabId.value, tabId);
+  runFailureMessageByTabId.value = omitTabScopedRecordEntry(runFailureMessageByTabId.value, tabId);
+  activeRunEdgeIdsByTabId.value = omitTabScopedRecordEntry(activeRunEdgeIdsByTabId.value, tabId);
 }
 
 function createDraftForTab(tab: EditorWorkspaceTab): GraphPayload {
@@ -862,12 +789,10 @@ function createDraftForTab(tab: EditorWorkspaceTab): GraphPayload {
 }
 
 function ensureUnsavedTabDocuments() {
-  for (const tab of workspace.value.tabs) {
-    if (tab.graphId || documentsByTabId.value[tab.tabId]) {
-      continue;
-    }
+  for (const tab of listTabsMissingDocumentDrafts(workspace.value.tabs, documentsByTabId.value)) {
     const persistedDraft = readPersistedEditorDocumentDraft(tab.tabId);
-    registerDocumentForTab(tab.tabId, persistedDraft ?? createDraftForTab(tab));
+    const hydrationSource = resolveUnsavedGraphDocumentHydrationSource(persistedDraft);
+    registerDocumentForTab(tab.tabId, hydrationSource.type === "persisted" ? hydrationSource.document : createDraftForTab(tab));
   }
 }
 
@@ -965,36 +890,25 @@ function openImportedGraphTab(graph: GraphPayload, fileName: string) {
 }
 
 async function loadExistingGraphIntoTab(tabId: string, graphId: string) {
-  if (documentsByTabId.value[tabId] || loadingByTabId.value[tabId]) {
+  if (!shouldHydrateExistingGraphDocument({ hasDocument: Boolean(documentsByTabId.value[tabId]), isLoading: Boolean(loadingByTabId.value[tabId]) })) {
     return;
   }
 
-  loadingByTabId.value = {
-    ...loadingByTabId.value,
-    [tabId]: true,
-  };
-  errorByTabId.value = {
-    ...errorByTabId.value,
-    [tabId]: null,
-  };
+  loadingByTabId.value = setTabScopedRecordEntry(loadingByTabId.value, tabId, true);
+  errorByTabId.value = setTabScopedRecordEntry(errorByTabId.value, tabId, null);
 
   try {
     const persistedDraft = readPersistedEditorDocumentDraft(tabId);
-    if (persistedDraft) {
-      registerDocumentForTab(tabId, persistedDraft);
+    const hydrationSource = resolveExistingGraphDocumentHydrationSource({ persistedDraft, cachedGraph: null });
+    if (hydrationSource.type === "persisted") {
+      registerDocumentForTab(tabId, hydrationSource.document);
       return;
     }
     const graph = await fetchGraph(graphId);
     registerDocumentForTab(tabId, graph);
   } catch (error) {
-    loadingByTabId.value = {
-      ...loadingByTabId.value,
-      [tabId]: false,
-    };
-    errorByTabId.value = {
-      ...errorByTabId.value,
-      [tabId]: error instanceof Error ? error.message : "Failed to load graph.",
-    };
+    loadingByTabId.value = setTabScopedRecordEntry(loadingByTabId.value, tabId, false);
+    errorByTabId.value = setTabScopedRecordEntry(errorByTabId.value, tabId, error instanceof Error ? error.message : "Failed to load graph.");
   }
 }
 
@@ -1007,13 +921,14 @@ function openExistingGraph(graphId: string, navigation: "push" | "replace" | "no
   updateWorkspace(nextWorkspace);
 
   const nextTabId = nextWorkspace.activeTabId;
-  if (nextTabId && !documentsByTabId.value[nextTabId]) {
+  if (nextTabId && shouldHydrateExistingGraphDocument({ hasDocument: Boolean(documentsByTabId.value[nextTabId]), isLoading: Boolean(loadingByTabId.value[nextTabId]) })) {
     const persistedDraft = readPersistedEditorDocumentDraft(nextTabId);
-    if (persistedDraft) {
-      registerDocumentForTab(nextTabId, persistedDraft);
-    } else if (graph) {
-      registerDocumentForTab(nextTabId, cloneGraphDocument(graph));
-    } else {
+    const hydrationSource = resolveExistingGraphDocumentHydrationSource({ persistedDraft, cachedGraph: graph });
+    if (hydrationSource.type === "persisted") {
+      registerDocumentForTab(nextTabId, hydrationSource.document);
+    } else if (hydrationSource.type === "cached-graph") {
+      registerDocumentForTab(nextTabId, cloneGraphDocument(hydrationSource.graph));
+    } else if (hydrationSource.type === "fetch") {
       void loadExistingGraphIntoTab(nextTabId, graphId);
     }
   }
@@ -2477,12 +2392,13 @@ async function loadPersistedPresets() {
 watch(
   workspace,
   (nextWorkspace) => {
-    if (!hydrated.value) {
+    const persistenceRequest = resolveWorkspaceDraftPersistenceRequest({ hydrated: hydrated.value, workspace: nextWorkspace });
+    if (!persistenceRequest) {
       return;
     }
-    writePersistedEditorWorkspace(nextWorkspace);
-    prunePersistedEditorDocumentDrafts(nextWorkspace.tabs.map((tab) => tab.tabId));
-    prunePersistedEditorViewportDrafts(nextWorkspace.tabs.map((tab) => tab.tabId));
+    writePersistedEditorWorkspace(persistenceRequest.workspace);
+    prunePersistedEditorDocumentDrafts(persistenceRequest.tabIds);
+    prunePersistedEditorViewportDrafts(persistenceRequest.tabIds);
   },
   { deep: true },
 );
@@ -2490,7 +2406,7 @@ watch(
 watch(
   [() => workspace.value.tabs, () => props.templates],
   () => {
-    if (!hydrated.value) {
+    if (!shouldRunWorkspaceDraftHydration(hydrated.value)) {
       return;
     }
     ensureTabViewportDrafts();
