@@ -1,5 +1,248 @@
 # Progress Log
 
+## Session: 2026-04-30 Phase 95
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Continued automatically after commit `83945de` because the full-roadmap progress is below 100%.
+  - Inspected remaining provider discovery and provider transport clusters in `model_provider_client.py`.
+  - Chose model discovery because it is a narrower boundary than chat transport extraction and has existing settings/local/Codex behavior coverage.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added structure coverage requiring model discovery helpers to live in `app.tools.model_provider_discovery`.
+  - Verified the expected red failure because the module did not exist and model-id parsing helpers were still local to `model_provider_client.py`.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `backend/app/tools/model_provider_discovery.py`.
+  - Moved OpenAI/Anthropic data model id parsing, Gemini model id filtering, Codex model id sorting/filtering, and provider model discovery into the new module.
+  - Kept `model_provider_client.discover_provider_models` as the compatibility facade and injected Codex token resolve/refresh callbacks so existing patch seams continue to work.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran the focused red/green structure test.
+  - Ran provider discovery, settings model provider, OpenAI-compatible runtime, and Codex provider tests.
+  - Ran the full backend test suite.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend entry returned HTTP 200 and backend `/health` returned `{"status":"ok"}`.
+
+### Phase 5: Honest Progress Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated the full roadmap at about 75-76%.
+  - Recalculated the frontend-focused roadmap at about 83-85%; unchanged because Phase 95 was backend-only.
+  - Recalculated P3 `EditorWorkspaceShell.vue` cleanup at about 82%; unchanged.
+  - Recalculated P4 backend cleanup at about 10-12% after isolating HTTP/request and model discovery slices.
+  - Opened Phase 96 automatically because the full roadmap is still below 100%.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red structure test | `PYTHONPATH=backend pytest backend/tests/test_model_provider_client.py::ModelProviderClientTests::test_model_discovery_helpers_are_isolated_from_provider_client -q` before implementation | Fails because `model_provider_discovery` is missing | Failed with missing module assertion | Passed |
+| Focused structure test | Same command after implementation | Structure test passes | 1 passed | Passed |
+| Provider/discovery regression tests | `PYTHONPATH=backend pytest backend/tests/test_model_provider_client.py backend/tests/test_openai_codex_provider.py backend/tests/test_openai_compatible_provider_runtime.py backend/tests/test_settings_model_providers.py -q` | Discovery behavior and patch seams stay unchanged | 42 passed, 2 existing warnings | Passed |
+| Full backend tests | `PYTHONPATH=backend pytest backend/tests -q` | All backend tests pass | 141 passed, 2 existing warnings | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | None | Phase 95 | No implementation errors beyond the expected red structure failure. |
+
+## Session: 2026-04-30 Phase 94
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Continued automatically because the recalibrated full-roadmap progress is below 100%.
+  - Re-read the roadmap, Phase 93 findings, backend provider tests, and `model_provider_client.py`.
+  - Chose the first P4 provider-client slice because backend cleanup was the largest honest progress gap.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added backend structure coverage requiring shared HTTP/request helpers to live in `app.tools.model_provider_http`.
+  - Verified the expected red failure because the module did not exist and `model_provider_client.py` still owned the helper definitions.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `backend/app/tools/model_provider_http.py`.
+  - Moved base URL normalization, auth header construction, Anthropic headers, string dedupe, request JSON handling, request-error formatting, model request log safety, SSE event reading, and streaming JSON fallback into the new module.
+  - Kept `model_provider_client.py` as the public API and provider orchestration layer, including compatibility aliases for existing imports and test patch points.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran the focused red/green structure test.
+  - Ran model-provider, OpenAI-compatible local runtime, Codex provider, and model request log tests.
+  - Ran the full backend test suite.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend entry returned HTTP 200 and backend `/health` returned `{"status":"ok"}`.
+
+### Phase 5: Honest Progress Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated the full roadmap at about 74-75%.
+  - Recalculated the frontend-focused roadmap at about 83-85%; unchanged because Phase 94 was backend-only.
+  - Recalculated P3 `EditorWorkspaceShell.vue` cleanup at about 82%; unchanged.
+  - Recalculated P4 backend cleanup at about 6-8% after the first `model_provider_client.py` helper extraction.
+  - Opened Phase 95 automatically because the full roadmap is still below 100%.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red structure test | `PYTHONPATH=backend pytest backend/tests/test_model_provider_client.py::ModelProviderClientTests::test_http_request_helpers_are_isolated_from_provider_client -q` before implementation | Fails because `model_provider_http` is missing | Failed with missing module assertion | Passed |
+| Focused structure test | Same command after implementation | Structure test passes | 1 passed | Passed |
+| Provider regression tests | `PYTHONPATH=backend pytest backend/tests/test_model_provider_client.py backend/tests/test_openai_compatible_provider_runtime.py backend/tests/test_openai_codex_provider.py backend/tests/test_model_request_logs.py -q` | Provider behavior stays unchanged | 39 passed, 2 existing warnings | Passed |
+| Full backend tests | `PYTHONPATH=backend pytest backend/tests -q` | All backend tests pass | 140 passed, 2 existing warnings | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | Existing provider tests patched `app.tools.model_provider_client.append_model_request_log` after the log helper moved | Phase 94 focused regression run | Added a compatibility adapter in `model_provider_client.py` that delegates to `model_provider_http.append_model_request_log_safely` while preserving the old patch seam. |
+
+## Session: 2026-04-30 Phase 93
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Continued automatically because the recalibrated full-roadmap progress is below 100%.
+  - Re-read the roadmap, Phase 92 findings, and remaining `EditorWorkspaceShell.vue` graph mutation handlers.
+  - Accepted the user's updated risk tolerance and chose the larger `useGraphMutationActions` roadmap slice.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added structure coverage requiring `EditorWorkspaceShell.vue` to import and destructure `useWorkspaceGraphMutationActions`.
+  - Verified the expected red failure because the composable did not exist and graph mutation handlers were still local to the shell.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `frontend/src/editor/workspace/useWorkspaceGraphMutationActions.ts`.
+  - Moved state binding, port binding/reorder, data-edge disconnect, create-port state, node deletion, flow/route connect/reconnect/remove, state binding connect, reverse input-source connect, node config, condition config/branch, output config, state field update, state deletion, and writer removal handlers out of `EditorWorkspaceShell.vue`.
+  - Kept save/open routing, node creation execution, preset persistence, run lifecycle, human-review routing, route sync, and draft persistence in the shell.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran the focused structure test and updated older shell-ownership assertions to point at the new composable source.
+  - Ran TypeScript unused-symbol verification from `frontend`.
+  - Ran related workspace, tab runtime, node creation, state panel, graph document, graph node creation, canvas auto-snap, run stream, and run state tests.
+  - Ran the full frontend `node --test` suite.
+  - Ran the frontend production build; no large chunk warning was emitted.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed backend `/health` returned `{"status":"ok"}` and the frontend entry returned HTTP 200.
+  - Captured a headless Chrome screenshot and confirmed the home workspace rendered normally.
+
+### Phase 5: Honest Progress Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated the full roadmap at about 72-73%; this remains bounded by P4 backend cleanup still being effectively 0%.
+  - Recalculated the frontend-focused roadmap at about 83-85%.
+  - Recalculated P3 `EditorWorkspaceShell.vue` cleanup at about 82% after completing the `useGraphMutationActions` slice.
+  - Opened Phase 94 automatically because the full roadmap is still below 100%.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Focused structure test | `node --test frontend/src/editor/workspace/EditorWorkspaceShell.structure.test.ts` | Workspace structure tests pass | 36 passed | Passed |
+| Unused symbol check | `./node_modules/.bin/vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No diagnostics | Exit 0 | Passed |
+| Related high-risk regression | `node --test` over workspace structure/runtime, node creation, state panel, graph document, graph node creation, canvas auto-snap, run stream, and run state tests | Related graph mutation and interaction tests pass | 173 passed | Passed |
+| Full frontend tests | `node --test $(rg --files src vite.config.structure.test.ts \| rg '\.test\.ts$')` in `frontend` | All frontend tests pass | 878 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without a large chunk warning | Exit 0, no Vite chunk warning | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+| Browser smoke | Headless Chrome screenshot with virtual-time wait | App renders normally | Home workspace UI rendered | Passed |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | Structure tests still expected graph mutation helpers to be local to `EditorWorkspaceShell.vue` after the composable extraction | Phase 93 focused green run | Updated those assertions to read and verify `useWorkspaceGraphMutationActions.ts` while keeping template event wiring assertions in the shell test. |
+| 2026-04-30 | The simple graph mutation structure regex did not account for nested function indentation inside the composable factory | Phase 93 focused green run | Relaxed the regex boundary to match the indented composable helper layout. |
+
+## Session: 2026-04-30 Phase 92
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Continued automatically because the recalibrated full-roadmap progress is below 100%.
+  - Re-read the roadmap and current shell findings after correcting the earlier optimistic `99.x%` progress interpretation.
+  - Chose simple graph mutation commit consolidation because it removes repeated shell boilerplate while leaving auto-snap, node creation, graph mutators, run streams, route sync, and visual layout untouched.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added structure coverage requiring a local `commitDocumentMutationForTab` helper to own document lookup, no-op detection, dirty commit, optional focus sequencing, and result return.
+  - Verified the expected red failure before implementation because the helper did not exist yet.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `commitDocumentMutationForTab` after `markDocumentDirty`.
+  - Refactored simple state binding, port binding/reorder, flow/route connect/reconnect/remove, node config, condition config/branch, output config, state field update, and state writer removal handlers onto the helper.
+  - Kept complex creation/delete/save/open/human-review flows bespoke because they still combine graph mutation with extra side effects or persistence routing.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused workspace structure and runtime helper tests.
+  - Ran related workspace, node-creation, graph-document, run-state, run-stream, and run-detail regression tests.
+  - Ran TypeScript unused-symbol verification from `frontend`.
+  - Ran the full frontend `node --test` suite.
+  - Ran the frontend production build; no large chunk warning was emitted.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed backend `/health` returned `{"status":"ok"}` and the frontend entry returned HTTP 200.
+  - Captured a headless Chrome screenshot and confirmed the home workspace rendered normally.
+
+### Phase 5: Honest Progress Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated the full roadmap at about 71-72%, not `99.x%`, because backend P4 is still effectively unstarted.
+  - Recalculated the frontend-focused roadmap at about 81-83%.
+  - Recalculated P3 `EditorWorkspaceShell.vue` cleanup at about 74%.
+  - Opened Phase 93 automatically because the full roadmap is still below 100%.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Focused runtime/structure tests | `node --test frontend/src/editor/workspace/EditorWorkspaceShell.structure.test.ts frontend/src/editor/workspace/editorTabRuntimeModel.test.ts` | All focused tests pass | 38 passed | Passed |
+| Related workspace regression | `node --test` over workspace structure, tab runtime, node creation, graph document, run state, run event stream, and run detail structure tests | Related workspace tests pass | 144 passed | Passed |
+| Unused symbol check | `./node_modules/.bin/vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No diagnostics | Exit 0 | Passed |
+| Full frontend tests | `node --test $(rg --files src vite.config.structure.test.ts \| rg '\.test\.ts$')` in `frontend` | All frontend tests pass | 877 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without a large chunk warning | Exit 0, no Vite chunk warning | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+| Browser smoke | Headless Chrome screenshot with virtual-time wait | App renders normally | Home workspace UI rendered | Passed |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | New graph mutation commit structure assertion initially expected a one-line flow connection helper shape | Phase 92 focused green run | Relaxed the regex to match the actual multiline helper call while still requiring `commitDocumentMutationForTab`. |
+| 2026-04-30 | The same assertion expected an unnecessary trailing comma after the focus options object | Phase 92 focused green run | Removed the trailing-comma requirement so the test verifies behavior boundary instead of formatting. |
+
+## Session: 2026-04-30 Progress Recalibration
+
+### Progress Accuracy Correction
+- **Status:** completed
+- Actions taken:
+  - Re-read the roadmap and current line-count evidence after the user questioned whether the total progress estimate was realistic.
+  - Reclassified the prior `99.x%` numbers as an active frontend-batch tail estimate, not a true full-roadmap estimate.
+  - Updated `task_plan.md` to use a more honest progress model that includes P4 backend work.
+
+### Current Honest Estimate
+| Scope | Estimate | Rationale |
+|------|----------|-----------|
+| Full architecture roadmap | About 70-72% | P0 is complete, P1 is mostly complete, P2 has many extracted models but a large canvas remains, P3 shell cleanup is active, and P4 backend refactor has not started. |
+| Frontend-focused roadmap | About 80-82% | NodeCard and Canvas have had major extraction passes, and WorkspaceShell is about 72% through its P3 cleanup. |
+| P3 `EditorWorkspaceShell.vue` | About 72% | Run stream, draft persistence, runtime record writes, node creation menu state, and panel/focus state writes are extracted or consolidated; graph mutation actions and save/open routing still remain. |
+| P4 backend cleanup | About 0% | `model_provider_client.py`, `node_system_executor.py`, and LangGraph runtime are still essentially untouched by this cleanup. |
+
 ## Session: 2026-04-30 Phase 91
 
 ### Phase 1: Re-orientation

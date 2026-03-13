@@ -120,6 +120,8 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 - `editorTabRuntimeModel.ts` 已继续承接 run invocation 与 human-review resume 的 tab-state set writes；`EditorWorkspaceShell.vue` 仍保留 `runGraph`/`resumeRun` 调用、polling generation、EventSource lifecycle、restored checkpoint usage、feedback formatting 和 human-review behavior。
 - `EditorWorkspaceShell.vue` 本地已集中 dirty graph document commit：位置、尺寸、重命名和普通 dirty 写入共享 `commitDirtyDocumentForTab`；graph mutator calls、edit guards、draft writes、save behavior 和 route sync 仍保持 shell-owned。
 - `editorTabRuntimeModel.ts` 已继续承接 document、side-panel 与 focus/focus-request 的 tab-scoped set writes；`EditorWorkspaceShell.vue` 仍保留 persisted document draft writes、panel mode decisions、human-review lock/open policy 和 focus request sequencing。
+- `EditorWorkspaceShell.vue` 本地已继续集中 simple graph mutation commit：state binding、port binding/reorder、flow/route connect/reconnect/remove、node config、condition/output config、state field update 等简单 handler 共享 `commitDocumentMutationForTab` 的 document lookup、no-op、dirty commit 和 optional focus sequencing；node creation、delete、save/open 与 human-review routing 仍保持 shell-owned。
+- `useWorkspaceGraphMutationActions.ts` 已承接更完整的 graph mutation action layer：state binding、port binding/reorder、data-edge disconnect、create-port state、node deletion、flow/route connect/reconnect/remove、state input source connect、node/config/state field update/delete 等 handler；`EditorWorkspaceShell.vue` 仍保留 save/open routing、node creation execution、preset persistence、run lifecycle、human-review routing、route sync 和 draft persistence。
 
 ## 后端重点
 
@@ -143,6 +145,12 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 - Codex token 过期刷新。
 - provider model discovery fallback。
 - thinking/reasoning metadata。
+
+当前执行进展：
+
+- `model_provider_http.py` 已作为 P4 的第一步承接 provider client 共用的 base URL normalization、auth headers、Anthropic headers、string dedupe、request JSON、request-error formatting、request log safety、SSE event reading 和 streaming fallback。`model_provider_client.py` 仍保留现有公共 API、provider discovery/chat 编排、各 provider 协议解析、Codex refresh 语义和兼容 patch 接缝。
+- `model_provider_discovery.py` 已承接 OpenAI/Anthropic data model id parsing、Gemini model id filtering、Codex model id sorting/filtering 和 provider model discovery 请求；`model_provider_client.discover_provider_models` 仍作为兼容门面，并注入 Codex token resolve/refresh callbacks 以保留现有 patch 接缝。
+- Phase 95 后 `model_provider_client.py` 从 1,380 行降到 1,039 行；下一步应继续拆单个 provider transport，而不是同时移动 executor/runtime 语义。
 
 ### 2. `node_system_executor.py`
 
@@ -216,6 +224,8 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 - 2026-04-30：`nodeCreationMenuModel.ts` 已承担 node creation menu state projection 与 created-state edge editor request projection；workspace shell 仍保留 node creation execution、Date generation、state editor ref assignment、feedback 和 graph mutation ownership。
 - 2026-04-30：`EditorWorkspaceShell.vue` 已集中 dirty graph document commit helper；位置、尺寸、重命名和 dirty 写入复用同一 metadata update path，graph mutation helpers 和 save/open routing 后续仍可继续拆分。
 - 2026-04-30：`editorTabRuntimeModel.ts` 已继续覆盖 document、side-panel、focused-node 和 focus-request tab-state writes；workspace shell 仍保留实际 draft persistence、panel routing、human-review lock policy 和 focus sequencing。
+- 2026-04-30：`EditorWorkspaceShell.vue` 已集中 simple graph mutation commit helper；简单图 mutation handlers 复用 document lookup、no-op detection、dirty commit 和 focus sequencing，复杂 node creation/delete/save/open/human-review flows 暂不移动。
+- 2026-04-30：`useWorkspaceGraphMutationActions.ts` 已承接 broader graph mutation action layer，`EditorWorkspaceShell.vue` 从 2462 行降到约 2055 行；save/open、node creation execution、run lifecycle 和 human-review routing 后续仍需单独拆分。
 
 ## 优先级路线
 
@@ -247,6 +257,8 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 ### P4：后端阶段
 
 先拆 `model_provider_client.py`，再拆 `node_system_executor.py`，最后拆 LangGraph runtime。理由：provider client 的协议边界最清晰，executor 和 LangGraph runtime 对产品语义影响更大。
+
+当前 P4 进展：`model_provider_client.py` 的共享 HTTP/request 层和 provider discovery 层已完成抽取；OpenAI/Anthropic/Gemini/Codex transport、executor 和 LangGraph runtime 仍待迁移。
 
 ## 架构红线
 
