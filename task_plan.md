@@ -6,10 +6,10 @@ Run a ten-round conservative cleanup batch focused on `EditorCanvas.vue` pure pr
 ## Progress Accuracy Note
 - The earlier `99.x%` values are no longer treated as the true total optimization progress. They reflected the active frontend cleanup batch getting close to its own tail, not the whole architecture roadmap.
 - The honest full-roadmap progress must include P0 cleanup, P1 `NodeCard.vue`, P2 `EditorCanvas.vue`, P3 `EditorWorkspaceShell.vue`, and P4 backend runtime/provider cleanup.
-- Current conservative estimate after Phase 99: full roadmap is about 80-81% complete; frontend-focused roadmap is about 83-85% complete; P3 `EditorWorkspaceShell.vue` is about 82% complete; backend P4 is about 32-36% started.
+- Current conservative estimate after Phase 103: full roadmap is about 85-86% complete; frontend-focused roadmap is about 83-85% complete; P3 `EditorWorkspaceShell.vue` is about 82% complete; backend P4 is about 52-56% started.
 
 ## Current Phase
-Phase 100 in progress
+Phase 104 in progress
 
 ## Autonomous Continuation Gate
 - After every completed cleanup phase, re-read `docs/future/2026-04-28-architecture-refactor-roadmap.md`, `task_plan.md`, `findings.md`, and `progress.md`, then recalculate the total roadmap progress and the active area progress.
@@ -914,13 +914,49 @@ Phase 100 in progress
 - [x] If total roadmap progress is below 100%, automatically open the next phase after Phase 99 and re-judge total progress.
 - **Status:** completed
 
-### Phase 100: Provider Facade Cleanup Boundary
-- [ ] Re-read the formal roadmap, Phase 99 findings, and remaining provider facade code in `model_provider_client.py`.
-- [ ] Choose the next safest P4 boundary from provider facade cleanup, transport package organization, or first executor pure-helper slice.
+### Phase 100: Executor Pure Prompt/Condition/Parser Boundary
+- [x] Re-read the formal roadmap, Phase 99 findings, remaining provider facade code, and first executor pure-helper candidates.
+- [x] Choose the next safest P4 boundary: condition evaluation, agent prompt construction, and LLM JSON output parsing.
+- [x] Add focused red tests before production changes.
+- [x] Preserve backend provider behavior, stream delta merging, fallback retry behavior, Codex token refresh, thinking/reasoning metadata, executor private-helper compatibility, frontend graph interactions, and visual layout.
+- [x] Run focused backend tests, full backend verification when needed, dev restart, commit, push, and progress re-evaluation.
+- [x] If total roadmap progress is below 100%, automatically open the next phase after Phase 100 and re-judge total progress.
+- **Status:** completed
+
+### Phase 101: Executor Execution Graph Boundary
+- [x] Re-read the formal roadmap, Phase 100 findings, and remaining `node_system_executor.py` execution/state helper clusters.
+- [x] Choose the next safest P4 boundary: execution edge id construction, cycle detection, and active outgoing edge selection.
+- [x] Add focused red tests before production changes.
+- [x] Preserve backend execution order, conditional branch routing, cycle detection, output previews, provider behavior, frontend graph interactions, and visual layout.
+- [x] Run focused backend tests, full backend verification when needed, dev restart, commit, push, and progress re-evaluation.
+- [x] If total roadmap progress is below 100%, automatically open the next phase after Phase 101 and re-judge total progress.
+- **Status:** completed
+
+### Phase 102: Executor State I/O Boundary
+- [x] Re-read the formal roadmap, Phase 101 findings, and remaining `node_system_executor.py` state/output helper clusters.
+- [x] Choose the next safest P4 boundary: state initialization, node input collection, and state write application.
+- [x] Add focused red tests before production changes.
+- [x] Preserve state value initialization, read/write records, state events, output previews, saved outputs, provider behavior, frontend graph interactions, and visual layout.
+- [x] Run focused backend tests, full backend verification when needed, dev restart, commit, push, and progress re-evaluation.
+- [x] If total roadmap progress is below 100%, automatically open the next phase after Phase 102 and re-judge total progress.
+- **Status:** completed
+
+### Phase 103: Executor Output Artifact Boundary
+- [x] Re-read the formal roadmap, Phase 102 findings, and remaining `node_system_executor.py` output/artifact helper clusters.
+- [x] Choose the next safest P4 boundary: loop-limit output message formatting/wrapping and active output-node resolution.
+- [x] Add focused red tests before production changes.
+- [x] Preserve output preview filtering, saved output filtering, loop-limit messaging, active edge targeting, final result selection, provider behavior, frontend graph interactions, and visual layout.
+- [x] Run focused backend tests, full backend verification when needed, dev restart, commit, push, and progress re-evaluation.
+- [x] If total roadmap progress is below 100%, automatically open the next phase after Phase 103 and re-judge total progress.
+- **Status:** completed
+
+### Phase 104: Executor Run Artifact Refresh Boundary
+- [ ] Re-read the formal roadmap, Phase 103 findings, and remaining `node_system_executor.py` run artifact helper clusters.
+- [ ] Choose the next safest P4 boundary from run artifact refresh, knowledge summary building, snapshot append helpers, or output boundary collection.
 - [ ] Add focused red tests before production changes.
-- [ ] Preserve backend provider behavior, stream delta merging, fallback retry behavior, Codex token refresh, thinking/reasoning metadata, frontend graph interactions, and visual layout.
+- [ ] Preserve artifacts payload shape, state snapshot shape, active edge ids, output previews, saved outputs, knowledge summary, duration updates, provider behavior, frontend graph interactions, and visual layout.
 - [ ] Run focused backend tests, full backend verification when needed, dev restart, commit, push, and progress re-evaluation.
-- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 100 and re-judge total progress.
+- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 104 and re-judge total progress.
 - **Status:** in progress
 
 ## Progress Estimate
@@ -1235,6 +1271,30 @@ Phase 100 in progress
 | P4 backend cleanup after Phase 99 | About 32-36% complete. `model_provider_client.py` is now 333 lines and mostly a provider facade; executor and LangGraph runtime are still untouched. |
 | Current continuation gate after Phase 99 | Total roadmap progress is still below 100%, so Phase 100 is automatically opened for provider facade cleanup or the next backend area. |
 | P4 cleanup target for Phase 100 | About 36-40% P4 if provider facade cleanup closes the `model_provider_client.py` split without behavior changes. |
+| Full roadmap cleanup after Phase 100 | About 82-83% complete after extracting the first executor pure-helper group. |
+| Frontend roadmap cleanup after Phase 100 | Still about 83-85%; this phase was backend-only and did not touch graph editing UI. |
+| P3 `EditorWorkspaceShell.vue` cleanup after Phase 100 | Still about 82%; no workspace shell changes in this phase. |
+| P4 backend cleanup after Phase 100 | About 40-44% complete. `node_system_executor.py` is now 969 lines, with condition evaluation, agent prompt construction, and LLM output parsing isolated into focused modules while execution side effects remain in the executor. |
+| Current continuation gate after Phase 100 | Total roadmap progress is still below 100%, so Phase 101 is automatically opened for the next executor execution/state boundary. |
+| P4 cleanup target for Phase 101 | About 44-48% P4 if execution edge/cycle helpers or state I/O helpers move out with focused runtime tests. |
+| Full roadmap cleanup after Phase 101 | About 83-84% complete after extracting executor execution-graph helpers. |
+| Frontend roadmap cleanup after Phase 101 | Still about 83-85%; this phase was backend-only and did not touch graph editing UI. |
+| P3 `EditorWorkspaceShell.vue` cleanup after Phase 101 | Still about 82%; no workspace shell changes in this phase. |
+| P4 backend cleanup after Phase 101 | About 44-48% complete. `node_system_executor.py` is now 882 lines, with execution edge construction, edge id formatting, cycle detection, and active outgoing edge selection isolated in `execution_graph.py`. |
+| Current continuation gate after Phase 101 | Total roadmap progress is still below 100%, so Phase 102 is automatically opened for the next executor state I/O or output helper boundary. |
+| P4 cleanup target for Phase 102 | About 48-52% P4 if state initialization/input collection/write application or output artifact helpers move out with focused runtime tests. |
+| Full roadmap cleanup after Phase 102 | About 84-85% complete after extracting executor state I/O helpers. |
+| Frontend roadmap cleanup after Phase 102 | Still about 83-85%; this phase was backend-only and did not touch graph editing UI. |
+| P3 `EditorWorkspaceShell.vue` cleanup after Phase 102 | Still about 82%; no workspace shell changes in this phase. |
+| P4 backend cleanup after Phase 102 | About 48-52% complete. `node_system_executor.py` is now 811 lines, with state initialization, node input collection, and state write application isolated in `state_io.py`; LangGraph runtime and exported Python source now depend on that module directly. |
+| Current continuation gate after Phase 102 | Total roadmap progress is still below 100%, so Phase 103 is automatically opened for the next executor output/artifact boundary. |
+| P4 cleanup target for Phase 103 | About 52-56% P4 if output boundary collection or run artifact refresh helpers move out with focused runtime tests. |
+| Full roadmap cleanup after Phase 103 | About 85-86% complete after extracting executor output artifact helpers. |
+| Frontend roadmap cleanup after Phase 103 | Still about 83-85%; this phase was backend-only and did not touch graph editing UI. |
+| P3 `EditorWorkspaceShell.vue` cleanup after Phase 103 | Still about 82%; no workspace shell changes in this phase. |
+| P4 backend cleanup after Phase 103 | About 52-56% complete. `node_system_executor.py` is now 755 lines, with loop-limit output wrapping and active output-node resolution isolated in `output_artifacts.py`; output boundary execution still remains in the executor. |
+| Current continuation gate after Phase 103 | Total roadmap progress is still below 100%, so Phase 104 is automatically opened for run artifact refresh or output boundary collection cleanup. |
+| P4 cleanup target for Phase 104 | About 56-60% P4 if run artifact refresh, knowledge summary, or output boundary collection helpers move out with focused runtime tests. |
 
 ## Decisions Made
 | Decision | Rationale |

@@ -6,7 +6,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.core.runtime.node_system_executor import _build_auto_system_prompt, _parse_llm_json_response
+from app.core.runtime.agent_prompt import build_auto_system_prompt
+from app.core.runtime.llm_output_parser import parse_llm_json_response
 from app.core.schemas.node_system import NodeSystemStateDefinition, NodeSystemStateType
 
 
@@ -27,7 +28,7 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
             ),
         }
 
-        prompt = _build_auto_system_prompt(
+        prompt = build_auto_system_prompt(
             ["state_1"],
             {"question_state": "请总结这段内容"},
             {},
@@ -58,7 +59,7 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
             ),
         }
 
-        prompt = _build_auto_system_prompt(
+        prompt = build_auto_system_prompt(
             ["state_1", "state_2"],
             {},
             {},
@@ -98,7 +99,7 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
             ),
         }
 
-        prompt = _build_auto_system_prompt(
+        prompt = build_auto_system_prompt(
             ["summary", "draft"],
             {"context": "先读这个", "question": "再读这个"},
             {},
@@ -110,7 +111,7 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
         self.assertLess(prompt.index('"summary": "..."'), prompt.index('"draft": "..."'))
 
     def test_llm_json_response_can_map_unique_state_name_alias_back_to_output_key(self) -> None:
-        parsed = _parse_llm_json_response(
+        parsed = parse_llm_json_response(
             '{"最终答案": "这是中文语义字段返回的内容"}',
             ["state_1"],
             output_key_aliases={"state_1": ["最终答案"]},

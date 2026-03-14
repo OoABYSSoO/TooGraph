@@ -12,17 +12,17 @@ from typing_extensions import TypedDict
 
 from app.core.langgraph.checkpoints import JsonCheckpointSaver
 from app.core.langgraph.compiler import compile_graph_to_langgraph_plan
-from app.core.runtime.run_events import publish_run_event
-from app.core.runtime.node_system_executor import (
+from app.core.runtime.execution_graph import (
     CycleDetector,
-    _apply_state_writes,
-    _collect_node_inputs,
+    build_execution_edges,
+    select_active_outgoing_edges,
+)
+from app.core.runtime.run_events import publish_run_event
+from app.core.runtime.state_io import apply_state_writes, collect_node_inputs, initialize_graph_state
+from app.core.runtime.node_system_executor import (
     _execute_node,
-    _initialize_graph_state,
     _persist_run_progress,
     _refresh_run_artifacts,
-    _select_active_outgoing_edges,
-    _build_execution_edges,
     append_run_snapshot,
     collect_output_boundaries,
 )
@@ -86,11 +86,11 @@ def execute_node_system_graph_langgraph(
         state["node_status_map"] = {node_name: "idle" for node_name in graph.nodes}
     state["metadata"] = dict(graph.metadata)
     state["metadata"]["resolved_runtime_backend"] = "langgraph"
-    _initialize_graph_state(graph, state)
+    initialize_graph_state(graph, state)
     _mark_input_boundaries_success(graph, state)
     checkpoint_saver, runtime_config, checkpoint_lookup_config = _build_checkpoint_runtime(graph=graph, state=state)
 
-    execution_edges = _build_execution_edges(graph)
+    execution_edges = build_execution_edges(graph)
     outgoing_edges_by_source: dict[str, list[Any]] = defaultdict(list)
     conditional_edge_ids: dict[tuple[str, str | None, str], str] = {}
     for edge in execution_edges:
@@ -292,13 +292,13 @@ def _build_langgraph_node_callable(
 
             try:
                 iteration = _current_cycle_iteration(cycle_tracker)
-                input_values, state_reads = _collect_node_inputs(node, state)
+                input_values, state_reads = collect_node_inputs(node, state)
                 body = _execute_node(graph, node_name, node, input_values, state)
                 outputs = dict(body.get("outputs", {}))
-                selected_edge_ids = _select_active_outgoing_edges(outgoing_edges, body)
+                selected_edge_ids = select_active_outgoing_edges(outgoing_edges, body)
                 duration_ms = int((time.perf_counter() - node_started_perf) * 1000)
                 node_outputs[node_name] = outputs
-                state_writes = _apply_state_writes(node_name, node.writes, outputs, state)
+                state_writes = apply_state_writes(node_name, node.writes, outputs, state)
                 state["node_status_map"][node_name] = "success"
                 if body.get("selected_skills"):
                     state["selected_skills"] = [*state.get("selected_skills", []), *body["selected_skills"]]
@@ -428,7 +428,7 @@ def _build_langgraph_route_callable(
                 **dict(current_values or {}),
             }
             try:
-                input_values, _state_reads = _collect_node_inputs(condition_node, state)
+                input_values, _state_reads = collect_node_inputs(condition_node, state)
                 body = _execute_node(graph, condition_name, condition_node, input_values, state)
             except Exception:
                 state["node_status_map"][condition_name] = "failed"

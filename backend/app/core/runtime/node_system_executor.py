@@ -3,16 +3,49 @@ from __future__ import annotations
 import copy
 import inspect
 import json
-import re
 import time
-from collections import defaultdict
-from dataclasses import dataclass
 from typing import Any
 
 from app.core.model_catalog import get_default_text_model_ref, normalize_model_ref, resolve_runtime_model_name
+from app.core.runtime.agent_prompt import (
+    build_auto_system_prompt as _build_auto_system_prompt,
+    build_effective_system_prompt as _build_effective_system_prompt,
+    format_state_output_contract_lines as _format_state_output_contract_lines,
+    format_state_prompt_lines as _format_state_prompt_lines,
+)
+from app.core.runtime.condition_eval import (
+    coerce_condition_text as _coerce_condition_text,
+    evaluate_condition_rule as _evaluate_condition_rule,
+    normalize_condition_operands as _normalize_condition_operands,
+    parse_condition_number as _parse_condition_number,
+    resolve_branch_key as _resolve_branch_key,
+)
+from app.core.runtime.execution_graph import (
+    CycleDetector,
+    ExecutionEdge,
+    build_conditional_edge_id as _build_conditional_edge_id,
+    build_execution_edges as _build_execution_edges,
+    build_regular_edge_id as _build_regular_edge_id,
+    select_active_outgoing_edges as _select_active_outgoing_edges,
+)
+from app.core.runtime.llm_output_parser import (
+    build_output_key_aliases as _build_output_key_aliases,
+    parse_llm_json_response as _parse_llm_json_response,
+    read_parsed_output_value as _read_parsed_output_value,
+)
+from app.core.runtime.output_artifacts import (
+    apply_loop_limit_exhausted_output_message as _apply_loop_limit_exhausted_output_message,
+    format_loop_limit_exhausted_output_value as _format_loop_limit_exhausted_output_value,
+    resolve_active_output_nodes as _resolve_active_output_nodes,
+)
 from app.core.runtime.output_boundary_utils import save_output_value
 from app.core.runtime.knowledge_retrieval import retrieve_knowledge_base_context
 from app.core.runtime.run_events import publish_run_event
+from app.core.runtime.state_io import (
+    apply_state_writes as _apply_state_writes,
+    collect_node_inputs as _collect_node_inputs,
+    initialize_graph_state as _initialize_graph_state,
+)
 from app.core.runtime.state import touch_run_lifecycle, utc_now_iso
 from app.core.schemas.node_system import (
     NodeSystemAgentNode,
@@ -35,54 +68,6 @@ from app.core.thinking_levels import normalize_thinking_level, resolve_effective
 from app.tools.model_provider_client import chat_with_model_ref_with_meta
 
 KNOWLEDGE_BASE_SKILL_KEY = "search_knowledge_base"
-
-
-@dataclass(frozen=True)
-class ExecutionEdge:
-    id: str
-    source: str
-    target: str
-    kind: str
-    state: str | None = None
-    branch: str | None = None
-
-
-class CycleDetector:
-    def __init__(self, edges: list[ExecutionEdge]) -> None:
-        self.edges = edges
-        self.graph: dict[str, list[ExecutionEdge]] = defaultdict(list)
-        for edge in edges:
-            self.graph[edge.source].append(edge)
-
-    def detect(self) -> tuple[bool, list[ExecutionEdge]]:
-        WHITE, GRAY, BLACK = 0, 1, 2
-        color: dict[str, int] = defaultdict(lambda: WHITE)
-        back_edges: list[ExecutionEdge] = []
-
-        def dfs(node_name: str) -> None:
-            color[node_name] = GRAY
-            for edge in self.graph.get(node_name, []):
-                neighbor = edge.target
-                if color[neighbor] == GRAY:
-                    back_edges.append(edge)
-                elif color[neighbor] == WHITE:
-                    dfs(neighbor)
-            color[node_name] = BLACK
-
-        ordered_nodes: list[str] = []
-        seen_nodes: set[str] = set()
-        for edge in self.edges:
-            for node_name in (edge.source, edge.target):
-                if node_name in seen_nodes:
-                    continue
-                seen_nodes.add(node_name)
-                ordered_nodes.append(node_name)
-
-        for node_name in ordered_nodes:
-            if color[node_name] == WHITE:
-                dfs(node_name)
-
-        return len(back_edges) > 0, back_edges
 
 
 def _persist_run_progress(
@@ -161,21 +146,6 @@ def _refresh_run_artifacts(
     state["knowledge_summary"] = _build_knowledge_summary(state.get("skill_outputs", []))
 
 
-def _initialize_graph_state(graph: NodeSystemGraphDocument, state: dict[str, Any]) -> None:
-    initialized_values = {
-        state_name: copy.deepcopy(definition.value)
-        for state_name, definition in graph.state_schema.items()
-    }
-    initialized_values.update(dict(state.get("state_values", {})))
-    state["state_values"] = initialized_values
-    state["state_last_writers"] = dict(state.get("state_last_writers", {}))
-    state["state_events"] = list(state.get("state_events", []))
-    state["state_snapshot"] = {
-        "values": dict(initialized_values),
-        "last_writers": dict(state["state_last_writers"]),
-    }
-
-
 def append_run_snapshot(
     state: dict[str, Any],
     *,
@@ -201,94 +171,6 @@ def append_run_snapshot(
             "final_result": str(state.get("final_result", "") or ""),
         }
     )
-
-
-def _collect_node_inputs(node: Any, state: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    resolved_inputs: dict[str, Any] = {}
-    read_records: list[dict[str, Any]] = []
-    for binding in node.reads:
-        value = copy.deepcopy(state.get("state_values", {}).get(binding.state))
-        resolved_inputs[binding.state] = value
-        read_records.append(
-            {
-                "state_key": binding.state,
-                "input_key": binding.state,
-                "value": value,
-            }
-        )
-    return resolved_inputs, read_records
-
-
-def _apply_state_writes(
-    node_name: str,
-    write_bindings: list[Any],
-    output_values: dict[str, Any],
-    state: dict[str, Any],
-) -> list[dict[str, Any]]:
-    write_records: list[dict[str, Any]] = []
-    state_values = state.setdefault("state_values", {})
-    state_last_writers = state.setdefault("state_last_writers", {})
-    state_events = state.setdefault("state_events", [])
-
-    for binding in write_bindings:
-        value = copy.deepcopy(output_values.get(binding.state))
-        previous_value = copy.deepcopy(state_values.get(binding.state))
-        changed = previous_value != value
-        state_values[binding.state] = value
-        writer_record = {
-            "node_id": node_name,
-            "output_key": binding.state,
-            "mode": binding.mode.value,
-            "updated_at": utc_now_iso(),
-        }
-        state_last_writers[binding.state] = writer_record
-        state_events.append(
-            {
-                "node_id": node_name,
-                "state_key": binding.state,
-                "output_key": binding.state,
-                "mode": binding.mode.value,
-                "value": value,
-                "created_at": utc_now_iso(),
-            }
-        )
-        write_records.append(
-            {
-                "state_key": binding.state,
-                "output_key": binding.state,
-                "mode": binding.mode.value,
-                "value": value,
-                "changed": changed,
-            }
-        )
-    return write_records
-
-
-def _build_execution_edges(graph: NodeSystemGraphDocument) -> list[ExecutionEdge]:
-    execution_edges: list[ExecutionEdge] = []
-    for edge in graph.edges:
-        execution_edges.append(
-            ExecutionEdge(
-                id=_build_regular_edge_id(edge.source, edge.target),
-                source=edge.source,
-                target=edge.target,
-                kind="edge",
-                state=None,
-            )
-        )
-
-    for conditional_edge in graph.conditional_edges:
-        for branch, target in conditional_edge.branches.items():
-            execution_edges.append(
-                ExecutionEdge(
-                    id=_build_conditional_edge_id(conditional_edge.source, branch, target),
-                    source=conditional_edge.source,
-                    target=target,
-                    kind="conditional",
-                    branch=branch,
-                )
-            )
-    return execution_edges
 
 
 def _execute_node(
@@ -551,39 +433,6 @@ def _execute_output_node(
     }
 
 
-def _format_loop_limit_exhausted_output_value(value: Any) -> str:
-    if isinstance(value, str):
-        rendered = value
-    elif value is None:
-        rendered = ""
-    elif isinstance(value, (dict, list, tuple, bool)):
-        rendered = json.dumps(value, ensure_ascii=False)
-    else:
-        rendered = str(value)
-    return f"循环已达上限，最新的结果是：{rendered}"
-
-
-def _apply_loop_limit_exhausted_output_message(body: dict[str, Any]) -> dict[str, Any]:
-    preview_items = list(body.get("output_previews", []))
-    wrapped_final_result = _format_loop_limit_exhausted_output_value(
-        preview_items[0].get("value") if preview_items else body.get("final_result")
-    )
-    wrapped_previews: list[dict[str, Any]] = []
-    for preview in preview_items:
-        wrapped_previews.append(
-            {
-                **preview,
-                "display_mode": "text",
-                "value": wrapped_final_result,
-            }
-        )
-    return {
-        **body,
-        "output_previews": wrapped_previews,
-        "final_result": wrapped_final_result,
-    }
-
-
 def collect_output_boundaries(
     graph: NodeSystemGraphDocument,
     state: dict[str, Any],
@@ -631,34 +480,6 @@ def collect_output_boundaries(
 
     if final_results:
         state["final_result"] = str(final_results[-1])
-
-
-def _resolve_active_output_nodes(
-    graph: NodeSystemGraphDocument,
-    active_edge_ids: set[str],
-) -> set[str]:
-    if not active_edge_ids:
-        return set()
-
-    active_output_nodes: set[str] = set()
-    for edge in graph.edges:
-        target_node = graph.nodes.get(edge.target)
-        if (
-            isinstance(target_node, NodeSystemOutputNode)
-            and _build_regular_edge_id(edge.source, edge.target) in active_edge_ids
-        ):
-            active_output_nodes.add(edge.target)
-
-    for conditional_edge in graph.conditional_edges:
-        for branch, target in conditional_edge.branches.items():
-            target_node = graph.nodes.get(target)
-            if (
-                isinstance(target_node, NodeSystemOutputNode)
-                and _build_conditional_edge_id(conditional_edge.source, branch, target) in active_edge_ids
-            ):
-                active_output_nodes.add(target)
-
-    return active_output_nodes
 
 
 def _execute_condition_node(
@@ -782,135 +603,6 @@ def _generate_agent_response(
     return response_payload, reasoning, llm_meta.get("warnings", []), updated_runtime_config
 
 
-def _build_effective_system_prompt(
-    output_keys: list[str],
-    input_values: dict[str, Any],
-    skill_context: dict[str, Any],
-    *,
-    state_schema: dict[str, NodeSystemStateDefinition] | None = None,
-) -> str:
-    return _build_auto_system_prompt(output_keys, input_values, skill_context, state_schema=state_schema)
-
-
-def _build_auto_system_prompt(
-    output_keys: list[str],
-    input_values: dict[str, Any],
-    skill_context: dict[str, Any],
-    *,
-    state_schema: dict[str, NodeSystemStateDefinition] | None = None,
-) -> str:
-    resolved_state_schema = state_schema or {}
-    parts = [
-        "你是一个工作流处理节点。根据输入和技能结果完成用户的任务指令。",
-        "严格返回一个 JSON 对象，不要加 markdown 围栏或任何前缀。",
-    ]
-
-    if input_values:
-        parts.append("\n== Graph State Inputs ==")
-        for key, value in input_values.items():
-            display = str(value)
-            if len(display) > 200:
-                display = display[:200] + "..."
-            parts.extend(_format_state_prompt_lines(key, resolved_state_schema.get(key), value=display))
-
-    if skill_context:
-        parts.append("\n== Skill Results ==")
-        for skill_key, result in skill_context.items():
-            parts.append(f"[{skill_key}]")
-            if isinstance(result, dict):
-                for result_key, result_value in result.items():
-                    display = str(result_value)
-                    if len(display) > 300:
-                        display = display[:300] + "..."
-                    parts.append(f"  {result_key}: {display}")
-            else:
-                parts.append(f"  {result}")
-
-    example = json.dumps({key: "..." for key in output_keys}, ensure_ascii=False)
-    parts.append("\n== 必须返回的 JSON 字段 ==")
-    for key in output_keys:
-        parts.extend(_format_state_prompt_lines(key, resolved_state_schema.get(key), include_output_contract=True))
-    parts.append("\n== 必须返回的 JSON 格式 ==")
-    parts.append(example)
-    parts.append("每个字段必须使用上方的 key；name 只用于理解字段语义。")
-    return "\n".join(parts)
-
-
-def _format_state_prompt_lines(
-    key: str,
-    definition: NodeSystemStateDefinition | None,
-    *,
-    value: str | None = None,
-    include_output_contract: bool = False,
-) -> list[str]:
-    if definition is None and value is not None:
-        return [f"- {key}: {value}"]
-
-    lines = [f"- key: {key}"]
-    if definition is not None:
-        name = definition.name.strip()
-        if name and name != key:
-            lines.append(f"  name: {name}")
-        lines.append(f"  type: {definition.type.value}")
-        description = definition.description.strip()
-        if description:
-            lines.append(f"  description: {description}")
-        if include_output_contract:
-            lines.extend(_format_state_output_contract_lines(definition.type))
-    if value is not None:
-        lines.append(f"  value: {value}")
-    return lines
-
-
-def _format_state_output_contract_lines(state_type: NodeSystemStateType) -> list[str]:
-    if state_type == NodeSystemStateType.MARKDOWN:
-        return [
-            "  output_format: markdown string inside the JSON value",
-            "  output_rule: 这个字段的值必须是 Markdown 内容字符串；不要把整个 JSON 包进 Markdown 代码块。",
-        ]
-    if state_type in {NodeSystemStateType.JSON, NodeSystemStateType.OBJECT}:
-        return [
-            "  output_format: JSON object inside the JSON value",
-            "  output_rule: 这个字段的值必须是对象；不要把对象再序列化成字符串。",
-        ]
-    if state_type in {NodeSystemStateType.ARRAY, NodeSystemStateType.FILE_LIST}:
-        return [
-            "  output_format: JSON array inside the JSON value",
-            "  output_rule: 这个字段的值必须是数组；不要把数组再序列化成字符串。",
-        ]
-    if state_type == NodeSystemStateType.NUMBER:
-        return ["  output_format: JSON number"]
-    if state_type == NodeSystemStateType.BOOLEAN:
-        return ["  output_format: JSON boolean"]
-    return ["  output_format: JSON string"]
-
-
-def _build_output_key_aliases(
-    output_keys: list[str],
-    state_schema: dict[str, NodeSystemStateDefinition],
-) -> dict[str, list[str]]:
-    name_counts: dict[str, int] = {}
-    aliases: dict[str, list[str]] = {}
-    candidate_names: list[str] = []
-    for key in output_keys:
-        definition = state_schema.get(key)
-        if definition is None:
-            continue
-        name = definition.name.strip()
-        if name and name != key:
-            candidate_names.append(name)
-    for name in candidate_names:
-        name_counts[name] = name_counts.get(name, 0) + 1
-    for key in output_keys:
-        definition = state_schema.get(key)
-        if definition is None:
-            continue
-        name = definition.name.strip()
-        if name and name != key and name_counts.get(name, 0) == 1:
-            aliases[key] = [name]
-    return aliases
-
-
 def _resolve_agent_runtime_config(node: NodeSystemAgentNode) -> dict[str, Any]:
     global_model_ref = get_default_text_model_ref(force_refresh=True)
     global_thinking_enabled = get_default_agent_thinking_enabled()
@@ -990,169 +682,6 @@ def _resolve_reference(
     return reference
 
 
-def _evaluate_condition_rule(left_value: Any, operator: str, right_value: Any) -> bool:
-    left_value, right_value = _normalize_condition_operands(left_value, right_value)
-    if operator == "exists":
-        return left_value not in (None, "", [], {})
-    if operator == "==":
-        return left_value == right_value
-    if operator == "!=":
-        return left_value != right_value
-    if operator == ">":
-        return left_value > right_value
-    if operator == "<":
-        return left_value < right_value
-    if operator == ">=":
-        return left_value >= right_value
-    if operator == "<=":
-        return left_value <= right_value
-    if operator == "contains":
-        return _coerce_condition_text(right_value) in _coerce_condition_text(left_value)
-    if operator == "not_contains":
-        return _coerce_condition_text(right_value) not in _coerce_condition_text(left_value)
-    raise ValueError(f"Unsupported condition operator '{operator}'.")
-
-
-def _normalize_condition_operands(left_value: Any, right_value: Any) -> tuple[Any, Any]:
-    left_number = _parse_condition_number(left_value)
-    right_number = _parse_condition_number(right_value)
-    if left_number is not None and right_number is not None:
-        return left_number, right_number
-    return left_value, right_value
-
-
-def _parse_condition_number(value: Any) -> int | float | None:
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, (int, float)):
-        return value
-    if not isinstance(value, str):
-        return None
-
-    trimmed = value.strip()
-    if not trimmed:
-        return None
-    if re.fullmatch(r"[+-]?\d+", trimmed):
-        return int(trimmed)
-    if re.fullmatch(r"[+-]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?", trimmed):
-        return float(trimmed)
-    return None
-
-
-def _coerce_condition_text(value: Any) -> str:
-    if value is None:
-        return ""
-    if isinstance(value, str):
-        return value
-    return str(value)
-
-
-def _resolve_branch_key(branches: list[str], branch_mapping: dict[str, str], condition_result: Any) -> str | None:
-    lookup_keys = [
-        str(condition_result).lower(),
-        str(condition_result),
-    ]
-    for lookup_key in lookup_keys:
-        if lookup_key in branch_mapping:
-            return branch_mapping[lookup_key]
-
-    if isinstance(condition_result, bool):
-        bool_key = "true" if condition_result else "false"
-        if bool_key in branches:
-            return bool_key
-        if len(branches) >= 2:
-            return branches[0] if condition_result else branches[1]
-
-    normalized_matches = {branch.lower(): branch for branch in branches}
-    for lookup_key in lookup_keys:
-        if lookup_key.lower() in normalized_matches:
-            return normalized_matches[lookup_key.lower()]
-    return None
-
-
-def _select_active_outgoing_edges(outgoing_edges: list[ExecutionEdge], body: dict[str, Any]) -> set[str]:
-    selected_branch = body.get("selected_branch")
-    active_edges: set[str] = set()
-    for edge in outgoing_edges:
-        if edge.kind == "conditional":
-            if selected_branch and edge.branch == selected_branch:
-                active_edges.add(edge.id)
-            continue
-        active_edges.add(edge.id)
-    return active_edges
-
-
-def _parse_llm_json_response(
-    content: str,
-    output_keys: list[str],
-    *,
-    output_key_aliases: dict[str, list[str]] | None = None,
-) -> dict[str, Any]:
-    aliases = output_key_aliases or {}
-    if not content:
-        return {key: "" for key in output_keys}
-    cleaned = re.sub(r"^\s*```(?:json)?\s*\n?", "", content)
-    cleaned = re.sub(r"\n?\s*```\s*$", "", cleaned).strip()
-
-    candidate_payloads = [cleaned]
-    json_start = cleaned.find("{")
-    json_end = cleaned.rfind("}")
-    if json_start != -1 and json_end > json_start:
-        candidate_payloads.append(cleaned[json_start : json_end + 1].strip())
-
-    for candidate in candidate_payloads:
-        try:
-            parsed = json.loads(candidate)
-            if isinstance(parsed, dict):
-                return {key: _read_parsed_output_value(parsed, key, aliases) for key in output_keys}
-        except json.JSONDecodeError:
-            continue
-
-    key_value_matches: dict[str, str] = {}
-    for line in cleaned.splitlines():
-        match = re.match(r'^\s*["\']?([A-Za-z0-9_\-]+)["\']?\s*[:：]\s*(.+?)\s*$', line)
-        if not match:
-            continue
-        key, value = match.groups()
-        if key in output_keys:
-            key_value_matches[key] = value.strip().strip('"').strip("'")
-
-    if key_value_matches:
-        return {
-            key: key_value_matches.get(key, "")
-            for key in output_keys
-        }
-
-    if len(output_keys) == 1:
-        key = output_keys[0]
-        single_match = re.match(rf'^\s*{re.escape(key)}\s*[:：]\s*(.+?)\s*$', cleaned, flags=re.IGNORECASE | re.DOTALL)
-        if single_match:
-            return {key: single_match.group(1).strip()}
-
-    try:
-        parsed = json.loads(cleaned)
-        if isinstance(parsed, dict):
-            return {key: _read_parsed_output_value(parsed, key, aliases) for key in output_keys}
-    except json.JSONDecodeError:
-        pass
-    return {key: cleaned for key in output_keys}
-
-
-def _read_parsed_output_value(parsed: dict[str, Any], output_key: str, aliases: dict[str, list[str]]) -> Any:
-    if output_key in parsed:
-        return parsed.get(output_key)
-    for alias in aliases.get(output_key, []):
-        if alias in parsed:
-            return parsed.get(alias)
-    return None
-
-
-def _build_regular_edge_id(source: str, target: str) -> str:
-    return f"edge:{source}:{target}"
-
-
-def _build_conditional_edge_id(source: str, branch: str, target: str) -> str:
-    return f"conditional:{source}:{branch}->{target}"
 def _build_knowledge_summary(skill_outputs: list[dict[str, Any]]) -> str:
     lines: list[str] = []
     for skill_output in skill_outputs:

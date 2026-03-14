@@ -39,13 +39,9 @@ from typing_extensions import TypedDict
 from langgraph.graph import END, START, StateGraph
 
 from app.core.langgraph.compiler import compile_graph_to_langgraph_plan
-from app.core.runtime.node_system_executor import (
-    _apply_state_writes,
-    _collect_node_inputs,
-    _execute_node,
-    _initialize_graph_state,
-)
+from app.core.runtime.node_system_executor import _execute_node
 from app.core.runtime.state import create_initial_run_state
+from app.core.runtime.state_io import apply_state_writes, collect_node_inputs, initialize_graph_state
 from app.core.schemas.node_system import NodeSystemGraphPayload
 
 
@@ -106,7 +102,7 @@ def build_graph():
         graph_name=GRAPH.name,
         max_revision_round=int(GRAPH.metadata.get("max_revision_round", 1)),
     )
-    _initialize_graph_state(GRAPH, runtime_state)
+    initialize_graph_state(GRAPH, runtime_state)
 
     if not RUNTIME_NODES and not BUILD_PLAN.runtime_condition_routes:
         return None
@@ -121,10 +117,10 @@ def build_graph():
                 **dict(runtime_state.get("state_values", {{}})),
                 **dict(current_values or {{}}),
             }}
-            input_values, _state_reads = _collect_node_inputs(node, runtime_state)
+            input_values, _state_reads = collect_node_inputs(node, runtime_state)
             body = _execute_node(GRAPH, node_name, node, input_values, runtime_state)
             outputs = dict(body.get("outputs", {{}}))
-            _apply_state_writes(node_name, node.writes, outputs, runtime_state)
+            apply_state_writes(node_name, node.writes, outputs, runtime_state)
             return outputs
 
         return _call
@@ -137,7 +133,7 @@ def build_graph():
                 **dict(runtime_state.get("state_values", {{}})),
                 **dict(current_values or {{}}),
             }}
-            input_values, _state_reads = _collect_node_inputs(condition_node, runtime_state)
+            input_values, _state_reads = collect_node_inputs(condition_node, runtime_state)
             body = _execute_node(GRAPH, route.condition, condition_node, input_values, runtime_state)
             branch = str(body.get("selected_branch") or "").strip()
             if not branch:
