@@ -1,5 +1,222 @@
 # Progress Log
 
+## Session: 2026-04-30 Phase 99
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Continued automatically after commit `77ab60a` because the full-roadmap progress is below 100%.
+  - Chose Codex responses transport as the last provider-transport slice in `model_provider_client.py`.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added structure coverage requiring Codex responses transport helpers to live in `app.tools.model_provider_codex`.
+  - Verified the expected red failure because the module did not exist.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `backend/app/tools/model_provider_codex.py`.
+  - Moved Codex response text extraction, stream delta extraction, stream coalescing, one-shot responses POST, token-expiry retry handling, request logging calls, and response metadata into the new transport module.
+  - Kept `_chat_codex_responses` as the client compatibility facade and injected Codex token resolve/refresh plus request-log seams.
+  - Preserved legacy `model_provider_client.httpx` and `_build_auth_headers` patch aliases used by existing tests.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran the focused red/green structure test.
+  - Ran Codex provider, provider client, and model request log regression tests.
+  - Ran the full backend test suite.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend entry returned HTTP 200 and backend `/health` returned `{"status":"ok"}`.
+
+### Phase 5: Honest Progress Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated the full roadmap at about 80-81%.
+  - Recalculated the frontend-focused roadmap at about 83-85%; unchanged because Phase 99 was backend-only.
+  - Recalculated P3 `EditorWorkspaceShell.vue` cleanup at about 82%; unchanged.
+  - Recalculated P4 backend cleanup at about 32-36% after isolating all provider transports from `model_provider_client.py`.
+  - Opened Phase 100 automatically because the full roadmap is still below 100%.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red structure test | `PYTHONPATH=backend pytest backend/tests/test_model_provider_client.py::ModelProviderClientTests::test_codex_chat_transport_is_isolated_from_provider_client -q` before implementation | Fails because `model_provider_codex` is missing | Failed with missing module assertion | Passed |
+| Focused structure test | Same command after implementation | Structure test passes | 1 passed | Passed |
+| Codex/provider regression tests | `PYTHONPATH=backend pytest backend/tests/test_openai_codex_provider.py backend/tests/test_model_provider_client.py backend/tests/test_model_request_logs.py -q` | Codex refresh, stream, discovery, and request-log behavior stay unchanged | 33 passed, 2 existing warnings | Passed |
+| Full backend tests | `PYTHONPATH=backend pytest backend/tests -q` | All backend tests pass | 145 passed, 2 existing warnings | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | Existing tests still patched `model_provider_client.httpx.Client` and checked `_build_auth_headers` after the client stopped importing them | Phase 99 focused regression run | Restored `httpx` and `_build_auth_headers` as compatibility aliases in the client facade while leaving implementation in transport/helper modules. |
+
+## Session: 2026-04-30 Phase 98
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Continued automatically after commit `1be1553` because the full-roadmap progress is below 100%.
+  - Chose Gemini generate-content transport as the next single-provider P4 slice.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added structure coverage requiring Gemini chat transport helpers to live in `app.tools.model_provider_gemini`.
+  - Verified the expected red failure because the module did not exist.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `backend/app/tools/model_provider_gemini.py`.
+  - Moved Gemini request payload construction, stream delta extraction, stream coalescing, response text extraction, fallback metadata, and request logging calls into the new transport module.
+  - Kept `_chat_gemini` as the client compatibility facade and injected the existing request-log and streaming fallback seams.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran the focused red/green structure test.
+  - Ran provider client and model request log regression tests.
+  - Ran the full backend test suite.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend entry returned HTTP 200 and backend `/health` returned `{"status":"ok"}`.
+
+### Phase 5: Honest Progress Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated the full roadmap at about 78-79%.
+  - Recalculated the frontend-focused roadmap at about 83-85%; unchanged because Phase 98 was backend-only.
+  - Recalculated P3 `EditorWorkspaceShell.vue` cleanup at about 82%; unchanged.
+  - Recalculated P4 backend cleanup at about 25-28% after isolating the Gemini generate-content transport.
+  - Opened Phase 99 automatically because the full roadmap is still below 100%.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red structure test | `PYTHONPATH=backend pytest backend/tests/test_model_provider_client.py::ModelProviderClientTests::test_gemini_chat_transport_is_isolated_from_provider_client -q` before implementation | Fails because `model_provider_gemini` is missing | Failed with missing module assertion | Passed |
+| Focused structure test | Same command after implementation | Structure test passes | 1 passed | Passed |
+| Provider regression tests | `PYTHONPATH=backend pytest backend/tests/test_model_provider_client.py backend/tests/test_model_request_logs.py -q` | Provider client behavior and request-log behavior stay unchanged | 20 passed, 2 existing warnings | Passed |
+| Full backend tests | `PYTHONPATH=backend pytest backend/tests -q` | All backend tests pass | 144 passed, 2 existing warnings | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | None | Phase 98 | No implementation errors beyond the expected red structure failure. |
+
+## Session: 2026-04-30 Phase 97
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Continued automatically after commit `1178132` because the full-roadmap progress is below 100%.
+  - Inspected remaining Anthropic, Gemini, and Codex transport clusters.
+  - Chose Anthropic messages because it mirrors the already extracted OpenAI transport shape and has focused provider-client coverage.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added structure coverage requiring Anthropic chat transport helpers to live in `app.tools.model_provider_anthropic`.
+  - Verified the expected red failure because the module did not exist.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `backend/app/tools/model_provider_anthropic.py`.
+  - Moved Anthropic request payload construction, stream delta extraction, stream coalescing, response text extraction, fallback metadata, and request logging calls into the new transport module.
+  - Kept `_chat_anthropic` as the client compatibility facade and injected the existing request-log and streaming fallback seams.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran the focused red/green structure test.
+  - Ran provider client and model request log regression tests.
+  - Ran the full backend test suite.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend entry returned HTTP 200 and backend `/health` returned `{"status":"ok"}`.
+
+### Phase 5: Honest Progress Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated the full roadmap at about 77-78%.
+  - Recalculated the frontend-focused roadmap at about 83-85%; unchanged because Phase 97 was backend-only.
+  - Recalculated P3 `EditorWorkspaceShell.vue` cleanup at about 82%; unchanged.
+  - Recalculated P4 backend cleanup at about 20-23% after isolating the Anthropic messages transport.
+  - Opened Phase 98 automatically because the full roadmap is still below 100%.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red structure test | `PYTHONPATH=backend pytest backend/tests/test_model_provider_client.py::ModelProviderClientTests::test_anthropic_chat_transport_is_isolated_from_provider_client -q` before implementation | Fails because `model_provider_anthropic` is missing | Failed with missing module assertion | Passed |
+| Focused structure test | Same command after implementation | Structure test passes | 1 passed | Passed |
+| Provider regression tests | `PYTHONPATH=backend pytest backend/tests/test_model_provider_client.py backend/tests/test_model_request_logs.py -q` | Provider client behavior and request-log behavior stay unchanged | 19 passed, 2 existing warnings | Passed |
+| Full backend tests | `PYTHONPATH=backend pytest backend/tests -q` | All backend tests pass | 143 passed, 2 existing warnings | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | None | Phase 97 | No implementation errors beyond the expected red structure failure. |
+
+## Session: 2026-04-30 Phase 96
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Continued automatically after commit `85eb7ae` because the full-roadmap progress is below 100%.
+  - Inspected remaining provider transport clusters in `model_provider_client.py`.
+  - Chose the OpenAI-compatible chat transport because it is heavily covered by existing stream, fallback, delta, request log, and local runtime tests.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added structure coverage requiring OpenAI-compatible chat transport helpers to live in `app.tools.model_provider_openai`.
+  - Verified the expected red failure because the module did not exist.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `backend/app/tools/model_provider_openai.py`.
+  - Added `backend/app/tools/model_provider_response_parsing.py` for shared message text normalization and SSE JSON event parsing.
+  - Moved OpenAI-compatible chat request construction, stream delta extraction, stream coalescing, response text extraction, fallback metadata, and request logging calls into the new transport module.
+  - Kept `_chat_openai_compatible` as the client compatibility facade and injected the existing request-log and streaming fallback seams.
+  - Updated `local_llm.py` to import the shared OpenAI stream coalesce/delta helpers from the new transport module instead of private client symbols.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran the focused red/green structure test.
+  - Ran provider client, OpenAI-compatible runtime, and model request log regression tests.
+  - Ran the full backend test suite.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend entry returned HTTP 200 and backend `/health` returned `{"status":"ok"}`.
+
+### Phase 5: Honest Progress Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated the full roadmap at about 76-77%.
+  - Recalculated the frontend-focused roadmap at about 83-85%; unchanged because Phase 96 was backend-only.
+  - Recalculated P3 `EditorWorkspaceShell.vue` cleanup at about 82%; unchanged.
+  - Recalculated P4 backend cleanup at about 15-18% after isolating HTTP/request, discovery, OpenAI-compatible chat, and shared response parsing.
+  - Opened Phase 97 automatically because the full roadmap is still below 100%.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red structure test | `PYTHONPATH=backend pytest backend/tests/test_model_provider_client.py::ModelProviderClientTests::test_openai_compatible_chat_transport_is_isolated_from_provider_client -q` before implementation | Fails because `model_provider_openai` is missing | Failed with missing module assertion | Passed |
+| Focused structure test | Same command after implementation | Structure test passes | 1 passed | Passed |
+| OpenAI/local regression tests | `PYTHONPATH=backend pytest backend/tests/test_model_provider_client.py backend/tests/test_openai_compatible_provider_runtime.py backend/tests/test_model_request_logs.py -q` | OpenAI-compatible, local runtime, and request-log behavior stay unchanged | 29 passed, 2 existing warnings | Passed |
+| Full backend tests | `PYTHONPATH=backend pytest backend/tests -q` | All backend tests pass | 142 passed, 2 existing warnings | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | `local_llm.py` still imported OpenAI stream helpers from `model_provider_client.py` after those helpers moved | Phase 96 focused structure run | Updated `local_llm.py` to import `coalesce_openai_chat_stream_response` and `extract_openai_chat_stream_delta` from `model_provider_openai.py`. |
+
 ## Session: 2026-04-30 Phase 95
 
 ### Phase 1: Re-orientation
