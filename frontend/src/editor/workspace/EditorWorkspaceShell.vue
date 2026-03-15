@@ -296,9 +296,11 @@ import { omitTabScopedRecordEntry, setTabScopedRecordEntry } from "./editorTabRu
 import { formatRunFeedback, formatValidationFeedback, type RunFeedback, type WorkspaceFeedbackTone } from "./runFeedbackModel.ts";
 import { buildRunNodeArtifactsModel, mergeRunOutputPreviewByNodeId } from "./runNodeArtifactsModel.ts";
 import { applyRunWrittenStateValuesToDocument } from "./runStatePersistence.ts";
+import type { WorkspaceSidePanelMode } from "./workspaceSidePanelModel.ts";
 import { buildPythonExportFileName, downloadPythonSource } from "./pythonExportModel.ts";
 import { isGraphiteUiPythonExportFile, isGraphiteUiPythonExportSource } from "./pythonImportModel.ts";
 import { buildPresetPayloadForNode } from "./presetPersistence.ts";
+import { useWorkspaceSidePanelController } from "./useWorkspaceSidePanelController.ts";
 import { useWorkspaceGraphMutationActions } from "./useWorkspaceGraphMutationActions.ts";
 
 type DataEdgeStateEditorRequest = CreatedStateEdgeEditorRequest;
@@ -332,7 +334,7 @@ const closeBusy = ref(false);
 const closeError = ref<string | null>(null);
 const handledRouteSignature = ref<string | null>(null);
 const statePanelOpenByTabId = ref<Record<string, boolean>>({});
-const sidePanelModeByTabId = ref<Record<string, "state" | "human-review">>({});
+const sidePanelModeByTabId = ref<Record<string, WorkspaceSidePanelMode>>({});
 const focusedNodeIdByTabId = ref<Record<string, string | null>>({});
 const focusRequestByTabId = ref<Record<string, NodeFocusRequest | null>>({});
 const viewportByTabId = ref<Record<string, CanvasViewport>>({});
@@ -377,9 +379,26 @@ const activeStateCount = computed(() => {
   }
   return Object.keys(document.state_schema ?? {}).length;
 });
-const activeStatePanelOpen = computed(() => {
-  const tab = activeTab.value;
-  return tab ? statePanelOpenByTabId.value[tab.tabId] ?? false : false;
+const {
+  activeStatePanelOpen,
+  isStatePanelOpen,
+  shouldShowHumanReviewPanel,
+  toggleStatePanel,
+  openHumanReviewPanelForTab,
+  focusNodeForTab,
+  requestNodeFocusForTab,
+  toggleActiveStatePanel,
+  editorMainStyle,
+  sidePanelLayerStyle,
+} = useWorkspaceSidePanelController({
+  activeTab,
+  statePanelOpenByTabId,
+  sidePanelModeByTabId,
+  latestRunDetailByTabId,
+  focusedNodeIdByTabId,
+  focusRequestByTabId,
+  closeNodeCreationMenu,
+  showGraphLockedEditToast,
 });
 const activeTabRouteSignature = computed(() => {
   const tab = activeTab.value;
@@ -982,44 +1001,6 @@ function persistRunStateValuesForTab(tabId: string, run: RunDetail) {
   }
 }
 
-function isStatePanelOpen(tabId: string) {
-  return statePanelOpenByTabId.value[tabId] ?? false;
-}
-
-function sidePanelMode(tabId: string) {
-  return sidePanelModeByTabId.value[tabId] ?? "state";
-}
-
-function canShowHumanReviewPanel(tabId: string) {
-  return latestRunDetailByTabId.value[tabId]?.status === "awaiting_human";
-}
-
-function shouldShowHumanReviewPanel(tabId: string) {
-  return sidePanelMode(tabId) === "human-review" && canShowHumanReviewPanel(tabId);
-}
-
-function isHumanReviewPanelLockedOpen(tabId: string) {
-  return canShowHumanReviewPanel(tabId) && sidePanelMode(tabId) === "human-review";
-}
-
-function toggleStatePanel(tabId: string) {
-  if (isHumanReviewPanelLockedOpen(tabId)) {
-    showGraphLockedEditToast();
-    return;
-  }
-  statePanelOpenByTabId.value = setTabScopedRecordEntry(statePanelOpenByTabId.value, tabId, !isStatePanelOpen(tabId));
-}
-
-function openHumanReviewPanelForTab(tabId: string, nodeId: string | null) {
-  if (!canShowHumanReviewPanel(tabId)) {
-    return;
-  }
-  closeNodeCreationMenu(tabId);
-  sidePanelModeByTabId.value = setTabScopedRecordEntry(sidePanelModeByTabId.value, tabId, "human-review");
-  statePanelOpenByTabId.value = setTabScopedRecordEntry(statePanelOpenByTabId.value, tabId, true);
-  focusNodeForTab(tabId, nodeId);
-}
-
 function isGraphInteractionLocked(tabId: string) {
   return latestRunDetailByTabId.value[tabId]?.status === "awaiting_human";
 }
@@ -1042,65 +1023,6 @@ function guardGraphEditForTab(tabId: string) {
   }
   showGraphLockedEditToast();
   return true;
-}
-
-function focusNodeForTab(tabId: string, nodeId: string | null) {
-  focusedNodeIdByTabId.value = setTabScopedRecordEntry(focusedNodeIdByTabId.value, tabId, nodeId);
-}
-
-function requestNodeFocusForTab(tabId: string, nodeId: string | null) {
-  focusNodeForTab(tabId, nodeId);
-  if (!nodeId) {
-    focusRequestByTabId.value = setTabScopedRecordEntry(focusRequestByTabId.value, tabId, null);
-    return;
-  }
-
-  const previousSequence = focusRequestByTabId.value[tabId]?.sequence ?? 0;
-  focusRequestByTabId.value = setTabScopedRecordEntry(focusRequestByTabId.value, tabId, {
-    nodeId,
-    sequence: previousSequence + 1,
-  });
-}
-
-function toggleActiveStatePanel() {
-  if (!activeTab.value) {
-    return;
-  }
-  const tabId = activeTab.value.tabId;
-  if (isHumanReviewPanelLockedOpen(tabId)) {
-    openHumanReviewPanelForTab(tabId, latestRunDetailByTabId.value[tabId]?.current_node_id ?? null);
-    showGraphLockedEditToast();
-    return;
-  }
-  if (sidePanelMode(tabId) !== "state") {
-    sidePanelModeByTabId.value = setTabScopedRecordEntry(sidePanelModeByTabId.value, tabId, "state");
-    statePanelOpenByTabId.value = setTabScopedRecordEntry(statePanelOpenByTabId.value, tabId, true);
-    return;
-  }
-  sidePanelModeByTabId.value = setTabScopedRecordEntry(sidePanelModeByTabId.value, tabId, "state");
-  toggleStatePanel(tabId);
-}
-
-function editorMainStyle(tabId: string) {
-  if (!isStatePanelOpen(tabId)) {
-    return {};
-  }
-
-  return {
-    "--editor-canvas-minimap-right-clearance": `calc(${sidePanelOpenWidth(tabId)} + 12px)`,
-  };
-}
-
-function sidePanelLayerStyle(tabId: string) {
-  return {
-    width: sidePanelOpenWidth(tabId),
-  };
-}
-
-function sidePanelOpenWidth(tabId: string) {
-  return sidePanelMode(tabId) === "human-review"
-    ? "var(--editor-human-review-panel-open-width)"
-    : "var(--editor-state-panel-open-width)";
 }
 
 function nodeCreationMenuState(tabId: string) {
