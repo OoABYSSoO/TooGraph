@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import inspect
 from typing import Any
 
 from app.core.model_catalog import get_default_text_model_ref, normalize_model_ref, resolve_runtime_model_name
@@ -14,6 +13,8 @@ from app.core.runtime.agent_prompt import (
     format_state_output_contract_lines as _format_state_output_contract_lines,
     format_state_prompt_lines as _format_state_prompt_lines,
 )
+from app.core.runtime.agent_runtime_config import resolve_agent_runtime_config
+from app.core.runtime.agent_response_generation import generate_agent_response
 from app.core.runtime.condition_eval import (
     coerce_condition_text as _coerce_condition_text,
     evaluate_condition_rule as _evaluate_condition_rule,
@@ -48,6 +49,11 @@ from app.core.runtime.output_boundaries import (
     execute_output_node as _execute_output_node,
 )
 from app.core.runtime.knowledge_retrieval import retrieve_knowledge_base_context
+from app.core.runtime.reference_resolution import (
+    read_path as _read_path,
+    resolve_condition_source as _resolve_condition_source,
+    resolve_reference as _resolve_reference,
+)
 from app.core.runtime.run_artifacts import (
     append_run_snapshot,
     build_knowledge_summary as _build_knowledge_summary,
@@ -58,6 +64,10 @@ from app.core.runtime.state_io import (
     apply_state_writes as _apply_state_writes,
     collect_node_inputs as _collect_node_inputs,
     initialize_graph_state as _initialize_graph_state,
+)
+from app.core.runtime.skill_invocation import (
+    callable_accepts_keyword as _callable_accepts_keyword,
+    invoke_skill as _invoke_skill,
 )
 from app.core.runtime.state import touch_run_lifecycle
 from app.core.schemas.node_system import (
@@ -254,14 +264,6 @@ def _execute_agent_node(
     }
 
 
-def _callable_accepts_keyword(func: Any, keyword: str) -> bool:
-    try:
-        parameters = inspect.signature(func).parameters
-    except (TypeError, ValueError):
-        return True
-    return keyword in parameters or any(parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values())
-
-
 def _execute_condition_node(
     node: NodeSystemConditionNode,
     input_values: dict[str, Any],
@@ -285,30 +287,6 @@ def _execute_condition_node(
     }
 
 
-def _resolve_condition_source(
-    source: str,
-    *,
-    inputs: dict[str, Any],
-    graph: dict[str, Any],
-    state_values: dict[str, Any],
-) -> Any:
-    if source.startswith("$"):
-        return _resolve_reference(
-            source,
-            inputs=inputs,
-            response={},
-            skills={},
-            context={},
-            graph=graph,
-            state_values=state_values,
-        )
-    if source in inputs:
-        return inputs[source]
-    if source in state_values:
-        return state_values[source]
-    return source
-
-
 def _generate_agent_response(
     node: NodeSystemAgentNode,
     input_values: dict[str, Any],
@@ -318,158 +296,33 @@ def _generate_agent_response(
     state_schema: dict[str, NodeSystemStateDefinition] | None = None,
     on_delta: Any | None = None,
 ) -> tuple[dict[str, Any], str, list[str], dict[str, Any]]:
-    output_keys = [binding.state for binding in node.writes]
-    if not output_keys:
-        return {"summary": ""}, "", [], runtime_config
-
-    system_prompt = _build_effective_system_prompt(
-        output_keys,
+    return generate_agent_response(
+        node,
         input_values,
         skill_context,
+        runtime_config,
         state_schema=state_schema,
+        on_delta=on_delta,
+        build_effective_system_prompt_func=_build_effective_system_prompt,
+        chat_with_local_model_with_meta_func=_chat_with_local_model_with_meta,
+        chat_with_model_ref_with_meta_func=chat_with_model_ref_with_meta,
+        parse_llm_json_response_func=_parse_llm_json_response,
+        build_output_key_aliases_func=_build_output_key_aliases,
     )
-    user_prompt = (
-        node.config.task_instruction
-        if node.config.task_instruction
-        else "根据输入和技能结果完成输出。"
-    )
-
-    thinking_level = runtime_config.get("resolved_thinking_level")
-    if not isinstance(thinking_level, str):
-        thinking_level = "medium" if runtime_config.get("resolved_thinking") else "off"
-
-    if runtime_config.get("resolved_provider_id") == "local":
-        content, llm_meta = _chat_with_local_model_with_meta(
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            model=runtime_config["runtime_model_name"],
-            provider_id="local",
-            temperature=runtime_config["resolved_temperature"],
-            thinking_enabled=runtime_config["resolved_thinking"],
-            thinking_level=thinking_level,
-            on_delta=on_delta,
-        )
-    else:
-        content, llm_meta = chat_with_model_ref_with_meta(
-            model_ref=runtime_config["resolved_model_ref"],
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            temperature=runtime_config["resolved_temperature"],
-            thinking_enabled=runtime_config["resolved_thinking"],
-            thinking_level=thinking_level,
-            on_delta=on_delta,
-        )
-
-    parsed_fields = _parse_llm_json_response(
-        content,
-        output_keys,
-        output_key_aliases=_build_output_key_aliases(output_keys, state_schema or {}),
-    )
-    response_payload: dict[str, Any] = {"summary": content, **parsed_fields}
-    reasoning = str(llm_meta.get("reasoning") or "").strip()
-    updated_runtime_config = {
-        **runtime_config,
-        "provider_model": llm_meta.get("model", runtime_config["runtime_model_name"]),
-        "provider_id": llm_meta.get("provider_id", runtime_config["resolved_provider_id"]),
-        "provider_temperature": llm_meta.get("temperature", runtime_config["resolved_temperature"]),
-        "provider_reasoning_format": llm_meta.get("reasoning_format"),
-        "provider_thinking_enabled": bool(llm_meta.get("thinking_enabled")),
-        "provider_thinking_level": llm_meta.get("thinking_level", thinking_level),
-        "provider_reasoning_captured": bool(reasoning),
-        "provider_response_id": llm_meta.get("response_id"),
-        "provider_usage": llm_meta.get("usage"),
-        "provider_timings": llm_meta.get("timings"),
-    }
-    return response_payload, reasoning, llm_meta.get("warnings", []), updated_runtime_config
 
 
 def _resolve_agent_runtime_config(node: NodeSystemAgentNode) -> dict[str, Any]:
-    global_model_ref = get_default_text_model_ref(force_refresh=True)
-    global_thinking_enabled = get_default_agent_thinking_enabled()
-    global_thinking_level = get_default_agent_thinking_level()
-    default_temperature = get_default_agent_temperature()
-    override_model_ref = normalize_model_ref(node.config.model) if node.config.model.strip() else ""
-
-    resolved_model = (
-        override_model_ref
-        if node.config.model_source.value == "override" and override_model_ref
-        else global_model_ref
+    return resolve_agent_runtime_config(
+        node,
+        get_default_text_model_ref_func=get_default_text_model_ref,
+        get_default_agent_thinking_enabled_func=get_default_agent_thinking_enabled,
+        get_default_agent_thinking_level_func=get_default_agent_thinking_level,
+        get_default_agent_temperature_func=get_default_agent_temperature,
+        normalize_model_ref_func=normalize_model_ref,
+        resolve_runtime_model_name_func=resolve_runtime_model_name,
+        normalize_thinking_level_func=normalize_thinking_level,
+        resolve_effective_thinking_level_func=resolve_effective_thinking_level,
     )
-    resolved_temperature = max(0.0, min(float(node.config.temperature), 2.0))
-    resolved_provider_id, _resolved_model_name = resolved_model.split("/", 1) if "/" in resolved_model else ("local", resolved_model)
-    runtime_model_name = resolve_runtime_model_name(resolved_model)
-    configured_thinking_level = normalize_thinking_level(node.config.thinking_mode.value)
-    resolved_thinking_level = resolve_effective_thinking_level(
-        configured_level=configured_thinking_level,
-        provider_id=resolved_provider_id,
-        model=runtime_model_name,
-    )
-    resolved_thinking = resolved_thinking_level != "off"
-
-    return {
-        "model_source": node.config.model_source.value,
-        "configured_model_ref": override_model_ref,
-        "thinking_mode": node.config.thinking_mode.value,
-        "configured_thinking_level": normalize_thinking_level(node.config.thinking_mode.value),
-        "configured_temperature": node.config.temperature,
-        "global_model_ref": global_model_ref,
-        "global_thinking_enabled": global_thinking_enabled,
-        "global_thinking_level": global_thinking_level,
-        "default_temperature": default_temperature,
-        "resolved_model_ref": resolved_model,
-        "resolved_provider_id": resolved_provider_id,
-        "resolved_thinking": resolved_thinking,
-        "resolved_thinking_level": resolved_thinking_level,
-        "resolved_temperature": resolved_temperature,
-        "runtime_model_name": runtime_model_name,
-        "request_return_progress": resolved_thinking and resolved_provider_id == "local",
-        "request_reasoning_format": "auto" if resolved_thinking and resolved_provider_id == "local" else None,
-    }
-
-
-def _invoke_skill(skill_func: Any, skill_inputs: dict[str, Any]) -> dict[str, Any]:
-    signature = inspect.signature(skill_func)
-    parameters = list(signature.parameters.values())
-    if len(parameters) >= 2:
-        return skill_func({}, skill_inputs)
-    return skill_func(**skill_inputs)
-
-
-def _resolve_reference(
-    reference: str,
-    *,
-    inputs: dict[str, Any],
-    response: dict[str, Any],
-    skills: dict[str, Any],
-    context: dict[str, Any],
-    graph: dict[str, Any],
-    state_values: dict[str, Any],
-) -> Any:
-    if not isinstance(reference, str) or not reference.startswith("$"):
-        return reference
-    if reference.startswith("$inputs."):
-        return _read_path(inputs, reference[len("$inputs."):])
-    if reference.startswith("$response."):
-        return _read_path(response, reference[len("$response."):])
-    if reference.startswith("$skills."):
-        return _read_path(skills, reference[len("$skills."):])
-    if reference.startswith("$context."):
-        return _read_path(context, reference[len("$context."):])
-    if reference.startswith("$state."):
-        return _read_path(state_values, reference[len("$state."):])
-    if reference.startswith("$graph."):
-        return _read_path(graph, reference[len("$graph."):])
-    return reference
-
-
-def _read_path(payload: Any, path: str) -> Any:
-    current = payload
-    for part in path.split("."):
-        if isinstance(current, dict):
-            current = current.get(part)
-        else:
-            return None
-    return current
 
 
 def _summarize_inputs(input_values: dict[str, Any]) -> str:
