@@ -228,7 +228,6 @@ import {
   createEditorSeedDraftGraph,
   pruneUnreferencedStateSchemaInDocument,
   resolveEditorSeedTemplate,
-  syncKnowledgeBaseSkillsInDocument,
 } from "@/lib/graph-document";
 import {
   applyDocumentMetaToWorkspaceTab,
@@ -238,15 +237,12 @@ import {
   prunePersistedEditorDocumentDrafts,
   prunePersistedEditorViewportDrafts,
   readPersistedEditorDocumentDraft,
-  readPersistedEditorViewportDraft,
   readPersistedEditorWorkspace,
   reorderWorkspaceTab,
   removePersistedEditorDocumentDraft,
   removePersistedEditorViewportDraft,
   resolveEditorUrl,
   resolveWorkspaceTabUrl,
-  writePersistedEditorDocumentDraft,
-  writePersistedEditorViewportDraft,
   writePersistedEditorWorkspace,
   type EditorWorkspaceTab,
   type PersistedEditorWorkspace,
@@ -283,9 +279,7 @@ import EditorStatePanel from "./EditorStatePanel.vue";
 import EditorTabBar from "./EditorTabBar.vue";
 import EditorWelcomeState from "./EditorWelcomeState.vue";
 import {
-  buildNextCanvasViewportDrafts,
   listTabsMissingDocumentDrafts,
-  listTabsMissingViewportDrafts,
   resolveExistingGraphDocumentHydrationSource,
   resolveUnsavedGraphDocumentHydrationSource,
   resolveWorkspaceDraftPersistenceRequest,
@@ -293,13 +287,13 @@ import {
   shouldRunWorkspaceDraftHydration,
 } from "./editorDraftPersistenceModel.ts";
 import { omitTabScopedRecordEntry, setTabScopedRecordEntry } from "./editorTabRuntimeModel.ts";
-import { formatRunFeedback, formatValidationFeedback, type RunFeedback, type WorkspaceFeedbackTone } from "./runFeedbackModel.ts";
-import { buildRunNodeArtifactsModel, mergeRunOutputPreviewByNodeId } from "./runNodeArtifactsModel.ts";
-import { applyRunWrittenStateValuesToDocument } from "./runStatePersistence.ts";
+import { formatValidationFeedback } from "./runFeedbackModel.ts";
 import type { WorkspaceSidePanelMode } from "./workspaceSidePanelModel.ts";
 import { buildPythonExportFileName, downloadPythonSource } from "./pythonExportModel.ts";
 import { isGraphiteUiPythonExportFile, isGraphiteUiPythonExportSource } from "./pythonImportModel.ts";
 import { buildPresetPayloadForNode } from "./presetPersistence.ts";
+import { useWorkspaceDocumentState } from "./useWorkspaceDocumentState.ts";
+import { useWorkspaceRunVisualState, type WorkspaceRunFeedback } from "./useWorkspaceRunVisualState.ts";
 import { useWorkspaceSidePanelController } from "./useWorkspaceSidePanelController.ts";
 import { useWorkspaceGraphMutationActions } from "./useWorkspaceGraphMutationActions.ts";
 
@@ -348,7 +342,7 @@ const humanReviewErrorByTabId = ref<Record<string, string | null>>({});
 const runOutputPreviewByTabId = ref<Record<string, Record<string, { text: string; displayMode: string | null }>>>({});
 const runFailureMessageByTabId = ref<Record<string, Record<string, string>>>({});
 const activeRunEdgeIdsByTabId = ref<Record<string, string[]>>({});
-const feedbackByTabId = ref<Record<string, (RunFeedback & { activeRunId?: string | null; activeRunStatus?: string | null }) | null>>({});
+const feedbackByTabId = ref<Record<string, WorkspaceRunFeedback | null>>({});
 const routeRestoreError = ref<string | null>(null);
 const knowledgeBases = ref<KnowledgeBaseRecord[]>([]);
 const settings = ref<SettingsPayload | null>(null);
@@ -400,6 +394,38 @@ const {
   closeNodeCreationMenu,
   showGraphLockedEditToast,
 });
+const {
+  feedbackForTab,
+  applyRunVisualStateToTab,
+  setFeedbackForTab,
+  setMessageFeedbackForTab,
+} = useWorkspaceRunVisualState({
+  latestRunDetailByTabId,
+  runNodeStatusByTabId,
+  currentRunNodeIdByTabId,
+  runOutputPreviewByTabId,
+  runFailureMessageByTabId,
+  activeRunEdgeIdsByTabId,
+  feedbackByTabId,
+});
+const {
+  registerDocumentForTab,
+  ensureTabViewportDrafts,
+  updateCanvasViewportForTab,
+  persistRunStateValuesForTab,
+  commitDirtyDocumentForTab,
+  markDocumentDirty,
+} = useWorkspaceDocumentState({
+  workspace,
+  documentsByTabId,
+  loadingByTabId,
+  errorByTabId,
+  feedbackByTabId,
+  viewportByTabId,
+  updateWorkspace,
+  setMessageFeedbackForTab,
+  guardGraphEditForTab,
+});
 const activeTabRouteSignature = computed(() => {
   const tab = activeTab.value;
   if (!tab) {
@@ -425,71 +451,6 @@ const routeSignature = computed(() => {
   return "root";
 });
 
-function feedbackForTab(tabId: string) {
-  return feedbackByTabId.value[tabId] ?? null;
-}
-
-function applyRunVisualStateToTab(
-  tabId: string,
-  run: RunDetail,
-  document: GraphPayload | GraphDocument,
-  visualRun: RunDetail = run,
-) {
-  const nodeIds = Object.keys(document.nodes);
-  const nodeLabelLookup = Object.fromEntries(Object.entries(document.nodes).map(([nodeId, node]) => [nodeId, node.name.trim() || nodeId]));
-  const feedback = formatRunFeedback(visualRun, {
-    nodeIds,
-    nodeLabelLookup,
-  });
-  const runArtifactsModel = buildRunNodeArtifactsModel(visualRun);
-  latestRunDetailByTabId.value = setTabScopedRecordEntry(latestRunDetailByTabId.value, tabId, visualRun);
-  runNodeStatusByTabId.value = setTabScopedRecordEntry(runNodeStatusByTabId.value, tabId, visualRun.node_status_map ?? {});
-  currentRunNodeIdByTabId.value = setTabScopedRecordEntry(currentRunNodeIdByTabId.value, tabId, visualRun.current_node_id ?? null);
-  applyRunOutputPreviewForTab(tabId, runArtifactsModel.outputPreviewByNodeId);
-  runFailureMessageByTabId.value = setTabScopedRecordEntry(runFailureMessageByTabId.value, tabId, runArtifactsModel.failedMessageByNodeId);
-  activeRunEdgeIdsByTabId.value = setTabScopedRecordEntry(activeRunEdgeIdsByTabId.value, tabId, runArtifactsModel.activeEdgeIds);
-  setFeedbackForTab(tabId, {
-    ...feedback,
-    activeRunId: run.run_id,
-    activeRunStatus: visualRun.status,
-  });
-}
-
-function setFeedbackForTab(
-  tabId: string,
-  feedback: RunFeedback & {
-    activeRunId?: string | null;
-    activeRunStatus?: string | null;
-  },
-) {
-  feedbackByTabId.value = setTabScopedRecordEntry(feedbackByTabId.value, tabId, feedback);
-}
-
-function setMessageFeedbackForTab(
-  tabId: string,
-  input: {
-    tone: WorkspaceFeedbackTone;
-    message: string;
-    activeRunId?: string | null;
-    activeRunStatus?: string | null;
-  },
-) {
-  setFeedbackForTab(tabId, {
-    tone: input.tone,
-    message: input.message,
-    activeRunId: input.activeRunId ?? null,
-    activeRunStatus: input.activeRunStatus ?? null,
-    summary: {
-      idle: 0,
-      running: 0,
-      paused: 0,
-      success: 0,
-      failed: 0,
-    },
-    currentNodeLabel: null,
-  });
-}
-
 function cancelRunPolling(tabId: string) {
   runPollGenerationByTabId.set(tabId, (runPollGenerationByTabId.get(tabId) ?? 0) + 1);
   const timerId = runPollTimerByTabId.get(tabId);
@@ -511,18 +472,6 @@ function applyStreamingOutputPreviewToTab(tabId: string, payload: Record<string,
     return;
   }
   runOutputPreviewByTabId.value = setTabScopedRecordEntry(runOutputPreviewByTabId.value, tabId, nextPreview);
-}
-
-function applyRunOutputPreviewForTab(
-  tabId: string,
-  nextPreviewByNodeId: Record<string, { text: string; displayMode: string | null }>,
-  options: { preserveMissing?: boolean } = {},
-) {
-  runOutputPreviewByTabId.value = setTabScopedRecordEntry(
-    runOutputPreviewByTabId.value,
-    tabId,
-    mergeRunOutputPreviewByNodeId(runOutputPreviewByTabId.value[tabId] ?? {}, nextPreviewByNodeId, options),
-  );
 }
 
 function startRunEventStreamForTab(tabId: string, runId: string) {
@@ -578,28 +527,8 @@ async function pollRunForTab(tabId: string, runId: string, generation = runPollG
       return;
     }
 
-    const document = documentsByTabId.value[tabId];
-    const nodeIds = document ? Object.keys(document.nodes) : [];
-    const nodeLabelLookup = document
-      ? Object.fromEntries(Object.entries(document.nodes).map(([nodeId, node]) => [nodeId, node.name.trim() || nodeId]))
-      : {};
-    const feedback = formatRunFeedback(run, {
-      nodeIds,
-      nodeLabelLookup,
-    });
-    const runArtifactsModel = buildRunNodeArtifactsModel(run);
-    latestRunDetailByTabId.value = setTabScopedRecordEntry(latestRunDetailByTabId.value, tabId, run);
+    applyRunVisualStateToTab(tabId, run, documentsByTabId.value[tabId], run, { preserveMissing: shouldPollRunStatus(run.status) });
     restoredRunSnapshotIdByTabId.value = setTabScopedRecordEntry(restoredRunSnapshotIdByTabId.value, tabId, null);
-    runNodeStatusByTabId.value = setTabScopedRecordEntry(runNodeStatusByTabId.value, tabId, run.node_status_map ?? {});
-    currentRunNodeIdByTabId.value = setTabScopedRecordEntry(currentRunNodeIdByTabId.value, tabId, run.current_node_id ?? null);
-    applyRunOutputPreviewForTab(tabId, runArtifactsModel.outputPreviewByNodeId, { preserveMissing: shouldPollRunStatus(run.status) });
-    runFailureMessageByTabId.value = setTabScopedRecordEntry(runFailureMessageByTabId.value, tabId, runArtifactsModel.failedMessageByNodeId);
-    activeRunEdgeIdsByTabId.value = setTabScopedRecordEntry(activeRunEdgeIdsByTabId.value, tabId, runArtifactsModel.activeEdgeIds);
-    setFeedbackForTab(tabId, {
-      ...feedback,
-      activeRunId: run.run_id,
-      activeRunStatus: run.status,
-    });
 
     if (run.status === "awaiting_human" && run.current_node_id) {
       openHumanReviewPanelForTab(tabId, run.current_node_id);
@@ -687,45 +616,6 @@ function updateWorkspaceTab(tabId: string, updater: (tab: EditorWorkspaceTab) =>
     ...workspace.value,
     tabs: workspace.value.tabs.map((tab) => (tab.tabId === tabId ? updater(tab) : tab)),
   });
-}
-
-function registerDocumentForTab(tabId: string, graph: GraphPayload | GraphDocument) {
-  const syncedDocument = syncKnowledgeBaseSkillsInDocument(graph);
-  documentsByTabId.value = setTabScopedRecordEntry(documentsByTabId.value, tabId, syncedDocument);
-  writePersistedEditorDocumentDraft(tabId, syncedDocument);
-  loadingByTabId.value = setTabScopedRecordEntry(loadingByTabId.value, tabId, false);
-  errorByTabId.value = setTabScopedRecordEntry(errorByTabId.value, tabId, null);
-  if (!feedbackByTabId.value[tabId]) {
-    setMessageFeedbackForTab(tabId, {
-      tone: "neutral",
-      message: `Ready to edit ${syncedDocument.name}.`,
-    });
-  }
-}
-
-function ensureTabViewportDrafts() {
-  let nextViewports = viewportByTabId.value;
-  for (const tabId of listTabsMissingViewportDrafts(workspace.value.tabs, viewportByTabId.value)) {
-    const persistedViewport = readPersistedEditorViewportDraft(tabId);
-    if (!persistedViewport) {
-      continue;
-    }
-    nextViewports = buildNextCanvasViewportDrafts(nextViewports, tabId, persistedViewport) ?? nextViewports;
-  }
-
-  if (nextViewports !== viewportByTabId.value) {
-    viewportByTabId.value = nextViewports;
-  }
-}
-
-function updateCanvasViewportForTab(tabId: string, viewport: CanvasViewport) {
-  const nextViewports = buildNextCanvasViewportDrafts(viewportByTabId.value, tabId, viewport);
-  if (!nextViewports) {
-    return;
-  }
-
-  viewportByTabId.value = nextViewports;
-  writePersistedEditorViewportDraft(tabId, viewport);
 }
 
 function clearTabRuntime(tabId: string) {
@@ -983,24 +873,6 @@ function discardPendingClose() {
   closeError.value = null;
 }
 
-function setDocumentForTab(tabId: string, nextDocument: GraphPayload | GraphDocument) {
-  const syncedDocument = syncKnowledgeBaseSkillsInDocument(nextDocument);
-  documentsByTabId.value = setTabScopedRecordEntry(documentsByTabId.value, tabId, syncedDocument);
-  writePersistedEditorDocumentDraft(tabId, syncedDocument);
-}
-
-function persistRunStateValuesForTab(tabId: string, run: RunDetail) {
-  const document = documentsByTabId.value[tabId];
-  if (!document) {
-    return;
-  }
-
-  const nextDocument = applyRunWrittenStateValuesToDocument(document, run);
-  if (nextDocument !== document) {
-    setDocumentForTab(tabId, nextDocument);
-  }
-}
-
 function isGraphInteractionLocked(tabId: string) {
   return latestRunDetailByTabId.value[tabId]?.status === "awaiting_human";
 }
@@ -1219,24 +1091,6 @@ function handleNodeSizeUpdate(tabId: string, payload: { nodeId: string; position
   const nextDocument = cloneGraphDocument(document);
   nextDocument.nodes[payload.nodeId].ui.position = payload.position;
   nextDocument.nodes[payload.nodeId].ui.size = payload.size;
-  commitDirtyDocumentForTab(tabId, nextDocument);
-}
-
-function commitDirtyDocumentForTab(tabId: string, nextDocument: GraphPayload | GraphDocument) {
-  setDocumentForTab(tabId, nextDocument);
-  updateWorkspace(
-    applyDocumentMetaToWorkspaceTab(workspace.value, tabId, {
-      title: nextDocument.name,
-      dirty: true,
-      graphId: "graph_id" in nextDocument ? nextDocument.graph_id ?? null : null,
-    }),
-  );
-}
-
-function markDocumentDirty(tabId: string, nextDocument: GraphPayload | GraphDocument) {
-  if (guardGraphEditForTab(tabId)) {
-    return;
-  }
   commitDirtyDocumentForTab(tabId, nextDocument);
 }
 

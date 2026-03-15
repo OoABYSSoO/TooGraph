@@ -6,10 +6,10 @@ Run a ten-round conservative cleanup batch focused on `EditorCanvas.vue` pure pr
 ## Progress Accuracy Note
 - The earlier `99.x%` values are no longer treated as the true total optimization progress. They reflected the active frontend cleanup batch getting close to its own tail, not the whole architecture roadmap.
 - The honest full-roadmap progress must include P0 cleanup, P1 `NodeCard.vue`, P2 `EditorCanvas.vue`, P3 `EditorWorkspaceShell.vue`, and P4 backend runtime/provider cleanup.
-- Current conservative estimate after Phase 119: full roadmap is about 95-96% complete; frontend-focused roadmap is about 85-87% complete; P3 `EditorWorkspaceShell.vue` is about 86% complete; backend P4 is about 95% complete.
+- Current conservative estimate after Phase 121: full roadmap is about 96.5% complete; frontend-focused roadmap is about 88-89% complete; P3 `EditorWorkspaceShell.vue` is about 90% complete; backend P4 is about 95% complete.
 
 ## Current Phase
-Phase 120 in progress
+Phase 122 in progress
 
 ## Autonomous Continuation Gate
 - After every completed cleanup phase, re-read `docs/future/2026-04-28-architecture-refactor-roadmap.md`, `task_plan.md`, `findings.md`, and `progress.md`, then recalculate the total roadmap progress and the active area progress.
@@ -1095,12 +1095,30 @@ Phase 120 in progress
 - **Status:** completed
 
 ### Phase 120: Frontend Tail Continuation Gate
-- [ ] Re-read the formal roadmap, Phase 119 findings, and remaining frontend high-line-count files.
-- [ ] Choose the next safest remaining tail slice from `EditorWorkspaceShell.vue` run lifecycle, `EditorCanvas.vue` residual interaction/presentation seams, or `NodeCard.vue` residual orchestration.
+- [x] Re-read the formal roadmap, Phase 119 findings, and remaining frontend high-line-count files.
+- [x] Choose the next safest remaining tail slice from `EditorWorkspaceShell.vue` run lifecycle, `EditorCanvas.vue` residual interaction/presentation seams, or `NodeCard.vue` residual orchestration.
+- [x] Add focused red tests before production changes.
+- [x] Preserve graph editing interactions, auto-snapping, node creation naming/context, Human Review behavior, runtime visuals, provider behavior, output boundary behavior, and visual layout.
+- [x] Run focused frontend/backend verification as needed, dev restart, commit, push, and progress re-evaluation.
+- [x] If total roadmap progress is below 100%, automatically open the next phase after Phase 120 and re-judge total progress.
+- **Status:** completed
+
+### Phase 121: Frontend Tail Continuation Gate
+- [x] Re-read the formal roadmap, Phase 120 findings, and remaining frontend high-line-count files.
+- [x] Choose the next safest remaining tail slice from `EditorWorkspaceShell.vue` document/draft state, run lifecycle/save-open routing, `EditorCanvas.vue` residual interaction/presentation seams, or `NodeCard.vue` residual orchestration.
+- [x] Add focused red tests before production changes.
+- [x] Preserve graph editing interactions, auto-snapping, node creation naming/context, Human Review behavior, runtime visuals, provider behavior, output boundary behavior, and visual layout.
+- [x] Run focused frontend/backend verification as needed, dev restart, commit, push, and progress re-evaluation.
+- [x] If total roadmap progress is below 100%, automatically open the next phase after Phase 121 and re-judge total progress.
+- **Status:** completed
+
+### Phase 122: Frontend Tail Continuation Gate
+- [ ] Re-read the formal roadmap, Phase 121 findings, and remaining frontend high-line-count files.
+- [ ] Choose the next safest remaining tail slice from `EditorWorkspaceShell.vue` save/open routing or run lifecycle, `EditorCanvas.vue` residual interaction/presentation seams, or `NodeCard.vue` residual orchestration.
 - [ ] Add focused red tests before production changes.
 - [ ] Preserve graph editing interactions, auto-snapping, node creation naming/context, Human Review behavior, runtime visuals, provider behavior, output boundary behavior, and visual layout.
 - [ ] Run focused frontend/backend verification as needed, dev restart, commit, push, and progress re-evaluation.
-- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 120 and re-judge total progress.
+- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 122 and re-judge total progress.
 - **Status:** in progress
 
 ## Progress Estimate
@@ -1535,6 +1553,18 @@ Phase 120 in progress
 | P4 backend cleanup after Phase 119 | Still about 95%; this phase was frontend-only and did not touch backend runtime/provider code. |
 | Current continuation gate after Phase 119 | Total roadmap progress is still below 100%, so Phase 120 is automatically opened for the next safe frontend tail slice. |
 | Frontend cleanup target for Phase 120 | About 87-89% frontend-focused if another `EditorWorkspaceShell.vue` run lifecycle or residual canvas/node tail boundary moves out with focused regression coverage. |
+| Full roadmap cleanup after Phase 120 | About 96% complete after extracting the workspace run visual state controller while preserving polling, SSE, Human Review opening, graph interaction, and provider/backend behavior. |
+| Frontend roadmap cleanup after Phase 120 | About 87-88% complete; `EditorWorkspaceShell.vue` dropped from 1,977 to 1,894 lines and run visual state writes now have focused controller coverage. |
+| P3 `EditorWorkspaceShell.vue` cleanup after Phase 120 | About 88% complete after moving run feedback, run node status/current-node, output previews, failure messages, active edge ids, and message feedback helpers into `useWorkspaceRunVisualState.ts`. |
+| P4 backend cleanup after Phase 120 | Still about 95%; this phase was frontend-only and did not touch backend runtime/provider code. |
+| Current continuation gate after Phase 120 | Total roadmap progress is still below 100%, so Phase 121 is automatically opened for the next safe frontend tail slice. |
+| Frontend cleanup target for Phase 121 | About 88-90% frontend-focused if another run lifecycle/save-open routing or residual canvas/node tail boundary can move out with focused regression coverage. |
+| Full roadmap cleanup after Phase 121 | About 96.5% complete after extracting the workspace document state controller while preserving canvas auto-snapping, node creation context, run lifecycle, Human Review, save/open routing, and provider/backend behavior. |
+| Frontend roadmap cleanup after Phase 121 | About 88-89% complete; `EditorWorkspaceShell.vue` dropped from 1,894 to 1,831 lines and document registration, viewport drafts, terminal run state persistence, and dirty-document commits now have focused controller coverage. |
+| P3 `EditorWorkspaceShell.vue` cleanup after Phase 121 | About 90% complete after moving document writes, viewport draft hydration/update, run-written state persistence, and dirty graph metadata commits into `useWorkspaceDocumentState.ts`. |
+| P4 backend cleanup after Phase 121 | Still about 95%; this phase was frontend-only and did not touch backend runtime/provider code. |
+| Current continuation gate after Phase 121 | Total roadmap progress is still below 100%, so Phase 122 is automatically opened for the next safe frontend tail slice. |
+| Frontend cleanup target for Phase 122 | About 89-91% frontend-focused if another save/open routing, run lifecycle, canvas tail, or NodeCard residual orchestration boundary can move out with focused regression coverage. |
 
 ## Decisions Made
 | Decision | Rationale |
