@@ -1,5 +1,218 @@
 # Progress Log
 
+## Session: 2026-04-30 Phase 141
+
+### Phase 1: Final Re-read
+- **Status:** completed
+- Actions taken:
+  - Continued automatically after commit `f9acef2` because the full-roadmap progress was still recorded at about 99.9%.
+  - Re-read the formal roadmap, Phase 140 findings, and remaining high-line-count files.
+  - Confirmed no additional low-risk tail should be forced into this cleanup plan: remaining `NodeCard.vue`, `EditorCanvas.vue`, `EditorWorkspaceShell.vue`, and LangGraph runtime code is now mostly intentional orchestration/template/callable surface.
+
+### Phase 2: Final Verification
+- **Status:** completed
+- Actions taken:
+  - Ran the final backend LangGraph regression set.
+  - Ran frontend TypeScript unused-symbol verification.
+  - Ran the full frontend test suite.
+  - Ran the production frontend build and confirmed there was no large chunk warning.
+  - Confirmed the running dev environment still returned frontend HTTP 200 and backend `/health` returned `{"status":"ok"}`.
+
+### Phase 3: Completion Decision
+- **Status:** completed
+- Actions taken:
+  - Marked the current architecture cleanup roadmap as 100% complete for the agreed safe-migration scope.
+  - Recorded that future work can still optimize product internals, but it should be treated as new scoped work rather than unfinished cleanup-plan migration.
+  - Stopped the automatic continuation loop because the current roadmap reached its final completion gate.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Final backend LangGraph regression | `python -m pytest backend/tests/test_langgraph_finalization.py backend/tests/test_langgraph_runtime_setup.py backend/tests/test_langgraph_progress.py backend/tests/test_langgraph_migration.py backend/tests/test_langgraph_checkpoint_runtime.py backend/tests/test_langgraph_interrupts.py backend/tests/test_langgraph_cycle_tracker.py backend/tests/test_runtime_summaries.py` | LangGraph finalization, setup, progress, migration, checkpoint, interrupt, cycle, and summary tests pass | 67 passed | Passed |
+| Final TypeScript check | `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No type or unused-symbol errors | Exit 0 | Passed |
+| Final frontend tests | `node --test $(rg --files src -g '*.test.ts' \| sort) vite.config.structure.test.ts` in `frontend` | Full frontend suite passes | 940 passed | Passed |
+| Final production build | `npm run build` in `frontend` | Build succeeds with no large chunk warning | Exit 0; Vite build completed without a large chunk warning | Passed |
+| Final dev health | HTTP checks against the running dev environment | Frontend HTTP 200 and backend `/health` ok | Frontend HTTP 200, backend `/health` ok | Passed |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | None in Phase 141 | Final verification | No fix needed. |
+
+## Session: 2026-04-30 Phase 140
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Continued automatically after commit `ce00683` because the full-roadmap progress is below 100%.
+  - Re-read the formal roadmap, Phase 139 findings, and remaining frontend/backend high-line-count files.
+  - Chose the LangGraph finalization slice because completed/failed run cleanup was the remaining duplicated backend P4 tail, and it can preserve `runtime.save_run` patchability through explicit dependency injection.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `backend/tests/test_langgraph_finalization.py` covering completed finalization side-effect order and failed finalization error/snapshot/event behavior.
+  - Verified the expected red failure because `app.core.langgraph.finalization` did not exist yet.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `backend/app/core/langgraph/finalization.py`.
+  - Moved completed and failed LangGraph run finalization out of `runtime.py`.
+  - Updated `core/langgraph/runtime.py` to call the finalization helpers while passing its `save_run` symbol explicitly, preserving existing tests that patch `app.core.langgraph.runtime.save_run`.
+  - Reduced `backend/app/core/langgraph/runtime.py` from 467 to 458 lines.
+
+### Phase 4: Verification and Progress Gate
+- **Status:** completed
+- Actions taken:
+  - Ran focused backend LangGraph/runtime regression tests.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend entry returned HTTP 200 and backend `/health` returned `{"status":"ok"}`.
+  - Recalculated the full roadmap at about 99.9%, frontend-focused progress at about 98.2%, P2 `EditorCanvas.vue` residual cleanup at about 99%, and backend P4 at about 99.5%.
+  - Opened Phase 141 automatically because the full roadmap is still just below 100%.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red backend test | `python -m pytest backend/tests/test_langgraph_finalization.py` before implementation | Fails because the LangGraph finalization module is missing | Failed with `ModuleNotFoundError: No module named 'app.core.langgraph.finalization'` | Passed |
+| Focused backend tests | `python -m pytest backend/tests/test_langgraph_finalization.py backend/tests/test_langgraph_runtime_setup.py backend/tests/test_langgraph_progress.py backend/tests/test_langgraph_migration.py backend/tests/test_langgraph_checkpoint_runtime.py backend/tests/test_langgraph_interrupts.py backend/tests/test_langgraph_cycle_tracker.py backend/tests/test_runtime_summaries.py` | Finalization, setup, progress, migration, checkpoint, interrupt, cycle, and summary tests pass | 67 passed | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | New LangGraph finalization backend test failed with a missing module import | Red test before implementation | Added `finalization.py`, wired `runtime.py` to use it, and reran focused backend tests successfully. |
+
+## Session: 2026-04-30 Phase 139
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Continued automatically after commit `8a90b9e` because the full-roadmap progress is below 100%.
+  - Re-read the formal roadmap, Phase 138 findings, and remaining frontend/backend high-line-count files.
+  - Chose the LangGraph runtime state preparation slice because it is the remaining setup-heavy block before checkpoint runtime construction and has clear new-run and resume behavior to cover with focused tests.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Extended `backend/tests/test_langgraph_runtime_setup.py` to cover new-run state initialization and checkpoint-resume node status preservation.
+  - Verified the expected red failure because `prepare_langgraph_runtime_state` was not exported yet.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `prepare_langgraph_runtime_state` to `backend/app/core/langgraph/runtime_setup.py`.
+  - Moved LangGraph state preparation, runtime metadata setup, node status map initialization, graph state initialization, and input-boundary success marking out of `runtime.py`.
+  - Updated `core/langgraph/runtime.py` to call the setup helper before checkpoint runtime construction.
+  - Reduced `backend/app/core/langgraph/runtime.py` from 483 to 467 lines.
+
+### Phase 4: Verification and Progress Gate
+- **Status:** completed
+- Actions taken:
+  - Ran focused backend LangGraph/runtime regression tests.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend entry returned HTTP 200 and backend `/health` returned `{"status":"ok"}`.
+  - Recalculated the full roadmap at about 99.8%, frontend-focused progress at about 98.2%, P2 `EditorCanvas.vue` residual cleanup at about 99%, and backend P4 at about 99%.
+  - Opened Phase 140 automatically because the full roadmap is still below 100%.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red backend test | `python -m pytest backend/tests/test_langgraph_runtime_setup.py` before implementation | Fails because the runtime state preparation helper is missing | Failed with `ImportError: cannot import name 'prepare_langgraph_runtime_state'` | Passed |
+| Focused backend tests | `python -m pytest backend/tests/test_langgraph_runtime_setup.py backend/tests/test_langgraph_progress.py backend/tests/test_langgraph_migration.py backend/tests/test_langgraph_checkpoint_runtime.py backend/tests/test_langgraph_interrupts.py backend/tests/test_langgraph_cycle_tracker.py backend/tests/test_runtime_summaries.py` | Runtime setup, progress, migration, checkpoint, interrupt, cycle, and summary tests pass | 65 passed | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | Runtime setup test failed because the runtime state preparation helper was not exported | Red test before implementation | Added `prepare_langgraph_runtime_state`, wired `runtime.py` to use it, and reran focused backend tests successfully. |
+
+## Session: 2026-04-30 Phase 138
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Continued automatically after commit `05a8b8e` because the full-roadmap progress is below 100%.
+  - Re-read the formal roadmap, Phase 137 findings, and remaining frontend/backend high-line-count files.
+  - Chose the LangGraph after-breakpoint setup helper slice because it is pure mapping/merging around already-resolved interrupt settings and does not change Human Review waiting behavior, checkpointing, node execution, or frontend interactions.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Extended `backend/tests/test_langgraph_runtime_setup.py` to cover after-breakpoint node map filtering and compiled interrupt-before merging.
+  - Verified the expected red failure because `build_after_breakpoint_node_map` and `build_compiled_interrupt_before` were not exported yet.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `build_after_breakpoint_node_map` and `build_compiled_interrupt_before` to `backend/app/core/langgraph/runtime_setup.py`.
+  - Updated `core/langgraph/runtime.py` to consume the extracted helpers while leaving interrupt resolution, graph compilation, and Human Review runtime behavior unchanged.
+  - `runtime.py` ended at 483 lines; this is a two-line increase from Phase 137 because explicit setup imports/calls cost more lines than the removed inline comprehensions, but the responsibility moved out of the runtime body.
+
+### Phase 4: Verification and Progress Gate
+- **Status:** completed
+- Actions taken:
+  - Ran focused backend LangGraph/runtime regression tests.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend entry returned HTTP 200 and backend `/health` returned `{"status":"ok"}`.
+  - Recalculated the full roadmap at about 99.7%, frontend-focused progress at about 98.2%, P2 `EditorCanvas.vue` residual cleanup at about 99%, and backend P4 at about 98%.
+  - Opened Phase 139 automatically because the full roadmap is still below 100%.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red backend test | `python -m pytest backend/tests/test_langgraph_runtime_setup.py` before implementation | Fails because the after-breakpoint setup helpers are missing | Failed with `ImportError: cannot import name 'build_after_breakpoint_node_map'` | Passed |
+| Focused backend tests | `python -m pytest backend/tests/test_langgraph_runtime_setup.py backend/tests/test_langgraph_progress.py backend/tests/test_langgraph_migration.py backend/tests/test_langgraph_checkpoint_runtime.py backend/tests/test_langgraph_interrupts.py backend/tests/test_langgraph_cycle_tracker.py backend/tests/test_runtime_summaries.py` | Runtime setup, progress, migration, checkpoint, interrupt, cycle, and summary tests pass | 63 passed | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | Runtime setup test failed because the after-breakpoint setup helpers were not exported | Red test before implementation | Added the helpers, wired `runtime.py` to use them, and reran focused backend tests successfully. |
+
+## Session: 2026-04-30 Phase 137
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Continued automatically after commit `3a2882a` because the full-roadmap progress is below 100%.
+  - Re-read the formal roadmap, Phase 136 findings, and remaining frontend/backend high-line-count files.
+  - Chose the LangGraph execution-edge index helper slice because it is pure data construction before graph compilation and does not change node execution, conditional route evaluation, checkpointing, or frontend interactions.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Extended `backend/tests/test_langgraph_runtime_setup.py` to cover outgoing edge grouping and conditional edge id indexing.
+  - Verified the expected red failure because `build_langgraph_execution_edge_indexes` was not exported yet.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `build_langgraph_execution_edge_indexes` to `backend/app/core/langgraph/runtime_setup.py`.
+  - Updated `core/langgraph/runtime.py` to consume the extracted index builder instead of constructing `defaultdict` indexes inline.
+  - Reduced `backend/app/core/langgraph/runtime.py` from 486 to 481 lines.
+
+### Phase 4: Verification and Progress Gate
+- **Status:** completed
+- Actions taken:
+  - Ran focused backend LangGraph/runtime regression tests.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend entry returned HTTP 200 and backend `/health` returned `{"status":"ok"}`.
+  - Recalculated the full roadmap at about 99.6%, frontend-focused progress at about 98.2%, P2 `EditorCanvas.vue` residual cleanup at about 99%, and backend P4 at about 97.5%.
+  - Opened Phase 138 automatically because the full roadmap is still below 100%.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red backend test | `python -m pytest backend/tests/test_langgraph_runtime_setup.py` before implementation | Fails because the execution-edge index helper is missing | Failed with `ImportError: cannot import name 'build_langgraph_execution_edge_indexes'` | Passed |
+| Focused backend tests | `python -m pytest backend/tests/test_langgraph_runtime_setup.py backend/tests/test_langgraph_progress.py backend/tests/test_langgraph_migration.py backend/tests/test_langgraph_checkpoint_runtime.py backend/tests/test_langgraph_interrupts.py backend/tests/test_langgraph_cycle_tracker.py backend/tests/test_runtime_summaries.py` | Runtime setup, progress, migration, checkpoint, interrupt, cycle, and summary tests pass | 61 passed | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | Runtime setup test failed because the execution-edge index helper was not exported | Red test before implementation | Added `build_langgraph_execution_edge_indexes`, wired `runtime.py` to use it, and reran focused backend tests successfully. |
+
 ## Session: 2026-04-30 Phase 136
 
 ### Phase 1: Re-orientation
