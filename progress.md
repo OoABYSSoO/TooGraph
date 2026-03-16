@@ -1,5 +1,428 @@
 # Progress Log
 
+## Session: 2026-04-30 Phase 134
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Continued automatically after commit `0b84048` because the full-roadmap progress is below 100%.
+  - Re-read the formal roadmap, Phase 133 findings, and remaining high-line-count files.
+  - Chose the `EditorCanvas.vue` pinch/touch pointer state slice because it is stateful but isolated from graph mutation, auto-snap payload construction, node creation naming/context, and connection completion emits.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `useCanvasPinchZoomState.test.ts` covering pinch start after two touch pointers, scheduled zoom updates from touch movement, and pinch pointer release/clear behavior.
+  - Verified the expected red failure because `useCanvasPinchZoomState.ts` did not exist yet.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `useCanvasPinchZoomState.ts`.
+  - Moved active touch pointer cache, pinch zoom ref, pinch start/update/release, and touch-move scheduling into the composable.
+  - Updated `EditorCanvas.vue` to keep DOM event side effects, panning end, viewport zoom execution, connection pointer-up, and node drag/resize release in the component.
+  - Updated structure tests to lock the new pinch state composable boundary.
+  - Reduced `EditorCanvas.vue` from 3,319 to 3,251 lines.
+
+### Phase 4: Verification and Progress Gate
+- **Status:** completed
+- Actions taken:
+  - Ran focused pinch state composable and `EditorCanvas` structure tests.
+  - Ran TypeScript unused-symbol verification.
+  - Ran the full frontend test suite and production build.
+  - Confirmed the production build still has no Vite large chunk warning.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend entry returned HTTP 200 and backend `/health` returned `{"status":"ok"}`.
+  - Recalculated the full roadmap at about 99.3%, frontend-focused progress at about 98.2%, and P2 `EditorCanvas.vue` residual cleanup at about 99%.
+  - Opened Phase 135 automatically because the full roadmap is still below 100%.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red composable test | `node --test src/editor/canvas/useCanvasPinchZoomState.test.ts` before implementation | Fails because the pinch state composable module is missing | Failed with missing module import | Passed |
+| Focused frontend tests | `node --test src/editor/canvas/useCanvasPinchZoomState.test.ts src/editor/canvas/EditorCanvas.structure.test.ts` | Pinch state composable and canvas structure tests pass | 65 passed | Passed |
+| TypeScript check | `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` | No type or unused-symbol errors | Exit 0 | Passed |
+| Full frontend tests | `node --test $(rg --files src -g '*.test.ts' \| sort) vite.config.structure.test.ts` | Full frontend suite passes | 940 passed | Passed |
+| Production build | `npm run build` in `frontend` | Build succeeds with no large chunk warning | Exit 0; Vite build completed | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | New pinch state composable test failed with a missing module import | Red test before implementation | Added `useCanvasPinchZoomState.ts` and reran focused tests successfully. |
+
+## Session: 2026-04-30 Phase 133
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Continued automatically after commit `d9b22e1` because the full-roadmap progress is below 100%.
+  - Re-read the formal roadmap, Phase 132 findings, and remaining high-line-count files.
+  - Chose the `EditorCanvas.vue` hover/RAF scheduler slice because it only moves local refs, timers, and requestAnimationFrame batching without touching auto-snap, connection completion, or node creation payload semantics.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `useCanvasHoverState.test.ts` covering delayed node hover release, stale release cancellation, point-anchor hover clearing, and flow-handle hover clearing.
+  - Added `useCanvasAnimationFrameScheduler.test.ts` covering latest-callback batching, immediate flush, and cancellation.
+  - Verified the expected red failure because both composable modules were missing.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `useCanvasHoverState.ts` for node hover release timers, point-anchor hover refs, flow-handle hover refs, and anchor-measurement callbacks.
+  - Added `useCanvasAnimationFrameScheduler.ts` for canvas drag-frame scheduling, flush, and cancellation.
+  - Updated `EditorCanvas.vue` to consume both composables while keeping template event names and existing pointer/connection behavior unchanged.
+  - Updated structure tests to lock the new composable boundaries.
+  - Reduced `EditorCanvas.vue` from 3,396 to 3,319 lines.
+
+### Phase 4: Verification and Progress Gate
+- **Status:** completed
+- Actions taken:
+  - Ran focused hover/scheduler composable and `EditorCanvas` structure tests.
+  - Ran TypeScript unused-symbol verification.
+  - Ran the full frontend test suite and production build.
+  - Confirmed the production build still has no Vite large chunk warning.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend entry returned HTTP 200 and backend `/health` returned `{"status":"ok"}`.
+  - Recalculated the full roadmap at about 99.2%, frontend-focused progress at about 98%, and P2 `EditorCanvas.vue` residual cleanup at about 98-99%.
+  - Opened Phase 134 automatically because the full roadmap is still below 100%.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red composable tests | `node --test src/editor/canvas/useCanvasHoverState.test.ts src/editor/canvas/useCanvasAnimationFrameScheduler.test.ts` before implementation | Fail because both composable modules are missing | Failed with missing module imports | Passed |
+| Focused frontend tests | `node --test src/editor/canvas/useCanvasHoverState.test.ts src/editor/canvas/useCanvasAnimationFrameScheduler.test.ts src/editor/canvas/EditorCanvas.structure.test.ts` | Hover/scheduler composables and canvas structure tests pass | 68 passed after updating one stale structure assertion | Passed |
+| TypeScript check | `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` | No type or unused-symbol errors | Exit 0 | Passed |
+| Full frontend tests | `node --test $(rg --files src -g '*.test.ts' \| sort) vite.config.structure.test.ts` | Full frontend suite passes | 937 passed | Passed |
+| Production build | `npm run build` in `frontend` | Build succeeds with no large chunk warning | Exit 0; Vite build completed | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | New hover/scheduler composable tests failed with missing module imports | Red test before implementation | Added `useCanvasHoverState.ts` and `useCanvasAnimationFrameScheduler.ts`. |
+| 2026-04-30 | Structure test still expected `hoveredPointAnchorNodeId` to be declared directly inside `EditorCanvas.vue` | First focused structure run after component integration | Updated the assertion to verify `useCanvasHoverState.ts` owns the point-anchor hover ref and handlers. |
+| 2026-04-30 | A read-only `rg` inspection command used unescaped backticks and failed in the shell | Documentation/progress inspection | Re-ran the search with safer quoting; no files were changed by the failed command. |
+
+## Session: 2026-04-30 Phase 132
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Continued automatically after commit `a4b0d40` because the full-roadmap progress is below 100%.
+  - Re-read the formal roadmap, Phase 131 findings, and remaining frontend high-line-count files.
+  - Chose the `EditorWorkspaceShell.vue` edit-guard slice because the shell still owned awaiting-human edit locks, locked edit feedback, and node position/size dirty graph commits.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `useWorkspaceEditGuardController.test.ts` covering awaiting-human lock detection, locked edit toast triggering, guarded node position commits, guarded node size commits, and missing-document no-ops.
+  - Verified the expected red failure because `useWorkspaceEditGuardController.ts` did not exist yet.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `useWorkspaceEditGuardController.ts`.
+  - Updated `EditorWorkspaceShell.vue` to delegate `isGraphInteractionLocked`, `guardGraphEditForTab`, `showGraphLockedEditToast`, `handleNodePositionUpdate`, and `handleNodeSizeUpdate` through the controller while keeping stable template-facing wrapper names.
+  - Kept the Element Plus toast rendering and i18n message in the shell through an injected callback.
+  - Updated structure tests to lock the edit guard controller boundary.
+  - Reduced the remaining shell-owned edit-guard and geometry commit logic while keeping `EditorWorkspaceShell.vue` at 1,134 lines.
+
+### Phase 4: Verification and Progress Gate
+- **Status:** completed
+- Actions taken:
+  - Ran focused edit guard controller and workspace-shell structure tests.
+  - Ran TypeScript unused-symbol verification.
+  - Ran the full frontend test suite and production build.
+  - Confirmed the production build still has no Vite large chunk warning.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend entry returned HTTP 200 and backend `/health` returned `{"status":"ok"}`.
+  - Confirmed the previous dev session exited after the restart.
+  - Recalculated the full roadmap at about 99.1%, frontend-focused progress at about 97-98%, and P3 `EditorWorkspaceShell.vue` progress at about 99.8%.
+  - Opened Phase 133 automatically because the full roadmap is still below 100%.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red controller test | `node --test src/editor/workspace/useWorkspaceEditGuardController.test.ts` before implementation | Fails because the edit guard controller module is missing | Failed with missing module import | Passed |
+| Focused frontend tests | `node --test src/editor/workspace/useWorkspaceEditGuardController.test.ts src/editor/workspace/EditorWorkspaceShell.structure.test.ts` | Edit guard controller and shell structure tests pass | 41 passed | Passed |
+| TypeScript check | `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` | No type or unused-symbol errors | Exit 0 | Passed |
+| Full frontend tests | `node --test $(rg --files src -g '*.test.ts' \| sort) vite.config.structure.test.ts` | Full frontend suite passes | 931 passed | Passed |
+| Production build | `npm run build` in `frontend` | Build succeeds with no large chunk warning | Exit 0; Vite build completed | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | New edit guard controller test failed with a missing module import | Red test before implementation | Added `useWorkspaceEditGuardController.ts` and reran focused tests successfully. |
+
+## Session: 2026-04-30 Phase 131
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Continued automatically after commit `cf30b70` because the full-roadmap progress is below 100%.
+  - Re-read the formal roadmap, Phase 130 findings, and remaining high-line-count files.
+  - Chose the `EditorWorkspaceShell.vue` resource-loading slice because the shell still owned knowledge-base, settings, skill-definition, and persisted-preset refs plus their loading/refresh functions.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `useWorkspaceResourceController.test.ts` covering successful resource loading into refs, existing fallback behavior on knowledge/settings/skill failures, and agent model refresh through settings reload.
+  - Verified the expected red failure because `useWorkspaceResourceController.ts` did not exist yet.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `useWorkspaceResourceController.ts`.
+  - Updated `EditorWorkspaceShell.vue` to consume resource refs and `refreshAgentModels` from the controller while keeping template binding names unchanged.
+  - Replaced the four on-mounted resource load calls with `loadInitialWorkspaceResources`.
+  - Updated structure tests to lock the resource controller boundary.
+  - Reduced `EditorWorkspaceShell.vue` from 1,169 to 1,135 lines.
+
+### Phase 4: Verification and Progress Gate
+- **Status:** completed
+- Actions taken:
+  - Ran focused resource controller and workspace-shell structure tests.
+  - Ran TypeScript unused-symbol verification.
+  - Ran the full frontend test suite and production build.
+  - Confirmed the production build still has no Vite large chunk warning.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend entry returned HTTP 200 and backend `/health` returned `{"status":"ok"}`.
+  - Confirmed the previous dev session exited after the restart.
+  - Recalculated the full roadmap at about 99.0%, frontend-focused progress at about 97%, and P3 `EditorWorkspaceShell.vue` progress at about 99.7%.
+  - Opened Phase 132 automatically because the full roadmap is still below 100%.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red controller test | `node --test src/editor/workspace/useWorkspaceResourceController.test.ts` before implementation | Fails because the resource controller module is missing | Failed with missing module import | Passed |
+| Focused frontend tests | `node --test src/editor/workspace/useWorkspaceResourceController.test.ts src/editor/workspace/EditorWorkspaceShell.structure.test.ts` | Resource controller and shell structure tests pass | 40 passed | Passed |
+| TypeScript check | `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` | No type or unused-symbol errors | Exit 0 after fixture type cleanup | Passed |
+| Full frontend tests | `node --test $(rg --files src -g '*.test.ts' \| sort) vite.config.structure.test.ts` | Full frontend suite passes | 927 passed | Passed |
+| Production build | `npm run build` in `frontend` | Build succeeds with no large chunk warning | Exit 0; Vite build completed | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | `vue-tsc` flagged incomplete resource test fixtures for knowledge bases, settings, and skill definitions | First TypeScript verification | Replaced ad hoc test objects with fixtures matching the real frontend resource types. |
+
+## Session: 2026-04-30 Phase 130
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Continued automatically after commit `6ad2e49` because the full-roadmap progress is below 100%.
+  - Re-read the formal roadmap, Phase 129 findings, and remaining high-line-count files.
+  - Chose the `EditorWorkspaceShell.vue` open/restore slice because the shell still owned new-tab seeding, unsaved document hydration, existing graph load/open routing, run restore tab creation, and Human Review opening from restored runs.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `useWorkspaceOpenController.test.ts` covering new template tab creation and route sync, cached existing graph opening without fetch, persisted draft preference for existing graph loading, and run restore into a dirty unsaved tab with Human Review opening.
+  - Verified the expected red failure because `useWorkspaceOpenController.ts` did not exist yet.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `useWorkspaceOpenController.ts`.
+  - Updated `EditorWorkspaceShell.vue` to delegate `ensureUnsavedTabDocuments`, `openNewTab`, `openRestoredRunTab`, `loadExistingGraphIntoTab`, and `openExistingGraph` through the controller while keeping stable wrapper function names for template, route-controller, and watcher wiring.
+  - Kept route instruction dispatch in `useWorkspaceRouteController.ts`, document registration/persistence in `useWorkspaceDocumentState.ts`, run visual state in `useWorkspaceRunVisualState.ts`, and graph mutation/node creation semantics unchanged.
+  - Updated structure tests to lock the open controller boundary.
+  - Reduced `EditorWorkspaceShell.vue` from 1,263 to 1,169 lines.
+
+### Phase 4: Verification and Progress Gate
+- **Status:** completed
+- Actions taken:
+  - Ran focused open controller, workspace-shell structure, route controller, editor route sync, and run restore tests.
+  - Ran TypeScript unused-symbol verification.
+  - Ran the full frontend test suite and production build.
+  - Confirmed the production build still has no Vite large chunk warning.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend entry returned HTTP 200 and backend `/health` returned `{"status":"ok"}`.
+  - Confirmed the previous dev session exited after the restart.
+  - Recalculated the full roadmap at about 98.9%, frontend-focused progress at about 96-97%, and P3 `EditorWorkspaceShell.vue` progress at about 99.5%.
+  - Opened Phase 131 automatically because the full roadmap is still below 100%.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red controller test | `node --test src/editor/workspace/useWorkspaceOpenController.test.ts` before implementation | Fails because the open controller module is missing | Failed with missing module import | Passed |
+| Focused frontend tests | `node --test src/editor/workspace/useWorkspaceOpenController.test.ts src/editor/workspace/EditorWorkspaceShell.structure.test.ts src/editor/workspace/useWorkspaceRouteController.test.ts src/lib/run-restore.test.ts src/lib/editor-route-sync.test.ts` | Open/restore controller and existing route/restore semantics pass | 64 passed | Passed |
+| TypeScript check | `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` | No type or unused-symbol errors | Exit 0 after test fixture type cleanup | Passed |
+| Full frontend tests | `node --test $(rg --files src -g '*.test.ts' \| sort) vite.config.structure.test.ts` | Full frontend suite passes | 924 passed | Passed |
+| Production build | `npm run build` in `frontend` | Build succeeds with no large chunk warning | Exit 0; Vite build completed | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | New controller test expected template-tab title to use `default_graph_name`, but the existing behavior uses the template `label` for the tab title and `default_graph_name` for the draft graph name | First green run after adding the controller | Corrected the test to preserve current behavior. |
+| 2026-04-30 | Structure tests still expected open/restore/draft hydration logic inline in `EditorWorkspaceShell.vue` | First focused structure run after shell integration | Updated assertions to verify `useWorkspaceOpenController.ts` owns new-tab seeding, existing graph hydration, and run restore behavior. |
+| 2026-04-30 | `vue-tsc` flagged test fixture mismatches for `graphById` and optional route sync mode | First TypeScript verification | Used a real `computed` for `graphById` and normalized the optional route mode in the test spy. |
+
+## Session: 2026-04-30 Phase 129
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Continued automatically after commit `39e39a4` because the full-roadmap progress is below 100%.
+  - Re-read the formal roadmap, Phase 128 findings, and remaining high-line-count files.
+  - Chose the `EditorWorkspaceShell.vue` run lifecycle slice because the shell still owned polling generations, timers, EventSource lifecycle, streaming preview application, Human Review await handling, terminal persistence, and retry feedback.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `useWorkspaceRunLifecycleController.test.ts` covering EventSource output preview updates, awaiting-human polling/Human Review opening, active-run follow-up polling, stale generation cancellation/teardown, and retry feedback on polling errors.
+  - Verified the expected red failure because `useWorkspaceRunLifecycleController.ts` did not exist yet.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `useWorkspaceRunLifecycleController.ts`.
+  - Updated `EditorWorkspaceShell.vue` to delegate run polling timers, polling generation checks, EventSource startup/teardown, live output preview writes, terminal run persistence, Human Review await routing, and polling retry feedback to the controller.
+  - Kept run invocation/resume orchestration in `useWorkspaceRunController.ts`, visual-state writes in `useWorkspaceRunVisualState.ts`, terminal state document mutation in `useWorkspaceDocumentState.ts`, and graph/node creation semantics unchanged.
+  - Updated structure tests to lock the run lifecycle controller boundary.
+  - Reduced `EditorWorkspaceShell.vue` from 1,365 to 1,263 lines.
+
+### Phase 4: Verification and Progress Gate
+- **Status:** completed
+- Actions taken:
+  - Ran focused run lifecycle, workspace-shell structure, run controller, and run-event-stream tests.
+  - Ran TypeScript unused-symbol verification.
+  - Ran the full frontend test suite and production build.
+  - Confirmed the production build still has no Vite large chunk warning.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend entry returned HTTP 200 and backend `/health` returned `{"status":"ok"}`.
+  - Confirmed the previous dev session exited after the restart.
+  - Recalculated the full roadmap at about 98.7%, frontend-focused progress at about 95-96%, and P3 `EditorWorkspaceShell.vue` progress at about 99%.
+  - Opened Phase 130 automatically because the full roadmap is still below 100%.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red controller test | `node --test src/editor/workspace/useWorkspaceRunLifecycleController.test.ts` before implementation | Fails because the run lifecycle controller module is missing | Failed with missing module import | Passed |
+| Focused frontend tests | `node --test src/editor/workspace/useWorkspaceRunLifecycleController.test.ts src/editor/workspace/EditorWorkspaceShell.structure.test.ts src/editor/workspace/useWorkspaceRunController.test.ts src/lib/run-event-stream.test.ts` | Focused run lifecycle and existing run stream semantics pass | 55 passed | Passed |
+| TypeScript check | `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` | No type or unused-symbol errors | Exit 0 after EventSource interface alignment | Passed |
+| Full frontend tests | `node --test $(rg --files src -g '*.test.ts' \| sort) vite.config.structure.test.ts` | Full frontend suite passes | 920 passed | Passed |
+| Production build | `npm run build` in `frontend` | Build succeeds with no large chunk warning | Exit 0; Vite build completed | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | Structure tests still expected old inline run preview writes and terminal persistence calls in `EditorWorkspaceShell.vue` | First focused structure run after shell integration | Updated the assertions to verify `useWorkspaceRunLifecycleController.ts` owns streaming preview writes and terminal persistence calls. |
+| 2026-04-30 | `vue-tsc` rejected the custom EventSource interface because `onerror` did not match the browser `EventSource` callback signature | First TypeScript verification | Changed the controller and test fake `onerror` type to accept the native `Event` parameter. |
+
+## Session: 2026-04-30 Phase 128
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Continued automatically after commit `bc91a8a` because the full-roadmap progress is below 100%.
+  - Re-read the formal roadmap, Phase 127 findings, and remaining high-line-count files.
+  - Chose the `EditorWorkspaceShell.vue` node creation controller slice because it removes a larger orchestration cluster while continuing to reuse the existing `nodeCreationExecution.ts` semantics that protect auto-snap payloads and new-node naming/context.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `useWorkspaceNodeCreationController.test.ts` covering menu open/query/close, builtin menu creation, created-state edge editor request ids, GraphiteUI Python export import short-circuit, and uploaded-file input node fallback creation.
+  - Verified the expected red failure because `useWorkspaceNodeCreationController.ts` did not exist yet.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `useWorkspaceNodeCreationController.ts`.
+  - Updated `EditorWorkspaceShell.vue` to delegate node creation menu state, menu entries, menu selection creation, created-state edge editor requests, and dropped-file node creation to the controller.
+  - Kept actual node creation semantics in `nodeCreationExecution.ts`, Python import behavior in the existing import controller, and graph dirty writes injected from the shell.
+  - Updated structure tests to lock the controller boundary instead of the old inline shell implementation.
+  - Reduced `EditorWorkspaceShell.vue` from 1,472 to 1,365 lines.
+
+### Phase 4: Verification and Progress Gate
+- **Status:** completed
+- Actions taken:
+  - Ran focused node creation controller, workspace-shell structure, node creation execution, and node creation menu model tests.
+  - Ran TypeScript unused-symbol verification; first pass caught test-only type issues, then passed after tightening the test fixture types.
+  - Ran the full frontend test suite and production build.
+  - Confirmed the production build still has no Vite large chunk warning.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend entry returned HTTP 200 and backend `/health` returned `{"status":"ok"}`.
+  - Confirmed the previous dev session exited after the restart.
+  - Recalculated the full roadmap at about 98.5%, frontend-focused progress at about 94-95%, and P3 `EditorWorkspaceShell.vue` progress at about 98%.
+  - Opened Phase 129 automatically because the full roadmap is still below 100%.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red controller test | `node --test src/editor/workspace/useWorkspaceNodeCreationController.test.ts` before implementation | Fails because the node creation controller module is missing | Failed with missing module import | Passed |
+| Focused frontend tests | `node --test src/editor/workspace/useWorkspaceNodeCreationController.test.ts src/editor/workspace/EditorWorkspaceShell.structure.test.ts src/editor/workspace/nodeCreationExecution.test.ts src/editor/workspace/nodeCreationMenuModel.test.ts` | Focused node creation controller and existing node creation semantics pass | 60 passed | Passed |
+| TypeScript check | `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` | No type or unused-symbol errors | Exit 0 after test fixture type cleanup | Passed |
+| Full frontend tests | `node --test $(rg --files src -g '*.test.ts' \| sort) vite.config.structure.test.ts` | Full frontend suite passes | 915 passed | Passed |
+| Production build | `npm run build` in `frontend` | Build succeeds with no large chunk warning | Exit 0; Vite build completed | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | Node test runner could not resolve `@/editor` imports from the new controller | First green run after adding the controller | Switched the controller imports to the same relative-path style used by nearby workspace controllers. |
+| 2026-04-30 | Structure tests still expected old inline node creation imports and menu-state writes in `EditorWorkspaceShell.vue` | First focused structure run after shell integration | Updated the assertions to verify the new `useWorkspaceNodeCreationController.ts` boundary. |
+| 2026-04-30 | `vue-tsc` flagged an unused test type and an overly narrow empty-object ref in the new controller test | First TypeScript verification | Removed the unused type and typed the created-state request ref as `Record<string, CreatedStateEdgeEditorRequest | null>`. |
+
+## Session: 2026-04-30 Phase 127
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Continued automatically after commit `f9405a5` because the full-roadmap progress is below 100%.
+  - Re-read the formal roadmap, Phase 126 findings, and remaining high-line-count files.
+  - Chose the `EditorWorkspaceShell.vue` preset-save slice because it is a narrow node top-action flow and does not touch canvas auto-snapping, node creation naming/context, Human Review, or low-level run polling/SSE.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `useWorkspacePresetController.test.ts` covering successful agent preset save, refreshed persisted preset list, success feedback/toast, and missing-node failure feedback/toast.
+  - Verified the expected red failure because `useWorkspacePresetController.ts` did not exist yet.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `useWorkspacePresetController.ts`.
+  - Updated `EditorWorkspaceShell.vue` to consume the preset controller for `saveNodePresetForTab`.
+  - Kept node top-action event wiring, preset API imports, and Element Plus toast rendering injected from the shell.
+  - Unwrapped Vue reactive graph documents with `toRaw` before preset payload cloning so `structuredClone` does not receive a reactive proxy.
+  - Updated structure tests to lock the new preset controller boundary.
+  - Reduced `EditorWorkspaceShell.vue` from 1,498 to 1,472 lines.
+
+### Phase 4: Verification and Progress Gate
+- **Status:** completed
+- Actions taken:
+  - Ran focused preset controller and workspace-shell structure tests.
+  - Ran TypeScript unused-symbol verification.
+  - Ran the full frontend test suite and production build.
+  - Confirmed the production build still has no Vite large chunk warning.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend entry returned HTTP 200 and backend `/health` returned `{"status":"ok"}`.
+  - Confirmed the previous dev session exited after the restart.
+  - Recalculated the full roadmap at about 98.2%, frontend-focused progress at about 93-94%, and P3 `EditorWorkspaceShell.vue` progress at about 97%.
+  - Opened Phase 128 automatically because the full roadmap is still below 100%.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red controller test | `node --test src/editor/workspace/useWorkspacePresetController.test.ts` before implementation | Fails because the preset controller module is missing | Failed with missing module import | Passed |
+| Focused frontend tests | `node --test src/editor/workspace/useWorkspacePresetController.test.ts src/editor/workspace/EditorWorkspaceShell.structure.test.ts` | Focused preset controller and structure tests pass | 39 passed | Passed |
+| TypeScript check | `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` | No type or unused-symbol errors | Exit 0 | Passed |
+| Full frontend tests | `node --test $(rg --files src -g '*.test.ts' \| sort) vite.config.structure.test.ts` | Full frontend suite passes | 910 passed | Passed |
+| Production build | `npm run build` in `frontend` | Build succeeds with no large chunk warning | Exit 0; Vite build completed | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | `structuredClone` rejected the reactive node object while the new controller test saved a preset from a Vue `ref` document map | First green run after adding the controller | Unwrapped the graph document with `toRaw` before passing it into `buildPresetPayloadForNode`. |
+
 ## Session: 2026-04-30 Phase 126
 
 ### Phase 1: Re-orientation

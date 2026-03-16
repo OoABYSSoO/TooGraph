@@ -211,28 +211,10 @@ import { exportLangGraphPython, fetchGraph, importGraphFromPythonSource, runGrap
 import { resolveAgentRuntimeCatalog } from "@/editor/nodes/agentConfigModel";
 import EditorCanvas from "@/editor/canvas/EditorCanvas.vue";
 import type { NodeFocusRequest } from "@/editor/canvas/useNodeSelectionFocus";
-import { buildBuiltinNodeCreationEntries } from "@/editor/workspace/nodeCreationBuiltins";
+import type { CreatedStateEdgeEditorRequest, NodeCreationMenuState } from "@/editor/workspace/nodeCreationMenuModel";
 import {
-  buildClosedNodeCreationMenuState,
-  buildCreatedStateEdgeEditorRequest,
-  buildNodeCreationEntries,
-  buildOpenNodeCreationMenuState,
-  buildUpdatedNodeCreationMenuQuery,
-  type CreatedStateEdgeEditorRequest,
-  type NodeCreationMenuState,
-} from "@/editor/workspace/nodeCreationMenuModel";
-import { createNodeFromCreationEntry, createNodeFromDroppedFile } from "./nodeCreationExecution.ts";
-import {
-  cloneGraphDocument,
-  createEditorSeedDraftGraph,
-  resolveEditorSeedTemplate,
-} from "@/lib/graph-document";
-import {
-  createUnsavedWorkspaceTab,
-  ensureSavedGraphTab,
   prunePersistedEditorDocumentDrafts,
   prunePersistedEditorViewportDrafts,
-  readPersistedEditorDocumentDraft,
   readPersistedEditorWorkspace,
   removePersistedEditorDocumentDraft,
   removePersistedEditorViewportDraft,
@@ -241,26 +223,11 @@ import {
   type PersistedEditorWorkspace,
 } from "@/lib/editor-workspace";
 import type { CanvasViewport } from "@/editor/canvas/canvasViewport";
-import {
-  buildRunEventOutputPreviewUpdate,
-  buildRunEventStreamUrl,
-  parseRunEventPayload,
-  shouldPollRunStatus,
-} from "@/lib/run-event-stream";
-import { buildRestoredGraphFromRun, buildSnapshotScopedRun, canRestoreRunDetail, resolveRestoredRunTabTitle } from "@/lib/run-restore";
 import { useGraphDocumentStore } from "@/stores/graphDocument";
-import type { KnowledgeBaseRecord } from "@/types/knowledge";
 import type { RunDetail } from "@/types/run";
-import type { SettingsPayload } from "@/types/settings";
-import type { SkillDefinition } from "@/types/skills";
 import type {
   GraphDocument,
-  GraphNodeSize,
   GraphPayload,
-  GraphPosition,
-  NodeCreationContext,
-  NodeCreationEntry,
-  PresetDocument,
   TemplateRecord,
 } from "@/types/node-system";
 
@@ -272,22 +239,22 @@ import EditorStatePanel from "./EditorStatePanel.vue";
 import EditorTabBar from "./EditorTabBar.vue";
 import EditorWelcomeState from "./EditorWelcomeState.vue";
 import {
-  listTabsMissingDocumentDrafts,
-  resolveExistingGraphDocumentHydrationSource,
-  resolveUnsavedGraphDocumentHydrationSource,
   resolveWorkspaceDraftPersistenceRequest,
-  shouldHydrateExistingGraphDocument,
   shouldRunWorkspaceDraftHydration,
 } from "./editorDraftPersistenceModel.ts";
-import { setTabScopedRecordEntry } from "./editorTabRuntimeModel.ts";
 import type { WorkspaceSidePanelMode } from "./workspaceSidePanelModel.ts";
 import { downloadPythonSource } from "./pythonExportModel.ts";
 import { isGraphiteUiPythonExportFile, isGraphiteUiPythonExportSource } from "./pythonImportModel.ts";
-import { buildPresetPayloadForNode } from "./presetPersistence.ts";
 import { useWorkspaceDocumentState } from "./useWorkspaceDocumentState.ts";
+import { useWorkspaceEditGuardController } from "./useWorkspaceEditGuardController.ts";
 import { useWorkspaceGraphPersistenceController } from "./useWorkspaceGraphPersistenceController.ts";
+import { useWorkspaceNodeCreationController } from "./useWorkspaceNodeCreationController.ts";
+import { useWorkspaceOpenController } from "./useWorkspaceOpenController.ts";
+import { useWorkspacePresetController } from "./useWorkspacePresetController.ts";
 import { useWorkspacePythonImportController } from "./useWorkspacePythonImportController.ts";
+import { useWorkspaceResourceController } from "./useWorkspaceResourceController.ts";
 import { useWorkspaceRouteController } from "./useWorkspaceRouteController.ts";
+import { useWorkspaceRunLifecycleController } from "./useWorkspaceRunLifecycleController.ts";
 import { useWorkspaceRunController } from "./useWorkspaceRunController.ts";
 import { useWorkspaceRunVisualState, type WorkspaceRunFeedback } from "./useWorkspaceRunVisualState.ts";
 import { useWorkspaceSidePanelController } from "./useWorkspaceSidePanelController.ts";
@@ -341,18 +308,23 @@ const runFailureMessageByTabId = ref<Record<string, Record<string, string>>>({})
 const activeRunEdgeIdsByTabId = ref<Record<string, string[]>>({});
 const feedbackByTabId = ref<Record<string, WorkspaceRunFeedback | null>>({});
 const routeRestoreError = ref<string | null>(null);
-const knowledgeBases = ref<KnowledgeBaseRecord[]>([]);
-const settings = ref<SettingsPayload | null>(null);
-const skillDefinitions = ref<SkillDefinition[]>([]);
-const skillDefinitionsLoading = ref(true);
-const skillDefinitionsError = ref<string | null>(null);
-const persistedPresets = ref<PresetDocument[]>([]);
 const nodeCreationMenuByTabId = ref<Record<string, NodeCreationMenuState>>({});
-const runPollGenerationByTabId = new Map<string, number>();
-const runPollTimerByTabId = new Map<string, number>();
-const runEventSourceByTabId = new Map<string, EventSource>();
+const {
+  knowledgeBases,
+  settings,
+  skillDefinitions,
+  skillDefinitionsLoading,
+  skillDefinitionsError,
+  persistedPresets,
+  loadInitialWorkspaceResources,
+  refreshAgentModels,
+} = useWorkspaceResourceController({
+  fetchKnowledgeBases,
+  fetchSettings,
+  fetchSkillDefinitions,
+  fetchPresets,
+});
 
-const templateById = computed(() => new Map(props.templates.map((template) => [template.template_id, template])));
 const graphById = computed(() => new Map(props.graphs.map((graph) => [graph.graph_id, graph])));
 const agentRuntimeCatalog = computed(() => resolveAgentRuntimeCatalog(settings.value));
 const activeTab = computed(() => workspace.value.tabs.find((tab) => tab.tabId === workspace.value.activeTabId) ?? null);
@@ -370,6 +342,43 @@ const activeStateCount = computed(() => {
   }
   return Object.keys(document.state_schema ?? {}).length;
 });
+let closeNodeCreationMenuFromController: ((tabId: string) => void) | null = null;
+function closeNodeCreationMenu(tabId: string) {
+  closeNodeCreationMenuFromController?.(tabId);
+}
+let guardGraphEditForTabFromController: (tabId: string) => boolean = () => {
+  throw new Error("Workspace edit guard controller is not initialized.");
+};
+let handleNodePositionUpdateFromController: (tabId: string, payload: { nodeId: string; position: { x: number; y: number } }) => void = () => {
+  throw new Error("Workspace edit guard controller is not initialized.");
+};
+let handleNodeSizeUpdateFromController: (tabId: string, payload: { nodeId: string; position: { x: number; y: number }; size: { width: number; height: number } }) => void = () => {
+  throw new Error("Workspace edit guard controller is not initialized.");
+};
+let isGraphInteractionLockedFromController: (tabId: string) => boolean = () => false;
+let showGraphLockedEditToastFromController: () => void = () => {
+  throw new Error("Workspace edit guard controller is not initialized.");
+};
+
+function isGraphInteractionLocked(tabId: string) {
+  return isGraphInteractionLockedFromController(tabId);
+}
+
+function showGraphLockedEditToast() {
+  showGraphLockedEditToastFromController();
+}
+
+function guardGraphEditForTab(tabId: string) {
+  return guardGraphEditForTabFromController(tabId);
+}
+
+function handleNodePositionUpdate(tabId: string, payload: { nodeId: string; position: { x: number; y: number } }) {
+  handleNodePositionUpdateFromController(tabId, payload);
+}
+
+function handleNodeSizeUpdate(tabId: string, payload: { nodeId: string; position: { x: number; y: number }; size: { width: number; height: number } }) {
+  handleNodeSizeUpdateFromController(tabId, payload);
+}
 const {
   activeStatePanelOpen,
   isStatePanelOpen,
@@ -423,6 +432,44 @@ const {
   setMessageFeedbackForTab,
   guardGraphEditForTab,
 });
+const workspaceEditGuardController = useWorkspaceEditGuardController({
+  documentsByTabId,
+  latestRunDetailByTabId,
+  commitDirtyDocumentForTab,
+  showLockedEditToast: () => {
+    ElMessage({
+      customClass: "editor-workspace-shell__locked-toast",
+      type: "warning",
+      duration: 4200,
+      grouping: true,
+      placement: "top",
+      showClose: false,
+      message: t("editor.lockedToast"),
+    });
+  },
+});
+guardGraphEditForTabFromController = workspaceEditGuardController.guardGraphEditForTab;
+handleNodePositionUpdateFromController = workspaceEditGuardController.handleNodePositionUpdate;
+handleNodeSizeUpdateFromController = workspaceEditGuardController.handleNodeSizeUpdate;
+isGraphInteractionLockedFromController = workspaceEditGuardController.isGraphInteractionLocked;
+showGraphLockedEditToastFromController = workspaceEditGuardController.showGraphLockedEditToast;
+const {
+  cancelRunEventStreamForTab,
+  cancelRunPolling,
+  getRunGeneration,
+  pollRunForTab,
+  startRunEventStreamForTab,
+  teardownRunLifecycle,
+} = useWorkspaceRunLifecycleController({
+  documentsByTabId,
+  runOutputPreviewByTabId,
+  restoredRunSnapshotIdByTabId,
+  fetchRun,
+  applyRunVisualStateToTab,
+  openHumanReviewPanelForTab,
+  persistRunStateValuesForTab,
+  setMessageFeedbackForTab,
+});
 const activeTabRouteSignature = computed(() => {
   const tab = activeTab.value;
   if (!tab) {
@@ -447,6 +494,45 @@ const routeSignature = computed(() => {
   }
   return "root";
 });
+let ensureUnsavedTabDocumentsFromController: () => void = () => {
+  throw new Error("Workspace open controller is not initialized.");
+};
+let loadExistingGraphIntoTabFromController: (tabId: string, graphId: string) => Promise<void> = async () => {
+  throw new Error("Workspace open controller is not initialized.");
+};
+let openExistingGraphFromController: (graphId: string, navigation?: "push" | "replace" | "none") => void = () => {
+  throw new Error("Workspace open controller is not initialized.");
+};
+let openNewTabFromController: (templateId: string | null, navigation?: "push" | "replace" | "none") => void = () => {
+  throw new Error("Workspace open controller is not initialized.");
+};
+let openRestoredRunTabFromController: (
+  runId: string,
+  snapshotId: string | null,
+  navigation?: "push" | "replace" | "none",
+) => Promise<void> = async () => {
+  throw new Error("Workspace open controller is not initialized.");
+};
+
+function ensureUnsavedTabDocuments() {
+  ensureUnsavedTabDocumentsFromController();
+}
+
+function openNewTab(templateId: string | null, navigation: "push" | "replace" | "none" = "push") {
+  openNewTabFromController(templateId, navigation);
+}
+
+async function openRestoredRunTab(runId: string, snapshotId: string | null = props.restoreSnapshotId ?? null, navigation: "push" | "replace" | "none" = "push") {
+  await openRestoredRunTabFromController(runId, snapshotId, navigation);
+}
+
+async function loadExistingGraphIntoTab(tabId: string, graphId: string) {
+  await loadExistingGraphIntoTabFromController(tabId, graphId);
+}
+
+function openExistingGraph(graphId: string, navigation: "push" | "replace" | "none" = "push") {
+  openExistingGraphFromController(graphId, navigation);
+}
 const { applyCurrentRouteInstruction, syncRouteToUrl, syncRouteToTab } = useWorkspaceRouteController({
   routeMode: () => props.routeMode,
   routeGraphId: () => props.routeGraphId ?? null,
@@ -464,6 +550,30 @@ const { applyCurrentRouteInstruction, syncRouteToUrl, syncRouteToTab } = useWork
   openNewTab,
   openExistingGraph,
 });
+const workspaceOpenController = useWorkspaceOpenController({
+  workspace,
+  documentsByTabId,
+  loadingByTabId,
+  errorByTabId,
+  restoredRunSnapshotIdByTabId,
+  routeRestoreError,
+  handledRouteSignature,
+  routeSignature,
+  templates: () => props.templates,
+  graphById,
+  updateWorkspace,
+  registerDocumentForTab,
+  fetchGraph,
+  fetchRun,
+  applyRunVisualStateToTab,
+  openHumanReviewPanelForTab,
+  syncRouteToTab,
+});
+ensureUnsavedTabDocumentsFromController = workspaceOpenController.ensureUnsavedTabDocuments;
+loadExistingGraphIntoTabFromController = workspaceOpenController.loadExistingGraphIntoTab;
+openExistingGraphFromController = workspaceOpenController.openExistingGraph;
+openNewTabFromController = workspaceOpenController.openNewTab;
+openRestoredRunTabFromController = workspaceOpenController.openRestoredRunTab;
 const {
   renameActiveGraph,
   saveActiveGraph,
@@ -505,6 +615,36 @@ const {
   importGraphFromPythonSource,
   isGraphiteUiPythonExportSource,
   setMessageFeedbackForTab,
+});
+const {
+  closeNodeCreationMenu: closeNodeCreationMenuController,
+  createNodeFromFileForTab,
+  createNodeFromMenuForTab,
+  nodeCreationEntriesForTab,
+  nodeCreationMenuState,
+  openCreatedStateEdgeEditorForTab,
+  openNodeCreationMenuForTab,
+  updateNodeCreationQuery,
+} = useWorkspaceNodeCreationController({
+  documentsByTabId,
+  dataEdgeStateEditorRequestByTabId,
+  nodeCreationMenuByTabId,
+  persistedPresets,
+  guardGraphEditForTab,
+  markDocumentDirty,
+  setMessageFeedbackForTab,
+  importPythonGraphFile,
+  isGraphiteUiPythonExportFile,
+});
+closeNodeCreationMenuFromController = closeNodeCreationMenuController;
+const { saveNodePresetForTab } = useWorkspacePresetController({
+  documentsByTabId,
+  persistedPresets,
+  savePreset,
+  fetchPreset,
+  setMessageFeedbackForTab,
+  showPresetSaveToast,
+  translate: (key, params) => t(key, params ?? {}),
 });
 const {
   activateTab,
@@ -563,119 +703,13 @@ const { runActiveGraph, resumeHumanReviewRun } = useWorkspaceRunController({
   runGraph,
   resumeRun,
   cancelRunPolling,
-  getRunGeneration: (tabId) => runPollGenerationByTabId.get(tabId) ?? 0,
+  getRunGeneration,
   startRunEventStreamForTab,
   pollRunForTab,
   setFeedbackForTab,
   setMessageFeedbackForTab,
   translate: (key, params) => t(key, params ?? {}),
 });
-
-function cancelRunPolling(tabId: string) {
-  runPollGenerationByTabId.set(tabId, (runPollGenerationByTabId.get(tabId) ?? 0) + 1);
-  const timerId = runPollTimerByTabId.get(tabId);
-  if (typeof timerId === "number") {
-    window.clearTimeout(timerId);
-    runPollTimerByTabId.delete(tabId);
-  }
-}
-
-function cancelRunEventStreamForTab(tabId: string) {
-  runEventSourceByTabId.get(tabId)?.close();
-  runEventSourceByTabId.delete(tabId);
-}
-
-function applyStreamingOutputPreviewToTab(tabId: string, payload: Record<string, unknown>) {
-  const currentPreview = runOutputPreviewByTabId.value[tabId] ?? {};
-  const nextPreview = buildRunEventOutputPreviewUpdate(documentsByTabId.value[tabId], currentPreview, payload);
-  if (!nextPreview) {
-    return;
-  }
-  runOutputPreviewByTabId.value = setTabScopedRecordEntry(runOutputPreviewByTabId.value, tabId, nextPreview);
-}
-
-function startRunEventStreamForTab(tabId: string, runId: string) {
-  cancelRunEventStreamForTab(tabId);
-  const streamUrl = buildRunEventStreamUrl(runId);
-  if (!streamUrl || typeof EventSource === "undefined") {
-    return;
-  }
-  const source = new EventSource(streamUrl);
-  runEventSourceByTabId.set(tabId, source);
-  source.addEventListener("node.output.delta", (event) => {
-    const payload = parseRunEventPayload(event);
-    if (payload) {
-      applyStreamingOutputPreviewToTab(tabId, payload);
-    }
-  });
-  source.addEventListener("node.output.completed", (event) => {
-    const payload = parseRunEventPayload(event);
-    if (payload) {
-      applyStreamingOutputPreviewToTab(tabId, payload);
-    }
-  });
-  source.addEventListener("run.completed", () => {
-    cancelRunEventStreamForTab(tabId);
-    void pollRunForTab(tabId, runId);
-  });
-  source.addEventListener("run.failed", () => {
-    cancelRunEventStreamForTab(tabId);
-    void pollRunForTab(tabId, runId);
-  });
-  source.onerror = () => {
-    if (runEventSourceByTabId.get(tabId) === source) {
-      cancelRunEventStreamForTab(tabId);
-    }
-  };
-}
-
-function scheduleRunPoll(tabId: string, runId: string, delayMs: number, generation: number) {
-  const timerId = window.setTimeout(() => {
-    void pollRunForTab(tabId, runId, generation);
-  }, delayMs);
-  runPollTimerByTabId.set(tabId, timerId);
-}
-
-async function pollRunForTab(tabId: string, runId: string, generation = runPollGenerationByTabId.get(tabId) ?? 0) {
-  if ((runPollGenerationByTabId.get(tabId) ?? 0) !== generation) {
-    return;
-  }
-
-  try {
-    const run = await fetchRun(runId);
-    if ((runPollGenerationByTabId.get(tabId) ?? 0) !== generation) {
-      return;
-    }
-
-    applyRunVisualStateToTab(tabId, run, documentsByTabId.value[tabId], run, { preserveMissing: shouldPollRunStatus(run.status) });
-    restoredRunSnapshotIdByTabId.value = setTabScopedRecordEntry(restoredRunSnapshotIdByTabId.value, tabId, null);
-
-    if (run.status === "awaiting_human" && run.current_node_id) {
-      openHumanReviewPanelForTab(tabId, run.current_node_id);
-    }
-
-    if (shouldPollRunStatus(run.status)) {
-      scheduleRunPoll(tabId, runId, 500, generation);
-      return;
-    }
-
-    persistRunStateValuesForTab(tabId, run);
-    runPollTimerByTabId.delete(tabId);
-    cancelRunEventStreamForTab(tabId);
-  } catch (error) {
-    if ((runPollGenerationByTabId.get(tabId) ?? 0) !== generation) {
-      return;
-    }
-
-    setMessageFeedbackForTab(tabId, {
-      tone: "warning",
-      message: error instanceof Error ? error.message : "Failed to load run detail.",
-      activeRunId: runId,
-      activeRunStatus: "running",
-    });
-    scheduleRunPoll(tabId, runId, 1000, generation);
-  }
-}
 
 function updateWorkspace(nextWorkspace: PersistedEditorWorkspace) {
   workspace.value = nextWorkspace;
@@ -686,324 +720,6 @@ function updateWorkspaceTab(tabId: string, updater: (tab: EditorWorkspaceTab) =>
     ...workspace.value,
     tabs: workspace.value.tabs.map((tab) => (tab.tabId === tabId ? updater(tab) : tab)),
   });
-}
-
-function createDraftForTab(tab: EditorWorkspaceTab): GraphPayload {
-  if (tab.templateId) {
-    const template = templateById.value.get(tab.templateId);
-    if (template) {
-      const draft = createEditorSeedDraftGraph(props.templates, template.template_id, tab.title);
-      draft.name = tab.title;
-      return draft;
-    }
-  }
-  return createEditorSeedDraftGraph(props.templates, tab.defaultTemplateId ?? null, tab.title);
-}
-
-function ensureUnsavedTabDocuments() {
-  for (const tab of listTabsMissingDocumentDrafts(workspace.value.tabs, documentsByTabId.value)) {
-    const persistedDraft = readPersistedEditorDocumentDraft(tab.tabId);
-    const hydrationSource = resolveUnsavedGraphDocumentHydrationSource(persistedDraft);
-    registerDocumentForTab(tab.tabId, hydrationSource.type === "persisted" ? hydrationSource.document : createDraftForTab(tab));
-  }
-}
-
-function openNewTab(templateId: string | null, navigation: "push" | "replace" | "none" = "push") {
-  const template = templateId ? templateById.value.get(templateId) ?? null : null;
-  const seedTemplate = resolveEditorSeedTemplate(props.templates, template?.template_id ?? null);
-  const draft = createEditorSeedDraftGraph(props.templates, template?.template_id ?? null);
-  const tab = createUnsavedWorkspaceTab({
-    kind: template ? "template" : "new",
-    title: template?.label ?? seedTemplate?.default_graph_name ?? draft.name,
-    templateId: template?.template_id ?? null,
-    defaultTemplateId: template?.template_id ?? null,
-  });
-
-  registerDocumentForTab(tab.tabId, draft);
-  updateWorkspace({
-    activeTabId: tab.tabId,
-    tabs: [...workspace.value.tabs, tab],
-  });
-
-  if (navigation !== "none") {
-    syncRouteToTab(tab, navigation === "replace" ? "replace" : "push");
-  }
-  handledRouteSignature.value = templateId ? `new:${templateId}` : "new:";
-}
-
-async function openRestoredRunTab(runId: string, snapshotId: string | null = props.restoreSnapshotId ?? null, navigation: "push" | "replace" | "none" = "push") {
-  routeRestoreError.value = null;
-
-  try {
-    const run = await fetchRun(runId);
-    if (!canRestoreRunDetail(run)) {
-      throw new Error(`Run ${runId} cannot be restored into the editor.`);
-    }
-    const visualRun = buildSnapshotScopedRun(run, snapshotId);
-    const restoredGraph = buildRestoredGraphFromRun(run, snapshotId);
-    const tab = {
-      ...createUnsavedWorkspaceTab({
-        kind: "new",
-        title: resolveRestoredRunTabTitle(run),
-      }),
-      dirty: true,
-    };
-
-    registerDocumentForTab(tab.tabId, restoredGraph);
-    updateWorkspace({
-      activeTabId: tab.tabId,
-      tabs: [...workspace.value.tabs, tab],
-    });
-    restoredRunSnapshotIdByTabId.value = {
-      ...restoredRunSnapshotIdByTabId.value,
-      [tab.tabId]: snapshotId,
-    };
-    applyRunVisualStateToTab(tab.tabId, run, restoredGraph, visualRun);
-    handledRouteSignature.value = routeSignature.value;
-
-    if (visualRun.status === "awaiting_human" && visualRun.current_node_id) {
-      openHumanReviewPanelForTab(tab.tabId, visualRun.current_node_id);
-    }
-
-    if (navigation !== "none") {
-      syncRouteToTab(tab, navigation === "replace" ? "replace" : "push");
-    }
-  } catch (error) {
-    routeRestoreError.value = error instanceof Error ? error.message : `Failed to restore run ${runId}.`;
-    handledRouteSignature.value = routeSignature.value;
-  }
-}
-
-async function loadExistingGraphIntoTab(tabId: string, graphId: string) {
-  if (!shouldHydrateExistingGraphDocument({ hasDocument: Boolean(documentsByTabId.value[tabId]), isLoading: Boolean(loadingByTabId.value[tabId]) })) {
-    return;
-  }
-
-  loadingByTabId.value = setTabScopedRecordEntry(loadingByTabId.value, tabId, true);
-  errorByTabId.value = setTabScopedRecordEntry(errorByTabId.value, tabId, null);
-
-  try {
-    const persistedDraft = readPersistedEditorDocumentDraft(tabId);
-    const hydrationSource = resolveExistingGraphDocumentHydrationSource({ persistedDraft, cachedGraph: null });
-    if (hydrationSource.type === "persisted") {
-      registerDocumentForTab(tabId, hydrationSource.document);
-      return;
-    }
-    const graph = await fetchGraph(graphId);
-    registerDocumentForTab(tabId, graph);
-  } catch (error) {
-    loadingByTabId.value = setTabScopedRecordEntry(loadingByTabId.value, tabId, false);
-    errorByTabId.value = setTabScopedRecordEntry(errorByTabId.value, tabId, error instanceof Error ? error.message : "Failed to load graph.");
-  }
-}
-
-function openExistingGraph(graphId: string, navigation: "push" | "replace" | "none" = "push") {
-  const graph = graphById.value.get(graphId) ?? null;
-  const nextWorkspace = ensureSavedGraphTab(workspace.value, {
-    graphId,
-    title: graph?.name ?? graphId,
-  });
-  updateWorkspace(nextWorkspace);
-
-  const nextTabId = nextWorkspace.activeTabId;
-  if (nextTabId && shouldHydrateExistingGraphDocument({ hasDocument: Boolean(documentsByTabId.value[nextTabId]), isLoading: Boolean(loadingByTabId.value[nextTabId]) })) {
-    const persistedDraft = readPersistedEditorDocumentDraft(nextTabId);
-    const hydrationSource = resolveExistingGraphDocumentHydrationSource({ persistedDraft, cachedGraph: graph });
-    if (hydrationSource.type === "persisted") {
-      registerDocumentForTab(nextTabId, hydrationSource.document);
-    } else if (hydrationSource.type === "cached-graph") {
-      registerDocumentForTab(nextTabId, cloneGraphDocument(hydrationSource.graph));
-    } else if (hydrationSource.type === "fetch") {
-      void loadExistingGraphIntoTab(nextTabId, graphId);
-    }
-  }
-
-  if (navigation !== "none") {
-    syncRouteToTab(
-      {
-        graphId,
-        kind: "existing",
-        templateId: null,
-        defaultTemplateId: null,
-      },
-      navigation === "replace" ? "replace" : "push",
-    );
-  }
-  handledRouteSignature.value = `existing:${graphId}`;
-}
-
-function isGraphInteractionLocked(tabId: string) {
-  return latestRunDetailByTabId.value[tabId]?.status === "awaiting_human";
-}
-
-function showGraphLockedEditToast() {
-  ElMessage({
-    customClass: "editor-workspace-shell__locked-toast",
-    type: "warning",
-    duration: 4200,
-    grouping: true,
-    placement: "top",
-    showClose: false,
-    message: t("editor.lockedToast"),
-  });
-}
-
-function guardGraphEditForTab(tabId: string) {
-  if (!isGraphInteractionLocked(tabId)) {
-    return false;
-  }
-  showGraphLockedEditToast();
-  return true;
-}
-
-function nodeCreationMenuState(tabId: string) {
-  return nodeCreationMenuByTabId.value[tabId] ?? null;
-}
-
-function nodeCreationEntriesForTab(tabId: string): NodeCreationEntry[] {
-  const menuState = nodeCreationMenuState(tabId);
-  const context = menuState?.context ?? null;
-  return buildNodeCreationEntries({
-    builtins: buildBuiltinNodeCreationEntries(),
-    presets: persistedPresets.value,
-    query: menuState?.query ?? "",
-    sourceValueType: context?.sourceValueType ?? context?.targetValueType ?? null,
-    sourceAnchorKind: context?.sourceAnchorKind ?? context?.targetAnchorKind ?? null,
-  });
-}
-
-function openNodeCreationMenuForTab(tabId: string, context: NodeCreationContext) {
-  if (guardGraphEditForTab(tabId)) {
-    return;
-  }
-  nodeCreationMenuByTabId.value = setTabScopedRecordEntry(nodeCreationMenuByTabId.value, tabId, buildOpenNodeCreationMenuState(context));
-}
-
-function closeNodeCreationMenu(tabId: string) {
-  nodeCreationMenuByTabId.value = setTabScopedRecordEntry(nodeCreationMenuByTabId.value, tabId, buildClosedNodeCreationMenuState());
-}
-
-function updateNodeCreationQuery(tabId: string, query: string) {
-  const currentState = nodeCreationMenuState(tabId);
-  nodeCreationMenuByTabId.value = setTabScopedRecordEntry(
-    nodeCreationMenuByTabId.value,
-    tabId,
-    buildUpdatedNodeCreationMenuQuery(currentState, query),
-  );
-}
-
-function createNodeFromMenuForTab(tabId: string, _entry: NodeCreationEntry) {
-  if (guardGraphEditForTab(tabId)) {
-    closeNodeCreationMenu(tabId);
-    return;
-  }
-  const document = documentsByTabId.value[tabId];
-  const menuState = nodeCreationMenuState(tabId);
-  if (!document || !menuState?.context) {
-    closeNodeCreationMenu(tabId);
-    return;
-  }
-
-  try {
-    const result = createNodeFromCreationEntry(document, {
-      entry: _entry,
-      context: menuState.context,
-      persistedPresets: persistedPresets.value,
-    });
-    markDocumentDirty(tabId, result.document);
-    openCreatedStateEdgeEditorForTab(tabId, menuState.context, result);
-    setMessageFeedbackForTab(tabId, {
-      tone: "neutral",
-      message: `Created ${result.document.nodes[result.createdNodeId]?.name ?? _entry.label}.`,
-    });
-    closeNodeCreationMenu(tabId);
-  } catch (error) {
-    setMessageFeedbackForTab(tabId, {
-      tone: "warning",
-      message: error instanceof Error ? error.message : "Failed to create node.",
-    });
-  }
-}
-
-function openCreatedStateEdgeEditorForTab(
-  tabId: string,
-  context: NodeCreationContext,
-  result: { createdNodeId: string; createdStateKey: string | null },
-) {
-  const editorRequest = buildCreatedStateEdgeEditorRequest(context, result, Date.now());
-  if (!editorRequest) {
-    return;
-  }
-
-  dataEdgeStateEditorRequestByTabId.value = setTabScopedRecordEntry(
-    dataEdgeStateEditorRequestByTabId.value,
-    tabId,
-    editorRequest,
-  );
-}
-
-async function createNodeFromFileForTab(tabId: string, _payload: { file: File; position: GraphPosition }) {
-  if (guardGraphEditForTab(tabId)) {
-    closeNodeCreationMenu(tabId);
-    return;
-  }
-  const document = documentsByTabId.value[tabId];
-  if (!document) {
-    closeNodeCreationMenu(tabId);
-    return;
-  }
-
-  try {
-    if (isGraphiteUiPythonExportFile(_payload.file) && (await importPythonGraphFile(_payload.file, { fallbackToFileNode: true }))) {
-      closeNodeCreationMenu(tabId);
-      return;
-    }
-
-    const result = await createNodeFromDroppedFile(document, {
-      file: _payload.file,
-      position: _payload.position,
-    });
-    markDocumentDirty(tabId, result.document);
-    setMessageFeedbackForTab(tabId, {
-      tone: "neutral",
-      message: `Created ${result.document.nodes[result.createdNodeId]?.name ?? "input node"} from ${_payload.file.name}.`,
-    });
-  } catch (error) {
-    setMessageFeedbackForTab(tabId, {
-      tone: "warning",
-      message: error instanceof Error ? error.message : "Failed to create input node from file.",
-    });
-  }
-  closeNodeCreationMenu(tabId);
-}
-
-function handleNodePositionUpdate(tabId: string, payload: { nodeId: string; position: GraphPosition }) {
-  if (guardGraphEditForTab(tabId)) {
-    return;
-  }
-  const document = documentsByTabId.value[tabId];
-  if (!document?.nodes[payload.nodeId]) {
-    return;
-  }
-
-  const nextDocument = cloneGraphDocument(document);
-  nextDocument.nodes[payload.nodeId].ui.position = payload.position;
-  commitDirtyDocumentForTab(tabId, nextDocument);
-}
-
-function handleNodeSizeUpdate(tabId: string, payload: { nodeId: string; position: GraphPosition; size: GraphNodeSize }) {
-  if (guardGraphEditForTab(tabId)) {
-    return;
-  }
-  const document = documentsByTabId.value[tabId];
-  if (!document?.nodes[payload.nodeId]) {
-    return;
-  }
-
-  const nextDocument = cloneGraphDocument(document);
-  nextDocument.nodes[payload.nodeId].ui.position = payload.position;
-  nextDocument.nodes[payload.nodeId].ui.size = payload.size;
-  commitDirtyDocumentForTab(tabId, nextDocument);
 }
 
 const {
@@ -1049,41 +765,6 @@ const {
   translate: t,
 });
 
-async function saveNodePresetForTab(tabId: string, nodeId: string) {
-  const document = documentsByTabId.value[tabId];
-  if (!document) {
-    return;
-  }
-
-  const payload = buildPresetPayloadForNode(document, nodeId);
-  if (!payload) {
-    setMessageFeedbackForTab(tabId, {
-      tone: "danger",
-      message: t("feedback.presetSaveFailed"),
-    });
-    showPresetSaveToast("error", t("feedback.presetSaveFailed"));
-    return;
-  }
-
-  try {
-    const saved = await savePreset(payload);
-    const savedPreset = await fetchPreset(saved.presetId);
-    const presetLabel = savedPreset.definition.label || savedPreset.presetId;
-    persistedPresets.value = [savedPreset, ...persistedPresets.value.filter((preset) => preset.presetId !== savedPreset.presetId)];
-    setMessageFeedbackForTab(tabId, {
-      tone: "success",
-      message: t("feedback.presetSaved", { label: presetLabel }),
-    });
-    showPresetSaveToast("success", t("feedback.presetSaved", { label: presetLabel }));
-  } catch (error) {
-    setMessageFeedbackForTab(tabId, {
-      tone: "danger",
-      message: error instanceof Error ? error.message : t("feedback.presetSaveFailed"),
-    });
-    showPresetSaveToast("error", error instanceof Error ? error.message : t("feedback.presetSaveFailed"));
-  }
-}
-
 function showPresetSaveToast(type: "success" | "error", message: string) {
   ElMessage({
     customClass: "editor-workspace-shell__preset-toast",
@@ -1106,43 +787,6 @@ function showStateDeleteBlockedToast(message: string) {
     showClose: true,
     message,
   });
-}
-
-async function loadKnowledgeBases() {
-  try {
-    knowledgeBases.value = await fetchKnowledgeBases();
-  } catch {
-    knowledgeBases.value = [];
-  }
-}
-
-async function loadSettings() {
-  try {
-    settings.value = await fetchSettings();
-  } catch {
-    settings.value = null;
-  }
-}
-
-async function refreshAgentModels() {
-  await loadSettings();
-}
-
-async function loadSkillDefinitions() {
-  try {
-    skillDefinitionsLoading.value = true;
-    skillDefinitions.value = await fetchSkillDefinitions();
-    skillDefinitionsError.value = null;
-  } catch (error) {
-    skillDefinitions.value = [];
-    skillDefinitionsError.value = error instanceof Error ? error.message : "Failed to load skills.";
-  } finally {
-    skillDefinitionsLoading.value = false;
-  }
-}
-
-async function loadPersistedPresets() {
-  persistedPresets.value = await fetchPresets();
 }
 
 watch(
@@ -1204,19 +848,11 @@ watch(
 );
 
 onBeforeUnmount(() => {
-  for (const tabId of Array.from(runEventSourceByTabId.keys())) {
-    cancelRunEventStreamForTab(tabId);
-  }
-  for (const tabId of Array.from(runPollTimerByTabId.keys())) {
-    cancelRunPolling(tabId);
-  }
+  teardownRunLifecycle();
 });
 
 onMounted(() => {
-  void loadKnowledgeBases();
-  void loadSettings();
-  void loadSkillDefinitions();
-  void loadPersistedPresets();
+  loadInitialWorkspaceResources();
   updateWorkspace(readPersistedEditorWorkspace());
   ensureTabViewportDrafts();
   hydrated.value = true;

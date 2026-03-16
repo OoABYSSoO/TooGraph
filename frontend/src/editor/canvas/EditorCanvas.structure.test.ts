@@ -89,6 +89,10 @@ function readCanvasPinchZoomModelSource() {
   return readFileSync(resolve(currentDirectory, "canvasPinchZoomModel.ts"), "utf8").replace(/\r\n/g, "\n");
 }
 
+function readCanvasPinchZoomStateSource() {
+  return readFileSync(resolve(currentDirectory, "useCanvasPinchZoomState.ts"), "utf8").replace(/\r\n/g, "\n");
+}
+
 function readCanvasViewportDisplayModelSource() {
   return readFileSync(resolve(currentDirectory, "canvasViewportDisplayModel.ts"), "utf8").replace(/\r\n/g, "\n");
 }
@@ -107,6 +111,14 @@ function readCanvasNodeDragResizeModelSource() {
 
 function readCanvasNodeDragResizeSource() {
   return readFileSync(resolve(currentDirectory, "useCanvasNodeDragResize.ts"), "utf8").replace(/\r\n/g, "\n");
+}
+
+function readCanvasAnimationFrameSchedulerSource() {
+  return readFileSync(resolve(currentDirectory, "useCanvasAnimationFrameScheduler.ts"), "utf8").replace(/\r\n/g, "\n");
+}
+
+function readCanvasHoverStateSource() {
+  return readFileSync(resolve(currentDirectory, "useCanvasHoverState.ts"), "utf8").replace(/\r\n/g, "\n");
 }
 
 function readEdgeVisibilityModelSource() {
@@ -671,11 +683,15 @@ test("EditorCanvas resolves rendered anchor geometry from measured node slot off
 });
 
 test("EditorCanvas delays clearing node hover state so hover-dependent node chrome does not disappear immediately", () => {
-  assert.match(componentSource, /const NODE_HOVER_RELEASE_DELAY_MS = 2000;/);
-  assert.match(componentSource, /const hoveredNodeReleaseTimeoutRef = ref<number \| null>\(null\);/);
-  assert.match(componentSource, /function clearScheduledHoveredNodeRelease\(\)/);
-  assert.match(componentSource, /function setHoveredNode\(nodeId: string\) \{[\s\S]*clearScheduledHoveredNodeRelease\(\);[\s\S]*hoveredNodeId\.value = nodeId;/);
-  assert.match(componentSource, /function clearHoveredNode\(nodeId: string\) \{[\s\S]*hoveredNodeReleaseTimeoutRef\.value = window\.setTimeout\(\(\) => \{[\s\S]*hoveredNodeId\.value = null;[\s\S]*\}, NODE_HOVER_RELEASE_DELAY_MS\);/);
+  const canvasHoverStateSource = readCanvasHoverStateSource();
+
+  assert.match(componentSource, /import \{ useCanvasHoverState \} from "\.\/useCanvasHoverState";/);
+  assert.match(componentSource, /\} = useCanvasHoverState\(\{[\s\S]*scheduleAnchorMeasurement,[\s\S]*\}\);/);
+  assert.match(canvasHoverStateSource, /export const NODE_HOVER_RELEASE_DELAY_MS = 2000;/);
+  assert.match(canvasHoverStateSource, /const hoveredNodeReleaseTimeoutRef = ref<number \| null>\(null\);/);
+  assert.match(canvasHoverStateSource, /function clearScheduledHoveredNodeRelease\(\)/);
+  assert.match(canvasHoverStateSource, /function setHoveredNode\(nodeId: string\) \{[\s\S]*clearScheduledHoveredNodeRelease\(\);[\s\S]*hoveredNodeId\.value = nodeId;/);
+  assert.match(canvasHoverStateSource, /function clearHoveredNode\(nodeId: string\) \{[\s\S]*hoveredNodeReleaseTimeoutRef\.value = timerScheduler\.setTimeout\(\(\) => \{[\s\S]*hoveredNodeId\.value = null;[\s\S]*\}, NODE_HOVER_RELEASE_DELAY_MS\);/);
   assert.match(componentSource, /onBeforeUnmount\(\(\) => \{[\s\S]*clearScheduledHoveredNodeRelease\(\);/);
 });
 
@@ -693,7 +709,7 @@ test("EditorCanvas renders output flow hotspots only for allowed modes and inter
   assert.match(componentSource, /:class="flowHotspotClassState\(anchor\)"/);
   assert.match(componentSource, /@pointerenter="setHoveredNode\(nodeId\)"/);
   assert.match(componentSource, /@pointerleave="clearHoveredNode\(nodeId\)"/);
-  assert.match(componentSource, /const hoveredNodeId = ref<string \| null>\(null\);/);
+  assert.match(readCanvasHoverStateSource(), /const hoveredNodeId = ref<string \| null>\(null\);/);
   assert.doesNotMatch(componentSource, /'editor-canvas__flow-hotspot--outbound': anchor\.kind === 'flow-out'/);
   assert.doesNotMatch(componentSource, /'editor-canvas__flow-hotspot--visible': isFlowHotspotVisible\(anchor\)/);
   assert.match(edgeVisibilityModelSource, /input\.anchor\.kind === "flow-out" \|\| input\.anchor\.kind === "route-out"/);
@@ -1306,15 +1322,17 @@ test("EditorCanvas keeps transient input capsules aligned while dragging over no
 });
 
 test("EditorCanvas keeps node port capsules visible while their state anchor dots are hovered", () => {
-  assert.match(componentSource, /const hoveredPointAnchorNodeId = ref<string \| null>\(null\);/);
+  const canvasHoverStateSource = readCanvasHoverStateSource();
+
+  assert.match(canvasHoverStateSource, /const hoveredPointAnchorNodeId = ref<string \| null>\(null\);/);
   assert.match(componentSource, /:hovered="hoveredNodeId === nodeId \|\| activeConnectionHoverNodeId === nodeId \|\| hoveredPointAnchorNodeId === nodeId"/);
   assert.match(componentSource, /@pointerenter="setHoveredPointAnchorNode\(anchor\.nodeId\)"/);
   assert.match(componentSource, /@pointerleave="clearHoveredPointAnchorNode\(anchor\.nodeId\)"/);
-  assert.match(componentSource, /function setHoveredPointAnchorNode\(nodeId: string\)/);
-  assert.match(componentSource, /function clearHoveredPointAnchorNode\(nodeId: string\)/);
-  assert.match(componentSource, /function setHoveredPointAnchorNode\(nodeId: string\) \{[\s\S]*scheduleAnchorMeasurement\(nodeId\);/);
-  assert.match(componentSource, /hoveredPointAnchorNodeId\.value === nodeId/);
-  assert.match(componentSource, /if \(hoveredPointAnchorNodeId\.value === nodeId\) \{[\s\S]*hoveredPointAnchorNodeId\.value = null;[\s\S]*scheduleAnchorMeasurement\(nodeId\);/);
+  assert.match(canvasHoverStateSource, /function setHoveredPointAnchorNode\(nodeId: string\)/);
+  assert.match(canvasHoverStateSource, /function clearHoveredPointAnchorNode\(nodeId: string\)/);
+  assert.match(canvasHoverStateSource, /function setHoveredPointAnchorNode\(nodeId: string\) \{[\s\S]*input\.scheduleAnchorMeasurement\(nodeId\);/);
+  assert.match(canvasHoverStateSource, /hoveredPointAnchorNodeId\.value === nodeId/);
+  assert.match(canvasHoverStateSource, /if \(hoveredPointAnchorNodeId\.value === nodeId\) \{[\s\S]*hoveredPointAnchorNodeId\.value = null;[\s\S]*input\.scheduleAnchorMeasurement\(nodeId\);/);
   assert.match(componentSource, /function clearCanvasTransientState\(\) \{[\s\S]*hoveredPointAnchorNodeId\.value = null;/);
 });
 
@@ -1418,20 +1436,23 @@ test("EditorCanvas opts mobile touch drags out of browser gestures", () => {
 
 test("EditorCanvas supports two-finger pinch zoom on mobile without changing single-pointer gestures", () => {
   const canvasPinchZoomModelSource = readCanvasPinchZoomModelSource();
+  const canvasPinchZoomStateSource = readCanvasPinchZoomStateSource();
 
-  assert.match(componentSource, /import \{ buildPinchZoomStart, resolveCanvasPinchPointerReleaseAction, resolveCanvasPinchZoomUpdateAction, resolveCanvasPointerDownAction, resolveCanvasTouchPointerMoveAction \} from "\.\/canvasPinchZoomModel";/);
-  assert.match(componentSource, /const activeCanvasPointers = new Map<number, \{ clientX: number; clientY: number; pointerType: string \}>\(\);/);
-  assert.match(componentSource, /const pinchZoom = ref<\{/);
-  assert.match(componentSource, /function beginPinchZoomIfReady\(\)/);
-  assert.match(componentSource, /const nextPinchZoom = buildPinchZoomStart\(\{[\s\S]*pointers: Array\.from\(activeCanvasPointers\.entries\(\)\),[\s\S]*currentScale: viewport\.viewport\.scale,[\s\S]*\}\);/);
-  assert.match(componentSource, /viewport\.endPan\(\);/);
-  assert.match(componentSource, /pinchZoom\.value = nextPinchZoom;/);
-  assert.match(componentSource, /function updatePinchZoom\(\)/);
-  assert.match(componentSource, /const pinchZoomUpdateAction = resolveCanvasPinchZoomUpdateAction\(\{[\s\S]*pinch,[\s\S]*leftPointer,[\s\S]*rightPointer,[\s\S]*canvasRect,[\s\S]*\}\);/);
-  assert.match(componentSource, /case "ignore-missing-pinch":[\s\S]*return;/);
-  assert.match(componentSource, /case "clear-pinch-zoom":[\s\S]*clearPinchZoom\(\);[\s\S]*return;/);
-  assert.match(componentSource, /case "ignore-non-positive-distance":[\s\S]*return;/);
-  assert.match(componentSource, /case "zoom-at":[\s\S]*viewport\.zoomAt\(pinchZoomUpdateAction\.request\);/);
+  assert.match(componentSource, /import \{ useCanvasPinchZoomState \} from "\.\/useCanvasPinchZoomState";/);
+  assert.match(componentSource, /import \{ resolveCanvasPointerDownAction \} from "\.\/canvasPinchZoomModel";/);
+  assert.match(componentSource, /const pinchZoomState = useCanvasPinchZoomState\(\{[\s\S]*currentScale: \(\) => viewport\.viewport\.scale,[\s\S]*getCanvasRect: \(\) => canvasRef\.value\?\.getBoundingClientRect\(\) \?\? null,[\s\S]*scheduleDragFrame,[\s\S]*endPan: \(\) => viewport\.endPan\(\),[\s\S]*zoomAt: \(request\) => viewport\.zoomAt\(request\),[\s\S]*\}\);/);
+  assert.match(canvasPinchZoomStateSource, /const activeCanvasPointers = new Map<number, CanvasPointerSnapshot>\(\);/);
+  assert.match(canvasPinchZoomStateSource, /const pinchZoom = ref<CanvasPinchZoomStart \| null>\(null\);/);
+  assert.match(canvasPinchZoomStateSource, /function beginPinchZoomIfReady\(\)/);
+  assert.match(canvasPinchZoomStateSource, /const nextPinchZoom = buildPinchZoomStart\(\{[\s\S]*pointers: Array\.from\(activeCanvasPointers\.entries\(\)\),[\s\S]*currentScale: input\.currentScale\(\),[\s\S]*\}\);/);
+  assert.match(canvasPinchZoomStateSource, /input\.endPan\(\);/);
+  assert.match(canvasPinchZoomStateSource, /pinchZoom\.value = nextPinchZoom;/);
+  assert.match(canvasPinchZoomStateSource, /function updatePinchZoom\(\)/);
+  assert.match(canvasPinchZoomStateSource, /const pinchZoomUpdateAction = resolveCanvasPinchZoomUpdateAction\(\{[\s\S]*pinch,[\s\S]*leftPointer,[\s\S]*rightPointer,[\s\S]*canvasRect,[\s\S]*\}\);/);
+  assert.match(canvasPinchZoomStateSource, /case "ignore-missing-pinch":[\s\S]*return;/);
+  assert.match(canvasPinchZoomStateSource, /case "clear-pinch-zoom":[\s\S]*clearPinchZoom\(\);[\s\S]*return;/);
+  assert.match(canvasPinchZoomStateSource, /case "ignore-non-positive-distance":[\s\S]*return;/);
+  assert.match(canvasPinchZoomStateSource, /case "zoom-at":[\s\S]*input\.zoomAt\(pinchZoomUpdateAction\.request\);/);
   assert.match(canvasPinchZoomModelSource, /export function buildPinchZoomStart/);
   assert.match(canvasPinchZoomModelSource, /export type CanvasPointerDownAction/);
   assert.match(canvasPinchZoomModelSource, /export function resolveCanvasPointerDownAction/);
@@ -1446,19 +1467,20 @@ test("EditorCanvas supports two-finger pinch zoom on mobile without changing sin
   assert.doesNotMatch(componentSource, /function resolvePointerDistance/);
   assert.doesNotMatch(componentSource, /function resolvePointerCenter/);
   assert.doesNotMatch(componentSource, /nextScale: pinch\.startScale \* \(nextDistance \/ pinch\.startDistance\)/);
-  assert.match(componentSource, /if \(event\.pointerType === "touch"\) \{/);
+  assert.match(componentSource, /const startedPinchZoom = trackTouchPointerDown\(event\);/);
   assert.match(componentSource, /const canvasPointerDownAction = resolveCanvasPointerDownAction\(\{ startedPinchZoom \}\);/);
   assert.match(componentSource, /function applyCanvasPointerDownSetup\([\s\S]*action: CanvasPointerDownAction,[\s\S]*event: PointerEvent,[\s\S]*\)/);
   assert.match(componentSource, /if \(action\.focusCanvas\) \{[\s\S]*canvasRef\.value\?\.focus\(\);/);
   assert.match(componentSource, /if \(action\.setPointerCapture\) \{[\s\S]*canvasRef\.value\?\.setPointerCapture\(event\.pointerId\);/);
   assert.match(componentSource, /if \(action\.beginPan\) \{[\s\S]*viewport\.beginPan\(event\);/);
-  assert.match(componentSource, /const touchPointerMoveAction = resolveCanvasTouchPointerMoveAction\(\{[\s\S]*pointerType: event\.pointerType,[\s\S]*isTrackedPointer: activeCanvasPointers\.has\(event\.pointerId\),[\s\S]*hasPinchZoom: Boolean\(pinchZoom\.value\),[\s\S]*\}\);/);
-  assert.match(componentSource, /case "track-touch-pointer":[\s\S]*activeCanvasPointers\.set\(event\.pointerId,[\s\S]*clientX: event\.clientX,[\s\S]*clientY: event\.clientY,[\s\S]*pointerType: event\.pointerType,/);
-  assert.match(componentSource, /if \(touchPointerMoveAction\.preventDefault\) \{[\s\S]*event\.preventDefault\(\);/);
-  assert.match(componentSource, /if \(touchPointerMoveAction\.schedulePinchZoomUpdate\) \{[\s\S]*scheduleDragFrame\(\(\) => \{[\s\S]*updatePinchZoom\(\);/);
-  assert.match(componentSource, /if \(touchPointerMoveAction\.stopPointerMove\) \{[\s\S]*return;/);
+  assert.match(canvasPinchZoomStateSource, /const touchPointerMoveAction = resolveCanvasTouchPointerMoveAction\(\{[\s\S]*pointerType: pointer\.pointerType,[\s\S]*isTrackedPointer: activeCanvasPointers\.has\(pointer\.pointerId\),[\s\S]*hasPinchZoom: Boolean\(pinchZoom\.value\),[\s\S]*\}\);/);
+  assert.match(canvasPinchZoomStateSource, /case "track-touch-pointer":[\s\S]*setCanvasPointer\(pointer\);/);
+  assert.match(canvasPinchZoomStateSource, /if \(touchPointerMoveAction\.preventDefault\) \{[\s\S]*preventDefault\(\);/);
+  assert.match(canvasPinchZoomStateSource, /if \(touchPointerMoveAction\.schedulePinchZoomUpdate\) \{[\s\S]*input\.scheduleDragFrame\(\(\) => \{[\s\S]*updatePinchZoom\(\);/);
+  assert.match(componentSource, /handleTouchPointerMove\(event, \(\) => \{[\s\S]*event\.preventDefault\(\);/);
   assert.doesNotMatch(componentSource, /if \(event\.pointerType === "touch" && activeCanvasPointers\.has\(event\.pointerId\)\) \{/);
-  assert.match(componentSource, /const pinchPointerReleaseAction = resolveCanvasPinchPointerReleaseAction\(\{[\s\S]*pinch: pinchZoom\.value,[\s\S]*pointerId: event\.pointerId,[\s\S]*\}\);/);
+  assert.match(componentSource, /const pinchPointerReleaseAction = releaseCanvasPointer\(event\.pointerId\);/);
+  assert.match(canvasPinchZoomStateSource, /return resolveCanvasPinchPointerReleaseAction\(\{[\s\S]*pinch: pinchZoom\.value,[\s\S]*pointerId,[\s\S]*\}\);/);
   assert.match(componentSource, /case "end-pinch-zoom":[\s\S]*clearPinchZoom\(\);[\s\S]*viewport\.endPan\(\);[\s\S]*return;/);
   assert.match(componentSource, /case "continue-pointer-up":[\s\S]*break;/);
   assert.doesNotMatch(componentSource, /if \(pinchZoom\.value\?\.pointerIds\.includes\(event\.pointerId\)\) \{/);
@@ -1467,20 +1489,23 @@ test("EditorCanvas supports two-finger pinch zoom on mobile without changing sin
 test("EditorCanvas captures node drags and batches drag writes with animation frames", () => {
   const canvasNodeDragResizeModelSource = readCanvasNodeDragResizeModelSource();
   const canvasNodeDragResizeSource = readCanvasNodeDragResizeSource();
+  const canvasAnimationFrameSchedulerSource = readCanvasAnimationFrameSchedulerSource();
 
   assert.match(canvasNodeDragResizeModelSource, /export type CanvasNodePointerDownAction/);
   assert.match(canvasNodeDragResizeModelSource, /export function resolveNodePointerDownAction/);
   assert.match(componentSource, /const nodePointerDownAction = resolveNodePointerDownAction\(\{[\s\S]*nodeId,[\s\S]*nodeExists: Boolean\(node\),[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*preserveInlineEditorFocus,[\s\S]*\}\);/);
   assert.match(componentSource, /case "locked-edit-attempt":[\s\S]*event\.preventDefault\(\);[\s\S]*canvasRef\.value\?\.focus\(\);[\s\S]*clearCanvasTransientState\(\);[\s\S]*selection\.selectNode\(nodePointerDownAction\.selectNodeId\);[\s\S]*return;/);
   assert.match(componentSource, /function applyNodePointerDownDragSetup[\s\S]*if \(action\.preventDefault\) \{[\s\S]*event\.preventDefault\(\);[\s\S]*if \(action\.setPointerCapture && event\.currentTarget instanceof HTMLElement\) \{[\s\S]*event\.currentTarget\.setPointerCapture\(event\.pointerId\);/);
-  assert.match(componentSource, /let scheduledDragFrame: number \| null = null;/);
-  assert.match(componentSource, /function scheduleDragFrame/);
-  assert.match(componentSource, /window\.requestAnimationFrame\(\(\) => \{/);
+  assert.match(componentSource, /import \{ useCanvasAnimationFrameScheduler \} from "\.\/useCanvasAnimationFrameScheduler";/);
+  assert.match(componentSource, /\} = useCanvasAnimationFrameScheduler\(\);/);
+  assert.match(canvasAnimationFrameSchedulerSource, /let scheduledDragFrame: number \| null = null;/);
+  assert.match(canvasAnimationFrameSchedulerSource, /function scheduleDragFrame/);
+  assert.match(canvasAnimationFrameSchedulerSource, /scheduler\.requestAnimationFrame\(\(\) => \{/);
   assert.match(canvasNodeDragResizeSource, /input\.scheduleDragFrame\(\(\) => \{[\s\S]*input\.emitNodePosition/);
   assert.match(canvasNodeDragResizeSource, /input\.scheduleDragFrame\(\(\) => \{[\s\S]*input\.emitNodeSize/);
   assert.match(componentSource, /scheduleDragFrame\(\(\) => \{[\s\S]*viewport\.movePan\(event\);/);
-  assert.match(componentSource, /function cancelScheduledDragFrame\(\)/);
-  assert.match(componentSource, /window\.cancelAnimationFrame\(scheduledDragFrame\);/);
+  assert.match(canvasAnimationFrameSchedulerSource, /function cancelScheduledDragFrame\(\)/);
+  assert.match(canvasAnimationFrameSchedulerSource, /scheduler\?\.cancelAnimationFrame\(scheduledDragFrame\);/);
 });
 
 test("EditorCanvas suppresses the residual click after a node drag so inline editors do not open on release", () => {
