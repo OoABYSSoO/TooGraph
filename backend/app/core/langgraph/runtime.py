@@ -4,11 +4,9 @@ import time
 import threading
 from collections import defaultdict
 from typing import Any
-from typing import Annotated
 
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command
-from typing_extensions import TypedDict
 
 from app.core.langgraph.checkpoints import JsonCheckpointSaver
 from app.core.langgraph.checkpoint_runtime import (
@@ -43,6 +41,13 @@ from app.core.langgraph.interrupts import (
     snapshot_has_interrupt_payload as _snapshot_has_interrupt_payload,
     source_node_from_after_breakpoint as _source_node_from_after_breakpoint,
 )
+from app.core.langgraph.progress import persist_langgraph_progress as _persist_langgraph_progress
+from app.core.langgraph.runtime_setup import (
+    build_after_breakpoint_passthrough_callable as _build_after_breakpoint_passthrough_callable,
+    build_langgraph_state_schema as _build_langgraph_state_schema,
+    mark_input_boundaries_success as _mark_input_boundaries_success,
+    runtime_graph_endpoint as _runtime_graph_endpoint,
+)
 from app.core.runtime.execution_graph import (
     build_execution_edges,
     select_active_outgoing_edges,
@@ -54,21 +59,10 @@ from app.core.runtime.runtime_summaries import summarize_first_value as _summari
 from app.core.runtime.state_io import apply_state_writes, collect_node_inputs, initialize_graph_state
 from app.core.runtime.node_system_executor import (
     _execute_node,
-    _persist_run_progress,
 )
 from app.core.runtime.state import create_initial_run_state, set_run_status, touch_run_lifecycle, utc_now_iso
 from app.core.schemas.node_system import NodeSystemGraphDocument
 from app.core.storage.run_store import save_run
-
-def _replace_reducer(_current: Any, update: Any) -> Any:
-    return update
-
-
-def _build_after_breakpoint_passthrough_callable():
-    def _call(_current_values: dict[str, Any]) -> dict[str, Any]:
-        return {}
-
-    return _call
 
 
 def execute_node_system_graph_langgraph(
@@ -411,14 +405,6 @@ def _build_langgraph_node_callable(
     return _call
 
 
-def _runtime_graph_endpoint(node_name: str) -> str:
-    if node_name == "__start__":
-        return START
-    if node_name == "__end__":
-        return END
-    return node_name
-
-
 def _build_langgraph_route_callable(
     *,
     graph: NodeSystemGraphDocument,
@@ -498,31 +484,3 @@ def _build_langgraph_route_callable(
             return selected_branch
 
     return _route
-
-
-def _mark_input_boundaries_success(graph: NodeSystemGraphDocument, state: dict[str, Any]) -> None:
-    node_status_map = state.setdefault("node_status_map", {})
-    for node_name, node in graph.nodes.items():
-        if node.kind == "input":
-            node_status_map[node_name] = "success"
-
-
-def _build_langgraph_state_schema(graph: NodeSystemGraphDocument):
-    annotations = {
-        state_name: Annotated[Any, _replace_reducer]
-        for state_name in graph.state_schema
-    }
-    return TypedDict("GraphiteUILangGraphState", annotations, total=False)
-
-
-def _persist_langgraph_progress(
-    state: dict[str, Any],
-    node_outputs: dict[str, dict[str, Any]],
-    active_edge_ids: set[str],
-    *,
-    started_perf: float,
-    checkpoint_saver: JsonCheckpointSaver,
-    checkpoint_lookup_config: dict[str, Any],
-) -> None:
-    _sync_checkpoint_metadata(state, checkpoint_saver, checkpoint_lookup_config)
-    _persist_run_progress(state, node_outputs, active_edge_ids, started_perf=started_perf)

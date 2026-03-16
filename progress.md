@@ -1,5 +1,93 @@
 # Progress Log
 
+## Session: 2026-04-30 Phase 136
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Continued automatically after commit `0759b9c` because the full-roadmap progress is below 100%.
+  - Re-read the formal roadmap, Phase 135 findings, and remaining frontend/backend high-line-count files.
+  - Chose the LangGraph progress persistence helper slice because it is a small backend P4 tail boundary already listed in the roadmap and only wraps checkpoint metadata sync plus the existing run progress facade.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `backend/tests/test_langgraph_progress.py` covering that LangGraph progress persistence syncs checkpoint metadata before persisting run progress.
+  - Verified the expected red failure because `app.core.langgraph.progress` did not exist yet.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `backend/app/core/langgraph/progress.py`.
+  - Moved the LangGraph progress persistence wrapper out of `runtime.py`.
+  - Updated `core/langgraph/runtime.py` to import `persist_langgraph_progress` as the existing private alias while keeping node/route call sites unchanged.
+  - Reduced `backend/app/core/langgraph/runtime.py` from 499 to 486 lines.
+
+### Phase 4: Verification and Progress Gate
+- **Status:** completed
+- Actions taken:
+  - Ran focused backend LangGraph/runtime regression tests.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend entry returned HTTP 200 and backend `/health` returned `{"status":"ok"}`.
+  - Recalculated the full roadmap at about 99.5%, frontend-focused progress at about 98.2%, P2 `EditorCanvas.vue` residual cleanup at about 99%, and backend P4 at about 97%.
+  - Opened Phase 137 automatically because the full roadmap is still below 100%.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red backend test | `python -m pytest backend/tests/test_langgraph_progress.py` before implementation | Fails because the LangGraph progress module is missing | Failed with `ModuleNotFoundError: No module named 'app.core.langgraph.progress'` | Passed |
+| Focused backend tests | `python -m pytest backend/tests/test_langgraph_progress.py backend/tests/test_langgraph_runtime_setup.py backend/tests/test_langgraph_migration.py backend/tests/test_langgraph_checkpoint_runtime.py backend/tests/test_langgraph_interrupts.py backend/tests/test_langgraph_cycle_tracker.py backend/tests/test_runtime_summaries.py` | Progress, setup, migration, checkpoint, interrupt, cycle, and summary tests pass | 60 passed | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | New LangGraph progress backend test failed with a missing module import | Red test before implementation | Added `progress.py`, wired `runtime.py` to import it, and reran focused backend tests successfully. |
+
+## Session: 2026-04-30 Phase 135
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Continued automatically after commit `041dd4a` because the full-roadmap progress is below 100%.
+  - Re-read the formal roadmap, Phase 134 findings, and remaining frontend/backend high-line-count files.
+  - Chose the LangGraph runtime setup helper slice because it is a small P4 backend tail boundary and does not touch graph editing interactions, auto-snap, node creation naming/context, or visual layout.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `backend/tests/test_langgraph_runtime_setup.py` covering sentinel endpoint mapping, after-breakpoint passthrough updates, input-boundary status marking, and state schema annotation construction.
+  - Verified the expected red failure because `app.core.langgraph.runtime_setup` did not exist yet.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `backend/app/core/langgraph/runtime_setup.py`.
+  - Moved LangGraph setup helpers for state reducer/schema creation, after-breakpoint passthrough callable construction, sentinel endpoint mapping, and input-boundary success marking out of `runtime.py`.
+  - Updated `core/langgraph/runtime.py` to import those helpers while keeping graph construction, node/route callables, checkpoint, interrupt, cycle tracking, and progress persistence in the runtime module.
+  - Reduced `backend/app/core/langgraph/runtime.py` from 528 to 499 lines.
+
+### Phase 4: Verification and Progress Gate
+- **Status:** completed
+- Actions taken:
+  - Ran focused backend LangGraph/runtime regression tests.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend entry returned HTTP 200 and backend `/health` returned `{"status":"ok"}`.
+  - Recalculated the full roadmap at about 99.4%, frontend-focused progress at about 98.2%, P2 `EditorCanvas.vue` residual cleanup at about 99%, and backend P4 at about 96%.
+  - Opened Phase 136 automatically because the full roadmap is still below 100%.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red backend test | `python -m pytest backend/tests/test_langgraph_runtime_setup.py` before implementation | Fails because the runtime setup module is missing | Failed with `ModuleNotFoundError: No module named 'app.core.langgraph.runtime_setup'` | Passed |
+| Focused backend tests | `python -m pytest backend/tests/test_langgraph_runtime_setup.py backend/tests/test_langgraph_migration.py backend/tests/test_langgraph_checkpoint_runtime.py backend/tests/test_langgraph_interrupts.py backend/tests/test_langgraph_cycle_tracker.py backend/tests/test_runtime_summaries.py` | Runtime setup, migration, checkpoint, interrupt, cycle, and summary tests pass | 59 passed | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | New runtime setup backend test failed with a missing module import | Red test before implementation | Added `runtime_setup.py`, wired `runtime.py` to import it, and reran focused backend tests successfully. |
+
 ## Session: 2026-04-30 Phase 134
 
 ### Phase 1: Re-orientation
