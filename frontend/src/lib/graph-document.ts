@@ -791,9 +791,10 @@ export function connectStateBindingInDocument<T extends GraphPayload | GraphDocu
 
   const nextDocument = cloneGraphDocument(document);
   let resolvedSourceStateKey = sourceStateKey;
+  const nextSourceNode = nextDocument.nodes[sourceNodeId];
   const nextTargetNode = nextDocument.nodes[targetNodeId];
   if (isVirtualAnyOutputStateKey(sourceStateKey)) {
-    if (isCreateAgentInputStateKey(targetStateKey) || isVirtualAnyInputStateKey(targetStateKey)) {
+    if (nextSourceNode.kind === "agent" || isCreateAgentInputStateKey(targetStateKey) || isVirtualAnyInputStateKey(targetStateKey)) {
       const materializedState = buildNextMaterializedVirtualStateField(nextDocument);
       nextDocument.state_schema[materializedState.key] = materializedState.definition;
       rememberMaterializedStateKeyIndex(nextDocument, materializedState.key);

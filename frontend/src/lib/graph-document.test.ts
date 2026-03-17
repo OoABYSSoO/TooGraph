@@ -1047,6 +1047,134 @@ test("connectStateBindingInDocument adopts a selected concrete input binding for
   assert.deepEqual(document.nodes.multi_input_agent.reads.map((binding) => binding.state), ["first", "second", "third", "fourth"]);
 });
 
+test("connectStateBindingInDocument materializes an agent virtual output before replacing an output input", () => {
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Agent virtual output to output input graph",
+    state_schema: {
+      previous: { name: "previous", description: "", type: "text", value: "", color: "#d97706" },
+    },
+    nodes: {
+      writer_agent: {
+        kind: "agent",
+        name: "writer_agent",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [],
+        config: {
+          skills: [],
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+      output_result: {
+        kind: "output",
+        name: "output_result",
+        description: "",
+        ui: { position: { x: 240, y: 0 } },
+        reads: [{ state: "previous", required: true }],
+        writes: [],
+        config: {
+          displayMode: "auto",
+          persistEnabled: false,
+          persistFormat: "auto",
+          fileNameTemplate: "",
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {
+      graphiteui_state_key_counter: 2,
+    },
+  };
+
+  const nextDocument = graphDocument.connectStateBindingInDocument(
+    document,
+    "writer_agent",
+    VIRTUAL_ANY_OUTPUT_STATE_KEY,
+    "output_result",
+    "previous",
+  );
+
+  assert.deepEqual(nextDocument.nodes.writer_agent.writes, [{ state: "state_3", mode: "replace" }]);
+  assert.deepEqual(nextDocument.nodes.output_result.reads, [{ state: "state_3", required: true }]);
+  assert.equal(nextDocument.state_schema.state_3?.name, "state_3");
+  assert.equal(nextDocument.metadata.graphiteui_state_key_counter, 3);
+  assert.deepEqual(nextDocument.edges, [{ source: "writer_agent", target: "output_result" }]);
+  assert.deepEqual(document.nodes.writer_agent.writes, []);
+  assert.deepEqual(document.nodes.output_result.reads, [{ state: "previous", required: true }]);
+});
+
+test("connectStateBindingInDocument materializes another state from an agent virtual output with existing writes", () => {
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Agent virtual output with existing writes graph",
+    state_schema: {
+      existing: { name: "existing", description: "", type: "text", value: "", color: "#2563eb" },
+    },
+    nodes: {
+      writer_agent: {
+        kind: "agent",
+        name: "writer_agent",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [{ state: "existing", mode: "replace" }],
+        config: {
+          skills: [],
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+      output_result: {
+        kind: "output",
+        name: "output_result",
+        description: "",
+        ui: { position: { x: 240, y: 0 } },
+        reads: [],
+        writes: [],
+        config: {
+          displayMode: "auto",
+          persistEnabled: false,
+          persistFormat: "auto",
+          fileNameTemplate: "",
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {
+      graphiteui_state_key_counter: 2,
+    },
+  };
+
+  const nextDocument = graphDocument.connectStateBindingInDocument(
+    document,
+    "writer_agent",
+    VIRTUAL_ANY_OUTPUT_STATE_KEY,
+    "output_result",
+    VIRTUAL_ANY_INPUT_STATE_KEY,
+  );
+
+  assert.deepEqual(nextDocument.nodes.writer_agent.writes, [
+    { state: "existing", mode: "replace" },
+    { state: "state_3", mode: "replace" },
+  ]);
+  assert.deepEqual(nextDocument.nodes.output_result.reads, [{ state: "state_3", required: true }]);
+  assert.equal(nextDocument.state_schema.state_3?.name, "state_3");
+  assert.equal(nextDocument.metadata.graphiteui_state_key_counter, 3);
+  assert.deepEqual(nextDocument.edges, [{ source: "writer_agent", target: "output_result" }]);
+  assert.deepEqual(document.nodes.writer_agent.writes, [{ state: "existing", mode: "replace" }]);
+});
+
 test("connectStateBindingInDocument restores ordering for an existing matching state binding", () => {
   const document: GraphPayload = {
     graph_id: null,

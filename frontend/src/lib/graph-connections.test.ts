@@ -633,6 +633,45 @@ test("canCompleteGraphConnection allows virtual state outputs to materialize int
   );
 });
 
+test("canCompleteGraphConnection allows agent virtual outputs to create another state after existing writes", () => {
+  const graphWithWritingAgent: GraphPayload = {
+    ...document,
+    state_schema: {
+      answer: { name: "answer", description: "", type: "text", value: "", color: "#2563eb" },
+    },
+    nodes: {
+      ...document.nodes,
+      answer_helper: {
+        ...document.nodes.answer_helper,
+        writes: [{ state: "answer", mode: "replace" }],
+      },
+      output_answer: {
+        ...document.nodes.output_answer,
+        reads: [],
+      },
+    },
+    edges: [{ source: "input_question", target: "answer_helper" }],
+    conditional_edges: [],
+  };
+
+  assert.equal(
+    canCompleteGraphConnection(
+      graphWithWritingAgent,
+      {
+        sourceNodeId: "output_answer",
+        sourceKind: "state-in",
+        sourceStateKey: VIRTUAL_ANY_INPUT_STATE_KEY,
+      },
+      {
+        nodeId: "answer_helper",
+        kind: "state-out",
+        stateKey: VIRTUAL_ANY_OUTPUT_STATE_KEY,
+      },
+    ),
+    true,
+  );
+});
+
 test("canCompleteGraphConnection allows virtual input outputs to target concrete state input bindings", () => {
   const pending: PendingGraphConnection = {
     sourceNodeId: "empty_input",

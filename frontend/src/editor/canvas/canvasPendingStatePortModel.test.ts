@@ -91,8 +91,8 @@ test("pending state port model preserves virtual output sources for create-input
     {
       target: {
         stateKey: VIRTUAL_ANY_OUTPUT_STATE_KEY,
-        label: VIRTUAL_ANY_OUTPUT_STATE_KEY,
-        stateColor: "#d97706",
+        label: "new state",
+        stateColor: "#9a3412",
       },
     },
   );
@@ -132,6 +132,43 @@ test("pending state port model builds virtual input and output target previews",
         stateKey: "answer",
         label: "Answer",
         stateColor: "#2563eb",
+      },
+    },
+  );
+  assert.deepEqual(
+    buildPendingStateInputSourceTargetByNodeId({
+      connection: {
+        sourceNodeId: "target",
+        sourceKind: "state-in",
+        sourceStateKey: VIRTUAL_ANY_INPUT_STATE_KEY,
+      },
+      stateSchema: document.state_schema,
+      autoSnappedTargetStateKey: VIRTUAL_ANY_OUTPUT_STATE_KEY,
+    }),
+    {
+      target: {
+        stateKey: VIRTUAL_ANY_OUTPUT_STATE_KEY,
+        label: "new state",
+        stateColor: "#9a3412",
+      },
+    },
+  );
+  assert.deepEqual(
+    buildPendingStateOutputTargetByNodeId({
+      connection: {
+        sourceNodeId: "target",
+        sourceKind: "state-in",
+        sourceStateKey: VIRTUAL_ANY_INPUT_STATE_KEY,
+      },
+      stateSchema: document.state_schema,
+      autoSnappedTargetNodeId: "writer",
+      autoSnappedTargetStateKey: VIRTUAL_ANY_OUTPUT_STATE_KEY,
+    }),
+    {
+      writer: {
+        stateKey: VIRTUAL_ANY_OUTPUT_STATE_KEY,
+        label: "new state",
+        stateColor: "#9a3412",
       },
     },
   );

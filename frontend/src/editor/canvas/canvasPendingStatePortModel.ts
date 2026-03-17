@@ -1,6 +1,7 @@
 import type { PendingGraphConnection } from "../../lib/graph-connections.ts";
 import {
   CREATE_AGENT_INPUT_STATE_KEY,
+  VIRTUAL_ANY_OUTPUT_COLOR,
   VIRTUAL_ANY_INPUT_STATE_KEY,
   VIRTUAL_ANY_OUTPUT_STATE_KEY,
 } from "../../lib/virtual-any-input.ts";
@@ -16,6 +17,15 @@ export type PendingStateInputSource = {
 export type PendingStatePortPreview = PendingStateInputSource;
 
 type StateSchemaLike = Record<string, Pick<StateDefinition, "name" | "color"> | undefined>;
+const PENDING_NEW_STATE_LABEL = "new state";
+
+function buildPendingNewStatePreview(): PendingStatePortPreview {
+  return {
+    stateKey: VIRTUAL_ANY_OUTPUT_STATE_KEY,
+    label: PENDING_NEW_STATE_LABEL,
+    stateColor: VIRTUAL_ANY_OUTPUT_COLOR,
+  };
+}
 
 export function resolveStatePortPreview(
   stateSchema: StateSchemaLike,
@@ -50,8 +60,8 @@ export function buildPendingAgentInputSourceByNodeId(input: {
   const sourceState = input.document.state_schema[sourceStateKey];
   const pendingSource = {
     stateKey: sourceStateKey,
-    label: sourceState?.name?.trim() || sourceStateKey,
-    stateColor: sourceState?.color?.trim() || "#d97706",
+    label: sourceStateKey === VIRTUAL_ANY_OUTPUT_STATE_KEY ? PENDING_NEW_STATE_LABEL : sourceState?.name?.trim() || sourceStateKey,
+    stateColor: sourceStateKey === VIRTUAL_ANY_OUTPUT_STATE_KEY ? VIRTUAL_ANY_OUTPUT_COLOR : sourceState?.color?.trim() || "#d97706",
   };
 
   return Object.fromEntries(
@@ -68,7 +78,15 @@ export function buildPendingStateInputSourceTargetByNodeId(input: {
   autoSnappedTargetStateKey?: string | null;
 }): Record<string, PendingStatePortPreview> {
   const connection = input.connection;
-  if (connection?.sourceKind !== "state-in" || connection.sourceStateKey !== VIRTUAL_ANY_INPUT_STATE_KEY) {
+  if (connection?.sourceKind !== "state-in") {
+    return {};
+  }
+
+  if (connection.sourceStateKey && input.autoSnappedTargetStateKey === VIRTUAL_ANY_OUTPUT_STATE_KEY) {
+    return { [connection.sourceNodeId]: buildPendingNewStatePreview() };
+  }
+
+  if (connection.sourceStateKey !== VIRTUAL_ANY_INPUT_STATE_KEY) {
     return {};
   }
 
@@ -79,11 +97,24 @@ export function buildPendingStateInputSourceTargetByNodeId(input: {
 export function buildPendingStateOutputTargetByNodeId(input: {
   connection: PendingGraphConnection | null;
   stateSchema: StateSchemaLike;
+  autoSnappedTargetNodeId?: string | null;
   autoSnappedTargetStateKey?: string | null;
 }): Record<string, PendingStatePortPreview> {
   const connection = input.connection;
+  if (
+    connection?.sourceKind === "state-in" &&
+    input.autoSnappedTargetNodeId &&
+    input.autoSnappedTargetStateKey === VIRTUAL_ANY_OUTPUT_STATE_KEY
+  ) {
+    return { [input.autoSnappedTargetNodeId]: buildPendingNewStatePreview() };
+  }
+
   if (connection?.sourceKind !== "state-out" || connection.sourceStateKey !== VIRTUAL_ANY_OUTPUT_STATE_KEY) {
     return {};
+  }
+
+  if (input.autoSnappedTargetStateKey === VIRTUAL_ANY_INPUT_STATE_KEY || input.autoSnappedTargetStateKey === CREATE_AGENT_INPUT_STATE_KEY) {
+    return { [connection.sourceNodeId]: buildPendingNewStatePreview() };
   }
 
   const targetPreview = resolveStatePortPreview(input.stateSchema, input.autoSnappedTargetStateKey);

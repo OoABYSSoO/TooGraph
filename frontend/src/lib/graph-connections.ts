@@ -69,8 +69,7 @@ export function canConnectStateBinding(
 
   const isVirtualOutputSource =
     isVirtualAnyOutputStateKey(sourceStateKey) &&
-    (sourceNode.kind === "agent" || sourceNode.kind === "input") &&
-    sourceNode.writes.length === 0;
+    (sourceNode.kind === "agent" || (sourceNode.kind === "input" && sourceNode.writes.length === 0));
 
   if (!isVirtualOutputSource && !sourceNode.writes.some((binding) => binding.state === sourceStateKey)) {
     return false;

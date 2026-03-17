@@ -789,6 +789,7 @@ const pendingStateOutputTargetByNodeId = computed<Record<string, PendingStatePor
   buildPendingStateOutputTargetByNodeId({
     connection: pendingConnection.value,
     stateSchema: props.document.state_schema,
+    autoSnappedTargetNodeId: autoSnappedTargetAnchor.value?.nodeId,
     autoSnappedTargetStateKey: autoSnappedTargetAnchor.value?.stateKey,
   }),
 );
