@@ -1,4 +1,4 @@
-import type { SkillDefinition } from "@/types/skills";
+import type { SkillDefinition, SkillFileContentResponse, SkillFileTreeResponse } from "@/types/skills";
 
 import { apiDelete, apiGet, apiPost, apiPostForm } from "./http.ts";
 
@@ -9,6 +9,14 @@ export async function fetchSkillDefinitions(): Promise<SkillDefinition[]> {
 export async function fetchSkillCatalog(options: { includeDisabled?: boolean } = {}): Promise<SkillDefinition[]> {
   const includeDisabled = options.includeDisabled ?? true;
   return apiGet<SkillDefinition[]>(`/api/skills/catalog?include_disabled=${includeDisabled ? "true" : "false"}`);
+}
+
+export async function fetchSkillFiles(skillKey: string): Promise<SkillFileTreeResponse> {
+  return apiGet<SkillFileTreeResponse>(`/api/skills/${skillKey}/files`);
+}
+
+export async function fetchSkillFileContent(skillKey: string, path: string): Promise<SkillFileContentResponse> {
+  return apiGet<SkillFileContentResponse>(`/api/skills/${skillKey}/files/content?path=${encodeURIComponent(path)}`);
 }
 
 export async function importSkill(skillKey: string): Promise<SkillDefinition> {

@@ -8,7 +8,7 @@
 - GraphiteUI 托管的 Skill。
 - 能在运行时真正执行的 Skill。
 - 只作为说明或兼容信息存在的 Skill。
-- Skill 管理页上的导入、启停、删除、兼容性展示。
+- Skill 管理页上的导入、启停、删除、就绪状态和健康状态展示。
 
 这些概念被压缩进同一套 `SkillDefinition` 和同一个 catalog 视图后，用户很难判断一个 Skill 到底是“被发现了”、“已安装”、“已启用”，还是“真的能被 Agent 节点执行”。
 
@@ -402,7 +402,7 @@ backend/app/skills/
   executor.py        # Python atomic skill 执行器
 ```
 
-现有 `definitions.py` 里外部扫描、解析、兼容性合并的职责应该拆开。现有 `registry.py` 里硬编码运行时函数的方式可以先保留为 legacy adapter，但不应继续作为新系统核心。
+现有 `definitions.py` 里解析、状态聚合、运行时就绪判断的职责应该拆开。现有 `registry.py` 里硬编码运行时函数的方式可以先保留为 legacy adapter，但不应继续作为新系统核心。
 
 ## API 草案
 

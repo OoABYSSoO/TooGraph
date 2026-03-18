@@ -11,13 +11,33 @@ const sourceCoverageTest = readFileSync(resolve(currentDirectory, "../i18n/sourc
 
 test("SkillsPage loads the full skill catalog into a searchable management surface", () => {
   assert.match(skillsApiSource, /export async function fetchSkillCatalog/);
-  assert.match(componentSource, /import \{ deleteSkill, fetchSkillCatalog, importSkill, importSkillUpload, updateSkillStatus \} from "@\/api\/skills";/);
+  assert.match(componentSource, /fetchSkillCatalog/);
+  assert.match(componentSource, /fetchSkillFiles/);
   assert.match(componentSource, /const skills = ref<SkillDefinition\[\]>\(\[\]\);/);
   assert.match(componentSource, /const filteredSkills = computed\(\(\) => filterSkillsForManagement/);
   assert.match(componentSource, /<ElInput[\s\S]*v-model="query"[\s\S]*class="skills-page__search"/);
   assert.match(componentSource, /role="tablist"[\s\S]*class="skills-page__filter-tabs"/);
   assert.match(componentSource, /v-for="skill in filteredSkills"/);
-  assert.match(componentSource, /skill\.compatibility/);
+  assert.doesNotMatch(componentSource, /skill\.compatibility/);
+  assert.doesNotMatch(componentSource, /skills\.compatibility/);
+});
+
+test("SkillsPage uses a two-column inspector with a compact selectable Skill list", () => {
+  assert.match(componentSource, /class="skills-page__workspace"/);
+  assert.match(componentSource, /class="skills-page__selector"/);
+  assert.match(componentSource, /class="skills-page__detail"/);
+  assert.match(componentSource, /selectedSkillKey/);
+  assert.match(componentSource, /<ElSwitch[\s\S]*:model-value="skill\.status === 'active'"/);
+  assert.doesNotMatch(componentSource, /<details[\s\S]*class="skills-page__card"/);
+});
+
+test("SkillsPage exposes a read-only Skill package file browser", () => {
+  assert.match(componentSource, /fetchSkillFiles/);
+  assert.match(componentSource, /fetchSkillFileContent/);
+  assert.match(componentSource, /class="skills-page__file-browser"/);
+  assert.match(componentSource, /class="skills-page__file-tree"/);
+  assert.match(componentSource, /class="skills-page__file-preview"/);
+  assert.match(componentSource, /selectedFilePath/);
 });
 
 test("SkillsPage surfaces native Skill taxonomy and readiness metadata", () => {
@@ -25,21 +45,28 @@ test("SkillsPage surfaces native Skill taxonomy and readiness metadata", () => {
   assert.match(componentSource, /overview\.companionSkills/);
   assert.match(componentSource, /overview\.runtimeReady/);
   assert.match(componentSource, /overview\.needsAttention/);
-  assert.match(componentSource, /skill\.targets/);
-  assert.match(componentSource, /skill\.kind/);
-  assert.match(componentSource, /skill\.mode/);
-  assert.match(componentSource, /skill\.scope/);
-  assert.match(componentSource, /skill\.permissions/);
-  assert.match(componentSource, /skill\.runtimeReady/);
-  assert.match(componentSource, /skill\.configured/);
-  assert.match(componentSource, /skill\.healthy/);
+  assert.match(componentSource, /selectedSkill\.targets/);
+  assert.match(componentSource, /selectedSkill\.kind/);
+  assert.match(componentSource, /selectedSkill\.mode/);
+  assert.match(componentSource, /selectedSkill\.scope/);
+  assert.match(componentSource, /selectedSkill\.permissions/);
+  assert.match(componentSource, /selectedSkill\.runtimeReady/);
+  assert.match(componentSource, /selectedSkill\.runtime\.type/);
+  assert.match(componentSource, /selectedSkill\.runtime\.entrypoint/);
+  assert.match(componentSource, /selectedSkill\.configured/);
+  assert.match(componentSource, /selectedSkill\.healthy/);
+  assert.match(componentSource, /selectedSkill\.agentNodeEligibility/);
+  assert.match(componentSource, /selectedSkill\.agentNodeBlockers/);
   assert.match(componentSource, /t\("skills\.targets"\)/);
   assert.match(componentSource, /t\("skills\.permissions"\)/);
+  assert.match(componentSource, /t\("skills\.agentNodeEligibility"\)/);
+  assert.match(componentSource, /t\("skills\.agentNodeBlockers"\)/);
 });
 
 test("SkillsPage exposes import, status, and delete management actions with local button styling", () => {
   assert.match(componentSource, /const confirmingSkillDeleteKey = ref<string \| null>\(null\);/);
   assert.match(componentSource, /async function importSkillIntoCatalog/);
+  assert.match(componentSource, /async function setSkillEnabled/);
   assert.match(componentSource, /async function setSkillStatus/);
   assert.match(componentSource, /async function deleteSkillFromCatalog/);
   assert.match(componentSource, /async function importUploadedSkill/);
@@ -84,6 +111,6 @@ test("SkillsPage uses local short shadows so dense management cards do not stack
   assert.match(componentSource, /--skills-page-panel-shadow:/);
   assert.match(componentSource, /--skills-page-card-shadow:/);
   assert.match(componentSource, /box-shadow:\s*var\(--skills-page-panel-shadow\);/);
-  assert.match(componentSource, /\.skills-page__metric,\n\.skills-page__card \{[\s\S]*box-shadow:\s*var\(--skills-page-card-shadow\);/);
+  assert.match(componentSource, /\.skills-page__metric,\n\.skills-page__selector,\n\.skills-page__detail \{[\s\S]*box-shadow:\s*var\(--skills-page-card-shadow\);/);
   assert.doesNotMatch(componentSource, /box-shadow:\s*var\(--graphite-shadow-panel\);/);
 });

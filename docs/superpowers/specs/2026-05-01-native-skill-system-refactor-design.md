@@ -66,7 +66,7 @@ GraphiteUI 当前已经有 Skills Page、Skill catalog、Agent Node skill picker
 - `backend/app/skills/registry.py`：内置 runtime functions，包括 `search_knowledge_base`、`summarize_text`、`extract_json_fields`、`translate_text`、`rewrite_text`。
 - `backend/app/core/runtime/node_handlers.py`：Agent Node 执行所有 `config.skills`，把结果放进 `skill_context`，再调用一次模型生成。
 - `backend/app/core/compiler/validator.py`：验证 skill 是否 active、target 包含 agent_node、configured、healthy、runtime_registered。
-- `frontend/src/pages/SkillsPage.vue`：展示 catalog、targets、kind、mode、schema、permissions、compatibility、导入/启停/删除。
+- `frontend/src/pages/SkillsPage.vue`：展示 catalog、targets、kind、mode、schema、permissions、Agent 节点就绪状态、导入/启停/删除。
 - `frontend/src/editor/nodes/AgentSkillPicker.vue`：只展示 attachable agent_node skills。
 
 这个基线已经不错，因此第一版应当是“兼容式重构”，不是推倒重来。

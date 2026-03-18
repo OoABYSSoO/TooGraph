@@ -133,6 +133,72 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         self.assertEqual(result["final_result"], "value")
         self.assertEqual(finalized, {"answer": "value"})
 
+    def test_execute_agent_node_maps_bound_skill_outputs_into_state_outputs(self) -> None:
+        state_schema = {
+            "source_text": NodeSystemStateDefinition.model_validate({"type": "text"}),
+            "summary_text": NodeSystemStateDefinition.model_validate({"type": "text"}),
+            "answer": NodeSystemStateDefinition.model_validate({"type": "text"}),
+        }
+        node = NodeSystemAgentNode.model_validate(
+            {
+                "kind": "agent",
+                "name": "writer",
+                "ui": {"position": {"x": 0, "y": 0}},
+                "reads": [{"state": "source_text"}],
+                "writes": [{"state": "answer"}],
+                "config": {
+                    "skills": ["summarize_text"],
+                    "skillBindings": [
+                        {
+                            "skillKey": "summarize_text",
+                            "inputMapping": {"text": "source_text"},
+                            "outputMapping": {"summary": "summary_text"},
+                            "config": {"max_sentences": 2},
+                        }
+                    ],
+                },
+            }
+        )
+
+        result = execute_agent_node(
+            state_schema,
+            node,
+            {"source_text": "Long text"},
+            {"state": {}},
+            node_name="writer",
+            state={"run_id": "run-1"},
+            get_skill_registry_func=lambda *, include_disabled: {
+                "summarize_text": object(),
+            },
+            invoke_skill_func=lambda skill_func, skill_inputs: {
+                "summary": f"{skill_inputs['text']} / {skill_inputs['max_sentences']}",
+                "key_points": ["one"],
+            },
+            resolve_agent_runtime_config_func=lambda agent_node: {"runtime": "initial"},
+            build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: "delta",
+            callable_accepts_keyword_func=lambda func, keyword: False,
+            generate_agent_response_func=lambda agent_node, input_values, skill_context, runtime_config, **kwargs: (
+                {"answer": f"Final using {skill_context['summarize_text']['summary']}"},
+                "",
+                [],
+                runtime_config,
+            ),
+            finalize_agent_stream_delta_func=lambda *, state, node_name, output_values: None,
+            first_truthy_func=lambda values: next((value for value in values if value), None),
+        )
+
+        self.assertEqual(
+            result["outputs"],
+            {
+                "summary_text": "Long text / 2",
+                "answer": "Final using Long text / 2",
+            },
+        )
+        self.assertEqual(result["skill_outputs"][0]["inputs"], {"text": "Long text", "max_sentences": 2})
+        self.assertEqual(result["skill_outputs"][0]["output_mapping"], {"summary": "summary_text"})
+        self.assertEqual(result["skill_outputs"][0]["state_writes"], {"summary_text": "Long text / 2"})
+        self.assertEqual(result["skill_outputs"][0]["status"], "succeeded")
+
 
 if __name__ == "__main__":
     unittest.main()

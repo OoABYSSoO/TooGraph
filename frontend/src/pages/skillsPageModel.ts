@@ -70,7 +70,7 @@ function matchesSkillStatus(skill: SkillDefinition, filter: SkillStatusFilter): 
 }
 
 function skillNeedsAttention(skill: SkillDefinition): boolean {
-  return skill.status !== "active" || !skill.configured || !skill.healthy;
+  return skill.status !== "active" || !skill.configured || !skill.healthy || (skill.targets.includes("agent_node") && skill.agentNodeEligibility !== "ready");
 }
 
 function buildSkillSearchText(skill: SkillDefinition): string {
@@ -82,17 +82,22 @@ function buildSkillSearchText(skill: SkillDefinition): string {
     skill.kind,
     skill.mode,
     skill.scope,
+    `${skill.runtime.entrypoint} ${skill.runtime.type} runtime`,
+    `${skill.runtime.type} runtime`,
+    skill.runtime.entrypoint,
+    skill.health.type,
+    skill.agentNodeEligibility,
     skill.sourceFormat,
     skill.sourceScope,
     skill.sourcePath,
     skill.status,
     ...skill.targets,
     ...skill.permissions,
+    ...skill.agentNodeBlockers,
     ...skill.supportedValueTypes,
     ...skill.sideEffects,
     ...skill.inputSchema.map((field) => `${field.key} ${field.label} ${field.valueType} ${field.description}`),
     ...skill.outputSchema.map((field) => `${field.key} ${field.label} ${field.valueType} ${field.description}`),
-    ...skill.compatibility.map((item) => `${item.target} ${item.status} ${item.summary} ${item.missingCapabilities.join(" ")}`),
   ]
     .join(" ")
     .toLowerCase();

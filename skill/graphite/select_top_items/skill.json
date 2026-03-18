@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "graphite.skill/v1",
+  "skillKey": "select_top_items",
+  "label": "Select Top Items",
+  "description": "Select the first N items from an array.",
+  "version": "1.0.0",
+  "targets": ["agent_node"],
+  "kind": "atomic",
+  "mode": "tool",
+  "scope": "node",
+  "permissions": [],
+  "inputSchema": [
+    {
+      "key": "items",
+      "label": "Items",
+      "valueType": "json",
+      "required": true,
+      "description": "Array to limit."
+    },
+    {
+      "key": "top_n",
+      "label": "Top N",
+      "valueType": "number",
+      "required": true,
+      "description": "Maximum number of items to keep."
+    }
+  ],
+  "outputSchema": [
+    {
+      "key": "selected_items",
+      "label": "Selected Items",
+      "valueType": "json",
+      "description": "The first N items."
+    }
+  ],
+  "supportedValueTypes": ["json", "array", "number"],
+  "sideEffects": ["none"],
+  "runtime": {
+    "type": "builtin",
+    "entrypoint": "select_top_items"
+  },
+  "health": {
+    "type": "builtin"
+  },
+  "configured": true,
+  "healthy": true
+}

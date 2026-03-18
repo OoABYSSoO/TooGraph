@@ -92,163 +92,229 @@
         <article v-if="loading" class="skills-page__empty">{{ t("common.loading") }}</article>
         <article v-else-if="error" class="skills-page__empty">{{ t("common.failedToLoad", { error }) }}</article>
         <article v-else-if="filteredSkills.length === 0" class="skills-page__empty">{{ t("skills.empty") }}</article>
-        <template v-else>
-          <div class="skills-page__result-count">{{ t("skills.resultCount", { count: filteredSkills.length }) }}</div>
-          <article v-for="skill in filteredSkills" :key="skill.skillKey" class="skills-page__card">
-            <div class="skills-page__card-heading">
+        <section v-else class="skills-page__workspace">
+          <aside class="skills-page__selector" :aria-label="t('skills.selectorLabel')">
+            <div class="skills-page__result-count">{{ t("skills.resultCount", { count: filteredSkills.length }) }}</div>
+            <div
+              v-for="skill in filteredSkills"
+              :key="skill.skillKey"
+              class="skills-page__selector-item"
+              :class="{ 'skills-page__selector-item--active': selectedSkillKey === skill.skillKey }"
+            >
+              <button
+                type="button"
+                class="skills-page__selector-button"
+                :aria-pressed="selectedSkillKey === skill.skillKey"
+                @click="selectSkill(skill.skillKey)"
+              >
+                <span>{{ skill.label }}</span>
+              </button>
+              <ElSwitch
+                :model-value="skill.status === 'active'"
+                :disabled="!skill.canManage || actionSkillKey === skill.skillKey"
+                :aria-label="enabledToggleLabel(skill)"
+                @change="setSkillEnabled(skill, Boolean($event))"
+              />
+            </div>
+          </aside>
+
+          <article v-if="selectedSkill" class="skills-page__detail" :aria-label="t('skills.detailLabel')">
+            <header class="skills-page__detail-header">
               <div>
-                <div class="skills-page__id">{{ skill.skillKey }}</div>
-                <h3>{{ skill.label }}</h3>
+                <div class="skills-page__id">{{ selectedSkill.skillKey }}</div>
+                <h3>{{ selectedSkill.label }}</h3>
+                <p>{{ selectedSkill.description }}</p>
               </div>
               <div class="skills-page__status">
-                <span>{{ t(`skills.${skill.status}`) }}</span>
-                <span>{{ skill.runtimeReady ? t("skills.runtimeReady") : t("skills.runtimePending") }}</span>
-                <span>{{ skill.runtimeRegistered ? t("skills.runtimeRegistered") : t("skills.runtimeNotRegistered") }}</span>
-                <span v-if="!skill.configured" class="skills-page__status-warning">{{ t("skills.notConfigured") }}</span>
-                <span v-if="!skill.healthy" class="skills-page__status-warning">{{ t("skills.unhealthy") }}</span>
-                <span v-if="skill.canManage">{{ t("skills.manageable") }}</span>
-                <span v-if="skill.canImport">{{ t("skills.importable") }}</span>
+                <span>{{ t(`skills.${selectedSkill.status}`) }}</span>
+                <span>{{ selectedSkill.runtimeReady ? t("skills.runtimeReady") : t("skills.runtimePending") }}</span>
+                <span>{{ selectedSkill.runtimeRegistered ? t("skills.runtimeRegistered") : t("skills.runtimeNotRegistered") }}</span>
+                <span>{{ t("skills.agentNodeEligibility") }}: {{ selectedSkill.agentNodeEligibility }}</span>
+                <span v-if="!selectedSkill.configured" class="skills-page__status-warning">{{ t("skills.notConfigured") }}</span>
+                <span v-if="!selectedSkill.healthy" class="skills-page__status-warning">{{ t("skills.unhealthy") }}</span>
+                <span v-if="selectedSkill.canManage">{{ t("skills.manageable") }}</span>
+                <span v-if="selectedSkill.canImport">{{ t("skills.importable") }}</span>
               </div>
+            </header>
+
+            <div class="skills-page__actions" :aria-label="t('skills.actions')">
+              <button
+                v-if="selectedSkill.canImport"
+                type="button"
+                class="skills-page__action"
+                :disabled="actionSkillKey === selectedSkill.skillKey"
+                @click="importSkillIntoCatalog(selectedSkill)"
+              >
+                {{ t("skills.import") }}
+              </button>
+              <button
+                v-if="selectedSkill.canManage"
+                type="button"
+                class="skills-page__action"
+                :class="{ 'skills-page__action--danger': confirmingSkillDeleteKey === selectedSkill.skillKey }"
+                :disabled="actionSkillKey === selectedSkill.skillKey"
+                @click="deleteSkillFromCatalog(selectedSkill)"
+              >
+                {{ confirmingSkillDeleteKey === selectedSkill.skillKey ? t("skills.confirmDelete") : t("skills.delete") }}
+              </button>
             </div>
 
-            <p>{{ skill.description }}</p>
+            <div class="skills-page__source">
+              <span>{{ t("skills.source") }}: {{ selectedSkill.sourceScope }} / {{ selectedSkill.sourceFormat }}</span>
+              <code>{{ selectedSkill.sourcePath }}</code>
+            </div>
 
             <div class="skills-page__taxonomy">
               <section>
                 <h4>{{ t("skills.targets") }}</h4>
                 <div class="skills-page__badges">
-                  <span v-for="target in skill.targets" :key="target">{{ target }}</span>
+                  <span v-for="target in selectedSkill.targets" :key="target">{{ target }}</span>
                 </div>
               </section>
               <section>
                 <h4>{{ t("skills.kind") }}</h4>
                 <div class="skills-page__badges">
-                  <span>{{ skill.kind }}</span>
-                  <span>{{ skill.mode }}</span>
-                  <span>{{ skill.scope }}</span>
+                  <span>{{ selectedSkill.kind }}</span>
+                  <span>{{ selectedSkill.mode }}</span>
+                  <span>{{ selectedSkill.scope }}</span>
+                </div>
+              </section>
+              <section>
+                <h4>{{ t("skills.runtime") }}</h4>
+                <div class="skills-page__badges">
+                  <span>{{ selectedSkill.runtime.type }}</span>
+                  <span>{{ selectedSkill.runtime.entrypoint || t("common.none") }}</span>
+                  <span>{{ selectedSkill.health.type }}</span>
                 </div>
               </section>
               <section>
                 <h4>{{ t("skills.version") }}</h4>
                 <div class="skills-page__badges">
-                  <span>{{ skill.version || t("common.none") }}</span>
+                  <span>{{ selectedSkill.version || t("common.none") }}</span>
                 </div>
               </section>
-            </div>
-
-            <div class="skills-page__actions" :aria-label="t('skills.actions')">
-              <button
-                v-if="skill.canImport"
-                type="button"
-                class="skills-page__action"
-                :disabled="actionSkillKey === skill.skillKey"
-                @click="importSkillIntoCatalog(skill)"
-              >
-                {{ t("skills.import") }}
-              </button>
-              <button
-                v-if="skill.canManage && skill.status === 'disabled'"
-                type="button"
-                class="skills-page__action"
-                :disabled="actionSkillKey === skill.skillKey"
-                @click="setSkillStatus(skill, 'active')"
-              >
-                {{ t("skills.enable") }}
-              </button>
-              <button
-                v-else-if="skill.canManage"
-                type="button"
-                class="skills-page__action"
-                :disabled="actionSkillKey === skill.skillKey"
-                @click="setSkillStatus(skill, 'disabled')"
-              >
-                {{ t("skills.disable") }}
-              </button>
-              <button
-                v-if="skill.canManage"
-                type="button"
-                class="skills-page__action"
-                :class="{ 'skills-page__action--danger': confirmingSkillDeleteKey === skill.skillKey }"
-                :disabled="actionSkillKey === skill.skillKey"
-                @click="deleteSkillFromCatalog(skill)"
-              >
-                {{ confirmingSkillDeleteKey === skill.skillKey ? t("skills.confirmDelete") : t("skills.delete") }}
-              </button>
-            </div>
-
-            <div class="skills-page__source">
-              <span>{{ t("skills.source") }}: {{ skill.sourceScope }} / {{ skill.sourceFormat }}</span>
-              <code>{{ skill.sourcePath }}</code>
             </div>
 
             <div class="skills-page__columns">
               <section>
                 <h4>{{ t("skills.inputSchema") }}</h4>
                 <div class="skills-page__schema-list">
-                  <span v-for="field in skill.inputSchema" :key="`in-${field.key}`">
+                  <span v-for="field in selectedSkill.inputSchema" :key="`in-${field.key}`">
                     {{ field.key }} · {{ field.valueType }} · {{ field.required ? t("skills.required") : t("skills.optional") }}
                   </span>
-                  <span v-if="skill.inputSchema.length === 0">{{ t("common.none") }}</span>
+                  <span v-if="selectedSkill.inputSchema.length === 0">{{ t("common.none") }}</span>
                 </div>
               </section>
               <section>
                 <h4>{{ t("skills.outputSchema") }}</h4>
                 <div class="skills-page__schema-list">
-                  <span v-for="field in skill.outputSchema" :key="`out-${field.key}`">
+                  <span v-for="field in selectedSkill.outputSchema" :key="`out-${field.key}`">
                     {{ field.key }} · {{ field.valueType }} · {{ field.required ? t("skills.required") : t("skills.optional") }}
                   </span>
-                  <span v-if="skill.outputSchema.length === 0">{{ t("common.none") }}</span>
+                  <span v-if="selectedSkill.outputSchema.length === 0">{{ t("common.none") }}</span>
                 </div>
               </section>
               <section>
                 <h4>{{ t("skills.supportedTypes") }}</h4>
                 <div class="skills-page__badges">
-                  <span v-for="valueType in skill.supportedValueTypes" :key="valueType">{{ valueType }}</span>
-                  <span v-if="skill.supportedValueTypes.length === 0">{{ t("common.none") }}</span>
+                  <span v-for="valueType in selectedSkill.supportedValueTypes" :key="valueType">{{ valueType }}</span>
+                  <span v-if="selectedSkill.supportedValueTypes.length === 0">{{ t("common.none") }}</span>
                 </div>
               </section>
               <section>
                 <h4>{{ t("skills.sideEffects") }}</h4>
                 <div class="skills-page__badges">
-                  <span v-for="effect in skill.sideEffects" :key="effect">{{ effect }}</span>
-                  <span v-if="skill.sideEffects.length === 0">{{ t("skills.noSideEffects") }}</span>
+                  <span v-for="effect in selectedSkill.sideEffects" :key="effect">{{ effect }}</span>
+                  <span v-if="selectedSkill.sideEffects.length === 0">{{ t("skills.noSideEffects") }}</span>
                 </div>
               </section>
               <section>
                 <h4>{{ t("skills.permissions") }}</h4>
                 <div class="skills-page__badges">
-                  <span v-for="permission in skill.permissions" :key="permission">{{ permission }}</span>
-                  <span v-if="skill.permissions.length === 0">{{ t("common.none") }}</span>
+                  <span v-for="permission in selectedSkill.permissions" :key="permission">{{ permission }}</span>
+                  <span v-if="selectedSkill.permissions.length === 0">{{ t("common.none") }}</span>
+                </div>
+              </section>
+              <section>
+                <h4>{{ t("skills.agentNodeBlockers") }}</h4>
+                <div class="skills-page__schema-list">
+                  <span v-for="blocker in selectedSkill.agentNodeBlockers" :key="blocker">{{ blocker }}</span>
+                  <span v-if="selectedSkill.agentNodeBlockers.length === 0">{{ t("skills.agentNodeReady") }}</span>
                 </div>
               </section>
             </div>
 
-            <section class="skills-page__compatibility">
-              <h4>{{ t("skills.compatibility") }}</h4>
-              <div v-if="skill.compatibility.length === 0" class="skills-page__compatibility-empty">{{ t("skills.noCompatibility") }}</div>
-              <div v-for="item in skill.compatibility" :key="item.target" class="skills-page__compatibility-row">
-                <strong>{{ item.target }} · {{ item.status }}</strong>
-                <span>{{ item.summary }}</span>
-                <small v-if="item.missingCapabilities.length > 0">
-                  {{ t("skills.missingCapabilities") }}: {{ item.missingCapabilities.join(", ") }}
-                </small>
+            <section class="skills-page__file-browser" :aria-label="t('skills.fileBrowser')">
+              <div class="skills-page__file-tree">
+                <h4>{{ t("skills.fileTree") }}</h4>
+                <div v-if="skillFilesLoading" class="skills-page__file-state">{{ t("skills.fileLoading") }}</div>
+                <div v-else-if="skillFilesError" class="skills-page__file-state">{{ skillFilesError }}</div>
+                <div v-else-if="flattenedSkillFiles.length === 0" class="skills-page__file-state">{{ t("skills.fileEmpty") }}</div>
+                <template v-else>
+                  <button
+                    v-for="file in flattenedSkillFiles"
+                    :key="file.path"
+                    type="button"
+                    class="skills-page__file-tree-button"
+                    :class="{
+                      'skills-page__file-tree-button--active': selectedFilePath === file.path,
+                      'skills-page__file-tree-button--directory': file.type === 'directory',
+                    }"
+                    :style="{ paddingLeft: `${12 + file.depth * 14}px` }"
+                    :disabled="file.type === 'directory'"
+                    @click="selectSkillFile(file.path)"
+                  >
+                    <span>{{ file.name }}</span>
+                    <small v-if="file.type === 'file'">{{ formatFileSize(file.size) }}</small>
+                  </button>
+                </template>
+              </div>
+
+              <div class="skills-page__file-preview">
+                <header>
+                  <div>
+                    <h4>{{ t("skills.filePreview") }}</h4>
+                    <p v-if="selectedFile">{{ selectedFile.path }}</p>
+                    <p v-else>{{ t("skills.fileSelectHint") }}</p>
+                  </div>
+                  <span v-if="selectedFile?.executable" class="skills-page__file-pill">{{ t("skills.fileExecutable") }}</span>
+                </header>
+                <div v-if="skillFileContentLoading" class="skills-page__file-state">{{ t("skills.fileContentLoading") }}</div>
+                <div v-else-if="skillFileContentError" class="skills-page__file-state">{{ skillFileContentError }}</div>
+                <div v-else-if="!selectedFilePath" class="skills-page__file-state">{{ t("skills.fileSelectHint") }}</div>
+                <div v-else-if="skillFileContent?.encoding === 'too_large'" class="skills-page__file-state">
+                  {{ t("skills.fileTooLarge") }}
+                </div>
+                <div v-else-if="skillFileContent?.encoding === 'binary'" class="skills-page__file-state">
+                  {{ t("skills.fileBinary") }}
+                </div>
+                <pre v-else-if="skillFileContent?.content != null" class="skills-page__file-code"><code>{{ skillFileContent?.content }}</code></pre>
+                <div v-else class="skills-page__file-state">{{ t("skills.fileUnavailable") }}</div>
               </div>
             </section>
           </article>
-        </template>
+        </section>
       </section>
     </section>
   </AppShell>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
-import { ElInput } from "element-plus";
+import { computed, onMounted, ref, watch } from "vue";
+import { ElInput, ElSwitch } from "element-plus";
 import { useI18n } from "vue-i18n";
 
-import { deleteSkill, fetchSkillCatalog, importSkill, importSkillUpload, updateSkillStatus } from "@/api/skills";
+import {
+  deleteSkill,
+  fetchSkillCatalog,
+  fetchSkillFileContent,
+  fetchSkillFiles,
+  importSkill,
+  importSkillUpload,
+  updateSkillStatus,
+} from "@/api/skills";
 import AppShell from "@/layouts/AppShell.vue";
-import type { SkillDefinition } from "@/types/skills";
+import type { SkillDefinition, SkillFileContentResponse, SkillFileNode, SkillFileTreeResponse } from "@/types/skills";
 
 import {
   buildSkillOverview,
@@ -256,6 +322,10 @@ import {
   filterSkillsForManagement,
   type SkillStatusFilter,
 } from "./skillsPageModel.ts";
+
+type FlatSkillFileNode = SkillFileNode & {
+  depth: number;
+};
 
 const skills = ref<SkillDefinition[]>([]);
 const loading = ref(true);
@@ -268,16 +338,45 @@ const skillArchiveInput = ref<HTMLInputElement | null>(null);
 const skillDirectoryInput = ref<HTMLInputElement | null>(null);
 const query = ref("");
 const statusFilter = ref<SkillStatusFilter>("all");
+const selectedSkillKey = ref("");
+const skillFileTree = ref<SkillFileTreeResponse | null>(null);
+const skillFilesLoading = ref(false);
+const skillFilesError = ref<string | null>(null);
+const selectedFilePath = ref("");
+const skillFileContent = ref<SkillFileContentResponse | null>(null);
+const skillFileContentLoading = ref(false);
+const skillFileContentError = ref<string | null>(null);
 const { t } = useI18n();
+
+let fileTreeRequestId = 0;
+let fileContentRequestId = 0;
 
 const overview = computed(() => buildSkillOverview(skills.value));
 const filteredSkills = computed(() => filterSkillsForManagement(skills.value, { query: query.value, status: statusFilter.value }));
+const selectedSkill = computed(() => filteredSkills.value.find((skill) => skill.skillKey === selectedSkillKey.value) ?? null);
+const flattenedSkillFiles = computed<FlatSkillFileNode[]>(() => flattenSkillFiles(skillFileTree.value?.root.children ?? []));
+const selectedFile = computed(() => flattenedSkillFiles.value.find((file) => file.path === selectedFilePath.value) ?? null);
 const statusOptions = computed(() =>
   buildSkillStatusOptions().map((value) => ({
     value,
     label: t(`skills.${value}`),
   })),
 );
+
+watch(
+  filteredSkills,
+  (availableSkills) => {
+    if (availableSkills.some((skill) => skill.skillKey === selectedSkillKey.value)) {
+      return;
+    }
+    selectedSkillKey.value = availableSkills[0]?.skillKey ?? "";
+  },
+  { immediate: true },
+);
+
+watch(selectedSkillKey, (skillKey) => {
+  void loadSkillFilesForSelection(skillKey);
+});
 
 async function loadSkills() {
   loading.value = true;
@@ -294,6 +393,15 @@ async function loadSkills() {
 
 function replaceSkill(updatedSkill: SkillDefinition) {
   skills.value = skills.value.map((skill) => (skill.skillKey === updatedSkill.skillKey ? updatedSkill : skill));
+}
+
+function selectSkill(skillKey: string) {
+  selectedSkillKey.value = skillKey;
+  confirmingSkillDeleteKey.value = null;
+}
+
+function enabledToggleLabel(skill: SkillDefinition) {
+  return skill.status === "active" ? t("skills.disable") : t("skills.enable");
 }
 
 async function importSkillIntoCatalog(skill: SkillDefinition) {
@@ -330,6 +438,10 @@ async function importUploadedSkill(event: Event, mode: "archive" | "folder") {
   }
 }
 
+async function setSkillEnabled(skill: SkillDefinition, enabled: boolean) {
+  await setSkillStatus(skill, enabled ? "active" : "disabled");
+}
+
 async function setSkillStatus(skill: SkillDefinition, status: SkillDefinition["status"]) {
   actionSkillKey.value = skill.skillKey;
   actionError.value = null;
@@ -361,6 +473,98 @@ async function deleteSkillFromCatalog(skill: SkillDefinition) {
   }
 }
 
+async function loadSkillFilesForSelection(skillKey: string) {
+  const requestId = ++fileTreeRequestId;
+  ++fileContentRequestId;
+  skillFileTree.value = null;
+  selectedFilePath.value = "";
+  skillFileContent.value = null;
+  skillFileContentError.value = null;
+  skillFilesError.value = null;
+
+  if (!skillKey) {
+    skillFilesLoading.value = false;
+    return;
+  }
+
+  skillFilesLoading.value = true;
+  try {
+    const tree = await fetchSkillFiles(skillKey);
+    if (requestId !== fileTreeRequestId) {
+      return;
+    }
+    skillFileTree.value = tree;
+    const initialFilePath = pickInitialFilePath(tree.root);
+    if (initialFilePath) {
+      selectedFilePath.value = initialFilePath;
+      await loadSkillFileContent(skillKey, initialFilePath);
+    }
+  } catch (fileError) {
+    if (requestId === fileTreeRequestId) {
+      skillFilesError.value = fileError instanceof Error ? fileError.message : t("common.loading");
+    }
+  } finally {
+    if (requestId === fileTreeRequestId) {
+      skillFilesLoading.value = false;
+    }
+  }
+}
+
+async function selectSkillFile(path: string) {
+  if (!selectedSkill.value || selectedFilePath.value === path) {
+    return;
+  }
+  selectedFilePath.value = path;
+  await loadSkillFileContent(selectedSkill.value.skillKey, path);
+}
+
+async function loadSkillFileContent(skillKey: string, path: string) {
+  const requestId = ++fileContentRequestId;
+  skillFileContent.value = null;
+  skillFileContentError.value = null;
+  skillFileContentLoading.value = true;
+  try {
+    const content = await fetchSkillFileContent(skillKey, path);
+    if (requestId !== fileContentRequestId || selectedSkillKey.value !== skillKey || selectedFilePath.value !== path) {
+      return;
+    }
+    skillFileContent.value = content;
+  } catch (contentError) {
+    if (requestId === fileContentRequestId) {
+      skillFileContentError.value = contentError instanceof Error ? contentError.message : t("common.loading");
+    }
+  } finally {
+    if (requestId === fileContentRequestId) {
+      skillFileContentLoading.value = false;
+    }
+  }
+}
+
+function flattenSkillFiles(nodes: SkillFileNode[], depth = 0): FlatSkillFileNode[] {
+  return nodes.flatMap((node) => [{ ...node, depth }, ...flattenSkillFiles(node.children, depth + 1)]);
+}
+
+function pickInitialFilePath(root: SkillFileNode): string {
+  const files = flattenSkillFiles(root.children).filter((file) => file.type === "file");
+  return (
+    files.find((file) => file.name === "skill.json")?.path ??
+    files.find((file) => file.name === "SKILL.md")?.path ??
+    files.find((file) => file.previewable)?.path ??
+    files[0]?.path ??
+    ""
+  );
+}
+
+function formatFileSize(size: number): string {
+  if (size < 1024) {
+    return `${size} B`;
+  }
+  if (size < 1024 * 1024) {
+    return `${(size / 1024).toFixed(1)} KB`;
+  }
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 onMounted(loadSkills);
 </script>
 
@@ -378,8 +582,6 @@ onMounted(loadSkills);
 
 .skills-page__hero,
 .skills-page__toolbar,
-.skills-page__metric,
-.skills-page__card,
 .skills-page__empty,
 .skills-page__notice {
   min-width: 0;
@@ -389,14 +591,23 @@ onMounted(loadSkills);
   box-shadow: var(--skills-page-panel-shadow);
 }
 
+.skills-page__metric,
+.skills-page__selector,
+.skills-page__detail {
+  box-shadow: var(--skills-page-card-shadow);
+}
+
 .skills-page__hero > *,
 .skills-page__search-field,
 .skills-page__status-filter,
 .skills-page__hero-actions,
-.skills-page__card-heading > *,
+.skills-page__selector,
+.skills-page__detail,
+.skills-page__detail-header > *,
 .skills-page__taxonomy section,
 .skills-page__columns section,
-.skills-page__compatibility {
+.skills-page__file-tree,
+.skills-page__file-preview {
   min-width: 0;
 }
 
@@ -437,18 +648,20 @@ onMounted(loadSkills);
 }
 
 .skills-page__body,
-.skills-page__card p,
+.skills-page__detail-header p,
 .skills-page__empty,
 .skills-page__notice,
 .skills-page__result-count,
 .skills-page__source,
-.skills-page__compatibility-empty {
+.skills-page__file-preview p,
+.skills-page__file-state {
   color: rgba(60, 41, 20, 0.72);
   line-height: 1.6;
 }
 
 .skills-page__body,
-.skills-page__card p {
+.skills-page__detail-header p,
+.skills-page__file-preview p {
   margin: 0;
   overflow-wrap: anywhere;
 }
@@ -486,7 +699,9 @@ onMounted(loadSkills);
 }
 
 .skills-page__refresh:focus-visible,
-.skills-page__action:focus-visible {
+.skills-page__action:focus-visible,
+.skills-page__selector-button:focus-visible,
+.skills-page__file-tree-button:focus-visible {
   outline: 2px solid rgba(216, 166, 80, 0.5);
   outline-offset: 2px;
 }
@@ -498,13 +713,11 @@ onMounted(loadSkills);
 }
 
 .skills-page__metric {
+  min-width: 0;
+  border: 1px solid var(--graphite-border);
+  border-radius: 24px;
   padding: 16px;
   background: rgba(255, 255, 255, 0.62);
-}
-
-.skills-page__metric,
-.skills-page__card {
-  box-shadow: var(--skills-page-card-shadow);
 }
 
 .skills-page__metric span {
@@ -590,30 +803,97 @@ onMounted(loadSkills);
   padding: 24px;
 }
 
-.skills-page__card {
+.skills-page__workspace {
   display: grid;
-  gap: 16px;
-  padding: 18px;
+  grid-template-columns: minmax(220px, 320px) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  min-width: 0;
+}
+
+.skills-page__selector,
+.skills-page__detail {
+  border: 1px solid var(--graphite-border);
+  border-radius: 24px;
   background: var(--graphite-surface-card);
 }
 
-.skills-page__card-heading {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
+.skills-page__selector {
+  position: sticky;
+  top: 16px;
+  display: grid;
+  gap: 6px;
+  max-height: calc(100vh - 120px);
+  overflow: auto;
+  padding: 12px;
 }
 
-.skills-page__card h3,
-.skills-page__card h4 {
+.skills-page__result-count {
+  padding: 4px 4px 8px;
+  font-size: 0.84rem;
+}
+
+.skills-page__selector-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  padding: 6px 8px 6px 10px;
+  background: rgba(255, 255, 255, 0.36);
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+
+.skills-page__selector-item--active {
+  border-color: rgba(154, 52, 18, 0.18);
+  background: rgba(255, 248, 240, 0.96);
+}
+
+.skills-page__selector-button {
+  min-width: 0;
+  border: 0;
+  padding: 6px 0;
+  background: transparent;
+  color: var(--graphite-text-strong);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.skills-page__selector-button span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skills-page__detail {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+}
+
+.skills-page__detail-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 0.8fr);
+  gap: 18px;
+}
+
+.skills-page__detail-header h3,
+.skills-page__detail h4,
+.skills-page__file-preview h4 {
   margin: 0;
 }
 
-.skills-page__card h3 {
-  margin-top: 6px;
+.skills-page__detail-header h3 {
+  margin: 6px 0 8px;
   color: var(--graphite-text-strong);
+  font-size: 1.28rem;
 }
 
-.skills-page__card h4 {
+.skills-page__detail h4,
+.skills-page__file-preview h4 {
   color: rgba(60, 41, 20, 0.76);
   font-size: 0.86rem;
 }
@@ -624,6 +904,7 @@ onMounted(loadSkills);
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  min-width: 0;
 }
 
 .skills-page__actions {
@@ -632,13 +913,16 @@ onMounted(loadSkills);
 
 .skills-page__taxonomy {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
 
 .skills-page__status span,
 .skills-page__badges span,
-.skills-page__schema-list span {
+.skills-page__schema-list span,
+.skills-page__file-pill {
+  display: inline-block;
+  max-width: 100%;
   border: 1px solid rgba(154, 52, 18, 0.08);
   border-radius: 999px;
   padding: 4px 10px;
@@ -646,6 +930,8 @@ onMounted(loadSkills);
   color: rgb(154, 52, 18);
   font-family: var(--graphite-font-mono);
   font-size: 0.82rem;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .skills-page__status .skills-page__status-warning {
@@ -667,40 +953,142 @@ onMounted(loadSkills);
 
 .skills-page__columns {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 12px;
 }
 
 .skills-page__taxonomy section,
 .skills-page__columns section,
-.skills-page__schema-list,
-.skills-page__compatibility {
+.skills-page__schema-list {
   display: grid;
   align-content: start;
   gap: 8px;
   min-width: 0;
 }
 
-.skills-page__compatibility-row {
+.skills-page__file-browser {
   display: grid;
-  gap: 4px;
-  border-top: 1px solid rgba(154, 52, 18, 0.1);
-  padding-top: 10px;
-  color: rgba(60, 41, 20, 0.72);
+  grid-template-columns: minmax(210px, 0.38fr) minmax(0, 1fr);
+  gap: 12px;
+  border-top: 1px solid rgba(154, 52, 18, 0.08);
+  padding-top: 16px;
 }
 
-.skills-page__compatibility-row strong {
-  color: var(--graphite-text-strong);
+.skills-page__file-tree,
+.skills-page__file-preview {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-height: 240px;
+  border: 1px solid rgba(154, 52, 18, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.36);
+  padding: 12px;
 }
 
-.skills-page__compatibility-row small {
-  color: rgba(154, 52, 18, 0.82);
+.skills-page__file-tree {
+  max-height: 520px;
+  overflow: auto;
 }
 
-@media (max-width: 1100px) {
-  .skills-page__taxonomy,
-  .skills-page__columns {
+.skills-page__file-tree-button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 7px 10px;
+  background: transparent;
+  color: rgba(60, 41, 20, 0.82);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.skills-page__file-tree-button:hover:not(:disabled),
+.skills-page__file-tree-button--active {
+  border-color: rgba(154, 52, 18, 0.12);
+  background: rgba(255, 248, 240, 0.9);
+  color: rgb(154, 52, 18);
+}
+
+.skills-page__file-tree-button:disabled {
+  cursor: default;
+  opacity: 0.78;
+}
+
+.skills-page__file-tree-button--directory {
+  color: rgba(60, 41, 20, 0.58);
+  font-weight: 600;
+}
+
+.skills-page__file-tree-button span,
+.skills-page__file-tree-button small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skills-page__file-tree-button small {
+  color: rgba(60, 41, 20, 0.48);
+  font-family: var(--graphite-font-mono);
+  font-size: 0.72rem;
+}
+
+.skills-page__file-preview header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.skills-page__file-code {
+  max-height: 460px;
+  margin: 0;
+  overflow: auto;
+  border: 1px solid rgba(154, 52, 18, 0.08);
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(39, 29, 20, 0.92);
+  color: rgba(255, 248, 240, 0.92);
+  font-family: var(--graphite-font-mono);
+  font-size: 0.82rem;
+  line-height: 1.55;
+  white-space: pre;
+}
+
+.skills-page__file-state {
+  display: grid;
+  place-items: center;
+  min-height: 150px;
+  border: 1px dashed rgba(154, 52, 18, 0.12);
+  border-radius: 14px;
+  padding: 16px;
+  text-align: center;
+}
+
+@media (max-width: 1180px) {
+  .skills-page__detail-header,
+  .skills-page__file-browser {
+    grid-template-columns: 1fr;
+  }
+
+  .skills-page__taxonomy {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 980px) {
+  .skills-page__workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .skills-page__selector {
+    position: static;
+    max-height: 360px;
   }
 
   .skills-page__toolbar {
@@ -709,8 +1097,7 @@ onMounted(loadSkills);
 }
 
 @media (max-width: 700px) {
-  .skills-page__hero,
-  .skills-page__card-heading {
+  .skills-page__hero {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
   }
@@ -735,13 +1122,18 @@ onMounted(loadSkills);
   }
 
   .skills-page {
-    max-width: calc(100vw - 112px);
+    max-width: 100%;
   }
 
   .skills-page__overview,
   .skills-page__taxonomy,
   .skills-page__columns {
     grid-template-columns: 1fr;
+  }
+
+  .skills-page__detail,
+  .skills-page__selector {
+    border-radius: 18px;
   }
 }
 </style>

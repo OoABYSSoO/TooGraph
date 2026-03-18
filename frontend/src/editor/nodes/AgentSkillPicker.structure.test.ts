@@ -20,6 +20,8 @@ test("AgentSkillPicker owns agent skill picker presentation and emits parent sid
   assert.match(componentSource, /v-else-if="availableSkillDefinitions\.length === 0"/);
   assert.match(componentSource, /v-for="definition in availableSkillDefinitions"/);
   assert.match(componentSource, /@click\.stop="emit\('attach', definition\.skillKey\)"/);
+  assert.match(componentSource, /definition\.runtime\.type/);
+  assert.match(componentSource, /definition\.runtime\.entrypoint/);
   assert.match(componentSource, /v-for="badge in attachedSkillBadges"/);
   assert.match(componentSource, /@click\.stop="emit\('remove', badge\.skillKey\)"/);
   assert.match(componentSource, /\.node-card__skill-picker \{/);

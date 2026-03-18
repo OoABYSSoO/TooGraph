@@ -35,6 +35,13 @@
   ],
   "supportedValueTypes": ["text"],
   "sideEffects": ["model_call"],
+  "runtime": {
+    "type": "builtin",
+    "entrypoint": "rewrite_text"
+  },
+  "health": {
+    "type": "builtin"
+  },
   "configured": true,
   "healthy": true
 }

@@ -7,6 +7,15 @@ from typing import Any
 from app.core.runtime.knowledge_retrieval import retrieve_knowledge_base_context
 from app.core.schemas.skills import SkillCatalogStatus
 from app.core.storage.skill_store import get_skill_status_map, list_managed_skill_keys
+from app.skills.builtin.demo_creative import (
+    build_final_summary_skill,
+    build_storyboard_package_skill,
+    build_video_prompt_package_skill,
+    dedupe_items_skill,
+    extract_json_block_skill,
+    normalize_storyboard_shots_skill,
+    select_top_items_skill,
+)
 from app.tools.local_llm import _chat_with_local_model
 
 
@@ -20,6 +29,13 @@ def _build_runtime_skill_registry() -> dict[str, SkillFunc]:
         "extract_json_fields": extract_json_fields_skill,
         "translate_text": translate_text_skill,
         "rewrite_text": rewrite_text_skill,
+        "extract_json_block": extract_json_block_skill,
+        "dedupe_items": dedupe_items_skill,
+        "select_top_items": select_top_items_skill,
+        "normalize_storyboard_shots": normalize_storyboard_shots_skill,
+        "build_storyboard_package": build_storyboard_package_skill,
+        "build_video_prompt_package": build_video_prompt_package_skill,
+        "build_final_summary": build_final_summary_skill,
     }
 
 

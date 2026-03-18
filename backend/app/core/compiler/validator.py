@@ -14,7 +14,7 @@ from app.core.schemas.node_system import (
     NodeSystemStateType,
     ValidationIssue,
 )
-from app.core.schemas.skills import SkillCatalogStatus, SkillDefinition, SkillTarget
+from app.core.schemas.skills import SkillAgentNodeEligibility, SkillCatalogStatus, SkillDefinition, SkillTarget
 from app.skills.definitions import get_skill_catalog_registry
 from app.skills.registry import get_skill_registry
 
@@ -156,7 +156,8 @@ def _validate_agent_node(
             )
         )
 
-    for index, skill_key in enumerate(node.config.skills):
+    skill_refs = _iter_agent_skill_refs(node_name, node)
+    for skill_key, skill_path in skill_refs:
         definition = skill_catalog.get(skill_key)
         if definition is None:
             issues.append(
@@ -166,7 +167,7 @@ def _validate_agent_node(
                         f"Agent node '{node_name}' attaches skill '{skill_key}', "
                         "but the skill is not runtime-registered."
                     ),
-                    path=f"nodes.{node_name}.config.skills.{index}",
+                    path=skill_path,
                 )
             )
             continue
@@ -176,20 +177,37 @@ def _validate_agent_node(
                 ValidationIssue(
                     code="agent_skill_disabled",
                     message=f"Agent node '{node_name}' attaches skill '{skill_key}', but the skill is disabled.",
-                    path=f"nodes.{node_name}.config.skills.{index}",
+                    path=skill_path,
                 )
             )
             continue
 
         if SkillTarget.AGENT_NODE not in definition.targets:
+            target_message = (
+                f"Skill '{skill_key}' is a companion skill and cannot be attached to Agent nodes."
+                if SkillTarget.COMPANION in definition.targets
+                else (
+                    f"Agent node '{node_name}' attaches skill '{skill_key}', "
+                    "but the skill is not available for agent nodes."
+                )
+            )
             issues.append(
                 ValidationIssue(
                     code="agent_skill_target_not_agent_node",
+                    message=target_message,
+                    path=skill_path,
+                )
+            )
+        elif definition.agent_node_eligibility != SkillAgentNodeEligibility.READY:
+            blockers = "; ".join(definition.agent_node_blockers) or "No readiness details provided."
+            issues.append(
+                ValidationIssue(
+                    code="agent_skill_not_agent_node_ready",
                     message=(
-                        f"Agent node '{node_name}' attaches skill '{skill_key}', "
-                        "but the skill is not available for agent nodes."
+                        f"Skill '{skill_key}' needs a GraphiteUI agent-node manifest before it can be used by Agent nodes. "
+                        f"{blockers}"
                     ),
-                    path=f"nodes.{node_name}.config.skills.{index}",
+                    path=skill_path,
                 )
             )
 
@@ -198,7 +216,7 @@ def _validate_agent_node(
                 ValidationIssue(
                     code="agent_skill_not_configured",
                     message=f"Agent node '{node_name}' attaches skill '{skill_key}', but the skill is not configured.",
-                    path=f"nodes.{node_name}.config.skills.{index}",
+                    path=skill_path,
                 )
             )
 
@@ -207,11 +225,12 @@ def _validate_agent_node(
                 ValidationIssue(
                     code="agent_skill_unhealthy",
                     message=f"Agent node '{node_name}' attaches skill '{skill_key}', but the skill health check is failing.",
-                    path=f"nodes.{node_name}.config.skills.{index}",
+                    path=skill_path,
                 )
             )
 
-        if skill_key not in runtime_skill_keys or not definition.runtime_registered:
+        runtime_entrypoint = definition.runtime.entrypoint or skill_key
+        if runtime_entrypoint not in runtime_skill_keys or not definition.runtime_registered:
             issues.append(
                 ValidationIssue(
                     code="agent_skill_not_runtime_registered",
@@ -219,11 +238,11 @@ def _validate_agent_node(
                         f"Agent node '{node_name}' attaches skill '{skill_key}', "
                         "but the skill is not runtime-registered."
                     ),
-                    path=f"nodes.{node_name}.config.skills.{index}",
+                    path=skill_path,
                 )
             )
 
-    knowledge_skill_count = sum(1 for skill_key in node.config.skills if skill_key == KNOWLEDGE_BASE_SKILL_KEY)
+    knowledge_skill_count = sum(1 for skill_key, _path in skill_refs if skill_key == KNOWLEDGE_BASE_SKILL_KEY)
     if knowledge_reads:
         if knowledge_skill_count != 1:
             issues.append(
@@ -265,7 +284,25 @@ def _validate_agent_node(
             )
         )
 
+    issues.extend(_validate_agent_skill_bindings(node_name, node, state_schema, skill_catalog))
+
     return issues
+
+
+def _iter_agent_skill_refs(node_name: str, node: NodeSystemAgentNode) -> list[tuple[str, str]]:
+    refs: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for index, skill_key in enumerate(node.config.skills):
+        if skill_key in seen:
+            continue
+        refs.append((skill_key, f"nodes.{node_name}.config.skills.{index}"))
+        seen.add(skill_key)
+    for binding_index, binding in enumerate(node.config.skill_bindings):
+        if binding.skill_key in seen:
+            continue
+        refs.append((binding.skill_key, f"nodes.{node_name}.config.skillBindings.{binding_index}.skillKey"))
+        seen.add(binding.skill_key)
+    return refs
 
 
 def _validate_condition_node(
@@ -332,6 +369,52 @@ def _validate_condition_node(
                 )
             )
 
+    return issues
+
+
+def _validate_agent_skill_bindings(
+    node_name: str,
+    node: NodeSystemAgentNode,
+    state_schema: dict[str, object],
+    skill_catalog: dict[str, SkillDefinition],
+) -> list[ValidationIssue]:
+    issues: list[ValidationIssue] = []
+    read_state_keys = {binding.state for binding in node.reads}
+    for binding_index, binding in enumerate(node.config.skill_bindings):
+        definition = skill_catalog.get(binding.skill_key)
+        if definition is None:
+            continue
+        for output_key, state_key in binding.output_mapping.items():
+            if state_key not in state_schema:
+                issues.append(
+                    ValidationIssue(
+                        code="agent_skill_output_state_unknown",
+                        message=(
+                            f"Agent node '{node_name}' maps output '{output_key}' from skill '{binding.skill_key}' "
+                            f"to unknown state '{state_key}'."
+                        ),
+                        path=f"nodes.{node_name}.config.skillBindings.{binding_index}.outputMapping.{output_key}",
+                    )
+                )
+
+        for field in definition.input_schema:
+            if not field.required:
+                continue
+            has_mapped_input = field.key in binding.input_mapping
+            has_config_input = field.key in binding.config
+            has_legacy_read_input = not binding.input_mapping and field.key in read_state_keys
+            if has_mapped_input or has_config_input or has_legacy_read_input:
+                continue
+            issues.append(
+                ValidationIssue(
+                    code="agent_skill_required_input_missing",
+                    message=(
+                        f"Agent node '{node_name}' binding for skill '{binding.skill_key}' is missing required input "
+                        f"'{field.key}'. Add an input mapping or fixed config value."
+                    ),
+                    path=f"nodes.{node_name}.config.skillBindings.{binding_index}.inputMapping",
+                )
+            )
     return issues
 
 

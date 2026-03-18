@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from time import perf_counter
 from typing import Any, Callable
 
 from app.core.runtime.agent_streaming import build_agent_stream_delta_callback, finalize_agent_stream_delta
@@ -9,6 +10,7 @@ from app.core.runtime.condition_eval import evaluate_condition_rule, resolve_bra
 from app.core.runtime.input_boundary import coerce_input_boundary_value, first_truthy
 from app.core.runtime.knowledge_retrieval import retrieve_knowledge_base_context
 from app.core.runtime.reference_resolution import resolve_condition_source
+from app.core.runtime.skill_bindings import build_skill_inputs, map_skill_outputs, normalize_agent_skill_bindings
 from app.core.runtime.skill_invocation import callable_accepts_keyword, invoke_skill
 from app.core.schemas.node_system import (
     NodeSystemAgentNode,
@@ -117,12 +119,15 @@ def execute_agent_node(
         None,
     )
 
-    for skill_key in node.config.skills:
+    mapped_skill_outputs: dict[str, Any] = {}
+    for binding in normalize_agent_skill_bindings(node):
+        skill_key = binding.skill_key
         skill_func = registry.get(skill_key)
         if skill_func is None:
             raise ValueError(f"Skill '{skill_key}' is not registered.")
 
-        if skill_key == knowledge_base_skill_key:
+        started_at = perf_counter()
+        if skill_key == knowledge_base_skill_key and not binding.input_mapping:
             skill_inputs = {
                 "knowledge_base": input_values.get(knowledge_read) if knowledge_read else None,
                 "query": input_values.get(query_read) if query_read else None,
@@ -133,16 +138,25 @@ def execute_agent_node(
                 limit=3,
             )
         else:
-            skill_inputs = dict(input_values)
+            skill_inputs = build_skill_inputs(binding, input_values)
             skill_result = invoke_skill_func(skill_func, skill_inputs)
+        duration_ms = int((perf_counter() - started_at) * 1000)
+        state_writes = map_skill_outputs(binding, skill_result)
+        mapped_skill_outputs.update(state_writes)
         selected_skills.append(skill_key)
         skill_context[skill_key] = skill_result
         skill_outputs.append(
             {
                 "skill_name": skill_key,
                 "skill_key": skill_key,
+                "trigger": binding.trigger,
                 "inputs": skill_inputs,
                 "outputs": skill_result,
+                "output_mapping": dict(binding.output_mapping),
+                "state_writes": state_writes,
+                "duration_ms": duration_ms,
+                "status": "succeeded",
+                "error": "",
             }
         )
 
@@ -167,10 +181,13 @@ def execute_agent_node(
     )
     warnings.extend(response_warnings)
 
-    output_values = {
-        state_name: response_payload.get(state_name)
-        for state_name in output_keys
-    }
+    output_values = dict(mapped_skill_outputs)
+    output_values.update(
+        {
+            state_name: response_payload.get(state_name)
+            for state_name in output_keys
+        }
+    )
     finalize_agent_stream_delta_func(
         state=state,
         node_name=node_name,

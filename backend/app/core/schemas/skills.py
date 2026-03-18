@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -56,25 +57,10 @@ class SkillScope(str, Enum):
     GLOBAL = "global"
 
 
-class SkillCompatibilityStatus(str, Enum):
-    NATIVE = "native"
-    PARTIAL = "partial"
+class SkillAgentNodeEligibility(str, Enum):
+    READY = "ready"
+    NEEDS_MANIFEST = "needs_manifest"
     INCOMPATIBLE = "incompatible"
-
-
-class SkillCompatibilityTarget(str, Enum):
-    CLAUDE_CODE = "claude_code"
-    OPENCLAW = "openclaw"
-    CODEX = "codex"
-
-
-class SkillCompatibilityReport(BaseModel):
-    target: SkillCompatibilityTarget
-    status: SkillCompatibilityStatus
-    summary: str
-    missing_capabilities: list[str] = Field(default_factory=list, alias="missingCapabilities")
-
-    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
 
 class SkillCatalogStatus(str, Enum):
@@ -93,20 +79,41 @@ class SkillIoField(BaseModel):
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
 
+class SkillRuntimeSpec(BaseModel):
+    type: str = "builtin"
+    entrypoint: str = ""
+
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
+
+
+class SkillHealthSpec(BaseModel):
+    type: str = "builtin"
+
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
+
+
 class SkillDefinition(BaseModel):
     skill_key: str = Field(..., min_length=1, alias="skillKey")
     label: str = Field(..., min_length=1)
     description: str = ""
+    schema_version: str = Field(default="", alias="schemaVersion")
     version: str = ""
     targets: list[SkillTarget] = Field(default_factory=lambda: [SkillTarget.AGENT_NODE])
     kind: SkillKind = SkillKind.ATOMIC
     mode: SkillMode = SkillMode.TOOL
     scope: SkillScope = SkillScope.NODE
     permissions: list[str] = Field(default_factory=list)
+    runtime: SkillRuntimeSpec = Field(default_factory=SkillRuntimeSpec)
+    health: SkillHealthSpec = Field(default_factory=SkillHealthSpec)
     input_schema: list[SkillIoField] = Field(default_factory=list, alias="inputSchema")
     output_schema: list[SkillIoField] = Field(default_factory=list, alias="outputSchema")
     supported_value_types: list[str] = Field(default_factory=list, alias="supportedValueTypes")
     side_effects: list[SkillSideEffect] = Field(default_factory=list, alias="sideEffects")
+    agent_node_eligibility: SkillAgentNodeEligibility = Field(
+        default=SkillAgentNodeEligibility.NEEDS_MANIFEST,
+        alias="agentNodeEligibility",
+    )
+    agent_node_blockers: list[str] = Field(default_factory=list, alias="agentNodeBlockers")
     source_format: SkillSourceFormat = Field(default=SkillSourceFormat.GRAPHITE, alias="sourceFormat")
     source_scope: SkillSourceScope = Field(default=SkillSourceScope.GRAPHITE_MANAGED, alias="sourceScope")
     source_path: str = Field(default="", alias="sourcePath")
@@ -117,6 +124,39 @@ class SkillDefinition(BaseModel):
     status: SkillCatalogStatus = Field(default=SkillCatalogStatus.ACTIVE)
     can_manage: bool = Field(default=False, alias="canManage")
     can_import: bool = Field(default=False, alias="canImport")
-    compatibility: list[SkillCompatibilityReport] = Field(default_factory=list)
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
+
+
+class SkillFileNode(BaseModel):
+    name: str
+    path: str
+    type: Literal["directory", "file"]
+    size: int = 0
+    language: str = ""
+    previewable: bool = False
+    executable: bool = False
+    children: list["SkillFileNode"] = Field(default_factory=list)
+
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
+
+
+class SkillFileTreeResponse(BaseModel):
+    skill_key: str = Field(..., alias="skillKey")
+    root: SkillFileNode
+
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
+
+
+class SkillFileContentResponse(BaseModel):
+    skill_key: str = Field(..., alias="skillKey")
+    path: str
+    name: str
+    size: int
+    language: str = ""
+    previewable: bool = False
+    executable: bool = False
+    encoding: Literal["utf-8", "binary", "too_large"]
+    content: str | None = None
+
+    model_config = ConfigDict(populate_by_name=True)

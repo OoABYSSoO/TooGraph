@@ -19,6 +19,7 @@ export function isAgentAttachableSkillDefinition(definition: SkillDefinition) {
   return (
     definition.status === "active" &&
     definition.targets.includes("agent_node") &&
+    definition.agentNodeEligibility === "ready" &&
     definition.runtimeReady &&
     definition.runtimeRegistered &&
     definition.configured &&

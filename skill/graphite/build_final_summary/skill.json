@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "graphite.skill/v1",
+  "skillKey": "build_final_summary",
+  "label": "Build Final Summary",
+  "description": "Render a final Markdown summary from creative workflow payload fields.",
+  "version": "1.0.0",
+  "targets": ["agent_node"],
+  "kind": "atomic",
+  "mode": "tool",
+  "scope": "node",
+  "permissions": [],
+  "inputSchema": [
+    {
+      "key": "payload",
+      "label": "Payload",
+      "valueType": "json",
+      "required": true,
+      "description": "Creative workflow payload."
+    }
+  ],
+  "outputSchema": [
+    {
+      "key": "summary_markdown",
+      "label": "Summary Markdown",
+      "valueType": "markdown",
+      "description": "Final Markdown summary."
+    }
+  ],
+  "supportedValueTypes": ["json", "markdown"],
+  "sideEffects": ["none"],
+  "runtime": {
+    "type": "builtin",
+    "entrypoint": "build_final_summary"
+  },
+  "health": {
+    "type": "builtin"
+  },
+  "configured": true,
+  "healthy": true
+}

@@ -46,6 +46,7 @@
             <span>{{ definition.kind }}</span>
             <span>{{ definition.mode }}</span>
             <span>{{ definition.scope }}</span>
+            <span>{{ definition.runtime.type }}:{{ definition.runtime.entrypoint || definition.skillKey }}</span>
             <span v-if="definition.inputSchema.length > 0">{{ t("nodeCard.inputCount", { count: definition.inputSchema.length }) }}</span>
             <span v-if="definition.outputSchema.length > 0">{{ t("nodeCard.outputCount", { count: definition.outputSchema.length }) }}</span>
           </div>

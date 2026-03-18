@@ -72,6 +72,13 @@
   ],
   "supportedValueTypes": ["text", "knowledge_base"],
   "sideEffects": ["knowledge_read"],
+  "runtime": {
+    "type": "builtin",
+    "entrypoint": "search_knowledge_base"
+  },
+  "health": {
+    "type": "builtin"
+  },
   "configured": true,
   "healthy": true
 }

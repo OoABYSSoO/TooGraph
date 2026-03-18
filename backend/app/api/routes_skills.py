@@ -3,9 +3,9 @@ from __future__ import annotations
 from pathlib import Path, PurePosixPath
 import tempfile
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 
-from app.core.schemas.skills import SkillDefinition
+from app.core.schemas.skills import SkillDefinition, SkillFileContentResponse, SkillFileTreeResponse
 from app.core.storage.skill_store import (
     delete_skill,
     disable_skill,
@@ -20,6 +20,7 @@ from app.skills.definitions import (
     list_skill_catalog,
     list_skill_definitions,
 )
+from app.skills.files import build_skill_file_tree, read_skill_file_content
 
 
 router = APIRouter(prefix="/api/skills", tags=["skills"])
@@ -97,6 +98,30 @@ def enable_skill_endpoint(skill_key: str) -> SkillDefinition:
         raise HTTPException(status_code=400, detail="Import the skill into GraphiteUI before managing it.")
     enable_skill(skill_key)
     return get_skill_catalog_registry(include_disabled=True)[skill_key]
+
+
+@router.get("/{skill_key}/files", response_model=SkillFileTreeResponse)
+def get_skill_files_endpoint(skill_key: str) -> SkillFileTreeResponse:
+    definition = get_skill_catalog_registry(include_disabled=True).get(skill_key)
+    if definition is None:
+        raise HTTPException(status_code=404, detail=f"Skill '{skill_key}' does not exist.")
+    try:
+        return build_skill_file_tree(definition)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/{skill_key}/files/content", response_model=SkillFileContentResponse)
+def get_skill_file_content_endpoint(skill_key: str, path: str = Query(..., min_length=1)) -> SkillFileContentResponse:
+    definition = get_skill_catalog_registry(include_disabled=True).get(skill_key)
+    if definition is None:
+        raise HTTPException(status_code=404, detail=f"Skill '{skill_key}' does not exist.")
+    try:
+        return read_skill_file_content(definition, path)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.delete("/{skill_key}")

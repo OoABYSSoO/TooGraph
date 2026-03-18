@@ -41,6 +41,13 @@
   ],
   "supportedValueTypes": ["text", "json"],
   "sideEffects": ["model_call"],
+  "runtime": {
+    "type": "builtin",
+    "entrypoint": "extract_json_fields"
+  },
+  "health": {
+    "type": "builtin"
+  },
   "configured": true,
   "healthy": true
 }

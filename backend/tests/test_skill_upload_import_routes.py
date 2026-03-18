@@ -4,10 +4,13 @@ from contextlib import ExitStack, contextmanager
 from io import BytesIO
 import json
 from pathlib import Path
+import sys
 import tempfile
 import unittest
 import zipfile
 from unittest.mock import patch
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from fastapi.testclient import TestClient
 
@@ -22,42 +25,47 @@ def _native_skill_manifest(
     targets: list[str] | None = None,
     configured: bool = True,
     healthy: bool = True,
+    runtime_entrypoint: str | None = None,
 ) -> str:
+    manifest = {
+        "schemaVersion": "graphite.skill/v1",
+        "skillKey": skill_key,
+        "label": "Video Understanding" if skill_key == "video_understanding" else skill_key.replace("_", " ").title(),
+        "description": "Use frame sampling rules to understand a video with image-only model capability.",
+        "version": "0.1.0",
+        "targets": targets or ["agent_node", "companion"],
+        "kind": "workflow",
+        "mode": "workflow",
+        "scope": "graph",
+        "permissions": ["model_vision", "file_read"],
+        "inputSchema": [
+            {
+                "key": "video",
+                "label": "Video",
+                "valueType": "video",
+                "required": True,
+                "description": "Source video file.",
+            }
+        ],
+        "outputSchema": [
+            {
+                "key": "summary",
+                "label": "Summary",
+                "valueType": "text",
+                "required": True,
+                "description": "Structured video summary.",
+            }
+        ],
+        "supportedValueTypes": ["video", "image", "text"],
+        "sideEffects": ["model_call", "file_read"],
+        "configured": configured,
+        "healthy": healthy,
+    }
+    if runtime_entrypoint is not None:
+        manifest["runtime"] = {"type": "builtin", "entrypoint": runtime_entrypoint}
+        manifest["health"] = {"type": "builtin"}
     return json.dumps(
-        {
-            "schemaVersion": "graphite.skill/v1",
-            "skillKey": skill_key,
-            "label": "Video Understanding" if skill_key == "video_understanding" else skill_key.replace("_", " ").title(),
-            "description": "Use frame sampling rules to understand a video with image-only model capability.",
-            "version": "0.1.0",
-            "targets": targets or ["agent_node", "companion"],
-            "kind": "workflow",
-            "mode": "workflow",
-            "scope": "graph",
-            "permissions": ["model_vision", "file_read"],
-            "inputSchema": [
-                {
-                    "key": "video",
-                    "label": "Video",
-                    "valueType": "video",
-                    "required": True,
-                    "description": "Source video file.",
-                }
-            ],
-            "outputSchema": [
-                {
-                    "key": "summary",
-                    "label": "Summary",
-                    "valueType": "text",
-                    "required": True,
-                    "description": "Structured video summary.",
-                }
-            ],
-            "supportedValueTypes": ["video", "image", "text"],
-            "sideEffects": ["model_call", "file_read"],
-            "configured": configured,
-            "healthy": healthy,
-        },
+        manifest,
         ensure_ascii=False,
         indent=2,
     )
@@ -127,6 +135,7 @@ def _native_skill_zip_bytes() -> bytes:
         archive.writestr("video_understanding/skill.json", _native_skill_manifest())
         archive.writestr("video_understanding/SKILL.md", "# Video Understanding\n")
         archive.writestr("video_understanding/workflow.json", '{"steps":[]}\n')
+        archive.writestr("video_understanding/scripts/probe.py", "print('probe')\n")
     return payload.getvalue()
 
 
@@ -137,11 +146,18 @@ def _write_native_skill(
     targets: list[str],
     configured: bool = True,
     healthy: bool = True,
+    runtime: bool = True,
 ) -> None:
     skill_dir = skills_dir / "graphite" / skill_key
     skill_dir.mkdir(parents=True, exist_ok=True)
     (skill_dir / "skill.json").write_text(
-        _native_skill_manifest(skill_key, targets=targets, configured=configured, healthy=healthy),
+        _native_skill_manifest(
+            skill_key,
+            targets=targets,
+            configured=configured,
+            healthy=healthy,
+            runtime_entrypoint=skill_key if runtime else None,
+        ),
         encoding="utf-8",
     )
     (skill_dir / "SKILL.md").write_text(f"# {skill_key}\n", encoding="utf-8")
@@ -168,6 +184,7 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                     self.assertEqual(catalog_items[skill_key]["targets"], ["agent_node"])
                     self.assertTrue(catalog_items[skill_key]["runtimeReady"])
                     self.assertTrue(catalog_items[skill_key]["runtimeRegistered"])
+                    self.assertNotIn("compatibility", catalog_items[skill_key])
 
     def test_native_skill_json_upload_imports_graphite_skill_package(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -190,8 +207,11 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertEqual(payload["mode"], "workflow")
                 self.assertEqual(payload["scope"], "graph")
                 self.assertEqual(payload["permissions"], ["model_vision", "file_read"])
+                self.assertNotIn("compatibility", payload)
                 self.assertFalse(payload["runtimeReady"])
                 self.assertFalse(payload["runtimeRegistered"])
+                self.assertEqual(payload["agentNodeEligibility"], "needs_manifest")
+                self.assertIn("Skill manifest is missing a builtin runtime entrypoint.", payload["agentNodeBlockers"])
                 self.assertTrue(payload["configured"])
                 self.assertTrue(payload["healthy"])
 
@@ -204,6 +224,51 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 catalog_items = {item["skillKey"]: item for item in catalog_response.json()}
                 self.assertIn("video_understanding", catalog_items)
                 self.assertEqual(catalog_items["video_understanding"]["targets"], ["agent_node", "companion"])
+
+    def test_skill_file_tree_lists_package_files_for_inspection(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            skills_dir = temp_path / "skill"
+            state_dir = temp_path / "data" / "skills"
+            with _test_client_with_skill_storage(skills_dir, state_dir) as client:
+                client.post(
+                    "/api/skills/imports/upload",
+                    files=[("files", ("video_understanding.zip", _native_skill_zip_bytes(), "application/zip"))],
+                )
+
+                response = client.get("/api/skills/video_understanding/files")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["skillKey"], "video_understanding")
+        self.assertEqual(payload["root"]["type"], "directory")
+        root_children = {item["path"]: item for item in payload["root"]["children"]}
+        self.assertIn("skill.json", root_children)
+        self.assertIn("SKILL.md", root_children)
+        self.assertIn("workflow.json", root_children)
+        self.assertIn("scripts", root_children)
+        self.assertEqual(root_children["scripts"]["type"], "directory")
+        self.assertEqual(root_children["scripts"]["children"][0]["path"], "scripts/probe.py")
+        self.assertTrue(root_children["scripts"]["children"][0]["previewable"])
+
+    def test_skill_file_content_reads_text_and_blocks_path_traversal(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            skills_dir = temp_path / "skill"
+            state_dir = temp_path / "data" / "skills"
+            with _test_client_with_skill_storage(skills_dir, state_dir) as client:
+                client.post(
+                    "/api/skills/imports/upload",
+                    files=[("files", ("video_understanding.zip", _native_skill_zip_bytes(), "application/zip"))],
+                )
+
+                content_response = client.get("/api/skills/video_understanding/files/content?path=SKILL.md")
+                traversal_response = client.get("/api/skills/video_understanding/files/content?path=../registry_states.json")
+
+        self.assertEqual(content_response.status_code, 200)
+        self.assertEqual(content_response.json()["content"], "# Video Understanding\n")
+        self.assertEqual(content_response.json()["language"], "markdown")
+        self.assertEqual(traversal_response.status_code, 400)
 
     def test_zip_archive_upload_imports_skill_into_managed_catalog(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -279,6 +344,7 @@ class SkillUploadImportRouteTests(unittest.TestCase):
             skills_dir = temp_path / "skill"
             state_dir = temp_path / "data" / "skills"
             _write_native_skill(skills_dir, "search_knowledge_base", targets=["agent_node"])
+            _write_native_skill(skills_dir, "extract_json_fields", targets=["agent_node"], runtime=False)
             _write_native_skill(skills_dir, "rewrite_text", targets=["companion"])
             _write_native_skill(skills_dir, "summarize_text", targets=["agent_node"], configured=False)
             _write_native_skill(skills_dir, "translate_text", targets=["agent_node"], healthy=False)

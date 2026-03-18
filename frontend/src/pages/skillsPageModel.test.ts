@@ -10,10 +10,15 @@ const skills: SkillDefinition[] = [
     skillKey: "rewrite_text",
     label: "Rewrite Text",
     description: "Rewrite text with a specified style.",
+    schemaVersion: "graphite.skill/v1",
     inputSchema: [{ key: "text", label: "Text", valueType: "text", required: true, description: "Source text" }],
     outputSchema: [{ key: "rewritten", label: "Rewritten", valueType: "text", required: false, description: "Result" }],
     supportedValueTypes: ["text"],
     sideEffects: [],
+    runtime: { type: "builtin", entrypoint: "rewrite_text" },
+    health: { type: "builtin" },
+    agentNodeEligibility: "ready",
+    agentNodeBlockers: [],
     version: "1.0.0",
     targets: ["agent_node"],
     kind: "atomic",
@@ -30,16 +35,20 @@ const skills: SkillDefinition[] = [
     status: "active",
     canManage: true,
     canImport: false,
-    compatibility: [],
   },
   {
     skillKey: "external_search",
     label: "External Search",
     description: "Imported from another runtime.",
+    schemaVersion: "graphite.skill/v1",
     inputSchema: [],
     outputSchema: [],
     supportedValueTypes: ["text", "json"],
     sideEffects: ["network"],
+    runtime: { type: "future", entrypoint: "" },
+    health: { type: "none" },
+    agentNodeEligibility: "needs_manifest",
+    agentNodeBlockers: ["Skill manifest is missing a builtin runtime entrypoint."],
     version: "0.1.0",
     targets: ["agent_node", "companion"],
     kind: "atomic",
@@ -56,16 +65,20 @@ const skills: SkillDefinition[] = [
     status: "active",
     canManage: true,
     canImport: false,
-    compatibility: [],
   },
   {
     skillKey: "desktop_companion_profile",
     label: "Desktop Companion Profile",
     description: "A companion context profile.",
+    schemaVersion: "graphite.skill/v1",
     inputSchema: [],
     outputSchema: [],
     supportedValueTypes: ["text"],
     sideEffects: [],
+    runtime: { type: "none", entrypoint: "" },
+    health: { type: "none" },
+    agentNodeEligibility: "incompatible",
+    agentNodeBlockers: ["Skill target does not include agent_node."],
     version: "0.1.0",
     targets: ["companion"],
     kind: "profile",
@@ -82,7 +95,6 @@ const skills: SkillDefinition[] = [
     status: "active",
     canManage: true,
     canImport: false,
-    compatibility: [],
   },
 ];
 
@@ -98,6 +110,14 @@ test("filterSkillsForManagement searches native taxonomy and permission fields",
   assert.deepEqual(
     filterSkillsForManagement(skills, { query: "profile", status: "all" }).map((skill) => skill.skillKey),
     ["desktop_companion_profile"],
+  );
+  assert.deepEqual(
+    filterSkillsForManagement(skills, { query: "rewrite_text builtin runtime", status: "all" }).map((skill) => skill.skillKey),
+    ["rewrite_text"],
+  );
+  assert.deepEqual(
+    filterSkillsForManagement(skills, { query: "missing a builtin runtime", status: "all" }).map((skill) => skill.skillKey),
+    ["external_search"],
   );
 });
 
