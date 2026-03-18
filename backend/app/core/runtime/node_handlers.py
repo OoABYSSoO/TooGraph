@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from time import perf_counter
 from typing import Any, Callable
 
@@ -22,6 +23,7 @@ from app.core.schemas.node_system import (
 from app.skills.registry import get_skill_registry
 
 KNOWLEDGE_BASE_SKILL_KEY = "search_knowledge_base"
+WEB_SEARCH_SKILL_KEY = "web_search"
 
 
 def execute_input_node(
@@ -139,9 +141,14 @@ def execute_agent_node(
             )
         else:
             skill_inputs = build_skill_inputs(binding, input_values)
+            if skill_key == WEB_SEARCH_SKILL_KEY:
+                skill_inputs = _with_default_web_search_query(skill_inputs, node)
             skill_result = invoke_skill_func(skill_func, skill_inputs)
         duration_ms = int((perf_counter() - started_at) * 1000)
         state_writes = map_skill_outputs(binding, skill_result)
+        skill_status, skill_error = _resolve_skill_invocation_status(skill_key, skill_result)
+        if skill_status == "failed":
+            warnings.append(f"Skill '{skill_key}' failed: {skill_error or 'Unknown error.'}")
         mapped_skill_outputs.update(state_writes)
         selected_skills.append(skill_key)
         skill_context[skill_key] = skill_result
@@ -155,8 +162,8 @@ def execute_agent_node(
                 "output_mapping": dict(binding.output_mapping),
                 "state_writes": state_writes,
                 "duration_ms": duration_ms,
-                "status": "succeeded",
-                "error": "",
+                "status": skill_status,
+                "error": skill_error,
             }
         )
 
@@ -204,3 +211,67 @@ def execute_agent_node(
         "warnings": list(dict.fromkeys(warnings)),
         "final_result": first_truthy_func(output_values.values()) or response_payload.get("summary") or "",
     }
+
+
+def _with_default_web_search_query(
+    skill_inputs: dict[str, Any],
+    node: NodeSystemAgentNode,
+) -> dict[str, Any]:
+    if _compact_text(skill_inputs.get("query")):
+        return skill_inputs
+
+    default_query = _build_web_search_query_from_instruction(node.config.task_instruction)
+    if not default_query:
+        for key in ("question", "input", "text", "prompt", "instruction"):
+            default_query = _compact_text(skill_inputs.get(key))
+            if default_query:
+                break
+
+    if not default_query:
+        text_values = [
+            _compact_text(value)
+            for value in skill_inputs.values()
+            if isinstance(value, str) and _compact_text(value)
+        ]
+        if len(text_values) == 1:
+            default_query = text_values[0]
+
+    if not default_query:
+        return skill_inputs
+
+    return {**skill_inputs, "query": default_query}
+
+
+def _build_web_search_query_from_instruction(instruction: Any) -> str:
+    query = _compact_text(instruction)
+    if not query:
+        return ""
+
+    query = re.sub(r"^(请|帮我|帮忙|麻烦你)\s*", "", query)
+    for prefix in ("联网搜索", "在线搜索", "网络搜索", "搜索一下", "搜索", "查询一下", "查询", "查一下", "查找"):
+        if query.startswith(prefix):
+            query = query[len(prefix) :].lstrip(" ，,。:：；;")
+            break
+
+    query = re.sub(
+        r"^(并|然后|再)?\s*(请|帮我|帮忙)?\s*(告知|告诉我|告诉|回答|说明|输出|总结|分析)\s*",
+        "",
+        query,
+    )
+    return _compact_text(query)
+
+
+def _resolve_skill_invocation_status(skill_key: str, skill_result: dict[str, Any]) -> tuple[str, str]:
+    status = _compact_text(skill_result.get("status")).lower()
+    error = _compact_text(skill_result.get("error"))
+    if status in {"failed", "error"}:
+        return "failed", error
+    if status in {"succeeded", "success", "ok"}:
+        return "succeeded", error
+    if error:
+        return "failed", error
+    return "succeeded", ""
+
+
+def _compact_text(value: Any) -> str:
+    return str(value or "").strip()

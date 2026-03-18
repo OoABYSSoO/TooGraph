@@ -1,0 +1,121 @@
+{
+  "schemaVersion": "graphite.skill/v1",
+  "skillKey": "web_search",
+  "label": "Web Search",
+  "description": "Search the public web and return cited results for agent reasoning.",
+  "version": "1.0.0",
+  "targets": ["agent_node", "companion"],
+  "kind": "atomic",
+  "mode": "tool",
+  "scope": "node",
+  "permissions": ["network", "secret_read"],
+  "inputSchema": [
+    {
+      "key": "query",
+      "label": "Query",
+      "valueType": "text",
+      "required": true,
+      "description": "Search query or question to look up on the public web."
+    },
+    {
+      "key": "max_results",
+      "label": "Max Results",
+      "valueType": "text",
+      "required": false,
+      "description": "Number of results to return. Defaults to 5 and is capped at 20."
+    },
+    {
+      "key": "search_depth",
+      "label": "Search Depth",
+      "valueType": "text",
+      "required": false,
+      "description": "Tavily depth: basic, advanced, fast, or ultra-fast. Defaults to basic."
+    },
+    {
+      "key": "include_raw_content",
+      "label": "Include Raw Content",
+      "valueType": "text",
+      "required": false,
+      "description": "When true and Tavily is configured, includes raw extracted content in results."
+    }
+  ],
+  "outputSchema": [
+    {
+      "key": "status",
+      "label": "Status",
+      "valueType": "text",
+      "description": "succeeded or failed."
+    },
+    {
+      "key": "provider",
+      "label": "Provider",
+      "valueType": "text",
+      "description": "Search provider used for this request."
+    },
+    {
+      "key": "query",
+      "label": "Query",
+      "valueType": "text",
+      "description": "Final query string used for search."
+    },
+    {
+      "key": "result_count",
+      "label": "Result Count",
+      "valueType": "text",
+      "description": "Number of normalized search results returned."
+    },
+    {
+      "key": "searched_at",
+      "label": "Searched At",
+      "valueType": "text",
+      "description": "Local timestamp when the search was executed."
+    },
+    {
+      "key": "searched_date",
+      "label": "Searched Date",
+      "valueType": "text",
+      "description": "Local date when the search was executed, useful for recency-sensitive answers."
+    },
+    {
+      "key": "summary",
+      "label": "Summary",
+      "valueType": "markdown",
+      "description": "Short answer or compact result summary."
+    },
+    {
+      "key": "context",
+      "label": "Context",
+      "valueType": "markdown",
+      "description": "Cited result blocks formatted for direct agent reasoning."
+    },
+    {
+      "key": "results",
+      "label": "Results",
+      "valueType": "json",
+      "description": "Structured search results with title, url, content, score, and optional raw content."
+    },
+    {
+      "key": "citations",
+      "label": "Citations",
+      "valueType": "json",
+      "description": "Compact citation list with index, title, and URL."
+    },
+    {
+      "key": "error",
+      "label": "Error",
+      "valueType": "text",
+      "description": "Error message when status is failed."
+    }
+  ],
+  "supportedValueTypes": ["text", "markdown", "json"],
+  "sideEffects": ["network", "secret_read"],
+  "runtime": {
+    "type": "builtin",
+    "entrypoint": "web_search"
+  },
+  "health": {
+    "type": "builtin"
+  },
+  "configured": true,
+  "healthy": true
+}

@@ -110,6 +110,24 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
         self.assertLess(prompt.index("key: summary"), prompt.index("key: draft"))
         self.assertLess(prompt.index('"summary": "..."'), prompt.index('"draft": "..."'))
 
+    def test_auto_prompt_requires_fact_answers_to_stay_grounded_in_skill_results(self) -> None:
+        prompt = build_auto_system_prompt(
+            ["answer"],
+            {"question": "今天的日期是什么？"},
+            {
+                "web_search": {
+                    "status": "succeeded",
+                    "searched_date": "2026-05-01",
+                    "summary": "搜索摘要",
+                }
+            },
+            state_schema={"answer": NodeSystemStateDefinition(type=NodeSystemStateType.TEXT)},
+        )
+
+        self.assertIn("涉及事实、日期、天气、新闻或外部资料时，必须以技能结果为依据", prompt)
+        self.assertIn("不要编造技能结果中不存在的事实", prompt)
+        self.assertIn("searched_date: 2026-05-01", prompt)
+
     def test_llm_json_response_can_map_unique_state_name_alias_back_to_output_key(self) -> None:
         parsed = parse_llm_json_response(
             '{"最终答案": "这是中文语义字段返回的内容"}',

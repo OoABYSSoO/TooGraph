@@ -8,7 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.core.schemas.skills import SkillAgentNodeEligibility, SkillSourceScope
+from app.core.schemas.skills import SkillAgentNodeEligibility, SkillSideEffect, SkillSourceScope, SkillTarget
 from app.skills.definitions import _parse_native_skill_manifest
 
 
@@ -122,6 +122,20 @@ class SkillManifestContractTests(unittest.TestCase):
 
         self.assertEqual(definition.agent_node_eligibility, SkillAgentNodeEligibility.NEEDS_MANIFEST)
         self.assertIn("Skill manifest is missing a builtin runtime entrypoint.", definition.agent_node_blockers)
+
+    def test_web_search_manifest_is_agent_and_companion_ready_with_network_permissions(self) -> None:
+        manifest = Path(__file__).resolve().parents[2] / "skill" / "graphite" / "web_search" / "skill.json"
+
+        definition = _parse_native_skill_manifest(manifest, SkillSourceScope.GRAPHITE_MANAGED).definition
+
+        self.assertEqual(definition.skill_key, "web_search")
+        self.assertIn(SkillTarget.AGENT_NODE, definition.targets)
+        self.assertIn(SkillTarget.COMPANION, definition.targets)
+        self.assertEqual(definition.runtime.entrypoint, "web_search")
+        self.assertEqual(definition.agent_node_eligibility, SkillAgentNodeEligibility.READY)
+        self.assertIn("network", definition.permissions)
+        self.assertIn(SkillSideEffect.NETWORK, definition.side_effects)
+        self.assertIn(SkillSideEffect.SECRET_READ, definition.side_effects)
 
 
 if __name__ == "__main__":

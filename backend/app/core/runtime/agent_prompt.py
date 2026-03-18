@@ -39,6 +39,8 @@ def build_auto_system_prompt(
 
     if skill_context:
         parts.append("\n== Skill Results ==")
+        parts.append("涉及事实、日期、天气、新闻或外部资料时，必须以技能结果为依据；不要编造技能结果中不存在的事实。")
+        parts.append("如果技能结果没有提供足够证据，明确说明未检索到可靠答案。")
         for skill_key, result in skill_context.items():
             parts.append(f"[{skill_key}]")
             if isinstance(result, dict):

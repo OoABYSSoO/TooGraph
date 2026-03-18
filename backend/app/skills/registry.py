@@ -16,6 +16,7 @@ from app.skills.builtin.demo_creative import (
     normalize_storyboard_shots_skill,
     select_top_items_skill,
 )
+from app.skills.builtin.web_search import web_search_skill
 from app.tools.local_llm import _chat_with_local_model
 
 
@@ -29,6 +30,7 @@ def _build_runtime_skill_registry() -> dict[str, SkillFunc]:
         "extract_json_fields": extract_json_fields_skill,
         "translate_text": translate_text_skill,
         "rewrite_text": rewrite_text_skill,
+        "web_search": web_search_skill,
         "extract_json_block": extract_json_block_skill,
         "dedupe_items": dedupe_items_skill,
         "select_top_items": select_top_items_skill,
