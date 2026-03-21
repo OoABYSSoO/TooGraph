@@ -6,6 +6,7 @@ import type { EditorWorkspaceTab } from "@/lib/editor-workspace";
 import type { GraphPayload, GraphRunResponse } from "@/types/node-system";
 import type { RunDetail } from "@/types/run";
 
+import type { RunActivityState } from "./runActivityModel.ts";
 import { useWorkspaceRunController } from "./useWorkspaceRunController.ts";
 import type { WorkspaceRunFeedback } from "./useWorkspaceRunVisualState.ts";
 
@@ -58,6 +59,26 @@ function createRunHarness() {
   });
   const runFailureMessageByTabId = ref<Record<string, Record<string, string>>>({ tab_a: { old_node: "old failed" } });
   const activeRunEdgeIdsByTabId = ref<Record<string, string[]>>({ tab_a: ["old_edge"] });
+  const runActivityByTabId = ref<Record<string, RunActivityState>>({
+    tab_a: {
+      entries: [
+        {
+          id: "old-entry",
+          kind: "state-updated",
+          nodeId: "old_node",
+          nodeType: null,
+          stateKey: "answer",
+          title: "answer",
+          preview: "old",
+          detail: {},
+          createdAt: "",
+          sequence: 1,
+          active: true,
+        },
+      ],
+      autoFollow: true,
+    },
+  });
   const feedbackByTabId = ref<Record<string, WorkspaceRunFeedback | null>>({});
   const runGraphDocuments: GraphPayload[] = [];
   const resumedRuns: Array<{ runId: string; payload: Record<string, unknown>; snapshotId: string | null }> = [];
@@ -78,6 +99,7 @@ function createRunHarness() {
     runOutputPreviewByTabId,
     runFailureMessageByTabId,
     activeRunEdgeIdsByTabId,
+    runActivityByTabId,
     refreshAgentModels: async () => {
       documentsByTabId.value = {
         tab_a: graphDocument("After", ["new_node", "output_node"]),
@@ -133,6 +155,7 @@ function createRunHarness() {
     runOutputPreviewByTabId,
     runFailureMessageByTabId,
     activeRunEdgeIdsByTabId,
+    runActivityByTabId,
     feedbackByTabId,
     runGraphDocuments,
     resumedRuns,
@@ -155,6 +178,7 @@ test("useWorkspaceRunController runs the latest document after model refresh and
   assert.deepEqual(harness.runOutputPreviewByTabId.value.tab_a, {});
   assert.deepEqual(harness.runFailureMessageByTabId.value.tab_a, {});
   assert.deepEqual(harness.activeRunEdgeIdsByTabId.value.tab_a, []);
+  assert.deepEqual(harness.runActivityByTabId.value.tab_a, { entries: [], autoFollow: true });
   assert.equal(harness.latestRunDetailByTabId.value.tab_a, null);
   assert.equal(harness.humanReviewErrorByTabId.value.tab_a, null);
   assert.equal(harness.feedbackByTabId.value.tab_a?.activeRunId, "run_started");
@@ -186,4 +210,3 @@ test("useWorkspaceRunController resumes Human Review runs with the restored snap
   assert.deepEqual(harness.streams, [{ tabId: "tab_a", runId: "run_resumed" }]);
   assert.deepEqual(harness.polls, [{ tabId: "tab_a", runId: "run_resumed", generation: 8 }]);
 });
-

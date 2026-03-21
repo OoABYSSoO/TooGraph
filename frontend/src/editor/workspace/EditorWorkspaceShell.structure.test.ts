@@ -180,6 +180,7 @@ test("EditorWorkspaceShell floats the right side panel above the canvas while pr
   assert.match(componentSource, /class="editor-workspace-shell__side-panel-layer"/);
   assert.match(componentSource, /v-if="isStatePanelOpen\(tab\.tabId\) && documentsByTabId\[tab\.tabId\]"/);
   assert.match(componentSource, /<EditorHumanReviewPanel[\s\S]*v-if="shouldShowHumanReviewPanel\(tab\.tabId\)"/);
+  assert.match(componentSource, /<EditorRunActivityPanel[\s\S]*v-else-if="shouldShowRunActivityPanel\(tab\.tabId\)"/);
   assert.match(componentSource, /<EditorStatePanel[\s\S]*v-else/);
   assert.match(componentSource, /:style="sidePanelLayerStyle\(tab\.tabId\)"/);
   assert.match(componentSource, /class="editor-workspace-shell__editor-main"[\s\S]*:style="editorMainStyle\(tab\.tabId\)"/);
@@ -191,6 +192,7 @@ test("EditorWorkspaceShell floats the right side panel above the canvas while pr
   assert.doesNotMatch(componentSource, /56px/);
   assert.match(componentSource, /@media \(max-width:\s*760px\) \{[\s\S]*\.editor-workspace-shell \{[\s\S]*--editor-state-panel-open-width:\s*min\(320px,\s*calc\(100vw - var\(--app-sidebar-width\) - 24px\)\);/);
   assert.match(componentSource, /@media \(max-width:\s*760px\) \{[\s\S]*\.editor-workspace-shell \{[\s\S]*--editor-human-review-panel-open-width:\s*var\(--editor-state-panel-open-width\);/);
+  assert.match(componentSource, /\.editor-workspace-shell \{[\s\S]*--editor-run-activity-panel-open-width:\s*var\(--editor-state-panel-open-width\);/);
   assert.match(componentSource, /\.editor-workspace-shell__editor-grid \{[\s\S]*position:\s*relative;[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\);/);
   assert.match(componentSource, /\.editor-workspace-shell \{[\s\S]*--editor-workspace-floating-top-clearance:\s*72px;/);
   assert.match(componentSource, /\.editor-workspace-shell__side-panel-layer \{[\s\S]*position:\s*absolute;[\s\S]*top:\s*var\(--editor-workspace-floating-top-clearance\);[\s\S]*right:\s*12px;[\s\S]*bottom:\s*12px;[\s\S]*z-index:\s*30;/);
@@ -726,7 +728,8 @@ test("EditorWorkspaceShell renders the graph action controls as a detached capsu
   const editorTabBarUsage = componentSource.match(/<EditorTabBar[\s\S]*?\/>/)?.[0] ?? "";
 
   assert.match(componentSource, /import EditorActionCapsule from "\.\/EditorActionCapsule\.vue";/);
-  assert.match(componentSource, /<EditorActionCapsule[\s\S]*:active-state-count="activeStateCount"[\s\S]*:is-state-panel-open="activeStatePanelOpen"/);
+  assert.match(componentSource, /<EditorActionCapsule[\s\S]*:active-state-count="activeStateCount"[\s\S]*:is-state-panel-open="activeStatePanelOpen"[\s\S]*:is-run-activity-panel-open="activeRunActivityPanelOpen"/);
+  assert.match(componentSource, /@toggle-run-activity-panel="toggleActiveRunActivityPanel"/);
   assert.match(componentSource, /@save-active-graph="saveActiveGraph"/);
   assert.match(componentSource, /@validate-active-graph="validateActiveGraph"/);
   assert.match(componentSource, /@import-python-graph="openPythonGraphImportDialog"/);
@@ -735,6 +738,21 @@ test("EditorWorkspaceShell renders the graph action controls as a detached capsu
   assert.match(editorTabBarUsage, /<EditorTabBar/);
   assert.doesNotMatch(editorTabBarUsage, /@save-active-graph=/);
   assert.doesNotMatch(editorTabBarUsage, /@run-active-graph=/);
+});
+
+test("EditorWorkspaceShell mounts Run Activity as a realtime side panel beside State", () => {
+  assert.match(componentSource, /import EditorRunActivityPanel from "\.\/EditorRunActivityPanel\.vue";/);
+  assert.match(componentSource, /import type \{ RunActivityState \} from "\.\/runActivityModel\.ts";/);
+  assert.match(componentSource, /const runActivityByTabId = ref<Record<string, RunActivityState>>\(\{\}\);/);
+  assert.match(
+    componentSource,
+    /const \{[\s\S]*activeRunActivityPanelOpen,[\s\S]*shouldShowRunActivityPanel,[\s\S]*toggleActiveRunActivityPanel,[\s\S]*\} = useWorkspaceSidePanelController\(\{/,
+  );
+  assert.match(componentSource, /<EditorRunActivityPanel[\s\S]*:entries="runActivityByTabId\[tab\.tabId\]\?\.entries \?\? \[\]"/);
+  assert.match(componentSource, /:run-status="latestRunDetailByTabId\[tab\.tabId\]\?\.status \?\? feedbackForTab\(tab\.tabId\)\?\.activeRunStatus \?\? null"/);
+  assert.match(componentSource, /@toggle="toggleStatePanel\(tab\.tabId\)"/);
+  assert.match(tabLifecycleControllerSource, /runActivityByTabId: TabScopedRecordRef<RunActivityState>;/);
+  assert.match(tabLifecycleControllerSource, /clearRecord\(input\.runActivityByTabId, tabId\);/);
 });
 
 test("EditorWorkspaceShell lays out the tab strip tight to the right action capsule", () => {

@@ -6,8 +6,10 @@ import type { RunDetail } from "@/types/run";
 import {
   canShowWorkspaceHumanReviewPanel,
   isWorkspaceHumanReviewPanelLockedOpen,
+  isWorkspaceRunActivityPanelOpen,
   isWorkspaceStatePanelOpen,
   resolveWorkspaceSidePanelMode,
+  shouldShowWorkspaceRunActivityPanel,
   shouldShowWorkspaceHumanReviewPanel,
 } from "./workspaceSidePanelModel.ts";
 
@@ -23,7 +25,15 @@ test("isWorkspaceStatePanelOpen reads the tab entry and defaults missing tabs to
 
 test("resolveWorkspaceSidePanelMode reads the tab entry and defaults missing tabs to state mode", () => {
   assert.equal(resolveWorkspaceSidePanelMode({ tab_a: "human-review" }, "tab_a"), "human-review");
+  assert.equal(resolveWorkspaceSidePanelMode({ tab_b: "run-activity" }, "tab_b"), "run-activity");
   assert.equal(resolveWorkspaceSidePanelMode({ tab_a: "human-review" }, "tab_missing"), "state");
+});
+
+test("shouldShowWorkspaceRunActivityPanel requires the side panel to be open in run-activity mode", () => {
+  assert.equal(shouldShowWorkspaceRunActivityPanel({ tab_a: true }, { tab_a: "run-activity" }, "tab_a"), true);
+  assert.equal(shouldShowWorkspaceRunActivityPanel({ tab_a: true }, { tab_a: "state" }, "tab_a"), false);
+  assert.equal(shouldShowWorkspaceRunActivityPanel({ tab_a: false }, { tab_a: "run-activity" }, "tab_a"), false);
+  assert.equal(isWorkspaceRunActivityPanelOpen({ tab_a: true }, { tab_a: "run-activity" }, "tab_a"), true);
 });
 
 test("canShowWorkspaceHumanReviewPanel only allows awaiting-human runs", () => {

@@ -114,7 +114,9 @@ export type StateEvent = {
   state_key: string;
   output_key: string;
   mode?: string;
+  previous_value?: unknown;
   value?: unknown;
+  sequence?: number | null;
   created_at: string;
 };
 

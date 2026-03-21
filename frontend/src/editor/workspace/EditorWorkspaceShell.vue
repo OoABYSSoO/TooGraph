@@ -48,7 +48,9 @@
           <EditorActionCapsule
             :active-state-count="activeStateCount"
             :is-state-panel-open="activeStatePanelOpen"
+            :is-run-activity-panel-open="activeRunActivityPanelOpen"
             @toggle-state-panel="toggleActiveStatePanel"
+            @toggle-run-activity-panel="toggleActiveRunActivityPanel"
             @save-active-graph="saveActiveGraph"
             @validate-active-graph="validateActiveGraph"
             @import-python-graph="openPythonGraphImportDialog"
@@ -164,6 +166,13 @@
                 @resume="resumeHumanReviewRun(tab.tabId, $event)"
               />
 
+              <EditorRunActivityPanel
+                v-else-if="shouldShowRunActivityPanel(tab.tabId)"
+                :entries="runActivityByTabId[tab.tabId]?.entries ?? []"
+                :run-status="latestRunDetailByTabId[tab.tabId]?.status ?? feedbackForTab(tab.tabId)?.activeRunStatus ?? null"
+                @toggle="toggleStatePanel(tab.tabId)"
+              />
+
               <EditorStatePanel
                 v-else
                 :document="documentsByTabId[tab.tabId]!"
@@ -235,6 +244,7 @@ import EditorActionCapsule from "./EditorActionCapsule.vue";
 import EditorCloseConfirmDialog from "./EditorCloseConfirmDialog.vue";
 import EditorHumanReviewPanel from "./EditorHumanReviewPanel.vue";
 import EditorNodeCreationMenu from "./EditorNodeCreationMenu.vue";
+import EditorRunActivityPanel from "./EditorRunActivityPanel.vue";
 import EditorStatePanel from "./EditorStatePanel.vue";
 import EditorTabBar from "./EditorTabBar.vue";
 import EditorWelcomeState from "./EditorWelcomeState.vue";
@@ -260,6 +270,7 @@ import { useWorkspaceRunVisualState, type WorkspaceRunFeedback } from "./useWork
 import { useWorkspaceSidePanelController } from "./useWorkspaceSidePanelController.ts";
 import { useWorkspaceTabLifecycleController } from "./useWorkspaceTabLifecycleController.ts";
 import { useWorkspaceGraphMutationActions } from "./useWorkspaceGraphMutationActions.ts";
+import type { RunActivityState } from "./runActivityModel.ts";
 
 type DataEdgeStateEditorRequest = CreatedStateEdgeEditorRequest;
 
@@ -306,6 +317,7 @@ const humanReviewErrorByTabId = ref<Record<string, string | null>>({});
 const runOutputPreviewByTabId = ref<Record<string, Record<string, { text: string; displayMode: string | null }>>>({});
 const runFailureMessageByTabId = ref<Record<string, Record<string, string>>>({});
 const activeRunEdgeIdsByTabId = ref<Record<string, string[]>>({});
+const runActivityByTabId = ref<Record<string, RunActivityState>>({});
 const feedbackByTabId = ref<Record<string, WorkspaceRunFeedback | null>>({});
 const routeRestoreError = ref<string | null>(null);
 const nodeCreationMenuByTabId = ref<Record<string, NodeCreationMenuState>>({});
@@ -381,13 +393,16 @@ function handleNodeSizeUpdate(tabId: string, payload: { nodeId: string; position
 }
 const {
   activeStatePanelOpen,
+  activeRunActivityPanelOpen,
   isStatePanelOpen,
   shouldShowHumanReviewPanel,
+  shouldShowRunActivityPanel,
   toggleStatePanel,
   openHumanReviewPanelForTab,
   focusNodeForTab,
   requestNodeFocusForTab,
   toggleActiveStatePanel,
+  toggleActiveRunActivityPanel,
   editorMainStyle,
   sidePanelLayerStyle,
 } = useWorkspaceSidePanelController({
@@ -463,6 +478,7 @@ const {
 } = useWorkspaceRunLifecycleController({
   documentsByTabId,
   runOutputPreviewByTabId,
+  runActivityByTabId,
   restoredRunSnapshotIdByTabId,
   fetchRun,
   applyRunVisualStateToTab,
@@ -676,6 +692,7 @@ const {
   runOutputPreviewByTabId,
   runFailureMessageByTabId,
   activeRunEdgeIdsByTabId,
+  runActivityByTabId,
   cancelRunPolling,
   cancelRunEventStreamForTab,
   updateWorkspace,
@@ -699,6 +716,7 @@ const { runActiveGraph, resumeHumanReviewRun } = useWorkspaceRunController({
   runOutputPreviewByTabId,
   runFailureMessageByTabId,
   activeRunEdgeIdsByTabId,
+  runActivityByTabId,
   refreshAgentModels,
   runGraph,
   resumeRun,
@@ -865,6 +883,7 @@ onMounted(() => {
 .editor-workspace-shell {
   --editor-state-panel-open-width: clamp(340px, 32vw, 480px);
   --editor-human-review-panel-open-width: var(--editor-state-panel-open-width);
+  --editor-run-activity-panel-open-width: var(--editor-state-panel-open-width);
   --editor-workspace-floating-top-clearance: 72px;
   position: relative;
   display: flex;
@@ -1129,6 +1148,7 @@ onMounted(() => {
   .editor-workspace-shell {
     --editor-state-panel-open-width: min(320px, calc(100vw - var(--app-sidebar-width) - 24px));
     --editor-human-review-panel-open-width: var(--editor-state-panel-open-width);
+    --editor-run-activity-panel-open-width: var(--editor-state-panel-open-width);
   }
 }
 </style>

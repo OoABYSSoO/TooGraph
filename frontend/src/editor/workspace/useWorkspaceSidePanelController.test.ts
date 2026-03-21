@@ -54,11 +54,13 @@ test("useWorkspaceSidePanelController exposes panel visibility and width decisio
   harness.sidePanelModeByTabId.value = { tab_a: "human-review" };
   harness.latestRunDetailByTabId.value = { tab_a: runWithStatus("awaiting_human") };
 
-  assert.equal(harness.controller.activeStatePanelOpen.value, true);
+  assert.equal(harness.controller.activeStatePanelOpen.value, false);
+  assert.equal(harness.controller.activeRunActivityPanelOpen.value, false);
   assert.equal(harness.controller.isStatePanelOpen("tab_missing"), false);
   assert.equal(harness.controller.sidePanelMode("tab_a"), "human-review");
   assert.equal(harness.controller.canShowHumanReviewPanel("tab_a"), true);
   assert.equal(harness.controller.shouldShowHumanReviewPanel("tab_a"), true);
+  assert.equal(harness.controller.shouldShowRunActivityPanel("tab_a"), false);
   assert.equal(harness.controller.sidePanelOpenWidth("tab_a"), "var(--editor-human-review-panel-open-width)");
   assert.deepEqual(harness.controller.editorMainStyle("tab_a"), {
     "--editor-canvas-minimap-right-clearance": "calc(var(--editor-human-review-panel-open-width) + 12px)",
@@ -134,6 +136,23 @@ test("useWorkspaceSidePanelController toggles the active side panel without chan
   assert.equal(harness.statePanelOpenByTabId.value.tab_a, false);
 });
 
+test("useWorkspaceSidePanelController toggles Run Activity as a normal side panel mode", () => {
+  const harness = createSidePanelHarness();
+
+  harness.controller.toggleActiveRunActivityPanel();
+
+  assert.equal(harness.sidePanelModeByTabId.value.tab_a, "run-activity");
+  assert.equal(harness.statePanelOpenByTabId.value.tab_a, true);
+  assert.equal(harness.controller.activeRunActivityPanelOpen.value, true);
+  assert.equal(harness.controller.activeStatePanelOpen.value, false);
+  assert.equal(harness.controller.shouldShowRunActivityPanel("tab_a"), true);
+  assert.equal(harness.controller.sidePanelOpenWidth("tab_a"), "var(--editor-run-activity-panel-open-width)");
+
+  harness.controller.toggleActiveRunActivityPanel();
+
+  assert.equal(harness.statePanelOpenByTabId.value.tab_a, false);
+});
+
 test("useWorkspaceSidePanelController routes locked active toggles back to Human Review", () => {
   const harness = createSidePanelHarness();
   harness.sidePanelModeByTabId.value = { tab_a: "human-review" };
@@ -145,4 +164,17 @@ test("useWorkspaceSidePanelController routes locked active toggles back to Human
   assert.deepEqual(harness.closedMenuTabIds, ["tab_a"]);
   assert.equal(harness.focusedNodeIdByTabId.value.tab_a, "node_review");
   assert.equal(harness.statePanelOpenByTabId.value.tab_a, true);
+});
+
+test("useWorkspaceSidePanelController keeps Human Review locked when Run Activity is requested", () => {
+  const harness = createSidePanelHarness();
+  harness.sidePanelModeByTabId.value = { tab_a: "human-review" };
+  harness.latestRunDetailByTabId.value = { tab_a: runWithStatus("awaiting_human", "node_review") };
+
+  harness.controller.toggleActiveRunActivityPanel();
+
+  assert.equal(harness.lockedToastCount(), 1);
+  assert.deepEqual(harness.closedMenuTabIds, ["tab_a"]);
+  assert.equal(harness.sidePanelModeByTabId.value.tab_a, "human-review");
+  assert.equal(harness.focusedNodeIdByTabId.value.tab_a, "node_review");
 });

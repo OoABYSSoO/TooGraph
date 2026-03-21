@@ -12,6 +12,7 @@ import type { GraphDocument, GraphPayload } from "../../types/node-system.ts";
 import type { RunDetail } from "../../types/run.ts";
 
 import { omitTabScopedRecordEntry } from "./editorTabRuntimeModel.ts";
+import type { RunActivityState } from "./runActivityModel.ts";
 import type { WorkspaceRunFeedback } from "./useWorkspaceRunVisualState.ts";
 import type { WorkspaceSidePanelMode } from "./workspaceSidePanelModel.ts";
 
@@ -46,6 +47,7 @@ type WorkspaceTabLifecycleControllerInput = {
   runOutputPreviewByTabId: TabScopedRecordRef<Record<string, { text: string; displayMode: string | null }>>;
   runFailureMessageByTabId: TabScopedRecordRef<Record<string, string>>;
   activeRunEdgeIdsByTabId: TabScopedRecordRef<string[]>;
+  runActivityByTabId: TabScopedRecordRef<RunActivityState>;
   cancelRunPolling: (tabId: string) => void;
   cancelRunEventStreamForTab: (tabId: string) => void;
   updateWorkspace: (workspace: PersistedEditorWorkspace) => void;
@@ -84,6 +86,7 @@ export function useWorkspaceTabLifecycleController(input: WorkspaceTabLifecycleC
     clearRecord(input.runOutputPreviewByTabId, tabId);
     clearRecord(input.runFailureMessageByTabId, tabId);
     clearRecord(input.activeRunEdgeIdsByTabId, tabId);
+    clearRecord(input.runActivityByTabId, tabId);
   }
 
   function activateTab(tabId: string) {

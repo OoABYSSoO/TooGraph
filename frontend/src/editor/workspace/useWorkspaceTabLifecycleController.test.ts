@@ -7,6 +7,7 @@ import type { PersistedEditorWorkspace } from "@/lib/editor-workspace";
 import type { GraphPayload } from "@/types/node-system";
 import type { RunDetail } from "@/types/run";
 
+import type { RunActivityState } from "./runActivityModel.ts";
 import type { WorkspaceRunFeedback } from "./useWorkspaceRunVisualState.ts";
 import { useWorkspaceTabLifecycleController } from "./useWorkspaceTabLifecycleController.ts";
 import type { WorkspaceSidePanelMode } from "./workspaceSidePanelModel.ts";
@@ -65,6 +66,10 @@ function createLifecycleHarness() {
   });
   const runFailureMessageByTabId = ref<Record<string, Record<string, string>>>({ tab_a: { node_a: "failed" }, tab_b: {} });
   const activeRunEdgeIdsByTabId = ref<Record<string, string[]>>({ tab_a: ["edge_a"], tab_b: [] });
+  const runActivityByTabId = ref<Record<string, RunActivityState>>({
+    tab_a: { entries: [], autoFollow: true },
+    tab_b: { entries: [], autoFollow: true },
+  });
   const cancelledPolling: string[] = [];
   const cancelledStreams: string[] = [];
   const syncedRoutes: string[] = [];
@@ -94,6 +99,7 @@ function createLifecycleHarness() {
     runOutputPreviewByTabId,
     runFailureMessageByTabId,
     activeRunEdgeIdsByTabId,
+    runActivityByTabId,
     cancelRunPolling: (tabId) => {
       cancelledPolling.push(tabId);
     },
@@ -144,6 +150,7 @@ function createLifecycleHarness() {
       runOutputPreviewByTabId,
       runFailureMessageByTabId,
       activeRunEdgeIdsByTabId,
+      runActivityByTabId,
     },
     cancelledPolling,
     cancelledStreams,

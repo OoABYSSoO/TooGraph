@@ -13,13 +13,17 @@ test("EditorActionCapsule keeps graph tools compact while preserving Run as the 
   assert.match(componentSource, /import \{ ElIcon, ElTooltip \} from "element-plus";/);
   assert.match(
     componentSource,
-    /class="editor-action-capsule__tools"[\s\S]*class="editor-action-capsule__state-pill"[\s\S]*class="editor-action-capsule__run"/,
+    /class="editor-action-capsule__tools"[\s\S]*class="editor-action-capsule__state-pill"[\s\S]*t\("editor\.statePanel"\)[\s\S]*class="editor-action-capsule__state-pill"[\s\S]*t\("editor\.runActivityPanel"\)[\s\S]*class="editor-action-capsule__run"/,
   );
   assert.match(componentSource, /:class="\{ 'editor-action-capsule__state-pill--active': isStatePanelOpen \}"/);
+  assert.match(componentSource, /:class="\{ 'editor-action-capsule__state-pill--active': isRunActivityPanelOpen \}"/);
   assert.match(componentSource, /<span class="editor-action-capsule__state-count">\{\{ activeStateCount \}\}<\/span>/);
   assert.match(componentSource, /class="editor-action-capsule__run-icon"[\s\S]*<VideoPlay \/>/);
   assert.match(componentSource, /@click="\$emit\('toggle-state-panel'\)"/);
+  assert.match(componentSource, /@click="\$emit\('toggle-run-activity-panel'\)"/);
   assert.match(componentSource, /@click="\$emit\('run-active-graph'\)"/);
+  assert.match(componentSource, /isRunActivityPanelOpen: boolean;/);
+  assert.match(componentSource, /\(event: "toggle-run-activity-panel"\): void;/);
 });
 
 test("EditorActionCapsule renders non-primary graph actions as icon buttons with tooltips", () => {

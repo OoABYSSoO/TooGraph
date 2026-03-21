@@ -9,6 +9,7 @@ import {
   isWorkspaceStatePanelOpen,
   resolveWorkspaceSidePanelMode,
   shouldShowWorkspaceHumanReviewPanel,
+  shouldShowWorkspaceRunActivityPanel,
   type WorkspaceSidePanelMode,
 } from "./workspaceSidePanelModel.ts";
 
@@ -30,7 +31,12 @@ type WorkspaceSidePanelControllerInput = {
 export function useWorkspaceSidePanelController(input: WorkspaceSidePanelControllerInput) {
   const activeStatePanelOpen = computed(() => {
     const tab = input.activeTab.value;
-    return tab ? isWorkspaceStatePanelOpen(input.statePanelOpenByTabId.value, tab.tabId) : false;
+    return tab ? isWorkspaceStatePanelOpen(input.statePanelOpenByTabId.value, tab.tabId) && sidePanelMode(tab.tabId) === "state" : false;
+  });
+
+  const activeRunActivityPanelOpen = computed(() => {
+    const tab = input.activeTab.value;
+    return tab ? shouldShowRunActivityPanel(tab.tabId) : false;
   });
 
   function isStatePanelOpen(tabId: string) {
@@ -47,6 +53,10 @@ export function useWorkspaceSidePanelController(input: WorkspaceSidePanelControl
 
   function shouldShowHumanReviewPanel(tabId: string) {
     return shouldShowWorkspaceHumanReviewPanel(input.sidePanelModeByTabId.value, input.latestRunDetailByTabId.value, tabId);
+  }
+
+  function shouldShowRunActivityPanel(tabId: string) {
+    return shouldShowWorkspaceRunActivityPanel(input.statePanelOpenByTabId.value, input.sidePanelModeByTabId.value, tabId);
   }
 
   function isHumanReviewPanelLockedOpen(tabId: string) {
@@ -109,10 +119,34 @@ export function useWorkspaceSidePanelController(input: WorkspaceSidePanelControl
     toggleStatePanel(tabId);
   }
 
+  function toggleActiveRunActivityPanel() {
+    const tab = input.activeTab.value;
+    if (!tab) {
+      return;
+    }
+    const tabId = tab.tabId;
+    if (isHumanReviewPanelLockedOpen(tabId)) {
+      openHumanReviewPanelForTab(tabId, input.latestRunDetailByTabId.value[tabId]?.current_node_id ?? null);
+      input.showGraphLockedEditToast();
+      return;
+    }
+    if (sidePanelMode(tabId) !== "run-activity") {
+      input.sidePanelModeByTabId.value = setTabScopedRecordEntry(input.sidePanelModeByTabId.value, tabId, "run-activity");
+      input.statePanelOpenByTabId.value = setTabScopedRecordEntry(input.statePanelOpenByTabId.value, tabId, true);
+      return;
+    }
+    input.sidePanelModeByTabId.value = setTabScopedRecordEntry(input.sidePanelModeByTabId.value, tabId, "run-activity");
+    toggleStatePanel(tabId);
+  }
+
   function sidePanelOpenWidth(tabId: string) {
-    return sidePanelMode(tabId) === "human-review"
-      ? "var(--editor-human-review-panel-open-width)"
-      : "var(--editor-state-panel-open-width)";
+    if (sidePanelMode(tabId) === "human-review") {
+      return "var(--editor-human-review-panel-open-width)";
+    }
+    if (sidePanelMode(tabId) === "run-activity") {
+      return "var(--editor-run-activity-panel-open-width)";
+    }
+    return "var(--editor-state-panel-open-width)";
   }
 
   function editorMainStyle(tabId: string) {
@@ -133,16 +167,19 @@ export function useWorkspaceSidePanelController(input: WorkspaceSidePanelControl
 
   return {
     activeStatePanelOpen,
+    activeRunActivityPanelOpen,
     isStatePanelOpen,
     sidePanelMode,
     canShowHumanReviewPanel,
     shouldShowHumanReviewPanel,
+    shouldShowRunActivityPanel,
     isHumanReviewPanelLockedOpen,
     toggleStatePanel,
     openHumanReviewPanelForTab,
     focusNodeForTab,
     requestNodeFocusForTab,
     toggleActiveStatePanel,
+    toggleActiveRunActivityPanel,
     editorMainStyle,
     sidePanelLayerStyle,
     sidePanelOpenWidth,

@@ -33,6 +33,15 @@
       <span class="editor-action-capsule__state-count">{{ activeStateCount }}</span>
     </button>
 
+    <button
+      type="button"
+      class="editor-action-capsule__state-pill"
+      :class="{ 'editor-action-capsule__state-pill--active': isRunActivityPanelOpen }"
+      @click="$emit('toggle-run-activity-panel')"
+    >
+      <span>{{ t("editor.runActivityPanel") }}</span>
+    </button>
+
     <button type="button" class="editor-action-capsule__run" @click="$emit('run-active-graph')">
       <ElIcon class="editor-action-capsule__run-icon" aria-hidden="true"><VideoPlay /></ElIcon>
       <span>{{ t("editor.runGraph") }}</span>
@@ -48,10 +57,12 @@ import { useI18n } from "vue-i18n";
 defineProps<{
   activeStateCount: number;
   isStatePanelOpen: boolean;
+  isRunActivityPanelOpen: boolean;
 }>();
 
 defineEmits<{
   (event: "toggle-state-panel"): void;
+  (event: "toggle-run-activity-panel"): void;
   (event: "save-active-graph"): void;
   (event: "validate-active-graph"): void;
   (event: "import-python-graph"): void;

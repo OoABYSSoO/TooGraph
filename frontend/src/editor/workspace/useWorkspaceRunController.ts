@@ -5,6 +5,7 @@ import type { GraphDocument, GraphPayload, GraphRunResponse } from "../../types/
 import type { RunDetail } from "../../types/run.ts";
 
 import { setTabScopedRecordEntry } from "./editorTabRuntimeModel.ts";
+import type { RunActivityState } from "./runActivityModel.ts";
 import type { WorkspaceRunFeedback } from "./useWorkspaceRunVisualState.ts";
 
 type WorkspaceRunControllerInput = {
@@ -19,6 +20,7 @@ type WorkspaceRunControllerInput = {
   runOutputPreviewByTabId: Ref<Record<string, Record<string, { text: string; displayMode: string | null }>>>;
   runFailureMessageByTabId: Ref<Record<string, Record<string, string>>>;
   activeRunEdgeIdsByTabId: Ref<Record<string, string[]>>;
+  runActivityByTabId: Ref<Record<string, RunActivityState>>;
   refreshAgentModels: () => Promise<void>;
   runGraph: (document: GraphPayload | GraphDocument) => Promise<GraphRunResponse>;
   resumeRun: (runId: string, payload: Record<string, unknown>, snapshotId: string | null) => Promise<GraphRunResponse>;
@@ -41,6 +43,7 @@ export function useWorkspaceRunController(input: WorkspaceRunControllerInput) {
     input.runOutputPreviewByTabId.value = setTabScopedRecordEntry(input.runOutputPreviewByTabId.value, tabId, {});
     input.runFailureMessageByTabId.value = setTabScopedRecordEntry(input.runFailureMessageByTabId.value, tabId, {});
     input.activeRunEdgeIdsByTabId.value = setTabScopedRecordEntry(input.activeRunEdgeIdsByTabId.value, tabId, []);
+    input.runActivityByTabId.value = setTabScopedRecordEntry(input.runActivityByTabId.value, tabId, { entries: [], autoFollow: true });
     input.latestRunDetailByTabId.value = setTabScopedRecordEntry(input.latestRunDetailByTabId.value, tabId, null);
     input.humanReviewErrorByTabId.value = setTabScopedRecordEntry(input.humanReviewErrorByTabId.value, tabId, null);
   }
