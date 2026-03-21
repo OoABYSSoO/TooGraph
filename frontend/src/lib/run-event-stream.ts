@@ -1,3 +1,5 @@
+import { routeStreamingJsonStateText } from "./streamingJsonStateRouter.ts";
+
 export type RunEventPayload = Record<string, unknown>;
 
 export type LiveStreamingOutput = {
@@ -89,19 +91,69 @@ export function buildRunEventOutputPreviewUpdate(
   currentPreviewByNodeId: Record<string, RunEventOutputPreviewEntry>,
   payload: RunEventPayload,
 ) {
+  const explicitStateKey = typeof payload.state_key === "string" ? payload.state_key.trim() : "";
+  if (explicitStateKey) {
+    const previewNodeIds = resolveOutputNodeIdsForState(document, explicitStateKey);
+    return previewNodeIds.length > 0
+      ? buildRunEventOutputPreviewByNodeId(
+          currentPreviewByNodeId,
+          previewNodeIds,
+          stringifyRunEventPreviewValue(payload.value ?? payload.text),
+          document,
+        )
+      : null;
+  }
+
   const text = resolveRunEventText(payload);
   if (!text) {
     return null;
   }
 
   const outputKeys = listRunEventOutputKeys(payload);
+  const streamStateKeys = listRunEventOutputKeys({ output_keys: payload.stream_state_keys }, outputKeys);
+  if (streamStateKeys.length > 1) {
+    const routed = routeStreamingJsonStateText(text, streamStateKeys);
+    const nextPreviewByNodeId = { ...currentPreviewByNodeId };
+    let changed = false;
+    for (const [stateKey, route] of Object.entries(routed)) {
+      const previewNodeIds = resolveOutputNodeIdsForState(document, stateKey);
+      for (const nodeId of previewNodeIds) {
+        nextPreviewByNodeId[nodeId] = {
+          text: route.text,
+          displayMode: resolveRunEventPreviewDisplayMode(document, nodeId),
+        };
+        changed = true;
+      }
+    }
+    return changed ? nextPreviewByNodeId : null;
+  }
+
   const fallbackNodeId = resolveRunEventNodeId(payload);
-  const previewNodeIds = resolveRunEventPreviewNodeIds(document, outputKeys, fallbackNodeId);
+  const previewNodeIds = resolveRunEventPreviewNodeIds(document, streamStateKeys, fallbackNodeId);
   if (previewNodeIds.length === 0) {
     return null;
   }
 
   return buildRunEventOutputPreviewByNodeId(currentPreviewByNodeId, previewNodeIds, text, document);
+}
+
+export function stringifyRunEventPreviewValue(value: unknown) {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (value === undefined || value === null) {
+    return "";
+  }
+  return JSON.stringify(value, null, 2);
+}
+
+function resolveOutputNodeIdsForState(document: RunEventPreviewDocument | null | undefined, stateKey: string) {
+  if (!document || !stateKey) {
+    return [];
+  }
+  return Object.entries(document.nodes)
+    .filter(([, node]) => node.kind === "output" && node.reads?.some((read) => read.state === stateKey))
+    .map(([nodeId]) => nodeId);
 }
 
 function resolveRunEventPreviewDisplayMode(document: RunEventPreviewDocument | null | undefined, nodeId: string) {

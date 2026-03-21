@@ -204,6 +204,66 @@ test("buildRunEventOutputPreviewUpdate preserves configured document output disp
   );
 });
 
+test("buildRunEventOutputPreviewUpdate routes multi-state JSON streams to matching Output nodes only", () => {
+  const document = {
+    nodes: {
+      output_zh: { kind: "output", reads: [{ state: "greeting_zh" }], config: { displayMode: "plain" } },
+      output_en: { kind: "output", reads: [{ state: "greeting_en" }], config: { displayMode: "plain" } },
+    },
+  };
+
+  assert.deepEqual(
+    buildRunEventOutputPreviewUpdate(document, {}, {
+      node_id: "agent_greeter",
+      text: '{"greeting_zh":"你好，Abyss","greeting_en":"Hel',
+      output_keys: ["greeting_zh", "greeting_en"],
+      stream_state_keys: ["greeting_zh", "greeting_en"],
+    }),
+    {
+      output_zh: { text: "你好，Abyss", displayMode: "plain" },
+      output_en: { text: "Hel", displayMode: "plain" },
+    },
+  );
+});
+
+test("buildRunEventOutputPreviewUpdate does not broadcast ambiguous multi-state text streams", () => {
+  const document = {
+    nodes: {
+      output_zh: { kind: "output", reads: [{ state: "greeting_zh" }] },
+      output_en: { kind: "output", reads: [{ state: "greeting_en" }] },
+    },
+  };
+
+  assert.equal(
+    buildRunEventOutputPreviewUpdate(document, {}, {
+      node_id: "agent_greeter",
+      text: "plain model stream",
+      output_keys: ["greeting_zh", "greeting_en"],
+      stream_state_keys: ["greeting_zh", "greeting_en"],
+    }),
+    null,
+  );
+});
+
+test("buildRunEventOutputPreviewUpdate applies authoritative state.updated values", () => {
+  const document = {
+    nodes: {
+      output_answer: { kind: "output", reads: [{ state: "answer" }], config: { displayMode: "markdown" } },
+    },
+  };
+
+  assert.deepEqual(
+    buildRunEventOutputPreviewUpdate(document, {}, {
+      event_type: "state.updated",
+      state_key: "answer",
+      value: "# Final",
+    }),
+    {
+      output_answer: { text: "# Final", displayMode: "markdown" },
+    },
+  );
+});
+
 test("buildLiveStreamingOutput preserves live output merge semantics", () => {
   const current = {
     nodeId: "output",
