@@ -11,7 +11,8 @@ const componentSource = readFileSync(resolve(currentDirectory, "EditorRunActivit
 test("EditorRunActivityPanel renders a realtime auto-follow activity feed", () => {
   assert.match(componentSource, /class="editor-run-activity-panel"/);
   assert.match(componentSource, /ref="activityScrollRef"/);
-  assert.match(componentSource, /watch\(\s*\(\) => props\.entries\.length/);
+  assert.match(componentSource, /watch\(\s*\(\) => getAutoScrollSignature\(\)/);
+  assert.match(componentSource, /activeEntry\?\.preview\.length/);
   assert.match(componentSource, /scrollToLatest/);
   assert.match(componentSource, /autoFollow/);
   assert.match(componentSource, /backToLatest/);

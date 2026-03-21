@@ -755,6 +755,23 @@ test("EditorWorkspaceShell mounts Run Activity as a realtime side panel beside S
   assert.match(tabLifecycleControllerSource, /clearRecord\(input\.runActivityByTabId, tabId\);/);
 });
 
+test("EditorWorkspaceShell opens Run Activity automatically when a run starts or resumes", () => {
+  assert.match(
+    componentSource,
+    /const \{[\s\S]*openRunActivityPanelForTab,[\s\S]*toggleActiveRunActivityPanel,[\s\S]*\} = useWorkspaceSidePanelController\(\{/,
+  );
+  assert.match(
+    componentSource,
+    /useWorkspaceRunController\(\{[\s\S]*startRunEventStreamForTab,[\s\S]*pollRunForTab,[\s\S]*openRunActivityPanelForTab,[\s\S]*setFeedbackForTab,[\s\S]*\}\);/,
+  );
+  assert.match(sidePanelControllerSource, /function openRunActivityPanelForTab\(tabId: string\)/);
+  assert.match(sidePanelControllerSource, /if \(isHumanReviewPanelLockedOpen\(tabId\)\) \{[\s\S]*return;/);
+  assert.match(sidePanelControllerSource, /input\.sidePanelModeByTabId\.value = setTabScopedRecordEntry\(input\.sidePanelModeByTabId\.value, tabId, "run-activity"\);/);
+  assert.match(sidePanelControllerSource, /input\.statePanelOpenByTabId\.value = setTabScopedRecordEntry\(input\.statePanelOpenByTabId\.value, tabId, true\);/);
+  assert.match(runControllerSource, /input\.openRunActivityPanelForTab\(tab\.tabId\);/);
+  assert.match(runControllerSource, /input\.openRunActivityPanelForTab\(tabId\);/);
+});
+
 test("EditorWorkspaceShell lays out the tab strip tight to the right action capsule", () => {
   assert.match(componentSource, /class="editor-workspace-shell__action-capsule-row"/);
   assert.match(componentSource, /\.editor-workspace-shell__chrome \{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\) auto;[\s\S]*gap:\s*12px;[\s\S]*padding:\s*0 12px 0 0;/);

@@ -29,6 +29,35 @@ test("appendRunActivityEvent appends node streams and state updates in event ord
   );
 });
 
+test("appendRunActivityEvent updates the current stream entry for repeated node output chunks", () => {
+  let state: RunActivityState = { entries: [], autoFollow: true };
+  state = appendRunActivityEvent(state, {
+    eventType: "node.started",
+    payload: { node_id: "agent", node_type: "agent", created_at: "2026-05-03T01:00:00Z" },
+  });
+  state = appendRunActivityEvent(state, {
+    eventType: "node.output.delta",
+    payload: { node_id: "agent", text: "Hel", chunk_count: 1, created_at: "2026-05-03T01:00:01Z" },
+  });
+  state = appendRunActivityEvent(state, {
+    eventType: "node.output.delta",
+    payload: { node_id: "agent", text: "Hello", chunk_count: 2, created_at: "2026-05-03T01:00:02Z" },
+  });
+  state = appendRunActivityEvent(state, {
+    eventType: "node.output.completed",
+    payload: { node_id: "agent", text: "Hello!", completed: true, created_at: "2026-05-03T01:00:03Z" },
+  });
+
+  assert.deepEqual(
+    state.entries.map((entry) => ({ kind: entry.kind, nodeId: entry.nodeId, preview: entry.preview, active: entry.active, sequence: entry.sequence })),
+    [
+      { kind: "node-started", nodeId: "agent", preview: "agent running", active: false, sequence: 1 },
+      { kind: "node-stream", nodeId: "agent", preview: "Hello!", active: true, sequence: 2 },
+    ],
+  );
+  assert.equal((state.entries[1]?.detail as Record<string, unknown>).completed, true);
+});
+
 test("buildRunActivityEntriesFromRun replays stored state events for completed run details", () => {
   const run = {
     run_id: "run_1",

@@ -81,7 +81,7 @@ function runDetail(status: string, patch: Partial<RunDetail> = {}): RunDetail {
     warnings: [],
     errors: [],
     output_previews: [],
-    artifacts: { outputs: [], state_events: [] },
+    artifacts: { output_previews: [], state_events: [] },
     state_snapshot: { values: {}, last_writers: {} },
     graph_snapshot: {},
     ...patch,
@@ -159,13 +159,19 @@ test("useWorkspaceRunLifecycleController streams output preview updates through 
       data: JSON.stringify({ node_id: "agent_1", text: "hello", output_keys: ["answer"] }),
     }),
   );
+  harness.eventSources[0]?.emit(
+    "node.output.delta",
+    new MessageEvent("node.output.delta", {
+      data: JSON.stringify({ node_id: "agent_1", text: "hello world", output_keys: ["answer"] }),
+    }),
+  );
 
   assert.deepEqual(harness.runOutputPreviewByTabId.value.tab_a, {
-    output_answer: { text: "hello", displayMode: "plain" },
+    output_answer: { text: "hello world", displayMode: "plain" },
   });
   assert.deepEqual(
     harness.runActivityByTabId.value.tab_a.entries.map((entry) => ({ kind: entry.kind, nodeId: entry.nodeId, preview: entry.preview })),
-    [{ kind: "node-stream", nodeId: "agent_1", preview: "hello" }],
+    [{ kind: "node-stream", nodeId: "agent_1", preview: "hello world" }],
   );
 });
 
@@ -223,7 +229,7 @@ test("useWorkspaceRunLifecycleController reconciles terminal run activity from s
     fetchRun: async () =>
       runDetail("completed", {
         artifacts: {
-          outputs: [],
+          output_previews: [],
           state_events: [
             {
               node_id: "agent_1",

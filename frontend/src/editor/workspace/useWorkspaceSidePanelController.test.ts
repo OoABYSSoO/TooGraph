@@ -153,6 +153,21 @@ test("useWorkspaceSidePanelController toggles Run Activity as a normal side pane
   assert.equal(harness.statePanelOpenByTabId.value.tab_a, false);
 });
 
+test("useWorkspaceSidePanelController opens Run Activity explicitly without closing an already open panel", () => {
+  const harness = createSidePanelHarness();
+
+  harness.controller.openRunActivityPanelForTab("tab_a");
+
+  assert.equal(harness.sidePanelModeByTabId.value.tab_a, "run-activity");
+  assert.equal(harness.statePanelOpenByTabId.value.tab_a, true);
+  assert.equal(harness.controller.shouldShowRunActivityPanel("tab_a"), true);
+
+  harness.controller.openRunActivityPanelForTab("tab_a");
+
+  assert.equal(harness.sidePanelModeByTabId.value.tab_a, "run-activity");
+  assert.equal(harness.statePanelOpenByTabId.value.tab_a, true);
+});
+
 test("useWorkspaceSidePanelController routes locked active toggles back to Human Review", () => {
   const harness = createSidePanelHarness();
   harness.sidePanelModeByTabId.value = { tab_a: "human-review" };
@@ -177,4 +192,18 @@ test("useWorkspaceSidePanelController keeps Human Review locked when Run Activit
   assert.deepEqual(harness.closedMenuTabIds, ["tab_a"]);
   assert.equal(harness.sidePanelModeByTabId.value.tab_a, "human-review");
   assert.equal(harness.focusedNodeIdByTabId.value.tab_a, "node_review");
+});
+
+test("useWorkspaceSidePanelController does not steal a locked Human Review panel when opening Run Activity", () => {
+  const harness = createSidePanelHarness();
+  harness.sidePanelModeByTabId.value = { tab_a: "human-review" };
+  harness.statePanelOpenByTabId.value = { tab_a: true };
+  harness.latestRunDetailByTabId.value = { tab_a: runWithStatus("awaiting_human", "node_review") };
+
+  harness.controller.openRunActivityPanelForTab("tab_a");
+
+  assert.equal(harness.lockedToastCount(), 0);
+  assert.equal(harness.sidePanelModeByTabId.value.tab_a, "human-review");
+  assert.equal(harness.statePanelOpenByTabId.value.tab_a, true);
+  assert.equal(harness.focusedNodeIdByTabId.value.tab_a ?? null, null);
 });

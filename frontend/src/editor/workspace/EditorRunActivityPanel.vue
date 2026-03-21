@@ -74,13 +74,18 @@ const autoFollow = ref(true);
 const expandedEntries = ref<Record<string, boolean>>({});
 
 watch(
-  () => props.entries.length,
+  () => getAutoScrollSignature(),
   () => {
     if (autoFollow.value) {
       void nextTick(scrollToLatest);
     }
   },
 );
+
+function getAutoScrollSignature() {
+  const activeEntry = props.entries.find((entry) => entry.active);
+  return `${props.entries.length}:${activeEntry?.id ?? ""}:${activeEntry?.preview.length ?? 0}:${activeEntry?.createdAt ?? ""}`;
+}
 
 function scrollToLatest() {
   const element = activityScrollRef.value;

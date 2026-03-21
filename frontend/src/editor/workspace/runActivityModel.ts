@@ -31,6 +31,17 @@ export function appendRunActivityEvent(state: RunActivityState, event: RunActivi
   if (!entry) {
     return state;
   }
+  if (entry.kind === "node-stream") {
+    const streamEntryIndex = findMergeableStreamEntryIndex(state.entries, entry);
+    if (streamEntryIndex >= 0) {
+      return {
+        ...state,
+        entries: state.entries.map((item, index) =>
+          index === streamEntryIndex ? { ...entry, id: item.id, sequence: item.sequence, active: true } : { ...item, active: false },
+        ),
+      };
+    }
+  }
   return {
     ...state,
     entries: [...state.entries.map((item) => ({ ...item, active: false })), entry],
@@ -115,6 +126,25 @@ function createEntry(
     sequence,
     active: true,
   };
+}
+
+function findMergeableStreamEntryIndex(entries: RunActivityEntry[], streamEntry: RunActivityEntry) {
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    const entry = entries[index];
+    if (!entry) {
+      continue;
+    }
+    if (entry.nodeId !== streamEntry.nodeId) {
+      continue;
+    }
+    if (entry.kind === "node-stream") {
+      return index;
+    }
+    if (entry.kind === "node-started" || entry.kind === "node-completed" || entry.kind === "node-failed") {
+      return -1;
+    }
+  }
+  return -1;
 }
 
 function normalizeText(value: unknown) {

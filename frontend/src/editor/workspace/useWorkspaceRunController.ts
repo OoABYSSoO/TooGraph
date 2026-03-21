@@ -28,6 +28,7 @@ type WorkspaceRunControllerInput = {
   getRunGeneration: (tabId: string) => number;
   startRunEventStreamForTab: (tabId: string, runId: string) => void;
   pollRunForTab: (tabId: string, runId: string, generation: number) => void;
+  openRunActivityPanelForTab: (tabId: string) => void;
   setFeedbackForTab: (tabId: string, feedback: WorkspaceRunFeedback) => void;
   setMessageFeedbackForTab: (
     tabId: string,
@@ -74,6 +75,7 @@ export function useWorkspaceRunController(input: WorkspaceRunControllerInput) {
 
       const response = await input.runGraph(latestDocument);
       clearQueuedRunVisualState(tab.tabId);
+      input.openRunActivityPanelForTab(tab.tabId);
       input.setFeedbackForTab(tab.tabId, {
         tone: "warning",
         message: input.translate("feedback.runQueued", {
@@ -118,6 +120,7 @@ export function useWorkspaceRunController(input: WorkspaceRunControllerInput) {
         status: response.status,
       });
       input.restoredRunSnapshotIdByTabId.value = setTabScopedRecordEntry(input.restoredRunSnapshotIdByTabId.value, tabId, null);
+      input.openRunActivityPanelForTab(tabId);
       input.setMessageFeedbackForTab(tabId, {
         tone: "warning",
         message: input.translate("feedback.runResuming", { runId: response.run_id }),
