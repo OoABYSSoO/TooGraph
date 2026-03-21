@@ -253,6 +253,133 @@ class ModelProviderClientTests(unittest.TestCase):
         self.assertEqual(requested["json"]["stream"], True)
         self.assertEqual(requested["json"]["messages"][0], {"role": "system", "content": "sys"})
 
+    def test_chat_openai_compatible_sends_image_attachments_as_content_parts(self) -> None:
+        from app.tools.model_provider_client import chat_with_model_provider
+
+        fake_client, client_patch = self._patched_client(
+            FakeResponse({"id": "chatcmpl_1", "model": "gpt-4.1", "choices": [{"message": {"content": "hello"}}]})
+        )
+        with client_patch, patch("app.tools.model_provider_client.append_model_request_log"):
+            content, _meta = chat_with_model_provider(
+                provider_id="openai",
+                transport="openai-compatible",
+                base_url="https://api.openai.com/v1",
+                api_key="sk-openai",
+                model="gpt-4.1",
+                system_prompt="sys",
+                user_prompt="user",
+                temperature=0.2,
+                input_attachments=[
+                    {
+                        "type": "image",
+                        "state_key": "reference_image",
+                        "name": "reference.png",
+                        "mime_type": "image/png",
+                        "data_url": "data:image/png;base64,AAAABBBB",
+                    }
+                ],
+            )
+
+        requested = fake_client.post_calls[0]
+        self.assertEqual(content, "hello")
+        self.assertEqual(
+            requested["json"]["messages"][1]["content"],
+            [
+                {"type": "text", "text": "user"},
+                {"type": "image_url", "image_url": {"url": "data:image/png;base64,AAAABBBB"}},
+            ],
+        )
+
+    def test_chat_openai_compatible_sends_video_attachments_as_native_video_parts(self) -> None:
+        from app.tools.model_provider_client import chat_with_model_provider
+
+        fake_client, client_patch = self._patched_client(
+            FakeResponse({"id": "chatcmpl_1", "model": "gpt-4.1", "choices": [{"message": {"content": "hello"}}]})
+        )
+        with client_patch, patch("app.tools.model_provider_client.append_model_request_log"):
+            content, _meta = chat_with_model_provider(
+                provider_id="openai",
+                transport="openai-compatible",
+                base_url="https://api.openai.com/v1",
+                api_key="sk-openai",
+                model="gpt-4.1",
+                system_prompt="sys",
+                user_prompt="user",
+                temperature=0.2,
+                input_attachments=[
+                    {
+                        "type": "video",
+                        "state_key": "clip",
+                        "name": "clip.mp4",
+                        "mime_type": "video/mp4",
+                        "data_url": "data:video/mp4;base64,CCCCDDDD",
+                    }
+                ],
+            )
+
+        requested = fake_client.post_calls[0]
+        self.assertEqual(content, "hello")
+        self.assertEqual(
+            requested["json"]["messages"][1]["content"],
+            [
+                {"type": "text", "text": "user"},
+                {"type": "video_url", "video_url": {"url": "data:video/mp4;base64,CCCCDDDD"}},
+            ],
+        )
+
+    def test_chat_provider_falls_back_from_native_video_to_extracted_frames(self) -> None:
+        from app.tools import model_provider_client
+        from app.tools.model_provider_client import chat_with_model_provider
+
+        calls: list[list[dict[str, Any]]] = []
+        frame_attachments = [
+            {
+                "type": "image",
+                "state_key": "clip#frame_001",
+                "name": "clip_frame_001.jpg",
+                "mime_type": "image/jpeg",
+                "data_url": "data:image/jpeg;base64,FRAME",
+            }
+        ]
+
+        def fake_openai_chat(**kwargs: Any) -> tuple[str, dict[str, Any]]:
+            calls.append(kwargs["input_attachments"])
+            if len(calls) == 1:
+                raise RuntimeError("openai request failed: unsupported video_url input")
+            return "hello", {"model": "gpt-4.1", "provider_id": "openai", "temperature": 0.2}
+
+        with patch.object(model_provider_client, "_chat_openai_compatible", side_effect=fake_openai_chat):
+            with patch.object(
+                model_provider_client,
+                "build_video_frame_fallback_attachments",
+                return_value=(frame_attachments, {"used": True, "frame_count": 1, "video_count": 1}),
+            ):
+                content, meta = chat_with_model_provider(
+                    provider_id="openai",
+                    transport="openai-compatible",
+                    base_url="https://api.openai.com/v1",
+                    api_key="sk-openai",
+                    model="gpt-4.1",
+                    system_prompt="sys",
+                    user_prompt="user",
+                    temperature=0.2,
+                    input_attachments=[
+                        {
+                            "type": "video",
+                            "state_key": "clip",
+                            "name": "clip.mp4",
+                            "mime_type": "video/mp4",
+                            "data_url": "data:video/mp4;base64,CCCCDDDD",
+                        }
+                    ],
+                )
+
+        self.assertEqual(content, "hello")
+        self.assertEqual(calls[0][0]["type"], "video")
+        self.assertEqual(calls[1], frame_attachments)
+        self.assertEqual(meta["video_fallback"], {"used": True, "frame_count": 1, "video_count": 1})
+        self.assertTrue(any("Native video request failed" in warning for warning in meta["warnings"]))
+
     def test_chat_openai_compatible_coalesces_streaming_response(self) -> None:
         from app.tools.model_provider_client import chat_with_model_provider
 

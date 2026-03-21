@@ -6,6 +6,7 @@ from typing import Any, Callable
 from app.core.model_provider_templates import TRANSPORT_ANTHROPIC_MESSAGES
 from app.core.thinking_levels import build_native_thinking_payload
 from app.tools.model_provider_http import DEFAULT_REQUEST_TIMEOUT_SEC, anthropic_headers
+from app.tools.model_provider_multimodal import build_anthropic_user_content
 from app.tools.model_provider_response_parsing import normalize_message_text, parse_sse_json_events
 
 
@@ -101,6 +102,7 @@ def chat_anthropic(
     append_request_log: Callable[..., None],
     post_streaming_json_with_fallback_fn: Callable[..., tuple[dict[str, Any], dict[str, Any], str | None, bool]],
     on_delta: Callable[[str], None] | None = None,
+    input_attachments: list[dict[str, Any]] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     native_thinking_payload = build_native_thinking_payload(
         provider_id=provider_id,
@@ -118,7 +120,7 @@ def chat_anthropic(
         "max_tokens": max_output_tokens,
         "temperature": temperature,
         "stream": True,
-        "messages": [{"role": "user", "content": user_prompt}],
+        "messages": [{"role": "user", "content": build_anthropic_user_content(user_prompt, input_attachments)}],
     }
     request_payload.update(native_thinking_payload)
     started_at = time.monotonic()

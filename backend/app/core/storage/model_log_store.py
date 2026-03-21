@@ -71,10 +71,15 @@ def list_model_request_logs(*, page: int = 1, size: int = 20, query: str = "") -
 
 def sanitize_payload_for_log(value: Any) -> Any:
     if isinstance(value, dict):
+        inline_media_mime_type = _resolve_inline_media_mime_type(value)
         return {
-            str(key): sanitize_media_value_for_log(raw_value)
-            if str(key) in {"url", "image", "video"}
-            else sanitize_payload_for_log(raw_value)
+            str(key): _summarize_inline_base64_data(raw_value, inline_media_mime_type)
+            if str(key) == "data" and inline_media_mime_type
+            else (
+                sanitize_media_value_for_log(raw_value)
+                if str(key) in {"url", "image", "video"}
+                else sanitize_payload_for_log(raw_value)
+            )
             for key, raw_value in value.items()
         }
     if isinstance(value, list):
@@ -101,6 +106,18 @@ def summarize_data_url(url: str) -> str:
     if head.startswith("data:"):
         mime = head[5:].split(";", 1)[0] or "unknown"
     return f"<data-url mime={mime} chars={len(url)}>"
+
+
+def _resolve_inline_media_mime_type(value: dict[str, Any]) -> str:
+    raw_mime_type = value.get("mime_type") or value.get("media_type")
+    mime_type = str(raw_mime_type or "").strip()
+    return mime_type if mime_type.startswith(("image/", "video/", "audio/")) else ""
+
+
+def _summarize_inline_base64_data(value: Any, mime_type: str) -> Any:
+    if isinstance(value, str) and len(value) > 256:
+        return f"<base64-data mime={mime_type} chars={len(value)}>"
+    return sanitize_payload_for_log(value)
 
 
 def _read_raw_log_entries() -> list[dict[str, Any]]:

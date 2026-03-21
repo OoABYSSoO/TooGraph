@@ -25,6 +25,11 @@ from app.tools.model_provider_openai import (
     coalesce_openai_chat_stream_response as _coalesce_openai_chat_stream_response,
     extract_openai_chat_stream_delta as _extract_openai_chat_stream_delta,
 )
+from app.tools.model_provider_multimodal import build_openai_user_content
+from app.tools.video_frame_fallback import (
+    build_video_frame_fallback_attachments,
+    should_fallback_video_to_frames,
+)
 
 
 def _env_first(*keys: str, default: str) -> str:
@@ -525,6 +530,7 @@ def _chat_with_local_model_with_meta(
     thinking_enabled: bool = False,
     thinking_level: str | None = None,
     on_delta: Callable[[str], None] | None = None,
+    input_attachments: list[dict[str, Any]] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     request_payload: dict[str, Any] = {
         "model": model or get_default_text_model(),
@@ -532,7 +538,7 @@ def _chat_with_local_model_with_meta(
         "stream": True,
         "messages": [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
+            {"role": "user", "content": build_openai_user_content(user_prompt, input_attachments)},
         ],
     }
     if max_tokens is not None:
@@ -602,6 +608,42 @@ def _chat_with_local_model_with_meta(
         if not content:
             raise RuntimeError("Local LLM returned an empty response.")
     except Exception as exc:
+        if should_fallback_video_to_frames(exc, input_attachments):
+            error_payload = dict(response_payload) if response_payload else {}
+            error_payload["error"] = str(exc)
+            _append_local_model_request_log_safely(
+                provider_id=provider_id,
+                model=str(logged_request_payload.get("model") or model or get_default_text_model()),
+                request_raw=logged_request_payload,
+                response_raw=error_payload,
+                started_at=started_at,
+                status_code=None,
+                error=str(exc),
+            )
+            fallback_attachments, fallback_meta = build_video_frame_fallback_attachments(input_attachments)
+            try:
+                content, meta = _chat_with_local_model_with_meta(
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    model=model,
+                    provider_id=provider_id,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    thinking_enabled=thinking_enabled,
+                    thinking_level=thinking_level,
+                    on_delta=on_delta,
+                    input_attachments=fallback_attachments,
+                )
+            except Exception as fallback_exc:
+                raise RuntimeError(
+                    f"Native video request failed, and frame fallback also failed: {fallback_exc}"
+                ) from fallback_exc
+            meta["video_fallback"] = fallback_meta
+            meta["warnings"] = [
+                *meta.get("warnings", []),
+                f"Native video request failed; analyzed extracted frames instead. {exc}",
+            ]
+            return content, meta
         error_payload = dict(response_payload) if response_payload else {}
         error_payload["error"] = str(exc)
         _append_local_model_request_log_safely(

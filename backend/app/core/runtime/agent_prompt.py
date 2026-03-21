@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from app.core.runtime.agent_multimodal import normalize_uploaded_file_envelope, summarize_data_url
 from app.core.schemas.node_system import NodeSystemStateDefinition, NodeSystemStateType
 
 
@@ -66,9 +67,33 @@ def build_auto_system_prompt(
 
 
 def format_prompt_value(value: Any) -> str:
-    if isinstance(value, (dict, list)):
-        return json.dumps(value, ensure_ascii=False, indent=2)
-    return "" if value is None else str(value)
+    sanitized = sanitize_prompt_value(value)
+    if isinstance(sanitized, (dict, list)):
+        return json.dumps(sanitized, ensure_ascii=False, indent=2)
+    return "" if sanitized is None else str(sanitized)
+
+
+def sanitize_prompt_value(value: Any) -> Any:
+    envelope = normalize_uploaded_file_envelope(value)
+    if envelope is not None:
+        return {
+            str(key): summarize_data_url(raw_value)
+            if str(key) == "content" and isinstance(raw_value, str) and raw_value.startswith("data:")
+            else sanitize_prompt_value(raw_value)
+            for key, raw_value in envelope.items()
+        }
+    if isinstance(value, dict):
+        return {
+            str(key): summarize_data_url(raw_value)
+            if isinstance(raw_value, str) and raw_value.startswith("data:")
+            else sanitize_prompt_value(raw_value)
+            for key, raw_value in value.items()
+        }
+    if isinstance(value, list):
+        return [sanitize_prompt_value(item) for item in value]
+    if isinstance(value, str) and value.startswith("data:"):
+        return summarize_data_url(value)
+    return value
 
 
 def example_output_value_for_state(definition: NodeSystemStateDefinition | None) -> Any:

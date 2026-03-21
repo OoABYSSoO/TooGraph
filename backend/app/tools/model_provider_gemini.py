@@ -6,6 +6,7 @@ from typing import Any, Callable
 from app.core.model_provider_templates import TRANSPORT_GEMINI_GENERATE_CONTENT
 from app.core.thinking_levels import build_native_thinking_payload
 from app.tools.model_provider_http import DEFAULT_REQUEST_TIMEOUT_SEC
+from app.tools.model_provider_multimodal import build_gemini_user_parts
 from app.tools.model_provider_response_parsing import normalize_message_text, parse_sse_json_events
 
 
@@ -107,6 +108,7 @@ def chat_gemini(
     append_request_log: Callable[..., None],
     post_streaming_json_with_fallback_fn: Callable[..., tuple[dict[str, Any], dict[str, Any], str | None, bool]],
     on_delta: Callable[[str], None] | None = None,
+    input_attachments: list[dict[str, Any]] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     request_payload: dict[str, Any] = {
         "system_instruction": {
@@ -117,7 +119,7 @@ def chat_gemini(
         "contents": [
             {
                 "role": "user",
-                "parts": [{"text": user_prompt}],
+                "parts": build_gemini_user_parts(user_prompt, input_attachments),
             }
         ],
         "generationConfig": {

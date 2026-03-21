@@ -6,6 +6,7 @@ from typing import Any, Callable
 from app.core.model_provider_templates import TRANSPORT_OPENAI_COMPATIBLE
 from app.core.thinking_levels import build_native_thinking_payload
 from app.tools.model_provider_http import DEFAULT_REQUEST_TIMEOUT_SEC, build_auth_headers
+from app.tools.model_provider_multimodal import build_openai_user_content
 from app.tools.model_provider_response_parsing import normalize_message_text, parse_sse_json_events
 
 
@@ -111,6 +112,7 @@ def chat_openai_compatible(
     append_request_log: Callable[..., None],
     post_streaming_json_with_fallback_fn: Callable[..., tuple[dict[str, Any], dict[str, Any], str | None, bool]],
     on_delta: Callable[[str], None] | None = None,
+    input_attachments: list[dict[str, Any]] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     request_payload: dict[str, Any] = {
         "model": model,
@@ -118,7 +120,7 @@ def chat_openai_compatible(
         "stream": True,
         "messages": [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
+            {"role": "user", "content": build_openai_user_content(user_prompt, input_attachments)},
         ],
     }
     if max_tokens is not None:
