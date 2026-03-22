@@ -6,6 +6,9 @@ export type OutputPreviewDocumentReference = {
   localPath: string;
   contentType: string;
   charCount: number | null;
+  artifactKind: "document" | "image" | "video" | "audio" | "file";
+  size: number | null;
+  filename: string;
   error?: string;
 };
 
@@ -123,7 +126,10 @@ function formatDocumentPreview(text: string, documents: OutputPreviewDocumentRef
   }
 
   const availableCount = documents.filter((document) => document.localPath).length;
-  const header = `${availableCount} local source document${availableCount === 1 ? "" : "s"}`;
+  const hasMedia = documents.some((document) => document.artifactKind !== "document");
+  const header = hasMedia
+    ? `${availableCount} local artifact${availableCount === 1 ? "" : "s"}`
+    : `${availableCount} local source document${availableCount === 1 ? "" : "s"}`;
   const lines = [header];
   documents.forEach((document, index) => {
     lines.push(`${index + 1}. ${document.title || `Document ${index + 1}`}`);
@@ -135,6 +141,8 @@ function formatDocumentPreview(text: string, documents: OutputPreviewDocumentRef
     }
     if (document.charCount !== null) {
       lines.push(`   Size: ${document.charCount} chars`);
+    } else if (document.size !== null) {
+      lines.push(`   Size: ${document.size} bytes`);
     }
     if (!document.localPath && document.error) {
       lines.push(`   Unavailable: ${document.error}`);
@@ -195,13 +203,45 @@ function appendDocumentPreviewRecord(record: Record<string, unknown>, documents:
   }
   const error = normalizePreviewText(record.error);
   documents.push({
-    title: normalizePreviewText(record.title) || `Document ${documents.length + 1}`,
+    title: normalizePreviewText(record.title) || normalizePreviewText(record.filename) || `Document ${documents.length + 1}`,
     url: normalizePreviewText(record.url),
     localPath,
     contentType: normalizePreviewText(record.content_type ?? record.contentType) || "text/markdown",
     charCount: normalizePreviewNumber(record.char_count ?? record.charCount),
+    artifactKind: resolveArtifactKind(normalizePreviewText(record.content_type ?? record.contentType), localPath),
+    size: normalizePreviewNumber(record.size),
+    filename: normalizePreviewText(record.filename) || localPath.split("/").at(-1) || "",
     ...(error ? { error } : {}),
   });
+}
+
+function resolveArtifactKind(contentType: string, localPath: string): OutputPreviewDocumentReference["artifactKind"] {
+  const normalizedType = contentType.toLowerCase();
+  if (normalizedType.startsWith("image/")) {
+    return "image";
+  }
+  if (normalizedType.startsWith("video/")) {
+    return "video";
+  }
+  if (normalizedType.startsWith("audio/")) {
+    return "audio";
+  }
+  if (normalizedType.startsWith("text/") || normalizedType === "application/json" || normalizedType === "text/markdown") {
+    return "document";
+  }
+  if (/\.(md|markdown|txt|json|jsonl|csv|log)$/i.test(localPath)) {
+    return "document";
+  }
+  if (/\.(avif|bmp|gif|heic|ico|jpe?g|png|svg|tiff?|webp)$/i.test(localPath)) {
+    return "image";
+  }
+  if (/\.(3gp|avi|flv|m4v|mkv|mov|mp4|mpeg|mpg|ogv|webm)$/i.test(localPath)) {
+    return "video";
+  }
+  if (/\.(aac|flac|m4a|mp3|oga|ogg|opus|wav)$/i.test(localPath)) {
+    return "audio";
+  }
+  return "file";
 }
 
 function normalizePreviewText(value: unknown) {

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { fetchSkillArtifactContent } from "./skillArtifacts.ts";
+import { buildSkillArtifactFileUrl, fetchSkillArtifactContent } from "./skillArtifacts.ts";
 
 const originalFetch = globalThis.fetch;
 
@@ -39,4 +39,11 @@ test("fetchSkillArtifactContent reads artifact content by encoded relative path"
   });
 
   globalThis.fetch = originalFetch;
+});
+
+test("buildSkillArtifactFileUrl encodes artifact file paths for media preview", () => {
+  assert.equal(
+    buildSkillArtifactFileUrl("run_1/downloader/clip 001.mp4"),
+    "/api/skill-artifacts/file?path=run_1%2Fdownloader%2Fclip+001.mp4",
+  );
 });

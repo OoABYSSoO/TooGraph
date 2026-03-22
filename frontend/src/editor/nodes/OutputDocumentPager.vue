@@ -30,12 +30,25 @@
       </div>
     </div>
 
-    <pre class="node-card__document-pager-content">{{ displayText }}</pre>
+    <div v-if="activeDocument?.artifactKind === 'video'" class="node-card__document-pager-media">
+      <video class="node-card__document-pager-video" :src="activeArtifactUrl" controls preload="metadata" />
+    </div>
+    <div v-else-if="activeDocument?.artifactKind === 'image'" class="node-card__document-pager-media">
+      <img class="node-card__document-pager-image" :src="activeArtifactUrl" :alt="activeDocument.title" />
+    </div>
+    <div v-else-if="activeDocument?.artifactKind === 'audio'" class="node-card__document-pager-media">
+      <audio class="node-card__document-pager-audio" :src="activeArtifactUrl" controls preload="metadata" />
+    </div>
+    <div v-else-if="activeDocument?.artifactKind === 'file'" class="node-card__document-pager-file">
+      <a :href="activeArtifactUrl" target="_blank" rel="noreferrer" @pointerdown.stop @click.stop>{{ activeDocument.filename || activeDocument.localPath }}</a>
+    </div>
+    <pre v-else class="node-card__document-pager-content">{{ displayText }}</pre>
 
     <div v-if="activeDocument" class="node-card__document-pager-meta">
       <span>{{ activeDocument.contentType }}</span>
       <span>{{ activeDocument.localPath }}</span>
       <span v-if="activeDocument.charCount !== null">{{ activeDocument.charCount }} chars</span>
+      <span v-else-if="activeDocument.size !== null">{{ activeDocument.size }} bytes</span>
     </div>
   </section>
 </template>
@@ -46,7 +59,7 @@ import { ElIcon } from "element-plus";
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
-import { fetchSkillArtifactContent } from "@/api/skillArtifacts";
+import { buildSkillArtifactFileUrl, fetchSkillArtifactContent } from "@/api/skillArtifacts";
 
 import type { OutputPreviewDocumentReference } from "./outputPreviewContentModel";
 
@@ -62,6 +75,7 @@ const error = ref("");
 let requestId = 0;
 
 const activeDocument = computed(() => props.documents[Math.min(activeIndex.value, Math.max(props.documents.length - 1, 0))] ?? null);
+const activeArtifactUrl = computed(() => (activeDocument.value ? buildSkillArtifactFileUrl(activeDocument.value.localPath) : ""));
 const displayText = computed(() => {
   if (loading.value) {
     return t("common.loading");
@@ -93,6 +107,11 @@ async function loadActiveDocument() {
   error.value = "";
 
   if (!document) {
+    loading.value = false;
+    return;
+  }
+
+  if (document.artifactKind !== "document") {
     loading.value = false;
     return;
   }
@@ -195,6 +214,41 @@ async function loadActiveDocument() {
   line-height: 1.6;
   padding: 10px 12px;
   white-space: pre-wrap;
+}
+
+.node-card__document-pager-media {
+  display: grid;
+  min-height: 120px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(37, 99, 235, 0.12);
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.94);
+}
+
+.node-card__document-pager-video,
+.node-card__document-pager-image {
+  display: block;
+  width: 100%;
+  max-height: 260px;
+  object-fit: contain;
+}
+
+.node-card__document-pager-audio {
+  width: min(100%, 420px);
+  padding: 18px;
+}
+
+.node-card__document-pager-file {
+  overflow: hidden;
+  border-left: 3px solid rgba(37, 99, 235, 0.54);
+  background: rgba(255, 255, 255, 0.72);
+  padding: 12px;
+}
+
+.node-card__document-pager-file a {
+  color: rgb(29, 78, 216);
+  word-break: break-all;
 }
 
 .node-card__document-pager-meta {

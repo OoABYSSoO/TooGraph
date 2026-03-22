@@ -57,6 +57,20 @@ def read_skill_artifact_text(relative_path: str) -> dict[str, Any]:
     }
 
 
+def read_skill_artifact_file_metadata(relative_path: str) -> dict[str, Any]:
+    normalized_path = normalize_skill_artifact_relative_path(relative_path)
+    target = resolve_skill_artifact_path(normalized_path)
+    if not target.is_file():
+        raise FileNotFoundError(f"Skill artifact '{normalized_path}' does not exist.")
+    return {
+        "path": normalized_path,
+        "name": target.name,
+        "size": target.stat().st_size,
+        "content_type": mimetypes.guess_type(target.name)[0] or "application/octet-stream",
+        "filesystem_path": target,
+    }
+
+
 def resolve_skill_artifact_path(relative_path: str) -> Path:
     normalized_path = normalize_skill_artifact_relative_path(relative_path)
     root = SKILL_ARTIFACT_DATA_DIR.resolve()

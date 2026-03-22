@@ -12,3 +12,8 @@ export async function fetchSkillArtifactContent(path: string): Promise<SkillArti
   const searchParams = new URLSearchParams({ path });
   return apiGet<SkillArtifactContent>(`/api/skill-artifacts/content?${searchParams.toString()}`);
 }
+
+export function buildSkillArtifactFileUrl(path: string): string {
+  const searchParams = new URLSearchParams({ path });
+  return `/api/skill-artifacts/file?${searchParams.toString()}`;
+}

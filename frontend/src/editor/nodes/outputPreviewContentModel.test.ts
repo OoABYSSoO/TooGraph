@@ -71,6 +71,9 @@ test("resolveOutputPreviewContent summarizes local document references instead o
       localPath: "run_1/search/doc_001.md",
       contentType: "text/markdown",
       charCount: 1200,
+      artifactKind: "document",
+      size: null,
+      filename: "doc_001.md",
     },
     {
       title: "Article Two",
@@ -78,6 +81,42 @@ test("resolveOutputPreviewContent summarizes local document references instead o
       localPath: "run_1/search/doc_002.md",
       contentType: "text/markdown",
       charCount: null,
+      artifactKind: "document",
+      size: null,
+      filename: "doc_002.md",
+    },
+  ]);
+});
+
+test("resolveOutputPreviewContent extracts media artifact references from downloaded files", () => {
+  const preview = resolveOutputPreviewContent(
+    JSON.stringify({
+      downloaded_files: [
+        {
+          filename: "clip.mp4",
+          url: "https://example.com/watch",
+          local_path: "run_1/downloader/clip.mp4",
+          content_type: "video/mp4",
+          size: 2048,
+        },
+      ],
+    }),
+    "documents",
+  );
+
+  assert.equal(preview.kind, "documents");
+  assert.match(preview.text, /1 local artifact/);
+  assert.match(preview.text, /clip\.mp4/);
+  assert.deepEqual(preview.documentRefs, [
+    {
+      title: "clip.mp4",
+      url: "https://example.com/watch",
+      localPath: "run_1/downloader/clip.mp4",
+      contentType: "video/mp4",
+      charCount: null,
+      artifactKind: "video",
+      size: 2048,
+      filename: "clip.mp4",
     },
   ]);
 });

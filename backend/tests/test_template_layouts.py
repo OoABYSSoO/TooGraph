@@ -304,3 +304,54 @@ class TemplateLayoutTests(unittest.TestCase):
                 "exhausted": "output_exhausted_answer",
             },
         )
+
+    def test_download_video_preview_template_searches_before_downloading_media(self):
+        template = next(
+            NodeSystemTemplate.model_validate(record)
+            for record in list_template_records()
+            if record["template_id"] == "download_video_preview"
+        )
+        state_by_name = {
+            definition.name: state_key
+            for state_key, definition in template.state_schema.items()
+        }
+
+        self.assertEqual(template.default_graph_name, "下载并展示视频")
+        self.assertEqual(
+            template.state_schema[state_by_name["video_request"]].value,
+            "找一个公开可访问的视频页面，下载视频并在 Output 中预览",
+        )
+        self.assertIn("web_search_agent", template.nodes)
+        self.assertIn("download_video_agent", template.nodes)
+        self.assertIn("output_downloaded_video", template.nodes)
+
+        search_node = template.nodes["web_search_agent"]
+        self.assertEqual(search_node.config.skills, ["web_search"])
+        self.assertEqual(search_node.config.skill_bindings[0].skill_key, "web_search")
+        self.assertEqual(
+            search_node.config.skill_bindings[0].input_mapping,
+            {"query": state_by_name["search_query"]},
+        )
+        self.assertEqual(
+            search_node.config.skill_bindings[0].output_mapping,
+            {"results": state_by_name["search_results"]},
+        )
+
+        download_node = template.nodes["download_video_agent"]
+        self.assertEqual(download_node.config.skills, ["web_media_downloader"])
+        self.assertIn(state_by_name["search_results"], [binding.state for binding in download_node.reads])
+        self.assertEqual(download_node.config.skill_bindings[0].skill_key, "web_media_downloader")
+        self.assertEqual(
+            download_node.config.skill_bindings[0].input_mapping,
+            {"urls": state_by_name["candidate_video_url"]},
+        )
+        self.assertEqual(
+            download_node.config.skill_bindings[0].output_mapping,
+            {"downloaded_files": state_by_name["downloaded_video_files"]},
+        )
+        self.assertEqual(download_node.config.skill_bindings[0].config.get("media_types"), "video")
+        self.assertEqual(download_node.config.skill_bindings[0].config.get("use_ytdlp"), "true")
+
+        output_node = template.nodes["output_downloaded_video"]
+        self.assertEqual(output_node.reads[0].state, state_by_name["downloaded_video_files"])
+        self.assertEqual(output_node.config.display_mode.value, "documents")

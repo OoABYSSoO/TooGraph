@@ -193,6 +193,9 @@ test("listRunOutputArtifacts keeps skill artifact document references for paged 
       localPath: "run_1/search/doc_001.md",
       contentType: "text/markdown",
       charCount: 1200,
+      artifactKind: "document",
+      size: null,
+      filename: "doc_001.md",
     },
     {
       title: "Document 2",
@@ -200,6 +203,9 @@ test("listRunOutputArtifacts keeps skill artifact document references for paged 
       localPath: "run_1/search/doc_002.md",
       contentType: "text/markdown",
       charCount: null,
+      artifactKind: "document",
+      size: null,
+      filename: "doc_002.md",
     },
   ]);
 });
@@ -219,6 +225,9 @@ test("normalizeArtifactDocumentReferences ignores values without safe local path
         localPath: "run_1/a.md",
         contentType: "text/markdown",
         charCount: null,
+        artifactKind: "document",
+        size: null,
+        filename: "a.md",
       },
     ],
   );
@@ -234,6 +243,9 @@ test("normalizeArtifactDocumentReferences accepts arrays and structured objects 
         localPath: "run_1/search/doc_000.md",
         contentType: "text/markdown",
         charCount: null,
+        artifactKind: "document",
+        size: null,
+        filename: "doc_000.md",
       },
     ],
   );
@@ -256,6 +268,9 @@ test("normalizeArtifactDocumentReferences accepts arrays and structured objects 
         localPath: "run_1/search/doc_001.md",
         contentType: "text/markdown",
         charCount: null,
+        artifactKind: "document",
+        size: null,
+        filename: "doc_001.md",
       },
     ],
   );
@@ -273,6 +288,9 @@ test("normalizeArtifactDocumentReferences accepts arrays and structured objects 
         localPath: "run_1/search/doc_002.md",
         contentType: "text/markdown",
         charCount: 42,
+        artifactKind: "document",
+        size: null,
+        filename: "doc_002.md",
       },
     ],
   );

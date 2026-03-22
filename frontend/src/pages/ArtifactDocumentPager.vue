@@ -28,12 +28,25 @@
       </div>
     </div>
 
-    <pre class="artifact-document-pager__content">{{ displayText }}</pre>
+    <div v-if="activeDocument?.artifactKind === 'video'" class="artifact-document-pager__media">
+      <video class="artifact-document-pager__video" :src="activeArtifactUrl" controls preload="metadata" />
+    </div>
+    <div v-else-if="activeDocument?.artifactKind === 'image'" class="artifact-document-pager__media">
+      <img class="artifact-document-pager__image" :src="activeArtifactUrl" :alt="activeDocument.title" />
+    </div>
+    <div v-else-if="activeDocument?.artifactKind === 'audio'" class="artifact-document-pager__media">
+      <audio class="artifact-document-pager__audio" :src="activeArtifactUrl" controls preload="metadata" />
+    </div>
+    <div v-else-if="activeDocument?.artifactKind === 'file'" class="artifact-document-pager__file">
+      <a :href="activeArtifactUrl" target="_blank" rel="noreferrer">{{ activeDocument.filename || activeDocument.localPath }}</a>
+    </div>
+    <pre v-else class="artifact-document-pager__content">{{ displayText }}</pre>
 
     <div v-if="activeDocument" class="artifact-document-pager__badges">
       <span>{{ activeDocument.contentType }}</span>
       <span>{{ activeDocument.localPath }}</span>
       <span v-if="activeDocument.charCount !== null">{{ activeDocument.charCount }} chars</span>
+      <span v-else-if="activeDocument.size !== null">{{ activeDocument.size }} bytes</span>
     </div>
   </section>
 </template>
@@ -44,7 +57,7 @@ import { ElIcon } from "element-plus";
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
-import { fetchSkillArtifactContent } from "@/api/skillArtifacts";
+import { buildSkillArtifactFileUrl, fetchSkillArtifactContent } from "@/api/skillArtifacts";
 
 import type { ArtifactDocumentReference } from "./runDetailModel";
 
@@ -60,6 +73,7 @@ const error = ref("");
 let requestId = 0;
 
 const activeDocument = computed(() => props.documents[Math.min(activeIndex.value, Math.max(props.documents.length - 1, 0))] ?? null);
+const activeArtifactUrl = computed(() => (activeDocument.value ? buildSkillArtifactFileUrl(activeDocument.value.localPath) : ""));
 const displayText = computed(() => {
   if (loading.value) {
     return t("common.loading");
@@ -91,6 +105,11 @@ async function loadActiveDocument() {
   error.value = "";
 
   if (!document) {
+    loading.value = false;
+    return;
+  }
+
+  if (document.artifactKind !== "document") {
     loading.value = false;
     return;
   }
@@ -197,6 +216,42 @@ async function loadActiveDocument() {
   line-height: 1.68;
   padding: 14px;
   white-space: pre-wrap;
+}
+
+.artifact-document-pager__media {
+  display: grid;
+  min-height: 220px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(37, 99, 235, 0.12);
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.94);
+}
+
+.artifact-document-pager__video,
+.artifact-document-pager__image {
+  display: block;
+  width: 100%;
+  max-height: 520px;
+  object-fit: contain;
+}
+
+.artifact-document-pager__audio {
+  width: min(100%, 520px);
+  padding: 24px;
+}
+
+.artifact-document-pager__file {
+  overflow: hidden;
+  border-left: 4px solid rgba(37, 99, 235, 0.58);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.86);
+  padding: 14px;
+}
+
+.artifact-document-pager__file a {
+  color: rgb(29, 78, 216);
+  word-break: break-all;
 }
 
 .artifact-document-pager__badges {

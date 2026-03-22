@@ -1,0 +1,143 @@
+{
+  "schemaVersion": "graphite.skill/v1",
+  "skillKey": "web_media_downloader",
+  "label": "Web Media Downloader",
+  "description": "Download authorized web-hosted images, videos, audio, thumbnails, galleries, and dynamically loaded media, then return local artifact paths.",
+  "version": "1.0.0",
+  "targets": ["agent_node", "companion"],
+  "kind": "atomic",
+  "mode": "tool",
+  "scope": "node",
+  "permissions": ["network", "file_write", "subprocess"],
+  "inputSchema": [
+    {
+      "key": "urls",
+      "label": "URLs",
+      "valueType": "text",
+      "required": true,
+      "description": "One or more page or direct media URLs. Accepts newline-separated, comma-separated, or JSON array input."
+    },
+    {
+      "key": "media_types",
+      "label": "Media Types",
+      "valueType": "text",
+      "required": false,
+      "description": "Comma-separated types: image, video, audio, or all. Defaults to image,video,audio."
+    },
+    {
+      "key": "max_items",
+      "label": "Max Items",
+      "valueType": "text",
+      "required": false,
+      "description": "Maximum media files to download. Defaults to 100 and is capped at 500."
+    },
+    {
+      "key": "discover_only",
+      "label": "Discover Only",
+      "valueType": "text",
+      "required": false,
+      "description": "When true, returns discovered media without downloading files."
+    },
+    {
+      "key": "use_playwright",
+      "label": "Use Playwright",
+      "valueType": "text",
+      "required": false,
+      "description": "When true, renders pages with the bundled Playwright discovery helper after static discovery."
+    },
+    {
+      "key": "use_ytdlp",
+      "label": "Use yt-dlp",
+      "valueType": "text",
+      "required": false,
+      "description": "When true, attempts yt-dlp downloads into the artifact directory for input URLs."
+    },
+    {
+      "key": "timeout_seconds",
+      "label": "Timeout Seconds",
+      "valueType": "text",
+      "required": false,
+      "description": "HTTP timeout per request. Defaults to 30 seconds."
+    }
+  ],
+  "outputSchema": [
+    {
+      "key": "status",
+      "label": "Status",
+      "valueType": "text",
+      "description": "succeeded, partial, or failed."
+    },
+    {
+      "key": "summary",
+      "label": "Summary",
+      "valueType": "markdown",
+      "description": "Compact execution summary with output location."
+    },
+    {
+      "key": "discovered_count",
+      "label": "Discovered Count",
+      "valueType": "text",
+      "description": "Number of media URLs discovered after filtering."
+    },
+    {
+      "key": "downloaded_count",
+      "label": "Downloaded Count",
+      "valueType": "text",
+      "description": "Number of media files successfully written to local artifacts."
+    },
+    {
+      "key": "failed_count",
+      "label": "Failed Count",
+      "valueType": "text",
+      "description": "Number of failed downloads."
+    },
+    {
+      "key": "downloaded_files",
+      "label": "Downloaded Files",
+      "valueType": "json",
+      "description": "Downloaded media records with source URL, kind, filename, local_path, size, and content_type."
+    },
+    {
+      "key": "media_items",
+      "label": "Media Items",
+      "valueType": "json",
+      "description": "Discovered media URL records."
+    },
+    {
+      "key": "paths_file",
+      "label": "Paths File",
+      "valueType": "json",
+      "description": "Local artifact path to a text file listing downloaded local paths."
+    },
+    {
+      "key": "manifest_file",
+      "label": "Manifest File",
+      "valueType": "json",
+      "description": "Local artifact path to the JSONL download manifest."
+    },
+    {
+      "key": "warnings",
+      "label": "Warnings",
+      "valueType": "json",
+      "description": "Non-fatal warnings such as optional tool availability."
+    },
+    {
+      "key": "error",
+      "label": "Error",
+      "valueType": "text",
+      "description": "Error message when status is failed."
+    }
+  ],
+  "supportedValueTypes": ["text", "markdown", "json"],
+  "sideEffects": ["network", "file_write", "subprocess"],
+  "runtime": {
+    "type": "python",
+    "entrypoint": "run.py",
+    "timeoutSeconds": 180
+  },
+  "health": {
+    "type": "none"
+  },
+  "configured": true,
+  "healthy": true
+}

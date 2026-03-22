@@ -19,6 +19,9 @@ export type ArtifactDocumentReference = {
   localPath: string;
   contentType: string;
   charCount: number | null;
+  artifactKind: "document" | "image" | "video" | "audio" | "file";
+  size: number | null;
+  filename: string;
 };
 
 export type RunStatusFact = {
@@ -103,12 +106,44 @@ function appendArtifactDocumentReference(record: Record<string, unknown>, refere
     return;
   }
   references.push({
-    title: normalizeText(record.title) || `Document ${references.length + 1}`,
+    title: normalizeText(record.title) || normalizeText(record.filename) || `Document ${references.length + 1}`,
     url: normalizeText(record.url),
     localPath,
     contentType: normalizeText(record.content_type ?? record.contentType) || "text/markdown",
     charCount: normalizeNumber(record.char_count ?? record.charCount),
+    artifactKind: resolveArtifactKind(normalizeText(record.content_type ?? record.contentType), localPath),
+    size: normalizeNumber(record.size),
+    filename: normalizeText(record.filename) || localPath.split("/").at(-1) || "",
   });
+}
+
+function resolveArtifactKind(contentType: string, localPath: string): ArtifactDocumentReference["artifactKind"] {
+  const normalizedType = contentType.toLowerCase();
+  if (normalizedType.startsWith("image/")) {
+    return "image";
+  }
+  if (normalizedType.startsWith("video/")) {
+    return "video";
+  }
+  if (normalizedType.startsWith("audio/")) {
+    return "audio";
+  }
+  if (normalizedType.startsWith("text/") || normalizedType === "application/json" || normalizedType === "text/markdown") {
+    return "document";
+  }
+  if (/\.(md|markdown|txt|json|jsonl|csv|log)$/i.test(localPath)) {
+    return "document";
+  }
+  if (/\.(avif|bmp|gif|heic|ico|jpe?g|png|svg|tiff?|webp)$/i.test(localPath)) {
+    return "image";
+  }
+  if (/\.(3gp|avi|flv|m4v|mkv|mov|mp4|mpeg|mpg|ogv|webm)$/i.test(localPath)) {
+    return "video";
+  }
+  if (/\.(aac|flac|m4a|mp3|oga|ogg|opus|wav)$/i.test(localPath)) {
+    return "audio";
+  }
+  return "file";
 }
 
 function normalizeLocalArtifactPath(value: unknown) {

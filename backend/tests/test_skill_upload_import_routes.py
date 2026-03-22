@@ -175,7 +175,7 @@ class SkillUploadImportRouteTests(unittest.TestCase):
 
                 self.assertEqual(response.status_code, 200)
                 catalog_items = {item["skillKey"]: item for item in response.json()}
-                self.assertEqual(sorted(catalog_items), ["web_search"])
+                self.assertEqual(sorted(catalog_items), ["web_media_downloader", "web_search"])
                 self.assertEqual(catalog_items["web_search"]["sourceFormat"], "skill")
                 self.assertEqual(catalog_items["web_search"]["sourceScope"], "installed")
                 self.assertEqual(catalog_items["web_search"]["targets"], ["agent_node", "companion"])
@@ -183,6 +183,13 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertTrue(catalog_items["web_search"]["runtimeRegistered"])
                 self.assertTrue(catalog_items["web_search"]["sourcePath"].endswith("/skill/web_search/skill.json"))
                 self.assertNotIn("compatibility", catalog_items["web_search"])
+                self.assertEqual(catalog_items["web_media_downloader"]["sourceFormat"], "skill")
+                self.assertEqual(catalog_items["web_media_downloader"]["sourceScope"], "installed")
+                self.assertEqual(catalog_items["web_media_downloader"]["targets"], ["agent_node", "companion"])
+                self.assertTrue(catalog_items["web_media_downloader"]["runtimeReady"])
+                self.assertTrue(catalog_items["web_media_downloader"]["runtimeRegistered"])
+                self.assertTrue(catalog_items["web_media_downloader"]["sourcePath"].endswith("/skill/web_media_downloader/skill.json"))
+                self.assertNotIn("compatibility", catalog_items["web_media_downloader"])
 
     def test_native_skill_json_upload_imports_installed_skill_package(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
