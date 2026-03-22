@@ -1,0 +1,153 @@
+{
+  "template_id": "companion_chat_loop",
+  "label": "桌宠对话循环",
+  "description": "Run one companion chat turn from the floating mascot using the current message, compact conversation history, and page context.",
+  "default_graph_name": "桌宠对话循环",
+  "state_schema": {
+    "state_1": {
+      "name": "user_message",
+      "description": "Current message sent by the user to the floating companion.",
+      "type": "text",
+      "value": "你好，帮我看一下当前页面。",
+      "color": "#9a3412"
+    },
+    "state_2": {
+      "name": "conversation_history",
+      "description": "Compact transcript of recent companion chat turns.",
+      "type": "markdown",
+      "value": "暂无历史对话。",
+      "color": "#0f766e"
+    },
+    "state_3": {
+      "name": "page_context",
+      "description": "Frontend page context visible to the companion.",
+      "type": "markdown",
+      "value": "当前路径: /",
+      "color": "#2563eb"
+    },
+    "state_4": {
+      "name": "companion_reply",
+      "description": "Short response spoken by the floating companion.",
+      "type": "markdown",
+      "value": "",
+      "color": "#d97706"
+    }
+  },
+  "nodes": {
+    "input_user_message": {
+      "kind": "input",
+      "name": "input_user_message",
+      "description": "Message sent to the companion.",
+      "ui": {
+        "position": { "x": 80, "y": 80 },
+        "collapsed": false
+      },
+      "writes": [
+        { "state": "state_1", "mode": "replace" }
+      ],
+      "config": {
+        "value": "你好，帮我看一下当前页面。",
+        "boundaryType": "text"
+      }
+    },
+    "input_conversation_history": {
+      "kind": "input",
+      "name": "input_conversation_history",
+      "description": "Recent companion chat transcript.",
+      "ui": {
+        "position": { "x": 80, "y": 480 },
+        "collapsed": false
+      },
+      "writes": [
+        { "state": "state_2", "mode": "replace" }
+      ],
+      "config": {
+        "value": "暂无历史对话。",
+        "boundaryType": "text"
+      }
+    },
+    "input_page_context": {
+      "kind": "input",
+      "name": "input_page_context",
+      "description": "Current page context supplied by the frontend.",
+      "ui": {
+        "position": { "x": 80, "y": 880 },
+        "collapsed": false
+      },
+      "writes": [
+        { "state": "state_3", "mode": "replace" }
+      ],
+      "config": {
+        "value": "当前路径: /",
+        "boundaryType": "text"
+      }
+    },
+    "companion_reply_agent": {
+      "kind": "agent",
+      "name": "companion_reply_agent",
+      "description": "Respond as the floating GraphiteUI companion.",
+      "ui": {
+        "position": { "x": 640, "y": 360 },
+        "collapsed": false
+      },
+      "reads": [
+        { "state": "state_1", "required": true },
+        { "state": "state_2", "required": false },
+        { "state": "state_3", "required": false }
+      ],
+      "writes": [
+        { "state": "state_4", "mode": "replace" }
+      ],
+      "config": {
+        "skills": [],
+        "skillBindings": [],
+        "taskInstruction": "你是 GraphiteUI 页面右下角的桌宠，不是主 agent。根据 user_message、conversation_history 和 page_context 回复用户。要求：1. 默认使用中文；2. 语气简短、直接、友好，不要写长篇说明；3. 可以解释当前页面或 GraphiteUI 工作流概念，但不要声称你已经修改了图、运行了节点或访问了前端未提供的信息；4. 如果用户要你执行页面操作，只说明你当前第一版只能对话，后续需要动作权限；5. 只把要显示在桌宠气泡中的内容写入 companion_reply。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "medium",
+        "temperature": 0.4
+      }
+    },
+    "output_companion_reply": {
+      "kind": "output",
+      "name": "output_companion_reply",
+      "description": "Display the companion reply.",
+      "ui": {
+        "position": { "x": 1200, "y": 360 },
+        "collapsed": false
+      },
+      "reads": [
+        { "state": "state_4", "required": false }
+      ],
+      "config": {
+        "displayMode": "markdown",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    }
+  },
+  "edges": [
+    {
+      "source": "input_user_message",
+      "target": "companion_reply_agent"
+    },
+    {
+      "source": "input_conversation_history",
+      "target": "companion_reply_agent"
+    },
+    {
+      "source": "input_page_context",
+      "target": "companion_reply_agent"
+    },
+    {
+      "source": "companion_reply_agent",
+      "target": "output_companion_reply"
+    }
+  ],
+  "conditional_edges": [],
+  "metadata": {
+    "graphiteui_state_key_counter": 4,
+    "companion_template": true
+  }
+}

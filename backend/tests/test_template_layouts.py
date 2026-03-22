@@ -387,6 +387,34 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(output_node.reads[0].state, state_by_name["downloaded_video_files"])
         self.assertEqual(output_node.config.display_mode.value, "documents")
 
+    def test_companion_chat_loop_template_models_single_turn_companion_reply(self):
+        template = next(
+            NodeSystemTemplate.model_validate(record)
+            for record in list_template_records()
+            if record["template_id"] == "companion_chat_loop"
+        )
+        state_by_name = {
+            definition.name: state_key
+            for state_key, definition in template.state_schema.items()
+        }
+
+        self.assertEqual(template.default_graph_name, "桌宠对话循环")
+        self.assertEqual(
+            list(state_by_name.keys()),
+            ["user_message", "conversation_history", "page_context", "companion_reply"],
+        )
+        agent = template.nodes["companion_reply_agent"]
+        self.assertEqual(agent.kind, "agent")
+        self.assertEqual(agent.config.skills, [])
+        self.assertIn(state_by_name["user_message"], [binding.state for binding in agent.reads])
+        self.assertIn(state_by_name["conversation_history"], [binding.state for binding in agent.reads])
+        self.assertIn(state_by_name["page_context"], [binding.state for binding in agent.reads])
+        self.assertEqual([binding.state for binding in agent.writes], [state_by_name["companion_reply"]])
+
+        output_node = template.nodes["output_companion_reply"]
+        self.assertEqual(output_node.reads[0].state, state_by_name["companion_reply"])
+        self.assertEqual(output_node.config.display_mode.value, "markdown")
+
     def test_game_ad_creative_factory_template_models_generic_game_research_workflow(self):
         template = next(
             NodeSystemTemplate.model_validate(record)
@@ -398,7 +426,7 @@ class TemplateLayoutTests(unittest.TestCase):
             for state_key, definition in template.state_schema.items()
         }
 
-        self.assertEqual(template.default_graph_name, "游戏广告创意工厂")
+        self.assertEqual(template.default_graph_name, "广告创意分析demo模板")
         self.assertEqual(template.state_schema[state_by_name["genre"]].value, "SLG")
         self.assertIn("collect_game_market_signals", template.nodes)
         self.assertIn("analyze_video_patterns", template.nodes)
