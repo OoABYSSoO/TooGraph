@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import tempfile
 import time
 from pathlib import Path
 from typing import Any, Callable
@@ -96,6 +97,22 @@ def _append_local_model_request_log_safely(
         )
     except Exception:
         return
+
+
+def _should_retry_without_media_after_frame_fallback(exc: Exception) -> bool:
+    message = str(exc or "").lower()
+    return any(
+        marker in message
+        for marker in (
+            "file:// urls are not allowed",
+            "--media-path",
+            "unsupported content",
+            "unsupported media",
+            "unsupported image",
+            "image_url",
+            "invalid image",
+        )
+    )
 
 
 def _get_saved_local_provider_config() -> dict[str, Any]:
@@ -620,24 +637,49 @@ def _chat_with_local_model_with_meta(
                 status_code=None,
                 error=str(exc),
             )
-            fallback_attachments, fallback_meta = build_video_frame_fallback_attachments(input_attachments)
-            try:
-                content, meta = _chat_with_local_model_with_meta(
-                    system_prompt=system_prompt,
-                    user_prompt=user_prompt,
-                    model=model,
-                    provider_id=provider_id,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    thinking_enabled=thinking_enabled,
-                    thinking_level=thinking_level,
-                    on_delta=on_delta,
-                    input_attachments=fallback_attachments,
+            with tempfile.TemporaryDirectory(prefix="graphite_video_fallback_") as temp_dir:
+                fallback_attachments, fallback_meta = build_video_frame_fallback_attachments(
+                    input_attachments,
+                    output_dir=temp_dir,
                 )
-            except Exception as fallback_exc:
-                raise RuntimeError(
-                    f"Native video request failed, and frame fallback also failed: {fallback_exc}"
-                ) from fallback_exc
+                try:
+                    content, meta = _chat_with_local_model_with_meta(
+                        system_prompt=system_prompt,
+                        user_prompt=user_prompt,
+                        model=model,
+                        provider_id=provider_id,
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                        thinking_enabled=thinking_enabled,
+                        thinking_level=thinking_level,
+                        on_delta=on_delta,
+                        input_attachments=fallback_attachments,
+                    )
+                except Exception as fallback_exc:
+                    if _should_retry_without_media_after_frame_fallback(fallback_exc):
+                        content, meta = _chat_with_local_model_with_meta(
+                            system_prompt=system_prompt,
+                            user_prompt=user_prompt,
+                            model=model,
+                            provider_id=provider_id,
+                            temperature=temperature,
+                            max_tokens=max_tokens,
+                            thinking_enabled=thinking_enabled,
+                            thinking_level=thinking_level,
+                            on_delta=on_delta,
+                            input_attachments=[],
+                        )
+                        fallback_meta = {**fallback_meta, "text_only_retry": True}
+                        meta["video_fallback"] = fallback_meta
+                        meta["warnings"] = [
+                            *meta.get("warnings", []),
+                            "Native video request failed, frame fallback media was rejected, "
+                            f"and the request was retried without media attachments. {fallback_exc}",
+                        ]
+                        return content, meta
+                    raise RuntimeError(
+                        f"Native video request failed, and frame fallback also failed: {fallback_exc}"
+                    ) from fallback_exc
             meta["video_fallback"] = fallback_meta
             meta["warnings"] = [
                 *meta.get("warnings", []),

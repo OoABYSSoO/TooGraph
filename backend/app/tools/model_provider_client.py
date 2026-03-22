@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import tempfile
 from typing import Any, Callable
 
 import httpx
@@ -308,13 +309,17 @@ def _invoke_with_video_auto_fallback(
     except Exception as exc:
         if not should_fallback_video_to_frames(exc, input_attachments):
             raise
-        fallback_attachments, fallback_meta = build_video_frame_fallback_attachments(input_attachments)
-        try:
-            content, meta = invoke(fallback_attachments)
-        except Exception as fallback_exc:
-            raise RuntimeError(
-                f"Native video request failed, and frame fallback also failed: {fallback_exc}"
-            ) from fallback_exc
+        with tempfile.TemporaryDirectory(prefix="graphite_video_fallback_") as temp_dir:
+            fallback_attachments, fallback_meta = build_video_frame_fallback_attachments(
+                input_attachments,
+                output_dir=temp_dir,
+            )
+            try:
+                content, meta = invoke(fallback_attachments)
+            except Exception as fallback_exc:
+                raise RuntimeError(
+                    f"Native video request failed, and frame fallback also failed: {fallback_exc}"
+                ) from fallback_exc
         meta["video_fallback"] = fallback_meta
         meta["_video_fallback_warning"] = f"Native video request failed; analyzed extracted frames instead. {exc}"
         return content, meta

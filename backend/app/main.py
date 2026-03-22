@@ -11,6 +11,7 @@ from app.api.routes_settings import router as settings_router
 from app.api.routes_skill_artifacts import router as skill_artifacts_router
 from app.api.routes_skills import router as skills_router
 from app.api.routes_templates import router as templates_router
+from app.core.runtime.run_recovery import mark_interrupted_active_runs
 from app.core.storage.database import initialize_storage
 
 app = FastAPI(
@@ -42,6 +43,7 @@ app.include_router(templates_router)
 @app.on_event("startup")
 def startup() -> None:
     initialize_storage()
+    mark_interrupted_active_runs()
 
 
 @app.api_route("/health", methods=["GET", "HEAD"])

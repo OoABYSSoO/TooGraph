@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import base64
 import json
 import subprocess
 import tempfile
 from pathlib import Path
 from typing import Any
+from urllib.parse import unquote, urlparse
 
 
 DEFAULT_VIDEO_FRAME_COUNT = 8
@@ -44,16 +44,19 @@ def build_video_frame_fallback_attachments(
     input_attachments: list[dict[str, Any]] | None,
     *,
     frame_count: int = DEFAULT_VIDEO_FRAME_COUNT,
+    output_dir: str | Path | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     fallback_attachments: list[dict[str, Any]] = []
     video_count = 0
     generated_frame_count = 0
+    frame_root = Path(output_dir) if output_dir is not None else None
     for attachment in input_attachments or []:
         if _attachment_type(attachment) != "video":
             fallback_attachments.append(attachment)
             continue
         video_count += 1
-        frames = extract_video_frame_attachments(attachment, frame_count=frame_count)
+        video_output_dir = frame_root / f"video_{video_count:03d}" if frame_root is not None else None
+        frames = extract_video_frame_attachments(attachment, frame_count=frame_count, output_dir=video_output_dir)
         generated_frame_count += len(frames)
         fallback_attachments.extend(frames)
     if video_count and generated_frame_count == 0:
@@ -70,37 +73,43 @@ def extract_video_frame_attachments(
     attachment: dict[str, Any],
     *,
     frame_count: int = DEFAULT_VIDEO_FRAME_COUNT,
+    output_dir: str | Path | None = None,
 ) -> list[dict[str, Any]]:
-    data_url = str(attachment.get("data_url") or "").strip()
-    mime_type, encoded = split_data_url(data_url)
-    if not mime_type.startswith("video/") or not encoded:
-        raise RuntimeError("Video fallback requires a video data URL attachment.")
+    source_path = _resolve_source_video_path(attachment)
+    if source_path is None:
+        raise RuntimeError("Video fallback requires a local filesystem path or file:// video attachment.")
 
     requested_frame_count = max(1, min(int(frame_count or DEFAULT_VIDEO_FRAME_COUNT), MAX_VIDEO_FRAME_COUNT))
-    video_bytes = base64.b64decode(encoded)
-    suffix = _suffix_for_mime_type(mime_type)
-    with tempfile.TemporaryDirectory(prefix="graphite_video_frames_") as temp_dir_name:
-        temp_dir = Path(temp_dir_name)
-        video_path = temp_dir / f"input{suffix}"
-        video_path.write_bytes(video_bytes)
-        duration = _probe_video_duration(video_path)
-        frame_paths = _extract_frame_files(video_path, temp_dir, duration=duration, frame_count=requested_frame_count)
-        return [
-            _build_frame_attachment(attachment, frame_path, index=index, timestamp=_frame_timestamp(duration, index, len(frame_paths)))
-            for index, frame_path in enumerate(frame_paths, start=1)
-        ]
+    frame_dir = Path(output_dir) if output_dir is not None else Path(tempfile.mkdtemp(prefix="graphite_video_frames_"))
+    frame_dir.mkdir(parents=True, exist_ok=True)
+    duration = _probe_video_duration(source_path)
+    frame_paths = _extract_frame_files(source_path, frame_dir, duration=duration, frame_count=requested_frame_count)
+    return [
+        _build_frame_attachment(attachment, frame_path, index=index, timestamp=_frame_timestamp(duration, index, len(frame_paths)))
+        for index, frame_path in enumerate(frame_paths, start=1)
+    ]
 
 
-def split_data_url(data_url: str) -> tuple[str, str]:
-    head, separator, data = str(data_url or "").partition(",")
-    if not separator or not head.startswith("data:"):
-        return "", ""
-    return head[5:].split(";", 1)[0].strip(), data.strip()
+def _resolve_source_video_path(attachment: dict[str, Any]) -> Path | None:
+    filesystem_path = str(attachment.get("filesystem_path") or "").strip()
+    if not filesystem_path:
+        file_url = str(attachment.get("file_url") or attachment.get("url") or "").strip()
+        parsed = urlparse(file_url)
+        if parsed.scheme != "file" or not parsed.path:
+            return None
+        filesystem_path = unquote(parsed.path)
+    path = Path(filesystem_path)
+    if not path.is_file():
+        raise RuntimeError("Video fallback local filesystem path does not exist.")
+    mime_type = str(attachment.get("mime_type") or "").strip().lower()
+    if mime_type and not mime_type.startswith("video/"):
+        raise RuntimeError("Video fallback local filesystem path must reference a video attachment.")
+    return path
 
 
 def _extract_frame_files(
     video_path: Path,
-    temp_dir: Path,
+    frame_dir: Path,
     *,
     duration: float | None,
     frame_count: int,
@@ -109,7 +118,7 @@ def _extract_frame_files(
     if duration is not None and duration > 0:
         for index in range(1, frame_count + 1):
             timestamp = _frame_timestamp(duration, index, frame_count)
-            frame_path = temp_dir / f"frame_{index:03d}.jpg"
+            frame_path = frame_dir / f"frame_{index:03d}.jpg"
             command = [
                 "ffmpeg",
                 "-hide_banner",
@@ -130,7 +139,7 @@ def _extract_frame_files(
         if frame_paths:
             return frame_paths
 
-    pattern = temp_dir / "frame_%03d.jpg"
+    pattern = frame_dir / "frame_%03d.jpg"
     command = [
         "ffmpeg",
         "-hide_banner",
@@ -146,7 +155,7 @@ def _extract_frame_files(
         str(pattern),
     ]
     _run_media_command(command)
-    return sorted(path for path in temp_dir.glob("frame_*.jpg") if path.stat().st_size > 0)[:frame_count]
+    return sorted(path for path in frame_dir.glob("frame_*.jpg") if path.stat().st_size > 0)[:frame_count]
 
 
 def _probe_video_duration(video_path: Path) -> float | None:
@@ -181,7 +190,7 @@ def _build_frame_attachment(
     index: int,
     timestamp: float | None,
 ) -> dict[str, Any]:
-    encoded = base64.b64encode(frame_path.read_bytes()).decode("ascii")
+    resolved_frame_path = frame_path.resolve()
     state_key = str(video_attachment.get("state_key") or "video").strip() or "video"
     name_stem = Path(str(video_attachment.get("name") or state_key)).stem or state_key
     return {
@@ -189,7 +198,8 @@ def _build_frame_attachment(
         "state_key": f"{state_key}#frame_{index:03d}",
         "name": f"{name_stem}_frame_{index:03d}.jpg",
         "mime_type": "image/jpeg",
-        "data_url": f"data:image/jpeg;base64,{encoded}",
+        "filesystem_path": str(resolved_frame_path),
+        "file_url": resolved_frame_path.as_uri(),
         "source": {
             "type": "video_frame",
             "video_state_key": state_key,
@@ -214,17 +224,6 @@ def _frame_timestamp(duration: float | None, index: int, frame_count: int) -> fl
     if duration is None or duration <= 0 or frame_count <= 0:
         return None
     return duration * index / (frame_count + 1)
-
-
-def _suffix_for_mime_type(mime_type: str) -> str:
-    normalized = mime_type.lower().strip()
-    if normalized == "video/webm":
-        return ".webm"
-    if normalized in {"video/quicktime", "video/mov"}:
-        return ".mov"
-    if normalized == "video/x-matroska":
-        return ".mkv"
-    return ".mp4"
 
 
 def _attachment_type(attachment: dict[str, Any]) -> str:
