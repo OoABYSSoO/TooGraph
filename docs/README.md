@@ -10,10 +10,10 @@
   - 当前仍在路线图中的事项
   - 也是 GraphiteUI 项目知识库导入源之一
 
-- [future/2026-04-21-agent-companion-graph-orchestration.md](future/2026-04-21-agent-companion-graph-orchestration.md)
-  - 桌宠 Agent
-  - 自动编排图
-  - 规划后确认与边走边画两种未来模式
+- [future/2026-05-05-agent-companion-graph-orchestration.md](future/2026-05-05-agent-companion-graph-orchestration.md)
+  - 桌宠 Agent 自我设定、记忆与图操作权限方针
+  - 三档图操作权限：建议档、审批档、全权限档
+  - 自动编排图作为补充设想，服从新的权限边界
 
 - [future/2026-04-27-skill-product-taxonomy.md](future/2026-04-27-skill-product-taxonomy.md)
   - Agent Skill 与 Companion Skill 的产品边界
