@@ -550,19 +550,44 @@ function isPersistedMessage(value: unknown): value is CompanionChatMessage {
   background: transparent;
   box-shadow: none;
   cursor: grab;
+  isolation: isolate;
   overflow: visible;
   pointer-events: auto;
   touch-action: none;
   transition: transform 160ms ease;
 }
 
+.companion-pet__avatar > .companion-mascot {
+  position: relative;
+  z-index: 1;
+  filter:
+    drop-shadow(0 8px 12px rgba(255, 255, 255, 0.86))
+    drop-shadow(0 2px 5px rgba(255, 255, 255, 0.72))
+    drop-shadow(0 0 3px rgba(255, 255, 255, 0.94));
+  transition: filter 160ms ease;
+}
+
 .companion-pet__avatar:hover {
   transform: translateY(-2px);
+}
+
+.companion-pet__avatar:hover > .companion-mascot {
+  filter:
+    drop-shadow(0 9px 14px rgba(255, 255, 255, 0.9))
+    drop-shadow(0 3px 6px rgba(255, 255, 255, 0.76))
+    drop-shadow(0 0 4px rgba(255, 255, 255, 0.98));
 }
 
 .companion-pet__avatar:active {
   cursor: grabbing;
   transform: translateY(0) scale(0.98);
+}
+
+.companion-pet__avatar:active > .companion-mascot {
+  filter:
+    drop-shadow(0 7px 10px rgba(255, 255, 255, 0.82))
+    drop-shadow(0 2px 4px rgba(255, 255, 255, 0.68))
+    drop-shadow(0 0 3px rgba(255, 255, 255, 0.9));
 }
 
 .companion-pet__avatar:focus-visible,

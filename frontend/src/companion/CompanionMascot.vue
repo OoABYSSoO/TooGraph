@@ -7,7 +7,7 @@
       focusable="false"
     >
       <defs>
-        <radialGradient id="companionMascotSparkleGold" cx="0" cy="-106" r="56" gradientUnits="userSpaceOnUse">
+        <radialGradient id="companionMascotSparkleGold" cx="0" cy="-136" r="56" gradientUnits="userSpaceOnUse">
           <stop offset="0%" stop-color="#f2c968" />
           <stop offset="62%" stop-color="#dfad50" />
           <stop offset="100%" stop-color="#c89136" />
@@ -38,34 +38,34 @@
           d="M206 154 C240 154 268 136 282 108"
         />
 
-        <g class="companion-mascot__sparkle-wrap">
-          <path
-            class="companion-mascot__sparkle"
-            fill="url(#companionMascotSparkleGold)"
-            d="M0-150 C5-124 18-111 44-106 C18-101 5-88 0-62 C-5-88 -18-101 -44-106 C-18-111 -5-124 0-150Z"
-          />
-        </g>
-
         <g class="companion-mascot__body">
           <path
             class="companion-mascot__left-ear"
             fill="url(#companionMascotBlack)"
-            d="M-146-143 C-114-132-82-101-55-61 C-90-61-130-43-168-4 C-174-52-164-106-146-143Z"
+            d="M-146-143 C-114-132-82-101-55-61 C-60-24-84 25-124 63 C-158 95-190 53-168-4 C-174-52-164-106-146-143Z"
           />
           <path
             class="companion-mascot__right-ear"
             fill="url(#companionMascotBlack)"
-            d="M146-143 C114-132 82-101 55-61 C90-61 130-43 168-4 C174-52 164-106 146-143Z"
+            d="M146-143 C114-132 82-101 55-61 C60-24 84 25 124 63 C158 95 190 53 168-4 C174-52 164-106 146-143Z"
           />
           <path
             class="companion-mascot__head"
             fill="url(#companionMascotBlack)"
-            d="M-120-80 C-88-104-42-118 0-118 C42-118 88-104 120-80 C151-56 171-18 168 20 C197 47 214 84 218 116 C226 208 145 264 0 264 C-145 264-226 208-218 116 C-214 84-197 47-168 20 C-171-18-151-56-120-80Z"
+            d="M-55-61 C-25-66 25-66 55-61 C90-61 130-43 168-4 C196 22 214 66 218 116 C226 208 145 264 0 264 C-145 264-226 208-218 116 C-214 66-196 22-168-4 C-130-43-90-61-55-61Z"
           />
           <ellipse class="companion-mascot__resting-eye companion-mascot__resting-eye--left" cx="-80" cy="82" rx="24" ry="52" fill="url(#companionMascotEyeGold)" />
           <ellipse class="companion-mascot__resting-eye companion-mascot__resting-eye--right" cx="80" cy="82" rx="24" ry="52" fill="url(#companionMascotEyeGold)" />
           <path class="companion-mascot__drag-eye companion-mascot__drag-eye--left" d="M-104 52 L-64 82 L-104 112" />
           <path class="companion-mascot__drag-eye companion-mascot__drag-eye--right" d="M104 52 L64 82 L104 112" />
+        </g>
+
+        <g class="companion-mascot__sparkle-wrap">
+          <path
+            class="companion-mascot__sparkle"
+            fill="url(#companionMascotSparkleGold)"
+            d="M0-180 C5-154 18-141 44-136 C18-131 5-118 0-92 C-5-118 -18-131 -44-136 C-18-141 -5-154 0-180Z"
+          />
         </g>
       </g>
     </svg>
@@ -206,7 +206,7 @@ function clearTapTimeout() {
 }
 
 .companion-mascot--idle .companion-mascot__tail {
-  animation: companion-mascot-tail-sway 4.2s ease-in-out infinite;
+  animation: companion-mascot-tail-sway 3.2s ease-in-out infinite;
 }
 
 .companion-mascot--idle .companion-mascot__sparkle-wrap {
@@ -214,11 +214,12 @@ function clearTapTimeout() {
 }
 
 .companion-mascot--idle .companion-mascot__left-ear {
-  animation: companion-mascot-ear-idle-left 6.8s ease-in-out infinite;
+  animation: companion-mascot-ear-idle-left 4.2s ease-in-out infinite;
 }
 
 .companion-mascot--idle .companion-mascot__right-ear {
-  animation: companion-mascot-ear-idle-right 6.8s ease-in-out infinite;
+  animation: companion-mascot-ear-idle-right 4.2s ease-in-out infinite;
+  animation-delay: 160ms;
 }
 
 .companion-mascot--idle .companion-mascot__resting-eye {
@@ -227,6 +228,10 @@ function clearTapTimeout() {
 
 .companion-mascot--thinking .companion-mascot__body {
   animation: companion-mascot-thinking-body 1.15s ease-in-out infinite;
+}
+
+.companion-mascot--thinking .companion-mascot__tail {
+  animation: companion-mascot-tail-thinking 920ms ease-in-out infinite;
 }
 
 .companion-mascot--thinking .companion-mascot__sparkle {
@@ -243,6 +248,10 @@ function clearTapTimeout() {
 
 .companion-mascot--speaking .companion-mascot__body {
   animation: companion-mascot-speaking-body 640ms ease-in-out infinite;
+}
+
+.companion-mascot--speaking .companion-mascot__tail {
+  animation: companion-mascot-tail-speaking 560ms ease-in-out infinite;
 }
 
 .companion-mascot--speaking .companion-mascot__sparkle {
@@ -266,19 +275,19 @@ function clearTapTimeout() {
 }
 
 .companion-mascot--dragging .companion-mascot__body {
-  transform: translateY(5px) scaleX(1.04) scaleY(0.92) rotate(-2deg);
+  animation: companion-mascot-drag-body 720ms ease-in-out infinite;
 }
 
 .companion-mascot--dragging .companion-mascot__tail {
-  animation: companion-mascot-tail-drag 520ms ease-in-out infinite;
+  animation: companion-mascot-tail-drag 420ms ease-in-out infinite;
 }
 
 .companion-mascot--dragging .companion-mascot__left-ear {
-  transform: rotate(-14deg) translateY(8px);
+  animation: companion-mascot-ear-drag-left 360ms ease-in-out infinite;
 }
 
 .companion-mascot--dragging .companion-mascot__right-ear {
-  transform: rotate(14deg) translateY(8px);
+  animation: companion-mascot-ear-drag-right 360ms ease-in-out infinite;
 }
 
 .companion-mascot--dragging .companion-mascot__resting-eye {
@@ -318,10 +327,10 @@ function clearTapTimeout() {
 @keyframes companion-mascot-tail-sway {
   0%,
   100% {
-    transform: rotate(-2deg);
+    transform: rotate(-7deg);
   }
   50% {
-    transform: rotate(8deg);
+    transform: rotate(15deg);
   }
 }
 
@@ -342,10 +351,10 @@ function clearTapTimeout() {
     transform: rotate(0deg);
   }
   88% {
-    transform: rotate(-5deg);
+    transform: rotate(-8deg);
   }
   94% {
-    transform: rotate(2deg);
+    transform: rotate(4deg);
   }
 }
 
@@ -356,10 +365,10 @@ function clearTapTimeout() {
     transform: rotate(0deg);
   }
   88% {
-    transform: rotate(5deg);
+    transform: rotate(8deg);
   }
   94% {
-    transform: rotate(-2deg);
+    transform: rotate(-4deg);
   }
 }
 
@@ -382,6 +391,16 @@ function clearTapTimeout() {
   }
   50% {
     transform: translateY(-2px) rotate(1.5deg);
+  }
+}
+
+@keyframes companion-mascot-tail-thinking {
+  0%,
+  100% {
+    transform: rotate(4deg);
+  }
+  50% {
+    transform: rotate(12deg);
   }
 }
 
@@ -419,6 +438,19 @@ function clearTapTimeout() {
   }
 }
 
+@keyframes companion-mascot-tail-speaking {
+  0%,
+  100% {
+    transform: rotate(-3deg);
+  }
+  38% {
+    transform: rotate(18deg);
+  }
+  72% {
+    transform: rotate(5deg);
+  }
+}
+
 @keyframes companion-mascot-ear-speak-left {
   0%,
   100% {
@@ -452,10 +484,40 @@ function clearTapTimeout() {
 @keyframes companion-mascot-tail-drag {
   0%,
   100% {
-    transform: rotate(8deg);
+    transform: rotate(18deg);
   }
   50% {
-    transform: rotate(-10deg);
+    transform: rotate(-18deg);
+  }
+}
+
+@keyframes companion-mascot-drag-body {
+  0%,
+  100% {
+    transform: translateY(1px) scaleX(0.96) scaleY(1.04) rotate(-5deg);
+  }
+  50% {
+    transform: translateY(-2px) scaleX(0.98) scaleY(1.02) rotate(5deg);
+  }
+}
+
+@keyframes companion-mascot-ear-drag-left {
+  0%,
+  100% {
+    transform: rotate(-18deg) translateY(8px);
+  }
+  50% {
+    transform: rotate(-4deg) translateY(2px);
+  }
+}
+
+@keyframes companion-mascot-ear-drag-right {
+  0%,
+  100% {
+    transform: rotate(18deg) translateY(8px);
+  }
+  50% {
+    transform: rotate(4deg) translateY(2px);
   }
 }
 
