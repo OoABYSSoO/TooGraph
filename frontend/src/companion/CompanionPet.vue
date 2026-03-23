@@ -16,6 +16,29 @@
             <h2>{{ t("companion.title") }}</h2>
           </div>
           <div class="companion-pet__header-actions">
+            <div class="companion-pet__mode" :title="companionModeLabel">
+              <span class="companion-pet__mode-label">{{ t("companion.modeLabel") }}</span>
+              <ElSelect
+                v-model="companionMode"
+                class="companion-pet__mode-select"
+                size="small"
+                :aria-label="t('companion.modeLabel')"
+                :title="companionModeLabel"
+              >
+                <ElOption
+                  v-for="option in COMPANION_MODE_OPTIONS"
+                  :key="option.value"
+                  :label="t(option.labelKey)"
+                  :value="option.value"
+                  :disabled="option.disabled"
+                >
+                  <span class="companion-pet__mode-option">
+                    <span>{{ t(option.labelKey) }}</span>
+                    <small>{{ t(option.descriptionKey) }}</small>
+                  </span>
+                </ElOption>
+              </ElSelect>
+            </div>
             <button
               type="button"
               class="companion-pet__icon-button"
@@ -83,13 +106,12 @@
       <button
         type="button"
         class="companion-pet__avatar"
-        :class="`companion-pet__avatar--${mood}`"
         :title="t('companion.dragHint')"
         :aria-label="t('companion.open')"
         @pointerdown="handlePointerDown"
         @click="handleAvatarClick"
       >
-        <img src="/mascot.svg" alt="" draggable="false" />
+        <CompanionMascot :mood="mood" :dragging="isDragging" :tap-nonce="tapNonce" />
       </button>
     </div>
   </div>
@@ -97,7 +119,7 @@
 
 <script setup lang="ts">
 import { Close, Delete, Promotion } from "@element-plus/icons-vue";
-import { ElIcon } from "element-plus";
+import { ElIcon, ElOption, ElSelect } from "element-plus";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
@@ -105,14 +127,21 @@ import { useRoute } from "vue-router";
 import { fetchTemplate, runGraph } from "../api/graphs.ts";
 import { fetchRun } from "../api/runs.ts";
 import { buildRunEventStreamUrl, parseRunEventPayload, shouldPollRunStatus } from "../lib/run-event-stream.ts";
+import { useCompanionContextStore } from "../stores/companionContext.ts";
 import type { RunDetail } from "../types/run.ts";
 
+import CompanionMascot from "./CompanionMascot.vue";
+import { buildCompanionPageContext } from "./companionPageContext.ts";
 import {
   COMPANION_TEMPLATE_ID,
+  COMPANION_MODE_OPTIONS,
+  DEFAULT_COMPANION_MODE,
   buildCompanionChatGraph,
+  resolveCompanionMode,
   resolveCompanionReplyFromRunEvent,
   resolveCompanionReplyText,
   type CompanionChatMessage,
+  type CompanionMode,
 } from "./companionChatGraph.ts";
 import {
   COMPANION_POSITION_STORAGE_KEY,
@@ -138,14 +167,17 @@ const RUN_POLL_TIMEOUT_MS = 240000;
 
 const { t } = useI18n();
 const route = useRoute();
+const companionContextStore = useCompanionContextStore();
 
 const viewport = ref(resolveViewport());
 const position = ref(resolveDefaultCompanionPosition(viewport.value));
 const isPanelOpen = ref(false);
 const draft = ref("");
+const companionMode = ref<CompanionMode>(DEFAULT_COMPANION_MODE);
 const messages = ref<CompanionMessage[]>([]);
 const errorMessage = ref("");
 const mood = ref<CompanionMood>("idle");
+const tapNonce = ref(0);
 const activeRunId = ref<string | null>(null);
 const messageListElement = ref<HTMLElement | null>(null);
 const pointerDrag = ref<{
@@ -161,6 +193,11 @@ let eventSource: EventSource | null = null;
 let activeAbortController: AbortController | null = null;
 
 const isBusy = computed(() => mood.value === "thinking" || mood.value === "speaking");
+const isDragging = computed(() => Boolean(pointerDrag.value?.moved));
+const companionModeLabel = computed(() => {
+  const option = COMPANION_MODE_OPTIONS.find((candidate) => candidate.value === companionMode.value);
+  return option ? `${t(option.labelKey)} - ${t(option.descriptionKey)}` : t("companion.modes.advisory");
+});
 const anchorStyle = computed(() => ({
   transform: `translate3d(${position.value.x}px, ${position.value.y}px, 0)`,
 }));
@@ -201,11 +238,19 @@ watch(
   { deep: true },
 );
 
+watch(companionMode, (nextMode) => {
+  const safeMode = resolveCompanionMode(nextMode);
+  if (safeMode !== nextMode) {
+    companionMode.value = safeMode;
+  }
+});
+
 function handleAvatarClick() {
   if (suppressNextClick) {
     suppressNextClick = false;
     return;
   }
+  tapNonce.value += 1;
   isPanelOpen.value = !isPanelOpen.value;
   if (isPanelOpen.value) {
     void scrollMessagesToBottom();
@@ -282,6 +327,7 @@ async function sendMessage() {
       userMessage,
       history,
       pageContext: buildPageContext(),
+      companionMode: companionMode.value,
     });
     const run = await runGraph(graph);
     activeRunId.value = run.run_id;
@@ -421,7 +467,11 @@ async function scrollMessagesToBottom() {
 }
 
 function buildPageContext() {
-  return [`当前路径: ${route.fullPath}`, activeRunId.value ? `桌宠运行: ${activeRunId.value}` : ""].filter(Boolean).join("\n");
+  return buildCompanionPageContext({
+    routePath: route.fullPath,
+    editor: companionContextStore.editorSnapshot,
+    activeCompanionRunId: activeRunId.value,
+  });
 }
 
 function createMessage(role: CompanionChatMessage["role"], content: string): CompanionMessage {
@@ -523,28 +573,6 @@ function isPersistedMessage(value: unknown): value is CompanionChatMessage {
   box-shadow: 0 0 0 3px rgba(210, 162, 117, 0.3);
 }
 
-.companion-pet__avatar img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  user-select: none;
-  transform-origin: 50% 62%;
-  animation: companion-idle 4.8s ease-in-out infinite;
-}
-
-.companion-pet__avatar--thinking img {
-  animation: companion-thinking 900ms ease-in-out infinite;
-}
-
-.companion-pet__avatar--speaking img {
-  animation: companion-speaking 640ms ease-in-out infinite;
-}
-
-.companion-pet__avatar--error {
-  filter: saturate(0.85);
-}
-
 .companion-pet__panel,
 .companion-pet__bubble {
   position: absolute;
@@ -584,6 +612,7 @@ function isPersistedMessage(value: unknown): value is CompanionChatMessage {
 }
 
 .companion-pet__heading {
+  flex: 1 1 auto;
   min-width: 0;
 }
 
@@ -605,7 +634,51 @@ function isPersistedMessage(value: unknown): value is CompanionChatMessage {
 
 .companion-pet__header-actions {
   display: flex;
+  align-items: flex-start;
   gap: 6px;
+}
+
+.companion-pet__mode {
+  display: grid;
+  gap: 4px;
+  width: 136px;
+  min-width: 0;
+}
+
+.companion-pet__mode-label {
+  color: var(--graphite-text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.companion-pet__mode-select {
+  width: 100%;
+}
+
+.companion-pet__mode-select :deep(.el-select__wrapper) {
+  min-height: 30px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.66);
+  box-shadow: 0 0 0 1px rgba(154, 52, 18, 0.14) inset;
+}
+
+.companion-pet__mode-select :deep(.el-select__wrapper.is-focused) {
+  box-shadow:
+    0 0 0 1px rgba(154, 52, 18, 0.22) inset,
+    0 0 0 3px rgba(210, 162, 117, 0.22);
+}
+
+.companion-pet__mode-option {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.companion-pet__mode-option small {
+  color: var(--graphite-text-muted);
+  font-size: 11px;
 }
 
 .companion-pet__icon-button,
@@ -766,36 +839,6 @@ function isPersistedMessage(value: unknown): value is CompanionChatMessage {
   left: 0;
 }
 
-@keyframes companion-idle {
-  0%,
-  100% {
-    transform: translateY(0) rotate(0deg);
-  }
-  50% {
-    transform: translateY(-4px) rotate(-1.2deg);
-  }
-}
-
-@keyframes companion-thinking {
-  0%,
-  100% {
-    transform: translateY(0) scale(1);
-  }
-  50% {
-    transform: translateY(-3px) scale(1.03);
-  }
-}
-
-@keyframes companion-speaking {
-  0%,
-  100% {
-    transform: translateY(0) rotate(-1deg);
-  }
-  50% {
-    transform: translateY(-5px) rotate(1deg);
-  }
-}
-
 @media (max-width: 560px) {
   .companion-pet__panel {
     width: calc(100vw - 32px);
@@ -810,7 +853,6 @@ function isPersistedMessage(value: unknown): value is CompanionChatMessage {
 @media (prefers-reduced-motion: reduce) {
   .companion-pet__anchor,
   .companion-pet__avatar,
-  .companion-pet__avatar img,
   .companion-pet__icon-button,
   .companion-pet__send {
     animation: none;
