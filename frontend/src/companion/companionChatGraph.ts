@@ -7,6 +7,10 @@ export const COMPANION_HISTORY_STATE_KEY = "state_2";
 export const COMPANION_PAGE_CONTEXT_STATE_KEY = "state_3";
 export const COMPANION_REPLY_STATE_KEY = "state_4";
 export const COMPANION_MODE_STATE_KEY = "state_5";
+export const COMPANION_PROFILE_STATE_KEY = "state_6";
+export const COMPANION_POLICY_STATE_KEY = "state_7";
+export const COMPANION_MEMORY_CONTEXT_STATE_KEY = "state_8";
+export const COMPANION_SESSION_SUMMARY_STATE_KEY = "state_9";
 export const MAX_COMPANION_HISTORY_MESSAGES = 12;
 export const DEFAULT_COMPANION_MODE = "advisory";
 
@@ -47,11 +51,19 @@ export type CompanionChatMessage = {
   includeInContext?: boolean;
 };
 
+export type CompanionSelfConfigContext = {
+  profile: string;
+  policy: string;
+  memoryContext: string;
+  sessionSummary: string;
+};
+
 export type BuildCompanionChatGraphInput = {
   userMessage: string;
   history: CompanionChatMessage[];
   pageContext: string;
   companionMode?: unknown;
+  selfConfigContext?: Partial<CompanionSelfConfigContext>;
 };
 
 export function formatCompanionHistory(messages: CompanionChatMessage[], maxMessages = MAX_COMPANION_HISTORY_MESSAGES) {
@@ -74,6 +86,11 @@ export function formatCompanionHistory(messages: CompanionChatMessage[], maxMess
 
 export function buildCompanionChatGraph(template: TemplateRecord, input: BuildCompanionChatGraphInput): GraphPayload {
   const companionMode = resolveCompanionMode(input.companionMode);
+  const selfConfigContext = input.selfConfigContext ?? {};
+  const profileContext = wrapCompanionContext("companion-profile", selfConfigContext.profile ?? "", "未配置桌宠人设。");
+  const policyContext = wrapCompanionContext("companion-policy", selfConfigContext.policy ?? "", "未配置桌宠行为边界。");
+  const memoryContext = wrapCompanionContext("memory-context", selfConfigContext.memoryContext ?? "", "暂无长期记忆。");
+  const sessionSummaryContext = wrapCompanionContext("session-summary", selfConfigContext.sessionSummary ?? "", "暂无会话摘要。");
   const graph: GraphPayload = {
     graph_id: null,
     name: template.default_graph_name,
@@ -96,11 +113,19 @@ export function buildCompanionChatGraph(template: TemplateRecord, input: BuildCo
   setStateValue(graph, COMPANION_PAGE_CONTEXT_STATE_KEY, input.pageContext.trim() || "当前页面上下文不可用。");
   setStateValue(graph, COMPANION_REPLY_STATE_KEY, "");
   setStateValue(graph, COMPANION_MODE_STATE_KEY, companionMode);
+  setStateValue(graph, COMPANION_PROFILE_STATE_KEY, profileContext);
+  setStateValue(graph, COMPANION_POLICY_STATE_KEY, policyContext);
+  setStateValue(graph, COMPANION_MEMORY_CONTEXT_STATE_KEY, memoryContext);
+  setStateValue(graph, COMPANION_SESSION_SUMMARY_STATE_KEY, sessionSummaryContext);
 
   syncInputNodeValue(graph, COMPANION_USER_MESSAGE_STATE_KEY, input.userMessage);
   syncInputNodeValue(graph, COMPANION_HISTORY_STATE_KEY, graph.state_schema[COMPANION_HISTORY_STATE_KEY]?.value ?? "");
   syncInputNodeValue(graph, COMPANION_PAGE_CONTEXT_STATE_KEY, graph.state_schema[COMPANION_PAGE_CONTEXT_STATE_KEY]?.value ?? "");
   syncInputNodeValue(graph, COMPANION_MODE_STATE_KEY, companionMode);
+  syncInputNodeValue(graph, COMPANION_PROFILE_STATE_KEY, profileContext);
+  syncInputNodeValue(graph, COMPANION_POLICY_STATE_KEY, policyContext);
+  syncInputNodeValue(graph, COMPANION_MEMORY_CONTEXT_STATE_KEY, memoryContext);
+  syncInputNodeValue(graph, COMPANION_SESSION_SUMMARY_STATE_KEY, sessionSummaryContext);
   enforceAdvisoryCompanionGraph(graph);
 
   return graph;
@@ -166,6 +191,11 @@ function syncInputNodeValue(graph: GraphPayload, stateKey: string, value: unknow
       value,
     };
   }
+}
+
+function wrapCompanionContext(tag: string, value: string, fallback: string) {
+  const text = value.trim() || fallback;
+  return `<${tag}>\n${text}\n</${tag}>`;
 }
 
 function enforceAdvisoryCompanionGraph(graph: GraphPayload) {

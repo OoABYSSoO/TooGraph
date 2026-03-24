@@ -423,7 +423,17 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(template.default_graph_name, "桌宠对话循环")
         self.assertEqual(
             list(state_by_name.keys()),
-            ["user_message", "conversation_history", "page_context", "companion_reply", "companion_mode"],
+            [
+                "user_message",
+                "conversation_history",
+                "page_context",
+                "companion_reply",
+                "companion_mode",
+                "companion_profile",
+                "companion_policy",
+                "companion_memory_context",
+                "companion_session_summary",
+            ],
         )
         agent = template.nodes["companion_reply_agent"]
         self.assertEqual(agent.kind, "agent")
@@ -432,11 +442,16 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertIn(state_by_name["conversation_history"], [binding.state for binding in agent.reads])
         self.assertIn(state_by_name["page_context"], [binding.state for binding in agent.reads])
         self.assertIn(state_by_name["companion_mode"], [binding.state for binding in agent.reads])
+        self.assertIn(state_by_name["companion_profile"], [binding.state for binding in agent.reads])
+        self.assertIn(state_by_name["companion_policy"], [binding.state for binding in agent.reads])
+        self.assertIn(state_by_name["companion_memory_context"], [binding.state for binding in agent.reads])
+        self.assertIn(state_by_name["companion_session_summary"], [binding.state for binding in agent.reads])
         self.assertEqual([binding.state for binding in agent.writes], [state_by_name["companion_reply"]])
         self.assertIn("全局主桌宠 Agent", agent.config.task_instruction)
         self.assertIn("不是图内普通 agent 节点", agent.config.task_instruction)
         self.assertIn("只允许陪伴聊天", agent.config.task_instruction)
         self.assertIn("提供建议", agent.config.task_instruction)
+        self.assertIn("只读背景上下文", agent.config.task_instruction)
         self.assertIn("先内部判断用户意图", agent.config.task_instruction)
         self.assertIn("闲聊", agent.config.task_instruction)
         self.assertIn("图操作请求", agent.config.task_instruction)

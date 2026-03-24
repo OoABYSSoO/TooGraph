@@ -126,10 +126,17 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 
+import {
+  fetchCompanionMemories,
+  fetchCompanionPolicy,
+  fetchCompanionProfile,
+  fetchCompanionSessionSummary,
+} from "../api/companion.ts";
 import { fetchTemplate, runGraph } from "../api/graphs.ts";
 import { fetchRun } from "../api/runs.ts";
 import { buildRunEventStreamUrl, parseRunEventPayload, shouldPollRunStatus } from "../lib/run-event-stream.ts";
 import { useCompanionContextStore } from "../stores/companionContext.ts";
+import type { CompanionMemory, CompanionPolicy, CompanionProfile } from "../types/companion.ts";
 import type { RunDetail } from "../types/run.ts";
 
 import CompanionMascot from "./CompanionMascot.vue";
@@ -144,6 +151,7 @@ import {
   resolveCompanionReplyText,
   type CompanionChatMessage,
   type CompanionMode,
+  type CompanionSelfConfigContext,
 } from "./companionChatGraph.ts";
 import {
   COMPANION_POSITION_STORAGE_KEY,
@@ -372,11 +380,13 @@ async function processQueuedTurn(turn: CompanionQueuedTurn) {
   try {
     activeAbortController = new AbortController();
     const template = await fetchTemplate(COMPANION_TEMPLATE_ID);
+    const selfConfigContext = await fetchSelfConfigContext();
     const graph = buildCompanionChatGraph(template, {
       userMessage: turn.userMessage,
       history,
       pageContext: buildPageContext(),
       companionMode: companionMode.value,
+      selfConfigContext,
     });
     const run = await runGraph(graph);
     activeRunId.value = run.run_id;
@@ -560,6 +570,54 @@ function buildPageContext() {
     editor: companionContextStore.editorSnapshot,
     activeCompanionRunId: activeRunId.value,
   });
+}
+
+async function fetchSelfConfigContext(): Promise<Partial<CompanionSelfConfigContext>> {
+  try {
+    const [profile, policy, memoryList, sessionSummary] = await Promise.all([
+      fetchCompanionProfile(),
+      fetchCompanionPolicy(),
+      fetchCompanionMemories(false),
+      fetchCompanionSessionSummary(),
+    ]);
+    return {
+      profile: formatProfileForPrompt(profile),
+      policy: formatPolicyForPrompt(policy),
+      memoryContext: formatMemoriesForPrompt(memoryList),
+      sessionSummary: sessionSummary.content,
+    };
+  } catch {
+    return {};
+  }
+}
+
+function formatProfileForPrompt(profile: CompanionProfile) {
+  return [
+    `名字: ${profile.name}`,
+    `人设: ${profile.persona}`,
+    `语气: ${profile.tone}`,
+    `回复风格: ${profile.response_style}`,
+  ]
+    .map((line) => line.trim())
+    .filter((line) => !line.endsWith(":"))
+    .join("\n");
+}
+
+function formatPolicyForPrompt(policy: CompanionPolicy) {
+  return [
+    `图操作档位: ${policy.graph_permission_mode}`,
+    "行为边界:",
+    ...policy.behavior_boundaries.map((boundary) => `- ${boundary}`),
+    "沟通偏好:",
+    ...policy.communication_preferences.map((preference) => `- ${preference}`),
+  ].join("\n");
+}
+
+function formatMemoriesForPrompt(memoryList: CompanionMemory[]) {
+  if (memoryList.length === 0) {
+    return "暂无长期记忆。";
+  }
+  return memoryList.map((memory) => `- [${memory.type}] ${memory.title}: ${memory.content}`).join("\n");
 }
 
 function createMessage(role: CompanionChatMessage["role"], content: string): CompanionMessage {

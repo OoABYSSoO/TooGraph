@@ -96,3 +96,9 @@ test("AppShell exposes model request logs as a primary sidebar destination", () 
   assert.match(componentSource, /to="\/model-logs"[\s\S]*activeNavigationSection === 'modelLogs'[\s\S]*t\("nav\.modelLogs"\)/);
   assert.match(componentSource, /<ElIcon class="app-shell__link-icon"><Tickets \/><\/ElIcon>/);
 });
+
+test("AppShell exposes Companion as a primary sidebar destination", () => {
+  assert.match(componentSource, /import \{[\s\S]*ChatDotRound[\s\S]*\} from "@element-plus\/icons-vue";/);
+  assert.match(componentSource, /to="\/companion"[\s\S]*activeNavigationSection === 'companion'[\s\S]*t\("nav\.companion"\)/);
+  assert.match(componentSource, /<ElIcon class="app-shell__link-icon"><ChatDotRound \/><\/ElIcon>/);
+});

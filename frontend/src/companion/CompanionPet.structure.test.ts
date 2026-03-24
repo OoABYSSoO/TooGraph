@@ -87,3 +87,17 @@ test("CompanionPet keeps runtime error replies out of model context and persiste
   assert.match(componentSource, /nextMessages[\s\S]*\.filter\(isPersistableMessageForStorage\)[\s\S]*\.slice\(-24\)[\s\S]*\.map\(\(\{ role, content, includeInContext \}\) => \(\{ role, content, includeInContext \}\)\)/);
   assert.match(componentSource, /updateAssistantMessage\(assistantMessage\.id, t\("companion\.errorReply", \{ error: message \}\), \{ includeInContext: false \}\);/);
 });
+
+test("CompanionPet injects backend self config context without blocking chat on context fetch failure", () => {
+  assert.match(
+    componentSource,
+    /import \{[\s\S]*fetchCompanionMemories,[\s\S]*fetchCompanionPolicy,[\s\S]*fetchCompanionProfile,[\s\S]*fetchCompanionSessionSummary,[\s\S]*\} from "\.\.\/api\/companion\.ts";/,
+  );
+  assert.match(componentSource, /const selfConfigContext = await fetchSelfConfigContext\(\);/);
+  assert.match(componentSource, /selfConfigContext,/);
+  assert.match(componentSource, /async function fetchSelfConfigContext\(\)/);
+  assert.match(componentSource, /catch \{[\s\S]*return \{\};[\s\S]*\}/);
+  assert.match(componentSource, /function formatProfileForPrompt/);
+  assert.match(componentSource, /function formatPolicyForPrompt/);
+  assert.match(componentSource, /function formatMemoriesForPrompt/);
+});

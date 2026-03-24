@@ -168,6 +168,34 @@ export async function apiPost<T>(path: string, payload: unknown): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+export async function apiPut<T>(path: string, payload: unknown): Promise<T> {
+  const response = await fetch(buildApiUrl(path), {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw new Error(await buildHttpErrorMessage(response, "PUT", path));
+  }
+  return response.json() as Promise<T>;
+}
+
+export async function apiPatch<T>(path: string, payload: unknown): Promise<T> {
+  const response = await fetch(buildApiUrl(path), {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw new Error(await buildHttpErrorMessage(response, "PATCH", path));
+  }
+  return response.json() as Promise<T>;
+}
+
 export async function apiPostText(path: string, payload: unknown): Promise<string> {
   const response = await fetch(buildApiUrl(path), {
     method: "POST",

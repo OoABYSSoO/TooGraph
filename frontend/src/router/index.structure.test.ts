@@ -17,6 +17,8 @@ test("router exposes first-class management pages for presets and skills", () =>
   assert.match(routerSource, /const SkillsPage = \(\) => import\("@\/pages\/SkillsPage\.vue"\);/);
   assert.match(routerSource, /const ModelProvidersPage = \(\) => import\("@\/pages\/ModelProvidersPage\.vue"\);/);
   assert.match(routerSource, /const ModelLogsPage = \(\) => import\("@\/pages\/ModelLogsPage\.vue"\);/);
+  assert.match(routerSource, /const CompanionPage = \(\) => import\("@\/pages\/CompanionPage\.vue"\);/);
+  assert.match(routerSource, /\{ path: "\/companion", component: CompanionPage \}/);
   assert.match(routerSource, /\{ path: "\/presets", component: PresetsPage \}/);
   assert.match(routerSource, /\{ path: "\/skills", component: SkillsPage \}/);
   assert.match(routerSource, /\{ path: "\/models", component: ModelProvidersPage \}/);
@@ -27,6 +29,7 @@ test("router lazy-loads page components to keep the production entry chunk small
   for (const pageName of [
     "EditorPage",
     "HomePage",
+    "CompanionPage",
     "ModelLogsPage",
     "ModelProvidersPage",
     "PresetsPage",
