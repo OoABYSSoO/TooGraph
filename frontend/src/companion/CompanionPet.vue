@@ -76,6 +76,9 @@
             <p>{{ message.content || t("companion.streaming") }}</p>
           </article>
           <p v-if="errorMessage" class="companion-pet__error">{{ errorMessage }}</p>
+          <p v-if="queuedTurns.length > 0" class="companion-pet__queue">
+            {{ t("companion.queueStatus", { count: queuedTurns.length }) }}
+          </p>
         </div>
 
         <form class="companion-pet__form" @submit.prevent="sendMessage">
@@ -84,13 +87,12 @@
             class="companion-pet__input"
             rows="2"
             :placeholder="t('companion.placeholder')"
-            :disabled="isBusy"
             @keydown.enter.exact.prevent="sendMessage"
           />
           <button
             type="submit"
             class="companion-pet__send"
-            :disabled="isBusy || !draft.trim()"
+            :disabled="!draft.trim()"
             :title="t('companion.send')"
             :aria-label="t('companion.send')"
           >
@@ -158,6 +160,13 @@ type CompanionMessage = CompanionChatMessage & {
   id: string;
 };
 
+type CompanionMessagePatch = Partial<Pick<CompanionMessage, "content" | "includeInContext">>;
+
+type CompanionQueuedTurn = {
+  userMessageId: string;
+  userMessage: string;
+};
+
 type CompanionMood = "idle" | "thinking" | "speaking" | "error";
 
 const COMPANION_HISTORY_STORAGE_KEY = "graphiteui:companion-history";
@@ -175,6 +184,7 @@ const isPanelOpen = ref(false);
 const draft = ref("");
 const companionMode = ref<CompanionMode>(DEFAULT_COMPANION_MODE);
 const messages = ref<CompanionMessage[]>([]);
+const queuedTurns = ref<CompanionQueuedTurn[]>([]);
 const errorMessage = ref("");
 const mood = ref<CompanionMood>("idle");
 const tapNonce = ref(0);
@@ -191,8 +201,9 @@ const pointerDrag = ref<{
 let suppressNextClick = false;
 let eventSource: EventSource | null = null;
 let activeAbortController: AbortController | null = null;
+let isDrainingCompanionQueue = false;
+let speakingIdleTimerId: number | null = null;
 
-const isBusy = computed(() => mood.value === "thinking" || mood.value === "speaking");
 const isDragging = computed(() => Boolean(pointerDrag.value?.moved));
 const companionModeLabel = computed(() => {
   const option = COMPANION_MODE_OPTIONS.find((candidate) => candidate.value === companionMode.value);
@@ -223,6 +234,8 @@ onBeforeUnmount(() => {
   window.removeEventListener("resize", handleResize);
   window.removeEventListener("pointermove", handlePointerMove);
   window.removeEventListener("pointerup", handlePointerUp);
+  queuedTurns.value = [];
+  clearSpeakingIdleTimer();
   closeEventSource();
   activeAbortController?.abort();
 });
@@ -232,7 +245,12 @@ watch(
   (nextMessages) => {
     window.localStorage.setItem(
       COMPANION_HISTORY_STORAGE_KEY,
-      JSON.stringify(nextMessages.slice(-24).map(({ role, content }) => ({ role, content }))),
+      JSON.stringify(
+        nextMessages
+          .filter(isPersistableMessageForStorage)
+          .slice(-24)
+          .map(({ role, content, includeInContext }) => ({ role, content, includeInContext })),
+      ),
     );
   },
   { deep: true },
@@ -304,7 +322,7 @@ function handlePointerUp(event: PointerEvent) {
 
 async function sendMessage() {
   const userMessage = draft.value.trim();
-  if (!userMessage || isBusy.value) {
+  if (!userMessage) {
     return;
   }
 
@@ -312,19 +330,50 @@ async function sendMessage() {
   isPanelOpen.value = true;
   draft.value = "";
 
-  const history = messages.value.map(({ role, content }) => ({ role, content }));
-  messages.value.push(createMessage("user", userMessage));
-  const assistantMessage = createMessage("assistant", "");
-  messages.value.push(assistantMessage);
+  const userEntry = createMessage("user", userMessage);
+  messages.value.push(userEntry);
+  queuedTurns.value.push({
+    userMessageId: userEntry.id,
+    userMessage,
+  });
+  void drainCompanionQueue();
+  await scrollMessagesToBottom();
+}
+
+async function drainCompanionQueue() {
+  if (isDrainingCompanionQueue) {
+    return;
+  }
+
+  isDrainingCompanionQueue = true;
+  try {
+    while (queuedTurns.value.length > 0) {
+      const nextTurn = queuedTurns.value.shift();
+      if (!nextTurn) {
+        continue;
+      }
+      await processQueuedTurn(nextTurn);
+    }
+  } finally {
+    isDrainingCompanionQueue = false;
+    if (queuedTurns.value.length > 0) {
+      void drainCompanionQueue();
+    }
+  }
+}
+
+async function processQueuedTurn(turn: CompanionQueuedTurn) {
+  clearSpeakingIdleTimer();
+  const history = buildHistoryBeforeMessage(turn.userMessageId);
+  const assistantMessage = appendAssistantMessageForTurn(turn.userMessageId);
   mood.value = "thinking";
   await scrollMessagesToBottom();
 
   try {
-    activeAbortController?.abort();
     activeAbortController = new AbortController();
     const template = await fetchTemplate(COMPANION_TEMPLATE_ID);
     const graph = buildCompanionChatGraph(template, {
-      userMessage,
+      userMessage: turn.userMessage,
       history,
       pageContext: buildPageContext(),
       companionMode: companionMode.value,
@@ -346,22 +395,25 @@ async function sendMessage() {
     mood.value = "error";
     const message = error instanceof Error ? error.message : t("companion.runFailed");
     errorMessage.value = message;
-    updateAssistantMessage(assistantMessage.id, t("companion.errorReply", { error: message }));
+    updateAssistantMessage(assistantMessage.id, t("companion.errorReply", { error: message }), { includeInContext: false });
   } finally {
     closeEventSource();
     activeRunId.value = null;
-    if (mood.value === "speaking") {
-      window.setTimeout(() => {
-        if (!isBusy.value) {
-          mood.value = "idle";
-        }
-      }, 1400);
+    activeAbortController = null;
+    if (mood.value === "speaking" && queuedTurns.value.length === 0) {
+      scheduleSpeakingIdle();
     }
     await scrollMessagesToBottom();
   }
 }
 
 function clearMessages() {
+  queuedTurns.value = [];
+  clearSpeakingIdleTimer();
+  closeEventSource();
+  activeAbortController?.abort();
+  activeAbortController = null;
+  activeRunId.value = null;
   messages.value = [];
   errorMessage.value = "";
   mood.value = "idle";
@@ -449,12 +501,48 @@ function closeEventSource() {
   eventSource = null;
 }
 
-function updateAssistantMessage(messageId: string, content: string) {
+function updateAssistantMessage(messageId: string, content: string, patch: CompanionMessagePatch = {}) {
   const target = messages.value.find((message) => message.id === messageId);
   if (!target) {
     return;
   }
   target.content = content;
+  Object.assign(target, patch);
+}
+
+function buildHistoryBeforeMessage(messageId: string): CompanionChatMessage[] {
+  const messageIndex = messages.value.findIndex((message) => message.id === messageId);
+  const previousMessages = messageIndex >= 0 ? messages.value.slice(0, messageIndex) : messages.value;
+  return previousMessages.filter(isContextMessage).map(({ role, content }) => ({ role, content }));
+}
+
+function appendAssistantMessageForTurn(userMessageId: string): CompanionMessage {
+  const assistantMessage = createMessage("assistant", "");
+  const userMessageIndex = messages.value.findIndex((message) => message.id === userMessageId);
+  if (userMessageIndex >= 0 && userMessageIndex < messages.value.length - 1) {
+    messages.value.splice(userMessageIndex + 1, 0, assistantMessage);
+    return assistantMessage;
+  }
+  messages.value.push(assistantMessage);
+  return assistantMessage;
+}
+
+function scheduleSpeakingIdle() {
+  clearSpeakingIdleTimer();
+  speakingIdleTimerId = window.setTimeout(() => {
+    speakingIdleTimerId = null;
+    if (mood.value === "speaking" && queuedTurns.value.length === 0 && !isDrainingCompanionQueue) {
+      mood.value = "idle";
+    }
+  }, 1400);
+}
+
+function clearSpeakingIdleTimer() {
+  if (speakingIdleTimerId === null) {
+    return;
+  }
+  window.clearTimeout(speakingIdleTimerId);
+  speakingIdleTimerId = null;
 }
 
 async function scrollMessagesToBottom() {
@@ -480,6 +568,14 @@ function createMessage(role: CompanionChatMessage["role"], content: string): Com
     role,
     content,
   };
+}
+
+function isContextMessage(message: CompanionMessage): boolean {
+  return message.includeInContext !== false;
+}
+
+function isPersistableMessageForStorage(message: CompanionMessage): boolean {
+  return message.includeInContext !== false;
 }
 
 function resolveViewport() {
@@ -516,7 +612,9 @@ function isPersistedMessage(value: unknown): value is CompanionChatMessage {
     value !== null &&
     !Array.isArray(value) &&
     ((value as CompanionChatMessage).role === "user" || (value as CompanionChatMessage).role === "assistant") &&
-    typeof (value as CompanionChatMessage).content === "string"
+    typeof (value as CompanionChatMessage).content === "string" &&
+    ((value as CompanionChatMessage).includeInContext === undefined ||
+      typeof (value as CompanionChatMessage).includeInContext === "boolean")
   );
 }
 </script>
@@ -747,7 +845,8 @@ function isPersistedMessage(value: unknown): value is CompanionChatMessage {
 }
 
 .companion-pet__empty,
-.companion-pet__error {
+.companion-pet__error,
+.companion-pet__queue {
   margin: 0;
   font-size: 13px;
   line-height: 1.5;
@@ -763,6 +862,11 @@ function isPersistedMessage(value: unknown): value is CompanionChatMessage {
   border-radius: 8px;
   background: rgba(254, 242, 242, 0.92);
   color: rgb(185, 28, 28);
+}
+
+.companion-pet__queue {
+  color: rgba(108, 82, 62, 0.72);
+  font-size: 12px;
 }
 
 .companion-pet__message {

@@ -44,6 +44,7 @@ export const COMPANION_MODE_OPTIONS: CompanionModeOption[] = [
 export type CompanionChatMessage = {
   role: CompanionChatRole;
   content: string;
+  includeInContext?: boolean;
 };
 
 export type BuildCompanionChatGraphInput = {
@@ -58,7 +59,9 @@ export function formatCompanionHistory(messages: CompanionChatMessage[], maxMess
     .map((message) => ({
       role: message.role,
       content: message.content.trim(),
+      includeInContext: message.includeInContext,
     }))
+    .filter((message) => message.includeInContext !== false)
     .filter((message) => message.content.length > 0)
     .slice(-maxMessages);
 

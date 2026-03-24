@@ -131,6 +131,17 @@ test("formatCompanionHistory keeps a compact readable transcript", () => {
   );
 });
 
+test("formatCompanionHistory ignores messages marked outside the model context", () => {
+  assert.equal(
+    formatCompanionHistory([
+      { role: "user", content: "你好" },
+      { role: "assistant", content: "运行失败：GET /api/runs/run_1 failed with status 500", includeInContext: false },
+      { role: "user", content: "继续" },
+    ]),
+    "用户: 你好\n用户: 继续",
+  );
+});
+
 test("companion mode options expose only advisory as selectable", () => {
   assert.deepEqual(
     COMPANION_MODE_OPTIONS.map((option) => ({ value: option.value, disabled: option.disabled })),

@@ -15,6 +15,11 @@
   - 三档图操作权限：建议档、审批档、全权限档
   - 自动编排图作为补充设想，服从新的权限边界
 
+- [future/2026-05-05-companion-self-config-memory-design.md](future/2026-05-05-companion-self-config-memory-design.md)
+  - 侧边栏 Companion 页面与后端自我设定数据层
+  - 自动记忆整理，不询问、不提供关闭开关
+  - 每次更新备份旧设定，支持历史版本和恢复
+
 - [future/2026-04-27-skill-product-taxonomy.md](future/2026-04-27-skill-product-taxonomy.md)
   - Agent Skill 与 Companion Skill 的产品边界
   - Atomic / Workflow / Tool / Context / Profile / Adapter / Control 等能力形态
