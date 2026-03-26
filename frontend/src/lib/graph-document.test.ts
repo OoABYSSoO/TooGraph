@@ -21,10 +21,10 @@ const {
 } = graphDocument;
 
 const template: TemplateRecord = {
-  template_id: "hello_world",
-  label: "Hello World",
-  description: "A minimal hello world graph for validating the runtime path.",
-  default_graph_name: "Hello World",
+  template_id: "starter_graph",
+  label: "Starter Graph",
+  description: "A minimal starter graph for validating the runtime path.",
+  default_graph_name: "Starter Graph",
   state_schema: {
     question: {
       name: "question",
@@ -63,7 +63,7 @@ test("createDraftFromTemplate creates a backend-native graph payload", () => {
   const draft = createDraftFromTemplate(template);
 
   assert.equal(draft.graph_id, null);
-  assert.equal(draft.name, "Hello World");
+  assert.equal(draft.name, "Starter Graph");
   assert.deepEqual(draft.state_schema, template.state_schema);
   assert.deepEqual(draft.nodes, template.nodes);
   assert.deepEqual(draft.edges, template.edges);
@@ -215,14 +215,14 @@ test("createDraftFromTemplate accepts Vue reactive template records", () => {
 
   const draft = createDraftFromTemplate(reactiveTemplate);
 
-  assert.equal(draft.name, "Hello World");
+  assert.equal(draft.name, "Starter Graph");
   assert.deepEqual(draft.nodes, template.nodes);
 });
 
 test("cloneGraphDocument accepts Vue reactive graph documents", () => {
   const graph: GraphDocument = {
     graph_id: "graph_123",
-    name: "Hello World",
+    name: "Starter Graph",
     state_schema: template.state_schema,
     nodes: template.nodes,
     edges: template.edges,
@@ -302,7 +302,7 @@ test("createEmptyDraftGraph creates an empty backend-native payload", () => {
   });
 });
 
-test("resolveEditorSeedTemplate prefers the requested template, then hello world, then the first template", () => {
+test("resolveEditorSeedTemplate prefers the requested template, then the first template", () => {
   const alternateTemplate = {
     ...template,
     template_id: "alternate",
@@ -310,16 +310,16 @@ test("resolveEditorSeedTemplate prefers the requested template, then hello world
   };
 
   assert.equal(resolveEditorSeedTemplate([template, alternateTemplate], "alternate")?.template_id, "alternate");
-  assert.equal(resolveEditorSeedTemplate([alternateTemplate, template], null)?.template_id, "hello_world");
+  assert.equal(resolveEditorSeedTemplate([alternateTemplate, template], null)?.template_id, "alternate");
   assert.equal(resolveEditorSeedTemplate([alternateTemplate], null)?.template_id, "alternate");
   assert.equal(resolveEditorSeedTemplate([], null), null);
 });
 
-test("createEditorSeedDraftGraph restores the baseline hello world seed for blank new graphs", () => {
+test("createEditorSeedDraftGraph restores the first available seed for blank new graphs", () => {
   const draft = createEditorSeedDraftGraph([template], null);
 
   assert.equal(draft.graph_id, null);
-  assert.equal(draft.name, "Hello World");
+  assert.equal(draft.name, "Starter Graph");
   assert.deepEqual(draft.nodes, template.nodes);
   assert.notEqual(draft.nodes, template.nodes);
 

@@ -91,8 +91,9 @@ function skillIsAutoSelectable(skill: SkillDefinition): boolean {
 function buildSkillSearchText(skill: SkillDefinition): string {
   return [
     skill.skillKey,
-    skill.label,
+    skill.name,
     skill.description,
+    skill.agentInstruction,
     skill.version,
     skill.kind,
     skill.mode,

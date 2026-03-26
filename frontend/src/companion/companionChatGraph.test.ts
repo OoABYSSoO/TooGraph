@@ -18,7 +18,7 @@ import type { SkillDefinition } from "../types/skills.ts";
 
 function createTemplate(): TemplateRecord {
   return {
-    template_id: "companion_chat_loop",
+    template_id: "basic_companion_loop",
     label: "桌宠对话循环",
     description: "Companion chat",
     default_graph_name: "桌宠对话循环",
@@ -165,7 +165,7 @@ function createTemplate(): TemplateRecord {
 
 function createAgenticTemplate(): TemplateRecord {
   return {
-    template_id: "companion_agentic_tool_loop",
+    template_id: "companion_autonomous_loop",
     label: "桌宠自主工具循环",
     description: "Agentic companion loop",
     default_graph_name: "桌宠自主工具循环",
@@ -259,8 +259,9 @@ function createAgenticTemplate(): TemplateRecord {
 function createSkillDefinition(overrides: Partial<SkillDefinition> = {}): SkillDefinition {
   return {
     skillKey: "web_search",
-    label: "Web Search",
+    name: "Web Search",
     description: "Search the public web.",
+    agentInstruction: "Choose the query and run the bound web search skill.",
     schemaVersion: "graphite.skill/v1",
     version: "1.0.0",
     runPolicies: {
@@ -341,8 +342,8 @@ test("resolveCompanionMode accepts approval and falls back from unavailable tier
   assert.equal(resolveCompanionMode("unknown"), "advisory");
 });
 
-test("companion pet defaults to the agentic tool loop template", () => {
-  assert.equal(COMPANION_TEMPLATE_ID, "companion_agentic_tool_loop");
+test("companion pet defaults to the autonomous loop template id", () => {
+  assert.equal(COMPANION_TEMPLATE_ID, "companion_autonomous_loop");
 });
 
 test("buildCompanionChatGraph keeps no-approval web search auto-selectable in advisory mode", () => {
@@ -354,9 +355,9 @@ test("buildCompanionChatGraph keeps no-approval web search auto-selectable in ad
     skillCatalog: [
       createSkillDefinition(),
       createSkillDefinition({
-        skillKey: "web_media_downloader",
-        label: "Web Media Downloader",
-        description: "Download authorized web media.",
+        skillKey: "restricted_media_fetcher",
+        name: "Restricted Media Fetcher",
+        description: "Fetch authorized media with approval.",
         runPolicies: {
           default: { discoverable: true, autoSelectable: false, requiresApproval: true },
           origins: {

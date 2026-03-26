@@ -27,7 +27,7 @@ def _agent_skill_definition(
 ) -> SkillDefinition:
     return SkillDefinition(
         skillKey=skill_key,
-        label=skill_key,
+        name=skill_key,
         runtime={"type": "python", "entrypoint": runtime_entrypoint or "run.py"},
         inputSchema=input_schema or [],
         outputSchema=output_schema or [SkillIoField(key="summary", label="Summary", valueType="text")],

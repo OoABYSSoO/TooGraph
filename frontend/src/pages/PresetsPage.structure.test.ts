@@ -5,8 +5,8 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
-const componentSource = readFileSync(resolve(currentDirectory, "PresetsPage.vue"), "utf8");
-const sourceCoverageTest = readFileSync(resolve(currentDirectory, "../i18n/sourceCoverage.test.ts"), "utf8");
+const componentSource = readFileSync(resolve(currentDirectory, "PresetsPage.vue"), "utf8").replace(/\r\n/g, "\n");
+const sourceCoverageTest = readFileSync(resolve(currentDirectory, "../i18n/sourceCoverage.test.ts"), "utf8").replace(/\r\n/g, "\n");
 
 test("PresetsPage loads persisted node presets into a searchable management surface", () => {
   assert.match(componentSource, /import \{ deletePreset, fetchPresets, updatePresetStatus \} from "@\/api\/presets";/);

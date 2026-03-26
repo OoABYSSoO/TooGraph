@@ -283,7 +283,7 @@ class AgentResponseGenerationTests(unittest.TestCase):
                     _agent_node(writes=[{"state": "answer"}], task_instruction="整理技能结果。"),
                     {"genre": "SLG"},
                     {
-                        "game_ad_research_collector": {
+                        "artifact_collector": {
                             "downloaded_files": [
                                 {
                                     "filename": "clip.mp4",

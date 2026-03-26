@@ -6,10 +6,10 @@ import { filterWelcomeGraphs, filterWelcomeTemplates } from "./editorWelcomeSear
 test("filterWelcomeTemplates matches id label and description", () => {
   const templates = [
     {
-      template_id: "hello_world",
-      label: "Hello World",
-      description: "A minimal hello world graph.",
-      default_graph_name: "Hello World",
+      template_id: "starter_graph",
+      label: "Starter Graph",
+      description: "A minimal starter graph.",
+      default_graph_name: "Starter Graph",
       state_schema: {},
       nodes: {},
       edges: [],
@@ -29,7 +29,7 @@ test("filterWelcomeTemplates matches id label and description", () => {
     },
   ];
 
-  assert.equal(filterWelcomeTemplates(templates, "hello").length, 1);
+  assert.equal(filterWelcomeTemplates(templates, "starter").length, 1);
   assert.equal(filterWelcomeTemplates(templates, "docs").length, 1);
   assert.equal(filterWelcomeTemplates(templates, "knowledge_validation").length, 1);
 });
@@ -38,7 +38,7 @@ test("filterWelcomeGraphs matches graph id and name", () => {
   const graphs = [
     {
       graph_id: "graph_1",
-      name: "Hello World",
+      name: "Starter Graph",
       state_schema: {},
       nodes: {},
       edges: [],
@@ -56,6 +56,6 @@ test("filterWelcomeGraphs matches graph id and name", () => {
     },
   ];
 
-  assert.equal(filterWelcomeGraphs(graphs, "hello").length, 1);
+  assert.equal(filterWelcomeGraphs(graphs, "starter").length, 1);
   assert.equal(filterWelcomeGraphs(graphs, "graph_2").length, 1);
 });

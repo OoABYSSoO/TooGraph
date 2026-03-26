@@ -12,8 +12,9 @@ import type { SkillDefinition } from "../../types/skills.ts";
 const skillDefinitions: SkillDefinition[] = [
   {
     skillKey: "web_search",
-    label: "Web Search",
+    name: "Web Search",
     description: "Searches the public web.",
+    agentInstruction: "Decide the search query and execute this bound web search skill. Do not summarize the result.",
     schemaVersion: "graphite.skill/v1",
     inputSchema: [],
     outputSchema: [],
@@ -40,8 +41,9 @@ const skillDefinitions: SkillDefinition[] = [
   },
   {
     skillKey: "append_usage_introduction",
-    label: "Append Usage Introduction",
+    name: "Append Usage Introduction",
     description: "Appends usage instructions to the answer.",
+    agentInstruction: "Use append_usage_introduction only when it is explicitly bound to the agent node.",
     schemaVersion: "graphite.skill/v1",
     inputSchema: [],
     outputSchema: [],
@@ -73,7 +75,7 @@ const unavailableSkillDefinitions: SkillDefinition[] = [
   {
     ...skillDefinitions[1],
     skillKey: "desktop_companion_profile",
-    label: "Desktop Companion Profile",
+    name: "Desktop Companion Profile",
     kind: "profile",
     mode: "context",
     scope: "global",
@@ -81,31 +83,31 @@ const unavailableSkillDefinitions: SkillDefinition[] = [
   {
     ...skillDefinitions[1],
     skillKey: "needs_configuration",
-    label: "Needs Configuration",
+    name: "Needs Configuration",
     configured: false,
   },
   {
     ...skillDefinitions[1],
     skillKey: "unhealthy_skill",
-    label: "Unhealthy Skill",
+    name: "Unhealthy Skill",
     healthy: false,
   },
   {
     ...skillDefinitions[1],
     skillKey: "runtime_pending",
-    label: "Runtime Pending",
+    name: "Runtime Pending",
     runtimeRegistered: false,
   },
   {
     ...skillDefinitions[1],
     skillKey: "disabled_skill",
-    label: "Disabled Skill",
+    name: "Disabled Skill",
     status: "disabled",
   },
   {
     ...skillDefinitions[1],
     skillKey: "needs_manifest",
-    label: "Needs Manifest",
+    name: "Needs Manifest",
     agentNodeEligibility: "needs_manifest",
     agentNodeBlockers: ["Skill manifest is missing a script runtime entrypoint."],
   },
@@ -131,28 +133,51 @@ test("resolveAttachedSkillBadges preserves attached order and falls back to raw 
     [
       {
         skillKey: "append_usage_introduction",
-        label: "Append Usage Introduction",
+        name: "Append Usage Introduction",
         description: "Appends usage instructions to the answer.",
       },
       {
         skillKey: "custom_skill",
-        label: "custom_skill",
+        name: "custom_skill",
         description: "",
       },
     ],
   );
 });
 
-test("resolveAttachAgentSkillPatch appends new skills and ignores duplicates", () => {
-  assert.deepEqual(resolveAttachAgentSkillPatch(["web_search"], "append_usage_introduction"), {
+test("resolveAttachAgentSkillPatch appends new skills and creates instruction blocks", () => {
+  assert.deepEqual(resolveAttachAgentSkillPatch(["web_search"], "append_usage_introduction", skillDefinitions, {}), {
     skills: ["web_search", "append_usage_introduction"],
+    skillInstructionBlocks: {
+      append_usage_introduction: {
+        skillKey: "append_usage_introduction",
+        title: "Append Usage Introduction skill instruction",
+        content: "Use append_usage_introduction only when it is explicitly bound to the agent node.",
+        source: "skill.agentInstruction",
+      },
+    },
   });
-  assert.equal(resolveAttachAgentSkillPatch(["web_search"], "web_search"), null);
+  assert.equal(resolveAttachAgentSkillPatch(["web_search"], "web_search", skillDefinitions, {}), null);
 });
 
-test("resolveRemoveAgentSkillPatch removes existing skills and ignores missing keys", () => {
-  assert.deepEqual(resolveRemoveAgentSkillPatch(["web_search", "append_usage_introduction"], "web_search"), {
-    skills: ["append_usage_introduction"],
-  });
-  assert.equal(resolveRemoveAgentSkillPatch(["web_search"], "append_usage_introduction"), null);
+test("resolveRemoveAgentSkillPatch removes existing skills and instruction blocks", () => {
+  assert.deepEqual(
+    resolveRemoveAgentSkillPatch(
+      ["web_search", "append_usage_introduction"],
+      "web_search",
+      {
+        web_search: {
+          skillKey: "web_search",
+          title: "Web Search skill instruction",
+          content: "Decide the search query and execute this bound web search skill. Do not summarize the result.",
+          source: "skill.agentInstruction",
+        },
+      },
+    ),
+    {
+      skills: ["append_usage_introduction"],
+      skillInstructionBlocks: {},
+    },
+  );
+  assert.equal(resolveRemoveAgentSkillPatch(["web_search"], "append_usage_introduction", {}), null);
 });

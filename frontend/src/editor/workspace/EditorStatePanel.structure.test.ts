@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDirectory = dirname(currentFilePath);
-const componentSource = readFileSync(resolve(currentDirectory, "EditorStatePanel.vue"), "utf8");
+const componentSource = readFileSync(resolve(currentDirectory, "EditorStatePanel.vue"), "utf8").replace(/\r\n/g, "\n");
 
 test("EditorStatePanel presents the right sidebar as a compact inspector", () => {
   assert.doesNotMatch(componentSource, /editor-state-panel__collapsed/);

@@ -17,7 +17,7 @@ from app.core.schemas.skills import SkillIoField
 
 
 class RuntimeSkillBindingsTests(unittest.TestCase):
-    def test_legacy_skills_normalize_to_before_agent_bindings(self) -> None:
+    def test_attached_skills_normalize_to_before_agent_bindings(self) -> None:
         node = NodeSystemAgentNode.model_validate(
             {
                 "kind": "agent",
@@ -79,17 +79,17 @@ class RuntimeSkillBindingsTests(unittest.TestCase):
             node,
             input_values={
                 "allowed_skills": [
-                    {"skillKey": "local_file", "label": "Local File"},
+                    {"skillKey": "file_reader", "name": "File Reader"},
                     {"skill_key": "web_search"},
-                    "web_media_downloader",
+                    "media_fetcher",
                 ]
             },
             state_schema=state_schema,
         )
 
-        self.assertEqual([binding.skill_key for binding in bindings], ["web_search", "local_file", "web_media_downloader"])
+        self.assertEqual([binding.skill_key for binding in bindings], ["web_search", "file_reader", "media_fetcher"])
 
-    def test_resolved_bindings_mark_skill_state_source_without_changing_legacy_bindings(self) -> None:
+    def test_resolved_bindings_mark_skill_state_source_without_changing_attached_bindings(self) -> None:
         node = NodeSystemAgentNode.model_validate(
             {
                 "kind": "agent",
@@ -106,7 +106,7 @@ class RuntimeSkillBindingsTests(unittest.TestCase):
             node,
             input_values={
                 "allowed_skills": [
-                    {"skillKey": "local_file", "label": "Local File"},
+                    {"skillKey": "file_reader", "name": "File Reader"},
                     {"skill_key": "web_search"},
                 ]
             },
@@ -115,7 +115,7 @@ class RuntimeSkillBindingsTests(unittest.TestCase):
 
         self.assertEqual(
             [(item.binding.skill_key, item.source) for item in resolved],
-            [("web_search", "node_config"), ("local_file", "skill_state")],
+            [("web_search", "node_config"), ("file_reader", "skill_state")],
         )
 
     def test_skill_state_inputs_ignore_non_skill_state_values(self) -> None:
@@ -136,7 +136,7 @@ class RuntimeSkillBindingsTests(unittest.TestCase):
             node,
             input_values={
                 "allowed_skills": {"skillKey": "web_search"},
-                "raw_json": {"skillKey": "local_file"},
+                "raw_json": {"skillKey": "file_reader"},
             },
             state_schema=state_schema,
         )

@@ -22,8 +22,9 @@ test("fetchSkillDefinitions requests the skill definitions endpoint", async () =
       JSON.stringify([
         {
           skillKey: "web_search",
-          label: "Web Search",
+          name: "Web Search",
           description: "Searches the web.",
+          agentInstruction: "Choose the query and run the bound web search skill.",
           schemaVersion: "graphite.skill/v1",
           inputSchema: [
             {
@@ -84,8 +85,9 @@ test("fetchSkillDefinitions requests the skill definitions endpoint", async () =
   assert.deepEqual(skillDefinitions, [
     {
       skillKey: "web_search",
-      label: "Web Search",
+      name: "Web Search",
       description: "Searches the web.",
+      agentInstruction: "Choose the query and run the bound web search skill.",
       schemaVersion: "graphite.skill/v1",
       inputSchema: [
         {

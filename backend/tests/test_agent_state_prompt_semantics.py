@@ -55,6 +55,40 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
         self.assertIn("description: 给用户看的中文总结", prompt)
         self.assertIn('"state_1": "在此填写完整内容"', prompt)
 
+    def test_auto_prompt_hides_skill_bound_state_when_marked_prompt_invisible(self) -> None:
+        state_schema = {
+            "search_urls": NodeSystemStateDefinition(
+                name="Search URLs",
+                description="Raw URLs returned by the bound web search skill.",
+                type=NodeSystemStateType.FILE_LIST,
+                value=[],
+                promptVisible=False,
+            ),
+            "question": NodeSystemStateDefinition(
+                name="Question",
+                description="Visible user request.",
+                type=NodeSystemStateType.TEXT,
+                value="",
+            ),
+            "answer": NodeSystemStateDefinition(
+                name="Answer",
+                type=NodeSystemStateType.MARKDOWN,
+                value="",
+            ),
+        }
+
+        prompt = build_auto_system_prompt(
+            ["answer"],
+            {"search_urls": ["https://example.com/a"], "question": "Summarize the latest AI news"},
+            {},
+            state_schema=state_schema,
+        )
+
+        self.assertNotIn("key: search_urls", prompt)
+        self.assertNotIn("https://example.com/a", prompt)
+        self.assertIn("key: question", prompt)
+        self.assertIn("Summarize the latest AI news", prompt)
+
     def test_auto_prompt_emphasizes_output_state_value_formats(self) -> None:
         state_schema = {
             "state_1": NodeSystemStateDefinition(

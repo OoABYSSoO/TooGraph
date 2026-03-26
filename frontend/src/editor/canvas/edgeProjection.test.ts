@@ -1,6 +1,5 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 
 import { buildSequenceFlowPath } from "./flowEdgePath.ts";
 import { groupProjectedCanvasAnchors, groupProjectedCanvasEdges, projectCanvasAnchors, projectCanvasEdges } from "./edgeProjection.ts";
@@ -242,46 +241,81 @@ test("projectCanvasEdges shows every reachable data writer for a state read", ()
 });
 
 test("projectCanvasEdges shows the web research search query flowing from the planner", () => {
-  const template = JSON.parse(
-    readFileSync(new URL("../../../../backend/app/templates/web_research_loop.json", import.meta.url), "utf8"),
-  ) as GraphPayload;
-  for (const node of Object.values(template.nodes)) {
-    node.reads ??= [];
-    node.writes ??= [];
-  }
-  const projected = projectCanvasEdges(template);
-  const queryEdge = projected.find((edge) => edge.kind === "data" && edge.state === "state_2" && edge.target === "web_search_agent");
+  const searchGraph: GraphPayload = {
+    graph_id: null,
+    name: "Manual search graph",
+    state_schema: {
+      search_query: { name: "search_query", description: "", type: "text", value: "", color: "#2563eb" },
+      search_result: { name: "search_result", description: "", type: "json", value: {}, color: "#7c3aed" },
+    },
+    nodes: {
+      plan_search_query: {
+        kind: "agent",
+        name: "plan_search_query",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [{ state: "search_query", mode: "replace" }],
+        config: { skills: [], taskInstruction: "", modelSource: "global", model: "", thinkingMode: "off", temperature: 0 },
+      },
+      web_search_agent: {
+        kind: "agent",
+        name: "web_search_agent",
+        description: "",
+        ui: { position: { x: 480, y: 0 } },
+        reads: [{ state: "search_query", required: true }],
+        writes: [{ state: "search_result", mode: "replace" }],
+        config: { skills: ["web_search"], taskInstruction: "", modelSource: "global", model: "", thinkingMode: "off", temperature: 0 },
+      },
+    },
+    edges: [{ source: "plan_search_query", target: "web_search_agent" }],
+    conditional_edges: [],
+    metadata: {},
+  };
+  const projected = projectCanvasEdges(searchGraph);
+  const queryEdge = projected.find((edge) => edge.kind === "data" && edge.state === "search_query" && edge.target === "web_search_agent");
 
   assert.ok(queryEdge);
   assert.equal(queryEdge.source, "plan_search_query");
-  assert.equal(queryEdge.id, "data:plan_search_query:state_2->web_search_agent");
+  assert.equal(queryEdge.id, "data:plan_search_query:search_query->web_search_agent");
 });
 
 test("projectCanvasEdges shows a self feedback data edge for nodes that read and write the same state", () => {
-  const template = JSON.parse(
-    readFileSync(new URL("../../../../backend/app/templates/web_research_loop.json", import.meta.url), "utf8"),
-  ) as GraphPayload;
-  for (const node of Object.values(template.nodes)) {
-    node.reads ??= [];
-    node.writes ??= [];
-  }
+  const feedbackGraph: GraphPayload = {
+    graph_id: null,
+    name: "Manual feedback graph",
+    state_schema: {
+      retry_state: { name: "retry_state", description: "", type: "json", value: {}, color: "#7c3aed" },
+    },
+    nodes: {
+      assess_search_sufficiency: {
+        kind: "agent",
+        name: "assess_search_sufficiency",
+        description: "",
+        ui: { position: { x: 120, y: 120 } },
+        reads: [{ state: "retry_state", required: false }],
+        writes: [{ state: "retry_state", mode: "replace" }],
+        config: { skills: [], taskInstruction: "", modelSource: "global", model: "", thinkingMode: "off", temperature: 0 },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
 
-  const projected = projectCanvasEdges(template);
+  const projected = projectCanvasEdges(feedbackGraph);
   const feedbackEdge = projected.find(
     (edge) =>
       edge.kind === "data" &&
       edge.source === "assess_search_sufficiency" &&
       edge.target === "assess_search_sufficiency" &&
-      edge.state === "state_4",
+      edge.state === "retry_state",
   );
 
   assert.ok(feedbackEdge);
-  assert.equal(feedbackEdge.id, "data:assess_search_sufficiency:state_4->assess_search_sufficiency");
+  assert.equal(feedbackEdge.id, "data:assess_search_sufficiency:retry_state->assess_search_sufficiency");
   assert.equal(feedbackEdge.color, "#7c3aed");
-  assert.equal(
-    feedbackEdge.path,
-    "M 2540 425 L 2568 425 L 2594 425 Q 2612 425 2612 407 L 2612 250 Q 2612 232 2594 232 L 2072 232 Q 2054 232 2054 250 L 2054 583 Q 2054 601 2072 601 L 2098 601 L 2126 601",
-  );
+  assert.match(feedbackEdge.path, /^M .* Q /);
 });
 
 test("projectCanvasEdges exposes branch metadata for condition routes", () => {

@@ -264,5 +264,5 @@ test("skill state type is available and uses structured skill descriptors", () =
   assert.ok(STATE_FIELD_TYPE_OPTIONS.includes("skill"));
   assert.deepEqual(defaultValueForStateType("skill"), []);
   assert.equal(formatStateValueInput("skill", [{ skillKey: "web_search" }]), '[\n  {\n    "skillKey": "web_search"\n  }\n]');
-  assert.deepEqual(parseStateValueInput("skill", '[{"skillKey":"local_file"}]'), [{ skillKey: "local_file" }]);
+  assert.deepEqual(parseStateValueInput("skill", '[{"skillKey":"file_reader"}]'), [{ skillKey: "file_reader" }]);
 });

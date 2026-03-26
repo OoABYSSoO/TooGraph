@@ -33,8 +33,11 @@ def build_auto_system_prompt(
     if input_values:
         parts.append("\n== Graph State Inputs ==")
         for key, value in input_values.items():
+            definition = resolved_state_schema.get(key)
+            if definition is not None and not definition.prompt_visible:
+                continue
             display = format_prompt_value(value)
-            parts.extend(format_state_prompt_lines(key, resolved_state_schema.get(key), value=display))
+            parts.extend(format_state_prompt_lines(key, definition, value=display))
 
     if skill_context:
         parts.append("\n== Skill Results ==")

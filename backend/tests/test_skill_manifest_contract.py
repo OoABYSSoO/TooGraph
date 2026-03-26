@@ -22,7 +22,8 @@ def _ready_manifest(skill_key: str) -> dict[str, object]:
     return {
         "schemaVersion": "graphite.skill/v1",
         "skillKey": skill_key,
-        "label": skill_key.replace("_", " ").title(),
+        "name": skill_key.replace("_", " ").title(),
+        "agentInstruction": f"Use {skill_key} only when it is explicitly bound to the agent node.",
         "inputSchema": [
             {"key": "text", "label": "Text", "valueType": "text", "required": True}
         ],
@@ -60,6 +61,12 @@ class SkillManifestContractTests(unittest.TestCase):
             definition = _parse_native_skill_manifest(manifest, SkillSourceScope.INSTALLED).definition
 
         serialized = definition.model_dump(by_alias=True)
+        self.assertEqual(serialized["name"], "Summarize Text")
+        self.assertEqual(
+            serialized["agentInstruction"],
+            "Use summarize_text only when it is explicitly bound to the agent node.",
+        )
+        self.assertNotIn("label", serialized)
         self.assertNotIn("compatibility", serialized)
         self.assertNotIn("targets", serialized)
         self.assertEqual(
@@ -118,6 +125,18 @@ class SkillManifestContractTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "targets.*no longer supported"):
                 _parse_native_skill_manifest(manifest, SkillSourceScope.INSTALLED)
 
+    def test_legacy_top_level_label_field_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            skill_dir = Path(temp_dir) / "legacy_label"
+            skill_dir.mkdir()
+            payload = _ready_manifest("legacy_label")
+            payload["label"] = "Legacy Label"
+            manifest = _write_manifest(skill_dir, payload)
+            (skill_dir / "run.py").write_text("print('{}')\n", encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "label.*no longer supported"):
+                _parse_native_skill_manifest(manifest, SkillSourceScope.INSTALLED)
+
     def test_manifest_without_runtime_needs_manifest_before_agent_node_use(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             skill_dir = Path(temp_dir) / "legacy"
@@ -127,7 +146,7 @@ class SkillManifestContractTests(unittest.TestCase):
                 {
                     "schemaVersion": "graphite.skill/v1",
                     "skillKey": "legacy_agent_skill",
-                    "label": "Legacy Agent Skill",
+                    "name": "Legacy Agent Skill",
                 },
             )
 
@@ -152,6 +171,8 @@ class SkillManifestContractTests(unittest.TestCase):
         self.assertEqual(definition.runtime.type, "python")
         self.assertEqual(definition.runtime.entrypoint, "run.py")
         self.assertEqual(definition.agent_node_eligibility, SkillAgentNodeEligibility.READY)
+        self.assertEqual([field.key for field in definition.input_schema], ["query"])
+        self.assertEqual([field.key for field in definition.output_schema], ["context", "source_urls", "artifact_paths", "errors"])
         self.assertIn("network", definition.permissions)
         self.assertIn(SkillSideEffect.NETWORK, definition.side_effects)
         self.assertIn(SkillSideEffect.SECRET_READ, definition.side_effects)

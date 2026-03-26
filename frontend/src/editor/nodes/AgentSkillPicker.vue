@@ -40,7 +40,7 @@
           @pointerdown.stop
           @click.stop="emit('attach', definition.skillKey)"
         >
-          <div class="node-card__skill-option-title">{{ definition.label }}</div>
+          <div class="node-card__skill-option-title">{{ definition.name }}</div>
           <div class="node-card__skill-option-copy">{{ definition.description }}</div>
           <div class="node-card__skill-option-meta">
             <span>{{ definition.kind }}</span>
@@ -62,7 +62,7 @@
       class="node-card__skill-badge"
       :title="badge.description || badge.skillKey"
     >
-      <span>{{ badge.label }}</span>
+      <span>{{ badge.name }}</span>
       <button
         type="button"
         class="node-card__skill-badge-remove"

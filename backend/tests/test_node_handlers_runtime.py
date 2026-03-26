@@ -198,7 +198,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             node,
             {
                 "allowed_skills": [
-                    {"skillKey": "local_file", "label": "Local File"},
+                    {"skillKey": "file_reader", "name": "File Reader"},
                     {"skill_key": "web_search"},
                 ],
                 "question": "q",
@@ -208,7 +208,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             state={"run_id": "run-1"},
             get_skill_registry_func=lambda *, include_disabled: {
                 "web_search": "web_search",
-                "local_file": "local_file",
+                "file_reader": "file_reader",
             },
             get_skill_definition_registry_func=lambda *, include_disabled: {},
             invoke_skill_func=invoke_skill_func,
@@ -225,9 +225,9 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             first_truthy_func=lambda values: next((value for value in values if value), None),
         )
 
-        self.assertEqual(invoked, ["web_search", "local_file"])
-        self.assertEqual(result["selected_skills"], ["web_search", "local_file"])
-        self.assertEqual(result["outputs"], {"answer": "web_search,local_file"})
+        self.assertEqual(invoked, ["web_search", "file_reader"])
+        self.assertEqual(result["selected_skills"], ["web_search", "file_reader"])
+        self.assertEqual(result["outputs"], {"answer": "web_search,file_reader"})
 
     def test_execute_agent_node_resolves_dynamic_skill_inputs_from_tool_input(self) -> None:
         state_schema = {
@@ -263,7 +263,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             get_skill_definition_registry_func=lambda *, include_disabled: {
                 "web_search": SkillDefinition(
                     skillKey="web_search",
-                    label="Web Search",
+                    name="Web Search",
                     inputSchema=[
                         SkillIoField(key="query", label="Query", valueType="text", required=True),
                         SkillIoField(key="max_results", label="Max Results", valueType="text"),
@@ -325,7 +325,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             get_skill_definition_registry_func=lambda *, include_disabled: {
                 "web_search": SkillDefinition(
                     skillKey="web_search",
-                    label="Web Search",
+                    name="Web Search",
                     inputSchema=[
                         SkillIoField(key="query", label="Query", valueType="text", required=True),
                     ],

@@ -107,7 +107,7 @@
                 :aria-pressed="selectedSkillKey === skill.skillKey"
                 @click="selectSkill(skill.skillKey)"
               >
-                <span>{{ skill.label }}</span>
+                <span>{{ skill.name }}</span>
               </button>
               <ElSwitch
                 :model-value="skill.status === 'active'"
@@ -122,7 +122,7 @@
             <header class="skills-page__detail-header">
               <div>
                 <div class="skills-page__id">{{ selectedSkill.skillKey }}</div>
-                <h3>{{ selectedSkill.label }}</h3>
+                <h3>{{ selectedSkill.name }}</h3>
                 <p>{{ selectedSkill.description }}</p>
               </div>
               <div class="skills-page__status">

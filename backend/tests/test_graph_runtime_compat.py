@@ -10,7 +10,7 @@ from app.api.routes_graphs import _build_runtime_graph_document
 from app.core.schemas.node_system import NodeSystemGraphPayload
 
 
-def _legacy_swapped_web_research_graph() -> NodeSystemGraphPayload:
+def _manual_graph_with_crossed_answer_writes() -> NodeSystemGraphPayload:
     return NodeSystemGraphPayload.model_validate(
         {
             "name": "联网研究循环",
@@ -102,11 +102,11 @@ def _legacy_swapped_web_research_graph() -> NodeSystemGraphPayload:
 
 
 class GraphRuntimeCompatTests(unittest.TestCase):
-    def test_runtime_graph_repairs_legacy_web_research_answer_writers(self):
-        runtime_graph = _build_runtime_graph_document(_legacy_swapped_web_research_graph())
+    def test_runtime_graph_preserves_submitted_writes_without_legacy_repairs(self):
+        runtime_graph = _build_runtime_graph_document(_manual_graph_with_crossed_answer_writes())
 
-        self.assertEqual(runtime_graph.nodes["final_answer_writer"].writes[0].state, "state_6")
-        self.assertEqual(runtime_graph.nodes["exhausted_answer_writer"].writes[0].state, "state_7")
+        self.assertEqual(runtime_graph.nodes["final_answer_writer"].writes[0].state, "state_7")
+        self.assertEqual(runtime_graph.nodes["exhausted_answer_writer"].writes[0].state, "state_6")
 
 
 if __name__ == "__main__":

@@ -313,8 +313,8 @@ test("resolveWorkspaceTabUrl keeps unsaved drafts on /editor/new", () => {
   const templateTab = createUnsavedWorkspaceTab({
     title: "Hello World",
     kind: "template",
-    templateId: "hello_world",
-    defaultTemplateId: "hello_world",
+    templateId: "starter_graph",
+    defaultTemplateId: "starter_graph",
   });
   const savedTab = {
     ...createUnsavedWorkspaceTab({ title: "已保存图", kind: "existing" as const }),
@@ -323,7 +323,7 @@ test("resolveWorkspaceTabUrl keeps unsaved drafts on /editor/new", () => {
   };
 
   assert.equal(resolveWorkspaceTabUrl(draftTab), "/editor/new");
-  assert.equal(resolveWorkspaceTabUrl(templateTab), "/editor/new?template=hello_world");
+  assert.equal(resolveWorkspaceTabUrl(templateTab), "/editor/new?template=starter_graph");
   assert.equal(resolveWorkspaceTabUrl(savedTab), "/editor/graph_123");
 });
 
@@ -348,7 +348,7 @@ test("ensureSavedGraphTab activates an existing graph tab instead of duplicating
 test("closeWorkspaceTab keeps a valid active tab after removing the current tab", () => {
   const first = createUnsavedWorkspaceTab({ title: "A", kind: "existing" });
   const second = createUnsavedWorkspaceTab({ title: "B", kind: "new" });
-  const third = createUnsavedWorkspaceTab({ title: "C", kind: "template", templateId: "hello_world" });
+  const third = createUnsavedWorkspaceTab({ title: "C", kind: "template", templateId: "starter_graph" });
   const workspace: PersistedEditorWorkspace = {
     activeTabId: second.tabId,
     tabs: [first, second, third],
@@ -366,7 +366,7 @@ test("closeWorkspaceTab keeps a valid active tab after removing the current tab"
 test("reorderWorkspaceTab moves a tab before a target tab without changing the active tab", () => {
   const first = createUnsavedWorkspaceTab({ title: "A", kind: "existing" });
   const second = createUnsavedWorkspaceTab({ title: "B", kind: "new" });
-  const third = createUnsavedWorkspaceTab({ title: "C", kind: "template", templateId: "hello_world" });
+  const third = createUnsavedWorkspaceTab({ title: "C", kind: "template", templateId: "starter_graph" });
   const workspace: PersistedEditorWorkspace = {
     activeTabId: second.tabId,
     tabs: [first, second, third],
@@ -384,7 +384,7 @@ test("reorderWorkspaceTab moves a tab before a target tab without changing the a
 test("reorderWorkspaceTab moves a tab after a target tab", () => {
   const first = createUnsavedWorkspaceTab({ title: "A", kind: "existing" });
   const second = createUnsavedWorkspaceTab({ title: "B", kind: "new" });
-  const third = createUnsavedWorkspaceTab({ title: "C", kind: "template", templateId: "hello_world" });
+  const third = createUnsavedWorkspaceTab({ title: "C", kind: "template", templateId: "starter_graph" });
   const workspace: PersistedEditorWorkspace = {
     activeTabId: first.tabId,
     tabs: [first, second, third],
