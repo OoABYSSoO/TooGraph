@@ -22,7 +22,7 @@ from app.main import app
 def _native_skill_manifest(
     skill_key: str = "video_understanding",
     *,
-    targets: list[str] | None = None,
+    run_policies: dict[str, object] | None = None,
     configured: bool = True,
     healthy: bool = True,
     runtime_entrypoint: str | None = None,
@@ -33,7 +33,21 @@ def _native_skill_manifest(
         "label": "Video Understanding" if skill_key == "video_understanding" else skill_key.replace("_", " ").title(),
         "description": "Use frame sampling rules to understand a video with image-only model capability.",
         "version": "0.1.0",
-        "targets": targets or ["agent_node", "companion"],
+        "runPolicies": run_policies
+        or {
+            "default": {
+                "discoverable": True,
+                "autoSelectable": False,
+                "requiresApproval": False,
+            },
+            "origins": {
+                "companion": {
+                    "discoverable": True,
+                    "autoSelectable": True,
+                    "requiresApproval": True,
+                }
+            },
+        },
         "kind": "workflow",
         "mode": "workflow",
         "scope": "graph",
@@ -144,7 +158,6 @@ def _write_native_skill(
     skills_dir: Path,
     skill_key: str,
     *,
-    targets: list[str],
     configured: bool = True,
     healthy: bool = True,
     runtime: bool = True,
@@ -154,7 +167,6 @@ def _write_native_skill(
     (skill_dir / "skill.json").write_text(
         _native_skill_manifest(
             skill_key,
-            targets=targets,
             configured=configured,
             healthy=healthy,
             runtime_entrypoint="run.py" if runtime else None,
@@ -185,28 +197,37 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 }
                 self.assertEqual(catalog_items["web_search"]["sourceFormat"], "skill")
                 self.assertEqual(catalog_items["web_search"]["sourceScope"], "installed")
-                self.assertEqual(catalog_items["web_search"]["targets"], ["agent_node", "companion"])
+                self.assertNotIn("targets", catalog_items["web_search"])
+                self.assertTrue(catalog_items["web_search"]["runPolicies"]["default"]["discoverable"])
+                self.assertTrue(catalog_items["web_search"]["runPolicies"]["origins"]["companion"]["autoSelectable"])
+                self.assertTrue(catalog_items["web_search"]["runPolicies"]["origins"]["companion"]["requiresApproval"])
                 self.assertTrue(catalog_items["web_search"]["runtimeReady"])
                 self.assertTrue(catalog_items["web_search"]["runtimeRegistered"])
                 self.assertTrue(source_path["web_search"].endswith("/skill/web_search/skill.json"))
                 self.assertNotIn("compatibility", catalog_items["web_search"])
                 self.assertEqual(catalog_items["local_file"]["sourceFormat"], "skill")
                 self.assertEqual(catalog_items["local_file"]["sourceScope"], "installed")
-                self.assertEqual(catalog_items["local_file"]["targets"], ["agent_node"])
+                self.assertNotIn("targets", catalog_items["local_file"])
+                self.assertFalse(catalog_items["local_file"]["runPolicies"]["default"]["discoverable"])
                 self.assertTrue(catalog_items["local_file"]["runtimeReady"])
                 self.assertTrue(catalog_items["local_file"]["runtimeRegistered"])
                 self.assertTrue(source_path["local_file"].endswith("/skill/local_file/skill.json"))
                 self.assertNotIn("compatibility", catalog_items["local_file"])
                 self.assertEqual(catalog_items["web_media_downloader"]["sourceFormat"], "skill")
                 self.assertEqual(catalog_items["web_media_downloader"]["sourceScope"], "installed")
-                self.assertEqual(catalog_items["web_media_downloader"]["targets"], ["agent_node", "companion"])
+                self.assertNotIn("targets", catalog_items["web_media_downloader"])
+                self.assertTrue(catalog_items["web_media_downloader"]["runPolicies"]["default"]["discoverable"])
+                self.assertFalse(
+                    catalog_items["web_media_downloader"]["runPolicies"]["origins"]["companion"]["autoSelectable"]
+                )
                 self.assertTrue(catalog_items["web_media_downloader"]["runtimeReady"])
                 self.assertTrue(catalog_items["web_media_downloader"]["runtimeRegistered"])
                 self.assertTrue(source_path["web_media_downloader"].endswith("/skill/web_media_downloader/skill.json"))
                 self.assertNotIn("compatibility", catalog_items["web_media_downloader"])
                 self.assertEqual(catalog_items["game_ad_research_collector"]["sourceFormat"], "skill")
                 self.assertEqual(catalog_items["game_ad_research_collector"]["sourceScope"], "installed")
-                self.assertEqual(catalog_items["game_ad_research_collector"]["targets"], ["agent_node", "companion"])
+                self.assertNotIn("targets", catalog_items["game_ad_research_collector"])
+                self.assertTrue(catalog_items["game_ad_research_collector"]["runPolicies"]["default"]["discoverable"])
                 self.assertTrue(catalog_items["game_ad_research_collector"]["runtimeReady"])
                 self.assertTrue(catalog_items["game_ad_research_collector"]["runtimeRegistered"])
                 self.assertTrue(
@@ -232,7 +253,15 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertEqual(payload["skillKey"], "video_understanding")
                 self.assertEqual(payload["sourceFormat"], "skill")
                 self.assertEqual(payload["sourceScope"], "installed")
-                self.assertEqual(payload["targets"], ["agent_node", "companion"])
+                self.assertNotIn("targets", payload)
+                self.assertEqual(
+                    payload["runPolicies"]["origins"]["companion"],
+                    {
+                        "discoverable": True,
+                        "autoSelectable": True,
+                        "requiresApproval": True,
+                    },
+                )
                 self.assertEqual(payload["kind"], "workflow")
                 self.assertEqual(payload["mode"], "workflow")
                 self.assertEqual(payload["scope"], "graph")
@@ -253,7 +282,8 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertEqual(catalog_response.status_code, 200)
                 catalog_items = {item["skillKey"]: item for item in catalog_response.json()}
                 self.assertIn("video_understanding", catalog_items)
-                self.assertEqual(catalog_items["video_understanding"]["targets"], ["agent_node", "companion"])
+                self.assertNotIn("targets", catalog_items["video_understanding"])
+                self.assertTrue(catalog_items["video_understanding"]["runPolicies"]["default"]["discoverable"])
 
     def test_skill_file_tree_lists_package_files_for_inspection(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -378,11 +408,10 @@ class SkillUploadImportRouteTests(unittest.TestCase):
             temp_path = Path(temp_dir)
             skills_dir = temp_path / "skill"
             state_dir = temp_path / "data" / "skills"
-            _write_native_skill(skills_dir, "web_search", targets=["agent_node"])
-            _write_native_skill(skills_dir, "extract_json_fields", targets=["agent_node"], runtime=False)
-            _write_native_skill(skills_dir, "rewrite_text", targets=["companion"])
-            _write_native_skill(skills_dir, "summarize_text", targets=["agent_node"], configured=False)
-            _write_native_skill(skills_dir, "translate_text", targets=["agent_node"], healthy=False)
+            _write_native_skill(skills_dir, "web_search")
+            _write_native_skill(skills_dir, "extract_json_fields", runtime=False)
+            _write_native_skill(skills_dir, "summarize_text", configured=False)
+            _write_native_skill(skills_dir, "translate_text", healthy=False)
 
             with _test_client_with_skill_storage(skills_dir, state_dir) as client:
                 response = client.get("/api/skills/definitions")
@@ -390,14 +419,14 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertEqual(response.status_code, 200)
                 self.assertEqual([item["skillKey"] for item in response.json()], ["web_search"])
 
-    def test_graph_validation_reports_non_attachable_agent_skills(self) -> None:
+    def test_graph_validation_reports_unready_agent_skills(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             skills_dir = temp_path / "skill"
             state_dir = temp_path / "data" / "skills"
-            _write_native_skill(skills_dir, "rewrite_text", targets=["companion"])
-            _write_native_skill(skills_dir, "summarize_text", targets=["agent_node"], configured=False)
-            _write_native_skill(skills_dir, "translate_text", targets=["agent_node"], healthy=False)
+            _write_native_skill(skills_dir, "rewrite_text", runtime=False)
+            _write_native_skill(skills_dir, "summarize_text", configured=False)
+            _write_native_skill(skills_dir, "translate_text", healthy=False)
 
             graph = NodeSystemGraphPayload.model_validate(
                 {
@@ -430,7 +459,7 @@ class SkillUploadImportRouteTests(unittest.TestCase):
 
             self.assertFalse(validation.valid)
             issue_codes = [issue.code for issue in validation.issues]
-            self.assertIn("agent_skill_target_not_agent_node", issue_codes)
+            self.assertIn("agent_skill_not_agent_node_ready", issue_codes)
             self.assertIn("agent_skill_not_configured", issue_codes)
             self.assertIn("agent_skill_unhealthy", issue_codes)
             self.assertIn("agent_skill_not_runtime_registered", issue_codes)

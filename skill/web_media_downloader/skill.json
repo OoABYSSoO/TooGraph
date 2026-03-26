@@ -4,7 +4,20 @@
   "label": "Web Media Downloader",
   "description": "Download authorized web-hosted images, videos, audio, thumbnails, galleries, and dynamically loaded media, then return local artifact paths.",
   "version": "1.0.0",
-  "targets": ["agent_node", "companion"],
+  "runPolicies": {
+    "default": {
+      "discoverable": true,
+      "autoSelectable": false,
+      "requiresApproval": false
+    },
+    "origins": {
+      "companion": {
+        "discoverable": true,
+        "autoSelectable": false,
+        "requiresApproval": true
+      }
+    }
+  },
   "kind": "atomic",
   "mode": "tool",
   "scope": "node",

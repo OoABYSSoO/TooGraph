@@ -25,11 +25,6 @@ class SkillSourceScope(str, Enum):
     INSTALLED = "installed"
 
 
-class SkillTarget(str, Enum):
-    AGENT_NODE = "agent_node"
-    COMPANION = "companion"
-
-
 class SkillKind(str, Enum):
     ATOMIC = "atomic"
     WORKFLOW = "workflow"
@@ -90,13 +85,28 @@ class SkillHealthSpec(BaseModel):
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
 
+class SkillRunPolicy(BaseModel):
+    discoverable: bool = True
+    auto_selectable: bool = Field(default=False, alias="autoSelectable")
+    requires_approval: bool = Field(default=False, alias="requiresApproval")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class SkillRunPolicies(BaseModel):
+    default: SkillRunPolicy = Field(default_factory=SkillRunPolicy)
+    origins: dict[str, SkillRunPolicy] = Field(default_factory=dict)
+
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
+
+
 class SkillDefinition(BaseModel):
     skill_key: str = Field(..., min_length=1, alias="skillKey")
     label: str = Field(..., min_length=1)
     description: str = ""
     schema_version: str = Field(default="", alias="schemaVersion")
     version: str = ""
-    targets: list[SkillTarget] = Field(default_factory=lambda: [SkillTarget.AGENT_NODE])
+    run_policies: SkillRunPolicies = Field(default_factory=SkillRunPolicies, alias="runPolicies")
     kind: SkillKind = SkillKind.ATOMIC
     mode: SkillMode = SkillMode.TOOL
     scope: SkillScope = SkillScope.NODE

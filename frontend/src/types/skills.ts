@@ -17,13 +17,24 @@ export type SkillHealthSpec = {
   type: string;
 };
 
+export type SkillRunPolicy = {
+  discoverable: boolean;
+  autoSelectable: boolean;
+  requiresApproval: boolean;
+};
+
+export type SkillRunPolicies = {
+  default: SkillRunPolicy;
+  origins: Record<string, SkillRunPolicy>;
+};
+
 export type SkillDefinition = {
   skillKey: string;
   label: string;
   description: string;
   schemaVersion: string;
   version: string;
-  targets: string[];
+  runPolicies: SkillRunPolicies;
   kind: string;
   mode: string;
   scope: string;

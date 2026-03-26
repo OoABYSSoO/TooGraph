@@ -41,11 +41,11 @@ test("SkillsPage exposes a read-only Skill package file browser", () => {
 });
 
 test("SkillsPage surfaces native Skill taxonomy and readiness metadata", () => {
-  assert.match(componentSource, /overview\.agentSkills/);
-  assert.match(componentSource, /overview\.companionSkills/);
+  assert.match(componentSource, /overview\.discoverableSkills/);
+  assert.match(componentSource, /overview\.autoSelectableSkills/);
   assert.match(componentSource, /overview\.runtimeReady/);
   assert.match(componentSource, /overview\.needsAttention/);
-  assert.match(componentSource, /selectedSkill\.targets/);
+  assert.match(componentSource, /runPolicyOriginEntries/);
   assert.match(componentSource, /selectedSkill\.kind/);
   assert.match(componentSource, /selectedSkill\.mode/);
   assert.match(componentSource, /selectedSkill\.scope/);
@@ -57,7 +57,7 @@ test("SkillsPage surfaces native Skill taxonomy and readiness metadata", () => {
   assert.match(componentSource, /selectedSkill\.healthy/);
   assert.match(componentSource, /selectedSkill\.agentNodeEligibility/);
   assert.match(componentSource, /selectedSkill\.agentNodeBlockers/);
-  assert.match(componentSource, /t\("skills\.targets"\)/);
+  assert.match(componentSource, /t\("skills\.runPolicies"\)/);
   assert.match(componentSource, /t\("skills\.permissions"\)/);
   assert.match(componentSource, /t\("skills\.agentNodeEligibility"\)/);
   assert.match(componentSource, /t\("skills\.agentNodeBlockers"\)/);
@@ -108,6 +108,6 @@ test("SkillsPage uses local short shadows so dense management cards do not stack
   assert.match(componentSource, /--skills-page-panel-shadow:/);
   assert.match(componentSource, /--skills-page-card-shadow:/);
   assert.match(componentSource, /box-shadow:\s*var\(--skills-page-panel-shadow\);/);
-  assert.match(componentSource, /\.skills-page__metric,\n\.skills-page__selector,\n\.skills-page__detail \{[\s\S]*box-shadow:\s*var\(--skills-page-card-shadow\);/);
+  assert.match(componentSource, /\.skills-page__metric,\r?\n\.skills-page__selector,\r?\n\.skills-page__detail \{[\s\S]*box-shadow:\s*var\(--skills-page-card-shadow\);/);
   assert.doesNotMatch(componentSource, /box-shadow:\s*var\(--graphite-shadow-panel\);/);
 });

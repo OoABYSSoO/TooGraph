@@ -4,7 +4,20 @@
   "label": "Web Search",
   "description": "Search the public web and return cited results for agent reasoning.",
   "version": "1.0.0",
-  "targets": ["agent_node", "companion"],
+  "runPolicies": {
+    "default": {
+      "discoverable": true,
+      "autoSelectable": false,
+      "requiresApproval": false
+    },
+    "origins": {
+      "companion": {
+        "discoverable": true,
+        "autoSelectable": true,
+        "requiresApproval": true
+      }
+    }
+  },
   "kind": "atomic",
   "mode": "tool",
   "scope": "node",

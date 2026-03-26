@@ -13,7 +13,6 @@ from app.core.schemas.skills import (
     SkillAgentNodeEligibility,
     SkillDefinition,
     SkillIoField,
-    SkillTarget,
 )
 
 
@@ -24,13 +23,11 @@ def _agent_skill_definition(
     blockers: list[str] | None = None,
     input_schema: list[SkillIoField] | None = None,
     output_schema: list[SkillIoField] | None = None,
-    targets: list[SkillTarget] | None = None,
     runtime_entrypoint: str | None = None,
 ) -> SkillDefinition:
     return SkillDefinition(
         skillKey=skill_key,
         label=skill_key,
-        targets=targets or [SkillTarget.AGENT_NODE],
         runtime={"type": "python", "entrypoint": runtime_entrypoint or "run.py"},
         inputSchema=input_schema or [],
         outputSchema=output_schema or [SkillIoField(key="summary", label="Summary", valueType="text")],
@@ -73,24 +70,6 @@ def _graph_with_agent_config(config: dict) -> NodeSystemGraphDocument:
 
 
 class NodeSystemValidatorSkillTests(unittest.TestCase):
-    def test_companion_only_skill_reports_specific_agent_node_error(self) -> None:
-        graph = _graph_with_agent_config({"skills": ["desktop_profile"]})
-        definition = _agent_skill_definition(
-            "desktop_profile",
-            targets=[SkillTarget.COMPANION],
-            eligibility=SkillAgentNodeEligibility.INCOMPATIBLE,
-            blockers=["Skill target does not include agent_node."],
-        )
-
-        with (
-            patch("app.core.compiler.validator.get_skill_registry", return_value={"desktop_profile": object()}),
-            patch("app.core.compiler.validator.get_skill_catalog_registry", return_value={"desktop_profile": definition}),
-        ):
-            validation = validate_graph(graph)
-
-        self.assertIn("agent_skill_target_not_agent_node", [issue.code for issue in validation.issues])
-        self.assertTrue(any("companion skill" in issue.message for issue in validation.issues))
-
     def test_needs_manifest_skill_is_rejected_for_agent_nodes(self) -> None:
         graph = _graph_with_agent_config({"skills": ["legacy_skill"]})
         definition = _agent_skill_definition(
@@ -169,9 +148,8 @@ class NodeSystemValidatorSkillTests(unittest.TestCase):
         )
         definition = _agent_skill_definition(
             "desktop_profile",
-            targets=[SkillTarget.COMPANION],
-            eligibility=SkillAgentNodeEligibility.INCOMPATIBLE,
-            blockers=["Skill target does not include agent_node."],
+            eligibility=SkillAgentNodeEligibility.NEEDS_MANIFEST,
+            blockers=["Skill manifest is missing a script runtime entrypoint."],
         )
 
         with (
@@ -180,7 +158,7 @@ class NodeSystemValidatorSkillTests(unittest.TestCase):
         ):
             validation = validate_graph(graph)
 
-        self.assertIn("agent_skill_target_not_agent_node", [issue.code for issue in validation.issues])
+        self.assertIn("agent_skill_not_agent_node_ready", [issue.code for issue in validation.issues])
 
 
 if __name__ == "__main__":

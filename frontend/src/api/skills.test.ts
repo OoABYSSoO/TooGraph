@@ -46,7 +46,10 @@ test("fetchSkillDefinitions requests the skill definitions endpoint", async () =
           supportedValueTypes: ["text", "json"],
           sideEffects: ["network"],
           version: "1.0.0",
-          targets: ["agent_node"],
+          runPolicies: {
+            default: { discoverable: true, autoSelectable: false, requiresApproval: false },
+            origins: {},
+          },
           kind: "atomic",
           mode: "tool",
           scope: "node",
@@ -105,7 +108,10 @@ test("fetchSkillDefinitions requests the skill definitions endpoint", async () =
       supportedValueTypes: ["text", "json"],
       sideEffects: ["network"],
       version: "1.0.0",
-      targets: ["agent_node"],
+      runPolicies: {
+        default: { discoverable: true, autoSelectable: false, requiresApproval: false },
+        origins: {},
+      },
       kind: "atomic",
       mode: "tool",
       scope: "node",

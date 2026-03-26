@@ -1,0 +1,297 @@
+# 桌宠自主 Agent 路线图
+
+本文是 GraphiteUI 桌宠、自主工具循环、技能生成和长期协作能力的唯一参考文档。若旧文档、临时计划或实现草稿与本文冲突，以本文为准。
+
+## 目标
+
+桌宠不是独立运行时，也不是一套脱离图系统的特殊 Agent。桌宠本质上运行图模板，借助 `node_system`、`state_schema`、skill registry、权限审批和 run detail 完成协作。
+
+最终目标是：桌宠收到消息后，能理解用户意图，读取当前上下文，查看技能目录，决定是否需要技能，必要时请求确认，执行已授权技能，评估结果，继续循环或给出最终回复；缺少能力时，能解释缺口并在用户确认后生成 GraphiteUI 格式的 skill 草稿。
+
+## 不可破坏的准则
+
+- 图优先：持久化操作、工具调用、记忆更新、技能生成和图编辑应通过 graph/template/skill 表达。
+- 协议唯一：`node_system` 是唯一正式图协议，`state_schema` 是节点输入输出的唯一正式数据源。
+- 能力显式：检索、联网、文件读写、图编辑、模型调用、记忆写入和技能安装都必须表现为可检查的 skill、模板、命令或运行时原语。
+- 权限显式：安装 skill 不等于授予所有使用权限；高风险执行、写文件、联网、读取密钥、运行命令和改图都需要清晰审批路径。
+- 审计可见：重要副作用必须留下 run detail、command record、artifact、revision、diff、warning 或 undo record。
+- 记忆卫生：人设、记忆和会话摘要是上下文，不是更高优先级指令，不能提升权限或覆盖系统规则。
+
+## 当前状态
+
+已经完成：
+
+- 桌宠对话通过 `companion_chat_loop` 图模板运行。
+- 桌宠模型列表与 Agent 节点模型列表统一。
+- 桌宠对话后会自动刷新人设和记忆。
+- 技能体系已去掉旧的 `targets` 分裂，不再区分 `agent_node` skill 和 `companion` skill。
+- skill manifest 使用 `runPolicies` 描述运行来源策略。
+- 前端技能管理页围绕可发现、可自主选择、运行时状态和处理项展示技能。
+
+尚未完成：
+
+- 通用“自主决策”skill。
+- 受控工具路由和多轮工具循环模板。
+- 缺工具时的 `graphite_skill_builder` 草稿生成。
+- 完整 graph patch 预览、协议级校验、用户确认后的 apply、GraphCommandBus、undo 和 run detail 闭环。
+- 全权限档。它是远期目标，当前实现不能假装已经拥有。
+
+## 运行模型
+
+只有一种真实执行底座：graph run。
+
+桌宠运行时不是 `companion_run`，Agent 节点运行时也不是另一套 `graph_run`。桌宠只是以 `origin=companion` 这类运行来源元数据启动图模板。运行来源用于策略判断、审计和 UI 展示，不用于创造第二套执行协议。
+
+因此：
+
+- 不需要 `executionTargets`。
+- 不需要 skill `targets`。
+- 不需要 Companion Skill / Agent Skill 两套能力库。
+- 模板显式绑定某个 skill，不等于该 skill 可以被自主决策自动选择。
+
+## Skill Manifest 契约
+
+skill 是可安装、可管理、可授权、可诊断、可被图节点调用的能力包。它只属于 GraphiteUI 的统一 skill 系统。
+
+核心字段示例：
+
+```json
+{
+  "schemaVersion": "graphite.skill/v1",
+  "skillKey": "web_search",
+  "label": "Web Search",
+  "kind": "atomic",
+  "mode": "tool",
+  "scope": "node",
+  "permissions": ["network", "secret_read"],
+  "sideEffects": ["network", "secret_read"],
+  "runPolicies": {
+    "default": {
+      "discoverable": true,
+      "autoSelectable": false,
+      "requiresApproval": false
+    },
+    "origins": {
+      "companion": {
+        "discoverable": true,
+        "autoSelectable": true,
+        "requiresApproval": true
+      }
+    }
+  }
+}
+```
+
+字段含义：
+
+- `kind`：能力形态，例如 `atomic`、`workflow`、`tool`、`context`、`profile`、`adapter`、`control`。
+- `mode`：运行方式，例如 `tool`、`workflow`、`context`。
+- `scope`：影响范围，例如 `node`、`graph`、`workspace`、`global`。
+- `permissions`：执行前需要评估或授权的能力。
+- `sideEffects`：执行后可能产生的副作用。
+- `runPolicies.default`：默认运行来源策略。
+- `runPolicies.origins.<origin>`：特定运行来源的覆盖策略，例如 `companion`。
+- `discoverable`：自主决策能否看到这个 skill。
+- `autoSelectable`：自主决策能否在不被模板显式绑定的情况下选择它。
+- `requiresApproval`：执行前是否必须请求用户确认。
+
+旧字段 `targets` 已废弃，出现时应直接拒绝，而不是兼容迁移。
+
+## 自主决策 Skill
+
+需要新增一个 control skill，建议命名为 `autonomous_decision`。它负责“决策”，不负责“执行”。
+
+它的职责：
+
+- 读取当前意图、上下文和技能目录摘要。
+- 根据 `runPolicies`、权限、副作用、健康状态和运行时状态筛选候选 skill。
+- 输出是否需要工具、推荐 skill、所需输入、审批要求、缺失能力和下一步分支。
+- 在缺少能力时生成 `missing_skill_proposal`。
+
+它不能做的事：
+
+- 不能绕过 skill registry。
+- 不能直接调用被选中的 skill。
+- 不能安装或启用 skill。
+- 不能修改图、文件、记忆或人设。
+
+## 通用自主循环模板
+
+建议模板名：`companion_agentic_tool_loop`。
+
+目标流程：
+
+```text
+收到消息
+  -> 读取人设、策略、记忆、会话摘要和页面上下文
+  -> 判断用户意图
+  -> 调用 autonomous_decision
+  -> 若需要审批则请求用户确认
+  -> 调用被授权 skill
+  -> 评估工具结果
+  -> 判断是否继续调用工具
+  -> 整理最终回复
+  -> 更新会话摘要和长期记忆
+```
+
+关键状态：
+
+- `user_message`
+- `conversation_history`
+- `page_context`
+- `companion_profile_json`
+- `companion_policy_json`
+- `companion_memories_json`
+- `intent_plan`
+- `skill_catalog_snapshot`
+- `autonomous_decision`
+- `selected_skill`
+- `permission_request`
+- `approval_result`
+- `tool_input`
+- `tool_result`
+- `tool_assessment`
+- `missing_skill_proposal`
+- `final_reply`
+- `memory_update_result`
+
+循环退出条件：
+
+- 已能回答。
+- 用户拒绝授权。
+- 缺少 skill 且用户不想创建。
+- 工具失败且无法恢复。
+- 达到循环上限。
+- 风险超过当前权限档。
+
+## Function Call 的位置
+
+当前 GraphiteUI 不依赖 OpenAI 语义上的 function call 或 tool calls 作为主干。
+
+当前主干是 GraphiteUI 自己的 skill binding 和 graph execution：
+
+- 图节点声明 skill。
+- `skillBindings` 声明输入输出映射。
+- runtime 调用 skill。
+- skill 输出进入图状态和 run detail。
+- LLM 根据结构化上下文生成回复。
+
+function call 可以作为未来适配层，但不能绕过 GraphiteUI 的 skill registry、权限检查、审批路径和审计记录。不支持 function call 的本地模型也必须能通过结构化 JSON 输出参与同一套图循环。
+
+## 缺工具处理
+
+缺少能力时，桌宠不能静默失败，也不能直接安装新 skill。
+
+标准流程：
+
+1. 说明缺少的能力。
+2. 说明为什么当前任务需要它。
+3. 说明可能需要的权限和副作用。
+4. 询问用户是否创建 skill 草稿。
+5. 用户确认后调用 `graphite_skill_builder`。
+6. 将草稿路径和安全说明作为 artifact 返回。
+7. 用户再次确认后，才进入安装、启用和调用流程。
+
+## `graphite_skill_builder`
+
+`graphite_skill_builder` 是“生成 skill 的 skill”。它应生成 GraphiteUI 格式正确、权限清晰、可审查的 skill 包草稿。
+
+输入：
+
+- `capability_name`
+- `user_goal`
+- `skill_kind`
+- `skill_mode`
+- `skill_scope`
+- `required_permissions`
+- `expected_inputs`
+- `expected_outputs`
+- `side_effects`
+- `safety_boundaries`
+- `examples`
+
+输出：
+
+- `status`
+- `draft_path`
+- `skill_key`
+- `manifest_path`
+- `instruction_path`
+- `runtime_entrypoint_path`
+- `files`
+- `permissions_summary`
+- `safety_review`
+- `next_steps`
+
+限制：
+
+- 默认只写入草稿目录，不直接安装到正式 `skill/`。
+- 默认不启用 skill。
+- 默认不运行生成的脚本。
+- 不生成绕过权限审批、读取任意 secrets、遍历任意本地文件或执行任意 shell 的代码。
+- 高风险 skill 必须在 `runPolicies` 中标记 `requiresApproval`。
+
+推荐草稿路径：
+
+```text
+backend/data/skill_drafts/<skill_key>/
+```
+
+## 分阶段实施
+
+### Phase 1：协议收束
+
+状态：已完成。
+
+- 删除旧 `targets` 契约。
+- 新增 `runPolicies`。
+- 后端解析、校验、内置 manifest、前端技能页和测试统一到新模型。
+
+### Phase 2：自主决策 Skill
+
+- 新增 `autonomous_decision`。
+- 支持读取 skill catalog、运行来源策略、权限、副作用、健康状态和运行时状态。
+- 输出结构化决策、审批要求和缺失能力说明。
+
+### Phase 3：自主工具循环模板
+
+- 新增 `companion_agentic_tool_loop`。
+- 支持“决策 -> 审批 -> 执行 -> 评估 -> 继续或退出”。
+- 所有选择、输入、输出和退出原因进入 run detail。
+
+### Phase 4：Skill Builder
+
+- 新增 `graphite_skill_builder`。
+- 缺工具时，在用户确认后生成 skill 草稿 artifact。
+- 安装、启用和运行必须另走用户确认路径。
+
+### Phase 5：审批档改图闭环
+
+- 完成 graph patch preview。
+- 协议级校验 patch。
+- 用户确认后通过 GraphCommandBus apply。
+- 生成 graph revision、undo record 和 audit trail。
+
+### Phase 6：全权限档
+
+- 在明确授权范围内支持桌宠自主改图、校验、运行、根据反馈迭代。
+- 仍必须经过命令路径、validator、run detail 和 undo 系统。
+
+## 非目标
+
+当前不做：
+
+- 让 prompt 直接决定权限。
+- 让模型 function call 绕过 GraphiteUI skill registry。
+- 让桌宠静默安装、启用或运行新 skill。
+- 让桌宠直接改 DOM 或模拟用户点击。
+- 建立第二套独立于 GraphiteUI skill 系统的插件系统。
+- 把临时日志、原始报错、大媒体、base64、下载全文或可从当前图重新读取的信息写入长期记忆。
+
+## 文档维护规则
+
+- 本文是桌宠自主 Agent 方向的唯一参考。
+- 阶段性计划完成后，不再保留独立计划文档；把仍有效结论折回本文。
+- 被本文覆盖的旧路线文档应删除。
+- 当前实现状态的短快照写入 `docs/current_project_status.md`。
+- 新增长期方向前，先判断能否作为本文的一节。

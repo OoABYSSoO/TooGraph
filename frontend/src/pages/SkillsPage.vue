@@ -46,12 +46,12 @@
           <strong>{{ overview.active }}</strong>
         </article>
         <article class="skills-page__metric">
-          <span>{{ t("skills.agentSkills") }}</span>
-          <strong>{{ overview.agentSkills }}</strong>
+          <span>{{ t("skills.discoverableSkills") }}</span>
+          <strong>{{ overview.discoverableSkills }}</strong>
         </article>
         <article class="skills-page__metric">
-          <span>{{ t("skills.companionSkills") }}</span>
-          <strong>{{ overview.companionSkills }}</strong>
+          <span>{{ t("skills.autoSelectableSkills") }}</span>
+          <strong>{{ overview.autoSelectableSkills }}</strong>
         </article>
         <article class="skills-page__metric">
           <span>{{ t("skills.runtimeReady") }}</span>
@@ -156,9 +156,14 @@
 
             <div class="skills-page__taxonomy">
               <section>
-                <h4>{{ t("skills.targets") }}</h4>
-                <div class="skills-page__badges">
-                  <span v-for="target in selectedSkill.targets" :key="target">{{ target }}</span>
+                <h4>{{ t("skills.runPolicies") }}</h4>
+                <div class="skills-page__schema-list">
+                  <span
+                    v-for="entry in runPolicyOriginEntries(selectedSkill)"
+                    :key="entry.origin"
+                  >
+                    {{ formatRunPolicy(entry.origin, entry.policy) }}
+                  </span>
                 </div>
               </section>
               <section>
@@ -309,6 +314,7 @@ import {
   buildSkillOverview,
   buildSkillStatusOptions,
   filterSkillsForManagement,
+  listSkillRunPolicies,
   type SkillStatusFilter,
 } from "./skillsPageModel.ts";
 
@@ -391,6 +397,19 @@ function selectSkill(skillKey: string) {
 
 function enabledToggleLabel(skill: SkillDefinition) {
   return skill.status === "active" ? t("skills.disable") : t("skills.enable");
+}
+
+function runPolicyOriginEntries(skill: SkillDefinition) {
+  return listSkillRunPolicies(skill);
+}
+
+function formatRunPolicy(origin: string, policy: SkillDefinition["runPolicies"]["default"]) {
+  return [
+    origin,
+    policy.discoverable ? t("skills.policyDiscoverable") : t("skills.policyHidden"),
+    policy.autoSelectable ? t("skills.policyAutoSelectable") : t("skills.policyManualOnly"),
+    policy.requiresApproval ? t("skills.policyRequiresApproval") : t("skills.policyNoApproval"),
+  ].join(" · ");
 }
 
 async function importUploadedSkill(event: Event, mode: "archive" | "folder") {

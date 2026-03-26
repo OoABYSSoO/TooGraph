@@ -13,7 +13,7 @@ from app.core.schemas.node_system import (
     NodeSystemOutputNode,
     ValidationIssue,
 )
-from app.core.schemas.skills import SkillAgentNodeEligibility, SkillCatalogStatus, SkillDefinition, SkillTarget
+from app.core.schemas.skills import SkillAgentNodeEligibility, SkillCatalogStatus, SkillDefinition
 from app.skills.definitions import get_skill_catalog_registry
 from app.skills.registry import get_skill_registry
 
@@ -164,23 +164,7 @@ def _validate_agent_node(
             )
             continue
 
-        if SkillTarget.AGENT_NODE not in definition.targets:
-            target_message = (
-                f"Skill '{skill_key}' is a companion skill and cannot be attached to Agent nodes."
-                if SkillTarget.COMPANION in definition.targets
-                else (
-                    f"Agent node '{node_name}' attaches skill '{skill_key}', "
-                    "but the skill is not available for agent nodes."
-                )
-            )
-            issues.append(
-                ValidationIssue(
-                    code="agent_skill_target_not_agent_node",
-                    message=target_message,
-                    path=skill_path,
-                )
-            )
-        elif definition.agent_node_eligibility != SkillAgentNodeEligibility.READY:
+        if definition.agent_node_eligibility != SkillAgentNodeEligibility.READY:
             blockers = "; ".join(definition.agent_node_blockers) or "No readiness details provided."
             issues.append(
                 ValidationIssue(
