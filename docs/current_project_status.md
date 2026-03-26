@@ -9,6 +9,7 @@
 - `node_system` 是唯一正式图协议，`state_schema` 是唯一正式节点输入输出数据源。
 - 桌宠自主 Agent 方向以 `docs/future/companion-autonomous-agent-roadmap.md` 为唯一参考。
 - Skill 系统已收束为统一能力库：不再按 Agent 节点和桌宠拆分两类 skill，也不再使用 skill `targets`。
+- `state_schema` 支持 `skill` 类型；Agent 节点会把卡片手动添加的 skills 与 state 输入传入的 skill / skill[] 做并集合并。
 
 ## 当前正式能力
 
@@ -47,6 +48,7 @@
 - Companion 页面：`/companion`
   - 桌宠对话入口
   - 对话后自动刷新人设和记忆
+  - 桌宠浮窗默认运行 `companion_agentic_tool_loop`，并向图注入真实 skill catalog snapshot
 
 ### 编辑器与运行
 
@@ -64,6 +66,8 @@
 - FastAPI 提供 graphs / runs / templates / presets / settings / skills / knowledge / memories API。
 - validator 负责 `node_system` graph 结构校验。
 - LangGraph runtime 是当前运行主链，并采用 agent-only 语义：只有 agent 注册为 LangGraph node，input / output / condition 作为边界状态、输出 artifact 和条件 route 参与反馈。
+- LangGraph runtime 原生支持 `condition` 分支继续指向另一个 `condition`，用于表达嵌套判断和桌宠自主循环中的多级路由；condition 仍保持纯控制流代理，不注册为 LangGraph node。
+- 控制流分析允许互斥条件分支共同写入同一个汇合状态，例如 `final_reply`；普通并行无序写入仍会被拒绝。
 - 后端支持 LangGraph Python 源码导出接口。
 - 后端具备 interrupt / checkpoint / resume 能力，前端人类在环完整产品闭环仍在路线图中。
 
@@ -72,12 +76,15 @@
 - knowledge base 可以通过 input 节点进入图。
 - agent 读取 knowledge base state，不再隐式挂载内置知识库 skill；检索能力需要以 `skill/<skill_key>` 文件夹加 `skill.json` manifest 的形式显式安装和绑定。
 - skills catalog/definitions 与 knowledge base catalog 都有真实接口。
-- 当前内置 skill 包括 `local_file`、`web_search`、`web_media_downloader` 和 `game_ad_research_collector`。
+- 当前内置 skill 包括 `local_file`、`web_search`、`web_media_downloader`、`game_ad_research_collector` 和 `autonomous_decision`。
 - skill manifest 使用 `runPolicies` 描述默认和运行来源策略；旧 `targets` 字段已废弃。
 - `local_file` 是受白名单约束的基础本地文件读写技能，当前用于桌宠人设、策略、记忆和会话摘要的显式图模板读写闭环。
-- `web_search` 支持 Tavily 优先、DuckDuckGo HTML fallback、日期上下文注入、搜索结果引用、网页正文抓取和 source document 本地 artifact 输出。
+- `web_search` 支持 Tavily 优先、DuckDuckGo HTML fallback、日期上下文注入、搜索结果引用、网页正文抓取和 source document 本地 artifact 输出；对桌宠 `origin=companion` 默认可自主选择且无需确认。
 - `web_media_downloader` 支持下载公开或用户授权的网页媒体，并返回可由 Output 节点展示的本地 artifact 路径。
 - `game_ad_research_collector` 支持采集游戏市场 RSS、生成广告库搜索记录、发现/下载公开视频广告素材，并把视频和来源文档作为本地 artifact 返回。
+- `autonomous_decision` 是 control/context 技能，负责根据技能目录和 `runPolicies` 决定直接回复、执行已授权技能、请求审批或提出缺失技能草案，不直接执行工具或产生副作用。
+- `skill` state 可以把 `autonomous_decision` 选出的技能作为显式图状态传给下游 Agent 节点；这些动态技能与 Agent 卡片 skills 一视同仁，执行前仍走 registry、运行时状态、runPolicies 和需要时的审批校验。动态技能没有显式 `inputMapping` 时，Agent runtime 会按 skill `inputSchema` 优先从 `tool_input`、其次从同名 state 解析脚本入参；缺少必填入参时返回结构化失败而不启动脚本。
+- `companion_agentic_tool_loop` 模板已进入桌宠入口主链，串起人设/记忆读取、意图规划、`autonomous_decision`、审批暂停、`skill` state 动态执行、工具结果评估、互斥分支写入 `final_reply`、多轮退出和同模板内记忆整理写回。
 
 ## 当前技术栈
 
@@ -98,5 +105,6 @@
 - LangGraph Python 源码预览、下载和导入校验体验完善。
 - cycles 更高级的终止策略和可视化。
 - 更强的 knowledge base 管理能力。
-- `autonomous_decision`、`companion_agentic_tool_loop` 和 `graphite_skill_builder`。
+- 桌宠审批恢复 UI：展示 `approval_prompt`，确认后写入 `approval_granted` 并 resume。
+- `graphite_skill_builder`。
 - 桌宠 Agent 与自动编排图协作层，具体路线见 `docs/future/companion-autonomous-agent-roadmap.md`。

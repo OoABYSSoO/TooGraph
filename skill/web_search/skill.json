@@ -14,7 +14,7 @@
       "companion": {
         "discoverable": true,
         "autoSelectable": true,
-        "requiresApproval": true
+        "requiresApproval": false
       }
     }
   },

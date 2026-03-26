@@ -84,10 +84,9 @@ function createSkillDefinition(): SkillDefinition {
     description: "",
     schemaVersion: "graphite.skill/v1",
     version: "1",
-    targets: [],
     kind: "tool",
-    mode: "sync",
-    scope: "project",
+    mode: "tool",
+    scope: "node",
     permissions: [],
     runtime: { type: "python", entrypoint: "run.py" },
     health: { type: "none" },
@@ -104,7 +103,7 @@ function createSkillDefinition(): SkillDefinition {
     runtimeRegistered: true,
     configured: true,
     healthy: true,
-    status: "ready",
+    status: "active",
     canManage: true,
   };
 }

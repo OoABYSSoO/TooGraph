@@ -26,6 +26,7 @@ def coerce_input_boundary_value(value: Any, state_type: NodeSystemStateType) -> 
             NodeSystemStateType.ARRAY,
             NodeSystemStateType.JSON,
             NodeSystemStateType.FILE_LIST,
+            NodeSystemStateType.SKILL,
         }:
             return parsed
         if (

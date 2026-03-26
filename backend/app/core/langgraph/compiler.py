@@ -9,6 +9,7 @@ from app.core.langgraph.build_plan import (
     LangGraphEdgePlan,
     LangGraphNodePlan,
     LangGraphRuntimeConditionRoutePlan,
+    LangGraphRuntimeConditionStepPlan,
     LangGraphRuntimeRequirements,
 )
 from app.core.schemas.node_system import (
@@ -97,37 +98,72 @@ def compile_graph_to_langgraph_plan(graph: NodeSystemGraphPayload) -> LangGraphB
             return target
         if isinstance(target_node, NodeSystemOutputNode):
             return RUNTIME_END
-        if isinstance(target_node, NodeSystemConditionNode):
-            unsupported_reasons.append(
-                f"condition '{target}' cannot be used as a condition branch target in agent-only runtime."
-            )
-            return None
         if target_node is not None:
             unsupported_reasons.append(
                 f"node '{target}' with kind '{target_node.kind}' cannot be used as a runtime branch target."
             )
         return None
 
-    def _add_runtime_condition_route(source: str, condition_name: str) -> None:
-        route_key = f"{source}:{condition_name}"
-        if route_key in route_sources:
-            return
-        route_sources.add(route_key)
+    def _runtime_route_key(path: list[LangGraphRuntimeConditionStepPlan]) -> str:
+        return " -> ".join(f"{step.condition}.{step.branch}" for step in path)
+
+    def _runtime_condition_paths(
+        condition_name: str,
+        *,
+        visited_conditions: set[str] | None = None,
+    ) -> list[tuple[str, str, list[LangGraphRuntimeConditionStepPlan]]]:
+        if condition_name in (visited_conditions or set()):
+            unsupported_reasons.append(
+                f"condition chain starting at '{condition_name}' contains a condition-only cycle."
+            )
+            return []
+
         conditional_edge = conditional_edges_by_source.get(condition_name)
         if conditional_edge is None:
             unsupported_reasons.append(
                 f"condition '{condition_name}' is missing conditional edge branch targets."
             )
-            return
+            return []
 
-        branches: dict[str, str] = {}
-        branch_targets: dict[str, str] = {}
+        paths: list[tuple[str, str, list[LangGraphRuntimeConditionStepPlan]]] = []
+        next_visited_conditions = {*(visited_conditions or set()), condition_name}
         for branch, visual_target in conditional_edge.branches.items():
+            step = LangGraphRuntimeConditionStepPlan(
+                condition=condition_name,
+                branch=branch,
+                target=visual_target,
+            )
+            target_node = graph.nodes.get(visual_target)
+            if isinstance(target_node, NodeSystemConditionNode):
+                nested_paths = _runtime_condition_paths(
+                    visual_target,
+                    visited_conditions=next_visited_conditions,
+                )
+                for runtime_target, final_visual_target, nested_path in nested_paths:
+                    paths.append((runtime_target, final_visual_target, [step, *nested_path]))
+                continue
+
             runtime_target = _runtime_target_for_visual_node(visual_target)
             if runtime_target is None:
                 continue
-            branches[branch] = runtime_target
-            branch_targets[branch] = visual_target
+            paths.append((runtime_target, visual_target, [step]))
+
+        return paths
+
+    def _add_runtime_condition_route(source: str, condition_name: str) -> None:
+        route_key = f"{source}:{condition_name}"
+        if route_key in route_sources:
+            return
+        route_sources.add(route_key)
+
+        branches: dict[str, str] = {}
+        branch_targets: dict[str, str] = {}
+        branch_paths: dict[str, list[LangGraphRuntimeConditionStepPlan]] = {}
+        for runtime_target, visual_target, path in _runtime_condition_paths(condition_name):
+            path_key = _runtime_route_key(path)
+            branches[path_key] = runtime_target
+            branch_targets[path_key] = visual_target
+            branch_paths[path_key] = path
             if runtime_target != RUNTIME_END:
                 runtime_incoming_counts[runtime_target] += 1
 
@@ -144,6 +180,7 @@ def compile_graph_to_langgraph_plan(graph: NodeSystemGraphPayload) -> LangGraphB
                 condition=condition_name,
                 branches=branches,
                 branch_targets=branch_targets,
+                branch_paths=branch_paths,
             )
         )
 

@@ -126,19 +126,60 @@ def build_graph():
         return _call
 
     def make_router(route):
-        condition_node = GRAPH.nodes[route.condition]
+        conditional_edges_by_source = {{
+            conditional_edge.source: conditional_edge
+            for conditional_edge in GRAPH.conditional_edges
+        }}
+
+        def route_key_for_steps(selected_steps: list[tuple[str, str, str]]) -> str:
+            for route_key, planned_steps in route.branch_paths.items():
+                if [
+                    (str(step.condition), str(step.branch), str(step.target))
+                    for step in planned_steps
+                ] == selected_steps:
+                    return str(route_key)
+            rendered_path = " -> ".join(
+                f"{{condition_name}}.{{branch}}->{{target}}"
+                for condition_name, branch, target in selected_steps
+            )
+            raise ValueError(f"Condition route path is not compiled into the LangGraph plan: {{rendered_path}}")
 
         def _route(current_values: dict[str, Any]) -> str:
             runtime_state["state_values"] = {{
                 **dict(runtime_state.get("state_values", {{}})),
                 **dict(current_values or {{}}),
             }}
-            input_values, _state_reads = collect_node_inputs(condition_node, runtime_state)
-            body = _execute_node(GRAPH, route.condition, condition_node, input_values, runtime_state)
-            branch = str(body.get("selected_branch") or "").strip()
-            if not branch:
-                raise ValueError(f"Condition node '{{route.condition}}' did not produce a selected branch.")
-            return branch
+            condition_name = str(route.condition)
+            selected_steps: list[tuple[str, str, str]] = []
+            visited_conditions: set[str] = set()
+
+            while True:
+                if condition_name in visited_conditions:
+                    raise ValueError(f"Condition route contains a condition-only cycle at '{{condition_name}}'.")
+                visited_conditions.add(condition_name)
+
+                condition_node = GRAPH.nodes[condition_name]
+                input_values, _state_reads = collect_node_inputs(condition_node, runtime_state)
+                body = _execute_node(GRAPH, condition_name, condition_node, input_values, runtime_state)
+                branch = str(body.get("selected_branch") or "").strip()
+                if not branch:
+                    raise ValueError(f"Condition node '{{condition_name}}' did not produce a selected branch.")
+
+                conditional_edge = conditional_edges_by_source.get(condition_name)
+                if conditional_edge is None:
+                    raise ValueError(f"Condition node '{{condition_name}}' has no conditional edge mapping.")
+                target = str(conditional_edge.branches.get(branch) or "")
+                if not target:
+                    raise ValueError(
+                        f"Condition node '{{condition_name}}' selected branch '{{branch}}', but that branch has no target."
+                    )
+
+                selected_steps.append((condition_name, branch, target))
+                target_node = GRAPH.nodes.get(target)
+                if target_node is not None and target_node.kind == "condition":
+                    condition_name = target
+                    continue
+                return route_key_for_steps(selected_steps)
 
         return _route
 

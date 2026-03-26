@@ -330,6 +330,55 @@ test("applyNodeCreationResult materializes a virtual input output when it spawns
   assert.deepEqual(result.document.edges, [{ source: "empty_input", target: "output_created" }]);
 });
 
+test("applyNodeCreationResult materializes skill virtual outputs with an empty skill list", () => {
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Creation Graph",
+    state_schema: {},
+    nodes: {
+      empty_agent: {
+        kind: "agent",
+        name: "Empty Agent",
+        description: "",
+        ui: { position: { x: 0, y: 0 }, collapsed: false },
+        reads: [],
+        writes: [],
+        config: {
+          skills: [],
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+  const createdOutput = buildGenericOutputNode({
+    id: "output_created",
+    position: { x: 260, y: 0 },
+  });
+
+  const result = applyNodeCreationResult(document, {
+    createdNodeId: createdOutput.id,
+    createdNode: createdOutput.node,
+    mergedStateSchema: createdOutput.state_schema,
+    context: {
+      position: { x: 260, y: 0 },
+      sourceNodeId: "empty_agent",
+      sourceAnchorKind: "state-out",
+      sourceStateKey: VIRTUAL_ANY_OUTPUT_STATE_KEY,
+      sourceValueType: "skill",
+    },
+  });
+
+  assert.equal(result.document.state_schema.state_1?.type, "skill");
+  assert.deepEqual(result.document.state_schema.state_1?.value, []);
+});
+
 test("applyNodeCreationResult wires a created input node upstream of an existing concrete state input", () => {
   const document: GraphPayload = {
     graph_id: null,

@@ -91,7 +91,7 @@ def example_output_value_for_state(definition: NodeSystemStateDefinition | None)
         return "在此填写完整内容"
     if definition.type in {NodeSystemStateType.JSON, NodeSystemStateType.OBJECT}:
         return {}
-    if definition.type in {NodeSystemStateType.ARRAY, NodeSystemStateType.FILE_LIST}:
+    if definition.type in {NodeSystemStateType.ARRAY, NodeSystemStateType.FILE_LIST, NodeSystemStateType.SKILL}:
         return []
     if definition.type == NodeSystemStateType.NUMBER:
         return 0
@@ -137,7 +137,7 @@ def format_state_output_contract_lines(state_type: NodeSystemStateType) -> list[
             "  output_format: JSON object inside the JSON value",
             "  output_rule: 这个字段的值必须是对象；不要把对象再序列化成字符串。",
         ]
-    if state_type in {NodeSystemStateType.ARRAY, NodeSystemStateType.FILE_LIST}:
+    if state_type in {NodeSystemStateType.ARRAY, NodeSystemStateType.FILE_LIST, NodeSystemStateType.SKILL}:
         return [
             "  output_format: JSON array inside the JSON value",
             "  output_rule: 这个字段的值必须是数组；不要把数组再序列化成字符串。",

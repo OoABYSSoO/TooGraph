@@ -189,7 +189,13 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 catalog_items = {item["skillKey"]: item for item in response.json()}
                 self.assertEqual(
                     sorted(catalog_items),
-                    ["game_ad_research_collector", "local_file", "web_media_downloader", "web_search"],
+                    [
+                        "autonomous_decision",
+                        "game_ad_research_collector",
+                        "local_file",
+                        "web_media_downloader",
+                        "web_search",
+                    ],
                 )
                 source_path = {
                     key: item["sourcePath"].replace("\\", "/")
@@ -200,7 +206,7 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertNotIn("targets", catalog_items["web_search"])
                 self.assertTrue(catalog_items["web_search"]["runPolicies"]["default"]["discoverable"])
                 self.assertTrue(catalog_items["web_search"]["runPolicies"]["origins"]["companion"]["autoSelectable"])
-                self.assertTrue(catalog_items["web_search"]["runPolicies"]["origins"]["companion"]["requiresApproval"])
+                self.assertFalse(catalog_items["web_search"]["runPolicies"]["origins"]["companion"]["requiresApproval"])
                 self.assertTrue(catalog_items["web_search"]["runtimeReady"])
                 self.assertTrue(catalog_items["web_search"]["runtimeRegistered"])
                 self.assertTrue(source_path["web_search"].endswith("/skill/web_search/skill.json"))
@@ -236,6 +242,17 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                     )
                 )
                 self.assertNotIn("compatibility", catalog_items["game_ad_research_collector"])
+                self.assertEqual(catalog_items["autonomous_decision"]["sourceFormat"], "skill")
+                self.assertEqual(catalog_items["autonomous_decision"]["sourceScope"], "installed")
+                self.assertNotIn("targets", catalog_items["autonomous_decision"])
+                self.assertFalse(catalog_items["autonomous_decision"]["runPolicies"]["default"]["discoverable"])
+                self.assertFalse(
+                    catalog_items["autonomous_decision"]["runPolicies"]["origins"]["companion"]["autoSelectable"]
+                )
+                self.assertTrue(catalog_items["autonomous_decision"]["runtimeReady"])
+                self.assertTrue(catalog_items["autonomous_decision"]["runtimeRegistered"])
+                self.assertTrue(source_path["autonomous_decision"].endswith("/skill/autonomous_decision/skill.json"))
+                self.assertNotIn("compatibility", catalog_items["autonomous_decision"])
 
     def test_native_skill_json_upload_imports_installed_skill_package(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

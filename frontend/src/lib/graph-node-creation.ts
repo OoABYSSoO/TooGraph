@@ -70,6 +70,7 @@ function defaultValueForStateType(type: string): unknown {
       return {};
     case "array":
     case "file_list":
+    case "skill":
       return [];
     default:
       return "";

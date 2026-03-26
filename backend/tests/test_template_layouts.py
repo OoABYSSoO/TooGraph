@@ -8,6 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.compiler.validator import validate_graph
+from app.core.langgraph.compiler import get_langgraph_runtime_unsupported_reasons
 from app.core.schemas.node_system import NodeSystemGraphDocument, NodeSystemInputNode, NodeSystemTemplate
 from app.templates.loader import list_template_records
 
@@ -247,6 +248,229 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(template.nodes["companion_reply_agent"].config.skill_bindings, [])
         self.assertIn("第一档", template.nodes["companion_reply_agent"].config.task_instruction)
         self.assertIn("不能修改图", template.nodes["companion_reply_agent"].config.task_instruction)
+
+    def test_companion_agentic_tool_loop_template_models_dynamic_skill_decision_flow(self):
+        template = next(
+            NodeSystemTemplate.model_validate(record)
+            for record in list_template_records()
+            if record["template_id"] == "companion_agentic_tool_loop"
+        )
+
+        state_by_name = {
+            definition.name: state_key
+            for state_key, definition in template.state_schema.items()
+        }
+
+        self.assertEqual(template.default_graph_name, "桌宠自主工具循环")
+        for state_name in [
+            "user_message",
+            "conversation_history",
+            "page_context",
+            "companion_profile",
+            "companion_policy",
+            "companion_memory_context",
+            "intent_plan",
+            "skill_catalog_snapshot",
+            "required_capability",
+            "needs_tool",
+            "decision",
+            "next_action",
+            "allowed_skills",
+            "requires_approval",
+            "permission_request",
+            "approval_prompt",
+            "approval_granted",
+            "missing_skill_proposal",
+            "proposed_tool_input",
+            "tool_input",
+            "query",
+            "tool_result",
+            "tool_assessment",
+            "needs_more_tools",
+            "direct_reply",
+            "denied_reply",
+            "final_reply",
+            "companion_session_summary",
+            "companion_profile_json",
+            "companion_policy_json",
+            "companion_memories_json",
+            "companion_session_summary_json",
+            "companion_profile_next",
+            "companion_policy_next",
+            "companion_memories_next",
+            "companion_session_summary_next",
+            "companion_memory_update_result",
+            "companion_profile_write_result",
+            "companion_policy_write_result",
+            "companion_memories_write_result",
+            "companion_session_summary_write_result",
+        ]:
+            self.assertIn(state_name, state_by_name)
+
+        self.assertEqual(template.state_schema[state_by_name["allowed_skills"]].type.value, "skill")
+        self.assertEqual(template.state_schema[state_by_name["allowed_skills"]].value, [])
+        skill_catalog = template.state_schema[state_by_name["skill_catalog_snapshot"]].value
+        web_search = next(item for item in skill_catalog if item["skillKey"] == "web_search")
+        self.assertTrue(web_search["runPolicies"]["origins"]["companion"]["autoSelectable"])
+        self.assertFalse(web_search["runPolicies"]["origins"]["companion"]["requiresApproval"])
+
+        self.assertIn("intent_planner", template.nodes)
+        self.assertIn("decide_next_skill", template.nodes)
+        self.assertIn("request_approval_agent", template.nodes)
+        self.assertIn("approval_granted_check", template.nodes)
+        self.assertIn("tool_execution_agent", template.nodes)
+        self.assertIn("assess_tool_result", template.nodes)
+        self.assertIn("continue_tool_loop_check", template.nodes)
+        self.assertIn("read_companion_profile", template.nodes)
+        self.assertIn("read_companion_policy", template.nodes)
+        self.assertIn("read_companion_memories", template.nodes)
+        self.assertIn("read_companion_session_summary", template.nodes)
+        self.assertIn("curate_companion_memory", template.nodes)
+        self.assertIn("write_companion_profile", template.nodes)
+        self.assertIn("write_companion_policy", template.nodes)
+        self.assertIn("write_companion_memories", template.nodes)
+        self.assertIn("write_companion_session_summary", template.nodes)
+        self.assertNotIn("input_companion_profile", template.nodes)
+        self.assertNotIn("input_companion_policy", template.nodes)
+        self.assertNotIn("input_companion_memory_context", template.nodes)
+        self.assertEqual(template.metadata.get("interrupt_after"), ["request_approval_agent"])
+
+        decision_node = template.nodes["decide_next_skill"]
+        self.assertEqual(decision_node.config.skills, ["autonomous_decision"])
+        self.assertEqual(len(decision_node.config.skill_bindings), 1)
+        decision_binding = decision_node.config.skill_bindings[0]
+        self.assertEqual(decision_binding.skill_key, "autonomous_decision")
+        self.assertEqual(
+            decision_binding.input_mapping,
+            {
+                "user_message": state_by_name["user_message"],
+                "intent": state_by_name["intent_plan"],
+                "required_capability": state_by_name["required_capability"],
+                "needs_tool": state_by_name["needs_tool"],
+                "skill_catalog": state_by_name["skill_catalog_snapshot"],
+                "proposed_tool_input": state_by_name["proposed_tool_input"],
+            },
+        )
+        self.assertEqual(decision_binding.config.get("run_origin"), "companion")
+        self.assertEqual(
+            decision_binding.output_mapping,
+            {
+                "decision": state_by_name["decision"],
+                "next_action": state_by_name["next_action"],
+                "selected_skill": state_by_name["allowed_skills"],
+                "requires_approval": state_by_name["requires_approval"],
+                "permission_request": state_by_name["permission_request"],
+                "missing_skill_proposal": state_by_name["missing_skill_proposal"],
+                "tool_input": state_by_name["tool_input"],
+            },
+        )
+
+        tool_executor = template.nodes["tool_execution_agent"]
+        self.assertEqual(tool_executor.config.skills, [])
+        self.assertEqual(tool_executor.config.skill_bindings, [])
+        self.assertIn(state_by_name["allowed_skills"], [binding.state for binding in tool_executor.reads])
+        self.assertIn(state_by_name["query"], [binding.state for binding in tool_executor.reads])
+        self.assertIn(state_by_name["tool_input"], [binding.state for binding in tool_executor.reads])
+        self.assertIn(state_by_name["tool_result"], [binding.state for binding in tool_executor.writes])
+        self.assertIn("按技能 inputSchema", tool_executor.config.task_instruction)
+        self.assertIn("error_type", tool_executor.config.task_instruction)
+
+        self.assertIn(state_by_name["final_reply"], [binding.state for binding in template.nodes["compose_direct_reply"].writes])
+        self.assertIn(state_by_name["final_reply"], [binding.state for binding in template.nodes["compose_denied_reply"].writes])
+        self.assertIn(state_by_name["final_reply"], [binding.state for binding in template.nodes["assess_tool_result"].writes])
+        self.assertIn("相同错误", template.nodes["assess_tool_result"].config.task_instruction)
+
+        conditional_edges = {edge.source: edge.branches for edge in template.conditional_edges}
+        self.assertEqual(
+            conditional_edges["missing_skill_check"],
+            {
+                "true": "output_missing_skill",
+                "false": "direct_reply_check",
+                "exhausted": "output_missing_skill",
+            },
+        )
+        self.assertEqual(
+            conditional_edges["direct_reply_check"],
+            {
+                "true": "compose_direct_reply",
+                "false": "approval_required_check",
+                "exhausted": "compose_direct_reply",
+            },
+        )
+        self.assertEqual(
+            conditional_edges["approval_required_check"],
+            {
+                "true": "request_approval_agent",
+                "false": "tool_execution_agent",
+                "exhausted": "request_approval_agent",
+            },
+        )
+        self.assertEqual(
+            conditional_edges["approval_granted_check"],
+            {
+                "true": "tool_execution_agent",
+                "false": "compose_denied_reply",
+                "exhausted": "compose_denied_reply",
+            },
+        )
+        self.assertEqual(
+            conditional_edges["continue_tool_loop_check"],
+            {
+                "true": "decide_next_skill",
+                "false": "curate_companion_memory",
+                "exhausted": "curate_companion_memory",
+            },
+        )
+
+        graph_payload = template.model_dump(mode="json", by_alias=True)
+        graph_payload["graph_id"] = "template_companion_agentic_tool_loop"
+        graph_payload["name"] = template.default_graph_name
+        for template_only_key in ["template_id", "label", "description", "default_graph_name"]:
+            graph_payload.pop(template_only_key, None)
+        self.assertEqual(
+            get_langgraph_runtime_unsupported_reasons(NodeSystemGraphDocument.model_validate(graph_payload)),
+            [],
+        )
+
+        self.assertEqual(
+            template.nodes["missing_skill_check"].config.rule.source,
+            state_by_name["decision"],
+        )
+        self.assertEqual(template.nodes["missing_skill_check"].config.rule.value, "missing_skill")
+        self.assertEqual(
+            template.nodes["direct_reply_check"].config.rule.source,
+            state_by_name["decision"],
+        )
+        self.assertEqual(template.nodes["direct_reply_check"].config.rule.value, "answer_directly")
+        self.assertEqual(
+            template.nodes["approval_required_check"].config.rule.source,
+            state_by_name["next_action"],
+        )
+        self.assertEqual(template.nodes["approval_required_check"].config.rule.value, "request_approval")
+        self.assertEqual(
+            template.nodes["approval_granted_check"].config.rule.source,
+            state_by_name["approval_granted"],
+        )
+        self.assertEqual(template.nodes["approval_granted_check"].config.rule.value, True)
+        self.assertEqual(
+            template.nodes["continue_tool_loop_check"].config.rule.source,
+            state_by_name["needs_more_tools"],
+        )
+        self.assertEqual(template.nodes["continue_tool_loop_check"].config.rule.value, True)
+        self.assertEqual(template.nodes["continue_tool_loop_check"].config.loop_limit, 3)
+
+        memory_curator = template.nodes["curate_companion_memory"]
+        self.assertIn(state_by_name["final_reply"], [binding.state for binding in memory_curator.reads])
+        self.assertNotIn(state_by_name["final_reply"], [binding.state for binding in memory_curator.writes])
+        self.assertIn(state_by_name["companion_memory_update_result"], [binding.state for binding in memory_curator.writes])
+        profile_writer = template.nodes["write_companion_profile"]
+        self.assertEqual(profile_writer.config.skills, ["local_file"])
+        self.assertEqual(profile_writer.config.skill_bindings[0].skill_key, "local_file")
+        self.assertEqual(profile_writer.config.skill_bindings[0].config.get("operation"), "write_json")
+        self.assertEqual(
+            profile_writer.config.skill_bindings[0].config.get("changed_by"),
+            "companion_agentic_tool_loop_template",
+        )
 
     def test_web_research_loop_template_models_generic_search_retry_flow(self):
         template = next(

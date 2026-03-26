@@ -64,6 +64,7 @@ class NodeSystemStateType(str, Enum):
     VIDEO = "video"
     FILE = "file"
     KNOWLEDGE_BASE = "knowledge_base"
+    SKILL = "skill"
 
 
 class StateWriteMode(str, Enum):

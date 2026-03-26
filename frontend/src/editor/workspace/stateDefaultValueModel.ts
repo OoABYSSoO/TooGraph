@@ -30,7 +30,7 @@ export function resolveStateDefaultValueEditorConfig(type: StateFieldType): Stat
     return {
       mode: "structured",
       rows: 5,
-      placeholder: type === "array" || type === "file_list" ? "[]" : "{}",
+      placeholder: type === "array" || type === "file_list" || type === "skill" ? "[]" : "{}",
     };
   }
 
@@ -44,7 +44,7 @@ export function resolveStateDefaultValueEditorConfig(type: StateFieldType): Stat
 export function parseStructuredStateDraft(type: StateFieldType, draft: string): { ok: true; value: unknown } | { ok: false; error: string } {
   try {
     const parsed = draft.trim() === "" ? defaultValueForStateType(type) : JSON.parse(draft);
-    if ((type === "array" || type === "file_list") && !Array.isArray(parsed)) {
+    if ((type === "array" || type === "file_list" || type === "skill") && !Array.isArray(parsed)) {
       return {
         ok: false,
         error: translate("nodeCard.jsonArrayRequired"),
@@ -73,5 +73,5 @@ export function stringifyStructuredStateValue(type: StateFieldType, value: unkno
 }
 
 function isStructuredStateType(type: StateFieldType) {
-  return type === "json" || type === "object" || type === "array" || type === "file_list";
+  return type === "json" || type === "object" || type === "array" || type === "file_list" || type === "skill";
 }

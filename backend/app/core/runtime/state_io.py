@@ -24,7 +24,7 @@ def default_empty_state_value(state_type: NodeSystemStateType) -> Any:
         return False
     if state_type in {NodeSystemStateType.OBJECT, NodeSystemStateType.JSON}:
         return {}
-    if state_type in {NodeSystemStateType.ARRAY, NodeSystemStateType.FILE_LIST}:
+    if state_type in {NodeSystemStateType.ARRAY, NodeSystemStateType.FILE_LIST, NodeSystemStateType.SKILL}:
         return []
     return ""
 
