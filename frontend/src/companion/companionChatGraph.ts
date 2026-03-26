@@ -35,7 +35,7 @@ export const COMPANION_MODE_OPTIONS: CompanionModeOption[] = [
     value: "approval",
     labelKey: "companion.modes.approval",
     descriptionKey: "companion.modeDescriptions.approval",
-    disabled: true,
+    disabled: false,
   },
   {
     value: "unrestricted",
@@ -56,6 +56,7 @@ export type BuildCompanionChatGraphInput = {
   history: CompanionChatMessage[];
   pageContext: string;
   companionMode?: unknown;
+  companionModel?: unknown;
 };
 
 export function formatCompanionHistory(messages: CompanionChatMessage[], maxMessages = MAX_COMPANION_HISTORY_MESSAGES) {
@@ -90,10 +91,11 @@ export function buildCompanionChatGraph(template: TemplateRecord, input: BuildCo
       companion_template_id: template.template_id,
       companion_run: true,
       companion_mode: companionMode,
-      companion_permission_tier: 1,
       companion_can_execute_actions: false,
     },
   };
+  applyCompanionModePolicy(graph, companionMode);
+  applyCompanionModelOverride(graph, input.companionModel);
 
   setStateValue(graph, COMPANION_USER_MESSAGE_STATE_KEY, input.userMessage);
   setStateValue(graph, COMPANION_HISTORY_STATE_KEY, formatCompanionHistory(input.history));
@@ -105,13 +107,15 @@ export function buildCompanionChatGraph(template: TemplateRecord, input: BuildCo
   syncInputNodeValue(graph, COMPANION_HISTORY_STATE_KEY, graph.state_schema[COMPANION_HISTORY_STATE_KEY]?.value ?? "");
   syncInputNodeValue(graph, COMPANION_PAGE_CONTEXT_STATE_KEY, graph.state_schema[COMPANION_PAGE_CONTEXT_STATE_KEY]?.value ?? "");
   syncInputNodeValue(graph, COMPANION_MODE_STATE_KEY, companionMode);
-  enforceAdvisoryCompanionGraph(graph);
+  if (companionMode !== "unrestricted") {
+    enforceAdvisoryCompanionGraph(graph);
+  }
 
   return graph;
 }
 
 export function resolveCompanionMode(value: unknown): CompanionMode {
-  return value === DEFAULT_COMPANION_MODE ? DEFAULT_COMPANION_MODE : DEFAULT_COMPANION_MODE;
+  return value === "approval" || value === DEFAULT_COMPANION_MODE ? value : DEFAULT_COMPANION_MODE;
 }
 
 export function resolveCompanionReplyText(run: RunDetail): string {
@@ -183,6 +187,53 @@ function enforceAdvisoryCompanionGraph(graph: GraphPayload) {
     skills: [],
     skillBindings: [],
   };
+}
+
+function applyCompanionModePolicy(graph: GraphPayload, companionMode: CompanionMode) {
+  graph.metadata.companion_permission_tier = companionMode === "approval" ? 2 : 1;
+  graph.metadata.companion_can_execute_actions = false;
+  graph.metadata.companion_requires_approval = companionMode === "approval";
+  graph.metadata.companion_graph_patch_drafts_enabled = companionMode === "approval";
+  if (companionMode !== "approval") {
+    return;
+  }
+  graph.metadata.interrupt_after = addUniqueMetadataNodeId(graph.metadata.interrupt_after, "companion_reply_agent");
+  graph.metadata.agent_breakpoint_timing = {
+    ...(isRecord(graph.metadata.agent_breakpoint_timing) ? graph.metadata.agent_breakpoint_timing : {}),
+    companion_reply_agent: "after",
+  };
+}
+
+function applyCompanionModelOverride(graph: GraphPayload, value: unknown) {
+  const model = typeof value === "string" ? value.trim() : "";
+  if (!model) {
+    delete graph.metadata.companion_model_ref;
+    return;
+  }
+  graph.metadata.companion_model_ref = model;
+  for (const node of Object.values(graph.nodes)) {
+    if (node.kind !== "agent") {
+      continue;
+    }
+    node.config = {
+      ...node.config,
+      modelSource: "override",
+      model,
+    };
+  }
+}
+
+function addUniqueMetadataNodeId(value: unknown, nodeId: string) {
+  const items = Array.isArray(value)
+    ? value.map((item) => String(item).trim()).filter(Boolean)
+    : typeof value === "string" && value.trim()
+      ? [value.trim()]
+      : [];
+  return items.includes(nodeId) ? items : [...items, nodeId];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function resolveOutputPreviewValue(previews: RunDetail["output_previews"] | undefined) {

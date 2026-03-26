@@ -74,3 +74,9 @@
 
 - [x] 已创建独立计划 `docs/superpowers/plans/2026-05-05-companion-command-flow.md`。
 - [x] 第一刀选择 command flow 外壳：Companion 页面手动写入先进入 `/api/companion/commands`，完整审批档 graph draft/patch 仍留到下一阶段。
+
+## Phase 3 进展
+
+- [x] 已创建独立计划 `docs/superpowers/plans/2026-05-05-companion-graph-patch-draft.md`。
+- [x] 第一刀只实现 `graph_patch.draft` 草案命令：它会记录 `awaiting_approval` 状态、返回草案 ID 和 patch 内容，但不会写入图、不会创建 graph revision，也不会启动 graph run。
+- [ ] 后续审批档还需要补齐 graph patch 预览、协议级校验、用户确认后的 apply 命令、GraphCommandBus 接入、撤销记录和运行详情展示。

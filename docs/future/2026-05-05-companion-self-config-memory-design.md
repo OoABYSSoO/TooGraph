@@ -27,6 +27,8 @@
 
 自我设定和记忆不受这三档限制。用户在任何档位都可以编辑桌宠人设、记忆、语气和行为边界，但这些编辑仍应通过图模板、skill 或同等可审计命令路径完成。
 
+当前 Phase 3 的第一刀只开放 `graph_patch.draft` 草案能力：桌宠可以把拟议图修改记录成 `awaiting_approval` 命令，返回草案 ID、目标图和 patch 内容；系统不会因为创建草案而写入图、创建 graph revision 或启动 graph run。应用 patch、协议级校验、撤销记录和 GraphCommandBus 接入仍属于后续审批档工作。
+
 ## 侧边栏 Companion 页面
 
 侧边栏新增一个一级入口，建议命名为 `Companion` 或 `桌宠`。页面职责：

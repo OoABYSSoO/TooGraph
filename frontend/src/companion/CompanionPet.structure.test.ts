@@ -45,13 +45,26 @@ test("CompanionPet tracks dragging and click pulses for mascot animation", () =>
   assert.match(componentSource, /tapNonce\.value \+= 1;/);
 });
 
-test("CompanionPet exposes permission tiers with only advisory mode enabled", () => {
+test("CompanionPet exposes advisory and approval permission tiers", () => {
   assert.match(componentSource, /<ElSelect[\s\S]*v-model="companionMode"/);
   assert.match(componentSource, /v-for="option in COMPANION_MODE_OPTIONS"/);
   assert.match(componentSource, /:disabled="option\.disabled"/);
   assert.match(componentSource, /companionModeLabel/);
-  assert.doesNotMatch(componentSource, /companionMode\s*=\s*"approval"/);
   assert.doesNotMatch(componentSource, /companionMode\s*=\s*"unrestricted"/);
+});
+
+test("CompanionPet lets the companion runtime choose its own model", () => {
+  assert.match(componentSource, /import \{ fetchSettings \} from "\.\.\/api\/settings\.ts";/);
+  assert.match(componentSource, /import \{ buildRuntimeModelOptions \} from "\.\.\/lib\/runtimeModelCatalog\.ts";/);
+  assert.match(componentSource, /const companionModelRef = ref\("/);
+  assert.match(componentSource, /COMPANION_MODEL_STORAGE_KEY/);
+  assert.match(componentSource, /v-model="companionModelRef"/);
+  assert.match(componentSource, /@visible-change="handleCompanionModelSelectVisibleChange"/);
+  assert.match(componentSource, /popper-class="graphite-select-popper companion-pet__select-popper"/);
+  assert.match(componentSource, /:global\(\.companion-pet__select-popper\.el-popper\)[\s\S]*z-index:\s*46\d\d\s*!important;/);
+  assert.match(componentSource, /companionModelOptions/);
+  assert.match(componentSource, /return buildRuntimeModelOptions\(settings\);/);
+  assert.match(componentSource, /companionModel:\s*companionModelRef\.value/);
 });
 
 test("CompanionPet builds advisory page context from the shared editor snapshot", () => {
@@ -59,6 +72,10 @@ test("CompanionPet builds advisory page context from the shared editor snapshot"
   assert.match(componentSource, /import \{ useCompanionContextStore \} from "\.\.\/stores\/companionContext\.ts";/);
   assert.match(componentSource, /const companionContextStore = useCompanionContextStore\(\);/);
   assert.match(componentSource, /return buildCompanionPageContext\(\{[\s\S]*routePath: route\.fullPath,[\s\S]*editor: companionContextStore\.editorSnapshot,[\s\S]*activeCompanionRunId: activeRunId\.value,[\s\S]*\}\);/);
+});
+
+test("CompanionPet notifies companion pages to refresh after a completed chat graph run", () => {
+  assert.match(componentSource, /if \(runDetail\.status === "completed"\) \{[\s\S]*companionContextStore\.notifyCompanionDataChanged\(\);[\s\S]*\}/);
 });
 
 test("CompanionPet returns speaking replies to idle so the next message can be typed", () => {

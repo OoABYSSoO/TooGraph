@@ -7,7 +7,7 @@
           <h2 class="companion-page__title">{{ t("companionPage.title") }}</h2>
           <p class="companion-page__body">{{ t("companionPage.body") }}</p>
         </div>
-        <ElButton class="companion-page__refresh" :loading="isLoading" @click="loadAll">
+        <ElButton class="companion-page__refresh" :loading="isLoading" @click="loadAll()">
           <ElIcon><Refresh /></ElIcon>
           <span>{{ t("companionPage.refresh") }}</span>
         </ElButton>
@@ -207,7 +207,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import {
   ElAlert,
   ElButton,
@@ -242,6 +242,7 @@ import {
   updateCompanionSessionSummary,
 } from "@/api/companion";
 import AppShell from "@/layouts/AppShell.vue";
+import { useCompanionContextStore } from "@/stores/companionContext";
 import type {
   CompanionCommandRecord,
   CompanionCommandResponse,
@@ -253,8 +254,12 @@ import type {
 } from "@/types/companion";
 
 type MemoryDraft = Pick<CompanionMemory, "type" | "title" | "content">;
+type LoadAllOptions = {
+  silent?: boolean;
+};
 
 const { t } = useI18n();
+const companionContextStore = useCompanionContextStore();
 const activeTab = ref("profile");
 const hasLoaded = ref(false);
 const isLoading = ref(false);
@@ -365,9 +370,23 @@ function acceptCommandResult<T>(response: CompanionCommandResponse<T>): T {
   return response.result;
 }
 
-async function loadAll() {
+function hasActiveCompanionPageWrite() {
+  return Boolean(
+    isLoading.value ||
+      isSavingProfile.value ||
+      isSavingPolicy.value ||
+      isSavingMemory.value ||
+      isSavingSummary.value ||
+      memoryActionId.value ||
+      restoreActionId.value,
+  );
+}
+
+async function loadAll(options: LoadAllOptions = {}) {
   try {
-    isLoading.value = true;
+    if (!options.silent) {
+      isLoading.value = true;
+    }
     const [profile, policy, memoryList, summary, revisionList] = await Promise.all([
       fetchCompanionProfile(),
       fetchCompanionPolicy(),
@@ -385,7 +404,9 @@ async function loadAll() {
   } catch (error) {
     setError(error);
   } finally {
-    isLoading.value = false;
+    if (!options.silent) {
+      isLoading.value = false;
+    }
   }
 }
 
@@ -530,6 +551,16 @@ async function restoreRevision(revisionId: string) {
     restoreActionId.value = "";
   }
 }
+
+watch(
+  () => companionContextStore.dataRefreshNonce,
+  () => {
+    if (!hasLoaded.value || hasActiveCompanionPageWrite()) {
+      return;
+    }
+    void loadAll({ silent: true });
+  },
+);
 
 onMounted(loadAll);
 </script>

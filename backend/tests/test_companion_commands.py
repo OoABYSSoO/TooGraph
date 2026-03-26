@@ -81,6 +81,68 @@ class CompanionCommandRouteTests(unittest.TestCase):
         self.assertTrue(body["command"]["revision_id"].startswith("rev_"))
         self.assertEqual(enabled_memories, [])
 
+    def test_graph_patch_draft_records_approval_command_without_revision(self) -> None:
+        patch_payload = {
+            "graph_id": "graph_pet_loop",
+            "graph_name": "桌宠对话循环",
+            "summary": "增加记忆写入前的确认节点。",
+            "rationale": "让桌宠先提出图修改建议，再由用户审批。",
+            "patch": [
+                {
+                    "op": "add",
+                    "path": "/nodes/confirm_memory_write",
+                    "value": {"type": "approval", "label": "确认记忆写入"},
+                }
+            ],
+        }
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch.object(store, "COMPANION_DATA_DIR", Path(temp_dir)):
+                with TestClient(app) as client:
+                    response = client.post(
+                        "/api/companion/commands",
+                        json={
+                            "action": "graph_patch.draft",
+                            "payload": patch_payload,
+                            "change_reason": "Companion suggested a graph patch.",
+                        },
+                    )
+                    commands_response = client.get("/api/companion/commands")
+                    revisions_response = client.get("/api/companion/revisions")
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["command"]["action"], "graph_patch.draft")
+        self.assertEqual(body["command"]["kind"], "companion.graph_patch_draft")
+        self.assertEqual(body["command"]["status"], "awaiting_approval")
+        self.assertEqual(body["command"]["target_type"], "graph")
+        self.assertEqual(body["command"]["target_id"], "graph_pet_loop")
+        self.assertIsNone(body["command"]["revision_id"])
+        self.assertIsNone(body["command"]["run_id"])
+        self.assertIsNone(body["command"]["completed_at"])
+        self.assertIsNone(body["revision"])
+        self.assertEqual(body["result"]["draft_id"], body["command"]["command_id"])
+        self.assertEqual(body["result"]["graph_id"], "graph_pet_loop")
+        self.assertEqual(body["result"]["patch"], patch_payload["patch"])
+        self.assertEqual(commands_response.status_code, 200)
+        self.assertEqual(commands_response.json()[-1]["status"], "awaiting_approval")
+        self.assertEqual(revisions_response.status_code, 200)
+        self.assertEqual(revisions_response.json(), [])
+
+    def test_graph_patch_draft_rejects_empty_patch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch.object(store, "COMPANION_DATA_DIR", Path(temp_dir)):
+                with TestClient(app) as client:
+                    response = client.post(
+                        "/api/companion/commands",
+                        json={
+                            "action": "graph_patch.draft",
+                            "payload": {"graph_id": "graph_pet_loop", "patch": []},
+                        },
+                    )
+
+        self.assertEqual(response.status_code, 422)
+
     def test_command_rejects_unsupported_action(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch.object(store, "COMPANION_DATA_DIR", Path(temp_dir)):

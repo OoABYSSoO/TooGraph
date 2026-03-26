@@ -54,11 +54,37 @@ export type CompanionCommandRecord = {
   payload: Record<string, unknown>;
   change_reason: string;
   created_at: string;
-  completed_at: string;
+  completed_at: string | null;
 };
 
 export type CompanionCommandResponse<T> = {
   command: CompanionCommandRecord;
   result: T;
   revision: CompanionRevision | null;
+};
+
+export type CompanionGraphPatchOperation = {
+  op: "add" | "remove" | "replace" | "move" | "copy" | "test";
+  path: string;
+  from?: string;
+  value?: unknown;
+};
+
+export type CompanionGraphPatchDraftPayload = {
+  graph_id?: string | null;
+  graph_name?: string | null;
+  summary: string;
+  rationale?: string;
+  patch: CompanionGraphPatchOperation[];
+  preview?: Record<string, unknown> | null;
+};
+
+export type CompanionGraphPatchDraft = {
+  draft_id: string;
+  graph_id: string | null;
+  graph_name: string | null;
+  summary: string;
+  rationale: string;
+  patch: CompanionGraphPatchOperation[];
+  preview: Record<string, unknown> | null;
 };

@@ -190,20 +190,20 @@ test("formatCompanionHistory ignores messages marked outside the model context",
   );
 });
 
-test("companion mode options expose only advisory as selectable", () => {
+test("companion mode options expose advisory and approval as selectable", () => {
   assert.deepEqual(
     COMPANION_MODE_OPTIONS.map((option) => ({ value: option.value, disabled: option.disabled })),
     [
       { value: "advisory", disabled: false },
-      { value: "approval", disabled: true },
+      { value: "approval", disabled: false },
       { value: "unrestricted", disabled: true },
     ],
   );
 });
 
-test("resolveCompanionMode falls back to advisory for unavailable tiers", () => {
+test("resolveCompanionMode accepts approval and falls back from unavailable tiers", () => {
   assert.equal(resolveCompanionMode("advisory"), "advisory");
-  assert.equal(resolveCompanionMode("approval"), "advisory");
+  assert.equal(resolveCompanionMode("approval"), "approval");
   assert.equal(resolveCompanionMode("unrestricted"), "advisory");
   assert.equal(resolveCompanionMode("unknown"), "advisory");
 });
@@ -233,6 +233,44 @@ test("buildCompanionChatGraph injects the current message, history, and page con
   assertAgentNode(graph.nodes.companion_reply_agent);
   assert.deepEqual(graph.nodes.companion_reply_agent.config.skills, []);
   assert.deepEqual(graph.nodes.companion_reply_agent.config.skillBindings, []);
+});
+
+test("buildCompanionChatGraph marks approval mode with a reply breakpoint", () => {
+  const graph = buildCompanionChatGraph(createTemplate(), {
+    userMessage: "请帮我生成一个图修改草案",
+    history: [],
+    pageContext: "当前路径: /editor",
+    companionMode: "approval",
+  });
+
+  assert.equal(graph.state_schema[COMPANION_MODE_STATE_KEY].value, "approval");
+  assert.equal(graph.metadata.companion_mode, "approval");
+  assert.equal(graph.metadata.companion_permission_tier, 2);
+  assert.equal(graph.metadata.companion_can_execute_actions, false);
+  assert.equal(graph.metadata.companion_requires_approval, true);
+  assert.deepEqual(graph.metadata.interrupt_after, ["companion_reply_agent"]);
+  assert.deepEqual(graph.metadata.agent_breakpoint_timing, { companion_reply_agent: "after" });
+});
+
+test("buildCompanionChatGraph overrides template agent models with the companion model", () => {
+  const template = createTemplate();
+  const templateAgent = template.nodes.companion_reply_agent;
+  assertAgentNode(templateAgent);
+  templateAgent.config.modelSource = "override";
+  templateAgent.config.model = "template-selected-model";
+
+  const graph = buildCompanionChatGraph(template, {
+    userMessage: "你好",
+    history: [],
+    pageContext: "当前路径: /companion",
+    companionMode: "advisory",
+    companionModel: "openai/gpt-4.1",
+  });
+
+  assertAgentNode(graph.nodes.companion_reply_agent);
+  assert.equal(graph.nodes.companion_reply_agent.config.modelSource, "override");
+  assert.equal(graph.nodes.companion_reply_agent.config.model, "openai/gpt-4.1");
+  assert.equal(graph.metadata.companion_model_ref, "openai/gpt-4.1");
 });
 
 test("buildCompanionChatGraph leaves companion self config states for graph template skills", () => {
