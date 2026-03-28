@@ -39,13 +39,14 @@ const webSearchSkill: SkillDefinition = {
   permissions: ["network"],
   runtime: { type: "python", entrypoint: "run.py" },
   health: { type: "none" },
-  inputSchema: [{ key: "query", label: "Query", valueType: "text", required: true, description: "" }],
+  inputSchema: [{ key: "query", name: "Query", valueType: "text", required: true, description: "" }],
   outputSchema: [
-    { key: "source_urls", label: "Source URLs", valueType: "json", required: false, description: "URLs." },
-    { key: "artifact_paths", label: "Artifact Paths", valueType: "file_list", required: false, description: "Files." },
-    { key: "errors", label: "Errors", valueType: "json", required: false, description: "Errors." },
+    { key: "query", name: "Query", valueType: "text", required: false, description: "Search query." },
+    { key: "source_urls", name: "Source URLs", valueType: "json", required: false, description: "URLs." },
+    { key: "artifact_paths", name: "Artifact Paths", valueType: "file", required: false, description: "Files." },
+    { key: "errors", name: "Errors", valueType: "json", required: false, description: "Errors." },
   ],
-  supportedValueTypes: ["text", "json"],
+  supportedValueTypes: ["text", "json", "file"],
   sideEffects: ["network"],
   agentNodeEligibility: "ready",
   agentNodeBlockers: [],
@@ -370,26 +371,26 @@ test("updateAgentNodeConfigInDocument materializes attached skill outputs as man
 
   const node = nextDocument.nodes.search_agent;
   assert.equal(node.kind, "agent");
-  assert.deepEqual(node.writes.map((binding) => binding.state), ["state_1", "state_2", "state_3"]);
+  assert.deepEqual(node.writes.map((binding) => binding.state), ["state_1", "state_2", "state_3", "state_4"]);
   assert.deepEqual(node.config.skillBindings, [
     {
       skillKey: "web_search",
-      trigger: "before_agent",
-      inputMapping: {},
       outputMapping: {
-        source_urls: "state_1",
-        artifact_paths: "state_2",
-        errors: "state_3",
+        query: "state_1",
+        source_urls: "state_2",
+        artifact_paths: "state_3",
+        errors: "state_4",
       },
-      config: {},
     },
   ]);
-  assert.equal(nextDocument.state_schema.state_1?.name, "联网搜索 Source URLs");
-  assert.equal(nextDocument.state_schema.state_1?.type, "json");
+  assert.equal(nextDocument.state_schema.state_1?.name, "联网搜索 Query");
+  assert.equal(nextDocument.state_schema.state_1?.type, "text");
   assert.equal(nextDocument.state_schema.state_1?.promptVisible, false);
-  assert.equal(nextDocument.state_schema.state_2?.type, "file_list");
-  assert.equal(nextDocument.state_schema.state_2?.promptVisible, true);
-  assert.deepEqual(nextDocument.state_schema.state_2?.binding, {
+  assert.equal(nextDocument.state_schema.state_2?.type, "json");
+  assert.equal(nextDocument.state_schema.state_2?.promptVisible, false);
+  assert.equal(nextDocument.state_schema.state_3?.type, "file");
+  assert.equal(nextDocument.state_schema.state_3?.promptVisible, true);
+  assert.deepEqual(nextDocument.state_schema.state_3?.binding, {
     kind: "skill_output",
     skillKey: "web_search",
     nodeId: "search_agent",
@@ -399,7 +400,7 @@ test("updateAgentNodeConfigInDocument materializes attached skill outputs as man
   assert.deepEqual(document.nodes.search_agent.writes, []);
 });
 
-test("updateAgentNodeConfigInDocument maps a single required skill input to the agent input state", () => {
+test("updateAgentNodeConfigInDocument does not create static skill input mappings", () => {
   const document: GraphPayload = {
     graph_id: null,
     name: "Skill Input Binding Graph",
@@ -449,7 +450,7 @@ test("updateAgentNodeConfigInDocument maps a single required skill input to the 
 
   const node = nextDocument.nodes.search_agent;
   assert.equal(node.kind, "agent");
-  assert.deepEqual(node.config.skillBindings?.[0]?.inputMapping, { query: "search_content" });
+  assert.equal("inputMapping" in (node.config.skillBindings?.[0] ?? {}), false);
 });
 
 test("createEmptyDraftGraph creates an empty backend-native payload", () => {

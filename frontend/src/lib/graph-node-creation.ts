@@ -65,11 +65,8 @@ function defaultValueForStateType(type: string): unknown {
       return 0;
     case "boolean":
       return false;
-    case "object":
     case "json":
       return {};
-    case "array":
-    case "file_list":
     case "skill":
       return [];
     default:
@@ -156,20 +153,7 @@ export function buildInputNodeFromFile(params: {
   encoding: "local_path";
 }): CreatedNodeResult {
   const stateKey = params.stateKey;
-  const uploadedValue =
-    params.detectedType === "file"
-      ? params.localPath
-      : JSON.stringify({
-          kind: "uploaded_file",
-          name: params.fileName,
-          mimeType: params.mimeType || "application/octet-stream",
-          size: params.size,
-          detectedType: params.detectedType,
-          localPath: params.localPath,
-          contentType: params.contentType || params.mimeType || "application/octet-stream",
-          textPreview: params.textPreview,
-          encoding: params.encoding,
-        });
+  const uploadedValue = params.localPath;
   return {
     id: params.id,
     node: {

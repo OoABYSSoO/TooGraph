@@ -30,7 +30,7 @@ def _agent_skill_definition(
         name=skill_key,
         runtime={"type": "python", "entrypoint": runtime_entrypoint or "run.py"},
         inputSchema=input_schema or [],
-        outputSchema=output_schema or [SkillIoField(key="summary", label="Summary", valueType="text")],
+        outputSchema=output_schema or [SkillIoField(key="summary", name="Summary", valueType="text")],
         runtimeReady=True,
         runtimeRegistered=True,
         configured=True,
@@ -94,7 +94,6 @@ class NodeSystemValidatorSkillTests(unittest.TestCase):
                 "skillBindings": [
                     {
                         "skillKey": "summarize_text",
-                        "inputMapping": {"text": "source_text"},
                         "outputMapping": {"summary": "missing_state"},
                     }
                 ],
@@ -110,7 +109,7 @@ class NodeSystemValidatorSkillTests(unittest.TestCase):
 
         self.assertIn("agent_skill_output_state_unknown", [issue.code for issue in validation.issues])
 
-    def test_required_skill_input_missing_from_binding_is_rejected(self) -> None:
+    def test_required_skill_inputs_are_generated_at_runtime_not_validated_as_static_bindings(self) -> None:
         graph = _graph_with_agent_config(
             {
                 "skills": ["summarize_text"],
@@ -124,7 +123,7 @@ class NodeSystemValidatorSkillTests(unittest.TestCase):
         )
         definition = _agent_skill_definition(
             "summarize_text",
-            input_schema=[SkillIoField(key="text", label="Text", valueType="text", required=True)],
+            input_schema=[SkillIoField(key="text", name="Text", valueType="text", required=True)],
         )
 
         with (
@@ -133,7 +132,7 @@ class NodeSystemValidatorSkillTests(unittest.TestCase):
         ):
             validation = validate_graph(graph)
 
-        self.assertIn("agent_skill_required_input_missing", [issue.code for issue in validation.issues])
+        self.assertNotIn("agent_skill_required_input_missing", [issue.code for issue in validation.issues])
 
     def test_binding_only_skill_still_goes_through_agent_node_validation(self) -> None:
         graph = _graph_with_agent_config(
@@ -141,7 +140,6 @@ class NodeSystemValidatorSkillTests(unittest.TestCase):
                 "skillBindings": [
                     {
                         "skillKey": "desktop_profile",
-                        "inputMapping": {"text": "source_text"},
                     }
                 ]
             }

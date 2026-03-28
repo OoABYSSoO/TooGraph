@@ -302,7 +302,6 @@ def _validate_agent_skill_bindings(
     skill_catalog: dict[str, SkillDefinition],
 ) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
-    read_state_keys = {binding.state for binding in node.reads}
     for binding_index, binding in enumerate(node.config.skill_bindings):
         definition = skill_catalog.get(binding.skill_key)
         if definition is None:
@@ -319,25 +318,6 @@ def _validate_agent_skill_bindings(
                         path=f"nodes.{node_name}.config.skillBindings.{binding_index}.outputMapping.{output_key}",
                     )
                 )
-
-        for field in definition.input_schema:
-            if not field.required:
-                continue
-            has_mapped_input = field.key in binding.input_mapping
-            has_config_input = field.key in binding.config
-            has_legacy_read_input = not binding.input_mapping and field.key in read_state_keys
-            if has_mapped_input or has_config_input or has_legacy_read_input:
-                continue
-            issues.append(
-                ValidationIssue(
-                    code="agent_skill_required_input_missing",
-                    message=(
-                        f"Agent node '{node_name}' binding for skill '{binding.skill_key}' is missing required input "
-                        f"'{field.key}'. Add an input mapping or fixed config value."
-                    ),
-                    path=f"nodes.{node_name}.config.skillBindings.{binding_index}.inputMapping",
-                )
-            )
     return issues
 
 

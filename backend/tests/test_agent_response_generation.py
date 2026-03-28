@@ -133,7 +133,7 @@ class AgentResponseGenerationTests(unittest.TestCase):
         self.assertEqual(warnings, [])
         system_prompt = str(captured["system_prompt"])
         self.assertIn("reference.png", system_prompt)
-        self.assertIn("uploads/reference.png", system_prompt)
+        self.assertNotIn("uploads/reference.png", system_prompt)
         attachments = captured["input_attachments"]
         self.assertEqual(len(attachments), 1)
         self.assertEqual(attachments[0]["type"], "image")
@@ -192,7 +192,7 @@ class AgentResponseGenerationTests(unittest.TestCase):
         self.assertEqual(warnings, [])
         system_prompt = str(captured["system_prompt"])
         self.assertIn("clip.mp4", system_prompt)
-        self.assertIn("uploads/clip.mp4", system_prompt)
+        self.assertNotIn("uploads/clip.mp4", system_prompt)
         attachments = captured["input_attachments"]
         self.assertEqual(len(attachments), 1)
         self.assertEqual(attachments[0]["type"], "video")
@@ -243,7 +243,7 @@ class AgentResponseGenerationTests(unittest.TestCase):
                     state_schema={
                         "downloaded_files": NodeSystemStateDefinition(
                             name="下载素材",
-                            type=NodeSystemStateType.ARRAY,
+                            type=NodeSystemStateType.FILE,
                         ),
                         "answer": NodeSystemStateDefinition(type=NodeSystemStateType.TEXT),
                     },
@@ -264,6 +264,53 @@ class AgentResponseGenerationTests(unittest.TestCase):
         self.assertEqual(attachments[1]["state_key"], "downloaded_files")
         self.assertEqual(attachments[1]["name"], "clip.mp4")
         self.assertEqual(attachments[1]["file_url"], video_path.resolve().as_uri())
+
+    def test_routes_audio_file_state_arrays_as_model_attachments(self) -> None:
+        captured: dict[str, object] = {}
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            artifact_root = Path(temp_dir) / "skill_artifacts"
+            audio_path = artifact_root / "run_1" / "download" / "voice.mp3"
+            audio_path.parent.mkdir(parents=True)
+            audio_path.write_bytes(b"fake-mp3")
+
+            def chat_with_local_model_with_meta_func(**kwargs):
+                captured.update(kwargs)
+                return ('{"answer": "ok"}', {"warnings": []})
+
+            with patch("app.core.storage.skill_artifact_store.SKILL_ARTIFACT_DATA_DIR", artifact_root):
+                payload, _reasoning, warnings, _updated_config = generate_agent_response(
+                    _agent_node(writes=[{"state": "answer"}], task_instruction="Analyze the audio."),
+                    {"audio_files": ["run_1/download/voice.mp3"]},
+                    {},
+                    {
+                        "resolved_provider_id": "local",
+                        "runtime_model_name": "audio-model",
+                        "resolved_temperature": 0.2,
+                        "resolved_thinking": False,
+                        "resolved_thinking_level": "off",
+                        "resolved_model_ref": "local/audio-model",
+                    },
+                    state_schema={
+                        "audio_files": NodeSystemStateDefinition(
+                            name="Audio files",
+                            type=NodeSystemStateType.AUDIO,
+                        ),
+                        "answer": NodeSystemStateDefinition(type=NodeSystemStateType.TEXT),
+                    },
+                    chat_with_local_model_with_meta_func=chat_with_local_model_with_meta_func,
+                    parse_llm_json_response_func=lambda content, output_keys, *, output_key_aliases: {"answer": "ok"},
+                    build_output_key_aliases_func=lambda output_keys, state_schema: {"answer": ["answer"]},
+                )
+
+        self.assertEqual(payload["answer"], "ok")
+        self.assertEqual(warnings, [])
+        attachments = captured["input_attachments"]
+        self.assertEqual(len(attachments), 1)
+        self.assertEqual(attachments[0]["type"], "audio")
+        self.assertEqual(attachments[0]["state_key"], "audio_files")
+        self.assertEqual(attachments[0]["name"], "voice.mp3")
+        self.assertEqual(attachments[0]["file_url"], audio_path.resolve().as_uri())
 
     def test_does_not_route_skill_result_artifacts_as_model_attachments(self) -> None:
         captured: dict[str, object] = {}

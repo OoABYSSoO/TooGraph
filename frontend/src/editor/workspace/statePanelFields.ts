@@ -10,11 +10,8 @@ export type StateFieldType =
   | "text"
   | "number"
   | "boolean"
-  | "object"
-  | "array"
   | "markdown"
   | "json"
-  | "file_list"
   | "image"
   | "audio"
   | "video"
@@ -34,11 +31,8 @@ export const STATE_FIELD_TYPE_OPTIONS: StateFieldType[] = [
   "text",
   "number",
   "boolean",
-  "object",
-  "array",
   "markdown",
   "json",
-  "file_list",
   "image",
   "audio",
   "video",
@@ -278,8 +272,11 @@ export function deleteStateFieldFromDocument<T extends GraphPayload | GraphDocum
 }
 
 export function formatStateValueInput(type: StateFieldType, value: unknown) {
-  if (type === "json" || type === "object" || type === "array" || type === "file_list" || type === "skill") {
+  if (type === "json" || type === "skill") {
     return JSON.stringify(value ?? defaultValueForStateType(type), null, 2);
+  }
+  if (isFileReferenceStateType(type) && (Array.isArray(value) || (value !== null && typeof value === "object"))) {
+    return JSON.stringify(value, null, 2);
   }
   if (type === "boolean") {
     return String(Boolean(value));
@@ -298,12 +295,15 @@ export function parseStateValueInput(type: StateFieldType, input: string): unkno
   if (type === "boolean") {
     return input === "true";
   }
-  if (type === "json" || type === "object" || type === "array" || type === "file_list" || type === "skill") {
+  if (type === "json" || type === "skill") {
     try {
       return JSON.parse(input || JSON.stringify(defaultValueForStateType(type)));
     } catch {
       return defaultValueForStateType(type);
     }
+  }
+  if (isFileReferenceStateType(type)) {
+    return parseFileReferenceStateInput(input);
   }
   return input;
 }
@@ -314,14 +314,30 @@ export function defaultValueForStateType(type: StateFieldType): unknown {
       return 0;
     case "boolean":
       return false;
-    case "object":
     case "json":
       return {};
-    case "array":
-    case "file_list":
     case "skill":
       return [];
     default:
       return "";
+  }
+}
+
+function isFileReferenceStateType(type: StateFieldType) {
+  return type === "file" || type === "image" || type === "audio" || type === "video";
+}
+
+function parseFileReferenceStateInput(input: string): unknown {
+  const trimmed = input.trim();
+  if (!trimmed) {
+    return "";
+  }
+  if (!trimmed.startsWith("[") && !trimmed.startsWith("{")) {
+    return input;
+  }
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return input;
   }
 }

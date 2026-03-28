@@ -5,7 +5,7 @@ from typing import Any
 
 from app.core.runtime.agent_multimodal import normalize_uploaded_file_envelope
 from app.core.schemas.node_system import NodeSystemStateDefinition, NodeSystemStateType
-from app.core.storage.skill_artifact_store import read_skill_artifact_text_for_prompt
+from app.core.storage.skill_artifact_store import read_skill_artifact_file_metadata, read_skill_artifact_text_for_prompt
 
 
 def build_effective_system_prompt(
@@ -37,9 +37,15 @@ def build_auto_system_prompt(
             definition = resolved_state_schema.get(key)
             if definition is not None and not definition.prompt_visible:
                 continue
-            if _is_file_prompt_state(definition):
+            if _is_file_reference_prompt_state(definition):
                 parts.extend(format_state_prompt_lines(key, definition))
-                parts.extend(format_file_state_prompt_lines(value))
+                parts.extend(
+                    format_file_state_prompt_lines(
+                        value,
+                        allow_text=definition.type == NodeSystemStateType.FILE,
+                        declared_state_type=definition.type,
+                    )
+                )
                 continue
             display = format_prompt_value(value)
             parts.extend(format_state_prompt_lines(key, definition, value=display))
@@ -94,7 +100,12 @@ def sanitize_prompt_value(value: Any) -> Any:
     return value
 
 
-def format_file_state_prompt_lines(value: Any) -> list[str]:
+def format_file_state_prompt_lines(
+    value: Any,
+    *,
+    allow_text: bool = True,
+    declared_state_type: NodeSystemStateType | None = None,
+) -> list[str]:
     references = _collect_file_state_references(value)
     if not references:
         return ["  value: "]
@@ -105,12 +116,26 @@ def format_file_state_prompt_lines(value: Any) -> list[str]:
             lines.append("")
         local_path = reference["local_path"]
         requested_name = reference.get("name", "")
+        requested_content_type = reference.get("content_type", "")
+        file_name = requested_name or _filename_from_local_path(local_path)
+        content_type = requested_content_type or _content_type_for_file_reference(file_name, declared_state_type)
         try:
+            metadata = read_skill_artifact_file_metadata(local_path)
+            file_name = requested_name or str(metadata.get("name") or file_name)
+            content_type = requested_content_type or str(metadata.get("content_type") or content_type)
+            if not allow_text or not _is_text_like_artifact(file_name, content_type):
+                lines.append(f"  media_file: {file_name}")
+                lines.append(f"  media_type: {content_type}")
+                lines.append("  media_rule: passed as a model attachment; do not treat it as text content")
+                continue
             artifact = read_skill_artifact_text_for_prompt(local_path)
-            file_name = requested_name or str(artifact.get("name") or _filename_from_local_path(local_path))
             content = str(artifact.get("content") or "")
         except Exception:
-            file_name = requested_name or _filename_from_local_path(local_path)
+            if not allow_text:
+                lines.append(f"  media_file: {file_name}")
+                lines.append(f"  media_type: {content_type}")
+                lines.append("  media_rule: passed as a model attachment; do not treat it as text content")
+                continue
             content = "[文件读取失败：文件不存在或无法读取。]"
         lines.append(f"  文件名：{file_name}")
         lines.append("  原文：")
@@ -118,8 +143,13 @@ def format_file_state_prompt_lines(value: Any) -> list[str]:
     return lines
 
 
-def _is_file_prompt_state(definition: NodeSystemStateDefinition | None) -> bool:
-    return definition is not None and definition.type in {NodeSystemStateType.FILE, NodeSystemStateType.FILE_LIST}
+def _is_file_reference_prompt_state(definition: NodeSystemStateDefinition | None) -> bool:
+    return definition is not None and definition.type in {
+        NodeSystemStateType.FILE,
+        NodeSystemStateType.IMAGE,
+        NodeSystemStateType.AUDIO,
+        NodeSystemStateType.VIDEO,
+    }
 
 
 def _collect_file_state_references(value: Any) -> list[dict[str, str]]:
@@ -158,6 +188,9 @@ def _append_file_record(record: dict[str, Any], references: list[dict[str, str]]
     reference = {"local_path": local_path}
     if name:
         reference["name"] = name
+    content_type = _first_non_empty_string(record, ("content_type", "contentType", "mimeType"))
+    if content_type:
+        reference["content_type"] = content_type
     references.append(reference)
 
 
@@ -183,12 +216,31 @@ def _filename_from_local_path(local_path: str) -> str:
     return str(local_path).replace("\\", "/").rstrip("/").rsplit("/", 1)[-1] or "document"
 
 
+def _content_type_for_file_reference(file_name: str, declared_state_type: NodeSystemStateType | None) -> str:
+    if declared_state_type == NodeSystemStateType.IMAGE:
+        return _mime_type_from_file_name(file_name, default="image/png", media_prefix="image/")
+    if declared_state_type == NodeSystemStateType.AUDIO:
+        return _mime_type_from_file_name(file_name, default="audio/mpeg", media_prefix="audio/")
+    if declared_state_type == NodeSystemStateType.VIDEO:
+        return _mime_type_from_file_name(file_name, default="video/mp4", media_prefix="video/")
+    return _mime_type_from_file_name(file_name, default="application/octet-stream")
+
+
+def _mime_type_from_file_name(file_name: str, *, default: str, media_prefix: str = "") -> str:
+    import mimetypes
+
+    guessed = mimetypes.guess_type(file_name)[0] or ""
+    if guessed and (not media_prefix or guessed.startswith(media_prefix)):
+        return guessed
+    return default
+
+
 def example_output_value_for_state(definition: NodeSystemStateDefinition | None) -> Any:
     if definition is None:
         return "在此填写完整内容"
-    if definition.type in {NodeSystemStateType.JSON, NodeSystemStateType.OBJECT}:
+    if definition.type == NodeSystemStateType.JSON:
         return {}
-    if definition.type in {NodeSystemStateType.ARRAY, NodeSystemStateType.FILE_LIST, NodeSystemStateType.SKILL}:
+    if definition.type == NodeSystemStateType.SKILL:
         return []
     if definition.type == NodeSystemStateType.NUMBER:
         return 0
@@ -229,18 +281,90 @@ def format_state_output_contract_lines(state_type: NodeSystemStateType) -> list[
             "  output_format: markdown string inside the JSON value",
             "  output_rule: 这个字段的值必须是 Markdown 内容字符串；不要把整个 JSON 包进 Markdown 代码块。",
         ]
-    if state_type in {NodeSystemStateType.JSON, NodeSystemStateType.OBJECT}:
+    if state_type == NodeSystemStateType.JSON:
         return [
-            "  output_format: JSON object inside the JSON value",
-            "  output_rule: 这个字段的值必须是对象；不要把对象再序列化成字符串。",
+            "  output_format: JSON value inside the JSON value",
+            "  output_rule: 这个字段的值必须是合法 JSON 值；不要把对象或数组再序列化成字符串。",
         ]
-    if state_type in {NodeSystemStateType.ARRAY, NodeSystemStateType.FILE_LIST, NodeSystemStateType.SKILL}:
+    if state_type == NodeSystemStateType.SKILL:
         return [
             "  output_format: JSON array inside the JSON value",
             "  output_rule: 这个字段的值必须是数组；不要把数组再序列化成字符串。",
+        ]
+    if state_type in {
+        NodeSystemStateType.FILE,
+        NodeSystemStateType.IMAGE,
+        NodeSystemStateType.AUDIO,
+        NodeSystemStateType.VIDEO,
+    }:
+        return [
+            "  output_format: local artifact path string or JSON array of local artifact path strings",
+            "  output_rule: 只能使用输入或技能结果中已经存在的本地文件路径；不要编造路径。",
         ]
     if state_type == NodeSystemStateType.NUMBER:
         return ["  output_format: JSON number"]
     if state_type == NodeSystemStateType.BOOLEAN:
         return ["  output_format: JSON boolean"]
     return ["  output_format: JSON string"]
+
+
+def _is_text_like_artifact(file_name: str, content_type: str) -> bool:
+    normalized_type = content_type.lower().strip()
+    if normalized_type.startswith("text/"):
+        return True
+    if normalized_type in {
+        "application/json",
+        "application/xml",
+        "application/javascript",
+        "application/x-javascript",
+        "application/x-ndjson",
+    }:
+        return True
+    if normalized_type.endswith("+json") or normalized_type.endswith("+xml"):
+        return True
+    return file_name.lower().endswith(
+        (
+            ".txt",
+            ".md",
+            ".markdown",
+            ".csv",
+            ".tsv",
+            ".json",
+            ".jsonl",
+            ".yaml",
+            ".yml",
+            ".xml",
+            ".html",
+            ".htm",
+            ".css",
+            ".js",
+            ".jsx",
+            ".ts",
+            ".tsx",
+            ".py",
+            ".java",
+            ".c",
+            ".cc",
+            ".cpp",
+            ".h",
+            ".hpp",
+            ".cs",
+            ".go",
+            ".rs",
+            ".rb",
+            ".php",
+            ".sh",
+            ".bash",
+            ".zsh",
+            ".fish",
+            ".bat",
+            ".cmd",
+            ".ps1",
+            ".sql",
+            ".log",
+            ".ini",
+            ".toml",
+            ".env",
+            ".gitignore",
+        )
+    )

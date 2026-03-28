@@ -202,10 +202,12 @@ function buildBody(
 
   const connectedState = node.reads[0]?.state ?? null;
   const runtime = options.runtime;
-  const configuredDisplayMode =
-    node.config.displayMode === "auto"
-      ? runtime?.outputDisplayMode?.trim() || node.config.displayMode
-      : node.config.displayMode;
+  const connectedStateType = connectedState ? stateSchema[connectedState]?.type?.trim() || "" : "";
+  const configuredDisplayMode = resolveConfiguredOutputDisplayMode({
+    configuredDisplayMode: node.config.displayMode,
+    runtimeDisplayMode: runtime?.outputDisplayMode,
+    connectedStateType,
+  });
   const previewText = resolveOutputPreviewText({
     connectedState,
     stateSchema,
@@ -283,6 +285,24 @@ function resolveOutputPreviewText(input: {
     return `Connected to ${getStateLabel(input.connectedState, input.stateSchema)}. Run the graph to preview/export it.`;
   }
   return "Connect an upstream output to preview/export it.";
+}
+
+function resolveConfiguredOutputDisplayMode(input: {
+  configuredDisplayMode: string;
+  runtimeDisplayMode: string | null | undefined;
+  connectedStateType: string;
+}) {
+  if (input.configuredDisplayMode !== "auto") {
+    return input.configuredDisplayMode;
+  }
+  if (isDocumentStateType(input.connectedStateType)) {
+    return "documents";
+  }
+  return input.runtimeDisplayMode?.trim() || input.configuredDisplayMode;
+}
+
+function isDocumentStateType(stateType: string) {
+  return stateType === "file" || stateType === "image" || stateType === "audio" || stateType === "video";
 }
 
 function isActiveRunStatus(status: string | null) {

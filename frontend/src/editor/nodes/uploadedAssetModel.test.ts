@@ -51,6 +51,20 @@ test("tryParseUploadedAssetEnvelope accepts legacy uploaded file payloads", () =
   assert.equal(tryParseUploadedAssetEnvelope({ kind: "uploaded_file", name: 123 }), null);
 });
 
+test("tryParseUploadedAssetEnvelope builds asset metadata for plain local paths", () => {
+  assert.deepEqual(tryParseUploadedAssetEnvelope("uploads/reference.png", "image"), {
+    kind: "uploaded_file",
+    name: "reference.png",
+    mimeType: "image/png",
+    size: 0,
+    detectedType: "image",
+    localPath: "uploads/reference.png",
+    contentType: "image/png",
+    encoding: "local_path",
+  });
+  assert.equal(tryParseUploadedAssetEnvelope("uploads/reference.png"), null);
+});
+
 test("uploaded asset presentation helpers preserve NodeCard display text", () => {
   const textAsset: UploadedAssetEnvelope = {
     kind: "uploaded_file",

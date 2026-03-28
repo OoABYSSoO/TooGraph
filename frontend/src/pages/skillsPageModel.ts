@@ -119,8 +119,8 @@ function buildSkillSearchText(skill: SkillDefinition): string {
     ...skill.agentNodeBlockers,
     ...skill.supportedValueTypes,
     ...skill.sideEffects,
-    ...skill.inputSchema.map((field) => `${field.key} ${field.label} ${field.valueType} ${field.description}`),
-    ...skill.outputSchema.map((field) => `${field.key} ${field.label} ${field.valueType} ${field.description}`),
+    ...skill.inputSchema.map((field) => `${field.key} ${field.name} ${field.valueType} ${field.description}`),
+    ...skill.outputSchema.map((field) => `${field.key} ${field.name} ${field.valueType} ${field.description}`),
   ]
     .join(" ")
     .toLowerCase();

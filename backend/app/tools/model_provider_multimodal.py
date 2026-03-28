@@ -15,6 +15,8 @@ def build_openai_user_content(user_prompt: str, input_attachments: list[dict[str
     for attachment in media_attachments:
         if attachment["type"] == "image":
             content.append({"type": "image_url", "image_url": {"url": attachment["url"]}})
+        elif attachment["type"] == "audio":
+            content.append({"type": "audio_url", "audio_url": {"url": attachment["url"]}})
         elif attachment["type"] == "video":
             content.append({"type": "video_url", "video_url": {"url": attachment["url"]}})
     return content
@@ -33,6 +35,16 @@ def build_anthropic_user_content(user_prompt: str, input_attachments: list[dict[
             content.append(
                 {
                     "type": "image",
+                    "source": {
+                        "type": "url",
+                        "url": attachment["url"],
+                    },
+                }
+            )
+        elif attachment["type"] == "audio":
+            content.append(
+                {
+                    "type": "audio",
                     "source": {
                         "type": "url",
                         "url": attachment["url"],
@@ -79,6 +91,8 @@ def build_codex_responses_user_content(user_prompt: str, input_attachments: list
     for attachment in media_attachments:
         if attachment["type"] == "image":
             content.append({"type": "input_image", "image_url": attachment["url"]})
+        elif attachment["type"] == "audio":
+            content.append({"type": "input_audio", "audio_url": attachment["url"]})
         elif attachment["type"] == "video":
             content.append({"type": "input_video", "video_url": attachment["url"]})
     return content
@@ -92,7 +106,7 @@ def _normalize_media_attachments(input_attachments: list[dict[str, Any]] | None)
         if not isinstance(attachment, dict):
             continue
         attachment_type = str(attachment.get("type") or "").strip().lower()
-        if attachment_type not in {"image", "video"}:
+        if attachment_type not in {"image", "audio", "video"}:
             continue
         url = _attachment_url(attachment)
         if not url:
@@ -113,4 +127,8 @@ def _attachment_url(attachment: dict[str, Any]) -> str:
 
 
 def _fallback_mime_type(attachment_type: str) -> str:
-    return "image/png" if attachment_type == "image" else "video/mp4"
+    if attachment_type == "image":
+        return "image/png"
+    if attachment_type == "audio":
+        return "audio/mpeg"
+    return "video/mp4"

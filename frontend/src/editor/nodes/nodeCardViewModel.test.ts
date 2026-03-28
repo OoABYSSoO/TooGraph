@@ -443,6 +443,38 @@ test("buildNodeCardViewModel exposes configured document output display format",
   assert.equal(model.body.displayModeLabel, "DOCS");
 });
 
+test("buildNodeCardViewModel auto-displays file output state arrays as documents", () => {
+  const node: GraphNode = {
+    kind: "output",
+    name: "output_artifacts",
+    description: "Preview fetched source documents.",
+    ui: { position: { x: 980, y: 420 } },
+    reads: [{ state: "artifact_paths", required: false }],
+    writes: [],
+    config: {
+      displayMode: "auto",
+      persistEnabled: false,
+      persistFormat: "auto",
+      fileNameTemplate: "",
+    },
+  };
+
+  const model = buildNodeCardViewModel("output_artifacts", node, {
+    ...stateSchema,
+    artifact_paths: {
+      name: "Artifact Paths",
+      description: "Local fetched documents.",
+      type: "file",
+      value: ["run_1/searcher/web_search/invocation_001/doc_001.md"],
+      color: "#1d4ed8",
+    },
+  });
+
+  assert.equal(model.body.kind, "output");
+  assert.equal(model.body.displayMode, "documents");
+  assert.equal(model.body.displayModeLabel, "DOCS");
+});
+
 test("buildNodeCardViewModel uses the legacy output empty state when no upstream state is connected", () => {
   const node: GraphNode = {
     kind: "output",

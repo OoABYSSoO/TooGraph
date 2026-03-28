@@ -15,6 +15,7 @@ from app.core.runtime.agent_prompt import (
 )
 from app.core.runtime.agent_runtime_config import resolve_agent_runtime_config
 from app.core.runtime.agent_response_generation import generate_agent_response
+from app.core.runtime.agent_skill_input_generation import generate_agent_skill_inputs
 from app.core.runtime.condition_eval import (
     coerce_condition_text as _coerce_condition_text,
     evaluate_condition_rule as _evaluate_condition_rule,
@@ -174,6 +175,7 @@ def _execute_agent_node(
         resolve_agent_runtime_config_func=_resolve_agent_runtime_config,
         build_agent_stream_delta_callback_func=_build_agent_stream_delta_callback,
         callable_accepts_keyword_func=_callable_accepts_keyword,
+        generate_agent_skill_inputs_func=_generate_agent_skill_inputs,
         generate_agent_response_func=_generate_agent_response,
         finalize_agent_stream_delta_func=_finalize_agent_stream_delta,
         first_truthy_func=_first_truthy,
@@ -217,6 +219,10 @@ def _generate_agent_response(
         parse_llm_json_response_func=_parse_llm_json_response,
         build_output_key_aliases_func=_build_output_key_aliases,
     )
+
+
+def _generate_agent_skill_inputs(**kwargs: Any) -> tuple[dict[str, dict[str, Any]], str, list[str], dict[str, Any]]:
+    return generate_agent_skill_inputs(**kwargs)
 
 
 def _resolve_agent_runtime_config(node: NodeSystemAgentNode) -> dict[str, Any]:

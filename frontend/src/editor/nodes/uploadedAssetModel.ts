@@ -82,8 +82,11 @@ export function detectUploadedAssetTypeFromFileName(fileName: string, mimeType =
   return "file";
 }
 
-export function tryParseUploadedAssetEnvelope(value: unknown): UploadedAssetEnvelope | null {
+export function tryParseUploadedAssetEnvelope(value: unknown, fallbackType: UploadedAssetType | null = null): UploadedAssetEnvelope | null {
   const parsed = typeof value === "string" ? tryParseJson(value) : value;
+  if (typeof value === "string" && parsed === null && fallbackType && value.trim()) {
+    return buildLocalPathUploadedAssetEnvelope(value.trim(), fallbackType);
+  }
   if (!parsed || typeof parsed !== "object") {
     return null;
   }
@@ -116,6 +119,22 @@ export function tryParseUploadedAssetEnvelope(value: unknown): UploadedAssetEnve
     contentType: String(candidate.contentType ?? candidate.mimeType ?? "application/octet-stream"),
     textPreview: typeof candidate.textPreview === "string" ? candidate.textPreview : undefined,
     encoding,
+  };
+}
+
+function buildLocalPathUploadedAssetEnvelope(localPath: string, fallbackType: UploadedAssetType): UploadedAssetEnvelope {
+  const name = localPath.replaceAll("\\", "/").split("/").filter(Boolean).at(-1) || localPath;
+  const detectedType = fallbackType === "file" ? detectUploadedAssetTypeFromFileName(name) : fallbackType;
+  const mimeType = resolveMimeTypeFromFileName(name, detectedType);
+  return {
+    kind: "uploaded_file",
+    name,
+    mimeType,
+    size: 0,
+    detectedType,
+    localPath,
+    contentType: mimeType,
+    encoding: "local_path",
   };
 }
 
@@ -170,6 +189,9 @@ export function resolveUploadedAssetSummary(asset: UploadedAssetEnvelope | null)
   if (!asset) {
     return "";
   }
+  if (!asset.size) {
+    return asset.mimeType;
+  }
   return `${asset.mimeType} · ${Math.max(1, Math.round(asset.size / 1024))} KB`;
 }
 
@@ -217,6 +239,53 @@ function isTextLikeUploadedFile(file: File) {
   return /\.(txt|md|markdown|csv|tsv|json|jsonl|yaml|yml|xml|html|htm|css|js|jsx|ts|tsx|py|java|c|cc|cpp|h|hpp|cs|go|rs|rb|php|sh|bash|zsh|fish|bat|cmd|ps1|sql|log|ini|toml|env|gitignore)$/i.test(
     file.name,
   );
+}
+
+function resolveMimeTypeFromFileName(fileName: string, detectedType: UploadedAssetType) {
+  const normalized = fileName.toLowerCase();
+  if (detectedType === "image") {
+    if (normalized.endsWith(".svg")) {
+      return "image/svg+xml";
+    }
+    if (normalized.endsWith(".webp")) {
+      return "image/webp";
+    }
+    if (normalized.endsWith(".gif")) {
+      return "image/gif";
+    }
+    return "image/png";
+  }
+  if (detectedType === "audio") {
+    if (normalized.endsWith(".wav")) {
+      return "audio/wav";
+    }
+    if (normalized.endsWith(".ogg") || normalized.endsWith(".oga")) {
+      return "audio/ogg";
+    }
+    if (normalized.endsWith(".flac")) {
+      return "audio/flac";
+    }
+    return "audio/mpeg";
+  }
+  if (detectedType === "video") {
+    if (normalized.endsWith(".webm")) {
+      return "video/webm";
+    }
+    if (normalized.endsWith(".mov")) {
+      return "video/quicktime";
+    }
+    return "video/mp4";
+  }
+  if (/\.(md|markdown)$/i.test(fileName)) {
+    return "text/markdown";
+  }
+  if (/\.(txt|log)$/i.test(fileName)) {
+    return "text/plain";
+  }
+  if (/\.jsonl?$/i.test(fileName)) {
+    return "application/json";
+  }
+  return "application/octet-stream";
 }
 
 function tryParseJson(value: string) {

@@ -15,6 +15,7 @@ class SkillSideEffect(str, Enum):
     FILE_WRITE = "file_write"
     SUBPROCESS = "subprocess"
     SECRET_READ = "secret_read"
+    BROWSER_AUTOMATION = "browser_automation"
 
 
 class SkillSourceFormat(str, Enum):
@@ -62,12 +63,12 @@ class SkillCatalogStatus(str, Enum):
 
 class SkillIoField(BaseModel):
     key: str = Field(..., min_length=1)
-    label: str = Field(..., min_length=1)
+    name: str = Field(..., min_length=1)
     value_type: str = Field(..., alias="valueType", min_length=1)
     required: bool = False
     description: str = ""
 
-    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True, extra="forbid")
 
 
 class SkillRuntimeSpec(BaseModel):

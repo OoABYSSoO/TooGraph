@@ -129,6 +129,14 @@ test("resolveOutputPreviewContent treats string arrays as local document paths",
   assert.match(preview.text, /Local: run_1\/search\/doc_001\.md/);
 });
 
+test("resolveOutputPreviewContent treats a single local path as a document reference in document mode", () => {
+  const preview = resolveOutputPreviewContent("run_1/search/doc_001.md", "documents");
+
+  assert.equal(preview.kind, "documents");
+  assert.equal(preview.documentRefs[0]?.localPath, "run_1/search/doc_001.md");
+  assert.match(preview.text, /1 local source document/);
+});
+
 test("resolveOutputPreviewContent treats active waiting output as an empty preview state", () => {
   const preview = resolveOutputPreviewContent("Waiting for output...", "auto");
 

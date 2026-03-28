@@ -256,8 +256,16 @@ test("parseStateValueInput coerces values by state type", () => {
   assert.equal(parseStateValueInput("number", "42"), 42);
   assert.equal(parseStateValueInput("boolean", "true"), true);
   assert.deepEqual(parseStateValueInput("json", "{\"ok\":true}"), { ok: true });
-  assert.deepEqual(parseStateValueInput("array", "[1,2]"), [1, 2]);
+  assert.deepEqual(parseStateValueInput("file", "[\"uploads/a.md\",\"uploads/b.md\"]"), ["uploads/a.md", "uploads/b.md"]);
+  assert.equal(parseStateValueInput("file", "uploads/a.md"), "uploads/a.md");
   assert.equal(parseStateValueInput("text", "hello"), "hello");
+});
+
+test("legacy collection and object state types are not exposed", () => {
+  const stateTypeOptions = STATE_FIELD_TYPE_OPTIONS.map(String);
+  assert.equal(stateTypeOptions.includes("object"), false);
+  assert.equal(stateTypeOptions.includes("array"), false);
+  assert.equal(stateTypeOptions.includes("file_list"), false);
 });
 
 test("skill state type is available and uses structured skill descriptors", () => {

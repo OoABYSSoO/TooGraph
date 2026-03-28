@@ -6,13 +6,12 @@ from typing import Any, Callable
 from app.core.runtime.agent_streaming import build_agent_stream_delta_callback, finalize_agent_stream_delta
 from app.core.runtime.agent_runtime_config import resolve_agent_runtime_config
 from app.core.runtime.agent_response_generation import generate_agent_response
+from app.core.runtime.agent_skill_input_generation import generate_agent_skill_inputs
 from app.core.runtime.condition_eval import evaluate_condition_rule, resolve_branch_key
 from app.core.runtime.input_boundary import coerce_input_boundary_value, first_truthy
 from app.core.runtime.reference_resolution import resolve_condition_source
 from app.core.runtime.skill_bindings import (
-    build_skill_inputs,
     map_skill_outputs,
-    missing_required_skill_inputs,
     resolve_agent_skill_bindings,
 )
 from app.core.runtime.skill_invocation import callable_accepts_keyword, invoke_skill
@@ -92,6 +91,7 @@ def execute_agent_node(
     resolve_agent_runtime_config_func: Callable[..., dict[str, Any]] = resolve_agent_runtime_config,
     build_agent_stream_delta_callback_func: Callable[..., Any] = build_agent_stream_delta_callback,
     callable_accepts_keyword_func: Callable[..., bool] = callable_accepts_keyword,
+    generate_agent_skill_inputs_func: Callable[..., tuple[dict[str, dict[str, Any]], str, list[str], dict[str, Any]]] = generate_agent_skill_inputs,
     generate_agent_response_func: Callable[..., tuple[dict[str, Any], str, list[str], dict[str, Any]]] = generate_agent_response,
     finalize_agent_stream_delta_func: Callable[..., None] = finalize_agent_stream_delta,
     first_truthy_func: Callable[..., Any] = first_truthy,
@@ -105,9 +105,22 @@ def execute_agent_node(
     warnings: list[str] = []
     runtime_config = resolve_agent_runtime_config_func(node)
     skill_definitions = get_skill_definition_registry_func(include_disabled=False)
+    resolved_bindings = resolve_agent_skill_bindings(node, input_values=input_values, state_schema=state_schema)
+    generated_skill_inputs: dict[str, dict[str, Any]] = {}
+    skill_input_reasoning = ""
+    if resolved_bindings:
+        generated_skill_inputs, skill_input_reasoning, skill_input_warnings, runtime_config = generate_agent_skill_inputs_func(
+            node=node,
+            input_values=input_values,
+            bindings=resolved_bindings,
+            skill_definitions=skill_definitions,
+            runtime_config=runtime_config,
+            state_schema=state_schema,
+        )
+        warnings.extend(skill_input_warnings)
 
     mapped_skill_outputs: dict[str, Any] = {}
-    for resolved_binding in resolve_agent_skill_bindings(node, input_values=input_values, state_schema=state_schema):
+    for resolved_binding in resolved_bindings:
         binding = resolved_binding.binding
         skill_key = binding.skill_key
         skill_func = registry.get(skill_key)
@@ -117,24 +130,22 @@ def execute_agent_node(
         started_at = perf_counter()
         skill_definition = skill_definitions.get(skill_key)
         input_schema = list(getattr(skill_definition, "input_schema", []) or [])
-        skill_inputs = build_skill_inputs(
-            binding,
-            input_values,
-            binding_source=resolved_binding.source,
-            state_schema=state_schema,
-            input_schema=input_schema,
-        )
-        missing_inputs = (
-            missing_required_skill_inputs(skill_inputs, input_schema)
-            if resolved_binding.source == "skill_state"
-            else []
-        )
+        skill_inputs = dict(generated_skill_inputs.get(skill_key) or {})
+        missing_inputs = missing_required_skill_inputs(skill_inputs, input_schema)
         if missing_inputs:
             missing_label = ", ".join(missing_inputs)
             skill_result = {
                 "status": "failed",
                 "error_type": "missing_required_input",
                 "error": f"Missing required input(s) for skill '{skill_key}': {missing_label}.",
+                "errors": [
+                    {
+                        "type": "missing_required_input",
+                        "message": f"Missing required input '{input_key}'.",
+                        "input": input_key,
+                    }
+                    for input_key in missing_inputs
+                ],
                 "missing_inputs": missing_inputs,
                 "recoverable": True,
             }
@@ -164,8 +175,8 @@ def execute_agent_node(
             {
                 "skill_name": skill_key,
                 "skill_key": skill_key,
-                "trigger": binding.trigger,
                 "binding_source": resolved_binding.source,
+                "input_source": "agent_llm",
                 "inputs": skill_inputs,
                 "outputs": skill_result,
                 "output_mapping": dict(binding.output_mapping),
@@ -193,6 +204,7 @@ def execute_agent_node(
             "outputs": output_values,
             "response": response_payload,
             "reasoning": response_reasoning,
+            "skill_input_reasoning": skill_input_reasoning,
             "selected_skills": selected_skills,
             "skill_outputs": skill_outputs,
             "runtime_config": runtime_config,
@@ -244,6 +256,7 @@ def execute_agent_node(
         "outputs": output_values,
         "response": response_payload,
         "reasoning": response_reasoning,
+        "skill_input_reasoning": skill_input_reasoning,
         "selected_skills": selected_skills,
         "skill_outputs": skill_outputs,
         "runtime_config": runtime_config,
@@ -266,6 +279,22 @@ def _next_skill_artifact_invocation_index(state: dict[str, Any], node_name: str,
     next_index = max(0, current_index) + 1
     raw_counters[counter_key] = next_index
     return next_index
+
+
+def missing_required_skill_inputs(skill_inputs: dict[str, Any], input_schema: list[Any] | None) -> list[str]:
+    missing: list[str] = []
+    for field in input_schema or []:
+        if field.required and is_missing_skill_input_value(skill_inputs.get(field.key)):
+            missing.append(field.key)
+    return missing
+
+
+def is_missing_skill_input_value(value: Any) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, str) and not value.strip():
+        return True
+    return False
 
 
 def _resolve_skill_invocation_status(skill_key: str, skill_result: dict[str, Any]) -> tuple[str, str]:

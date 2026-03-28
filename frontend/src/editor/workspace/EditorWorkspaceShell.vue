@@ -764,7 +764,6 @@ const { runActiveGraph, resumeHumanReviewRun } = useWorkspaceRunController({
   runFailureMessageByTabId,
   activeRunEdgeIdsByTabId,
   runActivityByTabId,
-  skillDefinitions,
   refreshAgentModels,
   runGraph,
   resumeRun,

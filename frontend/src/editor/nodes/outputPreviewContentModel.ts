@@ -162,7 +162,9 @@ function parseDocumentPreviewRecords(text: string): OutputPreviewDocumentReferen
     collectDocumentPreviewRecords(parsed, documents, false);
     return documents;
   } catch {
-    return null;
+    const documents: OutputPreviewDocumentReference[] = [];
+    collectDocumentPreviewRecords(trimmed, documents, true);
+    return documents.length > 0 ? documents : null;
   }
 }
 

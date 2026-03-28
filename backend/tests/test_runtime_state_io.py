@@ -26,9 +26,8 @@ class RuntimeStateIoTests(unittest.TestCase):
                     "answer": {"name": "Answer", "type": "markdown", "value": "stale schema answer"},
                     "count": {"name": "Count", "type": "number", "value": 9},
                     "ready": {"name": "Ready", "type": "boolean", "value": True},
-                    "payload": {"name": "Payload", "type": "object", "value": {"items": [1]}},
-                    "items": {"name": "Items", "type": "array", "value": [1]},
-                    "files": {"name": "Files", "type": "file_list", "value": [{"path": "old.txt"}]},
+                    "payload": {"name": "Payload", "type": "json", "value": {"items": [1]}},
+                    "files": {"name": "Files", "type": "file", "value": ["old.txt"]},
                     "allowed_skills": {
                         "name": "Allowed Skills",
                         "type": "skill",
@@ -49,7 +48,6 @@ class RuntimeStateIoTests(unittest.TestCase):
                             {"state": "count"},
                             {"state": "ready"},
                             {"state": "payload"},
-                            {"state": "items"},
                             {"state": "files"},
                             {"state": "allowed_skills"},
                         ],
@@ -66,8 +64,7 @@ class RuntimeStateIoTests(unittest.TestCase):
                 "count": 99,
                 "ready": True,
                 "payload": {"previous": True},
-                "items": ["previous"],
-                "files": [{"path": "previous.txt"}],
+                "files": ["previous.txt"],
                 "allowed_skills": [{"skillKey": "previous"}],
                 "obsolete": "remove me",
             },
@@ -85,8 +82,7 @@ class RuntimeStateIoTests(unittest.TestCase):
                 "count": 0,
                 "ready": False,
                 "payload": {},
-                "items": [],
-                "files": [],
+                "files": "",
                 "allowed_skills": [],
             },
         )
@@ -102,7 +98,7 @@ class RuntimeStateIoTests(unittest.TestCase):
                 "name": "State Graph",
                 "state_schema": {
                     "question": {"name": "Question", "type": "text", "value": "seed"},
-                    "payload": {"name": "Payload", "type": "object", "value": {"items": [1]}},
+                    "payload": {"name": "Payload", "type": "json", "value": {"items": [1]}},
                 },
                 "nodes": {
                     "input_question": {
