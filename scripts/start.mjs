@@ -8,16 +8,18 @@ import { createPortReleasePlan } from "./dev-port-ownership.mjs";
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const backendDir = resolve(rootDir, "backend");
 const frontendDir = resolve(rootDir, "frontend");
+const frontendDistDir = resolve(frontendDir, "dist");
 
 const isWindows = process.platform === "win32";
-const backendPort = String(process.env.BACKEND_PORT || "8765");
-const frontendPort = String(process.env.FRONTEND_PORT || "3477");
-const backendLogPath = resolve(rootDir, ".dev_backend.log");
-const frontendLogPath = resolve(rootDir, ".dev_frontend.log");
-const devPidPath = resolve(rootDir, ".dev_pids.json");
+const appPort = String(process.env.PORT || process.env.GRAPHITEUI_PORT || "3477");
+const legacyBackendPort = String(process.env.GRAPHITEUI_LEGACY_BACKEND_PORT || "8765");
+const serverLogPath = resolve(rootDir, ".graphiteui_server.log");
+const pidPath = resolve(rootDir, ".graphiteui_pids.json");
+const legacyPidPath = resolve(rootDir, ".dev_pids.json");
+const legacyBackendLogPath = resolve(rootDir, ".dev_backend.log");
+const legacyFrontendLogPath = resolve(rootDir, ".dev_frontend.log");
 
-let backendProcess;
-let frontendProcess;
+let serverProcess;
 let stopping = false;
 
 function sleep(ms) {
@@ -45,6 +47,37 @@ function execFileAsync(command, args, options = {}) {
       },
     );
   });
+}
+
+function runCommand(command, args, options = {}) {
+  return new Promise((resolveRun, rejectRun) => {
+    const child = spawn(command, args, {
+      cwd: options.cwd,
+      env: options.env,
+      stdio: options.stdio || "inherit",
+      windowsHide: true,
+    });
+
+    child.once("error", rejectRun);
+    child.once("exit", (code, signal) => {
+      if (code === 0) {
+        resolveRun();
+        return;
+      }
+      rejectRun(new Error(`${options.label || command} exited with code ${code ?? "null"} signal ${signal ?? "null"}`));
+    });
+  });
+}
+
+function npmCommand(args) {
+  const npmExecutable = process.env.NPM || (isWindows ? "npm.cmd" : "npm");
+  if (isWindows) {
+    return {
+      command: process.env.ComSpec || "cmd.exe",
+      args: ["/d", "/s", "/c", npmExecutable, ...args],
+    };
+  }
+  return { command: npmExecutable, args };
 }
 
 function matchesPort(localAddress, port) {
@@ -100,6 +133,25 @@ function addPid(pids, value) {
   }
 }
 
+function addPidStatePids(pids, statePath) {
+  if (!existsSync(statePath)) {
+    return;
+  }
+
+  try {
+    const state = JSON.parse(readFileSync(statePath, "utf8"));
+    if (state.rootDir !== rootDir) {
+      return;
+    }
+    addPid(pids, state.launcherPid);
+    addPid(pids, state.server?.pid);
+    addPid(pids, state.backend?.pid);
+    addPid(pids, state.frontend?.pid);
+  } catch {
+    // A corrupt stale PID file should not block startup.
+  }
+}
+
 function addLogPids(pids, logPath) {
   if (!existsSync(logPath)) {
     return;
@@ -108,7 +160,7 @@ function addLogPids(pids, logPath) {
   const content = readFileSync(logPath, "utf8");
   const patterns = [
     /Started (?:reloader|server) process \[(\d+)\]/g,
-    /\b(?:Backend|Frontend) PID:\s*(\d+)/g,
+    /\b(?:Server|Backend|Frontend) PID:\s*(\d+)/g,
   ];
 
   for (const pattern of patterns) {
@@ -120,22 +172,11 @@ function addLogPids(pids, logPath) {
 
 function loadKnownGraphitePids() {
   const pids = new Set();
-
-  if (existsSync(devPidPath)) {
-    try {
-      const state = JSON.parse(readFileSync(devPidPath, "utf8"));
-      if (state.rootDir === rootDir) {
-        addPid(pids, state.launcherPid);
-        addPid(pids, state.backend?.pid);
-        addPid(pids, state.frontend?.pid);
-      }
-    } catch {
-      // A corrupt stale PID file should not block startup.
-    }
-  }
-
-  addLogPids(pids, backendLogPath);
-  addLogPids(pids, frontendLogPath);
+  addPidStatePids(pids, pidPath);
+  addPidStatePids(pids, legacyPidPath);
+  addLogPids(pids, serverLogPath);
+  addLogPids(pids, legacyBackendLogPath);
+  addLogPids(pids, legacyFrontendLogPath);
   return pids;
 }
 
@@ -187,6 +228,18 @@ async function listProcessInfos() {
   }
 }
 
+function portReleaseContext() {
+  return {
+    knownGraphitePids: loadKnownGraphitePids(),
+    rootDir,
+    backendDir,
+    frontendDir,
+    backendPort: appPort,
+    frontendPort: appPort,
+    appPort,
+  };
+}
+
 async function terminatePids(pids) {
   if (isWindows) {
     await Promise.all(
@@ -214,41 +267,36 @@ async function terminatePids(pids) {
   }
 }
 
-async function killPortPids(port) {
+async function createReleasePlan(port) {
   const pids = await findPortPids(port);
   if (pids.length === 0) {
-    return;
+    return null;
   }
 
-  const processInfos = await listProcessInfos();
-  const plan = createPortReleasePlan({
+  return createPortReleasePlan({
     port,
     portPids: pids,
-    processInfos,
-    context: {
-      knownGraphitePids: loadKnownGraphitePids(),
-      rootDir,
-      backendDir,
-      frontendDir,
-      backendPort,
-      frontendPort,
-    },
+    processInfos: await listProcessInfos(),
+    context: portReleaseContext(),
   });
+}
+
+async function killPortPids(port) {
+  const plan = await createReleasePlan(port);
+  if (!plan) {
+    return;
+  }
 
   if (plan.blockedOwners.length > 0) {
     console.error(`Port ${port} is used by process(es) that do not look like GraphiteUI:`);
     for (const owner of plan.blockedOwners) {
       console.error(`  ${owner}`);
     }
-    throw new Error(`Port ${port} is occupied by another program. Stop that program or change the port.`);
+    throw new Error(`Port ${port} is occupied by another program. Stop that program or change PORT.`);
   }
 
   if (plan.killPids.length === 0) {
-    throw new Error(
-      `Port ${port} is occupied by PID(s): ${pids.join(
-        ", ",
-      )}, but no live GraphiteUI process could be found to terminate.`,
-    );
+    throw new Error(`Port ${port} is occupied, but no live GraphiteUI process could be found to terminate.`);
   }
 
   console.log(`Releasing GraphiteUI process(es) on port ${port}: ${plan.killPids.join(", ")}`);
@@ -260,21 +308,31 @@ async function killPortPids(port) {
   }
 }
 
-function writeDevPidState() {
+async function releaseLegacyGraphitePort(port) {
+  if (!port || port === appPort) {
+    return;
+  }
+
+  const plan = await createReleasePlan(port);
+  if (!plan || plan.killPids.length === 0) {
+    return;
+  }
+
+  console.log(`Stopping legacy GraphiteUI process(es) on port ${port}: ${plan.killPids.join(", ")}`);
+  await terminatePids(plan.killPids);
+}
+
+function writePidState() {
   writeFileSync(
-    devPidPath,
+    pidPath,
     `${JSON.stringify(
       {
         rootDir,
         startedAt: new Date().toISOString(),
         launcherPid: process.pid,
-        backend: {
-          pid: backendProcess?.pid,
-          port: backendPort,
-        },
-        frontend: {
-          pid: frontendProcess?.pid,
-          port: frontendPort,
+        server: {
+          pid: serverProcess?.pid,
+          port: appPort,
         },
       },
       null,
@@ -283,10 +341,10 @@ function writeDevPidState() {
   );
 }
 
-function clearDevPidState() {
-  if (existsSync(devPidPath)) {
+function clearPidState() {
+  if (existsSync(pidPath)) {
     try {
-      const state = JSON.parse(readFileSync(devPidPath, "utf8"));
+      const state = JSON.parse(readFileSync(pidPath, "utf8"));
       if (String(state.launcherPid ?? "") !== String(process.pid)) {
         return;
       }
@@ -294,7 +352,7 @@ function clearDevPidState() {
       // Remove unreadable state written by this launcher path.
     }
   }
-  rmSync(devPidPath, { force: true });
+  rmSync(pidPath, { force: true });
 }
 
 async function resolvePythonCommand() {
@@ -449,22 +507,35 @@ async function stopServices() {
   }
 
   stopping = true;
-  if (!frontendProcess && !backendProcess) {
+  if (!serverProcess) {
     return;
   }
 
-  console.log("\nStopping GraphiteUI services...");
-  await Promise.all([stopProcessTree(frontendProcess), stopProcessTree(backendProcess)]);
-  clearDevPidState();
-  console.log("Services stopped.");
+  console.log("\nStopping GraphiteUI service...");
+  await stopProcessTree(serverProcess);
+  clearPidState();
+  console.log("Service stopped.");
+}
+
+async function buildFrontend() {
+  if (!existsSync(resolve(frontendDir, "node_modules"))) {
+    console.warn("Warning: frontend/node_modules was not found. Run `npm --prefix frontend install` first if startup fails.");
+  }
+
+  const build = npmCommand(["run", "build"]);
+  console.log("Building frontend...");
+  await runCommand(build.command, build.args, {
+    cwd: frontendDir,
+    env: process.env,
+    label: "Frontend build",
+  });
 }
 
 async function main() {
-  console.log("Starting GraphiteUI dev environment...");
-  console.log(`  Backend port : ${backendPort}`);
-  console.log(`  Frontend port: ${frontendPort}`);
-  console.log(`  Backend log  : ${backendLogPath}`);
-  console.log(`  Frontend log : ${frontendLogPath}`);
+  console.log("Starting GraphiteUI...");
+  console.log(`  URL : http://127.0.0.1:${appPort}`);
+  console.log(`  Port: ${appPort}`);
+  console.log(`  Log : ${serverLogPath}`);
   console.log("");
 
   const python = await resolvePythonCommand();
@@ -472,87 +543,60 @@ async function main() {
     throw new Error("Python 3.11+ was not found. Install Python or set PYTHON to its executable path.");
   }
 
-  if (!existsSync(resolve(frontendDir, "node_modules"))) {
-    console.warn("Warning: frontend/node_modules was not found. Run `npm.cmd install` in frontend first if startup fails.");
-  }
+  await buildFrontend();
+  await killPortPids(appPort);
+  await releaseLegacyGraphitePort(legacyBackendPort);
 
-  await killPortPids(backendPort);
-  await killPortPids(frontendPort);
-
-  backendProcess = spawnLoggedProcess(
+  serverProcess = spawnLoggedProcess(
     python.command,
     [
       ...python.prefixArgs,
       "-m",
       "uvicorn",
       "app.main:app",
-      "--reload",
+      "--host",
+      "127.0.0.1",
       "--port",
-      backendPort,
+      appPort,
     ],
     {
       cwd: backendDir,
-      env: process.env,
-    },
-    backendLogPath,
-    "Backend",
-  );
-
-  const npmExecutable = process.env.NPM || (isWindows ? "npm.cmd" : "npm");
-  const npmCommand = isWindows ? process.env.ComSpec || "cmd.exe" : npmExecutable;
-  const npmArgs = ["run", "dev", "--", "--host", "127.0.0.1", "--port", frontendPort];
-  frontendProcess = spawnLoggedProcess(
-    npmCommand,
-    isWindows ? ["/d", "/s", "/c", npmExecutable, ...npmArgs] : npmArgs,
-    {
-      cwd: frontendDir,
       env: {
         ...process.env,
-        INTERNAL_API_BASE_URL: `http://127.0.0.1:${backendPort}`,
+        GRAPHITEUI_FRONTEND_DIST: frontendDistDir,
       },
     },
-    frontendLogPath,
-    "Frontend",
+    serverLogPath,
+    "Server",
   );
 
-  writeDevPidState();
+  writePidState();
 
-  const backendReady = await waitForHttp(`http://127.0.0.1:${backendPort}/health`, 20, 500);
-  if (!backendReady) {
-    console.error(`Backend failed to start. Check ${backendLogPath}`);
-    await printLogTail(backendLogPath);
-    await stopServices();
-    process.exit(1);
-  }
-
-  const frontendReady = await waitForHttp(`http://127.0.0.1:${frontendPort}`, 30, 500);
-  if (!frontendReady) {
-    console.error(`Frontend failed to start. Check ${frontendLogPath}`);
-    await printLogTail(frontendLogPath);
+  const serverReady = await waitForHttp(`http://127.0.0.1:${appPort}/health`, 30, 500);
+  if (!serverReady) {
+    console.error(`GraphiteUI failed to start. Check ${serverLogPath}`);
+    await printLogTail(serverLogPath);
     await stopServices();
     process.exit(1);
   }
 
   console.log("");
-  console.log("GraphiteUI services started.");
-  console.log(`  Frontend: http://127.0.0.1:${frontendPort}`);
-  console.log(`  Backend:  http://127.0.0.1:${backendPort}`);
+  console.log("GraphiteUI started.");
+  console.log(`  Open: http://127.0.0.1:${appPort}`);
+  console.log(`  Health: http://127.0.0.1:${appPort}/health`);
   console.log("");
-  console.log("Press Ctrl+C to stop both services.");
+  console.log("Press Ctrl+C to stop.");
   console.log("");
 
-  const exitOnChildStop = async (label, logPath) => {
+  serverProcess.once("exit", async () => {
     if (stopping) {
       return;
     }
-    console.error(`${label} process exited unexpectedly. Check ${logPath}`);
-    await printLogTail(logPath);
+    console.error(`GraphiteUI server exited unexpectedly. Check ${serverLogPath}`);
+    await printLogTail(serverLogPath);
     await stopServices();
     process.exit(1);
-  };
-
-  backendProcess.once("exit", () => exitOnChildStop("Backend", backendLogPath));
-  frontendProcess.once("exit", () => exitOnChildStop("Frontend", frontendLogPath));
+  });
 }
 
 process.on("SIGINT", async () => {

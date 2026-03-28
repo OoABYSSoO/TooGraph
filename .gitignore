@@ -76,6 +76,7 @@ backend/data/*.sqlite
 backend/data/*.sqlite3
 backend/data/graphs/
 backend/data/checkpoints/
+backend/data/companion/
 backend/data/memories/runtime/
 backend/data/presets/
 backend/data/runs/
@@ -101,6 +102,8 @@ backend/data/outputs/
 .dev_*.log
 .dev_*.err
 .dev_pids.json
+.graphiteui_*.log
+.graphiteui_pids.json
 .next/
 
 # Agent/dev-only configs (not for open source)

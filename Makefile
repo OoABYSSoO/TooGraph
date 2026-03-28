@@ -1,37 +1,32 @@
 PYTHON ?= python3
 PIP ?= pip3
-FRONTEND_PORT ?= 3477
-BACKEND_PORT ?= 8765
+PORT ?= 3477
 
-.PHONY: help frontend-install frontend-dev frontend-build backend-install backend-dev backend-health tree
+.PHONY: help start frontend-install frontend-build backend-install health tree
 
 help:
 	@echo "Available commands:"
+	@echo "  make start            Build and start GraphiteUI on one port"
 	@echo "  make frontend-install Install frontend dependencies"
-	@echo "  make frontend-dev     Run Vite frontend in dev mode"
 	@echo "  make frontend-build   Build the frontend"
 	@echo "  make backend-install  Install backend dependencies"
-	@echo "  make backend-dev      Run FastAPI backend in dev mode"
-	@echo "  make backend-health   Check backend /health endpoint"
+	@echo "  make health           Check GraphiteUI /health endpoint"
 	@echo "  make tree             Show top-level project structure"
+
+start:
+	PORT=$(PORT) npm start
 
 frontend-install:
 	cd frontend && npm install
 
-frontend-dev:
-	cd frontend && INTERNAL_API_BASE_URL=http://localhost:$(BACKEND_PORT) npm run dev -- --port $(FRONTEND_PORT)
-
 frontend-build:
-	cd frontend && INTERNAL_API_BASE_URL=http://localhost:$(BACKEND_PORT) npm run build
+	cd frontend && npm run build
 
 backend-install:
 	cd backend && $(PIP) install -r requirements.txt
 
-backend-dev:
-	cd backend && $(PYTHON) -m uvicorn app.main:app --reload --port $(BACKEND_PORT)
-
-backend-health:
-	curl --noproxy '*' -fsS http://127.0.0.1:$(BACKEND_PORT)/health
+health:
+	curl --noproxy '*' -fsS http://127.0.0.1:$(PORT)/health
 
 tree:
 	find . -maxdepth 2 \( -path './.git' -o -path './demo/outputs' \) -prune -o -print | sort

@@ -2,7 +2,6 @@
   "name": "graphiteui",
   "private": true,
   "scripts": {
-    "dev": "node scripts/start.mjs",
     "start": "node scripts/start.mjs"
   }
 }
