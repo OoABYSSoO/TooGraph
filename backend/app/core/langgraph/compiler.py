@@ -58,11 +58,11 @@ def compile_graph_to_langgraph_plan(graph: NodeSystemGraphPayload) -> LangGraphB
     graph_nodes: dict[str, LangGraphNodePlan] = {}
     skill_keys: set[str] = set()
     for node_name, node in graph.nodes.items():
-        attached_skills = list(node.config.skills) if isinstance(node, NodeSystemAgentNode) else []
+        attached_skills = [node.config.skill_key] if isinstance(node, NodeSystemAgentNode) and node.config.skill_key else []
         if isinstance(node, NodeSystemSubgraphNode):
             for inner_node in node.config.graph.nodes.values():
-                if isinstance(inner_node, NodeSystemAgentNode):
-                    skill_keys.update(inner_node.config.skills)
+                if isinstance(inner_node, NodeSystemAgentNode) and inner_node.config.skill_key:
+                    skill_keys.add(inner_node.config.skill_key)
         skill_keys.update(attached_skills)
         graph_nodes[node_name] = LangGraphNodePlan(
             name=node.name or node_name,

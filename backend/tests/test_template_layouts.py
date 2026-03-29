@@ -51,7 +51,7 @@ class TemplateLayoutTests(unittest.TestCase):
 
         search_node = nodes["run_web_search"]
         self.assertEqual(search_node["kind"], "agent")
-        self.assertEqual(search_node["config"]["skills"], ["web_search"])
+        self.assertEqual(search_node["config"]["skillKey"], "web_search")
         self.assertEqual(
             search_node["config"]["skillBindings"],
             [
@@ -155,11 +155,11 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(metadata["interrupt_after"][:3], ["clarify_requirements", "draft_examples", "design_skill"])
 
         inspect_node = nodes["inspect_existing_skills"]
-        self.assertEqual(inspect_node["config"]["skills"], ["graphiteUI_skill_builder"])
+        self.assertEqual(inspect_node["config"]["skillKey"], "graphiteUI_skill_builder")
         self.assertEqual(inspect_node["config"]["skillBindings"][0]["outputMapping"]["skill_catalog"], "existing_skill_catalog")
 
         build_node = nodes["write_skill_package"]
-        self.assertEqual(build_node["config"]["skills"], ["graphiteUI_skill_builder"])
+        self.assertEqual(build_node["config"]["skillKey"], "graphiteUI_skill_builder")
         self.assertEqual(build_node["config"]["skillBindings"][0]["outputMapping"]["test_status"], "test_status")
         self.assertIn("backend/data/skills/user", build_node["config"]["taskInstruction"])
 

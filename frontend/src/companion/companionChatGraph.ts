@@ -253,7 +253,7 @@ function enforceAdvisoryCompanionGraph(graph: GraphPayload) {
   const companionAgent = agentNode as AgentNode;
   companionAgent.config = {
     ...companionAgent.config,
-    skills: [],
+    skillKey: "",
     skillBindings: [],
   };
 }

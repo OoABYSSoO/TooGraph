@@ -5,7 +5,7 @@ import { buildAnchorModel } from "./anchorModel.ts";
 import { VIRTUAL_ANY_INPUT_STATE_KEY, VIRTUAL_ANY_OUTPUT_STATE_KEY } from "../../lib/virtual-any-input.ts";
 import type { GraphNode } from "../../types/node-system.ts";
 
-test("buildAnchorModel creates flow and state anchors for agent nodes", () => {
+test("buildAnchorModel creates flow and state anchors for LLM nodes", () => {
   const node: GraphNode = {
     kind: "agent",
     name: "answer_helper",
@@ -16,7 +16,7 @@ test("buildAnchorModel creates flow and state anchors for agent nodes", () => {
     reads: [{ state: "question", required: true }],
     writes: [{ state: "answer", mode: "replace" }],
     config: {
-      skills: [],
+      skillKey: "",
       taskInstruction: "请直接回答。",
       modelSource: "global",
       model: "",
@@ -79,7 +79,7 @@ test("buildAnchorModel exposes a virtual any state input for non-input nodes wit
     reads: [],
     writes: [],
     config: {
-      skills: [],
+      skillKey: "",
       taskInstruction: "",
       modelSource: "global",
       model: "",
@@ -131,7 +131,7 @@ test("buildAnchorModel exposes a virtual plus output for empty agent and input n
     reads: [{ state: "question", required: true }],
     writes: [],
     config: {
-      skills: [],
+      skillKey: "",
       taskInstruction: "",
       modelSource: "global",
       model: "",

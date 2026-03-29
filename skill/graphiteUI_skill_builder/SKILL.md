@@ -20,4 +20,4 @@ Actions:
 - `rollback_skill_revision`: restore a previous package revision.
 - `get_skill_revision`: list or read saved revisions.
 
-When a result fails, downstream Agent nodes should inspect `validation_errors`, `smoke_test`, `stdout`, `stderr`, `errors`, and `builder_result`, then generate corrected full package files before retrying.
+When a result fails, downstream LLM nodes should inspect `validation_errors`, `smoke_test`, `stdout`, `stderr`, `errors`, and `builder_result`, then generate corrected full package files before retrying.

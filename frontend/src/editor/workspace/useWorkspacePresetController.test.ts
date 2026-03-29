@@ -19,7 +19,7 @@ function graphDocument(): GraphPayload {
         reads: [{ state: "topic" }],
         writes: [{ state: "summary" }],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -92,7 +92,7 @@ function createHarness() {
   };
 }
 
-test("useWorkspacePresetController saves agent node presets and refreshes the preset list", async () => {
+test("useWorkspacePresetController saves LLM node presets and refreshes the preset list", async () => {
   const harness = createHarness();
 
   await harness.controller.saveNodePresetForTab("tab_a", "agent_a");
@@ -107,7 +107,7 @@ test("useWorkspacePresetController saves agent node presets and refreshes the pr
   assert.deepEqual(harness.toasts, [{ type: "success", message: "feedback.presetSaved:Research Agent" }]);
 });
 
-test("useWorkspacePresetController reports preset save failure for non-agent nodes", async () => {
+test("useWorkspacePresetController reports preset save failure for non-LLM nodes", async () => {
   const harness = createHarness();
 
   await harness.controller.saveNodePresetForTab("tab_a", "missing_node");

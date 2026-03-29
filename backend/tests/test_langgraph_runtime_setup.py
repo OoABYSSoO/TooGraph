@@ -58,7 +58,7 @@ def _build_graph() -> NodeSystemGraphPayload:
                     "ui": {"position": {"x": 240, "y": 0}},
                     "reads": [{"state": "answer", "required": True}],
                     "writes": [{"state": "summary"}],
-                    "config": {"skills": [], "taskInstruction": ""},
+                    "config": {"skillKey": "", "taskInstruction": ""},
                 },
             },
             "edges": [{"source": "input_answer", "target": "agent_answer"}],

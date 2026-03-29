@@ -113,8 +113,8 @@ test("createNodeFromCreationEntry builds the builtin empty agent preset and auto
   const entry: NodeCreationEntry = {
     id: "preset-agent-empty",
     family: "agent",
-    label: "Empty Agent Node",
-    description: "Blank agent node.",
+    label: "Empty LLM Node",
+    description: "Blank one-turn LLM node.",
     mode: "preset",
     origin: "builtin",
     presetId: "preset.agent.empty.v0",

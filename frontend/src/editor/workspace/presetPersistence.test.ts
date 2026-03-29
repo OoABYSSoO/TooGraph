@@ -30,7 +30,7 @@ const document: GraphPayload = {
       reads: [{ state: "question", required: true }],
       writes: [{ state: "answer" }],
       config: {
-        skills: [],
+        skillKey: "",
         taskInstruction: "Answer the question.",
         modelSource: "global",
         model: "",
@@ -77,7 +77,7 @@ test("slugifyPresetBase creates stable preset id segments", () => {
   assert.equal(slugifyPresetBase("  !!!  "), "node");
 });
 
-test("buildPresetPayloadForNode saves only agent nodes as manageable presets", () => {
+test("buildPresetPayloadForNode saves only LLM nodes as manageable presets", () => {
   const payload = buildPresetPayloadForNode(document, "agent_1", { idSuffix: "fixed" });
 
   assert.equal(payload?.presetId, "preset.local.agent.answer_agent.fixed");

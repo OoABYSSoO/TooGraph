@@ -374,7 +374,7 @@
         { "state": "builder_result", "mode": "replace" }
       ],
       "config": {
-        "skills": ["graphiteUI_skill_builder"],
+        "skillKey": "graphiteUI_skill_builder",
         "skillBindings": [
           {
             "skillKey": "graphiteUI_skill_builder",
@@ -414,7 +414,7 @@
         { "state": "requirements_draft", "mode": "replace" }
       ],
       "config": {
-        "skills": [],
+        "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
         "taskInstruction": "根据 skill_idea 和 existing_skill_catalog 判断是否已有 Skill 可以满足需求。existing_skill_match 写 JSON，包含 can_reuse_existing(boolean)、matching_skill_keys(array)、reason、recommendation。requirements_draft 写 Markdown，总结你当前理解的目标、输入、输出、权限、失败情况和验收标准。clarification_questions 写 JSON 数组；每个问题包含 id、question、why、options，其中 options 尽量给 2 到 4 个可选项，但允许用户自定义回答。如果需求已经足够清晰，也至少给一个确认问题，让用户在断点处确认或补充。",
@@ -437,7 +437,7 @@
       ],
       "writes": [{ "state": "accepted_requirements", "mode": "replace" }],
       "config": {
-        "skills": [],
+        "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
         "taskInstruction": "根据用户澄清回答整理最终需求。accepted_requirements 写 Markdown，必须包含目标、非目标、输入字段、输出字段、权限和副作用、错误处理、示例验收标准、测试策略。不要生成代码。",
@@ -458,7 +458,7 @@
       ],
       "writes": [{ "state": "example_io", "mode": "replace" }],
       "config": {
-        "skills": [],
+        "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
         "taskInstruction": "生成用户可确认的示例输入输出。example_io 必须是 JSON 对象，包含 skill_input_example、expected_output_example、acceptance_checks、edge_cases、smoke_input。若 example_feedback 不为空，优先按反馈修订。不要生成 Skill 文件。",
@@ -494,7 +494,7 @@
       ],
       "writes": [{ "state": "skill_design", "mode": "replace" }],
       "config": {
-        "skills": [],
+        "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
         "taskInstruction": "设计一个 GraphiteUI Skill 包。skill_design 必须是 JSON 对象，包含 skill_key、name、description、permissions、input_schema、output_schema、runtime、files_to_generate、smoke_test_plan、risks。skill_key 必须适合作为路径名，不能包含 /、\\ 或冒号。只设计，不写文件。若 design_feedback 不为空，优先按反馈修订。",
@@ -534,7 +534,7 @@
         { "state": "smoke_input", "mode": "replace" }
       ],
       "config": {
-        "skills": [],
+        "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
         "taskInstruction": "生成完整 GraphiteUI Skill 包。target_skill_key 写 skill_design.skill_key。generated_skill_files 必须是 JSON 对象，键为相对路径，至少包含 skill.json、SKILL.md、run.py；值为完整 UTF-8 文本内容。skill.json 必须包含 schemaVersion=graphite.skill/v1、skillKey、name、description、agentInstruction、version、kind、mode、scope、permissions、inputSchema、outputSchema、runtime、health、configured、healthy。run.py 必须从 stdin 读取 JSON，向 stdout 打印 JSON 对象。smoke_input 使用 example_io.smoke_input 或 skill_input_example。不要写压缩包，不要写官方目录。",
@@ -566,7 +566,7 @@
         { "state": "changed_paths", "mode": "replace" }
       ],
       "config": {
-        "skills": ["graphiteUI_skill_builder"],
+        "skillKey": "graphiteUI_skill_builder",
         "skillBindings": [
           {
             "skillKey": "graphiteUI_skill_builder",
@@ -637,7 +637,7 @@
         { "state": "repair_attempt_count", "mode": "replace" }
       ],
       "config": {
-        "skills": [],
+        "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
         "taskInstruction": "你负责修复生成 Skill。先分析 builder_result、validation_errors、builder_errors、test_stdout、test_stderr 和 failed_repair_feedback。repair_plan 写 Markdown，说明根因和修复步骤。repair_patch 写 JSON，只列出本轮改动的文件和原因。generated_skill_files 必须输出修复后的完整文件映射，而不是 diff。repair_attempt_count 写当前次数加 1。保持 skillKey 不变。优先修复 JSON schema、run.py 语法、stdout JSON、required output 缺失、路径和权限声明问题。",
@@ -661,7 +661,7 @@
       ],
       "writes": [{ "state": "final_verification_report", "mode": "replace" }],
       "config": {
-        "skills": [],
+        "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
         "taskInstruction": "自动修复达到上限。final_verification_report 写 Markdown，包含当前 Skill key、已尝试修复次数、最后错误、可能根因、建议用户选择 continue 或 stop。如果建议继续，给出用户可填写到 failed_repair_feedback 的具体方向。",
@@ -699,10 +699,10 @@
       ],
       "writes": [{ "state": "final_verification_report", "mode": "replace" }],
       "config": {
-        "skills": [],
+        "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
-        "taskInstruction": "生成最终完成报告。必须说明 Skill 已生成到 final_skill_path、变更文件、测试通过、如何在 Agent 节点中使用、仍需用户注意的权限或警告。不要夸大能力。",
+        "taskInstruction": "生成最终完成报告。必须说明 Skill 已生成到 final_skill_path、变更文件、测试通过、如何在 LLM 节点中使用、仍需用户注意的权限或警告。不要夸大能力。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "medium",
@@ -724,7 +724,7 @@
       ],
       "writes": [{ "state": "final_verification_report", "mode": "replace" }],
       "config": {
-        "skills": [],
+        "skillKey": "",
         "skillBindings": [],
         "skillInstructionBlocks": {},
         "taskInstruction": "生成失败报告。说明失败阶段、最后错误、已写入或保留的路径、可以如何修改需求或继续修复。若已有 final_skill_path，要说明它可能是未通过测试的草稿。",

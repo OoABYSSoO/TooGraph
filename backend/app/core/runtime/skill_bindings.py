@@ -39,23 +39,25 @@ def resolve_agent_skill_bindings(
     input_values: dict[str, Any] | None = None,
     state_schema: dict[str, NodeSystemStateDefinition] | None = None,
 ) -> list[ResolvedAgentSkillBinding]:
-    bindings: list[ResolvedAgentSkillBinding] = [
-        ResolvedAgentSkillBinding(binding=binding.model_copy(deep=True), source="node_config")
+    configured_bindings = {
+        binding.skill_key: binding.model_copy(deep=True)
         for binding in node.config.skill_bindings
-    ]
-    bound_keys = {resolved.binding.skill_key for resolved in bindings}
-    for skill_key in node.config.skills:
-        if skill_key in bound_keys:
-            continue
+    }
+    bindings: list[ResolvedAgentSkillBinding] = []
+    bound_keys: set[str] = set()
+    skill_key = node.config.skill_key
+    if skill_key and skill_key not in bound_keys:
+        binding = configured_bindings.get(skill_key) or NodeSystemAgentSkillBinding(skillKey=skill_key)
         bindings.append(
-            ResolvedAgentSkillBinding(binding=NodeSystemAgentSkillBinding(skillKey=skill_key), source="node_config")
+            ResolvedAgentSkillBinding(binding=binding, source="node_config")
         )
         bound_keys.add(skill_key)
     for skill_key in iter_skill_state_input_keys(node, input_values=input_values, state_schema=state_schema):
         if skill_key in bound_keys:
             continue
+        binding = configured_bindings.get(skill_key) or NodeSystemAgentSkillBinding(skillKey=skill_key)
         bindings.append(
-            ResolvedAgentSkillBinding(binding=NodeSystemAgentSkillBinding(skillKey=skill_key), source="skill_state")
+            ResolvedAgentSkillBinding(binding=binding, source="skill_state")
         )
         bound_keys.add(skill_key)
     return bindings

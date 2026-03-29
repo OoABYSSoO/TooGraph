@@ -432,7 +432,7 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                     "name": "Skill validation",
                     "state_schema": {},
                     "nodes": {
-                        "agent": {
+                        "agent_rewrite": {
                             "kind": "agent",
                             "name": "Agent",
                             "description": "",
@@ -440,10 +440,37 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                             "reads": [],
                             "writes": [],
                             "config": {
-                                "skills": ["rewrite_text", "summarize_text", "translate_text", "video_understanding"],
+                                "skillKey": "rewrite_text",
                                 "taskInstruction": "",
                             },
-                        }
+                        },
+                        "agent_summarize": {
+                            "kind": "agent",
+                            "name": "Agent",
+                            "description": "",
+                            "ui": {"position": {"x": 220, "y": 0}, "collapsed": False},
+                            "reads": [],
+                            "writes": [],
+                            "config": {"skillKey": "summarize_text", "taskInstruction": ""},
+                        },
+                        "agent_translate": {
+                            "kind": "agent",
+                            "name": "Agent",
+                            "description": "",
+                            "ui": {"position": {"x": 440, "y": 0}, "collapsed": False},
+                            "reads": [],
+                            "writes": [],
+                            "config": {"skillKey": "translate_text", "taskInstruction": ""},
+                        },
+                        "agent_video": {
+                            "kind": "agent",
+                            "name": "Agent",
+                            "description": "",
+                            "ui": {"position": {"x": 660, "y": 0}, "collapsed": False},
+                            "reads": [],
+                            "writes": [],
+                            "config": {"skillKey": "video_understanding", "taskInstruction": ""},
+                        },
                     },
                     "edges": [],
                     "conditional_edges": [],

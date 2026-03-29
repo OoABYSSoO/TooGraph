@@ -1,17 +1,10 @@
 import type { SkillDefinition } from "../../types/skills.ts";
 import type { AgentNode, AgentSkillInstructionBlock } from "../../types/node-system.ts";
 
-export type AttachedSkillBadge = {
-  skillKey: string;
-  name: string;
-  description: string;
-};
+export type AgentSkillPatch = Partial<Pick<AgentNode["config"], "skillKey" | "skillInstructionBlocks">>;
 
-export type AgentSkillPatch = Partial<Pick<AgentNode["config"], "skills" | "skillInstructionBlocks">>;
-
-export function listAttachableSkillDefinitions(skillDefinitions: SkillDefinition[], attachedSkillKeys: string[]) {
-  const attached = new Set(attachedSkillKeys);
-  return skillDefinitions.filter((definition) => !attached.has(definition.skillKey) && isAgentAttachableSkillDefinition(definition));
+export function listSelectableSkillDefinitions(skillDefinitions: SkillDefinition[]) {
+  return skillDefinitions.filter(isAgentAttachableSkillDefinition);
 }
 
 export function isAgentAttachableSkillDefinition(definition: SkillDefinition) {
@@ -25,61 +18,41 @@ export function isAgentAttachableSkillDefinition(definition: SkillDefinition) {
   );
 }
 
-export function resolveAttachedSkillBadges(attachedSkillKeys: string[], skillDefinitions: SkillDefinition[]): AttachedSkillBadge[] {
-  const skillDefinitionMap = new Map(skillDefinitions.map((definition) => [definition.skillKey, definition]));
-
-  return attachedSkillKeys.map((skillKey) => {
-    const definition = skillDefinitionMap.get(skillKey);
-    return {
-      skillKey,
-      name: definition?.name ?? skillKey,
-      description: definition?.description ?? "",
-    };
-  });
-}
-
-export function resolveAttachAgentSkillPatch(
-  attachedSkillKeys: string[],
+export function resolveSelectAgentSkillPatch(
+  currentSkillKey: string,
   skillKey: string,
   skillDefinitions: SkillDefinition[],
   currentInstructionBlocks: Record<string, AgentSkillInstructionBlock> = {},
 ): AgentSkillPatch | null {
-  if (attachedSkillKeys.includes(skillKey)) {
+  const normalizedSkillKey = skillKey.trim();
+  const normalizedCurrentSkillKey = currentSkillKey.trim();
+  if (normalizedSkillKey === normalizedCurrentSkillKey) {
     return null;
   }
 
-  const definition = skillDefinitions.find((candidate) => candidate.skillKey === skillKey);
+  if (!normalizedSkillKey) {
+    return !normalizedCurrentSkillKey && Object.keys(currentInstructionBlocks).length === 0
+      ? null
+      : {
+          skillKey: "",
+          skillInstructionBlocks: {},
+        };
+  }
+
+  const definition = skillDefinitions.find((candidate) => candidate.skillKey === normalizedSkillKey);
   const instruction = definition?.agentInstruction?.trim() ?? "";
-  const title = `${definition?.name?.trim() || skillKey} skill instruction`;
+  const title = `${definition?.name?.trim() || normalizedSkillKey} skill instruction`;
   return {
-    skills: [...attachedSkillKeys, skillKey],
+    skillKey: normalizedSkillKey,
     skillInstructionBlocks: instruction
       ? {
-          ...currentInstructionBlocks,
-          [skillKey]: {
-            skillKey,
+          [normalizedSkillKey]: {
+            skillKey: normalizedSkillKey,
             title,
             content: instruction,
             source: "skill.agentInstruction",
           },
         }
-      : currentInstructionBlocks,
-  };
-}
-
-export function resolveRemoveAgentSkillPatch(
-  attachedSkillKeys: string[],
-  skillKey: string,
-  currentInstructionBlocks: Record<string, AgentSkillInstructionBlock> = {},
-): AgentSkillPatch | null {
-  if (!attachedSkillKeys.includes(skillKey)) {
-    return null;
-  }
-
-  const nextInstructionBlocks = { ...currentInstructionBlocks };
-  delete nextInstructionBlocks[skillKey];
-  return {
-    skills: attachedSkillKeys.filter((candidateKey) => candidateKey !== skillKey),
-    skillInstructionBlocks: nextInstructionBlocks,
+      : {},
   };
 }

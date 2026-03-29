@@ -32,7 +32,7 @@ class LangGraphRuntimeProgressEventTests(unittest.TestCase):
                         "ui": {"position": {"x": 240, "y": 0}},
                         "reads": [{"state": "question"}],
                         "writes": [{"state": "answer"}],
-                        "config": {"taskInstruction": "Say hello.", "skills": []},
+                        "config": {"taskInstruction": "Say hello.", "skillKey": ""},
                     },
                     "output_answer": {
                         "kind": "output",

@@ -35,7 +35,7 @@ const document: GraphPayload = {
       reads: [{ state: "question", required: true }],
       writes: [],
       config: {
-        skills: [],
+        skillKey: "",
         taskInstruction: "",
         modelSource: "global",
         model: "",
@@ -316,7 +316,7 @@ test("canCompleteGraphConnection allows reverse virtual input drags to target co
         reads: [],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -421,7 +421,7 @@ test("canCompleteGraphConnection allows a concrete state input source to be repl
         reads: [{ state: "question", required: true }],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -578,7 +578,7 @@ test("canCompleteGraphConnection allows virtual state outputs to materialize int
         reads: [{ state: "question", required: true }],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -713,7 +713,7 @@ test("canCompleteGraphConnection allows virtual input outputs to target concrete
         ],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -788,7 +788,7 @@ test("canCompleteGraphConnection allows multiple reachable writers for the same 
         reads: [],
         writes: [{ state: "answer", mode: "replace" }],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -804,7 +804,7 @@ test("canCompleteGraphConnection allows multiple reachable writers for the same 
         reads: [],
         writes: [{ state: "answer", mode: "replace" }],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -820,7 +820,7 @@ test("canCompleteGraphConnection allows multiple reachable writers for the same 
         reads: [{ state: "draft_question", required: true }],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",

@@ -71,7 +71,7 @@ def _graph_with_agent_config(config: dict) -> NodeSystemGraphDocument:
 
 class NodeSystemValidatorSkillTests(unittest.TestCase):
     def test_needs_manifest_skill_is_rejected_for_agent_nodes(self) -> None:
-        graph = _graph_with_agent_config({"skills": ["legacy_skill"]})
+        graph = _graph_with_agent_config({"skillKey": "legacy_skill"})
         definition = _agent_skill_definition(
             "legacy_skill",
             eligibility=SkillAgentNodeEligibility.NEEDS_MANIFEST,
@@ -85,12 +85,12 @@ class NodeSystemValidatorSkillTests(unittest.TestCase):
             validation = validate_graph(graph)
 
         self.assertIn("agent_skill_not_agent_node_ready", [issue.code for issue in validation.issues])
-        self.assertTrue(any("needs a GraphiteUI agent-node manifest" in issue.message for issue in validation.issues))
+        self.assertTrue(any("needs a GraphiteUI LLM-node manifest" in issue.message for issue in validation.issues))
 
     def test_binding_output_mapping_to_unknown_state_is_rejected(self) -> None:
         graph = _graph_with_agent_config(
             {
-                "skills": ["summarize_text"],
+                "skillKey": "summarize_text",
                 "skillBindings": [
                     {
                         "skillKey": "summarize_text",
@@ -112,7 +112,7 @@ class NodeSystemValidatorSkillTests(unittest.TestCase):
     def test_required_skill_inputs_are_generated_at_runtime_not_validated_as_static_bindings(self) -> None:
         graph = _graph_with_agent_config(
             {
-                "skills": ["summarize_text"],
+                "skillKey": "summarize_text",
                 "skillBindings": [
                     {
                         "skillKey": "summarize_text",

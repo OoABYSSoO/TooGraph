@@ -19,7 +19,7 @@ const graphs: GraphDocument[] = [
         reads: [],
         writes: [],
         config: {
-          skills: ["web_search"],
+          skillKey: "web_search",
           taskInstruction: "Write.",
           modelSource: "global",
           model: "",

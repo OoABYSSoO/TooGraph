@@ -4,7 +4,7 @@ import { reactive } from "vue";
 
 import * as graphDocument from "./graph-document.ts";
 import { CREATE_AGENT_INPUT_STATE_KEY, VIRTUAL_ANY_INPUT_STATE_KEY, VIRTUAL_ANY_OUTPUT_STATE_KEY } from "./virtual-any-input.ts";
-import type { GraphCorePayload, GraphDocument, GraphPayload, TemplateRecord } from "../types/node-system.ts";
+import type { AgentNode, GraphCorePayload, GraphDocument, GraphPayload, TemplateRecord } from "../types/node-system.ts";
 import type { SkillDefinition } from "../types/skills.ts";
 
 const {
@@ -146,7 +146,7 @@ test("reorderNodePortStateInDocument swaps input bindings within the same node",
         ],
         writes: [{ state: "answer", mode: "replace" }],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -188,7 +188,7 @@ test("reorderNodePortStateInDocument swaps output bindings without crossing side
           { state: "summary", mode: "replace" },
         ],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -233,7 +233,7 @@ test("reorderNodePortStateInDocument moves bindings to an insertion index for dr
         ],
         writes: [{ state: "answer", mode: "replace" }],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -424,8 +424,8 @@ test("cloneGraphDocument accepts Vue reactive graph documents", () => {
   assert.notEqual(clone, reactiveGraph);
 });
 
-test("cloneGraphDocument unwraps nested reactive arrays inside graph documents", () => {
-  const reactiveSkills = reactive(["web_search"]) as unknown as string[];
+test("cloneGraphDocument unwraps nested reactive skill bindings inside graph documents", () => {
+  const reactiveSkillBindings = reactive([{ skillKey: "web_search" }]) as unknown as NonNullable<AgentNode["config"]["skillBindings"]>;
   const graph: GraphDocument = {
     graph_id: "graph_nested_reactive",
     name: "Nested Reactive",
@@ -447,7 +447,8 @@ test("cloneGraphDocument unwraps nested reactive arrays inside graph documents",
         reads: [{ state: "question", required: true }],
         writes: [],
         config: {
-          skills: reactiveSkills,
+          skillKey: "web_search",
+          skillBindings: reactiveSkillBindings,
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -469,8 +470,8 @@ test("cloneGraphDocument unwraps nested reactive arrays inside graph documents",
 
   assert.equal(clonedNode.kind, "agent");
   assert.equal(reactiveNode.kind, "agent");
-  assert.deepEqual(clonedNode.config.skills, ["web_search"]);
-  assert.notEqual(clonedNode.config.skills, reactiveNode.config.skills);
+  assert.deepEqual(clonedNode.config.skillBindings, [{ skillKey: "web_search" }]);
+  assert.notEqual(clonedNode.config.skillBindings, reactiveNode.config.skillBindings);
 });
 
 test("updateAgentNodeConfigInDocument materializes attached skill outputs as managed state writes", () => {
@@ -487,7 +488,7 @@ test("updateAgentNodeConfigInDocument materializes attached skill outputs as man
         reads: [],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           skillBindings: [],
           skillInstructionBlocks: {},
           taskInstruction: "",
@@ -508,7 +509,7 @@ test("updateAgentNodeConfigInDocument materializes attached skill outputs as man
     "search_agent",
     (config) => ({
       ...config,
-      skills: ["web_search"],
+      skillKey: "web_search",
     }),
     { skillDefinitions: [webSearchSkill] },
   );
@@ -566,7 +567,7 @@ test("updateAgentNodeConfigInDocument does not create static skill input mapping
         reads: [{ state: "search_content", required: true }],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           skillBindings: [],
           skillInstructionBlocks: {},
           taskInstruction: "",
@@ -587,7 +588,7 @@ test("updateAgentNodeConfigInDocument does not create static skill input mapping
     "search_agent",
     (config) => ({
       ...config,
-      skills: ["web_search"],
+      skillKey: "web_search",
     }),
     { skillDefinitions: [webSearchSkill] },
   );
@@ -666,7 +667,7 @@ test("pruneUnreferencedStateSchemaInDocument removes states that no node still r
         reads: [{ state: "question", required: true }],
         writes: [{ state: "answer", mode: "replace" }],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -734,7 +735,7 @@ test("updateAgentBreakpointInDocument stores agent breakpoints with a default af
         reads: [{ state: "question", required: true }],
         writes: [{ state: "answer", mode: "replace" }],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -787,7 +788,7 @@ test("updateAgentBreakpointTimingInDocument moves enabled agent breakpoints betw
         reads: [{ state: "question", required: true }],
         writes: [{ state: "answer", mode: "replace" }],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -844,7 +845,7 @@ test("connectStateBindingInDocument rewires a target read binding to the source 
         reads: [{ state: "draft_question", required: true }],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -953,7 +954,7 @@ test("connectStateBindingInDocument binds a virtual any input to the source stat
         reads: [],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -1038,7 +1039,7 @@ test("connectStateBindingInDocument appends source state through a transient new
         reads: [{ state: "draft_question", required: true }],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -1132,7 +1133,7 @@ test("connectStateBindingInDocument appends source state through an agent virtua
         reads: [{ state: "question", required: true }],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -1181,7 +1182,7 @@ test("connectStateBindingInDocument materializes a virtual output before connect
         reads: [{ state: "question", required: true }],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -1197,7 +1198,7 @@ test("connectStateBindingInDocument materializes a virtual output before connect
         reads: [{ state: "question", required: true }],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -1311,7 +1312,7 @@ test("connectStateBindingInDocument materializes an input virtual output with th
         reads: [],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -1375,7 +1376,7 @@ test("connectStateBindingInDocument adopts a selected concrete input binding for
         ],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -1429,7 +1430,7 @@ test("connectStateBindingInDocument materializes an agent virtual output before 
         reads: [],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -1492,7 +1493,7 @@ test("connectStateBindingInDocument materializes another state from an agent vir
         reads: [],
         writes: [{ state: "existing", mode: "replace" }],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -1566,7 +1567,7 @@ test("connectStateBindingInDocument restores ordering for an existing matching s
         reads: [{ state: "question", required: true }],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -1628,7 +1629,7 @@ test("connectStateBindingInDocument replaces the previous source edge for a conc
         reads: [{ state: "question", required: true }],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -1698,7 +1699,7 @@ test("connectStateBindingInDocument preserves existing same-state writer source 
         reads: [{ state: "question", required: true }],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -1851,7 +1852,7 @@ test("updateAgentNodeConfigInDocument patches agent config immutably", () => {
         reads: [],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -1874,7 +1875,7 @@ test("updateAgentNodeConfigInDocument patches agent config immutably", () => {
   assert.equal(nextDocument.nodes.answer_helper.kind, "agent");
   assert.equal(document.nodes.answer_helper.kind, "agent");
   if (nextDocument.nodes.answer_helper.kind !== "agent" || document.nodes.answer_helper.kind !== "agent") {
-    throw new Error("Expected answer_helper to remain an agent node");
+    throw new Error("Expected answer_helper to remain an LLM node");
   }
   assert.equal(nextDocument.nodes.answer_helper.config.taskInstruction, "请直接用中文回答用户问题。");
   assert.equal(document.nodes.answer_helper.config.taskInstruction, "");
@@ -1896,7 +1897,7 @@ test("updateAgentNodeConfigInDocument returns original document for non-agent or
         reads: [],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "已有内容",
           modelSource: "global",
           model: "",
@@ -1950,7 +1951,7 @@ test("updateNodeMetadataInDocument patches node name and description immutably",
         reads: [],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -2015,7 +2016,7 @@ test("connectStateBindingInDocument does not rewrite agent skills for knowledge-
         reads: [{ state: "question", required: true }],
         writes: [],
         config: {
-          skills: ["markdown_formatter", "custom_retrieval"],
+          skillKey: "markdown_formatter",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -2040,9 +2041,9 @@ test("connectStateBindingInDocument does not rewrite agent skills for knowledge-
   assert.notEqual(nextDocument, document);
   assert.equal(nextDocument.nodes.research_helper.kind, "agent");
   if (nextDocument.nodes.research_helper.kind !== "agent") {
-    throw new Error("Expected research_helper to remain an agent node");
+    throw new Error("Expected research_helper to remain an LLM node");
   }
-  assert.deepEqual(nextDocument.nodes.research_helper.config.skills, ["markdown_formatter", "custom_retrieval"]);
+  assert.equal(nextDocument.nodes.research_helper.config.skillKey, "markdown_formatter");
 });
 
 test("updateConditionNodeConfigInDocument patches condition rules and loop limits while preserving fixed branches", () => {
@@ -2140,7 +2141,7 @@ test("updateConditionNodeConfigInDocument returns original document for non-cond
         reads: [],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -2242,7 +2243,7 @@ test("connectFlowNodesInDocument appends a control-flow edge immutably", () => {
         reads: [{ state: "question", required: true }],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -2311,7 +2312,7 @@ test("connectFlowNodesInDocument rejects invalid or duplicate flow edges", () =>
         reads: [{ state: "question", required: true }],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -2369,7 +2370,7 @@ test("connectConditionRouteInDocument upserts a branch route immutably", () => {
         reads: [],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -2463,7 +2464,7 @@ test("connectConditionRouteInDocument updates existing route targets and rejects
         reads: [],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -2551,7 +2552,7 @@ test("removeFlowEdgeFromDocument removes an existing control-flow edge immutably
         reads: [{ state: "question", required: true }],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -2617,7 +2618,7 @@ test("removeFlowEdgeFromDocument returns original document when the edge is miss
         reads: [{ state: "question", required: true }],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -2660,7 +2661,7 @@ test("reconnectFlowEdgeInDocument retargets an existing control-flow edge immuta
         reads: [{ state: "question", required: true }],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -2720,7 +2721,7 @@ test("reconnectFlowEdgeInDocument rejects missing, duplicate, or invalid reconne
         reads: [{ state: "question", required: true }],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -2945,7 +2946,7 @@ test("reconnectConditionRouteInDocument retargets an existing branch route immut
         reads: [],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -3035,7 +3036,7 @@ test("reconnectConditionRouteInDocument rejects missing, duplicate, or invalid r
         reads: [],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -3221,7 +3222,7 @@ test("removeNodeFromDocument prunes the node, flow edges, and route branches tha
         reads: [{ state: "question", required: true }],
         writes: [{ state: "answer", mode: "replace" }],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "Answer the question",
           modelSource: "global",
           model: "",

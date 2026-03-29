@@ -246,12 +246,10 @@
         :thinking-options="agentThinkingOptions"
         :thinking-enabled="agentThinkingEnabled"
         :breakpoint-enabled="Boolean(agentBreakpointEnabled)"
-        :skill-picker-open="isSkillPickerOpen"
-        :show-skill-picker-trigger="showSkillPickerTrigger"
+        :selected-skill-key="selectedSkillKey"
         :skill-definitions-loading="skillDefinitionsLoading"
         :skill-definitions-error="skillDefinitionsError"
         :available-skill-definitions="availableSkillDefinitions"
-        :attached-skill-badges="attachedSkillBadges"
         @pointer-enter="handleStateEditorPillPointerEnter"
         @pointer-leave="handleStateEditorPillPointerLeave"
         @reorder-pointer-down="handlePortReorderPointerDown"
@@ -273,9 +271,7 @@
         @update:model-value="handleAgentModelValueChange"
         @update:thinking-mode="handleAgentThinkingModeSelect"
         @update:breakpoint-enabled="handleAgentBreakpointToggleValue"
-        @toggle-skill-picker="toggleSkillPicker"
-        @attach-skill="attachAgentSkill"
-        @remove-skill="removeAgentSkill"
+        @select-skill="selectAgentSkill"
         @update-skill-instruction="handleSkillInstructionInput"
         @task-input="handleAgentTaskInstructionInput"
       />
@@ -483,10 +479,8 @@ import {
 import { resolveOutputPreviewContent } from "./outputPreviewContentModel";
 import { usePortReorder } from "./usePortReorder";
 import {
-  listAttachableSkillDefinitions,
-  resolveAttachAgentSkillPatch,
-  resolveAttachedSkillBadges,
-  resolveRemoveAgentSkillPatch,
+  listSelectableSkillDefinitions,
+  resolveSelectAgentSkillPatch,
 } from "./skillPickerModel";
 import {
   buildStateEditorDraftFromSchema,
@@ -648,7 +642,6 @@ const outputPreviewContent = computed(() => {
   return resolveOutputPreviewContent(view.value.body.previewText, view.value.body.displayMode);
 });
 const conditionRuleValueDraft = ref("");
-const isSkillPickerOpen = ref(false);
 const activePortPickerSide = ref<"input" | "output" | null>(null);
 const portStateDraft = ref<StateFieldDraft | null>(null);
 const portStateError = ref<string | null>(null);
@@ -715,7 +708,6 @@ const {
     clearRemovePortStateConfirmState();
     closeStateEditor();
     closePortPicker();
-    isSkillPickerOpen.value = false;
   },
   emitUpdateNodeMetadata: (patch) => {
     emit("update-node-metadata", { nodeId: props.nodeId, patch });
@@ -833,14 +825,9 @@ const agentBreakpointTimingValue = computed(() => props.agentBreakpointTiming ??
 const agentModelOptions = computed(() =>
   buildAgentModelSelectOptions(trimmedGlobalTextModelRef.value, props.availableAgentModelRefs, props.agentModelDisplayLookup),
 );
-const attachedSkillBadges = computed(() =>
-  props.node.kind === "agent" ? resolveAttachedSkillBadges(props.node.config.skills, props.skillDefinitions) : [],
-);
+const selectedSkillKey = computed(() => props.node.kind === "agent" ? props.node.config.skillKey.trim() : "");
 const availableSkillDefinitions = computed(() =>
-  props.node.kind === "agent" ? listAttachableSkillDefinitions(props.skillDefinitions, props.node.config.skills) : [],
-);
-const showSkillPickerTrigger = computed(
-  () => availableSkillDefinitions.value.length > 0 || props.skillDefinitionsLoading || Boolean(props.skillDefinitionsError),
+  props.node.kind === "agent" ? listSelectableSkillDefinitions(props.skillDefinitions) : [],
 );
 const portPickerTitle = computed(() => {
   if (!activePortPickerSide.value) {
@@ -871,8 +858,7 @@ const hasFloatingPanelOpen = computed(
     activeStateEditorConfirmAnchorId.value !== null ||
     activeRemovePortStateConfirmAnchorId.value !== null ||
     activeStateEditorAnchorId.value !== null ||
-    activePortPickerSide.value !== null ||
-    isSkillPickerOpen.value,
+    activePortPickerSide.value !== null,
 );
 const shouldRevealAgentCreateInputPort = computed(() => shouldShowAgentCreateInputPort.value || props.selected || Boolean(props.hovered) || hasFloatingPanelOpen.value);
 const shouldRevealAgentCreateOutputPort = computed(() => shouldShowAgentCreateOutputPort.value || props.selected || Boolean(props.hovered) || hasFloatingPanelOpen.value);
@@ -947,7 +933,6 @@ function closeLockedFloatingPanels() {
   clearTextEditorConfirmState();
   clearStateEditorConfirmState();
   clearRemovePortStateConfirmState();
-  isSkillPickerOpen.value = false;
   closePortPicker();
   closeStateEditor();
   closeTextEditor();
@@ -1099,56 +1084,17 @@ function handleAgentTaskInstructionInput(event: Event) {
   emitAgentConfigPatch({ taskInstruction: target.value });
 }
 
-function toggleSkillPicker() {
-  if (guardLockedGraphInteraction()) {
-    return;
-  }
-  if (!showSkillPickerTrigger.value) {
-    return;
-  }
-  clearTopActionTimeout();
-  activeTopAction.value = null;
-  clearTextEditorConfirmState();
-  clearStateEditorConfirmState();
-  clearRemovePortStateConfirmState();
-  commitOpenTextEditorIfNeeded();
-  closeStateEditor();
-  activePortPickerSide.value = null;
-  portStateDraft.value = null;
-  portStateError.value = null;
-  isSkillPickerOpen.value = !isSkillPickerOpen.value;
-}
-
-function attachAgentSkill(skillKey: string) {
+function selectAgentSkill(skillKey: string) {
   if (guardLockedGraphInteraction()) {
     return;
   }
   if (props.node.kind !== "agent") {
     return;
   }
-  const patch = resolveAttachAgentSkillPatch(
-    props.node.config.skills,
+  const patch = resolveSelectAgentSkillPatch(
+    props.node.config.skillKey,
     skillKey,
     props.skillDefinitions,
-    props.node.config.skillInstructionBlocks ?? {},
-  );
-  if (!patch) {
-    return;
-  }
-  emitAgentConfigPatch(patch);
-  isSkillPickerOpen.value = false;
-}
-
-function removeAgentSkill(skillKey: string) {
-  if (guardLockedGraphInteraction()) {
-    return;
-  }
-  if (props.node.kind !== "agent") {
-    return;
-  }
-  const patch = resolveRemoveAgentSkillPatch(
-    props.node.config.skills,
-    skillKey,
     props.node.config.skillInstructionBlocks ?? {},
   );
   if (!patch) {
@@ -1192,7 +1138,6 @@ function openPortStateCreate(side: "input" | "output") {
   clearRemovePortStateConfirmState();
   commitOpenTextEditorIfNeeded();
   closeStateEditor();
-  isSkillPickerOpen.value = false;
   portStateError.value = null;
   activePortPickerSide.value = side;
   portStateDraft.value = createStateDraftFromQuery("", Object.keys(props.stateSchema));
@@ -1376,7 +1321,6 @@ function openStateEditor(anchorId: string, stateKey: string | null | undefined) 
   clearRemovePortStateConfirmState();
   commitOpenTextEditorIfNeeded();
   activePortPickerSide.value = null;
-  isSkillPickerOpen.value = false;
   activeStateEditorAnchorId.value = anchorId;
   stateEditorDraft.value = nextDraft;
   stateEditorError.value = null;
@@ -1458,7 +1402,6 @@ function toggleAdvancedPanel() {
   clearTextEditorConfirmState();
   clearStateEditorConfirmState();
   clearRemovePortStateConfirmState();
-  isSkillPickerOpen.value = false;
   closePortPicker();
   closeStateEditor();
   commitOpenTextEditorIfNeeded();
@@ -1482,14 +1425,12 @@ function closeFloatingPanels(options?: { commitTextEditor?: boolean }) {
   }
   closeStateEditor();
   closePortPicker();
-  isSkillPickerOpen.value = false;
 }
 
 function handlePresetActionClick() {
   if (guardLockedGraphInteraction()) {
     return;
   }
-  isSkillPickerOpen.value = false;
   closePortPicker();
   closeStateEditor();
   clearTextEditorConfirmState();
@@ -1507,7 +1448,6 @@ function handleDeleteActionClick() {
   if (guardLockedGraphInteraction()) {
     return;
   }
-  isSkillPickerOpen.value = false;
   closePortPicker();
   closeStateEditor();
   clearTextEditorConfirmState();
@@ -1528,7 +1468,6 @@ function handleEditSubgraphActionClick() {
   if (props.node.kind !== "subgraph") {
     return;
   }
-  isSkillPickerOpen.value = false;
   closePortPicker();
   closeStateEditor();
   clearTextEditorConfirmState();

@@ -9,7 +9,7 @@ from app.core.storage.json_file_utils import read_json_file, utc_now_iso, write_
 
 def save_preset(payload: NodeSystemPresetPayload) -> NodeSystemPresetDocument:
     if payload.definition.node.kind != "agent":
-        raise ValueError("Only agent nodes can be saved as presets.")
+        raise ValueError("Only LLM nodes can be saved as presets.")
     PRESET_DATA_DIR.mkdir(parents=True, exist_ok=True)
     path = _preset_path(payload.preset_id)
     existing_payload = read_json_file(path, default=None)

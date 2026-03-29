@@ -3,7 +3,7 @@
   "skillKey": "graphiteUI_skill_builder",
   "name": "GraphiteUI Skill Builder",
   "description": "构建、校验、测试和修订 GraphiteUI 用户自定义 Skill 包。只写入 backend/data/skills/user，官方 Skill 只读，适合被创建 Skill 的图模板调用。",
-  "agentInstruction": "你已绑定 GraphiteUI Skill Builder。它只负责确定性的 Skill 包操作：检查现有 Skill、校验 skill.json/SKILL.md/run.py、写入用户 Skill 目录、运行 smoke test、创建修订和回滚。不要让它替代需求澄清或方案设计；这些应由 Agent 节点完成。生成或修复 Skill 时，files 必须是完整的相对路径到 UTF-8 文本内容映射，目标只能是 backend/data/skills/user/<skill_key>。如果测试失败，读取 validation_errors、smoke_test、stdout、stderr 和 errors，修改 generated_skill_files 后再次调用。",
+  "agentInstruction": "你已绑定 GraphiteUI Skill Builder。它只负责确定性的 Skill 包操作：检查现有 Skill、校验 skill.json/SKILL.md/run.py、写入用户 Skill 目录、运行 smoke test、创建修订和回滚。不要让它替代需求澄清或方案设计；这些应由 LLM 节点完成。生成或修复 Skill 时，files 必须是完整的相对路径到 UTF-8 文本内容映射，目标只能是 backend/data/skills/user/<skill_key>。如果测试失败，读取 validation_errors、smoke_test、stdout、stderr 和 errors，修改 generated_skill_files 后再次调用。",
   "version": "1.0.0",
   "runPolicies": {
     "default": {

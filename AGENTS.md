@@ -54,11 +54,16 @@ These instructions apply to all work in this repository and should persist acros
 
 - GraphiteUI product behavior should be framed by graph templates whenever practical. Persistent operations, local file edits, memory updates, companion self-configuration, and other side effects should happen because a designated graph/template ran, not because hidden product-specific imperative code made the decision.
 - Keep node responsibilities clear:
-  - Agent nodes reason, plan, classify intent, and produce structured outputs.
+  - A whole graph is the Agent. Do not treat a single node as an autonomous multi-step agent.
+  - LLM nodes perform one model turn. They reason, classify, plan, generate structured state, or prepare one capability call.
+  - One LLM node may use at most one explicit capability source: no capability, one selected Skill, one incoming `skill` state, or one incoming `subgraph` state. If a workflow needs multiple capabilities, express the sequence with multiple nodes and edges.
+  - A manually selected LLM-node Skill must be stored as scalar `config.skillKey`, never as `config.skills` or any other array. Arrays here imply multi-skill semantics and are considered legacy-invalid protocol.
+  - When an LLM node uses a Skill or dynamic Subgraph, the LLM prepares invocation inputs and output mapping before execution. The runtime executes the capability and writes raw structured outputs to state; the same LLM node should not summarize, repackage, or make follow-up capability calls.
+  - Manual reusable graph embedding belongs to Subgraph nodes. `subgraph` state exists for dynamic graph capability selection inside templates such as the companion loop, not as a normal card-level dropdown on LLM nodes.
   - Skill nodes execute controlled capabilities and side effects, such as writing local files, updating memory stores, downloading resources, or creating revisions.
   - Output nodes display, preview, export, or link results. They should not own persistent mutation logic.
 - Backend code should provide reusable primitives, storage APIs, validators, revision mechanisms, and skill runtimes. Avoid burying product behavior such as companion memory policy, persona update rules, or workflow decisions directly in backend endpoints when the behavior can be expressed as a graph/template.
-- Companion behavior, memory management, persona updates, and file-edit workflows should be modeled as auditable graph flows: input/context -> agent planning -> optional validation/approval -> skill execution -> output display.
+- Companion behavior, memory management, persona updates, and file-edit workflows should be modeled as auditable graph flows: input/context -> LLM planning -> optional validation/approval -> skill/subgraph execution -> output display.
 - Low-level operations should remain visible and replayable through graph runs. When a feature needs to modify local documents, profile data, policy data, memories, templates, or other local state, prefer adding or reusing a skill plus a template that performs the operation and returns clear artifacts such as local file paths, diffs, revision IDs, and status messages.
 
 ## Skill Package Boundaries

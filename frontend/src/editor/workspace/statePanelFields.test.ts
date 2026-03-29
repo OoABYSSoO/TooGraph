@@ -59,7 +59,7 @@ function buildDocument(): GraphPayload {
         reads: [{ state: "question", required: true }],
         writes: [{ state: "answer", mode: "replace" }],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",

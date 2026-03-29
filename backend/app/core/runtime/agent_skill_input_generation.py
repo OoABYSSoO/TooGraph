@@ -105,7 +105,7 @@ def build_skill_input_system_prompt(
 ) -> str:
     resolved_state_schema = state_schema or {}
     parts = [
-        "You are the skill-input planning phase of a graph Agent node.",
+        "You are the skill-input planning phase of a graph LLM node.",
         "Choose concrete arguments for every bound skill from the current graph state and the skill schemas.",
         "Return only one JSON object. Do not add markdown fences or prose.",
         "The top-level keys must be skill keys. Each value must be a JSON object of arguments for that skill.",
@@ -159,7 +159,7 @@ def build_skill_input_user_prompt(node: NodeSystemAgentNode) -> str:
     instruction_blocks = [
         block
         for skill_key, block in node.config.skill_instruction_blocks.items()
-        if skill_key in node.config.skills and block.content.strip()
+        if skill_key == node.config.skill_key and block.content.strip()
     ]
     if instruction_blocks:
         parts.append("\n== Bound Skill Instructions ==")

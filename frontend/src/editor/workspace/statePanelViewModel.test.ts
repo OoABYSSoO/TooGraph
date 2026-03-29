@@ -44,7 +44,7 @@ test("buildStatePanelViewModel returns sorted state rows with readable values", 
         reads: [{ state: "alpha", required: true }],
         writes: [{ state: "beta", mode: "replace" }],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -169,7 +169,7 @@ test("buildStatePanelViewModel orders rows by first state appearance in node exe
         reads: [{ state: "question", required: true }],
         writes: [{ state: "draft_answer", mode: "replace" }],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -188,7 +188,7 @@ test("buildStatePanelViewModel orders rows by first state appearance in node exe
         ],
         writes: [{ state: "final_answer", mode: "replace" }],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -270,7 +270,7 @@ test("buildStatePanelViewModel groups the latest run state timeline per state ro
         reads: [],
         writes: [{ state: "draft", mode: "replace" }],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -289,7 +289,7 @@ test("buildStatePanelViewModel groups the latest run state timeline per state ro
           { state: "final", mode: "replace" },
         ],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",

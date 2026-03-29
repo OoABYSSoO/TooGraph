@@ -42,13 +42,13 @@ test("i18n messages preserve product and technical proper nouns", () => {
 });
 
 test("Preset management labels localize node families in Chinese", () => {
-  assert.equal(messages["zh-CN"].presets.agents, "智能体预设");
+  assert.equal(messages["zh-CN"].presets.agents, "LLM 预设");
   assert.equal(messages["zh-CN"].presets.input, "输入");
-  assert.equal(messages["zh-CN"].presets.agent, "智能体");
+  assert.equal(messages["zh-CN"].presets.agent, "LLM");
   assert.equal(messages["zh-CN"].presets.condition, "条件");
   assert.equal(messages["zh-CN"].presets.output, "输出");
   assert.equal(messages["en-US"].presets.input, "Input");
-  assert.equal(messages["en-US"].presets.agent, "Agent");
+  assert.equal(messages["en-US"].presets.agent, "LLM");
 });
 
 test("i18n messages localize preset persistence feedback", () => {

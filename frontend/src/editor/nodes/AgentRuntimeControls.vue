@@ -56,50 +56,14 @@
       </template>
       <div class="node-card__confirm-hint node-card__confirm-hint--toggle">{{ t("nodeCard.thinkingMode") }}</div>
     </ElPopover>
-    <ElPopover
-      trigger="hover"
-      placement="top-start"
-      :show-arrow="false"
-      :popper-style="confirmPopoverStyle"
-      popper-class="node-card__agent-toggle-hint-popper"
-    >
-      <template #reference>
-        <div
-          class="node-card__agent-toggle-card node-card__agent-toggle-card--breakpoint"
-          :class="{ 'node-card__agent-toggle-card--enabled': breakpointEnabled }"
-          @pointerdown.stop
-          @click.stop
-        >
-          <ElIcon
-            class="node-card__agent-breakpoint-icon"
-            :class="{ 'node-card__agent-breakpoint-icon--enabled': breakpointEnabled }"
-          >
-            <Flag />
-          </ElIcon>
-          <ElSwitch
-            class="node-card__agent-toggle-switch node-card__agent-breakpoint-switch"
-            :model-value="breakpointEnabled"
-            :width="56"
-            inline-prompt
-            active-text="ON"
-            inactive-text="OFF"
-            :aria-label="t('nodeCard.toggleBreakpoint')"
-            @pointerdown.stop
-            @click.stop
-            @update:model-value="emit('update:breakpoint-enabled', $event)"
-          />
-        </div>
-      </template>
-      <div class="node-card__confirm-hint node-card__confirm-hint--toggle">{{ t("nodeCard.setBreakpoint") }}</div>
-    </ElPopover>
   </div>
 </template>
 
 <script setup lang="ts">
 import type { CSSProperties } from "vue";
 import { ref } from "vue";
-import { ElIcon, ElOption, ElPopover, ElSelect, ElSwitch } from "element-plus";
-import { Flag, Opportunity } from "@element-plus/icons-vue";
+import { ElOption, ElPopover, ElSelect } from "element-plus";
+import { Opportunity } from "@element-plus/icons-vue";
 import { useI18n } from "vue-i18n";
 
 import type { AgentThinkingControlMode } from "./agentConfigModel";
@@ -121,7 +85,6 @@ defineProps<{
   thinkingModeValue: AgentThinkingControlMode;
   thinkingOptions: AgentThinkingOption[];
   thinkingEnabled: boolean;
-  breakpointEnabled: boolean;
   confirmPopoverStyle: CSSProperties;
 }>();
 
@@ -129,7 +92,6 @@ const emit = defineEmits<{
   (event: "model-visible-change", visible: boolean): void;
   (event: "update:model-value", value: string | number | boolean | undefined): void;
   (event: "update:thinking-mode", value: string | number | boolean | undefined): void;
-  (event: "update:breakpoint-enabled", value: string | number | boolean): void;
 }>();
 
 const { t } = useI18n();
@@ -150,7 +112,7 @@ defineExpose({
 <style scoped>
 .node-card__agent-runtime-row {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1.35fr) minmax(132px, 0.65fr);
   gap: 10px;
   align-items: center;
   justify-content: stretch;
@@ -279,13 +241,7 @@ defineExpose({
   height: 20px;
 }
 
-.node-card__agent-breakpoint-icon {
-  width: 20px;
-  height: 20px;
-}
-
-.node-card__agent-thinking-icon,
-.node-card__agent-breakpoint-icon {
+.node-card__agent-thinking-icon {
   flex: none;
   display: inline-flex;
   align-items: center;
@@ -294,21 +250,13 @@ defineExpose({
   transition: color 140ms ease;
 }
 
-.node-card__agent-thinking-icon :deep(svg),
-.node-card__agent-breakpoint-icon :deep(svg) {
+.node-card__agent-thinking-icon :deep(svg) {
   width: 18px;
   height: 18px;
 }
 
-.node-card__agent-thinking-icon--enabled,
-.node-card__agent-breakpoint-icon--enabled {
+.node-card__agent-thinking-icon--enabled {
   color: #b45309;
-}
-
-.node-card__agent-toggle-switch {
-  justify-self: end;
-  --el-switch-on-color: #c96b1f;
-  --el-switch-off-color: rgba(154, 52, 18, 0.24);
 }
 
 .node-card__agent-thinking-select {

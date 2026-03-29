@@ -304,7 +304,7 @@ def _validate_agent_node(
                 ValidationIssue(
                     code="agent_skill_not_runtime_registered",
                     message=(
-                        f"Agent node '{node_name}' attaches skill '{skill_key}', "
+                        f"LLM node '{node_name}' attaches skill '{skill_key}', "
                         "but the skill is not runtime-registered."
                     ),
                     path=skill_path,
@@ -316,7 +316,7 @@ def _validate_agent_node(
             issues.append(
                 ValidationIssue(
                     code="agent_skill_disabled",
-                    message=f"Agent node '{node_name}' attaches skill '{skill_key}', but the skill is disabled.",
+                    message=f"LLM node '{node_name}' attaches skill '{skill_key}', but the skill is disabled.",
                     path=skill_path,
                 )
             )
@@ -328,7 +328,7 @@ def _validate_agent_node(
                 ValidationIssue(
                     code="agent_skill_not_agent_node_ready",
                     message=(
-                        f"Skill '{skill_key}' needs a GraphiteUI agent-node manifest before it can be used by Agent nodes. "
+                        f"Skill '{skill_key}' needs a GraphiteUI LLM-node manifest before it can be used by LLM nodes. "
                         f"{blockers}"
                     ),
                     path=skill_path,
@@ -339,7 +339,7 @@ def _validate_agent_node(
             issues.append(
                 ValidationIssue(
                     code="agent_skill_not_configured",
-                    message=f"Agent node '{node_name}' attaches skill '{skill_key}', but the skill is not configured.",
+                    message=f"LLM node '{node_name}' attaches skill '{skill_key}', but the skill is not configured.",
                     path=skill_path,
                 )
             )
@@ -348,7 +348,7 @@ def _validate_agent_node(
             issues.append(
                 ValidationIssue(
                     code="agent_skill_unhealthy",
-                    message=f"Agent node '{node_name}' attaches skill '{skill_key}', but the skill health check is failing.",
+                    message=f"LLM node '{node_name}' attaches skill '{skill_key}', but the skill health check is failing.",
                     path=skill_path,
                 )
             )
@@ -358,7 +358,7 @@ def _validate_agent_node(
                 ValidationIssue(
                     code="agent_skill_not_runtime_registered",
                     message=(
-                        f"Agent node '{node_name}' attaches skill '{skill_key}', "
+                        f"LLM node '{node_name}' attaches skill '{skill_key}', "
                         "but the skill is not runtime-registered."
                     ),
                     path=skill_path,
@@ -373,11 +373,9 @@ def _validate_agent_node(
 def _iter_agent_skill_refs(node_name: str, node: NodeSystemAgentNode) -> list[tuple[str, str]]:
     refs: list[tuple[str, str]] = []
     seen: set[str] = set()
-    for index, skill_key in enumerate(node.config.skills):
-        if skill_key in seen:
-            continue
-        refs.append((skill_key, f"nodes.{node_name}.config.skills.{index}"))
-        seen.add(skill_key)
+    if node.config.skill_key:
+        refs.append((node.config.skill_key, f"nodes.{node_name}.config.skillKey"))
+        seen.add(node.config.skill_key)
     for binding_index, binding in enumerate(node.config.skill_bindings):
         if binding.skill_key in seen:
             continue
@@ -477,7 +475,7 @@ def _validate_agent_skill_bindings(
                     ValidationIssue(
                         code="agent_skill_output_state_unknown",
                         message=(
-                            f"Agent node '{node_name}' maps output '{output_key}' from skill '{binding.skill_key}' "
+                            f"LLM node '{node_name}' maps output '{output_key}' from skill '{binding.skill_key}' "
                             f"to unknown state '{state_key}'."
                         ),
                         path=f"nodes.{node_name}.config.skillBindings.{binding_index}.outputMapping.{output_key}",

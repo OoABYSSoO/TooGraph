@@ -137,7 +137,7 @@ test("buildNodeCardViewModel derives agent body, ports, and labels", () => {
     reads: [{ state: "question", required: true }],
     writes: [{ state: "answer", mode: "replace" }],
     config: {
-      skills: [],
+      skillKey: "",
       taskInstruction: "请直接用中文回答用户问题。",
       modelSource: "global",
       model: "",
@@ -148,13 +148,13 @@ test("buildNodeCardViewModel derives agent body, ports, and labels", () => {
 
   const model = buildNodeCardViewModel("answer_helper", node, stateSchema);
 
-  assert.equal(model.kindLabel, "AGENT");
+  assert.equal(model.kindLabel, "LLM");
   assert.deepEqual(model.inputs.map((port) => port.label), ["question"]);
   assert.deepEqual(model.outputs.map((port) => port.label), ["answer"]);
   assert.equal(model.body.kind, "agent");
   assert.ok(!("systemInstruction" in model.body));
   assert.equal(model.body.taskInstruction, "请直接用中文回答用户问题。");
-  assert.equal(model.body.skillLabel, "No skills");
+  assert.equal(model.body.skillLabel, "No skill");
   assert.equal(model.body.primaryInput?.label, "question");
   assert.equal(model.body.primaryOutput?.label, "answer");
   assert.equal(model.body.primaryInput?.typeLabel, "text");
@@ -171,7 +171,7 @@ test("buildNodeCardViewModel exposes a virtual plus input for empty non-input no
     reads: [],
     writes: [{ state: "answer", mode: "replace" }],
     config: {
-      skills: [],
+      skillKey: "",
       taskInstruction: "",
       modelSource: "global",
       model: "",
@@ -264,7 +264,7 @@ test("buildNodeCardViewModel exposes virtual plus outputs for empty agent and in
     reads: [{ state: "question", required: true }],
     writes: [],
     config: {
-      skills: [],
+      skillKey: "",
       taskInstruction: "",
       modelSource: "global",
       model: "",
@@ -709,7 +709,7 @@ test("buildNodeCardViewModel exposes node-level latest run failure notes", () =>
     reads: [{ state: "question", required: true }],
     writes: [{ state: "answer", mode: "replace" }],
     config: {
-      skills: [],
+      skillKey: "",
       taskInstruction: "请直接用中文回答用户问题。",
       modelSource: "global",
       model: "",
@@ -855,7 +855,7 @@ test("buildNodeCardViewModel derives subgraph boundary and thumbnail summary", (
             reads: [{ state: "internal_question", required: true }],
             writes: [{ state: "internal_answer", mode: "replace" }],
             config: {
-              skills: ["web_search"],
+              skillKey: "web_search",
               taskInstruction: "",
               modelSource: "global",
               model: "",
@@ -936,7 +936,7 @@ test("buildNodeCardViewModel projects subgraph runtime status onto thumbnail nod
             reads: [],
             writes: [],
             config: {
-              skills: ["web_search"],
+              skillKey: "web_search",
               taskInstruction: "",
               modelSource: "global",
               model: "",
@@ -952,7 +952,7 @@ test("buildNodeCardViewModel projects subgraph runtime status onto thumbnail nod
             reads: [],
             writes: [],
             config: {
-              skills: [],
+              skillKey: "",
               taskInstruction: "",
               modelSource: "global",
               model: "",
@@ -1001,7 +1001,7 @@ test("buildNodeCardViewModel projects subgraph runtime status onto thumbnail nod
 
 test("buildNodeCardViewModel compacts subgraph thumbnails and includes condition branches", () => {
   const agentConfig = {
-    skills: [],
+    skillKey: "",
     taskInstruction: "",
     modelSource: "global" as const,
     model: "",
@@ -1158,7 +1158,7 @@ test("buildNodeCardViewModel marks exhausted condition routes as neutral", () =>
   ]);
 });
 
-test("buildNodeCardViewModel derives unlimited loop label and multiple skills", () => {
+test("buildNodeCardViewModel derives unlimited loop label and selected skill", () => {
   const node: GraphNode = {
     kind: "agent",
     name: "multi_skill_agent",
@@ -1167,7 +1167,7 @@ test("buildNodeCardViewModel derives unlimited loop label and multiple skills", 
     reads: [{ state: "question", required: true }],
     writes: [{ state: "answer", mode: "replace" }],
     config: {
-      skills: ["kb.lookup", "browser.search"],
+      skillKey: "browser.search",
       taskInstruction: "",
       modelSource: "override",
       model: "gpt-5.4",
@@ -1179,7 +1179,7 @@ test("buildNodeCardViewModel derives unlimited loop label and multiple skills", 
   const model = buildNodeCardViewModel("multi_skill_agent", node, stateSchema);
 
   assert.equal(model.body.kind, "agent");
-  assert.equal(model.body.skillLabel, "2 skills");
+  assert.equal(model.body.skillLabel, "browser.search");
   assert.equal(model.body.modelLabel, "gpt-5.4");
   assert.equal(model.body.thinkingLabel, "thinking off");
 });
@@ -1193,7 +1193,7 @@ test("buildNodeCardViewModel presents xhigh thinking as Extra High", () => {
     reads: [],
     writes: [],
     config: {
-      skills: [],
+      skillKey: "",
       taskInstruction: "",
       modelSource: "override",
       model: "gpt-5.5",

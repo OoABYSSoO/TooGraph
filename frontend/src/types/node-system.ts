@@ -72,7 +72,7 @@ export type AgentNode = {
   reads: ReadBinding[];
   writes: WriteBinding[];
   config: {
-    skills: string[];
+    skillKey: string;
     skillBindings?: AgentSkillBinding[];
     skillInstructionBlocks?: Record<string, AgentSkillInstructionBlock>;
     taskInstruction: string;

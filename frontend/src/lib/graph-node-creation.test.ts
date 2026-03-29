@@ -120,13 +120,13 @@ test("buildNodeFromPreset preserves preset node semantics while replacing the ca
     updatedAt: null,
     status: "active",
     definition: {
-      label: "Empty Agent Node",
-      description: "Blank agent node.",
+      label: "Empty LLM Node",
+      description: "Blank one-turn LLM node.",
       state_schema: {},
       node: {
         kind: "agent",
-        name: "Empty Agent Node",
-        description: "Blank agent node.",
+        name: "Empty LLM Node",
+        description: "Blank one-turn LLM node.",
         ui: {
           position: { x: 0, y: 0 },
           collapsed: false,
@@ -134,7 +134,7 @@ test("buildNodeFromPreset preserves preset node semantics while replacing the ca
         reads: [],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -153,7 +153,7 @@ test("buildNodeFromPreset preserves preset node semantics while replacing the ca
   assert.equal(result.node.kind, "agent");
   assert.equal(result.node.ui.position.x, 320);
   assert.equal(result.node.ui.position.y, 180);
-  assert.equal(result.node.name, "Empty Agent Node");
+  assert.equal(result.node.name, "Empty LLM Node");
 });
 
 test("applyNodeCreationResult auto-binds state outputs into a created output node and adds control flow", () => {
@@ -231,7 +231,7 @@ test("applyNodeCreationResult auto-creates a read binding for blank agent preset
         reads: [],
         writes: [{ state: "answer", mode: "replace" }],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -252,18 +252,18 @@ test("applyNodeCreationResult auto-creates a read binding for blank agent preset
     updatedAt: null,
     status: "active",
     definition: {
-      label: "Empty Agent Node",
-      description: "Blank agent node.",
+      label: "Empty LLM Node",
+      description: "Blank one-turn LLM node.",
       state_schema: {},
       node: {
         kind: "agent",
-        name: "Empty Agent Node",
-        description: "Blank agent node.",
+        name: "Empty LLM Node",
+        description: "Blank one-turn LLM node.",
         ui: { position: { x: 0, y: 0 }, collapsed: false },
         reads: [],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -317,7 +317,7 @@ test("applyNodeCreationResult materializes a virtual agent any output when it sp
         reads: [{ state: "question", required: true }],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -530,7 +530,7 @@ test("applyNodeCreationResult materializes skill virtual outputs with an empty s
         reads: [],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -587,7 +587,7 @@ test("applyNodeCreationResult wires a created input node upstream of an existing
         reads: [{ state: "question", required: true }],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -638,7 +638,7 @@ test("applyNodeCreationResult materializes a virtual target input when creating 
         reads: [],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -718,7 +718,7 @@ test("connectStateInputSourceToTarget wires an empty input node upstream of a co
         reads: [{ state: "question", required: true }],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -789,7 +789,7 @@ test("connectStateInputSourceToTarget preserves previous same-state source edges
         reads: [{ state: "question", required: true }],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -841,7 +841,7 @@ test("connectStateInputSourceToTarget materializes a virtual input through an ex
         reads: [],
         writes: [{ state: "draft", mode: "replace" }],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -857,7 +857,7 @@ test("connectStateInputSourceToTarget materializes a virtual input through an ex
         reads: [],
         writes: [],
         config: {
-          skills: [],
+          skillKey: "",
           taskInstruction: "",
           modelSource: "global",
           model: "",
