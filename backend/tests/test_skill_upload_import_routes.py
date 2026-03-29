@@ -32,7 +32,7 @@ def _native_skill_manifest(
         "skillKey": skill_key,
         "name": "Video Understanding" if skill_key == "video_understanding" else skill_key.replace("_", " ").title(),
         "description": "Use frame sampling rules to understand a video with image-only model capability.",
-        "agentInstruction": "Prepare the skill input from bound graph state and run the skill.",
+        "llmInstruction": "Prepare the skill input from bound graph state and run the skill.",
         "version": "0.1.0",
         "runPolicies": run_policies
         or {
@@ -252,8 +252,8 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertNotIn("compatibility", payload)
                 self.assertFalse(payload["runtimeReady"])
                 self.assertFalse(payload["runtimeRegistered"])
-                self.assertEqual(payload["agentNodeEligibility"], "needs_manifest")
-                self.assertIn("Skill manifest is missing a script runtime entrypoint.", payload["agentNodeBlockers"])
+                self.assertEqual(payload["llmNodeEligibility"], "needs_manifest")
+                self.assertIn("Skill manifest is missing a script runtime entrypoint.", payload["llmNodeBlockers"])
                 self.assertTrue(payload["configured"])
                 self.assertTrue(payload["healthy"])
 

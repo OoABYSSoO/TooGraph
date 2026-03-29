@@ -40,7 +40,7 @@
 
 - 技能系统去掉旧 `targets` / `executionTargets` 分流。
 - skill manifest 顶层和 `inputSchema` / `outputSchema` 字段从 `label` 收束为 `name`。
-- `description` 承载选择条件，`agentInstruction` 承载绑定后的使用说明。
+- `description` 承载选择条件，`llmInstruction` 承载绑定后的使用说明。
 - `state_schema` 增加 `skill` 类型和技能绑定元数据；`promptVisible` 是待移除的历史字段，未来上下文边界由节点 `reads` 决定。
 - LLM 节点卡片已改为单选 Skill 控件；动态 `subgraph` state 只服务于模板内运行时能力选择，不作为普通卡片下拉项。
 - LLM 节点提示词区域支持技能说明胶囊，胶囊可编辑、可随技能移除。
@@ -187,7 +187,7 @@ input_question
   "skillKey": "web_search",
   "name": "联网搜索",
   "description": "当任务需要获取最新公开网页信息、新闻、版本内容、引用来源或网页正文时使用。不负责最终总结。",
-  "agentInstruction": "你已经绑定了联网搜索技能。请根据任务决定 query，然后运行技能；不要在本节点整理最终结论。",
+  "llmInstruction": "你已经绑定了联网搜索技能。请根据任务决定 query，然后运行技能；不要在本节点整理最终结论。",
   "kind": "atomic",
   "mode": "tool",
   "scope": "node",
@@ -215,7 +215,7 @@ input_question
 - `skillKey`：稳定机器标识。
 - `name`：用户可见名称。
 - `description`：能力说明与选择条件。
-- `agentInstruction`：Agent 已经绑定该技能后，应该如何使用它。
+- `llmInstruction`：LLM 节点已经绑定该技能后，应该如何使用它。
 - `kind`：能力形态，例如 `atomic`、`workflow`、`control`。
 - `mode`：运行方式，例如 `tool`、`workflow`、`context`。
 - `scope`：影响范围，例如 `node`、`graph`、`workspace`、`global`。
@@ -296,7 +296,7 @@ LLM 节点提示词区域中，绑定的技能以胶囊展示。
 
 规则：
 
-- 选择 skill 时，根据 `agentInstruction` 自动生成技能说明胶囊。
+- 选择 skill 时，根据 `llmInstruction` 自动生成技能说明胶囊。
 - 点击胶囊可以查看和编辑本节点的技能说明。
 - 编辑只影响当前节点，不反向修改 skill 包。
 - 移除 skill 时自动移除胶囊。
@@ -436,7 +436,7 @@ backend/data/skills/revisions/<skill_key>/
 
 - 图节点声明 skill。
 - runtime 合并有效 skill。
-- Agent 根据 skill `agentInstruction` 和 `inputSchema` 生成入参。
+- LLM 节点根据 skill `llmInstruction` 和 `inputSchema` 生成入参。
 - runtime 调用 skill。
 - skill 输出进入 state 和 run detail。
 - 后续节点根据结构化结果继续运行。

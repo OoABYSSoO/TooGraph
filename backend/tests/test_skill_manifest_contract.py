@@ -8,7 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.core.schemas.skills import SkillAgentNodeEligibility, SkillSideEffect, SkillSourceScope
+from app.core.schemas.skills import SkillLlmNodeEligibility, SkillSideEffect, SkillSourceScope
 from app.skills.definitions import _parse_native_skill_manifest
 
 
@@ -23,7 +23,7 @@ def _ready_manifest(skill_key: str) -> dict[str, object]:
         "schemaVersion": "graphite.skill/v1",
         "skillKey": skill_key,
         "name": skill_key.replace("_", " ").title(),
-        "agentInstruction": f"Use {skill_key} only when it is explicitly bound to the LLM node.",
+        "llmInstruction": f"Use {skill_key} only when it is explicitly bound to the LLM node.",
         "inputSchema": [
             {"key": "text", "name": "Text", "valueType": "text", "required": True}
         ],
@@ -63,9 +63,10 @@ class SkillManifestContractTests(unittest.TestCase):
         serialized = definition.model_dump(by_alias=True)
         self.assertEqual(serialized["name"], "Summarize Text")
         self.assertEqual(
-            serialized["agentInstruction"],
+            serialized["llmInstruction"],
             "Use summarize_text only when it is explicitly bound to the LLM node.",
         )
+        self.assertNotIn("agentInstruction", serialized)
         self.assertNotIn("label", serialized)
         self.assertNotIn("compatibility", serialized)
         self.assertNotIn("targets", serialized)
@@ -107,8 +108,8 @@ class SkillManifestContractTests(unittest.TestCase):
         self.assertEqual(definition.runtime.type, "python")
         self.assertEqual(definition.runtime.entrypoint, "run.py")
         self.assertEqual(definition.health.type, "none")
-        self.assertEqual(definition.agent_node_eligibility, SkillAgentNodeEligibility.READY)
-        self.assertEqual(definition.agent_node_blockers, [])
+        self.assertEqual(definition.llm_node_eligibility, SkillLlmNodeEligibility.READY)
+        self.assertEqual(definition.llm_node_blockers, [])
         self.assertTrue(definition.run_policies.default.discoverable)
         self.assertFalse(definition.run_policies.default.auto_selectable)
         self.assertFalse(definition.run_policies.default.requires_approval)
@@ -123,6 +124,19 @@ class SkillManifestContractTests(unittest.TestCase):
             (skill_dir / "run.py").write_text("print('{}')\n", encoding="utf-8")
 
             with self.assertRaisesRegex(ValueError, "targets.*no longer supported"):
+                _parse_native_skill_manifest(manifest, SkillSourceScope.INSTALLED)
+
+    def test_legacy_agent_instruction_field_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            skill_dir = Path(temp_dir) / "legacy_agent_instruction"
+            skill_dir.mkdir()
+            payload = _ready_manifest("legacy_agent_instruction")
+            payload.pop("llmInstruction")
+            payload["agentInstruction"] = "Old field."
+            manifest = _write_manifest(skill_dir, payload)
+            (skill_dir / "run.py").write_text("print('{}')\n", encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "agentInstruction.*llmInstruction"):
                 _parse_native_skill_manifest(manifest, SkillSourceScope.INSTALLED)
 
     def test_legacy_execution_targets_field_is_rejected(self) -> None:
@@ -178,8 +192,8 @@ class SkillManifestContractTests(unittest.TestCase):
 
             definition = _parse_native_skill_manifest(manifest, SkillSourceScope.INSTALLED).definition
 
-        self.assertEqual(definition.agent_node_eligibility, SkillAgentNodeEligibility.NEEDS_MANIFEST)
-        self.assertIn("Skill manifest is missing a script runtime entrypoint.", definition.agent_node_blockers)
+        self.assertEqual(definition.llm_node_eligibility, SkillLlmNodeEligibility.NEEDS_MANIFEST)
+        self.assertIn("Skill manifest is missing a script runtime entrypoint.", definition.llm_node_blockers)
 
     def test_web_search_manifest_is_ready_with_origin_run_policies_and_network_permissions(self) -> None:
         manifest = Path(__file__).resolve().parents[2] / "skill" / "web_search" / "skill.json"
@@ -197,7 +211,7 @@ class SkillManifestContractTests(unittest.TestCase):
         self.assertEqual(definition.runtime.type, "python")
         self.assertEqual(definition.runtime.entrypoint, "run.py")
         self.assertEqual(definition.runtime.timeout_seconds, 300)
-        self.assertEqual(definition.agent_node_eligibility, SkillAgentNodeEligibility.READY)
+        self.assertEqual(definition.llm_node_eligibility, SkillLlmNodeEligibility.READY)
         self.assertEqual([field.key for field in definition.input_schema], ["query"])
         self.assertEqual([field.key for field in definition.output_schema], ["query", "source_urls", "artifact_paths", "errors"])
         self.assertIn("network", definition.permissions)

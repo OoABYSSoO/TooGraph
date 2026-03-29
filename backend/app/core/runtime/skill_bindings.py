@@ -10,6 +10,7 @@ from app.core.schemas.node_system import (
     NodeSystemStateDefinition,
     NodeSystemStateType,
 )
+from app.core.schemas.skills import SkillDefinition, SkillIoField
 
 
 BindingSource = Literal["node_config", "skill_state"]
@@ -31,6 +32,38 @@ def normalize_agent_skill_bindings(
         resolved.binding
         for resolved in resolve_agent_skill_bindings(node, input_values=input_values, state_schema=state_schema)
     ]
+
+
+def resolve_agent_skill_output_binding(
+    binding: NodeSystemAgentSkillBinding,
+    *,
+    node: NodeSystemAgentNode,
+    state_schema: dict[str, NodeSystemStateDefinition],
+    skill_definition: SkillDefinition | None,
+) -> NodeSystemAgentSkillBinding:
+    if skill_definition is None or not skill_definition.output_schema:
+        return binding
+
+    output_mapping = dict(binding.output_mapping)
+    used_state_keys = {state_key for state_key in output_mapping.values() if state_key}
+    writable_state_keys = [write.state for write in node.writes]
+    for field in skill_definition.output_schema:
+        if output_mapping.get(field.key):
+            continue
+        state_key = _infer_skill_output_state_key(
+            skill_key=binding.skill_key,
+            field=field,
+            writable_state_keys=writable_state_keys,
+            used_state_keys=used_state_keys,
+            state_schema=state_schema,
+        )
+        if state_key:
+            output_mapping[field.key] = state_key
+            used_state_keys.add(state_key)
+
+    if output_mapping == binding.output_mapping:
+        return binding
+    return binding.model_copy(update={"output_mapping": output_mapping})
 
 
 def resolve_agent_skill_bindings(
@@ -110,3 +143,61 @@ def map_skill_outputs(binding: NodeSystemAgentSkillBinding, skill_result: dict[s
         state_key: skill_result.get(output_key)
         for output_key, state_key in binding.output_mapping.items()
     }
+
+
+def _infer_skill_output_state_key(
+    *,
+    skill_key: str,
+    field: SkillIoField,
+    writable_state_keys: list[str],
+    used_state_keys: set[str],
+    state_schema: dict[str, NodeSystemStateDefinition],
+) -> str:
+    candidates: list[tuple[int, str]] = []
+    field_key = _normalize_name(field.key)
+    field_name = _normalize_name(field.name)
+    for state_key in writable_state_keys:
+        if state_key in used_state_keys:
+            continue
+        definition = state_schema.get(state_key)
+        binding = definition.binding if definition is not None else None
+        if (
+            binding is not None
+            and binding.skill_key == skill_key
+            and binding.field_key == field.key
+        ):
+            return state_key
+
+        score = 0
+        state_key_name = _normalize_name(state_key)
+        state_display_name = _normalize_name(definition.name if definition is not None else "")
+        if state_key == field.key:
+            score = 100
+        elif state_key_name == field_key:
+            score = 90
+        elif field_name and state_display_name == field_name:
+            score = 80
+        elif _state_type_matches_field(definition, field):
+            if field_key and field_key in state_key_name:
+                score = 70
+            elif field_name and field_name in state_display_name:
+                score = 60
+        if score:
+            candidates.append((score, state_key))
+
+    if not candidates:
+        return ""
+    candidates.sort(reverse=True)
+    best_score = candidates[0][0]
+    best_candidates = [state_key for score, state_key in candidates if score == best_score]
+    return best_candidates[0] if len(best_candidates) == 1 else ""
+
+
+def _normalize_name(value: str) -> str:
+    return "".join(character for character in value.lower() if character.isalnum())
+
+
+def _state_type_matches_field(definition: NodeSystemStateDefinition | None, field: SkillIoField) -> bool:
+    if definition is None:
+        return False
+    return definition.type.value == field.value_type

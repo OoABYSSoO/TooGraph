@@ -51,7 +51,7 @@ class SkillScope(str, Enum):
     GLOBAL = "global"
 
 
-class SkillAgentNodeEligibility(str, Enum):
+class SkillLlmNodeEligibility(str, Enum):
     READY = "ready"
     NEEDS_MANIFEST = "needs_manifest"
     INCOMPATIBLE = "incompatible"
@@ -107,7 +107,7 @@ class SkillDefinition(BaseModel):
     skill_key: str = Field(..., min_length=1, alias="skillKey")
     name: str = Field(..., min_length=1)
     description: str = ""
-    agent_instruction: str = Field(default="", alias="agentInstruction")
+    llm_instruction: str = Field(default="", alias="llmInstruction")
     schema_version: str = Field(default="", alias="schemaVersion")
     version: str = ""
     run_policies: SkillRunPolicies = Field(default_factory=SkillRunPolicies, alias="runPolicies")
@@ -121,11 +121,11 @@ class SkillDefinition(BaseModel):
     output_schema: list[SkillIoField] = Field(default_factory=list, alias="outputSchema")
     supported_value_types: list[str] = Field(default_factory=list, alias="supportedValueTypes")
     side_effects: list[SkillSideEffect] = Field(default_factory=list, alias="sideEffects")
-    agent_node_eligibility: SkillAgentNodeEligibility = Field(
-        default=SkillAgentNodeEligibility.NEEDS_MANIFEST,
-        alias="agentNodeEligibility",
+    llm_node_eligibility: SkillLlmNodeEligibility = Field(
+        default=SkillLlmNodeEligibility.NEEDS_MANIFEST,
+        alias="llmNodeEligibility",
     )
-    agent_node_blockers: list[str] = Field(default_factory=list, alias="agentNodeBlockers")
+    llm_node_blockers: list[str] = Field(default_factory=list, alias="llmNodeBlockers")
     source_format: SkillSourceFormat = Field(default=SkillSourceFormat.SKILL, alias="sourceFormat")
     source_scope: SkillSourceScope = Field(default=SkillSourceScope.INSTALLED, alias="sourceScope")
     source_path: str = Field(default="", alias="sourcePath")

@@ -32,7 +32,7 @@ export type SkillDefinition = {
   skillKey: string;
   name: string;
   description: string;
-  agentInstruction: string;
+  llmInstruction: string;
   schemaVersion: string;
   version: string;
   runPolicies: SkillRunPolicies;
@@ -46,8 +46,8 @@ export type SkillDefinition = {
   outputSchema: SkillIoField[];
   supportedValueTypes: string[];
   sideEffects: string[];
-  agentNodeEligibility: string;
-  agentNodeBlockers: string[];
+  llmNodeEligibility: string;
+  llmNodeBlockers: string[];
   sourceFormat: string;
   sourceScope: string;
   sourcePath: string;

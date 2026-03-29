@@ -10,7 +10,7 @@ export function listSelectableSkillDefinitions(skillDefinitions: SkillDefinition
 export function isAgentAttachableSkillDefinition(definition: SkillDefinition) {
   return (
     definition.status === "active" &&
-    definition.agentNodeEligibility === "ready" &&
+    definition.llmNodeEligibility === "ready" &&
     definition.runtimeReady &&
     definition.runtimeRegistered &&
     definition.configured &&
@@ -40,7 +40,7 @@ export function resolveSelectAgentSkillPatch(
   }
 
   const definition = skillDefinitions.find((candidate) => candidate.skillKey === normalizedSkillKey);
-  const instruction = definition?.agentInstruction?.trim() ?? "";
+  const instruction = definition?.llmInstruction?.trim() ?? "";
   const title = `${definition?.name?.trim() || normalizedSkillKey} skill instruction`;
   return {
     skillKey: normalizedSkillKey,
@@ -50,7 +50,7 @@ export function resolveSelectAgentSkillPatch(
             skillKey: normalizedSkillKey,
             title,
             content: instruction,
-            source: "skill.agentInstruction",
+            source: "skill.llmInstruction",
           },
         }
       : {},

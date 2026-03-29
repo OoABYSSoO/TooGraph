@@ -9,9 +9,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.core.runtime.skill_bindings import (
     map_skill_outputs,
     normalize_agent_skill_bindings,
+    resolve_agent_skill_output_binding,
     resolve_agent_skill_bindings,
 )
 from app.core.schemas.node_system import NodeSystemAgentNode, NodeSystemStateDefinition
+from app.core.schemas.skills import SkillDefinition, SkillIoField
 
 
 class RuntimeSkillBindingsTests(unittest.TestCase):
@@ -164,6 +166,44 @@ class RuntimeSkillBindingsTests(unittest.TestCase):
         mapped = map_skill_outputs(binding, {"summary": "Short", "key_points": ["a"]})
 
         self.assertEqual(mapped, {"summary_text": "Short"})
+
+    def test_resolve_skill_output_mapping_from_existing_state_outputs(self) -> None:
+        node = NodeSystemAgentNode.model_validate(
+            {
+                "kind": "agent",
+                "ui": {"position": {"x": 0, "y": 0}},
+                "writes": [{"state": "source_urls"}, {"state": "artifact_paths"}],
+                "config": {"skillKey": "web_search"},
+            }
+        )
+        binding = normalize_agent_skill_bindings(node)[0]
+        definition = SkillDefinition(
+            skillKey="web_search",
+            name="Web Search",
+            outputSchema=[
+                SkillIoField(key="source_urls", name="Source URLs", valueType="json"),
+                SkillIoField(key="artifact_paths", name="Artifact Paths", valueType="file"),
+            ],
+        )
+        state_schema = {
+            "source_urls": NodeSystemStateDefinition.model_validate({"type": "json"}),
+            "artifact_paths": NodeSystemStateDefinition.model_validate({"type": "file"}),
+        }
+
+        resolved = resolve_agent_skill_output_binding(
+            binding,
+            node=node,
+            state_schema=state_schema,
+            skill_definition=definition,
+        )
+
+        self.assertEqual(
+            resolved.output_mapping,
+            {
+                "source_urls": "source_urls",
+                "artifact_paths": "artifact_paths",
+            },
+        )
 
 
 if __name__ == "__main__":

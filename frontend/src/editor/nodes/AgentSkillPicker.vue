@@ -4,6 +4,7 @@
       <div class="node-card__agent-skill-select-shell" @pointerdown.stop @click.stop>
         <ElSelect
           class="node-card__agent-skill-select graphite-select"
+          :class="{ 'node-card__agent-skill-select--empty': isSkillEmpty }"
           :model-value="selectedSkillKey"
           :placeholder="skillPlaceholder"
           :disabled="skillSelectDisabled"
@@ -12,7 +13,7 @@
           :aria-label="t('nodeCard.selectSkill')"
           @update:model-value="emit('update:selected-skill', String($event ?? ''))"
         >
-          <ElOption :label="t('nodeCard.noSkill')" value="" />
+          <ElOption :label="t('nodeCard.noSkillOption')" value="" />
           <ElOption
             v-if="selectedSkillMissing"
             :label="selectedSkillKey"
@@ -24,20 +25,7 @@
             :key="definition.skillKey"
             :label="definition.name"
             :value="definition.skillKey"
-          >
-            <div class="node-card__skill-option">
-              <div class="node-card__skill-option-title">{{ definition.name }}</div>
-              <div class="node-card__skill-option-copy">{{ definition.description }}</div>
-              <div class="node-card__skill-option-meta">
-                <span>{{ definition.kind }}</span>
-                <span>{{ definition.mode }}</span>
-                <span>{{ definition.scope }}</span>
-                <span>{{ definition.runtime.type }}:{{ definition.runtime.entrypoint || definition.skillKey }}</span>
-                <span v-if="definition.inputSchema.length > 0">{{ t("nodeCard.inputCount", { count: definition.inputSchema.length }) }}</span>
-                <span v-if="definition.outputSchema.length > 0">{{ t("nodeCard.outputCount", { count: definition.outputSchema.length }) }}</span>
-              </div>
-            </div>
-          </ElOption>
+          />
         </ElSelect>
       </div>
       <ElPopover
@@ -110,11 +98,12 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+const isSkillEmpty = computed(() => !props.selectedSkillKey.trim());
 const selectedSkillMissing = computed(
   () => Boolean(props.selectedSkillKey) && !props.availableSkillDefinitions.some((definition) => definition.skillKey === props.selectedSkillKey),
 );
 const skillSelectDisabled = computed(
-  () => props.loading || Boolean(props.error) || (props.availableSkillDefinitions.length === 0 && !props.selectedSkillKey),
+  () => props.loading || Boolean(props.error),
 );
 const skillPlaceholder = computed(() => {
   if (props.loading) {
@@ -123,10 +112,7 @@ const skillPlaceholder = computed(() => {
   if (props.error) {
     return t("nodeCard.skillLoadFailed");
   }
-  if (props.availableSkillDefinitions.length === 0) {
-    return t("nodeCard.noSkills");
-  }
-  return t("nodeCard.selectSkill");
+  return isSkillEmpty.value ? t("nodeCard.noSkill") : t("nodeCard.selectSkill");
 });
 </script>
 
@@ -166,6 +152,18 @@ const skillPlaceholder = computed(() => {
   padding: 0 14px;
 }
 
+.node-card__agent-skill-select--empty :deep(.el-select__wrapper) {
+  border-style: dashed;
+  border-width: 1.5px;
+  border-color: rgba(37, 99, 235, 0.5);
+  background: rgba(239, 246, 255, 0.58);
+}
+
+.node-card__agent-skill-select--empty :deep(.el-select__wrapper:hover) {
+  border-color: rgba(37, 99, 235, 0.68);
+  background: rgba(219, 234, 254, 0.66);
+}
+
 .node-card__agent-skill-select :deep(.el-select__wrapper:hover) {
   border-color: rgba(37, 99, 235, 0.3);
   background: rgba(219, 234, 254, 0.82);
@@ -193,66 +191,6 @@ const skillPlaceholder = computed(() => {
 .node-card__agent-skill-select :deep(.is-disabled .el-select__wrapper) {
   opacity: 0.62;
   background: rgba(239, 246, 255, 0.58);
-}
-
-:deep(.node-card__agent-skill-popper.el-popper) {
-  border: 1px solid rgba(37, 99, 235, 0.16);
-  border-radius: 16px;
-  background: rgba(248, 251, 255, 0.98);
-  box-shadow: 0 20px 40px rgba(30, 64, 175, 0.12);
-}
-
-:deep(.node-card__agent-skill-popper .el-select-dropdown__list) {
-  padding: 8px;
-}
-
-:deep(.node-card__agent-skill-popper .el-select-dropdown__item) {
-  height: auto;
-  min-height: 42px;
-  border-radius: 12px;
-  color: #1e3a8a;
-  padding: 8px 10px;
-}
-
-:deep(.node-card__agent-skill-popper .el-select-dropdown__item.hover),
-:deep(.node-card__agent-skill-popper .el-select-dropdown__item:hover) {
-  background: rgba(37, 99, 235, 0.08);
-}
-
-:deep(.node-card__agent-skill-popper .el-select-dropdown__item.is-selected) {
-  color: #1d4ed8;
-  background: rgba(37, 99, 235, 0.12);
-}
-
-.node-card__skill-option {
-  display: grid;
-  gap: 5px;
-  min-width: 0;
-}
-
-.node-card__skill-option-title {
-  font-size: 0.88rem;
-  font-weight: 700;
-  color: #1e3a8a;
-}
-
-.node-card__skill-option-copy {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.76rem;
-  line-height: 1.4;
-  color: rgba(30, 58, 138, 0.72);
-}
-
-.node-card__skill-option-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-  font-size: 0.66rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #2563eb;
 }
 
 .node-card__agent-toggle-card {

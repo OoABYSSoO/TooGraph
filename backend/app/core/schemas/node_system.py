@@ -236,7 +236,7 @@ class NodeSystemSkillInstructionBlock(BaseModel):
     skill_key: str = Field(..., min_length=1, alias="skillKey")
     title: str = ""
     content: str = ""
-    source: Literal["skill.agentInstruction", "node.override"] = "skill.agentInstruction"
+    source: Literal["skill.llmInstruction", "node.override"] = "skill.llmInstruction"
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 

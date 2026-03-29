@@ -12,6 +12,7 @@ from app.core.runtime.input_boundary import coerce_input_boundary_value, first_t
 from app.core.runtime.reference_resolution import resolve_condition_source
 from app.core.runtime.skill_bindings import (
     map_skill_outputs,
+    resolve_agent_skill_output_binding,
     resolve_agent_skill_bindings,
 )
 from app.core.runtime.skill_invocation import callable_accepts_keyword, invoke_skill
@@ -129,6 +130,12 @@ def execute_agent_node(
 
         started_at = perf_counter()
         skill_definition = skill_definitions.get(skill_key)
+        binding = resolve_agent_skill_output_binding(
+            binding,
+            node=node,
+            state_schema=state_schema,
+            skill_definition=skill_definition,
+        )
         input_schema = list(getattr(skill_definition, "input_schema", []) or [])
         skill_inputs = dict(generated_skill_inputs.get(skill_key) or {})
         missing_inputs = missing_required_skill_inputs(skill_inputs, input_schema)

@@ -1232,9 +1232,7 @@ test("NodeCard closes floating panels on focus loss and keeps popup surfaces on 
   assert.match(floatingPanelsComposableSource, /options\.closeFloatingPanels\(\{ commitTextEditor: false \}\);/);
   assert.match(componentSource, /data-node-popup-surface="true"/);
   assert.match(componentSource, /\.node-card__text-editor-popper/);
-  assert.match(agentSkillPickerSource, /:deep\(\.node-card__agent-skill-popper\.el-popper\) \{[\s\S]*border:\s*1px solid rgba\(37,\s*99,\s*235,\s*0\.16\);/);
-  assert.match(agentSkillPickerSource, /:deep\(\.node-card__agent-skill-popper\.el-popper\) \{[\s\S]*background:\s*rgba\(248,\s*251,\s*255,\s*0\.98\);/);
-  assert.match(agentSkillPickerSource, /:deep\(\.node-card__agent-skill-popper\.el-popper\) \{[\s\S]*box-shadow:\s*0 20px 40px rgba\(30,\s*64,\s*175,\s*0\.12\);/);
+  assert.match(agentSkillPickerSource, /popper-class="graphite-select-popper node-card__agent-skill-popper"/);
   assert.match(createPopoverSource, /\.node-card__port-picker \{[\s\S]*border:\s*1px solid rgba\(154,\s*52,\s*18,\s*0\.16\);/);
   assert.match(createPopoverSource, /\.node-card__port-picker \{[\s\S]*background:\s*rgba\(255,\s*244,\s*232,\s*0\.96\);/);
   assert.match(createPopoverSource, /\.node-card__port-picker \{[\s\S]*box-shadow:\s*0 16px 34px rgba\(60,\s*41,\s*20,\s*0\.12\);/);

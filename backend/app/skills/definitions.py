@@ -9,7 +9,7 @@ from typing import TypeVar
 import yaml
 
 from app.core.schemas.skills import (
-    SkillAgentNodeEligibility,
+    SkillLlmNodeEligibility,
     SkillCatalogStatus,
     SkillDefinition,
     SkillHealthSpec,
@@ -41,13 +41,13 @@ class SkillDefinitionRecord:
 
 def list_skill_definitions(*, include_disabled: bool = False) -> list[SkillDefinition]:
     catalog = list_skill_catalog(include_disabled=include_disabled)
-    return [item for item in catalog if is_agent_attachable_skill(item)]
+    return [item for item in catalog if is_llm_attachable_skill(item)]
 
 
-def is_agent_attachable_skill(definition: SkillDefinition) -> bool:
+def is_llm_attachable_skill(definition: SkillDefinition) -> bool:
     return (
         definition.status == SkillCatalogStatus.ACTIVE
-        and definition.agent_node_eligibility == SkillAgentNodeEligibility.READY
+        and definition.llm_node_eligibility == SkillLlmNodeEligibility.READY
         and definition.runtime_ready
         and definition.runtime_registered
         and definition.configured
@@ -141,13 +141,14 @@ def _parse_native_skill_manifest(path: Path, source_scope: SkillSourceScope) -> 
     payload = json.loads(path.read_text(encoding="utf-8"))
     _reject_legacy_targets(payload)
     _reject_legacy_label(payload)
+    _reject_legacy_llm_fields(payload)
     skill_key = str(payload.get("skillKey") or payload.get("skill_key") or path.parent.name)
     name = str(payload.get("name") or skill_key)
     definition = SkillDefinition(
         skillKey=skill_key,
         name=name,
         description=str(payload.get("description") or "").strip(),
-        agentInstruction=str(payload.get("agentInstruction") or payload.get("agent_instruction") or "").strip(),
+        llmInstruction=str(payload.get("llmInstruction") or payload.get("llm_instruction") or "").strip(),
         schemaVersion=str(payload.get("schemaVersion") or payload.get("schema_version") or ""),
         version=str(payload.get("version") or ""),
         runPolicies=_parse_run_policies(payload.get("runPolicies") or payload.get("run_policies")),
@@ -164,9 +165,9 @@ def _parse_native_skill_manifest(path: Path, source_scope: SkillSourceScope) -> 
         configured=bool(payload.get("configured", True)),
         healthy=bool(payload.get("healthy", True)),
     )
-    eligibility, blockers = _resolve_agent_node_eligibility(definition, path.parent)
-    definition.agent_node_eligibility = eligibility
-    definition.agent_node_blockers = blockers
+    eligibility, blockers = _resolve_llm_node_eligibility(definition, path.parent)
+    definition.llm_node_eligibility = eligibility
+    definition.llm_node_blockers = blockers
     return SkillDefinitionRecord(
         definition=definition,
         source_format=SkillSourceFormat.SKILL,
@@ -182,6 +183,7 @@ def _parse_skill_file(path: Path, source_format: SkillSourceFormat, source_scope
     graphite = payload.get("graphite") or {}
     _reject_legacy_targets(graphite)
     _reject_legacy_label(graphite)
+    _reject_legacy_llm_fields(graphite)
 
     skill_key = str(graphite.get("skill_key") or payload.get("name") or path.stem)
     name = str(payload.get("name") or graphite.get("name") or skill_key)
@@ -195,7 +197,7 @@ def _parse_skill_file(path: Path, source_format: SkillSourceFormat, source_scope
         skillKey=skill_key,
         name=name,
         description=description or body.splitlines()[0].strip() if body.strip() else "",
-        agentInstruction=str(graphite.get("agentInstruction") or graphite.get("agent_instruction") or "").strip(),
+        llmInstruction=str(graphite.get("llmInstruction") or graphite.get("llm_instruction") or "").strip(),
         schemaVersion=str(graphite.get("schema_version") or graphite.get("schemaVersion") or ""),
         version=str(graphite.get("version") or payload.get("version") or ""),
         runPolicies=_parse_run_policies(graphite.get("runPolicies") or graphite.get("run_policies")),
@@ -210,9 +212,9 @@ def _parse_skill_file(path: Path, source_format: SkillSourceFormat, source_scope
         supportedValueTypes=[str(item) for item in graphite.get("supported_value_types", [])],
         sideEffects=side_effects,
     )
-    eligibility, blockers = _resolve_agent_node_eligibility(definition, path.parent)
-    definition.agent_node_eligibility = eligibility
-    definition.agent_node_blockers = blockers
+    eligibility, blockers = _resolve_llm_node_eligibility(definition, path.parent)
+    definition.llm_node_eligibility = eligibility
+    definition.llm_node_blockers = blockers
     return SkillDefinitionRecord(
         definition=definition,
         source_format=source_format,
@@ -279,6 +281,22 @@ def _reject_legacy_label(payload: object) -> None:
         )
 
 
+def _reject_legacy_llm_fields(payload: object) -> None:
+    if not isinstance(payload, dict):
+        return
+    legacy_fields = {
+        "agentInstruction": "llmInstruction",
+        "agent_instruction": "llm_instruction",
+        "agentNodeEligibility": "llmNodeEligibility",
+        "agentNodeBlockers": "llmNodeBlockers",
+    }
+    for legacy, replacement in legacy_fields.items():
+        if legacy in payload:
+            raise ValueError(
+                f"Skill manifest field '{legacy}' is no longer supported. Use '{replacement}'."
+            )
+
+
 def _parse_float(value: object, fallback: float) -> float:
     try:
         parsed = float(value)
@@ -287,7 +305,7 @@ def _parse_float(value: object, fallback: float) -> float:
     return parsed if parsed > 0 else fallback
 
 
-def _resolve_agent_node_eligibility(definition: SkillDefinition, skill_dir: Path) -> tuple[SkillAgentNodeEligibility, list[str]]:
+def _resolve_llm_node_eligibility(definition: SkillDefinition, skill_dir: Path) -> tuple[SkillLlmNodeEligibility, list[str]]:
     blockers: list[str] = []
     blockers.extend(
         validate_script_runtime_spec(
@@ -301,8 +319,8 @@ def _resolve_agent_node_eligibility(definition: SkillDefinition, skill_dir: Path
         blockers.append("Skill manifest is missing outputSchema.")
 
     if blockers:
-        return SkillAgentNodeEligibility.NEEDS_MANIFEST, blockers
-    return SkillAgentNodeEligibility.READY, []
+        return SkillLlmNodeEligibility.NEEDS_MANIFEST, blockers
+    return SkillLlmNodeEligibility.READY, []
 
 
 def _parse_enum(value: object, enum_type: type[EnumValue], fallback: EnumValue) -> EnumValue:
