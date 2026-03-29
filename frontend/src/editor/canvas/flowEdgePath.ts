@@ -10,6 +10,34 @@ const UPSTREAM_TOP_CLEARANCE = 160;
 const UPSTREAM_NODE_TOP_GUTTER = 48;
 const UPSTREAM_CORNER_RADIUS = 18;
 
+export type SequenceFlowPathConfig = {
+  terminalOverlap: number;
+  terminalStagger: number;
+  laneSpacing: number;
+  downstreamTightMinControl: number;
+  downstreamControlMin: number;
+  downstreamControlMax: number;
+  downstreamControlRatio: number;
+  upstreamHorizontalClearance: number;
+  upstreamTopClearance: number;
+  upstreamNodeTopGutter: number;
+  upstreamCornerRadius: number;
+};
+
+export const DEFAULT_SEQUENCE_FLOW_PATH_CONFIG: SequenceFlowPathConfig = {
+  terminalOverlap: FLOW_TERMINAL_OVERLAP,
+  terminalStagger: FLOW_TERMINAL_STAGGER,
+  laneSpacing: FLOW_LANE_SPACING,
+  downstreamTightMinControl: DOWNSTREAM_TIGHT_MIN_CONTROL,
+  downstreamControlMin: DOWNSTREAM_CONTROL_MIN,
+  downstreamControlMax: DOWNSTREAM_CONTROL_MAX,
+  downstreamControlRatio: DOWNSTREAM_CONTROL_RATIO,
+  upstreamHorizontalClearance: UPSTREAM_HORIZONTAL_CLEARANCE,
+  upstreamTopClearance: UPSTREAM_TOP_CLEARANCE,
+  upstreamNodeTopGutter: UPSTREAM_NODE_TOP_GUTTER,
+  upstreamCornerRadius: UPSTREAM_CORNER_RADIUS,
+};
+
 export type SequenceFlowPathInput = {
   sourceX: number;
   sourceY: number;
@@ -25,26 +53,26 @@ export type SequenceFlowPathInput = {
   targetLaneCount?: number;
 };
 
-export function buildSequenceFlowPath(input: SequenceFlowPathInput) {
-  const sourceLaneOffset = resolveLaneOffset(input.sourceLaneIndex, input.sourceLaneCount);
-  const targetLaneOffset = resolveLaneOffset(input.targetLaneIndex, input.targetLaneCount);
+export function buildSequenceFlowPath(input: SequenceFlowPathInput, config: SequenceFlowPathConfig = DEFAULT_SEQUENCE_FLOW_PATH_CONFIG) {
+  const sourceLaneOffset = resolveLaneOffset(input.sourceLaneIndex, input.sourceLaneCount, config);
+  const targetLaneOffset = resolveLaneOffset(input.targetLaneIndex, input.targetLaneCount, config);
 
   if (shouldUseVerticalDropPath(input)) {
-    return buildVerticalDropPath(input, sourceLaneOffset, targetLaneOffset);
+    return buildVerticalDropPath(input, sourceLaneOffset, targetLaneOffset, config);
   }
 
   if (input.targetX > input.sourceX) {
-    return buildLaneBezierPath(input, sourceLaneOffset, targetLaneOffset);
+    return buildLaneBezierPath(input, sourceLaneOffset, targetLaneOffset, config);
   }
 
-  const topY = resolveUpstreamTopY(input, sourceLaneOffset, targetLaneOffset);
-  const startLeadX = input.sourceX + FLOW_TERMINAL_OVERLAP;
+  const topY = resolveUpstreamTopY(input, sourceLaneOffset, targetLaneOffset, config);
+  const startLeadX = input.sourceX + config.terminalOverlap;
   const sourceBranchX =
     input.sourceX +
-    UPSTREAM_HORIZONTAL_CLEARANCE +
-    resolveTerminalStagger(input.sourceLaneIndex, input.sourceLaneCount);
-  const targetDropX = resolveReturnDropX(input, sourceBranchX);
-  const endLeadX = input.targetX - FLOW_TERMINAL_OVERLAP;
+    config.upstreamHorizontalClearance +
+    resolveTerminalStagger(input.sourceLaneIndex, input.sourceLaneCount, config);
+  const targetDropX = resolveReturnDropX(input, sourceBranchX, config);
+  const endLeadX = input.targetX - config.terminalOverlap;
 
   return buildRoundedOrthogonalPath(
     [
@@ -57,24 +85,24 @@ export function buildSequenceFlowPath(input: SequenceFlowPathInput) {
       { x: endLeadX, y: input.targetY },
       { x: input.targetX, y: input.targetY },
     ],
-    UPSTREAM_CORNER_RADIUS,
+    config.upstreamCornerRadius,
   );
 }
 
-export function buildSelfFeedbackFlowPath(input: SequenceFlowPathInput) {
-  const sourceLaneOffset = resolveLaneOffset(input.sourceLaneIndex, input.sourceLaneCount);
-  const targetLaneOffset = resolveLaneOffset(input.targetLaneIndex, input.targetLaneCount);
-  const topY = resolveUpstreamTopY(input, sourceLaneOffset, targetLaneOffset);
-  const startLeadX = input.sourceX + FLOW_TERMINAL_OVERLAP;
+export function buildSelfFeedbackFlowPath(input: SequenceFlowPathInput, config: SequenceFlowPathConfig = DEFAULT_SEQUENCE_FLOW_PATH_CONFIG) {
+  const sourceLaneOffset = resolveLaneOffset(input.sourceLaneIndex, input.sourceLaneCount, config);
+  const targetLaneOffset = resolveLaneOffset(input.targetLaneIndex, input.targetLaneCount, config);
+  const topY = resolveUpstreamTopY(input, sourceLaneOffset, targetLaneOffset, config);
+  const startLeadX = input.sourceX + config.terminalOverlap;
   const sourceBranchX =
     input.sourceX +
-    UPSTREAM_HORIZONTAL_CLEARANCE +
-    resolveTerminalStagger(input.sourceLaneIndex, input.sourceLaneCount);
+    config.upstreamHorizontalClearance +
+    resolveTerminalStagger(input.sourceLaneIndex, input.sourceLaneCount, config);
   const targetDropX =
     input.targetX -
-    UPSTREAM_HORIZONTAL_CLEARANCE -
-    resolveTerminalStagger(input.targetLaneIndex, input.targetLaneCount);
-  const endLeadX = input.targetX - FLOW_TERMINAL_OVERLAP;
+    config.upstreamHorizontalClearance -
+    resolveTerminalStagger(input.targetLaneIndex, input.targetLaneCount, config);
+  const endLeadX = input.targetX - config.terminalOverlap;
 
   return buildRoundedOrthogonalPath(
     [
@@ -87,19 +115,19 @@ export function buildSelfFeedbackFlowPath(input: SequenceFlowPathInput) {
       { x: endLeadX, y: input.targetY },
       { x: input.targetX, y: input.targetY },
     ],
-    UPSTREAM_CORNER_RADIUS,
+    config.upstreamCornerRadius,
   );
 }
 
-function buildVerticalDropPath(input: SequenceFlowPathInput, sourceLaneOffset: number, targetLaneOffset: number) {
-  const startLeadX = input.sourceX + FLOW_TERMINAL_OVERLAP;
-  const sourceBranchX = resolveVerticalDropSourceRailX(input);
-  const transferY = resolveVerticalDropTransferY(input, sourceLaneOffset, targetLaneOffset);
+function buildVerticalDropPath(input: SequenceFlowPathInput, sourceLaneOffset: number, targetLaneOffset: number, config: SequenceFlowPathConfig) {
+  const startLeadX = input.sourceX + config.terminalOverlap;
+  const sourceBranchX = resolveVerticalDropSourceRailX(input, config);
+  const transferY = resolveVerticalDropTransferY(input, sourceLaneOffset, targetLaneOffset, config);
   const targetDropX =
     input.targetX -
-    UPSTREAM_HORIZONTAL_CLEARANCE -
-    resolveTerminalStagger(input.targetLaneIndex, input.targetLaneCount);
-  const endLeadX = input.targetX - FLOW_TERMINAL_OVERLAP;
+    config.upstreamHorizontalClearance -
+    resolveTerminalStagger(input.targetLaneIndex, input.targetLaneCount, config);
+  const endLeadX = input.targetX - config.terminalOverlap;
 
   return buildRoundedOrthogonalPath(
     [
@@ -112,21 +140,21 @@ function buildVerticalDropPath(input: SequenceFlowPathInput, sourceLaneOffset: n
       { x: endLeadX, y: input.targetY },
       { x: input.targetX, y: input.targetY },
     ],
-    UPSTREAM_CORNER_RADIUS,
+    config.upstreamCornerRadius,
   );
 }
 
-function buildLaneBezierPath(input: SequenceFlowPathInput, sourceLaneOffset: number, targetLaneOffset: number) {
+function buildLaneBezierPath(input: SequenceFlowPathInput, sourceLaneOffset: number, targetLaneOffset: number, config: SequenceFlowPathConfig) {
   const directDistance = input.targetX - input.sourceX;
-  if (directDistance <= FLOW_TERMINAL_OVERLAP * 2) {
-    return buildTightBezierPath(input, sourceLaneOffset, targetLaneOffset);
+  if (directDistance <= config.terminalOverlap * 2) {
+    return buildTightBezierPath(input, sourceLaneOffset, targetLaneOffset, config);
   }
 
-  const startLeadX = input.sourceX + FLOW_TERMINAL_OVERLAP;
-  const endLeadX = input.targetX - FLOW_TERMINAL_OVERLAP;
+  const startLeadX = input.sourceX + config.terminalOverlap;
+  const endLeadX = input.targetX - config.terminalOverlap;
   const laneDistance = endLeadX - startLeadX;
 
-  const controlSpan = resolveDownstreamControlSpan(laneDistance);
+  const controlSpan = resolveDownstreamControlSpan(laneDistance, config);
 
   return [
     `M ${roundCoordinate(input.sourceX)} ${roundCoordinate(input.sourceY)}`,
@@ -136,8 +164,8 @@ function buildLaneBezierPath(input: SequenceFlowPathInput, sourceLaneOffset: num
   ].join(" ");
 }
 
-function buildTightBezierPath(input: SequenceFlowPathInput, sourceLaneOffset: number, targetLaneOffset: number) {
-  const controlSpan = Math.max((input.targetX - input.sourceX) / 2, DOWNSTREAM_TIGHT_MIN_CONTROL);
+function buildTightBezierPath(input: SequenceFlowPathInput, sourceLaneOffset: number, targetLaneOffset: number, config: SequenceFlowPathConfig) {
+  const controlSpan = Math.max((input.targetX - input.sourceX) / 2, config.downstreamTightMinControl);
 
   return [
     `M ${roundCoordinate(input.sourceX)} ${roundCoordinate(input.sourceY)}`,
@@ -155,56 +183,56 @@ function shouldUseVerticalDropPath(input: SequenceFlowPathInput) {
   return input.targetNodeX >= input.sourceNodeX;
 }
 
-function resolveVerticalDropSourceRailX(input: SequenceFlowPathInput) {
+function resolveVerticalDropSourceRailX(input: SequenceFlowPathInput, config: SequenceFlowPathConfig) {
   const sourceNodeWidthEstimate =
-    input.sourceNodeX !== undefined ? Math.max(input.sourceX - input.sourceNodeX, FLOW_TERMINAL_OVERLAP * 2) : 0;
+    input.sourceNodeX !== undefined ? Math.max(input.sourceX - input.sourceNodeX, config.terminalOverlap * 2) : 0;
   const targetRightEstimate =
     input.targetNodeX !== undefined && sourceNodeWidthEstimate > 0 ? input.targetNodeX + sourceNodeWidthEstimate : input.targetX;
 
   return (
     Math.max(input.sourceX, targetRightEstimate) +
-    UPSTREAM_HORIZONTAL_CLEARANCE +
-    resolveTerminalStagger(input.sourceLaneIndex, input.sourceLaneCount)
+    config.upstreamHorizontalClearance +
+    resolveTerminalStagger(input.sourceLaneIndex, input.sourceLaneCount, config)
   );
 }
 
-function resolveVerticalDropTransferY(input: SequenceFlowPathInput, sourceLaneOffset: number, targetLaneOffset: number) {
+function resolveVerticalDropTransferY(input: SequenceFlowPathInput, sourceLaneOffset: number, targetLaneOffset: number, config: SequenceFlowPathConfig) {
   const midpointY = input.sourceY + (input.targetY - input.sourceY) / 2;
   const targetApproachY =
-    input.targetNodeY !== undefined ? input.targetNodeY - UPSTREAM_NODE_TOP_GUTTER : Number.POSITIVE_INFINITY;
+    input.targetNodeY !== undefined ? input.targetNodeY - config.upstreamNodeTopGutter : Number.POSITIVE_INFINITY;
 
-  return Math.max(input.sourceY + FLOW_TERMINAL_OVERLAP, Math.min(midpointY, targetApproachY)) - sourceLaneOffset + targetLaneOffset;
+  return Math.max(input.sourceY + config.terminalOverlap, Math.min(midpointY, targetApproachY)) - sourceLaneOffset + targetLaneOffset;
 }
 
-function resolveUpstreamTopY(input: SequenceFlowPathInput, sourceLaneOffset: number, targetLaneOffset: number) {
+function resolveUpstreamTopY(input: SequenceFlowPathInput, sourceLaneOffset: number, targetLaneOffset: number, config: SequenceFlowPathConfig) {
   if (input.sourceNodeY !== undefined && input.targetNodeY !== undefined) {
-    return Math.min(input.sourceNodeY, input.targetNodeY) - UPSTREAM_NODE_TOP_GUTTER - sourceLaneOffset + targetLaneOffset;
+    return Math.min(input.sourceNodeY, input.targetNodeY) - config.upstreamNodeTopGutter - sourceLaneOffset + targetLaneOffset;
   }
 
-  return Math.min(input.sourceY, input.targetY) - UPSTREAM_TOP_CLEARANCE - sourceLaneOffset + targetLaneOffset;
+  return Math.min(input.sourceY, input.targetY) - config.upstreamTopClearance - sourceLaneOffset + targetLaneOffset;
 }
 
-function resolveLaneOffset(index?: number, count?: number) {
+function resolveLaneOffset(index: number | undefined, count: number | undefined, config: SequenceFlowPathConfig) {
   if (index === undefined || count === undefined || count <= 1) {
     return 0;
   }
 
-  return (index - (count - 1) / 2) * FLOW_LANE_SPACING;
+  return (index - (count - 1) / 2) * config.laneSpacing;
 }
 
-function resolveTerminalStagger(index?: number, count?: number) {
+function resolveTerminalStagger(index: number | undefined, count: number | undefined, config: SequenceFlowPathConfig) {
   if (index === undefined || count === undefined || count <= 1) {
     return 0;
   }
 
-  return index * FLOW_TERMINAL_STAGGER;
+  return index * config.terminalStagger;
 }
 
-function resolveReturnDropX(input: SequenceFlowPathInput, sourceBranchX: number) {
+function resolveReturnDropX(input: SequenceFlowPathInput, sourceBranchX: number, config: SequenceFlowPathConfig) {
   const targetDropX =
     input.targetX -
-    UPSTREAM_HORIZONTAL_CLEARANCE -
-    resolveTerminalStagger(input.targetLaneIndex, input.targetLaneCount);
+    config.upstreamHorizontalClearance -
+    resolveTerminalStagger(input.targetLaneIndex, input.targetLaneCount, config);
 
   const targetNodeIsStillOnOrRightOfSource =
     input.sourceNodeX !== undefined && input.targetNodeX !== undefined && input.targetNodeX >= input.sourceNodeX;
@@ -216,10 +244,10 @@ function resolveReturnDropX(input: SequenceFlowPathInput, sourceBranchX: number)
   return targetDropX;
 }
 
-function resolveDownstreamControlSpan(distance: number) {
+function resolveDownstreamControlSpan(distance: number, config: SequenceFlowPathConfig) {
   return Math.min(
-    Math.max(distance * DOWNSTREAM_CONTROL_RATIO, DOWNSTREAM_CONTROL_MIN),
-    Math.min(DOWNSTREAM_CONTROL_MAX, distance / 2),
+    Math.max(distance * config.downstreamControlRatio, config.downstreamControlMin),
+    Math.min(config.downstreamControlMax, distance / 2),
   );
 }
 
