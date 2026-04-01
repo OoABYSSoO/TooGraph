@@ -38,6 +38,11 @@ test("ModelLogsPage renders a themed paginated raw model request log", () => {
   assert.match(pageSource, /model-logs-page__output-chunk/);
   assert.match(pageSource, /formatStreamEventLabel/);
   assert.match(pageSource, /formatStreamEvent/);
+  assert.match(pageSource, /rawResponseDisplayMode/);
+  assert.match(pageSource, /rawResponseNormal/);
+  assert.match(pageSource, /rawResponseChunks/);
+  assert.match(pageSource, /formatResponseNormalRaw/);
+  assert.match(pageSource, /delete normalized\._stream/);
   assert.match(pageSource, /model-logs-page__stream-event/);
   assert.match(pageSource, /rawStreamSource/);
   assert.match(pageSource, /formatReadableContent/);

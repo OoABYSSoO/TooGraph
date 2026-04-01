@@ -297,14 +297,14 @@ def _validate_agent_node(
     skill_catalog: dict[str, SkillDefinition],
 ) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
-    dynamic_skill_state_reads = _agent_skill_state_reads(node, state_schema)
+    dynamic_capability_state_reads = _agent_capability_state_reads(node, state_schema)
     if node.config.skill_bindings and not node.config.skill_key:
         issues.append(
             ValidationIssue(
                 code="agent_skill_binding_without_skill_key",
                 message=(
                     f"LLM node '{node_name}' defines skillBindings without a static skillKey. "
-                    "Use skillKey for static skills or a skill state input with one result_package output for dynamic skills."
+                    "Use skillKey for static skills or a capability state input with one result_package output for dynamic capabilities."
                 ),
                 path=f"nodes.{node_name}.config.skillBindings",
             )
@@ -322,18 +322,18 @@ def _validate_agent_node(
                 )
             )
 
-    if node.config.skill_key and dynamic_skill_state_reads:
+    if node.config.skill_key and dynamic_capability_state_reads:
         issues.append(
             ValidationIssue(
-                code="agent_static_and_dynamic_skill_mixed",
+                code="agent_static_and_dynamic_capability_mixed",
                 message=(
-                    f"LLM node '{node_name}' cannot combine a static skillKey with skill state inputs. "
-                    "Use either a static mounted skill or a dynamic skill executor."
+                    f"LLM node '{node_name}' cannot combine a static skillKey with capability state inputs. "
+                    "Use either a static mounted skill or a dynamic capability executor."
                 ),
                 path=f"nodes.{node_name}.reads",
             )
         )
-    if not node.config.skill_key and dynamic_skill_state_reads:
+    if not node.config.skill_key and dynamic_capability_state_reads:
         result_package_writes = [
             binding.state
             for binding in node.writes
@@ -342,9 +342,9 @@ def _validate_agent_node(
         if len(node.writes) != 1 or len(result_package_writes) != 1:
             issues.append(
                 ValidationIssue(
-                    code="dynamic_skill_output_state_invalid",
+                    code="dynamic_capability_output_state_invalid",
                     message=(
-                        f"LLM node '{node_name}' reads a skill state dynamically and must write exactly one "
+                        f"LLM node '{node_name}' reads a capability state dynamically and must write exactly one "
                         "result_package state."
                     ),
                     path=f"nodes.{node_name}.writes",
@@ -432,14 +432,14 @@ def _iter_agent_skill_refs(node_name: str, node: NodeSystemAgentNode) -> list[tu
     return refs
 
 
-def _agent_skill_state_reads(
+def _agent_capability_state_reads(
     node: NodeSystemAgentNode,
     state_schema: dict[str, object],
 ) -> list[str]:
     state_keys: list[str] = []
     for binding in node.reads:
         definition = state_schema.get(binding.state)
-        if getattr(definition, "type", None) == NodeSystemStateType.SKILL:
+        if getattr(definition, "type", None) == NodeSystemStateType.CAPABILITY:
             state_keys.append(binding.state)
     return state_keys
 

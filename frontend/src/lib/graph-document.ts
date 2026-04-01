@@ -54,7 +54,7 @@ const STATE_FIELD_TYPE_VALUES = new Set([
   "video",
   "file",
   "knowledge_base",
-  "skill",
+  "capability",
   "result_package",
 ]);
 
@@ -190,8 +190,8 @@ function defaultMaterializedStateValueForType(type: string): unknown {
       return false;
     case "json":
       return {};
-    case "skill":
-      return [];
+    case "capability":
+      return { kind: "none" };
     case "result_package":
       return {};
     default:
@@ -721,10 +721,21 @@ function reconcileAgentSkillOutputBindings<T extends GraphPayload | GraphDocumen
   const processedSkillKeys = new Set<string>();
 
   if (removedManagedStateKeys.size > 0) {
-    node.writes = node.writes.filter((binding) => !removedManagedStateKeys.has(binding.state));
+    removeManagedSkillOutputStates(document, removedManagedStateKeys);
   }
 
   if (attachedSkillKey) {
+    const suspendedFreeWrites = mergeWriteBindings(
+      normalizeWriteBindings(node.config.suspendedFreeWrites).filter((binding) => document.state_schema[binding.state]),
+      node.writes.filter((binding) => !isManagedSkillOutputStateForNode(document, nodeId, binding.state)),
+    );
+    if (suspendedFreeWrites.length > 0) {
+      node.config.suspendedFreeWrites = suspendedFreeWrites;
+    } else {
+      delete node.config.suspendedFreeWrites;
+    }
+    node.writes = node.writes.filter((binding) => isManagedSkillOutputStateForNode(document, nodeId, binding.state, attachedSkillKey));
+
     const definition = skillDefinitionMap.get(attachedSkillKey);
     const existingBinding = currentBindingBySkill.get(attachedSkillKey);
     if (!definition?.outputSchema.length) {
@@ -753,6 +764,11 @@ function reconcileAgentSkillOutputBindings<T extends GraphPayload | GraphDocumen
       });
       processedSkillKeys.add(attachedSkillKey);
     }
+  } else {
+    const restoredFreeWrites = normalizeWriteBindings(node.config.suspendedFreeWrites).filter((binding) => document.state_schema[binding.state]);
+    const currentFreeWrites = node.writes.filter((binding) => !isManagedSkillOutputStateForNode(document, nodeId, binding.state));
+    node.writes = mergeWriteBindings(restoredFreeWrites, currentFreeWrites);
+    delete node.config.suspendedFreeWrites;
   }
 
   for (const binding of currentBindings) {
@@ -763,6 +779,33 @@ function reconcileAgentSkillOutputBindings<T extends GraphPayload | GraphDocumen
   }
 
   node.config.skillBindings = nextSkillBindings;
+}
+
+function normalizeWriteBindings(value: AgentNode["config"]["suspendedFreeWrites"]): WriteBinding[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((binding) => ({
+      state: String(binding.state ?? "").trim(),
+      mode: binding.mode === "append" ? "append" as const : "replace" as const,
+    }))
+    .filter((binding) => binding.state);
+}
+
+function mergeWriteBindings(...bindingGroups: WriteBinding[][]): WriteBinding[] {
+  const seen = new Set<string>();
+  const merged: WriteBinding[] = [];
+  for (const bindings of bindingGroups) {
+    for (const binding of bindings) {
+      if (seen.has(binding.state)) {
+        continue;
+      }
+      seen.add(binding.state);
+      merged.push({ ...binding });
+    }
+  }
+  return merged;
 }
 
 function normalizeAgentSkillBindings(value: AgentNode["config"]["skillBindings"]): AgentSkillBinding[] {
@@ -801,6 +844,74 @@ function collectRemovedManagedSkillOutputStateKeys(
     }
   }
   return removedStateKeys;
+}
+
+function removeManagedSkillOutputStates(document: GraphPayload | GraphDocument, stateKeys: Set<string>) {
+  const touchedNodeIds = new Set<string>();
+  for (const stateKey of stateKeys) {
+    delete document.state_schema[stateKey];
+  }
+
+  for (const [nodeId, node] of Object.entries(document.nodes)) {
+    const nextReads = node.reads.filter((binding) => !stateKeys.has(binding.state));
+    const nextWrites = node.writes.filter((binding) => !stateKeys.has(binding.state));
+    if (nextReads.length !== node.reads.length || nextWrites.length !== node.writes.length) {
+      touchedNodeIds.add(nodeId);
+      node.reads = nextReads;
+      node.writes = nextWrites;
+    }
+
+    if (node.kind === "condition" && stateKeys.has(node.config.rule.source)) {
+      node.config.rule.source = node.reads[0]?.state ?? "";
+      touchedNodeIds.add(nodeId);
+    }
+
+    if (node.kind === "agent") {
+      const nextSuspendedWrites = normalizeWriteBindings(node.config.suspendedFreeWrites).filter((binding) => !stateKeys.has(binding.state));
+      if (nextSuspendedWrites.length > 0) {
+        node.config.suspendedFreeWrites = nextSuspendedWrites;
+      } else {
+        delete node.config.suspendedFreeWrites;
+      }
+      node.config.skillBindings = normalizeAgentSkillBindings(node.config.skillBindings)
+        .map((binding) => ({
+          skillKey: binding.skillKey,
+          outputMapping: Object.fromEntries(Object.entries(binding.outputMapping ?? {}).filter(([, stateKey]) => !stateKeys.has(stateKey))),
+        }));
+    }
+  }
+
+  document.edges = document.edges.filter((edge) => {
+    if (!touchedNodeIds.has(edge.source) && !touchedNodeIds.has(edge.target)) {
+      return true;
+    }
+    const sourceNode = document.nodes[edge.source];
+    const targetNode = document.nodes[edge.target];
+    if (!sourceNode || !targetNode) {
+      return false;
+    }
+    return hasSharedStateBinding(sourceNode, targetNode);
+  });
+}
+
+function hasSharedStateBinding(sourceNode: GraphNode, targetNode: GraphNode) {
+  const targetReadStates = new Set(targetNode.reads.map((binding) => binding.state));
+  return sourceNode.writes.some((binding) => targetReadStates.has(binding.state));
+}
+
+function isManagedSkillOutputStateForNode(
+  document: GraphPayload | GraphDocument,
+  nodeId: string,
+  stateKey: string,
+  skillKey?: string,
+) {
+  const stateBinding = document.state_schema[stateKey]?.binding;
+  return (
+    stateBinding?.kind === "skill_output" &&
+    stateBinding.nodeId === nodeId &&
+    stateBinding.managed !== false &&
+    (skillKey === undefined || stateBinding.skillKey === skillKey)
+  );
 }
 
 function ensureAgentWriteBinding(node: AgentNode, stateKey: string) {

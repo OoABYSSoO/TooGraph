@@ -157,8 +157,19 @@ def _schema_for_value_type(value_type: str) -> dict[str, Any]:
         return {"type": "boolean"}
     if normalized in {NodeSystemStateType.JSON.value, NodeSystemStateType.RESULT_PACKAGE.value}:
         return {"type": "object", "additionalProperties": True}
-    if normalized == NodeSystemStateType.SKILL.value:
-        return {"type": "array", "items": {"type": "object", "additionalProperties": True}}
+    if normalized == NodeSystemStateType.CAPABILITY.value:
+        return _object_schema(
+            {
+                "kind": {"type": "string", "enum": ["skill", "subgraph", "none"]},
+                "key": {"type": "string"},
+                "name": {"type": "string"},
+                "description": {"type": "string"},
+                "reason": {"type": "string"},
+                "confidence": {"type": "number"},
+            },
+            required=["kind"],
+            additional_properties=True,
+        )
     if normalized in {
         NodeSystemStateType.FILE.value,
         NodeSystemStateType.IMAGE.value,
@@ -228,6 +239,10 @@ def _validate_schema_value(value: Any, schema: dict[str, Any], path: str, errors
         if isinstance(item_schema, dict):
             for index, item in enumerate(value):
                 _validate_schema_value(item, item_schema, f"{path}[{index}]", errors)
+
+    enum_values = schema.get("enum")
+    if isinstance(enum_values, list) and value not in enum_values:
+        errors.append(f"{path} expected one of {enum_values}, got {value!r}.")
 
 
 def _collect_validation_errors(value: Any, schema: dict[str, Any], path: str) -> list[str]:

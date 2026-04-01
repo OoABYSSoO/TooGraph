@@ -11,7 +11,7 @@
   -> 判断用户意图
   -> 查看当前技能目录
   -> 决定需要哪些技能
-  -> 把选中的技能作为 skill state 传给下游 LLM 节点
+  -> 把选中的能力作为 capability state 传给下游 LLM 节点
   -> 下游 LLM 节点根据绑定技能的说明决定如何填写技能输入并运行技能
   -> 将动态能力输出封装为 result_package state
   -> 下游节点拆包后按普通 state/file 语义阅读结果
@@ -42,8 +42,8 @@
 - 技能系统去掉旧 `targets` / `executionTargets` 分流。
 - skill manifest 顶层和 `inputSchema` / `outputSchema` 字段从 `label` 收束为 `name`。
 - `description` 承载选择条件，`llmInstruction` 承载绑定后的使用说明。
-- `state_schema` 增加 `skill`、`result_package` 类型和技能绑定元数据；`promptVisible` 已移除，上下文边界由节点 `reads` 决定。
-- LLM 节点卡片已改为单选 Skill 控件；动态 `subgraph` state 只服务于模板内运行时能力选择，不作为普通卡片下拉项。
+- `state_schema` 增加 `capability`、`result_package` 类型和技能绑定元数据；`promptVisible` 已移除，上下文边界由节点 `reads` 决定。
+- LLM 节点卡片已改为单选 Skill 控件；动态 `capability.kind=subgraph` 只服务于模板内运行时能力选择，不作为普通卡片下拉项。
 - LLM 节点提示词区域支持技能说明胶囊；默认胶囊从 skill `llmInstruction` 动态展示，用户编辑后才作为 `node.override` 写入当前节点。
 - 旧内置模板已删除，旧模板运行入口兼容修补已删除。
 - 旧技能包已删除，当前官方 Skill 包包括 `web_search`、`local_workspace_executor` 和 `graphiteUI_skill_builder`。
@@ -54,7 +54,7 @@
 - 静态手动选择 skill 的 `skillBindings` 已收束为技能身份和 `outputMapping`，不再包含 `inputMapping`、静态参数 `config` 或无意义的 `trigger`。
 - LLM 节点卡片选择带 `outputSchema` 的 skill 时，会自动创建 managed skill output state、写入节点输出端口，并同步 `skillBindings.outputMapping`。
 - 技能输入由 LLM 节点在运行前根据当前输入 state、技能说明和 `inputSchema` 生成；必填技能输入缺失时由运行时记录可恢复错误。
-- 动态 `skill` state 执行结果已收束为唯一 `result_package` 输出：运行时封包，下游 prompt 组装时拆包，复用普通 state 和 artifact 展开逻辑。
+- 动态 `capability` state 执行结果已收束为唯一 `result_package` 输出：运行时封包，下游 prompt 组装时拆包，复用普通 state 和 artifact 展开逻辑。
 - 图运行前不再兼容补齐旧绑定。旧草稿、旧模板和旧技能需要按当前协议重建。
 - 已新增通用 `advanced_web_research_loop` 内置模板，用于验证“搜索技能执行 -> 证据评估 -> condition 控制补搜 -> 依据筛选 -> final_reply”的图式工具循环。它不是桌宠自主循环模板，但可作为联网研究子流程和后续桌宠模板的参考构件。
 - 已新增通用 `create_user_skill` 内置模板，用于通过用户确认、示例确认、设计确认、写入、测试和有限修复循环创建用户自定义 Skill。
@@ -66,7 +66,7 @@
 - 真实的 `autonomous_decision` 技能。
 - 新版桌宠自主循环模板。
 - 将内部 `agent` kind 迁移为面向用户和协议一致的 LLM 节点语义。
-- 增加 `subgraph` state 类型和运行时动态子图执行能力。
+- 增加 `capability.kind=subgraph` 的运行时动态子图执行能力。
 - 用户 Skill 创建和管理的 UI 完善，例如文件预览、revision 对比、回滚入口和测试运行入口。
 - 当前仍残留 `backend/app/companion/commands.py` 中的 `graph_patch.draft` 草案记录 stub。它是历史遗留入口，只能记录待审批草案，不能应用图补丁，也没有接入 GraphCommandBus、graph revision、undo 或完整审计闭环；下一轮应删除它，或按新的图优先命令流重建。
 - 审批恢复 UI、图补丁预览、GraphCommandBus、graph revision、undo 和完整审计闭环。
@@ -231,20 +231,19 @@ input_question
 
 旧字段 `label`、`targets`、`executionTargets`、`inputMapping`、静态技能参数 `config` 和无意义的 `trigger` 已废弃，出现在当前协议载荷中应被拒绝，而不是悄悄兼容。
 
-## Skill State 契约
+## Capability State 契约
 
-`skill` 是 `state_schema` 的一等类型，用于在图中显式传递“当前 LLM 节点需要使用的技能描述符”。
+`capability` 是 `state_schema` 的一等类型，用于在图中显式传递“当前 LLM 节点需要使用的单个能力描述符”。它是单选互斥对象，不是列表；`kind` 可为 `skill`、`subgraph` 或 `none`。
 
 最小形式：
 
 ```json
-[
-  {
-    "skillKey": "web_search",
-    "name": "联网搜索",
-    "description": "搜索最新公开网页信息。"
-  }
-]
+{
+  "kind": "skill",
+  "key": "web_search",
+  "name": "联网搜索",
+  "description": "搜索最新公开网页信息。"
+}
 ```
 
 有效能力来源按单一来源计算：
@@ -252,30 +251,30 @@ input_question
 ```text
 effective_capability =
   selected_skill
-  OR input_state[type=skill]
-  OR input_state[type=subgraph]
+  OR input_state[type=capability]
   OR none
 ```
 
 规则：
 
 - LLM 节点卡片只能手动选择一个 skill。
-- `skill` state 只表达“选中的一个技能”，不等于安装、启用或授权。
-- `subgraph` state 只表达“选中的一个可运行子图能力”，主要服务桌宠主循环等动态模板。
-- 一个 LLM 节点不能同时使用卡片 skill、输入 skill state 和输入 subgraph state；冲突时应作为协议错误处理。
+- `capability.kind=skill` 只表达“选中的一个技能”，不等于安装、启用或授权。
+- `capability.kind=subgraph` 只表达“选中的一个可运行子图能力”，主要服务桌宠主循环等动态模板。
+- `capability.kind=none` 表达没有合适能力。
+- 一个 LLM 节点不能同时使用卡片 skill 和输入 capability state；冲突时应作为协议错误处理。
 - 真正执行前仍必须通过 skill registry、运行时注册状态、健康状态、`runPolicies` 和审批检查。
 - 多个能力调用必须拆成多个节点，由图结构显式编排。
 
 ## 绑定技能的语义
 
-如果某个 LLM 节点已经选择了 skill，或从 state 收到了 skill/subgraph，那么语义不是“要不要用这个能力”，而是“本节点需要使用这个能力，如何生成调用输入由本节点决定”。
+如果某个 LLM 节点已经选择了 skill，或从 state 收到了 capability，那么语义不是“要不要用这个能力”，而是“本节点需要使用这个能力，如何生成调用输入由本节点决定”。
 
 职责划分：
 
 - 决策节点只决定应使用哪个技能或子图。
 - 执行 LLM 节点读取绑定能力的 schema 和说明，决定具体输入并触发一次运行。
 - 静态手动绑定 skill 时，技能输出通过 `skillBindings.outputMapping` 写入明确 state。
-- 动态输入 `skill` 或 `subgraph` state 时，运行时只写一个 `result_package` state，包内 `outputs.<outputKey>` 保存 `{ name, description, type, value }`，不额外写 `fieldKey`。
+- 动态输入 `capability` state 时，运行时只写一个 `result_package` state，包内 `outputs.<outputKey>` 保存 `{ name, description, type, value }`，不额外写 `fieldKey`。
 - 下游 LLM 节点接收 `result_package` 时先拆包成虚拟输出，再按普通 state 和 artifact 展开逻辑拼上下文。
 - 分析 LLM 节点读取能力输出，负责整理、比较、总结或生成最终回复。
 
@@ -334,7 +333,7 @@ LLM 节点提示词区域中，绑定的技能以胶囊展示。
 
 ## 技能绑定 State
 
-本节只描述静态手动选择 skill 的绑定语义。动态 `skill` / `subgraph` state 执行不使用本节的 `outputMapping`，而是写唯一 `result_package` state。
+本节只描述静态手动选择 skill 的绑定语义。动态 `capability` state 执行不使用本节的 `outputMapping`，而是写唯一 `result_package` state。
 
 技能如果有明确输出，应能自动生成绑定 state。
 
@@ -411,7 +410,7 @@ LLM 节点提示词区域中，绑定的技能以胶囊展示。
 
 ## 动态结果包 State
 
-动态执行节点的输入来自上游 `skill` 或未来的 `subgraph` state。这意味着上游只决定“用哪个能力”，执行节点负责为该能力生成一次调用输入并运行它。
+动态执行节点的输入来自上游 `capability` state。这意味着上游只决定“用哪个能力”，执行节点负责为该能力生成一次调用输入并运行它。
 
 固定规则：
 

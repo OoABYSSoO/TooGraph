@@ -632,8 +632,9 @@ const agentInputPorts = computed<NodePortViewModel[]>(() =>
 const agentOutputPorts = computed<NodePortViewModel[]>(() =>
   view.value.body.kind === "agent" || view.value.body.kind === "subgraph" ? view.value.outputs.filter((port) => !port.virtual) : [],
 );
+const isAgentOutputManagedBySkill = computed(() => props.node.kind === "agent" && props.node.config.skillKey.trim().length > 0);
 const shouldShowAgentCreateInputPort = computed(() => agentInputPorts.value.length === 0);
-const shouldShowAgentCreateOutputPort = computed(() => agentOutputPorts.value.length === 0);
+const shouldShowAgentCreateOutputPort = computed(() => !isAgentOutputManagedBySkill.value && agentOutputPorts.value.length === 0);
 const agentCreateInputAnchorStateKey = computed(() =>
   props.pendingStateInputSource ? CREATE_AGENT_INPUT_STATE_KEY : VIRTUAL_ANY_INPUT_STATE_KEY,
 );
@@ -863,7 +864,9 @@ const hasFloatingPanelOpen = computed(
     activePortPickerSide.value !== null,
 );
 const shouldRevealAgentCreateInputPort = computed(() => shouldShowAgentCreateInputPort.value || props.selected || Boolean(props.hovered) || hasFloatingPanelOpen.value);
-const shouldRevealAgentCreateOutputPort = computed(() => shouldShowAgentCreateOutputPort.value || props.selected || Boolean(props.hovered) || hasFloatingPanelOpen.value);
+const shouldRevealAgentCreateOutputPort = computed(
+  () => !isAgentOutputManagedBySkill.value && (shouldShowAgentCreateOutputPort.value || props.selected || Boolean(props.hovered) || hasFloatingPanelOpen.value),
+);
 
 function isPortCreateOpen(side: "input" | "output") {
   return activePortPickerSide.value === side && Boolean(portStateDraft.value);
@@ -1129,6 +1132,9 @@ function openPortStateCreate(side: "input" | "output") {
   if (guardLockedGraphInteraction()) {
     return;
   }
+  if (side === "output" && isAgentOutputManagedBySkill.value) {
+    return;
+  }
   clearTopActionTimeout();
   activeTopAction.value = null;
   clearTextEditorConfirmState();
@@ -1262,8 +1268,21 @@ function handleStateEditorPillPointerLeave(anchorId: string) {
   }
 }
 
+function isSkillManagedOutputState(stateKey: string) {
+  const binding = props.stateSchema[stateKey]?.binding;
+  return (
+    props.node.kind === "agent" &&
+    binding?.kind === "skill_output" &&
+    binding.nodeId === props.nodeId &&
+    binding.managed !== false
+  );
+}
+
 function handleStateEditorActionClick(anchorId: string, stateKey: string | null | undefined) {
   if (!stateKey) {
+    return;
+  }
+  if (isSkillManagedOutputState(stateKey)) {
     return;
   }
   if (guardLockedStateEditAttempt()) {
@@ -1284,6 +1303,9 @@ function handleStateEditorActionClick(anchorId: string, stateKey: string | null 
 
 function handleRemovePortStateClick(anchorId: string, side: "input" | "output", stateKey: string | null | undefined) {
   if (!stateKey) {
+    return;
+  }
+  if (side === "output" && isSkillManagedOutputState(stateKey)) {
     return;
   }
   if (guardLockedStateEditAttempt()) {

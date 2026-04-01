@@ -21,12 +21,13 @@
               : 'node-card__port-pill--output node-card__port-pill--dock-end',
             {
               'node-card__port-pill--create': port.virtual,
+              'node-card__port-pill--skill-managed': side === 'output' && Boolean(port.managedBySkill),
               'node-card__port-pill--revealed': !port.virtual && isStateEditorPillRevealed(anchorId),
               'node-card__port-pill--confirm': !port.virtual && isStateEditorConfirmOpen(anchorId),
             },
           ]"
           :style="{ '--node-card-port-accent': portAccentColor }"
-          data-state-editor-trigger="true"
+          :data-state-editor-trigger="canEditPort ? 'true' : undefined"
           data-anchor-hitarea="true"
           @pointerenter="emit('pointer-enter', anchorId)"
           @pointerleave="emit('pointer-leave', anchorId)"
@@ -39,6 +40,13 @@
             :data-anchor-slot-id="anchorSlotId"
             aria-hidden="true"
           />
+          <ElIcon
+            v-if="side === 'output' && port.managedBySkill"
+            class="node-card__port-pill-source-icon"
+            title="Skill managed output"
+          >
+            <Connection />
+          </ElIcon>
           <span
             class="node-card__port-pill-label"
             :class="{ 'node-card__port-pill-label--confirm': isStateEditorConfirmOpen(anchorId) }"
@@ -98,7 +106,7 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
 import { ElIcon, ElPopover } from "element-plus";
-import { Check } from "@element-plus/icons-vue";
+import { Check, Connection } from "@element-plus/icons-vue";
 import { useI18n } from "vue-i18n";
 
 import StateEditorPopover from "./StateEditorPopover.vue";
@@ -180,7 +188,7 @@ const isPopoverVisible = computed(() => {
   if (port.virtual) {
     return props.createOpen;
   }
-  return (
+  return canEditPort.value && (
     props.isStateEditorOpen(anchorId.value) ||
     props.isStateEditorConfirmOpen(anchorId.value) ||
     (props.allowRemoveConfirm && props.isRemovePortStateConfirmOpen(anchorId.value))
@@ -199,6 +207,7 @@ const popoverWidth = computed(() => {
   }
   return props.isStateEditorOpen(anchorId.value) ? 320 : undefined;
 });
+const canEditPort = computed(() => Boolean(props.port && !props.port.virtual && !(props.side === "output" && props.port.managedBySkill)));
 
 function handlePortClick() {
   if (!props.port) {
@@ -206,6 +215,9 @@ function handlePortClick() {
   }
   if (props.port.virtual) {
     emit("open-create", props.side);
+    return;
+  }
+  if (props.port.managedBySkill) {
     return;
   }
   emit("port-click", anchorId.value, props.port.key);
@@ -269,6 +281,23 @@ function handlePortClick() {
 
 .node-card__port-pill--output {
   color: #1f2937;
+}
+
+.node-card__port-pill--skill-managed {
+  cursor: default;
+}
+
+.node-card__port-pill--skill-managed:focus-visible,
+.node-card__port-pill--skill-managed.node-card__port-pill--revealed {
+  border-color: color-mix(in srgb, var(--node-card-port-accent) 22%, transparent);
+  background: color-mix(in srgb, var(--node-card-port-accent) 8%, #fff);
+}
+
+.node-card__port-pill-source-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: color-mix(in srgb, var(--node-card-port-accent) 78%, #1f2937);
 }
 
 .node-card__port-pill--input {

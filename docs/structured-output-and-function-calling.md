@@ -577,7 +577,7 @@ LLM sees all enabled skills
 
 - GraphiteUI 已经确定“图才是 Agent，单个 LLM 节点只做一次模型运行或一次能力调用准备”。
 - 一个 LLM 节点最多一个能力来源，不能把多工具选择和多轮调用藏进单节点。
-- 手动 Skill、动态 `skill` state、动态 `subgraph` state 已经有明确协议。
+- 手动 Skill、动态 `capability` state 已经有明确协议。
 - 直接 tool_call 容易绕开 `skillBindings.outputMapping`、`result_package`、run detail 和权限审批。
 - 本地模型和自定义 OpenAI-compatible 网关的 function calling 支持不稳定，不能作为唯一通道。
 
@@ -598,8 +598,7 @@ GraphiteUI node_system / state_schema / skill schema
 也就是说，GraphiteUI 对外仍然表达：
 
 - 这个 LLM 节点绑定了一个 Skill。
-- 这个 LLM 节点接收了一个 `skill` state。
-- 这个 LLM 节点接收了一个 `subgraph` state。
+- 这个 LLM 节点接收了一个 `capability` state，且该对象的 `kind` 是 `skill`、`subgraph` 或 `none`。
 - runtime 要执行这个 Skill 或 Subgraph。
 
 provider 内部可以选择：
@@ -674,30 +673,26 @@ provider 内部可以选择：
 
 但运行时仍应把它还原为 GraphiteUI 的 skill input，然后走现有 skill runtime。
 
-### 动态 Skill State
+### 动态 Capability State
 
-动态 `skill` state 来自上游选择节点。下游 LLM 节点接收到它时，也已经只有一个能力来源。
+动态 `capability` state 来自上游选择节点。下游 LLM 节点接收到它时，也已经只有一个能力来源。它是单个互斥对象，不是列表；`kind=skill` 时执行技能，`kind=subgraph` 时执行子图能力，`kind=none` 时表达没有合适能力。
 
 这种情况下也不应该让模型从多个工具中 function call 选择，而是：
 
 ```text
-上游输出 skill state
-  -> 下游 LLM 节点读取这个 skill descriptor
-  -> 根据该 skill 的 inputSchema 生成入参
-  -> runtime 执行 skill
+上游输出 capability state
+  -> 下游 LLM 节点读取这个 capability descriptor
+  -> 根据该 capability 的公开 inputSchema 生成入参
+  -> runtime 执行 capability
   -> 输出唯一 result_package state
 ```
 
 function calling 在这里最多还是“入参生成约束”，不是“自主多工具调用循环”。
 
-### 动态 Subgraph State
-
-动态 `subgraph` state 以后也会遇到相同问题。LLM 节点收到一个子图能力后，需要根据这个子图公开 input 生成运行输入，然后 runtime 运行子图。
-
 因此 function calling 的抽象最好不要叫 `skill_calling`，而应是更通用的 capability input generation：
 
 ```text
-capability = static skill | dynamic skill state | dynamic subgraph state
+capability = static skill | dynamic capability state
 LLM generates capability input
 runtime executes capability
 runtime writes mapped outputs or result_package
@@ -796,9 +791,9 @@ Skill 执行还应记录：
 - `state_schema` 仍是节点输入输出唯一数据来源。
 - 静态 Skill 仍是 `config.skillKey` 单值。
 - 静态 Skill 输出仍通过 `skillBindings.outputMapping` 写入 managed state。
-- 动态 `skill` 或 `subgraph` 执行仍输出唯一 `result_package`。
+- 动态 `capability` 执行仍输出唯一 `result_package`。
 - LLM 节点仍是一次性节点，不变成多轮自主 agent。
-- Subgraph 仍通过 Subgraph 节点做手动复用，`subgraph` state 只服务动态能力选择。
+- Subgraph 仍通过 Subgraph 节点做手动复用，`capability.kind=subgraph` 只服务动态能力选择。
 
 ### 可以增强的内容
 

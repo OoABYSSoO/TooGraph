@@ -25,7 +25,7 @@ def coerce_input_boundary_value(value: Any, state_type: NodeSystemStateType) -> 
             NodeSystemStateType.NUMBER,
             NodeSystemStateType.BOOLEAN,
             NodeSystemStateType.JSON,
-            NodeSystemStateType.SKILL,
+            NodeSystemStateType.CAPABILITY,
         }:
             return parsed
         if state_type == NodeSystemStateType.KNOWLEDGE_BASE:

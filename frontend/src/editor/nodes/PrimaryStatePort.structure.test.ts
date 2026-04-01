@@ -19,6 +19,10 @@ test("PrimaryStatePort owns primary input and output state-pill popover presenta
   assert.match(componentSource, /`\$\{props\.nodeId\}:\$\{anchorSlotKind\.value\}:\$\{props\.port\.key\}`/);
   assert.match(componentSource, /emit\("open-create", props\.side\)/);
   assert.match(componentSource, /emit\("port-click", anchorId\.value, props\.port\.key\)/);
+  assert.match(componentSource, /if \(props\.port\.managedBySkill\) \{[\s\S]*return;/);
+  assert.match(componentSource, /v-if="side === 'output' && port\.managedBySkill"/);
+  assert.match(componentSource, /<Connection \/>/);
+  assert.match(componentSource, /import \{ Check, Connection \} from "@element-plus\/icons-vue";/);
   assert.match(componentSource, /emit\('pointer-enter', anchorId\)/);
   assert.match(componentSource, /emit\('pointer-leave', anchorId\)/);
 });
@@ -26,6 +30,8 @@ test("PrimaryStatePort owns primary input and output state-pill popover presenta
 test("PrimaryStatePort carries primary state-pill scoped styles", () => {
   assert.match(componentSource, /\.node-card__port-pill-row \{/);
   assert.match(componentSource, /\.node-card__port-pill \{[\s\S]*display:\s*inline-flex;/);
+  assert.match(componentSource, /\.node-card__port-pill-source-icon \{/);
+  assert.match(componentSource, /\.node-card__port-pill--skill-managed \{/);
   assert.match(componentSource, /\.node-card__port-pill--dock-start \{[\s\S]*margin-left:\s*calc\(var\(--node-card-inline-padding\) \* -1 - 10px\);/);
   assert.match(componentSource, /\.node-card__port-pill--dock-end \{[\s\S]*margin-right:\s*calc\(var\(--node-card-inline-padding\) \* -1 - 10px\);/);
   assert.doesNotMatch(componentSource, /text-overflow:\s*ellipsis;/);

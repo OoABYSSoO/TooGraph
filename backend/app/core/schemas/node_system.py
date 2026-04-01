@@ -66,7 +66,7 @@ class NodeSystemStateType(str, Enum):
     VIDEO = "video"
     FILE = "file"
     KNOWLEDGE_BASE = "knowledge_base"
-    SKILL = "skill"
+    CAPABILITY = "capability"
     RESULT_PACKAGE = "result_package"
 
 
@@ -249,6 +249,7 @@ class NodeSystemSkillInstructionBlock(BaseModel):
 class NodeSystemAgentConfig(BaseModel):
     skill_key: str = Field(default="", alias="skillKey")
     skill_bindings: list[NodeSystemAgentSkillBinding] = Field(default_factory=list, alias="skillBindings")
+    suspended_free_writes: list[NodeSystemWriteBinding] = Field(default_factory=list, alias="suspendedFreeWrites")
     skill_instruction_blocks: dict[str, NodeSystemSkillInstructionBlock] = Field(
         default_factory=dict,
         alias="skillInstructionBlocks",

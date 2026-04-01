@@ -73,6 +73,7 @@ export type AgentNode = {
   config: {
     skillKey: string;
     skillBindings?: AgentSkillBinding[];
+    suspendedFreeWrites?: WriteBinding[];
     skillInstructionBlocks?: Record<string, AgentSkillInstructionBlock>;
     taskInstruction: string;
     modelSource: "global" | "override";

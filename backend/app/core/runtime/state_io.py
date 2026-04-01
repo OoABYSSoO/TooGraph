@@ -24,8 +24,8 @@ def default_empty_state_value(state_type: NodeSystemStateType) -> Any:
         return False
     if state_type == NodeSystemStateType.JSON:
         return {}
-    if state_type == NodeSystemStateType.SKILL:
-        return []
+    if state_type == NodeSystemStateType.CAPABILITY:
+        return {"kind": "none"}
     return ""
 
 

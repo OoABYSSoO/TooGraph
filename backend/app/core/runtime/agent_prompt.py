@@ -318,8 +318,8 @@ def example_output_value_for_state(definition: NodeSystemStateDefinition | None)
         return "在此填写完整内容"
     if definition.type == NodeSystemStateType.JSON:
         return {}
-    if definition.type == NodeSystemStateType.SKILL:
-        return []
+    if definition.type == NodeSystemStateType.CAPABILITY:
+        return {"kind": "none"}
     if definition.type == NodeSystemStateType.RESULT_PACKAGE:
         return {}
     if definition.type == NodeSystemStateType.NUMBER:
@@ -366,10 +366,10 @@ def format_state_output_contract_lines(state_type: NodeSystemStateType) -> list[
             "  output_format: JSON value inside the JSON value",
             "  output_rule: 这个字段的值必须是合法 JSON 值；不要把对象或数组再序列化成字符串。",
         ]
-    if state_type == NodeSystemStateType.SKILL:
+    if state_type == NodeSystemStateType.CAPABILITY:
         return [
-            "  output_format: JSON array inside the JSON value",
-            "  output_rule: 这个字段的值必须是数组；不要把数组再序列化成字符串。",
+            "  output_format: capability JSON object",
+            "  output_rule: 这个字段只能是单个能力对象；kind 必须是 skill、subgraph 或 none；不要返回数组。",
         ]
     if state_type == NodeSystemStateType.RESULT_PACKAGE:
         return [

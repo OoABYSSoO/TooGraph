@@ -194,21 +194,45 @@
         </template>
 
         <div v-if="selectedLog" class="model-logs-page__raw-dialog-body">
-          <div v-if="rawDialogKind === 'response' && hasStreamRaw(selectedLog)" class="model-logs-page__stream-raw">
-            <div v-if="selectedStreamSummary?.events.length" class="model-logs-page__stream-events">
-              <article v-for="(event, eventIndex) in selectedStreamSummary.events" :key="eventIndex" class="model-logs-page__stream-event">
-                <header class="model-logs-page__stream-event-header">
-                  <span>{{ formatStreamEventLabel(event, eventIndex) }}</span>
-                  <small>#{{ eventIndex + 1 }}</small>
-                </header>
-                <pre class="model-logs-page__json-block" v-html="highlightJson(formatStreamEvent(event))"></pre>
-              </article>
+          <template v-if="rawDialogKind === 'response'">
+            <div class="model-logs-page__raw-tabs" :aria-label="t('modelLogs.rawResponseMode')">
+              <button
+                type="button"
+                :class="{ 'model-logs-page__raw-tab--active': rawResponseDisplayMode === 'normal' }"
+                @click="rawResponseDisplayMode = 'normal'"
+              >
+                {{ t("modelLogs.rawResponseNormal") }}
+              </button>
+              <button
+                type="button"
+                :disabled="!hasStreamRaw(selectedLog)"
+                :class="{ 'model-logs-page__raw-tab--active': rawResponseDisplayMode === 'chunks' }"
+                @click="rawResponseDisplayMode = 'chunks'"
+              >
+                {{ t("modelLogs.rawResponseChunks") }}
+              </button>
             </div>
-            <section class="model-logs-page__stream-source">
-              <h4>{{ t("modelLogs.rawStreamSource") }}</h4>
-              <pre class="model-logs-page__raw-text">{{ formatResponseRaw(selectedLog) }}</pre>
-            </section>
-          </div>
+            <pre
+              v-if="rawResponseDisplayMode === 'normal' || !hasStreamRaw(selectedLog)"
+              class="model-logs-page__raw-dialog-code model-logs-page__json-block"
+              v-html="highlightJson(formatResponseNormalRaw(selectedLog))"
+            ></pre>
+            <div v-else class="model-logs-page__stream-raw">
+              <div v-if="selectedStreamSummary?.events.length" class="model-logs-page__stream-events">
+                <article v-for="(event, eventIndex) in selectedStreamSummary.events" :key="eventIndex" class="model-logs-page__stream-event">
+                  <header class="model-logs-page__stream-event-header">
+                    <span>{{ formatStreamEventLabel(event, eventIndex) }}</span>
+                    <small>#{{ eventIndex + 1 }}</small>
+                  </header>
+                  <pre class="model-logs-page__json-block" v-html="highlightJson(formatStreamEvent(event))"></pre>
+                </article>
+              </div>
+              <section class="model-logs-page__stream-source">
+                <h4>{{ t("modelLogs.rawStreamSource") }}</h4>
+                <pre class="model-logs-page__raw-text">{{ getStreamSummary(selectedLog)?.rawText || formatResponseRaw(selectedLog) }}</pre>
+              </section>
+            </div>
+          </template>
           <pre v-else class="model-logs-page__raw-dialog-code model-logs-page__json-block" v-html="highlightJson(rawDialogContent)"></pre>
         </div>
       </ElDialog>
@@ -238,6 +262,7 @@ const query = ref("");
 const loading = ref(true);
 const error = ref<string | null>(null);
 const outputDisplayMode = ref<"normal" | "chunks">("normal");
+const rawResponseDisplayMode = ref<"normal" | "chunks">("normal");
 const rawDialogVisible = ref(false);
 const rawDialogKind = ref<"request" | "response">("request");
 let searchTimer: number | null = null;
@@ -372,6 +397,7 @@ function selectLog(logId: string) {
 
 function openRawDialog(kind: "request" | "response") {
   rawDialogKind.value = kind;
+  rawResponseDisplayMode.value = "normal";
   rawDialogVisible.value = true;
 }
 
@@ -414,11 +440,13 @@ function formatRequestRaw(selectedLog: ModelLogEntry) {
 }
 
 function formatResponseRaw(selectedLog: ModelLogEntry) {
-  const streamRawText = getStreamSummary(selectedLog)?.rawText;
-  if (streamRawText) {
-    return streamRawText;
-  }
   return JSON.stringify(selectedLog.response_raw, null, 2);
+}
+
+function formatResponseNormalRaw(selectedLog: ModelLogEntry) {
+  const normalized = { ...selectedLog.response_raw };
+  delete normalized._stream;
+  return JSON.stringify(normalized, null, 2);
 }
 
 watch(query, () => {
@@ -432,6 +460,7 @@ watch(currentPage, () => {
 
 watch(selectedLogId, () => {
   outputDisplayMode.value = "normal";
+  rawResponseDisplayMode.value = "normal";
   rawDialogVisible.value = false;
 });
 
@@ -974,6 +1003,37 @@ onBeforeUnmount(() => {
 
 .model-logs-page__raw-dialog-body {
   min-width: 0;
+}
+
+.model-logs-page__raw-tabs {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid rgba(37, 99, 235, 0.16);
+  border-radius: 999px;
+  margin-bottom: 12px;
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.model-logs-page__raw-tabs button {
+  min-height: 32px;
+  border: 0;
+  padding: 0 14px;
+  background: transparent;
+  color: rgba(60, 41, 20, 0.64);
+  cursor: pointer;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.model-logs-page__raw-tabs button:hover:not(:disabled),
+.model-logs-page__raw-tab--active {
+  background: rgba(37, 99, 235, 0.1);
+  color: rgb(37, 99, 235);
+}
+
+.model-logs-page__raw-tabs button:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
 }
 
 .model-logs-page__raw-dialog-code,
