@@ -4,7 +4,6 @@ import json
 import os
 from pathlib import Path
 import re
-import sys
 from typing import Any
 
 
@@ -12,7 +11,35 @@ SKILL_KEY = "graphiteui_capability_selector"
 DEFAULT_ORIGIN = "companion"
 
 
-def graphiteui_capability_selector(**skill_inputs: Any) -> dict[str, Any]:
+def build_capability_catalog_context(*, origin: str = DEFAULT_ORIGIN) -> str:
+    catalog = load_capability_catalog(origin=origin)
+    lines = [
+        "Available GraphiteUI capabilities:",
+        "Use this catalog only for the `capability` argument of graphiteui_capability_selector.",
+        "Graph templates are preferred over Skills when both can satisfy the requirement.",
+        "Choose exactly one item by returning {\"kind\":\"subgraph\",\"key\":\"...\"} or {\"kind\":\"skill\",\"key\":\"...\"}.",
+        "If no item fits, return {\"kind\":\"none\"}. Do not invent keys outside this catalog.",
+        "",
+        "Graph Templates:",
+    ]
+    lines.extend(_format_candidate_lines(catalog["templates"]) or ["- none"])
+    lines.append("Skills:")
+    lines.extend(_format_candidate_lines(catalog["skills"]) or ["- none"])
+    return "\n".join(lines)
+
+
+def load_capability_catalog(*, origin: str = DEFAULT_ORIGIN) -> dict[str, list[dict[str, Any]]]:
+    repo_root = _resolve_repo_root()
+    templates, template_errors = _load_template_candidates(repo_root)
+    skills, skill_errors = _load_skill_candidates(repo_root, origin=origin)
+    return {
+        "templates": templates,
+        "skills": skills,
+        "errors": [{"message": item} for item in [*template_errors, *skill_errors]],
+    }
+
+
+def normalize_selected_capability(**skill_inputs: Any) -> dict[str, Any]:
     origin = _compact_text(skill_inputs.get("origin")) or DEFAULT_ORIGIN
     selected = _coerce_capability(skill_inputs.get("capability"))
     if selected["kind"] == "none":
@@ -66,7 +93,7 @@ def _load_template_candidates(repo_root: Path) -> tuple[list[dict[str, Any]], li
     errors: list[str] = []
     roots = [
         ("official", repo_root / "backend" / "app" / "templates" / "official"),
-        ("user", repo_root / "backend" / "data" / "templates"),
+        ("user", repo_root / "backend" / "data" / "templates" / "user"),
     ]
     for source, root in roots:
         if not root.exists():
@@ -165,20 +192,8 @@ def _skill_readiness_error(skill_dir: Path, payload: dict[str, Any]) -> str:
     output_schema = payload.get("outputSchema")
     if not isinstance(output_schema, list) or not output_schema:
         return "missing outputSchema"
-    runtime = payload.get("runtime")
-    if not isinstance(runtime, dict):
-        return "missing runtime"
-    entrypoint = _compact_text(runtime.get("entrypoint"))
-    runtime_type = _compact_text(runtime.get("type")).lower()
-    if runtime_type not in {"python", "node", "bash", "sh", "pwsh", "powershell", "cmd"}:
-        return "unsupported runtime"
-    if not entrypoint:
-        return "missing runtime entrypoint"
-    entrypoint_path = Path(entrypoint.replace("\\", "/"))
-    if entrypoint_path.is_absolute() or any(part in {"", ".", ".."} for part in entrypoint_path.parts):
-        return "unsafe runtime entrypoint"
-    if not (skill_dir / entrypoint_path).is_file():
-        return "runtime entrypoint missing"
+    if not (skill_dir / "after_llm.py").is_file():
+        return "missing after_llm.py"
     return ""
 
 
@@ -197,15 +212,15 @@ def _none_response() -> dict[str, Any]:
     return {"capability": {"kind": "none"}}
 
 
-def main() -> None:
-    try:
-        payload = json.loads(sys.stdin.read() or "{}")
-    except json.JSONDecodeError:
-        payload = {}
-    if not isinstance(payload, dict):
-        payload = {}
-    print(json.dumps(graphiteui_capability_selector(**payload), ensure_ascii=False))
-
-
-if __name__ == "__main__":
-    main()
+def _format_candidate_lines(candidates: list[dict[str, Any]]) -> list[str]:
+    lines: list[str] = []
+    for candidate in sorted(candidates, key=lambda item: str(item.get("key") or "")):
+        lines.extend(
+            [
+                f"- kind: {candidate['kind']}",
+                f"  key: {candidate['key']}",
+                f"  name: {candidate['name']}",
+                f"  whenToUse: {candidate['description'] or candidate['name']}",
+            ]
+        )
+    return lines

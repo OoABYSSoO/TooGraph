@@ -7,10 +7,15 @@ Use this skill when a workflow or companion agent needs current public web infor
 
 The skill asks the search provider for extra candidates, then keeps fetching candidates until it saves the target number of readable local documents or runs out of candidates. It first uses a fast HTTP fetch; if that fails or produces no readable text, it uses Playwright browser rendering as a fallback.
 
+Lifecycle:
+- `before_llm.py` adds the current local date to the skill-input planning context.
+- `after_llm.py` receives the LLM-generated `query`, performs the search and page download, and returns structured outputs.
+
 Input:
 - `query`: required public web search query.
 
 Outputs:
+- `query`: actual query sent to the search provider.
 - `source_urls`: final source URL list for successfully saved local source documents.
 - `artifact_paths`: final local artifact path list for successfully fetched readable pages.
 - `errors`: final URL-specific error list collected during search or page fetch.

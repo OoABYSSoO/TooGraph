@@ -46,7 +46,7 @@
 - LLM 节点卡片已改为单选 Skill 控件；动态 `capability.kind=subgraph` 只服务于模板内运行时能力选择，不作为普通卡片下拉项。
 - LLM 节点提示词区域支持技能说明胶囊；默认胶囊从 skill `llmInstruction` 动态展示，用户编辑后才作为 `node.override` 写入当前节点。
 - 旧内置模板已删除，旧模板运行入口兼容修补已删除。
-- 旧技能包已删除，当前官方 Skill 包包括 `web_search`、`local_workspace_executor` 和 `graphiteui_capability_selector`。
+- 当前官方 Skill 包包括 `web_search` 和 `graphiteui_capability_selector`。
 - `file` / `image` / `audio` / `video` state 已采用路径透传语义，值可以是本地路径字符串或路径数组；`file_list`、`array`、`object` 不再作为 state 类型存在。
 - LLM 节点会读取 `file` state 中的文本类文件，并只把文件名与原文全文放入模型上下文；图片、音频和视频路径走多模态附件处理。
 - `web_search` 不再输出 `context`，只输出 `query`、`source_urls`、`artifact_paths` 和 `errors`。
@@ -67,7 +67,7 @@
 - 新版桌宠自主循环模板。
 - 将内部 `agent` kind 迁移为面向用户和协议一致的 LLM 节点语义。
 - 增加 `capability.kind=subgraph` 的运行时动态子图执行能力。
-- 按新职责重建用户 Skill 生成能力：从需求产出 `run.py`、`skill.json` 和 `SKILL.md` 三个必要文件内容，后续写入、测试和修复应通过明确的图流程或其他受控能力表达。
+- 按新职责重建用户 Skill 生成能力：从需求产出 `skill.json`、`SKILL.md` 以及必要的 `before_llm.py` / `after_llm.py` 文件内容，后续写入、测试和修复应通过明确的图流程或其他受控能力表达。
 - 当前仍残留 `backend/app/companion/commands.py` 中的 `graph_patch.draft` 草案记录 stub。它是历史遗留入口，只能记录待审批草案，不能应用图补丁，也没有接入 GraphCommandBus、graph revision、undo 或完整审计闭环；下一轮应删除它，或按新的图优先命令流重建。
 - 审批恢复 UI、图补丁预览、GraphCommandBus、graph revision、undo 和完整审计闭环。
 
@@ -191,13 +191,13 @@ input_question
   "description": "当任务需要获取最新公开网页信息、新闻、版本内容、引用来源或网页正文时使用。不负责最终总结。",
   "llmInstruction": "你已经绑定了联网搜索技能。请根据任务决定 query，然后运行技能；不要在本节点整理最终结论。",
   "permissions": ["network", "secret_read"],
+  "timeoutSeconds": 300,
   "inputSchema": [
     { "key": "query", "name": "Query", "valueType": "text", "required": true }
   ],
   "outputSchema": [
     { "key": "source_urls", "name": "Source URLs", "valueType": "json" }
   ],
-  "runtime": { "type": "python", "entrypoint": "run.py" },
   "capabilityPolicy": {
     "default": {
       "selectable": true,
@@ -221,7 +221,8 @@ input_question
 - `llmInstruction`：LLM 节点已经绑定该技能后，应该如何使用它。
 - `permissions`：执行前需要评估或授权的能力。
 - `inputSchema` / `outputSchema`：技能入参和结构化输出契约。
-- `runtime`：技能脚本入口和执行参数。
+- `before_llm.py`：可选固定入口，在 LLM 生成技能参数前补充上下文，例如当前日期或候选能力清单。
+- `after_llm.py`：可选固定入口，在 LLM 生成技能参数后执行、校验或规范化结果；技能脚本不直接写 state。
 - `capabilityPolicy.default`：默认能力选择策略。
 - `capabilityPolicy.origins.<origin>`：特定来源策略，例如 `companion`。
 - `selectable`：能力选择器是否可以看到并返回这个 skill。
@@ -426,10 +427,10 @@ LLM 节点提示词区域中，绑定的技能以胶囊展示。
 
 它应该：
 
-- 在 LLM 节点的技能入参规划提示词中列出本地启用模板，以及启用且对当前 `origin` 可选择的 Skill。
+- 通过 `before_llm.py` 在 LLM 节点的技能入参规划提示词中列出本地启用模板，以及启用且对当前 `origin` 可选择的 Skill。
 - 每个候选项必须提供 `kind`、`key`、名称和简短适用场景说明，让模型基于语义选择。
 - 模型负责根据用户需求选择一个 `capability` 入参；选择原则是优先图模板，其次 Skill，没有合适能力则选 `{ "kind": "none" }`。
-- Skill 脚本只校验模型选择是否仍在本地可用清单中，并规范化名称和描述。
+- `after_llm.py` 只校验模型选择是否仍在本地可用清单中，并规范化名称和描述。
 - 只输出一个 `capability` state 值；没有合适能力时输出 `{ "kind": "none" }`。
 
 它不应该：
@@ -444,11 +445,12 @@ LLM 节点提示词区域中，绑定的技能以胶囊展示。
 
 旧 `graphiteUI_skill_builder` 已删除，因为它把生成、写入、校验、测试、修复、revision 和回滚混在一个 Skill 中，偏离了新的职责边界。
 
-待重建的 Skill 生成能力应更窄：读取用户需求和已确认的设计信息，只产出一个 Skill 包必要的三个文件内容：
+待重建的 Skill 生成能力应更窄：读取用户需求和已确认的设计信息，只产出一个 Skill 包必要的文件内容。随着生命周期入口收束，新的 Skill 包优先围绕固定入口组织：
 
-- `run.py`
 - `skill.json`
 - `SKILL.md`
+- `before_llm.py`，仅在需要给 LLM 补充上下文时生成
+- `after_llm.py`，仅在需要确定性执行、校验或规范化时生成
 
 它不应该：
 

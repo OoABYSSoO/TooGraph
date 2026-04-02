@@ -12,7 +12,7 @@
 - 新版桌宠自主循环模板 `companion_autonomous_loop` 尚未创建和注册。当前桌宠浮窗仍会尝试读取这个模板，因此桌宠对话入口的 UI 已存在，但完整对话循环还不能作为当前可用能力描述。
 - 当前仓库提供一个官方图模板：`advanced_web_research_loop`（高级联网搜索）。它是通用模板，不是桌宠专用自主循环模板。
 - 技能系统已收束为统一技能库，不再区分“桌宠技能”和“LLM 节点技能”，也不再使用 `targets` / `executionTargets` 这类旧分流字段。
-- 当前官方技能包包括 `web_search`、`local_workspace_executor` 和 `graphiteui_capability_selector`。旧技能包已经删除，后续新能力应按当前统一 Skill 结构专门编写。
+- 当前官方技能包包括 `web_search` 和 `graphiteui_capability_selector`。后续新能力应按当前统一 Skill 结构专门编写。
 - `subgraph` 已是正式节点类型：可从官方或用户自定义 graph 模板创建实例，运行时隔离内部 state，公开 input/output 映射为父图端口，并可双击打开当前实例的工作区页签；主图节点、子图缩略图和右下角画布缩略图共享克制的节点类型强调色。
 
 ## 当前协议
@@ -28,6 +28,7 @@
 - 用户编辑胶囊后才会把该节点的覆盖说明写入 `skillInstructionBlocks`，并标记为 `node.override`；移除 skill 时对应覆盖会移除，且不会反向写回技能包原始文档。
 - 静态手动选择的 Skill 使用 `config.skillKey` 和协议拥有的 `skillBindings.outputMapping`。`outputMapping` 由图协议、前端和运行时维护，只用于确定 skill 输出写入哪个 state 与运行审计；LLM 不看也不修改它。
 - 技能输入由 LLM 节点在运行前根据当前输入 state、技能 `description`、有效 `llmInstruction` 和 `inputSchema` 生成。有效 `llmInstruction` 默认来自 skill manifest；如果当前节点存在 `node.override` 胶囊覆盖，则使用覆盖内容。这个说明只进入技能入参生成阶段的 system prompt，不会再追加到 user prompt。
+- Skill 生命周期脚本使用固定文件名而不是在 manifest 中配置入口。存在 `before_llm.py` 时，运行时会在技能入参规划前执行它，并把返回的上下文注入 LLM 提示词；存在 `after_llm.py` 时，运行时会在 LLM 生成结构化技能参数后执行它，并把它返回的 JSON 当作技能结果。写入 state 仍由 GraphiteUI runtime 根据 `outputSchema` 和 `skillBindings.outputMapping` 完成，脚本不直接绑定 state。
 - 在 LLM 节点卡片选择带 `outputSchema` 的静态 skill 时，前端会自动创建 managed skill output state、添加到该节点输出端口，并写入 `skillBindings.outputMapping`，让运行时能把技能结果透传给下游节点。
 - 动态能力执行来自输入 `capability` state，不复用 `skillBindings.outputMapping`，也不会推断普通输出映射。这类节点必须只写一个 `result_package` state。包内 `outputs.<outputKey>` 保存 `{ name, description, type, value }`，不额外捏造 `fieldKey`；下游 LLM 节点会把这些虚拟输出拆开并复用普通 state/file 展开逻辑。
 - 图运行前不再做旧草稿兼容补齐。提交到运行时的图必须已经符合当前协议。
@@ -46,6 +47,7 @@
 - 位置：`skill/web_search/`
 - 显示名称：`联网搜索`
 - 作用：执行联网搜索、返回来源链接、本地原文文件路径和结构化错误信息。
+- 生命周期：`before_llm.py` 只补充当前日期；`after_llm.py` 接收 LLM 生成的 `query`，执行搜索和原文下载。旧的程序侧“识别时效查询并自动给 query 拼日期”逻辑已移除，是否把日期写入 query 由 LLM 根据上下文判断。
 - 桌宠来源默认可自主使用且无需确认，前提仍是它被图模板显式绑定或由图状态传入，并通过 registry、运行策略和运行时就绪检查。
 - 它只负责搜索和资料获取，不负责最终总结。搜索词由绑定它的 LLM 节点根据任务决定；整理和总结应交给后续 LLM 节点。
 - 搜索源请求默认最多尝试 5 次，用于缓解 DuckDuckGo fallback 或外部搜索 API 的瞬时 TLS、连接中断和网关抖动。
@@ -57,20 +59,12 @@
 - `artifact_paths`：成功保存到本地的来源原文文件路径，类型应绑定为 `file`，值可以是路径字符串或路径数组。
 - `errors`：结构化错误列表。
 
-### `local_workspace_executor`
-
-- 位置：`skill/local_workspace_executor/`
-- 显示名称：`本地工作区执行器`
-- 作用：提供受策略约束的文件读取、文件写入、目录查看、路径删除、命令运行和脚本运行能力。
-- 默认写入范围限制在 `backend/data` 下；默认执行范围限制在 `backend/data/skills/user` 和 `backend/data/tmp` 下。
-- 权限策略由受保护的 `backend/data/settings/security/local_executor_policy.json` 管理。遇到越权路径时，技能返回 `blocked` 状态、阻断原因和建议追加的最小白名单，而不是静默执行。
-- 命令和脚本执行会拒绝 `python -c`、`bash -c`、`node -e` 这类内联执行形式；该技能是 GraphiteUI 层面的权限门禁，不是操作系统级沙箱。
-
 ### `graphiteui_capability_selector`
 
 - 位置：`skill/graphiteui_capability_selector/`
 - 显示名称：`GraphiteUI Capability Selector`
-- 作用：根据 LLM 节点技能入参规划阶段看到的本地可用能力清单，校验并规范化模型选出的单个 `capability`。
+- 作用：根据 LLM 节点技能入参规划阶段看到的本地可用能力清单，让模型选择并校验规范化单个 `capability`。
+- 生命周期：`before_llm.py` 读取当前启用的图模板和可选择 Skill，生成候选能力清单；`after_llm.py` 接收模型选择的 `capability`，按同一清单做真实性与启用状态校验。
 - 选择对象包括当前启用的图模板和对当前 `origin` 可选择的 Skill；图模板优先于 Skill。
 - 它不执行被选能力，不生成被选能力的运行入参，也不做程序字段匹配；模型基于候选项的名称和描述判断，脚本只做真实性与启用状态校验。
 
@@ -87,7 +81,7 @@
 - 输出语义：`query`、`source_urls`、`artifact_paths`、`errors` 通过 managed binding state 透传；后续 LLM 节点读取 `artifact_paths` 对应的本地原文，负责证据筛选和最终总结。
 - 模型语义：模板默认使用全局模型配置，不写死某个 provider。LLM 节点和桌宠模型下拉的第一项是“全局（实时读取当前全局设定的模型）”，后面才是具体模型 override。若全局本地网关未启动，运行该模板前需要在 Model Providers 页面选择可用模型，或在图中为 LLM 节点设置 override。
 
-创建用户自定义 Skill 的旧官方模板已删除。后续需要按新的职责重新讨论和重建：Skill 生成能力应只根据需求产出 `run.py`、`skill.json` 和 `SKILL.md` 三个必要文件的内容，写入、测试、修复和回滚不再由旧模板方案代表。
+创建用户自定义 Skill 的旧官方模板已删除。后续需要按新的职责重新讨论和重建：Skill 生成能力应只根据需求产出 `skill.json`、`SKILL.md` 以及必要的 `before_llm.py` / `after_llm.py` 文件内容，写入、测试、修复和回滚不再由旧模板方案代表。
 
 ## 当前前端能力
 
@@ -103,7 +97,6 @@
 
 - FastAPI 提供 graphs / runs / templates / presets / settings / skills / knowledge / memories API。
 - 后端 Skill catalog 合并官方 Skill 和用户自定义 Skill。官方 Skill 只读，用户 Skill 可在 Skills 页面启用、停用和删除。
-- 后端提供本地执行器策略读取和白名单追加 API，用于支持 `local_workspace_executor` 的显式权限流。
 - validator 负责 `node_system` graph 结构校验。必填技能输入不再做静态绑定校验，而是在 LLM 节点生成技能输入后由运行时检查。
 - 动态读取 `capability` state 的 LLM 节点必须写唯一 `result_package` state；静态 `skillKey` 与动态 `capability` state 不能混用；没有静态 `skillKey` 的 `skillBindings` 会被视为旧协议并拒绝。
 - LangGraph runtime 是当前运行主链。
