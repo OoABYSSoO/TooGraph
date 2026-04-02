@@ -53,6 +53,53 @@ def _inner_passthrough_graph() -> dict:
     }
 
 
+def _dynamic_passthrough_template() -> dict:
+    return {
+        "template_id": "simple_dynamic_subgraph",
+        "label": "Simple Dynamic Subgraph",
+        "description": "Returns the public input as the final reply.",
+        "default_graph_name": "Simple Dynamic Subgraph",
+        "state_schema": {
+            "final_reply": {
+                "name": "Final Reply",
+                "description": "The final subgraph output.",
+                "type": "markdown",
+                "value": "",
+                "color": "#2563eb",
+            }
+        },
+        "nodes": {
+            "inner_input": {
+                "kind": "input",
+                "name": "Inner Input",
+                "description": "",
+                "ui": {"position": {"x": 0, "y": 0}},
+                "reads": [],
+                "writes": [{"state": "final_reply", "mode": "replace"}],
+                "config": {"value": ""},
+            },
+            "inner_output": {
+                "kind": "output",
+                "name": "Inner Output",
+                "description": "",
+                "ui": {"position": {"x": 240, "y": 0}},
+                "reads": [{"state": "final_reply", "required": True}],
+                "writes": [],
+                "config": {
+                    "displayMode": "markdown",
+                    "persistEnabled": False,
+                    "persistFormat": "md",
+                    "fileNameTemplate": "",
+                },
+            },
+        },
+        "edges": [{"source": "inner_input", "target": "inner_output"}],
+        "conditional_edges": [],
+        "metadata": {},
+        "source": "official",
+    }
+
+
 def _parent_graph_payload(*, subgraph_reads: list[dict], subgraph_writes: list[dict]) -> dict:
     return {
         "graph_id": "graph_subgraph_runtime",
@@ -210,3 +257,83 @@ def test_langgraph_runtime_publishes_subgraph_event_context(monkeypatch) -> None
     ]
     assert inner_status_events
     assert inner_status_events[0]["subgraph_path"] == ["nested_research"]
+
+
+def test_langgraph_runtime_runs_dynamic_subgraph_capability_and_packages_outputs(monkeypatch) -> None:
+    import app.core.langgraph.runtime as runtime_module
+    import app.core.runtime.node_system_executor as executor_module
+
+    template = _dynamic_passthrough_template()
+    monkeypatch.setattr(runtime_module, "load_template_record", lambda template_key: template)
+    monkeypatch.setattr(executor_module, "load_template_record", lambda template_key: template)
+    monkeypatch.setattr(
+        executor_module,
+        "_generate_agent_subgraph_inputs",
+        lambda **kwargs: (
+            {"simple_dynamic_subgraph": {"final_reply": "子图最终回复"}},
+            "planned subgraph inputs",
+            [],
+            kwargs["runtime_config"],
+        ),
+    )
+
+    graph = NodeSystemGraphDocument.model_validate(
+        {
+            "graph_id": "graph_dynamic_subgraph_runtime",
+            "name": "Dynamic Subgraph Runtime",
+            "state_schema": {
+                "selected_capability": {"type": "capability", "value": {"kind": "subgraph", "key": "simple_dynamic_subgraph"}},
+                "requirement": {"type": "text", "value": "运行这个子图"},
+                "dynamic_result": {"type": "result_package"},
+            },
+            "nodes": {
+                "capability_input": {
+                    "kind": "input",
+                    "ui": {"position": {"x": 0, "y": 0}},
+                    "writes": [{"state": "selected_capability"}],
+                    "config": {"value": {"kind": "subgraph", "key": "simple_dynamic_subgraph"}},
+                },
+                "requirement_input": {
+                    "kind": "input",
+                    "ui": {"position": {"x": 0, "y": 180}},
+                    "writes": [{"state": "requirement"}],
+                    "config": {"value": "运行这个子图"},
+                },
+                "run_selected_subgraph": {
+                    "kind": "agent",
+                    "ui": {"position": {"x": 320, "y": 80}},
+                    "reads": [{"state": "selected_capability"}, {"state": "requirement"}],
+                    "writes": [{"state": "dynamic_result"}],
+                    "config": {"skillKey": ""},
+                },
+                "result_output": {
+                    "kind": "output",
+                    "ui": {"position": {"x": 640, "y": 80}},
+                    "reads": [{"state": "dynamic_result"}],
+                },
+            },
+            "edges": [
+                {"source": "capability_input", "target": "run_selected_subgraph"},
+                {"source": "requirement_input", "target": "run_selected_subgraph"},
+                {"source": "run_selected_subgraph", "target": "result_output"},
+            ],
+            "conditional_edges": [],
+        }
+    )
+
+    result = execute_node_system_graph_langgraph(graph)
+
+    assert result["status"] == "completed"
+    package = result["state_values"]["dynamic_result"]
+    assert package["kind"] == "result_package"
+    assert package["sourceType"] == "subgraph"
+    assert package["sourceKey"] == "simple_dynamic_subgraph"
+    assert package["inputs"] == {"final_reply": "子图最终回复"}
+    assert package["outputs"]["final_reply"] == {
+        "name": "Final Reply",
+        "description": "The final subgraph output.",
+        "type": "markdown",
+        "value": "子图最终回复",
+    }
+    execution = next(item for item in result["node_executions"] if item["node_id"] == "run_selected_subgraph")
+    assert execution["artifacts"]["capability_outputs"][0]["inputs"] == {"final_reply": "子图最终回复"}

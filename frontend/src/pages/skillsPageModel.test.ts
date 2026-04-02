@@ -115,40 +115,48 @@ test("filterSkillsForManagement searches capability policy and permission fields
   );
   assert.deepEqual(
     filterSkillsForManagement(skills, { query: "run.py python runtime", status: "all" }).map((skill) => skill.skillKey),
-    ["rewrite_text"],
+    [],
   );
   assert.deepEqual(
     filterSkillsForManagement(skills, { query: "missing a script runtime", status: "all" }).map((skill) => skill.skillKey),
-    ["draft_search"],
+    [],
   );
 });
 
-test("filterSkillsForManagement filters by capability policy and attention state", () => {
+test("filterSkillsForManagement filters by user-facing status and capability policy", () => {
   assert.deepEqual(
     filterSkillsForManagement(skills, { query: "", status: "selectable" }).map((skill) => skill.skillKey),
     ["rewrite_text", "draft_search"],
   );
   assert.deepEqual(
-    filterSkillsForManagement(skills, { query: "", status: "runtime" }).map((skill) => skill.skillKey),
-    ["rewrite_text"],
+    filterSkillsForManagement(skills, { query: "", status: "active" }).map((skill) => skill.skillKey),
+    ["rewrite_text", "draft_search", "desktop_companion_profile"],
   );
   assert.deepEqual(
-    filterSkillsForManagement(skills, { query: "", status: "attention" }).map((skill) => skill.skillKey),
-    ["draft_search", "desktop_companion_profile"],
+    filterSkillsForManagement(skills, { query: "", status: "all" }).map((skill) => skill.skillKey),
+    ["rewrite_text", "draft_search", "desktop_companion_profile"],
   );
 });
 
-test("buildSkillOverview summarizes runtime and management readiness", () => {
+test("filterSkillsForManagement ignores removed runtime and attention filters", () => {
+  assert.deepEqual(
+    filterSkillsForManagement(skills, { query: "", status: "runtime" as never }).map((skill) => skill.skillKey),
+    ["rewrite_text", "draft_search", "desktop_companion_profile"],
+  );
+  assert.deepEqual(
+    filterSkillsForManagement(skills, { query: "", status: "attention" as never }).map((skill) => skill.skillKey),
+    ["rewrite_text", "draft_search", "desktop_companion_profile"],
+  );
+});
+
+test("buildSkillOverview summarizes user-facing management counts", () => {
   assert.deepEqual(buildSkillOverview(skills), {
     total: 3,
     active: 3,
     selectableSkills: 2,
-    runtimeReady: 1,
-    runtimeRegistered: 1,
-    needsAttention: 2,
   });
 });
 
-test("buildSkillStatusOptions keeps management filters stable", () => {
-  assert.deepEqual(buildSkillStatusOptions(), ["all", "active", "selectable", "runtime", "attention"]);
+test("buildSkillStatusOptions keeps user-facing management filters stable", () => {
+  assert.deepEqual(buildSkillStatusOptions(), ["all", "active", "selectable"]);
 });

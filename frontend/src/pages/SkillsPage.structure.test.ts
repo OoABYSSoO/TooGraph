@@ -40,26 +40,32 @@ test("SkillsPage exposes a read-only Skill package file browser", () => {
   assert.match(componentSource, /selectedFilePath/);
 });
 
-test("SkillsPage surfaces useful Skill capability and readiness metadata", () => {
+test("SkillsPage surfaces Skill capability metadata without internal runtime status fields", () => {
   assert.match(componentSource, /overview\.selectableSkills/);
-  assert.match(componentSource, /overview\.runtimeReady/);
-  assert.match(componentSource, /overview\.needsAttention/);
+  assert.doesNotMatch(componentSource, /overview\.runtimeReady/);
+  assert.doesNotMatch(componentSource, /overview\.runtimeRegistered/);
+  assert.doesNotMatch(componentSource, /overview\.needsAttention/);
   assert.match(componentSource, /capabilityPolicyOriginEntries/);
   assert.doesNotMatch(componentSource, /selectedSkill\.kind/);
   assert.doesNotMatch(componentSource, /selectedSkill\.mode/);
   assert.doesNotMatch(componentSource, /selectedSkill\.scope/);
   assert.match(componentSource, /selectedSkill\.permissions/);
-  assert.match(componentSource, /selectedSkill\.runtimeReady/);
-  assert.match(componentSource, /selectedSkill\.runtime\.type/);
-  assert.match(componentSource, /selectedSkill\.runtime\.entrypoint/);
+  assert.doesNotMatch(componentSource, /selectedSkill\.runtimeReady/);
+  assert.doesNotMatch(componentSource, /selectedSkill\.runtimeRegistered/);
+  assert.doesNotMatch(componentSource, /selectedSkill\.runtime\.type/);
+  assert.doesNotMatch(componentSource, /selectedSkill\.runtime\.entrypoint/);
   assert.doesNotMatch(componentSource, /selectedSkill\.configured/);
   assert.doesNotMatch(componentSource, /selectedSkill\.healthy/);
-  assert.match(componentSource, /selectedSkill\.llmNodeEligibility/);
-  assert.match(componentSource, /selectedSkill\.llmNodeBlockers/);
+  assert.doesNotMatch(componentSource, /selectedSkill\.llmNodeEligibility/);
+  assert.doesNotMatch(componentSource, /selectedSkill\.llmNodeBlockers/);
   assert.match(componentSource, /t\("skills\.capabilityPolicy"\)/);
   assert.match(componentSource, /t\("skills\.permissions"\)/);
-  assert.match(componentSource, /t\("skills\.llmNodeEligibility"\)/);
-  assert.match(componentSource, /t\("skills\.llmNodeBlockers"\)/);
+  assert.doesNotMatch(componentSource, /t\("skills\.runtimeReady"\)/);
+  assert.doesNotMatch(componentSource, /t\("skills\.runtimeRegistered"\)/);
+  assert.doesNotMatch(componentSource, /t\("skills\.runtimePending"\)/);
+  assert.doesNotMatch(componentSource, /t\("skills\.runtimeNotRegistered"\)/);
+  assert.doesNotMatch(componentSource, /t\("skills\.llmNodeEligibility"\)/);
+  assert.doesNotMatch(componentSource, /t\("skills\.llmNodeBlockers"\)/);
 });
 
 test("SkillsPage exposes upload, status, and delete management actions with local button styling", () => {

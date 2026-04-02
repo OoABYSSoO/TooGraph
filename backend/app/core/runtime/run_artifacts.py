@@ -43,6 +43,7 @@ def refresh_run_artifacts(
     state_last_writers = dict(state.get("state_last_writers", {}))
     state["artifacts"] = {
         "skill_outputs": state.get("skill_outputs", []),
+        "capability_outputs": state.get("capability_outputs", []),
         "output_previews": state.get("output_previews", []),
         "saved_outputs": saved_outputs,
         "exported_outputs": exported_outputs,

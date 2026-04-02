@@ -72,6 +72,10 @@ def schema_for_skill_io_field(field: SkillIoField) -> dict[str, Any]:
     return field_schema
 
 
+def schema_for_value_type(value_type: str) -> dict[str, Any]:
+    return _schema_for_value_type(value_type)
+
+
 def build_openai_json_schema_response_format(schema: dict[str, Any]) -> dict[str, Any]:
     return {
         "type": "json_schema",

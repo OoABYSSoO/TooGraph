@@ -59,6 +59,8 @@ class RunState(TypedDict, total=False):
     max_revision_round: int
     selected_skills: list[str]
     skill_outputs: list[dict[str, Any]]
+    selected_capabilities: list[dict[str, Any]]
+    capability_outputs: list[dict[str, Any]]
     evaluation_result: dict[str, Any]
     final_result: str
     node_status_map: dict[str, NodeStatus]
@@ -190,6 +192,8 @@ def create_initial_run_state(graph_id: str, graph_name: str, max_revision_round:
         max_revision_round=max_revision_round,
         selected_skills=[],
         skill_outputs=[],
+        selected_capabilities=[],
+        capability_outputs=[],
         evaluation_result={},
         final_result="",
         node_status_map={},

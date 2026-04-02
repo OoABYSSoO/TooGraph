@@ -51,6 +51,8 @@ export type NodeExecutionArtifacts = {
   response?: Record<string, unknown> | null;
   reasoning?: string | null;
   runtime_config?: Record<string, unknown> | null;
+  selected_capabilities?: Array<Record<string, unknown>>;
+  capability_outputs?: Array<Record<string, unknown>>;
   state_reads: NodeStateReadRecord[];
   state_writes: NodeStateWriteRecord[];
 };
@@ -159,6 +161,7 @@ export type RunSnapshotOption = {
 
 export type RunArtifacts = {
   skill_outputs?: Array<Record<string, unknown>>;
+  capability_outputs?: Array<Record<string, unknown>>;
   output_previews?: OutputPreview[];
   saved_outputs?: SavedOutputArtifact[];
   exported_outputs?: ExportedOutput[];
@@ -193,6 +196,8 @@ export type RunDetail = RunSummary & {
   metadata: Record<string, unknown>;
   selected_skills: string[];
   skill_outputs: Array<Record<string, unknown>>;
+  selected_capabilities?: Array<Record<string, unknown>>;
+  capability_outputs?: Array<Record<string, unknown>>;
   evaluation_result: Record<string, unknown>;
   memory_summary: string;
   final_result: string;

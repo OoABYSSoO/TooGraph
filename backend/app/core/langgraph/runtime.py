@@ -67,6 +67,7 @@ from app.core.runtime.node_system_executor import (
 from app.core.runtime.state import create_initial_run_state, set_run_status, touch_run_lifecycle, utc_now_iso
 from app.core.schemas.node_system import NodeSystemGraphDocument, NodeSystemInputNode, NodeSystemOutputNode, NodeSystemSubgraphNode
 from app.core.storage.run_store import save_run
+from app.templates.loader import load_template_record
 
 
 def execute_node_system_graph_langgraph(
@@ -365,7 +366,17 @@ def _build_langgraph_node_callable(
                         persist_parent_progress=persist_progress,
                     )
                 else:
-                    body = _execute_node(graph, node_name, node, input_values, state)
+                    body = _execute_node(
+                        graph,
+                        node_name,
+                        node,
+                        input_values,
+                        state,
+                        execute_dynamic_subgraph_func=lambda **kwargs: _execute_dynamic_subgraph_capability(
+                            **kwargs,
+                            persist_parent_progress=persist_progress,
+                        ),
+                    )
                 outputs = dict(body.get("outputs", {}))
                 selected_edge_ids = select_active_outgoing_edges(outgoing_edges, body)
                 duration_ms = int((time.perf_counter() - node_started_perf) * 1000)
@@ -395,6 +406,16 @@ def _build_langgraph_node_callable(
                     state["selected_skills"] = [*state.get("selected_skills", []), *body["selected_skills"]]
                 if body.get("skill_outputs"):
                     state["skill_outputs"] = [*state.get("skill_outputs", []), *body["skill_outputs"]]
+                if body.get("selected_capabilities"):
+                    state["selected_capabilities"] = [
+                        *state.get("selected_capabilities", []),
+                        *body["selected_capabilities"],
+                    ]
+                if body.get("capability_outputs"):
+                    state["capability_outputs"] = [
+                        *state.get("capability_outputs", []),
+                        *body["capability_outputs"],
+                    ]
                 if body.get("output_previews"):
                     state["output_previews"] = [*state.get("output_previews", []), *body["output_previews"]]
                 if body.get("saved_outputs"):
@@ -422,6 +443,8 @@ def _build_langgraph_node_callable(
                             "response": body.get("response"),
                             "reasoning": body.get("reasoning"),
                             "runtime_config": body.get("runtime_config"),
+                            "selected_capabilities": body.get("selected_capabilities", []),
+                            "capability_outputs": body.get("capability_outputs", []),
                             "state_reads": state_reads,
                             "state_writes": state_writes,
                         },
@@ -622,6 +645,151 @@ def _execute_subgraph_node_runtime(
             "node_executions": list(subgraph_state.get("node_executions", [])),
             "errors": list(subgraph_state.get("errors", [])),
         },
+    }
+
+
+def _execute_dynamic_subgraph_capability(
+    *,
+    template_key: str,
+    subgraph_inputs: dict[str, Any],
+    node_name: str,
+    state: dict[str, Any],
+    persist_parent_progress: bool,
+) -> dict[str, Any]:
+    template = load_template_record(template_key)
+    subgraph_document = _build_dynamic_subgraph_document(template_key, template, subgraph_inputs)
+    parent_status_map = _root_parent_run_state(state).setdefault("subgraph_status_map", {})
+    parent_status_map[node_name] = {
+        inner_node_name: "idle"
+        for inner_node_name in subgraph_document.nodes
+    }
+    parent_context = _subgraph_context(state)
+    parent_path = parent_context["path"] if parent_context else []
+    subgraph_initial_state = create_initial_run_state(subgraph_document.graph_id, subgraph_document.name)
+    subgraph_initial_state["run_id"] = str(state.get("run_id") or subgraph_initial_state["run_id"])
+    subgraph_initial_state["subgraph_status_map"] = parent_status_map
+    subgraph_initial_state["_parent_run_state"] = _root_parent_run_state(state)
+    subgraph_initial_state["_subgraph_context"] = {
+        "node_id": node_name,
+        "path": [*parent_path, node_name],
+    }
+    subgraph_initial_state["_subgraph_persist_progress"] = persist_parent_progress
+    started_at = time.perf_counter()
+    subgraph_state = execute_node_system_graph_langgraph(
+        subgraph_document,
+        subgraph_initial_state,
+        persist_progress=False,
+        save_final_run=False,
+        emit_lifecycle_events=False,
+    )
+    duration_ms = int((time.perf_counter() - started_at) * 1000)
+    parent_status_map[node_name] = dict(subgraph_state.get("node_status_map", {}))
+    _publish_subgraph_final_node_status_events(state, node_name, subgraph_document, parent_status_map[node_name])
+    if persist_parent_progress:
+        touch_run_lifecycle(_root_parent_run_state(state))
+        save_run(_root_parent_run_state(state))
+
+    output_state_keys = _graph_output_state_keys(subgraph_document)
+    output_values = {
+        state_key: copy.deepcopy(subgraph_state.get("state_values", {}).get(state_key))
+        for state_key in output_state_keys
+    }
+    output_definitions = {
+        state_key: _serialize_state_definition(subgraph_document, state_key)
+        for state_key in output_state_keys
+    }
+    status = str(subgraph_state.get("status") or "completed")
+    errors = list(subgraph_state.get("errors", []))
+    error = "; ".join(str(item) for item in errors if str(item))
+    return {
+        "source_name": str(template.get("label") or template.get("default_graph_name") or template_key),
+        "status": "failed" if status == "failed" or error else "succeeded",
+        "outputs": output_values,
+        "output_definitions": output_definitions,
+        "duration_ms": duration_ms,
+        "error": error,
+        "error_type": "subgraph_execution_failed" if status == "failed" or error else "",
+        "warnings": list(subgraph_state.get("warnings", [])),
+        "subgraph": {
+            "graph_id": subgraph_document.graph_id,
+            "name": subgraph_document.name,
+            "status": status,
+            "node_status_map": dict(subgraph_state.get("node_status_map", {})),
+            "input_values": {
+                state_key: copy.deepcopy(subgraph_document.state_schema[state_key].value)
+                for state_key in _graph_input_state_keys(subgraph_document)
+            },
+            "output_values": output_values,
+            "node_executions": list(subgraph_state.get("node_executions", [])),
+            "errors": errors,
+        },
+    }
+
+
+def _build_dynamic_subgraph_document(
+    template_key: str,
+    template: dict[str, Any],
+    subgraph_inputs: dict[str, Any],
+) -> NodeSystemGraphDocument:
+    payload = {
+        key: copy.deepcopy(value)
+        for key, value in template.items()
+        if key not in {"template_id", "label", "description", "default_graph_name", "source", "status"}
+    }
+    state_schema = dict(payload.get("state_schema") or {})
+    for state_key in _template_input_state_keys(template):
+        if state_key not in state_schema:
+            raise ValueError(f"Subgraph template '{template_key}' input boundary references unknown state '{state_key}'.")
+        state_schema[state_key] = {
+            **dict(state_schema[state_key]),
+            "value": copy.deepcopy(subgraph_inputs.get(state_key)),
+        }
+    payload["state_schema"] = state_schema
+    return NodeSystemGraphDocument.model_validate(
+        {
+            **payload,
+            "graph_id": f"dynamic_subgraph_{template_key}",
+            "name": str(template.get("default_graph_name") or template.get("label") or template_key),
+        }
+    )
+
+
+def _template_input_state_keys(template: dict[str, Any]) -> list[str]:
+    keys: list[str] = []
+    nodes = template.get("nodes") if isinstance(template.get("nodes"), dict) else {}
+    for node in nodes.values():
+        if not isinstance(node, dict) or node.get("kind") != "input":
+            continue
+        writes = node.get("writes") if isinstance(node.get("writes"), list) else []
+        if writes and isinstance(writes[0], dict) and writes[0].get("state"):
+            keys.append(str(writes[0]["state"]))
+    return keys
+
+
+def _graph_input_state_keys(graph: NodeSystemGraphDocument) -> list[str]:
+    keys: list[str] = []
+    for node in graph.nodes.values():
+        if isinstance(node, NodeSystemInputNode) and node.writes:
+            keys.append(node.writes[0].state)
+    return keys
+
+
+def _graph_output_state_keys(graph: NodeSystemGraphDocument) -> list[str]:
+    keys: list[str] = []
+    for node in graph.nodes.values():
+        if isinstance(node, NodeSystemOutputNode) and node.reads:
+            keys.append(node.reads[0].state)
+    return keys
+
+
+def _serialize_state_definition(graph: NodeSystemGraphDocument, state_key: str) -> dict[str, str]:
+    definition = graph.state_schema.get(state_key)
+    if definition is None:
+        return {"name": state_key, "description": "", "type": "text"}
+    return {
+        "name": definition.name or state_key,
+        "description": definition.description or "",
+        "type": definition.type.value,
     }
 
 
