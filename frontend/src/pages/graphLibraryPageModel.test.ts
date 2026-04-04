@@ -2,7 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import type { GraphDocument, TemplateRecord } from "../types/node-system.ts";
-import { buildGraphLibraryItems, buildGraphLibraryOverview, filterGraphLibraryItems } from "./graphLibraryPageModel.ts";
+import {
+  buildGraphLibraryItems,
+  buildGraphLibraryOverview,
+  filterGraphLibraryItems,
+  splitGraphLibraryItems,
+} from "./graphLibraryPageModel.ts";
 
 const graphs: GraphDocument[] = [
   {
@@ -120,4 +125,11 @@ test("buildGraphLibraryOverview summarizes graph and template management invento
     officialTemplates: 1,
     disabled: 2,
   });
+});
+
+test("splitGraphLibraryItems separates templates and graphs for the management columns", () => {
+  const columns = splitGraphLibraryItems(buildGraphLibraryItems(graphs, templates));
+
+  assert.deepEqual(columns.templates.map((item) => item.id), ["official_loop", "user_summary"]);
+  assert.deepEqual(columns.graphs.map((item) => item.id), ["graph_research", "graph_archived"]);
 });

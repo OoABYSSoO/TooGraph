@@ -436,6 +436,7 @@ import type { KnowledgeBaseRecord } from "@/types/knowledge";
 import type { AgentNode, ConditionNode, GraphNode, InputNode, OutputNode, StateDefinition } from "@/types/node-system";
 import type { SkillDefinition } from "@/types/skills";
 import { buildSkillArtifactFileUrl, uploadSkillArtifactFile } from "@/api/skillArtifacts";
+import { isAgentOutputManagedByDynamicCapability } from "@/lib/agent-capability-management";
 import { CREATE_AGENT_INPUT_STATE_KEY, VIRTUAL_ANY_INPUT_STATE_KEY, VIRTUAL_ANY_OUTPUT_COLOR, VIRTUAL_ANY_OUTPUT_STATE_KEY } from "@/lib/virtual-any-input";
 
 import {
@@ -633,8 +634,17 @@ const agentOutputPorts = computed<NodePortViewModel[]>(() =>
   view.value.body.kind === "agent" || view.value.body.kind === "subgraph" ? view.value.outputs.filter((port) => !port.virtual) : [],
 );
 const isAgentOutputManagedBySkill = computed(() => props.node.kind === "agent" && props.node.config.skillKey.trim().length > 0);
+const isAgentOutputManagedByCapability = computed(() =>
+  isAgentOutputManagedByDynamicCapability({
+    nodeId: props.nodeId,
+    node: props.node,
+    stateSchema: props.stateSchema,
+  }),
+);
 const shouldShowAgentCreateInputPort = computed(() => agentInputPorts.value.length === 0);
-const shouldShowAgentCreateOutputPort = computed(() => !isAgentOutputManagedBySkill.value && agentOutputPorts.value.length === 0);
+const shouldShowAgentCreateOutputPort = computed(
+  () => !isAgentOutputManagedBySkill.value && !isAgentOutputManagedByCapability.value && agentOutputPorts.value.length === 0,
+);
 const agentCreateInputAnchorStateKey = computed(() =>
   props.pendingStateInputSource ? CREATE_AGENT_INPUT_STATE_KEY : VIRTUAL_ANY_INPUT_STATE_KEY,
 );
@@ -865,7 +875,10 @@ const hasFloatingPanelOpen = computed(
 );
 const shouldRevealAgentCreateInputPort = computed(() => shouldShowAgentCreateInputPort.value || props.selected || Boolean(props.hovered) || hasFloatingPanelOpen.value);
 const shouldRevealAgentCreateOutputPort = computed(
-  () => !isAgentOutputManagedBySkill.value && (shouldShowAgentCreateOutputPort.value || props.selected || Boolean(props.hovered) || hasFloatingPanelOpen.value),
+  () =>
+    !isAgentOutputManagedBySkill.value &&
+    !isAgentOutputManagedByCapability.value &&
+    (shouldShowAgentCreateOutputPort.value || props.selected || Boolean(props.hovered) || hasFloatingPanelOpen.value),
 );
 
 function isPortCreateOpen(side: "input" | "output") {
@@ -1132,7 +1145,7 @@ function openPortStateCreate(side: "input" | "output") {
   if (guardLockedGraphInteraction()) {
     return;
   }
-  if (side === "output" && isAgentOutputManagedBySkill.value) {
+  if (side === "output" && (isAgentOutputManagedBySkill.value || isAgentOutputManagedByCapability.value)) {
     return;
   }
   clearTopActionTimeout();

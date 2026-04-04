@@ -24,6 +24,9 @@ export type NodePortViewModel = {
     skillKey: string;
     fieldKey: string;
   };
+  managedByCapability?: {
+    role: "input" | "result_package";
+  };
 };
 
 export type NodeConditionRouteOutputViewModel = {
@@ -161,6 +164,7 @@ export function buildNodeCardViewModel(
         required: binding.required,
         typeLabel: getStateTypeLabel(binding.state, stateSchema),
         stateColor: stateSchema[binding.state]?.color ?? "#d97706",
+        managedByCapability: resolveManagedCapabilityInputPort(node, binding.state, stateSchema),
       }));
 
   const outputs = shouldExposeVirtualAnyOutput(node)
@@ -173,6 +177,7 @@ export function buildNodeCardViewModel(
           typeLabel: getStateTypeLabel(binding.state, stateSchema),
           stateColor: stateSchema[binding.state]?.color ?? "#d97706",
           managedBySkill: resolveManagedSkillOutputPort(nodeId, binding.state, stateSchema),
+          managedByCapability: resolveManagedCapabilityOutputPort(nodeId, binding.state, stateSchema),
         }));
 
   const branches =
@@ -523,6 +528,29 @@ function resolveManagedSkillOutputPort(
     skillKey: binding.skillKey,
     fieldKey: binding.fieldKey,
   };
+}
+
+function resolveManagedCapabilityInputPort(
+  node: GraphNode,
+  stateKey: string,
+  stateSchema: Record<string, StateDefinition>,
+): NodePortViewModel["managedByCapability"] {
+  if (node.kind !== "agent" || stateSchema[stateKey]?.type?.trim() !== "capability") {
+    return undefined;
+  }
+  return { role: "input" };
+}
+
+function resolveManagedCapabilityOutputPort(
+  nodeId: string,
+  stateKey: string,
+  stateSchema: Record<string, StateDefinition>,
+): NodePortViewModel["managedByCapability"] {
+  const binding = stateSchema[stateKey]?.binding;
+  if (binding?.kind !== "capability_result" || binding.nodeId !== nodeId || binding.managed === false) {
+    return undefined;
+  }
+  return { role: "result_package" };
 }
 
 function stringifyValue(value: unknown) {

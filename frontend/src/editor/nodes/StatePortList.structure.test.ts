@@ -23,10 +23,11 @@ test("StatePortList owns agent real state port rows and emits parent side effect
   assert.match(componentSource, /@pointerdown\.stop="handlePortPointerDown\(port, \$event\)"/);
   assert.match(componentSource, /@click\.stop="handlePortClick\(port\)"/);
   assert.match(componentSource, /@click\.stop="emit\('remove-click', anchorId\(port\.key\), side, port\.key\)"/);
-  assert.match(componentSource, /v-if="side === 'output' && port\.managedBySkill"/);
+  assert.match(componentSource, /v-if="isManagedPort\(port\)"/);
   assert.match(componentSource, /<Connection \/>/);
-  assert.match(componentSource, /v-if="side === 'output' && !port\.virtual && !port\.managedBySkill"/);
+  assert.match(componentSource, /v-if="side === 'output' && canRemovePort\(port\)"/);
   assert.match(componentSource, /function canEditPort\(port: NodePortViewModel\)/);
+  assert.match(componentSource, /function isManagedPort\(port: NodePortViewModel\)/);
   assert.match(componentSource, /function canReorderPort\(port: NodePortViewModel\)/);
   assert.match(componentSource, /<StateEditorPopover/);
   assert.match(componentSource, /import StatePortCreatePopover from "\.\/StatePortCreatePopover\.vue";/);

@@ -41,24 +41,6 @@
           <ElInput v-model="query" class="graph-library-page__search" :placeholder="t('graphLibrary.searchPlaceholder')" clearable />
         </label>
         <div class="graph-library-page__filter-group">
-          <span>{{ t("graphLibrary.kindFilter") }}</span>
-          <div role="tablist" class="graph-library-page__filter-tabs" :aria-label="t('graphLibrary.kindFilter')">
-            <button
-              v-for="option in kindOptions"
-              :key="option.value"
-              type="button"
-              role="tab"
-              class="graph-library-page__filter-tab"
-              :class="{ 'graph-library-page__filter-tab--active': kindFilter === option.value }"
-              :aria-selected="kindFilter === option.value"
-              :tabindex="kindFilter === option.value ? 0 : -1"
-              @click="kindFilter = option.value"
-            >
-              {{ option.label }}
-            </button>
-          </div>
-        </div>
-        <div class="graph-library-page__filter-group">
           <span>{{ t("graphLibrary.statusFilter") }}</span>
           <div role="tablist" class="graph-library-page__filter-tabs" :aria-label="t('graphLibrary.statusFilter')">
             <button
@@ -90,53 +72,73 @@
         </article>
         <template v-else>
           <div class="graph-library-page__result-count">{{ t("graphLibrary.resultCount", { count: filteredItems.length }) }}</div>
-          <article v-for="item in filteredItems" :key="itemKey(item)" class="graph-library-page__card">
-            <div class="graph-library-page__card-heading">
-              <div>
-                <div class="graph-library-page__id">{{ item.id }}</div>
-                <h3>{{ item.title }}</h3>
-                <p>{{ item.description || t("common.none") }}</p>
+          <div class="graph-library-page__columns">
+            <section
+              v-for="column in libraryColumns"
+              :key="column.key"
+              class="graph-library-page__column"
+              :class="column.className"
+            >
+              <div class="graph-library-page__column-header">
+                <h3>{{ column.title }}</h3>
+                <span>{{ t("graphLibrary.resultCount", { count: column.items.length }) }}</span>
               </div>
-              <div class="graph-library-page__badges">
-                <span>{{ t(`graphLibrary.${item.kind}`) }}</span>
-                <span>{{ t(`graphLibrary.${item.source}`) }}</span>
-                <span>{{ t(`graphLibrary.${item.status}`) }}</span>
-                <span v-if="!item.canManage" class="graph-library-page__badge--readonly">
-                  {{ t("graphLibrary.readOnlyOfficial") }}
-                </span>
+              <div class="graph-library-page__column-list">
+                <article v-if="column.items.length === 0" class="graph-library-page__empty graph-library-page__empty--column">
+                  {{ t("graphLibrary.empty") }}
+                </article>
+                <article v-for="item in column.items" :key="itemKey(item)" class="graph-library-page__card">
+                  <div class="graph-library-page__card-heading">
+                    <div>
+                      <div class="graph-library-page__id">{{ item.id }}</div>
+                      <h3>{{ item.title }}</h3>
+                      <p>{{ item.description || t("common.none") }}</p>
+                    </div>
+                    <div class="graph-library-page__badges">
+                      <span>{{ t(`graphLibrary.${item.kind}`) }}</span>
+                      <span>{{ t(`graphLibrary.${item.source}`) }}</span>
+                      <span>{{ t(`graphLibrary.${item.status}`) }}</span>
+                      <span v-if="!item.canManage" class="graph-library-page__badge--readonly">
+                        {{ t("graphLibrary.readOnlyOfficial") }}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div class="graph-library-page__meta">
+                    <span>{{ t("graphLibrary.nodes", { count: item.nodeCount }) }}</span>
+                    <span>{{ t("graphLibrary.edges", { count: item.edgeCount }) }}</span>
+                    <span>{{ t("graphLibrary.states", { count: item.stateCount }) }}</span>
+                  </div>
+
+                  <div class="graph-library-page__actions" :aria-label="t('graphLibrary.actions')">
+                    <template v-if="item.canManage">
+                      <label class="graph-library-page__toggle">
+                        <span>
+                          {{ item.status === "active" ? t("graphLibrary.enabledStatus") : t("graphLibrary.disabledStatus") }}
+                        </span>
+                        <ElSwitch
+                          :model-value="item.status === 'active'"
+                          :disabled="actionItemKey === itemKey(item)"
+                          :aria-label="enabledToggleLabel(item)"
+                          @change="setItemEnabled(item, Boolean($event))"
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        class="graph-library-page__action"
+                        :class="{ 'graph-library-page__action--danger': confirmingDeleteKey === itemKey(item) }"
+                        :disabled="actionItemKey === itemKey(item)"
+                        @click="deleteItemFromCatalog(item)"
+                      >
+                        {{ confirmingDeleteKey === itemKey(item) ? t("graphLibrary.confirmDelete") : t("graphLibrary.delete") }}
+                      </button>
+                    </template>
+                    <span v-else class="graph-library-page__readonly-note">{{ t("graphLibrary.officialReadOnly") }}</span>
+                  </div>
+                </article>
               </div>
-            </div>
-
-            <div class="graph-library-page__meta">
-              <span>{{ t("graphLibrary.nodes", { count: item.nodeCount }) }}</span>
-              <span>{{ t("graphLibrary.edges", { count: item.edgeCount }) }}</span>
-              <span>{{ t("graphLibrary.states", { count: item.stateCount }) }}</span>
-            </div>
-
-            <div class="graph-library-page__actions" :aria-label="t('graphLibrary.actions')">
-              <template v-if="item.canManage">
-                <label class="graph-library-page__toggle">
-                  <span>{{ item.status === "active" ? t("graphLibrary.enabledStatus") : t("graphLibrary.disabledStatus") }}</span>
-                  <ElSwitch
-                    :model-value="item.status === 'active'"
-                    :disabled="actionItemKey === itemKey(item)"
-                    :aria-label="enabledToggleLabel(item)"
-                    @change="setItemEnabled(item, Boolean($event))"
-                  />
-                </label>
-                <button
-                  type="button"
-                  class="graph-library-page__action"
-                  :class="{ 'graph-library-page__action--danger': confirmingDeleteKey === itemKey(item) }"
-                  :disabled="actionItemKey === itemKey(item)"
-                  @click="deleteItemFromCatalog(item)"
-                >
-                  {{ confirmingDeleteKey === itemKey(item) ? t("graphLibrary.confirmDelete") : t("graphLibrary.delete") }}
-                </button>
-              </template>
-              <span v-else class="graph-library-page__readonly-note">{{ t("graphLibrary.officialReadOnly") }}</span>
-            </div>
-          </article>
+            </section>
+          </div>
         </template>
       </section>
     </section>
@@ -163,8 +165,8 @@ import {
   buildGraphLibraryItems,
   buildGraphLibraryOverview,
   filterGraphLibraryItems,
+  splitGraphLibraryItems,
   type GraphLibraryItem,
-  type GraphLibraryKindFilter,
   type GraphLibraryStatusFilter,
 } from "./graphLibraryPageModel.ts";
 
@@ -176,21 +178,29 @@ const actionError = ref<string | null>(null);
 const actionItemKey = ref<string | null>(null);
 const confirmingDeleteKey = ref<string | null>(null);
 const query = ref("");
-const kindFilter = ref<GraphLibraryKindFilter>("all");
 const statusFilter = ref<GraphLibraryStatusFilter>("all");
 const { t } = useI18n();
 
 const items = computed(() => buildGraphLibraryItems(graphs.value, templates.value));
 const overview = computed(() => buildGraphLibraryOverview(items.value));
 const filteredItems = computed(() =>
-  filterGraphLibraryItems(items.value, { query: query.value, kind: kindFilter.value, status: statusFilter.value }),
+  filterGraphLibraryItems(items.value, { query: query.value, kind: "all", status: statusFilter.value }),
 );
-const kindOptions = computed(() =>
-  (["all", "graphs", "templates"] satisfies GraphLibraryKindFilter[]).map((value) => ({
-    value,
-    label: value === "all" ? t("graphLibrary.allKinds") : t(`graphLibrary.${value}`),
-  })),
-);
+const filteredColumns = computed(() => splitGraphLibraryItems(filteredItems.value));
+const libraryColumns = computed(() => [
+  {
+    key: "templates",
+    className: "graph-library-page__column--templates",
+    title: t("graphLibrary.templates"),
+    items: filteredColumns.value.templates,
+  },
+  {
+    key: "graphs",
+    className: "graph-library-page__column--graphs",
+    title: t("graphLibrary.graphs"),
+    items: filteredColumns.value.graphs,
+  },
+]);
 const statusOptions = computed(() =>
   (["all", "active", "disabled"] satisfies GraphLibraryStatusFilter[]).map((value) => ({
     value,
@@ -428,7 +438,7 @@ onMounted(loadCatalog);
 
 .graph-library-page__toolbar {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) auto auto;
+  grid-template-columns: minmax(220px, 1fr) auto;
   gap: 14px;
   align-items: end;
   padding: 16px;
@@ -487,9 +497,56 @@ onMounted(loadCatalog);
   gap: 12px;
 }
 
+.graph-library-page__columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.graph-library-page__column,
+.graph-library-page__column-list {
+  display: grid;
+  min-width: 0;
+}
+
+.graph-library-page__column {
+  gap: 12px;
+}
+
+.graph-library-page__column-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: 0 2px;
+}
+
+.graph-library-page__column-header h3 {
+  margin: 0;
+  color: var(--graphite-text-strong);
+  font-size: 1rem;
+}
+
+.graph-library-page__column-header span {
+  flex: 0 0 auto;
+  color: rgba(60, 41, 20, 0.62);
+  font-family: var(--graphite-font-mono);
+  font-size: 0.78rem;
+}
+
+.graph-library-page__column-list {
+  gap: 12px;
+}
+
 .graph-library-page__empty,
 .graph-library-page__notice {
   padding: 24px;
+}
+
+.graph-library-page__empty--column {
+  min-height: 112px;
 }
 
 .graph-library-page__card {
@@ -574,6 +631,12 @@ onMounted(loadCatalog);
   }
 
   .graph-library-page__toolbar {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 980px) {
+  .graph-library-page__columns {
     grid-template-columns: 1fr;
   }
 }

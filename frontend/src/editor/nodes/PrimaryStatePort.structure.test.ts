@@ -19,8 +19,9 @@ test("PrimaryStatePort owns primary input and output state-pill popover presenta
   assert.match(componentSource, /`\$\{props\.nodeId\}:\$\{anchorSlotKind\.value\}:\$\{props\.port\.key\}`/);
   assert.match(componentSource, /emit\("open-create", props\.side\)/);
   assert.match(componentSource, /emit\("port-click", anchorId\.value, props\.port\.key\)/);
-  assert.match(componentSource, /if \(props\.port\.managedBySkill\) \{[\s\S]*return;/);
-  assert.match(componentSource, /v-if="side === 'output' && port\.managedBySkill"/);
+  assert.match(componentSource, /const isManagedPort = computed\(\(\) => Boolean\(props\.port\?\.managedBySkill \|\| props\.port\?\.managedByCapability\)\);/);
+  assert.match(componentSource, /if \(isManagedPort\.value\) \{[\s\S]*return;/);
+  assert.match(componentSource, /v-if="isManagedPort"/);
   assert.match(componentSource, /<Connection \/>/);
   assert.match(componentSource, /import \{ Check, Connection \} from "@element-plus\/icons-vue";/);
   assert.match(componentSource, /emit\('pointer-enter', anchorId\)/);

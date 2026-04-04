@@ -77,21 +77,39 @@ class StateWriteMode(str, Enum):
 
 class NodeSystemStateBindingKind(str, Enum):
     SKILL_OUTPUT = "skill_output"
+    CAPABILITY_RESULT = "capability_result"
 
 
 class NodeSystemStateBindingMetadata(BaseModel):
     kind: NodeSystemStateBindingKind = NodeSystemStateBindingKind.SKILL_OUTPUT
-    skill_key: str = Field(..., min_length=1, alias="skillKey")
+    skill_key: str = Field(default="", alias="skillKey")
     node_id: str = Field(..., min_length=1, alias="nodeId")
-    field_key: str = Field(..., min_length=1, alias="fieldKey")
+    field_key: str = Field(default="", alias="fieldKey")
     managed: bool = True
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
-    @field_validator("skill_key", "node_id", "field_key")
+    @field_validator("node_id")
     @classmethod
-    def validate_binding_identifier(cls, value: str) -> str:
+    def validate_required_binding_identifier(cls, value: str) -> str:
         return _validate_identifier(value, label="State binding identifier")
+
+    @field_validator("skill_key", "field_key")
+    @classmethod
+    def validate_optional_binding_identifier(cls, value: str) -> str:
+        stripped = value.strip()
+        return _validate_identifier(stripped, label="State binding identifier") if stripped else ""
+
+    @model_validator(mode="after")
+    def validate_binding_shape(self) -> "NodeSystemStateBindingMetadata":
+        if self.kind == NodeSystemStateBindingKind.SKILL_OUTPUT:
+            self.skill_key = _validate_identifier(self.skill_key, label="Skill key")
+            self.field_key = _validate_identifier(self.field_key, label="Skill output field")
+            return self
+
+        self.skill_key = ""
+        self.field_key = self.field_key or "result_package"
+        return self
 
 
 class AgentModelSource(str, Enum):
