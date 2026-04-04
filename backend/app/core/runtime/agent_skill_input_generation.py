@@ -208,6 +208,7 @@ def build_skill_input_system_prompt(
         input_values=input_values,
         bindings=bindings,
         skill_definitions=skill_definitions,
+        node=node,
     )
     if before_llm_context_lines:
         parts.extend(before_llm_context_lines)
@@ -222,6 +223,7 @@ def format_skill_before_llm_context_lines(
     input_values: dict[str, Any],
     bindings: list[ResolvedAgentSkillBinding],
     skill_definitions: dict[str, SkillDefinition],
+    node: NodeSystemAgentNode | None = None,
 ) -> list[str]:
     entries: list[tuple[str, str]] = []
     for resolved_binding in bindings:
@@ -235,6 +237,7 @@ def format_skill_before_llm_context_lines(
         payload = {
             "skill_key": skill_key,
             "graph_state": input_values,
+            "task_instruction": node.config.task_instruction if node is not None else "",
         }
         context_payload = invoke_lifecycle_before_llm(
             skill_key=skill_key,

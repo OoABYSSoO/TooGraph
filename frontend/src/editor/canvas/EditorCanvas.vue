@@ -766,7 +766,7 @@ const minimapEdges = computed(() =>
   }),
 );
 const conditionRouteTargetsByNodeId = computed(() => buildConditionRouteTargetsByNodeId(props.document));
-const resolvedCanvasLayout = computed(() => resolveCanvasLayout(props.document, measuredAnchorOffsets.value));
+const resolvedCanvasLayout = computed(() => resolveCanvasLayout(props.document, measuredAnchorOffsets.value, measuredNodeSizes.value));
 const projectedEdges = computed(() => resolvedCanvasLayout.value.edges);
 const projectedEdgeGroups = computed(() => groupProjectedCanvasEdges(projectedEdges.value));
 const flowRouteEdges = computed(() => projectedEdgeGroups.value.flowRouteEdges);

@@ -122,15 +122,63 @@ test("placeAnchors gives condition nodes a left flow entry and right-side route 
       side: anchor.side,
     })),
     [
-      { id: "branch:true", branch: "true", x: 1234, y: 365, side: "right" },
-      { id: "branch:false", branch: "false", x: 1234, y: 459, side: "right" },
-      { id: "branch:exhausted", branch: "exhausted", x: 1234, y: 553, side: "right" },
+      { id: "branch:true", branch: "true", x: 1240, y: 365, side: "right" },
+      { id: "branch:false", branch: "false", x: 1240, y: 421, side: "right" },
+      { id: "branch:exhausted", branch: "exhausted", x: 1240, y: 477, side: "right" },
     ],
   );
 });
 
-test("resolveRouteOutputRowGap derives wider branch spacing from row count instead of fixed offsets", () => {
+test("placeAnchors keeps condition route exits inside the rendered frame height", () => {
+  const model = buildAnchorModel("score_gate", conditionNode);
+  const placement = placeAnchors(model, {
+    x: 780,
+    y: 220,
+    width: 320,
+    height: 220,
+    headerHeight: 68,
+    bodyTop: 116,
+    rowGap: 44,
+    footerTop: 148,
+  });
+
+  assert.deepEqual(
+    placement.routeOutputs.map((anchor) => ({
+      branch: anchor.branch,
+      x: anchor.x,
+      y: anchor.y,
+    })),
+    [
+      { branch: "true", x: 1100, y: 300 },
+      { branch: "false", x: 1100, y: 356 },
+      { branch: "exhausted", x: 1100, y: 412 },
+    ],
+  );
+});
+
+test("placeAnchors keeps condition route exits pinned while the frame grows taller", () => {
+  const model = buildAnchorModel("score_gate", conditionNode);
+  const baseFrame = {
+    x: 780,
+    y: 220,
+    width: 460,
+    headerHeight: 68,
+    bodyTop: 116,
+    rowGap: 44,
+    footerTop: 148,
+  };
+
+  const compactPlacement = placeAnchors(model, { ...baseFrame, height: 320 });
+  const tallPlacement = placeAnchors(model, { ...baseFrame, height: 620 });
+
+  assert.deepEqual(
+    compactPlacement.routeOutputs.map((anchor) => anchor.y),
+    tallPlacement.routeOutputs.map((anchor) => anchor.y),
+  );
+});
+
+test("resolveRouteOutputRowGap keeps route handles compact without overlapping", () => {
   assert.equal(resolveRouteOutputRowGap(0, 52), 52);
   assert.equal(resolveRouteOutputRowGap(1, 52), 52);
-  assert.equal(resolveRouteOutputRowGap(3, 52), 94);
+  assert.equal(resolveRouteOutputRowGap(3, 52), 56);
 });

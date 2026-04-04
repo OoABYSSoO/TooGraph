@@ -238,7 +238,7 @@
       "ui": {
         "position": { "x": 1900, "y": 260 },
         "collapsed": false,
-        "size": { "width": 280, "height": 180 }
+        "size": { "width": 560, "height": 280 }
       },
       "reads": [{ "state": "evidence_review", "required": true }],
       "writes": [],
@@ -261,7 +261,7 @@
       "name": "筛选关键依据",
       "description": "从原文中挑出最重要的依据文档和支持点。",
       "ui": {
-        "position": { "x": 2260, "y": 200 },
+        "position": { "x": 2520, "y": 200 },
         "collapsed": false,
         "size": { "width": 420, "height": 300 }
       },
@@ -289,7 +289,7 @@
       "name": "整理最终回复",
       "description": "基于关键依据和原文生成给用户看的最终结果。",
       "ui": {
-        "position": { "x": 2760, "y": 200 },
+        "position": { "x": 3020, "y": 200 },
         "collapsed": false,
         "size": { "width": 420, "height": 300 }
       },
@@ -316,7 +316,7 @@
       "name": "最终回复",
       "description": "展示最终整理结果。",
       "ui": {
-        "position": { "x": 3260, "y": 60 },
+        "position": { "x": 3520, "y": 60 },
         "collapsed": false,
         "size": { "width": 420, "height": 260 }
       },

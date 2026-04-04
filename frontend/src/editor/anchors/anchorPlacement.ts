@@ -1,10 +1,11 @@
 import type { AnchorDescriptor, NodeAnchorModel } from "./anchorModel.ts";
-import { FLOW_OUT_HOTSPOT_GEOMETRY } from "../flowHandleGeometry.ts";
+import { ROUTE_OUT_HOTSPOT_GEOMETRY } from "../flowHandleGeometry.ts";
 
 export type NodeFrame = {
   x: number;
   y: number;
   width: number;
+  height?: number;
   headerHeight: number;
   bodyTop: number;
   rowGap: number;
@@ -31,6 +32,7 @@ export type PlacedAnchorSet = {
 const EDGE_PORT_INSET = 6;
 const BODY_OUTPUT_PORT_INSET = 40;
 const BODY_PORT_ROW_CENTER_OFFSET = 29;
+const ROUTE_OUTPUT_EDGE_INSET = 28;
 
 export function placeAnchors(model: NodeAnchorModel, frame: NodeFrame): PlacedAnchorSet {
   return {
@@ -46,15 +48,67 @@ export function resolveRouteOutputRowGap(routeOutputCount: number, bodyRowGap: n
   if (routeOutputCount <= 1) {
     return bodyRowGap;
   }
-  return Math.max((bodyRowGap * routeOutputCount) / (routeOutputCount - 1), FLOW_OUT_HOTSPOT_GEOMETRY.height);
+  return Math.max(bodyRowGap, ROUTE_OUT_HOTSPOT_GEOMETRY.centerGap);
 }
 
 function placeRouteOutputs(anchors: AnchorDescriptor[], frame: NodeFrame): PlacedAnchor[] {
+  if (anchors.length <= 0) {
+    return [];
+  }
+  if (hasFrameHeight(frame)) {
+    return anchors.map((anchor, index) => placeRouteAnchor(anchor, frame, index, anchors.length));
+  }
   const routeFrame = {
     ...frame,
     rowGap: resolveRouteOutputRowGap(anchors.length, frame.rowGap),
   };
   return anchors.map((anchor) => placeAnchor(anchor, routeFrame)).filter(Boolean) as PlacedAnchor[];
+}
+
+function placeRouteAnchor(anchor: AnchorDescriptor, frame: NodeFrame & { height: number }, index: number, count: number): PlacedAnchor {
+  const topOffset = resolveRouteOutputTopOffset(frame);
+  const yOffset = resolveRouteOutputYOffset(frame, index, count, topOffset);
+  return {
+    id: anchor.id,
+    x: resolveX(anchor, frame),
+    y: frame.y + yOffset,
+    side: anchor.side,
+    ...(anchor.stateKey ? { stateKey: anchor.stateKey } : {}),
+    ...(anchor.branch ? { branch: anchor.branch } : {}),
+  };
+}
+
+function resolveRouteOutputYOffset(
+  frame: NodeFrame & { height: number },
+  index: number,
+  count: number,
+  topOffset: number,
+) {
+  if (count <= 1) {
+    return Math.round(topOffset);
+  }
+
+  const rowGap = resolveRouteOutputRowGap(count, frame.rowGap);
+  const groupHeight = rowGap * (count - 1);
+  const minTop = ROUTE_OUTPUT_EDGE_INSET;
+  const maxTop = Math.max(minTop, frame.height - ROUTE_OUTPUT_EDGE_INSET - groupHeight);
+  const groupTop = clamp(topOffset, minTop, maxTop);
+
+  return Math.round(groupTop + rowGap * index);
+}
+
+function resolveRouteOutputTopOffset(frame: NodeFrame & { height: number }) {
+  const preferredTop = frame.bodyTop + BODY_PORT_ROW_CENTER_OFFSET;
+  const maxTop = Math.max(ROUTE_OUTPUT_EDGE_INSET, frame.height - ROUTE_OUTPUT_EDGE_INSET);
+  return clamp(preferredTop, ROUTE_OUTPUT_EDGE_INSET, maxTop);
+}
+
+function hasFrameHeight(frame: NodeFrame): frame is NodeFrame & { height: number } {
+  return typeof frame.height === "number" && Number.isFinite(frame.height) && frame.height > 0;
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
 }
 
 function placeAnchor(anchor: AnchorDescriptor | null, frame: NodeFrame): PlacedAnchor | null {
@@ -84,7 +138,7 @@ function resolveX(anchor: AnchorDescriptor, frame: NodeFrame): number {
   }
   if (anchor.side === "right") {
     if (anchor.branch) {
-      return frame.x + frame.width - EDGE_PORT_INSET;
+      return frame.x + frame.width;
     }
     return frame.x + frame.width - (anchor.lane === "body" ? BODY_OUTPUT_PORT_INSET : EDGE_PORT_INSET);
   }
