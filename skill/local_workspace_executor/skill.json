@@ -1,0 +1,128 @@
+{
+  "schemaVersion": "graphite.skill/v1",
+  "skillKey": "local_workspace_executor",
+  "name": "Local Workspace Executor",
+  "description": "当用户需要在 GraphiteUI 本地工作区白名单内读取文件、写入 backend/data 下文件，或执行 backend/data 下的临时脚本时选择此技能。",
+  "llmInstruction": "你已绑定 Local Workspace Executor。根据当前图 state 和用户意图生成一个受控本地操作。action 只能是 read、list、write、append、execute。read/list 需要 path；write/append 需要 path 和 content；execute 需要 path，并可附带 args、cwd、timeout_seconds。默认只能写 backend/data，默认只能执行 backend/data/tmp 或 backend/data/skills/user 下的脚本；不要尝试访问 .git、.env 或 backend/data/settings。运行结果由技能脚本返回，不要伪造 stdout、stderr、exit_code 或错误信息。",
+  "version": "1.0.0",
+  "timeoutSeconds": 120,
+  "capabilityPolicy": {
+    "default": {
+      "selectable": true,
+      "requiresApproval": true
+    },
+    "origins": {
+      "companion": {
+        "selectable": true,
+        "requiresApproval": true
+      }
+    }
+  },
+  "permissions": ["file_read", "file_write", "subprocess"],
+  "inputSchema": [
+    {
+      "key": "action",
+      "name": "Action",
+      "valueType": "text",
+      "required": true,
+      "description": "要执行的操作：read、list、write、append 或 execute。"
+    },
+    {
+      "key": "path",
+      "name": "Path",
+      "valueType": "text",
+      "required": true,
+      "description": "仓库内相对路径。write/append 默认只允许 backend/data；execute 默认只允许 backend/data/tmp 或 backend/data/skills/user。"
+    },
+    {
+      "key": "content",
+      "name": "Content",
+      "valueType": "text",
+      "required": false,
+      "description": "write 或 append 操作写入的文本内容。"
+    },
+    {
+      "key": "args",
+      "name": "Arguments",
+      "valueType": "json",
+      "required": false,
+      "description": "execute 操作传给脚本的参数数组。"
+    },
+    {
+      "key": "cwd",
+      "name": "Working Directory",
+      "valueType": "text",
+      "required": false,
+      "description": "execute 操作的工作目录；必须位于可执行白名单内，缺省为脚本所在目录。"
+    },
+    {
+      "key": "timeout_seconds",
+      "name": "Timeout Seconds",
+      "valueType": "number",
+      "required": false,
+      "description": "execute 操作超时时间，默认 30 秒，最大 120 秒。"
+    }
+  ],
+  "outputSchema": [
+    {
+      "key": "status",
+      "name": "Status",
+      "valueType": "text",
+      "description": "操作状态：succeeded 或 failed。"
+    },
+    {
+      "key": "summary",
+      "name": "Summary",
+      "valueType": "markdown",
+      "description": "操作摘要。"
+    },
+    {
+      "key": "action",
+      "name": "Action",
+      "valueType": "text",
+      "description": "实际执行的操作。"
+    },
+    {
+      "key": "path",
+      "name": "Path",
+      "valueType": "text",
+      "description": "实际处理的仓库相对路径。"
+    },
+    {
+      "key": "content",
+      "name": "Content",
+      "valueType": "text",
+      "description": "read 操作读取到的文本内容。"
+    },
+    {
+      "key": "entries",
+      "name": "Entries",
+      "valueType": "json",
+      "description": "list 操作返回的目录项。"
+    },
+    {
+      "key": "stdout",
+      "name": "Stdout",
+      "valueType": "text",
+      "description": "execute 操作标准输出。"
+    },
+    {
+      "key": "stderr",
+      "name": "Stderr",
+      "valueType": "text",
+      "description": "execute 操作标准错误输出。"
+    },
+    {
+      "key": "exit_code",
+      "name": "Exit Code",
+      "valueType": "number",
+      "description": "execute 操作退出码；非执行操作为 0。"
+    },
+    {
+      "key": "errors",
+      "name": "Errors",
+      "valueType": "json",
+      "description": "结构化错误列表。"
+    }
+  ]
+}
