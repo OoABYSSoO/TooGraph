@@ -99,13 +99,13 @@
 - 输出语义：`query`、`source_urls`、`artifact_paths`、`errors` 通过 managed binding state 透传；后续 LLM 节点读取 `artifact_paths` 对应的本地原文，负责证据筛选和最终总结。模板只公开 `final_reply` 这一个 output 节点，关键依据笔记和原文路径属于内部中间 state，不直接连接 output 节点。
 - 模型语义：模板默认使用全局模型配置，不写死某个 provider。LLM 节点和桌宠模型下拉的第一项是“全局（实时读取当前全局设定的模型）”，后面才是具体模型 override。若全局本地网关未启动，运行该模板前需要在 Model Providers 页面选择可用模型，或在图中为 LLM 节点设置 override。
 
-创建用户自定义 Skill 的旧官方模板已删除。当前由 `graphiteUI_skill_builder` 承担窄职责的 Skill 生成能力：只根据需求产出 `skill.json`、`SKILL.md` 以及必要的 `before_llm.py` / `after_llm.py` 文件内容，写入、测试、修复和回滚不由该 Skill 执行；测试环节可由后续图流程调用 `graphiteUI_script_tester` 这类专门能力完成。
+创建用户自定义 Skill 的旧官方模板已删除。当前由 `graphiteUI_skill_builder` 承担窄职责的 Skill 生成能力：只根据需求产出 `skill_key`、`skill.json`、`SKILL.md` 以及必要的 `before_llm.py` / `after_llm.py` / `requirements.txt` 内容，写入、测试、修复和回滚不由该 Skill 执行；测试环节可由后续图流程调用 `graphiteUI_script_tester` 这类专门能力完成。
 
 ### `graphiteUI_skill_builder`
 
 - 位置：`skill/graphiteUI_skill_builder/`
-- 作用：根据用户需求和已确认设计生成一个 GraphiteUI Skill 包的四类文件内容。
-- 生命周期：`before_llm.py` 注入当前 `skill/SKILL_AUTHORING_GUIDE.md`；`after_llm.py` 只规范化 `skill_json`、`skill_md`、`before_llm_py`、`after_llm_py` 四个输出字段。
+- 作用：根据用户需求和已确认设计生成一个 GraphiteUI Skill 包的身份和文件内容。
+- 生命周期：`before_llm.py` 注入当前 `skill/SKILL_AUTHORING_GUIDE.md`；`after_llm.py` 只规范化 `skill_key`、`skill_json`、`skill_md`、`before_llm_py`、`after_llm_py`、`requirements_txt` 六个输出字段。
 - 边界：不写入 `backend/data/skills/user/`，不安装、不启用、不运行测试、不修复生成文件，也不修改官方 Skill 目录。
 
 ## 当前前端能力

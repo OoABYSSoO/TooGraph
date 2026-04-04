@@ -43,11 +43,11 @@ class GraphiteUiSkillBuilderSkillTests(unittest.TestCase):
         self.assertEqual(definition.permissions, ["file_read"])
         self.assertEqual(
             [field.key for field in definition.input_schema],
-            ["skill_json", "skill_md", "before_llm_py", "after_llm_py"],
+            ["skill_key", "skill_json", "skill_md", "before_llm_py", "after_llm_py", "requirements_txt"],
         )
         self.assertEqual(
             [field.key for field in definition.output_schema],
-            ["skill_json", "skill_md", "before_llm_py", "after_llm_py"],
+            ["skill_key", "skill_json", "skill_md", "before_llm_py", "after_llm_py", "requirements_txt"],
         )
 
     def test_before_llm_injects_current_skill_authoring_guide_boundaries(self) -> None:
@@ -57,11 +57,12 @@ class GraphiteUiSkillBuilderSkillTests(unittest.TestCase):
         self.assertIn("GraphiteUI Skill 编写指南", context)
         self.assertIn("skill.json", context)
         self.assertIn("SKILL.md", context)
+        self.assertIn("requirements.txt", context)
         self.assertIn("before_llm.py", context)
         self.assertIn("after_llm.py", context)
         self.assertIn("不直接写图 state", context)
 
-    def test_after_llm_returns_exactly_the_four_skill_file_content_fields(self) -> None:
+    def test_after_llm_returns_exactly_the_skill_identity_and_file_content_fields(self) -> None:
         skill_json = {
             "schemaVersion": "graphite.skill/v1",
             "skillKey": "tone_rewriter",
@@ -73,19 +74,40 @@ class GraphiteUiSkillBuilderSkillTests(unittest.TestCase):
         payload = _run_skill_script(
             BUILDER_AFTER_LLM_PATH,
             {
+                "skill_key": "tone_rewriter",
                 "skill_json": json.dumps(skill_json),
                 "skill_md": "```markdown\n# Tone Rewriter\n\nRewrites text.\n```",
                 "before_llm_py": "",
                 "after_llm_py": "```python\nprint('{}')\n```",
+                "requirements_txt": "```text\npytest>=8,<9\n```",
                 "ignored": "do not leak",
             },
         )
 
-        self.assertEqual(set(payload), {"skill_json", "skill_md", "before_llm_py", "after_llm_py"})
+        self.assertEqual(
+            set(payload),
+            {"skill_key", "skill_json", "skill_md", "before_llm_py", "after_llm_py", "requirements_txt"},
+        )
+        self.assertEqual(payload["skill_key"], "tone_rewriter")
         self.assertEqual(payload["skill_json"], skill_json)
         self.assertEqual(payload["skill_md"], "# Tone Rewriter\n\nRewrites text.")
         self.assertEqual(payload["before_llm_py"], "")
         self.assertEqual(payload["after_llm_py"], "print('{}')")
+        self.assertEqual(payload["requirements_txt"], "pytest>=8,<9")
+
+    def test_after_llm_derives_skill_key_from_skill_json_when_missing(self) -> None:
+        payload = _run_skill_script(
+            BUILDER_AFTER_LLM_PATH,
+            {
+                "skill_json": {"skillKey": "json_only_skill"},
+                "skill_md": "# Json Only Skill",
+                "before_llm_py": "",
+                "after_llm_py": "",
+                "requirements_txt": "",
+            },
+        )
+
+        self.assertEqual(payload["skill_key"], "json_only_skill")
 
 
 if __name__ == "__main__":

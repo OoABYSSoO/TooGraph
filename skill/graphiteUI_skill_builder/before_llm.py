@@ -16,7 +16,7 @@ def graphiteui_skill_builder_before_llm(**payload: Any) -> dict[str, str]:
         return {
             "context": (
                 "GraphiteUI Skill authoring guide was not found. "
-                "Generate only skill_json, skill_md, before_llm_py and after_llm_py. "
+                "Generate only skill_key, skill_json, skill_md, before_llm_py, after_llm_py and requirements_txt. "
                 "Do not write files or install the generated Skill."
             )
         }
@@ -25,7 +25,7 @@ def graphiteui_skill_builder_before_llm(**payload: Any) -> dict[str, str]:
     return {
         "context": (
             "Use the following active GraphiteUI Skill authoring guide. "
-            "Generate file contents only; do not write files, install, test, repair or create templates.\n\n"
+            "Generate Skill identity and file contents only; do not write files, install, test, repair or create templates.\n\n"
             f"{trimmed}{suffix}"
         )
     }
