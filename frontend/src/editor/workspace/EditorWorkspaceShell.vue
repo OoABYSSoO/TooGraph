@@ -236,7 +236,7 @@ import {
 } from "@/api/graphs";
 import { resolveAgentRuntimeCatalog } from "@/editor/nodes/agentConfigModel";
 import EditorCanvas from "@/editor/canvas/EditorCanvas.vue";
-import { clonePlainValue } from "@/lib/graph-document";
+import { clonePlainValue, reconcileAgentSkillOutputBindingsInDocument } from "@/lib/graph-document";
 import type { NodeFocusRequest } from "@/editor/canvas/useNodeSelectionFocus";
 import type { CreatedStateEdgeEditorRequest, NodeCreationMenuState } from "@/editor/workspace/nodeCreationMenuModel";
 import {
@@ -978,6 +978,25 @@ watch(
     ensureUnsavedTabDocuments();
   },
   { deep: true },
+);
+
+function reconcileOpenDocumentsWithSkillDefinitions() {
+  if (!hydrated.value || skillDefinitions.value.length === 0) {
+    return;
+  }
+
+  for (const [tabId, document] of Object.entries(documentsByTabId.value)) {
+    const nextDocument = reconcileAgentSkillOutputBindingsInDocument(document, skillDefinitions.value);
+    if (nextDocument !== document) {
+      markDocumentDirty(tabId, nextDocument);
+    }
+  }
+}
+
+watch(
+  [() => documentsByTabId.value, () => skillDefinitions.value],
+  reconcileOpenDocumentsWithSkillDefinitions,
+  { deep: false },
 );
 
 watch(

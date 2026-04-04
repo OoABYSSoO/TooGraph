@@ -15,6 +15,7 @@ const {
   createEmptyDraftGraph,
   isAgentBreakpointEnabledInDocument,
   pruneUnreferencedStateSchemaInDocument,
+  reconcileAgentSkillOutputBindingsInDocument,
   reorderNodePortStateInDocument,
   resolveEditorSeedTemplate,
   resolveAgentBreakpointTimingInDocument,
@@ -53,6 +54,38 @@ const webSearchSkill: SkillDefinition = {
   runtimeRegistered: true,
   status: "active",
   canManage: true,
+};
+
+const localWorkspaceExecutorSkill: SkillDefinition = {
+  skillKey: "local_workspace_executor",
+  name: "Local Workspace Executor",
+  description: "Run one local workspace operation.",
+  llmInstruction: "Prepare one local workspace operation.",
+  schemaVersion: "graphite.skill/v1",
+  version: "1.0.0",
+  capabilityPolicy: {
+    default: { selectable: true, requiresApproval: true },
+    origins: {},
+  },
+  permissions: ["file_read", "file_write", "subprocess"],
+  runtime: { type: "python", entrypoint: "after_llm.py" },
+  inputSchema: [
+    { key: "path", name: "Path", valueType: "text", required: true, description: "" },
+    { key: "operation", name: "Operation", valueType: "text", required: true, description: "" },
+    { key: "content", name: "Content", valueType: "text", required: false, description: "" },
+  ],
+  outputSchema: [
+    { key: "success", name: "Success", valueType: "boolean", required: false, description: "操作是否成功。" },
+    { key: "result", name: "Result", valueType: "markdown", required: false, description: "成功输出或失败报错内容。" },
+  ],
+  llmNodeEligibility: "ready",
+  llmNodeBlockers: [],
+  sourceScope: "official",
+  sourcePath: "/skills/local_workspace_executor/skill.json",
+  runtimeReady: true,
+  runtimeRegistered: true,
+  status: "active",
+  canManage: false,
 };
 
 const template: TemplateRecord = {
@@ -521,14 +554,14 @@ test("updateAgentNodeConfigInDocument materializes attached skill outputs as man
       },
     },
   ]);
-  assert.equal(nextDocument.state_schema.state_1?.name, "联网搜索 Query");
+  assert.equal(nextDocument.state_schema.state_1?.name, "Query");
   assert.equal(nextDocument.state_schema.state_1?.description, "Search query.");
   assert.equal(nextDocument.state_schema.state_1?.type, "text");
   assert.equal(nextDocument.state_schema.state_2?.type, "json");
-  assert.equal(nextDocument.state_schema.state_2?.name, "联网搜索 Source URLs");
+  assert.equal(nextDocument.state_schema.state_2?.name, "Source URLs");
   assert.equal(nextDocument.state_schema.state_2?.description, "URLs.");
   assert.equal(nextDocument.state_schema.state_3?.type, "file");
-  assert.equal(nextDocument.state_schema.state_3?.name, "联网搜索 Artifact Paths");
+  assert.equal(nextDocument.state_schema.state_3?.name, "Artifact Paths");
   assert.equal(nextDocument.state_schema.state_3?.description, "Files.");
   assert.equal("promptVisible" in (nextDocument.state_schema.state_1 ?? {}), false);
   assert.equal("promptVisible" in (nextDocument.state_schema.state_2 ?? {}), false);
@@ -696,6 +729,189 @@ test("updateAgentNodeConfigInDocument does not create static skill input mapping
   const node = nextDocument.nodes.search_agent;
   assert.equal(node.kind, "agent");
   assert.equal("inputMapping" in (node.config.skillBindings?.[0] ?? {}), false);
+});
+
+test("reconcileAgentSkillOutputBindingsInDocument prunes stale managed outputs for the attached skill schema", () => {
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Stale Local Executor Outputs",
+    state_schema: {
+      state_status: {
+        name: "Local Workspace Executor Status",
+        description: "Old status output.",
+        type: "text",
+        value: "",
+        color: "#d97706",
+        binding: {
+          kind: "skill_output",
+          skillKey: "local_workspace_executor",
+          nodeId: "executor",
+          fieldKey: "status",
+          managed: true,
+        },
+      },
+      state_summary: {
+        name: "Local Workspace Executor Summary",
+        description: "Old summary output.",
+        type: "markdown",
+        value: "",
+        color: "#2563eb",
+        binding: {
+          kind: "skill_output",
+          skillKey: "local_workspace_executor",
+          nodeId: "executor",
+          fieldKey: "summary",
+          managed: true,
+        },
+      },
+    },
+    nodes: {
+      executor: {
+        kind: "agent",
+        name: "Executor",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [
+          { state: "state_status", mode: "replace" },
+          { state: "state_summary", mode: "replace" },
+        ],
+        config: {
+          skillKey: "local_workspace_executor",
+          skillBindings: [
+            {
+              skillKey: "local_workspace_executor",
+              outputMapping: {
+                status: "state_status",
+                summary: "state_summary",
+              },
+            },
+          ],
+          skillInstructionBlocks: {},
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "high",
+          temperature: 0.2,
+        },
+      },
+      output: {
+        kind: "output",
+        name: "Output",
+        description: "",
+        ui: { position: { x: 420, y: 0 } },
+        reads: [{ state: "state_summary", required: true }],
+        writes: [],
+        config: { channel: "final", format: "markdown", persistFormat: "none", fileNameTemplate: "" },
+      },
+    },
+    edges: [{ source: "executor", target: "output" }],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const nextDocument = reconcileAgentSkillOutputBindingsInDocument(document, [localWorkspaceExecutorSkill]);
+  const executor = nextDocument.nodes.executor;
+
+  assert.notEqual(nextDocument, document);
+  assert.equal(executor.kind, "agent");
+  assert.equal(nextDocument.state_schema.state_status, undefined);
+  assert.equal(nextDocument.state_schema.state_summary, undefined);
+  assert.deepEqual(executor.writes.map((binding) => binding.state), ["state_1", "state_2"]);
+  assert.equal(nextDocument.nodes.output.reads.length, 0);
+  assert.deepEqual(nextDocument.edges, []);
+  assert.deepEqual(executor.config.skillBindings, [
+    {
+      skillKey: "local_workspace_executor",
+      outputMapping: {
+        success: "state_1",
+        result: "state_2",
+      },
+    },
+  ]);
+  assert.equal(nextDocument.state_schema.state_1?.name, "Success");
+  assert.equal(nextDocument.state_schema.state_1?.type, "boolean");
+  assert.equal(nextDocument.state_schema.state_2?.name, "Result");
+  assert.equal(nextDocument.state_schema.state_2?.type, "markdown");
+});
+
+test("reconcileAgentSkillOutputBindingsInDocument shortens existing managed output names", () => {
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Long Managed Output Names",
+    state_schema: {
+      executor_success: {
+        name: "Local Workspace Executor Success",
+        description: "Old generated success label.",
+        type: "boolean",
+        value: false,
+        color: "#10b981",
+        binding: {
+          kind: "skill_output",
+          skillKey: "local_workspace_executor",
+          nodeId: "executor",
+          fieldKey: "success",
+          managed: true,
+        },
+      },
+      executor_result: {
+        name: "Local Workspace Executor Result",
+        description: "Old generated result label.",
+        type: "markdown",
+        value: "",
+        color: "#2563eb",
+        binding: {
+          kind: "skill_output",
+          skillKey: "local_workspace_executor",
+          nodeId: "executor",
+          fieldKey: "result",
+          managed: true,
+        },
+      },
+    },
+    nodes: {
+      executor: {
+        kind: "agent",
+        name: "Executor",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [
+          { state: "executor_success", mode: "replace" },
+          { state: "executor_result", mode: "replace" },
+        ],
+        config: {
+          skillKey: "local_workspace_executor",
+          skillBindings: [
+            {
+              skillKey: "local_workspace_executor",
+              outputMapping: {
+                success: "executor_success",
+                result: "executor_result",
+              },
+            },
+          ],
+          skillInstructionBlocks: {},
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "high",
+          temperature: 0.2,
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const nextDocument = reconcileAgentSkillOutputBindingsInDocument(document, [localWorkspaceExecutorSkill]);
+
+  assert.notEqual(nextDocument, document);
+  assert.equal(nextDocument.state_schema.executor_success?.name, "Success");
+  assert.equal(nextDocument.state_schema.executor_success?.description, "操作是否成功。");
+  assert.equal(nextDocument.state_schema.executor_result?.name, "Result");
+  assert.equal(nextDocument.state_schema.executor_result?.description, "成功输出或失败报错内容。");
 });
 
 test("connectStateBindingInDocument materializes dynamic capability result package outputs", () => {
