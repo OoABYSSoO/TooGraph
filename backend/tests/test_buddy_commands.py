@@ -17,7 +17,7 @@ from app.main import app
 class BuddyCommandRouteTests(unittest.TestCase):
     def test_profile_update_command_records_command_and_revision(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            with patch.object(store, "BUDDY_DATA_DIR", Path(temp_dir)):
+            with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"):
                 with TestClient(app) as client:
                     response = client.post(
                         "/api/buddy/commands",
@@ -51,7 +51,7 @@ class BuddyCommandRouteTests(unittest.TestCase):
 
     def test_memory_delete_command_soft_deletes_and_reports_revision(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            with patch.object(store, "BUDDY_DATA_DIR", Path(temp_dir)):
+            with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"):
                 with TestClient(app) as client:
                     created_response = client.post(
                         "/api/buddy/commands",
@@ -97,7 +97,7 @@ class BuddyCommandRouteTests(unittest.TestCase):
         }
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            with patch.object(store, "BUDDY_DATA_DIR", Path(temp_dir)):
+            with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"):
                 with TestClient(app) as client:
                     response = client.post(
                         "/api/buddy/commands",
@@ -131,7 +131,7 @@ class BuddyCommandRouteTests(unittest.TestCase):
 
     def test_graph_patch_draft_rejects_empty_patch(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            with patch.object(store, "BUDDY_DATA_DIR", Path(temp_dir)):
+            with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"):
                 with TestClient(app) as client:
                     response = client.post(
                         "/api/buddy/commands",
@@ -145,7 +145,7 @@ class BuddyCommandRouteTests(unittest.TestCase):
 
     def test_command_rejects_unsupported_action(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            with patch.object(store, "BUDDY_DATA_DIR", Path(temp_dir)):
+            with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"):
                 with TestClient(app) as client:
                     response = client.post(
                         "/api/buddy/commands",

@@ -17,7 +17,7 @@ from app.main import app
 class BuddyRouteTests(unittest.TestCase):
     def test_profile_roundtrip_creates_revision(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            with patch.object(store, "BUDDY_DATA_DIR", Path(temp_dir)):
+            with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"):
                 with TestClient(app) as client:
                     get_response = client.get("/api/buddy/profile")
                     put_response = client.put(
@@ -34,7 +34,7 @@ class BuddyRouteTests(unittest.TestCase):
 
     def test_memory_delete_and_restore(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            with patch.object(store, "BUDDY_DATA_DIR", Path(temp_dir)):
+            with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"):
                 with TestClient(app) as client:
                     created = client.post(
                         "/api/buddy/memories",

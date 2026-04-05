@@ -67,6 +67,7 @@ frontend/out/
 frontend/*.tsbuildinfo
 
 # Backend local runtime files
+/buddy_home/
 backend/.venv/
 backend/*.db
 backend/*.sqlite

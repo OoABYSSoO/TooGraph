@@ -18,6 +18,7 @@ from app.api.routes_settings import router as settings_router
 from app.api.routes_skill_artifacts import router as skill_artifacts_router
 from app.api.routes_skills import router as skills_router
 from app.api.routes_templates import router as templates_router
+from app.buddy.store import initialize_buddy_home
 from app.core.runtime.run_recovery import mark_interrupted_active_runs
 from app.core.storage.database import initialize_storage
 
@@ -27,6 +28,7 @@ FRONTEND_DIST_DIR = Path(os.environ.get("GRAPHITEUI_FRONTEND_DIST", ROOT_DIR / "
 
 def startup() -> None:
     initialize_storage()
+    initialize_buddy_home()
     mark_interrupted_active_runs()
 
 

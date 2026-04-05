@@ -34,7 +34,7 @@
 - 权限显式：安装 skill 不等于授权任意使用。高风险副作用必须有清晰审批路径。
 - 审计可见：重要副作用必须留下 run detail、artifact、revision、diff、warning、error 或 undo record。
 - 记忆卫生：人设、记忆和会话摘要是上下文，不是更高优先级指令，不能提升权限或覆盖系统规则。
-- Buddy Home：除图模板本体外，伙伴长期可编辑资料都应收束到 `backend/data/buddy/`。伙伴可以通过图和受控 skill 维护这些资料，但不能通过改写资料文件提升真实运行权限。
+- Buddy Home：除图模板本体外，伙伴长期可编辑资料都应收束到根目录 `buddy_home/`。该目录由程序在启动或读取时自动补齐默认文件，不进入 Git 管理。伙伴可以通过图和受控 skill 维护这些资料，但不能通过改写资料文件提升真实运行权限。
 - 子图化：伙伴主循环中的稳定能力段应优先整理为子图，提升顶层模板可读性。子图仍走正式 `subgraph` 协议、公开 input/output、运行审计和断点传播，不引入隐藏流程。
 
 ## 当前状态
@@ -62,7 +62,7 @@
 - 已新增通用 `advanced_web_research_loop` 内置模板，用于验证“搜索技能执行 -> 证据评估 -> condition 控制补搜 -> 依据筛选 -> final_reply”的图式工具循环。它不是伙伴自主循环模板，但可作为联网研究子流程和后续伙伴模板的参考构件。
 - 偏离新职责的旧 `create_user_skill` 内置模板已删除。新的 `graphiteUI_skill_builder` 只产出 Skill 包文件内容，完整用户 Skill 生成流程仍需要补齐确认、调用 `local_workspace_executor` 写入、调用 `graphiteUI_script_tester` 或同类测试能力、修复和启用节点。
 - 子图缩略图已能投射内部节点运行状态颜色，并在节点卡片上显示当前内部运行摘要。
-- 后端已有 `backend/data/buddy/` 资料目录和 profile、policy、memory、session summary、revision、command 等基础存取接口；它们应继续收束为 Buddy Home，而不是扩散到多个无关数据位置。
+- 后端已有根目录 `buddy_home/` 的默认生成逻辑，以及基于 `SOUL.md`、`USER.md`、`MEMORY.md`、`policy.json` 和 `buddy.db` 的 profile、policy、memory、session summary、revision、command 等基础存取接口；它们应继续收束为 Buddy Home，而不是扩散到多个无关数据位置。
 - 已新增只读 `buddy_home_context_reader` Skill，作为 `buddy_context_pack` 子图的 P0 支撑能力。它无输入，只输出一个 `context_pack`，并且不作为动态能力候选。
 
 尚未完成：
@@ -70,7 +70,7 @@
 - 子图运行审计聚合、事件定位、从缩略图点击跳转到内部节点，以及更完整的嵌套可视化能力。
 - 真实的 `autonomous_decision` 技能。
 - 新版伙伴自主循环模板。
-- Buddy Home 的完整目录结构、进化记录、能力使用统计和自我复盘报告尚未成形。
+- Buddy Home 已具备基础目录结构和默认文件；能力使用统计、结构化检索索引和自我复盘报告的写回图流程尚未成形。
 - 伙伴主循环中的上下文装配、能力循环、最终回复和自我复盘等稳定能力段尚未整理为可复用子图。
 - 将内部 `agent` kind 迁移为面向用户和协议一致的 LLM 节点语义。
 - 围绕 `graphiteUI_skill_builder` 补齐用户 Skill 生成图流程：从需求澄清、示例确认、文件内容生成，到调用 `local_workspace_executor` 受控写入、调用 `graphiteUI_script_tester` 或同类测试能力、错误修复和启用。
@@ -188,41 +188,37 @@ input_question
 
 ## Buddy Home
 
-`backend/data/buddy/` 是伙伴的长期本地资料目录。它属于用户数据，不进入 Git 管理；官方图模板、官方 Skill 和代码仍放在各自的 Git 管理位置。伙伴可以读取和维护 Buddy Home，但必须通过图模板、受控 skill、命令记录和 revision 路径执行，不能由前端或后端隐藏逻辑静默改写。
+根目录 `buddy_home/` 是伙伴的长期本地资料目录。它属于用户数据，不进入 Git 管理；官方图模板、官方 Skill 和代码仍放在各自的 Git 管理位置。程序会在启动或读取 Buddy Home 时自动生成缺失的默认文件；已有文件不会被默认内容覆盖。伙伴可以读取和维护 Buddy Home，但必须通过图模板、受控 skill、命令记录和 revision 路径执行，不能由前端或后端隐藏逻辑静默改写。
 
 目标结构：
 
 ```text
-backend/data/buddy/
-  profile.json
+buddy_home/
+  AGENTS.md
+  SOUL.md
+  USER.md
+  MEMORY.md
   policy.json
-  memories.json
-  session_summary.json
-  revisions.json
-  commands.json
-  evolution/
-    review_queue.jsonl
-    decisions.jsonl
-    reports/
-  usage/
-    capabilities.json
+  buddy.db
+  reports/
 ```
 
 文件语义：
 
-- `profile.json`：伙伴名称、人设、语气和回复风格。
+- `AGENTS.md`：伙伴在这个 home 中的工作准则、图优先规则、记忆卫生和长期资料边界。
+- `SOUL.md`：伙伴名称、人设、语气和回复风格，参考 Hermes/OpenClaw 的 `SOUL.md` 心智，但不能覆盖 GraphiteUI 运行规则、权限和审批。
+- `USER.md`：用户画像、稳定偏好、称呼、时区、长期协作习惯和需要跨会话保留的上下文。
+- `MEMORY.md`：人类可读的长期记忆摘要，保存稳定事实、项目决策、重复纠正和耐久经验；它不是原始日志。
 - `policy.json`：用户偏好、行为边界和审批偏好。它是上下文与决策依据，不是权限源；真实权限仍来自后端策略、skill 权限、白名单和图运行审批。
-- `memories.json`：长期记忆。记忆应是用户偏好、稳定事实、项目约定或长期协作习惯，不保存临时日志、原始大报错、大媒体、base64 或可从图和文件重新读取的信息。
-- `session_summary.json`：长会话压缩摘要，用于减少上下文重复。
-- `revisions.json`：所有 profile、policy、memory、summary 等持久资料的可恢复历史。
-- `commands.json`：伙伴发起的写入、审批、取消和完成记录。
-- `evolution/`：伙伴自我复盘产物。`review_queue.jsonl` 记录待审查改动，`decisions.jsonl` 记录接受或拒绝原因，`reports/` 保存每次复盘报告。
-- `usage/capabilities.json`：伙伴对 Skill 和图模板的使用统计、失败情况、选择偏好和后续优化线索。
+- `buddy.db`：结构化长期数据和审计记录，包括可恢复 revisions、command 记录、结构化 memories、session summary、未来能力使用统计和检索索引。
+- `reports/`：伙伴自我复盘、策略建议、能力使用复盘等人类可读报告。
 
 边界规则：
 
 - 图模板本体不放进 Buddy Home。官方模板仍在 `backend/app/templates/official/`，用户自定义模板仍在 `backend/data/templates/user/`。
 - 用户自定义 Skill 不放进 Buddy Home。它仍在 `backend/data/skills/user/`；Buddy Home 可以记录候选、草案、使用统计或改进建议。
+- 不维护长期 `TOOLS.md`。当前可用能力由启用的 Skill、启用的图模板和 `graphiteui_capability_selector` 读取，避免静态能力文件过期。
+- 自然为空的结构化记录放进 `buddy.db`；自然为空的人类可读复盘放进 `reports/`。
 - Buddy Home 内的资料可以影响伙伴如何选择、解释和组织行动，但不能绕过 capability policy、local executor policy、图断点、人类审批或后端校验。
 - `policy.json` 可以由伙伴提出修改，但涉及权限、审批级别或危险操作偏好的变化必须走显式确认与 revision。
 
@@ -492,7 +488,7 @@ LLM 节点提示词区域中，绑定的技能以胶囊展示。
 
 ## `buddy_home_context_reader`
 
-`buddy_home_context_reader` 是伙伴主循环的只读上下文装配 Skill。它读取 `backend/data/buddy/` 中的 profile、policy、memories 和 session summary，并输出一个克制的 `context_pack`。
+`buddy_home_context_reader` 是伙伴主循环的只读上下文装配 Skill。它读取根目录 `buddy_home/` 中的 `AGENTS.md`、`SOUL.md`、`USER.md`、`MEMORY.md`、`policy.json` 和 `buddy.db`，并输出一个克制的 `context_pack`。如果 Buddy Home 或默认文件缺失，它会先触发程序默认初始化再读取。
 
 契约：
 
@@ -500,7 +496,7 @@ LLM 节点提示词区域中，绑定的技能以胶囊展示。
 - 输出：`context_pack` 一个 JSON 字段。
 - 权限：`file_read`。
 - 动态选择：`capabilityPolicy.default.selectable=false`，不进入 `graphiteui_capability_selector` 候选清单。
-- 边界：不写 Buddy Home，不修改 revision，不记录 command，不提升权限。
+- 边界：它读取长期资料，但不修改 Buddy Home，不修改 revision，不记录 command，不提升权限。
 
 该 Skill 应由 `buddy_context_pack` 子图显式绑定。后续 Buddy Home 写回应由单独的写入 Skill 完成，不能扩展这个只读 Skill。
 
@@ -563,7 +559,7 @@ function call 未来可以作为某些模型的适配层，但不能绕过 Graph
 
 ## 新版伙伴自主循环模板
 
-当前仓库尚未创建或注册 `buddy_autonomous_loop`。伙伴浮窗 UI 已经存在，并会尝试读取这个模板；在模板按新协议重建前，伙伴对话循环不能作为当前可用能力。下一轮工作的起点应是按完整目标创建并接入这个模板，而不是增强旧 `buddy_chat_loop`、恢复旧兼容入口，或先做一套之后还需要迁移的临时简化版。
+当前仓库已创建并注册官方 `buddy_autonomous_loop` 模板。它已经按完整目标把上下文装配、请求理解、能力循环、最终回复和自我复盘整理为子图，且 output 只展示最终回复。后续路线图不应再重建另一套伙伴循环，而应在这个模板和统一图协议上继续补齐暂停交互、审批体验、Buddy Home 写回和审计展示。
 
 `buddy_autonomous_loop` 的目标不是复刻 Claude Code 或 Hermes Agent 代码里的多工具循环，而是把它们已经验证有效的循环能力翻译为 GraphiteUI 的图协议：
 
@@ -585,28 +581,25 @@ function call 未来可以作为某些模型的适配层，但不能绕过 Graph
   -> output 只展示最终回复
 ```
 
-目标模板应包含的公开输入 state：
+当前模板包含的公开输入 state：
 
 - `user_message`：当前用户消息。
 - `conversation_history`：进入上下文的近期对话。
 - `page_context`：当前页面或编辑器上下文。
-- `buddy_profile`：来自 Buddy Home 的伙伴名称、语气、响应风格和人设资料。
-- `buddy_policy`：来自 Buddy Home 的边界、偏好和审批策略，只作为上下文与决策依据，不能提升运行权限。
-- `buddy_memory_context`：从 Buddy Home 召回的长期记忆摘要。
-- `buddy_session_summary`：Buddy Home 中的当前会话摘要。
+- `buddy_mode`：伙伴运行模式。Buddy Home 资料不作为多个公开输入 state 传入，而是在 `pack_context` 子图中由 `buddy_home_context_reader` 显式读取并整理为 `buddy_context`。
 
-目标模板应包含的核心内部 state：
+当前模板包含的核心内部 state：
 
+- `buddy_context`：来自 Buddy Home、页面上下文和对话历史的有边界上下文包。
 - `request_understanding`：需求理解、任务类型、是否需要能力、是否需要澄清、风险等级和原因。
 - `clarification_prompt`：需要向用户补充询问的问题。
 - `clarification_answer`：用户在断点恢复时写入的澄清回答。
 - `selected_capability`：`capability` 类型，来自 `graphiteui_capability_selector`。
 - `capability_found`：是否找到了启用且可选择的能力。
-- `capability_approval_request`：能力执行前需要用户确认的摘要。
-- `capability_approval_decision`：用户审批结果。
+- `approval_prompt`：能力执行前需要用户确认的摘要。
+- `approval_decision`：用户审批结果，存在于能力循环子图内部。
 - `capability_result`：`result_package` 类型，动态能力执行唯一输出。
 - `capability_review`：对结果包的评估，包括是否足够、是否继续、失败是否可恢复、下一轮需求。
-- `loop_state`：循环轮次、退出原因和已用能力摘要。
 - `memory_update_plan`：是否需要写回记忆、会话摘要或用户资料。
 - `buddy_evolution_plan`：是否需要写入自我复盘、能力使用统计、改进建议或待审查队列。
 - `final_reply`：唯一用户可见最终回复。
@@ -619,8 +612,8 @@ function call 未来可以作为某些模型的适配层，但不能绕过 Graph
 - `merge_clarification`：把澄清回答合入 `request_understanding` 或写新的确认需求摘要。
 - `select_capability`：静态绑定 `graphiteui_capability_selector`，根据需求选择一个启用的图模板或 Skill。图模板优先，找不到则输出 `{ "kind": "none" }` 和 `capability_found=false`。
 - `capability_found`：condition。未找到能力时进入直接回复或缺失能力说明；找到能力时进入审批检查。
-- `review_capability_permission`：根据 `selected_capability`、`buddy_policy`、skill/template 的 capability policy 与 permissions 写审批请求或免审批结论。prompt 不能直接授予权限，只能生成审查说明。
-- `request_capability_approval`：需要人工确认时写 `capability_approval_request` 并设置 `interrupt_after`。恢复 payload 写入 `capability_approval_decision`。
+- `review_capability_permission`：根据请求风险、伙伴模式和 Buddy Home policy 写审批请求或免审批结论。它不能直接读取 `capability` state；当前协议规定读取 `capability` state 的 LLM 节点就是动态能力执行节点。
+- `request_capability_approval`：需要人工确认时写 `approval_prompt` 并设置 `interrupt_after`。恢复 payload 写入 `approval_decision`。
 - `execute_capability`：读取 `selected_capability`。该节点只负责生成目标能力的公开输入；runtime 执行 skill 或动态 subgraph，并只写一个 `capability_result`。
 - `review_capability_result`：读取拆包后的 `capability_result`，判断是否已经足够、是否需要继续另一个能力、是否需要向用户解释失败或请求更多信息。
 - `continue_capability_loop`：condition。需要继续时回到 `select_capability`，达到 `loopLimit` 时进入最终回复。循环上限是正式行为，不是错误；达到上限时必须用已有信息收束。
@@ -676,8 +669,8 @@ function call 未来可以作为某些模型的适配层，但不能绕过 Graph
 1. 将伙伴运行来源收束为统一 `origin=buddy`，停止扩展 `buddy_run`、`buddy_permission_tier`、`buddy_graph_patch_drafts_enabled` 等旧标记。
 2. 补齐动态 `capability.kind=subgraph` 的断点传播、父级暂停和恢复。
 3. 补齐动态能力审批路径：需要确认的能力必须进入标准 `awaiting_human`，不能只靠 prompt 文字提醒。
-4. 将 `backend/data/buddy/` 收束为正式 Buddy Home，补齐 evolution、usage、reports 等资料结构和 revision/command 审计路径。
-5. 创建官方 `buddy_autonomous_loop` 模板，按本文完整节点职责和 state 契约搭建，并把上下文装配、需求理解、能力循环、最终回复和自我复盘整理为子图。
+4. 将根目录 `buddy_home/` 收束为正式 Buddy Home，使用 `AGENTS.md`、`SOUL.md`、`USER.md`、`MEMORY.md`、`policy.json`、`buddy.db` 和 `reports/`，并把 revision/command 审计路径落到 `buddy.db`。
+5. 已完成：创建官方 `buddy_autonomous_loop` 模板，按本文完整节点职责和 state 契约搭建，并把上下文装配、需求理解、能力循环、最终回复和自我复盘整理为子图。
 6. 改造伙伴浮窗，使它能展示暂停卡片、恢复断点、拒绝或取消运行，并在暂停期间阻塞队列。
 7. 改造伙伴页面，增加“运行与确认”和 Buddy Home 管理视图，复用 Human Review 与 revision 数据模型。
 8. 将记忆、资料、会话摘要、进化记录和能力使用统计写回做成模板中的显式分支和受控能力，移除隐藏产品逻辑。

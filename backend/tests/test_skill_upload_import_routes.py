@@ -185,6 +185,7 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertEqual(
                     sorted(catalog_items),
                     [
+                        "buddy_home_context_reader",
                         "graphiteUI_script_tester",
                         "graphiteUI_skill_builder",
                         "graphiteui_capability_selector",
