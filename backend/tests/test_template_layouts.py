@@ -369,11 +369,40 @@ class TemplateLayoutTests(unittest.TestCase):
         )
         self.assertEqual([node_id for node_id, node in nodes.items() if node["kind"] == "output"], ["output_final"])
         self.assertEqual(nodes["output_final"]["reads"], [{"state": "final_reply", "required": True}])
+        self.assertIn("needs_capability", nodes)
+        self.assertEqual(nodes["needs_capability"]["kind"], "condition")
+        self.assertEqual(
+            nodes["needs_capability"]["config"]["rule"],
+            {"source": "$state.request_understanding.requires_capability", "operator": "==", "value": True},
+        )
+        self.assertIn({"source": "draft_final_response", "target": "output_final"}, template["edges"])
+        self.assertIn({"source": "draft_final_response", "target": "review_buddy_memory"}, template["edges"])
+        self.assertNotIn({"source": "review_buddy_memory", "target": "output_final"}, template["edges"])
+        self.assertEqual(
+            template["conditional_edges"],
+            [
+                {
+                    "source": "needs_capability",
+                    "branches": {
+                        "true": "run_capability_cycle",
+                        "false": "draft_final_response",
+                        "exhausted": "draft_final_response",
+                    },
+                }
+            ],
+        )
         for node_id, node in nodes.items():
             with self.subTest(top_level_node=node_id):
                 self.assertIsNone(node["ui"].get("size"))
 
         pack_graph = nodes["pack_context"]["config"]["graph"]
+        self.assertEqual(
+            pack_graph["edges"],
+            [
+                {"source": "read_buddy_home", "target": "assemble_buddy_context"},
+                {"source": "assemble_buddy_context", "target": "output_buddy_context"},
+            ],
+        )
         self.assertEqual(pack_graph["nodes"]["read_buddy_home"]["config"]["skillKey"], "buddy_home_context_reader")
         self.assertEqual(
             pack_graph["nodes"]["read_buddy_home"]["config"]["skillBindings"],

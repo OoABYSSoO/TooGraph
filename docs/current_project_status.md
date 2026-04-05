@@ -9,7 +9,7 @@
 - 伙伴不是独立运行时。伙伴本质也是按图模板发起一次 graph run，并通过运行来源、状态和技能目录表达上下文。
 - 产品心智已收束为“图才是 Agent，单个节点是 LLM 节点”。当前协议中仍存在 `agent` kind 命名，这是待迁移的内部命名；新设计不应继续把单节点描述为多轮 Agent。
 - 旧的 `buddy_agentic_tool_loop`、`buddy_chat_loop`、`web_research_loop` 等模板不再随仓库提供，也不再通过后端兼容逻辑修补。
-- 新版伙伴自主循环模板 `buddy_autonomous_loop` 已创建为官方图模板。它通过子图串联 Buddy Home 上下文装配、请求理解、能力选择与动态执行、最终回复和记忆/成长复盘，output 只展示 `final_reply`。
+- 新版伙伴自主循环模板 `buddy_autonomous_loop` 已创建为官方图模板。它通过子图串联 Buddy Home 上下文装配、请求理解、按需能力选择与动态执行、最终回复和记忆/成长复盘；简单闲聊或可直接回答的请求会绕过能力循环，output 只展示 `final_reply`。
 - 当前仓库提供三个官方图模板：`advanced_web_research_loop`（高级联网搜索）、`buddy_autonomous_loop`（伙伴自主循环）和 `graphiteui_skill_creation_workflow`（创建自定义 Skill）。
 - 技能系统已收束为统一技能库，不再区分“伙伴技能”和“LLM 节点技能”，也不再使用 `targets` / `executionTargets` 这类旧分流字段。
 - 当前官方技能包包括 `buddy_home_context_reader`、`web_search`、`graphiteui_capability_selector`、`graphiteUI_skill_builder`、`graphiteUI_script_tester` 和 `local_workspace_executor`。后续新能力应按当前统一 Skill 结构专门编写。
@@ -116,7 +116,7 @@
 - 位置：`backend/app/templates/official/buddy_autonomous_loop.json`
 - 显示名称：`伙伴自主循环`
 - 作用：作为伙伴浮窗和伙伴页面的默认图循环，把本轮用户消息、对话历史、页面上下文和 Buddy Home 长期资料转成一次可审计 graph run。
-- 主要流程：输入用户消息、历史、页面上下文和伙伴模式 -> `pack_context` 子图读取 `buddy_home_context_reader` 并整理 `buddy_context` -> `intake_request` 子图理解请求，必要时在 `ask_clarification` 断点等待用户澄清 -> `run_capability_cycle` 子图调用 `graphiteui_capability_selector` 选择一个启用能力，必要时在 `request_capability_approval` 断点等待批准，再由动态能力执行节点写唯一 `capability_result` 结果包 -> `draft_final_response` 子图只写 `final_reply` -> `review_buddy_memory` 子图产出记忆与伙伴成长计划 -> `output_final` 只展示 `final_reply`。
+- 主要流程：输入用户消息、历史、页面上下文和伙伴模式 -> `pack_context` 子图读取 `buddy_home_context_reader` 并整理 `buddy_context` -> `intake_request` 子图理解请求，必要时在 `ask_clarification` 断点等待用户澄清 -> `needs_capability` 判断是否需要启用能力；不需要时直接进入 `draft_final_response`，需要时进入 `run_capability_cycle` 调用 `graphiteui_capability_selector`、必要时在 `request_capability_approval` 断点等待批准，再由动态能力执行节点写唯一 `capability_result` 结果包 -> `draft_final_response` 子图只写 `final_reply` -> `output_final` 先展示 `final_reply`，同时 `review_buddy_memory` 子图在回复后产出记忆与伙伴成长计划。
 - 动态能力语义：只有 `execute_capability` 读取 `selected_capability` 这个 `capability` state，并且它只写一个 `result_package` state。其他复盘节点不能读取 `capability` state，否则会被运行协议视为动态能力执行节点。
 - 断点语义：澄清和能力审批都使用子图内部 `interrupt_after`。父级 Buddy run 需要通过标准暂停/恢复路径展示子图 scope，而不是由伙伴前端额外发明确认协议。
 - 边界：当前模板已经表达完整循环主干，但长期记忆写回、Buddy Home 修改、图补丁应用和更完整的伙伴页面暂停交互仍应作为后续显式模板/命令流补齐，不能隐藏在 output 节点或前端逻辑里。

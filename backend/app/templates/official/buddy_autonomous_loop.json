@@ -529,22 +529,6 @@
           },
           "edges": [
             {
-              "source": "input_user_message",
-              "target": "assemble_buddy_context"
-            },
-            {
-              "source": "input_conversation_history",
-              "target": "assemble_buddy_context"
-            },
-            {
-              "source": "input_page_context",
-              "target": "assemble_buddy_context"
-            },
-            {
-              "source": "input_buddy_mode",
-              "target": "assemble_buddy_context"
-            },
-            {
               "source": "read_buddy_home",
               "target": "assemble_buddy_context"
             },
@@ -1034,13 +1018,49 @@
         }
       }
     },
+    "needs_capability": {
+      "kind": "condition",
+      "name": "需要能力?",
+      "description": "简单闲聊和可直接回答的问题绕过能力循环，避免不必要的能力选择和权限检查。",
+      "ui": {
+        "position": {
+          "x": 1240,
+          "y": 300
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "request_understanding",
+          "required": true
+        }
+      ],
+      "writes": [],
+      "config": {
+        "branches": [
+          "true",
+          "false",
+          "exhausted"
+        ],
+        "loopLimit": 3,
+        "branchMapping": {
+          "true": "true",
+          "false": "false"
+        },
+        "rule": {
+          "source": "$state.request_understanding.requires_capability",
+          "operator": "==",
+          "value": true
+        }
+      }
+    },
     "run_capability_cycle": {
       "kind": "subgraph",
       "name": "能力循环",
       "description": "选择一个启用能力，必要时请求批准，执行后把结果打包。",
       "ui": {
         "position": {
-          "x": 1340,
+          "x": 1600,
           "y": 300
         },
         "collapsed": false
@@ -2137,7 +2157,7 @@
       "description": "把请求理解和能力执行结果转成面向用户的最终回复。",
       "ui": {
         "position": {
-          "x": 1780,
+          "x": 2060,
           "y": 300
         },
         "collapsed": false
@@ -2626,7 +2646,7 @@
       "description": "判断本轮是否值得写入长期记忆或调整伙伴策略。本模板只产出计划，不直接写文件。",
       "ui": {
         "position": {
-          "x": 2220,
+          "x": 2520,
           "y": 300
         },
         "collapsed": false
@@ -3117,8 +3137,8 @@
       "description": "伙伴唯一可见输出。",
       "ui": {
         "position": {
-          "x": 2660,
-          "y": 300
+          "x": 2520,
+          "y": 40
         },
         "collapsed": false
       },
@@ -3160,7 +3180,7 @@
     },
     {
       "source": "intake_request",
-      "target": "run_capability_cycle"
+      "target": "needs_capability"
     },
     {
       "source": "run_capability_cycle",
@@ -3168,14 +3188,23 @@
     },
     {
       "source": "draft_final_response",
-      "target": "review_buddy_memory"
+      "target": "output_final"
     },
     {
-      "source": "review_buddy_memory",
-      "target": "output_final"
+      "source": "draft_final_response",
+      "target": "review_buddy_memory"
     }
   ],
-  "conditional_edges": [],
+  "conditional_edges": [
+    {
+      "source": "needs_capability",
+      "branches": {
+        "true": "run_capability_cycle",
+        "false": "draft_final_response",
+        "exhausted": "draft_final_response"
+      }
+    }
+  ],
   "metadata": {
     "graphProtocol": "node_system",
     "origin": "buddy",

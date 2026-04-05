@@ -111,6 +111,15 @@ test("BuddyWidget keeps runtime error replies out of model context and persisted
   assert.match(componentSource, /updateAssistantMessage\(assistantMessage\.id, t\("buddy\.errorReply", \{ error: message \}\), \{ includeInContext: false \}\);/);
 });
 
+test("BuddyWidget shows live run activity while the assistant reply is still empty", () => {
+  assert.match(componentSource, /resolveBuddyRunActivityFromRunEvent/);
+  assert.match(componentSource, /activityText/);
+  assert.match(componentSource, /message\.content \|\| message\.activityText \|\| t\("buddy\.streaming"\)/);
+  assert.match(componentSource, /setAssistantActivityText\(assistantMessage\.id, t\("buddy\.activity\.preparing"\)\);/);
+  assert.match(componentSource, /setAssistantActivityFromRunEvent\(assistantMessageId, eventType, payload, graph\);/);
+  assert.match(componentSource, /if \(mood\.value === "thinking" && latestActivityText\.value\) \{/);
+});
+
 test("BuddyWidget leaves buddy self config loading and memory curation to the chat graph template", () => {
   assert.doesNotMatch(componentSource, new RegExp("fetch" + "BuddyContext"));
   assert.doesNotMatch(componentSource, new RegExp("curate" + "BuddyMemoryTurn"));

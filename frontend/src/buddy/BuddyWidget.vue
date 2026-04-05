@@ -98,7 +98,9 @@
             <span class="buddy-widget__message-label">
               {{ message.role === "user" ? t("buddy.user") : t("buddy.name") }}
             </span>
-            <p>{{ message.content || t("buddy.streaming") }}</p>
+            <p :class="{ 'buddy-widget__message-activity': !message.content && message.activityText }">
+              {{ message.content || message.activityText || t("buddy.streaming") }}
+            </p>
           </article>
           <p v-if="errorMessage" class="buddy-widget__error">{{ errorMessage }}</p>
           <p v-if="queuedTurns.length > 0" class="buddy-widget__queue">
@@ -158,6 +160,7 @@ import { fetchSkillCatalog } from "../api/skills.ts";
 import { buildRuntimeModelOptions } from "../lib/runtimeModelCatalog.ts";
 import { buildRunEventStreamUrl, parseRunEventPayload, shouldPollRunStatus } from "../lib/run-event-stream.ts";
 import { useBuddyContextStore } from "../stores/buddyContext.ts";
+import type { GraphPayload } from "../types/node-system.ts";
 import type { RunDetail } from "../types/run.ts";
 import type { SettingsPayload } from "../types/settings.ts";
 
@@ -169,6 +172,7 @@ import {
   DEFAULT_BUDDY_MODE,
   buildBuddyChatGraph,
   resolveBuddyMode,
+  resolveBuddyRunActivityFromRunEvent,
   resolveBuddyReplyFromRunEvent,
   resolveBuddyReplyText,
   type BuddyChatMessage,
@@ -187,9 +191,10 @@ import {
 
 type BuddyMessage = BuddyChatMessage & {
   id: string;
+  activityText?: string;
 };
 
-type BuddyMessagePatch = Partial<Pick<BuddyMessage, "content" | "includeInContext">>;
+type BuddyMessagePatch = Partial<Pick<BuddyMessage, "content" | "includeInContext" | "activityText">>;
 
 type BuddyQueuedTurn = {
   userMessageId: string;
@@ -260,7 +265,16 @@ const anchorStyle = computed(() => ({
   transform: `translate3d(${position.value.x}px, ${position.value.y}px, 0)`,
 }));
 const panelPlacement = computed(() => (position.value.x > viewport.value.width / 2 ? "left" : "right"));
+const latestActivityText = computed(() => {
+  const latestPendingMessage = [...messages.value]
+    .reverse()
+    .find((message) => message.role === "assistant" && !message.content.trim() && message.activityText?.trim());
+  return latestPendingMessage?.activityText?.trim() ?? "";
+});
 const bubbleText = computed(() => {
+  if (mood.value === "thinking" && latestActivityText.value) {
+    return latestActivityText.value;
+  }
   if (mood.value === "thinking") {
     return t("buddy.thinking");
   }
@@ -431,6 +445,7 @@ async function processQueuedTurn(turn: BuddyQueuedTurn) {
   const history = buildHistoryBeforeMessage(turn.userMessageId);
   const assistantMessage = appendAssistantMessageForTurn(turn.userMessageId);
   mood.value = "thinking";
+  setAssistantActivityText(assistantMessage.id, t("buddy.activity.preparing"));
   await scrollMessagesToBottom();
 
   try {
@@ -447,9 +462,10 @@ async function processQueuedTurn(turn: BuddyQueuedTurn) {
       buddyModel: buddyModelRef.value,
       skillCatalog,
     });
+    setAssistantActivityText(assistantMessage.id, t("buddy.activity.starting"));
     const run = await runGraph(graph);
     activeRunId.value = run.run_id;
-    startRunEventStream(run.run_id, assistantMessage.id);
+    startRunEventStream(run.run_id, assistantMessage.id, graph);
     const runDetail = await pollRunUntilFinished(run.run_id, activeAbortController.signal);
     const finalReply = resolveBuddyReplyText(runDetail);
     updateAssistantMessage(assistantMessage.id, finalReply || t("buddy.emptyReply"));
@@ -548,7 +564,7 @@ function persistPosition() {
   window.localStorage.setItem(BUDDY_POSITION_STORAGE_KEY, serializeBuddyPosition(position.value));
 }
 
-function startRunEventStream(runId: string, assistantMessageId: string) {
+function startRunEventStream(runId: string, assistantMessageId: string, graph: GraphPayload) {
   closeEventSource();
   const streamUrl = buildRunEventStreamUrl(runId);
   if (!streamUrl || typeof EventSource === "undefined") {
@@ -556,22 +572,26 @@ function startRunEventStream(runId: string, assistantMessageId: string) {
   }
 
   eventSource = new EventSource(streamUrl);
-  const handleStreamingEvent = (event: Event) => {
+  const handleStreamingEvent = (eventType: string, event: Event) => {
     const payload = parseRunEventPayload(event);
     if (!payload) {
       return;
     }
     const nextText = resolveBuddyReplyFromRunEvent(payload);
     if (!nextText) {
+      setAssistantActivityFromRunEvent(assistantMessageId, eventType, payload, graph);
       return;
     }
     mood.value = "speaking";
     updateAssistantMessage(assistantMessageId, nextText);
     void scrollMessagesToBottom();
   };
-  eventSource.addEventListener("node.output.delta", handleStreamingEvent);
-  eventSource.addEventListener("node.output.completed", handleStreamingEvent);
-  eventSource.addEventListener("state.updated", handleStreamingEvent);
+  eventSource.addEventListener("node.started", (event) => handleStreamingEvent("node.started", event));
+  eventSource.addEventListener("node.output.delta", (event) => handleStreamingEvent("node.output.delta", event));
+  eventSource.addEventListener("node.output.completed", (event) => handleStreamingEvent("node.output.completed", event));
+  eventSource.addEventListener("state.updated", (event) => handleStreamingEvent("state.updated", event));
+  eventSource.addEventListener("node.completed", (event) => handleStreamingEvent("node.completed", event));
+  eventSource.addEventListener("node.failed", (event) => handleStreamingEvent("node.failed", event));
   eventSource.addEventListener("run.completed", closeEventSource);
   eventSource.addEventListener("run.failed", closeEventSource);
   eventSource.onerror = closeEventSource;
@@ -600,7 +620,32 @@ function updateAssistantMessage(messageId: string, content: string, patch: Buddy
     return;
   }
   target.content = content;
+  if (content.trim()) {
+    target.activityText = "";
+  }
   Object.assign(target, patch);
+}
+
+function setAssistantActivityText(messageId: string, activityText: string) {
+  const target = messages.value.find((message) => message.id === messageId);
+  if (!target || target.content.trim()) {
+    return;
+  }
+  target.activityText = activityText;
+  void scrollMessagesToBottom();
+}
+
+function setAssistantActivityFromRunEvent(
+  assistantMessageId: string,
+  eventType: string,
+  payload: Record<string, unknown>,
+  graph: GraphPayload,
+) {
+  const activity = resolveBuddyRunActivityFromRunEvent(eventType, payload, graph);
+  if (!activity) {
+    return;
+  }
+  setAssistantActivityText(assistantMessageId, t(activity.labelKey, activity.params));
 }
 
 function buildHistoryBeforeMessage(messageId: string): BuddyChatMessage[] {
@@ -660,6 +705,7 @@ function createMessage(role: BuddyChatMessage["role"], content: string): BuddyMe
     id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
     role,
     content,
+    activityText: "",
   };
 }
 
@@ -1004,6 +1050,11 @@ function isPersistedMessage(value: unknown): value is BuddyChatMessage {
   line-height: 1.55;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.buddy-widget__message-activity {
+  color: rgba(108, 82, 62, 0.76);
+  font-size: 12px;
 }
 
 .buddy-widget__message--user {
