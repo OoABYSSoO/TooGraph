@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "graphite.skill/v1",
+  "skillKey": "buddy_home_context_reader",
+  "name": "Buddy Home Context Reader",
+  "description": "当伙伴主循环需要读取 Buddy Home 中的人设、策略、长期记忆和会话摘要并形成上下文包时使用。此技能只读 backend/data/buddy，不写入任何长期资料。",
+  "llmInstruction": "你已绑定 Buddy Home Context Reader。这个技能不需要模型生成业务参数；请返回空参数对象，运行时会读取 Buddy Home，并把结果作为 context_pack 输出。不要让本节点总结或改写 Buddy Home 内容。",
+  "version": "1.0.0",
+  "timeoutSeconds": 30,
+  "capabilityPolicy": {
+    "default": {
+      "selectable": false,
+      "requiresApproval": false
+    },
+    "origins": {
+      "buddy": {
+        "selectable": false,
+        "requiresApproval": false
+      }
+    }
+  },
+  "permissions": ["file_read"],
+  "inputSchema": [],
+  "outputSchema": [
+    {
+      "key": "context_pack",
+      "name": "Context Pack",
+      "valueType": "json",
+      "description": "从 Buddy Home 读取并压缩后的上下文包，包含 profile、policy、memories、session_summary 和 meta。"
+    }
+  ]
+}

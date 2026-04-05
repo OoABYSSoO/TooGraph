@@ -8,21 +8,21 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.companion import store
+from app.buddy import store
 
 
-class CompanionStoreTests(unittest.TestCase):
+class BuddyStoreTests(unittest.TestCase):
     def test_defaults_load_when_files_do_not_exist(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            with patch.object(store, "COMPANION_DATA_DIR", Path(temp_dir)):
-                self.assertEqual(store.load_profile()["name"], "GraphiteUI Companion")
+            with patch.object(store, "BUDDY_DATA_DIR", Path(temp_dir)):
+                self.assertEqual(store.load_profile()["name"], "GraphiteUI Buddy")
                 self.assertEqual(store.load_policy()["graph_permission_mode"], "advisory")
                 self.assertEqual(store.list_memories(), [])
                 self.assertIn("content", store.load_session_summary())
 
     def test_profile_update_creates_revision_with_previous_and_next_values(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            with patch.object(store, "COMPANION_DATA_DIR", Path(temp_dir)):
+            with patch.object(store, "BUDDY_DATA_DIR", Path(temp_dir)):
                 updated = store.save_profile({"name": "小石墨"}, changed_by="user", change_reason="测试更新")
                 revisions = store.list_revisions(target_type="profile", target_id="profile")
 
@@ -30,12 +30,12 @@ class CompanionStoreTests(unittest.TestCase):
         self.assertEqual(len(revisions), 1)
         self.assertEqual(revisions[0]["target_type"], "profile")
         self.assertEqual(revisions[0]["operation"], "update")
-        self.assertEqual(revisions[0]["previous_value"]["name"], "GraphiteUI Companion")
+        self.assertEqual(revisions[0]["previous_value"]["name"], "GraphiteUI Buddy")
         self.assertEqual(revisions[0]["next_value"]["name"], "小石墨")
 
     def test_memory_delete_is_soft_delete_and_restore_creates_revision(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            with patch.object(store, "COMPANION_DATA_DIR", Path(temp_dir)):
+            with patch.object(store, "BUDDY_DATA_DIR", Path(temp_dir)):
                 memory = store.create_memory(
                     {
                         "type": "preference",

@@ -250,7 +250,7 @@ import {
   type PersistedEditorWorkspace,
 } from "@/lib/editor-workspace";
 import type { CanvasViewport } from "@/editor/canvas/canvasViewport";
-import { useCompanionContextStore } from "@/stores/companionContext";
+import { useBuddyContextStore } from "@/stores/buddyContext";
 import { useGraphDocumentStore } from "@/stores/graphDocument";
 import type { RunDetail } from "@/types/run";
 import type {
@@ -307,7 +307,7 @@ const props = defineProps<{
 const router = useRouter();
 const route = useRoute();
 const graphStore = useGraphDocumentStore();
-const companionContextStore = useCompanionContextStore();
+const buddyContextStore = useBuddyContextStore();
 const { t } = useI18n();
 
 const workspace = ref<PersistedEditorWorkspace>({
@@ -484,7 +484,7 @@ const {
   subgraphRunStatusByTabId,
   feedbackByTabId,
 });
-const activeCompanionEditorSnapshot = computed(() => {
+const activeBuddyEditorSnapshot = computed(() => {
   const tab = activeTab.value;
   if (!tab) {
     return null;
@@ -960,8 +960,8 @@ function showRunErrorToast(message: string) {
 }
 
 watch(
-  activeCompanionEditorSnapshot,
-  (snapshot) => companionContextStore.setEditorSnapshot(snapshot),
+  activeBuddyEditorSnapshot,
+  (snapshot) => buddyContextStore.setEditorSnapshot(snapshot),
   { immediate: true, deep: true },
 );
 
@@ -1043,7 +1043,7 @@ watch(
 );
 
 onBeforeUnmount(() => {
-  companionContextStore.clearEditorSnapshot();
+  buddyContextStore.clearEditorSnapshot();
   teardownRunLifecycle();
 });
 

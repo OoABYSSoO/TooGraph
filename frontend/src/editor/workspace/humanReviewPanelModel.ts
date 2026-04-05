@@ -22,7 +22,10 @@ export type HumanReviewRow = {
 };
 
 export type HumanReviewPanelModel = {
+  scopePath: string[];
+  producedRows: HumanReviewRow[];
   requiredNow: HumanReviewRow[];
+  contextRows: HumanReviewRow[];
   otherRows: HumanReviewRow[];
   allRows: HumanReviewRow[];
   requiredCount: number;
@@ -75,17 +78,21 @@ export function buildHumanReviewPanelModel(
   run: RunDetail | null,
   document: GraphPayload | GraphDocument,
 ): HumanReviewPanelModel {
-  const values = resolveHumanReviewStateValues(run);
-  const currentNodeId = run?.current_node_id ?? null;
-  const windowNodeIds = collectBreakpointWindowNodeIds(document, currentNodeId);
+  const scope = resolveHumanReviewScope(run, document);
+  const scopedRun = scope.run;
+  const scopedDocument = scope.document;
+  const values = resolveHumanReviewStateValues(scopedRun);
+  const currentNodeId = scopedRun?.current_node_id ?? null;
+  const currentExecution = resolveCurrentNodeExecution(scopedRun, currentNodeId);
+  const windowNodeIds = collectBreakpointWindowNodeIds(scopedDocument, currentNodeId);
   const orderedWindowNodeIds = Array.from(windowNodeIds);
-  const predecessors = resolveGraphPredecessors(document);
-  const successors = resolveGraphSuccessors(document);
-  const graphAvailability = resolveGraphStateAvailability(document, predecessors);
-  const conditionalDescendantNodeIds = resolveConditionalDescendantNodeIds(document, successors);
-  const breakpointStateKeys = resolveBreakpointStateKeys(document, currentNodeId, graphAvailability);
+  const predecessors = resolveGraphPredecessors(scopedDocument);
+  const successors = resolveGraphSuccessors(scopedDocument);
+  const graphAvailability = resolveGraphStateAvailability(scopedDocument, predecessors);
+  const conditionalDescendantNodeIds = resolveConditionalDescendantNodeIds(scopedDocument, successors);
+  const breakpointStateKeys = resolveBreakpointStateKeys(scopedDocument, currentNodeId, graphAvailability);
   const availableStatesBeforeNode = resolveWindowStateAvailability(
-    document,
+    scopedDocument,
     predecessors,
     windowNodeIds,
     currentNodeId,
@@ -98,7 +105,7 @@ export function buildHumanReviewPanelModel(
   const requiredMetadataByKey = new Map<string, RequiredStateMetadata>();
 
   for (const [consumerOrder, nodeId] of orderedWindowNodeIds.entries()) {
-    const node = document.nodes[nodeId];
+    const node = scopedDocument.nodes[nodeId];
     if (!node) {
       continue;
     }
@@ -126,18 +133,34 @@ export function buildHumanReviewPanelModel(
     }
   }
 
+  const producedStateKeys = resolveCurrentNodeProducedStateKeys(
+    scopedRun,
+    scopedDocument,
+    currentNodeId,
+    currentExecution,
+    values,
+  );
+  const contextStateKeys = resolveCurrentNodeContextStateKeys(
+    scopedRun,
+    scopedDocument,
+    currentNodeId,
+    currentExecution,
+    values,
+  );
   const rowKeys = sortHumanReviewStateKeys(
     Array.from(
       new Set([
         ...Object.keys(values),
         ...requiredCandidateKeys,
+        ...producedStateKeys,
+        ...contextStateKeys,
       ]),
     ),
-    document,
+    scopedDocument,
   );
 
   const allRows = rowKeys.map((key) => {
-    const definition = document.state_schema[key];
+    const definition = scopedDocument.state_schema[key];
     const type = resolveHumanReviewStateType(definition?.type);
     const value = Object.prototype.hasOwnProperty.call(values, key) ? values[key] : definition?.value ?? "";
     return {
@@ -174,11 +197,25 @@ export function buildHumanReviewPanelModel(
       }
       return left.key.localeCompare(right.key);
     });
-  const otherRows = allRows.filter((row) => !requiredKeys.has(row.key));
+  const producedRows = producedStateKeys
+    .map((key) => rowByKey.get(key))
+    .filter((row): row is HumanReviewRow => row !== undefined);
+  const producedKeySet = new Set(producedRows.map((row) => row.key));
+  const contextRows = contextStateKeys
+    .filter((key) => !requiredKeys.has(key) && !producedKeySet.has(key))
+    .map((key) => rowByKey.get(key))
+    .filter((row): row is HumanReviewRow => row !== undefined);
+  const contextKeySet = new Set(contextRows.map((row) => row.key));
+  const otherRows = allRows.filter(
+    (row) => !requiredKeys.has(row.key) && !producedKeySet.has(row.key) && !contextKeySet.has(row.key),
+  );
   const firstBlockingRequiredKey = requiredNow.find(draftValueIsBlocking)?.key ?? null;
 
   return {
+    scopePath: scope.scopePath,
+    producedRows,
     requiredNow,
+    contextRows,
     otherRows,
     allRows,
     requiredCount: requiredNow.length,
@@ -186,6 +223,145 @@ export function buildHumanReviewPanelModel(
     firstBlockingRequiredKey,
     summaryText: resolveSummaryText(requiredNow.length),
   };
+}
+
+function resolveHumanReviewScope(run: RunDetail | null, document: GraphPayload | GraphDocument) {
+  const pending = readPendingSubgraphBreakpoint(run);
+  if (!run || !pending) {
+    return { run, document, scopePath: [] };
+  }
+  const subgraphNodeId = stringFromUnknown(pending.subgraph_node_id);
+  const innerNodeId = stringFromUnknown(pending.inner_node_id);
+  if (!subgraphNodeId || !innerNodeId) {
+    return { run, document, scopePath: [] };
+  }
+  const subgraphNode = document.nodes[subgraphNodeId];
+  if (!subgraphNode || subgraphNode.kind !== "subgraph") {
+    return { run, document, scopePath: [] };
+  }
+  const subgraphDocument: GraphPayload = {
+    ...subgraphNode.config.graph,
+    graph_id: null,
+    name: subgraphNode.name?.trim() || subgraphNodeId,
+  };
+  const stateValues = recordFromUnknown(pending.state_values);
+  const nodeStatusMap = stringRecordFromUnknown(pending.node_status_map);
+  const nodeExecutions = Array.isArray(pending.node_executions) ? pending.node_executions : [];
+  const scopedRun: RunDetail = {
+    ...run,
+    current_node_id: innerNodeId,
+    node_status_map: nodeStatusMap,
+    node_executions: nodeExecutions as RunDetail["node_executions"],
+    artifacts: {
+      ...run.artifacts,
+      state_values: stateValues,
+    },
+    state_snapshot: {
+      ...run.state_snapshot,
+      values: stateValues,
+    },
+  };
+  const innerNode = subgraphDocument.nodes[innerNodeId];
+  return {
+    run: scopedRun,
+    document: subgraphDocument,
+    scopePath: [
+      subgraphNode.name?.trim() || subgraphNodeId,
+      innerNode?.name?.trim() || stringFromUnknown(pending.inner_node_name) || innerNodeId,
+    ],
+  };
+}
+
+function readPendingSubgraphBreakpoint(run: RunDetail | null) {
+  const pending = run?.metadata?.pending_subgraph_breakpoint;
+  return pending && typeof pending === "object" && !Array.isArray(pending)
+    ? pending as Record<string, unknown>
+    : null;
+}
+
+function recordFromUnknown(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? { ...(value as Record<string, unknown>) } : {};
+}
+
+function stringRecordFromUnknown(value: unknown): Record<string, string> {
+  const record = recordFromUnknown(value);
+  return Object.fromEntries(Object.entries(record).map(([key, item]) => [key, String(item ?? "")]));
+}
+
+function stringFromUnknown(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function resolveCurrentNodeExecution(run: RunDetail | null, currentNodeId: string | null) {
+  if (!run || !currentNodeId) {
+    return null;
+  }
+  return [...(run.node_executions ?? [])].reverse().find((execution) => execution.node_id === currentNodeId) ?? null;
+}
+
+function resolveCurrentNodeProducedStateKeys(
+  run: RunDetail | null,
+  document: GraphPayload | GraphDocument,
+  currentNodeId: string | null,
+  execution: ReturnType<typeof resolveCurrentNodeExecution>,
+  values: Record<string, unknown>,
+) {
+  const writeKeys =
+    execution?.artifacts?.state_writes
+      ?.map((write) => write.state_key)
+      .filter((key) => hasHumanReviewStateKey(document, values, key)) ?? [];
+  if (writeKeys.length > 0) {
+    return uniqueStateKeys(writeKeys);
+  }
+
+  const node = currentNodeId ? document.nodes[currentNodeId] : null;
+  if (!run || !node) {
+    return [];
+  }
+  return uniqueStateKeys(
+    node.writes
+      .map((write) => write.state)
+      .filter((key) => Object.prototype.hasOwnProperty.call(values, key)),
+  );
+}
+
+function resolveCurrentNodeContextStateKeys(
+  run: RunDetail | null,
+  document: GraphPayload | GraphDocument,
+  currentNodeId: string | null,
+  execution: ReturnType<typeof resolveCurrentNodeExecution>,
+  values: Record<string, unknown>,
+) {
+  const readKeys =
+    execution?.artifacts?.state_reads
+      ?.map((read) => read.state_key)
+      .filter((key) => hasHumanReviewStateKey(document, values, key)) ?? [];
+  if (readKeys.length > 0) {
+    return uniqueStateKeys(readKeys);
+  }
+
+  const node = currentNodeId ? document.nodes[currentNodeId] : null;
+  if (!run || !node) {
+    return [];
+  }
+  return uniqueStateKeys(
+    node.reads
+      .map((read) => read.state)
+      .filter((key) => Object.prototype.hasOwnProperty.call(values, key)),
+  );
+}
+
+function hasHumanReviewStateKey(
+  document: GraphPayload | GraphDocument,
+  values: Record<string, unknown>,
+  key: string,
+) {
+  return Object.prototype.hasOwnProperty.call(document.state_schema, key)
+    || Object.prototype.hasOwnProperty.call(values, key);
+}
+
+function uniqueStateKeys(keys: string[]) {
+  return Array.from(new Set(keys));
 }
 
 function resolveGraphSuccessors(document: GraphPayload | GraphDocument) {

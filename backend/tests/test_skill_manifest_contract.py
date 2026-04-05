@@ -46,7 +46,7 @@ class SkillManifestContractTests(unittest.TestCase):
                     "requiresApproval": False,
                 },
                 "origins": {
-                    "companion": {
+                    "buddy": {
                         "selectable": True,
                         "requiresApproval": True,
                     }
@@ -78,7 +78,7 @@ class SkillManifestContractTests(unittest.TestCase):
                     "requiresApproval": False,
                 },
                 "origins": {
-                    "companion": {
+                    "buddy": {
                         "selectable": True,
                         "requiresApproval": True,
                     }
@@ -256,8 +256,8 @@ class SkillManifestContractTests(unittest.TestCase):
         self.assertNotIn("targets", serialized)
         self.assertTrue(definition.capability_policy.default.selectable)
         self.assertFalse(definition.capability_policy.default.requires_approval)
-        self.assertTrue(definition.capability_policy.origins["companion"].selectable)
-        self.assertFalse(definition.capability_policy.origins["companion"].requires_approval)
+        self.assertTrue(definition.capability_policy.origins["buddy"].selectable)
+        self.assertFalse(definition.capability_policy.origins["buddy"].requires_approval)
         self.assertEqual(definition.runtime.type, "none")
         self.assertEqual(definition.runtime.entrypoint, "")
         self.assertEqual(definition.llm_node_eligibility, SkillLlmNodeEligibility.READY)

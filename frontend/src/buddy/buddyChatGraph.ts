@@ -3,67 +3,67 @@ import type { RunDetail } from "../types/run.ts";
 import type { SkillDefinition } from "../types/skills.ts";
 import { GLOBAL_RUNTIME_MODEL_OPTION_VALUE } from "../lib/runtimeModelCatalog.ts";
 
-export const COMPANION_TEMPLATE_ID = "companion_autonomous_loop";
-export const COMPANION_USER_MESSAGE_STATE_KEY = "state_1";
-export const COMPANION_HISTORY_STATE_KEY = "state_2";
-export const COMPANION_PAGE_CONTEXT_STATE_KEY = "state_3";
-export const COMPANION_REPLY_STATE_KEY = "state_4";
-export const COMPANION_MODE_STATE_KEY = "state_5";
-export const COMPANION_PROFILE_STATE_KEY = "state_6";
-export const COMPANION_POLICY_STATE_KEY = "state_7";
-export const COMPANION_MEMORY_CONTEXT_STATE_KEY = "state_8";
-export const COMPANION_SESSION_SUMMARY_STATE_KEY = "state_9";
-export const COMPANION_AGENTIC_REPLY_STATE_KEYS = ["state_27", "state_25", "state_26", "state_16", "state_18"];
-export const MAX_COMPANION_HISTORY_MESSAGES = 12;
-export const DEFAULT_COMPANION_MODE = "advisory";
+export const BUDDY_TEMPLATE_ID = "buddy_autonomous_loop";
+export const BUDDY_USER_MESSAGE_STATE_KEY = "state_1";
+export const BUDDY_HISTORY_STATE_KEY = "state_2";
+export const BUDDY_PAGE_CONTEXT_STATE_KEY = "state_3";
+export const BUDDY_REPLY_STATE_KEY = "state_4";
+export const BUDDY_MODE_STATE_KEY = "state_5";
+export const BUDDY_PROFILE_STATE_KEY = "state_6";
+export const BUDDY_POLICY_STATE_KEY = "state_7";
+export const BUDDY_MEMORY_CONTEXT_STATE_KEY = "state_8";
+export const BUDDY_SESSION_SUMMARY_STATE_KEY = "state_9";
+export const BUDDY_AGENTIC_REPLY_STATE_KEYS = ["state_27", "state_25", "state_26", "state_16", "state_18"];
+export const MAX_BUDDY_HISTORY_MESSAGES = 12;
+export const DEFAULT_BUDDY_MODE = "advisory";
 
-export type CompanionChatRole = "user" | "assistant";
-export type CompanionMode = "advisory" | "approval" | "unrestricted";
+export type BuddyChatRole = "user" | "assistant";
+export type BuddyMode = "advisory" | "approval" | "unrestricted";
 
-export type CompanionModeOption = {
-  value: CompanionMode;
+export type BuddyModeOption = {
+  value: BuddyMode;
   labelKey: string;
   descriptionKey: string;
   disabled: boolean;
 };
 
-export const COMPANION_MODE_OPTIONS: CompanionModeOption[] = [
+export const BUDDY_MODE_OPTIONS: BuddyModeOption[] = [
   {
     value: "advisory",
-    labelKey: "companion.modes.advisory",
-    descriptionKey: "companion.modeDescriptions.advisory",
+    labelKey: "buddy.modes.advisory",
+    descriptionKey: "buddy.modeDescriptions.advisory",
     disabled: false,
   },
   {
     value: "approval",
-    labelKey: "companion.modes.approval",
-    descriptionKey: "companion.modeDescriptions.approval",
+    labelKey: "buddy.modes.approval",
+    descriptionKey: "buddy.modeDescriptions.approval",
     disabled: false,
   },
   {
     value: "unrestricted",
-    labelKey: "companion.modes.unrestricted",
-    descriptionKey: "companion.modeDescriptions.unrestricted",
+    labelKey: "buddy.modes.unrestricted",
+    descriptionKey: "buddy.modeDescriptions.unrestricted",
     disabled: true,
   },
 ];
 
-export type CompanionChatMessage = {
-  role: CompanionChatRole;
+export type BuddyChatMessage = {
+  role: BuddyChatRole;
   content: string;
   includeInContext?: boolean;
 };
 
-export type BuildCompanionChatGraphInput = {
+export type BuildBuddyChatGraphInput = {
   userMessage: string;
-  history: CompanionChatMessage[];
+  history: BuddyChatMessage[];
   pageContext: string;
-  companionMode?: unknown;
-  companionModel?: unknown;
+  buddyMode?: unknown;
+  buddyModel?: unknown;
   skillCatalog?: SkillDefinition[];
 };
 
-export function formatCompanionHistory(messages: CompanionChatMessage[], maxMessages = MAX_COMPANION_HISTORY_MESSAGES) {
+export function formatBuddyHistory(messages: BuddyChatMessage[], maxMessages = MAX_BUDDY_HISTORY_MESSAGES) {
   const entries = messages
     .map((message) => ({
       role: message.role,
@@ -78,11 +78,11 @@ export function formatCompanionHistory(messages: CompanionChatMessage[], maxMess
     return "暂无历史对话。";
   }
 
-  return entries.map((message) => `${message.role === "user" ? "用户" : "桌宠"}: ${message.content}`).join("\n");
+  return entries.map((message) => `${message.role === "user" ? "用户" : "伙伴"}: ${message.content}`).join("\n");
 }
 
-export function buildCompanionChatGraph(template: TemplateRecord, input: BuildCompanionChatGraphInput): GraphPayload {
-  const companionMode = resolveCompanionMode(input.companionMode);
+export function buildBuddyChatGraph(template: TemplateRecord, input: BuildBuddyChatGraphInput): GraphPayload {
+  const buddyMode = resolveBuddyMode(input.buddyMode);
   const graph: GraphPayload = {
     graph_id: null,
     name: template.default_graph_name,
@@ -92,45 +92,45 @@ export function buildCompanionChatGraph(template: TemplateRecord, input: BuildCo
     conditional_edges: cloneJson(template.conditional_edges),
     metadata: {
       ...cloneJson(template.metadata),
-      companion_template_id: template.template_id,
-      companion_run: true,
-      companion_mode: companionMode,
-      companion_can_execute_actions: false,
+      buddy_template_id: template.template_id,
+      buddy_run: true,
+      buddy_mode: buddyMode,
+      buddy_can_execute_actions: false,
     },
   };
-  applyCompanionModePolicy(graph, companionMode);
-  applyCompanionModelOverride(graph, input.companionModel);
+  applyBuddyModePolicy(graph, buddyMode);
+  applyBuddyModelOverride(graph, input.buddyModel);
 
-  const historyValue = formatCompanionHistory(input.history);
+  const historyValue = formatBuddyHistory(input.history);
   const pageContextValue = input.pageContext.trim() || "当前页面上下文不可用。";
-  const skillCatalogSnapshot = buildCompanionSkillCatalogSnapshot(input.skillCatalog ?? [], companionMode);
+  const skillCatalogSnapshot = buildBuddySkillCatalogSnapshot(input.skillCatalog ?? [], buddyMode);
 
-  setStateValueByNameOrKey(graph, "user_message", COMPANION_USER_MESSAGE_STATE_KEY, input.userMessage);
-  setStateValueByNameOrKey(graph, "conversation_history", COMPANION_HISTORY_STATE_KEY, historyValue);
-  setStateValueByNameOrKey(graph, "page_context", COMPANION_PAGE_CONTEXT_STATE_KEY, pageContextValue);
-  setStateValueByNameOrKey(graph, "companion_mode", COMPANION_MODE_STATE_KEY, companionMode);
+  setStateValueByNameOrKey(graph, "user_message", BUDDY_USER_MESSAGE_STATE_KEY, input.userMessage);
+  setStateValueByNameOrKey(graph, "conversation_history", BUDDY_HISTORY_STATE_KEY, historyValue);
+  setStateValueByNameOrKey(graph, "page_context", BUDDY_PAGE_CONTEXT_STATE_KEY, pageContextValue);
+  setStateValueByNameOrKey(graph, "buddy_mode", BUDDY_MODE_STATE_KEY, buddyMode);
   setStateValueByName(graph, "skill_catalog_snapshot", skillCatalogSnapshot);
-  for (const stateName of ["companion_reply", "final_reply", "direct_reply", "denied_reply", "approval_prompt"]) {
+  for (const stateName of ["buddy_reply", "final_reply", "direct_reply", "denied_reply", "approval_prompt"]) {
     setStateValueByName(graph, stateName, "");
   }
 
-  syncInputNodeValueByNameOrKey(graph, "user_message", COMPANION_USER_MESSAGE_STATE_KEY, input.userMessage);
-  syncInputNodeValueByNameOrKey(graph, "conversation_history", COMPANION_HISTORY_STATE_KEY, historyValue);
-  syncInputNodeValueByNameOrKey(graph, "page_context", COMPANION_PAGE_CONTEXT_STATE_KEY, pageContextValue);
-  syncInputNodeValueByNameOrKey(graph, "companion_mode", COMPANION_MODE_STATE_KEY, companionMode);
+  syncInputNodeValueByNameOrKey(graph, "user_message", BUDDY_USER_MESSAGE_STATE_KEY, input.userMessage);
+  syncInputNodeValueByNameOrKey(graph, "conversation_history", BUDDY_HISTORY_STATE_KEY, historyValue);
+  syncInputNodeValueByNameOrKey(graph, "page_context", BUDDY_PAGE_CONTEXT_STATE_KEY, pageContextValue);
+  syncInputNodeValueByNameOrKey(graph, "buddy_mode", BUDDY_MODE_STATE_KEY, buddyMode);
   syncInputNodeValueByName(graph, "skill_catalog_snapshot", skillCatalogSnapshot);
-  if (companionMode !== "unrestricted") {
-    enforceAdvisoryCompanionGraph(graph);
+  if (buddyMode !== "unrestricted") {
+    enforceAdvisoryBuddyGraph(graph);
   }
 
   return graph;
 }
 
-export function resolveCompanionMode(value: unknown): CompanionMode {
-  return value === "approval" || value === DEFAULT_COMPANION_MODE ? value : DEFAULT_COMPANION_MODE;
+export function resolveBuddyMode(value: unknown): BuddyMode {
+  return value === "approval" || value === DEFAULT_BUDDY_MODE ? value : DEFAULT_BUDDY_MODE;
 }
 
-export function buildCompanionSkillCatalogSnapshot(skills: SkillDefinition[], companionMode: CompanionMode) {
+export function buildBuddySkillCatalogSnapshot(skills: SkillDefinition[], buddyMode: BuddyMode) {
   return skills.map((skill) => {
     const snapshot = cloneJson(skill);
     const configuredDefaultPolicy = snapshot.capabilityPolicy?.default ?? {};
@@ -139,30 +139,30 @@ export function buildCompanionSkillCatalogSnapshot(skills: SkillDefinition[], co
       selectable: configuredDefaultPolicy.selectable ?? true,
       requiresApproval: configuredDefaultPolicy.requiresApproval ?? false,
     };
-    const companionPolicy = {
+    const buddyPolicy = {
       ...defaultPolicy,
-      ...(snapshot.capabilityPolicy?.origins?.companion ?? {}),
+      ...(snapshot.capabilityPolicy?.origins?.buddy ?? {}),
     };
-    const companionOriginPolicy =
-      companionMode === "approval" || !companionPolicy.requiresApproval
-        ? companionPolicy
+    const buddyOriginPolicy =
+      buddyMode === "approval" || !buddyPolicy.requiresApproval
+        ? buddyPolicy
         : {
-            ...companionPolicy,
+            ...buddyPolicy,
             selectable: false,
           };
     snapshot.capabilityPolicy = {
       default: defaultPolicy,
       origins: {
         ...(snapshot.capabilityPolicy?.origins ?? {}),
-        companion: companionOriginPolicy,
+        buddy: buddyOriginPolicy,
       },
     };
     return snapshot;
   });
 }
 
-export function resolveCompanionReplyText(run: RunDetail): string {
-  const replyStateKeys = resolveCompanionReplyStateKeys(run.graph_snapshot);
+export function resolveBuddyReplyText(run: RunDetail): string {
+  const replyStateKeys = resolveBuddyReplyStateKeys(run.graph_snapshot);
   const candidates = [
     ...replyStateKeys.map((stateKey) => run.state_snapshot?.values?.[stateKey]),
     ...replyStateKeys.map((stateKey) => run.artifacts?.state_values?.[stateKey]),
@@ -172,7 +172,7 @@ export function resolveCompanionReplyText(run: RunDetail): string {
   ];
 
   for (const candidate of candidates) {
-    const text = stringifyCompanionReplyCandidate(candidate);
+    const text = stringifyBuddyReplyCandidate(candidate);
     if (text) {
       return text;
     }
@@ -181,17 +181,17 @@ export function resolveCompanionReplyText(run: RunDetail): string {
   return "";
 }
 
-export function resolveCompanionReplyFromRunEvent(payload: Record<string, unknown>): string {
+export function resolveBuddyReplyFromRunEvent(payload: Record<string, unknown>): string {
   const stateKey = typeof payload.state_key === "string" ? payload.state_key.trim() : "";
-  if (isCompanionReplyStateKey(stateKey)) {
-    return stringifyCompanionReplyCandidate(payload.value ?? payload.text);
+  if (isBuddyReplyStateKey(stateKey)) {
+    return stringifyBuddyReplyCandidate(payload.value ?? payload.text);
   }
 
   const outputKeys = Array.isArray(payload.output_keys)
     ? payload.output_keys.map((key) => String(key)).filter(Boolean)
     : [];
-  if (outputKeys.some(isCompanionReplyStateKey)) {
-    return stringifyCompanionReplyCandidate(payload.text ?? payload.value);
+  if (outputKeys.some(isBuddyReplyStateKey)) {
+    return stringifyBuddyReplyCandidate(payload.text ?? payload.value);
   }
 
   return "";
@@ -244,35 +244,35 @@ function syncInputNodeValue(graph: GraphPayload, stateKey: string, value: unknow
   }
 }
 
-function enforceAdvisoryCompanionGraph(graph: GraphPayload) {
-  const agentNode = graph.nodes.companion_reply_agent;
+function enforceAdvisoryBuddyGraph(graph: GraphPayload) {
+  const agentNode = graph.nodes.buddy_reply_agent;
   if (!agentNode || agentNode.kind !== "agent") {
     return;
   }
-  const companionAgent = agentNode as AgentNode;
-  companionAgent.config = {
-    ...companionAgent.config,
+  const buddyAgent = agentNode as AgentNode;
+  buddyAgent.config = {
+    ...buddyAgent.config,
     skillKey: "",
     skillBindings: [],
   };
 }
 
-function applyCompanionModePolicy(graph: GraphPayload, companionMode: CompanionMode) {
-  graph.metadata.companion_permission_tier = companionMode === "approval" ? 2 : 1;
-  graph.metadata.companion_can_execute_actions = false;
-  graph.metadata.companion_requires_approval = companionMode === "approval";
-  graph.metadata.companion_graph_patch_drafts_enabled = companionMode === "approval";
-  if (companionMode !== "approval") {
+function applyBuddyModePolicy(graph: GraphPayload, buddyMode: BuddyMode) {
+  graph.metadata.buddy_permission_tier = buddyMode === "approval" ? 2 : 1;
+  graph.metadata.buddy_can_execute_actions = false;
+  graph.metadata.buddy_requires_approval = buddyMode === "approval";
+  graph.metadata.buddy_graph_patch_drafts_enabled = buddyMode === "approval";
+  if (buddyMode !== "approval") {
     return;
   }
-  const approvalNodeId = graph.nodes.request_approval_agent ? "request_approval_agent" : "companion_reply_agent";
+  const approvalNodeId = graph.nodes.request_approval_agent ? "request_approval_agent" : "buddy_reply_agent";
   graph.metadata.interrupt_after = addUniqueMetadataNodeId(graph.metadata.interrupt_after, approvalNodeId);
 }
 
-function applyCompanionModelOverride(graph: GraphPayload, value: unknown) {
+function applyBuddyModelOverride(graph: GraphPayload, value: unknown) {
   const model = typeof value === "string" ? value.trim() : "";
   if (!model || model === GLOBAL_RUNTIME_MODEL_OPTION_VALUE) {
-    delete graph.metadata.companion_model_ref;
+    delete graph.metadata.buddy_model_ref;
     for (const node of Object.values(graph.nodes)) {
       if (node.kind !== "agent") {
         continue;
@@ -285,7 +285,7 @@ function applyCompanionModelOverride(graph: GraphPayload, value: unknown) {
     }
     return;
   }
-  graph.metadata.companion_model_ref = model;
+  graph.metadata.buddy_model_ref = model;
   for (const node of Object.values(graph.nodes)) {
     if (node.kind !== "agent") {
       continue;
@@ -315,14 +315,14 @@ function findStateKeyByName(graph: GraphPayload, stateName: string) {
   return Object.entries(graph.state_schema).find(([, definition]) => definition.name === stateName)?.[0] ?? null;
 }
 
-function resolveCompanionReplyStateKeys(graphSnapshot: Record<string, unknown> | null | undefined) {
+function resolveBuddyReplyStateKeys(graphSnapshot: Record<string, unknown> | null | undefined) {
   const stateSchema = isRecord(graphSnapshot?.state_schema) ? graphSnapshot.state_schema : null;
   const keysFromNames = stateSchema
     ? Object.entries(stateSchema)
         .filter(([, definition]) => isRecord(definition) && typeof definition.name === "string")
         .filter(([, definition]) =>
           [
-            "companion_reply",
+            "buddy_reply",
             "final_reply",
             "direct_reply",
             "denied_reply",
@@ -332,18 +332,18 @@ function resolveCompanionReplyStateKeys(graphSnapshot: Record<string, unknown> |
         )
         .map(([stateKey]) => stateKey)
     : [];
-  return uniqueStrings([...keysFromNames, ...COMPANION_AGENTIC_REPLY_STATE_KEYS, COMPANION_REPLY_STATE_KEY]);
+  return uniqueStrings([...keysFromNames, ...BUDDY_AGENTIC_REPLY_STATE_KEYS, BUDDY_REPLY_STATE_KEY]);
 }
 
-function isCompanionReplyStateKey(stateKey: string) {
-  return stateKey === COMPANION_REPLY_STATE_KEY || COMPANION_AGENTIC_REPLY_STATE_KEYS.includes(stateKey);
+function isBuddyReplyStateKey(stateKey: string) {
+  return stateKey === BUDDY_REPLY_STATE_KEY || BUDDY_AGENTIC_REPLY_STATE_KEYS.includes(stateKey);
 }
 
 function resolveOutputPreviewValue(previews: RunDetail["output_previews"] | undefined, stateKeys: string[]) {
   return previews?.find((preview) => stateKeys.includes(preview.source_key))?.value;
 }
 
-function stringifyCompanionReplyCandidate(value: unknown): string {
+function stringifyBuddyReplyCandidate(value: unknown): string {
   if (typeof value === "string") {
     return value.trim();
   }

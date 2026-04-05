@@ -58,6 +58,7 @@ from app.core.runtime.execution_graph import (
     select_active_outgoing_edges,
 )
 from app.core.runtime.run_artifacts import append_run_snapshot as _append_run_snapshot
+from app.core.runtime.run_artifacts import refresh_run_artifacts as _refresh_run_artifacts
 from app.core.runtime.runtime_summaries import summarize_first_value as _summarize_values
 from app.core.runtime.state_io import apply_state_writes, collect_node_inputs
 from app.core.runtime.run_events import publish_run_event
@@ -68,6 +69,10 @@ from app.core.runtime.state import create_initial_run_state, set_run_status, tou
 from app.core.schemas.node_system import NodeSystemGraphDocument, NodeSystemInputNode, NodeSystemOutputNode, NodeSystemSubgraphNode
 from app.core.storage.run_store import save_run
 from app.templates.loader import load_template_record
+
+
+class _SubgraphAwaitingHuman(Exception):
+    pass
 
 
 def execute_node_system_graph_langgraph(
@@ -215,7 +220,8 @@ def execute_node_system_graph_langgraph(
                 node_outputs=node_outputs,
                 active_edge_ids=active_edge_ids,
             )
-            save_run(state)
+            if save_final_run:
+                save_run(state)
             return state
         return _finalize_completed_langgraph_state(
             graph,
@@ -230,6 +236,10 @@ def execute_node_system_graph_langgraph(
             save_run_func=save_run if save_final_run else _noop_save_run,
             publish_run_event_func=publish_run_event if emit_lifecycle_events else _noop_publish_run_event,
         )
+    except _SubgraphAwaitingHuman:
+        if save_final_run:
+            save_run(state)
+        return state
     except Exception as exc:  # pragma: no cover - defensive runtime path
         _finalize_failed_langgraph_state(
             state,
@@ -357,14 +367,27 @@ def _build_langgraph_node_callable(
                 iteration = _current_cycle_iteration(cycle_tracker)
                 input_values, state_reads = collect_node_inputs(node, state)
                 if isinstance(node, NodeSystemSubgraphNode):
-                    body = _execute_subgraph_node_runtime(
-                        graph,
-                        node_name,
-                        node,
-                        input_values,
-                        state,
-                        persist_parent_progress=persist_progress,
-                    )
+                    pending_subgraph = _pending_subgraph_breakpoint_for_node(state, node_name)
+                    if pending_subgraph:
+                        body = _resume_subgraph_node_runtime(
+                            graph,
+                            node_name,
+                            node,
+                            input_values,
+                            state,
+                            pending_subgraph,
+                            resume_payload=state.setdefault("metadata", {}).pop("pending_subgraph_resume_payload", None),
+                            persist_parent_progress=persist_progress,
+                        )
+                    else:
+                        body = _execute_subgraph_node_runtime(
+                            graph,
+                            node_name,
+                            node,
+                            input_values,
+                            state,
+                            persist_parent_progress=persist_progress,
+                        )
                 else:
                     body = _execute_node(
                         graph,
@@ -377,6 +400,22 @@ def _build_langgraph_node_callable(
                             persist_parent_progress=persist_progress,
                         ),
                     )
+                if body.get("awaiting_human"):
+                    duration_ms = int((time.perf_counter() - node_started_perf) * 1000)
+                    _apply_subgraph_waiting_parent_state(
+                        state,
+                        node_name,
+                        node,
+                        body,
+                        state_reads=state_reads,
+                        duration_ms=duration_ms,
+                        node_outputs=node_outputs,
+                        active_edge_ids=active_edge_ids,
+                        started_perf=started_perf,
+                        checkpoint_saver=checkpoint_saver,
+                        checkpoint_lookup_config=checkpoint_lookup_config,
+                    )
+                    raise _SubgraphAwaitingHuman()
                 outputs = dict(body.get("outputs", {}))
                 selected_edge_ids = select_active_outgoing_edges(outgoing_edges, body)
                 duration_ms = int((time.perf_counter() - node_started_perf) * 1000)
@@ -483,6 +522,8 @@ def _build_langgraph_node_callable(
                         checkpoint_lookup_config=checkpoint_lookup_config,
                     )
                 return graph_updates
+            except _SubgraphAwaitingHuman:
+                raise
             except Exception as exc:  # pragma: no cover - defensive runtime path
                 duration_ms = int((time.perf_counter() - node_started_perf) * 1000)
                 state["node_status_map"][node_name] = "failed"
@@ -534,6 +575,72 @@ def _build_langgraph_node_callable(
     return _call
 
 
+def _pending_subgraph_breakpoint_for_node(state: dict[str, Any], node_name: str) -> dict[str, Any] | None:
+    pending = state.get("metadata", {}).get("pending_subgraph_breakpoint")
+    if not isinstance(pending, dict):
+        return None
+    if str(pending.get("subgraph_node_id") or "") != node_name:
+        return None
+    return pending
+
+
+def _apply_subgraph_waiting_parent_state(
+    state: dict[str, Any],
+    node_name: str,
+    node: NodeSystemSubgraphNode,
+    body: dict[str, Any],
+    *,
+    state_reads: list[dict[str, Any]],
+    duration_ms: int,
+    node_outputs: dict[str, dict[str, Any]],
+    active_edge_ids: set[str],
+    started_perf: float,
+    checkpoint_saver: JsonCheckpointSaver,
+    checkpoint_lookup_config: dict[str, Any],
+) -> None:
+    pending = dict(body.get("pending_subgraph_breakpoint") or {})
+    subgraph_artifact = dict(body.get("subgraph") or {})
+    state["current_node_id"] = node_name
+    state["node_status_map"][node_name] = "paused"
+    set_run_status(state, "awaiting_human", pause_reason="subgraph_breakpoint")
+    metadata = state.setdefault("metadata", {})
+    metadata["pending_interrupt_nodes"] = [node_name]
+    metadata["pending_interrupts"] = []
+    metadata["pending_subgraph_breakpoint"] = pending
+    metadata["resolved_runtime_backend"] = "langgraph"
+    state["node_executions"] = [
+        *state.get("node_executions", []),
+        {
+            "node_id": node_name,
+            "node_type": node.kind,
+            "status": "paused",
+            "started_at": utc_now_iso(),
+            "finished_at": utc_now_iso(),
+            "duration_ms": duration_ms,
+            "input_summary": _summarize_values(subgraph_artifact.get("input_values", {})),
+            "output_summary": "",
+            "artifacts": {
+                "inputs": subgraph_artifact.get("input_values", {}),
+                "outputs": {},
+                "family": node.kind,
+                "subgraph": subgraph_artifact,
+                "state_reads": state_reads,
+                "state_writes": [],
+            },
+            "warnings": body.get("warnings", []),
+            "errors": [],
+        },
+    ]
+    _sync_checkpoint_metadata(state, checkpoint_saver, checkpoint_lookup_config)
+    _refresh_run_artifacts(state, node_outputs, active_edge_ids, started_perf=started_perf)
+    _append_run_snapshot(
+        state,
+        snapshot_id=f"pause_{len([item for item in state.get('run_snapshots', []) if item.get('kind') == 'pause']) + 1}",
+        kind="pause",
+        label=f"Paused in {node.name or node_name}",
+    )
+
+
 def _subgraph_input_boundaries(node: NodeSystemSubgraphNode) -> list[tuple[str, str]]:
     boundaries: list[tuple[str, str]] = []
     for inner_node_name, inner_node in node.config.graph.nodes.items():
@@ -578,6 +685,62 @@ def _build_subgraph_document(
     )
 
 
+def _subgraph_checkpoint_thread_id(run_id: str, path: list[str]) -> str:
+    return "__".join([run_id, "subgraph", *[item for item in path if item]])
+
+
+def _build_subgraph_execution_artifact(
+    node: NodeSystemSubgraphNode,
+    subgraph_document: NodeSystemGraphDocument,
+    subgraph_state: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "graph_id": subgraph_document.graph_id,
+        "name": subgraph_document.name,
+        "status": subgraph_state.get("status"),
+        "node_status_map": dict(subgraph_state.get("node_status_map", {})),
+        "input_values": {
+            internal_state_key: copy.deepcopy(subgraph_document.state_schema[internal_state_key].value)
+            for _inner_node_name, internal_state_key in _subgraph_input_boundaries(node)
+        },
+        "output_values": {
+            internal_state_key: copy.deepcopy(subgraph_state.get("state_values", {}).get(internal_state_key))
+            for _inner_node_name, internal_state_key in _subgraph_output_boundaries(node)
+        },
+        "node_executions": list(subgraph_state.get("node_executions", [])),
+        "errors": list(subgraph_state.get("errors", [])),
+    }
+
+
+def _build_pending_subgraph_breakpoint(
+    node_name: str,
+    node: NodeSystemSubgraphNode,
+    subgraph_document: NodeSystemGraphDocument,
+    subgraph_state: dict[str, Any],
+    parent_path: list[str],
+) -> dict[str, Any]:
+    inner_node_id = str(subgraph_state.get("current_node_id") or "").strip()
+    inner_node = subgraph_document.nodes.get(inner_node_id) if inner_node_id else None
+    return {
+        "subgraph_node_id": node_name,
+        "subgraph_node_name": node.name or node_name,
+        "inner_node_id": inner_node_id or None,
+        "inner_node_name": inner_node.name if inner_node is not None and inner_node.name else inner_node_id,
+        "subgraph_path": [*parent_path, node_name],
+        "state_values": copy.deepcopy(subgraph_state.get("state_values", {})),
+        "node_status_map": dict(subgraph_state.get("node_status_map", {})),
+        "node_executions": list(subgraph_state.get("node_executions", [])),
+        "checkpoint_metadata": copy.deepcopy(subgraph_state.get("checkpoint_metadata", {})),
+    }
+
+
+def _mark_pending_subgraph_inner_node_paused(subgraph_state: dict[str, Any]) -> None:
+    inner_node_id = str(subgraph_state.get("current_node_id") or "").strip()
+    if not inner_node_id:
+        return
+    subgraph_state.setdefault("node_status_map", {})[inner_node_id] = "paused"
+
+
 def _execute_subgraph_node_runtime(
     parent_graph: NodeSystemGraphDocument,
     node_name: str,
@@ -597,6 +760,14 @@ def _execute_subgraph_node_runtime(
     parent_path = parent_context["path"] if parent_context else []
     subgraph_initial_state = create_initial_run_state(subgraph_document.graph_id, subgraph_document.name)
     subgraph_initial_state["run_id"] = str(state.get("run_id") or subgraph_initial_state["run_id"])
+    subgraph_initial_state["checkpoint_metadata"] = {
+        "available": False,
+        "checkpoint_id": None,
+        "thread_id": _subgraph_checkpoint_thread_id(subgraph_initial_state["run_id"], [*parent_path, node_name]),
+        "checkpoint_ns": "",
+        "saver": None,
+        "resume_source": None,
+    }
     subgraph_initial_state["subgraph_status_map"] = parent_status_map
     subgraph_initial_state["_parent_run_state"] = _root_parent_run_state(state)
     subgraph_initial_state["_subgraph_context"] = {
@@ -611,11 +782,29 @@ def _execute_subgraph_node_runtime(
         save_final_run=False,
         emit_lifecycle_events=False,
     )
+    if subgraph_state.get("status") == "awaiting_human":
+        _mark_pending_subgraph_inner_node_paused(subgraph_state)
     parent_status_map[node_name] = dict(subgraph_state.get("node_status_map", {}))
     _publish_subgraph_final_node_status_events(state, node_name, subgraph_document, parent_status_map[node_name])
     if persist_parent_progress:
         touch_run_lifecycle(_root_parent_run_state(state))
         save_run(_root_parent_run_state(state))
+    subgraph_artifact = _build_subgraph_execution_artifact(node, subgraph_document, subgraph_state)
+    if subgraph_state.get("status") == "awaiting_human":
+        return {
+            "outputs": {},
+            "final_result": "",
+            "awaiting_human": True,
+            "warnings": list(subgraph_state.get("warnings", [])),
+            "pending_subgraph_breakpoint": _build_pending_subgraph_breakpoint(
+                node_name,
+                node,
+                subgraph_document,
+                subgraph_state,
+                parent_path,
+            ),
+            "subgraph": subgraph_artifact,
+        }
     output_values_by_internal_state = {
         internal_state_key: copy.deepcopy(subgraph_state.get("state_values", {}).get(internal_state_key))
         for _inner_node_name, internal_state_key in _subgraph_output_boundaries(node)
@@ -632,18 +821,84 @@ def _execute_subgraph_node_runtime(
         "outputs": parent_outputs,
         "final_result": "" if first_value is None else str(first_value),
         "warnings": list(subgraph_state.get("warnings", [])),
+        "subgraph": {**subgraph_artifact, "output_values": output_values_by_internal_state},
+    }
+
+
+def _resume_subgraph_node_runtime(
+    parent_graph: NodeSystemGraphDocument,
+    node_name: str,
+    node: NodeSystemSubgraphNode,
+    input_values: dict[str, Any],
+    state: dict[str, Any],
+    pending_subgraph: dict[str, Any],
+    *,
+    resume_payload: Any | None,
+    persist_parent_progress: bool,
+) -> dict[str, Any]:
+    subgraph_document = _build_subgraph_document(parent_graph, node_name, node, input_values)
+    subgraph_initial_state = create_initial_run_state(subgraph_document.graph_id, subgraph_document.name)
+    subgraph_initial_state["run_id"] = str(state.get("run_id") or subgraph_initial_state["run_id"])
+    subgraph_initial_state["state_values"] = copy.deepcopy(pending_subgraph.get("state_values") or {})
+    subgraph_initial_state["node_status_map"] = dict(pending_subgraph.get("node_status_map") or {})
+    subgraph_initial_state["node_executions"] = list(pending_subgraph.get("node_executions") or [])
+    subgraph_initial_state["checkpoint_metadata"] = copy.deepcopy(pending_subgraph.get("checkpoint_metadata") or {})
+    subgraph_initial_state["subgraph_status_map"] = _root_parent_run_state(state).setdefault("subgraph_status_map", {})
+    parent_context = _subgraph_context(state)
+    parent_path = parent_context["path"] if parent_context else []
+    subgraph_initial_state["_parent_run_state"] = _root_parent_run_state(state)
+    subgraph_initial_state["_subgraph_context"] = {
+        "node_id": node_name,
+        "path": [*parent_path, node_name],
+    }
+    subgraph_initial_state["_subgraph_persist_progress"] = persist_parent_progress
+    subgraph_state = execute_node_system_graph_langgraph(
+        subgraph_document,
+        subgraph_initial_state,
+        persist_progress=False,
+        resume_from_checkpoint=True,
+        resume_command=resume_payload,
+        save_final_run=False,
+        emit_lifecycle_events=False,
+    )
+    if subgraph_state.get("status") == "awaiting_human":
+        _mark_pending_subgraph_inner_node_paused(subgraph_state)
+    _root_parent_run_state(state).setdefault("subgraph_status_map", {})[node_name] = dict(subgraph_state.get("node_status_map", {}))
+    if subgraph_state.get("status") == "awaiting_human":
+        subgraph_artifact = _build_subgraph_execution_artifact(node, subgraph_document, subgraph_state)
+        return {
+            "outputs": {},
+            "final_result": "",
+            "awaiting_human": True,
+            "warnings": list(subgraph_state.get("warnings", [])),
+            "pending_subgraph_breakpoint": _build_pending_subgraph_breakpoint(
+                node_name,
+                node,
+                subgraph_document,
+                subgraph_state,
+                parent_path,
+            ),
+            "subgraph": subgraph_artifact,
+        }
+    state.setdefault("metadata", {}).pop("pending_subgraph_breakpoint", None)
+    output_values_by_internal_state = {
+        internal_state_key: copy.deepcopy(subgraph_state.get("state_values", {}).get(internal_state_key))
+        for _inner_node_name, internal_state_key in _subgraph_output_boundaries(node)
+    }
+    parent_outputs: dict[str, Any] = {}
+    for index, (_inner_node_name, internal_state_key) in enumerate(_subgraph_output_boundaries(node)):
+        external_binding = node.writes[index] if index < len(node.writes) else None
+        if external_binding is None:
+            raise ValueError(f"Subgraph node '{node_name}' is missing required output {index + 1}.")
+        parent_outputs[external_binding.state] = copy.deepcopy(output_values_by_internal_state.get(internal_state_key))
+    first_value = next((value for value in parent_outputs.values() if value not in (None, "", [], {})), "")
+    return {
+        "outputs": parent_outputs,
+        "final_result": "" if first_value is None else str(first_value),
+        "warnings": list(subgraph_state.get("warnings", [])),
         "subgraph": {
-            "graph_id": subgraph_document.graph_id,
-            "name": subgraph_document.name,
-            "status": subgraph_state.get("status"),
-            "node_status_map": dict(subgraph_state.get("node_status_map", {})),
-            "input_values": {
-                internal_state_key: copy.deepcopy(subgraph_document.state_schema[internal_state_key].value)
-                for _inner_node_name, internal_state_key in _subgraph_input_boundaries(node)
-            },
+            **_build_subgraph_execution_artifact(node, subgraph_document, subgraph_state),
             "output_values": output_values_by_internal_state,
-            "node_executions": list(subgraph_state.get("node_executions", [])),
-            "errors": list(subgraph_state.get("errors", [])),
         },
     }
 

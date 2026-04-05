@@ -53,6 +53,32 @@ def _inner_passthrough_graph() -> dict:
     }
 
 
+def _inner_breakpoint_graph() -> dict:
+    graph = _inner_passthrough_graph()
+    graph["nodes"]["inner_agent"] = {
+        "kind": "agent",
+        "name": "Inner Agent",
+        "description": "",
+        "ui": {"position": {"x": 120, "y": 0}},
+        "reads": [{"state": "internal_question", "required": True}],
+        "writes": [{"state": "internal_question", "mode": "replace"}],
+        "config": {
+            "skillKey": "",
+            "taskInstruction": "",
+            "modelSource": "global",
+            "model": "",
+            "thinkingMode": "on",
+            "temperature": 0.2,
+        },
+    }
+    graph["edges"] = [
+        {"source": "inner_input", "target": "inner_agent"},
+        {"source": "inner_agent", "target": "inner_output"},
+    ]
+    graph["metadata"] = {"interrupt_after": ["inner_agent"]}
+    return graph
+
+
 def _dynamic_passthrough_template() -> dict:
     return {
         "template_id": "simple_dynamic_subgraph",
@@ -165,6 +191,17 @@ def _parent_graph_payload(*, subgraph_reads: list[dict], subgraph_writes: list[d
     }
 
 
+def _parent_graph_payload_with_inner_graph(
+    inner_graph: dict,
+    *,
+    subgraph_reads: list[dict],
+    subgraph_writes: list[dict],
+) -> dict:
+    payload = _parent_graph_payload(subgraph_reads=subgraph_reads, subgraph_writes=subgraph_writes)
+    payload["nodes"]["nested_research"]["config"]["graph"] = inner_graph
+    return payload
+
+
 def test_subgraph_node_schema_accepts_embedded_graph_instances() -> None:
     graph = NodeSystemGraphDocument.model_validate(
         _parent_graph_payload(
@@ -229,6 +266,79 @@ def test_langgraph_runtime_records_subgraph_internal_status_map() -> None:
         "inner_input": "success",
         "inner_output": "success",
     }
+
+
+def test_langgraph_runtime_pauses_parent_when_subgraph_hits_inner_breakpoint(monkeypatch) -> None:
+    import app.core.langgraph.runtime as runtime_module
+
+    original_execute_node = runtime_module._execute_node
+
+    def execute_node_without_llm(graph, node_name, node, input_values, state, **kwargs):
+        if node_name == "inner_agent":
+            return {
+                "outputs": {"internal_question": input_values["internal_question"]},
+                "final_result": input_values["internal_question"],
+            }
+        return original_execute_node(graph, node_name, node, input_values, state, **kwargs)
+
+    monkeypatch.setattr(runtime_module, "save_run", lambda _state: None)
+    monkeypatch.setattr(runtime_module, "_execute_node", execute_node_without_llm)
+    graph = NodeSystemGraphDocument.model_validate(
+        _parent_graph_payload_with_inner_graph(
+            _inner_breakpoint_graph(),
+            subgraph_reads=[{"state": "question", "required": True}],
+            subgraph_writes=[{"state": "answer", "mode": "replace"}],
+        )
+    )
+
+    result = execute_node_system_graph_langgraph(graph)
+
+    assert result["status"] == "awaiting_human"
+    assert result["current_node_id"] == "nested_research"
+    assert result["node_status_map"]["nested_research"] == "paused"
+    assert result["subgraph_status_map"]["nested_research"]["inner_agent"] == "paused"
+    pending = result["metadata"]["pending_subgraph_breakpoint"]
+    assert pending["subgraph_node_id"] == "nested_research"
+    assert pending["inner_node_id"] == "inner_agent"
+    assert pending["subgraph_path"] == ["nested_research"]
+    assert pending["state_values"]["internal_question"] == "来自父图的明确输入"
+
+
+def test_langgraph_runtime_resumes_parent_after_subgraph_breakpoint(monkeypatch) -> None:
+    import app.core.langgraph.runtime as runtime_module
+
+    original_execute_node = runtime_module._execute_node
+
+    def execute_node_without_llm(graph, node_name, node, input_values, state, **kwargs):
+        if node_name == "inner_agent":
+            return {
+                "outputs": {"internal_question": input_values["internal_question"]},
+                "final_result": input_values["internal_question"],
+            }
+        return original_execute_node(graph, node_name, node, input_values, state, **kwargs)
+
+    monkeypatch.setattr(runtime_module, "save_run", lambda _state: None)
+    monkeypatch.setattr(runtime_module, "_execute_node", execute_node_without_llm)
+    graph = NodeSystemGraphDocument.model_validate(
+        _parent_graph_payload_with_inner_graph(
+            _inner_breakpoint_graph(),
+            subgraph_reads=[{"state": "question", "required": True}],
+            subgraph_writes=[{"state": "answer", "mode": "replace"}],
+        )
+    )
+    paused = execute_node_system_graph_langgraph(graph)
+    paused["metadata"]["pending_subgraph_resume_payload"] = {}
+
+    resumed = execute_node_system_graph_langgraph(
+        graph,
+        paused,
+        resume_from_checkpoint=True,
+        resume_command=None,
+    )
+
+    assert resumed["status"] == "completed"
+    assert resumed["state_values"]["answer"] == "来自父图的明确输入"
+    assert "pending_subgraph_breakpoint" not in resumed["metadata"]
 
 
 def test_langgraph_runtime_publishes_subgraph_event_context(monkeypatch) -> None:

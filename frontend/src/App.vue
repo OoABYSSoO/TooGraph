@@ -1,7 +1,7 @@
 <template>
   <ElConfigProvider :locale="elementPlusLocale">
     <RouterView />
-    <CompanionPet />
+    <BuddyWidget />
   </ElConfigProvider>
 </template>
 
@@ -11,7 +11,7 @@ import { storeToRefs } from "pinia";
 import { computed, watch } from "vue";
 
 import { resolveElementPlusLocale, setI18nLocale } from "./i18n";
-import CompanionPet from "./companion/CompanionPet.vue";
+import BuddyWidget from "./buddy/BuddyWidget.vue";
 import { useLocaleStore } from "@/stores/locale";
 
 const localeStore = useLocaleStore();

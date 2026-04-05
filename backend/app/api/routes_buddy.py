@@ -5,14 +5,14 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.companion import commands, store
+from app.buddy import commands, store
 
 
-router = APIRouter(prefix="/api/companion", tags=["companion"])
+router = APIRouter(prefix="/api/buddy", tags=["buddy"])
 
 
-class CompanionUpdatePayload(BaseModel):
-    change_reason: str = Field(default="用户在 Companion 页面更新。", alias="change_reason")
+class BuddyUpdatePayload(BaseModel):
+    change_reason: str = Field(default="用户在伙伴页面更新。", alias="change_reason")
 
     model_config = ConfigDict(extra="allow", populate_by_name=True, str_strip_whitespace=True)
 
@@ -22,17 +22,17 @@ class CompanionUpdatePayload(BaseModel):
         return payload
 
 
-class CompanionMemoryPayload(CompanionUpdatePayload):
+class BuddyMemoryPayload(BuddyUpdatePayload):
     type: str = "fact"
     title: str = Field(min_length=1)
     content: str = Field(min_length=1)
 
 
-class CompanionCommandPayload(BaseModel):
+class BuddyCommandPayload(BaseModel):
     action: str = Field(min_length=1)
     payload: dict[str, Any] = Field(default_factory=dict)
     target_id: str | None = None
-    change_reason: str = "User requested a companion command."
+    change_reason: str = "User requested a buddy command."
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
@@ -43,7 +43,7 @@ def get_profile_endpoint() -> dict[str, Any]:
 
 
 @router.put("/profile")
-def update_profile_endpoint(payload: CompanionUpdatePayload) -> dict[str, Any]:
+def update_profile_endpoint(payload: BuddyUpdatePayload) -> dict[str, Any]:
     return store.save_profile(payload.data(), changed_by="user", change_reason=payload.change_reason)
 
 
@@ -53,7 +53,7 @@ def get_policy_endpoint() -> dict[str, Any]:
 
 
 @router.put("/policy")
-def update_policy_endpoint(payload: CompanionUpdatePayload) -> dict[str, Any]:
+def update_policy_endpoint(payload: BuddyUpdatePayload) -> dict[str, Any]:
     return store.save_policy(payload.data(), changed_by="user", change_reason=payload.change_reason)
 
 
@@ -63,12 +63,12 @@ def list_memories_endpoint(include_deleted: bool = Query(default=False)) -> list
 
 
 @router.post("/memories")
-def create_memory_endpoint(payload: CompanionMemoryPayload) -> dict[str, Any]:
+def create_memory_endpoint(payload: BuddyMemoryPayload) -> dict[str, Any]:
     return store.create_memory(payload.data(), changed_by="user", change_reason=payload.change_reason)
 
 
 @router.patch("/memories/{memory_id}")
-def update_memory_endpoint(memory_id: str, payload: CompanionUpdatePayload) -> dict[str, Any]:
+def update_memory_endpoint(memory_id: str, payload: BuddyUpdatePayload) -> dict[str, Any]:
     try:
         return store.update_memory(memory_id, payload.data(), changed_by="user", change_reason=payload.change_reason)
     except KeyError as exc:
@@ -89,7 +89,7 @@ def get_session_summary_endpoint() -> dict[str, Any]:
 
 
 @router.put("/session-summary")
-def update_session_summary_endpoint(payload: CompanionUpdatePayload) -> dict[str, Any]:
+def update_session_summary_endpoint(payload: BuddyUpdatePayload) -> dict[str, Any]:
     return store.save_session_summary(payload.data(), changed_by="user", change_reason=payload.change_reason)
 
 
@@ -115,10 +115,10 @@ def list_commands_endpoint() -> list[dict[str, Any]]:
 
 
 @router.post("/commands")
-def execute_command_endpoint(payload: CompanionCommandPayload) -> dict[str, Any]:
+def execute_command_endpoint(payload: BuddyCommandPayload) -> dict[str, Any]:
     try:
         return commands.execute_command(payload.model_dump())
     except KeyError as exc:
-        raise HTTPException(status_code=404, detail="Companion command target not found") from exc
+        raise HTTPException(status_code=404, detail="Buddy command target not found") from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

@@ -4,16 +4,16 @@ from copy import deepcopy
 from typing import Any
 from uuid import uuid4
 
-from app.companion import store
+from app.buddy import store
 from app.core.storage.json_file_utils import read_json_file, utc_now_iso, write_json_file
 
 
 COMMANDS_PATH = "commands.json"
-COMMAND_CHANGED_BY = "companion_command"
+COMMAND_CHANGED_BY = "buddy_command"
 
 
 def list_commands() -> list[dict[str, Any]]:
-    value = read_json_file(store.COMPANION_DATA_DIR / COMMANDS_PATH, default=[])
+    value = read_json_file(store.BUDDY_DATA_DIR / COMMANDS_PATH, default=[])
     return value if isinstance(value, list) else []
 
 
@@ -26,7 +26,7 @@ def execute_command(payload: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("payload must be an object.")
 
     target_id = _optional_text(payload.get("target_id"))
-    change_reason = _optional_text(payload.get("change_reason")) or f"Companion command executed: {action}."
+    change_reason = _optional_text(payload.get("change_reason")) or f"Buddy command executed: {action}."
     if action == "graph_patch.draft":
         return _execute_graph_patch_draft(command_payload, target_id=target_id, change_reason=change_reason)
 
@@ -42,7 +42,7 @@ def execute_command(payload: dict[str, Any]) -> dict[str, Any]:
     now = utc_now_iso()
     command = {
         "command_id": f"cmd_{uuid4().hex[:12]}",
-        "kind": "companion.manual_write",
+        "kind": "buddy.manual_write",
         "action": action,
         "status": "succeeded",
         "target_type": target_type,
@@ -73,14 +73,14 @@ def _execute_graph_patch_draft(
         "draft_id": command_id,
         "graph_id": graph_id,
         "graph_name": _optional_text(payload.get("graph_name")),
-        "summary": _optional_text(payload.get("summary")) or "Companion graph patch draft.",
+        "summary": _optional_text(payload.get("summary")) or "Buddy graph patch draft.",
         "rationale": _optional_text(payload.get("rationale")) or "",
         "patch": patch,
         "preview": deepcopy(payload.get("preview")) if isinstance(payload.get("preview"), dict) else None,
     }
     command = {
         "command_id": command_id,
-        "kind": "companion.graph_patch_draft",
+        "kind": "buddy.graph_patch_draft",
         "action": "graph_patch.draft",
         "status": "awaiting_approval",
         "target_type": "graph",
@@ -126,7 +126,7 @@ def _dispatch_command(
         revision_id = _required_target_id(target_id, action)
         result = store.restore_revision(revision_id, changed_by=COMMAND_CHANGED_BY, change_reason=change_reason)
         return result, str(result.get("target_type") or ""), str(result.get("target_id") or "")
-    raise ValueError(f"Unsupported companion command action: {action}")
+    raise ValueError(f"Unsupported buddy command action: {action}")
 
 
 def _latest_new_revision(previous_revision_ids: set[str]) -> dict[str, Any] | None:
@@ -140,7 +140,7 @@ def _latest_new_revision(previous_revision_ids: set[str]) -> dict[str, Any] | No
 def _append_command(command: dict[str, Any]) -> None:
     commands = list_commands()
     commands.append(command)
-    write_json_file(store.COMPANION_DATA_DIR / COMMANDS_PATH, commands)
+    write_json_file(store.BUDDY_DATA_DIR / COMMANDS_PATH, commands)
 
 
 def _required_target_id(value: str | None, action: str) -> str:

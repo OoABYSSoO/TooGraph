@@ -1,33 +1,33 @@
 <template>
-  <div class="companion-pet" aria-live="polite">
+  <div class="buddy-widget" aria-live="polite">
     <div
-      class="companion-pet__anchor"
-      :class="`companion-pet__anchor--${panelPlacement}`"
+      class="buddy-widget__anchor"
+      :class="`buddy-widget__anchor--${panelPlacement}`"
       :style="anchorStyle"
     >
       <section
         v-if="isPanelOpen"
-        class="companion-pet__panel"
-        :aria-label="t('companion.panelLabel')"
+        class="buddy-widget__panel"
+        :aria-label="t('buddy.panelLabel')"
       >
-        <header class="companion-pet__header">
-          <div class="companion-pet__heading">
-            <span class="companion-pet__eyebrow">{{ t("companion.eyebrow") }}</span>
-            <h2>{{ t("companion.title") }}</h2>
+        <header class="buddy-widget__header">
+          <div class="buddy-widget__heading">
+            <span class="buddy-widget__eyebrow">{{ t("buddy.eyebrow") }}</span>
+            <h2>{{ t("buddy.title") }}</h2>
           </div>
-          <div class="companion-pet__header-actions">
+          <div class="buddy-widget__header-actions">
             <button
               type="button"
-              class="companion-pet__icon-button"
-              :title="t('companion.clear')"
-              :aria-label="t('companion.clear')"
+              class="buddy-widget__icon-button"
+              :title="t('buddy.clear')"
+              :aria-label="t('buddy.clear')"
               @click="clearMessages"
             >
               <ElIcon><Delete /></ElIcon>
             </button>
             <button
               type="button"
-              class="companion-pet__icon-button"
+              class="buddy-widget__icon-button"
               :title="t('common.close')"
               :aria-label="t('common.close')"
               @click="isPanelOpen = false"
@@ -35,47 +35,47 @@
               <ElIcon><Close /></ElIcon>
             </button>
           </div>
-          <div class="companion-pet__runtime-controls">
-            <div class="companion-pet__model" :title="companionModelLabel">
-              <span class="companion-pet__control-label">{{ t("companion.modelLabel") }}</span>
+          <div class="buddy-widget__runtime-controls">
+            <div class="buddy-widget__model" :title="buddyModelLabel">
+              <span class="buddy-widget__control-label">{{ t("buddy.modelLabel") }}</span>
               <ElSelect
-                v-model="companionModelRef"
-                class="companion-pet__model-select graphite-select"
-                popper-class="graphite-select-popper companion-pet__select-popper"
+                v-model="buddyModelRef"
+                class="buddy-widget__model-select graphite-select"
+                popper-class="graphite-select-popper buddy-widget__select-popper"
                 size="small"
                 filterable
-                :placeholder="companionModelPlaceholder"
-                :aria-label="t('companion.modelLabel')"
-                :title="companionModelLabel"
-                :disabled="companionModelOptions.length === 0"
-                @visible-change="handleCompanionModelSelectVisibleChange"
+                :placeholder="buddyModelPlaceholder"
+                :aria-label="t('buddy.modelLabel')"
+                :title="buddyModelLabel"
+                :disabled="buddyModelOptions.length === 0"
+                @visible-change="handleBuddyModelSelectVisibleChange"
               >
                 <ElOption
-                  v-for="option in companionModelOptions"
+                  v-for="option in buddyModelOptions"
                   :key="option.value"
                   :label="option.label"
                   :value="option.value"
                 />
               </ElSelect>
             </div>
-            <div class="companion-pet__mode" :title="companionModeLabel">
-              <span class="companion-pet__control-label">{{ t("companion.modeLabel") }}</span>
+            <div class="buddy-widget__mode" :title="buddyModeLabel">
+              <span class="buddy-widget__control-label">{{ t("buddy.modeLabel") }}</span>
               <ElSelect
-                v-model="companionMode"
-                class="companion-pet__mode-select graphite-select"
-                popper-class="graphite-select-popper companion-pet__select-popper"
+                v-model="buddyMode"
+                class="buddy-widget__mode-select graphite-select"
+                popper-class="graphite-select-popper buddy-widget__select-popper"
                 size="small"
-                :aria-label="t('companion.modeLabel')"
-                :title="companionModeLabel"
+                :aria-label="t('buddy.modeLabel')"
+                :title="buddyModeLabel"
               >
                 <ElOption
-                  v-for="option in COMPANION_MODE_OPTIONS"
+                  v-for="option in BUDDY_MODE_OPTIONS"
                   :key="option.value"
                   :label="t(option.labelKey)"
                   :value="option.value"
                   :disabled="option.disabled"
                 >
-                  <span class="companion-pet__mode-option">
+                  <span class="buddy-widget__mode-option">
                     <span>{{ t(option.labelKey) }}</span>
                     <small>{{ t(option.descriptionKey) }}</small>
                   </span>
@@ -85,60 +85,60 @@
           </div>
         </header>
 
-        <div ref="messageListElement" class="companion-pet__messages">
-          <p v-if="messages.length === 0" class="companion-pet__empty">
-            {{ t("companion.empty") }}
+        <div ref="messageListElement" class="buddy-widget__messages">
+          <p v-if="messages.length === 0" class="buddy-widget__empty">
+            {{ t("buddy.empty") }}
           </p>
           <article
             v-for="message in messages"
             :key="message.id"
-            class="companion-pet__message"
-            :class="`companion-pet__message--${message.role}`"
+            class="buddy-widget__message"
+            :class="`buddy-widget__message--${message.role}`"
           >
-            <span class="companion-pet__message-label">
-              {{ message.role === "user" ? t("companion.user") : t("companion.pet") }}
+            <span class="buddy-widget__message-label">
+              {{ message.role === "user" ? t("buddy.user") : t("buddy.name") }}
             </span>
-            <p>{{ message.content || t("companion.streaming") }}</p>
+            <p>{{ message.content || t("buddy.streaming") }}</p>
           </article>
-          <p v-if="errorMessage" class="companion-pet__error">{{ errorMessage }}</p>
-          <p v-if="queuedTurns.length > 0" class="companion-pet__queue">
-            {{ t("companion.queueStatus", { count: queuedTurns.length }) }}
+          <p v-if="errorMessage" class="buddy-widget__error">{{ errorMessage }}</p>
+          <p v-if="queuedTurns.length > 0" class="buddy-widget__queue">
+            {{ t("buddy.queueStatus", { count: queuedTurns.length }) }}
           </p>
         </div>
 
-        <form class="companion-pet__form" @submit.prevent="sendMessage">
+        <form class="buddy-widget__form" @submit.prevent="sendMessage">
           <textarea
             v-model="draft"
-            class="companion-pet__input"
+            class="buddy-widget__input"
             rows="2"
-            :placeholder="t('companion.placeholder')"
+            :placeholder="t('buddy.placeholder')"
             @keydown.enter.exact.prevent="sendMessage"
           />
           <button
             type="submit"
-            class="companion-pet__send"
+            class="buddy-widget__send"
             :disabled="!draft.trim()"
-            :title="t('companion.send')"
-            :aria-label="t('companion.send')"
+            :title="t('buddy.send')"
+            :aria-label="t('buddy.send')"
           >
             <ElIcon><Promotion /></ElIcon>
           </button>
         </form>
       </section>
 
-      <div v-if="bubbleText && !isPanelOpen" class="companion-pet__bubble">
+      <div v-if="bubbleText && !isPanelOpen" class="buddy-widget__bubble">
         {{ bubbleText }}
       </div>
 
       <button
         type="button"
-        class="companion-pet__avatar"
-        :title="t('companion.dragHint')"
-        :aria-label="t('companion.open')"
+        class="buddy-widget__avatar"
+        :title="t('buddy.dragHint')"
+        :aria-label="t('buddy.open')"
         @pointerdown="handlePointerDown"
         @click="handleAvatarClick"
       >
-        <CompanionMascot :mood="mood" :dragging="isDragging" :tap-nonce="tapNonce" />
+        <BuddyMascot :mood="mood" :dragging="isDragging" :tap-nonce="tapNonce" />
       </button>
     </div>
   </div>
@@ -157,73 +157,73 @@ import { fetchSettings } from "../api/settings.ts";
 import { fetchSkillCatalog } from "../api/skills.ts";
 import { buildRuntimeModelOptions } from "../lib/runtimeModelCatalog.ts";
 import { buildRunEventStreamUrl, parseRunEventPayload, shouldPollRunStatus } from "../lib/run-event-stream.ts";
-import { useCompanionContextStore } from "../stores/companionContext.ts";
+import { useBuddyContextStore } from "../stores/buddyContext.ts";
 import type { RunDetail } from "../types/run.ts";
 import type { SettingsPayload } from "../types/settings.ts";
 
-import CompanionMascot from "./CompanionMascot.vue";
-import { buildCompanionPageContext } from "./companionPageContext.ts";
+import BuddyMascot from "./BuddyMascot.vue";
+import { buildBuddyPageContext } from "./buddyPageContext.ts";
 import {
-  COMPANION_TEMPLATE_ID,
-  COMPANION_MODE_OPTIONS,
-  DEFAULT_COMPANION_MODE,
-  buildCompanionChatGraph,
-  resolveCompanionMode,
-  resolveCompanionReplyFromRunEvent,
-  resolveCompanionReplyText,
-  type CompanionChatMessage,
-  type CompanionMode,
-} from "./companionChatGraph.ts";
+  BUDDY_TEMPLATE_ID,
+  BUDDY_MODE_OPTIONS,
+  DEFAULT_BUDDY_MODE,
+  buildBuddyChatGraph,
+  resolveBuddyMode,
+  resolveBuddyReplyFromRunEvent,
+  resolveBuddyReplyText,
+  type BuddyChatMessage,
+  type BuddyMode,
+} from "./buddyChatGraph.ts";
 import {
-  COMPANION_POSITION_STORAGE_KEY,
-  DEFAULT_COMPANION_MARGIN,
-  DEFAULT_COMPANION_SIZE,
-  clampCompanionPosition,
-  parseStoredCompanionPosition,
-  resolveDefaultCompanionPosition,
-  serializeCompanionPosition,
-  type CompanionPosition,
-} from "./companionPosition.ts";
+  BUDDY_POSITION_STORAGE_KEY,
+  DEFAULT_BUDDY_MARGIN,
+  DEFAULT_BUDDY_SIZE,
+  clampBuddyPosition,
+  parseStoredBuddyPosition,
+  resolveDefaultBuddyPosition,
+  serializeBuddyPosition,
+  type BuddyPosition,
+} from "./buddyPosition.ts";
 
-type CompanionMessage = CompanionChatMessage & {
+type BuddyMessage = BuddyChatMessage & {
   id: string;
 };
 
-type CompanionMessagePatch = Partial<Pick<CompanionMessage, "content" | "includeInContext">>;
+type BuddyMessagePatch = Partial<Pick<BuddyMessage, "content" | "includeInContext">>;
 
-type CompanionQueuedTurn = {
+type BuddyQueuedTurn = {
   userMessageId: string;
   userMessage: string;
 };
 
-type CompanionMood = "idle" | "thinking" | "speaking" | "error";
-type CompanionModelOption = {
+type BuddyMood = "idle" | "thinking" | "speaking" | "error";
+type BuddyModelOption = {
   value: string;
   label: string;
 };
 
-const COMPANION_HISTORY_STORAGE_KEY = "graphiteui:companion-history";
-const COMPANION_MODEL_STORAGE_KEY = "graphiteui:companion-model";
+const BUDDY_HISTORY_STORAGE_KEY = "graphiteui:buddy-history";
+const BUDDY_MODEL_STORAGE_KEY = "graphiteui:buddy-model";
 const DRAG_THRESHOLD_PX = 4;
 const RUN_POLL_INTERVAL_MS = 700;
 const RUN_POLL_TIMEOUT_MS = 240000;
 
 const { t } = useI18n();
 const route = useRoute();
-const companionContextStore = useCompanionContextStore();
+const buddyContextStore = useBuddyContextStore();
 
 const viewport = ref(resolveViewport());
-const position = ref(resolveDefaultCompanionPosition(viewport.value));
+const position = ref(resolveDefaultBuddyPosition(viewport.value));
 const isPanelOpen = ref(false);
 const draft = ref("");
-const companionMode = ref<CompanionMode>(DEFAULT_COMPANION_MODE);
-const companionModelRef = ref("");
-const companionModelOptions = ref<CompanionModelOption[]>([]);
-const companionModelLoadError = ref("");
-const messages = ref<CompanionMessage[]>([]);
-const queuedTurns = ref<CompanionQueuedTurn[]>([]);
+const buddyMode = ref<BuddyMode>(DEFAULT_BUDDY_MODE);
+const buddyModelRef = ref("");
+const buddyModelOptions = ref<BuddyModelOption[]>([]);
+const buddyModelLoadError = ref("");
+const messages = ref<BuddyMessage[]>([]);
+const queuedTurns = ref<BuddyQueuedTurn[]>([]);
 const errorMessage = ref("");
-const mood = ref<CompanionMood>("idle");
+const mood = ref<BuddyMood>("idle");
 const tapNonce = ref(0);
 const activeRunId = ref<string | null>(null);
 const messageListElement = ref<HTMLElement | null>(null);
@@ -231,30 +231,30 @@ const pointerDrag = ref<{
   pointerId: number;
   startX: number;
   startY: number;
-  startPosition: CompanionPosition;
+  startPosition: BuddyPosition;
   moved: boolean;
 } | null>(null);
 
 let suppressNextClick = false;
 let eventSource: EventSource | null = null;
 let activeAbortController: AbortController | null = null;
-let isDrainingCompanionQueue = false;
+let isDrainingBuddyQueue = false;
 let speakingIdleTimerId: number | null = null;
 
 const isDragging = computed(() => Boolean(pointerDrag.value?.moved));
-const companionModeLabel = computed(() => {
-  const option = COMPANION_MODE_OPTIONS.find((candidate) => candidate.value === companionMode.value);
-  return option ? `${t(option.labelKey)} - ${t(option.descriptionKey)}` : t("companion.modes.advisory");
+const buddyModeLabel = computed(() => {
+  const option = BUDDY_MODE_OPTIONS.find((candidate) => candidate.value === buddyMode.value);
+  return option ? `${t(option.labelKey)} - ${t(option.descriptionKey)}` : t("buddy.modes.advisory");
 });
-const companionModelLabel = computed(() => {
-  const option = companionModelOptions.value.find((candidate) => candidate.value === companionModelRef.value);
+const buddyModelLabel = computed(() => {
+  const option = buddyModelOptions.value.find((candidate) => candidate.value === buddyModelRef.value);
   if (option) {
-    return `${t("companion.modelLabel")} - ${option.label}`;
+    return `${t("buddy.modelLabel")} - ${option.label}`;
   }
-  return companionModelLoadError.value || t("companion.modelUnavailable");
+  return buddyModelLoadError.value || t("buddy.modelUnavailable");
 });
-const companionModelPlaceholder = computed(() =>
-  companionModelLoadError.value ? t("companion.modelLoadFailed") : t("companion.modelLoading"),
+const buddyModelPlaceholder = computed(() =>
+  buddyModelLoadError.value ? t("buddy.modelLoadFailed") : t("buddy.modelLoading"),
 );
 const anchorStyle = computed(() => ({
   transform: `translate3d(${position.value.x}px, ${position.value.y}px, 0)`,
@@ -262,20 +262,20 @@ const anchorStyle = computed(() => ({
 const panelPlacement = computed(() => (position.value.x > viewport.value.width / 2 ? "left" : "right"));
 const bubbleText = computed(() => {
   if (mood.value === "thinking") {
-    return t("companion.thinking");
+    return t("buddy.thinking");
   }
   if (mood.value === "error") {
-    return t("companion.errorBubble");
+    return t("buddy.errorBubble");
   }
-  const latestPetMessage = [...messages.value].reverse().find((message) => message.role === "assistant" && message.content.trim());
-  return latestPetMessage?.content.trim().slice(0, 84) || t("companion.readyBubble");
+  const latestBuddyMessage = [...messages.value].reverse().find((message) => message.role === "assistant" && message.content.trim());
+  return latestBuddyMessage?.content.trim().slice(0, 84) || t("buddy.readyBubble");
 });
 
 onMounted(() => {
   hydratePosition();
   hydrateMessages();
-  hydrateCompanionModel();
-  void loadCompanionModelOptions();
+  hydrateBuddyModel();
+  void loadBuddyModelOptions();
   window.addEventListener("resize", handleResize);
 });
 
@@ -293,7 +293,7 @@ watch(
   messages,
   (nextMessages) => {
     window.localStorage.setItem(
-      COMPANION_HISTORY_STORAGE_KEY,
+      BUDDY_HISTORY_STORAGE_KEY,
       JSON.stringify(
         nextMessages
           .filter(isPersistableMessageForStorage)
@@ -305,20 +305,20 @@ watch(
   { deep: true },
 );
 
-watch(companionMode, (nextMode) => {
-  const safeMode = resolveCompanionMode(nextMode);
+watch(buddyMode, (nextMode) => {
+  const safeMode = resolveBuddyMode(nextMode);
   if (safeMode !== nextMode) {
-    companionMode.value = safeMode;
+    buddyMode.value = safeMode;
   }
 });
 
-watch(companionModelRef, (nextModel) => {
+watch(buddyModelRef, (nextModel) => {
   const normalized = nextModel.trim();
   if (normalized) {
-    window.localStorage.setItem(COMPANION_MODEL_STORAGE_KEY, normalized);
+    window.localStorage.setItem(BUDDY_MODEL_STORAGE_KEY, normalized);
     return;
   }
-  window.localStorage.removeItem(COMPANION_MODEL_STORAGE_KEY);
+  window.localStorage.removeItem(BUDDY_MODEL_STORAGE_KEY);
 });
 
 function handleAvatarClick() {
@@ -333,9 +333,9 @@ function handleAvatarClick() {
   }
 }
 
-function handleCompanionModelSelectVisibleChange(visible: boolean) {
+function handleBuddyModelSelectVisibleChange(visible: boolean) {
   if (visible) {
-    void loadCompanionModelOptions();
+    void loadBuddyModelOptions();
   }
 }
 
@@ -362,14 +362,14 @@ function handlePointerMove(event: PointerEvent) {
   if (Math.hypot(deltaX, deltaY) > DRAG_THRESHOLD_PX) {
     drag.moved = true;
   }
-  position.value = clampCompanionPosition(
+  position.value = clampBuddyPosition(
     {
       x: drag.startPosition.x + deltaX,
       y: drag.startPosition.y + deltaY,
     },
     viewport.value,
-    DEFAULT_COMPANION_SIZE,
-    DEFAULT_COMPANION_MARGIN,
+    DEFAULT_BUDDY_SIZE,
+    DEFAULT_BUDDY_MARGIN,
   );
 }
 
@@ -400,16 +400,16 @@ async function sendMessage() {
     userMessageId: userEntry.id,
     userMessage,
   });
-  void drainCompanionQueue();
+  void drainBuddyQueue();
   await scrollMessagesToBottom();
 }
 
-async function drainCompanionQueue() {
-  if (isDrainingCompanionQueue) {
+async function drainBuddyQueue() {
+  if (isDrainingBuddyQueue) {
     return;
   }
 
-  isDrainingCompanionQueue = true;
+  isDrainingBuddyQueue = true;
   try {
     while (queuedTurns.value.length > 0) {
       const nextTurn = queuedTurns.value.shift();
@@ -419,14 +419,14 @@ async function drainCompanionQueue() {
       await processQueuedTurn(nextTurn);
     }
   } finally {
-    isDrainingCompanionQueue = false;
+    isDrainingBuddyQueue = false;
     if (queuedTurns.value.length > 0) {
-      void drainCompanionQueue();
+      void drainBuddyQueue();
     }
   }
 }
 
-async function processQueuedTurn(turn: CompanionQueuedTurn) {
+async function processQueuedTurn(turn: BuddyQueuedTurn) {
   clearSpeakingIdleTimer();
   const history = buildHistoryBeforeMessage(turn.userMessageId);
   const assistantMessage = appendAssistantMessageForTurn(turn.userMessageId);
@@ -436,38 +436,38 @@ async function processQueuedTurn(turn: CompanionQueuedTurn) {
   try {
     activeAbortController = new AbortController();
     const [template, skillCatalog] = await Promise.all([
-      fetchTemplate(COMPANION_TEMPLATE_ID),
+      fetchTemplate(BUDDY_TEMPLATE_ID),
       fetchSkillCatalog({ includeDisabled: true }),
     ]);
-    const graph = buildCompanionChatGraph(template, {
+    const graph = buildBuddyChatGraph(template, {
       userMessage: turn.userMessage,
       history,
       pageContext: buildPageContext(),
-      companionMode: companionMode.value,
-      companionModel: companionModelRef.value,
+      buddyMode: buddyMode.value,
+      buddyModel: buddyModelRef.value,
       skillCatalog,
     });
     const run = await runGraph(graph);
     activeRunId.value = run.run_id;
     startRunEventStream(run.run_id, assistantMessage.id);
     const runDetail = await pollRunUntilFinished(run.run_id, activeAbortController.signal);
-    const finalReply = resolveCompanionReplyText(runDetail);
-    updateAssistantMessage(assistantMessage.id, finalReply || t("companion.emptyReply"));
+    const finalReply = resolveBuddyReplyText(runDetail);
+    updateAssistantMessage(assistantMessage.id, finalReply || t("buddy.emptyReply"));
     mood.value = runDetail.status === "failed" ? "error" : "speaking";
     if (runDetail.status === "completed") {
-      companionContextStore.notifyCompanionDataChanged();
+      buddyContextStore.notifyBuddyDataChanged();
     }
     if (runDetail.status === "failed") {
-      errorMessage.value = runDetail.errors?.[0] ?? t("companion.runFailed");
+      errorMessage.value = runDetail.errors?.[0] ?? t("buddy.runFailed");
     }
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
       return;
     }
     mood.value = "error";
-    const message = error instanceof Error ? error.message : t("companion.runFailed");
+    const message = error instanceof Error ? error.message : t("buddy.runFailed");
     errorMessage.value = message;
-    updateAssistantMessage(assistantMessage.id, t("companion.errorReply", { error: message }), { includeInContext: false });
+    updateAssistantMessage(assistantMessage.id, t("buddy.errorReply", { error: message }), { includeInContext: false });
   } finally {
     closeEventSource();
     activeRunId.value = null;
@@ -489,22 +489,22 @@ function clearMessages() {
   messages.value = [];
   errorMessage.value = "";
   mood.value = "idle";
-  window.localStorage.removeItem(COMPANION_HISTORY_STORAGE_KEY);
+  window.localStorage.removeItem(BUDDY_HISTORY_STORAGE_KEY);
 }
 
 function hydratePosition() {
-  const stored = parseStoredCompanionPosition(window.localStorage.getItem(COMPANION_POSITION_STORAGE_KEY));
-  position.value = clampCompanionPosition(
-    stored ?? resolveDefaultCompanionPosition(viewport.value),
+  const stored = parseStoredBuddyPosition(window.localStorage.getItem(BUDDY_POSITION_STORAGE_KEY));
+  position.value = clampBuddyPosition(
+    stored ?? resolveDefaultBuddyPosition(viewport.value),
     viewport.value,
-    DEFAULT_COMPANION_SIZE,
-    DEFAULT_COMPANION_MARGIN,
+    DEFAULT_BUDDY_SIZE,
+    DEFAULT_BUDDY_MARGIN,
   );
 }
 
 function hydrateMessages() {
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(COMPANION_HISTORY_STORAGE_KEY) ?? "[]") as unknown;
+    const parsed = JSON.parse(window.localStorage.getItem(BUDDY_HISTORY_STORAGE_KEY) ?? "[]") as unknown;
     if (!Array.isArray(parsed)) {
       return;
     }
@@ -517,35 +517,35 @@ function hydrateMessages() {
   }
 }
 
-function hydrateCompanionModel() {
-  companionModelRef.value = window.localStorage.getItem(COMPANION_MODEL_STORAGE_KEY)?.trim() ?? "";
+function hydrateBuddyModel() {
+  buddyModelRef.value = window.localStorage.getItem(BUDDY_MODEL_STORAGE_KEY)?.trim() ?? "";
 }
 
-async function loadCompanionModelOptions() {
-  companionModelLoadError.value = "";
+async function loadBuddyModelOptions() {
+  buddyModelLoadError.value = "";
   try {
     const settings = await fetchSettings();
-    const options = buildCompanionModelOptions(settings);
-    companionModelOptions.value = options;
+    const options = buildBuddyModelOptions(settings);
+    buddyModelOptions.value = options;
     if (options.length === 0) {
       return;
     }
-    if (!options.some((option) => option.value === companionModelRef.value)) {
-      companionModelRef.value = options[0].value;
+    if (!options.some((option) => option.value === buddyModelRef.value)) {
+      buddyModelRef.value = options[0].value;
     }
   } catch (error) {
-    companionModelLoadError.value = error instanceof Error ? error.message : t("companion.modelLoadFailed");
+    buddyModelLoadError.value = error instanceof Error ? error.message : t("buddy.modelLoadFailed");
   }
 }
 
 function handleResize() {
   viewport.value = resolveViewport();
-  position.value = clampCompanionPosition(position.value, viewport.value, DEFAULT_COMPANION_SIZE, DEFAULT_COMPANION_MARGIN);
+  position.value = clampBuddyPosition(position.value, viewport.value, DEFAULT_BUDDY_SIZE, DEFAULT_BUDDY_MARGIN);
   persistPosition();
 }
 
 function persistPosition() {
-  window.localStorage.setItem(COMPANION_POSITION_STORAGE_KEY, serializeCompanionPosition(position.value));
+  window.localStorage.setItem(BUDDY_POSITION_STORAGE_KEY, serializeBuddyPosition(position.value));
 }
 
 function startRunEventStream(runId: string, assistantMessageId: string) {
@@ -561,7 +561,7 @@ function startRunEventStream(runId: string, assistantMessageId: string) {
     if (!payload) {
       return;
     }
-    const nextText = resolveCompanionReplyFromRunEvent(payload);
+    const nextText = resolveBuddyReplyFromRunEvent(payload);
     if (!nextText) {
       return;
     }
@@ -586,7 +586,7 @@ async function pollRunUntilFinished(runId: string, signal: AbortSignal): Promise
     }
     await delay(RUN_POLL_INTERVAL_MS, signal);
   }
-  throw new Error(t("companion.runTimeout"));
+  throw new Error(t("buddy.runTimeout"));
 }
 
 function closeEventSource() {
@@ -594,7 +594,7 @@ function closeEventSource() {
   eventSource = null;
 }
 
-function updateAssistantMessage(messageId: string, content: string, patch: CompanionMessagePatch = {}) {
+function updateAssistantMessage(messageId: string, content: string, patch: BuddyMessagePatch = {}) {
   const target = messages.value.find((message) => message.id === messageId);
   if (!target) {
     return;
@@ -603,13 +603,13 @@ function updateAssistantMessage(messageId: string, content: string, patch: Compa
   Object.assign(target, patch);
 }
 
-function buildHistoryBeforeMessage(messageId: string): CompanionChatMessage[] {
+function buildHistoryBeforeMessage(messageId: string): BuddyChatMessage[] {
   const messageIndex = messages.value.findIndex((message) => message.id === messageId);
   const previousMessages = messageIndex >= 0 ? messages.value.slice(0, messageIndex) : messages.value;
   return previousMessages.filter(isContextMessage).map(({ role, content }) => ({ role, content }));
 }
 
-function appendAssistantMessageForTurn(userMessageId: string): CompanionMessage {
+function appendAssistantMessageForTurn(userMessageId: string): BuddyMessage {
   const assistantMessage = createMessage("assistant", "");
   const userMessageIndex = messages.value.findIndex((message) => message.id === userMessageId);
   if (userMessageIndex >= 0 && userMessageIndex < messages.value.length - 1) {
@@ -624,7 +624,7 @@ function scheduleSpeakingIdle() {
   clearSpeakingIdleTimer();
   speakingIdleTimerId = window.setTimeout(() => {
     speakingIdleTimerId = null;
-    if (mood.value === "speaking" && queuedTurns.value.length === 0 && !isDrainingCompanionQueue) {
+    if (mood.value === "speaking" && queuedTurns.value.length === 0 && !isDrainingBuddyQueue) {
       mood.value = "idle";
     }
   }, 1400);
@@ -648,14 +648,14 @@ async function scrollMessagesToBottom() {
 }
 
 function buildPageContext() {
-  return buildCompanionPageContext({
+  return buildBuddyPageContext({
     routePath: route.fullPath,
-    editor: companionContextStore.editorSnapshot,
-    activeCompanionRunId: activeRunId.value,
+    editor: buddyContextStore.editorSnapshot,
+    activeBuddyRunId: activeRunId.value,
   });
 }
 
-function createMessage(role: CompanionChatMessage["role"], content: string): CompanionMessage {
+function createMessage(role: BuddyChatMessage["role"], content: string): BuddyMessage {
   return {
     id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
     role,
@@ -663,15 +663,15 @@ function createMessage(role: CompanionChatMessage["role"], content: string): Com
   };
 }
 
-function buildCompanionModelOptions(settings: SettingsPayload): CompanionModelOption[] {
+function buildBuddyModelOptions(settings: SettingsPayload): BuddyModelOption[] {
   return buildRuntimeModelOptions(settings);
 }
 
-function isContextMessage(message: CompanionMessage): boolean {
+function isContextMessage(message: BuddyMessage): boolean {
   return message.includeInContext !== false;
 }
 
-function isPersistableMessageForStorage(message: CompanionMessage): boolean {
+function isPersistableMessageForStorage(message: BuddyMessage): boolean {
   return message.includeInContext !== false;
 }
 
@@ -703,21 +703,21 @@ function delay(timeoutMs: number, signal: AbortSignal) {
   });
 }
 
-function isPersistedMessage(value: unknown): value is CompanionChatMessage {
+function isPersistedMessage(value: unknown): value is BuddyChatMessage {
   return (
     typeof value === "object" &&
     value !== null &&
     !Array.isArray(value) &&
-    ((value as CompanionChatMessage).role === "user" || (value as CompanionChatMessage).role === "assistant") &&
-    typeof (value as CompanionChatMessage).content === "string" &&
-    ((value as CompanionChatMessage).includeInContext === undefined ||
-      typeof (value as CompanionChatMessage).includeInContext === "boolean")
+    ((value as BuddyChatMessage).role === "user" || (value as BuddyChatMessage).role === "assistant") &&
+    typeof (value as BuddyChatMessage).content === "string" &&
+    ((value as BuddyChatMessage).includeInContext === undefined ||
+      typeof (value as BuddyChatMessage).includeInContext === "boolean")
   );
 }
 </script>
 
 <style scoped>
-.companion-pet {
+.buddy-widget {
   position: fixed;
   inset: 0;
   z-index: 4500;
@@ -725,7 +725,7 @@ function isPersistedMessage(value: unknown): value is CompanionChatMessage {
   font-family: var(--graphite-font-ui);
 }
 
-.companion-pet__anchor {
+.buddy-widget__anchor {
   position: fixed;
   top: 0;
   left: 0;
@@ -735,7 +735,7 @@ function isPersistedMessage(value: unknown): value is CompanionChatMessage {
   transition: transform 120ms ease;
 }
 
-.companion-pet__avatar {
+.buddy-widget__avatar {
   appearance: none;
   position: relative;
   width: 96px;
@@ -752,7 +752,7 @@ function isPersistedMessage(value: unknown): value is CompanionChatMessage {
   transition: transform 160ms ease;
 }
 
-.companion-pet__avatar > .companion-mascot {
+.buddy-widget__avatar > .buddy-mascot {
   position: relative;
   z-index: 1;
   filter:
@@ -762,44 +762,44 @@ function isPersistedMessage(value: unknown): value is CompanionChatMessage {
   transition: filter 160ms ease;
 }
 
-.companion-pet__avatar:hover {
+.buddy-widget__avatar:hover {
   transform: translateY(-2px);
 }
 
-.companion-pet__avatar:hover > .companion-mascot {
+.buddy-widget__avatar:hover > .buddy-mascot {
   filter:
     drop-shadow(0 9px 14px rgba(255, 255, 255, 0.9))
     drop-shadow(0 3px 6px rgba(255, 255, 255, 0.76))
     drop-shadow(0 0 4px rgba(255, 255, 255, 0.98));
 }
 
-.companion-pet__avatar:active {
+.buddy-widget__avatar:active {
   cursor: grabbing;
   transform: translateY(0) scale(0.98);
 }
 
-.companion-pet__avatar:active > .companion-mascot {
+.buddy-widget__avatar:active > .buddy-mascot {
   filter:
     drop-shadow(0 7px 10px rgba(255, 255, 255, 0.82))
     drop-shadow(0 2px 4px rgba(255, 255, 255, 0.68))
     drop-shadow(0 0 3px rgba(255, 255, 255, 0.9));
 }
 
-.companion-pet__avatar:focus-visible,
-.companion-pet__icon-button:focus-visible,
-.companion-pet__send:focus-visible,
-.companion-pet__input:focus-visible {
+.buddy-widget__avatar:focus-visible,
+.buddy-widget__icon-button:focus-visible,
+.buddy-widget__send:focus-visible,
+.buddy-widget__input:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px rgba(210, 162, 117, 0.3);
 }
 
-.companion-pet__panel,
-.companion-pet__bubble {
+.buddy-widget__panel,
+.buddy-widget__bubble {
   position: absolute;
   pointer-events: auto;
 }
 
-.companion-pet__panel {
+.buddy-widget__panel {
   bottom: calc(100% + 12px);
   width: min(360px, calc(100vw - 32px));
   max-height: min(560px, calc(100vh - 132px));
@@ -813,15 +813,15 @@ function isPersistedMessage(value: unknown): value is CompanionChatMessage {
   backdrop-filter: blur(18px) saturate(1.2);
 }
 
-.companion-pet__anchor--left .companion-pet__panel {
+.buddy-widget__anchor--left .buddy-widget__panel {
   right: 0;
 }
 
-.companion-pet__anchor--right .companion-pet__panel {
+.buddy-widget__anchor--right .buddy-widget__panel {
   left: 0;
 }
 
-.companion-pet__header {
+.buddy-widget__header {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
@@ -830,12 +830,12 @@ function isPersistedMessage(value: unknown): value is CompanionChatMessage {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 248, 240, 0.5));
 }
 
-.companion-pet__heading {
+.buddy-widget__heading {
   flex: 1 1 auto;
   min-width: 0;
 }
 
-.companion-pet__eyebrow {
+.buddy-widget__eyebrow {
   display: block;
   color: var(--graphite-accent);
   font-size: 11px;
@@ -844,79 +844,79 @@ function isPersistedMessage(value: unknown): value is CompanionChatMessage {
   text-transform: uppercase;
 }
 
-.companion-pet__heading h2 {
+.buddy-widget__heading h2 {
   margin: 3px 0 0;
   color: var(--graphite-text-strong);
   font-size: 16px;
   line-height: 1.2;
 }
 
-.companion-pet__header-actions {
+.buddy-widget__header-actions {
   display: flex;
   align-items: flex-start;
   justify-content: flex-end;
   gap: 6px;
 }
 
-.companion-pet__runtime-controls {
+.buddy-widget__runtime-controls {
   grid-column: 1 / -1;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(116px, 136px);
   gap: 8px;
 }
 
-.companion-pet__model,
-.companion-pet__mode {
+.buddy-widget__model,
+.buddy-widget__mode {
   display: grid;
   gap: 4px;
   min-width: 0;
 }
 
-.companion-pet__control-label {
+.buddy-widget__control-label {
   color: var(--graphite-text-muted);
   font-size: 11px;
   font-weight: 700;
   line-height: 1;
 }
 
-.companion-pet__model-select,
-.companion-pet__mode-select {
+.buddy-widget__model-select,
+.buddy-widget__mode-select {
   width: 100%;
 }
 
-.companion-pet__model-select :deep(.el-select__wrapper),
-.companion-pet__mode-select :deep(.el-select__wrapper) {
+.buddy-widget__model-select :deep(.el-select__wrapper),
+.buddy-widget__mode-select :deep(.el-select__wrapper) {
   min-height: 30px;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.66);
   box-shadow: 0 0 0 1px rgba(154, 52, 18, 0.14) inset;
 }
 
-.companion-pet__model-select :deep(.el-select__wrapper.is-focused),
-.companion-pet__mode-select :deep(.el-select__wrapper.is-focused) {
+.buddy-widget__model-select :deep(.el-select__wrapper.is-focused),
+.buddy-widget__mode-select :deep(.el-select__wrapper.is-focused) {
   box-shadow:
     0 0 0 1px rgba(154, 52, 18, 0.22) inset,
     0 0 0 3px rgba(210, 162, 117, 0.22);
 }
 
-:global(.companion-pet__select-popper.el-popper) {
+:global(.buddy-widget__select-popper.el-popper) {
   z-index: 4600 !important;
 }
 
-.companion-pet__mode-option {
+.buddy-widget__mode-option {
   display: grid;
   gap: 2px;
   min-width: 0;
   line-height: 1.2;
 }
 
-.companion-pet__mode-option small {
+.buddy-widget__mode-option small {
   color: var(--graphite-text-muted);
   font-size: 11px;
 }
 
-.companion-pet__icon-button,
-.companion-pet__send {
+.buddy-widget__icon-button,
+.buddy-widget__send {
   appearance: none;
   display: inline-flex;
   align-items: center;
@@ -932,20 +932,20 @@ function isPersistedMessage(value: unknown): value is CompanionChatMessage {
     transform 160ms ease;
 }
 
-.companion-pet__icon-button {
+.buddy-widget__icon-button {
   width: 30px;
   height: 30px;
   border-radius: 8px;
 }
 
-.companion-pet__icon-button:hover,
-.companion-pet__send:hover {
+.buddy-widget__icon-button:hover,
+.buddy-widget__send:hover {
   border-color: rgba(154, 52, 18, 0.24);
   background: rgba(255, 248, 240, 0.92);
   transform: translateY(-1px);
 }
 
-.companion-pet__messages {
+.buddy-widget__messages {
   display: grid;
   align-content: start;
   gap: 10px;
@@ -955,19 +955,19 @@ function isPersistedMessage(value: unknown): value is CompanionChatMessage {
   padding: 14px;
 }
 
-.companion-pet__empty,
-.companion-pet__error,
-.companion-pet__queue {
+.buddy-widget__empty,
+.buddy-widget__error,
+.buddy-widget__queue {
   margin: 0;
   font-size: 13px;
   line-height: 1.5;
 }
 
-.companion-pet__empty {
+.buddy-widget__empty {
   color: var(--graphite-text-muted);
 }
 
-.companion-pet__error {
+.buddy-widget__error {
   padding: 10px 12px;
   border: 1px solid rgba(220, 38, 38, 0.16);
   border-radius: 8px;
@@ -975,23 +975,23 @@ function isPersistedMessage(value: unknown): value is CompanionChatMessage {
   color: rgb(185, 28, 28);
 }
 
-.companion-pet__queue {
+.buddy-widget__queue {
   color: rgba(108, 82, 62, 0.72);
   font-size: 12px;
 }
 
-.companion-pet__message {
+.buddy-widget__message {
   display: grid;
   gap: 4px;
 }
 
-.companion-pet__message-label {
+.buddy-widget__message-label {
   color: var(--graphite-text-muted);
   font-size: 11px;
   font-weight: 700;
 }
 
-.companion-pet__message p {
+.buddy-widget__message p {
   width: fit-content;
   max-width: 100%;
   margin: 0;
@@ -1006,16 +1006,16 @@ function isPersistedMessage(value: unknown): value is CompanionChatMessage {
   overflow-wrap: anywhere;
 }
 
-.companion-pet__message--user {
+.buddy-widget__message--user {
   justify-items: end;
 }
 
-.companion-pet__message--user p {
+.buddy-widget__message--user p {
   background: rgba(154, 52, 18, 0.08);
   color: var(--graphite-text-strong);
 }
 
-.companion-pet__form {
+.buddy-widget__form {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 38px;
   gap: 8px;
@@ -1024,7 +1024,7 @@ function isPersistedMessage(value: unknown): value is CompanionChatMessage {
   background: rgba(255, 248, 240, 0.56);
 }
 
-.companion-pet__input {
+.buddy-widget__input {
   width: 100%;
   min-height: 42px;
   max-height: 96px;
@@ -1038,25 +1038,25 @@ function isPersistedMessage(value: unknown): value is CompanionChatMessage {
   line-height: 1.45;
 }
 
-.companion-pet__input:disabled {
+.buddy-widget__input:disabled {
   cursor: not-allowed;
   opacity: 0.72;
 }
 
-.companion-pet__send {
+.buddy-widget__send {
   width: 38px;
   height: 42px;
   border-radius: 8px;
   background: rgba(154, 52, 18, 0.1);
 }
 
-.companion-pet__send:disabled {
+.buddy-widget__send:disabled {
   cursor: not-allowed;
   opacity: 0.54;
   transform: none;
 }
 
-.companion-pet__bubble {
+.buddy-widget__bubble {
   bottom: calc(100% + 10px);
   max-width: min(260px, calc(100vw - 32px));
   padding: 9px 11px;
@@ -1071,21 +1071,21 @@ function isPersistedMessage(value: unknown): value is CompanionChatMessage {
   backdrop-filter: blur(14px) saturate(1.18);
 }
 
-.companion-pet__anchor--left .companion-pet__bubble {
+.buddy-widget__anchor--left .buddy-widget__bubble {
   right: 0;
 }
 
-.companion-pet__anchor--right .companion-pet__bubble {
+.buddy-widget__anchor--right .buddy-widget__bubble {
   left: 0;
 }
 
 @media (max-width: 560px) {
-  .companion-pet__panel {
+  .buddy-widget__panel {
     width: calc(100vw - 32px);
     max-height: min(520px, calc(100vh - 120px));
   }
 
-  .companion-pet__messages {
+  .buddy-widget__messages {
     max-height: 320px;
   }
 }

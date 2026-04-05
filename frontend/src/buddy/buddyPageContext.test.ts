@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import type { GraphPayload } from "../types/node-system.ts";
 
-import { buildCompanionPageContext } from "./companionPageContext.ts";
+import { buildBuddyPageContext } from "./buddyPageContext.ts";
 
 function createGraph(): GraphPayload {
   return {
@@ -65,8 +65,8 @@ function createGraph(): GraphPayload {
   };
 }
 
-test("buildCompanionPageContext creates a fenced read-only context snapshot for advisory chat", () => {
-  const context = buildCompanionPageContext({
+test("buildBuddyPageContext creates a fenced read-only context snapshot for advisory chat", () => {
+  const context = buildBuddyPageContext({
     routePath: "/editor/graph_123",
     editor: {
       activeTabTitle: "投放素材分析",
@@ -98,8 +98,8 @@ test("buildCompanionPageContext creates a fenced read-only context snapshot for 
   assert.match(context, /运行反馈: 校验通过。/);
 });
 
-test("buildCompanionPageContext reports the absence of an active graph without inventing access", () => {
-  const context = buildCompanionPageContext({
+test("buildBuddyPageContext reports the absence of an active graph without inventing access", () => {
+  const context = buildBuddyPageContext({
     routePath: "/settings",
     editor: null,
   });

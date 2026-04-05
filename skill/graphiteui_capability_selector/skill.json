@@ -12,7 +12,7 @@
       "requiresApproval": false
     },
     "origins": {
-      "companion": {
+      "buddy": {
         "selectable": true,
         "requiresApproval": false
       }
@@ -32,7 +32,7 @@
       "name": "Origin",
       "valueType": "text",
       "required": false,
-      "description": "能力选择来源，例如 companion；默认 companion。"
+      "description": "能力选择来源，例如 buddy；默认 buddy。"
     },
     {
       "key": "capability",

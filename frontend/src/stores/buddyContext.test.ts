@@ -4,7 +4,7 @@ import { createPinia, setActivePinia } from "pinia";
 
 import type { GraphPayload } from "../types/node-system.ts";
 
-import { useCompanionContextStore } from "./companionContext.ts";
+import { useBuddyContextStore } from "./buddyContext.ts";
 
 function createGraph(): GraphPayload {
   return {
@@ -18,9 +18,9 @@ function createGraph(): GraphPayload {
   };
 }
 
-test("companion context store keeps the editor snapshot read-only for companion prompts", () => {
+test("buddy context store keeps the editor snapshot read-only for buddy prompts", () => {
   setActivePinia(createPinia());
-  const store = useCompanionContextStore();
+  const store = useBuddyContextStore();
   const document = createGraph();
 
   store.setEditorSnapshot({
@@ -43,13 +43,13 @@ test("companion context store keeps the editor snapshot read-only for companion 
   assert.equal(store.editorSnapshot, null);
 });
 
-test("companion context store exposes a refresh nonce for companion data updates", () => {
+test("buddy context store exposes a refresh nonce for buddy data updates", () => {
   setActivePinia(createPinia());
-  const store = useCompanionContextStore();
+  const store = useBuddyContextStore();
 
   assert.equal(store.dataRefreshNonce, 0);
 
-  store.notifyCompanionDataChanged();
+  store.notifyBuddyDataChanged();
 
   assert.equal(store.dataRefreshNonce, 1);
 });

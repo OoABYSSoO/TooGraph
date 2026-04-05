@@ -8,7 +8,7 @@ from app.core.storage.database import DATA_DIR
 from app.core.storage.json_file_utils import read_json_file, utc_now_iso, write_json_file
 
 
-COMPANION_DATA_DIR = DATA_DIR / "companion"
+BUDDY_DATA_DIR = DATA_DIR / "buddy"
 PROFILE_PATH = "profile.json"
 POLICY_PATH = "policy.json"
 MEMORIES_PATH = "memories.json"
@@ -16,8 +16,8 @@ SESSION_SUMMARY_PATH = "session_summary.json"
 REVISIONS_PATH = "revisions.json"
 
 DEFAULT_PROFILE = {
-    "name": "GraphiteUI Companion",
-    "persona": "GraphiteUI 的全局主桌宠 Agent。",
+    "name": "GraphiteUI Buddy",
+    "persona": "GraphiteUI 的全局主伙伴 Agent。",
     "tone": "简短、直接、友好。",
     "response_style": "默认先给结论，再给必要理由。",
     "display_preferences": {},
@@ -188,17 +188,17 @@ def _write_with_revision(
 
 
 def _read_dict(file_name: str, default: dict[str, Any]) -> dict[str, Any]:
-    value = read_json_file(COMPANION_DATA_DIR / file_name, default=deepcopy(default))
+    value = read_json_file(BUDDY_DATA_DIR / file_name, default=deepcopy(default))
     return value if isinstance(value, dict) else deepcopy(default)
 
 
 def _read_list(file_name: str) -> list[dict[str, Any]]:
-    value = read_json_file(COMPANION_DATA_DIR / file_name, default=[])
+    value = read_json_file(BUDDY_DATA_DIR / file_name, default=[])
     return value if isinstance(value, list) else []
 
 
 def _write_json(file_name: str, payload: Any) -> None:
-    write_json_file(COMPANION_DATA_DIR / file_name, payload)
+    write_json_file(BUDDY_DATA_DIR / file_name, payload)
 
 
 def _find_memory_index(memories: list[dict[str, Any]], memory_id: str) -> int:

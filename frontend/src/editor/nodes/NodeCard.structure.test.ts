@@ -108,6 +108,7 @@ test("SubgraphNodeBody renders a status-aware DAG mini map with node names", () 
   assert.match(subgraphNodeBodySource, /<SubgraphMiniMap[\s\S]*:nodes="body\.thumbnailNodes"[\s\S]*:edges="body\.thumbnailEdges"/);
   assert.match(subgraphNodeBodySource, /summary\.currentNodeLabel/);
   assert.match(subgraphNodeBodySource, /v-if="body\.runtimeSummary"/);
+  assert.match(subgraphNodeBodySource, /summary\.tone === "paused"[\s\S]*Paused \$\{progress\} - \$\{summary\.currentNodeLabel\}/);
   assert.doesNotMatch(subgraphNodeBodySource, /body\.inputCount[\s\S]*in/);
   assert.doesNotMatch(subgraphNodeBodySource, /body\.outputCount[\s\S]*out/);
   assert.doesNotMatch(subgraphNodeBodySource, /v-for="item in body\.thumbnailNodes"[\s\S]*class="subgraph-node-body__mini-node"/);

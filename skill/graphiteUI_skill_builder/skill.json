@@ -12,7 +12,7 @@
       "requiresApproval": false
     },
     "origins": {
-      "companion": {
+      "buddy": {
         "selectable": true,
         "requiresApproval": false
       }

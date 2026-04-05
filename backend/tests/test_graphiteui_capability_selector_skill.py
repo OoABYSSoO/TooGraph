@@ -85,7 +85,7 @@ def _write_skill(
         "capabilityPolicy": {
             "default": {"selectable": selectable, "requiresApproval": False},
             "origins": {
-                "companion": {"selectable": selectable, "requiresApproval": False},
+                "buddy": {"selectable": selectable, "requiresApproval": False},
             },
         },
         "permissions": ["network"] if "搜索" in description else [],
