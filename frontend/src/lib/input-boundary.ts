@@ -1,6 +1,6 @@
 import type { GraphNode, InputBoundaryConfigType } from "../types/node-system.ts";
 
-export type InputBoundarySelection = "text" | "file" | "knowledge_base";
+export type InputBoundarySelection = "text" | "file" | "folder" | "knowledge_base";
 
 export function isInputBoundaryConfigType(value: unknown): value is InputBoundaryConfigType {
   return (
@@ -17,9 +17,12 @@ export function normalizeInputBoundaryConfigType(value: unknown): InputBoundaryC
   return isInputBoundaryConfigType(value) ? value : "text";
 }
 
-export function resolveInputBoundarySelection(type: InputBoundaryConfigType): InputBoundarySelection {
+export function resolveInputBoundarySelection(type: InputBoundaryConfigType, value?: unknown): InputBoundarySelection {
   if (type === "knowledge_base") {
     return "knowledge_base";
+  }
+  if (type === "file" && isLocalFolderBoundaryValue(value)) {
+    return "folder";
   }
   if (type === "file" || type === "image" || type === "audio" || type === "video") {
     return "file";
@@ -50,6 +53,11 @@ function resolveUploadedAssetTypeFromValue(value: unknown): InputBoundaryConfigT
     return null;
   }
   return isInputBoundaryConfigType(candidate.detectedType) ? candidate.detectedType : null;
+}
+
+function isLocalFolderBoundaryValue(value: unknown): boolean {
+  const parsed = typeof value === "string" ? tryParseJson(value) : value;
+  return Boolean(parsed && typeof parsed === "object" && !Array.isArray(parsed) && (parsed as { kind?: unknown }).kind === "local_folder");
 }
 
 function tryParseJson(value: string) {

@@ -9,7 +9,7 @@
 - 伙伴不是独立运行时。伙伴本质也是按图模板发起一次 graph run，并通过运行来源、状态和技能目录表达上下文。
 - 产品心智已收束为“图才是 Agent，单个节点是 LLM 节点”。当前协议中仍存在 `agent` kind 命名，这是待迁移的内部命名；新设计不应继续把单节点描述为多轮 Agent。
 - 旧的 `buddy_agentic_tool_loop`、`buddy_chat_loop`、`web_research_loop` 等模板不再随仓库提供，也不再通过后端兼容逻辑修补。
-- 新版伙伴自主循环模板 `buddy_autonomous_loop` 已创建为官方图模板。它通过子图串联 Buddy Home 上下文装配、请求理解、按需能力选择与动态执行、最终回复和记忆/成长复盘；简单闲聊或可直接回答的请求会绕过能力循环，output 只展示 `final_reply`。
+- 新版伙伴自主循环模板 `buddy_autonomous_loop` 已创建为官方图模板。它通过 Input 节点以本地文件夹方式注入 Buddy Home 选中文件，再通过子图串联请求理解、按需能力选择与动态执行、最终回复和记忆/成长复盘；简单闲聊或可直接回答的请求会绕过能力循环，output 只展示 `final_reply`。
 - 当前仓库提供三个官方图模板：`advanced_web_research_loop`（高级联网搜索）、`buddy_autonomous_loop`（伙伴自主循环）和 `graphiteui_skill_creation_workflow`（创建自定义 Skill）。
 - 技能系统已收束为统一技能库，不再区分“伙伴技能”和“LLM 节点技能”，也不再使用 `targets` / `executionTargets` 这类旧分流字段。
 - 当前官方技能包包括 `buddy_home_context_reader`、`web_search`、`graphiteui_capability_selector`、`graphiteUI_skill_builder`、`graphiteUI_script_tester` 和 `local_workspace_executor`。后续新能力应按当前统一 Skill 结构专门编写。
@@ -37,8 +37,8 @@
 - 图运行前不再做旧草稿兼容补齐。提交到运行时的图必须已经符合当前协议。
 - `promptVisible` 已移除。上下文边界由节点 `reads` 决定：LLM 节点只接收自己显式读取的 state。
 - `state_schema` 支持 `binding` 元数据，用来标记某个 state 是否由技能输出自动绑定。
-- `file` / `image` / `audio` / `video` 类型 state 的值是本地 artifact 路径或路径列表，不再有单独的 `file_list`、`array` 或 `object` state 类型。LLM 节点接收 `file` state 时，会读取文本类文件并只把“文件名 + 原文全文”拼入模型上下文；图片、音频和视频路径会走多模态附件处理，不作为文本读取。
-- Input 节点输出文件、图片、音频或视频时都写入本地路径；Output 节点可通过 documents 预览展示这些 artifact。
+- `file` / `image` / `audio` / `video` 类型 state 的值是本地 artifact 路径、路径列表，或 `kind=local_folder` 的本地文件夹选择包；不再有单独的 `file_list`、`array` 或 `object` state 类型。LLM 节点接收 `file` state 时，会读取文本类文件并只把“文件名 + 原文全文”拼入模型上下文；图片、音频和视频路径会走多模态附件处理，不作为文本读取。
+- Input 节点输出文件、图片、音频或视频时都写入本地路径；文件输入还可以切到“文件夹”模式，通过后端只读策略列出文件树，并在节点面板中勾选要注入的文件。Output 节点可通过 documents 预览展示这些 artifact。
 - 目标运行来源语义是 `origin=buddy`。当前前端伙伴构图代码仍残留 `buddy_run`、`buddy_permission_tier`、`buddy_graph_patch_drafts_enabled` 等旧元数据；这些字段是待迁移标记，不应作为新一轮伙伴架构的设计依据。
 
 ## 当前技能
@@ -77,7 +77,7 @@
 - 显示名称：`Buddy Home Context Reader`
 - 作用：只读根目录 `buddy_home/`，把 `SOUL.md` 人设、`USER.md` 用户画像、`MEMORY.md` 可读记忆、`policy.json`、`buddy.db` 中的结构化记忆和会话摘要整理成一个 `context_pack`；如果目录或默认文件缺失，会先由程序补齐默认资料再读取。
 - 输出克制：无输入，只输出一个 `context_pack` JSON 字段。
-- 能力选择：该 Skill 是伙伴主循环的显式支撑能力，不作为 `graphiteui_capability_selector` 的动态候选；模板应在 `buddy_context_pack` 这类上下文装配节点中手动绑定它。
+- 能力选择：该 Skill 不作为 `graphiteui_capability_selector` 的动态候选。当前伙伴主循环已改为 Input 文件夹注入 Buddy Home 选中文件，不再用它触发一次无参数 Skill 调用。
 - 权限：只声明 `file_read`，它读取 Buddy Home 长期资料，但不修改 SOUL、USER、MEMORY、policy、数据库记录、revision、command 或 reports。
 
 ### `graphiteUI_script_tester`
@@ -116,7 +116,7 @@
 - 位置：`backend/app/templates/official/buddy_autonomous_loop.json`
 - 显示名称：`伙伴自主循环`
 - 作用：作为伙伴浮窗和伙伴页面的默认图循环，把本轮用户消息、对话历史、页面上下文和 Buddy Home 长期资料转成一次可审计 graph run。
-- 主要流程：输入用户消息、历史、页面上下文和伙伴模式 -> `pack_context` 子图读取 `buddy_home_context_reader` 并整理 `buddy_context` -> `intake_request` 子图理解请求，必要时在 `ask_clarification` 断点等待用户澄清 -> `needs_capability` 判断是否需要启用能力；不需要时直接进入 `draft_final_response`，需要时进入 `run_capability_cycle` 调用 `graphiteui_capability_selector`、必要时在 `request_capability_approval` 断点等待批准，再由动态能力执行节点写唯一 `capability_result` 结果包 -> `draft_final_response` 子图只写 `final_reply` -> `output_final` 先展示 `final_reply`，同时 `review_buddy_memory` 子图在回复后产出记忆与伙伴成长计划。
+- 主要流程：输入用户消息、历史、页面上下文、伙伴模式和 Buddy Home 选中文件 -> `intake_request` 子图理解请求，必要时在 `ask_clarification` 断点等待用户澄清 -> `needs_capability` 判断是否需要启用能力；不需要时直接进入 `draft_final_response`，需要时进入 `run_capability_cycle` 调用 `graphiteui_capability_selector`、必要时在 `request_capability_approval` 断点等待批准，再由动态能力执行节点写唯一 `capability_result` 结果包 -> `draft_final_response` 子图只写 `final_reply` -> `output_final` 先展示 `final_reply`，同时 `review_buddy_memory` 子图在回复后产出记忆与伙伴成长计划。
 - 动态能力语义：只有 `execute_capability` 读取 `selected_capability` 这个 `capability` state，并且它只写一个 `result_package` state。其他复盘节点不能读取 `capability` state，否则会被运行协议视为动态能力执行节点。
 - 断点语义：澄清和能力审批都使用子图内部 `interrupt_after`。父级 Buddy run 需要通过标准暂停/恢复路径展示子图 scope，而不是由伙伴前端额外发明确认协议。
 - 边界：当前模板已经表达完整循环主干，但长期记忆写回、Buddy Home 修改、图补丁应用和更完整的伙伴页面暂停交互仍应作为后续显式模板/命令流补齐，不能隐藏在 output 节点或前端逻辑里。

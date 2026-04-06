@@ -5,6 +5,7 @@ from typing import Any
 
 from app.core.runtime.agent_multimodal import normalize_uploaded_file_envelope
 from app.core.schemas.node_system import NodeSystemStateDefinition, NodeSystemStateType
+from app.core.storage.local_input_sources import read_local_input_file_metadata, read_local_input_text_for_prompt
 from app.core.storage.skill_artifact_store import read_skill_artifact_file_metadata, read_skill_artifact_text_for_prompt
 
 
@@ -121,27 +122,46 @@ def format_file_state_prompt_lines(
     for index, reference in enumerate(references):
         if index > 0:
             lines.append("")
+        reference_source = reference.get("source", "skill_artifact")
         local_path = reference["local_path"]
         requested_name = reference.get("name", "")
         requested_content_type = reference.get("content_type", "")
         file_name = requested_name or _filename_from_local_path(local_path)
         content_type = requested_content_type or _content_type_for_file_reference(file_name, declared_state_type)
         try:
-            metadata = read_skill_artifact_file_metadata(local_path)
+            if reference_source == "local_input":
+                metadata = read_local_input_file_metadata(
+                    str(reference.get("root") or ""),
+                    str(reference.get("relative_path") or ""),
+                )
+            else:
+                metadata = read_skill_artifact_file_metadata(local_path)
             file_name = requested_name or str(metadata.get("name") or file_name)
             content_type = requested_content_type or str(metadata.get("content_type") or content_type)
             if not allow_text or not _is_text_like_artifact(file_name, content_type):
                 lines.append(f"  media_file: {file_name}")
                 lines.append(f"  media_type: {content_type}")
-                lines.append("  media_rule: passed as a model attachment; do not treat it as text content")
+                if reference_source == "local_input":
+                    lines.append("  media_rule: local non-text file was selected; it is not injected as text content")
+                else:
+                    lines.append("  media_rule: passed as a model attachment; do not treat it as text content")
                 continue
-            artifact = read_skill_artifact_text_for_prompt(local_path)
+            if reference_source == "local_input":
+                artifact = read_local_input_text_for_prompt(
+                    str(reference.get("root") or ""),
+                    str(reference.get("relative_path") or ""),
+                )
+            else:
+                artifact = read_skill_artifact_text_for_prompt(local_path)
             content = str(artifact.get("content") or "")
         except Exception:
             if not allow_text:
                 lines.append(f"  media_file: {file_name}")
                 lines.append(f"  media_type: {content_type}")
-                lines.append("  media_rule: passed as a model attachment; do not treat it as text content")
+                if reference_source == "local_input":
+                    lines.append("  media_rule: local non-text file was selected; it is not injected as text content")
+                else:
+                    lines.append("  media_rule: passed as a model attachment; do not treat it as text content")
                 continue
             content = "[文件读取失败：文件不存在或无法读取。]"
         lines.append(f"  文件名：{file_name}")
@@ -251,6 +271,9 @@ def _append_file_state_references(value: Any, references: list[dict[str, str]]) 
             references.append({"local_path": trimmed})
         return
     if isinstance(value, dict):
+        if value.get("kind") == "local_folder":
+            _append_local_folder_references(value, references)
+            return
         _append_file_record(value, references)
         return
     if isinstance(value, list):
@@ -270,6 +293,26 @@ def _append_file_record(record: dict[str, Any], references: list[dict[str, str]]
     if content_type:
         reference["content_type"] = content_type
     references.append(reference)
+
+
+def _append_local_folder_references(record: dict[str, Any], references: list[dict[str, str]]) -> None:
+    root = _first_non_empty_string(record, ("root", "path"))
+    selected = record.get("selected")
+    if not root or not isinstance(selected, list):
+        return
+    for item in selected:
+        if not isinstance(item, str) or not item.strip():
+            continue
+        relative_path = item.strip().replace("\\", "/")
+        references.append(
+            {
+                "source": "local_input",
+                "root": root,
+                "relative_path": relative_path,
+                "local_path": f"{root.rstrip('/')}/{relative_path}",
+                "name": relative_path,
+            }
+        )
 
 
 def _parse_file_state_json(value: str) -> Any | None:

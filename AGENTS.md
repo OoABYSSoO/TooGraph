@@ -12,6 +12,7 @@ These instructions apply to all work in this repository and should persist acros
 - After making code changes, restart GraphiteUI with the repository's standard cross-platform command: `npm start`.
 - Treat `node scripts/start.mjs` as the underlying standard start command for this repository; `npm start` should resolve to it.
 - GraphiteUI uses a single-port start model. The default public URL is `http://127.0.0.1:3477`, and the port can be overridden with `PORT=<port> npm start`.
+- `npm start` should reuse an up-to-date `frontend/dist` build instead of rebuilding every launch. Use `GRAPHITEUI_FORCE_FRONTEND_BUILD=1 npm start` when a forced frontend rebuild is needed.
 - `npm run dev` is intentionally not a supported project command.
 - On Windows PowerShell, if execution policy blocks `npm.ps1`, use `npm.cmd start`.
 - `scripts/start.sh` remains the standard Bash wrapper for Linux, macOS, Git Bash, and WSL, and should stay behaviorally aligned with `scripts/start.mjs`.
@@ -93,6 +94,7 @@ These instructions apply to all work in this repository and should persist acros
 ## Artifact and Output Contract
 
 - Skills and graph runs should return structured results and local artifact paths for generated or downloaded resources.
+- Input nodes may expose local files or folders as explicit graph state. Folder inputs must store an inspectable selection package such as `kind=local_folder`, list selected files in the graph, and use the shared file-state prompt expansion path instead of adding LLM-only context assembly nodes.
 - Output nodes are responsible for displaying, previewing, exporting, or linking artifacts such as local documents, images, and videos. Output nodes should not own persistent mutation policy or hidden product decisions.
 - Avoid base64 for normal artifact flow. Large media and downloaded resources should be represented by local paths or artifact references, not embedded into node state, memory, or long-lived documents.
 

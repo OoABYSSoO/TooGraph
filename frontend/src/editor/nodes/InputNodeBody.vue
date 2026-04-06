@@ -40,6 +40,85 @@
         {{ selectedKnowledgeBaseDescription }}
       </div>
     </div>
+    <div v-else-if="showLocalFolderInput" class="node-card__surface node-card__local-folder">
+      <label class="node-card__control-row">
+        <span class="node-card__control-label">{{ t("nodeCard.localFolder") }}</span>
+        <div class="node-card__local-folder-path-row">
+          <input
+            class="node-card__local-folder-path-input"
+            :value="localFolderRoot"
+            :placeholder="t('nodeCard.localFolderPathPlaceholder')"
+            @pointerdown.stop
+            @click.stop
+            @input="emit('local-folder-root-input', ($event.target as HTMLInputElement).value)"
+          />
+          <button
+            type="button"
+            class="node-card__local-folder-action"
+            :disabled="localFolderLoading || !localFolderRoot.trim()"
+            @pointerdown.stop
+            @click.stop="emit('local-folder-refresh')"
+          >
+            {{ localFolderLoading ? t("nodeCard.localFolderLoading") : t("nodeCard.localFolderRefresh") }}
+          </button>
+        </div>
+      </label>
+      <div class="node-card__local-folder-toolbar">
+        <span class="node-card__input-meta">{{ localFolderSummary }}</span>
+        <div class="node-card__local-folder-actions">
+          <button
+            type="button"
+            class="node-card__local-folder-link"
+            :disabled="localFolderEntries.length === 0"
+            @pointerdown.stop
+            @click.stop="emit('local-folder-select-all')"
+          >
+            {{ t("nodeCard.localFolderSelectAll") }}
+          </button>
+          <button
+            type="button"
+            class="node-card__local-folder-link"
+            :disabled="localFolderSelected.length === 0"
+            @pointerdown.stop
+            @click.stop="emit('local-folder-clear')"
+          >
+            {{ t("nodeCard.localFolderClear") }}
+          </button>
+        </div>
+      </div>
+      <div v-if="localFolderError" class="node-card__local-folder-error">
+        {{ localFolderError }}
+      </div>
+      <div v-else class="node-card__local-folder-list" @pointerdown.stop @click.stop>
+        <label
+          v-for="entry in localFolderEntries"
+          :key="entry.path"
+          class="node-card__local-folder-entry"
+          :class="{
+            'node-card__local-folder-entry--directory': entry.type === 'directory',
+            'node-card__local-folder-entry--file': entry.type === 'file',
+          }"
+        >
+          <input
+            v-if="entry.type === 'file'"
+            class="node-card__local-folder-checkbox"
+            type="checkbox"
+            :checked="selectedLocalFolderPaths.has(entry.path)"
+            @change="emit('local-folder-selection-toggle', entry.path, ($event.target as HTMLInputElement).checked)"
+          />
+          <span v-else class="node-card__local-folder-directory-spacer" />
+          <span class="node-card__local-folder-entry-main">
+            <span class="node-card__local-folder-entry-path">{{ entry.path }}</span>
+            <span class="node-card__local-folder-entry-meta">
+              {{ entry.type === "directory" ? t("nodeCard.localFolderDirectory") : `${entry.content_type} · ${entry.size} B` }}
+            </span>
+          </span>
+        </label>
+        <div v-if="!localFolderLoading && localFolderEntries.length === 0" class="node-card__input-meta">
+          {{ localFolderRoot.trim() ? t("nodeCard.localFolderEmpty") : t("nodeCard.localFolderNeedsPath") }}
+        </div>
+      </div>
+    </div>
     <div v-else-if="showAssetUploadInput" class="node-card__input-upload">
       <label
         v-if="!inputAssetEnvelope"
@@ -156,10 +235,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, type Component } from "vue";
+import { computed, ref, type Component } from "vue";
 import { ElOption, ElSegmented, ElSelect } from "element-plus";
 import { useI18n } from "vue-i18n";
 
+import type { LocalFolderTreeEntry } from "@/api/localInputSources";
 import type { InputKnowledgeBaseOption } from "./inputKnowledgeBaseModel";
 import type { NodeCardViewModel } from "./nodeCardViewModel";
 import type { UploadedAssetEnvelope } from "./uploadedAssetModel";
@@ -167,14 +247,14 @@ import type { UploadedAssetEnvelope } from "./uploadedAssetModel";
 type InputBodyViewModel = Extract<NodeCardViewModel["body"], { kind: "input" }>;
 
 type InputTypeOption = {
-  value: "text" | "file" | "knowledge_base";
+  value: "text" | "file" | "folder" | "knowledge_base";
   label: string;
   icon: Component;
 };
 
-defineProps<{
+const props = defineProps<{
   body: InputBodyViewModel;
-  inputBoundarySelection: "text" | "file" | "knowledge_base";
+  inputBoundarySelection: "text" | "file" | "folder" | "knowledge_base";
   inputTypeOptions: InputTypeOption[];
   inputAssetEnvelope: UploadedAssetEnvelope | null;
   inputAssetSummary: string;
@@ -183,10 +263,17 @@ defineProps<{
   inputAssetPreviewUrl: string;
   inputAssetAccept: string;
   inputAssetLabel: string;
+  localFolderRoot: string;
+  localFolderEntries: LocalFolderTreeEntry[];
+  localFolderSelected: string[];
+  localFolderSummary: string;
+  localFolderLoading: boolean;
+  localFolderError: string;
   inputKnowledgeBaseOptions: InputKnowledgeBaseOption[];
   inputKnowledgeBaseValue: string;
   selectedKnowledgeBaseDescription: string;
   showKnowledgeBaseInput: boolean;
+  showLocalFolderInput: boolean;
   showAssetUploadInput: boolean;
   showLegacyUploadedAssetHint: boolean;
   isInputValueEditable: boolean;
@@ -196,6 +283,11 @@ defineProps<{
 const emit = defineEmits<{
   (event: "update:boundary-selection", value: string | number | boolean): void;
   (event: "update:knowledge-base", value: string | number | boolean | undefined): void;
+  (event: "local-folder-root-input", value: string): void;
+  (event: "local-folder-refresh"): void;
+  (event: "local-folder-selection-toggle", path: string, selected: boolean): void;
+  (event: "local-folder-select-all"): void;
+  (event: "local-folder-clear"): void;
   (event: "asset-file-change", inputEvent: Event): void;
   (event: "asset-drop", dragEvent: DragEvent): void;
   (event: "clear-asset"): void;
@@ -204,6 +296,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 const inputAssetInputRef = ref<HTMLInputElement | null>(null);
+const selectedLocalFolderPaths = computed(() => new Set(props.localFolderSelected));
 
 function handleAssetUploadSurfaceClick(event: MouseEvent) {
   if (event.target instanceof HTMLInputElement) {
@@ -277,6 +370,142 @@ function openInputAssetPicker() {
 .node-card__input-upload {
   display: grid;
   gap: 10px;
+}
+
+.node-card__local-folder {
+  display: grid;
+  min-height: 220px;
+  gap: 12px;
+}
+
+.node-card__local-folder-path-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.node-card__local-folder-path-input {
+  min-width: 0;
+  height: 38px;
+  border: 1px solid rgba(154, 52, 18, 0.14);
+  border-radius: 14px;
+  padding: 0 12px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #1f2937;
+  font: inherit;
+  outline: none;
+}
+
+.node-card__local-folder-path-input:focus {
+  border-color: rgba(37, 99, 235, 0.42);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.node-card__local-folder-action,
+.node-card__local-folder-link {
+  min-height: 32px;
+  border: 1px solid rgba(37, 99, 235, 0.18);
+  border-radius: 999px;
+  padding: 0 12px;
+  background: rgba(239, 246, 255, 0.92);
+  color: #1d4ed8;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.node-card__local-folder-action:disabled,
+.node-card__local-folder-link:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.node-card__local-folder-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.node-card__local-folder-actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 6px;
+}
+
+.node-card__local-folder-list {
+  display: grid;
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid rgba(154, 52, 18, 0.1);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.node-card__local-folder-entry {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-height: 42px;
+  border-bottom: 1px solid rgba(154, 52, 18, 0.08);
+  padding: 7px 10px;
+  color: #1f2937;
+}
+
+.node-card__local-folder-entry:last-child {
+  border-bottom: none;
+}
+
+.node-card__local-folder-entry--directory {
+  background: rgba(255, 248, 240, 0.54);
+}
+
+.node-card__local-folder-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: #2563eb;
+}
+
+.node-card__local-folder-directory-spacer {
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  background: rgba(154, 52, 18, 0.12);
+}
+
+.node-card__local-folder-entry-main {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.node-card__local-folder-entry-path {
+  overflow: hidden;
+  color: #1f2937;
+  font-size: 0.86rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.node-card__local-folder-entry-meta {
+  overflow: hidden;
+  color: rgba(60, 41, 20, 0.62);
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.node-card__local-folder-error {
+  border: 1px solid rgba(185, 28, 28, 0.18);
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: rgba(254, 242, 242, 0.9);
+  color: #991b1b;
+  font-size: 0.82rem;
+  line-height: 1.45;
 }
 
 .node-card__input-boundary-toggle {

@@ -357,9 +357,7 @@ function resolveBuddyActivityPhase(nodeId: string, subgraphNodeId: string) {
 }
 
 const BUDDY_ACTIVITY_PHASE_BY_NODE_ID: Record<string, string> = {
-  pack_context: "readingContext",
-  read_buddy_home: "readingContext",
-  assemble_buddy_context: "readingContext",
+  input_buddy_context: "readingContext",
   intake_request: "understanding",
   understand_request: "understanding",
   need_clarification: "checkingClarification",

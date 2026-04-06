@@ -63,7 +63,7 @@
 - 偏离新职责的旧 `create_user_skill` 内置模板已删除。新的 `graphiteUI_skill_builder` 只产出 Skill 包文件内容，完整用户 Skill 生成流程仍需要补齐确认、调用 `local_workspace_executor` 写入、调用 `graphiteUI_script_tester` 或同类测试能力、修复和启用节点。
 - 子图缩略图已能投射内部节点运行状态颜色，并在节点卡片上显示当前内部运行摘要。
 - 后端已有根目录 `buddy_home/` 的默认生成逻辑，以及基于 `SOUL.md`、`USER.md`、`MEMORY.md`、`policy.json` 和 `buddy.db` 的 profile、policy、memory、session summary、revision、command 等基础存取接口；它们应继续收束为 Buddy Home，而不是扩散到多个无关数据位置。
-- 已新增只读 `buddy_home_context_reader` Skill，作为 `buddy_context_pack` 子图的 P0 支撑能力。它无输入，只输出一个 `context_pack`，并且不作为动态能力候选。
+- 已新增只读 `buddy_home_context_reader` Skill，但当前伙伴主循环已改为通过 Input 文件夹模式直接注入 Buddy Home 选中文件。它仍不作为动态能力候选，后续只有在确实需要读取 `buddy.db` 结构化摘要时才应作为显式支撑能力使用。
 
 尚未完成：
 
@@ -227,7 +227,7 @@ buddy_home/
 `buddy_autonomous_loop` 顶层模板不应堆叠大量细碎节点。重要、稳定且可复用的能力段应整理为子图，让顶层只保留主干：
 
 ```text
-buddy_context_pack
+buddy_home_files_input
   -> buddy_request_intake
   -> buddy_capability_cycle
   -> buddy_final_response
@@ -236,7 +236,7 @@ buddy_context_pack
 
 推荐子图边界：
 
-- `buddy_context_pack`：读取用户消息、页面上下文、近期历史、Buddy Home 中的人设、策略、记忆和会话摘要，输出统一上下文包。它不执行外部能力，也不写长期状态。
+- `buddy_home_files_input`：通过 Input 节点的文件夹模式选择并注入 Buddy Home 中的人设、策略和记忆文件。它是程序化文件读取，不调用 LLM，不执行外部能力，也不写长期状态。
 - `buddy_request_intake`：理解需求、判断风险、决定是否需要澄清，并在需要时通过标准断点等待用户补充。
 - `buddy_capability_cycle`：选择一个启用能力、检查审批、执行 skill 或动态 subgraph、评估 `result_package`，必要时按 condition 回到能力选择。它是工具循环核心，但每轮仍保持单能力语义。
 - `buddy_final_response`：只根据当前 state 和能力结果生成 `final_reply`，不再执行能力或写 Buddy Home。
@@ -488,7 +488,7 @@ LLM 节点提示词区域中，绑定的技能以胶囊展示。
 
 ## `buddy_home_context_reader`
 
-`buddy_home_context_reader` 是伙伴主循环的只读上下文装配 Skill。它读取根目录 `buddy_home/` 中的 `AGENTS.md`、`SOUL.md`、`USER.md`、`MEMORY.md`、`policy.json` 和 `buddy.db`，并输出一个克制的 `context_pack`。如果 Buddy Home 或默认文件缺失，它会先触发程序默认初始化再读取。
+`buddy_home_context_reader` 是只读上下文装配 Skill。它读取根目录 `buddy_home/` 中的 `AGENTS.md`、`SOUL.md`、`USER.md`、`MEMORY.md`、`policy.json` 和 `buddy.db`，并输出一个克制的 `context_pack`。如果 Buddy Home 或默认文件缺失，它会先触发程序默认初始化再读取。
 
 契约：
 
@@ -498,7 +498,7 @@ LLM 节点提示词区域中，绑定的技能以胶囊展示。
 - 动态选择：`capabilityPolicy.default.selectable=false`，不进入 `graphiteui_capability_selector` 候选清单。
 - 边界：它读取长期资料，但不修改 Buddy Home，不修改 revision，不记录 command，不提升权限。
 
-该 Skill 应由 `buddy_context_pack` 子图显式绑定。后续 Buddy Home 写回应由单独的写入 Skill 完成，不能扩展这个只读 Skill。
+当前默认 `buddy_autonomous_loop` 不再绑定该 Skill，而是通过 Input 文件夹模式注入选中的 Buddy Home 文本文件。后续 Buddy Home 写回应由单独的写入 Skill 完成，不能扩展这个只读 Skill。
 
 ## `graphiteui_capability_selector`
 
@@ -573,7 +573,7 @@ function call 未来可以作为某些模型的适配层，但不能绕过 Graph
 
 ```text
 用户消息、页面上下文、历史、Buddy Home
-  -> buddy_context_pack
+  -> buddy_home_files_input
   -> buddy_request_intake
   -> needs_capability
   -> 需要能力时进入 buddy_capability_cycle，否则直接进入 buddy_final_response
@@ -586,11 +586,11 @@ function call 未来可以作为某些模型的适配层，但不能绕过 Graph
 - `user_message`：当前用户消息。
 - `conversation_history`：进入上下文的近期对话。
 - `page_context`：当前页面或编辑器上下文。
-- `buddy_mode`：伙伴运行模式。Buddy Home 资料不作为多个公开输入 state 传入，而是在 `pack_context` 子图中由 `buddy_home_context_reader` 显式读取并整理为 `buddy_context`。
+- `buddy_mode`：伙伴运行模式。
+- `buddy_context`：`file` 类型，默认由 `input_buddy_context` 以 `kind=local_folder` 读取 `buddy_home/` 中勾选的 `AGENTS.md`、`SOUL.md`、`USER.md`、`MEMORY.md` 和 `policy.json`，由统一文件 state prompt 展开逻辑注入下游 LLM。
 
 当前模板包含的核心内部 state：
 
-- `buddy_context`：来自 Buddy Home、页面上下文和对话历史的有边界上下文包。
 - `request_understanding`：需求理解、任务类型、是否需要能力、是否需要澄清、风险等级和原因。
 - `clarification_prompt`：需要向用户补充询问的问题。
 - `clarification_answer`：用户在断点恢复时写入的澄清回答。

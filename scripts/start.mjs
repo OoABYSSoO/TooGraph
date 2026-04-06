@@ -4,6 +4,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { createPortReleasePlan } from "./dev-port-ownership.mjs";
+import { resolveFrontendBuildPlan } from "./frontend-build-plan.mjs";
 
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const backendDir = resolve(rootDir, "backend");
@@ -522,8 +523,26 @@ async function buildFrontend() {
     console.warn("Warning: frontend/node_modules was not found. Run `npm --prefix frontend install` first if startup fails.");
   }
 
+  const buildPlan = resolveFrontendBuildPlan({
+    frontendDir,
+    distDir: frontendDistDir,
+    env: process.env,
+  });
+  if (!buildPlan.shouldBuild) {
+    console.log("Frontend build is up to date; skipping.");
+    return;
+  }
+
   const build = npmCommand(["run", "build"]);
-  console.log("Building frontend...");
+  if (buildPlan.reason === "forced") {
+    console.log("Building frontend... (forced by GRAPHITEUI_FORCE_FRONTEND_BUILD)");
+  } else if (buildPlan.reason === "missing_dist") {
+    console.log("Building frontend... (frontend/dist/index.html was not found)");
+  } else if (buildPlan.reason === "source_changed") {
+    console.log(`Building frontend... (${buildPlan.newestInputPath} is newer than frontend/dist/index.html)`);
+  } else {
+    console.log("Building frontend...");
+  }
   await runCommand(build.command, build.args, {
     cwd: frontendDir,
     env: process.env,

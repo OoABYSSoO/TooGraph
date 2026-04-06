@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   isSwitchableInputBoundaryType,
+  resolveInputBoundarySelection,
   resolveNextInputValueForBoundaryType,
   resolveStateTypeForInputBoundary,
 } from "./inputValueTypeModel.ts";
@@ -10,6 +11,7 @@ import {
 test("resolveStateTypeForInputBoundary maps input boundary types onto state field types", () => {
   assert.equal(resolveStateTypeForInputBoundary("text"), "text");
   assert.equal(resolveStateTypeForInputBoundary("file"), "file");
+  assert.equal(resolveStateTypeForInputBoundary("folder"), "file");
   assert.equal(resolveStateTypeForInputBoundary("knowledge_base"), "knowledge_base");
   assert.equal(resolveStateTypeForInputBoundary("image"), "image");
   assert.equal(resolveStateTypeForInputBoundary("audio"), "audio");
@@ -34,6 +36,15 @@ test("resolveNextInputValueForBoundaryType follows legacy input switching rules"
       knowledgeBaseNames: [],
     }),
     "",
+  );
+  assert.deepEqual(
+    resolveNextInputValueForBoundaryType({
+      nextType: "folder",
+      currentType: "text",
+      currentValue: "hello",
+      knowledgeBaseNames: [],
+    }),
+    { kind: "local_folder", root: "", selected: [] },
   );
   assert.equal(
     resolveNextInputValueForBoundaryType({
@@ -76,6 +87,12 @@ test("resolveNextInputValueForBoundaryType follows legacy input switching rules"
 test("isSwitchableInputBoundaryType exposes the manual input picker types", () => {
   assert.equal(isSwitchableInputBoundaryType("text"), true);
   assert.equal(isSwitchableInputBoundaryType("file"), true);
+  assert.equal(isSwitchableInputBoundaryType("folder"), true);
   assert.equal(isSwitchableInputBoundaryType("knowledge_base"), true);
   assert.equal(isSwitchableInputBoundaryType("image"), false);
+});
+
+test("resolveInputBoundarySelection shows local folder envelopes as folder mode", () => {
+  assert.equal(resolveInputBoundarySelection("file", { kind: "local_folder", root: "buddy_home", selected: [] }), "folder");
+  assert.equal(resolveInputBoundarySelection("file", "uploads/document.md"), "file");
 });

@@ -351,7 +351,7 @@ class TemplateLayoutTests(unittest.TestCase):
 
         self.assertEqual(template["metadata"]["graphProtocol"], "node_system")
         self.assertEqual(template["metadata"]["origin"], "buddy")
-        self.assertEqual(states["buddy_context"]["type"], "json")
+        self.assertEqual(states["buddy_context"]["type"], "file")
         self.assertEqual(states["selected_capability"]["type"], "capability")
         self.assertEqual(states["capability_found"]["type"], "boolean")
         self.assertEqual(states["capability_result"]["type"], "result_package")
@@ -360,7 +360,6 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(
             [node_id for node_id, node in nodes.items() if node["kind"] == "subgraph"],
             [
-                "pack_context",
                 "intake_request",
                 "run_capability_cycle",
                 "draft_final_response",
@@ -395,23 +394,15 @@ class TemplateLayoutTests(unittest.TestCase):
             with self.subTest(top_level_node=node_id):
                 self.assertIsNone(node["ui"].get("size"))
 
-        pack_graph = nodes["pack_context"]["config"]["graph"]
+        self.assertNotIn("pack_context", nodes)
+        buddy_context_node = nodes["input_buddy_context"]
+        self.assertEqual(buddy_context_node["kind"], "input")
+        self.assertEqual(buddy_context_node["config"]["boundaryType"], "file")
+        self.assertEqual(buddy_context_node["config"]["value"]["kind"], "local_folder")
+        self.assertEqual(buddy_context_node["config"]["value"]["root"], "buddy_home")
         self.assertEqual(
-            pack_graph["edges"],
-            [
-                {"source": "read_buddy_home", "target": "assemble_buddy_context"},
-                {"source": "assemble_buddy_context", "target": "output_buddy_context"},
-            ],
-        )
-        self.assertEqual(pack_graph["nodes"]["read_buddy_home"]["config"]["skillKey"], "buddy_home_context_reader")
-        self.assertEqual(
-            pack_graph["nodes"]["read_buddy_home"]["config"]["skillBindings"],
-            [
-                {
-                    "skillKey": "buddy_home_context_reader",
-                    "outputMapping": {"context_pack": "home_context_pack"},
-                }
-            ],
+            buddy_context_node["config"]["value"]["selected"],
+            ["AGENTS.md", "SOUL.md", "USER.md", "MEMORY.md", "policy.json"],
         )
 
         intake_graph = nodes["intake_request"]["config"]["graph"]
