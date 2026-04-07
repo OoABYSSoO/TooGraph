@@ -258,6 +258,10 @@ button {
   gap: 16px;
 }
 
+.editor-layout-v2 {
+  grid-template-columns: 360px minmax(0, 1fr) 380px;
+}
+
 .editor-toolbar-card {
   padding: 16px 20px;
 }
@@ -290,6 +294,70 @@ button {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.editor-left-stack {
+  grid-template-rows: auto auto auto auto;
+}
+
+.editor-palette-box {
+  display: grid;
+  gap: 12px;
+}
+
+.editor-theme-card {
+  padding: 16px 20px;
+}
+
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.state-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.state-panel-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.state-add-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) repeat(2, minmax(0, 1fr)) auto;
+  gap: 10px;
+}
+
+.state-item {
+  display: grid;
+  gap: 10px;
+}
+
+.state-item-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) repeat(2, minmax(0, 1fr)) auto;
+  gap: 10px;
+}
+
+.toggle-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.toggle-card {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid rgba(212, 198, 170, 0.9);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.65);
 }
 
 .node-palette-item {
@@ -417,6 +485,13 @@ button {
   }
 
   .editor-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .theme-grid,
+  .state-add-row,
+  .state-item-row,
+  .toggle-grid {
     grid-template-columns: 1fr;
   }
 }

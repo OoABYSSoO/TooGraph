@@ -8,6 +8,22 @@ from app.memory.store import load_memories, save_memory
 from app.runtime.state import RunState, utc_now_iso
 from app.schemas.graph import GraphNode, NodeType
 from app.skills.registry import get_skill_registry
+from app.skills.slg_creative_factory import (
+    slg_analyze_videos,
+    slg_build_brief,
+    slg_clean_news,
+    slg_extract_patterns,
+    slg_fetch_ads,
+    slg_fetch_rss,
+    slg_generate_storyboards,
+    slg_generate_variants,
+    slg_generate_video_prompts,
+    slg_normalize_assets,
+    slg_prepare_image_todo,
+    slg_prepare_video_todo,
+    slg_review_variants,
+    slg_select_top_videos,
+)
 
 
 def execute_runtime_node(state: RunState, node: GraphNode) -> RunState:
@@ -74,6 +90,156 @@ def execute_runtime_node(state: RunState, node: GraphNode) -> RunState:
 
 
 def _run_node_logic(state: RunState, node: GraphNode) -> dict[str, Any]:
+    if node.type == NodeType.START:
+        theme_config = dict(state.get("theme_config", {}))
+        genre = str(theme_config.get("genre", "")).strip()
+        market = str(theme_config.get("market", "")).strip()
+        platform = str(theme_config.get("platform", "")).strip()
+        task_input = (
+            f"Generate a {genre or 'strategy'} creative workflow for {market or 'global'} on {platform or 'digital'}."
+        )
+        return {
+            "theme_config": theme_config,
+            "task_input": task_input,
+        }
+
+    if node.type == NodeType.RESEARCH:
+        rss_result = slg_fetch_rss(state, node.params)
+        clean_result = slg_clean_news({**state, **rss_result.get("state_updates", {})}, node.params)
+        rss_items = rss_result.get("state_updates", {}).get("rss_items", [])
+        clean_news_items = clean_result.get("state_updates", {}).get("clean_news_items", [])
+        market_inputs = [
+            {
+                "kind": "rss_item",
+                "title": item.get("title", ""),
+                "summary": item.get("summary", ""),
+                "creative_hint": item.get("creative_hint", ""),
+            }
+            for item in clean_news_items
+        ]
+        return {
+            **rss_result.get("state_updates", {}),
+            **clean_result.get("state_updates", {}),
+            "market_inputs": market_inputs,
+        }
+
+    if node.type == NodeType.COLLECT_ASSETS:
+        asset_result = slg_fetch_ads(state, node.params)
+        ad_items = asset_result.get("state_updates", {}).get("ad_items", [])
+        market_inputs = [
+            *state.get("market_inputs", []),
+            *[
+                {
+                    "kind": "ad_asset",
+                    "item_id": item.get("item_id", ""),
+                    "creative_theme": item.get("creative_theme", ""),
+                    "hook": item.get("hook", ""),
+                }
+                for item in ad_items
+            ],
+        ]
+        return {
+            **asset_result.get("state_updates", {}),
+            "market_inputs": market_inputs,
+        }
+
+    if node.type == NodeType.NORMALIZE_ASSETS:
+        normalized_result = slg_normalize_assets(state, node.params)
+        normalized_items = normalized_result.get("state_updates", {}).get("normalized_video_items", [])
+        market_inputs = [
+            *state.get("market_inputs", []),
+            *[
+                {
+                    "kind": "normalized_asset",
+                    "item_id": item.get("item_id", ""),
+                    "hook": item.get("hook", ""),
+                    "creative_theme": item.get("creative_theme", ""),
+                }
+                for item in normalized_items
+            ],
+        ]
+        return {
+            **normalized_result.get("state_updates", {}),
+            "market_inputs": market_inputs,
+        }
+
+    if node.type == NodeType.SELECT_ASSETS:
+        return slg_select_top_videos(state, node.params).get("state_updates", {})
+
+    if node.type == NodeType.ANALYZE_ASSETS:
+        return slg_analyze_videos(state, node.params).get("state_updates", {})
+
+    if node.type == NodeType.EXTRACT_PATTERNS:
+        return slg_extract_patterns(state, node.params).get("state_updates", {})
+
+    if node.type == NodeType.BUILD_BRIEF:
+        return slg_build_brief(state, node.params).get("state_updates", {})
+
+    if node.type == NodeType.GENERATE_VARIANTS:
+        remapped_params = dict(node.params)
+        if "variantCount" in remapped_params and "variant_count" not in remapped_params:
+            remapped_params["variant_count"] = remapped_params["variantCount"]
+        return slg_generate_variants(state, remapped_params).get("state_updates", {})
+
+    if node.type == NodeType.GENERATE_STORYBOARDS:
+        return slg_generate_storyboards(state, node.params).get("state_updates", {})
+
+    if node.type == NodeType.GENERATE_VIDEO_PROMPTS:
+        return slg_generate_video_prompts(state, node.params).get("state_updates", {})
+
+    if node.type == NodeType.REVIEW_VARIANTS:
+        remapped_params = dict(node.params)
+        if "scoreThreshold" in remapped_params and "pass_threshold" not in remapped_params:
+            remapped_params["pass_threshold"] = remapped_params["scoreThreshold"]
+        return slg_review_variants(state, remapped_params).get("state_updates", {})
+
+    if node.type == NodeType.CONDITION:
+        return {}
+
+    if node.type == NodeType.PREPARE_IMAGE_TODO:
+        return slg_prepare_image_todo(state, node.params).get("state_updates", {})
+
+    if node.type == NodeType.PREPARE_VIDEO_TODO:
+        return slg_prepare_video_todo(state, node.params).get("state_updates", {})
+
+    if node.type == NodeType.FINALIZE:
+        evaluation = dict(state.get("evaluation_result", {}))
+        final_package = {
+            "theme_config": state.get("theme_config", {}),
+            "creative_brief": state.get("creative_brief", ""),
+            "best_variant": state.get("best_variant", {}),
+            "storyboard_packages": state.get("storyboard_packages", []),
+            "video_prompt_packages": state.get("video_prompt_packages", []),
+            "image_generation_todo": state.get("image_generation_todo", {}),
+            "video_generation_todo": state.get("video_generation_todo", {}),
+            "evaluation_result": evaluation,
+        }
+        result = (
+            f"Finalized creative package for {state.get('graph_name', '')} "
+            f"with decision '{evaluation.get('decision', 'pass')}'."
+        )
+        save_memory(
+            {
+                "memory_type": "success_pattern" if evaluation.get("decision") == "pass" else "failure_reason",
+                "summary": result,
+                "content": {
+                    "theme_config": state.get("theme_config", {}),
+                    "evaluation": evaluation,
+                    "best_variant": state.get("best_variant", {}),
+                },
+            }
+        )
+        return {
+            "status": "completed",
+            "final_package": final_package,
+            "final_result": result,
+            "completed_at": utc_now_iso(),
+            "current_node_id": node.id,
+        }
+
+    if node.type == NodeType.END:
+        return {}
+
     if node.type == NodeType.INPUT:
         task_input = str(
             node.config.get("task_input")
@@ -215,6 +381,10 @@ def _build_output_summary(body: dict[str, Any]) -> str:
         value = body.get(key)
         if value:
             return str(value)[:160]
+    if body.get("final_package"):
+        return "final package assembled"
+    if body.get("market_inputs"):
+        return f"market inputs={len(body['market_inputs'])}"
     if body.get("evaluation_result"):
         decision = body["evaluation_result"].get("decision", "unknown")
         return f"evaluation decision={decision}"

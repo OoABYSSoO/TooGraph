@@ -18,7 +18,9 @@ class RunState(TypedDict, total=False):
     current_node_id: str | None
     revision_round: int
     max_revision_round: int
+    theme_config: dict[str, Any]
     task_input: str
+    market_inputs: list[dict[str, Any]]
     retrieved_knowledge: list[str]
     matched_memories: list[str]
     plan: str
@@ -42,6 +44,7 @@ class RunState(TypedDict, total=False):
     best_variant: dict[str, Any]
     image_generation_todo: dict[str, Any]
     video_generation_todo: dict[str, Any]
+    final_package: dict[str, Any]
     revision_feedback: list[str]
     node_status_map: dict[str, NodeStatus]
     node_executions: list[dict[str, Any]]
@@ -64,7 +67,9 @@ def create_initial_run_state(graph_id: str, graph_name: str, max_revision_round:
         current_node_id=None,
         revision_round=0,
         max_revision_round=max_revision_round,
+        theme_config={},
         task_input="",
+        market_inputs=[],
         retrieved_knowledge=[],
         matched_memories=[],
         plan="",
@@ -88,6 +93,7 @@ def create_initial_run_state(graph_id: str, graph_name: str, max_revision_round:
         best_variant={},
         image_generation_todo={},
         video_generation_todo={},
+        final_package={},
         revision_feedback=[],
         node_status_map={},
         node_executions=[],

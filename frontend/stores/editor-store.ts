@@ -1,17 +1,26 @@
 "use client";
 
-import { addEdge, applyEdgeChanges, applyNodeChanges, type Connection, type EdgeChange, type NodeChange } from "@xyflow/react";
+import {
+  addEdge,
+  applyEdgeChanges,
+  applyNodeChanges,
+  type Connection,
+  type EdgeChange,
+  type NodeChange,
+} from "@xyflow/react";
 import { create } from "zustand";
 
 import { createStarterGraphDocument, NODE_PRESETS } from "@/lib/editor-presets";
 import type {
+  EdgeKind,
   GraphCanvasEdge,
   GraphCanvasNode,
   GraphDocument,
-  GraphNodeConfig,
   GraphNodeType,
   NodeExecutionSummary,
   RunDetailPayload,
+  StateField,
+  ThemeConfig,
 } from "@/types/editor";
 
 type ValidationIssue = {
@@ -22,6 +31,9 @@ type ValidationIssue = {
 type EditorState = {
   graphId: string;
   graphName: string;
+  templateId: string;
+  themeConfig: ThemeConfig;
+  stateSchema: StateField[];
   nodes: GraphCanvasNode[];
   edges: GraphCanvasEdge[];
   selectedNodeId: string | null;
@@ -39,6 +51,10 @@ type EditorState = {
   hydrateGraph: (graph: GraphDocument, sourceLabel: string) => void;
   updateGraphIdentity: (graphId: string, graphName?: string) => void;
   updateGraphName: (graphName: string) => void;
+  updateThemeConfig: (patch: Partial<ThemeConfig>) => void;
+  updateStateField: (key: string, patch: Partial<StateField>) => void;
+  addStateField: (field?: Partial<StateField>) => void;
+  removeStateField: (key: string) => void;
   applyRunDetail: (runDetail: RunDetailPayload) => void;
   setCurrentRunId: (runId: string | null) => void;
   onNodesChange: (changes: NodeChange<GraphCanvasNode>[]) => void;
@@ -49,20 +65,58 @@ type EditorState = {
   selectEdge: (edgeId: string | null) => void;
   updateSelectedNodeLabel: (label: string) => void;
   updateSelectedNodeDescription: (description: string) => void;
-  updateSelectedNodeConfig: (config: Partial<GraphNodeConfig>) => void;
+  toggleSelectedNodeRead: (key: string) => void;
+  toggleSelectedNodeWrite: (key: string) => void;
+  updateSelectedNodeParam: (paramKey: string, value: unknown) => void;
+  replaceSelectedNodeParams: (params: Record<string, unknown>) => void;
+  updateSelectedEdgeFlowKeys: (flowKeys: string[]) => void;
+  updateSelectedEdgeKind: (edgeKind: EdgeKind) => void;
+  updateSelectedEdgeBranchLabel: (branchLabel: "pass" | "revise" | "fail" | "") => void;
   updateSelectedNodeConfigDraft: (draft: string) => void;
   saveGraphLocally: () => void;
   validateGraph: () => void;
   simulateRun: () => void;
 };
 
-const initialGraphName = "Untitled Graph";
-
 const toStorageKey = (graphId: string) => `graphiteui:graph:${graphId}`;
+
+function defaultStateField(partial?: Partial<StateField>): StateField {
+  return {
+    key: partial?.key ?? `field_${crypto.randomUUID().slice(0, 6)}`,
+    type: partial?.type ?? "string",
+    role: partial?.role ?? "intermediate",
+    title: partial?.title ?? "",
+    description: partial?.description ?? "",
+    example: partial?.example,
+    sourceNodes: partial?.sourceNodes ?? [],
+    targetNodes: partial?.targetNodes ?? [],
+  };
+}
+
+function graphForStorage(state: EditorState): GraphDocument {
+  return {
+    graphId: state.graphId,
+    name: state.graphName,
+    templateId: state.templateId,
+    themeConfig: state.themeConfig,
+    stateSchema: state.stateSchema,
+    nodes: state.nodes,
+    edges: state.edges,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function buildDraftFromNode(node: GraphCanvasNode | null): string {
+  if (!node) return "";
+  return JSON.stringify(node.data, null, 2);
+}
 
 export const useEditorStore = create<EditorState>((set, get) => ({
   graphId: "",
-  graphName: initialGraphName,
+  graphName: "Creative Factory",
+  templateId: "creative_factory",
+  themeConfig: createStarterGraphDocument("template-creative-factory").themeConfig,
+  stateSchema: createStarterGraphDocument("template-creative-factory").stateSchema,
   nodes: [],
   edges: [],
   selectedNodeId: null,
@@ -84,6 +138,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       set({
         graphId,
         graphName: parsed.name,
+        templateId: parsed.templateId,
+        themeConfig: parsed.themeConfig,
+        stateSchema: parsed.stateSchema,
         nodes: parsed.nodes,
         edges: parsed.edges,
         selectedNodeId: null,
@@ -105,12 +162,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({
       graphId,
       graphName: starterGraph.name,
+      templateId: starterGraph.templateId,
+      themeConfig: starterGraph.themeConfig,
+      stateSchema: starterGraph.stateSchema,
       nodes: starterGraph.nodes,
       edges: starterGraph.edges,
       selectedNodeId: null,
       selectedEdgeId: null,
       validationIssues: [],
-      runtimeLabel: graphId === "slg-creative-factory" ? "SLG creative factory template ready" : "Starter graph ready",
+      runtimeLabel: "Standard template ready",
+      lastSavedAt: starterGraph.updatedAt,
       configDraft: "",
       validationPassed: null,
       currentRunId: null,
@@ -124,6 +185,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({
       graphId: graph.graphId,
       graphName: graph.name,
+      templateId: graph.templateId,
+      themeConfig: graph.themeConfig,
+      stateSchema: graph.stateSchema,
       nodes: graph.nodes,
       edges: graph.edges,
       selectedNodeId: null,
@@ -141,19 +205,52 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   updateGraphIdentity: (graphId, graphName) => {
+    set((state) => ({ graphId, graphName: graphName ?? state.graphName }));
+  },
+
+  updateGraphName: (graphName) => set({ graphName }),
+
+  updateThemeConfig: (patch) => {
     set((state) => ({
-      graphId,
-      graphName: graphName ?? state.graphName,
+      themeConfig: { ...state.themeConfig, ...patch },
     }));
   },
 
-  updateGraphName: (graphName) => {
-    set({ graphName });
+  updateStateField: (key, patch) => {
+    set((state) => ({
+      stateSchema: state.stateSchema.map((field) => (field.key === key ? { ...field, ...patch } : field)),
+    }));
   },
 
-  setCurrentRunId: (runId) => {
-    set({ currentRunId: runId });
+  addStateField: (field) => {
+    set((state) => ({
+      stateSchema: [...state.stateSchema, defaultStateField(field)],
+    }));
   },
+
+  removeStateField: (key) => {
+    set((state) => ({
+      stateSchema: state.stateSchema.filter((field) => field.key !== key),
+      nodes: state.nodes.map((node) => ({
+        ...node,
+        data: {
+          ...node.data,
+          reads: node.data.reads.filter((value) => value !== key),
+          writes: node.data.writes.filter((value) => value !== key),
+        },
+      })),
+      edges: state.edges.map((edge) => ({
+        ...edge,
+        data: {
+          flowKeys: (edge.data?.flowKeys ?? []).filter((value) => value !== key),
+          edgeKind: edge.data?.edgeKind ?? "normal",
+          branchLabel: edge.data?.branchLabel,
+        },
+      })),
+    }));
+  },
+
+  setCurrentRunId: (runId) => set({ currentRunId: runId }),
 
   applyRunDetail: (runDetail) => {
     const nodeExecutionMap = Object.fromEntries(
@@ -171,9 +268,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       nodes: state.nodes.map((node) => {
         const rawStatus = runDetail.node_status_map[node.id];
         const nodeStatus =
-          rawStatus === "running" || rawStatus === "success" || rawStatus === "failed"
-            ? rawStatus
-            : "idle";
+          rawStatus === "running" || rawStatus === "success" || rawStatus === "failed" ? rawStatus : "idle";
         return {
           ...node,
           className: `graph-node status-${nodeStatus}`,
@@ -186,17 +281,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }));
   },
 
-  onNodesChange: (changes) => {
-    set((state) => ({
-      nodes: applyNodeChanges(changes, state.nodes),
-    }));
-  },
-
-  onEdgesChange: (changes) => {
-    set((state) => ({
-      edges: applyEdgeChanges(changes, state.edges),
-    }));
-  },
+  onNodesChange: (changes) => set((state) => ({ nodes: applyNodeChanges(changes, state.nodes) })),
+  onEdgesChange: (changes) => set((state) => ({ edges: applyEdgeChanges(changes, state.edges) })),
 
   onConnect: (connection) => {
     set((state) => ({
@@ -205,6 +291,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           ...connection,
           id: `edge_${connection.source}_${connection.target}_${state.edges.length + 1}`,
           animated: false,
+          data: { flowKeys: [], edgeKind: "normal" },
         },
         state.edges,
       ),
@@ -214,7 +301,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   addNode: (kind) => {
     const preset = NODE_PRESETS.find((item) => item.kind === kind);
     if (!preset) return;
-
     set((state) => {
       const count = state.nodes.filter((node) => node.data.kind === kind).length + 1;
       const nodeId = `${kind}_${count}`;
@@ -223,95 +309,161 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         type: "default",
         className: "graph-node status-idle",
         position: {
-          x: 160 + (state.nodes.length % 3) * 220,
-          y: 120 + Math.floor(state.nodes.length / 3) * 140,
+          x: 160 + (state.nodes.length % 3) * 240,
+          y: 120 + Math.floor(state.nodes.length / 3) * 150,
         },
         data: {
           label: preset.label,
           kind: preset.kind,
           description: preset.description,
           status: "idle",
-          config:
-            preset.kind === "input"
-              ? { taskInput: "Describe the workflow task here." }
-              : preset.kind === "knowledge"
-                ? { query: "" }
-                : preset.kind === "memory"
-                  ? { memoryType: "success_pattern" }
-                  : preset.kind === "planner"
-                    ? { plannerMode: "default" }
-                    : preset.kind === "skill_executor"
-                      ? { selectedSkills: ["search_docs"] }
-                      : preset.kind === "evaluator"
-                        ? { evaluatorDecision: "pass", score: 8.5 }
-                        : { finalMessage: "Finalize workflow output." },
+          reads: preset.defaultReads ?? [],
+          writes: preset.defaultWrites ?? [],
+          params: preset.defaultParams ?? {},
         },
       };
       return {
         nodes: [...state.nodes, nextNode],
         selectedNodeId: nodeId,
         selectedEdgeId: null,
-        configDraft: JSON.stringify(nextNode.data, null, 2),
+        configDraft: buildDraftFromNode(nextNode),
       };
     });
   },
 
   selectNode: (nodeId) => {
-    const state = get();
-    const node = state.nodes.find((item) => item.id === nodeId);
+    const node = get().nodes.find((item) => item.id === nodeId) ?? null;
     set({
       selectedNodeId: nodeId,
       selectedEdgeId: null,
-      configDraft: node ? JSON.stringify(node.data, null, 2) : "",
+      configDraft: buildDraftFromNode(node),
     });
   },
 
-  selectEdge: (edgeId) => {
-    set({ selectedEdgeId: edgeId, selectedNodeId: null, configDraft: "" });
-  },
+  selectEdge: (edgeId) => set({ selectedEdgeId: edgeId, selectedNodeId: null, configDraft: "" }),
 
   updateSelectedNodeLabel: (label) => {
     set((state) => ({
-      nodes: state.nodes.map((node) =>
-        node.id === state.selectedNodeId
-          ? { ...node, data: { ...node.data, label } }
-          : node,
-      ),
+      nodes: state.nodes.map((node) => (node.id === state.selectedNodeId ? { ...node, data: { ...node.data, label } } : node)),
     }));
   },
 
   updateSelectedNodeDescription: (description) => {
     set((state) => ({
       nodes: state.nodes.map((node) =>
-        node.id === state.selectedNodeId
-          ? { ...node, data: { ...node.data, description } }
-          : node,
+        node.id === state.selectedNodeId ? { ...node, data: { ...node.data, description } } : node,
       ),
     }));
   },
 
-  updateSelectedNodeConfig: (config) => {
-    set((state) => {
-      const nodes = state.nodes.map((node) =>
+  toggleSelectedNodeRead: (key) => {
+    set((state) => ({
+      nodes: state.nodes.map((node) =>
         node.id === state.selectedNodeId
           ? {
               ...node,
               data: {
                 ...node.data,
-                config: {
-                  ...node.data.config,
-                  ...config,
-                },
+                reads: node.data.reads.includes(key) ? node.data.reads.filter((value) => value !== key) : [...node.data.reads, key],
               },
             }
           : node,
+      ),
+    }));
+  },
+
+  toggleSelectedNodeWrite: (key) => {
+    set((state) => ({
+      nodes: state.nodes.map((node) =>
+        node.id === state.selectedNodeId
+          ? {
+              ...node,
+              data: {
+                ...node.data,
+                writes: node.data.writes.includes(key)
+                  ? node.data.writes.filter((value) => value !== key)
+                  : [...node.data.writes, key],
+              },
+            }
+          : node,
+      ),
+    }));
+  },
+
+  updateSelectedNodeParam: (paramKey, value) => {
+    set((state) => {
+      const nodes = state.nodes.map((node) =>
+        node.id === state.selectedNodeId
+          ? { ...node, data: { ...node.data, params: { ...node.data.params, [paramKey]: value } } }
+          : node,
       );
-      const updatedNode = nodes.find((node) => node.id === state.selectedNodeId);
-      return {
-        nodes,
-        configDraft: updatedNode ? JSON.stringify(updatedNode.data, null, 2) : state.configDraft,
-      };
+      const updatedNode = nodes.find((node) => node.id === state.selectedNodeId) ?? null;
+      return { nodes, configDraft: buildDraftFromNode(updatedNode) };
     });
+  },
+
+  replaceSelectedNodeParams: (params) => {
+    set((state) => {
+      const nodes = state.nodes.map((node) =>
+        node.id === state.selectedNodeId ? { ...node, data: { ...node.data, params } } : node,
+      );
+      const updatedNode = nodes.find((node) => node.id === state.selectedNodeId) ?? null;
+      return { nodes, configDraft: buildDraftFromNode(updatedNode) };
+    });
+  },
+
+  updateSelectedEdgeFlowKeys: (flowKeys) => {
+    set((state) => ({
+      edges: state.edges.map((edge) =>
+        edge.id === state.selectedEdgeId
+          ? {
+              ...edge,
+              label: edge.data?.branchLabel ?? (flowKeys.length ? flowKeys.slice(0, 2).join(", ") : undefined),
+              data: {
+                flowKeys,
+                edgeKind: edge.data?.edgeKind ?? "normal",
+                branchLabel: edge.data?.branchLabel,
+              },
+            }
+          : edge,
+      ),
+    }));
+  },
+
+  updateSelectedEdgeKind: (edgeKind) => {
+    set((state) => ({
+      edges: state.edges.map((edge) =>
+        edge.id === state.selectedEdgeId
+          ? {
+              ...edge,
+              label: edgeKind === "branch" ? edge.data?.branchLabel : edge.data?.flowKeys?.slice(0, 2).join(", "),
+              data: {
+                flowKeys: edge.data?.flowKeys ?? [],
+                edgeKind,
+                branchLabel: edgeKind === "branch" ? edge.data?.branchLabel : undefined,
+              },
+            }
+          : edge,
+      ),
+    }));
+  },
+
+  updateSelectedEdgeBranchLabel: (branchLabel) => {
+    set((state) => ({
+      edges: state.edges.map((edge) =>
+        edge.id === state.selectedEdgeId
+          ? {
+              ...edge,
+              label: branchLabel || (edge.data?.flowKeys ?? []).slice(0, 2).join(", "),
+              data: {
+                flowKeys: edge.data?.flowKeys ?? [],
+                edgeKind: branchLabel ? "branch" : edge.data?.edgeKind ?? "normal",
+                branchLabel: branchLabel || undefined,
+              },
+            }
+          : edge,
+      ),
+    }));
   },
 
   updateSelectedNodeConfigDraft: (draft) => {
@@ -327,17 +479,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
                   ...node.data,
                   ...parsed,
                   label: typeof parsed.label === "string" ? parsed.label : node.data.label,
-                  description:
-                    typeof parsed.description === "string"
-                      ? parsed.description
-                      : node.data.description,
-                  config:
-                    parsed.config && typeof parsed.config === "object"
-                      ? {
-                          ...node.data.config,
-                          ...parsed.config,
-                        }
-                      : node.data.config,
+                  description: typeof parsed.description === "string" ? parsed.description : node.data.description,
+                  reads: Array.isArray(parsed.reads)
+                    ? parsed.reads.filter((value): value is string => typeof value === "string")
+                    : node.data.reads,
+                  writes: Array.isArray(parsed.writes)
+                    ? parsed.writes.filter((value): value is string => typeof value === "string")
+                    : node.data.writes,
+                  params: parsed.params && typeof parsed.params === "object" ? parsed.params : node.data.params,
                 },
               }
             : node,
@@ -349,41 +498,44 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   saveGraphLocally: () => {
-    const state = get();
-    const payload: GraphDocument = {
-      graphId: state.graphId,
-      name: state.graphName,
-      nodes: state.nodes,
-      edges: state.edges,
-      updatedAt: new Date().toISOString(),
-    };
+    const payload = graphForStorage(get());
     if (typeof window !== "undefined") {
-      window.localStorage.setItem(toStorageKey(state.graphId), JSON.stringify(payload));
+      window.localStorage.setItem(toStorageKey(payload.graphId), JSON.stringify(payload));
     }
-    set({
-      lastSavedAt: payload.updatedAt,
-      runtimeLabel: "Saved locally",
-    });
+    set({ lastSavedAt: payload.updatedAt, runtimeLabel: "Saved locally" });
   },
 
   validateGraph: () => {
     const state = get();
     const issues: ValidationIssue[] = [];
-    const inputCount = state.nodes.filter((node) => node.data.kind === "input").length;
-    const evaluatorCount = state.nodes.filter((node) => node.data.kind === "evaluator").length;
-    const finalizerCount = state.nodes.filter((node) => node.data.kind === "finalizer").length;
+    const startCount = state.nodes.filter((node) => node.data.kind === "start").length;
+    const endCount = state.nodes.filter((node) => node.data.kind === "end").length;
+    const conditionNodes = state.nodes.filter((node) => node.data.kind === "condition");
+    const stateKeys = new Set(state.stateSchema.map((field) => field.key));
 
-    if (inputCount !== 1) {
-      issues.push({ code: "input_count", message: "Editor graph must contain exactly one Input node." });
+    if (startCount !== 1) {
+      issues.push({ code: "start_count", message: "Graph must contain exactly one Start node." });
     }
-    if (evaluatorCount < 1) {
-      issues.push({ code: "missing_evaluator", message: "Editor graph must include an Evaluator node." });
+    if (endCount !== 1) {
+      issues.push({ code: "end_count", message: "Graph must contain exactly one End node." });
     }
-    if (finalizerCount !== 1) {
-      issues.push({ code: "finalizer_count", message: "Editor graph must contain exactly one Finalizer node." });
+    for (const node of state.nodes) {
+      for (const readKey of node.data.reads) {
+        if (!stateKeys.has(readKey)) {
+          issues.push({ code: "unknown_read_key", message: `Node '${node.id}' reads missing state key '${readKey}'.` });
+        }
+      }
+      for (const writeKey of node.data.writes) {
+        if (!stateKeys.has(writeKey)) {
+          issues.push({ code: "unknown_write_key", message: `Node '${node.id}' writes missing state key '${writeKey}'.` });
+        }
+      }
     }
-    if (state.edges.length < Math.max(state.nodes.length - 1, 1)) {
-      issues.push({ code: "edge_count", message: "Graph needs enough edges to connect the active node flow." });
+    for (const node of conditionNodes) {
+      const branchEdges = state.edges.filter((edge) => edge.source === node.id && edge.data?.edgeKind === "branch");
+      if (branchEdges.length < 2) {
+        issues.push({ code: "condition_branches", message: `Condition node '${node.id}' must have at least two branch edges.` });
+      }
     }
 
     set({
@@ -397,13 +549,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((state) => ({
       currentRunStatus: "completed",
       currentNodeId: state.nodes.at(-1)?.id ?? null,
-      nodes: state.nodes.map((node, index) => ({
+      nodes: state.nodes.map((node) => ({
         ...node,
         className: "graph-node status-success",
-        data: {
-          ...node.data,
-          status: index === state.nodes.length - 1 ? "success" : "success",
-        },
+        data: { ...node.data, status: "success" },
       })),
       runtimeLabel: "Simulated run completed",
     }));

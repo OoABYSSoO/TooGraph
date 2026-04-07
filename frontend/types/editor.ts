@@ -1,37 +1,79 @@
 import type { Edge, Node } from "@xyflow/react";
 
 export type GraphNodeType =
-  | "input"
+  | "start"
+  | "end"
+  | "condition"
+  | "research"
+  | "collect_assets"
+  | "normalize_assets"
+  | "select_assets"
+  | "analyze_assets"
+  | "extract_patterns"
+  | "build_brief"
+  | "generate_variants"
+  | "generate_storyboards"
+  | "generate_video_prompts"
+  | "review_variants"
+  | "prepare_image_todo"
+  | "prepare_video_todo"
+  | "finalize"
   | "knowledge"
   | "memory"
   | "planner"
-  | "skill_executor"
   | "evaluator"
-  | "finalizer";
+  | "tool"
+  | "transform";
 
-export type EvaluatorDecision = "pass" | "revise" | "fail";
+export type EdgeKind = "normal" | "branch";
+export type BranchLabel = "pass" | "revise" | "fail";
+export type StateFieldType = "string" | "number" | "boolean" | "object" | "array" | "markdown" | "json" | "file_list";
+export type StateFieldRole = "input" | "intermediate" | "decision" | "artifact" | "final";
 
-export type GraphNodeConfig = {
-  taskInput?: string;
-  query?: string;
-  memoryType?: string;
-  plannerMode?: string;
-  selectedSkills?: string[];
-  evaluatorDecision?: EvaluatorDecision;
-  score?: number;
-  finalMessage?: string;
+export type ThemeConfig = {
+  domain: string;
+  genre: string;
+  market: string;
+  platform: string;
+  language: string;
+  creativeStyle: string;
+  tone: string;
+  languageConstraints: string[];
+  evaluationPolicy: Record<string, unknown>;
+  assetSourcePolicy: Record<string, unknown>;
 };
+
+export type StateField = {
+  key: string;
+  type: StateFieldType;
+  role: StateFieldRole;
+  title: string;
+  description: string;
+  example?: unknown;
+  sourceNodes: string[];
+  targetNodes: string[];
+};
+
+export type GraphNodeParams = Record<string, unknown>;
 
 export type GraphNodeData = {
   label: string;
   kind: GraphNodeType;
   description: string;
   status?: "idle" | "running" | "success" | "failed";
-  config: GraphNodeConfig;
+  reads: string[];
+  writes: string[];
+  params: GraphNodeParams;
+};
+
+export type GraphEdgeData = {
+  flowKeys: string[];
+  edgeKind: EdgeKind;
+  branchLabel?: BranchLabel;
 };
 
 export type GraphCanvasNode = Node<GraphNodeData>;
-export type GraphCanvasEdge = Edge;
+export type GraphCanvasEdge = Edge<GraphEdgeData>;
 
 export type NodeExecutionSummary = {
   node_id: string;
@@ -59,6 +101,9 @@ export type RunDetailPayload = {
 export type GraphDocument = {
   graphId: string;
   name: string;
+  templateId: string;
+  themeConfig: ThemeConfig;
+  stateSchema: StateField[];
   nodes: GraphCanvasNode[];
   edges: GraphCanvasEdge[];
   updatedAt: string;

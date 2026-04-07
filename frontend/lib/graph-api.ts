@@ -1,21 +1,61 @@
-import type { GraphCanvasEdge, GraphCanvasNode, GraphNodeType } from "@/types/editor";
+import type {
+  BranchLabel,
+  EdgeKind,
+  GraphCanvasEdge,
+  GraphCanvasNode,
+  GraphDocument,
+  GraphNodeType,
+  StateField,
+  ThemeConfig,
+} from "@/types/editor";
 
 export type BackendGraphPayload = {
   graph_id?: string;
   name: string;
+  template_id: string;
+  theme_config: {
+    domain: string;
+    genre: string;
+    market: string;
+    platform: string;
+    language: string;
+    creative_style: string;
+    tone: string;
+    language_constraints: string[];
+    evaluation_policy: Record<string, unknown>;
+    asset_source_policy: Record<string, unknown>;
+  };
+  state_schema: Array<{
+    key: string;
+    type: string;
+    role: string;
+    title: string;
+    description: string;
+    example?: unknown;
+    source_nodes: string[];
+    target_nodes: string[];
+  }>;
   nodes: Array<{
     id: string;
     type: string;
     label: string;
     position: { x: number; y: number };
-    config: Record<string, unknown>;
+    reads: string[];
+    writes: string[];
+    params: Record<string, unknown>;
+    implementation: {
+      executor: string;
+      handler_key: string;
+      tool_keys: string[];
+    };
   }>;
   edges: Array<{
     id: string;
-    type: "normal" | "conditional";
     source: string;
     target: string;
-    condition_label?: "pass" | "revise" | "fail";
+    flow_keys: string[];
+    edge_kind: EdgeKind;
+    branch_label?: BranchLabel;
   }>;
   metadata: Record<string, unknown>;
 };
@@ -24,16 +64,87 @@ export type BackendGraphDocument = BackendGraphPayload & {
   graph_id: string;
 };
 
-export function toBackendGraphPayload(
-  graphId: string,
-  name: string,
-  nodes: GraphCanvasNode[],
-  edges: GraphCanvasEdge[],
-): BackendGraphPayload {
+function toBackendThemeConfig(themeConfig: ThemeConfig): BackendGraphPayload["theme_config"] {
   return {
-    graph_id: graphId === "demo-graph" ? undefined : graphId,
-    name,
-    nodes: nodes.map((node) => ({
+    domain: themeConfig.domain,
+    genre: themeConfig.genre,
+    market: themeConfig.market,
+    platform: themeConfig.platform,
+    language: themeConfig.language,
+    creative_style: themeConfig.creativeStyle,
+    tone: themeConfig.tone,
+    language_constraints: themeConfig.languageConstraints,
+    evaluation_policy: themeConfig.evaluationPolicy,
+    asset_source_policy: themeConfig.assetSourcePolicy,
+  };
+}
+
+function fromBackendThemeConfig(themeConfig: BackendGraphDocument["theme_config"]): ThemeConfig {
+  return {
+    domain: themeConfig.domain ?? "",
+    genre: themeConfig.genre ?? "",
+    market: themeConfig.market ?? "",
+    platform: themeConfig.platform ?? "",
+    language: themeConfig.language ?? "",
+    creativeStyle: themeConfig.creative_style ?? "",
+    tone: themeConfig.tone ?? "",
+    languageConstraints: Array.isArray(themeConfig.language_constraints)
+      ? themeConfig.language_constraints.filter((value): value is string => typeof value === "string")
+      : [],
+    evaluationPolicy:
+      themeConfig.evaluation_policy && typeof themeConfig.evaluation_policy === "object"
+        ? themeConfig.evaluation_policy
+        : {},
+    assetSourcePolicy:
+      themeConfig.asset_source_policy && typeof themeConfig.asset_source_policy === "object"
+        ? themeConfig.asset_source_policy
+        : {},
+  };
+}
+
+function toBackendStateField(field: StateField): BackendGraphPayload["state_schema"][number] {
+  return {
+    key: field.key,
+    type: field.type,
+    role: field.role,
+    title: field.title,
+    description: field.description,
+    example: field.example,
+    source_nodes: field.sourceNodes,
+    target_nodes: field.targetNodes,
+  };
+}
+
+function fromBackendStateField(field: BackendGraphDocument["state_schema"][number]): StateField {
+  return {
+    key: field.key,
+    type: field.type as StateField["type"],
+    role: field.role as StateField["role"],
+    title: field.title ?? "",
+    description: field.description ?? "",
+    example: field.example,
+    sourceNodes: Array.isArray(field.source_nodes)
+      ? field.source_nodes.filter((value): value is string => typeof value === "string")
+      : [],
+    targetNodes: Array.isArray(field.target_nodes)
+      ? field.target_nodes.filter((value): value is string => typeof value === "string")
+      : [],
+  };
+}
+
+export function toBackendGraphPayload(document: GraphDocument): BackendGraphPayload {
+  return {
+    graph_id:
+      document.graphId.startsWith("template-") ||
+      document.graphId === "creative-factory" ||
+      document.graphId === "slg-creative-factory"
+        ? undefined
+        : document.graphId,
+    name: document.name,
+    template_id: document.templateId,
+    theme_config: toBackendThemeConfig(document.themeConfig),
+    state_schema: document.stateSchema.map(toBackendStateField),
+    nodes: document.nodes.map((node) => ({
       id: node.id,
       type: node.data.kind,
       label: node.data.label,
@@ -41,57 +152,40 @@ export function toBackendGraphPayload(
         x: node.position.x,
         y: node.position.y,
       },
-      config: {
-        description: node.data.description,
-        status: node.data.status ?? "idle",
-        ...(node.data.kind === "input" ? { task_input: node.data.config.taskInput ?? "" } : {}),
-        ...(node.data.kind === "knowledge" ? { query: node.data.config.query ?? "" } : {}),
-        ...(node.data.kind === "memory" ? { memory_type: node.data.config.memoryType ?? "" } : {}),
-        ...(node.data.kind === "planner" ? { planner_mode: node.data.config.plannerMode ?? "default" } : {}),
-        ...(node.data.kind === "skill_executor"
-          ? { selected_skills: node.data.config.selectedSkills ?? ["search_docs"] }
-          : {}),
-        ...(node.data.kind === "evaluator"
-          ? {
-              decision: node.data.config.evaluatorDecision ?? "pass",
-              score: node.data.config.score ?? 8.5,
-            }
-          : {}),
-        ...(node.data.kind === "finalizer" ? { final_message: node.data.config.finalMessage ?? "" } : {}),
+      reads: node.data.reads,
+      writes: node.data.writes,
+      params: node.data.params,
+      implementation: {
+        executor: "node_handler",
+        handler_key: node.data.kind,
+        tool_keys: [],
       },
     })),
-    edges: edges.map((edge) => {
-      const label = typeof edge.label === "string" ? edge.label.toLowerCase() : "";
-      const isConditional = label === "pass" || label === "revise" || label === "fail";
-      return {
-        id: edge.id,
-        type: isConditional ? "conditional" : "normal",
-        source: edge.source,
-        target: edge.target,
-        ...(isConditional ? { condition_label: label as "pass" | "revise" | "fail" } : {}),
-      };
-    }),
+    edges: document.edges.map((edge) => ({
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
+      flow_keys: edge.data?.flowKeys ?? [],
+      edge_kind: edge.data?.edgeKind ?? "normal",
+      ...(edge.data?.edgeKind === "branch" && edge.data.branchLabel
+        ? { branch_label: edge.data.branchLabel }
+        : {}),
+    })),
     metadata: {},
   };
 }
 
-export function fromBackendGraphDocument(document: BackendGraphDocument): {
-  graphId: string;
-  graphName: string;
-  nodes: GraphCanvasNode[];
-  edges: GraphCanvasEdge[];
-} {
+export function fromBackendGraphDocument(document: BackendGraphDocument): GraphDocument {
   return {
     graphId: document.graph_id,
-    graphName: document.name,
+    name: document.name,
+    templateId: document.template_id ?? "",
+    themeConfig: fromBackendThemeConfig(document.theme_config),
+    stateSchema: Array.isArray(document.state_schema) ? document.state_schema.map(fromBackendStateField) : [],
     nodes: document.nodes.map((node) => ({
       id: node.id,
       type: "default",
-      className: `graph-node status-${
-        node.config.status === "running" || node.config.status === "success" || node.config.status === "failed"
-          ? node.config.status
-          : "idle"
-      }`,
+      className: "graph-node status-idle",
       position: {
         x: node.position.x,
         y: node.position.y,
@@ -99,41 +193,27 @@ export function fromBackendGraphDocument(document: BackendGraphDocument): {
       data: {
         label: node.label,
         kind: node.type as GraphNodeType,
-        description:
-          typeof node.config.description === "string"
-            ? node.config.description
-            : typeof node.config.task_input === "string"
-              ? node.config.task_input
-              : "",
-        status:
-          node.config.status === "running" ||
-          node.config.status === "success" ||
-          node.config.status === "failed"
-            ? node.config.status
-            : "idle",
-        config: {
-          taskInput: typeof node.config.task_input === "string" ? node.config.task_input : undefined,
-          query: typeof node.config.query === "string" ? node.config.query : undefined,
-          memoryType: typeof node.config.memory_type === "string" ? node.config.memory_type : undefined,
-          plannerMode: typeof node.config.planner_mode === "string" ? node.config.planner_mode : undefined,
-          selectedSkills: Array.isArray(node.config.selected_skills)
-            ? node.config.selected_skills.filter((value): value is string => typeof value === "string")
-            : undefined,
-          evaluatorDecision:
-            node.config.decision === "pass" || node.config.decision === "revise" || node.config.decision === "fail"
-              ? node.config.decision
-              : undefined,
-          score: typeof node.config.score === "number" ? node.config.score : undefined,
-          finalMessage: typeof node.config.final_message === "string" ? node.config.final_message : undefined,
-        },
+        description: typeof node.params?.description === "string" ? node.params.description : "",
+        status: "idle",
+        reads: Array.isArray(node.reads) ? node.reads.filter((value): value is string => typeof value === "string") : [],
+        writes: Array.isArray(node.writes) ? node.writes.filter((value): value is string => typeof value === "string") : [],
+        params: node.params && typeof node.params === "object" ? node.params : {},
       },
     })),
     edges: document.edges.map((edge) => ({
       id: edge.id,
       source: edge.source,
       target: edge.target,
-      label: edge.condition_label ?? undefined,
+      label: edge.branch_label ?? (edge.flow_keys?.length ? edge.flow_keys.slice(0, 2).join(", ") : undefined),
       animated: false,
+      data: {
+        flowKeys: Array.isArray(edge.flow_keys)
+          ? edge.flow_keys.filter((value): value is string => typeof value === "string")
+          : [],
+        edgeKind: edge.edge_kind,
+        branchLabel: edge.branch_label,
+      },
     })),
+    updatedAt: new Date().toISOString(),
   };
 }

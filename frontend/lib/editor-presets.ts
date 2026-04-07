@@ -1,279 +1,305 @@
-import type { GraphCanvasEdge, GraphCanvasNode, GraphNodeType } from "@/types/editor";
+import type {
+  GraphCanvasEdge,
+  GraphCanvasNode,
+  GraphDocument,
+  GraphNodeType,
+  StateField,
+  ThemeConfig,
+} from "@/types/editor";
 
 type NodePreset = {
   kind: GraphNodeType;
   label: string;
   description: string;
+  defaultReads?: string[];
+  defaultWrites?: string[];
+  defaultParams?: Record<string, unknown>;
 };
 
 export const NODE_PRESETS: NodePreset[] = [
-  { kind: "input", label: "Input", description: "Collect task input and initialize run state." },
-  {
-    kind: "knowledge",
-    label: "Knowledge",
-    description: "Load or retrieve knowledge relevant to the task.",
-  },
-  { kind: "memory", label: "Memory", description: "Load past memory patterns into context." },
-  { kind: "planner", label: "Planner", description: "Create an execution plan." },
-  {
-    kind: "skill_executor",
-    label: "Skill Executor",
-    description: "Run registered tools or helper skills.",
-  },
-  { kind: "evaluator", label: "Evaluator", description: "Score output and choose a route." },
-  { kind: "finalizer", label: "Finalizer", description: "Collect outputs and finish the run." },
+  { kind: "start", label: "Start", description: "Define initial context and expose root state." },
+  { kind: "research", label: "Research", description: "Collect market or strategy inputs.", defaultWrites: ["market_inputs"] },
+  { kind: "collect_assets", label: "Collect Assets", description: "Fetch assets from configured sources." },
+  { kind: "normalize_assets", label: "Normalize Assets", description: "Normalize raw asset inputs." },
+  { kind: "select_assets", label: "Select Assets", description: "Choose top candidate materials." },
+  { kind: "analyze_assets", label: "Analyze Assets", description: "Analyze asset structure and patterns." },
+  { kind: "extract_patterns", label: "Extract Patterns", description: "Summarize reusable patterns." },
+  { kind: "build_brief", label: "Build Brief", description: "Convert context into a creative brief." },
+  { kind: "generate_variants", label: "Generate Variants", description: "Generate candidate outputs." },
+  { kind: "generate_storyboards", label: "Generate Storyboards", description: "Create storyboard packages." },
+  { kind: "generate_video_prompts", label: "Video Prompts", description: "Generate video prompt packages." },
+  { kind: "review_variants", label: "Review", description: "Evaluate variants and produce decision state." },
+  { kind: "condition", label: "Condition", description: "Branch based on a decision field." },
+  { kind: "prepare_image_todo", label: "Image TODO", description: "Prepare image generation package." },
+  { kind: "prepare_video_todo", label: "Video TODO", description: "Prepare video generation package." },
+  { kind: "finalize", label: "Finalize", description: "Assemble final package and persist results." },
+  { kind: "end", label: "End", description: "Collect final outputs." },
+  { kind: "knowledge", label: "Knowledge", description: "Read long-lived knowledge sources." },
+  { kind: "memory", label: "Memory", description: "Read historical memories." },
+  { kind: "planner", label: "Planner", description: "Plan downstream execution." },
+  { kind: "evaluator", label: "Evaluator", description: "Produce a decision payload." },
+  { kind: "tool", label: "Tool", description: "Invoke reusable tools." },
+  { kind: "transform", label: "Transform", description: "Convert one state structure into another." },
 ];
 
-function createDefaultStarterNodes(): GraphCanvasNode[] {
+function defaultThemeConfig(): ThemeConfig {
+  return {
+    domain: "game_ads",
+    genre: "SLG",
+    market: "US",
+    platform: "facebook",
+    language: "zh",
+    creativeStyle: "high_pressure_growth_loop",
+    tone: "urgent",
+    languageConstraints: ["ui_en_only"],
+    evaluationPolicy: { scoreThreshold: 7.8 },
+    assetSourcePolicy: { adLibrary: true, rss: true },
+  };
+}
+
+function defaultStateSchema(): StateField[] {
   return [
     {
-      id: "input_1",
-      type: "default",
-      position: { x: 80, y: 220 },
-      data: {
-        label: "Input",
-        kind: "input",
-        description: "Provide task input for the workflow.",
-        status: "idle",
-        config: {
-          taskInput: "Describe the workflow task here.",
-        },
-      },
+      key: "theme_config",
+      type: "object",
+      role: "input",
+      title: "Theme Config",
+      description: "Global theme and domain settings.",
+      sourceNodes: ["start_1"],
+      targetNodes: ["research_1", "build_brief_1", "generate_variants_1"],
     },
     {
-      id: "planner_1",
-      type: "default",
-      position: { x: 320, y: 220 },
-      data: {
-        label: "Planner",
-        kind: "planner",
-        description: "Create a plan using available context.",
-        status: "idle",
-        config: {
-          plannerMode: "default",
-        },
-      },
+      key: "market_inputs",
+      type: "array",
+      role: "intermediate",
+      title: "Market Inputs",
+      description: "Collected research signals and asset references.",
+      sourceNodes: ["research_1", "collect_assets_1", "normalize_assets_1"],
+      targetNodes: ["build_brief_1"],
     },
     {
-      id: "evaluator_1",
-      type: "default",
-      position: { x: 560, y: 220 },
-      data: {
-        label: "Evaluator",
-        kind: "evaluator",
-        description: "Evaluate output and choose next route.",
-        status: "idle",
-        config: {
-          evaluatorDecision: "pass",
-          score: 8.5,
-        },
-      },
+      key: "selected_video_items",
+      type: "array",
+      role: "intermediate",
+      title: "Selected Assets",
+      description: "Shortlisted benchmark assets for deeper analysis.",
+      sourceNodes: ["select_assets_1"],
+      targetNodes: ["analyze_assets_1"],
     },
     {
-      id: "finalizer_1",
-      type: "default",
-      position: { x: 800, y: 220 },
-      data: {
-        label: "Finalizer",
-        kind: "finalizer",
-        description: "Return final result and wrap the run.",
-        status: "idle",
-        config: {
-          finalMessage: "Finalize workflow output.",
-        },
-      },
+      key: "video_analysis_results",
+      type: "array",
+      role: "artifact",
+      title: "Asset Analyses",
+      description: "Structured findings extracted from selected assets.",
+      sourceNodes: ["analyze_assets_1"],
+      targetNodes: ["extract_patterns_1"],
+    },
+    {
+      key: "pattern_summary",
+      type: "markdown",
+      role: "artifact",
+      title: "Pattern Summary",
+      description: "Cross-asset reusable pattern summary.",
+      sourceNodes: ["extract_patterns_1"],
+      targetNodes: ["build_brief_1"],
+    },
+    {
+      key: "creative_brief",
+      type: "markdown",
+      role: "artifact",
+      title: "Creative Brief",
+      description: "Structured brief for generation.",
+      sourceNodes: ["build_brief_1"],
+      targetNodes: ["generate_variants_1", "review_variants_1"],
+    },
+    {
+      key: "script_variants",
+      type: "array",
+      role: "artifact",
+      title: "Script Variants",
+      description: "Generated creative variants.",
+      sourceNodes: ["generate_variants_1"],
+      targetNodes: ["generate_storyboards_1", "review_variants_1"],
+    },
+    {
+      key: "storyboard_packages",
+      type: "array",
+      role: "artifact",
+      title: "Storyboard Packages",
+      description: "Storyboard image packages derived from selected variants.",
+      sourceNodes: ["generate_storyboards_1"],
+      targetNodes: ["generate_video_prompts_1", "prepare_image_todo_1", "finalize_1"],
+    },
+    {
+      key: "video_prompt_packages",
+      type: "array",
+      role: "artifact",
+      title: "Video Prompt Packages",
+      description: "Video-generation prompt packages derived from storyboards.",
+      sourceNodes: ["generate_video_prompts_1"],
+      targetNodes: ["prepare_video_todo_1", "finalize_1"],
+    },
+    {
+      key: "best_variant",
+      type: "object",
+      role: "artifact",
+      title: "Best Variant",
+      description: "Best candidate selected during review.",
+      sourceNodes: ["review_variants_1"],
+      targetNodes: ["prepare_image_todo_1", "prepare_video_todo_1", "finalize_1"],
+    },
+    {
+      key: "evaluation_result",
+      type: "object",
+      role: "decision",
+      title: "Evaluation Result",
+      description: "Review decision and score payload.",
+      sourceNodes: ["review_variants_1"],
+      targetNodes: ["condition_1", "finalize_1", "end_1"],
+    },
+    {
+      key: "image_generation_todo",
+      type: "object",
+      role: "artifact",
+      title: "Image TODO",
+      description: "Prepared image generation work package.",
+      sourceNodes: ["prepare_image_todo_1"],
+      targetNodes: ["finalize_1"],
+    },
+    {
+      key: "video_generation_todo",
+      type: "object",
+      role: "artifact",
+      title: "Video TODO",
+      description: "Prepared video generation work package.",
+      sourceNodes: ["prepare_video_todo_1"],
+      targetNodes: ["finalize_1"],
+    },
+    {
+      key: "final_package",
+      type: "object",
+      role: "final",
+      title: "Final Package",
+      description: "Final artifact package exposed at the end of the flow.",
+      sourceNodes: ["finalize_1"],
+      targetNodes: ["end_1"],
     },
   ];
 }
 
-function createDefaultStarterEdges(): GraphCanvasEdge[] {
-  return [
-    { id: "edge_input_planner", source: "input_1", target: "planner_1" },
-    { id: "edge_planner_eval", source: "planner_1", target: "evaluator_1" },
-    {
-      id: "edge_eval_finalizer",
-      source: "evaluator_1",
-      target: "finalizer_1",
-      label: "pass",
+function createNode(
+  id: string,
+  kind: GraphNodeType,
+  label: string,
+  x: number,
+  y: number,
+  description: string,
+  reads: string[] = [],
+  writes: string[] = [],
+  params: Record<string, unknown> = {},
+): GraphCanvasNode {
+  return {
+    id,
+    type: "default",
+    className: "graph-node status-idle",
+    position: { x, y },
+    data: {
+      label,
+      kind,
+      description,
+      status: "idle",
+      reads,
+      writes,
+      params,
     },
-  ];
+  };
 }
 
-function createSlgCreativeFactoryNodes(): GraphCanvasNode[] {
-  return [
-    {
-      id: "input_1",
-      type: "default",
-      position: { x: 80, y: 220 },
-      data: {
-        label: "Campaign Input",
-        kind: "input",
-        description: "Provide the campaign brief and target problem.",
-        status: "idle",
-        config: {
-          taskInput:
-            "Build an SLG creative factory workflow that researches market signals, analyzes benchmark ads, generates multiple script variants, storyboard packages, video prompts, and TODO payloads for image/video generation.",
-        },
-      },
-    },
-    {
-      id: "planner_1",
-      type: "default",
-      position: { x: 300, y: 220 },
-      data: {
-        label: "Pipeline Planner",
-        kind: "planner",
-        description: "Create the high-level execution plan for the SLG creative pipeline.",
-        status: "idle",
-        config: { plannerMode: "careful" },
-      },
-    },
-    {
-      id: "skill_1",
-      type: "default",
-      position: { x: 540, y: 80 },
-      data: {
-        label: "News Research",
-        kind: "skill_executor",
-        description: "Fetch and clean market news for SLG creative hints.",
-        status: "idle",
-        config: { selectedSkills: ["slg_fetch_rss", "slg_clean_news"] },
-      },
-    },
-    {
-      id: "skill_2",
-      type: "default",
-      position: { x: 540, y: 220 },
-      data: {
-        label: "Benchmark Ads",
-        kind: "skill_executor",
-        description: "Fetch benchmark ads and normalize them into analysis-ready assets.",
-        status: "idle",
-        config: { selectedSkills: ["slg_fetch_ads", "slg_normalize_assets", "slg_select_top_videos"] },
-      },
-    },
-    {
-      id: "skill_3",
-      type: "default",
-      position: { x: 780, y: 220 },
-      data: {
-        label: "Asset Analysis",
-        kind: "skill_executor",
-        description: "Analyze selected ads and extract creative patterns.",
-        status: "idle",
-        config: { selectedSkills: ["slg_analyze_videos", "slg_extract_patterns", "slg_build_brief"] },
-      },
-    },
-    {
-      id: "skill_4",
-      type: "default",
-      position: { x: 1020, y: 220 },
-      data: {
-        label: "Creative Generation",
-        kind: "skill_executor",
-        description: "Generate variants, storyboards, and video prompt packages.",
-        status: "idle",
-        config: {
-          selectedSkills: ["slg_generate_variants", "slg_generate_storyboards", "slg_generate_video_prompts"],
-        },
-      },
-    },
-    {
-      id: "skill_5",
-      type: "default",
-      position: { x: 1260, y: 220 },
-      data: {
-        label: "Variant Review",
-        kind: "skill_executor",
-        description: "Review variants and prepare evaluator payload.",
-        status: "idle",
-        config: { selectedSkills: ["slg_review_variants"] },
-      },
-    },
-    {
-      id: "evaluator_1",
-      type: "default",
-      position: { x: 1500, y: 220 },
-      data: {
-        label: "Evaluator",
-        kind: "evaluator",
-        description: "Route pass/revise/fail based on upstream review result.",
-        status: "idle",
-        config: { evaluatorDecision: "pass", score: 8.5 },
-      },
-    },
-    {
-      id: "skill_6",
-      type: "default",
-      position: { x: 1740, y: 140 },
-      data: {
-        label: "Image TODO",
-        kind: "skill_executor",
-        description: "Prepare image-generation TODO package.",
-        status: "idle",
-        config: { selectedSkills: ["slg_prepare_image_todo"] },
-      },
-    },
-    {
-      id: "skill_7",
-      type: "default",
-      position: { x: 1980, y: 140 },
-      data: {
-        label: "Video TODO",
-        kind: "skill_executor",
-        description: "Prepare video-generation TODO package.",
-        status: "idle",
-        config: { selectedSkills: ["slg_prepare_video_todo"] },
-      },
-    },
-    {
-      id: "finalizer_1",
-      type: "default",
-      position: { x: 2220, y: 220 },
-      data: {
-        label: "Finalizer",
-        kind: "finalizer",
-        description: "Collect pipeline outputs and finish the run.",
-        status: "idle",
-        config: { finalMessage: "Finalize SLG creative factory output." },
-      },
-    },
-  ];
+function createEdge(
+  id: string,
+  source: string,
+  target: string,
+  flowKeys: string[],
+  edgeKind: "normal" | "branch" = "normal",
+  branchLabel?: "pass" | "revise" | "fail",
+): GraphCanvasEdge {
+  return {
+    id,
+    source,
+    target,
+    animated: false,
+    label: branchLabel ?? (flowKeys.length ? flowKeys.slice(0, 2).join(", ") : undefined),
+    data: { flowKeys, edgeKind, branchLabel },
+  };
 }
 
-function createSlgCreativeFactoryEdges(): GraphCanvasEdge[] {
-  return [
-    { id: "edge_1", source: "input_1", target: "planner_1" },
-    { id: "edge_2", source: "planner_1", target: "skill_1" },
-    { id: "edge_3", source: "skill_1", target: "skill_2" },
-    { id: "edge_4", source: "skill_2", target: "skill_3" },
-    { id: "edge_5", source: "skill_3", target: "skill_4" },
-    { id: "edge_6", source: "skill_4", target: "skill_5" },
-    { id: "edge_7", source: "skill_5", target: "evaluator_1" },
-    { id: "edge_8", source: "evaluator_1", target: "skill_6", label: "pass" },
-    { id: "edge_9", source: "evaluator_1", target: "planner_1", label: "revise" },
-    { id: "edge_10", source: "evaluator_1", target: "finalizer_1", label: "fail" },
-    { id: "edge_11", source: "skill_6", target: "skill_7" },
-    { id: "edge_12", source: "skill_7", target: "finalizer_1" },
-  ];
+function createCreativeFactoryTemplate(graphId: string): GraphDocument {
+  return {
+    graphId,
+    name: "Creative Factory",
+    templateId: "creative_factory",
+    themeConfig: defaultThemeConfig(),
+    stateSchema: defaultStateSchema(),
+    nodes: [
+      createNode("start_1", "start", "Start", 40, 220, "Define initial context and expose root state.", [], ["theme_config"]),
+      createNode("research_1", "research", "Research", 240, 80, "Collect market news and strategic context.", ["theme_config"], ["market_inputs"], {
+        sources: ["rss", "ad_library"],
+      }),
+      createNode("collect_assets_1", "collect_assets", "Collect Assets", 240, 260, "Fetch benchmark ad assets.", ["theme_config"], ["market_inputs"], {
+        sourcePreset: "ad_library",
+      }),
+      createNode("normalize_assets_1", "normalize_assets", "Normalize Assets", 460, 260, "Normalize raw assets into analysis-ready records.", ["market_inputs"], ["market_inputs"]),
+      createNode("select_assets_1", "select_assets", "Select Assets", 680, 260, "Select top benchmark videos.", ["market_inputs"], ["selected_video_items"], {
+        top_n: 2,
+      }),
+      createNode("analyze_assets_1", "analyze_assets", "Analyze Assets", 900, 260, "Analyze selected benchmark assets.", ["selected_video_items"], ["video_analysis_results"]),
+      createNode("extract_patterns_1", "extract_patterns", "Extract Patterns", 1120, 260, "Summarize reusable patterns from analyses.", ["video_analysis_results"], ["pattern_summary"]),
+      createNode("build_brief_1", "build_brief", "Build Brief", 1340, 260, "Build a structured brief.", ["theme_config", "market_inputs", "pattern_summary"], ["creative_brief"]),
+      createNode("generate_variants_1", "generate_variants", "Generate Variants", 1580, 260, "Generate creative variants.", ["theme_config", "creative_brief"], ["script_variants"], {
+        variantCount: 3,
+      }),
+      createNode("generate_storyboards_1", "generate_storyboards", "Storyboards", 1800, 180, "Create storyboard packages for each variant.", ["script_variants"], ["storyboard_packages"]),
+      createNode("generate_video_prompts_1", "generate_video_prompts", "Video Prompts", 1800, 340, "Create video prompt packages from storyboards.", ["script_variants", "storyboard_packages"], ["video_prompt_packages"]),
+      createNode("review_variants_1", "review_variants", "Review", 2020, 260, "Review generated variants.", ["creative_brief", "script_variants"], ["best_variant", "evaluation_result"], {
+        scoreThreshold: 7.8,
+      }),
+      createNode("condition_1", "condition", "Condition", 2240, 260, "Route pass/revise/fail.", ["evaluation_result"], [], {
+        decision_key: "evaluation_result.decision",
+      }),
+      createNode("prepare_image_todo_1", "prepare_image_todo", "Image TODO", 2460, 180, "Prepare image generation package.", ["best_variant", "storyboard_packages"], ["image_generation_todo"]),
+      createNode("prepare_video_todo_1", "prepare_video_todo", "Video TODO", 2460, 340, "Prepare video generation package.", ["best_variant", "video_prompt_packages"], ["video_generation_todo"]),
+      createNode("finalize_1", "finalize", "Finalize", 2680, 260, "Assemble final package.", ["evaluation_result", "best_variant", "storyboard_packages", "video_prompt_packages", "image_generation_todo", "video_generation_todo"], ["final_package"]),
+      createNode("end_1", "end", "End", 2900, 260, "Expose final package.", ["final_package", "evaluation_result"], []),
+    ],
+    edges: [
+      createEdge("edge_1", "start_1", "research_1", ["theme_config"]),
+      createEdge("edge_2", "research_1", "collect_assets_1", ["market_inputs"]),
+      createEdge("edge_3", "collect_assets_1", "normalize_assets_1", ["market_inputs"]),
+      createEdge("edge_4", "normalize_assets_1", "select_assets_1", ["market_inputs"]),
+      createEdge("edge_5", "select_assets_1", "analyze_assets_1", ["selected_video_items"]),
+      createEdge("edge_6", "analyze_assets_1", "extract_patterns_1", ["video_analysis_results"]),
+      createEdge("edge_7", "extract_patterns_1", "build_brief_1", ["pattern_summary"]),
+      createEdge("edge_8", "build_brief_1", "generate_variants_1", ["creative_brief"]),
+      createEdge("edge_9", "generate_variants_1", "generate_storyboards_1", ["script_variants"]),
+      createEdge("edge_10", "generate_storyboards_1", "generate_video_prompts_1", ["storyboard_packages"]),
+      createEdge("edge_11", "generate_video_prompts_1", "review_variants_1", ["video_prompt_packages"]),
+      createEdge("edge_12", "review_variants_1", "condition_1", ["evaluation_result", "best_variant"]),
+      createEdge("edge_13", "condition_1", "prepare_image_todo_1", ["evaluation_result", "best_variant"], "branch", "pass"),
+      createEdge("edge_14", "prepare_image_todo_1", "prepare_video_todo_1", ["image_generation_todo"]),
+      createEdge("edge_15", "prepare_video_todo_1", "finalize_1", ["video_generation_todo"]),
+      createEdge("edge_16", "condition_1", "generate_variants_1", ["evaluation_result"], "branch", "revise"),
+      createEdge("edge_17", "condition_1", "end_1", ["evaluation_result"], "branch", "fail"),
+      createEdge("edge_18", "finalize_1", "end_1", ["final_package"]),
+    ],
+    updatedAt: new Date().toISOString(),
+  };
 }
 
-export function createStarterGraphDocument(graphId: string): {
-  name: string;
-  nodes: GraphCanvasNode[];
-  edges: GraphCanvasEdge[];
-} {
-  if (graphId === "slg-creative-factory") {
-    return {
-      name: "SLG Creative Factory",
-      nodes: createSlgCreativeFactoryNodes(),
-      edges: createSlgCreativeFactoryEdges(),
-    };
+export function createStarterGraphDocument(graphId: string): GraphDocument {
+  if (graphId === "creative-factory" || graphId === "slg-creative-factory" || graphId === "template-creative-factory") {
+    return createCreativeFactoryTemplate(graphId);
   }
 
-  return {
-    name: graphId === "demo-graph" ? "Demo Graph" : "Untitled Graph",
-    nodes: createDefaultStarterNodes(),
-    edges: createDefaultStarterEdges(),
-  };
+  return createCreativeFactoryTemplate(graphId);
 }

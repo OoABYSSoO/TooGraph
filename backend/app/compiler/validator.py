@@ -46,6 +46,7 @@ def validate_graph(graph: GraphDocument) -> GraphValidationResponse:
     outgoing_by_source: dict[str, list[str]] = defaultdict(list)
     incoming_by_target: dict[str, list[str]] = defaultdict(list)
     conditional_by_source: dict[str, set[ConditionLabel]] = defaultdict(set)
+    normal_outgoing_by_source: dict[str, list[str]] = defaultdict(list)
     state_field_keys = {field.key for field in graph.state_schema}
     writes_by_node = {node.id: set(node.writes) for node in graph.nodes}
 
@@ -70,6 +71,8 @@ def validate_graph(graph: GraphDocument) -> GraphValidationResponse:
         if edge.source in node_id_set and edge.target in node_id_set:
             outgoing_by_source[edge.source].append(edge.id)
             incoming_by_target[edge.target].append(edge.id)
+            if edge.edge_kind == EdgeKind.NORMAL:
+                normal_outgoing_by_source[edge.source].append(edge.id)
 
         if edge.edge_kind == EdgeKind.BRANCH:
             conditional_by_source[edge.source].add(edge.branch_label)
@@ -150,6 +153,17 @@ def validate_graph(graph: GraphDocument) -> GraphValidationResponse:
                         path=f"nodes.{node.id}",
                     )
                 )
+        elif len(normal_outgoing_by_source[node.id]) > 1:
+            issues.append(
+                ValidationIssue(
+                    code="multiple_normal_outgoing_edges_not_supported",
+                    message=(
+                        f"Node '{node.id}' has multiple normal outgoing edges. "
+                        "Current standard runtime requires a single normal successor; use a condition node for branching."
+                    ),
+                    path=f"nodes.{node.id}",
+                )
+            )
 
     issues.extend(_validate_business_dependencies(graph))
 
