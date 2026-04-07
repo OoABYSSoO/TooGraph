@@ -1,0 +1,66 @@
+{
+  "name": "Minimal Pass Graph",
+  "metadata": {
+    "max_revision_round": 1
+  },
+  "nodes": [
+    {
+      "id": "input_1",
+      "type": "input",
+      "label": "Input",
+      "position": { "x": 80, "y": 220 },
+      "config": {
+        "task_input": "Prepare a concise workflow summary."
+      }
+    },
+    {
+      "id": "planner_1",
+      "type": "planner",
+      "label": "Planner",
+      "position": { "x": 320, "y": 220 },
+      "config": {
+        "planner_mode": "default"
+      }
+    },
+    {
+      "id": "evaluator_1",
+      "type": "evaluator",
+      "label": "Evaluator",
+      "position": { "x": 560, "y": 220 },
+      "config": {
+        "decision": "pass",
+        "score": 8.5
+      }
+    },
+    {
+      "id": "finalizer_1",
+      "type": "finalizer",
+      "label": "Finalizer",
+      "position": { "x": 800, "y": 220 },
+      "config": {
+        "final_message": "Finalize workflow output."
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_1",
+      "type": "normal",
+      "source": "input_1",
+      "target": "planner_1"
+    },
+    {
+      "id": "edge_2",
+      "type": "normal",
+      "source": "planner_1",
+      "target": "evaluator_1"
+    },
+    {
+      "id": "edge_3",
+      "type": "conditional",
+      "source": "evaluator_1",
+      "target": "finalizer_1",
+      "condition_label": "pass"
+    }
+  ]
+}
