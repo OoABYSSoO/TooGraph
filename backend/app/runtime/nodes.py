@@ -3,8 +3,11 @@ from __future__ import annotations
 import time
 from typing import Any
 
+from app.knowledge.loader import search_knowledge
+from app.memory.store import load_memories, save_memory
 from app.runtime.state import RunState, utc_now_iso
 from app.schemas.graph import GraphNode, NodeType
+from app.skills.registry import get_skill_registry
 
 
 def execute_runtime_node(state: RunState, node: GraphNode) -> RunState:
@@ -28,9 +31,11 @@ def execute_runtime_node(state: RunState, node: GraphNode) -> RunState:
             "node_id": node.id,
             "node_type": node.type.value,
             "status": "success",
+            "started_at": utc_now_iso(),
             "duration_ms": duration_ms,
             "input_summary": _build_input_summary(state, node),
             "output_summary": _build_output_summary(body),
+            "artifacts": _build_artifact_payload(body),
             "warnings": [],
             "errors": [],
             "finished_at": utc_now_iso(),
@@ -50,9 +55,11 @@ def execute_runtime_node(state: RunState, node: GraphNode) -> RunState:
             "node_id": node.id,
             "node_type": node.type.value,
             "status": "failed",
+            "started_at": utc_now_iso(),
             "duration_ms": duration_ms,
             "input_summary": _build_input_summary(state, node),
             "output_summary": "",
+            "artifacts": {},
             "warnings": [],
             "errors": [str(exc)],
             "finished_at": utc_now_iso(),
@@ -77,14 +84,21 @@ def _run_node_logic(state: RunState, node: GraphNode) -> dict[str, Any]:
 
     if node.type == NodeType.KNOWLEDGE:
         task_input = state.get("task_input", "")
+        results = search_knowledge(task_input, limit=3)
         return {
-            "retrieved_knowledge": [
-                f"Knowledge summary for task: {task_input[:120]}".strip()
-            ]
+            "retrieved_knowledge": [item["summary"] for item in results]
         }
 
     if node.type == NodeType.MEMORY:
-        return {"matched_memories": ["No prior memory matched. Using fresh planning context."]}
+        memories = load_memories()
+        if not memories:
+            return {"matched_memories": ["No prior memory matched. Using fresh planning context."]}
+        return {
+            "matched_memories": [
+                str(memory.get("summary") or memory.get("content") or "memory item")[:180]
+                for memory in memories[:3]
+            ]
+        }
 
     if node.type == NodeType.PLANNER:
         task_input = state.get("task_input", "")
@@ -99,13 +113,26 @@ def _run_node_logic(state: RunState, node: GraphNode) -> dict[str, Any]:
     if node.type == NodeType.SKILL_EXECUTOR:
         plan = state.get("plan", "")
         selected_skills = list(node.config.get("selected_skills", ["search_docs"]))
-        skill_outputs = [
-            {
-                "skill": skill_name,
-                "summary": f"Executed {skill_name} for plan: {plan[:120]}",
-            }
-            for skill_name in selected_skills
-        ]
+        registry = get_skill_registry()
+        skill_outputs = []
+        for skill_name in selected_skills:
+            skill = registry.get(skill_name)
+            if not skill:
+                skill_outputs.append({"skill": skill_name, "summary": "Skill is not registered."})
+                continue
+            if skill_name == "search_docs":
+                result = skill(state.get("task_input", ""))
+            elif skill_name == "analyze_assets":
+                result = skill(state.get("retrieved_knowledge", []))
+            elif skill_name == "generate_draft":
+                result = skill(
+                    state.get("plan", ""),
+                    state.get("retrieved_knowledge", []),
+                    state.get("matched_memories", []),
+                )
+            else:
+                result = skill(state.get("plan", ""))
+            skill_outputs.append({"skill": skill_name, **result})
         return {
             "selected_skills": selected_skills,
             "skill_outputs": skill_outputs,
@@ -121,11 +148,13 @@ def _run_node_logic(state: RunState, node: GraphNode) -> dict[str, Any]:
         if decision == "revise" and revision_round >= max_revision_round:
             decision = "fail"
         score = float(node.config.get("score", 8.5 if decision == "pass" else 6.5))
+        evaluator_payload = get_skill_registry()["evaluate_output"](state.get("plan", ""))
         return {
             "evaluation_result": {
                 "decision": decision,
                 "score": score,
                 "issues": [] if decision == "pass" else ["Requires another revision."],
+                "suggestions": evaluator_payload["suggestions"],
             },
             "revision_round": revision_round + 1 if decision == "revise" else revision_round,
         }
@@ -135,6 +164,16 @@ def _run_node_logic(state: RunState, node: GraphNode) -> dict[str, Any]:
         result = (
             f"Finalized graph '{state.get('graph_name', '')}' "
             f"with decision '{evaluation.get('decision', 'pass')}'."
+        )
+        save_memory(
+            {
+                "memory_type": "success_pattern" if evaluation.get("decision") == "pass" else "failure_reason",
+                "summary": result,
+                "content": {
+                    "plan": state.get("plan", ""),
+                    "evaluation": evaluation,
+                },
+            }
         )
         return {
             "status": "completed",
@@ -167,3 +206,16 @@ def _build_output_summary(body: dict[str, Any]) -> str:
         return f"knowledge items={len(body['retrieved_knowledge'])}"
     return "updated state"
 
+
+def _build_artifact_payload(body: dict[str, Any]) -> dict[str, Any]:
+    artifact_keys = (
+        "task_input",
+        "retrieved_knowledge",
+        "matched_memories",
+        "plan",
+        "selected_skills",
+        "skill_outputs",
+        "evaluation_result",
+        "final_result",
+    )
+    return {key: body[key] for key in artifact_keys if key in body}

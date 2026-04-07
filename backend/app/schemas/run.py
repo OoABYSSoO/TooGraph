@@ -15,18 +15,36 @@ class RunSummary(BaseModel):
     started_at: str
     completed_at: str | None = None
     final_result: str | None = None
+    duration_ms: int | None = None
+    final_score: float | None = None
 
 
 class RunDetail(RunSummary):
     task_input: str = ""
     retrieved_knowledge: list[str] = Field(default_factory=list)
     matched_memories: list[str] = Field(default_factory=list)
+    knowledge_summary: str = ""
+    memory_summary: str = ""
     plan: str = ""
     selected_skills: list[str] = Field(default_factory=list)
     skill_outputs: list[dict[str, Any]] = Field(default_factory=list)
     evaluation_result: dict[str, Any] = Field(default_factory=dict)
+    artifacts: dict[str, Any] = Field(default_factory=dict)
     node_status_map: dict[str, str] = Field(default_factory=dict)
     node_executions: list[dict[str, Any]] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     errors: list[str] = Field(default_factory=list)
 
+
+class NodeExecutionDetail(BaseModel):
+    node_id: str
+    node_type: str
+    status: str
+    started_at: str | None = None
+    finished_at: str | None = None
+    duration_ms: int
+    input_summary: str
+    output_summary: str
+    artifacts: dict[str, Any] = Field(default_factory=dict)
+    warnings: list[str] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
