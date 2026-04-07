@@ -4,6 +4,30 @@ A visual node-based editor and runtime workspace for LangGraph agent workflows.
 
 GraphiteUI 不是一个聊天应用，也不是一个单轮 prompt 包装器。它的目标是把复杂业务任务的执行过程，从“黑盒代码”变成 **可视化编排、可运行、可观察、可回看** 的 workflow 系统。
 
+---
+
+## 当前仓库状态
+
+当前仓库已经完成：
+
+- 产品范围文档
+- 架构设计文档
+- 任务拆解文档
+- 验收标准文档
+- 开发计划文档
+- Python demo 原型
+- 后端最小骨架与 `/health` 接口
+- 前后端目录结构预留
+
+当前仓库尚未完成：
+
+- 完整 Next.js 前端初始化
+- graph schema 与 graph API
+- runtime 编译与执行主流程
+- runs / knowledge / memories 页面联调
+
+因此，本仓库现在更适合视为“已完成规划和脚手架准备的项目起点”。
+
 在 GraphiteUI 中，用户可以：
 
 - 在 **Workspace** 中查看最近 graph、最近 runs 和系统状态
@@ -232,7 +256,33 @@ repo/
 
 ## 9. 本地开发启动
 
+### 当前可直接启动的部分
+
+目前可以直接启动后端最小骨架：
+
+```bash
+make backend-install
+make backend-dev
+```
+
+健康检查：
+
+```bash
+make backend-health
+```
+
+默认地址：
+
+```bash
+http://localhost:8000/health
+```
+
 ### 前端
+
+前端目录已预留，但尚未初始化为完整 Next.js 应用。
+
+后续建议在 `frontend/` 内完成初始化后再使用：
+
 ```bash
 cd frontend
 npm install
@@ -245,6 +295,9 @@ http://localhost:3000
 ```
 
 ### 后端
+
+当前后端最小骨架可直接使用以下方式启动：
+
 ```bash
 cd backend
 python -m venv .venv
@@ -373,4 +426,3 @@ backend/data/runs/
 GraphiteUI 的目标不是“做一个像 ComfyUI 的画布”，而是：
 
 **做一个能把可视化 graph 转成真实 LangGraph workflow，并把执行过程白盒化展示出来的 Agent 编排工作台。**
-
