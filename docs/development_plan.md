@@ -164,6 +164,7 @@
 - `Tool Registry` 基础下沉
 - 自定义节点语义
 - creative factory 模板
+- preset 驱动的节点默认参数覆盖
 
 仍在推进中的能力：
 

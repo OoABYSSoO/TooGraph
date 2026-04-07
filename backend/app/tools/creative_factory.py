@@ -10,6 +10,43 @@ def compact_text(value: Any, fallback: str = "") -> str:
     return text or fallback
 
 
+def theme_profile(theme_config: dict[str, Any]) -> dict[str, str]:
+    genre = compact_text(theme_config.get("genre"), "strategy")
+    tone = compact_text(theme_config.get("tone"), "urgent")
+    platform = compact_text(theme_config.get("platform"), "digital")
+    creative_style = compact_text(theme_config.get("creative_style"), compact_text(theme_config.get("creativeStyle"), "high_intensity"))
+
+    if genre.upper() == "RPG":
+        return {
+            "genre": genre,
+            "tone": tone,
+            "platform": platform,
+            "creative_style": creative_style,
+            "hook_theme": "英雄觉醒与强敌压境",
+            "payoff_theme": "职业成长、掉落回报与 Boss 压制",
+            "visual_pattern": "技能爆发、装备光效、Boss 定格",
+        }
+    if genre.lower() == "survival":
+        return {
+            "genre": genre,
+            "tone": tone,
+            "platform": platform,
+            "creative_style": creative_style,
+            "hook_theme": "资源匮乏与生存崩盘边缘",
+            "payoff_theme": "极限翻盘、补给回收与据点重建",
+            "visual_pattern": "低资源警报、混乱尸潮、临界反杀",
+        }
+    return {
+        "genre": genre,
+        "tone": tone,
+        "platform": platform,
+        "creative_style": creative_style,
+        "hook_theme": "资源危机与战局失控",
+        "payoff_theme": "联盟推进、战力成长与结果反转",
+        "visual_pattern": "警报色、大地图轨迹、爆字反馈",
+    }
+
+
 def ensure_list(value: Any) -> list[Any]:
     if value is None:
         return []
@@ -151,20 +188,19 @@ def fetch_market_news_context(state: dict[str, Any], params: dict[str, Any] | No
     del params
     task = compact_text(state.get("task_input"), "creative research")
     theme_config = state.get("theme_config") or {}
-    genre = compact_text(theme_config.get("genre"), "strategy")
-    platform = compact_text(theme_config.get("platform"), "digital")
+    profile = theme_profile(theme_config)
     rss_items = [
         {
             "source": "PocketGamer.biz",
             "title": f"{task[:48]} market trend snapshot",
-            "summary": f"{genre} 市场近期强调危机感开场、成长反馈和协同推进，平台侧重点为 {platform}。",
-            "creative_hint": "前3秒可直接抛资源危机或敌军压境。",
+            "summary": f"{profile['genre']} 市场近期强调{profile['hook_theme']}，平台侧重点为 {profile['platform']}。",
+            "creative_hint": f"前3秒优先建立 {profile['hook_theme']}。",
         },
         {
             "source": "GameDeveloper",
             "title": "UA creatives increasingly focus on survival pressure",
             "summary": "买量创意更偏爱明确冲突、数值反馈和强节奏推进。",
-            "creative_hint": "用数值暴涨和战报结果强化爽点。",
+            "creative_hint": f"用 {profile['payoff_theme']} 强化爽点。",
         },
     ]
     return {"rss_items": rss_items}
@@ -215,17 +251,17 @@ def select_top_video_assets(state: dict[str, Any], params: dict[str, Any] | None
 def analyze_video_assets(state: dict[str, Any], params: dict[str, Any] | None = None) -> dict[str, Any]:
     del params
     task = compact_text(state.get("task_input"), "creative campaign")
-    genre = compact_text((state.get("theme_config") or {}).get("genre"), "strategy")
+    profile = theme_profile(state.get("theme_config") or {})
     analyses = []
     for idx, item in enumerate(ensure_list(state.get("selected_video_items")), start=1):
         analyses.append(
             {
                 "item_id": item.get("item_id", f"ASSET_{idx}"),
                 "hook_type": "高压危机开场",
-                "opening_summary": f"{task[:40]} 以{genre}题材常见的危机开场在前3秒建立紧张感。",
+                "opening_summary": f"{task[:40]} 以{profile['genre']}题材常见的{profile['hook_theme']}在前3秒建立紧张感。",
                 "core_conflict": item.get("creative_theme", "资源与战局双重压力"),
                 "selling_points": ["强反馈数值", "协同推进", "局势反转"],
-                "visual_patterns": ["红色警报", "大地图推进", "爆字反馈"],
+                "visual_patterns": [profile["visual_pattern"], "结果页强化", "节奏推进"],
                 "reusable_formula": "危机 -> 决策 -> 爽点 -> 成长 -> 规模 -> 结果",
                 "one_sentence_takeaway": "前3秒必须抛高压局面，后续用数值反馈完成闭环。",
             }
@@ -253,11 +289,8 @@ def build_creative_brief(state: dict[str, Any], params: dict[str, Any] | None = 
     del params
     task = compact_text(state.get("task_input"), "creative brief")
     theme_config = state.get("theme_config", {})
-    genre = compact_text(theme_config.get("genre"), "strategy")
+    profile = theme_profile(theme_config)
     market = compact_text(theme_config.get("market"), "global")
-    platform = compact_text(theme_config.get("platform"), "digital")
-    creative_style = compact_text(theme_config.get("creative_style"), compact_text(theme_config.get("creativeStyle"), "high_intensity"))
-    tone = compact_text(theme_config.get("tone"), "urgent")
     pattern_summary = compact_text(state.get("pattern_summary"))
     news_context = compact_text(state.get("news_context"))
     brief = "\n".join(
@@ -265,12 +298,12 @@ def build_creative_brief(state: dict[str, Any], params: dict[str, Any] | None = 
             "# Creative Brief",
             "",
             f"- 目标任务：{task}",
-            f"- 题材：{genre}",
+            f"- 题材：{profile['genre']}",
             f"- 市场：{market}",
-            f"- 平台：{platform}",
-            f"- 风格：{creative_style}",
-            f"- 语气：{tone}",
-            "- 创意方向：用危机与反转建立高压叙事。",
+            f"- 平台：{profile['platform']}",
+            f"- 风格：{profile['creative_style']}",
+            f"- 语气：{profile['tone']}",
+            f"- 创意方向：围绕 {profile['hook_theme']} 和 {profile['payoff_theme']} 构建高压叙事。",
             "- 结构要求：15 秒内完成危机、决策、爽点和结果落点。",
             f"- 模式参考：{pattern_summary[:220]}",
             f"- 新闻辅助：{news_context[:220]}",
@@ -283,21 +316,19 @@ def generate_creative_variants(state: dict[str, Any], params: dict[str, Any] | N
     variant_count = int((params or {}).get("variant_count", 2))
     revision_round = int(state.get("revision_round", 0))
     theme_config = state.get("theme_config", {})
-    genre = compact_text(theme_config.get("genre"), "strategy")
-    tone = compact_text(theme_config.get("tone"), "urgent")
-    creative_style = compact_text(theme_config.get("creative_style"), compact_text(theme_config.get("creativeStyle"), "high_intensity"))
+    profile = theme_profile(theme_config)
     feedback = " / ".join(ensure_list(state.get("revision_feedback"))) or "保持前3秒高压钩子和机制爽点"
     variants = []
     for idx in range(1, max(variant_count, 1) + 1):
         variants.append(
             {
                 "variant_id": f"V{idx}",
-                "strategy_name": f"{genre} 危机反转版本 {idx}",
-                "positioning": "突出资源危机、即时决策与反推节奏",
-                "visual_style_cn": f"{tone}、{creative_style}、强反馈的 {genre} 游戏录屏广告",
-                "hook": "前3秒直接抛出资源告急与敌军压境",
-                "core_conflict": f"在多线压力下完成调兵、升级与反推。第 {revision_round + 1} 轮侧重：{feedback}",
-                "selling_points": ["危机感", "成长反馈", "协同推进"],
+                "strategy_name": f"{profile['genre']} 核心钩子版本 {idx}",
+                "positioning": f"突出 {profile['hook_theme']} 与 {profile['payoff_theme']}",
+                "visual_style_cn": f"{profile['tone']}、{profile['creative_style']}、强反馈的 {profile['genre']} 游戏录屏广告",
+                "hook": f"前3秒直接抛出 {profile['hook_theme']}",
+                "core_conflict": f"在多线压力下完成推进与反转。第 {revision_round + 1} 轮侧重：{feedback}",
+                "selling_points": [profile["hook_theme"], profile["payoff_theme"], profile["visual_pattern"]],
                 "why_it_might_work": "强钩子 + 爽点闭环 + 英文 UI 适合买量投放",
                 "risk": "如果节奏不够快，容易只剩概念没有爽点",
                 "shot_list": normalize_shot_list([]),

@@ -124,6 +124,10 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
   const selectedNode = useMemo(() => nodes.find((node) => node.id === selectedNodeId) ?? null, [nodes, selectedNodeId]);
   const selectedEdge = useMemo(() => edges.find((edge) => edge.id === selectedEdgeId) ?? null, [edges, selectedEdgeId]);
   const selectedNodeExecution = selectedNode ? nodeExecutionMap[selectedNode.id] ?? null : null;
+  const selectedThemePreset = useMemo(
+    () => THEME_PRESETS.find((preset) => preset.id === themeConfig.themePreset) ?? null,
+    [themeConfig.themePreset],
+  );
 
   useEffect(() => {
     setNewReadKey("");
@@ -317,6 +321,12 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
             <input className="text-input" value={themeConfig.tone} onChange={(event) => updateThemeConfig({ tone: event.target.value })} />
           </label>
         </div>
+        {selectedThemePreset ? (
+          <div className="preset-banner">
+            <strong>{selectedThemePreset.label}</strong>
+            <span>{selectedThemePreset.description}</span>
+          </div>
+        ) : null}
       </section>
 
       <section className="editor-layout editor-layout-v2">

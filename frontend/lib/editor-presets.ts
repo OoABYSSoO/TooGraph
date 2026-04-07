@@ -48,6 +48,12 @@ export const THEME_PRESETS: ThemePreset[] = [
     id: "slg_launch",
     label: "SLG Launch",
     description: "High-pressure strategy war ads with rapid escalation and alliance scale.",
+    graphName: "Creative Factory · SLG Launch",
+    nodeParamOverrides: {
+      select_assets_1: { top_n: 2 },
+      generate_variants_1: { variantCount: 3 },
+      review_variants_1: { scoreThreshold: 7.8 },
+    },
     themeConfig: {
       themePreset: "slg_launch",
       domain: "game_ads",
@@ -66,6 +72,12 @@ export const THEME_PRESETS: ThemePreset[] = [
     id: "rpg_fantasy",
     label: "RPG Fantasy",
     description: "Hero-led fantasy progression with class fantasy, bosses, and loot payoff.",
+    graphName: "Creative Factory · RPG Fantasy",
+    nodeParamOverrides: {
+      select_assets_1: { top_n: 3 },
+      generate_variants_1: { variantCount: 3 },
+      review_variants_1: { scoreThreshold: 7.6 },
+    },
     themeConfig: {
       themePreset: "rpg_fantasy",
       domain: "game_ads",
@@ -84,6 +96,12 @@ export const THEME_PRESETS: ThemePreset[] = [
     id: "survival_chaos",
     label: "Survival Chaos",
     description: "Overwhelming threat, scrappy resource recovery, and last-second reversals.",
+    graphName: "Creative Factory · Survival Chaos",
+    nodeParamOverrides: {
+      select_assets_1: { top_n: 2 },
+      generate_variants_1: { variantCount: 4 },
+      review_variants_1: { scoreThreshold: 7.9 },
+    },
     themeConfig: {
       themePreset: "survival_chaos",
       domain: "game_ads",
@@ -106,6 +124,20 @@ export function getThemePresetById(themePresetId: string): ThemePreset | undefin
 
 function defaultThemeConfig(): ThemeConfig {
   return THEME_PRESETS[0].themeConfig;
+}
+
+function applyNodeParamOverrides(nodes: GraphCanvasNode[], themePreset: ThemePreset): GraphCanvasNode[] {
+  const overrides = themePreset.nodeParamOverrides ?? {};
+  return nodes.map((node) => ({
+    ...node,
+    data: {
+      ...node.data,
+      params: {
+        ...node.data.params,
+        ...(overrides[node.id] ?? {}),
+      },
+    },
+  }));
 }
 
 function defaultStateSchema(): StateField[] {
@@ -288,43 +320,44 @@ function createEdge(
 
 function createCreativeFactoryTemplate(graphId: string, themePresetId?: string): GraphDocument {
   const themePreset = getThemePresetById(themePresetId ?? "") ?? THEME_PRESETS[0];
+  const baseNodes = [
+    createNode("start_1", "start", "Start", 40, 220, "Define initial context and expose root state.", [], ["theme_config"]),
+    createNode("research_1", "research", "Research", 240, 80, "Collect market news and strategic context.", ["theme_config"], ["market_inputs"], {
+      sources: ["rss", "ad_library"],
+    }),
+    createNode("collect_assets_1", "collect_assets", "Collect Assets", 240, 260, "Fetch benchmark ad assets.", ["theme_config"], ["market_inputs"], {
+      sourcePreset: "ad_library",
+    }),
+    createNode("normalize_assets_1", "normalize_assets", "Normalize Assets", 460, 260, "Normalize raw assets into analysis-ready records.", ["market_inputs"], ["market_inputs"]),
+    createNode("select_assets_1", "select_assets", "Select Assets", 680, 260, "Select top benchmark videos.", ["market_inputs"], ["selected_video_items"], {
+      top_n: 2,
+    }),
+    createNode("analyze_assets_1", "analyze_assets", "Analyze Assets", 900, 260, "Analyze selected benchmark assets.", ["selected_video_items"], ["video_analysis_results"]),
+    createNode("extract_patterns_1", "extract_patterns", "Extract Patterns", 1120, 260, "Summarize reusable patterns from analyses.", ["video_analysis_results"], ["pattern_summary"]),
+    createNode("build_brief_1", "build_brief", "Build Brief", 1340, 260, "Build a structured brief.", ["theme_config", "market_inputs", "pattern_summary"], ["creative_brief"]),
+    createNode("generate_variants_1", "generate_variants", "Generate Variants", 1580, 260, "Generate creative variants.", ["theme_config", "creative_brief"], ["script_variants"], {
+      variantCount: 3,
+    }),
+    createNode("generate_storyboards_1", "generate_storyboards", "Storyboards", 1800, 180, "Create storyboard packages for each variant.", ["script_variants"], ["storyboard_packages"]),
+    createNode("generate_video_prompts_1", "generate_video_prompts", "Video Prompts", 1800, 340, "Create video prompt packages from storyboards.", ["script_variants", "storyboard_packages"], ["video_prompt_packages"]),
+    createNode("review_variants_1", "review_variants", "Review", 2020, 260, "Review generated variants.", ["creative_brief", "script_variants"], ["best_variant", "evaluation_result"], {
+      scoreThreshold: 7.8,
+    }),
+    createNode("condition_1", "condition", "Condition", 2240, 260, "Route pass/revise/fail.", ["evaluation_result"], [], {
+      decision_key: "evaluation_result.decision",
+    }),
+    createNode("prepare_image_todo_1", "prepare_image_todo", "Image TODO", 2460, 180, "Prepare image generation package.", ["best_variant", "storyboard_packages"], ["image_generation_todo"]),
+    createNode("prepare_video_todo_1", "prepare_video_todo", "Video TODO", 2460, 340, "Prepare video generation package.", ["best_variant", "video_prompt_packages"], ["video_generation_todo"]),
+    createNode("finalize_1", "finalize", "Finalize", 2680, 260, "Assemble final package.", ["evaluation_result", "best_variant", "storyboard_packages", "video_prompt_packages", "image_generation_todo", "video_generation_todo"], ["final_package"]),
+    createNode("end_1", "end", "End", 2900, 260, "Expose final package.", ["final_package", "evaluation_result"], []),
+  ];
   return {
     graphId,
-    name: `Creative Factory · ${themePreset.label}`,
+    name: themePreset.graphName ?? `Creative Factory · ${themePreset.label}`,
     templateId: "creative_factory",
     themeConfig: themePreset.themeConfig,
     stateSchema: defaultStateSchema(),
-    nodes: [
-      createNode("start_1", "start", "Start", 40, 220, "Define initial context and expose root state.", [], ["theme_config"]),
-      createNode("research_1", "research", "Research", 240, 80, "Collect market news and strategic context.", ["theme_config"], ["market_inputs"], {
-        sources: ["rss", "ad_library"],
-      }),
-      createNode("collect_assets_1", "collect_assets", "Collect Assets", 240, 260, "Fetch benchmark ad assets.", ["theme_config"], ["market_inputs"], {
-        sourcePreset: "ad_library",
-      }),
-      createNode("normalize_assets_1", "normalize_assets", "Normalize Assets", 460, 260, "Normalize raw assets into analysis-ready records.", ["market_inputs"], ["market_inputs"]),
-      createNode("select_assets_1", "select_assets", "Select Assets", 680, 260, "Select top benchmark videos.", ["market_inputs"], ["selected_video_items"], {
-        top_n: themePreset.id === "rpg_fantasy" ? 3 : 2,
-      }),
-      createNode("analyze_assets_1", "analyze_assets", "Analyze Assets", 900, 260, "Analyze selected benchmark assets.", ["selected_video_items"], ["video_analysis_results"]),
-      createNode("extract_patterns_1", "extract_patterns", "Extract Patterns", 1120, 260, "Summarize reusable patterns from analyses.", ["video_analysis_results"], ["pattern_summary"]),
-      createNode("build_brief_1", "build_brief", "Build Brief", 1340, 260, "Build a structured brief.", ["theme_config", "market_inputs", "pattern_summary"], ["creative_brief"]),
-      createNode("generate_variants_1", "generate_variants", "Generate Variants", 1580, 260, "Generate creative variants.", ["theme_config", "creative_brief"], ["script_variants"], {
-        variantCount: themePreset.id === "survival_chaos" ? 4 : 3,
-      }),
-      createNode("generate_storyboards_1", "generate_storyboards", "Storyboards", 1800, 180, "Create storyboard packages for each variant.", ["script_variants"], ["storyboard_packages"]),
-      createNode("generate_video_prompts_1", "generate_video_prompts", "Video Prompts", 1800, 340, "Create video prompt packages from storyboards.", ["script_variants", "storyboard_packages"], ["video_prompt_packages"]),
-      createNode("review_variants_1", "review_variants", "Review", 2020, 260, "Review generated variants.", ["creative_brief", "script_variants"], ["best_variant", "evaluation_result"], {
-        scoreThreshold: (themePreset.themeConfig.evaluationPolicy.scoreThreshold as number | undefined) ?? 7.8,
-      }),
-      createNode("condition_1", "condition", "Condition", 2240, 260, "Route pass/revise/fail.", ["evaluation_result"], [], {
-        decision_key: "evaluation_result.decision",
-      }),
-      createNode("prepare_image_todo_1", "prepare_image_todo", "Image TODO", 2460, 180, "Prepare image generation package.", ["best_variant", "storyboard_packages"], ["image_generation_todo"]),
-      createNode("prepare_video_todo_1", "prepare_video_todo", "Video TODO", 2460, 340, "Prepare video generation package.", ["best_variant", "video_prompt_packages"], ["video_generation_todo"]),
-      createNode("finalize_1", "finalize", "Finalize", 2680, 260, "Assemble final package.", ["evaluation_result", "best_variant", "storyboard_packages", "video_prompt_packages", "image_generation_todo", "video_generation_todo"], ["final_package"]),
-      createNode("end_1", "end", "End", 2900, 260, "Expose final package.", ["final_package", "evaluation_result"], []),
-    ],
+    nodes: applyNodeParamOverrides(baseNodes, themePreset),
     edges: [
       createEdge("edge_1", "start_1", "research_1", ["theme_config"]),
       createEdge("edge_2", "research_1", "collect_assets_1", ["market_inputs"]),

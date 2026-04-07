@@ -48,6 +48,8 @@ export type ThemePreset = {
   id: string;
   label: string;
   description: string;
+  graphName?: string;
+  nodeParamOverrides?: Record<string, Record<string, unknown>>;
   themeConfig: ThemeConfig;
 };
 

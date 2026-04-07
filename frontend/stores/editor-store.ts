@@ -234,38 +234,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         graphName: starter.name,
         themeConfig: preset.themeConfig,
         nodes: state.nodes.map((node) => {
-          if (node.id === "select_assets_1") {
-            return {
-              ...node,
-              data: {
-                ...node.data,
-                params: { ...node.data.params, top_n: starter.nodes.find((item) => item.id === node.id)?.data.params.top_n ?? node.data.params.top_n },
-              },
-            };
-          }
-          if (node.id === "generate_variants_1") {
-            return {
-              ...node,
-              data: {
-                ...node.data,
-                params: { ...node.data.params, variantCount: starter.nodes.find((item) => item.id === node.id)?.data.params.variantCount ?? node.data.params.variantCount },
-              },
-            };
-          }
-          if (node.id === "review_variants_1") {
-            return {
-              ...node,
-              data: {
-                ...node.data,
-                params: {
-                  ...node.data.params,
-                  scoreThreshold:
-                    starter.nodes.find((item) => item.id === node.id)?.data.params.scoreThreshold ?? node.data.params.scoreThreshold,
+          const starterNode = starter.nodes.find((item) => item.id === node.id);
+          return starterNode
+            ? {
+                ...node,
+                data: {
+                  ...node.data,
+                  params: { ...node.data.params, ...starterNode.data.params },
                 },
-              },
-            };
-          }
-          return node;
+              }
+            : node;
         }),
         runtimeLabel: `Applied theme preset ${preset.label}`,
       };
