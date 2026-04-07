@@ -87,6 +87,11 @@ export function fromBackendGraphDocument(document: BackendGraphDocument): {
     nodes: document.nodes.map((node) => ({
       id: node.id,
       type: "default",
+      className: `graph-node status-${
+        node.config.status === "running" || node.config.status === "success" || node.config.status === "failed"
+          ? node.config.status
+          : "idle"
+      }`,
       position: {
         x: node.position.x,
         y: node.position.y,

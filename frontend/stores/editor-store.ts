@@ -4,7 +4,15 @@ import { addEdge, applyEdgeChanges, applyNodeChanges, type Connection, type Edge
 import { create } from "zustand";
 
 import { createStarterGraph, NODE_PRESETS } from "@/lib/editor-presets";
-import type { GraphCanvasEdge, GraphCanvasNode, GraphDocument, GraphNodeConfig, GraphNodeType } from "@/types/editor";
+import type {
+  GraphCanvasEdge,
+  GraphCanvasNode,
+  GraphDocument,
+  GraphNodeConfig,
+  GraphNodeType,
+  NodeExecutionSummary,
+  RunDetailPayload,
+} from "@/types/editor";
 
 type ValidationIssue = {
   code: string;
@@ -23,10 +31,16 @@ type EditorState = {
   runtimeLabel: string;
   configDraft: string;
   validationPassed: boolean | null;
+  currentRunId: string | null;
+  currentRunStatus: string | null;
+  currentNodeId: string | null;
+  nodeExecutionMap: Record<string, NodeExecutionSummary>;
   initGraph: (graphId: string) => void;
   hydrateGraph: (graph: GraphDocument, sourceLabel: string) => void;
   updateGraphIdentity: (graphId: string, graphName?: string) => void;
   updateGraphName: (graphName: string) => void;
+  applyRunDetail: (runDetail: RunDetailPayload) => void;
+  setCurrentRunId: (runId: string | null) => void;
   onNodesChange: (changes: NodeChange<GraphCanvasNode>[]) => void;
   onEdgesChange: (changes: EdgeChange<GraphCanvasEdge>[]) => void;
   onConnect: (connection: Connection) => void;
@@ -58,6 +72,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   runtimeLabel: "Idle",
   configDraft: "",
   validationPassed: null,
+  currentRunId: null,
+  currentRunStatus: null,
+  currentNodeId: null,
+  nodeExecutionMap: {},
 
   initGraph: (graphId) => {
     const storage = typeof window !== "undefined" ? window.localStorage.getItem(toStorageKey(graphId)) : null;
@@ -75,6 +93,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         lastSavedAt: parsed.updatedAt,
         configDraft: "",
         validationPassed: null,
+        currentRunId: null,
+        currentRunStatus: null,
+        currentNodeId: null,
+        nodeExecutionMap: {},
       });
       return;
     }
@@ -101,6 +123,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       runtimeLabel: "Starter graph ready",
       configDraft: "",
       validationPassed: null,
+      currentRunId: null,
+      currentRunStatus: null,
+      currentNodeId: null,
+      nodeExecutionMap: {},
     });
   },
 
@@ -117,6 +143,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       lastSavedAt: graph.updatedAt,
       configDraft: "",
       validationPassed: null,
+      currentRunId: null,
+      currentRunStatus: null,
+      currentNodeId: null,
+      nodeExecutionMap: {},
     });
   },
 
@@ -129,6 +159,41 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   updateGraphName: (graphName) => {
     set({ graphName });
+  },
+
+  setCurrentRunId: (runId) => {
+    set({ currentRunId: runId });
+  },
+
+  applyRunDetail: (runDetail) => {
+    const nodeExecutionMap = Object.fromEntries(
+      runDetail.node_executions.map((execution) => [execution.node_id, execution]),
+    );
+    set((state) => ({
+      currentRunId: runDetail.run_id,
+      currentRunStatus: runDetail.status,
+      currentNodeId: runDetail.current_node_id ?? null,
+      nodeExecutionMap,
+      runtimeLabel:
+        runDetail.status === "completed"
+          ? `Run ${runDetail.run_id} completed`
+          : `Run ${runDetail.run_id} ${runDetail.status}`,
+      nodes: state.nodes.map((node) => {
+        const rawStatus = runDetail.node_status_map[node.id];
+        const nodeStatus =
+          rawStatus === "running" || rawStatus === "success" || rawStatus === "failed"
+            ? rawStatus
+            : "idle";
+        return {
+          ...node,
+          className: `graph-node status-${nodeStatus}`,
+          data: {
+            ...node.data,
+            status: nodeStatus,
+          },
+        };
+      }),
+    }));
   },
 
   onNodesChange: (changes) => {
@@ -166,6 +231,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const nextNode: GraphCanvasNode = {
         id: nodeId,
         type: "default",
+        className: "graph-node status-idle",
         position: {
           x: 160 + (state.nodes.length % 3) * 220,
           y: 120 + Math.floor(state.nodes.length / 3) * 140,
@@ -339,8 +405,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   simulateRun: () => {
     set((state) => ({
+      currentRunStatus: "completed",
+      currentNodeId: state.nodes.at(-1)?.id ?? null,
       nodes: state.nodes.map((node, index) => ({
         ...node,
+        className: "graph-node status-success",
         data: {
           ...node.data,
           status: index === state.nodes.length - 1 ? "success" : "success",

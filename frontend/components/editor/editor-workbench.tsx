@@ -18,7 +18,7 @@ import { apiGet, apiPost } from "@/lib/api";
 import { fromBackendGraphDocument, toBackendGraphPayload, type BackendGraphDocument } from "@/lib/graph-api";
 import { NODE_PRESETS } from "@/lib/editor-presets";
 import { useEditorStore } from "@/stores/editor-store";
-import type { GraphCanvasNode, GraphNodeConfig } from "@/types/editor";
+import type { GraphCanvasNode, GraphNodeConfig, RunDetailPayload } from "@/types/editor";
 
 function EditorWorkbenchInner({ graphId }: { graphId: string }) {
   const {
@@ -26,6 +26,8 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
     hydrateGraph,
     updateGraphIdentity,
     updateGraphName,
+    applyRunDetail,
+    setCurrentRunId,
     graphId: activeGraphId,
     graphName,
     nodes,
@@ -37,6 +39,10 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
     runtimeLabel,
     configDraft,
     validationPassed,
+    currentRunId,
+    currentRunStatus,
+    currentNodeId,
+    nodeExecutionMap,
     onNodesChange,
     onEdgesChange,
     onConnect,
@@ -108,6 +114,8 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
     selectEdge(edge.id);
   };
 
+  const selectedNodeExecution = selectedNode ? nodeExecutionMap[selectedNode.id] ?? null : null;
+
   function updateNodeConfig(config: Partial<GraphNodeConfig>) {
     updateSelectedNodeConfig(config);
   }
@@ -158,10 +166,12 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
     try {
       const payload = toBackendGraphPayload(activeGraphId, graphName, nodes, edges);
       const response = await apiPost<{ run_id: string; status: string }>("/api/graphs/run", payload);
+      setCurrentRunId(response.run_id);
       useEditorStore.setState({
         runtimeLabel: `Run started: ${response.run_id}`,
       });
-      router.push(`/runs/${response.run_id}`);
+      const runDetail = await apiGet<RunDetailPayload>(`/api/runs/${response.run_id}`);
+      applyRunDetail(runDetail);
     } catch (error) {
       useEditorStore.setState({
         runtimeLabel: error instanceof Error ? error.message : "Run failed.",
@@ -225,6 +235,8 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
           <div className="editor-summary">
             <div className="pill">Nodes {nodes.length}</div>
             <div className="pill">Edges {edges.length}</div>
+            {currentRunStatus ? <div className="pill">Run {currentRunStatus}</div> : null}
+            {currentNodeId ? <div className="pill">Current node {currentNodeId}</div> : null}
             {selectedEdgeId ? <div className="pill">Selected edge {selectedEdgeId}</div> : null}
           </div>
 
@@ -238,6 +250,21 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
                     <div className="muted">{issue.message}</div>
                   </div>
                 ))}
+              </div>
+            </div>
+          ) : null}
+
+          {currentRunId ? (
+            <div className="validation-box">
+              <h3>Latest Run</h3>
+              <div className="list">
+                <div className="list-item">
+                  <strong>{currentRunId}</strong>
+                  <div className="muted">Status: {currentRunStatus ?? "unknown"}</div>
+                </div>
+                <button className="button secondary" onClick={() => router.push(`/runs/${currentRunId}`)} type="button">
+                  Open Run Detail
+                </button>
               </div>
             </div>
           ) : null}
@@ -423,6 +450,31 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
                 <span className="pill">Type {selectedNode.data.kind}</span>
                 <span className="pill">Status {selectedNode.data.status ?? "idle"}</span>
               </div>
+
+              {selectedNodeExecution ? (
+                <div className="execution-box">
+                  <h3>Latest Execution</h3>
+                  <div className="list">
+                    <div className="list-item">
+                      <strong>{selectedNodeExecution.status}</strong>
+                      <div className="muted">{selectedNodeExecution.input_summary}</div>
+                    </div>
+                    <div className="list-item">
+                      <strong>Output</strong>
+                      <div className="muted">{selectedNodeExecution.output_summary}</div>
+                    </div>
+                    <div className="status-row">
+                      <span className="pill">{selectedNodeExecution.duration_ms}ms</span>
+                      {(selectedNodeExecution.warnings ?? []).length > 0 ? (
+                        <span className="pill">warnings {(selectedNodeExecution.warnings ?? []).length}</span>
+                      ) : null}
+                      {(selectedNodeExecution.errors ?? []).length > 0 ? (
+                        <span className="pill">errors {(selectedNodeExecution.errors ?? []).length}</span>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
             </div>
           ) : (
             <p className="muted">

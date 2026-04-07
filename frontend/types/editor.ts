@@ -33,6 +33,29 @@ export type GraphNodeData = {
 export type GraphCanvasNode = Node<GraphNodeData>;
 export type GraphCanvasEdge = Edge;
 
+export type NodeExecutionSummary = {
+  node_id: string;
+  node_type: string;
+  status: string;
+  duration_ms: number;
+  input_summary: string;
+  output_summary: string;
+  artifacts?: Record<string, unknown>;
+  warnings?: string[];
+  errors?: string[];
+};
+
+export type RunDetailPayload = {
+  run_id: string;
+  status: string;
+  current_node_id?: string | null;
+  revision_round: number;
+  final_result?: string | null;
+  final_score?: number | null;
+  node_status_map: Record<string, string>;
+  node_executions: NodeExecutionSummary[];
+};
+
 export type GraphDocument = {
   graphId: string;
   name: string;
