@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import {
   Background,
   Controls,
@@ -13,6 +14,8 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
+import { apiPost } from "@/lib/api";
+import { toBackendGraphPayload } from "@/lib/graph-api";
 import { NODE_PRESETS } from "@/lib/editor-presets";
 import { useEditorStore } from "@/stores/editor-store";
 import type { GraphCanvasNode } from "@/types/editor";
@@ -20,6 +23,7 @@ import type { GraphCanvasNode } from "@/types/editor";
 function EditorWorkbenchInner({ graphId }: { graphId: string }) {
   const {
     initGraph,
+    graphId: activeGraphId,
     graphName,
     nodes,
     edges,
@@ -29,6 +33,7 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
     validationIssues,
     runtimeLabel,
     configDraft,
+    validationPassed,
     onNodesChange,
     onEdgesChange,
     onConnect,
@@ -42,6 +47,7 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
     validateGraph,
     simulateRun,
   } = useEditorStore();
+  const router = useRouter();
 
   useEffect(() => {
     initGraph(graphId);
@@ -60,6 +66,59 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
     selectEdge(edge.id);
   };
 
+  async function handleValidateBackend() {
+    try {
+      const payload = toBackendGraphPayload(activeGraphId, graphName, nodes, edges);
+      const response = await apiPost<{ valid: boolean; issues: Array<{ code: string; message: string }> }>(
+        "/api/graphs/validate",
+        payload,
+      );
+      if (response.valid) {
+        validateGraph();
+      } else {
+        useEditorStore.setState({
+          validationIssues: response.issues,
+          validationPassed: false,
+          runtimeLabel: `Backend validation found ${response.issues.length} issue(s)`,
+        });
+      }
+    } catch (error) {
+      useEditorStore.setState({
+        runtimeLabel: error instanceof Error ? error.message : "Backend validation failed.",
+      });
+    }
+  }
+
+  async function handleSaveBackend() {
+    try {
+      const payload = toBackendGraphPayload(activeGraphId, graphName, nodes, edges);
+      const response = await apiPost<{ graph_id: string }>("/api/graphs/save", payload);
+      saveGraphLocally();
+      useEditorStore.setState({
+        runtimeLabel: `Saved graph ${response.graph_id}`,
+      });
+    } catch (error) {
+      useEditorStore.setState({
+        runtimeLabel: error instanceof Error ? error.message : "Save failed.",
+      });
+    }
+  }
+
+  async function handleRunBackend() {
+    try {
+      const payload = toBackendGraphPayload(activeGraphId, graphName, nodes, edges);
+      const response = await apiPost<{ run_id: string; status: string }>("/api/graphs/run", payload);
+      useEditorStore.setState({
+        runtimeLabel: `Run started: ${response.run_id}`,
+      });
+      router.push(`/runs/${response.run_id}`);
+    } catch (error) {
+      useEditorStore.setState({
+        runtimeLabel: error instanceof Error ? error.message : "Run failed.",
+      });
+    }
+  }
+
   return (
     <div className="page">
       <section>
@@ -73,16 +132,25 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
 
       <section className="card editor-toolbar-card">
         <div className="toolbar">
-          <button className="button secondary" onClick={validateGraph} type="button">
+          <button className="button secondary" onClick={handleValidateBackend} type="button">
             Validate Graph
+          </button>
+          <button className="button secondary" onClick={handleSaveBackend} type="button">
+            Save Graph
+          </button>
+          <button className="button" onClick={handleRunBackend} type="button">
+            Run Graph
           </button>
           <button className="button secondary" onClick={saveGraphLocally} type="button">
             Save Local Draft
           </button>
-          <button className="button" onClick={simulateRun} type="button">
+          <button className="button secondary" onClick={simulateRun} type="button">
             Simulate Run
           </button>
           <span className="pill">{runtimeLabel}</span>
+          {validationPassed !== null ? (
+            <span className="pill">{validationPassed ? "Backend valid" : "Needs fixes"}</span>
+          ) : null}
           {lastSavedAt ? <span className="pill">Saved {new Date(lastSavedAt).toLocaleTimeString()}</span> : null}
         </div>
       </section>

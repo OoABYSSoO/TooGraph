@@ -22,6 +22,7 @@ type EditorState = {
   validationIssues: ValidationIssue[];
   runtimeLabel: string;
   configDraft: string;
+  validationPassed: boolean | null;
   initGraph: (graphId: string) => void;
   onNodesChange: (changes: NodeChange<GraphCanvasNode>[]) => void;
   onEdgesChange: (changes: EdgeChange<GraphCanvasEdge>[]) => void;
@@ -52,6 +53,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   validationIssues: [],
   runtimeLabel: "Idle",
   configDraft: "",
+  validationPassed: null,
 
   initGraph: (graphId) => {
     const storage = typeof window !== "undefined" ? window.localStorage.getItem(toStorageKey(graphId)) : null;
@@ -68,6 +70,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         runtimeLabel: "Loaded from local draft",
         lastSavedAt: parsed.updatedAt,
         configDraft: "",
+        validationPassed: null,
       });
       return;
     }
@@ -93,6 +96,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       validationIssues: [],
       runtimeLabel: "Starter graph ready",
       configDraft: "",
+      validationPassed: null,
     });
   },
 
@@ -252,6 +256,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     set({
       validationIssues: issues,
+      validationPassed: issues.length === 0,
       runtimeLabel: issues.length === 0 ? "Local validation passed" : `Validation found ${issues.length} issue(s)`,
     });
   },

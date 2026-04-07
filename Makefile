@@ -1,5 +1,7 @@
 PYTHON ?= python3
 PIP ?= pip3
+FRONTEND_PORT ?= 3477
+BACKEND_PORT ?= 8765
 
 .PHONY: help frontend-install frontend-dev frontend-build backend-install backend-dev backend-health tree
 
@@ -17,19 +19,19 @@ frontend-install:
 	cd frontend && npm install
 
 frontend-dev:
-	cd frontend && npm run dev
+	cd frontend && NEXT_PUBLIC_API_BASE_URL=http://localhost:$(BACKEND_PORT) npm run dev -- --port $(FRONTEND_PORT)
 
 frontend-build:
-	cd frontend && npm run build
+	cd frontend && NEXT_PUBLIC_API_BASE_URL=http://localhost:$(BACKEND_PORT) npm run build
 
 backend-install:
 	cd backend && $(PIP) install -r requirements.txt
 
 backend-dev:
-	cd backend && $(PYTHON) -m uvicorn app.main:app --reload --port 8000
+	cd backend && $(PYTHON) -m uvicorn app.main:app --reload --port $(BACKEND_PORT)
 
 backend-health:
-	curl -fsS http://localhost:8000/health
+	curl -fsS http://localhost:$(BACKEND_PORT)/health
 
 tree:
 	find . -maxdepth 2 \( -path './.git' -o -path './demo/outputs' \) -prune -o -print | sort
