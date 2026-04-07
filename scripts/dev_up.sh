@@ -23,6 +23,26 @@ print_port_owner() {
   ss -ltnp "( sport = :$port )" || true
 }
 
+kill_port_owner() {
+  local port=$1
+  local pids
+
+  pids="$(fuser "${port}/tcp" 2>/dev/null || true)"
+  if [[ -z "$pids" ]]; then
+    return 0
+  fi
+
+  echo "Releasing port $port used by PID(s): $pids"
+  kill $pids 2>/dev/null || true
+  sleep 1
+
+  if port_in_use "$port"; then
+    echo "Port $port is still busy after graceful stop, forcing termination."
+    kill -9 $pids 2>/dev/null || true
+    sleep 1
+  fi
+}
+
 wait_for_http() {
   local url=$1
   local retries=${2:-20}
@@ -63,13 +83,23 @@ echo "Frontend log: $FRONTEND_LOG"
 
 if port_in_use "$BACKEND_PORT"; then
   print_port_owner "$BACKEND_PORT"
-  echo "Please stop the existing backend process or set a different BACKEND_PORT."
+  kill_port_owner "$BACKEND_PORT"
+fi
+
+if port_in_use "$FRONTEND_PORT"; then
+  print_port_owner "$FRONTEND_PORT"
+  kill_port_owner "$FRONTEND_PORT"
+fi
+
+if port_in_use "$BACKEND_PORT"; then
+  print_port_owner "$BACKEND_PORT"
+  echo "Failed to release backend port $BACKEND_PORT."
   exit 1
 fi
 
 if port_in_use "$FRONTEND_PORT"; then
   print_port_owner "$FRONTEND_PORT"
-  echo "Please stop the existing frontend process or set a different FRONTEND_PORT."
+  echo "Failed to release frontend port $FRONTEND_PORT."
   exit 1
 fi
 
