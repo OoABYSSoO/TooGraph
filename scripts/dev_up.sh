@@ -11,6 +11,7 @@ FRONTEND_LOG="$ROOT_DIR/.dev_frontend.log"
 
 backend_pid=""
 frontend_pid=""
+cleanup_done=0
 
 port_in_use() {
   local port=$1
@@ -58,22 +59,37 @@ wait_for_http() {
   return 1
 }
 
-cleanup() {
-  local exit_code=$?
+stop_process_tree() {
+  local pid=$1
 
-  if [[ -n "$frontend_pid" ]] && kill -0 "$frontend_pid" 2>/dev/null; then
-    kill "$frontend_pid" 2>/dev/null || true
+  if [[ -z "$pid" ]] || ! kill -0 "$pid" 2>/dev/null; then
+    return 0
   fi
 
-  if [[ -n "$backend_pid" ]] && kill -0 "$backend_pid" 2>/dev/null; then
-    kill "$backend_pid" 2>/dev/null || true
-  fi
-
-  wait 2>/dev/null || true
-  exit "$exit_code"
+  pkill -TERM -P "$pid" 2>/dev/null || true
+  kill -TERM "$pid" 2>/dev/null || true
 }
 
-trap cleanup EXIT INT TERM
+cleanup() {
+  if [[ "$cleanup_done" -eq 1 ]]; then
+    return
+  fi
+  cleanup_done=1
+
+  stop_process_tree "$frontend_pid"
+  stop_process_tree "$backend_pid"
+
+  wait 2>/dev/null || true
+}
+
+handle_interrupt() {
+  echo
+  echo "Stopping GraphiteUI services..."
+  exit 130
+}
+
+trap cleanup EXIT
+trap handle_interrupt INT TERM
 
 echo "Starting GraphiteUI dev environment..."
 echo "Backend port: $BACKEND_PORT"
