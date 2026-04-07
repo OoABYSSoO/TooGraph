@@ -274,6 +274,12 @@ make backend-dev
 make frontend-dev
 ```
 
+也可以直接一键启动前后端：
+
+```bash
+./scripts/dev_up.sh
+```
+
 建议演示入口：
 
 ```bash

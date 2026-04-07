@@ -31,7 +31,7 @@ backend-dev:
 	cd backend && $(PYTHON) -m uvicorn app.main:app --reload --port $(BACKEND_PORT)
 
 backend-health:
-	curl -fsS http://localhost:$(BACKEND_PORT)/health
+	curl --noproxy '*' -fsS http://127.0.0.1:$(BACKEND_PORT)/health
 
 tree:
 	find . -maxdepth 2 \( -path './.git' -o -path './demo/outputs' \) -prune -o -print | sort
