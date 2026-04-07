@@ -235,6 +235,17 @@ button {
   gap: 16px;
 }
 
+.editor-layout {
+  min-height: 620px;
+  display: grid;
+  grid-template-columns: 270px minmax(0, 1fr) 340px;
+  gap: 16px;
+}
+
+.editor-toolbar-card {
+  padding: 16px 20px;
+}
+
 .panel {
   min-height: 100%;
   border: 1px dashed rgba(154, 52, 18, 0.25);
@@ -251,6 +262,82 @@ button {
 
 .toolbar .pill {
   background: var(--surface);
+}
+
+.editor-side {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+}
+
+.editor-summary {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.node-palette-item {
+  display: grid;
+  gap: 6px;
+  text-align: left;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(212, 198, 170, 0.9);
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.node-palette-item:hover {
+  border-color: rgba(154, 52, 18, 0.45);
+  transform: translateY(-1px);
+}
+
+.editor-canvas {
+  min-height: 620px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.editor-canvas .react-flow {
+  background:
+    radial-gradient(circle at 20% 20%, rgba(154, 52, 18, 0.08), transparent 18%),
+    linear-gradient(180deg, rgba(255, 250, 241, 0.85), rgba(250, 245, 236, 0.95));
+}
+
+.config-form {
+  display: grid;
+  gap: 14px;
+}
+
+.field {
+  display: grid;
+  gap: 8px;
+  font-size: 0.94rem;
+}
+
+.text-input,
+.text-area {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--text);
+}
+
+.text-area {
+  resize: vertical;
+}
+
+.code-area {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.88rem;
+}
+
+.validation-box {
+  display: grid;
+  gap: 10px;
 }
 
 @media (max-width: 960px) {
@@ -279,6 +366,10 @@ button {
   }
 
   .empty-editor {
+    grid-template-columns: 1fr;
+  }
+
+  .editor-layout {
     grid-template-columns: 1fr;
   }
 }
