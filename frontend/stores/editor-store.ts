@@ -24,6 +24,9 @@ type EditorState = {
   configDraft: string;
   validationPassed: boolean | null;
   initGraph: (graphId: string) => void;
+  hydrateGraph: (graph: GraphDocument, sourceLabel: string) => void;
+  updateGraphIdentity: (graphId: string, graphName?: string) => void;
+  updateGraphName: (graphName: string) => void;
   onNodesChange: (changes: NodeChange<GraphCanvasNode>[]) => void;
   onEdgesChange: (changes: EdgeChange<GraphCanvasEdge>[]) => void;
   onConnect: (connection: Connection) => void;
@@ -98,6 +101,33 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       configDraft: "",
       validationPassed: null,
     });
+  },
+
+  hydrateGraph: (graph, sourceLabel) => {
+    set({
+      graphId: graph.graphId,
+      graphName: graph.name,
+      nodes: graph.nodes,
+      edges: graph.edges,
+      selectedNodeId: null,
+      selectedEdgeId: null,
+      validationIssues: [],
+      runtimeLabel: sourceLabel,
+      lastSavedAt: graph.updatedAt,
+      configDraft: "",
+      validationPassed: null,
+    });
+  },
+
+  updateGraphIdentity: (graphId, graphName) => {
+    set((state) => ({
+      graphId,
+      graphName: graphName ?? state.graphName,
+    }));
+  },
+
+  updateGraphName: (graphName) => {
+    set({ graphName });
   },
 
   onNodesChange: (changes) => {

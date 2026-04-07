@@ -1,6 +1,6 @@
-import type { GraphCanvasEdge, GraphCanvasNode } from "@/types/editor";
+import type { GraphCanvasEdge, GraphCanvasNode, GraphNodeType } from "@/types/editor";
 
-type BackendGraphPayload = {
+export type BackendGraphPayload = {
   graph_id?: string;
   name: string;
   nodes: Array<{
@@ -18,6 +18,10 @@ type BackendGraphPayload = {
     condition_label?: "pass" | "revise" | "fail";
   }>;
   metadata: Record<string, unknown>;
+};
+
+export type BackendGraphDocument = BackendGraphPayload & {
+  graph_id: string;
 };
 
 export function toBackendGraphPayload(
@@ -59,3 +63,45 @@ export function toBackendGraphPayload(
   };
 }
 
+export function fromBackendGraphDocument(document: BackendGraphDocument): {
+  graphId: string;
+  graphName: string;
+  nodes: GraphCanvasNode[];
+  edges: GraphCanvasEdge[];
+} {
+  return {
+    graphId: document.graph_id,
+    graphName: document.name,
+    nodes: document.nodes.map((node) => ({
+      id: node.id,
+      type: "default",
+      position: {
+        x: node.position.x,
+        y: node.position.y,
+      },
+      data: {
+        label: node.label,
+        kind: node.type as GraphNodeType,
+        description:
+          typeof node.config.description === "string"
+            ? node.config.description
+            : typeof node.config.task_input === "string"
+              ? node.config.task_input
+              : "",
+        status:
+          node.config.status === "running" ||
+          node.config.status === "success" ||
+          node.config.status === "failed"
+            ? node.config.status
+            : "idle",
+      },
+    })),
+    edges: document.edges.map((edge) => ({
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
+      label: edge.condition_label ?? undefined,
+      animated: false,
+    })),
+  };
+}

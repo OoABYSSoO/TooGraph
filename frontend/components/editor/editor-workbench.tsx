@@ -14,8 +14,8 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
-import { apiPost } from "@/lib/api";
-import { toBackendGraphPayload } from "@/lib/graph-api";
+import { apiGet, apiPost } from "@/lib/api";
+import { fromBackendGraphDocument, toBackendGraphPayload, type BackendGraphDocument } from "@/lib/graph-api";
 import { NODE_PRESETS } from "@/lib/editor-presets";
 import { useEditorStore } from "@/stores/editor-store";
 import type { GraphCanvasNode } from "@/types/editor";
@@ -23,6 +23,9 @@ import type { GraphCanvasNode } from "@/types/editor";
 function EditorWorkbenchInner({ graphId }: { graphId: string }) {
   const {
     initGraph,
+    hydrateGraph,
+    updateGraphIdentity,
+    updateGraphName,
     graphId: activeGraphId,
     graphName,
     nodes,
@@ -52,6 +55,44 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
   useEffect(() => {
     initGraph(graphId);
   }, [graphId, initGraph]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadGraphFromBackend() {
+      if (graphId === "demo-graph") {
+        return;
+      }
+      try {
+        const document = await apiGet<BackendGraphDocument>(`/api/graphs/${graphId}`);
+        if (!cancelled) {
+          const hydrated = fromBackendGraphDocument(document);
+          hydrateGraph(
+            {
+              graphId: hydrated.graphId,
+              name: hydrated.graphName,
+              nodes: hydrated.nodes,
+              edges: hydrated.edges,
+              updatedAt: new Date().toISOString(),
+            },
+            "Loaded from backend",
+          );
+        }
+      } catch (error) {
+        if (!cancelled) {
+          useEditorStore.setState({
+            runtimeLabel:
+              error instanceof Error ? `Backend load failed: ${error.message}` : "Backend load failed.",
+          });
+        }
+      }
+    }
+
+    loadGraphFromBackend();
+    return () => {
+      cancelled = true;
+    };
+  }, [graphId, hydrateGraph]);
 
   const selectedNode = useMemo(
     () => nodes.find((node) => node.id === selectedNodeId) ?? null,
@@ -93,10 +134,14 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
     try {
       const payload = toBackendGraphPayload(activeGraphId, graphName, nodes, edges);
       const response = await apiPost<{ graph_id: string }>("/api/graphs/save", payload);
+      updateGraphIdentity(response.graph_id);
       saveGraphLocally();
       useEditorStore.setState({
         runtimeLabel: `Saved graph ${response.graph_id}`,
       });
+      if (graphId === "demo-graph" || graphId !== response.graph_id) {
+        router.replace(`/editor/${response.graph_id}`);
+      }
     } catch (error) {
       useEditorStore.setState({
         runtimeLabel: error instanceof Error ? error.message : "Save failed.",
@@ -218,6 +263,15 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
           <h2>Config Panel</h2>
           {selectedNode ? (
             <div className="config-form">
+              <label className="field">
+                <span>Graph Name</span>
+                <input
+                  className="text-input"
+                  value={graphName}
+                  onChange={(event) => updateGraphName(event.target.value)}
+                />
+              </label>
+
               <label className="field">
                 <span>Name</span>
                 <input
