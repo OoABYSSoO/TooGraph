@@ -159,6 +159,7 @@
 - `State Panel`
 - `theme_config`
 - `Condition Node`
+- `Node Handler Registry`
 - 自定义节点语义
 - creative factory 模板
 
@@ -183,7 +184,6 @@
 
 ## P1 高价值后续项
 
-- Handler Registry 正式落地，替代 runtime 中的大块 if/else
 - Tool Registry 下沉，弱化 demo 时代的 `slg_*` 命名
 - 主题模板系统
 - 节点顺序调整与插入体验

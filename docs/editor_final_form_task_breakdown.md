@@ -39,6 +39,7 @@
 - `Task 1.1` 新版 Graph Schema：`已完成`
 - `Task 2.1` Graph Parser：`已完成`
 - `Task 2.2` Validator：`已完成`
+- `Task 2.3` Node Handler Registry：`已完成`
 - `Task 2.5` Condition Node 编译与执行：`已完成`
 - `Task 3.1` 前端类型系统升级：`已完成`
 - `Task 3.2` State Panel：`已完成`
@@ -47,7 +48,6 @@
 
 当前最值得继续推进的任务：
 
-- `Task 2.3` Handler Registry 正式拆分
 - `Task 2.4` Tool Registry 下沉
 - `Task 3.4` Edge bus / flow 可视化增强
 - `Task 3.5` Start / End 特殊节点语义强化
