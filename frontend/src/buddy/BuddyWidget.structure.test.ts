@@ -105,10 +105,12 @@ test("BuddyWidget keeps the composer enabled and queues sends while a reply is r
 });
 
 test("BuddyWidget keeps runtime error replies out of model context and persisted history", () => {
-  assert.match(componentSource, /const history = buildHistoryBeforeMessage\(turn\.userMessageId\);/);
+  assert.match(componentSource, /const history = buildHistoryBeforeMessage\(userEntry\.id\);/);
+  assert.match(componentSource, /const history = turn\.history;/);
   assert.match(componentSource, /return previousMessages\.filter\(isContextMessage\)\.map\(\(\{ role, content \}\) => \(\{ role, content \}\)\);/);
-  assert.match(componentSource, /nextMessages[\s\S]*\.filter\(isPersistableMessageForStorage\)[\s\S]*\.slice\(-24\)[\s\S]*\.map\(\(\{ role, content, includeInContext \}\) => \(\{ role, content, includeInContext \}\)\)/);
+  assert.match(componentSource, /appendBuddyChatMessage\(sessionId,[\s\S]*include_in_context: options\.includeInContext \?\? message\.includeInContext !== false,[\s\S]*\)/);
   assert.match(componentSource, /updateAssistantMessage\(assistantMessage\.id, t\("buddy\.errorReply", \{ error: message \}\), \{ includeInContext: false \}\);/);
+  assert.match(componentSource, /persistBuddyMessage\(turn\.sessionId,[\s\S]*includeInContext: false,[\s\S]*\);/);
 });
 
 test("BuddyWidget shows live run activity while the assistant reply is still empty", () => {
@@ -135,6 +137,7 @@ test("BuddyWidget records and displays per-stage run trace durations", () => {
   assert.match(componentSource, /import \{ formatRunDuration \} from "\.\.\/lib\/run-display-name\.ts";/);
   assert.match(componentSource, /const runTraceStartedAtByKey = new Map<string, number>\(\);/);
   assert.match(componentSource, /function appendRunTraceEntry\(eventType: string, traceEntry: BuddyRunTraceEntry\)/);
+  assert.match(componentSource, /mergeRunTraceEntry\(runTraceEntries\.value\[existingIndex\], timedTraceEntry\)/);
   assert.match(componentSource, /runTraceStartedAtByKey\.set\(traceEntry\.timingKey, nowRunTraceMs\(\)\);/);
   assert.match(componentSource, /durationMs: Math\.max\(1, Math\.round\(nowRunTraceMs\(\) - startedAt\)\),/);
   assert.match(componentSource, /class="buddy-widget__run-trace-duration"/);
@@ -152,6 +155,33 @@ test("BuddyWidget keeps the run trace above the formal reply and collapses to el
   assert.match(componentSource, /v-if="message\.role === 'assistant' && message\.content"/);
   assert.match(componentSource, /shouldShowAssistantActivityBubble\(message\)/);
   assert.doesNotMatch(componentSource, /message\.content \|\| message\.activityText \|\| t\("buddy\.streaming"\)/);
+});
+
+test("BuddyWidget stores buddy chat in backend sessions and exposes a compact history dropdown", () => {
+  assert.match(componentSource, /import \{[\s\S]*appendBuddyChatMessage,[\s\S]*fetchBuddyChatMessages,[\s\S]*fetchBuddyChatSessions,[\s\S]*\} from "\.\.\/api\/buddy\.ts";/);
+  assert.match(componentSource, /const BUDDY_ACTIVE_SESSION_STORAGE_KEY = "graphiteui:buddy-active-session";/);
+  assert.match(componentSource, /const chatSessions = ref<BuddyChatSession\[\]>\(\[\]\);/);
+  assert.match(componentSource, /const activeSessionId = ref<string \| null>\(null\);/);
+  assert.match(componentSource, /class="buddy-widget__history-control"/);
+  assert.match(componentSource, /class="buddy-widget__sessions-panel"/);
+  assert.match(componentSource, /v-for="session in chatSessions"/);
+  assert.match(componentSource, /@click="selectChatSession\(session\.session_id\)"/);
+  assert.match(componentSource, /@click\.stop="deleteSession\(session\.session_id\)"/);
+  assert.match(componentSource, /chatSessionInitializationPromise = initializeBuddyChatSessions\(\)\.finally/);
+  assert.match(componentSource, /async function migrateLegacyBuddyHistory\(\)/);
+  assert.match(componentSource, /\.buddy-widget__sessions-panel\s*\{[\s\S]*position:\s*absolute;[\s\S]*width:\s*min\(330px,/);
+  assert.doesNotMatch(componentSource, /watch\(\s*messages,/);
+});
+
+test("BuddyWidget uses the top toolbar for new chat and fullscreen expansion", () => {
+  assert.match(componentSource, /import \{ ArrowDown, Clock, Close, Delete, FullScreen, Plus, Promotion, ScaleToOriginal \} from "@element-plus\/icons-vue";/);
+  assert.match(componentSource, /const isPanelFullscreen = ref\(false\);/);
+  assert.match(componentSource, /:title="t\('buddy\.newSession'\)"[\s\S]*@click="createNewSession"[\s\S]*<ElIcon><Plus \/><\/ElIcon>/);
+  assert.match(componentSource, /:title="isPanelFullscreen \? t\('buddy\.exitFullscreen'\) : t\('buddy\.fullscreen'\)"/);
+  assert.match(componentSource, /<ScaleToOriginal v-if="isPanelFullscreen" \/>/);
+  assert.match(componentSource, /<FullScreen v-else \/>/);
+  assert.match(componentSource, /class="buddy-widget__backdrop"/);
+  assert.match(componentSource, /\.buddy-widget__panel--fullscreen\s*\{[\s\S]*width:\s*min\(880px,/);
 });
 
 test("BuddyWidget leaves buddy self config loading and memory curation to the chat graph template", () => {

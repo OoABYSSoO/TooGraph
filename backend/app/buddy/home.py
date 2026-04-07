@@ -190,11 +190,38 @@ def ensure_buddy_database(home_dir: Path) -> Path:
                 updated_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS buddy_sessions (
+                session_id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                archived INTEGER NOT NULL DEFAULT 0,
+                deleted INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS buddy_messages (
+                message_id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                role TEXT NOT NULL,
+                content TEXT NOT NULL,
+                include_in_context INTEGER NOT NULL DEFAULT 1,
+                run_id TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY(session_id) REFERENCES buddy_sessions(session_id)
+            );
+
             CREATE INDEX IF NOT EXISTS idx_buddy_memories_visible
                 ON buddy_memories (enabled, deleted, updated_at);
 
             CREATE INDEX IF NOT EXISTS idx_buddy_revisions_target
                 ON buddy_revisions (target_type, target_id, created_at);
+
+            CREATE INDEX IF NOT EXISTS idx_buddy_sessions_visible
+                ON buddy_sessions (deleted, archived, updated_at);
+
+            CREATE INDEX IF NOT EXISTS idx_buddy_messages_session
+                ON buddy_messages (session_id, created_at);
             """
         )
         connection.commit()

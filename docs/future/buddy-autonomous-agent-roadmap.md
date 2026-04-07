@@ -68,6 +68,7 @@
 尚未完成：
 
 - 子图运行审计聚合、事件定位、从缩略图点击跳转到内部节点，以及更完整的嵌套可视化能力。
+- 工具级活动摘要事件。当前伙伴浮窗只能显示节点级运行过程和流式输出预览，还不能稳定显示类似 `Explored 7 files`、`ran 1 command`、`Editing store.py +132 -9` 的低层操作摘要。
 - 真实的 `autonomous_decision` 技能。
 - 新版伙伴自主循环模板。
 - Buddy Home 已具备基础目录结构和默认文件；能力使用统计、结构化检索索引和自我复盘报告的写回图流程尚未成形。
@@ -185,6 +186,46 @@ input_question
 - 不需要 skill `targets`。
 - 不需要 伙伴 Skill / Agent Skill 两套能力库。
 - 模板显式绑定某个 skill，或上游 state 传入某个 skill，都表示下游 LLM 节点需要使用这个 skill。
+
+## 工具级活动摘要
+
+伙伴浮窗和运行详情页需要补齐一层统一的 `activity_events`，用于表达图运行内部发生的低层操作摘要。这类信息不应由 LLM 自己编写，也不应只存在于前端临时文本里，而应由运行时、技能和文件/命令执行原语程序化产生，并写入 run artifacts，同时通过 SSE 推送给前端。
+
+目标效果类似：
+
+```text
+Explored 7 files
+Explored 8 files, 6 searches, 2 lists, ran 1 command
+Editing backend/app/buddy/store.py +132 -9
+Ran python -m pytest -q, exit 0
+```
+
+推荐事件形状：
+
+```json
+{
+  "kind": "file_edit",
+  "summary": "Editing backend/app/buddy/store.py +132 -9",
+  "path": "backend/app/buddy/store.py",
+  "added": 132,
+  "removed": 9,
+  "duration_ms": 420
+}
+```
+
+事件来源：
+
+- 文件读取、目录枚举、搜索、命令执行、脚本测试、联网下载、图编辑、Buddy Home 写入和 skill/subgraph 执行都应能产生活动事件。
+- `local_workspace_executor`、`graphiteUI_script_tester`、`web_search` 和未来图编辑命令是首批适配对象。
+- 同一个节点可以产生多个活动事件；事件应带 `run_id`、`node_id`、可选 `subgraph_path`、时间戳、摘要和结构化 detail。
+
+展示规则：
+
+- 伙伴浮窗中，活动事件显示为正式回复上方的灰色小字过程摘要；运行中可展开，完成后默认折叠为耗时摘要。
+- 运行详情页复用同一渲染器，不维护第二套解释逻辑。
+- 事件摘要面向人类扫描，detail 面向审计和调试。摘要里可以显示计数和增删行数，但敏感路径、密钥、完整错误大段日志和大型文件内容不能直接铺到浮窗里。
+
+这层能力是“看起来没卡住”的关键体验补丁，也是伙伴长期自主工具循环的审计基础。它不改变图协议中的 state 传递语义；它只补充运行过程的可观察性。
 
 ## Buddy Home
 

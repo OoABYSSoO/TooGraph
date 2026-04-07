@@ -254,7 +254,7 @@ export function resolveBuddyRunTraceFromRunEvent(
           params,
           preview,
           tone: "stream",
-          replaceKey: buildBuddyTraceReplaceKey("stream", nodeId, subgraphNodeId),
+          replaceKey: buildBuddyTraceReplaceKey("node", nodeId, subgraphNodeId),
           timingKey,
         }
       : null;
@@ -297,6 +297,9 @@ function shouldSuppressBuddyRunTraceEvent(eventType: string, payload: Record<str
     return true;
   }
   if (nodeType === "input" || nodeType === "output") {
+    return true;
+  }
+  if (nodeType === "subgraph" && (eventType === "node.started" || eventType === "node.completed")) {
     return true;
   }
   return false;

@@ -1,4 +1,6 @@
 import type {
+  BuddyChatMessageRecord,
+  BuddyChatSession,
   BuddyCommandResponse,
   BuddyGraphPatchDraft,
   BuddyGraphPatchDraftPayload,
@@ -9,7 +11,7 @@ import type {
   BuddySessionSummary,
 } from "../types/buddy.ts";
 
-import { apiGet, apiPost } from "./http.ts";
+import { apiDelete, apiGet, apiPatch, apiPost } from "./http.ts";
 
 function executeBuddyCommand<T>(
   action: string,
@@ -72,6 +74,39 @@ export function fetchBuddySessionSummary() {
 
 export function updateBuddySessionSummary(payload: Partial<BuddySessionSummary>, changeReason: string) {
   return executeBuddyCommand<BuddySessionSummary>("session_summary.update", payload, changeReason);
+}
+
+export function fetchBuddyChatSessions(includeDeleted = false) {
+  return apiGet<BuddyChatSession[]>(`/api/buddy/sessions${includeDeleted ? "?include_deleted=true" : ""}`);
+}
+
+export function createBuddyChatSession(payload: { title?: string | null } = {}) {
+  return apiPost<BuddyChatSession>("/api/buddy/sessions", payload);
+}
+
+export function updateBuddyChatSession(sessionId: string, payload: { title?: string | null; archived?: boolean | null }) {
+  return apiPatch<BuddyChatSession>(`/api/buddy/sessions/${encodeURIComponent(sessionId)}`, payload);
+}
+
+export function deleteBuddyChatSession(sessionId: string) {
+  return apiDelete<BuddyChatSession>(`/api/buddy/sessions/${encodeURIComponent(sessionId)}`);
+}
+
+export function fetchBuddyChatMessages(sessionId: string) {
+  return apiGet<BuddyChatMessageRecord[]>(`/api/buddy/sessions/${encodeURIComponent(sessionId)}/messages`);
+}
+
+export function appendBuddyChatMessage(
+  sessionId: string,
+  payload: {
+    message_id?: string | null;
+    role: "user" | "assistant";
+    content: string;
+    include_in_context?: boolean;
+    run_id?: string | null;
+  },
+) {
+  return apiPost<BuddyChatMessageRecord>(`/api/buddy/sessions/${encodeURIComponent(sessionId)}/messages`, payload);
 }
 
 export function fetchBuddyRevisions(targetType?: string, targetId?: string) {

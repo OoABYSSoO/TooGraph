@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
@@ -35,6 +35,42 @@ class BuddyCommandPayload(BaseModel):
     change_reason: str = "User requested a buddy command."
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+
+class BuddySessionPayload(BaseModel):
+    title: str | None = None
+    change_reason: str = "用户创建伙伴历史会话。"
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+
+class BuddySessionPatchPayload(BaseModel):
+    title: str | None = None
+    archived: bool | None = None
+    change_reason: str = "用户更新伙伴历史会话。"
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    def data(self) -> dict[str, Any]:
+        payload = self.model_dump()
+        payload.pop("change_reason", None)
+        return {key: value for key, value in payload.items() if value is not None}
+
+
+class BuddyChatMessagePayload(BaseModel):
+    message_id: str | None = None
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1)
+    include_in_context: bool = True
+    run_id: str | None = None
+    change_reason: str = "用户追加伙伴历史消息。"
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    def data(self) -> dict[str, Any]:
+        payload = self.model_dump()
+        payload.pop("change_reason", None)
+        return payload
 
 
 @router.get("/profile")
@@ -91,6 +127,57 @@ def get_session_summary_endpoint() -> dict[str, Any]:
 @router.put("/session-summary")
 def update_session_summary_endpoint(payload: BuddyUpdatePayload) -> dict[str, Any]:
     return store.save_session_summary(payload.data(), changed_by="user", change_reason=payload.change_reason)
+
+
+@router.get("/sessions")
+def list_chat_sessions_endpoint(include_deleted: bool = Query(default=False)) -> list[dict[str, Any]]:
+    return store.list_chat_sessions(include_deleted=include_deleted)
+
+
+@router.post("/sessions")
+def create_chat_session_endpoint(payload: BuddySessionPayload) -> dict[str, Any]:
+    return store.create_chat_session(
+        {"title": payload.title},
+        changed_by="user",
+        change_reason=payload.change_reason,
+    )
+
+
+@router.patch("/sessions/{session_id}")
+def update_chat_session_endpoint(session_id: str, payload: BuddySessionPatchPayload) -> dict[str, Any]:
+    try:
+        return store.update_chat_session(session_id, payload.data(), changed_by="user", change_reason=payload.change_reason)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Buddy session not found") from exc
+
+
+@router.delete("/sessions/{session_id}")
+def delete_chat_session_endpoint(session_id: str) -> dict[str, Any]:
+    try:
+        return store.delete_chat_session(session_id, changed_by="user", change_reason="用户删除伙伴历史会话。")
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Buddy session not found") from exc
+
+
+@router.get("/sessions/{session_id}/messages")
+def list_chat_messages_endpoint(
+    session_id: str,
+    limit: int | None = Query(default=None, ge=1, le=500),
+) -> list[dict[str, Any]]:
+    try:
+        return store.list_chat_messages(session_id, limit=limit)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Buddy session not found") from exc
+
+
+@router.post("/sessions/{session_id}/messages")
+def append_chat_message_endpoint(session_id: str, payload: BuddyChatMessagePayload) -> dict[str, Any]:
+    try:
+        return store.append_chat_message(session_id, payload.data(), changed_by="user", change_reason=payload.change_reason)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Buddy session not found") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.get("/revisions")

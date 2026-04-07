@@ -2,10 +2,16 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  appendBuddyChatMessage,
+  createBuddyChatSession,
   createBuddyMemory,
   createBuddyGraphPatchDraft,
+  deleteBuddyChatSession,
+  fetchBuddyChatMessages,
+  fetchBuddyChatSessions,
   fetchBuddyProfile,
   restoreBuddyRevision,
+  updateBuddyChatSession,
   updateBuddyProfile,
 } from "./buddy.ts";
 
@@ -94,5 +100,51 @@ test("buddy API creates memories and restores revisions through command flow", a
     payload: {},
     change_reason: "User restored a buddy revision from the Buddy page.",
   });
+  globalThis.fetch = originalFetch;
+});
+
+test("buddy API manages chat sessions and messages directly", async () => {
+  const requests: Array<{ url: string; method: string; body: unknown }> = [];
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    requests.push({
+      url: String(input),
+      method: init?.method ?? "GET",
+      body: init?.body ? JSON.parse(String(init.body)) : null,
+    });
+    return new Response(JSON.stringify({ session_id: "session_1", message_id: "msg_1" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }) as typeof fetch;
+
+  await fetchBuddyChatSessions();
+  await createBuddyChatSession({ title: "需求讨论" });
+  await updateBuddyChatSession("session_1", { title: "新标题" });
+  await fetchBuddyChatMessages("session_1");
+  await appendBuddyChatMessage("session_1", {
+    role: "assistant",
+    content: "我在。",
+    include_in_context: false,
+    run_id: "run_1",
+  });
+  await deleteBuddyChatSession("session_1");
+
+  assert.equal(requests[0].url, "/api/buddy/sessions");
+  assert.equal(requests[1].method, "POST");
+  assert.equal(requests[1].url, "/api/buddy/sessions");
+  assert.deepEqual(requests[1].body, { title: "需求讨论" });
+  assert.equal(requests[2].method, "PATCH");
+  assert.equal(requests[2].url, "/api/buddy/sessions/session_1");
+  assert.deepEqual(requests[2].body, { title: "新标题" });
+  assert.equal(requests[3].url, "/api/buddy/sessions/session_1/messages");
+  assert.equal(requests[4].method, "POST");
+  assert.deepEqual(requests[4].body, {
+    role: "assistant",
+    content: "我在。",
+    include_in_context: false,
+    run_id: "run_1",
+  });
+  assert.equal(requests[5].method, "DELETE");
+  assert.equal(requests[5].url, "/api/buddy/sessions/session_1");
   globalThis.fetch = originalFetch;
 });

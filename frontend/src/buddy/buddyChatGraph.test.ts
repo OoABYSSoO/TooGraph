@@ -682,16 +682,16 @@ test("resolveBuddyRunTraceFromRunEvent summarizes streaming output from non-outp
       },
       preview: "正在识别：这是一个简单问候，不需要调用能力",
       tone: "stream",
-      replaceKey: "stream:intake_request:understand_request",
+      replaceKey: "node:intake_request:understand_request",
       timingKey: "stage:intake_request:understand_request",
     },
   );
 });
 
-test("resolveBuddyRunTraceFromRunEvent keeps backend stage duration on top-level completed stages", () => {
+test("resolveBuddyRunTraceFromRunEvent hides aggregate subgraph containers from buddy progress", () => {
   const graph = createActivityGraph();
 
-  assert.deepEqual(
+  assert.equal(
     resolveBuddyRunTraceFromRunEvent(
       "node.completed",
       {
@@ -702,17 +702,18 @@ test("resolveBuddyRunTraceFromRunEvent keeps backend stage duration on top-level
       },
       graph,
     ),
-    {
-      labelKey: "buddy.activity.completed",
-      params: {
-        node: "理解请求",
+    null,
+  );
+  assert.equal(
+    resolveBuddyRunTraceFromRunEvent(
+      "node.started",
+      {
+        node_id: "intake_request",
+        node_type: "subgraph",
       },
-      preview: "",
-      tone: "success",
-      replaceKey: "node:intake_request",
-      timingKey: "stage:intake_request",
-      durationMs: 1534,
-    },
+      graph,
+    ),
+    null,
   );
 });
 

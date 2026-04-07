@@ -25,6 +25,9 @@ from app.core.storage.json_file_utils import read_json_file, utc_now_iso, write_
 
 
 BUDDY_HOME_DIR = get_default_buddy_home_dir()
+DEFAULT_CHAT_SESSION_TITLE = "新的对话"
+MAX_CHAT_SESSION_TITLE_CHARS = 32
+MAX_CHAT_MESSAGE_PREVIEW_CHARS = 96
 
 
 def initialize_buddy_home() -> None:
@@ -194,6 +197,198 @@ def save_session_summary(payload: dict[str, Any], *, changed_by: str, change_rea
         )
         connection.commit()
     return load_session_summary()
+
+
+def list_chat_sessions(*, include_deleted: bool = False) -> list[dict[str, Any]]:
+    query = """
+        SELECT session_id, title, archived, deleted, created_at, updated_at
+        FROM buddy_sessions
+    """
+    params: list[Any] = []
+    if not include_deleted:
+        query += " WHERE deleted = 0"
+    query += " ORDER BY updated_at DESC, created_at DESC"
+    with _connection() as connection:
+        rows = connection.execute(query, params).fetchall()
+        sessions = [_chat_session_from_row(row) for row in rows]
+        for session in sessions:
+            session.update(_chat_session_stats(connection, str(session["session_id"])))
+    return sessions
+
+
+def create_chat_session(
+    payload: dict[str, Any] | None = None,
+    *,
+    changed_by: str,
+    change_reason: str,
+) -> dict[str, Any]:
+    del changed_by, change_reason
+    now = utc_now_iso()
+    title = _normalize_chat_session_title((payload or {}).get("title"))
+    session = {
+        "session_id": f"session_{uuid4().hex[:12]}",
+        "title": title or DEFAULT_CHAT_SESSION_TITLE,
+        "archived": False,
+        "deleted": False,
+        "created_at": now,
+        "updated_at": now,
+    }
+    with _connection() as connection:
+        connection.execute(
+            """
+            INSERT INTO buddy_sessions (session_id, title, archived, deleted, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                session["session_id"],
+                session["title"],
+                int(session["archived"]),
+                int(session["deleted"]),
+                session["created_at"],
+                session["updated_at"],
+            ),
+        )
+        connection.commit()
+    return get_chat_session(str(session["session_id"]))
+
+
+def get_chat_session(session_id: str, *, include_deleted: bool = False) -> dict[str, Any]:
+    with _connection() as connection:
+        row = connection.execute(
+            """
+            SELECT session_id, title, archived, deleted, created_at, updated_at
+            FROM buddy_sessions
+            WHERE session_id = ?
+            """,
+            (session_id,),
+        ).fetchone()
+        if not row:
+            raise KeyError(session_id)
+        session = _chat_session_from_row(row)
+        if session["deleted"] and not include_deleted:
+            raise KeyError(session_id)
+        session.update(_chat_session_stats(connection, session_id))
+    return session
+
+
+def update_chat_session(
+    session_id: str,
+    payload: dict[str, Any],
+    *,
+    changed_by: str,
+    change_reason: str,
+) -> dict[str, Any]:
+    del changed_by, change_reason
+    previous = get_chat_session(session_id, include_deleted=True)
+    next_title = previous["title"]
+    if "title" in payload:
+        next_title = _normalize_chat_session_title(payload.get("title")) or DEFAULT_CHAT_SESSION_TITLE
+    next_archived = bool(payload.get("archived", previous.get("archived", False)))
+    now = utc_now_iso()
+    with _connection() as connection:
+        connection.execute(
+            """
+            UPDATE buddy_sessions
+            SET title = ?, archived = ?, updated_at = ?
+            WHERE session_id = ?
+            """,
+            (next_title, int(next_archived), now, session_id),
+        )
+        connection.commit()
+    return get_chat_session(session_id, include_deleted=bool(previous.get("deleted")))
+
+
+def delete_chat_session(session_id: str, *, changed_by: str, change_reason: str) -> dict[str, Any]:
+    del changed_by, change_reason
+    previous = get_chat_session(session_id, include_deleted=True)
+    now = utc_now_iso()
+    with _connection() as connection:
+        connection.execute(
+            """
+            UPDATE buddy_sessions
+            SET deleted = 1, archived = 1, updated_at = ?
+            WHERE session_id = ?
+            """,
+            (now, session_id),
+        )
+        connection.commit()
+    return get_chat_session(session_id, include_deleted=bool(previous))
+
+
+def list_chat_messages(session_id: str, *, limit: int | None = None) -> list[dict[str, Any]]:
+    get_chat_session(session_id)
+    query = """
+        SELECT message_id, session_id, role, content, include_in_context, run_id, created_at, updated_at
+        FROM buddy_messages
+        WHERE session_id = ?
+        ORDER BY created_at ASC, rowid ASC
+    """
+    params: list[Any] = [session_id]
+    if limit is not None:
+        query += " LIMIT ?"
+        params.append(max(1, int(limit)))
+    with _connection() as connection:
+        rows = connection.execute(query, params).fetchall()
+    return [_chat_message_from_row(row) for row in rows]
+
+
+def append_chat_message(
+    session_id: str,
+    payload: dict[str, Any],
+    *,
+    changed_by: str,
+    change_reason: str,
+) -> dict[str, Any]:
+    del changed_by, change_reason
+    session = get_chat_session(session_id)
+    role = str(payload.get("role") or "").strip()
+    if role not in {"user", "assistant"}:
+        raise ValueError("Message role must be user or assistant.")
+    content = str(payload.get("content") or "")
+    if not content.strip():
+        raise ValueError("Message content cannot be empty.")
+    now = utc_now_iso()
+    message = {
+        "message_id": str(payload.get("message_id") or f"msg_{uuid4().hex[:12]}"),
+        "session_id": session_id,
+        "role": role,
+        "content": content,
+        "include_in_context": bool(payload.get("include_in_context", True)),
+        "run_id": payload.get("run_id") if payload.get("run_id") is None else str(payload.get("run_id")),
+        "created_at": now,
+        "updated_at": now,
+    }
+    with _connection() as connection:
+        connection.execute(
+            """
+            INSERT INTO buddy_messages
+                (message_id, session_id, role, content, include_in_context, run_id, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                message["message_id"],
+                message["session_id"],
+                message["role"],
+                message["content"],
+                int(message["include_in_context"]),
+                message["run_id"],
+                message["created_at"],
+                message["updated_at"],
+            ),
+        )
+        next_title = str(session.get("title") or DEFAULT_CHAT_SESSION_TITLE)
+        if role == "user" and next_title == DEFAULT_CHAT_SESSION_TITLE:
+            next_title = _derive_chat_session_title(content)
+        connection.execute(
+            """
+            UPDATE buddy_sessions
+            SET title = ?, updated_at = ?
+            WHERE session_id = ?
+            """,
+            (next_title, now, session_id),
+        )
+        connection.commit()
+    return _get_chat_message(str(message["message_id"]))
 
 
 def list_revisions(target_type: str | None = None, target_id: str | None = None) -> list[dict[str, Any]]:
@@ -452,6 +647,96 @@ def _command_from_row(row: Any) -> dict[str, Any]:
         "created_at": str(row["created_at"] or ""),
         "completed_at": row["completed_at"],
     }
+
+
+def _get_chat_message(message_id: str) -> dict[str, Any]:
+    with _connection() as connection:
+        row = connection.execute(
+            """
+            SELECT message_id, session_id, role, content, include_in_context, run_id, created_at, updated_at
+            FROM buddy_messages
+            WHERE message_id = ?
+            """,
+            (message_id,),
+        ).fetchone()
+    if not row:
+        raise KeyError(message_id)
+    return _chat_message_from_row(row)
+
+
+def _chat_session_from_row(row: Any) -> dict[str, Any]:
+    return {
+        "session_id": str(row["session_id"] or ""),
+        "title": str(row["title"] or DEFAULT_CHAT_SESSION_TITLE),
+        "archived": bool(row["archived"]),
+        "deleted": bool(row["deleted"]),
+        "created_at": str(row["created_at"] or ""),
+        "updated_at": str(row["updated_at"] or ""),
+    }
+
+
+def _chat_session_stats(connection: Any, session_id: str) -> dict[str, Any]:
+    count_row = connection.execute(
+        "SELECT COUNT(*) AS message_count FROM buddy_messages WHERE session_id = ?",
+        (session_id,),
+    ).fetchone()
+    last_row = connection.execute(
+        """
+        SELECT content, created_at
+        FROM buddy_messages
+        WHERE session_id = ?
+        ORDER BY created_at DESC, rowid DESC
+        LIMIT 1
+        """,
+        (session_id,),
+    ).fetchone()
+    last_preview = ""
+    last_message_at = None
+    if last_row:
+        last_preview = _truncate_chat_message_preview(str(last_row["content"] or ""))
+        last_message_at = str(last_row["created_at"] or "")
+    return {
+        "message_count": int(count_row["message_count"] if count_row else 0),
+        "last_message_preview": last_preview,
+        "last_message_at": last_message_at,
+    }
+
+
+def _chat_message_from_row(row: Any) -> dict[str, Any]:
+    return {
+        "message_id": str(row["message_id"] or ""),
+        "session_id": str(row["session_id"] or ""),
+        "role": str(row["role"] or ""),
+        "content": str(row["content"] or ""),
+        "include_in_context": bool(row["include_in_context"]),
+        "run_id": row["run_id"],
+        "created_at": str(row["created_at"] or ""),
+        "updated_at": str(row["updated_at"] or ""),
+    }
+
+
+def _derive_chat_session_title(content: str) -> str:
+    normalized = " ".join(content.strip().split())
+    if not normalized:
+        return DEFAULT_CHAT_SESSION_TITLE
+    return _truncate_chat_session_title(normalized)
+
+
+def _normalize_chat_session_title(value: Any) -> str:
+    return _truncate_chat_session_title(" ".join(str(value or "").strip().split()))
+
+
+def _truncate_chat_session_title(value: str) -> str:
+    if len(value) <= MAX_CHAT_SESSION_TITLE_CHARS:
+        return value
+    return f"{value[: MAX_CHAT_SESSION_TITLE_CHARS - 1]}…"
+
+
+def _truncate_chat_message_preview(value: str) -> str:
+    normalized = " ".join(value.strip().split())
+    if len(normalized) <= MAX_CHAT_MESSAGE_PREVIEW_CHARS:
+        return normalized
+    return f"{normalized[: MAX_CHAT_MESSAGE_PREVIEW_CHARS - 1]}…"
 
 
 def _json_loads_object(value: Any) -> dict[str, Any]:

@@ -30,6 +30,29 @@ export type BuddySessionSummary = {
   updated_at: string;
 };
 
+export type BuddyChatSession = {
+  session_id: string;
+  title: string;
+  archived: boolean;
+  deleted: boolean;
+  created_at: string;
+  updated_at: string;
+  message_count: number;
+  last_message_preview: string;
+  last_message_at: string | null;
+};
+
+export type BuddyChatMessageRecord = {
+  message_id: string;
+  session_id: string;
+  role: "user" | "assistant";
+  content: string;
+  include_in_context: boolean;
+  run_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type BuddyRevision = {
   revision_id: string;
   target_type: string;
