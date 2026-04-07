@@ -70,6 +70,7 @@ backend/.venv/
 backend/*.db
 backend/*.sqlite
 backend/*.sqlite3
+backend/data/graphs/*.json
 backend/data/runs/
 
 # Generated demo artifacts
