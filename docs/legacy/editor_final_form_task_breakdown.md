@@ -2,7 +2,7 @@
 
 ## 1. 文档目的
 
-本文档是 [editor_final_form_development_plan.md](/home/abyss/GraphiteUI/docs/editor_final_form_development_plan.md) 的执行版拆解。
+本文档是 [editor_final_form_development_plan.md](/home/abyss/GraphiteUI/docs/legacy/editor_final_form_development_plan.md) 的执行版拆解。
 
 目标：
 
