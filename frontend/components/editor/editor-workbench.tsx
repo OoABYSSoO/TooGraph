@@ -21,8 +21,9 @@ import { ThemeConfigPanel } from "@/components/editor/theme-config-panel";
 import { WorkflowNode } from "@/components/editor/workflow-node";
 import { useLanguage } from "@/components/providers/language-provider";
 import { apiGet, apiPost } from "@/lib/api";
-import { NODE_PRESETS, THEME_PRESETS } from "@/lib/editor-presets";
+import { NODE_PRESETS } from "@/lib/editor-presets";
 import { fromBackendGraphDocument, toBackendGraphPayload, type BackendGraphDocument } from "@/lib/graph-api";
+import { getTemplateThemePresets } from "@/lib/templates";
 import { useEditorStore } from "@/stores/editor-store";
 import type { GraphCanvasNode, GraphDocument, RunDetailPayload, StateFieldRole, StateFieldType, TemplateDefinition, ThemePreset } from "@/types/editor";
 
@@ -39,7 +40,7 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
   const router = useRouter();
   const [newReadKey, setNewReadKey] = useState("");
   const [newWriteKey, setNewWriteKey] = useState("");
-  const [templatePresets, setTemplatePresets] = useState<ThemePreset[]>(THEME_PRESETS);
+  const [templatePresets, setTemplatePresets] = useState<ThemePreset[]>(getTemplateThemePresets("creative_factory"));
   const {
     initGraph,
     hydrateGraph,
@@ -197,7 +198,7 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
         }
       } catch {
         if (!cancelled) {
-          setTemplatePresets(THEME_PRESETS);
+          setTemplatePresets(getTemplateThemePresets(templateId));
         }
       }
     }

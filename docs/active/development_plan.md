@@ -22,6 +22,7 @@
 - creative factory 默认模板
 - `demo/slg_langgraph_single_file_modified_v2.py` 继续作为独立参考实现保留，主程序不依赖它
 - 模板注册与模板查询 API 已落地
+- 前端模板源已开始独立化，`creative_factory` 默认图定义已从通用 preset 文件中抽离
 - 编辑器中的 `State Panel`
 - 节点左入右出、自定义节点卡片
 - 节点输入输出绑定、结构化参数面板、快速新增 state key
@@ -178,6 +179,7 @@
 - 节点顺序重排体验
 - Tool Registry / Handler Registry 正式拆分
 - 模板系统与主题系统继续抽象
+- 前后端模板源继续收拢，减少 editor 本地硬编码
 
 ---
 

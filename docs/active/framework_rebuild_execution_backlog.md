@@ -32,7 +32,7 @@
 
 1. `creative_factory` 仍然散落在多个文件中
 2. 后端尚未形成 `core/` 与 `templates/` 的目录分层
-3. 主题 preset 仍主要停留在前端 preset 文件
+3. 前端模板源已经开始抽离，但模板主题与默认图仍需继续向统一注册源收拢
 4. theme panel 还不是完整结构化策略编辑器
 5. runtime handler 仍偏单文件集中
 
@@ -148,6 +148,12 @@ backend/app/templates/creative_factory/
 - 节点链定义
 
 保留在 `editor-presets.ts` 的只应是轻量入口或兼容导出。
+
+当前状态：
+
+- `frontend/lib/templates/creative-factory.ts` 已创建
+- 默认 graph 构造和 theme preset 已从通用 preset 文件中抽离
+- 下一步需要继续把模板源和后端模板返回做统一，而不是双份维护
 
 完成标准：
 
