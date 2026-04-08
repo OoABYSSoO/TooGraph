@@ -3,10 +3,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  addEdge,
   Background,
   BackgroundVariant,
   Controls,
+  Handle,
   MarkerType,
   MiniMap,
   ReactFlow,
@@ -18,6 +18,7 @@ import {
   type Connection,
   type Edge,
   type Node,
+  type NodeProps,
   type OnSelectionChangeParams,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -117,6 +118,7 @@ type EditorClientProps = {
 };
 
 type FlowNodeData = {
+  nodeId: string;
   label: string;
   nodeType: string;
   description: string;
@@ -156,7 +158,7 @@ const NODE_PRESETS: Record<string, NodePreset> = {
     label: "Hello Model",
     description: "Send a name to the local OpenAI-compatible model.",
     reads: ["name"],
-    writes: ["name", "greeting", "final_result", "llm_response"],
+    writes: ["greeting", "final_result", "llm_response"],
     params: {
       name: "Abyss",
       temperature: 0.2,
@@ -209,6 +211,7 @@ function graphNodeToFlowNode(node: GraphNodePayload): FlowNode {
     type: "default",
     position: node.position,
     data: {
+      nodeId: node.id,
       label: node.label,
       nodeType: node.type,
       description: preset?.description ?? `${node.type} node`,
@@ -221,38 +224,6 @@ function graphNodeToFlowNode(node: GraphNodePayload): FlowNode {
     sourcePosition: Position.Right,
     targetPosition: Position.Left,
     style: getNodeStyle(node.type),
-  };
-}
-
-function graphEdgeToFlowEdge(edge: GraphEdgePayload): Edge {
-  const label = buildEdgeLabel(edge.flow_keys, edge.edge_kind, edge.branch_label ?? null);
-  return {
-    id: edge.id,
-    source: edge.source,
-    target: edge.target,
-    label,
-    data: {
-      flow_keys: edge.flow_keys,
-      edge_kind: edge.edge_kind,
-      branch_label: edge.branch_label ?? null,
-    },
-    markerEnd: { type: MarkerType.ArrowClosed, color: "#9a3412" },
-    style: {
-      stroke: "#9a3412",
-      strokeWidth: 1.8,
-    },
-    labelStyle: {
-      fill: "#7c2d12",
-      fontSize: 11,
-      fontWeight: 600,
-    },
-    labelBgPadding: [6, 4],
-    labelBgBorderRadius: 999,
-    labelBgStyle: {
-      fill: "rgba(255,250,241,0.96)",
-      stroke: "rgba(154,52,18,0.14)",
-      strokeWidth: 1,
-    },
   };
 }
 
@@ -276,24 +247,25 @@ function getNodeStyle(nodeType: string) {
   return base;
 }
 
-function FlowNodeCard({ data, selected }: { data: FlowNodeData; selected: boolean }) {
-  const allStateKeys = Object.keys(data.stateColors);
-  const reads =
-    data.nodeType === "end"
-      ? allStateKeys.length
-        ? allStateKeys
-        : ["none"]
-      : data.reads.length
-        ? data.reads
-        : ["none"];
-  const writes =
-    data.nodeType === "start"
-      ? allStateKeys.length
-        ? allStateKeys
-        : ["none"]
-      : data.writes.length
-        ? data.writes
-        : ["none"];
+function getVisualInputKeys(nodeType: string, reads: string[], stateColors: StateColorMap) {
+  const allStateKeys = Object.keys(stateColors);
+  if (nodeType === "end") {
+    return allStateKeys.length ? allStateKeys : [];
+  }
+  return reads;
+}
+
+function getVisualOutputKeys(nodeType: string, writes: string[], stateColors: StateColorMap) {
+  const allStateKeys = Object.keys(stateColors);
+  if (nodeType === "start") {
+    return allStateKeys.length ? allStateKeys : [];
+  }
+  return writes;
+}
+
+function FlowNodeCard({ data, selected }: NodeProps<FlowNode>) {
+  const reads = getVisualInputKeys(data.nodeType, data.reads, data.stateColors);
+  const writes = getVisualOutputKeys(data.nodeType, data.writes, data.stateColors);
 
   return (
     <div
@@ -306,15 +278,15 @@ function FlowNodeCard({ data, selected }: { data: FlowNodeData; selected: boolea
         <div className="border-r border-[rgba(154,52,18,0.08)] px-3 py-3">
           <div className="mb-2 text-[0.68rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">Inputs</div>
           <div className="flex flex-col gap-1.5">
-            {reads.map((key) => (
+            {reads.length > 0 ? reads.map((key) => (
               <StateChip
                 key={`read-${key}`}
+                nodeId={data.nodeId}
                 label={key}
                 color={data.stateColors[key] ?? DEFAULT_STATE_COLOR}
-                muted={key === "none"}
                 side="input"
               />
-            ))}
+            )) : <EmptyIoState side="input" />}
           </div>
         </div>
         <div className="flex flex-col items-center justify-center px-4 py-3 text-center">
@@ -325,15 +297,15 @@ function FlowNodeCard({ data, selected }: { data: FlowNodeData; selected: boolea
         <div className="border-l border-[rgba(154,52,18,0.08)] px-3 py-3">
           <div className="mb-2 text-right text-[0.68rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">Outputs</div>
           <div className="flex flex-col gap-1.5">
-            {writes.map((key) => (
+            {writes.length > 0 ? writes.map((key) => (
               <StateChip
                 key={`write-${key}`}
+                nodeId={data.nodeId}
                 label={key}
                 color={data.stateColors[key] ?? DEFAULT_STATE_COLOR}
-                muted={key === "none"}
                 side="output"
               />
-            ))}
+            )) : <EmptyIoState side="output" />}
           </div>
         </div>
       </div>
@@ -342,39 +314,61 @@ function FlowNodeCard({ data, selected }: { data: FlowNodeData; selected: boolea
 }
 
 function StateChip({
+  nodeId,
   label,
   color,
-  muted = false,
   side,
 }: {
+  nodeId: string;
   label: string;
   color: string;
-  muted?: boolean;
   side: "input" | "output";
 }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[0.7rem] font-medium",
-        muted
-          ? "border-[rgba(154,52,18,0.1)] bg-[rgba(255,255,255,0.74)] text-[var(--muted)]"
-          : "border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.82)] text-[var(--text)]",
+        "relative inline-flex items-center gap-1 rounded-full border border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.82)] px-2 py-1 text-[0.7rem] font-medium text-[var(--text)]",
         side === "input" ? "justify-start self-start" : "justify-end self-end",
       )}
     >
       {side === "input" ? (
         <>
-          <span className={cn("h-2.5 w-2.5 rounded-full border border-[rgba(154,52,18,0.24)] bg-white", muted && "opacity-40")} />
-          {!muted ? <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} /> : null}
+          <Handle
+            id={buildHandleId("input", label)}
+            type="target"
+            position={Position.Left}
+            className="!left-[-7px] !top-1/2 !m-0 !h-3 !w-3 !-translate-y-1/2 !border !border-[rgba(154,52,18,0.24)] !bg-white"
+            isConnectable
+          />
+          <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />
           <span>{label}</span>
         </>
       ) : (
         <>
           <span>{label}</span>
-          {!muted ? <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} /> : null}
-          <span className={cn("h-2.5 w-2.5 rounded-full border border-[rgba(154,52,18,0.24)] bg-white", muted && "opacity-40")} />
+          <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />
+          <Handle
+            id={buildHandleId("output", label)}
+            type="source"
+            position={Position.Right}
+            className="!right-[-7px] !top-1/2 !m-0 !h-3 !w-3 !-translate-y-1/2 !border !border-[rgba(154,52,18,0.24)] !bg-white"
+            isConnectable
+          />
         </>
       )}
+    </span>
+  );
+}
+
+function EmptyIoState({ side }: { side: "input" | "output" }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 rounded-full border border-[rgba(154,52,18,0.1)] bg-[rgba(255,255,255,0.74)] px-2 py-1 text-[0.7rem] font-medium text-[var(--muted)]",
+        side === "input" ? "justify-start self-start" : "justify-end self-end",
+      )}
+    >
+      <span>none</span>
     </span>
   );
 }
@@ -385,6 +379,130 @@ function buildEdgeLabel(flowKeys: string[], edgeKind: "normal" | "branch", branc
     return branchLabel ? (flowLabel ? `${branchLabel} · ${flowLabel}` : branchLabel) : flowLabel || "branch";
   }
   return flowLabel || "flow";
+}
+
+function buildHandleId(side: "input" | "output", stateKey: string) {
+  return `${side}:${stateKey}`;
+}
+
+function getStateKeyFromHandle(handleId?: string | null) {
+  if (!handleId) {
+    return null;
+  }
+  const [, stateKey] = handleId.split(":");
+  return stateKey || null;
+}
+
+function createVisualEdge(params: {
+  id: string;
+  source: string;
+  target: string;
+  flowKey: string | null;
+  edgeKind?: "normal" | "branch";
+  branchLabel?: "pass" | "revise" | "fail" | null;
+  stateColors: StateColorMap;
+  sourceHandle?: string | null;
+  targetHandle?: string | null;
+  logicalId?: string;
+}): Edge {
+  const edgeKind = params.edgeKind ?? "normal";
+  const branchLabel = params.branchLabel ?? null;
+  const flowKeys = params.flowKey ? [params.flowKey] : [];
+  const color = params.flowKey ? params.stateColors[params.flowKey] ?? "#9a3412" : "#9a3412";
+
+  return {
+    id: params.id,
+    source: params.source,
+    target: params.target,
+    sourceHandle: params.sourceHandle ?? (params.flowKey ? buildHandleId("output", params.flowKey) : null),
+    targetHandle: params.targetHandle ?? (params.flowKey ? buildHandleId("input", params.flowKey) : null),
+    label: buildEdgeLabel(flowKeys, edgeKind, branchLabel),
+    data: {
+      flow_keys: flowKeys,
+      edge_kind: edgeKind,
+      branch_label: branchLabel,
+      logical_id: params.logicalId ?? params.id,
+      flow_key: params.flowKey,
+    },
+    markerEnd: { type: MarkerType.ArrowClosed, color },
+    style: {
+      stroke: color,
+      strokeWidth: 1.8,
+    },
+    labelStyle: {
+      fill: "#7c2d12",
+      fontSize: 11,
+      fontWeight: 600,
+    },
+    labelBgPadding: [6, 4],
+    labelBgBorderRadius: 999,
+    labelBgStyle: {
+      fill: "rgba(255,250,241,0.96)",
+      stroke: "rgba(154,52,18,0.14)",
+      strokeWidth: 1,
+    },
+  };
+}
+
+function explodeGraphEdges(graph: GraphPayload, colors: StateColorMap): Edge[] {
+  return graph.edges.flatMap((edge) => {
+    if (edge.flow_keys.length === 0) {
+      return [
+        createVisualEdge({
+          id: edge.id,
+          source: edge.source,
+          target: edge.target,
+          flowKey: null,
+          edgeKind: edge.edge_kind,
+          branchLabel: edge.branch_label ?? null,
+          stateColors: colors,
+          logicalId: edge.id,
+        }),
+      ];
+    }
+
+    return edge.flow_keys.map((flowKey, index) =>
+      createVisualEdge({
+        id: `${edge.id}__${flowKey}__${index}`,
+        source: edge.source,
+        target: edge.target,
+        flowKey,
+        edgeKind: edge.edge_kind,
+        branchLabel: edge.branch_label ?? null,
+        stateColors: colors,
+        logicalId: edge.id,
+      }),
+    );
+  });
+}
+
+function collapseVisualEdges(edges: Edge[]): GraphEdgePayload[] {
+  const grouped = new Map<string, GraphEdgePayload>();
+
+  edges.forEach((edge, index) => {
+    const edgeKind = (edge.data?.edge_kind as "normal" | "branch" | undefined) ?? "normal";
+    const branchLabel = (edge.data?.branch_label as "pass" | "revise" | "fail" | null | undefined) ?? null;
+    const flowKey = (edge.data?.flow_key as string | null | undefined) ?? getStateKeyFromHandle(edge.sourceHandle);
+    const groupKey = [edge.source, edge.target, edgeKind, branchLabel ?? ""].join("::");
+    const existing =
+      grouped.get(groupKey) ??
+      {
+        id: (edge.data?.logical_id as string | undefined) ?? `edge_${index + 1}`,
+        source: edge.source,
+        target: edge.target,
+        flow_keys: [],
+        edge_kind: edgeKind,
+        branch_label: branchLabel,
+      };
+
+    if (flowKey && !existing.flow_keys.includes(flowKey)) {
+      existing.flow_keys.push(flowKey);
+    }
+
+    grouped.set(groupKey, existing);
+  });
+
+  return [...grouped.values()];
 }
 
 function getInitialStateColors(graph: GraphPayload): StateColorMap {
@@ -406,7 +524,7 @@ function EditorCanvas({ initialGraph, mode, graphId }: { initialGraph: GraphPayl
   const router = useRouter();
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>(initialGraph.nodes.map(graphNodeToFlowNode));
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialGraph.edges.map(graphEdgeToFlowEdge));
+  const [edges, setEdges, onEdgesChange] = useEdgesState(explodeGraphEdges(initialGraph, getInitialStateColors(initialGraph)));
   const [graphName, setGraphName] = useState(initialGraph.name);
   const [currentGraphId, setCurrentGraphId] = useState<string | null>(initialGraph.graph_id ?? graphId ?? null);
   const [stateSchema, setStateSchema] = useState<StateField[]>(initialGraph.state_schema);
@@ -474,6 +592,23 @@ function EditorCanvas({ initialGraph, mode, graphId }: { initialGraph: GraphPayl
     );
   }, [stateColors, setNodes]);
 
+  useEffect(() => {
+    setEdges((current) =>
+      current.map((edge) => {
+        const flowKey = (edge.data?.flow_key as string | null | undefined) ?? null;
+        const color = flowKey ? stateColors[flowKey] ?? "#9a3412" : "#9a3412";
+        return {
+          ...edge,
+          markerEnd: { type: MarkerType.ArrowClosed, color },
+          style: {
+            stroke: color,
+            strokeWidth: 1.8,
+          },
+        };
+      }),
+    );
+  }, [setEdges, stateColors]);
+
   const nodePalette = useMemo(() => {
     return Object.values(NODE_PRESETS).filter((item) => {
       const query = search.trim().toLowerCase();
@@ -527,14 +662,7 @@ function EditorCanvas({ initialGraph, mode, graphId }: { initialGraph: GraphPayl
           tool_keys: node.data.nodeType === "hello_model" ? ["generate_hello_greeting"] : [],
         },
       })),
-      edges: edges.map((edge) => ({
-        id: edge.id,
-        source: edge.source,
-        target: edge.target,
-        flow_keys: ((edge.data?.flow_keys as string[] | undefined) ?? []).filter(Boolean),
-        edge_kind: (edge.data?.edge_kind as "normal" | "branch" | undefined) ?? "normal",
-        branch_label: (edge.data?.branch_label as "pass" | "revise" | "fail" | null | undefined) ?? null,
-      })),
+      edges: collapseVisualEdges(edges),
     };
   }
 
@@ -561,6 +689,7 @@ function EditorCanvas({ initialGraph, mode, graphId }: { initialGraph: GraphPayl
         position: nextPosition,
         data: {
           label: preset.label,
+          nodeId: nextId,
           nodeType: preset.type,
           description: preset.description,
           reads: [...preset.reads],
@@ -662,6 +791,7 @@ function EditorCanvas({ initialGraph, mode, graphId }: { initialGraph: GraphPayl
             data: {
               ...(edge.data ?? {}),
               flow_keys: flowKeys,
+              flow_key: flowKeys[0] ?? null,
             },
           };
         }),
@@ -901,16 +1031,39 @@ function EditorCanvas({ initialGraph, mode, graphId }: { initialGraph: GraphPayl
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}
               onConnect={(connection: Connection) => {
-                const nextEdge: Edge = {
-                  ...connection,
+                const sourceKey = getStateKeyFromHandle(connection.sourceHandle);
+                const targetKey = getStateKeyFromHandle(connection.targetHandle);
+
+                if (!sourceKey || !targetKey) {
+                  setStatusMessage("Connect state handles directly.");
+                  return;
+                }
+                if (sourceKey !== targetKey) {
+                  setStatusMessage("Only matching state keys can be connected.");
+                  return;
+                }
+
+                const nextEdge = createVisualEdge({
                   id: `edge_${crypto.randomUUID().slice(0, 8)}`,
-                  markerEnd: { type: MarkerType.ArrowClosed, color: "#9a3412" },
-                  style: { stroke: "#9a3412", strokeWidth: 1.8 },
-                  label: "flow",
-                  data: { flow_keys: [], edge_kind: "normal", branch_label: null },
-                };
-                setEdges((current) => addEdge(nextEdge, current));
-                setStatusMessage("Connected nodes");
+                  source: connection.source ?? "",
+                  target: connection.target ?? "",
+                  sourceHandle: connection.sourceHandle,
+                  targetHandle: connection.targetHandle,
+                  flowKey: sourceKey,
+                  stateColors,
+                });
+
+                setEdges((current) => {
+                  const exists = current.some(
+                    (edge) =>
+                      edge.source === nextEdge.source &&
+                      edge.target === nextEdge.target &&
+                      edge.sourceHandle === nextEdge.sourceHandle &&
+                      edge.targetHandle === nextEdge.targetHandle,
+                  );
+                  return exists ? current : current.concat(nextEdge);
+                });
+                setStatusMessage(`Connected ${sourceKey}`);
               }}
               onSelectionChange={handleSelectionChange}
               onPaneClick={() => {
@@ -1166,11 +1319,15 @@ function EditorCanvas({ initialGraph, mode, graphId }: { initialGraph: GraphPayl
                     value={((selectedEdge.data?.flow_keys as string[] | undefined) ?? []).join(", ")}
                     onChange={(event) => {
                       const flowKeys = splitCommaValues(event.target.value);
+                      const primaryKey = flowKeys[0] ?? null;
                       updateEdge(selectedEdge.id, {
+                        sourceHandle: primaryKey ? buildHandleId("output", primaryKey) : selectedEdge.sourceHandle,
+                        targetHandle: primaryKey ? buildHandleId("input", primaryKey) : selectedEdge.targetHandle,
                         label: buildEdgeLabel(flowKeys, "normal", null),
                         data: {
                           ...(selectedEdge.data ?? {}),
                           flow_keys: flowKeys,
+                          flow_key: primaryKey,
                           edge_kind: "normal",
                           branch_label: null,
                         },
