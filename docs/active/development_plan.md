@@ -56,11 +56,14 @@
   - `default_graph`
 - editor 已具备：
   - `State Panel`
+  - `State Panel` 折叠
   - 自定义节点卡片
   - 左入右出
   - `reads / writes` 绑定
   - 结构化参数编辑
   - 快速新增 state key
+  - 画布优先的浮动面板布局
+  - 节点库搜索
   - Validate / Save / Run
   - 节点执行摘要展示
 - 前端模板路由已优先按后端模板 `default_graph` 初始化
@@ -95,6 +98,11 @@
   - 顶部会显示轮询中的 run 状态
   - run 级 `warnings / errors` 会在编辑器内展示
   - 选中节点后会请求 `/api/runs/{run_id}/nodes/{node_id}` 查看节点级执行明细
+- editor 已进入第一阶段 `canvas-first` 交互
+  - `State Panel` 为左侧浮动面板，可折叠
+  - `Theme / Run / Node Inspector` 已改为画布上的浮动面板
+  - `Node Inspector` 仅在选中节点或边时显示
+- 节点库已支持搜索
 - `runs` 页面已支持按 `graph_name` 搜索、按 `status` 过滤
 - `knowledge` 页面已支持搜索和展开详情
 - `memories` 页面已支持按 `memory_type` 过滤和展开详情

@@ -15,30 +15,38 @@ import {
 import "@xyflow/react/dist/style.css";
 
 import { NodeParamsForm } from "@/components/editor/node-params-form";
-import { WorkflowEdge } from "@/components/editor/workflow-edge";
 import { StatePanel } from "@/components/editor/state-panel";
 import { ThemeConfigPanel } from "@/components/editor/theme-config-panel";
+import { WorkflowEdge } from "@/components/editor/workflow-edge";
 import { WorkflowNode } from "@/components/editor/workflow-node";
 import { useLanguage } from "@/components/providers/language-provider";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { SubtleCard } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { apiGet, apiPost } from "@/lib/api";
 import { NODE_PRESETS } from "@/lib/editor-presets";
 import {
   fromBackendGraphDocument,
-  fromBackendThemePreset,
   fromBackendTemplateDefaultGraph,
+  fromBackendThemePreset,
   toBackendGraphPayload,
   type BackendGraphDocument,
   type BackendTemplateDefinition,
 } from "@/lib/graph-api";
 import { createTemplateShellDocument, getTemplateThemePresets } from "@/lib/templates";
 import { useEditorStore } from "@/stores/editor-store";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
-import { SubtleCard } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
-import type { GraphCanvasNode, GraphDocument, NodeExecutionDetail, RunDetailPayload, StateFieldRole, StateFieldType, TemplateDefinition, ThemePreset } from "@/types/editor";
+import type {
+  GraphCanvasNode,
+  GraphDocument,
+  NodeExecutionDetail,
+  RunDetailPayload,
+  StateFieldRole,
+  StateFieldType,
+  ThemePreset,
+} from "@/types/editor";
 
 const nodeTypes = {
   workflow: WorkflowNode,
@@ -48,11 +56,15 @@ const edgeTypes = {
   workflow: WorkflowEdge,
 };
 
+const STATE_PANEL_STORAGE_KEY = "graphiteui:editor:state-panel-collapsed";
+
 function EditorWorkbenchInner({ graphId }: { graphId: string }) {
   const { t } = useLanguage();
   const router = useRouter();
   const [newReadKey, setNewReadKey] = useState("");
   const [newWriteKey, setNewWriteKey] = useState("");
+  const [nodeSearch, setNodeSearch] = useState("");
+  const [isStatePanelCollapsed, setIsStatePanelCollapsed] = useState(false);
   const [latestRunDetail, setLatestRunDetail] = useState<RunDetailPayload | null>(null);
   const [selectedNodeDetail, setSelectedNodeDetail] = useState<NodeExecutionDetail | null>(null);
   const [templatePresets, setTemplatePresets] = useState<ThemePreset[]>(getTemplateThemePresets("creative_factory"));
@@ -110,6 +122,19 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
   useEffect(() => {
     initGraph(graphId);
   }, [graphId, initGraph]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const persisted = window.localStorage.getItem(STATE_PANEL_STORAGE_KEY);
+    if (persisted === "true") {
+      setIsStatePanelCollapsed(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(STATE_PANEL_STORAGE_KEY, String(isStatePanelCollapsed));
+  }, [isStatePanelCollapsed]);
 
   useEffect(() => {
     let cancelled = false;
@@ -230,10 +255,17 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
   const selectedNode = useMemo(() => nodes.find((node) => node.id === selectedNodeId) ?? null, [nodes, selectedNodeId]);
   const selectedEdge = useMemo(() => edges.find((edge) => edge.id === selectedEdgeId) ?? null, [edges, selectedEdgeId]);
   const selectedNodeExecution = selectedNode ? nodeExecutionMap[selectedNode.id] ?? null : null;
-  const selectedThemePreset = useMemo(
-    () => templatePresets.find((preset) => preset.id === themeConfig.themePreset) ?? null,
-    [templatePresets, themeConfig.themePreset],
-  );
+  const filteredNodePresets = useMemo(() => {
+    const query = nodeSearch.trim().toLowerCase();
+    if (!query) return NODE_PRESETS;
+    return NODE_PRESETS.filter((preset) => {
+      return (
+        preset.label.toLowerCase().includes(query) ||
+        preset.kind.toLowerCase().includes(query) ||
+        preset.description.toLowerCase().includes(query)
+      );
+    });
+  }, [nodeSearch]);
 
   useEffect(() => {
     setNewReadKey("");
@@ -351,57 +383,87 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
         <p className="max-w-[68ch] text-[1.02rem] leading-[1.7] text-[var(--muted)]">{t("editor.desc")}</p>
       </section>
 
-      <section className="rounded-[22px] border border-[var(--line)] bg-[rgba(255,250,241,0.86)] px-5 py-4 shadow-[0_10px_30px_var(--shadow)]">
-        <div className="flex flex-wrap gap-2.5">
-          <Button onClick={handleValidateBackend}>{t("editor.validate")}</Button>
-          <Button onClick={handleSaveBackend}>{t("editor.save")}</Button>
-          <Button onClick={handleRunBackend} variant="primary">{t("editor.run")}</Button>
-          <Button onClick={saveGraphLocally}>{t("editor.save_local")}</Button>
-          <Button onClick={simulateRun}>{t("editor.simulate")}</Button>
-          <Badge>{runtimeLabel}</Badge>
-          <Badge>Template {templateId}</Badge>
-          {currentRunId && currentRunStatus !== "completed" && currentRunStatus !== "failed" ? <Badge>Polling run</Badge> : null}
-          {validationPassed !== null ? <Badge>{validationPassed ? "Schema valid" : "Needs fixes"}</Badge> : null}
-          {lastSavedAt ? <Badge>Saved {new Date(lastSavedAt).toLocaleTimeString()}</Badge> : null}
-        </div>
-      </section>
-
-      <ThemeConfigPanel
-        graphName={graphName}
-        themeConfig={themeConfig}
-        presets={templatePresets}
-        onGraphNameChange={updateGraphName}
-        onThemeConfigChange={updateThemeConfig}
-        onApplyPreset={applyThemePreset}
-      />
-
-      <section className="grid min-h-[620px] grid-cols-[360px_minmax(0,1fr)_380px] gap-4 max-[960px]:grid-cols-1">
-        <aside className="grid content-start gap-4 rounded-[22px] border border-dashed border-[rgba(154,52,18,0.25)] bg-[rgba(255,255,255,0.42)] p-[18px]">
-          <StatePanel stateSchema={stateSchema} onAddField={addStateField} onUpdateField={updateStateField} onRemoveField={removeStateField} />
-
-          <div className="grid gap-3">
-            <h2 className="text-lg font-semibold">{t("editor.palette")}</h2>
-            <div className="grid gap-3">
-              {NODE_PRESETS.map((preset) => (
-                <button key={preset.kind} className="grid gap-1.5 rounded-[18px] border border-[rgba(212,198,170,0.9)] bg-[rgba(255,255,255,0.78)] p-3.5 text-left text-[var(--text)] transition-transform hover:-translate-y-px hover:border-[rgba(154,52,18,0.45)]" onClick={() => addNode(preset.kind)} type="button">
-                  <strong>{preset.label}</strong>
-                  <span className="text-[var(--muted)]">{preset.description}</span>
-                </button>
-              ))}
+      <section className="relative min-h-[780px] overflow-hidden rounded-[26px] border border-[var(--line)] bg-[rgba(255,250,241,0.92)] shadow-[0_18px_48px_var(--shadow)]">
+        <div className="absolute left-4 right-4 top-4 z-20 flex flex-wrap items-start justify-between gap-3">
+          <SubtleCard className="max-w-[min(100%,34rem)] border-[rgba(154,52,18,0.18)] bg-[rgba(255,255,255,0.88)] backdrop-blur">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <Badge>{runtimeLabel}</Badge>
+              <Badge>Template {templateId}</Badge>
+              {currentRunId && currentRunStatus !== "completed" && currentRunStatus !== "failed" ? <Badge>Polling run</Badge> : null}
+              {validationPassed !== null ? <Badge>{validationPassed ? "Schema valid" : "Needs fixes"}</Badge> : null}
+              {lastSavedAt ? <Badge>Saved {new Date(lastSavedAt).toLocaleTimeString()}</Badge> : null}
             </div>
-          </div>
+            <div className="mt-2 flex flex-wrap gap-2.5">
+              <Button onClick={handleValidateBackend}>{t("editor.validate")}</Button>
+              <Button onClick={handleSaveBackend}>{t("editor.save")}</Button>
+              <Button onClick={handleRunBackend} variant="primary">{t("editor.run")}</Button>
+              <Button onClick={saveGraphLocally}>{t("editor.save_local")}</Button>
+              <Button onClick={simulateRun}>{t("editor.simulate")}</Button>
+            </div>
+          </SubtleCard>
+        </div>
 
-          <div className="flex flex-wrap gap-2.5">
-            <Badge>Nodes {nodes.length}</Badge>
-            <Badge>Edges {edges.length}</Badge>
-            <Badge>State {stateSchema.length}</Badge>
-            {currentRunStatus ? <Badge>Run {currentRunStatus}</Badge> : null}
-            {currentNodeId ? <Badge>Current {currentNodeId}</Badge> : null}
-            {selectedEdgeId ? <Badge>Selected edge {selectedEdgeId}</Badge> : null}
-          </div>
+        <div className="absolute left-4 top-28 z-20 flex items-start gap-3">
+          {isStatePanelCollapsed ? (
+            <button
+              className="rounded-[18px] border border-[rgba(154,52,18,0.22)] bg-[rgba(255,255,255,0.9)] px-3 py-2 text-sm font-medium text-[var(--text)] shadow-[0_10px_28px_var(--shadow)] backdrop-blur transition hover:border-[rgba(154,52,18,0.45)]"
+              onClick={() => setIsStatePanelCollapsed(false)}
+              type="button"
+            >
+              Open State
+            </button>
+          ) : (
+            <div className="grid max-h-[calc(100vh-18rem)] w-[360px] gap-3 overflow-hidden rounded-[22px] border border-[rgba(154,52,18,0.18)] bg-[rgba(255,255,255,0.9)] p-4 shadow-[0_14px_34px_var(--shadow)] backdrop-blur">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-lg font-semibold">State & Nodes</h2>
+                <Button size="sm" onClick={() => setIsStatePanelCollapsed(true)}>Collapse</Button>
+              </div>
+
+              <div className="overflow-y-auto pr-1">
+                <div className="grid gap-4">
+                  <StatePanel stateSchema={stateSchema} onAddField={addStateField} onUpdateField={updateStateField} onRemoveField={removeStateField} />
+
+                  <div className="grid gap-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <h2 className="text-lg font-semibold">{t("editor.palette")}</h2>
+                      <Badge>{filteredNodePresets.length}</Badge>
+                    </div>
+                    <Input placeholder="Search nodes" value={nodeSearch} onChange={(event) => setNodeSearch(event.target.value)} />
+                    <div className="grid gap-3">
+                      {filteredNodePresets.map((preset) => (
+                        <button
+                          key={preset.kind}
+                          className="grid gap-1.5 rounded-[18px] border border-[rgba(212,198,170,0.9)] bg-[rgba(255,255,255,0.78)] p-3.5 text-left text-[var(--text)] transition-transform hover:-translate-y-px hover:border-[rgba(154,52,18,0.45)]"
+                          onClick={() => addNode(preset.kind)}
+                          type="button"
+                        >
+                          <strong>{preset.label}</strong>
+                          <span className="text-[var(--muted)]">{preset.description}</span>
+                        </button>
+                      ))}
+                      {filteredNodePresets.length === 0 ? <SubtleCard>No matching nodes.</SubtleCard> : null}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="absolute bottom-4 left-4 z-20 grid w-[320px] gap-3 max-[960px]:hidden">
+          <SubtleCard className="border-[rgba(154,52,18,0.18)] bg-[rgba(255,255,255,0.88)] backdrop-blur">
+            <div className="flex flex-wrap gap-2.5">
+              <Badge>Nodes {nodes.length}</Badge>
+              <Badge>Edges {edges.length}</Badge>
+              <Badge>State {stateSchema.length}</Badge>
+              {currentRunStatus ? <Badge>Run {currentRunStatus}</Badge> : null}
+              {currentNodeId ? <Badge>Current {currentNodeId}</Badge> : null}
+              {selectedEdgeId ? <Badge>Selected edge {selectedEdgeId}</Badge> : null}
+            </div>
+          </SubtleCard>
 
           {validationIssues.length > 0 ? (
-            <div className="grid gap-2.5">
+            <SubtleCard className="grid gap-2.5 border-[rgba(159,18,57,0.18)] bg-[rgba(255,255,255,0.9)] backdrop-blur">
               <h3 className="font-semibold">Validation Issues</h3>
               <div className="grid gap-3">
                 {validationIssues.map((issue) => (
@@ -411,75 +473,60 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
                   </SubtleCard>
                 ))}
               </div>
-            </div>
+            </SubtleCard>
           ) : null}
-
-          {currentRunId ? (
-            <div className="grid gap-2.5">
-              <h3 className="font-semibold">{t("editor.latest_run")}</h3>
-              <div className="grid gap-3">
-                <SubtleCard>
-                  <strong>{currentRunId}</strong>
-                  <div className="text-[var(--muted)]">Status: {currentRunStatus ?? "unknown"}</div>
-                </SubtleCard>
-                <Button onClick={() => router.push(`/runs/${currentRunId}`)}>{t("editor.open_run")}</Button>
-                {latestRunDetail?.warnings?.length ? (
-                  <SubtleCard>
-                    <strong>Run warnings</strong>
-                    <div className="mt-1.5 grid gap-1 text-[var(--muted)]">
-                      {latestRunDetail.warnings.map((warning) => (
-                        <div key={warning}>{warning}</div>
-                      ))}
-                    </div>
-                  </SubtleCard>
-                ) : null}
-                {latestRunDetail?.errors?.length ? (
-                  <SubtleCard className="border-[rgba(159,18,57,0.28)]">
-                    <strong>Run errors</strong>
-                    <div className="mt-1.5 grid gap-1 text-[var(--muted)]">
-                      {latestRunDetail.errors.map((error) => (
-                        <div key={error}>{error}</div>
-                      ))}
-                    </div>
-                  </SubtleCard>
-                ) : null}
-              </div>
-            </div>
-          ) : null}
-        </aside>
-
-        <div className="min-h-[620px] overflow-hidden rounded-[22px] border border-[var(--line)] bg-[rgba(255,250,241,0.86)] p-0 shadow-[0_10px_30px_var(--shadow)]">
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            fitView
-            edgeTypes={edgeTypes}
-            nodeTypes={nodeTypes}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onNodeClick={onNodeClick}
-            onEdgeClick={onEdgeClick}
-            deleteKeyCode={["Backspace", "Delete"]}
-            style={{
-              background:
-                "radial-gradient(circle at 20% 20%, rgba(154, 52, 18, 0.08), transparent 18%), linear-gradient(180deg, rgba(255, 250, 241, 0.85), rgba(250, 245, 236, 0.95))",
-            }}
-          >
-            <MiniMap zoomable pannable />
-            <Controls />
-            <Background gap={18} size={1} />
-            <Panel position="top-left">
-              <Badge>Edges represent execution flow and carry major state keys.</Badge>
-            </Panel>
-          </ReactFlow>
         </div>
 
-        <aside className="grid content-start gap-4 rounded-[22px] border border-dashed border-[rgba(154,52,18,0.25)] bg-[rgba(255,255,255,0.42)] p-[18px]">
-          <h2 className="text-lg font-semibold">{t("editor.config")}</h2>
+        <div className="absolute right-4 top-24 z-20 grid max-h-[calc(100vh-14rem)] w-[min(28rem,calc(100%-2rem))] gap-3 overflow-y-auto max-[960px]:left-4 max-[960px]:right-4 max-[960px]:top-[7.5rem] max-[960px]:w-auto">
+          <ThemeConfigPanel
+            graphName={graphName}
+            themeConfig={themeConfig}
+            presets={templatePresets}
+            onGraphNameChange={updateGraphName}
+            onThemeConfigChange={updateThemeConfig}
+            onApplyPreset={applyThemePreset}
+          />
+
+          {currentRunId ? (
+            <SubtleCard className="grid gap-2.5 border-[rgba(154,52,18,0.18)] bg-[rgba(255,255,255,0.9)] backdrop-blur">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="font-semibold">{t("editor.latest_run")}</h3>
+                <Button size="sm" onClick={() => router.push(`/runs/${currentRunId}`)}>{t("editor.open_run")}</Button>
+              </div>
+              <SubtleCard>
+                <strong>{currentRunId}</strong>
+                <div className="text-[var(--muted)]">Status: {currentRunStatus ?? "unknown"}</div>
+              </SubtleCard>
+              {latestRunDetail?.warnings?.length ? (
+                <SubtleCard>
+                  <strong>Run warnings</strong>
+                  <div className="mt-1.5 grid gap-1 text-[var(--muted)]">
+                    {latestRunDetail.warnings.map((warning) => (
+                      <div key={warning}>{warning}</div>
+                    ))}
+                  </div>
+                </SubtleCard>
+              ) : null}
+              {latestRunDetail?.errors?.length ? (
+                <SubtleCard className="border-[rgba(159,18,57,0.28)]">
+                  <strong>Run errors</strong>
+                  <div className="mt-1.5 grid gap-1 text-[var(--muted)]">
+                    {latestRunDetail.errors.map((error) => (
+                      <div key={error}>{error}</div>
+                    ))}
+                  </div>
+                </SubtleCard>
+              ) : null}
+            </SubtleCard>
+          ) : null}
 
           {selectedNode ? (
-            <div className="grid gap-3.5">
+            <SubtleCard className="grid gap-4 border-[rgba(154,52,18,0.18)] bg-[rgba(255,255,255,0.92)] backdrop-blur">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-lg font-semibold">{t("editor.config")}</h2>
+                <Badge>{selectedNode.data.kind}</Badge>
+              </div>
+
               <label className="grid gap-2 text-[0.94rem]">
                 <span>{t("editor.node_name")}</span>
                 <Input value={selectedNode.data.label} onChange={(event) => updateSelectedNodeLabel(event.target.value)} />
@@ -562,7 +609,6 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
               </label>
 
               <div className="flex flex-wrap gap-2.5">
-                <Badge>Type {selectedNode.data.kind}</Badge>
                 <Badge>Reads {selectedNode.data.reads.length}</Badge>
                 <Badge>Writes {selectedNode.data.writes.length}</Badge>
                 <Badge>Status {selectedNode.data.status ?? "idle"}</Badge>
@@ -617,11 +663,15 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
                   </div>
                 </div>
               ) : null}
-            </div>
+            </SubtleCard>
           ) : null}
 
           {selectedEdge ? (
-            <div className="grid gap-3.5">
+            <SubtleCard className="grid gap-3.5 border-[rgba(154,52,18,0.18)] bg-[rgba(255,255,255,0.92)] backdrop-blur">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-lg font-semibold">{t("editor.config")}</h2>
+                <Badge>Edge</Badge>
+              </div>
               <div className="grid gap-2 text-[0.94rem]">
                 <span>Edge Kind</span>
                 <Select value={selectedEdge.data?.edgeKind ?? "normal"} onChange={(event) => updateSelectedEdgeKind(event.target.value as "normal" | "branch")}>
@@ -665,13 +715,36 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
                   })}
                 </div>
               </div>
-            </div>
+            </SubtleCard>
           ) : null}
+        </div>
 
-          {!selectedNode && !selectedEdge ? (
-            <p className="text-[var(--muted)]">Select a node to edit reads/writes/params, or select an edge to edit flow keys and branch metadata.</p>
-          ) : null}
-        </aside>
+        <div className="min-h-[780px] overflow-hidden">
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            fitView
+            edgeTypes={edgeTypes}
+            nodeTypes={nodeTypes}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onNodeClick={onNodeClick}
+            onEdgeClick={onEdgeClick}
+            deleteKeyCode={["Backspace", "Delete"]}
+            style={{
+              background:
+                "radial-gradient(circle at 20% 20%, rgba(154, 52, 18, 0.08), transparent 18%), linear-gradient(180deg, rgba(255, 250, 241, 0.85), rgba(250, 245, 236, 0.95))",
+            }}
+          >
+            <MiniMap zoomable pannable />
+            <Controls />
+            <Background gap={18} size={1} />
+            <Panel position="top-left">
+              <Badge>Edges represent execution flow and carry major state keys.</Badge>
+            </Panel>
+          </ReactFlow>
+        </div>
       </section>
     </div>
   );
