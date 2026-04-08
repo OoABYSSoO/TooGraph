@@ -29,10 +29,9 @@
 以下事项仍然是现实问题：
 
 1. 模板注册表目前只有 `creative_factory`
-2. editor 没有运行轮询
-3. 前端仍保留 fallback 模板逻辑
-4. `/api/settings` 仍暴露 `skills`
-5. UI 层虽然已有 primitives 和语义组件，但还没有完整设计系统
+2. 前端仍保留 fallback 模板逻辑
+3. `/api/settings` 仍暴露 `skills`
+4. UI 层虽然已有 primitives 和语义组件，但还没有完整设计系统
 
 ---
 
@@ -85,6 +84,27 @@
 - editor 模板主路径已优先依赖后端 `default_graph`
 - store 初始化已改为轻量 shell，而非完整本地模板图
 - 本地完整模板图仍保留为模板接口失败时的兜底
+
+## Task T2A Editor 运行观测增强
+
+优先级：`P0`
+
+状态：`已完成`
+
+目标：
+
+让 editor 内的运行反馈不只停留在节点颜色变化，而是能直接看到当前 run 的警告、错误和节点级执行明细。
+
+已完成结果：
+
+- 运行中会显示 `Polling run` 状态标签
+- run 级 `warnings / errors` 会显示在编辑器右侧摘要区
+- 选中节点时会请求 `/api/runs/{run_id}/nodes/{node_id}`
+- 节点执行明细已包含：
+  - `warnings`
+  - `errors`
+  - `artifacts`
+  - 更完整的执行时间信息
 
 ## Task T3 第二个模板
 
@@ -154,8 +174,7 @@
 
 建议按这个顺序推进：
 
-1. `T1 Editor 运行轮询`
-2. `T2 模板单一来源继续收口`
-3. `T3 第二个模板`
-4. `T4 弱化 settings 中的 skills 概念`
-5. `T5 UI 组件层继续收口`
+1. `T2 模板单一来源继续收口`
+2. `T3 第二个模板`
+3. `T4 弱化 settings 中的 skills 概念`
+4. `T5 UI 组件层继续收口`

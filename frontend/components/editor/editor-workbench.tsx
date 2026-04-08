@@ -38,7 +38,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { SubtleCard } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import type { GraphCanvasNode, GraphDocument, RunDetailPayload, StateFieldRole, StateFieldType, TemplateDefinition, ThemePreset } from "@/types/editor";
+import type { GraphCanvasNode, GraphDocument, NodeExecutionDetail, RunDetailPayload, StateFieldRole, StateFieldType, TemplateDefinition, ThemePreset } from "@/types/editor";
 
 const nodeTypes = {
   workflow: WorkflowNode,
@@ -53,6 +53,8 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
   const router = useRouter();
   const [newReadKey, setNewReadKey] = useState("");
   const [newWriteKey, setNewWriteKey] = useState("");
+  const [latestRunDetail, setLatestRunDetail] = useState<RunDetailPayload | null>(null);
+  const [selectedNodeDetail, setSelectedNodeDetail] = useState<NodeExecutionDetail | null>(null);
   const [templatePresets, setTemplatePresets] = useState<ThemePreset[]>(getTemplateThemePresets("creative_factory"));
   const {
     initGraph,
@@ -180,6 +182,7 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
       try {
         const runDetail = await apiGet<RunDetailPayload>(`/api/runs/${currentRunId}`);
         if (!cancelled) {
+          setLatestRunDetail(runDetail);
           applyRunDetail(runDetail);
         }
       } catch (error) {
@@ -196,6 +199,33 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
       window.clearInterval(intervalId);
     };
   }, [applyRunDetail, currentRunId, currentRunStatus]);
+
+  useEffect(() => {
+    if (!currentRunId || !selectedNodeId) {
+      setSelectedNodeDetail(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadNodeDetail() {
+      try {
+        const payload = await apiGet<NodeExecutionDetail>(`/api/runs/${currentRunId}/nodes/${selectedNodeId}`);
+        if (!cancelled) {
+          setSelectedNodeDetail(payload);
+        }
+      } catch {
+        if (!cancelled) {
+          setSelectedNodeDetail(null);
+        }
+      }
+    }
+
+    loadNodeDetail();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentRunId, selectedNodeId, nodeExecutionMap]);
 
   const selectedNode = useMemo(() => nodes.find((node) => node.id === selectedNodeId) ?? null, [nodes, selectedNodeId]);
   const selectedEdge = useMemo(() => edges.find((edge) => edge.id === selectedEdgeId) ?? null, [edges, selectedEdgeId]);
@@ -304,6 +334,7 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
       setCurrentRunId(response.run_id);
       useEditorStore.setState({ runtimeLabel: `Run started: ${response.run_id}` });
       const runDetail = await apiGet<RunDetailPayload>(`/api/runs/${response.run_id}`);
+      setLatestRunDetail(runDetail);
       applyRunDetail(runDetail);
     } catch (error) {
       useEditorStore.setState({
@@ -329,6 +360,7 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
           <Button onClick={simulateRun}>{t("editor.simulate")}</Button>
           <Badge>{runtimeLabel}</Badge>
           <Badge>Template {templateId}</Badge>
+          {currentRunId && currentRunStatus !== "completed" && currentRunStatus !== "failed" ? <Badge>Polling run</Badge> : null}
           {validationPassed !== null ? <Badge>{validationPassed ? "Schema valid" : "Needs fixes"}</Badge> : null}
           {lastSavedAt ? <Badge>Saved {new Date(lastSavedAt).toLocaleTimeString()}</Badge> : null}
         </div>
@@ -391,6 +423,26 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
                   <div className="text-[var(--muted)]">Status: {currentRunStatus ?? "unknown"}</div>
                 </SubtleCard>
                 <Button onClick={() => router.push(`/runs/${currentRunId}`)}>{t("editor.open_run")}</Button>
+                {latestRunDetail?.warnings?.length ? (
+                  <SubtleCard>
+                    <strong>Run warnings</strong>
+                    <div className="mt-1.5 grid gap-1 text-[var(--muted)]">
+                      {latestRunDetail.warnings.map((warning) => (
+                        <div key={warning}>{warning}</div>
+                      ))}
+                    </div>
+                  </SubtleCard>
+                ) : null}
+                {latestRunDetail?.errors?.length ? (
+                  <SubtleCard className="border-[rgba(159,18,57,0.28)]">
+                    <strong>Run errors</strong>
+                    <div className="mt-1.5 grid gap-1 text-[var(--muted)]">
+                      {latestRunDetail.errors.map((error) => (
+                        <div key={error}>{error}</div>
+                      ))}
+                    </div>
+                  </SubtleCard>
+                ) : null}
               </div>
             </div>
           ) : null}
@@ -531,6 +583,37 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
                     <div className="flex flex-wrap gap-2.5">
                       <Badge>{selectedNodeExecution.duration_ms}ms</Badge>
                     </div>
+                    {selectedNodeDetail?.warnings?.length ? (
+                      <SubtleCard>
+                        <strong>Warnings</strong>
+                        <div className="mt-1.5 grid gap-1 text-[var(--muted)]">
+                          {selectedNodeDetail.warnings.map((warning) => (
+                            <div key={warning}>{warning}</div>
+                          ))}
+                        </div>
+                      </SubtleCard>
+                    ) : null}
+                    {selectedNodeDetail?.errors?.length ? (
+                      <SubtleCard className="border-[rgba(159,18,57,0.28)]">
+                        <strong>Errors</strong>
+                        <div className="mt-1.5 grid gap-1 text-[var(--muted)]">
+                          {selectedNodeDetail.errors.map((error) => (
+                            <div key={error}>{error}</div>
+                          ))}
+                        </div>
+                      </SubtleCard>
+                    ) : null}
+                    {selectedNodeDetail?.artifacts && Object.keys(selectedNodeDetail.artifacts).length > 0 ? (
+                      <label className="grid gap-2 text-[0.94rem]">
+                        <span>Artifacts</span>
+                        <Textarea
+                          className="font-mono text-[0.82rem]"
+                          rows={8}
+                          readOnly
+                          value={JSON.stringify(selectedNodeDetail.artifacts, null, 2)}
+                        />
+                      </label>
+                    ) : null}
                   </div>
                 </div>
               ) : null}

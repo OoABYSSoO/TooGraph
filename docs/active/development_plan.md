@@ -91,6 +91,10 @@
 - editor 点击 `Run` 后会立即请求一次 `/api/runs/{run_id}`，并把结果映射回节点状态
 - editor 已具备持续轮询
   - run 未进入终态前，会周期性刷新 `/api/runs/{run_id}`
+- editor 已具备基础运行观测增强
+  - 顶部会显示轮询中的 run 状态
+  - run 级 `warnings / errors` 会在编辑器内展示
+  - 选中节点后会请求 `/api/runs/{run_id}/nodes/{node_id}` 查看节点级执行明细
 - `runs` 页面已支持按 `graph_name` 搜索、按 `status` 过滤
 - `knowledge` 页面已支持搜索和展开详情
 - `memories` 页面已支持按 `memory_type` 过滤和展开详情
@@ -214,13 +218,15 @@
 
 ### P0
 
-- 增强 editor 的运行观测
-  - 当前节点高亮更实时
-  - 更明确的 run status 区
-  - 失败节点的错误摘要展示
 - 继续收拢模板单一来源
   - 继续减少前端 fallback 模板图维护量
   - 让后端模板定义成为更明确的源头
+
+### 已完成的近期增量
+
+- editor 运行轮询已完成
+- editor run 级 `warnings / errors` 展示已完成
+- editor 节点级执行明细查看已完成
 
 ### P1
 

@@ -14,6 +14,8 @@
 补充说明：
 
 - 当前 editor 在点击 `Run` 后会持续轮询 run detail，直到 run 进入终态
+- 当前 editor 会在运行期间展示 run 级 `warnings / errors`
+- 当前 editor 选中节点后会请求节点级执行明细
 - 当前模板注册表中实际只有一个模板：`creative_factory`
 
 ---
@@ -203,6 +205,7 @@ http://127.0.0.1:8765
 
 - 当前节点状态会在运行期间持续刷新
 - 终态后轮询会自动停止
+- 运行中的整体警告与错误会在 editor 中同步显示
 
 ### AC-RUNTIME-2 条件路由
 
@@ -246,6 +249,10 @@ http://127.0.0.1:8765
   - `duration_ms`
   - `input_summary`
   - `output_summary`
+- 如果节点详情存在，还应能看到：
+  - `warnings`
+  - `errors`
+  - `artifacts`
 
 ---
 

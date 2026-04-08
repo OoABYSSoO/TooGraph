@@ -116,6 +116,11 @@ export type NodeExecutionSummary = {
   errors?: string[];
 };
 
+export type NodeExecutionDetail = NodeExecutionSummary & {
+  started_at?: string | null;
+  finished_at?: string | null;
+};
+
 export type RunDetailPayload = {
   run_id: string;
   status: string;
@@ -125,6 +130,9 @@ export type RunDetailPayload = {
   final_score?: number | null;
   node_status_map: Record<string, string>;
   node_executions: NodeExecutionSummary[];
+  warnings?: string[];
+  errors?: string[];
+  artifacts?: Record<string, unknown>;
 };
 
 export type GraphDocument = {
