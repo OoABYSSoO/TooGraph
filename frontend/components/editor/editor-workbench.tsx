@@ -17,13 +17,14 @@ import "@xyflow/react/dist/style.css";
 import { NodeParamsForm } from "@/components/editor/node-params-form";
 import { WorkflowEdge } from "@/components/editor/workflow-edge";
 import { StatePanel } from "@/components/editor/state-panel";
+import { ThemeConfigPanel } from "@/components/editor/theme-config-panel";
 import { WorkflowNode } from "@/components/editor/workflow-node";
 import { useLanguage } from "@/components/providers/language-provider";
 import { apiGet, apiPost } from "@/lib/api";
 import { NODE_PRESETS, THEME_PRESETS } from "@/lib/editor-presets";
 import { fromBackendGraphDocument, toBackendGraphPayload, type BackendGraphDocument } from "@/lib/graph-api";
 import { useEditorStore } from "@/stores/editor-store";
-import type { GraphCanvasNode, GraphDocument, RunDetailPayload, StateFieldRole, StateFieldType } from "@/types/editor";
+import type { GraphCanvasNode, GraphDocument, RunDetailPayload, StateFieldRole, StateFieldType, TemplateDefinition, ThemePreset } from "@/types/editor";
 
 const nodeTypes = {
   workflow: WorkflowNode,
@@ -38,6 +39,7 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
   const router = useRouter();
   const [newReadKey, setNewReadKey] = useState("");
   const [newWriteKey, setNewWriteKey] = useState("");
+  const [templatePresets, setTemplatePresets] = useState<ThemePreset[]>(THEME_PRESETS);
   const {
     initGraph,
     hydrateGraph,
@@ -121,12 +123,97 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
     };
   }, [graphId, hydrateGraph]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadTemplateDefinition() {
+      try {
+        const payload = await apiGet<{
+          template_id: string;
+          label: string;
+          description: string;
+          default_graph_name: string;
+          default_theme_preset: string;
+          supported_node_types: string[];
+          state_keys: string[];
+          theme_presets: Array<{
+            id: string;
+            label: string;
+            description: string;
+            graph_name?: string;
+            node_param_overrides?: Record<string, Record<string, unknown>>;
+            theme_config: {
+              theme_preset: string;
+              domain: string;
+              genre: string;
+              market: string;
+              platform: string;
+              language: string;
+              creative_style: string;
+              tone: string;
+              language_constraints: string[];
+              evaluation_policy: Record<string, unknown>;
+              asset_source_policy: Record<string, unknown>;
+              strategy_profile: {
+                hookTheme?: string;
+                payoffTheme?: string;
+                visualPattern?: string;
+                pacingPattern?: string;
+                evaluationFocus?: string[];
+              };
+            };
+          }>;
+        }>(`/api/templates/${templateId}`);
+        if (cancelled) return;
+        const nextPresets: ThemePreset[] = payload.theme_presets.map((preset) => ({
+          id: preset.id,
+          label: preset.label,
+          description: preset.description,
+          graphName: preset.graph_name,
+          nodeParamOverrides: preset.node_param_overrides ?? {},
+          themeConfig: {
+            themePreset: preset.theme_config.theme_preset,
+            domain: preset.theme_config.domain,
+            genre: preset.theme_config.genre,
+            market: preset.theme_config.market,
+            platform: preset.theme_config.platform,
+            language: preset.theme_config.language,
+            creativeStyle: preset.theme_config.creative_style,
+            tone: preset.theme_config.tone,
+            languageConstraints: preset.theme_config.language_constraints ?? [],
+            evaluationPolicy: preset.theme_config.evaluation_policy ?? {},
+            assetSourcePolicy: preset.theme_config.asset_source_policy ?? {},
+            strategyProfile: {
+              hookTheme: preset.theme_config.strategy_profile?.hookTheme ?? "",
+              payoffTheme: preset.theme_config.strategy_profile?.payoffTheme ?? "",
+              visualPattern: preset.theme_config.strategy_profile?.visualPattern ?? "",
+              pacingPattern: preset.theme_config.strategy_profile?.pacingPattern ?? "",
+              evaluationFocus: preset.theme_config.strategy_profile?.evaluationFocus ?? [],
+            },
+          },
+        }));
+        if (nextPresets.length > 0) {
+          setTemplatePresets(nextPresets);
+        }
+      } catch {
+        if (!cancelled) {
+          setTemplatePresets(THEME_PRESETS);
+        }
+      }
+    }
+
+    loadTemplateDefinition();
+    return () => {
+      cancelled = true;
+    };
+  }, [templateId]);
+
   const selectedNode = useMemo(() => nodes.find((node) => node.id === selectedNodeId) ?? null, [nodes, selectedNodeId]);
   const selectedEdge = useMemo(() => edges.find((edge) => edge.id === selectedEdgeId) ?? null, [edges, selectedEdgeId]);
   const selectedNodeExecution = selectedNode ? nodeExecutionMap[selectedNode.id] ?? null : null;
   const selectedThemePreset = useMemo(
-    () => THEME_PRESETS.find((preset) => preset.id === themeConfig.themePreset) ?? null,
-    [themeConfig.themePreset],
+    () => templatePresets.find((preset) => preset.id === themeConfig.themePreset) ?? null,
+    [templatePresets, themeConfig.themePreset],
   );
 
   useEffect(() => {
@@ -268,70 +355,14 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
         </div>
       </section>
 
-      <section className="card editor-theme-card">
-        <div className="theme-grid">
-          <label className="field">
-            <span>{t("editor.graph_name")}</span>
-            <input className="text-input" value={graphName} onChange={(event) => updateGraphName(event.target.value)} />
-          </label>
-          <label className="field">
-            <span>Theme Preset</span>
-            <select
-              className="text-input"
-              value={themeConfig.themePreset}
-              onChange={(event) => applyThemePreset(event.target.value)}
-            >
-              {THEME_PRESETS.map((preset) => (
-                <option key={preset.id} value={preset.id}>
-                  {preset.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span>Domain</span>
-            <input className="text-input" value={themeConfig.domain} onChange={(event) => updateThemeConfig({ domain: event.target.value })} />
-          </label>
-          <label className="field">
-            <span>Genre</span>
-            <input className="text-input" value={themeConfig.genre} onChange={(event) => updateThemeConfig({ genre: event.target.value })} />
-          </label>
-          <label className="field">
-            <span>Market</span>
-            <input className="text-input" value={themeConfig.market} onChange={(event) => updateThemeConfig({ market: event.target.value })} />
-          </label>
-          <label className="field">
-            <span>Platform</span>
-            <input className="text-input" value={themeConfig.platform} onChange={(event) => updateThemeConfig({ platform: event.target.value })} />
-          </label>
-          <label className="field">
-            <span>Language</span>
-            <input className="text-input" value={themeConfig.language} onChange={(event) => updateThemeConfig({ language: event.target.value })} />
-          </label>
-          <label className="field">
-            <span>Creative Style</span>
-            <input
-              className="text-input"
-              value={themeConfig.creativeStyle}
-              onChange={(event) => updateThemeConfig({ creativeStyle: event.target.value })}
-            />
-          </label>
-          <label className="field">
-            <span>Tone</span>
-            <input className="text-input" value={themeConfig.tone} onChange={(event) => updateThemeConfig({ tone: event.target.value })} />
-          </label>
-        </div>
-        {selectedThemePreset ? (
-          <div className="preset-banner">
-            <strong>{selectedThemePreset.label}</strong>
-            <span>{selectedThemePreset.description}</span>
-            <span>Hook: {themeConfig.strategyProfile.hookTheme}</span>
-            <span>Payoff: {themeConfig.strategyProfile.payoffTheme}</span>
-            <span>Visual: {themeConfig.strategyProfile.visualPattern}</span>
-            <span>Focus: {themeConfig.strategyProfile.evaluationFocus.join(" / ") || "None"}</span>
-          </div>
-        ) : null}
-      </section>
+      <ThemeConfigPanel
+        graphName={graphName}
+        themeConfig={themeConfig}
+        presets={templatePresets}
+        onGraphNameChange={updateGraphName}
+        onThemeConfigChange={updateThemeConfig}
+        onApplyPreset={applyThemePreset}
+      />
 
       <section className="editor-layout editor-layout-v2">
         <aside className="panel editor-side editor-left-stack">

@@ -21,9 +21,11 @@
 - legacy runtime、旧节点类型和旧图入口正在被清理出主线
 - creative factory 默认模板
 - `demo/slg_langgraph_single_file_modified_v2.py` 继续作为独立参考实现保留，主程序不依赖它
+- 模板注册与模板查询 API 已落地
 - 编辑器中的 `State Panel`
 - 节点左入右出、自定义节点卡片
 - 节点输入输出绑定、结构化参数面板、快速新增 state key
+- 主题配置面板已独立组件化，editor 可优先读取后端模板预设
 - runs / run detail / knowledge / memories / settings 的基础页面联通
 
 当前项目最准确的状态应理解为：

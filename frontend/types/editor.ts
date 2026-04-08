@@ -60,6 +60,17 @@ export type ThemePreset = {
   themeConfig: ThemeConfig;
 };
 
+export type TemplateDefinition = {
+  templateId: string;
+  label: string;
+  description: string;
+  defaultGraphName: string;
+  defaultThemePreset: string;
+  supportedNodeTypes: GraphNodeType[];
+  stateKeys: string[];
+  themePresets: ThemePreset[];
+};
+
 export type StateField = {
   key: string;
   type: StateFieldType;

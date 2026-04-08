@@ -25,6 +25,8 @@
 - 标准 creative factory 模板已存在
 - runtime 主链可执行
 - editor 已具备 state panel 和节点读写 state 的能力
+- 基础模板注册 API 已落地
+- 主题配置面板已组件化
 
 当前最明显的问题：
 

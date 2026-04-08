@@ -17,7 +17,13 @@ type SettingsPayload = {
     default_score_threshold: number;
     routes: string[];
   };
+  tools: string[];
   skills: string[];
+  templates: Array<{
+    template_id: string;
+    label: string;
+    default_theme_preset: string;
+  }>;
 };
 
 export function SettingsPanelClient() {
@@ -71,11 +77,21 @@ export function SettingsPanelClient() {
         <p className="muted">Routes: {settings.evaluator.routes.join(", ")}</p>
       </article>
       <article className="card span-12">
-        <h2>Skills</h2>
+        <h2>Templates</h2>
         <div className="status-row">
-          {settings.skills.map((skill) => (
-            <span className="pill" key={skill}>
-              {skill}
+          {settings.templates.map((template) => (
+            <span className="pill" key={template.template_id}>
+              {template.label} · {template.default_theme_preset}
+            </span>
+          ))}
+        </div>
+      </article>
+      <article className="card span-12">
+        <h2>Tools</h2>
+        <div className="status-row">
+          {settings.tools.map((tool) => (
+            <span className="pill" key={tool}>
+              {tool}
             </span>
           ))}
         </div>
