@@ -20,6 +20,7 @@
 - `development_plan.md`
 - `acceptance_runbook.md`
 - `node_definition_spec.md`
+- `node_source_of_truth_strategy.md`
 
 ## `docs/architecture/`
 
@@ -55,7 +56,8 @@
 3. `docs/active/development_plan.md`
 4. `docs/active/acceptance_runbook.md`
 5. `docs/active/node_definition_spec.md`
-6. `docs/architecture/framework_positioning.md`
+6. `docs/active/node_source_of_truth_strategy.md`
+7. `docs/architecture/framework_positioning.md`
 
 ## 3. Current Source of Truth
 
@@ -66,6 +68,7 @@
 - [development_plan.md](/home/abyss/GraphiteUI/docs/active/development_plan.md)
 - [acceptance_runbook.md](/home/abyss/GraphiteUI/docs/active/acceptance_runbook.md)
 - [node_definition_spec.md](/home/abyss/GraphiteUI/docs/active/node_definition_spec.md)
+- [node_source_of_truth_strategy.md](/home/abyss/GraphiteUI/docs/active/node_source_of_truth_strategy.md)
 
 这些文档共同定义：
 
@@ -83,3 +86,4 @@
 - ComfyUI 风格的参数 socket 覆盖本地 widget
 - `hello_world` 的真实闭环验收
 - 节点定义驱动渲染与 runtime mapping
+- 节点唯一源与 ComfyUI 式接入策略
