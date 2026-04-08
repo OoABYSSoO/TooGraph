@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
 import { apiGet } from "@/lib/api";
 import { useLanguage } from "@/components/providers/language-provider";
 
@@ -53,49 +55,49 @@ export function SettingsPanelClient() {
   }, []);
 
   if (error) {
-    return <section className="rounded-[22px] border border-[var(--line)] bg-[rgba(255,250,241,0.86)] p-5 shadow-[0_10px_30px_var(--shadow)]">{t("common.failed")}: {error}</section>;
+    return <Card>{t("common.failed")}: {error}</Card>;
   }
 
   if (!settings) {
-    return <section className="rounded-[22px] border border-[var(--line)] bg-[rgba(255,250,241,0.86)] p-5 shadow-[0_10px_30px_var(--shadow)]">{t("common.loading")}</section>;
+    return <Card>{t("common.loading")}</Card>;
   }
 
   return (
     <section className="grid grid-cols-12 gap-[18px] max-[960px]:grid-cols-1">
-      <article className="col-span-4 rounded-[22px] border border-[var(--line)] bg-[rgba(255,250,241,0.86)] p-5 shadow-[0_10px_30px_var(--shadow)] max-[960px]:col-span-1">
+      <Card className="col-span-4 max-[960px]:col-span-1">
         <h2 className="mb-2.5">Model</h2>
         <p className="text-[var(--muted)]">Text model: {settings.model.text_model}</p>
         <p className="text-[var(--muted)]">Video model: {settings.model.video_model}</p>
-      </article>
-      <article className="col-span-4 rounded-[22px] border border-[var(--line)] bg-[rgba(255,250,241,0.86)] p-5 shadow-[0_10px_30px_var(--shadow)] max-[960px]:col-span-1">
+      </Card>
+      <Card className="col-span-4 max-[960px]:col-span-1">
         <h2 className="mb-2.5">Revision</h2>
         <p className="text-[var(--muted)]">Max revision rounds: {settings.revision.max_revision_round}</p>
-      </article>
-      <article className="col-span-4 rounded-[22px] border border-[var(--line)] bg-[rgba(255,250,241,0.86)] p-5 shadow-[0_10px_30px_var(--shadow)] max-[960px]:col-span-1">
+      </Card>
+      <Card className="col-span-4 max-[960px]:col-span-1">
         <h2 className="mb-2.5">Evaluator</h2>
         <p className="text-[var(--muted)]">Threshold: {settings.evaluator.default_score_threshold}</p>
         <p className="text-[var(--muted)]">Routes: {settings.evaluator.routes.join(", ")}</p>
-      </article>
-      <article className="col-span-12 rounded-[22px] border border-[var(--line)] bg-[rgba(255,250,241,0.86)] p-5 shadow-[0_10px_30px_var(--shadow)]">
+      </Card>
+      <Card className="col-span-12">
         <h2 className="mb-2.5">Templates</h2>
         <div className="flex flex-wrap gap-2.5">
           {settings.templates.map((template) => (
-            <span className="inline-flex items-center rounded-full border border-[var(--line)] bg-[rgba(255,255,255,0.78)] px-2.5 py-1.5 text-[0.86rem] text-[var(--muted)]" key={template.template_id}>
+            <Badge key={template.template_id}>
               {template.label} · {template.default_theme_preset}
-            </span>
+            </Badge>
           ))}
         </div>
-      </article>
-      <article className="col-span-12 rounded-[22px] border border-[var(--line)] bg-[rgba(255,250,241,0.86)] p-5 shadow-[0_10px_30px_var(--shadow)]">
+      </Card>
+      <Card className="col-span-12">
         <h2 className="mb-2.5">Tools</h2>
         <div className="flex flex-wrap gap-2.5">
           {settings.tools.map((tool) => (
-            <span className="inline-flex items-center rounded-full border border-[var(--line)] bg-[rgba(255,255,255,0.78)] px-2.5 py-1.5 text-[0.86rem] text-[var(--muted)]" key={tool}>
+            <Badge key={tool}>
               {tool}
-            </span>
+            </Badge>
           ))}
         </div>
-      </article>
+      </Card>
     </section>
   );
 }
