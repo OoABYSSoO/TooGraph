@@ -37,7 +37,11 @@ export function WorkflowEdge(props: EdgeProps) {
       />
       <EdgeLabelRenderer>
         <div
-          className={`workflow-edge-label${isBranch ? " is-branch" : ""}`}
+          className={`rounded-full border px-2.5 py-1.5 text-[0.76rem] leading-none shadow-[0_6px_20px_rgba(60,41,20,0.08)] whitespace-nowrap ${
+            isBranch
+              ? "border-[rgba(154,52,18,0.35)] bg-[rgba(255,242,234,0.96)] uppercase tracking-[0.04em] text-[var(--accent-strong)]"
+              : "border-[rgba(138,109,59,0.35)] bg-[rgba(255,250,241,0.96)] text-[var(--text)]"
+          }`}
           style={{
             position: "absolute",
             transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,

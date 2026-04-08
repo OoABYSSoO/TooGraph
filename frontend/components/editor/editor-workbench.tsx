@@ -275,34 +275,34 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
   }
 
   return (
-    <div className="page">
+    <div className="grid gap-6">
       <section>
-        <div className="eyebrow">Editor</div>
-        <h1 className="page-title">{graphName}</h1>
-        <p className="page-subtitle">{t("editor.desc")}</p>
+        <div className="inline-flex rounded-full border border-[rgba(154,52,18,0.18)] bg-[rgba(255,255,255,0.72)] px-2.5 py-1.5 text-[0.82rem] uppercase tracking-[0.06em] text-[var(--accent-strong)]">Editor</div>
+        <h1 className="mb-2.5 mt-3.5 text-[clamp(2rem,4vw,3.4rem)] leading-[1.05]">{graphName}</h1>
+        <p className="max-w-[68ch] text-[1.02rem] leading-[1.7] text-[var(--muted)]">{t("editor.desc")}</p>
       </section>
 
-      <section className="card editor-toolbar-card">
-        <div className="toolbar">
-          <button className="button secondary" onClick={handleValidateBackend} type="button">
+      <section className="rounded-[22px] border border-[var(--line)] bg-[rgba(255,250,241,0.86)] px-5 py-4 shadow-[0_10px_30px_var(--shadow)]">
+        <div className="flex flex-wrap gap-2.5">
+          <button className="inline-flex items-center justify-center rounded-[14px] border border-[var(--accent)] bg-transparent px-[18px] py-3 text-[var(--accent-strong)] transition-transform duration-150 hover:-translate-y-px" onClick={handleValidateBackend} type="button">
             {t("editor.validate")}
           </button>
-          <button className="button secondary" onClick={handleSaveBackend} type="button">
+          <button className="inline-flex items-center justify-center rounded-[14px] border border-[var(--accent)] bg-transparent px-[18px] py-3 text-[var(--accent-strong)] transition-transform duration-150 hover:-translate-y-px" onClick={handleSaveBackend} type="button">
             {t("editor.save")}
           </button>
-          <button className="button" onClick={handleRunBackend} type="button">
+          <button className="inline-flex items-center justify-center rounded-[14px] border border-[var(--accent)] bg-[var(--accent)] px-[18px] py-3 text-white transition-transform duration-150 hover:-translate-y-px" onClick={handleRunBackend} type="button">
             {t("editor.run")}
           </button>
-          <button className="button secondary" onClick={saveGraphLocally} type="button">
+          <button className="inline-flex items-center justify-center rounded-[14px] border border-[var(--accent)] bg-transparent px-[18px] py-3 text-[var(--accent-strong)] transition-transform duration-150 hover:-translate-y-px" onClick={saveGraphLocally} type="button">
             {t("editor.save_local")}
           </button>
-          <button className="button secondary" onClick={simulateRun} type="button">
+          <button className="inline-flex items-center justify-center rounded-[14px] border border-[var(--accent)] bg-transparent px-[18px] py-3 text-[var(--accent-strong)] transition-transform duration-150 hover:-translate-y-px" onClick={simulateRun} type="button">
             {t("editor.simulate")}
           </button>
-          <span className="pill">{runtimeLabel}</span>
-          <span className="pill">Template {templateId}</span>
-          {validationPassed !== null ? <span className="pill">{validationPassed ? "Schema valid" : "Needs fixes"}</span> : null}
-          {lastSavedAt ? <span className="pill">Saved {new Date(lastSavedAt).toLocaleTimeString()}</span> : null}
+          <span className="inline-flex items-center rounded-full border border-[var(--line)] bg-[rgba(255,255,255,0.78)] px-2.5 py-1.5 text-[0.86rem] text-[var(--muted)]">{runtimeLabel}</span>
+          <span className="inline-flex items-center rounded-full border border-[var(--line)] bg-[rgba(255,255,255,0.78)] px-2.5 py-1.5 text-[0.86rem] text-[var(--muted)]">Template {templateId}</span>
+          {validationPassed !== null ? <span className="inline-flex items-center rounded-full border border-[var(--line)] bg-[rgba(255,255,255,0.78)] px-2.5 py-1.5 text-[0.86rem] text-[var(--muted)]">{validationPassed ? "Schema valid" : "Needs fixes"}</span> : null}
+          {lastSavedAt ? <span className="inline-flex items-center rounded-full border border-[var(--line)] bg-[rgba(255,255,255,0.78)] px-2.5 py-1.5 text-[0.86rem] text-[var(--muted)]">Saved {new Date(lastSavedAt).toLocaleTimeString()}</span> : null}
         </div>
       </section>
 
@@ -315,39 +315,39 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
         onApplyPreset={applyThemePreset}
       />
 
-      <section className="editor-layout editor-layout-v2">
-        <aside className="panel editor-side editor-left-stack">
+      <section className="grid min-h-[620px] grid-cols-[360px_minmax(0,1fr)_380px] gap-4 max-[960px]:grid-cols-1">
+        <aside className="grid content-start gap-4 rounded-[22px] border border-dashed border-[rgba(154,52,18,0.25)] bg-[rgba(255,255,255,0.42)] p-[18px]">
           <StatePanel stateSchema={stateSchema} onAddField={addStateField} onUpdateField={updateStateField} onRemoveField={removeStateField} />
 
-          <div className="editor-palette-box">
-            <h2>{t("editor.palette")}</h2>
-            <div className="list">
+          <div className="grid gap-3">
+            <h2 className="text-lg font-semibold">{t("editor.palette")}</h2>
+            <div className="grid gap-3">
               {NODE_PRESETS.map((preset) => (
-                <button key={preset.kind} className="node-palette-item" onClick={() => addNode(preset.kind)} type="button">
+                <button key={preset.kind} className="grid gap-1.5 rounded-[18px] border border-[rgba(212,198,170,0.9)] bg-[rgba(255,255,255,0.78)] p-3.5 text-left text-[var(--text)] transition-transform hover:-translate-y-px hover:border-[rgba(154,52,18,0.45)]" onClick={() => addNode(preset.kind)} type="button">
                   <strong>{preset.label}</strong>
-                  <span className="muted">{preset.description}</span>
+                  <span className="text-[var(--muted)]">{preset.description}</span>
                 </button>
               ))}
             </div>
           </div>
 
-          <div className="editor-summary">
-            <div className="pill">Nodes {nodes.length}</div>
-            <div className="pill">Edges {edges.length}</div>
-            <div className="pill">State {stateSchema.length}</div>
-            {currentRunStatus ? <div className="pill">Run {currentRunStatus}</div> : null}
-            {currentNodeId ? <div className="pill">Current {currentNodeId}</div> : null}
-            {selectedEdgeId ? <div className="pill">Selected edge {selectedEdgeId}</div> : null}
+          <div className="flex flex-wrap gap-2.5">
+            <div className="inline-flex items-center rounded-full border border-[var(--line)] bg-[rgba(255,255,255,0.78)] px-2.5 py-1.5 text-[0.86rem] text-[var(--muted)]">Nodes {nodes.length}</div>
+            <div className="inline-flex items-center rounded-full border border-[var(--line)] bg-[rgba(255,255,255,0.78)] px-2.5 py-1.5 text-[0.86rem] text-[var(--muted)]">Edges {edges.length}</div>
+            <div className="inline-flex items-center rounded-full border border-[var(--line)] bg-[rgba(255,255,255,0.78)] px-2.5 py-1.5 text-[0.86rem] text-[var(--muted)]">State {stateSchema.length}</div>
+            {currentRunStatus ? <div className="inline-flex items-center rounded-full border border-[var(--line)] bg-[rgba(255,255,255,0.78)] px-2.5 py-1.5 text-[0.86rem] text-[var(--muted)]">Run {currentRunStatus}</div> : null}
+            {currentNodeId ? <div className="inline-flex items-center rounded-full border border-[var(--line)] bg-[rgba(255,255,255,0.78)] px-2.5 py-1.5 text-[0.86rem] text-[var(--muted)]">Current {currentNodeId}</div> : null}
+            {selectedEdgeId ? <div className="inline-flex items-center rounded-full border border-[var(--line)] bg-[rgba(255,255,255,0.78)] px-2.5 py-1.5 text-[0.86rem] text-[var(--muted)]">Selected edge {selectedEdgeId}</div> : null}
           </div>
 
           {validationIssues.length > 0 ? (
-            <div className="validation-box">
-              <h3>Validation Issues</h3>
-              <div className="list">
+            <div className="grid gap-2.5">
+              <h3 className="font-semibold">Validation Issues</h3>
+              <div className="grid gap-3">
                 {validationIssues.map((issue) => (
-                  <div className="list-item" key={`${issue.code}-${issue.message}`}>
+                  <div className="rounded-2xl border border-[rgba(212,198,170,0.9)] bg-[rgba(255,255,255,0.65)] p-3.5" key={`${issue.code}-${issue.message}`}>
                     <strong>{issue.code}</strong>
-                    <div className="muted">{issue.message}</div>
+                    <div className="text-[var(--muted)]">{issue.message}</div>
                   </div>
                 ))}
               </div>
@@ -355,14 +355,14 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
           ) : null}
 
           {currentRunId ? (
-            <div className="validation-box">
-              <h3>{t("editor.latest_run")}</h3>
-              <div className="list">
-                <div className="list-item">
+            <div className="grid gap-2.5">
+              <h3 className="font-semibold">{t("editor.latest_run")}</h3>
+              <div className="grid gap-3">
+                <div className="rounded-2xl border border-[rgba(212,198,170,0.9)] bg-[rgba(255,255,255,0.65)] p-3.5">
                   <strong>{currentRunId}</strong>
-                  <div className="muted">Status: {currentRunStatus ?? "unknown"}</div>
+                  <div className="text-[var(--muted)]">Status: {currentRunStatus ?? "unknown"}</div>
                 </div>
-                <button className="button secondary" onClick={() => router.push(`/runs/${currentRunId}`)} type="button">
+                <button className="inline-flex items-center justify-center rounded-[14px] border border-[var(--accent)] bg-transparent px-[18px] py-3 text-[var(--accent-strong)] transition-transform duration-150 hover:-translate-y-px" onClick={() => router.push(`/runs/${currentRunId}`)} type="button">
                   {t("editor.open_run")}
                 </button>
               </div>
@@ -370,7 +370,7 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
           ) : null}
         </aside>
 
-        <div className="editor-canvas card">
+        <div className="editor-canvas rounded-[22px] border border-[var(--line)] bg-[rgba(255,250,241,0.86)] p-0 shadow-[0_10px_30px_var(--shadow)]">
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -388,47 +388,47 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
             <Controls />
             <Background gap={18} size={1} />
             <Panel position="top-left">
-              <div className="pill">Edges represent execution flow and carry major state keys.</div>
+              <div className="inline-flex items-center rounded-full border border-[var(--line)] bg-[rgba(255,255,255,0.78)] px-2.5 py-1.5 text-[0.86rem] text-[var(--muted)]">Edges represent execution flow and carry major state keys.</div>
             </Panel>
           </ReactFlow>
         </div>
 
-        <aside className="panel editor-side">
-          <h2>{t("editor.config")}</h2>
+        <aside className="grid content-start gap-4 rounded-[22px] border border-dashed border-[rgba(154,52,18,0.25)] bg-[rgba(255,255,255,0.42)] p-[18px]">
+          <h2 className="text-lg font-semibold">{t("editor.config")}</h2>
 
           {selectedNode ? (
-            <div className="config-form">
-              <label className="field">
+            <div className="grid gap-3.5">
+              <label className="grid gap-2 text-[0.94rem]">
                 <span>{t("editor.node_name")}</span>
-                <input className="text-input" value={selectedNode.data.label} onChange={(event) => updateSelectedNodeLabel(event.target.value)} />
+                <input className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]" value={selectedNode.data.label} onChange={(event) => updateSelectedNodeLabel(event.target.value)} />
               </label>
 
-              <label className="field">
+              <label className="grid gap-2 text-[0.94rem]">
                 <span>{t("editor.description")}</span>
                 <textarea
-                  className="text-area"
+                  className="w-full resize-y rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]"
                   rows={3}
                   value={selectedNode.data.description}
                   onChange={(event) => updateSelectedNodeDescription(event.target.value)}
                 />
               </label>
 
-              <div className="field">
+              <div className="grid gap-2 text-[0.94rem]">
                 <span>Inputs</span>
-                <div className="inline-input-row">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2.5">
                   <input
-                    className="text-input"
+                    className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]"
                     placeholder="new_input_key"
                     value={newReadKey}
                     onChange={(event) => setNewReadKey(event.target.value)}
                   />
-                  <button className="button secondary small" onClick={() => handleQuickAddState(newReadKey, "read")} type="button">
+                  <button className="inline-flex items-center justify-center rounded-xl border border-[var(--accent)] bg-transparent px-3 py-2.5 text-[var(--accent-strong)] transition-transform duration-150 hover:-translate-y-px" onClick={() => handleQuickAddState(newReadKey, "read")} type="button">
                     + Add
                   </button>
                 </div>
-                <div className="toggle-grid">
+                <div className="grid grid-cols-2 gap-2.5 max-[960px]:grid-cols-1">
                   {stateSchema.map((field) => (
-                    <label className="toggle-card" key={`read-${field.key}`}>
+                    <label className="flex items-center gap-2 rounded-[14px] border border-[rgba(212,198,170,0.9)] bg-[rgba(255,255,255,0.65)] px-3 py-2.5" key={`read-${field.key}`}>
                       <input
                         type="checkbox"
                         checked={selectedNode.data.reads.includes(field.key)}
@@ -440,22 +440,22 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
                 </div>
               </div>
 
-              <div className="field">
+              <div className="grid gap-2 text-[0.94rem]">
                 <span>Outputs</span>
-                <div className="inline-input-row">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2.5">
                   <input
-                    className="text-input"
+                    className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]"
                     placeholder="new_output_key"
                     value={newWriteKey}
                     onChange={(event) => setNewWriteKey(event.target.value)}
                   />
-                  <button className="button secondary small" onClick={() => handleQuickAddState(newWriteKey, "write")} type="button">
+                  <button className="inline-flex items-center justify-center rounded-xl border border-[var(--accent)] bg-transparent px-3 py-2.5 text-[var(--accent-strong)] transition-transform duration-150 hover:-translate-y-px" onClick={() => handleQuickAddState(newWriteKey, "write")} type="button">
                     + Add
                   </button>
                 </div>
-                <div className="toggle-grid">
+                <div className="grid grid-cols-2 gap-2.5 max-[960px]:grid-cols-1">
                   {stateSchema.map((field) => (
-                    <label className="toggle-card" key={`write-${field.key}`}>
+                    <label className="flex items-center gap-2 rounded-[14px] border border-[rgba(212,198,170,0.9)] bg-[rgba(255,255,255,0.65)] px-3 py-2.5" key={`write-${field.key}`}>
                       <input
                         type="checkbox"
                         checked={selectedNode.data.writes.includes(field.key)}
@@ -467,15 +467,15 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
                 </div>
               </div>
 
-              <div className="field">
+              <div className="grid gap-2 text-[0.94rem]">
                 <span>Structured Params</span>
                 <NodeParamsForm node={selectedNode} onParamChange={updateSelectedNodeParam} />
               </div>
 
-              <label className="field">
+              <label className="grid gap-2 text-[0.94rem]">
                 <span>Params JSON</span>
                 <textarea
-                  className="text-area code-area"
+                  className="w-full resize-y rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 font-mono text-[0.88rem] text-[var(--text)]"
                   rows={8}
                   value={JSON.stringify(selectedNode.data.params, null, 2)}
                   onChange={(event) => {
@@ -488,37 +488,37 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
                 />
               </label>
 
-              <label className="field">
+              <label className="grid gap-2 text-[0.94rem]">
                 <span>{t("editor.advanced")}</span>
                 <textarea
-                  className="text-area code-area"
+                  className="w-full resize-y rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 font-mono text-[0.88rem] text-[var(--text)]"
                   rows={10}
                   value={configDraft}
                   onChange={(event) => updateSelectedNodeConfigDraft(event.target.value)}
                 />
               </label>
 
-              <div className="status-row">
-                <span className="pill">Type {selectedNode.data.kind}</span>
-                <span className="pill">Reads {selectedNode.data.reads.length}</span>
-                <span className="pill">Writes {selectedNode.data.writes.length}</span>
-                <span className="pill">Status {selectedNode.data.status ?? "idle"}</span>
+              <div className="flex flex-wrap gap-2.5">
+                <span className="inline-flex items-center rounded-full border border-[var(--line)] bg-[rgba(255,255,255,0.78)] px-2.5 py-1.5 text-[0.86rem] text-[var(--muted)]">Type {selectedNode.data.kind}</span>
+                <span className="inline-flex items-center rounded-full border border-[var(--line)] bg-[rgba(255,255,255,0.78)] px-2.5 py-1.5 text-[0.86rem] text-[var(--muted)]">Reads {selectedNode.data.reads.length}</span>
+                <span className="inline-flex items-center rounded-full border border-[var(--line)] bg-[rgba(255,255,255,0.78)] px-2.5 py-1.5 text-[0.86rem] text-[var(--muted)]">Writes {selectedNode.data.writes.length}</span>
+                <span className="inline-flex items-center rounded-full border border-[var(--line)] bg-[rgba(255,255,255,0.78)] px-2.5 py-1.5 text-[0.86rem] text-[var(--muted)]">Status {selectedNode.data.status ?? "idle"}</span>
               </div>
 
               {selectedNodeExecution ? (
-                <div className="execution-box">
-                  <h3>{t("editor.latest_execution")}</h3>
-                  <div className="list">
-                    <div className="list-item">
+                <div className="grid gap-2.5">
+                  <h3 className="font-semibold">{t("editor.latest_execution")}</h3>
+                  <div className="grid gap-3">
+                    <div className="rounded-2xl border border-[rgba(212,198,170,0.9)] bg-[rgba(255,255,255,0.65)] p-3.5">
                       <strong>{selectedNodeExecution.status}</strong>
-                      <div className="muted">{selectedNodeExecution.input_summary}</div>
+                      <div className="text-[var(--muted)]">{selectedNodeExecution.input_summary}</div>
                     </div>
-                    <div className="list-item">
+                    <div className="rounded-2xl border border-[rgba(212,198,170,0.9)] bg-[rgba(255,255,255,0.65)] p-3.5">
                       <strong>Output</strong>
-                      <div className="muted">{selectedNodeExecution.output_summary}</div>
+                      <div className="text-[var(--muted)]">{selectedNodeExecution.output_summary}</div>
                     </div>
-                    <div className="status-row">
-                      <span className="pill">{selectedNodeExecution.duration_ms}ms</span>
+                    <div className="flex flex-wrap gap-2.5">
+                      <span className="inline-flex items-center rounded-full border border-[var(--line)] bg-[rgba(255,255,255,0.78)] px-2.5 py-1.5 text-[0.86rem] text-[var(--muted)]">{selectedNodeExecution.duration_ms}ms</span>
                     </div>
                   </div>
                 </div>
@@ -527,11 +527,11 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
           ) : null}
 
           {selectedEdge ? (
-            <div className="config-form">
-              <div className="field">
+            <div className="grid gap-3.5">
+              <div className="grid gap-2 text-[0.94rem]">
                 <span>Edge Kind</span>
                 <select
-                  className="text-input"
+                  className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]"
                   value={selectedEdge.data?.edgeKind ?? "normal"}
                   onChange={(event) => updateSelectedEdgeKind(event.target.value as "normal" | "branch")}
                 >
@@ -541,10 +541,10 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
               </div>
 
               {(selectedEdge.data?.edgeKind ?? "normal") === "branch" ? (
-                <div className="field">
+                <div className="grid gap-2 text-[0.94rem]">
                   <span>Branch Label</span>
                   <select
-                    className="text-input"
+                    className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]"
                     value={selectedEdge.data?.branchLabel ?? ""}
                     onChange={(event) => updateSelectedEdgeBranchLabel(event.target.value as "pass" | "revise" | "fail" | "")}
                   >
@@ -556,14 +556,14 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
                 </div>
               ) : null}
 
-              <div className="field">
+              <div className="grid gap-2 text-[0.94rem]">
                 <span>Flow Keys</span>
-                <div className="toggle-grid">
+                <div className="grid grid-cols-2 gap-2.5 max-[960px]:grid-cols-1">
                   {stateSchema.map((field) => {
                     const flowKeys = selectedEdge.data?.flowKeys ?? [];
                     const checked = flowKeys.includes(field.key);
                     return (
-                      <label className="toggle-card" key={`edge-${field.key}`}>
+                      <label className="flex items-center gap-2 rounded-[14px] border border-[rgba(212,198,170,0.9)] bg-[rgba(255,255,255,0.65)] px-3 py-2.5" key={`edge-${field.key}`}>
                         <input
                           type="checkbox"
                           checked={checked}
@@ -583,7 +583,7 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
           ) : null}
 
           {!selectedNode && !selectedEdge ? (
-            <p className="muted">Select a node to edit reads/writes/params, or select an edge to edit flow keys and branch metadata.</p>
+            <p className="text-[var(--muted)]">Select a node to edit reads/writes/params, or select an edge to edit flow keys and branch metadata.</p>
           ) : null}
         </aside>
       </section>

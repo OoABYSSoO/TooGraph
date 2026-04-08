@@ -19,10 +19,10 @@ export function NodeParamsForm({ node, onParamChange }: Props) {
   if (kind === "generate_variants") {
     return (
       <>
-        <label className="field">
+        <label className="grid gap-2 text-[0.94rem]">
           <span>Variant Count</span>
           <input
-            className="text-input"
+            className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]"
             min={1}
             type="number"
             value={String(params.variantCount ?? 2)}
@@ -35,10 +35,10 @@ export function NodeParamsForm({ node, onParamChange }: Props) {
 
   if (kind === "review_variants") {
     return (
-      <label className="field">
+      <label className="grid gap-2 text-[0.94rem]">
         <span>Score Threshold</span>
         <input
-          className="text-input"
+          className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]"
           max={10}
           min={0}
           step="0.1"
@@ -52,10 +52,10 @@ export function NodeParamsForm({ node, onParamChange }: Props) {
 
   if (kind === "select_assets") {
     return (
-      <label className="field">
+      <label className="grid gap-2 text-[0.94rem]">
         <span>Top N</span>
         <input
-          className="text-input"
+          className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]"
           min={1}
           type="number"
           value={String(params.top_n ?? 2)}
@@ -67,10 +67,10 @@ export function NodeParamsForm({ node, onParamChange }: Props) {
 
   if (kind === "condition") {
     return (
-      <label className="field">
+      <label className="grid gap-2 text-[0.94rem]">
         <span>Decision Path</span>
         <input
-          className="text-input"
+          className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]"
           value={String(params.decision_key ?? "evaluation_result.decision")}
           onChange={(event) => onParamChange("decision_key", event.target.value)}
         />
@@ -81,10 +81,10 @@ export function NodeParamsForm({ node, onParamChange }: Props) {
   if (kind === "research") {
     const sources = Array.isArray(params.sources) ? params.sources.join(", ") : "";
     return (
-      <label className="field">
+      <label className="grid gap-2 text-[0.94rem]">
         <span>Sources</span>
         <input
-          className="text-input"
+          className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]"
           placeholder="rss, ad_library"
           value={sources}
           onChange={(event) =>
@@ -101,5 +101,5 @@ export function NodeParamsForm({ node, onParamChange }: Props) {
     );
   }
 
-  return <p className="muted">This node currently has no dedicated structured params. Use advanced JSON if needed.</p>;
+  return <p className="text-[var(--muted)]">This node currently has no dedicated structured params. Use advanced JSON if needed.</p>;
 }

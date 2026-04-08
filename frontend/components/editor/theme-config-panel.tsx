@@ -33,15 +33,15 @@ export function ThemeConfigPanel({
   const selectedPreset = presets.find((preset) => preset.id === themeConfig.themePreset) ?? null;
 
   return (
-    <section className="card editor-theme-card">
-      <div className="theme-grid">
-        <label className="field">
+    <section className="rounded-[22px] border border-[var(--line)] bg-[rgba(255,250,241,0.86)] p-5 shadow-[0_10px_30px_var(--shadow)]">
+      <div className="grid grid-cols-4 gap-3.5 max-[960px]:grid-cols-1">
+        <label className="grid gap-2 text-[0.94rem]">
           <span>Graph Name</span>
-          <input className="text-input" value={graphName} onChange={(event) => onGraphNameChange(event.target.value)} />
+          <input className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]" value={graphName} onChange={(event) => onGraphNameChange(event.target.value)} />
         </label>
-        <label className="field">
+        <label className="grid gap-2 text-[0.94rem]">
           <span>Theme Preset</span>
-          <select className="text-input" value={themeConfig.themePreset} onChange={(event) => onApplyPreset(event.target.value)}>
+          <select className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]" value={themeConfig.themePreset} onChange={(event) => onApplyPreset(event.target.value)}>
             {presets.map((preset) => (
               <option key={preset.id} value={preset.id}>
                 {preset.label}
@@ -49,40 +49,40 @@ export function ThemeConfigPanel({
             ))}
           </select>
         </label>
-        <label className="field">
+        <label className="grid gap-2 text-[0.94rem]">
           <span>Domain</span>
-          <input className="text-input" value={themeConfig.domain} onChange={(event) => onThemeConfigChange({ domain: event.target.value })} />
+          <input className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]" value={themeConfig.domain} onChange={(event) => onThemeConfigChange({ domain: event.target.value })} />
         </label>
-        <label className="field">
+        <label className="grid gap-2 text-[0.94rem]">
           <span>Genre</span>
-          <input className="text-input" value={themeConfig.genre} onChange={(event) => onThemeConfigChange({ genre: event.target.value })} />
+          <input className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]" value={themeConfig.genre} onChange={(event) => onThemeConfigChange({ genre: event.target.value })} />
         </label>
-        <label className="field">
+        <label className="grid gap-2 text-[0.94rem]">
           <span>Market</span>
-          <input className="text-input" value={themeConfig.market} onChange={(event) => onThemeConfigChange({ market: event.target.value })} />
+          <input className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]" value={themeConfig.market} onChange={(event) => onThemeConfigChange({ market: event.target.value })} />
         </label>
-        <label className="field">
+        <label className="grid gap-2 text-[0.94rem]">
           <span>Platform</span>
-          <input className="text-input" value={themeConfig.platform} onChange={(event) => onThemeConfigChange({ platform: event.target.value })} />
+          <input className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]" value={themeConfig.platform} onChange={(event) => onThemeConfigChange({ platform: event.target.value })} />
         </label>
-        <label className="field">
+        <label className="grid gap-2 text-[0.94rem]">
           <span>Language</span>
-          <input className="text-input" value={themeConfig.language} onChange={(event) => onThemeConfigChange({ language: event.target.value })} />
+          <input className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]" value={themeConfig.language} onChange={(event) => onThemeConfigChange({ language: event.target.value })} />
         </label>
-        <label className="field">
+        <label className="grid gap-2 text-[0.94rem]">
           <span>Creative Style</span>
-          <input className="text-input" value={themeConfig.creativeStyle} onChange={(event) => onThemeConfigChange({ creativeStyle: event.target.value })} />
+          <input className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]" value={themeConfig.creativeStyle} onChange={(event) => onThemeConfigChange({ creativeStyle: event.target.value })} />
         </label>
-        <label className="field">
+        <label className="grid gap-2 text-[0.94rem]">
           <span>Tone</span>
-          <input className="text-input" value={themeConfig.tone} onChange={(event) => onThemeConfigChange({ tone: event.target.value })} />
+          <input className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]" value={themeConfig.tone} onChange={(event) => onThemeConfigChange({ tone: event.target.value })} />
         </label>
       </div>
-      <div className="theme-grid">
-        <label className="field">
+      <div className="mt-3.5 grid grid-cols-4 gap-3.5 max-[960px]:grid-cols-1">
+        <label className="grid gap-2 text-[0.94rem]">
           <span>Hook Theme</span>
           <input
-            className="text-input"
+            className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]"
             value={themeConfig.strategyProfile.hookTheme}
             onChange={(event) =>
               onThemeConfigChange({
@@ -91,10 +91,10 @@ export function ThemeConfigPanel({
             }
           />
         </label>
-        <label className="field">
+        <label className="grid gap-2 text-[0.94rem]">
           <span>Payoff Theme</span>
           <input
-            className="text-input"
+            className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]"
             value={themeConfig.strategyProfile.payoffTheme}
             onChange={(event) =>
               onThemeConfigChange({
@@ -103,10 +103,10 @@ export function ThemeConfigPanel({
             }
           />
         </label>
-        <label className="field">
+        <label className="grid gap-2 text-[0.94rem]">
           <span>Visual Pattern</span>
           <input
-            className="text-input"
+            className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]"
             value={themeConfig.strategyProfile.visualPattern}
             onChange={(event) =>
               onThemeConfigChange({
@@ -115,10 +115,10 @@ export function ThemeConfigPanel({
             }
           />
         </label>
-        <label className="field">
+        <label className="grid gap-2 text-[0.94rem]">
           <span>Pacing Pattern</span>
           <input
-            className="text-input"
+            className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]"
             value={themeConfig.strategyProfile.pacingPattern}
             onChange={(event) =>
               onThemeConfigChange({
@@ -127,10 +127,10 @@ export function ThemeConfigPanel({
             }
           />
         </label>
-        <label className="field">
+        <label className="grid gap-2 text-[0.94rem]">
           <span>Evaluation Focus</span>
           <input
-            className="text-input"
+            className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]"
             value={joinList(themeConfig.strategyProfile.evaluationFocus)}
             onChange={(event) =>
               onThemeConfigChange({
@@ -141,13 +141,13 @@ export function ThemeConfigPanel({
         </label>
       </div>
       {selectedPreset ? (
-        <div className="preset-banner">
+        <div className="mt-3.5 grid gap-1.5 rounded-2xl border border-[rgba(154,52,18,0.18)] bg-[rgba(255,250,241,0.74)] px-3.5 py-3">
           <strong>{selectedPreset.label}</strong>
-          <span>{selectedPreset.description}</span>
-          <span>Hook: {themeConfig.strategyProfile.hookTheme}</span>
-          <span>Payoff: {themeConfig.strategyProfile.payoffTheme}</span>
-          <span>Visual: {themeConfig.strategyProfile.visualPattern}</span>
-          <span>Focus: {themeConfig.strategyProfile.evaluationFocus.join(" / ") || "None"}</span>
+          <span className="text-[var(--muted)]">{selectedPreset.description}</span>
+          <span className="text-[var(--muted)]">Hook: {themeConfig.strategyProfile.hookTheme}</span>
+          <span className="text-[var(--muted)]">Payoff: {themeConfig.strategyProfile.payoffTheme}</span>
+          <span className="text-[var(--muted)]">Visual: {themeConfig.strategyProfile.visualPattern}</span>
+          <span className="text-[var(--muted)]">Focus: {themeConfig.strategyProfile.evaluationFocus.join(" / ") || "None"}</span>
         </div>
       ) : null}
     </section>

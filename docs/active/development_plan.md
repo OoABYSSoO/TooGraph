@@ -32,6 +32,7 @@
 - 主题配置面板已独立组件化，editor 可优先读取后端模板预设
 - runs / run detail / knowledge / memories / settings 的基础页面联通
 - 前端 Tailwind 基础设施已接入，后续新 UI 将优先基于 Tailwind 开发
+- 页面壳、列表页、详情页、设置页和 editor 周边组件已大面积迁移到 Tailwind
 
 当前项目最准确的状态应理解为：
 

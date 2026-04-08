@@ -43,24 +43,24 @@ export function KnowledgeListClient() {
   }, [query]);
 
   if (error) {
-    return <div className="list-item">{t("common.failed")}: {error}</div>;
+    return <div className="rounded-2xl border border-[rgba(212,198,170,0.9)] bg-[rgba(255,255,255,0.65)] p-3.5">{t("common.failed")}: {error}</div>;
   }
 
   if (items.length === 0) {
-    return <div className="list-item">{t("common.no_data")}</div>;
+    return <div className="rounded-2xl border border-[rgba(212,198,170,0.9)] bg-[rgba(255,255,255,0.65)] p-3.5">{t("common.no_data")}</div>;
   }
 
   return (
-    <div className="list">
-      <div className="list-item">
-        <div className="field">
+    <div className="grid gap-3">
+      <div className="rounded-2xl border border-[rgba(212,198,170,0.9)] bg-[rgba(255,255,255,0.65)] p-3.5">
+        <div className="grid gap-2 text-[0.94rem]">
           <span>{t("common.search_docs")}</span>
-          <input className="text-input" value={query} onChange={(event) => setQuery(event.target.value)} />
+          <input className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]" value={query} onChange={(event) => setQuery(event.target.value)} />
         </div>
       </div>
       {items.map((item) => (
         <button
-          className="list-item"
+          className="grid gap-2 rounded-2xl border border-[rgba(212,198,170,0.9)] bg-[rgba(255,255,255,0.65)] p-3.5 text-left"
           key={`${item.source}-${item.title}`}
           onClick={() =>
             setExpandedKey((current) => (current === `${item.source}-${item.title}` ? null : `${item.source}-${item.title}`))
@@ -68,9 +68,9 @@ export function KnowledgeListClient() {
           type="button"
         >
           <strong>{item.title}</strong>
-          <div className="muted">{item.source}</div>
-          <p className="muted">{item.summary}</p>
-          {expandedKey === `${item.source}-${item.title}` ? <pre className="muted">{item.content}</pre> : null}
+          <div className="text-[var(--muted)]">{item.source}</div>
+          <p className="text-[var(--muted)]">{item.summary}</p>
+          {expandedKey === `${item.source}-${item.title}` ? <pre className="overflow-x-auto whitespace-pre-wrap text-sm text-[var(--muted)]">{item.content}</pre> : null}
         </button>
       ))}
     </div>
