@@ -11,7 +11,7 @@ import {
 import { create } from "zustand";
 
 import { NODE_PRESETS } from "@/lib/editor-presets";
-import { createStarterGraphDocument, createTemplateGraphDocument, getTemplateThemePresetById } from "@/lib/templates";
+import { createStarterGraphDocument, getTemplateThemePresetById } from "@/lib/templates";
 import type {
   EdgeKind,
   GraphCanvasEdge,
@@ -231,18 +231,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const preset = getTemplateThemePresetById(templateId, themePresetId);
     if (!preset) return;
     set((state) => {
-      const starter = createTemplateGraphDocument(state.templateId, state.graphId || "creative-factory", themePresetId);
+      const overrides = preset.nodeParamOverrides ?? {};
       return {
-        graphName: starter.name,
+        graphName: preset.graphName ?? state.graphName,
         themeConfig: preset.themeConfig,
         nodes: state.nodes.map((node) => {
-          const starterNode = starter.nodes.find((item) => item.id === node.id);
-          return starterNode
+          const nodeOverrides = overrides[node.id];
+          return nodeOverrides
             ? {
                 ...node,
                 data: {
                   ...node.data,
-                  params: { ...node.data.params, ...starterNode.data.params },
+                  params: { ...node.data.params, ...nodeOverrides },
                 },
               }
             : node;

@@ -30,7 +30,7 @@ import {
   type BackendGraphDocument,
   type BackendTemplateDefinition,
 } from "@/lib/graph-api";
-import { getTemplateThemePresets } from "@/lib/templates";
+import { createTemplateGraphDocument, getTemplateThemePresets } from "@/lib/templates";
 import { useEditorStore } from "@/stores/editor-store";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -154,6 +154,12 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
         }
       } catch {
         if (!cancelled) {
+          if (graphId === "creative-factory" || graphId.startsWith("template-")) {
+            hydrateGraph(
+              createTemplateGraphDocument(templateId, graphId, themeConfig.themePreset),
+              "Loaded from local fallback template",
+            );
+          }
           setTemplatePresets(getTemplateThemePresets(templateId));
         }
       }
@@ -163,7 +169,33 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [templateId]);
+  }, [graphId, hydrateGraph, templateId, themeConfig.themePreset]);
+
+  useEffect(() => {
+    if (!currentRunId) return;
+    if (currentRunStatus === "completed" || currentRunStatus === "failed") return;
+
+    let cancelled = false;
+    const intervalId = window.setInterval(async () => {
+      try {
+        const runDetail = await apiGet<RunDetailPayload>(`/api/runs/${currentRunId}`);
+        if (!cancelled) {
+          applyRunDetail(runDetail);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          useEditorStore.setState({
+            runtimeLabel: error instanceof Error ? `Run polling failed: ${error.message}` : "Run polling failed.",
+          });
+        }
+      }
+    }, 1500);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [applyRunDetail, currentRunId, currentRunStatus]);
 
   const selectedNode = useMemo(() => nodes.find((node) => node.id === selectedNodeId) ?? null, [nodes, selectedNodeId]);
   const selectedEdge = useMemo(() => edges.find((edge) => edge.id === selectedEdgeId) ?? null, [edges, selectedEdgeId]);

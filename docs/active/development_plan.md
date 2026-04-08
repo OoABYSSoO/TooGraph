@@ -89,6 +89,8 @@
 ### 3.1 已完成
 
 - editor 点击 `Run` 后会立即请求一次 `/api/runs/{run_id}`，并把结果映射回节点状态
+- editor 已具备持续轮询
+  - run 未进入终态前，会周期性刷新 `/api/runs/{run_id}`
 - `runs` 页面已支持按 `graph_name` 搜索、按 `status` 过滤
 - `knowledge` 页面已支持搜索和展开详情
 - `memories` 页面已支持按 `memory_type` 过滤和展开详情
@@ -97,16 +99,15 @@
   - `skills`
   - `templates`
 - `creative_factory` 默认图已由后端模板层生成
+- editor 模板主路径已优先依赖后端 `default_graph`
+  - 前端本地完整模板图仅作为异常兜底
 
 ### 3.2 尚未完成
 
-- editor **没有持续轮询**
-  - 当前只是在点击 `Run` 后立刻拉取一次 run detail
-  - 没有持续刷新 run 状态的逻辑
 - 模板注册表目前 **只有一个模板**
   - 还没有第二个模板用于验证框架通用性
 - 前端和后端的模板定义虽然已收拢很多，但仍不是完全单一来源
-  - 前端仍保留 fallback 模板逻辑
+  - 前端仍保留 fallback 模板逻辑，但已不再参与主路径
 - `settings` 里仍保留 `skills` 字段
   - 说明 skill 层还没有完全退出主概念层
 - 前端已建立 primitives 与语义组件，但还没有形成完整设计系统
@@ -213,15 +214,12 @@
 
 ### P0
 
-- 为 editor 增加 **运行状态持续轮询**
-  - 点击 `Run` 后持续刷新 `/api/runs/{run_id}`
-  - 直到状态进入 `completed / failed`
 - 增强 editor 的运行观测
   - 当前节点高亮更实时
   - 更明确的 run status 区
   - 失败节点的错误摘要展示
 - 继续收拢模板单一来源
-  - 减少前端 fallback 模板图维护量
+  - 继续减少前端 fallback 模板图维护量
   - 让后端模板定义成为更明确的源头
 
 ### P1

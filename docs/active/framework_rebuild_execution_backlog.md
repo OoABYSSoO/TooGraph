@@ -42,6 +42,8 @@
 
 优先级：`P0`
 
+状态：`已完成`
+
 目标：
 
 让 editor 在点击 `Run` 后持续刷新 run 状态，而不是只拉一次。
@@ -51,12 +53,12 @@
 - `frontend/components/editor/editor-workbench.tsx`
 - `frontend/stores/editor-store.ts`
 
-完成标准：
+已完成结果：
 
 - 点击 `Run` 后保存 `run_id`
 - 周期性请求 `/api/runs/{run_id}`
 - 状态进入 `completed / failed` 后停止轮询
-- 节点状态随 run detail 持续更新
+- 节点状态会随 run detail 更新
 
 ## Task T2 模板单一来源继续收口
 
@@ -77,6 +79,12 @@
 
 - 前端不再维护完整独立默认图副本
 - fallback 只保留最小安全兜底能力
+
+当前进度：
+
+- editor 模板主路径已优先依赖后端 `default_graph`
+- store 初始化已改为轻量 shell，而非完整本地模板图
+- 本地完整模板图仍保留为模板接口失败时的兜底
 
 ## Task T3 第二个模板
 
