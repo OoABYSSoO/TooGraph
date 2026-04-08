@@ -1,5 +1,8 @@
 "use client";
 
+import { Card, SubtleCard } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import type { ThemeConfig, ThemePreset } from "@/types/editor";
 
 type Props = {
@@ -33,56 +36,55 @@ export function ThemeConfigPanel({
   const selectedPreset = presets.find((preset) => preset.id === themeConfig.themePreset) ?? null;
 
   return (
-    <section className="rounded-[22px] border border-[var(--line)] bg-[rgba(255,250,241,0.86)] p-5 shadow-[0_10px_30px_var(--shadow)]">
+    <Card>
       <div className="grid grid-cols-4 gap-3.5 max-[960px]:grid-cols-1">
         <label className="grid gap-2 text-[0.94rem]">
           <span>Graph Name</span>
-          <input className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]" value={graphName} onChange={(event) => onGraphNameChange(event.target.value)} />
+          <Input value={graphName} onChange={(event) => onGraphNameChange(event.target.value)} />
         </label>
         <label className="grid gap-2 text-[0.94rem]">
           <span>Theme Preset</span>
-          <select className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]" value={themeConfig.themePreset} onChange={(event) => onApplyPreset(event.target.value)}>
+          <Select value={themeConfig.themePreset} onChange={(event) => onApplyPreset(event.target.value)}>
             {presets.map((preset) => (
               <option key={preset.id} value={preset.id}>
                 {preset.label}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
         <label className="grid gap-2 text-[0.94rem]">
           <span>Domain</span>
-          <input className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]" value={themeConfig.domain} onChange={(event) => onThemeConfigChange({ domain: event.target.value })} />
+          <Input value={themeConfig.domain} onChange={(event) => onThemeConfigChange({ domain: event.target.value })} />
         </label>
         <label className="grid gap-2 text-[0.94rem]">
           <span>Genre</span>
-          <input className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]" value={themeConfig.genre} onChange={(event) => onThemeConfigChange({ genre: event.target.value })} />
+          <Input value={themeConfig.genre} onChange={(event) => onThemeConfigChange({ genre: event.target.value })} />
         </label>
         <label className="grid gap-2 text-[0.94rem]">
           <span>Market</span>
-          <input className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]" value={themeConfig.market} onChange={(event) => onThemeConfigChange({ market: event.target.value })} />
+          <Input value={themeConfig.market} onChange={(event) => onThemeConfigChange({ market: event.target.value })} />
         </label>
         <label className="grid gap-2 text-[0.94rem]">
           <span>Platform</span>
-          <input className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]" value={themeConfig.platform} onChange={(event) => onThemeConfigChange({ platform: event.target.value })} />
+          <Input value={themeConfig.platform} onChange={(event) => onThemeConfigChange({ platform: event.target.value })} />
         </label>
         <label className="grid gap-2 text-[0.94rem]">
           <span>Language</span>
-          <input className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]" value={themeConfig.language} onChange={(event) => onThemeConfigChange({ language: event.target.value })} />
+          <Input value={themeConfig.language} onChange={(event) => onThemeConfigChange({ language: event.target.value })} />
         </label>
         <label className="grid gap-2 text-[0.94rem]">
           <span>Creative Style</span>
-          <input className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]" value={themeConfig.creativeStyle} onChange={(event) => onThemeConfigChange({ creativeStyle: event.target.value })} />
+          <Input value={themeConfig.creativeStyle} onChange={(event) => onThemeConfigChange({ creativeStyle: event.target.value })} />
         </label>
         <label className="grid gap-2 text-[0.94rem]">
           <span>Tone</span>
-          <input className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]" value={themeConfig.tone} onChange={(event) => onThemeConfigChange({ tone: event.target.value })} />
+          <Input value={themeConfig.tone} onChange={(event) => onThemeConfigChange({ tone: event.target.value })} />
         </label>
       </div>
       <div className="mt-3.5 grid grid-cols-4 gap-3.5 max-[960px]:grid-cols-1">
         <label className="grid gap-2 text-[0.94rem]">
           <span>Hook Theme</span>
-          <input
-            className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]"
+          <Input
             value={themeConfig.strategyProfile.hookTheme}
             onChange={(event) =>
               onThemeConfigChange({
@@ -93,8 +95,7 @@ export function ThemeConfigPanel({
         </label>
         <label className="grid gap-2 text-[0.94rem]">
           <span>Payoff Theme</span>
-          <input
-            className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]"
+          <Input
             value={themeConfig.strategyProfile.payoffTheme}
             onChange={(event) =>
               onThemeConfigChange({
@@ -105,8 +106,7 @@ export function ThemeConfigPanel({
         </label>
         <label className="grid gap-2 text-[0.94rem]">
           <span>Visual Pattern</span>
-          <input
-            className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]"
+          <Input
             value={themeConfig.strategyProfile.visualPattern}
             onChange={(event) =>
               onThemeConfigChange({
@@ -117,8 +117,7 @@ export function ThemeConfigPanel({
         </label>
         <label className="grid gap-2 text-[0.94rem]">
           <span>Pacing Pattern</span>
-          <input
-            className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]"
+          <Input
             value={themeConfig.strategyProfile.pacingPattern}
             onChange={(event) =>
               onThemeConfigChange({
@@ -129,8 +128,7 @@ export function ThemeConfigPanel({
         </label>
         <label className="grid gap-2 text-[0.94rem]">
           <span>Evaluation Focus</span>
-          <input
-            className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]"
+          <Input
             value={joinList(themeConfig.strategyProfile.evaluationFocus)}
             onChange={(event) =>
               onThemeConfigChange({
@@ -141,15 +139,15 @@ export function ThemeConfigPanel({
         </label>
       </div>
       {selectedPreset ? (
-        <div className="mt-3.5 grid gap-1.5 rounded-2xl border border-[rgba(154,52,18,0.18)] bg-[rgba(255,250,241,0.74)] px-3.5 py-3">
+        <SubtleCard className="mt-3.5 grid gap-1.5 border-[rgba(154,52,18,0.18)] bg-[rgba(255,250,241,0.74)] px-3.5 py-3">
           <strong>{selectedPreset.label}</strong>
           <span className="text-[var(--muted)]">{selectedPreset.description}</span>
           <span className="text-[var(--muted)]">Hook: {themeConfig.strategyProfile.hookTheme}</span>
           <span className="text-[var(--muted)]">Payoff: {themeConfig.strategyProfile.payoffTheme}</span>
           <span className="text-[var(--muted)]">Visual: {themeConfig.strategyProfile.visualPattern}</span>
           <span className="text-[var(--muted)]">Focus: {themeConfig.strategyProfile.evaluationFocus.join(" / ") || "None"}</span>
-        </div>
+        </SubtleCard>
       ) : null}
-    </section>
+    </Card>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { Input } from "@/components/ui/input";
 import type { GraphCanvasNode } from "@/types/editor";
 
 type Props = {
@@ -21,8 +22,7 @@ export function NodeParamsForm({ node, onParamChange }: Props) {
       <>
         <label className="grid gap-2 text-[0.94rem]">
           <span>Variant Count</span>
-          <input
-            className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]"
+          <Input
             min={1}
             type="number"
             value={String(params.variantCount ?? 2)}
@@ -37,8 +37,7 @@ export function NodeParamsForm({ node, onParamChange }: Props) {
     return (
       <label className="grid gap-2 text-[0.94rem]">
         <span>Score Threshold</span>
-        <input
-          className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]"
+        <Input
           max={10}
           min={0}
           step="0.1"
@@ -54,8 +53,7 @@ export function NodeParamsForm({ node, onParamChange }: Props) {
     return (
       <label className="grid gap-2 text-[0.94rem]">
         <span>Top N</span>
-        <input
-          className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]"
+        <Input
           min={1}
           type="number"
           value={String(params.top_n ?? 2)}
@@ -69,8 +67,7 @@ export function NodeParamsForm({ node, onParamChange }: Props) {
     return (
       <label className="grid gap-2 text-[0.94rem]">
         <span>Decision Path</span>
-        <input
-          className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]"
+        <Input
           value={String(params.decision_key ?? "evaluation_result.decision")}
           onChange={(event) => onParamChange("decision_key", event.target.value)}
         />
@@ -83,8 +80,7 @@ export function NodeParamsForm({ node, onParamChange }: Props) {
     return (
       <label className="grid gap-2 text-[0.94rem]">
         <span>Sources</span>
-        <input
-          className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]"
+        <Input
           placeholder="rss, ad_library"
           value={sources}
           onChange={(event) =>

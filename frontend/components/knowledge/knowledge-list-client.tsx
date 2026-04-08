@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import { Input } from "@/components/ui/input";
+import { SubtleCard } from "@/components/ui/card";
 import { apiGet } from "@/lib/api";
 import { useLanguage } from "@/components/providers/language-provider";
 
@@ -43,34 +45,36 @@ export function KnowledgeListClient() {
   }, [query]);
 
   if (error) {
-    return <div className="rounded-2xl border border-[rgba(212,198,170,0.9)] bg-[rgba(255,255,255,0.65)] p-3.5">{t("common.failed")}: {error}</div>;
+    return <SubtleCard>{t("common.failed")}: {error}</SubtleCard>;
   }
 
   if (items.length === 0) {
-    return <div className="rounded-2xl border border-[rgba(212,198,170,0.9)] bg-[rgba(255,255,255,0.65)] p-3.5">{t("common.no_data")}</div>;
+    return <SubtleCard>{t("common.no_data")}</SubtleCard>;
   }
 
   return (
     <div className="grid gap-3">
-      <div className="rounded-2xl border border-[rgba(212,198,170,0.9)] bg-[rgba(255,255,255,0.65)] p-3.5">
+      <SubtleCard>
         <div className="grid gap-2 text-[0.94rem]">
           <span>{t("common.search_docs")}</span>
-          <input className="w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-[var(--text)]" value={query} onChange={(event) => setQuery(event.target.value)} />
+          <Input value={query} onChange={(event) => setQuery(event.target.value)} />
         </div>
-      </div>
+      </SubtleCard>
       {items.map((item) => (
         <button
-          className="grid gap-2 rounded-2xl border border-[rgba(212,198,170,0.9)] bg-[rgba(255,255,255,0.65)] p-3.5 text-left"
+          className="text-left"
           key={`${item.source}-${item.title}`}
           onClick={() =>
             setExpandedKey((current) => (current === `${item.source}-${item.title}` ? null : `${item.source}-${item.title}`))
           }
           type="button"
         >
+          <SubtleCard className="grid gap-2">
           <strong>{item.title}</strong>
           <div className="text-[var(--muted)]">{item.source}</div>
           <p className="text-[var(--muted)]">{item.summary}</p>
           {expandedKey === `${item.source}-${item.title}` ? <pre className="overflow-x-auto whitespace-pre-wrap text-sm text-[var(--muted)]">{item.content}</pre> : null}
+          </SubtleCard>
         </button>
       ))}
     </div>
