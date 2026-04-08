@@ -17,9 +17,10 @@
 1. 用户看到的不是抽象图，而是 state 处理链
 2. state 必须是可见对象，而不是隐藏在 JSON 里的字段
 3. 节点必须表达“读取什么、产出什么”
-4. 边只做单线，但必须通过标签表达当前流动的重点 state
+4. 每个 state 项都应尽量拥有独立连接线，便于观察来龙去脉
 5. condition 是节点，不是边特效
 6. 节点运行结果必须能在 editor 内直接查看
+7. 前端边界应优先表现为 `Input / Output`，而不是直接暴露 `START / END`
 
 ## 3. Layout
 
@@ -65,6 +66,13 @@
 - 支持平移和缩放
 - 空画布状态有引导
 
+空画布引导应优先提示：
+
+- 先定义输入
+- 再定义输出
+- 再放置处理节点
+- 最后连接逐项 state flow
+
 ## 3.4 Right Inspector
 
 右侧 inspector 负责展示当前选中对象。
@@ -75,14 +83,6 @@
 - node
 - edge
 - state
-
-第一阶段可先实现：
-
-- graph
-- node
-- edge
-
-如果选中 state，允许后续在第二阶段补完整。
 
 ## 4. State Panel
 
@@ -119,6 +119,18 @@
 
 第一阶段至少在 inspector 中显示“writers / readers”文本列表。
 
+## 4.4 Boundary Summary
+
+左侧或画布边缘应能帮助用户理解：
+
+- 哪些 state 是输入边界
+- 哪些 state 是输出边界
+
+第一阶段允许先用轻量方式实现：
+
+- 输入 state 没有上游生产者、但被节点读取
+- 输出 state 没有下游继续消费、但被节点写出
+
 ## 5. Node Palette
 
 ## 5.1 Palette Cards
@@ -146,74 +158,75 @@
 
 ## 6.1 Card Structure
 
-节点卡片结构建议分为三层：
+节点卡片应采用单行横向结构：
 
-1. Header
-   - 节点类型
-   - 节点标题
-2. Body
-   - 节点职责摘要
-3. IO Bands
-   - 左：Inputs
-   - 右：Outputs
+1. 左：Inputs
+2. 中：节点类型、标题、职责摘要
+3. 右：Outputs
 
 ## 6.2 Inputs and Outputs
 
-输入输出应至少用文本 chip 或列表表达：
+输入输出必须满足：
 
 - 输入在左侧
 - 输出在右侧
+- 每个 state 项有独立连接点
+- 输入项顺序是 `连接点 -> state 名称`
+- 输出项顺序是 `state 名称 -> 连接点`
 - state 名称带颜色提示
-
-第一阶段不强制每个 state 都有独立 handle。
 
 第一阶段必须做到：
 
 - 人眼能快速区分输入和输出
 - 选中节点时可以编辑 `reads / writes`
+- 每个 state 项都能形成独立连线
+
+普通节点规则：
+
+- 左侧只显示真实 `reads`
+- 右侧只显示真实 `writes`
 
 ## 6.3 Special Nodes
-
-`start`：
-
-- 重点展示初始 state 入口
-- 输出侧应清晰可见
 
 `condition`：
 
 - 重点展示判断性质
 - 分支去向要清晰
 
-`end`：
+`Input Boundary`：
 
-- 重点展示最终汇总
-- 让用户感知 graph 最终收口到了哪些 state
+- 表达图的真实输入
+- 例如文本框、文件、媒体输入或结构化参数
+
+`Output Boundary`：
+
+- 表达图的真实输出
+- 例如文本、图片、视频、音频或结构化对象
 
 ## 7. Edge Presentation
 
 ## 7.1 Visual Rule
 
-边统一使用单线。
+边按 state 项逐条显示。
 
 要求：
 
 - 线条足够清楚
-- 不走复杂多通道视觉
+- 每条线只表达一个 state
 - 标签不遮挡主要连线关系
 
 ## 7.2 Label Rule
 
 边标签显示规则：
 
-- 优先显示 `flow_keys`
-- 多个 key 时可逗号分隔或折叠显示数量
+- 当前方向下，一条边通常只显示一个 state key
 - condition 分支边应优先显示 branch label
 
 若同时需要 branch label 和 flow keys：
 
 - 第一阶段建议格式：
-  - `pass · greeting, final_result`
-  - `revise · score, issues`
+  - `pass · greeting`
+  - `revise · issues`
 
 ## 7.3 Color Rule
 
@@ -223,12 +236,12 @@ state 的颜色来自 state 定义。
 
 - 颜色仅辅助理解
 - 不让颜色本身承担全部语义
-- 文本标签仍是主表达
+- 标签文本仍是主表达
 
 第一阶段推荐：
 
-- 边主线保持统一基础色
-- 标签内小色块或 key 文本可使用 state 色彩
+- 边主线跟随对应 state 色彩
+- 标签内继续显示 state key
 
 ## 8. Inspector Behavior
 
@@ -279,7 +292,7 @@ state 的颜色来自 state 定义。
 
 - source
 - target
-- `flow_keys`
+- 当前 state key
 - `edge_kind`
 - `branch_label`
 
@@ -307,24 +320,48 @@ state 的颜色来自 state 定义。
 - 最终结果摘要
 - `hello_world` 的 greeting
 
-## 10. Hello World Flow
+## 10. Boundary Model
+
+前端不应直接把 `START / END` 暴露为主要用户概念。
+
+前端图模型：
+
+- `Input Boundary`
+- `Process Node`
+- `Condition Node`
+- `Output Boundary`
+
+后端运行模型：
+
+- `START`
+- process nodes
+- condition nodes
+- `END`
+
+转换规则：
+
+1. 前端输入边界在编译时映射为 graph 初始输入和内部 `START`
+2. 前端输出边界在编译时映射为 graph 最终输出和内部 `END`
+3. 普通节点与条件节点尽量一一映射到后端节点
+4. 前端逐项 state 连线保存时可合并为后端 `flow_keys`
+
+## 11. Hello World Flow
 
 第一阶段唯一必须跑通的交互流：
 
 1. 打开 `/editor/new`
-2. 定义或确认所需 state
-3. 创建 `start`
+2. 定义输入 state `name`
+3. 定义输出 state `greeting / final_result`
 4. 创建 `hello_model`
-5. 创建 `end`
-6. 连接边并设置 `flow_keys`
-7. 配置名字参数
-8. Save
-9. Validate
-10. Run
-11. 点击 `hello_model` 查看节点结果
-12. 在最终结果中看到 greeting
+5. 连接逐项 state flow
+6. 配置名字参数
+7. Save
+8. Validate
+9. Run
+10. 点击 `hello_model` 查看节点结果
+11. 在最终结果中看到 greeting
 
-## 11. Non-Goals
+## 12. Non-Goals
 
 第一阶段交互明确不做：
 

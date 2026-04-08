@@ -7,6 +7,7 @@
 本轮验收重点不再是旧版 `creative_factory` 体验，而是：
 
 - state-aware editor 语义是否成立
+- 前端边界模型与后端 LangGraph 编译模型是否一致
 - `hello_world` 是否能完成保存、校验、运行闭环
 - 节点级结果是否能在 editor 内直接查看
 
@@ -105,29 +106,29 @@ curl --noproxy '*' -fsS http://127.0.0.1:8765/health
 
 步骤：
 
-1. 创建 `start`
-2. 创建 `hello_model`
-3. 创建 `end`
+1. 定义输入 state `name`
+2. 定义输出 state `greeting / final_result`
+3. 创建 `hello_model`
 4. 观察节点呈现
 
 通过标准：
 
 - 节点能区分输入和输出
-- `start`、`hello_model`、`end` 视觉语义明确
+- `hello_model` 只显示真实 `reads / writes`
+- 用户不需要依赖显式 `start/end` 才能理解图
 
 ## AC-6 Edge Semantics
 
 步骤：
 
-1. 连线 `start -> hello_model`
-2. 连线 `hello_model -> end`
-3. 为边配置 `flow_keys`
+1. 将输入 state `name` 连到 `hello_model`
+2. 将 `hello_model` 的输出 state 连到输出边界
+3. 检查每个 state 是否有独立连线
 
 通过标准：
 
-- 边为单线
-- 线上有小标签
-- 标签能表达当前边代表的 state 内容
+- 每个 state 项有独立连线
+- 每条线能清楚表达该 state 的来龙去脉
 
 ## AC-7 Save and Reload
 
@@ -161,7 +162,7 @@ curl --noproxy '*' -fsS http://127.0.0.1:8765/health
 步骤：
 
 1. 使用最小 `hello_world` 图
-2. 在 `hello_model` 中设置名字参数
+2. 在输入边界中设置名字参数
 3. 点击 `Run`
 4. 等待运行结束
 
@@ -189,17 +190,19 @@ curl --noproxy '*' -fsS http://127.0.0.1:8765/health
   - `errors`
   - `artifacts`
 
-## AC-11 End Summary Semantics
+## AC-11 Boundary Compilation Semantics
 
 步骤：
 
 1. 完成一次 `hello_world` run
-2. 观察 `end` 节点和最终结果表达
+2. 观察输入、处理节点和输出的表达
+3. 确认前端模型可以被保存、校验和运行
 
 通过标准：
 
-- 用户能理解最终 state 在 `end` 收口
+- 用户能理解真实输入和真实输出
 - greeting 或最终结果能被明确读取
+- 前端边界模型不会阻碍后端 LangGraph 运行
 
 ## 5. Exit Criteria
 
@@ -207,6 +210,7 @@ curl --noproxy '*' -fsS http://127.0.0.1:8765/health
 
 - 新 editor 路由可用
 - state-aware 基本心智成立
-- 节点输入输出和边标签可读
+- 前端边界模型明确
+- 节点输入输出和逐项连线可读
 - 节点运行结果可在 editor 内查看
 - `hello_world` 可保存、校验、运行

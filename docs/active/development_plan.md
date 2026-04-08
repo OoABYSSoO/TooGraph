@@ -20,8 +20,9 @@
 
 - 左侧尚未形成真正的 `State Panel + Node Palette`
 - state 还不是 editor 的一等对象
-- 节点输入输出表达还不够强
-- 边标签还没有形成稳定的 state flow 语义
+- 前端边界模型还没有从 `start/end` 彻底切到 `Input/Output`
+- 节点输入输出表达还需要与边界模型统一
+- 逐项 state 连线还需要与后端编译映射正式收口
 - 节点运行结果展示还不够完整
 - `hello_world` 闭环需要按新心智再收紧一次
 
@@ -30,14 +31,15 @@
 执行策略：
 
 1. 先把编辑器语义做对
-2. 再把 `hello_world` 跑通
-3. 最后再做扩展体验
+2. 先明确前端边界模型与后端 LangGraph 编译模型的映射
+3. 再把 `hello_world` 跑通
+4. 最后再做扩展体验
 
 明确禁止：
 
 - 在核心语义没稳定前，优先做大量样式微调
 - 在 state model 没定清楚前，继续堆复杂交互
-- 在 `hello_world` 没闭环前，继续扩模板能力
+- 在边界模型没定清楚前，继续堆复杂节点类型
 
 ## 4. Phases
 
@@ -60,7 +62,7 @@
 - 左侧能同时查看 state 和 nodes
 - state 不再只作为节点配置里的附属字段存在
 
-## Phase 2 Node and Edge Semantics
+## Phase 2 Boundary Model and Graph Semantics
 
 目标：
 
@@ -68,15 +70,16 @@
 
 任务：
 
+- 把前端边界模型切到 `Input / Output Boundary`
 - 强化节点输入输出布局
-- 区分 `start` / `condition` / `end`
-- 收紧边标签显示规则
-- 让 `flow_keys` 表达稳定可读
+- 收紧逐项 state 连线规则
+- 定义前后端编译映射
 
 完成标准：
 
 - 用户能一眼看懂某节点读什么、写什么
-- 用户能通过边标签读懂主要 state flow
+- 用户能通过逐项连线读懂主要 state flow
+- 用户不必直接理解 `START / END`
 
 ## Phase 3 Inspector and Runtime Visibility
 
@@ -104,11 +107,12 @@
 
 任务：
 
+- 定义输入与输出边界
 - 建最小图
 - 配置输入参数
 - Save / Validate / Run
 - 在 editor 内查看 greeting
-- 检查 `end` 汇总状态
+- 验证前端边界模型可被编译为后端 LangGraph
 
 完成标准：
 
@@ -133,7 +137,7 @@
 当前推荐顺序：
 
 1. Phase 1 State Model and Left Rail
-2. Phase 2 Node and Edge Semantics
+2. Phase 2 Boundary Model and Graph Semantics
 3. Phase 3 Inspector and Runtime Visibility
 4. Phase 4 Hello World Closure
 5. Phase 5 Cleanup and Expansion
@@ -153,8 +157,9 @@
 完成条件：
 
 - 节点输入输出表达明确
-- 边标签可读
-- `condition` 和 `end` 语义明确
+- 逐项 state 连线可读
+- `condition` 语义明确
+- 边界模型明确
 
 ## M3 Observable Runtime
 
@@ -169,6 +174,7 @@
 
 - 新 editor 创建的 `hello_world` 图可保存、校验、运行
 - greeting 在 editor 内可见
+- 前端边界模型可稳定编译为后端 LangGraph
 
 ## 7. Risks
 
@@ -176,10 +182,10 @@
 
 1. 过度把 edge 当成数据实体，导致 editor 语义偏离 LangGraph
 2. state color 若只做前端临时字段，后续可能出现持久化断层
-3. 若节点 IO 表达做得太复杂，会把第一阶段拖进“端口系统设计”泥潭
+3. 若前端边界模型与后端编译规则不清晰，会导致前后端模型漂移
 
 对应策略：
 
 - 明确 edge 只是 route + visual hint
 - 尽早确定 state color 的正式承载位置
-- 第一阶段先做清晰可读，不做复杂端口拓扑
+- 先定义清楚前端 Input/Output 与后端 START/END 的转换规则
