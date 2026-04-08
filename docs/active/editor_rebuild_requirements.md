@@ -7,7 +7,8 @@
 边界：
 
 - 删除并废弃现有前端编排器实现，不做兼容。
-- 保留后端运行能力、模板注册、`hello_world` 与 `creative_factory` 的运行入口，作为后续新 editor 的接入目标。
+- 不保留旧模板入口，不沿用旧 editor 路由语义，不复用旧图结构。
+- 后端现有运行能力可以作为参考能力保留，但新 editor 必须以新的图结构重新接入。
 - 保留 `demo/slg_langgraph_single_file_modified_v2.py`，但新 editor 不得依赖该单文件。
 
 ## 2. Rebuild Goals
@@ -25,11 +26,10 @@
 
 - 编排器入口页
 - 空白画布页
-- 模板图加载
 - 节点列表
 - 画布交互
 - Save / Validate / Run
-- `hello_world` 模板可运行
+- `hello_world` 新图可运行
 
 第一阶段明确不做：
 
@@ -48,18 +48,10 @@
   - 编排器入口页
   - 提供：
     - `新建空白图`
-    - `从 hello_world 模板创建`
-    - `从 creative_factory 模板创建`
     - `打开已有图`
 
 - `/editor/new`
   - 空白图编辑页
-
-- `/editor/template-hello-world`
-  - `hello_world` 模板编辑页
-
-- `/editor/template-creative-factory`
-  - `creative_factory` 模板编辑页
 
 - `/editor/[graphId]`
   - 已保存图编辑页
@@ -164,7 +156,7 @@
 
 ## 6. Hello World Validation Flow
 
-`hello_world` 是第一阶段唯一必须跑通的验证模板。
+`hello_world` 是第一阶段唯一必须跑通的验证任务，但它不应再依赖旧模板入口。
 
 ### 6.1 Functional Goal
 
@@ -174,9 +166,9 @@
 
 ### 6.2 Required Flow
 
-1. 打开 `/editor/template-hello-world`
-2. 看到一个最小 graph
-3. 修改名字参数
+1. 打开 `/editor/new`
+2. 在新 editor 中创建最小 `hello world` 图
+3. 输入名字参数
 4. 点击 `Run`
 5. 后端运行图
 6. 前端能看到 run 成功
@@ -217,12 +209,12 @@
 - FastAPI
 - LangGraph
 - SQLite
-- 模板注册接口
 - `hello_world` 运行能力
 
 原则：
 
 - editor 重构阶段优先复用现有后端接口
+- editor 重构阶段不得把旧模板 API 当作前端主入口
 - 非必要不同时重写后端
 
 ## 8. Implementation Plan
@@ -238,6 +230,7 @@
 
 - 旧 editor 前端代码已删除
 - `/editor` 与 `/editor/[graphId]` 仅显示重构占位说明
+- 旧模板入口不再作为保留目标
 
 ### Phase 2: New Canvas Base
 
@@ -291,7 +284,7 @@
 
 完成标准：
 
-- `hello_world` 模板图可运行成功
+- 新 editor 创建的 `hello world` 图可运行成功
 
 ### Phase 5: Reintroduce Advanced Features
 
@@ -320,7 +313,7 @@
 - 节点列表可搜索
 - 节点可点击创建
 - 节点可拖拽创建
-- `/editor/template-hello-world` 可运行成功
+- 新建的 `hello world` 图可运行成功
 - 前端构建通过
 - 后端编译通过
 
@@ -332,6 +325,8 @@
 - 延续旧 editor 的浮动面板实现
 - 修修补补旧交互
 - 在旧代码上叠功能
+- 保留旧模板入口
+- 兼容旧图结构
 
 本轮必须遵守：
 
