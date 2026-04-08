@@ -45,7 +45,6 @@ type ThemeConfig = {
 type StateField = {
   key: string;
   type: string;
-  role: string;
   title: string;
   description: string;
   example?: unknown;
@@ -142,7 +141,6 @@ const HELLO_WORLD_TEMPLATE_ID = "hello_world";
 const DEFAULT_STATE_COLOR = "#d97706";
 const STATE_COLOR_PALETTE = ["#d97706", "#0f766e", "#2563eb", "#b45309", "#be185d", "#6d28d9", "#15803d", "#475569"];
 const STATE_TYPE_OPTIONS = ["string", "number", "boolean", "object", "array", "markdown", "json", "file_list"] as const;
-const STATE_ROLE_OPTIONS = ["input", "intermediate", "decision", "artifact", "final"] as const;
 
 const NODE_PRESETS: Record<string, NodePreset> = {
   start: {
@@ -428,7 +426,6 @@ function EditorCanvas({ initialGraph, mode, graphId }: { initialGraph: GraphPayl
   const [newStateKey, setNewStateKey] = useState("");
   const [newStateDescription, setNewStateDescription] = useState("");
   const [newStateType, setNewStateType] = useState<(typeof STATE_TYPE_OPTIONS)[number]>("string");
-  const [newStateRole, setNewStateRole] = useState<(typeof STATE_ROLE_OPTIONS)[number]>("intermediate");
   const reactFlow = useReactFlow<FlowNode, Edge>();
 
   const selectedNode = useMemo(
@@ -493,7 +490,7 @@ function EditorCanvas({ initialGraph, mode, graphId }: { initialGraph: GraphPayl
       if (!query) {
         return true;
       }
-      return [field.key, field.type, field.role, field.description, field.title].some((value) =>
+      return [field.key, field.type, field.description, field.title].some((value) =>
         value.toLowerCase().includes(query),
       );
     });
@@ -599,7 +596,6 @@ function EditorCanvas({ initialGraph, mode, graphId }: { initialGraph: GraphPayl
       current.concat({
         key,
         type: newStateType,
-        role: newStateRole,
         title: key,
         description: newStateDescription.trim(),
       }),
@@ -612,7 +608,6 @@ function EditorCanvas({ initialGraph, mode, graphId }: { initialGraph: GraphPayl
     setNewStateKey("");
     setNewStateDescription("");
     setNewStateType("string");
-    setNewStateRole("intermediate");
     setStatusMessage(`Added state ${key}`);
   }
 
@@ -805,10 +800,10 @@ function EditorCanvas({ initialGraph, mode, graphId }: { initialGraph: GraphPayl
               className="mt-4 h-10"
               value={stateSearch}
               onChange={(event) => setStateSearch(event.target.value)}
-              placeholder="Search state key or role"
+              placeholder="Search state key or type"
             />
             <div className="mt-4 grid gap-2 rounded-[20px] border border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.72)] p-3">
-              <div className="grid grid-cols-[minmax(0,1fr)_100px_100px] gap-2">
+              <div className="grid grid-cols-[minmax(0,1fr)_120px] gap-2">
                 <Input value={newStateKey} onChange={(event) => setNewStateKey(event.target.value)} placeholder="state key" />
                 <select
                   className="rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3 py-3 text-[var(--text)]"
@@ -816,17 +811,6 @@ function EditorCanvas({ initialGraph, mode, graphId }: { initialGraph: GraphPayl
                   onChange={(event) => setNewStateType(event.target.value as (typeof STATE_TYPE_OPTIONS)[number])}
                 >
                   {STATE_TYPE_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  className="rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3 py-3 text-[var(--text)]"
-                  value={newStateRole}
-                  onChange={(event) => setNewStateRole(event.target.value as (typeof STATE_ROLE_OPTIONS)[number])}
-                >
-                  {STATE_ROLE_OPTIONS.map((option) => (
                     <option key={option} value={option}>
                       {option}
                     </option>
@@ -863,7 +847,7 @@ function EditorCanvas({ initialGraph, mode, graphId }: { initialGraph: GraphPayl
                           <span className="text-sm font-semibold text-[var(--text)]">{field.key}</span>
                         </div>
                         <div className="mt-1 text-xs uppercase tracking-[0.08em] text-[var(--muted)]">
-                          {field.type} / {field.role}
+                          {field.type}
                         </div>
                       </div>
                       <div className="text-xs text-[var(--muted)]">{relationships.writers.length}W · {relationships.readers.length}R</div>
@@ -1029,7 +1013,7 @@ function EditorCanvas({ initialGraph, mode, graphId }: { initialGraph: GraphPayl
                           <div className="text-sm font-semibold text-[var(--text)]">{field.key}</div>
                         </div>
                         <div className="text-xs uppercase tracking-[0.08em] text-[var(--muted)]">
-                          {field.type} / {field.role}
+                          {field.type}
                         </div>
                       </div>
                     ))}
@@ -1119,36 +1103,20 @@ function EditorCanvas({ initialGraph, mode, graphId }: { initialGraph: GraphPayl
                     onChange={(event) => updateStateField(selectedState.key, { description: event.target.value })}
                   />
                 </label>
-                <div className="grid grid-cols-[1fr_1fr] gap-3">
-                  <label className="grid gap-1.5 text-sm text-[var(--muted)]">
-                    <span>Type</span>
-                    <select
-                      className="rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3 py-3 text-[var(--text)]"
-                      value={selectedState.type}
-                      onChange={(event) => updateStateField(selectedState.key, { type: event.target.value })}
-                    >
-                      {STATE_TYPE_OPTIONS.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="grid gap-1.5 text-sm text-[var(--muted)]">
-                    <span>Role</span>
-                    <select
-                      className="rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3 py-3 text-[var(--text)]"
-                      value={selectedState.role}
-                      onChange={(event) => updateStateField(selectedState.key, { role: event.target.value })}
-                    >
-                      {STATE_ROLE_OPTIONS.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
+                <label className="grid gap-1.5 text-sm text-[var(--muted)]">
+                  <span>Type</span>
+                  <select
+                    className="rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3 py-3 text-[var(--text)]"
+                    value={selectedState.type}
+                    onChange={(event) => updateStateField(selectedState.key, { type: event.target.value })}
+                  >
+                    {STATE_TYPE_OPTIONS.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 <div className="grid gap-2 rounded-[20px] border border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.76)] p-4">
                   <div className="text-sm font-semibold text-[var(--text)]">Color</div>
                   <div className="flex flex-wrap gap-2">

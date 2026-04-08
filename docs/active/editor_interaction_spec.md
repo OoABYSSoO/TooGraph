@@ -93,7 +93,6 @@
 - color swatch
 - key
 - type
-- role
 - 简短描述
 
 ## 4.2 Edit Actions

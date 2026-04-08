@@ -10,7 +10,6 @@ type TemplateRecord = {
   state_schema: Array<{
     key: string;
     type: string;
-    role: string;
     title: string;
     description: string;
   }>;
@@ -34,7 +33,6 @@ type TemplateRecord = {
     state_schema: Array<{
       key: string;
       type: string;
-      role: string;
       title: string;
       description: string;
     }>;
