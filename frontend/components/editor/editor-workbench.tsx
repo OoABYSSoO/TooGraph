@@ -72,6 +72,7 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
   const [nodeSearch, setNodeSearch] = useState("");
   const [isStatePanelCollapsed, setIsStatePanelCollapsed] = useState(false);
   const [isThemePanelCollapsed, setIsThemePanelCollapsed] = useState(false);
+  const [isCanvasDragOver, setIsCanvasDragOver] = useState(false);
   const [latestRunDetail, setLatestRunDetail] = useState<RunDetailPayload | null>(null);
   const [selectedNodeDetail, setSelectedNodeDetail] = useState<NodeExecutionDetail | null>(null);
   const [templatePresets, setTemplatePresets] = useState<ThemePreset[]>(getTemplateThemePresets("creative_factory"));
@@ -312,11 +313,17 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
   const handleCanvasDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
+    setIsCanvasDragOver(true);
+  }, []);
+
+  const handleCanvasDragLeave = useCallback(() => {
+    setIsCanvasDragOver(false);
   }, []);
 
   const handleCanvasDrop = useCallback(
     (event: DragEvent<HTMLDivElement>) => {
       event.preventDefault();
+      setIsCanvasDragOver(false);
       const kind = event.dataTransfer.getData(NODE_DND_MIME);
       if (!kind) return;
       const position = reactFlow.screenToFlowPosition({
@@ -470,6 +477,9 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
                     </div>
                     <Input placeholder="Search nodes" value={nodeSearch} onChange={(event) => setNodeSearch(event.target.value)} />
                     <div className="grid gap-3">
+                      <SubtleCard className="border-dashed text-[0.88rem] text-[var(--muted)]">
+                        Drag a node card onto the canvas, or click to insert one.
+                      </SubtleCard>
                       {filteredNodePresets.map((preset) => (
                         <button
                           key={preset.kind}
@@ -783,7 +793,13 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
           ) : null}
         </div>
 
-        <div className="min-h-[780px] overflow-hidden rounded-[26px] border border-[rgba(154,52,18,0.14)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.35)]">
+        <div
+          className={`relative min-h-[780px] overflow-hidden rounded-[26px] border shadow-[inset_0_0_0_1px_rgba(255,255,255,0.35)] transition ${
+            isCanvasDragOver
+              ? "border-[rgba(154,52,18,0.45)] ring-2 ring-[rgba(154,52,18,0.16)]"
+              : "border-[rgba(154,52,18,0.14)]"
+          }`}
+        >
           <ReactFlow
             className="cursor-grab active:cursor-grabbing"
             nodes={nodes}
@@ -797,9 +813,13 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
             onNodeClick={onNodeClick}
             onEdgeClick={onEdgeClick}
             onDragOver={handleCanvasDragOver}
+            onDragLeave={handleCanvasDragLeave}
             onDrop={handleCanvasDrop}
             panOnDrag
-            panOnScroll
+            panOnScroll={false}
+            zoomOnScroll
+            zoomOnPinch
+            zoomOnDoubleClick={false}
             selectionOnDrag={false}
             minZoom={0.35}
             maxZoom={1.8}
@@ -816,19 +836,24 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
               <div className="grid gap-2">
                 <Badge className="w-fit">Canvas</Badge>
                 <Badge>Edges represent execution flow and carry major state keys.</Badge>
+                <Badge>Mouse wheel to zoom</Badge>
               </div>
             </Panel>
-            <Panel className="!z-40 !m-4" position="bottom-right">
-              <div className="grid gap-2 rounded-[22px] border border-[rgba(154,52,18,0.16)] bg-[rgba(255,255,255,0.84)] p-2 shadow-[0_14px_34px_rgba(96,52,23,0.16)] backdrop-blur">
-                <div className="flex justify-end">
+            <Panel className="!z-[80] !m-4 !pointer-events-auto" position="bottom-right">
+              <div className="grid w-[248px] gap-2 rounded-[22px] border-2 border-[rgba(154,52,18,0.2)] bg-[rgba(255,255,255,0.92)] p-2.5 shadow-[0_16px_38px_rgba(96,52,23,0.18)] backdrop-blur">
+                <div className="flex items-center justify-between gap-2">
+                  <strong className="text-[0.9rem] text-[var(--text)]">Mini Map</strong>
                   <Badge>Drag canvas to pan</Badge>
                 </div>
                 <MiniMap
+                  maskColor="rgba(242,236,224,0.55)"
+                  nodeColor={() => "#9a3412"}
                   zoomable
                   pannable
                   style={{
-                    width: 220,
-                    height: 140,
+                    width: 228,
+                    height: 152,
+                    display: "block",
                     background: "rgba(255,255,255,0.98)",
                     border: "1px solid rgba(154,52,18,0.14)",
                     borderRadius: 14,
@@ -837,6 +862,14 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
               </div>
             </Panel>
           </ReactFlow>
+          {nodes.length === 0 ? (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <div className="rounded-[24px] border border-dashed border-[rgba(154,52,18,0.28)] bg-[rgba(255,255,255,0.72)] px-6 py-5 text-center shadow-[0_12px_30px_rgba(96,52,23,0.08)] backdrop-blur">
+                <div className="text-[1.05rem] font-semibold text-[var(--text)]">Empty Canvas</div>
+                <div className="mt-1 text-[0.92rem] text-[var(--muted)]">Drag a node here from the left panel, or click a node card to insert it.</div>
+              </div>
+            </div>
+          ) : null}
         </div>
       </section>
     </div>
