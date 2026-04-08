@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type DragEvent } from "react
 import { useRouter } from "next/navigation";
 import {
   Background,
+  BackgroundVariant,
   Controls,
   MiniMap,
   Panel,
@@ -473,9 +474,10 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
                         <button
                           key={preset.kind}
                           draggable
-                          className="grid gap-1.5 rounded-[18px] border border-[rgba(212,198,170,0.9)] bg-[rgba(255,255,255,0.78)] p-3.5 text-left text-[var(--text)] transition-transform hover:-translate-y-px hover:border-[rgba(154,52,18,0.45)]"
+                          className="grid cursor-grab gap-1.5 rounded-[18px] border border-[rgba(212,198,170,0.9)] bg-[rgba(255,255,255,0.78)] p-3.5 text-left text-[var(--text)] transition-transform hover:-translate-y-px hover:border-[rgba(154,52,18,0.45)] active:cursor-grabbing"
                           onClick={() => addNode(preset.kind)}
                           onDragStart={(event) => handleNodePresetDragStart(event, preset.kind)}
+                          title="Click to add, or drag onto canvas"
                           type="button"
                         >
                           <strong>{preset.label}</strong>
@@ -518,7 +520,7 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
           ) : null}
         </div>
 
-        <div className="absolute right-4 top-24 z-20 grid max-h-[calc(100vh-18rem)] w-[min(28rem,calc(100%-2rem))] gap-3 overflow-y-auto max-[960px]:left-4 max-[960px]:right-4 max-[960px]:top-[7.5rem] max-[960px]:max-h-[calc(100vh-10rem)] max-[960px]:w-auto">
+        <div className="absolute right-4 top-24 bottom-44 z-20 grid w-[min(28rem,calc(100%-2rem))] gap-3 overflow-y-auto pr-1 max-[960px]:left-4 max-[960px]:right-4 max-[960px]:top-[7.5rem] max-[960px]:bottom-4 max-[960px]:w-auto">
           {isThemePanelCollapsed ? (
             <div className="flex justify-end">
               <button
@@ -781,7 +783,7 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
           ) : null}
         </div>
 
-        <div className="min-h-[780px] overflow-hidden">
+        <div className="min-h-[780px] overflow-hidden rounded-[26px] border border-[rgba(154,52,18,0.14)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.35)]">
           <ReactFlow
             className="cursor-grab active:cursor-grabbing"
             nodes={nodes}
@@ -801,33 +803,37 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
             selectionOnDrag={false}
             minZoom={0.35}
             maxZoom={1.8}
+            defaultViewport={{ x: 0, y: 0, zoom: 0.9 }}
             deleteKeyCode={["Backspace", "Delete"]}
             style={{
               background:
-                "radial-gradient(circle at 20% 20%, rgba(154, 52, 18, 0.08), transparent 18%), linear-gradient(180deg, rgba(255, 250, 241, 0.85), rgba(250, 245, 236, 0.95))",
+                "linear-gradient(180deg, rgba(255, 250, 241, 0.92), rgba(250, 245, 236, 0.98))",
             }}
           >
             <Controls />
-            <Background gap={18} size={1} />
+            <Background color="rgba(154,52,18,0.14)" gap={20} size={1.4} variant={BackgroundVariant.Dots} />
             <Panel position="top-left">
-              <Badge>Edges represent execution flow and carry major state keys.</Badge>
-            </Panel>
-            <Panel className="!z-30 !m-4" position="bottom-right">
               <div className="grid gap-2">
-                <div className="justify-self-end">
+                <Badge className="w-fit">Canvas</Badge>
+                <Badge>Edges represent execution flow and carry major state keys.</Badge>
+              </div>
+            </Panel>
+            <Panel className="!z-40 !m-4" position="bottom-right">
+              <div className="grid gap-2 rounded-[22px] border border-[rgba(154,52,18,0.16)] bg-[rgba(255,255,255,0.84)] p-2 shadow-[0_14px_34px_rgba(96,52,23,0.16)] backdrop-blur">
+                <div className="flex justify-end">
                   <Badge>Drag canvas to pan</Badge>
                 </div>
-                <div className="overflow-hidden rounded-[18px] border border-[rgba(154,52,18,0.18)] bg-[rgba(255,255,255,0.92)] shadow-[0_12px_30px_rgba(96,52,23,0.14)]">
-                  <MiniMap
-                    zoomable
-                    pannable
-                    style={{
-                      width: 188,
-                      height: 124,
-                      background: "rgba(255,255,255,0.92)",
-                    }}
-                  />
-                </div>
+                <MiniMap
+                  zoomable
+                  pannable
+                  style={{
+                    width: 220,
+                    height: 140,
+                    background: "rgba(255,255,255,0.98)",
+                    border: "1px solid rgba(154,52,18,0.14)",
+                    borderRadius: 14,
+                  }}
+                />
               </div>
             </Panel>
           </ReactFlow>
