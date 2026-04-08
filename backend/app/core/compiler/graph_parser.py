@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.schemas.graph import EdgeKind, GraphDocument, GraphEdge, GraphNode, NodeType, StateField, ThemeConfig
+from app.core.schemas.graph import EdgeKind, GraphDocument, GraphEdge, GraphNode, NodeType, StateField, ThemeConfig
 
 
 @dataclass

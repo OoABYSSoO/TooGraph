@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from app.compiler.graph_parser import parse_graph
-from app.compiler.workflow_builder import build_workflow
-from app.runtime.state import create_initial_run_state, utc_now_iso
-from app.schemas.graph import GraphDocument
-from app.storage.run_store import save_run
+from app.core.compiler.graph_parser import parse_graph
+from app.core.compiler.workflow_builder import build_workflow
+from app.core.runtime.state import create_initial_run_state, utc_now_iso
+from app.core.schemas.graph import GraphDocument
+from app.core.storage.run_store import save_run
 
 
 def execute_graph(graph: GraphDocument) -> dict:

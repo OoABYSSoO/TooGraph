@@ -31,7 +31,7 @@
 当前最明显的问题：
 
 1. `creative_factory` 的前后端模板源已经开始集中，但前后端仍是双份定义
-2. 后端尚未形成 `core/` 与 `templates/` 的目录分层
+2. 后端 `core/` 与 `templates/` 的第一轮目录分层已经完成，但导出边界还可继续收紧
 3. 前端模板源已经开始抽离，但模板主题与默认图仍需继续向统一注册源收拢
 4. theme panel 还不是完整结构化策略编辑器
 5. runtime handler 仍偏单文件集中
@@ -98,6 +98,13 @@ backend/app/templates/creative_factory/
 
 - `python -m compileall backend/app` 通过
 - 所有 API import 正常
+
+当前状态：
+
+- `schemas / compiler / runtime / storage` 已迁入 `backend/app/core/`
+- API 已改为从 `app.core.*` 引用
+- 旧目录 `backend/app/compiler`、`backend/app/runtime`、`backend/app/schemas`、`backend/app/storage` 已删除
+- 下一步可选项是继续补 `core` 层的导出边界和更细的 handler/tool 划分
 
 ---
 

@@ -3,9 +3,9 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from app.runtime.registry import get_node_handler_registry
-from app.runtime.state import RunState, utc_now_iso
-from app.schemas.graph import GraphNode
+from app.core.registry.node_registry import get_node_handler_registry
+from app.core.runtime.state import RunState, utc_now_iso
+from app.core.schemas.graph import GraphNode
 
 
 def execute_runtime_node(state: RunState, node: GraphNode) -> RunState:

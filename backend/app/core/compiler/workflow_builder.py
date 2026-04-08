@@ -4,11 +4,11 @@ from functools import partial
 
 from langgraph.graph import END, START, StateGraph
 
-from app.compiler.graph_parser import WorkflowConfig
-from app.runtime.nodes import execute_runtime_node
-from app.runtime.router import route_after_condition
-from app.runtime.state import RunState
-from app.schemas.graph import NodeType
+from app.core.compiler.graph_parser import WorkflowConfig
+from app.core.runtime.nodes import execute_runtime_node
+from app.core.runtime.router import route_after_condition
+from app.core.runtime.state import RunState
+from app.core.schemas.graph import NodeType
 
 
 def build_workflow(workflow_config: WorkflowConfig):
