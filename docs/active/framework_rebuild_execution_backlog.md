@@ -30,7 +30,7 @@
 
 当前最明显的问题：
 
-1. `creative_factory` 仍然散落在多个文件中
+1. `creative_factory` 的前后端模板源已经开始集中，但前后端仍是双份定义
 2. 后端尚未形成 `core/` 与 `templates/` 的目录分层
 3. 前端模板源已经开始抽离，但模板主题与默认图仍需继续向统一注册源收拢
 4. theme panel 还不是完整结构化策略编辑器
@@ -133,6 +133,15 @@ backend/app/templates/creative_factory/
 
 `handlers.py`
 - 返回模板节点和具体 handler 的绑定关系
+
+当前状态：
+
+- `backend/app/templates/creative_factory/template.py` 已创建
+- `backend/app/templates/creative_factory/state.py` 已创建
+- `backend/app/templates/creative_factory/themes.py` 已创建
+- `backend/app/templates/creative_factory/handlers.py` 已创建
+- 注册表已改为从新模板目录装配 `creative_factory`
+- 下一步需要决定默认 graph 结构是在后端模板层生成，还是继续只由前端模板层生成
 
 ### A2.3 前端对应抽离
 
