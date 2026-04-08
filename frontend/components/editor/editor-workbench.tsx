@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type DragEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
   Background,
@@ -9,6 +9,7 @@ import {
   Panel,
   ReactFlow,
   ReactFlowProvider,
+  useReactFlow,
   type EdgeMouseHandler,
   type NodeMouseHandler,
 } from "@xyflow/react";
@@ -39,6 +40,7 @@ import {
 import { createTemplateShellDocument, getTemplateThemePresets } from "@/lib/templates";
 import { useEditorStore } from "@/stores/editor-store";
 import type {
+  GraphCanvasEdge,
   GraphCanvasNode,
   GraphDocument,
   NodeExecutionDetail,
@@ -58,10 +60,12 @@ const edgeTypes = {
 
 const STATE_PANEL_STORAGE_KEY = "graphiteui:editor:state-panel-collapsed";
 const THEME_PANEL_STORAGE_KEY = "graphiteui:editor:theme-panel-collapsed";
+const NODE_DND_MIME = "application/graphiteui-node-kind";
 
 function EditorWorkbenchInner({ graphId }: { graphId: string }) {
   const { t } = useLanguage();
   const router = useRouter();
+  const reactFlow = useReactFlow<GraphCanvasNode, GraphCanvasEdge>();
   const [newReadKey, setNewReadKey] = useState("");
   const [newWriteKey, setNewWriteKey] = useState("");
   const [nodeSearch, setNodeSearch] = useState("");
@@ -299,6 +303,29 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
 
   const onNodeClick: NodeMouseHandler<GraphCanvasNode> = (_, node) => selectNode(node.id);
   const onEdgeClick: EdgeMouseHandler = (_, edge) => selectEdge(edge.id);
+  const handleNodePresetDragStart = useCallback((event: DragEvent<HTMLButtonElement>, kind: string) => {
+    event.dataTransfer.setData(NODE_DND_MIME, kind);
+    event.dataTransfer.effectAllowed = "move";
+  }, []);
+
+  const handleCanvasDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+  }, []);
+
+  const handleCanvasDrop = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      const kind = event.dataTransfer.getData(NODE_DND_MIME);
+      if (!kind) return;
+      const position = reactFlow.screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+      addNode(kind as GraphCanvasNode["data"]["kind"], position);
+    },
+    [addNode, reactFlow],
+  );
 
   function handleQuickAddState(
     nextKey: string,
@@ -438,8 +465,10 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
                       {filteredNodePresets.map((preset) => (
                         <button
                           key={preset.kind}
+                          draggable
                           className="grid gap-1.5 rounded-[18px] border border-[rgba(212,198,170,0.9)] bg-[rgba(255,255,255,0.78)] p-3.5 text-left text-[var(--text)] transition-transform hover:-translate-y-px hover:border-[rgba(154,52,18,0.45)]"
                           onClick={() => addNode(preset.kind)}
+                          onDragStart={(event) => handleNodePresetDragStart(event, preset.kind)}
                           type="button"
                         >
                           <strong>{preset.label}</strong>
@@ -745,8 +774,13 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
           ) : null}
         </div>
 
-        <div className="min-h-[780px] overflow-hidden">
+        <div
+          className="min-h-[780px] overflow-hidden"
+          onDragOver={handleCanvasDragOver}
+          onDrop={handleCanvasDrop}
+        >
           <ReactFlow
+            className="cursor-grab active:cursor-grabbing"
             nodes={nodes}
             edges={edges}
             fitView
@@ -757,17 +791,39 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
             onConnect={onConnect}
             onNodeClick={onNodeClick}
             onEdgeClick={onEdgeClick}
+            panOnDrag
+            panOnScroll
+            selectionOnDrag={false}
+            minZoom={0.35}
+            maxZoom={1.8}
             deleteKeyCode={["Backspace", "Delete"]}
             style={{
               background:
                 "radial-gradient(circle at 20% 20%, rgba(154, 52, 18, 0.08), transparent 18%), linear-gradient(180deg, rgba(255, 250, 241, 0.85), rgba(250, 245, 236, 0.95))",
             }}
           >
-            <MiniMap zoomable pannable />
+            <MiniMap
+              zoomable
+              pannable
+              position="bottom-right"
+              style={{
+                width: 188,
+                height: 124,
+                background: "rgba(255,255,255,0.92)",
+                border: "1px solid rgba(154,52,18,0.18)",
+                borderRadius: 18,
+                boxShadow: "0 12px 30px rgba(96, 52, 23, 0.14)",
+              }}
+            />
             <Controls />
             <Background gap={18} size={1} />
             <Panel position="top-left">
               <Badge>Edges represent execution flow and carry major state keys.</Badge>
+            </Panel>
+            <Panel position="bottom-right">
+              <div className="pointer-events-none mb-[136px] mr-1">
+                <Badge>Drag canvas to pan</Badge>
+              </div>
             </Panel>
           </ReactFlow>
         </div>

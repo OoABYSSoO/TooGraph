@@ -70,7 +70,7 @@ type EditorState = {
   onNodesChange: (changes: NodeChange<GraphCanvasNode>[]) => void;
   onEdgesChange: (changes: EdgeChange<GraphCanvasEdge>[]) => void;
   onConnect: (connection: Connection) => void;
-  addNode: (kind: GraphNodeType) => void;
+  addNode: (kind: GraphNodeType, position?: { x: number; y: number }) => void;
   selectNode: (nodeId: string | null) => void;
   selectEdge: (edgeId: string | null) => void;
   updateSelectedNodeLabel: (label: string) => void;
@@ -337,7 +337,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }));
   },
 
-  addNode: (kind) => {
+  addNode: (kind, position) => {
     const preset = NODE_PRESETS.find((item) => item.kind === kind);
     if (!preset) return;
     set((state) => {
@@ -346,10 +346,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const nextNode: GraphCanvasNode = {
         id: nodeId,
         type: "workflow",
-        position: {
-          x: 160 + (state.nodes.length % 3) * 240,
-          y: 120 + Math.floor(state.nodes.length / 3) * 150,
-        },
+        position:
+          position ?? {
+            x: 160 + (state.nodes.length % 3) * 240,
+            y: 120 + Math.floor(state.nodes.length / 3) * 150,
+          },
         data: {
           label: preset.label,
           kind: preset.kind,
