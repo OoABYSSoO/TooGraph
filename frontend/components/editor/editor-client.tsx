@@ -28,6 +28,25 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { API_BASE_URL, apiPost, type ApiIssue } from "@/lib/api";
 import { cn } from "@/lib/cn";
+import {
+  EDITOR_NODE_DEFINITIONS,
+  createEditorNodePreset,
+  getEditorNodeInspectorFields,
+  getEditorNodeDefinition,
+  getEditorNodeUi,
+  getInlinePortKeys,
+  getVisiblePorts,
+  getWidgetValue as getDefinitionWidgetValue,
+  hydrateEditorNodeParams,
+  resolveRuntimeParams,
+  resolveRuntimeReads,
+  resolvePortStateKey,
+  resolveRuntimeWrites,
+  setWidgetValue as setDefinitionWidgetValue,
+  type EditorNodeInspectorFieldDefinition,
+  type EditorNodePreset,
+  type EditorPortType,
+} from "@/lib/editor-node-definitions";
 
 type ThemeConfig = {
   theme_preset: string;
@@ -137,95 +156,17 @@ type FlowNodeData = {
 
 type FlowNode = Node<FlowNodeData>;
 
-type PortType = "text" | "json" | "any";
-
-type NodeWidgetDefinition = {
-  key: string;
-  label: string;
-  widget: "text" | "textarea";
-  valueType: PortType;
-  bindable?: boolean;
-  rows?: number;
-  placeholder?: string;
-};
-
-type NodePortDefinition = {
-  key: string;
-  label: string;
-  valueType: PortType;
-};
-
-type NodePreset = {
-  type: string;
-  label: string;
-  description: string;
-  reads: string[];
-  writes: string[];
-  params: Record<string, unknown>;
-  inputs?: NodePortDefinition[];
-  outputs?: NodePortDefinition[];
-  widgets?: NodeWidgetDefinition[];
-};
-
 const HELLO_WORLD_TEMPLATE_ID = "hello_world";
 const DEFAULT_STATE_COLOR = "#d97706";
 const STATE_COLOR_PALETTE = ["#d97706", "#0f766e", "#2563eb", "#b45309", "#be185d", "#6d28d9", "#15803d", "#475569"];
 const STATE_TYPE_OPTIONS = ["string", "number", "boolean", "object", "array", "markdown", "json", "file_list"] as const;
 
-const NODE_PRESETS: Record<string, NodePreset> = {
-  text_input: {
-    type: "text_input",
-    label: "Text Input",
-    description: "Provide a text value to the workflow.",
-    reads: [],
-    writes: ["name"],
-    params: {
-      input_key: "name",
-      default_value: "Abyss",
-      placeholder: "Enter a name",
-      multiline: false,
-    },
-    inputs: [],
-    outputs: [{ key: "text", label: "text", valueType: "text" }],
-    widgets: [{ key: "text", label: "Text", widget: "textarea", valueType: "text", bindable: true, rows: 5, placeholder: "Enter text" }],
-  },
-  hello_model: {
-    type: "hello_model",
-    label: "Hello Model",
-    description: "Send a name to the local OpenAI-compatible model.",
-    reads: ["name"],
-    writes: ["greeting", "final_result", "llm_response"],
-    params: {
-      name: "Abyss",
-      temperature: 0.2,
-      max_tokens: 40,
-    },
-    inputs: [],
-    outputs: [
-      { key: "greeting", label: "greeting", valueType: "text" },
-      { key: "final_result", label: "final_result", valueType: "text" },
-      { key: "llm_response", label: "llm_response", valueType: "text" },
-    ],
-    widgets: [{ key: "name", label: "Name", widget: "text", valueType: "text", bindable: true, placeholder: "Enter a name" }],
-  },
-  text_output: {
-    type: "text_output",
-    label: "Text Output",
-    description: "Preview text output and optionally persist it.",
-    reads: ["final_result"],
-    writes: [],
-    params: {
-      source_state_key: "final_result",
-      display_mode: "auto",
-      persist_enabled: false,
-      persist_format: "txt",
-      file_name_template: "result",
-    },
-    inputs: [{ key: "text", label: "text", valueType: "text" }],
-    outputs: [],
-    widgets: [],
-  },
-};
+const NODE_PRESETS: Record<string, EditorNodePreset> = Object.fromEntries(
+  Object.values(EDITOR_NODE_DEFINITIONS).map((definition) => [
+    definition.type,
+    createEditorNodePreset(definition),
+  ]),
+);
 
 function createEditorDefaults(templates: TemplateRecord[]): GraphPayload {
   const helloWorldTemplate = templates.find((item) => item.template_id === HELLO_WORLD_TEMPLATE_ID);
@@ -300,38 +241,19 @@ function inferBoundaryKeys(node: GraphNodePayload, graph: GraphPayload) {
 function graphNodeToFlowNode(node: GraphNodePayload, graph: GraphPayload): FlowNode {
   const editorNodeType = runtimeNodeTypeToEditorNodeType(node.type);
   const preset = NODE_PRESETS[editorNodeType];
+  const definition = getEditorNodeDefinition(editorNodeType);
   const boundaryKeys = inferBoundaryKeys(node, graph);
   const rawParams = (node.params ?? {}) as Record<string, unknown>;
   const persistedParamBindings =
     rawParams.__param_bindings && typeof rawParams.__param_bindings === "object"
       ? (rawParams.__param_bindings as Record<string, string>)
       : {};
-  const paramsWithoutBindings = { ...rawParams };
-  delete paramsWithoutBindings.__param_bindings;
-  const derivedParams =
-    editorNodeType === "text_input"
-      ? {
-          input_key: boundaryKeys.writes[0] ?? "",
-          default_value: String(rawParams.input_values && boundaryKeys.writes[0] ? (rawParams.input_values as Record<string, unknown>)[boundaryKeys.writes[0]] ?? "" : ""),
-          placeholder: String(rawParams.placeholder ?? "Enter text"),
-          multiline: Boolean(rawParams.multiline),
-        }
-      : editorNodeType === "text_output"
-        ? {
-            source_state_key: boundaryKeys.reads[0] ?? "",
-            display_mode: "auto",
-            persist_enabled: false,
-            persist_format: "txt",
-            file_name_template: boundaryKeys.reads[0] ?? "result",
-            ...(Array.isArray(rawParams.outputs) && rawParams.outputs[0] && typeof rawParams.outputs[0] === "object"
-              ? {
-                  ...(rawParams.outputs[0] as Record<string, unknown>),
-                  source_state_key:
-                    String((rawParams.outputs[0] as Record<string, unknown>).state_key ?? boundaryKeys.reads[0] ?? ""),
-                }
-              : {}),
-          }
-        : paramsWithoutBindings;
+  const derivedParams = hydrateEditorNodeParams({
+    definition,
+    rawParams,
+    nodeReads: boundaryKeys.reads,
+    nodeWrites: boundaryKeys.writes,
+  });
   return {
     id: node.id,
     type: "default",
@@ -377,65 +299,78 @@ function getNodeStyle(nodeType: string) {
 }
 
 function getVisualInputKeys(nodeType: string, reads: string[], stateColors: StateColorMap, params: Record<string, unknown>) {
-  if (nodeType === "text_output") {
-    return ["text"];
-  }
-  if (nodeType === "hello_model") return [];
-  return reads;
+  return getVisiblePorts(getEditorNodeDefinition(nodeType), "input").map((port) =>
+    resolvePortStateKey({
+      definition: getEditorNodeDefinition(nodeType),
+      nodeParams: params,
+      nodeReads: reads,
+      side: "input",
+      portKey: port.key,
+    }),
+  );
 }
 
 function getVisualOutputKeys(nodeType: string, writes: string[], stateColors: StateColorMap, params: Record<string, unknown>) {
-  if (nodeType === "text_input") {
-    return ["text"];
-  }
-  return writes;
+  return getVisiblePorts(getEditorNodeDefinition(nodeType), "output").map((port) =>
+    resolvePortStateKey({
+      definition: getEditorNodeDefinition(nodeType),
+      nodeParams: params,
+      nodeWrites: writes,
+      side: "output",
+      portKey: port.key,
+    }),
+  );
 }
 
 function getNodePreset(nodeType: string) {
+  const definition = getEditorNodeDefinition(nodeType);
+  if (definition) {
+    return createEditorNodePreset(definition);
+  }
   return NODE_PRESETS[nodeType];
 }
 
 function getWidgetValue(node: FlowNodeData, widgetKey: string) {
-  if (node.nodeType === "text_input" && widgetKey === "text") {
-    return String(node.params.default_value ?? "");
-  }
-  return String(node.params[widgetKey] ?? "");
+  return getDefinitionWidgetValue({
+    definition: getEditorNodeDefinition(node.nodeType),
+    nodeParams: node.params,
+    widgetKey,
+  });
 }
 
 function updateWidgetValue(node: FlowNodeData, widgetKey: string, nextValue: string) {
-  if (node.nodeType === "text_input" && widgetKey === "text") {
-    return {
-      ...node,
-      params: {
-        ...node.params,
-        default_value: nextValue,
-      },
-    };
-  }
   return {
     ...node,
-    params: {
-      ...node.params,
-      [widgetKey]: nextValue,
-    },
+    params: setDefinitionWidgetValue({
+      definition: getEditorNodeDefinition(node.nodeType),
+      nodeParams: node.params,
+      widgetKey,
+      nextValue,
+    }),
   };
 }
 
 function resolveOutputStateKey(node: FlowNodeData, portKey: string) {
-  if (node.nodeType === "text_input" && portKey === "text") {
-    return String(node.params.input_key ?? "").trim() || node.writes[0] || "";
-  }
-  return portKey;
+  return resolvePortStateKey({
+    definition: getEditorNodeDefinition(node.nodeType),
+    nodeParams: node.params,
+    nodeWrites: node.writes,
+    side: "output",
+    portKey,
+  });
 }
 
 function resolveInputStateKey(node: FlowNodeData, portKey: string) {
-  if (node.nodeType === "text_output" && portKey === "text") {
-    return String(node.params.source_state_key ?? "").trim() || node.reads[0] || "";
-  }
-  return portKey;
+  return resolvePortStateKey({
+    definition: getEditorNodeDefinition(node.nodeType),
+    nodeParams: node.params,
+    nodeReads: node.reads,
+    side: "input",
+    portKey,
+  });
 }
 
-function resolveHandlePortType(node: FlowNodeData, handleId?: string | null): PortType | null {
+function resolveHandlePortType(node: FlowNodeData, handleId?: string | null): EditorPortType | null {
   const preset = getNodePreset(node.nodeType);
   const stateKey = getStateKeyFromHandle(handleId);
   if (stateKey) {
@@ -465,11 +400,31 @@ function resolveActualFlowKeyFromNode(node: FlowNodeData, handleId?: string | nu
 
 function FlowNodeCard({ data, selected }: NodeProps<FlowNode>) {
   const reactFlow = useReactFlow<FlowNode, Edge>();
+  const definition = getEditorNodeDefinition(data.nodeType);
   const preset = getNodePreset(data.nodeType);
+  const ui = getEditorNodeUi(definition);
   const reads = getVisualInputKeys(data.nodeType, data.reads, data.stateColors, data.params);
   const writes = getVisualOutputKeys(data.nodeType, data.writes, data.stateColors, data.params);
-  const outputSourceKey = String(data.params.source_state_key ?? data.reads[0] ?? "");
-  const textBinding = data.paramBindings.text;
+  const inlineInputPorts = getInlinePortKeys(definition, "input").map((portKey) => {
+    const portDefinition = definition?.inputs.find((port) => port.key === portKey);
+    const actualKey = resolveInputStateKey(data, portKey);
+    return {
+      portKey,
+      label: portDefinition?.label ?? portKey,
+      actualKey,
+      color: data.stateColors[actualKey] ?? DEFAULT_STATE_COLOR,
+    };
+  });
+  const inlineOutputPorts = getInlinePortKeys(definition, "output").map((portKey) => {
+    const portDefinition = definition?.outputs.find((port) => port.key === portKey);
+    const actualKey = resolveOutputStateKey(data, portKey);
+    return {
+      portKey,
+      label: portDefinition?.label ?? portKey,
+      actualKey,
+      color: data.stateColors[actualKey] ?? DEFAULT_STATE_COLOR,
+    };
+  });
 
   return (
     <div
@@ -487,7 +442,7 @@ function FlowNodeCard({ data, selected }: NodeProps<FlowNode>) {
       </div>
 
       <div className="grid gap-3 px-4 py-3">
-        {reads.length > 0 && data.nodeType !== "text_output" ? (
+        {reads.length > 0 ? (
           <div className="grid gap-1">
             {reads.map((key) => (
               <SidePortRow
@@ -503,17 +458,18 @@ function FlowNodeCard({ data, selected }: NodeProps<FlowNode>) {
 
         {preset?.widgets?.length ? (
           <div className="grid gap-3">
-            {data.nodeType !== "text_input" ? (
+            {ui.showDescription ? (
               <div className="text-sm leading-6 text-[var(--muted)]">{data.description}</div>
             ) : null}
-            {data.nodeType === "text_input" ? (
+            {inlineOutputPorts.map((port) => (
               <PortLine
+                key={`inline-output-${port.portKey}`}
                 nodeId={data.nodeId}
-                label="text"
+                label={port.label}
                 rightSocket
-                color={data.stateColors[resolveOutputStateKey(data, "text")] ?? DEFAULT_STATE_COLOR}
+                color={port.color}
               />
-            ) : null}
+            ))}
             {preset.widgets.map((widget) => {
               const binding = data.paramBindings[widget.key];
               const showSocket = Boolean(widget.bindable) && (data.isConnecting || Boolean(binding));
@@ -523,14 +479,14 @@ function FlowNodeCard({ data, selected }: NodeProps<FlowNode>) {
                   key={widget.key}
                   nodeId={data.nodeId}
                   paramName={widget.key}
-                  label={data.nodeType === "text_input" ? "" : widget.label}
+                  label={ui.showDescription ? widget.label : ""}
                   value={getWidgetValue(data, widget.key)}
                   binding={binding}
                   showSocket={showSocket}
                   disabled={disabled}
                   widgetType={widget.widget}
                   rows={widget.rows}
-                  socketAnchor={data.nodeType === "text_input" ? "top-left" : "center-left"}
+                  socketAnchor={ui.widgetSocketAnchor}
                   placeholder={widget.placeholder ?? String(data.params.placeholder ?? "")}
                   onChange={(nextValue) => {
                     reactFlow.setNodes((current) =>
@@ -550,29 +506,34 @@ function FlowNodeCard({ data, selected }: NodeProps<FlowNode>) {
           </div>
         ) : null}
 
-        {data.nodeType === "text_output" ? (
+        {inlineInputPorts.length > 0 ? (
           <div className="grid gap-2">
-            <PortLine
-              nodeId={data.nodeId}
-              label="text"
-              leftInput
-              color={data.stateColors[outputSourceKey] ?? DEFAULT_STATE_COLOR}
-            />
-            <div className="rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,255,255,0.82)] p-3">
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <WidgetLabel label="Preview" />
-                {data.outputPreview ? (
-                  <span className="text-[0.68rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">
-                    {data.outputPreview.kind}
-                  </span>
-                ) : null}
+            {inlineInputPorts.map((port) => (
+              <PortLine
+                key={`inline-input-${port.portKey}`}
+                nodeId={data.nodeId}
+                label={port.label}
+                leftInput
+                color={port.color}
+              />
+            ))}
+            {ui.outputPreview.inputKey ? (
+              <div className="rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,255,255,0.82)] p-3">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <WidgetLabel label="Preview" />
+                  {data.outputPreview ? (
+                    <span className="text-[0.68rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">
+                      {data.outputPreview.kind}
+                    </span>
+                  ) : null}
+                </div>
+                <OutputPreviewPanel preview={data.outputPreview} emptyText={ui.outputPreview.emptyText} />
               </div>
-              <OutputPreviewPanel preview={data.outputPreview} />
-            </div>
+            ) : null}
           </div>
         ) : null}
 
-        {writes.length > 0 && data.nodeType !== "text_input" ? (
+        {writes.length > 0 ? (
           <div className="grid gap-1">
             {writes.map((key) => (
               <SidePortRow
@@ -586,7 +547,9 @@ function FlowNodeCard({ data, selected }: NodeProps<FlowNode>) {
           </div>
         ) : null}
 
-        {reads.length === 0 && writes.length === 0 ? <EmptyIoState side="input" /> : null}
+        {reads.length === 0 && writes.length === 0 && inlineInputPorts.length === 0 && inlineOutputPorts.length === 0 ? (
+          <EmptyIoState side="input" />
+        ) : null}
       </div>
     </div>
   );
@@ -781,11 +744,17 @@ function SocketField({
 
 function OutputPreviewPanel({
   preview,
+  emptyText,
 }: {
   preview: FlowNodeData["outputPreview"];
+  emptyText?: string;
 }) {
   if (!preview?.text) {
-    return <div className="max-h-[180px] overflow-auto rounded-[12px] bg-[rgba(248,242,234,0.8)] px-3 py-3 text-sm text-[var(--muted)]">No output yet</div>;
+    return (
+      <div className="max-h-[180px] overflow-auto rounded-[12px] bg-[rgba(248,242,234,0.8)] px-3 py-3 text-sm text-[var(--muted)]">
+        {emptyText ?? "No output yet"}
+      </div>
+    );
   }
 
   if (preview.kind === "json") {
@@ -860,6 +829,51 @@ function EmptyIoState({ side }: { side: "input" | "output" }) {
     >
       <span>none</span>
     </span>
+  );
+}
+
+function InspectorField({
+  field,
+  value,
+  onChange,
+}: {
+  field: EditorNodeInspectorFieldDefinition;
+  value: unknown;
+  onChange: (value: string | boolean) => void;
+}) {
+  if (field.control === "checkbox") {
+    return (
+      <label className="flex items-center gap-2 text-sm text-[var(--muted)]">
+        <input checked={Boolean(value)} onChange={(event) => onChange(event.target.checked)} type="checkbox" />
+        <span>{field.label}</span>
+      </label>
+    );
+  }
+
+  if (field.control === "select") {
+    return (
+      <label className="grid gap-1.5 text-sm text-[var(--muted)]">
+        <span>{field.label}</span>
+        <select
+          className="rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3 py-3 text-[var(--text)]"
+          value={String(value ?? "")}
+          onChange={(event) => onChange(event.target.value)}
+        >
+          {(field.options ?? []).map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+    );
+  }
+
+  return (
+    <label className="grid gap-1.5 text-sm text-[var(--muted)]">
+      <span>{field.label}</span>
+      <Input value={String(value ?? "")} onChange={(event) => onChange(event.target.value)} />
+    </label>
   );
 }
 
@@ -1153,6 +1167,10 @@ function EditorCanvas({ initialGraph, mode, graphId }: { initialGraph: GraphPayl
     () => stateSchema.find((field) => field.key === selectedStateKey) ?? null,
     [stateSchema, selectedStateKey],
   );
+  const selectedNodeDefinition = useMemo(
+    () => (selectedNode ? getEditorNodeDefinition(selectedNode.data.nodeType) : undefined),
+    [selectedNode],
+  );
   const paramBindingsByNode = useMemo(() => collectParamBindings(edges), [edges]);
 
   const stateRelationships = useMemo(() => {
@@ -1185,13 +1203,24 @@ function EditorCanvas({ initialGraph, mode, graphId }: { initialGraph: GraphPayl
           stateColors,
           paramBindings: paramBindingsByNode[node.id] ?? {},
           isConnecting,
-          outputPreview:
-            node.data.nodeType === "text_output"
-              ? detectOutputPreview(
-                  runDetail?.state_snapshot?.[String(node.data.params.source_state_key ?? "")] ?? runDetail?.final_result ?? "",
-                  String(node.data.params.display_mode ?? "auto"),
-                )
-              : null,
+          outputPreview: (() => {
+            const definition = getEditorNodeDefinition(node.data.nodeType);
+            const previewInputKey = getEditorNodeUi(definition).outputPreview.inputKey;
+            if (!previewInputKey) {
+              return null;
+            }
+            const previewStateKey = resolvePortStateKey({
+              definition,
+              nodeParams: node.data.params,
+              nodeReads: node.data.reads,
+              side: "input",
+              portKey: previewInputKey,
+            });
+            return detectOutputPreview(
+              runDetail?.state_snapshot?.[previewStateKey] ?? runDetail?.final_result ?? "",
+              String(node.data.params.display_mode ?? "auto"),
+            );
+          })(),
         },
       })),
     );
@@ -1250,51 +1279,25 @@ function EditorCanvas({ initialGraph, mode, graphId }: { initialGraph: GraphPayl
 
     const compiledNodes = nodes.map((node) => {
       const runtimeType = editorNodeTypeToRuntimeNodeType(node.data.nodeType);
-      const inputKey = String(node.data.params.input_key ?? "").trim();
-      const sourceStateKey = String(node.data.params.source_state_key ?? "").trim();
       const paramBindings = paramBindingsByNode[node.id] ?? {};
-      const reads =
-        node.data.nodeType === "text_output"
-          ? uniqueKeys([sourceStateKey || node.data.reads[0] || ""])
-          : node.data.nodeType === "text_input" && paramBindings.text
-            ? uniqueKeys([paramBindings.text])
-            : node.data.reads;
-      const writes = node.data.nodeType === "text_input" ? uniqueKeys([inputKey || node.data.writes[0] || ""]) : node.data.writes;
-
-      let params = node.data.params;
-      if (node.data.nodeType === "text_input") {
-        params = {
-          input_values: inputKey
-            ? {
-                [inputKey]: node.data.params.default_value ?? "",
-              }
-            : {},
-          placeholder: node.data.params.placeholder ?? "",
-          multiline: Boolean(node.data.params.multiline),
-        };
-      }
-      if (node.data.nodeType === "text_output") {
-        params = {
-          outputs: sourceStateKey
-            ? [
-                {
-                  state_key: sourceStateKey,
-                  label: node.data.label,
-                  display_mode: node.data.params.display_mode ?? "auto",
-                  persist_enabled: Boolean(node.data.params.persist_enabled),
-                  persist_format: node.data.params.persist_format ?? "txt",
-                  file_name_template: node.data.params.file_name_template ?? sourceStateKey,
-                },
-              ]
-            : [],
-        };
-      }
-      if (Object.keys(paramBindings).length > 0) {
-        params = {
-          ...params,
-          __param_bindings: paramBindings,
-        };
-      }
+      const definition = getEditorNodeDefinition(node.data.nodeType);
+      const reads = resolveRuntimeReads({
+        definition,
+        nodeReads: node.data.reads,
+        nodeParams: node.data.params,
+        paramBindings,
+      });
+      const writes = resolveRuntimeWrites({
+        definition,
+        nodeWrites: node.data.writes,
+        nodeParams: node.data.params,
+      });
+      const params = resolveRuntimeParams({
+        definition,
+        nodeParams: node.data.params,
+        nodeLabel: node.data.label,
+        paramBindings,
+      });
 
       return {
         id: node.id,
@@ -1307,8 +1310,8 @@ function EditorCanvas({ initialGraph, mode, graphId }: { initialGraph: GraphPayl
         config: params,
         implementation: {
           executor: "node_handler",
-          handler_key: runtimeType,
-          tool_keys: runtimeType === "hello_model" ? ["generate_hello_greeting"] : [],
+          handler_key: definition?.runtime.handlerKey ?? runtimeType,
+          tool_keys: definition?.runtime.toolKeys ?? [],
         },
       };
     });
@@ -1913,195 +1916,86 @@ function EditorCanvas({ initialGraph, mode, graphId }: { initialGraph: GraphPayl
                   <div>Type: {selectedNode.data.nodeType}</div>
                   <div>Description: {selectedNode.data.description}</div>
                 </div>
-                {selectedNode.data.nodeType === "text_input" ? (
-                  <>
-                    <label className="grid gap-1.5 text-sm text-[var(--muted)]">
-                      <span>Bound State Key</span>
-                      <Input
-                        value={String(selectedNode.data.params.input_key ?? "")}
-                        onChange={(event) =>
-                          updateNodeData(selectedNode.id, (data) => ({
-                            ...data,
-                            writes: uniqueKeys([event.target.value.trim() || data.writes[0] || ""]),
-                            params: {
-                              ...data.params,
-                              input_key: event.target.value,
-                            },
-                          }))
-                        }
-                      />
-                    </label>
-                    <label className="grid gap-1.5 text-sm text-[var(--muted)]">
-                      <span>Default Value</span>
-                      <Input
-                        value={String(selectedNode.data.params.default_value ?? "")}
-                        onChange={(event) =>
-                          updateNodeData(selectedNode.id, (data) => ({
-                            ...data,
-                            params: {
-                              ...data.params,
-                              default_value: event.target.value,
-                            },
-                          }))
-                        }
-                      />
-                    </label>
-                    <label className="grid gap-1.5 text-sm text-[var(--muted)]">
-                      <span>Placeholder</span>
-                      <Input
-                        value={String(selectedNode.data.params.placeholder ?? "")}
-                        onChange={(event) =>
-                          updateNodeData(selectedNode.id, (data) => ({
-                            ...data,
-                            params: {
-                              ...data.params,
-                              placeholder: event.target.value,
-                            },
-                          }))
-                        }
-                      />
-                    </label>
-                  </>
-                ) : null}
-                {selectedNode.data.nodeType === "hello_model" ? (
-                  <>
-                    <label className="grid gap-1.5 text-sm text-[var(--muted)]">
-                      <span>Name</span>
-                      <Input
-                        value={String(selectedNode.data.params.name ?? "")}
-                        onChange={(event) =>
-                          updateNodeData(selectedNode.id, (data) => ({
-                            ...data,
-                            params: {
-                              ...data.params,
-                              name: event.target.value,
-                            },
-                          }))
-                        }
-                      />
-                    </label>
-                    <div className="rounded-[16px] border border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.78)] px-3 py-2 text-xs leading-5 text-[var(--muted)]">
-                      {selectedNode.data.paramBindings.name
-                        ? `Connected state overrides local value: ${selectedNode.data.paramBindings.name}`
-                        : "If connected from a state line, the upstream value overrides this field."}
-                    </div>
-                  </>
-                ) : null}
-                {selectedNode.data.nodeType === "text_output" ? (
-                  <>
-                    <label className="grid gap-1.5 text-sm text-[var(--muted)]">
-                      <span>Source State Key</span>
-                      <Input
-                        value={String(selectedNode.data.params.source_state_key ?? "")}
-                        onChange={(event) =>
-                          updateNodeData(selectedNode.id, (data) => ({
-                            ...data,
-                            reads: uniqueKeys([event.target.value.trim() || data.reads[0] || ""]),
-                            params: {
-                              ...data.params,
-                              source_state_key: event.target.value,
-                            },
-                          }))
-                        }
-                      />
-                    </label>
-                    <div className="grid grid-cols-[1fr_1fr] gap-3">
-                      <label className="grid gap-1.5 text-sm text-[var(--muted)]">
-                        <span>Display Mode</span>
-                        <select
-                          className="rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3 py-3 text-[var(--text)]"
-                          value={String(selectedNode.data.params.display_mode ?? "auto")}
+                {(selectedNodeDefinition?.widgets?.length ?? 0) > 0 ? (
+                  <div className="grid gap-3">
+                    {selectedNodeDefinition?.widgets.map((widget) => (
+                      <label key={widget.key} className="grid gap-1.5 text-sm text-[var(--muted)]">
+                        <span>{widget.label}</span>
+                        <Input
+                          value={getWidgetValue(selectedNode.data, widget.key)}
+                          disabled={Boolean(selectedNode.data.paramBindings[widget.key])}
                           onChange={(event) =>
-                            updateNodeData(selectedNode.id, (data) => ({
-                              ...data,
-                              params: {
-                                ...data.params,
-                                display_mode: event.target.value,
-                              },
-                            }))
+                            updateNodeData(selectedNode.id, (data) => updateWidgetValue(data, widget.key, event.target.value))
                           }
-                        >
-                          {["auto", "plain", "markdown", "json"].map((option) => (
-                            <option key={option} value={option}>
-                              {option}
-                            </option>
-                          ))}
-                        </select>
+                        />
                       </label>
-                      <label className="grid gap-1.5 text-sm text-[var(--muted)]">
-                        <span>Persist Format</span>
-                        <select
-                          className="rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3 py-3 text-[var(--text)]"
-                          value={String(selectedNode.data.params.persist_format ?? "txt")}
-                          onChange={(event) =>
-                            updateNodeData(selectedNode.id, (data) => ({
-                              ...data,
-                              params: {
-                                ...data.params,
-                                persist_format: event.target.value,
-                              },
-                            }))
-                          }
-                        >
-                          {["txt", "md", "json"].map((option) => (
-                            <option key={option} value={option}>
-                              {option}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    </div>
-                    <label className="grid gap-1.5 text-sm text-[var(--muted)]">
-                      <span>File Name</span>
-                      <Input
-                        value={String(selectedNode.data.params.file_name_template ?? "")}
-                        onChange={(event) =>
-                          updateNodeData(selectedNode.id, (data) => ({
-                            ...data,
-                            params: {
-                              ...data.params,
-                              file_name_template: event.target.value,
-                            },
-                          }))
+                    ))}
+                  </div>
+                ) : null}
+                {getEditorNodeInspectorFields(selectedNodeDefinition).map((field) => (
+                  <InspectorField
+                    key={field.key}
+                    field={field}
+                    value={selectedNode.data.params[field.paramKey]}
+                    onChange={(nextValue) => {
+                      updateNodeData(selectedNode.id, (data) => {
+                        const nextData: FlowNodeData = {
+                          ...data,
+                          params: {
+                            ...data.params,
+                            [field.paramKey]: nextValue,
+                          },
+                        };
+
+                        if (field.syncPort?.side === "input") {
+                          nextData.reads = uniqueKeys([
+                            String(nextValue).trim() || resolveInputStateKey(data, field.syncPort.key) || "",
+                          ]);
                         }
-                      />
-                    </label>
-                    <label className="flex items-center gap-2 text-sm text-[var(--muted)]">
-                      <input
-                        checked={Boolean(selectedNode.data.params.persist_enabled)}
-                        onChange={(event) =>
-                          updateNodeData(selectedNode.id, (data) => ({
-                            ...data,
-                            params: {
-                              ...data.params,
-                              persist_enabled: event.target.checked,
-                            },
-                          }))
+
+                        if (field.syncPort?.side === "output") {
+                          nextData.writes = uniqueKeys([
+                            String(nextValue).trim() || resolveOutputStateKey(data, field.syncPort.key) || "",
+                          ]);
                         }
-                        type="checkbox"
-                      />
-                      <span>Save output to run files</span>
-                    </label>
-                    {runDetail ? (
-                      <div className="rounded-[20px] border border-[rgba(31,111,80,0.18)] bg-[rgba(241,250,245,0.92)] p-4 text-sm leading-6 text-[var(--text)]">
-                        <div className="font-semibold text-[var(--success)]">Output Preview</div>
-                        <div className="mt-2 whitespace-pre-wrap break-words">
-                          {String(
-                            runDetail.state_snapshot?.[String(selectedNode.data.params.source_state_key ?? "")] ??
-                              runDetail.final_result ??
-                              "",
-                          )}
-                        </div>
-                        {Array.isArray((runDetail.state_snapshot?.saved_outputs as unknown[]) ?? [])
-                          ? ((runDetail.state_snapshot?.saved_outputs as Array<{ file_name?: string; format?: string }>) ?? []).map((item, index) => (
-                              <div key={`${item.file_name ?? "saved"}-${index}`} className="mt-2 text-xs text-[var(--muted)]">
-                                Saved: {item.file_name ?? "output"} ({item.format ?? "txt"})
-                              </div>
-                            ))
-                          : null}
+
+                        return nextData;
+                      });
+                    }}
+                  />
+                ))}
+                {Object.keys(selectedNode.data.paramBindings).length > 0 ? (
+                  <div className="rounded-[16px] border border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.78)] px-3 py-2 text-xs leading-5 text-[var(--muted)]">
+                    {Object.entries(selectedNode.data.paramBindings).map(([paramName, bindingKey]) => (
+                      <div key={paramName}>
+                        {paramName}: {bindingKey} overrides local value
                       </div>
-                    ) : null}
-                  </>
+                    ))}
+                  </div>
+                ) : null}
+                {selectedNodeDefinition?.kind === "output_boundary" && runDetail ? (
+                  <div className="rounded-[20px] border border-[rgba(31,111,80,0.18)] bg-[rgba(241,250,245,0.92)] p-4 text-sm leading-6 text-[var(--text)]">
+                    <div className="font-semibold text-[var(--success)]">Output Preview</div>
+                    <div className="mt-2 whitespace-pre-wrap break-words">
+                      {String(
+                        runDetail.state_snapshot?.[
+                          resolveInputStateKey(
+                            selectedNode.data,
+                            getEditorNodeUi(selectedNodeDefinition).outputPreview.inputKey || selectedNode.data.reads[0] || "",
+                          )
+                        ] ??
+                          runDetail.final_result ??
+                          "",
+                      )}
+                    </div>
+                    {Array.isArray((runDetail.state_snapshot?.saved_outputs as unknown[]) ?? [])
+                      ? ((runDetail.state_snapshot?.saved_outputs as Array<{ file_name?: string; format?: string }>) ?? []).map((item, index) => (
+                          <div key={`${item.file_name ?? "saved"}-${index}`} className="mt-2 text-xs text-[var(--muted)]">
+                            Saved: {item.file_name ?? "output"} ({item.format ?? "txt"})
+                          </div>
+                        ))
+                      : null}
+                  </div>
                 ) : null}
                 <label className="grid gap-1.5 text-sm text-[var(--muted)]">
                   <span>Reads</span>
