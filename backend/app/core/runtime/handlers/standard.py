@@ -141,6 +141,10 @@ def handle_finalize(state: RunState, params: dict[str, Any]) -> dict[str, Any]:
     return {"status": "completed", "final_package": final_package, "final_result": result, "completed_at": utc_now_iso()}
 
 
+def handle_hello_model(state: RunState, params: dict[str, Any]) -> dict[str, Any]:
+    return TOOLS["generate_hello_greeting"](state, params)
+
+
 def handle_end(state: RunState, params: dict[str, Any]) -> dict[str, Any]:
     del state, params
     return {}
@@ -163,5 +167,6 @@ STANDARD_HANDLER_MAP = {
     NodeType.PREPARE_IMAGE_TODO: handle_prepare_image_todo,
     NodeType.PREPARE_VIDEO_TODO: handle_prepare_video_todo,
     NodeType.FINALIZE: handle_finalize,
+    NodeType.HELLO_MODEL: handle_hello_model,
     NodeType.END: handle_end,
 }

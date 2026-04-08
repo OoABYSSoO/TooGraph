@@ -19,6 +19,7 @@ from app.tools.creative_factory import (
     review_creative_variants,
     select_top_video_assets,
 )
+from app.tools.local_llm import generate_hello_greeting
 
 
 ToolFunc = Callable[[dict[str, Any], dict[str, Any] | None], dict[str, Any]]
@@ -40,4 +41,5 @@ def get_tool_registry() -> dict[str, ToolFunc]:
         "review_creative_variants": review_creative_variants,
         "prepare_image_generation_todo": prepare_image_generation_todo,
         "prepare_video_generation_todo": prepare_video_generation_todo,
+        "generate_hello_greeting": generate_hello_greeting,
     }

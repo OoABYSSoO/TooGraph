@@ -18,6 +18,7 @@ export type GraphNodeType =
   | "prepare_image_todo"
   | "prepare_video_todo"
   | "finalize"
+  | "hello_model"
   | "knowledge"
   | "memory"
   | "planner"

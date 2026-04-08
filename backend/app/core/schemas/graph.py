@@ -24,6 +24,7 @@ class NodeType(str, Enum):
     PREPARE_IMAGE_TODO = "prepare_image_todo"
     PREPARE_VIDEO_TODO = "prepare_video_todo"
     FINALIZE = "finalize"
+    HELLO_MODEL = "hello_model"
     KNOWLEDGE = "knowledge"
     MEMORY = "memory"
     PLANNER = "planner"

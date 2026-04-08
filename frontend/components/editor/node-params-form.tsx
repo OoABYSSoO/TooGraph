@@ -97,5 +97,27 @@ export function NodeParamsForm({ node, onParamChange }: Props) {
     );
   }
 
+  if (kind === "hello_model") {
+    return (
+      <>
+        <label className="grid gap-2 text-[0.94rem]">
+          <span>Name</span>
+          <Input
+            value={String(params.name ?? "World")}
+            onChange={(event) => onParamChange("name", event.target.value)}
+          />
+        </label>
+        <label className="grid gap-2 text-[0.94rem]">
+          <span>Model</span>
+          <Input
+            placeholder="Use backend default if empty"
+            value={String(params.model ?? "")}
+            onChange={(event) => onParamChange("model", event.target.value)}
+          />
+        </label>
+      </>
+    );
+  }
+
   return <p className="text-[var(--muted)]">This node currently has no dedicated structured params. Use advanced JSON if needed.</p>;
 }

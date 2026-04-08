@@ -32,11 +32,10 @@
 
 以下事项仍然是现实问题：
 
-1. 模板注册表目前只有 `creative_factory`
-2. 前端仍保留 fallback 模板逻辑
-3. `/api/settings` 仍暴露 `skills`
-4. `Node Picker` 与拖线建点还未实现
-5. UI 层虽然已有 primitives 和语义组件，但还没有完整设计系统
+1. 前端仍保留 fallback 模板逻辑
+2. `/api/settings` 仍暴露 `skills`
+3. `Node Picker` 与拖线建点还未实现
+4. UI 层虽然已有 primitives 和语义组件，但还没有完整设计系统
 
 ---
 
@@ -116,20 +115,14 @@
 
 优先级：`P1`
 
-目标：
+状态：`已完成`
 
-验证当前架构不是只服务 `creative_factory`。
+已完成结果：
 
-建议新增：
-
-- 第二个模板目录：
-  - `backend/app/templates/<new_template>/`
-- 对应前端模板源最小支持
-
-完成标准：
-
-- `/api/templates` 返回两个模板
-- editor 能通过模板路由打开第二个模板
+- 第二个模板 `hello_world` 已落地
+- `/api/templates` 现在返回两个模板
+- editor 可通过模板路由打开 `hello_world`
+- `hello_world` 用于验证前端编排到本地 OpenAI-compatible 模型服务的调用链
 
 ## Task T4 弱化 settings 中的 skills 概念
 

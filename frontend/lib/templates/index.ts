@@ -4,14 +4,32 @@ import {
   CREATIVE_FACTORY_THEME_PRESETS,
   getCreativeFactoryThemePresetById,
 } from "@/lib/templates/creative-factory";
+import {
+  HELLO_WORLD_THEME_PRESETS,
+  getHelloWorldThemePresetById,
+} from "@/lib/templates/hello-world";
+
+function normalizeTemplateId(templateIdOrGraphId: string): string {
+  if (templateIdOrGraphId === "creative_factory" || templateIdOrGraphId === "hello_world") {
+    return templateIdOrGraphId;
+  }
+  if (templateIdOrGraphId === "creative-factory" || templateIdOrGraphId === "template-creative-factory") {
+    return "creative_factory";
+  }
+  if (templateIdOrGraphId === "hello-world" || templateIdOrGraphId === "template-hello-world") {
+    return "hello_world";
+  }
+  return "creative_factory";
+}
 
 export function createTemplateShellDocument(templateId: string, graphId: string, themePresetId?: string): GraphDocument {
-  const preset = getTemplateThemePresetById(templateId, themePresetId ?? "") ?? getTemplateThemePresets(templateId)[0];
+  const normalizedTemplateId = normalizeTemplateId(templateId);
+  const preset = getTemplateThemePresetById(normalizedTemplateId, themePresetId ?? "") ?? getTemplateThemePresets(normalizedTemplateId)[0];
   return {
     graphId,
     name: preset?.graphName ?? "Creative Factory",
-    templateId,
-    themeConfig: preset?.themeConfig ?? getTemplateThemePresets(templateId)[0].themeConfig,
+    templateId: normalizedTemplateId,
+    themeConfig: preset?.themeConfig ?? getTemplateThemePresets(normalizedTemplateId)[0].themeConfig,
     stateSchema: [],
     nodes: [],
     edges: [],
@@ -20,19 +38,27 @@ export function createTemplateShellDocument(templateId: string, graphId: string,
 }
 
 export function createStarterGraphDocument(graphId: string, themePresetId?: string): GraphDocument {
-  return createTemplateShellDocument("creative_factory", graphId, themePresetId);
+  return createTemplateShellDocument(normalizeTemplateId(graphId), graphId, themePresetId);
 }
 
 export function getTemplateThemePresetById(templateId: string, themePresetId: string) {
-  if (templateId === "creative_factory") {
+  const normalizedTemplateId = normalizeTemplateId(templateId);
+  if (normalizedTemplateId === "creative_factory") {
     return getCreativeFactoryThemePresetById(themePresetId);
+  }
+  if (normalizedTemplateId === "hello_world") {
+    return getHelloWorldThemePresetById(themePresetId);
   }
   return getCreativeFactoryThemePresetById(themePresetId);
 }
 
 export function getTemplateThemePresets(templateId: string): ThemePreset[] {
-  if (templateId === "creative_factory") {
+  const normalizedTemplateId = normalizeTemplateId(templateId);
+  if (normalizedTemplateId === "creative_factory") {
     return CREATIVE_FACTORY_THEME_PRESETS;
+  }
+  if (normalizedTemplateId === "hello_world") {
+    return HELLO_WORLD_THEME_PRESETS;
   }
   return CREATIVE_FACTORY_THEME_PRESETS;
 }

@@ -28,6 +28,7 @@ export const NODE_PRESETS: NodePreset[] = [
   { kind: "prepare_image_todo", label: "Image TODO", description: "Prepare image generation package." },
   { kind: "prepare_video_todo", label: "Video TODO", description: "Prepare video generation package." },
   { kind: "finalize", label: "Finalize", description: "Assemble final package and persist results." },
+  { kind: "hello_model", label: "Hello Model", description: "Call the local LLM and return a greeting." },
   { kind: "end", label: "End", description: "Collect final outputs." },
   { kind: "knowledge", label: "Knowledge", description: "Read long-lived knowledge sources." },
   { kind: "memory", label: "Memory", description: "Read historical memories." },

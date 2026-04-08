@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from fastapi import APIRouter
 
 from app.skills.registry import get_skill_registry
@@ -14,8 +16,16 @@ router = APIRouter(prefix="/api/settings", tags=["settings"])
 def get_settings_endpoint() -> dict:
     return {
         "model": {
-            "text_model": "local-text-model",
-            "video_model": "local-video-model",
+            "text_model": os.environ.get("LOCAL_TEXT_MODEL")
+            or os.environ.get("TEXT_MODEL")
+            or os.environ.get("LOCAL_MODEL_NAME")
+            or os.environ.get("UPSTREAM_MODEL_NAME")
+            or "qwen-local",
+            "video_model": os.environ.get("LOCAL_VIDEO_MODEL")
+            or os.environ.get("VIDEO_MODEL")
+            or os.environ.get("LOCAL_MODEL_NAME")
+            or os.environ.get("UPSTREAM_MODEL_NAME")
+            or "qwen-local",
         },
         "revision": {
             "max_revision_round": 1,

@@ -49,6 +49,7 @@
   - `storage`
 - 模板系统已存在，当前模板注册表里实际只有一个模板：
   - `creative_factory`
+  - `hello_world`
 - 模板 API 已能返回：
   - 模板元数据
   - `theme_presets`
@@ -117,8 +118,9 @@
 
 ### 3.2 尚未完成
 
-- 模板注册表目前 **只有一个模板**
-  - 还没有第二个模板用于验证框架通用性
+- 第二个模板已存在：
+  - `hello_world`
+  - 当前已可用于验证前端到本地 OpenAI-compatible 模型服务的调用链
 - 前端和后端的模板定义虽然已收拢很多，但仍不是完全单一来源
   - 前端仍保留 fallback shell 与本地 preset 逻辑，但已不再维护完整图结构
 - `settings` 里仍保留 `skills` 字段
