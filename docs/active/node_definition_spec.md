@@ -510,3 +510,27 @@ type NodeConstraintDefinition = {
 - 前端端口语义与后端 state key 解耦
 
 这应作为后续 editor 节点系统的正式方向。
+
+---
+
+## 14. Example File
+
+为了让后续开发者能像参考 ComfyUI example 一样快速上手，仓库里提供了一个独立示例文件：
+
+[editor-node-definition-example.ts](/home/abyss/GraphiteUI/frontend/lib/editor-node-definition-example.ts)
+
+这个示例节点 `EXAMPLE_SUMMARIZE_TEXT_NODE` 演示了完整链路：
+
+- 如何声明一个 `process` 节点
+- 如何同时定义 `inputs / outputs / widgets`
+- 如何给 widget 开启 `bindable` 覆盖能力
+- 如何通过 `editor.portParamKeys` 让端口和 inspector 参数保持同步
+- 如何通过 `runtime.reads / writes / params` 编译到后端 payload
+
+这个 example 默认**不会**自动出现在 editor 里，目的是作为开发参考，避免把示例节点混入正式节点库。
+
+如果要把它真正启用，按下面三步做：
+
+1. 把定义加入 `EDITOR_NODE_DEFINITIONS`
+2. 在后端实现对应的 `handlerKey`
+3. 按需要把它加入模板默认图或节点面板
