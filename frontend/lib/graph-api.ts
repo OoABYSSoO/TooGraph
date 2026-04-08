@@ -200,7 +200,7 @@ function fromBackendStateField(field: BackendGraphDocument["state_schema"][numbe
 export function toBackendGraphPayload(document: GraphDocument): BackendGraphPayload {
   return {
     graph_id:
-      document.graphId.startsWith("template-") || document.graphId === "creative-factory"
+      document.graphId === "new" || document.graphId.startsWith("template-") || document.graphId === "creative-factory"
         ? undefined
         : document.graphId,
     name: document.name,

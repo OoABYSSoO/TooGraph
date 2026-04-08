@@ -151,7 +151,7 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
     let cancelled = false;
 
     async function loadGraphFromBackend() {
-      if (graphId === "creative-factory" || graphId.startsWith("template-")) {
+      if (graphId === "new" || graphId === "creative-factory" || graphId.startsWith("template-")) {
         return;
       }
       try {

@@ -338,7 +338,10 @@ make frontend-dev
 
 ```bash
 http://localhost:3477/workspace
-http://localhost:3477/editor/creative-factory
+http://localhost:3477/editor
+http://localhost:3477/editor/new
+http://localhost:3477/editor/template-creative-factory
+http://localhost:3477/editor/template-hello-world
 http://localhost:3477/runs
 ```
 

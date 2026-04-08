@@ -62,6 +62,8 @@ export function EditorHomeClient() {
         eyebrow: "编排器入口",
         title: "先选择图或模板，再进入画布。",
         desc: "编排器不再直接绑定某一张默认图。你可以从模板创建，也可以打开已有 graph。",
+        blank: "新建空白图",
+        blankDesc: "从空白画布开始，自行添加节点、状态和连线。",
         create: "从模板创建",
         recent: "最近的图",
         emptyGraphs: "还没有已保存的图。先从下面的模板创建一张。",
@@ -74,6 +76,8 @@ export function EditorHomeClient() {
         eyebrow: "Editor Entry",
         title: "Choose a graph or template before opening the canvas.",
         desc: "The editor is no longer hard-wired to a single default graph. Start from a template or reopen a saved graph.",
+        blank: "New Blank Graph",
+        blankDesc: "Start from an empty canvas and add nodes, state, and edges yourself.",
         create: "Create from Template",
         recent: "Recent Graphs",
         emptyGraphs: "No saved graphs yet. Start with one of the templates below.",
@@ -93,8 +97,24 @@ export function EditorHomeClient() {
 
       <section className="grid grid-cols-12 gap-[18px] max-[960px]:grid-cols-1">
         <Card className="col-span-7 max-[960px]:col-span-1">
-          <h2 className="mb-3 text-[1.1rem] font-semibold">{copy.create}</h2>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="text-[1.1rem] font-semibold">{copy.create}</h2>
+            <Link href="/editor/new">
+              <Button variant="primary">{copy.blank}</Button>
+            </Link>
+          </div>
           <div className="grid gap-3">
+            <SubtleCard className="grid gap-3 border-dashed">
+              <div className="grid gap-1">
+                <strong>{copy.blank}</strong>
+                <span className="text-[var(--muted)]">{copy.blankDesc}</span>
+              </div>
+              <div>
+                <Link href="/editor/new">
+                  <Button variant="secondary">{copy.open}</Button>
+                </Link>
+              </div>
+            </SubtleCard>
             {templates.map((template) => (
               <SubtleCard className="grid gap-3" key={template.template_id}>
                 <div className="flex items-start justify-between gap-3">

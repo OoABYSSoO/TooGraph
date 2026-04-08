@@ -9,7 +9,33 @@ import {
   getHelloWorldThemePresetById,
 } from "@/lib/templates/hello-world";
 
+function createBlankThemeConfig() {
+  return {
+    themePreset: "",
+    domain: "",
+    genre: "",
+    market: "",
+    platform: "",
+    language: "",
+    creativeStyle: "",
+    tone: "",
+    languageConstraints: [],
+    evaluationPolicy: {},
+    assetSourcePolicy: {},
+    strategyProfile: {
+      hookTheme: "",
+      payoffTheme: "",
+      visualPattern: "",
+      pacingPattern: "",
+      evaluationFocus: [],
+    },
+  };
+}
+
 function normalizeTemplateId(templateIdOrGraphId: string): string {
+  if (templateIdOrGraphId === "new") {
+    return "creative_factory";
+  }
   if (templateIdOrGraphId === "creative_factory" || templateIdOrGraphId === "hello_world") {
     return templateIdOrGraphId;
   }
@@ -37,7 +63,23 @@ export function createTemplateShellDocument(templateId: string, graphId: string,
   };
 }
 
+export function createBlankGraphDocument(graphId = "new"): GraphDocument {
+  return {
+    graphId,
+    name: "Untitled Graph",
+    templateId: "creative_factory",
+    themeConfig: createBlankThemeConfig(),
+    stateSchema: [],
+    nodes: [],
+    edges: [],
+    updatedAt: new Date().toISOString(),
+  };
+}
+
 export function createStarterGraphDocument(graphId: string, themePresetId?: string): GraphDocument {
+  if (graphId === "new") {
+    return createBlankGraphDocument(graphId);
+  }
   return createTemplateShellDocument(normalizeTemplateId(graphId), graphId, themePresetId);
 }
 
