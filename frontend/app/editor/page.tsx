@@ -1,35 +1,107 @@
 import Link from "next/link";
 
-export default function EditorPage() {
+import { apiGet } from "@/lib/api";
+
+type GraphSummary = {
+  graph_id: string;
+  name: string;
+  template_id: string;
+  nodes: unknown[];
+  edges: unknown[];
+};
+
+type TemplateSummary = {
+  template_id: string;
+  label: string;
+  description: string;
+};
+
+async function loadEditorLandingData() {
+  try {
+    const [graphs, templates] = await Promise.all([
+      apiGet<GraphSummary[]>("/api/graphs"),
+      apiGet<TemplateSummary[]>("/api/templates"),
+    ]);
+    return { graphs, templates };
+  } catch {
+    return { graphs: [] as GraphSummary[], templates: [] as TemplateSummary[] };
+  }
+}
+
+export default async function EditorPage() {
+  const { graphs, templates } = await loadEditorLandingData();
+
   return (
-    <main className="mx-auto grid max-w-5xl gap-6 px-6 py-10">
-      <section className="rounded-[28px] border border-[var(--line)] bg-[rgba(255,250,241,0.9)] p-8 shadow-[0_20px_60px_var(--shadow)]">
+    <main className="mx-auto grid max-w-7xl gap-6 px-6 py-8">
+      <section className="rounded-[32px] border border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.9)] p-8 shadow-[0_20px_60px_var(--shadow)]">
         <div className="grid gap-3">
-          <span className="text-sm uppercase tracking-[0.12em] text-[var(--muted)]">Editor Reset</span>
-          <h1 className="text-3xl font-semibold text-[var(--text)]">编排器已清空，等待按新规格重建。</h1>
+          <span className="text-sm uppercase tracking-[0.12em] text-[var(--accent-strong)]">Canvas First Editor</span>
+          <h1 className="text-4xl font-semibold text-[var(--text)]">新编排器入口</h1>
           <p className="max-w-3xl text-[0.98rem] leading-7 text-[var(--muted)]">
-            旧的编排器实现已移除，避免历史交互和状态模型继续影响下一轮开发。当前页面只保留重构说明和新规格文档入口。
+            当前 editor 已按 `hello_world` 第一阶段目标重建入口。你可以新建空白图，或继续编辑已保存 graph。
           </p>
         </div>
-      </section>
-
-      <section className="grid gap-4 rounded-[24px] border border-[var(--line)] bg-[rgba(255,255,255,0.76)] p-6">
-        <h2 className="text-xl font-semibold text-[var(--text)]">下一步</h2>
-        <ul className="grid gap-2 text-[var(--muted)]">
-          <li>1. 阅读新的编排器需求文档。</li>
-          <li>2. 新会话中按文档逐项重建 editor。</li>
-          <li>3. 先实现空白画布、拖拽建点、缩放和平移，再接回 hello world 运行链路。</li>
-        </ul>
-        <div className="grid gap-2 pt-2 text-sm text-[var(--muted)]">
-          <div>规格文档路径：<span className="font-mono text-[var(--text)]">docs/active/editor_rebuild_requirements.md</span></div>
-        </div>
-        <div className="flex flex-wrap gap-3 pt-2">
+        <div className="mt-6 flex flex-wrap gap-3">
           <Link
-            className="inline-flex items-center rounded-full border border-[var(--line)] bg-[rgba(255,255,255,0.9)] px-4 py-2 text-sm text-[var(--text)]"
+            className="inline-flex items-center rounded-full border border-[var(--accent)] bg-[var(--accent)] px-5 py-2.5 text-sm text-white"
+            href="/editor/new"
+          >
+            新建空白图
+          </Link>
+          <Link
+            className="inline-flex items-center rounded-full border border-[var(--line)] bg-[rgba(255,255,255,0.9)] px-5 py-2.5 text-sm text-[var(--text)]"
             href="/workspace"
           >
             返回工作台
           </Link>
+        </div>
+      </section>
+
+      <section className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+        <div className="rounded-[28px] border border-[rgba(154,52,18,0.16)] bg-[rgba(255,255,255,0.78)] p-6">
+          <h2 className="text-xl font-semibold text-[var(--text)]">Available Templates</h2>
+          <div className="mt-4 grid gap-3">
+            {templates.map((template) => (
+              <div key={template.template_id} className="rounded-[20px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,250,241,0.86)] p-4">
+                <div className="text-sm uppercase tracking-[0.08em] text-[var(--accent-strong)]">{template.template_id}</div>
+                <div className="mt-1 text-lg font-semibold text-[var(--text)]">{template.label}</div>
+                <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{template.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-[28px] border border-[rgba(154,52,18,0.16)] bg-[rgba(255,255,255,0.78)] p-6">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-xl font-semibold text-[var(--text)]">已有图</h2>
+            <div className="text-sm text-[var(--muted)]">{graphs.length} graphs</div>
+          </div>
+          <div className="mt-4 grid gap-3">
+            {graphs.length === 0 ? (
+              <div className="rounded-[22px] border border-dashed border-[rgba(154,52,18,0.2)] bg-[rgba(255,250,241,0.7)] px-5 py-8 text-sm text-[var(--muted)]">
+                还没有已保存图。先创建一个新的 `hello_world` 图来验证保存、校验和运行链路。
+              </div>
+            ) : (
+              graphs.map((graph) => (
+                <Link
+                  key={graph.graph_id}
+                  href={`/editor/${graph.graph_id}`}
+                  className="rounded-[22px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,250,241,0.86)] p-4 transition-transform hover:-translate-y-px"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-lg font-semibold text-[var(--text)]">{graph.name}</div>
+                      <div className="text-sm text-[var(--muted)]">{graph.graph_id}</div>
+                    </div>
+                    <div className="text-right text-sm text-[var(--muted)]">
+                      <div>{graph.template_id || "no template"}</div>
+                      <div>{graph.nodes.length} nodes / {graph.edges.length} edges</div>
+                    </div>
+                  </div>
+                </Link>
+              ))
+            )}
+          </div>
         </div>
       </section>
     </main>

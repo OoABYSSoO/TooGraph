@@ -1,39 +1,136 @@
-import Link from "next/link";
+import { notFound } from "next/navigation";
+
+import { EditorClient } from "@/components/editor/editor-client";
+import { apiGet } from "@/lib/api";
 
 type EditorGraphPageProps = {
   params: Promise<{ graphId: string }>;
 };
 
+async function loadTemplates() {
+  try {
+    return await apiGet<
+      Array<{
+        template_id: string;
+        label: string;
+        description: string;
+        default_graph_name: string;
+        supported_node_types: string[];
+        state_schema: Array<{
+          key: string;
+          type: string;
+          role: string;
+          title: string;
+          description: string;
+        }>;
+        default_graph: {
+          name: string;
+          template_id: string;
+          theme_config: {
+            theme_preset: string;
+            domain: string;
+            genre: string;
+            market: string;
+            platform: string;
+            language: string;
+            creative_style: string;
+            tone: string;
+            language_constraints: string[];
+            evaluation_policy: Record<string, unknown>;
+            asset_source_policy: Record<string, unknown>;
+            strategy_profile: Record<string, unknown>;
+          };
+          state_schema: Array<{
+            key: string;
+            type: string;
+            role: string;
+            title: string;
+            description: string;
+          }>;
+          nodes: Array<{
+            id: string;
+            type: string;
+            label: string;
+            position: { x: number; y: number };
+            reads: string[];
+            writes: string[];
+            params: Record<string, unknown>;
+          }>;
+          edges: Array<{
+            id: string;
+            source: string;
+            target: string;
+            flow_keys: string[];
+            edge_kind: "normal" | "branch";
+            branch_label?: "pass" | "revise" | "fail" | null;
+          }>;
+          metadata: Record<string, unknown>;
+        };
+      }>
+    >("/api/templates");
+  } catch {
+    return [];
+  }
+}
+
+async function loadGraph(graphId: string) {
+  try {
+    return await apiGet<{
+      graph_id: string;
+      name: string;
+      template_id: string;
+      theme_config: {
+        theme_preset: string;
+        domain: string;
+        genre: string;
+        market: string;
+        platform: string;
+        language: string;
+        creative_style: string;
+        tone: string;
+        language_constraints: string[];
+        evaluation_policy: Record<string, unknown>;
+        asset_source_policy: Record<string, unknown>;
+        strategy_profile: Record<string, unknown>;
+      };
+      state_schema: Array<{
+        key: string;
+        type: string;
+        role: string;
+        title: string;
+        description: string;
+      }>;
+      nodes: Array<{
+        id: string;
+        type: string;
+        label: string;
+        position: { x: number; y: number };
+        reads: string[];
+        writes: string[];
+        params: Record<string, unknown>;
+      }>;
+      edges: Array<{
+        id: string;
+        source: string;
+        target: string;
+        flow_keys: string[];
+        edge_kind: "normal" | "branch";
+        branch_label?: "pass" | "revise" | "fail" | null;
+      }>;
+      metadata: Record<string, unknown>;
+    }>(`/api/graphs/${graphId}`);
+  } catch {
+    return null;
+  }
+}
+
 export default async function EditorGraphPage({ params }: EditorGraphPageProps) {
   const { graphId } = await params;
+  const [graph, templates] = await Promise.all([loadGraph(graphId), loadTemplates()]);
 
-  return (
-    <main className="mx-auto grid max-w-5xl gap-6 px-6 py-10">
-      <section className="rounded-[28px] border border-[var(--line)] bg-[rgba(255,250,241,0.9)] p-8 shadow-[0_20px_60px_var(--shadow)]">
-        <div className="grid gap-3">
-          <span className="text-sm uppercase tracking-[0.12em] text-[var(--muted)]">Editor Rebuild Pending</span>
-          <h1 className="text-3xl font-semibold text-[var(--text)]">当前编排器已下线重构</h1>
-          <p className="max-w-3xl text-[0.98rem] leading-7 text-[var(--muted)]">
-            目标图 ID：<span className="font-mono text-[var(--text)]">{graphId}</span>
-          </p>
-          <p className="max-w-3xl text-[0.98rem] leading-7 text-[var(--muted)]">
-            旧的 editor 已删除，避免遗留交互逻辑继续影响下一轮实现。请在新会话中按照新的需求文档重建编排器。
-          </p>
-        </div>
-      </section>
+  if (!graph) {
+    notFound();
+  }
 
-      <div className="grid gap-2 text-sm text-[var(--muted)]">
-        <div>规格文档路径：<span className="font-mono text-[var(--text)]">docs/active/editor_rebuild_requirements.md</span></div>
-      </div>
-
-      <div className="flex flex-wrap gap-3">
-        <Link
-          className="inline-flex items-center rounded-full border border-[var(--line)] bg-[rgba(255,255,255,0.9)] px-4 py-2 text-sm text-[var(--text)]"
-          href="/editor"
-        >
-          返回编排器入口
-        </Link>
-      </div>
-    </main>
-  );
+  return <EditorClient mode="existing" graphId={graphId} initialGraph={graph} templates={templates} />;
 }
