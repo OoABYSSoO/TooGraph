@@ -2,6 +2,12 @@
 
 A visual node-based editor and runtime workspace for LangGraph agent workflows.
 
+Current note:
+
+- The previous frontend editor implementation has been intentionally removed.
+- `/editor` and `/editor/[graphId]` are now rebuild placeholder pages.
+- The next editor implementation should follow `docs/active/editor_rebuild_requirements.md`.
+
 GraphiteUI 不是一个聊天应用，也不是一个单轮 prompt 包装器。它的目标是把复杂业务任务的执行过程，从“黑盒代码”变成 **可视化编排、可运行、可观察、可回看** 的 workflow 系统。
 
 ---

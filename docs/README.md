@@ -58,6 +58,7 @@
 - `framework_rebuild_execution_backlog.md`
 - `acceptance_runbook.md`
 - `editor_interaction_spec.md`
+- `editor_rebuild_requirements.md`
 
 ---
 
@@ -71,6 +72,7 @@
 4. `docs/active/development_plan.md`
 5. `docs/active/acceptance_runbook.md`
 6. `docs/active/editor_interaction_spec.md`
+7. `docs/active/editor_rebuild_requirements.md`
 
 如果你只是想理解项目历史，再去看：
 
@@ -85,6 +87,7 @@
 - [framework_positioning.md](/home/abyss/GraphiteUI/docs/architecture/framework_positioning.md)
 - [framework_rebuild_task_plan.md](/home/abyss/GraphiteUI/docs/architecture/framework_rebuild_task_plan.md)
 - [framework_rebuild_execution_backlog.md](/home/abyss/GraphiteUI/docs/active/framework_rebuild_execution_backlog.md)
+- [editor_rebuild_requirements.md](/home/abyss/GraphiteUI/docs/active/editor_rebuild_requirements.md)
 
 它们共同定义了：
 
