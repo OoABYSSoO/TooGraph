@@ -624,7 +624,7 @@ function EditorCanvas({ initialGraph, mode, graphId }: { initialGraph: GraphPayl
                 pannable
                 zoomable
                 position="bottom-right"
-                className="!bottom-4 !right-4 !h-[168px] !w-[220px] !overflow-hidden !rounded-[18px] !border-[rgba(154,52,18,0.16)] !bg-[rgba(255,250,241,0.94)] !shadow-[0_14px_30px_rgba(60,41,20,0.12)]"
+                className="!bottom-4 !right-4 !h-[168px] !w-[220px] !bg-transparent !shadow-none"
                 maskColor="rgba(154,52,18,0.08)"
                 nodeColor="#d97706"
               />
