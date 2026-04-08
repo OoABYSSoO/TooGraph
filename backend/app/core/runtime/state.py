@@ -50,6 +50,8 @@ class RunState(TypedDict, total=False):
     node_executions: list[dict[str, Any]]
     warnings: list[str]
     errors: list[str]
+    output_previews: list[dict[str, Any]]
+    saved_outputs: list[dict[str, Any]]
     started_at: str
     completed_at: str | None
 
@@ -99,6 +101,8 @@ def create_initial_run_state(graph_id: str, graph_name: str, max_revision_round:
         node_executions=[],
         warnings=[],
         errors=[],
+        output_previews=[],
+        saved_outputs=[],
         started_at=utc_now_iso(),
         completed_at=None,
     )

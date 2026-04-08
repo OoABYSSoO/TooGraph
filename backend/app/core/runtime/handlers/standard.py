@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Any
 
 from app.memory.store import save_memory
@@ -12,13 +14,13 @@ TOOLS = get_tool_registry()
 
 
 def handle_start(state: RunState, params: dict[str, Any]) -> dict[str, Any]:
-    del params
     theme_config = dict(state.get("theme_config", {}))
     genre = str(theme_config.get("genre", "")).strip()
     market = str(theme_config.get("market", "")).strip()
     platform = str(theme_config.get("platform", "")).strip()
     task_input = f"Generate a {genre or 'strategy'} creative workflow for {market or 'global'} on {platform or 'digital'}."
-    return {"theme_config": theme_config, "task_input": task_input}
+    input_values = dict(params.get("input_values", {}))
+    return {"theme_config": theme_config, "task_input": task_input, **input_values}
 
 
 def handle_research(state: RunState, params: dict[str, Any]) -> dict[str, Any]:
@@ -146,8 +148,79 @@ def handle_hello_model(state: RunState, params: dict[str, Any]) -> dict[str, Any
 
 
 def handle_end(state: RunState, params: dict[str, Any]) -> dict[str, Any]:
-    del state, params
-    return {}
+    outputs = params.get("outputs", [])
+    output_previews: list[dict[str, Any]] = []
+    saved_outputs: list[dict[str, Any]] = []
+
+    for output in outputs:
+        state_key = str(output.get("state_key", "")).strip()
+        if not state_key:
+            continue
+
+        value = state.get(state_key)
+        display_mode = str(output.get("display_mode") or "auto")
+        persist_enabled = bool(output.get("persist_enabled"))
+        persist_format = str(output.get("persist_format") or "txt")
+        label = str(output.get("label") or state_key)
+
+        output_previews.append(
+            {
+                "state_key": state_key,
+                "label": label,
+                "display_mode": display_mode,
+                "persist_enabled": persist_enabled,
+                "persist_format": persist_format,
+                "value": value,
+            }
+        )
+
+        if persist_enabled and value not in (None, "", [], {}):
+            saved_outputs.append(
+                _save_text_output(
+                    run_id=str(state.get("run_id", "")),
+                    state_key=state_key,
+                    value=value,
+                    persist_format=persist_format,
+                    file_name_template=str(output.get("file_name_template") or state_key),
+                )
+            )
+
+    return {
+        "output_previews": output_previews,
+        "saved_outputs": saved_outputs,
+    }
+
+
+def _save_text_output(
+    *,
+    run_id: str,
+    state_key: str,
+    value: Any,
+    persist_format: str,
+    file_name_template: str,
+) -> dict[str, Any]:
+    extension = persist_format if persist_format in {"txt", "md", "json"} else "txt"
+    output_root = Path(__file__).resolve().parents[4] / "backend" / "data" / "outputs" / run_id
+    output_root.mkdir(parents=True, exist_ok=True)
+
+    safe_file_name = "".join(char if char.isalnum() or char in {"-", "_"} else "_" for char in file_name_template).strip("_") or state_key
+    file_path = output_root / f"{safe_file_name}.{extension}"
+    file_path.write_text(_serialize_output_value(value, extension), encoding="utf-8")
+
+    return {
+      "state_key": state_key,
+      "path": str(file_path.relative_to(output_root.parents[2])),
+      "format": extension,
+      "file_name": file_path.name,
+    }
+
+
+def _serialize_output_value(value: Any, extension: str) -> str:
+    if extension == "json":
+        return json.dumps(value, ensure_ascii=False, indent=2)
+    if isinstance(value, str):
+        return value
+    return json.dumps(value, ensure_ascii=False, indent=2)
 
 
 STANDARD_HANDLER_MAP = {
