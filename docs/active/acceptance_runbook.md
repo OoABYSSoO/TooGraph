@@ -11,6 +11,11 @@
 - creative factory 模板是否能跑通
 - run detail 与产物是否可回看
 
+补充说明：
+
+- 当前 editor 在点击 `Run` 后会拉取一次 run detail，但尚未实现持续轮询
+- 当前模板注册表中实际只有一个模板：`creative_factory`
+
 ---
 
 ## 2. 启动准备
@@ -193,6 +198,11 @@ http://127.0.0.1:8765
 - 返回 `run_id`
 - run 状态为 `completed` 或 `failed`
 - 画布节点状态发生变化
+
+当前实现说明：
+
+- 当前节点状态会在运行后更新一次
+- 若要看到持续变化，需要后续补 editor 轮询
 
 ### AC-RUNTIME-2 条件路由
 

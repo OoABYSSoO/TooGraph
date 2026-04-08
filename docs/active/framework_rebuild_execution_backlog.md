@@ -2,443 +2,152 @@
 
 ## 1. 文档目的
 
-这份文档是在 [framework_rebuild_task_plan.md](/home/abyss/GraphiteUI/docs/architecture/framework_rebuild_task_plan.md) 基础上的 **执行级 backlog**。
+这份文档记录 **基于当前代码状态** 的可执行 backlog。
 
-它只关心一件事：
+它不再展开历史规划，而是回答两个问题：
 
-**下一步到底改哪些文件，先删什么，再建什么，做到什么算完成。**
-
-前提与约束：
-
-- 不兼容旧图
-- 可以激进重构
-- 必须保留 [slg_langgraph_single_file_modified_v2.py](/home/abyss/GraphiteUI/demo/slg_langgraph_single_file_modified_v2.py)
-- 但正式程序绝不依赖这个单文件
+1. 现在代码已经改到哪一步了
+2. 下一步具体应该继续做什么
 
 ---
 
-## 2. 当前代码现实判断
+## 2. 当前代码状态快照
 
-当前仓库已经具备这些条件：
+以下事项已完成：
 
-- 标准 graph 协议已存在
-- 标准 creative factory 模板已存在
-- runtime 主链可执行
-- editor 已具备 state panel 和节点读写 state 的能力
-- 基础模板注册 API 已落地
-- 主题配置面板已组件化
+- 后端 `core/` 分层已存在
+- `creative_factory` 模板已拆为：
+  - `template.py`
+  - `state.py`
+  - `themes.py`
+  - `handlers.py`
+- 模板注册 API 已存在
+- editor 模板页已优先从后端模板 `default_graph` 初始化
+- SQLite 持久化已落地
+- Tailwind 与前端组件层已建立
 
-当前最明显的问题：
+以下事项仍然是现实问题：
 
-1. `creative_factory` 的前后端模板源已经开始集中，但前后端仍是双份定义
-2. 后端 `core/` 与 `templates/` 的第一轮目录分层已经完成，但导出边界还可继续收紧
-3. 前端模板源已经开始抽离，但模板主题与默认图仍需继续向统一注册源收拢
-4. theme panel 还不是完整结构化策略编辑器
-5. runtime handler 仍偏单文件集中
-
-所以当前第一轮重构不该再做“大而全新功能”，而应聚焦：
-
-- 目录重组
-- 模板抽离
-- 主题系统收拢
+1. 模板注册表目前只有 `creative_factory`
+2. editor 没有运行轮询
+3. 前端仍保留 fallback 模板逻辑
+4. `/api/settings` 仍暴露 `skills`
+5. UI 层虽然已有 primitives 和语义组件，但还没有完整设计系统
 
 ---
 
-## 3. 第一批必须执行的任务
+## 3. 当前优先任务
 
-## Task A1 后端目录重组
+## Task T1 Editor 运行轮询
 
 优先级：`P0`
 
 目标：
 
-建立真正的 `core/` 与 `templates/` 分层。
+让 editor 在点击 `Run` 后持续刷新 run 状态，而不是只拉一次。
 
-### A1.1 新建目录
+需要修改：
 
-需要新增：
-
-```text
-backend/app/core/
-backend/app/core/schemas/
-backend/app/core/compiler/
-backend/app/core/runtime/
-backend/app/core/runtime/handlers/
-backend/app/core/registry/
-backend/app/core/storage/
-backend/app/templates/
-backend/app/templates/creative_factory/
-```
-
-### A1.2 迁移文件
-
-建议迁移：
-
-- `backend/app/schemas/graph.py` -> `backend/app/core/schemas/graph.py`
-- `backend/app/schemas/run.py` -> `backend/app/core/schemas/run.py`
-- `backend/app/compiler/graph_parser.py` -> `backend/app/core/compiler/graph_parser.py`
-- `backend/app/compiler/validator.py` -> `backend/app/core/compiler/validator.py`
-- `backend/app/compiler/workflow_builder.py` -> `backend/app/core/compiler/workflow_builder.py`
-- `backend/app/runtime/executor.py` -> `backend/app/core/runtime/executor.py`
-- `backend/app/runtime/nodes.py` -> `backend/app/core/runtime/nodes.py`
-- `backend/app/runtime/registry.py` -> `backend/app/core/registry/node_registry.py`
-- `backend/app/storage/graph_store.py` -> `backend/app/core/storage/graph_store.py`
-- `backend/app/storage/run_store.py` -> `backend/app/core/storage/run_store.py`
-
-### A1.3 同步 import
-
-必须同步修改：
-
-- `backend/app/main.py`
-- `backend/app/api/routes_graphs.py`
-- `backend/app/api/routes_runs.py`
-- `backend/app/api/routes_settings.py`
+- `frontend/components/editor/editor-workbench.tsx`
+- `frontend/stores/editor-store.ts`
 
 完成标准：
 
-- `python -m compileall backend/app` 通过
-- 所有 API import 正常
+- 点击 `Run` 后保存 `run_id`
+- 周期性请求 `/api/runs/{run_id}`
+- 状态进入 `completed / failed` 后停止轮询
+- 节点状态随 run detail 持续更新
 
-当前状态：
-
-- `schemas / compiler / runtime / storage` 已迁入 `backend/app/core/`
-- API 已改为从 `app.core.*` 引用
-- 旧目录 `backend/app/compiler`、`backend/app/runtime`、`backend/app/schemas`、`backend/app/storage` 已删除
-- 下一步可选项是继续补 `core` 层的导出边界和更细的 handler/tool 划分
-
----
-
-## Task A2 抽出模板注册系统
+## Task T2 模板单一来源继续收口
 
 优先级：`P0`
 
 目标：
 
-让 `creative_factory` 从“分散逻辑”变成“注册模板”。
+进一步减少前端 fallback 模板维护量。
 
-### A2.1 新建文件
-
-新增：
-
-- `backend/app/templates/registry.py`
-- `backend/app/templates/creative_factory/template.py`
-- `backend/app/templates/creative_factory/state.py`
-- `backend/app/templates/creative_factory/themes.py`
-- `backend/app/templates/creative_factory/handlers.py`
-
-### A2.2 后端职责拆分
-
-`template.py`
-- 返回模板 id
-- 返回模板默认 graph 结构
-
-`state.py`
-- 返回模板默认 state schema
-
-`themes.py`
-- 返回模板内置 theme presets
-
-`handlers.py`
-- 返回模板节点和具体 handler 的绑定关系
-
-当前状态：
-
-- `backend/app/templates/creative_factory/template.py` 已创建
-- `backend/app/templates/creative_factory/state.py` 已创建
-- `backend/app/templates/creative_factory/themes.py` 已创建
-- `backend/app/templates/creative_factory/handlers.py` 已创建
-- 注册表已改为从新模板目录装配 `creative_factory`
-- `default_graph` 已开始由后端模板层返回，editor 模板路由优先使用后端模板图
-- 下一步需要继续减少前端 fallback 和后端模板图的双份维护
-
-### A2.3 前端对应抽离
-
-新增：
+需要关注：
 
 - `frontend/lib/templates/creative-factory.ts`
 - `frontend/lib/templates/index.ts`
-
-从 [editor-presets.ts](/home/abyss/GraphiteUI/frontend/lib/editor-presets.ts) 中抽离：
-
-- 模板图构造
-- 默认 state schema
-- 节点链定义
-
-保留在 `editor-presets.ts` 的只应是轻量入口或兼容导出。
-
-当前状态：
-
-- `frontend/lib/templates/creative-factory.ts` 已创建
-- 默认 graph 构造和 theme preset 已从通用 preset 文件中抽离
-- editor 模板路由已优先使用后端 `default_graph`
-- 下一步需要继续把前端 fallback 压缩到最小，而不是继续双份维护完整模板图
+- `frontend/components/editor/editor-workbench.tsx`
+- `backend/app/templates/creative_factory/template.py`
 
 完成标准：
 
-- `creative_factory` 的节点链不再散落在多个文件里
-- 前后端都能通过模板定义生成默认图
+- 前端不再维护完整独立默认图副本
+- fallback 只保留最小安全兜底能力
 
----
-
-## Task A3 Theme 系统收拢
-
-优先级：`P0`
-
-目标：
-
-把 theme preset 从“前端数组为主”改成“模板主题定义为主”。
-
-### A3.1 后端主题源
-
-在：
-
-- `backend/app/templates/creative_factory/themes.py`
-
-定义：
-
-- `slg_launch`
-- `rpg_fantasy`
-- `survival_chaos`
-
-每个 preset 应包含：
-
-- basic fields
-- market fields
-- style fields
-- evaluation policy
-- strategy profile
-- node param overrides
-
-### A3.2 前端主题读取层
-
-新增：
-
-- `frontend/lib/theme-registry.ts`
-
-职责：
-
-- 读取模板主题
-- 提供默认 theme
-- 处理 preset 切换
-
-### A3.3 从 editor 里移除“硬编码 preset 逻辑”
-
-重点改造：
-
-- [editor-workbench.tsx](/home/abyss/GraphiteUI/frontend/components/editor/editor-workbench.tsx)
-- [editor-store.ts](/home/abyss/GraphiteUI/frontend/stores/editor-store.ts)
-
-完成标准：
-
-- 切换 preset 不依赖前端固定数组
-- 主题定义来源清晰
-
----
-
-## 4. 第二批重要任务
-
-## Task B1 Theme Config Panel 组件化
+## Task T3 第二个模板
 
 优先级：`P1`
 
 目标：
 
-把 editor 顶部主题区从散输入框改成完整组件。
+验证当前架构不是只服务 `creative_factory`。
 
-新增：
+建议新增：
 
-- `frontend/components/editor/theme-config-panel.tsx`
-
-分区：
-
-- Basic
-- Market
-- Style
-- Evaluation
-- Strategy Profile
-
-必须支持直接编辑：
-
-- `hookTheme`
-- `payoffTheme`
-- `visualPattern`
-- `pacingPattern`
-- `evaluationFocus`
+- 第二个模板目录：
+  - `backend/app/templates/<new_template>/`
+- 对应前端模板源最小支持
 
 完成标准：
 
-- 用户不需要手改 JSON
+- `/api/templates` 返回两个模板
+- editor 能通过模板路由打开第二个模板
 
-## Task B2 Palette 分层
+## Task T4 弱化 settings 中的 skills 概念
 
 优先级：`P1`
 
 目标：
 
-节点面板必须区分：
+让 `Core / Template / Theme / Tool` 成为更清晰的主概念。
 
-- Core Nodes
-- Template Nodes
-- Utility Nodes
+需要修改：
 
-改动文件：
-
-- [editor-workbench.tsx](/home/abyss/GraphiteUI/frontend/components/editor/editor-workbench.tsx)
-- [workflow-node.tsx](/home/abyss/GraphiteUI/frontend/components/editor/workflow-node.tsx)
+- `backend/app/api/routes_settings.py`
+- `frontend/components/settings/settings-panel-client.tsx`
 
 完成标准：
 
-- 用户能看懂哪些是框架能力，哪些是模板能力
+- UI 不再强调 `skills`
+- 必要时保留内部兼容，但不继续强化这个概念
 
-## Task B3 Run Detail 分层
-
-优先级：`P1`
-
-目标：
-
-把 `RunDetail` 的输出分成：
-
-- system
-- state
-- artifacts
-- trace
-
-改动文件：
-
-- `backend/app/core/schemas/run.py`
-- `backend/app/core/runtime/executor.py`
-- [run-detail-client.tsx](/home/abyss/GraphiteUI/frontend/components/runs/run-detail-client.tsx)
-
-完成标准：
-
-- 前端不再需要猜字段归属
-
----
-
-## 5. 第三批增强任务
-
-## Task C1 Start / End Source-Sink 强化
+## Task T5 UI 组件层继续收口
 
 优先级：`P2`
 
 目标：
 
-让 Start / End 变成真正的 state source / sink。
+继续从“基础组件 + 少量语义组件”推进到更稳定的设计系统。
 
-文件：
+建议新增：
 
-- [workflow-node.tsx](/home/abyss/GraphiteUI/frontend/components/editor/workflow-node.tsx)
-- [state-panel.tsx](/home/abyss/GraphiteUI/frontend/components/editor/state-panel.tsx)
-
-## Task C2 边的 bus 视图
-
-优先级：`P2`
-
-目标：
-
-让边的 `flow_keys` 变成真正有信息量的总线视图。
-
-文件：
-
-- [workflow-edge.tsx](/home/abyss/GraphiteUI/frontend/components/editor/workflow-edge.tsx)
-
-## Task C3 节点插入与顺序重排
-
-优先级：`P2`
-
-目标：
-
-支持“在两节点之间插入节点”和自动重排。
-
-文件：
-
-- [editor-workbench.tsx](/home/abyss/GraphiteUI/frontend/components/editor/editor-workbench.tsx)
-- [editor-store.ts](/home/abyss/GraphiteUI/frontend/stores/editor-store.ts)
+- `FormField`
+- `DataList`
+- `ToolbarGroup`
 
 ---
 
-## 6. demo 单文件的专门处理方式
+## 4. 当前不建议优先做的事
 
-## Task D1 保持 demo 可独立运行
+这些事项目前不应抢占前面几项优先级：
 
-优先级：`P0`
-
-目标：
-
-保证 [slg_langgraph_single_file_modified_v2.py](/home/abyss/GraphiteUI/demo/slg_langgraph_single_file_modified_v2.py) 仍是可独立运行的样板。
-
-必须做到：
-
-- demo 文件不删除
-- demo 文件不被 runtime import
-- demo 文件不被模板系统 import
-- demo 文件可继续单独编译检查
-
-建议检查：
-
-```bash
-python -m py_compile demo/slg_langgraph_single_file_modified_v2.py
-rg -n "slg_langgraph_single_file_modified_v2" .
-```
-
-完成标准：
-
-- 代码层只有文档引用它
-
-## Task D2 用模板能力对齐 demo 能力，而不是调用 demo
-
-优先级：`P0`
-
-目标：
-
-让 `creative_factory` 模板表达 demo 的能力集合，但不依赖 demo 文件本身。
-
-必须覆盖：
-
-- 研究
-- 素材收集
-- 规范化
-- 素材分析
-- 模式提取
-- brief 生成
-- variants 生成
-- storyboard 生成
-- 视频提示词生成
-- review
-- image/video todo 导出
-
-完成标准：
-
-- 模板输出结构与 demo 核心产物对齐
-- 但代码依赖链不经过 `demo/`
+- 再做一轮纯样式微调
+- 增加大量新的 theme preset
+- 增加更多 creative factory 专用节点
+- 重新引入旧图兼容层
 
 ---
 
-## 7. 建议实施节奏
+## 5. 当前执行顺序建议
 
-推荐按下面顺序执行：
+建议按这个顺序推进：
 
-1. `Task D1`
-2. `Task A1`
-3. `Task A2`
-4. `Task A3`
-5. `Task B1`
-6. `Task B3`
-7. `Task B2`
-8. `Task D2`
-9. `Task C1`
-10. `Task C2`
-11. `Task C3`
-
----
-
-## 8. 本轮重构的完成标志
-
-满足下面这些条件时，可以认为这轮“framework 化重构”进入稳定阶段：
-
-1. `demo/` 只保留为参考实现，不参与正式运行依赖。
-2. `creative_factory` 已是模板注册系统中的正式模板。
-3. theme preset 已从前端硬编码迁移到模板定义体系。
-4. 后端目录已形成 `core/` 与 `templates/` 分层。
-5. editor 能围绕模板、主题、state、节点配置进行标准创建和修改。
-6. 文档已全部同步到新的代码结构。
+1. `T1 Editor 运行轮询`
+2. `T2 模板单一来源继续收口`
+3. `T3 第二个模板`
+4. `T4 弱化 settings 中的 skills 概念`
+5. `T5 UI 组件层继续收口`

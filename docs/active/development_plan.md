@@ -2,73 +2,114 @@
 
 ## 1. 文档目的
 
-本文档用于描述 **GraphiteUI 当前实际开发进度**、主线里程碑完成情况，以及接下来最值得继续推进的工作。
+这份文档记录 **当前代码已经实现的能力**、**当前真实存在的缺口** 和 **接下来应该继续推进的事项**。
 
-它不再假设仓库还停留在“刚搭骨架”的阶段，而是作为当前代码状态的同步文档。
-
----
-
-## 2. 当前项目判断
-
-截至当前版本，GraphiteUI 已经从“最小闭环原型”进入 **标准编辑器协议 + 标准 creative factory 模板 + 可执行运行链** 阶段。
-
-当前已经完成的主线能力：
-
-- 前后端工程、开发脚本、健康检查、语言切换
-- 标准 graph 协议：`template_id / theme_config / state_schema / reads / writes / params / flow_keys`
-- graph 的 `validate / save / load / run`
-- 基于 LangGraph 的标准节点执行链
-- legacy runtime、旧节点类型和旧图入口正在被清理出主线
-- creative factory 默认模板
-- `demo/slg_langgraph_single_file_modified_v2.py` 继续作为独立参考实现保留，主程序不依赖它
-- 模板注册与模板查询 API 已落地
-- 前端模板源已开始独立化，`creative_factory` 默认图定义已从通用 preset 文件中抽离
-- 后端 `creative_factory` 模板已拆成 `template / state / themes / handlers` 模块
-- 后端模板 API 已开始直接返回 `default_graph`，editor 模板路由优先使用后端模板图初始化
-- 后端 `core/` 分层已落地，`schemas / compiler / runtime / storage` 已迁入 `backend/app/core/`
-- 编辑器中的 `State Panel`
-- 节点左入右出、自定义节点卡片
-- 节点输入输出绑定、结构化参数面板、快速新增 state key
-- 主题配置面板已独立组件化，editor 可优先读取后端模板预设
-- runs / run detail / knowledge / memories / settings 的基础页面联通
-- 前端 Tailwind 基础设施已接入，后续新 UI 将优先基于 Tailwind 开发
-- 页面壳、列表页、详情页、设置页和 editor 周边组件已大面积迁移到 Tailwind
-
-当前项目最准确的状态应理解为：
-
-**“标准编排模型已经落地，后端 core/template 分层已经开始成形，主链路可运行，正在从可用走向更强的模板统一和调试体验。”**
+这不是历史规划复述，而是基于当前仓库代码的状态同步文档。
 
 ---
 
-## 3. 当前标准模型
+## 2. 当前代码状态
 
-当前系统以以下模型为主：
+截至当前版本，GraphiteUI 已进入：
 
-- `State First`
-- `Node First`
-- `Condition Node` 替代特殊条件边
-- 边表示“执行流转 + 一组主要 flow keys”
-- `theme_config` 负责切换主题、题材、市场和表达风格
+**标准协议 + creative factory 模板 + 可执行运行链 + Tailwind/语义组件化前端**
 
-标准节点体系当前已支持：
+当前代码中已经明确实现的能力：
 
-- `start`
-- `research`
-- `collect_assets`
-- `normalize_assets`
-- `select_assets`
-- `analyze_assets`
-- `extract_patterns`
-- `build_brief`
-- `generate_variants`
-- `generate_storyboards`
-- `generate_video_prompts`
-- `review_variants`
-- `condition`
-- `prepare_image_todo`
-- `prepare_video_todo`
-- `finalize`
-- `end`
+- 前后端均可启动，开发脚本可用，默认端口：
+  - 前端 `3477`
+  - 后端 `8765`
+- 后端 API 已包含：
+  - `/health`
+  - `/api/graphs`
+  - `/api/runs`
+  - `/api/knowledge`
+  - `/api/memories`
+  - `/api/settings`
+  - `/api/templates`
+- 标准 graph 协议已落地，核心字段包括：
+  - `template_id`
+  - `theme_config`
+  - `state_schema`
+  - 节点 `reads / writes / params`
+  - 边 `flow_keys / edge_kind / branch_label`
+- graph 已支持：
+  - `validate`
+  - `save`
+  - `load`
+  - `list`
+  - `run`
+- 后端已使用 SQLite 持久化 `graphs / runs`
+  - 数据库文件：`backend/data/graphiteui.db`
+  - 历史 `graphs/*.json`、`runs/*.json` 会自动导入
+- 后端 `core/` 分层已建立：
+  - `compiler`
+  - `runtime`
+  - `schemas`
+  - `storage`
+- 模板系统已存在，当前模板注册表里实际只有一个模板：
+  - `creative_factory`
+- 模板 API 已能返回：
+  - 模板元数据
+  - `theme_presets`
+  - `state_schema`
+  - `default_graph`
+- editor 已具备：
+  - `State Panel`
+  - 自定义节点卡片
+  - 左入右出
+  - `reads / writes` 绑定
+  - 结构化参数编辑
+  - 快速新增 state key
+  - Validate / Save / Run
+  - 节点执行摘要展示
+- 前端模板路由已优先按后端模板 `default_graph` 初始化
+- 主题系统已支持多个 preset，并能影响：
+  - `theme_config`
+  - 节点默认参数
+  - creative factory 产出策略
+- 页面已全部可访问：
+  - `/`
+  - `/workspace`
+  - `/editor/[graphId]`
+  - `/runs`
+  - `/runs/[runId]`
+  - `/knowledge`
+  - `/memories`
+  - `/settings`
+- Tailwind 迁移已完成大半，且已建立两层前端 UI 抽象：
+  - 基础组件：`Button / Input / Select / Textarea / Card / Badge`
+  - 语义组件：`SectionHeader / EmptyState / InfoBlock / MetricCard`
+- `demo/slg_langgraph_single_file_modified_v2.py` 仍保留，且主程序不依赖它
+
+---
+
+## 3. 代码核对后确认的事实
+
+### 3.1 已完成
+
+- editor 点击 `Run` 后会立即请求一次 `/api/runs/{run_id}`，并把结果映射回节点状态
+- `runs` 页面已支持按 `graph_name` 搜索、按 `status` 过滤
+- `knowledge` 页面已支持搜索和展开详情
+- `memories` 页面已支持按 `memory_type` 过滤和展开详情
+- `/api/settings` 目前同时返回：
+  - `tools`
+  - `skills`
+  - `templates`
+- `creative_factory` 默认图已由后端模板层生成
+
+### 3.2 尚未完成
+
+- editor **没有持续轮询**
+  - 当前只是在点击 `Run` 后立刻拉取一次 run detail
+  - 没有持续刷新 run 状态的逻辑
+- 模板注册表目前 **只有一个模板**
+  - 还没有第二个模板用于验证框架通用性
+- 前端和后端的模板定义虽然已收拢很多，但仍不是完全单一来源
+  - 前端仍保留 fallback 模板逻辑
+- `settings` 里仍保留 `skills` 字段
+  - 说明 skill 层还没有完全退出主概念层
+- 前端已建立 primitives 与语义组件，但还没有形成完整设计系统
 
 ---
 
@@ -80,12 +121,11 @@
 
 已完成内容：
 
-- `frontend/` 与 `backend/` 正式工程落地
-- `Makefile` 与 `scripts/dev_up.sh`
-- 前后端固定开发端口
-- `/health` 与启动链路
-
----
+- `frontend/` 和 `backend/` 正式工程存在
+- `Makefile`
+- `scripts/dev_up.sh`
+- `/health`
+- 固定开发端口
 
 ## M2 Graph 基础能力
 
@@ -94,10 +134,8 @@
 已完成内容：
 
 - graph schema
-- save / load / validate / list
+- save / load / validate / list / run
 - 前后端 graph 协议映射
-
----
 
 ## M3 Runtime 主流程
 
@@ -105,143 +143,111 @@
 
 已完成内容：
 
-- 标准 graph 解析
-- workflow 编译
+- graph 校验与编译
 - condition 路由
-- creative factory 主链可运行
-- run detail / state snapshot / artifacts 落盘
+- run 落盘
+- node execution 落盘
+- creative factory 主链可执行
 
 备注：
 
-- 当前普通节点默认只支持单一主后继
-- 分支必须通过 `condition` 节点完成
-
----
+- 当前普通节点仍要求单一主后继
+- 分支必须通过 `condition` 节点
 
 ## M4 Editor 基础交互
 
-状态：`已完成并持续增强`
+状态：`已完成`
 
 已完成内容：
 
-- 节点增删改
-- 节点拖拽与连线
-- `State Panel`
-- 自定义节点卡片
-- 左入右出
-- 输入输出绑定
-- 快速新增 state key
+- 画布交互
+- 节点拖拽
+- 连线
+- State Panel
+- 节点输入输出绑定
 - 结构化参数编辑
-- Validate / Save / Run
-
----
+- Save / Validate / Run
 
 ## M5 页面闭环
 
-状态：`大体完成`
+状态：`已完成`
 
 已完成内容：
 
-- 首页
 - Workspace
-- Editor
-- Runs
-- Run Detail
+- Runs / Run Detail
 - Knowledge
 - Memories
 - Settings
 
-仍待增强：
+## M6 模板化与标准化
 
-- 更强的运行轮询与调试体验
+状态：`已完成第一轮`
 
----
+已完成内容：
 
-## M6 最终形态推进
+- `core/` 目录分层
+- `creative_factory` 模板目录拆分
+- 模板注册 API
+- 主题 preset 体系
+- SQLite 持久化
+
+## M7 设计系统与前端收口
 
 状态：`进行中`
 
-当前已落地的最终形态能力：
+已完成内容：
 
-- 标准协议
-- `State Panel`
-- `theme_config`
-- `theme preset`
-- `Condition Node`
-- `Node Handler Registry`
-- `Tool Registry` 基础下沉
-- 自定义节点语义
-- creative factory 模板
-- preset 驱动的节点默认参数覆盖
-- preset 驱动的主题策略画像：`hook / payoff / visual / pacing / evaluation focus`
-- 后端 `core/` 目录重组
-- `graphs / runs` SQLite 持久化
+- Tailwind 基础设施
+- 基础 UI primitives
+- 语义组件第一轮
 
-仍在推进中的能力：
+仍待推进：
 
-- 更强的边可视化与 bus 表达
-- Start / End 特殊节点语义增强
-- 节点顺序重排体验
-- Tool Registry / Handler Registry 继续细分
-- 模板系统与主题系统继续抽象
-- 前后端模板源继续收拢，减少本地 fallback 维护量
+- 继续减少页面中散落的重复布局 class
+- 形成更完整的前端 UI 约定
 
 ---
 
-## 5. 当前优先级
+## 5. 当前 Todo
 
-## P0 正在推进
+### P0
 
-- 提升 editor 画布语义表达
-- 提升 `Start / End / Condition` 的可理解性
-- 让边更明确表达 flow keys
-- 让 creative factory 更接近 demo 的真实编排体验
+- 为 editor 增加 **运行状态持续轮询**
+  - 点击 `Run` 后持续刷新 `/api/runs/{run_id}`
+  - 直到状态进入 `completed / failed`
+- 增强 editor 的运行观测
+  - 当前节点高亮更实时
+  - 更明确的 run status 区
+  - 失败节点的错误摘要展示
+- 继续收拢模板单一来源
+  - 减少前端 fallback 模板图维护量
+  - 让后端模板定义成为更明确的源头
 
-## P1 高价值后续项
+### P1
 
-- 主题模板系统继续扩展
-- 主题策略字段编辑器与更细粒度可视化
-- 节点顺序调整与插入体验
-- 更强的 Run 轮询和调试能力
-- 更彻底的工具分层与跨主题复用
+- 增加第二个模板
+  - 用来验证 `Core / Template / Theme` 分层不是只适配 creative factory
+- 继续清理主概念层中的 `skills`
+  - 至少在 UI 和 settings 语义上弱化 skill 暴露
+- 增强模板系统
+  - 更细的 preset 可视化
+  - 更清晰的 theme strategy 编辑
 
-## P2 后续增强
+### P2
 
-- 更精细的 state diff 与调试可视化
-
----
-
-## 6. 近期实施顺序建议
-
-建议按以下顺序继续：
-
-1. 继续增强 Editor 语义表达
-2. 把 `Start / End / Condition` 交互进一步做实
-3. 将运行节点逻辑拆成正式 handler registry
-4. 将 demo 相关 helper 下沉为通用工具层
-5. 补齐资产页搜索筛选和调试体验
-
----
-
-## 7. 当前完成标准
-
-如果以“编辑器能通过编排完成 demo 任务，并能方便切换主题或调整顺序”为判断标准，那么当前完成度可以理解为：
-
-- 标准协议：`已完成`
-- 标准模板：`已完成`
-- 标准执行链：`已完成`
-- 编辑器基础交互：`已完成`
-- 最终形态视觉与交互：`进行中`
-- 更彻底的模块化抽象：`进行中`
+- 建立更完整的前端设计系统约定
+  - `FormField`
+  - `DataList`
+  - `Dialog/Popover`
+- 更细的 state diff / run debug 可视化
 
 ---
 
-## 8. 当前最重要的结论
+## 6. 当前最重要的判断
 
-GraphiteUI 已经不再是“演示级画布”，而是一个正在成形的 **LangGraph 状态驱动编排器**。
+GraphiteUI 当前已经不是“能不能跑起来”的阶段。
 
-接下来的重点不再是“从 0 到 1 搭起来”，而是：
+当前最准确的判断是：
 
-- 把 editor 的语义表达做得更强
-- 把 runtime 的内部抽象做得更干净
-- 把模板和主题系统做得更可复用
+**主链路已完成，模板系统和 UI 体系已建立第一轮基础，接下来应优先补运行观察与模板抽象，而不是继续扩散零散功能。**
