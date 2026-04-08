@@ -339,6 +339,9 @@ function getVisualInputKeys(nodeType: string, reads: string[], stateColors: Stat
     const sourceStateKey = String(params.source_state_key ?? "").trim();
     return sourceStateKey ? [sourceStateKey] : reads;
   }
+  if (nodeType === "hello_model") {
+    return reads.filter((key) => key !== "name");
+  }
   return reads;
 }
 
@@ -351,6 +354,7 @@ function getVisualOutputKeys(nodeType: string, writes: string[], stateColors: St
 }
 
 function FlowNodeCard({ data, selected }: NodeProps<FlowNode>) {
+  const reactFlow = useReactFlow<FlowNode, Edge>();
   const reads = getVisualInputKeys(data.nodeType, data.reads, data.stateColors, data.params);
   const writes = getVisualOutputKeys(data.nodeType, data.writes, data.stateColors, data.params);
   const nameBinding = data.paramBindings.name;
@@ -383,10 +387,33 @@ function FlowNodeCard({ data, selected }: NodeProps<FlowNode>) {
           <div className="mt-2 text-base font-semibold text-[var(--text)]">{data.label}</div>
           <div className="mt-2 text-[0.8rem] leading-5 text-[var(--muted)]">{data.description}</div>
           {data.nodeType === "hello_model" ? (
-            <div className="mt-3 flex flex-col items-center gap-2">
-              <ParamSocket name="name" binding={nameBinding} />
+            <div className="mt-3 flex w-full flex-col items-center gap-2">
+              <ParamInputField
+                nodeId={data.nodeId}
+                paramName="name"
+                value={localName}
+                binding={nameBinding}
+                onChange={(nextValue) => {
+                  reactFlow.setNodes((current) =>
+                    current.map((node) =>
+                      node.id === data.nodeId
+                        ? {
+                            ...node,
+                            data: {
+                              ...node.data,
+                              params: {
+                                ...node.data.params,
+                                name: nextValue,
+                              },
+                            },
+                          }
+                        : node,
+                    ),
+                  );
+                }}
+              />
               <div className="rounded-full border border-[rgba(154,52,18,0.12)] bg-[rgba(255,255,255,0.78)] px-3 py-1 text-[0.68rem] text-[var(--muted)]">
-                {nameBinding ? `Using connected state ${nameBinding}` : `Local name: ${localName || "empty"}`}
+                {nameBinding ? `Connected state overrides this text field: ${nameBinding}` : "No connection: local text is used at runtime"}
               </div>
             </div>
           ) : null}
@@ -457,24 +484,41 @@ function StateChip({
   );
 }
 
-function ParamSocket({
-  name,
+function ParamInputField({
+  nodeId,
+  paramName,
+  value,
   binding,
+  onChange,
 }: {
-  name: string;
+  nodeId: string;
+  paramName: string;
+  value: string;
   binding?: string;
+  onChange: (value: string) => void;
 }) {
   return (
-    <div className="relative flex items-center gap-2 rounded-full border border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.82)] px-2.5 py-1 text-[0.68rem] font-medium text-[var(--text)]">
+    <div className="relative flex w-full max-w-[180px] items-center rounded-[14px] border border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.88)] px-2.5 py-2">
       <Handle
-        id={buildParamHandleId(name)}
+        id={buildParamHandleId(paramName)}
         type="target"
         position={Position.Left}
         className="!left-[-7px] !top-1/2 !m-0 !h-3 !w-3 !-translate-y-1/2 !border !border-[rgba(154,52,18,0.24)] !bg-white"
         isConnectable
       />
-      <span className="uppercase tracking-[0.08em] text-[var(--accent-strong)]">{name}</span>
-      <span className="text-[var(--muted)]">{binding ? `bound:${binding}` : "local"}</span>
+      <input
+        value={value}
+        onChange={(event) => {
+          event.stopPropagation();
+          onChange(event.target.value);
+        }}
+        onClick={(event) => event.stopPropagation()}
+        onPointerDown={(event) => event.stopPropagation()}
+        placeholder={paramName}
+        className="w-full border-none bg-transparent text-center text-[0.8rem] text-[var(--text)] outline-none placeholder:text-[var(--muted)]"
+        aria-label={`${nodeId}-${paramName}`}
+      />
+      {binding ? <span className="ml-2 shrink-0 text-[0.62rem] uppercase tracking-[0.08em] text-[var(--accent-strong)]">link</span> : null}
     </div>
   );
 }
@@ -1472,7 +1516,6 @@ function EditorCanvas({ initialGraph, mode, graphId }: { initialGraph: GraphPayl
                       <span>Name</span>
                       <Input
                         value={String(selectedNode.data.params.name ?? "")}
-                        disabled={Boolean(selectedNode.data.paramBindings.name)}
                         onChange={(event) =>
                           updateNodeData(selectedNode.id, (data) => ({
                             ...data,
