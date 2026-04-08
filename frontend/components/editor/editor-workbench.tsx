@@ -323,6 +323,13 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
         y: event.clientY,
       });
       addNode(kind as GraphCanvasNode["data"]["kind"], position);
+      window.requestAnimationFrame(() => {
+        reactFlow.setCenter(position.x, position.y, {
+          zoom: Math.max(reactFlow.getZoom(), 0.9),
+          duration: 180,
+        });
+      });
+      useEditorStore.setState({ runtimeLabel: `Added ${kind} at drop position` });
     },
     [addNode, reactFlow],
   );
@@ -511,7 +518,7 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
           ) : null}
         </div>
 
-        <div className="absolute right-4 top-24 z-20 grid max-h-[calc(100vh-14rem)] w-[min(28rem,calc(100%-2rem))] gap-3 overflow-y-auto max-[960px]:left-4 max-[960px]:right-4 max-[960px]:top-[7.5rem] max-[960px]:w-auto">
+        <div className="absolute right-4 top-24 z-20 grid max-h-[calc(100vh-18rem)] w-[min(28rem,calc(100%-2rem))] gap-3 overflow-y-auto max-[960px]:left-4 max-[960px]:right-4 max-[960px]:top-[7.5rem] max-[960px]:max-h-[calc(100vh-10rem)] max-[960px]:w-auto">
           {isThemePanelCollapsed ? (
             <div className="flex justify-end">
               <button
@@ -774,11 +781,7 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
           ) : null}
         </div>
 
-        <div
-          className="min-h-[780px] overflow-hidden"
-          onDragOver={handleCanvasDragOver}
-          onDrop={handleCanvasDrop}
-        >
+        <div className="min-h-[780px] overflow-hidden">
           <ReactFlow
             className="cursor-grab active:cursor-grabbing"
             nodes={nodes}
@@ -791,6 +794,8 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
             onConnect={onConnect}
             onNodeClick={onNodeClick}
             onEdgeClick={onEdgeClick}
+            onDragOver={handleCanvasDragOver}
+            onDrop={handleCanvasDrop}
             panOnDrag
             panOnScroll
             selectionOnDrag={false}
@@ -802,27 +807,27 @@ function EditorWorkbenchInner({ graphId }: { graphId: string }) {
                 "radial-gradient(circle at 20% 20%, rgba(154, 52, 18, 0.08), transparent 18%), linear-gradient(180deg, rgba(255, 250, 241, 0.85), rgba(250, 245, 236, 0.95))",
             }}
           >
-            <MiniMap
-              zoomable
-              pannable
-              position="bottom-right"
-              style={{
-                width: 188,
-                height: 124,
-                background: "rgba(255,255,255,0.92)",
-                border: "1px solid rgba(154,52,18,0.18)",
-                borderRadius: 18,
-                boxShadow: "0 12px 30px rgba(96, 52, 23, 0.14)",
-              }}
-            />
             <Controls />
             <Background gap={18} size={1} />
             <Panel position="top-left">
               <Badge>Edges represent execution flow and carry major state keys.</Badge>
             </Panel>
-            <Panel position="bottom-right">
-              <div className="pointer-events-none mb-[136px] mr-1">
-                <Badge>Drag canvas to pan</Badge>
+            <Panel className="!z-30 !m-4" position="bottom-right">
+              <div className="grid gap-2">
+                <div className="justify-self-end">
+                  <Badge>Drag canvas to pan</Badge>
+                </div>
+                <div className="overflow-hidden rounded-[18px] border border-[rgba(154,52,18,0.18)] bg-[rgba(255,255,255,0.92)] shadow-[0_12px_30px_rgba(96,52,23,0.14)]">
+                  <MiniMap
+                    zoomable
+                    pannable
+                    style={{
+                      width: 188,
+                      height: 124,
+                      background: "rgba(255,255,255,0.92)",
+                    }}
+                  />
+                </div>
               </div>
             </Panel>
           </ReactFlow>
