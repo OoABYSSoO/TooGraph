@@ -1,97 +1,72 @@
 # Docs Index
 
-## 1. 文档分区说明
+## 1. Documentation Zones
 
-当前 `docs/` 已按用途分成三类：
+`docs/` 当前分为三类：
 
-### `docs/legacy/`
+## `docs/active/`
 
-历史遗留文档、早期方案和阶段性设计稿。
+当前开发的直接依据。
 
 适合：
 
-- 回看项目最初的规划
-- 追溯历史设计思路
-- 对比当前实现与早期设想的差异
+- 继续开发新 editor
+- 看当前需求、交互规则、开发顺序、验收标准
 
-不适合：
+当前主文档：
 
-- 作为当前开发的主依据
+- `editor_rebuild_requirements.md`
+- `editor_interaction_spec.md`
+- `development_plan.md`
+- `acceptance_runbook.md`
 
-当前包含：
+## `docs/architecture/`
 
-- `graphiteui_spec.md`
-- `graphiteui_architecture.md`
-- `graphiteui_tasks.md`
-- `graphiteui_acceptance_criteria.md`
+项目长期架构和框架定位文档。
+
+适合：
+
+- 理解 GraphiteUI 长期方向
+- 理解 runtime / template / framework 层级
+
+## `docs/legacy/`
+
+历史方案、过期执行文档和旧阶段设计稿。
+
+适合：
+
+- 回看历史决策
+- 对比旧 editor 和新 state-aware editor 的差异
+
+当前已归档的旧文档包括：
+
 - `editor_final_form_development_plan.md`
 - `editor_final_form_task_breakdown.md`
+- `framework_rebuild_execution_backlog_pre_state_aware_editor.md`
+- 其他早期 spec / tasks / architecture 文档
 
-### `docs/architecture/`
+## 2. Recommended Reading Order
 
-当前有效的架构总定义和重构方向文档。
+如果现在继续开发 editor，建议按这个顺序阅读：
 
-适合：
+1. `docs/active/editor_rebuild_requirements.md`
+2. `docs/active/editor_interaction_spec.md`
+3. `docs/active/development_plan.md`
+4. `docs/active/acceptance_runbook.md`
+5. `docs/architecture/framework_positioning.md`
 
-- 理解 GraphiteUI 的长期定位
-- 理解 `Core / Template / Theme` 三层结构
-- 作为重大架构决策的依据
+## 3. Current Source of Truth
 
-当前包含：
+当前 editor 的主依据是：
 
-- `framework_positioning.md`
-- `framework_rebuild_task_plan.md`
-
-### `docs/active/`
-
-当前最应该关注的执行文档。
-
-适合：
-
-- 看当前代码进度
-- 看当前验收方式
-- 直接按任务继续开发
-
-当前包含：
-
-- `development_plan.md`
-- `framework_rebuild_execution_backlog.md`
-- `acceptance_runbook.md`
-- `editor_interaction_spec.md`
-- `editor_rebuild_requirements.md`
-
----
-
-## 2. 当前阅读顺序建议
-
-如果你现在要继续开发，建议按这个顺序看：
-
-1. `docs/architecture/framework_positioning.md`
-2. `docs/architecture/framework_rebuild_task_plan.md`
-3. `docs/active/framework_rebuild_execution_backlog.md`
-4. `docs/active/development_plan.md`
-5. `docs/active/acceptance_runbook.md`
-6. `docs/active/editor_interaction_spec.md`
-7. `docs/active/editor_rebuild_requirements.md`
-
-如果你只是想理解项目历史，再去看：
-
-- `docs/legacy/`
-
----
-
-## 3. 当前主依据
-
-当前最重要的文档是：
-
-- [framework_positioning.md](/home/abyss/GraphiteUI/docs/architecture/framework_positioning.md)
-- [framework_rebuild_task_plan.md](/home/abyss/GraphiteUI/docs/architecture/framework_rebuild_task_plan.md)
-- [framework_rebuild_execution_backlog.md](/home/abyss/GraphiteUI/docs/active/framework_rebuild_execution_backlog.md)
 - [editor_rebuild_requirements.md](/home/abyss/GraphiteUI/docs/active/editor_rebuild_requirements.md)
+- [editor_interaction_spec.md](/home/abyss/GraphiteUI/docs/active/editor_interaction_spec.md)
+- [development_plan.md](/home/abyss/GraphiteUI/docs/active/development_plan.md)
+- [acceptance_runbook.md](/home/abyss/GraphiteUI/docs/active/acceptance_runbook.md)
 
-它们共同定义了：
+这些文档共同定义：
 
-- 项目要成为什么
-- 允许怎样重构
-- 下一步具体怎么做
-- 编排器当前应按新需求直接开发
+- 新 editor 是什么
+- 为什么它和 LangGraph 兼容但不完全等同
+- 现在应该先做什么
+- 怎么验收第一阶段
