@@ -579,6 +579,15 @@ agent node 的 skill attachment 已经有可依赖的数据源。
 
 新 graph 体系已经能表达最基础的条件路由。
 
+### Status
+
+第一版条件路由已接入：
+
+- `Condition Node` 已支持 `condition_mode = rule`
+- 当前支持单规则与基础 `branch_mapping`
+- 运行时会只激活命中的分支边
+- 更复杂的表达式与 model-based condition 仍待后续扩展
+
 ---
 
 ## Phase 7: Make Output Boundary The Only Export Surface

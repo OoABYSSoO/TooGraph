@@ -37,18 +37,26 @@ def execute_node_system_graph(graph: NodeSystemGraphDocument) -> dict[str, Any]:
     incoming_edges, outgoing_edges = _index_edges(graph.edges)
     execution_order = _topological_order(graph.nodes, graph.edges)
     node_outputs: dict[str, dict[str, Any]] = {}
+    active_edge_ids: set[str] = set()
 
     for node_id in execution_order:
         node = nodes_by_id[node_id]
+        incoming_for_node = incoming_edges.get(node_id, [])
+        is_root_node = len(incoming_for_node) == 0
+        is_active_node = is_root_node or any(edge.id in active_edge_ids for edge in incoming_for_node)
+        if not is_active_node:
+            continue
+
         node_started_perf = time.perf_counter()
         state["current_node_id"] = node_id
         state["node_status_map"][node_id] = "running"
 
         try:
-            input_values = _resolve_input_values(node, incoming_edges.get(node_id, []), node_outputs)
+            input_values = _resolve_input_values(incoming_for_node, node_outputs, active_edge_ids)
             body = _execute_node(node, input_values, state)
             duration_ms = int((time.perf_counter() - node_started_perf) * 1000)
             node_outputs[node_id] = body.get("outputs", {})
+            active_edge_ids.update(_select_active_outgoing_edges(outgoing_edges.get(node_id, []), body))
             state["node_status_map"][node_id] = "success"
             if body.get("selected_skills"):
                 state["selected_skills"] = [*state.get("selected_skills", []), *body["selected_skills"]]
@@ -75,6 +83,7 @@ def execute_node_system_graph(graph: NodeSystemGraphDocument) -> dict[str, Any]:
                         "inputs": input_values,
                         "outputs": body.get("outputs", {}),
                         "family": node.data.config.family,
+                        "selected_branch": body.get("selected_branch"),
                     },
                     "warnings": body.get("warnings", []),
                     "errors": [],
@@ -113,6 +122,7 @@ def execute_node_system_graph(graph: NodeSystemGraphDocument) -> dict[str, Any]:
         "output_previews": state.get("output_previews", []),
         "saved_outputs": state.get("saved_outputs", []),
         "node_outputs": node_outputs,
+        "active_edge_ids": sorted(active_edge_ids),
     }
     state["state_snapshot"] = {
         "node_outputs": node_outputs,
@@ -121,6 +131,7 @@ def execute_node_system_graph(graph: NodeSystemGraphDocument) -> dict[str, Any]:
         "output_previews": state.get("output_previews", []),
         "saved_outputs": state.get("saved_outputs", []),
         "final_result": state.get("final_result", ""),
+        "active_edge_ids": sorted(active_edge_ids),
     }
     save_run(state)
     return state
@@ -158,12 +169,14 @@ def _topological_order(nodes: list[NodeSystemGraphNode], edges: list[NodeSystemG
 
 
 def _resolve_input_values(
-    node: NodeSystemGraphNode,
     incoming_edges: list[NodeSystemGraphEdge],
     node_outputs: dict[str, dict[str, Any]],
+    active_edge_ids: set[str],
 ) -> dict[str, Any]:
     input_values: dict[str, Any] = {}
     for edge in incoming_edges:
+        if edge.id not in active_edge_ids:
+            continue
         source_outputs = node_outputs.get(edge.source, {})
         if not edge.source_handle or not edge.target_handle:
             continue
@@ -199,7 +212,7 @@ def _execute_node(node: NodeSystemGraphNode, input_values: dict[str, Any], state
             "final_result": "" if value is None else str(value),
         }
     if isinstance(config, ConditionNodeConfig):
-        raise ValueError("Condition node runtime is not available yet for node_system graphs.")
+        return _execute_condition_node(config, input_values)
     raise ValueError(f"Unsupported node family '{config.family}'.")
 
 
@@ -306,6 +319,29 @@ def _invoke_skill(skill_func: Any, skill_inputs: dict[str, Any]) -> dict[str, An
     return skill_func(**skill_inputs)
 
 
+def _execute_condition_node(config: ConditionNodeConfig, input_values: dict[str, Any]) -> dict[str, Any]:
+    if config.condition_mode.value != "rule":
+        raise ValueError("Condition node currently only supports rule mode.")
+
+    rule_value = _resolve_reference(
+        config.rule.source,
+        inputs=input_values,
+        response={},
+        skills={},
+        context={},
+    )
+    condition_result = _evaluate_condition_rule(rule_value, config.rule.operator.value, config.rule.value)
+    branch_key = _resolve_branch_key(config.branch_mapping, condition_result)
+    if branch_key is None:
+        raise ValueError("Condition node could not resolve a target branch from branchMapping.")
+
+    return {
+        "outputs": {branch.key: branch.key == branch_key for branch in config.branches},
+        "selected_branch": branch_key,
+        "final_result": branch_key,
+    }
+
+
 def _resolve_reference(
     reference: str,
     *,
@@ -326,6 +362,50 @@ def _resolve_reference(
     if reference.startswith("$context."):
         return _read_path(context, reference[len("$context."):])
     return reference
+
+
+def _evaluate_condition_rule(left_value: Any, operator: str, right_value: Any) -> bool:
+    if operator == "exists":
+        return left_value not in (None, "", [], {})
+    if operator == "==":
+        return left_value == right_value
+    if operator == "!=":
+        return left_value != right_value
+    if operator == ">":
+        return left_value > right_value
+    if operator == "<":
+        return left_value < right_value
+    if operator == ">=":
+        return left_value >= right_value
+    if operator == "<=":
+        return left_value <= right_value
+    raise ValueError(f"Unsupported condition operator '{operator}'.")
+
+
+def _resolve_branch_key(branch_mapping: dict[str, str], condition_result: Any) -> str | None:
+    lookup_keys = [
+        str(condition_result).lower(),
+        str(condition_result),
+    ]
+    for lookup_key in lookup_keys:
+        if lookup_key in branch_mapping:
+            return branch_mapping[lookup_key]
+    return None
+
+
+def _select_active_outgoing_edges(outgoing_edges: list[NodeSystemGraphEdge], body: dict[str, Any]) -> set[str]:
+    selected_branch = body.get("selected_branch")
+    if not selected_branch:
+        return {edge.id for edge in outgoing_edges}
+
+    active_edges: set[str] = set()
+    for edge in outgoing_edges:
+        if not edge.source_handle:
+            continue
+        source_key = edge.source_handle.split(":", 1)[-1]
+        if source_key == selected_branch:
+            active_edges.add(edge.id)
+    return active_edges
 
 
 def _read_path(payload: Any, path: str) -> Any:
