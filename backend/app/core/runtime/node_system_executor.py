@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import inspect
 import time
 from collections import defaultdict, deque
@@ -189,7 +190,8 @@ def _resolve_input_values(
 def _execute_node(node: NodeSystemGraphNode, input_values: dict[str, Any], state: dict[str, Any]) -> dict[str, Any]:
     config = node.data.config
     if isinstance(config, InputBoundaryNodeConfig):
-        value = input_values.get(config.output.key, config.default_value)
+        raw_value = input_values.get(config.output.key, config.default_value)
+        value = _coerce_input_boundary_value(raw_value, config.value_type.value)
         return {
             "outputs": {config.output.key: value},
             "final_result": str(value) if value is not None else "",
@@ -437,3 +439,13 @@ def _first_truthy(values: Any) -> Any:
         if value:
             return value
     return None
+
+
+def _coerce_input_boundary_value(value: Any, value_type: str) -> Any:
+    if value_type != "json" or not isinstance(value, str):
+        return value
+
+    try:
+        return json.loads(value)
+    except json.JSONDecodeError:
+        return value
