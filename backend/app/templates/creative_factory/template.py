@@ -261,7 +261,7 @@ def _create_default_graph(theme_preset: dict[str, Any]) -> dict[str, Any]:
 def _create_default_node_system_graph(theme_preset: dict[str, Any]) -> dict[str, Any]:
     return {
         "graph_family": "node_system",
-        "name": f"{theme_preset.get('graph_name') or 'Creative Factory'} Review Flow",
+        "name": f"{theme_preset.get('graph_name') or 'Creative Factory'} Final Package Flow",
         "template_id": "creative_factory",
         "theme_config": theme_preset["theme_config"],
         "state_schema": get_creative_factory_state_schema(),
@@ -630,6 +630,237 @@ def _create_default_node_system_graph(theme_preset: dict[str, Any]) -> dict[str,
                     "previewText": "",
                 },
             },
+            {
+                "id": "agent_storyboards_1",
+                "type": "default",
+                "position": {"x": 2820, "y": 140},
+                "data": {
+                    "nodeId": "agent_storyboards_1",
+                    "config": {
+                        "presetId": "preset.agent.generate_storyboard_packages.v1",
+                        "label": "Generate Storyboards",
+                        "description": "Generate storyboard packages from the current creative variants.",
+                        "family": "agent",
+                        "inputs": [
+                            {"key": "script_variants", "label": "Script Variants", "valueType": "json", "required": True},
+                        ],
+                        "outputs": [
+                            {"key": "storyboard_packages", "label": "Storyboard Packages", "valueType": "json"},
+                        ],
+                        "systemInstruction": "You are a storyboard generation agent.",
+                        "taskInstruction": "Generate storyboard packages from the provided variants.",
+                        "skills": [
+                            {
+                                "name": "generate_storyboard_packages",
+                                "skillKey": "generate_storyboard_packages",
+                                "inputMapping": {
+                                    "script_variants": "$inputs.script_variants",
+                                },
+                                "contextBinding": {},
+                                "usage": "required",
+                            }
+                        ],
+                        "responseMode": "json",
+                        "outputBinding": {
+                            "storyboard_packages": "$skills.generate_storyboard_packages.storyboard_packages",
+                        },
+                    },
+                    "previewText": "",
+                },
+            },
+            {
+                "id": "agent_video_prompts_1",
+                "type": "default",
+                "position": {"x": 3280, "y": 140},
+                "data": {
+                    "nodeId": "agent_video_prompts_1",
+                    "config": {
+                        "presetId": "preset.agent.generate_video_prompt_packages.v1",
+                        "label": "Generate Video Prompts",
+                        "description": "Generate video prompt packages from variants and storyboard packages.",
+                        "family": "agent",
+                        "inputs": [
+                            {"key": "script_variants", "label": "Script Variants", "valueType": "json", "required": True},
+                            {"key": "storyboard_packages", "label": "Storyboard Packages", "valueType": "json", "required": True},
+                        ],
+                        "outputs": [
+                            {"key": "video_prompt_packages", "label": "Video Prompt Packages", "valueType": "json"},
+                        ],
+                        "systemInstruction": "You are a video prompt generation agent.",
+                        "taskInstruction": "Generate video prompt packages from variants and storyboard packages.",
+                        "skills": [
+                            {
+                                "name": "generate_video_prompt_packages",
+                                "skillKey": "generate_video_prompt_packages",
+                                "inputMapping": {
+                                    "script_variants": "$inputs.script_variants",
+                                    "storyboard_packages": "$inputs.storyboard_packages",
+                                },
+                                "contextBinding": {},
+                                "usage": "required",
+                            }
+                        ],
+                        "responseMode": "json",
+                        "outputBinding": {
+                            "video_prompt_packages": "$skills.generate_video_prompt_packages.video_prompt_packages",
+                        },
+                    },
+                    "previewText": "",
+                },
+            },
+            {
+                "id": "agent_image_todo_1",
+                "type": "default",
+                "position": {"x": 3740, "y": 80},
+                "data": {
+                    "nodeId": "agent_image_todo_1",
+                    "config": {
+                        "presetId": "preset.agent.prepare_image_generation_todo.v1",
+                        "label": "Prepare Image TODO",
+                        "description": "Prepare image generation todo payload from review outputs.",
+                        "family": "agent",
+                        "inputs": [
+                            {"key": "best_variant", "label": "Best Variant", "valueType": "json", "required": True},
+                            {"key": "storyboard_packages", "label": "Storyboard Packages", "valueType": "json", "required": True},
+                        ],
+                        "outputs": [
+                            {"key": "image_generation_todo", "label": "Image Generation TODO", "valueType": "json"},
+                        ],
+                        "systemInstruction": "You are an image production prep agent.",
+                        "taskInstruction": "Prepare image generation todo payload from the current review outputs.",
+                        "skills": [
+                            {
+                                "name": "prepare_image_generation_todo",
+                                "skillKey": "prepare_image_generation_todo",
+                                "inputMapping": {
+                                    "best_variant": "$inputs.best_variant",
+                                    "storyboard_packages": "$inputs.storyboard_packages",
+                                },
+                                "contextBinding": {},
+                                "usage": "required",
+                            }
+                        ],
+                        "responseMode": "json",
+                        "outputBinding": {
+                            "image_generation_todo": "$skills.prepare_image_generation_todo.image_generation_todo",
+                        },
+                    },
+                    "previewText": "",
+                },
+            },
+            {
+                "id": "agent_video_todo_1",
+                "type": "default",
+                "position": {"x": 3740, "y": 240},
+                "data": {
+                    "nodeId": "agent_video_todo_1",
+                    "config": {
+                        "presetId": "preset.agent.prepare_video_generation_todo.v1",
+                        "label": "Prepare Video TODO",
+                        "description": "Prepare video generation todo payload from review outputs.",
+                        "family": "agent",
+                        "inputs": [
+                            {"key": "best_variant", "label": "Best Variant", "valueType": "json", "required": True},
+                            {"key": "video_prompt_packages", "label": "Video Prompt Packages", "valueType": "json", "required": True},
+                        ],
+                        "outputs": [
+                            {"key": "video_generation_todo", "label": "Video Generation TODO", "valueType": "json"},
+                        ],
+                        "systemInstruction": "You are a video production prep agent.",
+                        "taskInstruction": "Prepare video generation todo payload from the current review outputs.",
+                        "skills": [
+                            {
+                                "name": "prepare_video_generation_todo",
+                                "skillKey": "prepare_video_generation_todo",
+                                "inputMapping": {
+                                    "best_variant": "$inputs.best_variant",
+                                    "video_prompt_packages": "$inputs.video_prompt_packages",
+                                },
+                                "contextBinding": {},
+                                "usage": "required",
+                            }
+                        ],
+                        "responseMode": "json",
+                        "outputBinding": {
+                            "video_generation_todo": "$skills.prepare_video_generation_todo.video_generation_todo",
+                        },
+                    },
+                    "previewText": "",
+                },
+            },
+            {
+                "id": "agent_finalize_1",
+                "type": "default",
+                "position": {"x": 4200, "y": 160},
+                "data": {
+                    "nodeId": "agent_finalize_1",
+                    "config": {
+                        "presetId": "preset.agent.finalize_creative_package.v1",
+                        "label": "Finalize Creative Package",
+                        "description": "Assemble the final creative package artifact from downstream production inputs.",
+                        "family": "agent",
+                        "inputs": [
+                            {"key": "creative_brief", "label": "Creative Brief", "valueType": "text", "required": True},
+                            {"key": "best_variant", "label": "Best Variant", "valueType": "json", "required": True},
+                            {"key": "storyboard_packages", "label": "Storyboard Packages", "valueType": "json", "required": True},
+                            {"key": "video_prompt_packages", "label": "Video Prompt Packages", "valueType": "json", "required": True},
+                            {"key": "image_generation_todo", "label": "Image Generation TODO", "valueType": "json", "required": True},
+                            {"key": "video_generation_todo", "label": "Video Generation TODO", "valueType": "json", "required": True},
+                            {"key": "evaluation_result", "label": "Evaluation Result", "valueType": "json", "required": True},
+                        ],
+                        "outputs": [
+                            {"key": "final_package", "label": "Final Package", "valueType": "json"},
+                            {"key": "final_result", "label": "Final Result", "valueType": "text"},
+                        ],
+                        "systemInstruction": "You are a creative packaging agent.",
+                        "taskInstruction": "Assemble the final creative package from reviewed and prepared outputs.",
+                        "skills": [
+                            {
+                                "name": "finalize_creative_package",
+                                "skillKey": "finalize_creative_package",
+                                "inputMapping": {
+                                    "creative_brief": "$inputs.creative_brief",
+                                    "best_variant": "$inputs.best_variant",
+                                    "storyboard_packages": "$inputs.storyboard_packages",
+                                    "video_prompt_packages": "$inputs.video_prompt_packages",
+                                    "image_generation_todo": "$inputs.image_generation_todo",
+                                    "video_generation_todo": "$inputs.video_generation_todo",
+                                    "evaluation_result": "$inputs.evaluation_result",
+                                    "theme_config": "$graph.theme_config",
+                                },
+                                "contextBinding": {},
+                                "usage": "required",
+                            }
+                        ],
+                        "responseMode": "json",
+                        "outputBinding": {
+                            "final_package": "$skills.finalize_creative_package.final_package",
+                            "final_result": "$skills.finalize_creative_package.final_result",
+                        },
+                    },
+                    "previewText": "",
+                },
+            },
+            {
+                "id": "output_final_1",
+                "type": "default",
+                "position": {"x": 4660, "y": 160},
+                "data": {
+                    "nodeId": "output_final_1",
+                    "config": {
+                        "presetId": "preset.output.final_package.v1",
+                        "label": "Final Package Output",
+                        "description": "Preview the assembled final creative package.",
+                        "family": "output",
+                        "input": {"key": "value", "label": "Final Package", "valueType": "json", "required": True},
+                        "displayMode": "json",
+                        "persistEnabled": False,
+                        "persistFormat": "json",
+                        "fileNameTemplate": "final_package",
+                    },
+                    "previewText": "",
+                },
+            },
         ],
         "edges": [
             {
@@ -721,6 +952,111 @@ def _create_default_node_system_graph(theme_preset: dict[str, Any]) -> dict[str,
                 "source": "condition_1",
                 "target": "output_revise_1",
                 "sourceHandle": "output:revise",
+                "targetHandle": "input:value",
+            },
+            {
+                "id": "edge_14",
+                "source": "agent_variants_1",
+                "target": "agent_storyboards_1",
+                "sourceHandle": "output:script_variants",
+                "targetHandle": "input:script_variants",
+            },
+            {
+                "id": "edge_15",
+                "source": "agent_variants_1",
+                "target": "agent_video_prompts_1",
+                "sourceHandle": "output:script_variants",
+                "targetHandle": "input:script_variants",
+            },
+            {
+                "id": "edge_16",
+                "source": "agent_storyboards_1",
+                "target": "agent_video_prompts_1",
+                "sourceHandle": "output:storyboard_packages",
+                "targetHandle": "input:storyboard_packages",
+            },
+            {
+                "id": "edge_17",
+                "source": "agent_review_1",
+                "target": "agent_image_todo_1",
+                "sourceHandle": "output:best_variant",
+                "targetHandle": "input:best_variant",
+            },
+            {
+                "id": "edge_18",
+                "source": "agent_storyboards_1",
+                "target": "agent_image_todo_1",
+                "sourceHandle": "output:storyboard_packages",
+                "targetHandle": "input:storyboard_packages",
+            },
+            {
+                "id": "edge_19",
+                "source": "agent_review_1",
+                "target": "agent_video_todo_1",
+                "sourceHandle": "output:best_variant",
+                "targetHandle": "input:best_variant",
+            },
+            {
+                "id": "edge_20",
+                "source": "agent_video_prompts_1",
+                "target": "agent_video_todo_1",
+                "sourceHandle": "output:video_prompt_packages",
+                "targetHandle": "input:video_prompt_packages",
+            },
+            {
+                "id": "edge_21",
+                "source": "agent_brief_1",
+                "target": "agent_finalize_1",
+                "sourceHandle": "output:creative_brief",
+                "targetHandle": "input:creative_brief",
+            },
+            {
+                "id": "edge_22",
+                "source": "agent_review_1",
+                "target": "agent_finalize_1",
+                "sourceHandle": "output:best_variant",
+                "targetHandle": "input:best_variant",
+            },
+            {
+                "id": "edge_23",
+                "source": "agent_review_1",
+                "target": "agent_finalize_1",
+                "sourceHandle": "output:evaluation_result",
+                "targetHandle": "input:evaluation_result",
+            },
+            {
+                "id": "edge_24",
+                "source": "agent_storyboards_1",
+                "target": "agent_finalize_1",
+                "sourceHandle": "output:storyboard_packages",
+                "targetHandle": "input:storyboard_packages",
+            },
+            {
+                "id": "edge_25",
+                "source": "agent_video_prompts_1",
+                "target": "agent_finalize_1",
+                "sourceHandle": "output:video_prompt_packages",
+                "targetHandle": "input:video_prompt_packages",
+            },
+            {
+                "id": "edge_26",
+                "source": "agent_image_todo_1",
+                "target": "agent_finalize_1",
+                "sourceHandle": "output:image_generation_todo",
+                "targetHandle": "input:image_generation_todo",
+            },
+            {
+                "id": "edge_27",
+                "source": "agent_video_todo_1",
+                "target": "agent_finalize_1",
+                "sourceHandle": "output:video_generation_todo",
+                "targetHandle": "input:video_generation_todo",
+            },
+            {
+                "id": "edge_28",
+                "source": "agent_finalize_1",
+                "target": "output_final_1",
+                "sourceHandle": "output:final_package",
                 "targetHandle": "input:value",
             },
         ],

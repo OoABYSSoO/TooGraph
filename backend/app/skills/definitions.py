@@ -208,6 +208,82 @@ SKILL_DEFINITIONS: list[SkillDefinition] = [
         supportedValueTypes=["text", "json"],
         sideEffects=[SkillSideEffect.MODEL_CALL],
     ),
+    SkillDefinition(
+        skillKey="generate_storyboard_packages",
+        label="Generate Storyboard Packages",
+        description="Generate storyboard packages from reviewed creative variants.",
+        inputSchema=[
+            SkillIoField(key="script_variants", label="Script Variants", valueType="json", required=True, description="Variants used to derive storyboard packages."),
+        ],
+        outputSchema=[
+            SkillIoField(key="storyboard_packages", label="Storyboard Packages", valueType="json", description="Generated storyboard packages."),
+        ],
+        supportedValueTypes=["json"],
+        sideEffects=[SkillSideEffect.NONE],
+    ),
+    SkillDefinition(
+        skillKey="generate_video_prompt_packages",
+        label="Generate Video Prompt Packages",
+        description="Generate video prompt packages from variants and storyboard packages.",
+        inputSchema=[
+            SkillIoField(key="script_variants", label="Script Variants", valueType="json", required=True, description="Variants used to derive prompt packages."),
+            SkillIoField(key="storyboard_packages", label="Storyboard Packages", valueType="json", required=True, description="Storyboard packages used to derive prompt packages."),
+        ],
+        outputSchema=[
+            SkillIoField(key="video_prompt_packages", label="Video Prompt Packages", valueType="json", description="Generated video prompt packages."),
+        ],
+        supportedValueTypes=["json"],
+        sideEffects=[SkillSideEffect.NONE],
+    ),
+    SkillDefinition(
+        skillKey="prepare_image_generation_todo",
+        label="Prepare Image Generation TODO",
+        description="Prepare image generation todo items from review results and storyboard packages.",
+        inputSchema=[
+            SkillIoField(key="best_variant", label="Best Variant", valueType="json", required=True, description="Best reviewed variant."),
+            SkillIoField(key="storyboard_packages", label="Storyboard Packages", valueType="json", description="Storyboard packages for image todo derivation."),
+        ],
+        outputSchema=[
+            SkillIoField(key="image_generation_todo", label="Image Generation TODO", valueType="json", description="Prepared image generation todo payload."),
+        ],
+        supportedValueTypes=["json"],
+        sideEffects=[SkillSideEffect.NONE],
+    ),
+    SkillDefinition(
+        skillKey="prepare_video_generation_todo",
+        label="Prepare Video Generation TODO",
+        description="Prepare video generation todo items from review results and prompt packages.",
+        inputSchema=[
+            SkillIoField(key="best_variant", label="Best Variant", valueType="json", required=True, description="Best reviewed variant."),
+            SkillIoField(key="video_prompt_packages", label="Video Prompt Packages", valueType="json", required=True, description="Prompt packages for video todo derivation."),
+        ],
+        outputSchema=[
+            SkillIoField(key="video_generation_todo", label="Video Generation TODO", valueType="json", description="Prepared video generation todo payload."),
+        ],
+        supportedValueTypes=["json"],
+        sideEffects=[SkillSideEffect.NONE],
+    ),
+    SkillDefinition(
+        skillKey="finalize_creative_package",
+        label="Finalize Creative Package",
+        description="Assemble the final creative package artifact from downstream production inputs.",
+        inputSchema=[
+            SkillIoField(key="creative_brief", label="Creative Brief", valueType="text", required=True, description="Creative brief text."),
+            SkillIoField(key="best_variant", label="Best Variant", valueType="json", required=True, description="Best reviewed variant."),
+            SkillIoField(key="storyboard_packages", label="Storyboard Packages", valueType="json", description="Storyboard packages to include."),
+            SkillIoField(key="video_prompt_packages", label="Video Prompt Packages", valueType="json", description="Video prompt packages to include."),
+            SkillIoField(key="image_generation_todo", label="Image Generation TODO", valueType="json", description="Prepared image generation todo payload."),
+            SkillIoField(key="video_generation_todo", label="Video Generation TODO", valueType="json", description="Prepared video generation todo payload."),
+            SkillIoField(key="evaluation_result", label="Evaluation Result", valueType="json", required=True, description="Evaluation result used to mark decision."),
+            SkillIoField(key="theme_config", label="Theme Config", valueType="json", description="Theme configuration used by the workflow."),
+        ],
+        outputSchema=[
+            SkillIoField(key="final_package", label="Final Package", valueType="json", description="Final assembled creative package."),
+            SkillIoField(key="final_result", label="Final Result", valueType="text", description="Final result summary."),
+        ],
+        supportedValueTypes=["text", "json"],
+        sideEffects=[SkillSideEffect.FILE_READ],
+    ),
 ]
 
 
