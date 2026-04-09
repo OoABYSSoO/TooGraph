@@ -90,6 +90,7 @@ type EditorClientProps = {
   initialGraph?: GraphPayload | null;
   graphId?: string;
   templates: TemplateRecord[];
+  defaultTemplateId?: string;
 };
 
 type FlowNodeData = {
@@ -139,11 +140,14 @@ const TYPE_COLORS: Record<ValueType, string> = {
 const VALUE_TYPE_OPTIONS: ValueType[] = ["text", "json", "image", "audio", "video", "any"];
 const RULE_OPERATOR_OPTIONS: ConditionRule["operator"][] = ["==", "!=", ">=", "<=", ">", "<", "exists"];
 
-function createEditorDefaults(templates: TemplateRecord[]): GraphPayload {
-  const helloWorldTemplate = templates.find((item) => item.template_id === HELLO_WORLD_TEMPLATE_ID);
-  if (helloWorldTemplate?.default_node_system_graph) {
+function createEditorDefaults(templates: TemplateRecord[], defaultTemplateId?: string): GraphPayload {
+  const preferredTemplate =
+    templates.find((item) => item.template_id === defaultTemplateId) ??
+    templates.find((item) => item.template_id === HELLO_WORLD_TEMPLATE_ID) ??
+    templates[0];
+  if (preferredTemplate?.default_node_system_graph) {
     return {
-      ...helloWorldTemplate.default_node_system_graph,
+      ...preferredTemplate.default_node_system_graph,
       graph_id: null,
     };
   }
@@ -151,10 +155,10 @@ function createEditorDefaults(templates: TemplateRecord[]): GraphPayload {
   return {
     graph_family: "node_system",
     graph_id: null,
-    name: helloWorldTemplate?.default_graph_name ?? "Node System Playground",
-    template_id: helloWorldTemplate?.template_id ?? HELLO_WORLD_TEMPLATE_ID,
+    name: preferredTemplate?.default_graph_name ?? "Node System Playground",
+    template_id: preferredTemplate?.template_id ?? HELLO_WORLD_TEMPLATE_ID,
     theme_config:
-      helloWorldTemplate?.default_graph.theme_config ?? {
+      preferredTemplate?.default_graph.theme_config ?? {
         theme_preset: "node_system",
         domain: "workflow",
         genre: "agent_framework",
@@ -168,7 +172,7 @@ function createEditorDefaults(templates: TemplateRecord[]): GraphPayload {
         asset_source_policy: {},
         strategy_profile: {},
       },
-    state_schema: helloWorldTemplate?.state_schema ?? [],
+    state_schema: preferredTemplate?.state_schema ?? [],
     nodes: [],
     edges: [],
     metadata: {},
@@ -2012,7 +2016,7 @@ function createNodeFromPreset(preset: NodePresetDefinition, position: { x: numbe
 }
 
 export function NodeSystemEditor(props: EditorClientProps) {
-  const graph = props.initialGraph ?? createEditorDefaults(props.templates);
+  const graph = props.initialGraph ?? createEditorDefaults(props.templates, props.defaultTemplateId);
 
   return (
     <ReactFlowProvider>

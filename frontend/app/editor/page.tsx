@@ -66,6 +66,14 @@ export default async function EditorPage() {
                 <div className="text-sm uppercase tracking-[0.08em] text-[var(--accent-strong)]">{template.template_id}</div>
                 <div className="mt-1 text-lg font-semibold text-[var(--text)]">{template.label}</div>
                 <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{template.description}</p>
+                <div className="mt-4">
+                  <Link
+                    className="inline-flex items-center rounded-full border border-[var(--line)] bg-[rgba(255,255,255,0.92)] px-4 py-2 text-sm text-[var(--text)]"
+                    href={`/editor/new?template=${template.template_id}`}
+                  >
+                    使用这个模板创建
+                  </Link>
+                </div>
               </div>
             ))}
           </div>

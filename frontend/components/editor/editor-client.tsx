@@ -151,6 +151,7 @@ type EditorClientProps = {
   initialGraph?: EditorClientGraphPayload | null;
   graphId?: string;
   templates: EditorClientTemplateRecord[];
+  defaultTemplateId?: string;
 };
 
 type FlowNodeData = {

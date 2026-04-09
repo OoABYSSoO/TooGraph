@@ -46,6 +46,22 @@ export const NAME_INPUT_PRESET = {
   placeholder: "Enter a name",
 } satisfies NodePresetDefinition;
 
+export const TASK_INPUT_PRESET = {
+  presetId: "preset.input.task_input.v1",
+  label: "Task Input",
+  description: "Provide the workflow task or research question.",
+  family: "input",
+  valueType: "text",
+  output: {
+    key: "task_input",
+    label: "Task Input",
+    valueType: "text",
+  },
+  defaultValue: "Research current SLG mobile ad market hooks and summarize reusable signals.",
+  inputMode: "inline",
+  placeholder: "Describe the workflow task",
+} satisfies NodePresetDefinition;
+
 export const TEXT_OUTPUT_PRESET = {
   presetId: "preset.output.text.v1",
   label: "Text Output",
@@ -149,49 +165,86 @@ export const GREETING_OUTPUT_PRESET = {
 } satisfies NodePresetDefinition;
 
 export const FETCH_NEWS_AGENT_PRESET = {
-  presetId: "preset.agent.fetch_news.v1",
-  label: "Fetch News",
-  description: "Use a news fetching skill and return normalized news items.",
+  presetId: "preset.agent.fetch_market_news_context.v1",
+  label: "Fetch Market News",
+  description: "Fetch market news signals for the current creative research task.",
   family: "agent",
   inputs: [
     {
-      key: "feed_urls",
-      label: "Feed URLs",
+      key: "task_input",
+      label: "Task Input",
+      valueType: "text",
+      required: true,
+    },
+  ],
+  outputs: [
+    {
+      key: "rss_items",
+      label: "RSS Items",
+      valueType: "json",
+    },
+  ],
+  systemInstruction: "You are a research workflow agent specialized in fetching market news signals.",
+  taskInstruction: "Fetch market news and trend references for the provided task.",
+  skills: [
+    {
+      name: "fetch_market_news",
+      skillKey: "fetch_market_news_context",
+      inputMapping: {
+        task_input: "$inputs.task_input",
+      },
+      contextBinding: {},
+      usage: "required",
+    },
+  ],
+  responseMode: "json",
+  outputBinding: {
+    rss_items: "$skills.fetch_market_news.rss_items",
+  },
+} satisfies NodePresetDefinition;
+
+export const CLEAN_MARKET_NEWS_AGENT_PRESET = {
+  presetId: "preset.agent.clean_market_news.v1",
+  label: "Clean Market News",
+  description: "Normalize fetched market news into cleaned items and a text research context.",
+  family: "agent",
+  inputs: [
+    {
+      key: "rss_items",
+      label: "RSS Items",
       valueType: "json",
       required: true,
     },
   ],
   outputs: [
     {
-      key: "news_items",
-      label: "News Items",
+      key: "clean_news_items",
+      label: "Clean News Items",
       valueType: "json",
     },
     {
-      key: "summary",
-      label: "Summary",
+      key: "news_context",
+      label: "News Context",
       valueType: "text",
     },
   ],
-  systemInstruction: "You are a research workflow agent specialized in fetching and organizing news items.",
-  taskInstruction: "Use the attached skill to fetch feeds, then summarize the retrieved items.",
+  systemInstruction: "You are a research normalization agent.",
+  taskInstruction: "Normalize fetched market news and return a concise research context.",
   skills: [
     {
-      name: "fetch_news",
-      skillKey: "fetch_news_feed",
+      name: "clean_market_news",
+      skillKey: "clean_market_news",
       inputMapping: {
-        feed_urls: "$inputs.feed_urls",
+        rss_items: "$inputs.rss_items",
       },
-      contextBinding: {
-        fetched_news: "$skills.fetch_news.news_items",
-      },
+      contextBinding: {},
       usage: "required",
     },
   ],
   responseMode: "json",
   outputBinding: {
-    news_items: "$context.fetched_news",
-    summary: "$response.summary",
+    clean_news_items: "$skills.clean_market_news.clean_news_items",
+    news_context: "$skills.clean_market_news.news_context",
   },
 } satisfies NodePresetDefinition;
 
@@ -224,15 +277,35 @@ export const REVIEW_GATE_PRESET = {
   },
 } satisfies NodePresetDefinition;
 
+export const NEWS_CONTEXT_OUTPUT_PRESET = {
+  presetId: "preset.output.news_context.v1",
+  label: "Research Context Output",
+  description: "Preview and optionally persist normalized research context.",
+  family: "output",
+  input: {
+    key: "value",
+    label: "Research Context",
+    valueType: "text",
+    required: true,
+  },
+  displayMode: "auto",
+  persistEnabled: false,
+  persistFormat: "txt",
+  fileNameTemplate: "research_context",
+} satisfies NodePresetDefinition;
+
 export const NODE_PRESETS_MOCK = [
   EMPTY_AGENT_PRESET,
   NAME_INPUT_PRESET,
+  TASK_INPUT_PRESET,
   TEXT_INPUT_PRESET,
   HELLO_GREETING_AGENT_PRESET,
   SUMMARY_AGENT_PRESET,
   FETCH_NEWS_AGENT_PRESET,
+  CLEAN_MARKET_NEWS_AGENT_PRESET,
   REVIEW_GATE_PRESET,
   GREETING_OUTPUT_PRESET,
+  NEWS_CONTEXT_OUTPUT_PRESET,
   TEXT_OUTPUT_PRESET,
 ] satisfies NodePresetDefinition[];
 
@@ -242,7 +315,7 @@ export function getNodePresetById(presetId: string) {
 
 export function getSuggestedPresets(valueType?: ValueType | null) {
   if (!valueType) {
-    return [EMPTY_AGENT_PRESET, NAME_INPUT_PRESET, TEXT_INPUT_PRESET, HELLO_GREETING_AGENT_PRESET, SUMMARY_AGENT_PRESET, FETCH_NEWS_AGENT_PRESET, REVIEW_GATE_PRESET, GREETING_OUTPUT_PRESET, TEXT_OUTPUT_PRESET];
+    return [EMPTY_AGENT_PRESET, NAME_INPUT_PRESET, TASK_INPUT_PRESET, TEXT_INPUT_PRESET, HELLO_GREETING_AGENT_PRESET, SUMMARY_AGENT_PRESET, FETCH_NEWS_AGENT_PRESET, CLEAN_MARKET_NEWS_AGENT_PRESET, REVIEW_GATE_PRESET, GREETING_OUTPUT_PRESET, NEWS_CONTEXT_OUTPUT_PRESET, TEXT_OUTPUT_PRESET];
   }
 
   const supportsType = (preset: NodePresetDefinition) => {

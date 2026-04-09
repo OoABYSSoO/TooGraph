@@ -17,15 +17,15 @@ def get_skill_registry() -> dict[str, SkillFunc]:
         "analyze_assets": analyze_assets,
         "generate_draft": generate_draft,
         "evaluate_output": evaluate_output,
+        "fetch_market_news_context": fetch_market_news_context_skill,
+        "clean_market_news": clean_market_news_skill,
+        "build_creative_brief": build_creative_brief_skill,
         "generate_hello_greeting": tools["generate_hello_greeting"],
-        "fetch_market_news_context": tools["fetch_market_news_context"],
-        "clean_market_news": tools["clean_market_news"],
         "fetch_benchmark_assets": tools["fetch_benchmark_assets"],
         "normalize_asset_records": tools["normalize_asset_records"],
         "select_top_video_assets": tools["select_top_video_assets"],
         "analyze_video_assets": tools["analyze_video_assets"],
         "extract_creative_patterns": tools["extract_creative_patterns"],
-        "build_creative_brief": tools["build_creative_brief"],
         "generate_creative_variants": tools["generate_creative_variants"],
         "generate_storyboard_packages": tools["generate_storyboard_packages"],
         "generate_video_prompt_packages": tools["generate_video_prompt_packages"],
@@ -69,3 +69,37 @@ def evaluate_output(content: str) -> dict[str, Any]:
         "issues": [] if content else ["Content is empty."],
         "suggestions": ["Tighten the opening hook.", "Clarify the target audience."],
     }
+
+
+def fetch_market_news_context_skill(**skill_inputs: Any) -> dict[str, Any]:
+    tools = get_tool_registry()
+    return tools["fetch_market_news_context"](
+        {
+            "task_input": skill_inputs.get("task_input", ""),
+            "theme_config": skill_inputs.get("theme_config") or {},
+        },
+        None,
+    )
+
+
+def clean_market_news_skill(**skill_inputs: Any) -> dict[str, Any]:
+    tools = get_tool_registry()
+    return tools["clean_market_news"](
+        {
+            "rss_items": skill_inputs.get("rss_items") or [],
+        },
+        None,
+    )
+
+
+def build_creative_brief_skill(**skill_inputs: Any) -> dict[str, Any]:
+    tools = get_tool_registry()
+    return tools["build_creative_brief"](
+        {
+            "task_input": skill_inputs.get("task_input", ""),
+            "theme_config": skill_inputs.get("theme_config") or {},
+            "pattern_summary": skill_inputs.get("pattern_summary", ""),
+            "news_context": skill_inputs.get("news_context", ""),
+        },
+        None,
+    )

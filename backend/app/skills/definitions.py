@@ -82,23 +82,66 @@ SKILL_DEFINITIONS: list[SkillDefinition] = [
         skillKey="fetch_market_news_context",
         label="Fetch Market News Context",
         description="Fetch market news items to provide research context for downstream nodes.",
-        inputSchema=[],
+        inputSchema=[
+            SkillIoField(
+                key="task_input",
+                label="Task Input",
+                valueType="text",
+                description="Research task or market question to guide the news fetch.",
+            )
+        ],
         outputSchema=[
             SkillIoField(
-                key="news_items",
-                label="News Items",
+                key="rss_items",
+                label="RSS Items",
                 valueType="json",
                 description="Fetched market news records.",
             )
         ],
-        supportedValueTypes=["json"],
+        supportedValueTypes=["text", "json"],
         sideEffects=[SkillSideEffect.NETWORK],
+    ),
+    SkillDefinition(
+        skillKey="clean_market_news",
+        label="Clean Market News",
+        description="Normalize fetched market news into cleaned items and a text research context.",
+        inputSchema=[
+            SkillIoField(
+                key="rss_items",
+                label="RSS Items",
+                valueType="json",
+                required=True,
+                description="Raw fetched market news records.",
+            )
+        ],
+        outputSchema=[
+            SkillIoField(
+                key="clean_news_items",
+                label="Clean News Items",
+                valueType="json",
+                description="Normalized news items used by downstream research nodes.",
+            ),
+            SkillIoField(
+                key="news_context",
+                label="News Context",
+                valueType="text",
+                description="Concise text context distilled from cleaned news items.",
+            ),
+        ],
+        supportedValueTypes=["json", "text"],
+        sideEffects=[SkillSideEffect.NONE],
     ),
     SkillDefinition(
         skillKey="build_creative_brief",
         label="Build Creative Brief",
         description="Assemble a creative brief from structured research and pattern inputs.",
         inputSchema=[
+            SkillIoField(
+                key="task_input",
+                label="Task Input",
+                valueType="text",
+                description="Creative task or campaign brief goal.",
+            ),
             SkillIoField(
                 key="research_summary",
                 label="Research Summary",
@@ -114,9 +157,9 @@ SKILL_DEFINITIONS: list[SkillDefinition] = [
         ],
         outputSchema=[
             SkillIoField(
-                key="brief",
-                label="Brief",
-                valueType="json",
+                key="creative_brief",
+                label="Creative Brief",
+                valueType="text",
                 description="Structured creative brief payload.",
             )
         ],

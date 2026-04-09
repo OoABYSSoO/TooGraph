@@ -1,6 +1,10 @@
 import { EditorClient, type EditorClientTemplateRecord } from "@/components/editor/editor-client";
 import { apiGet } from "@/lib/api";
 
+type EditorNewPageProps = {
+  searchParams?: Promise<{ template?: string }>;
+};
+
 async function loadTemplates() {
   try {
     return await apiGet<EditorClientTemplateRecord[]>("/api/templates");
@@ -9,8 +13,9 @@ async function loadTemplates() {
   }
 }
 
-export default async function EditorNewPage() {
+export default async function EditorNewPage({ searchParams }: EditorNewPageProps) {
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const templates = await loadTemplates();
 
-  return <EditorClient mode="new" templates={templates} />;
+  return <EditorClient mode="new" templates={templates} defaultTemplateId={resolvedSearchParams?.template} />;
 }

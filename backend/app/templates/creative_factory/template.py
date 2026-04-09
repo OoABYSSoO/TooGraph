@@ -258,6 +258,191 @@ def _create_default_graph(theme_preset: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _create_default_node_system_graph(theme_preset: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "graph_family": "node_system",
+        "name": f"{theme_preset.get('graph_name') or 'Creative Factory'} Research",
+        "template_id": "creative_factory",
+        "theme_config": theme_preset["theme_config"],
+        "state_schema": get_creative_factory_state_schema(),
+        "nodes": [
+            {
+                "id": "input_1",
+                "type": "default",
+                "position": {"x": 80, "y": 220},
+                "data": {
+                    "nodeId": "input_1",
+                    "config": {
+                        "presetId": "preset.input.task_input.v1",
+                        "label": "Task Input",
+                        "description": "Describe the market research task for the creative workflow.",
+                        "family": "input",
+                        "valueType": "text",
+                        "output": {
+                            "key": "task_input",
+                            "label": "Task Input",
+                            "valueType": "text",
+                        },
+                        "defaultValue": "Research current SLG mobile ad market hooks and summarize reusable signals.",
+                        "inputMode": "inline",
+                        "placeholder": "Describe the research task",
+                    },
+                    "previewText": "",
+                },
+            },
+            {
+                "id": "agent_fetch_1",
+                "type": "default",
+                "position": {"x": 540, "y": 220},
+                "data": {
+                    "nodeId": "agent_fetch_1",
+                    "config": {
+                        "presetId": "preset.agent.fetch_market_news_context.v1",
+                        "label": "Fetch Market News",
+                        "description": "Collect raw market news and trend signals for the current creative research task.",
+                        "family": "agent",
+                        "inputs": [
+                            {
+                                "key": "task_input",
+                                "label": "Task Input",
+                                "valueType": "text",
+                                "required": True,
+                            }
+                        ],
+                        "outputs": [
+                            {
+                                "key": "rss_items",
+                                "label": "RSS Items",
+                                "valueType": "json",
+                            }
+                        ],
+                        "systemInstruction": "You are a research collection agent.",
+                        "taskInstruction": "Collect raw market news and trend references for the provided task.",
+                        "skills": [
+                            {
+                                "name": "fetch_market_news",
+                                "skillKey": "fetch_market_news_context",
+                                "inputMapping": {
+                                    "task_input": "$inputs.task_input",
+                                },
+                                "contextBinding": {},
+                                "usage": "required",
+                            }
+                        ],
+                        "responseMode": "json",
+                        "outputBinding": {
+                            "rss_items": "$skills.fetch_market_news.rss_items",
+                        },
+                    },
+                    "previewText": "",
+                },
+            },
+            {
+                "id": "agent_clean_1",
+                "type": "default",
+                "position": {"x": 1000, "y": 220},
+                "data": {
+                    "nodeId": "agent_clean_1",
+                    "config": {
+                        "presetId": "preset.agent.clean_market_news.v1",
+                        "label": "Clean Market News",
+                        "description": "Normalize raw market news and produce a compact research context.",
+                        "family": "agent",
+                        "inputs": [
+                            {
+                                "key": "rss_items",
+                                "label": "RSS Items",
+                                "valueType": "json",
+                                "required": True,
+                            }
+                        ],
+                        "outputs": [
+                            {
+                                "key": "clean_news_items",
+                                "label": "Clean News Items",
+                                "valueType": "json",
+                            },
+                            {
+                                "key": "news_context",
+                                "label": "News Context",
+                                "valueType": "text",
+                            }
+                        ],
+                        "systemInstruction": "You are a research normalization agent.",
+                        "taskInstruction": "Normalize fetched news into cleaned items and a concise text context.",
+                        "skills": [
+                            {
+                                "name": "clean_market_news",
+                                "skillKey": "clean_market_news",
+                                "inputMapping": {
+                                    "rss_items": "$inputs.rss_items",
+                                },
+                                "contextBinding": {},
+                                "usage": "required",
+                            }
+                        ],
+                        "responseMode": "json",
+                        "outputBinding": {
+                            "clean_news_items": "$skills.clean_market_news.clean_news_items",
+                            "news_context": "$skills.clean_market_news.news_context",
+                        },
+                    },
+                    "previewText": "",
+                },
+            },
+            {
+                "id": "output_1",
+                "type": "default",
+                "position": {"x": 1480, "y": 220},
+                "data": {
+                    "nodeId": "output_1",
+                    "config": {
+                        "presetId": "preset.output.news_context.v1",
+                        "label": "Research Context Output",
+                        "description": "Preview the normalized research context for downstream creative steps.",
+                        "family": "output",
+                        "input": {
+                            "key": "value",
+                            "label": "Research Context",
+                            "valueType": "text",
+                            "required": True,
+                        },
+                        "displayMode": "auto",
+                        "persistEnabled": False,
+                        "persistFormat": "txt",
+                        "fileNameTemplate": "research_context",
+                    },
+                    "previewText": "",
+                },
+            },
+        ],
+        "edges": [
+            {
+                "id": "edge_1",
+                "source": "input_1",
+                "target": "agent_fetch_1",
+                "sourceHandle": "output:task_input",
+                "targetHandle": "input:task_input",
+            },
+            {
+                "id": "edge_2",
+                "source": "agent_fetch_1",
+                "target": "agent_clean_1",
+                "sourceHandle": "output:rss_items",
+                "targetHandle": "input:rss_items",
+            },
+            {
+                "id": "edge_3",
+                "source": "agent_clean_1",
+                "target": "output_1",
+                "sourceHandle": "output:news_context",
+                "targetHandle": "input:value",
+            },
+        ],
+        "metadata": {},
+    }
+
+
 def get_creative_factory_template() -> dict[str, Any]:
     theme_presets = get_creative_factory_theme_presets()
     default_theme_preset = "slg_launch"
@@ -273,4 +458,5 @@ def get_creative_factory_template() -> dict[str, Any]:
         "state_schema": get_creative_factory_state_schema(),
         "theme_presets": theme_presets,
         "default_graph": _create_default_graph(default_theme),
+        "default_node_system_graph": _create_default_node_system_graph(default_theme),
     }
