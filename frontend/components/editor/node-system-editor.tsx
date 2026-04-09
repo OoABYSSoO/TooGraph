@@ -63,6 +63,7 @@ type StateField = {
 };
 
 type GraphPayload = {
+  graph_family?: "node_system";
   graph_id?: string | null;
   name: string;
   template_id: string;
@@ -81,6 +82,7 @@ type TemplateRecord = {
   supported_node_types: string[];
   state_schema: StateField[];
   default_graph: Omit<GraphPayload, "graph_id">;
+  default_node_system_graph?: Omit<GraphPayload, "graph_id"> | null;
 };
 
 type EditorClientProps = {
@@ -139,8 +141,15 @@ const RULE_OPERATOR_OPTIONS: ConditionRule["operator"][] = ["==", "!=", ">=", "<
 
 function createEditorDefaults(templates: TemplateRecord[]): GraphPayload {
   const helloWorldTemplate = templates.find((item) => item.template_id === HELLO_WORLD_TEMPLATE_ID);
+  if (helloWorldTemplate?.default_node_system_graph) {
+    return {
+      ...helloWorldTemplate.default_node_system_graph,
+      graph_id: null,
+    };
+  }
 
   return {
+    graph_family: "node_system",
     graph_id: null,
     name: helloWorldTemplate?.default_graph_name ?? "Node System Playground",
     template_id: helloWorldTemplate?.template_id ?? HELLO_WORLD_TEMPLATE_ID,
@@ -164,6 +173,45 @@ function createEditorDefaults(templates: TemplateRecord[]): GraphPayload {
     edges: [],
     metadata: {},
   };
+}
+
+function createFlowNodeFromGraphNode(node: any): FlowNode {
+  return {
+    id: node.id,
+    type: node.type ?? "default",
+    position: node.position ?? { x: 0, y: 0 },
+    data: {
+      nodeId: node.data?.nodeId ?? node.id,
+      config: deepClonePreset(node.data?.config as NodePresetDefinition),
+      previewText: node.data?.previewText ?? "",
+    },
+    sourcePosition: Position.Right,
+    targetPosition: Position.Left,
+    style: {
+      background: "transparent",
+      border: "none",
+      padding: 0,
+      width: "auto",
+    },
+  } satisfies FlowNode;
+}
+
+function createFlowEdgeFromGraphEdge(edge: any, nodesById: Map<string, FlowNode>): Edge {
+  const sourceNode = nodesById.get(edge.source);
+  const sourceType = sourceNode ? getPortType(sourceNode.data.config, edge.sourceHandle) : "any";
+  const color = TYPE_COLORS[sourceType ?? "any"];
+  return {
+    id: edge.id,
+    source: edge.source,
+    target: edge.target,
+    sourceHandle: edge.sourceHandle ?? null,
+    targetHandle: edge.targetHandle ?? null,
+    markerEnd: { type: MarkerType.ArrowClosed, color },
+    style: {
+      stroke: color,
+      strokeWidth: 1.8,
+    },
+  } satisfies Edge;
 }
 
 function deepClonePreset<T extends NodePresetDefinition>(preset: T): T {
@@ -910,6 +958,11 @@ function NodeSystemCanvas({ initialGraph }: { initialGraph: GraphPayload }) {
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const reactFlow = useReactFlow<FlowNode, Edge>();
   const [graphName, setGraphName] = useState(initialGraph.name);
+  const [graphId, setGraphId] = useState<string | null>(initialGraph.graph_id ?? null);
+  const [templateId] = useState(initialGraph.template_id);
+  const [themeConfig] = useState(initialGraph.theme_config);
+  const [stateSchema] = useState(initialGraph.state_schema);
+  const [metadata] = useState(initialGraph.metadata);
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -918,6 +971,7 @@ function NodeSystemCanvas({ initialGraph }: { initialGraph: GraphPayload }) {
   const [persistedPresets, setPersistedPresets] = useState<NodePresetDefinition[]>([]);
   const [presetsLoading, setPresetsLoading] = useState(true);
   const [presetsError, setPresetsError] = useState<string | null>(null);
+  const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [skillDefinitions, setSkillDefinitions] = useState<SkillDefinition[]>([]);
   const [skillDefinitionsLoading, setSkillDefinitionsLoading] = useState(true);
   const [skillDefinitionsError, setSkillDefinitionsError] = useState<string | null>(null);
@@ -1007,6 +1061,16 @@ function NodeSystemCanvas({ initialGraph }: { initialGraph: GraphPayload }) {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    const initialNodes = Array.isArray(initialGraph.nodes) ? initialGraph.nodes.map((node) => createFlowNodeFromGraphNode(node)) : [];
+    const nodesById = new Map(initialNodes.map((node) => [node.id, node]));
+    const initialEdges = Array.isArray(initialGraph.edges)
+      ? initialGraph.edges.map((edge) => createFlowEdgeFromGraphEdge(edge, nodesById))
+      : [];
+    setNodes(initialNodes);
+    setEdges(initialEdges);
+  }, [initialGraph.edges, initialGraph.nodes, setEdges, setNodes]);
 
   useEffect(() => {
     let active = true;
@@ -1168,19 +1232,77 @@ function createNodeFromPreset(preset: NodePresetDefinition, position: { x: numbe
     }
   }
 
+  function buildPayload(): GraphPayload {
+    return {
+      graph_family: "node_system",
+      graph_id: graphId,
+      name: graphName,
+      template_id: templateId,
+      theme_config: themeConfig,
+      state_schema: stateSchema,
+      nodes: nodes.map((node) => ({
+        id: node.id,
+        type: "default",
+        position: node.position,
+        data: {
+          nodeId: node.data.nodeId,
+          config: node.data.config,
+          previewText: previewTextByNode[node.id] ?? node.data.previewText ?? "",
+        },
+      })),
+      edges: edges.map((edge) => ({
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        sourceHandle: edge.sourceHandle ?? null,
+        targetHandle: edge.targetHandle ?? null,
+      })),
+      metadata,
+    };
+  }
+
+  async function handleSave() {
+    try {
+      const response = await apiPost<{ graph_id: string; validation: { valid: boolean; issues: Array<{ message: string }> } }>("/api/graphs/save", buildPayload());
+      setGraphId(response.graph_id);
+      setStatusMessage(`Saved graph ${response.graph_id}`);
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : "Failed to save graph.");
+    }
+  }
+
+  async function handleValidate() {
+    try {
+      const response = await apiPost<{ valid: boolean; issues: Array<{ message: string }> }>("/api/graphs/validate", buildPayload());
+      setStatusMessage(response.valid ? "Validation passed." : response.issues.map((issue) => issue.message).join("; "));
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : "Failed to validate graph.");
+    }
+  }
+
+  async function handleRun() {
+    try {
+      const response = await apiPost<{ run_id: string; status: string }>("/api/graphs/run", buildPayload());
+      setActiveRunId(response.run_id);
+      setStatusMessage(`Run ${response.run_id} ${response.status}`);
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : "Failed to run graph.");
+    }
+  }
+
   return (
     <div className="grid h-screen grid-rows-[56px_minmax(0,1fr)_36px] bg-[radial-gradient(circle_at_top,rgba(154,52,18,0.1),transparent_22%),linear-gradient(180deg,#f5efe2_0%,#ede4d2_100%)]">
       <header className="grid grid-cols-[minmax(220px,320px)_1fr_auto] items-center gap-3 border-b border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.82)] px-4 backdrop-blur-xl">
         <Input className="h-10" value={graphName} onChange={(event) => setGraphName(event.target.value)} placeholder="Graph name" />
         <div className="text-sm text-[var(--muted)]">Preset-driven node system prototype</div>
         <div className="flex items-center gap-2">
-          <Button size="sm" disabled>
+          <Button size="sm" onClick={() => void handleSave()}>
             Save
           </Button>
-          <Button size="sm" disabled>
+          <Button size="sm" onClick={() => void handleValidate()}>
             Validate
           </Button>
-          <Button size="sm" variant="primary" disabled>
+          <Button size="sm" variant="primary" onClick={() => void handleRun()}>
             Run
           </Button>
         </div>
@@ -1873,6 +1995,11 @@ function createNodeFromPreset(preset: NodePresetDefinition, position: { x: numbe
             <span>Status</span>
             <span className="text-[var(--text)]">{statusMessage}</span>
           </div>
+          {activeRunId ? (
+            <div className="mt-3 rounded-[18px] border border-[rgba(31,111,80,0.16)] bg-[rgba(241,250,245,0.92)] px-3 py-2 text-sm text-[var(--muted)]">
+              Latest run: <a className="text-[var(--accent-strong)] underline" href={`/runs/${activeRunId}`}>{activeRunId}</a>
+            </div>
+          ) : null}
         </aside>
       </div>
 

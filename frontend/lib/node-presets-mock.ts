@@ -30,6 +30,22 @@ export const TEXT_INPUT_PRESET = {
   placeholder: "Enter text",
 } satisfies NodePresetDefinition;
 
+export const NAME_INPUT_PRESET = {
+  presetId: "preset.input.name.v1",
+  label: "Name Input",
+  description: "Provide a name used by greeting workflows.",
+  family: "input",
+  valueType: "text",
+  output: {
+    key: "name",
+    label: "Name",
+    valueType: "text",
+  },
+  defaultValue: "Abyss",
+  inputMode: "inline",
+  placeholder: "Enter a name",
+} satisfies NodePresetDefinition;
+
 export const TEXT_OUTPUT_PRESET = {
   presetId: "preset.output.text.v1",
   label: "Text Output",
@@ -74,6 +90,62 @@ export const SUMMARY_AGENT_PRESET = {
   outputBinding: {
     summary: "$response.summary",
   },
+} satisfies NodePresetDefinition;
+
+export const HELLO_GREETING_AGENT_PRESET = {
+  presetId: "preset.agent.hello_greeting.v1",
+  label: "Hello Greeting",
+  description: "Generate a short greeting by calling the hello greeting skill.",
+  family: "agent",
+  inputs: [
+    {
+      key: "name",
+      label: "Name",
+      valueType: "text",
+      required: true,
+    },
+  ],
+  outputs: [
+    {
+      key: "greeting",
+      label: "Greeting",
+      valueType: "text",
+    },
+  ],
+  systemInstruction: "You are a precise assistant.",
+  taskInstruction: "Return a short greeting for the provided name.",
+  skills: [
+    {
+      name: "generate_greeting",
+      skillKey: "generate_hello_greeting",
+      inputMapping: {
+        name: "$inputs.name",
+      },
+      contextBinding: {},
+      usage: "required",
+    },
+  ],
+  responseMode: "json",
+  outputBinding: {
+    greeting: "$skills.generate_greeting.greeting",
+  },
+} satisfies NodePresetDefinition;
+
+export const GREETING_OUTPUT_PRESET = {
+  presetId: "preset.output.greeting.v1",
+  label: "Greeting Output",
+  description: "Preview and optionally persist the generated greeting.",
+  family: "output",
+  input: {
+    key: "value",
+    label: "Greeting",
+    valueType: "text",
+    required: true,
+  },
+  displayMode: "auto",
+  persistEnabled: false,
+  persistFormat: "txt",
+  fileNameTemplate: "greeting",
 } satisfies NodePresetDefinition;
 
 export const FETCH_NEWS_AGENT_PRESET = {
@@ -154,10 +226,13 @@ export const REVIEW_GATE_PRESET = {
 
 export const NODE_PRESETS_MOCK = [
   EMPTY_AGENT_PRESET,
+  NAME_INPUT_PRESET,
   TEXT_INPUT_PRESET,
+  HELLO_GREETING_AGENT_PRESET,
   SUMMARY_AGENT_PRESET,
   FETCH_NEWS_AGENT_PRESET,
   REVIEW_GATE_PRESET,
+  GREETING_OUTPUT_PRESET,
   TEXT_OUTPUT_PRESET,
 ] satisfies NodePresetDefinition[];
 
@@ -167,7 +242,7 @@ export function getNodePresetById(presetId: string) {
 
 export function getSuggestedPresets(valueType?: ValueType | null) {
   if (!valueType) {
-    return [EMPTY_AGENT_PRESET, TEXT_INPUT_PRESET, SUMMARY_AGENT_PRESET, FETCH_NEWS_AGENT_PRESET, REVIEW_GATE_PRESET, TEXT_OUTPUT_PRESET];
+    return [EMPTY_AGENT_PRESET, NAME_INPUT_PRESET, TEXT_INPUT_PRESET, HELLO_GREETING_AGENT_PRESET, SUMMARY_AGENT_PRESET, FETCH_NEWS_AGENT_PRESET, REVIEW_GATE_PRESET, GREETING_OUTPUT_PRESET, TEXT_OUTPUT_PRESET];
   }
 
   const supportsType = (preset: NodePresetDefinition) => {

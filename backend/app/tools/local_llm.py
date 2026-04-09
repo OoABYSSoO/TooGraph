@@ -56,19 +56,30 @@ def generate_hello_greeting(state: dict[str, Any], params: dict[str, Any] | None
     name = str(state.get("name") or params.get("name") or "World").strip() or "World"
     system_prompt = "You are a precise assistant. Return only a short greeting in the format: Hello, <name>."
     user_prompt = f"Name: {name}"
-    greeting = _chat_with_local_model(
-        system_prompt=system_prompt,
-        user_prompt=user_prompt,
-        model=str(params.get("model") or LOCAL_LLM_MODEL),
-        temperature=float(params.get("temperature", 0.2)),
-        max_tokens=int(params.get("max_tokens", 40)),
-    )
+    model_name = str(params.get("model") or LOCAL_LLM_MODEL)
+    try:
+        greeting = _chat_with_local_model(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            model=model_name,
+            temperature=float(params.get("temperature", 0.2)),
+            max_tokens=int(params.get("max_tokens", 40)),
+        )
+        llm_response: dict[str, Any] = {
+            "base_url": LOCAL_LLM_BASE_URL,
+            "model": model_name,
+        }
+    except RuntimeError as exc:  # pragma: no cover - fallback path depends on local model availability
+        greeting = f"Hello, {name}."
+        llm_response = {
+            "base_url": LOCAL_LLM_BASE_URL,
+            "model": model_name,
+            "fallback": True,
+            "reason": str(exc),
+        }
     return {
         "name": name,
         "greeting": greeting,
         "final_result": greeting,
-        "llm_response": {
-            "base_url": LOCAL_LLM_BASE_URL,
-            "model": str(params.get("model") or LOCAL_LLM_MODEL),
-        },
+        "llm_response": llm_response,
     }

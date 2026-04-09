@@ -5,6 +5,30 @@ from app.core.schemas.skills import SkillDefinition, SkillIoField, SkillSideEffe
 
 SKILL_DEFINITIONS: list[SkillDefinition] = [
     SkillDefinition(
+        skillKey="generate_hello_greeting",
+        label="Generate Hello Greeting",
+        description="Generate a short greeting string from a provided name.",
+        inputSchema=[
+            SkillIoField(
+                key="name",
+                label="Name",
+                valueType="text",
+                required=True,
+                description="Name to greet.",
+            )
+        ],
+        outputSchema=[
+            SkillIoField(
+                key="greeting",
+                label="Greeting",
+                valueType="text",
+                description="Generated greeting text.",
+            )
+        ],
+        supportedValueTypes=["text"],
+        sideEffects=[SkillSideEffect.MODEL_CALL],
+    ),
+    SkillDefinition(
         skillKey="search_docs",
         label="Search Docs",
         description="Search the local knowledge base and return concise matching references.",

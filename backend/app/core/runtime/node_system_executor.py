@@ -292,7 +292,21 @@ def _execute_agent_node(
             }
         )
 
-    response_payload = _generate_agent_response(config, input_values, skill_context)
+    response_payload: dict[str, Any] = {}
+    bound_output_values = {
+        output.key: _resolve_reference(
+            config.output_binding.get(output.key, f"$response.{output.key}"),
+            inputs=input_values,
+            response={},
+            skills=skill_context,
+            context=skill_context,
+        )
+        for output in config.outputs
+    }
+
+    if any(value in (None, "") for value in bound_output_values.values()):
+        response_payload = _generate_agent_response(config, input_values, skill_context)
+
     output_values = {
         output.key: _resolve_reference(
             config.output_binding.get(output.key, f"$response.{output.key}"),

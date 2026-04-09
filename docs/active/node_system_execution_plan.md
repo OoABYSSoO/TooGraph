@@ -692,6 +692,16 @@ agent node 的 skill attachment 已经有可依赖的数据源。
 
 不要再继续用 `hello_model` 当主验证路径，把 demo 中的核心阶段迁成新模型样板。
 
+### Status
+
+进行中：
+
+- `hello_world` 模板已开始提供 `default_node_system_graph`
+- 新默认图已改为 `Input Boundary -> Agent Node -> Output Boundary`
+- 新默认 `Agent Node` 已通过 `generate_hello_greeting` skill 生成 greeting
+- `hello_world` 的模板图已通过 validate/run，最小闭环已可作为 node system smoke path
+- 旧 `hello_model` 图仍作为兼容路径保留，尚未完全退出主验证链路
+
 ### Changes
 
 从 demo 中优先抽出最少一条闭环：

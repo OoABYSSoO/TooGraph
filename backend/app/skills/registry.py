@@ -17,6 +17,7 @@ def get_skill_registry() -> dict[str, SkillFunc]:
         "analyze_assets": analyze_assets,
         "generate_draft": generate_draft,
         "evaluate_output": evaluate_output,
+        "generate_hello_greeting": tools["generate_hello_greeting"],
         "fetch_market_news_context": tools["fetch_market_news_context"],
         "clean_market_news": tools["clean_market_news"],
         "fetch_benchmark_assets": tools["fetch_benchmark_assets"],

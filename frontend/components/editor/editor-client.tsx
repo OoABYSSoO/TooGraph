@@ -110,6 +110,18 @@ type GraphPayload = {
   metadata: Record<string, unknown>;
 };
 
+export type EditorClientGraphPayload = {
+  graph_family?: "node_system";
+  graph_id?: string | null;
+  name: string;
+  template_id: string;
+  theme_config: ThemeConfig;
+  state_schema: StateField[];
+  nodes: unknown[];
+  edges: unknown[];
+  metadata: Record<string, unknown>;
+};
+
 type TemplateRecord = {
   template_id: string;
   label: string;
@@ -118,7 +130,10 @@ type TemplateRecord = {
   supported_node_types: string[];
   state_schema: StateField[];
   default_graph: Omit<GraphPayload, "graph_id">;
+  default_node_system_graph?: Omit<EditorClientGraphPayload, "graph_id"> | null;
 };
+
+export type EditorClientTemplateRecord = TemplateRecord;
 
 type RunDetail = {
   run_id: string;
@@ -133,9 +148,9 @@ type StateColorMap = Record<string, string>;
 
 type EditorClientProps = {
   mode: "new" | "existing";
-  initialGraph?: GraphPayload | null;
+  initialGraph?: EditorClientGraphPayload | null;
   graphId?: string;
-  templates: TemplateRecord[];
+  templates: EditorClientTemplateRecord[];
 };
 
 type FlowNodeData = {
