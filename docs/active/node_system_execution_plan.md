@@ -533,6 +533,15 @@ agent node 的 skill attachment 已经有可依赖的数据源。
 
 至少一个 agent preset 能脱离旧 `hello_model` 体系运行。
 
+### Status
+
+第一版最小 runtime 已接入：
+
+- `node_system` graph 已增加独立执行入口
+- 当前支持线性 DAG 下的 `Input Boundary -> Agent Node -> Output Boundary`
+- `Agent Node` 已支持基础 skill 调用、文本生成与 `output_binding`
+- `Condition Node` runtime 仍待 Phase 6
+
 ---
 
 ## Phase 6: Add Generic Condition Node Runtime

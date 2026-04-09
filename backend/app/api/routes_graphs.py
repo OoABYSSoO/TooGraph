@@ -13,11 +13,7 @@ from app.core.schemas.graph_family import (
     normalize_graph_document,
     schema_errors_to_paths,
 )
-from app.core.schemas.graph import (
-    GraphPayload,
-    GraphSaveResponse,
-    GraphValidationResponse,
-)
+from app.core.schemas.graph import GraphSaveResponse, GraphValidationResponse
 from app.core.storage.graph_store import list_graphs, load_graph, save_graph
 
 
@@ -67,15 +63,20 @@ def validate_graph_endpoint(payload: dict[str, Any]) -> GraphValidationResponse:
 
 
 @router.post("/run")
-def run_graph_endpoint(payload: GraphPayload) -> dict[str, str]:
-    graph = GraphDocument(
-        **payload.model_dump(exclude={"graph_id"}),
-        graph_id=payload.graph_id or "temp",
-    )
+def run_graph_endpoint(payload: dict[str, Any]) -> dict[str, str]:
+    try:
+        graph_payload = parse_graph_payload(payload)
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=GraphValidationResponse(valid=False, issues=schema_errors_to_paths(exc)).model_dump(),
+        ) from exc
+
+    graph = normalize_graph_document(graph_payload)
     validation = validate_graph(graph)
     if not validation.valid:
         raise HTTPException(status_code=422, detail=validation.model_dump())
 
-    executed_graph = save_graph(payload)
+    executed_graph = save_graph(graph_payload)
     run_result = execute_graph(executed_graph)
     return {"run_id": run_result["run_id"], "status": run_result["status"]}

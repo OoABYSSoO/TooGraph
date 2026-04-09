@@ -2,12 +2,17 @@ from __future__ import annotations
 
 from app.core.compiler.graph_parser import parse_graph
 from app.core.compiler.workflow_builder import build_workflow
+from app.core.runtime.node_system_executor import execute_node_system_graph
 from app.core.runtime.state import create_initial_run_state, utc_now_iso
+from app.core.schemas.graph_family import AnyGraphDocument
 from app.core.schemas.graph import GraphDocument
+from app.core.schemas.node_system import NodeSystemGraphDocument
 from app.core.storage.run_store import save_run
 
 
-def execute_graph(graph: GraphDocument) -> dict:
+def execute_graph(graph: AnyGraphDocument) -> dict:
+    if isinstance(graph, NodeSystemGraphDocument):
+        return execute_node_system_graph(graph)
     workflow_config = parse_graph(graph)
     app = build_workflow(workflow_config)
     initial_state = create_initial_run_state(
