@@ -971,6 +971,11 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
 
           {config.family === "input" ? (
             <>
+              <div className="grid gap-1">
+                {outputs.map((port) => (
+                  <PortRow key={`output-${port.key}`} nodeId={data.nodeId} port={port} side="output" />
+                ))}
+              </div>
               {isExpanded ? (
                 <>
                   <div className="grid grid-cols-2 gap-3">
@@ -1020,11 +1025,6 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                         ))}
                       </select>
                     </label>
-                  </div>
-                  <div className="grid gap-1">
-                    {outputs.map((port) => (
-                      <PortRow key={`output-${port.key}`} nodeId={data.nodeId} port={port} side="output" />
-                    ))}
                   </div>
                 </>
               ) : null}
@@ -1255,6 +1255,11 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
 
           {config.family === "output" ? (
             <>
+              <div className="grid gap-1">
+                {inputs.map((port) => (
+                  <PortRow key={`input-${port.key}`} nodeId={data.nodeId} port={port} side="input" />
+                ))}
+              </div>
               {isExpanded ? (
                 <>
                   <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-3">
@@ -1314,11 +1319,6 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                       onChange={(event) => data.onConfigChange?.((currentConfig) => ({ ...(currentConfig as OutputBoundaryNode), fileNameTemplate: event.target.value }))}
                       placeholder="File name template"
                     />
-                  </div>
-                  <div className="grid gap-1">
-                    {inputs.map((port) => (
-                      <PortRow key={`input-${port.key}`} nodeId={data.nodeId} port={port} side="input" />
-                    ))}
                   </div>
                 </>
               ) : null}
