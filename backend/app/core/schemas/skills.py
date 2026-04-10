@@ -16,6 +16,7 @@ class SkillSideEffect(str, Enum):
 class SkillSourceFormat(str, Enum):
     GRAPHITE = "graphite_definition"
     CLAUDE_CODE = "claude_code"
+    OPENCLAW = "openclaw"
     CODEX = "codex"
 
 
@@ -27,6 +28,7 @@ class SkillCompatibilityStatus(str, Enum):
 
 class SkillCompatibilityTarget(str, Enum):
     CLAUDE_CODE = "claude_code"
+    OPENCLAW = "openclaw"
     CODEX = "codex"
 
 

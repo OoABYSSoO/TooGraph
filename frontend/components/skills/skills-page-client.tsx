@@ -20,7 +20,7 @@ type SkillField = {
 };
 
 type SkillCompatibilityReport = {
-  target: "claude_code" | "codex";
+  target: "claude_code" | "openclaw" | "codex";
   status: "native" | "partial" | "incompatible";
   summary: string;
   missingCapabilities: string[];
@@ -34,7 +34,7 @@ type SkillDefinition = {
   outputSchema: SkillField[];
   supportedValueTypes: string[];
   sideEffects: string[];
-  sourceFormat: "graphite_definition" | "claude_code" | "codex";
+  sourceFormat: "graphite_definition" | "claude_code" | "openclaw" | "codex";
   runtimeRegistered: boolean;
   status: "active" | "disabled" | "deleted";
   compatibility: SkillCompatibilityReport[];
@@ -49,6 +49,7 @@ const COMPATIBILITY_LABELS: Record<SkillCompatibilityReport["status"], string> =
 const FORMAT_LABELS: Record<SkillDefinition["sourceFormat"], string> = {
   graphite_definition: "Graphite 定义",
   claude_code: "Claude Code",
+  openclaw: "OpenClaw",
   codex: "Codex",
 };
 
@@ -164,7 +165,7 @@ export function SkillsPageClient() {
 
   return (
     <div className="grid gap-6">
-      <section className="grid grid-cols-4 gap-[18px] max-[1100px]:grid-cols-2 max-[720px]:grid-cols-1">
+      <section className="grid grid-cols-5 gap-[18px] max-[1280px]:grid-cols-3 max-[900px]:grid-cols-2 max-[720px]:grid-cols-1">
         <MetricCard title="技能总数" value={String(skills.length)} detail="当前后端已登记的 skill definitions" />
         <MetricCard
           title="已注册运行时"
@@ -180,6 +181,11 @@ export function SkillsPageClient() {
           title="Claude 原生"
           value={String(skills.filter((skill) => skill.compatibility.some((item) => item.target === "claude_code" && item.status === "native")).length)}
           detail="当前已经以 Claude Code 文件作为定义源"
+        />
+        <MetricCard
+          title="OpenClaw 部分兼容"
+          value={String(skills.filter((skill) => skill.compatibility.some((item) => item.target === "openclaw" && item.status === "partial")).length)}
+          detail="和 OpenClaw 的 SKILL.md 目录格式只差包装层"
         />
       </section>
 
@@ -330,7 +336,11 @@ export function SkillsPageClient() {
                   <div key={report.target} className="rounded-[20px] border border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.72)] p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div className="text-lg font-semibold text-[var(--text)]">
-                        {report.target === "claude_code" ? "Claude Code" : "Codex"}
+                        {report.target === "claude_code"
+                          ? "Claude Code"
+                          : report.target === "openclaw"
+                            ? "OpenClaw"
+                            : "Codex"}
                       </div>
                       <Badge>{COMPATIBILITY_LABELS[report.status]}</Badge>
                     </div>

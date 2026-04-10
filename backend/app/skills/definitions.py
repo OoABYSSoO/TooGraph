@@ -129,6 +129,16 @@ def _build_compatibility_reports(definition: SkillDefinition) -> list[SkillCompa
             missingCapabilities=[],
         ),
         SkillCompatibilityReport(
+            target=SkillCompatibilityTarget.OPENCLAW,
+            status=SkillCompatibilityStatus.PARTIAL,
+            summary="当前 skill 已采用 Claude Code 风格 Markdown 定义，和 OpenClaw 的 SKILL.md 结构非常接近，但还不是 OpenClaw 目录格式。",
+            missingCapabilities=[
+                *shared_missing_capabilities,
+                "缺少 OpenClaw 的技能目录包装",
+                "缺少目录内 `SKILL.md` 主文件布局",
+            ],
+        ),
+        SkillCompatibilityReport(
             target=SkillCompatibilityTarget.CODEX,
             status=SkillCompatibilityStatus.PARTIAL,
             summary="当前 skill 已切到 Claude Code 原生格式，但还没有 Codex 原生 SKILL.md 包装。",

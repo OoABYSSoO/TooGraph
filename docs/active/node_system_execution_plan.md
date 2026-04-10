@@ -471,7 +471,7 @@ agent node 的 skill attachment 已经有可依赖的数据源。
 - 已提供 `/api/skills/definitions`
 - 当前已有一批正式 machine-readable skill definitions 可供前端读取
 - 前端 `NodeSystemEditor` 已接入 definitions，用于 skill 选择与 contract 展示
-- 前端已新增独立 `Skills` 管理页，用于查看 skill 列表、运行注册状态和 Claude Code / Codex 兼容缺口，并支持禁用、启用、删除
+- 前端已新增独立 `Skills` 管理页，用于查看 skill 列表、运行注册状态和 Claude Code / OpenClaw / Codex 兼容缺口，并支持禁用、启用、删除
 - skill 定义源已从 Graphite 原生 Python 常量迁到 `.claude/agents/*.md`，当前以 Claude Code 风格文件作为单一来源
 - 现阶段 definitions 先覆盖代表性 skills，后续再扩展到完整 skill 集
 
