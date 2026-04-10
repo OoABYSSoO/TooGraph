@@ -1802,9 +1802,9 @@ function createNodeFromPreset(preset: NodePresetDefinition, position: { x: numbe
         </div>
       </header>
 
-      <div className="relative min-w-0 min-h-0">
+      <div className="relative min-w-0 min-h-0 h-full">
         <div
-          className="relative min-w-0 min-h-0"
+          className="relative min-w-0 min-h-0 h-full"
           ref={wrapperRef}
           onDoubleClickCapture={(event) => {
             const target = event.target as HTMLElement | null;
