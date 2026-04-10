@@ -31,12 +31,77 @@
         <g class="buddy-mascot__tail buddy-mascot__tail-rig">
           <path
             class="buddy-mascot__tail-pose buddy-mascot__tail-pose--right"
-            d="M206 154 C240 154 268 136 282 108"
-          />
+            d="M0 176 C54 214 104 166 154 160 C212 152 240 112 260 82 C270 66 278 60 282 62"
+          >
+            <animate
+              attributeName="d"
+              dur="3.6s"
+              repeatCount="indefinite"
+              calcMode="spline"
+              keyTimes="0;0.25;0.5;0.75;1"
+              keySplines="0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1"
+              values="M0 176 C54 214 104 166 154 160 C212 152 240 112 260 82 C270 66 278 60 282 62;M0 176 C62 198 124 178 178 150 C222 126 254 86 274 68 C278 64 280 62 282 62;M0 176 C70 180 138 148 196 116 C236 94 264 74 278 64 C280 62 282 62 282 62;M0 176 C64 184 122 198 170 162 C214 132 246 88 272 66 C276 62 280 60 282 62;M0 176 C54 214 104 166 154 160 C212 152 240 112 260 82 C270 66 278 60 282 62"
+            />
+          </path>
+          <path
+            class="buddy-mascot__tail-pose buddy-mascot__tail-pose--back-right"
+            d="M0 176 C36 204 72 166 100 146 C130 124 158 82 156 62 C156 56 154 52 152 54"
+          >
+            <animate
+              attributeName="d"
+              dur="3.9s"
+              begin="-0.3s"
+              repeatCount="indefinite"
+              calcMode="spline"
+              keyTimes="0;0.25;0.5;0.75;1"
+              keySplines="0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1"
+              values="M0 176 C36 204 72 166 100 146 C130 124 158 82 156 62 C156 56 154 52 152 54;M0 176 C42 190 84 166 116 134 C144 106 166 76 156 58 C154 54 152 52 152 54;M0 176 C48 174 88 146 120 116 C140 96 152 72 154 58 C154 54 153 52 152 54;M0 176 C28 182 84 174 118 136 C148 104 168 78 158 58 C156 54 154 52 152 54;M0 176 C36 204 72 166 100 146 C130 124 158 82 156 62 C156 56 154 52 152 54"
+            />
+          </path>
+          <path
+            class="buddy-mascot__tail-pose buddy-mascot__tail-pose--back-center"
+            d="M0 176 C-24 164 20 138 -2 108 C-20 82 -12 58 0 48 C8 54 12 62 8 72"
+          >
+            <animate
+              attributeName="d"
+              dur="4.2s"
+              begin="-0.6s"
+              repeatCount="indefinite"
+              calcMode="spline"
+              keyTimes="0;0.25;0.5;0.75;1"
+              keySplines="0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1"
+              values="M0 176 C-24 164 20 138 -2 108 C-20 82 -12 58 0 48 C8 54 12 62 8 72;M0 176 C-8 158 -8 124 -2 92 C0 70 4 54 8 46 C10 50 12 58 8 72;M0 176 C0 154 0 116 0 84 C0 62 0 50 2 44 C6 50 8 60 8 72;M0 176 C8 158 8 124 2 92 C0 70 -4 54 -8 46 C-10 50 -12 58 -8 72;M0 176 C24 164 -20 138 2 108 C20 82 12 58 0 48 C-8 54 -12 62 -8 72"
+            />
+          </path>
+          <path
+            class="buddy-mascot__tail-pose buddy-mascot__tail-pose--back-left"
+            d="M0 176 C-36 204 -72 166 -100 146 C-130 124 -158 82 -156 62 C-156 56 -154 52 -152 54"
+          >
+            <animate
+              attributeName="d"
+              dur="3.9s"
+              begin="-0.3s"
+              repeatCount="indefinite"
+              calcMode="spline"
+              keyTimes="0;0.25;0.5;0.75;1"
+              keySplines="0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1"
+              values="M0 176 C-36 204 -72 166 -100 146 C-130 124 -158 82 -156 62 C-156 56 -154 52 -152 54;M0 176 C-42 190 -84 166 -116 134 C-144 106 -166 76 -156 58 C-154 54 -152 52 -152 54;M0 176 C-48 174 -88 146 -120 116 C-140 96 -152 72 -154 58 C-154 54 -153 52 -152 54;M0 176 C-28 182 -84 174 -118 136 C-148 104 -168 78 -158 58 C-156 54 -154 52 -152 54;M0 176 C-36 204 -72 166 -100 146 C-130 124 -158 82 -156 62 C-156 56 -154 52 -152 54"
+            />
+          </path>
           <path
             class="buddy-mascot__tail-pose buddy-mascot__tail-pose--left"
-            d="M-206 154 C-240 154-268 136-282 108"
-          />
+            d="M0 176 C-54 214 -104 166 -154 160 C-212 152 -240 112 -260 82 C-270 66 -278 60 -282 62"
+          >
+            <animate
+              attributeName="d"
+              dur="3.6s"
+              repeatCount="indefinite"
+              calcMode="spline"
+              keyTimes="0;0.25;0.5;0.75;1"
+              keySplines="0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1;0.42 0 0.58 1"
+              values="M0 176 C-54 214 -104 166 -154 160 C-212 152 -240 112 -260 82 C-270 66 -278 60 -282 62;M0 176 C-62 198 -124 178 -178 150 C-222 126 -254 86 -274 68 C-278 64 -280 62 -282 62;M0 176 C-70 180 -138 148 -196 116 C-236 94 -264 74 -278 64 C-280 62 -282 62 -282 62;M0 176 C-64 184 -122 198 -170 162 C-214 132 -246 88 -272 66 C-276 62 -280 60 -282 62;M0 176 C-54 214 -104 166 -154 160 C-212 152 -240 112 -260 82 C-270 66 -278 60 -282 62"
+            />
+          </path>
         </g>
 
         <g class="buddy-mascot__body-turn">
@@ -212,7 +277,7 @@ function clampLookAxis(value: number | undefined) {
 }
 
 .buddy-mascot__tail {
-  transform-origin: 4% 90%;
+  transform-origin: 50% 78%;
 }
 
 .buddy-mascot__tail-pose {
@@ -292,7 +357,7 @@ function clampLookAxis(value: number | undefined) {
 }
 
 .buddy-mascot--idle .buddy-mascot__tail {
-  animation: buddy-mascot-tail-sway 3.2s ease-in-out infinite;
+  animation: buddy-mascot-tail-sway 5.6s ease-in-out infinite;
 }
 
 .buddy-mascot--idle .buddy-mascot__sparkle-wrap {
@@ -416,8 +481,48 @@ function clampLookAxis(value: number | undefined) {
   animation: buddy-mascot-spin-turn 980ms cubic-bezier(0.2, 1.18, 0.3, 1) both;
 }
 
+.buddy-mascot--motion-spin .buddy-mascot__left-ear {
+  animation: buddy-mascot-ear-spin-left 980ms ease-in-out both;
+}
+
+.buddy-mascot--motion-spin .buddy-mascot__right-ear {
+  animation: buddy-mascot-ear-spin-right 980ms ease-in-out both;
+}
+
+.buddy-mascot--motion-spin .buddy-mascot__look-eye--left {
+  animation: buddy-mascot-look-spin-left 980ms ease-in-out both;
+}
+
+.buddy-mascot--motion-spin .buddy-mascot__look-eye--right {
+  animation: buddy-mascot-look-spin-right 980ms ease-in-out both;
+}
+
+.buddy-mascot--motion-spin .buddy-mascot__resting-eye--left {
+  animation: buddy-mascot-eye-spin-left 980ms ease-in-out both;
+}
+
+.buddy-mascot--motion-spin .buddy-mascot__resting-eye--right {
+  animation: buddy-mascot-eye-spin-right 980ms ease-in-out both;
+}
+
+.buddy-mascot--motion-spin .buddy-mascot__sparkle-wrap {
+  animation: buddy-mascot-star-spin-orbit 980ms ease-in-out both;
+}
+
 .buddy-mascot--motion-spin .buddy-mascot__tail-pose--right {
   animation: buddy-mascot-tail-spin-right 980ms ease-in-out both;
+}
+
+.buddy-mascot--motion-spin .buddy-mascot__tail-pose--back-right {
+  animation: buddy-mascot-tail-spin-back-right 980ms ease-in-out both;
+}
+
+.buddy-mascot--motion-spin .buddy-mascot__tail-pose--back-center {
+  animation: buddy-mascot-tail-spin-back-center 980ms ease-in-out both;
+}
+
+.buddy-mascot--motion-spin .buddy-mascot__tail-pose--back-left {
+  animation: buddy-mascot-tail-spin-back-left 980ms ease-in-out both;
 }
 
 .buddy-mascot--motion-spin .buddy-mascot__tail-pose--left {
@@ -456,44 +561,237 @@ function clampLookAxis(value: number | undefined) {
   0% {
     transform: translateY(0) scaleX(1) scaleY(1) rotate(0deg);
   }
-  18% {
+  14% {
     transform: translateY(10px) scaleX(1.1) scaleY(0.88) rotate(0deg);
   }
-  42% {
-    transform: translateY(-24px) scaleX(0.18) scaleY(1.14) rotate(-5deg);
+  32% {
+    transform: translateY(-24px) scaleX(0.78) scaleY(1.12) rotate(-4deg);
   }
-  58% {
-    transform: translateY(-24px) scaleX(-0.18) scaleY(1.14) rotate(5deg);
+  48% {
+    transform: translateY(-34px) scaleX(0.48) scaleY(1.14) rotate(0deg);
   }
-  82% {
-    transform: translateY(6px) scaleX(1.08) scaleY(0.92) rotate(0deg);
+  64% {
+    transform: translateY(-24px) scaleX(0.78) scaleY(1.12) rotate(4deg);
+  }
+  84% {
+    transform: translateY(7px) scaleX(1.08) scaleY(0.9) rotate(0deg);
   }
   100% {
     transform: translateY(0) scaleX(1) scaleY(1) rotate(0deg);
   }
 }
 
-@keyframes buddy-mascot-tail-spin-right {
+@keyframes buddy-mascot-ear-spin-left {
   0%,
+  100% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1) rotate(0deg);
+  }
+  28% {
+    opacity: 0.86;
+    transform: translate(-8px, 5px) scale(0.82) rotate(-9deg);
+  }
+  48% {
+    opacity: 0.58;
+    transform: translate(-13px, 9px) scale(0.72) rotate(-15deg);
+  }
+  66% {
+    opacity: 1;
+    transform: translate(9px, -2px) scale(1.08) rotate(5deg);
+  }
+  84% {
+    transform: translate(3px, 3px) scale(1.02) rotate(3deg);
+  }
+}
+
+@keyframes buddy-mascot-ear-spin-right {
+  0%,
+  100% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1) rotate(0deg);
+  }
   28% {
     opacity: 1;
+    transform: translate(-9px, -2px) scale(1.08) rotate(-5deg);
   }
-  44%,
-  70% {
+  48% {
+    opacity: 0.58;
+    transform: translate(13px, 9px) scale(0.72) rotate(15deg);
+  }
+  66% {
+    opacity: 0.86;
+    transform: translate(8px, 5px) scale(0.82) rotate(9deg);
+  }
+  84% {
+    transform: translate(-3px, 3px) scale(1.02) rotate(-3deg);
+  }
+}
+
+@keyframes buddy-mascot-look-spin-left {
+  0%,
+  100% {
+    transform: translate(var(--buddy-mascot-look-x, 0px), var(--buddy-mascot-look-y, 0px));
+  }
+  30% {
+    transform: translate(calc(var(--buddy-mascot-look-x, 0px) - 22px), calc(var(--buddy-mascot-look-y, 0px) + 2px)) scaleX(0.64);
+  }
+  48% {
+    transform: translate(calc(var(--buddy-mascot-look-x, 0px) - 14px), calc(var(--buddy-mascot-look-y, 0px) + 3px)) scaleX(0.22);
+  }
+  66% {
+    transform: translate(calc(var(--buddy-mascot-look-x, 0px) + 18px), calc(var(--buddy-mascot-look-y, 0px) + 1px)) scaleX(1.08);
+  }
+}
+
+@keyframes buddy-mascot-look-spin-right {
+  0%,
+  100% {
+    transform: translate(var(--buddy-mascot-look-x, 0px), var(--buddy-mascot-look-y, 0px));
+  }
+  30% {
+    transform: translate(calc(var(--buddy-mascot-look-x, 0px) - 18px), calc(var(--buddy-mascot-look-y, 0px) + 1px)) scaleX(1.08);
+  }
+  48% {
+    transform: translate(calc(var(--buddy-mascot-look-x, 0px) + 14px), calc(var(--buddy-mascot-look-y, 0px) + 3px)) scaleX(0.22);
+  }
+  66% {
+    transform: translate(calc(var(--buddy-mascot-look-x, 0px) + 22px), calc(var(--buddy-mascot-look-y, 0px) + 2px)) scaleX(0.64);
+  }
+}
+
+@keyframes buddy-mascot-eye-spin-left {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scaleX(1) scaleY(1);
+  }
+  30% {
+    opacity: 0.62;
+    transform: scaleX(0.42) scaleY(1.04);
+  }
+  48% {
+    opacity: 0;
+    transform: scaleX(0.12) scaleY(1.08);
+  }
+  66% {
+    opacity: 1;
+    transform: scaleX(1.08) scaleY(0.98);
+  }
+}
+
+@keyframes buddy-mascot-eye-spin-right {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scaleX(1) scaleY(1);
+  }
+  30% {
+    opacity: 1;
+    transform: scaleX(1.08) scaleY(0.98);
+  }
+  48% {
+    opacity: 0;
+    transform: scaleX(0.12) scaleY(1.08);
+  }
+  66% {
+    opacity: 0.62;
+    transform: scaleX(0.42) scaleY(1.04);
+  }
+}
+
+@keyframes buddy-mascot-star-spin-orbit {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1) rotate(0deg);
+  }
+  28% {
+    transform: translate(-18px, -7px) scale(1.08) rotate(-10deg);
+  }
+  48% {
+    transform: translate(0, -14px) scale(0.72) rotate(8deg);
+  }
+  66% {
+    transform: translate(20px, -8px) scale(0.82) rotate(12deg);
+  }
+  84% {
+    transform: translate(8px, 2px) scale(1.04) rotate(4deg);
+  }
+}
+
+@keyframes buddy-mascot-tail-spin-right {
+  0%,
+  12% {
+    opacity: 1;
+  }
+  24%,
+  88% {
     opacity: 0;
   }
+  96%,
   100% {
     opacity: 1;
   }
 }
 
-@keyframes buddy-mascot-tail-spin-left {
+@keyframes buddy-mascot-tail-spin-back-right {
   0%,
-  30% {
+  10% {
     opacity: 0;
   }
-  46%,
-  66% {
+  18%,
+  30% {
+    opacity: 1;
+  }
+  38%,
+  82% {
+    opacity: 0;
+  }
+  90%,
+  96% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes buddy-mascot-tail-spin-back-center {
+  0%,
+  22% {
+    opacity: 0;
+  }
+  30%,
+  40% {
+    opacity: 1;
+  }
+  48%,
+  68% {
+    opacity: 0;
+  }
+  76%,
+  86% {
+    opacity: 1;
+  }
+  94%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes buddy-mascot-tail-spin-back-left {
+  0%,
+  36% {
+    opacity: 0;
+  }
+  44%,
+  54% {
+    opacity: 1;
+  }
+  62% {
+    opacity: 0;
+  }
+  66%,
+  76% {
     opacity: 1;
   }
   84%,
@@ -502,13 +800,28 @@ function clampLookAxis(value: number | undefined) {
   }
 }
 
+@keyframes buddy-mascot-tail-spin-left {
+  0%,
+  50% {
+    opacity: 0;
+  }
+  56%,
+  66% {
+    opacity: 1;
+  }
+  76%,
+  100% {
+    opacity: 0;
+  }
+}
+
 @keyframes buddy-mascot-tail-sway {
   0%,
   100% {
-    transform: rotate(-7deg);
+    transform: rotate(-2deg);
   }
   50% {
-    transform: rotate(15deg);
+    transform: rotate(4deg);
   }
 }
 
