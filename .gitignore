@@ -64,6 +64,7 @@ frontend/.env.production.local
 frontend/node_modules/
 frontend/.next/
 frontend/out/
+frontend/*.tsbuildinfo
 
 # Backend local runtime files
 backend/.venv/
