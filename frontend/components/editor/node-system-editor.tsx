@@ -13,6 +13,7 @@ import {
   ReactFlow,
   ReactFlowProvider,
   useEdgesState,
+  useNodesInitialized,
   useNodesState,
   useReactFlow,
   type Connection,
@@ -1019,7 +1020,7 @@ const nodeTypes = {
   default: NodeCard,
 };
 
-function NodeSystemCanvas({ initialGraph }: { initialGraph: GraphPayload }) {
+function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: GraphPayload; isNewFromTemplate: boolean }) {
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const reactFlow = useReactFlow<FlowNode, Edge>();
   const [graphName, setGraphName] = useState(initialGraph.name);
@@ -1029,6 +1030,8 @@ function NodeSystemCanvas({ initialGraph }: { initialGraph: GraphPayload }) {
   const [stateSchema] = useState(initialGraph.state_schema);
   const [metadata] = useState(initialGraph.metadata);
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
+  const nodesInitialized = useNodesInitialized();
+  const autoLayoutDoneRef = useRef(false);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -1226,6 +1229,28 @@ function NodeSystemCanvas({ initialGraph }: { initialGraph: GraphPayload }) {
     setNodes(initialNodes);
     setEdges(initialEdges);
   }, [initialGraph.edges, initialGraph.nodes, setEdges, setNodes]);
+
+  useEffect(() => {
+    if (!isNewFromTemplate) return;
+    if (!nodesInitialized) return;
+    if (autoLayoutDoneRef.current) return;
+    autoLayoutDoneRef.current = true;
+
+    setNodes((current) => {
+      if (current.length === 0) return current;
+      const sorted = [...current].sort((a, b) => a.position.x - b.position.x);
+      const GAP = 80;
+      let nextX = sorted[0].position.x;
+      const centerY = sorted.reduce((sum, n) => sum + n.position.y, 0) / sorted.length;
+
+      return sorted.map((node) => {
+        const width = node.measured?.width ?? (typeof node.style?.width === "number" ? node.style.width : 280);
+        const updatedNode = { ...node, position: { x: nextX, y: centerY } };
+        nextX += width + GAP;
+        return updatedNode;
+      });
+    });
+  }, [isNewFromTemplate, nodesInitialized, setNodes]);
 
   useEffect(() => {
     let active = true;
@@ -2193,10 +2218,11 @@ function createNodeFromPreset(preset: NodePresetDefinition, position: { x: numbe
 
 export function NodeSystemEditor(props: EditorClientProps) {
   const graph = props.initialGraph ?? createEditorDefaults(props.templates, props.defaultTemplateId);
+  const isNewFromTemplate = props.mode === "new" && props.initialGraph == null;
 
   return (
     <ReactFlowProvider>
-      <NodeSystemCanvas initialGraph={graph} />
+      <NodeSystemCanvas initialGraph={graph} isNewFromTemplate={isNewFromTemplate} />
     </ReactFlowProvider>
   );
 }
