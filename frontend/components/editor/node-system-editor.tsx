@@ -1026,11 +1026,6 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                       }
                       placeholder="Output label"
                     />
-                    <Input
-                      value={config.placeholder}
-                      onChange={(event) => data.onConfigChange?.((currentConfig) => ({ ...(currentConfig as InputBoundaryNode), placeholder: event.target.value }))}
-                      placeholder="Placeholder"
-                    />
                   </>
                 ) : null}
                 <textarea
