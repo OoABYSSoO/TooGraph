@@ -1201,6 +1201,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
   const isExpanded = config.family === "input" ? true : Boolean(data.isExpanded);
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [isHoveringNode, setIsHoveringNode] = useState(false);
   const [draftLabel, setDraftLabel] = useState(config.label);
   const [draftDescription, setDraftDescription] = useState(config.description);
   const [isDeleteConfirmActive, setIsDeleteConfirmActive] = useState(false);
@@ -1281,7 +1282,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
   return (
     <>
       <NodeResizer
-        isVisible={selected}
+        isVisible={selected || isHoveringNode}
         minWidth={160}
         minHeight={minHeight}
         handleStyle={{ width: 8, height: 8, borderRadius: 4, background: "var(--accent)", border: "none" }}
@@ -1294,6 +1295,8 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
           "group/node relative h-full min-w-[160px] rounded-[18px] border bg-[linear-gradient(180deg,rgba(255,250,241,0.98)_0%,rgba(248,237,219,0.96)_100%)] shadow-[0_18px_36px_rgba(60,41,20,0.1)]",
           selected ? "border-[var(--accent)]" : "border-[rgba(154,52,18,0.25)]",
         )}
+        onPointerEnter={() => setIsHoveringNode(true)}
+        onPointerLeave={() => setIsHoveringNode(false)}
         onDoubleClickCapture={(event) => {
           if (!isCollapsible || isExpanded) return;
           const target = event.target as HTMLElement | null;
