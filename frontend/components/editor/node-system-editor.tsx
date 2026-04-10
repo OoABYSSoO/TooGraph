@@ -1567,7 +1567,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
             </>
           ) : null}
 
-          {config.family !== "input" && isExpanded && (inputs.length > 0 || outputs.length > 0) ? (
+          {config.family !== "input" && (config.family === "agent" || isExpanded) && (inputs.length > 0 || outputs.length > 0) ? (
             <div className="grid grid-cols-2 items-start gap-x-6">
               <div className="grid gap-1">
                 {inputs.map((port) => (
