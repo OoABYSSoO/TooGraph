@@ -427,13 +427,15 @@ function createEditorDefaults(templates: TemplateRecord[], defaultTemplateId?: s
 
 function createFlowNodeFromGraphNode(node: any): FlowNode {
   const hasExplicitSize = typeof node.style?.width === "number" && typeof node.style?.height === "number";
+  const config = deepClonePreset(node.data?.config as NodePresetDefinition);
+  const defaultWidth = getDefaultNodeWidth(config);
   return {
     id: node.id,
     type: node.type ?? "default",
     position: node.position ?? { x: 0, y: 0 },
     data: {
       nodeId: node.data?.nodeId ?? node.id,
-      config: deepClonePreset(node.data?.config as NodePresetDefinition),
+      config,
       previewText: node.data?.previewText ?? "",
       isExpanded: false,
     },
@@ -441,7 +443,7 @@ function createFlowNodeFromGraphNode(node: any): FlowNode {
     targetPosition: Position.Left,
     style: hasExplicitSize
       ? { background: "transparent", border: "none", padding: 0, width: node.style.width, height: node.style.height }
-      : { background: "transparent", border: "none", padding: 0, width: "auto" },
+      : { background: "transparent", border: "none", padding: 0, width: defaultWidth ?? "auto" },
   } satisfies FlowNode;
 }
 
@@ -1183,6 +1185,14 @@ const NODE_MIN_HEIGHT: Record<string, number> = {
   condition: 100, // header + port rows + rule summary + padding
 };
 
+const DEFAULT_NODE_WIDTH: Partial<Record<NodePresetDefinition["family"], number>> = {
+  agent: 360,
+};
+
+function getDefaultNodeWidth(config: NodePresetDefinition) {
+  return DEFAULT_NODE_WIDTH[config.family] ?? null;
+}
+
 function NodeCard({ data, selected }: NodeProps<FlowNode>) {
   const config = data.config;
   const inputs = listInputPorts(config);
@@ -1399,10 +1409,18 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
             {isCollapsible ? (
               <button
                 type="button"
-                className="rounded-full border border-[rgba(154,52,18,0.16)] bg-[rgba(255,255,255,0.72)] px-2.5 py-1 text-[0.68rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]"
+                aria-label={isExpanded ? "折叠节点" : "展开节点"}
+                title={isExpanded ? "折叠节点" : "展开节点"}
+                className="grid h-8 w-8 place-items-center rounded-full border border-[rgba(154,52,18,0.16)] bg-[rgba(255,255,255,0.72)] text-[var(--accent-strong)] transition hover:border-[rgba(154,52,18,0.28)] hover:bg-[rgba(255,248,240,0.92)]"
                 onClick={() => data.onToggleExpanded?.()}
               >
-                {isExpanded ? "Fold" : "Open"}
+                <svg
+                  viewBox="0 0 16 16"
+                  className={cn("h-4 w-4 fill-none stroke-current transition-transform", isExpanded ? "" : "rotate-180")}
+                  strokeWidth="1.6"
+                >
+                  <path d="m4.5 10 3.5-4 3.5 4" />
+                </svg>
               </button>
             ) : null}
           </div>
@@ -1585,7 +1603,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
           {config.family === "agent" ? (
             <>
               {!isExpanded ? (
-                <div className="rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,255,255,0.78)] px-3 py-2 text-sm text-[var(--text)]">
+                <div className="rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,255,255,0.78)] px-3 py-2 text-sm text-[var(--text)] break-words">
                   {summarizeNode(config)}
                 </div>
               ) : (
@@ -1680,7 +1698,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
           {config.family === "condition" ? (
             <>
               {!isExpanded ? (
-                <div className="rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,255,255,0.78)] px-3 py-3 text-sm leading-6 text-[var(--text)]">
+                <div className="rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,255,255,0.78)] px-3 py-3 text-sm leading-6 text-[var(--text)] break-words">
                   {summarizeNode(config)}
                 </div>
               ) : (
@@ -2134,6 +2152,7 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
 
   function createNodeFromConfig(config: NodePresetDefinition, position: { x: number; y: number }) {
     const id = `${config.family}_${crypto.randomUUID().slice(0, 8)}`;
+    const defaultWidth = getDefaultNodeWidth(config);
     return {
       id,
       type: "default",
@@ -2150,7 +2169,7 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
         background: "transparent",
         border: "none",
         padding: 0,
-        width: "auto",
+        width: defaultWidth ?? "auto",
       },
     } satisfies FlowNode;
   }
