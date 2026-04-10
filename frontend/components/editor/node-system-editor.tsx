@@ -258,6 +258,74 @@ function tryParseUploadedAssetEnvelope(value: string): UploadedAssetEnvelope | n
   return null;
 }
 
+function renderUploadedAssetPreview(asset: UploadedAssetEnvelope) {
+  if (asset.detectedType === "image" && asset.encoding === "data_url") {
+    return (
+      <div className="grid gap-3">
+        <div className="overflow-hidden rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,255,255,0.88)]">
+          <img src={asset.content} alt={asset.name} className="max-h-[240px] w-full object-contain bg-[rgba(248,242,234,0.8)]" />
+        </div>
+        <div className="text-xs leading-5 text-[var(--muted)]">{asset.name}</div>
+      </div>
+    );
+  }
+
+  if (asset.detectedType === "audio" && asset.encoding === "data_url") {
+    return (
+      <div className="grid gap-3">
+        <div className="rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,255,255,0.88)] p-3">
+          <audio controls className="w-full">
+            <source src={asset.content} type={asset.mimeType} />
+          </audio>
+        </div>
+        <div className="text-xs leading-5 text-[var(--muted)]">{asset.name}</div>
+      </div>
+    );
+  }
+
+  if (asset.detectedType === "video" && asset.encoding === "data_url") {
+    return (
+      <div className="grid gap-3">
+        <div className="overflow-hidden rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,255,255,0.88)]">
+          <video controls className="max-h-[240px] w-full bg-[rgba(248,242,234,0.8)]">
+            <source src={asset.content} type={asset.mimeType} />
+          </video>
+        </div>
+        <div className="text-xs leading-5 text-[var(--muted)]">{asset.name}</div>
+      </div>
+    );
+  }
+
+  if (asset.detectedType === "file") {
+    return (
+      <div className="grid gap-3">
+        <div className="rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,255,255,0.88)] p-3">
+          <div className="text-sm font-medium text-[var(--text)]">{asset.name}</div>
+          <div className="mt-1 text-xs leading-5 text-[var(--muted)]">
+            {asset.mimeType} · {Math.max(1, Math.round(asset.size / 1024))} KB
+          </div>
+          {asset.encoding === "text" ? (
+            <pre className="mt-3 max-h-[220px] overflow-auto whitespace-pre-wrap break-words rounded-[12px] bg-[rgba(248,242,234,0.8)] px-3 py-3 text-xs leading-5 text-[var(--text)]">
+              {asset.content.slice(0, 3000)}
+            </pre>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-3">
+      <div className="rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,255,255,0.88)] p-3">
+        <div className="text-sm font-medium text-[var(--text)]">{asset.name}</div>
+        <div className="mt-1 text-xs leading-5 text-[var(--muted)]">
+          {asset.detectedType} · {asset.mimeType} · {Math.max(1, Math.round(asset.size / 1024))} KB
+        </div>
+      </div>
+    </div>
+  );
+}
+
 async function fileToEnvelope(file: File): Promise<UploadedAssetEnvelope> {
   const detectedType = detectInputValueTypeFromFileName(file.name);
   const encoding = detectedType === "file" ? "text" : "data_url";
@@ -1091,6 +1159,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
   const [draftLabel, setDraftLabel] = useState(config.label);
   const [draftDescription, setDraftDescription] = useState(config.description);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
+  const uploadedAsset = config.family === "input" ? tryParseUploadedAssetEnvelope(config.defaultValue) : null;
 
   useEffect(() => {
     setDraftLabel(config.label);
@@ -1214,41 +1283,47 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
         <div className="grid gap-3 px-4 py-3">
           {config.family === "input" ? (
             <>
-              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
-                <div className="flex flex-wrap gap-2">
-                  {INPUT_VALUE_TYPE_OPTIONS.map((option) => {
-                    const active = config.valueType === option.value;
-                    return (
-                      <button
-                        key={option.value}
-                        type="button"
-                        title={option.label}
-                        aria-label={option.label}
-                        className={cn(
-                          "inline-flex h-9 w-9 items-center justify-center rounded-full border transition-colors",
-                          active
-                            ? "border-[var(--accent)] bg-[rgba(154,52,18,0.12)] text-[var(--accent-strong)]"
-                            : "border-[rgba(154,52,18,0.16)] bg-[rgba(255,255,255,0.72)] text-[var(--muted)] hover:bg-[rgba(255,248,240,0.92)]",
-                        )}
-                        onClick={() =>
-                          data.onConfigChange?.((currentConfig) => {
-                            const currentInput = currentConfig as InputBoundaryNode;
-                            return {
-                              ...currentInput,
-                              valueType: option.value,
-                              output: {
-                                ...currentInput.output,
+              <div className={cn("grid items-center gap-3", uploadedAsset ? "grid-cols-[1fr_auto]" : "grid-cols-[minmax(0,1fr)_auto]")}>
+                {!uploadedAsset ? (
+                  <div className="flex flex-wrap gap-2">
+                    {INPUT_VALUE_TYPE_OPTIONS.map((option) => {
+                      const active = config.valueType === option.value;
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          title={option.label}
+                          aria-label={option.label}
+                          className={cn(
+                            "inline-flex h-9 w-9 items-center justify-center rounded-full border transition-colors",
+                            active
+                              ? "border-[var(--accent)] bg-[rgba(154,52,18,0.12)] text-[var(--accent-strong)]"
+                              : "border-[rgba(154,52,18,0.16)] bg-[rgba(255,255,255,0.72)] text-[var(--muted)] hover:bg-[rgba(255,248,240,0.92)]",
+                          )}
+                          onClick={() =>
+                            data.onConfigChange?.((currentConfig) => {
+                              const currentInput = currentConfig as InputBoundaryNode;
+                              return {
+                                ...currentInput,
                                 valueType: option.value,
-                              },
-                            };
-                          })
-                        }
-                      >
-                        {option.icon}
-                      </button>
-                    );
-                  })}
-                </div>
+                                output: {
+                                  ...currentInput.output,
+                                  valueType: option.value,
+                                },
+                              };
+                            })
+                          }
+                        >
+                          {option.icon}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-xs leading-5 text-[var(--muted)]">
+                    Uploaded asset locked this input as <span className="font-medium text-[var(--text)]">{uploadedAsset.detectedType}</span>.
+                  </div>
+                )}
                 <div className="grid gap-1">
                   {outputs.map((port) => (
                     <PortRow
@@ -1296,43 +1371,47 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                         event.currentTarget.value = "";
                       }}
                     />
-                    <button
-                      type="button"
-                      className="grid min-h-[120px] place-items-center rounded-[16px] border border-dashed border-[rgba(154,52,18,0.24)] bg-[rgba(255,255,255,0.82)] px-4 py-5 text-center"
-                      onClick={() => uploadInputRef.current?.click()}
-                      onDragOver={(event) => {
-                        event.preventDefault();
-                        event.dataTransfer.dropEffect = "copy";
-                      }}
-                      onDrop={(event) => {
-                        event.preventDefault();
-                        const file = event.dataTransfer.files?.[0] ?? null;
-                        void handleInputFileSelection(file);
-                      }}
-                    >
-                      {(() => {
-                        const asset = tryParseUploadedAssetEnvelope(config.defaultValue);
-                        if (!asset) {
-                          return (
-                            <div className="grid gap-2">
-                              <div className="text-sm font-medium text-[var(--text)]">Drop file here</div>
-                              <div className="text-xs leading-5 text-[var(--muted)]">Or click to choose a file from your device.</div>
-                            </div>
-                          );
-                        }
-                        return (
-                          <div className="grid gap-2 text-left">
-                            <div className="text-sm font-medium text-[var(--text)]">{asset.name}</div>
-                            <div className="text-xs leading-5 text-[var(--muted)]">
-                              {asset.detectedType} · {asset.mimeType} · {Math.max(1, Math.round(asset.size / 1024))} KB
-                            </div>
-                            <div className="text-xs leading-5 text-[var(--muted)]">
-                              Click or drop another file to replace it.
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </button>
+                    {!uploadedAsset ? (
+                      <button
+                        type="button"
+                        className="grid min-h-[120px] place-items-center rounded-[16px] border border-dashed border-[rgba(154,52,18,0.24)] bg-[rgba(255,255,255,0.82)] px-4 py-5 text-center"
+                        onClick={() => uploadInputRef.current?.click()}
+                        onDragOver={(event) => {
+                          event.preventDefault();
+                          event.dataTransfer.dropEffect = "copy";
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          const file = event.dataTransfer.files?.[0] ?? null;
+                          void handleInputFileSelection(file);
+                        }}
+                      >
+                        <div className="grid gap-2">
+                          <div className="text-sm font-medium text-[var(--text)]">Drop file here</div>
+                          <div className="text-xs leading-5 text-[var(--muted)]">Or click to choose a file from your device.</div>
+                        </div>
+                      </button>
+                    ) : (
+                      <div
+                        className="grid min-h-[120px] gap-3 rounded-[16px] border border-dashed border-[rgba(154,52,18,0.24)] bg-[rgba(255,255,255,0.82)] px-4 py-5 text-left"
+                        onDragOver={(event) => {
+                          event.preventDefault();
+                          event.dataTransfer.dropEffect = "copy";
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          const file = event.dataTransfer.files?.[0] ?? null;
+                          void handleInputFileSelection(file);
+                        }}
+                      >
+                        {renderUploadedAssetPreview(uploadedAsset)}
+                        <div className="flex justify-start">
+                          <Button variant="ghost" onClick={() => uploadInputRef.current?.click()}>
+                            Replace File
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </>
                 )}
               </div>
