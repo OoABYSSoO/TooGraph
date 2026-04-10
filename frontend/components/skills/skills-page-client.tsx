@@ -177,9 +177,9 @@ export function SkillsPageClient() {
           detail="暂时不出现在默认可用 skill 列表里"
         />
         <MetricCard
-          title="Claude 部分兼容"
-          value={String(skills.filter((skill) => skill.compatibility.some((item) => item.target === "claude_code" && item.status === "partial")).length)}
-          detail="已接近 Claude Code skill 语义"
+          title="Claude 原生"
+          value={String(skills.filter((skill) => skill.compatibility.some((item) => item.target === "claude_code" && item.status === "native")).length)}
+          detail="当前已经以 Claude Code 文件作为定义源"
         />
       </section>
 
