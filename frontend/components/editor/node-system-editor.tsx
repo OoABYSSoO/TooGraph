@@ -168,10 +168,11 @@ const TYPE_COLORS: Record<ValueType, string> = {
   image: "#0f766e",
   audio: "#7c3aed",
   video: "#be185d",
+  file: "#475569",
   any: "#64748b",
 };
 
-const VALUE_TYPE_OPTIONS: ValueType[] = ["text", "json", "image", "audio", "video", "any"];
+const VALUE_TYPE_OPTIONS: ValueType[] = ["text", "json", "image", "audio", "video", "file", "any"];
 const RULE_OPERATOR_OPTIONS: ConditionRule["operator"][] = ["==", "!=", ">=", "<=", ">", "<", "exists"];
 
 const INPUT_VALUE_TYPE_OPTIONS: Array<{ value: ValueType; label: string; icon: ReactNode }> = [
@@ -214,7 +215,72 @@ const INPUT_VALUE_TYPE_OPTIONS: Array<{ value: ValueType; label: string; icon: R
       </svg>
     ),
   },
+  {
+    value: "file",
+    label: "File",
+    icon: (
+      <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 fill-none stroke-current" strokeWidth="1.5">
+        <path d="M5 2.5h4l2.5 2.5V12a1.5 1.5 0 0 1-1.5 1.5h-5A1.5 1.5 0 0 1 3.5 12V4A1.5 1.5 0 0 1 5 2.5Z" />
+        <path d="M9 2.5V5h2.5" />
+      </svg>
+    ),
+  },
 ];
+
+type UploadedAssetEnvelope = {
+  kind: "uploaded_file";
+  name: string;
+  mimeType: string;
+  size: number;
+  detectedType: ValueType;
+  content: string;
+  encoding: "text" | "data_url";
+};
+
+function detectInputValueTypeFromFileName(fileName: string): ValueType {
+  const normalized = fileName.toLowerCase();
+  if (/\.(png|jpg|jpeg|gif|webp|bmp|svg)$/.test(normalized)) return "image";
+  if (/\.(mp3|wav|ogg|m4a|aac|flac)$/.test(normalized)) return "audio";
+  if (/\.(mp4|mov|webm|mkv|avi|m4v)$/.test(normalized)) return "video";
+  if (/\.(txt|md|py|js|ts|tsx|jsx|json|yaml|yml|toml|csv|log|xml)$/.test(normalized)) return "file";
+  return "file";
+}
+
+function tryParseUploadedAssetEnvelope(value: string): UploadedAssetEnvelope | null {
+  try {
+    const parsed = JSON.parse(value) as UploadedAssetEnvelope;
+    if (parsed && parsed.kind === "uploaded_file" && typeof parsed.name === "string") {
+      return parsed;
+    }
+  } catch {
+    // ignore invalid JSON
+  }
+  return null;
+}
+
+async function fileToEnvelope(file: File): Promise<UploadedAssetEnvelope> {
+  const detectedType = detectInputValueTypeFromFileName(file.name);
+  const encoding = detectedType === "file" ? "text" : "data_url";
+  const content =
+    encoding === "text"
+      ? await file.text()
+      : await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result ?? ""));
+          reader.onerror = () => reject(reader.error ?? new Error("Failed to read file."));
+          reader.readAsDataURL(file);
+        });
+
+  return {
+    kind: "uploaded_file",
+    name: file.name,
+    mimeType: file.type || "application/octet-stream",
+    size: file.size,
+    detectedType,
+    content,
+    encoding,
+  };
+}
 
 function createEditorDefaults(templates: TemplateRecord[], defaultTemplateId?: string): GraphPayload {
   const preferredTemplate =
@@ -1024,6 +1090,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [draftLabel, setDraftLabel] = useState(config.label);
   const [draftDescription, setDraftDescription] = useState(config.description);
+  const uploadInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     setDraftLabel(config.label);
@@ -1047,6 +1114,20 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
       data.onConfigChange?.((currentConfig) => ({ ...currentConfig, description: nextDescription }));
     }
     setIsEditingDescription(false);
+  }
+
+  async function handleInputFileSelection(file: File | null) {
+    if (!file || config.family !== "input") return;
+    const envelope = await fileToEnvelope(file);
+    data.onConfigChange?.((currentConfig) => ({
+      ...(currentConfig as InputBoundaryNode),
+      valueType: envelope.detectedType,
+      output: {
+        ...(currentConfig as InputBoundaryNode).output,
+        valueType: envelope.detectedType,
+      },
+      defaultValue: JSON.stringify(envelope),
+    }));
   }
 
   return (
@@ -1190,18 +1271,70 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                 </div>
               </div>
               <div className="grid gap-2">
-                <textarea
-                  value={config.defaultValue}
-                  rows={5}
-                  placeholder={config.placeholder}
-                  onChange={(event) =>
-                    data.onConfigChange?.((currentConfig) => ({
-                      ...(currentConfig as InputBoundaryNode),
-                      defaultValue: event.target.value,
-                    }))
-                  }
-                  className="min-h-[120px] resize-none rounded-[16px] border border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.88)] px-3 py-3 text-sm text-[var(--text)]"
-                />
+                {config.valueType === "text" ? (
+                  <textarea
+                    value={config.defaultValue}
+                    rows={5}
+                    placeholder={config.placeholder}
+                    onChange={(event) =>
+                      data.onConfigChange?.((currentConfig) => ({
+                        ...(currentConfig as InputBoundaryNode),
+                        defaultValue: event.target.value,
+                      }))
+                    }
+                    className="min-h-[120px] resize-none rounded-[16px] border border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.88)] px-3 py-3 text-sm text-[var(--text)]"
+                  />
+                ) : (
+                  <>
+                    <input
+                      ref={uploadInputRef}
+                      type="file"
+                      className="hidden"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0] ?? null;
+                        void handleInputFileSelection(file);
+                        event.currentTarget.value = "";
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="grid min-h-[120px] place-items-center rounded-[16px] border border-dashed border-[rgba(154,52,18,0.24)] bg-[rgba(255,255,255,0.82)] px-4 py-5 text-center"
+                      onClick={() => uploadInputRef.current?.click()}
+                      onDragOver={(event) => {
+                        event.preventDefault();
+                        event.dataTransfer.dropEffect = "copy";
+                      }}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        const file = event.dataTransfer.files?.[0] ?? null;
+                        void handleInputFileSelection(file);
+                      }}
+                    >
+                      {(() => {
+                        const asset = tryParseUploadedAssetEnvelope(config.defaultValue);
+                        if (!asset) {
+                          return (
+                            <div className="grid gap-2">
+                              <div className="text-sm font-medium text-[var(--text)]">Drop file here</div>
+                              <div className="text-xs leading-5 text-[var(--muted)]">Or click to choose a file from your device.</div>
+                            </div>
+                          );
+                        }
+                        return (
+                          <div className="grid gap-2 text-left">
+                            <div className="text-sm font-medium text-[var(--text)]">{asset.name}</div>
+                            <div className="text-xs leading-5 text-[var(--muted)]">
+                              {asset.detectedType} · {asset.mimeType} · {Math.max(1, Math.round(asset.size / 1024))} KB
+                            </div>
+                            <div className="text-xs leading-5 text-[var(--muted)]">
+                              Click or drop another file to replace it.
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </button>
+                  </>
+                )}
               </div>
             </>
           ) : null}

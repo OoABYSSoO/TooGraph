@@ -537,10 +537,15 @@ def _first_truthy(values: Any) -> Any:
 
 
 def _coerce_input_boundary_value(value: Any, value_type: str) -> Any:
-    if value_type != "json" or not isinstance(value, str):
+    if not isinstance(value, str):
         return value
 
     try:
-        return json.loads(value)
+        parsed = json.loads(value)
+        if value_type == "json":
+            return parsed
+        if value_type in {"image", "audio", "video", "file"} and isinstance(parsed, dict) and parsed.get("kind") == "uploaded_file":
+            return parsed
+        return value
     except json.JSONDecodeError:
         return value

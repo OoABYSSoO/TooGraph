@@ -1,4 +1,4 @@
-export type ValueType = "text" | "json" | "image" | "audio" | "video" | "any";
+export type ValueType = "text" | "json" | "image" | "audio" | "video" | "file" | "any";
 
 export type PortDefinition = {
   key: string;
