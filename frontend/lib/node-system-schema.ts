@@ -23,7 +23,6 @@ export type InputBoundaryNode = {
   valueType: ValueType;
   output: PortDefinition;
   defaultValue: string;
-  inputMode: "inline" | "reference";
   placeholder: string;
 };
 

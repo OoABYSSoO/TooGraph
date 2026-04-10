@@ -26,7 +26,6 @@ export const TEXT_INPUT_PRESET = {
     valueType: "text",
   },
   defaultValue: "Abyss",
-  inputMode: "inline",
   placeholder: "Enter text",
 } satisfies NodePresetDefinition;
 
@@ -42,7 +41,6 @@ export const NAME_INPUT_PRESET = {
     valueType: "text",
   },
   defaultValue: "Abyss",
-  inputMode: "inline",
   placeholder: "Enter a name",
 } satisfies NodePresetDefinition;
 
@@ -58,7 +56,6 @@ export const TASK_INPUT_PRESET = {
     valueType: "text",
   },
   defaultValue: "Research current SLG mobile ad market hooks and summarize reusable signals.",
-  inputMode: "inline",
   placeholder: "Describe the workflow task",
 } satisfies NodePresetDefinition;
 

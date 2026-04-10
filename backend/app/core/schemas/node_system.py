@@ -32,11 +32,6 @@ class ConditionOperator(str, Enum):
     EXISTS = "exists"
 
 
-class InputMode(str, Enum):
-    INLINE = "inline"
-    REFERENCE = "reference"
-
-
 class ResponseMode(str, Enum):
     JSON = "json"
     TEXT = "text"
@@ -87,7 +82,6 @@ class InputBoundaryNodeConfig(BaseModel):
     value_type: ValueType = Field(alias="valueType")
     output: PortDefinition
     default_value: str = Field(default="", alias="defaultValue")
-    input_mode: InputMode = Field(default=InputMode.INLINE, alias="inputMode")
     placeholder: str = ""
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
