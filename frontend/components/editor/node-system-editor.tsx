@@ -174,6 +174,48 @@ const TYPE_COLORS: Record<ValueType, string> = {
 const VALUE_TYPE_OPTIONS: ValueType[] = ["text", "json", "image", "audio", "video", "any"];
 const RULE_OPERATOR_OPTIONS: ConditionRule["operator"][] = ["==", "!=", ">=", "<=", ">", "<", "exists"];
 
+const INPUT_VALUE_TYPE_OPTIONS: Array<{ value: ValueType; label: string; icon: ReactNode }> = [
+  {
+    value: "text",
+    label: "Text",
+    icon: (
+      <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 fill-none stroke-current" strokeWidth="1.5">
+        <path d="M3 4.5h10M8 4.5v7M5.5 11.5h5" />
+      </svg>
+    ),
+  },
+  {
+    value: "image",
+    label: "Image",
+    icon: (
+      <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 fill-none stroke-current" strokeWidth="1.5">
+        <rect x="2.5" y="3" width="11" height="10" rx="1.5" />
+        <circle cx="6" cy="6.5" r="1" />
+        <path d="m4 11 2.5-2.5L8.5 10l1.5-1.5L12 11" />
+      </svg>
+    ),
+  },
+  {
+    value: "audio",
+    label: "Audio",
+    icon: (
+      <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 fill-none stroke-current" strokeWidth="1.5">
+        <path d="M9.5 3.5v6.2a1.8 1.8 0 1 1-1-1.6V5.2l4-1v4.5a1.8 1.8 0 1 1-1-1.6V3.5Z" />
+      </svg>
+    ),
+  },
+  {
+    value: "video",
+    label: "Video",
+    icon: (
+      <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 fill-none stroke-current" strokeWidth="1.5">
+        <rect x="2.5" y="4" width="8.5" height="8" rx="1.5" />
+        <path d="m11 7 2.5-1.5v5L11 9" />
+      </svg>
+    ),
+  },
+];
+
 function createEditorDefaults(templates: TemplateRecord[], defaultTemplateId?: string): GraphPayload {
   const preferredTemplate =
     templates.find((item) => item.template_id === defaultTemplateId) ??
@@ -1085,57 +1127,61 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
         <div className="grid gap-3 px-4 py-3">
           {config.family === "input" ? (
             <>
-              <div className="flex flex-wrap gap-2">
-                {(["text", "json", "image", "audio", "video"] as ValueType[]).map((option) => {
-                  const active = config.valueType === option;
-                  return (
-                    <button
-                      key={option}
-                      type="button"
-                      className={cn(
-                        "rounded-full border px-3 py-1.5 text-[0.72rem] uppercase tracking-[0.12em] transition-colors",
-                        active
-                          ? "border-[var(--accent)] bg-[rgba(154,52,18,0.12)] text-[var(--accent-strong)]"
-                          : "border-[rgba(154,52,18,0.16)] bg-[rgba(255,255,255,0.72)] text-[var(--muted)] hover:bg-[rgba(255,248,240,0.92)]",
-                      )}
-                      onClick={() =>
-                        data.onConfigChange?.((currentConfig) => {
-                          const currentInput = currentConfig as InputBoundaryNode;
-                          return {
-                            ...currentInput,
-                            valueType: option,
-                            output: {
-                              ...currentInput.output,
-                              valueType: option,
-                            },
-                          };
-                        })
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+                <div className="flex flex-wrap gap-2">
+                  {INPUT_VALUE_TYPE_OPTIONS.map((option) => {
+                    const active = config.valueType === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        title={option.label}
+                        aria-label={option.label}
+                        className={cn(
+                          "inline-flex h-9 w-9 items-center justify-center rounded-full border transition-colors",
+                          active
+                            ? "border-[var(--accent)] bg-[rgba(154,52,18,0.12)] text-[var(--accent-strong)]"
+                            : "border-[rgba(154,52,18,0.16)] bg-[rgba(255,255,255,0.72)] text-[var(--muted)] hover:bg-[rgba(255,248,240,0.92)]",
+                        )}
+                        onClick={() =>
+                          data.onConfigChange?.((currentConfig) => {
+                            const currentInput = currentConfig as InputBoundaryNode;
+                            return {
+                              ...currentInput,
+                              valueType: option.value,
+                              output: {
+                                ...currentInput.output,
+                                valueType: option.value,
+                              },
+                            };
+                          })
+                        }
+                      >
+                        {option.icon}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="grid gap-1">
+                  {outputs.map((port) => (
+                    <PortRow
+                      key={`output-${port.key}`}
+                      nodeId={data.nodeId}
+                      port={port}
+                      side="output"
+                      editable
+                      onRename={(nextLabel) =>
+                        data.onConfigChange?.((currentConfig) => ({
+                          ...(currentConfig as InputBoundaryNode),
+                          output: {
+                            ...(currentConfig as InputBoundaryNode).output,
+                            label: nextLabel,
+                          },
+                        }))
                       }
-                    >
-                      {option}
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="grid gap-1">
-                {outputs.map((port) => (
-                  <PortRow
-                    key={`output-${port.key}`}
-                    nodeId={data.nodeId}
-                    port={port}
-                    side="output"
-                    editable
-                    onRename={(nextLabel) =>
-                      data.onConfigChange?.((currentConfig) => ({
-                        ...(currentConfig as InputBoundaryNode),
-                        output: {
-                          ...(currentConfig as InputBoundaryNode).output,
-                          label: nextLabel,
-                        },
-                      }))
-                    }
-                  />
-                ))}
+                    />
+                  ))}
+                </div>
               </div>
               <div className="grid gap-2">
                 <textarea
