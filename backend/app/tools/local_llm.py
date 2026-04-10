@@ -29,7 +29,7 @@ def _chat_with_local_model(
     user_prompt: str,
     model: str | None = None,
     temperature: float = 0.2,
-    max_tokens: int = 80,
+    max_tokens: int | None = None,
 ) -> str:
     client = OpenAI(
         base_url=LOCAL_LLM_BASE_URL,
@@ -37,15 +37,17 @@ def _chat_with_local_model(
         http_client=httpx.Client(trust_env=False),
     )
     try:
-        response = client.chat.completions.create(
-            model=model or LOCAL_LLM_MODEL,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            messages=[
+        request_payload: dict[str, Any] = {
+            "model": model or LOCAL_LLM_MODEL,
+            "temperature": temperature,
+            "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-        )
+        }
+        if max_tokens is not None:
+            request_payload["max_tokens"] = max_tokens
+        response = client.chat.completions.create(**request_payload)
     except Exception as exc:  # pragma: no cover - network path
         raise RuntimeError(f"Local LLM request failed: {exc}") from exc
     content = (response.choices[0].message.content or "").strip()

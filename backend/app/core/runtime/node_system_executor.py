@@ -375,7 +375,6 @@ def _generate_agent_response(
         system_prompt=config.system_instruction or "You are a precise workflow agent.",
         user_prompt=user_prompt,
         temperature=0.2,
-        max_tokens=160,
     )
 
     response_payload: dict[str, Any] = {"summary": content}
