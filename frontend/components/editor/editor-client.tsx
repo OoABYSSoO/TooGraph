@@ -129,8 +129,7 @@ type TemplateRecord = {
   default_graph_name: string;
   supported_node_types: string[];
   state_schema: StateField[];
-  default_graph: Omit<GraphPayload, "graph_id">;
-  default_node_system_graph?: Omit<EditorClientGraphPayload, "graph_id"> | null;
+  default_node_system_graph: Omit<EditorClientGraphPayload, "graph_id">;
 };
 
 export type EditorClientTemplateRecord = TemplateRecord;
@@ -187,13 +186,14 @@ const NODE_PRESETS: Record<string, EditorNodePreset> = Object.fromEntries(
 
 function createEditorDefaults(templates: TemplateRecord[]): GraphPayload {
   const helloWorldTemplate = templates.find((item) => item.template_id === HELLO_WORLD_TEMPLATE_ID);
+  const defaultNodeSystemGraph = helloWorldTemplate?.default_node_system_graph;
 
   return {
     graph_id: null,
     name: helloWorldTemplate?.default_graph_name ?? "Hello World",
     template_id: helloWorldTemplate?.template_id ?? HELLO_WORLD_TEMPLATE_ID,
     theme_config:
-      helloWorldTemplate?.default_graph.theme_config ?? {
+      defaultNodeSystemGraph?.theme_config ?? {
         theme_preset: "hello_local",
         domain: "llm_validation",
         genre: "hello_world",

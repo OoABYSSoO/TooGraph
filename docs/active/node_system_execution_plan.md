@@ -705,6 +705,7 @@ agent node 的 skill attachment 已经有可依赖的数据源。
 - `creative_factory` 已扩展到 `review + condition` 第三阶段闭环
 - `creative_factory` 第三阶段模板已通过 validate/run，并能正确命中 `pass / revise` 分支
 - `creative_factory` 已扩展到 `storyboards / prompts / todo / finalize` 主链原型
+- 模板默认入口已收口到 `default_node_system_graph`，不再继续维护旧 `default_graph` 默认图
 - `/editor/new` 已支持按模板创建新节点系统图
 - 旧 `hello_model` 图仍作为兼容路径保留，尚未完全退出主验证链路
 

@@ -6,77 +6,6 @@ from app.templates.hello_world.handlers import get_hello_world_supported_node_ty
 from app.templates.hello_world.state import get_hello_world_state_keys, get_hello_world_state_schema
 
 
-def _create_node(
-    *,
-    node_id: str,
-    node_type: str,
-    label: str,
-    x: int,
-    y: int,
-    reads: list[str] | None = None,
-    writes: list[str] | None = None,
-    params: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    params = params or {}
-    return {
-        "id": node_id,
-        "type": node_type,
-        "label": label,
-        "position": {"x": x, "y": y},
-        "reads": reads or [],
-        "writes": writes or [],
-        "params": params,
-        "config": dict(params),
-        "implementation": {
-            "executor": "node_handler",
-            "handler_key": node_type,
-            "tool_keys": ["generate_hello_greeting"] if node_type == "hello_model" else [],
-        },
-    }
-
-
-def _create_edge(*, edge_id: str, source: str, target: str, flow_keys: list[str]) -> dict[str, Any]:
-    return {
-        "id": edge_id,
-        "source": source,
-        "target": target,
-        "flow_keys": flow_keys,
-        "edge_kind": "normal",
-    }
-
-
-def _create_default_graph(theme_preset: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "name": theme_preset.get("graph_name") or "Hello World",
-        "template_id": "hello_world",
-        "theme_config": theme_preset["theme_config"],
-        "state_schema": get_hello_world_state_schema(),
-        "nodes": [
-            _create_node(node_id="start_1", node_type="start", label="Start", x=80, y=220),
-            _create_node(
-                node_id="hello_model_1",
-                node_type="hello_model",
-                label="Hello Model",
-                x=360,
-                y=220,
-                reads=["name"],
-                writes=["name", "greeting", "final_result", "llm_response"],
-                params={
-                    "name": "Abyss",
-                    "temperature": 0.2,
-                    "max_tokens": 40,
-                },
-            ),
-            _create_node(node_id="end_1", node_type="end", label="End", x=660, y=220, reads=["greeting", "final_result"]),
-        ],
-        "edges": [
-            _create_edge(edge_id="edge_1", source="start_1", target="hello_model_1", flow_keys=["name"]),
-            _create_edge(edge_id="edge_2", source="hello_model_1", target="end_1", flow_keys=["greeting", "final_result"]),
-        ],
-        "metadata": {},
-    }
-
-
 def _create_default_node_system_graph(theme_preset: dict[str, Any]) -> dict[str, Any]:
     return {
         "graph_family": "node_system",
@@ -240,6 +169,5 @@ def get_hello_world_template() -> dict[str, Any]:
         "state_keys": get_hello_world_state_keys(),
         "state_schema": get_hello_world_state_schema(),
         "theme_presets": [theme_preset],
-        "default_graph": _create_default_graph(theme_preset),
         "default_node_system_graph": _create_default_node_system_graph(theme_preset),
     }
