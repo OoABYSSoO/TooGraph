@@ -132,18 +132,16 @@ export const HELLO_GREETING_AGENT_PRESET = {
   taskInstruction: "Return a short usage introduction for the provided name.",
   skills: [
     {
-      name: "generate_greeting",
-      skillKey: "generate_hello_greeting",
-      inputMapping: {
-        name: "$inputs.name",
-      },
+      name: "output_usage_introduction",
+      skillKey: "output_usage_introduction",
+      inputMapping: {},
       contextBinding: {},
       usage: "required",
     },
   ],
   responseMode: "json",
   outputBinding: {
-    greeting: "$skills.generate_greeting.greeting",
+    greeting: "$skills.output_usage_introduction.greeting",
   },
 } satisfies NodePresetDefinition;
 

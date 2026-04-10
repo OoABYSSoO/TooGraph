@@ -75,18 +75,16 @@ def _create_default_node_system_graph(theme_preset: dict[str, Any]) -> dict[str,
                         "taskInstruction": "Return a short usage introduction for the provided name.",
                         "skills": [
                             {
-                                "name": "generate_greeting",
-                                "skillKey": "generate_hello_greeting",
-                                "inputMapping": {
-                                    "name": "$inputs.name",
-                                },
+                                "name": "output_usage_introduction",
+                                "skillKey": "output_usage_introduction",
+                                "inputMapping": {},
                                 "contextBinding": {},
                                 "usage": "required",
                             }
                         ],
                         "responseMode": "json",
                         "outputBinding": {
-                            "greeting": "$skills.generate_greeting.greeting",
+                            "greeting": "$skills.output_usage_introduction.greeting",
                         },
                     },
                     "previewText": "",

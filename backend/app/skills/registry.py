@@ -30,6 +30,7 @@ def get_skill_registry(*, include_disabled: bool = False) -> dict[str, SkillFunc
         "prepare_video_generation_todo": prepare_video_generation_todo_skill,
         "finalize_creative_package": finalize_creative_package_skill,
         "generate_hello_greeting": tools["generate_hello_greeting"],
+        "output_usage_introduction": tools["output_usage_introduction"],
         "fetch_benchmark_assets": tools["fetch_benchmark_assets"],
         "normalize_asset_records": tools["normalize_asset_records"],
         "select_top_video_assets": tools["select_top_video_assets"],

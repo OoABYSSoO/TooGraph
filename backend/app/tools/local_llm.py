@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -18,6 +19,8 @@ def _env_first(*keys: str, default: str) -> str:
 LOCAL_LLM_BASE_URL = _env_first("LOCAL_BASE_URL", "OPENAI_BASE_URL", "LOCAL_LLM_BASE_URL", default="http://127.0.0.1:8888/v1").rstrip("/")
 LOCAL_LLM_MODEL = _env_first("LOCAL_TEXT_MODEL", "TEXT_MODEL", "LOCAL_MODEL_NAME", "UPSTREAM_MODEL_NAME", "LOCAL_LLM_MODEL", default="qwen-local")
 LOCAL_LLM_API_KEY = _env_first("LOCAL_API_KEY", "OPENAI_API_KEY", "LITELLM_MASTER_KEY", "LOCAL_LLM_API_KEY", default="sk-local")
+ROOT_DIR = Path(__file__).resolve().parents[3]
+LOCAL_USAGE_GUIDE_PATH = ROOT_DIR / "使用介绍.md"
 
 
 def _chat_with_local_model(
@@ -90,4 +93,19 @@ def generate_hello_greeting(state: dict[str, Any], params: dict[str, Any] | None
         "greeting": greeting,
         "final_result": greeting,
         "llm_response": llm_response,
+    }
+
+
+def output_usage_introduction(state: dict[str, Any], params: dict[str, Any] | None = None) -> dict[str, Any]:
+    _ = state
+    _ = params
+    if not LOCAL_USAGE_GUIDE_PATH.exists():
+        raise RuntimeError(f"Local usage guide file not found: {LOCAL_USAGE_GUIDE_PATH}")
+    content = LOCAL_USAGE_GUIDE_PATH.read_text(encoding="utf-8").strip()
+    if not content:
+        raise RuntimeError(f"Local usage guide file is empty: {LOCAL_USAGE_GUIDE_PATH}")
+    return {
+        "greeting": content,
+        "final_result": content,
+        "source_path": str(LOCAL_USAGE_GUIDE_PATH),
     }
