@@ -1,5 +1,26 @@
 <template>
   <div class="buddy-widget" aria-live="polite">
+    <aside
+      v-if="shouldShowMascotDebugPanel"
+      class="buddy-widget__debug-panel"
+      aria-label="Mascot action debug panel"
+    >
+      <div class="buddy-widget__debug-title">动作调试</div>
+      <div v-for="group in BUDDY_DEBUG_ACTION_GROUPS" :key="group.label" class="buddy-widget__debug-group">
+        <span class="buddy-widget__debug-label">{{ group.label }}</span>
+        <div class="buddy-widget__debug-actions">
+          <button
+            v-for="action in group.actions"
+            :key="action.action"
+            type="button"
+            class="buddy-widget__debug-button"
+            @click="triggerMascotDebugAction(action.action)"
+          >
+            {{ action.label }}
+          </button>
+        </div>
+      </div>
+    </aside>
     <div
       class="buddy-widget__anchor"
       :class="[
@@ -286,7 +307,7 @@
         class="buddy-widget__avatar"
         :class="{
           'buddy-widget__avatar--roaming': mascotMotion === 'roam',
-          'buddy-widget__avatar--spinning': mascotMotion === 'spin',
+          'buddy-widget__avatar--hopping': mascotMotion === 'hop',
         }"
         :style="avatarStyle"
         :title="t('buddy.dragHint')"
@@ -299,7 +320,7 @@
           :mood="mood"
           :motion="mascotMotion"
           :facing="mascotFacing"
-          :dragging="isDragging"
+          :dragging="isMascotDragging"
           :tap-nonce="tapNonce"
           :look-x="mascotLook.x"
           :look-y="mascotLook.y"
@@ -383,8 +404,16 @@ type BuddyQueuedTurn = {
 };
 
 type BuddyMood = "idle" | "thinking" | "speaking" | "error";
-type BuddyMascotMotion = "idle" | "roam" | "hop" | "spin";
+type BuddyMascotMotion = "idle" | "roam" | "hop";
 type BuddyMascotFacing = "front" | "left" | "right";
+type BuddyMascotDebugAction = "idle" | "thinking" | "speaking" | "error" | "tap" | "dragging" | "hop" | "roam" | "face-left" | "face-front" | "face-right";
+type BuddyMascotDebugActionGroup = {
+  label: string;
+  actions: Array<{
+    label: string;
+    action: BuddyMascotDebugAction;
+  }>;
+};
 type BuddyModelOption = {
   value: string;
   label: string;
@@ -401,9 +430,35 @@ const RUN_TRACE_MAX_ENTRIES = 24;
 const BUDDY_ROAM_MIN_DELAY_MS = 8000;
 const BUDDY_ROAM_MAX_DELAY_MS = 18000;
 const BUDDY_ROAM_MOVE_DURATION_MS = 980;
-const BUDDY_ROAM_SPIN_DURATION_MS = 980;
-const BUDDY_ROAM_SPIN_CHANCE = 0.22;
 const BUDDY_ROAM_MIN_DISTANCE_PX = 132;
+const BUDDY_DEBUG_ACTION_GROUPS: BuddyMascotDebugActionGroup[] = [
+  {
+    label: "状态",
+    actions: [
+      { label: "Idle", action: "idle" },
+      { label: "Thinking", action: "thinking" },
+      { label: "Speaking", action: "speaking" },
+      { label: "Error", action: "error" },
+    ],
+  },
+  {
+    label: "动作",
+    actions: [
+      { label: "Tap", action: "tap" },
+      { label: "Drag", action: "dragging" },
+      { label: "Hop", action: "hop" },
+      { label: "Roam", action: "roam" },
+    ],
+  },
+  {
+    label: "朝向",
+    actions: [
+      { label: "Left", action: "face-left" },
+      { label: "Front", action: "face-front" },
+      { label: "Right", action: "face-right" },
+    ],
+  },
+];
 
 const { t } = useI18n();
 const route = useRoute();
@@ -440,6 +495,7 @@ const mascotLook = ref({ x: 0, y: 0 });
 const mascotMotion = ref<BuddyMascotMotion>("idle");
 const mascotFacing = ref<BuddyMascotFacing>("front");
 const messageListElement = ref<HTMLElement | null>(null);
+const debugDragging = ref(false);
 const pointerDrag = ref<{
   pointerId: number;
   startX: number;
@@ -457,6 +513,7 @@ let speakingIdleTimerId: number | null = null;
 let mascotLookFrameId: number | null = null;
 let buddyRoamTimerId: number | null = null;
 let buddyRoamMotionTimerId: number | null = null;
+let buddyDebugActionTimerId: number | null = null;
 let pendingMascotLookPointer: { x: number; y: number } | null = null;
 let chatSessionInitializationPromise: Promise<void> | null = null;
 const backgroundReviewAbortControllers = new Set<AbortController>();
@@ -464,10 +521,12 @@ const runTraceStartedAtByKey = new Map<string, number>();
 let nextBuddyMessageClientOrder = 0;
 
 const isDragging = computed(() => Boolean(pointerDrag.value?.moved));
+const isMascotDragging = computed(() => isDragging.value || debugDragging.value);
+const shouldShowMascotDebugPanel = computed(() => route.path === "/buddy");
 const canBuddyRoam = computed(() =>
   !isPanelOpen.value &&
   mood.value === "idle" &&
-  !isDragging.value &&
+  !isMascotDragging.value &&
   queuedTurns.value.length === 0 &&
   activeRunId.value === null,
 );
@@ -564,6 +623,7 @@ onBeforeUnmount(() => {
   clearSessionDeleteConfirmTimeout();
   clearAvatarSingleClickTimer();
   clearSpeakingIdleTimer();
+  clearBuddyDebugActionTimer();
   cancelBuddyRoamTimers();
   cancelMascotLookFrame();
   closeEventSource();
@@ -659,6 +719,7 @@ function handleBuddyModelSelectVisibleChange(visible: boolean) {
 
 function handlePointerDown(event: PointerEvent) {
   cancelBuddyRoamTimers();
+  clearBuddyDebugActionTimer();
   pointerDrag.value = {
     pointerId: event.pointerId,
     startX: event.clientX,
@@ -757,25 +818,7 @@ function runBuddyIdleRoam() {
   if (!canBuddyRoam.value) {
     return;
   }
-  if (Math.random() < BUDDY_ROAM_SPIN_CHANCE) {
-    runBuddyIdleSpin();
-    return;
-  }
   runBuddyIdleHop();
-}
-
-function runBuddyIdleSpin() {
-  if (!canBuddyRoam.value) {
-    return;
-  }
-  mascotFacing.value = Math.random() > 0.5 ? "left" : "right";
-  mascotMotion.value = "spin";
-  buddyRoamMotionTimerId = window.setTimeout(() => {
-    mascotMotion.value = "idle";
-    mascotFacing.value = "front";
-    buddyRoamMotionTimerId = null;
-    scheduleBuddyRoam();
-  }, BUDDY_ROAM_SPIN_DURATION_MS);
 }
 
 function runBuddyIdleHop() {
@@ -836,6 +879,86 @@ function cancelBuddyRoamTimers() {
   mascotFacing.value = "front";
 }
 
+function clearBuddyDebugActionTimer() {
+  if (buddyDebugActionTimerId !== null) {
+    window.clearTimeout(buddyDebugActionTimerId);
+    buddyDebugActionTimerId = null;
+  }
+  debugDragging.value = false;
+}
+
+function playMascotDebugMotion(motion: BuddyMascotMotion, durationMs: number, facing: BuddyMascotFacing) {
+  mood.value = "idle";
+  mascotFacing.value = facing;
+  mascotMotion.value = motion;
+  buddyDebugActionTimerId = window.setTimeout(() => {
+    mascotMotion.value = "idle";
+    mascotFacing.value = "front";
+    buddyDebugActionTimerId = null;
+  }, durationMs);
+}
+
+function triggerMascotDebugAction(action: BuddyMascotDebugAction) {
+  cancelBuddyRoamTimers();
+  clearSpeakingIdleTimer();
+  clearBuddyDebugActionTimer();
+  switch (action) {
+    case "idle":
+      mood.value = "idle";
+      mascotMotion.value = "idle";
+      mascotFacing.value = "front";
+      break;
+    case "thinking":
+      mood.value = "thinking";
+      mascotMotion.value = "idle";
+      mascotFacing.value = "front";
+      break;
+    case "speaking":
+      mood.value = "speaking";
+      mascotMotion.value = "idle";
+      mascotFacing.value = "front";
+      break;
+    case "error":
+      mood.value = "error";
+      mascotMotion.value = "idle";
+      mascotFacing.value = "front";
+      break;
+    case "tap":
+      mood.value = "idle";
+      tapNonce.value += 1;
+      break;
+    case "dragging":
+      mood.value = "idle";
+      debugDragging.value = true;
+      buddyDebugActionTimerId = window.setTimeout(() => {
+        debugDragging.value = false;
+        buddyDebugActionTimerId = null;
+      }, 1100);
+      break;
+    case "hop":
+      playMascotDebugMotion("hop", 760, "front");
+      break;
+    case "roam":
+      playMascotDebugMotion("roam", BUDDY_ROAM_MOVE_DURATION_MS, "right");
+      break;
+    case "face-left":
+      mood.value = "idle";
+      mascotMotion.value = "idle";
+      mascotFacing.value = "left";
+      break;
+    case "face-front":
+      mood.value = "idle";
+      mascotMotion.value = "idle";
+      mascotFacing.value = "front";
+      break;
+    case "face-right":
+      mood.value = "idle";
+      mascotMotion.value = "idle";
+      mascotFacing.value = "right";
+      break;
+  }
+}
+
 function randomBetween(min: number, max: number) {
   if (max <= min) {
     return min;
@@ -850,6 +973,7 @@ async function sendMessage() {
   }
 
   cancelBuddyRoamTimers();
+  clearBuddyDebugActionTimer();
   errorMessage.value = "";
   isPanelOpen.value = true;
   await waitForChatSessionInitialization();
@@ -1723,6 +1847,79 @@ function formatErrorMessage(error: unknown): string {
   font-family: var(--graphite-font-ui);
 }
 
+.buddy-widget__debug-panel {
+  position: fixed;
+  left: 18px;
+  bottom: 18px;
+  z-index: 4520;
+  width: min(320px, calc(100vw - 36px));
+  display: grid;
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid rgba(154, 52, 18, 0.14);
+  border-radius: 8px;
+  background:
+    var(--graphite-glass-specular),
+    var(--graphite-glass-lens),
+    rgba(255, 252, 247, 0.86);
+  box-shadow: 0 18px 42px rgba(69, 42, 20, 0.12);
+  backdrop-filter: blur(22px) saturate(1.25);
+  pointer-events: auto;
+}
+
+.buddy-widget__debug-title {
+  color: rgba(90, 59, 36, 0.96);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.buddy-widget__debug-group {
+  display: grid;
+  gap: 5px;
+}
+
+.buddy-widget__debug-label {
+  color: rgba(108, 82, 62, 0.72);
+  font-size: 10px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.buddy-widget__debug-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.buddy-widget__debug-button {
+  appearance: none;
+  min-height: 26px;
+  padding: 0 9px;
+  border: 1px solid rgba(154, 52, 18, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.7);
+  color: rgba(77, 51, 32, 0.92);
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.buddy-widget__debug-button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(37, 99, 235, 0.22);
+  background: rgba(239, 246, 255, 0.86);
+  color: #1d4ed8;
+}
+
+.buddy-widget__debug-button:active {
+  transform: translateY(0);
+}
+
 .buddy-widget__anchor {
   position: fixed;
   top: 0;
@@ -1798,8 +1995,8 @@ function formatErrorMessage(error: unknown): string {
   animation: buddy-widget-avatar-hop-path 980ms cubic-bezier(0.2, 1.05, 0.32, 1) both;
 }
 
-.buddy-widget__avatar--spinning {
-  animation: buddy-widget-avatar-spin-pop 980ms cubic-bezier(0.2, 1.18, 0.3, 1) both;
+.buddy-widget__avatar--hopping {
+  animation: buddy-widget-avatar-hop-path 760ms cubic-bezier(0.2, 1.05, 0.32, 1) both;
 }
 
 .buddy-widget__avatar:active {
@@ -1828,26 +2025,13 @@ function formatErrorMessage(error: unknown): string {
 @keyframes buddy-widget-avatar-hop-path {
   0%,
   100% {
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
   }
   34% {
-    transform: translateY(-18px) scaleX(0.94) scaleY(1.06);
+    transform: translateY(-18px);
   }
   66% {
-    transform: translateY(-6px) scaleX(1.03) scaleY(0.97);
-  }
-}
-
-@keyframes buddy-widget-avatar-spin-pop {
-  0%,
-  100% {
-    transform: translateY(0) scale(1);
-  }
-  28% {
-    transform: translateY(-20px) scaleX(0.92) scaleY(1.08);
-  }
-  72% {
-    transform: translateY(4px) scaleX(1.06) scaleY(0.94);
+    transform: translateY(-6px);
   }
 }
 
