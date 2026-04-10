@@ -1294,6 +1294,14 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
           "group/node relative h-full min-w-[160px] rounded-[18px] border bg-[linear-gradient(180deg,rgba(255,250,241,0.98)_0%,rgba(248,237,219,0.96)_100%)] shadow-[0_18px_36px_rgba(60,41,20,0.1)]",
           selected ? "border-[var(--accent)]" : "border-[rgba(154,52,18,0.25)]",
         )}
+        onDoubleClickCapture={(event) => {
+          if (!isCollapsible || isExpanded) return;
+          const target = event.target as HTMLElement | null;
+          if (target?.closest("button, input, textarea, select, summary, [data-delete-surface='true']")) return;
+          event.preventDefault();
+          event.stopPropagation();
+          data.onToggleExpanded?.();
+        }}
         onClickCapture={(event) => {
           const target = event.target as HTMLElement | null;
           if (target?.closest("[data-delete-surface='true']")) return;
@@ -1412,7 +1420,10 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                 type="button"
                 aria-label={isExpanded ? "折叠节点" : "展开节点"}
                 title={isExpanded ? "折叠节点" : "展开节点"}
-                className="grid h-8 w-8 place-items-center rounded-full border border-[rgba(154,52,18,0.16)] bg-[rgba(255,255,255,0.72)] text-[var(--accent-strong)] transition hover:border-[rgba(154,52,18,0.28)] hover:bg-[rgba(255,248,240,0.92)]"
+                className={cn(
+                  "grid h-8 w-8 place-items-center rounded-full border border-[rgba(154,52,18,0.16)] bg-[rgba(255,255,255,0.72)] text-[var(--accent-strong)] transition hover:border-[rgba(154,52,18,0.28)] hover:bg-[rgba(255,248,240,0.92)]",
+                  selected ? "opacity-100" : "opacity-0 group-hover/node:opacity-100",
+                )}
                 onClick={() => data.onToggleExpanded?.()}
               >
                 <svg
