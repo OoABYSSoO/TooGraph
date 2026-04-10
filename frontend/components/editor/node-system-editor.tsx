@@ -1006,25 +1006,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                         ))}
                       </select>
                     </label>
-                    <label className="grid gap-1.5 text-sm text-[var(--muted)]">
-                      <span>Input Mode</span>
-                      <select
-                        className="rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3 py-3 text-[var(--text)]"
-                        value={config.inputMode}
-                        onChange={(event) =>
-                          data.onConfigChange?.((currentConfig) => ({
-                            ...(currentConfig as InputBoundaryNode),
-                            inputMode: event.target.value as InputBoundaryNode["inputMode"],
-                          }))
-                        }
-                      >
-                        {["inline", "reference"].map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                    <div />
                   </div>
                 </>
               ) : null}
