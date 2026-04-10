@@ -357,11 +357,14 @@ def _skill_uses_response(mapping: dict[str, str]) -> bool:
 def _parse_llm_json_response(content: str, output_keys: list[str]) -> dict[str, Any]:
     """清理 LLM 返回的 markdown 代码块标记，尝试解析 JSON，按 output_keys 提取字段值。
     解析失败时，将原始字符串作为每个 key 的 fallback 值。"""
-    cleaned = re.sub(r"```(?:json)?\s*|\s*```", "", content).strip()
+    if not content:
+        return {key: "" for key in output_keys}
+    cleaned = re.sub(r"^\s*```(?:json)?\s*\n?", "", content)
+    cleaned = re.sub(r"\n?\s*```\s*$", "", cleaned).strip()
     try:
         parsed = json.loads(cleaned)
         if isinstance(parsed, dict):
-            return {key: parsed.get(key, cleaned) for key in output_keys}
+            return {key: parsed.get(key) for key in output_keys}
     except json.JSONDecodeError:
         pass
     return {key: cleaned for key in output_keys}
