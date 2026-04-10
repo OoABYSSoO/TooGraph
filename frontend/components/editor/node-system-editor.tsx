@@ -1300,15 +1300,15 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
           </svg>
         </button>
         {deleteConfirmPoint ? (
-          <div
-            className="pointer-events-none absolute z-30"
-            style={{
-              left: deleteConfirmPoint.x,
-              top: deleteConfirmPoint.y,
-              transform: "translate(-50%, -50%)",
-            }}
-          >
-            <div className="pointer-events-none absolute left-1/2 top-0 -translate-x-1/2 -translate-y-[calc(100%+8px)] whitespace-nowrap rounded-full border border-[rgba(185,28,28,0.16)] bg-[rgba(255,248,248,0.96)] px-2.5 py-1 text-[0.68rem] uppercase tracking-[0.12em] text-[rgb(153,27,27)] shadow-[0_10px_24px_rgba(127,29,29,0.12)]">
+          <>
+            <div
+              className="pointer-events-none absolute z-30 whitespace-nowrap rounded-full border border-[rgba(185,28,28,0.16)] bg-[rgba(255,248,248,0.96)] px-2.5 py-1 text-[0.68rem] uppercase tracking-[0.12em] text-[rgb(153,27,27)] shadow-[0_10px_24px_rgba(127,29,29,0.12)]"
+              style={{
+                left: deleteConfirmPoint.x,
+                top: deleteConfirmPoint.y,
+                transform: "translate(-50%, calc(-100% - 12px))",
+              }}
+            >
               Delete node?
             </div>
             <button
@@ -1316,7 +1316,12 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
               aria-label="确认删除节点"
               title="确认删除节点"
               data-delete-surface="true"
-              className="pointer-events-auto grid h-8 w-8 place-items-center rounded-full border border-[rgba(185,28,28,0.28)] bg-[rgb(185,28,28)] text-white shadow-[0_12px_28px_rgba(127,29,29,0.28)] transition hover:scale-[1.03]"
+              className="absolute z-30 grid h-8 w-8 place-items-center rounded-full border border-[rgba(185,28,28,0.28)] bg-[rgb(185,28,28)] text-white shadow-[0_12px_28px_rgba(127,29,29,0.28)] transition hover:scale-[1.03]"
+              style={{
+                left: deleteConfirmPoint.x,
+                top: deleteConfirmPoint.y,
+                transform: "translate(-50%, -50%)",
+              }}
               onClick={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
@@ -1327,7 +1332,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                 <path d="m4.5 8 2.25 2.25L11.5 5.5" />
               </svg>
             </button>
-          </div>
+          </>
         ) : null}
         <div className="flex items-start justify-between gap-3 border-b border-[rgba(154,52,18,0.12)] pl-4 pr-14 py-3">
           <div className="min-w-0 flex-1">
