@@ -96,6 +96,7 @@ type FlowNodeData = {
   nodeId: string;
   config: NodePresetDefinition;
   previewText: string;
+  onConfigChange?: (updater: (config: NodePresetDefinition) => NodePresetDefinition) => void;
 };
 
 type FlowNode = Node<FlowNodeData>;
@@ -939,9 +940,15 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
               value={config.defaultValue}
               rows={5}
               placeholder={config.placeholder}
-              readOnly
+              onChange={(event) => data.onConfigChange?.((currentConfig) => ({
+                ...(currentConfig as InputBoundaryNode),
+                defaultValue: event.target.value,
+              }))}
               className="min-h-[120px] resize-none rounded-[16px] border border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.88)] px-3 py-3 text-sm text-[var(--text)]"
             />
+            <div className="text-xs leading-5 text-[var(--muted)]">
+              这里可以直接编辑输入内容；右侧 Inspector 里继续调整占位符、类型和端口配置。
+            </div>
           </div>
         ) : null}
 
@@ -1502,6 +1509,21 @@ function createNodeFromPreset(preset: NodePresetDefinition, position: { x: numbe
                 data: {
                   ...node.data,
                   previewText: node.data.previewText || previewTextByNode[node.id] || "",
+                  onConfigChange: (updater: (config: NodePresetDefinition) => NodePresetDefinition) => {
+                    setNodes((current) =>
+                      current.map((candidate) =>
+                        candidate.id === node.id
+                          ? {
+                              ...candidate,
+                              data: {
+                                ...candidate.data,
+                                config: updater(candidate.data.config),
+                              },
+                            }
+                          : candidate,
+                      ),
+                    );
+                  },
                 },
               }))}
               edges={edges}
