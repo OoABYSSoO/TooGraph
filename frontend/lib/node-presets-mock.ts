@@ -110,8 +110,8 @@ export const SUMMARY_AGENT_PRESET = {
 
 export const HELLO_GREETING_AGENT_PRESET = {
   presetId: "preset.agent.hello_greeting.v1",
-  label: "Usage Introduction",
-  description: "Generate a short onboarding introduction by calling the hello greeting skill.",
+  label: "Greeting With Guide",
+  description: "Let the agent greet the user, then append the local usage guide with a skill.",
   family: "agent",
   inputs: [
     {
@@ -124,35 +124,37 @@ export const HELLO_GREETING_AGENT_PRESET = {
   outputs: [
     {
       key: "greeting",
-      label: "Usage Introduction",
+      label: "Greeting With Guide",
       valueType: "text",
     },
   ],
-  systemInstruction: "You are a GraphiteUI onboarding assistant.",
-  taskInstruction: "Return a short usage introduction for the provided name.",
+  systemInstruction: "You are a friendly GraphiteUI onboarding assistant.",
+  taskInstruction: "Write one short Chinese greeting for the provided name only. Do not include usage instructions.",
   skills: [
     {
-      name: "output_usage_introduction",
-      skillKey: "output_usage_introduction",
-      inputMapping: {},
+      name: "append_usage_introduction",
+      skillKey: "append_usage_introduction",
+      inputMapping: {
+        greeting: "$response.greeting",
+      },
       contextBinding: {},
       usage: "required",
     },
   ],
   responseMode: "json",
   outputBinding: {
-    greeting: "$skills.output_usage_introduction.greeting",
+    greeting: "$skills.append_usage_introduction.greeting",
   },
 } satisfies NodePresetDefinition;
 
 export const GREETING_OUTPUT_PRESET = {
   presetId: "preset.output.greeting.v1",
-  label: "Usage Introduction Output",
-  description: "Preview and optionally persist the generated usage introduction.",
+  label: "Greeting With Guide Output",
+  description: "Preview and optionally persist the greeting followed by the local usage guide.",
   family: "output",
   input: {
     key: "value",
-    label: "Usage Introduction",
+    label: "Greeting With Guide",
     valueType: "text",
     required: true,
   },

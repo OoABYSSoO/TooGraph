@@ -268,6 +268,14 @@ def _execute_agent_node(
     skill_outputs: list[dict[str, Any]] = []
     skill_context: dict[str, Any] = {}
     registry = get_skill_registry(include_disabled=False)
+    response_payload: dict[str, Any] = {}
+
+    requires_response_before_skills = any(
+        _skill_uses_response(skill.input_mapping) or _skill_uses_response(skill.context_binding)
+        for skill in config.skills
+    )
+    if requires_response_before_skills:
+        response_payload = _generate_agent_response(config, input_values, skill_context)
 
     for skill in config.skills:
         skill_func = registry.get(skill.skill_key)
@@ -277,7 +285,7 @@ def _execute_agent_node(
             target_key: _resolve_reference(
                 source_ref,
                 inputs=input_values,
-                response={},
+                response=response_payload,
                 skills=skill_context,
                 context=skill_context,
                 graph=graph_context,
@@ -291,7 +299,7 @@ def _execute_agent_node(
             skill_context[context_key] = _resolve_reference(
                 source_ref,
                 inputs=input_values,
-                response={},
+                response=response_payload,
                 skills=skill_context,
                 context=skill_context,
                 graph=graph_context,
@@ -305,12 +313,11 @@ def _execute_agent_node(
             }
         )
 
-    response_payload: dict[str, Any] = {}
     bound_output_values = {
         output.key: _resolve_reference(
             config.output_binding.get(output.key, f"$response.{output.key}"),
             inputs=input_values,
-            response={},
+            response=response_payload,
             skills=skill_context,
             context=skill_context,
             graph=graph_context,
@@ -342,6 +349,10 @@ def _execute_agent_node(
     }
 
 
+def _skill_uses_response(mapping: dict[str, str]) -> bool:
+    return any(isinstance(source_ref, str) and source_ref.startswith("$response.") for source_ref in mapping.values())
+
+
 def _generate_agent_response(
     config: AgentNodeConfig,
     input_values: dict[str, Any],
@@ -360,12 +371,15 @@ def _generate_agent_response(
         ]
     )
 
-    content = _chat_with_local_model(
-        system_prompt=config.system_instruction or "You are a precise workflow agent.",
-        user_prompt=user_prompt,
-        temperature=0.2,
-        max_tokens=160,
-    )
+    try:
+        content = _chat_with_local_model(
+            system_prompt=config.system_instruction or "You are a precise workflow agent.",
+            user_prompt=user_prompt,
+            temperature=0.2,
+            max_tokens=160,
+        )
+    except RuntimeError:
+        content = _build_agent_fallback(output_keys, input_values)
 
     response_payload: dict[str, Any] = {"summary": content}
     if len(output_keys) == 1:
@@ -375,6 +389,15 @@ def _generate_agent_response(
     for key in output_keys:
         response_payload[key] = content
     return response_payload
+
+
+def _build_agent_fallback(output_keys: list[str], input_values: dict[str, Any]) -> str:
+    if len(output_keys) == 1 and output_keys[0] == "greeting":
+        name = str(input_values.get("name") or "朋友").strip() or "朋友"
+        return f"{name}，你好，欢迎来到 GraphiteUI。"
+    if len(output_keys) == 1:
+        return f"{output_keys[0]} generated from local fallback."
+    return "Generated from local fallback."
 
 
 def _invoke_skill(skill_func: Any, skill_inputs: dict[str, Any]) -> dict[str, Any]:

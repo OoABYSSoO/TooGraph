@@ -109,3 +109,22 @@ def output_usage_introduction(state: dict[str, Any], params: dict[str, Any] | No
         "final_result": content,
         "source_path": str(LOCAL_USAGE_GUIDE_PATH),
     }
+
+
+def append_usage_introduction(state: dict[str, Any], params: dict[str, Any] | None = None) -> dict[str, Any]:
+    _ = state
+    params = params or {}
+    greeting = str(params.get("greeting") or "").strip()
+    if not greeting:
+        raise RuntimeError("append_usage_introduction requires a non-empty greeting input.")
+    if not LOCAL_USAGE_GUIDE_PATH.exists():
+        raise RuntimeError(f"Local usage guide file not found: {LOCAL_USAGE_GUIDE_PATH}")
+    guide = LOCAL_USAGE_GUIDE_PATH.read_text(encoding="utf-8").strip()
+    if not guide:
+        raise RuntimeError(f"Local usage guide file is empty: {LOCAL_USAGE_GUIDE_PATH}")
+    combined = f"{greeting}\n\n{guide}"
+    return {
+        "greeting": combined,
+        "final_result": combined,
+        "source_path": str(LOCAL_USAGE_GUIDE_PATH),
+    }
