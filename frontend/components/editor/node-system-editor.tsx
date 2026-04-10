@@ -1195,6 +1195,8 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [draftLabel, setDraftLabel] = useState(config.label);
   const [draftDescription, setDraftDescription] = useState(config.description);
+  const [deleteConfirmPoint, setDeleteConfirmPoint] = useState<{ x: number; y: number } | null>(null);
+  const cardRef = useRef<HTMLDivElement | null>(null);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const uploadedAsset = config.family === "input" ? tryParseUploadedAssetEnvelope(config.defaultValue) : null;
 
@@ -1205,6 +1207,11 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
   useEffect(() => {
     setDraftDescription(config.description);
   }, [config.description]);
+
+  useEffect(() => {
+    if (selected) return;
+    setDeleteConfirmPoint(null);
+  }, [selected]);
 
   function commitLabelEdit() {
     const nextLabel = draftLabel.trim();
@@ -1247,13 +1254,82 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
         onResizeEnd={(_event, params) => data.onResizeEnd?.(params.width, params.height)}
       />
       <div
+        ref={cardRef}
         data-node-card="true"
         className={cn(
-          "h-full min-w-[160px] rounded-[18px] border bg-[linear-gradient(180deg,rgba(255,250,241,0.98)_0%,rgba(248,237,219,0.96)_100%)] shadow-[0_18px_36px_rgba(60,41,20,0.1)]",
+          "group/node relative h-full min-w-[160px] rounded-[18px] border bg-[linear-gradient(180deg,rgba(255,250,241,0.98)_0%,rgba(248,237,219,0.96)_100%)] shadow-[0_18px_36px_rgba(60,41,20,0.1)]",
           selected ? "border-[var(--accent)]" : "border-[rgba(154,52,18,0.25)]",
         )}
+        onClickCapture={(event) => {
+          const target = event.target as HTMLElement | null;
+          if (target?.closest("[data-delete-surface='true']")) return;
+          if (deleteConfirmPoint) {
+            setDeleteConfirmPoint(null);
+          }
+        }}
       >
-        <div className="flex items-start justify-between gap-3 border-b border-[rgba(154,52,18,0.12)] px-4 py-3">
+        <button
+          type="button"
+          aria-label="删除节点"
+          title="删除节点"
+          data-delete-surface="true"
+          className={cn(
+            "absolute right-3 top-3 z-20 grid h-8 w-8 place-items-center rounded-full border border-[rgba(154,52,18,0.14)] bg-[rgba(255,252,247,0.92)] text-[var(--muted)] shadow-[0_10px_24px_rgba(60,41,20,0.08)] transition",
+            selected || deleteConfirmPoint ? "opacity-100" : "opacity-0 group-hover/node:opacity-100",
+            deleteConfirmPoint
+              ? "border-[rgba(185,28,28,0.26)] text-[rgb(153,27,27)]"
+              : "hover:border-[rgba(154,52,18,0.24)] hover:text-[var(--accent)]",
+          )}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            const cardRect = cardRef.current?.getBoundingClientRect();
+            if (!cardRect) return;
+            setDeleteConfirmPoint({
+              x: event.clientX - cardRect.left,
+              y: event.clientY - cardRect.top,
+            });
+          }}
+        >
+          <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.5">
+            <path d="M3.5 4.5h9" />
+            <path d="M6.5 2.75h3" />
+            <path d="M5 4.5V12a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1V4.5" />
+            <path d="M6.75 6.5v4" />
+            <path d="M9.25 6.5v4" />
+          </svg>
+        </button>
+        {deleteConfirmPoint ? (
+          <div
+            className="pointer-events-none absolute z-30"
+            style={{
+              left: deleteConfirmPoint.x,
+              top: deleteConfirmPoint.y,
+              transform: "translate(-50%, -50%)",
+            }}
+          >
+            <div className="pointer-events-none absolute left-1/2 top-0 -translate-x-1/2 -translate-y-[calc(100%+8px)] whitespace-nowrap rounded-full border border-[rgba(185,28,28,0.16)] bg-[rgba(255,248,248,0.96)] px-2.5 py-1 text-[0.68rem] uppercase tracking-[0.12em] text-[rgb(153,27,27)] shadow-[0_10px_24px_rgba(127,29,29,0.12)]">
+              Delete node?
+            </div>
+            <button
+              type="button"
+              aria-label="确认删除节点"
+              title="确认删除节点"
+              data-delete-surface="true"
+              className="pointer-events-auto grid h-8 w-8 place-items-center rounded-full border border-[rgba(185,28,28,0.28)] bg-[rgb(185,28,28)] text-white shadow-[0_12px_28px_rgba(127,29,29,0.28)] transition hover:scale-[1.03]"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                data.onDelete?.();
+              }}
+            >
+              <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.7">
+                <path d="m4.5 8 2.25 2.25L11.5 5.5" />
+              </svg>
+            </button>
+          </div>
+        ) : null}
+        <div className="flex items-start justify-between gap-3 border-b border-[rgba(154,52,18,0.12)] pl-4 pr-14 py-3">
           <div className="min-w-0 flex-1">
             <div className="relative flex min-w-0 items-center gap-2">
               <span className="h-2.5 w-2.5 rounded-full bg-[rgba(154,52,18,0.55)]" />
@@ -1755,9 +1831,6 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
             <div className="flex flex-wrap justify-end gap-2">
               <Button variant="ghost" onClick={() => void data.onSavePreset?.()}>
                 Save As Preset
-              </Button>
-              <Button variant="ghost" onClick={() => data.onDelete?.()}>
-                Delete Node
               </Button>
             </div>
           ) : null}
