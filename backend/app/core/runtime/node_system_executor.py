@@ -444,7 +444,7 @@ def _generate_agent_response(
 
     user_prompt = "\n".join(
         [
-            f"Task instruction: {config.task_instruction or 'Complete the workflow task.'}",
+            f"Task instruction: {config.task_instruction or 'Use the provided inputs and skill context to complete the workflow task.'}",
             f"Inputs: {input_values}",
             f"Skill context: {skill_context}",
             f"Return only a valid JSON object with exactly these keys: {', '.join(output_keys)}.",
@@ -456,7 +456,10 @@ def _generate_agent_response(
     )
 
     content, llm_meta = _chat_with_local_model_with_meta(
-        system_prompt=config.system_instruction or "You are a precise workflow agent.",
+        system_prompt=(
+            config.system_instruction
+            or "You are a structured workflow agent. Follow the requested output schema exactly and return only valid JSON."
+        ),
         user_prompt=user_prompt,
         model=runtime_config["runtime_model_name"],
         provider_id=runtime_config["resolved_provider_id"],
