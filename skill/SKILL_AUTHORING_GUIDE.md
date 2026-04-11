@@ -76,7 +76,7 @@ Python Skill 的依赖规则：
 
 ## `skill.json`
 
-`skill.json` 是机器可读的 Skill 包定义。它决定这个 Skill 是什么、LLM 应该生成什么结构、脚本如何执行，以及最终会返回什么输出。它不保存本地使用设定；启用/禁用属于 `skill/settings.json`，可选择性由启用状态决定，写文件或执行脚本是否需确认由图/Buddy 的权限模式和能力权限声明共同决定。
+`skill.json` 是机器可读的 Skill 包定义。它决定这个 Skill 是什么、LLM 应该生成什么结构、脚本如何执行，以及最终会返回什么输出。它不保存本地使用设定；启用/禁用属于 `skill/settings.json`，是否可被选择由启用状态决定。写文件、删改文件或执行脚本是否需确认是图/Buddy 权限模式与运行时低层审批原语的职责，不应写进 Skill 包定义。
 
 标准结构：
 
@@ -150,7 +150,7 @@ Python Skill 的依赖规则：
 }
 ```
 
-`enabled`、`selectable`、`hidden`、`requiresApproval`、`capabilityPolicy`、`targets` 和 `executionTargets` 都不应写入新 `skill.json`。`settings.json` 只保存 `enabled`；`selectable`、`hidden`、按来源策略和 per-skill 审批开关都是旧协议。是否需要确认不由 Skill 自己决定，而由运行该图或 Buddy 的权限模式决定：`需确认` 下，写文件、删改文件或执行任意脚本/命令需要暂停确认；`完全访问` 下这些低层操作可自动执行。普通 Skill 调用、读取、联网搜索和 LLM 调用不因为 Skill 本身而触发确认。
+`enabled`、`selectable`、`hidden`、`requiresApproval`、`capabilityPolicy`、`targets` 和 `executionTargets` 都不应写入新 `skill.json`。`settings.json` 只保存 `enabled`；`selectable`、`hidden`、按来源策略和 per-skill 审批开关都是旧协议。是否需要确认不由 Skill 自己决定，而由运行该图或 Buddy 的权限模式决定：目标语义是 `需确认` 下写文件、删改文件或执行任意脚本/命令需要暂停确认，`完全访问` 下这些低层操作可自动执行。普通 Skill 调用、读取、联网搜索和 LLM 调用不因为 Skill 本身而触发确认。
 
 ## `SKILL.md`
 

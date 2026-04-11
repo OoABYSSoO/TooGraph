@@ -10,6 +10,8 @@
 - 产品心智已收束为“图才是 Agent，单个节点是 LLM 节点”。当前协议中仍存在 `agent` kind 命名，这是待迁移的内部命名；新设计不应继续把单节点描述为多轮 Agent。
 - 旧的 `buddy_agentic_tool_loop`、`buddy_chat_loop`、`web_research_loop` 等模板不再随仓库提供，也不再通过后端兼容逻辑修补。
 - 新版伙伴自主循环模板 `buddy_autonomous_loop` 已创建为官方图模板。它通过 Input 节点以本地文件夹方式注入 Buddy Home 选中文件，再通过子图串联请求理解、按需能力选择与动态执行、最终回复；简单闲聊或可直接回答的请求会绕过能力循环，output 只展示 `final_reply`。回复完成后，伙伴前端会另起内部 `buddy_self_review` 后台模板复盘本轮记忆与成长计划，不阻塞下一轮对话。
+- 动态 `capability.kind=subgraph` 已支持内部断点向父级 run 传播。动态子图遇到 `interrupt_after` 时，父级 run 会进入标准 `awaiting_human`，恢复仍走父级 run 的 resume API。
+- 伙伴浮窗已复用标准 `awaiting_human` 暂停卡片：能展示子图 scope、必填 state、当前已产出的内容和上下文，并在用户补充信息后恢复原 run；暂停时不会把本轮当作最终完成。
 - 当前普通模板列表提供三个可见官方图模板：`advanced_web_research_loop`（高级联网搜索）、`buddy_autonomous_loop`（伙伴自主循环）和 `graphiteui_skill_creation_workflow`（创建自定义 Skill）。仓库还包含内部后台模板 `buddy_self_review`，它不进入普通模板列表和能力选择候选。
 - 技能系统已收束为统一技能库，不再区分“伙伴技能”和“LLM 节点技能”，也不再使用 `targets` / `executionTargets` 这类旧分流字段。
 - 当前官方技能包包括 `web_search`、`graphiteui_capability_selector`、`graphiteUI_skill_builder`、`graphiteUI_script_tester` 和 `local_workspace_executor`。后续新能力应按当前统一 Skill 结构专门编写。
@@ -33,7 +35,7 @@
 - Skill 生命周期脚本使用固定文件名而不是在 manifest 中配置入口。存在 `before_llm.py` 时，运行时会在技能入参规划前执行它，并把返回的上下文注入 LLM 提示词；存在 `after_llm.py` 时，运行时会在 LLM 生成结构化技能参数后执行它，并把它返回的 JSON 当作技能结果。写入 state 仍由 GraphiteUI runtime 根据 `outputSchema` 和 `skillBindings.outputMapping` 完成，脚本不直接绑定 state。
 - 在 LLM 节点卡片选择带 `outputSchema` 的静态 skill 时，前端会自动创建 managed skill output state、添加到该节点输出端口，并写入 `skillBindings.outputMapping`，让运行时能把技能结果透传给下游节点。
 - 动态能力执行来自输入 `capability` state，不复用 `skillBindings.outputMapping`，也不会推断普通输出映射。这类节点必须只写一个 `result_package` state。包内 `outputs.<outputKey>` 保存 `{ name, description, type, value }`，不额外捏造 `fieldKey`；下游 LLM 节点会把这些虚拟输出拆开并复用普通 state/file 展开逻辑。
-- 当 `capability.kind=subgraph` 进入 LLM 节点时，该节点只负责根据当前 state 和目标模板公开输入 schema 生成子图输入；运行时负责执行对应图模板，并把公开 output 边界封装为同一套 `result_package`。这条路径不经过静态 Subgraph 节点端口 mapping，也不让 LLM 二次总结子图结果。
+- 当 `capability.kind=subgraph` 进入 LLM 节点时，该节点只负责根据当前 state 和目标模板公开输入 schema 生成子图输入；运行时负责执行对应图模板，并把公开 output 边界封装为同一套 `result_package`。这条路径不经过静态 Subgraph 节点端口 mapping，也不让 LLM 二次总结子图结果。若动态子图内部触发 `interrupt_after`，父级 run 会进入标准 `awaiting_human`，并通过 `pending_subgraph_breakpoint` 与父级 resume API 恢复。
 - 图运行前不再做旧草稿兼容补齐。提交到运行时的图必须已经符合当前协议。
 - `promptVisible` 已移除。上下文边界由节点 `reads` 决定：LLM 节点只接收自己显式读取的 state。
 - `state_schema` 支持 `binding` 元数据，用来标记某个 state 是否由技能输出自动绑定。
@@ -51,7 +53,7 @@
 - 显示名称：`联网搜索`
 - 作用：执行联网搜索、返回来源链接、本地原文文件路径和结构化错误信息。
 - 生命周期：`before_llm.py` 只补充当前日期；`after_llm.py` 接收 LLM 生成的 `query`，执行搜索和原文下载。旧的程序侧“识别时效查询并自动给 query 拼日期”逻辑已移除，是否把日期写入 query 由 LLM 根据上下文判断。
-- 启用的 Skill 默认可被图模板或能力选择器调用；运行 Skill 本身不需要确认，只有写文件、删改文件或执行任意脚本/命令会按图/Buddy 的权限模式触发确认。
+- 启用的 Skill 默认可被图模板或能力选择器调用；运行 Skill 本身不需要确认，目标上只有写文件、删改文件或执行任意脚本/命令应按图/Buddy 的权限模式触发确认。当前统一低层审批拦截仍在路线图中，不应再回到 per-skill 审批开关。
 - 它只负责搜索和资料获取，不负责最终总结。搜索词由绑定它的 LLM 节点根据任务决定；整理和总结应交给后续 LLM 节点。
 - 搜索源请求默认最多尝试 5 次，用于缓解 DuckDuckGo fallback 或外部搜索 API 的瞬时 TLS、连接中断和网关抖动。
 
@@ -67,7 +69,7 @@
 - 位置：`skill/official/graphiteui_capability_selector/`
 - 显示名称：`GraphiteUI Capability Selector`
 - 作用：根据 LLM 节点技能入参规划阶段看到的本地可用能力清单，让模型选择并校验规范化单个 `capability`。
-- 生命周期：`before_llm.py` 读取当前启用的图模板和启用的 Skill，生成候选能力清单；`after_llm.py` 接收模型选择的 `capability`，按同一清单做真实性与启用状态校验，并输出是否涉及写文件或执行脚本的审批标记。
+- 生命周期：`before_llm.py` 读取当前启用的图模板和启用的 Skill，生成候选能力清单；`after_llm.py` 接收模型选择的 `capability`，按同一清单做真实性与启用状态校验，并保留 `permissions` 供候选描述、审计和后续运行时策略使用。它不输出 `requiresApproval`，也不恢复 per-skill 审批协议。
 - 选择对象包括当前启用的图模板和启用的 Skill；图模板优先于 Skill。
 - 它不执行被选能力，不生成被选能力的运行入参，也不做程序字段匹配；模型基于候选项的名称和描述判断，脚本只做真实性与启用状态校验。
 
@@ -78,7 +80,7 @@
 - 作用：接收脚本内容和用户测试目标，由 LLM 根据当前系统环境编写测试工作区，然后在临时目录运行一次允许的测试命令。
 - 生命周期：`before_llm.py` 注入当前系统上下文，包括 OS、Python executable/version 和可用 allowlist 命令；如果输入 state 的字符串值是可读取的本地文件路径，还会把该文件文本追加到上下文；LLM 只生成 `files` 与 `command`；`after_llm.py` 写入临时文件、运行命令，并只返回 `success` 与 `result`。
 - 通用性：不再限定 Python/pytest。Python 脚本可使用 `python -m pytest`，JavaScript 脚本可在系统有 Node 时使用 `node --test`，其他脚本只要命令在 allowlist 且当前系统可执行即可。
-- 权限和依赖：声明 `file_write` 与 `subprocess` 权限，并在 `requirements.txt` 中声明 `pytest` 作为 Python 测试常用依赖。该 Skill 会执行用户提供的脚本和测试代码，是否暂停确认由当前图或 Buddy 的 `需确认` / `完全访问` 模式决定。
+- 权限和依赖：声明 `file_write` 与 `subprocess` 权限，并在 `requirements.txt` 中声明 `pytest` 作为 Python 测试常用依赖。该 Skill 会执行用户提供的脚本和测试代码；目标审批语义由当前图或 Buddy 的 `需确认` / `完全访问` 模式决定，但统一运行时低层审批拦截仍需补齐。
 
 ### `local_workspace_executor`
 
@@ -87,7 +89,7 @@
 - 作用：提供受控的单路径本地工作区操作能力，支持预读上下文、写入一个文件或执行一个脚本。
 - 生命周期：`before_llm.py` 会从图 state 和节点任务描述中提取仓库路径并预读已有文件，供 LLM 生成写入内容或执行参数；`after_llm.py` 执行 `read`、`write` 或 `execute`，并只返回 `success` 与 `result`。
 - 默认权限：预读可读取仓库内普通文件，但 `.git`、`.env`、`backend/data/settings` 永远拒绝；写入只允许 `backend/data`、`skill/user`、`graph_template/user` 和 `node_preset/user`；执行只允许 `backend/data/tmp` 和 `skill/user`。
-- 边界：该 Skill 会写本地文件并启动本地进程，是否暂停确认由当前图或 Buddy 的 `需确认` / `完全访问` 模式决定。路径白名单只是启动前检查，不是 OS 沙箱。
+- 边界：该 Skill 会写本地文件并启动本地进程。当前已有路径白名单和拒绝规则，但它们只是启动前检查，不是 OS 沙箱；按 `需确认` / `完全访问` 自动暂停或放行的统一运行时审批拦截仍是路线图项。
 
 ## 当前内置图模板
 
@@ -107,9 +109,9 @@
 - 位置：`graph_template/official/buddy_autonomous_loop/template.json`
 - 显示名称：`伙伴自主循环`
 - 作用：作为伙伴浮窗和伙伴页面的默认图循环，把本轮用户消息、对话历史、页面上下文和 Buddy Home 长期资料转成一次可审计 graph run。
-- 主要流程：输入用户消息、历史、页面上下文、伙伴模式和 Buddy Home 选中文件 -> `intake_request` 子图理解请求，必要时在 `ask_clarification` 断点等待用户澄清 -> `needs_capability` 判断是否需要启用能力；不需要时直接进入 `draft_final_response`，需要时进入 `run_capability_cycle` 调用 `graphiteui_capability_selector`，找到能力后由动态能力执行节点写唯一 `capability_result` 结果包，找不到能力时写 `capability_gap` 并在最终回复中询问是否构建该能力；多轮能力调用摘要写入 `capability_trace` -> `draft_final_response` 子图只写 `final_reply` -> `output_final` 展示 `final_reply` 并结束可见主运行。写文件、删改文件或执行脚本的确认不在模板内由 LLM 判断，而由运行时根据 `需确认` / `完全访问` 模式处理。
+- 主要流程：输入用户消息、历史、页面上下文、伙伴模式和 Buddy Home 选中文件 -> `intake_request` 子图理解请求，必要时在 `ask_clarification` 断点等待用户澄清 -> `needs_capability` 判断是否需要启用能力；不需要时直接进入 `draft_final_response`，需要时进入 `run_capability_cycle` 调用 `graphiteui_capability_selector`，找到能力后由动态能力执行节点写唯一 `capability_result` 结果包，找不到能力时写 `capability_gap` 并在最终回复中询问是否构建该能力；多轮能力调用摘要写入 `capability_trace` -> `draft_final_response` 子图只写 `final_reply` -> `output_final` 展示 `final_reply` 并结束可见主运行。写文件、删改文件或执行脚本的确认不应在模板内由 LLM 判断；目标是由运行时根据 `需确认` / `完全访问` 模式处理，这一统一低层审批拦截仍需补齐。
 - 动态能力语义：只有 `execute_capability` 读取 `selected_capability` 这个 `capability` state，并且它只写一个 `result_package` state。其他复盘节点不能读取 `capability` state，否则会被运行协议视为动态能力执行节点。
-- 断点语义：澄清和能力审批都使用子图内部 `interrupt_after`。父级 Buddy run 需要通过标准暂停/恢复路径展示子图 scope，而不是由伙伴前端额外发明确认协议。
+- 断点语义：澄清和人工确认类断点使用子图内部 `interrupt_after`。静态 Subgraph 节点和动态 `capability.kind=subgraph` 的内部断点都会通过父级 Buddy run 的标准暂停/恢复路径展示子图 scope，而不是由伙伴前端额外发明确认协议。写文件、删改文件或执行脚本这类低层操作审批不应由 LLM 判断，仍需要由运行时权限原语补齐。
 - 边界：当前模板已经表达完整可见回复主干，但长期记忆写回、Buddy Home 修改、图补丁应用和更完整的伙伴页面暂停交互仍应作为后续显式模板/命令流补齐，不能隐藏在 output 节点或前端逻辑里。
 
 ### `buddy_self_review`
@@ -128,7 +130,7 @@
 - 主要流程：输入需求 -> 调用 `graphiteui_capability_selector` 检查已有能力候选 -> 评估需求 -> 必要时断点询问用户 -> 确认是否继续创建 -> 断点确认示例输入输出 -> 调用 `graphiteUI_skill_builder` 生成 `skill_key`、`skill.json`、`SKILL.md`、`before_llm.py`、`after_llm.py`、`requirements.txt` -> 判断是否需要脚本测试 -> 调用 `graphiteUI_script_tester` -> 测试失败时经 `script_test_passed` 条件分支回到构建节点，最多三轮 -> 写入前断点审查 -> 用户明确批准后调用 `local_workspace_executor` 写入 `skill/user/<skill_key>/`。
 - 断点语义：`ask_clarification`、`draft_example_io`、`review_generated_skill` 使用 `interrupt_after` 暂停，分别等待用户补充澄清回答、样例反馈和写入批准。
 - 能力候选语义：模板会把 `graphiteui_capability_selector` 返回的候选能力保存为普通 `json` state 供需求评估读取，而不是保存为 `capability` state。原因是当前协议规定 LLM 节点读取 `capability` state 等价于动态执行该能力；这里只是做“是否已有能力可满足需求”的审查，不应触发执行。
-- 写入语义：模板只写用户自定义 Skill 目录，不写官方 `skill/` 目录；写入动作由 `local_workspace_executor` 完成，是否暂停确认由运行时的 `需确认` / `完全访问` 模式决定。`review_generated_skill` 只做生成方案审查，不再承担低层文件写入审批。`graphiteUI_skill_builder` 仍然只负责生成文件内容，不负责写入、测试、启用或修改官方 Skill。
+- 写入语义：模板只写用户自定义 Skill 目录，不写官方 `skill/` 目录；写入动作由 `local_workspace_executor` 完成。`review_generated_skill` 只做生成方案审查，不再承担低层文件写入审批；低层文件写入应由后续统一运行时审批拦截按 `需确认` / `完全访问` 模式处理。`graphiteUI_skill_builder` 仍然只负责生成文件内容，不负责写入、测试、启用或修改官方 Skill。
 - 视觉和协议约束：该模板只使用编辑器可创建的 `input / LLM / condition / output` 节点，LLM 节点最多绑定一个 Skill，condition 节点只使用固定 `true / false / exhausted` 分支，模板不手写节点尺寸，交给前端默认尺寸和用户后续拖拽调整。
 
 ### `graphiteUI_skill_builder`
@@ -146,7 +148,7 @@
 - subgraph 节点把一个 graph 模板复制为当前父图内的独立实例。模板分为 Git 管理的官方模板和 `graph_template/user/` 下的用户自定义模板；前端“保存为模板”只会创建用户自定义模板。节点卡片先展示公开输入/输出胶囊，再展示紧凑的内部 DAG 缩略图、内部能力摘要和子图内部运行状态；DAG 缩略图按行优先顺序展示实际内部执行/判断节点，隐藏 `input` / `output` 边界节点，宽度未知时默认三列，并会根据节点卡片当前宽度在 `1` 到可见节点总数之间自适应列数。缩略图会展示普通连线和条件分支连线，连线路径复用主图 sequence-flow 回流线逻辑并使用缩略图尺寸参数；只有目标节点明确落到下一行时才走下方换行路径，轻微纵向偏移仍保持回流路径。节点位置和连线路径来自同一个响应式布局计算，不再照搬大画布坐标导致横向裁切或因卡片尺寸变化造成连线错位。运行时会把子图内部节点状态投射到缩略图颜色、闪烁高亮与当前节点提示上；主图和缩略图的已完成节点都使用绿色包框。双击节点会打开当前实例的工作区页签，页签内复用正式画布编辑器。子图页签的保存会回写父图中该节点的 `config.graph`，并按内部 `input` / `output` 边界重新同步父图公开 state 端口；也可以另存为普通图。画布左上工具区会显示来源胶囊，例如“来自：Untitled Graph / 节点：高级联网搜索 Subgraph”。
 - output 节点负责展示、预览、导出或链接图运行产物，不拥有隐藏持久化策略；Markdown 预览支持安全渲染标题、列表、引用、分割线、表格、链接、inline code 和带语言标签的浅色代码围栏，并保留代码块缩进与横向滚动。
 - Skills 页面围绕统一 skill catalog 展示、导入、启用、禁用和删除技能。
-- 伙伴浮窗支持模型选择、对话入口、后端持久化历史会话、新建会话、历史下拉、删除确认、全屏展开、markdown 回复、运行过程一行折叠摘要、节点级流式输出预览和每步耗时，并会以 `buddy_autonomous_loop` 作为可见伙伴运行模板。主运行完成回复后，前端会把同一次运行的 state 快照灌入内部 `buddy_self_review` 模板并作为后台 run 启动；后台复盘不占用 `activeRunId`，不锁定下一轮输入。后续重点是把暂停卡片、恢复断点、拒绝或取消运行、运行与确认视图，以及 Buddy Home 写回流程接入完整交互。
+- 伙伴浮窗支持模型选择、对话入口、后端持久化历史会话、新建会话、历史下拉、删除确认、全屏展开、markdown 回复、运行过程一行折叠摘要、节点级流式输出预览和每步耗时，并会以 `buddy_autonomous_loop` 作为可见伙伴运行模板。主运行完成回复后，前端会把同一次运行的 state 快照灌入内部 `buddy_self_review` 模板并作为后台 run 启动；后台复盘不占用 `activeRunId`，不锁定下一轮输入。浮窗已把 `awaiting_human` 展示为暂停卡片，支持必填 state 草稿、底部输入恢复当前断点、暂停期间停止继续消费队列，并在卡片中先展示当前产物/上下文再展示需要补充的信息。后续重点是伙伴页面运行与确认视图、拒绝/取消/刷新找回、暂停队列策略细化和 Buddy Home 写回流程。
 
 ## 当前后端能力
 
@@ -157,15 +159,16 @@
 - LangGraph runtime 是当前运行主链。
 - 后端不再在 graph run 入口修补旧模板结构；提交什么图，就按当前协议校验和执行什么图。
 - graph run、run detail、SSE 事件、状态快照和 artifact 输出仍是审计与回放的基础。
+- 静态 Subgraph 节点和动态 `capability.kind=subgraph` 的内部 `interrupt_after` 都会通过父级 run 的 `pending_subgraph_breakpoint` 暂停，并在父级 resume 后继续内部 checkpoint。
+- 本地文件夹输入已能在普通仓库和 `.worktrees/<branch>` 工作区下读取根目录 `buddy_home/`，避免伙伴模板在分支工作区中丢失 Buddy Home 上下文。
 - `backend/app/buddy/home.py` 负责根目录 `buddy_home/` 的默认文件生成；`backend/app/buddy/store.py` 已提供基于 `SOUL.md`、`policy.json` 和 `buddy.db` 的 profile、policy、memories、session summary、revisions、command 记录、`buddy_sessions` 和 `buddy_messages` 存取；`backend/app/buddy/commands.py` 已有命令记录入口。完整 Buddy Home 写回图流程仍未补齐。
 - `backend/app/buddy/commands.py` 仍保留 `graph_patch.draft` 草案记录 stub。这是历史遗留入口，只记录待审批草案，不能应用图补丁，也没有接入 GraphCommandBus、图 revision、undo 或完整审计闭环。
 
 ## 当前仍在路线图中
 
 - 伙伴运行来源收束：官方模板已经使用 `metadata.origin=buddy`，但前端伙伴启动侧仍有 `buddy_run`、`buddy_permission_tier`、`buddy_graph_patch_drafts_enabled` 等旧标记，需要清理或迁移为明确策略字段。
-- 继续收束 `subgraph` 子图体验：补齐父子图运行详情页的审计聚合、事件定位和从缩略图点击跳转到内部节点。
-- 补齐动态 `capability.kind=subgraph` 的断点传播、父级暂停和恢复。
-- 补齐伙伴浮窗和伙伴页面的标准断点展示、恢复、拒绝、取消、暂停期间队列阻塞和刷新后找回能力。
+- 继续收束 `subgraph` 子图体验：补齐父子图运行详情页的审计聚合、事件定位、从缩略图点击跳转到内部节点，以及动态子图断点在运行详情中的更完整展示。
+- 完善伙伴断点交互：浮窗已有基础暂停卡片和恢复能力；仍需补齐拒绝、取消、刷新后找回、暂停期间队列策略细化，伙伴页面还需要运行与确认视图。
 - 补齐动态能力审批：写文件、删改文件和执行任意脚本/命令应按图或 Buddy 的 `需确认` / `完全访问` 模式进入标准 `awaiting_human`，而不是只靠提示词提醒；普通联网、读取、搜索和运行 Skill 本身不单独触发审批。
 - 实现统一 `activity_events`，让伙伴浮窗和运行详情页能展示文件探索、命令执行、写入行数、脚本测试等低层操作摘要。
 - 清理或按新命令流重建历史 `graph_patch.draft` stub，并完成图补丁预览、GraphCommandBus、graph revision、undo 和审计闭环。

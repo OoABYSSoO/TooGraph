@@ -8,7 +8,7 @@
   - 当前正式能力
   - 当前技术栈
   - 当前技能和模板状态
-  - 近期仍在路线图中的事项
+  - 已完成能力、部分完成的技术债和近期仍在路线图中的事项
 
 - [structured-output-and-function-calling.md](structured-output-and-function-calling.md)
   - `demo/` 中 Claude Code、Hermes Agent 和 OpenClaw 的结构化输出实现对比
@@ -21,7 +21,7 @@
 
 - [future/buddy-autonomous-agent-roadmap.md](future/buddy-autonomous-agent-roadmap.md)
   - 伙伴、自主工具循环、技能生成和长期协作能力的唯一长期参考
-  - 包含 graph-first 运行模型、可追踪资产与本地设置分离、Buddy Home、伙伴循环子图化、子图组件、skill manifest 契约、`capability` state、`result_package` 动态结果包、技能说明胶囊、技能绑定 state、能力选择、Skill 生成能力、伙伴断点交互、活动事件和 function call 取舍
+  - 包含 graph-first 运行模型、可追踪资产与本地设置分离、Buddy Home、伙伴循环子图化、子图组件、skill manifest 契约、`capability` state、`result_package` 动态结果包、技能说明胶囊、技能绑定 state、能力选择、Skill 生成能力、伙伴断点交互、已落地基线、剩余优先级、活动事件和 function call 取舍
 
 ## 已清理
 

@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-import os
 from typing import Any
 
 from app.core.model_provider_templates import get_provider_template, list_provider_templates, normalize_transport
 from app.core.storage.settings_store import load_app_settings
 from app.tools.local_llm import (
     get_default_text_model,
-    get_local_llm_base_url,
     get_local_gateway_runtime_config,
     get_local_route_model_names,
     has_local_llm_api_key_configured,
@@ -138,8 +136,6 @@ def _normalize_provider_config(
     template_transport = str(template.get("transport") or "openai-compatible")
     transport = _safe_transport(saved_provider.get("transport"), template_transport)
     default_base_url = str(template.get("base_url") or "")
-    if provider_id == "local":
-        default_base_url = get_local_llm_base_url()
     if provider_id == "openrouter" and isinstance(runtime_config, dict):
         cloud_config = _dict_or_empty(runtime_config.get("cloud"))
         default_base_url = str(cloud_config.get("api_base") or default_base_url)
@@ -148,7 +144,7 @@ def _normalize_provider_config(
     existing_saved_provider = bool(saved_provider)
     enabled = saved_provider.get("enabled")
     if not isinstance(enabled, bool):
-        enabled = provider_id == "local" or existing_saved_provider and provider_id not in {"bedrock"}
+        enabled = existing_saved_provider and provider_id not in {"bedrock"}
 
     auth_header = str(saved_provider.get("auth_header") or template.get("auth_header") or "Authorization").strip()
     if "auth_scheme" in saved_provider:
@@ -237,7 +233,9 @@ def _build_local_provider_models(
     force_refresh: bool,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str]:
     llama_config = _dict_or_empty(runtime_config.get("llama")) if isinstance(runtime_config, dict) else {}
-    local_route_models = get_local_route_model_names(force_refresh=force_refresh, runtime_config=runtime_config)
+    local_route_models = (
+        get_local_route_model_names(force_refresh=force_refresh, runtime_config=runtime_config) if provider.get("saved") else []
+    )
     saved_local_models = list(provider.get("models") or [])
     saved_text_model_ref = str(saved_settings.get("text_model_ref") or "").strip()
     if saved_text_model_ref:
@@ -249,7 +247,9 @@ def _build_local_provider_models(
         if saved_text_model_ref and saved_text_provider == "local"
         else local_route_models[0]
         if local_route_models
-        else get_default_text_model(force_refresh=False)
+        else str(saved_local_models[0].get("model") or "").strip()
+        if saved_local_models
+        else ""
     )
 
     saved_by_name = {str(model.get("model") or "").lower(): model for model in saved_local_models}
@@ -266,24 +266,7 @@ def _build_local_provider_models(
         for model_name in local_route_models
     ]
 
-    if provider.get("saved"):
-        source_models = saved_local_models
-    elif discovered_models:
-        source_models = discovered_models
-    elif saved_local_models:
-        source_models = saved_local_models
-    else:
-        source_models = [
-            {
-                "model": preferred_local_text_model,
-                "label": preferred_local_text_model,
-                "modalities": ["text"],
-                "reasoning": True,
-                "route_target": "",
-                "context_window": None,
-                "max_tokens": None,
-            }
-        ]
+    source_models = saved_local_models if provider.get("saved") else []
 
     selected_model_names = [str(model.get("model") or "").strip() for model in source_models if str(model.get("model") or "").strip()]
     discovered_model_names = [str(model.get("model") or "").strip() for model in discovered_models if str(model.get("model") or "").strip()]
@@ -483,18 +466,9 @@ def build_model_catalog(*, force_refresh: bool = False) -> dict[str, Any]:
             )
         )
 
-    if not local_text_model:
-        local_text_model = get_default_text_model(force_refresh=False)
-    fallback_text_ref = build_model_ref("local", local_text_model)
+    fallback_text_ref = build_model_ref("local", local_text_model) if local_text_model else ""
     saved_text_model_ref = str(saved_settings.get("text_model_ref") or "").strip()
     saved_video_model_ref = str(saved_settings.get("video_model_ref") or "").strip()
-    env_video_model = (
-        os.environ.get("LOCAL_VIDEO_MODEL")
-        or os.environ.get("VIDEO_MODEL")
-        or os.environ.get("LOCAL_MODEL_NAME")
-        or os.environ.get("UPSTREAM_MODEL_NAME")
-        or local_text_model
-    )
 
     return {
         "default_text_model_ref": _resolve_default_model_ref(
@@ -505,7 +479,7 @@ def build_model_catalog(*, force_refresh: bool = False) -> dict[str, Any]:
         "default_video_model_ref": _resolve_default_model_ref(
             saved_video_model_ref,
             provider_entries,
-            fallback_ref=build_model_ref("local", env_video_model),
+            fallback_ref=build_model_ref("local", local_text_model) if local_text_model else "",
         ),
         "providers": provider_entries,
         "provider_templates": list_provider_templates(),

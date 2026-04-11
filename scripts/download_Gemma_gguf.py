@@ -7,15 +7,13 @@ from textwrap import dedent
 
 MESSAGE = dedent(
     """\
-    [GraphiteUI] Legacy bundled model download is retired.
+    [GraphiteUI] Bundled model download is retired.
 
-    Use the model manager for your OpenAI-compatible gateway, then point GraphiteUI at it:
+    Use the model manager for your OpenAI-compatible gateway, then configure it in GraphiteUI:
 
-      LOCAL_BASE_URL=http://127.0.0.1:8000/v1
-      LOCAL_API_KEY=<optional api key>
-      LOCAL_TEXT_MODEL=<model name exposed by your gateway>
+      GraphiteUI -> Model Providers -> Local / Custom OpenAI-compatible
 
-    This wrapper only exists to guide migration and exits without downloading models.
+    This script exits without downloading models.
     """
 )
 
