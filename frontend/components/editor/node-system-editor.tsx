@@ -1207,7 +1207,6 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
   const [draftDescription, setDraftDescription] = useState(config.description);
   const [isDeleteConfirmActive, setIsDeleteConfirmActive] = useState(false);
   const deleteConfirmTimeoutRef = useRef<number | null>(null);
-  const hoverHideTimeoutRef = useRef<number | null>(null);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const uploadedAsset = config.family === "input" ? tryParseUploadedAssetEnvelope(config.defaultValue) : null;
 
@@ -1229,29 +1228,16 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
       if (deleteConfirmTimeoutRef.current) {
         window.clearTimeout(deleteConfirmTimeoutRef.current);
       }
-      if (hoverHideTimeoutRef.current) {
-        window.clearTimeout(hoverHideTimeoutRef.current);
-      }
     };
   }, []);
 
   function showNodeResizeHandles() {
-    if (hoverHideTimeoutRef.current) {
-      window.clearTimeout(hoverHideTimeoutRef.current);
-      hoverHideTimeoutRef.current = null;
-    }
     setIsHoveringNode(true);
   }
 
-  function hideNodeResizeHandlesSoon() {
+  function hideNodeResizeHandles() {
     if (isResizingNode) return;
-    if (hoverHideTimeoutRef.current) {
-      window.clearTimeout(hoverHideTimeoutRef.current);
-    }
-    hoverHideTimeoutRef.current = window.setTimeout(() => {
-      hoverHideTimeoutRef.current = null;
-      setIsHoveringNode(false);
-    }, 180);
+    setIsHoveringNode(false);
   }
 
   function clearDeleteConfirmState() {
@@ -1305,45 +1291,45 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
 
   return (
     <>
-      <NodeResizer
-        isVisible={selected || isHoveringNode || isResizingNode}
-        minWidth={160}
-        minHeight={minHeight}
-        handleStyle={{ width: 8, height: 8, borderRadius: 4, background: "var(--accent)", border: "none" }}
-        lineStyle={{ borderColor: "var(--accent)", borderWidth: 1 }}
-        onResizeStart={() => {
-          showNodeResizeHandles();
-          setIsResizingNode(true);
-        }}
-        onResizeEnd={(_event, params) => {
-          setIsResizingNode(false);
-          data.onResizeEnd?.(params.width, params.height);
-        }}
-      />
-      <div
-        data-node-card="true"
-        className={cn(
-          "group/node relative h-full min-w-[160px] rounded-[18px] border bg-[linear-gradient(180deg,rgba(255,250,241,0.98)_0%,rgba(248,237,219,0.96)_100%)] shadow-[0_18px_36px_rgba(60,41,20,0.1)]",
-          selected ? "border-[var(--accent)]" : "border-[rgba(154,52,18,0.25)]",
-        )}
-        onPointerEnter={showNodeResizeHandles}
-        onPointerLeave={hideNodeResizeHandlesSoon}
-        onDoubleClickCapture={(event) => {
+      <div className="relative h-full" onPointerEnter={showNodeResizeHandles} onPointerLeave={hideNodeResizeHandles}>
+        <div className="absolute inset-[-14px]" />
+        <NodeResizer
+          isVisible={selected || isHoveringNode || isResizingNode}
+          minWidth={160}
+          minHeight={minHeight}
+          handleStyle={{ width: 8, height: 8, borderRadius: 4, background: "var(--accent)", border: "none" }}
+          lineStyle={{ borderColor: "var(--accent)", borderWidth: 1 }}
+          onResizeStart={() => {
+            showNodeResizeHandles();
+            setIsResizingNode(true);
+          }}
+          onResizeEnd={(_event, params) => {
+            setIsResizingNode(false);
+            data.onResizeEnd?.(params.width, params.height);
+          }}
+        />
+        <div
+          data-node-card="true"
+          className={cn(
+            "group/node relative z-10 h-full min-w-[160px] rounded-[18px] border bg-[linear-gradient(180deg,rgba(255,250,241,0.98)_0%,rgba(248,237,219,0.96)_100%)] shadow-[0_18px_36px_rgba(60,41,20,0.1)]",
+            selected ? "border-[var(--accent)]" : "border-[rgba(154,52,18,0.25)]",
+          )}
+          onDoubleClickCapture={(event) => {
           if (!isCollapsible || isExpanded) return;
           const target = event.target as HTMLElement | null;
           if (target?.closest("button, input, textarea, select, summary, [data-delete-surface='true']")) return;
           event.preventDefault();
           event.stopPropagation();
           data.onToggleExpanded?.();
-        }}
-        onClickCapture={(event) => {
+          }}
+          onClickCapture={(event) => {
           const target = event.target as HTMLElement | null;
           if (target?.closest("[data-delete-surface='true']")) return;
           if (isDeleteConfirmActive) {
             clearDeleteConfirmState();
           }
-        }}
-      >
+          }}
+        >
         <button
           type="button"
           aria-label={isDeleteConfirmActive ? "确认删除节点" : "删除节点"}
@@ -1921,6 +1907,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
               </Button>
             </div>
           ) : null}
+        </div>
         </div>
       </div>
     </>
