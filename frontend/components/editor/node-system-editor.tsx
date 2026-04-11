@@ -208,7 +208,7 @@ type PresetDocument = {
 
 const HELLO_WORLD_TEMPLATE_ID = "hello_world";
 const DEFAULT_EDITOR_TEXT_MODEL_REF = "local/lm-local";
-const DEFAULT_AGENT_THINKING_ENABLED = false;
+const DEFAULT_AGENT_THINKING_ENABLED = true;
 const DEFAULT_AGENT_TEMPERATURE = 0.2;
 const TYPE_COLORS: Record<ValueType, string> = {
   text: "#d97706",
@@ -259,7 +259,7 @@ function normalizeNodeConfig<T extends NodePresetDefinition>(config: T): T {
     ...config,
     modelSource: config.modelSource ?? "global",
     model: config.model ?? "",
-    thinkingMode: config.thinkingMode ?? "inherit",
+    thinkingMode: config.thinkingMode === "off" ? "off" : "on",
     temperature: normalizeAgentTemperature(config.temperature),
   } satisfies AgentNode;
   return normalizedConfig as T;
@@ -280,10 +280,7 @@ function resolveAgentRuntimeConfig(
   const overrideModel = normalizedConfig.model?.trim() ?? "";
   const resolvedModel =
     normalizedConfig.modelSource === "override" && overrideModel ? overrideModel : globalTextModelRef;
-  const resolvedThinking =
-    normalizedConfig.thinkingMode === "inherit"
-      ? globalThinkingEnabled
-      : normalizedConfig.thinkingMode === "on";
+  const resolvedThinking = normalizedConfig.thinkingMode === "on";
   const resolvedTemperature = normalizeAgentTemperature(normalizedConfig.temperature ?? defaultAgentTemperature);
 
   return {
@@ -376,16 +373,12 @@ function buildModelSelectOptions(
 function buildThinkingSelectOptions(agentRuntime: ReturnType<typeof resolveAgentRuntimeConfig>) {
   return [
     {
-      value: "inherit",
-      label: `默认（当前${agentRuntime.globalThinkingEnabled ? "开" : "关"}）`,
-    },
-    {
       value: "off",
-      label: "关闭",
+      label: "off",
     },
     {
       value: "on",
-      label: "开启",
+      label: "on",
     },
   ];
 }
@@ -437,7 +430,7 @@ function AgentInlineRuntimeControls({
         ))}
       </InlineRuntimeSelect>
       <InlineRuntimeSelect
-        value={agentRuntime.thinkingMode ?? "inherit"}
+        value={agentRuntime.resolvedThinking ? "on" : "off"}
         title={`Resolved thinking: ${agentRuntime.resolvedThinking ? "On" : "Off"}`}
         onChange={(nextValue) =>
           onConfigChange((currentConfig) => ({
@@ -2347,7 +2340,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                           <span>Thinking</span>
                           <select
                             className="rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3 py-3 text-[var(--text)]"
-                            value={agentRuntime.thinkingMode}
+                            value={agentRuntime.resolvedThinking ? "on" : "off"}
                             onChange={(event) =>
                               data.onConfigChange?.((currentConfig) => ({
                                 ...(currentConfig as AgentNode),
@@ -2355,7 +2348,6 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                               }))
                             }
                           >
-                            <option value="inherit">inherit</option>
                             <option value="off">off</option>
                             <option value="on">on</option>
                           </select>

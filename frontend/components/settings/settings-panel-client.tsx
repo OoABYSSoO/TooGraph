@@ -65,7 +65,7 @@ function buildDraftFromSettings(settings: SettingsPayload): SettingsDraft {
   return {
     text_model_ref: settings.agent_runtime_defaults?.model ?? settings.model.text_model_ref,
     video_model_ref: settings.model.video_model_ref,
-    thinking_enabled: settings.agent_runtime_defaults?.thinking_enabled ?? false,
+    thinking_enabled: settings.agent_runtime_defaults?.thinking_enabled ?? true,
     temperature: settings.agent_runtime_defaults?.temperature ?? 0.2,
   };
 }
@@ -238,7 +238,7 @@ export function SettingsPanelClient() {
             />
           </label>
           <div className="rounded-[16px] border border-[var(--line)] bg-[rgba(255,255,255,0.6)] px-3.5 py-3 text-sm text-[var(--muted)]">
-            Nodes with <span className="font-medium text-[var(--text)]">thinking = 默认</span> will follow this global switch.
+            New agent nodes start from this default value. Existing nodes can still be changed per node.
           </div>
           <div className="flex items-center gap-2">
             <Button variant="ghost" onClick={handleSave} disabled={!isDirty || isSaving}>
