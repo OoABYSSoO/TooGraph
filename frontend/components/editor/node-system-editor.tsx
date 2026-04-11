@@ -1306,21 +1306,32 @@ function PortCreateButton({
       <button
         type="button"
         className={cn(
-          "relative inline-flex min-h-7 max-w-full items-center rounded-full border border-[rgba(154,52,18,0.16)] bg-[rgba(255,252,247,0.92)] text-sm text-[var(--muted)] shadow-[0_8px_18px_rgba(60,41,20,0.06)] transition hover:border-[rgba(154,52,18,0.24)] hover:bg-[rgba(255,248,240,0.92)] hover:text-[var(--accent)]",
-          side === "input" ? "justify-start pl-5 pr-3 text-left" : "justify-end pl-3 pr-5 text-right",
+          "relative inline-flex min-h-6 max-w-full items-center gap-1.5 rounded-full border border-[rgba(154,52,18,0.16)] bg-[rgba(255,252,247,0.92)] py-0.5 text-sm text-[var(--muted)] shadow-[0_8px_18px_rgba(60,41,20,0.06)] transition hover:border-[rgba(154,52,18,0.24)] hover:bg-[rgba(255,248,240,0.92)] hover:text-[var(--accent)]",
+          side === "input" ? "ml-[-14px] pl-1 pr-2.5" : "mr-[-14px] pl-2.5 pr-1",
         )}
         onClick={openEditor}
       >
-        <span
-          className={cn(
-            "pointer-events-none absolute top-1/2 h-3 w-3 -translate-y-1/2 rounded-full border-2 border-[rgba(154,52,18,0.18)] bg-[rgba(255,255,255,0.96)]",
-            side === "input" ? "-left-[7px]" : "-right-[7px]",
-          )}
-        >
-          <span className="absolute left-1/2 top-1/2 h-[1.5px] w-[7px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--accent-strong)]" />
-          <span className="absolute left-1/2 top-1/2 h-[7px] w-[1.5px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--accent-strong)]" />
-        </span>
-        <span>{side === "input" ? "Add input" : "Add output"}</span>
+        {side === "input" ? (
+          <>
+            <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[rgba(154,52,18,0.08)]">
+              <svg width="8" height="8" viewBox="0 0 8 8" className="text-[var(--accent-strong)]">
+                <line x1="4" y1="0.5" x2="4" y2="7.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                <line x1="0.5" y1="4" x2="7.5" y2="4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            </span>
+            <span>Add input</span>
+          </>
+        ) : (
+          <>
+            <span>Add output</span>
+            <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[rgba(154,52,18,0.08)]">
+              <svg width="8" height="8" viewBox="0 0 8 8" className="text-[var(--accent-strong)]">
+                <line x1="4" y1="0.5" x2="4" y2="7.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                <line x1="0.5" y1="4" x2="7.5" y2="4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            </span>
+          </>
+        )}
       </button>
       {isOpen ? (
         <div
