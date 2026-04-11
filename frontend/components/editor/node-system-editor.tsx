@@ -1756,12 +1756,10 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                       id={buildHandleId("input", CREATE_INPUT_PORT_KEY)}
                       type="target"
                       position={Position.Left}
-                      className="!left-[-7px] !top-1/2 !m-0 !h-3 !w-3 !-translate-y-1/2 !border-2 !border-[rgba(255,250,241,0.96)]"
-                      style={{ backgroundColor: TYPE_COLORS[data.connectingSourceType] }}
+                      className="!left-[-9px] !top-1/2 !m-0 !h-5 !w-5 !-translate-y-1/2 !border-2 !border-[rgba(154,52,18,0.18)] !bg-[rgba(255,255,255,0.96)] after:content-['+'] after:absolute after:left-1/2 after:top-1/2 after:-translate-x-1/2 after:-translate-y-1/2 after:text-[11px] after:font-semibold after:text-[var(--accent-strong)]"
                       isConnectable
                     />
-                    <span className="ml-2 inline-flex items-center gap-2 text-sm">
-                      <span className="grid h-5 w-5 place-items-center rounded-full border border-[rgba(154,52,18,0.18)] bg-[rgba(255,255,255,0.82)] text-[var(--accent-strong)]">+</span>
+                    <span className="ml-4 inline-flex items-center gap-2 text-sm">
                       <span>Add {formatValueTypeLabel(data.connectingSourceType)} input</span>
                     </span>
                   </div>
