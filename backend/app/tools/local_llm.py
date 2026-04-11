@@ -8,6 +8,8 @@ from typing import Any
 
 import httpx
 
+from app.core.storage.settings_store import load_app_settings
+
 
 def _env_first(*keys: str, default: str) -> str:
     for key in keys:
@@ -107,16 +109,37 @@ def get_local_route_model_names() -> list[str]:
     return [DEFAULT_LOCAL_MODEL_ALIAS]
 
 
+def _extract_model_name_from_ref(model_ref: str | None) -> str:
+    trimmed = str(model_ref or "").strip()
+    if not trimmed:
+        return ""
+    return trimmed.split("/")[-1].strip()
+
+
 def get_default_text_model() -> str:
+    saved_settings = load_app_settings()
+    saved_model_name = _extract_model_name_from_ref(saved_settings.get("text_model_ref"))
+    if saved_model_name:
+        return saved_model_name
     aliases = get_local_route_model_names()
     return aliases[0] if aliases else DEFAULT_LOCAL_MODEL_ALIAS
 
 
 def get_default_agent_temperature() -> float:
+    saved_settings = load_app_settings()
+    runtime_defaults = saved_settings.get("agent_runtime_defaults")
+    if isinstance(runtime_defaults, dict):
+        saved_temperature = runtime_defaults.get("temperature")
+        if isinstance(saved_temperature, (int, float)):
+            return max(0.0, min(float(saved_temperature), 2.0))
     return DEFAULT_AGENT_TEMPERATURE
 
 
 def get_default_agent_thinking_enabled() -> bool:
+    saved_settings = load_app_settings()
+    runtime_defaults = saved_settings.get("agent_runtime_defaults")
+    if isinstance(runtime_defaults, dict) and isinstance(runtime_defaults.get("thinking_enabled"), bool):
+        return bool(runtime_defaults["thinking_enabled"])
     return DEFAULT_AGENT_THINKING_ENABLED
 
 

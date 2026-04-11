@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
+from app.core.storage.settings_store import load_app_settings
 from app.tools.local_llm import (
     LOCAL_LLM_BASE_URL,
     get_default_text_model,
@@ -42,6 +43,10 @@ def get_default_text_model_ref() -> str:
 
 
 def get_default_video_model_name() -> str:
+    saved_settings = load_app_settings()
+    saved_video_model_ref = str(saved_settings.get("video_model_ref") or "").strip()
+    if saved_video_model_ref:
+        return split_model_ref(saved_video_model_ref, default_provider="local")[1]
     return (
         os.environ.get("LOCAL_VIDEO_MODEL")
         or os.environ.get("VIDEO_MODEL")

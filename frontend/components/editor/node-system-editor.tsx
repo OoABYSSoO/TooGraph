@@ -304,7 +304,7 @@ function InlineRuntimeSelect({
   children,
   title,
 }: {
-  label: string;
+  label?: string;
   value: string;
   onChange: (value: string) => void;
   children: ReactNode;
@@ -312,12 +312,14 @@ function InlineRuntimeSelect({
 }) {
   return (
     <label
-      className="relative flex min-w-0 items-center gap-2 rounded-full border border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.82)] pl-3 pr-8 text-[0.74rem] shadow-[0_8px_18px_rgba(60,41,20,0.05)]"
+      className="relative flex min-w-0 items-center gap-2 rounded-full border border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.82)] px-3 pr-8 text-[0.74rem] shadow-[0_8px_18px_rgba(60,41,20,0.05)]"
       title={title}
     >
-      <span className="shrink-0 uppercase tracking-[0.14em] text-[var(--accent-strong)]">{label}</span>
+      {label ? (
+        <span className="shrink-0 uppercase tracking-[0.14em] text-[var(--accent-strong)]">{label}</span>
+      ) : null}
       <select
-        aria-label={label}
+        aria-label={label || title || "Runtime select"}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className="min-w-0 appearance-none bg-transparent py-1.5 text-[var(--text)] outline-none"
@@ -335,6 +337,13 @@ function InlineRuntimeSelect({
   );
 }
 
+function formatModelChoiceLabel(modelRef: string) {
+  const trimmed = modelRef.trim();
+  if (!trimmed) return "";
+  const parts = trimmed.split("/");
+  return parts[parts.length - 1] || trimmed;
+}
+
 function buildModelSelectOptions(
   agentRuntime: ReturnType<typeof resolveAgentRuntimeConfig>,
   availableModelRefs: string[],
@@ -343,7 +352,7 @@ function buildModelSelectOptions(
   const options: Array<{ value: string; label: string }> = [
     {
       value: "__global__",
-      label: `Global · ${agentRuntime.globalTextModelRef}`,
+      label: formatModelChoiceLabel(agentRuntime.globalTextModelRef),
     },
   ];
   const seen = new Set<string>(["__global__"]);
@@ -353,11 +362,11 @@ function buildModelSelectOptions(
 
   for (const modelRef of candidates) {
     const trimmed = modelRef.trim();
-    if (!trimmed || seen.has(trimmed)) continue;
+    if (!trimmed || trimmed === agentRuntime.globalTextModelRef || seen.has(trimmed)) continue;
     seen.add(trimmed);
     options.push({
       value: trimmed,
-      label: trimmed,
+      label: formatModelChoiceLabel(trimmed),
     });
   }
 
@@ -368,15 +377,15 @@ function buildThinkingSelectOptions(agentRuntime: ReturnType<typeof resolveAgent
   return [
     {
       value: "inherit",
-      label: `Inherit · ${agentRuntime.globalThinkingEnabled ? "On" : "Off"}`,
+      label: `默认（当前${agentRuntime.globalThinkingEnabled ? "开" : "关"}）`,
     },
     {
       value: "off",
-      label: "Off",
+      label: "关闭",
     },
     {
       value: "on",
-      label: "On",
+      label: "开启",
     },
   ];
 }
@@ -401,7 +410,6 @@ function AgentInlineRuntimeControls({
   return (
     <div className="grid grid-cols-2 gap-2">
       <InlineRuntimeSelect
-        label="Model"
         value={selectedModelValue}
         title={`Resolved model: ${agentRuntime.resolvedModel}`}
         onChange={(nextValue) =>
@@ -429,7 +437,6 @@ function AgentInlineRuntimeControls({
         ))}
       </InlineRuntimeSelect>
       <InlineRuntimeSelect
-        label="Thinking"
         value={agentRuntime.thinkingMode ?? "inherit"}
         title={`Resolved thinking: ${agentRuntime.resolvedThinking ? "On" : "Off"}`}
         onChange={(nextValue) =>
