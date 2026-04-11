@@ -344,6 +344,147 @@ test("buildHumanReviewPanelModel renders an inner subgraph breakpoint against th
   assert.deepEqual(panel.requiredNow.map((row) => row.key), ["manual_feedback"]);
 });
 
+test("buildHumanReviewPanelModel renders a dynamic subgraph breakpoint from the pending graph snapshot", () => {
+  const document = createDocument();
+  document.state_schema.selected_capability = {
+    name: "Selected Capability",
+    description: "",
+    type: "capability",
+    value: { kind: "subgraph", key: "dynamic_breakpoint_subgraph" },
+    color: "#475569",
+  };
+  document.state_schema.dynamic_result = {
+    name: "Dynamic Result",
+    description: "",
+    type: "result_package",
+    value: null,
+    color: "#0891b2",
+  };
+  document.nodes.dynamic_executor = {
+    kind: "agent",
+    name: "Execute Capability",
+    description: "",
+    ui: { position: { x: 0, y: 0 } },
+    reads: [
+      { state: "selected_capability", required: true },
+      { state: "question", required: true },
+    ],
+    writes: [{ state: "dynamic_result", mode: "replace" }],
+    config: {
+      skillKey: "",
+      taskInstruction: "",
+      modelSource: "global",
+      model: "",
+      thinkingMode: "on",
+      temperature: 0.2,
+    },
+  };
+  const run: RunDetail = {
+    ...createRun(),
+    current_node_id: "dynamic_executor",
+    node_status_map: { dynamic_executor: "paused" },
+    subgraph_status_map: { dynamic_executor: { inner_agent: "paused", inner_output: "idle" } },
+    metadata: {
+      pending_subgraph_breakpoint: {
+        subgraph_node_id: "dynamic_executor",
+        subgraph_node_name: "Dynamic Breakpoint Subgraph",
+        capability_kind: "subgraph",
+        capability_key: "dynamic_breakpoint_subgraph",
+        inner_node_id: "inner_agent",
+        inner_node_name: "Inner Agent",
+        subgraph_path: ["dynamic_executor"],
+        state_values: {
+          final_reply: "dynamic pause input",
+          approval_note: "",
+        },
+        node_status_map: {
+          inner_agent: "paused",
+          inner_output: "idle",
+        },
+        node_executions: [
+          {
+            node_id: "inner_agent",
+            node_type: "agent",
+            status: "success",
+            duration_ms: 1,
+            input_summary: "",
+            output_summary: "",
+            artifacts: {
+              inputs: {},
+              outputs: {},
+              family: "agent",
+              state_reads: [{ state_key: "final_reply", input_key: "final_reply", value: "dynamic pause input" }],
+              state_writes: [
+                {
+                  state_key: "final_reply",
+                  output_key: "final_reply",
+                  mode: "replace",
+                  value: "dynamic pause input",
+                  changed: false,
+                },
+              ],
+            },
+            warnings: [],
+            errors: [],
+          },
+        ],
+        graph_snapshot: {
+          graph_id: "dynamic_subgraph_dynamic_breakpoint_subgraph",
+          name: "Dynamic Breakpoint Subgraph",
+          state_schema: {
+            final_reply: {
+              name: "Final Reply",
+              description: "The dynamic subgraph output",
+              type: "markdown",
+              value: "",
+              color: "#2563eb",
+            },
+            approval_note: {
+              name: "Approval Note",
+              description: "Human approval note",
+              type: "text",
+              value: "",
+              color: "#7c3aed",
+            },
+          },
+          nodes: {
+            inner_agent: {
+              kind: "agent",
+              name: "Inner Agent",
+              description: "",
+              ui: { position: { x: 0, y: 0 } },
+              reads: [{ state: "final_reply", required: true }],
+              writes: [{ state: "final_reply", mode: "replace" }],
+              config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+            },
+            inner_output: {
+              kind: "agent",
+              name: "Inner Output",
+              description: "",
+              ui: { position: { x: 240, y: 0 } },
+              reads: [
+                { state: "final_reply", required: true },
+                { state: "approval_note", required: true },
+              ],
+              writes: [],
+              config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+            },
+          },
+          edges: [{ source: "inner_agent", target: "inner_output" }],
+          conditional_edges: [],
+          metadata: { interrupt_after: ["inner_agent"] },
+        },
+      },
+    },
+  };
+
+  const panel = buildHumanReviewPanelModel(run, document);
+
+  assert.deepEqual(panel.scopePath, ["Dynamic Breakpoint Subgraph", "Inner Agent"]);
+  assert.deepEqual(panel.producedRows.map((row) => row.key), ["final_reply"]);
+  assert.deepEqual(panel.requiredNow.map((row) => row.key), ["approval_note"]);
+});
+
 test("buildHumanReviewPanelModel does not block continue when required fields already have values", () => {
   const run = createBranchingRun();
   run.artifacts = {

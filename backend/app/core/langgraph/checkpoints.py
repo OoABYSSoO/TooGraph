@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import threading
 from typing import Any, Iterator
 
 from langgraph.checkpoint.base import CheckpointTuple
@@ -14,10 +15,12 @@ class JsonCheckpointSaver(InMemorySaver):
     def __init__(self) -> None:
         super().__init__()
         self._loaded_threads: set[str] = set()
+        self._storage_lock = threading.RLock()
 
     def get_tuple(self, config: dict[str, Any]) -> CheckpointTuple | None:
-        self._load_thread_if_needed(_thread_id_from_config(config))
-        return super().get_tuple(config)
+        with self._storage_lock:
+            self._load_thread_if_needed(_thread_id_from_config(config))
+            return super().get_tuple(config)
 
     def list(
         self,
@@ -27,12 +30,13 @@ class JsonCheckpointSaver(InMemorySaver):
         before: dict[str, Any] | None = None,
         limit: int | None = None,
     ) -> Iterator[CheckpointTuple]:
-        if config is not None:
-            self._load_thread_if_needed(_thread_id_from_config(config))
-        else:
-            for path in CHECKPOINT_DATA_DIR.glob("*.json"):
-                self._load_thread_if_needed(path.stem)
-        return super().list(config, filter=filter, before=before, limit=limit)
+        with self._storage_lock:
+            if config is not None:
+                self._load_thread_if_needed(_thread_id_from_config(config))
+            else:
+                for path in CHECKPOINT_DATA_DIR.glob("*.json"):
+                    self._load_thread_if_needed(path.stem)
+            return iter(list(super().list(config, filter=filter, before=before, limit=limit)))
 
     def put(
         self,
@@ -41,11 +45,12 @@ class JsonCheckpointSaver(InMemorySaver):
         metadata: dict[str, Any],
         new_versions: dict[str, Any],
     ) -> dict[str, Any]:
-        thread_id = _thread_id_from_config(config)
-        self._load_thread_if_needed(thread_id)
-        result = super().put(config, checkpoint, metadata, new_versions)
-        self._save_thread(thread_id)
-        return result
+        with self._storage_lock:
+            thread_id = _thread_id_from_config(config)
+            self._load_thread_if_needed(thread_id)
+            result = super().put(config, checkpoint, metadata, new_versions)
+            self._save_thread(thread_id)
+            return result
 
     async def aput(
         self,
@@ -63,10 +68,11 @@ class JsonCheckpointSaver(InMemorySaver):
         task_id: str,
         task_path: str = "",
     ) -> None:
-        thread_id = _thread_id_from_config(config)
-        self._load_thread_if_needed(thread_id)
-        super().put_writes(config, writes, task_id, task_path=task_path)
-        self._save_thread(thread_id)
+        with self._storage_lock:
+            thread_id = _thread_id_from_config(config)
+            self._load_thread_if_needed(thread_id)
+            super().put_writes(config, writes, task_id, task_path=task_path)
+            self._save_thread(thread_id)
 
     async def aget_tuple(self, config: dict[str, Any]) -> CheckpointTuple | None:
         return self.get_tuple(config)
@@ -81,101 +87,104 @@ class JsonCheckpointSaver(InMemorySaver):
         self.put_writes(config, writes, task_id, task_path=task_path)
 
     def delete_thread(self, thread_id: str) -> None:
-        super().delete_thread(thread_id)
-        path = _thread_path(thread_id)
-        if path.exists():
-            path.unlink()
-        self._loaded_threads.add(thread_id)
+        with self._storage_lock:
+            super().delete_thread(thread_id)
+            path = _thread_path(thread_id)
+            if path.exists():
+                path.unlink()
+            self._loaded_threads.add(thread_id)
 
     def _load_thread_if_needed(self, thread_id: str) -> None:
-        if thread_id in self._loaded_threads:
-            return
-        payload = read_json_file(_thread_path(thread_id), default=None)
-        if payload:
-            for item in payload.get("storage", []):
-                checkpoint_ns = str(item.get("checkpoint_ns", ""))
-                checkpoint_id = str(item["checkpoint_id"])
-                self.storage[thread_id][checkpoint_ns][checkpoint_id] = (
-                    _typed_from_json(item["checkpoint"]),
-                    _typed_from_json(item["metadata"]),
-                    item.get("parent_checkpoint_id"),
-                )
+        with self._storage_lock:
+            if thread_id in self._loaded_threads:
+                return
+            payload = read_json_file(_thread_path(thread_id), default=None)
+            if payload:
+                for item in payload.get("storage", []):
+                    checkpoint_ns = str(item.get("checkpoint_ns", ""))
+                    checkpoint_id = str(item["checkpoint_id"])
+                    self.storage[thread_id][checkpoint_ns][checkpoint_id] = (
+                        _typed_from_json(item["checkpoint"]),
+                        _typed_from_json(item["metadata"]),
+                        item.get("parent_checkpoint_id"),
+                    )
 
-            for item in payload.get("writes", []):
-                checkpoint_ns = str(item.get("checkpoint_ns", ""))
-                checkpoint_id = str(item["checkpoint_id"])
-                task_id = str(item["task_id"])
-                write_index = int(item["write_index"])
-                outer_key = (thread_id, checkpoint_ns, checkpoint_id)
-                inner_key = (task_id, write_index)
-                self.writes[outer_key][inner_key] = (
-                    task_id,
-                    str(item["channel"]),
-                    _typed_from_json(item["value"]),
-                    str(item.get("task_path", "")),
-                )
+                for item in payload.get("writes", []):
+                    checkpoint_ns = str(item.get("checkpoint_ns", ""))
+                    checkpoint_id = str(item["checkpoint_id"])
+                    task_id = str(item["task_id"])
+                    write_index = int(item["write_index"])
+                    outer_key = (thread_id, checkpoint_ns, checkpoint_id)
+                    inner_key = (task_id, write_index)
+                    self.writes[outer_key][inner_key] = (
+                        task_id,
+                        str(item["channel"]),
+                        _typed_from_json(item["value"]),
+                        str(item.get("task_path", "")),
+                    )
 
-            for item in payload.get("blobs", []):
-                checkpoint_ns = str(item.get("checkpoint_ns", ""))
-                channel = str(item["channel"])
-                version = str(item["version"])
-                self.blobs[(thread_id, checkpoint_ns, channel, version)] = _typed_from_json(item["blob"])
+                for item in payload.get("blobs", []):
+                    checkpoint_ns = str(item.get("checkpoint_ns", ""))
+                    channel = str(item["channel"])
+                    version = str(item["version"])
+                    self.blobs[(thread_id, checkpoint_ns, channel, version)] = _typed_from_json(item["blob"])
 
-        self._loaded_threads.add(thread_id)
+            self._loaded_threads.add(thread_id)
 
     def _save_thread(self, thread_id: str) -> None:
-        CHECKPOINT_DATA_DIR.mkdir(parents=True, exist_ok=True)
+        with self._storage_lock:
+            CHECKPOINT_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-        storage_records: list[dict[str, Any]] = []
-        for checkpoint_ns, checkpoints in self.storage.get(thread_id, {}).items():
-            for checkpoint_id, (checkpoint_blob, metadata_blob, parent_checkpoint_id) in checkpoints.items():
-                storage_records.append(
+            storage_records: list[dict[str, Any]] = []
+            for checkpoint_ns, checkpoints in self.storage.get(thread_id, {}).items():
+                for checkpoint_id, (checkpoint_blob, metadata_blob, parent_checkpoint_id) in checkpoints.items():
+                    storage_records.append(
+                        {
+                            "checkpoint_ns": checkpoint_ns,
+                            "checkpoint_id": checkpoint_id,
+                            "checkpoint": _typed_to_json(checkpoint_blob),
+                            "metadata": _typed_to_json(metadata_blob),
+                            "parent_checkpoint_id": parent_checkpoint_id,
+                        }
+                    )
+
+            write_records: list[dict[str, Any]] = []
+            for (saved_thread_id, checkpoint_ns, checkpoint_id), writes in self.writes.items():
+                if saved_thread_id != thread_id:
+                    continue
+                for (task_id, write_index), (_, channel, value_blob, task_path) in writes.items():
+                    write_records.append(
+                        {
+                            "checkpoint_ns": checkpoint_ns,
+                            "checkpoint_id": checkpoint_id,
+                            "task_id": task_id,
+                            "write_index": write_index,
+                            "channel": channel,
+                            "value": _typed_to_json(value_blob),
+                            "task_path": task_path,
+                        }
+                    )
+
+            blob_records: list[dict[str, Any]] = []
+            for (saved_thread_id, checkpoint_ns, channel, version), blob in self.blobs.items():
+                if saved_thread_id != thread_id:
+                    continue
+                blob_records.append(
                     {
                         "checkpoint_ns": checkpoint_ns,
-                        "checkpoint_id": checkpoint_id,
-                        "checkpoint": _typed_to_json(checkpoint_blob),
-                        "metadata": _typed_to_json(metadata_blob),
-                        "parent_checkpoint_id": parent_checkpoint_id,
-                    }
-                )
-
-        write_records: list[dict[str, Any]] = []
-        for (saved_thread_id, checkpoint_ns, checkpoint_id), writes in self.writes.items():
-            if saved_thread_id != thread_id:
-                continue
-            for (task_id, write_index), (_, channel, value_blob, task_path) in writes.items():
-                write_records.append(
-                    {
-                        "checkpoint_ns": checkpoint_ns,
-                        "checkpoint_id": checkpoint_id,
-                        "task_id": task_id,
-                        "write_index": write_index,
                         "channel": channel,
-                        "value": _typed_to_json(value_blob),
-                        "task_path": task_path,
+                        "version": version,
+                        "blob": _typed_to_json(blob),
                     }
                 )
 
-        blob_records: list[dict[str, Any]] = []
-        for (saved_thread_id, checkpoint_ns, channel, version), blob in self.blobs.items():
-            if saved_thread_id != thread_id:
-                continue
-            blob_records.append(
-                {
-                    "checkpoint_ns": checkpoint_ns,
-                    "channel": channel,
-                    "version": version,
-                    "blob": _typed_to_json(blob),
-                }
-            )
-
-        payload = {
-            "thread_id": thread_id,
-            "storage": storage_records,
-            "writes": write_records,
-            "blobs": blob_records,
-        }
-        write_json_file(_thread_path(thread_id), payload)
+            payload = {
+                "thread_id": thread_id,
+                "storage": storage_records,
+                "writes": write_records,
+                "blobs": blob_records,
+            }
+            write_json_file(_thread_path(thread_id), payload)
 
 
 def _typed_to_json(value: tuple[str, bytes]) -> dict[str, str]:
