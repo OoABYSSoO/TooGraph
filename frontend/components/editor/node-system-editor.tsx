@@ -104,9 +104,11 @@ type FlowNodeData = {
   config: NodePresetDefinition;
   previewText: string;
   isExpanded?: boolean;
+  collapsedSize?: NodeViewportSize | null;
+  expandedSize?: NodeViewportSize | null;
   connectingSourceType?: ValueType | null;
   onConfigChange?: (updater: (config: NodePresetDefinition) => NodePresetDefinition) => void;
-  onResizeEnd?: (width: number, height: number) => void;
+  onResizeEnd?: (width: number, height: number, isExpanded: boolean) => void;
   onToggleExpanded?: () => void;
   onDelete?: () => void;
   onSavePreset?: () => void;
@@ -217,6 +219,18 @@ type CreationMenuEntry = {
   mode: "preset" | "node";
   presetId?: string;
   nodeKind?: "input" | "output";
+};
+
+type NodeViewportSize = {
+  width?: number;
+  height?: number;
+};
+
+const CREATION_MENU_FAMILY_PRIORITY: Record<NodeFamily, number> = {
+  input: 0,
+  output: 1,
+  agent: 2,
+  condition: 3,
 };
 
 const HELLO_WORLD_TEMPLATE_ID = "hello_world";
@@ -695,6 +709,40 @@ function formatValueTypeLabel(valueType: ValueType) {
   }
 }
 
+function normalizeViewportSize(size: unknown): NodeViewportSize | null {
+  if (!size || typeof size !== "object") return null;
+  const candidate = size as Record<string, unknown>;
+  const width = typeof candidate.width === "number" && Number.isFinite(candidate.width) ? candidate.width : undefined;
+  const height = typeof candidate.height === "number" && Number.isFinite(candidate.height) ? candidate.height : undefined;
+  if (width === undefined && height === undefined) return null;
+  return { width, height };
+}
+
+function getInitialExpandedHeight(config: NodePresetDefinition) {
+  if (config.family === "agent") return 520;
+  if (config.family === "condition") return 440;
+  if (config.family === "output") return 360;
+  return getNodeMinHeight(config, true);
+}
+
+function buildNodeStyleFromState(
+  config: NodePresetDefinition,
+  isExpanded: boolean,
+  size: NodeViewportSize | null,
+  fallbackWidth?: number,
+  fallbackHeight?: number,
+) {
+  const width = size?.width ?? fallbackWidth ?? getDefaultNodeWidth(config);
+  const height = size?.height ?? fallbackHeight;
+  return {
+    background: "transparent",
+    border: "none",
+    padding: 0,
+    width,
+    ...(typeof height === "number" ? { height } : {}),
+  };
+}
+
 function isPresetEligibleFamily(family: NodeFamily) {
   return family === "agent" || family === "condition";
 }
@@ -799,8 +847,13 @@ function createEditorDefaults(templates: TemplateRecord[], defaultTemplateId?: s
 }
 
 function createFlowNodeFromGraphNode(node: any): FlowNode {
-  const hasExplicitSize = typeof node.style?.width === "number" && typeof node.style?.height === "number";
   const config = normalizeNodeConfig(deepClonePreset(node.data?.config as NodePresetDefinition));
+  const isExpanded = config.family === "input" ? true : Boolean(node.data?.isExpanded);
+  const collapsedSize = normalizeViewportSize(node.data?.collapsedSize);
+  const expandedSize = normalizeViewportSize(node.data?.expandedSize);
+  const activeSize = isExpanded ? expandedSize : collapsedSize;
+  const fallbackWidth = typeof node.style?.width === "number" ? node.style.width : undefined;
+  const fallbackHeight = typeof node.style?.height === "number" ? node.style.height : undefined;
   const defaultWidth = getDefaultNodeWidth(config);
   return {
     id: node.id,
@@ -810,13 +863,13 @@ function createFlowNodeFromGraphNode(node: any): FlowNode {
       nodeId: node.data?.nodeId ?? node.id,
       config,
       previewText: node.data?.previewText ?? "",
-      isExpanded: false,
+      isExpanded,
+      collapsedSize,
+      expandedSize,
     },
     sourcePosition: Position.Right,
     targetPosition: Position.Left,
-    style: hasExplicitSize
-      ? { background: "transparent", border: "none", padding: 0, width: node.style.width, height: node.style.height }
-      : { background: "transparent", border: "none", padding: 0, width: defaultWidth ?? "auto" },
+    style: buildNodeStyleFromState(config, isExpanded, activeSize, fallbackWidth ?? defaultWidth, fallbackHeight),
   } satisfies FlowNode;
 }
 
@@ -1833,6 +1886,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
   const isInputNode = config.family === "input";
   const isCollapsible = config.family !== "input";
   const isExpanded = config.family === "input" ? true : Boolean(data.isExpanded);
+  const shouldUseCardScroll = isExpanded && config.family !== "input";
   const minHeight = getNodeMinHeight(config, isExpanded);
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
@@ -1998,7 +2052,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
           }}
           onResizeEnd={(_event, params) => {
             setIsResizingNode(false);
-            data.onResizeEnd?.(params.width, params.height);
+            data.onResizeEnd?.(params.width, params.height, isExpanded);
           }}
         />
         <div
@@ -2152,7 +2206,10 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
           </div>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-3 px-4 py-3">
+        <div
+          className={cn("flex min-h-0 flex-1 flex-col gap-3 px-4 py-3", shouldUseCardScroll && "overflow-y-auto overscroll-contain")}
+          onWheelCapture={shouldUseCardScroll ? (event) => event.stopPropagation() : undefined}
+        >
           {config.family === "input" ? (
             <>
               <div className={cn("grid items-center gap-3", uploadedAsset ? "grid-cols-[1fr_auto]" : "grid-cols-[minmax(0,1fr)_auto]")}>
@@ -2832,12 +2889,19 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
       mode: "preset",
       presetId: preset.presetId,
     }));
-    return [...boundaryEntries, ...presetEntries].filter((entry) => {
-      if (!query) return true;
-      return [entry.label, entry.description, entry.family, entry.presetId ?? entry.nodeKind ?? entry.id].some((value) =>
-        value.toLowerCase().includes(query),
-      );
-    });
+    return [...boundaryEntries, ...presetEntries]
+      .filter((entry) => {
+        if (!query) return true;
+        return [entry.label, entry.description, entry.family, entry.presetId ?? entry.nodeKind ?? entry.id].some((value) =>
+          value.toLowerCase().includes(query),
+        );
+      })
+      .sort((left, right) => {
+        const familyDelta = CREATION_MENU_FAMILY_PRIORITY[left.family] - CREATION_MENU_FAMILY_PRIORITY[right.family];
+        if (familyDelta !== 0) return familyDelta;
+        if (left.mode !== right.mode) return left.mode === "node" ? -1 : 1;
+        return left.label.localeCompare(right.label);
+      });
   }, [creationMenu?.sourceValueType, getRecommendedPresets, search]);
 
   const previewTextByNode = useMemo(() => {
@@ -3092,6 +3156,7 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
     const normalizedConfig = normalizeNodeConfig(config);
     const id = `${config.family}_${crypto.randomUUID().slice(0, 8)}`;
     const defaultWidth = getDefaultNodeWidth(normalizedConfig);
+    const isExpanded = normalizedConfig.family === "input";
     return {
       id,
       type: "default",
@@ -3100,16 +3165,13 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
         nodeId: id,
         config: normalizedConfig,
         previewText: "",
-        isExpanded: false,
+        isExpanded,
+        collapsedSize: null,
+        expandedSize: isExpanded ? { width: defaultWidth } : null,
       },
       sourcePosition: Position.Right,
       targetPosition: Position.Left,
-      style: {
-        background: "transparent",
-        border: "none",
-        padding: 0,
-        width: defaultWidth ?? "auto",
-      },
+      style: buildNodeStyleFromState(normalizedConfig, isExpanded, isExpanded ? { width: defaultWidth } : null, defaultWidth),
     } satisfies FlowNode;
   }
 
@@ -3294,6 +3356,9 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
           nodeId: node.data.nodeId,
           config: node.data.config,
           previewText: node.data.previewText || previewTextByNode[node.id] || "",
+          isExpanded: node.data.config.family === "input" ? true : Boolean(node.data.isExpanded),
+          collapsedSize: node.data.collapsedSize ?? null,
+          expandedSize: node.data.expandedSize ?? null,
         },
       })),
       edges: edges.map((edge) => ({
@@ -3372,6 +3437,8 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
                   ...node.data,
                   previewText: node.data.previewText || previewTextByNode[node.id] || "",
                   isExpanded: node.data.isExpanded,
+                  collapsedSize: node.data.collapsedSize ?? null,
+                  expandedSize: node.data.expandedSize ?? null,
                   onConfigChange: (updater: (config: NodePresetDefinition) => NodePresetDefinition) => {
                     setNodes((current) =>
                       current.map((candidate) =>
@@ -3391,26 +3458,72 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
                     setNodes((current) =>
                       current.map((candidate) =>
                         candidate.id === node.id
-                          ? {
-                              ...candidate,
-                              style: {
-                                ...candidate.style,
-                                height: undefined,
-                              },
-                              data: {
-                                ...candidate.data,
-                                isExpanded: !candidate.data.isExpanded,
-                              },
-                            }
+                          ? (() => {
+                              const currentExpanded = Boolean(candidate.data.isExpanded);
+                              const nextExpanded = candidate.data.config.family === "input" ? true : !currentExpanded;
+                              const currentWidth =
+                                typeof candidate.style?.width === "number"
+                                  ? candidate.style.width
+                                  : candidate.data.expandedSize?.width
+                                    ?? candidate.data.collapsedSize?.width
+                                    ?? getDefaultNodeWidth(candidate.data.config);
+                              const currentHeight =
+                                typeof candidate.style?.height === "number" ? candidate.style.height : undefined;
+                              const preservedCollapsedSize =
+                                currentExpanded || candidate.data.config.family === "input"
+                                  ? candidate.data.collapsedSize ?? null
+                                  : candidate.data.collapsedSize ?? {
+                                      width: currentWidth,
+                                      ...(typeof currentHeight === "number" ? { height: currentHeight } : {}),
+                                    };
+                              const preservedExpandedSize =
+                                currentExpanded
+                                  ? candidate.data.expandedSize ?? {
+                                      width: currentWidth,
+                                      ...(typeof currentHeight === "number" ? { height: currentHeight } : {}),
+                                    }
+                                  : candidate.data.expandedSize ?? null;
+                              const targetSize = nextExpanded
+                                ? preservedExpandedSize ?? {
+                                    width: currentWidth,
+                                    height: getInitialExpandedHeight(candidate.data.config),
+                                  }
+                                : preservedCollapsedSize;
+
+                              return {
+                                ...candidate,
+                                style: buildNodeStyleFromState(
+                                  candidate.data.config,
+                                  nextExpanded,
+                                  targetSize,
+                                  currentWidth,
+                                  typeof currentHeight === "number" && !nextExpanded ? currentHeight : undefined,
+                                ),
+                                data: {
+                                  ...candidate.data,
+                                  isExpanded: nextExpanded,
+                                  collapsedSize: preservedCollapsedSize,
+                                  expandedSize: preservedExpandedSize ?? (nextExpanded ? targetSize : null),
+                                },
+                              };
+                            })()
                           : candidate,
                       ),
                     );
                   },
-                  onResizeEnd: (width: number, height: number) => {
+                  onResizeEnd: (width: number, height: number, isExpanded: boolean) => {
                     setNodes((current) =>
                       current.map((n) =>
                         n.id === node.id
-                          ? { ...n, style: { ...n.style, width, height } }
+                          ? {
+                              ...n,
+                              style: buildNodeStyleFromState(n.data.config, isExpanded, { width, height }, width, height),
+                              data: {
+                                ...n.data,
+                                collapsedSize: isExpanded ? n.data.collapsedSize ?? null : { width, height },
+                                expandedSize: isExpanded ? { width, height } : n.data.expandedSize ?? null,
+                              },
+                            }
                           : n,
                       ),
                     );
@@ -3624,7 +3737,9 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
                 <div>
                   <div className="text-[0.72rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">Create Node</div>
                   <div className="mt-1 text-sm text-[var(--muted)]">
-                    {creationMenu.sourceValueType ? `Suggestions for ${creationMenu.sourceValueType}` : "Double click node picker"}
+                    {creationMenu.sourceValueType
+                      ? `Choose a node for ${formatValueTypeLabel(creationMenu.sourceValueType)} output`
+                      : "Choose a node to create"}
                   </div>
                 </div>
                 <button type="button" className="text-sm text-[var(--muted)]" onClick={() => setCreationMenu(null)}>

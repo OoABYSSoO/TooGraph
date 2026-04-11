@@ -164,10 +164,20 @@ NodeSystemNodeConfig = (
 )
 
 
+class NodeViewportSize(BaseModel):
+    width: float | None = None
+    height: float | None = None
+
+    model_config = ConfigDict(extra="ignore")
+
+
 class NodeSystemNodeData(BaseModel):
     node_id: str = Field(alias="nodeId", min_length=1)
     config: NodeSystemNodeConfig = Field(discriminator="family")
     preview_text: str = Field(default="", alias="previewText")
+    is_expanded: bool = Field(default=False, alias="isExpanded")
+    collapsed_size: NodeViewportSize | None = Field(default=None, alias="collapsedSize")
+    expanded_size: NodeViewportSize | None = Field(default=None, alias="expandedSize")
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
