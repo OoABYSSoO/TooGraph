@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Background,
   BackgroundVariant,
@@ -1007,6 +1008,88 @@ function AdvancedJsonSection({
   );
 }
 
+type FloatingPlacement = "bottom-start" | "bottom-end" | "top-center";
+
+function FloatingLayer({
+  anchorRef,
+  open,
+  placement,
+  className,
+  children,
+}: {
+  anchorRef: React.RefObject<HTMLElement | null>;
+  open: boolean;
+  placement: FloatingPlacement;
+  className?: string;
+  children: ReactNode;
+}) {
+  const [mounted, setMounted] = useState(false);
+  const [position, setPosition] = useState<{ left: number; top: number; shift: string } | null>(null);
+  const lastSignatureRef = useRef("");
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted || !open) {
+      setPosition(null);
+      lastSignatureRef.current = "";
+      return;
+    }
+
+    let frameId = 0;
+
+    const updatePosition = () => {
+      const anchor = anchorRef.current;
+      if (anchor) {
+        const rect = anchor.getBoundingClientRect();
+        let left = rect.left;
+        let top = rect.bottom + 8;
+        let shift = "";
+
+        if (placement === "bottom-end") {
+          left = rect.right;
+          shift = "translate(-100%, 0)";
+        } else if (placement === "top-center") {
+          left = rect.left + rect.width / 2;
+          top = rect.top - 8;
+          shift = "translate(-50%, -100%)";
+        }
+
+        const signature = `${Math.round(left)}:${Math.round(top)}:${shift}`;
+        if (signature !== lastSignatureRef.current) {
+          lastSignatureRef.current = signature;
+          setPosition({ left, top, shift });
+        }
+      }
+
+      frameId = window.requestAnimationFrame(updatePosition);
+    };
+
+    updatePosition();
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [anchorRef, mounted, open, placement]);
+
+  if (!mounted || !open || !position) {
+    return null;
+  }
+
+  return createPortal(
+    <div
+      className={cn("fixed left-0 top-0 z-[2000]", className)}
+      style={{
+        transform: `translate(${position.left}px, ${position.top}px) ${position.shift}`.trim(),
+      }}
+    >
+      {children}
+    </div>,
+    document.body,
+  );
+}
+
 function PortRow({
   nodeId,
   port,
@@ -1030,6 +1113,7 @@ function PortRow({
   const [draftLabel, setDraftLabel] = useState(port.label);
   const [isEditingPortConfig, setIsEditingPortConfig] = useState(false);
   const [draftPort, setDraftPort] = useState<PortDefinition>(port);
+  const labelRef = useRef<HTMLSpanElement | null>(null);
 
   useEffect(() => {
     setDraftLabel(port.label);
@@ -1083,11 +1167,11 @@ function PortRow({
             style={{ backgroundColor: color }}
             isConnectable
           />
-          <span className="ml-2 truncate cursor-text" onDoubleClick={startEditing}>
+          <span ref={labelRef} className="ml-2 truncate cursor-text" onDoubleClick={startEditing}>
             {port.label}
           </span>
-          {isEditing ? (
-            <div className="absolute left-5 top-full z-20 mt-2 w-[220px] rounded-[16px] border border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.98)] p-2 shadow-[0_14px_32px_rgba(60,41,20,0.14)]">
+          <FloatingLayer anchorRef={labelRef} open={isEditing} placement="bottom-start">
+            <div className="w-[220px] rounded-[16px] border border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.98)] p-2 shadow-[0_14px_32px_rgba(60,41,20,0.14)]">
               <Input
                 className="h-9"
                 value={draftLabel}
@@ -1103,9 +1187,9 @@ function PortRow({
                 }}
               />
             </div>
-          ) : null}
-          {isEditingPortConfig ? (
-            <div className="absolute left-5 top-full z-20 mt-2 w-[260px] rounded-[16px] border border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.98)] p-3 shadow-[0_14px_32px_rgba(60,41,20,0.14)]">
+          </FloatingLayer>
+          <FloatingLayer anchorRef={labelRef} open={isEditingPortConfig} placement="bottom-start">
+            <div className="w-[260px] rounded-[16px] border border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.98)] p-3 shadow-[0_14px_32px_rgba(60,41,20,0.14)]">
               <div className="grid gap-3">
                 <label className="grid gap-1 text-xs text-[var(--muted)]">
                   <span>Key</span>
@@ -1168,15 +1252,15 @@ function PortRow({
                 </div>
               </div>
             </div>
-          ) : null}
+          </FloatingLayer>
         </>
       ) : (
         <>
-          <span className="truncate text-right cursor-text" onDoubleClick={startEditing}>
+          <span ref={labelRef} className="truncate text-right cursor-text" onDoubleClick={startEditing}>
             {port.label}
           </span>
-          {isEditing ? (
-            <div className="absolute right-5 top-full z-20 mt-2 w-[220px] rounded-[16px] border border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.98)] p-2 shadow-[0_14px_32px_rgba(60,41,20,0.14)]">
+          <FloatingLayer anchorRef={labelRef} open={isEditing} placement="bottom-end">
+            <div className="w-[220px] rounded-[16px] border border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.98)] p-2 shadow-[0_14px_32px_rgba(60,41,20,0.14)]">
               <Input
                 className="h-9 text-right"
                 value={draftLabel}
@@ -1192,9 +1276,9 @@ function PortRow({
                 }}
               />
             </div>
-          ) : null}
-          {isEditingPortConfig ? (
-            <div className="absolute right-5 top-full z-20 mt-2 w-[260px] rounded-[16px] border border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.98)] p-3 shadow-[0_14px_32px_rgba(60,41,20,0.14)]">
+          </FloatingLayer>
+          <FloatingLayer anchorRef={labelRef} open={isEditingPortConfig} placement="bottom-end">
+            <div className="w-[260px] rounded-[16px] border border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.98)] p-3 shadow-[0_14px_32px_rgba(60,41,20,0.14)]">
               <div className="grid gap-3">
                 <label className="grid gap-1 text-xs text-[var(--muted)]">
                   <span>Key</span>
@@ -1247,7 +1331,7 @@ function PortRow({
                 </div>
               </div>
             </div>
-          ) : null}
+          </FloatingLayer>
           <Handle
             id={buildHandleId("output", port.key)}
             type="source"
@@ -1275,6 +1359,7 @@ function PortCreateButton({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [draftPort, setDraftPort] = useState<PortDefinition>(initialPort);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
 
   function openEditor() {
     setDraftPort(initialPort);
@@ -1304,6 +1389,7 @@ function PortCreateButton({
   return (
     <div className={cn("group relative flex min-h-6 items-center", side === "input" ? "justify-start" : "justify-end")}>
       <button
+        ref={triggerRef}
         type="button"
         className={cn(
           "relative inline-flex min-h-6 max-w-full items-center gap-1.5 rounded-full border border-[rgba(154,52,18,0.16)] bg-[rgba(255,252,247,0.92)] py-0.5 text-sm text-[var(--muted)] shadow-[0_8px_18px_rgba(60,41,20,0.06)] transition hover:border-[rgba(154,52,18,0.24)] hover:bg-[rgba(255,248,240,0.92)] hover:text-[var(--accent)]",
@@ -1333,13 +1419,8 @@ function PortCreateButton({
           </>
         )}
       </button>
-      {isOpen ? (
-        <div
-          className={cn(
-            "absolute top-full z-20 mt-2 w-[260px] rounded-[16px] border border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.98)] p-3 shadow-[0_14px_32px_rgba(60,41,20,0.14)]",
-            side === "input" ? "left-5" : "right-5",
-          )}
-        >
+      <FloatingLayer anchorRef={triggerRef} open={isOpen} placement={side === "input" ? "bottom-start" : "bottom-end"}>
+        <div className="w-[260px] rounded-[16px] border border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.98)] p-3 shadow-[0_14px_32px_rgba(60,41,20,0.14)]">
           <div className="grid gap-3">
             <label className="grid gap-1 text-xs text-[var(--muted)]">
               <span>Key</span>
@@ -1383,7 +1464,7 @@ function PortCreateButton({
             </div>
           </div>
         </div>
-      ) : null}
+      </FloatingLayer>
     </div>
   );
 }
@@ -1427,6 +1508,9 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
   const [isDeleteConfirmActive, setIsDeleteConfirmActive] = useState(false);
   const deleteConfirmTimeoutRef = useRef<number | null>(null);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
+  const deleteButtonRef = useRef<HTMLButtonElement | null>(null);
+  const labelAnchorRef = useRef<HTMLDivElement | null>(null);
+  const descriptionAnchorRef = useRef<HTMLDivElement | null>(null);
   const uploadedAsset = config.family === "input" ? tryParseUploadedAssetEnvelope(config.defaultValue) : null;
 
   useEffect(() => {
@@ -1597,6 +1681,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
           }}
         >
         <button
+          ref={deleteButtonRef}
           type="button"
           aria-label={isDeleteConfirmActive ? "确认删除节点" : "删除节点"}
           title={isDeleteConfirmActive ? "确认删除节点" : "删除节点"}
@@ -1641,22 +1726,22 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
             </svg>
           )}
         </button>
-        {isDeleteConfirmActive ? (
-          <div className="pointer-events-none absolute right-3 top-3 z-30 -translate-y-[calc(100%+8px)] whitespace-nowrap rounded-full border border-[rgba(185,28,28,0.16)] bg-[rgba(255,248,248,0.96)] px-2.5 py-1 text-[0.68rem] uppercase tracking-[0.12em] text-[rgb(153,27,27)] shadow-[0_10px_24px_rgba(127,29,29,0.12)]">
+        <FloatingLayer anchorRef={deleteButtonRef} open={isDeleteConfirmActive} placement="top-center" className="pointer-events-none">
+          <div className="whitespace-nowrap rounded-full border border-[rgba(185,28,28,0.16)] bg-[rgba(255,248,248,0.96)] px-2.5 py-1 text-[0.68rem] uppercase tracking-[0.12em] text-[rgb(153,27,27)] shadow-[0_10px_24px_rgba(127,29,29,0.12)]">
             Delete node?
           </div>
-        ) : null}
+        </FloatingLayer>
         <div className="flex items-start justify-between gap-3 border-b border-[rgba(154,52,18,0.12)] pl-4 pr-14 py-3">
           <div className="min-w-0 flex-1">
             <div className="relative flex min-w-0 items-center gap-2">
               <span className="rounded-full border border-[rgba(154,52,18,0.16)] bg-[rgba(255,255,255,0.72)] px-2 py-0.5 text-[0.62rem] uppercase tracking-[0.14em] text-[var(--accent-strong)]">
                 {config.family}
               </span>
-              <div className="truncate text-sm font-semibold text-[var(--text)] cursor-text" onDoubleClick={() => setIsEditingLabel(true)}>
+              <div ref={labelAnchorRef} className="truncate text-sm font-semibold text-[var(--text)] cursor-text" onDoubleClick={() => setIsEditingLabel(true)}>
                 {config.label}
               </div>
-              {isEditingLabel ? (
-                <div className="absolute left-0 top-full z-20 mt-2 w-[260px] rounded-[16px] border border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.98)] p-2 shadow-[0_14px_32px_rgba(60,41,20,0.14)]">
+              <FloatingLayer anchorRef={labelAnchorRef} open={isEditingLabel} placement="bottom-start">
+                <div className="w-[260px] rounded-[16px] border border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.98)] p-2 shadow-[0_14px_32px_rgba(60,41,20,0.14)]">
                   <Input
                     className="h-9"
                     value={draftLabel}
@@ -1672,15 +1757,15 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                     }}
                   />
                 </div>
-              ) : null}
+              </FloatingLayer>
             </div>
             {config.family !== "agent" ? (
               <div className="relative mt-1">
-                <div className="line-clamp-2 text-xs leading-5 text-[var(--muted)] cursor-text" onDoubleClick={() => setIsEditingDescription(true)}>
+                <div ref={descriptionAnchorRef} className="line-clamp-2 text-xs leading-5 text-[var(--muted)] cursor-text" onDoubleClick={() => setIsEditingDescription(true)}>
                   {config.description || summarizeNode(config)}
                 </div>
-                {isEditingDescription ? (
-                  <div className="absolute left-0 top-full z-20 mt-2 w-[320px] rounded-[16px] border border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.98)] p-2 shadow-[0_14px_32px_rgba(60,41,20,0.14)]">
+                <FloatingLayer anchorRef={descriptionAnchorRef} open={isEditingDescription} placement="bottom-start">
+                  <div className="w-[320px] rounded-[16px] border border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.98)] p-2 shadow-[0_14px_32px_rgba(60,41,20,0.14)]">
                     <Input
                       className="h-9"
                       value={draftDescription}
@@ -1696,7 +1781,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                       }}
                     />
                   </div>
-                ) : null}
+                </FloatingLayer>
               </div>
             ) : null}
           </div>
@@ -2962,7 +3047,7 @@ function createNodeFromPreset(preset: NodePresetDefinition, position: { x: numbe
 
           {creationMenu ? (
             <div
-              className="absolute z-20 w-[320px] rounded-[20px] border border-[rgba(154,52,18,0.18)] bg-[rgba(255,250,241,0.98)] p-3 shadow-[0_24px_48px_rgba(60,41,20,0.18)]"
+              className="absolute z-[1500] w-[320px] rounded-[20px] border border-[rgba(154,52,18,0.18)] bg-[rgba(255,250,241,0.98)] p-3 shadow-[0_24px_48px_rgba(60,41,20,0.18)]"
               style={{
                 left: Math.max(12, creationMenu.clientX - (wrapperRef.current?.getBoundingClientRect().left ?? 0) - 20),
                 top: Math.max(12, creationMenu.clientY - (wrapperRef.current?.getBoundingClientRect().top ?? 0) - 20),
