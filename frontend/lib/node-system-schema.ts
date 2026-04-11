@@ -15,6 +15,9 @@ export type SkillAttachment = {
   usage?: "required" | "optional";
 };
 
+export type AgentModelSource = "global" | "override";
+export type AgentThinkingMode = "inherit" | "off" | "on";
+
 export type InputBoundaryNode = {
   presetId: string;
   label: string;
@@ -37,6 +40,10 @@ export type AgentNode = {
   taskInstruction: string;
   skills: SkillAttachment[];
   outputBinding: Record<string, string>;
+  modelSource?: AgentModelSource;
+  model?: string;
+  thinkingMode?: AgentThinkingMode;
+  temperature?: number;
 };
 
 export type ConditionRule = {

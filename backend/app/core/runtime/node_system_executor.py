@@ -20,7 +20,12 @@ from app.core.schemas.node_system import (
 )
 from app.core.storage.run_store import save_run
 from app.skills.registry import get_skill_registry
-from app.tools.local_llm import _chat_with_local_model
+from app.tools.local_llm import (
+    _chat_with_local_model_with_meta,
+    get_default_agent_temperature,
+    get_default_agent_thinking_enabled,
+    get_default_text_model,
+)
 
 
 def execute_node_system_graph(graph: NodeSystemGraphDocument) -> dict[str, Any]:
@@ -87,6 +92,8 @@ def execute_node_system_graph(graph: NodeSystemGraphDocument) -> dict[str, Any]:
                         "outputs": body.get("outputs", {}),
                         "family": node.data.config.family,
                         "selected_branch": body.get("selected_branch"),
+                        "response": body.get("response"),
+                        "runtime_config": body.get("runtime_config"),
                     },
                     "warnings": body.get("warnings", []),
                     "errors": [],
@@ -270,13 +277,16 @@ def _execute_agent_node(
     skill_context: dict[str, Any] = {}
     registry = get_skill_registry(include_disabled=False)
     response_payload: dict[str, Any] = {}
+    warnings: list[str] = []
+    runtime_config = _resolve_agent_runtime_config(config)
 
     requires_response_before_skills = any(
         _skill_uses_response(skill.input_mapping) or _skill_uses_response(skill.context_binding)
         for skill in config.skills
     )
     if requires_response_before_skills:
-        response_payload = _generate_agent_response(config, input_values, skill_context)
+        response_payload, response_warnings, runtime_config = _generate_agent_response(config, input_values, skill_context, runtime_config)
+        warnings.extend(response_warnings)
 
     for skill in config.skills:
         skill_func = registry.get(skill.skill_key)
@@ -327,7 +337,8 @@ def _execute_agent_node(
     }
 
     if any(value in (None, "") for value in bound_output_values.values()):
-        response_payload = _generate_agent_response(config, input_values, skill_context)
+        response_payload, response_warnings, runtime_config = _generate_agent_response(config, input_values, skill_context, runtime_config)
+        warnings.extend(response_warnings)
 
     output_values = {
         output.key: _resolve_reference(
@@ -346,6 +357,8 @@ def _execute_agent_node(
         "response": response_payload,
         "selected_skills": selected_skills,
         "skill_outputs": skill_outputs,
+        "runtime_config": runtime_config,
+        "warnings": list(dict.fromkeys(warnings)),
         "final_result": _first_truthy(output_values.values()) or response_payload.get("summary") or "",
     }
 
@@ -374,10 +387,11 @@ def _generate_agent_response(
     config: AgentNodeConfig,
     input_values: dict[str, Any],
     skill_context: dict[str, Any],
-) -> dict[str, Any]:
+    runtime_config: dict[str, Any],
+) -> tuple[dict[str, Any], list[str], dict[str, Any]]:
     output_keys = [output.key for output in config.outputs]
     if not output_keys:
-        return {"summary": ""}
+        return {"summary": ""}, [], runtime_config
 
     user_prompt = "\n".join(
         [
@@ -388,15 +402,57 @@ def _generate_agent_response(
         ]
     )
 
-    content = _chat_with_local_model(
+    content, llm_meta = _chat_with_local_model_with_meta(
         system_prompt=config.system_instruction or "You are a precise workflow agent.",
         user_prompt=user_prompt,
-        temperature=0.2,
+        model=runtime_config["resolved_model"],
+        temperature=runtime_config["resolved_temperature"],
+        reasoning_effort=runtime_config.get("resolved_reasoning_effort"),
     )
 
     parsed_fields = _parse_llm_json_response(content, output_keys)
     response_payload: dict[str, Any] = {"summary": content, **parsed_fields}
-    return response_payload
+    updated_runtime_config = {
+        **runtime_config,
+        "provider_model": llm_meta.get("model", runtime_config["resolved_model"]),
+        "provider_temperature": llm_meta.get("temperature", runtime_config["resolved_temperature"]),
+        "provider_reasoning_effort": llm_meta.get("reasoning_effort"),
+        "provider_thinking_enabled": bool(llm_meta.get("reasoning_effort")),
+    }
+    return response_payload, llm_meta.get("warnings", []), updated_runtime_config
+
+
+def _resolve_agent_runtime_config(config: AgentNodeConfig) -> dict[str, Any]:
+    global_model = get_default_text_model()
+    global_thinking_enabled = get_default_agent_thinking_enabled()
+    default_temperature = get_default_agent_temperature()
+    override_model = config.model.strip()
+
+    resolved_model = (
+        override_model
+        if config.model_source.value == "override" and override_model
+        else global_model
+    )
+    resolved_thinking = (
+        global_thinking_enabled
+        if config.thinking_mode.value == "inherit"
+        else config.thinking_mode.value == "on"
+    )
+    resolved_temperature = max(0.0, min(float(config.temperature), 2.0))
+
+    return {
+        "model_source": config.model_source.value,
+        "configured_model": override_model,
+        "thinking_mode": config.thinking_mode.value,
+        "configured_temperature": config.temperature,
+        "global_model": global_model,
+        "global_thinking_enabled": global_thinking_enabled,
+        "default_temperature": default_temperature,
+        "resolved_model": resolved_model,
+        "resolved_thinking": resolved_thinking,
+        "resolved_temperature": resolved_temperature,
+        "resolved_reasoning_effort": "medium" if resolved_thinking else None,
+    }
 
 
 def _invoke_skill(skill_func: Any, skill_inputs: dict[str, Any]) -> dict[str, Any]:

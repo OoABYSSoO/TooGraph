@@ -23,6 +23,17 @@ class SkillUsage(str, Enum):
     OPTIONAL = "optional"
 
 
+class AgentModelSource(str, Enum):
+    GLOBAL = "global"
+    OVERRIDE = "override"
+
+
+class AgentThinkingMode(str, Enum):
+    INHERIT = "inherit"
+    OFF = "off"
+    ON = "on"
+
+
 class ConditionOperator(str, Enum):
     EQ = "=="
     NE = "!="
@@ -94,6 +105,10 @@ class AgentNodeConfig(BaseModel):
     task_instruction: str = Field(default="", alias="taskInstruction")
     skills: list[SkillAttachment] = Field(default_factory=list)
     output_binding: dict[str, str] = Field(default_factory=dict, alias="outputBinding")
+    model_source: AgentModelSource = Field(default=AgentModelSource.GLOBAL, alias="modelSource")
+    model: str = ""
+    thinking_mode: AgentThinkingMode = Field(default=AgentThinkingMode.INHERIT, alias="thinkingMode")
+    temperature: float = Field(default=0.2, ge=0, le=2)
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 

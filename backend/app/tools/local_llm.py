@@ -21,6 +21,79 @@ LOCAL_LLM_MODEL = _env_first("LOCAL_TEXT_MODEL", "TEXT_MODEL", "LOCAL_MODEL_NAME
 LOCAL_LLM_API_KEY = _env_first("LOCAL_API_KEY", "OPENAI_API_KEY", "LITELLM_MASTER_KEY", "LOCAL_LLM_API_KEY", default="sk-local")
 ROOT_DIR = Path(__file__).resolve().parents[3]
 LOCAL_USAGE_GUIDE_PATH = ROOT_DIR / "使用介绍.md"
+DEFAULT_AGENT_TEMPERATURE = 0.2
+DEFAULT_AGENT_THINKING_ENABLED = False
+
+
+def get_default_text_model() -> str:
+    return LOCAL_LLM_MODEL
+
+
+def get_default_agent_temperature() -> float:
+    return DEFAULT_AGENT_TEMPERATURE
+
+
+def get_default_agent_thinking_enabled() -> bool:
+    return DEFAULT_AGENT_THINKING_ENABLED
+
+
+def _chat_with_local_model_with_meta(
+    *,
+    system_prompt: str,
+    user_prompt: str,
+    model: str | None = None,
+    temperature: float = DEFAULT_AGENT_TEMPERATURE,
+    max_tokens: int | None = None,
+    reasoning_effort: str | None = None,
+) -> tuple[str, dict[str, Any]]:
+    client = OpenAI(
+        base_url=LOCAL_LLM_BASE_URL,
+        api_key=LOCAL_LLM_API_KEY,
+        http_client=httpx.Client(trust_env=False),
+    )
+    request_payload: dict[str, Any] = {
+        "model": model or LOCAL_LLM_MODEL,
+        "temperature": temperature,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+    }
+    if max_tokens is not None:
+        request_payload["max_tokens"] = max_tokens
+    if reasoning_effort:
+        request_payload["reasoning_effort"] = reasoning_effort
+
+    warnings: list[str] = []
+    used_reasoning_effort = reasoning_effort
+
+    try:
+        response = client.chat.completions.create(**request_payload)
+    except Exception as exc:  # pragma: no cover - network path
+        if reasoning_effort:
+            fallback_payload = dict(request_payload)
+            fallback_payload.pop("reasoning_effort", None)
+            try:
+                response = client.chat.completions.create(**fallback_payload)
+                warnings.append(
+                    "Thinking mode was requested, but the current model backend rejected reasoning_effort. Retried without provider-level thinking."
+                )
+                used_reasoning_effort = None
+            except Exception as fallback_exc:  # pragma: no cover - network path
+                raise RuntimeError(f"Local LLM request failed: {fallback_exc}") from fallback_exc
+        else:
+            raise RuntimeError(f"Local LLM request failed: {exc}") from exc
+
+    content = (response.choices[0].message.content or "").strip()
+    if not content:
+        raise RuntimeError("Local LLM returned an empty response.")
+    return content, {
+        "base_url": LOCAL_LLM_BASE_URL,
+        "model": request_payload["model"],
+        "temperature": temperature,
+        "reasoning_effort": used_reasoning_effort,
+        "warnings": warnings,
+    }
 
 
 def _chat_with_local_model(
@@ -28,31 +101,16 @@ def _chat_with_local_model(
     system_prompt: str,
     user_prompt: str,
     model: str | None = None,
-    temperature: float = 0.2,
+    temperature: float = DEFAULT_AGENT_TEMPERATURE,
     max_tokens: int | None = None,
 ) -> str:
-    client = OpenAI(
-        base_url=LOCAL_LLM_BASE_URL,
-        api_key=LOCAL_LLM_API_KEY,
-        http_client=httpx.Client(trust_env=False),
+    content, _meta = _chat_with_local_model_with_meta(
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        model=model,
+        temperature=temperature,
+        max_tokens=max_tokens,
     )
-    try:
-        request_payload: dict[str, Any] = {
-            "model": model or LOCAL_LLM_MODEL,
-            "temperature": temperature,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-        }
-        if max_tokens is not None:
-            request_payload["max_tokens"] = max_tokens
-        response = client.chat.completions.create(**request_payload)
-    except Exception as exc:  # pragma: no cover - network path
-        raise RuntimeError(f"Local LLM request failed: {exc}") from exc
-    content = (response.choices[0].message.content or "").strip()
-    if not content:
-        raise RuntimeError("Local LLM returned an empty response.")
     return content
 
 
@@ -72,7 +130,7 @@ def generate_hello_greeting(state: dict[str, Any], params: dict[str, Any] | None
             system_prompt=system_prompt,
             user_prompt=user_prompt,
             model=model_name,
-            temperature=float(params.get("temperature", 0.2)),
+            temperature=float(params.get("temperature", DEFAULT_AGENT_TEMPERATURE)),
             max_tokens=int(params.get("max_tokens", 120)),
         )
         llm_response: dict[str, Any] = {
