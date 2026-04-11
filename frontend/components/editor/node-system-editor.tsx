@@ -99,6 +99,7 @@ type FlowNodeData = {
   config: NodePresetDefinition;
   previewText: string;
   isExpanded?: boolean;
+  connectingSourceType?: ValueType | null;
   onConfigChange?: (updater: (config: NodePresetDefinition) => NodePresetDefinition) => void;
   onResizeEnd?: (width: number, height: number) => void;
   onToggleExpanded?: () => void;
@@ -473,6 +474,8 @@ function buildHandleId(side: "input" | "output", key: string) {
   return `${side}:${key}`;
 }
 
+const CREATE_INPUT_PORT_KEY = "__create__";
+
 function getPortKeyFromHandle(handleId?: string | null) {
   if (!handleId) return null;
   const [, key] = handleId.split(":");
@@ -490,10 +493,12 @@ function getPortType(config: NodePresetDefinition, handleId?: string | null): Va
     return handleId?.startsWith("input:") && config.input.key === key ? config.input.valueType : null;
   }
   if (config.family === "agent") {
+    if (handleId?.startsWith("input:") && key === CREATE_INPUT_PORT_KEY) return "any";
     if (handleId?.startsWith("input:")) return config.inputs.find((item) => item.key === key)?.valueType ?? null;
     if (handleId?.startsWith("output:")) return config.outputs.find((item) => item.key === key)?.valueType ?? null;
   }
   if (config.family === "condition") {
+    if (handleId?.startsWith("input:") && key === CREATE_INPUT_PORT_KEY) return "any";
     if (handleId?.startsWith("input:")) return config.inputs.find((item) => item.key === key)?.valueType ?? null;
     if (handleId?.startsWith("output:")) return "any";
   }
@@ -519,6 +524,28 @@ function listOutputPorts(config: NodePresetDefinition) {
 function findFirstCompatibleInputHandle(config: NodePresetDefinition, sourceType: ValueType) {
   const inputPort = listInputPorts(config).find((port) => isValueTypeCompatible(sourceType, port.valueType));
   return inputPort ? buildHandleId("input", inputPort.key) : null;
+}
+
+function createPortKey(base: string, existingPorts: PortDefinition[]) {
+  const normalizedBase = base.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "input";
+  let nextKey = normalizedBase;
+  let index = 2;
+  const existingKeys = new Set(existingPorts.map((port) => port.key));
+  while (existingKeys.has(nextKey)) {
+    nextKey = `${normalizedBase}_${index}`;
+    index += 1;
+  }
+  return nextKey;
+}
+
+function createAutoInputPort(existingPorts: PortDefinition[], sourceType: ValueType): PortDefinition {
+  const typeLabel = formatValueTypeLabel(sourceType);
+  return {
+    key: createPortKey(`${sourceType}_input`, existingPorts),
+    label: typeLabel,
+    valueType: sourceType,
+    required: true,
+  };
 }
 
 function summarizeNode(config: NodePresetDefinition) {
@@ -625,109 +652,6 @@ function PanelSection({
       </div>
       <div className="mt-4 grid gap-3">{children}</div>
     </section>
-  );
-}
-
-function PortEditorList({
-  label,
-  ports,
-  side,
-  onChange,
-}: {
-  label: string;
-  ports: PortDefinition[];
-  side: "input" | "output";
-  onChange: (nextPorts: PortDefinition[]) => void;
-}) {
-  return (
-    <PanelSection title={label} description={side === "input" ? "通过表单维护输入端口。" : "通过表单维护输出端口。"}>
-      {ports.map((port, index) => (
-        <div key={`${port.key}-${index}`} className="grid gap-3 rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,250,241,0.72)] p-3">
-          <div className="grid grid-cols-2 gap-3">
-            <label className="grid gap-1.5 text-sm text-[var(--muted)]">
-              <span>Key</span>
-              <Input
-                value={port.key}
-                onChange={(event) =>
-                  onChange(ports.map((item, portIndex) => (portIndex === index ? { ...item, key: event.target.value } : item)))
-                }
-              />
-            </label>
-            <label className="grid gap-1.5 text-sm text-[var(--muted)]">
-              <span>Label</span>
-              <Input
-                value={port.label}
-                onChange={(event) =>
-                  onChange(ports.map((item, portIndex) => (portIndex === index ? { ...item, label: event.target.value } : item)))
-                }
-              />
-            </label>
-          </div>
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3">
-            <label className="grid gap-1.5 text-sm text-[var(--muted)]">
-              <span>Value Type</span>
-              <select
-                className="rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3 py-3 text-[var(--text)]"
-                value={port.valueType}
-                onChange={(event) =>
-                  onChange(
-                    ports.map((item, portIndex) =>
-                      portIndex === index ? { ...item, valueType: event.target.value as ValueType } : item,
-                    ),
-                  )
-                }
-              >
-                {VALUE_TYPE_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {side === "input" ? (
-              <label className="mt-7 flex items-center gap-2 text-sm text-[var(--muted)]">
-                <input
-                  checked={Boolean(port.required)}
-                  type="checkbox"
-                  onChange={(event) =>
-                    onChange(
-                      ports.map((item, portIndex) =>
-                        portIndex === index ? { ...item, required: event.target.checked } : item,
-                      ),
-                    )
-                  }
-                />
-                <span>Required</span>
-              </label>
-            ) : (
-              <div />
-            )}
-          </div>
-          <div className="flex justify-end">
-            <Button variant="ghost" onClick={() => onChange(ports.filter((_, portIndex) => portIndex !== index))}>
-              Remove
-            </Button>
-          </div>
-        </div>
-      ))}
-      <div className="flex justify-start">
-        <Button
-          variant="ghost"
-          onClick={() =>
-            onChange(
-              ports.concat({
-                key: side === "input" ? `input_${ports.length + 1}` : `output_${ports.length + 1}`,
-                label: side === "input" ? `Input ${ports.length + 1}` : `Output ${ports.length + 1}`,
-                valueType: "text",
-                ...(side === "input" ? { required: false } : {}),
-              }),
-            )
-          }
-        >
-          Add {side === "input" ? "Input" : "Output"}
-        </Button>
-      </div>
-    </PanelSection>
   );
 }
 
@@ -1077,22 +1001,35 @@ function PortRow({
   side,
   editable = false,
   onRename,
+  portEditor,
 }: {
   nodeId: string;
   port: PortDefinition;
   side: "input" | "output";
   editable?: boolean;
   onRename?: (nextLabel: string) => void;
+  portEditor?: {
+    onChange: (nextPort: PortDefinition) => void;
+    onRemove?: () => void;
+  };
 }) {
   const color = TYPE_COLORS[port.valueType];
   const [isEditing, setIsEditing] = useState(false);
   const [draftLabel, setDraftLabel] = useState(port.label);
+  const [isEditingPortConfig, setIsEditingPortConfig] = useState(false);
+  const [draftPort, setDraftPort] = useState<PortDefinition>(port);
 
   useEffect(() => {
     setDraftLabel(port.label);
-  }, [port.label]);
+    setDraftPort(port);
+  }, [port]);
 
   function startEditing() {
+    if (portEditor) {
+      setDraftPort(port);
+      setIsEditingPortConfig(true);
+      return;
+    }
     if (!editable) return;
     setDraftLabel(port.label);
     setIsEditing(true);
@@ -1104,6 +1041,22 @@ function PortRow({
       onRename?.(nextLabel);
     }
     setIsEditing(false);
+  }
+
+  function commitPortEditing() {
+    const nextLabel = draftPort.label.trim();
+    const nextKey = draftPort.key.trim();
+    if (!nextLabel || !nextKey) {
+      setDraftPort(port);
+      setIsEditingPortConfig(false);
+      return;
+    }
+    portEditor?.onChange({
+      ...draftPort,
+      label: nextLabel,
+      key: nextKey,
+    });
+    setIsEditingPortConfig(false);
   }
 
   return (
@@ -1139,6 +1092,71 @@ function PortRow({
               />
             </div>
           ) : null}
+          {isEditingPortConfig ? (
+            <div className="absolute left-5 top-full z-20 mt-2 w-[260px] rounded-[16px] border border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.98)] p-3 shadow-[0_14px_32px_rgba(60,41,20,0.14)]">
+              <div className="grid gap-3">
+                <label className="grid gap-1 text-xs text-[var(--muted)]">
+                  <span>Key</span>
+                  <Input value={draftPort.key} onChange={(event) => setDraftPort((current) => ({ ...current, key: event.target.value }))} />
+                </label>
+                <label className="grid gap-1 text-xs text-[var(--muted)]">
+                  <span>Label</span>
+                  <Input value={draftPort.label} onChange={(event) => setDraftPort((current) => ({ ...current, label: event.target.value }))} />
+                </label>
+                <label className="grid gap-1 text-xs text-[var(--muted)]">
+                  <span>Value Type</span>
+                  <select
+                    className="rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3 py-2 text-[var(--text)]"
+                    value={draftPort.valueType}
+                    onChange={(event) => setDraftPort((current) => ({ ...current, valueType: event.target.value as ValueType }))}
+                  >
+                    {VALUE_TYPE_OPTIONS.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {side === "input" ? (
+                  <label className="flex items-center gap-2 text-xs text-[var(--muted)]">
+                    <input
+                      checked={Boolean(draftPort.required)}
+                      type="checkbox"
+                      onChange={(event) => setDraftPort((current) => ({ ...current, required: event.target.checked }))}
+                    />
+                    <span>Required</span>
+                  </label>
+                ) : null}
+                <div className="flex items-center justify-between gap-2">
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setDraftPort(port);
+                      setIsEditingPortConfig(false);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <div className="flex items-center gap-2">
+                    {portEditor?.onRemove ? (
+                      <Button
+                        variant="ghost"
+                        onClick={() => {
+                          portEditor.onRemove?.();
+                          setIsEditingPortConfig(false);
+                        }}
+                      >
+                        Remove
+                      </Button>
+                    ) : null}
+                    <Button variant="ghost" onClick={commitPortEditing}>
+                      Save
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </>
       ) : (
         <>
@@ -1161,6 +1179,61 @@ function PortRow({
                   }
                 }}
               />
+            </div>
+          ) : null}
+          {isEditingPortConfig ? (
+            <div className="absolute right-5 top-full z-20 mt-2 w-[260px] rounded-[16px] border border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.98)] p-3 shadow-[0_14px_32px_rgba(60,41,20,0.14)]">
+              <div className="grid gap-3">
+                <label className="grid gap-1 text-xs text-[var(--muted)]">
+                  <span>Key</span>
+                  <Input value={draftPort.key} onChange={(event) => setDraftPort((current) => ({ ...current, key: event.target.value }))} />
+                </label>
+                <label className="grid gap-1 text-xs text-[var(--muted)]">
+                  <span>Label</span>
+                  <Input value={draftPort.label} onChange={(event) => setDraftPort((current) => ({ ...current, label: event.target.value }))} />
+                </label>
+                <label className="grid gap-1 text-xs text-[var(--muted)]">
+                  <span>Value Type</span>
+                  <select
+                    className="rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3 py-2 text-[var(--text)]"
+                    value={draftPort.valueType}
+                    onChange={(event) => setDraftPort((current) => ({ ...current, valueType: event.target.value as ValueType }))}
+                  >
+                    {VALUE_TYPE_OPTIONS.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="flex items-center justify-between gap-2">
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setDraftPort(port);
+                      setIsEditingPortConfig(false);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <div className="flex items-center gap-2">
+                    {portEditor?.onRemove ? (
+                      <Button
+                        variant="ghost"
+                        onClick={() => {
+                          portEditor.onRemove?.();
+                          setIsEditingPortConfig(false);
+                        }}
+                      >
+                        Remove
+                      </Button>
+                    ) : null}
+                    <Button variant="ghost" onClick={commitPortEditing}>
+                      Save
+                    </Button>
+                  </div>
+                </div>
+              </div>
             </div>
           ) : null}
           <Handle
@@ -1295,6 +1368,39 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
       },
       defaultValue: JSON.stringify(envelope),
     }));
+  }
+
+  function updateNodePort(side: "input" | "output", portIndex: number, nextPort: PortDefinition) {
+    data.onConfigChange?.((currentConfig) => {
+      if (currentConfig.family === "agent") {
+        const nextPorts = side === "input" ? [...currentConfig.inputs] : [...currentConfig.outputs];
+        nextPorts[portIndex] = nextPort;
+        return side === "input"
+          ? { ...currentConfig, inputs: nextPorts }
+          : { ...currentConfig, outputs: nextPorts };
+      }
+      if (currentConfig.family === "condition" && side === "input") {
+        const nextPorts = [...currentConfig.inputs];
+        nextPorts[portIndex] = nextPort;
+        return { ...currentConfig, inputs: nextPorts };
+      }
+      return currentConfig;
+    });
+  }
+
+  function removeNodePort(side: "input" | "output", portIndex: number) {
+    data.onConfigChange?.((currentConfig) => {
+      if (currentConfig.family === "agent") {
+        const nextPorts = (side === "input" ? currentConfig.inputs : currentConfig.outputs).filter((_, index) => index !== portIndex);
+        return side === "input"
+          ? { ...currentConfig, inputs: nextPorts }
+          : { ...currentConfig, outputs: nextPorts };
+      }
+      if (currentConfig.family === "condition" && side === "input") {
+        return { ...currentConfig, inputs: currentConfig.inputs.filter((_, index) => index !== portIndex) };
+      }
+      return currentConfig;
+    });
   }
 
   return (
@@ -1628,13 +1734,55 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
           {config.family !== "input" && (config.family === "agent" || isExpanded) && (inputs.length > 0 || outputs.length > 0) ? (
             <div className="grid grid-cols-2 items-start gap-x-6">
               <div className="grid gap-1">
-                {inputs.map((port) => (
-                  <PortRow key={`input-${port.key}`} nodeId={data.nodeId} port={port} side="input" />
+                {inputs.map((port, index) => (
+                  <PortRow
+                    key={`input-${port.key}`}
+                    nodeId={data.nodeId}
+                    port={port}
+                    side="input"
+                    portEditor={
+                      config.family === "agent" || config.family === "condition"
+                        ? {
+                            onChange: (nextPort) => updateNodePort("input", index, nextPort),
+                            onRemove: inputs.length > 1 ? () => removeNodePort("input", index) : undefined,
+                          }
+                        : undefined
+                    }
+                  />
                 ))}
+                {(config.family === "agent" || config.family === "condition") && data.connectingSourceType ? (
+                  <div className="group relative flex min-h-6 items-center justify-start text-[0.9rem] text-[var(--muted)]">
+                    <Handle
+                      id={buildHandleId("input", CREATE_INPUT_PORT_KEY)}
+                      type="target"
+                      position={Position.Left}
+                      className="!left-[-7px] !top-1/2 !m-0 !h-3 !w-3 !-translate-y-1/2 !border-2 !border-[rgba(255,250,241,0.96)]"
+                      style={{ backgroundColor: TYPE_COLORS[data.connectingSourceType] }}
+                      isConnectable
+                    />
+                    <span className="ml-2 inline-flex items-center gap-2 text-sm">
+                      <span className="grid h-5 w-5 place-items-center rounded-full border border-[rgba(154,52,18,0.18)] bg-[rgba(255,255,255,0.82)] text-[var(--accent-strong)]">+</span>
+                      <span>Add {formatValueTypeLabel(data.connectingSourceType)} input</span>
+                    </span>
+                  </div>
+                ) : null}
               </div>
               <div className="grid gap-1">
-                {outputs.map((port) => (
-                  <PortRow key={`output-${port.key}`} nodeId={data.nodeId} port={port} side="output" />
+                {outputs.map((port, index) => (
+                  <PortRow
+                    key={`output-${port.key}`}
+                    nodeId={data.nodeId}
+                    port={port}
+                    side="output"
+                    portEditor={
+                      config.family === "agent"
+                        ? {
+                            onChange: (nextPort) => updateNodePort("output", index, nextPort),
+                            onRemove: outputs.length > 1 ? () => removeNodePort("output", index) : undefined,
+                          }
+                        : undefined
+                    }
+                  />
                 ))}
               </div>
             </div>
@@ -1672,18 +1820,6 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                       onChange={(event) => data.onConfigChange?.((currentConfig) => ({ ...(currentConfig as AgentNode), taskInstruction: event.target.value }))}
                     />
                   </label>
-                  <PortEditorList
-                    label="Inputs"
-                    side="input"
-                    ports={config.inputs}
-                    onChange={(nextPorts) => data.onConfigChange?.((currentConfig) => ({ ...(currentConfig as AgentNode), inputs: nextPorts }))}
-                  />
-                  <PortEditorList
-                    label="Outputs"
-                    side="output"
-                    ports={config.outputs}
-                    onChange={(nextPorts) => data.onConfigChange?.((currentConfig) => ({ ...(currentConfig as AgentNode), outputs: nextPorts }))}
-                  />
                   <SkillEditorList
                     skills={config.skills}
                     onChange={(nextSkills) => data.onConfigChange?.((currentConfig) => ({ ...(currentConfig as AgentNode), skills: nextSkills }))}
@@ -1751,12 +1887,6 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                 </div>
               ) : (
                 <>
-                  <PortEditorList
-                    label="Inputs"
-                    side="input"
-                    ports={config.inputs}
-                    onChange={(nextPorts) => data.onConfigChange?.((currentConfig) => ({ ...(currentConfig as ConditionNode), inputs: nextPorts }))}
-                  />
                   <BranchEditorList
                     branches={config.branches}
                     onChange={(nextBranches) => data.onConfigChange?.((currentConfig) => ({ ...(currentConfig as ConditionNode), branches: nextBranches }))}
@@ -1949,6 +2079,7 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
   const [skillDefinitions, setSkillDefinitions] = useState<SkillDefinition[]>([]);
   const [skillDefinitionsLoading, setSkillDefinitionsLoading] = useState(true);
   const [skillDefinitionsError, setSkillDefinitionsError] = useState<string | null>(null);
+  const [connectingSourceType, setConnectingSourceType] = useState<ValueType | null>(null);
   const [creationMenu, setCreationMenu] = useState<{
     clientX: number;
     clientY: number;
@@ -2476,6 +2607,7 @@ function createNodeFromPreset(preset: NodePresetDefinition, position: { x: numbe
                     setSelectedNodeId((current) => (current === node.id ? null : current));
                   },
                   onSavePreset: () => saveNodeAsPreset(node.id),
+                  connectingSourceType,
                   skillDefinitions,
                   skillDefinitionsLoading,
                   skillDefinitionsError,
@@ -2496,10 +2628,12 @@ function createNodeFromPreset(preset: NodePresetDefinition, position: { x: numbe
               onConnectStart={(_, params) => {
                 if (params.handleType !== "source" || !params.nodeId || !params.handleId) return;
                 const sourceNode = nodes.find((node) => node.id === params.nodeId);
+                const sourceValueType = sourceNode ? getPortType(sourceNode.data.config, params.handleId) : null;
+                setConnectingSourceType(sourceValueType);
                 pendingConnectRef.current = {
                   sourceNodeId: params.nodeId,
                   sourceHandle: params.handleId,
-                  sourceValueType: sourceNode ? getPortType(sourceNode.data.config, params.handleId) : null,
+                  sourceValueType,
                   completed: false,
                 };
               }}
@@ -2509,13 +2643,67 @@ function createNodeFromPreset(preset: NodePresetDefinition, position: { x: numbe
                 if (!sourceNode || !targetNode) return;
 
                 const sourceType = getPortType(sourceNode.data.config, connection.sourceHandle);
-                const targetType = getPortType(targetNode.data.config, connection.targetHandle);
+                let nextTargetHandle = connection.targetHandle ?? null;
+                let targetType = getPortType(targetNode.data.config, nextTargetHandle);
+
+                if (getPortKeyFromHandle(connection.targetHandle) === CREATE_INPUT_PORT_KEY && sourceType) {
+                  if (targetNode.data.config.family === "agent") {
+                    const nextPort = createAutoInputPort(targetNode.data.config.inputs, sourceType);
+                    nextTargetHandle = buildHandleId("input", nextPort.key);
+                    targetType = nextPort.valueType;
+                    setNodes((current) =>
+                      current.map((candidate) =>
+                        candidate.id === targetNode.id
+                          ? (() => {
+                              const currentConfig = candidate.data.config as AgentNode;
+                              return {
+                                ...candidate,
+                                data: {
+                                  ...candidate.data,
+                                  config: {
+                                    ...currentConfig,
+                                    inputs: [...currentConfig.inputs, nextPort],
+                                  } satisfies AgentNode,
+                                },
+                              };
+                            })()
+                          : candidate,
+                      ),
+                    );
+                  } else if (targetNode.data.config.family === "condition") {
+                    const nextPort = createAutoInputPort(targetNode.data.config.inputs, sourceType);
+                    nextTargetHandle = buildHandleId("input", nextPort.key);
+                    targetType = nextPort.valueType;
+                    setNodes((current) =>
+                      current.map((candidate) =>
+                        candidate.id === targetNode.id
+                          ? (() => {
+                              const currentConfig = candidate.data.config as ConditionNode;
+                              return {
+                                ...candidate,
+                                data: {
+                                  ...candidate.data,
+                                  config: {
+                                    ...currentConfig,
+                                    inputs: [...currentConfig.inputs, nextPort],
+                                  } satisfies ConditionNode,
+                                },
+                              };
+                            })()
+                          : candidate,
+                      ),
+                    );
+                  }
+                }
+
                 if (!sourceType || !targetType || !isValueTypeCompatible(sourceType, targetType)) {
                   setStatusMessage("Only compatible value types can be connected.");
+                  setConnectingSourceType(null);
                   return;
                 }
 
                 pendingConnectRef.current.completed = true;
+                setConnectingSourceType(null);
                 setEdges((current) =>
                   current
                     .filter(
@@ -2532,7 +2720,7 @@ function createNodeFromPreset(preset: NodePresetDefinition, position: { x: numbe
                       source: connection.source ?? "",
                       target: connection.target ?? "",
                       sourceHandle: connection.sourceHandle ?? null,
-                      targetHandle: connection.targetHandle ?? null,
+                      targetHandle: nextTargetHandle,
                       markerEnd: { type: MarkerType.ArrowClosed, color: TYPE_COLORS[sourceType] },
                       style: {
                         stroke: TYPE_COLORS[sourceType],
@@ -2557,6 +2745,7 @@ function createNodeFromPreset(preset: NodePresetDefinition, position: { x: numbe
                     sourceValueType: pending.sourceValueType ?? null,
                   });
                 }
+                setConnectingSourceType(null);
                 pendingConnectRef.current = { completed: false };
               }}
               onDragOver={(event) => {
