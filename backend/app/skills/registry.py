@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from app.knowledge.loader import search_knowledge
+from app.knowledge.loader import DEFAULT_KNOWLEDGE_BASE, search_knowledge
 from app.core.schemas.skills import SkillCatalogStatus
 from app.core.storage.skill_store import get_skill_status_map, list_managed_skill_keys
 from app.tools.registry import get_tool_registry
@@ -16,6 +16,7 @@ def get_skill_registry(*, include_disabled: bool = False) -> dict[str, SkillFunc
     tools = get_tool_registry()
     registry = {
         "search_docs": search_docs,
+        "search_knowledge_base": search_knowledge_base_skill,
         "analyze_assets": analyze_assets,
         "generate_draft": generate_draft,
         "evaluate_output": evaluate_output,
@@ -51,13 +52,42 @@ def get_skill_registry(*, include_disabled: bool = False) -> dict[str, SkillFunc
 
 
 def search_docs(query: str) -> dict[str, Any]:
-    results = search_knowledge(query, limit=3)
+    results = search_knowledge(query, knowledge_base=DEFAULT_KNOWLEDGE_BASE, limit=3)
     return {
         "query": query,
         "results": [
             {"title": item["title"], "summary": item["summary"], "source": item["source"]}
             for item in results
         ],
+    }
+
+
+def search_knowledge_base_skill(**skill_inputs: Any) -> dict[str, Any]:
+    query = str(skill_inputs.get("query") or "").strip()
+    knowledge_base = str(skill_inputs.get("knowledge_base") or DEFAULT_KNOWLEDGE_BASE).strip() or DEFAULT_KNOWLEDGE_BASE
+    try:
+        limit = int(skill_inputs.get("limit") or 3)
+    except (TypeError, ValueError):
+        limit = 3
+    limit = max(1, min(limit, 8))
+
+    results = search_knowledge(query, knowledge_base=knowledge_base, limit=limit)
+    serialized_results = [
+        {
+            "title": item["title"],
+            "summary": item["summary"],
+            "source": item["source"],
+        }
+        for item in results
+    ]
+    context = "\n\n".join(
+        f"[{index}] {item['title']} ({item['source']})\n{item['content']}"
+        for index, item in enumerate(results, start=1)
+    )
+    return {
+        "knowledge_base": knowledge_base,
+        "results": serialized_results,
+        "context": context,
     }
 
 
