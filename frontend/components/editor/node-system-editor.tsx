@@ -1177,13 +1177,21 @@ function PortRow({
   );
 }
 
-// 各节点类型的最小高度，防止缩放导致内容显示不全
-const NODE_MIN_HEIGHT: Record<string, number> = {
-  input: 248,     // header + port row + textarea(min-h-120) + bottom inset
-  output: 228,    // header + port row + preview area + bottom inset
-  agent: 208,     // header + port rows + summary block + bottom inset
-  condition: 176, // header + port rows + rule summary + bottom inset
-};
+function getNodeMinHeight(config: NodePresetDefinition, isExpanded: boolean) {
+  if (config.family === "input") {
+    return 320;
+  }
+  if (config.family === "output") {
+    return isExpanded ? 280 : 240;
+  }
+  if (config.family === "agent") {
+    return isExpanded ? 420 : 280;
+  }
+  if (config.family === "condition") {
+    return isExpanded ? 340 : 240;
+  }
+  return 180;
+}
 
 const DEFAULT_NODE_WIDTH = 360;
 
@@ -1195,10 +1203,10 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
   const config = data.config;
   const inputs = listInputPorts(config);
   const outputs = listOutputPorts(config);
-  const minHeight = NODE_MIN_HEIGHT[config.family] ?? 80;
   const isInputNode = config.family === "input";
   const isCollapsible = config.family !== "input";
   const isExpanded = config.family === "input" ? true : Boolean(data.isExpanded);
+  const minHeight = getNodeMinHeight(config, isExpanded);
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [isHoveringNode, setIsHoveringNode] = useState(false);
