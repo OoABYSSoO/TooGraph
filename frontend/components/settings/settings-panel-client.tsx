@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -35,6 +35,7 @@ type SettingsPayload = {
         model_ref: string;
         model: string;
         label: string;
+        route_target?: string | null;
       }>;
       example_model_refs: string[];
     }>;
@@ -60,6 +61,54 @@ type SettingsDraft = {
   thinking_enabled: boolean;
   temperature: number;
 };
+
+function formatModelChoiceLabel(modelRef: string) {
+  const trimmed = modelRef.trim();
+  if (!trimmed) return "";
+  const parts = trimmed.split("/");
+  return parts[parts.length - 1] || trimmed;
+}
+
+function getConcreteModelName(model: {
+  model_ref: string;
+  model: string;
+  label: string;
+  route_target?: string | null;
+}) {
+  return (
+    model.route_target?.trim() ||
+    model.label?.trim() ||
+    model.model?.trim() ||
+    formatModelChoiceLabel(model.model_ref)
+  );
+}
+
+function buildModelDisplayLookup(
+  models: Array<{
+    model_ref: string;
+    model: string;
+    label: string;
+    route_target?: string | null;
+  }>,
+) {
+  const baseLabels = models.map((model) => getConcreteModelName(model));
+  const duplicateCount = new Map<string, number>();
+  for (const label of baseLabels) {
+    duplicateCount.set(label, (duplicateCount.get(label) ?? 0) + 1);
+  }
+
+  return Object.fromEntries(
+    models.map((model, index) => {
+      const baseLabel = baseLabels[index];
+      const alias = model.model?.trim() || formatModelChoiceLabel(model.model_ref);
+      const label =
+        (duplicateCount.get(baseLabel) ?? 0) > 1 && alias && alias !== baseLabel
+          ? `${baseLabel} · ${alias}`
+          : baseLabel;
+      return [model.model_ref, label];
+    }),
+  ) as Record<string, string>;
+}
 
 function buildDraftFromSettings(settings: SettingsPayload): SettingsDraft {
   return {
@@ -100,23 +149,31 @@ export function SettingsPanelClient() {
     };
   }, []);
 
-  const configuredModelOptions = settings
-    ? Array.from(
+  const configuredModels = useMemo(
+    () =>
+      (settings?.model_catalog?.providers ?? [])
+        .filter((provider) => provider.configured)
+        .flatMap((provider) => provider.models),
+    [settings],
+  );
+
+  const modelDisplayLookup = useMemo(() => buildModelDisplayLookup(configuredModels), [configuredModels]);
+
+  const configuredModelOptions = useMemo(
+    () =>
+      Array.from(
         new Map(
-          (settings.model_catalog?.providers ?? [])
-            .filter((provider) => provider.configured)
-            .flatMap((provider) =>
-              provider.models.map((model) => [
-                model.model_ref,
-                {
-                  value: model.model_ref,
-                  label: model.model_ref,
-                },
-              ]),
-            ),
+          configuredModels.map((model) => [
+            model.model_ref,
+            {
+              value: model.model_ref,
+              label: modelDisplayLookup[model.model_ref] || model.model_ref,
+            },
+          ]),
         ).values(),
-      )
-    : [];
+      ),
+    [configuredModels, modelDisplayLookup],
+  );
 
   if (error) {
     return <EmptyState>{t("common.failed")}: {error}</EmptyState>;
@@ -271,7 +328,9 @@ export function SettingsPanelClient() {
               <div className="mt-3 text-xs text-[var(--muted)]">Base URL: {provider.base_url}</div>
               <div className="mt-3 flex flex-wrap gap-2.5">
                 {provider.models.map((model) => (
-                  <Badge key={model.model_ref}>{model.model_ref}</Badge>
+                  <Badge key={model.model_ref} title={model.model_ref}>
+                    {modelDisplayLookup[model.model_ref] || model.model_ref}
+                  </Badge>
                 ))}
                 {!provider.models.length
                   ? provider.example_model_refs.map((modelRef) => (

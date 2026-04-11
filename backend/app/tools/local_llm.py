@@ -261,6 +261,11 @@ def _chat_with_local_model_with_meta(
             "Thinking mode was requested, but the local gateway returned reasoning without final content. Retried without local thinking fields."
         )
 
+    if used_thinking and not reasoning:
+        warnings.append(
+            "Thinking mode was requested and the local gateway accepted the request, but this response did not include any reasoning text."
+        )
+
     if not content:
         raise RuntimeError("Local LLM returned an empty response.")
 
