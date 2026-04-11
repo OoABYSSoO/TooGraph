@@ -1202,10 +1202,12 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [isHoveringNode, setIsHoveringNode] = useState(false);
+  const [isResizingNode, setIsResizingNode] = useState(false);
   const [draftLabel, setDraftLabel] = useState(config.label);
   const [draftDescription, setDraftDescription] = useState(config.description);
   const [isDeleteConfirmActive, setIsDeleteConfirmActive] = useState(false);
   const deleteConfirmTimeoutRef = useRef<number | null>(null);
+  const hoverHideTimeoutRef = useRef<number | null>(null);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const uploadedAsset = config.family === "input" ? tryParseUploadedAssetEnvelope(config.defaultValue) : null;
 
@@ -1227,8 +1229,30 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
       if (deleteConfirmTimeoutRef.current) {
         window.clearTimeout(deleteConfirmTimeoutRef.current);
       }
+      if (hoverHideTimeoutRef.current) {
+        window.clearTimeout(hoverHideTimeoutRef.current);
+      }
     };
   }, []);
+
+  function showNodeResizeHandles() {
+    if (hoverHideTimeoutRef.current) {
+      window.clearTimeout(hoverHideTimeoutRef.current);
+      hoverHideTimeoutRef.current = null;
+    }
+    setIsHoveringNode(true);
+  }
+
+  function hideNodeResizeHandlesSoon() {
+    if (isResizingNode) return;
+    if (hoverHideTimeoutRef.current) {
+      window.clearTimeout(hoverHideTimeoutRef.current);
+    }
+    hoverHideTimeoutRef.current = window.setTimeout(() => {
+      hoverHideTimeoutRef.current = null;
+      setIsHoveringNode(false);
+    }, 180);
+  }
 
   function clearDeleteConfirmState() {
     if (deleteConfirmTimeoutRef.current) {
@@ -1282,12 +1306,19 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
   return (
     <>
       <NodeResizer
-        isVisible={selected || isHoveringNode}
+        isVisible={selected || isHoveringNode || isResizingNode}
         minWidth={160}
         minHeight={minHeight}
         handleStyle={{ width: 8, height: 8, borderRadius: 4, background: "var(--accent)", border: "none" }}
         lineStyle={{ borderColor: "var(--accent)", borderWidth: 1 }}
-        onResizeEnd={(_event, params) => data.onResizeEnd?.(params.width, params.height)}
+        onResizeStart={() => {
+          showNodeResizeHandles();
+          setIsResizingNode(true);
+        }}
+        onResizeEnd={(_event, params) => {
+          setIsResizingNode(false);
+          data.onResizeEnd?.(params.width, params.height);
+        }}
       />
       <div
         data-node-card="true"
@@ -1295,8 +1326,8 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
           "group/node relative h-full min-w-[160px] rounded-[18px] border bg-[linear-gradient(180deg,rgba(255,250,241,0.98)_0%,rgba(248,237,219,0.96)_100%)] shadow-[0_18px_36px_rgba(60,41,20,0.1)]",
           selected ? "border-[var(--accent)]" : "border-[rgba(154,52,18,0.25)]",
         )}
-        onPointerEnter={() => setIsHoveringNode(true)}
-        onPointerLeave={() => setIsHoveringNode(false)}
+        onPointerEnter={showNodeResizeHandles}
+        onPointerLeave={hideNodeResizeHandlesSoon}
         onDoubleClickCapture={(event) => {
           if (!isCollapsible || isExpanded) return;
           const target = event.target as HTMLElement | null;
