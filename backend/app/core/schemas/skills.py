@@ -87,6 +87,12 @@ class SkillDefinition(BaseModel):
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
 
+class SkillSettingsUpdate(BaseModel):
+    capability_policy: SkillCapabilityPolicies = Field(..., alias="capabilityPolicy")
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+
 class SkillFileNode(BaseModel):
     name: str
     path: str

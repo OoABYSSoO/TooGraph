@@ -5,6 +5,7 @@ import tempfile
 import unittest
 import json
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 from unittest.mock import patch
 
@@ -18,7 +19,7 @@ class BuddyStoreTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"):
                 self.assertEqual(store.load_profile()["name"], "GraphiteUI Buddy")
-                self.assertEqual(store.load_policy()["graph_permission_mode"], "advisory")
+                self.assertEqual(store.load_policy()["graph_permission_mode"], "ask_first")
                 self.assertEqual(store.list_memories(), [])
                 self.assertIn("content", store.load_session_summary())
 
@@ -178,7 +179,7 @@ class BuddyStoreTests(unittest.TestCase):
             buddy_home = Path(temp_dir) / "buddy_home"
             buddy_home.mkdir()
             db_path = buddy_home / "buddy.db"
-            with sqlite3.connect(db_path) as connection:
+            with closing(sqlite3.connect(db_path)) as connection:
                 connection.executescript(
                     """
                     CREATE TABLE buddy_sessions (

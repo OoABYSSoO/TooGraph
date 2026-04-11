@@ -26,6 +26,14 @@ test("BuddyPage manages profile, policy, memories, summary, and revisions", () =
   assert.match(source, /name="history"/);
 });
 
+test("BuddyPage exposes the unified buddy permission mode", () => {
+  assert.match(source, /<ElSegmented[\s\S]*v-model="policyDraft\.graph_permission_mode"[\s\S]*:options="permissionModeOptions"/);
+  assert.match(source, /permissionModeOptions/);
+  assert.match(source, /value: "ask_first"/);
+  assert.match(source, /value: "full_access"/);
+  assert.doesNotMatch(source, /graph_permission_mode:\s*"advisory"/);
+});
+
 test("BuddyPage reloads buddy data when the widget reports external updates", () => {
   assert.match(source, /import \{ computed, onMounted, ref, watch \} from "vue";/);
   assert.match(source, /import \{ useBuddyContextStore \} from "@\/stores\/buddyContext";/);

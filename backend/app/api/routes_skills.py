@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path, PurePosixPath
 import tempfile
+from typing import Any
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 
@@ -67,8 +68,6 @@ def disable_skill_endpoint(skill_key: str) -> SkillDefinition:
     definition = get_skill_catalog_registry(include_disabled=True).get(skill_key)
     if definition is None:
         raise HTTPException(status_code=404, detail=f"Skill '{skill_key}' does not exist.")
-    if not definition.can_manage:
-        raise HTTPException(status_code=400, detail="Import the skill into GraphiteUI before managing it.")
     disable_skill(skill_key)
     return get_skill_catalog_registry(include_disabled=True)[skill_key]
 
@@ -78,10 +77,20 @@ def enable_skill_endpoint(skill_key: str) -> SkillDefinition:
     definition = get_skill_catalog_registry(include_disabled=True).get(skill_key)
     if definition is None:
         raise HTTPException(status_code=404, detail=f"Skill '{skill_key}' does not exist.")
-    if not definition.can_manage:
-        raise HTTPException(status_code=400, detail="Import the skill into GraphiteUI before managing it.")
     enable_skill(skill_key)
     return get_skill_catalog_registry(include_disabled=True)[skill_key]
+
+
+@router.patch("/{skill_key}/settings")
+def update_skill_settings_endpoint(skill_key: str, payload: dict[str, Any] | None = None) -> None:
+    _ = payload
+    definition = get_skill_catalog_registry(include_disabled=True).get(skill_key)
+    if definition is None:
+        raise HTTPException(status_code=404, detail=f"Skill '{skill_key}' does not exist.")
+    raise HTTPException(
+        status_code=410,
+        detail="Skill capability policies were removed; enable or disable the skill to control visibility.",
+    )
 
 
 @router.get("/{skill_key}/files", response_model=SkillFileTreeResponse)

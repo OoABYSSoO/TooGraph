@@ -6,12 +6,10 @@ from typing import Iterable
 
 from app.core.schemas.skills import SkillCatalogStatus
 from app.core.storage.skill_store import (
-    SKILLS_DIR,
+    OFFICIAL_SKILLS_DIR,
     USER_SKILLS_DIR,
     get_skill_status_map,
     list_managed_skill_keys,
-    list_official_skill_keys,
-    list_user_skill_keys,
 )
 from app.skills.runtime import (
     ScriptSkillRunner,
@@ -27,7 +25,7 @@ SkillFunc = ScriptSkillRunner
 
 def _build_runtime_skill_registry() -> dict[str, SkillFunc]:
     registry: dict[str, SkillFunc] = {}
-    for skill_dir in _iter_skill_dirs([SKILLS_DIR, USER_SKILLS_DIR]):
+    for skill_dir in _iter_skill_dirs([OFFICIAL_SKILLS_DIR, USER_SKILLS_DIR]):
         manifest = skill_dir / "skill.json"
         if not manifest.is_file():
             continue
@@ -92,8 +90,6 @@ def list_runtime_skill_keys() -> set[str]:
 
 def get_skill_registry(*, include_disabled: bool = False) -> dict[str, SkillFunc]:
     registry = _build_runtime_skill_registry()
-    official_keys = list_official_skill_keys()
-    user_keys = list_user_skill_keys()
     if include_disabled:
         allowed_keys = list_managed_skill_keys()
         return {key: value for key, value in registry.items() if key in allowed_keys}
@@ -101,6 +97,5 @@ def get_skill_registry(*, include_disabled: bool = False) -> dict[str, SkillFunc
     return {
         key: value
         for key, value in registry.items()
-        if key in official_keys
-        or (key in user_keys and status_map.get(key, SkillCatalogStatus.ACTIVE) == SkillCatalogStatus.ACTIVE)
+        if status_map.get(key, SkillCatalogStatus.ACTIVE) == SkillCatalogStatus.ACTIVE
     }

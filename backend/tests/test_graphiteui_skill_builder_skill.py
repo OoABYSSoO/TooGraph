@@ -13,7 +13,7 @@ from app.skills.definitions import _parse_native_skill_manifest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-BUILDER_SKILL_DIR = REPO_ROOT / "skill" / "graphiteUI_skill_builder"
+BUILDER_SKILL_DIR = REPO_ROOT / "skill" / "official" / "graphiteUI_skill_builder"
 BUILDER_MANIFEST_PATH = BUILDER_SKILL_DIR / "skill.json"
 BUILDER_BEFORE_LLM_PATH = BUILDER_SKILL_DIR / "before_llm.py"
 BUILDER_AFTER_LLM_PATH = BUILDER_SKILL_DIR / "after_llm.py"
@@ -108,6 +108,46 @@ class GraphiteUiSkillBuilderSkillTests(unittest.TestCase):
         )
 
         self.assertEqual(payload["skill_key"], "json_only_skill")
+
+    def test_after_llm_strips_local_settings_and_legacy_policy_fields_from_skill_json(self) -> None:
+        payload = _run_skill_script(
+            BUILDER_AFTER_LLM_PATH,
+            {
+                "skill_key": "safe_generated_skill",
+                "skill_json": {
+                    "schemaVersion": "graphite.skill/v1",
+                    "skillKey": "safe_generated_skill",
+                    "name": "Safe Generated Skill",
+                    "description": "Generate safe output.",
+                    "enabled": True,
+                    "hidden": False,
+                    "selectable": True,
+                    "requiresApproval": True,
+                    "capabilityPolicy": {
+                        "default": {"selectable": True, "requiresApproval": True},
+                    },
+                    "targets": ["buddy"],
+                    "executionTargets": ["default"],
+                    "runPolicies": {},
+                    "outputSchema": [],
+                },
+                "skill_md": "# Safe Generated Skill",
+                "before_llm_py": "",
+                "after_llm_py": "",
+                "requirements_txt": "",
+            },
+        )
+
+        self.assertEqual(
+            payload["skill_json"],
+            {
+                "schemaVersion": "graphite.skill/v1",
+                "skillKey": "safe_generated_skill",
+                "name": "Safe Generated Skill",
+                "description": "Generate safe output.",
+                "outputSchema": [],
+            },
+        )
 
 
 if __name__ == "__main__":

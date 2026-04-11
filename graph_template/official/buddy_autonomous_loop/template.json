@@ -1,0 +1,2306 @@
+{
+  "template_id": "buddy_autonomous_loop",
+  "label": "伙伴自主循环",
+  "description": "读取 Buddy Home，理解用户请求，选择并执行启用的图模板或 Skill，必要时请求澄清或审批，最后只输出伙伴回复的官方循环模板。",
+  "default_graph_name": "伙伴自主循环",
+  "state_schema": {
+    "user_message": {
+      "name": "user_message",
+      "description": "用户本轮对伙伴说的话。",
+      "type": "text",
+      "value": "",
+      "color": "#d97706",
+      "binding": null
+    },
+    "conversation_history": {
+      "name": "conversation_history",
+      "description": "伙伴对话历史摘要。",
+      "type": "markdown",
+      "value": "",
+      "color": "#64748b",
+      "binding": null
+    },
+    "page_context": {
+      "name": "page_context",
+      "description": "当前页面、选中图、节点或其他 UI 上下文。",
+      "type": "markdown",
+      "value": "",
+      "color": "#0891b2",
+      "binding": null
+    },
+    "buddy_mode": {
+      "name": "buddy_mode",
+      "description": "Buddy permission mode: ask_first or full_access.",
+      "type": "text",
+      "value": "ask_first",
+      "color": "#7c3aed",
+      "binding": null
+    },
+    "buddy_context": {
+      "name": "buddy_context",
+      "description": "从 Buddy Home 文件夹中选择并注入的长期上下文文件。",
+      "type": "file",
+      "value": {
+        "kind": "local_folder",
+        "root": "buddy_home",
+        "selected": [
+          "AGENTS.md",
+          "SOUL.md",
+          "USER.md",
+          "MEMORY.md",
+          "policy.json"
+        ]
+      },
+      "color": "#0f766e",
+      "binding": null
+    },
+    "request_understanding": {
+      "name": "request_understanding",
+      "description": "对用户请求的结构化理解、澄清需求、目标和约束。",
+      "type": "json",
+      "value": {},
+      "color": "#16a34a",
+      "binding": null
+    },
+    "selected_capability": {
+      "name": "selected_capability",
+      "description": "能力选择阶段选出的单个能力，kind 为 skill、subgraph 或 none。",
+      "type": "capability",
+      "value": {
+        "kind": "none"
+      },
+      "color": "#2563eb",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "graphiteui_capability_selector",
+        "nodeId": "select_capability",
+        "fieldKey": "capability",
+        "managed": true
+      }
+    },
+    "capability_found": {
+      "name": "capability_found",
+      "description": "是否找到了适合当前请求的启用能力。",
+      "type": "boolean",
+      "value": false,
+      "color": "#2563eb",
+      "binding": {
+        "kind": "skill_output",
+        "skillKey": "graphiteui_capability_selector",
+        "nodeId": "select_capability",
+        "fieldKey": "found",
+        "managed": true
+      }
+    },
+    "capability_result": {
+      "name": "capability_result",
+      "description": "动态能力执行后的结果包。包内每个输出保留原始 name、description、type 和 value。",
+      "type": "result_package",
+      "value": {},
+      "color": "#0284c7",
+      "binding": {
+        "kind": "capability_result",
+        "nodeId": "execute_capability",
+        "managed": true
+      }
+    },
+    "capability_review": {
+      "name": "capability_review",
+      "description": "对能力选择、权限、执行结果和是否继续调用能力的复盘。",
+      "type": "json",
+      "value": {},
+      "color": "#0f766e",
+      "binding": null
+    },
+    "capability_gap": {
+      "name": "capability_gap",
+      "description": "找不到能力时的结构化能力缺口，供最终回复或能力构建模板使用。",
+      "type": "json",
+      "value": {},
+      "color": "#dc2626",
+      "binding": null
+    },
+    "capability_trace": {
+      "name": "capability_trace",
+      "description": "本轮能力循环的步骤摘要列表，保留多轮能力调用轨迹。",
+      "type": "json",
+      "value": [],
+      "color": "#4f46e5",
+      "binding": null
+    },
+    "final_reply": {
+      "name": "final_reply",
+      "description": "展示给用户的最终伙伴回复。",
+      "type": "markdown",
+      "value": "",
+      "color": "#16a34a",
+      "binding": null
+    }
+  },
+  "nodes": {
+    "input_user_message": {
+      "kind": "input",
+      "name": "用户消息",
+      "description": "伙伴本轮收到的用户消息。",
+      "ui": {
+        "position": {
+          "x": 80,
+          "y": 120
+        },
+        "collapsed": false
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "user_message",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "",
+        "boundaryType": "text"
+      }
+    },
+    "input_conversation_history": {
+      "kind": "input",
+      "name": "对话历史",
+      "description": "伙伴对话历史摘要。",
+      "ui": {
+        "position": {
+          "x": 80,
+          "y": 280
+        },
+        "collapsed": false
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "conversation_history",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "",
+        "boundaryType": "markdown"
+      }
+    },
+    "input_page_context": {
+      "kind": "input",
+      "name": "页面上下文",
+      "description": "当前页面、选中图或节点信息。",
+      "ui": {
+        "position": {
+          "x": 80,
+          "y": 440
+        },
+        "collapsed": false
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "page_context",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "",
+        "boundaryType": "markdown"
+      }
+    },
+    "input_buddy_mode": {
+      "kind": "input",
+      "name": "伙伴模式",
+      "description": "当前伙伴运行模式。",
+      "ui": {
+        "position": {
+          "x": 80,
+          "y": 600
+        },
+        "collapsed": false
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "buddy_mode",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": "chat",
+        "boundaryType": "text"
+      }
+    },
+    "input_buddy_context": {
+      "kind": "input",
+      "name": "Buddy Home Files",
+      "description": "选择要注入伙伴主循环的 Buddy Home 文件。",
+      "ui": {
+        "position": {
+          "x": 80,
+          "y": 760
+        },
+        "collapsed": false
+      },
+      "reads": [],
+      "writes": [
+        {
+          "state": "buddy_context",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "value": {
+          "kind": "local_folder",
+          "root": "buddy_home",
+          "selected": [
+            "AGENTS.md",
+            "SOUL.md",
+            "USER.md",
+            "MEMORY.md",
+            "policy.json"
+          ]
+        },
+        "boundaryType": "file"
+      }
+    },
+    "intake_request": {
+      "kind": "subgraph",
+      "name": "理解请求",
+      "description": "把用户请求转成结构化意图，必要时通过断点向用户澄清。",
+      "ui": {
+        "position": {
+          "x": 900,
+          "y": 300
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "user_message",
+          "required": true
+        },
+        {
+          "state": "conversation_history",
+          "required": true
+        },
+        {
+          "state": "page_context",
+          "required": true
+        },
+        {
+          "state": "buddy_mode",
+          "required": true
+        },
+        {
+          "state": "buddy_context",
+          "required": true
+        }
+      ],
+      "writes": [
+        {
+          "state": "request_understanding",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "graph": {
+          "state_schema": {
+            "user_message": {
+              "name": "user_message",
+              "description": "用户本轮消息。",
+              "type": "text",
+              "value": "",
+              "color": "#d97706",
+              "binding": null
+            },
+            "conversation_history": {
+              "name": "conversation_history",
+              "description": "伙伴对话历史摘要。",
+              "type": "markdown",
+              "value": "",
+              "color": "#64748b",
+              "binding": null
+            },
+            "page_context": {
+              "name": "page_context",
+              "description": "当前页面上下文。",
+              "type": "markdown",
+              "value": "",
+              "color": "#0891b2",
+              "binding": null
+            },
+            "buddy_mode": {
+              "name": "buddy_mode",
+              "description": "伙伴运行模式。",
+              "type": "text",
+              "value": "chat",
+              "color": "#7c3aed",
+              "binding": null
+            },
+            "buddy_context": {
+              "name": "buddy_context",
+              "description": "从 Buddy Home 文件夹中选择并注入的长期上下文文件。",
+              "type": "file",
+              "value": {
+                "kind": "local_folder",
+                "root": "buddy_home",
+                "selected": [
+                  "AGENTS.md",
+                  "SOUL.md",
+                  "USER.md",
+                  "MEMORY.md",
+                  "policy.json"
+                ]
+              },
+              "color": "#0f766e",
+              "binding": null
+            },
+            "request_understanding": {
+              "name": "request_understanding",
+              "description": "结构化请求理解。",
+              "type": "json",
+              "value": {},
+              "color": "#16a34a",
+              "binding": null
+            },
+            "clarification_prompt": {
+              "name": "clarification_prompt",
+              "description": "需要用户回答的澄清问题。",
+              "type": "markdown",
+              "value": "",
+              "color": "#0891b2",
+              "binding": null
+            },
+            "clarification_answer": {
+              "name": "clarification_answer",
+              "description": "用户对澄清问题的回答。",
+              "type": "markdown",
+              "value": "",
+              "color": "#d97706",
+              "binding": null
+            }
+          },
+          "nodes": {
+            "input_user_message": {
+              "kind": "input",
+              "name": "用户消息",
+              "description": "",
+              "ui": {
+                "position": {
+                  "x": 60,
+                  "y": 60
+                },
+                "collapsed": false
+              },
+              "reads": [],
+              "writes": [
+                {
+                  "state": "user_message",
+                  "mode": "replace"
+                }
+              ],
+              "config": {
+                "value": "",
+                "boundaryType": "text"
+              }
+            },
+            "input_conversation_history": {
+              "kind": "input",
+              "name": "对话历史",
+              "description": "",
+              "ui": {
+                "position": {
+                  "x": 60,
+                  "y": 180
+                },
+                "collapsed": false
+              },
+              "reads": [],
+              "writes": [
+                {
+                  "state": "conversation_history",
+                  "mode": "replace"
+                }
+              ],
+              "config": {
+                "value": "",
+                "boundaryType": "markdown"
+              }
+            },
+            "input_page_context": {
+              "kind": "input",
+              "name": "页面上下文",
+              "description": "",
+              "ui": {
+                "position": {
+                  "x": 60,
+                  "y": 300
+                },
+                "collapsed": false
+              },
+              "reads": [],
+              "writes": [
+                {
+                  "state": "page_context",
+                  "mode": "replace"
+                }
+              ],
+              "config": {
+                "value": "",
+                "boundaryType": "markdown"
+              }
+            },
+            "input_buddy_mode": {
+              "kind": "input",
+              "name": "伙伴模式",
+              "description": "",
+              "ui": {
+                "position": {
+                  "x": 60,
+                  "y": 420
+                },
+                "collapsed": false
+              },
+              "reads": [],
+              "writes": [
+                {
+                  "state": "buddy_mode",
+                  "mode": "replace"
+                }
+              ],
+              "config": {
+                "value": "chat",
+                "boundaryType": "text"
+              }
+            },
+            "input_buddy_context": {
+              "kind": "input",
+              "name": "伙伴上下文",
+              "description": "",
+              "ui": {
+                "position": {
+                  "x": 60,
+                  "y": 540
+                },
+                "collapsed": false
+              },
+              "reads": [],
+              "writes": [
+                {
+                  "state": "buddy_context",
+                  "mode": "replace"
+                }
+              ],
+              "config": {
+                "value": {
+                  "kind": "local_folder",
+                  "root": "buddy_home",
+                  "selected": [
+                    "AGENTS.md",
+                    "SOUL.md",
+                    "USER.md",
+                    "MEMORY.md",
+                    "policy.json"
+                  ]
+                },
+                "boundaryType": "file"
+              }
+            },
+            "understand_request": {
+              "kind": "agent",
+              "name": "理解请求",
+              "description": "判断用户目标、输入缺口、权限风险和是否需要澄清。",
+              "ui": {
+                "position": {
+                  "x": 430,
+                  "y": 270
+                },
+                "collapsed": false
+              },
+              "reads": [
+                {
+                  "state": "user_message",
+                  "required": true
+                },
+                {
+                  "state": "conversation_history",
+                  "required": false
+                },
+                {
+                  "state": "page_context",
+                  "required": false
+                },
+                {
+                  "state": "buddy_mode",
+                  "required": false
+                },
+                {
+                  "state": "buddy_context",
+                  "required": true
+                }
+              ],
+              "writes": [
+                {
+                  "state": "request_understanding",
+                  "mode": "replace"
+                }
+              ],
+              "config": {
+                "skillKey": "",
+                "skillBindings": [],
+                "skillInstructionBlocks": {},
+                "taskInstruction": "输出 request_understanding JSON。字段必须包含 intent、user_goal、known_inputs、missing_information、needs_clarification(boolean)、clarification_focus、constraints、risk_level、requires_capability(boolean)、direct_answer_possible(boolean)。如果问题可以直接回复且不需要工具，将 requires_capability 设为 false。",
+                "modelSource": "global",
+                "model": "",
+                "thinkingMode": "high",
+                "temperature": 0.1
+              }
+            },
+            "need_clarification": {
+              "kind": "condition",
+              "name": "需要澄清?",
+              "description": "根据请求理解判断是否暂停询问用户。",
+              "ui": {
+                "position": {
+                  "x": 790,
+                  "y": 270
+                },
+                "collapsed": false
+              },
+              "reads": [
+                {
+                  "state": "request_understanding",
+                  "required": true
+                }
+              ],
+              "writes": [],
+              "config": {
+                "branches": [
+                  "true",
+                  "false",
+                  "exhausted"
+                ],
+                "loopLimit": 3,
+                "branchMapping": {
+                  "true": "true",
+                  "false": "false"
+                },
+                "rule": {
+                  "source": "$state.request_understanding.needs_clarification",
+                  "operator": "==",
+                  "value": true
+                }
+              }
+            },
+            "ask_clarification": {
+              "kind": "agent",
+              "name": "询问澄清",
+              "description": "把缺失信息转成用户容易回答的问题。",
+              "ui": {
+                "position": {
+                  "x": 1150,
+                  "y": 100
+                },
+                "collapsed": false
+              },
+              "reads": [
+                {
+                  "state": "user_message",
+                  "required": true
+                },
+                {
+                  "state": "request_understanding",
+                  "required": true
+                }
+              ],
+              "writes": [
+                {
+                  "state": "clarification_prompt",
+                  "mode": "replace"
+                }
+              ],
+              "config": {
+                "skillKey": "",
+                "skillBindings": [],
+                "skillInstructionBlocks": {},
+                "taskInstruction": "生成面向用户的澄清问题。优先给 2 到 4 个选择项，并允许用户自由输入。只询问会影响下一步执行的关键问题。",
+                "modelSource": "global",
+                "model": "",
+                "thinkingMode": "high",
+                "temperature": 0.2
+              }
+            },
+            "merge_clarification": {
+              "kind": "agent",
+              "name": "合并澄清",
+              "description": "把用户回答合并回请求理解。",
+              "ui": {
+                "position": {
+                  "x": 1510,
+                  "y": 100
+                },
+                "collapsed": false
+              },
+              "reads": [
+                {
+                  "state": "user_message",
+                  "required": true
+                },
+                {
+                  "state": "request_understanding",
+                  "required": true
+                },
+                {
+                  "state": "clarification_prompt",
+                  "required": true
+                },
+                {
+                  "state": "clarification_answer",
+                  "required": true
+                }
+              ],
+              "writes": [
+                {
+                  "state": "request_understanding",
+                  "mode": "replace"
+                }
+              ],
+              "config": {
+                "skillKey": "",
+                "skillBindings": [],
+                "skillInstructionBlocks": {},
+                "taskInstruction": "根据用户澄清回答更新 request_understanding JSON。needs_clarification 通常应变为 false；如果回答仍然不足，保留缺口并说明原因。",
+                "modelSource": "global",
+                "model": "",
+                "thinkingMode": "high",
+                "temperature": 0.1
+              }
+            },
+            "output_request_understanding": {
+              "kind": "output",
+              "name": "输出请求理解",
+              "description": "",
+              "ui": {
+                "position": {
+                  "x": 1880,
+                  "y": 270
+                },
+                "collapsed": false
+              },
+              "reads": [
+                {
+                  "state": "request_understanding",
+                  "required": true
+                }
+              ],
+              "writes": [],
+              "config": {
+                "displayMode": "json",
+                "persistEnabled": false,
+                "persistFormat": "auto",
+                "fileNameTemplate": ""
+              }
+            }
+          },
+          "edges": [
+            {
+              "source": "input_user_message",
+              "target": "understand_request"
+            },
+            {
+              "source": "input_conversation_history",
+              "target": "understand_request"
+            },
+            {
+              "source": "input_page_context",
+              "target": "understand_request"
+            },
+            {
+              "source": "input_buddy_mode",
+              "target": "understand_request"
+            },
+            {
+              "source": "input_buddy_context",
+              "target": "understand_request"
+            },
+            {
+              "source": "understand_request",
+              "target": "need_clarification"
+            },
+            {
+              "source": "ask_clarification",
+              "target": "merge_clarification"
+            },
+            {
+              "source": "merge_clarification",
+              "target": "output_request_understanding"
+            }
+          ],
+          "conditional_edges": [
+            {
+              "source": "need_clarification",
+              "branches": {
+                "true": "ask_clarification",
+                "false": "output_request_understanding",
+                "exhausted": "output_request_understanding"
+              }
+            }
+          ],
+          "metadata": {
+            "graphProtocol": "node_system",
+            "role": "buddy_request_intake",
+            "interrupt_after": [
+              "ask_clarification"
+            ]
+          }
+        }
+      }
+    },
+    "needs_capability": {
+      "kind": "condition",
+      "name": "需要能力?",
+      "description": "简单闲聊和可直接回答的问题绕过能力循环，避免不必要的能力选择和权限检查。",
+      "ui": {
+        "position": {
+          "x": 1240,
+          "y": 300
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "request_understanding",
+          "required": true
+        }
+      ],
+      "writes": [],
+      "config": {
+        "branches": [
+          "true",
+          "false",
+          "exhausted"
+        ],
+        "loopLimit": 3,
+        "branchMapping": {
+          "true": "true",
+          "false": "false"
+        },
+        "rule": {
+          "source": "$state.request_understanding.requires_capability",
+          "operator": "==",
+          "value": true
+        }
+      }
+    },
+    "run_capability_cycle": {
+      "kind": "subgraph",
+      "name": "能力循环",
+      "description": "选择一个启用能力，执行后把结果和能力缺口打包；低层写文件或脚本审批由运行时处理。",
+      "ui": {
+        "position": {
+          "x": 1600,
+          "y": 300
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "user_message",
+          "required": true
+        },
+        {
+          "state": "conversation_history",
+          "required": true
+        },
+        {
+          "state": "page_context",
+          "required": true
+        },
+        {
+          "state": "buddy_mode",
+          "required": true
+        },
+        {
+          "state": "buddy_context",
+          "required": true
+        },
+        {
+          "state": "request_understanding",
+          "required": true
+        }
+      ],
+      "writes": [
+        {
+          "state": "selected_capability",
+          "mode": "replace"
+        },
+        {
+          "state": "capability_found",
+          "mode": "replace"
+        },
+        {
+          "state": "capability_result",
+          "mode": "replace"
+        },
+        {
+          "state": "capability_review",
+          "mode": "replace"
+        },
+        {
+          "state": "capability_gap",
+          "mode": "replace"
+        },
+        {
+          "state": "capability_trace",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "graph": {
+          "state_schema": {
+            "user_message": {
+              "name": "user_message",
+              "description": "用户本轮消息。",
+              "type": "text",
+              "value": "",
+              "color": "#d97706",
+              "binding": null
+            },
+            "conversation_history": {
+              "name": "conversation_history",
+              "description": "伙伴对话历史摘要。",
+              "type": "markdown",
+              "value": "",
+              "color": "#64748b",
+              "binding": null
+            },
+            "page_context": {
+              "name": "page_context",
+              "description": "当前页面上下文。",
+              "type": "markdown",
+              "value": "",
+              "color": "#0891b2",
+              "binding": null
+            },
+            "buddy_mode": {
+              "name": "buddy_mode",
+              "description": "Buddy permission mode: ask_first or full_access.",
+              "type": "text",
+              "value": "ask_first",
+              "color": "#7c3aed",
+              "binding": null
+            },
+            "buddy_context": {
+              "name": "buddy_context",
+              "description": "从 Buddy Home 文件夹中选择并注入的长期上下文文件。",
+              "type": "file",
+              "value": {
+                "kind": "local_folder",
+                "root": "buddy_home",
+                "selected": [
+                  "AGENTS.md",
+                  "SOUL.md",
+                  "USER.md",
+                  "MEMORY.md",
+                  "policy.json"
+                ]
+              },
+              "color": "#0f766e",
+              "binding": null
+            },
+            "request_understanding": {
+              "name": "request_understanding",
+              "description": "结构化请求理解。",
+              "type": "json",
+              "value": {},
+              "color": "#16a34a",
+              "binding": null
+            },
+            "selected_capability": {
+              "name": "selected_capability",
+              "description": "能力选择技能返回的单个能力。",
+              "type": "capability",
+              "value": {
+                "kind": "none"
+              },
+              "color": "#2563eb",
+              "binding": {
+                "kind": "skill_output",
+                "skillKey": "graphiteui_capability_selector",
+                "nodeId": "select_capability",
+                "fieldKey": "capability",
+                "managed": true
+              }
+            },
+            "capability_found": {
+              "name": "capability_found",
+              "description": "是否找到适合能力。",
+              "type": "boolean",
+              "value": false,
+              "color": "#2563eb",
+              "binding": {
+                "kind": "skill_output",
+                "skillKey": "graphiteui_capability_selector",
+                "nodeId": "select_capability",
+                "fieldKey": "found",
+                "managed": true
+              }
+            },
+            "capability_result": {
+              "name": "capability_result",
+              "description": "动态能力执行结果包。",
+              "type": "result_package",
+              "value": {},
+              "color": "#0284c7",
+              "binding": {
+                "kind": "capability_result",
+                "nodeId": "execute_capability",
+                "managed": true
+              }
+            },
+            "capability_review": {
+              "name": "capability_review",
+              "description": "能力执行后的复盘。",
+              "type": "json",
+              "value": {},
+              "color": "#0f766e",
+              "binding": null
+            },
+            "capability_gap": {
+              "name": "capability_gap",
+              "description": "找不到能力时的结构化能力缺口。",
+              "type": "json",
+              "value": {},
+              "color": "#dc2626",
+              "binding": null
+            },
+            "capability_trace": {
+              "name": "capability_trace",
+              "description": "能力循环步骤摘要列表。",
+              "type": "json",
+              "value": [],
+              "color": "#4f46e5",
+              "binding": null
+            }
+          },
+          "nodes": {
+            "input_user_message": {
+              "kind": "input",
+              "name": "用户消息",
+              "description": "",
+              "ui": {
+                "position": {
+                  "x": 40,
+                  "y": 60
+                },
+                "collapsed": false
+              },
+              "reads": [],
+              "writes": [
+                {
+                  "state": "user_message",
+                  "mode": "replace"
+                }
+              ],
+              "config": {
+                "value": "",
+                "boundaryType": "text"
+              }
+            },
+            "input_conversation_history": {
+              "kind": "input",
+              "name": "对话历史",
+              "description": "",
+              "ui": {
+                "position": {
+                  "x": 40,
+                  "y": 180
+                },
+                "collapsed": false
+              },
+              "reads": [],
+              "writes": [
+                {
+                  "state": "conversation_history",
+                  "mode": "replace"
+                }
+              ],
+              "config": {
+                "value": "",
+                "boundaryType": "markdown"
+              }
+            },
+            "input_page_context": {
+              "kind": "input",
+              "name": "页面上下文",
+              "description": "",
+              "ui": {
+                "position": {
+                  "x": 40,
+                  "y": 300
+                },
+                "collapsed": false
+              },
+              "reads": [],
+              "writes": [
+                {
+                  "state": "page_context",
+                  "mode": "replace"
+                }
+              ],
+              "config": {
+                "value": "",
+                "boundaryType": "markdown"
+              }
+            },
+            "input_buddy_mode": {
+              "kind": "input",
+              "name": "伙伴模式",
+              "description": "",
+              "ui": {
+                "position": {
+                  "x": 40,
+                  "y": 420
+                },
+                "collapsed": false
+              },
+              "reads": [],
+              "writes": [
+                {
+                  "state": "buddy_mode",
+                  "mode": "replace"
+                }
+              ],
+              "config": {
+                "value": "chat",
+                "boundaryType": "text"
+              }
+            },
+            "input_buddy_context": {
+              "kind": "input",
+              "name": "伙伴上下文",
+              "description": "",
+              "ui": {
+                "position": {
+                  "x": 40,
+                  "y": 540
+                },
+                "collapsed": false
+              },
+              "reads": [],
+              "writes": [
+                {
+                  "state": "buddy_context",
+                  "mode": "replace"
+                }
+              ],
+              "config": {
+                "value": {
+                  "kind": "local_folder",
+                  "root": "buddy_home",
+                  "selected": [
+                    "AGENTS.md",
+                    "SOUL.md",
+                    "USER.md",
+                    "MEMORY.md",
+                    "policy.json"
+                  ]
+                },
+                "boundaryType": "file"
+              }
+            },
+            "input_request_understanding": {
+              "kind": "input",
+              "name": "请求理解",
+              "description": "",
+              "ui": {
+                "position": {
+                  "x": 40,
+                  "y": 660
+                },
+                "collapsed": false
+              },
+              "reads": [],
+              "writes": [
+                {
+                  "state": "request_understanding",
+                  "mode": "replace"
+                }
+              ],
+              "config": {
+                "value": {},
+                "boundaryType": "json"
+              }
+            },
+            "select_capability": {
+              "kind": "agent",
+              "name": "选择能力",
+              "description": "从启用模板和 Skill 中选择一个能力。",
+              "ui": {
+                "position": {
+                  "x": 430,
+                  "y": 360
+                },
+                "collapsed": false
+              },
+              "reads": [
+                {
+                  "state": "user_message",
+                  "required": true
+                },
+                {
+                  "state": "request_understanding",
+                  "required": true
+                },
+                {
+                  "state": "capability_review",
+                  "required": false
+                }
+              ],
+              "writes": [
+                {
+                  "state": "selected_capability",
+                  "mode": "replace"
+                },
+                {
+                  "state": "capability_found",
+                  "mode": "replace"
+                }
+              ],
+              "config": {
+                "skillKey": "graphiteui_capability_selector",
+                "skillBindings": [
+                  {
+                    "skillKey": "graphiteui_capability_selector",
+                    "outputMapping": {
+                      "capability": "selected_capability",
+                      "found": "capability_found"
+                    }
+                  }
+                ],
+                "skillInstructionBlocks": {
+                  "graphiteui_capability_selector": {
+                    "skillKey": "graphiteui_capability_selector",
+                    "title": "能力选择 skill instruction",
+                    "content": "根据 request_understanding 和 user_message 从候选清单中选择一个启用能力。优先图模板，其次 Skill；不要选择 buddy_autonomous_loop 自身；如果用户请求可以直接回答或没有合适能力，选择 {\"kind\":\"none\"}。",
+                    "source": "node.override"
+                  }
+                },
+                "taskInstruction": "选择一个能完成当前请求的能力。不要把本伙伴循环模板自身作为候选答案。若 capability_review 表示需要继续调用另一个能力，则以 capability_review.next_requirement 为当前需求。",
+                "modelSource": "global",
+                "model": "",
+                "thinkingMode": "high",
+                "temperature": 0.1
+              }
+            },
+            "capability_found_condition": {
+              "kind": "condition",
+              "name": "找到能力?",
+              "description": "没有合适能力时进入缺失能力复盘。",
+              "ui": {
+                "position": {
+                  "x": 810,
+                  "y": 360
+                },
+                "collapsed": false
+              },
+              "reads": [
+                {
+                  "state": "capability_found",
+                  "required": true
+                }
+              ],
+              "writes": [],
+              "config": {
+                "branches": [
+                  "true",
+                  "false",
+                  "exhausted"
+                ],
+                "loopLimit": 3,
+                "branchMapping": {
+                  "true": "true",
+                  "false": "false"
+                },
+                "rule": {
+                  "source": "$state.capability_found",
+                  "operator": "==",
+                  "value": true
+                }
+              }
+            },
+            "review_missing_capability": {
+              "kind": "agent",
+              "name": "无匹配能力复盘",
+              "description": "没有能力可用时给出结构化能力缺口和构建建议。",
+              "ui": {
+                "position": {
+                  "x": 1180,
+                  "y": 560
+                },
+                "collapsed": false
+              },
+              "reads": [
+                {
+                  "state": "user_message",
+                  "required": true
+                },
+                {
+                  "state": "request_understanding",
+                  "required": true
+                }
+              ],
+              "writes": [
+                {
+                  "state": "capability_review",
+                  "mode": "replace"
+                },
+                {
+                  "state": "capability_gap",
+                  "mode": "replace"
+                }
+              ],
+              "config": {
+                "skillKey": "",
+                "skillBindings": [],
+                "skillInstructionBlocks": {},
+                "taskInstruction": "输出 capability_review JSON 和 capability_gap JSON。capability_review 说明 found=false、reason、direct_response_strategy，并把 needs_another_capability 设为 false。capability_gap 必须包含 gap_detected(true)、gap_type(skill|graph_template|unknown)、reason、missing_capability、suggested_asset_type(skill|graph_template|none)、build_requirement、should_offer_build(boolean)、should_route_to_builder(boolean)。只有用户明确要求创建、补齐、以后具备某能力，或 request_understanding 表明目标就是构建能力时，should_route_to_builder 才为 true；普通任务缺能力时只 should_offer_build=true，交由最终回复询问用户。",
+                "modelSource": "global",
+                "model": "",
+                "thinkingMode": "high",
+                "temperature": 0.1
+              }
+            },
+            "execute_capability": {
+              "kind": "agent",
+              "name": "执行能力",
+              "description": "根据 capability state 动态执行一个 Skill 或图模板，并把原始结果写入 result_package。",
+              "ui": {
+                "position": {
+                  "x": 3000,
+                  "y": 80
+                },
+                "collapsed": false
+              },
+              "reads": [
+                {
+                  "state": "selected_capability",
+                  "required": true
+                },
+                {
+                  "state": "user_message",
+                  "required": true
+                },
+                {
+                  "state": "page_context",
+                  "required": false
+                },
+                {
+                  "state": "buddy_context",
+                  "required": true
+                },
+                {
+                  "state": "request_understanding",
+                  "required": true
+                }
+              ],
+              "writes": [
+                {
+                  "state": "capability_result",
+                  "mode": "replace"
+                }
+              ],
+              "config": {
+                "skillKey": "",
+                "skillBindings": [],
+                "skillInstructionBlocks": {},
+                "taskInstruction": "你只负责为 selected_capability 准备一次运行输入。运行时会执行该 Skill 或图模板，并把原始输出写入 capability_result result_package。不要总结、改写或二次包装执行结果。",
+                "modelSource": "global",
+                "model": "",
+                "thinkingMode": "high",
+                "temperature": 0.1
+              }
+            },
+            "review_capability_result": {
+              "kind": "agent",
+              "name": "复盘能力结果",
+              "description": "判断能力结果是否足够，是否还需要调用另一个能力。",
+              "ui": {
+                "position": {
+                  "x": 3370,
+                  "y": 80
+                },
+                "collapsed": false
+              },
+              "reads": [
+                {
+                  "state": "user_message",
+                  "required": true
+                },
+                {
+                  "state": "request_understanding",
+                  "required": true
+                },
+                {
+                  "state": "capability_result",
+                  "required": true
+                }
+              ],
+              "writes": [
+                {
+                  "state": "capability_review",
+                  "mode": "replace"
+                },
+                {
+                  "state": "capability_trace",
+                  "mode": "append"
+                }
+              ],
+              "config": {
+                "skillKey": "",
+                "skillBindings": [],
+                "skillInstructionBlocks": {},
+                "taskInstruction": "输出 capability_review JSON，并向 capability_trace append 一个本轮能力调用摘要。capability_review 字段包含 executed(true)、success(boolean)、summary、missing_information、needs_another_capability(boolean)、next_requirement、final_response_strategy。capability_trace 条目包含 capability、success、summary、next_requirement、timestamp_note；只记录摘要，不复制大段结果。只有确实需要另一个不同能力时才把 needs_another_capability 设为 true。",
+                "modelSource": "global",
+                "model": "",
+                "thinkingMode": "high",
+                "temperature": 0.1
+              }
+            },
+            "continue_capability_loop": {
+              "kind": "condition",
+              "name": "继续调用能力?",
+              "description": "最多三轮能力循环。",
+              "ui": {
+                "position": {
+                  "x": 3740,
+                  "y": 80
+                },
+                "collapsed": false
+              },
+              "reads": [
+                {
+                  "state": "capability_review",
+                  "required": true
+                }
+              ],
+              "writes": [],
+              "config": {
+                "branches": [
+                  "true",
+                  "false",
+                  "exhausted"
+                ],
+                "loopLimit": 3,
+                "branchMapping": {
+                  "true": "true",
+                  "false": "false"
+                },
+                "rule": {
+                  "source": "$state.capability_review.needs_another_capability",
+                  "operator": "==",
+                  "value": true
+                }
+              }
+            },
+            "finalize_capability_cycle": {
+              "kind": "agent",
+              "name": "整理能力循环结果",
+              "description": "把能力循环的最终状态整理为统一复盘，供多个输出边界读取。",
+              "ui": {
+                "position": {
+                  "x": 4140,
+                  "y": 220
+                },
+                "collapsed": false
+              },
+              "reads": [
+                {
+                  "state": "capability_found",
+                  "required": true
+                },
+                {
+                  "state": "capability_result",
+                  "required": false
+                },
+                {
+                  "state": "capability_review",
+                  "required": true
+                },
+                {
+                  "state": "capability_gap",
+                  "required": false
+                },
+                {
+                  "state": "capability_trace",
+                  "required": false
+                }
+              ],
+              "writes": [
+                {
+                  "state": "capability_review",
+                  "mode": "replace"
+                }
+              ],
+              "config": {
+                "skillKey": "",
+                "skillBindings": [],
+                "skillInstructionBlocks": {},
+                "taskInstruction": "整理 capability_review JSON，保留上游判断，并补充 final_status、user_visible_summary、needs_another_capability(false)。如果存在 capability_gap，保留缺口摘要和 should_offer_build/should_route_to_builder 判断；如果存在 capability_trace，保留简短轨迹摘要。不要读取或执行能力，不要修改 capability_result。",
+                "modelSource": "global",
+                "model": "",
+                "thinkingMode": "high",
+                "temperature": 0.1
+              }
+            },
+            "output_selected_capability": {
+              "kind": "output",
+              "name": "输出选中能力",
+              "description": "",
+              "ui": {
+                "position": {
+                  "x": 4520,
+                  "y": 220
+                },
+                "collapsed": false
+              },
+              "reads": [
+                {
+                  "state": "selected_capability",
+                  "required": true
+                }
+              ],
+              "writes": [],
+              "config": {
+                "displayMode": "json",
+                "persistEnabled": false,
+                "persistFormat": "auto",
+                "fileNameTemplate": ""
+              }
+            },
+            "output_capability_found": {
+              "kind": "output",
+              "name": "输出能力存在",
+              "description": "",
+              "ui": {
+                "position": {
+                  "x": 4840,
+                  "y": 220
+                },
+                "collapsed": false
+              },
+              "reads": [
+                {
+                  "state": "capability_found",
+                  "required": true
+                }
+              ],
+              "writes": [],
+              "config": {
+                "displayMode": "auto",
+                "persistEnabled": false,
+                "persistFormat": "auto",
+                "fileNameTemplate": ""
+              }
+            },
+            "output_capability_result": {
+              "kind": "output",
+              "name": "输出能力结果",
+              "description": "",
+              "ui": {
+                "position": {
+                  "x": 5160,
+                  "y": 220
+                },
+                "collapsed": false
+              },
+              "reads": [
+                {
+                  "state": "capability_result",
+                  "required": false
+                }
+              ],
+              "writes": [],
+              "config": {
+                "displayMode": "auto",
+                "persistEnabled": false,
+                "persistFormat": "auto",
+                "fileNameTemplate": ""
+              }
+            },
+            "output_capability_review": {
+              "kind": "output",
+              "name": "输出能力复盘",
+              "description": "",
+              "ui": {
+                "position": {
+                  "x": 5480,
+                  "y": 220
+                },
+                "collapsed": false
+              },
+              "reads": [
+                {
+                  "state": "capability_review",
+                  "required": true
+                }
+              ],
+              "writes": [],
+              "config": {
+                "displayMode": "json",
+                "persistEnabled": false,
+                "persistFormat": "auto",
+                "fileNameTemplate": ""
+              }
+            },
+            "output_capability_gap": {
+              "kind": "output",
+              "name": "输出能力缺口",
+              "description": "输出找不到能力时的结构化缺口。",
+              "ui": {
+                "position": {
+                  "x": 4660,
+                  "y": 620
+                },
+                "collapsed": false
+              },
+              "reads": [
+                {
+                  "state": "capability_gap",
+                  "required": false
+                }
+              ],
+              "writes": [],
+              "config": {}
+            },
+            "output_capability_trace": {
+              "kind": "output",
+              "name": "输出能力轨迹",
+              "description": "输出能力循环的步骤摘要列表。",
+              "ui": {
+                "position": {
+                  "x": 4660,
+                  "y": 760
+                },
+                "collapsed": false
+              },
+              "reads": [
+                {
+                  "state": "capability_trace",
+                  "required": false
+                }
+              ],
+              "writes": [],
+              "config": {}
+            }
+          },
+          "edges": [
+            {
+              "source": "input_user_message",
+              "target": "select_capability"
+            },
+            {
+              "source": "input_request_understanding",
+              "target": "select_capability"
+            },
+            {
+              "source": "select_capability",
+              "target": "capability_found_condition"
+            },
+            {
+              "source": "review_missing_capability",
+              "target": "finalize_capability_cycle"
+            },
+            {
+              "source": "execute_capability",
+              "target": "review_capability_result"
+            },
+            {
+              "source": "review_capability_result",
+              "target": "continue_capability_loop"
+            },
+            {
+              "source": "finalize_capability_cycle",
+              "target": "output_selected_capability"
+            },
+            {
+              "source": "finalize_capability_cycle",
+              "target": "output_capability_found"
+            },
+            {
+              "source": "finalize_capability_cycle",
+              "target": "output_capability_result"
+            },
+            {
+              "source": "finalize_capability_cycle",
+              "target": "output_capability_review"
+            },
+            {
+              "source": "finalize_capability_cycle",
+              "target": "output_capability_gap"
+            },
+            {
+              "source": "finalize_capability_cycle",
+              "target": "output_capability_trace"
+            }
+          ],
+          "conditional_edges": [
+            {
+              "source": "capability_found_condition",
+              "branches": {
+                "true": "execute_capability",
+                "false": "review_missing_capability",
+                "exhausted": "review_missing_capability"
+              }
+            },
+            {
+              "source": "continue_capability_loop",
+              "branches": {
+                "true": "select_capability",
+                "false": "finalize_capability_cycle",
+                "exhausted": "finalize_capability_cycle"
+              }
+            }
+          ],
+          "metadata": {
+            "graphProtocol": "node_system",
+            "role": "buddy_capability_cycle",
+            "interrupt_after": []
+          }
+        }
+      }
+    },
+    "draft_final_response": {
+      "kind": "subgraph",
+      "name": "生成最终回复",
+      "description": "把请求理解和能力执行结果转成面向用户的最终回复。",
+      "ui": {
+        "position": {
+          "x": 2060,
+          "y": 300
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "user_message",
+          "required": true
+        },
+        {
+          "state": "conversation_history",
+          "required": true
+        },
+        {
+          "state": "page_context",
+          "required": true
+        },
+        {
+          "state": "buddy_context",
+          "required": true
+        },
+        {
+          "state": "request_understanding",
+          "required": true
+        },
+        {
+          "state": "capability_found",
+          "required": true
+        },
+        {
+          "state": "capability_result",
+          "required": true
+        },
+        {
+          "state": "capability_review",
+          "required": true
+        },
+        {
+          "state": "capability_gap",
+          "required": true
+        },
+        {
+          "state": "capability_trace",
+          "required": true
+        }
+      ],
+      "writes": [
+        {
+          "state": "final_reply",
+          "mode": "replace"
+        }
+      ],
+      "config": {
+        "graph": {
+          "state_schema": {
+            "user_message": {
+              "name": "user_message",
+              "description": "用户本轮消息。",
+              "type": "text",
+              "value": "",
+              "color": "#d97706",
+              "binding": null
+            },
+            "conversation_history": {
+              "name": "conversation_history",
+              "description": "伙伴对话历史摘要。",
+              "type": "markdown",
+              "value": "",
+              "color": "#64748b",
+              "binding": null
+            },
+            "page_context": {
+              "name": "page_context",
+              "description": "当前页面上下文。",
+              "type": "markdown",
+              "value": "",
+              "color": "#0891b2",
+              "binding": null
+            },
+            "buddy_context": {
+              "name": "buddy_context",
+              "description": "从 Buddy Home 文件夹中选择并注入的长期上下文文件。",
+              "type": "file",
+              "value": {
+                "kind": "local_folder",
+                "root": "buddy_home",
+                "selected": [
+                  "AGENTS.md",
+                  "SOUL.md",
+                  "USER.md",
+                  "MEMORY.md",
+                  "policy.json"
+                ]
+              },
+              "color": "#0f766e",
+              "binding": null
+            },
+            "request_understanding": {
+              "name": "request_understanding",
+              "description": "结构化请求理解。",
+              "type": "json",
+              "value": {},
+              "color": "#16a34a",
+              "binding": null
+            },
+            "capability_found": {
+              "name": "capability_found",
+              "description": "是否找到适合能力。",
+              "type": "boolean",
+              "value": false,
+              "color": "#2563eb",
+              "binding": null
+            },
+            "capability_result": {
+              "name": "capability_result",
+              "description": "能力执行结果包。",
+              "type": "result_package",
+              "value": {},
+              "color": "#0284c7",
+              "binding": null
+            },
+            "capability_review": {
+              "name": "capability_review",
+              "description": "能力执行复盘。",
+              "type": "json",
+              "value": {},
+              "color": "#0f766e",
+              "binding": null
+            },
+            "capability_gap": {
+              "name": "capability_gap",
+              "description": "找不到能力时的结构化能力缺口。",
+              "type": "json",
+              "value": {},
+              "color": "#dc2626",
+              "binding": null
+            },
+            "capability_trace": {
+              "name": "capability_trace",
+              "description": "能力循环步骤摘要列表。",
+              "type": "json",
+              "value": [],
+              "color": "#4f46e5",
+              "binding": null
+            },
+            "final_reply": {
+              "name": "final_reply",
+              "description": "最终回复。",
+              "type": "markdown",
+              "value": "",
+              "color": "#16a34a",
+              "binding": null
+            }
+          },
+          "nodes": {
+            "input_user_message": {
+              "kind": "input",
+              "name": "用户消息",
+              "description": "",
+              "ui": {
+                "position": {
+                  "x": 40,
+                  "y": 60
+                },
+                "collapsed": false
+              },
+              "reads": [],
+              "writes": [
+                {
+                  "state": "user_message",
+                  "mode": "replace"
+                }
+              ],
+              "config": {
+                "value": "",
+                "boundaryType": "text"
+              }
+            },
+            "input_conversation_history": {
+              "kind": "input",
+              "name": "对话历史",
+              "description": "",
+              "ui": {
+                "position": {
+                  "x": 40,
+                  "y": 180
+                },
+                "collapsed": false
+              },
+              "reads": [],
+              "writes": [
+                {
+                  "state": "conversation_history",
+                  "mode": "replace"
+                }
+              ],
+              "config": {
+                "value": "",
+                "boundaryType": "markdown"
+              }
+            },
+            "input_page_context": {
+              "kind": "input",
+              "name": "页面上下文",
+              "description": "",
+              "ui": {
+                "position": {
+                  "x": 40,
+                  "y": 300
+                },
+                "collapsed": false
+              },
+              "reads": [],
+              "writes": [
+                {
+                  "state": "page_context",
+                  "mode": "replace"
+                }
+              ],
+              "config": {
+                "value": "",
+                "boundaryType": "markdown"
+              }
+            },
+            "input_buddy_context": {
+              "kind": "input",
+              "name": "伙伴上下文",
+              "description": "",
+              "ui": {
+                "position": {
+                  "x": 40,
+                  "y": 420
+                },
+                "collapsed": false
+              },
+              "reads": [],
+              "writes": [
+                {
+                  "state": "buddy_context",
+                  "mode": "replace"
+                }
+              ],
+              "config": {
+                "value": {
+                  "kind": "local_folder",
+                  "root": "buddy_home",
+                  "selected": [
+                    "AGENTS.md",
+                    "SOUL.md",
+                    "USER.md",
+                    "MEMORY.md",
+                    "policy.json"
+                  ]
+                },
+                "boundaryType": "file"
+              }
+            },
+            "input_request_understanding": {
+              "kind": "input",
+              "name": "请求理解",
+              "description": "",
+              "ui": {
+                "position": {
+                  "x": 40,
+                  "y": 540
+                },
+                "collapsed": false
+              },
+              "reads": [],
+              "writes": [
+                {
+                  "state": "request_understanding",
+                  "mode": "replace"
+                }
+              ],
+              "config": {
+                "value": {},
+                "boundaryType": "json"
+              }
+            },
+            "input_capability_found": {
+              "kind": "input",
+              "name": "能力存在",
+              "description": "",
+              "ui": {
+                "position": {
+                  "x": 40,
+                  "y": 660
+                },
+                "collapsed": false
+              },
+              "reads": [],
+              "writes": [
+                {
+                  "state": "capability_found",
+                  "mode": "replace"
+                }
+              ],
+              "config": {
+                "value": false,
+                "boundaryType": "boolean"
+              }
+            },
+            "input_capability_result": {
+              "kind": "input",
+              "name": "能力结果",
+              "description": "",
+              "ui": {
+                "position": {
+                  "x": 40,
+                  "y": 780
+                },
+                "collapsed": false
+              },
+              "reads": [],
+              "writes": [
+                {
+                  "state": "capability_result",
+                  "mode": "replace"
+                }
+              ],
+              "config": {
+                "value": {},
+                "boundaryType": "result_package"
+              }
+            },
+            "input_capability_review": {
+              "kind": "input",
+              "name": "能力复盘",
+              "description": "",
+              "ui": {
+                "position": {
+                  "x": 40,
+                  "y": 900
+                },
+                "collapsed": false
+              },
+              "reads": [],
+              "writes": [
+                {
+                  "state": "capability_review",
+                  "mode": "replace"
+                }
+              ],
+              "config": {
+                "value": {},
+                "boundaryType": "json"
+              }
+            },
+            "draft_final_reply": {
+              "kind": "agent",
+              "name": "撰写最终回复",
+              "description": "只产出用户可见的最终回复。",
+              "ui": {
+                "position": {
+                  "x": 460,
+                  "y": 520
+                },
+                "collapsed": false
+              },
+              "reads": [
+                {
+                  "state": "user_message",
+                  "required": true
+                },
+                {
+                  "state": "conversation_history",
+                  "required": false
+                },
+                {
+                  "state": "page_context",
+                  "required": false
+                },
+                {
+                  "state": "buddy_context",
+                  "required": true
+                },
+                {
+                  "state": "request_understanding",
+                  "required": true
+                },
+                {
+                  "state": "capability_found",
+                  "required": true
+                },
+                {
+                  "state": "capability_result",
+                  "required": false
+                },
+                {
+                  "state": "capability_review",
+                  "required": true
+                },
+                {
+                  "state": "capability_gap",
+                  "required": false
+                },
+                {
+                  "state": "capability_trace",
+                  "required": false
+                }
+              ],
+              "writes": [
+                {
+                  "state": "final_reply",
+                  "mode": "replace"
+                }
+              ],
+              "config": {
+                "skillKey": "",
+                "skillBindings": [],
+                "skillInstructionBlocks": {},
+                "taskInstruction": "撰写 final_reply Markdown。只输出给用户看的最终回复，不输出调试 JSON。若能力未找到或失败，清楚说明当前能做什么和缺少什么；如果 capability_gap.should_offer_build 为 true，询问用户是否要创建对应能力；如果 should_route_to_builder 为 true，说明可以进入能力构建流程但不要假装已经创建。若 capability_result 是结果包，读取拆包后的内容，不要暴露内部字段名，除非网址、文件路径或错误是用户需要的证据。可以用 capability_trace 汇总多轮能力调用，但不要复制大段中间结果。",
+                "modelSource": "global",
+                "model": "",
+                "thinkingMode": "high",
+                "temperature": 0.2
+              }
+            },
+            "output_final_reply": {
+              "kind": "output",
+              "name": "输出最终回复",
+              "description": "",
+              "ui": {
+                "position": {
+                  "x": 860,
+                  "y": 520
+                },
+                "collapsed": false
+              },
+              "reads": [
+                {
+                  "state": "final_reply",
+                  "required": true
+                }
+              ],
+              "writes": [],
+              "config": {
+                "displayMode": "markdown",
+                "persistEnabled": false,
+                "persistFormat": "md",
+                "fileNameTemplate": ""
+              }
+            },
+            "input_capability_gap": {
+              "kind": "input",
+              "name": "输入能力缺口",
+              "description": "能力循环在找不到能力时生成的结构化缺口。",
+              "ui": {
+                "position": {
+                  "x": 40,
+                  "y": 1120
+                },
+                "collapsed": false
+              },
+              "reads": [],
+              "writes": [
+                {
+                  "state": "capability_gap",
+                  "mode": "replace"
+                }
+              ],
+              "config": {
+                "value": {},
+                "boundaryType": "json"
+              }
+            },
+            "input_capability_trace": {
+              "kind": "input",
+              "name": "输入能力轨迹",
+              "description": "能力循环中的能力调用摘要列表。",
+              "ui": {
+                "position": {
+                  "x": 40,
+                  "y": 1260
+                },
+                "collapsed": false
+              },
+              "reads": [],
+              "writes": [
+                {
+                  "state": "capability_trace",
+                  "mode": "replace"
+                }
+              ],
+              "config": {
+                "value": [],
+                "boundaryType": "json"
+              }
+            }
+          },
+          "edges": [
+            {
+              "source": "input_user_message",
+              "target": "draft_final_reply"
+            },
+            {
+              "source": "input_conversation_history",
+              "target": "draft_final_reply"
+            },
+            {
+              "source": "input_page_context",
+              "target": "draft_final_reply"
+            },
+            {
+              "source": "input_buddy_context",
+              "target": "draft_final_reply"
+            },
+            {
+              "source": "input_request_understanding",
+              "target": "draft_final_reply"
+            },
+            {
+              "source": "input_capability_found",
+              "target": "draft_final_reply"
+            },
+            {
+              "source": "input_capability_result",
+              "target": "draft_final_reply"
+            },
+            {
+              "source": "input_capability_review",
+              "target": "draft_final_reply"
+            },
+            {
+              "source": "draft_final_reply",
+              "target": "output_final_reply"
+            },
+            {
+              "source": "input_capability_gap",
+              "target": "draft_final_reply"
+            },
+            {
+              "source": "input_capability_trace",
+              "target": "draft_final_reply"
+            }
+          ],
+          "conditional_edges": [],
+          "metadata": {
+            "graphProtocol": "node_system",
+            "role": "buddy_final_response"
+          }
+        }
+      }
+    },
+    "output_final": {
+      "kind": "output",
+      "name": "最终回复",
+      "description": "伙伴唯一可见输出。",
+      "ui": {
+        "position": {
+          "x": 2520,
+          "y": 40
+        },
+        "collapsed": false
+      },
+      "reads": [
+        {
+          "state": "final_reply",
+          "required": true
+        }
+      ],
+      "writes": [],
+      "config": {
+        "displayMode": "markdown",
+        "persistEnabled": false,
+        "persistFormat": "md",
+        "fileNameTemplate": ""
+      }
+    }
+  },
+  "edges": [
+    {
+      "source": "input_user_message",
+      "target": "intake_request"
+    },
+    {
+      "source": "input_conversation_history",
+      "target": "intake_request"
+    },
+    {
+      "source": "input_page_context",
+      "target": "intake_request"
+    },
+    {
+      "source": "input_buddy_mode",
+      "target": "intake_request"
+    },
+    {
+      "source": "input_buddy_context",
+      "target": "intake_request"
+    },
+    {
+      "source": "intake_request",
+      "target": "needs_capability"
+    },
+    {
+      "source": "run_capability_cycle",
+      "target": "draft_final_response"
+    },
+    {
+      "source": "draft_final_response",
+      "target": "output_final"
+    }
+  ],
+  "conditional_edges": [
+    {
+      "source": "needs_capability",
+      "branches": {
+        "true": "run_capability_cycle",
+        "false": "draft_final_response",
+        "exhausted": "draft_final_response"
+      }
+    }
+  ],
+  "metadata": {
+    "graphProtocol": "node_system",
+    "origin": "buddy",
+    "templateVersion": "2026-05-10",
+    "tags": [
+      "buddy",
+      "agent",
+      "capability",
+      "subgraph"
+    ]
+  }
+}

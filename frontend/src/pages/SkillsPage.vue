@@ -46,8 +46,8 @@
           <strong>{{ overview.active }}</strong>
         </article>
         <article class="skills-page__metric">
-          <span>{{ t("skills.selectableSkills") }}</span>
-          <strong>{{ overview.selectableSkills }}</strong>
+          <span>{{ t("skills.visibleSkills") }}</span>
+          <strong>{{ overview.visibleSkills }}</strong>
         </article>
       </section>
 
@@ -99,7 +99,7 @@
               </button>
               <ElSwitch
                 :model-value="skill.status === 'active'"
-                :disabled="!skill.canManage || actionSkillKey === skill.skillKey"
+                :disabled="actionSkillKey === skill.skillKey"
                 :aria-label="enabledToggleLabel(skill)"
                 @change="setSkillEnabled(skill, Boolean($event))"
               />
@@ -134,17 +134,6 @@
             </div>
 
             <div class="skills-page__taxonomy">
-              <section>
-                <h4>{{ t("skills.capabilityPolicy") }}</h4>
-                <div class="skills-page__schema-list">
-                  <span
-                    v-for="entry in capabilityPolicyOriginEntries(selectedSkill)"
-                    :key="entry.origin"
-                  >
-                    {{ formatCapabilityPolicy(entry.origin, entry.policy) }}
-                  </span>
-                </div>
-              </section>
               <section>
                 <h4>{{ t("skills.version") }}</h4>
                 <div class="skills-page__badges">
@@ -260,7 +249,6 @@ import {
   buildSkillOverview,
   buildSkillStatusOptions,
   filterSkillsForManagement,
-  listSkillCapabilityPolicies,
   type SkillStatusFilter,
 } from "./skillsPageModel.ts";
 
@@ -343,18 +331,6 @@ function selectSkill(skillKey: string) {
 
 function enabledToggleLabel(skill: SkillDefinition) {
   return skill.status === "active" ? t("skills.disable") : t("skills.enable");
-}
-
-function capabilityPolicyOriginEntries(skill: SkillDefinition) {
-  return listSkillCapabilityPolicies(skill);
-}
-
-function formatCapabilityPolicy(origin: string, policy: SkillDefinition["capabilityPolicy"]["default"]) {
-  return [
-    origin,
-    policy.selectable ? t("skills.policySelectable") : t("skills.policyHidden"),
-    policy.requiresApproval ? t("skills.policyRequiresApproval") : t("skills.policyNoApproval"),
-  ].join(" · ");
 }
 
 async function importUploadedSkill(event: Event, mode: "archive" | "folder") {

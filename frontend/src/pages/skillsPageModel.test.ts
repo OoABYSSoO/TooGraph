@@ -79,12 +79,12 @@ const skills: SkillDefinition[] = [
     sourcePath: "/skills/desktop_buddy_profile/skill.json",
     runtimeReady: false,
     runtimeRegistered: false,
-    status: "active",
+    status: "disabled",
     canManage: true,
   },
 ];
 
-test("filterSkillsForManagement searches capability policy and permission fields", () => {
+test("filterSkillsForManagement searches skill metadata and permission fields", () => {
   assert.deepEqual(
     filterSkillsForManagement(skills, { query: "rewrite", status: "all" }).map((skill) => skill.skillKey),
     ["rewrite_text"],
@@ -98,20 +98,12 @@ test("filterSkillsForManagement searches capability policy and permission fields
     ["desktop_buddy_profile"],
   );
   assert.deepEqual(
-    filterSkillsForManagement(skills, { query: "requires approval", status: "all" }).map((skill) => skill.skillKey),
-    ["draft_search", "desktop_buddy_profile"],
-  );
-  assert.deepEqual(
-    filterSkillsForManagement(skills, { query: "selectable capability", status: "all" }).map((skill) => skill.skillKey),
-    ["rewrite_text", "draft_search"],
-  );
-  assert.deepEqual(
     filterSkillsForManagement(skills, { query: "profile_context", status: "all" }).map((skill) => skill.skillKey),
     ["desktop_buddy_profile"],
   );
   assert.deepEqual(
-    filterSkillsForManagement(skills, { query: "buddy selectable capability requires approval", status: "all" }).map((skill) => skill.skillKey),
-    ["draft_search"],
+    filterSkillsForManagement(skills, { query: "skill.json", status: "all" }).map((skill) => skill.skillKey),
+    ["draft_search", "desktop_buddy_profile"],
   );
   assert.deepEqual(
     filterSkillsForManagement(skills, { query: "run.py python runtime", status: "all" }).map((skill) => skill.skillKey),
@@ -123,14 +115,14 @@ test("filterSkillsForManagement searches capability policy and permission fields
   );
 });
 
-test("filterSkillsForManagement filters by user-facing status and capability policy", () => {
+test("filterSkillsForManagement filters by user-facing availability", () => {
   assert.deepEqual(
-    filterSkillsForManagement(skills, { query: "", status: "selectable" }).map((skill) => skill.skillKey),
-    ["rewrite_text", "draft_search"],
+    filterSkillsForManagement(skills, { query: "", status: "disabled" }).map((skill) => skill.skillKey),
+    ["desktop_buddy_profile"],
   );
   assert.deepEqual(
     filterSkillsForManagement(skills, { query: "", status: "active" }).map((skill) => skill.skillKey),
-    ["rewrite_text", "draft_search", "desktop_buddy_profile"],
+    ["rewrite_text", "draft_search"],
   );
   assert.deepEqual(
     filterSkillsForManagement(skills, { query: "", status: "all" }).map((skill) => skill.skillKey),
@@ -152,11 +144,11 @@ test("filterSkillsForManagement ignores removed runtime and attention filters", 
 test("buildSkillOverview summarizes user-facing management counts", () => {
   assert.deepEqual(buildSkillOverview(skills), {
     total: 3,
-    active: 3,
-    selectableSkills: 2,
+    active: 2,
+    visibleSkills: 2,
   });
 });
 
 test("buildSkillStatusOptions keeps user-facing management filters stable", () => {
-  assert.deepEqual(buildSkillStatusOptions(), ["all", "active", "selectable"]);
+  assert.deepEqual(buildSkillStatusOptions(), ["all", "active", "disabled"]);
 });

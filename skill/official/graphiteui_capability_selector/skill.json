@@ -1,0 +1,49 @@
+{
+  "schemaVersion": "graphite.skill/v1",
+  "skillKey": "graphiteui_capability_selector",
+  "name": "GraphiteUI Capability Selector",
+  "description": "当图流程需要根据用户需求从当前启用的图模板和 Skill 中选择一个可用能力时使用此技能。",
+  "llmInstruction": "你已绑定 GraphiteUI Capability Selector。Skill Pre-LLM Context 会列出当前启用的图模板和 Skill 清单，每项包含 key、名称、适用场景和权限摘要。你必须根据用户需求从清单中选择一个 capability 入参；优先选择图模板，其次选择 Skill；没有合适能力时选择 {\"kind\":\"none\"}。不要编造清单外能力。运行 Skill 本身不需要审批；写文件、删改文件或执行脚本由运行时的 需确认/完全访问 模式处理，不由本选择器判断。",
+  "version": "1.0.0",
+  "timeoutSeconds": 30,
+  "permissions": [
+    "file_read"
+  ],
+  "inputSchema": [
+    {
+      "key": "requirement",
+      "name": "Requirement",
+      "valueType": "text",
+      "required": true,
+      "description": "用户希望完成的原始需求。"
+    },
+    {
+      "key": "origin",
+      "name": "Origin",
+      "valueType": "text",
+      "required": false,
+      "description": "能力选择来源，例如 buddy；默认 buddy。"
+    },
+    {
+      "key": "capability",
+      "name": "Capability",
+      "valueType": "capability",
+      "required": true,
+      "description": "LLM 从候选清单中选出的单个能力对象，kind 为 subgraph、skill 或 none。"
+    }
+  ],
+  "outputSchema": [
+    {
+      "key": "capability",
+      "name": "Capability",
+      "valueType": "capability",
+      "description": "单个能力对象，kind 为 subgraph、skill 或 none。"
+    },
+    {
+      "key": "found",
+      "name": "Found",
+      "valueType": "boolean",
+      "description": "是否找到了可用的图模板或 Skill 能力。"
+    }
+  ]
+}

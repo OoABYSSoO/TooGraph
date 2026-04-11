@@ -15,7 +15,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.skills.registry import get_skill_registry
 
 
-WEB_SEARCH_AFTER_LLM_PATH = Path(__file__).resolve().parents[2] / "skill" / "web_search" / "after_llm.py"
+WEB_SEARCH_AFTER_LLM_PATH = (
+    Path(__file__).resolve().parents[2] / "skill" / "official" / "web_search" / "after_llm.py"
+)
 
 
 def _load_web_search_module():

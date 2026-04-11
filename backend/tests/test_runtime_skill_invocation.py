@@ -122,7 +122,7 @@ class RuntimeSkillInvocationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             skill_dir = Path(temp_dir) / "current_env"
             skill_dir.mkdir()
-            (skill_dir / "requirements.txt").write_text("pytest>=8,<9\n", encoding="utf-8")
+            (skill_dir / "requirements.txt").write_text("pytest>=8,<10\n", encoding="utf-8")
             (skill_dir / "run.py").write_text(
                 "\n".join(
                     [
@@ -245,7 +245,7 @@ class RuntimeSkillInvocationTests(unittest.TestCase):
             requirements_path.write_text(
                 "\n".join(
                     [
-                        "pytest>=8,<9  # already installed test runner",
+                        "pytest>=8,<10  # already installed test runner",
                         "missing-graphiteui-dependency>=1; python_version < '0'",
                     ]
                 ),

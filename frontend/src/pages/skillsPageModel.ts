@@ -1,6 +1,6 @@
-import type { SkillCapabilityPolicy, SkillDefinition } from "../types/skills.ts";
+import type { SkillDefinition } from "../types/skills.ts";
 
-export type SkillStatusFilter = "all" | "active" | "selectable";
+export type SkillStatusFilter = "all" | "active" | "disabled";
 
 export type SkillManagementFilters = {
   query: string;
@@ -10,11 +10,11 @@ export type SkillManagementFilters = {
 export type SkillOverview = {
   total: number;
   active: number;
-  selectableSkills: number;
+  visibleSkills: number;
 };
 
 export function buildSkillStatusOptions(): SkillStatusFilter[] {
-  return ["all", "active", "selectable"];
+  return ["all", "active", "disabled"];
 }
 
 export function filterSkillsForManagement(
@@ -38,7 +38,7 @@ export function buildSkillOverview(skills: SkillDefinition[]): SkillOverview {
   return {
     total: skills.length,
     active: skills.filter((skill) => skill.status === "active").length,
-    selectableSkills: skills.filter((skill) => skillIsSelectable(skill)).length,
+    visibleSkills: skills.filter((skill) => skill.status === "active").length,
   };
 }
 
@@ -46,21 +46,10 @@ function matchesSkillStatus(skill: SkillDefinition, filter: SkillStatusFilter): 
   if (filter === "active") {
     return skill.status === "active";
   }
-  if (filter === "selectable") {
-    return skillIsSelectable(skill);
+  if (filter === "disabled") {
+    return skill.status === "disabled";
   }
   return true;
-}
-
-export function listSkillCapabilityPolicies(skill: SkillDefinition): Array<{ origin: string; policy: SkillCapabilityPolicy }> {
-  return [
-    { origin: "default", policy: skill.capabilityPolicy.default },
-    ...Object.entries(skill.capabilityPolicy.origins).map(([origin, policy]) => ({ origin, policy })),
-  ];
-}
-
-function skillIsSelectable(skill: SkillDefinition): boolean {
-  return listSkillCapabilityPolicies(skill).some(({ policy }) => policy.selectable);
 }
 
 function buildSkillSearchText(skill: SkillDefinition): string {
@@ -73,13 +62,6 @@ function buildSkillSearchText(skill: SkillDefinition): string {
     skill.sourceScope,
     skill.sourcePath,
     skill.status,
-    ...listSkillCapabilityPolicies(skill).map(({ origin, policy }) =>
-      [
-        origin,
-        policy.selectable ? "selectable capability" : "hidden",
-        policy.requiresApproval ? "requires approval" : "no approval",
-      ].join(" "),
-    ),
     ...skill.permissions,
     ...skill.inputSchema.map((field) => `${field.key} ${field.name} ${field.valueType} ${field.description}`),
     ...skill.outputSchema.map((field) => `${field.key} ${field.name} ${field.valueType} ${field.description}`),
