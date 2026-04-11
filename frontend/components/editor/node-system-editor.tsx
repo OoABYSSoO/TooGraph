@@ -3651,7 +3651,7 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
                     }
                   >
                     <div className="text-[0.7rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">
-                      {entry.mode === "preset" ? `${entry.family} preset` : entry.family}
+                      {entry.family}
                     </div>
                     <div className="mt-0.5 text-sm font-semibold text-[var(--text)]">{entry.label}</div>
                     <div className="mt-1 text-xs leading-5 text-[var(--muted)]">{entry.description}</div>
