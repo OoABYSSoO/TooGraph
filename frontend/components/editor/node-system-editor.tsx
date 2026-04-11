@@ -297,11 +297,154 @@ function resolveAgentRuntimeConfig(
   };
 }
 
-function RuntimeBadge({ label, value }: { label: string; value: string }) {
+function InlineRuntimeSelect({
+  label,
+  value,
+  onChange,
+  children,
+  title,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  children: ReactNode;
+  title?: string;
+}) {
   return (
-    <div className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.78)] px-2.5 py-1 text-[0.7rem] leading-none text-[var(--muted)] shadow-[0_8px_18px_rgba(60,41,20,0.05)]">
-      <span className="uppercase tracking-[0.14em] text-[var(--accent-strong)]">{label}</span>
-      <span className="truncate text-[var(--text)]">{value}</span>
+    <label
+      className="relative flex min-w-0 items-center gap-2 rounded-full border border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.82)] pl-3 pr-8 text-[0.74rem] shadow-[0_8px_18px_rgba(60,41,20,0.05)]"
+      title={title}
+    >
+      <span className="shrink-0 uppercase tracking-[0.14em] text-[var(--accent-strong)]">{label}</span>
+      <select
+        aria-label={label}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="min-w-0 appearance-none bg-transparent py-1.5 text-[var(--text)] outline-none"
+      >
+        {children}
+      </select>
+      <svg
+        viewBox="0 0 16 16"
+        className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 fill-none stroke-[var(--muted)]"
+        strokeWidth="1.5"
+      >
+        <path d="m4.5 6 3.5 4 3.5-4" />
+      </svg>
+    </label>
+  );
+}
+
+function buildModelSelectOptions(
+  agentRuntime: ReturnType<typeof resolveAgentRuntimeConfig>,
+  availableModelRefs: string[],
+) {
+  const currentOverrideModel = agentRuntime.model?.trim() ?? "";
+  const options: Array<{ value: string; label: string }> = [
+    {
+      value: "__global__",
+      label: `Global · ${agentRuntime.globalTextModelRef}`,
+    },
+  ];
+  const seen = new Set<string>(["__global__"]);
+  const candidates = currentOverrideModel
+    ? [currentOverrideModel, ...availableModelRefs]
+    : availableModelRefs;
+
+  for (const modelRef of candidates) {
+    const trimmed = modelRef.trim();
+    if (!trimmed || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    options.push({
+      value: trimmed,
+      label: trimmed,
+    });
+  }
+
+  return options;
+}
+
+function buildThinkingSelectOptions(agentRuntime: ReturnType<typeof resolveAgentRuntimeConfig>) {
+  return [
+    {
+      value: "inherit",
+      label: `Inherit · ${agentRuntime.globalThinkingEnabled ? "On" : "Off"}`,
+    },
+    {
+      value: "off",
+      label: "Off",
+    },
+    {
+      value: "on",
+      label: "On",
+    },
+  ];
+}
+
+function AgentInlineRuntimeControls({
+  agentRuntime,
+  availableModelRefs,
+  onConfigChange,
+}: {
+  agentRuntime: ReturnType<typeof resolveAgentRuntimeConfig>;
+  availableModelRefs: string[];
+  onConfigChange: (updater: (config: AgentNode) => AgentNode) => void;
+}) {
+  const modelOptions = buildModelSelectOptions(agentRuntime, availableModelRefs);
+  const thinkingOptions = buildThinkingSelectOptions(agentRuntime);
+  const currentOverrideModel = agentRuntime.model?.trim() ?? "";
+  const selectedModelValue =
+    agentRuntime.modelSource === "override" && currentOverrideModel
+      ? currentOverrideModel
+      : "__global__";
+
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      <InlineRuntimeSelect
+        label="Model"
+        value={selectedModelValue}
+        title={`Resolved model: ${agentRuntime.resolvedModel}`}
+        onChange={(nextValue) =>
+          onConfigChange((currentConfig) => {
+            const currentAgent = currentConfig as AgentNode;
+            if (nextValue === "__global__") {
+              return {
+                ...currentAgent,
+                modelSource: "global",
+                model: "",
+              };
+            }
+            return {
+              ...currentAgent,
+              modelSource: "override",
+              model: nextValue,
+            };
+          })
+        }
+      >
+        {modelOptions.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </InlineRuntimeSelect>
+      <InlineRuntimeSelect
+        label="Thinking"
+        value={agentRuntime.thinkingMode ?? "inherit"}
+        title={`Resolved thinking: ${agentRuntime.resolvedThinking ? "On" : "Off"}`}
+        onChange={(nextValue) =>
+          onConfigChange((currentConfig) => ({
+            ...(currentConfig as AgentNode),
+            thinkingMode: nextValue as AgentThinkingMode,
+          }))
+        }
+      >
+        {thinkingOptions.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </InlineRuntimeSelect>
     </div>
   );
 }
@@ -1889,13 +2032,6 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col gap-3 px-4 py-3">
-          {config.family === "agent" && !isExpanded && agentRuntime ? (
-            <div className="flex flex-wrap gap-2">
-              <RuntimeBadge label="Model" value={agentRuntime.resolvedModel} />
-              <RuntimeBadge label="Thinking" value={agentRuntime.resolvedThinking ? "On" : "Off"} />
-            </div>
-          ) : null}
-
           {config.family === "input" ? (
             <>
               <div className={cn("grid items-center gap-3", uploadedAsset ? "grid-cols-[1fr_auto]" : "grid-cols-[minmax(0,1fr)_auto]")}>
@@ -2123,6 +2259,14 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                 ) : null}
               </div>
             </div>
+          ) : null}
+
+          {config.family === "agent" && !isExpanded && agentRuntime ? (
+            <AgentInlineRuntimeControls
+              agentRuntime={agentRuntime}
+              availableModelRefs={data.availableModelRefs ?? []}
+              onConfigChange={(updater) => data.onConfigChange?.((currentConfig) => updater(currentConfig as AgentNode))}
+            />
           ) : null}
 
           {config.family === "agent" ? (
