@@ -39,6 +39,7 @@ import {
   type ConditionNode,
   type ConditionRule,
   type InputBoundaryNode,
+  type NodeFamily,
   type NodePresetDefinition,
   type OutputBoundaryNode,
   type PortDefinition,
@@ -206,6 +207,16 @@ type PresetDocument = {
   definition: NodePresetDefinition;
   createdAt?: string | null;
   updatedAt?: string | null;
+};
+
+type CreationMenuEntry = {
+  id: string;
+  family: NodeFamily;
+  label: string;
+  description: string;
+  mode: "preset" | "node";
+  presetId?: string;
+  nodeKind?: "input" | "output";
 };
 
 const HELLO_WORLD_TEMPLATE_ID = "hello_world";
@@ -682,6 +693,47 @@ function formatValueTypeLabel(valueType: ValueType) {
     default:
       return "Text";
   }
+}
+
+function isPresetEligibleFamily(family: NodeFamily) {
+  return family === "agent" || family === "condition";
+}
+
+function createGenericInputNodeConfig(): InputBoundaryNode {
+  const baseConfig = deepClonePreset(TEXT_INPUT_PRESET);
+  return {
+    ...baseConfig,
+    presetId: "node.input.generic",
+    label: "Input",
+    description: "Provide a value to the current workflow.",
+    output: {
+      ...baseConfig.output,
+      key: "value",
+      label: "Value",
+      valueType: "text",
+    },
+    valueType: "text",
+    placeholder: "Enter value",
+  } satisfies InputBoundaryNode;
+}
+
+function createGenericOutputNodeConfig(sourceType: ValueType | null = null): OutputBoundaryNode {
+  return {
+    presetId: "node.output.generic",
+    label: "Output",
+    description: "Preview or persist the current workflow result.",
+    family: "output",
+    input: {
+      key: "value",
+      label: "Value",
+      valueType: sourceType ?? "any",
+      required: true,
+    },
+    displayMode: sourceType === "json" ? "json" : "auto",
+    persistEnabled: false,
+    persistFormat: sourceType === "json" ? "json" : "txt",
+    fileNameTemplate: "result",
+  } satisfies OutputBoundaryNode;
 }
 
 async function fileToEnvelope(file: File): Promise<UploadedAssetEnvelope> {
@@ -2649,7 +2701,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
             </div>
           ) : null}
 
-          {selected && config.family !== "input" && config.family !== "output" ? (
+          {selected && isPresetEligibleFamily(config.family) ? (
             <div className="flex flex-wrap justify-end gap-2">
               <Button variant="ghost" onClick={() => void data.onSavePreset?.()}>
                 Save As Preset
@@ -2712,7 +2764,10 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
   });
   const ignoreNextPaneClickRef = useRef(false);
 
-  const allPresets = useMemo(() => [...NODE_PRESETS_MOCK, ...persistedPresets], [persistedPresets]);
+  const allPresets = useMemo(
+    () => [...NODE_PRESETS_MOCK, ...persistedPresets].filter((preset) => isPresetEligibleFamily(preset.family)),
+    [persistedPresets],
+  );
   const getRecommendedPresets = useCallback(
     (sourceType: ValueType | null) => {
       if (!sourceType) {
@@ -2740,10 +2795,48 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
   const nodePalette = useMemo(() => {
     const query = search.trim().toLowerCase();
     const sourceType = creationMenu?.sourceValueType ?? null;
-    const recommended = getRecommendedPresets(sourceType);
-    return recommended.filter((preset) => {
+    const boundaryEntries: CreationMenuEntry[] = sourceType
+      ? [
+          {
+            id: `node-output-${sourceType}`,
+            family: "output",
+            label: "Output",
+            description: `Preview or persist the current ${formatValueTypeLabel(sourceType).toLowerCase()} result.`,
+            mode: "node",
+            nodeKind: "output",
+          },
+        ]
+      : [
+          {
+            id: "node-input",
+            family: "input",
+            label: "Input",
+            description: "Create a workflow input boundary for the current graph.",
+            mode: "node",
+            nodeKind: "input",
+          },
+          {
+            id: "node-output",
+            family: "output",
+            label: "Output",
+            description: "Create a workflow output boundary for the current graph.",
+            mode: "node",
+            nodeKind: "output",
+          },
+        ];
+    const presetEntries: CreationMenuEntry[] = getRecommendedPresets(sourceType).map((preset) => ({
+      id: `preset-${preset.presetId}`,
+      family: preset.family,
+      label: preset.label,
+      description: preset.description,
+      mode: "preset",
+      presetId: preset.presetId,
+    }));
+    return [...boundaryEntries, ...presetEntries].filter((entry) => {
       if (!query) return true;
-      return [preset.label, preset.description, preset.presetId].some((value) => value.toLowerCase().includes(query));
+      return [entry.label, entry.description, entry.family, entry.presetId ?? entry.nodeKind ?? entry.id].some((value) =>
+        value.toLowerCase().includes(query),
+      );
     });
   }, [creationMenu?.sourceValueType, getRecommendedPresets, search]);
 
@@ -2963,7 +3056,7 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
         setPresetsError(null);
         const payload = await apiGet<PresetDocument[]>("/api/presets");
         if (!active) return;
-        setPersistedPresets(payload.map((item) => item.definition));
+        setPersistedPresets(payload.map((item) => item.definition).filter((definition) => isPresetEligibleFamily(definition.family)));
       } catch (error) {
         if (!active) return;
         setPresetsError(error instanceof Error ? error.message : "Unknown error");
@@ -3049,6 +3142,43 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
     setStatusMessage(`Added ${inputConfig.label} from ${file.name}`);
   }
 
+  function addGenericBoundaryNode(
+    nodeKind: "input" | "output",
+    position: { x: number; y: number },
+    connectionSource?: { sourceNodeId?: string; sourceHandle?: string; sourceValueType?: ValueType | null },
+  ) {
+    const config =
+      nodeKind === "input"
+        ? createGenericInputNodeConfig()
+        : createGenericOutputNodeConfig(connectionSource?.sourceValueType ?? null);
+    const nextNode = createNodeFromConfig(config, position);
+    setNodes((current) => current.concat(nextNode));
+    setSelectedNodeId(nextNode.id);
+
+    if (nodeKind === "output" && connectionSource?.sourceNodeId && connectionSource.sourceHandle && connectionSource.sourceValueType) {
+      const targetHandle = findFirstCompatibleInputHandle(nextNode.data.config, connectionSource.sourceValueType);
+      if (targetHandle) {
+        setEdges((current) =>
+          current.concat({
+            id: `edge_${crypto.randomUUID().slice(0, 8)}`,
+            source: connectionSource.sourceNodeId ?? "",
+            target: nextNode.id,
+            sourceHandle: connectionSource.sourceHandle ?? null,
+            targetHandle,
+            markerEnd: { type: MarkerType.ArrowClosed, color: TYPE_COLORS[connectionSource.sourceValueType ?? "any"] },
+            style: {
+              stroke: TYPE_COLORS[connectionSource.sourceValueType ?? "any"],
+              strokeWidth: 1.8,
+            },
+          }),
+        );
+      }
+    }
+
+    setStatusMessage(`Added ${config.label}`);
+    setCreationMenu(null);
+  }
+
   function addNodeFromPresetId(presetId: string, position: { x: number; y: number }, connectionSource?: { sourceNodeId?: string; sourceHandle?: string; sourceValueType?: ValueType | null }) {
     const preset = getNodePresetById(presetId) ?? persistedPresets.find((item) => item.presetId === presetId);
     if (!preset) return;
@@ -3107,9 +3237,27 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
     setCreationMenu(null);
   }
 
+  function addNodeFromCreationEntry(
+    entry: CreationMenuEntry,
+    position: { x: number; y: number },
+    connectionSource?: { sourceNodeId?: string; sourceHandle?: string; sourceValueType?: ValueType | null },
+  ) {
+    if (entry.mode === "node" && entry.nodeKind) {
+      addGenericBoundaryNode(entry.nodeKind, position, connectionSource);
+      return;
+    }
+    if (entry.mode === "preset" && entry.presetId) {
+      addNodeFromPresetId(entry.presetId, position, connectionSource);
+    }
+  }
+
   async function saveNodeAsPreset(nodeId: string) {
     const targetNode = nodes.find((node) => node.id === nodeId);
     if (!targetNode) return;
+    if (!isPresetEligibleFamily(targetNode.data.config.family)) {
+      setStatusMessage("Only agent and condition nodes can be saved as presets.");
+      return;
+    }
     const slug = targetNode.data.config.label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "custom";
     const nextPreset = {
       ...deepClonePreset(targetNode.data.config),
@@ -3476,23 +3624,23 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
                 <div>
                   <div className="text-[0.72rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">Create Node</div>
                   <div className="mt-1 text-sm text-[var(--muted)]">
-                    {creationMenu.sourceValueType ? `Suggestions for ${creationMenu.sourceValueType}` : "Double click preset picker"}
+                    {creationMenu.sourceValueType ? `Suggestions for ${creationMenu.sourceValueType}` : "Double click node picker"}
                   </div>
                 </div>
                 <button type="button" className="text-sm text-[var(--muted)]" onClick={() => setCreationMenu(null)}>
                   Close
                 </button>
               </div>
-              <Input className="mt-3 h-10" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search presets" />
+              <Input className="mt-3 h-10" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search nodes and presets" />
               <div className="mt-3 grid gap-2">
-                {nodePalette.map((preset) => (
+                {nodePalette.map((entry) => (
                   <button
-                    key={`menu-${preset.presetId}`}
+                    key={`menu-${entry.id}`}
                     type="button"
                     className="rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,255,255,0.82)] px-3 py-2 text-left transition-colors hover:bg-[rgba(255,248,240,0.92)]"
                     onClick={() =>
-                      addNodeFromPresetId(
-                        preset.presetId,
+                      addNodeFromCreationEntry(
+                        entry,
                         { x: creationMenu.flowX, y: creationMenu.flowY },
                         {
                           sourceNodeId: creationMenu.sourceNodeId,
@@ -3502,9 +3650,11 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
                       )
                     }
                   >
-                    <div className="text-[0.7rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">{preset.family}</div>
-                    <div className="mt-0.5 text-sm font-semibold text-[var(--text)]">{preset.label}</div>
-                    <div className="mt-1 text-xs leading-5 text-[var(--muted)]">{preset.description}</div>
+                    <div className="text-[0.7rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">
+                      {entry.mode === "preset" ? `${entry.family} preset` : entry.family}
+                    </div>
+                    <div className="mt-0.5 text-sm font-semibold text-[var(--text)]">{entry.label}</div>
+                    <div className="mt-1 text-xs leading-5 text-[var(--muted)]">{entry.description}</div>
                   </button>
                 ))}
               </div>
