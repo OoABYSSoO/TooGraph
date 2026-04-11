@@ -1297,34 +1297,30 @@ function PortCreateButton({
     setIsOpen(false);
   }
 
+  if (!visible && !isOpen) {
+    return null;
+  }
+
   return (
     <div className={cn("group relative flex min-h-6 items-center", side === "input" ? "justify-start" : "justify-end")}>
       <button
         type="button"
         className={cn(
-          "relative inline-flex max-w-full items-center text-sm text-[var(--muted)] transition",
-          side === "input" ? "-ml-[7px] justify-start pl-[7px] text-left" : "-mr-[7px] justify-end pr-[7px] text-right",
-          visible ? "opacity-100" : "opacity-0 pointer-events-none",
+          "relative inline-flex min-h-7 max-w-full items-center rounded-full border border-[rgba(154,52,18,0.16)] bg-[rgba(255,252,247,0.92)] text-sm text-[var(--muted)] shadow-[0_8px_18px_rgba(60,41,20,0.06)] transition hover:border-[rgba(154,52,18,0.24)] hover:bg-[rgba(255,248,240,0.92)] hover:text-[var(--accent)]",
+          side === "input" ? "justify-start pl-5 pr-3 text-left" : "justify-end pl-3 pr-5 text-right",
         )}
         onClick={openEditor}
       >
         <span
           className={cn(
             "pointer-events-none absolute top-1/2 h-3 w-3 -translate-y-1/2 rounded-full border-2 border-[rgba(154,52,18,0.18)] bg-[rgba(255,255,255,0.96)]",
-            side === "input" ? "left-0" : "right-0",
+            side === "input" ? "-left-[7px]" : "-right-[7px]",
           )}
         >
           <span className="absolute left-1/2 top-1/2 h-[1.5px] w-[7px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--accent-strong)]" />
           <span className="absolute left-1/2 top-1/2 h-[7px] w-[1.5px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--accent-strong)]" />
         </span>
-        <span
-          className={cn(
-            "relative inline-flex min-h-7 max-w-full items-center rounded-full border border-[rgba(154,52,18,0.16)] bg-[rgba(255,252,247,0.92)] shadow-[0_8px_18px_rgba(60,41,20,0.06)] transition hover:border-[rgba(154,52,18,0.24)] hover:bg-[rgba(255,248,240,0.92)] hover:text-[var(--accent)]",
-            side === "input" ? "ml-2 pl-5 pr-3" : "mr-2 pl-3 pr-5",
-          )}
-        >
-          <span>{side === "input" ? "Add input" : "Add output"}</span>
-        </span>
+        <span>{side === "input" ? "Add input" : "Add output"}</span>
       </button>
       {isOpen ? (
         <div
