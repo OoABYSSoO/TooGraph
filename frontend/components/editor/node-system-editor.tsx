@@ -1523,7 +1523,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                   ))}
                 </div>
               </div>
-              <div className="mt-auto grid gap-2">
+              <div className="flex flex-1 flex-col gap-2">
                 {config.valueType === "text" ? (
                   <textarea
                     value={config.defaultValue}
@@ -1535,7 +1535,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                         defaultValue: event.target.value,
                       }))
                     }
-                    className="min-h-[120px] resize-none rounded-[16px] border border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.88)] px-3 py-3 text-sm text-[var(--text)]"
+                    className="min-h-[160px] h-full flex-1 resize-none rounded-[16px] border border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.88)] px-3 py-3 text-sm text-[var(--text)]"
                   />
                 ) : (
                   <>
@@ -1552,7 +1552,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                     {!uploadedAsset ? (
                       <button
                         type="button"
-                        className="grid min-h-[120px] place-items-center rounded-[16px] border border-dashed border-[rgba(154,52,18,0.24)] bg-[rgba(255,255,255,0.82)] px-4 py-5 text-center"
+                        className="grid min-h-[160px] flex-1 place-items-center rounded-[16px] border border-dashed border-[rgba(154,52,18,0.24)] bg-[rgba(255,255,255,0.82)] px-4 py-5 text-center"
                         onClick={() => uploadInputRef.current?.click()}
                         onDragOver={(event) => {
                           event.preventDefault();
@@ -1571,7 +1571,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                       </button>
                     ) : (
                       <div
-                        className="grid min-h-[120px] gap-3 text-left"
+                        className="grid min-h-[160px] flex-1 gap-3 text-left"
                         onDragOver={(event) => {
                           event.preventDefault();
                           event.dataTransfer.dropEffect = "copy";
@@ -1635,7 +1635,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
           {config.family === "agent" ? (
             <>
               {!isExpanded ? (
-                <div className="mt-auto rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,255,255,0.78)] px-3 py-2 text-sm text-[var(--text)] break-words">
+                <div className="flex min-h-[140px] flex-1 items-center justify-center rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,255,255,0.78)] px-5 py-4 text-center text-sm text-[var(--text)] break-words">
                   {summarizeNode(config)}
                 </div>
               ) : (
@@ -1738,7 +1738,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
           {config.family === "condition" ? (
             <>
               {!isExpanded ? (
-                <div className="mt-auto rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,255,255,0.78)] px-3 py-3 text-sm leading-6 text-[var(--text)] break-words">
+                <div className="flex min-h-[120px] flex-1 items-center rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,255,255,0.78)] px-4 py-4 text-sm leading-6 text-[var(--text)] break-words">
                   {summarizeNode(config)}
                 </div>
               ) : (
@@ -1882,12 +1882,12 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                   </div>
                 </>
               ) : null}
-              <div className="mt-auto rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,255,255,0.82)] p-3">
+              <div className="flex min-h-[160px] flex-1 flex-col rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,255,255,0.82)] p-3">
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <div className="text-[0.68rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">Preview</div>
                   <div className="text-[0.68rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">{config.displayMode}</div>
                 </div>
-                <div className="max-h-[180px] overflow-auto whitespace-pre-wrap break-words rounded-[12px] bg-[rgba(248,242,234,0.8)] px-3 py-3 text-sm leading-6 text-[var(--text)]">
+                <div className="min-h-[120px] flex-1 overflow-auto whitespace-pre-wrap break-words rounded-[12px] bg-[rgba(248,242,234,0.8)] px-3 py-3 text-sm leading-6 text-[var(--text)]">
                   {data.previewText || "Connect an upstream output to preview/export it."}
                 </div>
               </div>
