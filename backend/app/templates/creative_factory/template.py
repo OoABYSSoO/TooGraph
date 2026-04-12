@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Any
 
 from app.templates.creative_factory.state import get_creative_factory_state_keys, get_creative_factory_state_schema
-from app.templates.creative_factory.themes import get_creative_factory_theme_presets
 
 
 NODE_SYSTEM_SUPPORTED_NODE_TYPES = [
@@ -14,12 +13,11 @@ NODE_SYSTEM_SUPPORTED_NODE_TYPES = [
 ]
 
 
-def _create_default_node_system_graph(theme_preset: dict[str, Any]) -> dict[str, Any]:
+def _create_default_node_system_graph() -> dict[str, Any]:
     return {
         "graph_family": "node_system",
-        "name": f"{theme_preset.get('graph_name') or 'Creative Factory'} Final Package Flow",
+        "name": "Creative Factory Final Package Flow",
         "template_id": "creative_factory",
-        "theme_config": theme_preset["theme_config"],
         "state_schema": get_creative_factory_state_schema(),
         "nodes": [
             {
@@ -39,7 +37,7 @@ def _create_default_node_system_graph(theme_preset: dict[str, Any]) -> dict[str,
                             "label": "Task Input",
                             "valueType": "text",
                         },
-                        "defaultValue": "Research current SLG mobile ad market hooks and summarize reusable signals.",
+                        "defaultValue": "Research current mobile ad market hooks and summarize reusable signals.",
                         "placeholder": "Describe the research task",
                     },
                     "previewText": "",
@@ -184,7 +182,6 @@ def _create_default_node_system_graph(theme_preset: dict[str, Any]) -> dict[str,
                                 "inputMapping": {
                                     "task_input": "$inputs.task_input",
                                     "news_context": "$inputs.news_context",
-                                    "theme_config": "$graph.theme_config",
                                 },
                                 "contextBinding": {},
                                 "usage": "required",
@@ -249,7 +246,6 @@ def _create_default_node_system_graph(theme_preset: dict[str, Any]) -> dict[str,
                                 "inputMapping": {
                                     "task_input": "$inputs.task_input",
                                     "creative_brief": "$inputs.creative_brief",
-                                    "theme_config": "$graph.theme_config",
                                 },
                                 "contextBinding": {},
                                 "usage": "required",
@@ -293,7 +289,6 @@ def _create_default_node_system_graph(theme_preset: dict[str, Any]) -> dict[str,
                                     "task_input": "$inputs.task_input",
                                     "creative_brief": "$inputs.creative_brief",
                                     "script_variants": "$inputs.script_variants",
-                                    "theme_config": "$graph.theme_config",
                                 },
                                 "contextBinding": {},
                                 "usage": "required",
@@ -572,7 +567,6 @@ def _create_default_node_system_graph(theme_preset: dict[str, Any]) -> dict[str,
                                     "image_generation_todo": "$inputs.image_generation_todo",
                                     "video_generation_todo": "$inputs.video_generation_todo",
                                     "evaluation_result": "$inputs.evaluation_result",
-                                    "theme_config": "$graph.theme_config",
                                 },
                                 "contextBinding": {},
                                 "usage": "required",
@@ -810,18 +804,13 @@ def _create_default_node_system_graph(theme_preset: dict[str, Any]) -> dict[str,
 
 
 def get_creative_factory_template() -> dict[str, Any]:
-    theme_presets = get_creative_factory_theme_presets()
-    default_theme_preset = "slg_launch"
-    default_theme = next((preset for preset in theme_presets if preset["id"] == default_theme_preset), theme_presets[0])
     return {
         "template_id": "creative_factory",
         "label": "Creative Factory",
         "description": "Research, analyze, generate, review, and export a creative package.",
         "default_graph_name": "Creative Factory",
-        "default_theme_preset": default_theme_preset,
         "supported_node_types": NODE_SYSTEM_SUPPORTED_NODE_TYPES,
         "state_keys": get_creative_factory_state_keys(),
         "state_schema": get_creative_factory_state_schema(),
-        "theme_presets": theme_presets,
-        "default_node_system_graph": _create_default_node_system_graph(default_theme),
+        "default_node_system_graph": _create_default_node_system_graph(),
     }

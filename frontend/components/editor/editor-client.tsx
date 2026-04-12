@@ -2,20 +2,7 @@
 
 import { NodeSystemEditor } from "@/components/editor/node-system-editor";
 
-type ThemeConfig = {
-  theme_preset: string;
-  domain: string;
-  genre: string;
-  market: string;
-  platform: string;
-  language: string;
-  creative_style: string;
-  tone: string;
-  language_constraints: string[];
-  evaluation_policy: Record<string, unknown>;
-  asset_source_policy: Record<string, unknown>;
-  strategy_profile: Record<string, unknown>;
-};
+type ThemeConfig = Record<string, unknown>;
 
 type StateField = {
   key: string;

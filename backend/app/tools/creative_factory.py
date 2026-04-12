@@ -11,71 +11,25 @@ def compact_text(value: Any, fallback: str = "") -> str:
 
 
 def theme_profile(theme_config: dict[str, Any]) -> dict[str, str]:
-    genre = compact_text(theme_config.get("genre"), "strategy")
-    tone = compact_text(theme_config.get("tone"), "urgent")
-    platform = compact_text(theme_config.get("platform"), "digital")
-    creative_style = compact_text(theme_config.get("creative_style"), compact_text(theme_config.get("creativeStyle"), "high_intensity"))
+    """Extract a normalized profile from theme_config for use in prompts."""
+    genre = compact_text(theme_config.get("genre"), "general")
+    tone = compact_text(theme_config.get("tone"), "neutral")
+    platform = compact_text(theme_config.get("platform"), "general")
+    creative_style = compact_text(theme_config.get("creative_style"), "standard")
     strategy_profile = theme_config.get("strategy_profile") or theme_config.get("strategyProfile") or {}
 
-    if strategy_profile:
-        return {
-            "genre": genre,
-            "tone": tone,
-            "platform": platform,
-            "creative_style": creative_style,
-            "hook_theme": compact_text(strategy_profile.get("hook_theme"), compact_text(strategy_profile.get("hookTheme"), "资源危机与战局失控")),
-            "payoff_theme": compact_text(
-                strategy_profile.get("payoff_theme"),
-                compact_text(strategy_profile.get("payoffTheme"), "联盟推进、战力成长与结果反转"),
-            ),
-            "visual_pattern": compact_text(
-                strategy_profile.get("visual_pattern"),
-                compact_text(strategy_profile.get("visualPattern"), "警报色、大地图轨迹、爆字反馈"),
-            ),
-            "pacing_pattern": compact_text(
-                strategy_profile.get("pacing_pattern"),
-                compact_text(strategy_profile.get("pacingPattern"), "前三秒警报切入，中段连续决策，尾段规模反推"),
-            ),
-            "evaluation_focus": " / ".join(
-                compact_text(item) for item in ensure_list(strategy_profile.get("evaluation_focus") or strategy_profile.get("evaluationFocus")) if compact_text(item)
-            )
-            or "前三秒高压钩子 / 爽点闭环 / 结果落点",
-        }
-
-    if genre.upper() == "RPG":
-        return {
-            "genre": genre,
-            "tone": tone,
-            "platform": platform,
-            "creative_style": creative_style,
-            "hook_theme": "英雄觉醒与强敌压境",
-            "payoff_theme": "职业成长、掉落回报与 Boss 压制",
-            "visual_pattern": "技能爆发、装备光效、Boss 定格",
-            "pacing_pattern": "先压迫后觉醒，再用掉落和 Boss 结果收束",
-            "evaluation_focus": "职业幻想清晰 / 战斗爆发镜头 / 掉落与成长回报",
-        }
-    if genre.lower() == "survival":
-        return {
-            "genre": genre,
-            "tone": tone,
-            "platform": platform,
-            "creative_style": creative_style,
-            "hook_theme": "资源匮乏与生存崩盘边缘",
-            "payoff_theme": "极限翻盘、补给回收与据点重建",
-            "visual_pattern": "低资源警报、混乱尸潮、临界反杀",
-            "pacing_pattern": "先资源崩盘，再强压追逐，最后临界反杀",
-            "evaluation_focus": "匮乏压迫感 / 混乱威胁可见 / 最后翻盘够爽",
-        }
     return {
         "genre": genre,
         "tone": tone,
         "platform": platform,
         "creative_style": creative_style,
-        "hook_theme": "资源危机与战局失控",
-        "payoff_theme": "联盟推进、战力成长与结果反转",
-        "visual_pattern": "警报色、大地图轨迹、爆字反馈",
-        "pacing_pattern": "前三秒警报切入，中段连续决策，尾段规模反推",
-        "evaluation_focus": "前三秒高压钩子 / 成长反馈清晰 / 联盟规模感",
+        "hook_theme": compact_text(strategy_profile.get("hook_theme"), ""),
+        "payoff_theme": compact_text(strategy_profile.get("payoff_theme"), ""),
+        "visual_pattern": compact_text(strategy_profile.get("visual_pattern"), ""),
+        "pacing_pattern": compact_text(strategy_profile.get("pacing_pattern"), ""),
+        "evaluation_focus": " / ".join(
+            compact_text(item) for item in ensure_list(strategy_profile.get("evaluation_focus")) if compact_text(item)
+        ) or "overall quality",
     }
 
 
@@ -95,81 +49,28 @@ def allocate_time_ranges(num_shots: int) -> list[str]:
 
 
 def normalize_shot_list(raw_shots: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Normalize shot list with time ranges. Uses provided shots or generates defaults."""
     base_shots = raw_shots[:6] if raw_shots else []
     if not base_shots:
         base_shots = [
-            {
-                "scene_purpose": "前3秒钩子",
-                "visual_description_cn": "主城资源告急，红色警报和敌军压境同时出现。",
-                "camera_language_cn": "快速推进 + 高频切换",
-                "character_action_cn": "玩家拖拽部队、点击补给、快速作出调度。",
-                "ui_text_en": ["LOW FOOD", "ENEMY RAID"],
-                "voiceover_en": "One mistake and the whole base falls.",
-                "transition_cn": "警报闪白切到兵线推进。",
-            },
-            {
-                "scene_purpose": "冲突升级",
-                "visual_description_cn": "敌军箭头逼近，大地图上多路同时推进。",
-                "camera_language_cn": "拉远地图后快速切近主战场",
-                "character_action_cn": "玩家切换英雄技能和行军路线。",
-                "ui_text_en": ["REDEPLOY NOW", "HOLD THE LINE"],
-                "voiceover_en": "Every second changes the battle.",
-                "transition_cn": "地图轨迹衔接到技能爆发。",
-            },
-            {
-                "scene_purpose": "机制爽点",
-                "visual_description_cn": "技能命中后数值暴涨，突破敌方阵线。",
-                "camera_language_cn": "战场定格 + 爆发数值放大",
-                "character_action_cn": "英雄技能砸下，兵线前推。",
-                "ui_text_en": ["CRITICAL HIT", "+250% DAMAGE"],
-                "voiceover_en": "A perfect timing flips everything.",
-                "transition_cn": "爆字粒子飞散切到成长反馈。",
-            },
-            {
-                "scene_purpose": "成长反馈",
-                "visual_description_cn": "基地升级、科技点亮、战力暴涨。",
-                "camera_language_cn": "固定机位 + 多层 UI 叠加",
-                "character_action_cn": "玩家连续点击升级。",
-                "ui_text_en": ["POWER UP", "LEVEL 12"],
-                "voiceover_en": "Every upgrade buys us another chance.",
-                "transition_cn": "升级光效扩散到联盟集结。",
-            },
-            {
-                "scene_purpose": "联盟规模",
-                "visual_description_cn": "联盟多支队伍会师推进，规模感拉满。",
-                "camera_language_cn": "大地图拉远 + 轨迹汇聚",
-                "character_action_cn": "联盟同步进军同一目标。",
-                "ui_text_en": ["RALLY READY", "ALLIANCE MARCH"],
-                "voiceover_en": "When the alliance moves, nothing stops us.",
-                "transition_cn": "队伍冲锋带到胜利镜头。",
-            },
-            {
-                "scene_purpose": "结果落点",
-                "visual_description_cn": "敌军防线崩溃，胜利战报与资源反馈同时出现。",
-                "camera_language_cn": "胜利定格 + 结果页弹出",
-                "character_action_cn": "镜头停留在战报和重建后的主城。",
-                "ui_text_en": ["VICTORY", "BASE SECURED"],
-                "voiceover_en": "We held the line, and now the map is ours.",
-                "transition_cn": "以结果页收尾。",
-            },
+            {"scene_purpose": "Opening hook", "visual_description_cn": "Opening scene establishing the main concept.", "voiceover_en": "Set up the hook."},
+            {"scene_purpose": "Core conflict", "visual_description_cn": "Present the main challenge or tension.", "voiceover_en": "Build the tension."},
         ]
 
     ranges = allocate_time_ranges(len(base_shots))
     normalized: list[dict[str, Any]] = []
     for idx, shot in enumerate(base_shots, start=1):
-        normalized.append(
-            {
-                "shot_id": f"S{idx}",
-                "time_range": ranges[idx - 1],
-                "scene_purpose": compact_text(shot.get("scene_purpose"), f"镜头{idx}"),
-                "visual_description_cn": compact_text(shot.get("visual_description_cn"), "请补充画面描述"),
-                "camera_language_cn": compact_text(shot.get("camera_language_cn"), "稳定录屏机位"),
-                "character_action_cn": compact_text(shot.get("character_action_cn"), "角色执行关键操作"),
-                "ui_text_en": [compact_text(x) for x in ensure_list(shot.get("ui_text_en")) if compact_text(x)],
-                "voiceover_en": compact_text(shot.get("voiceover_en"), "No voiceover provided."),
-                "transition_cn": compact_text(shot.get("transition_cn"), "自然转入下一镜头"),
-            }
-        )
+        normalized.append({
+            "shot_id": f"S{idx}",
+            "time_range": ranges[idx - 1],
+            "scene_purpose": compact_text(shot.get("scene_purpose"), f"Shot {idx}"),
+            "visual_description_cn": compact_text(shot.get("visual_description_cn"), "Describe this shot."),
+            "camera_language_cn": compact_text(shot.get("camera_language_cn"), "Standard shot composition."),
+            "character_action_cn": compact_text(shot.get("character_action_cn"), "Character performs key action."),
+            "ui_text_en": [compact_text(x) for x in ensure_list(shot.get("ui_text_en")) if compact_text(x)],
+            "voiceover_en": compact_text(shot.get("voiceover_en"), "No voiceover provided."),
+            "transition_cn": compact_text(shot.get("transition_cn"), "Natural transition to next scene."),
+        })
     return normalized
 
 
@@ -218,21 +119,21 @@ def build_video_prompt_version2(variant: dict[str, Any], storyboard_images: list
 
 def fetch_market_news_context(state: dict[str, Any], params: dict[str, Any] | None = None) -> dict[str, Any]:
     del params
-    task = compact_text(state.get("task_input"), "creative research")
+    task = compact_text(state.get("task_input"), "research task")
     theme_config = state.get("theme_config") or {}
     profile = theme_profile(theme_config)
     rss_items = [
         {
-            "source": "PocketGamer.biz",
-            "title": f"{task[:48]} market trend snapshot",
-            "summary": f"{profile['genre']} 市场近期强调{profile['hook_theme']}，平台侧重点为 {profile['platform']}。",
-            "creative_hint": f"前3秒优先建立 {profile['hook_theme']}。",
+            "source": "Source 1",
+            "title": f"{task[:48]} - market research",
+            "summary": f"Research findings for {profile['genre']} on {profile['platform']} platform.",
+            "creative_hint": f"Consider {profile['hook_theme'] or 'general themes'} for effective hooks.",
         },
         {
-            "source": "GameDeveloper",
-            "title": "UA creatives increasingly focus on survival pressure",
-            "summary": "买量创意更偏爱明确冲突、数值反馈和强节奏推进。",
-            "creative_hint": f"用 {profile['payoff_theme']} 强化爽点。",
+            "source": "Source 2",
+            "title": "Current trends analysis",
+            "summary": "Trends analysis for creative content development.",
+            "creative_hint": f"Focus on {profile['payoff_theme'] or 'key themes'} for impact.",
         },
     ]
     return {"rss_items": rss_items}

@@ -13,12 +13,12 @@ NODE_SYSTEM_SUPPORTED_NODE_TYPES = [
 ]
 
 
-def _create_default_node_system_graph(theme_preset: dict[str, Any]) -> dict[str, Any]:
+def _create_default_node_system_graph() -> dict[str, Any]:
     return {
         "graph_family": "node_system",
-        "name": theme_preset.get("graph_name") or "Hello World",
+        "name": "Hello World",
         "template_id": "hello_world",
-        "theme_config": theme_preset["theme_config"],
+        "theme_config": {},
         "state_schema": get_hello_world_state_schema(),
         "nodes": [
             # ── Column 1: Inputs ──
@@ -253,42 +253,13 @@ def _create_default_node_system_graph(theme_preset: dict[str, Any]) -> dict[str,
 
 
 def get_hello_world_template() -> dict[str, Any]:
-    theme_preset = {
-        "id": "hello_local",
-        "label": "Hello Local",
-        "description": "Minimal local LLM validation flow.",
-        "graph_name": "Hello World",
-        "node_param_overrides": {},
-        "theme_config": {
-            "theme_preset": "hello_local",
-            "domain": "llm_validation",
-            "genre": "hello_world",
-            "market": "local",
-            "platform": "openai_compatible",
-            "language": "zh",
-            "creative_style": "minimal",
-            "tone": "plain",
-            "language_constraints": [],
-            "evaluation_policy": {},
-            "asset_source_policy": {},
-            "strategy_profile": {
-                "hookTheme": "",
-                "payoffTheme": "",
-                "visualPattern": "",
-                "pacingPattern": "",
-                "evaluationFocus": [],
-            },
-        },
-    }
     return {
         "template_id": "hello_world",
         "label": "Hello World",
         "description": "Ask GraphiteUI onboarding questions, retrieve grounded knowledge, and generate a concise guided answer.",
         "default_graph_name": "Hello World",
-        "default_theme_preset": theme_preset["id"],
         "supported_node_types": NODE_SYSTEM_SUPPORTED_NODE_TYPES,
         "state_keys": get_hello_world_state_keys(),
         "state_schema": get_hello_world_state_schema(),
-        "theme_presets": [theme_preset],
-        "default_node_system_graph": _create_default_node_system_graph(theme_preset),
+        "default_node_system_graph": _create_default_node_system_graph(),
     }

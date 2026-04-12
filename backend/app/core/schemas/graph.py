@@ -61,18 +61,8 @@ class Position(BaseModel):
 
 
 class ThemeConfig(BaseModel):
-    theme_preset: str = ""
-    domain: str = ""
-    genre: str = ""
-    market: str = ""
-    platform: str = ""
-    language: str = ""
-    creative_style: str = ""
-    tone: str = ""
-    language_constraints: list[str] = Field(default_factory=list)
-    evaluation_policy: dict[str, Any] = Field(default_factory=dict)
-    asset_source_policy: dict[str, Any] = Field(default_factory=dict)
-    strategy_profile: dict[str, Any] = Field(default_factory=dict)
+    """Optional theme configuration for graph templates. Can be extended as needed."""
+    pass
 
 
 class StateField(BaseModel):

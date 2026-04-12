@@ -57,20 +57,7 @@ import {
   type ValueType,
 } from "@/lib/node-system-schema";
 
-type ThemeConfig = {
-  theme_preset: string;
-  domain: string;
-  genre: string;
-  market: string;
-  platform: string;
-  language: string;
-  creative_style: string;
-  tone: string;
-  language_constraints: string[];
-  evaluation_policy: Record<string, unknown>;
-  asset_source_policy: Record<string, unknown>;
-  strategy_profile: Record<string, unknown>;
-};
+type ThemeConfig = Record<string, unknown>;
 
 type StateField = {
   key: string;
@@ -1408,20 +1395,7 @@ function createEditorDefaults(templates: TemplateRecord[], defaultTemplateId?: s
     graph_id: null,
     name: "Node System Playground",
     template_id: defaultTemplateId ?? HELLO_WORLD_TEMPLATE_ID,
-    theme_config: {
-      theme_preset: "node_system",
-      domain: "workflow",
-      genre: "agent_framework",
-      market: "local",
-      platform: "openai_compatible",
-      language: "zh",
-      creative_style: "minimal",
-      tone: "plain",
-      language_constraints: [],
-      evaluation_policy: {},
-      asset_source_policy: {},
-      strategy_profile: {},
-    },
+    theme_config: {},
     state_schema: [],
     nodes: [],
     edges: [],

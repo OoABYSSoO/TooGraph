@@ -8,10 +8,10 @@ These instructions apply to all work in this repository and should persist acros
 
 ## Dev Restart Workflow
 
-- After making code changes, restart the local dev environment by running `scripts/dev_up.sh`.
-- Treat `scripts/dev_up.sh` as the standard restart command for this repository.
-- If a task only involves documentation or other non-runtime changes, use judgment; for code changes, default to restarting with `scripts/dev_up.sh`.
+- After making code changes, restart the local dev environment by running `scripts/start.sh`.
+- Treat `scripts/start.sh` as the standard restart command for this repository.
+- If a task only involves documentation or other non-runtime changes, use judgment; for code changes, default to restarting with `scripts/start.sh`.
 
 ## Notes
 
-- `scripts/dev_up.sh` already handles restarting by releasing occupied frontend/backend ports before starting services again.
+- `scripts/start.sh` already handles restarting by releasing occupied frontend/backend ports before starting services again.
