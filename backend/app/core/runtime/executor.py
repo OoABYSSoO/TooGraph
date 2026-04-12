@@ -17,7 +17,6 @@ def prepare_graph_run(graph: AnyGraphDocument) -> dict:
         graph_name=graph.name,
         max_revision_round=int(graph.metadata.get("max_revision_round", 1)),
     )
-    initial_state["theme_config"] = graph.theme_config.model_dump(mode="json")
     initial_state["node_status_map"] = {node.id: "idle" for node in graph.nodes}
     return initial_state
 

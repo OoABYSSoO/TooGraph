@@ -60,11 +60,6 @@ class Position(BaseModel):
     y: float
 
 
-class ThemeConfig(BaseModel):
-    """Optional theme configuration for graph templates. Can be extended as needed."""
-    pass
-
-
 class StateField(BaseModel):
     key: str = Field(..., min_length=1)
     type: StateFieldType = StateFieldType.STRING
@@ -136,7 +131,7 @@ class GraphPayload(BaseModel):
     graph_id: str | None = None
     name: str = Field(..., min_length=1)
     template_id: str = ""
-    theme_config: ThemeConfig = Field(default_factory=ThemeConfig)
+    theme_config: dict[str, Any] = Field(default_factory=dict)
     state_schema: list[StateField] = Field(default_factory=list)
     nodes: list[GraphNode] = Field(default_factory=list)
     edges: list[GraphEdge] = Field(default_factory=list)

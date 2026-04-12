@@ -43,7 +43,6 @@ def execute_node_system_graph(
     )
     state["status"] = "running"
     state["started_at"] = utc_now_iso()
-    state["theme_config"] = graph.theme_config.model_dump(mode="json")
     state["node_status_map"] = {node.id: "idle" for node in graph.nodes}
 
     nodes_by_id = {node.id: node for node in graph.nodes}
@@ -185,7 +184,6 @@ def _refresh_run_artifacts(
         for preview in state.get("output_previews", [])
     ]
     state["artifacts"] = {
-        "theme_config": state.get("theme_config", {}),
         "skill_outputs": state.get("skill_outputs", []),
         "output_previews": state.get("output_previews", []),
         "saved_outputs": state.get("saved_outputs", []),
@@ -296,7 +294,6 @@ def _resolve_input_values(
 def _execute_node(node: NodeSystemGraphNode, input_values: dict[str, Any], state: dict[str, Any]) -> dict[str, Any]:
     config = node.data.config
     graph_context = {
-        "theme_config": state.get("theme_config", {}),
         "metadata": state.get("metadata", {}),
     }
     if isinstance(config, InputBoundaryNodeConfig):

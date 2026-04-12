@@ -13,13 +13,8 @@ TOOLS = get_tool_registry()
 
 
 def handle_start(state: RunState, params: dict[str, Any]) -> dict[str, Any]:
-    theme_config = dict(state.get("theme_config", {}))
-    genre = str(theme_config.get("genre", "")).strip()
-    market = str(theme_config.get("market", "")).strip()
-    platform = str(theme_config.get("platform", "")).strip()
-    task_input = f"Generate a {genre or 'strategy'} creative workflow for {market or 'global'} on {platform or 'digital'}."
     input_values = dict(params.get("input_values", {}))
-    return {"theme_config": theme_config, "task_input": task_input, **input_values}
+    return {"task_input": "creative workflow", **input_values}
 
 
 def handle_research(state: RunState, params: dict[str, Any]) -> dict[str, Any]:
@@ -118,7 +113,6 @@ def handle_finalize(state: RunState, params: dict[str, Any]) -> dict[str, Any]:
     del params
     evaluation = dict(state.get("evaluation_result", {}))
     final_package = {
-        "theme_config": state.get("theme_config", {}),
         "creative_brief": state.get("creative_brief", ""),
         "best_variant": state.get("best_variant", {}),
         "storyboard_packages": state.get("storyboard_packages", []),
@@ -133,7 +127,6 @@ def handle_finalize(state: RunState, params: dict[str, Any]) -> dict[str, Any]:
             "memory_type": "success_pattern" if evaluation.get("decision") == "pass" else "failure_reason",
             "summary": result,
             "content": {
-                "theme_config": state.get("theme_config", {}),
                 "evaluation": evaluation,
                 "best_variant": state.get("best_variant", {}),
             },

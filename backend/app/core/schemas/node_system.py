@@ -5,7 +5,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.core.schemas.graph import Position, StateField, ThemeConfig
+from app.core.schemas.graph import Position, StateField
 
 
 class ValueType(str, Enum):
@@ -214,7 +214,7 @@ class NodeSystemGraphPayload(BaseModel):
     graph_id: str | None = None
     name: str = Field(..., min_length=1)
     template_id: str = ""
-    theme_config: ThemeConfig = Field(default_factory=ThemeConfig)
+    theme_config: dict[str, Any] = Field(default_factory=dict)
     state_schema: list[StateField] = Field(default_factory=list)
     nodes: list[NodeSystemGraphNode] = Field(default_factory=list)
     edges: list[NodeSystemGraphEdge] = Field(default_factory=list)

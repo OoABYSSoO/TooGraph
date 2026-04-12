@@ -18,7 +18,6 @@ class RunState(TypedDict, total=False):
     current_node_id: str | None
     revision_round: int
     max_revision_round: int
-    theme_config: dict[str, Any]
     task_input: str
     market_inputs: list[dict[str, Any]]
     retrieved_knowledge: list[str]
@@ -69,7 +68,6 @@ def create_initial_run_state(graph_id: str, graph_name: str, max_revision_round:
         current_node_id=None,
         revision_round=0,
         max_revision_round=max_revision_round,
-        theme_config={},
         task_input="",
         market_inputs=[],
         retrieved_knowledge=[],

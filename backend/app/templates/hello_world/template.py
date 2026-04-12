@@ -18,7 +18,6 @@ def _create_default_node_system_graph() -> dict[str, Any]:
         "graph_family": "node_system",
         "name": "Hello World",
         "template_id": "hello_world",
-        "theme_config": {},
         "state_schema": get_hello_world_state_schema(),
         "nodes": [
             # ── Column 1: Inputs ──

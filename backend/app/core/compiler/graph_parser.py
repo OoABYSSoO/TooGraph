@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.core.schemas.graph import EdgeKind, GraphDocument, GraphEdge, GraphNode, NodeType, StateField, ThemeConfig
+from app.core.schemas.graph import EdgeKind, GraphDocument, GraphEdge, GraphNode, NodeType, StateField
 
 
 @dataclass
@@ -16,7 +16,6 @@ class WorkflowConfig:
     normal_edges: dict[str, list[str]]
     branch_edges: dict[str, dict[str, str]]
     state_schema: list[StateField]
-    theme_config: ThemeConfig
 
 
 def parse_graph(graph: GraphDocument) -> WorkflowConfig:
@@ -45,7 +44,6 @@ def parse_graph(graph: GraphDocument) -> WorkflowConfig:
         normal_edges=normal_edges,
         branch_edges=branch_edges,
         state_schema=graph.state_schema,
-        theme_config=graph.theme_config,
     )
 
 

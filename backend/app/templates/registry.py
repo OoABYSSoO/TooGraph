@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from app.templates.creative_factory import get_creative_factory_template
 from app.templates.hello_world import get_hello_world_template
 
 
 def list_templates() -> list[dict]:
-    return [get_creative_factory_template(), get_hello_world_template()]
+    return [get_hello_world_template()]
 
 
 def get_template(template_id: str) -> dict:

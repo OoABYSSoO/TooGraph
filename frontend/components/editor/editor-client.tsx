@@ -2,21 +2,11 @@
 
 import { NodeSystemEditor } from "@/components/editor/node-system-editor";
 
-type ThemeConfig = Record<string, unknown>;
-
-type StateField = {
-  key: string;
-  type: string;
-  title: string;
-  description: string;
-};
-
 export type EditorClientGraphPayload = {
   graph_family?: "node_system";
   graph_id?: string | null;
   name: string;
   template_id: string;
-  theme_config: ThemeConfig;
   state_schema: StateField[];
   nodes: unknown[];
   edges: unknown[];

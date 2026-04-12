@@ -57,8 +57,6 @@ import {
   type ValueType,
 } from "@/lib/node-system-schema";
 
-type ThemeConfig = Record<string, unknown>;
-
 type StateField = {
   key: string;
   type: string;
@@ -71,7 +69,6 @@ type GraphPayload = {
   graph_id?: string | null;
   name: string;
   template_id: string;
-  theme_config: ThemeConfig;
   state_schema: StateField[];
   nodes: unknown[];
   edges: unknown[];
@@ -1395,7 +1392,6 @@ function createEditorDefaults(templates: TemplateRecord[], defaultTemplateId?: s
     graph_id: null,
     name: "Node System Playground",
     template_id: defaultTemplateId ?? HELLO_WORLD_TEMPLATE_ID,
-    theme_config: {},
     state_schema: [],
     nodes: [],
     edges: [],
@@ -3511,7 +3507,6 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
   const [graphName, setGraphName] = useState(initialGraph.name);
   const [graphId, setGraphId] = useState<string | null>(initialGraph.graph_id ?? null);
   const [templateId] = useState(initialGraph.template_id);
-  const [themeConfig] = useState(initialGraph.theme_config);
   const [stateSchema] = useState(initialGraph.state_schema);
   const [metadata] = useState(initialGraph.metadata);
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
@@ -4144,7 +4139,6 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
       graph_id: graphId,
       name: graphName,
       template_id: templateId,
-      theme_config: themeConfig,
       state_schema: stateSchema,
       nodes: nodes.map((node) => ({
         id: node.id,
