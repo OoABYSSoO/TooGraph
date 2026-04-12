@@ -2087,17 +2087,21 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
             type="button"
             aria-label="Save as Preset"
             title="Save as Preset"
-            className="absolute right-3 top-3 z-20 flex items-center gap-1 rounded-full border border-[rgba(154,52,18,0.18)] bg-[rgba(255,252,247,0.92)] px-2.5 py-0.5 text-[0.68rem] font-medium text-[var(--muted)] shadow-[0_10px_24px_rgba(60,41,20,0.08)] transition hover:border-[rgba(154,52,18,0.28)] hover:text-[var(--accent)]"
+            className={cn(
+              "absolute z-20 grid h-8 w-8 place-items-center rounded-full shadow-[0_10px_24px_rgba(60,41,20,0.08)] transition",
+              selected ? "opacity-100" : "opacity-0 group-hover/node:opacity-100",
+              "border border-[rgba(154,52,18,0.14)] bg-[rgba(255,252,247,0.92)] text-[var(--muted)] hover:border-[rgba(154,52,18,0.24)] hover:text-[var(--accent)]",
+            )}
+            style={{ right: "52px" }}
             onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); }}
             onMouseDown={(event) => { event.preventDefault(); event.stopPropagation(); }}
             onClick={(event) => { event.preventDefault(); event.stopPropagation(); void data.onSavePreset?.(); }}
           >
-            <svg viewBox="0 0 16 16" className="h-3 w-3 fill-none stroke-current" strokeWidth="1.6">
+            <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.5">
               <path d="M2.5 10.5V13a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V6.5L11 3.5H3.5a1 1 0 0 0-1 1v6z" />
               <path d="M5 10.5V8h6v2.5" />
               <path d="M5 3.5V2.5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1" />
             </svg>
-            Preset
           </button>
         ) : null}
         <button
@@ -2107,7 +2111,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
           title={isDeleteConfirmActive ? "确认删除节点" : "删除节点"}
           data-delete-surface="true"
           className={cn(
-            "absolute right-14 top-3 z-20 grid h-8 w-8 place-items-center rounded-full shadow-[0_10px_24px_rgba(60,41,20,0.08)] transition",
+            "absolute right-3 top-3 z-20 grid h-8 w-8 place-items-center rounded-full shadow-[0_10px_24px_rgba(60,41,20,0.08)] transition",
             selected || isDeleteConfirmActive ? "opacity-100" : "opacity-0 group-hover/node:opacity-100",
             isDeleteConfirmActive
               ? "border border-[rgba(185,28,28,0.28)] bg-[rgb(185,28,28)] text-white hover:border-[rgba(185,28,28,0.36)] hover:bg-[rgb(153,27,27)]"
@@ -2151,7 +2155,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
             Delete node?
           </div>
         </FloatingLayer>
-        <div className="flex items-start justify-between gap-3 border-b border-[rgba(154,52,18,0.12)] pl-4 pr-32 py-3">
+        <div className="flex items-start justify-between gap-3 border-b border-[rgba(154,52,18,0.12)] pl-4 pr-14 py-3">
           <div className="min-w-0 flex-1">
             <div className="relative flex min-w-0 items-center gap-2">
               <span className="rounded-full border border-[rgba(154,52,18,0.16)] bg-[rgba(255,255,255,0.72)] px-2 py-0.5 text-[0.62rem] uppercase tracking-[0.14em] text-[var(--accent-strong)]">
