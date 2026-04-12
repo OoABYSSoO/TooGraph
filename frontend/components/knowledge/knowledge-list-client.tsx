@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { Input } from "@/components/ui/input";
 import { SubtleCard } from "@/components/ui/card";
+import { MarkdownArticle } from "@/components/ui/rich-content";
 import { apiGet } from "@/lib/api";
 import { useLanguage } from "@/components/providers/language-provider";
 
@@ -73,7 +74,7 @@ export function KnowledgeListClient() {
           <strong>{item.title}</strong>
           <div className="text-[var(--muted)]">{item.source}</div>
           <p className="text-[var(--muted)]">{item.summary}</p>
-          {expandedKey === `${item.source}-${item.title}` ? <pre className="overflow-x-auto whitespace-pre-wrap text-sm text-[var(--muted)]">{item.content}</pre> : null}
+          {expandedKey === `${item.source}-${item.title}` ? <MarkdownArticle className="mt-2 text-[0.95rem]" text={item.content} /> : null}
           </SubtleCard>
         </button>
       ))}

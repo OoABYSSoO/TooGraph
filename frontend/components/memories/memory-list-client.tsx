@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { Input } from "@/components/ui/input";
 import { SubtleCard } from "@/components/ui/card";
+import { RichContent } from "@/components/ui/rich-content";
 import { apiGet } from "@/lib/api";
 import { useLanguage } from "@/components/providers/language-provider";
 
@@ -70,7 +71,7 @@ export function MemoryListClient() {
           <SubtleCard className="grid gap-2">
           <strong>{item.memory_type}</strong>
           <div className="text-[var(--muted)]">{item.summary || "No summary provided."}</div>
-          {expandedId === item.memory_id && item.details ? <pre className="overflow-x-auto whitespace-pre-wrap text-sm text-[var(--muted)]">{item.details}</pre> : null}
+          {expandedId === item.memory_id && item.details ? <RichContent className="mt-2 text-sm" text={item.details} displayMode="auto" /> : null}
           </SubtleCard>
         </button>
       ))}

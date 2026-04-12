@@ -25,9 +25,9 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
-import Markdown from "react-markdown";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { RichContent, formatRichContentValue, resolveRichContentDisplayMode } from "@/components/ui/rich-content";
 import { apiGet, apiPost } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { EMPTY_AGENT_PRESET, getNodePresetById, NODE_PRESETS_MOCK, TEXT_INPUT_PRESET } from "@/lib/node-presets-mock";
@@ -186,6 +186,7 @@ type RunOutputPreview = {
   node_id?: string;
   state_key?: string;
   label?: string;
+  display_mode?: string;
   value?: unknown;
 };
 
@@ -1051,84 +1052,14 @@ function createPreviewText(node: FlowNode, nodes: FlowNode[], edges: Edge[]) {
   return `Connected to ${config.label}.${sourcePortKey ?? "value"}`;
 }
 
-function formatPreviewValue(value: unknown) {
-  if (value == null) return "";
-  if (typeof value === "string") return value;
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
-}
-
-function detectDisplayMode(text: string): "plain" | "markdown" | "json" {
-  const trimmed = text.trim();
-  if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
-    try { JSON.parse(trimmed); return "json"; } catch { /* not json */ }
-  }
-  if (/^#{1,6}\s/m.test(trimmed) || /\*\*.*?\*\*/.test(trimmed) || /```/.test(trimmed) || /^\*\s/m.test(trimmed) || /^\d+\.\s/m.test(trimmed) || /\[.*?\]\(.*?\)/.test(trimmed) || /^\|.*\|$/m.test(trimmed)) {
-    return "markdown";
-  }
-  return "plain";
-}
-
-function resolveDisplayMode(displayMode: string, text: string): string {
-  if (displayMode === "auto") return detectDisplayMode(text);
-  return displayMode;
-}
-
 function OutputPreviewContent({ text, displayMode }: { text: string; displayMode: string }) {
-  if (!text) {
-    return <span className="text-[var(--muted)]">Connect an upstream output to preview/export it.</span>;
-  }
-
-  const resolved = resolveDisplayMode(displayMode, text);
-
-  if (resolved === "json") {
-    let formatted = text;
-    try {
-      const parsed = JSON.parse(text);
-      formatted = JSON.stringify(parsed, null, 2);
-    } catch { /* keep original */ }
-    return (
-      <pre className="whitespace-pre-wrap break-words font-mono text-[0.82rem] leading-6">
-        <code>
-          {formatted.split("\n").map((line, i) => (
-            <span key={i}>
-              {i > 0 && "\n"}
-              {line.split(/("(?:[^"\\]|\\.)*")\s*(:?)/).map((part, j) => {
-                if (j % 3 === 1) {
-                  // string token
-                  const isKey = line.split(/("(?:[^"\\]|\\.)*")\s*(:?)/)[j + 1] === ":";
-                  return <span key={j} className={isKey ? "text-[#9a3412]" : "text-[#16a34a]"}>{part}</span>;
-                }
-                // numbers, booleans, null
-                return part.split(/\b(true|false|null|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\b/).map((token, k) => {
-                  if (k % 2 === 1) {
-                    if (token === "true" || token === "false") return <span key={`${j}-${k}`} className="text-[#2563eb]">{token}</span>;
-                    if (token === "null") return <span key={`${j}-${k}`} className="text-[#64748b]">{token}</span>;
-                    return <span key={`${j}-${k}`} className="text-[#d97706]">{token}</span>;
-                  }
-                  return <span key={`${j}-${k}`}>{token}</span>;
-                });
-              })}
-            </span>
-          ))}
-        </code>
-      </pre>
-    );
-  }
-
-  if (resolved === "markdown") {
-    return (
-      <div className="graphite-md text-sm leading-7 [&_h1]:mb-2 [&_h1]:mt-3 [&_h1]:text-lg [&_h1]:font-bold [&_h2]:mb-2 [&_h2]:mt-3 [&_h2]:text-base [&_h2]:font-semibold [&_h3]:mb-1 [&_h3]:mt-2 [&_h3]:text-sm [&_h3]:font-semibold [&_p]:mb-2 [&_ul]:mb-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:mb-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:mb-0.5 [&_code]:rounded [&_code]:bg-[rgba(154,52,18,0.08)] [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[0.82rem] [&_pre]:mb-2 [&_pre]:overflow-auto [&_pre]:rounded-lg [&_pre]:bg-[rgba(154,52,18,0.06)] [&_pre]:p-3 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_blockquote]:mb-2 [&_blockquote]:border-l-2 [&_blockquote]:border-[var(--accent)] [&_blockquote]:pl-3 [&_blockquote]:text-[var(--muted)] [&_strong]:font-semibold [&_a]:text-[var(--accent)] [&_a]:underline [&_hr]:my-3 [&_hr]:border-[rgba(154,52,18,0.12)]">
-        <Markdown>{text}</Markdown>
-      </div>
-    );
-  }
-
-  // plain / fallback
-  return <span className="whitespace-pre-wrap break-words">{text}</span>;
+  return (
+    <RichContent
+      text={text}
+      displayMode={displayMode}
+      empty={<span className="text-[var(--muted)]">Connect an upstream output to preview/export it.</span>}
+    />
+  );
 }
 
 function JsonTextArea({
@@ -2510,10 +2441,13 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                     config.persistEnabled ? "bg-[var(--accent)]" : "bg-[rgba(154,52,18,0.2)]",
                   )}
                   onClick={() =>
-                    data.onConfigChange?.((currentConfig) => ({
-                      ...(currentConfig as OutputBoundaryNode),
-                      persistEnabled: !currentConfig.persistEnabled,
-                    }))
+                    data.onConfigChange?.((currentConfig) => {
+                      const outputConfig = currentConfig as OutputBoundaryNode;
+                      return {
+                        ...outputConfig,
+                        persistEnabled: !outputConfig.persistEnabled,
+                      };
+                    })
                   }
                 >
                   <span
@@ -2879,7 +2813,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
               <div className="flex min-h-[160px] flex-1 flex-col rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,255,255,0.82)] p-3">
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <div className="text-[0.68rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">Preview</div>
-                  <div className="text-[0.68rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">{resolveDisplayMode(data.resolvedDisplayMode ?? config.displayMode, data.previewText)}</div>
+                  <div className="text-[0.68rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">{resolveRichContentDisplayMode(data.resolvedDisplayMode ?? config.displayMode, data.previewText)}</div>
                 </div>
                 <div className="min-h-[120px] flex-1 overflow-auto rounded-[12px] bg-[rgba(248,242,234,0.8)] px-3 py-3 text-sm leading-6 text-[var(--text)]">
                   <OutputPreviewContent text={data.previewText} displayMode={config.displayMode} />
@@ -3152,7 +3086,7 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
       const resolvedDisplayModeMap = new Map<string, string>();
       for (const output of run.artifacts.exported_outputs ?? []) {
         if (!output.node_id) continue;
-        outputPreviewMap.set(output.node_id, formatPreviewValue(output.value));
+        outputPreviewMap.set(output.node_id, formatRichContentValue(output.value));
         if (output.display_mode) {
           resolvedDisplayModeMap.set(output.node_id, output.display_mode);
         }

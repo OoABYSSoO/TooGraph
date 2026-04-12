@@ -26,6 +26,7 @@ html {
 body {
   margin: 0;
   color: var(--text);
+  background: var(--bg);
 }
 
 a {
@@ -38,4 +39,199 @@ input,
 select,
 textarea {
   font: inherit;
+}
+
+code,
+pre,
+kbd,
+samp {
+  font-family: "SFMono-Regular", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+.graphite-markdown {
+  color: var(--text);
+  font-size: 0.98rem;
+  line-height: 1.85;
+  word-break: break-word;
+  text-align: left !important;
+}
+
+.graphite-markdown > :first-child {
+  margin-top: 0;
+}
+
+.graphite-markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.graphite-markdown h1,
+.graphite-markdown h2,
+.graphite-markdown h3,
+.graphite-markdown h4,
+.graphite-markdown h5,
+.graphite-markdown h6 {
+  color: #111827;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  margin: 1.45em 0 0.7em;
+  text-align: left !important;
+}
+
+.graphite-markdown h1 {
+  font-size: 2rem;
+}
+
+.graphite-markdown h2 {
+  font-size: 1.55rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid rgba(154, 52, 18, 0.14);
+}
+
+.graphite-markdown h3 {
+  font-size: 1.2rem;
+}
+
+.graphite-markdown h4,
+.graphite-markdown h5,
+.graphite-markdown h6 {
+  font-size: 1rem;
+}
+
+.graphite-markdown p,
+.graphite-markdown ul,
+.graphite-markdown ol,
+.graphite-markdown blockquote,
+.graphite-markdown pre,
+.graphite-markdown .graphite-markdown-table-wrap,
+.graphite-markdown img,
+.graphite-markdown hr {
+  margin: 1em 0;
+  text-align: left !important;
+}
+
+.graphite-markdown ul,
+.graphite-markdown ol {
+  padding-left: 1.45rem;
+}
+
+.graphite-markdown li + li {
+  margin-top: 0.35rem;
+}
+
+.graphite-markdown li,
+.graphite-markdown div,
+.graphite-markdown span,
+.graphite-markdown td,
+.graphite-markdown th {
+  text-align: left !important;
+}
+
+.graphite-markdown li > ul,
+.graphite-markdown li > ol {
+  margin: 0.45rem 0 0;
+}
+
+.graphite-markdown blockquote {
+  border-left: 4px solid rgba(154, 52, 18, 0.3);
+  background: linear-gradient(180deg, rgba(255, 250, 241, 0.96) 0%, rgba(246, 231, 215, 0.82) 100%);
+  border-radius: 0 18px 18px 0;
+  padding: 0.95rem 1rem 0.95rem 1.1rem;
+  color: #4b5563;
+}
+
+.graphite-markdown hr {
+  border: none;
+  border-top: 1px solid rgba(154, 52, 18, 0.18);
+}
+
+.graphite-markdown a {
+  color: var(--accent-strong);
+  text-decoration-line: underline;
+  text-decoration-thickness: 1px;
+  text-decoration-color: rgba(154, 52, 18, 0.32);
+  text-underline-offset: 0.2em;
+}
+
+.graphite-markdown strong {
+  color: #111827;
+}
+
+.graphite-markdown em {
+  color: #374151;
+}
+
+.graphite-markdown :not(pre) > code {
+  border: 1px solid #d0d7de;
+  background: #f6f8fa;
+  color: #24292f;
+  border-radius: 0.35rem;
+  padding: 0.12rem 0.35rem;
+  font-size: 0.88em;
+}
+
+.graphite-markdown pre {
+  overflow-x: auto;
+  border: 1px solid #d0d7de;
+  border-radius: 0.75rem;
+  background: #f6f8fa;
+  padding: 0.9rem 1rem;
+  box-shadow: none;
+  text-align: left !important;
+}
+
+.graphite-markdown pre code {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: #24292f;
+  font-size: 0.84rem;
+  line-height: 1.7;
+  display: block;
+  text-align: left !important;
+}
+
+.graphite-markdown .graphite-markdown-table-wrap {
+  overflow-x: auto;
+  border: 1px solid rgba(154, 52, 18, 0.12);
+  border-radius: 1.1rem;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.graphite-markdown table {
+  width: 100%;
+  min-width: 32rem;
+  border-collapse: collapse;
+}
+
+.graphite-markdown th,
+.graphite-markdown td {
+  border-bottom: 1px solid rgba(154, 52, 18, 0.1);
+  padding: 0.8rem 0.95rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.graphite-markdown thead th {
+  background: rgba(154, 52, 18, 0.08);
+  color: #111827;
+  font-weight: 700;
+}
+
+.graphite-markdown tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.graphite-markdown img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 1rem;
+  border: 1px solid rgba(154, 52, 18, 0.12);
+  box-shadow: 0 10px 30px rgba(60, 41, 20, 0.1);
+}
+
+.graphite-markdown input[type="checkbox"] {
+  accent-color: var(--accent);
+  margin-right: 0.5rem;
 }

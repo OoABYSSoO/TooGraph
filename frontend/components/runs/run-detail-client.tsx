@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, SubtleCard } from "@/components/ui/card";
 import { InfoBlock } from "@/components/ui/info-block";
+import { RichContent, formatRichContentValue } from "@/components/ui/rich-content";
 import { apiGet } from "@/lib/api";
 import { useLanguage } from "@/components/providers/language-provider";
 
@@ -99,17 +100,23 @@ export function RunDetailClient({ runId }: { runId: string }) {
       <Card className="col-span-8 max-[960px]:col-span-1">
         <h2 className="mb-2.5">{t("run_detail.artifacts")}</h2>
         <div className="grid gap-3">
-          <InfoBlock title={t("run_detail.knowledge")}>{run.knowledge_summary || t("run_detail.no_knowledge")}</InfoBlock>
-          <InfoBlock title={t("run_detail.memory")}>{run.memory_summary || t("run_detail.no_memory")}</InfoBlock>
-          <InfoBlock title={t("run_detail.final_result")}>{run.final_result || t("run_detail.no_result")}</InfoBlock>
+          <InfoBlock title={t("run_detail.knowledge")}>
+            <RichContent text={run.knowledge_summary || ""} displayMode="auto" empty={t("run_detail.no_knowledge")} />
+          </InfoBlock>
+          <InfoBlock title={t("run_detail.memory")}>
+            <RichContent text={run.memory_summary || ""} displayMode="auto" empty={t("run_detail.no_memory")} />
+          </InfoBlock>
+          <InfoBlock title={t("run_detail.final_result")}>
+            <RichContent text={run.final_result || ""} displayMode="auto" empty={t("run_detail.no_result")} />
+          </InfoBlock>
           {Array.isArray(run.artifacts.exported_outputs) && (run.artifacts.exported_outputs as ExportedOutput[]).length > 0 ? (
             <InfoBlock title="Output Boundaries">
               <div className="grid gap-3">
                 {(run.artifacts.exported_outputs as ExportedOutput[]).map((output, index) => (
                   <div key={`${output.node_id ?? output.state_key ?? "output"}-${index}`} className="rounded-[14px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,250,241,0.72)] p-3">
                     <div className="font-medium">{output.label ?? output.state_key ?? "Output"}</div>
-                    <div className="mt-1 text-[var(--muted)] whitespace-pre-wrap break-words">
-                      {typeof output.value === "string" ? output.value : JSON.stringify(output.value, null, 2)}
+                    <div className="mt-2">
+                      <RichContent text={formatRichContentValue(output.value)} displayMode={output.display_mode ?? "auto"} />
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2.5">
                       {output.display_mode ? <Badge>{output.display_mode}</Badge> : null}
