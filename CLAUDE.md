@@ -11,7 +11,7 @@ GraphiteUI is a visual node-based editor and runtime workspace for LangGraph age
 ### Quick Start
 
 ```bash
-./scripts/dev_up.sh    # Starts both frontend (port 3477) and backend (port 8765)
+./scripts/start.sh    # Starts both frontend (port 3477) and backend (port 8765)
 ```
 
 This script kills occupied ports, starts both services, waits for health checks, and logs to `.dev_backend.log` / `.dev_frontend.log`.
@@ -43,7 +43,7 @@ curl http://localhost:8765/health    # {"status": "ok"}
 ### Agent Instructions (from AGENTS.md)
 
 - **Commit messages**: Always write in Chinese.
-- **After code changes**: Run `./scripts/dev_up.sh` to restart services. (Non-runtime changes like docs — use judgment.)
+- **After code changes**: Run `./scripts/start.sh` to restart services. (Non-runtime changes like docs — use judgment.)
 - The script handles port cleanup automatically.
 
 ## Architecture

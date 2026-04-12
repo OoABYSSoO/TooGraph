@@ -99,7 +99,7 @@ git clone https://github.com/changjiaxiang/GraphiteUI.git
 cd GraphiteUI
 
 # 一键启动前后端
-./scripts/dev_up.sh
+./scripts/start.sh
 ```
 
 或者手动启动：

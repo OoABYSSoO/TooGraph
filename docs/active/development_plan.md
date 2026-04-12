@@ -10,7 +10,7 @@
 
 当前代码已具备的基础：
 
-- 前后端开发环境可启动（`./scripts/dev_up.sh`，前端 3477 / 后端 8765）
+- 前后端开发环境可启动（`./scripts/start.sh`，前端 3477 / 后端 8765）
 - graph 保存、校验、运行接口可用
 - `hello_world` 与 `creative_factory` 两个模板存在，均由后端 `default_node_system_graph` 提供
 - `/editor`、`/editor/new`、`/editor/[graphId]` 路由已接回

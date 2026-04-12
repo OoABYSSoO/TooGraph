@@ -16,7 +16,7 @@
 推荐启动方式：
 
 ```bash
-./scripts/dev_up.sh
+./scripts/start.sh
 ```
 
 默认地址：
