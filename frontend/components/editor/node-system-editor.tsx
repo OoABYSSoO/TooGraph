@@ -1908,7 +1908,9 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
   const [draftLabel, setDraftLabel] = useState(config.label);
   const [draftDescription, setDraftDescription] = useState(config.description);
   const [isDeleteConfirmActive, setIsDeleteConfirmActive] = useState(false);
+  const [isPresetConfirmActive, setIsPresetConfirmActive] = useState(false);
   const deleteConfirmTimeoutRef = useRef<number | null>(null);
+  const presetConfirmTimeoutRef = useRef<number | null>(null);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const deleteButtonRef = useRef<HTMLButtonElement | null>(null);
   const labelAnchorRef = useRef<HTMLDivElement | null>(null);
@@ -1934,12 +1936,16 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
   useEffect(() => {
     if (selected) return;
     setIsDeleteConfirmActive(false);
+    setIsPresetConfirmActive(false);
   }, [selected]);
 
   useEffect(() => {
     return () => {
       if (deleteConfirmTimeoutRef.current) {
         window.clearTimeout(deleteConfirmTimeoutRef.current);
+      }
+      if (presetConfirmTimeoutRef.current) {
+        window.clearTimeout(presetConfirmTimeoutRef.current);
       }
     };
   }, []);
@@ -1969,6 +1975,25 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
     deleteConfirmTimeoutRef.current = window.setTimeout(() => {
       deleteConfirmTimeoutRef.current = null;
       setIsDeleteConfirmActive(false);
+    }, 2000);
+  }
+
+  function clearPresetConfirmState() {
+    if (presetConfirmTimeoutRef.current) {
+      window.clearTimeout(presetConfirmTimeoutRef.current);
+      presetConfirmTimeoutRef.current = null;
+    }
+    setIsPresetConfirmActive(false);
+  }
+
+  function startPresetConfirmWindow() {
+    if (presetConfirmTimeoutRef.current) {
+      window.clearTimeout(presetConfirmTimeoutRef.current);
+    }
+    setIsPresetConfirmActive(true);
+    presetConfirmTimeoutRef.current = window.setTimeout(() => {
+      presetConfirmTimeoutRef.current = null;
+      setIsPresetConfirmActive(false);
     }, 2000);
   }
 
@@ -2087,19 +2112,38 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
             type="button"
             aria-label="Save as Preset"
             title="Save as Preset"
+            data-delete-surface="true"
             className={cn(
-              "absolute right-[52px] top-3 z-20 grid h-8 w-8 place-items-center rounded-full shadow-[0_10px_24px_rgba(60,41,20,0.08)] transition border border-[rgba(154,52,18,0.14)] bg-[rgba(255,252,247,0.92)] text-[var(--muted)]",
-              selected || isDeleteConfirmActive ? "opacity-100" : "opacity-0 group-hover/node:opacity-100 group-hover/node:border-[rgba(154,52,18,0.24)] group-hover/node:text-[var(--accent)]",
+              "absolute right-[52px] top-3 z-20 grid h-8 w-8 place-items-center rounded-full shadow-[0_10px_24px_rgba(60,41,20,0.08)] transition",
+              selected || isPresetConfirmActive ? "opacity-100" : "opacity-0 group-hover/node:opacity-100",
+              isPresetConfirmActive
+                ? "border border-[rgba(34,197,94,0.3)] bg-[rgb(34,197,94)] text-white hover:border-[rgba(34,197,94,0.4)] hover:bg-[rgb(22,163,74)]"
+                : "border border-[rgba(154,52,18,0.14)] bg-[rgba(255,252,247,0.92)] text-[var(--muted)] hover:border-[rgba(154,52,18,0.24)] hover:text-[var(--accent)]",
             )}
             onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); }}
             onMouseDown={(event) => { event.preventDefault(); event.stopPropagation(); }}
-            onClick={(event) => { event.preventDefault(); event.stopPropagation(); void data.onSavePreset?.(); }}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              if (isPresetConfirmActive) {
+                clearPresetConfirmState();
+                void data.onSavePreset?.();
+                return;
+              }
+              startPresetConfirmWindow();
+            }}
           >
-            <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.5">
-              <path d="M2.5 10.5V13a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V6.5L11 3.5H3.5a1 1 0 0 0-1 1v6z" />
-              <path d="M5 10.5V8h6v2.5" />
-              <path d="M5 3.5V2.5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1" />
-            </svg>
+            {isPresetConfirmActive ? (
+              <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.7">
+                <path d="m4.5 8 2.25 2.25L11.5 5.5" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.5">
+                <path d="M2.5 10.5V13a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V6.5L11 3.5H3.5a1 1 0 0 0-1 1v6z" />
+                <path d="M5 10.5V8h6v2.5" />
+                <path d="M5 3.5V2.5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1" />
+              </svg>
+            )}
           </button>
         ) : null}
         <button
@@ -3332,7 +3376,7 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
     const nextPreset = {
       ...deepClonePreset(targetNode.data.config),
       presetId: `preset.local.${slug}.${crypto.randomUUID().slice(0, 6)}`,
-      label: `${targetNode.data.config.label} Copy`,
+      label: targetNode.data.config.label,
     } satisfies NodePresetDefinition;
     try {
       await apiPost<{ presetId: string; updatedAt?: string | null }>("/api/presets", {
