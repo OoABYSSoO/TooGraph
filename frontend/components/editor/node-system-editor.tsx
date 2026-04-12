@@ -2477,25 +2477,53 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
           ) : null}
 
           {config.family === "output" ? (
-            <div className="grid gap-1">
-              {inputs.map((port) => (
-                <PortRow
-                  key={`input-${port.key}`}
-                  nodeId={data.nodeId}
-                  port={port}
-                  side="input"
-                  editable
-                  onRename={(nextLabel) =>
+            <div className="flex items-center gap-3">
+              <div className="grid gap-1">
+                {inputs.map((port) => (
+                  <PortRow
+                    key={`input-${port.key}`}
+                    nodeId={data.nodeId}
+                    port={port}
+                    side="input"
+                    editable
+                    onRename={(nextLabel) =>
+                      data.onConfigChange?.((currentConfig) => ({
+                        ...(currentConfig as OutputBoundaryNode),
+                        input: {
+                          ...(currentConfig as OutputBoundaryNode).input,
+                          label: nextLabel,
+                        },
+                      }))
+                    }
+                  />
+                ))}
+              </div>
+              <div className="ml-auto flex items-center gap-2">
+                <span className="text-xs text-[var(--muted)]">Save</span>
+                <button
+                  type="button"
+                  aria-label="Toggle auto-save"
+                  role="switch"
+                  aria-checked={config.persistEnabled}
+                  className={cn(
+                    "relative inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full transition-colors",
+                    config.persistEnabled ? "bg-[var(--accent)]" : "bg-[rgba(154,52,18,0.2)]",
+                  )}
+                  onClick={() =>
                     data.onConfigChange?.((currentConfig) => ({
                       ...(currentConfig as OutputBoundaryNode),
-                      input: {
-                        ...(currentConfig as OutputBoundaryNode).input,
-                        label: nextLabel,
-                      },
+                      persistEnabled: !currentConfig.persistEnabled,
                     }))
                   }
-                />
-              ))}
+                >
+                  <span
+                    className={cn(
+                      "inline-block h-5 w-5 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.2)] transition-transform",
+                      config.persistEnabled ? "translate-x-6" : "translate-x-1",
+                    )}
+                  />
+                </button>
+              </div>
             </div>
           ) : null}
 
@@ -2847,33 +2875,6 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
 
           {config.family === "output" ? (
             <>
-              {/* Save toggle */}
-              <div className="flex items-center">
-                <span className="text-xs text-[var(--muted)]">Save</span>
-                <button
-                  type="button"
-                  aria-label="Toggle auto-save"
-                  role="switch"
-                  aria-checked={config.persistEnabled}
-                  className={cn(
-                    "relative ml-2 inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full transition-colors",
-                    config.persistEnabled ? "bg-[var(--accent)]" : "bg-[rgba(154,52,18,0.2)]",
-                  )}
-                  onClick={() =>
-                    data.onConfigChange?.((currentConfig) => ({
-                      ...(currentConfig as OutputBoundaryNode),
-                      persistEnabled: !currentConfig.persistEnabled,
-                    }))
-                  }
-                >
-                  <span
-                    className={cn(
-                      "inline-block h-5 w-5 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.2)] transition-transform",
-                      config.persistEnabled ? "translate-x-6" : "translate-x-1",
-                    )}
-                  />
-                </button>
-              </div>
               {/* Preview */}
               <div className="flex min-h-[160px] flex-1 flex-col rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,255,255,0.82)] p-3">
                 <div className="mb-2 flex items-center justify-between gap-3">
