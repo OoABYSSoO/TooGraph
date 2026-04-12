@@ -1,6 +1,16 @@
 "use client";
 
-import { type ReactNode, type SyntheticEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ReactNode,
+  type SelectHTMLAttributes,
+  type SyntheticEvent,
+  type TextareaHTMLAttributes,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 import {
   Background,
@@ -34,7 +44,6 @@ import { EMPTY_AGENT_PRESET, getNodePresetById, NODE_PRESETS_MOCK, TEXT_INPUT_PR
 import {
   isValueTypeCompatible,
   type AgentNode,
-  type AgentModelSource,
   type AgentThinkingMode,
   type BranchDefinition,
   type ConditionNode,
@@ -44,7 +53,6 @@ import {
   type NodePresetDefinition,
   type OutputBoundaryNode,
   type PortDefinition,
-  type SkillAttachment,
   type ValueType,
 } from "@/lib/node-system-schema";
 
@@ -358,27 +366,166 @@ function resolveAgentRuntimeConfig(
   };
 }
 
-function InlineRuntimeSelect({
+const NODE_SELECT_CLASS =
+  "min-h-[44px] w-full appearance-none rounded-[16px] border border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.88)] px-3.5 py-3 pr-10 text-sm text-[var(--text)] shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] outline-none transition focus:border-[rgba(154,52,18,0.28)] focus:bg-white";
+
+const NODE_TEXTAREA_CLASS =
+  "w-full resize-none rounded-[16px] border border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.88)] px-3.5 py-3 text-sm leading-6 text-[var(--text)] shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] outline-none transition focus:border-[rgba(154,52,18,0.28)] focus:bg-white";
+
+function FieldSelect({
+  className,
+  wrapperClassName,
+  iconClassName,
+  children,
+  ...props
+}: SelectHTMLAttributes<HTMLSelectElement> & {
+  wrapperClassName?: string;
+  iconClassName?: string;
+}) {
+  return (
+    <div className={cn("relative", wrapperClassName)}>
+      <select className={cn(NODE_SELECT_CLASS, className)} {...props}>
+        {children}
+      </select>
+      <svg
+        viewBox="0 0 16 16"
+        className={cn(
+          "pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 fill-none stroke-[var(--muted)]",
+          iconClassName,
+        )}
+        strokeWidth="1.5"
+      >
+        <path d="m4.5 6 3.5 4 3.5-4" />
+      </svg>
+    </div>
+  );
+}
+
+function FieldTextarea({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return <textarea className={cn(NODE_TEXTAREA_CLASS, className)} {...props} />;
+}
+
+function FloatingEditorCard({
+  anchorRef,
+  open,
+  placement,
+  title,
+  description,
+  widthClassName = "w-[360px]",
+  children,
+}: {
+  anchorRef: React.RefObject<HTMLElement | null>;
+  open: boolean;
+  placement: FloatingPlacement;
+  title: string;
+  description?: string;
+  widthClassName?: string;
+  children: ReactNode;
+}) {
+  return (
+    <FloatingLayer anchorRef={anchorRef} open={open} placement={placement}>
+      <div
+        className={cn(
+          widthClassName,
+          "rounded-[20px] border border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.98)] p-4 shadow-[0_18px_40px_rgba(60,41,20,0.16)] backdrop-blur",
+        )}
+      >
+        <div className="mb-3">
+          <div className="text-sm font-semibold text-[var(--text)]">{title}</div>
+          {description ? <div className="mt-1 text-xs leading-5 text-[var(--muted)]">{description}</div> : null}
+        </div>
+        <div className="grid gap-3">{children}</div>
+      </div>
+    </FloatingLayer>
+  );
+}
+
+function PanelIconButton({
   label,
+  tone = "neutral",
+  onClick,
+  children,
+}: {
+  label: string;
+  tone?: "neutral" | "positive" | "danger";
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  const toneClassName =
+    tone === "positive"
+      ? "border-[rgba(21,128,61,0.16)] bg-[rgba(240,253,244,0.9)] text-[#15803d] hover:border-[rgba(21,128,61,0.28)] hover:bg-[rgba(240,253,244,1)]"
+      : tone === "danger"
+        ? "border-[rgba(185,28,28,0.16)] bg-[rgba(255,248,248,0.92)] text-[rgb(153,27,27)] hover:border-[rgba(185,28,28,0.28)] hover:bg-[rgba(255,248,248,1)]"
+        : "border-[rgba(154,52,18,0.16)] bg-[rgba(255,255,255,0.88)] text-[var(--text)] hover:border-[rgba(154,52,18,0.28)] hover:bg-white";
+
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      className={cn(
+        "inline-flex h-10 w-10 items-center justify-center rounded-[14px] border shadow-[0_8px_18px_rgba(60,41,20,0.08)] transition hover:-translate-y-0.5",
+        toneClassName,
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function EditorSwitchRow({
+  label,
+  checked,
+  onCheckedChange,
+}: {
+  label: string;
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-[16px] border border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.78)] px-3.5 py-3">
+      <span className="text-sm text-[var(--text)]">{label}</span>
+      <button
+        type="button"
+        role="switch"
+        aria-label={label}
+        aria-checked={checked}
+        className={cn(
+          "relative inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full transition-colors",
+          checked ? "bg-[var(--accent)]" : "bg-[rgba(154,52,18,0.2)]",
+        )}
+        onClick={() => onCheckedChange(!checked)}
+      >
+        <span
+          className={cn(
+            "inline-block h-5 w-5 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.2)] transition-transform",
+            checked ? "translate-x-6" : "translate-x-1",
+          )}
+        />
+      </button>
+    </div>
+  );
+}
+
+function InlineRuntimeSelect({
   value,
   onChange,
   children,
-  title,
+  ariaLabel,
 }: {
-  label?: string;
   value: string;
   onChange: (value: string) => void;
   children: ReactNode;
-  title?: string;
+  ariaLabel: string;
 }) {
   const stopSelectEvent = (event: SyntheticEvent) => {
     event.stopPropagation();
   };
 
   return (
-    <label
-      className="nodrag nowheel pointer-events-auto relative flex min-h-10 min-w-0 items-center gap-2 rounded-full border border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.9)] px-3 pr-8 text-[0.74rem] shadow-[0_8px_18px_rgba(60,41,20,0.05)] transition hover:border-[rgba(154,52,18,0.24)]"
-      title={title}
+    <div
+      className="nodrag nowheel pointer-events-auto"
       onPointerDownCapture={stopSelectEvent}
       onMouseDownCapture={stopSelectEvent}
       onClickCapture={stopSelectEvent}
@@ -386,11 +533,9 @@ function InlineRuntimeSelect({
       onMouseDown={stopSelectEvent}
       onClick={stopSelectEvent}
     >
-      {label ? (
-        <span className="shrink-0 uppercase tracking-[0.14em] text-[var(--accent-strong)]">{label}</span>
-      ) : null}
-      <select
-        aria-label={label || title || "Runtime select"}
+      <FieldSelect
+        aria-label={ariaLabel}
+        title={ariaLabel}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         onPointerDownCapture={stopSelectEvent}
@@ -399,18 +544,13 @@ function InlineRuntimeSelect({
         onPointerDown={stopSelectEvent}
         onMouseDown={stopSelectEvent}
         onClick={stopSelectEvent}
-        className="nodrag nowheel min-w-0 flex-1 cursor-pointer appearance-none bg-transparent py-2 text-[var(--text)] outline-none"
+        wrapperClassName="min-w-0"
+        className="nodrag nowheel min-h-[40px] min-w-0 cursor-pointer rounded-[14px] border border-[rgba(15,23,42,0.12)] bg-[rgba(30,36,48,0.96)] px-3 py-2 pr-9 text-[0.82rem] font-medium text-[rgba(255,250,241,0.96)] shadow-[0_10px_18px_rgba(15,23,42,0.16)] focus:border-[rgba(217,119,6,0.32)] focus:bg-[rgba(38,44,56,0.98)]"
+        iconClassName="stroke-[rgba(255,250,241,0.72)]"
       >
         {children}
-      </select>
-      <svg
-        viewBox="0 0 16 16"
-        className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 fill-none stroke-[var(--muted)]"
-        strokeWidth="1.5"
-      >
-        <path d="m4.5 6 3.5 4 3.5-4" />
-      </svg>
-    </label>
+      </FieldSelect>
+    </div>
   );
 }
 
@@ -499,15 +639,15 @@ function buildModelSelectOptions(
   return options;
 }
 
-function buildThinkingSelectOptions(agentRuntime: ReturnType<typeof resolveAgentRuntimeConfig>) {
+function buildThinkingSelectOptions() {
   return [
     {
       value: "off",
-      label: "off",
+      label: "thinking off",
     },
     {
       value: "on",
-      label: "on",
+      label: "thinking on",
     },
   ];
 }
@@ -524,7 +664,7 @@ function AgentInlineRuntimeControls({
   onConfigChange: (updater: (config: AgentNode) => AgentNode) => void;
 }) {
   const modelOptions = buildModelSelectOptions(agentRuntime, availableModelRefs, modelDisplayLookup);
-  const thinkingOptions = buildThinkingSelectOptions(agentRuntime);
+  const thinkingOptions = buildThinkingSelectOptions();
   const currentOverrideModel = agentRuntime.model?.trim() ?? "";
   const selectedModelValue =
     agentRuntime.modelSource === "override" && currentOverrideModel
@@ -534,8 +674,8 @@ function AgentInlineRuntimeControls({
   return (
     <div className="grid grid-cols-2 gap-2">
       <InlineRuntimeSelect
+        ariaLabel="Select model"
         value={selectedModelValue}
-        title={`Resolved model: ${getModelDisplayLabel(agentRuntime.resolvedModel, modelDisplayLookup)}`}
         onChange={(nextValue) =>
           onConfigChange((currentConfig) => {
             const currentAgent = currentConfig as AgentNode;
@@ -561,8 +701,8 @@ function AgentInlineRuntimeControls({
         ))}
       </InlineRuntimeSelect>
       <InlineRuntimeSelect
+        ariaLabel="Select thinking mode"
         value={agentRuntime.resolvedThinking ? "on" : "off"}
-        title={`Resolved thinking: ${agentRuntime.resolvedThinking ? "On" : "Off"}`}
         onChange={(nextValue) =>
           onConfigChange((currentConfig) => ({
             ...(currentConfig as AgentNode),
@@ -1126,8 +1266,8 @@ function JsonTextArea({
   return (
     <label className="grid gap-1.5 text-sm text-[var(--muted)]">
       <span>{label}</span>
-      <textarea
-        className={cn(minHeight, "rounded-[16px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 font-mono text-[0.82rem] text-[var(--text)]")}
+      <FieldTextarea
+        className={cn(minHeight, "font-mono text-[0.82rem]")}
         value={text}
         onChange={(event) => {
           const nextText = event.target.value;
@@ -1162,6 +1302,90 @@ function PanelSection({
       </div>
       <div className="mt-4 grid gap-3">{children}</div>
     </section>
+  );
+}
+
+function SkillPickerPanel({
+  anchorRef,
+  open,
+  definitions,
+  loading,
+  error,
+  onClose,
+  onPick,
+}: {
+  anchorRef: React.RefObject<HTMLElement | null>;
+  open: boolean;
+  definitions: SkillDefinition[];
+  loading: boolean;
+  error: string | null;
+  onClose: () => void;
+  onPick: (definition: SkillDefinition) => void;
+}) {
+  return (
+    <FloatingEditorCard
+      anchorRef={anchorRef}
+      open={open}
+      placement="bottom-start"
+      title="Add Skill"
+      description="这里只负责附加已有 skill，不在编排界面里编辑 skill 内容。"
+      widthClassName="w-[360px]"
+    >
+      {loading ? (
+        <div className="rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,255,255,0.78)] px-4 py-3 text-sm text-[var(--muted)]">
+          Loading skills...
+        </div>
+      ) : error ? (
+        <div className="rounded-[16px] border border-[rgba(185,28,28,0.14)] bg-[rgba(255,248,248,0.86)] px-4 py-3 text-sm text-[rgb(153,27,27)]">
+          {error}
+        </div>
+      ) : definitions.length === 0 ? (
+        <div className="rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,255,255,0.78)] px-4 py-3 text-sm text-[var(--muted)]">
+          No available skills to attach.
+        </div>
+      ) : (
+        <div className="grid max-h-[320px] gap-2 overflow-y-auto pr-1">
+          {definitions.map((definition) => (
+            <button
+              key={definition.skillKey}
+              type="button"
+              className="rounded-[16px] border border-[rgba(37,99,235,0.14)] bg-[rgba(239,246,255,0.58)] px-3.5 py-3 text-left transition hover:border-[rgba(37,99,235,0.24)] hover:bg-[rgba(239,246,255,0.84)]"
+              onClick={() => onPick(definition)}
+            >
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 grid h-8 w-8 flex-shrink-0 place-items-center rounded-full bg-[rgba(37,99,235,0.1)] text-[#2563eb]">
+                  <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.6">
+                    <path d="M8 2.5v4l2.5 1.5" />
+                    <circle cx="8" cy="8" r="5.5" />
+                  </svg>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium text-[var(--text)]">{definition.label}</div>
+                  <div className="mt-1 text-xs leading-5 text-[var(--muted)]">{definition.description}</div>
+                  <div className="mt-2 flex flex-wrap gap-2 text-[0.68rem]">
+                    {definition.inputSchema.length > 0 ? (
+                      <span className="rounded-full border border-[rgba(37,99,235,0.12)] bg-white/70 px-2 py-0.5 text-[#2563eb]">
+                        In {definition.inputSchema.length}
+                      </span>
+                    ) : null}
+                    {definition.outputSchema.length > 0 ? (
+                      <span className="rounded-full border border-[rgba(37,99,235,0.12)] bg-white/70 px-2 py-0.5 text-[#2563eb]">
+                        Out {definition.outputSchema.length}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="flex justify-end">
+        <Button variant="ghost" onClick={onClose}>
+          Close
+        </Button>
+      </div>
+    </FloatingEditorCard>
   );
 }
 
@@ -1231,143 +1455,6 @@ function MappingEditor({
           {addLabel}
         </Button>
       </div>
-    </PanelSection>
-  );
-}
-
-function SkillEditorList({
-  skills,
-  onChange,
-  definitions,
-  definitionsLoading,
-  definitionsError,
-}: {
-  skills: SkillAttachment[];
-  onChange: (nextSkills: SkillAttachment[]) => void;
-  definitions: SkillDefinition[];
-  definitionsLoading: boolean;
-  definitionsError: string | null;
-}) {
-  const attachedSkillKeys = useMemo(() => new Set(skills.map((skill) => skill.skillKey)), [skills]);
-  const availableDefinitions = useMemo(
-    () => definitions.filter((definition) => !attachedSkillKeys.has(definition.skillKey)),
-    [attachedSkillKeys, definitions],
-  );
-  const [selectedSkillKey, setSelectedSkillKey] = useState("");
-
-  useEffect(() => {
-    if (!availableDefinitions.length) {
-      setSelectedSkillKey("");
-      return;
-    }
-    if (!availableDefinitions.some((definition) => definition.skillKey === selectedSkillKey)) {
-      setSelectedSkillKey(availableDefinitions[0]?.skillKey ?? "");
-    }
-  }, [availableDefinitions, selectedSkillKey]);
-
-  return (
-    <PanelSection title="Skills" description="挂载或移除已有 skill。">
-      {definitionsLoading ? (
-        <div className="px-1 py-1 text-xs text-[var(--muted)]">Loading skills...</div>
-      ) : definitionsError ? (
-        <div className="rounded-[12px] border border-[rgba(185,28,28,0.16)] bg-[rgba(255,248,248,0.8)] px-3 py-2 text-xs text-[rgb(153,27,27)]">{definitionsError}</div>
-      ) : null}
-      {skills.length > 0 ? (
-        <div className="grid gap-2">
-          {skills.map((skill, index) => {
-            const definition = definitions.find((item) => item.skillKey === skill.skillKey);
-            return (
-              <div key={`${skill.name}-${index}`} className="group/skill rounded-[14px] border border-[rgba(37,99,235,0.14)] bg-[rgba(239,246,255,0.6)] px-3 py-2.5">
-                <div className="flex items-center gap-2">
-                  <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 flex-shrink-0 fill-none stroke-[#2563eb]" strokeWidth="1.5">
-                    <path d="M8 2.5v4l2.5 1.5" />
-                    <circle cx="8" cy="8" r="5.5" />
-                  </svg>
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--text)]">{definition?.label ?? skill.name}</span>
-                  {skill.usage === "required" ? (
-                    <span className="flex-shrink-0 rounded-full bg-[rgba(37,99,235,0.1)] px-1.5 py-px text-[0.6rem] font-medium uppercase tracking-wider text-[#2563eb]">required</span>
-                  ) : null}
-                  <button
-                    type="button"
-                    title="Remove skill"
-                    className="grid h-5 w-5 flex-shrink-0 place-items-center rounded-full text-[var(--muted)] opacity-0 transition hover:bg-[rgba(185,28,28,0.08)] hover:text-[rgb(185,28,28)] group-hover/skill:opacity-100"
-                    onClick={() => onChange(skills.filter((_, i) => i !== index))}
-                  >
-                    <svg viewBox="0 0 16 16" className="h-3 w-3 fill-none stroke-current" strokeWidth="1.8">
-                      <path d="m5 5 6 6" />
-                      <path d="m11 5-6 6" />
-                    </svg>
-                  </button>
-                </div>
-                {definition ? (
-                  <>
-                    <div className="mt-1 line-clamp-1 text-xs text-[var(--muted)]">{definition.description}</div>
-                    {(definition.inputSchema.length > 0 || definition.outputSchema.length > 0) ? (
-                      <div className="mt-2 grid grid-cols-2 gap-x-4 text-[0.68rem]">
-                        {definition.inputSchema.length > 0 ? (
-                          <div>
-                            <div className="mb-0.5 font-medium uppercase tracking-wider text-[var(--muted)]">In</div>
-                            {definition.inputSchema.map((field) => (
-                              <div key={field.key} className="flex items-center gap-1 leading-5">
-                                <span className="text-[var(--text)]">{field.key}</span>
-                                <span style={{ color: TYPE_COLORS[field.valueType as ValueType] ?? TYPE_COLORS.any }}>{field.valueType}</span>
-                              </div>
-                            ))}
-                          </div>
-                        ) : <div />}
-                        {definition.outputSchema.length > 0 ? (
-                          <div>
-                            <div className="mb-0.5 font-medium uppercase tracking-wider text-[var(--muted)]">Out</div>
-                            {definition.outputSchema.map((field) => (
-                              <div key={field.key} className="flex items-center gap-1 leading-5">
-                                <span className="text-[var(--text)]">{field.key}</span>
-                                <span style={{ color: TYPE_COLORS[field.valueType as ValueType] ?? TYPE_COLORS.any }}>{field.valueType}</span>
-                              </div>
-                            ))}
-                          </div>
-                        ) : <div />}
-                      </div>
-                    ) : null}
-                  </>
-                ) : (
-                  <div className="mt-1 text-xs text-[rgba(185,28,28,0.7)]">Definition not found: {skill.skillKey}</div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      ) : null}
-      {availableDefinitions.length ? (
-        <div className="flex items-center gap-2">
-          <select
-            className="min-w-0 flex-1 rounded-[12px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-2.5 py-2 text-sm text-[var(--text)]"
-            value={selectedSkillKey}
-            onChange={(event) => setSelectedSkillKey(event.target.value)}
-          >
-            {availableDefinitions.map((definition) => (
-              <option key={definition.skillKey} value={definition.skillKey}>{definition.label}</option>
-            ))}
-          </select>
-          <Button
-            variant="ghost"
-            onClick={() => {
-              const nextDefinition = availableDefinitions.find((definition) => definition.skillKey === selectedSkillKey) ?? availableDefinitions[0];
-              if (!nextDefinition) return;
-              onChange(
-                skills.concat({
-                  name: nextDefinition.skillKey,
-                  skillKey: nextDefinition.skillKey,
-                  inputMapping: {},
-                  contextBinding: {},
-                  usage: "optional",
-                }),
-              );
-            }}
-          >
-            Add
-          </Button>
-        </div>
-      ) : null}
     </PanelSection>
   );
 }
@@ -1443,17 +1530,13 @@ function RuleEditor({
       <div className="grid grid-cols-2 gap-3">
         <label className="grid gap-1.5 text-sm text-[var(--muted)]">
           <span>Operator</span>
-          <select
-            className="rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3 py-3 text-[var(--text)]"
-            value={rule.operator}
-            onChange={(event) => onChange({ ...rule, operator: event.target.value as ConditionRule["operator"] })}
-          >
+          <FieldSelect value={rule.operator} onChange={(event) => onChange({ ...rule, operator: event.target.value as ConditionRule["operator"] })}>
             {RULE_OPERATOR_OPTIONS.map((option) => (
               <option key={option} value={option}>
                 {option}
               </option>
             ))}
-          </select>
+          </FieldSelect>
         </label>
         <label className="grid gap-1.5 text-sm text-[var(--muted)]">
           <span>Value</span>
@@ -1658,168 +1741,235 @@ function PortRow({
           <span ref={labelRef} className="ml-2 truncate cursor-text" onDoubleClick={startEditing}>
             {port.label}
           </span>
-          <FloatingLayer anchorRef={labelRef} open={isEditing} placement="bottom-start">
-            <div className="w-[220px] rounded-[16px] border border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.98)] p-2 shadow-[0_14px_32px_rgba(60,41,20,0.14)]">
-              <Input
-                className="h-9"
-                value={draftLabel}
-                autoFocus
-                onChange={(event) => setDraftLabel(event.target.value)}
-                onBlur={commitEditing}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") commitEditing();
-                  if (event.key === "Escape") {
-                    setDraftLabel(port.label);
-                    setIsEditing(false);
-                  }
+          <FloatingEditorCard
+            anchorRef={labelRef}
+            open={isEditing}
+            placement="bottom-start"
+            title="Edit Port Name"
+            widthClassName="w-[320px]"
+          >
+            <Input
+              className="h-11"
+              value={draftLabel}
+              autoFocus
+              onChange={(event) => setDraftLabel(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") commitEditing();
+                if (event.key === "Escape") {
+                  setDraftLabel(port.label);
+                  setIsEditing(false);
+                }
+              }}
+            />
+            <div className="flex items-center justify-end gap-2">
+              <PanelIconButton
+                label="Cancel"
+                onClick={() => {
+                  setDraftLabel(port.label);
+                  setIsEditing(false);
                 }}
-              />
+              >
+                <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
+                  <path d="m4.5 4.5 7 7" />
+                  <path d="m11.5 4.5-7 7" />
+                </svg>
+              </PanelIconButton>
+              <PanelIconButton label="Save" tone="positive" onClick={commitEditing}>
+                <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
+                  <path d="m3.5 8.5 3 3 6-7" />
+                </svg>
+              </PanelIconButton>
             </div>
-          </FloatingLayer>
-          <FloatingLayer anchorRef={labelRef} open={isEditingPortConfig} placement="bottom-start">
-            <div className="w-[260px] rounded-[16px] border border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.98)] p-3 shadow-[0_14px_32px_rgba(60,41,20,0.14)]">
-              <div className="grid gap-3">
-                <label className="grid gap-1 text-xs text-[var(--muted)]">
-                  <span>Key</span>
-                  <Input value={draftPort.key} onChange={(event) => setDraftPort((current) => ({ ...current, key: event.target.value }))} />
-                </label>
-                <label className="grid gap-1 text-xs text-[var(--muted)]">
-                  <span>Label</span>
-                  <Input value={draftPort.label} onChange={(event) => setDraftPort((current) => ({ ...current, label: event.target.value }))} />
-                </label>
-                <label className="grid gap-1 text-xs text-[var(--muted)]">
-                  <span>Value Type</span>
-                  <select
-                    className="rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3 py-2 text-[var(--text)]"
-                    value={draftPort.valueType}
-                    onChange={(event) => setDraftPort((current) => ({ ...current, valueType: event.target.value as ValueType }))}
-                  >
-                    {VALUE_TYPE_OPTIONS.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {side === "input" ? (
-                  <label className="flex items-center gap-2 text-xs text-[var(--muted)]">
-                    <input
-                      checked={Boolean(draftPort.required)}
-                      type="checkbox"
-                      onChange={(event) => setDraftPort((current) => ({ ...current, required: event.target.checked }))}
-                    />
-                    <span>Required</span>
-                  </label>
-                ) : null}
-                <div className="flex items-center justify-between gap-2">
-                  <Button
-                    variant="ghost"
+          </FloatingEditorCard>
+          <FloatingEditorCard
+            anchorRef={labelRef}
+            open={isEditingPortConfig}
+            placement="bottom-start"
+            title="Edit Port"
+            widthClassName="w-[340px]"
+          >
+            <label className="grid gap-1.5 text-sm text-[var(--muted)]">
+              <span>Key</span>
+              <Input value={draftPort.key} onChange={(event) => setDraftPort((current) => ({ ...current, key: event.target.value }))} />
+            </label>
+            <label className="grid gap-1.5 text-sm text-[var(--muted)]">
+              <span>Label</span>
+              <Input value={draftPort.label} onChange={(event) => setDraftPort((current) => ({ ...current, label: event.target.value }))} />
+            </label>
+            <label className="grid gap-1.5 text-sm text-[var(--muted)]">
+              <span>Value Type</span>
+              <FieldSelect value={draftPort.valueType} onChange={(event) => setDraftPort((current) => ({ ...current, valueType: event.target.value as ValueType }))}>
+                {VALUE_TYPE_OPTIONS.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </FieldSelect>
+            </label>
+            {side === "input" ? (
+              <EditorSwitchRow
+                label="Required"
+                checked={Boolean(draftPort.required)}
+                onCheckedChange={(checked) => setDraftPort((current) => ({ ...current, required: checked }))}
+              />
+            ) : null}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                {portEditor?.onRemove ? (
+                  <PanelIconButton
+                    label="Remove"
+                    tone="danger"
                     onClick={() => {
-                      setDraftPort(port);
+                      portEditor.onRemove?.();
                       setIsEditingPortConfig(false);
                     }}
                   >
-                    Cancel
-                  </Button>
-                  <div className="flex items-center gap-2">
-                    {portEditor?.onRemove ? (
-                      <Button
-                        variant="ghost"
-                        onClick={() => {
-                          portEditor.onRemove?.();
-                          setIsEditingPortConfig(false);
-                        }}
-                      >
-                        Remove
-                      </Button>
-                    ) : null}
-                    <Button variant="ghost" onClick={commitPortEditing}>
-                      Save
-                    </Button>
-                  </div>
-                </div>
+                    <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.7">
+                      <path d="M3.5 4.5h9" />
+                      <path d="M6 4.5V3.4c0-.5.4-.9.9-.9h2.2c.5 0 .9.4.9.9v1.1" />
+                      <path d="M5.2 6.2v5.1" />
+                      <path d="M8 6.2v5.1" />
+                      <path d="M10.8 6.2v5.1" />
+                      <path d="M4.4 4.5 5 12.6c0 .5.4.9.9.9h4.2c.5 0 .9-.4.9-.9l.6-8.1" />
+                    </svg>
+                  </PanelIconButton>
+                ) : null}
+              </div>
+              <div className="flex items-center gap-2">
+                <PanelIconButton
+                  label="Cancel"
+                  onClick={() => {
+                    setDraftPort(port);
+                    setIsEditingPortConfig(false);
+                  }}
+                >
+                  <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
+                    <path d="m4.5 4.5 7 7" />
+                    <path d="m11.5 4.5-7 7" />
+                  </svg>
+                </PanelIconButton>
+                <PanelIconButton label="Save" tone="positive" onClick={commitPortEditing}>
+                  <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
+                    <path d="m3.5 8.5 3 3 6-7" />
+                  </svg>
+                </PanelIconButton>
               </div>
             </div>
-          </FloatingLayer>
+          </FloatingEditorCard>
         </>
       ) : (
         <>
           <span ref={labelRef} className="truncate text-right cursor-text" onDoubleClick={startEditing}>
             {port.label}
           </span>
-          <FloatingLayer anchorRef={labelRef} open={isEditing} placement="bottom-end">
-            <div className="w-[220px] rounded-[16px] border border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.98)] p-2 shadow-[0_14px_32px_rgba(60,41,20,0.14)]">
-              <Input
-                className="h-9 text-right"
-                value={draftLabel}
-                autoFocus
-                onChange={(event) => setDraftLabel(event.target.value)}
-                onBlur={commitEditing}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") commitEditing();
-                  if (event.key === "Escape") {
-                    setDraftLabel(port.label);
-                    setIsEditing(false);
-                  }
+          <FloatingEditorCard
+            anchorRef={labelRef}
+            open={isEditing}
+            placement="bottom-end"
+            title="Edit Port Name"
+            widthClassName="w-[320px]"
+          >
+            <Input
+              className="h-11 text-left"
+              value={draftLabel}
+              autoFocus
+              onChange={(event) => setDraftLabel(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") commitEditing();
+                if (event.key === "Escape") {
+                  setDraftLabel(port.label);
+                  setIsEditing(false);
+                }
+              }}
+            />
+            <div className="flex items-center justify-end gap-2">
+              <PanelIconButton
+                label="Cancel"
+                onClick={() => {
+                  setDraftLabel(port.label);
+                  setIsEditing(false);
                 }}
-              />
+              >
+                <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
+                  <path d="m4.5 4.5 7 7" />
+                  <path d="m11.5 4.5-7 7" />
+                </svg>
+              </PanelIconButton>
+              <PanelIconButton label="Save" tone="positive" onClick={commitEditing}>
+                <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
+                  <path d="m3.5 8.5 3 3 6-7" />
+                </svg>
+              </PanelIconButton>
             </div>
-          </FloatingLayer>
-          <FloatingLayer anchorRef={labelRef} open={isEditingPortConfig} placement="bottom-end">
-            <div className="w-[260px] rounded-[16px] border border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.98)] p-3 shadow-[0_14px_32px_rgba(60,41,20,0.14)]">
-              <div className="grid gap-3">
-                <label className="grid gap-1 text-xs text-[var(--muted)]">
-                  <span>Key</span>
-                  <Input value={draftPort.key} onChange={(event) => setDraftPort((current) => ({ ...current, key: event.target.value }))} />
-                </label>
-                <label className="grid gap-1 text-xs text-[var(--muted)]">
-                  <span>Label</span>
-                  <Input value={draftPort.label} onChange={(event) => setDraftPort((current) => ({ ...current, label: event.target.value }))} />
-                </label>
-                <label className="grid gap-1 text-xs text-[var(--muted)]">
-                  <span>Value Type</span>
-                  <select
-                    className="rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3 py-2 text-[var(--text)]"
-                    value={draftPort.valueType}
-                    onChange={(event) => setDraftPort((current) => ({ ...current, valueType: event.target.value as ValueType }))}
-                  >
-                    {VALUE_TYPE_OPTIONS.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <div className="flex items-center justify-between gap-2">
-                  <Button
-                    variant="ghost"
+          </FloatingEditorCard>
+          <FloatingEditorCard
+            anchorRef={labelRef}
+            open={isEditingPortConfig}
+            placement="bottom-end"
+            title="Edit Port"
+            widthClassName="w-[340px]"
+          >
+            <label className="grid gap-1.5 text-sm text-[var(--muted)]">
+              <span>Key</span>
+              <Input value={draftPort.key} onChange={(event) => setDraftPort((current) => ({ ...current, key: event.target.value }))} />
+            </label>
+            <label className="grid gap-1.5 text-sm text-[var(--muted)]">
+              <span>Label</span>
+              <Input value={draftPort.label} onChange={(event) => setDraftPort((current) => ({ ...current, label: event.target.value }))} />
+            </label>
+            <label className="grid gap-1.5 text-sm text-[var(--muted)]">
+              <span>Value Type</span>
+              <FieldSelect value={draftPort.valueType} onChange={(event) => setDraftPort((current) => ({ ...current, valueType: event.target.value as ValueType }))}>
+                {VALUE_TYPE_OPTIONS.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </FieldSelect>
+            </label>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                {portEditor?.onRemove ? (
+                  <PanelIconButton
+                    label="Remove"
+                    tone="danger"
                     onClick={() => {
-                      setDraftPort(port);
+                      portEditor.onRemove?.();
                       setIsEditingPortConfig(false);
                     }}
                   >
-                    Cancel
-                  </Button>
-                  <div className="flex items-center gap-2">
-                    {portEditor?.onRemove ? (
-                      <Button
-                        variant="ghost"
-                        onClick={() => {
-                          portEditor.onRemove?.();
-                          setIsEditingPortConfig(false);
-                        }}
-                      >
-                        Remove
-                      </Button>
-                    ) : null}
-                    <Button variant="ghost" onClick={commitPortEditing}>
-                      Save
-                    </Button>
-                  </div>
-                </div>
+                    <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.7">
+                      <path d="M3.5 4.5h9" />
+                      <path d="M6 4.5V3.4c0-.5.4-.9.9-.9h2.2c.5 0 .9.4.9.9v1.1" />
+                      <path d="M5.2 6.2v5.1" />
+                      <path d="M8 6.2v5.1" />
+                      <path d="M10.8 6.2v5.1" />
+                      <path d="M4.4 4.5 5 12.6c0 .5.4.9.9.9h4.2c.5 0 .9-.4.9-.9l.6-8.1" />
+                    </svg>
+                  </PanelIconButton>
+                ) : null}
+              </div>
+              <div className="flex items-center gap-2">
+                <PanelIconButton
+                  label="Cancel"
+                  onClick={() => {
+                    setDraftPort(port);
+                    setIsEditingPortConfig(false);
+                  }}
+                >
+                  <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
+                    <path d="m4.5 4.5 7 7" />
+                    <path d="m11.5 4.5-7 7" />
+                  </svg>
+                </PanelIconButton>
+                <PanelIconButton label="Save" tone="positive" onClick={commitPortEditing}>
+                  <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
+                    <path d="m3.5 8.5 3 3 6-7" />
+                  </svg>
+                </PanelIconButton>
               </div>
             </div>
-          </FloatingLayer>
+          </FloatingEditorCard>
           <Handle
             id={buildHandleId("output", port.key)}
             type="source"
@@ -1892,52 +2042,52 @@ function PortCreateButton({
         </svg>
         {side === "input" ? "input" : "output"}
       </button>
-      <FloatingLayer anchorRef={triggerRef} open={isOpen} placement={side === "input" ? "bottom-start" : "bottom-end"}>
-        <div className="w-[260px] rounded-[16px] border border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.98)] p-3 shadow-[0_14px_32px_rgba(60,41,20,0.14)]">
-          <div className="grid gap-3">
-            <label className="grid gap-1 text-xs text-[var(--muted)]">
-              <span>Key</span>
-              <Input value={draftPort.key} onChange={(event) => setDraftPort((current) => ({ ...current, key: event.target.value }))} />
-            </label>
-            <label className="grid gap-1 text-xs text-[var(--muted)]">
-              <span>Label</span>
-              <Input value={draftPort.label} onChange={(event) => setDraftPort((current) => ({ ...current, label: event.target.value }))} />
-            </label>
-            <label className="grid gap-1 text-xs text-[var(--muted)]">
-              <span>Value Type</span>
-              <select
-                className="rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3 py-2 text-[var(--text)]"
-                value={draftPort.valueType}
-                onChange={(event) => setDraftPort((current) => ({ ...current, valueType: event.target.value as ValueType }))}
-              >
-                {VALUE_TYPE_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {side === "input" ? (
-              <label className="flex items-center gap-2 text-xs text-[var(--muted)]">
-                <input
-                  checked={Boolean(draftPort.required)}
-                  type="checkbox"
-                  onChange={(event) => setDraftPort((current) => ({ ...current, required: event.target.checked }))}
-                />
-                <span>Required</span>
-              </label>
-            ) : null}
-            <div className="flex items-center justify-between gap-2">
-              <Button variant="ghost" onClick={closeEditor}>
-                Cancel
-              </Button>
-              <Button variant="ghost" onClick={commit}>
-                Create
-              </Button>
-            </div>
-          </div>
+      <FloatingEditorCard
+        anchorRef={triggerRef}
+        open={isOpen}
+        placement={side === "input" ? "bottom-start" : "bottom-end"}
+        title={`Create ${side === "input" ? "Input" : "Output"}`}
+        widthClassName="w-[340px]"
+      >
+        <label className="grid gap-1.5 text-sm text-[var(--muted)]">
+          <span>Key</span>
+          <Input value={draftPort.key} onChange={(event) => setDraftPort((current) => ({ ...current, key: event.target.value }))} />
+        </label>
+        <label className="grid gap-1.5 text-sm text-[var(--muted)]">
+          <span>Label</span>
+          <Input value={draftPort.label} onChange={(event) => setDraftPort((current) => ({ ...current, label: event.target.value }))} />
+        </label>
+        <label className="grid gap-1.5 text-sm text-[var(--muted)]">
+          <span>Value Type</span>
+          <FieldSelect value={draftPort.valueType} onChange={(event) => setDraftPort((current) => ({ ...current, valueType: event.target.value as ValueType }))}>
+            {VALUE_TYPE_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </FieldSelect>
+        </label>
+        {side === "input" ? (
+          <EditorSwitchRow
+            label="Required"
+            checked={Boolean(draftPort.required)}
+            onCheckedChange={(checked) => setDraftPort((current) => ({ ...current, required: checked }))}
+          />
+        ) : null}
+        <div className="flex items-center justify-end gap-2">
+          <PanelIconButton label="Cancel" onClick={closeEditor}>
+            <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
+              <path d="m4.5 4.5 7 7" />
+              <path d="m11.5 4.5-7 7" />
+            </svg>
+          </PanelIconButton>
+          <PanelIconButton label="Create" tone="positive" onClick={commit}>
+            <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
+              <path d="m3.5 8.5 3 3 6-7" />
+            </svg>
+          </PanelIconButton>
         </div>
-      </FloatingLayer>
+      </FloatingEditorCard>
     </div>
   );
 }
@@ -1976,6 +2126,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const deleteButtonRef = useRef<HTMLButtonElement | null>(null);
   const presetButtonRef = useRef<HTMLButtonElement | null>(null);
+  const skillPickerButtonRef = useRef<HTMLButtonElement | null>(null);
   const labelAnchorRef = useRef<HTMLDivElement | null>(null);
   const descriptionAnchorRef = useRef<HTMLDivElement | null>(null);
   const uploadedAsset = config.family === "input" ? tryParseUploadedAssetEnvelope(config.defaultValue) : null;
@@ -1987,6 +2138,12 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
           defaultAgentTemperature: data.defaultAgentTemperature,
         })
       : null;
+  const [isSkillPickerOpen, setIsSkillPickerOpen] = useState(false);
+  const attachedSkillKeys = useMemo(() => new Set((config.family === "agent" ? config.skills : []).map((skill) => skill.skillKey)), [config]);
+  const availableSkillDefinitions = useMemo(
+    () => (data.skillDefinitions ?? []).filter((definition) => !attachedSkillKeys.has(definition.skillKey)),
+    [attachedSkillKeys, data.skillDefinitions],
+  );
 
   useEffect(() => {
     setDraftLabel(config.label);
@@ -2000,6 +2157,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
     if (selected) return;
     setIsDeleteConfirmActive(false);
     setIsPresetConfirmActive(false);
+    setIsSkillPickerOpen(false);
   }, [selected]);
 
   useEffect(() => {
@@ -2279,51 +2437,88 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
               <span className="rounded-full border border-[rgba(154,52,18,0.16)] bg-[rgba(255,255,255,0.72)] px-2 py-0.5 text-[0.62rem] uppercase tracking-[0.14em] text-[var(--accent-strong)]">
                 {config.family}
               </span>
-              <div ref={labelAnchorRef} className="truncate text-sm font-semibold text-[var(--text)] cursor-text" onDoubleClick={() => setIsEditingLabel(true)}>
+              <div ref={labelAnchorRef} className="truncate cursor-text text-left text-sm font-semibold text-[var(--text)]" onDoubleClick={() => setIsEditingLabel(true)}>
                 {config.label}
               </div>
-              <FloatingLayer anchorRef={labelAnchorRef} open={isEditingLabel} placement="bottom-start">
-                <div className="w-[260px] rounded-[16px] border border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.98)] p-2 shadow-[0_14px_32px_rgba(60,41,20,0.14)]">
-                  <Input
-                    className="h-9"
-                    value={draftLabel}
-                    autoFocus
-                    onChange={(event) => setDraftLabel(event.target.value)}
-                    onBlur={commitLabelEdit}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") commitLabelEdit();
-                      if (event.key === "Escape") {
-                        setDraftLabel(config.label);
-                        setIsEditingLabel(false);
-                      }
+              <FloatingEditorCard
+                anchorRef={labelAnchorRef}
+                open={isEditingLabel}
+                placement="bottom-start"
+                title="Edit Name"
+                widthClassName="w-[360px]"
+              >
+                <Input
+                  className="h-11"
+                  value={draftLabel}
+                  autoFocus
+                  onChange={(event) => setDraftLabel(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") commitLabelEdit();
+                    if (event.key === "Escape") {
+                      setDraftLabel(config.label);
+                      setIsEditingLabel(false);
+                    }
+                  }}
+                />
+                <div className="flex items-center justify-end gap-2">
+                  <PanelIconButton
+                    label="Cancel"
+                    onClick={() => {
+                      setDraftLabel(config.label);
+                      setIsEditingLabel(false);
                     }}
-                  />
+                  >
+                    <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
+                      <path d="m4.5 4.5 7 7" />
+                      <path d="m11.5 4.5-7 7" />
+                    </svg>
+                  </PanelIconButton>
+                  <PanelIconButton label="Save" tone="positive" onClick={commitLabelEdit}>
+                    <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
+                      <path d="m3.5 8.5 3 3 6-7" />
+                    </svg>
+                  </PanelIconButton>
                 </div>
-              </FloatingLayer>
+              </FloatingEditorCard>
             </div>
             {config.family ? (
               <div className="relative mt-1">
-                <div ref={descriptionAnchorRef} className="line-clamp-2 text-xs leading-5 text-[var(--muted)] cursor-text" onDoubleClick={() => setIsEditingDescription(true)}>
+                <div ref={descriptionAnchorRef} className="line-clamp-2 cursor-text text-left text-xs leading-5 text-[var(--muted)]" onDoubleClick={() => setIsEditingDescription(true)}>
                   {config.description || summarizeNode(config)}
                 </div>
-                <FloatingLayer anchorRef={descriptionAnchorRef} open={isEditingDescription} placement="bottom-start">
-                  <div className="w-[320px] rounded-[16px] border border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.98)] p-2 shadow-[0_14px_32px_rgba(60,41,20,0.14)]">
-                    <Input
-                      className="h-9"
-                      value={draftDescription}
-                      autoFocus
-                      onChange={(event) => setDraftDescription(event.target.value)}
-                      onBlur={commitDescriptionEdit}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") commitDescriptionEdit();
-                        if (event.key === "Escape") {
-                          setDraftDescription(config.description);
-                          setIsEditingDescription(false);
-                        }
+                <FloatingEditorCard
+                  anchorRef={descriptionAnchorRef}
+                  open={isEditingDescription}
+                  placement="bottom-start"
+                  title="Edit Description"
+                  widthClassName="w-[420px]"
+                >
+                  <FieldTextarea
+                    rows={6}
+                    value={draftDescription}
+                    autoFocus
+                    onChange={(event) => setDraftDescription(event.target.value)}
+                  />
+                  <div className="flex items-center justify-end gap-2">
+                    <PanelIconButton
+                      label="Cancel"
+                      onClick={() => {
+                        setDraftDescription(config.description);
+                        setIsEditingDescription(false);
                       }}
-                    />
+                    >
+                      <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
+                        <path d="m4.5 4.5 7 7" />
+                        <path d="m11.5 4.5-7 7" />
+                      </svg>
+                    </PanelIconButton>
+                    <PanelIconButton label="Save" tone="positive" onClick={commitDescriptionEdit}>
+                      <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
+                        <path d="m3.5 8.5 3 3 6-7" />
+                      </svg>
+                    </PanelIconButton>
                   </div>
-                </FloatingLayer>
+                </FloatingEditorCard>
               </div>
             ) : null}
           </div>
@@ -2525,7 +2720,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
               <div className="flex flex-1 flex-col gap-2">
                 {config.valueType === "knowledge_base" ? (
                   (data.knowledgeBases ?? []).length > 0 ? (
-                    <select
+                    <FieldSelect
                       value={config.defaultValue}
                       onChange={(event) =>
                         data.onConfigChange?.((currentConfig) => ({
@@ -2538,24 +2733,24 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                       {(data.knowledgeBases ?? []).map((kb) => (
                         <option key={kb.name} value={kb.name}>{kb.name}</option>
                       ))}
-                    </select>
+                    </FieldSelect>
                   ) : (
                     <div className="grid min-h-[60px] place-items-center rounded-[16px] border border-dashed border-[rgba(154,52,18,0.18)] bg-[rgba(255,255,255,0.82)] px-4 py-4 text-center text-sm text-[var(--muted)]">
                       No knowledge bases found
                     </div>
                   )
                 ) : config.valueType === "text" || config.valueType === "json" ? (
-                  <textarea
+                  <FieldTextarea
                     value={config.defaultValue}
                     rows={5}
                     placeholder={config.placeholder}
                     onChange={(event) =>
                       data.onConfigChange?.((currentConfig) => ({
-                        ...(currentConfig as InputBoundaryNode),
-                        defaultValue: event.target.value,
+                          ...(currentConfig as InputBoundaryNode),
+                          defaultValue: event.target.value,
                       }))
                     }
-                    className="min-h-[160px] h-full flex-1 resize-none rounded-[16px] border border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.88)] px-3 py-3 text-sm text-[var(--text)]"
+                    className="min-h-[160px] h-full flex-1"
                   />
                 ) : (
                   <>
@@ -2650,54 +2845,39 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
               {/* ── action buttons row: +skill, +input, +output ── */}
               <div className="flex items-center gap-1.5">
                 {/* +skill button */}
-                {(() => {
-                  const attachedKeys = new Set(config.skills.map((s) => s.skillKey));
-                  const available = (data.skillDefinitions ?? []).filter((d) => !attachedKeys.has(d.skillKey));
-                  if (!available.length) return null;
-                  return (
-                    <div className="relative">
-                      <button
-                        type="button"
-                        className="inline-flex items-center gap-1 rounded-full border border-dashed border-[rgba(37,99,235,0.24)] bg-[rgba(239,246,255,0.5)] px-2.5 py-0.5 text-[0.68rem] font-medium text-[#2563eb] transition hover:bg-[rgba(239,246,255,0.9)]"
-                        onClick={(event) => {
-                          const button = event.currentTarget;
-                          const menu = button.nextElementSibling as HTMLElement | null;
-                          if (menu) menu.classList.toggle("hidden");
-                        }}
-                      >
-                        <svg viewBox="0 0 16 16" className="h-3 w-3 fill-none stroke-current" strokeWidth="1.8">
-                          <path d="M8 3.5v9M3.5 8h9" />
-                        </svg>
-                        skill
-                      </button>
-                      <div className="hidden absolute left-0 top-full z-50 mt-1 min-w-[200px] rounded-[14px] border border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.98)] py-1 shadow-[0_14px_32px_rgba(60,41,20,0.14)]">
-                        {available.map((def) => (
-                          <button
-                            key={def.skillKey}
-                            type="button"
-                            className="flex w-full items-start gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-[rgba(154,52,18,0.06)]"
-                            onClick={(event) => {
-                              data.onConfigChange?.((currentConfig) => ({
-                                ...(currentConfig as AgentNode),
-                                skills: [
-                                  ...(currentConfig as AgentNode).skills,
-                                  { name: def.skillKey, skillKey: def.skillKey, inputMapping: {}, contextBinding: {}, usage: "optional" as const },
-                                ],
-                              }));
-                              const menu = (event.currentTarget.parentElement) as HTMLElement | null;
-                              if (menu) menu.classList.add("hidden");
-                            }}
-                          >
-                            <div className="min-w-0">
-                              <div className="font-medium text-[var(--text)]">{def.label}</div>
-                              <div className="line-clamp-1 text-xs text-[var(--muted)]">{def.description}</div>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })()}
+                {availableSkillDefinitions.length > 0 || data.skillDefinitionsLoading || data.skillDefinitionsError ? (
+                  <>
+                    <button
+                      ref={skillPickerButtonRef}
+                      type="button"
+                      className="inline-flex items-center gap-1 rounded-full border border-dashed border-[rgba(37,99,235,0.24)] bg-[rgba(239,246,255,0.5)] px-2.5 py-0.5 text-[0.68rem] font-medium text-[#2563eb] transition hover:bg-[rgba(239,246,255,0.9)]"
+                      onClick={() => setIsSkillPickerOpen((current) => !current)}
+                    >
+                      <svg viewBox="0 0 16 16" className="h-3 w-3 fill-none stroke-current" strokeWidth="1.8">
+                        <path d="M8 3.5v9M3.5 8h9" />
+                      </svg>
+                      skill
+                    </button>
+                    <SkillPickerPanel
+                      anchorRef={skillPickerButtonRef}
+                      open={isSkillPickerOpen}
+                      definitions={availableSkillDefinitions}
+                      loading={Boolean(data.skillDefinitionsLoading)}
+                      error={data.skillDefinitionsError ?? null}
+                      onClose={() => setIsSkillPickerOpen(false)}
+                      onPick={(definition) => {
+                        data.onConfigChange?.((currentConfig) => ({
+                          ...(currentConfig as AgentNode),
+                          skills: [
+                            ...(currentConfig as AgentNode).skills,
+                            { name: definition.skillKey, skillKey: definition.skillKey, inputMapping: {}, contextBinding: {}, usage: "optional" as const },
+                          ],
+                        }));
+                        setIsSkillPickerOpen(false);
+                      }}
+                    />
+                  </>
+                ) : null}
                 {/* +input button */}
                 <PortCreateButton
                   side="input"
@@ -2745,8 +2925,8 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                   })}
                 </div>
               ) : null}
-              <textarea
-                className="min-h-20 rounded-[16px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 text-sm text-[var(--text)]"
+              <FieldTextarea
+                className="min-h-20"
                 value={config.taskInstruction}
                 placeholder="描述这个节点应该做什么（可留空）"
                 onChange={(event) => data.onConfigChange?.((currentConfig) => ({ ...(currentConfig as AgentNode), taskInstruction: event.target.value }))}
@@ -2756,29 +2936,6 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                 <div className="mt-2 grid gap-3">
                   {agentRuntime ? (
                     <>
-                      <div className="grid grid-cols-2 gap-3">
-                        <label className="grid gap-1.5">
-                          <span>Model Source</span>
-                          <select className="rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3 py-2 text-[var(--text)]" value={agentRuntime.modelSource} onChange={(event) => data.onConfigChange?.((currentConfig) => ({ ...(currentConfig as AgentNode), modelSource: event.target.value as AgentModelSource }))}>
-                            <option value="global">global</option>
-                            <option value="override">override</option>
-                          </select>
-                        </label>
-                        <label className="grid gap-1.5">
-                          <span>Thinking</span>
-                          <select className="rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3 py-2 text-[var(--text)]" value={agentRuntime.resolvedThinking ? "on" : "off"} onChange={(event) => data.onConfigChange?.((currentConfig) => ({ ...(currentConfig as AgentNode), thinkingMode: event.target.value as AgentThinkingMode }))}>
-                            <option value="off">off</option>
-                            <option value="on">on</option>
-                          </select>
-                        </label>
-                      </div>
-                      {agentRuntime.modelSource === "override" ? (
-                        <label className="grid gap-1.5">
-                          <span>Model Ref</span>
-                          <Input list={`model-ref-options-${data.nodeId}`} value={agentRuntime.model} placeholder={agentRuntime.globalTextModelRef} onChange={(event) => data.onConfigChange?.((currentConfig) => ({ ...(currentConfig as AgentNode), model: event.target.value }))} />
-                          <datalist id={`model-ref-options-${data.nodeId}`}>{(data.availableModelRefs ?? []).map((modelRef) => (<option key={modelRef} value={modelRef} />))}</datalist>
-                        </label>
-                      ) : null}
                       <label className="grid gap-1.5">
                         <span>Temperature</span>
                         <Input type="number" min={0} max={2} step={0.1} value={String(agentRuntime.temperature)} onChange={(event) => { const v = event.target.value === "" ? DEFAULT_AGENT_TEMPERATURE : Number(event.target.value); if (Number.isFinite(v)) data.onConfigChange?.((currentConfig) => ({ ...(currentConfig as AgentNode), temperature: normalizeAgentTemperature(v) })); }} />
@@ -2805,8 +2962,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                   />
                   <label className="grid gap-1.5 text-sm text-[var(--muted)]">
                     <span>Condition Mode</span>
-                    <select
-                      className="rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.82)] px-3 py-3 text-[var(--text)]"
+                    <FieldSelect
                       value={config.conditionMode}
                       onChange={(event) =>
                         data.onConfigChange?.((currentConfig) => ({ ...(currentConfig as ConditionNode), conditionMode: event.target.value as ConditionNode["conditionMode"] }))
@@ -2817,7 +2973,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                           {option}
                         </option>
                       ))}
-                    </select>
+                    </FieldSelect>
                   </label>
                   <RuleEditor
                     rule={config.rule}

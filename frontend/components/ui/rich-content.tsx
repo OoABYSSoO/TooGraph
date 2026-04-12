@@ -149,6 +149,25 @@ function CopyTextButton({ text, label = "复制", className }: { text: string; l
   );
 }
 
+function CopyActionRow({
+  text,
+  label = "复制",
+  leading,
+  className,
+}: {
+  text: string;
+  label?: string;
+  leading?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex items-center gap-3", leading ? "justify-between" : "justify-end", className)}>
+      {leading ? <div className="min-w-0">{leading}</div> : null}
+      <CopyTextButton text={text} label={label} />
+    </div>
+  );
+}
+
 function JsonViewer({ text, className }: { text: string; className?: string }) {
   let formatted = text;
   try {
@@ -217,11 +236,16 @@ function JsonViewer({ text, className }: { text: string; className?: string }) {
 function MarkdownCodeBlock({ code, language }: { code: string; language?: string }) {
   return (
     <div className="my-4 overflow-hidden rounded-xl border border-[#d0d7de] bg-[#f6f8fa]">
-      <div className="flex items-center justify-between border-b border-[#d8dee4] bg-[#f6f8fa] px-3 py-2">
-        <span className="text-[0.68rem] font-medium uppercase tracking-[0.12em] text-[#57606a]">
-          {language ? language : "code"}
-        </span>
-        <CopyTextButton text={code} label="复制代码" />
+      <div className="border-b border-[#d8dee4] bg-[#f6f8fa] px-3 py-2">
+        <CopyActionRow
+          text={code}
+          label="复制代码"
+          leading={
+            <span className="text-[0.68rem] font-medium uppercase tracking-[0.12em] text-[#57606a]">
+              {language ? language : "code"}
+            </span>
+          }
+        />
       </div>
       <pre className="!m-0 rounded-none border-0 bg-transparent px-4 py-3">
         <code className={language ? `language-${language}` : undefined}>{code}</code>
@@ -305,9 +329,7 @@ export function RichContent({ text, displayMode = "auto", className, empty, copy
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex justify-end">
-        <CopyTextButton text={copyText ?? text} />
-      </div>
+      <CopyActionRow text={copyText ?? text} />
       <div>{content}</div>
     </div>
   );
