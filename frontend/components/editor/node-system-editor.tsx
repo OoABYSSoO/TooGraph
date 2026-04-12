@@ -1117,9 +1117,36 @@ function OutputPreviewContent({ text, displayMode }: { text: string; displayMode
   const resolved = resolveDisplayMode(displayMode, text);
 
   if (resolved === "json") {
+    let formatted = text;
+    try {
+      const parsed = JSON.parse(text);
+      formatted = JSON.stringify(parsed, null, 2);
+    } catch { /* keep original */ }
     return (
       <pre className="whitespace-pre-wrap break-words font-mono text-[0.82rem] leading-6">
-        <code>{text}</code>
+        <code>
+          {formatted.split("\n").map((line, i) => (
+            <span key={i}>
+              {i > 0 && "\n"}
+              {line.split(/("(?:[^"\\]|\\.)*")\s*(:?)/).map((part, j) => {
+                if (j % 3 === 1) {
+                  // string token
+                  const isKey = line.split(/("(?:[^"\\]|\\.)*")\s*(:?)/)[j + 1] === ":";
+                  return <span key={j} className={isKey ? "text-[#9a3412]" : "text-[#16a34a]"}>{part}</span>;
+                }
+                // numbers, booleans, null
+                return part.split(/\b(true|false|null|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\b/).map((token, k) => {
+                  if (k % 2 === 1) {
+                    if (token === "true" || token === "false") return <span key={`${j}-${k}`} className="text-[#2563eb]">{token}</span>;
+                    if (token === "null") return <span key={`${j}-${k}`} className="text-[#64748b]">{token}</span>;
+                    return <span key={`${j}-${k}`} className="text-[#d97706]">{token}</span>;
+                  }
+                  return <span key={`${j}-${k}`}>{token}</span>;
+                });
+              })}
+            </span>
+          ))}
+        </code>
       </pre>
     );
   }
