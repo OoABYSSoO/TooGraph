@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import threading
 from typing import Any
 
@@ -8,7 +9,7 @@ from pydantic import ValidationError
 
 from app.core.compiler.validator import validate_graph
 from app.core.runtime.node_system_executor import execute_node_system_graph
-from app.core.runtime.state import create_initial_run_state
+from app.core.runtime.state import create_initial_run_state, utc_now_iso
 from app.core.schemas.node_system import (
     GraphSaveResponse,
     GraphValidationResponse,
@@ -18,6 +19,7 @@ from app.core.schemas.node_system import (
 from app.core.storage.graph_store import list_graphs, load_graph, save_graph
 from app.core.storage.run_store import save_run
 
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/graphs", tags=["graphs"])
 
@@ -108,5 +110,9 @@ def run_graph_endpoint(payload: dict[str, Any]) -> dict[str, str]:
 def _run_graph_worker(graph: NodeSystemGraphDocument, run_state: dict[str, Any]) -> None:
     try:
         execute_node_system_graph(graph, run_state, persist_progress=True)
-    except Exception:
-        pass
+    except Exception as exc:  # pragma: no cover - defensive runtime path
+        logger.exception("Graph run %s failed: %s", run_state.get("run_id"), exc)
+        run_state["status"] = "failed"
+        run_state["completed_at"] = utc_now_iso()
+        run_state.setdefault("errors", []).append(str(exc))
+        save_run(run_state)
