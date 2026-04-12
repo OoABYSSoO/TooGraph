@@ -21,10 +21,11 @@ def _create_default_node_system_graph(theme_preset: dict[str, Any]) -> dict[str,
         "theme_config": theme_preset["theme_config"],
         "state_schema": get_hello_world_state_schema(),
         "nodes": [
+            # ── Column 1: Inputs ──
             {
                 "id": "input_1",
                 "type": "default",
-                "position": {"x": 80, "y": 160},
+                "position": {"x": 80, "y": 120},
                 "data": {
                     "nodeId": "input_1",
                     "config": {
@@ -67,16 +68,17 @@ def _create_default_node_system_graph(theme_preset: dict[str, Any]) -> dict[str,
                     "previewText": "",
                 },
             },
+            # ── Column 2: Agents ──
             {
                 "id": "agent_1",
                 "type": "default",
-                "position": {"x": 560, "y": 200},
+                "position": {"x": 560, "y": 80},
                 "data": {
                     "nodeId": "agent_1",
                     "config": {
                         "presetId": "preset.agent.onboarding_helper.v1",
-                        "label": "GraphiteUI Onboarding Helper",
-                        "description": "Search the official GraphiteUI knowledge base and answer onboarding questions.",
+                        "label": "Onboarding Helper",
+                        "description": "",
                         "family": "agent",
                         "inputs": [
                             {
@@ -95,7 +97,7 @@ def _create_default_node_system_graph(theme_preset: dict[str, Any]) -> dict[str,
                         "outputs": [
                             {
                                 "key": "answer",
-                                "label": "Onboarding Answer",
+                                "label": "Answer",
                                 "valueType": "text",
                             }
                         ],
@@ -108,51 +110,127 @@ def _create_default_node_system_graph(theme_preset: dict[str, Any]) -> dict[str,
                 },
             },
             {
+                "id": "agent_2",
+                "type": "default",
+                "position": {"x": 560, "y": 420},
+                "data": {
+                    "nodeId": "agent_2",
+                    "config": {
+                        "presetId": "preset.agent.markdown_formatter.v1",
+                        "label": "Markdown Formatter",
+                        "description": "使用markdown格式输出",
+                        "family": "agent",
+                        "inputs": [
+                            {
+                                "key": "text_input",
+                                "label": "Text Input",
+                                "valueType": "text",
+                                "required": True,
+                            },
+                        ],
+                        "outputs": [
+                            {
+                                "key": "formatted",
+                                "label": "Formatted",
+                                "valueType": "text",
+                            }
+                        ],
+                        "systemInstruction": "",
+                        "taskInstruction": "使用markdown格式输出",
+                        "skills": [],
+                        "outputBinding": {},
+                    },
+                    "previewText": "",
+                },
+            },
+            # ── Column 3: Outputs ──
+            {
                 "id": "output_1",
                 "type": "default",
-                "position": {"x": 1040, "y": 200},
+                "position": {"x": 1040, "y": 80},
                 "data": {
                     "nodeId": "output_1",
                     "config": {
-                        "presetId": "preset.output.onboarding_answer.v1",
-                        "label": "Onboarding Answer",
-                        "description": "Preview and optionally persist the grounded onboarding answer.",
+                        "presetId": "preset.output.raw_answer.v1",
+                        "label": "Raw Answer",
+                        "description": "Preview the raw onboarding answer.",
                         "family": "output",
                         "input": {
                             "key": "value",
-                            "label": "Onboarding Answer",
+                            "label": "Answer",
                             "valueType": "text",
                             "required": True,
                         },
                         "displayMode": "auto",
                         "persistEnabled": False,
                         "persistFormat": "auto",
-                        "fileNameTemplate": "graphiteui_onboarding_answer",
+                        "fileNameTemplate": "",
+                    },
+                    "previewText": "",
+                },
+            },
+            {
+                "id": "output_2",
+                "type": "default",
+                "position": {"x": 1040, "y": 420},
+                "data": {
+                    "nodeId": "output_2",
+                    "config": {
+                        "presetId": "preset.output.formatted_answer.v1",
+                        "label": "Formatted Answer",
+                        "description": "Preview the markdown-formatted answer.",
+                        "family": "output",
+                        "input": {
+                            "key": "value",
+                            "label": "Formatted",
+                            "valueType": "text",
+                            "required": True,
+                        },
+                        "displayMode": "auto",
+                        "persistEnabled": False,
+                        "persistFormat": "auto",
+                        "fileNameTemplate": "",
                     },
                     "previewText": "",
                 },
             },
         ],
         "edges": [
+            # Input → Agents
             {
-                "id": "edge_1",
+                "id": "edge_q_agent1",
                 "source": "input_1",
                 "target": "agent_1",
                 "sourceHandle": "output:question",
                 "targetHandle": "input:question",
             },
             {
-                "id": "edge_kb",
+                "id": "edge_kb_agent1",
                 "source": "input_kb",
                 "target": "agent_1",
                 "sourceHandle": "output:knowledge_base",
                 "targetHandle": "input:knowledge_base",
             },
             {
-                "id": "edge_2",
+                "id": "edge_agent1_agent2",
+                "source": "agent_1",
+                "target": "agent_2",
+                "sourceHandle": "output:answer",
+                "targetHandle": "input:text_input",
+            },
+            # Agents → Outputs
+            {
+                "id": "edge_agent1_out1",
                 "source": "agent_1",
                 "target": "output_1",
                 "sourceHandle": "output:answer",
+                "targetHandle": "input:value",
+            },
+            {
+                "id": "edge_agent2_out2",
+                "source": "agent_2",
+                "target": "output_2",
+                "sourceHandle": "output:formatted",
                 "targetHandle": "input:value",
             },
         ],
