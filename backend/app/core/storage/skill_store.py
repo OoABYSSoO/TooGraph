@@ -8,7 +8,7 @@ from app.core.storage.database import get_connection
 
 
 ROOT_DIR = Path(__file__).resolve().parents[4]
-GRAPHITE_SKILLS_DIR = ROOT_DIR / ".graphite" / "skills"
+GRAPHITE_SKILLS_DIR = ROOT_DIR / "skill"
 
 
 def graphite_skill_path_for(skill_key: str, source_format: SkillSourceFormat) -> Path:

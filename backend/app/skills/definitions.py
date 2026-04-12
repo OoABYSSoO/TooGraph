@@ -28,7 +28,6 @@ CLAUDE_EXTERNAL_DIRS = [
     HOME_DIR / ".claude" / "skills",
 ]
 OPENCLAW_EXTERNAL_DIRS = [
-    ROOT_DIR / "skills",
     ROOT_DIR / ".agents" / "skills",
     HOME_DIR / ".agents" / "skills",
     HOME_DIR / ".openclaw" / "skills",
