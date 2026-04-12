@@ -253,7 +253,7 @@ def _execute_node(node: NodeSystemGraphNode, input_values: dict[str, Any], state
                     state_key=config.input.key,
                     value=value,
                     persist_format=config.persist_format.value,
-                    file_name_template=config.file_name_template,
+                    file_name_template=config.file_name_template or config.label or config.input.key,
                 )
             )
         return {

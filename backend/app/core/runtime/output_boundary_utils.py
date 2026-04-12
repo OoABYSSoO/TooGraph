@@ -45,7 +45,8 @@ def detect_format(value: Any) -> str:
 def resolve_format(persist_format: str, value: Any) -> str:
     """Resolve persist format: 'auto' detects from content, otherwise uses the specified format."""
     if persist_format == "auto":
-        return detect_format(value)
+        detected = detect_format(value)
+        return {"plain": "txt", "markdown": "md", "json": "json"}.get(detected, "txt")
     return persist_format if persist_format in {"txt", "md", "json"} else "txt"
 
 
