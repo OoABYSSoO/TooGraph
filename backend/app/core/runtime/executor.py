@@ -1,34 +1,49 @@
 from __future__ import annotations
 
+from copy import deepcopy
+
 from app.core.compiler.graph_parser import parse_graph
 from app.core.compiler.workflow_builder import build_workflow
 from app.core.runtime.node_system_executor import execute_node_system_graph
 from app.core.runtime.state import create_initial_run_state, utc_now_iso
 from app.core.schemas.graph_family import AnyGraphDocument
-from app.core.schemas.graph import GraphDocument
 from app.core.schemas.node_system import NodeSystemGraphDocument
 from app.core.storage.run_store import save_run
 
 
-def execute_graph(graph: AnyGraphDocument) -> dict:
-    if isinstance(graph, NodeSystemGraphDocument):
-        return execute_node_system_graph(graph)
-    workflow_config = parse_graph(graph)
-    app = build_workflow(workflow_config)
+def prepare_graph_run(graph: AnyGraphDocument) -> dict:
     initial_state = create_initial_run_state(
         graph_id=graph.graph_id,
         graph_name=graph.name,
         max_revision_round=int(graph.metadata.get("max_revision_round", 1)),
     )
-    initial_state["status"] = "running"
     initial_state["theme_config"] = graph.theme_config.model_dump(mode="json")
     initial_state["node_status_map"] = {node.id: "idle" for node in graph.nodes}
-    result = app.invoke(initial_state)
+    return initial_state
+
+
+def execute_graph(
+    graph: AnyGraphDocument,
+    initial_state: dict | None = None,
+    *,
+    persist_progress: bool = False,
+) -> dict:
+    if isinstance(graph, NodeSystemGraphDocument):
+        return execute_node_system_graph(graph, initial_state=initial_state, persist_progress=persist_progress)
+    workflow_config = parse_graph(graph)
+    app = build_workflow(workflow_config)
+    run_state = deepcopy(initial_state) if initial_state is not None else prepare_graph_run(graph)
+    run_state["status"] = "running"
+    run_state["started_at"] = utc_now_iso()
+    if persist_progress:
+        save_run(run_state)
+    result = app.invoke(run_state)
 
     final_status = result.get("status", "completed")
     if final_status != "failed":
         final_status = "completed"
     result["status"] = final_status
+    result["current_node_id"] = None if final_status == "completed" else result.get("current_node_id")
     result["completed_at"] = result.get("completed_at") or utc_now_iso()
     result["knowledge_summary"] = " | ".join(result.get("retrieved_knowledge", [])[:3])
     result["memory_summary"] = " | ".join(result.get("matched_memories", [])[:3])
@@ -76,6 +91,27 @@ def execute_graph(graph: AnyGraphDocument) -> dict:
     }
     save_run(result)
     return result
+
+
+def execute_graph_safely(
+    graph: AnyGraphDocument,
+    initial_state: dict | None = None,
+    *,
+    persist_progress: bool = False,
+) -> dict:
+    run_state = deepcopy(initial_state) if initial_state is not None else prepare_graph_run(graph)
+    try:
+        return execute_graph(graph, initial_state=run_state, persist_progress=persist_progress)
+    except Exception as exc:  # pragma: no cover - defensive runtime path
+        run_state["status"] = "failed"
+        run_state["completed_at"] = utc_now_iso()
+        run_state["errors"] = [*run_state.get("errors", []), str(exc)]
+        run_state["duration_ms"] = _calculate_duration_ms(
+            run_state.get("started_at"),
+            run_state.get("completed_at"),
+        )
+        save_run(run_state)
+        return run_state
 
 
 def _calculate_duration_ms(started_at: str | None, completed_at: str | None) -> int | None:

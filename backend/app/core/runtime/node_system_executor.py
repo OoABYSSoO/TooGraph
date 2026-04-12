@@ -28,16 +28,20 @@ from app.tools.local_llm import (
 )
 
 
-def execute_node_system_graph(graph: NodeSystemGraphDocument) -> dict[str, Any]:
-    started_at = utc_now_iso()
+def execute_node_system_graph(
+    graph: NodeSystemGraphDocument,
+    initial_state: dict[str, Any] | None = None,
+    *,
+    persist_progress: bool = False,
+) -> dict[str, Any]:
     started_perf = time.perf_counter()
-    state = create_initial_run_state(
+    state = initial_state or create_initial_run_state(
         graph_id=graph.graph_id,
         graph_name=graph.name,
         max_revision_round=int(graph.metadata.get("max_revision_round", 1)),
     )
     state["status"] = "running"
-    state["started_at"] = started_at
+    state["started_at"] = utc_now_iso()
     state["theme_config"] = graph.theme_config.model_dump(mode="json")
     state["node_status_map"] = {node.id: "idle" for node in graph.nodes}
 
@@ -46,6 +50,8 @@ def execute_node_system_graph(graph: NodeSystemGraphDocument) -> dict[str, Any]:
     execution_order = _topological_order(graph.nodes, graph.edges)
     node_outputs: dict[str, dict[str, Any]] = {}
     active_edge_ids: set[str] = set()
+    if persist_progress:
+        _persist_run_progress(state, node_outputs, active_edge_ids, started_perf=started_perf)
 
     for node_id in execution_order:
         node = nodes_by_id[node_id]
@@ -58,6 +64,8 @@ def execute_node_system_graph(graph: NodeSystemGraphDocument) -> dict[str, Any]:
         node_started_perf = time.perf_counter()
         state["current_node_id"] = node_id
         state["node_status_map"][node_id] = "running"
+        if persist_progress:
+            _persist_run_progress(state, node_outputs, active_edge_ids, started_perf=started_perf)
 
         try:
             input_values = _resolve_input_values(incoming_for_node, node_outputs, active_edge_ids)
@@ -100,6 +108,8 @@ def execute_node_system_graph(graph: NodeSystemGraphDocument) -> dict[str, Any]:
                     "errors": [],
                 },
             ]
+            if persist_progress:
+                _persist_run_progress(state, node_outputs, active_edge_ids, started_perf=started_perf)
         except Exception as exc:  # pragma: no cover - defensive runtime path
             duration_ms = int((time.perf_counter() - node_started_perf) * 1000)
             state["node_status_map"][node_id] = "failed"
@@ -121,11 +131,37 @@ def execute_node_system_graph(graph: NodeSystemGraphDocument) -> dict[str, Any]:
                     "errors": [str(exc)],
                 },
             ]
+            if persist_progress:
+                _persist_run_progress(state, node_outputs, active_edge_ids, started_perf=started_perf)
             break
 
     if state.get("status") != "failed":
         state["status"] = "completed"
+        state["current_node_id"] = None
     state["completed_at"] = utc_now_iso()
+    _refresh_run_artifacts(state, node_outputs, active_edge_ids, started_perf=started_perf)
+    save_run(state)
+    return state
+
+
+def _persist_run_progress(
+    state: dict[str, Any],
+    node_outputs: dict[str, dict[str, Any]],
+    active_edge_ids: set[str],
+    *,
+    started_perf: float,
+) -> None:
+    _refresh_run_artifacts(state, node_outputs, active_edge_ids, started_perf=started_perf)
+    save_run(state)
+
+
+def _refresh_run_artifacts(
+    state: dict[str, Any],
+    node_outputs: dict[str, dict[str, Any]],
+    active_edge_ids: set[str],
+    *,
+    started_perf: float,
+) -> None:
     state["duration_ms"] = max(int((time.perf_counter() - started_perf) * 1000), 0)
     exported_outputs = [
         {
@@ -166,8 +202,6 @@ def execute_node_system_graph(graph: NodeSystemGraphDocument) -> dict[str, Any]:
         "final_result": state.get("final_result", ""),
         "active_edge_ids": sorted(active_edge_ids),
     }
-    save_run(state)
-    return state
 
 
 def _index_edges(edges: list[NodeSystemGraphEdge]) -> tuple[dict[str, list[NodeSystemGraphEdge]], dict[str, list[NodeSystemGraphEdge]]]:

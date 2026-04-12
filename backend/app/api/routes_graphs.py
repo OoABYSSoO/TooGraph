@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import threading
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import ValidationError
 
 from app.core.compiler.validator import validate_graph
-from app.core.runtime.executor import execute_graph
+from app.core.runtime.executor import execute_graph_safely, prepare_graph_run
 from app.core.schemas.graph_family import (
     AnyGraphDocument,
     parse_graph_payload,
@@ -15,6 +16,7 @@ from app.core.schemas.graph_family import (
 )
 from app.core.schemas.graph import GraphSaveResponse, GraphValidationResponse
 from app.core.storage.graph_store import list_graphs, load_graph, save_graph
+from app.core.storage.run_store import save_run
 
 
 router = APIRouter(prefix="/api/graphs", tags=["graphs"])
@@ -78,5 +80,14 @@ def run_graph_endpoint(payload: dict[str, Any]) -> dict[str, str]:
         raise HTTPException(status_code=422, detail=validation.model_dump())
 
     executed_graph = save_graph(graph_payload)
-    run_result = execute_graph(executed_graph)
-    return {"run_id": run_result["run_id"], "status": run_result["status"]}
+    run_state = prepare_graph_run(executed_graph)
+    save_run(run_state)
+
+    worker = threading.Thread(
+        target=execute_graph_safely,
+        args=(executed_graph, run_state),
+        kwargs={"persist_progress": True},
+        daemon=True,
+    )
+    worker.start()
+    return {"run_id": run_state["run_id"], "status": run_state["status"]}

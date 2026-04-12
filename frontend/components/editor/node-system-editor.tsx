@@ -105,6 +105,8 @@ type FlowNodeData = {
   config: NodePresetDefinition;
   previewText: string;
   resolvedDisplayMode?: string;
+  executionStatus?: RunNodeStatus;
+  isCurrentRunNode?: boolean;
   isExpanded?: boolean;
   collapsedSize?: NodeViewportSize | null;
   expandedSize?: NodeViewportSize | null;
@@ -190,6 +192,9 @@ type RunOutputPreview = {
   value?: unknown;
 };
 
+type RunStatus = "queued" | "running" | "completed" | "failed";
+type RunNodeStatus = "idle" | "running" | "success" | "failed";
+
 type RunNodeExecution = {
   node_id: string;
   status: string;
@@ -198,9 +203,11 @@ type RunNodeExecution = {
 
 type RunDetail = {
   run_id: string;
-  status: string;
+  status: RunStatus;
+  current_node_id?: string | null;
   final_result?: string | null;
   errors?: string[];
+  node_status_map?: Record<string, RunNodeStatus>;
   artifacts: {
     exported_outputs?: RunOutputPreview[];
   };
@@ -773,6 +780,44 @@ function buildNodeStyleFromState(
   };
 }
 
+function resolveNodeExecutionVisual(status?: RunNodeStatus, isCurrentRunNode?: boolean) {
+  if (status === "running") {
+    return {
+      haloClass: isCurrentRunNode ? "node-execution-halo-running-current" : "node-execution-halo-running",
+      shellClass: isCurrentRunNode ? "node-execution-shell-running-current" : "node-execution-shell-running",
+    };
+  }
+  if (status === "success") {
+    return {
+      haloClass: "node-execution-halo-success",
+      shellClass: "node-execution-shell-success",
+    };
+  }
+  if (status === "failed") {
+    return {
+      haloClass: "node-execution-halo-failed",
+      shellClass: "node-execution-shell-failed",
+    };
+  }
+  return null;
+}
+
+function summarizeRunNodeStates(nodeIds: string[], nodeStatusMap: Record<string, RunNodeStatus>) {
+  return nodeIds.reduce(
+    (counts, nodeId) => {
+      const status = nodeStatusMap[nodeId] ?? "idle";
+      counts[status] += 1;
+      return counts;
+    },
+    {
+      idle: 0,
+      running: 0,
+      success: 0,
+      failed: 0,
+    } satisfies Record<RunNodeStatus, number>,
+  );
+}
+
 function isPresetEligibleFamily(family: NodeFamily) {
   return family === "agent" || family === "condition";
 }
@@ -1057,6 +1102,7 @@ function OutputPreviewContent({ text, displayMode }: { text: string; displayMode
     <RichContent
       text={text}
       displayMode={displayMode}
+      copyable
       empty={<span className="text-[var(--muted)]">Connect an upstream output to preview/export it.</span>}
     />
   );
@@ -1918,6 +1964,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
   const outputs = listOutputPorts(config);
   const isInputNode = config.family === "input";
   const minHeight = getNodeMinHeight(config);
+  const executionVisual = resolveNodeExecutionVisual(data.executionStatus, data.isCurrentRunNode);
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [isHoveringNode, setIsHoveringNode] = useState(false);
@@ -2094,8 +2141,14 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
 
   return (
     <>
-      <div className="relative h-full" onPointerEnter={showNodeResizeHandles} onPointerLeave={hideNodeResizeHandles}>
+      <div className="relative h-full overflow-visible" onPointerEnter={showNodeResizeHandles} onPointerLeave={hideNodeResizeHandles}>
         <div className="absolute inset-[-14px]" />
+        {executionVisual ? (
+          <div
+            aria-hidden="true"
+            className={cn("pointer-events-none absolute inset-[-10px] rounded-[28px] transition-all duration-300", executionVisual.haloClass)}
+          />
+        ) : null}
         <NodeResizer
           isVisible={selected || isHoveringNode || isResizingNode}
           minWidth={160}
@@ -2115,6 +2168,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
           data-node-card="true"
           className={cn(
             "group/node relative z-10 flex h-full min-w-[160px] flex-col overflow-hidden rounded-[18px] border bg-[linear-gradient(180deg,rgba(255,250,241,0.98)_0%,rgba(248,237,219,0.96)_100%)] shadow-[0_18px_36px_rgba(60,41,20,0.1)]",
+            executionVisual?.shellClass,
             selected ? "border-[var(--accent)]" : "border-[rgba(154,52,18,0.25)]",
           )}
           onClickCapture={(event) => {
@@ -2815,7 +2869,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                   <div className="text-[0.68rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">Preview</div>
                   <div className="text-[0.68rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">{resolveRichContentDisplayMode(data.resolvedDisplayMode ?? config.displayMode, data.previewText)}</div>
                 </div>
-                <div className="min-h-[120px] flex-1 overflow-auto rounded-[12px] bg-[rgba(248,242,234,0.8)] px-3 py-3 text-sm leading-6 text-[var(--text)]">
+                <div className="nodrag nowheel min-h-[120px] flex-1 overflow-auto rounded-[12px] bg-[rgba(248,242,234,0.8)] px-3 py-3 text-sm leading-6 text-[var(--text)] select-text">
                   <OutputPreviewContent text={data.previewText} displayMode={config.displayMode} />
                 </div>
               </div>
@@ -2937,6 +2991,9 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
   const [presetsLoading, setPresetsLoading] = useState(true);
   const [presetsError, setPresetsError] = useState<string | null>(null);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
+  const [activeRunStatus, setActiveRunStatus] = useState<RunStatus | null>(null);
+  const [currentRunNodeId, setCurrentRunNodeId] = useState<string | null>(null);
+  const [runNodeStatusMap, setRunNodeStatusMap] = useState<Record<string, RunNodeStatus>>({});
   const [skillDefinitions, setSkillDefinitions] = useState<SkillDefinition[]>([]);
   const [skillDefinitionsLoading, setSkillDefinitionsLoading] = useState(true);
   const [skillDefinitionsError, setSkillDefinitionsError] = useState<string | null>(null);
@@ -3045,6 +3102,14 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
       });
   }, [creationMenu?.sourceValueType, getRecommendedPresets, search]);
 
+  const nodeIds = useMemo(() => nodes.map((node) => node.id), [nodes]);
+  const nodeLabelLookup = useMemo(
+    () => new Map(nodes.map((node) => [node.id, node.data.config.label || node.id])),
+    [nodes],
+  );
+  const runNodeSummary = useMemo(() => summarizeRunNodeStates(nodeIds, runNodeStatusMap), [nodeIds, runNodeStatusMap]);
+  const suppressOutputPreviewFallback = activeRunStatus === "queued" || activeRunStatus === "running";
+
   const previewTextByNode = useMemo(() => {
     return Object.fromEntries(nodes.map((node) => [node.id, createPreviewText(node, nodes, edges)]));
   }, [edges, nodes]);
@@ -3079,9 +3144,32 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
       ),
     [editorSettings],
   );
+  const formatRunStatusText = useCallback(
+    (run: RunDetail) => {
+      const summary = summarizeRunNodeStates(nodeIds, run.node_status_map ?? {});
+      const currentNodeLabel = run.current_node_id ? nodeLabelLookup.get(run.current_node_id) ?? run.current_node_id : null;
+      if (run.status === "queued") {
+        return `Run ${run.run_id} queued. Pending ${summary.idle} nodes.`;
+      }
+      if (run.status === "running") {
+        const currentLabelText = currentNodeLabel ? `Running ${currentNodeLabel}. ` : "";
+        return `${currentLabelText}Done ${summary.success} · Active ${summary.running} · Pending ${summary.idle} · Failed ${summary.failed}`;
+      }
+      if (run.status === "failed") {
+        const runErrors = run.errors?.filter(Boolean) ?? [];
+        const baseText = currentNodeLabel ? `Run failed at ${currentNodeLabel}.` : `Run ${run.run_id} failed.`;
+        return runErrors.length > 0 ? `${baseText} ${runErrors.join("; ")}` : baseText;
+      }
+      return `Run completed. OK ${summary.success} · Pending ${summary.idle} · Failed ${summary.failed}`;
+    },
+    [nodeIds, nodeLabelLookup],
+  );
 
   const hydrateRunResult = useCallback(
     (run: RunDetail) => {
+      setActiveRunStatus(run.status);
+      setCurrentRunNodeId(run.current_node_id ?? null);
+      setRunNodeStatusMap(run.node_status_map ?? {});
       const outputPreviewMap = new Map<string, string>();
       const resolvedDisplayModeMap = new Map<string, string>();
       for (const output of run.artifacts.exported_outputs ?? []) {
@@ -3145,36 +3233,44 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
         }),
       );
     },
-    [setNodes],
+    [setActiveRunStatus, setCurrentRunNodeId, setNodes, setRunNodeStatusMap],
   );
 
-  const loadRunResult = useCallback(
-    async (runId: string) => {
-      let latestError: Error | null = null;
-      for (let attempt = 0; attempt < 3; attempt += 1) {
-        try {
-          const run = await apiGet<RunDetail>(`/api/runs/${runId}`);
-          hydrateRunResult(run);
-          const runErrors = run.errors?.filter(Boolean) ?? [];
-          if (run.status === "failed" && runErrors.length > 0) {
-            setStatusMessage(`Run ${runId} failed: ${runErrors.join("; ")}`);
-          } else {
-            setStatusMessage(`Run ${runId} ${run.status}`);
-          }
-          return;
-        } catch (error) {
-          latestError = error instanceof Error ? error : new Error("Failed to load run detail.");
-          await new Promise((resolve) => {
-            window.setTimeout(resolve, 250 * (attempt + 1));
-          });
+  useEffect(() => {
+    if (!activeRunId) return;
+
+    let cancelled = false;
+    let pollTimer: number | null = null;
+
+    async function pollRun() {
+      try {
+        const run = await apiGet<RunDetail>(`/api/runs/${activeRunId}`);
+        if (cancelled) return;
+        hydrateRunResult(run);
+        setStatusMessage(formatRunStatusText(run));
+        if (run.status === "queued" || run.status === "running") {
+          pollTimer = window.setTimeout(() => {
+            void pollRun();
+          }, 500);
         }
+      } catch (error) {
+        if (cancelled) return;
+        setStatusMessage(error instanceof Error ? error.message : "Failed to load run detail.");
+        pollTimer = window.setTimeout(() => {
+          void pollRun();
+        }, 1000);
       }
-      if (latestError) {
-        setStatusMessage(latestError.message);
+    }
+
+    void pollRun();
+
+    return () => {
+      cancelled = true;
+      if (pollTimer !== null) {
+        window.clearTimeout(pollTimer);
       }
-    },
-    [hydrateRunResult],
-  );
+    };
+  }, [activeRunId, formatRunStatusText, hydrateRunResult]);
 
   useEffect(() => {
     let active = true;
@@ -3232,6 +3328,10 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
       ? initialGraph.edges.map((edge) => createFlowEdgeFromGraphEdge(edge, nodesById))
       : [];
     autoLayoutDoneRef.current = false;
+    setActiveRunId(null);
+    setActiveRunStatus(null);
+    setCurrentRunNodeId(null);
+    setRunNodeStatusMap({});
     setNodes(initialNodes);
     setEdges(initialEdges);
   }, [initialGraph.edges, initialGraph.nodes, setEdges, setNodes]);
@@ -3559,8 +3659,22 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
   async function handleRun() {
     try {
       const response = await apiPost<{ run_id: string; status: string }>("/api/graphs/run", buildPayload());
+      const queuedStatusMap = Object.fromEntries(nodes.map((node) => [node.id, "idle"])) as Record<string, RunNodeStatus>;
+      setRunNodeStatusMap(queuedStatusMap);
+      setActiveRunStatus(response.status as RunStatus);
+      setCurrentRunNodeId(null);
       setActiveRunId(response.run_id);
-      await loadRunResult(response.run_id);
+      setStatusMessage(`Run ${response.run_id} queued. Pending ${nodes.length} nodes.`);
+      setNodes((current) =>
+        current.map((node) => ({
+          ...node,
+          data: {
+            ...node.data,
+            previewText: node.data.config.family === "input" ? node.data.previewText : "",
+            resolvedDisplayMode: node.data.config.family === "output" ? undefined : node.data.resolvedDisplayMode,
+          },
+        })),
+      );
     } catch (error) {
       setStatusMessage(error instanceof Error ? error.message : "Failed to run graph.");
     }
@@ -3600,7 +3714,12 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
                 ...node,
                 data: {
                   ...node.data,
-                  previewText: node.data.previewText || previewTextByNode[node.id] || "",
+                  previewText:
+                    node.data.config.family === "output" && suppressOutputPreviewFallback
+                      ? node.data.previewText
+                      : node.data.previewText || previewTextByNode[node.id] || "",
+                  executionStatus: runNodeStatusMap[node.id],
+                  isCurrentRunNode: currentRunNodeId === node.id,
                   isExpanded: node.data.isExpanded,
                   collapsedSize: node.data.collapsedSize ?? null,
                   expandedSize: node.data.expandedSize ?? null,
@@ -3956,6 +4075,18 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
           <div className="pointer-events-none absolute bottom-4 left-4 z-10 max-w-[440px] rounded-[18px] border border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.92)] px-3 py-2 text-sm text-[var(--muted)] shadow-[0_14px_32px_rgba(60,41,20,0.1)]">
             <span>Status: </span>
             <span className="text-[var(--text)]">{statusMessage}</span>
+            {activeRunStatus ? (
+              <span className="ml-2 inline-flex flex-wrap items-center gap-2 text-xs">
+                <span className="rounded-full border border-[rgba(154,52,18,0.12)] bg-[rgba(255,255,255,0.72)] px-2 py-0.5 uppercase tracking-[0.12em] text-[var(--accent-strong)]">
+                  {activeRunStatus}
+                </span>
+                <span>OK {runNodeSummary.success}</span>
+                <span>Running {runNodeSummary.running}</span>
+                <span>Pending {runNodeSummary.idle}</span>
+                <span>Failed {runNodeSummary.failed}</span>
+                {currentRunNodeId ? <span>Current {nodeLabelLookup.get(currentRunNodeId) ?? currentRunNodeId}</span> : null}
+              </span>
+            ) : null}
             {activeRunId ? (
               <span className="pointer-events-auto ml-2">
                 Latest run: <a className="text-[var(--accent-strong)] underline" href={`/runs/${activeRunId}`}>{activeRunId}</a>

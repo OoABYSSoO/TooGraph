@@ -50,12 +50,18 @@ export function RunDetailClient({ runId }: { runId: string }) {
 
   useEffect(() => {
     let cancelled = false;
+    let pollTimer: number | null = null;
     async function loadRun() {
       try {
         const payload = await apiGet<RunDetail>(`/api/runs/${runId}`);
         if (!cancelled) {
           setRun(payload);
           setError(null);
+          if (payload.status === "queued" || payload.status === "running") {
+            pollTimer = window.setTimeout(() => {
+              void loadRun();
+            }, 750);
+          }
         }
       } catch (fetchError) {
         if (!cancelled) {
@@ -66,6 +72,9 @@ export function RunDetailClient({ runId }: { runId: string }) {
     loadRun();
     return () => {
       cancelled = true;
+      if (pollTimer !== null) {
+        window.clearTimeout(pollTimer);
+      }
     };
   }, [runId]);
 

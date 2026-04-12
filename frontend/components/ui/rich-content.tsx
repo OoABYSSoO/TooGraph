@@ -1,6 +1,6 @@
 "use client";
 
-import type { ComponentPropsWithoutRef, ReactNode } from "react";
+import { Children, isValidElement, useEffect, useState, type ComponentPropsWithoutRef, type ReactNode } from "react";
 
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -15,6 +15,8 @@ type RichContentProps = {
   displayMode?: string;
   className?: string;
   empty?: ReactNode;
+  copyable?: boolean;
+  copyText?: string;
 };
 
 export function formatRichContentValue(value: unknown) {
@@ -65,6 +67,88 @@ export function resolveRichContentDisplayMode(displayMode: string | undefined, t
   return detectRichContentDisplayMode(text);
 }
 
+function stringifyNodeText(node: ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") {
+    return String(node);
+  }
+
+  if (Array.isArray(node)) {
+    return node.map((item) => stringifyNodeText(item)).join("");
+  }
+
+  if (isValidElement<{ children?: ReactNode }>(node)) {
+    return stringifyNodeText(node.props.children);
+  }
+
+  return "";
+}
+
+async function writeTextToClipboard(text: string) {
+  if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  if (typeof document !== "undefined") {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "true");
+    textarea.style.position = "absolute";
+    textarea.style.left = "-9999px";
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand("copy");
+    document.body.removeChild(textarea);
+  }
+}
+
+function CopyTextButton({ text, label = "复制", className }: { text: string; label?: string; className?: string }) {
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!copied) return;
+    const timer = window.setTimeout(() => setCopied(false), 1200);
+    return () => window.clearTimeout(timer);
+  }, [copied]);
+
+  return (
+    <button
+      type="button"
+      className={cn(
+        "inline-flex h-7 w-7 items-center justify-center rounded-md border border-transparent bg-white/86 text-[#6b7280] shadow-sm transition hover:border-[#d0d7de] hover:bg-white hover:text-[#24292f]",
+        className,
+      )}
+      onPointerDown={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      }}
+      onMouseDown={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      }}
+      onClick={async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        await writeTextToClipboard(text);
+        setCopied(true);
+      }}
+      title={copied ? "已复制" : label}
+      aria-label={copied ? "已复制" : label}
+    >
+      {copied ? (
+        <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 fill-none stroke-current" strokeWidth="1.8">
+          <path d="m3.75 8.25 2.5 2.5 6-6" />
+        </svg>
+      ) : (
+        <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 fill-none stroke-current" strokeWidth="1.5">
+          <rect x="5.25" y="3.25" width="7.5" height="9.5" rx="1.5" />
+          <path d="M10.75 3V2.5A1.5 1.5 0 0 0 9.25 1h-5A1.5 1.5 0 0 0 2.75 2.5v8A1.5 1.5 0 0 0 4.25 12H4.5" />
+        </svg>
+      )}
+    </button>
+  );
+}
+
 function JsonViewer({ text, className }: { text: string; className?: string }) {
   let formatted = text;
   try {
@@ -77,7 +161,7 @@ function JsonViewer({ text, className }: { text: string; className?: string }) {
   return (
     <pre
       className={cn(
-        "overflow-x-auto whitespace-pre-wrap break-words rounded-[18px] border border-[rgba(154,52,18,0.12)] bg-[linear-gradient(180deg,rgba(255,255,255,0.95)_0%,rgba(248,242,234,0.92)_100%)] px-4 py-3.5 font-mono text-[0.82rem] leading-6 text-[var(--text)] shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]",
+        "select-text overflow-x-auto whitespace-pre-wrap break-words rounded-[18px] border border-[rgba(154,52,18,0.12)] bg-[linear-gradient(180deg,rgba(255,255,255,0.95)_0%,rgba(248,242,234,0.92)_100%)] px-4 py-3.5 font-mono text-[0.82rem] leading-6 text-[var(--text)] shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]",
         className,
       )}
     >
@@ -130,9 +214,38 @@ function JsonViewer({ text, className }: { text: string; className?: string }) {
   );
 }
 
+function MarkdownCodeBlock({ code, language }: { code: string; language?: string }) {
+  return (
+    <div className="my-4 overflow-hidden rounded-xl border border-[#d0d7de] bg-[#f6f8fa]">
+      <div className="flex items-center justify-between border-b border-[#d8dee4] bg-[#f6f8fa] px-3 py-2">
+        <span className="text-[0.68rem] font-medium uppercase tracking-[0.12em] text-[#57606a]">
+          {language ? language : "code"}
+        </span>
+        <CopyTextButton text={code} label="复制代码" />
+      </div>
+      <pre className="!m-0 rounded-none border-0 bg-transparent px-4 py-3">
+        <code className={language ? `language-${language}` : undefined}>{code}</code>
+      </pre>
+    </div>
+  );
+}
+
+function MarkdownPre({ children }: { children?: ReactNode }) {
+  const firstChild = Children.toArray(children)[0];
+  if (!isValidElement<{ className?: string; children?: ReactNode }>(firstChild)) {
+    return <pre>{children}</pre>;
+  }
+
+  const className = typeof firstChild.props.className === "string" ? firstChild.props.className : "";
+  const languageMatch = className.match(/language-([\w-]+)/);
+  const code = stringifyNodeText(firstChild.props.children).replace(/\n$/, "");
+
+  return <MarkdownCodeBlock code={code} language={languageMatch?.[1]} />;
+}
+
 export function MarkdownArticle({ text, className }: { text: string; className?: string }) {
   return (
-    <div className={cn("graphite-markdown", className)}>
+    <div className={cn("graphite-markdown select-text", className)}>
       <Markdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -159,6 +272,9 @@ export function MarkdownArticle({ text, className }: { text: string; className?:
               </div>
             );
           },
+          pre({ children }) {
+            return <MarkdownPre>{children}</MarkdownPre>;
+          },
         }}
       >
         {text}
@@ -167,20 +283,32 @@ export function MarkdownArticle({ text, className }: { text: string; className?:
   );
 }
 
-export function RichContent({ text, displayMode = "auto", className, empty }: RichContentProps) {
+export function RichContent({ text, displayMode = "auto", className, empty, copyable = false, copyText }: RichContentProps) {
   if (!text) {
     return empty ? <>{empty}</> : null;
   }
 
   const resolved = resolveRichContentDisplayMode(displayMode, text);
 
-  if (resolved === "json") {
-    return <JsonViewer text={text} className={className} />;
+  const content =
+    resolved === "json" ? (
+      <JsonViewer text={text} className={className} />
+    ) : resolved === "markdown" ? (
+      <MarkdownArticle text={text} className={className} />
+    ) : (
+      <div className={cn("select-text whitespace-pre-wrap break-words text-[0.96rem] leading-7 text-[var(--text)]", className)}>{text}</div>
+    );
+
+  if (!copyable) {
+    return content;
   }
 
-  if (resolved === "markdown") {
-    return <MarkdownArticle text={text} className={className} />;
-  }
-
-  return <div className={cn("whitespace-pre-wrap break-words text-[0.96rem] leading-7 text-[var(--text)]", className)}>{text}</div>;
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex justify-end">
+        <CopyTextButton text={copyText ?? text} />
+      </div>
+      <div>{content}</div>
+    </div>
+  );
 }
