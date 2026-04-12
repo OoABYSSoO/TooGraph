@@ -8,7 +8,7 @@
 |---|---|---|
 | Phase 1：立刻收口 | ✅ 已完成 | conditionMode 收口、StateField 统一、文档同步 |
 | Phase 2：结构与一致性 | ✅ 已完成 | worker 异常记录、共享类型统一、前端类型复用 |
-| Phase 3：Cycle-ready | 🔜 进行中 | ExecutionMode 枚举、CycleDetector、执行模式透传 |
+| Phase 3：Cycle-ready | ✅ 已完成 | ExecutionMode 枚举、CycleDetector、执行模式透传 |
 
 ---
 
