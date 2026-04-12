@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import heapq
 import json
+import logging
 import re
 import inspect
 import time
@@ -14,6 +15,7 @@ from app.core.model_catalog import get_default_text_model_ref, normalize_model_r
 from app.core.schemas.node_system import (
     AgentNodeConfig,
     ConditionNodeConfig,
+    ExecutionMode,
     InputBoundaryNodeConfig,
     NodeSystemGraphDocument,
     NodeSystemGraphEdge,
@@ -28,11 +30,49 @@ from app.tools.local_llm import (
     get_default_agent_thinking_enabled,
 )
 
+logger = logging.getLogger(__name__)
+
+
+# ─── Cycle Detection ────────────────────────────────────────────────────────────────
+
+class CycleDetector:
+    """
+    Detects cycles in a directed graph using DFS (white/gray/black coloring).
+    Call detect() to get (has_cycle, back_edges).
+    """
+
+    def __init__(self, edges: list[NodeSystemGraphEdge]) -> None:
+        self.edges = edges
+        self.graph: dict[str, list[str]] = defaultdict(list)
+        for edge in edges:
+            self.graph[edge.source].append(edge.target)
+
+    def detect(self) -> tuple[bool, list[tuple[str, str]]]:
+        WHITE, GRAY, BLACK = 0, 1, 2
+        color: dict[str, int] = defaultdict(lambda: WHITE)
+        back_edges: list[tuple[str, str]] = []
+
+        def dfs(node: str) -> None:
+            color[node] = GRAY
+            for neighbor in self.graph.get(node, []):
+                if color[neighbor] == GRAY:
+                    back_edges.append((node, neighbor))
+                elif color[neighbor] == WHITE:
+                    dfs(neighbor)
+            color[node] = BLACK
+
+        nodes = list(self.graph.keys())
+        for node in nodes:
+            if color[node] == WHITE:
+                dfs(node)
+        return len(back_edges) > 0, back_edges
+
 
 def execute_node_system_graph(
     graph: NodeSystemGraphDocument,
     initial_state: dict[str, Any] | None = None,
     *,
+    execution_mode: ExecutionMode | None = None,
     persist_progress: bool = False,
 ) -> dict[str, Any]:
     started_perf = time.perf_counter()
@@ -47,7 +87,22 @@ def execute_node_system_graph(
 
     nodes_by_id = {node.id: node for node in graph.nodes}
     incoming_edges, outgoing_edges = _index_edges(graph.edges)
-    execution_order = _topological_order(graph.nodes, graph.edges)
+
+    # Cycle detection — run before attempting topological order
+    mode = execution_mode or ExecutionMode.DAG
+    if mode == ExecutionMode.DAG:
+        has_cycle, back_edges = CycleDetector(graph.edges).detect()
+        if has_cycle:
+            back_edge_samples = [f"{s}→{t}" for s, t in back_edges[:3]]
+            logger.warning("Graph %s contains cycles (back edges: %s). DAG mode requires acyclic topology.", graph.graph_id, back_edge_samples)
+
+    try:
+        execution_order = _topological_order(graph.nodes, graph.edges)
+    except ValueError:
+        raise ValueError(
+            f"Graph '{graph.graph_id}' contains cycles and cannot be executed in DAG mode. "
+            "Use execution_mode='cycle' (planned) for cyclic graphs."
+        ) from None
     node_outputs: dict[str, dict[str, Any]] = {}
     active_edge_ids: set[str] = set()
     if persist_progress:

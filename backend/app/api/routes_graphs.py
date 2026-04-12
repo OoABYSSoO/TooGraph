@@ -9,6 +9,7 @@ from pydantic import ValidationError
 
 from app.core.compiler.validator import validate_graph
 from app.core.runtime.node_system_executor import execute_node_system_graph
+from app.core.schemas.node_system import ExecutionMode
 from app.core.runtime.state import create_initial_run_state, utc_now_iso
 from app.core.schemas.node_system import (
     GraphSaveResponse,
@@ -98,18 +99,22 @@ def run_graph_endpoint(payload: dict[str, Any]) -> dict[str, str]:
     run_state["node_status_map"] = {node.id: "idle" for node in executed_graph.nodes}
     save_run(run_state)
 
+    # Read execution_mode from metadata, defaulting to DAG
+    mode_str = executed_graph.metadata.get("execution_mode", "dag")
+    exec_mode = ExecutionMode(mode_str) if mode_str in [e.value for e in ExecutionMode] else ExecutionMode.DAG
+
     worker = threading.Thread(
         target=_run_graph_worker,
-        args=(executed_graph, run_state),
+        args=(executed_graph, run_state, exec_mode),
         daemon=True,
     )
     worker.start()
     return {"run_id": run_state["run_id"], "status": run_state["status"]}
 
 
-def _run_graph_worker(graph: NodeSystemGraphDocument, run_state: dict[str, Any]) -> None:
+def _run_graph_worker(graph: NodeSystemGraphDocument, run_state: dict[str, Any], exec_mode: ExecutionMode) -> None:
     try:
-        execute_node_system_graph(graph, run_state, persist_progress=True)
+        execute_node_system_graph(graph, run_state, execution_mode=exec_mode, persist_progress=True)
     except Exception as exc:  # pragma: no cover - defensive runtime path
         logger.exception("Graph run %s failed: %s", run_state.get("run_id"), exc)
         run_state["status"] = "failed"
