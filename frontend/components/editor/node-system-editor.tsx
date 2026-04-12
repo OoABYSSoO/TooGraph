@@ -789,13 +789,11 @@ function resolveNodeExecutionVisual(status?: RunNodeStatus, isCurrentRunNode?: b
   }
   if (status === "success") {
     return {
-      haloClass: "node-execution-halo-success",
       shellClass: "node-execution-shell-success",
     };
   }
   if (status === "failed") {
     return {
-      haloClass: "node-execution-halo-failed",
       shellClass: "node-execution-shell-failed",
     };
   }
@@ -2143,10 +2141,10 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
     <>
       <div className="relative h-full overflow-visible" onPointerEnter={showNodeResizeHandles} onPointerLeave={hideNodeResizeHandles}>
         <div className="absolute inset-[-14px]" />
-        {executionVisual ? (
+        {executionVisual?.haloClass ? (
           <div
             aria-hidden="true"
-            className={cn("pointer-events-none absolute inset-[-10px] rounded-[28px] transition-all duration-300", executionVisual.haloClass)}
+            className={cn("pointer-events-none absolute inset-[-6px] rounded-[24px] transition-all duration-300", executionVisual.haloClass)}
           />
         ) : null}
         <NodeResizer

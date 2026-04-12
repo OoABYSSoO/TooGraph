@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import heapq
 import json
 import re
 import inspect
@@ -214,25 +215,64 @@ def _index_edges(edges: list[NodeSystemGraphEdge]) -> tuple[dict[str, list[NodeS
 
 
 def _topological_order(nodes: list[NodeSystemGraphNode], edges: list[NodeSystemGraphEdge]) -> list[str]:
+    node_priority = _build_output_priority(nodes, edges)
+    node_order_lookup = {node.id: index for index, node in enumerate(nodes)}
     indegree = {node.id: 0 for node in nodes}
     adjacency: dict[str, list[str]] = defaultdict(list)
     for edge in edges:
         adjacency[edge.source].append(edge.target)
         indegree[edge.target] = indegree.get(edge.target, 0) + 1
 
-    queue = deque(sorted(node_id for node_id, degree in indegree.items() if degree == 0))
+    queue: list[tuple[int, int, str]] = []
+    for node_id, degree in indegree.items():
+        if degree != 0:
+            continue
+        heapq.heappush(queue, (node_priority[node_id], node_order_lookup[node_id], node_id))
     order: list[str] = []
     while queue:
-        node_id = queue.popleft()
+        _, _, node_id = heapq.heappop(queue)
         order.append(node_id)
         for target in adjacency.get(node_id, []):
             indegree[target] -= 1
             if indegree[target] == 0:
-                queue.append(target)
+                heapq.heappush(queue, (node_priority[target], node_order_lookup[target], target))
 
     if len(order) != len(nodes):
         raise ValueError("Node system graph currently requires an acyclic topology.")
     return order
+
+
+def _build_output_priority(nodes: list[NodeSystemGraphNode], edges: list[NodeSystemGraphEdge]) -> dict[str, int]:
+    reverse_adjacency: dict[str, list[str]] = defaultdict(list)
+    for edge in edges:
+        reverse_adjacency[edge.target].append(edge.source)
+
+    distances: dict[str, int] = {}
+    queue = deque(
+        node.id
+        for node in nodes
+        if isinstance(node.data.config, OutputBoundaryNodeConfig)
+    )
+
+    for node_id in queue:
+        distances[node_id] = 0
+
+    while queue:
+        node_id = queue.popleft()
+        distance = distances[node_id]
+        for parent_id in reverse_adjacency.get(node_id, []):
+            next_distance = distance + 1
+            current_distance = distances.get(parent_id)
+            if current_distance is not None and current_distance <= next_distance:
+                continue
+            distances[parent_id] = next_distance
+            queue.append(parent_id)
+
+    fallback_priority = len(nodes) + len(edges) + 1
+    return {
+        node.id: distances.get(node.id, fallback_priority)
+        for node in nodes
+    }
 
 
 def _resolve_input_values(
