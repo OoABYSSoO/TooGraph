@@ -103,6 +103,7 @@ type FlowNodeData = {
   nodeId: string;
   config: NodePresetDefinition;
   previewText: string;
+  resolvedDisplayMode?: string;
   isExpanded?: boolean;
   collapsedSize?: NodeViewportSize | null;
   expandedSize?: NodeViewportSize | null;
@@ -291,8 +292,7 @@ const OUTPUT_DISPLAY_MODE_BUTTONS: Array<{ value: OutputBoundaryNode["displayMod
     label: "Auto",
     icon: (
       <svg viewBox="0 0 16 16" className="h-3.5 w-3.5 fill-none stroke-current" strokeWidth="1.5">
-        <circle cx="8" cy="8" r="5" />
-        <path d="M8 5.5v5M5.5 8h5" />
+        <path d="M9 2.5L10.5 6L14 6.5L11.5 9L12 12.5L9 10.5L6 12.5L6.5 9L4 6.5L7.5 6L9 2.5Z" />
       </svg>
     ),
   },
@@ -325,17 +325,8 @@ const OUTPUT_DISPLAY_MODE_BUTTONS: Array<{ value: OutputBoundaryNode["displayMod
   },
 ];
 
-const OUTPUT_SAVE_FORMAT_BUTTONS: Array<{ value: OutputBoundaryNode["persistFormat"]; label: string; icon?: ReactNode }> = [
-  {
-    value: "auto",
-    label: "Auto",
-    icon: (
-      <svg viewBox="0 0 16 16" className="h-3 w-3 fill-none stroke-current" strokeWidth="1.5">
-        <circle cx="8" cy="8" r="5.5" />
-        <path d="M5.5 8a2.5 2.5 0 0 1 5 0 2.5 2.5 0 0 0 5 0 2.5 2.5 0 0 1-5 5 2.5 2.5 0 0 0-5 0 2.5 2.5 0 0 1 0-5z" />
-      </svg>
-    ),
-  },
+const OUTPUT_SAVE_FORMAT_BUTTONS: Array<{ value: OutputBoundaryNode["persistFormat"]; label: string }> = [
+  { value: "auto", label: "AUTO" },
   { value: "txt", label: "TXT" },
   { value: "md", label: "MD" },
   { value: "json", label: "JSON" },
@@ -2820,61 +2811,61 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
               {/* Display */}
               <div className="grid grid-cols-[auto_1fr] items-center gap-3">
                 <span className="text-xs text-[var(--muted)]">Display</span>
-                <div className="flex items-center gap-3">
-                  <div className="flex gap-1.5">
-                    {OUTPUT_DISPLAY_MODE_BUTTONS.map((option) => {
-                      const active = config.displayMode === option.value;
-                      return (
-                        <button
-                          key={option.value}
-                          type="button"
-                          title={option.label}
-                          aria-label={option.label}
-                          className={cn(
-                            "inline-flex h-9 w-9 items-center justify-center rounded-full border transition-colors",
-                            active
-                              ? "border-[var(--accent)] bg-[rgba(154,52,18,0.12)] text-[var(--accent-strong)]"
-                              : "border-[rgba(154,52,18,0.16)] bg-[rgba(255,255,255,0.72)] text-[var(--muted)] hover:bg-[rgba(255,248,240,0.92)]",
-                          )}
-                          onClick={() =>
-                            data.onConfigChange?.((currentConfig) => ({
-                              ...(currentConfig as OutputBoundaryNode),
-                              displayMode: option.value,
-                            }))
-                          }
-                        >
-                          {option.icon}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {/* Save toggle */}
-                  <div className="ml-auto flex items-center gap-2">
-                    <span className="text-xs text-[var(--muted)]">Save</span>
-                    <button
-                      type="button"
-                      aria-label="Toggle auto-save"
-                      role="switch"
-                      aria-checked={config.persistEnabled}
-                      className={cn(
-                        "relative h-8 w-[44px] rounded-full transition-colors",
-                        config.persistEnabled ? "bg-[var(--accent)]" : "bg-[rgba(154,52,18,0.2)]",
-                      )}
-                      onClick={() =>
-                        data.onConfigChange?.((currentConfig) => ({
-                          ...(currentConfig as OutputBoundaryNode),
-                          persistEnabled: !currentConfig.persistEnabled,
-                        }))
-                      }
-                    >
-                      <span
+                <div className="flex gap-1.5">
+                  {OUTPUT_DISPLAY_MODE_BUTTONS.map((option) => {
+                    const active = config.displayMode === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        title={option.label}
+                        aria-label={option.label}
                         className={cn(
-                          "absolute top-1 h-6 w-6 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.15)] transition-transform",
-                          config.persistEnabled ? "translate-x-[20px]" : "translate-x-1",
+                          "inline-flex h-9 w-9 items-center justify-center rounded-full border transition-colors",
+                          active
+                            ? "border-[var(--accent)] bg-[rgba(154,52,18,0.12)] text-[var(--accent-strong)]"
+                            : "border-[rgba(154,52,18,0.16)] bg-[rgba(255,255,255,0.72)] text-[var(--muted)] hover:bg-[rgba(255,248,240,0.92)]",
                         )}
-                      />
-                    </button>
-                  </div>
+                        onClick={() =>
+                          data.onConfigChange?.((currentConfig) => ({
+                            ...(currentConfig as OutputBoundaryNode),
+                            displayMode: option.value,
+                          }))
+                        }
+                      >
+                        {option.icon}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              {/* Save */}
+              <div className="grid grid-cols-[auto_1fr] items-center gap-3">
+                <span className="text-xs text-[var(--muted)]">Save</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    aria-label="Toggle auto-save"
+                    role="switch"
+                    aria-checked={config.persistEnabled}
+                    className={cn(
+                      "relative h-8 w-[44px] rounded-full transition-colors",
+                      config.persistEnabled ? "bg-[var(--accent)]" : "bg-[rgba(154,52,18,0.2)]",
+                    )}
+                    onClick={() =>
+                      data.onConfigChange?.((currentConfig) => ({
+                        ...(currentConfig as OutputBoundaryNode),
+                        persistEnabled: !currentConfig.persistEnabled,
+                      }))
+                    }
+                  >
+                    <span
+                      className={cn(
+                        "absolute top-1 h-6 w-6 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.15)] transition-transform",
+                        config.persistEnabled ? "translate-x-[20px]" : "translate-x-1",
+                      )}
+                    />
+                  </button>
                 </div>
               </div>
               {/* Format */}
@@ -2890,7 +2881,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                         title={option.label}
                         aria-label={option.label}
                         className={cn(
-                          "inline-flex h-7 items-center gap-1 rounded-full border px-2.5 text-[0.68rem] font-medium transition-colors",
+                          "inline-flex h-7 items-center rounded-full border px-3 text-[0.68rem] font-medium transition-colors",
                           active
                             ? "border-[var(--accent)] bg-[rgba(154,52,18,0.1)] text-[var(--accent-strong)]"
                             : "border-[rgba(154,52,18,0.16)] bg-[rgba(255,255,255,0.72)] text-[var(--muted)] hover:bg-[rgba(255,248,240,0.92)]",
@@ -2902,16 +2893,15 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                           }))
                         }
                       >
-                        {option.icon}
                         {option.label}
                       </button>
                     );
                   })}
                 </div>
               </div>
-              {/* File */}
+              {/* FileName */}
               <div className="grid grid-cols-[auto_1fr] items-center gap-3">
-                <span className="text-xs text-[var(--muted)]">File</span>
+                <span className="text-xs text-[var(--muted)]">FileName</span>
                 <Input
                   value={config.fileNameTemplate}
                   onChange={(event) => data.onConfigChange?.((currentConfig) => ({ ...(currentConfig as OutputBoundaryNode), fileNameTemplate: event.target.value }))}
@@ -2923,7 +2913,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
               <div className="flex min-h-[160px] flex-1 flex-col rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,255,255,0.82)] p-3">
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <div className="text-[0.68rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">Preview</div>
-                  <div className="text-[0.68rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">{config.displayMode}</div>
+                  <div className="text-[0.68rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">{data.resolvedDisplayMode ?? config.displayMode}</div>
                 </div>
                 <div className="min-h-[120px] flex-1 overflow-auto whitespace-pre-wrap break-words rounded-[12px] bg-[rgba(248,242,234,0.8)] px-3 py-3 text-sm leading-6 text-[var(--text)]">
                   {data.previewText || "Connect an upstream output to preview/export it."}
@@ -3115,9 +3105,13 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
   const hydrateRunResult = useCallback(
     (run: RunDetail) => {
       const outputPreviewMap = new Map<string, string>();
+      const resolvedDisplayModeMap = new Map<string, string>();
       for (const output of run.artifacts.exported_outputs ?? []) {
         if (!output.node_id) continue;
         outputPreviewMap.set(output.node_id, formatPreviewValue(output.value));
+        if (output.display_mode) {
+          resolvedDisplayModeMap.set(output.node_id, output.display_mode);
+        }
       }
 
       const failedNodeMap = new Map<string, string>();
@@ -3142,6 +3136,7 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
 
           if (node.data.config.family === "output") {
             const outputText = outputPreviewMap.get(node.id);
+            const resolvedDisplayMode = resolvedDisplayModeMap.get(node.id);
             let nextPreviewText = outputText ?? "";
             if (!nextPreviewText && run.status === "failed") {
               nextPreviewText = "Latest run failed before this output was produced.";
@@ -3153,6 +3148,7 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
               data: {
                 ...node.data,
                 previewText: nextPreviewText,
+                resolvedDisplayMode,
               },
             };
           }
