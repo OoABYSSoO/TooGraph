@@ -1093,12 +1093,30 @@ function formatPreviewValue(value: unknown) {
   }
 }
 
+function detectDisplayMode(text: string): "plain" | "markdown" | "json" {
+  const trimmed = text.trim();
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+    try { JSON.parse(trimmed); return "json"; } catch { /* not json */ }
+  }
+  if (/^#{1,6}\s/m.test(trimmed) || /\*\*.*?\*\*/.test(trimmed) || /```/.test(trimmed) || /^\*\s/m.test(trimmed) || /^\d+\.\s/m.test(trimmed) || /\[.*?\]\(.*?\)/.test(trimmed) || /^\|.*\|$/m.test(trimmed)) {
+    return "markdown";
+  }
+  return "plain";
+}
+
+function resolveDisplayMode(displayMode: string, text: string): string {
+  if (displayMode === "auto") return detectDisplayMode(text);
+  return displayMode;
+}
+
 function OutputPreviewContent({ text, displayMode }: { text: string; displayMode: string }) {
   if (!text) {
     return <span className="text-[var(--muted)]">Connect an upstream output to preview/export it.</span>;
   }
 
-  if (displayMode === "json") {
+  const resolved = resolveDisplayMode(displayMode, text);
+
+  if (resolved === "json") {
     return (
       <pre className="whitespace-pre-wrap break-words font-mono text-[0.82rem] leading-6">
         <code>{text}</code>
@@ -1106,7 +1124,7 @@ function OutputPreviewContent({ text, displayMode }: { text: string; displayMode
     );
   }
 
-  if (displayMode === "markdown") {
+  if (resolved === "markdown") {
     return (
       <div className="graphite-md text-sm leading-7 [&_h1]:mb-2 [&_h1]:mt-3 [&_h1]:text-lg [&_h1]:font-bold [&_h2]:mb-2 [&_h2]:mt-3 [&_h2]:text-base [&_h2]:font-semibold [&_h3]:mb-1 [&_h3]:mt-2 [&_h3]:text-sm [&_h3]:font-semibold [&_p]:mb-2 [&_ul]:mb-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:mb-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:mb-0.5 [&_code]:rounded [&_code]:bg-[rgba(154,52,18,0.08)] [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[0.82rem] [&_pre]:mb-2 [&_pre]:overflow-auto [&_pre]:rounded-lg [&_pre]:bg-[rgba(154,52,18,0.06)] [&_pre]:p-3 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_blockquote]:mb-2 [&_blockquote]:border-l-2 [&_blockquote]:border-[var(--accent)] [&_blockquote]:pl-3 [&_blockquote]:text-[var(--muted)] [&_strong]:font-semibold [&_a]:text-[var(--accent)] [&_a]:underline [&_hr]:my-3 [&_hr]:border-[rgba(154,52,18,0.12)]">
         <Markdown>{text}</Markdown>
@@ -2936,10 +2954,10 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
               <div className="flex min-h-[160px] flex-1 flex-col rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,255,255,0.82)] p-3">
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <div className="text-[0.68rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">Preview</div>
-                  <div className="text-[0.68rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">{data.resolvedDisplayMode ?? config.displayMode}</div>
+                  <div className="text-[0.68rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">{resolveDisplayMode(data.resolvedDisplayMode ?? config.displayMode, data.previewText)}</div>
                 </div>
                 <div className="min-h-[120px] flex-1 overflow-auto rounded-[12px] bg-[rgba(248,242,234,0.8)] px-3 py-3 text-sm leading-6 text-[var(--text)]">
-                  <OutputPreviewContent text={data.previewText} displayMode={data.resolvedDisplayMode ?? config.displayMode} />
+                  <OutputPreviewContent text={data.previewText} displayMode={config.displayMode} />
                 </div>
               </div>
             </>
