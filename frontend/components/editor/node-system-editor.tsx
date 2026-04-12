@@ -2808,8 +2808,9 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
 
           {config.family === "output" ? (
             <>
-              {/* Display mode buttons + Save toggle */}
+              {/* Display */}
               <div className="flex items-center gap-3">
+                <span className="flex-shrink-0 text-xs text-[var(--muted)]">Display</span>
                 <div className="flex gap-1.5">
                   {OUTPUT_DISPLAY_MODE_BUTTONS.map((option) => {
                     const active = config.displayMode === option.value;
@@ -2845,7 +2846,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                     role="switch"
                     aria-checked={config.persistEnabled}
                     className={cn(
-                      "relative h-[26px] w-[46px] flex-shrink-0 rounded-full transition-colors",
+                      "relative inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full transition-colors",
                       config.persistEnabled ? "bg-[var(--accent)]" : "bg-[rgba(154,52,18,0.2)]",
                     )}
                     onClick={() =>
@@ -2857,45 +2858,52 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                   >
                     <span
                       className={cn(
-                        "absolute top-[3px] h-5 w-5 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.2)] transition-transform",
-                        config.persistEnabled ? "translate-x-[23px]" : "translate-x-[3px]",
+                        "inline-block h-5 w-5 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.2)] transition-transform",
+                        config.persistEnabled ? "translate-x-6" : "translate-x-1",
                       )}
                     />
                   </button>
                 </div>
               </div>
-              {/* Format pills + FileName input */}
-              <div className="flex items-center gap-2">
-                {OUTPUT_SAVE_FORMAT_BUTTONS.map((option) => {
-                  const active = config.persistFormat === option.value;
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      title={option.label}
-                      aria-label={option.label}
-                      className={cn(
-                        "inline-flex h-7 items-center rounded-full border px-2.5 text-[0.68rem] font-medium transition-colors",
-                        active
-                          ? "border-[var(--accent)] bg-[rgba(154,52,18,0.1)] text-[var(--accent-strong)]"
-                          : "border-[rgba(154,52,18,0.16)] bg-[rgba(255,255,255,0.72)] text-[var(--muted)] hover:bg-[rgba(255,248,240,0.92)]",
-                      )}
-                      onClick={() =>
-                        data.onConfigChange?.((currentConfig) => ({
-                          ...(currentConfig as OutputBoundaryNode),
-                          persistFormat: option.value,
-                        }))
-                      }
-                    >
-                      {option.label}
-                    </button>
-                  );
-                })}
+              {/* Format */}
+              <div className="flex items-center gap-3">
+                <span className="flex-shrink-0 text-xs text-[var(--muted)]">Format</span>
+                <div className="flex items-center gap-2">
+                  {OUTPUT_SAVE_FORMAT_BUTTONS.map((option) => {
+                    const active = config.persistFormat === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        title={option.label}
+                        aria-label={option.label}
+                        className={cn(
+                          "inline-flex h-7 items-center rounded-full border px-2.5 text-[0.68rem] font-medium transition-colors",
+                          active
+                            ? "border-[var(--accent)] bg-[rgba(154,52,18,0.1)] text-[var(--accent-strong)]"
+                            : "border-[rgba(154,52,18,0.16)] bg-[rgba(255,255,255,0.72)] text-[var(--muted)] hover:bg-[rgba(255,248,240,0.92)]",
+                        )}
+                        onClick={() =>
+                          data.onConfigChange?.((currentConfig) => ({
+                            ...(currentConfig as OutputBoundaryNode),
+                            persistFormat: option.value,
+                          }))
+                        }
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              {/* FileName */}
+              <div className="flex items-center gap-3">
+                <span className="flex-shrink-0 text-xs text-[var(--muted)]">FileName</span>
                 <Input
                   value={config.fileNameTemplate}
                   onChange={(event) => data.onConfigChange?.((currentConfig) => ({ ...(currentConfig as OutputBoundaryNode), fileNameTemplate: event.target.value }))}
-                  placeholder="FileName"
-                  className="h-7 min-w-0 flex-1 text-xs"
+                  placeholder="File name template"
+                  className="h-8 min-w-0 flex-1 text-xs"
                 />
               </div>
               {/* Preview */}
