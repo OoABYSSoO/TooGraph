@@ -5,7 +5,56 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.core.schemas.graph import Position, StateField
+
+class Position(BaseModel):
+    x: float
+    y: float
+
+
+class StateFieldType(str, Enum):
+    STRING = "string"
+    NUMBER = "number"
+    BOOLEAN = "boolean"
+    OBJECT = "object"
+    ARRAY = "array"
+    MARKDOWN = "markdown"
+    JSON = "json"
+    FILE_LIST = "file_list"
+
+
+class StateField(BaseModel):
+    key: str = Field(..., min_length=1)
+    type: StateFieldType = StateFieldType.STRING
+    title: str = ""
+    description: str = ""
+    example: Any = None
+    source_nodes: list[str] = Field(default_factory=list)
+    target_nodes: list[str] = Field(default_factory=list)
+
+    @field_validator("key")
+    @classmethod
+    def validate_key(cls, value: str) -> str:
+        key = value.strip()
+        if not key:
+            raise ValueError("State field key cannot be empty.")
+        return key
+
+
+class ValidationIssue(BaseModel):
+    code: str
+    message: str
+    path: str | None = None
+
+
+class GraphValidationResponse(BaseModel):
+    valid: bool
+    issues: list[ValidationIssue] = Field(default_factory=list)
+
+
+class GraphSaveResponse(BaseModel):
+    graph_id: str
+    saved: bool = True
+    validation: GraphValidationResponse
 
 
 class ValueType(str, Enum):
