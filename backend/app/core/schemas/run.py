@@ -49,6 +49,23 @@ class StateEvent(BaseModel):
     created_at: str
 
 
+class CycleIterationRecord(BaseModel):
+    iteration: int
+    executed_node_ids: list[str] = Field(default_factory=list)
+    incoming_edge_ids: list[str] = Field(default_factory=list)
+    activated_edge_ids: list[str] = Field(default_factory=list)
+    next_iteration_edge_ids: list[str] = Field(default_factory=list)
+    stop_reason: str | None = None
+
+
+class CycleSummary(BaseModel):
+    has_cycle: bool = False
+    back_edges: list[str] = Field(default_factory=list)
+    iteration_count: int = 0
+    max_iterations: int = 0
+    stop_reason: str | None = None
+
+
 class NodeStateReadRecord(BaseModel):
     state_key: str
     input_key: str
@@ -66,6 +83,7 @@ class NodeExecutionArtifacts(BaseModel):
     inputs: dict[str, Any] = Field(default_factory=dict)
     outputs: dict[str, Any] = Field(default_factory=dict)
     family: str = ""
+    iteration: int | None = None
     selected_branch: str | None = None
     response: dict[str, Any] | None = None
     reasoning: str | None = None
@@ -83,6 +101,8 @@ class RunArtifacts(BaseModel):
     active_edge_ids: list[str] = Field(default_factory=list)
     state_events: list[StateEvent] = Field(default_factory=list)
     state_values: dict[str, Any] = Field(default_factory=dict)
+    cycle_iterations: list[CycleIterationRecord] = Field(default_factory=list)
+    cycle_summary: CycleSummary = Field(default_factory=CycleSummary)
 
 
 class RunSummary(BaseModel):
@@ -114,6 +134,7 @@ class RunDetail(RunSummary):
     output_previews: list[OutputPreview] = Field(default_factory=list)
     artifacts: RunArtifacts = Field(default_factory=RunArtifacts)
     state_snapshot: StateSnapshot = Field(default_factory=StateSnapshot)
+    cycle_summary: CycleSummary = Field(default_factory=CycleSummary)
 
 
 class NodeExecutionDetail(BaseModel):

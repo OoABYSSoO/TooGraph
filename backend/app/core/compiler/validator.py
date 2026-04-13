@@ -28,6 +28,7 @@ def _validate_node_system_graph(graph: NodeSystemGraphDocument) -> GraphValidati
     node_id_set = set(node_ids)
     state_key_set = {field.key for field in graph.state_schema}
     incoming_edge_targets_by_node: dict[str, set[str]] = defaultdict(set)
+    incoming_edge_handle_counts: dict[tuple[str, str], int] = defaultdict(int)
 
     issues.extend(_find_duplicate_ids(node_ids, "node"))
     issues.extend(_find_duplicate_ids(edge_ids, "edge"))
@@ -36,6 +37,20 @@ def _validate_node_system_graph(graph: NodeSystemGraphDocument) -> GraphValidati
     for edge in graph.edges:
         if edge.target_handle:
             incoming_edge_targets_by_node[edge.target].add(edge.target_handle.split(":", 1)[-1])
+            incoming_edge_handle_counts[(edge.target, edge.target_handle.split(":", 1)[-1])] += 1
+
+    for (target_node_id, target_key), count in incoming_edge_handle_counts.items():
+        if count > 1:
+            issues.append(
+                ValidationIssue(
+                    code="duplicate_incoming_target_handle",
+                    message=(
+                        f"Node '{target_node_id}' input '{target_key}' is targeted by more than one edge. "
+                        "Use a single incoming edge per input."
+                    ),
+                    path=f"nodes.{target_node_id}.edges",
+                )
+            )
 
     for node in graph.nodes:
         config = node.data.config

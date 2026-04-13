@@ -75,6 +75,20 @@ export function RunDetailClient({ runId }: { runId: string }) {
         </div>
       </Card>
 
+      {run.cycle_summary?.has_cycle ? (
+        <Card className="col-span-8 max-[960px]:col-span-1">
+          <h2 className="mb-2.5">Cycle Summary</h2>
+          <div className="flex flex-wrap gap-2.5">
+            <Badge>{run.cycle_summary.iteration_count} iterations</Badge>
+            <Badge>max {run.cycle_summary.max_iterations}</Badge>
+            {run.cycle_summary.stop_reason ? <Badge>{run.cycle_summary.stop_reason}</Badge> : null}
+            {(run.cycle_summary.back_edges ?? []).map((edge) => (
+              <Badge key={edge}>{edge}</Badge>
+            ))}
+          </div>
+        </Card>
+      ) : null}
+
       <Card className="col-span-8 max-[960px]:col-span-1">
         <h2 className="mb-2.5">{t("run_detail.artifacts")}</h2>
         <div className="grid gap-3">
@@ -112,14 +126,16 @@ export function RunDetailClient({ runId }: { runId: string }) {
       <Card className="col-span-12">
         <h2 className="mb-2.5">{t("run_detail.timeline")}</h2>
         <div className="grid gap-3">
-          {run.node_executions.map((execution) => (
-            <SubtleCard key={execution.node_id}>
+          {run.node_executions.map((execution, index) => (
+            <SubtleCard key={`${execution.node_id}-${execution.artifacts?.iteration ?? 1}-${index}`}>
               <strong>
                 {execution.node_id} {"->"} {execution.status}
               </strong>
               <div className="text-[var(--muted)]">{execution.output_summary}</div>
               <div className="mt-2 flex flex-wrap gap-2.5">
                 <Badge>{execution.duration_ms}ms</Badge>
+                {execution.artifacts?.iteration ? <Badge>iteration {execution.artifacts.iteration}</Badge> : null}
+                {execution.artifacts?.selected_branch ? <Badge>{execution.artifacts.selected_branch}</Badge> : null}
               </div>
             </SubtleCard>
           ))}

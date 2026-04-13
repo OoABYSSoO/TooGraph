@@ -105,7 +105,7 @@ export type ConditionNode = NodeStateBindings & {
   family: "condition";
   inputs: PortDefinition[];
   branches: BranchDefinition[];
-  conditionMode: "rule"; // "model" | "cycle" — planned for future versions
+  conditionMode: "rule" | "cycle";
   rule: ConditionRule;
   branchMapping: Record<string, string>;
 };
@@ -233,6 +233,7 @@ export type NodeExecutionArtifacts = {
   inputs?: Record<string, unknown>;
   outputs?: Record<string, unknown>;
   family?: string;
+  iteration?: number | null;
   selected_branch?: string | null;
   response?: Record<string, unknown> | null;
   reasoning?: string | null;
@@ -267,6 +268,23 @@ export type RunNodeExecution = {
   errors?: string[];
 };
 
+export type CycleIterationRecord = {
+  iteration: number;
+  executed_node_ids?: string[];
+  incoming_edge_ids?: string[];
+  activated_edge_ids?: string[];
+  next_iteration_edge_ids?: string[];
+  stop_reason?: string | null;
+};
+
+export type CycleSummary = {
+  has_cycle: boolean;
+  back_edges?: string[];
+  iteration_count: number;
+  max_iterations: number;
+  stop_reason?: string | null;
+};
+
 export type NodeSystemRunDetail = {
   run_id: string;
   graph_id: string;
@@ -293,8 +311,11 @@ export type NodeSystemRunDetail = {
     exported_outputs?: ExportedOutput[];
     state_events?: StateEvent[];
     state_values?: Record<string, unknown>;
+    cycle_iterations?: CycleIterationRecord[];
+    cycle_summary?: CycleSummary;
   };
   state_snapshot?: StateSnapshot;
+  cycle_summary?: CycleSummary;
 };
 
 export function isValueTypeCompatible(source: ValueType, target: ValueType) {

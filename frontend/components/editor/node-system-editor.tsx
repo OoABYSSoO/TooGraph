@@ -1287,7 +1287,7 @@ const RULE_OPERATOR_SELECT_OPTIONS: FieldSelectOption[] = RULE_OPERATOR_OPTIONS.
 
 const CONDITION_MODE_SELECT_OPTIONS: FieldSelectOption[] = [
   { value: "rule", label: "Rule", detail: "Evaluate an explicit source/operator/value rule." },
-  // TODO: Enable "model" and "cycle" modes once backend supports them.
+  { value: "cycle", label: "Cycle", detail: "Use the rule as a loop gate inside a cyclic graph." },
   // { value: "model", label: "Model", detail: "Let the model decide the branch from context." },
 ];
 
@@ -4524,19 +4524,24 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
     (run: RunDetail) => {
       const summary = summarizeRunNodeStates(nodeIds, run.node_status_map ?? {});
       const currentNodeLabel = run.current_node_id ? nodeLabelLookup.get(run.current_node_id) ?? run.current_node_id : null;
+      const cycleSummaryText =
+        run.cycle_summary?.has_cycle
+          ? ` Iterations ${run.cycle_summary.iteration_count}/${run.cycle_summary.max_iterations || run.cycle_summary.iteration_count}.`
+          : "";
       if (run.status === "queued") {
-        return `Run ${run.run_id} queued. Pending ${summary.idle} nodes.`;
+        return `Run ${run.run_id} queued. Pending ${summary.idle} nodes.${cycleSummaryText}`;
       }
       if (run.status === "running") {
         const currentLabelText = currentNodeLabel ? `Running ${currentNodeLabel}. ` : "";
-        return `${currentLabelText}Done ${summary.success} · Active ${summary.running} · Pending ${summary.idle} · Failed ${summary.failed}`;
+        return `${currentLabelText}Done ${summary.success} · Active ${summary.running} · Pending ${summary.idle} · Failed ${summary.failed}.${cycleSummaryText}`;
       }
       if (run.status === "failed") {
         const runErrors = run.errors?.filter(Boolean) ?? [];
         const baseText = currentNodeLabel ? `Run failed at ${currentNodeLabel}.` : `Run ${run.run_id} failed.`;
-        return runErrors.length > 0 ? `${baseText} ${runErrors.join("; ")}` : baseText;
+        const detailText = runErrors.length > 0 ? `${baseText} ${runErrors.join("; ")}` : baseText;
+        return `${detailText}${cycleSummaryText}`;
       }
-      return `Run completed. OK ${summary.success} · Pending ${summary.idle} · Failed ${summary.failed}`;
+      return `Run completed. OK ${summary.success} · Pending ${summary.idle} · Failed ${summary.failed}.${cycleSummaryText}`;
     },
     [nodeIds, nodeLabelLookup],
   );

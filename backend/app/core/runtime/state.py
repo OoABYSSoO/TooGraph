@@ -37,6 +37,8 @@ class RunState(TypedDict, total=False):
     duration_ms: int | None
     artifacts: dict[str, Any]
     state_snapshot: dict[str, Any]
+    cycle_summary: dict[str, Any]
+    cycle_iterations: list[dict[str, Any]]
 
 
 def utc_now_iso() -> str:
@@ -65,6 +67,8 @@ def create_initial_run_state(graph_id: str, graph_name: str, max_revision_round:
         state_values={},
         state_last_writers={},
         state_events=[],
+        cycle_summary={},
+        cycle_iterations=[],
         started_at=utc_now_iso(),
         completed_at=None,
     )

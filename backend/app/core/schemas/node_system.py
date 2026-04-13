@@ -106,8 +106,8 @@ class ConditionOperator(str, Enum):
 
 class ConditionMode(str, Enum):
     RULE = "rule"
+    CYCLE = "cycle"
     # MODEL = "model"  # planned: LLM-driven branch routing
-    # CYCLE = "cycle"  # planned: LangGraph cycle support
 
 
 class DisplayMode(str, Enum):

@@ -9,33 +9,41 @@
 
 当前优先级：
 
-1. Cycles 正式支持
+1. Cycles 交互与高级策略
 2. Knowledge Base 正式能力建设
 3. Memory 正式能力建设
 4. 人类在环与断点
 
-## 1. Cycles 正式支持
+## 1. Cycles 交互与高级策略
 
 当前代码现状：
 
-- runtime 会检测 cycles，但检测到后直接失败退出
-- condition 的 `cycle` 模式仍然只是注释中的计划项
-- 当前系统实际只支持 DAG 单次执行
+- runtime 已支持 cycles 的多轮执行
+- condition 已支持 `cycle` 模式，循环图会返回结构化的 `cycle_summary / cycle_iterations`
+- 当前循环停止条件只覆盖：
+  - 显式退出分支
+  - 命中最大轮次保护
 
 后续要做：
 
-- 定义 cycles 的正式执行语义，而不是只做检测：
-  - 多轮执行
-  - 退出条件
-  - 最大轮次
+- 增加更完整的停止策略：
   - 无变化停止
-- 明确 cycles 和 state 的关系：
-  - 循环中哪些 state 可以被反复读写
-  - 每轮执行后如何持久化快照
-- 明确 cycles 和 interrupt 的关系：
+  - 空轮次停止
+  - 按 state 或输出变化量停止
+- 给 editor 增加正式的循环配置入口：
+  - `cycle_max_iterations`
+  - 终止策略
+  - 循环回边高亮
+- 在 editor 和 run detail 中进一步可视化：
+  - 每轮执行路径
+  - 回边
+  - 终止原因
+- 明确 cycles 和 state 的正式约束：
+  - 循环中哪些 state 适合做 loop-carried state
+  - 边上传值和 state 读写的组合方式
+- 明确 cycles 和 interrupt 的衔接方式：
   - 是否允许在循环中暂停
   - 恢复后从哪一轮、哪个节点继续
-- 在 editor 和 run detail 中可视化循环轮次、回边和终止原因
 
 ## 2. Knowledge Base 正式能力建设
 
