@@ -62,7 +62,10 @@ def list_graphs() -> list[NodeSystemGraphDocument]:
     for row in rows:
         payload = row_payload(row)
         if payload is not None:
-            graphs.append(NodeSystemGraphDocument.model_validate(payload))
+            try:
+                graphs.append(NodeSystemGraphDocument.model_validate(payload))
+            except Exception:
+                continue
     return graphs
 
 

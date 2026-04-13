@@ -6,45 +6,25 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
+def _validate_identifier(value: str, *, label: str) -> str:
+    normalized = value.strip()
+    if not normalized:
+        raise ValueError(f"{label} cannot be empty.")
+    if ":" in normalized:
+        raise ValueError(f"{label} cannot contain ':'.")
+    return normalized
+
+
 class Position(BaseModel):
     x: float
     y: float
 
 
-class StateFieldType(str, Enum):
-    STRING = "string"
-    NUMBER = "number"
-    BOOLEAN = "boolean"
-    OBJECT = "object"
-    ARRAY = "array"
-    MARKDOWN = "markdown"
-    JSON = "json"
-    FILE_LIST = "file_list"
+class NodeViewportSize(BaseModel):
+    width: float | None = None
+    height: float | None = None
 
-
-class StateFieldUi(BaseModel):
-    color: str = ""
-
-    model_config = ConfigDict(str_strip_whitespace=True)
-
-
-class StateField(BaseModel):
-    key: str = Field(..., min_length=1)
-    type: StateFieldType = StateFieldType.STRING
-    title: str = ""
-    description: str = ""
-    default_value: Any = Field(default=None, alias="defaultValue")
-    ui: StateFieldUi = Field(default_factory=StateFieldUi)
-
-    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
-
-    @field_validator("key")
-    @classmethod
-    def validate_key(cls, value: str) -> str:
-        key = value.strip()
-        if not key:
-            raise ValueError("State field key cannot be empty.")
-        return key
+    model_config = ConfigDict(extra="ignore")
 
 
 class ValidationIssue(BaseModel):
@@ -64,20 +44,20 @@ class GraphSaveResponse(BaseModel):
     validation: GraphValidationResponse
 
 
-class ValueType(str, Enum):
+class NodeSystemStateType(str, Enum):
     TEXT = "text"
+    NUMBER = "number"
+    BOOLEAN = "boolean"
+    OBJECT = "object"
+    ARRAY = "array"
+    MARKDOWN = "markdown"
     JSON = "json"
+    FILE_LIST = "file_list"
     IMAGE = "image"
     AUDIO = "audio"
     VIDEO = "video"
     FILE = "file"
     KNOWLEDGE_BASE = "knowledge_base"
-    ANY = "any"
-
-
-class SkillUsage(str, Enum):
-    REQUIRED = "required"
-    OPTIONAL = "optional"
 
 
 class StateWriteMode(str, Enum):
@@ -107,7 +87,6 @@ class ConditionOperator(str, Enum):
 class ConditionMode(str, Enum):
     RULE = "rule"
     CYCLE = "cycle"
-    # MODEL = "model"  # planned: LLM-driven branch routing
 
 
 class DisplayMode(str, Enum):
@@ -124,193 +103,270 @@ class PersistFormat(str, Enum):
     AUTO = "auto"
 
 
-class PortDefinition(BaseModel):
-    key: str = Field(..., min_length=1)
-    label: str = Field(..., min_length=1)
-    value_type: ValueType = Field(alias="valueType")
+class NodeSystemStateDefinition(BaseModel):
+    description: str = ""
+    type: NodeSystemStateType = NodeSystemStateType.TEXT
+    default_value: Any = Field(default=None, alias="defaultValue")
+    color: str = ""
+
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
+
+
+class NodeSystemReadBinding(BaseModel):
+    state: str = Field(..., min_length=1)
     required: bool = False
 
-    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    @field_validator("state")
+    @classmethod
+    def validate_state(cls, value: str) -> str:
+        return _validate_identifier(value, label="State reference")
 
 
-class SkillAttachment(BaseModel):
-    name: str = Field(..., min_length=1)
-    skill_key: str = Field(..., alias="skillKey", min_length=1)
-    input_mapping: dict[str, str] = Field(default_factory=dict, alias="inputMapping")
-    context_binding: dict[str, str] = Field(default_factory=dict, alias="contextBinding")
-    usage: SkillUsage = SkillUsage.OPTIONAL
-
-    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
-
-
-class NodeStateReadBinding(BaseModel):
-    state_key: str = Field(..., alias="stateKey", min_length=1)
-    input_key: str = Field(..., alias="inputKey", min_length=1)
-    required: bool = False
-
-    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
-
-
-class NodeStateWriteBinding(BaseModel):
-    state_key: str = Field(..., alias="stateKey", min_length=1)
-    output_key: str = Field(..., alias="outputKey", min_length=1)
+class NodeSystemWriteBinding(BaseModel):
+    state: str = Field(..., min_length=1)
     mode: StateWriteMode = StateWriteMode.REPLACE
 
-    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    @field_validator("state")
+    @classmethod
+    def validate_state(cls, value: str) -> str:
+        return _validate_identifier(value, label="State reference")
 
 
-class InputBoundaryNodeConfig(BaseModel):
-    preset_id: str = Field(..., alias="presetId", min_length=1)
-    label: str = Field(..., min_length=1)
-    description: str = ""
-    family: Literal["input"] = "input"
-    value_type: ValueType = Field(alias="valueType")
-    output: PortDefinition
-    default_value: str = Field(default="", alias="defaultValue")
+class NodeSystemNodeUi(BaseModel):
+    position: Position
+    collapsed: bool = False
+    expanded_size: NodeViewportSize | None = Field(default=None, alias="expandedSize")
+    collapsed_size: NodeViewportSize | None = Field(default=None, alias="collapsedSize")
+
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
+
+class NodeSystemInputConfig(BaseModel):
+    source_kind: str = Field(default="manual", alias="sourceKind")
+    default_value: Any = Field(default="", alias="defaultValue")
     placeholder: str = ""
-    state_reads: list[NodeStateReadBinding] = Field(default_factory=list, alias="stateReads")
-    state_writes: list[NodeStateWriteBinding] = Field(default_factory=list, alias="stateWrites")
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
 
-class AgentNodeConfig(BaseModel):
-    preset_id: str = Field(..., alias="presetId", min_length=1)
-    label: str = Field(..., min_length=1)
-    description: str = ""
-    family: Literal["agent"] = "agent"
-    inputs: list[PortDefinition] = Field(default_factory=list)
-    outputs: list[PortDefinition] = Field(default_factory=list)
+class NodeSystemAgentConfig(BaseModel):
+    skills: list[str] = Field(default_factory=list)
     system_instruction: str = Field(default="", alias="systemInstruction")
     task_instruction: str = Field(default="", alias="taskInstruction")
-    skills: list[SkillAttachment] = Field(default_factory=list)
-    output_binding: dict[str, str] = Field(default_factory=dict, alias="outputBinding")
     model_source: AgentModelSource = Field(default=AgentModelSource.GLOBAL, alias="modelSource")
     model: str = ""
     thinking_mode: AgentThinkingMode = Field(default=AgentThinkingMode.ON, alias="thinkingMode")
     temperature: float = Field(default=0.2, ge=0, le=2)
-    state_reads: list[NodeStateReadBinding] = Field(default_factory=list, alias="stateReads")
-    state_writes: list[NodeStateWriteBinding] = Field(default_factory=list, alias="stateWrites")
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
 
-class ConditionRule(BaseModel):
+class NodeSystemConditionRule(BaseModel):
     source: str = Field(..., min_length=1)
-    operator: ConditionOperator
+    operator: ConditionOperator = ConditionOperator.EXISTS
     value: str | int | float | bool | None = None
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
-class BranchDefinition(BaseModel):
-    key: str = Field(..., min_length=1)
-    label: str = Field(..., min_length=1)
-
-    model_config = ConfigDict(str_strip_whitespace=True)
-
-
-class ConditionNodeConfig(BaseModel):
-    preset_id: str = Field(..., alias="presetId", min_length=1)
-    label: str = Field(..., min_length=1)
-    description: str = ""
-    family: Literal["condition"] = "condition"
-    inputs: list[PortDefinition] = Field(default_factory=list)
-    branches: list[BranchDefinition] = Field(default_factory=list)
+class NodeSystemConditionConfig(BaseModel):
+    branches: list[str] = Field(default_factory=list)
     condition_mode: ConditionMode = Field(default=ConditionMode.RULE, alias="conditionMode")
-    rule: ConditionRule
     branch_mapping: dict[str, str] = Field(default_factory=dict, alias="branchMapping")
-    state_reads: list[NodeStateReadBinding] = Field(default_factory=list, alias="stateReads")
-    state_writes: list[NodeStateWriteBinding] = Field(default_factory=list, alias="stateWrites")
+    rule: NodeSystemConditionRule = Field(
+        default_factory=lambda: NodeSystemConditionRule(source="result", operator=ConditionOperator.EXISTS, value=None)
+    )
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
+    @field_validator("branches")
+    @classmethod
+    def validate_branches(cls, value: list[str]) -> list[str]:
+        normalized: list[str] = []
+        seen: set[str] = set()
+        for branch in value:
+            next_branch = _validate_identifier(branch, label="Condition branch")
+            if next_branch in seen:
+                raise ValueError(f"Duplicate condition branch '{next_branch}' detected.")
+            seen.add(next_branch)
+            normalized.append(next_branch)
+        return normalized
 
-class OutputBoundaryNodeConfig(BaseModel):
-    preset_id: str = Field(..., alias="presetId", min_length=1)
-    label: str = Field(..., min_length=1)
-    description: str = ""
-    family: Literal["output"] = "output"
-    input: PortDefinition
+    @field_validator("branch_mapping")
+    @classmethod
+    def validate_branch_mapping(cls, value: dict[str, str]) -> dict[str, str]:
+        normalized: dict[str, str] = {}
+        for mapping_key, branch in value.items():
+            next_key = mapping_key.strip()
+            if not next_key:
+                raise ValueError("Condition branch mapping key cannot be empty.")
+            normalized[next_key] = _validate_identifier(branch, label="Condition branch")
+        return normalized
+
+
+class NodeSystemOutputConfig(BaseModel):
     display_mode: DisplayMode = Field(default=DisplayMode.AUTO, alias="displayMode")
     persist_enabled: bool = Field(default=False, alias="persistEnabled")
     persist_format: PersistFormat = Field(default=PersistFormat.AUTO, alias="persistFormat")
     file_name_template: str = Field(default="", alias="fileNameTemplate")
-    state_reads: list[NodeStateReadBinding] = Field(default_factory=list, alias="stateReads")
-    state_writes: list[NodeStateWriteBinding] = Field(default_factory=list, alias="stateWrites")
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
 
-NodeSystemNodeConfig = (
-    InputBoundaryNodeConfig
-    | AgentNodeConfig
-    | ConditionNodeConfig
-    | OutputBoundaryNodeConfig
+class NodeSystemInputNode(BaseModel):
+    kind: Literal["input"] = "input"
+    ui: NodeSystemNodeUi
+    reads: list[NodeSystemReadBinding] = Field(default_factory=list)
+    writes: list[NodeSystemWriteBinding] = Field(default_factory=list)
+    config: NodeSystemInputConfig = Field(default_factory=NodeSystemInputConfig)
+
+
+class NodeSystemAgentNode(BaseModel):
+    kind: Literal["agent"] = "agent"
+    ui: NodeSystemNodeUi
+    reads: list[NodeSystemReadBinding] = Field(default_factory=list)
+    writes: list[NodeSystemWriteBinding] = Field(default_factory=list)
+    config: NodeSystemAgentConfig = Field(default_factory=NodeSystemAgentConfig)
+
+
+class NodeSystemConditionNode(BaseModel):
+    kind: Literal["condition"] = "condition"
+    ui: NodeSystemNodeUi
+    reads: list[NodeSystemReadBinding] = Field(default_factory=list)
+    writes: list[NodeSystemWriteBinding] = Field(default_factory=list)
+    config: NodeSystemConditionConfig = Field(default_factory=NodeSystemConditionConfig)
+
+
+class NodeSystemOutputNode(BaseModel):
+    kind: Literal["output"] = "output"
+    ui: NodeSystemNodeUi
+    reads: list[NodeSystemReadBinding] = Field(default_factory=list)
+    writes: list[NodeSystemWriteBinding] = Field(default_factory=list)
+    config: NodeSystemOutputConfig = Field(default_factory=NodeSystemOutputConfig)
+
+
+NodeSystemNode = (
+    NodeSystemInputNode
+    | NodeSystemAgentNode
+    | NodeSystemConditionNode
+    | NodeSystemOutputNode
 )
 
-
-class NodeViewportSize(BaseModel):
-    width: float | None = None
-    height: float | None = None
-
-    model_config = ConfigDict(extra="ignore")
-
-
-class NodeSystemNodeData(BaseModel):
-    node_id: str = Field(alias="nodeId", min_length=1)
-    config: NodeSystemNodeConfig = Field(discriminator="family")
-    preview_text: str = Field(default="", alias="previewText")
-    is_expanded: bool = Field(default=False, alias="isExpanded")
-    collapsed_size: NodeViewportSize | None = Field(default=None, alias="collapsedSize")
-    expanded_size: NodeViewportSize | None = Field(default=None, alias="expandedSize")
-
-    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
-
-
-class NodeSystemGraphNode(BaseModel):
-    id: str = Field(..., min_length=1)
-    type: str = "default"
-    position: Position
-    data: NodeSystemNodeData
-
-    model_config = ConfigDict(str_strip_whitespace=True, extra="ignore")
-
-    @model_validator(mode="after")
-    def sync_embedded_node_id(self) -> "NodeSystemGraphNode":
-        if self.data.node_id != self.id:
-            self.data.node_id = self.id
-        return self
+NodeSystemNodeConfig = NodeSystemNode
 
 
 class NodeSystemGraphEdge(BaseModel):
-    id: str = Field(..., min_length=1)
     source: str = Field(..., min_length=1)
     target: str = Field(..., min_length=1)
-    source_handle: str | None = Field(default=None, alias="sourceHandle")
-    target_handle: str | None = Field(default=None, alias="targetHandle")
+    source_handle: str = Field(..., alias="sourceHandle", min_length=1)
+    target_handle: str = Field(..., alias="targetHandle", min_length=1)
 
-    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True, extra="ignore")
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
+
+    @field_validator("source", "target")
+    @classmethod
+    def validate_node_name(cls, value: str) -> str:
+        return _validate_identifier(value, label="Node name")
 
 
-class NodeSystemGraphPayload(BaseModel):
+class NodeSystemConditionalEdge(BaseModel):
+    source: str = Field(..., min_length=1)
+    branches: dict[str, str] = Field(default_factory=dict)
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    @field_validator("source")
+    @classmethod
+    def validate_source(cls, value: str) -> str:
+        return _validate_identifier(value, label="Node name")
+
+    @field_validator("branches")
+    @classmethod
+    def validate_branches(cls, value: dict[str, str]) -> dict[str, str]:
+        normalized: dict[str, str] = {}
+        for branch, target in value.items():
+            next_branch = _validate_identifier(branch, label="Condition branch")
+            next_target = _validate_identifier(target, label="Node name")
+            normalized[next_branch] = next_target
+        return normalized
+
+
+class NodeSystemGraphCore(BaseModel):
     graph_family: Literal["node_system"] = "node_system"
+    state_schema: dict[str, NodeSystemStateDefinition] = Field(default_factory=dict)
+    nodes: dict[str, NodeSystemNode] = Field(default_factory=dict)
+    edges: list[NodeSystemGraphEdge] = Field(default_factory=list)
+    conditional_edges: list[NodeSystemConditionalEdge] = Field(default_factory=list, alias="conditional_edges")
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
+
+    @model_validator(mode="after")
+    def validate_references(self) -> "NodeSystemGraphCore":
+        state_names: set[str] = set()
+        for state_name in self.state_schema:
+            state_names.add(_validate_identifier(state_name, label="State name"))
+
+        node_names: set[str] = set()
+        for node_name, node in self.nodes.items():
+            normalized_name = _validate_identifier(node_name, label="Node name")
+            node_names.add(normalized_name)
+            for binding in [*node.reads, *node.writes]:
+                if binding.state not in state_names:
+                    raise ValueError(f"Node '{node_name}' references unknown state '{binding.state}'.")
+            if isinstance(node, NodeSystemConditionNode):
+                for branch in node.config.branches:
+                    _validate_identifier(branch, label="Condition branch")
+
+        for edge in self.edges:
+            if edge.source not in node_names:
+                raise ValueError(f"Edge source '{edge.source}' does not exist.")
+            if edge.target not in node_names:
+                raise ValueError(f"Edge target '{edge.target}' does not exist.")
+
+        for conditional_edge in self.conditional_edges:
+            if conditional_edge.source not in node_names:
+                raise ValueError(f"Conditional edge source '{conditional_edge.source}' does not exist.")
+            for target in conditional_edge.branches.values():
+                if target not in node_names:
+                    raise ValueError(
+                        f"Conditional edge from '{conditional_edge.source}' references unknown target '{target}'."
+                    )
+
+        return self
+
+
+class NodeSystemTemplate(NodeSystemGraphCore):
+    template_id: str = Field(..., min_length=1)
+    label: str = Field(..., min_length=1)
+    description: str = ""
+    default_graph_name: str = Field(..., min_length=1)
+
+    @field_validator("template_id", "label", "default_graph_name")
+    @classmethod
+    def validate_template_fields(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Template field cannot be empty.")
+        return normalized
+
+
+class NodeSystemGraphPayload(NodeSystemGraphCore):
     graph_id: str | None = None
     name: str = Field(..., min_length=1)
     template_id: str = ""
-    state_schema: list[StateField] = Field(default_factory=list)
-    nodes: list[NodeSystemGraphNode] = Field(default_factory=list)
-    edges: list[NodeSystemGraphEdge] = Field(default_factory=list)
-    metadata: dict[str, Any] = Field(default_factory=dict)
-
-    model_config = ConfigDict(str_strip_whitespace=True)
 
     @field_validator("name")
     @classmethod
     def validate_name(cls, value: str) -> str:
-        if not value.strip():
+        normalized = value.strip()
+        if not normalized:
             raise ValueError("Graph name cannot be empty.")
-        return value
+        return normalized
 
 
 class NodeSystemGraphDocument(NodeSystemGraphPayload):

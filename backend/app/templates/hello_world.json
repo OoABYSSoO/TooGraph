@@ -1,0 +1,187 @@
+{
+  "template_id": "hello_world",
+  "label": "Hello World",
+  "description": "Ask GraphiteUI onboarding questions, retrieve grounded knowledge, and generate a concise guided answer.",
+  "default_graph_name": "Hello World",
+  "graph_family": "node_system",
+  "state_schema": {
+    "question": {
+      "description": "User question for the workflow.",
+      "type": "text",
+      "defaultValue": "什么是 GraphiteUI？你能做些什么？我该如何开始使用？",
+      "color": "#d97706"
+    },
+    "knowledge_base": {
+      "description": "Selected knowledge base for grounded answers.",
+      "type": "knowledge_base",
+      "defaultValue": "graphiteui-official",
+      "color": "#0f766e"
+    },
+    "raw_answer": {
+      "description": "Raw onboarding answer produced by the helper agent.",
+      "type": "text",
+      "defaultValue": "",
+      "color": "#9f1239"
+    },
+    "formatted_answer": {
+      "description": "Markdown-formatted answer produced by the formatter agent.",
+      "type": "text",
+      "defaultValue": "",
+      "color": "#7c3aed"
+    }
+  },
+  "nodes": {
+    "input_question": {
+      "kind": "input",
+      "ui": {
+        "position": { "x": 80, "y": 160 },
+        "collapsed": false,
+        "expandedSize": { "width": 300, "height": 220 },
+        "collapsedSize": { "width": 300, "height": 72 }
+      },
+      "writes": [
+        { "state": "question", "mode": "replace" }
+      ],
+      "config": {
+        "sourceKind": "manual",
+        "defaultValue": "什么是 GraphiteUI？你能做些什么？我该如何开始使用？",
+        "placeholder": "Ask about GraphiteUI"
+      }
+    },
+    "input_knowledge_base": {
+      "kind": "input",
+      "ui": {
+        "position": { "x": 80, "y": 540 },
+        "collapsed": false,
+        "expandedSize": { "width": 300, "height": 220 },
+        "collapsedSize": { "width": 300, "height": 72 }
+      },
+      "writes": [
+        { "state": "knowledge_base", "mode": "replace" }
+      ],
+      "config": {
+        "sourceKind": "manual",
+        "defaultValue": "graphiteui-official",
+        "placeholder": "Knowledge base name"
+      }
+    },
+    "onboarding_helper": {
+      "kind": "agent",
+      "ui": {
+        "position": { "x": 560, "y": 80 },
+        "collapsed": false,
+        "expandedSize": { "width": 340, "height": 520 },
+        "collapsedSize": { "width": 340, "height": 72 }
+      },
+      "reads": [
+        { "state": "question", "required": true },
+        { "state": "knowledge_base", "required": true }
+      ],
+      "writes": [
+        { "state": "raw_answer", "mode": "replace" }
+      ],
+      "config": {
+        "skills": ["search_knowledge_base"],
+        "systemInstruction": "",
+        "taskInstruction": ""
+      }
+    },
+    "markdown_formatter": {
+      "kind": "agent",
+      "ui": {
+        "position": { "x": 560, "y": 480 },
+        "collapsed": false,
+        "expandedSize": { "width": 340, "height": 520 },
+        "collapsedSize": { "width": 340, "height": 72 }
+      },
+      "reads": [
+        { "state": "question", "required": true },
+        { "state": "knowledge_base", "required": true }
+      ],
+      "writes": [
+        { "state": "formatted_answer", "mode": "replace" }
+      ],
+      "config": {
+        "skills": ["search_knowledge_base"],
+        "systemInstruction": "",
+        "taskInstruction": "使用markdown格式输出"
+      }
+    },
+    "output_raw_answer": {
+      "kind": "output",
+      "ui": {
+        "position": { "x": 1040, "y": 80 },
+        "collapsed": false,
+        "expandedSize": { "width": 320, "height": 360 },
+        "collapsedSize": { "width": 320, "height": 72 }
+      },
+      "reads": [
+        { "state": "raw_answer", "required": true }
+      ],
+      "config": {
+        "displayMode": "auto",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    },
+    "output_formatted_answer": {
+      "kind": "output",
+      "ui": {
+        "position": { "x": 1040, "y": 480 },
+        "collapsed": false,
+        "expandedSize": { "width": 320, "height": 360 },
+        "collapsedSize": { "width": 320, "height": 72 }
+      },
+      "reads": [
+        { "state": "formatted_answer", "required": true }
+      ],
+      "config": {
+        "displayMode": "markdown",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    }
+  },
+  "edges": [
+    {
+      "source": "input_question",
+      "target": "onboarding_helper",
+      "sourceHandle": "write:question",
+      "targetHandle": "read:question"
+    },
+    {
+      "source": "input_knowledge_base",
+      "target": "onboarding_helper",
+      "sourceHandle": "write:knowledge_base",
+      "targetHandle": "read:knowledge_base"
+    },
+    {
+      "source": "input_question",
+      "target": "markdown_formatter",
+      "sourceHandle": "write:question",
+      "targetHandle": "read:question"
+    },
+    {
+      "source": "input_knowledge_base",
+      "target": "markdown_formatter",
+      "sourceHandle": "write:knowledge_base",
+      "targetHandle": "read:knowledge_base"
+    },
+    {
+      "source": "onboarding_helper",
+      "target": "output_raw_answer",
+      "sourceHandle": "write:raw_answer",
+      "targetHandle": "read:raw_answer"
+    },
+    {
+      "source": "markdown_formatter",
+      "target": "output_formatted_answer",
+      "sourceHandle": "write:formatted_answer",
+      "targetHandle": "read:formatted_answer"
+    }
+  ],
+  "conditional_edges": [],
+  "metadata": {}
+}

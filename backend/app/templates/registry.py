@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-from app.templates.hello_world import get_hello_world_template
+from app.templates.loader import load_template_record, list_template_records
 
 
 def list_templates() -> list[dict]:
-    return [get_hello_world_template()]
+    return list_template_records()
 
 
 def get_template(template_id: str) -> dict:
-    templates = {item["template_id"]: item for item in list_templates()}
-    if template_id not in templates:
-        raise KeyError(template_id)
-    return templates[template_id]
+    return load_template_record(template_id)

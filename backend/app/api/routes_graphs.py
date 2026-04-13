@@ -95,7 +95,7 @@ def run_graph_endpoint(payload: dict[str, Any], background_tasks: BackgroundTask
         max_revision_round=int(executed_graph.metadata.get("max_revision_round", 1)),
     )
     run_state["metadata"] = dict(executed_graph.metadata)
-    run_state["node_status_map"] = {node.id: "idle" for node in executed_graph.nodes}
+    run_state["node_status_map"] = {node_name: "idle" for node_name in executed_graph.nodes}
     save_run(run_state)
 
     background_tasks.add_task(_run_graph_worker, executed_graph, run_state)
