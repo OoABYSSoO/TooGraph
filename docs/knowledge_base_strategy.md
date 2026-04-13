@@ -126,3 +126,118 @@
 - 不改变用户操作模型
 - 更贴近企业里“挂库后自动检索”的实际体验
 - 可以先把最关键的知识库价值验证出来
+
+## 8. graph 中如何保存知识库引用
+
+当前讨论结论：
+
+- graph 第一阶段先保存纯 `kb_id`
+- 不在 graph 中直接保存知识库的完整结构化快照
+
+推荐形式：
+
+- `python-official-3.14.4`
+- `langgraph-official-v1`
+
+不推荐把这些展示信息直接写进 graph：
+
+- `label`
+- `source`
+- `version`
+- `description`
+
+这些信息更适合由知识库 registry 提供。
+
+推荐职责边界：
+
+- graph 保存稳定资源引用：`kb_id`
+- UI 从 registry 读取展示名和说明
+- runtime 根据 `kb_id` 查索引和元数据
+
+这样更符合企业里常见的 workflow 设计习惯：
+
+- 图里只保存外部资源引用
+- 资源元数据由系统注册表统一管理
+
+优点：
+
+- graph payload 更稳定，diff 更干净
+- 更名不会破坏旧图
+- label 和 source 更新不需要改图
+- runtime、缓存、权限和索引都可以围绕稳定 id 建立
+
+## 9. 知识库技能的推荐模型
+
+当前讨论结论：
+
+- 知识库检索逻辑应当封装成一个正式的 skill
+- 这个 skill 负责真实的知识库读取、检索和结果组织
+- 当一个 `agent` 节点接入知识库时，系统自动为它挂载这个 skill
+
+但这里的“自动挂载”不建议直接写回用户的 `config.skills`。
+
+推荐做法：
+
+- 作为隐式系统技能注入执行计划
+- 而不是伪装成用户手工添加的显式技能
+
+推荐区分两类技能：
+
+1. 显式技能
+   - 来自用户在节点配置中主动选择的 `skills`
+
+2. 隐式技能
+   - 来自图连接关系和系统规则自动派生
+   - 例如：agent 接入知识库后自动获得 `search_knowledge_base`
+
+推荐理由：
+
+- 不让“连一根知识库线”静默改脏节点配置
+- graph diff 更稳定
+- 用户技能和系统派生能力边界更清楚
+- 后续更容易扩展更多隐式系统能力
+
+推荐执行心智：
+
+- 用户把知识库 input 连给 agent
+- 编译器或 runtime 识别该 agent 具备 knowledge capability
+- 系统隐式注入 `search_knowledge_base`
+- skill 执行真正的检索逻辑
+- 检索结果再进入 agent prompt 上下文
+
+## 10. 第一阶段的知识库 skill 约束
+
+当前倾向的第一版约束：
+
+- 一个 agent 一次只接一个知识库
+- 一个 agent 自动获得一个隐式 `search_knowledge_base` skill
+- 该 skill 的 `knowledge_base` 输入来自连接进来的 `kb_id`
+- 该 skill 的 `query` 输入来自 agent 的主问题输入
+
+主问题输入的推荐优先级：
+
+1. `question`
+2. `query`
+3. `input`
+4. 第一个 required 的 text input
+
+如果找不到明确问题输入，推荐直接在 validate 阶段报错，而不是运行时猜测。
+
+第一阶段不急着做：
+
+- 多知识库同时检索
+- 用户手工配置 query mapping
+- 多轮 tool calling 检索
+- 显式知识库检索节点替代当前交互
+
+## 11. 当前结论的统一表达
+
+当前已经收敛出的正式方向是：
+
+- 用户操作逻辑不变，仍然通过 `input` 节点把知识库传给 `agent`
+- graph 内部先保存纯 `kb_id`
+- 知识库检索逻辑由正式 skill 承担
+- 该 skill 以“隐式系统技能”的方式自动挂载到接入知识库的 agent
+- skill 负责真实的知识库检索
+- runtime 负责把检索结果注入 agent 上下文
+- run detail 负责展示检索命中与来源
