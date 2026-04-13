@@ -1,6 +1,6 @@
 # Docs Index
 
-当前 `docs/` 只保留两份文档：
+当前 `docs/` 只保留三份核心文档：
 
 - [FUTURE_WORK.md](/home/abyss/GraphiteUI/docs/FUTURE_WORK.md)
 - [knowledge_base_strategy.md](/home/abyss/GraphiteUI/docs/knowledge_base_strategy.md)

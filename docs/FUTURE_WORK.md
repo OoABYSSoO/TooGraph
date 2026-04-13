@@ -10,7 +10,7 @@
 当前优先级：
 
 1. Cycles 交互与高级策略
-2. Knowledge Base 正式能力建设
+2. Knowledge Base 收尾与增强
 3. Memory 正式能力建设
 4. 人类在环与断点
 
@@ -45,24 +45,39 @@
   - 是否允许在循环中暂停
   - 恢复后从哪一轮、哪个节点继续
 
-## 2. Knowledge Base 正式能力建设
+## 2. Knowledge Base 收尾与增强
 
 当前代码现状：
 
-- knowledge 当前是本地目录扫描加简单字符串搜索
-- `/api/knowledge/bases` 只返回目录名，editor 只是把 knowledge base 名称作为输入值传给节点
-- runtime 当前没有正式的 retrieval、引用、分块、索引、版本和来源契约
+- knowledge base 已经有正式资源层：
+  - graph 内绑定稳定 `kb_id`
+  - `/api/knowledge/bases` 返回 label / version / 文档数 / chunk 数
+  - editor 会显示正式知识库选项
+- 已经有离线导入与本地索引：
+  - Python 官方文档库
+  - LangGraph 官方文档库
+  - SQLite FTS 检索主链
+- `search_knowledge_base` 已经是正式 skill：
+  - agent 接入 knowledge base 后显式挂载
+  - skill 返回 `context / results / citations`
+  - run detail 已返回 `knowledge_summary`
 
 后续要做：
 
-- 把 knowledge base 明确定义成正式资源，而不是“目录名字符串”
-- 明确 knowledge base / document / chunk / retrieval result 的正式数据结构
 - 增加知识库导入、更新、删除、重建索引和状态查看能力
-- 定义 editor 与 runtime 的知识库契约：
-  - graph 中如何绑定 knowledge base
-  - node 如何声明要读哪一个 knowledge base
-  - runtime 如何返回检索命中、来源、摘要与引用
-- 决定第一版是否先做全文检索正式化，还是直接进入分块检索 / 向量检索
+- 增强检索质量：
+  - query 归一化
+  - rerank
+  - 向量检索或混合检索
+- 扩展知识库使用方式：
+  - 多 knowledge base
+  - 更细的 query mapping
+  - 更清晰的 citation 展示
+- 明确知识库管理边界：
+  - 本地缓存
+  - 版本刷新
+  - 导入失败恢复
+  - 重新导入后的兼容策略
 
 ## 3. Memory 正式能力建设
 
