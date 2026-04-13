@@ -8,6 +8,7 @@
 - skill outputs
 - knowledge summary
 - cycle summary / cycle iterations
+- `state` 作为唯一数据源参与整个执行链
 
 知识库这条链目前已经做到：
 
@@ -30,4 +31,5 @@
 如果要理解当前产品状态，一个简单心智是：
 
 - 核心编辑和运行主链已经成型
+- `node_system` 已经是唯一正式协议，不再区分旧模板和新模板
 - 围绕 cycles、memory、interrupt 和知识库增强的部分还在继续打磨

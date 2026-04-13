@@ -9,13 +9,15 @@ GraphiteUI 当前是一个前后端分离的工作台：
 当前主链已经收口到 `node_system`：
 
 - graph 保存和运行都围绕同一套协议
-- graph state 已经是正式对象
+- `state_schema` 已经是唯一正式数据源
+- `nodes` 使用对象映射保存，键名就是全图唯一节点名
+- 节点只声明读取哪些 state、写入哪些 state
 - agent skill 已经是显式挂载
 - knowledge base 已经是正式资源，而不是临时目录名
 
 现在的运行链路大致是：
 
-1. 前端保存 graph
+1. 前端编辑并保存 graph
 2. 后端做 schema + validator 校验
 3. runtime 执行节点图
 4. run 结果写入 SQLite

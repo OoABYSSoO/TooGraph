@@ -53,7 +53,7 @@ curl http://localhost:8765/health    # {"status": "ok"}
 - **Entry**: `frontend/app/layout.tsx` — root layout with language/theme providers
 - **API client**: `frontend/lib/api.ts` — typed helpers (`apiGet`, `apiPost`, `apiDelete`) against `process.env.NEXT_PUBLIC_API_BASE_URL`
 - **State**: 目前主要由页面级 React state 与 React Flow state 驱动，仓库内没有稳定落地的 `frontend/stores/`
-- **Node system**: Preset-driven via `frontend/lib/node-presets-mock.ts`. Four node families: `input`, `agent`, `condition`, `output`. Node types are defined as `NodePresetDefinition` objects, not freeform.
+- **Node system**: `node_system` is now the only formal graph protocol. `state_schema` is the single data source, `nodes` is a map keyed by unique node names, and nodes only declare which state they read or write. Four current node families: `input`, `agent`, `condition`, `output`.
 - **Canvas**: `@xyflow/react` (React Flow v12) — `frontend/components/editor/node-system-editor.tsx`
 - **Styling**: Tailwind CSS v4 (via `@tailwindcss/postcss`) + CSS custom properties in `frontend/app/globals.css` for design tokens
 - **Path alias**: All frontend imports use `@/*` → `./` (e.g., `import { apiGet } from "@/lib/api"`)
@@ -67,7 +67,7 @@ curl http://localhost:8765/health    # {"status": "ok"}
   - `schemas/` — `graph`, `node_system`, `run`, `preset`, `skills` (Pydantic models)
   - `storage/` — SQLite persistence (`database.py`, `graph_store.py`, `run_store.py`)
   - 其他能力：`model_catalog`, `templates`, `skills`, `tools`
-- **Templates**: `backend/app/templates/` — 当前主模板是 `hello_world`
+- **Templates**: `backend/app/templates/` — templates are JSON-backed and currently led by `hello_world.json`
 - **Persistence**: SQLite at `backend/data/graphiteui.db`
 - **Local LLM config**: `LOCAL_BASE_URL`, `LOCAL_API_KEY`, `LOCAL_TEXT_MODEL` (with fallback aliases `OPENAI_BASE_URL`, `OPENAI_API_KEY`, `TEXT_MODEL`)
 
