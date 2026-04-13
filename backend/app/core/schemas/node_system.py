@@ -100,16 +100,6 @@ class ConditionMode(str, Enum):
     # CYCLE = "cycle"  # planned: LangGraph cycle support
 
 
-class ExecutionMode(str, Enum):
-    """
-    Execution mode for node system graphs.
-    DAG:  Directed Acyclic Graph — current default. Enforces topological execution order.
-    Cycle: supports cyclic graphs (LangGraph full capability) — future work.
-    """
-    DAG = "dag"
-    # CYCLE = "cycle"  # TODO: implement LangGraph cycle executor
-
-
 class DisplayMode(str, Enum):
     AUTO = "auto"
     PLAIN = "plain"

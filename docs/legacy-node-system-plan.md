@@ -7,8 +7,8 @@
 | 阶段 | 状态 | 交付 |
 |---|---|---|
 | Phase 1：立刻收口 | ✅ 已完成 | conditionMode 收口、StateField 统一、文档同步 |
-| Phase 2：结构与一致性 | ✅ 已完成 | worker 异常记录、共享类型统一、前端类型复用 |
-| Phase 3：Cycle-ready | ✅ 已完成 | ExecutionMode 枚举、CycleDetector、执行模式透传 |
+| Phase 2：结构与一致性 | ✅ 已完成 | worker 异常记录、共享类型统一，前端类型复用 |
+| Phase 3：Cycle-ready | ✅ 已完成 | CycleDetector、自动环检测、明确错误提示 |
 
 ---
 
@@ -52,24 +52,9 @@
 
 ---
 
-## Phase 3 — Cycle-ready 🔜
+## Phase 3 — Cycle-ready ✅
 
-### 3.1 ExecutionMode 枚举
-
-`backend/app/core/schemas/node_system.py`:
-
-```python
-class ExecutionMode(str, Enum):
-    """
-    Execution mode for node system graphs.
-    DAG:  Directed Acyclic Graph — current default.
-    Cycle: supports cyclic graphs (LangGraph full capability) — future work.
-    """
-    DAG = "dag"
-    # CYCLE = "cycle"  # TODO: implement LangGraph cycle executor
-```
-
-### 3.2 CycleDetector
+### 3.1 CycleDetector
 
 `backend/app/core/runtime/node_system_executor.py`:
 
@@ -81,16 +66,18 @@ class CycleDetector:
         # Returns (has_cycle, back_edges)
 ```
 
-### 3.3 执行模式透传
+### 3.2 自动环检测
 
-- `execute_node_system_graph(graph, execution_mode=ExecutionMode.DAG)` — 签名新增参数
-- DAG 模式下：先运行 `CycleDetector`，检测到环则 logger.warning + 仍抛出明确错误
-- `/api/graphs/run` 从 `graph.metadata.execution_mode` 读取，默认 `"dag"`
-- 未来实现 cycle 模式时：只需在 `ExecutionMode` 枚举中取消注释 `CYCLE`，在 executor 中新增 `execute_cycle_mode()` 分支即可
+`execute_node_system_graph()` 启动时自动调用 `CycleDetector`：
 
-### 3.4 文档更新
+- 有环 → `logger.warning` + 状态置 `failed` + 明确错误信息回写到 `run_state.errors`，立即返回
+- 无环 → 正常 DAG 执行
 
-本文档已同步 Phase 3 进展。
+不需要显式 `execution_mode` 参数，自动判断即可。
+
+### 3.3 已废弃说明
+
+~~`ExecutionMode` 枚举~~：不加。有环/无环由检测器自动判断，不需要用户声明意图。
 
 ---
 
@@ -98,38 +85,29 @@ class CycleDetector:
 
 ### 目标
 
-完整支持 LangGraph Cycles（循环图），实现 ReAct / Agent Loop 等模式。
+有环时支持多轮迭代执行，完整支持 LangGraph Cycles（ReAct / Agent Loop 等模式）。
 
-### 技术方案（草案）
+### 技术方案
 
-1. **ExecutionMode.CYCLE** 枚举取消注释
-2. `node_system_executor.py` 新增 `execute_cycle_mode()`：
-   - 不再做 topological sort
-   - 使用 `while` 循环 + visited 计数
-   - 每次迭代：执行所有就绪节点 → 更新 state → 直到所有节点完成或达到 max_iterations
-3. 新增 `ConditionMode.CYCLE`：由 LLM 判断是否继续循环
-4. `graph.metadata.max_iterations`：最大迭代次数（防止死循环）
-5. `graph.metadata.cycle_state_key`：循环终止条件的 state key（如 `"should_continue"`）
-6. 前端 UI：在图配置面板中增加 execution mode 切换和 max_iterations 输入
+不需要 ExecutionMode，全程 auto-detect + max_iterations 控制：
+
+1. `execute_node_system_graph()` 中，检测到环时改为调用 `_execute_with_cycles()`（而非直接失败返回）
+2. `_execute_with_cycles()` 逻辑：
+   - 不做 topological sort
+   - `while` 循环 + 已访问节点计数
+   - 每次迭代：执行所有就绪节点（in-degree=0 且未执行过）→ 更新 state → 直到所有节点完成或达到 `max_iterations`
+3. `graph.metadata.max_iterations`：最大迭代次数（默认 100）
+4. 新增 `ConditionMode.CYCLE`：由 LLM 判断是否继续循环
 
 ### 待验证问题
 
-- [ ] state 中 cycle iteration counter 如何持久化
-- [ ] 循环分支如何处理 node_executions 历史（同一节点多次执行）
-- [ ] WebSocket 实时推送循环迭代进度
-- [ ] 循环终止条件的 UI 配置方式
+- [ ] 同一节点多次执行时 `node_executions` 历史如何记录
+- [ ] WebSocket 实时推送每轮迭代进度
+- [ ] 循环终止条件的 state key 如何配置
 
 ---
 
-## Phase 5 — 前端 execution_mode UI（未来）
-
-- `frontend/lib/node-system-schema.ts`: `conditionMode` 扩展为 `"rule" | "model" | "cycle"`
-- 图设置面板：增加 execution mode 单选（默认 DAG）和 max_iterations 输入
-- Cycles 可视化：循环连线用虚线表示，迭代次数 badge
-
----
-
-## Phase 6 — RunState Schema 版本化（未来）
+## Phase 5 — RunState Schema 版本化（未来）
 
 `run_state` 中写入 schema 版本：
 

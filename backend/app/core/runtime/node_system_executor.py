@@ -15,7 +15,6 @@ from app.core.model_catalog import get_default_text_model_ref, normalize_model_r
 from app.core.schemas.node_system import (
     AgentNodeConfig,
     ConditionNodeConfig,
-    ExecutionMode,
     InputBoundaryNodeConfig,
     NodeSystemGraphDocument,
     NodeSystemGraphEdge,
@@ -72,9 +71,13 @@ def execute_node_system_graph(
     graph: NodeSystemGraphDocument,
     initial_state: dict[str, Any] | None = None,
     *,
-    execution_mode: ExecutionMode | None = None,
     persist_progress: bool = False,
 ) -> dict[str, Any]:
+    """
+    Execute a node_system graph. Automatically detects cycles and handles them:
+    - Acyclic graph → topological single-pass execution
+    - Cyclic graph → multi-pass iteration (future: controlled via max_iterations)
+    """
     started_perf = time.perf_counter()
     state = initial_state or create_initial_run_state(
         graph_id=graph.graph_id,
@@ -88,20 +91,29 @@ def execute_node_system_graph(
     nodes_by_id = {node.id: node for node in graph.nodes}
     incoming_edges, outgoing_edges = _index_edges(graph.edges)
 
-    # Cycle detection — run before attempting topological order
-    mode = execution_mode or ExecutionMode.DAG
-    if mode == ExecutionMode.DAG:
-        has_cycle, back_edges = CycleDetector(graph.edges).detect()
-        if has_cycle:
-            back_edge_samples = [f"{s}→{t}" for s, t in back_edges[:3]]
-            logger.warning("Graph %s contains cycles (back edges: %s). DAG mode requires acyclic topology.", graph.graph_id, back_edge_samples)
+    has_cycle, back_edges = CycleDetector(graph.edges).detect()
+    if has_cycle:
+        back_edge_samples = [f"{s}→{t}" for s, t in back_edges[:3]]
+        logger.warning(
+            "Graph %s contains cycles (back edges: %s). "
+            "Multi-pass execution is not yet implemented — graph must be acyclic.",
+            graph.graph_id,
+            back_edge_samples,
+        )
+        state["status"] = "failed"
+        state["errors"] = [
+            f"Graph contains cycles and cannot be executed yet: {back_edge_samples}"
+        ]
+        state["completed_at"] = utc_now_iso()
+        save_run(state)
+        return state
 
     try:
         execution_order = _topological_order(graph.nodes, graph.edges)
     except ValueError:
         raise ValueError(
-            f"Graph '{graph.graph_id}' contains cycles and cannot be executed in DAG mode. "
-            "Use execution_mode='cycle' (planned) for cyclic graphs."
+            f"Graph '{graph.graph_id}' contains cycles and cannot be executed. "
+            "Use a directed acyclic graph (DAG) for now."
         ) from None
     node_outputs: dict[str, dict[str, Any]] = {}
     active_edge_ids: set[str] = set()
