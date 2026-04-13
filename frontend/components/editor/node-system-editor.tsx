@@ -62,6 +62,7 @@ import {
   type PortDefinition,
   type RunNodeStatus,
   type RunStatus,
+  type SkillAttachment,
   type StateField,
   type StateFieldType,
   type ValueType,
@@ -213,6 +214,8 @@ const HELLO_WORLD_TEMPLATE_ID = "hello_world";
 const DEFAULT_EDITOR_TEXT_MODEL_REF = "local/lm-local";
 const DEFAULT_AGENT_THINKING_ENABLED = true;
 const DEFAULT_AGENT_TEMPERATURE = 0.2;
+const KNOWLEDGE_BASE_SKILL_KEY = "search_knowledge_base";
+const KNOWLEDGE_BASE_SKILL_LIMIT = "4";
 const TYPE_COLORS: Record<ValueType, string> = {
   text: "#d97706",
   json: "#2563eb",
@@ -1580,6 +1583,104 @@ function createAutoInputPort(existingPorts: PortDefinition[], sourceType: ValueT
     valueType: sourceType,
     required: true,
   };
+}
+
+function isKnowledgeBaseSkill(skill: SkillAttachment) {
+  return skill.skillKey === KNOWLEDGE_BASE_SKILL_KEY;
+}
+
+function areSkillAttachmentsEqual(left: SkillAttachment[], right: SkillAttachment[]) {
+  if (left.length !== right.length) return false;
+  return left.every((skill, index) => JSON.stringify(skill) === JSON.stringify(right[index]));
+}
+
+function pickAgentKnowledgeQueryInputKey(config: AgentNode, knowledgeBaseInputKey: string) {
+  const candidateInputs = config.inputs.filter((port) => port.key !== knowledgeBaseInputKey && port.valueType !== "knowledge_base");
+  const preferredKeys = ["question", "query", "input"];
+  for (const key of preferredKeys) {
+    const matched = candidateInputs.find((port) => port.key === key);
+    if (matched) {
+      return matched.key;
+    }
+  }
+
+  const preferredTextInput =
+    candidateInputs.find((port) => port.required && (port.valueType === "text" || port.valueType === "any")) ??
+    candidateInputs.find((port) => port.valueType === "text" || port.valueType === "any");
+  if (preferredTextInput) {
+    return preferredTextInput.key;
+  }
+
+  return candidateInputs.find((port) => port.required)?.key ?? candidateInputs[0]?.key ?? null;
+}
+
+function createKnowledgeBaseSkillAttachment(knowledgeBaseInputKey: string, queryInputKey: string): SkillAttachment {
+  return {
+    name: KNOWLEDGE_BASE_SKILL_KEY,
+    skillKey: KNOWLEDGE_BASE_SKILL_KEY,
+    inputMapping: {
+      knowledge_base: `$inputs.${knowledgeBaseInputKey}`,
+      query: `$inputs.${queryInputKey}`,
+      limit: KNOWLEDGE_BASE_SKILL_LIMIT,
+    },
+    contextBinding: {},
+    usage: "optional",
+  };
+}
+
+function collectAgentKnowledgeBaseBindings(agentNode: FlowNode, nodesById: Map<string, FlowNode>, edges: Edge[]) {
+  const connectedInputKeys = new Set<string>();
+
+  for (const edge of edges) {
+    if (edge.target !== agentNode.id) continue;
+    const sourceNode = nodesById.get(edge.source);
+    if (!sourceNode) continue;
+    if (getPortType(sourceNode.data.config, edge.sourceHandle) !== "knowledge_base") continue;
+    const inputKey = getPortKeyFromHandle(edge.targetHandle);
+    if (!inputKey) continue;
+    connectedInputKeys.add(inputKey);
+  }
+
+  return Array.from(connectedInputKeys);
+}
+
+function syncKnowledgeBaseSkillOnAgent(agentNode: FlowNode, nodesById: Map<string, FlowNode>, edges: Edge[]) {
+  if (agentNode.data.config.family !== "agent") {
+    return agentNode.data.config;
+  }
+
+  const config = agentNode.data.config as AgentNode;
+  const knowledgeBaseInputKeys = collectAgentKnowledgeBaseBindings(agentNode, nodesById, edges);
+  const skillsWithoutKnowledgeBase = config.skills.filter((skill) => !isKnowledgeBaseSkill(skill));
+
+  if (knowledgeBaseInputKeys.length !== 1) {
+    return areSkillAttachmentsEqual(skillsWithoutKnowledgeBase, config.skills)
+      ? config
+      : normalizeNodeConfig({
+          ...config,
+          skills: skillsWithoutKnowledgeBase,
+        } satisfies AgentNode);
+  }
+
+  const knowledgeBaseInputKey = knowledgeBaseInputKeys[0];
+  const queryInputKey = pickAgentKnowledgeQueryInputKey(config, knowledgeBaseInputKey);
+  if (!queryInputKey) {
+    return areSkillAttachmentsEqual(skillsWithoutKnowledgeBase, config.skills)
+      ? config
+      : normalizeNodeConfig({
+          ...config,
+          skills: skillsWithoutKnowledgeBase,
+        } satisfies AgentNode);
+  }
+
+  const nextKnowledgeBaseSkill = createKnowledgeBaseSkillAttachment(knowledgeBaseInputKey, queryInputKey);
+  const nextSkills = [...skillsWithoutKnowledgeBase, nextKnowledgeBaseSkill];
+  return areSkillAttachmentsEqual(nextSkills, config.skills)
+    ? config
+    : normalizeNodeConfig({
+        ...config,
+        skills: nextSkills,
+      } satisfies AgentNode);
 }
 
 function createDefaultPort(side: "input" | "output", existingPorts: PortDefinition[]): PortDefinition {
@@ -4485,6 +4586,21 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
   }, [nodes]);
   const runNodeSummary = useMemo(() => summarizeRunNodeStates(nodeIds, runNodeStatusMap), [nodeIds, runNodeStatusMap]);
   const suppressOutputPreviewFallback = activeRunStatus === "queued" || activeRunStatus === "running";
+  const knowledgeSkillSyncSignature = useMemo(
+    () =>
+      nodes
+        .map((node) => {
+          const inputs = listInputPorts(node.data.config)
+            .map((port) => `${port.key}:${port.valueType}:${port.required ? "1" : "0"}`)
+            .join(",");
+          const outputs = listOutputPorts(node.data.config)
+            .map((port) => `${port.key}:${port.valueType}`)
+            .join(",");
+          return `${node.id}|${node.data.config.family}|${inputs}|${outputs}`;
+        })
+        .join("::"),
+    [nodes],
+  );
 
   const previewTextByNode = useMemo(() => {
     return Object.fromEntries(nodes.map((node) => [node.id, createPreviewText(node, nodes, edges)]));
@@ -4722,6 +4838,32 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
     setNodes(initialNodes);
     setEdges(initialEdges);
   }, [initialGraph, setEdges, setNodes]);
+
+  useEffect(() => {
+    setNodes((current) => {
+      const nodesById = new Map(current.map((node) => [node.id, node]));
+      let changed = false;
+      const nextNodes = current.map((node) => {
+        if (node.data.config.family !== "agent") {
+          return node;
+        }
+        const nextConfig = syncKnowledgeBaseSkillOnAgent(node, nodesById, edges);
+        if (nextConfig === node.data.config) {
+          return node;
+        }
+        changed = true;
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            config: nextConfig,
+          },
+        };
+      });
+
+      return changed ? nextNodes : current;
+    });
+  }, [edges, knowledgeSkillSyncSignature, setNodes]);
 
   useEffect(() => {
     if (!isNewFromTemplate) return;

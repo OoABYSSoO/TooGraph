@@ -113,18 +113,18 @@
    - 纯字符串 `kb_id`
    - 还是带 `id / label / version` 的结构化对象
 2. 检索方式先采用：
-   - agent 内隐式 retrieval
-   - 还是保留显式 `search_knowledge_base` 技能链路
+   - agent 内自动挂载显式 `search_knowledge_base` 技能
+   - 还是保留完全隐式 retrieval
 
 当前倾向：
 
 - graph 中先存稳定 `kb_id`
-- 第一阶段优先做 agent 内隐式 retrieval
+- 第一阶段优先做显式 `search_knowledge_base` 技能链路
 
 原因：
 
 - 不改变用户操作模型
-- 更贴近企业里“挂库后自动检索”的实际体验
+- 能让用户明确看到当前 agent 实际挂载了什么能力
 - 可以先把最关键的知识库价值验证出来
 
 ## 8. graph 中如何保存知识库引用
@@ -174,43 +174,33 @@
 - 这个 skill 负责真实的知识库读取、检索和结果组织
 - 当一个 `agent` 节点接入知识库时，系统自动为它挂载这个 skill
 
-但这里的“自动挂载”不建议直接写回用户的 `config.skills`。
+这里的“自动挂载”现在已经明确调整为：
 
-推荐做法：
-
-- 作为隐式系统技能注入执行计划
-- 而不是伪装成用户手工添加的显式技能
-
-推荐区分两类技能：
-
-1. 显式技能
-   - 来自用户在节点配置中主动选择的 `skills`
-
-2. 隐式技能
-   - 来自图连接关系和系统规则自动派生
-   - 例如：agent 接入知识库后自动获得 `search_knowledge_base`
-
-推荐理由：
-
-- 不让“连一根知识库线”静默改脏节点配置
-- graph diff 更稳定
-- 用户技能和系统派生能力边界更清楚
-- 后续更容易扩展更多隐式系统能力
+- 直接写回用户可见的 `config.skills`
+- 在 UI 上和用户手工添加的 skill 不做区分
+- 自动添加只是为了减少操作步骤，不再保留“隐式系统技能”心智
 
 推荐执行心智：
 
 - 用户把知识库 input 连给 agent
-- 编译器或 runtime 识别该 agent 具备 knowledge capability
-- 系统隐式注入 `search_knowledge_base`
-- skill 执行真正的检索逻辑
+- 编辑器自动把 `search_knowledge_base` 挂到该 agent 上
+- skill 作为普通显式 skill 出现在节点上
+- runtime 执行真正的检索逻辑
 - 检索结果再进入 agent prompt 上下文
+
+推荐理由：
+
+- 用户能明确看到当前节点挂载了什么技能
+- skill 链路和现有 agent 技能心智一致
+- 后续 run detail 和调试信息更容易解释
+- 仍然保留“连知识库线就少一步手工挂 skill”的效率收益
 
 ## 10. 第一阶段的知识库 skill 约束
 
 当前倾向的第一版约束：
 
 - 一个 agent 一次只接一个知识库
-- 一个 agent 自动获得一个隐式 `search_knowledge_base` skill
+- 一个 agent 自动获得一个显式 `search_knowledge_base` skill
 - 该 skill 的 `knowledge_base` 输入来自连接进来的 `kb_id`
 - 该 skill 的 `query` 输入来自 agent 的主问题输入
 
@@ -237,7 +227,7 @@
 - 用户操作逻辑不变，仍然通过 `input` 节点把知识库传给 `agent`
 - graph 内部先保存纯 `kb_id`
 - 知识库检索逻辑由正式 skill 承担
-- 该 skill 以“隐式系统技能”的方式自动挂载到接入知识库的 agent
+- 该 skill 以普通显式 skill 的形式自动挂载到接入知识库的 agent
 - skill 负责真实的知识库检索
 - runtime 负责把检索结果注入 agent 上下文
 - run detail 负责展示检索命中与来源
