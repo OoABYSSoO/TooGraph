@@ -103,7 +103,7 @@ type FlowNodeData = {
   defaultAgentTemperature?: number;
   availableModelRefs?: string[];
   modelDisplayLookup?: Record<string, string>;
-  knowledgeBases?: Array<{ name: string }>;
+  knowledgeBases?: KnowledgeBaseOption[];
   stateFieldLookup?: Record<string, string>;
   onOpenStatePanel?: () => void;
 };
@@ -126,6 +126,15 @@ type SkillDefinition = {
   outputSchema: SkillDefinitionField[];
   supportedValueTypes: string[];
   sideEffects: string[];
+};
+
+type KnowledgeBaseOption = {
+  name: string;
+  label?: string;
+  version?: string;
+  description?: string;
+  documentCount?: number;
+  chunkCount?: number;
 };
 
 type EditorSettingsPayload = {
@@ -3276,7 +3285,11 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                         }))
                       }
                       className="min-h-[48px] rounded-[16px] px-3 py-3 text-sm"
-                      options={(data.knowledgeBases ?? []).map((kb) => ({ value: kb.name, label: kb.name }))}
+                      options={(data.knowledgeBases ?? []).map((kb) => ({
+                        value: kb.name,
+                        label: kb.label || kb.name,
+                        detail: kb.version || (typeof kb.chunkCount === "number" ? `${kb.chunkCount} chunks` : undefined),
+                      }))}
                     />
                   ) : (
                     <div className="grid min-h-[60px] place-items-center rounded-[16px] border border-dashed border-[rgba(154,52,18,0.18)] bg-[rgba(255,255,255,0.82)] px-4 py-4 text-center text-sm text-[var(--muted)]">
@@ -4413,7 +4426,7 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
   const [skillDefinitions, setSkillDefinitions] = useState<SkillDefinition[]>([]);
   const [skillDefinitionsLoading, setSkillDefinitionsLoading] = useState(true);
   const [skillDefinitionsError, setSkillDefinitionsError] = useState<string | null>(null);
-  const [knowledgeBases, setKnowledgeBases] = useState<Array<{ name: string }>>([]);
+  const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBaseOption[]>([]);
   const [editorSettings, setEditorSettings] = useState<EditorSettingsPayload | null>(null);
   const [connectingSourceType, setConnectingSourceType] = useState<ValueType | null>(null);
   const [creationMenu, setCreationMenu] = useState<{
@@ -4790,7 +4803,7 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
     }
 
     void loadSkillDefinitions();
-    apiGet<Array<{ name: string }>>("/api/knowledge/bases").then(setKnowledgeBases).catch(() => {});
+    apiGet<KnowledgeBaseOption[]>("/api/knowledge/bases").then(setKnowledgeBases).catch(() => {});
 
     return () => {
       active = false;

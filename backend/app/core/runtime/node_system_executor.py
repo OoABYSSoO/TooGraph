@@ -24,6 +24,8 @@ from app.core.schemas.node_system import (
 )
 from app.core.storage.run_store import save_run
 from app.skills.registry import get_skill_registry
+
+KNOWLEDGE_BASE_SKILL_KEY = "search_knowledge_base"
 from app.tools.local_llm import (
     _chat_with_local_model_with_meta,
     get_default_agent_temperature,
@@ -520,6 +522,7 @@ def _refresh_run_artifacts(
         "values": state_values,
         "last_writers": state_last_writers,
     }
+    state["knowledge_summary"] = _build_knowledge_summary(state.get("skill_outputs", []))
 
 
 def _initialize_graph_state(graph: NodeSystemGraphDocument, state: dict[str, Any]) -> None:
@@ -535,6 +538,31 @@ def _initialize_graph_state(graph: NodeSystemGraphDocument, state: dict[str, Any
         "values": dict(initialized_values),
         "last_writers": dict(state["state_last_writers"]),
     }
+
+
+def _build_knowledge_summary(skill_outputs: list[dict[str, Any]]) -> str:
+    lines: list[str] = []
+    for skill_output in skill_outputs:
+        if skill_output.get("skill_key") != KNOWLEDGE_BASE_SKILL_KEY:
+            continue
+        outputs = skill_output.get("outputs") or {}
+        knowledge_base = outputs.get("knowledge_base") or "unknown"
+        query = outputs.get("query") or ""
+        citations = outputs.get("citations") or []
+        header = f"Knowledge Base: {knowledge_base}"
+        if query:
+            header += f"\nQuery: {query}"
+        lines.append(header)
+        if citations:
+            for citation in citations[:6]:
+                lines.append(
+                    f"- {citation.get('title') or 'Untitled'}"
+                    f" | {citation.get('section') or 'Overview'}"
+                    f" | {citation.get('url') or citation.get('source') or ''}"
+                )
+        else:
+            lines.append("- No citations returned.")
+    return "\n\n".join(lines).strip()
 
 
 def _apply_state_reads(

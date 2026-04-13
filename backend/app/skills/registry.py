@@ -55,16 +55,44 @@ def search_knowledge_base_skill(**skill_inputs: Any) -> dict[str, Any]:
     limit = max(1, min(limit, 8))
 
     results = search_knowledge(query, knowledge_base=knowledge_base, limit=limit)
+    formatted_results = [
+        {
+            "title": item["title"],
+            "section": item.get("section", ""),
+            "summary": item["summary"],
+            "source": item["source"],
+            "url": item.get("url") or item["source"],
+            "score": item.get("score", 0.0),
+        }
+        for item in results
+    ]
+    citations = [
+        {
+            "index": index,
+            "title": item["title"],
+            "section": item.get("section", ""),
+            "source": item["source"],
+            "url": item.get("url") or item["source"],
+        }
+        for index, item in enumerate(results, start=1)
+    ]
     context = "\n\n".join(
-        f"[{i}] {item['title']} ({item['source']})\n{item['content']}"
-        for i, item in enumerate(results, start=1)
+        (
+            f"[{index}] {item['title']}\n"
+            f"Knowledge Base: {item.get('kb_label') or item.get('kb_id') or knowledge_base}\n"
+            f"Section: {item.get('section') or 'Overview'}\n"
+            f"Source: {item.get('url') or item['source']}\n"
+            f"Excerpt:\n{item['content']}"
+        )
+        for index, item in enumerate(results, start=1)
     )
     return {
+        "knowledge_base": results[0].get("kb_id", knowledge_base) if results else knowledge_base,
+        "query": query,
+        "result_count": len(results),
         "context": context,
-        "results": [
-            {"title": item["title"], "summary": item["summary"], "source": item["source"]}
-            for item in results
-        ],
+        "results": formatted_results,
+        "citations": citations,
     }
 
 
