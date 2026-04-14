@@ -2525,17 +2525,31 @@ function PortRow({
   const [isEditing, setIsEditing] = useState(false);
   const [draftLabel, setDraftLabel] = useState(boundState ? getStateDisplayName(boundState) : port.label);
   const [isEditingPortConfig, setIsEditingPortConfig] = useState(false);
-  const [draftPort, setDraftPort] = useState<PortDefinition>(port);
+  const [draftPort, setDraftPort] = useState<PortDefinition>({
+    ...port,
+    label: boundState ? getStateDisplayName(boundState) : port.label,
+  });
   const labelRef = useRef<HTMLSpanElement | null>(null);
   const displayLabel = boundState ? getStateDisplayName(boundState) : port.label;
 
   useEffect(() => {
     setDraftLabel(displayLabel);
-    setDraftPort({
-      ...port,
-      label: displayLabel,
+    setDraftPort((current) => {
+      const nextPort: PortDefinition = {
+        ...port,
+        label: displayLabel,
+      };
+      if (
+        current.key === nextPort.key &&
+        current.label === nextPort.label &&
+        current.valueType === nextPort.valueType &&
+        Boolean(current.required) === Boolean(nextPort.required)
+      ) {
+        return current;
+      }
+      return nextPort;
     });
-  }, [displayLabel, port]);
+  }, [displayLabel, port.key, port.label, port.required, port.valueType]);
 
   function startEditing() {
     if (portEditor) {
@@ -5083,7 +5097,33 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
     }),
     [edges, graphId, graphName, metadata, nodes, previewTextByNode, stateSchema],
   );
+  const derivedCanonicalGraph = useMemo<CanonicalGraph>(
+    () => buildCanonicalGraphFromLegacyGraph(legacyGraphSnapshot),
+    [legacyGraphSnapshot],
+  );
   const canonicalGraph = canonicalGraphState;
+  const canonicalGraphForSubmission = useMemo<CanonicalGraph>(() => {
+    const mergedNodes = { ...derivedCanonicalGraph.nodes };
+    for (const [nodeId, currentNode] of Object.entries(canonicalGraphState.nodes)) {
+      const derivedNode = derivedCanonicalGraph.nodes[nodeId];
+      mergedNodes[nodeId] = derivedNode
+        ? {
+            ...derivedNode,
+            ...currentNode,
+            ui: derivedNode.ui,
+          }
+        : currentNode;
+    }
+
+    return {
+      ...derivedCanonicalGraph,
+      graph_id: canonicalGraphState.graph_id,
+      name: canonicalGraphState.name,
+      state_schema: canonicalGraphState.state_schema,
+      nodes: mergedNodes,
+      metadata: canonicalGraphState.metadata,
+    };
+  }, [canonicalGraphState, derivedCanonicalGraph]);
   const canonicalNodeKeys = useMemo(() => Object.keys(canonicalGraph.nodes), [canonicalGraph]);
   const canonicalStateCount = useMemo(() => Object.keys(canonicalGraph.state_schema).length, [canonicalGraph]);
   const nodeLabelLookup = useMemo(
@@ -5405,7 +5445,33 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
   }, [initialGraph, setEdges, setNodes]);
 
   useEffect(() => {
-    const derivedCanonical = buildCanonicalGraphFromLegacyGraph(legacyGraphSnapshot);
+    const uiSnapshot: GraphPayload = {
+      graph_id: graphId,
+      name: graphName,
+      state_schema: [],
+      nodes: nodes.map((node) => ({
+        id: node.id,
+        type: node.type ?? "default",
+        position: node.position,
+        data: {
+          nodeId: node.data.nodeId,
+          config: node.data.config,
+          previewText: "",
+          isExpanded: node.data.config.family === "input" ? true : Boolean(node.data.isExpanded),
+          collapsedSize: node.data.collapsedSize ?? null,
+          expandedSize: node.data.expandedSize ?? null,
+        },
+      })),
+      edges: edges.map((edge) => ({
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        sourceHandle: edge.sourceHandle ?? null,
+        targetHandle: edge.targetHandle ?? null,
+      })),
+      metadata: {},
+    };
+    const derivedCanonical = buildCanonicalGraphFromLegacyGraph(uiSnapshot);
     setCanonicalGraphState((current) => {
       let changed = false;
       const flowNodeIds = new Set(nodes.map((node) => node.id));
@@ -5456,33 +5522,53 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
         conditional_edges: nextConditionalEdges,
       };
     });
-  }, [legacyGraphSnapshot, nodes]);
+  }, [edges, graphId, graphName, nodes]);
 
   useEffect(() => {
-    setNodes((current) => {
-      const nodesById = new Map(current.map((node) => [node.id, node]));
-      let changed = false;
-      const nextNodes = current.map((node) => {
-        if (node.data.config.family !== "agent") {
-          return node;
-        }
-        const nextConfig = syncKnowledgeBaseSkillOnAgent(node, nodesById, edges);
-        if (nextConfig === node.data.config) {
-          return node;
-        }
-        changed = true;
-        return {
+    const nodesById = new Map(nodes.map((node) => [node.id, node]));
+    let changed = false;
+    const changedCanonicalNodes: Record<string, CanonicalGraph["nodes"][string]> = {};
+    const nextNodes = nodes.map((node) => {
+      if (node.data.config.family !== "agent") {
+        return node;
+      }
+      const nextConfig = syncKnowledgeBaseSkillOnAgent(node, nodesById, edges);
+      if (nextConfig === node.data.config) {
+        return node;
+      }
+      changed = true;
+      changedCanonicalNodes[node.id] = buildCanonicalNodeFromFlowNode(
+        {
           ...node,
           data: {
             ...node.data,
             config: nextConfig,
           },
-        };
-      });
-
-      return changed ? nextNodes : current;
+        },
+        nextConfig,
+      );
+      return {
+        ...node,
+        data: {
+          ...node.data,
+          config: nextConfig,
+        },
+      };
     });
-  }, [edges, knowledgeSkillSyncSignature, setNodes]);
+
+    if (!changed) {
+      return;
+    }
+
+    setNodes(nextNodes);
+    setCanonicalGraphState((current) => ({
+      ...current,
+      nodes: {
+        ...current.nodes,
+        ...changedCanonicalNodes,
+      },
+    }));
+  }, [edges, knowledgeSkillSyncSignature, nodes, setNodes]);
 
   useEffect(() => {
     if (!isNewFromTemplate) return;
@@ -5752,8 +5838,8 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
     }
   }
 
-  function buildPayload(): GraphPayload {
-    return legacyGraphSnapshot;
+  function buildPayload(): CanonicalGraph {
+    return canonicalGraphForSubmission;
   }
 
   async function handleSave() {

@@ -207,7 +207,7 @@
 - `graph.name`、`graph_id`、`state_schema` 和节点正式语义不再由旧前端结构单独持有
 - ReactFlow 节点位置、尺寸与连线会同步回填到正式协议中的 `ui / edges / conditional_edges`
 
-## Phase 3：保存 / 校验 / 运行原生化
+## Phase 3：保存 / 校验 / 运行原生化（已完成）
 
 ### 目标
 
@@ -242,6 +242,13 @@
 
 - 前端写路径全部原生化
 - 后端兼容层不再处理主写链路
+
+### 当前落实结果
+
+- 前端 `buildPayload()` 已直接输出正式 `node_system` 协议
+- `/api/graphs/save`、`/api/graphs/validate`、`/api/graphs/run` 已优先直接解析正式 `NodeSystemGraphPayload`
+- 后端 legacy 解析已降级为旧 payload 的兜底，不再是主写链路
+- `hello_world` 已用正式协议完成 save / validate / run 验证
 
 ## Phase 4：模板和图详情读取原生化
 
@@ -385,10 +392,10 @@
 
 当前最适合开始的下一步是：
 
-- Phase 3：保存 / 校验 / 运行原生化
+- Phase 4：模板和图详情读取原生化
 
 原因：
 
-- Phase 1 和 Phase 2 已完成
-- 前端内部已经具备正式协议主数据
-- 现在可以开始切主写链路，而不需要继续依赖旧 payload 作为提交形态
+- Phase 1、2、3 已完成
+- 写链路已经切到正式协议
+- 现在可以继续把 `/api/templates` 和 `/api/graphs` 的读链路从 legacy 返回中解开
