@@ -42,10 +42,15 @@ import { RichContent, formatRichContentValue, resolveRichContentDisplayMode } fr
 import { apiGet, apiPost } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import {
-  buildCanonicalGraphFromLegacyGraph,
   buildCanonicalNodeFromLegacyNode,
-  buildLegacyStateSchemaFromCanonicalGraph,
+  buildEditorNodeConfigFromCanonicalNode,
+  buildEditorPresetRecordFromCanonicalPreset,
+  buildEditorStateFieldsFromCanonicalGraph,
+  type CanonicalPresetDocument,
   type CanonicalGraphPayload,
+  type CanonicalTemplateRecord,
+  type CanonicalNode,
+  type EditorPresetRecord,
 } from "@/lib/node-system-canonical";
 import { EMPTY_AGENT_PRESET, getNodePresetById, NODE_PRESETS_MOCK, TEXT_INPUT_PRESET } from "@/lib/node-presets-mock";
 import {
@@ -57,11 +62,7 @@ import {
   type ConditionRule,
   type InputBoundaryNode,
   type NodeFamily,
-  type NodeSystemGraphEdge,
-  type NodeSystemGraphNode,
-  type NodeSystemGraphPayload,
   type NodeSystemRunDetail,
-  type NodeSystemTemplateRecord,
   type NodePresetDefinition,
   type NodeViewportSize,
   type OutputBoundaryNode,
@@ -74,8 +75,8 @@ import {
   type ValueType,
 } from "@/lib/node-system-schema";
 
-type GraphPayload = NodeSystemGraphPayload;
-type TemplateRecord = NodeSystemTemplateRecord;
+type GraphPayload = CanonicalGraphPayload;
+type TemplateRecord = CanonicalTemplateRecord;
 
 type EditorClientProps = {
   mode: "new" | "existing";
@@ -188,14 +189,6 @@ type EditorSettingsPayload = {
 
 type RunDetail = NodeSystemRunDetail;
 type CanonicalGraph = CanonicalGraphPayload;
-
-type PresetDocument = {
-  presetId: string;
-  sourcePresetId?: string | null;
-  definition: NodePresetDefinition;
-  createdAt?: string | null;
-  updatedAt?: string | null;
-};
 
 type CreationMenuEntry = {
   id: string;
@@ -1682,7 +1675,12 @@ function createEditorDefaults(templates: TemplateRecord[], defaultTemplateId?: s
     templates[0];
   if (preferredTemplate) {
     return {
-      ...preferredTemplate.default_node_system_graph,
+      name: preferredTemplate.default_graph_name,
+      state_schema: preferredTemplate.state_schema,
+      nodes: preferredTemplate.nodes,
+      edges: preferredTemplate.edges,
+      conditional_edges: preferredTemplate.conditional_edges,
+      metadata: preferredTemplate.metadata,
       graph_id: null,
     };
   }
@@ -1690,28 +1688,33 @@ function createEditorDefaults(templates: TemplateRecord[], defaultTemplateId?: s
   return {
     graph_id: null,
     name: "Node System Playground",
-    state_schema: [],
-    nodes: [],
+    state_schema: {},
+    nodes: {},
     edges: [],
+    conditional_edges: [],
     metadata: {},
   };
 }
 
-function createFlowNodeFromGraphNode(node: NodeSystemGraphNode): FlowNode {
-  const config = normalizeNodeConfig(deepClonePreset(node.data?.config as NodePresetDefinition));
-  const isExpanded = config.family === "input" ? true : Boolean(node.data?.isExpanded);
-  const collapsedSize = normalizeViewportSize(node.data?.collapsedSize);
-  const expandedSize = normalizeViewportSize(node.data?.expandedSize);
+function createFlowNodeFromCanonicalNode(
+  nodeId: string,
+  node: CanonicalNode,
+  stateSchema: CanonicalGraphPayload["state_schema"],
+): FlowNode {
+  const config = normalizeNodeConfig(deepClonePreset(buildEditorNodeConfigFromCanonicalNode(nodeId, node, stateSchema)));
+  const isExpanded = config.family === "input" ? true : !Boolean(node.ui.collapsed);
+  const collapsedSize = normalizeViewportSize(node.ui.collapsedSize);
+  const expandedSize = normalizeViewportSize(node.ui.expandedSize);
   const activeSize = isExpanded ? expandedSize : collapsedSize;
   const defaultWidth = getDefaultNodeWidth(config);
   return {
-    id: node.id,
-    type: node.type ?? "default",
-    position: node.position ?? { x: 0, y: 0 },
+    id: nodeId,
+    type: "default",
+    position: node.ui.position ?? { x: 0, y: 0 },
     data: {
-      nodeId: node.data?.nodeId ?? node.id,
+      nodeId,
       config,
-      previewText: node.data?.previewText ?? "",
+      previewText: "",
       isExpanded,
       collapsedSize,
       expandedSize,
@@ -1722,22 +1725,54 @@ function createFlowNodeFromGraphNode(node: NodeSystemGraphNode): FlowNode {
   } satisfies FlowNode;
 }
 
-function createFlowEdgeFromGraphEdge(edge: NodeSystemGraphEdge, nodesById: Map<string, FlowNode>): Edge {
+function createFlowEdgeFromCanonicalEdge(edge: CanonicalGraphPayload["edges"][number], nodesById: Map<string, FlowNode>): Edge {
   const sourceNode = nodesById.get(edge.source);
-  const sourceType = sourceNode ? getPortType(sourceNode.data.config, edge.sourceHandle) : "any";
+  const flowSourceHandle = `output:${edge.sourceHandle.split(":", 2)[1] ?? edge.sourceHandle}`;
+  const flowTargetHandle = `input:${edge.targetHandle.split(":", 2)[1] ?? edge.targetHandle}`;
+  const sourceType = sourceNode ? getPortType(sourceNode.data.config, flowSourceHandle) : "any";
   const color = TYPE_COLORS[sourceType ?? "any"];
   return {
-    id: edge.id,
+    id: `edge:${edge.source}:${edge.sourceHandle}:${edge.target}:${edge.targetHandle}`,
     source: edge.source,
     target: edge.target,
-    sourceHandle: edge.sourceHandle ?? null,
-    targetHandle: edge.targetHandle ?? null,
+    sourceHandle: flowSourceHandle,
+    targetHandle: flowTargetHandle,
     markerEnd: { type: MarkerType.ArrowClosed, color },
     style: {
       stroke: color,
       strokeWidth: 1.8,
     },
   } satisfies Edge;
+}
+
+function firstCanonicalInputHandle(node: CanonicalNode | undefined): string | null {
+  if (!node) return null;
+  const firstRead = node.reads[0];
+  return firstRead ? `input:${firstRead.state}` : null;
+}
+
+function createFlowEdgesFromCanonicalGraph(graph: CanonicalGraphPayload, nodesById: Map<string, FlowNode>): Edge[] {
+  const edges = graph.edges.map((edge) => createFlowEdgeFromCanonicalEdge(edge, nodesById));
+  for (const conditionalEdge of graph.conditional_edges) {
+    for (const [branchKey, target] of Object.entries(conditionalEdge.branches)) {
+      const sourceNode = nodesById.get(conditionalEdge.source);
+      const sourceType = sourceNode ? getPortType(sourceNode.data.config, `output:${branchKey}`) : "any";
+      const color = TYPE_COLORS[sourceType ?? "any"];
+      edges.push({
+        id: `conditional:${conditionalEdge.source}:${branchKey}:${target}`,
+        source: conditionalEdge.source,
+        target,
+        sourceHandle: `output:${branchKey}`,
+        targetHandle: firstCanonicalInputHandle(graph.nodes[target]),
+        markerEnd: { type: MarkerType.ArrowClosed, color },
+        style: {
+          stroke: color,
+          strokeWidth: 1.8,
+        },
+      } satisfies Edge);
+    }
+  }
+  return edges;
 }
 
 function buildCanonicalNodeFromFlowNode(node: FlowNode, config: NodePresetDefinition = node.data.config) {
@@ -1888,6 +1923,68 @@ function createAutoInputPort(existingPorts: PortDefinition[], sourceType: ValueT
     label: typeLabel,
     valueType: sourceType,
     required: true,
+  };
+}
+
+const GENERIC_STATE_KEYS = new Set(["value", "input", "output", "result", "text"]);
+
+function chooseStateKeyForConnection(sourceStateKey: string, targetStateKey: string) {
+  if (sourceStateKey === targetStateKey) return sourceStateKey;
+  const sourceGeneric = GENERIC_STATE_KEYS.has(sourceStateKey);
+  const targetGeneric = GENERIC_STATE_KEYS.has(targetStateKey);
+  if (sourceGeneric && !targetGeneric) return targetStateKey;
+  if (targetGeneric && !sourceGeneric) return sourceStateKey;
+  return targetStateKey || sourceStateKey;
+}
+
+function buildCanonicalFlowProjection(
+  nodes: FlowNode[],
+  edges: Edge[],
+): Pick<CanonicalGraph, "nodes" | "edges" | "conditional_edges"> {
+  const flowNodeMap = new Map(nodes.map((node) => [node.id, node]));
+  const canonicalNodes = Object.fromEntries(nodes.map((node) => [node.id, buildCanonicalNodeFromFlowNode(node)]));
+  const conditionalEdgesBySource: Record<string, Record<string, string>> = {};
+  const canonicalEdges: CanonicalGraph["edges"] = [];
+
+  for (const edge of edges) {
+    const sourceNode = flowNodeMap.get(edge.source);
+    const targetNode = flowNodeMap.get(edge.target);
+    if (!sourceNode || !targetNode) continue;
+
+    const sourcePortKey = getPortKeyFromHandle(edge.sourceHandle);
+    const targetPortKey = getPortKeyFromHandle(edge.targetHandle);
+
+    if (sourceNode.data.config.family === "condition") {
+      if (sourcePortKey) {
+        conditionalEdgesBySource[edge.source] = {
+          ...(conditionalEdgesBySource[edge.source] ?? {}),
+          [sourcePortKey]: edge.target,
+        };
+      }
+      continue;
+    }
+
+    if (!sourcePortKey || !targetPortKey) continue;
+
+    const sourceStateKey = getBoundStateKeyForPort(sourceNode.data.config, "output", sourcePortKey) ?? sourcePortKey;
+    const targetStateKey = getBoundStateKeyForPort(targetNode.data.config, "input", targetPortKey) ?? targetPortKey;
+    const stateKey = chooseStateKeyForConnection(sourceStateKey, targetStateKey);
+
+    canonicalEdges.push({
+      source: edge.source,
+      target: edge.target,
+      sourceHandle: `write:${stateKey}`,
+      targetHandle: `read:${stateKey}`,
+    });
+  }
+
+  return {
+    nodes: canonicalNodes,
+    edges: canonicalEdges,
+    conditional_edges: Object.entries(conditionalEdgesBySource).map(([source, branches]) => ({
+      source,
+      branches,
+    })),
   };
 }
 
@@ -4936,7 +5033,7 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const reactFlow = useReactFlow<FlowNode, Edge>();
   const updateNodeInternals = useUpdateNodeInternals();
-  const [canonicalGraphState, setCanonicalGraphState] = useState<CanonicalGraph>(() => buildCanonicalGraphFromLegacyGraph(initialGraph));
+  const [canonicalGraphState, setCanonicalGraphState] = useState<CanonicalGraph>(() => JSON.parse(JSON.stringify(initialGraph)) as CanonicalGraph);
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
   const nodesInitialized = useNodesInitialized();
   const autoLayoutDoneRef = useRef(false);
@@ -4945,7 +5042,7 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
   const [isStatePanelOpen, setIsStatePanelOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [statusMessage, setStatusMessage] = useState("Node system phase 4: skill definitions connected.");
-  const [persistedPresets, setPersistedPresets] = useState<NodePresetDefinition[]>([]);
+  const [persistedPresets, setPersistedPresets] = useState<EditorPresetRecord[]>([]);
   const [presetsLoading, setPresetsLoading] = useState(true);
   const [presetsError, setPresetsError] = useState<string | null>(null);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
@@ -4979,10 +5076,10 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
   const graphName = canonicalGraphState.name;
   const graphId = canonicalGraphState.graph_id ?? null;
   const metadata = canonicalGraphState.metadata;
-  const stateSchema = useMemo(() => buildLegacyStateSchemaFromCanonicalGraph(canonicalGraphState), [canonicalGraphState]);
+  const stateSchema = useMemo(() => buildEditorStateFieldsFromCanonicalGraph(canonicalGraphState), [canonicalGraphState]);
 
   const allPresets = useMemo(
-    () => [...NODE_PRESETS_MOCK, ...persistedPresets].filter((preset) => isPresetEligibleFamily(preset.family)),
+    () => [...NODE_PRESETS_MOCK, ...persistedPresets.map((preset) => preset.definition)].filter((preset) => isPresetEligibleFamily(preset.family)),
     [persistedPresets],
   );
   const getRecommendedPresets = useCallback(
@@ -5068,39 +5165,18 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
   const previewTextByNode = useMemo(() => {
     return Object.fromEntries(nodes.map((node) => [node.id, createPreviewText(node, nodes, edges)]));
   }, [edges, nodes]);
-  const legacyGraphSnapshot = useMemo<GraphPayload>(
-    () => ({
+  const derivedCanonicalGraph = useMemo<CanonicalGraph>(() => {
+    const projection = buildCanonicalFlowProjection(nodes, edges);
+    return {
       graph_id: graphId,
       name: graphName,
-      state_schema: stateSchema,
-      nodes: nodes.map((node) => ({
-        id: node.id,
-        type: "default",
-        position: node.position,
-        data: {
-          nodeId: node.data.nodeId,
-          config: node.data.config,
-          previewText: node.data.previewText || previewTextByNode[node.id] || "",
-          isExpanded: node.data.config.family === "input" ? true : Boolean(node.data.isExpanded),
-          collapsedSize: node.data.collapsedSize ?? null,
-          expandedSize: node.data.expandedSize ?? null,
-        },
-      })),
-      edges: edges.map((edge) => ({
-        id: edge.id,
-        source: edge.source,
-        target: edge.target,
-        sourceHandle: edge.sourceHandle ?? null,
-        targetHandle: edge.targetHandle ?? null,
-      })),
+      state_schema: canonicalGraphState.state_schema,
+      nodes: projection.nodes,
+      edges: projection.edges,
+      conditional_edges: projection.conditional_edges,
       metadata,
-    }),
-    [edges, graphId, graphName, metadata, nodes, previewTextByNode, stateSchema],
-  );
-  const derivedCanonicalGraph = useMemo<CanonicalGraph>(
-    () => buildCanonicalGraphFromLegacyGraph(legacyGraphSnapshot),
-    [legacyGraphSnapshot],
-  );
+    };
+  }, [canonicalGraphState.state_schema, edges, graphId, graphName, metadata, nodes]);
   const canonicalGraph = canonicalGraphState;
   const canonicalGraphForSubmission = useMemo<CanonicalGraph>(() => {
     const mergedNodes = { ...derivedCanonicalGraph.nodes };
@@ -5428,13 +5504,13 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
   }, []);
 
   useEffect(() => {
-    const initialNodes = Array.isArray(initialGraph.nodes) ? initialGraph.nodes.map((node) => createFlowNodeFromGraphNode(node)) : [];
+    const initialNodes = Object.entries(initialGraph.nodes).map(([nodeId, node]) =>
+      createFlowNodeFromCanonicalNode(nodeId, node, initialGraph.state_schema),
+    );
     const nodesById = new Map(initialNodes.map((node) => [node.id, node]));
-    const initialEdges = Array.isArray(initialGraph.edges)
-      ? initialGraph.edges.map((edge) => createFlowEdgeFromGraphEdge(edge, nodesById))
-      : [];
+    const initialEdges = createFlowEdgesFromCanonicalGraph(initialGraph, nodesById);
     autoLayoutDoneRef.current = false;
-    setCanonicalGraphState(buildCanonicalGraphFromLegacyGraph(initialGraph));
+    setCanonicalGraphState(JSON.parse(JSON.stringify(initialGraph)) as CanonicalGraph);
     setActiveRunId(null);
     setActiveRunStatus(null);
     setCurrentRunNodeId(null);
@@ -5445,33 +5521,7 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
   }, [initialGraph, setEdges, setNodes]);
 
   useEffect(() => {
-    const uiSnapshot: GraphPayload = {
-      graph_id: graphId,
-      name: graphName,
-      state_schema: [],
-      nodes: nodes.map((node) => ({
-        id: node.id,
-        type: node.type ?? "default",
-        position: node.position,
-        data: {
-          nodeId: node.data.nodeId,
-          config: node.data.config,
-          previewText: "",
-          isExpanded: node.data.config.family === "input" ? true : Boolean(node.data.isExpanded),
-          collapsedSize: node.data.collapsedSize ?? null,
-          expandedSize: node.data.expandedSize ?? null,
-        },
-      })),
-      edges: edges.map((edge) => ({
-        id: edge.id,
-        source: edge.source,
-        target: edge.target,
-        sourceHandle: edge.sourceHandle ?? null,
-        targetHandle: edge.targetHandle ?? null,
-      })),
-      metadata: {},
-    };
-    const derivedCanonical = buildCanonicalGraphFromLegacyGraph(uiSnapshot);
+    const derivedCanonical = buildCanonicalFlowProjection(nodes, edges);
     setCanonicalGraphState((current) => {
       let changed = false;
       const flowNodeIds = new Set(nodes.map((node) => node.id));
@@ -5522,7 +5572,7 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
         conditional_edges: nextConditionalEdges,
       };
     });
-  }, [edges, graphId, graphName, nodes]);
+  }, [edges, nodes]);
 
   useEffect(() => {
     const nodesById = new Map(nodes.map((node) => [node.id, node]));
@@ -5618,9 +5668,13 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
       try {
         setPresetsLoading(true);
         setPresetsError(null);
-        const payload = await apiGet<PresetDocument[]>("/api/presets");
+        const payload = await apiGet<CanonicalPresetDocument[]>("/api/presets");
         if (!active) return;
-        setPersistedPresets(payload.map((item) => item.definition).filter((definition) => isPresetEligibleFamily(definition.family)));
+        setPersistedPresets(
+          payload
+            .map(buildEditorPresetRecordFromCanonicalPreset)
+            .filter((item) => isPresetEligibleFamily(item.definition.family)),
+        );
       } catch (error) {
         if (!active) return;
         setPresetsError(error instanceof Error ? error.message : "Unknown error");
@@ -5677,6 +5731,15 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
   function createNodeFromPreset(preset: NodePresetDefinition, position: { x: number; y: number }) {
     const config = deepClonePreset(preset);
     return createNodeFromConfig(config, position);
+  }
+
+  function ensurePresetStateFields(stateFieldsToMerge: StateField[]) {
+    const existingKeys = new Set(stateSchema.map((field) => field.key));
+    for (const field of stateFieldsToMerge) {
+      if (existingKeys.has(field.key)) continue;
+      upsertCanonicalStateField(field);
+      existingKeys.add(field.key);
+    }
   }
 
   async function addInputNodeFromFile(file: File, position: { x: number; y: number }) {
@@ -5740,8 +5803,14 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
   }
 
   function addNodeFromPresetId(presetId: string, position: { x: number; y: number }, connectionSource?: { sourceNodeId?: string; sourceHandle?: string; sourceValueType?: ValueType | null }) {
-    const preset = getNodePresetById(presetId) ?? persistedPresets.find((item) => item.presetId === presetId);
+    const staticPreset = getNodePresetById(presetId);
+    const persistedPreset = persistedPresets.find((item) => item.presetId === presetId);
+    const preset = staticPreset ?? persistedPreset?.definition;
     if (!preset) return;
+
+    if (persistedPreset) {
+      ensurePresetStateFields(persistedPreset.stateSchema);
+    }
 
     const nextNode = createNodeFromPreset(preset, position);
     if (nextNode.data.config.family === "agent" && connectionSource?.sourceValueType) {
@@ -5820,19 +5889,59 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
     }
     const displayName = getNodeDisplayName(targetNode.data.config, targetNode.id);
     const slug = displayName.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "custom";
-    const nextPreset = {
-      ...deepClonePreset(targetNode.data.config),
-      presetId: `preset.local.${slug}.${crypto.randomUUID().slice(0, 6)}`,
-      name: displayName,
-    } satisfies NodePresetDefinition;
+    const presetId = `preset.local.${slug}.${crypto.randomUUID().slice(0, 6)}`;
+    const canonicalNode = canonicalGraphForSubmission.nodes[nodeId];
+    if (!canonicalNode) {
+      setStatusMessage("Failed to resolve canonical node for preset save.");
+      return;
+    }
+    const referencedStateKeys = Array.from(new Set([...canonicalNode.reads.map((binding) => binding.state), ...canonicalNode.writes.map((binding) => binding.state)]));
+    const presetStateSchema = Object.fromEntries(
+      referencedStateKeys
+        .map((stateKey) => {
+          const definition = canonicalGraphForSubmission.state_schema[stateKey];
+          if (!definition) return null;
+          return [stateKey, definition] as const;
+        })
+        .filter((entry): entry is readonly [string, (typeof canonicalGraphForSubmission.state_schema)[string]] => Boolean(entry)),
+    );
+    const editorPresetRecord = buildEditorPresetRecordFromCanonicalPreset({
+      presetId,
+      sourcePresetId: targetNode.data.config.presetId,
+      definition: {
+        label: displayName,
+        description: canonicalNode.description ?? "",
+        state_schema: presetStateSchema,
+        node: {
+          ...canonicalNode,
+          name: displayName,
+          ui: {
+            ...canonicalNode.ui,
+            position: { x: 0, y: 0 },
+          },
+        },
+      },
+    });
     try {
       await apiPost<{ presetId: string; updatedAt?: string | null }>("/api/presets", {
-        presetId: nextPreset.presetId,
+        presetId,
         sourcePresetId: targetNode.data.config.presetId,
-        definition: nextPreset,
+        definition: {
+          label: displayName,
+          description: canonicalNode.description ?? "",
+          state_schema: presetStateSchema,
+          node: {
+            ...canonicalNode,
+            name: displayName,
+            ui: {
+              ...canonicalNode.ui,
+              position: { x: 0, y: 0 },
+            },
+          },
+        },
       });
-      setPersistedPresets((current) => [nextPreset, ...current.filter((item) => item.presetId !== nextPreset.presetId)]);
-      setStatusMessage(`Saved preset ${nextPreset.presetId}`);
+      setPersistedPresets((current) => [editorPresetRecord, ...current.filter((item) => item.presetId !== presetId)]);
+      setStatusMessage(`Saved preset ${presetId}`);
     } catch (error) {
       setStatusMessage(error instanceof Error ? error.message : "Failed to save preset.");
     }

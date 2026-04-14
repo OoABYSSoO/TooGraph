@@ -168,25 +168,6 @@ export type NodeSystemGraphEdge = {
   targetHandle?: string | null;
 };
 
-export type NodeSystemGraphPayload = {
-  graph_id?: string | null;
-  name: string;
-  state_schema: StateField[];
-  nodes: NodeSystemGraphNode[];
-  edges: NodeSystemGraphEdge[];
-  metadata: Record<string, unknown>;
-};
-
-export type NodeSystemTemplateRecord = {
-  template_id: string;
-  label: string;
-  description: string;
-  default_graph_name: string;
-  supported_node_types: string[];
-  state_schema: StateField[];
-  default_node_system_graph: Omit<NodeSystemGraphPayload, "graph_id">;
-};
-
 export type SavedOutputArtifact = {
   node_id?: string | null;
   source_key: string;

@@ -36,8 +36,8 @@
 当前系统处于过渡态：
 
 - 后端正式协议已经是 `node_system`
-- 后端已经存在兼容层 [legacy_node_system.py](/home/abyss/GraphiteUI/backend/app/api/legacy_node_system.py)
-- 前端主编辑器仍以旧结构思维工作
+- 前端主编辑器已经直接以正式协议为主链
+- 旧前端结构只剩局部展示投影，不再是接口边界协议
 - 旧前端依赖的展示字段主要有：
   - `config.description`
   - 节点显示名与端口显示名的旧派生字段
@@ -294,7 +294,7 @@
 - 前端 `editor/new`、`editor/[graphId]`、编辑器入口页与工作台已在本地把正式数据适配为当前编辑器和列表页面所需结构
 - 页面视觉和交互保持不变，后端不再承担读取链路的主兼容职责
 
-## Phase 5：节点预设原生化
+## Phase 5：节点预设原生化（已完成）
 
 ### 目标
 
@@ -341,7 +341,15 @@
 - 预设系统不再依赖旧 `NodePresetDefinition`
 - 预设与正式协议一致
 
-## Phase 6：删除兼容层
+### 当前落实结果
+
+- `/api/presets` 已直接保存和返回正式单节点 preset 协议
+- 开发期不再保留旧 preset 格式兼容，历史旧 preset 文件已清理
+- 前端保存节点为预设时，已直接从 `canonicalGraph` 抽取正式节点定义和相关 state 定义
+- 前端从持久化预设创建节点时，会先补齐缺失的 state，再按当前编辑器所需 shape 创建节点
+- “保存为预设”的按钮位置、入口和创建菜单交互保持不变
+
+## Phase 6：删除兼容层（已完成）
 
 ### 目标
 
@@ -367,6 +375,15 @@
 ### 完成标准
 
 - 前后端都只保留正式 `node_system` 协议
+
+### 当前落实结果
+
+- 后端已删除 `legacy_node_system.py`
+- `/api/graphs/save`、`/api/graphs/validate`、`/api/graphs/run` 已只接受正式 `NodeSystemGraphPayload`
+- 前端 `editor/new`、`editor/[graphId]`、编辑器入口页和工作台已直接消费正式模板与正式 graph
+- 前端不再在页面入口层把正式协议转回旧 graph/template shape
+- 图、模板、预设、保存、校验、运行主链均已切到正式协议
+- 页面视觉和交互保持不变
 
 ## 每个阶段的统一验收清单
 
@@ -397,12 +414,4 @@
 
 ## 当前下一步
 
-当前最适合开始的下一步是：
-
-- Phase 5：节点预设原生化
-
-原因：
-
-- Phase 1、2、3、4 已完成
-- 读写链路都已经以正式协议为主
-- 现在最主要的遗留项是预设系统仍然依赖旧 `NodePresetDefinition` 心智
+当前迁移计划的 6 个阶段已经全部完成。

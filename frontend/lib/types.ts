@@ -1,4 +1,4 @@
-import type { NodeSystemGraphEdge, NodeSystemGraphNode, RunStatus } from "@/lib/node-system-schema";
+import type { RunStatus } from "@/lib/node-system-schema";
 
 // ─── Shared API Types ─────────────────────────────────────────────────────────────
 
@@ -9,8 +9,8 @@ import type { NodeSystemGraphEdge, NodeSystemGraphNode, RunStatus } from "@/lib/
 export type GraphSummary = {
   graph_id: string;
   name: string;
-  nodes: NodeSystemGraphNode[];
-  edges: NodeSystemGraphEdge[];
+  node_count: number;
+  edge_count: number;
 };
 
 /**

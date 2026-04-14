@@ -6,10 +6,6 @@ from typing import Any
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import ValidationError
 
-from app.api.legacy_node_system import (
-    LegacyGraphPayloadError,
-    parse_graph_payload,
-)
 from app.core.compiler.validator import validate_graph
 from app.core.runtime.node_system_executor import execute_node_system_graph
 from app.core.runtime.state import create_initial_run_state, utc_now_iso
@@ -37,39 +33,8 @@ def _schema_errors_to_paths(exc: ValidationError) -> list[dict[str, str]]:
         for error in exc.errors()
     ]
 
-
-def _legacy_payload_error_to_paths(exc: LegacyGraphPayloadError) -> list[dict[str, str | None]]:
-    return [
-        {
-            "code": "legacy_payload_error",
-            "message": str(exc),
-            "path": exc.path,
-        }
-    ]
-
-
-def _looks_like_canonical_payload(payload: dict[str, Any]) -> bool:
-    return (
-        isinstance(payload.get("state_schema"), dict)
-        or isinstance(payload.get("nodes"), dict)
-        or "conditional_edges" in payload
-        or "conditionalEdges" in payload
-    )
-
-
 def _parse_graph_request(payload: dict[str, Any]) -> NodeSystemGraphPayload:
-    if _looks_like_canonical_payload(payload):
-        return NodeSystemGraphPayload.model_validate(payload)
-
-    try:
-        return NodeSystemGraphPayload.model_validate(payload)
-    except ValidationError as canonical_exc:
-        try:
-            return parse_graph_payload(payload)
-        except LegacyGraphPayloadError:
-            raise
-        except ValidationError:
-            raise canonical_exc
+    return NodeSystemGraphPayload.model_validate(payload)
 
 
 @router.get("")
@@ -81,11 +46,6 @@ def list_graphs_endpoint() -> list[NodeSystemGraphDocument]:
 def save_graph_endpoint(payload: dict[str, Any]) -> GraphSaveResponse:
     try:
         graph_payload = _parse_graph_request(payload)
-    except LegacyGraphPayloadError as exc:
-        raise HTTPException(
-            status_code=422,
-            detail=GraphValidationResponse(valid=False, issues=_legacy_payload_error_to_paths(exc)).model_dump(),
-        ) from exc
     except ValidationError as exc:
         raise HTTPException(
             status_code=422,
@@ -112,8 +72,6 @@ def get_graph_endpoint(graph_id: str) -> NodeSystemGraphDocument:
 def validate_graph_endpoint(payload: dict[str, Any]) -> GraphValidationResponse:
     try:
         graph_payload = _parse_graph_request(payload)
-    except LegacyGraphPayloadError as exc:
-        return GraphValidationResponse(valid=False, issues=_legacy_payload_error_to_paths(exc))
     except ValidationError as exc:
         return GraphValidationResponse(valid=False, issues=_schema_errors_to_paths(exc))
     return validate_graph(graph_payload)
@@ -123,11 +81,6 @@ def validate_graph_endpoint(payload: dict[str, Any]) -> GraphValidationResponse:
 def run_graph_endpoint(payload: dict[str, Any], background_tasks: BackgroundTasks) -> dict[str, str]:
     try:
         graph_payload = _parse_graph_request(payload)
-    except LegacyGraphPayloadError as exc:
-        raise HTTPException(
-            status_code=422,
-            detail=GraphValidationResponse(valid=False, issues=_legacy_payload_error_to_paths(exc)).model_dump(),
-        ) from exc
     except ValidationError as exc:
         raise HTTPException(
             status_code=422,

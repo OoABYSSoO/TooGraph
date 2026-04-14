@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { apiGet } from "@/lib/api";
-import { buildLegacyGraphFromCanonicalGraph, type CanonicalGraphPayload, type CanonicalTemplateRecord } from "@/lib/node-system-canonical";
+import type { CanonicalGraphPayload, CanonicalTemplateRecord } from "@/lib/node-system-canonical";
 import type { GraphSummary, TemplateSummary } from "@/lib/types";
 
 async function loadEditorLandingData() {
@@ -12,12 +12,11 @@ async function loadEditorLandingData() {
     ]);
     return {
       graphs: graphs.map((graph) => {
-        const legacyGraph = buildLegacyGraphFromCanonicalGraph(graph);
         return {
-          graph_id: legacyGraph.graph_id ?? "",
-          name: legacyGraph.name,
-          nodes: legacyGraph.nodes,
-          edges: legacyGraph.edges,
+          graph_id: graph.graph_id ?? "",
+          name: graph.name,
+          node_count: Object.keys(graph.nodes).length,
+          edge_count: graph.edges.length + graph.conditional_edges.reduce((count, entry) => count + Object.keys(entry.branches).length, 0),
         } satisfies GraphSummary;
       }),
       templates: templates.map((template) => ({
@@ -105,7 +104,7 @@ export default async function EditorPage() {
                       <div className="text-sm text-[var(--muted)]">{graph.graph_id}</div>
                     </div>
                     <div className="text-right text-sm text-[var(--muted)]">
-                      <div>{graph.nodes.length} nodes / {graph.edges.length} edges</div>
+                      <div>{graph.node_count} nodes / {graph.edge_count} edges</div>
                     </div>
                   </div>
                 </Link>
