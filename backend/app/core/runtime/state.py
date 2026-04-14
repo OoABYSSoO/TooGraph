@@ -15,6 +15,7 @@ class RunState(TypedDict, total=False):
     graph_id: str
     graph_name: str
     status: RunStatus
+    runtime_backend: str
     current_node_id: str | None
     metadata: dict[str, Any]
     revision_round: int
@@ -51,6 +52,7 @@ def create_initial_run_state(graph_id: str, graph_name: str, max_revision_round:
         graph_id=graph_id,
         graph_name=graph_name,
         status="queued",
+        runtime_backend="",
         current_node_id=None,
         revision_round=0,
         max_revision_round=max_revision_round,

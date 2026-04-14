@@ -8,7 +8,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.compiler.validator import validate_graph
-from app.core.langgraph.compiler import compile_graph_to_langgraph_plan
+from app.core.langgraph.compiler import compile_graph_to_langgraph_plan, resolve_graph_runtime_backend
 from app.core.langgraph.runtime import execute_node_system_graph_langgraph
 from app.core.runtime.node_system_executor import execute_node_system_graph
 from app.core.schemas.node_system import NodeSystemGraphPayload, NodeSystemTemplate
@@ -83,6 +83,29 @@ class LangGraphMigrationTests(unittest.TestCase):
         self.assertEqual(plan.requirements.skill_keys, [])
         self.assertEqual(plan.requirements.unsupported_reasons, [])
 
+    def test_hello_world_resolves_langgraph_backend_without_template_flag(self):
+        graph = _load_hello_world_graph()
+        graph.metadata.pop("runtime_backend", None)
+        backend, reasons = resolve_graph_runtime_backend(graph)
+        self.assertEqual(backend, "langgraph")
+        self.assertEqual(reasons, [])
+
+    def test_conditional_graph_resolves_legacy_backend(self):
+        graph = _load_hello_world_graph()
+        payload = graph.model_dump(by_alias=True)
+        payload["conditional_edges"] = [
+            {
+                "source": "answer_helper",
+                "branches": {
+                    "done": "output_answer",
+                },
+            }
+        ]
+        conditional_graph = NodeSystemGraphPayload.model_validate(payload)
+        backend, reasons = resolve_graph_runtime_backend(conditional_graph)
+        self.assertEqual(backend, "legacy")
+        self.assertTrue(any("conditional_edges" in reason for reason in reasons), reasons)
+
     @patch("app.core.runtime.node_system_executor.save_run", lambda state: None)
     @patch("app.core.runtime.node_system_executor._generate_agent_response", _fake_generate_agent_response)
     @patch("app.core.runtime.node_system_executor._invoke_skill", _fake_invoke_skill)
@@ -91,6 +114,7 @@ class LangGraphMigrationTests(unittest.TestCase):
         graph = _load_hello_world_graph()
         result = execute_node_system_graph(graph, persist_progress=False)
         self.assertEqual(result["status"], "completed")
+        self.assertEqual(result["runtime_backend"], "legacy")
         self.assertEqual(len(result["node_executions"]), 3)
         self.assertIn("answer", result["state_snapshot"]["values"])
 
@@ -103,6 +127,7 @@ class LangGraphMigrationTests(unittest.TestCase):
         graph = _load_hello_world_graph()
         result = execute_node_system_graph_langgraph(graph, persist_progress=False)
         self.assertEqual(result["status"], "completed")
+        self.assertEqual(result["runtime_backend"], "langgraph")
         self.assertEqual(len(result["node_executions"]), 3)
         self.assertEqual(result["cycle_summary"]["has_cycle"], False)
         self.assertIn("output_answer", {item["node_id"] for item in result["node_executions"]})

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from typing import Literal
 
 from app.core.langgraph.build_plan import (
     LangGraphBuildPlan,
@@ -18,8 +19,21 @@ from app.core.schemas.node_system import (
 )
 
 
-def graph_requests_langgraph_runtime(graph: NodeSystemGraphPayload) -> bool:
-    return str(graph.metadata.get("runtime_backend", "")).strip().lower() == "langgraph"
+RuntimeBackend = Literal["langgraph", "legacy"]
+
+
+def resolve_graph_runtime_backend(
+    graph: NodeSystemGraphPayload,
+) -> tuple[RuntimeBackend, list[str]]:
+    requested_backend = str(graph.metadata.get("runtime_backend", "")).strip().lower()
+    if requested_backend == "legacy":
+        return "legacy", ["graph metadata requested legacy runtime"]
+
+    build_plan = compile_graph_to_langgraph_plan(graph)
+    unsupported_reasons = list(build_plan.requirements.unsupported_reasons)
+    if unsupported_reasons:
+        return "legacy", unsupported_reasons
+    return "langgraph", []
 
 
 def compile_graph_to_langgraph_plan(graph: NodeSystemGraphPayload) -> LangGraphBuildPlan:
@@ -124,4 +138,3 @@ def _parse_handle_state(handle: str) -> str | None:
         return None
     _prefix, state_name = handle.split(":", 1)
     return state_name.strip() or None
-

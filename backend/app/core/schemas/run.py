@@ -111,6 +111,7 @@ class RunSummary(BaseModel):
     graph_id: str
     graph_name: str
     status: str
+    runtime_backend: str = ""
     current_node_id: str | None = None
     revision_round: int = 0
     started_at: str
@@ -121,6 +122,7 @@ class RunSummary(BaseModel):
 
 class RunDetail(RunSummary):
     """Full detail returned by GET /api/runs/{run_id}."""
+    metadata: dict[str, Any] = Field(default_factory=dict)
     selected_skills: list[str] = Field(default_factory=list)
     skill_outputs: list[dict[str, Any]] = Field(default_factory=list)
     evaluation_result: dict[str, Any] = Field(default_factory=dict)

@@ -7,7 +7,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import ValidationError
 
 from app.core.compiler.validator import validate_graph
-from app.core.langgraph import execute_node_system_graph_langgraph, graph_requests_langgraph_runtime
+from app.core.langgraph import execute_node_system_graph_langgraph, resolve_graph_runtime_backend
 from app.core.runtime.node_system_executor import execute_node_system_graph
 from app.core.runtime.state import create_initial_run_state, utc_now_iso
 from app.core.schemas.node_system import (
@@ -93,31 +93,45 @@ def run_graph_endpoint(payload: dict[str, Any], background_tasks: BackgroundTask
         raise HTTPException(status_code=422, detail=validation.model_dump())
 
     executed_graph = save_graph(graph_payload)
+    runtime_backend, langgraph_fallback_reasons = resolve_graph_runtime_backend(executed_graph)
     run_state = create_initial_run_state(
         graph_id=executed_graph.graph_id,
         graph_name=executed_graph.name,
         max_revision_round=int(executed_graph.metadata.get("max_revision_round", 1)),
     )
+    run_state["runtime_backend"] = runtime_backend
     run_state["metadata"] = dict(executed_graph.metadata)
+    run_state["metadata"]["resolved_runtime_backend"] = runtime_backend
+    if langgraph_fallback_reasons:
+        run_state["metadata"]["langgraph_fallback_reasons"] = list(langgraph_fallback_reasons)
     run_state["node_status_map"] = {node_name: "idle" for node_name in executed_graph.nodes}
     save_run(run_state)
 
-    background_tasks.add_task(_run_graph_worker, executed_graph, run_state)
+    background_tasks.add_task(_run_graph_worker, executed_graph, run_state, runtime_backend, langgraph_fallback_reasons)
     return {"run_id": run_state["run_id"], "status": run_state["status"]}
 
 
-def _run_graph_worker(graph: NodeSystemGraphDocument, run_state: dict[str, Any]) -> None:
+def _run_graph_worker(
+    graph: NodeSystemGraphDocument,
+    run_state: dict[str, Any],
+    runtime_backend: str,
+    langgraph_fallback_reasons: list[str],
+) -> None:
     try:
-        if graph_requests_langgraph_runtime(graph):
+        if runtime_backend == "langgraph":
             try:
                 execute_node_system_graph_langgraph(graph, run_state, persist_progress=True)
                 return
             except NotImplementedError as exc:
                 logger.warning(
-                    "Graph %s requested LangGraph runtime but current adapter cannot execute it yet: %s. Falling back to legacy executor.",
+                    "Graph %s resolved to LangGraph runtime but current adapter could not execute it: %s. Falling back to legacy executor.",
                     graph.graph_id,
                     exc,
                 )
+                run_state["runtime_backend"] = "legacy"
+                run_state.setdefault("metadata", {})["resolved_runtime_backend"] = "legacy"
+                fallback_reasons = [*langgraph_fallback_reasons, str(exc)]
+                run_state["metadata"]["langgraph_fallback_reasons"] = list(dict.fromkeys(fallback_reasons))
 
         execute_node_system_graph(graph, run_state, persist_progress=True)
     except Exception as exc:  # pragma: no cover - defensive runtime path

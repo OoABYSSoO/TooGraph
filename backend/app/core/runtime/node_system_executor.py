@@ -90,9 +90,11 @@ def execute_node_system_graph(
         max_revision_round=int(graph.metadata.get("max_revision_round", 1)),
     )
     state["status"] = "running"
+    state["runtime_backend"] = "legacy"
     state["started_at"] = utc_now_iso()
     state["node_status_map"] = {node_name: "idle" for node_name in graph.nodes}
     state["metadata"] = dict(graph.metadata)
+    state["metadata"]["resolved_runtime_backend"] = "legacy"
     _initialize_graph_state(graph, state)
 
     execution_edges = _build_execution_edges(graph)
