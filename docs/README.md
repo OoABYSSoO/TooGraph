@@ -1,9 +1,10 @@
 # Docs Index
 
-当前 `docs/` 只保留三份进行中的文档：
+当前 `docs/` 只保留四份进行中的文档：
 
 - [FUTURE_WORK.md](/home/abyss/GraphiteUI/docs/FUTURE_WORK.md)
 - [editor_view_model_cleanup_plan.md](/home/abyss/GraphiteUI/docs/editor_view_model_cleanup_plan.md)
+- [langgraph_native_gap_analysis.md](/home/abyss/GraphiteUI/docs/langgraph_native_gap_analysis.md)
 - [README.md](/home/abyss/GraphiteUI/docs/README.md)
 
 使用原则：
