@@ -1484,7 +1484,6 @@ function createEditorDefaults(templates: TemplateRecord[], defaultTemplateId?: s
   }
 
   return {
-    graph_family: "node_system",
     graph_id: null,
     name: "Node System Playground",
     state_schema: [],
@@ -4498,7 +4497,6 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
   }, [edges, nodes]);
   const legacyGraphSnapshot = useMemo<GraphPayload>(
     () => ({
-      graph_family: "node_system",
       graph_id: graphId,
       name: graphName,
       state_schema: stateSchema,
