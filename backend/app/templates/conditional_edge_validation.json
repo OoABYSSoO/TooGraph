@@ -1,0 +1,155 @@
+{
+  "template_id": "conditional_edge_validation",
+  "label": "条件边验证",
+  "description": "A minimal conditional-edge graph for validating branch selection in the LangGraph runtime.",
+  "default_graph_name": "条件边验证",
+  "state_schema": {
+    "score": {
+      "name": "score",
+      "description": "Numeric score used by the condition node.",
+      "type": "number",
+      "value": 80,
+      "color": "#d97706"
+    },
+    "pass_message": {
+      "name": "pass_message",
+      "description": "Message shown when the score passes the threshold.",
+      "type": "text",
+      "value": "通过分支命中：score >= 60",
+      "color": "#15803d"
+    },
+    "fail_message": {
+      "name": "fail_message",
+      "description": "Message shown when the score misses the threshold.",
+      "type": "text",
+      "value": "未通过分支命中：score < 60",
+      "color": "#b91c1c"
+    }
+  },
+  "nodes": {
+    "input_score": {
+      "kind": "input",
+      "name": "input_score",
+      "description": "Provide the score checked by the condition node.",
+      "ui": {
+        "position": { "x": 80, "y": 120 },
+        "collapsed": false
+      },
+      "writes": [
+        { "state": "score", "mode": "replace" }
+      ],
+      "config": {
+        "value": 80
+      }
+    },
+    "input_pass_message": {
+      "kind": "input",
+      "name": "input_pass_message",
+      "description": "Provide the output text for the pass branch.",
+      "ui": {
+        "position": { "x": 80, "y": 360 },
+        "collapsed": false
+      },
+      "writes": [
+        { "state": "pass_message", "mode": "replace" }
+      ],
+      "config": {
+        "value": "通过分支命中：score >= 60"
+      }
+    },
+    "input_fail_message": {
+      "kind": "input",
+      "name": "input_fail_message",
+      "description": "Provide the output text for the fail branch.",
+      "ui": {
+        "position": { "x": 80, "y": 600 },
+        "collapsed": false
+      },
+      "writes": [
+        { "state": "fail_message", "mode": "replace" }
+      ],
+      "config": {
+        "value": "未通过分支命中：score < 60"
+      }
+    },
+    "score_gate": {
+      "kind": "condition",
+      "name": "score_gate",
+      "description": "Route to pass or fail based on the numeric score.",
+      "ui": {
+        "position": { "x": 520, "y": 120 },
+        "collapsed": false
+      },
+      "reads": [
+        { "state": "score", "required": true }
+      ],
+      "config": {
+        "branches": ["pass", "fail"],
+        "conditionMode": "rule",
+        "branchMapping": {
+          "true": "pass",
+          "false": "fail"
+        },
+        "rule": {
+          "source": "score",
+          "operator": ">=",
+          "value": 60
+        }
+      }
+    },
+    "output_pass": {
+      "kind": "output",
+      "name": "output_pass",
+      "description": "Show the pass-branch output.",
+      "ui": {
+        "position": { "x": 980, "y": 120 },
+        "collapsed": false
+      },
+      "reads": [
+        { "state": "pass_message", "required": true }
+      ],
+      "config": {
+        "displayMode": "auto",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    },
+    "output_fail": {
+      "kind": "output",
+      "name": "output_fail",
+      "description": "Show the fail-branch output.",
+      "ui": {
+        "position": { "x": 980, "y": 420 },
+        "collapsed": false
+      },
+      "reads": [
+        { "state": "fail_message", "required": true }
+      ],
+      "config": {
+        "displayMode": "auto",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    }
+  },
+  "edges": [
+    {
+      "source": "input_score",
+      "target": "score_gate",
+      "sourceHandle": "write:score",
+      "targetHandle": "read:score"
+    }
+  ],
+  "conditional_edges": [
+    {
+      "source": "score_gate",
+      "branches": {
+        "pass": "output_pass",
+        "fail": "output_fail"
+      }
+    }
+  ],
+  "metadata": {}
+}

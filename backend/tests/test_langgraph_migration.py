@@ -44,6 +44,20 @@ def _load_knowledge_base_validation_graph() -> NodeSystemGraphPayload:
     )
 
 
+def _load_conditional_edge_validation_graph() -> NodeSystemGraphPayload:
+    template = NodeSystemTemplate.model_validate(load_template_record("conditional_edge_validation"))
+    return NodeSystemGraphPayload.model_validate(
+        {
+            "name": template.default_graph_name,
+            "state_schema": template.state_schema,
+            "nodes": template.nodes,
+            "edges": template.edges,
+            "conditional_edges": template.conditional_edges,
+            "metadata": template.metadata,
+        }
+    )
+
+
 def _fake_skill_registry(*, include_disabled: bool = False):
     _ = include_disabled
     return {"search_knowledge_base": object()}
@@ -361,6 +375,11 @@ class LangGraphMigrationTests(unittest.TestCase):
         validation = validate_graph(graph)
         self.assertTrue(validation.valid, validation.model_dump())
 
+    def test_conditional_edge_validation_template_still_valid(self):
+        graph = _load_conditional_edge_validation_graph()
+        validation = validate_graph(graph)
+        self.assertTrue(validation.valid, validation.model_dump())
+
     def test_knowledge_base_validation_resolves_langgraph_backend(self):
         graph = _load_knowledge_base_validation_graph()
         backend, reasons = resolve_graph_runtime_backend(graph)
@@ -420,3 +439,16 @@ class LangGraphMigrationTests(unittest.TestCase):
         self.assertTrue(result["knowledge_summary"])
         self.assertIn("raw_answer", result["state_snapshot"]["values"])
         self.assertIn("formatted_answer", result["state_snapshot"]["values"])
+
+    @patch("app.core.langgraph.runtime.save_run", lambda state: None)
+    @patch("app.core.runtime.node_system_executor.save_run", lambda state: None)
+    def test_conditional_edge_validation_langgraph_runtime(self):
+        graph = _load_conditional_edge_validation_graph()
+        result = execute_node_system_graph_langgraph(graph, persist_progress=False)
+
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(result["runtime_backend"], "langgraph")
+        self.assertEqual(result["final_result"], "通过分支命中：score >= 60")
+        self.assertEqual(result["state_snapshot"]["values"]["score"], 80)
+        self.assertIn("output_pass", {item["node_id"] for item in result["node_executions"]})
+        self.assertNotIn("output_fail", {item["node_id"] for item in result["node_executions"]})
