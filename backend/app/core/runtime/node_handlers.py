@@ -12,6 +12,7 @@ from app.core.runtime.agent_subgraph_input_generation import (
     SubgraphCapabilityField,
     generate_agent_subgraph_inputs,
 )
+from app.core.runtime.activity_events import record_activity_event
 from app.core.runtime.condition_eval import evaluate_condition_rule, resolve_branch_key
 from app.core.runtime.input_boundary import coerce_input_boundary_value, first_truthy
 from app.core.runtime.reference_resolution import resolve_condition_source
@@ -132,6 +133,7 @@ def execute_agent_node(
     execute_subgraph_capability_func: Callable[..., dict[str, Any]] | None = None,
     finalize_agent_stream_delta_func: Callable[..., None] = finalize_agent_stream_delta,
     first_truthy_func: Callable[..., Any] = first_truthy,
+    record_activity_event_func: Callable[..., dict[str, Any]] = record_activity_event,
 ) -> dict[str, Any]:
     selected_skills: list[str] = []
     selected_capabilities: list[dict[str, str]] = []
@@ -226,6 +228,20 @@ def execute_agent_node(
                 approved_inputs = approved_pending.get("skill_inputs")
                 if isinstance(approved_inputs, dict):
                     skill_inputs = dict(approved_inputs)
+                if str(approved_pending.get("status") or "") == "denied":
+                    denial_reason = _compact_text(approved_pending.get("denial_reason")) or "The user denied this permission request."
+                    skill_result = _permission_denied_skill_result(skill_key, denial_reason)
+                else:
+                    skill_invoke_kwargs: dict[str, Any] = {}
+                    if callable_accepts_keyword_func(invoke_skill_func, "context"):
+                        invocation_index = _next_skill_artifact_invocation_index(state, node_name, skill_key)
+                        skill_invoke_kwargs["context"] = create_skill_artifact_context(
+                            run_id=str(state.get("run_id") or "run"),
+                            node_id=node_name,
+                            skill_key=skill_key,
+                            invocation_index=invocation_index,
+                        )
+                    skill_result = invoke_skill_func(skill_func, skill_inputs, **skill_invoke_kwargs)
             else:
                 approval_decision = should_pause_for_skill_permission_approval(
                     state=state,
@@ -260,16 +276,16 @@ def execute_agent_node(
                         "warnings": list(dict.fromkeys(warnings)),
                         "final_result": "",
                     }
-            skill_invoke_kwargs: dict[str, Any] = {}
-            if callable_accepts_keyword_func(invoke_skill_func, "context"):
-                invocation_index = _next_skill_artifact_invocation_index(state, node_name, skill_key)
-                skill_invoke_kwargs["context"] = create_skill_artifact_context(
-                    run_id=str(state.get("run_id") or "run"),
-                    node_id=node_name,
-                    skill_key=skill_key,
-                    invocation_index=invocation_index,
-                )
-            skill_result = invoke_skill_func(skill_func, skill_inputs, **skill_invoke_kwargs)
+                skill_invoke_kwargs: dict[str, Any] = {}
+                if callable_accepts_keyword_func(invoke_skill_func, "context"):
+                    invocation_index = _next_skill_artifact_invocation_index(state, node_name, skill_key)
+                    skill_invoke_kwargs["context"] = create_skill_artifact_context(
+                        run_id=str(state.get("run_id") or "run"),
+                        node_id=node_name,
+                        skill_key=skill_key,
+                        invocation_index=invocation_index,
+                    )
+                skill_result = invoke_skill_func(skill_func, skill_inputs, **skill_invoke_kwargs)
         duration_ms = int((perf_counter() - started_at) * 1000)
         skill_status, skill_error = _resolve_skill_invocation_status(skill_key, skill_result)
         skill_error_type = _resolve_skill_error_type(skill_result)
@@ -315,6 +331,22 @@ def execute_agent_node(
                 "error": skill_error,
                 "error_type": skill_error_type,
             }
+        )
+        record_activity_event_func(
+            state,
+            kind="skill_invocation",
+            summary=_skill_invocation_activity_summary(skill_key, skill_status),
+            node_id=node_name,
+            status=skill_status,
+            duration_ms=duration_ms,
+            detail={
+                "skill_key": skill_key,
+                "binding_source": resolved_binding.source,
+                "input_keys": sorted(skill_inputs.keys()),
+                "output_keys": sorted(skill_result.keys()),
+                **({"error_type": skill_error_type} if skill_error_type else {}),
+            },
+            error=skill_error,
         )
 
     subgraph_keys = (
@@ -745,6 +777,22 @@ def _resolve_skill_error_type(skill_result: dict[str, Any]) -> str:
     if "required" in error and ("missing" in error or "required input" in error or "query" in error):
         return "missing_required_input"
     return ""
+
+
+def _permission_denied_skill_result(skill_key: str, reason: str) -> dict[str, Any]:
+    return {
+        "status": "failed",
+        "error_type": "permission_denied",
+        "error": f"Permission denied for skill '{skill_key}': {reason}",
+        "denial_reason": reason,
+        "recoverable": True,
+    }
+
+
+def _skill_invocation_activity_summary(skill_key: str, status: str) -> str:
+    if status == "failed":
+        return f"Skill '{skill_key}' failed."
+    return f"Skill '{skill_key}' succeeded."
 
 
 def _compact_text(value: Any) -> str:

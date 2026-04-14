@@ -146,6 +146,9 @@ export function useWorkspaceRunLifecycleController(input: WorkspaceRunLifecycleC
     source.addEventListener("state.updated", (event) => {
       handleRunEvent(tabId, "state.updated", event, { updateOutputPreview: true });
     });
+    source.addEventListener("activity.event", (event) => {
+      handleRunEvent(tabId, "activity.event", event);
+    });
     source.addEventListener("node.completed", (event) => {
       handleRunEvent(tabId, "node.completed", event);
     });
@@ -161,6 +164,11 @@ export function useWorkspaceRunLifecycleController(input: WorkspaceRunLifecycleC
       void pollRunForTab(tabId, runId);
     });
     source.addEventListener("run.failed", () => {
+      input.clearRunActivityPanelHintForTab(tabId);
+      cancelRunEventStreamForTab(tabId);
+      void pollRunForTab(tabId, runId);
+    });
+    source.addEventListener("run.cancelled", () => {
       input.clearRunActivityPanelHintForTab(tabId);
       cancelRunEventStreamForTab(tabId);
       void pollRunForTab(tabId, runId);
@@ -252,5 +260,5 @@ function buildStateNameByKey(document: GraphPayload | GraphDocument | undefined)
 }
 
 function isFinishedRunStatus(status: string | null | undefined) {
-  return status === "completed" || status === "failed";
+  return status === "completed" || status === "failed" || status === "cancelled";
 }

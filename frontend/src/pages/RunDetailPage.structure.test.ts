@@ -115,6 +115,7 @@ test("RunDetailPage subscribes to run events and renders live streamed output", 
   assert.doesNotMatch(componentSource, /new EventSource\(`\/api\/runs\/\$\{normalizedRunId\}\/events`\)/);
   assert.match(componentSource, /addEventListener\("node\.output\.delta"/);
   assert.match(componentSource, /addEventListener\("run\.completed"/);
+  assert.match(componentSource, /addEventListener\("run\.cancelled"/);
   assert.match(componentSource, /function closeRunEventStream\(\)/);
   assert.match(componentSource, /class="run-detail__panel run-detail__panel--live"/);
   assert.match(componentSource, /v-for="stream in liveStreamingOutputItems"/);

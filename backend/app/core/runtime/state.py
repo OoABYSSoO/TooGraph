@@ -5,7 +5,7 @@ from typing import Any, Literal, TypedDict
 from uuid import uuid4
 
 
-RunStatus = Literal["queued", "running", "paused", "awaiting_human", "resuming", "completed", "failed"]
+RunStatus = Literal["queued", "running", "paused", "awaiting_human", "resuming", "completed", "failed", "cancelled"]
 NodeStatus = Literal["idle", "running", "paused", "success", "failed"]
 
 
@@ -59,6 +59,7 @@ class RunState(TypedDict, total=False):
     max_revision_round: int
     selected_skills: list[str]
     skill_outputs: list[dict[str, Any]]
+    activity_events: list[dict[str, Any]]
     selected_capabilities: list[dict[str, Any]]
     capability_outputs: list[dict[str, Any]]
     evaluation_result: dict[str, Any]
@@ -159,7 +160,7 @@ def set_run_status(
     elif status == "running":
         lifecycle["pause_reason"] = None
 
-    if status in {"completed", "failed"}:
+    if status in {"completed", "failed", "cancelled"}:
         state["completed_at"] = now
 
 
@@ -192,6 +193,7 @@ def create_initial_run_state(graph_id: str, graph_name: str, max_revision_round:
         max_revision_round=max_revision_round,
         selected_skills=[],
         skill_outputs=[],
+        activity_events=[],
         selected_capabilities=[],
         capability_outputs=[],
         evaluation_result={},

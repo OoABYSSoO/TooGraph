@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 import unittest
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -148,6 +149,62 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         self.assertEqual(result["warnings"], ["warn"])
         self.assertEqual(result["final_result"], "value")
         self.assertEqual(finalized, {"answer": "value"})
+
+    def test_execute_agent_node_records_skill_activity_event(self) -> None:
+        state_schema = {
+            "question": NodeSystemStateDefinition.model_validate({"type": "text"}),
+            "answer": NodeSystemStateDefinition.model_validate({"type": "text"}),
+        }
+        node = NodeSystemAgentNode.model_validate(
+            {
+                "kind": "agent",
+                "name": "writer",
+                "ui": {"position": {"x": 0, "y": 0}},
+                "reads": [{"state": "question"}],
+                "writes": [{"state": "answer"}],
+                "config": {"skillKey": "custom"},
+            }
+        )
+        recorded_events: list[dict[str, Any]] = []
+
+        def record_activity_event_func(state: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
+            recorded_events.append(kwargs)
+            return {"sequence": len(recorded_events), **kwargs}
+
+        execute_agent_node(
+            state_schema,
+            node,
+            {"question": "q"},
+            {"state": {}},
+            node_name="writer",
+            state={"run_id": "run-1"},
+            get_skill_registry_func=lambda *, include_disabled: {"custom": object()},
+            invoke_skill_func=lambda skill_func, skill_inputs: {"echo": skill_inputs["question"]},
+            resolve_agent_runtime_config_func=lambda agent_node: {},
+            build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
+            callable_accepts_keyword_func=lambda func, keyword: False,
+            generate_agent_skill_inputs_func=pass_through_skill_inputs_func,
+            generate_agent_response_func=lambda agent_node, input_values, skill_context, runtime_config, **kwargs: (
+                {"answer": "value"},
+                "",
+                [],
+                runtime_config,
+            ),
+            finalize_agent_stream_delta_func=lambda *, state, node_name, output_values: None,
+            first_truthy_func=lambda values: next((value for value in values if value), None),
+            record_activity_event_func=record_activity_event_func,
+        )
+
+        self.assertEqual(len(recorded_events), 1)
+        event = recorded_events[0]
+        self.assertEqual(event["kind"], "skill_invocation")
+        self.assertEqual(event["node_id"], "writer")
+        self.assertEqual(event["status"], "succeeded")
+        self.assertEqual(event["summary"], "Skill 'custom' succeeded.")
+        self.assertEqual(event["detail"]["skill_key"], "custom")
+        self.assertEqual(event["detail"]["binding_source"], "node_config")
+        self.assertEqual(event["detail"]["input_keys"], ["question"])
+        self.assertEqual(event["detail"]["output_keys"], ["echo"])
 
     def test_execute_agent_node_treats_knowledge_base_state_as_normal_skill_input(self) -> None:
         state_schema = {
@@ -551,6 +608,92 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         self.assertNotIn("pending_permission_approval", state["metadata"])
         self.assertEqual(state["permission_approvals"][0]["status"], "approved")
         self.assertEqual(result["outputs"]["dynamic_result"]["inputs"], stored_inputs)
+
+    def test_execute_agent_node_resumes_risky_skill_denial_as_result_package_failure(self) -> None:
+        state_schema = {
+            "selected_capability": NodeSystemStateDefinition.model_validate({"type": "capability"}),
+            "request": NodeSystemStateDefinition.model_validate({"type": "text"}),
+            "dynamic_result": NodeSystemStateDefinition.model_validate({"type": "result_package"}),
+        }
+        node = NodeSystemAgentNode.model_validate(
+            {
+                "kind": "agent",
+                "name": "tool_executor",
+                "ui": {"position": {"x": 0, "y": 0}},
+                "reads": [{"state": "selected_capability"}, {"state": "request"}],
+                "writes": [{"state": "dynamic_result"}],
+                "config": {"skillKey": ""},
+            }
+        )
+        stored_inputs = {"path": "skill/user/demo/SKILL.md", "content": "# Demo"}
+        state = {
+            "run_id": "run-1",
+            "metadata": {
+                "graph_permission_mode": "ask_first",
+                "pending_permission_approval": build_pending_permission_approval(
+                    state={"run_id": "run-1", "metadata": {"graph_permission_mode": "ask_first"}},
+                    node_name="execute_capability",
+                    skill_key="local_workspace_executor",
+                    skill_name="Local Workspace Executor",
+                    binding_source="capability_state",
+                    permissions=["file_write"],
+                    skill_inputs=stored_inputs,
+                ),
+                "pending_permission_approval_resume_payload": {
+                    "permission_approval": {
+                        "decision": "denied",
+                        "reason": "不要写本地文件",
+                    }
+                },
+            },
+        }
+
+        result = execute_agent_node(
+            state_schema,
+            node,
+            {
+                "selected_capability": {"kind": "skill", "key": "local_workspace_executor"},
+                "request": "write a file",
+            },
+            {"state": {}},
+            node_name="execute_capability",
+            state=state,
+            get_skill_registry_func=lambda *, include_disabled: {"local_workspace_executor": "local_workspace_executor"},
+            get_skill_definition_registry_func=lambda *, include_disabled: {
+                "local_workspace_executor": SkillDefinition(
+                    skillKey="local_workspace_executor",
+                    name="Local Workspace Executor",
+                    permissions=["file_write"],
+                    runtimeReady=True,
+                    runtimeRegistered=True,
+                )
+            },
+            generate_agent_skill_inputs_func=lambda **kwargs: (_ for _ in ()).throw(
+                AssertionError("denied resume should reuse stored permission inputs")
+            ),
+            invoke_skill_func=lambda skill_func, skill_inputs: (_ for _ in ()).throw(
+                AssertionError("denied permission should not execute the skill")
+            ),
+            resolve_agent_runtime_config_func=lambda agent_node: {},
+            build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
+            callable_accepts_keyword_func=lambda func, keyword: False,
+            generate_agent_response_func=lambda *args, **kwargs: (_ for _ in ()).throw(
+                AssertionError("dynamic denial results should be packaged without an extra LLM response")
+            ),
+            finalize_agent_stream_delta_func=lambda *, state, node_name, output_values: None,
+            first_truthy_func=lambda values: next((value for value in values if value), None),
+        )
+
+        self.assertNotIn("pending_permission_approval", state["metadata"])
+        self.assertEqual(state["permission_approvals"][0]["status"], "denied")
+        self.assertEqual(state["permission_approvals"][0]["denial_reason"], "不要写本地文件")
+        package = result["outputs"]["dynamic_result"]
+        self.assertEqual(package["status"], "failed")
+        self.assertEqual(package["errorType"], "permission_denied")
+        self.assertEqual(package["error"], "Permission denied for skill 'local_workspace_executor': 不要写本地文件")
+        self.assertEqual(package["inputs"], stored_inputs)
+        self.assertEqual(result["skill_outputs"][0]["status"], "failed")
+        self.assertEqual(result["skill_outputs"][0]["error_type"], "permission_denied")
 
     def test_execute_agent_node_uses_llm_inputs_for_capability_state_selected_subgraph(self) -> None:
         state_schema = {

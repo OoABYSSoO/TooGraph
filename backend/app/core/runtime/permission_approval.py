@@ -119,14 +119,21 @@ def consume_pending_permission_approval(
 
     metadata.pop("pending_permission_approval", None)
     resume_payload = metadata.pop("pending_permission_approval_resume_payload", {})
+    normalized_resume_payload = resume_payload if isinstance(resume_payload, dict) else {}
+    decision = _resolve_resume_decision(normalized_resume_payload)
+    denial_reason = _resolve_denial_reason(normalized_resume_payload)
     approval_record = {
         **pending,
-        "status": "approved",
-        "approved_at": utc_now_iso(),
-        "resume_payload": resume_payload if isinstance(resume_payload, dict) else {},
+        "status": decision,
+        "resume_payload": normalized_resume_payload,
     }
+    if decision == "denied":
+        approval_record["denied_at"] = utc_now_iso()
+        approval_record["denial_reason"] = denial_reason
+    else:
+        approval_record["approved_at"] = utc_now_iso()
     state["permission_approvals"] = [*state.get("permission_approvals", []), approval_record]
-    return pending
+    return approval_record
 
 
 def find_pending_permission_approval_for_node(
@@ -161,6 +168,21 @@ def _approval_reason(permissions: list[str], skill_name: str) -> str:
         return ""
     label = ", ".join(permissions)
     return f"Skill '{skill_name}' declares risky permission(s): {label}."
+
+
+def _resolve_resume_decision(resume_payload: dict[str, Any]) -> str:
+    approval_payload = resume_payload.get("permission_approval")
+    payload = approval_payload if isinstance(approval_payload, dict) else resume_payload
+    raw_decision = str(payload.get("decision") or payload.get("status") or "").strip().lower()
+    if raw_decision in {"denied", "deny", "rejected", "reject", "refused", "refuse"}:
+        return "denied"
+    return "approved"
+
+
+def _resolve_denial_reason(resume_payload: dict[str, Any]) -> str:
+    approval_payload = resume_payload.get("permission_approval")
+    payload = approval_payload if isinstance(approval_payload, dict) else resume_payload
+    return str(payload.get("reason") or payload.get("message") or "").strip()
 
 
 def _preview_value(value: Any, *, limit: int = 1000) -> str:

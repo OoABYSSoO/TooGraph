@@ -3,7 +3,7 @@ import { cloneGraphDocument, clonePlainValue } from "./graph-document.ts";
 import type { GraphPayload } from "@/types/node-system";
 import type { RunDetail, RunSnapshot, RunSummary } from "@/types/run";
 
-const RESTORABLE_RUN_STATUSES = new Set(["completed", "failed", "paused", "awaiting_human"]);
+const RESTORABLE_RUN_STATUSES = new Set(["completed", "failed", "cancelled", "paused", "awaiting_human"]);
 
 export function canRestoreRunStatus(status: string | null | undefined) {
   return RESTORABLE_RUN_STATUSES.has(String(status ?? "").trim());

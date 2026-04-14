@@ -49,6 +49,20 @@ class StateEvent(BaseModel):
     created_at: str
 
 
+class ActivityEvent(BaseModel):
+    sequence: int = 0
+    kind: str = ""
+    summary: str = ""
+    node_id: str | None = None
+    subgraph_node_id: str | None = None
+    subgraph_path: list[str] = Field(default_factory=list)
+    status: str | None = None
+    duration_ms: int | None = None
+    detail: dict[str, Any] = Field(default_factory=dict)
+    error: str | None = None
+    created_at: str
+
+
 class CycleIterationRecord(BaseModel):
     iteration: int
     executed_node_ids: list[str] = Field(default_factory=list)
@@ -141,6 +155,7 @@ class NodeExecutionArtifacts(BaseModel):
 
 class RunArtifacts(BaseModel):
     skill_outputs: list[dict[str, Any]] = Field(default_factory=list)
+    activity_events: list[ActivityEvent] = Field(default_factory=list)
     capability_outputs: list[dict[str, Any]] = Field(default_factory=list)
     output_previews: list[OutputPreview] = Field(default_factory=list)
     saved_outputs: list[SavedOutputArtifact] = Field(default_factory=list)

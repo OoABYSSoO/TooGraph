@@ -69,9 +69,11 @@ def initialize_graph_state(
     if preserve_existing_values:
         state["state_last_writers"] = dict(state.get("state_last_writers", {}))
         state["state_events"] = list(state.get("state_events", []))
+        state["activity_events"] = list(state.get("activity_events", []))
     else:
         state["state_last_writers"] = {}
         state["state_events"] = []
+        state["activity_events"] = []
     state["state_snapshot"] = {
         "values": dict(initialized_values),
         "last_writers": dict(state["state_last_writers"]),

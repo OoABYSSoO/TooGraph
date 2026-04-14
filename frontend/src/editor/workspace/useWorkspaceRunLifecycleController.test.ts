@@ -239,6 +239,19 @@ test("useWorkspaceRunLifecycleController appends node and state activity events 
       data: JSON.stringify({ node_id: "agent_1", reasoning: "Checked sources", created_at: "2026-05-03T01:00:02Z" }),
     }),
   );
+  harness.eventSources[0]?.emit(
+    "activity.event",
+    new MessageEvent("activity.event", {
+      data: JSON.stringify({
+        node_id: "agent_1",
+        kind: "skill_invocation",
+        summary: "Skill 'web_search' succeeded.",
+        detail: { skill_key: "web_search" },
+        sequence: 4,
+        created_at: "2026-05-03T01:00:03Z",
+      }),
+    }),
+  );
 
   assert.deepEqual(harness.runOutputPreviewByTabId.value.tab_a, {
     output_answer: { text: "Final answer", displayMode: "plain" },
@@ -248,7 +261,8 @@ test("useWorkspaceRunLifecycleController appends node and state activity events 
     [
       { kind: "node-started", title: "agent_1 running", stateKey: null, preview: "agent running", active: false },
       { kind: "state-updated", title: "Answer", stateKey: "answer", preview: "Final answer", active: false },
-      { kind: "reasoning", title: "agent_1 reasoning", stateKey: null, preview: "Checked sources", active: true },
+      { kind: "reasoning", title: "agent_1 reasoning", stateKey: null, preview: "Checked sources", active: false },
+      { kind: "activity-event", title: "Skill 'web_search' succeeded.", stateKey: null, preview: '{\n  "skill_key": "web_search"\n}', active: true },
     ],
   );
 });
@@ -272,6 +286,16 @@ test("useWorkspaceRunLifecycleController reconciles terminal run activity from s
       runDetail("completed", {
         artifacts: {
           output_previews: [],
+          activity_events: [
+            {
+              node_id: "agent_1",
+              kind: "skill_invocation",
+              summary: "Skill 'web_search' succeeded.",
+              detail: { skill_key: "web_search" },
+              sequence: 2,
+              created_at: "2026-05-03T01:00:02Z",
+            },
+          ],
           state_events: [
             {
               node_id: "agent_1",
@@ -291,7 +315,10 @@ test("useWorkspaceRunLifecycleController reconciles terminal run activity from s
 
   assert.deepEqual(
     harness.runActivityByTabId.value.tab_a.entries.map((entry) => ({ kind: entry.kind, title: entry.title, sequence: entry.sequence, preview: entry.preview })),
-    [{ kind: "state-updated", title: "Answer", sequence: 3, preview: "Stored answer" }],
+    [
+      { kind: "activity-event", title: "Skill 'web_search' succeeded.", sequence: 2, preview: '{\n  "skill_key": "web_search"\n}' },
+      { kind: "state-updated", title: "Answer", sequence: 3, preview: "Stored answer" },
+    ],
   );
   assert.deepEqual(harness.clearedRunActivityHints, ["tab_a"]);
 });

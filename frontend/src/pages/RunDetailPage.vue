@@ -400,6 +400,10 @@ function startRunEventStream(nextRunId: string) {
     void loadRun(normalizedRunId);
     closeRunEventStream();
   });
+  source.addEventListener("run.cancelled", () => {
+    void loadRun(normalizedRunId);
+    closeRunEventStream();
+  });
   source.onerror = () => {
     if (runEventSource === source) {
       closeRunEventStream();
@@ -518,6 +522,9 @@ function snapshotStatusLabel(status: string) {
   }
   if (status === "failed") {
     return t("status.failed");
+  }
+  if (status === "cancelled") {
+    return t("status.cancelled");
   }
   return status;
 }
