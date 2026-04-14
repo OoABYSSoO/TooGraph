@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import json
 import sqlite3
 from pathlib import Path
-from typing import Any
 
 
 BASE_DIR = Path(__file__).resolve().parents[3]
@@ -14,11 +12,9 @@ RUN_DATA_DIR = DATA_DIR / "runs"
 SETTINGS_DATA_DIR = DATA_DIR / "settings"
 SKILL_STATE_DATA_DIR = DATA_DIR / "skills"
 DB_PATH = DATA_DIR / "graphiteui.db"
-_JSON_STORAGE_MIGRATED = False
 
 
 def get_connection() -> sqlite3.Connection:
-    initialize_storage()
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(DB_PATH)
     connection.row_factory = sqlite3.Row
@@ -27,20 +23,13 @@ def get_connection() -> sqlite3.Connection:
 
 
 def initialize_storage() -> None:
-    global _JSON_STORAGE_MIGRATED
-
-    if _JSON_STORAGE_MIGRATED:
-        return
-
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(DB_PATH)
     connection.row_factory = sqlite3.Row
     try:
         ensure_schema(connection)
-        migrate_json_storage(connection)
     finally:
         connection.close()
-    _JSON_STORAGE_MIGRATED = True
 
 
 def ensure_schema(connection: sqlite3.Connection) -> None:
@@ -116,17 +105,3 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
         """
     )
     connection.commit()
-
-
-def migrate_json_storage(connection: sqlite3.Connection) -> None:
-    GRAPH_DATA_DIR.mkdir(parents=True, exist_ok=True)
-    PRESET_DATA_DIR.mkdir(parents=True, exist_ok=True)
-    RUN_DATA_DIR.mkdir(parents=True, exist_ok=True)
-    SETTINGS_DATA_DIR.mkdir(parents=True, exist_ok=True)
-    SKILL_STATE_DATA_DIR.mkdir(parents=True, exist_ok=True)
-
-
-def row_payload(row: sqlite3.Row | None) -> dict[str, Any] | None:
-    if row is None:
-        return None
-    return json.loads(row["payload_json"])

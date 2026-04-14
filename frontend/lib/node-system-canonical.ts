@@ -5,7 +5,6 @@ import type {
   GraphPosition,
   InputBoundaryNode,
   NodePresetDefinition,
-  NodeSystemGraphNode,
   NodeViewportSize,
   OutputBoundaryNode,
   PortDefinition,
@@ -254,20 +253,28 @@ function extractLegacyStateWrites(config: NodePresetDefinition): Record<string, 
   return result;
 }
 
-export function buildCanonicalNodeFromLegacyNode(node: NodeSystemGraphNode): CanonicalNode {
-  const config = node.data.config;
+export function buildCanonicalNodeFromEditorConfig(params: {
+  nodeId: string;
+  position: GraphPosition;
+  isExpanded: boolean;
+  collapsedSize?: NodeViewportSize | null;
+  expandedSize?: NodeViewportSize | null;
+  config: NodePresetDefinition;
+}): CanonicalNode {
+  const { nodeId, position, isExpanded, collapsedSize, expandedSize } = params;
+  const config = params.config;
   const readsByPort = extractLegacyStateReads(config);
   const writesByPort = extractLegacyStateWrites(config);
   const ui: CanonicalNodeUi = {
-    position: node.position,
-    collapsed: config.family === "input" ? false : !Boolean(node.data.isExpanded),
-    expandedSize: node.data.expandedSize ?? null,
-    collapsedSize: node.data.collapsedSize ?? null,
+    position,
+    collapsed: config.family === "input" ? false : !isExpanded,
+    expandedSize: expandedSize ?? null,
+    collapsedSize: collapsedSize ?? null,
   };
   const name =
     stripString((config as { name?: string }).name) ||
     stripString((config as { label?: string }).label) ||
-    node.id;
+    nodeId;
   const description = stripString((config as { description?: string }).description);
 
   if (config.family === "input") {

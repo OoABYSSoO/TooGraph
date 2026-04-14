@@ -1,18 +1,16 @@
 from __future__ import annotations
 
 import shutil
-import sqlite3
 from pathlib import Path
 
 from app.core.schemas.skills import SkillCatalogStatus
-from app.core.storage.database import SKILL_STATE_DATA_DIR, get_connection
+from app.core.storage.database import SKILL_STATE_DATA_DIR
 from app.core.storage.json_file_utils import read_json_file, write_json_file
 
 
 ROOT_DIR = Path(__file__).resolve().parents[4]
 GRAPHITE_SKILLS_DIR = ROOT_DIR / "skill"
 SKILL_STATE_PATH = SKILL_STATE_DATA_DIR / "registry_states.json"
-_SKILL_STATE_MIGRATED = False
 
 
 def graphite_managed_skill_path_for(skill_key: str) -> Path:
@@ -27,7 +25,7 @@ def list_managed_skill_keys() -> set[str]:
 
 
 def get_skill_status_map() -> dict[str, SkillCatalogStatus]:
-    _initialize_skill_state_storage()
+    SKILL_STATE_DATA_DIR.mkdir(parents=True, exist_ok=True)
     payload = read_json_file(SKILL_STATE_PATH, default={}) or {}
     return {
         str(skill_key): SkillCatalogStatus(str(status))
@@ -36,14 +34,14 @@ def get_skill_status_map() -> dict[str, SkillCatalogStatus]:
 
 
 def set_skill_status(skill_key: str, status: SkillCatalogStatus) -> None:
-    _initialize_skill_state_storage()
+    SKILL_STATE_DATA_DIR.mkdir(parents=True, exist_ok=True)
     payload = read_json_file(SKILL_STATE_PATH, default={}) or {}
     payload[skill_key] = status.value
     write_json_file(SKILL_STATE_PATH, payload)
 
 
 def clear_skill_status(skill_key: str) -> None:
-    _initialize_skill_state_storage()
+    SKILL_STATE_DATA_DIR.mkdir(parents=True, exist_ok=True)
     payload = read_json_file(SKILL_STATE_PATH, default={}) or {}
     if skill_key in payload:
         payload.pop(skill_key, None)
@@ -80,24 +78,3 @@ def import_skill_from_source(skill_key: str, source_path: str) -> Path:
     shutil.copytree(source_dir, destination.parent, dirs_exist_ok=True)
     enable_skill(skill_key)
     return destination
-
-
-def _initialize_skill_state_storage() -> None:
-    global _SKILL_STATE_MIGRATED
-    SKILL_STATE_DATA_DIR.mkdir(parents=True, exist_ok=True)
-    if _SKILL_STATE_MIGRATED:
-        return
-    if not SKILL_STATE_PATH.exists():
-        _migrate_skill_states_from_database()
-    _SKILL_STATE_MIGRATED = True
-
-
-def _migrate_skill_states_from_database() -> None:
-    try:
-        with get_connection() as connection:
-            rows = connection.execute("SELECT skill_key, status FROM skill_registry_states").fetchall()
-    except sqlite3.OperationalError:
-        return
-    payload = {str(row["skill_key"]): str(row["status"]) for row in rows}
-    if payload:
-        write_json_file(SKILL_STATE_PATH, payload)

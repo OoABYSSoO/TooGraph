@@ -144,30 +144,6 @@ export type GraphPosition = {
   y: number;
 };
 
-export type NodeSystemGraphNodeData = {
-  nodeId: string;
-  config: NodePresetDefinition;
-  previewText?: string;
-  isExpanded?: boolean;
-  collapsedSize?: NodeViewportSize | null;
-  expandedSize?: NodeViewportSize | null;
-};
-
-export type NodeSystemGraphNode = {
-  id: string;
-  type?: string;
-  position: GraphPosition;
-  data: NodeSystemGraphNodeData;
-};
-
-export type NodeSystemGraphEdge = {
-  id: string;
-  source: string;
-  target: string;
-  sourceHandle?: string | null;
-  targetHandle?: string | null;
-};
-
 export type SavedOutputArtifact = {
   node_id?: string | null;
   source_key: string;

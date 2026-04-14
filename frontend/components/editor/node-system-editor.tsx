@@ -42,7 +42,7 @@ import { RichContent, formatRichContentValue, resolveRichContentDisplayMode } fr
 import { apiGet, apiPost } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import {
-  buildCanonicalNodeFromLegacyNode,
+  buildCanonicalNodeFromEditorConfig,
   buildEditorNodeConfigFromCanonicalNode,
   buildEditorPresetRecordFromCanonicalPreset,
   buildEditorStateFieldsFromCanonicalGraph,
@@ -1776,18 +1776,13 @@ function createFlowEdgesFromCanonicalGraph(graph: CanonicalGraphPayload, nodesBy
 }
 
 function buildCanonicalNodeFromFlowNode(node: FlowNode, config: NodePresetDefinition = node.data.config) {
-  return buildCanonicalNodeFromLegacyNode({
-    id: node.id,
-    type: node.type ?? "default",
+  return buildCanonicalNodeFromEditorConfig({
+    nodeId: node.id,
     position: node.position,
-    data: {
-      nodeId: node.data.nodeId,
-      config,
-      previewText: node.data.previewText ?? "",
-      isExpanded: config.family === "input" ? true : Boolean(node.data.isExpanded),
-      collapsedSize: node.data.collapsedSize ?? null,
-      expandedSize: node.data.expandedSize ?? null,
-    },
+    config,
+    isExpanded: config.family === "input" ? true : Boolean(node.data.isExpanded),
+    collapsedSize: node.data.collapsedSize ?? null,
+    expandedSize: node.data.expandedSize ?? null,
   });
 }
 
