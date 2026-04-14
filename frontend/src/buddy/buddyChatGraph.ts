@@ -126,7 +126,7 @@ export function buildBuddyChatGraph(template: TemplateRecord, input: BuildBuddyC
   setStateValueByNameOrKey(graph, "page_context", BUDDY_PAGE_CONTEXT_STATE_KEY, pageContextValue);
   setStateValueByNameOrKey(graph, "buddy_mode", BUDDY_MODE_STATE_KEY, buddyMode);
   setStateValueByName(graph, "skill_catalog_snapshot", skillCatalogSnapshot);
-  for (const stateName of ["buddy_reply", "final_reply", "direct_reply", "denied_reply", "approval_prompt"]) {
+  for (const stateName of ["buddy_reply", "visible_reply", "final_reply", "direct_reply", "denied_reply", "approval_prompt"]) {
     setStateValueByName(graph, stateName, "");
   }
 
@@ -639,6 +639,7 @@ function resolveBuddyReplyStateKeys(graphSnapshot: Record<string, unknown> | nul
         .filter(([, definition]) =>
           [
             "buddy_reply",
+            "visible_reply",
             "final_reply",
             "direct_reply",
             "denied_reply",

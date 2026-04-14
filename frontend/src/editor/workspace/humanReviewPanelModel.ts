@@ -23,6 +23,7 @@ export type HumanReviewRow = {
 
 export type HumanReviewPanelModel = {
   scopePath: string[];
+  permissionApproval: PermissionApprovalDetails | null;
   producedRows: HumanReviewRow[];
   requiredNow: HumanReviewRow[];
   contextRows: HumanReviewRow[];
@@ -32,6 +33,14 @@ export type HumanReviewPanelModel = {
   hasBlockingEmptyRequiredField: boolean;
   firstBlockingRequiredKey: string | null;
   summaryText: string;
+};
+
+export type PermissionApprovalDetails = {
+  skillKey: string;
+  skillName: string;
+  permissions: string[];
+  inputPreview: string;
+  reason: string;
 };
 
 const stateFieldTypeSet = new Set<string>(STATE_FIELD_TYPE_OPTIONS);
@@ -81,6 +90,7 @@ export function buildHumanReviewPanelModel(
   const scope = resolveHumanReviewScope(run, document);
   const scopedRun = scope.run;
   const scopedDocument = scope.document;
+  const permissionApproval = resolvePendingPermissionApproval(scopedRun);
   const values = resolveHumanReviewStateValues(scopedRun);
   const currentNodeId = scopedRun?.current_node_id ?? null;
   const currentExecution = resolveCurrentNodeExecution(scopedRun, currentNodeId);
@@ -213,6 +223,7 @@ export function buildHumanReviewPanelModel(
 
   return {
     scopePath: scope.scopePath,
+    permissionApproval,
     producedRows,
     requiredNow,
     contextRows,
@@ -221,7 +232,7 @@ export function buildHumanReviewPanelModel(
     requiredCount: requiredNow.length,
     hasBlockingEmptyRequiredField: firstBlockingRequiredKey !== null,
     firstBlockingRequiredKey,
-    summaryText: resolveSummaryText(requiredNow.length),
+    summaryText: permissionApproval ? resolvePermissionApprovalSummary(permissionApproval) : resolveSummaryText(requiredNow.length),
   };
 }
 
@@ -255,6 +266,10 @@ function resolveHumanReviewScope(run: RunDetail | null, document: GraphPayload |
   const nodeExecutions = Array.isArray(pending.node_executions) ? pending.node_executions : [];
   const scopedRun: RunDetail = {
     ...run,
+    metadata: {
+      ...run.metadata,
+      ...recordFromUnknown(pending.metadata),
+    },
     current_node_id: innerNodeId,
     node_status_map: nodeStatusMap,
     node_executions: nodeExecutions as RunDetail["node_executions"],
@@ -316,6 +331,35 @@ function stringRecordFromUnknown(value: unknown): Record<string, string> {
 
 function stringFromUnknown(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function resolvePendingPermissionApproval(run: RunDetail | null): PermissionApprovalDetails | null {
+  const pending = recordFromUnknown(run?.metadata?.pending_permission_approval);
+  if (stringFromUnknown(pending.kind) !== "skill_permission_approval") {
+    return null;
+  }
+  const skillKey = stringFromUnknown(pending.skill_key);
+  const skillName = stringFromUnknown(pending.skill_name) || skillKey;
+  const permissions = Array.isArray(pending.permissions)
+    ? pending.permissions.map((permission) => stringFromUnknown(permission)).filter(Boolean)
+    : [];
+  if (!skillKey && permissions.length === 0) {
+    return null;
+  }
+  return {
+    skillKey,
+    skillName,
+    permissions,
+    inputPreview: stringFromUnknown(pending.input_preview),
+    reason: stringFromUnknown(pending.reason),
+  };
+}
+
+function resolvePermissionApprovalSummary(approval: PermissionApprovalDetails) {
+  return translate("humanReview.permissionSummary", {
+    skill: approval.skillName || approval.skillKey,
+    permissions: approval.permissions.join("、"),
+  });
 }
 
 function resolveCurrentNodeExecution(run: RunDetail | null, currentNodeId: string | null) {

@@ -11,6 +11,7 @@ from app.core.runtime.node_handlers import (
     execute_condition_node,
     execute_input_node,
 )
+from app.core.runtime.permission_approval import build_pending_permission_approval
 from app.core.runtime.skill_invocation import callable_accepts_keyword
 from app.core.schemas.node_system import NodeSystemAgentNode, NodeSystemConditionNode, NodeSystemInputNode, NodeSystemStateDefinition
 from app.core.schemas.skills import SkillDefinition, SkillIoField
@@ -412,6 +413,144 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         )
         self.assertIsInstance(result["final_result"], str)
         self.assertIn('"kind": "result_package"', result["final_result"].replace("'", '"'))
+
+    def test_execute_agent_node_pauses_before_ask_first_risky_dynamic_skill(self) -> None:
+        state_schema = {
+            "selected_capability": NodeSystemStateDefinition.model_validate({"type": "capability"}),
+            "request": NodeSystemStateDefinition.model_validate({"type": "text"}),
+            "dynamic_result": NodeSystemStateDefinition.model_validate({"type": "result_package"}),
+        }
+        node = NodeSystemAgentNode.model_validate(
+            {
+                "kind": "agent",
+                "name": "tool_executor",
+                "ui": {"position": {"x": 0, "y": 0}},
+                "reads": [{"state": "selected_capability"}, {"state": "request"}],
+                "writes": [{"state": "dynamic_result"}],
+                "config": {"skillKey": ""},
+            }
+        )
+
+        result = execute_agent_node(
+            state_schema,
+            node,
+            {
+                "selected_capability": {"kind": "skill", "key": "local_workspace_executor"},
+                "request": "write a file",
+            },
+            {"state": {}},
+            node_name="execute_capability",
+            state={"run_id": "run-1", "metadata": {"graph_permission_mode": "ask_first"}},
+            get_skill_registry_func=lambda *, include_disabled: {"local_workspace_executor": "local_workspace_executor"},
+            get_skill_definition_registry_func=lambda *, include_disabled: {
+                "local_workspace_executor": SkillDefinition(
+                    skillKey="local_workspace_executor",
+                    name="Local Workspace Executor",
+                    permissions=["file_write", "subprocess"],
+                    inputSchema=[SkillIoField(key="path", name="Path", valueType="text", required=True)],
+                    runtimeReady=True,
+                    runtimeRegistered=True,
+                )
+            },
+            generate_agent_skill_inputs_func=fixed_skill_inputs_func(
+                {"local_workspace_executor": {"path": "skill/user/demo/SKILL.md"}}
+            ),
+            invoke_skill_func=lambda skill_func, skill_inputs: (_ for _ in ()).throw(
+                AssertionError("risky skill should not execute before approval")
+            ),
+            resolve_agent_runtime_config_func=lambda agent_node: {},
+            build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
+            callable_accepts_keyword_func=lambda func, keyword: False,
+            generate_agent_response_func=lambda *args, **kwargs: (_ for _ in ()).throw(
+                AssertionError("dynamic skill approval should pause before response generation")
+            ),
+            finalize_agent_stream_delta_func=lambda *, state, node_name, output_values: None,
+            first_truthy_func=lambda values: next((value for value in values if value), None),
+        )
+
+        self.assertTrue(result["awaiting_human"])
+        approval = result["pending_permission_approval"]
+        self.assertEqual(approval["kind"], "skill_permission_approval")
+        self.assertEqual(approval["node_id"], "execute_capability")
+        self.assertEqual(approval["skill_key"], "local_workspace_executor")
+        self.assertEqual(approval["binding_source"], "capability_state")
+        self.assertEqual(approval["permissions"], ["file_write", "subprocess"])
+        self.assertEqual(approval["skill_inputs"], {"path": "skill/user/demo/SKILL.md"})
+
+    def test_execute_agent_node_resumes_risky_skill_with_stored_approval_inputs(self) -> None:
+        state_schema = {
+            "selected_capability": NodeSystemStateDefinition.model_validate({"type": "capability"}),
+            "request": NodeSystemStateDefinition.model_validate({"type": "text"}),
+            "dynamic_result": NodeSystemStateDefinition.model_validate({"type": "result_package"}),
+        }
+        node = NodeSystemAgentNode.model_validate(
+            {
+                "kind": "agent",
+                "name": "tool_executor",
+                "ui": {"position": {"x": 0, "y": 0}},
+                "reads": [{"state": "selected_capability"}, {"state": "request"}],
+                "writes": [{"state": "dynamic_result"}],
+                "config": {"skillKey": ""},
+            }
+        )
+        stored_inputs = {"path": "skill/user/demo/SKILL.md", "content": "# Demo"}
+        state = {
+            "run_id": "run-1",
+            "metadata": {
+                "graph_permission_mode": "ask_first",
+                "pending_permission_approval": build_pending_permission_approval(
+                    state={"run_id": "run-1", "metadata": {"graph_permission_mode": "ask_first"}},
+                    node_name="execute_capability",
+                    skill_key="local_workspace_executor",
+                    skill_name="Local Workspace Executor",
+                    binding_source="capability_state",
+                    permissions=["file_write"],
+                    skill_inputs=stored_inputs,
+                ),
+                "pending_permission_approval_resume_payload": {},
+            },
+        }
+        captured_inputs: list[dict[str, object]] = []
+
+        result = execute_agent_node(
+            state_schema,
+            node,
+            {
+                "selected_capability": {"kind": "skill", "key": "local_workspace_executor"},
+                "request": "write a file",
+            },
+            {"state": {}},
+            node_name="execute_capability",
+            state=state,
+            get_skill_registry_func=lambda *, include_disabled: {"local_workspace_executor": "local_workspace_executor"},
+            get_skill_definition_registry_func=lambda *, include_disabled: {
+                "local_workspace_executor": SkillDefinition(
+                    skillKey="local_workspace_executor",
+                    name="Local Workspace Executor",
+                    permissions=["file_write"],
+                    runtimeReady=True,
+                    runtimeRegistered=True,
+                )
+            },
+            generate_agent_skill_inputs_func=lambda **kwargs: (_ for _ in ()).throw(
+                AssertionError("approved resume should reuse stored skill inputs")
+            ),
+            invoke_skill_func=lambda skill_func, skill_inputs: captured_inputs.append(dict(skill_inputs))
+            or {"status": "succeeded", "path": skill_inputs["path"]},
+            resolve_agent_runtime_config_func=lambda agent_node: {},
+            build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
+            callable_accepts_keyword_func=lambda func, keyword: False,
+            generate_agent_response_func=lambda *args, **kwargs: (_ for _ in ()).throw(
+                AssertionError("dynamic skill results should be packaged without an extra LLM response")
+            ),
+            finalize_agent_stream_delta_func=lambda *, state, node_name, output_values: None,
+            first_truthy_func=lambda values: next((value for value in values if value), None),
+        )
+
+        self.assertEqual(captured_inputs, [stored_inputs])
+        self.assertNotIn("pending_permission_approval", state["metadata"])
+        self.assertEqual(state["permission_approvals"][0]["status"], "approved")
+        self.assertEqual(result["outputs"]["dynamic_result"]["inputs"], stored_inputs)
 
     def test_execute_agent_node_uses_llm_inputs_for_capability_state_selected_subgraph(self) -> None:
         state_schema = {

@@ -150,7 +150,7 @@ Python Skill 的依赖规则：
 }
 ```
 
-`enabled`、`selectable`、`hidden`、`requiresApproval`、`capabilityPolicy`、`targets` 和 `executionTargets` 都不应写入新 `skill.json`。`settings.json` 只保存 `enabled`；`selectable`、`hidden`、按来源策略和 per-skill 审批开关都是旧协议。是否需要确认不由 Skill 自己决定，而由运行该图或 Buddy 的权限模式决定：目标语义是 `需确认` 下写文件、删改文件或执行任意脚本/命令需要暂停确认，`完全访问` 下这些低层操作可自动执行。普通 Skill 调用、读取、联网搜索和 LLM 调用不因为 Skill 本身而触发确认。
+`enabled`、`selectable`、`hidden`、`requiresApproval`、`capabilityPolicy`、`targets` 和 `executionTargets` 都不应写入新 `skill.json`。`settings.json` 只保存 `enabled`；`selectable`、`hidden`、按来源策略和 per-skill 审批开关都是旧协议。是否需要确认不由 Skill 自己决定，而由运行该图或 Buddy 的权限模式决定：目标语义是 `需确认` 下写文件、删改文件或执行任意脚本/命令需要暂停确认，`完全访问` 下这些低层操作可自动执行。普通 Skill 调用、读取、联网搜索和 LLM 调用不因为 Skill 本身而触发确认。当前统一低层审批拦截仍在补齐中，因此现有 Skill 仍应声明真实权限、保持路径/命令白名单，并在模板中把高风险写入或执行动作放到可审查的流程位置。
 
 ## `SKILL.md`
 

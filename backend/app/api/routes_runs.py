@@ -25,7 +25,12 @@ logger = logging.getLogger(__name__)
 def list_runs_endpoint(
     graph_name: str = Query(default=""),
     status: str = Query(default=""),
+    include_internal: bool = Query(default=False),
 ) -> list[RunSummary]:
+    raw_runs = list_runs()
+    if not include_internal:
+        raw_runs = [run for run in raw_runs if not _is_internal_run(run)]
+
     runs = [
         RunSummary.model_validate(
             {
@@ -34,7 +39,7 @@ def list_runs_endpoint(
                 "run_snapshot_options": _build_run_snapshot_options(run),
             }
         )
-        for run in list_runs()
+        for run in raw_runs
     ]
     graph_name_query = graph_name.strip().lower()
     status_query = status.strip().lower()
@@ -45,6 +50,13 @@ def list_runs_endpoint(
         runs = [run for run in runs if run.status.lower() == status_query]
 
     return runs
+
+
+def _is_internal_run(run: dict[str, Any]) -> bool:
+    metadata = run.get("metadata")
+    if not isinstance(metadata, dict):
+        return False
+    return metadata.get("internal") is True or metadata.get("role") == "buddy_background_review"
 
 
 @router.get("/{run_id}", response_model=RunDetail)
@@ -170,6 +182,9 @@ def resume_run_endpoint(
     if "pending_subgraph_breakpoint" in previous_metadata:
         resumed_run["metadata"]["pending_subgraph_breakpoint"] = copy.deepcopy(previous_metadata["pending_subgraph_breakpoint"])
         resumed_run["metadata"]["pending_subgraph_resume_payload"] = copy.deepcopy(payload.get("resume") if payload else {})
+    if "pending_permission_approval" in previous_metadata:
+        resumed_run["metadata"]["pending_permission_approval"] = copy.deepcopy(previous_metadata["pending_permission_approval"])
+        resumed_run["metadata"]["pending_permission_approval_resume_payload"] = copy.deepcopy(payload.get("resume") if payload else {})
     resumed_run["metadata"]["resolved_runtime_backend"] = "langgraph"
     resumed_run["checkpoint_metadata"] = {
         "available": bool(checkpoint_metadata.get("checkpoint_id")),
@@ -186,7 +201,11 @@ def resume_run_endpoint(
     touch_run_lifecycle(resumed_run)
     save_run(resumed_run)
 
-    parent_resume_payload = None if "pending_subgraph_breakpoint" in resumed_run["metadata"] else (payload.get("resume") if payload else None)
+    parent_resume_payload = (
+        None
+        if "pending_subgraph_breakpoint" in resumed_run["metadata"] or "pending_permission_approval" in resumed_run["metadata"]
+        else (payload.get("resume") if payload else None)
+    )
     background_tasks.add_task(_resume_run_worker, graph, resumed_run, parent_resume_payload)
     return {"run_id": resumed_run["run_id"], "status": resumed_run["status"]}
 

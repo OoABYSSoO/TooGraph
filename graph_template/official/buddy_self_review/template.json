@@ -696,7 +696,7 @@
                 "taskInstruction": "输出两个 JSON。memory_update_plan 包含 should_update(boolean)、memory_type、summary、evidence、reason、sensitivity、requires_approval。buddy_evolution_plan 包含 should_update(boolean)、target_file、summary、reason、requires_approval。不要把临时错误、一次性路径、完整日志或可从图中重读的信息写入长期计划；本节点只产出计划，不执行写入。",
                 "modelSource": "global",
                 "model": "",
-                "thinkingMode": "high",
+                "thinkingMode": "low",
                 "temperature": 0.1
               }
             },

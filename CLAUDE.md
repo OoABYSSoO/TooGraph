@@ -8,6 +8,8 @@ TooGraph is a visual node-based editor and runtime workspace for LangGraph-style
 
 `node_system` is the only formal graph protocol in active use. `state_schema` is the single source of truth for graph data, while nodes declare what state they read and write.
 
+The product model is graph-first: the whole graph is the Agent, and an individual `agent` node should be treated as one LLM-node turn, one structured output step, or one capability-input preparation step.
+
 The current mainline is the Vue frontend plus the FastAPI backend. Treat current repository files as the implementation source of truth.
 
 ## Current Source Of Truth
@@ -125,6 +127,12 @@ Expected response:
 - Pages:
   - `/` -> `HomePage.vue`
   - `/editor`, `/editor/new`, `/editor/:graphId` -> `EditorPage.vue`
+  - `/library` -> `GraphLibraryPage.vue`
+  - `/buddy` -> `BuddyPage.vue`
+  - `/presets` -> `PresetsPage.vue`
+  - `/skills` -> `SkillsPage.vue`
+  - `/models` -> `ModelProvidersPage.vue`
+  - `/model-logs` -> `ModelLogsPage.vue`
   - `/runs` -> `RunsPage.vue`
   - `/runs/:runId` -> `RunDetailPage.vue`
   - `/settings` -> `SettingsPage.vue`
@@ -152,6 +160,7 @@ Current node families:
 - `agent`
 - `condition`
 - `output`
+- `subgraph`
 
 Current editor capabilities reflected in code:
 
@@ -160,13 +169,17 @@ Current editor capabilities reflected in code:
 - dropped-file creation for input nodes
 - state/data edges and control-flow edges
 - condition branch routing with loop limits
+- subgraph nodes created from graph templates
+- subgraph instance editing in workspace tabs
 - state editor and agent configuration popovers
 - edge visibility modes
 - minimap
 - runtime node and edge feedback
+- run activity panel
 - output previews
 - Python export/import UI wiring
 - human review panel plumbing in the editor workspace
+- Buddy floating-window graph run flow and pause-card integration
 
 ### Frontend Tests
 
@@ -178,14 +191,18 @@ The frontend includes many colocated `*.test.ts` and `*.structure.test.ts` files
 
 - Entry: `backend/app/main.py`
 - Routers in `backend/app/api/`:
-  - `routes_graphs.py`
-  - `routes_knowledge.py`
-  - `routes_memories.py`
-  - `routes_presets.py`
-  - `routes_runs.py`
-  - `routes_settings.py`
-  - `routes_skills.py`
-  - `routes_templates.py`
+- `routes_graphs.py`
+- `routes_knowledge.py`
+- `routes_local_input_sources.py`
+- `routes_memories.py`
+- `routes_model_logs.py`
+- `routes_presets.py`
+- `routes_runs.py`
+- `routes_settings.py`
+- `routes_skill_artifacts.py`
+- `routes_skills.py`
+- `routes_templates.py`
+- `routes_buddy.py`
 
 ### Backend Modules
 
@@ -197,8 +214,9 @@ The frontend includes many colocated `*.test.ts` and `*.structure.test.ts` files
 - Knowledge loading and search: `backend/app/knowledge/`
 - Memory loading: `backend/app/memory/`
 - Skill definitions and registry: `backend/app/skills/`
-- Tool registry and local LLM helpers: `backend/app/tools/`
-- Built-in templates: `backend/app/templates/`
+- Model-provider and local LLM helpers: `backend/app/tools/`
+- Template registry and loader: `backend/app/templates/`
+- Buddy Home and command storage: `backend/app/buddy/`
 
 ### Persistence Layout
 
@@ -215,6 +233,13 @@ Under `backend/data/`:
 - `toograph.db` - SQLite database for knowledge base metadata and FTS search
 
 Some directories are created on demand. Indexed knowledge base content lives in SQLite plus FTS tables, while `backend/data/kb/` stores import manifests and download artifacts used by the knowledge importer.
+
+Project-level reusable assets are stored outside `backend/data/`:
+
+- `graph_template/official/` and `graph_template/user/` - graph templates
+- `node_preset/official/` and `node_preset/user/` - node presets
+- `skill/official/` and `skill/user/` - Skill packages
+- `knowledge/TooGraph-official/` - official TooGraph knowledge-source Markdown
 
 ### Runtime Model And Tool Configuration
 
@@ -235,9 +260,15 @@ Model execution reads saved Model Providers configuration and default model sele
 5. Checkpoints, run state, node status, outputs, and artifacts are persisted during execution.
 6. The frontend polls run detail and projects runtime state back onto the editor and run-detail views.
 
-Important runtime constraint: only `agent` nodes are compiled into real LangGraph runtime nodes. `input`, `output`, and `condition` remain editor-visible boundary or routing constructs around that runtime model.
+Important runtime constraints:
 
-Resume support exists for runs with available LangGraph checkpoints and valid graph snapshots.
+- LLM nodes are still represented by the internal `agent` kind; do not introduce a parallel graph protocol while migrating naming.
+- One LLM node may use at most one explicit capability source: no capability, one selected Skill, or one incoming `capability` state.
+- Static Skill use stores scalar `config.skillKey` and runtime-owned `skillBindings.outputMapping`.
+- Dynamic capability execution writes exactly one `result_package` state.
+- `subgraph` nodes run isolated child graph state and expose only their input/output boundaries to the parent graph.
+
+Resume support exists for runs with available LangGraph checkpoints and valid graph snapshots. Standard human-review pauses use `awaiting_human` and `/api/runs/{run_id}/resume`.
 
 ## Key Routes
 
@@ -245,7 +276,8 @@ Resume support exists for runs with available LangGraph checkpoints and valid gr
 | --- | --- |
 | `GET /health` | Backend health check |
 | `GET /api/templates` | List built-in templates |
-| `GET /api/templates/{template_id}` | Load one built-in template |
+| `GET /api/templates/{template_id}` | Load one template |
+| `POST /api/templates/save` | Save the current graph as a user template |
 | `GET /api/graphs` | List saved graphs |
 | `GET /api/graphs/{graph_id}` | Load one saved graph |
 | `POST /api/graphs/save` | Save graph |
@@ -263,26 +295,29 @@ Resume support exists for runs with available LangGraph checkpoints and valid gr
 | `POST /api/runs/{run_id}/resume` | Resume failed, paused, or awaiting-human runs |
 | `GET /api/settings` | Read settings, model catalog, tool registry, and defaults |
 | `POST /api/settings` | Update settings |
+| `POST /api/settings/model-providers/discover` | Discover model provider models |
 | `GET /api/knowledge` | Search knowledge chunks |
 | `GET /api/knowledge/bases` | List knowledge bases |
 | `GET /api/skills/definitions` | List active skill definitions |
-| `GET /api/skills/catalog` | List skill catalog, including importable entries |
-| `POST /api/skills/{skill_key}/import` | Import a catalog skill |
+| `GET /api/skills/catalog` | List skill catalog |
+| `POST /api/skills/imports/upload` | Import a user Skill package |
 | `POST /api/skills/{skill_key}/disable` | Disable a managed skill |
 | `POST /api/skills/{skill_key}/enable` | Enable a managed skill |
-| `DELETE /api/skills/{skill_key}` | Delete an imported TooGraph skill |
+| `DELETE /api/skills/{skill_key}` | Delete a user Skill |
+| `GET /api/skill-artifacts/content` | Read text-like skill artifact content |
+| `GET /api/local-input-sources/folder` | List an allowed local folder input |
 | `GET /api/memories` | List stored memories, optionally filtered by type |
+| `GET /api/buddy/profile` | Read Buddy Home profile |
+| `GET /api/buddy/sessions` | List Buddy chat sessions |
 
 ## Built-In Templates
 
-Current templates in `backend/app/templates/`:
+Current official templates live in `graph_template/official/<template_id>/template.json`:
 
-- `conditional_edge_validation.json`
-- `cycle_counter_demo.json`
-- `hello_world.json`
-- `human_review_demo.json`
-- `poem_generator.json`
-- `web_research_loop.json`
+- `advanced_web_research_loop`
+- `buddy_autonomous_loop`
+- `toograph_skill_creation_workflow`
+- `buddy_self_review` - internal background Buddy self-review template, not a normal user-facing template entry
 
 ## Working Expectations For Agents
 
