@@ -4,7 +4,7 @@ import json
 from collections.abc import Callable
 from typing import Any
 
-from app.knowledge.loader import DEFAULT_KNOWLEDGE_BASE, search_knowledge
+from app.core.runtime.knowledge_retrieval import retrieve_knowledge_base_context
 from app.core.schemas.skills import SkillCatalogStatus
 from app.core.storage.skill_store import get_skill_status_map, list_managed_skill_keys
 from app.tools.local_llm import _chat_with_local_model
@@ -46,54 +46,15 @@ def get_skill_registry(*, include_disabled: bool = False) -> dict[str, SkillFunc
 # ---------------------------------------------------------------------------
 
 def search_knowledge_base_skill(**skill_inputs: Any) -> dict[str, Any]:
-    query = str(skill_inputs.get("query") or "").strip()
-    knowledge_base = str(skill_inputs.get("knowledge_base") or DEFAULT_KNOWLEDGE_BASE).strip() or DEFAULT_KNOWLEDGE_BASE
     try:
         limit = int(skill_inputs.get("limit") or 3)
     except (TypeError, ValueError):
         limit = 3
-    limit = max(1, min(limit, 8))
-
-    results = search_knowledge(query, knowledge_base=knowledge_base, limit=limit)
-    formatted_results = [
-        {
-            "title": item["title"],
-            "section": item.get("section", ""),
-            "summary": item["summary"],
-            "source": item["source"],
-            "url": item.get("url") or item["source"],
-            "score": item.get("score", 0.0),
-        }
-        for item in results
-    ]
-    citations = [
-        {
-            "index": index,
-            "title": item["title"],
-            "section": item.get("section", ""),
-            "source": item["source"],
-            "url": item.get("url") or item["source"],
-        }
-        for index, item in enumerate(results, start=1)
-    ]
-    context = "\n\n".join(
-        (
-            f"[{index}] {item['title']}\n"
-            f"Knowledge Base: {item.get('kb_label') or item.get('kb_id') or knowledge_base}\n"
-            f"Section: {item.get('section') or 'Overview'}\n"
-            f"Source: {item.get('url') or item['source']}\n"
-            f"Excerpt:\n{item['content']}"
-        )
-        for index, item in enumerate(results, start=1)
+    return retrieve_knowledge_base_context(
+        knowledge_base=str(skill_inputs.get("knowledge_base") or ""),
+        query=str(skill_inputs.get("query") or ""),
+        limit=limit,
     )
-    return {
-        "knowledge_base": results[0].get("kb_id", knowledge_base) if results else knowledge_base,
-        "query": query,
-        "result_count": len(results),
-        "context": context,
-        "results": formatted_results,
-        "citations": citations,
-    }
 
 
 # ---------------------------------------------------------------------------

@@ -13,6 +13,7 @@ from typing import Any
 
 from app.core.model_catalog import get_default_text_model_ref, normalize_model_ref, resolve_runtime_model_name
 from app.core.runtime.output_boundary_utils import save_output_value
+from app.core.runtime.knowledge_retrieval import retrieve_knowledge_base_context
 from app.core.runtime.state import create_initial_run_state, set_run_status, touch_run_lifecycle, utc_now_iso
 from app.core.schemas.node_system import (
     NodeSystemAgentNode,
@@ -782,10 +783,14 @@ def _execute_agent_node(
                 "knowledge_base": input_values.get(knowledge_read) if knowledge_read else None,
                 "query": input_values.get(query_read) if query_read else None,
             }
+            skill_result = retrieve_knowledge_base_context(
+                knowledge_base=skill_inputs.get("knowledge_base"),
+                query=skill_inputs.get("query"),
+                limit=3,
+            )
         else:
             skill_inputs = dict(input_values)
-
-        skill_result = _invoke_skill(skill_func, skill_inputs)
+            skill_result = _invoke_skill(skill_func, skill_inputs)
         selected_skills.append(skill_key)
         skill_context[skill_key] = skill_result
         skill_outputs.append(

@@ -387,6 +387,8 @@
 
 ## Phase 8：知识库与技能执行语义重构
 
+状态：已完成
+
 ### 目标
 
 把当前“自定义 skill runtime”逐步收成更接近 LangGraph-native 的 tool / retriever 模型。
