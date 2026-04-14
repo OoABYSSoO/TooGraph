@@ -167,24 +167,6 @@ def migrate_json_storage(connection: sqlite3.Connection) -> None:
     GRAPH_DATA_DIR.mkdir(parents=True, exist_ok=True)
     RUN_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-    for path in sorted(GRAPH_DATA_DIR.glob("*.json")):
-        payload = json.loads(path.read_text(encoding="utf-8"))
-        graph_id = payload.get("graph_id")
-        if not graph_id:
-            continue
-        connection.execute(
-            """
-            INSERT OR IGNORE INTO graphs (graph_id, name, template_id, payload_json)
-            VALUES (?, ?, ?, ?)
-            """,
-            (
-                graph_id,
-                payload.get("name", graph_id),
-                payload.get("template_id", ""),
-                json.dumps(payload, ensure_ascii=False),
-            ),
-        )
-
     for path in sorted(RUN_DATA_DIR.glob("*.json")):
         payload = json.loads(path.read_text(encoding="utf-8"))
         run_id = payload.get("run_id")

@@ -384,7 +384,6 @@ def graph_to_legacy_payload(graph: NodeSystemGraphDocument | NodeSystemGraphPayl
         "graph_family": "node_system",
         "graph_id": getattr(graph_document, "graph_id", None),
         "name": getattr(graph_document, "name", ""),
-        "template_id": getattr(graph_document, "template_id", ""),
         "state_schema": state_schema,
         "nodes": nodes,
         "edges": edges,
@@ -400,7 +399,6 @@ def template_to_legacy_record(template: NodeSystemTemplate | dict[str, Any]) -> 
                 "graph_family": "node_system",
                 "graph_id": None,
                 "name": template_document.default_graph_name,
-                "template_id": template_document.template_id,
                 "state_schema": template_document.state_schema,
                 "nodes": template_document.nodes,
                 "edges": template_document.edges,
@@ -897,7 +895,6 @@ def legacy_graph_payload_to_canonical(payload: dict[str, Any]) -> NodeSystemGrap
             "graph_family": "node_system",
             "graph_id": payload.get("graph_id"),
             "name": _strip_string(payload.get("name")) or "Untitled Graph",
-            "template_id": _strip_string(payload.get("template_id")),
             "state_schema": {
                 state_name: definition.model_dump(by_alias=True)
                 for state_name, definition in state_schema.items()

@@ -89,7 +89,6 @@ export default async function EditorPage() {
                       <div className="text-sm text-[var(--muted)]">{graph.graph_id}</div>
                     </div>
                     <div className="text-right text-sm text-[var(--muted)]">
-                      <div>{graph.template_id || "no template"}</div>
                       <div>{graph.nodes.length} nodes / {graph.edges.length} edges</div>
                     </div>
                   </div>

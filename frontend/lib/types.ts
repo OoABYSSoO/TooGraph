@@ -5,12 +5,10 @@ import type { NodeSystemGraphEdge, NodeSystemGraphNode, RunStatus } from "@/lib/
 /**
  * Summary of a saved graph.
  * Returned by GET /api/graphs as the full NodeSystemGraphDocument.
- * template_id may be absent in older persisted graphs.
  */
 export type GraphSummary = {
   graph_id: string;
   name: string;
-  template_id?: string;
   nodes: NodeSystemGraphNode[];
   edges: NodeSystemGraphEdge[];
 };

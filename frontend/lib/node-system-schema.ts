@@ -167,7 +167,6 @@ export type NodeSystemGraphPayload = {
   graph_family?: "node_system";
   graph_id?: string | null;
   name: string;
-  template_id: string;
   state_schema: StateField[];
   nodes: NodeSystemGraphNode[];
   edges: NodeSystemGraphEdge[];

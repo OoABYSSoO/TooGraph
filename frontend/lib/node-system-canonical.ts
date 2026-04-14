@@ -133,7 +133,6 @@ export type CanonicalGraphPayload = {
   graph_family: "node_system";
   graph_id?: string | null;
   name: string;
-  template_id: string;
   state_schema: Record<string, CanonicalStateDefinition>;
   nodes: Record<string, CanonicalNode>;
   edges: CanonicalEdge[];
@@ -451,7 +450,6 @@ export function buildCanonicalGraphFromLegacyGraph(graph: NodeSystemGraphPayload
     graph_family: "node_system",
     graph_id: graph.graph_id ?? null,
     name: graph.name,
-    template_id: graph.template_id,
     state_schema: stateSchema,
     nodes,
     edges,

@@ -1487,7 +1487,6 @@ function createEditorDefaults(templates: TemplateRecord[], defaultTemplateId?: s
     graph_family: "node_system",
     graph_id: null,
     name: "Node System Playground",
-    template_id: defaultTemplateId ?? HELLO_WORLD_TEMPLATE_ID,
     state_schema: [],
     nodes: [],
     edges: [],
@@ -4368,7 +4367,6 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
   const updateNodeInternals = useUpdateNodeInternals();
   const [graphName, setGraphName] = useState(initialGraph.name);
   const [graphId, setGraphId] = useState<string | null>(initialGraph.graph_id ?? null);
-  const [templateId, setTemplateId] = useState(initialGraph.template_id);
   const [stateSchema, setStateSchema] = useState(initialGraph.state_schema);
   const [metadata, setMetadata] = useState(initialGraph.metadata);
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
@@ -4503,7 +4501,6 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
       graph_family: "node_system",
       graph_id: graphId,
       name: graphName,
-      template_id: templateId,
       state_schema: stateSchema,
       nodes: nodes.map((node) => ({
         id: node.id,
@@ -4527,7 +4524,7 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
       })),
       metadata,
     }),
-    [edges, graphId, graphName, metadata, nodes, previewTextByNode, stateSchema, templateId],
+    [edges, graphId, graphName, metadata, nodes, previewTextByNode, stateSchema],
   );
   const canonicalGraph = useMemo<CanonicalGraph>(
     () => buildCanonicalGraphFromLegacyGraph(legacyGraphSnapshot),
@@ -4839,7 +4836,6 @@ function NodeSystemCanvas({ initialGraph, isNewFromTemplate }: { initialGraph: G
     autoLayoutDoneRef.current = false;
     setGraphName(initialGraph.name);
     setGraphId(initialGraph.graph_id ?? null);
-    setTemplateId(initialGraph.template_id);
     setStateSchema(initialGraph.state_schema);
     setMetadata(initialGraph.metadata);
     setActiveRunId(null);

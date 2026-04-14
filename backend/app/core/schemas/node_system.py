@@ -365,7 +365,6 @@ class NodeSystemTemplate(NodeSystemGraphCore):
 class NodeSystemGraphPayload(NodeSystemGraphCore):
     graph_id: str | None = None
     name: str = Field(..., min_length=1)
-    template_id: str = ""
 
     @field_validator("name")
     @classmethod
