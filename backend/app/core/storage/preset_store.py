@@ -1,87 +1,95 @@
 from __future__ import annotations
 
-from app.core.schemas.preset import (
-    NodeSystemPresetDocument,
-    NodeSystemPresetPayload,
-)
-from app.core.storage.database import get_connection, row_payload
+import sqlite3
+
+from app.core.schemas.preset import NodeSystemPresetDocument, NodeSystemPresetPayload
+from app.core.storage.database import PRESET_DATA_DIR, get_connection, row_payload
+from app.core.storage.json_file_utils import read_json_file, utc_now_iso, write_json_file
+
+
+_PRESET_STORAGE_MIGRATED = False
 
 
 def save_preset(payload: NodeSystemPresetPayload) -> NodeSystemPresetDocument:
-    document = NodeSystemPresetDocument.model_validate(payload.model_dump(by_alias=True))
-    definition = document.definition or {}
-    label = str(definition.get("name") or definition.get("label") or document.preset_id)
-    family = str(definition.get("family") or definition.get("kind") or "unknown")
-    with get_connection() as connection:
-        connection.execute(
-            """
-            INSERT INTO presets (preset_id, label, family, payload_json, created_at, updated_at)
-            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-            ON CONFLICT(preset_id) DO UPDATE SET
-                label = excluded.label,
-                family = excluded.family,
-                payload_json = excluded.payload_json,
-                updated_at = CURRENT_TIMESTAMP
-            """,
-            (
-                document.preset_id,
-                label,
-                family,
-                document.model_dump_json(by_alias=True),
-            ),
-        )
-        connection.commit()
-
-        row = connection.execute(
-            "SELECT payload_json, created_at, updated_at FROM presets WHERE preset_id = ?",
-            (document.preset_id,),
-        ).fetchone()
-    payload_row = row_payload(row)
-    if payload_row is None:
-        raise FileNotFoundError(f"Preset '{document.preset_id}' was not saved.")
-    payload_row["createdAt"] = row["created_at"]
-    payload_row["updatedAt"] = row["updated_at"]
-    return NodeSystemPresetDocument.model_validate(payload_row)
+    _initialize_preset_storage()
+    path = _preset_path(payload.preset_id)
+    existing_payload = read_json_file(path, default=None)
+    existing_document = NodeSystemPresetDocument.model_validate(existing_payload) if existing_payload else None
+    timestamp = utc_now_iso()
+    document = NodeSystemPresetDocument.model_validate(
+        {
+            **payload.model_dump(by_alias=True),
+            "createdAt": existing_document.created_at if existing_document else timestamp,
+            "updatedAt": timestamp,
+        }
+    )
+    write_json_file(path, document.model_dump(by_alias=True))
+    return document
 
 
 def load_preset(preset_id: str) -> NodeSystemPresetDocument:
-    with get_connection() as connection:
-        row = connection.execute(
-            "SELECT payload_json, created_at, updated_at FROM presets WHERE preset_id = ?",
-            (preset_id,),
-        ).fetchone()
-    payload = row_payload(row)
+    _initialize_preset_storage()
+    payload = read_json_file(_preset_path(preset_id), default=None)
     if payload is None:
         raise FileNotFoundError(f"Preset '{preset_id}' does not exist.")
-    payload["createdAt"] = row["created_at"]
-    payload["updatedAt"] = row["updated_at"]
     return NodeSystemPresetDocument.model_validate(payload)
 
 
 def list_presets() -> list[NodeSystemPresetDocument]:
-    with get_connection() as connection:
-        rows = connection.execute(
-            """
-            SELECT preset_id, label, family, payload_json, created_at, updated_at
-            FROM presets
-            ORDER BY updated_at DESC, preset_id DESC
-            """
-        ).fetchall()
-
+    _initialize_preset_storage()
     items: list[NodeSystemPresetDocument] = []
+    for path in sorted(PRESET_DATA_DIR.glob("*.json")):
+        payload = read_json_file(path, default=None)
+        if payload is None:
+            continue
+        try:
+            items.append(NodeSystemPresetDocument.model_validate(payload))
+        except Exception:
+            continue
+    items.sort(key=lambda item: ((item.updated_at or ""), item.preset_id), reverse=True)
+    return items
+
+
+def _initialize_preset_storage() -> None:
+    global _PRESET_STORAGE_MIGRATED
+    PRESET_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    if _PRESET_STORAGE_MIGRATED:
+        return
+    _migrate_presets_from_database()
+    _PRESET_STORAGE_MIGRATED = True
+
+
+def _migrate_presets_from_database() -> None:
+    try:
+        with get_connection() as connection:
+            rows = connection.execute(
+                """
+                SELECT preset_id, payload_json, created_at, updated_at
+                FROM presets
+                ORDER BY updated_at DESC, preset_id DESC
+                """
+            ).fetchall()
+    except sqlite3.OperationalError:
+        return
+
     for row in rows:
+        path = _preset_path(str(row["preset_id"]))
+        if path.exists():
+            continue
         payload = row_payload(row)
         if payload is None:
             continue
-        items.append(
-            NodeSystemPresetDocument.model_validate(
-                {
-                    "presetId": row["preset_id"],
-                    "sourcePresetId": payload.get("sourcePresetId"),
-                    "definition": payload.get("definition", {}),
-                    "createdAt": row["created_at"],
-                    "updatedAt": row["updated_at"],
-                }
-            )
+        document = NodeSystemPresetDocument.model_validate(
+            {
+                "presetId": row["preset_id"],
+                "sourcePresetId": payload.get("sourcePresetId"),
+                "definition": payload.get("definition", {}),
+                "createdAt": row["created_at"],
+                "updatedAt": row["updated_at"],
+            }
         )
-    return items
+        write_json_file(path, document.model_dump(by_alias=True))
+
+
+def _preset_path(preset_id: str):
+    return PRESET_DATA_DIR / f"{preset_id}.json"
