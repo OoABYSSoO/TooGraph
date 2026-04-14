@@ -285,6 +285,8 @@
 
 ## Phase 5：接入 checkpoint / resume
 
+状态：已完成
+
 ### 目标
 
 让 LangGraph-native 的关键能力开始落地，而不是只替换 executor。
