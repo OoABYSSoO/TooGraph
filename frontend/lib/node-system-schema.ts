@@ -50,7 +50,7 @@ export type StateField = {
   type: StateFieldType;
   title: string;
   description: string;
-  defaultValue?: unknown;
+  value?: unknown;
   ui?: StateFieldUi;
 };
 
@@ -61,18 +61,17 @@ type NodeStateBindings = {
 
 export type InputBoundaryNode = NodeStateBindings & {
   presetId: string;
-  label: string;
+  name?: string;
   description: string;
   family: "input";
   valueType: ValueType;
   output: PortDefinition;
-  defaultValue: string;
-  placeholder: string;
+  value: string;
 };
 
 export type AgentNode = NodeStateBindings & {
   presetId: string;
-  label: string;
+  name?: string;
   description: string;
   family: "agent";
   inputs: PortDefinition[];
@@ -100,7 +99,7 @@ export type BranchDefinition = {
 
 export type ConditionNode = NodeStateBindings & {
   presetId: string;
-  label: string;
+  name?: string;
   description: string;
   family: "condition";
   inputs: PortDefinition[];
@@ -112,7 +111,7 @@ export type ConditionNode = NodeStateBindings & {
 
 export type OutputBoundaryNode = NodeStateBindings & {
   presetId: string;
-  label: string;
+  name?: string;
   description: string;
   family: "output";
   input: PortDefinition;

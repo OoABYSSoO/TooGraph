@@ -8,25 +8,25 @@
     "question": {
       "description": "User question for the workflow.",
       "type": "text",
-      "defaultValue": "什么是 GraphiteUI？你能做些什么？我该如何开始使用？",
+      "value": "什么是 GraphiteUI？你能做些什么？我该如何开始使用？",
       "color": "#d97706"
     },
     "knowledge_base": {
       "description": "Selected knowledge base for grounded answers.",
       "type": "knowledge_base",
-      "defaultValue": "graphiteui-official",
+      "value": "graphiteui-official",
       "color": "#0f766e"
     },
     "raw_answer": {
       "description": "Raw onboarding answer produced by the helper agent.",
       "type": "text",
-      "defaultValue": "",
+      "value": "",
       "color": "#9f1239"
     },
     "formatted_answer": {
       "description": "Markdown-formatted answer produced by the formatter agent.",
       "type": "text",
-      "defaultValue": "",
+      "value": "",
       "color": "#7c3aed"
     }
   },
@@ -34,6 +34,7 @@
     "input_question": {
       "kind": "input",
       "name": "input_question",
+      "description": "Provide the onboarding question that will be answered by downstream agents.",
       "ui": {
         "position": { "x": 80, "y": 160 },
         "collapsed": false
@@ -42,14 +43,13 @@
         { "state": "question", "mode": "replace" }
       ],
       "config": {
-        "sourceKind": "manual",
-        "defaultValue": "什么是 GraphiteUI？你能做些什么？我该如何开始使用？",
-        "placeholder": "Ask about GraphiteUI"
+        "value": "什么是 GraphiteUI？你能做些什么？我该如何开始使用？"
       }
     },
     "input_knowledge_base": {
       "kind": "input",
       "name": "input_knowledge_base",
+      "description": "Choose the knowledge base that grounds the onboarding answers.",
       "ui": {
         "position": { "x": 80, "y": 540 },
         "collapsed": false
@@ -58,14 +58,13 @@
         { "state": "knowledge_base", "mode": "replace" }
       ],
       "config": {
-        "sourceKind": "manual",
-        "defaultValue": "graphiteui-official",
-        "placeholder": "Knowledge base name"
+        "value": "graphiteui-official"
       }
     },
     "onboarding_helper": {
       "kind": "agent",
       "name": "onboarding_helper",
+      "description": "Use the selected knowledge base to produce an onboarding answer.",
       "ui": {
         "position": { "x": 560, "y": 80 },
         "collapsed": false
@@ -86,6 +85,7 @@
     "markdown_formatter": {
       "kind": "agent",
       "name": "markdown_formatter",
+      "description": "Rewrite the onboarding answer into a cleaner markdown response.",
       "ui": {
         "position": { "x": 560, "y": 480 },
         "collapsed": false
@@ -106,6 +106,7 @@
     "output_raw_answer": {
       "kind": "output",
       "name": "output_raw_answer",
+      "description": "Show the helper agent's raw answer before any formatting pass.",
       "ui": {
         "position": { "x": 1040, "y": 80 },
         "collapsed": false
@@ -123,6 +124,7 @@
     "output_formatted_answer": {
       "kind": "output",
       "name": "output_formatted_answer",
+      "description": "Show the markdown-formatted onboarding answer.",
       "ui": {
         "position": { "x": 1040, "y": 480 },
         "collapsed": false

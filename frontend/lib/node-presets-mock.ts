@@ -2,7 +2,7 @@ import type { NodePresetDefinition, ValueType } from "@/lib/node-system-schema";
 
 export const EMPTY_AGENT_PRESET = {
   presetId: "preset.agent.empty.v0",
-  label: "Empty Agent Node",
+  name: "Empty Agent Node",
   description: "A blank agent node. Configure inputs, outputs, instructions and attached skills yourself.",
   family: "agent",
   inputs: [],
@@ -15,7 +15,7 @@ export const EMPTY_AGENT_PRESET = {
 
 export const TEXT_INPUT_PRESET = {
   presetId: "preset.input.text.v1",
-  label: "Text Input",
+  name: "Text Input",
   description: "Provide text to the workflow.",
   family: "input",
   valueType: "text",
@@ -24,13 +24,12 @@ export const TEXT_INPUT_PRESET = {
     label: "Text",
     valueType: "text",
   },
-  defaultValue: "",
-  placeholder: "Enter text",
+  value: "",
 } satisfies NodePresetDefinition;
 
 export const QUESTION_INPUT_PRESET = {
   presetId: "preset.input.question.v1",
-  label: "Question Input",
+  name: "Question Input",
   description: "Ask a question and route it into the workflow.",
   family: "input",
   valueType: "text",
@@ -39,13 +38,12 @@ export const QUESTION_INPUT_PRESET = {
     label: "Question",
     valueType: "text",
   },
-  defaultValue: "",
-  placeholder: "Type your question",
+  value: "",
 } satisfies NodePresetDefinition;
 
 export const KNOWLEDGE_BASE_INPUT_PRESET = {
   presetId: "preset.input.knowledge_base.v1",
-  label: "Knowledge Base",
+  name: "Knowledge Base",
   description: "Select a knowledge base to provide to downstream agents.",
   family: "input",
   valueType: "knowledge_base",
@@ -54,13 +52,12 @@ export const KNOWLEDGE_BASE_INPUT_PRESET = {
     label: "Knowledge Base",
     valueType: "knowledge_base",
   },
-  defaultValue: "graphiteui-official",
-  placeholder: "Knowledge base name",
+  value: "graphiteui-official",
 } satisfies NodePresetDefinition;
 
 export const TEXT_OUTPUT_PRESET = {
   presetId: "preset.output.text.v1",
-  label: "Text Output",
+  name: "Text Output",
   description: "Preview and optionally persist text content.",
   family: "output",
   input: {

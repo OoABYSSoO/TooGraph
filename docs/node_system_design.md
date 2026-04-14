@@ -77,19 +77,19 @@ Graph 中使用两类边命名：
   "question": {
     "description": "User question for the workflow.",
     "type": "text",
-    "defaultValue": "",
+    "value": "",
     "color": "#d97706"
   },
   "knowledge_base": {
     "description": "Selected knowledge base.",
     "type": "knowledge_base",
-    "defaultValue": "graphiteui-official",
+    "value": "graphiteui-official",
     "color": "#0f766e"
   },
   "final_result": {
     "description": "Final result shown in the UI.",
     "type": "text",
-    "defaultValue": "",
+    "value": "",
     "color": "#7c3aed"
   }
 }
@@ -122,8 +122,7 @@ Graph 中使用两类边命名：
       { "state": "question", "mode": "replace" }
     ],
     "config": {
-      "sourceKind": "manual",
-      "defaultValue": "什么是 GraphiteUI？"
+      "value": "什么是 GraphiteUI？"
     }
   },
   "agent_answer": {
@@ -254,7 +253,7 @@ Graph 中使用两类边命名：
 - 由用户配置这条 state 的属性：
   - `description`
   - `type`
-  - `defaultValue`
+  - `value`
   - `color`
 - 保存后自动写入 `state_schema`
 - 再把当前节点端口绑定到这条新 state

@@ -10,7 +10,7 @@ from app.core.storage.database import get_connection, row_payload
 def save_preset(payload: NodeSystemPresetPayload) -> NodeSystemPresetDocument:
     document = NodeSystemPresetDocument.model_validate(payload.model_dump(by_alias=True))
     definition = document.definition or {}
-    label = str(definition.get("label") or document.preset_id)
+    label = str(definition.get("name") or definition.get("label") or document.preset_id)
     family = str(definition.get("family") or definition.get("kind") or "unknown")
     with get_connection() as connection:
         connection.execute(

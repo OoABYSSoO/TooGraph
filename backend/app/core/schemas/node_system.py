@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 def _validate_identifier(value: str, *, label: str) -> str:
@@ -106,7 +106,7 @@ class PersistFormat(str, Enum):
 class NodeSystemStateDefinition(BaseModel):
     description: str = ""
     type: NodeSystemStateType = NodeSystemStateType.TEXT
-    default_value: Any = Field(default=None, alias="defaultValue")
+    value: Any = Field(default=None, validation_alias=AliasChoices("value", "defaultValue"), serialization_alias="value")
     color: str = ""
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
@@ -146,9 +146,7 @@ class NodeSystemNodeUi(BaseModel):
 
 
 class NodeSystemInputConfig(BaseModel):
-    source_kind: str = Field(default="manual", alias="sourceKind")
-    default_value: Any = Field(default="", alias="defaultValue")
-    placeholder: str = ""
+    value: Any = Field(default="", validation_alias=AliasChoices("value", "defaultValue"), serialization_alias="value")
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
@@ -323,6 +321,7 @@ class NodeSystemGraphCore(BaseModel):
         for node_name, node in self.nodes.items():
             normalized_name = _validate_identifier(node_name, label="Node name")
             node_names.add(normalized_name)
+            node.name = str(getattr(node, "name", "") or "").strip() or node_name
             for binding in [*node.reads, *node.writes]:
                 if binding.state not in state_names:
                     raise ValueError(f"Node '{node_name}' references unknown state '{binding.state}'.")

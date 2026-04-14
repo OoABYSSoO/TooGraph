@@ -522,7 +522,7 @@ def _refresh_run_artifacts(
 
 def _initialize_graph_state(graph: NodeSystemGraphDocument, state: dict[str, Any]) -> None:
     initialized_values = {
-        state_name: copy.deepcopy(definition.default_value)
+        state_name: copy.deepcopy(definition.value)
         for state_name, definition in graph.state_schema.items()
     }
     initialized_values.update(dict(state.get("state_values", {})))
@@ -726,7 +726,7 @@ def _execute_input_node(
     outputs: dict[str, Any] = {}
     for binding in node.writes:
         definition = state_schema[binding.state]
-        raw_value = node.config.default_value
+        raw_value = node.config.value
         value = _coerce_input_boundary_value(raw_value, definition.type)
         outputs[binding.state] = value
 

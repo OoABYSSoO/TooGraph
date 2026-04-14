@@ -30,7 +30,7 @@ export type CanonicalStateType =
 export type CanonicalStateDefinition = {
   description: string;
   type: CanonicalStateType;
-  defaultValue?: unknown;
+  value?: unknown;
   color: string;
 };
 
@@ -59,9 +59,7 @@ export type CanonicalInputNode = {
   reads: CanonicalReadBinding[];
   writes: CanonicalWriteBinding[];
   config: {
-    sourceKind: string;
-    defaultValue: unknown;
-    placeholder: string;
+    value: unknown;
   };
 };
 
@@ -149,15 +147,6 @@ function stripString(value: unknown): string {
   return String(value ?? "").trim();
 }
 
-function humanizeNodeKey(nodeKey: string): string {
-  const normalized = stripString(nodeKey).replace(/[_-]+/g, " ").replace(/\s+/g, " ");
-  if (!normalized) return "Node";
-  return normalized
-    .split(" ")
-    .map((segment) => segment.slice(0, 1).toUpperCase() + segment.slice(1))
-    .join(" ");
-}
-
 function canonicalStateTypeFromLegacy(stateType: StateFieldType | string | undefined): CanonicalStateType {
   switch (stateType) {
     case "number":
@@ -221,7 +210,7 @@ function ensureStateDefinition(
     stateSchema[stateKey] = {
       description: "",
       type: preferredType ?? "text",
-      defaultValue: preferredType === "number" ? 0 : preferredType === "boolean" ? false : preferredType === "json" || preferredType === "object" ? {} : preferredType === "array" || preferredType === "file_list" ? [] : "",
+      value: preferredType === "number" ? 0 : preferredType === "boolean" ? false : preferredType === "json" || preferredType === "object" ? {} : preferredType === "array" || preferredType === "file_list" ? [] : "",
       color: "",
     };
     return;
@@ -313,10 +302,14 @@ function toCanonicalNode(node: NodeSystemGraphNode): CanonicalNode {
     expandedSize: node.data.expandedSize ?? null,
     collapsedSize: node.data.collapsedSize ?? null,
   };
-  const name = stripString((config as { label?: string }).label) || humanizeNodeKey(node.id);
+  const name =
+    stripString((config as { name?: string }).name) ||
+    stripString((config as { label?: string }).label) ||
+    node.id;
   const description = stripString((config as { description?: string }).description);
 
   if (config.family === "input") {
+    const legacyConfig = config as InputBoundaryNode & { defaultValue?: unknown };
     return {
       kind: "input",
       name,
@@ -325,9 +318,7 @@ function toCanonicalNode(node: NodeSystemGraphNode): CanonicalNode {
       reads: [],
       writes: Object.values(writesByPort).map((binding) => ({ state: binding.stateKey, mode: "replace" })),
       config: {
-        sourceKind: config.valueType === "file" ? "file" : "manual",
-        defaultValue: config.defaultValue,
-        placeholder: config.placeholder,
+        value: legacyConfig.value ?? legacyConfig.defaultValue,
       },
     };
   }
@@ -389,10 +380,11 @@ function toCanonicalNode(node: NodeSystemGraphNode): CanonicalNode {
 export function buildCanonicalGraphFromLegacyGraph(graph: NodeSystemGraphPayload): CanonicalGraphPayload {
   const stateSchema: Record<string, CanonicalStateDefinition> = {};
   for (const field of graph.state_schema) {
+    const legacyField = field as StateField & { defaultValue?: unknown };
     stateSchema[field.key] = {
       description: field.description,
       type: canonicalStateTypeFromLegacy(field.type),
-      defaultValue: field.defaultValue,
+      value: legacyField.value ?? legacyField.defaultValue,
       color: field.ui?.color ?? "",
     };
   }
