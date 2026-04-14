@@ -1,16 +1,14 @@
 # Docs Index
 
-当前 `docs/` 只保留五份核心文档：
+当前 `docs/` 只保留三份进行中的文档：
 
 - [FUTURE_WORK.md](/home/abyss/GraphiteUI/docs/FUTURE_WORK.md)
 - [editor_view_model_cleanup_plan.md](/home/abyss/GraphiteUI/docs/editor_view_model_cleanup_plan.md)
-- [knowledge_base_strategy.md](/home/abyss/GraphiteUI/docs/knowledge_base_strategy.md)
-- [node_system_design.md](/home/abyss/GraphiteUI/docs/node_system_design.md)
 - [README.md](/home/abyss/GraphiteUI/docs/README.md)
 
 使用原则：
 
 - 当前系统行为以代码实现为准
-- 明确尚未完成、但未来仍要推进的事项写入 `FUTURE_WORK.md`
-- 与当前实现直接相关、仍需长期维护的设计或策略结论可单独写成专题文档
-- 过期的阶段性方案、设计稿、演示稿和实现记录不再保留
+- 只保留尚未完成、仍需继续执行的文档
+- 已完成的设计稿、阶段方案、实现记录和历史策略一律删除
+- 当前系统行为以代码实现为准，已落地能力不在 `docs/` 中重复归档

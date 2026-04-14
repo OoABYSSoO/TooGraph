@@ -41,7 +41,6 @@ GRAPHITEUI_PROJECT_DOC_FILES = [
     REPO_ROOT / "knowledge" / "GraphiteUI-official" / "runtime-and-roadmap.md",
     REPO_ROOT / "README.md",
     REPO_ROOT / "docs" / "FUTURE_WORK.md",
-    REPO_ROOT / "docs" / "knowledge_base_strategy.md",
 ]
 
 
@@ -414,7 +413,7 @@ def _score_project_specific_boosts(*, title: str, section: str, query_lower: str
         if any(term in query_lower for term in roadmap_terms):
             score += 20
 
-    if source_path.endswith("docs/knowledge_base_strategy.md"):
+    if source_path.endswith("readme.md"):
         if any(term in query_lower for term in knowledge_terms):
             score += 18
 
