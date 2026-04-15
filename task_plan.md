@@ -1,12 +1,12 @@
-# Task Plan: GraphiteUI 前端优化与产品化收口
+# Task Plan: GraphiteUI 前端优化与编排器工作区收口
 
 ## Goal
 
-在不破坏现有视觉气质和核心交互的前提下，逐步提升 GraphiteUI 前端的产品感、信息层级和可用性，并把复杂的多阶段改动持续记录到项目内的计划文件中。
+在不破坏现有视觉气质和核心交互的前提下，继续把 GraphiteUI 前端收口成真正可持续使用的工作台，其中本轮重点是把 `/editor` 改成可恢复、可多标签切换的真实编排器工作区。
 
 ## Current Phase
 
-Phase 5
+Phase 6
 
 ## Phases
 
@@ -46,12 +46,14 @@ Phase 5
 - [x] 左侧边栏支持完全收起与展开
 - **Status:** complete
 
-### Phase 6: 验证与交付
+### Phase 6: 编排器 Tab 工作区
 
-- [ ] 验证桌面与移动端表现
-- [ ] 记录测试结果
-- [ ] 形成最终变更说明
-- **Status:** pending
+- [x] `/editor` 改为真实工作区，而非目录页
+- [x] 新增 tab 工作区模型与本地持久化
+- [x] 为 `NodeSystemEditor` 暴露文档元信息和保存回调
+- [x] 收口 `/editor` 路由到单一 catch-all 页面
+- [ ] 验证关闭脏 tab、URL 同步和恢复逻辑
+- **Status:** in_progress
 
 ## Key Questions
 
@@ -72,12 +74,15 @@ Phase 5
 | 首页继续升级为三列等权入口 | 模板选择也应成为首页主入口，而不是隐藏到 `/editor` 之后 |
 | `/editor` 改成模板与图并列同权的目录页 | 首页承接快速开始，`/editor` 承接完整模板与图目录 |
 | 侧栏折叠采用“完全收起 + 展开按钮” | 不引入 rail 图标体系，更符合当前视觉语境 |
+| `/editor` 最终应是 tab 工作区，不再保留目录页心智 | 用户编排图时需要停留在画布内，不应通过二级页面往返切换图 |
+| editor tab 仅持久化工作区元信息，编辑器实例由同一工作区壳层持有 | 这样能保持现有编辑器交互不变，同时避免切换 tab 时丢失内存态 |
 
 ## Errors Encountered
 
 | Error | Attempt | Resolution |
 |-------|---------|------------|
 | 仓库当前没有前端测试框架 | 1 | 使用 `npx tsc --noEmit`、`git diff --check`、`./scripts/start.sh`、`curl` 路由探测替代本轮自动化验证 |
+| 浏览器内交互无法完全自动化验证 | 1 | 先用纯函数测试锁定 tab/workspace 规则，再通过本地启动和页面探测做回归 |
 
 ## Notes
 
