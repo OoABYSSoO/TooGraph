@@ -411,18 +411,25 @@ export function EditorTabBar({
                       : "border-[rgba(154,52,18,0.1)] bg-[rgba(255,250,241,0.64)] hover:bg-[rgba(255,255,255,0.84)]",
                   )}
                 >
-                  {tab.dirty ? <span className="h-2 w-2 rounded-full bg-[var(--accent-strong)]" /> : null}
                   <span className="min-w-0 truncate text-sm font-medium text-[var(--text)]">{tab.title}</span>
-                  <span
-                    role="button"
-                    tabIndex={-1}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onCloseTab(tab.tabId);
-                    }}
-                    className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[var(--accent-strong)] transition-colors duration-150 hover:bg-[rgba(154,52,18,0.08)]"
-                  >
-                    ×
+                  <span className="relative ml-0.5 h-5 w-5 shrink-0">
+                    {tab.dirty ? (
+                      <span className="pointer-events-none absolute left-1/2 top-1/2 z-10 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--accent-strong)] transition-opacity duration-150 group-hover:opacity-0" />
+                    ) : null}
+                    <span
+                      role="button"
+                      tabIndex={-1}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onCloseTab(tab.tabId);
+                      }}
+                      className={cn(
+                        "absolute inset-0 inline-flex items-center justify-center rounded-full text-[var(--accent-strong)] transition-all duration-150 hover:bg-[rgba(154,52,18,0.08)]",
+                        isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+                      )}
+                    >
+                      ×
+                    </span>
                   </span>
                 </button>
               );
