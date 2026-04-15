@@ -8,9 +8,10 @@ import { EditorTabBar } from "@/components/editor/editor-tab-bar";
 import { EditorWelcomeState } from "@/components/editor/editor-welcome-state";
 import {
   NodeSystemEditor,
+  type NodeSystemEditorActionSet,
+  type NodeSystemEditorChromeState,
   type NodeSystemEditorDocumentMeta,
   type NodeSystemEditorGraphSavedPayload,
-  type NodeSystemEditorSaveAction,
 } from "@/components/editor/node-system-editor";
 import { apiGet } from "@/lib/api";
 import { cn } from "@/lib/cn";
@@ -59,11 +60,12 @@ export function EditorWorkspaceShell({
   const [documentsByTabId, setDocumentsByTabId] = useState<Record<string, CanonicalGraphPayload>>({});
   const [loadingByTabId, setLoadingByTabId] = useState<Record<string, boolean>>({});
   const [errorByTabId, setErrorByTabId] = useState<Record<string, string | null>>({});
+  const [chromeByTabId, setChromeByTabId] = useState<Record<string, NodeSystemEditorChromeState>>({});
   const [pendingCloseTabId, setPendingCloseTabId] = useState<string | null>(null);
   const [closeBusy, setCloseBusy] = useState(false);
   const [closeError, setCloseError] = useState<string | null>(null);
   const handledRouteSignatureRef = useRef<string | null>(null);
-  const saveActionsRef = useRef<Record<string, NodeSystemEditorSaveAction | null>>({});
+  const editorActionsRef = useRef<Record<string, NodeSystemEditorActionSet | null>>({});
 
   const templateById = useMemo(() => new Map(templates.map((template) => [template.template_id, template])), [templates]);
   const graphById = useMemo(() => new Map(graphs.map((graph) => [graph.graph_id, graph])), [graphs]);
@@ -71,6 +73,7 @@ export function EditorWorkspaceShell({
     () => workspace.tabs.find((tab) => tab.tabId === workspace.activeTabId) ?? null,
     [workspace.activeTabId, workspace.tabs],
   );
+  const activeChrome = activeTab ? chromeByTabId[activeTab.tabId] ?? null : null;
   const routeSignature = useMemo(() => {
     if (routeMode === "existing") {
       return `existing:${routeGraphId ?? ""}`;
@@ -224,7 +227,15 @@ export function EditorWorkspaceShell({
         delete next[tabId];
         return next;
       });
-      delete saveActionsRef.current[tabId];
+      setChromeByTabId((current) => {
+        if (!(tabId in current)) {
+          return current;
+        }
+        const next = { ...current };
+        delete next[tabId];
+        return next;
+      });
+      delete editorActionsRef.current[tabId];
 
       if (closedActive) {
         syncRouteToTab(nextGraphId);
@@ -253,6 +264,25 @@ export function EditorWorkspaceShell({
 
   const handleDocumentMetaChange = useCallback((tabId: string, meta: NodeSystemEditorDocumentMeta) => {
     setWorkspace((current) => applyDocumentMetaToWorkspaceTab(current, tabId, meta));
+  }, []);
+
+  const handleChromeStateChange = useCallback((tabId: string, chrome: NodeSystemEditorChromeState) => {
+    setChromeByTabId((current) => {
+      const existing = current[tabId];
+      if (
+        existing
+        && existing.graphName === chrome.graphName
+        && existing.stateCount === chrome.stateCount
+        && existing.isStatePanelOpen === chrome.isStatePanelOpen
+      ) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [tabId]: chrome,
+      };
+    });
   }, []);
 
   const handleGraphSaved = useCallback(
@@ -359,6 +389,7 @@ export function EditorWorkspaceShell({
     };
   }, [activeTab, documentsByTabId, loadingByTabId, registerDocumentForTab]);
 
+  const activeActions = activeTab ? editorActionsRef.current[activeTab.tabId] ?? null : null;
   const pendingCloseTab = pendingCloseTabId ? workspace.tabs.find((tab) => tab.tabId === pendingCloseTabId) ?? null : null;
 
   if (!hydrated && routeMode === "root") {
@@ -396,11 +427,19 @@ export function EditorWorkspaceShell({
             activeTabId={workspace.activeTabId}
             templates={templates}
             graphs={graphs}
+            activeGraphName={activeChrome?.graphName ?? activeTab?.title ?? "Untitled Graph"}
+            activeStateCount={activeChrome?.stateCount ?? 0}
+            isStatePanelOpen={activeChrome?.isStatePanelOpen ?? false}
             onActivateTab={activateTab}
             onCloseTab={requestCloseTab}
             onCreateNew={() => openNewTab(null)}
             onCreateFromTemplate={(templateId) => openNewTab(templateId)}
             onOpenGraph={(graphId) => openExistingGraph(graphId, graphById.get(graphId)?.name ?? graphId)}
+            onRenameActiveGraph={(name) => activeActions?.setGraphName(name)}
+            onToggleStatePanel={() => activeActions?.toggleStatePanel()}
+            onSaveActiveGraph={() => void activeActions?.save()}
+            onValidateActiveGraph={() => void activeActions?.validate()}
+            onRunActiveGraph={() => void activeActions?.run()}
           />
           <div className="relative min-h-0 flex-1">
             {workspace.tabs.map((tab) => {
@@ -408,7 +447,7 @@ export function EditorWorkspaceShell({
               const loadedGraph = documentsByTabId[tab.tabId];
               const isLoading = loadingByTabId[tab.tabId] ?? false;
               const loadError = errorByTabId[tab.tabId] ?? null;
-              const hasLiveEditor = Boolean(saveActionsRef.current[tab.tabId]);
+              const hasLiveEditor = Boolean(editorActionsRef.current[tab.tabId]);
               const requiresExistingGraph = Boolean(tab.graphId) && !loadedGraph && tab.kind === "existing" && !hasLiveEditor;
 
               return (
@@ -438,9 +477,10 @@ export function EditorWorkspaceShell({
                       templates={templates}
                       defaultTemplateId={tab.defaultTemplateId ?? tab.templateId ?? undefined}
                       onDocumentMetaChange={(meta) => handleDocumentMetaChange(tab.tabId, meta)}
+                      onChromeStateChange={(chrome) => handleChromeStateChange(tab.tabId, chrome)}
                       onGraphSaved={(payload) => handleGraphSaved(tab.tabId, payload)}
-                      onSaveActionReady={(action) => {
-                        saveActionsRef.current[tab.tabId] = action;
+                      onActionSetReady={(actions) => {
+                        editorActionsRef.current[tab.tabId] = actions;
                       }}
                     />
                   )}
@@ -475,7 +515,7 @@ export function EditorWorkspaceShell({
             return;
           }
 
-          const action = saveActionsRef.current[pendingCloseTabId];
+          const action = editorActionsRef.current[pendingCloseTabId]?.save;
           if (!action) {
             setCloseError("当前标签页还没有可用的保存动作。");
             return;

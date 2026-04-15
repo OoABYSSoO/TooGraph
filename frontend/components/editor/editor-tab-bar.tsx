@@ -10,6 +10,7 @@ import {
 
 import { useLanguage } from "@/components/providers/language-provider";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/cn";
 import type { EditorWorkspaceTab } from "@/lib/editor-workspace";
 import type { CanonicalTemplateRecord } from "@/lib/node-system-canonical";
@@ -20,11 +21,19 @@ type EditorTabBarProps = {
   activeTabId: string | null;
   templates: CanonicalTemplateRecord[];
   graphs: GraphSummary[];
+  activeGraphName: string;
+  activeStateCount: number;
+  isStatePanelOpen: boolean;
   onActivateTab: (tabId: string) => void;
   onCloseTab: (tabId: string) => void;
   onCreateNew: () => void;
   onCreateFromTemplate: (templateId: string) => void;
   onOpenGraph: (graphId: string) => void;
+  onRenameActiveGraph: (name: string) => void;
+  onToggleStatePanel: () => void;
+  onSaveActiveGraph: () => void;
+  onValidateActiveGraph: () => void;
+  onRunActiveGraph: () => void;
 };
 
 type WorkspaceSelectOption = {
@@ -311,15 +320,25 @@ export function EditorTabBar({
   activeTabId,
   templates,
   graphs,
+  activeGraphName,
+  activeStateCount,
+  isStatePanelOpen,
   onActivateTab,
   onCloseTab,
   onCreateNew,
   onCreateFromTemplate,
   onOpenGraph,
+  onRenameActiveGraph,
+  onToggleStatePanel,
+  onSaveActiveGraph,
+  onValidateActiveGraph,
+  onRunActiveGraph,
 }: EditorTabBarProps) {
   const { language } = useLanguage();
   const [templateSelection, setTemplateSelection] = useState("");
   const [graphSelection, setGraphSelection] = useState("");
+  const [isEditingGraphName, setIsEditingGraphName] = useState(false);
+  const [draftGraphName, setDraftGraphName] = useState(activeGraphName);
   const copy =
     language === "zh"
       ? {
@@ -329,6 +348,10 @@ export function EditorTabBar({
           noTemplates: "暂无模板",
           noGraphs: "暂无已保存图",
           dirty: "未保存",
+          state: "State",
+          save: "Save",
+          validate: "Validate",
+          run: "Run",
         }
       : {
           newGraph: "New Graph",
@@ -337,6 +360,10 @@ export function EditorTabBar({
           noTemplates: "No templates",
           noGraphs: "No saved graphs",
           dirty: "Unsaved",
+          state: "State",
+          save: "Save",
+          validate: "Validate",
+          run: "Run",
         };
 
   const templateOptions = templates.map((template) => ({
@@ -348,6 +375,20 @@ export function EditorTabBar({
     value: graph.graph_id,
     label: graph.name,
   }));
+
+  useEffect(() => {
+    if (!isEditingGraphName) {
+      setDraftGraphName(activeGraphName);
+    }
+  }, [activeGraphName, isEditingGraphName]);
+
+  const commitGraphName = () => {
+    const nextName = draftGraphName.trim();
+    if (nextName && nextName !== activeGraphName) {
+      onRenameActiveGraph(nextName);
+    }
+    setIsEditingGraphName(false);
+  };
 
   return (
     <div className="border-b border-[rgba(154,52,18,0.14)] bg-[rgba(255,250,241,0.9)] px-4 py-2 shadow-[0_10px_24px_rgba(154,52,18,0.05)]">
@@ -390,6 +431,50 @@ export function EditorTabBar({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {isEditingGraphName ? (
+            <Input
+              autoFocus
+              className="h-[38px] min-w-[220px] rounded-[16px] border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.88)] px-3.5 py-2.5 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.45)]"
+              value={draftGraphName}
+              onChange={(event) => setDraftGraphName(event.target.value)}
+              onBlur={commitGraphName}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  commitGraphName();
+                }
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  setDraftGraphName(activeGraphName);
+                  setIsEditingGraphName(false);
+                }
+              }}
+            />
+          ) : (
+            <button
+              type="button"
+              onDoubleClick={() => setIsEditingGraphName(true)}
+              className="inline-flex h-[38px] min-w-[220px] items-center rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,255,255,0.72)] px-3.5 text-left text-sm font-medium text-[var(--text)] shadow-[inset_0_1px_0_rgba(255,255,255,0.38)] transition hover:border-[rgba(154,52,18,0.2)]"
+              title={activeGraphName}
+            >
+              <span className="truncate">{activeGraphName}</span>
+            </button>
+          )}
+          <button
+            type="button"
+            className={cn(
+              "inline-flex h-[38px] items-center gap-2 rounded-[16px] border px-3.5 text-sm font-medium transition",
+              isStatePanelOpen
+                ? "border-[var(--accent)] bg-[rgba(255,244,240,0.94)] text-[var(--accent-strong)]"
+                : "border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.82)] text-[var(--text)] hover:bg-white",
+            )}
+            onClick={onToggleStatePanel}
+          >
+            <span>{copy.state}</span>
+            <span className="rounded-full border border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.92)] px-2 py-0.5 text-[0.68rem] text-[var(--muted)]">
+              {activeStateCount}
+            </span>
+          </button>
           <Button size="sm" onClick={onCreateNew}>
             {copy.newGraph}
           </Button>
@@ -417,6 +502,15 @@ export function EditorTabBar({
               }
             }}
           />
+          <Button size="sm" onClick={onSaveActiveGraph}>
+            {copy.save}
+          </Button>
+          <Button size="sm" onClick={onValidateActiveGraph}>
+            {copy.validate}
+          </Button>
+          <Button size="sm" variant="primary" onClick={onRunActiveGraph}>
+            {copy.run}
+          </Button>
         </div>
       </div>
     </div>

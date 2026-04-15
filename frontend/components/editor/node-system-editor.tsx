@@ -91,6 +91,20 @@ export type NodeSystemEditorGraphSavedPayload = {
 
 export type NodeSystemEditorSaveAction = () => Promise<boolean>;
 
+export type NodeSystemEditorChromeState = {
+  graphName: string;
+  stateCount: number;
+  isStatePanelOpen: boolean;
+};
+
+export type NodeSystemEditorActionSet = {
+  save: NodeSystemEditorSaveAction;
+  validate: () => Promise<void>;
+  run: () => Promise<void>;
+  toggleStatePanel: () => void;
+  setGraphName: (name: string) => void;
+};
+
 export type NodeSystemEditorProps = {
   mode: "new" | "existing";
   initialGraph?: GraphPayload | null;
@@ -101,6 +115,8 @@ export type NodeSystemEditorProps = {
   onDocumentMetaChange?: (meta: NodeSystemEditorDocumentMeta) => void;
   onGraphSaved?: (payload: NodeSystemEditorGraphSavedPayload) => void;
   onSaveActionReady?: (action: NodeSystemEditorSaveAction | null) => void;
+  onChromeStateChange?: (state: NodeSystemEditorChromeState) => void;
+  onActionSetReady?: (actions: NodeSystemEditorActionSet | null) => void;
 };
 
 type FlowNodeData = {
@@ -5058,12 +5074,16 @@ function NodeSystemCanvas({
   onDocumentMetaChange,
   onGraphSaved,
   onSaveActionReady,
+  onChromeStateChange,
+  onActionSetReady,
 }: {
   initialGraph: GraphPayload;
   isNewFromTemplate: boolean;
   onDocumentMetaChange?: (meta: NodeSystemEditorDocumentMeta) => void;
   onGraphSaved?: (payload: NodeSystemEditorGraphSavedPayload) => void;
   onSaveActionReady?: (action: NodeSystemEditorSaveAction | null) => void;
+  onChromeStateChange?: (state: NodeSystemEditorChromeState) => void;
+  onActionSetReady?: (actions: NodeSystemEditorActionSet | null) => void;
 }) {
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const reactFlow = useReactFlow<FlowNode, Edge>();
@@ -5566,6 +5586,14 @@ function NodeSystemCanvas({
   }, [graphId, graphName, isDirty, onDocumentMetaChange]);
 
   useEffect(() => {
+    onChromeStateChange?.({
+      graphName,
+      stateCount: canonicalStateCount,
+      isStatePanelOpen,
+    });
+  }, [canonicalStateCount, graphName, isStatePanelOpen, onChromeStateChange]);
+
+  useEffect(() => {
     const derivedCanonical = buildCanonicalFlowProjection(nodes, edges);
     setCanonicalGraphState((current) => {
       let changed = false;
@@ -6025,16 +6053,16 @@ function NodeSystemCanvas({
     };
   }, [handleSave, onSaveActionReady]);
 
-  async function handleValidate() {
+  const handleValidate = useCallback(async () => {
     try {
       const response = await apiPost<{ valid: boolean; issues: Array<{ message: string }> }>("/api/graphs/validate", buildPayload());
       setStatusMessage(response.valid ? "Validation passed." : response.issues.map((issue) => issue.message).join("; "));
     } catch (error) {
       setStatusMessage(error instanceof Error ? error.message : "Failed to validate graph.");
     }
-  }
+  }, [buildPayload]);
 
-  async function handleRun() {
+  const handleRun = useCallback(async () => {
     try {
       const response = await apiPost<{ run_id: string; status: string }>("/api/graphs/run", buildPayload());
       const queuedStatusMap = Object.fromEntries(canonicalNodeKeys.map((nodeKey) => [nodeKey, "idle"])) as Record<string, RunNodeStatus>;
@@ -6056,7 +6084,30 @@ function NodeSystemCanvas({
     } catch (error) {
       setStatusMessage(error instanceof Error ? error.message : "Failed to run graph.");
     }
-  }
+  }, [buildPayload, canonicalNodeKeys, nodes.length, setNodes]);
+
+  const setGraphName = useCallback((name: string) => {
+    setCanonicalGraphState((current) => (current.name === name ? current : { ...current, name }));
+  }, []);
+
+  const toggleStatePanel = useCallback(() => {
+    setIsStatePanelOpen((current) => !current);
+  }, []);
+
+  useEffect(() => {
+    const actionSet: NodeSystemEditorActionSet = {
+      save: handleSave,
+      validate: handleValidate,
+      run: handleRun,
+      toggleStatePanel,
+      setGraphName,
+    };
+
+    onActionSetReady?.(actionSet);
+    return () => {
+      onActionSetReady?.(null);
+    };
+  }, [handleRun, handleSave, handleValidate, onActionSetReady, setGraphName, toggleStatePanel]);
 
   const focusNode = useCallback(
     (nodeId: string) => {
@@ -6588,48 +6639,7 @@ function NodeSystemCanvas({
   );
 
   return (
-    <div className="grid h-full min-h-0 grid-rows-[56px_minmax(0,1fr)_36px] bg-[radial-gradient(circle_at_top,rgba(154,52,18,0.1),transparent_22%),linear-gradient(180deg,#f5efe2_0%,#ede4d2_100%)]">
-      <header className="grid grid-cols-[minmax(220px,320px)_1fr_auto] items-center gap-3 border-b border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.82)] px-4 backdrop-blur-xl">
-        <Input
-          className="h-10"
-          value={graphName}
-          onChange={(event) =>
-            setCanonicalGraphState((current) => ({
-              ...current,
-              name: event.target.value,
-            }))
-          }
-          placeholder="Graph name"
-        />
-        <div className="text-sm text-[var(--muted)]">Double click canvas to create nodes. Drop files on empty canvas to create input nodes. Drag from an output handle into empty space for type-aware suggestions.</div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            className={cn(
-              "inline-flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-medium transition",
-              isStatePanelOpen
-                ? "border-[var(--accent)] bg-[rgba(255,244,240,0.94)] text-[var(--accent-strong)]"
-                : "border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.82)] text-[var(--text)] hover:bg-white",
-            )}
-            onClick={() => setIsStatePanelOpen((current) => !current)}
-          >
-            <span>State</span>
-            <span className="rounded-full border border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.92)] px-2 py-0.5 text-[0.68rem] text-[var(--muted)]">
-              {canonicalStateCount}
-            </span>
-          </button>
-          <Button size="sm" onClick={() => void handleSave()}>
-            Save
-          </Button>
-          <Button size="sm" onClick={() => void handleValidate()}>
-            Validate
-          </Button>
-          <Button size="sm" variant="primary" onClick={() => void handleRun()}>
-            Run
-          </Button>
-        </div>
-      </header>
-
+    <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_36px] bg-[radial-gradient(circle_at_top,rgba(154,52,18,0.1),transparent_22%),linear-gradient(180deg,#f5efe2_0%,#ede4d2_100%)]">
       <div
         className="grid min-w-0 min-h-0 h-full transition-[grid-template-columns] duration-300"
         style={{
@@ -7111,6 +7121,8 @@ export function NodeSystemEditor(props: NodeSystemEditorProps) {
         onDocumentMetaChange={props.onDocumentMetaChange}
         onGraphSaved={props.onGraphSaved}
         onSaveActionReady={props.onSaveActionReady}
+        onChromeStateChange={props.onChromeStateChange}
+        onActionSetReady={props.onActionSetReady}
       />
     </ReactFlowProvider>
   );
