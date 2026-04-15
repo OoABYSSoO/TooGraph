@@ -2,8 +2,7 @@
 
 当前 `docs/` 只保留仍需继续推进的文档：
 
-- [FUTURE_WORK.md](/home/abyss/GraphiteUI/docs/FUTURE_WORK.md)
-- [editor_view_model_cleanup_plan.md](/home/abyss/GraphiteUI/docs/editor_view_model_cleanup_plan.md)
+- [current_engineering_backlog.md](/home/abyss/GraphiteUI/docs/current_engineering_backlog.md)
 - [README.md](/home/abyss/GraphiteUI/docs/README.md)
 
 使用原则：
