@@ -41,6 +41,7 @@ import { Input } from "@/components/ui/input";
 import { RichContent, formatRichContentValue, resolveRichContentDisplayMode } from "@/components/ui/rich-content";
 import { apiGet, apiPost } from "@/lib/api";
 import { cn } from "@/lib/cn";
+import { createEditorSeedGraph } from "@/lib/editor-graph-defaults";
 import {
   buildEditorNodeConfigFromCanonicalNode,
   buildEditorPresetRecordFromCanonicalPreset,
@@ -271,7 +272,6 @@ const CREATION_MENU_FAMILY_PRIORITY: Record<NodeFamily, number> = {
   condition: 3,
 };
 
-const HELLO_WORLD_TEMPLATE_ID = "hello_world";
 const DEFAULT_EDITOR_TEXT_MODEL_REF = "local/lm-local";
 const DEFAULT_AGENT_THINKING_ENABLED = true;
 const DEFAULT_AGENT_TEMPERATURE = 0.2;
@@ -1620,34 +1620,6 @@ async function fileToEnvelope(file: File): Promise<UploadedAssetEnvelope> {
     detectedType,
     content,
     encoding,
-  };
-}
-
-function createEditorDefaults(templates: TemplateRecord[], defaultTemplateId?: string): GraphPayload {
-  const preferredTemplate =
-    templates.find((item) => item.template_id === defaultTemplateId) ??
-    templates.find((item) => item.template_id === HELLO_WORLD_TEMPLATE_ID) ??
-    templates[0];
-  if (preferredTemplate) {
-    return {
-      name: preferredTemplate.default_graph_name,
-      state_schema: preferredTemplate.state_schema,
-      nodes: preferredTemplate.nodes,
-      edges: preferredTemplate.edges,
-      conditional_edges: preferredTemplate.conditional_edges,
-      metadata: preferredTemplate.metadata,
-      graph_id: null,
-    };
-  }
-
-  return {
-    graph_id: null,
-    name: "Node System Playground",
-    state_schema: {},
-    nodes: {},
-    edges: [],
-    conditional_edges: [],
-    metadata: {},
   };
 }
 
@@ -6627,7 +6599,10 @@ function NodeSystemCanvas({
 }
 
 export function NodeSystemEditor(props: NodeSystemEditorProps) {
-  const graph = props.initialGraph ?? createEditorDefaults(props.templates, props.defaultTemplateId);
+  const graph = useMemo(
+    () => createEditorSeedGraph(props.templates, props.defaultTemplateId, props.initialGraph),
+    [props.defaultTemplateId, props.initialGraph, props.templates],
+  );
   const isNewFromTemplate = props.mode === "new" && props.initialGraph == null;
 
   return (
