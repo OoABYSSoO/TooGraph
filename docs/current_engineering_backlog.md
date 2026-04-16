@@ -10,25 +10,36 @@
 
 ## 当前优先级
 
-1. 编辑器旧视图模型收口
+1. 编辑器原生正式协议化
 2. Cycles 交互与高级策略
 3. Knowledge Base 收尾与增强
 4. Memory 正式能力建设
 5. 人类在环前端与审计闭环
 6. LangGraph Python 导出前端入口
 
-## 1. 编辑器旧视图模型收口
+## 1. 编辑器原生正式协议化
 
 当前代码现状：
 
-- 后端协议、模板、图、预设、保存、校验和运行都已经切到正式 `node_system`
-- LangGraph 已经是后端执行主链
-- 前端接口兼容层已删除
-- 但编辑器内部仍保留一层旧视图模型壳子：
+- 后端模板、图、保存、校验、运行、LangGraph 导出都已经以正式 `node_system` schema 为边界
+- `/api/templates`、`/api/graphs/*` 和 LangGraph runtime 直接消费正式协议
+- 前端在接口边界上已经提交正式协议
+- 但编辑器内部仍保留一层独立于正式协议的编辑视图模型：
   - `NodePresetDefinition`
   - `PortDefinition`
   - `StateField`
   - `SkillAttachment`
+- 当前仍存在明确的兼容/回退逻辑：
+  - `label` 回退
+  - `defaultValue` 回退
+  - `text -> string` 类型映射
+  - 从旧 `stateReads/stateWrites` 与端口结构推导 canonical `reads/writes`
+
+目标：
+
+- 前端内部以 `CanonicalGraph / NodeSystemGraphPayload` 作为唯一业务数据源
+- ReactFlow node/edge 只作为渲染投影，不再承载第二套业务协议
+- 在不改变现有视觉风格和主要交互表象的前提下，删除编辑器内部兼容层
 
 关键代码位置：
 
@@ -36,74 +47,104 @@
 - [node-system-canonical.ts](/home/abyss/GraphiteUI/frontend/lib/node-system-canonical.ts)
 - [node-system-editor.tsx](/home/abyss/GraphiteUI/frontend/components/editor/node-system-editor.tsx)
 - [node-presets-mock.ts](/home/abyss/GraphiteUI/frontend/lib/node-presets-mock.ts)
+- [node_system.py](/home/abyss/GraphiteUI/backend/app/core/schemas/node_system.py)
 
 执行顺序：
 
-### Phase B：技能面板直接改为 `string[]`
+### Phase A：明确唯一业务数据源
 
 范围：
 
-- 去掉 `SkillAttachment`
-- agent 配置中的 `skills` 直接变成 `string[]`
-- 技能定义元数据通过 `skillDefinitions` 查表获取显示名和 schema
+- `canonicalGraphState` 成为节点、state、边、条件边的唯一业务真相
+- ReactFlow 里的 `nodes / edges` 只保留渲染所需字段：
+  - 位置
+  - 折叠状态
+  - 框体尺寸
+  - 局部 UI 暂态
+- 节点卡片、State Panel、运行前保存逻辑都直接围绕 canonical graph 读写
 
 完成标准：
 
-- 节点技能区显示不变
-- 自动挂载知识库 skill 逻辑不变
-- 保存、校验、运行不需要再组装 skill attachment 对象
+- 业务字段只有一份主存储
+- 节点编辑不会再先改旧视图模型、再投影回 canonical
+- 保存、校验、运行继续直接提交正式协议
+- 视觉效果不变
 
-### Phase C：端口名去副本
+### Phase B：节点与 State Panel 直接围绕 canonical 渲染
 
 范围：
 
-- 删除 `PortDefinition.label`
-- 端口显示名统一直接取绑定的 `state.name`
-- 双击端口改名时直接修改对应 state
+- `NodeCard` 直接读取 canonical node
+- `StatePanel` 直接读取 canonical `state_schema`
+- reader / writer 摘要直接从 canonical `reads / writes` 派生
+- 节点标题、描述、state 展示都不再依赖旧壳类型做二次搬运
 
 完成标准：
 
-- 端口名没有第二份存储
+- state、端口、节点显示信息的源头唯一
+- State Panel 改名、节点端口改名都直接改正式数据源
+- 不引入新的视觉差异
+
+### Phase C：端口语义去副本
+
+范围：
+
+- 删除或降级 `PortDefinition.label`
+- state 绑定端口的显示名统一直接取 `state.name`
+- 双击端口改名时，直接修改对应 state
+- 只有 condition 的 branch 分支名保留独立语义；普通 state 绑定端口不再维护第二份名称
+
+完成标准：
+
+- 端口名没有第二份业务副本
 - state 改名和端口改名完全共用同一源数据
+- 不再需要为端口名做额外同步逻辑
 
-### Phase D：State Panel 直接读 canonical state
-
-范围：
-
-- `StatePanel` 直接消费 `canonicalGraph.state_schema`
-- `StateField[]` 降为局部辅助结构，或直接删除
-- State Panel 中的 reader / writer 摘要全部从 canonical `reads / writes` 派生
-
-完成标准：
-
-- State Panel 不再依赖 `StateField[]` 主状态
-- state 的增删改查直接落到 canonical graph
-
-### Phase E：节点卡片直接围绕 canonical node 渲染
+### Phase D：技能与预设围绕 canonical 收口
 
 范围：
 
-- `NodeCard` 直接读 canonical node
-- `listInputPorts` / `listOutputPorts` 等旧 config 辅助函数逐步退场
-- `NodePresetDefinition` 不再作为节点卡片主输入类型
+- 去掉 `SkillAttachment` 作为主业务结构
+- agent 的技能主存储直接收口为 `string[]`
+- 技能显示元数据通过 `skillDefinitions` 查表补充
+- preset 主链以 canonical preset 为基础
+- 删除 `EditorPresetRecord` 中不必要的旧 definition 壳子
 
 完成标准：
 
-- 节点卡片不再依赖旧 `config.inputs / outputs`
-- `NodePresetDefinition` 降为历史类型或被彻底删除
+- 技能区显示不变
+- 自动挂载知识库 skill 逻辑不变
+- 创建节点、保存预设、加载预设不再要求旧编辑协议做中转
 
-### Phase F：预设视图层收口
+### Phase E：删除旧字段兼容与历史回退
 
 范围：
 
-- 创建节点时直接基于 canonical preset
-- 删除 `EditorPresetRecord` 里的旧 definition 壳子
-- 预设菜单只保留当前 UI 所需的最薄投影
+- 删除前端的 `label` / `defaultValue` 回退
+- 删除后端 schema 对 `defaultValue` 的兼容接收
+- 删除 `text -> string` 的历史映射
+- 删除旧 `extractLegacyStateReads / extractLegacyStateWrites` 路径
+- 删除不再使用的 helper / 类型 / 映射函数
 
 完成标准：
 
-- preset 主链完全围绕 canonical
-- 不再需要把 preset definition 转成旧节点配置对象
+- 编辑器内部不再依赖旧字段兜底
+- 正式协议字段集合在前后端保持一致
+- 兼容层退场后，保存/运行/导出结果不变
+
+### Phase F：零视觉回归验收
+
+范围：
+
+- 在正式协议原生化完成后，逐项回归现在的界面视觉与交互
+- 特别检查节点卡片、标签栏、State Panel、节点编辑弹层、预设菜单
+
+完成标准：
+
+- 保持当前暖色、纸张感、工作台式视觉风格
+- 不改变节点卡片布局与信息层级
+- 不改变标签栏和画布的视觉设计
+- 用户可感知到的是“数据一致性更强”，而不是“前端换了套设计”
 
 每一步统一验收：
 
@@ -115,6 +156,7 @@
 6. State Panel 交互不变
 7. 节点预设保存仍可用
 8. `./scripts/start.sh` 重启后页面正常
+9. 前端内部不再保留第二套业务协议作为主编辑源
 
 ## 2. Cycles 交互与高级策略
 
