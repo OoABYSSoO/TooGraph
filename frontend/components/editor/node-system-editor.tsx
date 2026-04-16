@@ -72,7 +72,6 @@ import {
   updateCanonicalReadBindingRequired,
   upsertStateInCanonicalGraph,
 } from "@/lib/node-system-canonical-write";
-import { projectCanonicalConfigsOntoNodes } from "@/lib/node-system-projection";
 import {
   buildDisplayPortsForCanonicalNode,
   buildStateBindingNodeOptions,
@@ -5004,7 +5003,32 @@ function NodeSystemCanvas({
   const graphId = canonicalGraphState.graph_id ?? null;
   const metadata = canonicalGraphState.metadata;
   const stateSchema = useMemo(() => buildEditorStateFieldsFromCanonicalGraph(canonicalGraphState), [canonicalGraphState]);
-  const projectedNodes = useMemo(() => projectCanonicalConfigsOntoNodes(nodes, canonicalGraphState), [canonicalGraphState, nodes]);
+  const projectedNodes = useMemo(
+    () =>
+      nodes.map((node) => {
+        const canonicalNode = canonicalGraphState.nodes[node.id];
+        if (!canonicalNode) {
+          return node;
+        }
+
+        const nextConfig = normalizeNodeConfig(
+          deepClonePreset(buildEditorNodeConfigFromCanonicalNode(node.id, canonicalNode, canonicalGraphState.state_schema)),
+        );
+
+        if (JSON.stringify(node.data.config) === JSON.stringify(nextConfig)) {
+          return node;
+        }
+
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            config: nextConfig,
+          },
+        };
+      }),
+    [canonicalGraphState, nodes],
+  );
 
   const allPresets = useMemo(
     () => [...NODE_PRESETS_MOCK, ...persistedPresets.map((preset) => preset.definition)].filter((preset) => isPresetEligibleFamily(preset.family)),
@@ -5094,7 +5118,7 @@ function NodeSystemCanvas({
     return Object.fromEntries(projectedNodes.map((node) => [node.id, createPreviewText(node, projectedNodes, edges)]));
   }, [edges, projectedNodes]);
   const derivedCanonicalGraph = useMemo<CanonicalGraph>(() => {
-    const projection = buildCanonicalFlowProjectionFromEditorState(projectedNodes, edges);
+    const projection = buildCanonicalFlowProjectionFromEditorState(projectedNodes, canonicalGraphState, edges);
     return {
       graph_id: graphId,
       name: graphName,
@@ -5392,9 +5416,9 @@ function NodeSystemCanvas({
   }, [canonicalStateCount, graphName, isStatePanelOpen, onChromeStateChange]);
 
   useEffect(() => {
-    const derivedCanonical = buildCanonicalFlowProjectionFromEditorState(projectedNodes, edges);
+    const derivedCanonical = buildCanonicalFlowProjectionFromEditorState(projectedNodes, canonicalGraphState, edges);
     setCanonicalGraphState((current) => applyFlowProjectionToCanonicalGraph(current, derivedCanonical));
-  }, [edges, projectedNodes]);
+  }, [canonicalGraphState, edges, projectedNodes]);
 
   useEffect(() => {
     const nodesById = new Map(projectedNodes.map((node) => [node.id, node]));

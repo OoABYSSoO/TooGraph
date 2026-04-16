@@ -253,7 +253,67 @@ test("applyFlowProjectionToCanonicalGraph updates ui, removes missing nodes, and
   assert.deepEqual(next.conditional_edges, []);
 });
 
-test("buildCanonicalFlowProjectionFromEditorState projects regular and conditional edges into canonical form", () => {
+test("buildCanonicalFlowProjectionFromEditorState prefers canonical graph semantics over stale node config mirrors", () => {
+  const graph: CanonicalGraphPayload = {
+    graph_id: "graph_test",
+    name: "Projection Source of Truth Test",
+    state_schema: {
+      question: {
+        name: "Question",
+        description: "",
+        type: "text",
+        value: "",
+        color: "#d97706",
+      },
+    },
+    nodes: {
+      input_question: {
+        kind: "input",
+        name: "Input Question",
+        description: "",
+        ui: { position: { x: 0, y: 0 }, collapsed: false },
+        reads: [],
+        writes: [{ state: "question", mode: "replace" }],
+        config: { value: "" },
+      },
+      condition_route: {
+        kind: "condition",
+        name: "Condition Route",
+        description: "",
+        ui: { position: { x: 220, y: 0 }, collapsed: false },
+        reads: [{ state: "question", required: true }],
+        writes: [],
+        config: {
+          branches: ["done"],
+          conditionMode: "rule",
+          branchMapping: {},
+          rule: {
+            source: "question",
+            operator: "exists",
+            value: null,
+          },
+        },
+      },
+      output_answer: {
+        kind: "output",
+        name: "Output Answer",
+        description: "",
+        ui: { position: { x: 480, y: 0 }, collapsed: false },
+        reads: [{ state: "question", required: true }],
+        writes: [],
+        config: {
+          displayMode: "auto",
+          persistEnabled: false,
+          persistFormat: "auto",
+          fileNameTemplate: "",
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+
   const projection = buildCanonicalFlowProjectionFromEditorState(
     [
       {
@@ -270,8 +330,8 @@ test("buildCanonicalFlowProjectionFromEditorState projects regular and condition
             description: "",
             valueType: "text",
             output: {
-              key: "question",
-              label: "Question",
+              key: "legacy_question",
+              label: "Legacy Question",
               valueType: "text",
             },
             value: "",
@@ -292,8 +352,8 @@ test("buildCanonicalFlowProjectionFromEditorState projects regular and condition
             description: "",
             inputs: [
               {
-                key: "question",
-                label: "Question",
+                key: "legacy_question",
+                label: "Legacy Question",
                 valueType: "text",
                 required: true,
               },
@@ -327,8 +387,8 @@ test("buildCanonicalFlowProjectionFromEditorState projects regular and condition
             name: "Output Answer",
             description: "",
             input: {
-              key: "question",
-              label: "Question",
+              key: "legacy_question",
+              label: "Legacy Question",
               valueType: "text",
               required: true,
             },
@@ -340,18 +400,19 @@ test("buildCanonicalFlowProjectionFromEditorState projects regular and condition
         },
       },
     ],
+    graph,
     [
       {
         source: "input_question",
         target: "condition_route",
-        sourceHandle: "output:question",
-        targetHandle: "input:question",
+        sourceHandle: "output:legacy_question",
+        targetHandle: "input:legacy_question",
       },
       {
         source: "condition_route",
         target: "output_answer",
         sourceHandle: "output:done",
-        targetHandle: "input:question",
+        targetHandle: "input:legacy_question",
       },
     ],
   );

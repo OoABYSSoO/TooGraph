@@ -1,5 +1,7 @@
 import {
   buildCanonicalNodeFromEditorConfig,
+  buildEditorNodeConfigFromCanonicalNode,
+  type CanonicalNode,
   type CanonicalGraphPayload,
 } from "./node-system-canonical.ts";
 import type {
@@ -66,6 +68,33 @@ function getBoundStateKeyForPort(config: NodePresetDefinition, side: "input" | "
   }
 
   return null;
+}
+
+function listProjectionPorts(config: NodePresetDefinition, side: "input" | "output"): PortDefinition[] {
+  if (side === "input") {
+    if (config.family === "agent" || config.family === "condition") return config.inputs;
+    if (config.family === "output") return [config.input];
+    return [];
+  }
+
+  if (config.family === "agent") return config.outputs;
+  if (config.family === "input") return [config.output];
+  if (config.family === "condition") {
+    return config.branches.map((branch) => ({ key: branch.key, label: branch.label, valueType: "any" as const }));
+  }
+  return [];
+}
+
+function resolveProjectionStateKey(config: NodePresetDefinition, side: "input" | "output", portKey: string) {
+  const ports = listProjectionPorts(config, side);
+  const matchedPort = ports.find((port) => port.key === portKey);
+  if (matchedPort) {
+    return getBoundStateKeyForPort(config, side, matchedPort.key) ?? matchedPort.key;
+  }
+  if (ports.length === 1) {
+    return getBoundStateKeyForPort(config, side, ports[0].key) ?? ports[0].key;
+  }
+  return portKey;
 }
 
 function chooseStateKeyForConnection(sourceStateKey: string, targetStateKey: string) {
@@ -150,12 +179,48 @@ export function buildCanonicalNodeFromEditorState(
   });
 }
 
+function buildCanonicalNodeProjectionFromGraph(
+  node: EditorFlowNodeSnapshot,
+  canonicalNode: CanonicalNode | undefined,
+  graph: CanonicalGraphPayload,
+) {
+  const resolvedConfig = canonicalNode
+    ? buildEditorNodeConfigFromCanonicalNode(node.id, canonicalNode, graph.state_schema)
+    : node.data.config;
+
+  if (!canonicalNode) {
+    return buildCanonicalNodeFromEditorState(node, resolvedConfig);
+  }
+
+  return {
+    ...canonicalNode,
+    ui: {
+      position: node.position,
+      collapsed: resolvedConfig.family === "input" ? false : !Boolean(node.data.isExpanded),
+      expandedSize: node.data.expandedSize ?? null,
+      collapsedSize: node.data.collapsedSize ?? null,
+    },
+  } satisfies CanonicalNode;
+}
+
+function resolveProjectionConfig(
+  node: EditorFlowNodeSnapshot,
+  graph: CanonicalGraphPayload,
+): NodePresetDefinition {
+  const canonicalNode = graph.nodes[node.id];
+  return canonicalNode ? buildEditorNodeConfigFromCanonicalNode(node.id, canonicalNode, graph.state_schema) : node.data.config;
+}
+
 export function buildCanonicalFlowProjectionFromEditorState(
   nodes: EditorFlowNodeSnapshot[],
+  graph: CanonicalGraphPayload,
   edges: EditorFlowEdgeSnapshot[],
 ): Pick<CanonicalGraphPayload, "nodes" | "edges" | "conditional_edges"> {
   const flowNodeMap = new Map(nodes.map((node) => [node.id, node]));
-  const canonicalNodes = Object.fromEntries(nodes.map((node) => [node.id, buildCanonicalNodeFromEditorState(node)]));
+  const resolvedConfigs = new Map(nodes.map((node) => [node.id, resolveProjectionConfig(node, graph)]));
+  const canonicalNodes = Object.fromEntries(
+    nodes.map((node) => [node.id, buildCanonicalNodeProjectionFromGraph(node, graph.nodes[node.id], graph)]),
+  );
   const conditionalEdgesBySource: Record<string, Record<string, string>> = {};
   const canonicalEdges: CanonicalGraphPayload["edges"] = [];
 
@@ -163,11 +228,14 @@ export function buildCanonicalFlowProjectionFromEditorState(
     const sourceNode = flowNodeMap.get(edge.source);
     const targetNode = flowNodeMap.get(edge.target);
     if (!sourceNode || !targetNode) continue;
+    const sourceConfig = resolvedConfigs.get(edge.source);
+    const targetConfig = resolvedConfigs.get(edge.target);
+    if (!sourceConfig || !targetConfig) continue;
 
     const sourcePortKey = getPortKeyFromHandle(edge.sourceHandle);
     const targetPortKey = getPortKeyFromHandle(edge.targetHandle);
 
-    if (sourceNode.data.config.family === "condition") {
+    if (sourceConfig.family === "condition") {
       if (sourcePortKey) {
         conditionalEdgesBySource[edge.source] = {
           ...(conditionalEdgesBySource[edge.source] ?? {}),
@@ -179,8 +247,8 @@ export function buildCanonicalFlowProjectionFromEditorState(
 
     if (!sourcePortKey || !targetPortKey) continue;
 
-    const sourceStateKey = getBoundStateKeyForPort(sourceNode.data.config, "output", sourcePortKey) ?? sourcePortKey;
-    const targetStateKey = getBoundStateKeyForPort(targetNode.data.config, "input", targetPortKey) ?? targetPortKey;
+    const sourceStateKey = resolveProjectionStateKey(sourceConfig, "output", sourcePortKey);
+    const targetStateKey = resolveProjectionStateKey(targetConfig, "input", targetPortKey);
     const stateKey = chooseStateKeyForConnection(sourceStateKey, targetStateKey);
 
     canonicalEdges.push({
