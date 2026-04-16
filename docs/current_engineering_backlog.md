@@ -28,16 +28,18 @@
   - 节点与 state 的正式读写关系完全以 canonical `reads / writes` 为准
   - `stateReads / stateWrites` 已从前端正式节点类型和主转换链移除
   - 节点卡片、State Panel、输入节点值同步、运行前提交都已 canonical-first
+  - ReactFlow 画布主链已不再直接读取 `data.config`
+  - 新建节点、知识库自动挂 skill、预设保存、输出预览和连线判定都已改为 canonical-first
   - 后端已经拒绝 `defaultValue`，前后端正式字段边界一致
   - 后端已删除 `legacy runtime` 选择与 fallback 分支，只保留 LangGraph 支持性检查
   - 前端已删除 `applyEditorConfigToCanonicalGraph / applyEditorConfigsToCanonicalGraph` 历史桥接
   - 持久化 preset 已改成以 canonical preset 为前端主存储，不再通过 `EditorPresetRecord.definition` 中转
   - agent skill 已直接以 canonical `skills: string[]` 作为前端编辑主语义
-- 当前剩余问题主要集中在编辑器内部仍保留一层视图壳：
+- 当前剩余问题主要集中在编辑器内部还保留一层轻量视图壳：
   - `NodePresetDefinition`
   - `PortDefinition`
   - `StateField`
-- ReactFlow `nodes` 里仍然保留 `data.config` 镜像，编辑器仍通过投影层把 canonical 图转换成前端视图对象
+  - canonical `text` 与 editor-side `string` 的类型映射
 
 目标：
 
@@ -55,38 +57,23 @@
 
 执行顺序：
 
-### Phase A：删掉 ReactFlow `data.config` 业务镜像
+### Phase A：继续压薄 editor-side 视图壳
 
 范围：
 
-- ReactFlow 节点只保留渲染信息：
-  - 位置
-  - 折叠状态
-  - 框体尺寸
-  - 局部 UI 暂态
-- `NodeCard` 与相关编辑弹层不再依赖 `data.config`
-- `projectCanonicalConfigsOntoNodes` 不再承担主业务投影职责
+- 继续检查 `NodePresetDefinition / PortDefinition / StateField` 是否还承担业务语义，而不是仅作为展示/编辑临时结构
+- 让 editor helper 更明确地区分：
+  - canonical 正式数据
+  - 视图层派生数据
+  - 局部 UI 草稿状态
 
 完成标准：
 
-- ReactFlow 层不再保存第二份节点业务协议
-- 节点编辑直接改 canonical graph
+- 视图壳不再作为主业务真相
+- 节点编辑继续直接改 canonical graph
 - 不引入新的视觉差异
 
-### Phase B：技能与预设围绕 canonical 收口
-
-范围：
-
-- agent 技能区显示元数据通过 `skillDefinitions` 查表补充，而不是靠本地壳对象承载主语义
-- 检查 preset 创建、保存、加载链中是否还存在多余的 editor-side 中转对象
-
-完成标准：
-
-- 技能显示与知识库自动挂载行为不变
-- 创建节点、保存预设、加载预设不再要求旧编辑协议做中转
-- preset 与 graph 的保存/恢复都直接围绕正式协议
-
-### Phase C：删除剩余历史映射与无用 helper
+### Phase B：清理剩余类型映射与无用 helper
 
 范围：
 
@@ -100,7 +87,7 @@
 - 不再保留无主的兼容函数和僵尸类型
 - 保存/运行/导出结果保持不变
 
-### Phase D：零视觉回归验收
+### Phase C：零视觉回归验收
 
 范围：
 

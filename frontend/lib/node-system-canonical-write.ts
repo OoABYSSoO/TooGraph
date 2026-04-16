@@ -25,6 +25,7 @@ type CanonicalNodeSnapshot = {
 type EditorFlowNodeSnapshot = CanonicalNodeSnapshot & {
   data: CanonicalNodeSnapshot["data"] & {
     config: NodePresetDefinition;
+    canonicalNode?: CanonicalNode;
   };
 };
 
@@ -167,7 +168,7 @@ function upsertCanonicalStatesFromPorts<T extends CanonicalGraphPayload>(graph: 
 
 export function buildCanonicalNodeFromEditorState(
   node: EditorFlowNodeSnapshot,
-  config: NodePresetDefinition = node.data.config,
+  config: NodePresetDefinition,
 ) {
   return buildCanonicalNodeFromEditorConfig({
     nodeId: node.id,
@@ -184,19 +185,15 @@ function buildCanonicalNodeProjectionFromGraph(
   canonicalNode: CanonicalNode | undefined,
   graph: CanonicalGraphPayload,
 ) {
-  const resolvedConfig = canonicalNode
-    ? buildEditorNodeConfigFromCanonicalNode(node.id, canonicalNode, graph.state_schema)
-    : node.data.config;
-
   if (!canonicalNode) {
-    return buildCanonicalNodeFromEditorState(node, resolvedConfig);
+    return null;
   }
 
   return {
     ...canonicalNode,
     ui: {
       position: node.position,
-      collapsed: resolvedConfig.family === "input" ? false : !Boolean(node.data.isExpanded),
+      collapsed: canonicalNode.kind === "input" ? false : !Boolean(node.data.isExpanded),
       expandedSize: node.data.expandedSize ?? null,
       collapsedSize: node.data.collapsedSize ?? null,
     },
@@ -206,9 +203,9 @@ function buildCanonicalNodeProjectionFromGraph(
 function resolveProjectionConfig(
   node: EditorFlowNodeSnapshot,
   graph: CanonicalGraphPayload,
-): NodePresetDefinition {
-  const canonicalNode = graph.nodes[node.id];
-  return canonicalNode ? buildEditorNodeConfigFromCanonicalNode(node.id, canonicalNode, graph.state_schema) : node.data.config;
+): NodePresetDefinition | null {
+  const canonicalNode = node.data.canonicalNode ?? graph.nodes[node.id];
+  return canonicalNode ? buildEditorNodeConfigFromCanonicalNode(node.id, canonicalNode, graph.state_schema) : null;
 }
 
 export function buildCanonicalFlowProjectionFromEditorState(
@@ -217,10 +214,22 @@ export function buildCanonicalFlowProjectionFromEditorState(
   edges: EditorFlowEdgeSnapshot[],
 ): Pick<CanonicalGraphPayload, "nodes" | "edges" | "conditional_edges"> {
   const flowNodeMap = new Map(nodes.map((node) => [node.id, node]));
-  const resolvedConfigs = new Map(nodes.map((node) => [node.id, resolveProjectionConfig(node, graph)]));
-  const canonicalNodes = Object.fromEntries(
-    nodes.map((node) => [node.id, buildCanonicalNodeProjectionFromGraph(node, graph.nodes[node.id], graph)]),
+  const resolvedConfigs = new Map(
+    nodes
+      .map((node) => {
+        const resolvedConfig = resolveProjectionConfig(node, graph);
+        return resolvedConfig ? ([node.id, resolvedConfig] as const) : null;
+      })
+      .filter((entry): entry is readonly [string, NodePresetDefinition] => Boolean(entry)),
   );
+  const canonicalNodeEntries: Array<[string, CanonicalNode]> = [];
+  for (const node of nodes) {
+    const projectedNode = buildCanonicalNodeProjectionFromGraph(node, node.data.canonicalNode ?? graph.nodes[node.id], graph);
+    if (projectedNode) {
+      canonicalNodeEntries.push([node.id, projectedNode]);
+    }
+  }
+  const canonicalNodes = Object.fromEntries(canonicalNodeEntries);
   const conditionalEdgesBySource: Record<string, Record<string, string>> = {};
   const canonicalEdges: CanonicalGraphPayload["edges"] = [];
 
@@ -284,13 +293,31 @@ export function addEditorNodeToCanonicalGraph<T extends CanonicalGraphPayload>(
       ...node.data,
       config,
     },
-  });
+  }, config);
 
   return {
     ...graph,
     nodes: {
       ...graph.nodes,
       [node.id]: nextNode,
+    },
+  };
+}
+
+export function addCanonicalNodeToGraph<T extends CanonicalGraphPayload>(
+  graph: T,
+  nodeId: string,
+  node: CanonicalNode,
+): T {
+  if (graph.nodes[nodeId]) {
+    return graph;
+  }
+
+  return {
+    ...graph,
+    nodes: {
+      ...graph.nodes,
+      [nodeId]: node,
     },
   };
 }

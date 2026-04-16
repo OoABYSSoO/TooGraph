@@ -43,17 +43,24 @@ import { apiGet, apiPost } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { createEditorSeedGraph } from "@/lib/editor-graph-defaults";
 import {
+  buildCanonicalNodeFromEditorConfig,
   buildEditorNodeConfigFromCanonicalNode,
   buildEditorNodeConfigFromCanonicalPreset,
+  findFirstCompatibleInputHandleFromCanonicalNode,
   buildEditorStateFieldsFromCanonicalGraph,
   buildEditorStateFieldsFromCanonicalStateSchema,
+  getCanonicalNodeDisplayName as getCanonicalNodeNameFromNode,
+  getEditorPortValueTypeFromCanonicalHandle,
+  listEditorInputPortsFromCanonicalNode,
+  listEditorOutputPortsFromCanonicalNode,
+  syncKnowledgeBaseSkillOnCanonicalAgentNode,
   type CanonicalPresetDocument,
   type CanonicalGraphPayload,
   type CanonicalTemplateRecord,
   type CanonicalNode,
 } from "@/lib/node-system-canonical";
 import {
-  addEditorNodeToCanonicalGraph,
+  addCanonicalNodeToGraph,
   applyFlowProjectionToCanonicalGraph,
   bindStateToCanonicalNode,
   buildCanonicalFlowProjectionFromEditorState,
@@ -149,6 +156,7 @@ export type NodeSystemEditorProps = {
 type FlowNodeData = {
   nodeId: string;
   config: NodePresetDefinition;
+  canonicalNode?: CanonicalNode;
   displayName?: string;
   displayDescription?: string;
   displayInputs?: PortDefinition[];
@@ -280,7 +288,6 @@ const CREATION_MENU_FAMILY_PRIORITY: Record<NodeFamily, number> = {
 const DEFAULT_EDITOR_TEXT_MODEL_REF = "local/lm-local";
 const DEFAULT_AGENT_THINKING_ENABLED = true;
 const DEFAULT_AGENT_TEMPERATURE = 0.2;
-const KNOWLEDGE_BASE_SKILL_KEY = "search_knowledge_base";
 const TYPE_COLORS: Record<ValueType, string> = {
   text: "#d97706",
   json: "#2563eb",
@@ -546,8 +553,15 @@ function getNodeDisplayName(config: NodePresetDefinition, nodeId?: string) {
   return String((config as { name?: string }).name ?? "").trim() || nodeId || "node";
 }
 
-function getCanonicalNodeDisplayName(canonicalGraph: CanonicalGraphPayload, nodeId: string) {
+function getCanonicalNodeDisplayNameFromGraph(canonicalGraph: CanonicalGraphPayload, nodeId: string) {
   return canonicalGraph.nodes[nodeId]?.name?.trim() || nodeId;
+}
+
+function coerceNodeKind(kind?: CanonicalNode["kind"] | NodeFamily | null): CanonicalNode["kind"] {
+  if (kind === "input" || kind === "output" || kind === "agent" || kind === "condition") {
+    return kind;
+  }
+  return "agent";
 }
 
 function resolveAgentRuntimeConfig(
@@ -1484,21 +1498,21 @@ function normalizeViewportSize(size: unknown): NodeViewportSize | null {
   return { width, height };
 }
 
-function getInitialExpandedHeight(config: NodePresetDefinition) {
-  if (config.family === "agent") return 520;
-  if (config.family === "condition") return 440;
-  if (config.family === "output") return 360;
-  return getNodeMinHeight(config);
+function getInitialExpandedHeightForKind(kind: CanonicalNode["kind"]) {
+  if (kind === "agent") return 520;
+  if (kind === "condition") return 440;
+  if (kind === "output") return 360;
+  return getNodeMinHeightForKind(kind);
 }
 
 function buildNodeStyleFromState(
-  config: NodePresetDefinition,
   isExpanded: boolean,
   size: NodeViewportSize | null,
   fallbackWidth?: number,
   fallbackHeight?: number,
 ) {
-  const width = size?.width ?? fallbackWidth ?? getDefaultNodeWidth(config);
+  void isExpanded;
+  const width = size?.width ?? fallbackWidth ?? getDefaultNodeWidth();
   const height = size?.height ?? fallbackHeight;
   return {
     background: "transparent",
@@ -1546,7 +1560,7 @@ function summarizeRunNodeStates(nodeIds: string[], nodeStatusMap: Record<string,
   );
 }
 
-function isPresetEligibleFamily(family: NodeFamily) {
+function isPresetEligibleFamily(family: NodeFamily | CanonicalNode["kind"]) {
   return family === "agent" || family === "condition";
 }
 
@@ -1631,13 +1645,14 @@ function createFlowNodeFromCanonicalNode(
   const collapsedSize = normalizeViewportSize(node.ui.collapsedSize);
   const expandedSize = normalizeViewportSize(node.ui.expandedSize);
   const activeSize = isExpanded ? expandedSize : collapsedSize;
-  const defaultWidth = getDefaultNodeWidth(config);
+  const defaultWidth = getDefaultNodeWidth();
   return {
     id: nodeId,
     type: "default",
     position: node.ui.position ?? { x: 0, y: 0 },
     data: {
       nodeId,
+      canonicalNode: node,
       config,
       previewText: "",
       isExpanded,
@@ -1646,15 +1661,18 @@ function createFlowNodeFromCanonicalNode(
     },
     sourcePosition: Position.Right,
     targetPosition: Position.Left,
-    style: buildNodeStyleFromState(config, isExpanded, activeSize, defaultWidth),
+    style: buildNodeStyleFromState(isExpanded, activeSize, defaultWidth),
   } satisfies FlowNode;
 }
 
-function createFlowEdgeFromCanonicalEdge(edge: CanonicalGraphPayload["edges"][number], nodesById: Map<string, FlowNode>): Edge {
-  const sourceNode = nodesById.get(edge.source);
+function createFlowEdgeFromCanonicalEdge(
+  edge: CanonicalGraphPayload["edges"][number],
+  graph: CanonicalGraphPayload,
+  nodesById: Map<string, FlowNode>,
+): Edge {
   const flowSourceHandle = `output:${edge.sourceHandle.split(":", 2)[1] ?? edge.sourceHandle}`;
   const flowTargetHandle = `input:${edge.targetHandle.split(":", 2)[1] ?? edge.targetHandle}`;
-  const sourceType = sourceNode ? getPortType(sourceNode.data.config, flowSourceHandle) : "any";
+  const sourceType = getPortTypeFromCanonicalGraph(graph, edge.source, flowSourceHandle) ?? "any";
   const color = TYPE_COLORS[sourceType ?? "any"];
   return {
     id: `edge:${edge.source}:${edge.sourceHandle}:${edge.target}:${edge.targetHandle}`,
@@ -1677,11 +1695,10 @@ function firstCanonicalInputHandle(node: CanonicalNode | undefined): string | nu
 }
 
 function createFlowEdgesFromCanonicalGraph(graph: CanonicalGraphPayload, nodesById: Map<string, FlowNode>): Edge[] {
-  const edges = graph.edges.map((edge) => createFlowEdgeFromCanonicalEdge(edge, nodesById));
+  const edges = graph.edges.map((edge) => createFlowEdgeFromCanonicalEdge(edge, graph, nodesById));
   for (const conditionalEdge of graph.conditional_edges) {
     for (const [branchKey, target] of Object.entries(conditionalEdge.branches)) {
-      const sourceNode = nodesById.get(conditionalEdge.source);
-      const sourceType = sourceNode ? getPortType(sourceNode.data.config, `output:${branchKey}`) : "any";
+      const sourceType = getPortTypeFromCanonicalGraph(graph, conditionalEdge.source, `output:${branchKey}`) ?? "any";
       const color = TYPE_COLORS[sourceType ?? "any"];
       edges.push({
         id: `conditional:${conditionalEdge.source}:${branchKey}:${target}`,
@@ -1714,6 +1731,26 @@ function getPortKeyFromHandle(handleId?: string | null) {
   if (!handleId) return null;
   const [, key] = handleId.split(":");
   return key ?? null;
+}
+
+function getPortTypeFromCanonicalGraph(graph: CanonicalGraphPayload, nodeId: string, handleId?: string | null): ValueType | null {
+  const node = graph.nodes[nodeId];
+  return node ? getEditorPortValueTypeFromCanonicalHandle(node, graph.state_schema, handleId, CREATE_INPUT_PORT_KEY) : null;
+}
+
+function listInputPortsFromCanonicalGraph(graph: CanonicalGraphPayload, nodeId: string): PortDefinition[] {
+  const node = graph.nodes[nodeId];
+  return node ? listEditorInputPortsFromCanonicalNode(node, graph.state_schema) : [];
+}
+
+function listOutputPortsFromCanonicalGraph(graph: CanonicalGraphPayload, nodeId: string): PortDefinition[] {
+  const node = graph.nodes[nodeId];
+  return node ? listEditorOutputPortsFromCanonicalNode(node, graph.state_schema) : [];
+}
+
+function getNodeDisplayNameFromCanonicalGraph(graph: CanonicalGraphPayload, nodeId: string) {
+  const node = graph.nodes[nodeId];
+  return node ? getCanonicalNodeNameFromNode(nodeId, node) : nodeId;
 }
 
 function getPortType(config: NodePresetDefinition, handleId?: string | null): ValueType | null {
@@ -1832,49 +1869,19 @@ function createAutoInputPort(existingPorts: PortDefinition[], sourceType: ValueT
   };
 }
 
-function isKnowledgeBaseSkill(skillKey: string) {
-  return skillKey === KNOWLEDGE_BASE_SKILL_KEY;
-}
-
-function areSkillKeyListsEqual(left: string[], right: string[]) {
-  if (left.length !== right.length) return false;
-  return left.every((skillKey, index) => skillKey === right[index]);
-}
-
-function pickAgentKnowledgeQueryInputKey(config: AgentNode, knowledgeBaseInputKey: string) {
-  const candidateInputs = config.inputs.filter((port) => port.key !== knowledgeBaseInputKey && port.valueType !== "knowledge_base");
-  const preferredKeys = ["question", "query", "input"];
-  for (const key of preferredKeys) {
-    const matched = candidateInputs.find((port) => port.key === key);
-    if (matched) {
-      return matched.key;
-    }
-  }
-
-  const preferredTextInput =
-    candidateInputs.find((port) => port.required && (port.valueType === "text" || port.valueType === "any")) ??
-    candidateInputs.find((port) => port.valueType === "text" || port.valueType === "any");
-  if (preferredTextInput) {
-    return preferredTextInput.key;
-  }
-
-  return candidateInputs.find((port) => port.required)?.key ?? candidateInputs[0]?.key ?? null;
-}
-
-function createKnowledgeBaseSkillKey(knowledgeBaseInputKey: string, queryInputKey: string): string {
-  void knowledgeBaseInputKey;
-  void queryInputKey;
-  return KNOWLEDGE_BASE_SKILL_KEY;
-}
-
-function collectAgentKnowledgeBaseBindings(agentNode: FlowNode, nodesById: Map<string, FlowNode>, edges: Edge[]) {
+function collectAgentKnowledgeBaseBindings(
+  agentNode: FlowNode,
+  nodesById: Map<string, FlowNode>,
+  edges: Edge[],
+  graph: CanonicalGraphPayload,
+) {
   const connectedInputKeys = new Set<string>();
 
   for (const edge of edges) {
     if (edge.target !== agentNode.id) continue;
     const sourceNode = nodesById.get(edge.source);
     if (!sourceNode) continue;
-    if (getPortType(sourceNode.data.config, edge.sourceHandle) !== "knowledge_base") continue;
+    if (getPortTypeFromCanonicalGraph(graph, sourceNode.id, edge.sourceHandle) !== "knowledge_base") continue;
     const inputKey = getPortKeyFromHandle(edge.targetHandle);
     if (!inputKey) continue;
     connectedInputKeys.add(inputKey);
@@ -1884,42 +1891,17 @@ function collectAgentKnowledgeBaseBindings(agentNode: FlowNode, nodesById: Map<s
 }
 
 function syncKnowledgeBaseSkillOnAgent(
-  agentNode: FlowNode & { data: FlowNodeData & { config: AgentNode } },
+  agentNode: FlowNode,
   nodesById: Map<string, FlowNode>,
   edges: Edge[],
-): AgentNode {
-  const config = agentNode.data.config as AgentNode;
-  const knowledgeBaseInputKeys = collectAgentKnowledgeBaseBindings(agentNode, nodesById, edges);
-  const skillsWithoutKnowledgeBase = config.skills.filter((skillKey) => !isKnowledgeBaseSkill(skillKey));
-
-  if (knowledgeBaseInputKeys.length !== 1) {
-    return areSkillKeyListsEqual(skillsWithoutKnowledgeBase, config.skills)
-      ? config
-      : normalizeNodeConfig({
-          ...config,
-          skills: skillsWithoutKnowledgeBase,
-        } satisfies AgentNode);
+  graph: CanonicalGraphPayload,
+): CanonicalNode | null {
+  const canonicalNode = graph.nodes[agentNode.id];
+  if (!canonicalNode || canonicalNode.kind !== "agent") {
+    return null;
   }
-
-  const knowledgeBaseInputKey = knowledgeBaseInputKeys[0];
-  const queryInputKey = pickAgentKnowledgeQueryInputKey(config, knowledgeBaseInputKey);
-  if (!queryInputKey) {
-    return areSkillKeyListsEqual(skillsWithoutKnowledgeBase, config.skills)
-      ? config
-      : normalizeNodeConfig({
-          ...config,
-          skills: skillsWithoutKnowledgeBase,
-        } satisfies AgentNode);
-  }
-
-  const nextKnowledgeBaseSkill = createKnowledgeBaseSkillKey(knowledgeBaseInputKey, queryInputKey);
-  const nextSkills = [...skillsWithoutKnowledgeBase, nextKnowledgeBaseSkill];
-  return areSkillKeyListsEqual(nextSkills, config.skills)
-    ? config
-    : normalizeNodeConfig({
-        ...config,
-        skills: nextSkills,
-      } satisfies AgentNode);
+  const knowledgeBaseInputKeys = collectAgentKnowledgeBaseBindings(agentNode, nodesById, edges, graph);
+  return syncKnowledgeBaseSkillOnCanonicalAgentNode(canonicalNode, graph.state_schema, knowledgeBaseInputKeys);
 }
 
 function createDefaultPort(side: "input" | "output", existingPorts: PortDefinition[]): PortDefinition {
@@ -1933,8 +1915,9 @@ function createDefaultPort(side: "input" | "output", existingPorts: PortDefiniti
   };
 }
 
-function createPreviewText(node: FlowNode, nodes: FlowNode[], edges: Edge[]) {
-  if (node.data.config.family !== "output") {
+function createPreviewText(node: FlowNode, nodes: FlowNode[], edges: Edge[], graph: CanonicalGraphPayload) {
+  const canonicalNode = graph.nodes[node.id];
+  if (!canonicalNode || canonicalNode.kind !== "output") {
     return "";
   }
 
@@ -1949,13 +1932,15 @@ function createPreviewText(node: FlowNode, nodes: FlowNode[], edges: Edge[]) {
   }
 
   const sourcePortKey = getPortKeyFromHandle(incoming.sourceHandle);
-  const config = sourceNode.data.config;
-
-  if (config.family === "input" && sourcePortKey === config.output.key) {
-    return config.value;
+  const canonicalSourceNode = graph.nodes[sourceNode.id];
+  if (canonicalSourceNode?.kind === "input") {
+    const writtenStateKey = canonicalSourceNode.writes[0]?.state ?? null;
+    if (writtenStateKey && sourcePortKey === writtenStateKey) {
+      return String(graph.state_schema[writtenStateKey]?.value ?? canonicalSourceNode.config.value ?? "");
+    }
   }
 
-  return `Connected to ${getNodeDisplayName(config)}.${sourcePortKey ?? "value"}`;
+  return `Connected to ${getNodeDisplayNameFromCanonicalGraph(graph, sourceNode.id)}.${sourcePortKey ?? "value"}`;
 }
 
 function OutputPreviewContent({ text, displayMode }: { text: string; displayMode: string }) {
@@ -3117,28 +3102,55 @@ function getNodeMinHeight(config: NodePresetDefinition) {
   return 180;
 }
 
+function getNodeMinHeightForKind(kind: CanonicalNode["kind"]) {
+  if (kind === "input") return 260;
+  if (kind === "output") return 280;
+  if (kind === "agent") return 360;
+  if (kind === "condition") return 300;
+  return 180;
+}
+
 const DEFAULT_NODE_WIDTH = 360;
 
-function getDefaultNodeWidth(_config: NodePresetDefinition) {
+function getDefaultNodeWidth() {
   return DEFAULT_NODE_WIDTH;
 }
 
 function NodeCard({ data, selected }: NodeProps<FlowNode>) {
-  const config = data.config;
-  const displayName = data.displayName ?? getNodeDisplayName(config, data.nodeId);
-  const displayDescription = data.displayDescription?.trim() || config.description;
+  const canonicalNode = data.canonicalNode ?? null;
+  const nodeKind = coerceNodeKind(canonicalNode?.kind);
+  const displayName = data.displayName ?? (canonicalNode ? getCanonicalNodeNameFromNode(data.nodeId, canonicalNode) : data.nodeId);
+  const displayDescription = data.displayDescription?.trim() || canonicalNode?.description || "";
   const stateFields = data.stateFields ?? [];
-  const inputs = data.displayInputs ?? resolvePortsForDisplay(config, "input", stateFields);
-  const outputs = data.displayOutputs ?? resolvePortsForDisplay(config, "output", stateFields);
-  const isInputNode = config.family === "input";
-  const minHeight = getNodeMinHeight(config);
+  const inputs = data.displayInputs ?? (canonicalNode ? listEditorInputPortsFromCanonicalNode(canonicalNode, {}) : []);
+  const outputs = data.displayOutputs ?? (canonicalNode ? listEditorOutputPortsFromCanonicalNode(canonicalNode, {}) : []);
+  const isInputNode = nodeKind === "input";
+  const minHeight = getNodeMinHeightForKind(nodeKind);
   const executionVisual = resolveNodeExecutionVisual(data.executionStatus, data.isCurrentRunNode);
   const getBoundState = (side: "input" | "output", portKey: string) => {
-    const stateKey = getBoundStateKeyForPort(config, side, portKey);
+    const stateKey =
+      side === "input"
+        ? nodeKind === "agent" || nodeKind === "condition" || nodeKind === "output"
+          ? portKey
+          : null
+        : nodeKind === "agent" || nodeKind === "input"
+          ? portKey
+          : null;
     return stateKey ? getStateFieldByKey(stateFields, stateKey) ?? null : null;
   };
   const primaryOutputState = outputs[0] ? getBoundState("output", outputs[0].key) : null;
   const primaryOutputStateKey = primaryOutputState?.key ?? outputs[0]?.key ?? null;
+  const inputValueType = nodeKind === "input" ? outputs[0]?.valueType ?? "text" : null;
+  const inputValue =
+    nodeKind === "input"
+      ? typeof primaryOutputState?.value === "string"
+        ? primaryOutputState.value
+        : String(canonicalNode?.kind === "input" ? canonicalNode.config.value ?? "" : "")
+      : "";
+  const agentConfig = canonicalNode?.kind === "agent" ? canonicalNode.config : null;
+  const conditionConfig = canonicalNode?.kind === "condition" ? canonicalNode.config : null;
+  const outputConfig = canonicalNode?.kind === "output" ? canonicalNode.config : null;
+  const conditionBranches = conditionConfig?.branches.map((branchKey) => ({ key: branchKey, label: "" })) ?? [];
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [isHoveringNode, setIsHoveringNode] = useState(false);
@@ -3155,17 +3167,35 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
   const skillPickerButtonRef = useRef<HTMLButtonElement | null>(null);
   const labelAnchorRef = useRef<HTMLDivElement | null>(null);
   const descriptionAnchorRef = useRef<HTMLDivElement | null>(null);
-  const uploadedAsset = config.family === "input" ? tryParseUploadedAssetEnvelope(config.value) : null;
+  const uploadedAsset = nodeKind === "input" ? tryParseUploadedAssetEnvelope(inputValue) : null;
+  const agentRuntimeConfig =
+    nodeKind === "agent" && agentConfig
+      ? ({
+          presetId: `node.agent.${data.nodeId}`,
+          family: "agent",
+          name: displayName,
+          description: displayDescription,
+          inputs,
+          outputs,
+          skills: agentConfig.skills,
+          systemInstruction: agentConfig.systemInstruction,
+          taskInstruction: agentConfig.taskInstruction,
+          modelSource: agentConfig.modelSource,
+          model: agentConfig.model,
+          thinkingMode: agentConfig.thinkingMode,
+          temperature: agentConfig.temperature,
+        } satisfies AgentNode)
+      : null;
   const agentRuntime =
-    config.family === "agent"
-      ? resolveAgentRuntimeConfig(config, {
+    agentRuntimeConfig
+      ? resolveAgentRuntimeConfig(agentRuntimeConfig, {
           globalTextModelRef: data.globalTextModelRef,
           globalThinkingEnabled: data.globalThinkingEnabled,
           defaultAgentTemperature: data.defaultAgentTemperature,
         })
       : null;
   const [isSkillPickerOpen, setIsSkillPickerOpen] = useState(false);
-  const attachedSkillKeys = useMemo(() => new Set(config.family === "agent" ? config.skills : []), [config]);
+  const attachedSkillKeys = useMemo(() => new Set(agentConfig?.skills ?? []), [agentConfig]);
   const availableSkillDefinitions = useMemo(
     () => (data.skillDefinitions ?? []).filter((definition) => !attachedSkillKeys.has(definition.skillKey)),
     [attachedSkillKeys, data.skillDefinitions],
@@ -3265,7 +3295,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
   }
 
   async function handleInputFileSelection(file: File | null) {
-    if (!file || config.family !== "input") return;
+    if (!file || nodeKind !== "input") return;
     const envelope = await fileToEnvelope(file);
     if (!primaryOutputStateKey || !data.onUpdateInputBoundaryType || !data.onUpdateInputBoundaryValue) return;
     data.onUpdateInputBoundaryType(envelope.detectedType);
@@ -3312,7 +3342,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
           }
           }}
         >
-        {isPresetEligibleFamily(config.family) ? (
+        {isPresetEligibleFamily(nodeKind) ? (
           <button
             ref={presetButtonRef}
             type="button"
@@ -3412,7 +3442,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
           <div className="min-w-0 flex-1">
             <div className="relative flex min-w-0 items-center gap-2">
               <span className="rounded-full border border-[rgba(154,52,18,0.16)] bg-[rgba(255,255,255,0.72)] px-2 py-0.5 text-[0.62rem] uppercase tracking-[0.14em] text-[var(--accent-strong)]">
-                {config.family}
+                {nodeKind}
               </span>
               <div ref={labelAnchorRef} className="truncate cursor-text text-left text-sm font-semibold text-[var(--text)]" onDoubleClick={() => setIsEditingLabel(true)}>
                 {displayName}
@@ -3458,7 +3488,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                 </div>
               </FloatingEditorCard>
             </div>
-            {config.family ? (
+            {nodeKind ? (
               <div className="relative mt-1">
                 <div ref={descriptionAnchorRef} className="line-clamp-2 cursor-text text-left text-xs leading-5 text-[var(--muted)]" onDoubleClick={() => setIsEditingDescription(true)}>
                   {displayDescription}
@@ -3503,12 +3533,12 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
         </div>
 
         <div className="flex flex-shrink-0 flex-col gap-3 px-4 pt-3">
-          {config.family === "input" ? (
+          {nodeKind === "input" ? (
             <div className={cn("grid items-center gap-3", uploadedAsset ? "grid-cols-[1fr_auto]" : "grid-cols-[minmax(0,1fr)_auto]")}>
               {!uploadedAsset ? (
                 <div className="flex gap-1.5">
                   {INPUT_TYPE_BUTTONS.map((option) => {
-                    const active = config.valueType === option.value;
+                    const active = inputValueType === option.value;
                     return (
                       <button
                         key={option.value}
@@ -3528,9 +3558,9 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                                 ? (data.knowledgeBases ?? [])[0]?.name ?? ""
                                 : option.value === "file"
                                   ? ""
-                                  : config.valueType === "knowledge_base"
+                                  : inputValueType === "knowledge_base"
                                     ? ""
-                                    : config.value;
+                                    : inputValue;
 
                             if (!primaryOutputStateKey || !data.onUpdateInputBoundaryType || !data.onUpdateInputBoundaryValue) {
                               return;
@@ -3572,7 +3602,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
             </div>
           ) : null}
 
-          {config.family !== "input" && config.family !== "output" && (inputs.length > 0 || outputs.length > 0) ? (
+          {nodeKind !== "input" && nodeKind !== "output" && (inputs.length > 0 || outputs.length > 0) ? (
             <div className="grid grid-cols-2 items-start gap-x-6">
               <div className="grid gap-1">
                 {inputs.map((port, index) => (
@@ -3591,7 +3621,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                           }
                         }}
                         portEditor={
-                          (config.family === "agent" || config.family === "condition") && boundState
+                          (nodeKind === "agent" || nodeKind === "condition") && boundState
                             ? {
                                 onChange: (nextPort) => data.onUpdateReadRequirement?.(boundState.key, Boolean(nextPort.required)),
                                 onRemove:
@@ -3605,7 +3635,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                     );
                   })()
                 ))}
-                {(config.family === "agent" || config.family === "condition") && data.connectingSourceType ? (
+                {(nodeKind === "agent" || nodeKind === "condition") && data.connectingSourceType ? (
                   <div className="group relative flex min-h-6 items-center justify-start text-[0.9rem] text-[var(--muted)]">
                     <Handle
                       id={buildHandleId("input", CREATE_INPUT_PORT_KEY)}
@@ -3638,7 +3668,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                           }
                         }}
                         portEditor={
-                          config.family === "agent" && boundState
+                          nodeKind === "agent" && boundState
                             ? {
                                 onChange: () => undefined,
                                 onRemove:
@@ -3657,7 +3687,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
             </div>
           ) : null}
 
-          {config.family === "output" ? (
+          {nodeKind === "output" ? (
             <div className="flex items-center gap-3">
               <div className="grid gap-1">
                 {inputs.map((port) => (
@@ -3683,10 +3713,10 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                   type="button"
                   aria-label="Toggle auto-save"
                   role="switch"
-                  aria-checked={config.persistEnabled}
+                  aria-checked={outputConfig?.persistEnabled ?? false}
                   className={cn(
                     "relative inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full transition-colors",
-                    config.persistEnabled ? "bg-[var(--accent)]" : "bg-[rgba(154,52,18,0.2)]",
+                    outputConfig?.persistEnabled ? "bg-[var(--accent)]" : "bg-[rgba(154,52,18,0.2)]",
                   )}
                   onClick={() =>
                     updateCanonicalConfig((node) =>
@@ -3702,7 +3732,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                   <span
                     className={cn(
                       "inline-block h-5 w-5 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.2)] transition-transform",
-                      config.persistEnabled ? "translate-x-6" : "translate-x-1",
+                      outputConfig?.persistEnabled ? "translate-x-6" : "translate-x-1",
                     )}
                   />
                 </button>
@@ -3718,18 +3748,17 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
           onWheelCapture={(event) => event.stopPropagation()}
         >
           <NodeStateBindingSummary
-            config={config}
             stateFieldLookup={data.stateFieldLookup}
             onOpenStatePanel={data.onOpenStatePanel}
           />
 
-          {config.family === "input" ? (
+          {nodeKind === "input" ? (
             <>
               <div className="flex flex-1 flex-col gap-2">
-                {config.valueType === "knowledge_base" ? (
+                {inputValueType === "knowledge_base" ? (
                   (data.knowledgeBases ?? []).length > 0 ? (
                     <FieldSelect
-                      value={config.value}
+                      value={inputValue}
                       onValueChange={(nextValue) =>
                         primaryOutputState && data.onUpdateInputBoundaryValue
                           ? data.onUpdateInputBoundaryValue(nextValue)
@@ -3754,9 +3783,9 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                       No knowledge bases found
                     </div>
                   )
-                ) : config.valueType === "text" || config.valueType === "json" ? (
+                ) : inputValueType === "text" || inputValueType === "json" ? (
                   <FieldTextarea
-                    value={config.value}
+                    value={inputValue}
                     rows={6}
                     onChange={(event) =>
                       primaryOutputState && data.onUpdateInputBoundaryValue
@@ -3858,7 +3887,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
             </>
           ) : null}
 
-          {config.family === "agent" ? (
+          {nodeKind === "agent" ? (
             <>
               {agentRuntime ? (
                 <AgentInlineRuntimeControls
@@ -3923,9 +3952,9 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                 />
               </div>
               {/* ── attached skill pills ── */}
-              {config.skills.length > 0 ? (
+              {(agentConfig?.skills.length ?? 0) > 0 ? (
                 <div className="flex flex-wrap items-center gap-1.5">
-                  {config.skills.map((skillKey) => {
+                  {(agentConfig?.skills ?? []).map((skillKey) => {
                     const def = (data.skillDefinitions ?? []).find((d) => d.skillKey === skillKey);
                     return (
                       <span
@@ -3965,7 +3994,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
               ) : null}
               <FieldTextarea
                 className="min-h-20"
-                value={config.taskInstruction}
+                value={agentConfig?.taskInstruction ?? ""}
                 placeholder="描述这个节点应该做什么（可留空）"
                 onChange={(event) =>
                   updateCanonicalConfig((node) =>
@@ -4009,8 +4038,8 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                   ) : null}
                   <AdvancedJsonSection
                     sections={[
-                      { label: "Inputs JSON", value: config.inputs, onChange: (v) => data.onReplaceReadPorts?.(v as PortDefinition[]) },
-                      { label: "Outputs JSON", value: config.outputs, onChange: (v) => data.onReplaceWritePorts?.(v as PortDefinition[]) },
+                      { label: "Inputs JSON", value: inputs, onChange: (v) => data.onReplaceReadPorts?.(v as PortDefinition[]) },
+                      { label: "Outputs JSON", value: outputs, onChange: (v) => data.onReplaceWritePorts?.(v as PortDefinition[]) },
                     ]}
                   />
                 </div>
@@ -4018,10 +4047,10 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
             </>
           ) : null}
 
-          {config.family === "condition" ? (
+          {nodeKind === "condition" ? (
             <>
                   <BranchEditorList
-                    branches={config.branches}
+                    branches={conditionBranches}
                     onChange={(nextBranches) =>
                       updateCanonicalConfig((node) =>
                         node.kind === "condition"
@@ -4036,7 +4065,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                   <label className="grid gap-1.5 text-sm text-[var(--muted)]">
                     <span>Condition Mode</span>
                     <FieldSelect
-                      value={config.conditionMode}
+                      value={conditionConfig?.conditionMode ?? "rule"}
                       onValueChange={(nextValue) =>
                         updateCanonicalConfig((node) =>
                           node.kind === "condition"
@@ -4051,7 +4080,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                     />
                   </label>
                   <RuleEditor
-                    rule={config.rule}
+                    rule={conditionConfig?.rule ?? { source: "", operator: "exists", value: null }}
                     onChange={(nextRule) =>
                       updateCanonicalConfig((node) =>
                         node.kind === "condition"
@@ -4065,7 +4094,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                   />
                   <MappingEditor
                     title="Branch Mapping"
-                    value={config.branchMapping}
+                    value={conditionConfig?.branchMapping ?? {}}
                     addLabel="Add Branch Mapping"
                     onChange={(nextValue) =>
                       updateCanonicalConfig((node) =>
@@ -4082,12 +4111,12 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                     sections={[
                       {
                         label: "Inputs JSON",
-                        value: config.inputs,
+                        value: inputs,
                         onChange: (nextValue) => data.onReplaceReadPorts?.(nextValue as PortDefinition[]),
                       },
                       {
                         label: "Branches JSON",
-                        value: config.branches,
+                        value: conditionBranches,
                         onChange: (nextValue) =>
                           updateCanonicalConfig((node) =>
                             node.kind === "condition"
@@ -4103,7 +4132,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                       },
                       {
                         label: "Rule JSON",
-                        value: config.rule,
+                        value: conditionConfig?.rule ?? { source: "", operator: "exists", value: null },
                         onChange: (nextValue) =>
                           updateCanonicalConfig((node) =>
                             node.kind === "condition"
@@ -4117,7 +4146,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                       },
                       {
                         label: "Branch Mapping JSON",
-                        value: config.branchMapping,
+                        value: conditionConfig?.branchMapping ?? {},
                         onChange: (nextValue) =>
                           updateCanonicalConfig((node) =>
                             node.kind === "condition"
@@ -4134,16 +4163,16 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
             </>
           ) : null}
 
-          {config.family === "output" ? (
+          {nodeKind === "output" ? (
             <>
               {/* Preview */}
               <div className="flex min-h-[160px] flex-1 flex-col rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,255,255,0.82)] p-3">
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <div className="text-[0.68rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">Preview</div>
-                  <div className="text-[0.68rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">{resolveRichContentDisplayMode(data.resolvedDisplayMode ?? config.displayMode, data.previewText)}</div>
+                  <div className="text-[0.68rem] uppercase tracking-[0.12em] text-[var(--accent-strong)]">{resolveRichContentDisplayMode(data.resolvedDisplayMode ?? outputConfig?.displayMode ?? "auto", data.previewText)}</div>
                 </div>
                 <div className="nodrag nowheel min-h-[120px] flex-1 overflow-auto rounded-[12px] bg-[rgba(248,242,234,0.8)] px-3 py-3 text-sm leading-6 text-[var(--text)] select-text">
-                  <OutputPreviewContent text={data.previewText} displayMode={config.displayMode} />
+                  <OutputPreviewContent text={data.previewText} displayMode={outputConfig?.displayMode ?? "auto"} />
                 </div>
               </div>
               {/* Advanced */}
@@ -4155,7 +4184,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                     <span className="flex-shrink-0 text-xs">Display</span>
                     <div className="flex items-center gap-2">
                       {OUTPUT_DISPLAY_MODE_BUTTONS.map((option) => {
-                        const active = config.displayMode === option.value;
+                        const active = outputConfig?.displayMode === option.value;
                         return (
                           <button
                             key={option.value}
@@ -4190,7 +4219,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                     <span className="flex-shrink-0 text-xs">Format</span>
                     <div className="flex items-center gap-2">
                       {OUTPUT_SAVE_FORMAT_BUTTONS.map((option) => {
-                        const active = config.persistFormat === option.value;
+                        const active = outputConfig?.persistFormat === option.value;
                         return (
                           <button
                             key={option.value}
@@ -4224,7 +4253,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                   <div className="flex items-center gap-3">
                     <span className="flex-shrink-0 text-xs">FileName</span>
                     <Input
-                      value={config.fileNameTemplate}
+                      value={outputConfig?.fileNameTemplate ?? ""}
                       onChange={(event) =>
                         updateCanonicalConfig((node) =>
                           node.kind === "output"
@@ -4235,7 +4264,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                             : node.config,
                         )
                       }
-                      placeholder={getNodeDisplayName(config) || "Output"}
+                      placeholder={displayName || "Output"}
                       className="h-8 min-w-0 flex-1 text-xs"
                     />
                   </div>
@@ -4244,7 +4273,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
             </>
           ) : null}
 
-          {data.previewText && config.family !== "output" ? (
+          {data.previewText && nodeKind !== "output" ? (
             <div className="whitespace-pre-wrap rounded-[16px] border border-[rgba(154,52,18,0.18)] bg-[rgba(255,244,240,0.9)] px-3 py-3 text-sm leading-6 text-[var(--text)]">
               {data.previewText}
             </div>
@@ -4413,15 +4442,12 @@ function StateBindingChip({
 }
 
 function NodeStateBindingSummary({
-  config,
   stateFieldLookup,
   onOpenStatePanel,
 }: {
-  config: NodePresetDefinition;
   stateFieldLookup?: Record<string, string>;
   onOpenStatePanel?: () => void;
 }) {
-  void config;
   void stateFieldLookup;
   void onOpenStatePanel;
   return null;
@@ -5005,7 +5031,7 @@ function NodeSystemCanvas({
           deepClonePreset(buildEditorNodeConfigFromCanonicalNode(node.id, canonicalNode, canonicalGraphState.state_schema)),
         );
 
-        if (JSON.stringify(node.data.config) === JSON.stringify(nextConfig)) {
+        if (node.data.canonicalNode === canonicalNode) {
           return node;
         }
 
@@ -5013,6 +5039,7 @@ function NodeSystemCanvas({
           ...node,
           data: {
             ...node.data,
+            canonicalNode,
             config: nextConfig,
           },
         };
@@ -5108,8 +5135,8 @@ function NodeSystemCanvas({
 
   const nodeIds = useMemo(() => projectedNodes.map((node) => node.id), [projectedNodes]);
   const previewTextByNode = useMemo(() => {
-    return Object.fromEntries(projectedNodes.map((node) => [node.id, createPreviewText(node, projectedNodes, edges)]));
-  }, [edges, projectedNodes]);
+    return Object.fromEntries(projectedNodes.map((node) => [node.id, createPreviewText(node, projectedNodes, edges, canonicalGraphState)]));
+  }, [canonicalGraphState, edges, projectedNodes]);
   const derivedCanonicalGraph = useMemo<CanonicalGraph>(() => {
     const projection = buildCanonicalFlowProjectionFromEditorState(projectedNodes, canonicalGraphState, edges);
     return {
@@ -5132,7 +5159,7 @@ function NodeSystemCanvas({
   const canonicalNodeKeys = useMemo(() => Object.keys(canonicalGraph.nodes), [canonicalGraph]);
   const canonicalStateCount = useMemo(() => Object.keys(canonicalGraph.state_schema).length, [canonicalGraph]);
   const nodeLabelLookup = useMemo(
-    () => new Map(Object.keys(canonicalGraph.nodes).map((nodeId) => [nodeId, getCanonicalNodeDisplayName(canonicalGraph, nodeId)])),
+    () => new Map(Object.keys(canonicalGraph.nodes).map((nodeId) => [nodeId, getCanonicalNodeDisplayNameFromGraph(canonicalGraph, nodeId)])),
     [canonicalGraph],
   );
   const stateFieldLookup = useMemo(
@@ -5153,18 +5180,18 @@ function NodeSystemCanvas({
   const suppressOutputPreviewFallback = activeRunStatus === "queued" || activeRunStatus === "running";
   const knowledgeSkillSyncSignature = useMemo(
     () =>
-      projectedNodes
-        .map((node) => {
-          const inputs = listInputPorts(node.data.config)
+      Object.entries(canonicalGraph.nodes)
+        .map(([nodeId, canonicalNode]) => {
+          const inputs = listEditorInputPortsFromCanonicalNode(canonicalNode, canonicalGraph.state_schema)
             .map((port) => `${port.key}:${port.valueType}:${port.required ? "1" : "0"}`)
             .join(",");
-          const outputs = listOutputPorts(node.data.config)
+          const outputs = listEditorOutputPortsFromCanonicalNode(canonicalNode, canonicalGraph.state_schema)
             .map((port) => `${port.key}:${port.valueType}`)
             .join(",");
-          return `${node.id}|${node.data.config.family}|${inputs}|${outputs}`;
+          return `${nodeId}|${canonicalNode.kind}|${inputs}|${outputs}`;
         })
         .join("::"),
-    [projectedNodes],
+    [canonicalGraph],
   );
   const agentRuntimeDefaults = useMemo(
     () => ({
@@ -5258,7 +5285,7 @@ function NodeSystemCanvas({
             };
           }
 
-          if (node.data.config.family === "output") {
+          if (node.data.canonicalNode?.kind === "output") {
             const outputText = outputPreviewMap.get(node.id);
             const resolvedDisplayMode = resolvedDisplayModeMap.get(node.id);
             let nextPreviewText = outputText ?? "";
@@ -5277,7 +5304,7 @@ function NodeSystemCanvas({
             };
           }
 
-          if (node.data.config.family === "agent" || node.data.config.family === "condition") {
+          if (node.data.canonicalNode?.kind === "agent" || node.data.canonicalNode?.kind === "condition") {
             return {
               ...node,
               data: {
@@ -5420,27 +5447,27 @@ function NodeSystemCanvas({
       let nextGraph = current;
 
       for (const node of projectedNodes) {
-        if (node.data.config.family !== "agent") {
+        if (node.data.canonicalNode?.kind !== "agent") {
           continue;
         }
 
         const nextConfig = syncKnowledgeBaseSkillOnAgent(
-          node as FlowNode & { data: FlowNodeData & { config: AgentNode } },
+          node,
           nodesById,
           edges,
+          canonicalGraph,
         );
-        if (nextConfig === node.data.config) {
+        if (!nextConfig || nextConfig === node.data.canonicalNode) {
           continue;
         }
 
-        nextGraph = updateCanonicalNodeConfig(nextGraph, node.id, (canonicalNode) =>
-          canonicalNode.kind === "agent"
-            ? {
-                ...canonicalNode.config,
-                skills: [...nextConfig.skills],
-              }
-            : canonicalNode.config,
-        );
+        nextGraph = {
+          ...nextGraph,
+          nodes: {
+            ...nextGraph.nodes,
+            [node.id]: nextConfig,
+          },
+        };
       }
 
       return nextGraph;
@@ -5535,13 +5562,22 @@ function NodeSystemCanvas({
   function createNodeFromConfig(config: NodePresetDefinition, position: { x: number; y: number }) {
     const normalizedConfig = normalizeNodeConfig(config);
     const id = `${config.family}_${crypto.randomUUID().slice(0, 8)}`;
-    const defaultWidth = getDefaultNodeWidth(normalizedConfig);
+    const defaultWidth = getDefaultNodeWidth();
+    const canonicalNode = buildCanonicalNodeFromEditorConfig({
+      nodeId: id,
+      position,
+      isExpanded: true,
+      collapsedSize: null,
+      expandedSize: { width: defaultWidth },
+      config: normalizedConfig,
+    });
     return {
       id,
       type: "default",
       position,
       data: {
         nodeId: id,
+        canonicalNode,
         config: normalizedConfig,
         previewText: "",
         isExpanded: true,
@@ -5550,7 +5586,7 @@ function NodeSystemCanvas({
       },
       sourcePosition: Position.Right,
       targetPosition: Position.Left,
-      style: buildNodeStyleFromState(normalizedConfig, true, { width: defaultWidth }, defaultWidth),
+      style: buildNodeStyleFromState(true, { width: defaultWidth }, defaultWidth),
     } satisfies FlowNode;
   }
 
@@ -5566,6 +5602,20 @@ function NodeSystemCanvas({
       upsertCanonicalStateField(field);
       existingKeys.add(field.key);
     }
+  }
+
+  function resolveConnectionStateField(sourceHandle: string | undefined, sourceValueType: ValueType): StateField {
+    const sourcePortKey = getPortKeyFromHandle(sourceHandle) || `${sourceValueType}_input`;
+    const existingState = getStateFieldByKey(stateSchema, sourcePortKey);
+    if (existingState) {
+      return existingState;
+    }
+    return {
+      ...createDraftStateFromQuery(sourcePortKey, stateSchema.map((field) => field.key)),
+      name: sourcePortKey,
+      type: valueTypeToStateFieldType(sourceValueType),
+      value: defaultStateValueForType(valueTypeToStateFieldType(sourceValueType)),
+    };
   }
 
   async function addInputNodeFromFile(file: File, position: { x: number; y: number }) {
@@ -5586,7 +5636,9 @@ function NodeSystemCanvas({
     } satisfies InputBoundaryNode;
 
     const nextNode = createNodeFromConfig(inputConfig, position);
-    setCanonicalGraphState((current) => addEditorNodeToCanonicalGraph(current, nextNode, nextNode.data.config));
+    if (nextNode.data.canonicalNode) {
+      setCanonicalGraphState((current) => addCanonicalNodeToGraph(current, nextNode.id, nextNode.data.canonicalNode as CanonicalNode));
+    }
     setNodes((current) => current.concat(nextNode));
     setSelectedNodeId(nextNode.id);
     setStatusMessage(`Added ${getNodeDisplayName(inputConfig)} from ${file.name}`);
@@ -5602,12 +5654,34 @@ function NodeSystemCanvas({
         ? createGenericInputNodeConfig()
         : createGenericOutputNodeConfig(connectionSource?.sourceValueType ?? null);
     const nextNode = createNodeFromConfig(config, position);
-    setCanonicalGraphState((current) => addEditorNodeToCanonicalGraph(current, nextNode, nextNode.data.config));
+    const nextCanonicalNode = nextNode.data.canonicalNode ?? null;
+    const connectionStateField =
+      nodeKind === "output" && connectionSource?.sourceValueType
+        ? resolveConnectionStateField(connectionSource.sourceHandle, connectionSource.sourceValueType)
+        : null;
+    if (nextCanonicalNode) {
+      setCanonicalGraphState((current) => {
+        let nextGraph = addCanonicalNodeToGraph(current, nextNode.id, nextCanonicalNode);
+        if (nodeKind === "output" && connectionStateField) {
+          if (!nextGraph.state_schema[connectionStateField.key]) {
+            nextGraph = upsertStateInCanonicalGraph(nextGraph, connectionStateField.key, {
+              name: connectionStateField.name.trim() || connectionStateField.key,
+              description: connectionStateField.description,
+              type: stateFieldTypeToCanonicalStateType(connectionStateField.type),
+              value: connectionStateField.value,
+              color: connectionStateField.ui?.color ?? "",
+            });
+          }
+          nextGraph = bindStateToCanonicalNode(nextGraph, nextNode.id, "input", connectionStateField.key);
+        }
+        return nextGraph;
+      });
+    }
     setNodes((current) => current.concat(nextNode));
     setSelectedNodeId(nextNode.id);
 
     if (nodeKind === "output" && connectionSource?.sourceNodeId && connectionSource.sourceHandle && connectionSource.sourceValueType) {
-      const targetHandle = findFirstCompatibleInputHandle(nextNode.data.config, connectionSource.sourceValueType);
+      const targetHandle = connectionStateField ? buildHandleId("input", connectionStateField.key) : null;
       if (targetHandle) {
         setEdges((current) =>
           current.concat({
@@ -5641,39 +5715,53 @@ function NodeSystemCanvas({
     }
 
     const nextNode = createNodeFromPreset(preset, position);
-    if (nextNode.data.config.family === "agent" && connectionSource?.sourceValueType) {
-      const agentConfig = nextNode.data.config as AgentNode;
-      if (agentConfig.inputs.length === 0) {
-        agentConfig.inputs = [
-          {
-            key: "input",
-            label: "Input",
-            valueType: connectionSource.sourceValueType,
-            required: true,
-          },
-        ];
-      }
-    }
-    if (nextNode.data.config.family === "condition" && connectionSource?.sourceValueType) {
-      const conditionConfig = nextNode.data.config as ConditionNode;
-      if (conditionConfig.inputs.length === 0) {
-        conditionConfig.inputs = [
-          {
-            key: "input",
-            label: "Input",
-            valueType: connectionSource.sourceValueType,
-            required: true,
-          },
-        ];
-      }
-    }
     setNodes((current) => current.concat(nextNode));
-    setCanonicalGraphState((current) => addEditorNodeToCanonicalGraph(current, nextNode, nextNode.data.config));
+    const nextCanonicalNode = nextNode.data.canonicalNode ?? null;
+    const initialTargetHandle =
+      nextCanonicalNode && connectionSource?.sourceValueType
+        ? findFirstCompatibleInputHandleFromCanonicalNode(
+            nextCanonicalNode,
+            canonicalGraph.state_schema,
+            connectionSource.sourceValueType,
+            CREATE_INPUT_PORT_KEY,
+          )
+        : null;
+    const needsAutoCreateInput = Boolean(
+      initialTargetHandle === buildHandleId("input", CREATE_INPUT_PORT_KEY) &&
+      nextCanonicalNode &&
+      (nextCanonicalNode.kind === "agent" || nextCanonicalNode.kind === "condition") &&
+      connectionSource?.sourceValueType,
+    );
+    const connectionStateField = needsAutoCreateInput && connectionSource?.sourceValueType
+      ? resolveConnectionStateField(connectionSource?.sourceHandle, connectionSource.sourceValueType)
+      : null;
+    if (nextCanonicalNode) {
+      setCanonicalGraphState((current) => {
+        let nextGraph = addCanonicalNodeToGraph(current, nextNode.id, nextCanonicalNode);
+        if (connectionStateField) {
+          if (!nextGraph.state_schema[connectionStateField.key]) {
+            nextGraph = upsertStateInCanonicalGraph(nextGraph, connectionStateField.key, {
+              name: connectionStateField.name.trim() || connectionStateField.key,
+              description: connectionStateField.description,
+              type: stateFieldTypeToCanonicalStateType(connectionStateField.type),
+              value: connectionStateField.value,
+              color: connectionStateField.ui?.color ?? "",
+            });
+          }
+          nextGraph = bindStateToCanonicalNode(nextGraph, nextNode.id, "input", connectionStateField.key);
+        }
+        return nextGraph;
+      });
+    }
     setSelectedNodeId(nextNode.id);
     setStatusMessage(`Added ${getNodeDisplayName(preset, preset.presetId)}`);
 
     if (connectionSource?.sourceNodeId && connectionSource.sourceHandle && connectionSource.sourceValueType) {
-      const targetHandle = findFirstCompatibleInputHandle(nextNode.data.config, connectionSource.sourceValueType);
+      const targetHandle = connectionStateField
+        ? buildHandleId("input", connectionStateField.key)
+        : initialTargetHandle && initialTargetHandle !== buildHandleId("input", CREATE_INPUT_PORT_KEY)
+          ? initialTargetHandle
+          : null;
       if (targetHandle) {
         setEdges((current) =>
           current.concat({
@@ -5712,18 +5800,18 @@ function NodeSystemCanvas({
   async function saveNodeAsPreset(nodeId: string) {
     const targetNode = projectedNodes.find((node) => node.id === nodeId);
     if (!targetNode) return;
-    if (!isPresetEligibleFamily(targetNode.data.config.family)) {
-      setStatusMessage("Only agent and condition nodes can be saved as presets.");
-      return;
-    }
-    const displayName = getNodeDisplayName(targetNode.data.config, targetNode.id);
-    const slug = displayName.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "custom";
-    const presetId = `preset.local.${slug}.${crypto.randomUUID().slice(0, 6)}`;
     const canonicalNode = canonicalGraphForSubmission.nodes[nodeId];
     if (!canonicalNode) {
       setStatusMessage("Failed to resolve canonical node for preset save.");
       return;
     }
+    if (!isPresetEligibleFamily(canonicalNode.kind)) {
+      setStatusMessage("Only agent and condition nodes can be saved as presets.");
+      return;
+    }
+    const displayName = getCanonicalNodeNameFromNode(targetNode.id, canonicalNode);
+    const slug = displayName.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "custom";
+    const presetId = `preset.local.${slug}.${crypto.randomUUID().slice(0, 6)}`;
     const referencedStateKeys = Array.from(new Set([...canonicalNode.reads.map((binding) => binding.state), ...canonicalNode.writes.map((binding) => binding.state)]));
     const presetStateSchema = Object.fromEntries(
       referencedStateKeys
@@ -5736,7 +5824,7 @@ function NodeSystemCanvas({
     );
     const canonicalPreset: CanonicalPresetDocument = {
       presetId,
-      sourcePresetId: targetNode.data.config.presetId,
+      sourcePresetId: null,
       definition: {
         label: displayName,
         description: canonicalNode.description ?? "",
@@ -5754,7 +5842,7 @@ function NodeSystemCanvas({
     try {
       await apiPost<{ presetId: string; updatedAt?: string | null }>("/api/presets", {
         presetId,
-        sourcePresetId: targetNode.data.config.presetId,
+        sourcePresetId: null,
         definition: {
           label: displayName,
           description: canonicalNode.description ?? "",
@@ -5832,8 +5920,8 @@ function NodeSystemCanvas({
           ...node,
           data: {
             ...node.data,
-            previewText: node.data.config.family === "input" ? node.data.previewText : "",
-            resolvedDisplayMode: node.data.config.family === "output" ? undefined : node.data.resolvedDisplayMode,
+            previewText: node.data.canonicalNode?.kind === "input" ? node.data.previewText : "",
+            resolvedDisplayMode: node.data.canonicalNode?.kind === "output" ? undefined : node.data.resolvedDisplayMode,
           },
         })),
       );
@@ -5874,12 +5962,13 @@ function NodeSystemCanvas({
         targetNode.data.expandedSize?.width
         ?? targetNode.data.collapsedSize?.width
         ?? (typeof targetNode.style?.width === "number" ? targetNode.style.width : undefined)
-        ?? getDefaultNodeWidth(targetNode.data.config);
+        ?? getDefaultNodeWidth();
+      const targetKind = coerceNodeKind(targetNode.data.canonicalNode?.kind);
       const height =
         targetNode.data.expandedSize?.height
         ?? targetNode.data.collapsedSize?.height
         ?? (typeof targetNode.style?.height === "number" ? targetNode.style.height : undefined)
-        ?? getNodeMinHeight(targetNode.data.config);
+        ?? getNodeMinHeightForKind(targetKind);
 
       setSelectedNodeId(nodeId);
       setNodes((current) =>
@@ -5966,7 +6055,7 @@ function NodeSystemCanvas({
         return false;
       }
 
-      const displayName = getCanonicalNodeDisplayName(canonicalGraph, nodeId);
+      const displayName = getCanonicalNodeDisplayNameFromGraph(canonicalGraph, nodeId);
 
       if (side === "input") {
         if (canonicalNode.kind === "agent" || canonicalNode.kind === "condition") {
@@ -6137,12 +6226,13 @@ function NodeSystemCanvas({
                   ...node,
                   data: {
                     ...node.data,
-                    displayName: canonicalGraph.nodes[node.id]?.name?.trim() || getNodeDisplayName(node.data.config, node.id),
-                    displayDescription: canonicalGraph.nodes[node.id]?.description ?? node.data.config.description,
+                    canonicalNode: canonicalGraph.nodes[node.id],
+                    displayName: getCanonicalNodeDisplayNameFromGraph(canonicalGraph, node.id),
+                    displayDescription: canonicalGraph.nodes[node.id]?.description ?? "",
                     displayInputs: displayPorts.inputs,
                     displayOutputs: displayPorts.outputs,
                     previewText:
-                      node.data.config.family === "output" && suppressOutputPreviewFallback
+                      canonicalGraph.nodes[node.id]?.kind === "output" && suppressOutputPreviewFallback
                         ? node.data.previewText
                         : node.data.previewText || previewTextByNode[node.id] || "",
                     executionStatus: runNodeStatusMap[node.id],
@@ -6184,17 +6274,18 @@ function NodeSystemCanvas({
                         candidate.id === node.id
                           ? (() => {
                               const currentExpanded = Boolean(candidate.data.isExpanded);
-                              const nextExpanded = candidate.data.config.family === "input" ? true : !currentExpanded;
+                              const candidateKind = coerceNodeKind(candidate.data.canonicalNode?.kind);
+                              const nextExpanded = candidateKind === "input" ? true : !currentExpanded;
                               const currentWidth =
                                 typeof candidate.style?.width === "number"
                                   ? candidate.style.width
                                   : candidate.data.expandedSize?.width
                                     ?? candidate.data.collapsedSize?.width
-                                    ?? getDefaultNodeWidth(candidate.data.config);
+                                    ?? getDefaultNodeWidth();
                               const currentHeight =
                                 typeof candidate.style?.height === "number" ? candidate.style.height : undefined;
                               const preservedCollapsedSize =
-                                currentExpanded || candidate.data.config.family === "input"
+                                currentExpanded || candidateKind === "input"
                                   ? candidate.data.collapsedSize ?? null
                                   : candidate.data.collapsedSize ?? {
                                       width: currentWidth,
@@ -6210,19 +6301,13 @@ function NodeSystemCanvas({
                               const targetSize = nextExpanded
                                 ? preservedExpandedSize ?? {
                                     width: currentWidth,
-                                    height: getInitialExpandedHeight(candidate.data.config),
+                                    height: getInitialExpandedHeightForKind(candidateKind),
                                   }
                                 : preservedCollapsedSize;
 
                               return {
                                 ...candidate,
-                                style: buildNodeStyleFromState(
-                                  candidate.data.config,
-                                  nextExpanded,
-                                  targetSize,
-                                  currentWidth,
-                                  typeof currentHeight === "number" && !nextExpanded ? currentHeight : undefined,
-                                ),
+                                style: buildNodeStyleFromState(nextExpanded, targetSize, currentWidth, typeof currentHeight === "number" && !nextExpanded ? currentHeight : undefined),
                                 data: {
                                   ...candidate.data,
                                   isExpanded: nextExpanded,
@@ -6241,7 +6326,7 @@ function NodeSystemCanvas({
                         n.id === node.id
                           ? {
                               ...n,
-                              style: buildNodeStyleFromState(n.data.config, isExpanded, { width, height }, width, height),
+                              style: buildNodeStyleFromState(isExpanded, { width, height }, width, height),
                               data: {
                                 ...n.data,
                                 collapsedSize: isExpanded ? n.data.collapsedSize ?? null : { width, height },
@@ -6325,7 +6410,7 @@ function NodeSystemCanvas({
               onConnectStart={(_, params) => {
                 if (params.handleType !== "source" || !params.nodeId || !params.handleId) return;
                 const sourceNode = projectedNodes.find((node) => node.id === params.nodeId);
-                const sourceValueType = sourceNode ? getPortType(sourceNode.data.config, params.handleId) : null;
+                const sourceValueType = sourceNode ? getPortTypeFromCanonicalGraph(canonicalGraph, sourceNode.id, params.handleId) : null;
                 setConnectingSourceType(sourceValueType);
                 pendingConnectRef.current = {
                   sourceNodeId: params.nodeId,
@@ -6339,12 +6424,12 @@ function NodeSystemCanvas({
                 const targetNode = projectedNodes.find((node) => node.id === connection.target);
                 if (!sourceNode || !targetNode) return;
 
-                const sourceType = getPortType(sourceNode.data.config, connection.sourceHandle);
+                const sourceType = getPortTypeFromCanonicalGraph(canonicalGraph, sourceNode.id, connection.sourceHandle);
                 let nextTargetHandle = connection.targetHandle ?? null;
-                let targetType = getPortType(targetNode.data.config, nextTargetHandle);
+                let targetType = getPortTypeFromCanonicalGraph(canonicalGraph, targetNode.id, nextTargetHandle);
 
                 if (getPortKeyFromHandle(connection.targetHandle) === CREATE_INPUT_PORT_KEY && sourceType) {
-                  if (targetNode.data.config.family === "agent") {
+                  if (targetNode.data.canonicalNode?.kind === "agent") {
                     const sourcePortKey = getPortKeyFromHandle(connection.sourceHandle) || `${sourceType}_input`;
                     const existingState = getStateFieldByKey(stateSchema, sourcePortKey);
                     const nextField =
@@ -6365,7 +6450,7 @@ function NodeSystemCanvas({
                     nextTargetHandle = buildHandleId("input", nextField.key);
                     targetType = stateFieldTypeToValueType(nextField.type);
                     requestAnimationFrame(() => updateNodeInternals(targetNode.id));
-                  } else if (targetNode.data.config.family === "condition") {
+                  } else if (targetNode.data.canonicalNode?.kind === "condition") {
                     const sourcePortKey = getPortKeyFromHandle(connection.sourceHandle) || `${sourceType}_input`;
                     const existingState = getStateFieldByKey(stateSchema, sourcePortKey);
                     const nextField =
@@ -6421,7 +6506,9 @@ function NodeSystemCanvas({
                       },
                     }),
                 );
-                setStatusMessage(`Connected ${getNodeDisplayName(sourceNode.data.config, sourceNode.id)} -> ${getNodeDisplayName(targetNode.data.config, targetNode.id)}`);
+                setStatusMessage(
+                  `Connected ${getNodeDisplayNameFromCanonicalGraph(canonicalGraph, sourceNode.id)} -> ${getNodeDisplayNameFromCanonicalGraph(canonicalGraph, targetNode.id)}`,
+                );
               }}
               onConnectEnd={(event) => {
                 const pending = pendingConnectRef.current;

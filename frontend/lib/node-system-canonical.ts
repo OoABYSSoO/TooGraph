@@ -195,6 +195,10 @@ function valueTypeFromCanonicalState(stateType: CanonicalStateType): ValueType {
   }
 }
 
+function isValueTypeCompatible(source: ValueType, target: ValueType) {
+  return source === "any" || target === "any" || source === target;
+}
+
 function collectStateReadsByPort(config: NodePresetDefinition): Record<string, { stateKey: string; required?: boolean }> {
   if (config.family === "agent" || config.family === "condition") {
     return Object.fromEntries(
@@ -364,6 +368,174 @@ function buildEditorPort(
     valueType: valueTypeFromCanonicalState(definition?.type ?? "text"),
     required,
   };
+}
+
+export function getCanonicalNodeDisplayName(nodeId: string, node: CanonicalNode): string {
+  return stripString(node.name) || nodeId;
+}
+
+export function listEditorInputPortsFromCanonicalNode(
+  node: CanonicalNode,
+  stateSchema: Record<string, CanonicalStateDefinition>,
+): PortDefinition[] {
+  if (node.kind === "agent" || node.kind === "condition") {
+    return node.reads.map((binding) => buildEditorPort(binding.state, stateSchema, binding.required));
+  }
+  if (node.kind === "output") {
+    const inputState = node.reads[0]?.state ?? "value";
+    return [buildEditorPort(inputState, stateSchema, node.reads[0]?.required ?? true)];
+  }
+  return [];
+}
+
+export function listEditorOutputPortsFromCanonicalNode(
+  node: CanonicalNode,
+  stateSchema: Record<string, CanonicalStateDefinition>,
+): PortDefinition[] {
+  if (node.kind === "agent") {
+    return node.writes.map((binding) => buildEditorPort(binding.state, stateSchema, false));
+  }
+  if (node.kind === "input") {
+    const outputState = node.writes[0]?.state ?? "value";
+    return [buildEditorPort(outputState, stateSchema, false)];
+  }
+  if (node.kind === "condition") {
+    return buildEditorConditionBranches(node.config.branches).map((branch) => ({
+      key: branch.key,
+      label: branch.label,
+      valueType: "any",
+    }));
+  }
+  return [];
+}
+
+export function getEditorPortValueTypeFromCanonicalHandle(
+  node: CanonicalNode,
+  stateSchema: Record<string, CanonicalStateDefinition>,
+  handleId?: string | null,
+  createInputPortKey = "__create__",
+): ValueType | null {
+  if (!handleId) return null;
+  const [side, key] = handleId.split(":");
+  if (!key) return null;
+
+  if (node.kind === "agent") {
+    if (side === "input" && key === createInputPortKey) return "any";
+    if (side === "input") return listEditorInputPortsFromCanonicalNode(node, stateSchema).find((port) => port.key === key)?.valueType ?? null;
+    if (side === "output") return listEditorOutputPortsFromCanonicalNode(node, stateSchema).find((port) => port.key === key)?.valueType ?? null;
+  }
+
+  if (node.kind === "condition") {
+    if (side === "input" && key === createInputPortKey) return "any";
+    if (side === "input") return listEditorInputPortsFromCanonicalNode(node, stateSchema).find((port) => port.key === key)?.valueType ?? null;
+    if (side === "output") return "any";
+  }
+
+  if (node.kind === "input" && side === "output") {
+    return listEditorOutputPortsFromCanonicalNode(node, stateSchema).find((port) => port.key === key)?.valueType ?? null;
+  }
+
+  if (node.kind === "output" && side === "input") {
+    return listEditorInputPortsFromCanonicalNode(node, stateSchema).find((port) => port.key === key)?.valueType ?? null;
+  }
+
+  return null;
+}
+
+export function findFirstCompatibleInputHandleFromCanonicalNode(
+  node: CanonicalNode,
+  stateSchema: Record<string, CanonicalStateDefinition>,
+  sourceType: ValueType,
+  createInputPortKey = "__create__",
+): string | null {
+  const inputPort = listEditorInputPortsFromCanonicalNode(node, stateSchema).find((port) =>
+    isValueTypeCompatible(sourceType, port.valueType),
+  );
+  if (inputPort) {
+    return `input:${inputPort.key}`;
+  }
+  if (node.kind === "agent" || node.kind === "condition") {
+    return `input:${createInputPortKey}`;
+  }
+  return null;
+}
+
+function isKnowledgeBaseSkill(skillKey: string) {
+  return skillKey === "search_knowledge_base";
+}
+
+function areSkillKeyListsEqual(left: string[], right: string[]) {
+  if (left.length !== right.length) return false;
+  return left.every((skillKey, index) => skillKey === right[index]);
+}
+
+function pickCanonicalAgentKnowledgeQueryInputKey(
+  node: CanonicalAgentNode,
+  stateSchema: Record<string, CanonicalStateDefinition>,
+  knowledgeBaseInputKey: string,
+) {
+  const candidateInputs = listEditorInputPortsFromCanonicalNode(node, stateSchema).filter(
+    (port) => port.key !== knowledgeBaseInputKey && port.valueType !== "knowledge_base",
+  );
+  const preferredKeys = ["question", "query", "input"];
+  for (const key of preferredKeys) {
+    const matched = candidateInputs.find((port) => port.key === key);
+    if (matched) {
+      return matched.key;
+    }
+  }
+
+  const preferredTextInput =
+    candidateInputs.find((port) => port.required && (port.valueType === "text" || port.valueType === "any")) ??
+    candidateInputs.find((port) => port.valueType === "text" || port.valueType === "any");
+  return preferredTextInput?.key ?? null;
+}
+
+export function syncKnowledgeBaseSkillOnCanonicalAgentNode(
+  node: CanonicalAgentNode,
+  stateSchema: Record<string, CanonicalStateDefinition>,
+  knowledgeBaseInputKeys: string[],
+): CanonicalAgentNode {
+  const skillsWithoutKnowledgeBase = node.config.skills.filter((skillKey) => !isKnowledgeBaseSkill(skillKey));
+
+  if (knowledgeBaseInputKeys.length !== 1) {
+    return areSkillKeyListsEqual(skillsWithoutKnowledgeBase, node.config.skills)
+      ? node
+      : {
+          ...node,
+          config: {
+            ...node.config,
+            skills: skillsWithoutKnowledgeBase,
+          },
+        };
+  }
+
+  const knowledgeBaseInputKey = knowledgeBaseInputKeys[0];
+  const queryInputKey = pickCanonicalAgentKnowledgeQueryInputKey(node, stateSchema, knowledgeBaseInputKey);
+  if (!queryInputKey) {
+    return areSkillKeyListsEqual(skillsWithoutKnowledgeBase, node.config.skills)
+      ? node
+      : {
+          ...node,
+          config: {
+            ...node.config,
+            skills: skillsWithoutKnowledgeBase,
+          },
+        };
+  }
+
+  void knowledgeBaseInputKey;
+  void queryInputKey;
+  const nextSkills = [...skillsWithoutKnowledgeBase, "search_knowledge_base"];
+  return areSkillKeyListsEqual(nextSkills, node.config.skills)
+    ? node
+    : {
+        ...node,
+        config: {
+          ...node.config,
+          skills: nextSkills,
+        },
+      };
 }
 
 function buildEditorConditionBranches(branches: string[]): BranchDefinition[] {

@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import type { CanonicalGraphPayload } from "./node-system-canonical.ts";
 import type { AgentNode, ConditionNode, InputBoundaryNode, OutputBoundaryNode, PortDefinition } from "./node-system-schema.ts";
 import {
+  addCanonicalNodeToGraph,
   addEditorNodeToCanonicalGraph,
   bindStateToCanonicalNode,
   buildCanonicalFlowProjectionFromEditorState,
@@ -159,6 +160,65 @@ test("addEditorNodeToCanonicalGraph inserts a new canonical node from editor con
     collapsed: false,
     expandedSize: { width: 360, height: 240 },
     collapsedSize: null,
+  });
+});
+
+test("addCanonicalNodeToGraph inserts a canonical node directly without rebuilding from editor config", () => {
+  const graph: CanonicalGraphPayload = {
+    graph_id: "graph_test",
+    name: "Insert Canonical Node Test",
+    state_schema: {},
+    nodes: {},
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const next = addCanonicalNodeToGraph(graph, "agent_a", {
+    kind: "agent",
+    name: "Agent A",
+    description: "",
+    ui: {
+      position: { x: 128, y: 96 },
+      collapsed: false,
+      expandedSize: { width: 360, height: 320 },
+      collapsedSize: null,
+    },
+    reads: [],
+    writes: [],
+    config: {
+      skills: [],
+      systemInstruction: "",
+      taskInstruction: "",
+      modelSource: "global",
+      model: "",
+      thinkingMode: "on",
+      temperature: 0.2,
+    },
+  });
+
+  assert.notEqual(next, graph);
+  assert.deepEqual(next.nodes.agent_a, {
+    kind: "agent",
+    name: "Agent A",
+    description: "",
+    ui: {
+      position: { x: 128, y: 96 },
+      collapsed: false,
+      expandedSize: { width: 360, height: 320 },
+      collapsedSize: null,
+    },
+    reads: [],
+    writes: [],
+    config: {
+      skills: [],
+      systemInstruction: "",
+      taskInstruction: "",
+      modelSource: "global",
+      model: "",
+      thinkingMode: "on",
+      temperature: 0.2,
+    },
   });
 });
 
