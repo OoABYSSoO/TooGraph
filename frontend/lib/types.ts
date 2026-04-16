@@ -20,7 +20,7 @@ export type GraphSummary = {
  */
 export type RunSummary = {
   run_id: string;
-  graph_id?: string;
+  graph_id?: string | null;
   graph_name: string;
   status: RunStatus;
   current_node_id?: string | null;

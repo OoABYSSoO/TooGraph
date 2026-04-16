@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, Literal
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 def _validate_identifier(value: str, *, label: str) -> str:
@@ -13,6 +13,12 @@ def _validate_identifier(value: str, *, label: str) -> str:
     if ":" in normalized:
         raise ValueError(f"{label} cannot contain ':'.")
     return normalized
+
+
+def _reject_legacy_default_value_alias(data: Any) -> Any:
+    if isinstance(data, dict) and "defaultValue" in data:
+        raise ValueError("'defaultValue' is no longer supported. Use 'value' instead.")
+    return data
 
 
 class Position(BaseModel):
@@ -107,10 +113,15 @@ class NodeSystemStateDefinition(BaseModel):
     name: str = ""
     description: str = ""
     type: NodeSystemStateType = NodeSystemStateType.TEXT
-    value: Any = Field(default=None, validation_alias=AliasChoices("value", "defaultValue"), serialization_alias="value")
+    value: Any = Field(default=None)
     color: str = ""
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_legacy_default_value_alias(cls, data: Any) -> Any:
+        return _reject_legacy_default_value_alias(data)
 
 
 class NodeSystemReadBinding(BaseModel):
@@ -147,9 +158,14 @@ class NodeSystemNodeUi(BaseModel):
 
 
 class NodeSystemInputConfig(BaseModel):
-    value: Any = Field(default="", validation_alias=AliasChoices("value", "defaultValue"), serialization_alias="value")
+    value: Any = Field(default="")
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_legacy_default_value_alias(cls, data: Any) -> Any:
+        return _reject_legacy_default_value_alias(data)
 
 
 class NodeSystemAgentConfig(BaseModel):

@@ -181,7 +181,7 @@ function stripString(value: unknown): string {
   return String(value ?? "").trim();
 }
 
-function legacyStateTypeFromCanonical(stateType: CanonicalStateType): StateFieldType {
+function stateFieldTypeFromCanonicalState(stateType: CanonicalStateType): StateFieldType {
   return stateType === "text" ? "string" : stateType;
 }
 
@@ -204,7 +204,7 @@ function valueTypeFromCanonicalState(stateType: CanonicalStateType): ValueType {
   }
 }
 
-function extractLegacyStateReads(config: NodePresetDefinition): Record<string, { stateKey: string; required?: boolean }> {
+function collectStateReadsByPort(config: NodePresetDefinition): Record<string, { stateKey: string; required?: boolean }> {
   const result: Record<string, { stateKey: string; required?: boolean }> = {};
   for (const binding of config.stateReads ?? []) {
     result[binding.inputKey] = {
@@ -232,7 +232,7 @@ function extractLegacyStateReads(config: NodePresetDefinition): Record<string, {
   return result;
 }
 
-function extractLegacyStateWrites(config: NodePresetDefinition): Record<string, { stateKey: string }> {
+function collectStateWritesByPort(config: NodePresetDefinition): Record<string, { stateKey: string }> {
   const result: Record<string, { stateKey: string }> = {};
   for (const binding of config.stateWrites ?? []) {
     result[binding.outputKey] = {
@@ -263,22 +263,18 @@ export function buildCanonicalNodeFromEditorConfig(params: {
 }): CanonicalNode {
   const { nodeId, position, isExpanded, collapsedSize, expandedSize } = params;
   const config = params.config;
-  const readsByPort = extractLegacyStateReads(config);
-  const writesByPort = extractLegacyStateWrites(config);
+  const readsByPort = collectStateReadsByPort(config);
+  const writesByPort = collectStateWritesByPort(config);
   const ui: CanonicalNodeUi = {
     position,
     collapsed: config.family === "input" ? false : !isExpanded,
     expandedSize: expandedSize ?? null,
     collapsedSize: collapsedSize ?? null,
   };
-  const name =
-    stripString((config as { name?: string }).name) ||
-    stripString((config as { label?: string }).label) ||
-    nodeId;
+  const name = stripString((config as { name?: string }).name) || nodeId;
   const description = stripString((config as { description?: string }).description);
 
   if (config.family === "input") {
-    const legacyConfig = config as InputBoundaryNode & { defaultValue?: unknown };
     return {
       kind: "input",
       name,
@@ -287,7 +283,7 @@ export function buildCanonicalNodeFromEditorConfig(params: {
       reads: [],
       writes: Object.values(writesByPort).map((binding) => ({ state: binding.stateKey, mode: "replace" })),
       config: {
-        value: legacyConfig.value ?? legacyConfig.defaultValue,
+        value: config.value,
       },
     };
   }
@@ -351,7 +347,7 @@ export function buildEditorStateFieldsFromCanonicalGraph(graph: CanonicalGraphPa
     key,
     name: stripString(definition.name) || key,
     description: definition.description,
-    type: legacyStateTypeFromCanonical(definition.type),
+    type: stateFieldTypeFromCanonicalState(definition.type),
     value: definition.value,
     ui: {
       color: definition.color,

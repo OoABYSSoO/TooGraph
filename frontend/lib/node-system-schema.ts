@@ -263,7 +263,7 @@ export type RunLifecycleRecord = {
 
 export type NodeSystemRunDetail = {
   run_id: string;
-  graph_id: string;
+  graph_id: string | null;
   graph_name: string;
   status: RunStatus;
   runtime_backend?: string;

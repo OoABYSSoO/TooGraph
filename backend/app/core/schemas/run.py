@@ -126,7 +126,7 @@ class RunArtifacts(BaseModel):
 class RunSummary(BaseModel):
     """Summary returned by GET /api/runs."""
     run_id: str
-    graph_id: str
+    graph_id: str | None = None
     graph_name: str
     status: str
     runtime_backend: str = ""

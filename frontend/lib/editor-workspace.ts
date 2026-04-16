@@ -241,3 +241,24 @@ export function closeWorkspaceTab(workspace: PersistedEditorWorkspace, tabId: st
     tabs,
   };
 }
+
+export function closeWorkspaceTabTransition(
+  workspace: PersistedEditorWorkspace,
+  tabId: string,
+): {
+  workspace: PersistedEditorWorkspace;
+  nextGraphId: string | null;
+  closedActiveTab: boolean;
+} {
+  const closedActiveTab = workspace.activeTabId === tabId;
+  const nextWorkspace = closeWorkspaceTab(workspace, tabId);
+  const nextGraphId = closedActiveTab
+    ? nextWorkspace.tabs.find((tab) => tab.tabId === nextWorkspace.activeTabId)?.graphId ?? null
+    : null;
+
+  return {
+    workspace: nextWorkspace,
+    nextGraphId,
+    closedActiveTab,
+  };
+}

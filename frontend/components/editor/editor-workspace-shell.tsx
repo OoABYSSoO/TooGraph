@@ -17,7 +17,7 @@ import { apiGet } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import {
   applyDocumentMetaToWorkspaceTab,
-  closeWorkspaceTab,
+  closeWorkspaceTabTransition,
   createUnsavedWorkspaceTab,
   ensureSavedGraphTab,
   readPersistedEditorWorkspace,
@@ -203,14 +203,12 @@ export function EditorWorkspaceShell({
 
   const finalizeTabClose = useCallback(
     (tabId: string) => {
-      let closedActive = false;
-      let nextGraphId: string | null = null;
+      let transition = closeWorkspaceTabTransition(workspace, tabId);
       setWorkspace((current) => {
-        closedActive = current.activeTabId === tabId;
-        const next = closeWorkspaceTab(current, tabId);
-        nextGraphId = next.tabs.find((tab) => tab.tabId === next.activeTabId)?.graphId ?? null;
-        return next;
+        transition = closeWorkspaceTabTransition(current, tabId);
+        return transition.workspace;
       });
+      writePersistedEditorWorkspace(transition.workspace);
 
       setDocumentsByTabId((current) => {
         const next = { ...current };
@@ -237,11 +235,11 @@ export function EditorWorkspaceShell({
       });
       delete editorActionsRef.current[tabId];
 
-      if (closedActive) {
-        syncRouteToTab(nextGraphId);
+      if (transition.closedActiveTab) {
+        syncRouteToTab(transition.nextGraphId);
       }
     },
-    [syncRouteToTab],
+    [syncRouteToTab, workspace],
   );
 
   const requestCloseTab = useCallback(

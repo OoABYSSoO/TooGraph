@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   applyDocumentMetaToWorkspaceTab,
+  closeWorkspaceTabTransition,
   closeWorkspaceTab,
   createNewTabId,
   createUnsavedWorkspaceTab,
@@ -100,6 +101,51 @@ test("closeWorkspaceTab keeps a valid active tab after removing the current tab"
     [first.tabId, third.tabId],
   );
   assert.equal(next.activeTabId, third.tabId);
+});
+
+test("closeWorkspaceTabTransition returns empty workspace and null route target when closing the last active tab", () => {
+  const only = {
+    ...createUnsavedWorkspaceTab({ title: "唯一图", kind: "existing" }),
+    graphId: "graph_only",
+  };
+  const workspace: PersistedEditorWorkspace = {
+    activeTabId: only.tabId,
+    tabs: [only],
+  };
+
+  const transition = closeWorkspaceTabTransition(workspace, only.tabId);
+
+  assert.deepEqual(transition.workspace, {
+    activeTabId: null,
+    tabs: [],
+  });
+  assert.equal(transition.closedActiveTab, true);
+  assert.equal(transition.nextGraphId, null);
+});
+
+test("closeWorkspaceTabTransition leaves route target unset when closing an inactive tab", () => {
+  const first = {
+    ...createUnsavedWorkspaceTab({ title: "A", kind: "existing" }),
+    graphId: "graph_a",
+  };
+  const second = {
+    ...createUnsavedWorkspaceTab({ title: "B", kind: "existing" }),
+    graphId: "graph_b",
+  };
+  const workspace: PersistedEditorWorkspace = {
+    activeTabId: first.tabId,
+    tabs: [first, second],
+  };
+
+  const transition = closeWorkspaceTabTransition(workspace, second.tabId);
+
+  assert.equal(transition.closedActiveTab, false);
+  assert.equal(transition.nextGraphId, null);
+  assert.equal(transition.workspace.activeTabId, first.tabId);
+  assert.deepEqual(
+    transition.workspace.tabs.map((tab) => tab.tabId),
+    [first.tabId],
+  );
 });
 
 test("applyDocumentMetaToWorkspaceTab is a no-op when metadata is unchanged", () => {

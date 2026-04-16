@@ -42,7 +42,6 @@ import { RichContent, formatRichContentValue, resolveRichContentDisplayMode } fr
 import { apiGet, apiPost } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import {
-  buildCanonicalNodeFromEditorConfig,
   buildEditorNodeConfigFromCanonicalNode,
   buildEditorPresetRecordFromCanonicalPreset,
   buildEditorStateFieldsFromCanonicalGraph,
@@ -52,6 +51,19 @@ import {
   type CanonicalNode,
   type EditorPresetRecord,
 } from "@/lib/node-system-canonical";
+import {
+  addEditorNodeToCanonicalGraph,
+  applyEditorConfigToCanonicalGraph,
+  applyEditorConfigsToCanonicalGraph,
+  applyFlowProjectionToCanonicalGraph,
+  bindStateToCanonicalNode,
+  buildCanonicalFlowProjectionFromEditorState,
+  composeCanonicalGraphForSubmission,
+  deleteStateFromCanonicalGraph,
+  renameStateKeyInCanonicalGraph,
+  renameStateNameInCanonicalGraph,
+  upsertStateInCanonicalGraph,
+} from "@/lib/node-system-canonical-write";
 import { projectCanonicalConfigsOntoNodes } from "@/lib/node-system-projection";
 import { EMPTY_AGENT_PRESET, getNodePresetById, NODE_PRESETS_MOCK, TEXT_INPUT_PRESET } from "@/lib/node-presets-mock";
 import {
@@ -498,10 +510,7 @@ function stringifyStateValue(value: unknown, type: StateFieldType) {
 }
 
 function normalizeNodeConfig<T extends NodePresetDefinition>(config: T): T {
-  const normalizedName =
-    String((config as { name?: string }).name ?? "").trim() ||
-    String((config as { label?: string }).label ?? "").trim() ||
-    "Node";
+  const normalizedName = String((config as { name?: string }).name ?? "").trim() || "Node";
   const normalizedStateReads = config.stateReads ?? [];
   const normalizedStateWrites = (config.stateWrites ?? []).map((binding) => ({
     ...binding,
@@ -509,11 +518,10 @@ function normalizeNodeConfig<T extends NodePresetDefinition>(config: T): T {
   }));
 
   if (config.family === "input") {
-    const legacyConfig = config as InputBoundaryNode & { defaultValue?: string };
     return {
-      ...legacyConfig,
+      ...config,
       name: normalizedName,
-      value: legacyConfig.value ?? legacyConfig.defaultValue ?? "",
+      value: config.value ?? "",
       stateReads: normalizedStateReads,
       stateWrites: normalizedStateWrites,
     } as T;
@@ -542,12 +550,7 @@ function normalizeNodeConfig<T extends NodePresetDefinition>(config: T): T {
 }
 
 function getNodeDisplayName(config: NodePresetDefinition, nodeId?: string) {
-  return (
-    String((config as { name?: string }).name ?? "").trim() ||
-    String((config as { label?: string }).label ?? "").trim() ||
-    nodeId ||
-    "node"
-  );
+  return String((config as { name?: string }).name ?? "").trim() || nodeId || "node";
 }
 
 function getCanonicalNodeDisplayName(canonicalGraph: CanonicalGraphPayload, nodeId: string) {
@@ -564,89 +567,6 @@ function withNodeStateBindings(
     stateReads,
     stateWrites,
   } as NodePresetDefinition);
-}
-
-function renameStateKeyInPort(port: PortDefinition, currentKey: string, nextKey: string): PortDefinition {
-  if (port.key !== currentKey) return port;
-  return {
-    ...port,
-    key: nextKey,
-    label: port.label === currentKey ? nextKey : port.label,
-  };
-}
-
-function renameStateKeyInNodeConfig(config: NodePresetDefinition, currentKey: string, nextKey: string): NodePresetDefinition {
-  if (config.family === "input") {
-    return normalizeNodeConfig({
-      ...config,
-      output: renameStateKeyInPort(config.output, currentKey, nextKey),
-      stateWrites: (config.stateWrites ?? []).map((binding) =>
-        binding.stateKey === currentKey || binding.outputKey === currentKey
-          ? {
-              ...binding,
-              stateKey: binding.stateKey === currentKey ? nextKey : binding.stateKey,
-              outputKey: binding.outputKey === currentKey ? nextKey : binding.outputKey,
-            }
-          : binding,
-      ),
-    } satisfies InputBoundaryNode);
-  }
-
-  if (config.family === "output") {
-    return normalizeNodeConfig({
-      ...config,
-      input: renameStateKeyInPort(config.input, currentKey, nextKey),
-      stateReads: (config.stateReads ?? []).map((binding) =>
-        binding.stateKey === currentKey || binding.inputKey === currentKey
-          ? {
-              ...binding,
-              stateKey: binding.stateKey === currentKey ? nextKey : binding.stateKey,
-              inputKey: binding.inputKey === currentKey ? nextKey : binding.inputKey,
-            }
-          : binding,
-      ),
-    } satisfies OutputBoundaryNode);
-  }
-
-  if (config.family === "condition") {
-    return normalizeNodeConfig({
-      ...config,
-      inputs: config.inputs.map((port) => renameStateKeyInPort(port, currentKey, nextKey)),
-      stateReads: (config.stateReads ?? []).map((binding) =>
-        binding.stateKey === currentKey || binding.inputKey === currentKey
-          ? {
-              ...binding,
-              stateKey: binding.stateKey === currentKey ? nextKey : binding.stateKey,
-              inputKey: binding.inputKey === currentKey ? nextKey : binding.inputKey,
-            }
-          : binding,
-      ),
-    } satisfies ConditionNode);
-  }
-
-  return normalizeNodeConfig({
-    ...config,
-    inputs: config.inputs.map((port) => renameStateKeyInPort(port, currentKey, nextKey)),
-    outputs: config.outputs.map((port) => renameStateKeyInPort(port, currentKey, nextKey)),
-    stateReads: (config.stateReads ?? []).map((binding) =>
-      binding.stateKey === currentKey || binding.inputKey === currentKey
-        ? {
-            ...binding,
-            stateKey: binding.stateKey === currentKey ? nextKey : binding.stateKey,
-            inputKey: binding.inputKey === currentKey ? nextKey : binding.inputKey,
-          }
-        : binding,
-    ),
-    stateWrites: (config.stateWrites ?? []).map((binding) =>
-      binding.stateKey === currentKey || binding.outputKey === currentKey
-        ? {
-            ...binding,
-            stateKey: binding.stateKey === currentKey ? nextKey : binding.stateKey,
-            outputKey: binding.outputKey === currentKey ? nextKey : binding.outputKey,
-          }
-        : binding,
-    ),
-  } satisfies AgentNode);
 }
 
 function resolveAgentRuntimeConfig(
@@ -1821,17 +1741,6 @@ function createFlowEdgesFromCanonicalGraph(graph: CanonicalGraphPayload, nodesBy
   return edges;
 }
 
-function buildCanonicalNodeFromFlowNode(node: FlowNode, config: NodePresetDefinition = node.data.config) {
-  return buildCanonicalNodeFromEditorConfig({
-    nodeId: node.id,
-    position: node.position,
-    config,
-    isExpanded: config.family === "input" ? true : Boolean(node.data.isExpanded),
-    collapsedSize: node.data.collapsedSize ?? null,
-    expandedSize: node.data.expandedSize ?? null,
-  });
-}
-
 function deepClonePreset<T extends NodePresetDefinition>(preset: T): T {
   return JSON.parse(JSON.stringify(preset)) as T;
 }
@@ -1964,68 +1873,6 @@ function createAutoInputPort(existingPorts: PortDefinition[], sourceType: ValueT
     label: typeLabel,
     valueType: sourceType,
     required: true,
-  };
-}
-
-const GENERIC_STATE_KEYS = new Set(["value", "input", "output", "result", "text"]);
-
-function chooseStateKeyForConnection(sourceStateKey: string, targetStateKey: string) {
-  if (sourceStateKey === targetStateKey) return sourceStateKey;
-  const sourceGeneric = GENERIC_STATE_KEYS.has(sourceStateKey);
-  const targetGeneric = GENERIC_STATE_KEYS.has(targetStateKey);
-  if (sourceGeneric && !targetGeneric) return targetStateKey;
-  if (targetGeneric && !sourceGeneric) return sourceStateKey;
-  return targetStateKey || sourceStateKey;
-}
-
-function buildCanonicalFlowProjection(
-  nodes: FlowNode[],
-  edges: Edge[],
-): Pick<CanonicalGraph, "nodes" | "edges" | "conditional_edges"> {
-  const flowNodeMap = new Map(nodes.map((node) => [node.id, node]));
-  const canonicalNodes = Object.fromEntries(nodes.map((node) => [node.id, buildCanonicalNodeFromFlowNode(node)]));
-  const conditionalEdgesBySource: Record<string, Record<string, string>> = {};
-  const canonicalEdges: CanonicalGraph["edges"] = [];
-
-  for (const edge of edges) {
-    const sourceNode = flowNodeMap.get(edge.source);
-    const targetNode = flowNodeMap.get(edge.target);
-    if (!sourceNode || !targetNode) continue;
-
-    const sourcePortKey = getPortKeyFromHandle(edge.sourceHandle);
-    const targetPortKey = getPortKeyFromHandle(edge.targetHandle);
-
-    if (sourceNode.data.config.family === "condition") {
-      if (sourcePortKey) {
-        conditionalEdgesBySource[edge.source] = {
-          ...(conditionalEdgesBySource[edge.source] ?? {}),
-          [sourcePortKey]: edge.target,
-        };
-      }
-      continue;
-    }
-
-    if (!sourcePortKey || !targetPortKey) continue;
-
-    const sourceStateKey = getBoundStateKeyForPort(sourceNode.data.config, "output", sourcePortKey) ?? sourcePortKey;
-    const targetStateKey = getBoundStateKeyForPort(targetNode.data.config, "input", targetPortKey) ?? targetPortKey;
-    const stateKey = chooseStateKeyForConnection(sourceStateKey, targetStateKey);
-
-    canonicalEdges.push({
-      source: edge.source,
-      target: edge.target,
-      sourceHandle: `write:${stateKey}`,
-      targetHandle: `read:${stateKey}`,
-    });
-  }
-
-  return {
-    nodes: canonicalNodes,
-    edges: canonicalEdges,
-    conditional_edges: Object.entries(conditionalEdgesBySource).map(([source, branches]) => ({
-      source,
-      branches,
-    })),
   };
 }
 
@@ -5228,7 +5075,7 @@ function NodeSystemCanvas({
     return Object.fromEntries(projectedNodes.map((node) => [node.id, createPreviewText(node, projectedNodes, edges)]));
   }, [edges, projectedNodes]);
   const derivedCanonicalGraph = useMemo<CanonicalGraph>(() => {
-    const projection = buildCanonicalFlowProjection(projectedNodes, edges);
+    const projection = buildCanonicalFlowProjectionFromEditorState(projectedNodes, edges);
     return {
       graph_id: graphId,
       name: graphName,
@@ -5240,28 +5087,10 @@ function NodeSystemCanvas({
     };
   }, [canonicalGraphState.state_schema, edges, graphId, graphName, metadata, projectedNodes]);
   const canonicalGraph = canonicalGraphState;
-  const canonicalGraphForSubmission = useMemo<CanonicalGraph>(() => {
-    const mergedNodes = { ...derivedCanonicalGraph.nodes };
-    for (const [nodeId, currentNode] of Object.entries(canonicalGraphState.nodes)) {
-      const derivedNode = derivedCanonicalGraph.nodes[nodeId];
-      mergedNodes[nodeId] = derivedNode
-        ? {
-            ...derivedNode,
-            ...currentNode,
-            ui: derivedNode.ui,
-          }
-        : currentNode;
-    }
-
-    return {
-      ...derivedCanonicalGraph,
-      graph_id: canonicalGraphState.graph_id,
-      name: canonicalGraphState.name,
-      state_schema: canonicalGraphState.state_schema,
-      nodes: mergedNodes,
-      metadata: canonicalGraphState.metadata,
-    };
-  }, [canonicalGraphState, derivedCanonicalGraph]);
+  const canonicalGraphForSubmission = useMemo<CanonicalGraph>(
+    () => composeCanonicalGraphForSubmission(canonicalGraphState, derivedCanonicalGraph),
+    [canonicalGraphState, derivedCanonicalGraph],
+  );
   const documentSignature = useMemo(() => serializeCanonicalGraph(canonicalGraphForSubmission), [canonicalGraphForSubmission]);
   const isDirty = documentSignature !== savedBaselineSignature;
   const canonicalNodeKeys = useMemo(() => Object.keys(canonicalGraph.nodes), [canonicalGraph]);
@@ -5597,104 +5426,37 @@ function NodeSystemCanvas({
   }, [canonicalStateCount, graphName, isStatePanelOpen, onChromeStateChange]);
 
   useEffect(() => {
-    const derivedCanonical = buildCanonicalFlowProjection(nodes, edges);
-    setCanonicalGraphState((current) => {
-      let changed = false;
-      const flowNodeIds = new Set(nodes.map((node) => node.id));
-      const nextNodes = { ...current.nodes };
-
-      for (const [nodeId, existingNode] of Object.entries(current.nodes)) {
-        if (!flowNodeIds.has(nodeId)) {
-          delete nextNodes[nodeId];
-          changed = true;
-          continue;
-        }
-        const derivedNode = derivedCanonical.nodes[nodeId];
-        if (derivedNode && JSON.stringify(existingNode.ui) !== JSON.stringify(derivedNode.ui)) {
-          nextNodes[nodeId] = {
-            ...existingNode,
-            ui: derivedNode.ui,
-          };
-          changed = true;
-        }
-      }
-
-      for (const node of nodes) {
-        if (!nextNodes[node.id]) {
-          nextNodes[node.id] = buildCanonicalNodeFromFlowNode(node);
-          changed = true;
-        }
-      }
-
-      const nextEdges =
-        JSON.stringify(current.edges) === JSON.stringify(derivedCanonical.edges) ? current.edges : derivedCanonical.edges;
-      const nextConditionalEdges =
-        JSON.stringify(current.conditional_edges) === JSON.stringify(derivedCanonical.conditional_edges)
-          ? current.conditional_edges
-          : derivedCanonical.conditional_edges;
-
-      if (nextEdges !== current.edges || nextConditionalEdges !== current.conditional_edges) {
-        changed = true;
-      }
-
-      if (!changed) {
-        return current;
-      }
-
-      return {
-        ...current,
-        nodes: nextNodes,
-        edges: nextEdges,
-        conditional_edges: nextConditionalEdges,
-      };
-    });
-  }, [edges, nodes]);
+    const derivedCanonical = buildCanonicalFlowProjectionFromEditorState(projectedNodes, edges);
+    setCanonicalGraphState((current) => applyFlowProjectionToCanonicalGraph(current, derivedCanonical));
+  }, [edges, projectedNodes]);
 
   useEffect(() => {
     const nodesById = new Map(projectedNodes.map((node) => [node.id, node]));
-    let changed = false;
-    const changedCanonicalNodes: Record<string, CanonicalGraph["nodes"][string]> = {};
-    const nextNodes = projectedNodes.map((node) => {
+    const updates: Array<{
+      node: FlowNode;
+      config: NodePresetDefinition;
+    }> = [];
+
+    for (const node of projectedNodes) {
       if (node.data.config.family !== "agent") {
-        return node;
+        continue;
       }
       const nextConfig = syncKnowledgeBaseSkillOnAgent(node, nodesById, edges);
       if (nextConfig === node.data.config) {
-        return node;
+        continue;
       }
-      changed = true;
-      changedCanonicalNodes[node.id] = buildCanonicalNodeFromFlowNode(
-        {
-          ...node,
-          data: {
-            ...node.data,
-            config: nextConfig,
-          },
-        },
-        nextConfig,
-      );
-      return {
-        ...node,
-        data: {
-          ...node.data,
-          config: nextConfig,
-        },
-      };
-    });
+      updates.push({
+        node,
+        config: nextConfig,
+      });
+    }
 
-    if (!changed) {
+    if (updates.length === 0) {
       return;
     }
 
-    setNodes(nextNodes);
-    setCanonicalGraphState((current) => ({
-      ...current,
-      nodes: {
-        ...current.nodes,
-        ...changedCanonicalNodes,
-      },
-    }));
-  }, [edges, knowledgeSkillSyncSignature, projectedNodes, setNodes]);
+    setCanonicalGraphState((current) => applyEditorConfigsToCanonicalGraph(current, updates));
+  }, [edges, knowledgeSkillSyncSignature, projectedNodes]);
 
   useEffect(() => {
     if (!isNewFromTemplate) return;
@@ -5836,6 +5598,7 @@ function NodeSystemCanvas({
     } satisfies InputBoundaryNode;
 
     const nextNode = createNodeFromConfig(inputConfig, position);
+    setCanonicalGraphState((current) => addEditorNodeToCanonicalGraph(current, nextNode, nextNode.data.config));
     setNodes((current) => current.concat(nextNode));
     setSelectedNodeId(nextNode.id);
     setStatusMessage(`Added ${getNodeDisplayName(inputConfig)} from ${file.name}`);
@@ -5851,6 +5614,7 @@ function NodeSystemCanvas({
         ? createGenericInputNodeConfig()
         : createGenericOutputNodeConfig(connectionSource?.sourceValueType ?? null);
     const nextNode = createNodeFromConfig(config, position);
+    setCanonicalGraphState((current) => addEditorNodeToCanonicalGraph(current, nextNode, nextNode.data.config));
     setNodes((current) => current.concat(nextNode));
     setSelectedNodeId(nextNode.id);
 
@@ -5916,6 +5680,7 @@ function NodeSystemCanvas({
       }
     }
     setNodes((current) => current.concat(nextNode));
+    setCanonicalGraphState((current) => addEditorNodeToCanonicalGraph(current, nextNode, nextNode.data.config));
     setSelectedNodeId(nextNode.id);
     setStatusMessage(`Added ${getNodeDisplayName(preset, preset.presetId)}`);
 
@@ -6143,27 +5908,11 @@ function NodeSystemCanvas({
     [projectedNodes, reactFlow, setNodes],
   );
 
-  const syncCanonicalNodeFromLegacyConfig = useCallback(
+  const syncCanonicalNodeFromEditorConfig = useCallback(
     (nodeId: string, nextConfig: NodePresetDefinition, nodeSnapshot?: FlowNode) => {
       const sourceNode = nodeSnapshot ?? projectedNodeMap.get(nodeId);
       if (!sourceNode) return;
-      const canonicalNode = buildCanonicalNodeFromFlowNode(
-        {
-          ...sourceNode,
-          data: {
-            ...sourceNode.data,
-            config: nextConfig,
-          },
-        },
-        nextConfig,
-      );
-      setCanonicalGraphState((current) => ({
-        ...current,
-        nodes: {
-          ...current.nodes,
-          [nodeId]: canonicalNode,
-        },
-      }));
+      setCanonicalGraphState((current) => applyEditorConfigToCanonicalGraph(current, sourceNode, nextConfig));
     },
     [projectedNodeMap],
   );
@@ -6171,19 +5920,15 @@ function NodeSystemCanvas({
   const upsertCanonicalStateField = useCallback((field: StateField) => {
     const normalizedKey = field.key.trim();
     if (!normalizedKey) return;
-    setCanonicalGraphState((current) => ({
-      ...current,
-      state_schema: {
-        ...current.state_schema,
-        [normalizedKey]: {
-          name: field.name.trim() || normalizedKey,
-          description: field.description,
-          type: stateFieldTypeToCanonicalStateType(field.type),
-          value: field.value,
-          color: field.ui?.color ?? "",
-        },
-      },
-    }));
+    setCanonicalGraphState((current) =>
+      upsertStateInCanonicalGraph(current, normalizedKey, {
+        name: field.name.trim() || normalizedKey,
+        description: field.description,
+        type: stateFieldTypeToCanonicalStateType(field.type),
+        value: field.value,
+        color: field.ui?.color ?? "",
+      }),
+    );
   }, []);
 
   const updateStateField = useCallback(
@@ -6207,20 +5952,7 @@ function NodeSystemCanvas({
         return false;
       }
 
-      setCanonicalGraphState((current) => {
-        const { [currentKey]: currentDefinition, ...restStateSchema } = current.state_schema;
-        if (!currentDefinition) return current;
-        return {
-          ...current,
-          state_schema: {
-            ...restStateSchema,
-            [normalizedKey]: {
-              ...currentDefinition,
-              name: currentDefinition.name || normalizedKey,
-            },
-          },
-        };
-      });
+      setCanonicalGraphState((current) => renameStateKeyInCanonicalGraph(current, currentKey, normalizedKey));
       const readNodeIds = new Set(
         projectedNodes
           .filter((node) => (node.data.config.stateReads ?? []).some((binding) => binding.stateKey === currentKey))
@@ -6230,15 +5962,6 @@ function NodeSystemCanvas({
         projectedNodes
           .filter((node) => (node.data.config.stateWrites ?? []).some((binding) => binding.stateKey === currentKey))
           .map((node) => node.id),
-      );
-      setNodes((current) =>
-        current.map((node) => ({
-          ...node,
-          data: {
-            ...node.data,
-            config: renameStateKeyInNodeConfig(node.data.config, currentKey, normalizedKey),
-          },
-        })),
       );
       setEdges((current) =>
         current.map((edge) => ({
@@ -6256,126 +5979,44 @@ function NodeSystemCanvas({
       setStatusMessage(`Renamed state ${currentKey} -> ${normalizedKey}`);
       return true;
     },
-    [projectedNodes, setEdges, setNodes, stateSchema],
+    [projectedNodes, setEdges, stateSchema],
   );
 
   const renameStateName = useCallback((stateKey: string, nextName: string) => {
-    const normalizedName = nextName.trim();
-    setCanonicalGraphState((current) => {
-      const currentDefinition = current.state_schema[stateKey];
-      if (!currentDefinition) return current;
-      return {
-        ...current,
-        state_schema: {
-          ...current.state_schema,
-          [stateKey]: {
-            ...currentDefinition,
-            name: normalizedName || stateKey,
-          },
-        },
-      };
-    });
+    setCanonicalGraphState((current) => renameStateNameInCanonicalGraph(current, stateKey, nextName));
     setStatusMessage(`Updated state ${stateKey} name.`);
   }, []);
 
   const bindStateFieldToPort = useCallback(
     (nodeId: string, side: "input" | "output", field: StateField) => {
       const targetNode = projectedNodeMap.get(nodeId);
+      const canonicalNode = canonicalGraph.nodes[nodeId];
       if (!targetNode) {
+        return false;
+      }
+      if (!canonicalNode) {
         return false;
       }
 
       const displayName = getNodeDisplayName(targetNode.data.config, targetNode.id);
-      const port: PortDefinition = {
-        key: field.key,
-        label: getStateDisplayName(field),
-        valueType: stateFieldTypeToValueType(field.type),
-        ...(side === "input" ? { required: targetNode.data.config.family === "output" } : {}),
-      };
 
       if (side === "input") {
-        if (targetNode.data.config.family === "agent") {
-          const config = targetNode.data.config as AgentNode;
-          if (config.inputs.some((input) => input.key === field.key) || (config.stateReads ?? []).some((binding) => binding.inputKey === field.key)) {
+        if (canonicalNode.kind === "agent" || canonicalNode.kind === "condition") {
+          if (canonicalNode.reads.some((binding) => binding.state === field.key)) {
             setStatusMessage(`Node '${displayName}' already has input '${field.key}'.`);
             return false;
           }
-          const nextConfig = normalizeNodeConfig({
-            ...config,
-            inputs: [...config.inputs, port],
-            stateReads: [...(config.stateReads ?? []), { stateKey: field.key, inputKey: field.key, required: false }],
-          } satisfies AgentNode);
-          setNodes((current) =>
-            current.map((node) =>
-              node.id === nodeId
-                ? {
-                    ...node,
-                    data: {
-                      ...node.data,
-                      config: nextConfig,
-                    },
-                  }
-                : node,
-            ),
-          );
-          syncCanonicalNodeFromLegacyConfig(nodeId, nextConfig, targetNode);
+          setCanonicalGraphState((current) => bindStateToCanonicalNode(current, nodeId, side, field.key));
           setStatusMessage(`Bound state ${field.key} to ${displayName}.${field.key}`);
           return true;
         }
 
-        if (targetNode.data.config.family === "condition") {
-          const config = targetNode.data.config as ConditionNode;
-          if (config.inputs.some((input) => input.key === field.key) || (config.stateReads ?? []).some((binding) => binding.inputKey === field.key)) {
+        if (canonicalNode.kind === "output") {
+          if (canonicalNode.reads.length === 1 && canonicalNode.reads[0]?.state === field.key) {
             setStatusMessage(`Node '${displayName}' already has input '${field.key}'.`);
             return false;
           }
-          const nextConfig = normalizeNodeConfig({
-            ...config,
-            inputs: [...config.inputs, port],
-            stateReads: [...(config.stateReads ?? []), { stateKey: field.key, inputKey: field.key, required: false }],
-          } satisfies ConditionNode);
-          setNodes((current) =>
-            current.map((node) =>
-              node.id === nodeId
-                ? {
-                  ...node,
-                  data: {
-                    ...node.data,
-                    config: nextConfig,
-                  },
-                }
-              : node,
-            ),
-          );
-          syncCanonicalNodeFromLegacyConfig(nodeId, nextConfig, targetNode);
-          setStatusMessage(`Bound state ${field.key} to ${displayName}.${field.key}`);
-          return true;
-        }
-
-        if (targetNode.data.config.family === "output") {
-          const config = targetNode.data.config as OutputBoundaryNode;
-          const nextConfig = normalizeNodeConfig({
-            ...config,
-            input: {
-              ...port,
-              required: true,
-            },
-            stateReads: [{ stateKey: field.key, inputKey: field.key, required: true }],
-          } satisfies OutputBoundaryNode);
-          setNodes((current) =>
-            current.map((node) =>
-              node.id === nodeId
-                ? {
-                  ...node,
-                  data: {
-                    ...node.data,
-                    config: nextConfig,
-                  },
-                }
-              : node,
-            ),
-          );
-          syncCanonicalNodeFromLegacyConfig(nodeId, nextConfig, targetNode);
+          setCanonicalGraphState((current) => bindStateToCanonicalNode(current, nodeId, side, field.key));
           setStatusMessage(`Bound state ${field.key} to ${displayName}.${field.key}`);
           return true;
         }
@@ -6383,63 +6024,29 @@ function NodeSystemCanvas({
         return false;
       }
 
-      if (targetNode.data.config.family === "agent") {
-        const config = targetNode.data.config as AgentNode;
-        if (config.outputs.some((output) => output.key === field.key) || (config.stateWrites ?? []).some((binding) => binding.outputKey === field.key)) {
+      if (canonicalNode.kind === "agent") {
+        if (canonicalNode.writes.some((binding) => binding.state === field.key)) {
           setStatusMessage(`Node '${displayName}' already has output '${field.key}'.`);
           return false;
         }
-        const nextConfig = normalizeNodeConfig({
-          ...config,
-          outputs: [...config.outputs, port],
-          stateWrites: [...(config.stateWrites ?? []), { stateKey: field.key, outputKey: field.key, mode: "replace" }],
-        } satisfies AgentNode);
-        setNodes((current) =>
-          current.map((node) =>
-            node.id === nodeId
-              ? {
-                  ...node,
-                  data: {
-                    ...node.data,
-                    config: nextConfig,
-                  },
-                }
-              : node,
-          ),
-        );
-        syncCanonicalNodeFromLegacyConfig(nodeId, nextConfig, targetNode);
+        setCanonicalGraphState((current) => bindStateToCanonicalNode(current, nodeId, side, field.key));
         setStatusMessage(`Bound ${displayName}.${field.key} to state ${field.key}`);
         return true;
       }
 
-      if (targetNode.data.config.family === "input") {
-        const config = targetNode.data.config as InputBoundaryNode;
-        const nextConfig = normalizeNodeConfig({
-          ...config,
-          output: port,
-          stateWrites: [{ stateKey: field.key, outputKey: field.key, mode: "replace" }],
-        } satisfies InputBoundaryNode);
-        setNodes((current) =>
-          current.map((node) =>
-            node.id === nodeId
-              ? {
-                  ...node,
-                  data: {
-                    ...node.data,
-                    config: nextConfig,
-                  },
-                }
-              : node,
-          ),
-        );
-        syncCanonicalNodeFromLegacyConfig(nodeId, nextConfig, targetNode);
+      if (canonicalNode.kind === "input") {
+        if (canonicalNode.writes.length === 1 && canonicalNode.writes[0]?.state === field.key) {
+          setStatusMessage(`Node '${displayName}' already has output '${field.key}'.`);
+          return false;
+        }
+        setCanonicalGraphState((current) => bindStateToCanonicalNode(current, nodeId, side, field.key));
         setStatusMessage(`Bound ${displayName}.${field.key} to state ${field.key}`);
         return true;
       }
 
       return false;
     },
-    [projectedNodeMap, setNodes, syncCanonicalNodeFromLegacyConfig],
+    [canonicalGraph.nodes, projectedNodeMap],
   );
 
   const createStateAndBindToPort = useCallback(
@@ -6473,40 +6080,10 @@ function NodeSystemCanvas({
 
   const deleteStateField = useCallback(
     (stateKey: string) => {
-      setCanonicalGraphState((current) => {
-        const { [stateKey]: _, ...restStateSchema } = current.state_schema;
-        const nextNodes = Object.fromEntries(
-          Object.entries(current.nodes).map(([nodeId, node]) => [
-            nodeId,
-            {
-              ...node,
-              reads: node.reads.filter((binding) => binding.state !== stateKey),
-              writes: node.writes.filter((binding) => binding.state !== stateKey),
-            },
-          ]),
-        );
-        return {
-          ...current,
-          state_schema: restStateSchema,
-          nodes: nextNodes,
-        };
-      });
-      setNodes((current) =>
-        current.map((node) => ({
-          ...node,
-          data: {
-            ...node.data,
-            config: withNodeStateBindings(
-              node.data.config,
-              (node.data.config.stateReads ?? []).filter((binding) => binding.stateKey !== stateKey),
-              (node.data.config.stateWrites ?? []).filter((binding) => binding.stateKey !== stateKey),
-            ),
-          },
-        })),
-      );
+      setCanonicalGraphState((current) => deleteStateFromCanonicalGraph(current, stateKey));
       setStatusMessage(`Deleted state ${stateKey}`);
     },
-    [setNodes],
+    [],
   );
 
   const addStateReadBinding = useCallback(
@@ -6529,25 +6106,11 @@ function NodeSystemCanvas({
         [...(targetNode.data.config.stateReads ?? []), { stateKey, inputKey, required: false }],
         targetNode.data.config.stateWrites ?? [],
       );
-
-      setNodes((current) =>
-        current.map((node) =>
-          node.id === nodeId
-            ? {
-                ...node,
-                data: {
-                  ...node.data,
-                  config: nextConfig,
-                },
-              }
-            : node,
-        ),
-      );
-      syncCanonicalNodeFromLegacyConfig(nodeId, nextConfig, targetNode);
+      syncCanonicalNodeFromEditorConfig(nodeId, nextConfig, targetNode);
       setStatusMessage(`Bound state ${stateKey} to ${getNodeDisplayName(targetNode.data.config, targetNode.id)}.${inputKey}`);
       return true;
     },
-    [edges, projectedNodeMap, setNodes, syncCanonicalNodeFromLegacyConfig],
+    [edges, projectedNodeMap, syncCanonicalNodeFromEditorConfig],
   );
 
   const removeStateReadBinding = useCallback(
@@ -6561,23 +6124,10 @@ function NodeSystemCanvas({
         ),
         targetNode.data.config.stateWrites ?? [],
       );
-      setNodes((current) =>
-        current.map((node) =>
-          node.id === nodeId
-            ? {
-                ...node,
-                data: {
-                  ...node.data,
-                  config: nextConfig,
-                },
-              }
-            : node,
-        ),
-      );
-      syncCanonicalNodeFromLegacyConfig(nodeId, nextConfig, targetNode);
+      syncCanonicalNodeFromEditorConfig(nodeId, nextConfig, targetNode);
       setStatusMessage(`Removed reader ${nodeLabelLookup.get(nodeId) ?? nodeId}.${inputKey} from state ${stateKey}`);
     },
-    [nodeLabelLookup, projectedNodeMap, setNodes, syncCanonicalNodeFromLegacyConfig],
+    [nodeLabelLookup, projectedNodeMap, syncCanonicalNodeFromEditorConfig],
   );
 
   const addStateWriteBinding = useCallback(
@@ -6594,25 +6144,11 @@ function NodeSystemCanvas({
         targetNode.data.config.stateReads ?? [],
         [...(targetNode.data.config.stateWrites ?? []), { stateKey, outputKey, mode: "replace" }],
       );
-
-      setNodes((current) =>
-        current.map((node) =>
-          node.id === nodeId
-            ? {
-                ...node,
-                data: {
-                  ...node.data,
-                  config: nextConfig,
-                },
-              }
-            : node,
-        ),
-      );
-      syncCanonicalNodeFromLegacyConfig(nodeId, nextConfig, targetNode);
+      syncCanonicalNodeFromEditorConfig(nodeId, nextConfig, targetNode);
       setStatusMessage(`Bound ${getNodeDisplayName(targetNode.data.config, targetNode.id)}.${outputKey} to state ${stateKey}`);
       return true;
     },
-    [projectedNodeMap, setNodes, syncCanonicalNodeFromLegacyConfig],
+    [projectedNodeMap, syncCanonicalNodeFromEditorConfig],
   );
 
   const removeStateWriteBinding = useCallback(
@@ -6626,23 +6162,10 @@ function NodeSystemCanvas({
           (binding) => !(binding.stateKey === stateKey && binding.outputKey === outputKey),
         ),
       );
-      setNodes((current) =>
-        current.map((node) =>
-          node.id === nodeId
-            ? {
-                ...node,
-                data: {
-                  ...node.data,
-                  config: nextConfig,
-                },
-              }
-            : node,
-        ),
-      );
-      syncCanonicalNodeFromLegacyConfig(nodeId, nextConfig, targetNode);
+      syncCanonicalNodeFromEditorConfig(nodeId, nextConfig, targetNode);
       setStatusMessage(`Removed writer ${nodeLabelLookup.get(nodeId) ?? nodeId}.${outputKey} from state ${stateKey}`);
     },
-    [nodeLabelLookup, projectedNodeMap, setNodes, syncCanonicalNodeFromLegacyConfig],
+    [nodeLabelLookup, projectedNodeMap, syncCanonicalNodeFromEditorConfig],
   );
 
   return (
@@ -6683,21 +6206,8 @@ function NodeSystemCanvas({
                     const targetNode = projectedNodes.find((candidate) => candidate.id === node.id);
                     if (targetNode) {
                       const nextConfig = normalizeNodeConfig(updater(targetNode.data.config));
-                      syncCanonicalNodeFromLegacyConfig(node.id, nextConfig, targetNode);
+                      syncCanonicalNodeFromEditorConfig(node.id, nextConfig, targetNode);
                     }
-                    setNodes((current) =>
-                      current.map((candidate) =>
-                        candidate.id === node.id
-                          ? {
-                              ...candidate,
-                              data: {
-                                ...candidate.data,
-                                config: normalizeNodeConfig(updater(candidate.data.config)),
-                              },
-                            }
-                          : candidate,
-                      ),
-                    );
                   },
                   onToggleExpanded: () => {
                     setNodes((current) =>
