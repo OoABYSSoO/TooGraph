@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 from collections import Counter
-from typing import Literal
-
 from app.core.langgraph.build_plan import (
     LangGraphBuildPlan,
     LangGraphConditionalEdgePlan,
@@ -16,22 +14,11 @@ from app.core.schemas.node_system import (
     NodeSystemStateType,
 )
 
-
-RuntimeBackend = Literal["langgraph", "legacy"]
-
-
-def resolve_graph_runtime_backend(
+def get_langgraph_runtime_unsupported_reasons(
     graph: NodeSystemGraphPayload,
-) -> tuple[RuntimeBackend, list[str]]:
-    requested_backend = str(graph.metadata.get("runtime_backend", "")).strip().lower()
-    if requested_backend == "legacy":
-        return "legacy", ["graph metadata requested legacy runtime"]
-
+) -> list[str]:
     build_plan = compile_graph_to_langgraph_plan(graph)
-    unsupported_reasons = list(build_plan.requirements.unsupported_reasons)
-    if unsupported_reasons:
-        return "legacy", unsupported_reasons
-    return "langgraph", []
+    return list(build_plan.requirements.unsupported_reasons)
 
 
 def compile_graph_to_langgraph_plan(graph: NodeSystemGraphPayload) -> LangGraphBuildPlan:

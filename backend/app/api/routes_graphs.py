@@ -8,7 +8,7 @@ from fastapi.responses import PlainTextResponse
 from pydantic import ValidationError
 
 from app.core.compiler.validator import validate_graph
-from app.core.langgraph import execute_node_system_graph_langgraph, resolve_graph_runtime_backend
+from app.core.langgraph import execute_node_system_graph_langgraph, get_langgraph_runtime_unsupported_reasons
 from app.core.langgraph.codegen import generate_langgraph_python_source
 from app.core.runtime.state import create_initial_run_state, set_run_status, touch_run_lifecycle
 from app.core.schemas.node_system import (
@@ -93,8 +93,8 @@ def export_langgraph_python_endpoint(payload: dict[str, Any]) -> str:
     if not validation.valid:
         raise HTTPException(status_code=422, detail=validation.model_dump())
 
-    runtime_backend, reasons = resolve_graph_runtime_backend(graph_payload)
-    if runtime_backend != "langgraph":
+    reasons = get_langgraph_runtime_unsupported_reasons(graph_payload)
+    if reasons:
         raise HTTPException(
             status_code=422,
             detail={
@@ -120,13 +120,13 @@ def run_graph_endpoint(payload: dict[str, Any], background_tasks: BackgroundTask
         raise HTTPException(status_code=422, detail=validation.model_dump())
 
     executed_graph = save_graph(graph_payload)
-    runtime_backend, langgraph_fallback_reasons = resolve_graph_runtime_backend(executed_graph)
-    if runtime_backend != "langgraph":
+    langgraph_unsupported_reasons = get_langgraph_runtime_unsupported_reasons(executed_graph)
+    if langgraph_unsupported_reasons:
         raise HTTPException(
             status_code=422,
             detail={
                 "message": f"Graph '{executed_graph.graph_id or executed_graph.name}' is not supported by the LangGraph runtime.",
-                "reasons": langgraph_fallback_reasons,
+                "reasons": langgraph_unsupported_reasons,
             },
         )
     run_state = create_initial_run_state(

@@ -5,7 +5,7 @@ from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Body, HTTPException, Query
 
-from app.core.langgraph import execute_node_system_graph_langgraph, resolve_graph_runtime_backend
+from app.core.langgraph import execute_node_system_graph_langgraph, get_langgraph_runtime_unsupported_reasons
 from app.core.runtime.state import create_initial_run_state, set_run_status, touch_run_lifecycle
 from app.core.schemas.run import NodeExecutionDetail, RunDetail, RunSummary
 from app.core.storage.graph_store import load_graph
@@ -85,8 +85,8 @@ def resume_run_endpoint(
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
-    runtime_backend, fallback_reasons = resolve_graph_runtime_backend(graph)
-    if runtime_backend != "langgraph":
+    fallback_reasons = get_langgraph_runtime_unsupported_reasons(graph)
+    if fallback_reasons:
         raise HTTPException(
             status_code=409,
             detail={

@@ -29,6 +29,8 @@
   - `stateReads / stateWrites` 已从前端正式节点类型和主转换链移除
   - 节点卡片、State Panel、输入节点值同步、运行前提交都已 canonical-first
   - 后端已经拒绝 `defaultValue`，前后端正式字段边界一致
+  - 后端已删除 `legacy runtime` 选择与 fallback 分支，只保留 LangGraph 支持性检查
+  - 前端已删除 `applyEditorConfigToCanonicalGraph / applyEditorConfigsToCanonicalGraph` 历史桥接
 - 当前剩余问题主要集中在编辑器内部仍保留一层视图壳：
   - `NodePresetDefinition`
   - `PortDefinition`

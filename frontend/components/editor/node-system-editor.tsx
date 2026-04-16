@@ -54,7 +54,6 @@ import {
 } from "@/lib/node-system-canonical";
 import {
   addEditorNodeToCanonicalGraph,
-  applyEditorConfigsToCanonicalGraph,
   applyFlowProjectionToCanonicalGraph,
   bindStateToCanonicalNode,
   buildCanonicalFlowProjectionFromEditorState,
@@ -1895,11 +1894,11 @@ function collectAgentKnowledgeBaseBindings(agentNode: FlowNode, nodesById: Map<s
   return Array.from(connectedInputKeys);
 }
 
-function syncKnowledgeBaseSkillOnAgent(agentNode: FlowNode, nodesById: Map<string, FlowNode>, edges: Edge[]) {
-  if (agentNode.data.config.family !== "agent") {
-    return agentNode.data.config;
-  }
-
+function syncKnowledgeBaseSkillOnAgent(
+  agentNode: FlowNode & { data: FlowNodeData & { config: AgentNode } },
+  nodesById: Map<string, FlowNode>,
+  edges: Edge[],
+): AgentNode {
   const config = agentNode.data.config as AgentNode;
   const knowledgeBaseInputKeys = collectAgentKnowledgeBaseBindings(agentNode, nodesById, edges);
   const skillsWithoutKnowledgeBase = config.skills.filter((skill) => !isKnowledgeBaseSkill(skill));
@@ -5399,30 +5398,37 @@ function NodeSystemCanvas({
 
   useEffect(() => {
     const nodesById = new Map(projectedNodes.map((node) => [node.id, node]));
-    const updates: Array<{
-      node: FlowNode;
-      config: NodePresetDefinition;
-    }> = [];
 
-    for (const node of projectedNodes) {
-      if (node.data.config.family !== "agent") {
-        continue;
+    setCanonicalGraphState((current) => {
+      let nextGraph = current;
+
+      for (const node of projectedNodes) {
+        if (node.data.config.family !== "agent") {
+          continue;
+        }
+
+        const nextConfig = syncKnowledgeBaseSkillOnAgent(
+          node as FlowNode & { data: FlowNodeData & { config: AgentNode } },
+          nodesById,
+          edges,
+        );
+        if (nextConfig === node.data.config) {
+          continue;
+        }
+
+        const nextSkillKeys = nextConfig.skills.map((skill) => skill.skillKey);
+        nextGraph = updateCanonicalNodeConfig(nextGraph, node.id, (canonicalNode) =>
+          canonicalNode.kind === "agent"
+            ? {
+                ...canonicalNode.config,
+                skills: nextSkillKeys,
+              }
+            : canonicalNode.config,
+        );
       }
-      const nextConfig = syncKnowledgeBaseSkillOnAgent(node, nodesById, edges);
-      if (nextConfig === node.data.config) {
-        continue;
-      }
-      updates.push({
-        node,
-        config: nextConfig,
-      });
-    }
 
-    if (updates.length === 0) {
-      return;
-    }
-
-    setCanonicalGraphState((current) => applyEditorConfigsToCanonicalGraph(current, updates));
+      return nextGraph;
+    });
   }, [edges, knowledgeSkillSyncSignature, projectedNodes]);
 
   useEffect(() => {

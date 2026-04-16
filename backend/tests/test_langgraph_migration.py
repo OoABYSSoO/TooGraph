@@ -8,7 +8,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.compiler.validator import validate_graph
-from app.core.langgraph.compiler import compile_graph_to_langgraph_plan, resolve_graph_runtime_backend
+from app.core.langgraph.compiler import compile_graph_to_langgraph_plan, get_langgraph_runtime_unsupported_reasons
 from app.core.langgraph.codegen import generate_langgraph_python_source
 from app.core.langgraph.runtime import execute_node_system_graph_langgraph
 from app.core.runtime.state import create_initial_run_state, set_run_status
@@ -234,17 +234,15 @@ class LangGraphMigrationTests(unittest.TestCase):
         self.assertEqual(plan.requirements.skill_keys, [])
         self.assertEqual(plan.requirements.unsupported_reasons, [])
 
-    def test_hello_world_resolves_langgraph_backend_without_template_flag(self):
+    def test_hello_world_langgraph_support_ignores_legacy_runtime_metadata(self):
         graph = _load_hello_world_graph()
-        graph.metadata.pop("runtime_backend", None)
-        backend, reasons = resolve_graph_runtime_backend(graph)
-        self.assertEqual(backend, "langgraph")
+        graph.metadata["runtime_backend"] = "legacy"
+        reasons = get_langgraph_runtime_unsupported_reasons(graph)
         self.assertEqual(reasons, [])
 
-    def test_cycle_graph_resolves_langgraph_backend(self):
+    def test_cycle_graph_has_no_langgraph_support_issues(self):
         graph = _build_cycle_graph()
-        backend, reasons = resolve_graph_runtime_backend(graph)
-        self.assertEqual(backend, "langgraph")
+        reasons = get_langgraph_runtime_unsupported_reasons(graph)
         self.assertEqual(reasons, [])
 
     @patch("app.core.langgraph.runtime.save_run", lambda state: None)
@@ -395,10 +393,9 @@ class LangGraphMigrationTests(unittest.TestCase):
         validation = validate_graph(graph)
         self.assertTrue(validation.valid, validation.model_dump())
 
-    def test_knowledge_base_validation_resolves_langgraph_backend(self):
+    def test_knowledge_base_validation_has_no_langgraph_support_issues(self):
         graph = _load_knowledge_base_validation_graph()
-        backend, reasons = resolve_graph_runtime_backend(graph)
-        self.assertEqual(backend, "langgraph")
+        reasons = get_langgraph_runtime_unsupported_reasons(graph)
         self.assertEqual(reasons, [])
 
     @patch("app.core.runtime.node_system_executor._generate_agent_response", _fake_generate_agent_response)

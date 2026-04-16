@@ -201,37 +201,6 @@ export function buildCanonicalFlowProjectionFromEditorState(
   };
 }
 
-export function applyEditorConfigToCanonicalGraph<T extends CanonicalGraphPayload>(
-  graph: T,
-  node: CanonicalNodeSnapshot,
-  nextConfig: NodePresetDefinition,
-): T {
-  const currentNode = graph.nodes[node.id];
-  if (!currentNode) {
-    return graph;
-  }
-
-  const nextNode = buildCanonicalNodeFromEditorState({
-    ...node,
-    data: {
-      ...node.data,
-      config: nextConfig,
-    },
-  });
-
-  if (serializeNode(currentNode) === serializeNode(nextNode)) {
-    return graph;
-  }
-
-  return {
-    ...graph,
-    nodes: {
-      ...graph.nodes,
-      [node.id]: nextNode,
-    },
-  };
-}
-
 export function addEditorNodeToCanonicalGraph<T extends CanonicalGraphPayload>(
   graph: T,
   node: CanonicalNodeSnapshot,
@@ -304,22 +273,6 @@ export function applyFlowProjectionToCanonicalGraph<T extends CanonicalGraphPayl
     edges: nextEdges,
     conditional_edges: nextConditionalEdges,
   };
-}
-
-export function applyEditorConfigsToCanonicalGraph<T extends CanonicalGraphPayload>(
-  graph: T,
-  updates: Array<{
-    node: CanonicalNodeSnapshot;
-    config: NodePresetDefinition;
-  }>,
-): T {
-  let nextGraph = graph;
-
-  for (const update of updates) {
-    nextGraph = applyEditorConfigToCanonicalGraph(nextGraph, update.node, update.config);
-  }
-
-  return nextGraph;
 }
 
 export function renameStateKeyInCanonicalGraph<T extends CanonicalGraphPayload>(
