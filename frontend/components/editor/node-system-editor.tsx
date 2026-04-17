@@ -42,6 +42,9 @@ import { RichContent, formatRichContentValue, resolveRichContentDisplayMode } fr
 import { apiGet, apiPost } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { createEditorSeedGraph } from "@/lib/editor-graph-defaults";
+import { decorateFlowEdges } from "@/lib/node-system-edge-visuals";
+import { collectCycleBackEdgeIds } from "@/lib/node-system-cycle-edges";
+import { resolveCycleMaxIterations, writeCycleMaxIterations } from "@/lib/node-system-graph-metadata";
 import {
   buildCanonicalNodeFromEditorConfig,
   buildEditorNodeConfigFromCanonicalPreset,
@@ -1682,7 +1685,7 @@ function createFlowEdgeFromCanonicalEdge(
   const sourceType = getPortTypeFromCanonicalGraph(graph, edge.source, flowSourceHandle) ?? "any";
   const color = TYPE_COLORS[sourceType ?? "any"];
   return {
-    id: `edge:${edge.source}:${edge.sourceHandle}:${edge.target}:${edge.targetHandle}`,
+    id: buildFlowEdgeId(edge.source, edge.sourceHandle, edge.target, edge.targetHandle),
     source: edge.source,
     target: edge.target,
     sourceHandle: flowSourceHandle,
@@ -1693,6 +1696,10 @@ function createFlowEdgeFromCanonicalEdge(
       strokeWidth: 1.8,
     },
   } satisfies Edge;
+}
+
+function buildFlowEdgeId(source: string, sourceHandle: string, target: string, targetHandle: string) {
+  return `edge:${source}:${sourceHandle}:${target}:${targetHandle}`;
 }
 
 function firstCanonicalInputHandle(node: CanonicalNode | undefined): string | null {
@@ -2721,42 +2728,42 @@ function coerceCanonicalReadBindings(value: unknown): CanonicalNode["reads"] {
   if (!Array.isArray(value)) {
     return [];
   }
-  return value
-    .map((entry) => {
-      if (!entry || typeof entry !== "object") {
-        return null;
-      }
-      const state = String((entry as { state?: unknown }).state ?? "").trim();
-      if (!state) {
-        return null;
-      }
-      return {
-        state,
-        required: Boolean((entry as { required?: unknown }).required),
-      };
-    })
-    .filter((entry): entry is CanonicalNode["reads"][number] => Boolean(entry));
+  const bindings: CanonicalNode["reads"] = [];
+  for (const entry of value) {
+    if (!entry || typeof entry !== "object") {
+      continue;
+    }
+    const state = String((entry as { state?: unknown }).state ?? "").trim();
+    if (!state) {
+      continue;
+    }
+    bindings.push({
+      state,
+      required: Boolean((entry as { required?: unknown }).required),
+    });
+  }
+  return bindings;
 }
 
 function coerceCanonicalWriteBindings(value: unknown): CanonicalNode["writes"] {
   if (!Array.isArray(value)) {
     return [];
   }
-  return value
-    .map((entry) => {
-      if (!entry || typeof entry !== "object") {
-        return null;
-      }
-      const state = String((entry as { state?: unknown }).state ?? "").trim();
-      if (!state) {
-        return null;
-      }
-      return {
-        state,
-        mode: "replace" as const,
-      };
-    })
-    .filter((entry): entry is CanonicalNode["writes"][number] => Boolean(entry));
+  const bindings: CanonicalNode["writes"] = [];
+  for (const entry of value) {
+    if (!entry || typeof entry !== "object") {
+      continue;
+    }
+    const state = String((entry as { state?: unknown }).state ?? "").trim();
+    if (!state) {
+      continue;
+    }
+    bindings.push({
+      state,
+      mode: "replace",
+    });
+  }
+  return bindings;
 }
 
 function coerceConditionBranchKeys(value: unknown): string[] {
@@ -4749,12 +4756,14 @@ function StateFieldCard({
 function StatePanel({
   open,
   stateSchema,
+  cycleMaxIterations,
   readersByKey,
   writersByKey,
   nodeOptions,
   selectedNodeId,
   onToggle,
   onAddState,
+  onUpdateCycleMaxIterations,
   onRenameState,
   onUpdateState,
   onDeleteState,
@@ -4766,12 +4775,14 @@ function StatePanel({
 }: {
   open: boolean;
   stateSchema: StateField[];
+  cycleMaxIterations: number;
   readersByKey: Record<string, StateBindingSummary[]>;
   writersByKey: Record<string, StateBindingSummary[]>;
   nodeOptions: StateBindingNodeOption[];
   selectedNodeId: string | null;
   onToggle: () => void;
   onAddState: () => void;
+  onUpdateCycleMaxIterations: (nextValue: number | null) => void;
   onRenameState: (currentKey: string, nextKey: string) => boolean;
   onUpdateState: (stateKey: string, updater: (current: StateField) => StateField) => void;
   onDeleteState: (stateKey: string) => void;
@@ -4781,6 +4792,26 @@ function StatePanel({
   onRemoveWriter: (stateKey: string, nodeId: string, outputKey: string) => void;
   onFocusNode: (nodeId: string) => void;
 }) {
+  const [draftCycleMaxIterations, setDraftCycleMaxIterations] = useState(String(cycleMaxIterations));
+
+  useEffect(() => {
+    setDraftCycleMaxIterations(String(cycleMaxIterations));
+  }, [cycleMaxIterations]);
+
+  function commitCycleMaxIterations() {
+    const trimmed = draftCycleMaxIterations.trim();
+    if (!trimmed) {
+      onUpdateCycleMaxIterations(null);
+      return;
+    }
+    const parsedValue = Number(trimmed);
+    if (Number.isFinite(parsedValue) && parsedValue >= 1) {
+      onUpdateCycleMaxIterations(Math.trunc(parsedValue));
+      return;
+    }
+    setDraftCycleMaxIterations(String(cycleMaxIterations));
+  }
+
   if (!open) {
     return (
       <aside className="flex h-full min-h-0 items-center justify-center border-l border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.72)] px-2 backdrop-blur-xl">
@@ -4835,6 +4866,29 @@ function StatePanel({
           <Button size="sm" onClick={onAddState}>
             Add State
           </Button>
+        </div>
+        <div className="mt-3 rounded-[18px] border border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 shadow-[0_10px_24px_rgba(60,41,20,0.06)]">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-sm font-medium text-[var(--text)]">Cycle Limit</div>
+              <div className="mt-1 text-xs leading-5 text-[var(--muted)]">
+                Graph-level `cycle_max_iterations`. Leave blank to fall back to the runtime default of 12.
+              </div>
+            </div>
+            <Input
+              className="h-10 w-[104px] text-right"
+              inputMode="numeric"
+              value={draftCycleMaxIterations}
+              onChange={(event) => setDraftCycleMaxIterations(event.target.value)}
+              onBlur={commitCycleMaxIterations}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  commitCycleMaxIterations();
+                  event.currentTarget.blur();
+                }
+              }}
+            />
+          </div>
         </div>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
@@ -4918,6 +4972,7 @@ function NodeSystemCanvas({
   const [activeRunStatus, setActiveRunStatus] = useState<RunStatus | null>(null);
   const [currentRunNodeId, setCurrentRunNodeId] = useState<string | null>(null);
   const [runNodeStatusMap, setRunNodeStatusMap] = useState<Record<string, RunNodeStatus>>({});
+  const [activeRunEdgeIds, setActiveRunEdgeIds] = useState<string[]>([]);
   const [skillDefinitions, setSkillDefinitions] = useState<SkillDefinition[]>([]);
   const [skillDefinitionsLoading, setSkillDefinitionsLoading] = useState(true);
   const [skillDefinitionsError, setSkillDefinitionsError] = useState<string | null>(null);
@@ -4945,6 +5000,8 @@ function NodeSystemCanvas({
   const graphName = canonicalGraphState.name;
   const graphId = canonicalGraphState.graph_id ?? null;
   const metadata = canonicalGraphState.metadata;
+  const cycleMaxIterations = useMemo(() => resolveCycleMaxIterations(metadata), [metadata]);
+  const cycleBackEdgeIds = useMemo(() => collectCycleBackEdgeIds(canonicalGraphState), [canonicalGraphState]);
   const stateSchema = useMemo(() => buildEditorStateFieldsFromCanonicalGraph(canonicalGraphState), [canonicalGraphState]);
   const projectedNodes = useMemo(
     () =>
@@ -4994,6 +5051,11 @@ function NodeSystemCanvas({
       return [EMPTY_AGENT_PRESET, ...allPresets.filter((preset) => preset.presetId !== EMPTY_AGENT_PRESET.presetId && supportsType(preset))];
     },
     [allPresets],
+  );
+
+  const decoratedEdges = useMemo(
+    () => decorateFlowEdges(edges, cycleBackEdgeIds, new Set(activeRunEdgeIds)),
+    [activeRunEdgeIds, cycleBackEdgeIds, edges],
   );
 
   const nodePalette = useMemo(() => {
@@ -5173,6 +5235,7 @@ function NodeSystemCanvas({
       setActiveRunStatus(run.status);
       setCurrentRunNodeId(run.current_node_id ?? null);
       setRunNodeStatusMap(run.node_status_map ?? {});
+      setActiveRunEdgeIds(run.artifacts.active_edge_ids ?? []);
       const outputPreviewMap = new Map<string, string>();
       const resolvedDisplayModeMap = new Map<string, string>();
       for (const output of run.artifacts.exported_outputs ?? []) {
@@ -5236,7 +5299,7 @@ function NodeSystemCanvas({
         }),
       );
     },
-    [setActiveRunStatus, setCurrentRunNodeId, setNodes, setRunNodeStatusMap],
+    [setActiveRunEdgeIds, setActiveRunStatus, setCurrentRunNodeId, setNodes, setRunNodeStatusMap],
   );
 
   useEffect(() => {
@@ -5331,6 +5394,7 @@ function NodeSystemCanvas({
     setActiveRunId(null);
     setActiveRunStatus(null);
     setCurrentRunNodeId(null);
+    setActiveRunEdgeIds([]);
     setRunNodeStatusMap({});
     setSelectedNodeId(null);
     setNodes(initialFlowState.nodes);
@@ -5622,7 +5686,7 @@ function NodeSystemCanvas({
       if (targetHandle) {
         setEdges((current) =>
           current.concat({
-            id: `edge_${crypto.randomUUID().slice(0, 8)}`,
+            id: buildFlowEdgeId(connectionSource.sourceNodeId ?? "", connectionSource.sourceHandle ?? "", nextNode.id, targetHandle),
             source: connectionSource.sourceNodeId ?? "",
             target: nextNode.id,
             sourceHandle: connectionSource.sourceHandle ?? null,
@@ -5700,7 +5764,7 @@ function NodeSystemCanvas({
       if (targetHandle) {
         setEdges((current) =>
           current.concat({
-            id: `edge_${crypto.randomUUID().slice(0, 8)}`,
+            id: buildFlowEdgeId(connectionSource.sourceNodeId ?? "", connectionSource.sourceHandle ?? "", nextNode.id, targetHandle),
             source: connectionSource.sourceNodeId ?? "",
             target: nextNode.id,
             sourceHandle: connectionSource.sourceHandle ?? null,
@@ -5848,6 +5912,7 @@ function NodeSystemCanvas({
       setRunNodeStatusMap(queuedStatusMap);
       setActiveRunStatus(response.status as RunStatus);
       setCurrentRunNodeId(null);
+      setActiveRunEdgeIds([]);
       setActiveRunId(response.run_id);
       setStatusMessage(`Run ${response.run_id} queued. Pending ${nodes.length} nodes.`);
       setNodes((current) =>
@@ -6069,6 +6134,24 @@ function NodeSystemCanvas({
     setStatusMessage(`Added state ${nextField.key}`);
     setIsStatePanelOpen(true);
   }, [stateSchema, upsertCanonicalStateField]);
+
+  const updateCycleMaxIterations = useCallback((nextValue: number | null) => {
+    setCanonicalGraphState((current) => {
+      const nextMetadata = writeCycleMaxIterations(current.metadata, nextValue);
+      if (JSON.stringify(current.metadata ?? {}) === JSON.stringify(nextMetadata)) {
+        return current;
+      }
+      return {
+        ...current,
+        metadata: nextMetadata,
+      };
+    });
+    setStatusMessage(
+      nextValue == null
+        ? "Cycle limit reset to the runtime default."
+        : `Set cycle_max_iterations to ${Math.trunc(nextValue)}.`,
+    );
+  }, []);
 
   const deleteStateField = useCallback(
     (stateKey: string) => {
@@ -6330,7 +6413,7 @@ function NodeSystemCanvas({
                   },
                 };
               })}
-              edges={edges}
+              edges={decoratedEdges}
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}
               onSelectionChange={({ nodes: selectedNodes }) => setSelectedNodeId(selectedNodes[0]?.id ?? null)}
@@ -6429,7 +6512,12 @@ function NodeSystemCanvas({
                         ),
                     )
                     .concat({
-                      id: `edge_${crypto.randomUUID().slice(0, 8)}`,
+                      id: buildFlowEdgeId(
+                        connection.source ?? "",
+                        connection.sourceHandle ?? "",
+                        connection.target ?? "",
+                        nextTargetHandle ?? "",
+                      ),
                       source: connection.source ?? "",
                       target: connection.target ?? "",
                       sourceHandle: connection.sourceHandle ?? null,
@@ -6593,12 +6681,14 @@ function NodeSystemCanvas({
         <StatePanel
           open={isStatePanelOpen}
           stateSchema={stateSchema}
+          cycleMaxIterations={cycleMaxIterations}
           readersByKey={stateBindingsByKey.readersByKey}
           writersByKey={stateBindingsByKey.writersByKey}
           nodeOptions={stateBindingNodeOptions}
           selectedNodeId={selectedNodeId}
           onToggle={() => setIsStatePanelOpen((current) => !current)}
           onAddState={addStateField}
+          onUpdateCycleMaxIterations={updateCycleMaxIterations}
           onRenameState={renameStateField}
           onUpdateState={updateStateField}
           onDeleteState={deleteStateField}

@@ -22,6 +22,8 @@
 
 - LangGraph runtime 已支持条件边和 cycles 执行
 - 运行结果会返回 `cycle_summary / cycle_iterations`
+- editor 已有 `cycle_max_iterations` 图级配置入口、回边高亮和运行中 active edge 强调
+- run detail 已可展示循环摘要、回边和逐轮 iteration 明细
 - 当前循环停止条件只覆盖显式退出分支和最大轮次保护
 
 后续要做：
@@ -30,14 +32,10 @@
   - 无变化停止
   - 空轮次停止
   - 按 state 或输出变化量停止
-- 给 editor 增加正式的循环配置入口：
-  - `cycle_max_iterations`
+- 给 editor 增加剩余的循环配置入口：
   - 终止策略
-  - 回边高亮
-- 在 editor 和 run detail 中增强可视化：
-  - 每轮执行路径
-  - 回边
-  - 终止原因
+- 在 editor 和 run detail 中继续增强可视化：
+  - 更明确的终止原因展示
 - 明确 cycles 和 interrupt 的衔接方式
 
 ## 2. Knowledge Base 收尾与增强

@@ -15,6 +15,7 @@ import {
 } from "@/components/editor/node-system-editor";
 import { apiGet } from "@/lib/api";
 import { cn } from "@/lib/cn";
+import { createLiveEditorActionBridge } from "@/lib/editor-action-bridge";
 import {
   applyDocumentMetaToWorkspaceTab,
   closeWorkspaceTabTransition,
@@ -66,6 +67,7 @@ export function EditorWorkspaceShell({
   const [closeError, setCloseError] = useState<string | null>(null);
   const handledRouteSignatureRef = useRef<string | null>(null);
   const editorActionsRef = useRef<Record<string, NodeSystemEditorActionSet | null>>({});
+  const activeTabIdRef = useRef<string | null>(null);
 
   const templateById = useMemo(() => new Map(templates.map((template) => [template.template_id, template])), [templates]);
   const graphById = useMemo(() => new Map(graphs.map((graph) => [graph.graph_id, graph])), [graphs]);
@@ -73,7 +75,12 @@ export function EditorWorkspaceShell({
     () => workspace.tabs.find((tab) => tab.tabId === workspace.activeTabId) ?? null,
     [workspace.activeTabId, workspace.tabs],
   );
+  activeTabIdRef.current = activeTab?.tabId ?? null;
   const activeChrome = activeTab ? chromeByTabId[activeTab.tabId] ?? null : null;
+  const liveActions = useMemo(
+    () => createLiveEditorActionBridge<NodeSystemEditorActionSet>(editorActionsRef, activeTabIdRef),
+    [],
+  );
   const routeSignature = useMemo(() => {
     if (routeMode === "existing") {
       return `existing:${routeGraphId ?? ""}`;
@@ -387,7 +394,6 @@ export function EditorWorkspaceShell({
     };
   }, [activeTab, documentsByTabId, loadingByTabId, registerDocumentForTab]);
 
-  const activeActions = activeTab ? editorActionsRef.current[activeTab.tabId] ?? null : null;
   const pendingCloseTab = pendingCloseTabId ? workspace.tabs.find((tab) => tab.tabId === pendingCloseTabId) ?? null : null;
 
   if (!hydrated && routeMode === "root") {
@@ -433,11 +439,11 @@ export function EditorWorkspaceShell({
             onCreateNew={() => openNewTab(null)}
             onCreateFromTemplate={(templateId) => openNewTab(templateId)}
             onOpenGraph={(graphId) => openExistingGraph(graphId, graphById.get(graphId)?.name ?? graphId)}
-            onRenameActiveGraph={(name) => activeActions?.setGraphName(name)}
-            onToggleStatePanel={() => activeActions?.toggleStatePanel()}
-            onSaveActiveGraph={() => void activeActions?.save()}
-            onValidateActiveGraph={() => void activeActions?.validate()}
-            onRunActiveGraph={() => void activeActions?.run()}
+            onRenameActiveGraph={(name) => void liveActions.setGraphName(name)}
+            onToggleStatePanel={() => void liveActions.toggleStatePanel()}
+            onSaveActiveGraph={() => void liveActions.save()}
+            onValidateActiveGraph={() => void liveActions.validate()}
+            onRunActiveGraph={() => void liveActions.run()}
           />
           <div className="relative min-h-0 flex-1">
             {workspace.tabs.map((tab) => {

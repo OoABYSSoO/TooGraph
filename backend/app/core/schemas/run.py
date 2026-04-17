@@ -156,6 +156,7 @@ class RunDetail(RunSummary):
     output_previews: list[OutputPreview] = Field(default_factory=list)
     artifacts: RunArtifacts = Field(default_factory=RunArtifacts)
     state_snapshot: StateSnapshot = Field(default_factory=StateSnapshot)
+    graph_snapshot: dict[str, Any] = Field(default_factory=dict)
     cycle_summary: CycleSummary = Field(default_factory=CycleSummary)
 
 

@@ -9,6 +9,7 @@ import { RichContent, formatRichContentValue } from "@/components/ui/rich-conten
 import { apiGet } from "@/lib/api";
 import { useLanguage } from "@/components/providers/language-provider";
 import type { ExportedOutput, NodeSystemRunDetail } from "@/lib/node-system-schema";
+import { buildCycleVisualization, formatCycleStopReason } from "@/lib/run-cycle-visualization";
 
 type RunDetail = NodeSystemRunDetail;
 
@@ -55,6 +56,8 @@ export function RunDetailClient({ runId }: { runId: string }) {
     return <Card>{t("common.loading")}</Card>;
   }
 
+  const cycleVisualization = buildCycleVisualization(run);
+
   return (
     <section className="grid grid-cols-12 gap-[18px] max-[960px]:grid-cols-1">
       <Card className="col-span-4 max-[960px]:col-span-1">
@@ -75,15 +78,64 @@ export function RunDetailClient({ runId }: { runId: string }) {
         </div>
       </Card>
 
-      {run.cycle_summary?.has_cycle ? (
+      {cycleVisualization.hasCycle ? (
         <Card className="col-span-8 max-[960px]:col-span-1">
           <h2 className="mb-2.5">Cycle Summary</h2>
           <div className="flex flex-wrap gap-2.5">
-            <Badge>{run.cycle_summary.iteration_count} iterations</Badge>
-            <Badge>max {run.cycle_summary.max_iterations}</Badge>
-            {run.cycle_summary.stop_reason ? <Badge>{run.cycle_summary.stop_reason}</Badge> : null}
-            {(run.cycle_summary.back_edges ?? []).map((edge) => (
+            <Badge>{cycleVisualization.summary?.iteration_count ?? cycleVisualization.iterations.length} iterations</Badge>
+            <Badge>max {cycleVisualization.summary?.max_iterations ?? 0}</Badge>
+            {cycleVisualization.summary?.stop_reason ? <Badge>{formatCycleStopReason(cycleVisualization.summary.stop_reason)}</Badge> : null}
+            {cycleVisualization.backEdges.map((edge) => (
               <Badge key={edge}>{edge}</Badge>
+            ))}
+          </div>
+          {cycleVisualization.backEdges.length > 0 ? (
+            <div className="mt-3 text-sm leading-6 text-[var(--muted)]">
+              Back edges mark the links that keep the graph inside the loop.
+            </div>
+          ) : null}
+        </Card>
+      ) : null}
+
+      {cycleVisualization.hasCycle && cycleVisualization.iterations.length > 0 ? (
+        <Card className="col-span-12">
+          <h2 className="mb-2.5">Cycle Iterations</h2>
+          <div className="grid gap-3">
+            {cycleVisualization.iterations.map((iteration) => (
+              <SubtleCard key={iteration.iteration}>
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <strong>Iteration {iteration.iteration}</strong>
+                  <Badge>{iteration.executedNodeIds.length} nodes</Badge>
+                  <Badge>{iteration.activatedEdgeIds.length} edges</Badge>
+                  {iteration.stopReason ? <Badge>{formatCycleStopReason(iteration.stopReason)}</Badge> : null}
+                </div>
+                <div className="mt-3 grid gap-2 text-sm text-[var(--muted)]">
+                  <div>
+                    <span className="font-medium text-[var(--text)]">Executed</span>
+                    <div className="mt-1 flex flex-wrap gap-2">
+                      {iteration.executedNodeIds.length > 0 ? iteration.executedNodeIds.map((nodeId) => <Badge key={nodeId}>{nodeId}</Badge>) : <span>None</span>}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="font-medium text-[var(--text)]">Activated edges</span>
+                    <div className="mt-1 flex flex-wrap gap-2">
+                      {iteration.activatedEdgeIds.length > 0 ? iteration.activatedEdgeIds.map((edgeId) => <Badge key={edgeId}>{edgeId}</Badge>) : <span>None</span>}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="font-medium text-[var(--text)]">Incoming edges</span>
+                    <div className="mt-1 flex flex-wrap gap-2">
+                      {iteration.incomingEdgeIds.length > 0 ? iteration.incomingEdgeIds.map((edgeId) => <Badge key={edgeId}>{edgeId}</Badge>) : <span>None</span>}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="font-medium text-[var(--text)]">Next iteration</span>
+                    <div className="mt-1 flex flex-wrap gap-2">
+                      {iteration.nextIterationEdgeIds.length > 0 ? iteration.nextIterationEdgeIds.map((edgeId) => <Badge key={edgeId}>{edgeId}</Badge>) : <span>Loop exits here</span>}
+                    </div>
+                  </div>
+                </div>
+              </SubtleCard>
             ))}
           </div>
         </Card>

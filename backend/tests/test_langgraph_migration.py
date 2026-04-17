@@ -11,6 +11,7 @@ from app.core.compiler.validator import validate_graph
 from app.core.langgraph.compiler import compile_graph_to_langgraph_plan, get_langgraph_runtime_unsupported_reasons
 from app.core.langgraph.codegen import generate_langgraph_python_source
 from app.core.langgraph.runtime import execute_node_system_graph_langgraph
+from app.core.runtime import node_system_executor
 from app.core.runtime.state import create_initial_run_state, set_run_status
 from app.core.schemas.node_system import NodeSystemGraphPayload, NodeSystemTemplate
 from app.templates.loader import load_template_record
@@ -46,6 +47,20 @@ def _load_knowledge_base_validation_graph() -> NodeSystemGraphPayload:
 
 def _load_conditional_edge_validation_graph() -> NodeSystemGraphPayload:
     template = NodeSystemTemplate.model_validate(load_template_record("conditional_edge_validation"))
+    return NodeSystemGraphPayload.model_validate(
+        {
+            "name": template.default_graph_name,
+            "state_schema": template.state_schema,
+            "nodes": template.nodes,
+            "edges": template.edges,
+            "conditional_edges": template.conditional_edges,
+            "metadata": template.metadata,
+        }
+    )
+
+
+def _load_cycle_counter_demo_graph() -> NodeSystemGraphPayload:
+    template = NodeSystemTemplate.model_validate(load_template_record("cycle_counter_demo"))
     return NodeSystemGraphPayload.model_validate(
         {
             "name": template.default_graph_name,
@@ -393,6 +408,34 @@ class LangGraphMigrationTests(unittest.TestCase):
         validation = validate_graph(graph)
         self.assertTrue(validation.valid, validation.model_dump())
 
+    def test_cycle_counter_demo_template_still_valid(self):
+        graph = _load_cycle_counter_demo_graph()
+        validation = validate_graph(graph)
+        self.assertTrue(validation.valid, validation.model_dump())
+
+    def test_explicit_system_instruction_still_keeps_graph_state_inputs_in_agent_prompt(self):
+        graph = _load_cycle_counter_demo_graph()
+        node = graph.nodes["increment_counter"]
+        captured: dict[str, str] = {}
+
+        def _fake_chat_with_local_model_with_meta(**kwargs):
+            captured["system_prompt"] = kwargs["system_prompt"]
+            captured["user_prompt"] = kwargs["user_prompt"]
+            return ('{"counter": 1}', {"warnings": []})
+
+        with patch("app.core.runtime.node_system_executor._chat_with_local_model_with_meta", _fake_chat_with_local_model_with_meta):
+            runtime_config = node_system_executor._resolve_agent_runtime_config(node)
+            node_system_executor._generate_agent_response(node, {"counter": 0}, {}, runtime_config)
+
+        self.assertIn("== Graph State Inputs ==", captured["system_prompt"])
+        self.assertIn("- counter: 0", captured["system_prompt"])
+        self.assertIn('{"counter": "..."}', captured["system_prompt"])
+        self.assertIn("你是一个计数节点", captured["system_prompt"])
+        self.assertEqual(
+            captured["user_prompt"],
+            "读取输入 counter，并严格只返回 JSON：{\"counter\": 当前 counter + 1}。不要输出任何解释。",
+        )
+
     def test_knowledge_base_validation_has_no_langgraph_support_issues(self):
         graph = _load_knowledge_base_validation_graph()
         reasons = get_langgraph_runtime_unsupported_reasons(graph)
@@ -431,9 +474,31 @@ class LangGraphMigrationTests(unittest.TestCase):
         self.assertEqual(result["cycle_summary"]["iteration_count"], 3)
         self.assertEqual(result["cycle_summary"]["max_iterations"], 5)
         self.assertEqual(result["cycle_summary"]["stop_reason"], "completed")
+        self.assertEqual(result["cycle_summary"]["back_edges"], ["continue_check→increment_counter"])
         self.assertEqual(len(result["cycle_iterations"]), 3)
         self.assertEqual(result["cycle_iterations"][0]["stop_reason"], None)
         self.assertEqual(result["cycle_iterations"][-1]["stop_reason"], "completed")
+        self.assertEqual(result["cycle_iterations"][-1]["executed_node_ids"], ["increment_counter", "continue_check", "output_counter"])
+
+    @patch("app.core.langgraph.runtime.save_run", lambda state: None)
+    @patch("app.core.runtime.node_system_executor.save_run", lambda state: None)
+    @patch("app.core.runtime.node_system_executor._generate_agent_response", _fake_generate_agent_response_increment)
+    @patch("app.core.runtime.node_system_executor._invoke_skill", _fake_invoke_skill)
+    @patch("app.core.runtime.node_system_executor.get_skill_registry", _fake_skill_registry)
+    def test_cycle_counter_demo_template_langgraph_runtime(self):
+        graph = _load_cycle_counter_demo_graph()
+        result = execute_node_system_graph_langgraph(graph, persist_progress=False)
+
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(result["runtime_backend"], "langgraph")
+        self.assertEqual(result["state_snapshot"]["values"]["counter"], 3)
+        self.assertTrue(result["cycle_summary"]["has_cycle"])
+        self.assertEqual(result["cycle_summary"]["iteration_count"], 3)
+        self.assertEqual(result["cycle_summary"]["max_iterations"], 5)
+        self.assertEqual(result["cycle_summary"]["stop_reason"], "completed")
+        self.assertEqual(result["cycle_summary"]["back_edges"], ["continue_check→increment_counter"])
+        self.assertEqual(result["final_result"], "3")
+        self.assertEqual(result["cycle_iterations"][-1]["executed_node_ids"], ["increment_counter", "continue_check", "output_counter"])
 
     @patch("app.core.langgraph.runtime.save_run", lambda state: None)
     @patch("app.core.runtime.node_system_executor.save_run", lambda state: None)

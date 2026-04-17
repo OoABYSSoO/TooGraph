@@ -58,6 +58,7 @@ class RunState(TypedDict, total=False):
     duration_ms: int | None
     artifacts: dict[str, Any]
     state_snapshot: dict[str, Any]
+    graph_snapshot: dict[str, Any]
     cycle_summary: dict[str, Any]
     cycle_iterations: list[dict[str, Any]]
 

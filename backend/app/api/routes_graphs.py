@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from typing import Any
+from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from fastapi.responses import PlainTextResponse
@@ -37,6 +38,16 @@ def _schema_errors_to_paths(exc: ValidationError) -> list[dict[str, str]]:
 
 def _parse_graph_request(payload: dict[str, Any]) -> NodeSystemGraphPayload:
     return NodeSystemGraphPayload.model_validate(payload)
+
+
+def _build_runtime_graph_document(graph_payload: NodeSystemGraphPayload) -> NodeSystemGraphDocument:
+    runtime_graph_id = graph_payload.graph_id or f"runtime_graph_{uuid4().hex[:10]}"
+    return NodeSystemGraphDocument.model_validate(
+        {
+            **graph_payload.model_dump(exclude={"graph_id"}, by_alias=True),
+            "graph_id": runtime_graph_id,
+        }
+    )
 
 
 @router.get("")
@@ -119,7 +130,7 @@ def run_graph_endpoint(payload: dict[str, Any], background_tasks: BackgroundTask
     if not validation.valid:
         raise HTTPException(status_code=422, detail=validation.model_dump())
 
-    executed_graph = save_graph(graph_payload)
+    executed_graph = _build_runtime_graph_document(graph_payload)
     langgraph_unsupported_reasons = get_langgraph_runtime_unsupported_reasons(executed_graph)
     if langgraph_unsupported_reasons:
         raise HTTPException(
@@ -137,6 +148,7 @@ def run_graph_endpoint(payload: dict[str, Any], background_tasks: BackgroundTask
     run_state["runtime_backend"] = "langgraph"
     run_state["metadata"] = dict(executed_graph.metadata)
     run_state["metadata"]["resolved_runtime_backend"] = "langgraph"
+    run_state["graph_snapshot"] = executed_graph.model_dump(by_alias=True)
     run_state["node_status_map"] = {node_name: "idle" for node_name in executed_graph.nodes}
     touch_run_lifecycle(run_state)
     save_run(run_state)

@@ -262,6 +262,7 @@ export type NodeSystemRunDetail = {
   errors?: string[];
   output_previews?: OutputPreview[];
   artifacts: {
+    active_edge_ids?: string[];
     exported_outputs?: ExportedOutput[];
     state_events?: StateEvent[];
     state_values?: Record<string, unknown>;
