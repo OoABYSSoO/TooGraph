@@ -46,6 +46,12 @@ import { decorateFlowEdges } from "@/lib/node-system-edge-visuals";
 import { collectCycleBackEdgeIds } from "@/lib/node-system-cycle-edges";
 import { resolveCycleMaxIterations, writeCycleMaxIterations } from "@/lib/node-system-graph-metadata";
 import {
+  ROUTE_TARGET_HANDLE,
+  canNodeAcceptRouteTarget,
+  classifyEditorConnection,
+  resolveRouteTargetHandle,
+} from "@/lib/node-system-route-handles";
+import {
   buildCanonicalNodeFromEditorConfig,
   buildEditorNodeConfigFromCanonicalPreset,
   findFirstCompatibleInputHandleFromCanonicalNode,
@@ -170,6 +176,7 @@ type FlowNodeData = {
   collapsedSize?: NodeViewportSize | null;
   expandedSize?: NodeViewportSize | null;
   connectingSourceType?: ValueType | null;
+  showRouteTarget?: boolean;
   onUpdateCanonicalNodeConfig?: (updater: (node: CanonicalNode) => CanonicalNode["config"]) => void;
   onReplaceReadBindings?: (reads: CanonicalNode["reads"]) => void;
   onReplaceWriteBindings?: (writes: CanonicalNode["writes"]) => void;
@@ -1702,12 +1709,6 @@ function buildFlowEdgeId(source: string, sourceHandle: string, target: string, t
   return `edge:${source}:${sourceHandle}:${target}:${targetHandle}`;
 }
 
-function firstCanonicalInputHandle(node: CanonicalNode | undefined): string | null {
-  if (!node) return null;
-  const firstRead = node.reads[0];
-  return firstRead ? `input:${firstRead.state}` : null;
-}
-
 function createFlowEdgesFromCanonicalGraph(graph: CanonicalGraphPayload, nodesById: Map<string, FlowNode>): Edge[] {
   const edges = graph.edges.map((edge) => createFlowEdgeFromCanonicalEdge(edge, graph, nodesById));
   for (const conditionalEdge of graph.conditional_edges) {
@@ -1719,7 +1720,7 @@ function createFlowEdgesFromCanonicalGraph(graph: CanonicalGraphPayload, nodesBy
         source: conditionalEdge.source,
         target,
         sourceHandle: `output:${branchKey}`,
-        targetHandle: firstCanonicalInputHandle(graph.nodes[target]),
+        targetHandle: ROUTE_TARGET_HANDLE,
         markerEnd: { type: MarkerType.ArrowClosed, color },
         style: {
           stroke: color,
@@ -2662,6 +2663,21 @@ function PortRow({
   );
 }
 
+function RouteTargetHandle({ visible }: { visible: boolean }) {
+  return (
+    <Handle
+      id={ROUTE_TARGET_HANDLE}
+      type="target"
+      position={Position.Top}
+      className={cn(
+        "!left-1/2 !top-[10px] !m-0 !h-3 !w-3 !-translate-x-1/2 !border-2 !border-[rgba(255,250,241,0.96)] !bg-[rgba(154,52,18,0.92)] transition-all duration-150",
+        visible ? "!opacity-100 !scale-100" : "!opacity-0 !scale-75 pointer-events-none",
+      )}
+      isConnectable={visible}
+    />
+  );
+}
+
 function normalizeStateSearchText(value: string) {
   return value.toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
 }
@@ -3270,6 +3286,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
           }
           }}
         >
+        <RouteTargetHandle visible={Boolean(data.showRouteTarget)} />
         {isPresetEligibleFamily(nodeKind) ? (
           <button
             ref={presetButtonRef}
@@ -4979,6 +4996,7 @@ function NodeSystemCanvas({
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBaseOption[]>([]);
   const [editorSettings, setEditorSettings] = useState<EditorSettingsPayload | null>(null);
   const [connectingSourceType, setConnectingSourceType] = useState<ValueType | null>(null);
+  const [showRouteTargets, setShowRouteTargets] = useState(false);
   const [creationMenu, setCreationMenu] = useState<{
     clientX: number;
     clientY: number;
@@ -6255,6 +6273,7 @@ function NodeSystemCanvas({
                         : node.data.previewText || previewTextByNode[node.id] || "",
                     executionStatus: runNodeStatusMap[node.id],
                     isCurrentRunNode: currentRunNodeId === node.id,
+                    showRouteTarget: showRouteTargets && Boolean(canonicalGraph.nodes[node.id] && canNodeAcceptRouteTarget(canonicalGraph.nodes[node.id].kind)),
                     isExpanded: node.data.isExpanded,
                     collapsedSize: node.data.collapsedSize ?? null,
                     expandedSize: node.data.expandedSize ?? null,
@@ -6429,7 +6448,9 @@ function NodeSystemCanvas({
                 if (params.handleType !== "source" || !params.nodeId || !params.handleId) return;
                 const sourceNode = projectedNodes.find((node) => node.id === params.nodeId);
                 const sourceValueType = sourceNode ? getPortTypeFromCanonicalGraph(canonicalGraph, sourceNode.id, params.handleId) : null;
+                const sourceKind = sourceNode?.data.canonicalNode?.kind ?? canonicalGraph.nodes[params.nodeId]?.kind ?? null;
                 setConnectingSourceType(sourceValueType);
+                setShowRouteTargets(sourceKind === "condition");
                 pendingConnectRef.current = {
                   sourceNodeId: params.nodeId,
                   sourceHandle: params.handleId,
@@ -6442,11 +6463,37 @@ function NodeSystemCanvas({
                 const targetNode = projectedNodes.find((node) => node.id === connection.target);
                 if (!sourceNode || !targetNode) return;
 
-                const sourceType = getPortTypeFromCanonicalGraph(canonicalGraph, sourceNode.id, connection.sourceHandle);
-                let nextTargetHandle = connection.targetHandle ?? null;
-                let targetType = getPortTypeFromCanonicalGraph(canonicalGraph, targetNode.id, nextTargetHandle);
+                const sourceCanonicalNode = canonicalGraph.nodes[sourceNode.id];
+                if (!sourceCanonicalNode) {
+                  setStatusMessage("Failed to resolve source node.");
+                  setConnectingSourceType(null);
+                  setShowRouteTargets(false);
+                  return;
+                }
 
-                if (getPortKeyFromHandle(connection.targetHandle) === CREATE_INPUT_PORT_KEY && sourceType) {
+                const targetCanonicalNode = canonicalGraph.nodes[targetNode.id];
+                if (!targetCanonicalNode) {
+                  setStatusMessage("Failed to resolve target node.");
+                  setConnectingSourceType(null);
+                  setShowRouteTargets(false);
+                  return;
+                }
+
+                const connectionKind = classifyEditorConnection(sourceCanonicalNode.kind, targetCanonicalNode.kind, connection.targetHandle ?? null);
+                const sourceType = getPortTypeFromCanonicalGraph(canonicalGraph, sourceNode.id, connection.sourceHandle);
+                let nextTargetHandle = resolveRouteTargetHandle(sourceCanonicalNode.kind, connection.targetHandle ?? null);
+                let targetType = connectionKind === "data"
+                  ? getPortTypeFromCanonicalGraph(canonicalGraph, targetNode.id, nextTargetHandle)
+                  : null;
+
+                if (connectionKind === "invalid") {
+                  setStatusMessage("Top route handles only accept branch connections from condition nodes.");
+                  setConnectingSourceType(null);
+                  setShowRouteTargets(false);
+                  return;
+                }
+
+                if (connectionKind === "data" && getPortKeyFromHandle(connection.targetHandle) === CREATE_INPUT_PORT_KEY && sourceType) {
                   if (targetNode.data.canonicalNode?.kind === "agent") {
                     const sourcePortKey = getPortKeyFromHandle(connection.sourceHandle) || `${sourceType}_input`;
                     const existingState = getStateFieldByKey(stateSchema, sourcePortKey);
@@ -6463,6 +6510,7 @@ function NodeSystemCanvas({
                     }
                     if (!bindStateFieldToPort(targetNode.id, "input", nextField)) {
                       setConnectingSourceType(null);
+                      setShowRouteTargets(false);
                       return;
                     }
                     nextTargetHandle = buildHandleId("input", nextField.key);
@@ -6484,6 +6532,7 @@ function NodeSystemCanvas({
                     }
                     if (!bindStateFieldToPort(targetNode.id, "input", nextField)) {
                       setConnectingSourceType(null);
+                      setShowRouteTargets(false);
                       return;
                     }
                     nextTargetHandle = buildHandleId("input", nextField.key);
@@ -6492,14 +6541,20 @@ function NodeSystemCanvas({
                   }
                 }
 
-                if (!sourceType || !targetType || !isValueTypeCompatible(sourceType, targetType)) {
+                if (connectionKind === "data" && (!sourceType || !targetType || !isValueTypeCompatible(sourceType, targetType))) {
                   setStatusMessage("Only compatible value types can be connected.");
                   setConnectingSourceType(null);
+                  setShowRouteTargets(false);
                   return;
                 }
 
+                const edgeColor = connectionKind === "route"
+                  ? "var(--accent-strong)"
+                  : TYPE_COLORS[sourceType ?? "any"];
+
                 pendingConnectRef.current.completed = true;
                 setConnectingSourceType(null);
+                setShowRouteTargets(false);
                 setEdges((current) =>
                   current
                     .filter(
@@ -6508,7 +6563,7 @@ function NodeSystemCanvas({
                           edge.source === connection.source &&
                           edge.target === connection.target &&
                           edge.sourceHandle === connection.sourceHandle &&
-                          edge.targetHandle === connection.targetHandle
+                          edge.targetHandle === nextTargetHandle
                         ),
                     )
                     .concat({
@@ -6522,9 +6577,9 @@ function NodeSystemCanvas({
                       target: connection.target ?? "",
                       sourceHandle: connection.sourceHandle ?? null,
                       targetHandle: nextTargetHandle,
-                      markerEnd: { type: MarkerType.ArrowClosed, color: TYPE_COLORS[sourceType] },
+                      markerEnd: { type: MarkerType.ArrowClosed, color: edgeColor },
                       style: {
-                        stroke: TYPE_COLORS[sourceType],
+                        stroke: edgeColor,
                         strokeWidth: 1.8,
                       },
                     }),
@@ -6549,6 +6604,7 @@ function NodeSystemCanvas({
                   });
                 }
                 setConnectingSourceType(null);
+                setShowRouteTargets(false);
                 pendingConnectRef.current = { completed: false };
               }}
               onDragOver={(event) => {
