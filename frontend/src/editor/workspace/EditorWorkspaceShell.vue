@@ -1,31 +1,34 @@
 <template>
   <section class="editor-workspace-shell">
-    <EditorWelcomeState
-      v-if="workspace.tabs.length === 0"
-      :templates="templates"
-      :graphs="graphs"
-      @create-new="openNewTab(null)"
-      @open-template="openNewTab"
-      @open-graph="openExistingGraph"
-    />
-
-    <template v-else>
-      <EditorTabBar
-        :tabs="workspace.tabs"
-        :active-tab-id="workspace.activeTabId"
+    <div v-if="workspace.tabs.length === 0" class="editor-workspace-shell__welcome">
+      <EditorWelcomeState
         :templates="templates"
         :graphs="graphs"
-        :active-graph-name="activeTabTitle"
-        @activate-tab="activateTab"
-        @close-tab="requestCloseTab"
         @create-new="openNewTab(null)"
-        @create-from-template="openNewTab"
+        @open-template="openNewTab"
         @open-graph="openExistingGraph"
-        @rename-active-graph="renameActiveGraph"
-        @save-active-graph="saveActiveGraph"
-        @validate-active-graph="validateActiveGraph"
-        @run-active-graph="runActiveGraph"
       />
+    </div>
+
+    <template v-else>
+      <div class="editor-workspace-shell__chrome">
+        <EditorTabBar
+          :tabs="workspace.tabs"
+          :active-tab-id="workspace.activeTabId"
+          :templates="templates"
+          :graphs="graphs"
+          :active-graph-name="activeTabTitle"
+          @activate-tab="activateTab"
+          @close-tab="requestCloseTab"
+          @create-new="openNewTab(null)"
+          @create-from-template="openNewTab"
+          @open-graph="openExistingGraph"
+          @rename-active-graph="renameActiveGraph"
+          @save-active-graph="saveActiveGraph"
+          @validate-active-graph="validateActiveGraph"
+          @run-active-graph="runActiveGraph"
+        />
+      </div>
 
       <div class="editor-workspace-shell__body">
         <div
@@ -70,7 +73,7 @@ import { useRoute, useRouter } from "vue-router";
 import { fetchGraph, runGraph, saveGraph, validateGraph } from "@/api/graphs";
 import EditorCanvas from "@/editor/canvas/EditorCanvas.vue";
 import { resolveEditorRouteInstruction } from "@/lib/editor-route-sync";
-import { createDraftFromTemplate, createEmptyDraftGraph } from "@/lib/graph-document";
+import { cloneGraphDocument, createDraftFromTemplate, createEmptyDraftGraph } from "@/lib/graph-document";
 import {
   applyDocumentMetaToWorkspaceTab,
   closeWorkspaceTabTransition,
@@ -291,7 +294,7 @@ function openExistingGraph(graphId: string, navigation: "push" | "replace" | "no
 
   const nextTabId = nextWorkspace.activeTabId;
   if (nextTabId && graph) {
-    registerDocumentForTab(nextTabId, structuredClone(graph));
+    registerDocumentForTab(nextTabId, cloneGraphDocument(graph));
   } else if (nextTabId) {
     void loadExistingGraphIntoTab(nextTabId, graphId);
   }
@@ -378,7 +381,7 @@ function handleNodePositionUpdate(tabId: string, payload: { nodeId: string; posi
     return;
   }
 
-  const nextDocument = structuredClone(document);
+  const nextDocument = cloneGraphDocument(document);
   nextDocument.nodes[payload.nodeId].ui.position = payload.position;
   setDocumentForTab(tabId, nextDocument);
 
@@ -401,7 +404,7 @@ function renameActiveGraph(name: string) {
     return;
   }
 
-  const nextDocument = structuredClone(document);
+  const nextDocument = cloneGraphDocument(document);
   nextDocument.name = name;
   setDocumentForTab(tab.tabId, nextDocument);
   updateWorkspace(
@@ -577,13 +580,28 @@ onMounted(() => {
   position: relative;
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - 56px);
+  height: 100vh;
+  min-height: 0;
+  background: radial-gradient(circle at top, rgba(154, 52, 18, 0.1), transparent 22%),
+    linear-gradient(180deg, #f5efe2 0%, #ede4d2 100%);
+}
+
+.editor-workspace-shell__welcome {
+  flex: 1;
+  min-height: 0;
+  padding: 24px;
+  overflow: auto;
+}
+
+.editor-workspace-shell__chrome {
+  padding: 16px 16px 12px;
 }
 
 .editor-workspace-shell__body {
   position: relative;
-  min-height: 0;
   flex: 1;
+  min-height: 0;
+  padding: 0 16px 16px;
 }
 
 .editor-workspace-shell__editor {

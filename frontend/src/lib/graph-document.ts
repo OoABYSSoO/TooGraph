@@ -1,11 +1,11 @@
 import { toRaw } from "vue";
 
-import type { GraphPayload, TemplateRecord } from "../types/node-system.ts";
+import type { GraphDocument, GraphPayload, TemplateRecord } from "../types/node-system.ts";
 
 export function createDraftFromTemplate(template: TemplateRecord): GraphPayload {
   const rawTemplate = toRaw(template) as TemplateRecord;
 
-  return structuredClone({
+  return cloneGraphDocument({
     graph_id: null,
     name: rawTemplate.default_graph_name,
     state_schema: rawTemplate.state_schema,
@@ -26,4 +26,9 @@ export function createEmptyDraftGraph(name = "Untitled Graph"): GraphPayload {
     conditional_edges: [],
     metadata: {},
   };
+}
+
+export function cloneGraphDocument<T extends GraphPayload | GraphDocument>(document: T): T {
+  const rawDocument = toRaw(document) as T;
+  return structuredClone(rawDocument);
 }

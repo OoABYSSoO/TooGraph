@@ -2,8 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { reactive } from "vue";
 
-import { createDraftFromTemplate, createEmptyDraftGraph } from "./graph-document.ts";
-import type { TemplateRecord } from "../types/node-system.ts";
+import { cloneGraphDocument, createDraftFromTemplate, createEmptyDraftGraph } from "./graph-document.ts";
+import type { GraphDocument, TemplateRecord } from "../types/node-system.ts";
 
 const template: TemplateRecord = {
   template_id: "hello_world",
@@ -73,6 +73,26 @@ test("createDraftFromTemplate accepts Vue reactive template records", () => {
 
   assert.equal(draft.name, "Hello World");
   assert.deepEqual(draft.nodes, template.nodes);
+});
+
+test("cloneGraphDocument accepts Vue reactive graph documents", () => {
+  const graph: GraphDocument = {
+    graph_id: "graph_123",
+    name: "Hello World",
+    state_schema: template.state_schema,
+    nodes: template.nodes,
+    edges: template.edges,
+    conditional_edges: template.conditional_edges,
+    metadata: template.metadata,
+  };
+
+  const reactiveGraph = reactive(graph) as GraphDocument;
+
+  const clone = cloneGraphDocument(reactiveGraph);
+
+  assert.equal(clone.graph_id, "graph_123");
+  assert.deepEqual(clone.nodes, graph.nodes);
+  assert.notEqual(clone, reactiveGraph);
 });
 
 test("createEmptyDraftGraph creates an empty backend-native payload", () => {

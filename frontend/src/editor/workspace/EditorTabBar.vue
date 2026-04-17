@@ -135,11 +135,12 @@ function cancelGraphNameEdit() {
 <style scoped>
 .editor-tab-bar {
   display: grid;
-  gap: 14px;
-  border-bottom: 1px solid rgba(154, 52, 18, 0.14);
+  gap: 12px;
+  border: 1px solid rgba(154, 52, 18, 0.14);
+  border-radius: 28px;
   background: rgba(255, 250, 241, 0.9);
-  padding: 12px 16px;
-  box-shadow: 0 10px 24px rgba(154, 52, 18, 0.05);
+  padding: 14px 16px;
+  box-shadow: 0 18px 36px rgba(154, 52, 18, 0.08);
 }
 
 .editor-tab-bar__tabs {
