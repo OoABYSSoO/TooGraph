@@ -26,6 +26,7 @@ test("static canonical presets still derive usable editor configs", () => {
   assert.deepEqual(agentConfig.outputs, []);
   assert.equal(conditionConfig.family, "condition");
   assert.deepEqual(conditionConfig.branches.map((branch) => branch.key), ["continue", "retry"]);
+  assert.equal(conditionConfig.loopLimit, -1);
   assert.deepEqual(conditionConfig.branchMapping, {
     true: "continue",
     false: "retry",

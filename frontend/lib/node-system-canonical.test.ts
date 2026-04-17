@@ -7,6 +7,7 @@ import {
   getCanonicalNodeDisplayName,
   getEditorPortValueTypeFromCanonicalHandle,
   findFirstCompatibleInputHandleFromCanonicalNode,
+  listConditionRuleSourceOptions,
   listEditorInputPortsFromCanonicalNode,
   listEditorOutputPortsFromCanonicalNode,
   syncKnowledgeBaseSkillOnCanonicalAgentNode,
@@ -219,7 +220,7 @@ test("condition node helpers expose branch outputs by branch key", () => {
     writes: [],
     config: {
       branches: ["continue", "stop"],
-      conditionMode: "rule" as const,
+      loopLimit: 5,
       branchMapping: {},
       rule: {
         source: "question",
@@ -240,6 +241,64 @@ test("condition node helpers expose branch outputs by branch key", () => {
       label: "stop",
       valueType: "any",
     },
+  ]);
+});
+
+test("condition rule source options come only from the condition reads", () => {
+  const stateSchema = {
+    question: {
+      name: "Question",
+      description: "User question",
+      type: "text",
+      value: "",
+      color: "#d97706",
+    },
+    knowledge_base: {
+      name: "Knowledge Base",
+      description: "Selected knowledge base",
+      type: "knowledge_base",
+      value: "",
+      color: "#2563eb",
+    },
+    answer: {
+      name: "Answer",
+      description: "Generated answer",
+      type: "text",
+      value: "",
+      color: "#2563eb",
+    },
+  } as const;
+
+  const node = {
+    kind: "condition" as const,
+    name: "route_question",
+    description: "",
+    ui: {
+      position: { x: 0, y: 0 },
+      collapsed: false,
+    },
+    reads: [
+      { state: "question", required: true },
+      { state: "knowledge_base", required: false },
+    ],
+    writes: [],
+    config: {
+      branches: ["continue", "retry"],
+      branchMapping: {
+        true: "continue",
+        false: "retry",
+      },
+      rule: {
+        source: "question",
+        operator: "exists" as const,
+        value: null,
+      },
+    },
+  };
+
+  assert.deepEqual(listConditionRuleSourceOptions(node, stateSchema), [
+    { value: "question", label: "Question" },
+    { value: "knowledge_base", label: "Knowledge Base" },
   ]);
 });
 
@@ -297,7 +356,7 @@ test("getEditorPortValueTypeFromCanonicalHandle resolves canonical port types an
     writes: [],
     config: {
       branches: ["yes", "no"],
-      conditionMode: "rule" as const,
+      loopLimit: -1,
       branchMapping: { yes: "a", no: "b" },
       rule: { source: "question", operator: "exists" as const, value: null },
     },

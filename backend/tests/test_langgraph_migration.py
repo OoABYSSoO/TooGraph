@@ -185,7 +185,7 @@ def _build_cycle_graph() -> NodeSystemGraphPayload:
                     "reads": [{"state": "counter", "required": True}],
                     "config": {
                         "branches": ["continue", "stop"],
-                        "conditionMode": "rule",
+                        "loopLimit": 5,
                         "branchMapping": {},
                         "rule": {"source": "counter", "operator": "<", "value": 3},
                     },
@@ -227,9 +227,7 @@ def _build_cycle_graph() -> NodeSystemGraphPayload:
                     },
                 }
             ],
-            "metadata": {
-                "cycle_max_iterations": 5,
-            },
+            "metadata": {},
         }
     )
 
@@ -499,6 +497,41 @@ class LangGraphMigrationTests(unittest.TestCase):
         self.assertEqual(result["cycle_summary"]["back_edges"], ["continue_check→increment_counter"])
         self.assertEqual(result["final_result"], "3")
         self.assertEqual(result["cycle_iterations"][-1]["executed_node_ids"], ["increment_counter", "continue_check", "output_counter"])
+
+    @patch("app.core.langgraph.runtime.save_run", lambda state: None)
+    @patch("app.core.runtime.node_system_executor.save_run", lambda state: None)
+    @patch("app.core.runtime.node_system_executor._generate_agent_response", _fake_generate_agent_response_increment)
+    @patch("app.core.runtime.node_system_executor._invoke_skill", _fake_invoke_skill)
+    @patch("app.core.runtime.node_system_executor.get_skill_registry", _fake_skill_registry)
+    def test_cycle_counter_demo_allows_unlimited_cycle_iterations_with_negative_one(self):
+        graph = _load_cycle_counter_demo_graph()
+        graph.nodes["continue_check"].config.loop_limit = -1
+
+        result = execute_node_system_graph_langgraph(graph, persist_progress=False)
+
+        self.assertEqual(result["status"], "completed")
+        self.assertTrue(result["cycle_summary"]["has_cycle"])
+        self.assertEqual(result["cycle_summary"]["max_iterations"], -1)
+        self.assertEqual(result["cycle_summary"]["iteration_count"], 3)
+        self.assertEqual(result["state_snapshot"]["values"]["counter"], 3)
+
+    @patch("app.core.langgraph.runtime.save_run", lambda state: None)
+    @patch("app.core.runtime.node_system_executor.save_run", lambda state: None)
+    @patch("app.core.runtime.node_system_executor._generate_agent_response", _fake_generate_agent_response_increment)
+    @patch("app.core.runtime.node_system_executor._invoke_skill", _fake_invoke_skill)
+    @patch("app.core.runtime.node_system_executor.get_skill_registry", _fake_skill_registry)
+    def test_cycle_counter_demo_ignores_graph_level_cycle_limit_metadata(self):
+        graph = _load_cycle_counter_demo_graph()
+        graph.metadata["cycle_max_iterations"] = 1
+        graph.nodes["continue_check"].config.loop_limit = 5
+
+        result = execute_node_system_graph_langgraph(graph, persist_progress=False)
+
+        self.assertEqual(result["status"], "completed")
+        self.assertTrue(result["cycle_summary"]["has_cycle"])
+        self.assertEqual(result["cycle_summary"]["max_iterations"], 5)
+        self.assertEqual(result["cycle_summary"]["iteration_count"], 3)
+        self.assertEqual(result["state_snapshot"]["values"]["counter"], 3)
 
     @patch("app.core.langgraph.runtime.save_run", lambda state: None)
     @patch("app.core.runtime.node_system_executor.save_run", lambda state: None)

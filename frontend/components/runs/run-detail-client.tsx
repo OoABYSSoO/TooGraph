@@ -83,7 +83,7 @@ export function RunDetailClient({ runId }: { runId: string }) {
           <h2 className="mb-2.5">Cycle Summary</h2>
           <div className="flex flex-wrap gap-2.5">
             <Badge>{cycleVisualization.summary?.iteration_count ?? cycleVisualization.iterations.length} iterations</Badge>
-            <Badge>max {cycleVisualization.summary?.max_iterations ?? 0}</Badge>
+            <Badge>max {cycleVisualization.summary?.max_iterations === -1 ? "unlimited" : (cycleVisualization.summary?.max_iterations ?? 0)}</Badge>
             {cycleVisualization.summary?.stop_reason ? <Badge>{formatCycleStopReason(cycleVisualization.summary.stop_reason)}</Badge> : null}
             {cycleVisualization.backEdges.map((edge) => (
               <Badge key={edge}>{edge}</Badge>

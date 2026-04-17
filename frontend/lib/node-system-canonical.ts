@@ -12,6 +12,7 @@ import type {
   StateFieldType,
   ValueType,
 } from "@/lib/node-system-schema";
+import { buildConditionRuleSourceOptions } from "./node-system-condition-rule.ts";
 
 export type CanonicalStateType =
   | "text"
@@ -92,7 +93,7 @@ export type CanonicalConditionNode = {
   writes: CanonicalWriteBinding[];
   config: {
     branches: string[];
-    conditionMode: "rule" | "cycle";
+    loopLimit: number;
     branchMapping: Record<string, string>;
     rule: ConditionNode["rule"];
   };
@@ -312,7 +313,7 @@ export function buildCanonicalNodeFromEditorConfig(params: {
       writes: Object.values(writesByPort).map((binding) => ({ state: binding.stateKey, mode: "replace" })),
       config: {
         branches: config.branches.map((branch) => branch.key),
-        conditionMode: config.conditionMode,
+        loopLimit: typeof config.loopLimit === "number" ? config.loopLimit : -1,
         branchMapping: config.branchMapping,
         rule: config.rule,
       },
@@ -591,7 +592,7 @@ export function buildEditorNodeConfigFromCanonicalNode(
       family: "condition",
       inputs: node.reads.map((binding) => buildEditorPort(binding.state, stateSchema, binding.required)),
       branches: buildEditorConditionBranches(node.config.branches),
-      conditionMode: node.config.conditionMode,
+      loopLimit: typeof node.config.loopLimit === "number" ? node.config.loopLimit : -1,
       rule: node.config.rule,
       branchMapping: node.config.branchMapping,
     } satisfies ConditionNode;
@@ -626,4 +627,11 @@ export function buildEditorNodeConfigFromCanonicalPreset(preset: CanonicalPreset
     name: preset.definition.node.name || nodeId,
     description: preset.definition.description || preset.definition.node.description,
   };
+}
+
+export function listConditionRuleSourceOptions(
+  node: Pick<CanonicalConditionNode, "reads">,
+  stateSchema: Record<string, CanonicalStateDefinition>,
+) {
+  return buildConditionRuleSourceOptions(node.reads, stateSchema);
 }

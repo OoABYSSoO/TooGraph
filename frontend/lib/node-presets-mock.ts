@@ -53,7 +53,7 @@ export const EMPTY_CONDITION_PRESET = createCanonicalPresetDocument({
       writes: [],
       config: {
         branches: ["continue", "retry"],
-        conditionMode: "rule",
+        loopLimit: -1,
         branchMapping: {
           true: "continue",
           false: "retry",

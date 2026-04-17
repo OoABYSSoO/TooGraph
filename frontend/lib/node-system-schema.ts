@@ -83,7 +83,7 @@ export type ConditionNode = {
   family: "condition";
   inputs: PortDefinition[];
   branches: BranchDefinition[];
-  conditionMode: "rule" | "cycle";
+  loopLimit: number;
   rule: ConditionRule;
   branchMapping: Record<string, string>;
 };

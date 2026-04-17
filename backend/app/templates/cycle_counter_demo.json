@@ -61,7 +61,7 @@
       ],
       "config": {
         "branches": ["continue", "stop"],
-        "conditionMode": "rule",
+        "loopLimit": 5,
         "branchMapping": {},
         "rule": {
           "source": "counter",
@@ -111,8 +111,5 @@
         "stop": "output_counter"
       }
     }
-  ],
-  "metadata": {
-    "cycle_max_iterations": 5
-  }
+  ]
 }

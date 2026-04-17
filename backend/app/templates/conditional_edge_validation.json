@@ -85,7 +85,6 @@
       ],
       "config": {
         "branches": ["pass", "fail"],
-        "conditionMode": "rule",
         "branchMapping": {
           "true": "pass",
           "false": "fail"

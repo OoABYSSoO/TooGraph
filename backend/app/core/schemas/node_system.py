@@ -90,11 +90,6 @@ class ConditionOperator(str, Enum):
     EXISTS = "exists"
 
 
-class ConditionMode(str, Enum):
-    RULE = "rule"
-    CYCLE = "cycle"
-
-
 class DisplayMode(str, Enum):
     AUTO = "auto"
     PLAIN = "plain"
@@ -190,13 +185,20 @@ class NodeSystemConditionRule(BaseModel):
 
 class NodeSystemConditionConfig(BaseModel):
     branches: list[str] = Field(default_factory=list)
-    condition_mode: ConditionMode = Field(default=ConditionMode.RULE, alias="conditionMode")
+    loop_limit: int = Field(default=-1, alias="loopLimit")
     branch_mapping: dict[str, str] = Field(default_factory=dict, alias="branchMapping")
     rule: NodeSystemConditionRule = Field(
         default_factory=lambda: NodeSystemConditionRule(source="result", operator=ConditionOperator.EXISTS, value=None)
     )
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_legacy_condition_mode_alias(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "conditionMode" in data:
+            raise ValueError("'conditionMode' is no longer supported.")
+        return data
 
     @field_validator("branches")
     @classmethod
@@ -221,6 +223,15 @@ class NodeSystemConditionConfig(BaseModel):
                 raise ValueError("Condition branch mapping key cannot be empty.")
             normalized[next_key] = _validate_identifier(branch, label="Condition branch")
         return normalized
+
+    @field_validator("loop_limit")
+    @classmethod
+    def validate_loop_limit(cls, value: int) -> int:
+        if value == -1:
+            return -1
+        if value < 1:
+            raise ValueError("Condition loop limit must be -1 or a positive integer.")
+        return value
 
 
 class NodeSystemOutputConfig(BaseModel):

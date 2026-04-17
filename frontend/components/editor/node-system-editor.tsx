@@ -44,7 +44,6 @@ import { cn } from "@/lib/cn";
 import { createEditorSeedGraph } from "@/lib/editor-graph-defaults";
 import { decorateFlowEdges } from "@/lib/node-system-edge-visuals";
 import { collectCycleBackEdgeIds } from "@/lib/node-system-cycle-edges";
-import { resolveCycleMaxIterations, writeCycleMaxIterations } from "@/lib/node-system-graph-metadata";
 import { getNodePortSectionPresentation } from "@/lib/node-system-node-card-presentation";
 import {
   listConditionBranchMappingKeys,
@@ -64,6 +63,7 @@ import {
   buildEditorStateFieldsFromCanonicalStateSchema,
   getCanonicalNodeDisplayName as getCanonicalNodeNameFromNode,
   getEditorPortValueTypeFromCanonicalHandle,
+  listConditionRuleSourceOptions,
   listEditorInputPortsFromCanonicalNode,
   listEditorOutputPortsFromCanonicalNode,
   syncKnowledgeBaseSkillOnCanonicalAgentNode,
@@ -1508,12 +1508,6 @@ const RULE_OPERATOR_SELECT_OPTIONS: FieldSelectOption[] = RULE_OPERATOR_OPTIONS.
   label: option,
 }));
 
-const CONDITION_MODE_SELECT_OPTIONS: FieldSelectOption[] = [
-  { value: "rule", label: "Rule", detail: "Evaluate an explicit source/operator/value rule." },
-  { value: "cycle", label: "Cycle", detail: "Use the rule as a loop gate inside a cyclic graph." },
-  // { value: "model", label: "Model", detail: "Let the model decide the branch from context." },
-];
-
 function normalizeViewportSize(size: unknown): NodeViewportSize | null {
   if (!size || typeof size !== "object") return null;
   const candidate = size as Record<string, unknown>;
@@ -1994,16 +1988,35 @@ function SkillPickerPanel({
 
 function RuleEditor({
   rule,
+  sourceOptions,
   onChange,
 }: {
   rule: ConditionRule;
+  sourceOptions: FieldSelectOption[];
   onChange: (nextRule: ConditionRule) => void;
 }) {
+  const resolvedSourceOptions =
+    sourceOptions.length > 0
+      ? sourceOptions
+      : [
+          {
+            value: "",
+            label: "No inputs",
+          },
+        ];
+  const resolvedSource =
+    sourceOptions.some((option) => option.value === rule.source) ? rule.source : (resolvedSourceOptions[0]?.value ?? "");
+
   return (
-    <PanelSection title="Rule" description="配置条件节点的判断规则。">
+    <div className="grid gap-3 rounded-[18px] border border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.72)] p-3">
       <label className="grid gap-1.5 text-sm text-[var(--muted)]">
         <span>Source</span>
-        <Input value={rule.source} onChange={(event) => onChange({ ...rule, source: event.target.value })} />
+        <FieldSelect
+          value={resolvedSource}
+          onValueChange={(nextValue) => onChange({ ...rule, source: nextValue })}
+          options={resolvedSourceOptions}
+          disabled={sourceOptions.length === 0}
+        />
       </label>
       <div className="grid grid-cols-2 gap-3">
         <label className="grid gap-1.5 text-sm text-[var(--muted)]">
@@ -2023,7 +2036,7 @@ function RuleEditor({
           />
         </label>
       </div>
-    </PanelSection>
+    </div>
   );
 }
 
@@ -2826,6 +2839,25 @@ function coerceConditionBranchKeys(value: unknown): string[] {
     .filter((entry) => entry.length > 0);
 }
 
+function parseConditionLoopLimitDraft(value: string): number | null {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+  const integerValue = Math.trunc(parsed);
+  if (integerValue === -1) {
+    return -1;
+  }
+  if (integerValue < 1) {
+    return null;
+  }
+  return integerValue;
+}
+
 function StatePortCreateButton({
   side,
   visible,
@@ -3122,6 +3154,24 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
   const agentConfig = canonicalNode?.kind === "agent" ? canonicalNode.config : null;
   const conditionConfig = canonicalNode?.kind === "condition" ? canonicalNode.config : null;
   const outputConfig = canonicalNode?.kind === "output" ? canonicalNode.config : null;
+  const conditionRuleSourceOptions = useMemo(() => {
+    if (canonicalNode?.kind !== "condition") {
+      return [];
+    }
+    const stateSchemaLookup = Object.fromEntries(
+      stateFields.map((field) => [
+        field.key,
+        {
+          name: field.name,
+          description: field.description,
+          type: field.type,
+          value: field.value,
+          color: field.ui?.color ?? "",
+        },
+      ]),
+    );
+    return listConditionRuleSourceOptions(canonicalNode, stateSchemaLookup);
+  }, [canonicalNode, stateFields]);
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [isHoveringNode, setIsHoveringNode] = useState(false);
@@ -3130,6 +3180,7 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
   const [draftDescription, setDraftDescription] = useState(displayDescription);
   const [isDeleteConfirmActive, setIsDeleteConfirmActive] = useState(false);
   const [isPresetConfirmActive, setIsPresetConfirmActive] = useState(false);
+  const [draftLoopLimit, setDraftLoopLimit] = useState(String(conditionConfig?.loopLimit ?? -1));
   const deleteConfirmTimeoutRef = useRef<number | null>(null);
   const presetConfirmTimeoutRef = useRef<number | null>(null);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
@@ -3139,6 +3190,33 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
   const labelAnchorRef = useRef<HTMLDivElement | null>(null);
   const descriptionAnchorRef = useRef<HTMLDivElement | null>(null);
   const uploadedAsset = nodeKind === "input" ? tryParseUploadedAssetEnvelope(inputValue) : null;
+
+  useEffect(() => {
+    setDraftLoopLimit(String(conditionConfig?.loopLimit ?? -1));
+  }, [conditionConfig?.loopLimit]);
+
+  const commitConditionLoopLimit = useCallback(() => {
+    if (!conditionConfig) {
+      return;
+    }
+    const nextLoopLimit = parseConditionLoopLimitDraft(draftLoopLimit);
+    if (nextLoopLimit === null) {
+      setDraftLoopLimit(String(conditionConfig.loopLimit ?? -1));
+      return;
+    }
+    if (nextLoopLimit === conditionConfig.loopLimit) {
+      return;
+    }
+    updateCanonicalConfig((node) =>
+      node.kind === "condition"
+        ? {
+            ...node.config,
+            loopLimit: nextLoopLimit,
+          }
+        : node.config,
+    );
+  }, [conditionConfig, draftLoopLimit, updateCanonicalConfig]);
+
   const agentRuntimeConfig =
     nodeKind === "agent" && agentConfig
       ? ({
@@ -4062,44 +4140,46 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
 
           {nodeKind === "condition" ? (
             <>
-              <div className="flex items-center gap-1.5">
-                <StatePortCreateButton
-                  side="input"
-                  visible
-                  stateFields={stateFields}
-                  onBindState={(stateKey) => data.onBindStateToPort?.("input", stateKey) ?? false}
-                  onCreateState={(field) => data.onCreateStateAndBindToPort?.("input", field) ?? false}
-                />
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1 rounded-full border border-dashed border-[rgba(154,52,18,0.24)] bg-[rgba(255,248,240,0.5)] px-2.5 py-0.5 text-[0.68rem] font-medium text-[var(--accent-strong)] transition hover:bg-[rgba(255,248,240,0.9)]"
-                  onClick={addConditionBranch}
-                >
-                  <svg viewBox="0 0 16 16" className="h-3 w-3 fill-none stroke-current" strokeWidth="1.8">
-                    <path d="M8 3.5v9M3.5 8h9" />
-                  </svg>
-                  {portPresentation.outputActionLabel ?? "branch"}
-                </button>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-1.5">
+                  <StatePortCreateButton
+                    side="input"
+                    visible
+                    stateFields={stateFields}
+                    onBindState={(stateKey) => data.onBindStateToPort?.("input", stateKey) ?? false}
+                    onCreateState={(field) => data.onCreateStateAndBindToPort?.("input", field) ?? false}
+                  />
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 rounded-full border border-dashed border-[rgba(154,52,18,0.24)] bg-[rgba(255,248,240,0.5)] px-2.5 py-0.5 text-[0.68rem] font-medium text-[var(--accent-strong)] transition hover:bg-[rgba(255,248,240,0.9)]"
+                    onClick={addConditionBranch}
+                  >
+                    <svg viewBox="0 0 16 16" className="h-3 w-3 fill-none stroke-current" strokeWidth="1.8">
+                      <path d="M8 3.5v9M3.5 8h9" />
+                    </svg>
+                    {portPresentation.outputActionLabel ?? "branch"}
+                  </button>
+                </div>
+                <label className="flex items-center gap-2 text-[0.68rem] font-medium uppercase tracking-[0.12em] text-[var(--accent-strong)]">
+                  <span>Loop</span>
+                  <Input
+                    className="h-9 w-[88px] text-right text-sm"
+                    inputMode="numeric"
+                    value={draftLoopLimit}
+                    onChange={(event) => setDraftLoopLimit(event.target.value)}
+                    onBlur={commitConditionLoopLimit}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        commitConditionLoopLimit();
+                        event.currentTarget.blur();
+                      }
+                    }}
+                  />
+                </label>
               </div>
-              <label className="grid gap-1.5 text-sm text-[var(--muted)]">
-                <span>Condition Mode</span>
-                <FieldSelect
-                  value={conditionConfig?.conditionMode ?? "rule"}
-                  onValueChange={(nextValue) =>
-                    updateCanonicalConfig((node) =>
-                      node.kind === "condition"
-                        ? {
-                            ...node.config,
-                            conditionMode: nextValue as ConditionNode["conditionMode"],
-                          }
-                        : node.config,
-                    )
-                  }
-                  options={CONDITION_MODE_SELECT_OPTIONS}
-                />
-              </label>
               <RuleEditor
                 rule={conditionConfig?.rule ?? { source: "", operator: "exists", value: null }}
+                sourceOptions={conditionRuleSourceOptions}
                 onChange={(nextRule) =>
                   updateCanonicalConfig((node) =>
                     node.kind === "condition"
@@ -4829,14 +4909,12 @@ function StateFieldCard({
 function StatePanel({
   open,
   stateSchema,
-  cycleMaxIterations,
   readersByKey,
   writersByKey,
   nodeOptions,
   selectedNodeId,
   onToggle,
   onAddState,
-  onUpdateCycleMaxIterations,
   onRenameState,
   onUpdateState,
   onDeleteState,
@@ -4848,14 +4926,12 @@ function StatePanel({
 }: {
   open: boolean;
   stateSchema: StateField[];
-  cycleMaxIterations: number;
   readersByKey: Record<string, StateBindingSummary[]>;
   writersByKey: Record<string, StateBindingSummary[]>;
   nodeOptions: StateBindingNodeOption[];
   selectedNodeId: string | null;
   onToggle: () => void;
   onAddState: () => void;
-  onUpdateCycleMaxIterations: (nextValue: number | null) => void;
   onRenameState: (currentKey: string, nextKey: string) => boolean;
   onUpdateState: (stateKey: string, updater: (current: StateField) => StateField) => void;
   onDeleteState: (stateKey: string) => void;
@@ -4865,26 +4941,6 @@ function StatePanel({
   onRemoveWriter: (stateKey: string, nodeId: string, outputKey: string) => void;
   onFocusNode: (nodeId: string) => void;
 }) {
-  const [draftCycleMaxIterations, setDraftCycleMaxIterations] = useState(String(cycleMaxIterations));
-
-  useEffect(() => {
-    setDraftCycleMaxIterations(String(cycleMaxIterations));
-  }, [cycleMaxIterations]);
-
-  function commitCycleMaxIterations() {
-    const trimmed = draftCycleMaxIterations.trim();
-    if (!trimmed) {
-      onUpdateCycleMaxIterations(null);
-      return;
-    }
-    const parsedValue = Number(trimmed);
-    if (Number.isFinite(parsedValue) && parsedValue >= 1) {
-      onUpdateCycleMaxIterations(Math.trunc(parsedValue));
-      return;
-    }
-    setDraftCycleMaxIterations(String(cycleMaxIterations));
-  }
-
   if (!open) {
     return (
       <aside className="flex h-full min-h-0 items-center justify-center border-l border-[rgba(154,52,18,0.16)] bg-[rgba(255,250,241,0.72)] px-2 backdrop-blur-xl">
@@ -4939,29 +4995,6 @@ function StatePanel({
           <Button size="sm" onClick={onAddState}>
             Add State
           </Button>
-        </div>
-        <div className="mt-3 rounded-[18px] border border-[rgba(154,52,18,0.14)] bg-[rgba(255,255,255,0.82)] px-3.5 py-3 shadow-[0_10px_24px_rgba(60,41,20,0.06)]">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="text-sm font-medium text-[var(--text)]">Cycle Limit</div>
-              <div className="mt-1 text-xs leading-5 text-[var(--muted)]">
-                Graph-level `cycle_max_iterations`. Leave blank to fall back to the runtime default of 12.
-              </div>
-            </div>
-            <Input
-              className="h-10 w-[104px] text-right"
-              inputMode="numeric"
-              value={draftCycleMaxIterations}
-              onChange={(event) => setDraftCycleMaxIterations(event.target.value)}
-              onBlur={commitCycleMaxIterations}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  commitCycleMaxIterations();
-                  event.currentTarget.blur();
-                }
-              }}
-            />
-          </div>
         </div>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
@@ -5074,7 +5107,6 @@ function NodeSystemCanvas({
   const graphName = canonicalGraphState.name;
   const graphId = canonicalGraphState.graph_id ?? null;
   const metadata = canonicalGraphState.metadata;
-  const cycleMaxIterations = useMemo(() => resolveCycleMaxIterations(metadata), [metadata]);
   const cycleBackEdgeIds = useMemo(() => collectCycleBackEdgeIds(canonicalGraphState), [canonicalGraphState]);
   const stateSchema = useMemo(() => buildEditorStateFieldsFromCanonicalGraph(canonicalGraphState), [canonicalGraphState]);
   const projectedNodes = useMemo(
@@ -5284,7 +5316,7 @@ function NodeSystemCanvas({
       const currentNodeLabel = run.current_node_id ? nodeLabelLookup.get(run.current_node_id) ?? run.current_node_id : null;
       const cycleSummaryText =
         run.cycle_summary?.has_cycle
-          ? ` Iterations ${run.cycle_summary.iteration_count}/${run.cycle_summary.max_iterations || run.cycle_summary.iteration_count}.`
+          ? ` Iterations ${run.cycle_summary.iteration_count}/${run.cycle_summary.max_iterations === -1 ? "unlimited" : (run.cycle_summary.max_iterations || run.cycle_summary.iteration_count)}.`
           : "";
       if (run.status === "queued") {
         return `Run ${run.run_id} queued. Pending ${summary.idle} nodes.${cycleSummaryText}`;
@@ -6209,24 +6241,6 @@ function NodeSystemCanvas({
     setIsStatePanelOpen(true);
   }, [stateSchema, upsertCanonicalStateField]);
 
-  const updateCycleMaxIterations = useCallback((nextValue: number | null) => {
-    setCanonicalGraphState((current) => {
-      const nextMetadata = writeCycleMaxIterations(current.metadata, nextValue);
-      if (JSON.stringify(current.metadata ?? {}) === JSON.stringify(nextMetadata)) {
-        return current;
-      }
-      return {
-        ...current,
-        metadata: nextMetadata,
-      };
-    });
-    setStatusMessage(
-      nextValue == null
-        ? "Cycle limit reset to the runtime default."
-        : `Set cycle_max_iterations to ${Math.trunc(nextValue)}.`,
-    );
-  }, []);
-
   const deleteStateField = useCallback(
     (stateKey: string) => {
       setCanonicalGraphState((current) => deleteStateFromCanonicalGraph(current, stateKey));
@@ -6826,14 +6840,12 @@ function NodeSystemCanvas({
         <StatePanel
           open={isStatePanelOpen}
           stateSchema={stateSchema}
-          cycleMaxIterations={cycleMaxIterations}
           readersByKey={stateBindingsByKey.readersByKey}
           writersByKey={stateBindingsByKey.writersByKey}
           nodeOptions={stateBindingNodeOptions}
           selectedNodeId={selectedNodeId}
           onToggle={() => setIsStatePanelOpen((current) => !current)}
           onAddState={addStateField}
-          onUpdateCycleMaxIterations={updateCycleMaxIterations}
           onRenameState={renameStateField}
           onUpdateState={updateStateField}
           onDeleteState={deleteStateField}

@@ -135,7 +135,7 @@ test("renameConditionBranchKeyInCanonicalGraph keeps condition config and condit
         writes: [],
         config: {
           branches: ["continue", "stop"],
-          conditionMode: "rule",
+          loopLimit: 5,
           rule: {
             source: "decision",
             operator: "exists",
@@ -236,7 +236,7 @@ test("updateConditionBranchInCanonicalGraph updates branch name and mapping valu
         writes: [],
         config: {
           branches: ["continue", "retry"],
-          conditionMode: "rule",
+          loopLimit: -1,
           rule: {
             source: "result",
             operator: "exists",
@@ -512,7 +512,7 @@ test("buildCanonicalFlowProjectionFromEditorState prefers canonical graph semant
         writes: [],
         config: {
           branches: ["done"],
-          conditionMode: "rule",
+          loopLimit: -1,
           branchMapping: {},
           rule: {
             source: "question",
@@ -1335,7 +1335,7 @@ test("updateCanonicalNodeConfig updates condition and output config fields in pl
         writes: [],
         config: {
           branches: ["done"],
-          conditionMode: "rule",
+          loopLimit: -1,
           branchMapping: {},
           rule: {
             source: "answer",
@@ -1372,7 +1372,7 @@ test("updateCanonicalNodeConfig updates condition and output config fields in pl
     return {
       ...node.config,
       branches: ["approved", "rejected"],
-      conditionMode: "cycle",
+      loopLimit: 5,
       branchMapping: {
         approved: "output_answer",
       },
@@ -1403,7 +1403,7 @@ test("updateCanonicalNodeConfig updates condition and output config fields in pl
     assert.fail("expected condition node");
   }
   assert.deepEqual(next.nodes.route_result.config.branches, ["approved", "rejected"]);
-  assert.equal(next.nodes.route_result.config.conditionMode, "cycle");
+  assert.equal(next.nodes.route_result.config.loopLimit, 5);
   assert.deepEqual(next.nodes.route_result.config.branchMapping, { approved: "output_answer" });
   assert.deepEqual(next.nodes.route_result.config.rule, {
     source: "answer",

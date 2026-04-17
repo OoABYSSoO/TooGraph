@@ -19,7 +19,6 @@ from app.core.runtime.node_system_executor import (
     _execute_node,
     _initialize_graph_state,
     _persist_run_progress,
-    _resolve_cycle_max_iterations,
     _refresh_run_artifacts,
     _select_active_outgoing_edges,
     _build_execution_edges,
@@ -521,17 +520,70 @@ def _build_langgraph_cycle_tracker(
 ) -> dict[str, Any]:
     has_cycle, back_edges = CycleDetector(execution_edges).detect()
     back_edge_ids = {edge.id for edge in back_edges}
+    back_edges_by_id = {edge.id: edge for edge in back_edges}
+    loop_limits_by_source = _collect_condition_loop_limits(graph, back_edges)
     tracker = {
         "has_cycle": has_cycle,
         "back_edges": [f"{edge.source}→{edge.target}" for edge in back_edges],
         "back_edge_ids": back_edge_ids,
-        "max_iterations": _resolve_cycle_max_iterations(graph.metadata) if has_cycle else 0,
+        "back_edges_by_id": back_edges_by_id,
+        "loop_limits_by_source": loop_limits_by_source,
+        "loop_iterations_by_source": {},
+        "max_iterations": _resolve_cycle_summary_max_iterations(loop_limits_by_source) if has_cycle else 0,
         "current_iteration": 1,
         "records": {},
     }
     if has_cycle:
         _ensure_cycle_iteration_record(tracker, 1, [])
     return tracker
+
+
+def _collect_condition_loop_limits(
+    graph: NodeSystemGraphDocument,
+    back_edges: list[Any],
+) -> dict[str, int]:
+    limits_by_source: dict[str, int] = {}
+    for edge in back_edges:
+        if edge.kind != "conditional":
+            continue
+        source_node = graph.nodes.get(edge.source)
+        if not source_node or source_node.kind != "condition":
+            continue
+        limits_by_source[edge.source] = int(source_node.config.loop_limit)
+    return limits_by_source
+
+
+def _resolve_cycle_summary_max_iterations(loop_limits_by_source: dict[str, int]) -> int:
+    if not loop_limits_by_source:
+        return -1
+    finite_limits = [limit for limit in loop_limits_by_source.values() if limit >= 1]
+    if not finite_limits:
+        return -1
+    return min(finite_limits)
+
+
+def _check_condition_loop_limit(
+    cycle_tracker: dict[str, Any],
+    next_iteration_edge_ids: list[str],
+) -> tuple[int, str] | None:
+    back_edges_by_id = cycle_tracker.get("back_edges_by_id", {})
+    loop_limits_by_source = cycle_tracker.get("loop_limits_by_source", {})
+    loop_iterations_by_source = cycle_tracker.setdefault("loop_iterations_by_source", {})
+
+    for edge_id in next_iteration_edge_ids:
+        edge = back_edges_by_id.get(edge_id)
+        if edge is None:
+            continue
+        limit = int(loop_limits_by_source.get(edge.source, -1) or -1)
+        if limit == -1:
+            continue
+        current_iteration = int(loop_iterations_by_source.get(edge.source, 1) or 1)
+        next_iteration = current_iteration + 1
+        if next_iteration > limit:
+            return limit, edge.source
+        loop_iterations_by_source[edge.source] = next_iteration
+
+    return None
 
 
 def _current_cycle_iteration(cycle_tracker: dict[str, Any]) -> int:
@@ -589,22 +641,23 @@ def _record_cycle_activity(
     record["next_iteration_edge_ids"] = sorted(
         set(record.get("next_iteration_edge_ids", [])) | set(next_iteration_edge_ids)
     )
-    next_iteration = iteration + 1
-    max_iterations = int(cycle_tracker.get("max_iterations", 0) or 0)
-    if max_iterations and next_iteration > max_iterations:
+    loop_limit_violation = _check_condition_loop_limit(cycle_tracker, next_iteration_edge_ids)
+    if loop_limit_violation is not None:
+        max_iterations, source_node = loop_limit_violation
         record["stop_reason"] = "max_iterations_exceeded"
         state["cycle_summary"] = {
             "has_cycle": True,
             "back_edges": list(cycle_tracker.get("back_edges", [])),
-            "iteration_count": max_iterations,
+            "iteration_count": iteration,
             "max_iterations": max_iterations,
             "stop_reason": "max_iterations_exceeded",
         }
         state["cycle_iterations"] = _serialize_cycle_records(cycle_tracker, final_stop_reason="max_iterations_exceeded")
         raise ValueError(
-            f"Cycle execution exceeded max iterations ({max_iterations}). Add an exit branch or raise cycle_max_iterations."
+            f"Cycle execution exceeded loopLimit ({max_iterations}) for condition '{source_node}'. Add an exit branch or raise loopLimit."
         )
 
+    next_iteration = iteration + 1
     cycle_tracker["current_iteration"] = next_iteration
     _ensure_cycle_iteration_record(cycle_tracker, next_iteration, next_iteration_edge_ids)
 

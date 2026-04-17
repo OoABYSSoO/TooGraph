@@ -82,15 +82,6 @@ class CycleDetector:
         return len(back_edges) > 0, back_edges
 
 
-def _resolve_cycle_max_iterations(metadata: dict[str, Any]) -> int:
-    raw_value = metadata.get("cycle_max_iterations", metadata.get("cycleMaxIterations", 12))
-    try:
-        numeric = int(raw_value)
-    except (TypeError, ValueError):
-        numeric = 12
-    return max(1, min(numeric, 128))
-
-
 def _persist_run_progress(
     state: dict[str, Any],
     node_outputs: dict[str, dict[str, Any]],
