@@ -3,6 +3,7 @@
 当前 `docs/` 只保留仍需继续推进的文档：
 
 - [current_engineering_backlog.md](/home/abyss/GraphiteUI/docs/current_engineering_backlog.md)
+- [edge_semantics.md](/home/abyss/GraphiteUI/docs/edge_semantics.md)
 - [README.md](/home/abyss/GraphiteUI/docs/README.md)
 
 使用原则：
