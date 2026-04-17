@@ -625,6 +625,65 @@ export function renameStateNameInCanonicalGraph<T extends CanonicalGraphPayload>
   };
 }
 
+export function renameConditionBranchKeyInCanonicalGraph<T extends CanonicalGraphPayload>(
+  graph: T,
+  nodeId: string,
+  currentKey: string,
+  nextKey: string,
+): T {
+  const node = graph.nodes[nodeId];
+  if (!node || node.kind !== "condition") {
+    return graph;
+  }
+
+  const normalizedNextKey = nextKey.trim();
+  if (!normalizedNextKey || normalizedNextKey === currentKey) {
+    return graph;
+  }
+
+  if (!node.config.branches.includes(currentKey) || node.config.branches.includes(normalizedNextKey)) {
+    return graph;
+  }
+
+  const nextBranches = node.config.branches.map((branchKey) => (branchKey === currentKey ? normalizedNextKey : branchKey));
+  const nextBranchMapping = Object.fromEntries(
+    Object.entries(node.config.branchMapping).map(([branchKey, target]) => [
+      branchKey === currentKey ? normalizedNextKey : branchKey,
+      target,
+    ]),
+  );
+  const nextConditionalEdges = graph.conditional_edges.map((edge) => {
+    if (edge.source !== nodeId || !Object.prototype.hasOwnProperty.call(edge.branches, currentKey)) {
+      return edge;
+    }
+    return {
+      ...edge,
+      branches: Object.fromEntries(
+        Object.entries(edge.branches).map(([branchKey, target]) => [
+          branchKey === currentKey ? normalizedNextKey : branchKey,
+          target,
+        ]),
+      ),
+    };
+  }) as T["conditional_edges"];
+
+  return {
+    ...graph,
+    nodes: {
+      ...graph.nodes,
+      [nodeId]: {
+        ...node,
+        config: {
+          ...node.config,
+          branches: nextBranches,
+          branchMapping: nextBranchMapping,
+        },
+      },
+    },
+    conditional_edges: nextConditionalEdges,
+  };
+}
+
 export function renameCanonicalNodeName<T extends CanonicalGraphPayload>(
   graph: T,
   nodeId: string,

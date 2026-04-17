@@ -541,7 +541,7 @@ export function syncKnowledgeBaseSkillOnCanonicalAgentNode(
 function buildEditorConditionBranches(branches: string[]): BranchDefinition[] {
   return branches.map((branch) => ({
     key: branch,
-    label: "",
+    label: branch,
   }));
 }
 

@@ -45,6 +45,7 @@ import { createEditorSeedGraph } from "@/lib/editor-graph-defaults";
 import { decorateFlowEdges } from "@/lib/node-system-edge-visuals";
 import { collectCycleBackEdgeIds } from "@/lib/node-system-cycle-edges";
 import { resolveCycleMaxIterations, writeCycleMaxIterations } from "@/lib/node-system-graph-metadata";
+import { getNodePortSectionPresentation } from "@/lib/node-system-node-card-presentation";
 import {
   ROUTE_TARGET_HANDLE,
   canNodeAcceptRouteTarget,
@@ -75,6 +76,7 @@ import {
   composeCanonicalGraphForSubmission,
   deleteStateFromCanonicalGraph,
   removeStateFromCanonicalNode,
+  renameConditionBranchKeyInCanonicalGraph,
   renameStateKeyInCanonicalGraph,
   renameCanonicalNodeDescription,
   renameCanonicalNodeName,
@@ -100,7 +102,6 @@ import {
   isValueTypeCompatible,
   type AgentNode,
   type AgentThinkingMode,
-  type BranchDefinition,
   type ConditionNode,
   type ConditionRule,
   type InputBoundaryNode,
@@ -182,12 +183,14 @@ type FlowNodeData = {
   onReplaceWriteBindings?: (writes: CanonicalNode["writes"]) => void;
   onUpdateReadRequirement?: (stateKey: string, required: boolean) => void;
   onRemoveStateRelation?: (side: "input" | "output", stateKey: string) => void;
+  onRenameConditionBranch?: (currentKey: string, nextKey: string) => void;
   onRenameNode?: (nextName: string) => void;
   onUpdateNodeDescription?: (nextDescription: string) => void;
   onUpdateInputBoundaryValue?: (nextValue: unknown) => void;
   onUpdateInputBoundaryType?: (nextType: ValueType) => void;
   onResizeEnd?: (width: number, height: number, isExpanded: boolean) => void;
   onToggleExpanded?: () => void;
+  onRefreshNodeInternals?: () => void;
   onDelete?: () => void;
   onSavePreset?: () => void;
   skillDefinitions?: SkillDefinition[];
@@ -429,6 +432,16 @@ function createDefaultStateField(existingKeys: string[]): StateField {
       color: "",
     },
   };
+}
+
+function createConditionBranchKey(existingKeys: string[]) {
+  let index = existingKeys.length + 1;
+  let candidate = `branch_${index}`;
+  while (existingKeys.includes(candidate)) {
+    index += 1;
+    candidate = `branch_${index}`;
+  }
+  return candidate;
 }
 
 function isStructuredStateType(type: StateFieldType) {
@@ -2045,61 +2058,6 @@ function MappingEditor({
   );
 }
 
-function BranchEditorList({
-  branches,
-  onChange,
-}: {
-  branches: BranchDefinition[];
-  onChange: (nextBranches: BranchDefinition[]) => void;
-}) {
-  return (
-    <PanelSection title="Branches" description="通过增删行维护条件分支定义。">
-      {branches.map((branch, index) => (
-        <div key={`${branch.key}-${index}`} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-3 rounded-[16px] border border-[rgba(154,52,18,0.12)] bg-[rgba(255,250,241,0.72)] p-3">
-          <label className="grid gap-1.5 text-sm text-[var(--muted)]">
-            <span>Key</span>
-            <Input
-              value={branch.key}
-              onChange={(event) =>
-                onChange(branches.map((item, branchIndex) => (branchIndex === index ? { ...item, key: event.target.value } : item)))
-              }
-            />
-          </label>
-          <label className="grid gap-1.5 text-sm text-[var(--muted)]">
-            <span>Label</span>
-            <Input
-              value={branch.label}
-              onChange={(event) =>
-                onChange(branches.map((item, branchIndex) => (branchIndex === index ? { ...item, label: event.target.value } : item)))
-              }
-            />
-          </label>
-          <div className="flex items-end justify-end">
-            <Button variant="ghost" onClick={() => onChange(branches.filter((_, branchIndex) => branchIndex !== index))}>
-              Remove
-            </Button>
-          </div>
-        </div>
-      ))}
-      <div className="flex justify-start">
-        <Button
-          variant="ghost"
-          onClick={() =>
-            onChange(
-              branches.concat({
-                key: `branch_${branches.length + 1}`,
-                label: `Branch ${branches.length + 1}`,
-              }),
-            )
-          }
-        >
-          Add Branch
-        </Button>
-      </div>
-    </PanelSection>
-  );
-}
-
 function RuleEditor({
   rule,
   onChange,
@@ -2663,6 +2621,105 @@ function PortRow({
   );
 }
 
+function BranchRow({
+  branchKey,
+  onRename,
+}: {
+  branchKey: string;
+  onRename?: (nextKey: string) => void;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [draftBranchKey, setDraftBranchKey] = useState(branchKey);
+  const labelRef = useRef<HTMLSpanElement | null>(null);
+
+  useEffect(() => {
+    setDraftBranchKey(branchKey);
+  }, [branchKey]);
+
+  function commitEditing() {
+    const nextKey = draftBranchKey.trim();
+    if (nextKey && nextKey !== branchKey) {
+      onRename?.(nextKey);
+    }
+    setIsEditing(false);
+  }
+
+  return (
+    <div className="group relative flex min-h-6 items-center justify-end text-[0.9rem] text-[var(--accent-strong)]">
+      <span
+        ref={labelRef}
+        className="inline-flex max-w-full cursor-text items-center gap-1.5 truncate rounded-full border border-[rgba(154,52,18,0.16)] bg-[rgba(255,248,240,0.84)] px-2.5 py-0.5 text-right text-[0.76rem] font-medium tracking-[0.02em]"
+        onDoubleClick={() => {
+          setDraftBranchKey(branchKey);
+          setIsEditing(true);
+        }}
+      >
+        <svg viewBox="0 0 16 16" className="h-3 w-3 flex-shrink-0 fill-none stroke-current" strokeWidth="1.7">
+          <path d="M4.5 3.5v9" />
+          <path d="M4.5 8h4" />
+          <path d="M8.5 8V5.5" />
+          <path d="M8.5 8v2.5" />
+          <circle cx="4.5" cy="8" r="1.1" />
+          <circle cx="11.5" cy="5.5" r="1.1" />
+          <circle cx="11.5" cy="10.5" r="1.1" />
+        </svg>
+        <span className="truncate">{branchKey}</span>
+      </span>
+      <FloatingEditorCard
+        anchorRef={labelRef}
+        open={isEditing}
+        placement="bottom-end"
+        title="Edit Branch"
+        widthClassName="w-[320px]"
+      >
+        <label className="grid gap-1.5 text-sm text-[var(--muted)]">
+          <span>Branch Key</span>
+          <Input
+            className="h-11"
+            value={draftBranchKey}
+            autoFocus
+            onChange={(event) => setDraftBranchKey(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") commitEditing();
+              if (event.key === "Escape") {
+                setDraftBranchKey(branchKey);
+                setIsEditing(false);
+              }
+            }}
+          />
+        </label>
+        <div className="flex items-center justify-end gap-2">
+          <PanelIconButton
+            label="Cancel"
+            onClick={() => {
+              setDraftBranchKey(branchKey);
+              setIsEditing(false);
+            }}
+          >
+            <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
+              <path d="m4.5 4.5 7 7" />
+              <path d="m11.5 4.5-7 7" />
+            </svg>
+          </PanelIconButton>
+          <PanelIconButton label="Save" tone="positive" onClick={commitEditing}>
+            <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
+              <path d="m3.5 8.5 3 3 6-7" />
+            </svg>
+          </PanelIconButton>
+        </div>
+      </FloatingEditorCard>
+      <Handle
+        id={buildHandleId("output", branchKey)}
+        type="source"
+        position={Position.Right}
+        className="!right-[-7px] !top-1/2 !m-0 !h-3 !w-3 !-translate-y-1/2 !border-2 !border-[rgba(255,250,241,0.96)]"
+        style={{ backgroundColor: "var(--accent-strong)" }}
+        isConnectable
+      />
+    </div>
+  );
+}
+
 function RouteTargetHandle({ visible }: { visible: boolean }) {
   return (
     <Handle
@@ -3063,6 +3120,7 @@ function getDefaultNodeWidth() {
 function NodeCard({ data, selected }: NodeProps<FlowNode>) {
   const canonicalNode = data.canonicalNode ?? null;
   const nodeKind = coerceNodeKind(canonicalNode?.kind);
+  const portPresentation = canonicalNode ? getNodePortSectionPresentation(canonicalNode.kind) : getNodePortSectionPresentation("agent");
   const displayName = data.displayName ?? (canonicalNode ? getCanonicalNodeNameFromNode(data.nodeId, canonicalNode) : data.nodeId);
   const displayDescription = data.displayDescription?.trim() || canonicalNode?.description || "";
   const stateFields = data.stateFields ?? [];
@@ -3094,7 +3152,6 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
   const agentConfig = canonicalNode?.kind === "agent" ? canonicalNode.config : null;
   const conditionConfig = canonicalNode?.kind === "condition" ? canonicalNode.config : null;
   const outputConfig = canonicalNode?.kind === "output" ? canonicalNode.config : null;
-  const conditionBranches = conditionConfig?.branches.map((branchKey) => ({ key: branchKey, label: "" })) ?? [];
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [isHoveringNode, setIsHoveringNode] = useState(false);
@@ -3236,6 +3293,22 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
 
   function updateCanonicalConfig(updater: (node: CanonicalNode) => CanonicalNode["config"]) {
     data.onUpdateCanonicalNodeConfig?.(updater);
+  }
+
+  function addConditionBranch() {
+    if (nodeKind !== "condition" || !conditionConfig) {
+      return;
+    }
+    const nextBranchKey = createConditionBranchKey(conditionConfig.branches);
+    updateCanonicalConfig((node) =>
+      node.kind === "condition"
+        ? {
+            ...node.config,
+            branches: [...node.config.branches, nextBranchKey],
+          }
+        : node.config,
+    );
+    data.onRefreshNodeInternals?.();
   }
 
   async function handleInputFileSelection(file: File | null) {
@@ -3550,7 +3623,12 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
           {nodeKind !== "input" && nodeKind !== "output" && (inputs.length > 0 || outputs.length > 0) ? (
             <div className="grid grid-cols-2 items-start gap-x-6">
               <div className="grid gap-1">
-                {inputs.map((port, index) => (
+                {portPresentation.inputTitle ? (
+                  <div className="mb-1 text-[0.62rem] font-medium uppercase tracking-[0.14em] text-[var(--accent-strong)]">
+                    {portPresentation.inputTitle}
+                  </div>
+                ) : null}
+                {inputs.map((port) => (
                   (() => {
                     const boundState = getBoundState("input", port.key);
                     return (
@@ -3597,36 +3675,47 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
 {/* hover add-input button removed — use the +input pill in the skill bar instead */}
               </div>
               <div className="grid gap-1">
-                {outputs.map((port, index) => (
-                  (() => {
-                    const boundState = getBoundState("output", port.key);
-                    return (
-                      <PortRow
-                        key={`output-${port.key}`}
-                        nodeId={data.nodeId}
-                        port={port}
-                        side="output"
-                        boundState={boundState}
-                        onRename={(nextLabel) => {
-                          if (boundState) {
-                            data.onRenameStateName?.(boundState.key, nextLabel);
-                          }
-                        }}
-                        portEditor={
-                          nodeKind === "agent" && boundState
-                            ? {
-                                onChange: () => undefined,
-                                onRemove:
-                                  outputs.length > 1
-                                    ? () => data.onRemoveStateRelation?.("output", boundState.key)
-                                    : undefined,
-                              }
-                            : undefined
-                        }
+                {portPresentation.outputTitle ? (
+                  <div className="mb-1 text-right text-[0.62rem] font-medium uppercase tracking-[0.14em] text-[var(--accent-strong)]">
+                    {portPresentation.outputTitle}
+                  </div>
+                ) : null}
+                {nodeKind === "condition"
+                  ? outputs.map((port) => (
+                      <BranchRow
+                        key={`branch-${port.key}`}
+                        branchKey={port.key}
+                        onRename={(nextKey) => data.onRenameConditionBranch?.(port.key, nextKey)}
                       />
-                    );
-                  })()
-                ))}
+                    ))
+                  : outputs.map((port) => {
+                      const boundState = getBoundState("output", port.key);
+                      return (
+                        <PortRow
+                          key={`output-${port.key}`}
+                          nodeId={data.nodeId}
+                          port={port}
+                          side="output"
+                          boundState={boundState}
+                          onRename={(nextLabel) => {
+                            if (boundState) {
+                              data.onRenameStateName?.(boundState.key, nextLabel);
+                            }
+                          }}
+                          portEditor={
+                            nodeKind === "agent" && boundState
+                              ? {
+                                  onChange: () => undefined,
+                                  onRemove:
+                                    outputs.length > 1
+                                      ? () => data.onRemoveStateRelation?.("output", boundState.key)
+                                      : undefined,
+                                }
+                              : undefined
+                          }
+                        />
+                      );
+                    })}
 {/* hover add-output button removed — use the +output pill in the skill bar instead */}
               </div>
             </div>
@@ -4002,64 +4091,73 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
 
           {nodeKind === "condition" ? (
             <>
-                  <BranchEditorList
-                    branches={conditionBranches}
-                    onChange={(nextBranches) =>
-                      updateCanonicalConfig((node) =>
-                        node.kind === "condition"
-                          ? {
-                              ...node.config,
-                              branches: nextBranches.map((branch) => branch.key),
-                            }
-                          : node.config,
-                      )
-                    }
-                  />
-                  <label className="grid gap-1.5 text-sm text-[var(--muted)]">
-                    <span>Condition Mode</span>
-                    <FieldSelect
-                      value={conditionConfig?.conditionMode ?? "rule"}
-                      onValueChange={(nextValue) =>
-                        updateCanonicalConfig((node) =>
-                          node.kind === "condition"
-                            ? {
-                                ...node.config,
-                                conditionMode: nextValue as ConditionNode["conditionMode"],
-                              }
-                            : node.config,
-                        )
-                      }
-                      options={CONDITION_MODE_SELECT_OPTIONS}
-                    />
-                  </label>
-                  <RuleEditor
-                    rule={conditionConfig?.rule ?? { source: "", operator: "exists", value: null }}
-                    onChange={(nextRule) =>
-                      updateCanonicalConfig((node) =>
-                        node.kind === "condition"
-                          ? {
-                              ...node.config,
-                              rule: nextRule,
-                            }
-                          : node.config,
-                      )
-                    }
-                  />
-                  <MappingEditor
-                    title="Branch Mapping"
-                    value={conditionConfig?.branchMapping ?? {}}
-                    addLabel="Add Branch Mapping"
-                    onChange={(nextValue) =>
-                      updateCanonicalConfig((node) =>
-                        node.kind === "condition"
-                          ? {
-                              ...node.config,
-                              branchMapping: nextValue,
-                            }
-                          : node.config,
-                      )
-                    }
-                  />
+              <div className="flex items-center gap-1.5">
+                <StatePortCreateButton
+                  side="input"
+                  visible
+                  stateFields={stateFields}
+                  onBindState={(stateKey) => data.onBindStateToPort?.("input", stateKey) ?? false}
+                  onCreateState={(field) => data.onCreateStateAndBindToPort?.("input", field) ?? false}
+                />
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 rounded-full border border-dashed border-[rgba(154,52,18,0.24)] bg-[rgba(255,248,240,0.5)] px-2.5 py-0.5 text-[0.68rem] font-medium text-[var(--accent-strong)] transition hover:bg-[rgba(255,248,240,0.9)]"
+                  onClick={addConditionBranch}
+                >
+                  <svg viewBox="0 0 16 16" className="h-3 w-3 fill-none stroke-current" strokeWidth="1.8">
+                    <path d="M8 3.5v9M3.5 8h9" />
+                  </svg>
+                  {portPresentation.outputActionLabel ?? "branch"}
+                </button>
+              </div>
+              <label className="grid gap-1.5 text-sm text-[var(--muted)]">
+                <span>Condition Mode</span>
+                <FieldSelect
+                  value={conditionConfig?.conditionMode ?? "rule"}
+                  onValueChange={(nextValue) =>
+                    updateCanonicalConfig((node) =>
+                      node.kind === "condition"
+                        ? {
+                            ...node.config,
+                            conditionMode: nextValue as ConditionNode["conditionMode"],
+                          }
+                        : node.config,
+                    )
+                  }
+                  options={CONDITION_MODE_SELECT_OPTIONS}
+                />
+              </label>
+              <RuleEditor
+                rule={conditionConfig?.rule ?? { source: "", operator: "exists", value: null }}
+                onChange={(nextRule) =>
+                  updateCanonicalConfig((node) =>
+                    node.kind === "condition"
+                      ? {
+                          ...node.config,
+                          rule: nextRule,
+                        }
+                      : node.config,
+                  )
+                }
+              />
+              <MappingEditor
+                title="Branch Mapping"
+                value={conditionConfig?.branchMapping ?? {}}
+                addLabel="Add Branch Mapping"
+                onChange={(nextValue) =>
+                  updateCanonicalConfig((node) =>
+                    node.kind === "condition"
+                      ? {
+                          ...node.config,
+                          branchMapping: nextValue,
+                        }
+                      : node.config,
+                  )
+                }
+              />
+              <details className="text-sm text-[var(--muted)]">
+                <summary className="cursor-pointer select-none py-1 text-xs font-medium uppercase tracking-wider">Advanced</summary>
+                <div className="mt-2 grid gap-3">
                   <AdvancedJsonSection
                     sections={[
                       {
@@ -4111,6 +4209,8 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
                       },
                     ]}
                   />
+                </div>
+              </details>
             </>
           ) : null}
 
@@ -6292,6 +6392,37 @@ function NodeSystemCanvas({
                   onRemoveStateRelation: (side: "input" | "output", stateKey: string) => {
                     setCanonicalGraphState((current) => removeStateFromCanonicalNode(current, node.id, side, stateKey));
                   },
+                  onRenameConditionBranch: (currentKey: string, nextKey: string) => {
+                    const normalizedNextKey = nextKey.trim();
+                    const currentNode = canonicalGraph.nodes[node.id];
+                    if (!normalizedNextKey || currentNode?.kind !== "condition") {
+                      return;
+                    }
+                    if (normalizedNextKey === currentKey) {
+                      return;
+                    }
+                    if (currentNode.config.branches.includes(normalizedNextKey)) {
+                      setStatusMessage(`Branch '${normalizedNextKey}' already exists.`);
+                      return;
+                    }
+                    setCanonicalGraphState((current) =>
+                      renameConditionBranchKeyInCanonicalGraph(current, node.id, currentKey, normalizedNextKey),
+                    );
+                    const currentSourceHandle = buildHandleId("output", currentKey);
+                    const nextSourceHandle = buildHandleId("output", normalizedNextKey);
+                    setEdges((current) =>
+                      current.map((edge) =>
+                        edge.source === node.id && edge.sourceHandle === currentSourceHandle
+                          ? {
+                              ...edge,
+                              id: buildFlowEdgeId(edge.source, nextSourceHandle, edge.target, edge.targetHandle ?? ROUTE_TARGET_HANDLE),
+                              sourceHandle: nextSourceHandle,
+                            }
+                          : edge,
+                      ),
+                    );
+                    requestAnimationFrame(() => updateNodeInternals(node.id));
+                  },
                   onRenameNode: (nextName: string) => {
                     setCanonicalGraphState((current) => renameCanonicalNodeName(current, node.id, nextName));
                   },
@@ -6371,8 +6502,11 @@ function NodeSystemCanvas({
                               },
                             }
                           : n,
-                      ),
+                        ),
                     );
+                  },
+                  onRefreshNodeInternals: () => {
+                    requestAnimationFrame(() => updateNodeInternals(node.id));
                   },
                   onDelete: () => {
                     setCanonicalGraphState((current) => {

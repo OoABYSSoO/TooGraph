@@ -14,6 +14,7 @@ import {
   removeStateFromCanonicalNode,
   renameCanonicalNodeDescription,
   renameCanonicalNodeName,
+  renameConditionBranchKeyInCanonicalGraph,
   renameStateKeyInCanonicalGraph,
   renameStateNameInCanonicalGraph,
   updateCanonicalReadBindingRequired,
@@ -103,6 +104,115 @@ test("renameStateKeyInCanonicalGraph renames state schema, node bindings, and ed
       target: "output_answer",
       sourceHandle: "output:user_question",
       targetHandle: "input:user_question",
+    },
+  ]);
+});
+
+test("renameConditionBranchKeyInCanonicalGraph keeps condition config and conditional edges aligned", () => {
+  const graph: CanonicalGraphPayload = {
+    graph_id: "graph_test",
+    name: "Rename Condition Branch Test",
+    state_schema: {
+      decision: {
+        name: "Decision",
+        description: "",
+        type: "text",
+        value: "",
+        color: "#d97706",
+      },
+    },
+    nodes: {
+      decide_next: {
+        kind: "condition",
+        name: "Decide Next",
+        description: "",
+        ui: {
+          position: { x: 0, y: 0 },
+          collapsed: false,
+        },
+        reads: [{ state: "decision", required: true }],
+        writes: [],
+        config: {
+          branches: ["continue", "stop"],
+          conditionMode: "rule",
+          rule: {
+            source: "decision",
+            operator: "exists",
+            value: null,
+          },
+          branchMapping: {
+            continue: "continue",
+            stop: "stop",
+          },
+        },
+      },
+      continue_node: {
+        kind: "agent",
+        name: "Continue",
+        description: "",
+        ui: {
+          position: { x: 260, y: 0 },
+          collapsed: false,
+        },
+        reads: [],
+        writes: [],
+        config: {
+          skills: [],
+          systemInstruction: "",
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+      stop_node: {
+        kind: "output",
+        name: "Stop",
+        description: "",
+        ui: {
+          position: { x: 260, y: 140 },
+          collapsed: false,
+        },
+        reads: [],
+        writes: [],
+        config: {
+          displayMode: "auto",
+          persistEnabled: false,
+          persistFormat: "auto",
+          fileNameTemplate: "",
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [
+      {
+        source: "decide_next",
+        branches: {
+          continue: "continue_node",
+          stop: "stop_node",
+        },
+      },
+    ],
+    metadata: {},
+  };
+
+  const next = renameConditionBranchKeyInCanonicalGraph(graph, "decide_next", "continue", "retry");
+
+  assert.equal(next.nodes.decide_next.kind, "condition");
+  const nextConditionNode = next.nodes.decide_next;
+  assert.deepEqual(nextConditionNode.config.branches, ["retry", "stop"]);
+  assert.deepEqual(nextConditionNode.config.branchMapping, {
+    retry: "continue",
+    stop: "stop",
+  });
+  assert.deepEqual(next.conditional_edges, [
+    {
+      source: "decide_next",
+      branches: {
+        retry: "continue_node",
+        stop: "stop_node",
+      },
     },
   ]);
 });

@@ -206,6 +206,43 @@ test("canonical node helpers derive display name and port lists without relying 
   ]);
 });
 
+test("condition node helpers expose branch outputs by branch key", () => {
+  const node = {
+    kind: "condition" as const,
+    name: "route_question",
+    description: "",
+    ui: {
+      position: { x: 0, y: 0 },
+      collapsed: false,
+    },
+    reads: [],
+    writes: [],
+    config: {
+      branches: ["continue", "stop"],
+      conditionMode: "rule" as const,
+      branchMapping: {},
+      rule: {
+        source: "question",
+        operator: "exists" as const,
+        value: null,
+      },
+    },
+  };
+
+  assert.deepEqual(listEditorOutputPortsFromCanonicalNode(node, {}), [
+    {
+      key: "continue",
+      label: "continue",
+      valueType: "any",
+    },
+    {
+      key: "stop",
+      label: "stop",
+      valueType: "any",
+    },
+  ]);
+});
+
 test("getEditorPortValueTypeFromCanonicalHandle resolves canonical port types and create-input handles", () => {
   const stateSchema = {
     question: {
