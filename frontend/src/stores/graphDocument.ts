@@ -2,7 +2,7 @@ import { computed, ref } from "vue";
 import { defineStore } from "pinia";
 
 import { fetchGraph, fetchGraphs, fetchTemplate, fetchTemplates } from "@/api/graphs";
-import { createDraftFromTemplate } from "@/lib/graph-document";
+import { createDraftFromTemplate, createEmptyDraftGraph } from "@/lib/graph-document";
 import type { ActiveDocument, GraphDocument, GraphPayload, TemplateRecord } from "@/types/node-system";
 
 export const useGraphDocumentStore = defineStore("graphDocument", () => {
@@ -115,6 +115,13 @@ export const useGraphDocumentStore = defineStore("graphDocument", () => {
     error.value = null;
   }
 
+  function createBlankDraft(name = "Untitled Graph") {
+    activeTemplate.value = null;
+    activeGraph.value = null;
+    activeDraft.value = createEmptyDraftGraph(name);
+    error.value = null;
+  }
+
   function updateNodePosition(nodeId: string, position: { x: number; y: number }) {
     if (activeDraft.value?.nodes[nodeId]) {
       activeDraft.value.nodes[nodeId].ui.position = position;
@@ -145,6 +152,7 @@ export const useGraphDocumentStore = defineStore("graphDocument", () => {
     ensureGraphsLoaded,
     selectTemplate,
     clearActiveDocument,
+    createBlankDraft,
     updateNodePosition,
   };
 });

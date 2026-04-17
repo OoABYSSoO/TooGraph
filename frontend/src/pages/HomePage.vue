@@ -1,41 +1,233 @@
 <template>
   <AppShell>
-    <section class="page-card">
-      <div class="page-card__eyebrow">Home</div>
-      <h2 class="page-card__title">GraphiteUI Vue rebuild is running</h2>
-      <p class="page-card__body">The React frontend has been replaced on this branch. Next we rebuild the editor workspace, runs view, and settings on top of the current backend.</p>
+    <section class="home-hero">
+      <div class="home-hero__eyebrow">Workspace</div>
+      <h2 class="home-hero__title">GraphiteUI 工作台</h2>
+      <p class="home-hero__body">这里保留原来首页的工作台心智：最近运行、模板入口和最近的图都应该在这里汇合。</p>
+      <div class="home-hero__actions">
+        <RouterLink class="home-hero__action home-hero__action--primary" to="/editor/new">新建图</RouterLink>
+        <RouterLink class="home-hero__action" to="/editor">打开编排器</RouterLink>
+      </div>
+    </section>
+
+    <section class="home-dashboard">
+      <article class="home-panel">
+        <div class="home-panel__header">
+          <h3>最近运行记录</h3>
+          <RouterLink to="/runs">查看全部</RouterLink>
+        </div>
+        <div class="home-panel__body">
+          <div v-if="error" class="home-empty">加载失败：{{ error }}</div>
+          <div v-else-if="runs.length === 0" class="home-empty">还没有运行记录。</div>
+          <RouterLink v-for="run in runs.slice(0, 5)" :key="run.run_id" class="home-card" :to="`/runs/${run.run_id}`">
+            <strong>{{ run.run_id }}</strong>
+            <p>{{ run.graph_name }}</p>
+            <div class="home-badges">
+              <span>{{ run.status }}</span>
+              <span>revisions {{ run.revision_round }}</span>
+            </div>
+          </RouterLink>
+        </div>
+      </article>
+
+      <article class="home-panel">
+        <div class="home-panel__header">
+          <h3>模板选择</h3>
+          <RouterLink to="/editor">更多模板</RouterLink>
+        </div>
+        <div class="home-panel__body">
+          <div v-if="error" class="home-empty">加载失败：{{ error }}</div>
+          <div v-else-if="templates.length === 0" class="home-empty">当前没有模板。</div>
+          <RouterLink
+            v-for="template in templates.slice(0, 3)"
+            :key="template.template_id"
+            class="home-card"
+            :to="`/editor/new?template=${template.template_id}`"
+          >
+            <div class="home-card__eyebrow">{{ template.template_id }}</div>
+            <strong>{{ template.label }}</strong>
+            <p>{{ template.description }}</p>
+          </RouterLink>
+        </div>
+      </article>
+
+      <article class="home-panel">
+        <div class="home-panel__header">
+          <h3>最近的图</h3>
+          <RouterLink to="/editor">打开编排器</RouterLink>
+        </div>
+        <div class="home-panel__body">
+          <div v-if="error" class="home-empty">加载失败：{{ error }}</div>
+          <div v-else-if="graphs.length === 0" class="home-empty">当前还没有已保存图。</div>
+          <RouterLink v-for="graph in graphs.slice(0, 5)" :key="graph.graph_id" class="home-card" :to="`/editor/${graph.graph_id}`">
+            <strong>{{ graph.name }}</strong>
+            <p>{{ graph.graph_id }}</p>
+            <div class="home-badges">
+              <span>{{ Object.keys(graph.nodes).length }} nodes</span>
+              <span>{{ graph.edges.length + graph.conditional_edges.reduce((count, edge) => count + Object.keys(edge.branches).length, 0) }} edges</span>
+            </div>
+          </RouterLink>
+        </div>
+      </article>
     </section>
   </AppShell>
 </template>
 
 <script setup lang="ts">
+import { onMounted, ref } from "vue";
+
+import { fetchGraphs, fetchTemplates } from "@/api/graphs";
+import { fetchRuns } from "@/api/runs";
 import AppShell from "@/layouts/AppShell.vue";
+import type { GraphDocument, TemplateRecord } from "@/types/node-system";
+import type { RunSummary } from "@/types/run";
+
+const graphs = ref<GraphDocument[]>([]);
+const templates = ref<TemplateRecord[]>([]);
+const runs = ref<RunSummary[]>([]);
+const error = ref<string | null>(null);
+
+onMounted(async () => {
+  try {
+    const [graphPayload, runPayload, templatePayload] = await Promise.all([fetchGraphs(), fetchRuns(), fetchTemplates()]);
+    graphs.value = graphPayload;
+    runs.value = runPayload;
+    templates.value = templatePayload;
+    error.value = null;
+  } catch (fetchError) {
+    error.value = fetchError instanceof Error ? fetchError.message : "Failed to load workspace data.";
+  }
+});
 </script>
 
 <style scoped>
-.page-card {
+.home-hero,
+.home-panel {
   border: 1px solid rgba(154, 52, 18, 0.14);
-  border-radius: 24px;
-  padding: 24px;
+  border-radius: 28px;
   background: rgba(255, 252, 247, 0.88);
   box-shadow: 0 18px 36px rgba(60, 41, 20, 0.08);
 }
 
-.page-card__eyebrow {
+.home-hero {
+  padding: 24px;
+}
+
+.home-hero__eyebrow,
+.home-card__eyebrow {
   font-size: 0.72rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: rgba(154, 52, 18, 0.78);
 }
 
-.page-card__title {
+.home-hero__title {
   margin: 8px 0 10px;
   font-size: 2rem;
 }
 
-.page-card__body {
+.home-hero__body {
   margin: 0;
-  max-width: 60ch;
+  max-width: 65ch;
   line-height: 1.6;
+  color: rgba(60, 41, 20, 0.76);
+}
+
+.home-hero__actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.home-hero__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(154, 52, 18, 0.2);
+  border-radius: 14px;
+  padding: 12px 18px;
+  color: rgb(154, 52, 18);
+  text-decoration: none;
+}
+
+.home-hero__action--primary {
+  background: rgb(154, 52, 18);
+  color: rgba(255, 250, 241, 0.96);
+}
+
+.home-dashboard {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.home-panel {
+  padding: 20px;
+}
+
+.home-panel__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.home-panel__header h3 {
+  margin: 0 0 12px;
+}
+
+.home-panel__header a {
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(154, 52, 18);
+  text-decoration: none;
+}
+
+.home-panel__body {
+  display: grid;
+  gap: 12px;
+}
+
+.home-card,
+.home-empty {
+  border: 1px solid rgba(154, 52, 18, 0.12);
+  border-radius: 18px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.home-card {
+  color: inherit;
+  text-decoration: none;
+}
+
+.home-card p,
+.home-empty {
+  margin: 6px 0 0;
+  color: rgba(60, 41, 20, 0.72);
+  line-height: 1.5;
+}
+
+.home-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.home-badges span {
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: rgba(255, 248, 240, 0.92);
+  color: rgb(154, 52, 18);
+  font-size: 0.84rem;
+}
+
+@media (max-width: 1100px) {
+  .home-dashboard {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

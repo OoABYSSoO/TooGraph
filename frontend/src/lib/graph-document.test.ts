@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { reactive } from "vue";
 
-import { createDraftFromTemplate } from "./graph-document.ts";
+import { createDraftFromTemplate, createEmptyDraftGraph } from "./graph-document.ts";
 import type { TemplateRecord } from "../types/node-system.ts";
 
 const template: TemplateRecord = {
@@ -63,4 +64,27 @@ test("createDraftFromTemplate deep clones nested template content", () => {
 
   assert.equal(template.state_schema.question.value, "什么是 GraphiteUI？");
   assert.equal(template.metadata.category, "demo");
+});
+
+test("createDraftFromTemplate accepts Vue reactive template records", () => {
+  const reactiveTemplate = reactive(template) as TemplateRecord;
+
+  const draft = createDraftFromTemplate(reactiveTemplate);
+
+  assert.equal(draft.name, "Hello World");
+  assert.deepEqual(draft.nodes, template.nodes);
+});
+
+test("createEmptyDraftGraph creates an empty backend-native payload", () => {
+  const draft = createEmptyDraftGraph("Untitled Graph");
+
+  assert.deepEqual(draft, {
+    graph_id: null,
+    name: "Untitled Graph",
+    state_schema: {},
+    nodes: {},
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  });
 });
