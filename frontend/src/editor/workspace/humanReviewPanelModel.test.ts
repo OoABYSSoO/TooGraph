@@ -595,6 +595,154 @@ test("buildHumanReviewPanelModel renders a dynamic subgraph breakpoint from the 
   assert.deepEqual(panel.requiredNow.map((row) => row.key), ["approval_note"]);
 });
 
+test("buildHumanReviewPanelModel restores buddy clarification pause from run metadata", () => {
+  const document: GraphPayload = {
+    graph_id: "buddy_loop",
+    name: "Buddy Loop",
+    state_schema: {
+      request_understanding: { name: "Request Understanding", description: "", type: "json", value: {}, color: "#16a34a" },
+      final_reply: { name: "Final Reply", description: "", type: "markdown", value: "", color: "#16a34a" },
+    },
+    nodes: {
+      intake_request: {
+        kind: "subgraph",
+        name: "请求理解",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [{ state: "request_understanding", mode: "replace" }],
+        config: {
+          graph: {
+            graph_id: "buddy_turn_intake",
+            name: "请求理解",
+            state_schema: {
+              user_message: { name: "User Message", description: "", type: "text", value: "", color: "#d97706" },
+              request_understanding: { name: "Request Understanding", description: "", type: "json", value: {}, color: "#16a34a" },
+              clarification_prompt: { name: "Clarification Prompt", description: "需要用户回答的澄清问题。", type: "markdown", value: "", color: "#0891b2" },
+              clarification_answer: { name: "Clarification Answer", description: "用户对澄清问题的回答。", type: "markdown", value: "", color: "#d97706" },
+            },
+            nodes: {
+              input_user_message: {
+                kind: "input",
+                name: "用户消息",
+                description: "",
+                ui: { position: { x: -480, y: 0 } },
+                reads: [],
+                writes: [{ state: "user_message", mode: "replace" }],
+                config: { value: "", boundaryType: "text" },
+              },
+              understand_request: {
+                kind: "agent",
+                name: "理解请求",
+                description: "",
+                ui: { position: { x: -240, y: 0 } },
+                reads: [{ state: "user_message", required: true }],
+                writes: [{ state: "request_understanding", mode: "replace" }],
+                config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+              },
+              ask_clarification: {
+                kind: "agent",
+                name: "询问澄清",
+                description: "",
+                ui: { position: { x: 0, y: 0 } },
+                reads: [
+                  { state: "user_message", required: true },
+                  { state: "request_understanding", required: true },
+                ],
+                writes: [{ state: "clarification_prompt", mode: "replace" }],
+                config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+              },
+              merge_clarification: {
+                kind: "agent",
+                name: "合并澄清",
+                description: "",
+                ui: { position: { x: 240, y: 0 } },
+                reads: [
+                  { state: "request_understanding", required: true },
+                  { state: "clarification_prompt", required: true },
+                  { state: "clarification_answer", required: true },
+                ],
+                writes: [{ state: "request_understanding", mode: "replace" }],
+                config: { skillKey: "", taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+              },
+            },
+            edges: [
+              { source: "input_user_message", target: "understand_request" },
+              { source: "understand_request", target: "ask_clarification" },
+              { source: "ask_clarification", target: "merge_clarification" },
+            ],
+            conditional_edges: [],
+            metadata: { interrupt_after: ["ask_clarification"] },
+          },
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+  const run: RunDetail = {
+    ...createRun(),
+    current_node_id: "intake_request",
+    node_status_map: { intake_request: "paused" },
+    metadata: {
+      pending_subgraph_breakpoint: {
+        subgraph_node_id: "intake_request",
+        inner_node_id: "ask_clarification",
+        subgraph_path: ["intake_request"],
+        state_values: {
+          user_message: "帮我继续",
+          request_understanding: { needs_clarification: true },
+          clarification_prompt: "请选择先执行哪个方案。",
+          clarification_answer: "",
+        },
+        node_status_map: { ask_clarification: "paused", merge_clarification: "idle" },
+        node_executions: [
+          {
+            node_id: "ask_clarification",
+            node_type: "agent",
+            status: "success",
+            duration_ms: 1,
+            input_summary: "",
+            output_summary: "",
+            artifacts: {
+              inputs: {},
+              outputs: {},
+              family: "agent",
+              state_reads: [
+                { state_key: "user_message", input_key: "user_message", value: "帮我继续" },
+                { state_key: "request_understanding", input_key: "request_understanding", value: { needs_clarification: true } },
+              ],
+              state_writes: [
+                {
+                  state_key: "clarification_prompt",
+                  output_key: "clarification_prompt",
+                  mode: "replace",
+                  value: "请选择先执行哪个方案。",
+                  changed: true,
+                },
+              ],
+            },
+            warnings: [],
+            errors: [],
+          },
+        ],
+      },
+    },
+  };
+
+  const panel = buildHumanReviewPanelModel(run, document);
+  const resumePayload = buildHumanReviewResumePayload(panel.allRows, {
+    clarification_answer: "先执行方案一",
+  });
+
+  assert.deepEqual(panel.scopePath, ["请求理解", "询问澄清"]);
+  assert.deepEqual(panel.producedRows.map((row) => row.key), ["clarification_prompt"]);
+  assert.deepEqual(panel.requiredNow.map((row) => row.key), ["clarification_answer"]);
+  assert.equal(panel.hasBlockingEmptyRequiredField, true);
+  assert.deepEqual(resumePayload, { clarification_answer: "先执行方案一" });
+});
+
 test("buildHumanReviewPanelModel does not block continue when required fields already have values", () => {
   const run = createBranchingRun();
   run.artifacts = {

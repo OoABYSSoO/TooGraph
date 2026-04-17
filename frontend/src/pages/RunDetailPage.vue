@@ -216,21 +216,25 @@
           </div>
           <div class="run-detail__timeline">
             <div
-              v-for="execution in run.node_executions"
-              :key="`${execution.node_id}-${execution.artifacts.iteration ?? 1}-${execution.status}`"
+              v-for="item in aggregatedTimeline"
+              :key="item.key"
               class="run-detail__timeline-item"
             >
-              <span class="run-detail__timeline-rail" :class="statusBadgeClass(execution.status)" aria-hidden="true"></span>
+              <span class="run-detail__timeline-rail" :class="statusBadgeClass(item.status)" aria-hidden="true"></span>
               <div class="run-detail__timeline-body">
                 <div class="run-detail__timeline-heading">
-                  <strong>{{ execution.node_id }}</strong>
-                  <span :class="statusBadgeClass(execution.status)">{{ execution.status }}</span>
+                  <div class="run-detail__timeline-title">
+                    <strong>{{ item.pathLabel }}</strong>
+                    <small v-if="item.label !== item.pathLabel">{{ item.label }}</small>
+                  </div>
+                  <span :class="statusBadgeClass(item.status)">{{ item.status }}</span>
                 </div>
-                <p>{{ execution.output_summary || execution.input_summary || t("common.noSummary") }}</p>
+                <p>{{ item.summary || t("common.noSummary") }}</p>
                 <div class="run-detail__badges">
-                  <span>{{ t("common.ms", { value: execution.duration_ms }) }}</span>
-                  <span v-if="execution.artifacts.iteration">{{ t("common.iteration", { value: execution.artifacts.iteration }) }}</span>
-                  <span v-if="execution.artifacts.selected_branch">{{ execution.artifacts.selected_branch }}</span>
+                  <span>{{ item.kind }}</span>
+                  <span v-if="item.durationMs !== null">{{ t("common.ms", { value: item.durationMs }) }}</span>
+                  <span v-if="item.subgraphPath.length > 0">{{ item.subgraphPath.join(" / ") }}</span>
+                  <span v-for="label in item.artifactLabels" :key="`${item.key}-${label}`">{{ label }}</span>
                 </div>
               </div>
             </div>
@@ -263,7 +267,7 @@ import { buildCycleVisualization, describeCycleStopReason, formatCycleStopReason
 import { buildSnapshotScopedRun, canRestoreRunDetail, resolveRunRestoreUrl, resolveRunSnapshot } from "@/lib/run-restore";
 import type { RunDetail } from "@/types/run";
 
-import { buildRunStatusFacts, listRunOutputArtifacts } from "./runDetailModel.ts";
+import { buildRunAggregatedTimeline, buildRunStatusFacts, listRunOutputArtifacts } from "./runDetailModel.ts";
 import ArtifactDocumentPager from "./ArtifactDocumentPager.vue";
 
 const route = useRoute();
@@ -307,6 +311,7 @@ const cycleVisualization = computed(() =>
   viewedRun.value ? buildCycleVisualization(viewedRun.value) : { hasCycle: false, summary: null, backEdges: [], iterations: [] },
 );
 const outputArtifacts = computed(() => (viewedRun.value ? listRunOutputArtifacts(viewedRun.value) : []));
+const aggregatedTimeline = computed(() => (viewedRun.value ? buildRunAggregatedTimeline(viewedRun.value) : []));
 const liveStreamingOutputItems = computed(() =>
   Object.values(liveStreamingOutputs.value).sort((left, right) => left.nodeId.localeCompare(right.nodeId)),
 );
@@ -924,6 +929,18 @@ function statusBadgeClass(status: string) {
 
 .run-detail__timeline-heading strong {
   color: var(--toograph-text-strong);
+}
+
+.run-detail__timeline-title {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.run-detail__timeline-title small {
+  color: rgba(60, 41, 20, 0.58);
+  font-family: var(--toograph-font-mono);
+  font-size: 0.78rem;
 }
 
 @media (max-width: 1120px) {

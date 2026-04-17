@@ -208,6 +208,7 @@ def resume_run_endpoint(
         resumed_run["subgraph_status_map"] = copy.deepcopy(
             resume_snapshot.get("subgraph_status_map", resumed_run.get("subgraph_status_map", {}))
         )
+        resumed_run["metadata"] = copy.deepcopy(resume_snapshot.get("metadata", resumed_run.get("metadata", {})))
         resumed_run["output_previews"] = copy.deepcopy(resume_snapshot.get("output_previews", resumed_run.get("output_previews", [])))
         resumed_run["final_result"] = str(resume_snapshot.get("final_result", resumed_run.get("final_result", "")) or "")
     resumed_run["graph_id"] = graph.graph_id

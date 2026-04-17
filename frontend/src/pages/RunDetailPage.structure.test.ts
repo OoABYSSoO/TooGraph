@@ -76,6 +76,17 @@ test("RunDetailPage renders skill artifact document lists with a paged reader", 
   assert.match(componentSource, /v-else\s+class="run-detail__content"/);
 });
 
+test("RunDetailPage renders the aggregated parent and subgraph timeline", () => {
+  assert.match(componentSource, /import \{ buildRunAggregatedTimeline, buildRunStatusFacts, listRunOutputArtifacts \} from "\.\/runDetailModel\.ts";/);
+  assert.match(componentSource, /const aggregatedTimeline = computed\(\(\) => \(viewedRun\.value \? buildRunAggregatedTimeline\(viewedRun\.value\) : \[\]\)\);/);
+  assert.match(componentSource, /v-for="item in aggregatedTimeline"/);
+  assert.doesNotMatch(componentSource, /v-for="execution in run\.node_executions"/);
+  assert.match(componentSource, /\{\{ item\.pathLabel \}\}/);
+  assert.match(componentSource, /item\.subgraphPath\.join\(" \/ "\)/);
+  assert.match(componentSource, /item\.durationMs !== null/);
+  assert.match(componentSource, /v-for="label in item\.artifactLabels"/);
+});
+
 test("RunDetailPage uses one immediate route watcher for loading run details", () => {
   assert.match(componentSource, /import \{ computed, onBeforeUnmount, ref, watch \} from "vue";/);
   assert.doesNotMatch(componentSource, /onMounted/);

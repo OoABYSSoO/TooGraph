@@ -907,6 +907,7 @@ const baseMessages = {
         policy: "边界",
         memory: "记忆",
         summary: "摘要",
+        confirmation: "确认",
         history: "历史",
       },
       profile: {
@@ -949,6 +950,17 @@ const baseMessages = {
         body: "用于压缩较长对话的关键上下文，伙伴会在回复时参考它。",
         updatedAt: "更新时间：{value}",
         content: "摘要内容",
+      },
+      pausedRuns: {
+        title: "待确认运行",
+        body: "这里显示暂停等待确认的伙伴运行，使用和悬浮窗相同的暂停卡片继续、拒绝、取消或补充输入。",
+        refresh: "刷新待确认",
+        empty: "当前没有等待确认的伙伴运行。",
+        select: "查看",
+        selectedTitle: "确认视图",
+        selectedEmpty: "选择一个暂停运行后继续处理。",
+        resumeStarted: "已提交继续运行。",
+        cancelled: "已取消暂停运行。",
       },
       history: {
         title: "备份历史",
@@ -1877,6 +1889,7 @@ const baseMessages = {
         policy: "Boundaries",
         memory: "Memory",
         summary: "Summary",
+        confirmation: "Confirmations",
         history: "History",
       },
       profile: {
@@ -1919,6 +1932,17 @@ const baseMessages = {
         body: "Condensed context for longer conversations; the buddy will reference it while replying.",
         updatedAt: "Updated: {value}",
         content: "Summary content",
+      },
+      pausedRuns: {
+        title: "Pending Runs",
+        body: "Paused buddy runs waiting for review appear here, using the same pause card as the floating window for continue, deny, cancel, and supplemental input.",
+        refresh: "Refresh pending",
+        empty: "No buddy runs are waiting for confirmation.",
+        select: "View",
+        selectedTitle: "Confirmation View",
+        selectedEmpty: "Select a paused run to continue handling it.",
+        resumeStarted: "Resume submitted.",
+        cancelled: "Paused run cancelled.",
       },
       history: {
         title: "Revision History",

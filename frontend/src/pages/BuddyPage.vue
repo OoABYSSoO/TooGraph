@@ -176,6 +176,60 @@
           </article>
         </ElTabPane>
 
+        <ElTabPane :label="t('buddyPage.tabs.confirmation')" name="confirmation">
+          <section class="buddy-page__split buddy-page__split--confirmations">
+            <article class="buddy-page__panel buddy-page__panel--paused-list">
+              <div class="buddy-page__panel-heading">
+                <div>
+                  <h3>{{ t("buddyPage.pausedRuns.title") }}</h3>
+                  <p>{{ t("buddyPage.pausedRuns.body") }}</p>
+                </div>
+                <ElButton :loading="isLoadingPausedRuns" @click="loadPausedRuns()">
+                  <ElIcon><Refresh /></ElIcon>
+                  <span>{{ t("buddyPage.pausedRuns.refresh") }}</span>
+                </ElButton>
+              </div>
+              <ElTable :data="pausedRunSummaries" class="buddy-page__table" empty-text=" ">
+                <ElTableColumn prop="graph_name" :label="t('common.run')" min-width="180" show-overflow-tooltip />
+                <ElTableColumn :label="t('common.startedAt')" width="180">
+                  <template #default="{ row }">{{ formatDate(row.started_at) }}</template>
+                </ElTableColumn>
+                <ElTableColumn :label="t('buddyPage.memory.actions')" width="120" fixed="right">
+                  <template #default="{ row }">
+                    <ElButton
+                      size="small"
+                      :loading="selectedPausedRunId === row.run_id && isLoadingPausedRunDetail"
+                      @click="selectPausedRun(row.run_id)"
+                    >
+                      {{ t("buddyPage.pausedRuns.select") }}
+                    </ElButton>
+                  </template>
+                </ElTableColumn>
+              </ElTable>
+              <ElEmpty v-if="pausedRunSummaries.length === 0" :description="t('buddyPage.pausedRuns.empty')" />
+            </article>
+
+            <article class="buddy-page__panel buddy-page__panel--paused-detail">
+              <div class="buddy-page__panel-heading">
+                <div>
+                  <h3>{{ t("buddyPage.pausedRuns.selectedTitle") }}</h3>
+                  <p>{{ selectedPausedRunDetail?.graph_name || t("buddyPage.pausedRuns.selectedEmpty") }}</p>
+                </div>
+              </div>
+              <BuddyPauseCard
+                :run="selectedPausedRunDetail"
+                :busy="pausedRunActionBusy"
+                @resume="resumeSelectedPausedRun"
+                @cancel="cancelSelectedPausedRun"
+              />
+              <ElEmpty
+                v-if="!selectedPausedRunDetail"
+                :description="t('buddyPage.pausedRuns.selectedEmpty')"
+              />
+            </article>
+          </section>
+        </ElTabPane>
+
         <ElTabPane :label="t('buddyPage.tabs.history')" name="history">
           <article class="buddy-page__panel">
             <div class="buddy-page__panel-heading">
@@ -244,6 +298,8 @@ import {
   updateBuddyProfile,
   updateBuddySessionSummary,
 } from "@/api/buddy";
+import { cancelRun, fetchRun, fetchRuns, resumeRun } from "@/api/runs";
+import BuddyPauseCard from "@/buddy/BuddyPauseCard.vue";
 import AppShell from "@/layouts/AppShell.vue";
 import { useBuddyContextStore } from "@/stores/buddyContext";
 import type {
@@ -255,6 +311,7 @@ import type {
   BuddyRevision,
   BuddySessionSummary,
 } from "@/types/buddy";
+import type { RunDetail, RunSummary } from "@/types/run";
 
 type MemoryDraft = Pick<BuddyMemory, "type" | "title" | "content">;
 type LoadAllOptions = {
@@ -270,6 +327,9 @@ const isSavingProfile = ref(false);
 const isSavingPolicy = ref(false);
 const isSavingMemory = ref(false);
 const isSavingSummary = ref(false);
+const isLoadingPausedRuns = ref(false);
+const isLoadingPausedRunDetail = ref(false);
+const pausedRunActionBusy = ref(false);
 const memoryActionId = ref("");
 const restoreActionId = ref("");
 const errorMessage = ref("");
@@ -282,6 +342,9 @@ const editingMemoryId = ref("");
 const summaryDraft = ref<BuddySessionSummary>(defaultSummaryDraft());
 const revisions = ref<BuddyRevision[]>([]);
 const lastCommand = ref<BuddyCommandRecord | null>(null);
+const pausedRunSummaries = ref<RunSummary[]>([]);
+const selectedPausedRunId = ref("");
+const selectedPausedRunDetail = ref<RunDetail | null>(null);
 
 const policyBoundaryText = computed({
   get: () => listToText(policyDraft.value.behavior_boundaries),
@@ -395,6 +458,9 @@ function hasActiveBuddyPageWrite() {
       isSavingPolicy.value ||
       isSavingMemory.value ||
       isSavingSummary.value ||
+      isLoadingPausedRuns.value ||
+      isLoadingPausedRunDetail.value ||
+      pausedRunActionBusy.value ||
       memoryActionId.value ||
       restoreActionId.value,
   );
@@ -417,6 +483,7 @@ async function loadAll(options: LoadAllOptions = {}) {
     memories.value = memoryList;
     summaryDraft.value = summary;
     revisions.value = revisionList;
+    await loadPausedRuns({ silent: true });
     errorMessage.value = "";
     hasLoaded.value = true;
   } catch (error) {
@@ -425,6 +492,86 @@ async function loadAll(options: LoadAllOptions = {}) {
     if (!options.silent) {
       isLoading.value = false;
     }
+  }
+}
+
+function isBuddyPausedRunSummary(run: RunSummary) {
+  const graphName = run.graph_name.trim().toLowerCase();
+  return graphName.includes("buddy") || run.graph_name.includes("伙伴");
+}
+
+async function loadPausedRuns(options: LoadAllOptions = {}) {
+  try {
+    if (!options.silent) {
+      isLoadingPausedRuns.value = true;
+    }
+    const runs = await fetchRuns({ status: "awaiting_human" });
+    const nextRuns = runs.filter(isBuddyPausedRunSummary);
+    pausedRunSummaries.value = nextRuns;
+    if (!nextRuns.some((run) => run.run_id === selectedPausedRunId.value)) {
+      selectedPausedRunId.value = nextRuns[0]?.run_id ?? "";
+    }
+    await loadSelectedPausedRunDetail();
+  } catch (error) {
+    setError(error);
+  } finally {
+    if (!options.silent) {
+      isLoadingPausedRuns.value = false;
+    }
+  }
+}
+
+async function loadSelectedPausedRunDetail() {
+  if (!selectedPausedRunId.value) {
+    selectedPausedRunDetail.value = null;
+    return;
+  }
+  try {
+    isLoadingPausedRunDetail.value = true;
+    const run = await fetchRun(selectedPausedRunId.value);
+    selectedPausedRunDetail.value = run.status === "awaiting_human" ? run : null;
+  } catch (error) {
+    selectedPausedRunDetail.value = null;
+    setError(error);
+  } finally {
+    isLoadingPausedRunDetail.value = false;
+  }
+}
+
+async function selectPausedRun(runId: string) {
+  selectedPausedRunId.value = runId;
+  await loadSelectedPausedRunDetail();
+}
+
+async function resumeSelectedPausedRun(payload: Record<string, unknown>) {
+  if (!selectedPausedRunDetail.value || pausedRunActionBusy.value) {
+    return;
+  }
+  try {
+    pausedRunActionBusy.value = true;
+    await resumeRun(selectedPausedRunDetail.value.run_id, payload);
+    ElMessage.success(t("buddyPage.pausedRuns.resumeStarted"));
+    await loadPausedRuns({ silent: true });
+  } catch (error) {
+    setError(error, "common.failedToSave");
+  } finally {
+    pausedRunActionBusy.value = false;
+  }
+}
+
+async function cancelSelectedPausedRun() {
+  if (!selectedPausedRunDetail.value || pausedRunActionBusy.value) {
+    return;
+  }
+  try {
+    pausedRunActionBusy.value = true;
+    await cancelRun(selectedPausedRunDetail.value.run_id, t("buddy.pause.cancelReason"));
+    ElMessage.success(t("buddyPage.pausedRuns.cancelled"));
+    await loadPausedRuns({ silent: true });
+  } catch (error) {
+    setError(error, "common.failedToSave");
+  } finally {
+    pausedRunActionBusy.value = false;
   }
 }
 
@@ -694,6 +841,22 @@ onMounted(loadAll);
 .buddy-page__panel--memory-list {
   min-width: 0;
   overflow: hidden;
+}
+
+.buddy-page__panel--paused-list,
+.buddy-page__panel--paused-detail {
+  min-width: 0;
+}
+
+.buddy-page__panel--paused-detail {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.buddy-page__panel--paused-detail :deep(.buddy-widget__pause-card) {
+  width: 100%;
+  max-width: 680px;
 }
 
 .buddy-page__actions,
