@@ -1,17 +1,18 @@
 ---
 name: local_workspace_executor
-description: Read context, write one file, or execute one script inside TooGraph's local workspace permission boundaries.
+description: Read, list, search, write one file, or execute one script inside TooGraph's local workspace permission boundaries.
 ---
 
 # Local Workspace Executor
 
-Use this skill when a graph needs one explicit local workspace operation on one file path.
+Use this skill when a graph needs one explicit local workspace operation on one repository path.
 
 The LLM node generates only these skill input fields:
 
 - `path`: repository-relative file path.
-- `operation`: `read`, `write`, or `execute`.
+- `operation`: `read`, `list`, `search`, `write`, or `execute`.
 - `content`: required only when `operation` is `write`; it must be the complete final file content.
+- `query`: required only when `operation` is `search`; it must be the text to search for.
 
 The skill returns only:
 
@@ -35,6 +36,8 @@ If a referenced path does not exist, the pre-read context says that only `write`
 Supported operations:
 
 - `read`: reads one UTF-8 text file and returns its content in `result`.
+- `list`: lists readable text files below one path and returns skipped-entry counts.
+- `search`: searches readable text files below one path for `query` and returns matching lines plus skipped-entry counts.
 - `write`: creates or overwrites one UTF-8 text file under `backend/data`, `skill/user`, `graph_template/user`, or `node_preset/user`.
 - `execute`: runs one script under `backend/data/tmp` or `skill/user`.
 
@@ -45,4 +48,4 @@ Default policy:
 - Execute roots: `backend/data/tmp`, `skill/user`.
 - Execute extensions: `.py`, `.js`, `.mjs`, `.sh`, `.bat`, `.ps1`.
 
-Execution is not an OS sandbox. It is constrained by path policy before launch, but the launched script still runs as a local process. This Skill declares file-write and subprocess capability; `需确认` mode pauses before writes or execution and `完全访问` mode can run them without an extra prompt. Plain `read` operations do not require approval by themselves.
+Execution is not an OS sandbox. It is constrained by path policy before launch, but the launched script still runs as a local process. This Skill declares file-write and subprocess capability; the current runtime approval gate is skill-level, so `需确认` mode can pause before invoking this Skill even when the generated operation is read-only. `完全访问` mode can run it without an extra prompt.

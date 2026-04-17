@@ -269,6 +269,132 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         self.assertEqual(recorded_events[1]["detail"]["binding_source"], "node_config")
         self.assertEqual(recorded_events[1]["detail"]["path"], "docs/a.md")
 
+    def test_execute_agent_node_records_local_folder_prompt_context_activity_event(self) -> None:
+        state_schema = {
+            "buddy_context": NodeSystemStateDefinition.model_validate({"type": "file"}),
+            "answer": NodeSystemStateDefinition.model_validate({"type": "text"}),
+        }
+        node = NodeSystemAgentNode.model_validate(
+            {
+                "kind": "agent",
+                "name": "writer",
+                "ui": {"position": {"x": 0, "y": 0}},
+                "reads": [{"state": "buddy_context"}],
+                "writes": [{"state": "answer"}],
+                "config": {},
+            }
+        )
+        recorded_events: list[dict[str, Any]] = []
+
+        def record_activity_event_func(state: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
+            recorded_events.append(kwargs)
+            return {"sequence": len(recorded_events), **kwargs}
+
+        execute_agent_node(
+            state_schema,
+            node,
+            {
+                "buddy_context": {
+                    "kind": "local_folder",
+                    "root": "/tmp/buddy_home",
+                    "selected": ["SOUL.md", "MEMORY.md"],
+                }
+            },
+            {"state": {}},
+            node_name="writer",
+            state={"run_id": "run-1"},
+            get_skill_registry_func=lambda *, include_disabled: {},
+            get_skill_definition_registry_func=lambda *, include_disabled: {},
+            invoke_skill_func=lambda skill_func, skill_inputs: {},
+            resolve_agent_runtime_config_func=lambda agent_node: {},
+            build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
+            callable_accepts_keyword_func=lambda func, keyword: False,
+            generate_agent_skill_inputs_func=pass_through_skill_inputs_func,
+            generate_agent_response_func=lambda agent_node, input_values, skill_context, runtime_config, **kwargs: (
+                {"answer": "ok"},
+                "",
+                [],
+                runtime_config,
+            ),
+            finalize_agent_stream_delta_func=lambda *, state, node_name, output_values: None,
+            first_truthy_func=lambda values: next((value for value in values if value), None),
+            record_activity_event_func=record_activity_event_func,
+        )
+
+        self.assertEqual(len(recorded_events), 1)
+        event = recorded_events[0]
+        self.assertEqual(event["kind"], "file_context_read")
+        self.assertEqual(event["node_id"], "writer")
+        self.assertEqual(event["status"], "succeeded")
+        self.assertEqual(event["summary"], "Prepared 2 selected local input files for LLM context.")
+        self.assertEqual(event["detail"]["state_key"], "buddy_context")
+        self.assertEqual(event["detail"]["root"], "/tmp/buddy_home")
+        self.assertEqual(event["detail"]["file_count"], 2)
+        self.assertEqual(event["detail"]["files"], ["SOUL.md", "MEMORY.md"])
+
+    def test_execute_agent_node_records_local_folder_context_for_skill_input_planning(self) -> None:
+        state_schema = {
+            "buddy_context": NodeSystemStateDefinition.model_validate({"type": "file"}),
+            "answer": NodeSystemStateDefinition.model_validate({"type": "text"}),
+        }
+        node = NodeSystemAgentNode.model_validate(
+            {
+                "kind": "agent",
+                "name": "writer",
+                "ui": {"position": {"x": 0, "y": 0}},
+                "reads": [{"state": "buddy_context"}],
+                "writes": [{"state": "answer"}],
+                "config": {"skillKey": "custom"},
+            }
+        )
+        recorded_events: list[dict[str, Any]] = []
+
+        def record_activity_event_func(state: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
+            recorded_events.append(kwargs)
+            return {"sequence": len(recorded_events), **kwargs}
+
+        result = execute_agent_node(
+            state_schema,
+            node,
+            {
+                "buddy_context": {
+                    "kind": "local_folder",
+                    "root": "/tmp/buddy_home",
+                    "selected": ["SOUL.md"],
+                }
+            },
+            {"state": {}},
+            node_name="writer",
+            state={"run_id": "run-1"},
+            get_skill_registry_func=lambda *, include_disabled: {"custom": object()},
+            get_skill_definition_registry_func=lambda *, include_disabled: {
+                "custom": SkillDefinition(
+                    skillKey="custom",
+                    name="Custom",
+                    outputSchema=[SkillIoField(key="answer", name="Answer", valueType="text")],
+                    runtimeReady=True,
+                    runtimeRegistered=True,
+                )
+            },
+            invoke_skill_func=lambda skill_func, skill_inputs: {"answer": "skill answer"},
+            resolve_agent_runtime_config_func=lambda agent_node: {},
+            build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
+            callable_accepts_keyword_func=lambda func, keyword: False,
+            generate_agent_skill_inputs_func=fixed_skill_inputs_func({"custom": {}}),
+            generate_agent_response_func=lambda *args, **kwargs: (_ for _ in ()).throw(
+                AssertionError("mapped skill output should skip final response generation")
+            ),
+            finalize_agent_stream_delta_func=lambda *, state, node_name, output_values: None,
+            first_truthy_func=lambda values: next((value for value in values if value), None),
+            record_activity_event_func=record_activity_event_func,
+        )
+
+        self.assertEqual(result["outputs"], {"answer": "skill answer"})
+        self.assertEqual([event["kind"] for event in recorded_events], ["file_context_read", "skill_invocation"])
+        self.assertEqual(recorded_events[0]["summary"], "Prepared 1 selected local input file for LLM context.")
+        self.assertEqual(recorded_events[0]["detail"]["phase"], "skill_input_planning")
+        self.assertEqual(recorded_events[0]["detail"]["files"], ["SOUL.md"])
+
     def test_execute_agent_node_treats_knowledge_base_state_as_normal_skill_input(self) -> None:
         state_schema = {
             "kb": NodeSystemStateDefinition.model_validate({"type": "knowledge_base"}),

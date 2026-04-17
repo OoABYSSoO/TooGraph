@@ -12,6 +12,8 @@ from typing import Any
 MAX_READ_CHARS = 200_000
 MAX_OUTPUT_CHARS = 200_000
 DEFAULT_TIMEOUT_SECONDS = 30
+MAX_LIST_ENTRIES = 200
+MAX_SEARCH_MATCHES = 100
 READ_ROOTS: list[str] | None = None
 WRITE_ROOTS = ["backend/data", "skill/user", "graph_template/user", "node_preset/user"]
 EXECUTE_ROOTS = ["backend/data/tmp", "skill/user"]
@@ -26,11 +28,15 @@ def local_workspace_executor(**skill_inputs: Any) -> dict[str, Any]:
     repo_root = _repo_root()
     if operation == "read":
         return _read_file(repo_root, skill_inputs)
+    if operation == "list":
+        return _list_files(repo_root, skill_inputs)
+    if operation == "search":
+        return _search_files(repo_root, skill_inputs)
     if operation == "write":
         return _write_file(repo_root, skill_inputs)
     if operation == "execute":
         return _execute_script(repo_root, skill_inputs)
-    return _failed("invalid_operation", "operation must be one of read, write, execute.")
+    return _failed("invalid_operation", "operation must be one of read, list, search, write, execute.")
 
 
 def _read_file(repo_root: Path, payload: dict[str, Any]) -> dict[str, Any]:
@@ -53,6 +59,163 @@ def _read_file(repo_root: Path, payload: dict[str, Any]) -> dict[str, Any]:
                 summary=f"Read {display_path} ({len(content)} characters).",
                 status="succeeded",
                 detail={"path": display_path, "characters": len(content)},
+            )
+        ],
+    )
+
+
+def _list_files(repo_root: Path, payload: dict[str, Any]) -> dict[str, Any]:
+    raw_path = _as_text(payload.get("path")).strip()
+    target_result = _resolve_allowed_path(repo_root, raw_path, READ_ROOTS)
+    if isinstance(target_result, dict):
+        return _failed(
+            target_result["type"],
+            target_result["message"],
+            activity_events=[
+                _file_activity_event(
+                    kind="file_list",
+                    path=raw_path,
+                    summary=f"Failed to list {raw_path or '(missing path)'}.",
+                    status="failed",
+                    detail={"error_type": target_result["type"], "error": target_result["message"]},
+                    error=target_result["message"],
+                )
+            ],
+        )
+    target = target_result
+    if not target.exists():
+        message = "Path does not exist."
+        return _failed(
+            "not_found",
+            message,
+            activity_events=[
+                _file_activity_event(
+                    kind="file_list",
+                    path=_display_path(repo_root, target),
+                    summary=f"Failed to list {_display_path(repo_root, target)}.",
+                    status="failed",
+                    detail={"error_type": "not_found", "error": message},
+                    error=message,
+                )
+            ],
+        )
+
+    files, skipped_count = _collect_readable_files(repo_root, target)
+    display_path = _display_path(repo_root, target)
+    limited_files = files[:MAX_LIST_ENTRIES]
+    result_lines = [f"Listed `{display_path}` ({len(files)} entries, skipped {skipped_count})."]
+    if len(files) > MAX_LIST_ENTRIES:
+        result_lines[0] += f" Showing first {MAX_LIST_ENTRIES} entries."
+    result_lines.extend(f"- `{_display_path(repo_root, file_path)}`" for file_path in limited_files)
+    if not limited_files:
+        result_lines.append("- (no readable files)")
+    return _succeeded(
+        "\n".join(result_lines),
+        activity_events=[
+            _file_activity_event(
+                kind="file_list",
+                path=display_path,
+                summary=f"Listed {display_path} ({len(files)} entries, skipped {skipped_count}).",
+                status="succeeded",
+                detail={
+                    "entry_count": len(files),
+                    "skipped_count": skipped_count,
+                    "truncated": len(files) > MAX_LIST_ENTRIES,
+                },
+            )
+        ],
+    )
+
+
+def _search_files(repo_root: Path, payload: dict[str, Any]) -> dict[str, Any]:
+    raw_path = _as_text(payload.get("path")).strip()
+    query = _as_text(payload.get("query")).strip()
+    if not query:
+        message = "query is required for search."
+        return _failed(
+            "missing_query",
+            message,
+            activity_events=[
+                _file_activity_event(
+                    kind="file_search",
+                    path=raw_path,
+                    summary=f"Failed to search {raw_path or '(missing path)'}.",
+                    status="failed",
+                    detail={"query": query, "error_type": "missing_query", "error": message},
+                    error=message,
+                )
+            ],
+        )
+
+    target_result = _resolve_allowed_path(repo_root, raw_path, READ_ROOTS)
+    if isinstance(target_result, dict):
+        return _failed(
+            target_result["type"],
+            target_result["message"],
+            activity_events=[
+                _file_activity_event(
+                    kind="file_search",
+                    path=raw_path,
+                    summary=f"Failed to search {raw_path or '(missing path)'}.",
+                    status="failed",
+                    detail={"query": query, "error_type": target_result["type"], "error": target_result["message"]},
+                    error=target_result["message"],
+                )
+            ],
+        )
+    target = target_result
+    if not target.exists():
+        message = "Path does not exist."
+        return _failed(
+            "not_found",
+            message,
+            activity_events=[
+                _file_activity_event(
+                    kind="file_search",
+                    path=_display_path(repo_root, target),
+                    summary=f"Failed to search {_display_path(repo_root, target)}.",
+                    status="failed",
+                    detail={"query": query, "error_type": "not_found", "error": message},
+                    error=message,
+                )
+            ],
+        )
+
+    files, skipped_count = _collect_readable_files(repo_root, target)
+    matches: list[tuple[str, int, str]] = []
+    for file_path in files:
+        content = file_path.read_text(encoding="utf-8", errors="replace")
+        for line_number, line in enumerate(content.splitlines(), start=1):
+            if query.lower() not in line.lower():
+                continue
+            matches.append((_display_path(repo_root, file_path), line_number, line.strip()))
+            if len(matches) >= MAX_SEARCH_MATCHES:
+                break
+        if len(matches) >= MAX_SEARCH_MATCHES:
+            break
+
+    display_path = _display_path(repo_root, target)
+    result_lines = [f"Searched `{display_path}` for `{query}` ({len(matches)} matches, skipped {skipped_count})."]
+    if len(matches) >= MAX_SEARCH_MATCHES:
+        result_lines[0] += f" Showing first {MAX_SEARCH_MATCHES} matches."
+    result_lines.extend(f"- `{path}:{line_number}` {line}" for path, line_number, line in matches)
+    if not matches:
+        result_lines.append("- (no matches)")
+    match_noun = "match" if len(matches) == 1 else "matches"
+    return _succeeded(
+        "\n".join(result_lines),
+        activity_events=[
+            _file_activity_event(
+                kind="file_search",
+                path=display_path,
+                summary=f"Searched {display_path} for `{query}` ({len(matches)} {match_noun}, skipped {skipped_count}).",
+                status="succeeded",
+                detail={
+                    "query": query,
+                    "match_count": len(matches),
+                    "skipped_count": skipped_count,
+                    "truncated": len(matches) >= MAX_SEARCH_MATCHES,
+                },
             )
         ],
     )
@@ -263,6 +426,55 @@ def _line_count(value: str) -> int:
     return len(value.splitlines())
 
 
+def _collect_readable_files(repo_root: Path, target: Path) -> tuple[list[Path], int]:
+    if target.is_file():
+        if _is_text_file(target):
+            return [target], 0
+        return [], 1
+    if not target.is_dir():
+        return [], 1
+
+    files: list[Path] = []
+    skipped_count = 0
+    for current_dir, dir_names, file_names in os.walk(target):
+        current_path = Path(current_dir)
+        allowed_dirs: list[str] = []
+        for dir_name in sorted(dir_names):
+            child_dir = current_path / dir_name
+            if is_denied_workspace_path(repo_root, child_dir):
+                skipped_count += 1
+                continue
+            allowed_dirs.append(dir_name)
+        dir_names[:] = allowed_dirs
+
+        for file_name in sorted(file_names):
+            file_path = current_path / file_name
+            if is_denied_workspace_path(repo_root, file_path) or not _is_text_file(file_path):
+                skipped_count += 1
+                continue
+            files.append(file_path)
+    return files, skipped_count
+
+
+def is_denied_workspace_path(repo_root: Path, path: Path) -> bool:
+    resolved = path.resolve(strict=False)
+    if not _is_within(resolved, repo_root):
+        return True
+    for denied in DENIED_ROOTS:
+        denied_path = (repo_root / denied).resolve(strict=False)
+        if _is_within(resolved, denied_path):
+            return True
+    return False
+
+
+def _is_text_file(path: Path) -> bool:
+    try:
+        chunk = path.read_bytes()[:4096]
+    except OSError:
+        return False
+    return b"\x00" not in chunk
+
+
 def _activity_event(*, kind: str, summary: str, status: str, detail: dict[str, Any]) -> dict[str, Any]:
     return {
         "kind": kind,
@@ -270,6 +482,29 @@ def _activity_event(*, kind: str, summary: str, status: str, detail: dict[str, A
         "status": status,
         "detail": detail,
     }
+
+
+def _file_activity_event(
+    *,
+    kind: str,
+    path: str,
+    summary: str,
+    status: str,
+    detail: dict[str, Any],
+    error: str = "",
+) -> dict[str, Any]:
+    event = _activity_event(
+        kind=kind,
+        summary=summary,
+        status=status,
+        detail={
+            "path": path,
+            **detail,
+        },
+    )
+    if error:
+        event["error"] = error
+    return event
 
 
 def _command_activity_event(

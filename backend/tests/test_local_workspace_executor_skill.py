@@ -47,7 +47,7 @@ class LocalWorkspaceExecutorSkillTests(unittest.TestCase):
         self.assertFalse(definition.capability_policy.default.requires_approval)
         self.assertEqual(
             [field.key for field in definition.input_schema],
-            ["path", "operation", "content"],
+            ["path", "operation", "content", "query"],
         )
         self.assertEqual(
             [field.key for field in definition.output_schema],
@@ -133,6 +133,69 @@ class LocalWorkspaceExecutorSkillTests(unittest.TestCase):
         self.assertIn("hello workspace", str(read_result["result"]))
         self.assertEqual(read_result["activity_events"][0]["kind"], "file_read")
         self.assertEqual(read_result["activity_events"][0]["detail"]["characters"], len("hello workspace"))
+
+    def test_list_directory_returns_file_list_activity_event(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            docs = repo_root / "docs"
+            nested = docs / "notes"
+            nested.mkdir(parents=True)
+            (docs / "README.md").write_text("root doc", encoding="utf-8")
+            (nested / "MEMORY.md").write_text("nested doc", encoding="utf-8")
+            (repo_root / ".git").mkdir()
+            (repo_root / ".git" / "config").write_text("secret", encoding="utf-8")
+
+            result = _run_skill_script(
+                EXECUTOR_AFTER_LLM_PATH,
+                {
+                    "path": "docs",
+                    "operation": "list",
+                },
+                repo_root=repo_root,
+            )
+
+        self.assertEqual(result["success"], True)
+        self.assertIn("docs/README.md", str(result["result"]))
+        self.assertIn("docs/notes/MEMORY.md", str(result["result"]))
+        self.assertNotIn(".git/config", str(result["result"]))
+        event = result["activity_events"][0]
+        self.assertEqual(event["kind"], "file_list")
+        self.assertEqual(event["summary"], "Listed docs (2 entries, skipped 0).")
+        self.assertEqual(event["status"], "succeeded")
+        self.assertEqual(event["detail"]["path"], "docs")
+        self.assertEqual(event["detail"]["entry_count"], 2)
+        self.assertEqual(event["detail"]["skipped_count"], 0)
+
+    def test_search_directory_returns_file_search_activity_event(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            docs = repo_root / "docs"
+            docs.mkdir(parents=True)
+            (docs / "alpha.md").write_text("needle one\nsecond line\n", encoding="utf-8")
+            (docs / "beta.md").write_text("no match\n", encoding="utf-8")
+            (docs / "binary.bin").write_bytes(b"\x00\x01\x02")
+
+            result = _run_skill_script(
+                EXECUTOR_AFTER_LLM_PATH,
+                {
+                    "path": "docs",
+                    "operation": "search",
+                    "query": "needle",
+                },
+                repo_root=repo_root,
+            )
+
+        self.assertEqual(result["success"], True)
+        self.assertIn("docs/alpha.md:1", str(result["result"]))
+        self.assertNotIn("docs/beta.md", str(result["result"]))
+        event = result["activity_events"][0]
+        self.assertEqual(event["kind"], "file_search")
+        self.assertEqual(event["summary"], "Searched docs for `needle` (1 match, skipped 1).")
+        self.assertEqual(event["status"], "succeeded")
+        self.assertEqual(event["detail"]["path"], "docs")
+        self.assertEqual(event["detail"]["query"], "needle")
+        self.assertEqual(event["detail"]["match_count"], 1)
+        self.assertEqual(event["detail"]["skipped_count"], 1)
 
     def test_write_outside_backend_data_is_denied(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

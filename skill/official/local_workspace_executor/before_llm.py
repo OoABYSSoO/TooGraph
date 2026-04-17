@@ -24,9 +24,12 @@ def local_workspace_executor_before_llm(**payload: Any) -> dict[str, str]:
 
     lines = [
         "Local Workspace Executor policy:",
-        "- Generate skill input fields: path, operation, and content only when operation is write.",
-        "- operation must be one of: read, write, execute.",
+        "- Generate skill input fields: path, operation, content only when operation is write, and query only when operation is search.",
+        "- operation must be one of: read, list, search, write, execute.",
+        "- read/list/search are repository read operations and never write files.",
         "- read is a pre-LLM context aid: existing repository files below are read before planning, including non-artifact files.",
+        "- list returns readable text files below the selected path and reports skipped entries.",
+        "- search finds matching lines below the selected path and reports skipped entries.",
         "- write creates or overwrites one text file and is limited to backend/data, skill/user, graph_template/user, or node_preset/user.",
         "- execute runs one script file and is limited to backend/data/tmp or skill/user.",
         "- denied roots always fail: .git, .env, backend/data/settings.",

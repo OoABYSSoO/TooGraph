@@ -3,6 +3,7 @@ from __future__ import annotations
 from time import perf_counter
 from typing import Any, Callable
 
+from app.core.runtime.agent_prompt import collect_local_input_prompt_references
 from app.core.runtime.agent_streaming import build_agent_stream_delta_callback, finalize_agent_stream_delta
 from app.core.runtime.agent_runtime_config import resolve_agent_runtime_config
 from app.core.runtime.agent_response_generation import generate_agent_response
@@ -176,6 +177,14 @@ def execute_agent_node(
         generated_skill_inputs[pending_skill_key] = dict(pending_skill_inputs) if isinstance(pending_skill_inputs, dict) else {}
         skill_input_reasoning = "Resuming approved risky Skill execution with stored Skill inputs."
     elif resolved_bindings:
+        record_file_context_activity_events(
+            state=state,
+            node_name=node_name,
+            input_values=input_values,
+            state_schema=state_schema,
+            phase="skill_input_planning",
+            record_activity_event_func=record_activity_event_func,
+        )
         generated_skill_inputs, skill_input_reasoning, skill_input_warnings, runtime_config = generate_agent_skill_inputs_func(
             node=node,
             input_values=input_values,
@@ -542,6 +551,14 @@ def execute_agent_node(
         generate_kwargs["on_delta"] = stream_delta_callback
     if callable_accepts_keyword_func(generate_agent_response_func, "state_schema"):
         generate_kwargs["state_schema"] = state_schema
+    record_file_context_activity_events(
+        state=state,
+        node_name=node_name,
+        input_values=input_values,
+        state_schema=state_schema,
+        phase="agent_response",
+        record_activity_event_func=record_activity_event_func,
+    )
     response_payload, response_reasoning, response_warnings, runtime_config = generate_agent_response_func(
         node,
         input_values,
@@ -582,6 +599,47 @@ def execute_agent_node(
         "warnings": list(dict.fromkeys(warnings)),
         "final_result": str(first_truthy_func(output_values.values()) or response_payload.get("summary") or ""),
     }
+
+
+def record_file_context_activity_events(
+    *,
+    state: dict[str, Any],
+    node_name: str,
+    input_values: dict[str, Any],
+    state_schema: dict[str, NodeSystemStateDefinition],
+    phase: str,
+    record_activity_event_func: Callable[..., dict[str, Any]],
+) -> None:
+    references = collect_local_input_prompt_references(input_values, state_schema=state_schema)
+    grouped: dict[tuple[str, str], list[str]] = {}
+    for reference in references:
+        state_key = _compact_text(reference.get("state_key"))
+        root = _compact_text(reference.get("root"))
+        relative_path = _compact_text(reference.get("relative_path"))
+        if not state_key or not root or not relative_path:
+            continue
+        group_key = (state_key, root)
+        grouped.setdefault(group_key, [])
+        if relative_path not in grouped[group_key]:
+            grouped[group_key].append(relative_path)
+
+    for (state_key, root), files in grouped.items():
+        file_count = len(files)
+        noun = "file" if file_count == 1 else "files"
+        record_activity_event_func(
+            state,
+            kind="file_context_read",
+            summary=f"Prepared {file_count} selected local input {noun} for LLM context.",
+            node_id=node_name,
+            status="succeeded",
+            detail={
+                "state_key": state_key,
+                "root": root,
+                "phase": phase,
+                "file_count": file_count,
+                "files": files,
+            },
+        )
 
 
 def _next_skill_artifact_invocation_index(state: dict[str, Any], node_name: str, skill_key: str) -> int:
