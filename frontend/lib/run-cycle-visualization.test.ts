@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import type { NodeSystemRunDetail } from "./node-system-schema.ts";
-import { buildCycleVisualization, formatCycleStopReason } from "./run-cycle-visualization.ts";
+import {
+  buildCycleVisualization,
+  describeCycleStopReason,
+  formatCycleStopReason,
+} from "./run-cycle-visualization.ts";
 
 function createRunDetail(overrides: Partial<NodeSystemRunDetail> = {}): NodeSystemRunDetail {
   return {
@@ -74,7 +78,26 @@ test("buildCycleVisualization falls back to artifact summary when top-level summ
 });
 
 test("formatCycleStopReason turns stored stop reasons into readable labels", () => {
+  assert.equal(formatCycleStopReason("empty_iteration"), "Empty iteration");
   assert.equal(formatCycleStopReason("max_iterations_exceeded"), "Max iterations exceeded");
+  assert.equal(formatCycleStopReason("no_state_change"), "No state change");
   assert.equal(formatCycleStopReason("completed"), "Completed");
   assert.equal(formatCycleStopReason(null), "");
+});
+
+test("describeCycleStopReason explains cycle stop semantics", () => {
+  assert.equal(
+    describeCycleStopReason("empty_iteration"),
+    "The loop scheduled another pass, but no node ran in that iteration.",
+  );
+  assert.equal(
+    describeCycleStopReason("no_state_change"),
+    "The loop selected another back edge without changing any tracked state in that iteration.",
+  );
+  assert.equal(
+    describeCycleStopReason("max_iterations_exceeded"),
+    "The loop hit the configured loopLimit for its controlling condition node.",
+  );
+  assert.equal(describeCycleStopReason("completed"), "The loop exited through a non-back-edge path.");
+  assert.equal(describeCycleStopReason(null), "");
 });

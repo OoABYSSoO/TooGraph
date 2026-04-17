@@ -96,7 +96,7 @@ test("collectCycleBackEdgeIds marks plain edges that close a cycle", () => {
     ],
   });
 
-  assert.deepEqual([...collectCycleBackEdgeIds(graph)], ["edge:c:output:result->a:input:result"]);
+  assert.deepEqual([...collectCycleBackEdgeIds(graph)], ["edge:c:a"]);
 });
 
 test("collectCycleBackEdgeIds also marks conditional branches that loop back", () => {
@@ -115,7 +115,7 @@ test("buildCanonicalOrdinaryEdgeId matches the hydrated ordinary-edge presentati
 
   const edge = { source: "c", target: "a" };
   assert.equal(buildCanonicalOrdinaryEdgeId(graph, edge), resolveCanonicalOrdinaryEdgePresentation(graph, edge).id);
-  assert.equal(buildCanonicalOrdinaryEdgeId(graph, edge), "edge:c:output:result->a:input:result");
+  assert.equal(buildCanonicalOrdinaryEdgeId(graph, edge), "edge:c:a");
 });
 
 test("resolveCanonicalOrdinaryEdgePresentation leaves ambiguous ordinary edges generic", () => {
@@ -171,9 +171,9 @@ test("resolveCanonicalOrdinaryEdgePresentation leaves ambiguous ordinary edges g
 
   assert.deepEqual(resolveCanonicalOrdinaryEdgePresentation(graph, { source: "source", target: "target" }), {
     id: "edge:source:target",
-    sourceHandle: null,
-    targetHandle: null,
-    sharedState: null,
+    sourceHandle: "flow:out",
+    targetHandle: "flow:in",
+    projectedState: null,
   });
 });
 
@@ -224,8 +224,21 @@ test("resolveCanonicalOrdinaryEdgePresentation leaves zero-shared ordinary edges
 
   assert.deepEqual(resolveCanonicalOrdinaryEdgePresentation(graph, { source: "source", target: "target" }), {
     id: "edge:source:target",
-    sourceHandle: null,
-    targetHandle: null,
-    sharedState: null,
+    sourceHandle: "flow:out",
+    targetHandle: "flow:in",
+    projectedState: null,
+  });
+});
+
+test("resolveCanonicalOrdinaryEdgePresentation keeps resolved ordinary edges on shared flow handles", () => {
+  const graph = createGraph({
+    edges: [{ source: "c", target: "a" }],
+  });
+
+  assert.deepEqual(resolveCanonicalOrdinaryEdgePresentation(graph, { source: "c", target: "a" }), {
+    id: "edge:c:a",
+    sourceHandle: "flow:out",
+    targetHandle: "flow:in",
+    projectedState: "result",
   });
 });

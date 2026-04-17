@@ -45,20 +45,30 @@ import { NodeSystemRouteEdge } from "@/components/editor/node-system-route-edge"
 import { createEditorSeedGraph } from "@/lib/editor-graph-defaults";
 import { decorateFlowEdges } from "@/lib/node-system-edge-visuals";
 import { collectCycleBackEdgeIds } from "@/lib/node-system-cycle-edges";
+import { collectProjectedDataRelations } from "@/lib/node-system-data-flow-projection";
 import {
   buildCanonicalOrdinaryEdgeId,
   resolveCanonicalOrdinaryEdgePresentation,
 } from "@/lib/node-system-ordinary-edge";
-import { getNodePortSectionPresentation } from "@/lib/node-system-node-card-presentation";
+import {
+  getFlowHandlePlacement,
+  getNodeHandleRailPresentation,
+  getNodePortSectionPresentation,
+  getNodeTitleFlowOverlayPresentation,
+} from "@/lib/node-system-node-card-presentation";
 import { resolveRouteEdgeSourceOffset } from "@/lib/node-system-route-edge-path";
 import {
   listConditionBranchMappingKeys,
   parseConditionBranchMappingDraft,
 } from "@/lib/node-system-condition-branch-mapping";
 import {
+  FLOW_SOURCE_HANDLE,
+  FLOW_TARGET_HANDLE,
   ROUTE_TARGET_HANDLE,
+  canNodeAcceptFlowTarget,
   canNodeAcceptRouteTarget,
   classifyEditorConnection,
+  resolveFlowTargetHandle,
   resolveRouteTargetHandle,
 } from "@/lib/node-system-route-handles";
 import {
@@ -1704,8 +1714,8 @@ function createFlowEdgeFromCanonicalEdge(
   graph: CanonicalGraphPayload,
 ): Edge {
   const presentation = resolveCanonicalOrdinaryEdgePresentation(graph, edge);
-  const sourceType = presentation.sharedState
-    ? getPortTypeFromCanonicalGraph(graph, edge.source, `output:${presentation.sharedState}`) ?? "any"
+  const sourceType = presentation.projectedState
+    ? getPortTypeFromCanonicalGraph(graph, edge.source, `output:${presentation.projectedState}`) ?? "any"
     : "any";
   const color = TYPE_COLORS[sourceType ?? "any"];
   return {
@@ -1713,8 +1723,8 @@ function createFlowEdgeFromCanonicalEdge(
     source: edge.source,
     target: edge.target,
     type: "default",
-    sourceHandle: presentation.sourceHandle ?? undefined,
-    targetHandle: presentation.targetHandle ?? undefined,
+    sourceHandle: presentation.sourceHandle ?? FLOW_SOURCE_HANDLE,
+    targetHandle: presentation.targetHandle ?? FLOW_TARGET_HANDLE,
     markerEnd: { type: MarkerType.ArrowClosed, color },
     style: {
       stroke: color,
@@ -1725,6 +1735,69 @@ function createFlowEdgeFromCanonicalEdge(
 
 function buildFlowEdgeId(source: string, sourceHandle: string, target: string, targetHandle: string) {
   return `edge:${source}:${sourceHandle}:${target}:${targetHandle}`;
+}
+
+function resolveControlSourceHandle(
+  sourceNode: CanonicalNode | undefined,
+  requestedSourceHandle: string | null | undefined,
+): string | null {
+  if (!sourceNode) {
+    return null;
+  }
+  if (sourceNode.kind === "condition") {
+    return requestedSourceHandle ?? null;
+  }
+  if (sourceNode.kind === "agent" || sourceNode.kind === "input") {
+    return FLOW_SOURCE_HANDLE;
+  }
+  return null;
+}
+
+function buildCreationControlEdge(
+  graph: CanonicalGraphPayload,
+  sourceNodeId: string,
+  sourceNode: CanonicalNode | undefined,
+  requestedSourceHandle: string | null | undefined,
+  targetNodeId: string,
+  targetNodeKind: CanonicalNode["kind"],
+): Edge | null {
+  const sourceHandle = resolveControlSourceHandle(sourceNode, requestedSourceHandle);
+  if (!sourceHandle || !sourceNode) {
+    return null;
+  }
+  const nextTargetHandle = resolveFlowTargetHandle(sourceNode.kind, sourceHandle, targetNodeKind, null);
+  const connectionKind = classifyEditorConnection(sourceNode.kind, sourceHandle, targetNodeKind, nextTargetHandle);
+  if (connectionKind !== "flow" && connectionKind !== "route") {
+    return null;
+  }
+
+  const color = "var(--accent-strong)";
+  return {
+    id:
+      connectionKind === "route"
+        ? buildFlowEdgeId(sourceNodeId, sourceHandle, targetNodeId, nextTargetHandle ?? ROUTE_TARGET_HANDLE)
+        : buildCanonicalOrdinaryEdgeId(graph, { source: sourceNodeId, target: targetNodeId }),
+    source: sourceNodeId,
+    target: targetNodeId,
+    type: connectionKind === "route" ? "route" : "default",
+    sourceHandle,
+    targetHandle: nextTargetHandle,
+    data:
+      connectionKind === "route"
+        ? {
+            routeSourceOffset: resolveConditionBranchRouteSourceOffset(
+              graph,
+              sourceNodeId,
+              getPortKeyFromHandle(sourceHandle) ?? "",
+            ),
+          }
+        : undefined,
+    markerEnd: { type: MarkerType.ArrowClosed, color },
+    style: {
+      stroke: color,
+      strokeWidth: 1.8,
+    },
+  } satisfies Edge;
 }
 
 function resolveConditionBranchRouteSourceOffset(
@@ -1752,7 +1825,7 @@ function createFlowEdgesFromCanonicalGraph(graph: CanonicalGraphPayload): Edge[]
         target,
         type: "route",
         sourceHandle: `output:${branchKey}`,
-        targetHandle: ROUTE_TARGET_HANDLE,
+        targetHandle: FLOW_TARGET_HANDLE,
         data: {
           routeSourceOffset: resolveConditionBranchRouteSourceOffset(graph, conditionalEdge.source, branchKey),
         },
@@ -1765,6 +1838,32 @@ function createFlowEdgesFromCanonicalGraph(graph: CanonicalGraphPayload): Edge[]
     }
   }
   return edges;
+}
+
+function createProjectedDataEdgesFromCanonicalGraph(graph: CanonicalGraphPayload): Edge[] {
+  return collectProjectedDataRelations(graph).map((relation) => {
+    const sourceHandle = buildHandleId("output", relation.state);
+    const sourceType = getPortTypeFromCanonicalGraph(graph, relation.source, sourceHandle) ?? "any";
+    const color = TYPE_COLORS[sourceType ?? "any"];
+    return {
+      id: `data:${relation.source}:output:${relation.state}->${relation.target}:input:${relation.state}`,
+      source: relation.source,
+      target: relation.target,
+      type: "default",
+      sourceHandle,
+      targetHandle: buildHandleId("input", relation.state),
+      selectable: false,
+      focusable: false,
+      deletable: false,
+      markerEnd: { type: MarkerType.ArrowClosed, color },
+      style: {
+        stroke: color,
+        strokeWidth: 1.35,
+        strokeDasharray: "5 4",
+        opacity: 0.38,
+      },
+    } satisfies Edge;
+  });
 }
 
 function deepClonePreset<T extends NodePresetDefinition>(preset: T): T {
@@ -2246,6 +2345,7 @@ function PortRow({
     onRemove?: () => void;
   };
 }) {
+  const railPresentation = getNodeHandleRailPresentation();
   const color = TYPE_COLORS[port.valueType];
   const [isEditing, setIsEditing] = useState(false);
   const [draftLabel, setDraftLabel] = useState(boundState ? getStateDisplayName(boundState) : port.label);
@@ -2329,9 +2429,9 @@ function PortRow({
   }
 
   return (
-    <div className={cn("group relative flex min-h-6 items-center text-[0.9rem] text-[var(--text)]", side === "input" ? "justify-start" : "justify-end")}>
-      {side === "input" ? (
-        <>
+    <div className={cn(railPresentation.sharedGridClass, "group relative min-h-6 w-full text-[0.9rem] text-[var(--text)]")}>
+      <div className={cn("relative flex h-full items-center justify-center", railPresentation.railWidthClass)}>
+        {side === "input" ? (
           <Handle
             id={buildHandleId("input", port.key)}
             type="target"
@@ -2340,35 +2440,119 @@ function PortRow({
             style={{ backgroundColor: color }}
             isConnectable
           />
-          <span ref={labelRef} className="ml-2 truncate cursor-text" onDoubleClick={startEditing}>
-            {displayLabel}
-          </span>
-          <FloatingEditorCard
-            anchorRef={labelRef}
-            open={isEditing}
-            placement="bottom-start"
-            title="Edit Port Name"
-            widthClassName="w-[320px]"
-          >
-            <Input
-              className="h-11"
-              value={draftLabel}
-              autoFocus
-              onChange={(event) => setDraftLabel(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") commitEditing();
-                if (event.key === "Escape") {
-                  setDraftLabel(displayLabel);
-                  setIsEditing(false);
-                }
+        ) : null}
+      </div>
+      <div className={cn("min-w-0", side === "input" ? railPresentation.leadingContentClass : railPresentation.trailingContentClass)}>
+        <span
+          ref={labelRef}
+          className={cn("block truncate cursor-text", side === "output" ? "text-right" : "")}
+          onDoubleClick={startEditing}
+        >
+          {displayLabel}
+        </span>
+        <FloatingEditorCard
+          anchorRef={labelRef}
+          open={isEditing}
+          placement={side === "input" ? "bottom-start" : "bottom-end"}
+          title="Edit Port Name"
+          widthClassName="w-[320px]"
+        >
+          <Input
+            className={cn("h-11", side === "output" ? "text-left" : "")}
+            value={draftLabel}
+            autoFocus
+            onChange={(event) => setDraftLabel(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") commitEditing();
+              if (event.key === "Escape") {
+                setDraftLabel(displayLabel);
+                setIsEditing(false);
+              }
+            }}
+          />
+          <div className="flex items-center justify-end gap-2">
+            <PanelIconButton
+              label="Cancel"
+              onClick={() => {
+                setDraftLabel(displayLabel);
+                setIsEditing(false);
               }}
+            >
+              <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
+                <path d="m4.5 4.5 7 7" />
+                <path d="m11.5 4.5-7 7" />
+              </svg>
+            </PanelIconButton>
+            <PanelIconButton label="Save" tone="positive" onClick={commitEditing}>
+              <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
+                <path d="m3.5 8.5 3 3 6-7" />
+              </svg>
+            </PanelIconButton>
+          </div>
+        </FloatingEditorCard>
+        <FloatingEditorCard
+          anchorRef={labelRef}
+          open={isEditingPortConfig}
+          placement={side === "input" ? "bottom-start" : "bottom-end"}
+          title="Edit Port"
+          widthClassName="w-[340px]"
+        >
+          <label className="grid gap-1.5 text-sm text-[var(--muted)]">
+            <span>{boundState ? "State Key" : "Key"}</span>
+            <Input
+              value={boundState?.key ?? draftPort.key}
+              disabled={Boolean(boundState)}
+              onChange={(event) => setDraftPort((current) => ({ ...current, key: event.target.value }))}
             />
-            <div className="flex items-center justify-end gap-2">
+          </label>
+          <label className="grid gap-1.5 text-sm text-[var(--muted)]">
+            <span>{boundState ? "Name" : "Label"}</span>
+            <Input value={draftPort.label} onChange={(event) => setDraftPort((current) => ({ ...current, label: event.target.value }))} />
+          </label>
+          <label className="grid gap-1.5 text-sm text-[var(--muted)]">
+            <span>{boundState ? "State Type" : "Value Type"}</span>
+            <FieldSelect
+              value={draftPort.valueType}
+              disabled={Boolean(boundState)}
+              onValueChange={(nextValue) => setDraftPort((current) => ({ ...current, valueType: nextValue as ValueType }))}
+              options={VALUE_TYPE_SELECT_OPTIONS}
+            />
+          </label>
+          {side === "input" ? (
+            <EditorSwitchRow
+              label="Required"
+              checked={Boolean(draftPort.required)}
+              onCheckedChange={(checked) => setDraftPort((current) => ({ ...current, required: checked }))}
+            />
+          ) : null}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              {portEditor?.onRemove ? (
+                <PanelIconButton
+                  label="Remove"
+                  tone="danger"
+                  onClick={() => {
+                    portEditor.onRemove?.();
+                    setIsEditingPortConfig(false);
+                  }}
+                >
+                  <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.7">
+                    <path d="M3.5 4.5h9" />
+                    <path d="M6 4.5V3.4c0-.5.4-.9.9-.9h2.2c.5 0 .9.4.9.9v1.1" />
+                    <path d="M5.2 6.2v5.1" />
+                    <path d="M8 6.2v5.1" />
+                    <path d="M10.8 6.2v5.1" />
+                    <path d="M4.4 4.5 5 12.6c0 .5.4.9.9.9h4.2c.5 0 .9-.4.9-.9l.6-8.1" />
+                  </svg>
+                </PanelIconButton>
+              ) : null}
+            </div>
+            <div className="flex items-center gap-2">
               <PanelIconButton
                 label="Cancel"
                 onClick={() => {
-                  setDraftLabel(displayLabel);
-                  setIsEditing(false);
+                  setDraftPort(port);
+                  setIsEditingPortConfig(false);
                 }}
               >
                 <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
@@ -2376,208 +2560,17 @@ function PortRow({
                   <path d="m11.5 4.5-7 7" />
                 </svg>
               </PanelIconButton>
-              <PanelIconButton label="Save" tone="positive" onClick={commitEditing}>
+              <PanelIconButton label="Save" tone="positive" onClick={commitPortEditing}>
                 <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
                   <path d="m3.5 8.5 3 3 6-7" />
                 </svg>
               </PanelIconButton>
             </div>
-          </FloatingEditorCard>
-          <FloatingEditorCard
-            anchorRef={labelRef}
-            open={isEditingPortConfig}
-            placement="bottom-start"
-            title="Edit Port"
-            widthClassName="w-[340px]"
-          >
-            <label className="grid gap-1.5 text-sm text-[var(--muted)]">
-              <span>{boundState ? "State Key" : "Key"}</span>
-              <Input
-                value={boundState?.key ?? draftPort.key}
-                disabled={Boolean(boundState)}
-                onChange={(event) => setDraftPort((current) => ({ ...current, key: event.target.value }))}
-              />
-            </label>
-            <label className="grid gap-1.5 text-sm text-[var(--muted)]">
-              <span>{boundState ? "Name" : "Label"}</span>
-              <Input value={draftPort.label} onChange={(event) => setDraftPort((current) => ({ ...current, label: event.target.value }))} />
-            </label>
-            <label className="grid gap-1.5 text-sm text-[var(--muted)]">
-              <span>{boundState ? "State Type" : "Value Type"}</span>
-              <FieldSelect
-                value={draftPort.valueType}
-                disabled={Boolean(boundState)}
-                onValueChange={(nextValue) => setDraftPort((current) => ({ ...current, valueType: nextValue as ValueType }))}
-                options={VALUE_TYPE_SELECT_OPTIONS}
-              />
-            </label>
-            {side === "input" ? (
-              <EditorSwitchRow
-                label="Required"
-                checked={Boolean(draftPort.required)}
-                onCheckedChange={(checked) => setDraftPort((current) => ({ ...current, required: checked }))}
-              />
-            ) : null}
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                {portEditor?.onRemove ? (
-                  <PanelIconButton
-                    label="Remove"
-                    tone="danger"
-                    onClick={() => {
-                      portEditor.onRemove?.();
-                      setIsEditingPortConfig(false);
-                    }}
-                  >
-                    <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.7">
-                      <path d="M3.5 4.5h9" />
-                      <path d="M6 4.5V3.4c0-.5.4-.9.9-.9h2.2c.5 0 .9.4.9.9v1.1" />
-                      <path d="M5.2 6.2v5.1" />
-                      <path d="M8 6.2v5.1" />
-                      <path d="M10.8 6.2v5.1" />
-                      <path d="M4.4 4.5 5 12.6c0 .5.4.9.9.9h4.2c.5 0 .9-.4.9-.9l.6-8.1" />
-                    </svg>
-                  </PanelIconButton>
-                ) : null}
-              </div>
-              <div className="flex items-center gap-2">
-                <PanelIconButton
-                  label="Cancel"
-                  onClick={() => {
-                    setDraftPort(port);
-                    setIsEditingPortConfig(false);
-                  }}
-                >
-                  <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
-                    <path d="m4.5 4.5 7 7" />
-                    <path d="m11.5 4.5-7 7" />
-                  </svg>
-                </PanelIconButton>
-                <PanelIconButton label="Save" tone="positive" onClick={commitPortEditing}>
-                  <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
-                    <path d="m3.5 8.5 3 3 6-7" />
-                  </svg>
-                </PanelIconButton>
-              </div>
-            </div>
-          </FloatingEditorCard>
-        </>
-      ) : (
-        <>
-          <span ref={labelRef} className="truncate text-right cursor-text" onDoubleClick={startEditing}>
-            {displayLabel}
-          </span>
-          <FloatingEditorCard
-            anchorRef={labelRef}
-            open={isEditing}
-            placement="bottom-end"
-            title="Edit Port Name"
-            widthClassName="w-[320px]"
-          >
-            <Input
-              className="h-11 text-left"
-              value={draftLabel}
-              autoFocus
-              onChange={(event) => setDraftLabel(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") commitEditing();
-                if (event.key === "Escape") {
-                  setDraftLabel(displayLabel);
-                  setIsEditing(false);
-                }
-              }}
-            />
-            <div className="flex items-center justify-end gap-2">
-              <PanelIconButton
-                label="Cancel"
-                onClick={() => {
-                  setDraftLabel(displayLabel);
-                  setIsEditing(false);
-                }}
-              >
-                <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
-                  <path d="m4.5 4.5 7 7" />
-                  <path d="m11.5 4.5-7 7" />
-                </svg>
-              </PanelIconButton>
-              <PanelIconButton label="Save" tone="positive" onClick={commitEditing}>
-                <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
-                  <path d="m3.5 8.5 3 3 6-7" />
-                </svg>
-              </PanelIconButton>
-            </div>
-          </FloatingEditorCard>
-          <FloatingEditorCard
-            anchorRef={labelRef}
-            open={isEditingPortConfig}
-            placement="bottom-end"
-            title="Edit Port"
-            widthClassName="w-[340px]"
-          >
-            <label className="grid gap-1.5 text-sm text-[var(--muted)]">
-              <span>{boundState ? "State Key" : "Key"}</span>
-              <Input
-                value={boundState?.key ?? draftPort.key}
-                disabled={Boolean(boundState)}
-                onChange={(event) => setDraftPort((current) => ({ ...current, key: event.target.value }))}
-              />
-            </label>
-            <label className="grid gap-1.5 text-sm text-[var(--muted)]">
-              <span>{boundState ? "Name" : "Label"}</span>
-              <Input value={draftPort.label} onChange={(event) => setDraftPort((current) => ({ ...current, label: event.target.value }))} />
-            </label>
-            <label className="grid gap-1.5 text-sm text-[var(--muted)]">
-              <span>{boundState ? "State Type" : "Value Type"}</span>
-              <FieldSelect
-                value={draftPort.valueType}
-                disabled={Boolean(boundState)}
-                onValueChange={(nextValue) => setDraftPort((current) => ({ ...current, valueType: nextValue as ValueType }))}
-                options={VALUE_TYPE_SELECT_OPTIONS}
-              />
-            </label>
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                {portEditor?.onRemove ? (
-                  <PanelIconButton
-                    label="Remove"
-                    tone="danger"
-                    onClick={() => {
-                      portEditor.onRemove?.();
-                      setIsEditingPortConfig(false);
-                    }}
-                  >
-                    <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.7">
-                      <path d="M3.5 4.5h9" />
-                      <path d="M6 4.5V3.4c0-.5.4-.9.9-.9h2.2c.5 0 .9.4.9.9v1.1" />
-                      <path d="M5.2 6.2v5.1" />
-                      <path d="M8 6.2v5.1" />
-                      <path d="M10.8 6.2v5.1" />
-                      <path d="M4.4 4.5 5 12.6c0 .5.4.9.9.9h4.2c.5 0 .9-.4.9-.9l.6-8.1" />
-                    </svg>
-                  </PanelIconButton>
-                ) : null}
-              </div>
-              <div className="flex items-center gap-2">
-                <PanelIconButton
-                  label="Cancel"
-                  onClick={() => {
-                    setDraftPort(port);
-                    setIsEditingPortConfig(false);
-                  }}
-                >
-                  <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
-                    <path d="m4.5 4.5 7 7" />
-                    <path d="m11.5 4.5-7 7" />
-                  </svg>
-                </PanelIconButton>
-                <PanelIconButton label="Save" tone="positive" onClick={commitPortEditing}>
-                  <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
-                    <path d="m3.5 8.5 3 3 6-7" />
-                  </svg>
-                </PanelIconButton>
-              </div>
-            </div>
-          </FloatingEditorCard>
+          </div>
+        </FloatingEditorCard>
+      </div>
+      <div className={cn("relative flex h-full items-center justify-center", railPresentation.railWidthClass)}>
+        {side === "output" ? (
           <Handle
             id={buildHandleId("output", port.key)}
             type="source"
@@ -2586,8 +2579,8 @@ function PortRow({
             style={{ backgroundColor: color }}
             isConnectable
           />
-        </>
-      )}
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -2739,6 +2732,34 @@ function RouteTargetHandle({ visible }: { visible: boolean }) {
       )}
       isConnectable={visible}
     />
+  );
+}
+
+function TitleFlowTargetHandle() {
+  return (
+    <div className="relative flex h-5 w-5 flex-shrink-0 items-center justify-center">
+      <Handle
+        id={FLOW_TARGET_HANDLE}
+        type="target"
+        position={Position.Left}
+        className="!left-[-7px] !top-1/2 !m-0 !h-3 !w-3 !-translate-y-1/2 !border-2 !border-[rgba(255,250,241,0.96)] !bg-[rgba(154,52,18,0.92)]"
+        isConnectable
+      />
+    </div>
+  );
+}
+
+function TitleFlowSourceHandle() {
+  return (
+    <div className="relative flex h-5 w-5 flex-shrink-0 items-center justify-center">
+      <Handle
+        id={FLOW_SOURCE_HANDLE}
+        type="source"
+        position={Position.Right}
+        className="!right-[-7px] !top-1/2 !m-0 !h-3 !w-3 !-translate-y-1/2 !border-2 !border-[rgba(255,250,241,0.96)] !bg-[rgba(154,52,18,0.92)]"
+        isConnectable
+      />
+    </div>
   );
 }
 
@@ -3147,6 +3168,10 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
   const canonicalNode = data.canonicalNode ?? null;
   const nodeKind = coerceNodeKind(canonicalNode?.kind);
   const portPresentation = canonicalNode ? getNodePortSectionPresentation(canonicalNode.kind) : getNodePortSectionPresentation("agent");
+  const flowHandlePlacement = canonicalNode ? getFlowHandlePlacement(canonicalNode.kind) : getFlowHandlePlacement("agent");
+  const titleFlowOverlayPresentation = canonicalNode
+    ? getNodeTitleFlowOverlayPresentation(canonicalNode.kind)
+    : getNodeTitleFlowOverlayPresentation("agent");
   const displayName = data.displayName ?? (canonicalNode ? getCanonicalNodeNameFromNode(data.nodeId, canonicalNode) : data.nodeId);
   const displayDescription = data.displayDescription?.trim() || canonicalNode?.description || "";
   const stateFields = data.stateFields ?? [];
@@ -3528,56 +3553,132 @@ function NodeCard({ data, selected }: NodeProps<FlowNode>) {
             Delete node?
           </div>
         </FloatingLayer>
-        <div className="flex items-start justify-between gap-3 border-b border-[rgba(154,52,18,0.12)] pl-4 pr-14 py-3">
+        <div className="flex items-start justify-between gap-3 border-b border-[rgba(154,52,18,0.12)] px-4 py-3">
           <div className="min-w-0 flex-1">
-            <div className="relative flex min-w-0 items-center gap-2">
-              <span className="rounded-full border border-[rgba(154,52,18,0.16)] bg-[rgba(255,255,255,0.72)] px-2 py-0.5 text-[0.62rem] uppercase tracking-[0.14em] text-[var(--accent-strong)]">
-                {nodeKind}
-              </span>
-              <div ref={labelAnchorRef} className="truncate cursor-text text-left text-sm font-semibold text-[var(--text)]" onDoubleClick={() => setIsEditingLabel(true)}>
-                {displayName}
-              </div>
-              <FloatingEditorCard
-                anchorRef={labelAnchorRef}
-                open={isEditingLabel}
-                placement="bottom-start"
-                title="Edit Name"
-                widthClassName="w-[360px]"
-              >
-                <Input
-                  className="h-11"
-                  value={draftLabel}
-                  autoFocus
-                  onChange={(event) => setDraftLabel(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") commitLabelEdit();
-                    if (event.key === "Escape") {
-                      setDraftLabel(displayName);
-                      setIsEditingLabel(false);
-                    }
-                  }}
-                />
-                <div className="flex items-center justify-end gap-2">
-                  <PanelIconButton
-                    label="Cancel"
-                    onClick={() => {
-                      setDraftLabel(displayName);
-                      setIsEditingLabel(false);
-                    }}
-                  >
-                    <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
-                      <path d="m4.5 4.5 7 7" />
-                      <path d="m11.5 4.5-7 7" />
-                    </svg>
-                  </PanelIconButton>
-                  <PanelIconButton label="Save" tone="positive" onClick={commitLabelEdit}>
-                    <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
-                      <path d="m3.5 8.5 3 3 6-7" />
-                    </svg>
-                  </PanelIconButton>
+            {flowHandlePlacement.placement === "title-row" ? (
+              <div className="relative min-w-0">
+                <div
+                  className={cn(
+                    "pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2",
+                    titleFlowOverlayPresentation?.overlayGridClass,
+                  )}
+                >
+                  <div className={cn("relative flex min-w-0 pointer-events-none", titleFlowOverlayPresentation?.inputCellClass)}>
+                    {flowHandlePlacement.showFlowInput ? (
+                      <div className="pointer-events-auto">
+                        <TitleFlowTargetHandle />
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className={cn("relative flex min-w-0 pointer-events-none", titleFlowOverlayPresentation?.outputCellClass)}>
+                    {flowHandlePlacement.showFlowOutput ? (
+                      <div className="pointer-events-auto">
+                        <TitleFlowSourceHandle />
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
-              </FloatingEditorCard>
-            </div>
+                <div className="relative flex min-w-0 items-center gap-2 pl-5 pr-10">
+                  <span className="rounded-full border border-[rgba(154,52,18,0.16)] bg-[rgba(255,255,255,0.72)] px-2 py-0.5 text-[0.62rem] uppercase tracking-[0.14em] text-[var(--accent-strong)]">
+                    {nodeKind}
+                  </span>
+                  <div ref={labelAnchorRef} className="truncate cursor-text text-left text-sm font-semibold text-[var(--text)]" onDoubleClick={() => setIsEditingLabel(true)}>
+                    {displayName}
+                  </div>
+                  <FloatingEditorCard
+                    anchorRef={labelAnchorRef}
+                    open={isEditingLabel}
+                    placement="bottom-start"
+                    title="Edit Name"
+                    widthClassName="w-[360px]"
+                  >
+                    <Input
+                      className="h-11"
+                      value={draftLabel}
+                      autoFocus
+                      onChange={(event) => setDraftLabel(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") commitLabelEdit();
+                        if (event.key === "Escape") {
+                          setDraftLabel(displayName);
+                          setIsEditingLabel(false);
+                        }
+                      }}
+                    />
+                    <div className="flex items-center justify-end gap-2">
+                      <PanelIconButton
+                        label="Cancel"
+                        onClick={() => {
+                          setDraftLabel(displayName);
+                          setIsEditingLabel(false);
+                        }}
+                      >
+                        <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
+                          <path d="m4.5 4.5 7 7" />
+                          <path d="m11.5 4.5-7 7" />
+                        </svg>
+                      </PanelIconButton>
+                      <PanelIconButton label="Save" tone="positive" onClick={commitLabelEdit}>
+                        <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
+                          <path d="m3.5 8.5 3 3 6-7" />
+                        </svg>
+                      </PanelIconButton>
+                    </div>
+                  </FloatingEditorCard>
+                </div>
+              </div>
+            ) : (
+              <div className="relative flex min-w-0 items-center gap-2">
+                <div className="relative flex min-w-0 items-center gap-2 pr-10">
+                  <span className="rounded-full border border-[rgba(154,52,18,0.16)] bg-[rgba(255,255,255,0.72)] px-2 py-0.5 text-[0.62rem] uppercase tracking-[0.14em] text-[var(--accent-strong)]">
+                    {nodeKind}
+                  </span>
+                  <div ref={labelAnchorRef} className="truncate cursor-text text-left text-sm font-semibold text-[var(--text)]" onDoubleClick={() => setIsEditingLabel(true)}>
+                    {displayName}
+                  </div>
+                  <FloatingEditorCard
+                    anchorRef={labelAnchorRef}
+                    open={isEditingLabel}
+                    placement="bottom-start"
+                    title="Edit Name"
+                    widthClassName="w-[360px]"
+                  >
+                    <Input
+                      className="h-11"
+                      value={draftLabel}
+                      autoFocus
+                      onChange={(event) => setDraftLabel(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") commitLabelEdit();
+                        if (event.key === "Escape") {
+                          setDraftLabel(displayName);
+                          setIsEditingLabel(false);
+                        }
+                      }}
+                    />
+                    <div className="flex items-center justify-end gap-2">
+                      <PanelIconButton
+                        label="Cancel"
+                        onClick={() => {
+                          setDraftLabel(displayName);
+                          setIsEditingLabel(false);
+                        }}
+                      >
+                        <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
+                          <path d="m4.5 4.5 7 7" />
+                          <path d="m11.5 4.5-7 7" />
+                        </svg>
+                      </PanelIconButton>
+                      <PanelIconButton label="Save" tone="positive" onClick={commitLabelEdit}>
+                        <svg viewBox="0 0 16 16" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
+                          <path d="m3.5 8.5 3 3 6-7" />
+                        </svg>
+                      </PanelIconButton>
+                    </div>
+                  </FloatingEditorCard>
+                </div>
+              </div>
+            )}
             {nodeKind ? (
               <div className="relative mt-1">
                 <div ref={descriptionAnchorRef} className="line-clamp-2 cursor-text text-left text-xs leading-5 text-[var(--muted)]" onDoubleClick={() => setIsEditingDescription(true)}>
@@ -5191,6 +5292,14 @@ function NodeSystemCanvas({
     () => decorateFlowEdges(edges, cycleBackEdgeIds, new Set(activeRunEdgeIds)),
     [activeRunEdgeIds, cycleBackEdgeIds, edges],
   );
+  const projectedDataEdges = useMemo(
+    () => createProjectedDataEdgesFromCanonicalGraph(canonicalGraphState),
+    [canonicalGraphState],
+  );
+  const renderedEdges = useMemo(
+    () => [...projectedDataEdges, ...decoratedEdges],
+    [decoratedEdges, projectedDataEdges],
+  );
 
   const nodePalette = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -5815,26 +5924,18 @@ function NodeSystemCanvas({
     setNodes((current) => current.concat(nextNode));
     setSelectedNodeId(nextNode.id);
 
-    if (nodeKind === "output" && connectionSource?.sourceNodeId && connectionSource.sourceHandle && connectionSource.sourceValueType) {
-      const targetHandle = connectionStateField ? buildHandleId("input", connectionStateField.key) : null;
-      if (targetHandle) {
-        setEdges((current) =>
-          current.concat({
-            id: buildCanonicalOrdinaryEdgeId(canonicalGraph, {
-              source: connectionSource.sourceNodeId ?? "",
-              target: nextNode.id,
-            }),
-            source: connectionSource.sourceNodeId ?? "",
-            target: nextNode.id,
-            sourceHandle: connectionSource.sourceHandle ?? null,
-            targetHandle,
-            markerEnd: { type: MarkerType.ArrowClosed, color: TYPE_COLORS[connectionSource.sourceValueType ?? "any"] },
-            style: {
-              stroke: TYPE_COLORS[connectionSource.sourceValueType ?? "any"],
-              strokeWidth: 1.8,
-            },
-          }),
-        );
+    if (connectionSource?.sourceNodeId && connectionSource.sourceHandle) {
+      const sourceCanonicalNode = canonicalGraph.nodes[connectionSource.sourceNodeId];
+      const nextEdge = buildCreationControlEdge(
+        canonicalGraph,
+        connectionSource.sourceNodeId,
+        sourceCanonicalNode,
+        connectionSource.sourceHandle,
+        nextNode.id,
+        nextCanonicalNode?.kind ?? nodeKind,
+      );
+      if (nextEdge) {
+        setEdges((current) => current.concat(nextEdge));
       }
     }
 
@@ -5892,30 +5993,18 @@ function NodeSystemCanvas({
     setSelectedNodeId(nextNode.id);
     setStatusMessage(`Added ${getCanonicalPresetDisplayName(presetDocument)}`);
 
-    if (connectionSource?.sourceNodeId && connectionSource.sourceHandle && connectionSource.sourceValueType) {
-      const targetHandle = connectionStateField
-        ? buildHandleId("input", connectionStateField.key)
-        : initialTargetHandle && initialTargetHandle !== buildHandleId("input", CREATE_INPUT_PORT_KEY)
-          ? initialTargetHandle
-          : null;
-      if (targetHandle) {
-        setEdges((current) =>
-          current.concat({
-            id: buildCanonicalOrdinaryEdgeId(canonicalGraph, {
-              source: connectionSource.sourceNodeId ?? "",
-              target: nextNode.id,
-            }),
-            source: connectionSource.sourceNodeId ?? "",
-            target: nextNode.id,
-            sourceHandle: connectionSource.sourceHandle ?? null,
-            targetHandle,
-            markerEnd: { type: MarkerType.ArrowClosed, color: TYPE_COLORS[connectionSource.sourceValueType ?? "any"] },
-            style: {
-              stroke: TYPE_COLORS[connectionSource.sourceValueType ?? "any"],
-              strokeWidth: 1.8,
-            },
-          }),
-        );
+    if (connectionSource?.sourceNodeId && connectionSource.sourceHandle) {
+      const sourceCanonicalNode = canonicalGraph.nodes[connectionSource.sourceNodeId];
+      const nextEdge = buildCreationControlEdge(
+        canonicalGraph,
+        connectionSource.sourceNodeId,
+        sourceCanonicalNode,
+        connectionSource.sourceHandle,
+        nextNode.id,
+        nextCanonicalNode?.kind ?? "agent",
+      );
+      if (nextEdge) {
+        setEdges((current) => current.concat(nextEdge));
       }
     }
 
@@ -6403,7 +6492,7 @@ function NodeSystemCanvas({
                         : node.data.previewText || previewTextByNode[node.id] || "",
                     executionStatus: runNodeStatusMap[node.id],
                     isCurrentRunNode: currentRunNodeId === node.id,
-                    showRouteTarget: showRouteTargets && Boolean(canonicalGraph.nodes[node.id] && canNodeAcceptRouteTarget(canonicalGraph.nodes[node.id].kind)),
+                    showRouteTarget: showRouteTargets && canonicalGraph.nodes[node.id]?.kind === "condition",
                     isExpanded: node.data.isExpanded,
                     collapsedSize: node.data.collapsedSize ?? null,
                     expandedSize: node.data.expandedSize ?? null,
@@ -6595,7 +6684,7 @@ function NodeSystemCanvas({
                   },
                 };
               })}
-              edges={decoratedEdges}
+              edges={renderedEdges}
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}
               onSelectionChange={({ nodes: selectedNodes }) => setSelectedNodeId(selectedNodes[0]?.id ?? null)}
@@ -6613,7 +6702,7 @@ function NodeSystemCanvas({
                 const sourceValueType = sourceNode ? getPortTypeFromCanonicalGraph(canonicalGraph, sourceNode.id, params.handleId) : null;
                 const sourceKind = sourceNode?.data.canonicalNode?.kind ?? canonicalGraph.nodes[params.nodeId]?.kind ?? null;
                 setConnectingSourceType(sourceValueType);
-                setShowRouteTargets(sourceKind === "condition");
+                setShowRouteTargets(sourceKind === "condition" || params.handleId === FLOW_SOURCE_HANDLE);
                 pendingConnectRef.current = {
                   sourceNodeId: params.nodeId,
                   sourceHandle: params.handleId,
@@ -6642,15 +6731,25 @@ function NodeSystemCanvas({
                   return;
                 }
 
-                const connectionKind = classifyEditorConnection(sourceCanonicalNode.kind, targetCanonicalNode.kind, connection.targetHandle ?? null);
+                const connectionKind = classifyEditorConnection(
+                  sourceCanonicalNode.kind,
+                  connection.sourceHandle ?? null,
+                  targetCanonicalNode.kind,
+                  connection.targetHandle ?? null,
+                );
                 const sourceType = getPortTypeFromCanonicalGraph(canonicalGraph, sourceNode.id, connection.sourceHandle);
-                let nextTargetHandle = resolveRouteTargetHandle(sourceCanonicalNode.kind, connection.targetHandle ?? null);
+                let nextTargetHandle = resolveFlowTargetHandle(
+                  sourceCanonicalNode.kind,
+                  connection.sourceHandle ?? null,
+                  targetCanonicalNode.kind,
+                  connection.targetHandle ?? null,
+                );
                 let targetType = connectionKind === "data"
                   ? getPortTypeFromCanonicalGraph(canonicalGraph, targetNode.id, nextTargetHandle)
                   : null;
 
                 if (connectionKind === "invalid") {
-                  setStatusMessage("Top route handles only accept branch connections from condition nodes.");
+                  setStatusMessage("Control-flow handles only accept compatible flow links.");
                   setConnectingSourceType(null);
                   setShowRouteTargets(false);
                   return;
@@ -6711,9 +6810,45 @@ function NodeSystemCanvas({
                   return;
                 }
 
-                const edgeColor = connectionKind === "route"
-                  ? "var(--accent-strong)"
-                  : TYPE_COLORS[sourceType ?? "any"];
+                if (connectionKind === "data") {
+                  const nextEdge = buildCreationControlEdge(
+                    canonicalGraph,
+                    sourceNode.id,
+                    sourceCanonicalNode,
+                    connection.sourceHandle ?? null,
+                    targetNode.id,
+                    targetCanonicalNode.kind,
+                  );
+                  if (!nextEdge) {
+                    setStatusMessage("Failed to resolve control flow for the new state binding.");
+                    setConnectingSourceType(null);
+                    setShowRouteTargets(false);
+                    return;
+                  }
+
+                  pendingConnectRef.current.completed = true;
+                  setConnectingSourceType(null);
+                  setShowRouteTargets(false);
+                  setEdges((current) =>
+                    current
+                      .filter(
+                        (edge) =>
+                          !(
+                            edge.source === nextEdge.source &&
+                            edge.target === nextEdge.target &&
+                            edge.sourceHandle === nextEdge.sourceHandle &&
+                            edge.targetHandle === nextEdge.targetHandle
+                          ),
+                      )
+                      .concat(nextEdge),
+                  );
+                  setStatusMessage(
+                    `Bound state and linked control flow: ${getNodeDisplayNameFromCanonicalGraph(canonicalGraph, sourceNode.id)} -> ${getNodeDisplayNameFromCanonicalGraph(canonicalGraph, targetNode.id)}`,
+                  );
+                  return;
+                }
+
+                const edgeColor = "var(--accent-strong)";
                 const routeSourceOffset =
                   connectionKind === "route"
                     ? resolveConditionBranchRouteSourceOffset(
@@ -6753,7 +6888,7 @@ function NodeSystemCanvas({
                       source: connection.source ?? "",
                       target: connection.target ?? "",
                       type: connectionKind === "route" ? "route" : "default",
-                      sourceHandle: connection.sourceHandle ?? null,
+                      sourceHandle: connectionKind === "flow" ? FLOW_SOURCE_HANDLE : connection.sourceHandle ?? null,
                       targetHandle: nextTargetHandle,
                       data: connectionKind === "route" ? { routeSourceOffset } : undefined,
                       markerEnd: { type: MarkerType.ArrowClosed, color: edgeColor },

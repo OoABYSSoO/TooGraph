@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import Counter
 
+from app.core.control_flow_state_analysis import find_ambiguous_state_reads
 from app.core.schemas.node_system import (
     GraphValidationResponse,
     NodeSystemAgentNode,
@@ -13,7 +14,6 @@ from app.core.schemas.node_system import (
     NodeSystemStateType,
     ValidationIssue,
 )
-from app.core.ordinary_edge_resolution import resolve_ordinary_edge_shared_state
 from app.skills.registry import get_skill_registry
 
 KNOWLEDGE_BASE_SKILL_KEY = "search_knowledge_base"
@@ -51,6 +51,18 @@ def validate_graph(graph: NodeSystemGraphDocument) -> GraphValidationResponse:
 
     for index, conditional_edge in enumerate(graph.conditional_edges):
         issues.extend(_validate_conditional_edge(index, conditional_edge.source, conditional_edge.branches, graph))
+
+    for ambiguous_read in find_ambiguous_state_reads(graph):
+        issues.append(
+            ValidationIssue(
+                code="state_writer_order_ambiguous",
+                message=(
+                    f"State '{ambiguous_read.state_key}' reaches reader '{ambiguous_read.node_id}' "
+                    "from multiple unordered writers."
+                ),
+                path=f"nodes.{ambiguous_read.node_id}.reads",
+            )
+        )
 
     return GraphValidationResponse(valid=len(issues) == 0, issues=issues)
 
@@ -289,36 +301,20 @@ def _validate_edge(index: int, edge: NodeSystemGraphEdge, graph: NodeSystemGraph
         )
         return issues
 
-    shared_state = resolve_ordinary_edge_shared_state(graph, edge.source, edge.target)
-    if shared_state is None:
-        source_states = {binding.state for binding in source_node.writes}
-        target_states = {binding.state for binding in target_node.reads}
-        shared_states = sorted(source_states & target_states)
+    if source_node.kind not in {"input", "agent"}:
         issues.append(
             ValidationIssue(
-                code="edge_state_ambiguous" if len(shared_states) > 1 else "edge_state_mismatch",
-                message=(
-                    f"Edge '{edge.source} -> {edge.target}' does not resolve to a single shared state."
-                ),
-                path=f"edges.{index}",
-            )
-        )
-        return issues
-
-    if shared_state not in {binding.state for binding in source_node.writes}:
-        issues.append(
-            ValidationIssue(
-                code="edge_source_state_not_written",
-                message=f"Node '{edge.source}' does not write state '{shared_state}'.",
+                code="edge_source_kind_invalid",
+                message=f"Node '{edge.source}' cannot emit a plain control-flow edge.",
                 path=f"edges.{index}",
             )
         )
 
-    if shared_state not in {binding.state for binding in target_node.reads}:
+    if target_node.kind not in {"agent", "condition", "output"}:
         issues.append(
             ValidationIssue(
-                code="edge_target_state_not_read",
-                message=f"Node '{edge.target}' does not read state '{shared_state}'.",
+                code="edge_target_kind_invalid",
+                message=f"Node '{edge.target}' cannot accept a plain control-flow edge.",
                 path=f"edges.{index}",
             )
         )

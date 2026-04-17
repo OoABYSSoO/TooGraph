@@ -18,9 +18,6 @@ class LangGraphNodePlan(BaseModel):
 class LangGraphEdgePlan(BaseModel):
     source: str
     target: str
-    state: str
-    source_handle: str = Field(..., alias="sourceHandle")
-    target_handle: str = Field(..., alias="targetHandle")
 
 
 class LangGraphConditionalEdgePlan(BaseModel):
@@ -44,4 +41,3 @@ class LangGraphBuildPlan(BaseModel):
     edges: list[LangGraphEdgePlan] = Field(default_factory=list)
     conditional_edges: list[LangGraphConditionalEdgePlan] = Field(default_factory=list)
     requirements: LangGraphRuntimeRequirements = Field(default_factory=LangGraphRuntimeRequirements)
-

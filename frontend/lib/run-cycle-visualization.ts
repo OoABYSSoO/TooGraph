@@ -66,3 +66,18 @@ export function formatCycleStopReason(value: string | null | undefined): string 
     })
     .join(" ");
 }
+
+export function describeCycleStopReason(value: string | null | undefined): string {
+  switch (value) {
+    case "empty_iteration":
+      return "The loop scheduled another pass, but no node ran in that iteration.";
+    case "no_state_change":
+      return "The loop selected another back edge without changing any tracked state in that iteration.";
+    case "max_iterations_exceeded":
+      return "The loop hit the configured loopLimit for its controlling condition node.";
+    case "completed":
+      return "The loop exited through a non-back-edge path.";
+    default:
+      return "";
+  }
+}

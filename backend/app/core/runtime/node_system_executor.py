@@ -10,7 +10,6 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.core.model_catalog import get_default_text_model_ref, normalize_model_ref, resolve_runtime_model_name
-from app.core.ordinary_edge_resolution import resolve_ordinary_edge_shared_state
 from app.core.runtime.output_boundary_utils import save_output_value
 from app.core.runtime.knowledge_retrieval import retrieve_knowledge_base_context
 from app.core.runtime.state import touch_run_lifecycle, utc_now_iso
@@ -191,6 +190,8 @@ def _apply_state_writes(
 
     for binding in write_bindings:
         value = copy.deepcopy(output_values.get(binding.state))
+        previous_value = copy.deepcopy(state_values.get(binding.state))
+        changed = previous_value != value
         state_values[binding.state] = value
         writer_record = {
             "node_id": node_name,
@@ -215,6 +216,7 @@ def _apply_state_writes(
                 "output_key": binding.state,
                 "mode": binding.mode.value,
                 "value": value,
+                "changed": changed,
             }
         )
     return write_records
@@ -223,14 +225,13 @@ def _apply_state_writes(
 def _build_execution_edges(graph: NodeSystemGraphDocument) -> list[ExecutionEdge]:
     execution_edges: list[ExecutionEdge] = []
     for edge in graph.edges:
-        state_name = resolve_ordinary_edge_shared_state(graph, edge.source, edge.target)
         execution_edges.append(
             ExecutionEdge(
-                id=_build_regular_edge_id(edge.source, edge.target, state_name),
+                id=_build_regular_edge_id(edge.source, edge.target),
                 source=edge.source,
                 target=edge.target,
                 kind="edge",
-                state=state_name,
+                state=None,
             )
         )
 
@@ -740,9 +741,7 @@ def _parse_llm_json_response(content: str, output_keys: list[str]) -> dict[str, 
     return {key: cleaned for key in output_keys}
 
 
-def _build_regular_edge_id(source: str, target: str, state: str | None) -> str:
-    if state:
-        return f"edge:{source}:output:{state}:{target}:input:{state}"
+def _build_regular_edge_id(source: str, target: str) -> str:
     return f"edge:{source}:{target}"
 
 

@@ -9,7 +9,11 @@ import { RichContent, formatRichContentValue } from "@/components/ui/rich-conten
 import { apiGet } from "@/lib/api";
 import { useLanguage } from "@/components/providers/language-provider";
 import type { ExportedOutput, NodeSystemRunDetail } from "@/lib/node-system-schema";
-import { buildCycleVisualization, formatCycleStopReason } from "@/lib/run-cycle-visualization";
+import {
+  buildCycleVisualization,
+  describeCycleStopReason,
+  formatCycleStopReason,
+} from "@/lib/run-cycle-visualization";
 
 type RunDetail = NodeSystemRunDetail;
 
@@ -57,6 +61,7 @@ export function RunDetailClient({ runId }: { runId: string }) {
   }
 
   const cycleVisualization = buildCycleVisualization(run);
+  const cycleStopReasonDescription = describeCycleStopReason(cycleVisualization.summary?.stop_reason);
 
   return (
     <section className="grid grid-cols-12 gap-[18px] max-[960px]:grid-cols-1">
@@ -93,6 +98,9 @@ export function RunDetailClient({ runId }: { runId: string }) {
             <div className="mt-3 text-sm leading-6 text-[var(--muted)]">
               Back edges mark the links that keep the graph inside the loop.
             </div>
+          ) : null}
+          {cycleStopReasonDescription ? (
+            <div className="mt-2 text-sm leading-6 text-[var(--muted)]">{cycleStopReasonDescription}</div>
           ) : null}
         </Card>
       ) : null}

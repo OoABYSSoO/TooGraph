@@ -600,7 +600,7 @@ test("buildCanonicalFlowProjectionFromEditorState prefers canonical graph semant
   assert.deepEqual(projection.nodes.output_answer.ui.position, { x: 480, y: 0 });
 });
 
-test("buildCanonicalFlowProjectionFromEditorState preserves unresolved ordinary edges with zero shared states", () => {
+test("buildCanonicalFlowProjectionFromEditorState preserves unresolved ordinary edges with zero projected states", () => {
   const graph: CanonicalGraphPayload = {
     graph_id: "graph_test",
     name: "Zero Shared Edge Preservation Test",
@@ -681,7 +681,7 @@ test("buildCanonicalFlowProjectionFromEditorState preserves unresolved ordinary 
   assert.deepEqual(projection.edges, [{ source: "source_node", target: "target_node" }]);
 });
 
-test("buildCanonicalFlowProjectionFromEditorState preserves unresolved ordinary edges with multiple shared states", () => {
+test("buildCanonicalFlowProjectionFromEditorState preserves unresolved ordinary edges with multiple projected states", () => {
   const graph: CanonicalGraphPayload = {
     graph_id: "graph_test",
     name: "Multiple Shared Edge Preservation Test",
