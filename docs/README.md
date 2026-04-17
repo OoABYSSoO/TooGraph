@@ -4,6 +4,7 @@
 
 - [current_engineering_backlog.md](/home/abyss/GraphiteUI/docs/current_engineering_backlog.md)
 - [edge_semantics.md](/home/abyss/GraphiteUI/docs/edge_semantics.md)
+- [2026-04-17-control-flow-data-flow-design.md](/home/abyss/GraphiteUI/docs/superpowers/specs/2026-04-17-control-flow-data-flow-design.md)
 - [README.md](/home/abyss/GraphiteUI/docs/README.md)
 
 使用原则：
