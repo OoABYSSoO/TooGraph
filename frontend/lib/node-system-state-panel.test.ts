@@ -5,7 +5,6 @@ import type { CanonicalGraphPayload } from "./node-system-canonical.ts";
 import {
   buildDisplayPortsForCanonicalNode,
   buildStateBindingNodeOptions,
-  buildStateBindingNodeOptionsFromCanonicalGraph,
   buildStateBindingsByKeyFromCanonicalGraph,
   listStateBindingNodeIdsForCanonicalState,
 } from "./node-system-state-panel.ts";
@@ -87,8 +86,8 @@ const GRAPH: CanonicalGraphPayload = {
   metadata: {},
 };
 
-test("buildStateBindingNodeOptionsFromCanonicalGraph uses canonical node and state labels", () => {
-  const options = buildStateBindingNodeOptionsFromCanonicalGraph(GRAPH);
+test("buildStateBindingNodeOptions uses canonical node and state labels", () => {
+  const options = buildStateBindingNodeOptions(GRAPH);
 
   assert.equal(options.length, 3);
   assert.deepEqual(
@@ -106,6 +105,16 @@ test("buildDisplayPortsForCanonicalNode derives visible port labels directly fro
 
   assert.deepEqual(ports.inputs.map((port) => port.label), ["User Question"]);
   assert.deepEqual(ports.outputs.map((port) => port.label), ["Final Answer"]);
+});
+
+test("output nodes are not exposed as writer candidates in state binding options", () => {
+  const options = buildStateBindingNodeOptions(GRAPH);
+
+  const outputNode = options.find((option) => option.id === "output_answer");
+
+  assert.ok(outputNode);
+  assert.deepEqual(outputNode.inputs.map((port) => port.label), ["Final Answer"]);
+  assert.deepEqual(outputNode.outputs, []);
 });
 
 test("buildStateBindingsByKeyFromCanonicalGraph summarizes readers and writers from canonical bindings", () => {

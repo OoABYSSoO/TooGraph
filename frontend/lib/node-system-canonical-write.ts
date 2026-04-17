@@ -24,7 +24,6 @@ type CanonicalNodeSnapshot = {
 
 type EditorFlowNodeSnapshot = CanonicalNodeSnapshot & {
   data: CanonicalNodeSnapshot["data"] & {
-    config: NodePresetDefinition;
     canonicalNode?: CanonicalNode;
   };
 };
@@ -287,13 +286,7 @@ export function addEditorNodeToCanonicalGraph<T extends CanonicalGraphPayload>(
     return graph;
   }
 
-  const nextNode = buildCanonicalNodeFromEditorState({
-    ...node,
-    data: {
-      ...node.data,
-      config,
-    },
-  }, config);
+  const nextNode = buildCanonicalNodeFromEditorState(node, config);
 
   return {
     ...graph,

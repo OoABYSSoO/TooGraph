@@ -173,7 +173,7 @@ function stripString(value: unknown): string {
 }
 
 function stateFieldTypeFromCanonicalState(stateType: CanonicalStateType): StateFieldType {
-  return stateType === "text" ? "string" : stateType;
+  return stateType;
 }
 
 function valueTypeFromCanonicalState(stateType: CanonicalStateType): ValueType {

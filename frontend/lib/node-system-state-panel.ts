@@ -1,14 +1,10 @@
 import {
-  buildEditorNodeConfigFromCanonicalNode,
-  buildEditorStateFieldsFromCanonicalGraph,
+  getCanonicalNodeDisplayName,
+  listEditorInputPortsFromCanonicalNode,
+  listEditorOutputPortsFromCanonicalNode,
   type CanonicalGraphPayload,
 } from "./node-system-canonical.ts";
-import type {
-  NodeFamily,
-  NodePresetDefinition,
-  PortDefinition,
-  StateField,
-} from "./node-system-schema.ts";
+import type { NodeFamily, PortDefinition } from "./node-system-schema.ts";
 
 export type StateBindingSummary = {
   id: string;
@@ -28,70 +24,8 @@ export type StateBindingNodeOption = {
   outputs: PortDefinition[];
 };
 
-function getCanonicalNodeDisplayName(canonicalGraph: CanonicalGraphPayload, nodeId: string) {
-  return canonicalGraph.nodes[nodeId]?.name?.trim() || nodeId;
-}
-
-function getStateDisplayName(field: Pick<StateField, "key" | "name">) {
-  return field.name.trim() || field.key;
-}
-
-function listInputPorts(config: NodePresetDefinition) {
-  if (config.family === "agent") return config.inputs;
-  if (config.family === "condition") return config.inputs;
-  if (config.family === "output") return [config.input];
-  return [] as PortDefinition[];
-}
-
-function listOutputPorts(config: NodePresetDefinition) {
-  if (config.family === "agent") return config.outputs;
-  if (config.family === "input") return [config.output];
-  if (config.family === "condition") {
-    return config.branches.map((branch) => ({ key: branch.key, label: branch.label, valueType: "any" as const }));
-  }
-  return [] as PortDefinition[];
-}
-
-function getBoundStateKeyForPort(config: NodePresetDefinition, side: "input" | "output", portKey: string) {
-  if (side === "input") {
-    if (config.family === "agent" || config.family === "condition" || config.family === "output") {
-      return portKey;
-    }
-    return null;
-  }
-
-  if (config.family === "agent" || config.family === "input") {
-    return portKey;
-  }
-
-  return null;
-}
-
-function resolvePortForDisplay(
-  config: NodePresetDefinition,
-  side: "input" | "output",
-  port: PortDefinition,
-  stateFields: StateField[],
-): PortDefinition {
-  const stateKey = getBoundStateKeyForPort(config, side, port.key);
-  const stateField = stateKey ? stateFields.find((field) => field.key === stateKey) ?? null : null;
-  if (!stateField) {
-    return port;
-  }
-
-  return {
-    ...port,
-    label: getStateDisplayName(stateField),
-  };
-}
-
-function resolvePortsForDisplay(
-  config: NodePresetDefinition,
-  side: "input" | "output",
-  stateFields: StateField[],
-) {
-  const ports = side === "input" ? listInputPorts(config) : listOutputPorts(config);
-  return ports.map((port) => resolvePortForDisplay(config, side, port, stateFields));
+function getStateDisplayName(graph: CanonicalGraphPayload, stateKey: string) {
+  return graph.state_schema[stateKey]?.name?.trim() || stateKey;
 }
 
 export function buildDisplayPortsForCanonicalNode(
@@ -109,33 +43,22 @@ export function buildDisplayPortsForCanonicalNode(
     };
   }
 
-  const stateFields = buildEditorStateFieldsFromCanonicalGraph(graph);
-  const config = buildEditorNodeConfigFromCanonicalNode(nodeId, node, graph.state_schema);
-
   return {
-    inputs: resolvePortsForDisplay(config, "input", stateFields),
-    outputs:
-      config.family === "output"
-        ? resolvePortsForDisplay(config, "input", stateFields)
-        : resolvePortsForDisplay(config, "output", stateFields),
+    inputs: listEditorInputPortsFromCanonicalNode(node, graph.state_schema),
+    outputs: listEditorOutputPortsFromCanonicalNode(node, graph.state_schema),
   };
-}
-
-export function buildStateBindingNodeOptionsFromCanonicalGraph(graph: CanonicalGraphPayload): StateBindingNodeOption[] {
-  return buildStateBindingNodeOptions(graph);
 }
 
 export function buildStateBindingNodeOptions(
   graph: CanonicalGraphPayload,
 ): StateBindingNodeOption[] {
   return Object.entries(graph.nodes).map(([nodeId, node]) => {
-    const config = buildEditorNodeConfigFromCanonicalNode(nodeId, node, graph.state_schema);
     const ports = buildDisplayPortsForCanonicalNode(graph, nodeId);
 
     return {
       id: nodeId,
-      label: getCanonicalNodeDisplayName(graph, nodeId),
-      family: config.family,
+      label: getCanonicalNodeDisplayName(nodeId, node),
+      family: node.kind,
       inputs: ports.inputs,
       outputs: ports.outputs,
     };
@@ -146,18 +69,12 @@ export function buildStateBindingsByKeyFromCanonicalGraph(graph: CanonicalGraphP
   readersByKey: Record<string, StateBindingSummary[]>;
   writersByKey: Record<string, StateBindingSummary[]>;
 } {
-  const stateFields = buildEditorStateFieldsFromCanonicalGraph(graph);
   const readersByKey: Record<string, StateBindingSummary[]> = {};
   const writersByKey: Record<string, StateBindingSummary[]> = {};
 
   for (const [nodeId, node] of Object.entries(graph.nodes)) {
-    const config = buildEditorNodeConfigFromCanonicalNode(nodeId, node, graph.state_schema);
-    const nodeLabel = getCanonicalNodeDisplayName(graph, nodeId);
-    const inputPorts = resolvePortsForDisplay(config, "input", stateFields);
-    const outputPorts =
-      config.family === "output"
-        ? resolvePortsForDisplay(config, "input", stateFields)
-        : resolvePortsForDisplay(config, "output", stateFields);
+    const nodeLabel = getCanonicalNodeDisplayName(nodeId, node);
+    const { inputs: inputPorts, outputs: outputPorts } = buildDisplayPortsForCanonicalNode(graph, nodeId);
 
     for (const binding of node.reads) {
       const matchedPort = inputPorts.find((port) => port.key === binding.state);
@@ -165,9 +82,9 @@ export function buildStateBindingsByKeyFromCanonicalGraph(graph: CanonicalGraphP
         id: `${nodeId}:read:${binding.state}`,
         nodeId,
         nodeLabel,
-        nodeFamily: config.family,
+        nodeFamily: node.kind,
         portKey: binding.state,
-        portLabel: matchedPort?.label ?? binding.state,
+        portLabel: matchedPort?.label ?? getStateDisplayName(graph, binding.state),
         valid: Boolean(matchedPort),
       };
       readersByKey[binding.state] = [...(readersByKey[binding.state] ?? []), summary];
@@ -179,9 +96,9 @@ export function buildStateBindingsByKeyFromCanonicalGraph(graph: CanonicalGraphP
         id: `${nodeId}:write:${binding.state}`,
         nodeId,
         nodeLabel,
-        nodeFamily: config.family,
+        nodeFamily: node.kind,
         portKey: binding.state,
-        portLabel: matchedPort?.label ?? binding.state,
+        portLabel: matchedPort?.label ?? getStateDisplayName(graph, binding.state),
         valid: Boolean(matchedPort),
       };
       writersByKey[binding.state] = [...(writersByKey[binding.state] ?? []), summary];

@@ -383,19 +383,6 @@ test("buildCanonicalFlowProjectionFromEditorState prefers canonical graph semant
           isExpanded: true,
           expandedSize: { width: 320, height: 240 },
           collapsedSize: null,
-          config: {
-            presetId: "node.input.input_question",
-            family: "input",
-            name: "Input Question",
-            description: "",
-            valueType: "text",
-            output: {
-              key: "legacy_question",
-              label: "Legacy Question",
-              valueType: "text",
-            },
-            value: "",
-          },
         },
       },
       {
@@ -405,33 +392,6 @@ test("buildCanonicalFlowProjectionFromEditorState prefers canonical graph semant
           isExpanded: true,
           expandedSize: null,
           collapsedSize: null,
-          config: {
-            presetId: "node.condition.condition_route",
-            family: "condition",
-            name: "Condition Route",
-            description: "",
-            inputs: [
-              {
-                key: "legacy_question",
-                label: "Legacy Question",
-                valueType: "text",
-                required: true,
-              },
-            ],
-            branches: [
-              {
-                key: "done",
-                label: "",
-              },
-            ],
-            conditionMode: "rule",
-            branchMapping: {},
-            rule: {
-              source: "question",
-              operator: "exists",
-              value: null,
-            },
-          },
         },
       },
       {
@@ -441,22 +401,6 @@ test("buildCanonicalFlowProjectionFromEditorState prefers canonical graph semant
           isExpanded: true,
           expandedSize: null,
           collapsedSize: null,
-          config: {
-            presetId: "node.output.output_answer",
-            family: "output",
-            name: "Output Answer",
-            description: "",
-            input: {
-              key: "legacy_question",
-              label: "Legacy Question",
-              valueType: "text",
-              required: true,
-            },
-            displayMode: "auto",
-            persistEnabled: false,
-            persistFormat: "auto",
-            fileNameTemplate: "",
-          },
         },
       },
     ],

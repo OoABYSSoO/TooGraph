@@ -99,7 +99,7 @@ test("buildEditorStateFieldsFromCanonicalStateSchema derives editor state fields
       key: "question",
       name: "Question",
       description: "User question",
-      type: "string",
+      type: "text",
       value: "What is GraphiteUI?",
       ui: {
         color: "#d97706",
@@ -109,7 +109,7 @@ test("buildEditorStateFieldsFromCanonicalStateSchema derives editor state fields
       key: "answer",
       name: "Answer",
       description: "Final answer",
-      type: "string",
+      type: "text",
       value: "",
       ui: {
         color: "#2563eb",

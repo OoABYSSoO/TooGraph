@@ -12,7 +12,7 @@ export type AgentThinkingMode = "off" | "on";
 export type StateWriteMode = "replace";
 
 export type StateFieldType =
-  | "string"
+  | "text"
   | "number"
   | "boolean"
   | "object"

@@ -29,17 +29,18 @@
   - `stateReads / stateWrites` 已从前端正式节点类型和主转换链移除
   - 节点卡片、State Panel、输入节点值同步、运行前提交都已 canonical-first
   - ReactFlow 画布主链已不再直接读取 `data.config`
+  - ReactFlow node data 已删除 `config` 业务镜像，只保留 canonical node 与显示投影
   - 新建节点、知识库自动挂 skill、预设保存、输出预览和连线判定都已改为 canonical-first
   - 后端已经拒绝 `defaultValue`，前后端正式字段边界一致
   - 后端已删除 `legacy runtime` 选择与 fallback 分支，只保留 LangGraph 支持性检查
   - 前端已删除 `applyEditorConfigToCanonicalGraph / applyEditorConfigsToCanonicalGraph` 历史桥接
   - 持久化 preset 已改成以 canonical preset 为前端主存储，不再通过 `EditorPresetRecord.definition` 中转
   - agent skill 已直接以 canonical `skills: string[]` 作为前端编辑主语义
+  - 一批只服务旧编辑模型的 helper 已删除，State Panel 也已改成 canonical-first
 - 当前剩余问题主要集中在编辑器内部还保留一层轻量视图壳：
   - `NodePresetDefinition`
   - `PortDefinition`
   - `StateField`
-  - canonical `text` 与 editor-side `string` 的类型映射
 
 目标：
 
@@ -66,6 +67,10 @@
   - canonical 正式数据
   - 视图层派生数据
   - 局部 UI 草稿状态
+- 重点收口仍然保留旧视图壳的区域：
+  - 预设选择与 mock preset
+  - Advanced JSON 入口
+  - 节点编辑弹层里的端口临时结构
 
 完成标准：
 
@@ -77,7 +82,6 @@
 
 范围：
 
-- 删除剩余的 `text -> string` 映射和不再必要的转换辅助
 - 清理只为历史编辑模型服务的 helper、类型和中转函数
 - 检查并删除已经失去调用方的旧逻辑
 
