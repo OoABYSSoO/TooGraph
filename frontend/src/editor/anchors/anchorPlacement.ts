@@ -1,0 +1,75 @@
+import type { AnchorDescriptor, NodeAnchorModel } from "./anchorModel.ts";
+
+export type NodeFrame = {
+  x: number;
+  y: number;
+  width: number;
+  headerHeight: number;
+  bodyTop: number;
+  rowGap: number;
+  footerTop?: number;
+};
+
+export type PlacedAnchor = {
+  id: string;
+  x: number;
+  y: number;
+  stateKey?: string;
+  branch?: string;
+};
+
+export type PlacedAnchorSet = {
+  flowIn: PlacedAnchor | null;
+  flowOut: PlacedAnchor | null;
+  stateInputs: PlacedAnchor[];
+  stateOutputs: PlacedAnchor[];
+  routeOutputs: PlacedAnchor[];
+};
+
+export function placeAnchors(model: NodeAnchorModel, frame: NodeFrame): PlacedAnchorSet {
+  return {
+    flowIn: placeAnchor(model.flowIn, frame),
+    flowOut: placeAnchor(model.flowOut, frame),
+    stateInputs: model.stateInputs.map((anchor) => placeAnchor(anchor, frame)).filter(Boolean) as PlacedAnchor[],
+    stateOutputs: model.stateOutputs.map((anchor) => placeAnchor(anchor, frame)).filter(Boolean) as PlacedAnchor[],
+    routeOutputs: model.routeOutputs.map((anchor) => placeAnchor(anchor, frame)).filter(Boolean) as PlacedAnchor[],
+  };
+}
+
+function placeAnchor(anchor: AnchorDescriptor | null, frame: NodeFrame): PlacedAnchor | null {
+  if (!anchor) {
+    return null;
+  }
+
+  const x = resolveX(anchor, frame);
+  const y = resolveY(anchor, frame);
+
+  return {
+    id: anchor.id,
+    x,
+    y,
+    ...(anchor.stateKey ? { stateKey: anchor.stateKey } : {}),
+    ...(anchor.branch ? { branch: anchor.branch } : {}),
+  };
+}
+
+function resolveX(anchor: AnchorDescriptor, frame: NodeFrame): number {
+  if (anchor.side === "left" || anchor.side === "top") {
+    return frame.x;
+  }
+  if (anchor.side === "right") {
+    return frame.x + frame.width;
+  }
+  const count = Math.max(anchor.row + 2, 2);
+  return frame.x + (frame.width / count) * (anchor.row + 1);
+}
+
+function resolveY(anchor: AnchorDescriptor, frame: NodeFrame): number {
+  if (anchor.lane === "header") {
+    return frame.y + frame.headerHeight / 2;
+  }
+  if (anchor.lane === "body") {
+    return frame.y + frame.bodyTop + anchor.row * frame.rowGap;
+  }
+  return frame.y + (frame.footerTop ?? frame.bodyTop + 160) + anchor.row * 24;
+}

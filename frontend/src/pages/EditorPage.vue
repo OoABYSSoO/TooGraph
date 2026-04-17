@@ -102,6 +102,10 @@
                 </ul>
               </section>
             </div>
+
+            <div class="editor-page__canvas-shell">
+              <EditorCanvas :document="canvasDocument" @update:node-position="handleNodePositionUpdate" />
+            </div>
           </template>
 
           <template v-else>
@@ -119,6 +123,7 @@
 import { computed, onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
+import EditorCanvas from "@/editor/canvas/EditorCanvas.vue";
 import AppShell from "@/layouts/AppShell.vue";
 import { useEditorWorkspaceStore } from "@/stores/editorWorkspace";
 import { useGraphDocumentStore } from "@/stores/graphDocument";
@@ -197,6 +202,13 @@ const activeDescription = computed(() => {
     ? graphStore.activeDocument.template.description
     : `Graph ${graphStore.activeDocument.graph.graph_id}`;
 });
+const canvasDocument = computed(() => {
+  const document = graphStore.currentDocument;
+  if (!document) {
+    throw new Error("Canvas document requested before an active document exists.");
+  }
+  return document;
+});
 
 function asString(value: unknown): string | null {
   if (typeof value === "string" && value.trim().length > 0) {
@@ -248,6 +260,10 @@ async function openGraph(graphId: string) {
       graph: graphId,
     },
   });
+}
+
+function handleNodePositionUpdate(payload: { nodeId: string; position: { x: number; y: number } }) {
+  graphStore.updateNodePosition(payload.nodeId, payload.position);
 }
 
 onMounted(async () => {
@@ -425,6 +441,10 @@ watch(
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
+}
+
+.editor-page__canvas-shell {
+  margin-top: 20px;
 }
 
 .editor-page__document-section {

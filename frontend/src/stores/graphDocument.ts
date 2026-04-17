@@ -33,6 +33,9 @@ export const useGraphDocumentStore = defineStore("graphDocument", () => {
     }
     return null;
   });
+  const currentDocument = computed(() =>
+    activeDraft.value ?? activeGraph.value,
+  );
 
   async function loadTemplates() {
     isLoading.value = true;
@@ -93,6 +96,7 @@ export const useGraphDocumentStore = defineStore("graphDocument", () => {
       let template = templates.value.find((entry) => entry.template_id === templateId) ?? null;
       if (!template) {
         template = await fetchTemplate(templateId);
+        templates.value = [...templates.value, template];
       }
       activeTemplate.value = template;
       activeDraft.value = createDraftFromTemplate(template);
@@ -111,6 +115,16 @@ export const useGraphDocumentStore = defineStore("graphDocument", () => {
     error.value = null;
   }
 
+  function updateNodePosition(nodeId: string, position: { x: number; y: number }) {
+    if (activeDraft.value?.nodes[nodeId]) {
+      activeDraft.value.nodes[nodeId].ui.position = position;
+      return;
+    }
+    if (activeGraph.value?.nodes[nodeId]) {
+      activeGraph.value.nodes[nodeId].ui.position = position;
+    }
+  }
+
   return {
     templates,
     graphs,
@@ -123,6 +137,7 @@ export const useGraphDocumentStore = defineStore("graphDocument", () => {
     hasGraphs,
     hasActiveDocument,
     activeDocument,
+    currentDocument,
     loadTemplates,
     loadGraphs,
     loadGraph,
@@ -130,5 +145,6 @@ export const useGraphDocumentStore = defineStore("graphDocument", () => {
     ensureGraphsLoaded,
     selectTemplate,
     clearActiveDocument,
+    updateNodePosition,
   };
 });
