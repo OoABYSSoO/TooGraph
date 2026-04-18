@@ -3,12 +3,16 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+from app.core.runtime.node_execution_records import (
+    INTERRUPTED_RUN_MESSAGE,
+    duration_between_iso_ms,
+    find_latest_running_execution,
+)
 from app.core.runtime.state import ensure_checkpoint_metadata, ensure_run_lifecycle, utc_now_iso
 from app.core.storage.run_store import list_runs, save_run
 
 
 ACTIVE_RUN_STATUSES = {"queued", "running", "resuming"}
-INTERRUPTED_RUN_MESSAGE = "Run was interrupted because the backend service restarted before it completed."
 
 
 def mark_interrupted_active_runs(
@@ -63,6 +67,17 @@ def _append_interrupted_node_execution(run: dict[str, Any], current_node_id: str
     if not current_node_id:
         return
 
+    running_execution = find_latest_running_execution(run, current_node_id)
+    if running_execution is not None:
+        running_execution["status"] = "failed"
+        running_execution["finished_at"] = now
+        running_execution["duration_ms"] = duration_between_iso_ms(running_execution.get("started_at"), now)
+        running_execution["errors"] = [
+            *_without_message(running_execution.get("errors"), INTERRUPTED_RUN_MESSAGE),
+            INTERRUPTED_RUN_MESSAGE,
+        ]
+        return
+
     node_executions = run.setdefault("node_executions", [])
     if not isinstance(node_executions, list):
         run["node_executions"] = []
@@ -91,6 +106,12 @@ def _append_interrupted_node_execution(run: dict[str, Any], current_node_id: str
             "errors": [INTERRUPTED_RUN_MESSAGE],
         }
     )
+
+
+def _without_message(values: Any, message: str) -> list[str]:
+    if not isinstance(values, list):
+        return []
+    return [str(value) for value in values if str(value) != message]
 
 
 def _resolve_node_type(run: dict[str, Any], node_id: str) -> str:

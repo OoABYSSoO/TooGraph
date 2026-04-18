@@ -101,6 +101,50 @@ class RunStartupRecoveryTests(unittest.TestCase):
         self.assertEqual(paused_run["status"], "paused")
         self.assertEqual(completed_run["status"], "completed")
 
+    def test_mark_interrupted_active_runs_updates_existing_running_execution(self) -> None:
+        active_run = {
+            "run_id": "run_active",
+            "status": "running",
+            "current_node_id": "agent_a",
+            "graph_snapshot": {"nodes": {"agent_a": {"kind": "agent"}}},
+            "node_status_map": {"agent_a": "running"},
+            "node_executions": [
+                {
+                    "execution_id": "agent_a:1",
+                    "attempt": 1,
+                    "node_id": "agent_a",
+                    "node_type": "agent",
+                    "status": "running",
+                    "started_at": "2026-05-04T11:29:55+00:00",
+                    "finished_at": None,
+                    "duration_ms": 0,
+                    "input_summary": "",
+                    "output_summary": "",
+                    "artifacts": {"family": "agent"},
+                    "warnings": [],
+                    "errors": [],
+                }
+            ],
+            "errors": [],
+            "warnings": [],
+            "completed_at": None,
+            "lifecycle": {"updated_at": "old"},
+        }
+
+        interrupted_count = mark_interrupted_active_runs(
+            list_runs_func=lambda: [active_run],
+            save_run_func=lambda _run: None,
+            now_func=lambda: "2026-05-04T11:30:00+00:00",
+        )
+
+        self.assertEqual(interrupted_count, 1)
+        self.assertEqual(len(active_run["node_executions"]), 1)
+        execution = active_run["node_executions"][0]
+        self.assertEqual(execution["status"], "failed")
+        self.assertEqual(execution["finished_at"], "2026-05-04T11:30:00+00:00")
+        self.assertEqual(execution["duration_ms"], 5000)
+        self.assertEqual(execution["errors"], ["Run was interrupted because the backend service restarted before it completed."])
+
     def test_mark_interrupted_active_runs_handles_queued_runs_without_current_node(self) -> None:
         queued_run = {
             "run_id": "run_queued",
