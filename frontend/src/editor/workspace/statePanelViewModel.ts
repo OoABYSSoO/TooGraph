@@ -17,6 +17,7 @@ export type StatePanelRowViewModel = {
 export type StatePanelBindingViewModel = {
   nodeId: string;
   nodeLabel: string;
+  nodeKindLabel: string;
   portLabel: string;
 };
 
@@ -65,6 +66,7 @@ function summarizeBindingsByState(document: GraphPayload | GraphDocument) {
       current.readers.push({
         nodeId,
         nodeLabel,
+        nodeKindLabel: node.kind,
         portLabel: read.state,
       });
       acc[read.state] = current;
@@ -76,6 +78,7 @@ function summarizeBindingsByState(document: GraphPayload | GraphDocument) {
       current.writers.push({
         nodeId,
         nodeLabel,
+        nodeKindLabel: node.kind,
         portLabel: write.state,
       });
       acc[write.state] = current;

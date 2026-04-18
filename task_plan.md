@@ -30,9 +30,9 @@
 - [x] 基础画布、拖拽、锚点与控制流投影已接通
 - [x] `NodeCard` 已有第一版 richer view model
 - [x] `State` 面板已恢复开关与每 tab 开合状态
-- [~] 恢复 `State` 面板更深的图内语义：reader / writer 节点明细、后续交互
-- [ ] 继续对齐旧前端 `node-system-editor.tsx` 中的节点卡片结构
-- [ ] 恢复更完整的端口、分支、边和节点内部 chrome
+- [~] 恢复 `State` 面板更深的图内语义：reader / writer 节点明细、节点聚焦、读写绑定增删、state 字段编辑、按类型默认值编辑，以及 `State` 面板与画布选中态的双向联动都已接通，后续仍缺更完整的节点内联编辑联动
+- [~] 继续对齐旧前端 `node-system-editor.tsx` 中的节点卡片结构：`Reads / Writes` 摘要、端口 type / required 元信息、condition branch mapping 摘要，以及 output 节点 `Advanced` 第一版内联编辑（persist toggle / display mode / persist format / file name）、agent `taskInstruction` 与 `Advanced` 第一版（thinking / temperature）、condition `loopLimit` 与 `Source / Operator / Value` 规则编辑、condition `BranchRow` 第一版（branch key / mapping keys）、input 文本值第一版内联编辑都已接入；其余 input / agent / condition 深层内部编辑与端口细节仍待迁回
+- [~] 恢复更完整的端口、分支、边和节点内部 chrome：控制流边已接通，数据流投影边已恢复第一版，condition branch 改名 / mapping 编辑 / `Add branch` / 删除语义都已接通，branch 行也已显示 route target 第一版 chrome，route edge path 也开始对齐旧 React 的 rounded orthogonal 几何；后续继续补更完整的 route 呈现与细节打磨
 
 ### Phase 4: 辅助页面恢复与文档收口
 - [ ] 继续恢复 `/runs`、`/runs/:runId`、`/settings`、首页
@@ -46,9 +46,13 @@
 - 画布 / 节点 / 连线继续自定义
 - 工作区 chrome、选择器、弹窗、表单优先走 `Reka UI` / `shadcn-vue` 风格
 - 当前最高优先级是编辑器本体和状态语义，不再优先打磨外围页面
+- condition branch 编辑不能只 patch `node.config`；`branches`、`branchMapping` 与 `conditional_edges` 要视作同一条语义链一起更新
+- condition 分支后续实现按“先补旧前端已证实存在的交互，再补推断项”的顺序推进；当前 `Add branch` 已恢复，删除交互要等语义核对完成后再接
+- 当前推荐的下一实现切片仍是“condition route chrome 继续收满，或切向 input 上传流 / agent 深层高级配置”；其中 route chrome 仍是当前最连续的剩余链路，但已经从文案层推进到路径几何层
 
 ## Risks / Open Questions
 
 - 旧前端很多状态语义和编辑交互深埋在 `node-system-editor.tsx`，迁移时要防止只恢复外观不恢复行为
 - 当前 Vue 画布还是基础版，可能继续出现“看起来像但交互不够”的落差
 - 需要持续对照旧前端截图和代码，而不是凭新实现自行推断
+- condition 分支的第一版编辑、`Add branch` 与删除语义都已接通，但更丰富的 route chrome 和 branch 级交互细节仍可能继续暴露“能用但还不像旧前端”的差距

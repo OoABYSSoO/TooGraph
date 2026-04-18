@@ -61,12 +61,14 @@ const graph: GraphPayload = {
 test("projectCanvasEdges creates projected flow edges from graph edges", () => {
   const projected = projectCanvasEdges(graph);
 
-  assert.equal(projected.length, 2);
+  assert.equal(projected.length, 4);
   assert.deepEqual(
-    projected.map((edge) => ({ id: edge.id, kind: edge.kind, source: edge.source, target: edge.target })),
+    projected.map((edge) => ({ id: edge.id, kind: edge.kind, source: edge.source, target: edge.target, state: edge.state ?? null })),
     [
-      { id: "flow:input_question->answer_helper", kind: "flow", source: "input_question", target: "answer_helper" },
-      { id: "flow:answer_helper->output_answer", kind: "flow", source: "answer_helper", target: "output_answer" },
+      { id: "flow:input_question->answer_helper", kind: "flow", source: "input_question", target: "answer_helper", state: null },
+      { id: "flow:answer_helper->output_answer", kind: "flow", source: "answer_helper", target: "output_answer", state: null },
+      { id: "data:input_question:question->answer_helper", kind: "data", source: "input_question", target: "answer_helper", state: "question" },
+      { id: "data:answer_helper:answer->output_answer", kind: "data", source: "answer_helper", target: "output_answer", state: "answer" },
     ],
   );
   assert.match(projected[0]!.path, /^M /);
@@ -80,4 +82,79 @@ test("projectCanvasAnchors returns flow and state dots for visible nodes", () =>
   assert.ok(anchors.some((anchor) => anchor.kind === "flow-in" && anchor.nodeId === "answer_helper"));
   assert.ok(anchors.some((anchor) => anchor.kind === "state-out" && anchor.stateKey === "question"));
   assert.ok(anchors.some((anchor) => anchor.kind === "state-in" && anchor.stateKey === "question"));
+});
+
+test("projectCanvasEdges skips ambiguous data writers", () => {
+  const branchingGraph: GraphPayload = {
+    graph_id: null,
+    name: "Branching data",
+    state_schema: {
+      answer: {
+        name: "answer",
+        description: "",
+        type: "text",
+        value: "",
+        color: "#d97706",
+      },
+    },
+    nodes: {
+      writer_left: {
+        kind: "agent",
+        name: "writer_left",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [{ state: "answer", mode: "replace" }],
+        config: {
+          skills: [],
+          systemInstruction: "",
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "off",
+          temperature: 0,
+        },
+      },
+      writer_right: {
+        kind: "agent",
+        name: "writer_right",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [{ state: "answer", mode: "replace" }],
+        config: {
+          skills: [],
+          systemInstruction: "",
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "off",
+          temperature: 0,
+        },
+      },
+      sink: {
+        kind: "output",
+        name: "sink",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [{ state: "answer", required: true }],
+        writes: [],
+        config: {
+          displayMode: "auto",
+          persistEnabled: false,
+          persistFormat: "auto",
+          fileNameTemplate: "",
+        },
+      },
+    },
+    edges: [
+      { source: "writer_left", target: "sink" },
+      { source: "writer_right", target: "sink" },
+    ],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const projected = projectCanvasEdges(branchingGraph);
+  assert.equal(projected.filter((edge) => edge.kind === "data" && edge.target === "sink").length, 0);
 });

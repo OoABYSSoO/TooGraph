@@ -30,6 +30,7 @@
           <div class="editor-state-panel__summary-title">{{ view.count }} state objects</div>
           <div class="editor-state-panel__summary-body">These values are stored with the graph and restored in the editor.</div>
         </div>
+        <button type="button" class="editor-state-panel__summary-action" @click="$emit('add-state')">Add State</button>
       </div>
 
       <div class="editor-state-panel__content">
@@ -44,39 +45,197 @@
               <div class="editor-state-panel__card-title">{{ row.title }}</div>
               <div class="editor-state-panel__card-key">{{ row.key }}</div>
             </div>
-            <span class="editor-state-panel__card-type">{{ row.typeLabel }}</span>
+            <div class="editor-state-panel__card-head-actions">
+              <span class="editor-state-panel__card-type">{{ row.typeLabel }}</span>
+              <button
+                type="button"
+                class="editor-state-panel__card-delete"
+                aria-label="Delete state"
+                @click="$emit('delete-state', row.key)"
+              >
+                ×
+              </button>
+            </div>
           </div>
 
-          <p v-if="row.description" class="editor-state-panel__card-description">{{ row.description }}</p>
+          <div class="editor-state-panel__field-grid">
+            <label class="editor-state-panel__field">
+              <span>Key</span>
+              <input
+                class="editor-state-panel__input"
+                :value="row.key"
+                @blur="commitStateRename(row.key, ($event.target as HTMLInputElement).value)"
+                @keydown.enter="commitStateRename(row.key, ($event.target as HTMLInputElement).value)"
+              />
+            </label>
+
+            <label class="editor-state-panel__field">
+              <span>Name</span>
+              <input
+                class="editor-state-panel__input"
+                :value="stateDefinition(row.key)?.name ?? ''"
+                @input="
+                  $emit('update-state', {
+                    stateKey: row.key,
+                    patch: { name: ($event.target as HTMLInputElement).value },
+                  })
+                "
+              />
+            </label>
+          </div>
+
+          <label class="editor-state-panel__field">
+            <span>Description</span>
+            <textarea
+              class="editor-state-panel__textarea"
+              rows="2"
+              :value="stateDefinition(row.key)?.description ?? ''"
+              @input="
+                $emit('update-state', {
+                  stateKey: row.key,
+                  patch: { description: ($event.target as HTMLTextAreaElement).value },
+                })
+              "
+            />
+          </label>
+
+          <div class="editor-state-panel__field-grid">
+            <label class="editor-state-panel__field">
+              <span>Type</span>
+              <select class="editor-state-panel__select" :value="row.typeLabel" @change="handleStateTypeChange(row.key, ($event.target as HTMLSelectElement).value)">
+                <option v-for="typeOption in STATE_FIELD_TYPE_OPTIONS" :key="typeOption" :value="typeOption">{{ typeOption }}</option>
+              </select>
+            </label>
+
+            <label class="editor-state-panel__field">
+              <span>Color</span>
+              <input
+                class="editor-state-panel__input"
+                :value="stateDefinition(row.key)?.color ?? ''"
+                placeholder="#d97706"
+                @input="
+                  $emit('update-state', {
+                    stateKey: row.key,
+                    patch: { color: ($event.target as HTMLInputElement).value },
+                  })
+                "
+              />
+            </label>
+          </div>
 
           <div class="editor-state-panel__card-bindings">
             <span class="editor-state-panel__binding-chip editor-state-panel__binding-chip--readers">{{ row.readerCount }} readers</span>
             <span class="editor-state-panel__binding-chip editor-state-panel__binding-chip--writers">{{ row.writerCount }} writers</span>
           </div>
 
-          <div v-if="row.readers.length > 0 || row.writers.length > 0" class="editor-state-panel__binding-groups">
-            <div v-if="row.readers.length > 0" class="editor-state-panel__binding-group">
-              <div class="editor-state-panel__binding-group-title">Readers</div>
-              <div class="editor-state-panel__binding-list">
-                <span v-for="binding in row.readers" :key="`reader-${binding.nodeId}`" class="editor-state-panel__binding-token">
-                  {{ binding.nodeLabel }}
-                </span>
+          <div class="editor-state-panel__binding-groups">
+            <div class="editor-state-panel__binding-group">
+              <div class="editor-state-panel__binding-group-head">
+                <div class="editor-state-panel__binding-group-title">Readers</div>
+                <button type="button" class="editor-state-panel__binding-group-action" @click="toggleBindingForm(row.key, 'read')">
+                  {{ isBindingFormOpen(row.key, 'read') ? "Close" : "Add Reader" }}
+                </button>
               </div>
+
+              <div v-if="row.readers.length > 0" class="editor-state-panel__binding-list">
+                <div v-for="binding in row.readers" :key="`reader-${binding.nodeId}`" class="editor-state-panel__binding-item">
+                  <button
+                    type="button"
+                    class="editor-state-panel__binding-token"
+                    :class="{ 'editor-state-panel__binding-token--active': props.focusedNodeId === binding.nodeId }"
+                    @click="$emit('focus-node', binding.nodeId)"
+                  >
+                    <span class="editor-state-panel__binding-token-head">
+                      <span class="editor-state-panel__binding-kind">{{ binding.nodeKindLabel }}</span>
+                      <span class="editor-state-panel__binding-node-label">{{ binding.nodeLabel }}</span>
+                    </span>
+                    <span class="editor-state-panel__binding-port-detail">Input: {{ binding.portLabel }}</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="editor-state-panel__binding-remove"
+                    aria-label="Remove reader"
+                    @click="$emit('remove-reader', { stateKey: row.key, nodeId: binding.nodeId })"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+
+              <div v-else class="editor-state-panel__binding-empty">No readers yet.</div>
+
+              <StateBindingCreateForm
+                v-if="isBindingFormOpen(row.key, 'read')"
+                mode="read"
+                :options="bindingOptions(row.key, 'read')"
+                @add="
+                  $emit('add-reader', { stateKey: row.key, nodeId: $event });
+                  closeBindingForm(row.key, 'read');
+                "
+                @cancel="closeBindingForm(row.key, 'read')"
+              />
             </div>
 
-            <div v-if="row.writers.length > 0" class="editor-state-panel__binding-group">
-              <div class="editor-state-panel__binding-group-title">Writers</div>
-              <div class="editor-state-panel__binding-list">
-                <span v-for="binding in row.writers" :key="`writer-${binding.nodeId}`" class="editor-state-panel__binding-token">
-                  {{ binding.nodeLabel }}
-                </span>
+            <div class="editor-state-panel__binding-group">
+              <div class="editor-state-panel__binding-group-head">
+                <div class="editor-state-panel__binding-group-title">Writers</div>
+                <button type="button" class="editor-state-panel__binding-group-action" @click="toggleBindingForm(row.key, 'write')">
+                  {{ isBindingFormOpen(row.key, 'write') ? "Close" : "Add Writer" }}
+                </button>
               </div>
+
+              <div v-if="row.writers.length > 0" class="editor-state-panel__binding-list">
+                <div v-for="binding in row.writers" :key="`writer-${binding.nodeId}`" class="editor-state-panel__binding-item">
+                  <button
+                    type="button"
+                    class="editor-state-panel__binding-token"
+                    :class="{ 'editor-state-panel__binding-token--active': props.focusedNodeId === binding.nodeId }"
+                    @click="$emit('focus-node', binding.nodeId)"
+                  >
+                    <span class="editor-state-panel__binding-token-head">
+                      <span class="editor-state-panel__binding-kind">{{ binding.nodeKindLabel }}</span>
+                      <span class="editor-state-panel__binding-node-label">{{ binding.nodeLabel }}</span>
+                    </span>
+                    <span class="editor-state-panel__binding-port-detail">Output: {{ binding.portLabel }}</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="editor-state-panel__binding-remove"
+                    aria-label="Remove writer"
+                    @click="$emit('remove-writer', { stateKey: row.key, nodeId: binding.nodeId })"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+
+              <div v-else class="editor-state-panel__binding-empty">No writers yet.</div>
+
+              <StateBindingCreateForm
+                v-if="isBindingFormOpen(row.key, 'write')"
+                mode="write"
+                :options="bindingOptions(row.key, 'write')"
+                @add="
+                  $emit('add-writer', { stateKey: row.key, nodeId: $event });
+                  closeBindingForm(row.key, 'write');
+                "
+                @cancel="closeBindingForm(row.key, 'write')"
+              />
             </div>
           </div>
 
           <div class="editor-state-panel__card-value">
             <div class="editor-state-panel__card-value-label">Value</div>
-            <pre class="editor-state-panel__card-value-preview">{{ row.valuePreview }}</pre>
+            <StateDefaultValueEditor
+              v-if="stateDefinition(row.key)"
+              :field="stateDefinition(row.key)!"
+              @update-value="
+                $emit('update-state', {
+                  stateKey: row.key,
+                  patch: { value: $event },
+                })
+              "
+            />
           </div>
         </article>
       </div>
@@ -85,21 +244,97 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 
+import StateDefaultValueEditor from "./StateDefaultValueEditor.vue";
+import StateBindingCreateForm from "./StateBindingCreateForm.vue";
+import { listStateBindingNodeOptions, type StateBindingMode } from "./statePanelBindings.ts";
+import { defaultValueForStateType, STATE_FIELD_TYPE_OPTIONS, type StateFieldType } from "./statePanelFields.ts";
 import { buildStatePanelViewModel } from "./statePanelViewModel";
-import type { GraphDocument, GraphPayload } from "@/types/node-system";
+import type { GraphDocument, GraphPayload, StateDefinition } from "@/types/node-system";
 
 const props = defineProps<{
   open: boolean;
   document: GraphPayload | GraphDocument;
+  focusedNodeId?: string | null;
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
   (event: "toggle"): void;
+  (event: "focus-node", nodeId: string): void;
+  (event: "add-state"): void;
+  (event: "delete-state", stateKey: string): void;
+  (event: "rename-state", payload: { currentKey: string; nextKey: string }): void;
+  (event: "update-state", payload: { stateKey: string; patch: Partial<StateDefinition> }): void;
+  (event: "add-reader", payload: { stateKey: string; nodeId: string }): void;
+  (event: "remove-reader", payload: { stateKey: string; nodeId: string }): void;
+  (event: "add-writer", payload: { stateKey: string; nodeId: string }): void;
+  (event: "remove-writer", payload: { stateKey: string; nodeId: string }): void;
 }>();
 
 const view = computed(() => buildStatePanelViewModel(props.document));
+const readerFormOpenByKey = ref<Record<string, boolean>>({});
+const writerFormOpenByKey = ref<Record<string, boolean>>({});
+
+function isBindingFormOpen(stateKey: string, mode: StateBindingMode) {
+  return mode === "read" ? readerFormOpenByKey.value[stateKey] ?? false : writerFormOpenByKey.value[stateKey] ?? false;
+}
+
+function toggleBindingForm(stateKey: string, mode: StateBindingMode) {
+  if (mode === "read") {
+    readerFormOpenByKey.value = {
+      ...readerFormOpenByKey.value,
+      [stateKey]: !isBindingFormOpen(stateKey, mode),
+    };
+    return;
+  }
+
+  writerFormOpenByKey.value = {
+    ...writerFormOpenByKey.value,
+    [stateKey]: !isBindingFormOpen(stateKey, mode),
+  };
+}
+
+function closeBindingForm(stateKey: string, mode: StateBindingMode) {
+  if (mode === "read") {
+    readerFormOpenByKey.value = {
+      ...readerFormOpenByKey.value,
+      [stateKey]: false,
+    };
+    return;
+  }
+
+  writerFormOpenByKey.value = {
+    ...writerFormOpenByKey.value,
+    [stateKey]: false,
+  };
+}
+
+function bindingOptions(stateKey: string, mode: StateBindingMode) {
+  return listStateBindingNodeOptions(props.document, stateKey, mode);
+}
+
+function stateDefinition(stateKey: string) {
+  return props.document.state_schema[stateKey];
+}
+
+function commitStateRename(currentKey: string, nextKey: string) {
+  const normalizedNextKey = nextKey.trim();
+  if (!normalizedNextKey || normalizedNextKey === currentKey) {
+    return;
+  }
+  emit("rename-state", { currentKey, nextKey: normalizedNextKey });
+}
+
+function handleStateTypeChange(stateKey: string, nextType: string) {
+  emit("update-state", {
+    stateKey,
+    patch: {
+      type: nextType,
+      value: defaultValueForStateType(nextType as StateFieldType),
+    },
+  });
+}
 </script>
 
 <style scoped>
@@ -206,6 +441,10 @@ const view = computed(() => buildStatePanelViewModel(props.document));
   background: rgba(255, 255, 255, 0.82);
   padding: 14px;
   box-shadow: 0 10px 24px rgba(60, 41, 20, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .editor-state-panel__summary-title {
@@ -219,6 +458,20 @@ const view = computed(() => buildStatePanelViewModel(props.document));
   font-size: 0.82rem;
   line-height: 1.5;
   color: rgba(60, 41, 20, 0.68);
+}
+
+.editor-state-panel__summary-action {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(154, 52, 18, 0.18);
+  background: rgba(255, 244, 240, 0.94);
+  padding: 8px 12px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(154, 52, 18, 0.94);
 }
 
 .editor-state-panel__content {
@@ -271,6 +524,12 @@ const view = computed(() => buildStatePanelViewModel(props.document));
   align-items: flex-start;
 }
 
+.editor-state-panel__card-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .editor-state-panel__card-title {
   font-size: 1rem;
   font-weight: 600;
@@ -287,6 +546,42 @@ const view = computed(() => buildStatePanelViewModel(props.document));
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.editor-state-panel__field-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.editor-state-panel__field {
+  display: grid;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: rgba(60, 41, 20, 0.72);
+}
+
+.editor-state-panel__input,
+.editor-state-panel__select,
+.editor-state-panel__textarea {
+  width: 100%;
+  border: 1px solid rgba(154, 52, 18, 0.14);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.88);
+  padding: 10px 12px;
+  font-size: 0.9rem;
+  color: #1f2937;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.editor-state-panel__textarea {
+  resize: vertical;
+  min-height: 68px;
+}
+
+.editor-state-panel__textarea--value {
+  min-height: 120px;
+  white-space: pre-wrap;
 }
 
 .editor-state-panel__binding-chip {
@@ -323,6 +618,13 @@ const view = computed(() => buildStatePanelViewModel(props.document));
   gap: 6px;
 }
 
+.editor-state-panel__binding-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .editor-state-panel__binding-group-title {
   font-size: 0.72rem;
   font-weight: 600;
@@ -331,22 +633,113 @@ const view = computed(() => buildStatePanelViewModel(props.document));
   color: rgba(154, 52, 18, 0.74);
 }
 
+.editor-state-panel__binding-group-action {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(154, 52, 18, 0.18);
+  background: rgba(255, 244, 240, 0.94);
+  padding: 6px 10px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(154, 52, 18, 0.94);
+}
+
 .editor-state-panel__binding-list {
+  display: grid;
+  gap: 8px;
+}
+
+.editor-state-panel__binding-item {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
 }
 
 .editor-state-panel__binding-token {
-  display: inline-flex;
-  align-items: center;
-  min-height: 28px;
-  border-radius: 999px;
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  min-height: 48px;
+  border-radius: 14px;
   border: 1px solid rgba(154, 52, 18, 0.14);
-  padding: 0 10px;
-  font-size: 0.78rem;
+  padding: 9px 10px;
+  font-size: 0.82rem;
   color: rgba(60, 41, 20, 0.82);
   background: rgba(255, 250, 241, 0.92);
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 140ms ease, border-color 140ms ease, transform 140ms ease;
+}
+
+.editor-state-panel__binding-token:hover {
+  border-color: rgba(154, 52, 18, 0.22);
+  background: rgba(255, 248, 240, 0.98);
+  transform: translateY(-1px);
+}
+
+.editor-state-panel__binding-token--active {
+  border-color: rgba(154, 52, 18, 0.28);
+  background: rgba(255, 244, 240, 0.96);
+}
+
+.editor-state-panel__binding-token-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.editor-state-panel__binding-kind {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(154, 52, 18, 0.16);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(154, 52, 18, 0.84);
+  background: rgba(255, 250, 241, 0.92);
+}
+
+.editor-state-panel__binding-node-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.editor-state-panel__binding-port-detail {
+  font-size: 0.74rem;
+  line-height: 1.5;
+  color: rgba(60, 41, 20, 0.68);
+}
+
+.editor-state-panel__binding-remove {
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(154, 52, 18, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 252, 247, 0.92);
+  color: rgba(60, 41, 20, 0.62);
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.editor-state-panel__binding-empty {
+  border: 1px dashed rgba(154, 52, 18, 0.18);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.74);
+  padding: 10px 12px;
+  font-size: 0.82rem;
+  color: rgba(60, 41, 20, 0.68);
 }
 
 .editor-state-panel__card-type {
@@ -361,6 +754,17 @@ const view = computed(() => buildStatePanelViewModel(props.document));
   color: rgba(154, 52, 18, 0.82);
 }
 
+.editor-state-panel__card-delete {
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(154, 52, 18, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 252, 247, 0.92);
+  color: rgba(60, 41, 20, 0.62);
+  font-size: 1rem;
+  line-height: 1;
+}
+
 .editor-state-panel__card-description {
   margin: 0;
   font-size: 0.9rem;
@@ -373,6 +777,8 @@ const view = computed(() => buildStatePanelViewModel(props.document));
   border-radius: 16px;
   background: rgba(248, 242, 234, 0.72);
   padding: 12px 14px;
+  display: grid;
+  gap: 10px;
 }
 
 .editor-state-panel__card-value-label {

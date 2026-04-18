@@ -28,6 +28,26 @@
   - 面板按 tab 记住开合状态
   - 面板可浏览 graph state 对象、类型与当前值摘要
   - 每个 state 已能看到 reader / writer 数量与节点明细
+  - reader / writer 可增删，支持节点聚焦与当前聚焦态
+  - state key / name / description / type / color / default value 已可编辑
+- `NodeCard` 与画布主链已继续向旧前端收口：
+  - `Reads / Writes` 摘要已可见
+  - 端口 type / required 元信息已可见
+  - condition branch match values 摘要已可见
+  - 第一版节点内联编辑已接通：
+    - input 文本值
+    - agent `taskInstruction`
+    - agent `thinking / temperature`
+    - condition `loopLimit`
+    - condition `Source / Operator / Value`
+    - condition branch key / mapping keys
+    - output 节点 `Advanced`
+  - output 节点 `Advanced` 当前已接通：
+    - persist toggle
+    - display mode
+    - persist format
+    - file name
+  - condition branch 改名会同步到 `conditional_edges`
 - Vue 前端外围 UI 的实现方向已经明确：
   - 画布 / 节点 / 连线继续自定义
   - 工作区 chrome、面板、下拉、弹层改走 `Reka UI` / `shadcn-vue` 思路
@@ -37,7 +57,9 @@
 - Vue 版图编辑器本体仍然只恢复到基础版，距离旧前端完整体验还有明显差距
 - 顶部工作区 chrome 主链已恢复，但细节质感与组件化程度还不够
 - 节点卡片细节、状态面板深层交互、画布交互、运行反馈等还没有完全迁回旧逻辑
-- 旧前端 `State` 面板真正有用的 reader / writer 绑定交互还在 `node-system-editor.tsx` 内部，Vue 版目前只恢复到第一层浏览与摘要
+- 旧前端 `State` 面板真正有用的 reader / writer 绑定交互和字段编辑主链已经明显恢复，但与其余节点内联编辑和画布交互的联动还不完整
+- condition 节点的 branch key / mapping keys 编辑、`Add branch` 和删除语义已经接回；route chrome 也开始从“显示 target”推进到“路径几何对齐旧 React”，但更完整的 route 呈现仍待继续收口
+- 基于最新文档复盘，当前最建议优先推进的实现切片已经从“先补删除语义”推进到“继续收口 condition route chrome”；这比先切 input 上传流或 agent 深层配置更连续，也更容易保持与旧 React 的行为对齐
 - 文档需要围绕当前 Vue 路线持续收口，避免混入旧 React 方案和已废弃设计
 
 ## 当前优先级
@@ -54,15 +76,37 @@
 
 - `AppShell`、`EditorWorkspaceShell`、`EditorTabBar` 已回到旧前端的大框架方向
 - `EditorCanvas` 不再是一个大卡片，但节点/边/控件仍是 Vue 基础实现
-- `NodeCard` 已有 richer view model，但与旧前端 `node-system-editor.tsx` 的结构和细节还不一致
+- `NodeCard` 已有 richer view model，input 文本值、agent `taskInstruction` 与 `thinking / temperature`、condition `loopLimit` / 规则编辑 / branch key / mapping keys、output 节点第一版 `Advanced` 都已接通，但 input 的类型切换 / 上传流，以及其余 agent / condition 深层内部编辑还没有迁回
 
 后续要做：
 
 - 继续按旧前端 `node-system-editor.tsx` 的逻辑迁移：
   - 节点卡片结构
   - 端口排布
-  - 条件节点 branch 呈现
+  - 条件节点 `BranchRow` 的更完整呈现
+  - 节点内部编辑
   - 画布中的节点/边层级
+- condition branch 当前已经按“单条语义链”接通了：
+  - branch key 改名
+  - mapping keys 编辑
+  - `conditional_edges` 中对应 route 分支同步
+- condition branch 当前已经补到：
+  - `Add branch` 入口
+  - 新分支写入 `branches` 后的编辑行 / 画布锚点呈现
+- branch 删除当前已经按保守规则接通：
+  - 同步清理 `branches`
+  - 同步清理 `branchMapping`
+  - 同步清理对应 `conditional_edges`
+  - 不允许删到最后一个 branch
+- condition branch 当前也已有 route chrome 第一版：
+  - branch 行显示 route target
+  - 未连 route 时显示 `Unrouted`
+- route edge 几何当前也已开始对齐旧 React：
+  - branch offset 规则已对齐
+  - route edge path 改为 rounded orthogonal
+- 后续仍要继续收口：
+  - 更完整的 route 呈现
+  - 更接近旧前端的 branch 级交互手感
 - 把“能看到一个 Vue 图”推进到“旧前端那套图编辑器在 Vue 里重新活起来”
 
 ## 2. 用现代 Vue UI 基元提升工作区 chrome 和外围面板
@@ -89,13 +133,14 @@
 当前现状：
 
 - 基础拖拽、保存、校验、运行入口已经在 workspace shell 上接通
-- `State` 面板已接通，reader / writer 节点明细已恢复到第一版；旧前端那套聚焦、增删绑定与字段编辑交互还没迁回
+- `State` 面板已接通，reader / writer 节点明细、节点聚焦、增删绑定与字段编辑主链都已迁回第一版
+- input / output / agent / condition 已经开始从“展示”变成“可编辑”
 - 编辑器内部仍缺少旧前端的完整交互节奏
 
 后续要做：
 
 - 恢复图名编辑、状态面板、编辑器 chrome 的完整行为
-- 恢复节点内编辑交互、运行反馈、错误提示的旧逻辑节奏
+- 继续恢复 condition 剩余 route chrome 细节；之后再推进 input 节点剩余的类型切换 / 上传流，以及 agent 剩余 model / systemInstruction 交互、运行反馈、错误提示的旧逻辑节奏
 - 继续修正“看起来能用，但手感不像旧前端”的部分
 
 ## 4. 恢复辅助页面到可用水平

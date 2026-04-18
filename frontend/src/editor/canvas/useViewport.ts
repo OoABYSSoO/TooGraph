@@ -53,6 +53,12 @@ export function useViewport() {
     viewport.scale = clamp(viewport.scale + direction, 0.4, 2.2);
   }
 
+  function setViewport(nextViewport: { x: number; y: number; scale: number }) {
+    viewport.x = nextViewport.x;
+    viewport.y = nextViewport.y;
+    viewport.scale = clamp(nextViewport.scale, 0.4, 2.2);
+  }
+
   return {
     viewport,
     isPanning,
@@ -60,6 +66,7 @@ export function useViewport() {
     movePan,
     endPan,
     zoomBy,
+    setViewport,
   };
 }
 

@@ -4,11 +4,19 @@ export type NodePortViewModel = {
   key: string;
   label: string;
   required?: boolean;
+  typeLabel: string;
+  stateColor: string;
 };
 
 export type NodeBranchMappingViewModel = {
   branch: string;
   matchValues: string[];
+  matchValueLabel: string;
+  routeTargetLabel: string | null;
+};
+
+export type BuildNodeCardViewModelOptions = {
+  conditionRouteTargets?: Record<string, string | null>;
 };
 
 export type NodeCardViewModel = {
@@ -20,6 +28,10 @@ export type NodeCardViewModel = {
   inputs: NodePortViewModel[];
   outputs: NodePortViewModel[];
   branches: NodePortViewModel[];
+  stateSummary: {
+    reads: string[];
+    writes: string[];
+  } | null;
   body:
     | {
         kind: "input";
@@ -31,6 +43,7 @@ export type NodeCardViewModel = {
         taskInstruction: string;
         modelLabel: string;
         thinkingLabel: string;
+        skillLabel: string;
         primaryInput: NodePortViewModel | null;
         primaryOutput: NodePortViewModel | null;
       }
@@ -38,15 +51,19 @@ export type NodeCardViewModel = {
         kind: "condition";
         ruleSummary: string;
         loopLimitLabel: string;
+        primaryInput: NodePortViewModel | null;
         branchMappings: NodeBranchMappingViewModel[];
       }
     | {
         kind: "output";
         previewTitle: string;
         displayModeLabel: string;
+        persistFormatLabel: string;
         connectedStateLabel: string | null;
         previewText: string;
         persistEnabled: boolean;
+        persistLabel: string;
+        fileNameTemplate: string;
       };
 };
 
@@ -54,11 +71,14 @@ export function buildNodeCardViewModel(
   nodeId: string,
   node: GraphNode,
   stateSchema: Record<string, StateDefinition>,
+  options: BuildNodeCardViewModelOptions = {},
 ): NodeCardViewModel {
   const inputs = node.reads.map((binding) => ({
     key: binding.state,
     label: getStateLabel(binding.state, stateSchema),
     required: binding.required,
+    typeLabel: getStateTypeLabel(binding.state, stateSchema),
+    stateColor: stateSchema[binding.state]?.color ?? "#d97706",
   }));
 
   const outputs =
@@ -67,6 +87,8 @@ export function buildNodeCardViewModel(
       : node.writes.map((binding) => ({
           key: binding.state,
           label: getStateLabel(binding.state, stateSchema),
+          typeLabel: getStateTypeLabel(binding.state, stateSchema),
+          stateColor: stateSchema[binding.state]?.color ?? "#d97706",
         }));
 
   const branches =
@@ -74,6 +96,8 @@ export function buildNodeCardViewModel(
       ? node.config.branches.map((branch) => ({
           key: branch,
           label: branch,
+          typeLabel: "branch",
+          stateColor: "#9a3412",
         }))
       : [];
 
@@ -86,7 +110,11 @@ export function buildNodeCardViewModel(
     inputs,
     outputs,
     branches,
-    body: buildBody(node, stateSchema, inputs, outputs),
+    stateSummary: {
+      reads: inputs.map((port) => port.label),
+      writes: outputs.map((port) => port.label),
+    },
+    body: buildBody(node, stateSchema, inputs, outputs, options),
   };
 }
 
@@ -95,6 +123,7 @@ function buildBody(
   stateSchema: Record<string, StateDefinition>,
   inputs: NodePortViewModel[],
   outputs: NodePortViewModel[],
+  options: BuildNodeCardViewModelOptions,
 ): NodeCardViewModel["body"] {
   if (node.kind === "input") {
     return {
@@ -107,9 +136,10 @@ function buildBody(
   if (node.kind === "agent") {
     return {
       kind: "agent",
-      taskInstruction: node.config.taskInstruction?.trim() || "No task instruction yet.",
+      taskInstruction: node.config.taskInstruction?.trim() || "",
       modelLabel: resolveAgentModelLabel(node),
       thinkingLabel: resolveThinkingLabel(node),
+      skillLabel: node.config.skills.length > 0 ? `${node.config.skills.length} skill${node.config.skills.length > 1 ? "s" : ""}` : "No skills",
       primaryInput: inputs[0] ?? null,
       primaryOutput: outputs[0] ?? null,
     };
@@ -120,7 +150,8 @@ function buildBody(
       kind: "condition",
       ruleSummary: formatConditionRule(node.config.rule, stateSchema),
       loopLimitLabel: node.config.loopLimit === -1 ? "Loop · Unlimited" : `Loop · ${node.config.loopLimit}`,
-      branchMappings: mapConditionBranchMappings(node),
+      primaryInput: inputs[0] ?? null,
+      branchMappings: mapConditionBranchMappings(node, options.conditionRouteTargets ?? {}),
     };
   }
 
@@ -128,15 +159,23 @@ function buildBody(
   return {
     kind: "output",
     previewTitle: "Preview",
-    displayModeLabel: node.config.displayMode.toUpperCase(),
+    displayModeLabel: formatOutputDisplayModeLabel(node.config.displayMode),
+    persistFormatLabel: formatOutputPersistFormatLabel(node.config.persistFormat),
     connectedStateLabel: connectedState ? getStateLabel(connectedState, stateSchema) : null,
     previewText: connectedState ? stringifyValue(stateSchema[connectedState]?.value ?? "") : "Connect a state to preview output.",
     persistEnabled: node.config.persistEnabled,
+    persistLabel: node.config.persistEnabled ? "Save on" : "Save off",
+    fileNameTemplate: node.config.fileNameTemplate,
   };
 }
 
 function getStateLabel(stateKey: string, stateSchema: Record<string, StateDefinition>) {
   return stateSchema[stateKey]?.name?.trim() || stateKey;
+}
+
+function getStateTypeLabel(stateKey: string, stateSchema: Record<string, StateDefinition>) {
+  const stateType = stateSchema[stateKey]?.type?.trim() || "text";
+  return stateType.replace(/_/g, " ");
 }
 
 function stringifyValue(value: unknown) {
@@ -178,11 +217,46 @@ function formatConditionRule(
   return `${sourceLabel} ${rule.operator} ${valueLabel}`;
 }
 
-function mapConditionBranchMappings(node: Extract<GraphNode, { kind: "condition" }>): NodeBranchMappingViewModel[] {
+function mapConditionBranchMappings(
+  node: Extract<GraphNode, { kind: "condition" }>,
+  conditionRouteTargets: Record<string, string | null>,
+): NodeBranchMappingViewModel[] {
   return node.config.branches.map((branch) => ({
     branch,
     matchValues: Object.entries(node.config.branchMapping)
       .filter(([, mappedBranch]) => mappedBranch === branch)
       .map(([value]) => value),
+    matchValueLabel:
+      Object.entries(node.config.branchMapping)
+        .filter(([, mappedBranch]) => mappedBranch === branch)
+        .map(([value]) => value)
+        .join(", ") || "No matches",
+    routeTargetLabel: conditionRouteTargets[branch] ?? null,
   }));
+}
+
+function formatOutputDisplayModeLabel(displayMode: Extract<GraphNode, { kind: "output" }>["config"]["displayMode"]) {
+  switch (displayMode) {
+    case "markdown":
+      return "MD";
+    case "plain":
+      return "PLAIN";
+    case "json":
+      return "JSON";
+    default:
+      return "AUTO";
+  }
+}
+
+function formatOutputPersistFormatLabel(persistFormat: Extract<GraphNode, { kind: "output" }>["config"]["persistFormat"]) {
+  switch (persistFormat) {
+    case "md":
+      return "MD";
+    case "txt":
+      return "TXT";
+    case "json":
+      return "JSON";
+    default:
+      return "AUTO";
+  }
 }

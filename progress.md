@@ -2,6 +2,222 @@
 
 ## 2026-04-18
 
+- 再次运行 `planning-with-files` 会话接续，并把“当前距离迁移完成还剩多少”的结论落盘：
+  - 若以“达到旧 React 主要产品逻辑 parity 并收口辅助页面 / 文档”为目标，当前大约在 `60% - 70%`
+  - 若只看“核心编辑器主链已经能用”，当前大约在 `75%` 左右
+  - 当前剩余工作主要集中在最后那段高细节 parity，而不是骨架搭建
+- 结合 `task_plan.md`、`findings.md`、`docs/current_engineering_backlog.md` 重新收敛下一步推荐切片：
+  - 第一优先级：condition branch 删除语义与 route chrome 收口
+  - 第二优先级：input 节点剩余类型切换与上传流
+  - 第三优先级：agent 节点更深层高级配置
+  - 推荐先走第一条，因为与现有未完成链路最连续，且旧 React 对照证据最集中
+- 继续按这条切片推进 condition branch 删除语义与 route chrome 第一版：
+  - 重新审阅旧 React `87d3d6e` 的 `node-system-editor.tsx` 与 `node-system-canonical-write.ts`
+  - 确认旧 React 有 `rename` / `updateConditionBranch` helper，但没有现成的 `removeConditionBranch` helper
+  - 因此把 Vue 删除语义收敛为保守规则：
+    - 同步清理 `branches`
+    - 同步清理指向该 branch 的 `branchMapping`
+    - 同步清理对应 `conditional_edges`
+    - 删除后若 route source 已空，则删除空的 `conditional_edges` 记录
+    - 不允许删到最后一个 branch
+- 按 TDD 推进这一轮实现：
+  - 在 `src/lib/graph-document.test.ts` 先补红测，锁定：
+    - 删除 branch 时同步清理 `branchMapping` 与 `conditional_edges`
+    - 删除后空 route source 会被裁掉
+    - 最后一个 branch 不能删除
+  - 在 `src/editor/nodes/nodeCardViewModel.test.ts` 先补红测，锁定：
+    - condition branch view model 默认暴露 `routeTargetLabel: null`
+    - 传入 route target 时，branch 行能拿到对应 target label
+  - 首次运行：
+    - `cd frontend && node --test --experimental-strip-types src/lib/graph-document.test.ts`
+    - `cd frontend && node --test --experimental-strip-types src/editor/nodes/nodeCardViewModel.test.ts`
+    确认分别因缺少 `removeConditionBranchFromDocument`、缺少 `routeTargetLabel` 语义而失败，红测成立
+  - 更新 `src/lib/graph-document.ts`，新增 `removeConditionBranchFromDocument`
+  - 更新 `src/editor/nodes/nodeCardViewModel.ts`，为 condition branch 暴露 `routeTargetLabel`
+  - 更新 `src/editor/nodes/NodeCard.vue`：
+    - branch 行新增 `Remove`
+    - branch 行显示 route target / `Unrouted`
+  - 更新 `src/editor/canvas/EditorCanvas.vue`：
+    - 为每个 condition 节点解析 branch -> target node label
+    - 透传 `remove-condition-branch`
+  - 更新 `src/editor/workspace/EditorWorkspaceShell.vue`：
+    - 接通 `removeConditionBranchForTab`
+    - 将 branch 删除真正写回活动文档
+- 完成这一轮验证：
+  - `git diff --check`
+  - `cd frontend && node --test --experimental-strip-types src/lib/condition-branch-mapping.test.ts src/lib/graph-document.test.ts src/editor/nodes/nodeCardViewModel.test.ts src/editor/nodes/conditionLoopLimit.test.ts src/editor/nodes/conditionRuleEditorModel.test.ts src/editor/nodes/agentConfigModel.test.ts src/editor/canvas/useSelection.test.ts src/editor/canvas/focusNodeViewport.test.ts src/editor/canvas/edgeProjection.test.ts src/editor/workspace/statePanelViewModel.test.ts src/editor/workspace/statePanelBindings.test.ts src/editor/workspace/statePanelFields.test.ts src/editor/workspace/stateDefaultValueModel.test.ts`
+  - `cd frontend && npm run build`
+  - `./scripts/start.sh`
+  - `curl -sf --noproxy '*' http://127.0.0.1:8765/health`
+  - `curl -I -s --noproxy '*' http://127.0.0.1:3477/editor`
+  - `curl -I -s --noproxy '*' 'http://127.0.0.1:3477/editor/new?template=hello_world'`
+- 继续把 condition route chrome 往旧 React 的几何表现收口：
+  - 先新增 `src/editor/canvas/routeEdgePath.test.ts`，用 TDD 锁定：
+    - `resolveRouteEdgeSourceOffset` 的 branch spacing
+    - 近距离 target 的 shared lane 语义
+    - 较远 target 的 dedicated lane 语义
+    - rounded orthogonal path 的 `Q` 曲线输出
+  - 首次运行 `cd frontend && node --test --experimental-strip-types src/editor/canvas/routeEdgePath.test.ts`，确认因为 `routeEdgePath.ts` 缺失而失败，红测成立
+  - 新增 `src/editor/canvas/routeEdgePath.ts`，迁入旧 React 的：
+    - `resolveRouteEdgeSourceOffset`
+    - `buildRouteEdgeWaypoints`
+    - `buildRouteEdgePath`
+  - 更新 `src/editor/canvas/edgeProjection.ts`，让 route edge 改为复用新 helper
+  - 修正一条 waypoints 测试，使其和旧算法的 collinear-point normalize 行为对齐
+- 完成这一轮验证：
+  - `git diff --check`
+  - `cd frontend && node --test --experimental-strip-types src/editor/canvas/routeEdgePath.test.ts src/editor/canvas/edgeProjection.test.ts`
+  - `cd frontend && node --test --experimental-strip-types src/lib/condition-branch-mapping.test.ts src/lib/graph-document.test.ts src/editor/nodes/nodeCardViewModel.test.ts src/editor/nodes/conditionLoopLimit.test.ts src/editor/nodes/conditionRuleEditorModel.test.ts src/editor/nodes/agentConfigModel.test.ts src/editor/canvas/useSelection.test.ts src/editor/canvas/focusNodeViewport.test.ts src/editor/canvas/routeEdgePath.test.ts src/editor/canvas/edgeProjection.test.ts src/editor/workspace/statePanelViewModel.test.ts src/editor/workspace/statePanelBindings.test.ts src/editor/workspace/statePanelFields.test.ts src/editor/workspace/stateDefaultValueModel.test.ts`
+  - `cd frontend && npm run build`
+
+- 运行 `planning-with-files` 会话接续脚本，并重新核对：
+  - `task_plan.md`
+  - `findings.md`
+  - `progress.md`
+  - `git diff --stat`
+- 把当前未提交实现与旧 React `87d3d6e` 的 condition 分支交互重新对齐：
+  - 确认 Vue 版已经接通 `BranchRow` 第一版编辑（branch key / mapping keys）
+  - 确认旧 React 有明确的 `Add branch` 入口和 `createConditionBranchKey` 语义
+  - 确认当前直接可对照到的 `BranchRow` 并没有独立删除按钮，因此删除语义还不能凭空猜
+- 先同步文档，避免计划和实现继续漂移：
+  - `task_plan.md`
+  - `findings.md`
+  - `docs/current_engineering_backlog.md`
+  - `progress.md`
+- 将下一步实现切片收敛为：
+  - 先按 TDD 补 condition `Add branch`
+  - 再视旧代码继续核对 branch 删除与 route chrome 的收口语义
+- 按 TDD 补回 condition `Add branch`：
+  - 在 `src/lib/condition-branch-mapping.test.ts` 先补红测，锁定 `createConditionBranchKey` 的唯一 key 生成语义
+  - 在 `src/lib/graph-document.test.ts` 先补红测，锁定 `addConditionBranchToDocument` 的不可变追加语义
+  - 首次运行：
+    - `cd frontend && node --test --experimental-strip-types src/lib/condition-branch-mapping.test.ts`
+    - `cd frontend && node --test --experimental-strip-types src/lib/graph-document.test.ts`
+    确认分别因缺少 `createConditionBranchKey` 导出、缺少 `addConditionBranchToDocument` helper 而失败，红测成立
+  - 更新 `src/lib/condition-branch-mapping.ts`，新增 `createConditionBranchKey`
+  - 更新 `src/lib/graph-document.ts`，新增 `addConditionBranchToDocument`
+  - 更新 `src/editor/nodes/NodeCard.vue`：
+    - 在 condition branch 列表底部新增 `+ branch` 入口
+    - 发出 `add-condition-branch` 事件
+  - 更新 `src/editor/canvas/EditorCanvas.vue` 与 `src/editor/workspace/EditorWorkspaceShell.vue`：
+    - 透传 `add-condition-branch`
+    - 将新增分支真正写回活动文档
+- 完成这一轮验证：
+  - `git diff --check`
+  - `cd frontend && node --test --experimental-strip-types src/lib/condition-branch-mapping.test.ts src/lib/graph-document.test.ts src/editor/nodes/nodeCardViewModel.test.ts src/editor/nodes/conditionLoopLimit.test.ts src/editor/nodes/conditionRuleEditorModel.test.ts src/editor/nodes/agentConfigModel.test.ts src/editor/canvas/useSelection.test.ts src/editor/canvas/focusNodeViewport.test.ts src/editor/canvas/edgeProjection.test.ts src/editor/workspace/statePanelViewModel.test.ts src/editor/workspace/statePanelBindings.test.ts src/editor/workspace/statePanelFields.test.ts src/editor/workspace/stateDefaultValueModel.test.ts`
+  - `cd frontend && npm run build`
+  - `./scripts/start.sh`
+  - `curl -sf --noproxy '*' http://127.0.0.1:8765/health`
+  - `curl -I -s --noproxy '*' http://127.0.0.1:3477/editor`
+  - `curl -I -s --noproxy '*' 'http://127.0.0.1:3477/editor/new?template=hello_world'`
+
+- 再次运行 `planning-with-files` 会话接续，确认 `task_plan.md` / `findings.md` / `progress.md` 已经覆盖上一轮的：
+  - condition `loopLimit`
+  - input 文本值第一版编辑
+  - 以及对应的 build / restart / health 验证
+- 重新对照旧 React `87d3d6e` 的 condition 规则编辑实现，确认下一步优先级：
+  - 不是直接跳去 input 上传流
+  - 而是先迁回 condition 的 `Source / Operator / Value` 编辑区
+  - 其中 `exists` operator 会禁用 `Value` 输入，失效 source 会回退到首个可用项
+- 继续把 condition 节点从“只有 loopLimit 可改”推进到“规则本体也可改”：
+  - 先新增 `src/editor/nodes/conditionRuleEditorModel.test.ts`，用 TDD 锁定两条旧 React 语义：
+    - 无效 `rule.source` 在 UI 上回退到第一个可用 source
+    - `exists` operator 会禁用 `Value` 输入
+  - 首次运行 `cd frontend && node --test --experimental-strip-types src/editor/nodes/conditionRuleEditorModel.test.ts`，确认因为 `conditionRuleEditorModel.ts` 缺失而失败，红测成立
+  - 新增 `src/editor/nodes/conditionRuleEditorModel.ts`，封装：
+    - source options
+    - resolved source
+    - value disabled 状态
+    - operator options
+  - 更新 `src/editor/nodes/NodeCard.vue`：
+    - 在 condition surface 内新增 `Source / Operator / Value` 控件
+    - `Value` 在 `exists` 时禁用
+    - 通过已有 `update-condition-config` 链路把整段 `rule` patch 回活动文档
+- 完成这一轮验证：
+  - `cd frontend && node --test --experimental-strip-types src/editor/nodes/conditionRuleEditorModel.test.ts`
+  - `git diff --check`
+  - `cd frontend && node --test --experimental-strip-types src/editor/nodes/conditionRuleEditorModel.test.ts src/editor/nodes/conditionLoopLimit.test.ts src/lib/graph-document.test.ts src/editor/nodes/nodeCardViewModel.test.ts src/editor/canvas/useSelection.test.ts src/editor/canvas/focusNodeViewport.test.ts src/editor/canvas/edgeProjection.test.ts src/editor/workspace/statePanelViewModel.test.ts src/editor/workspace/statePanelBindings.test.ts src/editor/workspace/statePanelFields.test.ts src/editor/workspace/stateDefaultValueModel.test.ts`
+  - `cd frontend && npm run build`
+- 继续把 agent 节点从“只有 taskInstruction 可改”推进到 `Advanced` 第一版也可改：
+  - 先新增 `src/editor/nodes/agentConfigModel.test.ts`，用 TDD 锁定旧 React 的温度语义：
+    - 有效数字保留
+    - 小于 `0` clamp 到 `0`
+    - 大于 `2` clamp 到 `2`
+    - 无效值回退到默认 `0.2`
+  - 首次运行 `cd frontend && node --test --experimental-strip-types src/editor/nodes/agentConfigModel.test.ts`，确认因为 `agentConfigModel.ts` 缺失而失败，红测成立
+  - 新增 `src/editor/nodes/agentConfigModel.ts`，封装 `DEFAULT_AGENT_TEMPERATURE` 和 `normalizeAgentTemperature`
+  - 更新 `src/editor/nodes/NodeCard.vue`：
+    - 把 agent 的 `Advanced` 从静态文案改为可展开面板
+    - 接通 `thinkingMode` 的 `ON / OFF` 按钮
+    - 接通 `temperature` 数字输入，并复用温度 clamp 语义
+- 完成这一轮验证：
+  - `cd frontend && node --test --experimental-strip-types src/editor/nodes/agentConfigModel.test.ts`
+  - `git diff --check`
+  - `cd frontend && node --test --experimental-strip-types src/editor/nodes/agentConfigModel.test.ts src/editor/nodes/conditionRuleEditorModel.test.ts src/editor/nodes/conditionLoopLimit.test.ts src/lib/graph-document.test.ts src/editor/nodes/nodeCardViewModel.test.ts src/editor/canvas/useSelection.test.ts src/editor/canvas/focusNodeViewport.test.ts src/editor/canvas/edgeProjection.test.ts src/editor/workspace/statePanelViewModel.test.ts src/editor/workspace/statePanelBindings.test.ts src/editor/workspace/statePanelFields.test.ts src/editor/workspace/stateDefaultValueModel.test.ts`
+  - `cd frontend && npm run build`
+- 同步更新规划与 backlog 文档：
+  - `task_plan.md`
+  - `findings.md`
+  - `progress.md`
+  - `docs/current_engineering_backlog.md`
+- 按仓库约定重启并联机验证：
+  - `git diff --check`
+  - `./scripts/start.sh`
+  - `curl -sf --noproxy '*' http://127.0.0.1:8765/health`
+  - `curl -I -s --noproxy '*' http://127.0.0.1:3477/editor`
+  - `curl -I -s --noproxy '*' 'http://127.0.0.1:3477/editor/new?template=hello_world'`
+- 按 TDD 推进 condition branch 编辑第一版：
+  - 新增 `src/lib/condition-branch-mapping.test.ts`，先锁定旧 React 的三条 helper 语义：
+    - `listConditionBranchMappingKeys`
+    - `parseConditionBranchMappingDraft`
+    - `applyConditionBranchMapping`
+  - 在 `src/lib/graph-document.test.ts` 先补红测，要求 `updateConditionBranchInDocument`：
+    - branch 改名时同步 `conditional_edges`
+    - branch 不改名时也能重写 mapping keys
+    - 重复 branch key / 非 condition 节点返回原文档
+  - 首次运行：
+    - `cd frontend && node --test --experimental-strip-types src/lib/condition-branch-mapping.test.ts`
+    - `cd frontend && node --test --experimental-strip-types src/lib/graph-document.test.ts`
+    确认分别因 helper 模块缺失、`updateConditionBranchInDocument` 缺失而失败，红测成立
+- 完成 condition branch 编辑实现：
+  - 新增 `src/lib/condition-branch-mapping.ts`
+  - 更新 `src/lib/graph-document.ts`，新增 `updateConditionBranchInDocument`
+  - 更新 `src/editor/nodes/NodeCard.vue`：
+    - condition 分支列表从静态 chip 升级为 branch key / mapping keys 可编辑行
+    - blur / Enter 提交
+    - 空 branch key / 重名 branch key 会回退到 canonical 值
+  - 更新 `src/editor/canvas/EditorCanvas.vue` 与 `src/editor/workspace/EditorWorkspaceShell.vue`：
+    - 新增 `update-condition-branch` 事件链
+    - 把 branch 编辑真正写回活动文档
+- 完成这一轮验证：
+  - `cd frontend && node --test --experimental-strip-types src/lib/condition-branch-mapping.test.ts`
+  - `cd frontend && node --test --experimental-strip-types src/lib/graph-document.test.ts`
+  - `git diff --check`
+  - `cd frontend && node --test --experimental-strip-types src/lib/condition-branch-mapping.test.ts src/lib/graph-document.test.ts src/editor/nodes/nodeCardViewModel.test.ts src/editor/nodes/conditionLoopLimit.test.ts src/editor/nodes/conditionRuleEditorModel.test.ts src/editor/nodes/agentConfigModel.test.ts src/editor/canvas/useSelection.test.ts src/editor/canvas/focusNodeViewport.test.ts src/editor/canvas/edgeProjection.test.ts src/editor/workspace/statePanelViewModel.test.ts src/editor/workspace/statePanelBindings.test.ts src/editor/workspace/statePanelFields.test.ts src/editor/workspace/stateDefaultValueModel.test.ts`
+  - `cd frontend && npm run build`
+  - `./scripts/start.sh`
+  - `curl -sf --noproxy '*' http://127.0.0.1:8765/health`
+  - `curl -I -s --noproxy '*' http://127.0.0.1:3477/editor`
+  - `curl -I -s --noproxy '*' 'http://127.0.0.1:3477/editor/new?template=hello_world'`
+- 再次运行 `planning-with-files` 会话接续并复盘当前未提交迁移面：
+  - 当前 Vue 版已接通 condition `loopLimit` 与 `Source / Operator / Value`
+  - 旧 React 里与之相邻的下一块高价值交互不是 input 上传流，而是 condition 的 `BranchRow`
+  - 这块语义在旧前端里不是只读摘要，而是 branch key + mapping keys 的联合编辑
+- 重新对照旧 React `87d3d6e` 的 `node-system-editor.tsx` 与 `node-system-canonical-write.ts`，确认 condition branch 的真实更新范围：
+  - `node.config.branches`
+  - `node.config.branchMapping`
+  - `conditional_edges[].branches`
+  必须一并同步，不能只 patch 节点配置
+- 先更新当前文档面，避免计划与代码继续漂移：
+  - `task_plan.md`
+  - `findings.md`
+  - `progress.md`
+  - `docs/current_engineering_backlog.md`
+- 将下一步实现切片收敛为：
+  - 先用 TDD 迁回 condition branch mapping helper
+  - 再补图文档里的 branch rename / mapping update helper
+  - 最后把 Vue `NodeCard` 接上 branch key / mapping keys 编辑入口
+
 - 运行 `planning-with-files` 会话接续脚本，确认当前仓库没有旧的根目录计划文件可恢复。
 - 复盘当前迁移状态并整理出最新未提交工作：
   - 工作区选择器切到 `Reka UI`
@@ -24,6 +240,208 @@
 - 完成这一轮验证：
   - `cd frontend && node --test --experimental-strip-types src/editor/workspace/statePanelViewModel.test.ts src/editor/workspace/workspaceSelectModel.test.ts src/editor/workspace/editorWelcomeSearch.test.ts src/lib/layout-mode.test.ts src/lib/graph-document.test.ts src/lib/document-selection.test.ts src/editor/nodes/nodeCardViewModel.test.ts src/editor/canvas/edgeProjection.test.ts src/editor/anchors/anchorModel.test.ts src/editor/anchors/anchorPlacement.test.ts`
   - `cd frontend && npm run build`
+  - `git diff --check`
+  - `./scripts/start.sh`
+  - `curl -sf --noproxy '*' http://127.0.0.1:8765/health`
+  - `curl -I -s --noproxy '*' http://127.0.0.1:3477/editor`
+  - `curl -I -s --noproxy '*' 'http://127.0.0.1:3477/editor/new?template=hello_world'`
+- 继续恢复 `State` 面板到旧前端的“图内关系”语义：
+  - 新增 `focusNodeViewport.ts` 和测试，先用 TDD 锁定“聚焦节点时视口中心如何计算”
+  - `EditorStatePanel.vue` 的 reader / writer token 现在可点击
+  - `EditorWorkspaceShell.vue` 维护每个 tab 的 `focusedNodeId`
+  - `EditorCanvas.vue` 接收 `focusedNodeId`，选中对应节点并把它带回视口中心
+- 完成这轮针对性验证：
+  - `cd frontend && node --test --experimental-strip-types src/editor/canvas/focusNodeViewport.test.ts src/editor/workspace/statePanelViewModel.test.ts`
+  - `cd frontend && npm run build`
+  - `git diff --check`
+  - `./scripts/start.sh`
+- 继续把 `NodeCard` 往旧前端图编辑器本体靠：
+  - 先在 `nodeCardViewModel.test.ts` 增加失败断言，要求 agent / condition 节点暴露读写 state 摘要
+  - 更新 `nodeCardViewModel.ts`，加入 `stateSummary`
+  - 更新 `NodeCard.vue`，渲染 `Reads / Writes` token
+- 完成这一轮针对性验证：
+  - `cd frontend && node --test --experimental-strip-types src/editor/nodes/nodeCardViewModel.test.ts src/editor/canvas/focusNodeViewport.test.ts src/editor/workspace/statePanelViewModel.test.ts`
+  - `cd frontend && npm run build`
+  - `git diff --check`
+- 继续用 `planning-with-files` 做会话 catchup：
+  - 运行 `session-catchup.py`，确认最近 17 条未同步上下文主要集中在 `State` 面板 reader/writer 节点聚焦、`NodeCard` 的 `Reads / Writes` 摘要，以及对应测试与验证
+  - 重新核对 `git diff --stat`，确认当前未提交改动主要集中在：
+    - `EditorCanvas.vue`
+    - `useViewport.ts`
+    - `NodeCard.vue`
+    - `nodeCardViewModel.ts`
+    - `EditorStatePanel.vue`
+    - `EditorWorkspaceShell.vue`
+    - 以及新增的 `focusNodeViewport.ts`
+  - 把这些最新状态重新同步回 `task_plan.md`、`findings.md`、`progress.md`
+- 继续把 `State` 面板从“可浏览”推进到“可修改”：
+  - 先在 `statePanelBindings.test.ts` 写失败测试，锁定当前协议下的节点候选规则和绑定语义：
+    - `agent / condition / output` 可作为 reader
+    - `input / agent` 可作为 writer
+    - `output` 的 reader 为单值替换
+    - `input` 的 writer 为单值替换
+  - 新增 `statePanelBindings.ts`，把 reader / writer 增删规则抽成独立 helper
+  - 新增 `StateBindingCreateForm.vue`，把节点选择和 Add Reader / Add Writer 表单从 `EditorStatePanel` 中拆出来
+  - 更新 `EditorStatePanel.vue`，恢复旧前端那种每个 state 下 reader / writer 的：
+    - Add 按钮
+    - 绑定列表
+    - Remove 按钮
+  - 更新 `EditorWorkspaceShell.vue`，把读写绑定增删真正接到活动文档上，并在新增绑定后聚焦对应节点
+- 完成这一轮验证：
+  - `cd frontend && node --test --experimental-strip-types src/editor/workspace/statePanelBindings.test.ts src/editor/workspace/statePanelViewModel.test.ts src/editor/canvas/focusNodeViewport.test.ts src/editor/nodes/nodeCardViewModel.test.ts`
+  - `cd frontend && npm run build`
+  - `git diff --check`
+  - `./scripts/start.sh`
+  - `curl -sf --noproxy '*' http://127.0.0.1:8765/health`
+  - `curl -I -s --noproxy '*' http://127.0.0.1:3477/editor`
+  - `curl -I -s --noproxy '*' 'http://127.0.0.1:3477/editor/new?template=hello_world'`
+- 继续把 `State` 面板向旧前端 `StateFieldCard` 语义收口：
+  - 先在 `statePanelViewModel.test.ts` 补失败断言，要求 reader / writer 绑定项暴露节点 family
+  - 新增 `stateDefaultValueModel.ts` 与 `stateDefaultValueModel.test.ts`，把默认值编辑器按类型分流：
+    - `boolean` -> toggle
+    - `number` -> numeric input
+    - `object / array / json / file_list` -> structured JSON editor + Apply
+    - 其余 -> textarea
+  - 新增 `StateDefaultValueEditor.vue`，把 `EditorStatePanel.vue` 里的通用 value textarea 替换成旧前端那套分类型默认值编辑器
+  - `EditorStatePanel.vue` 的 reader / writer token 现在会显示：
+    - 节点 family badge
+    - 节点 label
+    - Input / Output 端口语义
+  - `EditorWorkspaceShell.vue` 把当前 `focusedNodeId` 传回 `EditorStatePanel`，reader / writer token 现在有聚焦高亮态
+- 完成这一轮验证：
+  - `cd frontend && node --test --experimental-strip-types src/editor/workspace/statePanelBindings.test.ts src/editor/workspace/statePanelFields.test.ts src/editor/workspace/statePanelViewModel.test.ts src/editor/workspace/stateDefaultValueModel.test.ts src/editor/canvas/focusNodeViewport.test.ts src/editor/nodes/nodeCardViewModel.test.ts src/lib/graph-document.test.ts src/lib/document-selection.test.ts`
+  - `cd frontend && npm run build`
+  - `git diff --check`
+  - `./scripts/start.sh`
+  - `curl -sf --noproxy '*' http://127.0.0.1:8765/health`
+  - `curl -I -s --noproxy '*' http://127.0.0.1:3477/editor`
+  - `curl -I -s --noproxy '*' 'http://127.0.0.1:3477/editor/new?template=hello_world'`
+- 继续把 `NodeCard` 往旧前端 `PortRow / BranchRow` 结构推进：
+  - `nodeCardViewModel.ts` 现在为端口暴露 `typeLabel / stateColor`，为 agent 暴露 `skillLabel`，为 output 暴露 `persistLabel`，为 condition 暴露 `primaryInput` 与 `matchValueLabel`
+  - `NodeCard.vue` 现在会渲染更接近旧前端的端口元信息：
+    - input/output 端口显示 state type
+    - required input 显示 badge
+    - agent 显示 skill 数量 chip
+    - output toolbar 显示 `Save on/off`
+    - condition branch 显示 match values 摘要
+- 把旧 React 的 `collectProjectedDataRelations` 逻辑迁入 Vue 画布：
+  - `edgeProjection.ts` 现在除了控制流和 route 边，还会投影数据流边
+  - 对多 writer 歧义场景保持跳过，不强行画错的数据来源
+  - `EditorCanvas.vue` 为数据流线增加了更弱的虚线样式
+- 完成这一轮验证：
+  - `cd frontend && node --test --experimental-strip-types src/editor/canvas/edgeProjection.test.ts src/editor/nodes/nodeCardViewModel.test.ts src/editor/workspace/statePanelViewModel.test.ts`
+  - `cd frontend && npm run build`
+  - `git diff --check`
+  - `./scripts/start.sh`
+- 继续用 `planning-with-files` 做当前会话收口：
+  - 确认旧 React 的 `node-system-editor.tsx` 不在当前工作树，后续对照必须直接从 `87d3d6e` 提交读取
+  - 重新聚焦当前下一步：继续补齐编辑器本体，而不是再扩外围页面
+- 继续补齐 `State` 面板与画布的联动：
+  - 先新增 `src/editor/canvas/useSelection.test.ts`，用 TDD 锁定两条规则：
+    - 外部 `focusedNodeId` 要同步到画布本地选中态
+    - 画布本地选中/清空要回传给父层，且相同选中不重复发射
+  - 更新 `src/editor/canvas/useSelection.ts`，让它支持外部选中态同步和 `onSelectedNodeIdChange`
+  - 更新 `src/editor/canvas/EditorCanvas.vue`，把节点点击和画布空白点击都抛成 `select-node`
+  - 更新 `src/editor/workspace/EditorWorkspaceShell.vue`，让 `focusedNodeIdByTabId` 真正接住画布选择，形成 `State` 面板 ↔ 画布 双向联动
+- 完成这一轮验证：
+  - `cd frontend && node --test --experimental-strip-types src/editor/canvas/useSelection.test.ts src/editor/canvas/focusNodeViewport.test.ts src/editor/workspace/statePanelBindings.test.ts src/editor/workspace/statePanelFields.test.ts src/editor/workspace/statePanelViewModel.test.ts src/editor/workspace/stateDefaultValueModel.test.ts src/editor/nodes/nodeCardViewModel.test.ts src/editor/canvas/edgeProjection.test.ts src/lib/graph-document.test.ts src/lib/document-selection.test.ts`
+  - `git diff --check`
+  - `cd frontend && npm run build`
+  - `./scripts/start.sh`
+  - `curl -sf --noproxy '*' http://127.0.0.1:8765/health`
+  - `curl -I -s --noproxy '*' http://127.0.0.1:3477/editor`
+  - `curl -I -s --noproxy '*' 'http://127.0.0.1:3477/editor/new?template=hello_world'`
+- 继续把 `NodeCard` 从“只展示”推进到“可内联编辑”的第一步：
+  - 先在 `src/lib/graph-document.test.ts` 写失败测试，锁定 output 节点配置更新的文档语义：
+    - 只允许更新 output 节点
+    - 更新需要保持不可变
+    - no-op 更新应返回原文档
+  - 在 `src/editor/nodes/nodeCardViewModel.test.ts` 补失败断言，要求 output 节点对 `markdown` display mode 使用旧前端的 `MD` 简写
+  - 更新 `src/lib/graph-document.ts`，新增 `updateOutputNodeConfigInDocument`
+  - 更新 `src/editor/nodes/nodeCardViewModel.ts`，把 output display mode 标签对齐旧前端
+  - 更新 `src/editor/nodes/NodeCard.vue`，让 output 节点接通：
+    - toolbar 上的 persist toggle
+    - `Advanced` 中的 display mode 切换按钮
+  - 更新 `src/editor/canvas/EditorCanvas.vue` 与 `src/editor/workspace/EditorWorkspaceShell.vue`，把 `NodeCard -> Canvas -> WorkspaceShell -> document` 的 output config 更新链路接通
+- 完成这一轮验证：
+  - `cd frontend && node --test --experimental-strip-types src/lib/graph-document.test.ts src/editor/nodes/nodeCardViewModel.test.ts src/editor/canvas/useSelection.test.ts src/editor/canvas/focusNodeViewport.test.ts src/editor/canvas/edgeProjection.test.ts src/editor/workspace/statePanelViewModel.test.ts src/editor/workspace/statePanelBindings.test.ts src/editor/workspace/statePanelFields.test.ts src/editor/workspace/stateDefaultValueModel.test.ts`
+  - `git diff --check`
+  - `cd frontend && npm run build`
+  - `./scripts/start.sh`
+  - `curl -sf --noproxy '*' http://127.0.0.1:8765/health`
+  - `curl -I -s --noproxy '*' http://127.0.0.1:3477/editor`
+  - `curl -I -s --noproxy '*' 'http://127.0.0.1:3477/editor/new?template=hello_world'`
+- 继续把 output 节点 `Advanced` 往旧前端收满第二步：
+  - 先在 `src/editor/nodes/nodeCardViewModel.test.ts` 补失败断言，要求 output body 暴露：
+    - `persistFormatLabel`
+    - `fileNameTemplate`
+  - 更新 `src/editor/nodes/nodeCardViewModel.ts`，补齐 output 的 `persistFormatLabel`
+  - 更新 `src/editor/nodes/NodeCard.vue`，把 output `Advanced` 剩余两项接上：
+    - `Format` 按钮组：`AUTO / TXT / MD / JSON`
+    - `FileName` 文本输入
+  - 复用已经接好的 `update-output-config` 链路，无需再新增第二套 output helper
+- 完成这一轮验证：
+  - `cd frontend && node --test --experimental-strip-types src/editor/nodes/nodeCardViewModel.test.ts`
+  - `cd frontend && node --test --experimental-strip-types src/editor/nodes/nodeCardViewModel.test.ts src/lib/graph-document.test.ts src/editor/canvas/useSelection.test.ts src/editor/canvas/focusNodeViewport.test.ts src/editor/canvas/edgeProjection.test.ts src/editor/workspace/statePanelViewModel.test.ts src/editor/workspace/statePanelBindings.test.ts src/editor/workspace/statePanelFields.test.ts src/editor/workspace/stateDefaultValueModel.test.ts`
+  - `git diff --check`
+  - `cd frontend && npm run build`
+  - `./scripts/start.sh`
+  - `curl -sf --noproxy '*' http://127.0.0.1:8765/health`
+  - `curl -I -s --noproxy '*' http://127.0.0.1:3477/editor`
+  - `curl -I -s --noproxy '*' 'http://127.0.0.1:3477/editor/new?template=hello_world'`
+- 继续把 `NodeCard` 从 output 单点编辑推进到旧前端更多节点内部编辑：
+  - 先新增 `src/editor/nodes/conditionLoopLimit.test.ts`，用 TDD 锁定旧 React 的 `loopLimit` 解析语义：
+    - 空值 / 非数字回退
+    - `-1` 表示 unlimited
+    - 其余只接受正整数，浮点会向下截断
+  - 首次运行 `cd frontend && node --test --experimental-strip-types src/editor/nodes/conditionLoopLimit.test.ts`，确认因为 `conditionLoopLimit.ts` 缺失而失败，红测成立
+  - 新增 `src/editor/nodes/conditionLoopLimit.ts`，迁入旧 React 的 `parseConditionLoopLimitDraft`
+  - 更新 `src/editor/nodes/NodeCard.vue`：
+    - condition 顶栏的 `Loop` 从静态标签改为本地 draft 输入框
+    - blur / Enter 提交到文档更新链路
+    - 非法输入会回退到当前 canonical `loopLimit`
+  - 更新 `src/editor/canvas/EditorCanvas.vue` 与 `src/editor/workspace/EditorWorkspaceShell.vue`：
+    - 新增 `update-condition-config` 事件
+    - 通过 `updateConditionNodeConfigInDocument` 把 condition `loopLimit` 真正写回活动文档
+- 完成这一轮验证：
+  - `cd frontend && node --test --experimental-strip-types src/editor/nodes/conditionLoopLimit.test.ts`
+  - `cd frontend && node --test --experimental-strip-types src/lib/graph-document.test.ts`
+  - `cd frontend && node --test --experimental-strip-types src/editor/nodes/conditionLoopLimit.test.ts src/lib/graph-document.test.ts src/editor/nodes/nodeCardViewModel.test.ts src/editor/canvas/useSelection.test.ts src/editor/canvas/focusNodeViewport.test.ts src/editor/canvas/edgeProjection.test.ts src/editor/workspace/statePanelViewModel.test.ts src/editor/workspace/statePanelBindings.test.ts src/editor/workspace/statePanelFields.test.ts src/editor/workspace/stateDefaultValueModel.test.ts`
+  - `git diff --check`
+  - `cd frontend && npm run build`
+- 同步更新规划与 backlog 文档：
+  - `task_plan.md`
+  - `findings.md`
+  - `progress.md`
+  - `docs/current_engineering_backlog.md`
+- 按仓库约定重启并联机验证：
+  - `./scripts/start.sh`
+  - `curl -sf --noproxy '*' http://127.0.0.1:8765/health`
+  - `curl -I -s --noproxy '*' http://127.0.0.1:3477/editor`
+  - `curl -I -s --noproxy '*' 'http://127.0.0.1:3477/editor/new?template=hello_world'`
+- 继续把 `NodeCard` 的 input 节点从只展示推进到第一版可编辑：
+  - 先在 `src/lib/graph-document.test.ts` 补失败测试，锁定 input 节点配置更新的文档语义：
+    - 只允许更新 input 节点
+    - 更新需要保持不可变
+    - no-op 更新应返回原文档
+  - 运行 `cd frontend && node --test --experimental-strip-types src/lib/graph-document.test.ts`，确认 `updateInputNodeConfigInDocument` 缺失导致红测成立
+  - 更新 `src/lib/graph-document.ts`，新增 `updateInputNodeConfigInDocument`
+  - 更新 `src/editor/nodes/NodeCard.vue`：
+    - input 节点当前值在字符串 / 空值场景下改为 textarea
+    - 通过 `update-input-config` 把文本输入直接接回文档
+    - 非字符串值仍暂时保持只读展示，避免误把结构化值和上传资产流降级成纯文本
+  - 更新 `src/editor/canvas/EditorCanvas.vue` 与 `src/editor/workspace/EditorWorkspaceShell.vue`，把 input 配置更新链路接通
+- 完成这一轮验证：
+  - `cd frontend && node --test --experimental-strip-types src/lib/graph-document.test.ts`
+  - `git diff --check`
+  - `cd frontend && node --test --experimental-strip-types src/editor/nodes/conditionLoopLimit.test.ts src/lib/graph-document.test.ts src/editor/nodes/nodeCardViewModel.test.ts src/editor/canvas/useSelection.test.ts src/editor/canvas/focusNodeViewport.test.ts src/editor/canvas/edgeProjection.test.ts src/editor/workspace/statePanelViewModel.test.ts src/editor/workspace/statePanelBindings.test.ts src/editor/workspace/statePanelFields.test.ts src/editor/workspace/stateDefaultValueModel.test.ts`
+  - `cd frontend && npm run build`
+- 同步更新规划与 backlog 文档：
+  - `task_plan.md`
+  - `findings.md`
+  - `progress.md`
+  - `docs/current_engineering_backlog.md`
+- 按仓库约定重启并联机验证：
   - `git diff --check`
   - `./scripts/start.sh`
   - `curl -sf --noproxy '*' http://127.0.0.1:8765/health`

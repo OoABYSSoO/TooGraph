@@ -54,6 +54,15 @@
               <EditorCanvas
                 v-else-if="documentsByTabId[tab.tabId]"
                 :document="documentsByTabId[tab.tabId]!"
+                :focused-node-id="focusedNodeIdByTabId[tab.tabId] ?? null"
+                @select-node="focusNodeForTab(tab.tabId, $event)"
+                @update-input-config="updateInputConfigForTab(tab.tabId, $event.nodeId, $event.patch)"
+                @update-agent-config="updateAgentConfigForTab(tab.tabId, $event.nodeId, $event.patch)"
+                @update-condition-config="updateConditionConfigForTab(tab.tabId, $event.nodeId, $event.patch)"
+                @update-condition-branch="updateConditionBranchForTab(tab.tabId, $event.nodeId, $event.currentKey, $event.nextKey, $event.mappingKeys)"
+                @add-condition-branch="addConditionBranchForTab(tab.tabId, $event.nodeId)"
+                @remove-condition-branch="removeConditionBranchForTab(tab.tabId, $event.nodeId, $event.branchKey)"
+                @update-output-config="updateOutputConfigForTab(tab.tabId, $event.nodeId, $event.patch)"
                 @update:node-position="(payload) => handleNodePositionUpdate(tab.tabId, payload)"
               />
             </div>
@@ -62,7 +71,17 @@
               v-if="documentsByTabId[tab.tabId]"
               :open="isStatePanelOpen(tab.tabId)"
               :document="documentsByTabId[tab.tabId]!"
+              :focused-node-id="focusedNodeIdByTabId[tab.tabId] ?? null"
               @toggle="toggleStatePanel(tab.tabId)"
+              @focus-node="focusNodeForTab(tab.tabId, $event)"
+              @add-state="addStateField(tab.tabId)"
+              @delete-state="deleteStateField(tab.tabId, $event)"
+              @rename-state="renameStateField(tab.tabId, $event.currentKey, $event.nextKey)"
+              @update-state="updateStateField(tab.tabId, $event.stateKey, $event.patch)"
+              @add-reader="addStateReaderBinding(tab.tabId, $event.stateKey, $event.nodeId)"
+              @remove-reader="removeStateReaderBinding(tab.tabId, $event.stateKey, $event.nodeId)"
+              @add-writer="addStateWriterBinding(tab.tabId, $event.stateKey, $event.nodeId)"
+              @remove-writer="removeStateWriterBinding(tab.tabId, $event.stateKey, $event.nodeId)"
             />
           </div>
         </div>
@@ -87,7 +106,18 @@ import { useRoute, useRouter } from "vue-router";
 import { fetchGraph, runGraph, saveGraph, validateGraph } from "@/api/graphs";
 import EditorCanvas from "@/editor/canvas/EditorCanvas.vue";
 import { resolveEditorRouteInstruction } from "@/lib/editor-route-sync";
-import { cloneGraphDocument, createDraftFromTemplate, createEmptyDraftGraph } from "@/lib/graph-document";
+import {
+  addConditionBranchToDocument,
+  cloneGraphDocument,
+  createDraftFromTemplate,
+  createEmptyDraftGraph,
+  removeConditionBranchFromDocument,
+  updateAgentNodeConfigInDocument,
+  updateConditionBranchInDocument,
+  updateConditionNodeConfigInDocument,
+  updateInputNodeConfigInDocument,
+  updateOutputNodeConfigInDocument,
+} from "@/lib/graph-document";
 import {
   applyDocumentMetaToWorkspaceTab,
   closeWorkspaceTabTransition,
@@ -101,12 +131,14 @@ import {
   type PersistedEditorWorkspace,
 } from "@/lib/editor-workspace";
 import { useGraphDocumentStore } from "@/stores/graphDocument";
-import type { GraphDocument, GraphPayload, GraphPosition, TemplateRecord } from "@/types/node-system";
+import type { AgentNode, ConditionNode, GraphDocument, GraphPayload, GraphPosition, InputNode, OutputNode, StateDefinition, TemplateRecord } from "@/types/node-system";
 
 import EditorCloseConfirmDialog from "./EditorCloseConfirmDialog.vue";
 import EditorStatePanel from "./EditorStatePanel.vue";
 import EditorTabBar from "./EditorTabBar.vue";
 import EditorWelcomeState from "./EditorWelcomeState.vue";
+import { addStateBindingToDocument, removeStateBindingFromDocument } from "./statePanelBindings.ts";
+import { addStateFieldToDocument, deleteStateFieldFromDocument, renameStateFieldInDocument, updateStateFieldInDocument } from "./statePanelFields.ts";
 
 const props = defineProps<{
   routeMode: "root" | "new" | "existing";
@@ -133,6 +165,7 @@ const closeBusy = ref(false);
 const closeError = ref<string | null>(null);
 const handledRouteSignature = ref<string | null>(null);
 const statePanelOpenByTabId = ref<Record<string, boolean>>({});
+const focusedNodeIdByTabId = ref<Record<string, string | null>>({});
 
 const templateById = computed(() => new Map(props.templates.map((template) => [template.template_id, template])));
 const graphById = computed(() => new Map(props.graphs.map((graph) => [graph.graph_id, graph])));
@@ -241,10 +274,13 @@ function clearTabRuntime(tabId: string) {
   delete nextErrors[tabId];
   const nextPanels = { ...statePanelOpenByTabId.value };
   delete nextPanels[tabId];
+  const nextFocusedNodes = { ...focusedNodeIdByTabId.value };
+  delete nextFocusedNodes[tabId];
   documentsByTabId.value = nextDocuments;
   loadingByTabId.value = nextLoading;
   errorByTabId.value = nextErrors;
   statePanelOpenByTabId.value = nextPanels;
+  focusedNodeIdByTabId.value = nextFocusedNodes;
 }
 
 function createDraftForTab(tab: EditorWorkspaceTab): GraphPayload {
@@ -420,6 +456,13 @@ function toggleStatePanel(tabId: string) {
   };
 }
 
+function focusNodeForTab(tabId: string, nodeId: string | null) {
+  focusedNodeIdByTabId.value = {
+    ...focusedNodeIdByTabId.value,
+    [tabId]: nodeId,
+  };
+}
+
 function toggleActiveStatePanel() {
   if (!activeTab.value) {
     return;
@@ -450,6 +493,231 @@ function handleNodePositionUpdate(tabId: string, payload: { nodeId: string; posi
       graphId: "graph_id" in nextDocument ? nextDocument.graph_id ?? null : null,
     }),
   );
+}
+
+function markDocumentDirty(tabId: string, nextDocument: GraphPayload | GraphDocument) {
+  setDocumentForTab(tabId, nextDocument);
+  updateWorkspace(
+    applyDocumentMetaToWorkspaceTab(workspace.value, tabId, {
+      title: nextDocument.name,
+      dirty: true,
+      graphId: "graph_id" in nextDocument ? nextDocument.graph_id ?? null : null,
+    }),
+  );
+}
+
+function addStateReaderBinding(tabId: string, stateKey: string, nodeId: string) {
+  const document = documentsByTabId.value[tabId];
+  if (!document) {
+    return;
+  }
+  const nextDocument = addStateBindingToDocument(document, stateKey, nodeId, "read");
+  if (nextDocument === document) {
+    return;
+  }
+  markDocumentDirty(tabId, nextDocument);
+  focusNodeForTab(tabId, nodeId);
+}
+
+function removeStateReaderBinding(tabId: string, stateKey: string, nodeId: string) {
+  const document = documentsByTabId.value[tabId];
+  if (!document) {
+    return;
+  }
+  const nextDocument = removeStateBindingFromDocument(document, stateKey, nodeId, "read");
+  if (nextDocument === document) {
+    return;
+  }
+  markDocumentDirty(tabId, nextDocument);
+}
+
+function addStateWriterBinding(tabId: string, stateKey: string, nodeId: string) {
+  const document = documentsByTabId.value[tabId];
+  if (!document) {
+    return;
+  }
+  const nextDocument = addStateBindingToDocument(document, stateKey, nodeId, "write");
+  if (nextDocument === document) {
+    return;
+  }
+  markDocumentDirty(tabId, nextDocument);
+  focusNodeForTab(tabId, nodeId);
+}
+
+function addStateField(tabId: string) {
+  const document = documentsByTabId.value[tabId];
+  if (!document) {
+    return;
+  }
+  markDocumentDirty(tabId, addStateFieldToDocument(document));
+}
+
+function updateInputConfigForTab(tabId: string, nodeId: string, patch: Partial<InputNode["config"]>) {
+  const document = documentsByTabId.value[tabId];
+  if (!document) {
+    return;
+  }
+
+  const nextDocument = updateInputNodeConfigInDocument(document, nodeId, (current) => ({
+    ...current,
+    ...patch,
+  }));
+  if (nextDocument === document) {
+    return;
+  }
+
+  markDocumentDirty(tabId, nextDocument);
+  focusNodeForTab(tabId, nodeId);
+}
+
+function updateAgentConfigForTab(tabId: string, nodeId: string, patch: Partial<AgentNode["config"]>) {
+  const document = documentsByTabId.value[tabId];
+  if (!document) {
+    return;
+  }
+
+  const nextDocument = updateAgentNodeConfigInDocument(document, nodeId, (current) => ({
+    ...current,
+    ...patch,
+  }));
+  if (nextDocument === document) {
+    return;
+  }
+
+  markDocumentDirty(tabId, nextDocument);
+  focusNodeForTab(tabId, nodeId);
+}
+
+function updateConditionConfigForTab(tabId: string, nodeId: string, patch: Partial<ConditionNode["config"]>) {
+  const document = documentsByTabId.value[tabId];
+  if (!document) {
+    return;
+  }
+
+  const nextDocument = updateConditionNodeConfigInDocument(document, nodeId, (current) => ({
+    ...current,
+    ...patch,
+  }));
+  if (nextDocument === document) {
+    return;
+  }
+
+  markDocumentDirty(tabId, nextDocument);
+  focusNodeForTab(tabId, nodeId);
+}
+
+function updateConditionBranchForTab(tabId: string, nodeId: string, currentKey: string, nextKey: string, mappingKeys: string[]) {
+  const document = documentsByTabId.value[tabId];
+  if (!document) {
+    return;
+  }
+
+  const nextDocument = updateConditionBranchInDocument(document, nodeId, currentKey, nextKey, mappingKeys);
+  if (nextDocument === document) {
+    return;
+  }
+
+  markDocumentDirty(tabId, nextDocument);
+  focusNodeForTab(tabId, nodeId);
+}
+
+function addConditionBranchForTab(tabId: string, nodeId: string) {
+  const document = documentsByTabId.value[tabId];
+  if (!document) {
+    return;
+  }
+
+  const nextDocument = addConditionBranchToDocument(document, nodeId);
+  if (nextDocument === document) {
+    return;
+  }
+
+  markDocumentDirty(tabId, nextDocument);
+  focusNodeForTab(tabId, nodeId);
+}
+
+function removeConditionBranchForTab(tabId: string, nodeId: string, branchKey: string) {
+  const document = documentsByTabId.value[tabId];
+  if (!document) {
+    return;
+  }
+
+  const nextDocument = removeConditionBranchFromDocument(document, nodeId, branchKey);
+  if (nextDocument === document) {
+    return;
+  }
+
+  markDocumentDirty(tabId, nextDocument);
+  focusNodeForTab(tabId, nodeId);
+}
+
+function updateOutputConfigForTab(tabId: string, nodeId: string, patch: Partial<OutputNode["config"]>) {
+  const document = documentsByTabId.value[tabId];
+  if (!document) {
+    return;
+  }
+
+  const nextDocument = updateOutputNodeConfigInDocument(document, nodeId, (current) => ({
+    ...current,
+    ...patch,
+  }));
+  if (nextDocument === document) {
+    return;
+  }
+
+  markDocumentDirty(tabId, nextDocument);
+  focusNodeForTab(tabId, nodeId);
+}
+
+function renameStateField(tabId: string, currentKey: string, nextKey: string) {
+  const document = documentsByTabId.value[tabId];
+  if (!document) {
+    return;
+  }
+  const nextDocument = renameStateFieldInDocument(document, currentKey, nextKey);
+  if (nextDocument === document) {
+    return;
+  }
+  markDocumentDirty(tabId, nextDocument);
+}
+
+function updateStateField(tabId: string, stateKey: string, patch: Partial<StateDefinition>) {
+  const document = documentsByTabId.value[tabId];
+  if (!document) {
+    return;
+  }
+  const nextDocument = updateStateFieldInDocument(document, stateKey, (current) => ({
+    ...current,
+    ...patch,
+  }));
+  if (nextDocument === document) {
+    return;
+  }
+  markDocumentDirty(tabId, nextDocument);
+}
+
+function deleteStateField(tabId: string, stateKey: string) {
+  const document = documentsByTabId.value[tabId];
+  if (!document) {
+    return;
+  }
+  const nextDocument = deleteStateFieldFromDocument(document, stateKey);
+  if (nextDocument === document) {
+    return;
+  }
+  markDocumentDirty(tabId, nextDocument);
+}
+
+function removeStateWriterBinding(tabId: string, stateKey: string, nodeId: string) {
+  const document = documentsByTabId.value[tabId];
+  if (!document) {
+    return;
+  }
+  const nextDocument = removeStateBindingFromDocument(document, stateKey, nodeId, "write");
+  if (nextDocument === document) {
+    return;
+  }
+  markDocumentDirty(tabId, nextDocument);
 }
 
 function renameActiveGraph(name: string) {
