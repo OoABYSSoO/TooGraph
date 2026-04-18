@@ -7,6 +7,7 @@ import {
   resolveLockBannerClickAction,
   resolveRunNodeClassListForCanvasNode,
   resolveRunNodePresentationForCanvasNode,
+  shouldShowRunNodeTiming,
 } from "./canvasRunPresentationModel.ts";
 
 test("canvas run presentation model treats awaiting-human current node as human review", () => {
@@ -109,4 +110,13 @@ test("canvas run presentation model resolves lock banner click actions", () => {
     type: "open-human-review",
     nodeId: "review",
   });
+});
+
+test("canvas run presentation model shows timing only for active or completed node records", () => {
+  assert.equal(shouldShowRunNodeTiming({ timing: null }), false);
+  assert.equal(shouldShowRunNodeTiming({ timing: { status: "", startedAtMs: null, durationMs: null } }), false);
+  assert.equal(shouldShowRunNodeTiming({ timing: { status: "running", startedAtMs: 1000, durationMs: null } }), true);
+  assert.equal(shouldShowRunNodeTiming({ timing: { status: "success", startedAtMs: null, durationMs: 42 } }), true);
+  assert.equal(shouldShowRunNodeTiming({ timing: { status: "failed", startedAtMs: null, durationMs: 42 } }), true);
+  assert.equal(shouldShowRunNodeTiming({ timing: { status: "paused", startedAtMs: null, durationMs: null } }), true);
 });

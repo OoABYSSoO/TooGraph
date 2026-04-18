@@ -245,6 +245,7 @@
           :run-output-preview-text="runOutputPreviewByNodeId?.[nodeId]?.text ?? null"
           :run-output-display-mode="runOutputPreviewByNodeId?.[nodeId]?.displayMode ?? null"
           :run-failure-message="runFailureMessageByNodeId?.[nodeId] ?? null"
+          :run-timing="shouldShowRunNodeTiming({ timing: props.runNodeTimingByNodeId?.[nodeId] }) ? props.runNodeTimingByNodeId?.[nodeId] ?? null : null"
           :subgraph-run-status-by-inner-node-id="subgraphRunStatusByNodeId?.[nodeId] ?? undefined"
           :pending-state-input-source="pendingAgentInputSourceByNodeId[nodeId] ?? null"
           :pending-state-input-target="pendingStateInputSourceTargetByNodeId[nodeId] ?? null"
@@ -451,6 +452,7 @@ import {
   resolveLockBannerClickAction,
   resolveRunNodeClassListForCanvasNode,
   resolveRunNodePresentationForCanvasNode,
+  shouldShowRunNodeTiming,
 } from "./canvasRunPresentationModel";
 import {
   resolveLockedCanvasInteractionGuardAction,
@@ -517,6 +519,7 @@ import { useViewport } from "./useViewport";
 import { isAgentBreakpointEnabledInDocument } from "@/lib/graph-document";
 import type { KnowledgeBaseRecord } from "@/types/knowledge";
 import type { SkillDefinition } from "@/types/skills";
+import type { RunNodeTiming } from "../workspace/runNodeTimingModel.ts";
 import type { AgentNode, ConditionNode, GraphDocument, GraphNode, GraphNodeSize, GraphPayload, GraphPosition, InputNode, OutputNode, StateDefinition } from "@/types/node-system";
 
 const props = defineProps<{
@@ -535,6 +538,7 @@ const props = defineProps<{
   latestRunStatus?: string | null;
   runOutputPreviewByNodeId?: Record<string, { text: string; displayMode: string | null }>;
   runFailureMessageByNodeId?: Record<string, string>;
+  runNodeTimingByNodeId?: Record<string, RunNodeTiming>;
   subgraphRunStatusByNodeId?: Record<string, Record<string, string>>;
   activeRunEdgeIds?: string[];
   interactionLocked?: boolean;

@@ -13,6 +13,7 @@ import type { RunDetail } from "../../types/run.ts";
 
 import { omitTabScopedRecordEntry } from "./editorTabRuntimeModel.ts";
 import type { RunActivityState } from "./runActivityModel.ts";
+import type { RunNodeTimingByNodeId } from "./runNodeTimingModel.ts";
 import type { WorkspaceRunFeedback } from "./useWorkspaceRunVisualState.ts";
 import type { WorkspaceSidePanelMode } from "./workspaceSidePanelModel.ts";
 
@@ -39,6 +40,7 @@ type WorkspaceTabLifecycleControllerInput = {
   focusRequestByTabId: TabScopedRecordRef<WorkspaceTabFocusRequest | null>;
   viewportByTabId: TabScopedRecordRef<CanvasViewport>;
   runNodeStatusByTabId: TabScopedRecordRef<Record<string, string>>;
+  runNodeTimingByTabId: TabScopedRecordRef<RunNodeTimingByNodeId>;
   currentRunNodeIdByTabId: TabScopedRecordRef<string | null>;
   latestRunDetailByTabId: TabScopedRecordRef<RunDetail | null>;
   restoredRunSnapshotIdByTabId: TabScopedRecordRef<string | null>;
@@ -79,6 +81,7 @@ export function useWorkspaceTabLifecycleController(input: WorkspaceTabLifecycleC
     clearRecord(input.focusRequestByTabId, tabId);
     clearRecord(input.viewportByTabId, tabId);
     clearRecord(input.runNodeStatusByTabId, tabId);
+    clearRecord(input.runNodeTimingByTabId, tabId);
     clearRecord(input.currentRunNodeIdByTabId, tabId);
     clearRecord(input.latestRunDetailByTabId, tabId);
     clearRecord(input.restoredRunSnapshotIdByTabId, tabId);

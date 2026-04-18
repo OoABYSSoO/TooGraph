@@ -528,6 +528,8 @@ test("EditorCanvas renders runtime node halos as one borderless rounded glow", (
 
 test("EditorCanvas styles runtime node card classes across the NodeCard component boundary", () => {
   assert.match(componentSource, /<NodeCard[\s\S]*:class="resolveRunNodeClassList\(nodeId\)"/);
+  assert.match(componentSource, /runNodeTimingByNodeId\?: Record<string, RunNodeTiming>;/);
+  assert.match(componentSource, /:run-timing="shouldShowRunNodeTiming\(\{ timing: props\.runNodeTimingByNodeId\?\.\[nodeId\] \}\) \? props\.runNodeTimingByNodeId\?\.\[nodeId\] \?\? null : null"/);
   assert.match(componentSource, /:global\(\.node-card\.editor-canvas__node--running\) \{/);
   assert.match(componentSource, /:global\(\.node-card\.editor-canvas__node--paused\) \{/);
   assert.match(componentSource, /:global\(\.node-card\.editor-canvas__node--success\) \{/);

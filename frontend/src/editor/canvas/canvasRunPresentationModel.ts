@@ -29,6 +29,12 @@ export function resolveRunNodeClassListForCanvasNode(input: CanvasRunPresentatio
   return presentation?.shellClass ? [presentation.shellClass] : [];
 }
 
+export function shouldShowRunNodeTiming(input: {
+  timing?: { status?: string; durationMs?: number | null; startedAtMs?: number | null } | null;
+}) {
+  return Boolean(input.timing && ["running", "success", "failed", "paused"].includes(String(input.timing.status ?? "")));
+}
+
 export function isCanvasNodeVisuallySelected(input: CanvasNodeVisualSelectionInput) {
   return input.selectedNodeId === input.nodeId || isHumanReviewRunNode(input);
 }

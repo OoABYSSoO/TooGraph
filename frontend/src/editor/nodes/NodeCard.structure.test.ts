@@ -24,6 +24,7 @@ const agentSkillPickerSource = readFileSync(resolve(currentDirectory, "AgentSkil
 const agentRuntimeControlsSource = readFileSync(resolve(currentDirectory, "AgentRuntimeControls.vue"), "utf8").replace(/\r\n/g, "\n");
 const statePortListSource = readFileSync(resolve(currentDirectory, "StatePortList.vue"), "utf8").replace(/\r\n/g, "\n");
 const portListSurfaceSource = `${statePortListSource}\n${conditionNodeBodySource}\n${primaryStatePortSource}\n${floatingStatePortPillSource}`;
+const runTimingIconStyle = componentSource.match(/\.node-card__run-timing-capsule :deep\(\.el-icon\) \{[\s\S]*?\n\}/)?.[0] ?? "";
 
 test("NodeCard does not render the reads and writes summary block", () => {
   assert.doesNotMatch(componentSource, /class="node-card__state-summary"/);
@@ -85,6 +86,32 @@ test("NodeCard accepts canvas-provided real dimensions through CSS variables", (
   assert.match(componentSource, /\.node-card \{[\s\S]*min-height:\s*var\(--node-card-min-height,\s*260px\);/);
   assert.match(componentSource, /\.node-card--condition \{[\s\S]*width:\s*var\(--node-card-width,\s*560px\);/);
   assert.match(componentSource, /\.node-card--subgraph \{[\s\S]*width:\s*var\(--node-card-width,\s*820px\);/);
+});
+
+test("NodeCard renders a top-left run timing capsule", () => {
+  assert.match(componentSource, /node-card__run-timing-capsule/);
+  assert.match(componentSource, /Clock/);
+  assert.match(componentSource, /formatNodeRunTimingDuration/);
+  assert.match(componentSource, /\.node-card \{[\s\S]*--node-card-floating-capsule-height:\s*58px;/);
+  assert.match(componentSource, /\.node-card \{[\s\S]*--node-card-floating-capsule-offset:\s*8px;/);
+  assert.match(componentSource, /\.node-card__run-timing-capsule \{[\s\S]*position:\s*absolute;/);
+  assert.match(componentSource, /\.node-card__run-timing-capsule \{[\s\S]*top:/);
+  assert.match(componentSource, /\.node-card__run-timing-capsule \{[\s\S]*left:\s*0;/);
+  assert.match(componentSource, /\.node-card__run-timing-capsule \{[\s\S]*height:\s*var\(--node-card-floating-capsule-height,\s*58px\);/);
+  assert.match(componentSource, /\.node-card__run-timing-capsule \{[\s\S]*box-sizing:\s*border-box;/);
+  assert.match(
+    componentSource,
+    /\.node-card__run-timing-capsule \{[\s\S]*transform:\s*translateY\(calc\(-100% - var\(--node-card-floating-capsule-offset,\s*8px\)\)\);/,
+  );
+  assert.match(componentSource, /\.node-card__run-timing-capsule \{[\s\S]*box-shadow:\s*var\(--toograph-glass-shadow\),\s*var\(--toograph-glass-highlight\),\s*var\(--toograph-glass-rim\);/);
+  assert.match(componentSource, /\.node-card__run-timing-capsule \{[\s\S]*backdrop-filter:\s*blur\(24px\)\s*saturate\(1\.6\)\s*contrast\(1\.02\);/);
+  assert.match(componentSource, /\.node-card__run-timing-capsule \{[\s\S]*font-size:\s*0\.92rem;/);
+  assert.match(componentSource, /\.node-card__run-timing-capsule::before \{/);
+  assert.match(runTimingIconStyle, /width:\s*18px;/);
+  assert.match(runTimingIconStyle, /height:\s*18px;/);
+  assert.match(runTimingIconStyle, /border:\s*0;/);
+  assert.match(runTimingIconStyle, /background:\s*transparent;/);
+  assert.doesNotMatch(runTimingIconStyle, /border-radius/);
 });
 
 test("NodeCard stretches primary editable surfaces when the canvas resizes the node", () => {
@@ -672,10 +699,17 @@ test("NodeCard moves node actions into hoverable top buttons built from Element 
   assert.match(componentSource, /"--el-popover-bg-color":\s*"transparent"/);
   assert.match(topActionsSource, /node-card__top-action-button--confirm/);
   assert.match(componentSource, /\.node-card \{[\s\S]*overflow:\s*visible;/);
+  assert.match(componentSource, /\.node-card \{[\s\S]*--node-card-floating-capsule-height:\s*58px;/);
+  assert.match(componentSource, /\.node-card \{[\s\S]*--node-card-floating-capsule-offset:\s*8px;/);
   assert.match(topActionsSource, /\.node-card__top-actions \{[\s\S]*top:\s*0;/);
-  assert.match(topActionsSource, /\.node-card__top-actions \{[\s\S]*right:\s*18px;/);
+  assert.match(topActionsSource, /\.node-card__top-actions \{[\s\S]*right:\s*0;/);
   assert.match(topActionsSource, /\.node-card__top-actions \{[\s\S]*z-index:\s*12;/);
-  assert.match(topActionsSource, /\.node-card__top-actions \{[\s\S]*transform:\s*translateY\(calc\(-100% - 8px\)\);/);
+  assert.match(topActionsSource, /\.node-card__top-actions \{[\s\S]*height:\s*var\(--node-card-floating-capsule-height,\s*58px\);/);
+  assert.match(topActionsSource, /\.node-card__top-actions \{[\s\S]*box-sizing:\s*border-box;/);
+  assert.match(
+    topActionsSource,
+    /\.node-card__top-actions \{[\s\S]*transform:\s*translateY\(calc\(-100% - var\(--node-card-floating-capsule-offset,\s*8px\)\)\);/,
+  );
   assert.match(topActionsSource, /\.node-card__top-actions \{[\s\S]*gap:\s*8px;/);
   assert.match(topActionsSource, /\.node-card__top-actions \{[\s\S]*padding:\s*8px;/);
   assert.match(topActionsSource, /\.node-card__top-actions \{[\s\S]*border:\s*1px solid rgba\(154,\s*52,\s*18,\s*0\.14\);/);
