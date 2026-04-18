@@ -1,7 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { buildEditorTabHint, resolveEditorTabBarSelectPlaceholders, ZH_EDITOR_TAB_BAR_COPY } from "./editorTabBarModel.ts";
+import {
+  buildEditorTabHint,
+  resolveEditorTabBarSelectPlaceholders,
+  resolveEditorTabDropPlacement,
+  ZH_EDITOR_TAB_BAR_COPY,
+} from "./editorTabBarModel.ts";
 import type { EditorWorkspaceTab } from "@/lib/editor-workspace";
 
 function buildTab(overrides: Partial<EditorWorkspaceTab> = {}): EditorWorkspaceTab {
@@ -46,4 +51,9 @@ test("resolveEditorTabBarSelectPlaceholders uses empty-state copy from legacy ta
       graph: "暂无已保存图",
     },
   );
+});
+
+test("resolveEditorTabDropPlacement splits the tab at its horizontal midpoint", () => {
+  assert.equal(resolveEditorTabDropPlacement(120, 100, 80), "before");
+  assert.equal(resolveEditorTabDropPlacement(160, 100, 80), "after");
 });

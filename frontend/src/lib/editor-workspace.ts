@@ -259,6 +259,39 @@ export function closeWorkspaceTab(workspace: PersistedEditorWorkspace, tabId: st
   };
 }
 
+export function reorderWorkspaceTab(
+  workspace: PersistedEditorWorkspace,
+  sourceTabId: string,
+  targetTabId: string,
+  placement: "before" | "after",
+): PersistedEditorWorkspace {
+  if (sourceTabId === targetTabId) {
+    return workspace;
+  }
+
+  const sourceIndex = workspace.tabs.findIndex((tab) => tab.tabId === sourceTabId);
+  const targetIndex = workspace.tabs.findIndex((tab) => tab.tabId === targetTabId);
+
+  if (sourceIndex === -1 || targetIndex === -1) {
+    return workspace;
+  }
+
+  const tabs = [...workspace.tabs];
+  const [sourceTab] = tabs.splice(sourceIndex, 1);
+  if (!sourceTab) {
+    return workspace;
+  }
+
+  const nextTargetIndex = tabs.findIndex((tab) => tab.tabId === targetTabId);
+  const insertionIndex = placement === "before" ? nextTargetIndex : nextTargetIndex + 1;
+  tabs.splice(insertionIndex, 0, sourceTab);
+
+  return {
+    ...workspace,
+    tabs,
+  };
+}
+
 export function closeWorkspaceTabTransition(
   workspace: PersistedEditorWorkspace,
   tabId: string,

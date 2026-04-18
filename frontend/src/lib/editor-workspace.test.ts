@@ -11,6 +11,7 @@ import {
   ensureSavedGraphTab,
   isSameSavedGraph,
   readPersistedEditorWorkspace,
+  reorderWorkspaceTab,
   resolveEditorUrl,
   resolveWorkspaceTabUrl,
   writePersistedEditorWorkspace,
@@ -121,6 +122,41 @@ test("closeWorkspaceTab keeps a valid active tab after removing the current tab"
     [first.tabId, third.tabId],
   );
   assert.equal(next.activeTabId, third.tabId);
+});
+
+test("reorderWorkspaceTab moves a tab before a target tab without changing the active tab", () => {
+  const first = createUnsavedWorkspaceTab({ title: "A", kind: "existing" });
+  const second = createUnsavedWorkspaceTab({ title: "B", kind: "new" });
+  const third = createUnsavedWorkspaceTab({ title: "C", kind: "template", templateId: "hello_world" });
+  const workspace: PersistedEditorWorkspace = {
+    activeTabId: second.tabId,
+    tabs: [first, second, third],
+  };
+
+  const next = reorderWorkspaceTab(workspace, third.tabId, first.tabId, "before");
+
+  assert.deepEqual(
+    next.tabs.map((tab) => tab.tabId),
+    [third.tabId, first.tabId, second.tabId],
+  );
+  assert.equal(next.activeTabId, second.tabId);
+});
+
+test("reorderWorkspaceTab moves a tab after a target tab", () => {
+  const first = createUnsavedWorkspaceTab({ title: "A", kind: "existing" });
+  const second = createUnsavedWorkspaceTab({ title: "B", kind: "new" });
+  const third = createUnsavedWorkspaceTab({ title: "C", kind: "template", templateId: "hello_world" });
+  const workspace: PersistedEditorWorkspace = {
+    activeTabId: first.tabId,
+    tabs: [first, second, third],
+  };
+
+  const next = reorderWorkspaceTab(workspace, first.tabId, third.tabId, "after");
+
+  assert.deepEqual(
+    next.tabs.map((tab) => tab.tabId),
+    [second.tabId, third.tabId, first.tabId],
+  );
 });
 
 test("closeWorkspaceTabTransition returns empty workspace and null route target when closing the last active tab", () => {

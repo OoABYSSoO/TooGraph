@@ -17,11 +17,11 @@
           :active-tab-id="workspace.activeTabId"
           :templates="templates"
           :graphs="graphs"
-          :active-graph-name="activeTabTitle"
           :active-state-count="activeStateCount"
           :is-state-panel-open="activeStatePanelOpen"
           @activate-tab="activateTab"
           @close-tab="requestCloseTab"
+          @reorder-tab="reorderTab"
           @create-new="openNewTab(null)"
           @create-from-template="openNewTab"
           @open-graph="openExistingGraph"
@@ -183,6 +183,7 @@ import {
   createUnsavedWorkspaceTab,
   ensureSavedGraphTab,
   readPersistedEditorWorkspace,
+  reorderWorkspaceTab,
   resolveEditorUrl,
   resolveWorkspaceTabUrl,
   writePersistedEditorWorkspace,
@@ -252,7 +253,6 @@ const activeTab = computed(() => workspace.value.tabs.find((tab) => tab.tabId ==
 const pendingCloseTab = computed(() =>
   pendingCloseTabId.value ? workspace.value.tabs.find((tab) => tab.tabId === pendingCloseTabId.value) ?? null : null,
 );
-const activeTabTitle = computed(() => activeTab.value?.title ?? "Untitled Graph");
 const activeStateCount = computed(() => {
   const tab = activeTab.value;
   if (!tab) {
@@ -640,6 +640,10 @@ function activateTab(tabId: string) {
     activeTabId: tabId,
   });
   syncRouteToTab(tab);
+}
+
+function reorderTab(sourceTabId: string, targetTabId: string, placement: "before" | "after") {
+  updateWorkspace(reorderWorkspaceTab(workspace.value, sourceTabId, targetTabId, placement));
 }
 
 function finalizeTabClose(tabId: string) {

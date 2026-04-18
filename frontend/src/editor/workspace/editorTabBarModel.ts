@@ -52,3 +52,8 @@ export function resolveEditorTabBarSelectPlaceholders(input: {
     graph: input.graphCount === 0 ? input.copy.noGraphs : input.copy.openGraph,
   };
 }
+
+export function resolveEditorTabDropPlacement(pointerClientX: number, tabLeft: number, tabWidth: number): "before" | "after" {
+  const midpoint = tabLeft + tabWidth / 2;
+  return pointerClientX < midpoint ? "before" : "after";
+}
