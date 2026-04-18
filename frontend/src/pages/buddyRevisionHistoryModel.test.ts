@@ -3,7 +3,10 @@ import test from "node:test";
 
 import type { BuddyCommandRecord, BuddyRevision } from "../types/buddy.ts";
 
-import { buildBuddyRevisionHistoryRows } from "./buddyRevisionHistoryModel.ts";
+import {
+  buildBuddyRevisionHistoryRows,
+  filterBuddyRevisionHistoryRows,
+} from "./buddyRevisionHistoryModel.ts";
 
 test("buildBuddyRevisionHistoryRows links revisions to command source runs", () => {
   const revisions: BuddyRevision[] = [
@@ -79,4 +82,110 @@ test("buildBuddyRevisionHistoryRows keeps legacy revisions visible without comma
   assert.equal(rows[0]?.sourceLabel, "Legacy revision");
   assert.equal(rows[0]?.sourceRunId, "");
   assert.equal(rows[0]?.sourceCommandId, "");
+});
+
+test("buildBuddyRevisionHistoryRows includes compact field-level diff entries", () => {
+  const rows = buildBuddyRevisionHistoryRows(
+    [
+      {
+        revision_id: "rev_diff",
+        target_type: "profile",
+        target_id: "profile",
+        operation: "update",
+        previous_value: {
+          name: "Old Buddy",
+          tone: "Direct",
+          unchanged: "same",
+          display_preferences: { language: "zh-CN" },
+        },
+        next_value: {
+          name: "New Buddy",
+          unchanged: "same",
+          display_preferences: { language: "en-US" },
+          response_style: "结论优先。",
+        },
+        changed_by: "user",
+        change_reason: "Manual profile update.",
+        created_at: "2026-05-12T01:00:00Z",
+      },
+    ],
+    [],
+  );
+
+  assert.deepEqual(rows[0]?.diffEntries, [
+    {
+      field: "name",
+      changeKind: "changed",
+      previousValueText: "Old Buddy",
+      nextValueText: "New Buddy",
+    },
+    {
+      field: "tone",
+      changeKind: "removed",
+      previousValueText: "Direct",
+      nextValueText: "",
+    },
+    {
+      field: "display_preferences",
+      changeKind: "changed",
+      previousValueText: '{"language":"zh-CN"}',
+      nextValueText: '{"language":"en-US"}',
+    },
+    {
+      field: "response_style",
+      changeKind: "added",
+      previousValueText: "",
+      nextValueText: "结论优先。",
+    },
+  ]);
+});
+
+test("filterBuddyRevisionHistoryRows narrows history by target type without reordering", () => {
+  const rows = buildBuddyRevisionHistoryRows(
+    [
+      {
+        revision_id: "rev_profile",
+        target_type: "profile",
+        target_id: "profile",
+        operation: "update",
+        previous_value: { name: "Old" },
+        next_value: { name: "New" },
+        changed_by: "user",
+        change_reason: "Manual profile update.",
+        created_at: "2026-05-12T03:00:00Z",
+      },
+      {
+        revision_id: "rev_memory_newer",
+        target_type: "memory",
+        target_id: "memory_2",
+        operation: "update",
+        previous_value: { title: "Old" },
+        next_value: { title: "New" },
+        changed_by: "buddy_command",
+        change_reason: "Updated stable preference.",
+        created_at: "2026-05-12T04:00:00Z",
+      },
+      {
+        revision_id: "rev_memory_older",
+        target_type: "memory",
+        target_id: "memory_1",
+        operation: "create",
+        previous_value: {},
+        next_value: { title: "Preference" },
+        changed_by: "buddy_command",
+        change_reason: "Created stable preference.",
+        created_at: "2026-05-12T02:00:00Z",
+      },
+    ],
+    [],
+  );
+
+  assert.deepEqual(
+    filterBuddyRevisionHistoryRows(rows, "memory").map((row) => row.revision_id),
+    ["rev_memory_newer", "rev_memory_older"],
+  );
+  assert.deepEqual(
+    filterBuddyRevisionHistoryRows(rows, "all").map((row) => row.revision_id),
+    ["rev_memory_newer", "rev_profile", "rev_memory_older"],
+  );
 });

@@ -238,18 +238,55 @@
                 <p>{{ t("buddyPage.history.body") }}</p>
               </div>
             </div>
-            <ElTable :data="orderedRevisionRows" class="buddy-page__table" empty-text=" ">
+            <div class="buddy-page__history-toolbar">
+              <span class="buddy-page__filter-label">{{ t("buddyPage.history.targetFilter") }}</span>
+              <ElSegmented
+                v-model="historyTargetFilter"
+                class="buddy-page__history-filter"
+                :options="historyTargetOptions"
+              />
+              <span class="buddy-page__meta">
+                {{ t("buddyPage.history.showingCount", { count: filteredRevisionRows.length, total: orderedRevisionRows.length }) }}
+              </span>
+            </div>
+            <ElTable :data="filteredRevisionRows" class="buddy-page__table" empty-text=" ">
               <ElTableColumn type="expand" width="44">
                 <template #default="{ row }">
                   <div class="buddy-page__history-diff">
-                    <section>
-                      <span>{{ t("buddyPage.history.before") }}</span>
-                      <pre>{{ row.previousValueText || t("common.none") }}</pre>
-                    </section>
-                    <section>
-                      <span>{{ t("buddyPage.history.after") }}</span>
-                      <pre>{{ row.nextValueText || t("common.none") }}</pre>
-                    </section>
+                    <div v-if="row.diffEntries.length" class="buddy-page__history-diff-list">
+                      <article v-for="entry in row.diffEntries" :key="entry.field" class="buddy-page__history-diff-entry">
+                        <div class="buddy-page__history-diff-field">
+                          <ElTag size="small" :type="historyDiffTagType(entry.changeKind)" effect="plain">
+                            {{ historyDiffKindLabel(entry.changeKind) }}
+                          </ElTag>
+                          <span>{{ entry.field }}</span>
+                        </div>
+                        <div class="buddy-page__history-diff-values">
+                          <section>
+                            <span>{{ t("buddyPage.history.before") }}</span>
+                            <pre>{{ entry.previousValueText || t("common.none") }}</pre>
+                          </section>
+                          <section>
+                            <span>{{ t("buddyPage.history.after") }}</span>
+                            <pre>{{ entry.nextValueText || t("common.none") }}</pre>
+                          </section>
+                        </div>
+                      </article>
+                    </div>
+                    <p v-else class="buddy-page__history-no-diff">{{ t("buddyPage.history.noDiff") }}</p>
+                    <details class="buddy-page__history-raw-diff">
+                      <summary>{{ t("buddyPage.history.rawComparison") }}</summary>
+                      <div class="buddy-page__history-raw-grid">
+                        <section>
+                          <span>{{ t("buddyPage.history.before") }}</span>
+                          <pre>{{ row.previousValueText || t("common.none") }}</pre>
+                        </section>
+                        <section>
+                          <span>{{ t("buddyPage.history.after") }}</span>
+                          <pre>{{ row.nextValueText || t("common.none") }}</pre>
+                        </section>
+                      </div>
+                    </details>
                   </div>
                 </template>
               </ElTableColumn>
@@ -276,7 +313,10 @@
                 </template>
               </ElTableColumn>
             </ElTable>
-            <ElEmpty v-if="orderedRevisionRows.length === 0" :description="t('buddyPage.history.empty')" />
+            <ElEmpty
+              v-if="filteredRevisionRows.length === 0"
+              :description="orderedRevisionRows.length === 0 ? t('buddyPage.history.empty') : t('buddyPage.history.filteredEmpty')"
+            />
           </article>
         </ElTabPane>
 
@@ -363,7 +403,13 @@ import type {
 } from "@/types/buddy";
 import type { RunDetail, RunSummary } from "@/types/run";
 
-import { buildBuddyRevisionHistoryRows } from "./buddyRevisionHistoryModel.ts";
+import {
+  BUDDY_REVISION_HISTORY_TARGET_FILTERS,
+  buildBuddyRevisionHistoryRows,
+  filterBuddyRevisionHistoryRows,
+  type BuddyRevisionDiffChangeKind,
+  type BuddyRevisionHistoryTargetFilter,
+} from "./buddyRevisionHistoryModel.ts";
 
 type MemoryDraft = Pick<BuddyMemory, "type" | "title" | "content">;
 type LoadAllOptions = {
@@ -374,6 +420,7 @@ const { t } = useI18n();
 const buddyContextStore = useBuddyContextStore();
 const buddyMascotDebugStore = useBuddyMascotDebugStore();
 const activeTab = ref("profile");
+const historyTargetFilter = ref<BuddyRevisionHistoryTargetFilter>("all");
 const hasLoaded = ref(false);
 const isLoading = ref(false);
 const isSavingProfile = ref(false);
@@ -416,6 +463,13 @@ const canSaveMemory = computed(() => {
   return Boolean(memoryDraft.value.title.trim() && memoryDraft.value.content.trim() && !isSavingMemory.value);
 });
 const orderedRevisionRows = computed(() => buildBuddyRevisionHistoryRows(revisions.value, commands.value));
+const filteredRevisionRows = computed(() => filterBuddyRevisionHistoryRows(orderedRevisionRows.value, historyTargetFilter.value));
+const historyTargetOptions = computed(() =>
+  BUDDY_REVISION_HISTORY_TARGET_FILTERS.map((value) => ({
+    label: t(`buddyPage.history.targets.${value}`),
+    value,
+  })),
+);
 const permissionModeOptions = computed(() => [
   { label: t("buddy.modes.askFirst"), value: "ask_first" },
   { label: t("buddy.modes.fullAccess"), value: "full_access" },
@@ -491,6 +545,26 @@ function formatDate(value: string) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(date);
+}
+
+function historyDiffTagType(kind: BuddyRevisionDiffChangeKind) {
+  if (kind === "added") {
+    return "success";
+  }
+  if (kind === "removed") {
+    return "danger";
+  }
+  return "warning";
+}
+
+function historyDiffKindLabel(kind: BuddyRevisionDiffChangeKind) {
+  if (kind === "added") {
+    return t("buddyPage.history.diffKinds.added");
+  }
+  if (kind === "removed") {
+    return t("buddyPage.history.diffKinds.removed");
+  }
+  return t("buddyPage.history.diffKinds.changed");
 }
 
 function setError(error: unknown, fallbackKey = "common.failedToLoad") {
@@ -936,6 +1010,25 @@ onMounted(loadAll);
   width: 100%;
 }
 
+.buddy-page__history-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.buddy-page__filter-label {
+  color: rgba(60, 41, 20, 0.68);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.buddy-page__history-filter {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
 .buddy-page__history-source {
   display: grid;
   gap: 2px;
@@ -948,16 +1041,51 @@ onMounted(loadAll);
 
 .buddy-page__history-diff {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   padding: 12px 10px;
 }
 
-.buddy-page__history-diff section {
+.buddy-page__history-diff-list {
+  display: grid;
+  gap: 10px;
+}
+
+.buddy-page__history-diff-entry {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+  border: 1px solid rgba(154, 52, 18, 0.1);
+  border-radius: 12px;
+  background: rgba(255, 252, 247, 0.62);
+  padding: 10px;
+}
+
+.buddy-page__history-diff-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+  color: var(--toograph-text-strong);
+  font-weight: 800;
+  word-break: break-word;
+}
+
+.buddy-page__history-diff-values,
+.buddy-page__history-raw-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.buddy-page__history-diff section,
+.buddy-page__history-raw-grid section {
   min-width: 0;
 }
 
-.buddy-page__history-diff span {
+.buddy-page__history-diff section > span,
+.buddy-page__history-raw-grid section > span {
   display: block;
   margin-bottom: 6px;
   color: rgba(60, 41, 20, 0.68);
@@ -965,8 +1093,9 @@ onMounted(loadAll);
   font-weight: 700;
 }
 
-.buddy-page__history-diff pre {
-  max-height: 260px;
+.buddy-page__history-diff pre,
+.buddy-page__history-raw-grid pre {
+  max-height: 180px;
   margin: 0;
   overflow: auto;
   border: 1px solid rgba(154, 52, 18, 0.1);
@@ -976,6 +1105,27 @@ onMounted(loadAll);
   padding: 10px;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.buddy-page__history-no-diff {
+  margin: 0;
+  color: rgba(60, 41, 20, 0.62);
+}
+
+.buddy-page__history-raw-diff {
+  border-top: 1px solid rgba(154, 52, 18, 0.1);
+  padding-top: 10px;
+}
+
+.buddy-page__history-raw-diff summary {
+  cursor: pointer;
+  color: rgba(60, 41, 20, 0.68);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.buddy-page__history-raw-grid {
+  margin-top: 10px;
 }
 
 .buddy-page__panel--mascot-debug {
@@ -1050,6 +1200,12 @@ onMounted(loadAll);
   }
 
   .buddy-page__history-diff {
+    grid-template-columns: 1fr;
+  }
+
+  .buddy-page__history-diff-entry,
+  .buddy-page__history-diff-values,
+  .buddy-page__history-raw-grid {
     grid-template-columns: 1fr;
   }
 }

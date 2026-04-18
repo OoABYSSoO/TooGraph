@@ -358,10 +358,10 @@ function resolveTailSideForFacing(facing: BuddyMascotFacing): TailSide {
 
 function resolveFrontTailSideFromPreviousFacing(facing: BuddyMascotFacing): TailSide {
   if (facing === "left") {
-    return "right";
+    return "left";
   }
   if (facing === "right") {
-    return "left";
+    return "right";
   }
   return tailSide.value;
 }
