@@ -6,6 +6,11 @@
 - 旧 React 的 `frontend/components/editor/node-system-editor.tsx` 已经不在当前工作树里；后续对照编辑器本体时，需要直接从 `87d3d6e` 提交内容里读取，而不是在现分支文件系统里查找。
 - 真正复杂的编辑器逻辑不只在工作区壳层，很多关键行为深埋在：
   - `frontend/components/editor/node-system-editor.tsx`
+- 当前 backend run schema 也已经把旧前端所依赖的运行态材料直接暴露出来了：
+  - `artifacts.exported_outputs`
+  - `artifacts.active_edge_ids`
+  - `node_executions[].errors`
+  - 因此 Vue 版恢复 node-level runtime feedback 时，不需要自行猜返回结构
 
 ## Workspace / Welcome Findings
 
@@ -46,6 +51,26 @@
 - 旧前端 output 节点对 `markdown` display mode 使用 `MD` 简写，而不是直接显示 `MARKDOWN`；Vue 版现在也应沿用这个标签语义。
 - 旧前端 output 节点对 persist format 同样使用 `AUTO / TXT / MD / JSON` 这组简写；Vue 版现在也应沿用。
 - 旧前端 agent 节点的主文本编辑面是 `taskInstruction`，不是只读占位内容；Vue 版接回内联编辑时应直接暴露真实字符串，避免 placeholder 抢占语义。
+- 旧前端 agent 节点的运行时控制不只包含 thinking / temperature：
+  - `systemInstruction` 也有独立编辑面
+  - model 选择依赖 settings 里的 configured model catalog
+  - 当选择值等于全局 text model ref 时，要回写成 `modelSource: "global"` 与 `model: ""`
+  - 选择其他 model ref 时，才回写成 `modelSource: "override"`
+- 旧前端 agent action row 里的 `+ skill` 不是纯装饰：
+  - 它会读取 `/api/skills/definitions`
+  - 只展示尚未挂载到当前 agent 的 skill
+  - 点击后会把 `skillKey` 追加进 `node.config.skills`
+  - 已挂载 skill 会以 pill 形式展示，并支持单条移除
+- 旧前端 agent action row 里的 `+ input / + output` 也不是纯占位：
+  - 会先搜索现有 state
+  - 允许直接把现有 state 绑定到 agent port
+  - 也允许从搜索词创建新 state，并在创建后立即绑定
+  - 创建草稿默认从查询词推导唯一 key，默认类型是 `text`
+- 旧前端 knowledge-base agent skill 不是纯手工维护：
+  - 会根据 agent 当前绑定到的 canonical input 自动推导
+  - 只有“恰好一个 `knowledge_base` 输入 + 一个可用的文本查询输入”成立时，才会自动挂上 `search_knowledge_base`
+  - 若条件不成立，会自动裁掉 knowledge-base skill
+  - 这条语义更适合放在文档 / canonical 归一化层，而不是某个单独点击路径里硬编码
 - 旧前端 agent 节点的 `Advanced` 至少包含：
   - `temperature` 数字输入
   - 温度会按 `0 - 2` 区间 clamp
@@ -71,6 +96,11 @@
   - 会通过 `createConditionBranchKey` 生成 `branch_2`、`branch_3` 这类不冲突 key
   - 新 branch 会先追加到 `node.config.branches`
   - 这说明 Vue 版下一步优先补 `Add branch` 是有直接代码依据的
+- 旧前端画布里的控制流连接不是静态展示：
+  - 普通节点通过 `FLOW_SOURCE_HANDLE` / `FLOW_TARGET_HANDLE` 建控制流
+  - condition 节点额外有 `ROUTE_TARGET_HANDLE`
+  - branch route 则通过 branch 自己的 output handle 建到目标节点
+  - 因此 Vue 版若只投影锚点但不能发起连接，仍然缺一段关键编辑主链
 - 旧 React 当前可直接对照到的 `BranchRow` 只覆盖编辑，不包含独立删除按钮：
   - 因此“删除 branch”不能凭空猜测 UI 和数据收缩策略
   - 如果要补删除，必须先核对 route / mapping 的收口规则
@@ -89,6 +119,16 @@
   - `knowledge_base` 用下拉
   - file / image / audio / video 走上传预览流
   - 因此当前 Vue 版先恢复“文本值直改”是安全的第一步，但不能把它误当成整套 input 交互都迁完
+- 当前后端已经直接提供 knowledge-base 目录接口：
+  - `GET /api/knowledge/bases`
+  - 返回 `name / kb_id / label / description / version / chunkCount ...`
+  - 因此 Vue 版恢复 `knowledge_base` 输入下拉时，不需要猜测选项来源，也不需要硬编码 catalog
+- 旧前端 input 顶部的手动类型切换按钮并不是全量类型集合，而是：
+  - `text`
+  - `file`
+  - `knowledge_base`
+  - image / audio / video 主要通过上传文件后自动探测并反写类型
+- 旧前端在 input 已经持有 `uploaded_file` envelope 时，不再展示手动类型按钮，而是显示“uploaded asset locked this input as …”的锁定提示
 
 ## UI Direction Findings
 
@@ -104,7 +144,17 @@
 - 当前最主要未完成项已经从“外围结构”转移到“编辑器本体”和“状态语义”。
 - 旧 React 前端的 `collectProjectedDataRelations` 逻辑已经迁入 Vue：数据流边不再依赖手工边存储，而是根据控制流可达性和 state 的唯一最近 writer 自动投影；多 writer 歧义场景保持跳过，避免画出错误数据来源。
 - `NodeCard` 当前已迁回的旧前端结构语义包括：端口 type 标签、required 输入标记、condition branch match values、output persist 文案，以及 agent skill 数量摘要。
-- `NodeCard` 现在已把一批旧前端内部编辑控件接回文档更新链路：output 的 display mode / persist toggle / persist format / fileNameTemplate、agent 的 taskInstruction 与 `Advanced` 第一版（thinking / temperature）、condition 的 loopLimit 与 `Source / Operator / Value` 规则编辑，以及 input 的文本值第一版编辑都不再只是展示。
+- `NodeCard` 现在已把一批旧前端内部编辑控件接回文档更新链路：output 的 display mode / persist toggle / persist format / fileNameTemplate、agent 的 `taskInstruction` / `systemInstruction` / global-override model / skill attach-remove / `+input / +output` state bind-create 与 `Advanced` 第一版（thinking / temperature）、condition 的 loopLimit 与 `Source / Operator / Value` 规则编辑，以及 input 的文本值与 `knowledge_base` 下拉第一版编辑都不再只是展示。
+- 当前 Vue 版已经把 `knowledge_base` 输入的真实目录接回：
+  - 通过 `/api/knowledge/bases` 拉取 knowledge base 列表
+  - `input` 节点会按 primary output state type 识别 `knowledge_base`
+  - `knowledge_base` 类型输入不再落回普通 textarea，而是用下拉选择真实 catalog 项
+- 当前 Vue 版也已经把 input 的上传流第一版接回：
+  - `image / audio / video / file` 类型输入会切到上传区，而不是普通文本框
+  - 上传文件后会生成与旧前端一致的 `uploaded_file` envelope
+  - image / audio / video 使用 data URL，文本类 file 使用 inline text
+  - 上传时会同步把 primary output state type 切到探测出的类型
+  - 没有上传 envelope 时，会恢复手动 `Text / File / KB` 类型切换按钮
 - 当前 Vue 版已经把 condition 的 `BranchRow` 第一版也接回：
   - branch key 可编辑
   - mapping keys 可编辑
@@ -135,11 +185,84 @@
   - 新增独立的 `routeEdgePath` helper
   - route edge path 改为 rounded orthogonal 几何
   - branch offset 语义与旧 React 的 `28 + index * 18` 对齐
-- condition 分支的下一块续做切片不再是“先补 Add branch / 删除语义”，而是：
-  - 继续把 route chrome 呈现往旧前端继续收满
-  - 再评估是否切向 input 上传流或 agent 更深层高级配置
-- 结合当前 plan / backlog / progress 重新评估后，最适合继续推进的迁移切片排序是：
-  - 第一优先级：condition branch 删除语义与 route chrome 收口
-  - 第二优先级：input 节点剩余类型切换与上传流
-  - 第三优先级：agent 节点更深层高级配置
-  推荐先走第一条，因为它与当前未完成链路最连续，且旧 React 对照依据最明确
+- 当前 Vue 版也已经把 agent 的运行时选择再往前推了一段：
+  - 编辑器会拉取 `/api/settings`
+  - agent 节点会消费 configured model catalog
+  - global / override model 选择第一版已接回
+  - `systemInstruction` 第一版编辑已接回
+- 当前 Vue 版也已经把 agent 的 skill 交互第一版接回：
+  - 编辑器会拉取 `/api/skills/definitions`
+  - `+ skill` 会展示尚未挂载的 definitions
+  - 点击会把 skillKey 追加到 agent
+  - 已挂载 skill 会显示 pill 并支持移除
+- 当前 Vue 版也已经把 agent port 交互再往前推进了一段：
+  - `+ input / + output` 不再是静态 pill
+  - 可以绑定现有 state
+  - 可以创建新 state 并立即绑定
+  - 新 state 会沿用现有 `StateDefaultValueEditor` 与 state field 类型语义
+- 当前 Vue 版也已经把 agent 的 knowledge-base skill auto-sync 接回：
+  - 编辑器文档会在 agent 绑定变化后自动归一化 knowledge-base skill
+  - 当 agent 恰好读取一个 `knowledge_base` state 且还有可用文本查询输入时，会自动挂上 `search_knowledge_base`
+  - 当条件不再成立时，会自动裁掉这颗 skill
+- 当前 Vue 版也已经把画布里的控制流 / route 建链第一版接回：
+  - `flow-out` 与 `route-out` 锚点不再只是装饰
+  - 可以从画布锚点发起连接，并在合法 target `flow-in` 上完成建链
+  - 普通控制流会写回 `edges`
+  - condition branch route 会写回 `conditional_edges`
+- 当前 Vue 版也已经把画布里的删边第一版接回：
+  - 控制流边和 condition route edge 可以被选中
+  - 选中后按 `Delete` / `Backspace` 会删除对应控制流边或 branch route
+  - 删除最后一条 branch route 时，会把空的 `conditional_edges` 记录一并裁掉
+- 当前 Vue 版也已经把建链时的 preview line 接回：
+  - 从 `flow-out` / `route-out` 发起连接后，会显示一条跟随当前指针的 ghost edge
+  - 普通控制流 preview 使用 orthogonal path
+  - condition route preview 复用 route-edge-path 的旧 React 几何
+- 当前 Vue 版也已经把现有 flow / route edge 的真正重连第一版接回：
+  - 选中已有 flow edge 后，可以直接在画布上点新的 `flow-in` target 改写它的目标
+  - 选中已有 route edge 后，也可以直接改写该 branch 的 route target
+  - 这条语义现在不再只是 UI 特判，而是有单独的文档 helper 和连接合法性判定
+- 当前 Vue 版也已经把 route chrome 再收口了一步：
+  - route edge 使用独立紫色系而不是继续混在普通控制流里
+  - flow / route / selected / preview 都有闭合箭头
+  - condition branch 行里的 route target 也从纯文本推进到了更明确的 status pill
+- 当前 Vue 版也已经把旧 React 的工作区运行反馈主链接回：
+  - `Save / Validate / Run` 不再只靠 `alert`
+  - 每个 tab 都会保留自己的状态消息
+  - run 期间会轮询 `/api/runs/:runId`，把 queued / running / failed / completed 摘要持续写回工作区反馈条
+  - 反馈条也会带上 latest run 链接和节点计数摘要
+- 当前 Vue 版也已经把最关键的节点运行态壳层接回画布：
+  - running 节点会有蓝色 halo
+  - 当前活跃 running 节点会有更强的 current halo
+  - success / failed 节点也会有独立的 shell glow
+- 旧 React 的 `hydrateRunResult` 不只给节点壳层上色，还会：
+  - 用 `artifacts.exported_outputs` 覆盖 output 节点 preview
+  - 在失败节点上写入 `Latest run failed here: ...`
+  - 用 `active_edge_ids` 高亮当前正在流经的路径
+- 当前 Vue 版也已经把这条更深一层的 runtime feedback 接回：
+  - output 节点会显示 latest run preview，并在存在时沿用 run 返回的 display mode
+  - output 未产出值时会显示 completed / failed 的 fallback 文案
+  - 失败节点会显示 `Latest run failed here:` 提示
+  - run 的 `active_edge_ids` 会高亮当前路径
+- 当前 Vue 版也已经把 Phase 4 里两个最明确的行为缺口补上了一截：
+  - `RunDetailPage` 现在会在 queued / running / resuming 时继续轮询 run detail
+  - `RunDetailPage` 已显示 `artifacts.exported_outputs`
+  - cycle iteration 也已经补回 executed / incoming / activated / next-iteration 这些明细
+  - `SettingsPage` 现在会对 provider 的空模型列表回退到 `example_model_refs`
+  - `SettingsPage` 保存时也会按旧前端语义收口 `temperature`
+- 当前 Vue 版也已经把首页 / runs 列表的最后一层页面语义补齐：
+  - 首页三个工作台 bucket 都有空态 CTA
+  - 首页 run / graph 卡片和 runs 列表卡片都补回了统一的 `查看详情` affordance
+  - 这说明 Phase 4 剩余项已经从“缺功能”收敛为“只剩可选 polish”
+- 当前 `docs/` 也已经收口到最小活文档集合：
+  - 迁移完成后，真正还应该继续保留的是“当前项目状态”而不是“迁移 backlog / 设计 / 执行计划”
+  - 因此更合适的保留形态是：
+    - `docs/current_project_status.md`
+    - 根目录的闭环记录：`task_plan.md` / `findings.md` / `progress.md`
+- 审计还发现一个重要结论：
+  - README、knowledge 文档和 `CLAUDE.md` 里还残留了 React / Next.js 时代的事实描述
+  - 这会制造“文档看起来没迁完，但代码其实已经迁完”的假象
+  - 因此判断迁移是否完成时，必须把“文档滞后”与“代码主链未恢复”区分开
+- 当前对“是否迁移完毕”的最终判断应收敛为：
+  - 以“Vue 版替掉旧 React 主前端”为标准：已完成
+  - 以“整个产品路线图全部完成”为标准：未完成
+  - 尚未完成的是 WebSocket、人类在环前端、导出 UI、memory 和更强的知识库管理，这些属于后续产品工作，不属于本次迁移缺口

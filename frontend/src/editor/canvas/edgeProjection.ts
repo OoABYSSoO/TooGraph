@@ -10,6 +10,7 @@ export type ProjectedCanvasEdge = {
   target: string;
   path: string;
   state?: string;
+  branch?: string;
 };
 
 export type ProjectedCanvasAnchor = {
@@ -62,6 +63,7 @@ export function projectCanvasEdges(document: GraphPayload | GraphDocument): Proj
           kind: "route" as const,
           source: edge.source,
           target: targetNodeId,
+          branch,
           path: buildRouteEdgePath({
             sourceX: routeSource.x,
             sourceY: routeSource.y,

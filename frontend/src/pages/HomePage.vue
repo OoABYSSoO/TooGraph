@@ -18,9 +18,15 @@
         </div>
         <div class="home-panel__body">
           <div v-if="error" class="home-empty">加载失败：{{ error }}</div>
-          <div v-else-if="runs.length === 0" class="home-empty">还没有运行记录。</div>
+          <div v-else-if="runs.length === 0" class="home-empty">
+            <p>还没有运行记录。</p>
+            <RouterLink class="home-empty__action" :to="runsEmptyAction.href">{{ runsEmptyAction.label }}</RouterLink>
+          </div>
           <RouterLink v-for="run in runs.slice(0, 5)" :key="run.run_id" class="home-card" :to="`/runs/${run.run_id}`">
-            <strong>{{ run.run_id }}</strong>
+            <div class="home-card__header">
+              <strong>{{ run.run_id }}</strong>
+              <span class="home-card__detail">{{ runCardDetail }}</span>
+            </div>
             <p>{{ run.graph_name }}</p>
             <div class="home-badges">
               <span>{{ run.status }}</span>
@@ -37,7 +43,10 @@
         </div>
         <div class="home-panel__body">
           <div v-if="error" class="home-empty">加载失败：{{ error }}</div>
-          <div v-else-if="templates.length === 0" class="home-empty">当前没有模板。</div>
+          <div v-else-if="templates.length === 0" class="home-empty">
+            <p>当前没有模板。</p>
+            <RouterLink class="home-empty__action" :to="templatesEmptyAction.href">{{ templatesEmptyAction.label }}</RouterLink>
+          </div>
           <RouterLink
             v-for="template in templates.slice(0, 3)"
             :key="template.template_id"
@@ -58,13 +67,19 @@
         </div>
         <div class="home-panel__body">
           <div v-if="error" class="home-empty">加载失败：{{ error }}</div>
-          <div v-else-if="graphs.length === 0" class="home-empty">当前还没有已保存图。</div>
+          <div v-else-if="graphs.length === 0" class="home-empty">
+            <p>当前还没有已保存图。</p>
+            <RouterLink class="home-empty__action" :to="graphsEmptyAction.href">{{ graphsEmptyAction.label }}</RouterLink>
+          </div>
           <RouterLink v-for="graph in graphs.slice(0, 5)" :key="graph.graph_id" class="home-card" :to="`/editor/${graph.graph_id}`">
-            <strong>{{ graph.name }}</strong>
+            <div class="home-card__header">
+              <strong>{{ graph.name }}</strong>
+              <span class="home-card__detail">{{ graphCardDetail }}</span>
+            </div>
             <p>{{ graph.graph_id }}</p>
             <div class="home-badges">
               <span>{{ Object.keys(graph.nodes).length }} nodes</span>
-              <span>{{ graph.edges.length + graph.conditional_edges.reduce((count, edge) => count + Object.keys(edge.branches).length, 0) }} edges</span>
+              <span>{{ countGraphEdgeTotal(graph) }} edges</span>
             </div>
           </RouterLink>
         </div>
@@ -82,10 +97,17 @@ import AppShell from "@/layouts/AppShell.vue";
 import type { GraphDocument, TemplateRecord } from "@/types/node-system";
 import type { RunSummary } from "@/types/run";
 
+import { countGraphEdgeTotal, resolveWorkspaceCardDetail, resolveWorkspaceEmptyAction } from "./workspaceDashboardModel.ts";
+
 const graphs = ref<GraphDocument[]>([]);
 const templates = ref<TemplateRecord[]>([]);
 const runs = ref<RunSummary[]>([]);
 const error = ref<string | null>(null);
+const runsEmptyAction = resolveWorkspaceEmptyAction("runs");
+const templatesEmptyAction = resolveWorkspaceEmptyAction("templates");
+const graphsEmptyAction = resolveWorkspaceEmptyAction("graphs");
+const runCardDetail = resolveWorkspaceCardDetail("runs");
+const graphCardDetail = resolveWorkspaceCardDetail("graphs");
 
 onMounted(async () => {
   try {
@@ -203,11 +225,42 @@ onMounted(async () => {
   text-decoration: none;
 }
 
+.home-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.home-card__detail {
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(154, 52, 18);
+}
+
 .home-card p,
-.home-empty {
+.home-empty p {
   margin: 6px 0 0;
   color: rgba(60, 41, 20, 0.72);
   line-height: 1.5;
+}
+
+.home-empty {
+  display: grid;
+  gap: 14px;
+}
+
+.home-empty__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  border: 1px solid rgba(154, 52, 18, 0.18);
+  border-radius: 999px;
+  padding: 10px 14px;
+  color: rgb(154, 52, 18);
+  text-decoration: none;
 }
 
 .home-badges {

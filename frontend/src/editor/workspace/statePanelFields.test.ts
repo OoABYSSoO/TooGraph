@@ -5,6 +5,7 @@ import {
   addStateFieldToDocument,
   buildDefaultStateField,
   deleteStateFieldFromDocument,
+  insertStateFieldIntoDocument,
   parseStateValueInput,
   renameStateFieldInDocument,
   updateStateFieldInDocument,
@@ -122,6 +123,25 @@ test("addStateFieldToDocument inserts a new default field", () => {
 
   assert.ok(nextDocument.state_schema.state_1);
   assert.equal(nextDocument.state_schema.state_1.type, "text");
+});
+
+test("insertStateFieldIntoDocument adds an explicit state definition immutably", () => {
+  const document = buildDocument();
+  const nextDocument = insertStateFieldIntoDocument(document, {
+    key: "review_notes",
+    definition: {
+      name: "Review Notes",
+      description: "Human review notes.",
+      type: "markdown",
+      value: "",
+      color: "#0f766e",
+    },
+  });
+
+  assert.ok(nextDocument.state_schema.review_notes);
+  assert.equal(nextDocument.state_schema.review_notes.type, "markdown");
+  assert.equal(nextDocument.state_schema.review_notes.name, "Review Notes");
+  assert.equal(document.state_schema.review_notes, undefined);
 });
 
 test("updateStateFieldInDocument applies updater to existing definition", () => {

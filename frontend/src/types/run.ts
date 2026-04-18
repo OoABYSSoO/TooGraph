@@ -74,7 +74,59 @@ export type CycleSummary = {
   stop_reason?: string | null;
 };
 
+export type SavedOutputArtifact = {
+  node_id?: string | null;
+  source_key: string;
+  path: string;
+  format: string;
+  file_name: string;
+};
+
+export type OutputPreview = {
+  node_id?: string | null;
+  label?: string | null;
+  source_kind: string;
+  source_key: string;
+  display_mode: string;
+  persist_enabled: boolean;
+  persist_format: string;
+  value?: unknown;
+};
+
+export type ExportedOutput = OutputPreview & {
+  saved_file?: SavedOutputArtifact | null;
+};
+
+export type StateWriterRecord = {
+  node_id: string;
+  output_key: string;
+  mode?: string;
+  updated_at?: string | null;
+};
+
+export type StateSnapshot = {
+  values: Record<string, unknown>;
+  last_writers: Record<string, StateWriterRecord>;
+};
+
+export type StateEvent = {
+  node_id: string;
+  state_key: string;
+  output_key: string;
+  mode?: string;
+  value?: unknown;
+  created_at: string;
+};
+
 export type RunArtifacts = {
+  skill_outputs?: Array<Record<string, unknown>>;
+  output_previews?: OutputPreview[];
+  saved_outputs?: SavedOutputArtifact[];
+  exported_outputs?: ExportedOutput[];
+  node_outputs?: Record<string, Record<string, unknown>>;
+  active_edge_ids?: string[];
+  state_events?: StateEvent[];
+  state_values?: Record<string, unknown>;
   cycle_iterations?: CycleIterationRecord[];
   cycle_summary?: CycleSummary;
 };
@@ -107,6 +159,9 @@ export type RunDetail = RunSummary & {
   node_executions: NodeExecutionDetail[];
   warnings: string[];
   errors: string[];
+  output_previews: OutputPreview[];
   artifacts: RunArtifacts;
+  state_snapshot: StateSnapshot;
+  graph_snapshot: Record<string, unknown>;
   cycle_summary?: CycleSummary;
 };

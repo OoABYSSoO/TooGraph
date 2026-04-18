@@ -45,15 +45,56 @@
                 <span>{{ iteration.activatedEdgeIds.length }} edges</span>
                 <span v-if="iteration.stopReason">{{ formatCycleStopReason(iteration.stopReason) }}</span>
               </div>
+              <div class="run-detail__meta-groups">
+                <div class="run-detail__meta-group">
+                  <span class="run-detail__meta-title">Executed</span>
+                  <div class="run-detail__badges">
+                    <span v-if="iteration.executedNodeIds.length === 0">None</span>
+                    <span v-for="nodeId in iteration.executedNodeIds" v-else :key="`executed-${iteration.iteration}-${nodeId}`">{{ nodeId }}</span>
+                  </div>
+                </div>
+                <div class="run-detail__meta-group">
+                  <span class="run-detail__meta-title">Activated edges</span>
+                  <div class="run-detail__badges">
+                    <span v-if="iteration.activatedEdgeIds.length === 0">None</span>
+                    <span v-for="edgeId in iteration.activatedEdgeIds" v-else :key="`edge-${iteration.iteration}-${edgeId}`">{{ edgeId }}</span>
+                  </div>
+                </div>
+                <div class="run-detail__meta-group">
+                  <span class="run-detail__meta-title">Incoming edges</span>
+                  <div class="run-detail__badges">
+                    <span v-if="iteration.incomingEdgeIds.length === 0">None</span>
+                    <span v-for="edgeId in iteration.incomingEdgeIds" v-else :key="`incoming-${iteration.iteration}-${edgeId}`">{{ edgeId }}</span>
+                  </div>
+                </div>
+                <div class="run-detail__meta-group">
+                  <span class="run-detail__meta-title">Next iteration</span>
+                  <div class="run-detail__badges">
+                    <span v-if="iteration.nextIterationEdgeIds.length === 0">Loop exits here</span>
+                    <span v-for="edgeId in iteration.nextIterationEdgeIds" v-else :key="`next-${iteration.iteration}-${edgeId}`">{{ edgeId }}</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </article>
 
         <article class="run-detail__panel">
           <h3>Artifacts</h3>
-          <div class="run-detail__info"><span>Knowledge</span><strong>{{ run.knowledge_summary || "None" }}</strong></div>
-          <div class="run-detail__info"><span>Memory</span><strong>{{ run.memory_summary || "None" }}</strong></div>
-          <div class="run-detail__info"><span>Final Result</span><strong>{{ run.final_result || "None" }}</strong></div>
+          <div class="run-detail__info"><span>Knowledge</span><strong class="run-detail__content">{{ run.knowledge_summary || "None" }}</strong></div>
+          <div class="run-detail__info"><span>Memory</span><strong class="run-detail__content">{{ run.memory_summary || "None" }}</strong></div>
+          <div class="run-detail__info"><span>Final Result</span><strong class="run-detail__content">{{ run.final_result || "None" }}</strong></div>
+          <div v-if="outputArtifacts.length > 0" class="run-detail__artifacts">
+            <div v-for="artifact in outputArtifacts" :key="artifact.key" class="run-detail__subcard">
+              <strong>{{ artifact.title }}</strong>
+              <pre class="run-detail__artifact-text">{{ artifact.text || "None" }}</pre>
+              <div class="run-detail__badges">
+                <span>{{ artifact.displayMode }}</span>
+                <span>{{ artifact.persistLabel }}</span>
+                <span v-if="artifact.fileName">{{ artifact.fileName }}</span>
+              </div>
+            </div>
+          </div>
         </article>
 
         <article class="run-detail__panel">
@@ -76,7 +117,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 
 import { fetchRun } from "@/api/runs";
@@ -84,18 +125,47 @@ import AppShell from "@/layouts/AppShell.vue";
 import { buildCycleVisualization, describeCycleStopReason, formatCycleStopReason } from "@/lib/run-cycle-visualization";
 import type { RunDetail } from "@/types/run";
 
+import { listRunOutputArtifacts, shouldPollRunStatus } from "./runDetailModel.ts";
+
 const route = useRoute();
 const run = ref<RunDetail | null>(null);
 const error = ref<string | null>(null);
 const runId = computed(() => String(route.params.runId ?? ""));
 const cycleVisualization = computed(() => (run.value ? buildCycleVisualization(run.value) : { hasCycle: false, summary: null, backEdges: [], iterations: [] }));
+const outputArtifacts = computed(() => (run.value ? listRunOutputArtifacts(run.value) : []));
+let pollTimer: number | null = null;
 
-onMounted(async () => {
+async function loadRun() {
+  if (pollTimer !== null) {
+    window.clearTimeout(pollTimer);
+    pollTimer = null;
+  }
   try {
     run.value = await fetchRun(runId.value);
     error.value = null;
+    if (shouldPollRunStatus(run.value.status)) {
+      pollTimer = window.setTimeout(() => {
+        void loadRun();
+      }, 750);
+    }
   } catch (fetchError) {
     error.value = fetchError instanceof Error ? fetchError.message : "Failed to load run detail.";
+  }
+}
+
+onMounted(() => {
+  void loadRun();
+});
+
+watch(runId, () => {
+  run.value = null;
+  error.value = null;
+  void loadRun();
+});
+
+onBeforeUnmount(() => {
+  if (pollTimer !== null) {
+    window.clearTimeout(pollTimer);
   }
 });
 </script>

@@ -38,8 +38,68 @@ test("buildNodeCardViewModel derives input body and output label", () => {
 
   assert.equal(model.body.kind, "input");
   assert.equal(model.body.valueText, "什么是 GraphiteUI？");
+  assert.equal(model.body.editorMode, "text");
   assert.equal(model.body.primaryOutput?.label, "question");
   assert.equal(model.body.primaryOutput?.typeLabel, "text");
+});
+
+test("buildNodeCardViewModel derives knowledge-base input editor mode from primary output state type", () => {
+  const node: GraphNode = {
+    kind: "input",
+    name: "input_knowledge_base",
+    description: "Pick a knowledge base.",
+    ui: { position: { x: 80, y: 220 } },
+    reads: [],
+    writes: [{ state: "knowledge_base", mode: "replace" }],
+    config: {
+      value: "graphiteui-official",
+    },
+  };
+
+  const model = buildNodeCardViewModel("input_knowledge_base", node, {
+    ...stateSchema,
+    knowledge_base: {
+      name: "knowledge_base",
+      description: "Knowledge base selection.",
+      type: "knowledge_base",
+      value: "graphiteui-official",
+      color: "#0f766e",
+    },
+  });
+
+  assert.equal(model.body.kind, "input");
+  assert.equal(model.body.editorMode, "knowledge_base");
+  assert.equal(model.body.primaryOutput?.typeLabel, "knowledge base");
+});
+
+test("buildNodeCardViewModel derives uploaded-asset input editor mode from primary output state type", () => {
+  const node: GraphNode = {
+    kind: "input",
+    name: "input_reference_image",
+    description: "Upload a reference image.",
+    ui: { position: { x: 80, y: 220 } },
+    reads: [],
+    writes: [{ state: "reference_image", mode: "replace" }],
+    config: {
+      value: "",
+    },
+  };
+
+  const model = buildNodeCardViewModel("input_reference_image", node, {
+    ...stateSchema,
+    reference_image: {
+      name: "reference_image",
+      description: "Reference image.",
+      type: "image",
+      value: "",
+      color: "#0f766e",
+    },
+  });
+
+  assert.equal(model.body.kind, "input");
+  assert.equal(model.body.editorMode, "asset");
+  assert.equal(model.body.assetType, "image");
+  assert.equal(model.body.primaryOutput?.typeLabel, "image");
 });
 
 test("buildNodeCardViewModel derives agent body, ports, and labels", () => {
@@ -67,6 +127,7 @@ test("buildNodeCardViewModel derives agent body, ports, and labels", () => {
   assert.deepEqual(model.inputs.map((port) => port.label), ["question"]);
   assert.deepEqual(model.outputs.map((port) => port.label), ["answer"]);
   assert.equal(model.body.kind, "agent");
+  assert.equal(model.body.systemInstruction, "");
   assert.equal(model.body.taskInstruction, "请直接用中文回答用户问题。");
   assert.equal(model.body.skillLabel, "No skills");
   assert.equal(model.body.primaryInput?.label, "question");
@@ -125,6 +186,129 @@ test("buildNodeCardViewModel uses legacy shorthand label for markdown output dis
   assert.equal(model.body.persistLabel, "Save on");
   assert.equal(model.body.persistFormatLabel, "MD");
   assert.equal(model.body.fileNameTemplate, "answer.md");
+});
+
+test("buildNodeCardViewModel prefers latest run output preview and display mode for output nodes", () => {
+  const node: GraphNode = {
+    kind: "output",
+    name: "output_answer",
+    description: "Preview the final answer.",
+    ui: { position: { x: 980, y: 220 } },
+    reads: [{ state: "answer", required: true }],
+    writes: [],
+    config: {
+      displayMode: "auto",
+      persistEnabled: false,
+      persistFormat: "auto",
+      fileNameTemplate: "",
+    },
+  };
+
+  const model = buildNodeCardViewModel("output_answer", node, stateSchema, {
+    runtime: {
+      latestRunStatus: "completed",
+      outputPreviewText: "# 最终答案\n\nGraphiteUI 已迁移完成。",
+      outputDisplayMode: "markdown",
+      failedMessage: null,
+    },
+  });
+
+  assert.equal(model.body.kind, "output");
+  assert.equal(model.body.previewText, "# 最终答案\n\nGraphiteUI 已迁移完成。");
+  assert.equal(model.body.displayModeLabel, "MD");
+});
+
+test("buildNodeCardViewModel reports missing output preview after a completed run", () => {
+  const node: GraphNode = {
+    kind: "output",
+    name: "output_answer",
+    description: "Preview the final answer.",
+    ui: { position: { x: 980, y: 220 } },
+    reads: [{ state: "answer", required: true }],
+    writes: [],
+    config: {
+      displayMode: "auto",
+      persistEnabled: false,
+      persistFormat: "auto",
+      fileNameTemplate: "",
+    },
+  };
+
+  const model = buildNodeCardViewModel("output_answer", node, stateSchema, {
+    runtime: {
+      latestRunStatus: "completed",
+      outputPreviewText: null,
+      outputDisplayMode: null,
+      failedMessage: null,
+    },
+  });
+
+  assert.equal(model.body.kind, "output");
+  assert.equal(model.body.previewText, "Latest run completed, but this output did not produce a value.");
+});
+
+test("buildNodeCardViewModel reports upstream run failure before an output was produced", () => {
+  const node: GraphNode = {
+    kind: "output",
+    name: "output_answer",
+    description: "Preview the final answer.",
+    ui: { position: { x: 980, y: 220 } },
+    reads: [{ state: "answer", required: true }],
+    writes: [],
+    config: {
+      displayMode: "auto",
+      persistEnabled: false,
+      persistFormat: "auto",
+      fileNameTemplate: "",
+    },
+  };
+
+  const model = buildNodeCardViewModel("output_answer", node, stateSchema, {
+    runtime: {
+      latestRunStatus: "failed",
+      outputPreviewText: null,
+      outputDisplayMode: null,
+      failedMessage: null,
+    },
+  });
+
+  assert.equal(model.body.kind, "output");
+  assert.equal(model.body.previewText, "Latest run failed before this output was produced.");
+});
+
+test("buildNodeCardViewModel exposes node-level latest run failure notes", () => {
+  const node: GraphNode = {
+    kind: "agent",
+    name: "answer_helper",
+    description: "Answer the question directly without external tools.",
+    ui: { position: { x: 520, y: 220 } },
+    reads: [{ state: "question", required: true }],
+    writes: [{ state: "answer", mode: "replace" }],
+    config: {
+      skills: [],
+      systemInstruction: "",
+      taskInstruction: "请直接用中文回答用户问题。",
+      modelSource: "global",
+      model: "",
+      thinkingMode: "on",
+      temperature: 0.2,
+    },
+  };
+
+  const model = buildNodeCardViewModel("answer_helper", node, stateSchema, {
+    runtime: {
+      latestRunStatus: "failed",
+      outputPreviewText: null,
+      outputDisplayMode: null,
+      failedMessage: "Tool execution crashed.",
+    },
+  });
+
+  assert.deepEqual(model.runtimeNote, {
+    tone: "danger",
+    label: "Latest run",
+    text: "Latest run failed here:\nTool execution crashed.",
+  });
 });
 
 test("buildNodeCardViewModel derives condition branches and rule summary", () => {
@@ -227,4 +411,29 @@ test("buildNodeCardViewModel derives unlimited loop label and multiple skills", 
   assert.equal(model.body.skillLabel, "2 skills");
   assert.equal(model.body.modelLabel, "gpt-5.4");
   assert.equal(model.body.thinkingLabel, "thinking off");
+});
+
+test("buildNodeCardViewModel keeps agent system instruction when present", () => {
+  const node: GraphNode = {
+    kind: "agent",
+    name: "guardrail_agent",
+    description: "Follow system constraints.",
+    ui: { position: { x: 0, y: 0 } },
+    reads: [{ state: "question", required: true }],
+    writes: [{ state: "answer", mode: "replace" }],
+    config: {
+      skills: [],
+      systemInstruction: "Always answer in Chinese.",
+      taskInstruction: "",
+      modelSource: "global",
+      model: "",
+      thinkingMode: "on",
+      temperature: 0.2,
+    },
+  };
+
+  const model = buildNodeCardViewModel("guardrail_agent", node, stateSchema);
+
+  assert.equal(model.body.kind, "agent");
+  assert.equal(model.body.systemInstruction, "Always answer in Chinese.");
 });

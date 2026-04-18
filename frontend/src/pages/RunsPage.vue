@@ -29,9 +29,15 @@
       <section class="runs-page__list">
         <article v-if="loading" class="runs-page__empty">Loading runs…</article>
         <article v-else-if="error" class="runs-page__empty">加载失败：{{ error }}</article>
-        <article v-else-if="runs.length === 0" class="runs-page__empty">当前没有运行记录。</article>
+        <article v-else-if="runs.length === 0" class="runs-page__empty">
+          <p>当前没有运行记录。</p>
+          <RouterLink class="runs-page__empty-action" :to="runsEmptyAction.href">{{ runsEmptyAction.label }}</RouterLink>
+        </article>
         <RouterLink v-for="run in runs" :key="run.run_id" class="runs-page__card" :to="`/runs/${run.run_id}`">
-          <strong>{{ run.run_id }}</strong>
+          <div class="runs-page__card-header">
+            <strong>{{ run.run_id }}</strong>
+            <span class="runs-page__detail">{{ runCardDetail }}</span>
+          </div>
           <p>{{ run.graph_name }}</p>
           <div class="runs-page__badges">
             <span>{{ run.status }}</span>
@@ -52,11 +58,15 @@ import { fetchRuns } from "@/api/runs";
 import AppShell from "@/layouts/AppShell.vue";
 import type { RunSummary } from "@/types/run";
 
+import { resolveRunsCardDetail, resolveRunsEmptyAction } from "./runsPageModel.ts";
+
 const runs = ref<RunSummary[]>([]);
 const loading = ref(true);
 const error = ref<string | null>(null);
 const graphNameQuery = ref("");
 const statusFilter = ref("");
+const runsEmptyAction = resolveRunsEmptyAction();
+const runCardDetail = resolveRunsCardDetail();
 
 async function loadRuns() {
   loading.value = true;
@@ -150,10 +160,41 @@ watch([graphNameQuery, statusFilter], loadRuns);
   text-decoration: none;
 }
 
+.runs-page__card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.runs-page__detail {
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(154, 52, 18);
+}
+
 .runs-page__card p,
-.runs-page__empty {
+.runs-page__empty p {
   margin: 6px 0 0;
   color: rgba(60, 41, 20, 0.72);
+}
+
+.runs-page__empty {
+  display: grid;
+  gap: 14px;
+}
+
+.runs-page__empty-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  border: 1px solid rgba(154, 52, 18, 0.18);
+  border-radius: 999px;
+  padding: 10px 14px;
+  color: rgb(154, 52, 18);
+  text-decoration: none;
 }
 
 .runs-page__badges {

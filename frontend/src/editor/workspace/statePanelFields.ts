@@ -1,6 +1,11 @@
 import { cloneGraphDocument } from "../../lib/graph-document.ts";
 import type { GraphDocument, GraphPayload, StateDefinition } from "../../types/node-system.ts";
 
+export type StateFieldDraft = {
+  key: string;
+  definition: StateDefinition;
+};
+
 export type StateFieldType =
   | "text"
   | "number"
@@ -53,8 +58,15 @@ export function buildDefaultStateField(existingKeys: string[]) {
 
 export function addStateFieldToDocument<T extends GraphPayload | GraphDocument>(document: T): T {
   const nextField = buildDefaultStateField(Object.keys(document.state_schema));
+  return insertStateFieldIntoDocument(document, nextField);
+}
+
+export function insertStateFieldIntoDocument<T extends GraphPayload | GraphDocument>(document: T, field: StateFieldDraft): T {
+  if (document.state_schema[field.key]) {
+    return document;
+  }
   const nextDocument = cloneGraphDocument(document);
-  nextDocument.state_schema[nextField.key] = nextField.definition;
+  nextDocument.state_schema[field.key] = field.definition;
   return nextDocument;
 }
 

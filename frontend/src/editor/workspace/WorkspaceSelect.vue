@@ -68,6 +68,7 @@ function handleValueChange(value: string) {
 
 <style scoped>
 .workspace-select__trigger {
+  position: relative;
   min-height: 38px;
   width: 100%;
   appearance: none;
@@ -75,7 +76,7 @@ function handleValueChange(value: string) {
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.88);
   padding: 8px 40px 8px 14px;
-  font-size: 0.92rem;
+  font-size: 0.875rem;
   color: #3c2914;
   text-align: left;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
@@ -129,7 +130,7 @@ function handleValueChange(value: string) {
 .workspace-select__viewport {
   display: grid;
   gap: 4px;
-  padding: 6px;
+  padding: 4px;
 }
 
 .workspace-select__item {
@@ -139,8 +140,8 @@ function handleValueChange(value: string) {
   justify-content: space-between;
   gap: 12px;
   border-radius: 12px;
-  padding: 10px 12px;
-  font-size: 0.92rem;
+  padding: 8px 12px;
+  font-size: 0.875rem;
   color: #3c2914;
   outline: none;
   cursor: pointer;

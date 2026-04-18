@@ -40,8 +40,128 @@
           </span>
         </div>
       </div>
+      <div class="node-card__input-toolbar">
+        <div v-if="!inputAssetEnvelope" class="node-card__control-list">
+          <button
+            v-for="option in inputTypeOptions"
+            :key="option.value"
+            type="button"
+            class="node-card__control-button"
+            :class="{ 'node-card__control-button--active': isInputTypeOptionActive(option.value) }"
+            @pointerdown.stop
+            @click.stop="updateInputBoundaryType(option.value)"
+          >
+            {{ option.label }}
+          </button>
+        </div>
+        <div v-else class="node-card__input-lock">
+          Uploaded asset locked this input as {{ inputAssetEnvelope.detectedType }}.
+        </div>
+      </div>
+      <div v-if="showKnowledgeBaseInput" class="node-card__surface node-card__input-picker">
+        <label class="node-card__control-row">
+          <span class="node-card__control-label">Knowledge Base</span>
+          <select
+            class="node-card__control-select node-card__input-select"
+            :value="inputKnowledgeBaseValue"
+            :disabled="inputKnowledgeBaseOptions.length === 0"
+            @pointerdown.stop
+            @click.stop
+            @change="handleInputKnowledgeBaseChange"
+          >
+            <option value="">{{ inputKnowledgeBaseOptions.length === 0 ? "No knowledge bases found" : "Select knowledge base" }}</option>
+            <option v-for="option in inputKnowledgeBaseOptions" :key="option.value" :value="option.value">
+              {{ option.label }}
+            </option>
+          </select>
+        </label>
+        <div class="node-card__input-meta">
+          {{ selectedKnowledgeBaseDescription }}
+        </div>
+      </div>
+      <div v-else-if="showAssetUploadInput" class="node-card__input-upload">
+        <input
+          ref="inputAssetInputRef"
+          class="node-card__sr-only"
+          type="file"
+          :accept="inputAssetAccept"
+          @change="handleInputAssetFileChange"
+        />
+        <button
+          v-if="!inputAssetEnvelope"
+          type="button"
+          class="node-card__asset-dropzone"
+          @pointerdown.stop
+          @click.stop="openInputAssetPicker"
+          @dragover.prevent
+          @drop.prevent="handleInputAssetDrop"
+        >
+          <span class="node-card__asset-dropzone-title">Drop {{ inputAssetLabel }} here</span>
+          <span class="node-card__asset-dropzone-copy">Or click to choose a file from your device.</span>
+        </button>
+        <div
+          v-else
+          class="node-card__asset-preview-card"
+          @dragover.prevent
+          @drop.prevent="handleInputAssetDrop"
+        >
+          <div class="node-card__asset-actions">
+            <button
+              type="button"
+              class="node-card__asset-action"
+              @pointerdown.stop
+              @click.stop="openInputAssetPicker"
+            >
+              Replace
+            </button>
+            <button
+              type="button"
+              class="node-card__asset-action node-card__asset-action--danger"
+              @pointerdown.stop
+              @click.stop="clearInputAsset"
+            >
+              Remove
+            </button>
+          </div>
+
+          <div
+            v-if="inputAssetEnvelope.detectedType === 'image' && inputAssetEnvelope.encoding === 'data_url'"
+            class="node-card__asset-media-shell"
+          >
+            <img :src="inputAssetEnvelope.content" :alt="inputAssetEnvelope.name" class="node-card__asset-image" />
+          </div>
+          <div
+            v-else-if="inputAssetEnvelope.detectedType === 'audio' && inputAssetEnvelope.encoding === 'data_url'"
+            class="node-card__asset-media-shell node-card__asset-media-shell--audio"
+          >
+            <audio controls class="node-card__asset-audio">
+              <source :src="inputAssetEnvelope.content" :type="inputAssetEnvelope.mimeType" />
+            </audio>
+          </div>
+          <div
+            v-else-if="inputAssetEnvelope.detectedType === 'video' && inputAssetEnvelope.encoding === 'data_url'"
+            class="node-card__asset-media-shell"
+          >
+            <video controls class="node-card__asset-video">
+              <source :src="inputAssetEnvelope.content" :type="inputAssetEnvelope.mimeType" />
+            </video>
+          </div>
+          <div v-else class="node-card__asset-file">
+            <div class="node-card__asset-name">{{ inputAssetEnvelope.name }}</div>
+            <div class="node-card__asset-summary">{{ inputAssetSummary }}</div>
+            <pre v-if="inputAssetTextPreview" class="node-card__asset-text">{{ inputAssetTextPreview }}</pre>
+          </div>
+
+          <div class="node-card__input-meta">
+            {{ inputAssetDescription }}
+          </div>
+        </div>
+        <div v-if="showLegacyUploadedAssetHint" class="node-card__input-meta">
+          Current value is raw text. Uploading a file will replace it with an uploaded asset envelope.
+        </div>
+      </div>
       <textarea
-        v-if="isInputValueEditable"
+        v-else-if="isInputValueEditable"
         class="node-card__surface node-card__surface-textarea"
         :value="inputValueText"
         placeholder="Enter input value"
@@ -76,9 +196,228 @@
         <span class="node-card__chip node-card__chip--muted">{{ view.body.skillLabel }}</span>
       </div>
       <div class="node-card__action-row">
-        <span class="node-card__action-pill node-card__action-pill--skill">+ skill</span>
-        <span class="node-card__action-pill node-card__action-pill--input">+ input</span>
-        <span class="node-card__action-pill node-card__action-pill--output">+ output</span>
+        <button
+          v-if="showSkillPickerTrigger"
+          type="button"
+          class="node-card__action-pill node-card__action-pill--skill node-card__action-pill-button"
+          @pointerdown.stop
+          @click.stop="toggleSkillPicker"
+        >
+          + skill
+        </button>
+        <span v-else class="node-card__action-pill node-card__action-pill--skill node-card__action-pill--disabled">+ skill</span>
+        <button
+          type="button"
+          class="node-card__action-pill node-card__action-pill--input node-card__action-pill-button"
+          @pointerdown.stop
+          @click.stop="openPortPicker('input')"
+        >
+          + input
+        </button>
+        <button
+          type="button"
+          class="node-card__action-pill node-card__action-pill--output node-card__action-pill-button"
+          @pointerdown.stop
+          @click.stop="openPortPicker('output')"
+        >
+          + output
+        </button>
+      </div>
+      <div v-if="activePortPickerSide" class="node-card__port-picker" @pointerdown.stop @click.stop>
+        <div class="node-card__port-picker-title">{{ portPickerTitle }}</div>
+        <div v-if="portStateDraft" class="node-card__port-picker-form">
+          <label class="node-card__control-row">
+            <span class="node-card__control-label">Name</span>
+            <input
+              class="node-card__control-input"
+              type="text"
+              :value="portStateDraft.definition.name"
+              @pointerdown.stop
+              @click.stop
+              @input="handlePortDraftNameInput"
+            />
+          </label>
+          <label class="node-card__control-row">
+            <span class="node-card__control-label">Key</span>
+            <input
+              class="node-card__control-input"
+              type="text"
+              :value="portStateDraft.key"
+              @pointerdown.stop
+              @click.stop
+              @input="handlePortDraftKeyInput"
+            />
+          </label>
+          <label class="node-card__control-row">
+            <span class="node-card__control-label">Type</span>
+            <select
+              class="node-card__control-select"
+              :value="portStateDraft.definition.type"
+              @pointerdown.stop
+              @click.stop
+              @change="handlePortDraftTypeChange"
+            >
+              <option v-for="typeOption in stateTypeOptions" :key="typeOption" :value="typeOption">{{ typeOption }}</option>
+            </select>
+          </label>
+          <label class="node-card__control-row">
+            <span class="node-card__control-label">Description</span>
+            <textarea
+              class="node-card__control-textarea"
+              :value="portStateDraft.definition.description"
+              @pointerdown.stop
+              @click.stop
+              @input="handlePortDraftDescriptionInput"
+            />
+          </label>
+          <label class="node-card__control-row">
+            <span class="node-card__control-label">Color</span>
+            <input
+              class="node-card__control-input"
+              type="text"
+              :value="portStateDraft.definition.color"
+              placeholder="#d97706"
+              @pointerdown.stop
+              @click.stop
+              @input="handlePortDraftColorInput"
+            />
+          </label>
+          <StateDefaultValueEditor
+            :field="portStateDraft.definition"
+            @update-value="updatePortDraftValue"
+          />
+          <div class="node-card__port-picker-hint" :class="{ 'node-card__port-picker-hint--error': Boolean(portStateError) }">
+            {{ portStateError ?? "Create the state and bind this port to it immediately." }}
+          </div>
+          <div class="node-card__port-picker-actions">
+            <button
+              type="button"
+              class="node-card__port-picker-button"
+              @pointerdown.stop
+              @click.stop="backPortDraft"
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              class="node-card__port-picker-button node-card__port-picker-button--primary"
+              @pointerdown.stop
+              @click.stop="commitPortStateCreate"
+            >
+              Create
+            </button>
+          </div>
+        </div>
+        <div v-else class="node-card__port-picker-form">
+          <input
+            class="node-card__control-input"
+            type="text"
+            :value="portStateSearch"
+            :placeholder="activePortPickerSide === 'input' ? 'Search or create input state' : 'Search or create output state'"
+            @pointerdown.stop
+            @click.stop
+            @input="handlePortStateSearchInput"
+          />
+          <button
+            v-if="portStateSearch.trim()"
+            type="button"
+            class="node-card__port-create-option"
+            @pointerdown.stop
+            @click.stop="beginPortStateCreate"
+          >
+            <span class="node-card__port-create-label">Create</span>
+            <span class="node-card__port-create-title">新增 “{{ portStateSearch.trim() }}”</span>
+          </button>
+          <button
+            v-for="stateRow in portPickerMatchingStates"
+            :key="stateRow.key"
+            type="button"
+            class="node-card__port-state-option"
+            @pointerdown.stop
+            @click.stop="bindStateToPort(stateRow.key)"
+          >
+            <span class="node-card__port-state-type">{{ stateRow.definition.type }}</span>
+            <span class="node-card__port-state-title">{{ stateRow.label }}</span>
+            <span class="node-card__port-state-key">{{ stateRow.key }}</span>
+          </button>
+          <div class="node-card__port-picker-actions">
+            <button
+              type="button"
+              class="node-card__port-picker-button"
+              @pointerdown.stop
+              @click.stop="closePortPicker"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+      <div v-if="isSkillPickerOpen" class="node-card__skill-picker" @pointerdown.stop @click.stop>
+        <div class="node-card__skill-picker-title">Add Skill</div>
+        <div class="node-card__skill-picker-copy">这里只负责附加已有 skill，不在编排界面里编辑 skill 内容。</div>
+        <div v-if="skillDefinitionsLoading" class="node-card__skill-panel-message">
+          Loading skills...
+        </div>
+        <div v-else-if="skillDefinitionsError" class="node-card__skill-panel-message node-card__skill-panel-message--error">
+          {{ skillDefinitionsError }}
+        </div>
+        <div v-else-if="availableSkillDefinitions.length === 0" class="node-card__skill-panel-message">
+          No available skills to attach.
+        </div>
+        <button
+          v-for="definition in availableSkillDefinitions"
+          v-else
+          :key="definition.skillKey"
+          type="button"
+          class="node-card__skill-option"
+          @pointerdown.stop
+          @click.stop="attachAgentSkill(definition.skillKey)"
+        >
+          <div class="node-card__skill-option-title">{{ definition.label }}</div>
+          <div class="node-card__skill-option-copy">{{ definition.description }}</div>
+          <div class="node-card__skill-option-meta">
+            <span v-if="definition.inputSchema.length > 0">In {{ definition.inputSchema.length }}</span>
+            <span v-if="definition.outputSchema.length > 0">Out {{ definition.outputSchema.length }}</span>
+          </div>
+        </button>
+      </div>
+      <div v-if="attachedSkillBadges.length > 0" class="node-card__skill-badges">
+        <span
+          v-for="badge in attachedSkillBadges"
+          :key="badge.skillKey"
+          class="node-card__skill-badge"
+          :title="badge.description || badge.skillKey"
+        >
+          <span>{{ badge.label }}</span>
+          <button
+            type="button"
+            class="node-card__skill-badge-remove"
+            title="Remove skill"
+            @pointerdown.stop
+            @click.stop="removeAgentSkill(badge.skillKey)"
+          >
+            ×
+          </button>
+        </span>
+      </div>
+      <label class="node-card__control-row">
+        <span class="node-card__control-label">Model</span>
+        <select
+          class="node-card__control-select"
+          :value="agentResolvedModelValue"
+          :disabled="agentModelOptions.length === 0"
+          @pointerdown.stop
+          @click.stop
+          @change="handleAgentModelChange"
+        >
+          <option v-if="agentModelOptions.length === 0" value="">No configured models</option>
+          <option v-for="option in agentModelOptions" :key="option.value" :value="option.value">
+            {{ option.value === trimmedGlobalTextModelRef ? `${option.label} (Global)` : option.label }}
+          </option>
+        </select>
+      </label>
+      <div class="node-card__input-meta">
+        {{ agentModelSelectionDescription }}
       </div>
       <textarea
         class="node-card__surface node-card__surface-textarea"
@@ -91,6 +430,17 @@
       <details class="node-card__advanced-panel" @pointerdown.stop>
         <summary class="node-card__advanced-summary">Advanced</summary>
         <div class="node-card__advanced-content">
+          <label class="node-card__control-row">
+            <span class="node-card__control-label">System</span>
+            <textarea
+              class="node-card__control-textarea"
+              :value="view.body.systemInstruction"
+              placeholder="Add system guardrails or role guidance"
+              @pointerdown.stop
+              @click.stop
+              @input="handleAgentSystemInstructionInput"
+            />
+          </label>
           <div class="node-card__control-row">
             <span class="node-card__control-label">Thinking</span>
             <div class="node-card__control-list">
@@ -319,7 +669,8 @@
               class="node-card__branch-route"
               :class="{ 'node-card__branch-route--unrouted': !branch.routeTargetLabel }"
             >
-              {{ branch.routeTargetLabel ? `Route to ${branch.routeTargetLabel}` : "Unrouted" }}
+              <span class="node-card__branch-route-label">Route</span>
+              <span class="node-card__branch-route-target">{{ branch.routeTargetLabel ?? "Unrouted" }}</span>
             </div>
           </div>
           <button
@@ -333,36 +684,67 @@
         </div>
       </div>
     </section>
+
+    <div
+      v-if="view.runtimeNote"
+      class="node-card__runtime-note"
+      :class="`node-card__runtime-note--${view.runtimeNote.tone}`"
+    >
+      <span class="node-card__runtime-note-label">{{ view.runtimeNote.label }}</span>
+      <div class="node-card__runtime-note-text">{{ view.runtimeNote.text }}</div>
+    </div>
   </article>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 
+import StateDefaultValueEditor from "@/editor/workspace/StateDefaultValueEditor.vue";
 import { listConditionBranchMappingKeys, parseConditionBranchMappingDraft } from "@/lib/condition-branch-mapping";
+import type { KnowledgeBaseRecord } from "@/types/knowledge";
 import type { AgentNode, ConditionNode, GraphNode, InputNode, OutputNode, StateDefinition } from "@/types/node-system";
+import type { SkillDefinition } from "@/types/skills";
 
-import { DEFAULT_AGENT_TEMPERATURE, normalizeAgentTemperature } from "./agentConfigModel";
+import { DEFAULT_AGENT_TEMPERATURE, buildAgentModelSelectOptions, normalizeAgentTemperature, resolveAgentModelSelection } from "./agentConfigModel";
 import { parseConditionLoopLimitDraft } from "./conditionLoopLimit";
 import { buildConditionRuleEditorModel, CONDITION_RULE_OPERATOR_OPTIONS } from "./conditionRuleEditorModel";
+import { isSwitchableInputBoundaryType, resolveNextInputValueForBoundaryType, resolveStateTypeForInputBoundary } from "./inputValueTypeModel";
 import { buildNodeCardViewModel } from "./nodeCardViewModel";
+import { listAttachableSkillDefinitions, resolveAttachedSkillBadges } from "./skillPickerModel";
+import { createStateDraftFromQuery, matchesStatePortSearch } from "./statePortCreateModel";
+import { createUploadedAssetEnvelope, resolveUploadedAssetInputAccept, tryParseUploadedAssetEnvelope } from "./uploadedAssetModel";
+import { defaultValueForStateType, STATE_FIELD_TYPE_OPTIONS, type StateFieldDraft, type StateFieldType } from "@/editor/workspace/statePanelFields";
 
 const props = defineProps<{
   nodeId: string;
   node: GraphNode;
   stateSchema: Record<string, StateDefinition>;
+  knowledgeBases: KnowledgeBaseRecord[];
+  skillDefinitions: SkillDefinition[];
+  skillDefinitionsLoading: boolean;
+  skillDefinitionsError: string | null;
+  availableAgentModelRefs: string[];
+  agentModelDisplayLookup: Record<string, string>;
+  globalTextModelRef: string;
   conditionRouteTargets?: Record<string, string | null>;
+  latestRunStatus?: string | null;
+  runOutputPreviewText?: string | null;
+  runOutputDisplayMode?: string | null;
+  runFailureMessage?: string | null;
   selected: boolean;
 }>();
 
 const emit = defineEmits<{
   (event: "update-input-config", payload: { nodeId: string; patch: Partial<InputNode["config"]> }): void;
+  (event: "update-input-state", payload: { stateKey: string; patch: Partial<StateDefinition> }): void;
   (event: "update-output-config", payload: { nodeId: string; patch: Partial<OutputNode["config"]> }): void;
   (event: "update-agent-config", payload: { nodeId: string; patch: Partial<AgentNode["config"]> }): void;
   (event: "update-condition-config", payload: { nodeId: string; patch: Partial<ConditionNode["config"]> }): void;
   (event: "update-condition-branch", payload: { nodeId: string; currentKey: string; nextKey: string; mappingKeys: string[] }): void;
   (event: "add-condition-branch", payload: { nodeId: string }): void;
   (event: "remove-condition-branch", payload: { nodeId: string; branchKey: string }): void;
+  (event: "bind-port-state", payload: { nodeId: string; side: "input" | "output"; stateKey: string }): void;
+  (event: "create-port-state", payload: { nodeId: string; side: "input" | "output"; field: StateFieldDraft }): void;
 }>();
 
 const outputDisplayModeOptions: Array<{ value: OutputNode["config"]["displayMode"]; label: string }> = [
@@ -381,22 +763,40 @@ const agentThinkingOptions: Array<{ value: AgentNode["config"]["thinkingMode"]; 
   { value: "on", label: "ON" },
   { value: "off", label: "OFF" },
 ];
+const inputTypeOptions: Array<{ value: "text" | "file" | "knowledge_base"; label: string }> = [
+  { value: "text", label: "Text" },
+  { value: "file", label: "File" },
+  { value: "knowledge_base", label: "KB" },
+];
+const stateTypeOptions = STATE_FIELD_TYPE_OPTIONS;
 const conditionRuleOperatorOptions = CONDITION_RULE_OPERATOR_OPTIONS;
 
 const view = computed(() =>
   buildNodeCardViewModel(props.nodeId, props.node, props.stateSchema, {
     conditionRouteTargets: props.conditionRouteTargets,
+    runtime: {
+      latestRunStatus: props.latestRunStatus ?? null,
+      outputPreviewText: props.runOutputPreviewText ?? null,
+      outputDisplayMode: props.runOutputDisplayMode ?? null,
+      failedMessage: props.runFailureMessage ?? null,
+    },
   }),
 );
 const canRemoveConditionBranch = computed(() => props.node.kind === "condition" && props.node.config.branches.length > 1);
 const conditionLoopLimitDraft = ref("");
 const conditionBranchDrafts = ref<Record<string, { branchKey: string; mappingText: string }>>({});
+const inputAssetInputRef = ref<HTMLInputElement | null>(null);
+const isSkillPickerOpen = ref(false);
+const activePortPickerSide = ref<"input" | "output" | null>(null);
+const portStateSearch = ref("");
+const portStateDraft = ref<StateFieldDraft | null>(null);
+const portStateError = ref<string | null>(null);
 const conditionRuleEditor = computed(() =>
   props.node.kind === "condition" ? buildConditionRuleEditorModel(props.node.config.rule, props.stateSchema) : null,
 );
-const isInputValueEditable = computed(
-  () => props.node.kind === "input" && (typeof props.node.config.value === "string" || props.node.config.value === null || props.node.config.value === undefined),
-);
+const showKnowledgeBaseInput = computed(() => view.value.body.kind === "input" && view.value.body.editorMode === "knowledge_base");
+const showAssetUploadInput = computed(() => view.value.body.kind === "input" && view.value.body.editorMode === "asset");
+const isInputValueEditable = computed(() => view.value.body.kind === "input" && view.value.body.editorMode === "text");
 const inputValueText = computed(() => {
   if (props.node.kind !== "input") {
     return "";
@@ -408,6 +808,160 @@ const inputValueText = computed(() => {
     return "";
   }
   return view.value.body.kind === "input" ? view.value.body.valueText : "";
+});
+const inputKnowledgeBaseValue = computed(() => {
+  if (props.node.kind !== "input") {
+    return "";
+  }
+  return typeof props.node.config.value === "string" ? props.node.config.value : "";
+});
+const inputAssetType = computed(() => (view.value.body.kind === "input" ? view.value.body.assetType : null));
+const inputAssetEnvelope = computed(() => (props.node.kind === "input" ? tryParseUploadedAssetEnvelope(props.node.config.value) : null));
+const inputAssetAccept = computed(() => resolveUploadedAssetInputAccept(inputAssetType.value));
+const inputStateKey = computed(() => (view.value.body.kind === "input" ? view.value.body.primaryOutput?.key ?? null : null));
+const inputStateType = computed(() => {
+  const stateKey = inputStateKey.value;
+  return stateKey ? String(props.stateSchema[stateKey]?.type ?? "text") : "text";
+});
+const inputAssetLabel = computed(() => {
+  switch (inputAssetType.value) {
+    case "image":
+      return "image";
+    case "audio":
+      return "audio clip";
+    case "video":
+      return "video";
+    default:
+      return "file";
+  }
+});
+const inputAssetSummary = computed(() => {
+  const asset = inputAssetEnvelope.value;
+  if (!asset) {
+    return "";
+  }
+  return `${asset.mimeType} · ${Math.max(1, Math.round(asset.size / 1024))} KB`;
+});
+const inputAssetTextPreview = computed(() => {
+  const asset = inputAssetEnvelope.value;
+  if (!asset || asset.encoding !== "text") {
+    return "";
+  }
+  return asset.content.slice(0, 3000);
+});
+const inputAssetDescription = computed(() => {
+  const asset = inputAssetEnvelope.value;
+  if (asset) {
+    return `Stored as ${asset.detectedType} upload. ${inputAssetSummary.value}`;
+  }
+  switch (inputAssetType.value) {
+    case "image":
+      return "Upload a reference image for this workflow.";
+    case "audio":
+      return "Upload an audio clip that this workflow should read.";
+    case "video":
+      return "Upload a video asset that this workflow should inspect.";
+    default:
+      return "Upload a file to seed this workflow.";
+  }
+});
+const showLegacyUploadedAssetHint = computed(
+  () => showAssetUploadInput.value && !inputAssetEnvelope.value && inputValueText.value.trim().length > 0,
+);
+const inputKnowledgeBaseOptions = computed(() => {
+  const options = props.knowledgeBases.map((knowledgeBase) => ({
+    value: knowledgeBase.name,
+    label: knowledgeBase.label?.trim() || knowledgeBase.name,
+    description: knowledgeBase.description?.trim() || "",
+  }));
+
+  const currentValue = inputKnowledgeBaseValue.value.trim();
+  if (currentValue && !options.some((option) => option.value === currentValue)) {
+    return [
+      {
+        value: currentValue,
+        label: `${currentValue} (current)`,
+        description: "This knowledge base is no longer available in the imported catalog.",
+      },
+      ...options,
+    ];
+  }
+
+  return options;
+});
+const selectedKnowledgeBaseDescription = computed(() => {
+  if (!showKnowledgeBaseInput.value) {
+    return "";
+  }
+  const selectedOption = inputKnowledgeBaseOptions.value.find((option) => option.value === inputKnowledgeBaseValue.value);
+  if (selectedOption?.description) {
+    return selectedOption.description;
+  }
+  if (inputKnowledgeBaseOptions.value.length === 0) {
+    return "Import or sync knowledge bases to make this input selectable.";
+  }
+  return "Pick the knowledge base that should ground this workflow.";
+});
+const trimmedGlobalTextModelRef = computed(() => props.globalTextModelRef.trim());
+const agentResolvedModelValue = computed(() => {
+  if (props.node.kind !== "agent") {
+    return trimmedGlobalTextModelRef.value;
+  }
+  const overrideModel = props.node.config.model.trim();
+  return props.node.config.modelSource === "override" && overrideModel ? overrideModel : trimmedGlobalTextModelRef.value;
+});
+const agentModelOptions = computed(() =>
+  buildAgentModelSelectOptions(agentResolvedModelValue.value, props.availableAgentModelRefs, props.agentModelDisplayLookup),
+);
+const agentModelSelectionDescription = computed(() => {
+  if (props.node.kind !== "agent") {
+    return "";
+  }
+  const resolvedModel = agentResolvedModelValue.value.trim();
+  if (!resolvedModel) {
+    return "Load settings to choose from configured models.";
+  }
+  const resolvedLabel = props.agentModelDisplayLookup[resolvedModel] || resolvedModel;
+  return props.node.config.modelSource === "global"
+    ? `Using workspace default model: ${resolvedLabel}.`
+    : `Overriding the workspace default with ${resolvedLabel}.`;
+});
+const attachedSkillBadges = computed(() =>
+  props.node.kind === "agent" ? resolveAttachedSkillBadges(props.node.config.skills, props.skillDefinitions) : [],
+);
+const availableSkillDefinitions = computed(() =>
+  props.node.kind === "agent" ? listAttachableSkillDefinitions(props.skillDefinitions, props.node.config.skills) : [],
+);
+const showSkillPickerTrigger = computed(
+  () => availableSkillDefinitions.value.length > 0 || props.skillDefinitionsLoading || Boolean(props.skillDefinitionsError),
+);
+const portPickerMatchingStates = computed(() =>
+  Object.entries(props.stateSchema)
+    .map(([key, definition]) => ({
+      key,
+      definition,
+      label: definition.name.trim() || key,
+    }))
+    .filter(({ key, definition }) =>
+      matchesStatePortSearch(
+        {
+          key,
+          name: definition.name,
+          description: definition.description,
+        },
+        portStateSearch.value,
+      ),
+    )
+    .sort((left, right) => left.label.localeCompare(right.label) || left.key.localeCompare(right.key)),
+);
+const portPickerTitle = computed(() => {
+  if (!activePortPickerSide.value) {
+    return "";
+  }
+  if (portStateDraft.value) {
+    return activePortPickerSide.value === "input" ? "Create Input State" : "Create Output State";
+  }
+  return activePortPickerSide.value === "input" ? "Select Input State" : "Select Output State";
 });
 const conditionRuleValueText = computed(() => {
   if (props.node.kind !== "condition") {
@@ -456,6 +1010,10 @@ function emitInputConfigPatch(patch: Partial<InputNode["config"]>) {
     return;
   }
   emit("update-input-config", { nodeId: props.nodeId, patch });
+}
+
+function emitInputStatePatch(stateKey: string, patch: Partial<StateDefinition>) {
+  emit("update-input-state", { stateKey, patch });
 }
 
 function emitAgentConfigPatch(patch: Partial<AgentNode["config"]>) {
@@ -542,6 +1100,208 @@ function handleAgentTaskInstructionInput(event: Event) {
   emitAgentConfigPatch({ taskInstruction: target.value });
 }
 
+function handleAgentSystemInstructionInput(event: Event) {
+  const target = event.target;
+  if (!(target instanceof HTMLTextAreaElement)) {
+    return;
+  }
+  emitAgentConfigPatch({ systemInstruction: target.value });
+}
+
+function toggleSkillPicker() {
+  if (!showSkillPickerTrigger.value) {
+    return;
+  }
+  activePortPickerSide.value = null;
+  portStateDraft.value = null;
+  portStateSearch.value = "";
+  portStateError.value = null;
+  isSkillPickerOpen.value = !isSkillPickerOpen.value;
+}
+
+function attachAgentSkill(skillKey: string) {
+  if (props.node.kind !== "agent" || props.node.config.skills.includes(skillKey)) {
+    return;
+  }
+  emitAgentConfigPatch({ skills: [...props.node.config.skills, skillKey] });
+  isSkillPickerOpen.value = false;
+}
+
+function removeAgentSkill(skillKey: string) {
+  if (props.node.kind !== "agent" || !props.node.config.skills.includes(skillKey)) {
+    return;
+  }
+  emitAgentConfigPatch({ skills: props.node.config.skills.filter((candidateKey) => candidateKey !== skillKey) });
+}
+
+function openPortPicker(side: "input" | "output") {
+  isSkillPickerOpen.value = false;
+  portStateSearch.value = "";
+  portStateDraft.value = null;
+  portStateError.value = null;
+  activePortPickerSide.value = activePortPickerSide.value === side ? null : side;
+}
+
+function closePortPicker() {
+  activePortPickerSide.value = null;
+  portStateSearch.value = "";
+  portStateDraft.value = null;
+  portStateError.value = null;
+}
+
+function handlePortStateSearchInput(event: Event) {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement)) {
+    return;
+  }
+  portStateSearch.value = target.value;
+}
+
+function beginPortStateCreate() {
+  portStateDraft.value = createStateDraftFromQuery(portStateSearch.value, Object.keys(props.stateSchema));
+  portStateError.value = null;
+}
+
+function backPortDraft() {
+  portStateDraft.value = null;
+  portStateError.value = null;
+}
+
+function handlePortDraftNameInput(event: Event) {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement) || !portStateDraft.value) {
+    return;
+  }
+  portStateDraft.value = {
+    ...portStateDraft.value,
+    definition: {
+      ...portStateDraft.value.definition,
+      name: target.value,
+    },
+  };
+}
+
+function handlePortDraftKeyInput(event: Event) {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement) || !portStateDraft.value) {
+    return;
+  }
+  portStateDraft.value = {
+    ...portStateDraft.value,
+    key: target.value,
+  };
+}
+
+function handlePortDraftTypeChange(event: Event) {
+  const target = event.target;
+  if (!(target instanceof HTMLSelectElement) || !portStateDraft.value) {
+    return;
+  }
+  portStateDraft.value = {
+    ...portStateDraft.value,
+    definition: {
+      ...portStateDraft.value.definition,
+      type: target.value,
+      value: defaultValueForStateType(target.value as StateFieldType),
+    },
+  };
+}
+
+function handlePortDraftDescriptionInput(event: Event) {
+  const target = event.target;
+  if (!(target instanceof HTMLTextAreaElement) || !portStateDraft.value) {
+    return;
+  }
+  portStateDraft.value = {
+    ...portStateDraft.value,
+    definition: {
+      ...portStateDraft.value.definition,
+      description: target.value,
+    },
+  };
+}
+
+function handlePortDraftColorInput(event: Event) {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement) || !portStateDraft.value) {
+    return;
+  }
+  portStateDraft.value = {
+    ...portStateDraft.value,
+    definition: {
+      ...portStateDraft.value.definition,
+      color: target.value,
+    },
+  };
+}
+
+function updatePortDraftValue(value: unknown) {
+  if (!portStateDraft.value) {
+    return;
+  }
+  portStateDraft.value = {
+    ...portStateDraft.value,
+    definition: {
+      ...portStateDraft.value.definition,
+      value,
+    },
+  };
+}
+
+function bindStateToPort(stateKey: string) {
+  if (!activePortPickerSide.value) {
+    return;
+  }
+  emit("bind-port-state", {
+    nodeId: props.nodeId,
+    side: activePortPickerSide.value,
+    stateKey,
+  });
+  closePortPicker();
+}
+
+function commitPortStateCreate() {
+  if (!activePortPickerSide.value || !portStateDraft.value) {
+    return;
+  }
+
+  const nextKey = portStateDraft.value.key.trim();
+  const nextName = portStateDraft.value.definition.name.trim() || nextKey;
+  if (!nextKey) {
+    portStateError.value = "State key cannot be empty.";
+    return;
+  }
+  if (props.stateSchema[nextKey]) {
+    portStateError.value = `State key '${nextKey}' already exists.`;
+    return;
+  }
+
+  emit("create-port-state", {
+    nodeId: props.nodeId,
+    side: activePortPickerSide.value,
+    field: {
+      key: nextKey,
+      definition: {
+        ...portStateDraft.value.definition,
+        name: nextName,
+      },
+    },
+  });
+  closePortPicker();
+}
+
+function handleAgentModelChange(event: Event) {
+  const target = event.target;
+  if (!(target instanceof HTMLSelectElement)) {
+    return;
+  }
+  const nextValue = target.value.trim();
+  if (!nextValue) {
+    return;
+  }
+  emitAgentConfigPatch(resolveAgentModelSelection(nextValue, trimmedGlobalTextModelRef.value));
+}
+
 function updateAgentThinkingMode(thinkingMode: AgentNode["config"]["thinkingMode"]) {
   emitAgentConfigPatch({ thinkingMode });
 }
@@ -568,6 +1328,83 @@ function handleInputValueInput(event: Event) {
     return;
   }
   emitInputConfigPatch({ value: target.value });
+}
+
+function handleInputKnowledgeBaseChange(event: Event) {
+  const target = event.target;
+  if (!(target instanceof HTMLSelectElement)) {
+    return;
+  }
+  emitInputConfigPatch({ value: target.value });
+}
+
+function isInputTypeOptionActive(type: "text" | "file" | "knowledge_base") {
+  return inputStateType.value === type;
+}
+
+function updateInputBoundaryType(nextType: "text" | "file" | "knowledge_base") {
+  const stateKey = inputStateKey.value;
+  if (!stateKey || !isSwitchableInputBoundaryType(nextType)) {
+    return;
+  }
+  if (inputStateType.value === nextType) {
+    return;
+  }
+
+  emitInputStatePatch(stateKey, {
+    type: resolveStateTypeForInputBoundary(nextType),
+    value: defaultValueForStateType(resolveStateTypeForInputBoundary(nextType) as StateFieldType),
+  });
+  emitInputConfigPatch({
+    value: resolveNextInputValueForBoundaryType({
+      nextType,
+      currentType: inputStateType.value,
+      currentValue: props.node.kind === "input" ? props.node.config.value : "",
+      knowledgeBaseNames: props.knowledgeBases.map((knowledgeBase) => knowledgeBase.name),
+    }),
+  });
+}
+
+function openInputAssetPicker() {
+  inputAssetInputRef.value?.click();
+}
+
+function clearInputAsset() {
+  emitInputConfigPatch({ value: "" });
+}
+
+async function commitInputAssetFile(file: File | null) {
+  const stateKey = inputStateKey.value;
+  if (!file || !stateKey) {
+    return;
+  }
+
+  try {
+    const envelope = await createUploadedAssetEnvelope(file);
+    emitInputStatePatch(stateKey, {
+      type: resolveStateTypeForInputBoundary(envelope.detectedType),
+      value: defaultValueForStateType(resolveStateTypeForInputBoundary(envelope.detectedType) as StateFieldType),
+    });
+    emitInputConfigPatch({ value: JSON.stringify(envelope) });
+  } catch (error) {
+    console.error("Failed to read uploaded asset", error);
+  }
+}
+
+function handleInputAssetFileChange(event: Event) {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement)) {
+    return;
+  }
+
+  const file = target.files?.[0] ?? null;
+  void commitInputAssetFile(file);
+  target.value = "";
+}
+
+function handleInputAssetDrop(event: DragEvent) {
+  const file = event.dataTransfer?.files?.[0] ?? null;
+  void commitInputAssetFile(file);
 }
 
 function handleConditionLoopLimitInput(event: Event) {
@@ -941,6 +1778,10 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
   font-weight: 500;
 }
 
+.node-card__action-pill-button {
+  cursor: pointer;
+}
+
 .node-card__action-pill--skill {
   color: #2563eb;
   border-color: rgba(37, 99, 235, 0.28);
@@ -957,6 +1798,201 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
   color: #d97706;
   border-color: rgba(217, 119, 6, 0.3);
   background: rgba(254, 243, 199, 0.72);
+}
+
+.node-card__action-pill--disabled {
+  opacity: 0.58;
+}
+
+.node-card__skill-picker {
+  display: grid;
+  gap: 10px;
+  border: 1px solid rgba(37, 99, 235, 0.14);
+  border-radius: 20px;
+  padding: 14px;
+  background: rgba(239, 246, 255, 0.56);
+}
+
+.node-card__skill-picker-title {
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.node-card__skill-picker-copy {
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: rgba(60, 41, 20, 0.72);
+}
+
+.node-card__skill-panel-message {
+  border-radius: 16px;
+  border: 1px solid rgba(154, 52, 18, 0.12);
+  background: rgba(255, 255, 255, 0.82);
+  padding: 12px 14px;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: rgba(60, 41, 20, 0.72);
+}
+
+.node-card__skill-panel-message--error {
+  border-color: rgba(185, 28, 28, 0.18);
+  background: rgba(254, 242, 242, 0.92);
+  color: rgb(153, 27, 27);
+}
+
+.node-card__skill-option {
+  display: grid;
+  gap: 6px;
+  border-radius: 16px;
+  border: 1px solid rgba(37, 99, 235, 0.14);
+  background: rgba(255, 255, 255, 0.84);
+  padding: 12px 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.node-card__skill-option-title {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.node-card__skill-option-copy {
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: rgba(60, 41, 20, 0.72);
+}
+
+.node-card__skill-option-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #2563eb;
+}
+
+.node-card__skill-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.node-card__skill-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(37, 99, 235, 0.18);
+  background: rgba(239, 246, 255, 0.88);
+  padding: 6px 10px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: #2563eb;
+}
+
+.node-card__skill-badge-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: currentColor;
+  cursor: pointer;
+}
+
+.node-card__port-picker {
+  display: grid;
+  gap: 12px;
+  border: 1px solid rgba(154, 52, 18, 0.14);
+  border-radius: 20px;
+  padding: 14px;
+  background: rgba(255, 252, 247, 0.94);
+}
+
+.node-card__port-picker-title {
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.node-card__port-picker-form {
+  display: grid;
+  gap: 10px;
+}
+
+.node-card__port-picker-hint {
+  font-size: 0.76rem;
+  line-height: 1.55;
+  color: rgba(60, 41, 20, 0.68);
+}
+
+.node-card__port-picker-hint--error {
+  color: rgb(153, 27, 27);
+}
+
+.node-card__port-picker-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.node-card__port-picker-button {
+  min-height: 32px;
+  border: 1px solid rgba(154, 52, 18, 0.16);
+  border-radius: 999px;
+  padding: 0 12px;
+  background: rgba(255, 255, 255, 0.88);
+  color: rgba(60, 41, 20, 0.78);
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.node-card__port-picker-button--primary {
+  border-color: rgba(21, 128, 61, 0.18);
+  background: rgba(240, 253, 244, 0.92);
+  color: #15803d;
+}
+
+.node-card__port-create-option,
+.node-card__port-state-option {
+  display: grid;
+  gap: 4px;
+  border-radius: 16px;
+  border: 1px solid rgba(154, 52, 18, 0.14);
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.84);
+  text-align: left;
+  cursor: pointer;
+}
+
+.node-card__port-create-label,
+.node-card__port-state-type {
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(154, 52, 18, 0.88);
+}
+
+.node-card__port-create-title,
+.node-card__port-state-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.node-card__port-state-key {
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: rgba(60, 41, 20, 0.68);
 }
 
 .node-card__surface {
@@ -977,6 +2013,166 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
 .node-card__surface--output {
   display: grid;
   gap: 14px;
+}
+
+.node-card__input-picker {
+  display: grid;
+  gap: 10px;
+}
+
+.node-card__input-upload {
+  display: grid;
+  gap: 10px;
+}
+
+.node-card__input-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.node-card__input-lock {
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: rgba(60, 41, 20, 0.68);
+}
+
+.node-card__input-select {
+  min-height: 48px;
+}
+
+.node-card__input-meta {
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: rgba(60, 41, 20, 0.7);
+}
+
+.node-card__asset-dropzone {
+  display: grid;
+  min-height: 176px;
+  place-items: center;
+  gap: 8px;
+  border: 1px dashed rgba(154, 52, 18, 0.24);
+  border-radius: 24px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.84);
+  color: #3c2914;
+  text-align: center;
+  cursor: pointer;
+}
+
+.node-card__asset-dropzone-title {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.node-card__asset-dropzone-copy {
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: rgba(60, 41, 20, 0.68);
+}
+
+.node-card__asset-preview-card {
+  display: grid;
+  gap: 12px;
+  border: 1px solid rgba(154, 52, 18, 0.12);
+  border-radius: 24px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.node-card__asset-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.node-card__asset-action {
+  min-height: 30px;
+  border: 1px solid rgba(154, 52, 18, 0.16);
+  border-radius: 999px;
+  padding: 0 12px;
+  background: rgba(255, 250, 241, 0.92);
+  color: rgba(60, 41, 20, 0.78);
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.node-card__asset-action--danger {
+  border-color: rgba(185, 28, 28, 0.2);
+  color: rgb(153, 27, 27);
+  background: rgba(254, 242, 242, 0.94);
+}
+
+.node-card__asset-media-shell {
+  overflow: hidden;
+  border-radius: 18px;
+  border: 1px solid rgba(154, 52, 18, 0.12);
+  background: rgba(248, 242, 234, 0.84);
+}
+
+.node-card__asset-media-shell--audio {
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.node-card__asset-image,
+.node-card__asset-video {
+  display: block;
+  max-height: 240px;
+  width: 100%;
+  object-fit: contain;
+}
+
+.node-card__asset-audio {
+  width: 100%;
+}
+
+.node-card__asset-file {
+  display: grid;
+  gap: 8px;
+}
+
+.node-card__asset-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.node-card__asset-summary {
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: rgba(60, 41, 20, 0.68);
+}
+
+.node-card__asset-text {
+  margin: 0;
+  max-height: 220px;
+  overflow: auto;
+  border-radius: 16px;
+  background: rgba(248, 242, 234, 0.84);
+  padding: 14px;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #1f2937;
+}
+
+.node-card__sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .node-card__surface-textarea {
@@ -1003,6 +2199,33 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
   padding: 18px;
   text-align: center;
   font-size: 1.1rem;
+}
+
+.node-card__runtime-note {
+  margin-top: 0.85rem;
+  border-radius: 14px;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid rgba(239, 68, 68, 0.22);
+  background: linear-gradient(180deg, rgba(255, 245, 245, 0.98), rgba(254, 242, 242, 0.94));
+}
+
+.node-card__runtime-note--danger {
+  color: #991b1b;
+}
+
+.node-card__runtime-note-label {
+  display: inline-flex;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(153, 27, 27, 0.72);
+}
+
+.node-card__runtime-note-text {
+  margin-top: 0.35rem;
+  white-space: pre-wrap;
+  line-height: 1.55;
 }
 
 .node-card__persist {
@@ -1137,6 +2360,18 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
   font-size: 0.82rem;
 }
 
+.node-card__control-textarea {
+  min-height: 112px;
+  width: 100%;
+  border: 1px solid rgba(154, 52, 18, 0.16);
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.86);
+  color: #1f2937;
+  font: inherit;
+  resize: vertical;
+}
+
 .node-card__condition-editor {
   display: grid;
   gap: 12px;
@@ -1240,15 +2475,36 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
 
 .node-card__branch-route {
   grid-column: 1 / -1;
-  font-size: 0.74rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-self: start;
+  min-height: 34px;
+  border: 1px solid rgba(124, 58, 237, 0.16);
+  border-radius: 999px;
+  padding: 0 12px;
+  background: rgba(245, 243, 255, 0.92);
+  color: rgba(91, 33, 182, 0.9);
+}
+
+.node-card__branch-route-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(154, 52, 18, 0.78);
+}
+
+.node-card__branch-route-target {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-transform: none;
 }
 
 .node-card__branch-route--unrouted {
-  color: rgba(120, 53, 15, 0.54);
+  border-color: rgba(120, 53, 15, 0.14);
+  background: rgba(255, 251, 235, 0.94);
+  color: rgba(120, 53, 15, 0.72);
 }
 
 .node-card__branch-add {

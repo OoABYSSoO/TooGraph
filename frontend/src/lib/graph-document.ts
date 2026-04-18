@@ -1,6 +1,12 @@
 import { toRaw } from "vue";
 
 import { applyConditionBranchMapping, createConditionBranchKey } from "./condition-branch-mapping.ts";
+import {
+  canConnectConditionRoute,
+  canConnectFlowNodes,
+  canReconnectConditionRoute,
+  canReconnectFlowEdge,
+} from "./graph-connections.ts";
 
 import type { AgentNode, ConditionNode, GraphDocument, GraphPayload, InputNode, OutputNode, TemplateRecord } from "../types/node-system.ts";
 
@@ -33,6 +39,108 @@ export function createEmptyDraftGraph(name = "Untitled Graph"): GraphPayload {
 export function cloneGraphDocument<T extends GraphPayload | GraphDocument>(document: T): T {
   const rawDocument = toRaw(document) as T;
   return structuredClone(rawDocument);
+}
+
+function areSkillKeyListsEqual(left: string[], right: string[]) {
+  return left.length === right.length && left.every((skillKey, index) => skillKey === right[index]);
+}
+
+function isKnowledgeBaseSkill(skillKey: string) {
+  return skillKey === "search_knowledge_base";
+}
+
+function pickAgentKnowledgeQueryStateKey(
+  node: AgentNode,
+  stateSchema: Record<string, GraphPayload["state_schema"][string]>,
+  knowledgeBaseStateKey: string,
+) {
+  const candidateReads = node.reads.filter((binding) => binding.state !== knowledgeBaseStateKey).filter((binding) => {
+    const stateDefinition = stateSchema[binding.state];
+    return stateDefinition?.type === "text" || stateDefinition?.type === "any";
+  });
+  const preferredKeys = ["question", "query", "input"];
+
+  for (const key of preferredKeys) {
+    if (candidateReads.some((binding) => binding.state === key)) {
+      return key;
+    }
+  }
+
+  const preferredTextRead = candidateReads.find((binding) => binding.required) ?? candidateReads[0];
+  return preferredTextRead?.state ?? null;
+}
+
+function syncKnowledgeBaseSkillOnAgentNode(
+  node: AgentNode,
+  stateSchema: GraphPayload["state_schema"],
+): AgentNode {
+  const skillsWithoutKnowledgeBase = node.config.skills.filter((skillKey) => !isKnowledgeBaseSkill(skillKey));
+  const knowledgeBaseStateKeys = Array.from(
+    new Set(
+      node.reads
+        .filter((binding) => stateSchema[binding.state]?.type === "knowledge_base")
+        .map((binding) => binding.state),
+    ),
+  );
+
+  if (knowledgeBaseStateKeys.length !== 1) {
+    return areSkillKeyListsEqual(skillsWithoutKnowledgeBase, node.config.skills)
+      ? node
+      : {
+          ...node,
+          config: {
+            ...node.config,
+            skills: skillsWithoutKnowledgeBase,
+          },
+        };
+  }
+
+  const queryStateKey = pickAgentKnowledgeQueryStateKey(node, stateSchema, knowledgeBaseStateKeys[0]);
+  if (!queryStateKey) {
+    return areSkillKeyListsEqual(skillsWithoutKnowledgeBase, node.config.skills)
+      ? node
+      : {
+          ...node,
+          config: {
+            ...node.config,
+            skills: skillsWithoutKnowledgeBase,
+          },
+        };
+  }
+
+  void queryStateKey;
+  const nextSkills = [...skillsWithoutKnowledgeBase, "search_knowledge_base"];
+  return areSkillKeyListsEqual(nextSkills, node.config.skills)
+    ? node
+    : {
+        ...node,
+        config: {
+          ...node.config,
+          skills: nextSkills,
+        },
+      };
+}
+
+export function syncKnowledgeBaseSkillsInDocument<T extends GraphPayload | GraphDocument>(document: T): T {
+  let nextDocument: T | null = null;
+
+  for (const [nodeId, node] of Object.entries(document.nodes)) {
+    if (node.kind !== "agent") {
+      continue;
+    }
+
+    const nextNode = syncKnowledgeBaseSkillOnAgentNode(node, document.state_schema);
+    if (nextNode === node) {
+      continue;
+    }
+
+    if (!nextDocument) {
+      nextDocument = cloneGraphDocument(document);
+    }
+    nextDocument.nodes[nodeId] = nextNode;
+  }
+
+  return nextDocument ?? document;
 }
 
 export function updateOutputNodeConfigInDocument<T extends GraphPayload | GraphDocument>(
@@ -230,6 +338,141 @@ export function removeConditionBranchFromDocument<T extends GraphPayload | Graph
   nextNode.config.branches = nextBranches;
   nextNode.config.branchMapping = nextBranchMapping;
   nextDocument.conditional_edges = nextConditionalEdges;
+  return nextDocument;
+}
+
+export function connectFlowNodesInDocument<T extends GraphPayload | GraphDocument>(document: T, sourceNodeId: string, targetNodeId: string): T {
+  if (!canConnectFlowNodes(document, sourceNodeId, targetNodeId)) {
+    return document;
+  }
+
+  const nextDocument = cloneGraphDocument(document);
+  nextDocument.edges = [...nextDocument.edges, { source: sourceNodeId, target: targetNodeId }];
+  return nextDocument;
+}
+
+export function connectConditionRouteInDocument<T extends GraphPayload | GraphDocument>(
+  document: T,
+  sourceNodeId: string,
+  branchKey: string,
+  targetNodeId: string,
+): T {
+  if (!canConnectConditionRoute(document, sourceNodeId, branchKey, targetNodeId)) {
+    return document;
+  }
+
+  const nextDocument = cloneGraphDocument(document);
+  const edgeIndex = nextDocument.conditional_edges.findIndex((edge) => edge.source === sourceNodeId);
+  if (edgeIndex === -1) {
+    nextDocument.conditional_edges = [
+      ...nextDocument.conditional_edges,
+      {
+        source: sourceNodeId,
+        branches: {
+          [branchKey]: targetNodeId,
+        },
+      },
+    ];
+    return nextDocument;
+  }
+
+  const nextEdge = nextDocument.conditional_edges[edgeIndex];
+  nextDocument.conditional_edges[edgeIndex] = {
+    ...nextEdge,
+    branches: {
+      ...nextEdge.branches,
+      [branchKey]: targetNodeId,
+    },
+  };
+  return nextDocument;
+}
+
+export function removeFlowEdgeFromDocument<T extends GraphPayload | GraphDocument>(document: T, sourceNodeId: string, targetNodeId: string): T {
+  if (!document.edges.some((edge) => edge.source === sourceNodeId && edge.target === targetNodeId)) {
+    return document;
+  }
+
+  const nextDocument = cloneGraphDocument(document);
+  nextDocument.edges = nextDocument.edges.filter((edge) => !(edge.source === sourceNodeId && edge.target === targetNodeId));
+  return nextDocument;
+}
+
+export function reconnectFlowEdgeInDocument<T extends GraphPayload | GraphDocument>(
+  document: T,
+  sourceNodeId: string,
+  currentTargetNodeId: string,
+  nextTargetNodeId: string,
+): T {
+  if (!canReconnectFlowEdge(document, sourceNodeId, currentTargetNodeId, nextTargetNodeId)) {
+    return document;
+  }
+
+  const nextDocument = cloneGraphDocument(document);
+  nextDocument.edges = nextDocument.edges.map((edge) =>
+    edge.source === sourceNodeId && edge.target === currentTargetNodeId
+      ? {
+          source: sourceNodeId,
+          target: nextTargetNodeId,
+        }
+      : edge,
+  );
+  return nextDocument;
+}
+
+export function removeConditionRouteFromDocument<T extends GraphPayload | GraphDocument>(document: T, sourceNodeId: string, branchKey: string): T {
+  const edgeIndex = document.conditional_edges.findIndex(
+    (edge) => edge.source === sourceNodeId && Object.prototype.hasOwnProperty.call(edge.branches, branchKey),
+  );
+  if (edgeIndex === -1) {
+    return document;
+  }
+
+  const nextDocument = cloneGraphDocument(document);
+  const nextEdge = nextDocument.conditional_edges[edgeIndex];
+  const nextBranches = Object.fromEntries(
+    Object.entries(nextEdge.branches).filter(([candidateBranchKey]) => candidateBranchKey !== branchKey),
+  );
+
+  if (Object.keys(nextBranches).length === 0) {
+    nextDocument.conditional_edges.splice(edgeIndex, 1);
+    return nextDocument;
+  }
+
+  nextDocument.conditional_edges[edgeIndex] = {
+    ...nextEdge,
+    branches: nextBranches,
+  };
+  return nextDocument;
+}
+
+export function reconnectConditionRouteInDocument<T extends GraphPayload | GraphDocument>(
+  document: T,
+  sourceNodeId: string,
+  branchKey: string,
+  nextTargetNodeId: string,
+): T {
+  const currentTargetNodeId = document.conditional_edges.find((edge) => edge.source === sourceNodeId)?.branches[branchKey];
+  if (
+    typeof currentTargetNodeId !== "string" ||
+    !canReconnectConditionRoute(document, sourceNodeId, branchKey, currentTargetNodeId, nextTargetNodeId)
+  ) {
+    return document;
+  }
+
+  const nextDocument = cloneGraphDocument(document);
+  const edgeIndex = nextDocument.conditional_edges.findIndex((edge) => edge.source === sourceNodeId);
+  if (edgeIndex === -1) {
+    return document;
+  }
+
+  const nextEdge = nextDocument.conditional_edges[edgeIndex];
+  nextDocument.conditional_edges[edgeIndex] = {
+    ...nextEdge,
+    branches: {
+      ...nextEdge.branches,
+      [branchKey]: nextTargetNodeId,
+    },
+  };
   return nextDocument;
 }
 

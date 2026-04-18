@@ -2,6 +2,596 @@
 
 ## 2026-04-18
 
+- 做了一次“迁移是否真的完结”的收尾审计，并把文档系统一起收口：
+  - 重新核对当前代码、页面路由、README、knowledge 文档和 `docs/` 目录
+  - 重点确认哪些差异属于“迁移未完成”，哪些只是“产品路线图尚未完成”
+- 审计结论收敛为：
+  - 以“Vue 版替掉旧 React 主前端”为标准，迁移已完成
+  - 仍未完成的是 WebSocket、人类在环前端、导出 UI、memory 和更强的知识库管理，它们属于后续产品路线图
+- 文档层同时发现并修复了一批过期事实：
+  - `README.md` 仍在描述 Next.js / React Flow / Zustand
+  - `knowledge/GraphiteUI-official/current-architecture.md` 仍在描述旧前端架构和 SQLite 全量持久化
+  - `node-editor-basics.md` 有少量交互说明超前于当前代码
+  - `backend/app/knowledge/loader.py` 仍然依赖旧的 `docs/current_engineering_backlog.md`
+- 这轮文档收口的目标改成：
+  - 新建 `docs/current_project_status.md` 作为正式当前状态文档
+  - 用它替换旧 backlog 在知识库导入链路里的角色
+  - 删除已完成使命的迁移专用 docs
+- 完成这轮文档与索引更新：
+  - 更新 `README.md`
+  - 更新 `docs/README.md`
+  - 新增 `docs/current_project_status.md`
+  - 更新 `knowledge/GraphiteUI-official/current-architecture.md`
+  - 更新 `knowledge/GraphiteUI-official/node-editor-basics.md`
+  - 更新 `knowledge/GraphiteUI-official/runtime-and-roadmap.md`
+  - 更新 `knowledge/GraphiteUI-official/what-is-graphiteui.md`
+  - 更新 `knowledge/GraphiteUI-official/capabilities.md`
+  - 更新 `CLAUDE.md`
+  - 更新 `backend/app/knowledge/loader.py`
+- 删除旧的迁移专用文档：
+  - `docs/current_engineering_backlog.md`
+  - `docs/superpowers/plans/2026-04-18-vue-editor-logic-restoration.md`
+  - `docs/superpowers/specs/2026-04-17-vue-frontend-rebuild-design.md`
+- 完成这一轮验证：
+  - `cd frontend && node --experimental-strip-types --test $(rg --files src -g '*test.ts')`
+  - `cd frontend && npm run build`
+  - `PYTHONPATH=backend python3 - <<'PY' ... _load_local_markdown_documents(GRAPHITEUI_PROJECT_DOC_FILES) ... PY`
+  - `git diff --check`
+  - `./scripts/start.sh`
+  - `curl -sf --noproxy '*' http://127.0.0.1:8765/health`
+  - `curl -I -s --noproxy '*' http://127.0.0.1:3477/`
+  - `curl -I -s --noproxy '*' http://127.0.0.1:3477/editor`
+  - `curl -I -s --noproxy '*' http://127.0.0.1:3477/runs`
+  - `curl -I -s --noproxy '*' http://127.0.0.1:3477/settings`
+
+- 继续沿“最后收尾不该只剩一句快完成了”的方向推进，把首页 / runs 列表 / docs 索引一起收口到完成态：
+  - 重新核对当前 Vue 页面实现和保留下来的最小文档集
+  - 把这刀收敛为：
+    - 首页三个 bucket 都补齐空态 CTA
+    - 首页 run / graph 卡片补回统一的 `查看详情`
+    - `/runs` 列表补回空态 CTA 和详情提示
+    - `docs/README.md` 明确当前文档已经收口为最小活集
+- 按 TDD 先补红测：
+  - 更新 `frontend/src/pages/workspaceDashboardModel.test.ts`，锁定主页 run / graph 卡片的 detail cue
+  - 新增 `frontend/src/pages/runsPageModel.test.ts`，锁定 `/runs` 空态 CTA 与 detail cue
+  - 首次运行：
+    - `cd frontend && node --test --experimental-strip-types src/pages/workspaceDashboardModel.test.ts`
+    - `cd frontend && node --test --experimental-strip-types src/pages/runsPageModel.test.ts`
+    - 确认分别因缺少 `resolveWorkspaceCardDetail` 和缺少 `runsPageModel.ts` 而失败，红测成立
+- 完成最后这轮收尾实现：
+  - 更新 `frontend/src/pages/workspaceDashboardModel.ts`
+  - 新增 `frontend/src/pages/runsPageModel.ts`
+  - 更新 `frontend/src/pages/HomePage.vue`
+    - 首页 runs / templates / graphs 空态都补上 CTA
+    - run / graph 卡片补回 `查看详情`
+    - graph edge 统计改为复用 helper
+  - 更新 `frontend/src/pages/RunsPage.vue`
+    - 空态补回 `打开编排器` CTA
+    - 卡片补回 `查看详情`
+  - 更新 `docs/README.md`
+    - 明确当前 docs 已经收口到最小活文档集
+- 完成这一轮验证：
+  - `cd frontend && node --experimental-strip-types --test src/pages/workspaceDashboardModel.test.ts`
+  - `cd frontend && node --experimental-strip-types --test src/pages/runsPageModel.test.ts`
+  - `cd frontend && node --experimental-strip-types --test $(rg --files src -g '*test.ts')`
+  - `cd frontend && npm run build`
+  - `git diff --check`
+  - `./scripts/start.sh`
+  - `curl -sf --noproxy '*' http://127.0.0.1:8765/health`
+  - `curl -I -s --noproxy '*' http://127.0.0.1:3477/`
+  - `curl -I -s --noproxy '*' http://127.0.0.1:3477/runs`
+  - `curl -I -s --noproxy '*' http://127.0.0.1:3477/settings`
+- 这轮之后的迁移判断更新为：
+  - 若以“Vue 版可替掉旧 React 前端主要产品逻辑”为目标，这条迁移线现在可以视为 `100%`
+  - 若只看“核心编辑器主链、运行反馈和外围主页面 parity”，当前也可以视为 `100%`
+  - 后续若继续做，只再属于可选 polish 或新需求，不再属于“迁移未完成”
+
+- 继续沿 Phase 4 收口，把 `RunDetailPage` 和 `SettingsPage` 从“基础接线”推进到更接近旧前端的真实行为：
+  - 重新核对旧 React `run-detail-client.tsx` 与 `settings-panel-client.tsx`
+  - 把这刀收敛为：
+    - `RunDetailPage` 在 queued / running / resuming 时继续轮询
+    - `RunDetailPage` 展示 `artifacts.exported_outputs`
+    - `RunDetailPage` 补回 cycle iteration 的 executed / incoming / activated / next-iteration 明细
+    - `SettingsPage` 在 provider 没有 concrete models 时回退到 `example_model_refs`
+    - `SettingsPage` 保存时继续按旧前端语义 clamp `temperature`
+- 按 TDD 先补红测：
+  - 新增 `frontend/src/pages/runDetailModel.test.ts`
+  - 新增 `frontend/src/pages/settingsPageModel.test.ts`
+  - 首次运行：
+    - `cd frontend && node --test --experimental-strip-types src/pages/runDetailModel.test.ts`
+    - `cd frontend && node --test --experimental-strip-types src/pages/settingsPageModel.test.ts`
+    - 确认分别因缺少 `runDetailModel.ts` 和 `settingsPageModel.ts` 而失败，红测成立
+- 完成 Phase 4 这轮实现：
+  - 新增 `frontend/src/pages/runDetailModel.ts`
+  - 新增 `frontend/src/pages/settingsPageModel.ts`
+  - 更新 `frontend/src/pages/RunDetailPage.vue`
+    - live polling 已接回
+    - output artifacts 已显示
+    - cycle iteration 明细已补回
+    - `runId` 切换会重新加载并复位轮询
+  - 更新 `frontend/src/pages/SettingsPage.vue`
+    - provider badge 会回退到 `example_model_refs`
+    - 保存时会 clamp `temperature`
+- 完成这一轮验证：
+  - `cd frontend && node --experimental-strip-types --test $(rg --files src -g '*test.ts')`
+  - `cd frontend && npm run build`
+  - `git diff --check`
+- 这轮之后的迁移判断更新为：
+  - 若以“Vue 版可替掉旧 React 前端主要产品逻辑”为目标，当前大约在 `93% - 95%`
+  - 若只看“核心编辑器主链和主要节点内联编辑已可用”，当前大约在 `98%` 以上
+  - 下一刀更适合收尾首页 / runs 列表视觉 parity、清理过时文档，并补完少量 agent runtime edge case
+
+- 继续沿“运行态不该只停在状态条和节点 glow”推进，把 latest run 的节点内语义和 active path 一起接回 Vue：
+  - 重新核对旧 React `87d3d6e` 的 `hydrateRunResult`
+  - 把这一刀收敛为：
+    - output 节点显示 latest run preview
+    - output 节点在 completed / failed 且未产出值时显示 fallback 文案
+    - 失败节点显示 `Latest run failed here`
+    - run `active_edge_ids` 高亮当前路径
+- 按 TDD 先补红测：
+  - 更新 `frontend/src/editor/nodes/nodeCardViewModel.test.ts`，锁定：
+    - latest run output preview / display mode override
+    - completed / failed 且未产出值时的 fallback 文案
+    - 节点级 latest run failure note
+  - 新增 `frontend/src/editor/workspace/runNodeArtifactsModel.test.ts`，锁定：
+    - `artifacts.exported_outputs`
+    - `node_executions[].errors`
+    - `active_edge_ids`
+    的提炼语义
+  - 新增 `frontend/src/editor/canvas/runEdgePresentation.test.ts`，锁定 active edge 高亮语义
+  - 首次运行：
+    - `cd frontend && node --test --experimental-strip-types src/editor/nodes/nodeCardViewModel.test.ts`
+    - `cd frontend && node --test --experimental-strip-types src/editor/workspace/runNodeArtifactsModel.test.ts`
+    - `cd frontend && node --test --experimental-strip-types src/editor/canvas/runEdgePresentation.test.ts`
+    - 确认分别因缺少 runtime 视图模型语义、缺少 `runNodeArtifactsModel.ts`、缺少 `runEdgePresentation.ts` 而失败，红测成立
+- 完成 runtime deeper feedback 实现：
+  - 新增 `frontend/src/editor/workspace/runNodeArtifactsModel.ts`
+  - 新增 `frontend/src/editor/canvas/runEdgePresentation.ts`
+  - 更新 `frontend/src/types/run.ts`，补齐 frontend `RunDetail` 与 backend schema 的运行态字段
+  - 更新 `frontend/src/editor/nodes/nodeCardViewModel.ts`：
+    - output 节点支持 latest run preview / display mode override
+    - output 节点支持 completed / failed fallback 文案
+    - 非 output 失败节点支持 runtime note
+  - 更新 `frontend/src/editor/nodes/NodeCard.vue`：
+    - 渲染 runtime note
+  - 更新 `frontend/src/editor/workspace/EditorWorkspaceShell.vue`：
+    - run 轮询时把 output preview / failed message / active edge ids 一起写回活动 tab
+  - 更新 `frontend/src/editor/canvas/EditorCanvas.vue`：
+    - 节点卡片消费 runtime preview / failed message
+    - active edge 会在画布上高亮
+- 完成这一轮验证：
+  - `cd frontend && node --experimental-strip-types --test $(rg --files src -g '*test.ts')`
+  - `cd frontend && npm run build`
+  - `git diff --check`
+  - `./scripts/start.sh`
+  - `curl -sf --noproxy '*' http://127.0.0.1:8765/health`
+  - `curl -I -s --noproxy '*' http://127.0.0.1:3477/editor`
+  - `curl -I -s --noproxy '*' 'http://127.0.0.1:3477/editor/new?template=hello_world'`
+- 这轮之后的迁移判断更新为：
+  - 若以“Vue 版可替掉旧 React 前端主要产品逻辑”为目标，当前大约在 `91% - 93%`
+  - 若只看“核心编辑器主链和主要节点内联编辑已可用”，当前大约在 `98%` 左右
+  - 下一刀更适合开始收口 Phase 4 的 runs / settings / 首页 parity 与 docs 清理，并顺手补完剩余 agent runtime edge case
+
+- 继续沿“运行不该只弹个 alert 就结束”的方向推进，把工作区里的 runtime feedback 第一版接回 Vue：
+  - 重新核对旧 React `87d3d6e` 的 `statusMessage`、run 轮询与 node status summary
+  - 把这一刀收敛为：
+    - `Save / Validate / Run` 都通过工作区内反馈条回传结果
+    - run 期间轮询 `/api/runs/:runId`
+    - 反馈条显示 latest run 链接、status badge 和节点摘要
+- 按 TDD 先补红测：
+  - 新增 `frontend/src/editor/workspace/runFeedbackModel.test.ts`，锁定：
+    - `summarizeRunNodeStates` 会统计 idle / running / paused / success / failed
+    - `formatValidationFeedback` 会输出 success / issue-list 语义
+    - `formatRunFeedback` 会正确表达 queued / running / failed / completed
+  - 首次运行：
+    - `cd frontend && node --test --experimental-strip-types src/editor/workspace/runFeedbackModel.test.ts`
+    - 确认因为缺少 `runFeedbackModel.ts` 而失败，红测成立
+- 完成 runtime feedback 第一版实现：
+  - 新增 `frontend/src/editor/workspace/runFeedbackModel.ts`
+  - 更新 `frontend/src/editor/workspace/EditorWorkspaceShell.vue`：
+    - 每个 tab 现在都会持有独立 feedback state
+    - `save / validate / run` 不再使用 `alert`
+    - run 会轮询 `/api/runs/:runId`，持续更新工作区状态反馈
+    - 反馈条会显示 latest run 链接和 run 摘要
+- 继续沿“反馈不该只停在文字层”的方向推进，把节点运行态壳层也接回画布：
+  - 新增 `frontend/src/editor/canvas/runNodePresentation.test.ts` 红测，锁定 running / success / failed 的最小 visual 语义
+  - 首次运行：
+    - `cd frontend && node --test --experimental-strip-types src/editor/canvas/runNodePresentation.test.ts`
+    - 确认因为缺少 `runNodePresentation.ts` 而失败，红测成立
+  - 新增 `frontend/src/editor/canvas/runNodePresentation.ts`
+  - 更新 `frontend/src/editor/canvas/EditorCanvas.vue`：
+    - 支持消费当前 tab 的 `runNodeStatusByNodeId` 与 `currentRunNodeId`
+    - running 节点会显示蓝色 halo
+    - current running 节点会显示更强的 current halo
+    - success / failed 节点也会显示独立 glow
+  - 更新 `frontend/src/editor/workspace/EditorWorkspaceShell.vue`：
+    - 轮询 run detail 时会把 `node_status_map` 和 `current_node_id` 一起写回活动 tab
+- 完成这一轮验证：
+  - `cd frontend && node --experimental-strip-types --test $(rg --files src -g '*test.ts')`
+  - `cd frontend && npm run build`
+  - `git diff --check`
+  - `./scripts/start.sh`
+  - `curl -sf --noproxy '*' http://127.0.0.1:8765/health`
+  - `curl -I -s --noproxy '*' http://127.0.0.1:3477/editor`
+  - `curl -I -s --noproxy '*' 'http://127.0.0.1:3477/editor/new?template=hello_world'`
+- 这轮之后的迁移判断更新为：
+  - 若以“Vue 版可替掉旧 React 前端主要产品逻辑”为目标，当前大约在 `90% - 92%`
+  - 若只看“核心编辑器主链和主要节点内联编辑已可用”，当前大约在 `97%` 左右
+  - 下一刀更适合继续深挖 agent runtime feedback 的更细节点内语义，或开始收口 Phase 4 的 runs / settings / 文档清理
+
+- 继续沿“已有边不该只能删了重建”的方向推进，把画布里的真正重连第一版接回 Vue：
+  - 重新核对旧 React `87d3d6e` 的连线语义与当前 Vue 画布事件链
+  - 把这一刀收敛为：
+    - 选中已有 flow edge 后，直接改写它的 target
+    - 选中已有 route edge 后，直接改写该 branch 的 route target
+    - 重连时继续复用已有 preview line 与合法 target 高亮
+- 按 TDD 先补红测：
+  - 在 `frontend/src/lib/graph-connections.test.ts` 先补红测，锁定：
+    - reconnect flow 只接受不同且合法的新 target
+    - reconnect route 必须建立在当前 route 真实存在的前提上
+  - 在 `frontend/src/lib/graph-document.test.ts` 先补红测，锁定：
+    - `reconnectFlowEdgeInDocument` 会不可变地改写现有控制流边 target
+    - `reconnectConditionRouteInDocument` 会不可变地改写现有 branch route target
+  - 首次运行：
+    - `cd frontend && node --test --experimental-strip-types src/lib/graph-connections.test.ts`
+    - `cd frontend && node --test --experimental-strip-types src/lib/graph-document.test.ts`
+    - 确认分别因 reconnect route 还不要求“当前 route 必须存在”以及缺少 reconnect helper 而失败，红测成立
+- 完成真正重连第一版实现：
+  - 更新 `frontend/src/lib/graph-connections.ts`：
+    - `PendingGraphConnection` 新增 `mode / currentTargetNodeId`
+    - 新增 `canReconnectFlowEdge`
+    - 新增 `canReconnectConditionRoute`
+  - 更新 `frontend/src/lib/graph-document.ts`：
+    - 新增 `reconnectFlowEdgeInDocument`
+    - 新增 `reconnectConditionRouteInDocument`
+  - 更新 `frontend/src/editor/canvas/EditorCanvas.vue`：
+    - 选中已有 flow / route edge 后进入 retarget 状态
+    - 继续复用 eligible target 高亮与 preview line
+    - 完成重连时会发出 `reconnect-flow` / `reconnect-route`
+  - 更新 `frontend/src/editor/workspace/EditorWorkspaceShell.vue`：
+    - 接住重连事件并真正写回活动文档
+- 顺手把 route chrome 视觉也收了一步：
+  - `frontend/src/editor/canvas/EditorCanvas.vue` 里的 flow / route / selected / preview edge 都补上闭合箭头
+  - route edge 改成独立紫色系，和普通控制流不再混在一起
+  - `frontend/src/editor/nodes/NodeCard.vue` 的 branch route 状态改成更明确的 status pill
+- 完成这一轮验证：
+  - `cd frontend && node --experimental-strip-types --test $(rg --files src -g '*test.ts')`
+  - `cd frontend && npm run build`
+  - `git diff --check`
+  - `./scripts/start.sh`
+  - `curl -sf --noproxy '*' http://127.0.0.1:8765/health`
+  - `curl -I -s --noproxy '*' http://127.0.0.1:3477/editor`
+  - `curl -I -s --noproxy '*' 'http://127.0.0.1:3477/editor/new?template=hello_world'`
+- 这轮之后的迁移判断更新为：
+  - 若以“Vue 版可替掉旧 React 前端主要产品逻辑”为目标，当前大约在 `89% - 91%`
+  - 若只看“核心编辑器主链和主要节点内联编辑已可用”，当前大约在 `96%` 左右
+  - 下一刀更适合继续深挖 agent port / runtime feedback，或开始收口 Phase 4 的 runs / settings / 文档清理
+
+- 继续沿“建链时也要有明确视觉反馈”的方向推进，把画布里的 connection preview line 第一版接回 Vue：
+  - 把这刀收敛为：
+    - 普通控制流建链时显示 orthogonal ghost line
+    - condition route 建链时复用 route-edge-path 的旧 React 几何作为 ghost line
+- 按 TDD 先补红测：
+  - 新增 `frontend/src/editor/canvas/connectionPreviewPath.test.ts`，锁定：
+    - `flow-out` preview 走 orthogonal path
+    - `route-out` preview 复用 `buildRouteEdgePath + resolveRouteEdgeSourceOffset`
+  - 首次运行：
+    - `cd frontend && node --test --experimental-strip-types src/editor/canvas/connectionPreviewPath.test.ts`
+    - 确认因为缺少 `connectionPreviewPath.ts` 而失败，红测成立
+- 完成画布 preview line 第一版实现：
+  - 新增 `frontend/src/editor/canvas/connectionPreviewPath.ts`
+  - 更新 `frontend/src/editor/canvas/EditorCanvas.vue`：
+    - 在 pending connection 时跟踪当前指针的画布坐标
+    - 渲染一条 preview edge
+    - flow / route 会分别使用各自路径 helper
+- 完成这一轮验证：
+  - `cd frontend && node --experimental-strip-types --test $(rg --files src -g '*test.ts')`
+  - `cd frontend && npm run build`
+  - `git diff --check`
+  - `./scripts/start.sh`
+  - `curl -sf --noproxy '*' http://127.0.0.1:8765/health`
+  - `curl -I -s --noproxy '*' http://127.0.0.1:3477/editor`
+  - `curl -I -s --noproxy '*' 'http://127.0.0.1:3477/editor/new?template=hello_world'`
+- 这轮之后的迁移判断更新为：
+  - 若以“Vue 版可替掉旧 React 前端主要产品逻辑”为目标，当前大约在 `88% - 90%`
+  - 若只看“核心编辑器主链和主要节点内联编辑已可用”，当前大约在 `95%` 左右
+  - 下一刀更适合继续补画布连线的真正重连和 route chrome 视觉细节，或继续深挖 agent port / runtime feedback 的剩余细节
+
+- 继续沿“建链之后也要能删链”的方向推进，把画布里的边删除第一版接回 Vue：
+  - 重新核对旧 React `87d3d6e` 的 edge state 与 `onEdgesChange`
+  - 虽然旧代码里没有单独的删边按钮，但边确实属于画布交互的一部分，因此先保守落地为：
+    - 边可选中
+    - 选中后按 `Delete` / `Backspace` 删除
+- 按 TDD 先补红测：
+  - 在 `frontend/src/lib/graph-document.test.ts` 先补红测，锁定：
+    - `removeFlowEdgeFromDocument` 会删除普通控制流边
+    - `removeConditionRouteFromDocument` 会删除单条 branch route，并在最后一条时裁掉空 `conditional_edges`
+  - 在 `frontend/src/editor/canvas/edgeProjection.test.ts` 先补红测，要求 route edge 暴露 `branch` 元信息，避免 UI 靠字符串 id 猜 branch
+  - 首次运行：
+    - `node --test --experimental-strip-types frontend/src/lib/graph-document.test.ts`
+    - `cd frontend && node --test --experimental-strip-types src/editor/canvas/edgeProjection.test.ts`
+    - 确认分别因缺少 `removeFlowEdgeFromDocument` / `removeConditionRouteFromDocument` 与 route edge 缺少 `branch` 元信息而失败，红测成立
+- 完成画布删边第一版实现：
+  - 更新 `frontend/src/lib/graph-document.ts`：
+    - 新增 `removeFlowEdgeFromDocument`
+    - 新增 `removeConditionRouteFromDocument`
+  - 更新 `frontend/src/editor/canvas/edgeProjection.ts`：
+    - route edge 现在会显式暴露 `branch`
+  - 更新 `frontend/src/editor/canvas/EditorCanvas.vue`：
+    - 边支持选中高亮
+    - 画布支持 `Delete` / `Backspace` 删除当前选中边
+    - 普通控制流边和 condition route edge 会分别发出 `remove-flow` / `remove-route`
+  - 更新 `frontend/src/editor/workspace/EditorWorkspaceShell.vue`：
+    - 接住删边事件并真正写回活动文档
+- 完成这一轮验证：
+  - `cd frontend && node --experimental-strip-types --test $(rg --files src -g '*test.ts')`
+  - `cd frontend && npm run build`
+  - `git diff --check`
+  - `./scripts/start.sh`
+  - `curl -sf --noproxy '*' http://127.0.0.1:8765/health`
+  - `curl -I -s --noproxy '*' http://127.0.0.1:3477/editor`
+  - `curl -I -s --noproxy '*' 'http://127.0.0.1:3477/editor/new?template=hello_world'`
+- 这轮之后的迁移判断更新为：
+  - 若以“Vue 版可替掉旧 React 前端主要产品逻辑”为目标，当前大约在 `87% - 89%`
+  - 若只看“核心编辑器主链和主要节点内联编辑已可用”，当前大约在 `94%` 左右
+  - 下一刀更适合继续补画布连线的重连预览和 route chrome 视觉细节，或继续深挖 agent port / runtime feedback 的剩余细节
+
+- 继续沿“编辑器不只是能看，还要能连线编辑”的方向推进，把画布里的控制流 / route 建链第一版接回 Vue：
+  - 重新核对旧 React `87d3d6e` 的 `FLOW_SOURCE_HANDLE`、`FLOW_TARGET_HANDLE`、`ROUTE_TARGET_HANDLE` 与 `classifyEditorConnection`
+  - 确认旧前端锚点不是静态装饰，而是编辑控制流 / branch route 的真实入口
+  - 因此把 Vue 版这一刀收敛为：
+    - 普通 `flow-out -> flow-in` 控制流建链
+    - condition `route-out -> flow-in` branch route 建链
+- 按 TDD 先补红测：
+  - 在 `frontend/src/lib/graph-document.test.ts` 先补红测，锁定：
+    - `connectFlowNodesInDocument` 会追加合法控制流边
+    - `connectConditionRouteInDocument` 会写入或更新 branch route
+  - 新增 `frontend/src/lib/graph-connections.test.ts`，锁定：
+    - 只有 `flow-out` / `route-out` 可以发起连接
+    - 只有合法 `flow-in` target 可以完成连接
+    - duplicate / invalid target 不应被视作可完成连接
+  - 首次运行：
+    - `node --test --experimental-strip-types frontend/src/lib/graph-document.test.ts`
+    - `node --test --experimental-strip-types frontend/src/lib/graph-connections.test.ts`
+    - 确认分别因缺少 `connectFlowNodesInDocument` / `connectConditionRouteInDocument` 与 `graph-connections.ts` 而失败，红测成立
+- 完成画布控制流 / route 建链第一版实现：
+  - 新增 `frontend/src/lib/graph-connections.ts`
+  - 更新 `frontend/src/lib/graph-document.ts`：
+    - 新增 `connectFlowNodesInDocument`
+    - 新增 `connectConditionRouteInDocument`
+  - 更新 `frontend/src/editor/canvas/EditorCanvas.vue`：
+    - 锚点支持发起 / 完成连接
+    - pending source 与 eligible targets 会高亮
+    - 新增连接提示文案
+    - 事件链会区分普通控制流和 condition route
+  - 更新 `frontend/src/editor/workspace/EditorWorkspaceShell.vue`：
+    - 接住 `connect-flow` / `connect-route`
+    - 真正写回活动文档，并保持 dirty / focus 语义
+- 完成这一轮验证：
+  - `cd frontend && node --experimental-strip-types --test $(rg --files src -g '*test.ts')`
+  - `cd frontend && npm run build`
+  - `git diff --check`
+  - `./scripts/start.sh`
+  - `curl -sf --noproxy '*' http://127.0.0.1:8765/health`
+  - `curl -I -s --noproxy '*' http://127.0.0.1:3477/editor`
+  - `curl -I -s --noproxy '*' 'http://127.0.0.1:3477/editor/new?template=hello_world'`
+  - `curl -sf --noproxy '*' http://127.0.0.1:8765/api/skills/definitions`
+- 这轮之后的迁移判断更新为：
+  - 若以“Vue 版可替掉旧 React 前端主要产品逻辑”为目标，当前大约在 `86% - 88%`
+  - 若只看“核心编辑器主链和主要节点内联编辑已可用”，当前大约在 `93%` 左右
+  - 下一刀更适合继续补画布连线的删边 / 重连和 route chrome 视觉细节，或继续深挖 agent port / runtime feedback 的剩余细节
+
+- 继续沿 agent 深层语义收口，把旧 React 已明确存在的 knowledge-base skill auto-sync 接回 Vue：
+  - 重新核对旧 React `87d3d6e` 的 `collectAgentKnowledgeBaseBindings` 与 `syncKnowledgeBaseSkillOnCanonicalAgentNode`
+  - 确认这条逻辑不是 UI 按钮特判，而是 canonical / 文档层归一化：
+    - 只有“恰好一个 `knowledge_base` 输入 + 一个可用文本查询输入”成立时，才挂上 `search_knowledge_base`
+    - 条件不成立时会自动裁掉 knowledge-base skill
+- 按 TDD 先补红测：
+  - 在 `frontend/src/lib/graph-document.test.ts` 先补红测，锁定：
+    - agent 读取一个 knowledge-base state 且有文本查询输入时，会自动补上 `search_knowledge_base`
+    - 缺少查询输入或出现多个 knowledge-base 输入时，会自动裁掉 `search_knowledge_base`
+  - 首次运行：
+    - `node --test --experimental-strip-types frontend/src/lib/graph-document.test.ts`
+    - 确认因缺少 `syncKnowledgeBaseSkillsInDocument` 而失败，红测成立
+- 完成 knowledge-base skill auto-sync 第一版实现：
+  - 更新 `frontend/src/lib/graph-document.ts`：
+    - 新增 `syncKnowledgeBaseSkillsInDocument`
+    - 按旧 React 语义补上 knowledge-base skill 判定、查询输入挑选与 skill 列表归一化
+  - 更新 `frontend/src/editor/workspace/EditorWorkspaceShell.vue`：
+    - `registerDocumentForTab` 与 `setDocumentForTab` 统一通过文档归一化接入 knowledge-base skill auto-sync
+    - 因此 agent 绑定、解绑、state 类型变化与已有图加载都会走同一条收口语义
+- 完成这一轮验证：
+  - `cd frontend && node --experimental-strip-types --test $(rg --files src -g '*test.ts')`
+  - `cd frontend && npm run build`
+  - `git diff --check`
+  - `./scripts/start.sh`
+  - `curl -sf --noproxy '*' http://127.0.0.1:8765/health`
+  - `curl -I -s --noproxy '*' http://127.0.0.1:3477/editor`
+  - `curl -I -s --noproxy '*' 'http://127.0.0.1:3477/editor/new?template=knowledge_base_validation'`
+  - `curl -sf --noproxy '*' http://127.0.0.1:8765/api/skills/definitions`
+- 这轮之后的迁移判断更新为：
+  - 若以“Vue 版可替掉旧 React 前端主要产品逻辑”为目标，当前大约在 `83% - 86%`
+  - 若只看“核心编辑器主链和主要节点内联编辑已可用”，当前大约在 `91%` 左右
+  - 下一刀更适合继续收口 condition route chrome，或继续深挖 agent port / runtime feedback 的剩余细节
+
+- 继续沿 agent action row 往下补，把旧 React 里真实存在的 `+ input / + output` port 交互第一版接回 Vue：
+  - 重新核对旧 React `87d3d6e` 的 `StatePortCreateButton`
+  - 确认这两颗按钮不是占位，而是支持：
+    - 搜索现有 state 并绑定
+    - 从搜索词创建新 state
+    - 创建后立即把 state 绑定到对应 port
+  - 确认创建草稿默认会从查询词生成唯一 key，默认类型是 `text`
+- 按 TDD 先补红测：
+  - 在 `frontend/src/editor/workspace/statePanelFields.test.ts` 先补红测，要求能把显式 state definition 插入文档
+  - 新增 `frontend/src/editor/nodes/statePortCreateModel.test.ts`，锁定：
+    - state 搜索命中 name / key / description
+    - 从查询词生成唯一 text-state 草稿
+  - 首次运行：
+    - `cd frontend && node --experimental-strip-types --test src/editor/workspace/statePanelFields.test.ts src/editor/nodes/statePortCreateModel.test.ts`
+    - 确认分别因缺少 `insertStateFieldIntoDocument` 与 `statePortCreateModel.ts` 而失败，红测成立
+- 完成 `+ input / + output` 第一版实现：
+  - 新增 `frontend/src/editor/nodes/statePortCreateModel.ts`
+  - 更新 `frontend/src/editor/workspace/statePanelFields.ts`，新增 `insertStateFieldIntoDocument`
+  - 更新 `frontend/src/editor/nodes/NodeCard.vue`：
+    - `+ input / + output` 从静态 pill 升级为 port picker
+    - 可搜索现有 state 并直接绑定
+    - 可创建新 state，并复用 `StateDefaultValueEditor`、类型与默认值语义
+  - 更新 `frontend/src/editor/canvas/EditorCanvas.vue` 与 `frontend/src/editor/workspace/EditorWorkspaceShell.vue`：
+    - 新增 `bind-port-state` / `create-port-state` 事件链
+    - 将新建 state 与绑定动作真正写回活动文档
+- 完成这一轮验证：
+  - `cd frontend && node --experimental-strip-types --test $(rg --files src -g '*test.ts')`
+  - `cd frontend && npm run build`
+  - `git diff --check`
+  - `./scripts/start.sh`
+  - `curl -sf --noproxy '*' http://127.0.0.1:8765/health`
+  - `curl -I -s --noproxy '*' http://127.0.0.1:3477/editor`
+  - `curl -I -s --noproxy '*' 'http://127.0.0.1:3477/editor/new?template=knowledge_base_validation'`
+  - `curl -sf --noproxy '*' http://127.0.0.1:8765/api/skills/definitions`
+  - `curl -sf --noproxy '*' http://127.0.0.1:8765/api/settings`
+- 这轮之后的迁移判断更新为：
+  - 若以“Vue 版可替掉旧 React 前端主要产品逻辑”为目标，当前大约在 `82% - 85%`
+  - 若只看“核心编辑器主链和主要节点内联编辑已可用”，当前大约在 `90%` 左右
+  - 下一刀更适合继续收口 condition route chrome，或回头补 agent port 更细的交互手感
+
+- 继续沿 agent action row 往下补，把旧 React 里真实可用的 `+ skill` 接回 Vue：
+  - 重新核对旧 React `87d3d6e` 的 `SkillPickerPanel`
+  - 确认 `+ skill` 不是装饰，而是会读取 `/api/skills/definitions`
+  - 确认 picker 只展示尚未挂载到当前 agent 的 skill
+  - 确认已挂载 skill 会以 pill 形式展示，并支持单条移除
+- 按 TDD 先补红测：
+  - 新增 `frontend/src/api/skills.test.ts`，锁定前端 API wrapper 会请求 `/api/skills/definitions`
+  - 新增 `frontend/src/editor/nodes/skillPickerModel.test.ts`，锁定：
+    - 已挂载 skill 会从 attachable 列表中过滤掉
+    - attached skill badge 按原顺序输出，并在 definition 缺失时回退 raw key
+  - 首次运行：
+    - `cd frontend && node --experimental-strip-types --test src/api/skills.test.ts src/editor/nodes/skillPickerModel.test.ts`
+    - 确认分别因缺少 `api/skills.ts` 与 `skillPickerModel.ts` 而失败，红测成立
+- 完成 agent `+ skill` 第一版实现：
+  - 新增 `frontend/src/types/skills.ts`
+  - 新增 `frontend/src/api/skills.ts`
+  - 新增 `frontend/src/editor/nodes/skillPickerModel.ts`
+  - 更新 `frontend/src/editor/workspace/EditorWorkspaceShell.vue`：
+    - 拉取 `/api/skills/definitions`
+    - 持有 `skillDefinitions / loading / error`
+    - 透传到编辑器画布
+  - 更新 `frontend/src/editor/canvas/EditorCanvas.vue`，把 skill definitions 继续透传到节点卡片
+  - 更新 `frontend/src/editor/nodes/NodeCard.vue`：
+    - `+ skill` 从静态 pill 升级为可展开 picker
+    - picker 展示可挂载 skill、loading 和 error 状态
+    - 点击 skill 会把 `skillKey` 追加到 `node.config.skills`
+    - 已挂载 skill 会以 pill 展示并支持移除
+- 完成这一轮验证：
+  - `cd frontend && node --experimental-strip-types --test $(rg --files src -g '*test.ts')`
+  - `cd frontend && npm run build`
+  - `git diff --check`
+  - `./scripts/start.sh`
+  - `curl -sf --noproxy '*' http://127.0.0.1:8765/health`
+  - `curl -I -s --noproxy '*' http://127.0.0.1:3477/editor`
+  - `curl -I -s --noproxy '*' 'http://127.0.0.1:3477/editor/new?template=knowledge_base_validation'`
+  - `curl -sf --noproxy '*' http://127.0.0.1:8765/api/skills/definitions`
+  - `curl -sf --noproxy '*' http://127.0.0.1:8765/api/settings`
+- 这轮之后的迁移判断更新为：
+  - 若以“Vue 版可替掉旧 React 前端主要产品逻辑”为目标，当前大约在 `80%` 左右
+  - 若只看“核心编辑器主链和主要节点内联编辑已可用”，当前大约在 `88%` 左右
+  - 下一刀更适合继续收口 condition route chrome 视觉细节，或转向 agent `+input / +output` port 交互
+
+- 继续沿“不要停在半迁移态”的方向推进，把剩余高价值缺口从 input 切回 agent 深层配置：
+  - 重新核对旧 React `87d3d6e` 的 `AgentInlineRuntimeControls`
+  - 确认旧前端 agent 运行时选择依赖 settings 里的 configured model catalog
+  - 确认当所选 model ref 等于全局 text model ref 时，要回写成 `modelSource: "global"` + `model: ""`
+  - 确认 `systemInstruction` 也属于 agent 节点需要直接编辑的一层，而不是只保留 `taskInstruction`
+- 按 TDD 先补红测，锁定这次迁移需要的最小运行时语义：
+  - 在 `frontend/src/editor/nodes/agentConfigModel.test.ts` 先补红测，要求：
+    - `resolveAgentRuntimeCatalog` 只消费 configured providers
+    - 全局模型优先使用 `agent_runtime_defaults.model`
+    - 若缺失再回退到 `model.text_model_ref`
+  - 首次运行：
+    - `cd frontend && node --test --experimental-strip-types src/editor/nodes/agentConfigModel.test.ts`
+    - 确认因为 `resolveAgentRuntimeCatalog` 缺失而失败，红测成立
+- 完成 agent 深层配置第一版实现：
+  - 更新 `frontend/src/editor/nodes/agentConfigModel.ts`，新增 `resolveAgentRuntimeCatalog`
+  - 更新 `frontend/src/editor/workspace/EditorWorkspaceShell.vue`：
+    - 拉取 `/api/settings`
+    - 推导 `globalTextModelRef`、`availableAgentModelRefs`、`agentModelDisplayLookup`
+    - 透传到编辑器画布
+  - 更新 `frontend/src/editor/canvas/EditorCanvas.vue`，把 agent 运行时目录继续透传到节点卡片
+  - 更新 `frontend/src/editor/nodes/NodeCard.vue`：
+    - agent 节点新增 model 下拉
+    - 全局模型选项回写 `modelSource: "global"` 语义
+    - 非全局模型选项回写 `modelSource: "override"` 语义
+    - `Advanced` 新增 `systemInstruction` 第一版编辑
+- 完成这一轮验证：
+  - `cd frontend && node --test --experimental-strip-types $(rg --files src -g '*test.ts')`
+  - `cd frontend && npm run build`
+  - `git diff --check`
+  - `./scripts/start.sh`
+  - `curl -sf --noproxy '*' http://127.0.0.1:8765/health`
+  - `curl -I -s --noproxy '*' http://127.0.0.1:3477/editor`
+  - `curl -I -s --noproxy '*' 'http://127.0.0.1:3477/editor/new?template=knowledge_base_validation'`
+  - `curl -sf --noproxy '*' http://127.0.0.1:8765/api/knowledge/bases`
+  - `curl -sf --noproxy '*' http://127.0.0.1:8765/api/settings`
+- 这轮之后的迁移判断更新为：
+  - 若以“Vue 版可替掉旧 React 前端主要产品逻辑”为目标，当前大约在 `75% - 80%`
+  - 若只看“核心编辑器主链和主要节点内联编辑已可用”，当前大约在 `85%` 左右
+  - 下一刀更适合继续收口 condition route chrome 视觉细节，或转向 agent 剩余 skills / port 深层交互
+
+- 在 `31771ff` 提交之后继续沿迁移线推进，这次切到 input 节点剩余类型的一块高把握切片：
+  - 重新核对旧 React `87d3d6e` 的 `node-system-editor.tsx`
+  - 确认旧前端 input 主体编辑区按值类型分流，`knowledge_base` 明确使用下拉
+  - 同时确认当前后端已直接提供 `/api/knowledge/bases`，可以给 Vue 编辑器提供真实 knowledge base catalog
+- 按 TDD 先补红测，锁定这次的最小新语义：
+  - 在 `src/editor/nodes/nodeCardViewModel.test.ts` 先补红测，要求 input 节点能根据 primary output state type 推导 `editorMode`
+  - 在 `src/api/knowledge.test.ts` 先补红测，要求前端 API wrapper 打到 `/api/knowledge/bases`
+  - 首次运行：
+    - `node --test --experimental-strip-types frontend/src/editor/nodes/nodeCardViewModel.test.ts`
+    - `node --test --experimental-strip-types frontend/src/api/knowledge.test.ts`
+    确认分别因缺少 `editorMode` 语义、缺少 `knowledge.ts` API 封装而失败，红测成立
+- 完成 input `knowledge_base` 下拉第一版实现：
+  - 新增 `frontend/src/types/knowledge.ts`
+  - 新增 `frontend/src/api/knowledge.ts`
+  - 更新 `frontend/src/editor/nodes/nodeCardViewModel.ts`，让 input body 根据输出 state type 推导 `text / knowledge_base / readonly`
+  - 更新 `frontend/src/editor/workspace/EditorWorkspaceShell.vue`，在编辑器加载后拉取 knowledge base 列表
+  - 更新 `frontend/src/editor/canvas/EditorCanvas.vue` 与 `frontend/src/editor/nodes/NodeCard.vue`，把 knowledge base catalog 透传到 input 节点卡片
+  - `knowledge_base` 类型的 input 不再回落为普通 textarea，而是显示真实下拉与当前 knowledge base 描述
+- 完成这一轮验证：
+  - `cd frontend && node --test --experimental-strip-types src/api/knowledge.test.ts src/editor/nodes/nodeCardViewModel.test.ts src/editor/nodes/conditionLoopLimit.test.ts src/editor/nodes/conditionRuleEditorModel.test.ts src/editor/nodes/agentConfigModel.test.ts src/editor/canvas/useSelection.test.ts src/editor/canvas/focusNodeViewport.test.ts src/editor/canvas/routeEdgePath.test.ts src/editor/canvas/edgeProjection.test.ts src/lib/condition-branch-mapping.test.ts src/lib/graph-document.test.ts src/editor/workspace/statePanelBindings.test.ts src/editor/workspace/statePanelFields.test.ts src/editor/workspace/stateDefaultValueModel.test.ts`
+  - `cd frontend && npm run build`
+  - `git diff --check`
+  - `./scripts/start.sh`
+  - `curl -sf --noproxy '*' http://127.0.0.1:8765/health`
+  - `curl -I -s --noproxy '*' http://127.0.0.1:3477/editor`
+  - `curl -I -s --noproxy '*' 'http://127.0.0.1:3477/editor/new?template=knowledge_base_validation'`
+  - `curl -sf --noproxy '*' http://127.0.0.1:8765/api/knowledge/bases`
+- 继续沿 input 这条线往下推进，把上传流与类型切换第一版一并接回：
+  - 重新核对旧 React `87d3d6e` 的 `uploaded_file` envelope、`fileToEnvelope`、`handleInputFileSelection` 与 `onUpdateInputBoundaryType`
+  - 确认后端运行时 `_coerce_input_boundary_value` 会接受 image / audio / video / file 的 `uploaded_file` payload
+  - 确认旧 React 的手动类型按钮只覆盖 `text / file / knowledge_base`，而 image / audio / video 主要通过上传后自动探测
+- 按 TDD 先补红测：
+  - 新增 `frontend/src/editor/nodes/uploadedAssetModel.test.ts`，锁定：
+    - 文件名到 `image / audio / video / file` 的探测
+    - `uploaded_file` envelope 解析
+    - text file / media file 的 envelope 序列化
+  - 新增 `frontend/src/editor/nodes/inputValueTypeModel.test.ts`，锁定：
+    - input boundary type 到 state field type 的映射
+    - `Text / File / KB` 切换时 input value 的保守收口规则
+  - 在 `frontend/src/editor/nodes/nodeCardViewModel.test.ts` 先补红测，要求 image 类型 input 能落到 asset editor mode
+- 完成 input 上传流与类型切换第一版实现：
+  - 新增 `frontend/src/editor/nodes/uploadedAssetModel.ts`
+  - 新增 `frontend/src/editor/nodes/inputValueTypeModel.ts`
+  - 更新 `frontend/src/editor/nodes/nodeCardViewModel.ts`，让 input body 支持 `asset` editor mode 与 `assetType`
+  - 更新 `frontend/src/editor/nodes/NodeCard.vue`：
+    - `image / audio / video / file` 类型 input 显示上传区
+    - 上传后显示 image / audio / video / file 预览
+    - `Text / File / KB` 类型按钮第一版接回
+    - 已上传资产时显示 locked 提示，不再展示手动类型按钮
+  - 更新 `frontend/src/editor/canvas/EditorCanvas.vue` 与 `frontend/src/editor/workspace/EditorWorkspaceShell.vue`：
+    - 接通 `update-input-state` 事件链
+    - 上传文件时同步把 primary output state type 切到探测到的类型
+- 完成这一轮验证：
+  - `cd frontend && node --test --experimental-strip-types src/api/knowledge.test.ts src/editor/nodes/inputValueTypeModel.test.ts src/editor/nodes/uploadedAssetModel.test.ts src/editor/nodes/nodeCardViewModel.test.ts src/editor/nodes/conditionLoopLimit.test.ts src/editor/nodes/conditionRuleEditorModel.test.ts src/editor/nodes/agentConfigModel.test.ts src/editor/canvas/useSelection.test.ts src/editor/canvas/focusNodeViewport.test.ts src/editor/canvas/routeEdgePath.test.ts src/editor/canvas/edgeProjection.test.ts src/lib/condition-branch-mapping.test.ts src/lib/graph-document.test.ts src/editor/workspace/statePanelBindings.test.ts src/editor/workspace/statePanelFields.test.ts src/editor/workspace/stateDefaultValueModel.test.ts`
+  - `cd frontend && npm run build`
+
 - 再次运行 `planning-with-files` 会话接续，并把“当前距离迁移完成还剩多少”的结论落盘：
   - 若以“达到旧 React 主要产品逻辑 parity 并收口辅助页面 / 文档”为目标，当前大约在 `60% - 70%`
   - 若只看“核心编辑器主链已经能用”，当前大约在 `75%` 左右

@@ -158,3 +158,64 @@ test("projectCanvasEdges skips ambiguous data writers", () => {
   const projected = projectCanvasEdges(branchingGraph);
   assert.equal(projected.filter((edge) => edge.kind === "data" && edge.target === "sink").length, 0);
 });
+
+test("projectCanvasEdges exposes branch metadata for condition routes", () => {
+  const routeGraph: GraphPayload = {
+    graph_id: null,
+    name: "Route graph",
+    state_schema: {},
+    nodes: {
+      route_result: {
+        kind: "condition",
+        name: "route_result",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [],
+        config: {
+          branches: ["continue", "retry"],
+          loopLimit: -1,
+          branchMapping: {
+            true: "continue",
+            false: "retry",
+          },
+          rule: {
+            source: "answer",
+            operator: "exists",
+            value: null,
+          },
+        },
+      },
+      output_answer: {
+        kind: "output",
+        name: "output_answer",
+        description: "",
+        ui: { position: { x: 480, y: 120 } },
+        reads: [],
+        writes: [],
+        config: {
+          displayMode: "auto",
+          persistEnabled: false,
+          persistFormat: "auto",
+          fileNameTemplate: "",
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [
+      {
+        source: "route_result",
+        branches: {
+          retry: "output_answer",
+        },
+      },
+    ],
+    metadata: {},
+  };
+
+  const projected = projectCanvasEdges(routeGraph);
+  const routeEdge = projected.find((edge) => edge.kind === "route");
+
+  assert.ok(routeEdge);
+  assert.equal(routeEdge?.branch, "retry");
+});

@@ -2,9 +2,12 @@
 
 GraphiteUI 当前是一个前后端分离的工作台：
 
-- 前端：Next.js + React Flow，负责画布编辑、节点配置、运行详情展示。
-- 后端：FastAPI，负责图校验、运行时执行、知识库检索和数据持久化。
-- 存储：SQLite，负责 graphs、runs、presets、settings，以及知识库索引。
+- 前端：Vue 3 + Vite，负责首页、编辑器、运行记录、运行详情和设置页。
+- 交互：Vue Router + Pinia + Reka UI；画布、节点和连线继续走自定义实现。
+- 后端：FastAPI，负责图校验、运行时执行、知识库检索、导出接口和数据持久化。
+- 存储：
+  - graphs、runs、presets、settings、skills：JSON 文件
+  - knowledge base：SQLite + FTS 索引
 
 当前主链已经收口到 `node_system`：
 
@@ -20,7 +23,7 @@ GraphiteUI 当前是一个前后端分离的工作台：
 1. 前端编辑并保存 graph
 2. 后端做 schema + validator 校验
 3. runtime 执行节点图
-4. run 结果写入 SQLite
+4. run 结果写入 JSON 存储
 5. 前端轮询 run detail，展示节点状态、skill 输出、知识库摘要和输出产物
 
 从调试角度看，GraphiteUI 现在已经不仅是一个画图工具，而是一个带运行态、知识库和观察能力的 workflow workspace。

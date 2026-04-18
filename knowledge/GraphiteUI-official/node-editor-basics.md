@@ -15,12 +15,12 @@ GraphiteUI 画布的基本单位是节点、state 和边。当前正式的心智
 
 当前画布里几个很关键的交互是：
 
-- 双击画布打开创建菜单。
-- 从节点 handle 拉线建立连接。
-- 从连接点拉到空白处时，直接创建下一个节点。
-- 在节点上新增输入或输出引用，并绑定已有 state 或即时新建 state。
+- 拖拽节点调整画布布局。
+- 从节点 handle 拉线建立普通控制流和 condition route 连接。
+- 选中已有边后删除或重新指定目标。
+- 在 agent 节点上新增输入或输出引用，并绑定已有 state 或即时新建 state。
 - 通过右侧 `State Panel` 直接编辑唯一的 `state_schema` 数据源。
-- 在节点上双击 state 名称或说明，直接修改同一份 state 数据。
+- 在节点卡片内部直接编辑 input / agent / condition / output 的核心配置。
 
 关于 state 和节点的关系，现在需要按这套心智理解：
 

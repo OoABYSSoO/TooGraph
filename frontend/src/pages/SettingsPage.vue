@@ -72,7 +72,12 @@
               <p>{{ provider.description }}</p>
               <div class="settings-page__provider-url">Base URL: {{ provider.base_url }}</div>
               <div class="settings-page__badges">
-                <span v-for="model in provider.models" :key="model.model_ref">{{ modelDisplayLookup[model.model_ref] || model.model_ref }}</span>
+                <span
+                  v-for="modelLabel in listProviderModelBadges(provider, modelDisplayLookup)"
+                  :key="`${provider.provider_id}-${modelLabel}`"
+                >
+                  {{ modelLabel }}
+                </span>
               </div>
             </div>
           </div>
@@ -95,6 +100,8 @@ import { computed, onMounted, ref } from "vue";
 import { fetchSettings, updateSettings } from "@/api/settings";
 import AppShell from "@/layouts/AppShell.vue";
 import type { SettingsPayload } from "@/types/settings";
+
+import { clampSettingsTemperature, listProviderModelBadges } from "./settingsPageModel.ts";
 
 type SettingsDraft = {
   text_model_ref: string;
@@ -217,7 +224,7 @@ async function handleSave() {
       agent_runtime_defaults: {
         model: draft.value.text_model_ref,
         thinking_enabled: draft.value.thinking_enabled,
-        temperature: draft.value.temperature,
+        temperature: clampSettingsTemperature(draft.value.temperature),
       },
     });
     draft.value = buildDraftFromSettings(settings.value);

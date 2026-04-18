@@ -32,7 +32,13 @@ function createRunDetail(overrides: Partial<RunDetail> = {}): RunDetail {
     node_executions: [],
     warnings: [],
     errors: [],
+    output_previews: [],
     artifacts: {},
+    state_snapshot: {
+      values: {},
+      last_writers: {},
+    },
+    graph_snapshot: {},
     ...overrides,
   };
 }

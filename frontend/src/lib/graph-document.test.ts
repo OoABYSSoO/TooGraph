@@ -319,6 +319,182 @@ test("updateAgentNodeConfigInDocument returns original document for non-agent or
   assert.equal(unchangedOutput, document);
 });
 
+test("syncKnowledgeBaseSkillsInDocument derives search_knowledge_base from agent knowledge bindings", () => {
+  assert.equal(typeof graphDocument.syncKnowledgeBaseSkillsInDocument, "function");
+
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Knowledge Agent Graph",
+    state_schema: {
+      question: {
+        name: "question",
+        description: "User question",
+        type: "text",
+        value: "",
+        color: "#d97706",
+      },
+      kb: {
+        name: "kb",
+        description: "Workspace knowledge base",
+        type: "knowledge_base",
+        value: "",
+        color: "#2563eb",
+      },
+    },
+    nodes: {
+      research_helper: {
+        kind: "agent",
+        name: "research_helper",
+        description: "Answer with workspace knowledge.",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [
+          { state: "kb", required: true },
+          { state: "question", required: true },
+        ],
+        writes: [],
+        config: {
+          skills: ["markdown_formatter"],
+          systemInstruction: "",
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const nextDocument = graphDocument.syncKnowledgeBaseSkillsInDocument(document);
+
+  assert.notEqual(nextDocument, document);
+  assert.equal(nextDocument.nodes.research_helper.kind, "agent");
+  assert.equal(document.nodes.research_helper.kind, "agent");
+  if (nextDocument.nodes.research_helper.kind !== "agent") {
+    throw new Error("Expected research_helper to remain an agent node");
+  }
+  if (document.nodes.research_helper.kind !== "agent") {
+    throw new Error("Expected research_helper to remain an agent node");
+  }
+  assert.deepEqual(nextDocument.nodes.research_helper.config.skills, ["markdown_formatter", "search_knowledge_base"]);
+  assert.deepEqual(document.nodes.research_helper.config.skills, ["markdown_formatter"]);
+});
+
+test("syncKnowledgeBaseSkillsInDocument prunes search_knowledge_base when agent no longer has a usable knowledge query", () => {
+  assert.equal(typeof graphDocument.syncKnowledgeBaseSkillsInDocument, "function");
+
+  const missingQueryDocument: GraphPayload = {
+    graph_id: null,
+    name: "Knowledge Agent No Query Graph",
+    state_schema: {
+      kb: {
+        name: "kb",
+        description: "Workspace knowledge base",
+        type: "knowledge_base",
+        value: "",
+        color: "#2563eb",
+      },
+    },
+    nodes: {
+      research_helper: {
+        kind: "agent",
+        name: "research_helper",
+        description: "Answer with workspace knowledge.",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [{ state: "kb", required: true }],
+        writes: [],
+        config: {
+          skills: ["markdown_formatter", "search_knowledge_base"],
+          systemInstruction: "",
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const nextMissingQueryDocument = graphDocument.syncKnowledgeBaseSkillsInDocument(missingQueryDocument);
+
+  assert.notEqual(nextMissingQueryDocument, missingQueryDocument);
+  assert.equal(nextMissingQueryDocument.nodes.research_helper.kind, "agent");
+  if (nextMissingQueryDocument.nodes.research_helper.kind !== "agent") {
+    throw new Error("Expected research_helper to remain an agent node");
+  }
+  assert.deepEqual(nextMissingQueryDocument.nodes.research_helper.config.skills, ["markdown_formatter"]);
+
+  const multiKnowledgeDocument: GraphPayload = {
+    graph_id: null,
+    name: "Knowledge Agent Multi KB Graph",
+    state_schema: {
+      question: {
+        name: "question",
+        description: "User question",
+        type: "text",
+        value: "",
+        color: "#d97706",
+      },
+      kb_primary: {
+        name: "kb_primary",
+        description: "Primary knowledge base",
+        type: "knowledge_base",
+        value: "",
+        color: "#2563eb",
+      },
+      kb_secondary: {
+        name: "kb_secondary",
+        description: "Secondary knowledge base",
+        type: "knowledge_base",
+        value: "",
+        color: "#1d4ed8",
+      },
+    },
+    nodes: {
+      research_helper: {
+        kind: "agent",
+        name: "research_helper",
+        description: "Answer with workspace knowledge.",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [
+          { state: "question", required: true },
+          { state: "kb_primary", required: true },
+          { state: "kb_secondary", required: false },
+        ],
+        writes: [],
+        config: {
+          skills: ["search_knowledge_base"],
+          systemInstruction: "",
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const nextMultiKnowledgeDocument = graphDocument.syncKnowledgeBaseSkillsInDocument(multiKnowledgeDocument);
+
+  assert.notEqual(nextMultiKnowledgeDocument, multiKnowledgeDocument);
+  assert.equal(nextMultiKnowledgeDocument.nodes.research_helper.kind, "agent");
+  if (nextMultiKnowledgeDocument.nodes.research_helper.kind !== "agent") {
+    throw new Error("Expected research_helper to remain an agent node");
+  }
+  assert.deepEqual(nextMultiKnowledgeDocument.nodes.research_helper.config.skills, []);
+});
+
 test("updateConditionNodeConfigInDocument patches condition config immutably", () => {
   assert.equal(typeof graphDocument.updateConditionNodeConfigInDocument, "function");
 
@@ -855,6 +1031,891 @@ test("removeConditionBranchFromDocument prunes empty conditional edge records an
 
   const unchangedLastBranch = graphDocument.removeConditionBranchFromDocument(singleBranchDocument, "route_result", "continue");
   assert.equal(unchangedLastBranch, singleBranchDocument);
+});
+
+test("connectFlowNodesInDocument appends a control-flow edge immutably", () => {
+  assert.equal(typeof graphDocument.connectFlowNodesInDocument, "function");
+
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Flow Connect Graph",
+    state_schema: {},
+    nodes: {
+      input_question: {
+        kind: "input",
+        name: "input_question",
+        description: "Provide the question",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [{ state: "question", mode: "replace" }],
+        config: {
+          value: "",
+        },
+      },
+      answer_helper: {
+        kind: "agent",
+        name: "answer_helper",
+        description: "Answer the question",
+        ui: { position: { x: 120, y: 0 } },
+        reads: [{ state: "question", required: true }],
+        writes: [],
+        config: {
+          skills: [],
+          systemInstruction: "",
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+      route_result: {
+        kind: "condition",
+        name: "route_result",
+        description: "Route the result",
+        ui: { position: { x: 240, y: 0 } },
+        reads: [],
+        writes: [],
+        config: {
+          branches: ["continue", "retry"],
+          loopLimit: -1,
+          branchMapping: {},
+          rule: {
+            source: "question",
+            operator: "exists",
+            value: null,
+          },
+        },
+      },
+    },
+    edges: [{ source: "input_question", target: "answer_helper" }],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const nextDocument = graphDocument.connectFlowNodesInDocument(document, "answer_helper", "route_result");
+
+  assert.notEqual(nextDocument, document);
+  assert.deepEqual(nextDocument.edges, [
+    { source: "input_question", target: "answer_helper" },
+    { source: "answer_helper", target: "route_result" },
+  ]);
+  assert.deepEqual(document.edges, [{ source: "input_question", target: "answer_helper" }]);
+});
+
+test("connectFlowNodesInDocument rejects invalid or duplicate flow edges", () => {
+  assert.equal(typeof graphDocument.connectFlowNodesInDocument, "function");
+
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Flow Connect No-op Graph",
+    state_schema: {},
+    nodes: {
+      input_question: {
+        kind: "input",
+        name: "input_question",
+        description: "Provide the question",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [{ state: "question", mode: "replace" }],
+        config: {
+          value: "",
+        },
+      },
+      answer_helper: {
+        kind: "agent",
+        name: "answer_helper",
+        description: "Answer the question",
+        ui: { position: { x: 120, y: 0 } },
+        reads: [{ state: "question", required: true }],
+        writes: [],
+        config: {
+          skills: [],
+          systemInstruction: "",
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+    },
+    edges: [{ source: "input_question", target: "answer_helper" }],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const duplicateEdge = graphDocument.connectFlowNodesInDocument(document, "input_question", "answer_helper");
+  const invalidTarget = graphDocument.connectFlowNodesInDocument(document, "answer_helper", "input_question");
+
+  assert.equal(duplicateEdge, document);
+  assert.equal(invalidTarget, document);
+});
+
+test("connectConditionRouteInDocument upserts a branch route immutably", () => {
+  assert.equal(typeof graphDocument.connectConditionRouteInDocument, "function");
+
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Condition Route Connect Graph",
+    state_schema: {},
+    nodes: {
+      route_result: {
+        kind: "condition",
+        name: "route_result",
+        description: "Route the result",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [],
+        config: {
+          branches: ["continue", "retry"],
+          loopLimit: -1,
+          branchMapping: {
+            true: "continue",
+            false: "retry",
+          },
+          rule: {
+            source: "answer",
+            operator: "exists",
+            value: null,
+          },
+        },
+      },
+      answer_helper: {
+        kind: "agent",
+        name: "answer_helper",
+        description: "Answer the question",
+        ui: { position: { x: 120, y: 0 } },
+        reads: [],
+        writes: [],
+        config: {
+          skills: [],
+          systemInstruction: "",
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+      fallback_output: {
+        kind: "output",
+        name: "fallback_output",
+        description: "Fallback result",
+        ui: { position: { x: 240, y: 0 } },
+        reads: [],
+        writes: [],
+        config: {
+          displayMode: "auto",
+          persistEnabled: false,
+          persistFormat: "auto",
+          fileNameTemplate: "",
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [
+      {
+        source: "route_result",
+        branches: {
+          continue: "answer_helper",
+        },
+      },
+    ],
+    metadata: {},
+  };
+
+  const nextDocument = graphDocument.connectConditionRouteInDocument(document, "route_result", "retry", "fallback_output");
+
+  assert.notEqual(nextDocument, document);
+  assert.deepEqual(nextDocument.conditional_edges, [
+    {
+      source: "route_result",
+      branches: {
+        continue: "answer_helper",
+        retry: "fallback_output",
+      },
+    },
+  ]);
+  assert.deepEqual(document.conditional_edges, [
+    {
+      source: "route_result",
+      branches: {
+        continue: "answer_helper",
+      },
+    },
+  ]);
+});
+
+test("connectConditionRouteInDocument updates existing route targets and rejects invalid targets", () => {
+  assert.equal(typeof graphDocument.connectConditionRouteInDocument, "function");
+
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Condition Route Update Graph",
+    state_schema: {},
+    nodes: {
+      route_result: {
+        kind: "condition",
+        name: "route_result",
+        description: "Route the result",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [],
+        config: {
+          branches: ["continue", "retry"],
+          loopLimit: -1,
+          branchMapping: {
+            true: "continue",
+            false: "retry",
+          },
+          rule: {
+            source: "answer",
+            operator: "exists",
+            value: null,
+          },
+        },
+      },
+      answer_helper: {
+        kind: "agent",
+        name: "answer_helper",
+        description: "Answer the question",
+        ui: { position: { x: 120, y: 0 } },
+        reads: [],
+        writes: [],
+        config: {
+          skills: [],
+          systemInstruction: "",
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+      output_answer: {
+        kind: "output",
+        name: "output_answer",
+        description: "Preview output",
+        ui: { position: { x: 240, y: 0 } },
+        reads: [],
+        writes: [],
+        config: {
+          displayMode: "auto",
+          persistEnabled: false,
+          persistFormat: "auto",
+          fileNameTemplate: "",
+        },
+      },
+      input_question: {
+        kind: "input",
+        name: "input_question",
+        description: "Question input",
+        ui: { position: { x: 360, y: 0 } },
+        reads: [],
+        writes: [{ state: "question", mode: "replace" }],
+        config: {
+          value: "",
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [
+      {
+        source: "route_result",
+        branches: {
+          retry: "answer_helper",
+        },
+      },
+    ],
+    metadata: {},
+  };
+
+  const nextDocument = graphDocument.connectConditionRouteInDocument(document, "route_result", "retry", "output_answer");
+  const invalidTarget = graphDocument.connectConditionRouteInDocument(document, "route_result", "retry", "input_question");
+  const duplicateRoute = graphDocument.connectConditionRouteInDocument(document, "route_result", "retry", "answer_helper");
+
+  assert.notEqual(nextDocument, document);
+  assert.deepEqual(nextDocument.conditional_edges, [
+    {
+      source: "route_result",
+      branches: {
+        retry: "output_answer",
+      },
+    },
+  ]);
+  assert.equal(invalidTarget, document);
+  assert.equal(duplicateRoute, document);
+});
+
+test("removeFlowEdgeFromDocument removes an existing control-flow edge immutably", () => {
+  assert.equal(typeof graphDocument.removeFlowEdgeFromDocument, "function");
+
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Flow Remove Graph",
+    state_schema: {},
+    nodes: {
+      input_question: {
+        kind: "input",
+        name: "input_question",
+        description: "Provide the question",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [{ state: "question", mode: "replace" }],
+        config: { value: "" },
+      },
+      answer_helper: {
+        kind: "agent",
+        name: "answer_helper",
+        description: "Answer the question",
+        ui: { position: { x: 120, y: 0 } },
+        reads: [{ state: "question", required: true }],
+        writes: [],
+        config: {
+          skills: [],
+          systemInstruction: "",
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+      output_answer: {
+        kind: "output",
+        name: "output_answer",
+        description: "Preview output",
+        ui: { position: { x: 240, y: 0 } },
+        reads: [],
+        writes: [],
+        config: {
+          displayMode: "auto",
+          persistEnabled: false,
+          persistFormat: "auto",
+          fileNameTemplate: "",
+        },
+      },
+    },
+    edges: [
+      { source: "input_question", target: "answer_helper" },
+      { source: "answer_helper", target: "output_answer" },
+    ],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const nextDocument = graphDocument.removeFlowEdgeFromDocument(document, "answer_helper", "output_answer");
+
+  assert.notEqual(nextDocument, document);
+  assert.deepEqual(nextDocument.edges, [{ source: "input_question", target: "answer_helper" }]);
+  assert.deepEqual(document.edges, [
+    { source: "input_question", target: "answer_helper" },
+    { source: "answer_helper", target: "output_answer" },
+  ]);
+});
+
+test("removeFlowEdgeFromDocument returns original document when the edge is missing", () => {
+  assert.equal(typeof graphDocument.removeFlowEdgeFromDocument, "function");
+
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Flow Remove No-op Graph",
+    state_schema: {},
+    nodes: {
+      input_question: {
+        kind: "input",
+        name: "input_question",
+        description: "Provide the question",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [{ state: "question", mode: "replace" }],
+        config: { value: "" },
+      },
+      answer_helper: {
+        kind: "agent",
+        name: "answer_helper",
+        description: "Answer the question",
+        ui: { position: { x: 120, y: 0 } },
+        reads: [{ state: "question", required: true }],
+        writes: [],
+        config: {
+          skills: [],
+          systemInstruction: "",
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+    },
+    edges: [{ source: "input_question", target: "answer_helper" }],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const unchangedDocument = graphDocument.removeFlowEdgeFromDocument(document, "answer_helper", "input_question");
+  assert.equal(unchangedDocument, document);
+});
+
+test("reconnectFlowEdgeInDocument retargets an existing control-flow edge immutably", () => {
+  assert.equal(typeof graphDocument.reconnectFlowEdgeInDocument, "function");
+
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Flow Reconnect Graph",
+    state_schema: {},
+    nodes: {
+      input_question: {
+        kind: "input",
+        name: "input_question",
+        description: "Provide the question",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [{ state: "question", mode: "replace" }],
+        config: { value: "" },
+      },
+      answer_helper: {
+        kind: "agent",
+        name: "answer_helper",
+        description: "Answer the question",
+        ui: { position: { x: 120, y: 0 } },
+        reads: [{ state: "question", required: true }],
+        writes: [],
+        config: {
+          skills: [],
+          systemInstruction: "",
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+      output_answer: {
+        kind: "output",
+        name: "output_answer",
+        description: "Preview output",
+        ui: { position: { x: 240, y: 0 } },
+        reads: [],
+        writes: [],
+        config: {
+          displayMode: "auto",
+          persistEnabled: false,
+          persistFormat: "auto",
+          fileNameTemplate: "",
+        },
+      },
+    },
+    edges: [{ source: "input_question", target: "answer_helper" }],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const nextDocument = graphDocument.reconnectFlowEdgeInDocument(document, "input_question", "answer_helper", "output_answer");
+
+  assert.notEqual(nextDocument, document);
+  assert.deepEqual(nextDocument.edges, [{ source: "input_question", target: "output_answer" }]);
+  assert.deepEqual(document.edges, [{ source: "input_question", target: "answer_helper" }]);
+});
+
+test("reconnectFlowEdgeInDocument rejects missing, duplicate, or invalid reconnections", () => {
+  assert.equal(typeof graphDocument.reconnectFlowEdgeInDocument, "function");
+
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Flow Reconnect No-op Graph",
+    state_schema: {},
+    nodes: {
+      input_question: {
+        kind: "input",
+        name: "input_question",
+        description: "Provide the question",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [{ state: "question", mode: "replace" }],
+        config: { value: "" },
+      },
+      answer_helper: {
+        kind: "agent",
+        name: "answer_helper",
+        description: "Answer the question",
+        ui: { position: { x: 120, y: 0 } },
+        reads: [{ state: "question", required: true }],
+        writes: [],
+        config: {
+          skills: [],
+          systemInstruction: "",
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+      route_result: {
+        kind: "condition",
+        name: "route_result",
+        description: "Route the result",
+        ui: { position: { x: 240, y: 0 } },
+        reads: [],
+        writes: [],
+        config: {
+          branches: ["continue", "retry"],
+          loopLimit: -1,
+          branchMapping: {},
+          rule: {
+            source: "question",
+            operator: "exists",
+            value: null,
+          },
+        },
+      },
+      output_answer: {
+        kind: "output",
+        name: "output_answer",
+        description: "Preview output",
+        ui: { position: { x: 360, y: 0 } },
+        reads: [],
+        writes: [],
+        config: {
+          displayMode: "auto",
+          persistEnabled: false,
+          persistFormat: "auto",
+          fileNameTemplate: "",
+        },
+      },
+    },
+    edges: [
+      { source: "input_question", target: "answer_helper" },
+      { source: "input_question", target: "output_answer" },
+    ],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const missingEdge = graphDocument.reconnectFlowEdgeInDocument(document, "answer_helper", "input_question", "route_result");
+  const duplicateEdge = graphDocument.reconnectFlowEdgeInDocument(document, "input_question", "answer_helper", "output_answer");
+  const invalidTarget = graphDocument.reconnectFlowEdgeInDocument(document, "input_question", "answer_helper", "input_question");
+
+  assert.equal(missingEdge, document);
+  assert.equal(duplicateEdge, document);
+  assert.equal(invalidTarget, document);
+});
+
+test("removeConditionRouteFromDocument removes a branch route and prunes empty records", () => {
+  assert.equal(typeof graphDocument.removeConditionRouteFromDocument, "function");
+
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Route Remove Graph",
+    state_schema: {},
+    nodes: {
+      route_result: {
+        kind: "condition",
+        name: "route_result",
+        description: "Route the result",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [],
+        config: {
+          branches: ["continue", "retry"],
+          loopLimit: -1,
+          branchMapping: {
+            true: "continue",
+            false: "retry",
+          },
+          rule: {
+            source: "answer",
+            operator: "exists",
+            value: null,
+          },
+        },
+      },
+      output_answer: {
+        kind: "output",
+        name: "output_answer",
+        description: "Preview output",
+        ui: { position: { x: 240, y: 0 } },
+        reads: [],
+        writes: [],
+        config: {
+          displayMode: "auto",
+          persistEnabled: false,
+          persistFormat: "auto",
+          fileNameTemplate: "",
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [
+      {
+        source: "route_result",
+        branches: {
+          continue: "output_answer",
+          retry: "output_answer",
+        },
+      },
+    ],
+    metadata: {},
+  };
+
+  const nextDocument = graphDocument.removeConditionRouteFromDocument(document, "route_result", "continue");
+
+  assert.notEqual(nextDocument, document);
+  assert.deepEqual(nextDocument.conditional_edges, [
+    {
+      source: "route_result",
+      branches: {
+        retry: "output_answer",
+      },
+    },
+  ]);
+
+  const prunedDocument = graphDocument.removeConditionRouteFromDocument(nextDocument, "route_result", "retry");
+  assert.deepEqual(prunedDocument.conditional_edges, []);
+});
+
+test("removeConditionRouteFromDocument returns original document when the route is missing", () => {
+  assert.equal(typeof graphDocument.removeConditionRouteFromDocument, "function");
+
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Route Remove No-op Graph",
+    state_schema: {},
+    nodes: {
+      route_result: {
+        kind: "condition",
+        name: "route_result",
+        description: "Route the result",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [],
+        config: {
+          branches: ["continue", "retry"],
+          loopLimit: -1,
+          branchMapping: {},
+          rule: {
+            source: "answer",
+            operator: "exists",
+            value: null,
+          },
+        },
+      },
+      output_answer: {
+        kind: "output",
+        name: "output_answer",
+        description: "Preview output",
+        ui: { position: { x: 240, y: 0 } },
+        reads: [],
+        writes: [],
+        config: {
+          displayMode: "auto",
+          persistEnabled: false,
+          persistFormat: "auto",
+          fileNameTemplate: "",
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [
+      {
+        source: "route_result",
+        branches: {
+          continue: "output_answer",
+        },
+      },
+    ],
+    metadata: {},
+  };
+
+  const unchangedDocument = graphDocument.removeConditionRouteFromDocument(document, "route_result", "retry");
+  assert.equal(unchangedDocument, document);
+});
+
+test("reconnectConditionRouteInDocument retargets an existing branch route immutably", () => {
+  assert.equal(typeof graphDocument.reconnectConditionRouteInDocument, "function");
+
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Route Reconnect Graph",
+    state_schema: {},
+    nodes: {
+      route_result: {
+        kind: "condition",
+        name: "route_result",
+        description: "Route the result",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [],
+        config: {
+          branches: ["continue", "retry"],
+          loopLimit: -1,
+          branchMapping: {
+            true: "continue",
+            false: "retry",
+          },
+          rule: {
+            source: "answer",
+            operator: "exists",
+            value: null,
+          },
+        },
+      },
+      answer_helper: {
+        kind: "agent",
+        name: "answer_helper",
+        description: "Answer the question",
+        ui: { position: { x: 120, y: 0 } },
+        reads: [],
+        writes: [],
+        config: {
+          skills: [],
+          systemInstruction: "",
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+      output_answer: {
+        kind: "output",
+        name: "output_answer",
+        description: "Preview output",
+        ui: { position: { x: 240, y: 0 } },
+        reads: [],
+        writes: [],
+        config: {
+          displayMode: "auto",
+          persistEnabled: false,
+          persistFormat: "auto",
+          fileNameTemplate: "",
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [
+      {
+        source: "route_result",
+        branches: {
+          continue: "output_answer",
+        },
+      },
+    ],
+    metadata: {},
+  };
+
+  const nextDocument = graphDocument.reconnectConditionRouteInDocument(document, "route_result", "continue", "answer_helper");
+
+  assert.notEqual(nextDocument, document);
+  assert.deepEqual(nextDocument.conditional_edges, [
+    {
+      source: "route_result",
+      branches: {
+        continue: "answer_helper",
+      },
+    },
+  ]);
+  assert.deepEqual(document.conditional_edges, [
+    {
+      source: "route_result",
+      branches: {
+        continue: "output_answer",
+      },
+    },
+  ]);
+});
+
+test("reconnectConditionRouteInDocument rejects missing, duplicate, or invalid route reconnections", () => {
+  assert.equal(typeof graphDocument.reconnectConditionRouteInDocument, "function");
+
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Route Reconnect No-op Graph",
+    state_schema: {},
+    nodes: {
+      route_result: {
+        kind: "condition",
+        name: "route_result",
+        description: "Route the result",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [],
+        config: {
+          branches: ["continue", "retry"],
+          loopLimit: -1,
+          branchMapping: {},
+          rule: {
+            source: "answer",
+            operator: "exists",
+            value: null,
+          },
+        },
+      },
+      answer_helper: {
+        kind: "agent",
+        name: "answer_helper",
+        description: "Answer the question",
+        ui: { position: { x: 120, y: 0 } },
+        reads: [],
+        writes: [],
+        config: {
+          skills: [],
+          systemInstruction: "",
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+      output_answer: {
+        kind: "output",
+        name: "output_answer",
+        description: "Preview output",
+        ui: { position: { x: 240, y: 0 } },
+        reads: [],
+        writes: [],
+        config: {
+          displayMode: "auto",
+          persistEnabled: false,
+          persistFormat: "auto",
+          fileNameTemplate: "",
+        },
+      },
+      input_question: {
+        kind: "input",
+        name: "input_question",
+        description: "Provide the question",
+        ui: { position: { x: 360, y: 0 } },
+        reads: [],
+        writes: [{ state: "question", mode: "replace" }],
+        config: {
+          value: "",
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [
+      {
+        source: "route_result",
+        branches: {
+          continue: "output_answer",
+        },
+      },
+    ],
+    metadata: {},
+  };
+
+  const missingRoute = graphDocument.reconnectConditionRouteInDocument(document, "route_result", "retry", "answer_helper");
+  const duplicateRoute = graphDocument.reconnectConditionRouteInDocument(document, "route_result", "continue", "output_answer");
+  const invalidTarget = graphDocument.reconnectConditionRouteInDocument(document, "route_result", "continue", "input_question");
+
+  assert.equal(missingRoute, document);
+  assert.equal(duplicateRoute, document);
+  assert.equal(invalidTarget, document);
 });
 
 test("updateInputNodeConfigInDocument patches input config immutably", () => {
