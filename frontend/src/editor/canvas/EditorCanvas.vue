@@ -21,9 +21,6 @@
     @drop.prevent="handleCanvasDrop"
   >
     <div class="editor-canvas__viewport" :style="viewportStyle">
-      <div v-if="connectionHint" class="editor-canvas__connect-hint">
-        {{ connectionHint }}
-      </div>
       <div v-if="nodeEntries.length === 0" class="editor-canvas__empty-state">
         <div class="editor-canvas__empty-eyebrow">Empty Canvas</div>
         <div class="editor-canvas__empty-title">Double click to create your first node</div>
@@ -45,6 +42,7 @@
           v-if="connectionPreview"
           :d="connectionPreview.path"
           class="editor-canvas__edge editor-canvas__edge--preview"
+          :style="connectionPreviewStyle"
           :class="{
             'editor-canvas__edge--flow': connectionPreview.kind === 'flow',
             'editor-canvas__edge--route': connectionPreview.kind === 'route',
@@ -173,6 +171,7 @@
         @pointerenter="setHoveredNode(nodeId)"
         @pointerleave="clearHoveredNode(nodeId)"
         @pointerdown.stop="handleNodePointerDown(nodeId, $event)"
+        @click.capture="handleNodeClickCapture(nodeId, $event)"
       >
         <div
           v-if="resolveRunNodePresentationForNode(nodeId)?.haloClass"
@@ -219,7 +218,7 @@
           v-for="anchor in flowAnchors"
           :key="`flow-${anchor.id}`"
           class="editor-canvas__flow-hotspot"
-          :style="flowHotspotStyle(anchor)"
+          :style="[flowHotspotStyle(anchor), flowHotspotConnectStyle(anchor)]"
           :class="{
             'editor-canvas__flow-hotspot--outbound': anchor.kind === 'flow-out',
             'editor-canvas__flow-hotspot--inbound': anchor.kind === 'flow-in',
@@ -240,7 +239,7 @@
           :cx="anchor.x"
           :cy="anchor.y"
           class="editor-canvas__anchor"
-          :style="anchorStyle(anchor)"
+          :style="[anchorStyle(anchor), anchorConnectStyle(anchor)]"
           :class="{
             'editor-canvas__anchor--state': anchor.kind === 'state-in' || anchor.kind === 'state-out',
             'editor-canvas__anchor--route': anchor.kind === 'route-out',
@@ -358,7 +357,10 @@ const nodeDrag = ref<{
   startClientY: number;
   originX: number;
   originY: number;
+  moved: boolean;
 } | null>(null);
+const suppressedNodeClickId = ref<string | null>(null);
+const suppressedNodeClickTimeoutRef = ref<number | null>(null);
 const pendingConnection = ref<PendingGraphConnection | null>(null);
 const pendingConnectionPoint = ref<{ x: number; y: number } | null>(null);
 const autoSnappedTargetAnchor = ref<ProjectedCanvasAnchor | null>(null);
@@ -464,37 +466,14 @@ const eligibleTargetAnchorIds = computed(() =>
       .map((anchor) => anchor.id),
   ),
 );
-const connectionHint = computed(() => {
-  if (!activeConnection.value) {
-    return null;
+const activeConnectionAccentColor = computed(() => {
+  if (activeConnection.value?.sourceKind === "state-out" && activeConnection.value.sourceStateKey) {
+    return props.document.state_schema[activeConnection.value.sourceStateKey]?.color?.trim() || "#2563eb";
   }
-
-  const sourceNode = props.document.nodes[activeConnection.value.sourceNodeId];
-  if (!sourceNode) {
-    return "Select a target node anchor to connect.";
+  if (activeConnection.value?.sourceKind === "route-out") {
+    return "#7c3aed";
   }
-
-  if (activeConnection.value.mode === "reconnect" && activeConnection.value.currentTargetNodeId) {
-    const currentTargetNode = props.document.nodes[activeConnection.value.currentTargetNodeId];
-    const currentTargetLabel = currentTargetNode?.name ?? activeConnection.value.currentTargetNodeId;
-    if (activeConnection.value.sourceKind === "route-out") {
-      return `Retargeting ${sourceNode.name} / ${activeConnection.value.branchKey} from ${currentTargetLabel}...`;
-    }
-    if (activeConnection.value.sourceKind === "state-out" && activeConnection.value.sourceStateKey) {
-      return `Retargeting ${activeConnection.value.sourceStateKey} from ${currentTargetLabel}...`;
-    }
-    return `Retargeting ${sourceNode.name} -> ${currentTargetLabel}...`;
-  }
-
-  if (activeConnection.value.sourceKind === "route-out") {
-    return `Connecting ${sourceNode.name} / ${activeConnection.value.branchKey} to a target node...`;
-  }
-
-  if (activeConnection.value.sourceKind === "state-out" && activeConnection.value.sourceStateKey) {
-    return `Connecting ${activeConnection.value.sourceStateKey} to a target state...`;
-  }
-
-  return `Connecting ${sourceNode.name} to a target node...`;
+  return "#c96b1f";
 });
 const connectionPreview = computed(() => {
   if (!activeConnection.value || !pendingConnectionPoint.value || !activeConnectionSourceAnchorId.value) {
@@ -524,6 +503,28 @@ const connectionPreview = computed(() => {
           ? resolveRouteBranchIndex(props.document, activeConnection.value.sourceNodeId, activeConnection.value.branchKey)
           : undefined,
     }),
+  };
+});
+const connectionPreviewStyle = computed(() => {
+  const accent = activeConnectionAccentColor.value;
+  if (!connectionPreview.value) {
+    return undefined;
+  }
+
+  if (connectionPreview.value.kind === "data") {
+    return {
+      "--editor-connection-preview-stroke": withAlpha(accent, 0.82),
+    };
+  }
+
+  if (connectionPreview.value.kind === "route") {
+    return {
+      "--editor-connection-preview-stroke": withAlpha(accent, 0.78),
+    };
+  }
+
+  return {
+    "--editor-connection-preview-stroke": withAlpha(accent, 0.76),
   };
 });
 const canvasSurfaceStyle = computed(() => resolveCanvasSurfaceStyle(viewport.viewport));
@@ -920,6 +921,19 @@ function edgeStyle(edge: ProjectedCanvasEdge) {
   };
 }
 
+function withAlpha(hexColor: string, alpha: number) {
+  const normalized = hexColor.trim();
+  const hex = normalized.startsWith("#") ? normalized.slice(1) : normalized;
+  if (!/^[0-9a-fA-F]{6}$/.test(hex)) {
+    return `rgba(37, 99, 235, ${alpha})`;
+  }
+
+  const red = Number.parseInt(hex.slice(0, 2), 16);
+  const green = Number.parseInt(hex.slice(2, 4), 16);
+  const blue = Number.parseInt(hex.slice(4, 6), 16);
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+}
+
 function flowHotspotStyle(anchor: ProjectedCanvasAnchor) {
   const isVertical = anchor.side === "left" || anchor.side === "right";
   let left = anchor.x;
@@ -945,6 +959,30 @@ function flowHotspotStyle(anchor: ProjectedCanvasAnchor) {
   };
 }
 
+function flowHotspotConnectStyle(anchor: ProjectedCanvasAnchor) {
+  const isSource = activeConnectionSourceAnchorId.value === anchor.id;
+  const isTarget = eligibleTargetAnchorIds.value.has(anchor.id);
+  if (!isSource && !isTarget) {
+    return undefined;
+  }
+
+  const accent = activeConnectionAccentColor.value;
+  if (activeConnection.value?.sourceKind === "state-out") {
+    return {
+      "--editor-connection-source-fill": withAlpha(accent, 0.16),
+      "--editor-connection-source-border": withAlpha(accent, 0.34),
+      "--editor-connection-source-glow": withAlpha(accent, 0.14),
+      "--editor-connection-source-symbol": withAlpha(accent, 0.96),
+      "--editor-connection-target-fill": withAlpha(accent, 0.12),
+      "--editor-connection-target-border": withAlpha(accent, 0.28),
+      "--editor-connection-target-glow": withAlpha(accent, 0.16),
+      "--editor-connection-target-anchor": withAlpha(accent, 0.92),
+    };
+  }
+
+  return undefined;
+}
+
 function anchorStyle(anchor: ProjectedCanvasAnchor) {
   if (!anchor.color) {
     return undefined;
@@ -952,6 +990,26 @@ function anchorStyle(anchor: ProjectedCanvasAnchor) {
   return {
     "--editor-anchor-fill": anchor.color,
   };
+}
+
+function anchorConnectStyle(anchor: ProjectedCanvasAnchor) {
+  const isSource = activeConnectionSourceAnchorId.value === anchor.id;
+  const isTarget = eligibleTargetAnchorIds.value.has(anchor.id);
+  if (!isSource && !isTarget) {
+    return undefined;
+  }
+
+  const accent = activeConnectionAccentColor.value;
+  if (activeConnection.value?.sourceKind === "state-out") {
+    return {
+      "--editor-connection-source-anchor": withAlpha(accent, 0.96),
+      "--editor-connection-source-stroke": withAlpha(accent, 0.24),
+      "--editor-connection-target-anchor": withAlpha(accent, 0.92),
+      "--editor-connection-target-stroke": withAlpha(accent, 0.18),
+    };
+  }
+
+  return undefined;
 }
 
 function registerNodeRef(nodeId: string, element: unknown) {
@@ -1141,8 +1199,16 @@ function handleCanvasPointerMove(event: PointerEvent) {
       : resolveCanvasPoint(event);
   }
   if (nodeDrag.value && nodeDrag.value.pointerId === event.pointerId) {
-    const deltaX = (event.clientX - nodeDrag.value.startClientX) / viewport.viewport.scale;
-    const deltaY = (event.clientY - nodeDrag.value.startClientY) / viewport.viewport.scale;
+    const pointerDeltaX = event.clientX - nodeDrag.value.startClientX;
+    const pointerDeltaY = event.clientY - nodeDrag.value.startClientY;
+    if (!nodeDrag.value.moved) {
+      if (Math.abs(pointerDeltaX) <= 3 && Math.abs(pointerDeltaY) <= 3) {
+        return;
+      }
+      nodeDrag.value.moved = true;
+    }
+    const deltaX = pointerDeltaX / viewport.viewport.scale;
+    const deltaY = pointerDeltaY / viewport.viewport.scale;
     emit("update:node-position", {
       nodeId: nodeDrag.value.nodeId,
       position: {
@@ -1167,9 +1233,40 @@ function handleCanvasPointerUp(event: PointerEvent) {
     openCreationMenuFromPendingConnection(event);
   }
   if (nodeDrag.value && nodeDrag.value.pointerId === event.pointerId) {
+    if (nodeDrag.value.moved) {
+      startSuppressedNodeClickWindow(nodeDrag.value.nodeId);
+    }
     nodeDrag.value = null;
   }
   viewport.endPan(event);
+}
+
+function clearSuppressedNodeClickWindow() {
+  if (suppressedNodeClickTimeoutRef.value !== null) {
+    window.clearTimeout(suppressedNodeClickTimeoutRef.value);
+    suppressedNodeClickTimeoutRef.value = null;
+  }
+  suppressedNodeClickId.value = null;
+}
+
+function startSuppressedNodeClickWindow(nodeId: string) {
+  clearSuppressedNodeClickWindow();
+  suppressedNodeClickId.value = nodeId;
+  suppressedNodeClickTimeoutRef.value = window.setTimeout(() => {
+    suppressedNodeClickTimeoutRef.value = null;
+    if (suppressedNodeClickId.value === nodeId) {
+      suppressedNodeClickId.value = null;
+    }
+  }, 80);
+}
+
+function handleNodeClickCapture(nodeId: string, event: MouseEvent) {
+  if (suppressedNodeClickId.value !== nodeId) {
+    return;
+  }
+  clearSuppressedNodeClickWindow();
+  event.preventDefault();
+  event.stopPropagation();
 }
 
 function handleCanvasDoubleClick(event: MouseEvent) {
@@ -1271,15 +1368,22 @@ function handleNodePointerDown(nodeId: string, event: PointerEvent) {
   if (!node) {
     return;
   }
+  const target = event.target;
+  const preserveInlineEditorFocus =
+    target instanceof HTMLElement && Boolean(target.closest("[data-text-editor-trigger='true']"));
   if (activeConnection.value) {
     const snappedAnchor = resolveEligibleTargetAnchorForNodeBody(nodeId);
     if (snappedAnchor) {
-      canvasRef.value?.focus();
+      if (!preserveInlineEditorFocus) {
+        canvasRef.value?.focus();
+      }
       completePendingConnection(snappedAnchor);
       return;
     }
   }
-  canvasRef.value?.focus();
+  if (!preserveInlineEditorFocus) {
+    canvasRef.value?.focus();
+  }
   clearCanvasTransientState();
   pendingConnection.value = null;
   pendingConnectionPoint.value = null;
@@ -1292,6 +1396,7 @@ function handleNodePointerDown(nodeId: string, event: PointerEvent) {
     startClientY: event.clientY,
     originX: node.ui.position.x,
     originY: node.ui.position.y,
+    moved: false,
   };
 }
 
@@ -1649,22 +1754,6 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   transform-origin: top left;
 }
 
-.editor-canvas__connect-hint {
-  position: absolute;
-  top: 18px;
-  right: 18px;
-  z-index: 1;
-  border: 1px solid rgba(154, 52, 18, 0.14);
-  border-radius: 999px;
-  background: rgba(255, 250, 241, 0.94);
-  color: rgba(154, 52, 18, 0.96);
-  padding: 8px 14px;
-  font-size: 0.76rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  box-shadow: 0 12px 28px rgba(120, 53, 15, 0.12);
-}
-
 .editor-canvas__empty-state {
   position: absolute;
   inset: 0;
@@ -1941,14 +2030,14 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
 }
 
 .editor-canvas__edge--preview {
-  stroke: rgba(37, 99, 235, 0.72);
+  stroke: var(--editor-connection-preview-stroke, rgba(37, 99, 235, 0.72));
   stroke-width: 2.8;
   stroke-dasharray: 8 6;
   pointer-events: none;
 }
 
 .editor-canvas__edge--preview.editor-canvas__edge--flow {
-  stroke: rgba(201, 107, 31, 0.76);
+  stroke: var(--editor-connection-preview-stroke, rgba(201, 107, 31, 0.76));
   stroke-width: 3.8;
   stroke-dasharray: 16 18;
   animation: editor-canvas-flow-line 1.8s linear infinite;
@@ -2067,23 +2156,23 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
 }
 
 .editor-canvas__flow-hotspot--connect-source::before {
-  background: rgba(239, 246, 255, 0.98);
+  background: var(--editor-connection-source-fill, rgba(239, 246, 255, 0.98));
   box-shadow:
-    inset 0 0 0 1px rgba(37, 99, 235, 0.34),
-    0 14px 28px rgba(37, 99, 235, 0.14);
+    inset 0 0 0 1px var(--editor-connection-source-border, rgba(37, 99, 235, 0.34)),
+    0 14px 28px var(--editor-connection-source-glow, rgba(37, 99, 235, 0.14));
   opacity: 1;
 }
 
 .editor-canvas__flow-hotspot--connect-source::after {
-  color: rgba(37, 99, 235, 0.96);
+  color: var(--editor-connection-source-symbol, rgba(37, 99, 235, 0.96));
   opacity: 1;
 }
 
 .editor-canvas__flow-hotspot--connect-target::before {
-  background: rgba(240, 253, 244, 0.98);
+  background: var(--editor-connection-target-fill, rgba(240, 253, 244, 0.98));
   box-shadow:
-    inset 0 0 0 1px rgba(34, 197, 94, 0.34),
-    0 14px 28px rgba(34, 197, 94, 0.16);
+    inset 0 0 0 1px var(--editor-connection-target-border, rgba(34, 197, 94, 0.34)),
+    0 14px 28px var(--editor-connection-target-glow, rgba(34, 197, 94, 0.16));
   opacity: 1;
 }
 
@@ -2092,8 +2181,8 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   width: 10px;
   height: 10px;
   border-radius: 999px;
-  background: rgba(34, 197, 94, 0.86);
-  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.12);
+  background: var(--editor-connection-target-anchor, rgba(34, 197, 94, 0.86));
+  box-shadow: 0 0 0 4px var(--editor-connection-target-glow, rgba(34, 197, 94, 0.12));
   opacity: 1;
 }
 
@@ -2124,13 +2213,13 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
 }
 
 .editor-canvas__anchor--connect-source {
-  --editor-anchor-fill: rgba(37, 99, 235, 0.96);
-  stroke: rgba(219, 234, 254, 0.98);
+  --editor-anchor-fill: var(--editor-connection-source-anchor, rgba(37, 99, 235, 0.96));
+  stroke: var(--editor-connection-source-stroke, rgba(219, 234, 254, 0.98));
 }
 
 .editor-canvas__anchor--connect-target {
-  --editor-anchor-fill: rgba(34, 197, 94, 0.92);
-  stroke: rgba(220, 252, 231, 0.98);
+  --editor-anchor-fill: var(--editor-connection-target-anchor, rgba(34, 197, 94, 0.92));
+  stroke: var(--editor-connection-target-stroke, rgba(220, 252, 231, 0.98));
 }
 
 .editor-canvas__node {

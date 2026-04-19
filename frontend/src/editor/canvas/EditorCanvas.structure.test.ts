@@ -30,7 +30,7 @@ test("EditorCanvas keeps state anchors and flow hotspots above hovered nodes", (
 
 test("EditorCanvas styles typed anchors and edges from projected state colors", () => {
   assert.match(componentSource, /:style="edgeStyle\(edge\)"/);
-  assert.match(componentSource, /:style="anchorStyle\(anchor\)"/);
+  assert.match(componentSource, /:style="\[anchorStyle\(anchor\), anchorConnectStyle\(anchor\)\]"/);
 });
 
 test("EditorCanvas renders anchors in a dedicated overlay layer above nodes", () => {
@@ -52,6 +52,7 @@ test("EditorCanvas resolves rendered anchor geometry from measured node slot off
 test("EditorCanvas renders hover-only flow hotspots and distinguishes flowing flow edges from data ant lines", () => {
   assert.match(componentSource, /v-for="anchor in flowAnchors"/);
   assert.match(componentSource, /class="editor-canvas__flow-hotspot"/);
+  assert.match(componentSource, /:style="\[flowHotspotStyle\(anchor\), flowHotspotConnectStyle\(anchor\)\]"/);
   assert.match(componentSource, /@pointerenter="setHoveredNode\(nodeId\)"/);
   assert.match(componentSource, /@pointerleave="clearHoveredNode\(nodeId\)"/);
   assert.match(componentSource, /const hoveredNodeId = ref<string \| null>\(null\);/);
@@ -61,11 +62,18 @@ test("EditorCanvas renders hover-only flow hotspots and distinguishes flowing fl
   assert.match(componentSource, /\.editor-canvas__flow-hotspot--visible::before \{[\s\S]*opacity:\s*1;/);
   assert.match(componentSource, /'editor-canvas__edge--flow': connectionPreview\.kind === 'flow'/);
   assert.match(componentSource, /'editor-canvas__edge--flow': edge\.kind === 'flow'/);
+  assert.match(componentSource, /:style="connectionPreviewStyle"/);
   assert.match(componentSource, /:marker-end="connectionPreview\.kind === 'route' \? 'url\(#editor-canvas-arrow-preview\)' : undefined"/);
   assert.doesNotMatch(componentSource, /editor-canvas-arrow-flow/);
+  assert.match(componentSource, /const activeConnectionAccentColor = computed\(\(\) =>/);
+  assert.match(componentSource, /function withAlpha\(hexColor: string, alpha: number\)/);
   assert.match(componentSource, /\.editor-canvas__edge--data \{[\s\S]*animation:\s*editor-canvas-ant-line 1\.2s linear infinite;/);
   assert.match(componentSource, /\.editor-canvas__edge--flow \{[\s\S]*animation:\s*editor-canvas-flow-line 1\.8s linear infinite;/);
-  assert.match(componentSource, /\.editor-canvas__edge--preview\.editor-canvas__edge--flow \{[\s\S]*stroke:\s*rgba\(201,\s*107,\s*31,\s*0\.76\);/);
+  assert.match(componentSource, /\.editor-canvas__edge--preview \{[\s\S]*stroke:\s*var\(--editor-connection-preview-stroke,/);
+  assert.match(componentSource, /\.editor-canvas__flow-hotspot--connect-source::before \{[\s\S]*background:\s*var\(--editor-connection-source-fill,/);
+  assert.match(componentSource, /\.editor-canvas__flow-hotspot--connect-target::before \{[\s\S]*background:\s*var\(--editor-connection-target-fill,/);
+  assert.match(componentSource, /\.editor-canvas__anchor--connect-source \{[\s\S]*--editor-anchor-fill:\s*var\(--editor-connection-source-anchor,/);
+  assert.match(componentSource, /\.editor-canvas__anchor--connect-target \{[\s\S]*--editor-anchor-fill:\s*var\(--editor-connection-target-anchor,/);
   assert.match(componentSource, /@keyframes editor-canvas-ant-line/);
   assert.match(componentSource, /@keyframes editor-canvas-flow-line/);
   assert.match(componentSource, /class="editor-canvas__edge-hitarea"/);
@@ -137,6 +145,7 @@ test("EditorCanvas gives data edges the same two-step state editing entry patter
 test("EditorCanvas restores empty-canvas onboarding copy for node creation", () => {
   assert.match(componentSource, /Double click to create your first node/);
   assert.match(componentSource, /Drag from an output handle into empty space to get type-aware preset suggestions\./);
+  assert.doesNotMatch(componentSource, /class="editor-canvas__connect-hint"/);
 });
 
 test("EditorCanvas emits node-creation intents for empty-canvas double click and dropped files", () => {
@@ -205,4 +214,32 @@ test("EditorCanvas keeps canvas panning alive outside the viewport and disables 
   assert.match(componentSource, /canvasRef\.value\?\.setPointerCapture\(event\.pointerId\)/);
   assert.match(componentSource, /releasePointerCapture\(event\.pointerId\)/);
   assert.match(componentSource, /\.editor-canvas--panning,\n\.editor-canvas--panning \* \{[\s\S]*user-select:\s*none;/);
+});
+
+test("EditorCanvas suppresses the residual click after a node drag so inline editors do not open on release", () => {
+  assert.match(componentSource, /@click\.capture="handleNodeClickCapture\(nodeId, \$event\)"/);
+  assert.match(componentSource, /const suppressedNodeClickId = ref<string \| null>\(null\);/);
+  assert.match(componentSource, /const suppressedNodeClickTimeoutRef = ref<number \| null>\(null\);/);
+  assert.match(componentSource, /moved:\s*boolean;/);
+  assert.match(componentSource, /const pointerDeltaX = event\.clientX - nodeDrag\.value\.startClientX;/);
+  assert.match(componentSource, /const pointerDeltaY = event\.clientY - nodeDrag\.value\.startClientY;/);
+  assert.match(componentSource, /if \(!nodeDrag\.value\.moved\) \{/);
+  assert.match(componentSource, /if \(Math\.abs\(pointerDeltaX\) <= 3 && Math\.abs\(pointerDeltaY\) <= 3\) \{\s*return;\s*\}/);
+  assert.match(componentSource, /nodeDrag\.value\.moved = true;/);
+  assert.match(componentSource, /const deltaX = pointerDeltaX \/ viewport\.viewport\.scale;/);
+  assert.match(componentSource, /const deltaY = pointerDeltaY \/ viewport\.viewport\.scale;/);
+  assert.match(componentSource, /if \(nodeDrag\.value\.moved\) \{[\s\S]*startSuppressedNodeClickWindow\(nodeDrag\.value\.nodeId\);/);
+  assert.match(componentSource, /function clearSuppressedNodeClickWindow\(\) \{/);
+  assert.match(componentSource, /window\.clearTimeout\(suppressedNodeClickTimeoutRef\.value\);/);
+  assert.match(componentSource, /function startSuppressedNodeClickWindow\(nodeId: string\) \{/);
+  assert.match(componentSource, /suppressedNodeClickId\.value = nodeId;/);
+  assert.match(componentSource, /suppressedNodeClickTimeoutRef\.value = window\.setTimeout\(\(\) => \{/);
+  assert.match(componentSource, /\}, 80\);/);
+  assert.match(componentSource, /function handleNodeClickCapture\(nodeId: string, event: MouseEvent\) \{/);
+  assert.match(componentSource, /if \(suppressedNodeClickId\.value !== nodeId\) \{/);
+  assert.match(componentSource, /clearSuppressedNodeClickWindow\(\);/);
+  assert.match(componentSource, /event\.preventDefault\(\);/);
+  assert.match(componentSource, /event\.stopPropagation\(\);/);
+  assert.match(componentSource, /const preserveInlineEditorFocus =[\s\S]*target\.closest\("\[data-text-editor-trigger='true'\]"\)/);
+  assert.match(componentSource, /if \(!preserveInlineEditorFocus\) \{\s*canvasRef\.value\?\.focus\(\);\s*\}/);
 });

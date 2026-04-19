@@ -139,8 +139,11 @@
             role="button"
             tabindex="0"
             data-text-editor-trigger="true"
-            @pointerdown.stop
-            @click.stop="handleTextEditorAction('title')"
+            @pointerdown="handleTextTriggerPointerDown('title', $event)"
+            @pointermove="handleTextTriggerPointerMove('title', $event)"
+            @pointerup="handleTextTriggerPointerUp('title', $event)"
+            @pointercancel="clearTextTriggerPointerState"
+            @click.stop.prevent="noop"
             @keydown.enter.prevent="handleTextEditorAction('title')"
             @keydown.space.prevent="handleTextEditorAction('title')"
           >
@@ -157,7 +160,6 @@
             ref="titleEditorInputRef"
             :model-value="textEditorDraftValue('title')"
             @update:model-value="handleTextEditorDraftInput('title', $event)"
-            @blur="commitTextEditor('title')"
             @keydown.enter.prevent="commitTextEditor('title')"
             @keydown.esc.prevent="closeTextEditor()"
           />
@@ -180,8 +182,11 @@
           role="button"
           tabindex="0"
           data-text-editor-trigger="true"
-          @pointerdown.stop
-          @click.stop="handleTextEditorAction('description')"
+          @pointerdown="handleTextTriggerPointerDown('description', $event)"
+          @pointermove="handleTextTriggerPointerMove('description', $event)"
+          @pointerup="handleTextTriggerPointerUp('description', $event)"
+          @pointercancel="clearTextTriggerPointerState"
+          @click.stop.prevent="noop"
           @keydown.enter.prevent="handleTextEditorAction('description')"
           @keydown.space.prevent="handleTextEditorAction('description')"
         >
@@ -200,7 +205,6 @@
           type="textarea"
           :autosize="{ minRows: 4, maxRows: 7 }"
           @update:model-value="handleTextEditorDraftInput('description', $event)"
-          @blur="commitTextEditor('description')"
           @keydown.ctrl.enter.prevent="commitTextEditor('description')"
           @keydown.meta.enter.prevent="commitTextEditor('description')"
           @keydown.esc.prevent="closeTextEditor()"
@@ -1240,7 +1244,15 @@ const activeTopAction = ref<"advanced" | "delete" | "preset" | null>(null);
 const topActionTimeoutRef = ref<number | null>(null);
 const activeTextEditor = ref<TextEditorField | null>(null);
 const activeTextEditorConfirmField = ref<TextEditorField | null>(null);
+const textTriggerPointerState = ref<{
+  field: TextEditorField;
+  pointerId: number;
+  startClientX: number;
+  startClientY: number;
+  moved: boolean;
+} | null>(null);
 const textEditorConfirmTimeoutRef = ref<number | null>(null);
+const textEditorFocusTimeoutRef = ref<number | null>(null);
 const titleEditorDraft = ref("");
 const descriptionEditorDraft = ref("");
 const titleEditorInputRef = ref<{ focus?: () => void } | null>(null);
@@ -1491,7 +1503,9 @@ watch(
 onBeforeUnmount(() => {
   removeGlobalFloatingPanelListeners();
   clearTopActionTimeout();
+  clearTextTriggerPointerState();
   clearTextEditorConfirmTimeout();
+  clearTextEditorFocusTimeout();
   clearStateEditorConfirmTimeout();
   clearRemovePortStateConfirmTimeout();
 });
@@ -1862,16 +1876,75 @@ function setTextEditorDraftValue(field: TextEditorField, value: string) {
   descriptionEditorDraft.value = value;
 }
 
+function noop() {}
+
+function clearTextTriggerPointerState() {
+  textTriggerPointerState.value = null;
+}
+
+function handleTextTriggerPointerDown(field: TextEditorField, event: PointerEvent) {
+  if (event.button !== 0) {
+    return;
+  }
+  textTriggerPointerState.value = {
+    field,
+    pointerId: event.pointerId,
+    startClientX: event.clientX,
+    startClientY: event.clientY,
+    moved: false,
+  };
+}
+
+function handleTextTriggerPointerMove(field: TextEditorField, event: PointerEvent) {
+  const pointerState = textTriggerPointerState.value;
+  if (!pointerState || pointerState.field !== field || pointerState.pointerId !== event.pointerId) {
+    return;
+  }
+
+  const deltaX = event.clientX - pointerState.startClientX;
+  const deltaY = event.clientY - pointerState.startClientY;
+  if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) {
+    pointerState.moved = true;
+  }
+}
+
+function handleTextTriggerPointerUp(field: TextEditorField, event: PointerEvent) {
+  const pointerState = textTriggerPointerState.value;
+  clearTextTriggerPointerState();
+  if (!pointerState || pointerState.field !== field || pointerState.pointerId !== event.pointerId) {
+    return;
+  }
+
+  const deltaX = event.clientX - pointerState.startClientX;
+  const deltaY = event.clientY - pointerState.startClientY;
+  if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) {
+    return;
+  }
+  if (pointerState.moved) {
+    return;
+  }
+  handleTextEditorAction(field);
+}
+
 function focusTextEditorField(field: TextEditorField) {
   void nextTick(() => {
-    window.requestAnimationFrame(() => {
+    clearTextEditorFocusTimeout();
+    textEditorFocusTimeoutRef.value = window.setTimeout(() => {
+      textEditorFocusTimeoutRef.value = null;
       if (field === "title") {
         titleEditorInputRef.value?.focus?.();
         return;
       }
       descriptionEditorInputRef.value?.focus?.();
-    });
+    }, 0);
   });
+}
+
+function clearTextEditorFocusTimeout() {
+  if (textEditorFocusTimeoutRef.value !== null) {
+    window.clearTimeout(textEditorFocusTimeoutRef.value);
+    textEditorFocusTimeoutRef.value = null;
+  }
 }
 
 function clearTextEditorConfirmTimeout() {
@@ -1931,6 +2004,7 @@ function openTextEditor(field: TextEditorField) {
 }
 
 function closeTextEditor() {
+  clearTextEditorFocusTimeout();
   activeTextEditor.value = null;
   syncTextEditorDraftsFromNode();
 }

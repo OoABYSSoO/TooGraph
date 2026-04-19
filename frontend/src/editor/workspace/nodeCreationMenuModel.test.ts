@@ -158,6 +158,18 @@ test("buildNodeCreationEntries filters creation candidates by query and source t
   assert.deepEqual(entries.map((entry) => entry.id), ["preset-preset.agent.lookup_kb"]);
 });
 
+test("buildNodeCreationEntries excludes input nodes when creation starts from a connection", () => {
+  const entries = buildNodeCreationEntries({
+    builtins: [...builtins],
+    presets: [...presets],
+    query: "",
+    sourceValueType: null,
+    sourceAnchorKind: "flow-out",
+  });
+
+  assert.ok(entries.every((entry) => entry.family !== "input"));
+});
+
 test("supportsCreationSourceType rejects text-only agent presets for knowledge base outputs", () => {
   const textPresetEntry: NodeCreationEntry = {
     id: "preset-preset.agent.answer_text",
@@ -172,4 +184,5 @@ test("supportsCreationSourceType rejects text-only agent presets for knowledge b
 
   assert.equal(supportsCreationSourceType(textPresetEntry, "knowledge_base"), false);
   assert.equal(supportsCreationSourceType(textPresetEntry, "text"), true);
+  assert.equal(supportsCreationSourceType(builtins[0], null, "flow-out"), false);
 });
