@@ -171,6 +171,27 @@ test("EditorCanvas opens the creation flow when output drags end on empty canvas
   assert.match(componentSource, /openCreationMenuFromPendingConnection\(event\)/);
 });
 
+test("EditorCanvas snaps flow drags to eligible target node bodies before mouseup", () => {
+  assert.match(componentSource, /const autoSnappedTargetAnchor = ref<ProjectedCanvasAnchor \| null>\(null\);/);
+  assert.match(componentSource, /function resolveAutoSnappedTargetAnchor\(event: PointerEvent\)/);
+  assert.match(componentSource, /function isPointerWithinFlowHotspot\(anchor: ProjectedCanvasAnchor, event: PointerEvent\)/);
+  assert.match(componentSource, /function resolveEligibleTargetAnchorForNodeBody\(nodeId: string\)/);
+  assert.match(componentSource, /if \(activeConnection\.value\) \{[\s\S]*autoSnappedTargetAnchor\.value = resolveAutoSnappedTargetAnchor\(event\);/);
+  assert.match(componentSource, /pendingConnectionPoint\.value = autoSnappedTargetAnchor\.value/);
+  assert.match(componentSource, /\? \{ x: autoSnappedTargetAnchor\.value\.x, y: autoSnappedTargetAnchor\.value\.y \}/);
+  assert.match(componentSource, /: resolveCanvasPoint\(event\);/);
+  assert.match(componentSource, /if \(activeConnection\.value\) \{[\s\S]*if \(autoSnappedTargetAnchor\.value\) \{[\s\S]*completePendingConnection\(autoSnappedTargetAnchor\.value\);[\s\S]*return;[\s\S]*\}[\s\S]*openCreationMenuFromPendingConnection\(event\);[\s\S]*\}/);
+  assert.match(componentSource, /for \(const anchor of flowAnchors\.value\) \{[\s\S]*if \(isPointerWithinFlowHotspot\(anchor, event\) && eligibleTargetAnchorIds\.value\.has\(anchor\.id\)\) \{[\s\S]*return anchor;[\s\S]*\}/);
+  assert.match(componentSource, /const hotspot = flowHotspotStyle\(anchor\);/);
+  assert.match(componentSource, /const left = parseFloat\(hotspot\.left\);/);
+  assert.match(componentSource, /const width = parseFloat\(hotspot\.width\);/);
+  assert.match(componentSource, /const rect = nodeElement\.getBoundingClientRect\(\);/);
+  assert.match(componentSource, /event\.clientX >= rect\.left/);
+  assert.match(componentSource, /event\.clientX <= rect\.right/);
+  assert.match(componentSource, /event\.clientY >= rect\.top/);
+  assert.match(componentSource, /event\.clientY <= rect\.bottom/);
+});
+
 test("EditorCanvas disables text selection while a connection drag is active", () => {
   assert.match(componentSource, /'editor-canvas--connecting': Boolean\(pendingConnection\)/);
   assert.match(componentSource, /window\.getSelection\(\)\?\.removeAllRanges\(\)/);
