@@ -53,6 +53,13 @@
           :marker-end="connectionPreview.kind === 'route' ? 'url(#editor-canvas-arrow-preview)' : undefined"
         />
         <path
+          v-for="edge in projectedEdges.filter((edge) => edge.kind === 'flow')"
+          :key="`${edge.id}:highlight`"
+          :d="edge.path"
+          class="editor-canvas__edge-delete-highlight"
+          :class="{ 'editor-canvas__edge-delete-highlight--active': isFlowEdgeDeleteConfirmOpen(edge.id) }"
+        />
+        <path
           v-for="edge in projectedEdges"
           :key="edge.id"
           :d="edge.path"
@@ -72,6 +79,17 @@
                 : 'url(#editor-canvas-arrow-route)'
               : undefined
           "
+        />
+        <path
+          v-for="edge in projectedEdges"
+          :key="`${edge.id}:hitarea`"
+          :d="edge.path"
+          class="editor-canvas__edge-hitarea"
+          :class="{
+            'editor-canvas__edge-hitarea--flow': edge.kind === 'flow',
+            'editor-canvas__edge-hitarea--route': edge.kind === 'route',
+            'editor-canvas__edge-hitarea--data': edge.kind === 'data',
+          }"
           @pointerdown.stop="handleEdgePointerDown(edge, $event)"
         />
       </svg>
@@ -441,6 +459,10 @@ const flowEdgeDeleteConfirmStyle = computed(() => {
     top: `${activeFlowEdgeDeleteConfirm.value.y}px`,
   };
 });
+
+function isFlowEdgeDeleteConfirmOpen(edgeId: string) {
+  return activeFlowEdgeDeleteConfirm.value?.id === edgeId;
+}
 
 watch(projectedEdges, (edges) => {
   if (selectedEdgeId.value && !edges.some((edge) => edge.id === selectedEdgeId.value)) {
@@ -1335,12 +1357,39 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   stroke-width: 4.6;
   stroke-linecap: round;
   stroke-linejoin: round;
-  pointer-events: stroke;
-  cursor: pointer;
+  pointer-events: none;
   transition:
     stroke 120ms ease,
     stroke-width 120ms ease,
     opacity 120ms ease;
+}
+
+.editor-canvas__edge-hitarea {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 18px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.editor-canvas__edge-delete-highlight {
+  fill: none;
+  stroke: rgba(201, 107, 31, 0.16);
+  stroke-width: 7px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+  transition:
+    stroke 120ms ease,
+    stroke-width 120ms ease,
+    opacity 120ms ease;
+}
+
+.editor-canvas__edge-delete-highlight--active {
+  stroke: rgba(220, 38, 38, 0.34);
+  stroke-width: 12px;
 }
 
 .editor-canvas__edge--flow {
