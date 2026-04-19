@@ -174,6 +174,7 @@ import EditorCanvas from "@/editor/canvas/EditorCanvas.vue";
 import type { NodeFocusRequest } from "@/editor/canvas/useNodeSelectionFocus";
 import { buildBuiltinNodeCreationEntries } from "@/editor/workspace/nodeCreationBuiltins";
 import { buildNodeCreationEntries } from "@/editor/workspace/nodeCreationMenuModel";
+import { createNodeFromCreationEntry, createNodeFromDroppedFile } from "./nodeCreationExecution.ts";
 import { resolveEditorRouteInstruction } from "@/lib/editor-route-sync";
 import {
   addConditionBranchToDocument,
@@ -847,10 +848,60 @@ function updateNodeCreationQuery(tabId: string, query: string) {
 }
 
 function createNodeFromMenuForTab(tabId: string, _entry: NodeCreationEntry) {
-  closeNodeCreationMenu(tabId);
+  const document = documentsByTabId.value[tabId];
+  const menuState = nodeCreationMenuState(tabId);
+  if (!document || !menuState?.context) {
+    closeNodeCreationMenu(tabId);
+    return;
+  }
+
+  try {
+    const result = createNodeFromCreationEntry(document, {
+      entry: _entry,
+      context: menuState.context,
+      persistedPresets: persistedPresets.value,
+    });
+    markDocumentDirty(tabId, result.document);
+    focusNodeForTab(tabId, result.createdNodeId);
+    requestNodeFocusForTab(tabId, result.createdNodeId);
+    setMessageFeedbackForTab(tabId, {
+      tone: "neutral",
+      message: `Created ${result.document.nodes[result.createdNodeId]?.name ?? _entry.label}.`,
+    });
+    closeNodeCreationMenu(tabId);
+  } catch (error) {
+    setMessageFeedbackForTab(tabId, {
+      tone: "warning",
+      message: error instanceof Error ? error.message : "Failed to create node.",
+    });
+  }
 }
 
-function createNodeFromFileForTab(tabId: string, _payload: { file: File; position: GraphPosition }) {
+async function createNodeFromFileForTab(tabId: string, _payload: { file: File; position: GraphPosition }) {
+  const document = documentsByTabId.value[tabId];
+  if (!document) {
+    closeNodeCreationMenu(tabId);
+    return;
+  }
+
+  try {
+    const result = await createNodeFromDroppedFile(document, {
+      file: _payload.file,
+      position: _payload.position,
+    });
+    markDocumentDirty(tabId, result.document);
+    focusNodeForTab(tabId, result.createdNodeId);
+    requestNodeFocusForTab(tabId, result.createdNodeId);
+    setMessageFeedbackForTab(tabId, {
+      tone: "neutral",
+      message: `Created ${result.document.nodes[result.createdNodeId]?.name ?? "input node"} from ${_payload.file.name}.`,
+    });
+  } catch (error) {
+    setMessageFeedbackForTab(tabId, {
+      tone: "warning",
+      message: error instanceof Error ? error.message : "Failed to create input node from file.",
+    });
+  }
   closeNodeCreationMenu(tabId);
 }
 

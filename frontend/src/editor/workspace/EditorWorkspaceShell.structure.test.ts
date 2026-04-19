@@ -32,3 +32,12 @@ test("EditorWorkspaceShell loads persisted presets for the node creation menu", 
   assert.match(componentSource, /async function loadPersistedPresets\(\)/);
   assert.match(componentSource, /persistedPresets\.value = await fetchPresets\(\)/);
 });
+
+test("EditorWorkspaceShell routes menu selections and dropped files through the node-creation execution helpers", () => {
+  assert.match(componentSource, /import \{ createNodeFromCreationEntry, createNodeFromDroppedFile \} from "\.\/nodeCreationExecution\.ts";/);
+  assert.match(componentSource, /const result = createNodeFromCreationEntry\(document, \{/);
+  assert.match(componentSource, /const result = await createNodeFromDroppedFile\(document, \{/);
+  assert.match(componentSource, /markDocumentDirty\(tabId, result\.document\)/);
+  assert.match(componentSource, /focusNodeForTab\(tabId, result\.createdNodeId\)/);
+  assert.match(componentSource, /closeNodeCreationMenu\(tabId\)/);
+});

@@ -1,0 +1,124 @@
+import { createUploadedAssetEnvelope } from "../nodes/uploadedAssetModel.ts";
+import {
+  applyNodeCreationResult,
+  buildGenericInputNode,
+  buildGenericOutputNode,
+  buildInputNodeFromFile,
+  buildNodeFromPreset,
+} from "../../lib/graph-node-creation.ts";
+import type {
+  GraphDocument,
+  GraphPayload,
+  GraphPosition,
+  NodeCreationContext,
+  NodeCreationEntry,
+  PresetDocument,
+} from "../../types/node-system.ts";
+
+import { resolveBuiltinNodeCreationPreset } from "./nodeCreationBuiltins.ts";
+
+type CreateNodeFromCreationEntryInput = {
+  entry: NodeCreationEntry;
+  context?: NodeCreationContext | null;
+  persistedPresets: PresetDocument[];
+  createdNodeId?: string;
+};
+
+type CreateNodeFromDroppedFileInput = {
+  file: File;
+  position: GraphPosition;
+  createdNodeId?: string;
+};
+
+function createGraphNodeId(prefix: string) {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return `${prefix}_${crypto.randomUUID().slice(0, 8)}`;
+  }
+  return `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function resolveCreationPreset(entry: NodeCreationEntry, persistedPresets: PresetDocument[]) {
+  if (!entry.presetId) {
+    return null;
+  }
+  return (
+    resolveBuiltinNodeCreationPreset(entry.presetId) ??
+    persistedPresets.find((preset) => preset.presetId === entry.presetId) ??
+    null
+  );
+}
+
+export function createNodeFromCreationEntry<T extends GraphPayload | GraphDocument>(
+  document: T,
+  input: CreateNodeFromCreationEntryInput,
+) {
+  const createdNodeId =
+    input.createdNodeId ??
+    createGraphNodeId(input.entry.nodeKind ?? input.entry.family ?? (input.entry.mode === "preset" ? "preset" : "node"));
+
+  if (input.entry.mode === "node" && input.entry.nodeKind === "input") {
+    const created = buildGenericInputNode({
+      id: createdNodeId,
+      position: input.context?.position ?? { x: 0, y: 0 },
+    });
+    return applyNodeCreationResult(document, {
+      createdNodeId,
+      createdNode: created.node,
+      mergedStateSchema: created.state_schema,
+      context: input.context ?? null,
+    });
+  }
+
+  if (input.entry.mode === "node" && input.entry.nodeKind === "output") {
+    const created = buildGenericOutputNode({
+      id: createdNodeId,
+      position: input.context?.position ?? { x: 0, y: 0 },
+    });
+    return applyNodeCreationResult(document, {
+      createdNodeId,
+      createdNode: created.node,
+      mergedStateSchema: created.state_schema,
+      context: input.context ?? null,
+    });
+  }
+
+  const preset = resolveCreationPreset(input.entry, input.persistedPresets);
+  if (!preset) {
+    throw new Error(`Unable to resolve creation preset for ${input.entry.id}.`);
+  }
+
+  const created = buildNodeFromPreset(preset, {
+    id: createdNodeId,
+    position: input.context?.position ?? { x: 0, y: 0 },
+  });
+  return applyNodeCreationResult(document, {
+    createdNodeId,
+    createdNode: created.node,
+    mergedStateSchema: created.state_schema,
+    context: input.context ?? null,
+  });
+}
+
+export async function createNodeFromDroppedFile<T extends GraphPayload | GraphDocument>(
+  document: T,
+  input: CreateNodeFromDroppedFileInput,
+) {
+  const createdNodeId = input.createdNodeId ?? createGraphNodeId("input");
+  const envelope = await createUploadedAssetEnvelope(input.file);
+  const created = buildInputNodeFromFile({
+    id: createdNodeId,
+    position: input.position,
+    fileName: envelope.name,
+    mimeType: envelope.mimeType,
+    size: envelope.size,
+    content: envelope.content,
+    detectedType: envelope.detectedType,
+    encoding: envelope.encoding,
+  });
+  return applyNodeCreationResult(document, {
+    createdNodeId,
+    createdNode: created.node,
+    mergedStateSchema: created.state_schema,
+    context: null,
+  });
+}

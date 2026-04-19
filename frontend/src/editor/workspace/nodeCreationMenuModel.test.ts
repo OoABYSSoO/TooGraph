@@ -2,8 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { buildNodeCreationEntries, supportsCreationSourceType } from "./nodeCreationMenuModel.ts";
+import type { NodeCreationEntry, PresetDocument } from "@/types/node-system";
 
-const builtins = [
+const builtins: NodeCreationEntry[] = [
   {
     id: "node-input",
     family: "input",
@@ -40,9 +41,9 @@ const builtins = [
     origin: "builtin",
     presetId: "preset.condition.empty.v0",
   },
-] as const;
+];
 
-const presets = [
+const presets: PresetDocument[] = [
   {
     presetId: "preset.agent.answer_text",
     sourcePresetId: null,
@@ -123,7 +124,7 @@ const presets = [
       },
     },
   },
-] as const;
+];
 
 test("buildNodeCreationEntries keeps node entries ahead of persisted presets within family order", () => {
   const entries = buildNodeCreationEntries({
@@ -158,7 +159,7 @@ test("buildNodeCreationEntries filters creation candidates by query and source t
 });
 
 test("supportsCreationSourceType rejects text-only agent presets for knowledge base outputs", () => {
-  const textPresetEntry = {
+  const textPresetEntry: NodeCreationEntry = {
     id: "preset-preset.agent.answer_text",
     family: "agent",
     label: "Answer Text",
@@ -167,7 +168,7 @@ test("supportsCreationSourceType rejects text-only agent presets for knowledge b
     origin: "persisted",
     presetId: "preset.agent.answer_text",
     acceptsValueTypes: ["text"],
-  } as const;
+  };
 
   assert.equal(supportsCreationSourceType(textPresetEntry, "knowledge_base"), false);
   assert.equal(supportsCreationSourceType(textPresetEntry, "text"), true);

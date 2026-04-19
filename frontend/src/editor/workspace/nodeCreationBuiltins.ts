@@ -1,4 +1,4 @@
-import type { NodeCreationEntry } from "@/types/node-system";
+import type { NodeCreationEntry, PresetDocument } from "@/types/node-system";
 
 export const NODE_CREATION_FAMILY_PRIORITY: Record<NodeCreationEntry["family"], number> = {
   input: 0,
@@ -50,4 +50,80 @@ export function buildBuiltinNodeCreationEntries(): NodeCreationEntry[] {
       acceptsValueTypes: null,
     },
   ];
+}
+
+const BUILTIN_EMPTY_AGENT_PRESET: PresetDocument = {
+  presetId: "preset.agent.empty.v0",
+  sourcePresetId: null,
+  createdAt: null,
+  updatedAt: null,
+  definition: {
+    label: "Empty Agent Node",
+    description: "Blank agent node.",
+    state_schema: {},
+    node: {
+      kind: "agent",
+      name: "Empty Agent Node",
+      description: "Blank agent node.",
+      ui: {
+        position: { x: 0, y: 0 },
+        collapsed: false,
+      },
+      reads: [],
+      writes: [],
+      config: {
+        skills: [],
+        taskInstruction: "",
+        modelSource: "global",
+        model: "",
+        thinkingMode: "on",
+        temperature: 0.2,
+      },
+    },
+  },
+};
+
+const BUILTIN_EMPTY_CONDITION_PRESET: PresetDocument = {
+  presetId: "preset.condition.empty.v0",
+  sourcePresetId: null,
+  createdAt: null,
+  updatedAt: null,
+  definition: {
+    label: "Condition Node",
+    description: "Branch based on state.",
+    state_schema: {},
+    node: {
+      kind: "condition",
+      name: "Condition Node",
+      description: "Branch based on state.",
+      ui: {
+        position: { x: 0, y: 0 },
+        collapsed: false,
+      },
+      reads: [],
+      writes: [],
+      config: {
+        branches: ["true", "false"],
+        loopLimit: -1,
+        branchMapping: {
+          true: "true",
+          false: "false",
+        },
+        rule: {
+          source: "",
+          operator: "exists",
+          value: null,
+        },
+      },
+    },
+  },
+};
+
+const BUILTIN_PRESETS_BY_ID: Record<string, PresetDocument> = {
+  [BUILTIN_EMPTY_AGENT_PRESET.presetId]: BUILTIN_EMPTY_AGENT_PRESET,
+  [BUILTIN_EMPTY_CONDITION_PRESET.presetId]: BUILTIN_EMPTY_CONDITION_PRESET,
+};
+
+export function resolveBuiltinNodeCreationPreset(presetId: string): PresetDocument | null {
+  return BUILTIN_PRESETS_BY_ID[presetId] ?? null;
 }

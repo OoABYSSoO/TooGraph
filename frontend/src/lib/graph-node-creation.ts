@@ -135,6 +135,7 @@ export function buildInputNodeFromFile(params: {
   size: number;
   content: string;
   detectedType: string;
+  encoding: "text" | "data_url";
 }): CreatedNodeResult {
   const stateKey = params.detectedType === "knowledge_base" ? "knowledge_base" : params.detectedType === "text" ? "value" : params.detectedType;
   return {
@@ -154,6 +155,7 @@ export function buildInputNodeFromFile(params: {
           size: params.size,
           detectedType: params.detectedType,
           content: params.content,
+          encoding: params.encoding,
         }),
       },
     },
@@ -180,6 +182,9 @@ function bindCreatedStateToNode(node: GraphNode, stateKey: string) {
   if (node.kind === "agent" || node.kind === "condition") {
     if (!node.reads.some((binding) => binding.state === stateKey)) {
       node.reads = [...node.reads, { state: stateKey, required: true }];
+    }
+    if (node.kind === "condition" && !node.config.rule.source.trim()) {
+      node.config.rule.source = stateKey;
     }
   }
 }
