@@ -24,25 +24,74 @@ function graphDocument() {
   };
 }
 
+function multiOutputGraphDocument() {
+  return {
+    nodes: {
+      agent: {
+        kind: "agent",
+        reads: [],
+        writes: [{ state: "state_ja" }, { state: "state_en" }],
+      },
+      output_ja: {
+        kind: "output",
+        reads: [{ state: "state_ja" }],
+        writes: [],
+      },
+      output_en: {
+        kind: "output",
+        reads: [{ state: "state_en" }],
+        writes: [],
+      },
+    },
+  };
+}
+
 test("reduceRunNodeTimingEvent starts and completes node timing", () => {
   let timings: RunNodeTimingByNodeId = {};
 
   timings = reduceRunNodeTimingEvent(timings, "node.started", { node_id: "agent" }, 1000);
-  assert.deepEqual(timings.agent, { status: "running", startedAtMs: 1000, durationMs: null });
+  assert.deepEqual(timings.agent, { status: "running", startedAtEpochMs: 1000, durationMs: null });
 
   timings = reduceRunNodeTimingEvent(timings, "node.completed", { node_id: "agent", duration_ms: 875 }, 2000);
-  assert.deepEqual(timings.agent, { status: "success", startedAtMs: 1000, durationMs: 875 });
+  assert.deepEqual(timings.agent, { status: "success", startedAtEpochMs: 1000, durationMs: 875 });
 });
 
 test("reduceRunNodeTimingEvent starts output timing from its upstream writer", () => {
   let timings: RunNodeTimingByNodeId = {};
 
   timings = reduceRunNodeTimingEvent(timings, "node.started", { node_id: "agent" }, 1000, graphDocument());
-  assert.deepEqual(timings.agent, { status: "running", startedAtMs: 1000, durationMs: null });
-  assert.deepEqual(timings.output, { status: "running", startedAtMs: 1000, durationMs: null });
+  assert.deepEqual(timings.agent, { status: "running", startedAtEpochMs: 1000, durationMs: null });
+  assert.deepEqual(timings.output, { status: "running", startedAtEpochMs: 1000, durationMs: null });
 
   timings = reduceRunNodeTimingEvent(timings, "state.updated", { node_id: "agent", state_key: "reply" }, 3250, graphDocument());
-  assert.deepEqual(timings.output, { status: "success", startedAtMs: 1000, durationMs: 2250 });
+  assert.deepEqual(timings.output, { status: "success", startedAtEpochMs: 1000, durationMs: 2250 });
+});
+
+test("reduceRunNodeTimingEvent completes each output from routed streaming state completion", () => {
+  let timings: RunNodeTimingByNodeId = {};
+
+  timings = reduceRunNodeTimingEvent(timings, "node.started", { node_id: "agent" }, 1000, multiOutputGraphDocument());
+  timings = reduceRunNodeTimingEvent(
+    timings,
+    "node.output.delta",
+    {
+      node_id: "agent",
+      text: '{"state_ja":"こんにちは","state_en":"Hel',
+      output_keys: ["state_ja", "state_en"],
+      stream_state_keys: ["state_ja", "state_en"],
+    },
+    8500,
+    multiOutputGraphDocument(),
+  );
+
+  assert.deepEqual(timings.output_ja, { status: "success", startedAtEpochMs: 1000, durationMs: 7500 });
+  assert.deepEqual(timings.output_en, { status: "running", startedAtEpochMs: 1000, durationMs: null });
+
+  timings = reduceRunNodeTimingEvent(timings, "state.updated", { node_id: "agent", state_key: "state_ja" }, 9200, multiOutputGraphDocument());
+  assert.deepEqual(timings.output_ja, { status: "success", startedAtEpochMs: 1000, durationMs: 7500 });
+
+  timings = reduceRunNodeTimingEvent(timings, "state.updated", { node_id: "agent", state_key: "state_en" }, 9300, multiOutputGraphDocument());
+  assert.deepEqual(timings.output_en, { status: "success", startedAtEpochMs: 1000, durationMs: 8300 });
 });
 
 test("reduceRunNodeTimingEvent marks failed nodes and computes duration when the payload omits it", () => {
@@ -51,7 +100,7 @@ test("reduceRunNodeTimingEvent marks failed nodes and computes duration when the
   timings = reduceRunNodeTimingEvent(timings, "node.started", { node_id: "agent" }, 1000);
   timings = reduceRunNodeTimingEvent(timings, "node.failed", { node_id: "agent" }, 2250);
 
-  assert.deepEqual(timings.agent, { status: "failed", startedAtMs: 1000, durationMs: 1250 });
+  assert.deepEqual(timings.agent, { status: "failed", startedAtEpochMs: 1000, durationMs: 1250 });
 });
 
 test("buildRunNodeTimingByNodeIdFromRun uses node executions", () => {
@@ -67,22 +116,169 @@ test("buildRunNodeTimingByNodeIdFromRun uses node executions", () => {
   assert.equal(timings.agent.durationMs, 1200);
 });
 
-test("buildRunNodeTimingByNodeIdFromRun derives output timing from writer state events", () => {
+test("buildRunNodeTimingByNodeIdFromRun restores model token usage on the writer node only", () => {
   const timings = buildRunNodeTimingByNodeIdFromRun(
     {
       node_executions: [
-        { node_id: "agent", status: "success", duration_ms: 8537 },
+        {
+          node_id: "agent",
+          status: "success",
+          started_at: "2026-05-13T10:00:00.000Z",
+          finished_at: "2026-05-13T10:00:03.500Z",
+          duration_ms: 3500,
+          artifacts: {
+            runtime_config: {
+              provider_usage: {
+                input_tokens: 1200,
+                output_tokens: 280,
+              },
+              structured_output_repair_provider_usage: {
+                prompt_tokens: 35,
+                completion_tokens: 15,
+              },
+              skill_input_provider_usage: {
+                total_tokens: 420,
+              },
+            },
+          },
+        },
       ],
       artifacts: {
         state_events: [
-          { node_id: "agent", state_key: "reply" },
+          {
+            node_id: "agent",
+            state_key: "reply",
+            created_at: "2026-05-13T10:00:02.250Z",
+          },
         ],
       },
     },
     graphDocument(),
   );
 
-  assert.equal(timings.agent.durationMs, 8537);
+  assert.equal(timings.agent.tokenCount, 1950);
+  assert.equal(timings.output.tokenCount, undefined);
+});
+
+test("buildRunNodeTimingByNodeIdFromRun restores running node timing from started_at", () => {
+  const timings = buildRunNodeTimingByNodeIdFromRun({
+    node_executions: [
+      {
+        node_id: "agent",
+        status: "running",
+        started_at: "2026-05-13T10:00:00.000Z",
+        finished_at: null,
+        duration_ms: 0,
+      },
+    ],
+  });
+
+  assert.equal(timings.agent.status, "running");
+  assert.equal(timings.agent.startedAtEpochMs, Date.parse("2026-05-13T10:00:00.000Z"));
+  assert.equal(timings.agent.durationMs, null);
+});
+
+test("buildRunNodeTimingByNodeIdFromRun starts output timing from a running upstream writer", () => {
+  const timings = buildRunNodeTimingByNodeIdFromRun(
+    {
+      node_executions: [
+        {
+          node_id: "agent",
+          status: "running",
+          started_at: "2026-05-13T10:00:00.000Z",
+          finished_at: null,
+          duration_ms: 0,
+        },
+      ],
+      artifacts: {
+        state_events: [],
+      },
+    },
+    graphDocument(),
+  );
+
+  assert.deepEqual(timings.output, {
+    status: "running",
+    startedAtEpochMs: Date.parse("2026-05-13T10:00:00.000Z"),
+    durationMs: null,
+  });
+});
+
+test("buildRunNodeTimingByNodeIdFromRun derives output timing from writer state events", () => {
+  const timings = buildRunNodeTimingByNodeIdFromRun(
+    {
+      node_executions: [
+        {
+          node_id: "agent",
+          status: "success",
+          started_at: "2026-05-13T10:00:00.000Z",
+          finished_at: "2026-05-13T10:00:03.500Z",
+          duration_ms: 3500,
+        },
+      ],
+      artifacts: {
+        state_events: [
+          {
+            node_id: "agent",
+            state_key: "reply",
+            created_at: "2026-05-13T10:00:02.250Z",
+          },
+        ],
+      },
+    },
+    graphDocument(),
+  );
+
+  assert.equal(timings.agent.durationMs, 3500);
   assert.equal(timings.output.status, "success");
-  assert.equal(timings.output.durationMs, 8537);
+  assert.equal(timings.output.startedAtEpochMs, Date.parse("2026-05-13T10:00:00.000Z"));
+  assert.equal(timings.output.durationMs, 2250);
+});
+
+test("buildRunNodeTimingByNodeIdFromRun prefers persisted state stream completion events for output timing", () => {
+  const timings = buildRunNodeTimingByNodeIdFromRun(
+    {
+      node_executions: [
+        {
+          node_id: "agent",
+          status: "success",
+          started_at: "2026-05-13T10:00:00.000Z",
+          finished_at: "2026-05-13T10:00:08.500Z",
+          duration_ms: 8500,
+        },
+      ],
+      artifacts: {
+        state_stream_events: [
+          {
+            node_id: "agent",
+            state_key: "state_ja",
+            status: "completed",
+            created_at: "2026-05-13T10:00:07.500Z",
+          },
+          {
+            node_id: "agent",
+            state_key: "state_en",
+            status: "completed",
+            created_at: "2026-05-13T10:00:07.700Z",
+          },
+        ],
+        state_events: [
+          {
+            node_id: "agent",
+            state_key: "state_ja",
+            created_at: "2026-05-13T10:00:08.500Z",
+          },
+          {
+            node_id: "agent",
+            state_key: "state_en",
+            created_at: "2026-05-13T10:00:08.500Z",
+          },
+        ],
+      },
+    },
+    multiOutputGraphDocument(),
+  );
+
+  assert.equal(timings.output_ja.durationMs, 7500);
+  assert.equal(timings.output_en.durationMs, 7700);
 });

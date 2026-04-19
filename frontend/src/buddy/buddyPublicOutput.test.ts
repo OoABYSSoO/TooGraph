@@ -132,6 +132,39 @@ test("reduceBuddyPublicOutputEvent starts output timing from upstream node start
   assert.equal(state.messagesByOutputNodeId.output_answer.status, "completed");
 });
 
+test("reduceBuddyPublicOutputEvent uses run event timestamps instead of local receive time", () => {
+  const bindings = [
+    {
+      outputNodeId: "output_answer",
+      outputNodeName: "Answer",
+      stateKey: "answer",
+      stateName: "answer",
+      stateType: "markdown",
+      displayMode: "markdown",
+      upstreamNodeIds: ["writer"],
+    },
+  ];
+  let state = createBuddyPublicOutputRuntimeState();
+
+  state = reduceBuddyPublicOutputEvent(
+    state,
+    bindings,
+    "node.started",
+    { node_id: "writer", started_at: "2026-05-13T10:00:00.000Z" },
+    Date.parse("2026-05-13T10:00:05.000Z"),
+  );
+  state = reduceBuddyPublicOutputEvent(
+    state,
+    bindings,
+    "state.updated",
+    { node_id: "writer", state_key: "answer", value: "你好", created_at: "2026-05-13T10:00:01.500Z" },
+    Date.parse("2026-05-13T10:00:08.000Z"),
+  );
+
+  assert.equal(state.messagesByOutputNodeId.output_answer.startedAtMs, Date.parse("2026-05-13T10:00:00.000Z"));
+  assert.equal(state.messagesByOutputNodeId.output_answer.durationMs, 1500);
+});
+
 test("reduceBuddyPublicOutputEvent ignores states without parent output bindings", () => {
   let state = createBuddyPublicOutputRuntimeState();
 

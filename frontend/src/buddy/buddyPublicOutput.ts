@@ -24,6 +24,7 @@ export type BuddyPublicOutputMessage = {
   displayMode: string;
   kind: BuddyPublicOutputMessageKind;
   content: unknown;
+  // Epoch milliseconds. The field name is kept for persisted Buddy message compatibility.
   startedAtMs: number | null;
   durationMs: number | null;
   status: BuddyPublicOutputMessageStatus;
@@ -90,19 +91,30 @@ export function reduceBuddyPublicOutputEvent(
   bindings: BuddyPublicOutputBinding[],
   eventType: string,
   payload: RunEventPayload,
-  nowMs: number,
+  nowEpochMs: number,
 ): BuddyPublicOutputRuntimeState {
   if (eventType === "node.started") {
-    return startOutputTimersForNode(state, bindings, normalizeString(payload.node_id), nowMs);
+    return startOutputTimersForNode(
+      state,
+      bindings,
+      normalizeString(payload.node_id),
+      parseEventEpochMs(payload.started_at) ?? nowEpochMs,
+    );
   }
   if (eventType === "node.output.delta") {
-    return applyStreamingDelta(state, bindings, payload, nowMs);
+    return applyStreamingDelta(state, bindings, payload, nowEpochMs);
   }
   if (eventType === "state.updated") {
-    return completeStateOutput(state, bindings, normalizeString(payload.state_key), payload.value, nowMs);
+    return completeStateOutput(
+      state,
+      bindings,
+      normalizeString(payload.state_key),
+      payload.value,
+      parseEventEpochMs(payload.created_at) ?? nowEpochMs,
+    );
   }
   if (eventType === "node.failed") {
-    return failOutputsForNode(state, bindings, normalizeString(payload.node_id), nowMs);
+    return failOutputsForNode(state, bindings, normalizeString(payload.node_id), nowEpochMs);
   }
   return state;
 }
@@ -282,4 +294,12 @@ function listOutputKeys(value: unknown, fallback: string[] = []) {
 
 function normalizeString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function parseEventEpochMs(value: unknown) {
+  if (typeof value !== "string" || !value.trim()) {
+    return null;
+  }
+  const epochMs = Date.parse(value);
+  return Number.isFinite(epochMs) ? epochMs : null;
 }

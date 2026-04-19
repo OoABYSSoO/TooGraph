@@ -63,6 +63,35 @@ class AgentStreamingRuntimeTests(unittest.TestCase):
         self.assertEqual(payload["stream_state_keys"], ["greeting_zh", "greeting_en"])
         self.assertEqual(payload["text"], '{"greeting_zh":"你好')
 
+    def test_stream_delta_callback_records_completed_state_stream_events_once(self) -> None:
+        state = {"run_id": "run_1"}
+
+        with patch("app.core.runtime.agent_streaming.publish_run_event") as publish:
+            callback = build_agent_stream_delta_callback(
+                state=state,
+                node_name="agent",
+                output_keys=["ja", "en"],
+                stream_state_keys=["ja", "en"],
+            )
+            self.assertIsNotNone(callback)
+            callback('{"ja":"こんにちは","en":"Hel')
+            callback('lo"}')
+
+        self.assertEqual(
+            [(event["state_key"], event["chunk_count"]) for event in state["state_stream_events"]],
+            [("ja", 1), ("en", 2)],
+        )
+        self.assertTrue(all(event["status"] == "completed" for event in state["state_stream_events"]))
+        self.assertTrue(all(event["node_id"] == "agent" for event in state["state_stream_events"]))
+        self.assertTrue(all(event["source"] == "node.output.delta" for event in state["state_stream_events"]))
+        completed_events = [
+            call.args[2]
+            for call in publish.call_args_list
+            if call.args[1] == "state.stream.completed"
+        ]
+        self.assertEqual([event["state_key"] for event in completed_events], ["ja", "en"])
+        self.assertTrue(all("created_at" in event for event in completed_events))
+
     def test_finalize_agent_stream_delta_marks_record_completed_and_publishes_outputs(self) -> None:
         state = {
             "run_id": "run_1",

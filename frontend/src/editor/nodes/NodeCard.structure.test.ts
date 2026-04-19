@@ -91,7 +91,10 @@ test("NodeCard accepts canvas-provided real dimensions through CSS variables", (
 test("NodeCard renders a top-left run timing capsule", () => {
   assert.match(componentSource, /node-card__run-timing-capsule/);
   assert.match(componentSource, /Clock/);
+  assert.match(componentSource, /Coin/);
   assert.match(componentSource, /formatNodeRunTimingDuration/);
+  assert.match(componentSource, /formatRunTokenUsageKTokens/);
+  assert.match(componentSource, /formattedNodeRunTokenUsage/);
   assert.match(componentSource, /\.node-card \{[\s\S]*--node-card-floating-capsule-height:\s*58px;/);
   assert.match(componentSource, /\.node-card \{[\s\S]*--node-card-floating-capsule-offset:\s*8px;/);
   assert.match(componentSource, /\.node-card__run-timing-capsule \{[\s\S]*position:\s*absolute;/);
@@ -107,6 +110,8 @@ test("NodeCard renders a top-left run timing capsule", () => {
   assert.match(componentSource, /\.node-card__run-timing-capsule \{[\s\S]*backdrop-filter:\s*blur\(24px\)\s*saturate\(1\.6\)\s*contrast\(1\.02\);/);
   assert.match(componentSource, /\.node-card__run-timing-capsule \{[\s\S]*font-size:\s*0\.92rem;/);
   assert.match(componentSource, /\.node-card__run-timing-capsule::before \{/);
+  assert.match(componentSource, /node-card__run-timing-divider/);
+  assert.match(componentSource, /node-card__run-token-text/);
   assert.match(runTimingIconStyle, /width:\s*18px;/);
   assert.match(runTimingIconStyle, /height:\s*18px;/);
   assert.match(runTimingIconStyle, /border:\s*0;/);
