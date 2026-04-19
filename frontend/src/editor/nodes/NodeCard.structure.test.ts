@@ -208,15 +208,33 @@ test("NodeCard moves node actions into hoverable top buttons built from Element 
   assert.doesNotMatch(componentSource, /<details class="node-card__advanced-panel"/);
 });
 
-test("NodeCard opens bound-state editing from a double click on the port label", () => {
+test("NodeCard reveals state pills on hover and opens state editing only after a confirm click", () => {
   assert.match(componentSource, /import StateEditorPopover from "\.\/StateEditorPopover\.vue";/);
-  assert.match(componentSource, /@dblclick\.stop="openStateEditor\(/);
+  assert.match(componentSource, /@click\.stop="handleStateEditorActionClick\(/);
   assert.match(componentSource, /const stateEditorDraft = ref<StateFieldDraft \| null>\(null\);/);
   assert.match(componentSource, /const activeStateEditorAnchorId = ref<string \| null>\(null\);/);
+  assert.match(componentSource, /const activeStateEditorConfirmAnchorId = ref<string \| null>\(null\);/);
+  assert.match(componentSource, /const stateEditorConfirmTimeoutRef = ref<number \| null>\(null\);/);
+  assert.match(componentSource, /function clearStateEditorConfirmState\(\)/);
+  assert.match(componentSource, /function startStateEditorConfirmWindow\(anchorId: string\)/);
+  assert.match(componentSource, /function handleStateEditorActionClick\(anchorId: string, stateKey: string \| null \| undefined\)/);
+  assert.match(componentSource, /if \(activeStateEditorConfirmAnchorId\.value === anchorId\) \{[\s\S]*openStateEditor\(anchorId, stateKey\);[\s\S]*return;/);
+  assert.match(componentSource, /startStateEditorConfirmWindow\(anchorId\);/);
   assert.match(componentSource, /emit\("rename-state", \{ currentKey:/);
   assert.match(componentSource, /emit\("update-state", \{[\s\S]*stateKey:/);
-  assert.match(componentSource, /<ElPopover[\s\S]*:visible="isStateEditorOpen\(/);
+  assert.match(
+    componentSource,
+    /<ElPopover[\s\S]*:visible="isStateEditorOpen\([^"]+\) \|\| isStateEditorConfirmOpen\([^"]+\)"/,
+  );
+  assert.match(
+    componentSource,
+    /:placement="isStateEditorOpen\([^"]+\) \? 'bottom-(start|end)' : 'top-(start|end)'"/,
+  );
   assert.match(componentSource, /<StateEditorPopover/);
+  assert.match(componentSource, /Edit state\?/);
+  assert.match(componentSource, /node-card__port-pill--revealed/);
+  assert.match(componentSource, /node-card__port-pill--confirm/);
+  assert.match(componentSource, /node-card__port-pill-confirm-icon/);
   assert.match(componentSource, /:width="320"/);
   assert.match(componentSource, /:show-arrow="false"/);
   assert.match(componentSource, /:popper-style="stateEditorPopoverStyle"/);
@@ -236,6 +254,8 @@ test("NodeCard opens bound-state editing from a double click on the port label",
   assert.match(componentSource, /:deep\(.node-card__state-editor-popper\.el-popper\) \{[\s\S]*background:\s*transparent;/);
   assert.match(componentSource, /:deep\(.node-card__state-editor-popper\.el-popper\) \{[\s\S]*padding:\s*0;/);
   assert.match(componentSource, /:deep\(.node-card__state-editor-popper\.el-popper\) \{[\s\S]*box-shadow:\s*none;/);
+  assert.match(componentSource, /\.node-card__port-pill \{[\s\S]*transition:/);
+  assert.match(componentSource, /\.node-card__port-pill-row:hover .node-card__port-pill,\n\.node-card__port-pill--revealed \{[\s\S]*border:\s*1px solid rgba\(154,\s*52,\s*18,\s*0\.14\);/);
 });
 
 test("NodeCard opens dedicated warm popovers for title and description editing on double click", () => {
