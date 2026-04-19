@@ -232,6 +232,24 @@
           @pointerdown.prevent.stop="handleAnchorPointerDown(anchor)"
         />
       </div>
+      <div class="editor-canvas__route-handles" aria-hidden="true">
+        <div
+          v-for="anchor in routeHandles"
+          :key="`route-${anchor.id}`"
+          class="editor-canvas__route-handle"
+          :class="{
+            'editor-canvas__route-handle--success': resolveRouteHandleTone(anchor.branch) === 'success',
+            'editor-canvas__route-handle--danger': resolveRouteHandleTone(anchor.branch) === 'danger',
+            'editor-canvas__route-handle--warning': resolveRouteHandleTone(anchor.branch) === 'warning',
+            'editor-canvas__route-handle--connect-source': activeConnectionSourceAnchorId === anchor.id,
+          }"
+          :style="routeHandleStyle(anchor)"
+          @pointerdown.prevent.stop="handleAnchorPointerDown(anchor)"
+        >
+          <span class="editor-canvas__route-handle-label">{{ formatRouteHandleLabel(anchor.branch) }}</span>
+          <span class="editor-canvas__route-handle-button">+</span>
+        </div>
+      </div>
       <svg class="editor-canvas__anchors" viewBox="0 0 4000 3000" preserveAspectRatio="none" aria-hidden="true">
         <circle
           v-for="anchor in pointAnchors"
@@ -410,10 +428,9 @@ const projectedAnchors = computed(() => resolvedCanvasLayout.value.anchors);
 const flowAnchors = computed(() =>
   projectedAnchors.value.filter((anchor) => anchor.kind === "flow-in" || anchor.kind === "flow-out"),
 );
+const routeHandles = computed(() => projectedAnchors.value.filter((anchor) => anchor.kind === "route-out"));
 const pointAnchors = computed(() =>
-  projectedAnchors.value.filter(
-    (anchor) => anchor.kind === "state-in" || anchor.kind === "state-out" || anchor.kind === "route-out",
-  ),
+  projectedAnchors.value.filter((anchor) => anchor.kind === "state-in" || anchor.kind === "state-out"),
 );
 const selectedReconnectConnection = computed<PendingGraphConnection | null>(() => {
   const edge = selectedEdgeId.value ? projectedEdges.value.find((candidate) => candidate.id === selectedEdgeId.value) : null;
@@ -470,8 +487,8 @@ const activeConnectionAccentColor = computed(() => {
   if (activeConnection.value?.sourceKind === "state-out" && activeConnection.value.sourceStateKey) {
     return props.document.state_schema[activeConnection.value.sourceStateKey]?.color?.trim() || "#2563eb";
   }
-  if (activeConnection.value?.sourceKind === "route-out") {
-    return "#7c3aed";
+  if (activeConnection.value?.sourceKind === "route-out" && activeConnection.value.branchKey) {
+    return resolveRouteHandlePalette(activeConnection.value.branchKey).accent;
   }
   return "#c96b1f";
 });
@@ -932,6 +949,73 @@ function withAlpha(hexColor: string, alpha: number) {
   const green = Number.parseInt(hex.slice(2, 4), 16);
   const blue = Number.parseInt(hex.slice(4, 6), 16);
   return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+}
+
+function resolveRouteHandleTone(branch: string | undefined) {
+  const normalizedBranch = branch?.trim().toLowerCase() ?? "";
+  if (normalizedBranch === "true") {
+    return "success" as const;
+  }
+  if (normalizedBranch === "false") {
+    return "danger" as const;
+  }
+  return "warning" as const;
+}
+
+function resolveRouteHandlePalette(branch: string | undefined) {
+  const tone = resolveRouteHandleTone(branch);
+  if (tone === "success") {
+    return {
+      fill: "rgba(240, 253, 244, 0.98)",
+      border: "rgba(34, 197, 94, 0.28)",
+      accent: "#16a34a",
+      glow: "rgba(34, 197, 94, 0.18)",
+      text: "rgba(21, 128, 61, 0.92)",
+    };
+  }
+  if (tone === "danger") {
+    return {
+      fill: "rgba(254, 242, 242, 0.98)",
+      border: "rgba(239, 68, 68, 0.24)",
+      accent: "#dc2626",
+      glow: "rgba(239, 68, 68, 0.18)",
+      text: "rgba(185, 28, 28, 0.92)",
+    };
+  }
+  return {
+    fill: "rgba(255, 251, 235, 0.98)",
+    border: "rgba(245, 158, 11, 0.26)",
+    accent: "#d97706",
+    glow: "rgba(245, 158, 11, 0.18)",
+    text: "rgba(161, 98, 7, 0.92)",
+  };
+}
+
+function formatRouteHandleLabel(branch: string | undefined) {
+  const normalizedBranch = branch?.trim().toLowerCase() ?? "";
+  if (normalizedBranch === "true") {
+    return "True";
+  }
+  if (normalizedBranch === "false") {
+    return "False";
+  }
+  if (normalizedBranch === "exhausted") {
+    return "Exhausted";
+  }
+  return branch ?? "Branch";
+}
+
+function routeHandleStyle(anchor: ProjectedCanvasAnchor) {
+  const palette = resolveRouteHandlePalette(anchor.branch);
+  return {
+    left: `${anchor.x}px`,
+    top: `${anchor.y}px`,
+    "--editor-route-handle-fill": palette.fill,
+    "--editor-route-handle-border": palette.border,
+    "--editor-route-handle-accent": palette.accent,
+    "--editor-route-handle-glow": palette.glow,
+    "--editor-route-handle-text": palette.text,
+  };
 }
 
 function flowHotspotStyle(anchor: ProjectedCanvasAnchor) {
@@ -1966,6 +2050,16 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   pointer-events: none;
 }
 
+.editor-canvas__route-handles {
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  width: 4000px;
+  height: 3000px;
+  overflow: visible;
+  pointer-events: none;
+}
+
 .editor-canvas__edge {
   fill: none;
   stroke: var(--editor-edge-stroke, rgba(217, 119, 6, 0.88));
@@ -2081,6 +2175,74 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   transform: translate(-50%, -50%);
   pointer-events: auto;
   cursor: crosshair;
+}
+
+.editor-canvas__route-handle {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  cursor: crosshair;
+}
+
+.editor-canvas__route-handle-label {
+  position: absolute;
+  right: calc(100% + 12px);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--editor-route-handle-text, rgba(120, 53, 15, 0.92));
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.editor-canvas__route-handle-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 56px;
+  border-radius: 999px;
+  border: 1px solid var(--editor-route-handle-border, rgba(201, 107, 31, 0.24));
+  background: var(--editor-route-handle-fill, rgba(255, 250, 241, 0.98));
+  box-shadow: 0 14px 28px var(--editor-route-handle-glow, rgba(120, 53, 15, 0.14));
+  color: var(--editor-route-handle-accent, rgba(201, 107, 31, 0.92));
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.editor-canvas__route-handle--connect-source .editor-canvas__route-handle-button {
+  border-color: var(--editor-route-handle-accent, rgba(201, 107, 31, 0.32));
+  box-shadow: 0 16px 30px var(--editor-route-handle-glow, rgba(120, 53, 15, 0.22));
+}
+
+.editor-canvas__route-handle--success {
+  --editor-route-handle-fill: rgba(240, 253, 244, 0.98);
+  --editor-route-handle-border: rgba(34, 197, 94, 0.28);
+  --editor-route-handle-accent: #16a34a;
+  --editor-route-handle-glow: rgba(34, 197, 94, 0.18);
+  --editor-route-handle-text: rgba(21, 128, 61, 0.92);
+}
+
+.editor-canvas__route-handle--danger {
+  --editor-route-handle-fill: rgba(254, 242, 242, 0.98);
+  --editor-route-handle-border: rgba(239, 68, 68, 0.24);
+  --editor-route-handle-accent: #dc2626;
+  --editor-route-handle-glow: rgba(239, 68, 68, 0.18);
+  --editor-route-handle-text: rgba(185, 28, 28, 0.92);
+}
+
+.editor-canvas__route-handle--warning {
+  --editor-route-handle-fill: rgba(255, 251, 235, 0.98);
+  --editor-route-handle-border: rgba(245, 158, 11, 0.26);
+  --editor-route-handle-accent: #d97706;
+  --editor-route-handle-glow: rgba(245, 158, 11, 0.18);
+  --editor-route-handle-text: rgba(161, 98, 7, 0.92);
 }
 
 .editor-canvas__flow-hotspot::before {

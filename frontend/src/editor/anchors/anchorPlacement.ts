@@ -67,6 +67,9 @@ function resolveX(anchor: AnchorDescriptor, frame: NodeFrame): number {
     return frame.x + frame.width / 2;
   }
   if (anchor.side === "right") {
+    if (anchor.branch) {
+      return frame.x + frame.width - EDGE_PORT_INSET;
+    }
     return frame.x + frame.width - (anchor.lane === "body" ? BODY_OUTPUT_PORT_INSET : EDGE_PORT_INSET);
   }
   const count = Math.max(anchor.row + 2, 2);

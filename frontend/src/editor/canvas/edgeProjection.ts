@@ -29,6 +29,7 @@ export type ProjectedCanvasAnchor = {
 };
 
 const DEFAULT_NODE_WIDTH = 460;
+const CONDITION_NODE_WIDTH = 560;
 
 export function projectCanvasEdges(document: GraphPayload | GraphDocument): ProjectedCanvasEdge[] {
   const placements = buildNodePlacements(document);
@@ -178,11 +179,11 @@ function buildNodeFrame(node: GraphNode): NodeFrame {
   return {
     x: node.ui.position.x,
     y: node.ui.position.y,
-    width: DEFAULT_NODE_WIDTH,
+    width: node.kind === "condition" ? CONDITION_NODE_WIDTH : DEFAULT_NODE_WIDTH,
     headerHeight: 68,
     bodyTop: 116,
     rowGap: 44,
-    footerTop: node.kind === "condition" ? 270 : 0,
+    footerTop: node.kind === "condition" ? 192 : 0,
   };
 }
 

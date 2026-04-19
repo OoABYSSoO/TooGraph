@@ -37,6 +37,23 @@ test("EditorCanvas renders anchors in a dedicated overlay layer above nodes", ()
   assert.match(componentSource, /<svg class="editor-canvas__anchors"[\s\S]*<circle[\s\S]*v-for="anchor in pointAnchors"/);
 });
 
+test("EditorCanvas renders condition route outputs as right-side floating branch handles", () => {
+  assert.match(componentSource, /const routeHandles = computed\(\(\) => projectedAnchors\.value\.filter\(\(anchor\) => anchor\.kind === "route-out"\)\);/);
+  assert.match(componentSource, /<div class="editor-canvas__route-handles" aria-hidden="true">/);
+  assert.match(componentSource, /v-for="anchor in routeHandles"/);
+  assert.match(componentSource, /class="editor-canvas__route-handle"/);
+  assert.match(componentSource, /class="editor-canvas__route-handle-label"/);
+  assert.match(componentSource, /class="editor-canvas__route-handle-button"/);
+  assert.match(componentSource, /formatRouteHandleLabel\(anchor\.branch\)/);
+  assert.match(componentSource, /@pointerdown\.prevent\.stop="handleAnchorPointerDown\(anchor\)"/);
+  assert.match(componentSource, /\.editor-canvas__route-handles \{[\s\S]*z-index:\s*12;/);
+  assert.match(componentSource, /\.editor-canvas__route-handle-button \{[\s\S]*border-radius:\s*999px;/);
+  assert.match(componentSource, /\.editor-canvas__route-handle-button \{[\s\S]*font-size:\s*24px;/);
+  assert.match(componentSource, /\.editor-canvas__route-handle--success/);
+  assert.match(componentSource, /\.editor-canvas__route-handle--danger/);
+  assert.match(componentSource, /\.editor-canvas__route-handle--warning/);
+});
+
 test("EditorCanvas does not render inline label pills for data edges", () => {
   assert.doesNotMatch(componentSource, /class="editor-canvas__edge-labels"/);
   assert.doesNotMatch(componentSource, /class="editor-canvas__edge-label"/);

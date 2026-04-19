@@ -307,7 +307,7 @@ test("NodeCard adds mirrored remove-binding buttons to non-output state pills", 
   assert.match(componentSource, /class="node-card__port-pill-remove node-card__port-pill-remove--leading"/);
   assert.match(componentSource, /@click\.stop="handleRemovePortStateClick\(`agent-input:\$\{port\.key\}`,\s*'input', port\.key\)"/);
   assert.match(componentSource, /@click\.stop="handleRemovePortStateClick\(`agent-output:\$\{port\.key\}`,\s*'output', port\.key\)"/);
-  assert.match(componentSource, /@click\.stop="handleRemovePortStateClick\(`condition-input:\$\{port\.key\}`,\s*'input', port\.key\)"/);
+  assert.match(componentSource, /@click\.stop="handleRemovePortStateClick\(`condition-input:\$\{view\.body\.primaryInput\.key\}`,\s*'input', view\.body\.primaryInput\.key\)"/);
   assert.match(componentSource, /Remove state\?/);
   const inputSectionMatch = componentSource.match(
     /<section v-if="view\.body\.kind === 'input'"[\s\S]*?<\/section>/,
@@ -333,6 +333,36 @@ test("NodeCard adds mirrored remove-binding buttons to non-output state pills", 
   assert.match(componentSource, /\.node-card__port-pill-remove--confirm,\n\.node-card__port-pill-remove--confirm:hover,\n\.node-card__port-pill-remove--confirm:focus-visible \{/);
   assert.match(componentSource, /\.node-card__port-pill--confirm \.node-card__port-pill-remove \{[\s\S]*opacity:\s*0;/);
   assert.match(componentSource, /\.node-card__confirm-hint--remove \{[\s\S]*background:\s*rgba\(255,\s*248,\s*248,\s*0\.98\);/);
+});
+
+test("NodeCard renders condition nodes as clean control-flow proxies", () => {
+  const conditionSectionMatch = componentSource.match(
+    /<section v-else-if="view\.body\.kind === 'condition'"[\s\S]*?<\/section>/,
+  );
+  assert.ok(conditionSectionMatch, "expected to find the condition node section");
+  const conditionSection = conditionSectionMatch[0];
+
+  assert.match(conditionSection, /class="node-card__condition-source-row"/);
+  assert.match(conditionSection, /view\.body\.primaryInput/);
+  assert.match(conditionSection, /class="node-card__port-pill[\s\S]*node-card__port-pill--input/);
+  assert.match(conditionSection, /condition-input:\$\{view\.body\.primaryInput\.key\}/);
+  assert.match(conditionSection, /class="node-card__condition-grid"/);
+  assert.match(conditionSection, /<span class="node-card__control-label">Operator<\/span>/);
+  assert.match(conditionSection, /<span class="node-card__control-label">Value<\/span>/);
+  assert.match(conditionSection, /<span class="node-card__control-label">Max loops<\/span>/);
+  assert.match(conditionSection, /view\.body\.operatorLabel/);
+  assert.match(conditionSection, /view\.body\.valueLabel/);
+  assert.match(conditionSection, /conditionLoopLimitDraft/);
+  assert.match(conditionSection, /class="node-card__condition-branch-rail"/);
+  assert.match(conditionSection, /v-for="branch in view\.body\.routeOutputs"/);
+  assert.match(conditionSection, /class="node-card__condition-branch-chip"/);
+  assert.match(conditionSection, /class="node-card__condition-branch-label"/);
+  assert.match(conditionSection, /branch\.tone/);
+  assert.doesNotMatch(conditionSection, /node-card__branch-editor/);
+  assert.doesNotMatch(conditionSection, /node-card__branch-list/);
+  assert.doesNotMatch(conditionSection, /\+ branch/);
+  assert.doesNotMatch(conditionSection, /Matches/);
+  assert.doesNotMatch(conditionSection, /Route/);
 });
 
 test("NodeCard routes title and description editing through hoverable confirm triggers before opening warm popovers", () => {

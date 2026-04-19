@@ -1,5 +1,12 @@
 <template>
-  <article class="node-card" :class="{ 'node-card--selected': selected }" @click.capture="handleNodeCardClickCapture">
+  <article
+    class="node-card"
+    :class="{
+      'node-card--selected': selected,
+      'node-card--condition': view.body.kind === 'condition',
+    }"
+    @click.capture="handleNodeCardClickCapture"
+  >
     <div
       class="node-card__top-actions"
       :class="{ 'node-card__top-actions--visible': isTopActionVisible }"
@@ -894,118 +901,89 @@
       </div>
     </section>
 
-    <section v-else class="node-card__body node-card__body--condition">
-      <div class="node-card__condition-topline">
-        <div class="node-card__port-column">
-          <div v-for="port in view.inputs" :key="port.key" class="node-card__port-pill-row">
-            <ElPopover
-              :visible="
-                isStateEditorOpen(`condition-input:${port.key}`) ||
-                isStateEditorConfirmOpen(`condition-input:${port.key}`) ||
-                isRemovePortStateConfirmOpen(`condition-input:${port.key}`)
-              "
-              :placement="isStateEditorOpen(`condition-input:${port.key}`) ? 'bottom-start' : 'top-start'"
-              :width="isStateEditorOpen(`condition-input:${port.key}`) ? 320 : undefined"
-              :show-arrow="false"
-              :popper-style="stateEditorPopoverStyle"
-              popper-class="node-card__state-editor-popper"
-            >
-              <template #reference>
-                <span
-                  class="node-card__port-pill node-card__port-pill--input node-card__port-pill--dock-start node-card__port-pill--removable"
-                  :class="{
-                    'node-card__port-pill--revealed': isStateEditorPillRevealed(`condition-input:${port.key}`),
-                    'node-card__port-pill--confirm': isStateEditorConfirmOpen(`condition-input:${port.key}`),
-                  }"
-                  :style="{ '--node-card-port-accent': port.stateColor }"
-                  data-state-editor-trigger="true"
-                  @pointerenter="handleStateEditorPillPointerEnter(`condition-input:${port.key}`)"
-                  @pointerleave="handleStateEditorPillPointerLeave(`condition-input:${port.key}`)"
-                  @pointerdown.stop
-                  @click.stop="handleStateEditorActionClick(`condition-input:${port.key}`, port.key)"
-                >
-                  <span
-                    class="node-card__port-pill-anchor-slot node-card__port-pill-anchor-slot--leading"
-                    :data-anchor-slot-id="`${nodeId}:state-in:${port.key}`"
-                    aria-hidden="true"
-                  />
-                  <span
-                    class="node-card__port-pill-label"
-                    :class="{ 'node-card__port-pill-label--confirm': isStateEditorConfirmOpen(`condition-input:${port.key}`) }"
-                  >
-                    <span class="node-card__port-pill-label-text">{{ port.label }}</span>
-                    <ElIcon class="node-card__port-pill-confirm-icon"><Check /></ElIcon>
-                  </span>
-                  <button
-                    type="button"
-                    class="node-card__port-pill-remove node-card__port-pill-remove--trailing"
-                    :class="{ 'node-card__port-pill-remove--confirm': isRemovePortStateConfirmOpen(`condition-input:${port.key}`) }"
-                    aria-label="Remove state binding"
-                    @pointerdown.stop
-                    @click.stop="handleRemovePortStateClick(`condition-input:${port.key}`, 'input', port.key)"
-                  >
-                    <ElIcon v-if="isRemovePortStateConfirmOpen(`condition-input:${port.key}`)"><Check /></ElIcon>
-                    <ElIcon v-else><Delete /></ElIcon>
-                  </button>
-                </span>
-              </template>
-              <div v-if="isRemovePortStateConfirmOpen(`condition-input:${port.key}`)" class="node-card__confirm-hint node-card__confirm-hint--remove">Remove state?</div>
-              <div v-else-if="isStateEditorConfirmOpen(`condition-input:${port.key}`)" class="node-card__confirm-hint node-card__confirm-hint--state">Edit state?</div>
-              <StateEditorPopover
-                v-else-if="stateEditorDraft"
-                class="node-card__state-editor"
-                :draft="stateEditorDraft"
-                :error="stateEditorError"
-                :type-options="stateTypeOptions"
-                :color-options="stateColorOptions"
-                @update:key="handleStateEditorKeyInput"
-                @update:name="handleStateEditorNameInput"
-                @update:type="handleStateEditorTypeValue"
-                @update:color="handleStateEditorColorInput"
-                @update:description="handleStateEditorDescriptionInput"
-              />
-            </ElPopover>
-          </div>
-        </div>
-        <label class="node-card__loop-control" @pointerdown.stop @click.stop>
-          <span class="node-card__loop-label">Loop</span>
-          <input
-            class="node-card__loop-input"
-            type="text"
-            inputmode="numeric"
-            :value="conditionLoopLimitDraft"
-            @pointerdown.stop
-            @click.stop
-            @input="handleConditionLoopLimitInput"
-            @blur="commitConditionLoopLimit"
-            @keydown.enter.prevent="handleConditionLoopLimitEnter"
-          />
-        </label>
-      </div>
-      <div class="node-card__surface">
-        <div class="node-card__condition-editor">
-          <label class="node-card__control-row">
+    <section v-else-if="view.body.kind === 'condition'" class="node-card__body node-card__body--condition">
+      <div class="node-card__surface node-card__surface--condition">
+        <div class="node-card__condition-panel">
+          <div class="node-card__condition-source-row">
             <span class="node-card__control-label">Source</span>
-            <select
-              class="node-card__control-select"
-              :value="conditionRuleEditor?.resolvedSource ?? ''"
-              :disabled="!conditionRuleEditor || conditionRuleEditor.sourceOptions.length === 0"
-              @pointerdown.stop
-              @click.stop
-              @change="handleConditionRuleSourceChange"
-            >
-              <option v-if="!conditionRuleEditor || conditionRuleEditor.sourceOptions.length === 0" value="">No state</option>
-              <option v-for="option in conditionRuleEditor?.sourceOptions ?? []" :key="option.value" :value="option.value">
-                {{ option.label }}
-              </option>
-            </select>
-          </label>
-          <div class="node-card__condition-editor-grid">
+            <div v-if="view.body.primaryInput" class="node-card__port-pill-row node-card__port-pill-row--condition-source">
+              <ElPopover
+                :visible="
+                  isStateEditorOpen(`condition-input:${view.body.primaryInput.key}`) ||
+                  isStateEditorConfirmOpen(`condition-input:${view.body.primaryInput.key}`) ||
+                  isRemovePortStateConfirmOpen(`condition-input:${view.body.primaryInput.key}`)
+                "
+                :placement="isStateEditorOpen(`condition-input:${view.body.primaryInput.key}`) ? 'bottom-start' : 'top-start'"
+                :width="isStateEditorOpen(`condition-input:${view.body.primaryInput.key}`) ? 320 : undefined"
+                :show-arrow="false"
+                :popper-style="stateEditorPopoverStyle"
+                popper-class="node-card__state-editor-popper"
+              >
+                <template #reference>
+                  <span
+                    class="node-card__port-pill node-card__port-pill--input node-card__port-pill--dock-start node-card__port-pill--removable node-card__port-pill--condition-source"
+                    :class="{
+                      'node-card__port-pill--revealed': isStateEditorPillRevealed(`condition-input:${view.body.primaryInput.key}`),
+                      'node-card__port-pill--confirm': isStateEditorConfirmOpen(`condition-input:${view.body.primaryInput.key}`),
+                    }"
+                    :style="{ '--node-card-port-accent': view.body.primaryInput.stateColor }"
+                    data-state-editor-trigger="true"
+                    @pointerenter="handleStateEditorPillPointerEnter(`condition-input:${view.body.primaryInput.key}`)"
+                    @pointerleave="handleStateEditorPillPointerLeave(`condition-input:${view.body.primaryInput.key}`)"
+                    @pointerdown.stop
+                    @click.stop="handleStateEditorActionClick(`condition-input:${view.body.primaryInput.key}`, view.body.primaryInput.key)"
+                  >
+                    <span
+                      class="node-card__port-pill-anchor-slot node-card__port-pill-anchor-slot--leading"
+                      :data-anchor-slot-id="`${nodeId}:state-in:${view.body.primaryInput.key}`"
+                      aria-hidden="true"
+                    />
+                    <span
+                      class="node-card__port-pill-label"
+                      :class="{ 'node-card__port-pill-label--confirm': isStateEditorConfirmOpen(`condition-input:${view.body.primaryInput.key}`) }"
+                    >
+                      <span class="node-card__port-pill-label-text">{{ view.body.primaryInput.label }}</span>
+                      <ElIcon class="node-card__port-pill-confirm-icon"><Check /></ElIcon>
+                    </span>
+                    <button
+                      type="button"
+                      class="node-card__port-pill-remove node-card__port-pill-remove--trailing"
+                      :class="{ 'node-card__port-pill-remove--confirm': isRemovePortStateConfirmOpen(`condition-input:${view.body.primaryInput.key}`) }"
+                      aria-label="Remove source binding"
+                      @pointerdown.stop
+                      @click.stop="handleRemovePortStateClick(`condition-input:${view.body.primaryInput.key}`, 'input', view.body.primaryInput.key)"
+                    >
+                      <ElIcon v-if="isRemovePortStateConfirmOpen(`condition-input:${view.body.primaryInput.key}`)"><Check /></ElIcon>
+                      <ElIcon v-else><Delete /></ElIcon>
+                    </button>
+                  </span>
+                </template>
+                <div v-if="isRemovePortStateConfirmOpen(`condition-input:${view.body.primaryInput.key}`)" class="node-card__confirm-hint node-card__confirm-hint--remove">Remove state?</div>
+                <div v-else-if="isStateEditorConfirmOpen(`condition-input:${view.body.primaryInput.key}`)" class="node-card__confirm-hint node-card__confirm-hint--state">Edit state?</div>
+                <StateEditorPopover
+                  v-else-if="stateEditorDraft"
+                  class="node-card__state-editor"
+                  :draft="stateEditorDraft"
+                  :error="stateEditorError"
+                  :type-options="stateTypeOptions"
+                  :color-options="stateColorOptions"
+                  @update:key="handleStateEditorKeyInput"
+                  @update:name="handleStateEditorNameInput"
+                  @update:type="handleStateEditorTypeValue"
+                  @update:color="handleStateEditorColorInput"
+                  @update:description="handleStateEditorDescriptionInput"
+                />
+              </ElPopover>
+            </div>
+            <div v-else class="node-card__condition-source-empty">Connect source state</div>
+          </div>
+          <div class="node-card__condition-grid">
             <label class="node-card__control-row">
               <span class="node-card__control-label">Operator</span>
               <select
                 class="node-card__control-select"
                 :value="node.kind === 'condition' ? node.config.rule.operator : ''"
+                :title="view.body.operatorLabel"
                 @pointerdown.stop
                 @click.stop
                 @change="handleConditionRuleOperatorChange"
@@ -1021,71 +999,40 @@
                 class="node-card__control-input"
                 type="text"
                 :value="conditionRuleValueText"
-                :disabled="conditionRuleEditor?.isValueDisabled"
+                :placeholder="view.body.valueLabel"
+                :disabled="conditionRuleValueDisabled"
                 @pointerdown.stop
                 @click.stop
                 @input="handleConditionRuleValueInput"
               />
             </label>
+            <label class="node-card__control-row">
+              <span class="node-card__control-label">Max loops</span>
+              <input
+                class="node-card__loop-input node-card__loop-input--condition"
+                type="text"
+                inputmode="numeric"
+                :value="conditionLoopLimitDraft"
+                :placeholder="view.body.maxLoopsLabel"
+                @pointerdown.stop
+                @click.stop
+                @input="handleConditionLoopLimitInput"
+                @blur="commitConditionLoopLimit"
+                @keydown.enter.prevent="handleConditionLoopLimitEnter"
+              />
+            </label>
           </div>
         </div>
-        <div class="node-card__condition-rule">{{ view.body.ruleSummary }}</div>
-        <div class="node-card__branch-list">
-          <div v-for="branch in view.body.branchMappings" :key="branch.branch" class="node-card__branch-editor">
-            <label class="node-card__branch-field">
-              <span class="node-card__branch-field-label">Branch</span>
-              <input
-                class="node-card__branch-input"
-                type="text"
-                autocomplete="off"
-                :value="conditionBranchDrafts[branch.branch]?.branchKey ?? branch.branch"
-                @pointerdown.stop
-                @click.stop
-                @input="handleConditionBranchKeyInput(branch.branch, $event)"
-                @blur="commitConditionBranch(branch.branch)"
-                @keydown.enter.prevent="handleConditionBranchEnter(branch.branch, $event)"
-              />
-            </label>
-            <label class="node-card__branch-field">
-              <span class="node-card__branch-field-label">Matches</span>
-              <input
-                class="node-card__branch-input node-card__branch-input--mapping"
-                type="text"
-                autocomplete="off"
-                :value="conditionBranchDrafts[branch.branch]?.mappingText ?? branch.matchValueLabel"
-                placeholder="true, false"
-                @pointerdown.stop
-                @click.stop
-                @input="handleConditionBranchMappingInput(branch.branch, $event)"
-                @blur="commitConditionBranch(branch.branch)"
-                @keydown.enter.prevent="handleConditionBranchEnter(branch.branch, $event)"
-              />
-            </label>
-            <button
-              v-if="canRemoveConditionBranch"
-              type="button"
-              class="node-card__branch-remove"
-              @pointerdown.stop
-              @click.stop="removeConditionBranch(branch.branch)"
-            >
-              Remove
-            </button>
-            <div
-              class="node-card__branch-route"
-              :class="{ 'node-card__branch-route--unrouted': !branch.routeTargetLabel }"
-            >
-              <span class="node-card__branch-route-label">Route</span>
-              <span class="node-card__branch-route-target">{{ branch.routeTargetLabel ?? "Unrouted" }}</span>
-            </div>
-          </div>
-          <button
-            type="button"
-            class="node-card__branch-add"
-            @pointerdown.stop
-            @click.stop="addConditionBranch"
+        <div class="node-card__condition-branch-rail">
+          <div
+            v-for="branch in view.body.routeOutputs"
+            :key="branch.branch"
+            class="node-card__condition-branch-chip"
+            :class="`node-card__condition-branch-chip--${branch.tone}`"
           >
-            + branch
-          </button>
+            <span class="node-card__condition-branch-label">{{ formatConditionBranchLabel(branch.branch) }}</span>
+            <span v-if="branch.routeTargetLabel" class="node-card__condition-branch-target">{{ branch.routeTargetLabel }}</span>
+          </div>
         </div>
       </div>
     </section>
@@ -1108,14 +1055,13 @@ import { Check, Collection, CollectionTag, Delete, Document, FolderOpened, Opera
 
 import StateDefaultValueEditor from "@/editor/workspace/StateDefaultValueEditor.vue";
 import StateEditorPopover from "./StateEditorPopover.vue";
-import { listConditionBranchMappingKeys, parseConditionBranchMappingDraft } from "@/lib/condition-branch-mapping";
 import type { KnowledgeBaseRecord } from "@/types/knowledge";
 import type { AgentNode, ConditionNode, GraphNode, InputNode, OutputNode, StateDefinition } from "@/types/node-system";
 import type { SkillDefinition } from "@/types/skills";
 
 import { DEFAULT_AGENT_TEMPERATURE, buildAgentModelSelectOptions, normalizeAgentTemperature, resolveAgentModelSelection } from "./agentConfigModel";
 import { parseConditionLoopLimitDraft } from "./conditionLoopLimit";
-import { buildConditionRuleEditorModel, CONDITION_RULE_OPERATOR_OPTIONS } from "./conditionRuleEditorModel";
+import { CONDITION_RULE_OPERATOR_OPTIONS } from "./conditionRuleEditorModel";
 import { isSwitchableInputBoundaryType, resolveNextInputValueForBoundaryType, resolveStateTypeForInputBoundary } from "./inputValueTypeModel";
 import { buildNodeCardViewModel } from "./nodeCardViewModel";
 import { listAttachableSkillDefinitions, resolveAttachedSkillBadges } from "./skillPickerModel";
@@ -1230,9 +1176,7 @@ const view = computed(() =>
     },
   }),
 );
-const canRemoveConditionBranch = computed(() => props.node.kind === "condition" && props.node.config.branches.length > 1);
 const conditionLoopLimitDraft = ref("");
-const conditionBranchDrafts = ref<Record<string, { branchKey: string; mappingText: string }>>({});
 const inputAssetInputRef = ref<HTMLInputElement | null>(null);
 const isSkillPickerOpen = ref(false);
 const activePortPickerSide = ref<"input" | "output" | null>(null);
@@ -1266,9 +1210,6 @@ const activeStateEditorAnchorId = ref<string | null>(null);
 const stateEditorDraft = ref<StateFieldDraft | null>(null);
 const stateEditorError = ref<string | null>(null);
 const stateColorOptions = computed(() => resolveStateColorOptions(stateEditorDraft.value?.definition.color ?? ""));
-const conditionRuleEditor = computed(() =>
-  props.node.kind === "condition" ? buildConditionRuleEditorModel(props.node.config.rule, props.stateSchema) : null,
-);
 const showKnowledgeBaseInput = computed(() => view.value.body.kind === "input" && view.value.body.editorMode === "knowledge_base");
 const showAssetUploadInput = computed(() => view.value.body.kind === "input" && view.value.body.editorMode === "asset");
 const isInputValueEditable = computed(() => view.value.body.kind === "input" && view.value.body.editorMode === "text");
@@ -1441,6 +1382,9 @@ const conditionRuleValueText = computed(() => {
   }
   return props.node.config.rule.value === null ? "" : String(props.node.config.rule.value);
 });
+const conditionRuleValueDisabled = computed(
+  () => props.node.kind === "condition" && props.node.config.rule.operator === "exists",
+);
 const agentTemperatureInput = computed(() => {
   if (props.node.kind !== "agent") {
     return String(DEFAULT_AGENT_TEMPERATURE);
@@ -1466,20 +1410,6 @@ watch(
   () => (props.node.kind === "condition" ? props.node.config.loopLimit : null),
   (loopLimit) => {
     conditionLoopLimitDraft.value = loopLimit === null ? "" : String(loopLimit);
-  },
-  { immediate: true },
-);
-
-watch(
-  () =>
-    props.node.kind === "condition"
-      ? JSON.stringify({
-          branches: props.node.config.branches,
-          branchMapping: props.node.config.branchMapping,
-        })
-      : "",
-  () => {
-    conditionBranchDrafts.value = props.node.kind === "condition" ? buildConditionBranchDrafts(props.node) : {};
   },
   { immediate: true },
 );
@@ -2635,14 +2565,6 @@ function updateConditionRule(patch: Partial<ConditionNode["config"]["rule"]>) {
   });
 }
 
-function handleConditionRuleSourceChange(event: Event) {
-  const target = event.target;
-  if (!(target instanceof HTMLSelectElement)) {
-    return;
-  }
-  updateConditionRule({ source: target.value });
-}
-
 function handleConditionRuleOperatorChange(event: Event) {
   const target = event.target;
   if (!(target instanceof HTMLSelectElement)) {
@@ -2659,83 +2581,18 @@ function handleConditionRuleValueInput(event: Event) {
   updateConditionRule({ value: target.value });
 }
 
-function buildConditionBranchDrafts(node: ConditionNode) {
-  return Object.fromEntries(
-    node.config.branches.map((branchKey) => [
-      branchKey,
-      {
-        branchKey,
-        mappingText: listConditionBranchMappingKeys(node.config.branchMapping, branchKey).join(", "),
-      },
-    ]),
-  );
-}
-
-function handleConditionBranchKeyInput(currentKey: string, event: Event) {
-  const target = event.target;
-  if (!(target instanceof HTMLInputElement)) {
-    return;
+function formatConditionBranchLabel(branch: string) {
+  const normalizedBranch = branch.trim().toLowerCase();
+  if (normalizedBranch === "true") {
+    return "True";
   }
-  conditionBranchDrafts.value = {
-    ...conditionBranchDrafts.value,
-    [currentKey]: {
-      branchKey: target.value,
-      mappingText: conditionBranchDrafts.value[currentKey]?.mappingText ?? "",
-    },
-  };
-}
-
-function handleConditionBranchMappingInput(currentKey: string, event: Event) {
-  const target = event.target;
-  if (!(target instanceof HTMLInputElement)) {
-    return;
+  if (normalizedBranch === "false") {
+    return "False";
   }
-  conditionBranchDrafts.value = {
-    ...conditionBranchDrafts.value,
-    [currentKey]: {
-      branchKey: conditionBranchDrafts.value[currentKey]?.branchKey ?? currentKey,
-      mappingText: target.value,
-    },
-  };
-}
-
-function commitConditionBranch(currentKey: string) {
-  if (props.node.kind !== "condition") {
-    return;
+  if (normalizedBranch === "exhausted") {
+    return "Exhausted";
   }
-
-  const draft = conditionBranchDrafts.value[currentKey];
-  if (!draft) {
-    return;
-  }
-
-  const nextKey = draft.branchKey.trim();
-  if (!nextKey) {
-    conditionBranchDrafts.value = buildConditionBranchDrafts(props.node);
-    return;
-  }
-  if (nextKey !== currentKey && props.node.config.branches.includes(nextKey)) {
-    conditionBranchDrafts.value = buildConditionBranchDrafts(props.node);
-    return;
-  }
-
-  const currentMappingKeys = listConditionBranchMappingKeys(props.node.config.branchMapping, currentKey);
-  const nextMappingKeys = parseConditionBranchMappingDraft(draft.mappingText);
-  const branchChanged = nextKey !== currentKey;
-  const mappingChanged = JSON.stringify(currentMappingKeys) !== JSON.stringify(nextMappingKeys);
-
-  if (!branchChanged && !mappingChanged) {
-    return;
-  }
-
-  emitConditionBranchUpdate(currentKey, nextKey, nextMappingKeys);
-}
-
-function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
-  const target = event.currentTarget;
-  if (target instanceof HTMLInputElement) {
-    target.blur();
-  }
+  return branch;
 }
 </script>
 
@@ -2751,6 +2608,10 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
   background: linear-gradient(180deg, rgba(255, 250, 241, 0.98) 0%, rgba(248, 237, 219, 0.96) 100%);
   box-shadow: 0 22px 40px rgba(60, 41, 20, 0.08);
   user-select: none;
+}
+
+.node-card--condition {
+  width: 560px;
 }
 
 .node-card--selected {
@@ -3123,6 +2984,10 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
     border-color 140ms ease,
     background 140ms ease,
     box-shadow 140ms ease;
+}
+
+.node-card__port-pill--condition-source {
+  min-width: 212px;
 }
 
 .node-card__port-pill:focus-visible,
@@ -4347,6 +4212,45 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
   margin-bottom: 4px;
 }
 
+.node-card__surface--condition {
+  display: grid;
+  gap: 14px;
+}
+
+.node-card__condition-panel {
+  display: grid;
+  grid-template-columns: minmax(208px, 1.45fr) minmax(0, 0.82fr) minmax(0, 1fr) minmax(112px, 0.72fr);
+  gap: 12px;
+  align-items: end;
+}
+
+.node-card__condition-source-row {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.node-card__port-pill-row--condition-source {
+  min-width: 0;
+}
+
+.node-card__condition-source-empty {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  width: 100%;
+  border: 1px dashed rgba(154, 52, 18, 0.2);
+  border-radius: 18px;
+  padding: 0 14px;
+  background: rgba(255, 252, 245, 0.86);
+  color: rgba(120, 53, 15, 0.72);
+  font-size: 0.84rem;
+}
+
+.node-card__condition-grid {
+  display: contents;
+}
+
 .node-card__condition-editor-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -4376,6 +4280,60 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
   color: #1f2937;
   font-size: 0.84rem;
   text-align: right;
+}
+
+.node-card__loop-input--condition {
+  width: 100%;
+}
+
+.node-card__condition-branch-rail {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.node-card__condition-branch-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  border-radius: 999px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  background: rgba(255, 250, 241, 0.86);
+  color: rgba(60, 41, 20, 0.9);
+}
+
+.node-card__condition-branch-chip--success {
+  border-color: rgba(34, 197, 94, 0.24);
+  background: rgba(240, 253, 244, 0.92);
+  color: rgba(22, 101, 52, 0.92);
+}
+
+.node-card__condition-branch-chip--danger {
+  border-color: rgba(239, 68, 68, 0.22);
+  background: rgba(254, 242, 242, 0.92);
+  color: rgba(153, 27, 27, 0.92);
+}
+
+.node-card__condition-branch-chip--warning {
+  border-color: rgba(234, 179, 8, 0.24);
+  background: rgba(255, 251, 235, 0.92);
+  color: rgba(161, 98, 7, 0.92);
+}
+
+.node-card__condition-branch-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.node-card__condition-branch-target {
+  font-size: 0.76rem;
+  font-weight: 600;
+  opacity: 0.72;
 }
 
 .node-card__condition-rule {

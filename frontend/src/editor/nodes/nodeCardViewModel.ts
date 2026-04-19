@@ -10,11 +10,10 @@ export type NodePortViewModel = {
   stateColor: string;
 };
 
-export type NodeBranchMappingViewModel = {
+export type NodeConditionRouteOutputViewModel = {
   branch: string;
-  matchValues: string[];
-  matchValueLabel: string;
   routeTargetLabel: string | null;
+  tone: "success" | "danger" | "warning";
 };
 
 export type BuildNodeCardViewModelOptions = {
@@ -66,10 +65,12 @@ export type NodeCardViewModel = {
       }
     | {
         kind: "condition";
-        ruleSummary: string;
-        loopLimitLabel: string;
+        sourceLabel: string;
+        operatorLabel: string;
+        valueLabel: string;
+        maxLoopsLabel: string;
         primaryInput: NodePortViewModel | null;
-        branchMappings: NodeBranchMappingViewModel[];
+        routeOutputs: NodeConditionRouteOutputViewModel[];
       }
     | {
         kind: "output";
@@ -170,10 +171,12 @@ function buildBody(
   if (node.kind === "condition") {
     return {
       kind: "condition",
-      ruleSummary: formatConditionRule(node.config.rule, stateSchema),
-      loopLimitLabel: node.config.loopLimit === -1 ? "Loop · Unlimited" : `Loop · ${node.config.loopLimit}`,
+      sourceLabel: getStateLabel(node.config.rule.source, stateSchema),
+      operatorLabel: node.config.rule.operator,
+      valueLabel: node.config.rule.value === null ? "null" : String(node.config.rule.value),
+      maxLoopsLabel: node.config.loopLimit === -1 ? "Unlimited" : String(node.config.loopLimit),
       primaryInput: inputs[0] ?? null,
-      branchMappings: mapConditionBranchMappings(node, options.conditionRouteTargets ?? {}),
+      routeOutputs: mapConditionRouteOutputs(node, options.conditionRouteTargets ?? {}),
     };
   }
 
@@ -304,34 +307,35 @@ function buildRuntimeNote(node: GraphNode, options: BuildNodeCardViewModelOption
   };
 }
 
-function formatConditionRule(
-  rule: Extract<GraphNode, { kind: "condition" }>["config"]["rule"],
-  stateSchema: Record<string, StateDefinition>,
-) {
-  const sourceLabel = getStateLabel(rule.source, stateSchema);
-  if (rule.operator === "exists") {
-    return `${sourceLabel} exists`;
-  }
-  const valueLabel = rule.value === null ? "null" : String(rule.value);
-  return `${sourceLabel} ${rule.operator} ${valueLabel}`;
-}
-
-function mapConditionBranchMappings(
+function mapConditionRouteOutputs(
   node: Extract<GraphNode, { kind: "condition" }>,
   conditionRouteTargets: Record<string, string | null>,
-): NodeBranchMappingViewModel[] {
-  return node.config.branches.map((branch) => ({
+): NodeConditionRouteOutputViewModel[] {
+  return node.config.branches.map((branch, index) => ({
     branch,
-    matchValues: Object.entries(node.config.branchMapping)
-      .filter(([, mappedBranch]) => mappedBranch === branch)
-      .map(([value]) => value),
-    matchValueLabel:
-      Object.entries(node.config.branchMapping)
-        .filter(([, mappedBranch]) => mappedBranch === branch)
-        .map(([value]) => value)
-        .join(", ") || "No matches",
     routeTargetLabel: conditionRouteTargets[branch] ?? null,
+    tone: resolveConditionRouteTone(branch, index),
   }));
+}
+
+function resolveConditionRouteTone(branch: string, index: number): NodeConditionRouteOutputViewModel["tone"] {
+  const normalizedBranch = branch.trim().toLowerCase();
+  if (normalizedBranch === "true") {
+    return "success";
+  }
+  if (normalizedBranch === "false") {
+    return "danger";
+  }
+  if (normalizedBranch === "exhausted") {
+    return "warning";
+  }
+  if (index === 0) {
+    return "success";
+  }
+  if (index === 1) {
+    return "danger";
+  }
+  return "warning";
 }
 
 function formatOutputDisplayModeLabel(displayMode: string) {

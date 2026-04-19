@@ -121,7 +121,7 @@ export function buildRouteEdgePath({
     sourceY: input.sourceY,
     targetX: input.targetX,
     targetY: input.targetY,
-    sourceSide: "bottom",
+    sourceSide: "right",
     targetSide: "left",
     sourceOffset: input.sourceOffset,
     targetOffset: input.laneOffset ? input.laneOffset * 2.5 : undefined,

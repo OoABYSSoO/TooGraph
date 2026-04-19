@@ -309,7 +309,7 @@ test("buildNodeCardViewModel exposes node-level latest run failure notes", () =>
   });
 });
 
-test("buildNodeCardViewModel derives condition branches and rule summary", () => {
+test("buildNodeCardViewModel derives proxy-style condition routing controls", () => {
   const node: GraphNode = {
     kind: "condition",
     name: "continue_check",
@@ -336,18 +336,20 @@ test("buildNodeCardViewModel derives condition branches and rule summary", () =>
 
   assert.equal(model.body.kind, "condition");
   assert.deepEqual(model.branches.map((branch) => branch.label), ["continue", "retry"]);
-  assert.equal(model.body.ruleSummary, "answer exists");
-  assert.equal(model.body.loopLimitLabel, "Loop · 5");
+  assert.equal(model.body.sourceLabel, "answer");
+  assert.equal(model.body.operatorLabel, "exists");
+  assert.equal(model.body.valueLabel, "null");
+  assert.equal(model.body.maxLoopsLabel, "5");
   assert.equal(model.body.primaryInput?.label, "answer");
-  assert.deepEqual(model.body.branchMappings, [
-    { branch: "continue", matchValues: ["true"], matchValueLabel: "true", routeTargetLabel: null },
-    { branch: "retry", matchValues: ["false"], matchValueLabel: "false", routeTargetLabel: null },
+  assert.deepEqual(model.body.routeOutputs, [
+    { branch: "continue", routeTargetLabel: null, tone: "success" },
+    { branch: "retry", routeTargetLabel: null, tone: "danger" },
   ]);
   assert.deepEqual(model.stateSummary?.reads, ["answer"]);
   assert.deepEqual(model.stateSummary?.writes, []);
 });
 
-test("buildNodeCardViewModel derives condition route target labels", () => {
+test("buildNodeCardViewModel derives condition route target labels for proxy outputs", () => {
   const node: GraphNode = {
     kind: "condition",
     name: "continue_check",
@@ -378,9 +380,9 @@ test("buildNodeCardViewModel derives condition route target labels", () => {
   });
 
   assert.equal(model.body.kind, "condition");
-  assert.deepEqual(model.body.branchMappings, [
-    { branch: "continue", matchValues: ["true"], matchValueLabel: "true", routeTargetLabel: "next_agent" },
-    { branch: "retry", matchValues: ["false"], matchValueLabel: "false", routeTargetLabel: null },
+  assert.deepEqual(model.body.routeOutputs, [
+    { branch: "continue", routeTargetLabel: "next_agent", tone: "success" },
+    { branch: "retry", routeTargetLabel: null, tone: "danger" },
   ]);
 });
 
