@@ -420,6 +420,49 @@ test("updateAgentNodeConfigInDocument returns original document for non-agent or
   assert.equal(unchangedOutput, document);
 });
 
+test("updateNodeMetadataInDocument patches node name and description immutably", () => {
+  assert.equal(typeof graphDocument.updateNodeMetadataInDocument, "function");
+
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Metadata Graph",
+    state_schema: {},
+    nodes: {
+      answer_helper: {
+        kind: "agent",
+        name: "answer_helper",
+        description: "Answer the question directly.",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [],
+        config: {
+          skills: [],
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const nextDocument = graphDocument.updateNodeMetadataInDocument(document, "answer_helper", (current) => ({
+    ...current,
+    name: "answer_helper_cn",
+    description: "请直接用中文回答用户问题。",
+  }));
+
+  assert.notEqual(nextDocument, document);
+  assert.equal(nextDocument.nodes.answer_helper.name, "answer_helper_cn");
+  assert.equal(nextDocument.nodes.answer_helper.description, "请直接用中文回答用户问题。");
+  assert.equal(document.nodes.answer_helper.name, "answer_helper");
+  assert.equal(document.nodes.answer_helper.description, "Answer the question directly.");
+});
+
 test("syncKnowledgeBaseSkillsInDocument derives search_knowledge_base from agent knowledge bindings", () => {
   assert.equal(typeof graphDocument.syncKnowledgeBaseSkillsInDocument, "function");
 

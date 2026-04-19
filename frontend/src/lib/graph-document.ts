@@ -9,7 +9,7 @@ import {
   canReconnectFlowEdge,
 } from "./graph-connections.ts";
 
-import type { AgentNode, ConditionNode, GraphDocument, GraphPayload, InputNode, OutputNode, TemplateRecord } from "../types/node-system.ts";
+import type { AgentNode, ConditionNode, GraphDocument, GraphNode, GraphPayload, InputNode, OutputNode, TemplateRecord } from "../types/node-system.ts";
 
 export function createDraftFromTemplate(template: TemplateRecord): GraphPayload {
   const rawTemplate = toRaw(template) as TemplateRecord;
@@ -197,6 +197,30 @@ export function updateOutputNodeConfigInDocument<T extends GraphPayload | GraphD
   }
 
   nextNode.config = nextConfig;
+  return nextDocument;
+}
+
+export function updateNodeMetadataInDocument<T extends GraphPayload | GraphDocument>(
+  document: T,
+  nodeId: string,
+  updater: (current: Pick<GraphNode, "name" | "description">) => Pick<GraphNode, "name" | "description">,
+): T {
+  const node = document.nodes[nodeId];
+  if (!node) {
+    return document;
+  }
+
+  const nextMetadata = updater({
+    name: node.name,
+    description: node.description,
+  });
+  if (nextMetadata.name === node.name && nextMetadata.description === node.description) {
+    return document;
+  }
+
+  const nextDocument = cloneGraphDocument(document);
+  nextDocument.nodes[nodeId].name = nextMetadata.name;
+  nextDocument.nodes[nodeId].description = nextMetadata.description;
   return nextDocument;
 }
 

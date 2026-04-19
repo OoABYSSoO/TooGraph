@@ -110,6 +110,7 @@
           :run-output-display-mode="runOutputPreviewByNodeId?.[nodeId]?.displayMode ?? null"
           :run-failure-message="runFailureMessageByNodeId?.[nodeId] ?? null"
           :selected="selection.selectedNodeId.value === nodeId"
+          @update-node-metadata="emit('update-node-metadata', $event)"
           @update-input-config="emit('update-input-config', $event)"
           @update-input-state="emit('update-input-state', $event)"
           @rename-state="emit('rename-state', $event)"
@@ -209,6 +210,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (event: "update:node-position", payload: { nodeId: string; position: GraphPosition }): void;
   (event: "select-node", nodeId: string | null): void;
+  (event: "update-node-metadata", payload: { nodeId: string; patch: Partial<Pick<InputNode | AgentNode | ConditionNode | OutputNode, "name" | "description">> }): void;
   (event: "update-input-config", payload: { nodeId: string; patch: Partial<InputNode["config"]> }): void;
   (event: "update-input-state", payload: { stateKey: string; patch: Partial<StateDefinition> }): void;
   (event: "rename-state", payload: { currentKey: string; nextKey: string }): void;
@@ -1158,7 +1160,7 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
 .editor-canvas__anchors {
   position: absolute;
   inset: 0;
-  z-index: 3;
+  z-index: 10;
   width: 4000px;
   height: 3000px;
   overflow: visible;
@@ -1168,7 +1170,7 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
 .editor-canvas__flow-hotspots {
   position: absolute;
   inset: 0;
-  z-index: 4;
+  z-index: 11;
   width: 4000px;
   height: 3000px;
   overflow: visible;

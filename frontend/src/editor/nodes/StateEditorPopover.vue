@@ -68,29 +68,12 @@
     </div>
 
     <div v-if="error" class="node-state-editor__hint node-state-editor__hint--error">{{ error }}</div>
-
-    <div class="node-state-editor__actions">
-      <ElButton circle size="small" aria-label="Cancel" class="node-state-editor__action-button node-state-editor__action-button--cancel" @click="$emit('cancel')">
-        <ElIcon><Close /></ElIcon>
-      </ElButton>
-      <ElButton
-        circle
-        size="small"
-        type="primary"
-        aria-label="Save"
-        class="node-state-editor__action-button node-state-editor__action-button--save"
-        @click="$emit('save')"
-      >
-        <ElIcon><Check /></ElIcon>
-      </ElButton>
-    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, ref } from "vue";
-import { Check, Close } from "@element-plus/icons-vue";
-import { ElButton, ElIcon, ElInput, ElOption, ElSelect } from "element-plus";
+import { ElInput, ElOption, ElSelect } from "element-plus";
 
 import type { StateColorOption, StateFieldDraft, StateFieldType } from "@/editor/workspace/statePanelFields";
 
@@ -107,8 +90,6 @@ const emit = defineEmits<{
   (event: "update:type", value: string): void;
   (event: "update:color", value: string): void;
   (event: "update:description", value: string): void;
-  (event: "cancel"): void;
-  (event: "save"): void;
 }>();
 
 const typeSelectRef = ref<{ blur?: () => void; toggleMenu?: () => void; expanded?: boolean } | null>(null);
@@ -223,36 +204,6 @@ async function handleColorSelect(value: string | number | boolean | undefined) {
 
 .node-state-editor__hint--error {
   color: rgb(153, 27, 27);
-}
-
-.node-state-editor__actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-:deep(.node-state-editor__action-button.el-button) {
-  width: 32px;
-  min-width: 32px;
-  min-height: 32px;
-  padding: 0;
-}
-
-:deep(.node-state-editor .el-button) {
-  min-height: 32px;
-  border-radius: 999px;
-}
-
-:deep(.node-state-editor .el-button:not(.el-button--primary)) {
-  border-color: rgba(154, 52, 18, 0.16);
-  background: rgba(255, 251, 246, 0.92);
-  color: rgba(60, 41, 20, 0.74);
-}
-
-:deep(.node-state-editor .el-button--primary) {
-  border-color: rgba(154, 52, 18, 0.22);
-  background: rgba(201, 107, 31, 0.92);
-  color: #fffaf3;
 }
 
 :deep(.node-state-editor .el-input__wrapper),

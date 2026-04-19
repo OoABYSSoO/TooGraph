@@ -23,6 +23,11 @@ test("EditorCanvas raises hovered and selected nodes above sibling cards", () =>
   assert.match(componentSource, /\.editor-canvas__node:hover,\n\.editor-canvas__node:focus-within,\n\.editor-canvas__node--selected \{[\s\S]*z-index:\s*8;/);
 });
 
+test("EditorCanvas keeps state anchors and flow hotspots above hovered nodes", () => {
+  assert.match(componentSource, /\.editor-canvas__anchors \{[\s\S]*z-index:\s*10;/);
+  assert.match(componentSource, /\.editor-canvas__flow-hotspots \{[\s\S]*z-index:\s*11;/);
+});
+
 test("EditorCanvas styles typed anchors and edges from projected state colors", () => {
   assert.match(componentSource, /:style="edgeStyle\(edge\)"/);
   assert.match(componentSource, /:style="anchorStyle\(anchor\)"/);
@@ -73,10 +78,12 @@ test("EditorCanvas emits node-creation intents for empty-canvas double click and
 });
 
 test("EditorCanvas forwards node-card state editing and top-action events", () => {
+  assert.match(componentSource, /@update-node-metadata="emit\('update-node-metadata', \$event\)"/);
   assert.match(componentSource, /@rename-state="emit\('rename-state', \$event\)"/);
   assert.match(componentSource, /@update-state="emit\('update-state', \$event\)"/);
   assert.match(componentSource, /@delete-node="emit\('delete-node', \$event\)"/);
   assert.match(componentSource, /@save-node-preset="emit\('save-node-preset', \$event\)"/);
+  assert.match(componentSource, /\(event: "update-node-metadata", payload: \{ nodeId: string; patch: Partial<Pick<InputNode \| AgentNode \| ConditionNode \| OutputNode, "name" \| "description">> \}\): void;/);
   assert.match(componentSource, /\(event: "rename-state", payload: \{ currentKey: string; nextKey: string \}\): void;/);
   assert.match(componentSource, /\(event: "update-state", payload: \{ stateKey: string; patch: Partial<StateDefinition> \}\): void;/);
   assert.match(componentSource, /\(event: "delete-node", payload: \{ nodeId: string \}\): void;/);

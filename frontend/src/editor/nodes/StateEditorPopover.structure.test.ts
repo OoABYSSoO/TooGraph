@@ -10,8 +10,7 @@ const componentSource = readFileSync(resolve(currentDirectory, "StateEditorPopov
 
 test("StateEditorPopover uses compact metadata-first editing with Element Plus selects", () => {
   assert.match(componentSource, /import \{ computed, nextTick, ref \} from "vue";/);
-  assert.match(componentSource, /import \{ ElButton, ElIcon, ElInput, ElOption, ElSelect \} from "element-plus";/);
-  assert.match(componentSource, /import \{ Check, Close \} from "@element-plus\/icons-vue";/);
+  assert.match(componentSource, /import \{ ElInput, ElOption, ElSelect \} from "element-plus";/);
   assert.match(componentSource, /<span class="node-state-editor__field-label">Key<\/span>[\s\S]*<span class="node-state-editor__field-label">Name<\/span>/);
   assert.match(componentSource, /<span class="node-state-editor__field-label">Type<\/span>[\s\S]*<span class="node-state-editor__field-label">Color<\/span>/);
   assert.match(componentSource, /class="node-state-editor__grid"/);
@@ -41,12 +40,12 @@ test("StateEditorPopover uses compact metadata-first editing with Element Plus s
   assert.match(componentSource, /:deep\(.node-state-editor__select-popper\.el-popper\) \{[\s\S]*border-radius:\s*16px;/);
   assert.match(componentSource, /:deep\(.node-state-editor__select-popper\.el-popper\) \{[\s\S]*background:\s*rgba\(255,\s*248,\s*240,\s*0\.98\);/);
   assert.match(componentSource, /:deep\(.node-state-editor__select-popper \.el-select-dropdown__item\.is-selected\) \{[\s\S]*color:\s*#9a3412;/);
-  assert.match(componentSource, /class="node-state-editor__actions"/);
-  assert.match(componentSource, /class="node-state-editor__action-button node-state-editor__action-button--cancel"/);
-  assert.match(componentSource, /class="node-state-editor__action-button node-state-editor__action-button--save"/);
-  assert.match(componentSource, /<ElButton[\s\S]*circle[\s\S]*size="small"[\s\S]*aria-label="Cancel"[\s\S]*node-state-editor__action-button--cancel[\s\S]*<ElIcon><Close \/><\/ElIcon>[\s\S]*<\/ElButton>/);
-  assert.match(componentSource, /<ElButton[\s\S]*circle[\s\S]*size="small"[\s\S]*type="primary"[\s\S]*aria-label="Save"[\s\S]*node-state-editor__action-button--save[\s\S]*<ElIcon><Check \/><\/ElIcon>[\s\S]*<\/ElButton>/);
+  assert.doesNotMatch(componentSource, /class="node-state-editor__actions"/);
+  assert.doesNotMatch(componentSource, /node-state-editor__action-button/);
+  assert.doesNotMatch(componentSource, /<ElButton/);
   assert.doesNotMatch(componentSource, />Cancel</);
   assert.doesNotMatch(componentSource, />Save</);
   assert.doesNotMatch(componentSource, />Value</);
+  assert.doesNotMatch(componentSource, /\(event: "cancel"\)/);
+  assert.doesNotMatch(componentSource, /\(event: "save"\)/);
 });

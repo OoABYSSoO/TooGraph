@@ -157,6 +157,8 @@ test("NodeCard moves node actions into hoverable top buttons built from Element 
   assert.match(componentSource, /class="node-card__top-action-button node-card__top-action-button--preset"/);
   assert.match(componentSource, /class="node-card__top-action-button node-card__top-action-button--delete"/);
   assert.match(componentSource, /@click\.stop="toggleAdvancedPanel"/);
+  assert.match(componentSource, /:show-arrow="false"/);
+  assert.match(componentSource, /:popper-style="actionPopoverStyle"/);
   assert.match(componentSource, /const activeTopAction = ref<"advanced" \| "delete" \| "preset" \| null>\(null\);/);
   assert.match(componentSource, /const topActionTimeoutRef = ref<number \| null>\(null\);/);
   assert.match(componentSource, /function clearTopActionConfirmState\(\)/);
@@ -172,6 +174,8 @@ test("NodeCard moves node actions into hoverable top buttons built from Element 
   assert.match(componentSource, /:visible="activeTopAction === 'delete'"/);
   assert.match(componentSource, /Delete node\?/);
   assert.match(componentSource, /const confirmPopoverStyle = \{/);
+  assert.match(componentSource, /const actionPopoverStyle = \{/);
+  assert.match(componentSource, /"--el-popover-bg-color":\s*"transparent"/);
   assert.match(componentSource, /node-card__top-action-button--confirm/);
   assert.match(componentSource, /\.node-card \{[\s\S]*overflow:\s*visible;/);
   assert.match(componentSource, /\.node-card__top-actions \{[\s\S]*top:\s*0;/);
@@ -193,6 +197,11 @@ test("NodeCard moves node actions into hoverable top buttons built from Element 
   assert.match(componentSource, /\.node-card__top-action-button \{[\s\S]*border-radius:\s*999px;/);
   assert.match(componentSource, /\.node-card__top-action-button \{[\s\S]*box-shadow:\s*none;/);
   assert.match(componentSource, /\.node-card__top-action-button :deep\(\.el-icon\) \{[\s\S]*font-size:\s*1\.18rem;/);
+  assert.match(componentSource, /\.node-card__top-popover \{[\s\S]*padding:\s*12px;/);
+  assert.match(componentSource, /\.node-card__top-popover \{[\s\S]*border:\s*1px solid rgba\(154,\s*52,\s*18,\s*0\.14\);/);
+  assert.match(componentSource, /\.node-card__top-popover \{[\s\S]*border-radius:\s*14px;/);
+  assert.match(componentSource, /\.node-card__top-popover \{[\s\S]*background:\s*rgba\(255,\s*244,\s*232,\s*0\.96\);/);
+  assert.match(componentSource, /\.node-card__top-popover \{[\s\S]*box-shadow:\s*0 16px 34px rgba\(60,\s*41,\s*20,\s*0\.12\);/);
   assert.match(componentSource, /\.node-card__header \{[\s\S]*padding:\s*18px var\(--node-card-inline-padding\) 8px var\(--node-card-inline-padding\);/);
   assert.doesNotMatch(componentSource, /type="primary" @click\.stop="confirmSavePreset"/);
   assert.doesNotMatch(componentSource, /type="danger" @click\.stop="confirmDeleteNode"/);
@@ -211,6 +220,10 @@ test("NodeCard opens bound-state editing from a double click on the port label",
   assert.match(componentSource, /:width="320"/);
   assert.match(componentSource, /:show-arrow="false"/);
   assert.match(componentSource, /:popper-style="stateEditorPopoverStyle"/);
+  assert.doesNotMatch(componentSource, /@cancel="closeStateEditor"/);
+  assert.doesNotMatch(componentSource, /@save="commitStateEditor"/);
+  assert.doesNotMatch(componentSource, /function commitStateEditor\(\)/);
+  assert.match(componentSource, /function syncStateEditorDraft\(nextDraft: StateFieldDraft, options\?: \{ allowInvalidKey\?: boolean \}\)/);
   assert.doesNotMatch(componentSource, /trigger="manual"/);
   assert.match(componentSource, /StateDefaultValueEditor/);
   assert.match(componentSource, /class="node-card__state-editor"/);
@@ -225,7 +238,29 @@ test("NodeCard opens bound-state editing from a double click on the port label",
   assert.match(componentSource, /:deep\(.node-card__state-editor-popper\.el-popper\) \{[\s\S]*box-shadow:\s*none;/);
 });
 
+test("NodeCard opens dedicated warm popovers for title and description editing on double click", () => {
+  assert.match(componentSource, /<h3 class="node-card__title" @dblclick\.stop="openTextEditor\('title'\)">\{\{ view\.title \}\}<\/h3>/);
+  assert.match(componentSource, /<p class="node-card__description" @dblclick\.stop="openTextEditor\('description'\)">\{\{ view\.description \}\}<\/p>/);
+  assert.match(componentSource, /const activeTextEditor = ref<"title" \| "description" \| null>\(null\);/);
+  assert.match(componentSource, /const titleEditorDraft = ref\(""\);/);
+  assert.match(componentSource, /const descriptionEditorDraft = ref\(""\);/);
+  assert.match(componentSource, /function openTextEditor\(field: "title" \| "description"\)/);
+  assert.match(componentSource, /function closeTextEditor\(\)/);
+  assert.match(componentSource, /function commitTitleEdit\(\)/);
+  assert.match(componentSource, /function commitDescriptionEdit\(\)/);
+  assert.match(componentSource, /emit\("update-node-metadata", \{ nodeId: props\.nodeId, patch: \{ name: nextTitle \} \}\);/);
+  assert.match(componentSource, /emit\("update-node-metadata", \{ nodeId: props\.nodeId, patch: \{ description: nextDescription \} \}\);/);
+  assert.match(componentSource, /:visible="activeTextEditor === 'title'"/);
+  assert.match(componentSource, /:visible="activeTextEditor === 'description'"/);
+  assert.match(componentSource, /popper-class="node-card__text-editor-popper"/);
+  assert.match(componentSource, /class="node-card__text-editor"/);
+  assert.match(componentSource, /\.node-card__text-editor \{[\s\S]*border:\s*1px solid rgba\(154,\s*52,\s*18,\s*0\.14\);/);
+  assert.match(componentSource, /\.node-card__text-editor \{[\s\S]*background:\s*rgba\(255,\s*244,\s*232,\s*0\.96\);/);
+  assert.match(componentSource, /\.node-card__text-editor \{[\s\S]*border-radius:\s*16px;/);
+});
+
 test("NodeCard declares top-action and state-edit events for canvas forwarding", () => {
+  assert.match(componentSource, /\(event: "update-node-metadata", payload: \{ nodeId: string; patch: Partial<Pick<GraphNode, "name" \| "description">> \}\): void;/);
   assert.match(componentSource, /\(event: "rename-state", payload: \{ currentKey: string; nextKey: string \}\): void;/);
   assert.match(componentSource, /\(event: "update-state", payload: \{ stateKey: string; patch: Partial<StateDefinition> \}\): void;/);
   assert.match(componentSource, /\(event: "delete-node", payload: \{ nodeId: string \}\): void;/);
@@ -234,7 +269,7 @@ test("NodeCard declares top-action and state-edit events for canvas forwarding",
 
 test("NodeCard closes floating panels on focus loss and keeps popup surfaces on the warm theme", () => {
   assert.match(componentSource, /import \{ computed, onBeforeUnmount, onMounted, ref, watch \} from "vue";/);
-  assert.match(componentSource, /const hasFloatingPanelOpen = computed\(\(\) =>/);
+  assert.match(componentSource, /const hasFloatingPanelOpen = computed\(/);
   assert.match(componentSource, /document\.addEventListener\("pointerdown", handleGlobalFloatingPanelPointerDown\)/);
   assert.match(componentSource, /document\.addEventListener\("focusin", handleGlobalFloatingPanelFocusIn\)/);
   assert.match(componentSource, /document\.addEventListener\("keydown", handleGlobalFloatingPanelKeyDown\)/);
@@ -242,6 +277,7 @@ test("NodeCard closes floating panels on focus loss and keeps popup surfaces on 
   assert.match(componentSource, /document\.removeEventListener\("focusin", handleGlobalFloatingPanelFocusIn\)/);
   assert.match(componentSource, /document\.removeEventListener\("keydown", handleGlobalFloatingPanelKeyDown\)/);
   assert.match(componentSource, /data-node-popup-surface="true"/);
+  assert.match(componentSource, /\.node-card__text-editor-popper/);
   assert.match(componentSource, /\.node-card__skill-picker \{[\s\S]*border:\s*1px solid rgba\(154,\s*52,\s*18,\s*0\.16\);/);
   assert.match(componentSource, /\.node-card__skill-picker \{[\s\S]*background:\s*rgba\(255,\s*250,\s*241,\s*0\.98\);/);
   assert.match(componentSource, /\.node-card__skill-picker \{[\s\S]*box-shadow:\s*0 20px 40px rgba\(60,\s*41,\s*20,\s*0\.12\);/);

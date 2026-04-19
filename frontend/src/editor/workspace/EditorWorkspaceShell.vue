@@ -71,6 +71,7 @@
                 :run-failure-message-by-node-id="runFailureMessageByTabId[tab.tabId] ?? undefined"
                 :active-run-edge-ids="activeRunEdgeIdsByTabId[tab.tabId] ?? undefined"
                 @select-node="focusNodeForTab(tab.tabId, $event)"
+                @update-node-metadata="updateNodeMetadataForTab(tab.tabId, $event.nodeId, $event.patch)"
                 @update-input-config="updateInputConfigForTab(tab.tabId, $event.nodeId, $event.patch)"
                 @update-input-state="updateStateField(tab.tabId, $event.stateKey, $event.patch)"
                 @rename-state="renameStateField(tab.tabId, $event.currentKey, $event.nextKey)"
@@ -199,6 +200,7 @@ import {
   updateConditionBranchInDocument,
   updateConditionNodeConfigInDocument,
   updateInputNodeConfigInDocument,
+  updateNodeMetadataInDocument,
   updateOutputNodeConfigInDocument,
 } from "@/lib/graph-document";
 import {
@@ -222,6 +224,7 @@ import type {
   AgentNode,
   ConditionNode,
   GraphDocument,
+  GraphNode,
   GraphPayload,
   GraphPosition,
   InputNode,
@@ -1223,6 +1226,24 @@ function updateInputConfigForTab(tabId: string, nodeId: string, patch: Partial<I
   }
 
   const nextDocument = updateInputNodeConfigInDocument(document, nodeId, (current) => ({
+    ...current,
+    ...patch,
+  }));
+  if (nextDocument === document) {
+    return;
+  }
+
+  markDocumentDirty(tabId, nextDocument);
+  focusNodeForTab(tabId, nodeId);
+}
+
+function updateNodeMetadataForTab(tabId: string, nodeId: string, patch: Partial<Pick<GraphNode, "name" | "description">>) {
+  const document = documentsByTabId.value[tabId];
+  if (!document) {
+    return;
+  }
+
+  const nextDocument = updateNodeMetadataInDocument(document, nodeId, (current) => ({
     ...current,
     ...patch,
   }));

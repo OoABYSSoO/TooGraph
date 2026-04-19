@@ -12,6 +12,8 @@
         :visible="activeTopAction === 'advanced'"
         placement="bottom-end"
         :width="view.body.kind === 'output' ? 340 : 280"
+        :show-arrow="false"
+        :popper-style="actionPopoverStyle"
         popper-class="node-card__action-popover"
       >
         <template #reference>
@@ -122,10 +124,57 @@
     </div>
     <header class="node-card__header">
       <div class="node-card__eyebrow">{{ view.kindLabel }}</div>
-      <h3 class="node-card__title">{{ view.title }}</h3>
+      <ElPopover
+        :visible="activeTextEditor === 'title'"
+        placement="bottom-start"
+        :width="360"
+        :show-arrow="false"
+        :popper-style="stateEditorPopoverStyle"
+        popper-class="node-card__text-editor-popper"
+      >
+        <template #reference>
+          <h3 class="node-card__title" @dblclick.stop="openTextEditor('title')">{{ view.title }}</h3>
+        </template>
+        <div class="node-card__text-editor" data-node-popup-surface="true">
+          <div class="node-card__text-editor-title">Edit Name</div>
+          <ElInput
+            :model-value="titleEditorDraft"
+            autofocus
+            @update:model-value="handleTitleEditorDraftInput"
+            @blur="commitTitleEdit"
+            @keydown.enter.prevent="commitTitleEdit"
+            @keydown.esc.prevent="closeTextEditor()"
+          />
+        </div>
+      </ElPopover>
     </header>
 
-    <p class="node-card__description">{{ view.description }}</p>
+    <ElPopover
+      :visible="activeTextEditor === 'description'"
+      placement="bottom-start"
+      :width="420"
+      :show-arrow="false"
+      :popper-style="stateEditorPopoverStyle"
+      popper-class="node-card__text-editor-popper"
+    >
+      <template #reference>
+        <p class="node-card__description" @dblclick.stop="openTextEditor('description')">{{ view.description }}</p>
+      </template>
+      <div class="node-card__text-editor" data-node-popup-surface="true">
+        <div class="node-card__text-editor-title">Edit Description</div>
+        <ElInput
+          :model-value="descriptionEditorDraft"
+          type="textarea"
+          :autosize="{ minRows: 4, maxRows: 7 }"
+          autofocus
+          @update:model-value="handleDescriptionEditorDraftInput"
+          @blur="commitDescriptionEdit"
+          @keydown.ctrl.enter.prevent="commitDescriptionEdit"
+          @keydown.meta.enter.prevent="commitDescriptionEdit"
+          @keydown.esc.prevent="closeTextEditor()"
+        />
+      </div>
+    </ElPopover>
 
     <section v-if="view.body.kind === 'input'" class="node-card__body node-card__body--input">
       <div class="node-card__port-row node-card__port-row--single node-card__port-row--input-boundary">
@@ -185,8 +234,6 @@
               @update:type="handleStateEditorTypeValue"
               @update:color="handleStateEditorColorInput"
               @update:description="handleStateEditorDescriptionInput"
-              @cancel="closeStateEditor"
-              @save="commitStateEditor"
             />
           </ElPopover>
         </div>
@@ -342,8 +389,6 @@
                 @update:type="handleStateEditorTypeValue"
                 @update:color="handleStateEditorColorInput"
                 @update:description="handleStateEditorDescriptionInput"
-                @cancel="closeStateEditor"
-                @save="commitStateEditor"
               />
             </ElPopover>
           </div>
@@ -383,8 +428,6 @@
                 @update:type="handleStateEditorTypeValue"
                 @update:color="handleStateEditorColorInput"
                 @update:description="handleStateEditorDescriptionInput"
-                @cancel="closeStateEditor"
-                @save="commitStateEditor"
               />
             </ElPopover>
           </div>
@@ -687,8 +730,6 @@
             @update:type="handleStateEditorTypeValue"
             @update:color="handleStateEditorColorInput"
             @update:description="handleStateEditorDescriptionInput"
-            @cancel="closeStateEditor"
-            @save="commitStateEditor"
           />
         </ElPopover>
         <span v-else class="node-card__port-label">Unbound</span>
@@ -753,8 +794,6 @@
                 @update:type="handleStateEditorTypeValue"
                 @update:color="handleStateEditorColorInput"
                 @update:description="handleStateEditorDescriptionInput"
-                @cancel="closeStateEditor"
-                @save="commitStateEditor"
               />
             </ElPopover>
           </div>
@@ -941,6 +980,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  (event: "update-node-metadata", payload: { nodeId: string; patch: Partial<Pick<GraphNode, "name" | "description">> }): void;
   (event: "update-input-config", payload: { nodeId: string; patch: Partial<InputNode["config"]> }): void;
   (event: "update-input-state", payload: { stateKey: string; patch: Partial<StateDefinition> }): void;
   (event: "rename-state", payload: { currentKey: string; nextKey: string }): void;
@@ -984,6 +1024,16 @@ const confirmPopoverStyle = {
   background: "transparent",
   boxShadow: "none",
 };
+const actionPopoverStyle = {
+  "--el-popover-bg-color": "transparent",
+  "--el-popover-border-color": "transparent",
+  "--el-popover-padding": "0px",
+  background: "transparent",
+  border: "none",
+  boxShadow: "none",
+  padding: "0",
+  "min-width": "0",
+} as const;
 const stateEditorPopoverStyle = {
   "--el-popover-bg-color": "transparent",
   "--el-popover-border-color": "transparent",
@@ -1020,6 +1070,9 @@ const portStateError = ref<string | null>(null);
 const agentModelSelectRef = ref<{ blur?: () => void; toggleMenu?: () => void; expanded?: boolean } | null>(null);
 const activeTopAction = ref<"advanced" | "delete" | "preset" | null>(null);
 const topActionTimeoutRef = ref<number | null>(null);
+const activeTextEditor = ref<"title" | "description" | null>(null);
+const titleEditorDraft = ref("");
+const descriptionEditorDraft = ref("");
 const activeStateEditorAnchorId = ref<string | null>(null);
 const stateEditorDraft = ref<StateFieldDraft | null>(null);
 const stateEditorError = ref<string | null>(null);
@@ -1208,7 +1261,14 @@ const agentTemperatureInput = computed(() => {
 const hasAdvancedSettings = computed(() => props.node.kind === "agent" || props.node.kind === "output");
 const canSavePreset = computed(() => props.node.kind === "agent");
 const isTopActionVisible = computed(() => props.selected || activeTopAction.value !== null);
-const hasFloatingPanelOpen = computed(() => activeTopAction.value !== null || activeStateEditorAnchorId.value !== null || activePortPickerSide.value !== null || isSkillPickerOpen.value);
+const hasFloatingPanelOpen = computed(
+  () =>
+    activeTopAction.value !== null ||
+    activeTextEditor.value !== null ||
+    activeStateEditorAnchorId.value !== null ||
+    activePortPickerSide.value !== null ||
+    isSkillPickerOpen.value,
+);
 
 watch(
   () => (props.node.kind === "condition" ? props.node.config.loopLimit : null),
@@ -1378,6 +1438,7 @@ function toggleSkillPicker() {
   }
   clearTopActionTimeout();
   activeTopAction.value = null;
+  commitOpenTextEditorIfNeeded();
   closeStateEditor();
   activePortPickerSide.value = null;
   portStateDraft.value = null;
@@ -1404,6 +1465,7 @@ function removeAgentSkill(skillKey: string) {
 function openPortPicker(side: "input" | "output") {
   clearTopActionTimeout();
   activeTopAction.value = null;
+  commitOpenTextEditorIfNeeded();
   closeStateEditor();
   isSkillPickerOpen.value = false;
   portStateSearch.value = "";
@@ -1578,6 +1640,66 @@ function buildStateDraftFromSchema(stateKey: string): StateFieldDraft | null {
   };
 }
 
+function syncTextEditorDraftsFromNode() {
+  titleEditorDraft.value = props.node.name;
+  descriptionEditorDraft.value = props.node.description;
+}
+
+function openTextEditor(field: "title" | "description") {
+  clearTopActionTimeout();
+  activeTopAction.value = null;
+  closeStateEditor();
+  closePortPicker();
+  isSkillPickerOpen.value = false;
+  syncTextEditorDraftsFromNode();
+  activeTextEditor.value = field;
+}
+
+function closeTextEditor() {
+  activeTextEditor.value = null;
+  syncTextEditorDraftsFromNode();
+}
+
+function commitTitleEdit() {
+  const nextTitle = titleEditorDraft.value.trim();
+  if (nextTitle && nextTitle !== props.node.name) {
+    emit("update-node-metadata", { nodeId: props.nodeId, patch: { name: nextTitle } });
+  }
+  closeTextEditor();
+}
+
+function commitDescriptionEdit() {
+  const nextDescription = descriptionEditorDraft.value.trim();
+  if (nextDescription !== props.node.description) {
+    emit("update-node-metadata", { nodeId: props.nodeId, patch: { description: nextDescription } });
+  }
+  closeTextEditor();
+}
+
+function handleTitleEditorDraftInput(value: string | number) {
+  if (typeof value !== "string") {
+    return;
+  }
+  titleEditorDraft.value = value;
+}
+
+function handleDescriptionEditorDraftInput(value: string | number) {
+  if (typeof value !== "string") {
+    return;
+  }
+  descriptionEditorDraft.value = value;
+}
+
+function commitOpenTextEditorIfNeeded() {
+  if (activeTextEditor.value === "title") {
+    commitTitleEdit();
+    return;
+  }
+  if (activeTextEditor.value === "description") {
+    commitDescriptionEdit();
+  }
+}
+
 function isStateEditorOpen(anchorId: string) {
   return activeStateEditorAnchorId.value === anchorId;
 }
@@ -1592,6 +1714,7 @@ function openStateEditor(anchorId: string, stateKey: string | null | undefined) 
   }
   clearTopActionTimeout();
   activeTopAction.value = null;
+  commitOpenTextEditorIfNeeded();
   activePortPickerSide.value = null;
   isSkillPickerOpen.value = false;
   activeStateEditorAnchorId.value = anchorId;
@@ -1605,78 +1728,17 @@ function closeStateEditor() {
   stateEditorError.value = null;
 }
 
-function handleStateEditorNameInput(value: string | number) {
-  if (!stateEditorDraft.value || typeof value !== "string") {
-    return;
-  }
-  stateEditorDraft.value = {
-    ...stateEditorDraft.value,
-    definition: {
-      ...stateEditorDraft.value.definition,
-      name: value,
-    },
-  };
-}
-
-function handleStateEditorKeyInput(value: string | number) {
-  if (!stateEditorDraft.value || typeof value !== "string") {
-    return;
-  }
-  stateEditorDraft.value = {
-    ...stateEditorDraft.value,
-    key: value,
-  };
-}
-
-function handleStateEditorDescriptionInput(value: string | number) {
-  if (!stateEditorDraft.value || typeof value !== "string") {
-    return;
-  }
-  stateEditorDraft.value = {
-    ...stateEditorDraft.value,
-    definition: {
-      ...stateEditorDraft.value.definition,
-      description: value,
-    },
-  };
-}
-
-function handleStateEditorColorInput(value: string | number) {
-  if (!stateEditorDraft.value || typeof value !== "string") {
-    return;
-  }
-  stateEditorDraft.value = {
-    ...stateEditorDraft.value,
-    definition: {
-      ...stateEditorDraft.value.definition,
-      color: value,
-    },
-  };
-}
-
-function handleStateEditorTypeValue(value: string | number | boolean | undefined) {
-  if (typeof value !== "string" || !stateEditorDraft.value) {
-    return;
-  }
-  stateEditorDraft.value = {
-    ...stateEditorDraft.value,
-    definition: {
-      ...stateEditorDraft.value.definition,
-      type: value,
-      value: defaultValueForStateType(value as StateFieldType),
-    },
-  };
-}
-
-function commitStateEditor() {
+function syncStateEditorDraft(nextDraft: StateFieldDraft, options?: { allowInvalidKey?: boolean }) {
   const currentAnchorId = activeStateEditorAnchorId.value;
-  const draft = stateEditorDraft.value;
-  if (!currentAnchorId || !draft) {
+  const currentDraft = stateEditorDraft.value;
+  if (!currentAnchorId || !currentDraft) {
     return;
   }
+
+  stateEditorDraft.value = nextDraft;
 
   const currentStateKey = currentAnchorId.split(":").at(-1) ?? "";
-  const nextKey = draft.key.trim();
+  const nextKey = nextDraft.key.trim();
   if (!nextKey) {
     stateEditorError.value = "State key cannot be empty.";
     return;
@@ -1686,20 +1748,87 @@ function commitStateEditor() {
     return;
   }
 
+  stateEditorError.value = null;
+
   if (nextKey !== currentStateKey) {
     emit("rename-state", { currentKey: currentStateKey, nextKey });
+    activeStateEditorAnchorId.value = [...currentAnchorId.split(":").slice(0, -1), nextKey].join(":");
   }
+
+  void options;
   emit("update-state", {
     stateKey: nextKey,
     patch: {
-      name: draft.definition.name.trim() || nextKey,
-      description: draft.definition.description,
-      type: draft.definition.type,
-      value: draft.definition.value,
-      color: draft.definition.color,
+      name: nextDraft.definition.name.trim() || nextKey,
+      description: nextDraft.definition.description,
+      type: nextDraft.definition.type,
+      value: nextDraft.definition.value,
+      color: nextDraft.definition.color,
     },
   });
-  closeStateEditor();
+}
+
+function handleStateEditorNameInput(value: string | number) {
+  if (!stateEditorDraft.value || typeof value !== "string") {
+    return;
+  }
+  syncStateEditorDraft({
+    ...stateEditorDraft.value,
+    definition: {
+      ...stateEditorDraft.value.definition,
+      name: value,
+    },
+  }, { allowInvalidKey: true });
+}
+
+function handleStateEditorKeyInput(value: string | number) {
+  if (!stateEditorDraft.value || typeof value !== "string") {
+    return;
+  }
+  syncStateEditorDraft({
+    ...stateEditorDraft.value,
+    key: value,
+  }, { allowInvalidKey: true });
+}
+
+function handleStateEditorDescriptionInput(value: string | number) {
+  if (!stateEditorDraft.value || typeof value !== "string") {
+    return;
+  }
+  syncStateEditorDraft({
+    ...stateEditorDraft.value,
+    definition: {
+      ...stateEditorDraft.value.definition,
+      description: value,
+    },
+  }, { allowInvalidKey: true });
+}
+
+function handleStateEditorColorInput(value: string | number) {
+  if (!stateEditorDraft.value || typeof value !== "string") {
+    return;
+  }
+  syncStateEditorDraft({
+    ...stateEditorDraft.value,
+    definition: {
+      ...stateEditorDraft.value.definition,
+      color: value,
+    },
+  }, { allowInvalidKey: true });
+}
+
+function handleStateEditorTypeValue(value: string | number | boolean | undefined) {
+  if (typeof value !== "string" || !stateEditorDraft.value) {
+    return;
+  }
+  syncStateEditorDraft({
+    ...stateEditorDraft.value,
+    definition: {
+      ...stateEditorDraft.value.definition,
+      type: value,
+      value: defaultValueForStateType(value as StateFieldType),
+    },
+  }, { allowInvalidKey: true });
 }
 
 function toggleAdvancedPanel() {
@@ -1710,6 +1839,7 @@ function toggleAdvancedPanel() {
   isSkillPickerOpen.value = false;
   closePortPicker();
   closeStateEditor();
+  commitOpenTextEditorIfNeeded();
   activeTopAction.value = activeTopAction.value === "advanced" ? null : "advanced";
 }
 
@@ -1724,10 +1854,12 @@ function isFloatingPanelSurfaceTarget(target: EventTarget | null) {
         "[data-top-action-surface='true']",
         "[data-node-popup-surface='true']",
         ".node-card__top-popover",
+        ".node-card__text-editor",
         ".node-card__state-editor",
         ".node-card__confirm-hint",
         ".node-card__action-popover",
         ".node-card__confirm-popover",
+        ".node-card__text-editor-popper",
         ".node-card__state-editor-popper",
         ".node-card__agent-model-popper",
       ].join(", "),
@@ -1735,10 +1867,23 @@ function isFloatingPanelSurfaceTarget(target: EventTarget | null) {
   );
 }
 
-function closeFloatingPanels() {
+function closeFloatingPanels(options?: { commitTextEditor?: boolean }) {
   clearTopActionConfirmState();
   if (activeTopAction.value === "advanced") {
     activeTopAction.value = null;
+  }
+  if (activeTextEditor.value === "title") {
+    if (options?.commitTextEditor) {
+      commitTitleEdit();
+    } else {
+      closeTextEditor();
+    }
+  } else if (activeTextEditor.value === "description") {
+    if (options?.commitTextEditor) {
+      commitDescriptionEdit();
+    } else {
+      closeTextEditor();
+    }
   }
   closeStateEditor();
   closePortPicker();
@@ -1749,21 +1894,21 @@ function handleGlobalFloatingPanelPointerDown(event: PointerEvent) {
   if (!hasFloatingPanelOpen.value || isFloatingPanelSurfaceTarget(event.target)) {
     return;
   }
-  closeFloatingPanels();
+  closeFloatingPanels({ commitTextEditor: true });
 }
 
 function handleGlobalFloatingPanelFocusIn(event: FocusEvent) {
   if (!hasFloatingPanelOpen.value || isFloatingPanelSurfaceTarget(event.target)) {
     return;
   }
-  closeFloatingPanels();
+  closeFloatingPanels({ commitTextEditor: true });
 }
 
 function handleGlobalFloatingPanelKeyDown(event: KeyboardEvent) {
   if (!hasFloatingPanelOpen.value || event.key !== "Escape") {
     return;
   }
-  closeFloatingPanels();
+  closeFloatingPanels({ commitTextEditor: false });
 }
 
 function addGlobalFloatingPanelListeners() {
@@ -1807,6 +1952,7 @@ function handlePresetActionClick() {
   isSkillPickerOpen.value = false;
   closePortPicker();
   closeStateEditor();
+  commitOpenTextEditorIfNeeded();
   if (activeTopAction.value === "preset") {
     confirmSavePreset();
     return;
@@ -1818,6 +1964,7 @@ function handleDeleteActionClick() {
   isSkillPickerOpen.value = false;
   closePortPicker();
   closeStateEditor();
+  commitOpenTextEditorIfNeeded();
   if (activeTopAction.value === "delete") {
     confirmDeleteNode();
     return;
@@ -2264,6 +2411,7 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
   font-size: 2rem;
   line-height: 1.15;
   color: #1f2937;
+  cursor: text;
 }
 
 .node-card__description {
@@ -2272,6 +2420,46 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
   font-size: 0.98rem;
   line-height: 1.55;
   color: rgba(60, 41, 20, 0.74);
+  cursor: text;
+}
+
+.node-card__text-editor {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(154, 52, 18, 0.14);
+  border-radius: 16px;
+  background: rgba(255, 244, 232, 0.96);
+  box-shadow: 0 16px 34px rgba(60, 41, 20, 0.12);
+}
+
+.node-card__text-editor-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(154, 52, 18, 0.8);
+}
+
+.node-card__text-editor :deep(.el-input__wrapper),
+.node-card__text-editor :deep(.el-textarea__inner) {
+  background: rgba(255, 252, 246, 0.98);
+  border-color: rgba(154, 52, 18, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(154, 52, 18, 0.08);
+}
+
+.node-card__text-editor :deep(.el-input__wrapper.is-focus),
+.node-card__text-editor :deep(.el-textarea__inner:focus) {
+  box-shadow:
+    inset 0 0 0 1px rgba(217, 119, 6, 0.28),
+    0 0 0 3px rgba(245, 158, 11, 0.12);
+}
+
+:deep(.node-card__text-editor-popper.el-popper) {
+  border: none;
+  background: transparent;
+  padding: 0;
+  box-shadow: none;
 }
 
 .node-card__state-summary {
@@ -2834,19 +3022,24 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
 
 .node-card__state-editor-title,
 .node-card__top-popover-title {
-  font-size: 0.98rem;
+  font-size: 0.96rem;
   font-weight: 600;
-  color: #1f2937;
+  color: #2f2114;
 }
 
 .node-card__top-popover {
   display: grid;
-  gap: 12px;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(154, 52, 18, 0.14);
+  border-radius: 14px;
+  background: rgba(255, 244, 232, 0.96);
+  box-shadow: 0 16px 34px rgba(60, 41, 20, 0.12);
 }
 
 .node-card__advanced-popover-content {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .node-card__top-popover-copy {
@@ -2886,10 +3079,11 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
 }
 
 :deep(.node-card__action-popover.el-popper) {
-  border: 1px solid rgba(154, 52, 18, 0.16);
-  border-radius: 18px;
-  background: rgba(255, 250, 241, 0.98);
-  box-shadow: 0 20px 40px rgba(60, 41, 20, 0.12);
+  border: none;
+  border-radius: 16px;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 :deep(.node-card__state-editor-popper.el-popper) {
@@ -2901,7 +3095,10 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
 }
 
 :deep(.node-card__action-popover .el-popover) {
-  padding: 14px;
+  padding: 0;
+  border-radius: 16px;
+  background: transparent;
+  box-shadow: none;
 }
 
 :deep(.node-card__state-editor-popper .el-popover) {
@@ -2913,17 +3110,27 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
 
 :deep(.node-card__action-popover .el-input__wrapper) {
   min-height: 38px;
-  border-radius: 14px;
+  border-radius: 12px;
   border: 1px solid rgba(154, 52, 18, 0.16);
-  background: rgba(255, 255, 255, 0.88);
+  background: rgba(255, 251, 246, 0.88);
   box-shadow: none;
 }
 
+:deep(.node-card__action-popover .el-input__wrapper.is-focus) {
+  border-color: rgba(201, 107, 31, 0.28);
+  box-shadow: 0 0 0 3px rgba(201, 107, 31, 0.08);
+}
+
 :deep(.node-card__action-popover .el-textarea__inner) {
-  border-radius: 14px;
+  border-radius: 12px;
   border-color: rgba(154, 52, 18, 0.16);
-  background: rgba(255, 255, 255, 0.88);
+  background: rgba(255, 251, 246, 0.88);
   box-shadow: none;
+}
+
+:deep(.node-card__action-popover .el-textarea__inner:focus) {
+  border-color: rgba(201, 107, 31, 0.28);
+  box-shadow: 0 0 0 3px rgba(201, 107, 31, 0.08);
 }
 
 :deep(.node-card__confirm-popover.el-popper) {
