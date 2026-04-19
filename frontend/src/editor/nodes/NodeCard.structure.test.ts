@@ -214,10 +214,15 @@ test("NodeCard reveals state pills on hover and opens state editing only after a
   assert.match(componentSource, /const stateEditorDraft = ref<StateFieldDraft \| null>\(null\);/);
   assert.match(componentSource, /const activeStateEditorAnchorId = ref<string \| null>\(null\);/);
   assert.match(componentSource, /const activeStateEditorConfirmAnchorId = ref<string \| null>\(null\);/);
+  assert.match(componentSource, /const hoveredStateEditorPillAnchorId = ref<string \| null>\(null\);/);
   assert.match(componentSource, /const stateEditorConfirmTimeoutRef = ref<number \| null>\(null\);/);
   assert.match(componentSource, /function clearStateEditorConfirmState\(\)/);
   assert.match(componentSource, /function startStateEditorConfirmWindow\(anchorId: string\)/);
+  assert.match(componentSource, /function handleStateEditorPillPointerEnter\(anchorId: string\)/);
+  assert.match(componentSource, /function handleStateEditorPillPointerLeave\(anchorId: string\)/);
   assert.match(componentSource, /function handleStateEditorActionClick\(anchorId: string, stateKey: string \| null \| undefined\)/);
+  assert.match(componentSource, /@pointerenter="handleStateEditorPillPointerEnter\(/);
+  assert.match(componentSource, /@pointerleave="handleStateEditorPillPointerLeave\(/);
   assert.match(componentSource, /if \(activeStateEditorConfirmAnchorId\.value === anchorId\) \{[\s\S]*openStateEditor\(anchorId, stateKey\);[\s\S]*return;/);
   assert.match(componentSource, /startStateEditorConfirmWindow\(anchorId\);/);
   assert.match(componentSource, /emit\("rename-state", \{ currentKey:/);
@@ -272,11 +277,16 @@ test("NodeCard reveals state pills on hover and opens state editing only after a
   assert.match(componentSource, /\.node-card__port-pill--dock-end \{[\s\S]*margin-right:\s*calc\(var\(--node-card-inline-padding\) \* -1 - 10px\);/);
   assert.match(
     componentSource,
-    /\.node-card__port-pill:hover,\n\.node-card__port-pill:focus-visible,\n\.node-card__port-pill--revealed \{[\s\S]*border-color:\s*rgba\(154,\s*52,\s*18,\s*0\.14\);/,
+    /\.node-card__port-pill:focus-visible,\n\.node-card__port-pill--revealed \{[\s\S]*border-color:\s*rgba\(154,\s*52,\s*18,\s*0\.14\);/,
   );
-  assert.doesNotMatch(componentSource, /\.node-card__port-pill--confirm \{[\s\S]*min-width:/);
+  assert.doesNotMatch(componentSource, /\.node-card__port-pill--confirm \{[^}]*min-width:/);
+  assert.match(componentSource, /\.node-card__port-pill--confirm \{[^}]*background:\s*rgba\(59,\s*130,\s*246,\s*0\.96\);/);
+  assert.match(componentSource, /\.node-card__port-pill--confirm \{[^}]*color:\s*#eff6ff;/);
+  assert.match(componentSource, /\.node-card__port-pill--confirm \{[^}]*box-shadow:\s*none;/);
+  assert.match(componentSource, /\.node-card__port-pill--confirm .node-card__port-pill-anchor-slot \{[^}]*opacity:\s*0;/);
   assert.match(componentSource, /\.node-card__port-pill-label--confirm .node-card__port-pill-label-text \{[\s\S]*opacity:\s*0;/);
   assert.match(componentSource, /\.node-card__port-pill-label--confirm .node-card__port-pill-confirm-icon \{[\s\S]*opacity:\s*1;/);
+  assert.doesNotMatch(componentSource, /\.node-card__port-pill-label \{[^}]*position:\s*relative;/);
   assert.match(componentSource, /\.node-card__confirm-hint--state \{[\s\S]*padding:\s*5px 10px;/);
   assert.match(componentSource, /\.node-card__confirm-hint--state \{[\s\S]*letter-spacing:\s*0\.12em;/);
   assert.match(componentSource, /\.node-card__confirm-hint \{[\s\S]*display:\s*inline-flex;/);

@@ -213,6 +213,8 @@
                 }"
                 :style="{ '--node-card-port-accent': view.body.primaryOutput.stateColor }"
                 data-state-editor-trigger="true"
+                @pointerenter="handleStateEditorPillPointerEnter(`input-primary-output:${view.body.primaryOutput.key}`)"
+                @pointerleave="handleStateEditorPillPointerLeave(`input-primary-output:${view.body.primaryOutput.key}`)"
                 @pointerdown.stop
                 @click.stop="handleStateEditorActionClick(`input-primary-output:${view.body.primaryOutput.key}`, view.body.primaryOutput.key)"
               >
@@ -387,6 +389,8 @@
                   }"
                   :style="{ '--node-card-port-accent': port.stateColor }"
                   data-state-editor-trigger="true"
+                  @pointerenter="handleStateEditorPillPointerEnter(`agent-input:${port.key}`)"
+                  @pointerleave="handleStateEditorPillPointerLeave(`agent-input:${port.key}`)"
                   @pointerdown.stop
                   @click.stop="handleStateEditorActionClick(`agent-input:${port.key}`, port.key)"
                 >
@@ -440,6 +444,8 @@
                   }"
                   :style="{ '--node-card-port-accent': port.stateColor }"
                   data-state-editor-trigger="true"
+                  @pointerenter="handleStateEditorPillPointerEnter(`agent-output:${port.key}`)"
+                  @pointerleave="handleStateEditorPillPointerLeave(`agent-output:${port.key}`)"
                   @pointerdown.stop
                   @click.stop="handleStateEditorActionClick(`agent-output:${port.key}`, port.key)"
                 >
@@ -748,12 +754,14 @@
               :class="{
                 'node-card__port-pill--revealed': isStateEditorPillRevealed(`output-input:${view.body.connectedStateKey}`),
                 'node-card__port-pill--confirm': isStateEditorConfirmOpen(`output-input:${view.body.connectedStateKey}`),
-              }"
-              :style="{ '--node-card-port-accent': stateSchema[view.body.connectedStateKey]?.color ?? '#2563eb' }"
-              data-state-editor-trigger="true"
-              @pointerdown.stop
-              @click.stop="handleStateEditorActionClick(`output-input:${view.body.connectedStateKey}`, view.body.connectedStateKey)"
-            >
+                }"
+                :style="{ '--node-card-port-accent': stateSchema[view.body.connectedStateKey]?.color ?? '#2563eb' }"
+                data-state-editor-trigger="true"
+                @pointerenter="handleStateEditorPillPointerEnter(`output-input:${view.body.connectedStateKey}`)"
+                @pointerleave="handleStateEditorPillPointerLeave(`output-input:${view.body.connectedStateKey}`)"
+                @pointerdown.stop
+                @click.stop="handleStateEditorActionClick(`output-input:${view.body.connectedStateKey}`, view.body.connectedStateKey)"
+              >
               <span
                 class="node-card__port-pill-anchor-slot node-card__port-pill-anchor-slot--leading"
                 :data-anchor-slot-id="`${nodeId}:state-in:${view.body.connectedStateKey}`"
@@ -829,6 +837,8 @@
                   }"
                   :style="{ '--node-card-port-accent': port.stateColor }"
                   data-state-editor-trigger="true"
+                  @pointerenter="handleStateEditorPillPointerEnter(`condition-input:${port.key}`)"
+                  @pointerleave="handleStateEditorPillPointerLeave(`condition-input:${port.key}`)"
                   @pointerdown.stop
                   @click.stop="handleStateEditorActionClick(`condition-input:${port.key}`, port.key)"
                 >
@@ -1139,6 +1149,7 @@ const activeTextEditor = ref<"title" | "description" | null>(null);
 const titleEditorDraft = ref("");
 const descriptionEditorDraft = ref("");
 const activeStateEditorConfirmAnchorId = ref<string | null>(null);
+const hoveredStateEditorPillAnchorId = ref<string | null>(null);
 const stateEditorConfirmTimeoutRef = ref<number | null>(null);
 const activeStateEditorAnchorId = ref<string | null>(null);
 const stateEditorDraft = ref<StateFieldDraft | null>(null);
@@ -1368,6 +1379,7 @@ watch(
     }
     clearTopActionTimeout();
     activeTopAction.value = null;
+    hoveredStateEditorPillAnchorId.value = null;
     clearStateEditorConfirmState();
     closeStateEditor();
   },
@@ -1805,7 +1817,17 @@ function isStateEditorConfirmOpen(anchorId: string) {
 }
 
 function isStateEditorPillRevealed(anchorId: string) {
-  return isStateEditorOpen(anchorId) || isStateEditorConfirmOpen(anchorId);
+  return hoveredStateEditorPillAnchorId.value === anchorId || isStateEditorOpen(anchorId) || isStateEditorConfirmOpen(anchorId);
+}
+
+function handleStateEditorPillPointerEnter(anchorId: string) {
+  hoveredStateEditorPillAnchorId.value = anchorId;
+}
+
+function handleStateEditorPillPointerLeave(anchorId: string) {
+  if (hoveredStateEditorPillAnchorId.value === anchorId) {
+    hoveredStateEditorPillAnchorId.value = null;
+  }
 }
 
 function handleStateEditorActionClick(anchorId: string, stateKey: string | null | undefined) {
@@ -1845,6 +1867,7 @@ function openStateEditor(anchorId: string, stateKey: string | null | undefined) 
 
 function closeStateEditor() {
   activeStateEditorAnchorId.value = null;
+  hoveredStateEditorPillAnchorId.value = null;
   stateEditorDraft.value = null;
   stateEditorError.value = null;
 }
@@ -2724,7 +2747,6 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
     box-shadow 140ms ease;
 }
 
-.node-card__port-pill:hover,
 .node-card__port-pill:focus-visible,
 .node-card__port-pill--revealed {
   border-color: rgba(154, 52, 18, 0.14);
@@ -2749,8 +2771,18 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
   margin-right: calc(var(--node-card-inline-padding) * -1 - 10px);
 }
 
+.node-card__port-pill--confirm {
+  border-color: rgba(59, 130, 246, 0.56);
+  background: rgba(59, 130, 246, 0.96);
+  box-shadow: none;
+  color: #eff6ff;
+}
+
+.node-card__port-pill--confirm .node-card__port-pill-anchor-slot {
+  opacity: 0;
+}
+
 .node-card__port-pill-label {
-  position: relative;
   display: inline-flex;
   align-items: center;
   padding-inline: 0;
@@ -2775,7 +2807,7 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
   position: absolute;
   left: 50%;
   top: 50%;
-  font-size: 1rem;
+  font-size: 1.08rem;
   opacity: 0;
   transform: translate(-50%, -50%);
   transition: opacity 140ms ease;
