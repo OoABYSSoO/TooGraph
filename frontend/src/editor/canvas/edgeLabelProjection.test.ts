@@ -72,13 +72,10 @@ const graph: GraphPayload = {
   metadata: {},
 };
 
-test("projectCanvasEdges exposes inline labels for data edges", () => {
+test("projectCanvasEdges does not expose inline label pills for data edges", () => {
   const projected = projectCanvasEdges(graph);
   const dataEdge = projected.find((edge) => edge.kind === "data" && edge.state === "answer");
 
   assert.ok(dataEdge);
-  assert.equal(dataEdge?.label, "answer");
-  assert.equal(dataEdge?.labelColor, "#a855f7");
-  assert.equal(typeof dataEdge?.labelX, "number");
-  assert.equal(typeof dataEdge?.labelY, "number");
+  assert.equal(dataEdge?.label, undefined);
 });

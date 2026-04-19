@@ -1,7 +1,7 @@
 import type { GraphDocument, GraphNode, GraphPayload } from "../../types/node-system.ts";
 import { buildAnchorModel } from "../anchors/anchorModel.ts";
 import { placeAnchors, type NodeFrame } from "../anchors/anchorPlacement.ts";
-import { buildConnectorCurvePath, resolveConnectorCurveLabelPoint } from "./connectionCurvePath.ts";
+import { buildConnectorCurvePath } from "./connectionCurvePath.ts";
 import { buildRouteEdgePath, resolveRouteEdgeSourceOffset } from "./routeEdgePath.ts";
 
 export type ProjectedCanvasEdge = {
@@ -12,9 +12,6 @@ export type ProjectedCanvasEdge = {
   path: string;
   color?: string;
   label?: string;
-  labelColor?: string;
-  labelX?: number;
-  labelY?: number;
   state?: string;
   branch?: string;
 };
@@ -93,18 +90,6 @@ export function projectCanvasEdges(document: GraphPayload | GraphDocument): Proj
       if (!sourceAnchor || !targetAnchor) {
         return null;
       }
-      const labelPoint = resolveConnectorCurveLabelPoint(
-        {
-          sourceX: sourceAnchor.x,
-          sourceY: sourceAnchor.y,
-          targetX: targetAnchor.x,
-          targetY: targetAnchor.y,
-          sourceSide: "right",
-          targetSide: "left",
-        },
-        0.5,
-        34,
-      );
 
       return {
         id: `data:${relation.source}:${relation.state}->${relation.target}`,
@@ -112,10 +97,6 @@ export function projectCanvasEdges(document: GraphPayload | GraphDocument): Proj
         source: relation.source,
         target: relation.target,
         color: document.state_schema[relation.state]?.color ?? undefined,
-        label: relation.state,
-        labelColor: document.state_schema[relation.state]?.color ?? undefined,
-        labelX: labelPoint.x,
-        labelY: labelPoint.y,
         state: relation.state,
         path: buildFlowPath(sourceAnchor.x, sourceAnchor.y, targetAnchor.x, targetAnchor.y),
       };

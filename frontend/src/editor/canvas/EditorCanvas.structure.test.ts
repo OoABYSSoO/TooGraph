@@ -27,9 +27,10 @@ test("EditorCanvas renders anchors in a dedicated overlay layer above nodes", ()
   assert.match(componentSource, /<svg class="editor-canvas__anchors"[\s\S]*<circle[\s\S]*v-for="anchor in pointAnchors"/);
 });
 
-test("EditorCanvas renders inline labels for data edges", () => {
-  assert.match(componentSource, /v-for="edge in projectedEdges\.filter\(\(candidate\) => candidate\.label\)"/);
-  assert.match(componentSource, /class="editor-canvas__edge-label"/);
+test("EditorCanvas does not render inline label pills for data edges", () => {
+  assert.doesNotMatch(componentSource, /class="editor-canvas__edge-labels"/);
+  assert.doesNotMatch(componentSource, /class="editor-canvas__edge-label"/);
+  assert.doesNotMatch(componentSource, /edgeLabelStyle\(edge\)/);
 });
 
 test("EditorCanvas resolves rendered anchor geometry from measured node slot offsets", () => {
@@ -41,6 +42,13 @@ test("EditorCanvas resolves rendered anchor geometry from measured node slot off
 test("EditorCanvas renders hover-only flow hotspots and animates data edges as ant lines", () => {
   assert.match(componentSource, /v-for="anchor in flowAnchors"/);
   assert.match(componentSource, /class="editor-canvas__flow-hotspot"/);
+  assert.match(componentSource, /@pointerenter="setHoveredNode\(nodeId\)"/);
+  assert.match(componentSource, /@pointerleave="clearHoveredNode\(nodeId\)"/);
+  assert.match(componentSource, /const hoveredNodeId = ref<string \| null>\(null\);/);
+  assert.match(componentSource, /'editor-canvas__flow-hotspot--outbound': anchor\.kind === 'flow-out'/);
+  assert.match(componentSource, /'editor-canvas__flow-hotspot--visible': isFlowHotspotVisible\(anchor\)/);
+  assert.match(componentSource, /\.editor-canvas__flow-hotspot--outbound::after \{[\s\S]*content:\s*"\+";/);
+  assert.match(componentSource, /\.editor-canvas__flow-hotspot--visible::before \{[\s\S]*opacity:\s*1;/);
   assert.match(componentSource, /\.editor-canvas__edge--data \{[\s\S]*animation:\s*editor-canvas-ant-line 1\.2s linear infinite;/);
   assert.match(componentSource, /@keyframes editor-canvas-ant-line/);
 });

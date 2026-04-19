@@ -1,6 +1,6 @@
 import type { GraphDocument, GraphPayload } from "../../types/node-system.ts";
 import { type ProjectedCanvasAnchor, type ProjectedCanvasEdge, projectCanvasAnchors, projectCanvasEdges } from "./edgeProjection.ts";
-import { buildConnectorCurvePath, resolveConnectorCurveLabelPoint } from "./connectionCurvePath.ts";
+import { buildConnectorCurvePath } from "./connectionCurvePath.ts";
 import { buildRouteEdgePath, resolveRouteEdgeSourceOffset } from "./routeEdgePath.ts";
 
 export type MeasuredAnchorOffset = {
@@ -76,24 +76,9 @@ function resolveCanvasEdges(
         return edge;
       }
 
-      const labelPoint = resolveConnectorCurveLabelPoint(
-        {
-          sourceX: sourceAnchor.x,
-          sourceY: sourceAnchor.y,
-          targetX: targetAnchor.x,
-          targetY: targetAnchor.y,
-          sourceSide: "right",
-          targetSide: "left",
-        },
-        0.5,
-        34,
-      );
-
       return {
         ...edge,
         path: buildFlowPath(sourceAnchor.x, sourceAnchor.y, targetAnchor.x, targetAnchor.y),
-        labelX: labelPoint.x,
-        labelY: labelPoint.y,
       };
     }
 
