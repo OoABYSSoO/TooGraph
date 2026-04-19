@@ -30,9 +30,6 @@
       </div>
       <svg class="editor-canvas__edges" viewBox="0 0 4000 3000" preserveAspectRatio="none" aria-hidden="true">
         <defs>
-          <marker id="editor-canvas-arrow-flow" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto">
-            <path d="M 1 1 L 12 7 L 1 13 Z" fill="rgba(217, 119, 6, 0.88)" />
-          </marker>
           <marker id="editor-canvas-arrow-route" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto">
             <path d="M 1 1 L 12 7 L 1 13 Z" fill="rgba(124, 58, 237, 0.88)" />
           </marker>
@@ -48,10 +45,11 @@
           :d="connectionPreview.path"
           class="editor-canvas__edge editor-canvas__edge--preview"
           :class="{
+            'editor-canvas__edge--flow': connectionPreview.kind === 'flow',
             'editor-canvas__edge--route': connectionPreview.kind === 'route',
             'editor-canvas__edge--data': connectionPreview.kind === 'data',
           }"
-          :marker-end="connectionPreview.kind === 'data' ? undefined : 'url(#editor-canvas-arrow-preview)'"
+          :marker-end="connectionPreview.kind === 'route' ? 'url(#editor-canvas-arrow-preview)' : undefined"
         />
         <path
           v-for="edge in projectedEdges"
@@ -60,19 +58,18 @@
           class="editor-canvas__edge"
           :style="edgeStyle(edge)"
           :class="{
+            'editor-canvas__edge--flow': edge.kind === 'flow',
             'editor-canvas__edge--route': edge.kind === 'route',
             'editor-canvas__edge--data': edge.kind === 'data',
             'editor-canvas__edge--selected': selectedEdgeId === edge.id,
             'editor-canvas__edge--active-run': resolveRunEdgePresentationForEdge(edge.id)?.edgeClass === 'editor-canvas__edge--active-run',
           }"
           :marker-end="
-            edge.kind === 'data'
-              ? undefined
-              : selectedEdgeId === edge.id
+            edge.kind === 'route'
+              ? selectedEdgeId === edge.id
                 ? 'url(#editor-canvas-arrow-selected)'
-                : edge.kind === 'route'
-                  ? 'url(#editor-canvas-arrow-route)'
-                  : 'url(#editor-canvas-arrow-flow)'
+                : 'url(#editor-canvas-arrow-route)'
+              : undefined
           "
           @pointerdown.stop="handleEdgePointerDown(edge)"
         />
@@ -115,6 +112,7 @@
           @update-input-state="emit('update-input-state', $event)"
           @rename-state="emit('rename-state', $event)"
           @update-state="emit('update-state', $event)"
+          @remove-port-state="emit('remove-port-state', $event)"
           @update-agent-config="emit('update-agent-config', $event)"
           @update-condition-config="emit('update-condition-config', $event)"
           @update-condition-branch="emit('update-condition-branch', $event)"
@@ -215,6 +213,7 @@ const emit = defineEmits<{
   (event: "update-input-state", payload: { stateKey: string; patch: Partial<StateDefinition> }): void;
   (event: "rename-state", payload: { currentKey: string; nextKey: string }): void;
   (event: "update-state", payload: { stateKey: string; patch: Partial<StateDefinition> }): void;
+  (event: "remove-port-state", payload: { nodeId: string; side: "input" | "output"; stateKey: string }): void;
   (event: "update-agent-config", payload: { nodeId: string; patch: Partial<AgentNode["config"]> }): void;
   (event: "update-condition-config", payload: { nodeId: string; patch: Partial<ConditionNode["config"]> }): void;
   (event: "update-condition-branch", payload: { nodeId: string; currentKey: string; nextKey: string; mappingKeys: string[] }): void;
@@ -1191,6 +1190,14 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
     opacity 120ms ease;
 }
 
+.editor-canvas__edge--flow {
+  stroke: rgba(201, 107, 31, 0.9);
+  stroke-width: 4.4;
+  stroke-dasharray: 18 22;
+  animation: editor-canvas-flow-line 1.8s linear infinite;
+  opacity: 0.94;
+}
+
 .editor-canvas__edge--route {
   stroke: rgba(124, 58, 237, 0.88);
   stroke-dasharray: 10 8;
@@ -1210,6 +1217,13 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   stroke-width: 2.8;
   stroke-dasharray: 8 6;
   pointer-events: none;
+}
+
+.editor-canvas__edge--preview.editor-canvas__edge--flow {
+  stroke: rgba(201, 107, 31, 0.76);
+  stroke-width: 3.8;
+  stroke-dasharray: 16 18;
+  animation: editor-canvas-flow-line 1.8s linear infinite;
 }
 
 .editor-canvas__edge--selected {
@@ -1232,6 +1246,16 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
 
   to {
     stroke-dashoffset: -20;
+  }
+}
+
+@keyframes editor-canvas-flow-line {
+  from {
+    stroke-dashoffset: 0;
+  }
+
+  to {
+    stroke-dashoffset: -40;
   }
 }
 

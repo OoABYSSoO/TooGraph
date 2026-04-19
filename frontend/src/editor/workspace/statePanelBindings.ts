@@ -85,6 +85,7 @@ export function removeStateBindingFromDocument<T extends GraphPayload | GraphDoc
     }
     const nextDocument = cloneGraphDocument(document);
     nextDocument.nodes[nodeId].reads = nextDocument.nodes[nodeId].reads.filter((binding) => binding.state !== stateKey);
+    pruneDisconnectedFlowEdges(nextDocument, nodeId, mode);
     return nextDocument;
   }
 
@@ -96,7 +97,32 @@ export function removeStateBindingFromDocument<T extends GraphPayload | GraphDoc
   }
   const nextDocument = cloneGraphDocument(document);
   nextDocument.nodes[nodeId].writes = nextDocument.nodes[nodeId].writes.filter((binding) => binding.state !== stateKey);
+  pruneDisconnectedFlowEdges(nextDocument, nodeId, mode);
   return nextDocument;
+}
+
+function pruneDisconnectedFlowEdges(document: GraphPayload | GraphDocument, nodeId: string, mode: StateBindingMode) {
+  document.edges = document.edges.filter((edge) => {
+    if (mode === "read" && edge.target !== nodeId) {
+      return true;
+    }
+    if (mode === "write" && edge.source !== nodeId) {
+      return true;
+    }
+
+    const sourceNode = document.nodes[edge.source];
+    const targetNode = document.nodes[edge.target];
+    if (!sourceNode || !targetNode) {
+      return false;
+    }
+
+    return hasSharedStateBinding(sourceNode, targetNode);
+  });
+}
+
+function hasSharedStateBinding(sourceNode: GraphNode, targetNode: GraphNode) {
+  const targetReadStates = new Set(targetNode.reads.map((binding) => binding.state));
+  return sourceNode.writes.some((binding) => targetReadStates.has(binding.state));
 }
 
 function canNodeBindState(node: GraphNode, stateKey: string, mode: StateBindingMode) {

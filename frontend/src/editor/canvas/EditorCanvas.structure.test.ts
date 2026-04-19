@@ -49,7 +49,7 @@ test("EditorCanvas resolves rendered anchor geometry from measured node slot off
   assert.match(componentSource, /querySelectorAll\("\[data-anchor-slot-id\]"\)/);
 });
 
-test("EditorCanvas renders hover-only flow hotspots and animates data edges as ant lines", () => {
+test("EditorCanvas renders hover-only flow hotspots and distinguishes flowing flow edges from data ant lines", () => {
   assert.match(componentSource, /v-for="anchor in flowAnchors"/);
   assert.match(componentSource, /class="editor-canvas__flow-hotspot"/);
   assert.match(componentSource, /@pointerenter="setHoveredNode\(nodeId\)"/);
@@ -59,8 +59,15 @@ test("EditorCanvas renders hover-only flow hotspots and animates data edges as a
   assert.match(componentSource, /'editor-canvas__flow-hotspot--visible': isFlowHotspotVisible\(anchor\)/);
   assert.match(componentSource, /\.editor-canvas__flow-hotspot--outbound::after \{[\s\S]*content:\s*"\+";/);
   assert.match(componentSource, /\.editor-canvas__flow-hotspot--visible::before \{[\s\S]*opacity:\s*1;/);
+  assert.match(componentSource, /'editor-canvas__edge--flow': connectionPreview\.kind === 'flow'/);
+  assert.match(componentSource, /'editor-canvas__edge--flow': edge\.kind === 'flow'/);
+  assert.match(componentSource, /:marker-end="connectionPreview\.kind === 'route' \? 'url\(#editor-canvas-arrow-preview\)' : undefined"/);
+  assert.doesNotMatch(componentSource, /editor-canvas-arrow-flow/);
   assert.match(componentSource, /\.editor-canvas__edge--data \{[\s\S]*animation:\s*editor-canvas-ant-line 1\.2s linear infinite;/);
+  assert.match(componentSource, /\.editor-canvas__edge--flow \{[\s\S]*animation:\s*editor-canvas-flow-line 1\.8s linear infinite;/);
+  assert.match(componentSource, /\.editor-canvas__edge--preview\.editor-canvas__edge--flow \{[\s\S]*stroke:\s*rgba\(201,\s*107,\s*31,\s*0\.76\);/);
   assert.match(componentSource, /@keyframes editor-canvas-ant-line/);
+  assert.match(componentSource, /@keyframes editor-canvas-flow-line/);
 });
 
 test("EditorCanvas restores empty-canvas onboarding copy for node creation", () => {
@@ -81,11 +88,13 @@ test("EditorCanvas forwards node-card state editing and top-action events", () =
   assert.match(componentSource, /@update-node-metadata="emit\('update-node-metadata', \$event\)"/);
   assert.match(componentSource, /@rename-state="emit\('rename-state', \$event\)"/);
   assert.match(componentSource, /@update-state="emit\('update-state', \$event\)"/);
+  assert.match(componentSource, /@remove-port-state="emit\('remove-port-state', \$event\)"/);
   assert.match(componentSource, /@delete-node="emit\('delete-node', \$event\)"/);
   assert.match(componentSource, /@save-node-preset="emit\('save-node-preset', \$event\)"/);
   assert.match(componentSource, /\(event: "update-node-metadata", payload: \{ nodeId: string; patch: Partial<Pick<InputNode \| AgentNode \| ConditionNode \| OutputNode, "name" \| "description">> \}\): void;/);
   assert.match(componentSource, /\(event: "rename-state", payload: \{ currentKey: string; nextKey: string \}\): void;/);
   assert.match(componentSource, /\(event: "update-state", payload: \{ stateKey: string; patch: Partial<StateDefinition> \}\): void;/);
+  assert.match(componentSource, /\(event: "remove-port-state", payload: \{ nodeId: string; side: "input" \| "output"; stateKey: string \}\): void;/);
   assert.match(componentSource, /\(event: "delete-node", payload: \{ nodeId: string \}\): void;/);
   assert.match(componentSource, /\(event: "save-node-preset", payload: \{ nodeId: string \}\): void;/);
 });
