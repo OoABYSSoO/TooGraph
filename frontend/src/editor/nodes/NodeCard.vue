@@ -10,10 +10,17 @@
     <section v-if="view.body.kind === 'input'" class="node-card__body node-card__body--input">
       <div class="node-card__port-row node-card__port-row--single">
         <span class="node-card__port-spacer" />
-        <div v-if="view.body.primaryOutput" class="node-card__port-stack node-card__port-stack--right">
-          <span class="node-card__port-label">{{ view.body.primaryOutput.label }}</span>
-          <span class="node-card__port-meta" :style="{ color: view.body.primaryOutput.stateColor }">
-            {{ view.body.primaryOutput.typeLabel }}
+        <div v-if="view.body.primaryOutput" class="node-card__port-pill-row node-card__port-pill-row--right">
+          <span
+            class="node-card__port-pill node-card__port-pill--output"
+            :style="{ '--node-card-port-accent': view.body.primaryOutput.stateColor }"
+          >
+            <span class="node-card__port-pill-label">{{ view.body.primaryOutput.label }}</span>
+            <span
+              class="node-card__port-pill-anchor-slot"
+              :data-anchor-slot-id="`${nodeId}:state-out:${view.body.primaryOutput.key}`"
+              aria-hidden="true"
+            />
           </span>
         </div>
       </div>
@@ -152,18 +159,34 @@
     <section v-else-if="view.body.kind === 'agent'" class="node-card__body node-card__body--agent">
       <div class="node-card__port-grid">
         <div class="node-card__port-column">
-          <div v-for="port in view.inputs" :key="port.key" class="node-card__port-stack">
-            <div class="node-card__port-label-row">
-              <span class="node-card__port-label">{{ port.label }}</span>
-              <span v-if="port.required" class="node-card__port-badge">Required</span>
-            </div>
-            <span class="node-card__port-meta" :style="{ color: port.stateColor }">{{ port.typeLabel }}</span>
+          <div v-for="port in view.inputs" :key="port.key" class="node-card__port-pill-row">
+            <span
+              class="node-card__port-pill node-card__port-pill--input"
+              :style="{ '--node-card-port-accent': port.stateColor }"
+            >
+              <span
+                class="node-card__port-pill-anchor-slot node-card__port-pill-anchor-slot--leading"
+                :data-anchor-slot-id="`${nodeId}:state-in:${port.key}`"
+                aria-hidden="true"
+              />
+              <span class="node-card__port-pill-label">{{ port.label }}</span>
+            </span>
+            <span v-if="port.required" class="node-card__port-badge">Required</span>
           </div>
         </div>
         <div class="node-card__port-column node-card__port-column--right">
-          <div v-for="port in view.outputs" :key="port.key" class="node-card__port-stack node-card__port-stack--right">
-            <span class="node-card__port-label">{{ port.label }}</span>
-            <span class="node-card__port-meta" :style="{ color: port.stateColor }">{{ port.typeLabel }}</span>
+          <div v-for="port in view.outputs" :key="port.key" class="node-card__port-pill-row node-card__port-pill-row--right">
+            <span
+              class="node-card__port-pill node-card__port-pill--output"
+              :style="{ '--node-card-port-accent': port.stateColor }"
+            >
+              <span class="node-card__port-pill-label">{{ port.label }}</span>
+              <span
+                class="node-card__port-pill-anchor-slot"
+                :data-anchor-slot-id="`${nodeId}:state-out:${port.key}`"
+                aria-hidden="true"
+              />
+            </span>
           </div>
         </div>
       </div>
@@ -454,7 +477,19 @@
 
     <section v-else-if="view.body.kind === 'output'" class="node-card__body node-card__body--output">
       <div class="node-card__output-toolbar">
-        <span class="node-card__port-label">{{ view.body.connectedStateLabel ?? "Unbound" }}</span>
+        <span
+          v-if="view.body.connectedStateKey && view.body.connectedStateLabel"
+          class="node-card__port-pill node-card__port-pill--input"
+          :style="{ '--node-card-port-accent': stateSchema[view.body.connectedStateKey]?.color ?? '#2563eb' }"
+        >
+          <span
+            class="node-card__port-pill-anchor-slot node-card__port-pill-anchor-slot--leading"
+            :data-anchor-slot-id="`${nodeId}:state-in:${view.body.connectedStateKey}`"
+            aria-hidden="true"
+          />
+          <span class="node-card__port-pill-label">{{ view.body.connectedStateLabel }}</span>
+        </span>
+        <span v-else class="node-card__port-label">Unbound</span>
         <button
           type="button"
           class="node-card__persist-button"
@@ -531,12 +566,19 @@
     <section v-else class="node-card__body node-card__body--condition">
       <div class="node-card__condition-topline">
         <div class="node-card__port-column">
-          <div v-for="port in view.inputs" :key="port.key" class="node-card__port-stack">
-            <div class="node-card__port-label-row">
-              <span class="node-card__port-label">{{ port.label }}</span>
-              <span v-if="port.required" class="node-card__port-badge">Required</span>
-            </div>
-            <span class="node-card__port-meta" :style="{ color: port.stateColor }">{{ port.typeLabel }}</span>
+          <div v-for="port in view.inputs" :key="port.key" class="node-card__port-pill-row">
+            <span
+              class="node-card__port-pill node-card__port-pill--input"
+              :style="{ '--node-card-port-accent': port.stateColor }"
+            >
+              <span
+                class="node-card__port-pill-anchor-slot node-card__port-pill-anchor-slot--leading"
+                :data-anchor-slot-id="`${nodeId}:state-in:${port.key}`"
+                aria-hidden="true"
+              />
+              <span class="node-card__port-pill-label">{{ port.label }}</span>
+            </span>
+            <span v-if="port.required" class="node-card__port-badge">Required</span>
           </div>
         </div>
         <label class="node-card__loop-control" @pointerdown.stop @click.stop>
@@ -1662,6 +1704,17 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
   text-align: right;
 }
 
+.node-card__port-pill-row {
+  display: flex;
+  align-items: center;
+  min-height: 34px;
+  gap: 10px;
+}
+
+.node-card__port-pill-row--right {
+  justify-content: flex-end;
+}
+
 .node-card__port-stack {
   display: grid;
   gap: 3px;
@@ -1679,6 +1732,52 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
 
 .node-card__port-spacer {
   min-height: 1px;
+}
+
+.node-card__port-pill {
+  --node-card-port-accent: rgba(217, 119, 6, 0.92);
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  min-height: 34px;
+  max-width: 100%;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--node-card-port-accent) 22%, rgba(154, 52, 18, 0.1));
+  background: rgba(255, 250, 241, 0.9);
+  padding: 0 9px 0 16px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.54),
+    0 8px 18px rgba(120, 53, 15, 0.07);
+}
+
+.node-card__port-pill--output {
+  color: #1f2937;
+}
+
+.node-card__port-pill--input {
+  justify-content: flex-start;
+  color: #1d4ed8;
+  padding: 0 16px 0 10px;
+}
+
+.node-card__port-pill-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 1.02rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.node-card__port-pill-anchor-slot {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+
+.node-card__port-pill-anchor-slot--leading {
+  order: -1;
 }
 
 .node-card__port-label {

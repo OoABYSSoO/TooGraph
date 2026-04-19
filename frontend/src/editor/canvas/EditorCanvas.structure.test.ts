@@ -24,10 +24,23 @@ test("EditorCanvas styles typed anchors and edges from projected state colors", 
 });
 
 test("EditorCanvas renders anchors in a dedicated overlay layer above nodes", () => {
-  assert.match(componentSource, /<svg class="editor-canvas__anchors"[\s\S]*<circle[\s\S]*v-for="anchor in projectedAnchors"/);
+  assert.match(componentSource, /<svg class="editor-canvas__anchors"[\s\S]*<circle[\s\S]*v-for="anchor in pointAnchors"/);
 });
 
 test("EditorCanvas renders inline labels for data edges", () => {
   assert.match(componentSource, /v-for="edge in projectedEdges\.filter\(\(candidate\) => candidate\.label\)"/);
   assert.match(componentSource, /class="editor-canvas__edge-label"/);
+});
+
+test("EditorCanvas resolves rendered anchor geometry from measured node slot offsets", () => {
+  assert.match(componentSource, /const measuredAnchorOffsets = ref<Record<string, MeasuredAnchorOffset>>\(\{\}\);/);
+  assert.match(componentSource, /const resolvedCanvasLayout = computed\(\(\) => resolveCanvasLayout\(props\.document, measuredAnchorOffsets\.value\)\);/);
+  assert.match(componentSource, /querySelectorAll\("\[data-anchor-slot-id\]"\)/);
+});
+
+test("EditorCanvas renders hover-only flow hotspots and animates data edges as ant lines", () => {
+  assert.match(componentSource, /v-for="anchor in flowAnchors"/);
+  assert.match(componentSource, /class="editor-canvas__flow-hotspot"/);
+  assert.match(componentSource, /\.editor-canvas__edge--data \{[\s\S]*animation:\s*editor-canvas-ant-line 1\.2s linear infinite;/);
+  assert.match(componentSource, /@keyframes editor-canvas-ant-line/);
 });

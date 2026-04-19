@@ -14,6 +14,7 @@ export type PlacedAnchor = {
   id: string;
   x: number;
   y: number;
+  side: AnchorDescriptor["side"];
   stateKey?: string;
   branch?: string;
 };
@@ -27,6 +28,8 @@ export type PlacedAnchorSet = {
 };
 
 const EDGE_PORT_INSET = 6;
+const BODY_OUTPUT_PORT_INSET = 40;
+const BODY_PORT_ROW_CENTER_OFFSET = 29;
 
 export function placeAnchors(model: NodeAnchorModel, frame: NodeFrame): PlacedAnchorSet {
   return {
@@ -50,6 +53,7 @@ function placeAnchor(anchor: AnchorDescriptor | null, frame: NodeFrame): PlacedA
     id: anchor.id,
     x,
     y,
+    side: anchor.side,
     ...(anchor.stateKey ? { stateKey: anchor.stateKey } : {}),
     ...(anchor.branch ? { branch: anchor.branch } : {}),
   };
@@ -63,7 +67,7 @@ function resolveX(anchor: AnchorDescriptor, frame: NodeFrame): number {
     return frame.x + frame.width / 2;
   }
   if (anchor.side === "right") {
-    return frame.x + frame.width - EDGE_PORT_INSET;
+    return frame.x + frame.width - (anchor.lane === "body" ? BODY_OUTPUT_PORT_INSET : EDGE_PORT_INSET);
   }
   const count = Math.max(anchor.row + 2, 2);
   return frame.x + (frame.width / count) * (anchor.row + 1);
@@ -74,7 +78,7 @@ function resolveY(anchor: AnchorDescriptor, frame: NodeFrame): number {
     return frame.y + frame.headerHeight / 2;
   }
   if (anchor.lane === "body") {
-    return frame.y + frame.bodyTop + anchor.row * frame.rowGap;
+    return frame.y + frame.bodyTop + BODY_PORT_ROW_CENTER_OFFSET + anchor.row * frame.rowGap;
   }
   return frame.y + (frame.footerTop ?? frame.bodyTop + 160) + anchor.row * 24;
 }

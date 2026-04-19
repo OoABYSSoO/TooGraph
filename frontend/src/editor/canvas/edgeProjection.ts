@@ -25,6 +25,7 @@ export type ProjectedCanvasAnchor = {
   kind: "flow-in" | "flow-out" | "state-in" | "state-out" | "route-out";
   x: number;
   y: number;
+  side: "left" | "right" | "top" | "bottom";
   color?: string;
   stateKey?: string;
   branch?: string;
@@ -135,6 +136,7 @@ export function projectCanvasAnchors(document: GraphPayload | GraphDocument): Pr
             kind: "flow-in" as const,
             x: placement.flowIn.x,
             y: placement.flowIn.y,
+            side: placement.flowIn.side,
           },
         ]
       : []),
@@ -146,6 +148,7 @@ export function projectCanvasAnchors(document: GraphPayload | GraphDocument): Pr
             kind: "flow-out" as const,
             x: placement.flowOut.x,
             y: placement.flowOut.y,
+            side: placement.flowOut.side,
           },
         ]
       : []),
@@ -155,6 +158,7 @@ export function projectCanvasAnchors(document: GraphPayload | GraphDocument): Pr
       kind: "state-in" as const,
       x: anchor.x,
       y: anchor.y,
+      side: anchor.side,
       color: document.state_schema[anchor.stateKey ?? ""]?.color ?? undefined,
       stateKey: anchor.stateKey,
     })),
@@ -164,6 +168,7 @@ export function projectCanvasAnchors(document: GraphPayload | GraphDocument): Pr
       kind: "state-out" as const,
       x: anchor.x,
       y: anchor.y,
+      side: anchor.side,
       color: document.state_schema[anchor.stateKey ?? ""]?.color ?? undefined,
       stateKey: anchor.stateKey,
     })),
@@ -173,6 +178,7 @@ export function projectCanvasAnchors(document: GraphPayload | GraphDocument): Pr
       kind: "route-out" as const,
       x: anchor.x,
       y: anchor.y,
+      side: anchor.side,
       branch: anchor.branch,
     })),
   ]);

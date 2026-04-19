@@ -2,7 +2,7 @@ import { buildConnectorCurvePath } from "./connectionCurvePath.ts";
 import { buildRouteEdgePath, resolveRouteEdgeSourceOffset } from "./routeEdgePath.ts";
 
 export function buildPendingConnectionPreviewPath(input: {
-  kind: "flow-out" | "route-out";
+  kind: "flow-out" | "route-out" | "state-out";
   sourceX: number;
   sourceY: number;
   targetX: number;

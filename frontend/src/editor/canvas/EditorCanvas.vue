@@ -35,8 +35,11 @@
           v-if="connectionPreview"
           :d="connectionPreview.path"
           class="editor-canvas__edge editor-canvas__edge--preview"
-          :class="{ 'editor-canvas__edge--route': connectionPreview.kind === 'route' }"
-          marker-end="url(#editor-canvas-arrow-preview)"
+          :class="{
+            'editor-canvas__edge--route': connectionPreview.kind === 'route',
+            'editor-canvas__edge--data': connectionPreview.kind === 'data',
+          }"
+          :marker-end="connectionPreview.kind === 'data' ? undefined : 'url(#editor-canvas-arrow-preview)'"
         />
         <path
           v-for="edge in projectedEdges"
@@ -105,6 +108,20 @@
           @update-output-config="emit('update-output-config', $event)"
         />
       </div>
+      <div class="editor-canvas__flow-hotspots" aria-hidden="true">
+        <div
+          v-for="anchor in flowAnchors"
+          :key="`flow-${anchor.id}`"
+          class="editor-canvas__flow-hotspot"
+          :style="flowHotspotStyle(anchor)"
+          :class="{
+            'editor-canvas__flow-hotspot--connect-source': activeConnectionSourceAnchorId === anchor.id,
+            'editor-canvas__flow-hotspot--connect-target': eligibleTargetAnchorIds.has(anchor.id),
+            'editor-canvas__flow-hotspot--top': anchor.side === 'top',
+          }"
+          @pointerdown.stop="handleAnchorPointerDown(anchor)"
+        />
+      </div>
       <div class="editor-canvas__edge-labels" aria-hidden="true">
         <div
           v-for="edge in projectedEdges.filter((candidate) => candidate.label)"
@@ -118,7 +135,7 @@
       </div>
       <svg class="editor-canvas__anchors" viewBox="0 0 4000 3000" preserveAspectRatio="none" aria-hidden="true">
         <circle
-          v-for="anchor in projectedAnchors"
+          v-for="anchor in pointAnchors"
           :key="anchor.id"
           :cx="anchor.x"
           :cy="anchor.y"
@@ -139,13 +156,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, toRef, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, toRef, watch } from "vue";
 
+import { buildAnchorModel } from "@/editor/anchors/anchorModel";
 import NodeCard from "@/editor/nodes/NodeCard.vue";
-import { projectCanvasAnchors, projectCanvasEdges, type ProjectedCanvasAnchor, type ProjectedCanvasEdge } from "@/editor/canvas/edgeProjection";
+import { type ProjectedCanvasAnchor, type ProjectedCanvasEdge } from "@/editor/canvas/edgeProjection";
 import { buildPendingConnectionPreviewPath } from "@/editor/canvas/connectionPreviewPath";
+import { resolveFlowAnchorOffset } from "@/editor/canvas/flowAnchorLayout";
 import { resolveEdgeRunPresentation } from "@/editor/canvas/runEdgePresentation";
 import { resolveNodeRunPresentation } from "@/editor/canvas/runNodePresentation";
+import { resolveCanvasLayout, type MeasuredAnchorOffset } from "@/editor/canvas/resolvedCanvasLayout";
 import { resolveCanvasSurfaceStyle } from "@/editor/canvas/canvasSurfaceStyle";
 import { canCompleteGraphConnection, canStartGraphConnection, type PendingGraphConnection } from "@/lib/graph-connections";
 import { resolveFocusedViewport } from "@/editor/canvas/focusNodeViewport";
@@ -188,6 +208,7 @@ const emit = defineEmits<{
   (event: "create-port-state", payload: { nodeId: string; side: "input" | "output"; field: { key: string; definition: StateDefinition } }): void;
   (event: "update-output-config", payload: { nodeId: string; patch: Partial<OutputNode["config"]> }): void;
   (event: "connect-flow", payload: { sourceNodeId: string; targetNodeId: string }): void;
+  (event: "connect-state", payload: { sourceNodeId: string; sourceStateKey: string; targetNodeId: string; targetStateKey: string }): void;
   (event: "connect-route", payload: { sourceNodeId: string; branchKey: string; targetNodeId: string }): void;
   (event: "reconnect-flow", payload: { sourceNodeId: string; currentTargetNodeId: string; nextTargetNodeId: string }): void;
   (event: "reconnect-route", payload: { sourceNodeId: string; branchKey: string; nextTargetNodeId: string }): void;
@@ -197,6 +218,9 @@ const emit = defineEmits<{
 
 const canvasRef = ref<HTMLElement | null>(null);
 const nodeElementMap = new Map<string, HTMLElement>();
+const nodeResizeObserverMap = new Map<string, ResizeObserver>();
+const nodeMutationObserverMap = new Map<string, MutationObserver>();
+const measuredAnchorOffsets = ref<Record<string, MeasuredAnchorOffset>>({});
 const viewport = useViewport();
 const selection = useNodeSelectionFocus({
   externalSelectedNodeId: toRef(props, "selectedNodeId"),
@@ -221,6 +245,8 @@ const nodeDrag = ref<{
 const pendingConnection = ref<PendingGraphConnection | null>(null);
 const pendingConnectionPoint = ref<{ x: number; y: number } | null>(null);
 const selectedEdgeId = ref<string | null>(null);
+const pendingAnchorMeasurementNodeIds = new Set<string>();
+let scheduledAnchorMeasurementFrame: number | null = null;
 
 const nodeEntries = computed(() => Object.entries(props.document.nodes));
 const conditionRouteTargetsByNodeId = computed(() =>
@@ -230,8 +256,17 @@ const conditionRouteTargetsByNodeId = computed(() =>
       .map(([nodeId]) => [nodeId, buildConditionRouteTargets(props.document, nodeId)]),
   ) as Record<string, Record<string, string | null>>,
 );
-const projectedEdges = computed(() => projectCanvasEdges(props.document));
-const projectedAnchors = computed(() => projectCanvasAnchors(props.document));
+const resolvedCanvasLayout = computed(() => resolveCanvasLayout(props.document, measuredAnchorOffsets.value));
+const projectedEdges = computed(() => resolvedCanvasLayout.value.edges);
+const projectedAnchors = computed(() => resolvedCanvasLayout.value.anchors);
+const flowAnchors = computed(() =>
+  projectedAnchors.value.filter((anchor) => anchor.kind === "flow-in" || anchor.kind === "flow-out"),
+);
+const pointAnchors = computed(() =>
+  projectedAnchors.value.filter(
+    (anchor) => anchor.kind === "state-in" || anchor.kind === "state-out" || anchor.kind === "route-out",
+  ),
+);
 const selectedReconnectConnection = computed<PendingGraphConnection | null>(() => {
   const edge = selectedEdgeId.value ? projectedEdges.value.find((candidate) => candidate.id === selectedEdgeId.value) : null;
   if (!edge || edge.kind === "data") {
@@ -265,7 +300,8 @@ const activeConnectionSourceAnchorId = computed(() => {
     (anchor) =>
       anchor.nodeId === activeConnection.value?.sourceNodeId &&
       anchor.kind === activeConnection.value.sourceKind &&
-      (anchor.kind !== "route-out" || anchor.branch === activeConnection.value.branchKey),
+      (anchor.kind !== "route-out" || anchor.branch === activeConnection.value.branchKey) &&
+      (anchor.kind !== "state-out" || anchor.stateKey === activeConnection.value.sourceStateKey),
   );
   return sourceAnchor?.id ?? null;
 });
@@ -276,6 +312,7 @@ const eligibleTargetAnchorIds = computed(() =>
         canCompleteGraphConnection(props.document, activeConnection.value, {
           nodeId: anchor.nodeId,
           kind: anchor.kind,
+          stateKey: anchor.stateKey,
         }),
       )
       .map((anchor) => anchor.id),
@@ -297,11 +334,18 @@ const connectionHint = computed(() => {
     if (activeConnection.value.sourceKind === "route-out") {
       return `Retargeting ${sourceNode.name} / ${activeConnection.value.branchKey} from ${currentTargetLabel}...`;
     }
+    if (activeConnection.value.sourceKind === "state-out" && activeConnection.value.sourceStateKey) {
+      return `Retargeting ${activeConnection.value.sourceStateKey} from ${currentTargetLabel}...`;
+    }
     return `Retargeting ${sourceNode.name} -> ${currentTargetLabel}...`;
   }
 
   if (activeConnection.value.sourceKind === "route-out") {
     return `Connecting ${sourceNode.name} / ${activeConnection.value.branchKey} to a target node...`;
+  }
+
+  if (activeConnection.value.sourceKind === "state-out" && activeConnection.value.sourceStateKey) {
+    return `Connecting ${activeConnection.value.sourceStateKey} to a target state...`;
   }
 
   return `Connecting ${sourceNode.name} to a target node...`;
@@ -317,7 +361,12 @@ const connectionPreview = computed(() => {
   }
 
   return {
-    kind: activeConnection.value.sourceKind === "route-out" ? "route" as const : "flow" as const,
+    kind:
+      activeConnection.value.sourceKind === "route-out"
+        ? "route" as const
+        : activeConnection.value.sourceKind === "state-out"
+          ? "data" as const
+          : "flow" as const,
     path: buildPendingConnectionPreviewPath({
       kind: activeConnection.value.sourceKind,
       sourceX: sourceAnchor.x,
@@ -342,6 +391,27 @@ watch(projectedEdges, (edges) => {
     if (!pendingConnection.value) {
       pendingConnectionPoint.value = null;
     }
+  }
+});
+
+onMounted(() => {
+  scheduleAnchorMeasurement();
+});
+
+onBeforeUnmount(() => {
+  for (const observer of nodeResizeObserverMap.values()) {
+    observer.disconnect();
+  }
+  nodeResizeObserverMap.clear();
+
+  for (const observer of nodeMutationObserverMap.values()) {
+    observer.disconnect();
+  }
+  nodeMutationObserverMap.clear();
+
+  if (scheduledAnchorMeasurementFrame !== null && typeof window !== "undefined") {
+    window.cancelAnimationFrame(scheduledAnchorMeasurementFrame);
+    scheduledAnchorMeasurementFrame = null;
   }
 });
 
@@ -371,6 +441,16 @@ function edgeLabelStyle(edge: ProjectedCanvasEdge) {
   };
 }
 
+function flowHotspotStyle(anchor: ProjectedCanvasAnchor) {
+  const isVertical = anchor.side === "left" || anchor.side === "right";
+  return {
+    left: `${anchor.x}px`,
+    top: `${anchor.y}px`,
+    width: `${isVertical ? 22 : 86}px`,
+    height: `${isVertical ? 86 : 22}px`,
+  };
+}
+
 function anchorStyle(anchor: ProjectedCanvasAnchor) {
   if (!anchor.color) {
     return undefined;
@@ -383,9 +463,167 @@ function anchorStyle(anchor: ProjectedCanvasAnchor) {
 function registerNodeRef(nodeId: string, element: unknown) {
   if (element instanceof HTMLElement) {
     nodeElementMap.set(nodeId, element);
+    attachNodeMeasurementObservers(nodeId, element);
+    scheduleAnchorMeasurement(nodeId);
     return;
   }
   nodeElementMap.delete(nodeId);
+  detachNodeMeasurementObservers(nodeId);
+  clearNodeAnchorOffsets(nodeId);
+}
+
+function attachNodeMeasurementObservers(nodeId: string, element: HTMLElement) {
+  detachNodeMeasurementObservers(nodeId);
+
+  if (typeof ResizeObserver !== "undefined") {
+    const resizeObserver = new ResizeObserver(() => {
+      scheduleAnchorMeasurement(nodeId);
+    });
+    resizeObserver.observe(element);
+    nodeResizeObserverMap.set(nodeId, resizeObserver);
+  }
+
+  if (typeof MutationObserver !== "undefined") {
+    const mutationObserver = new MutationObserver(() => {
+      scheduleAnchorMeasurement(nodeId);
+    });
+    mutationObserver.observe(element, {
+      subtree: true,
+      childList: true,
+      characterData: true,
+    });
+    nodeMutationObserverMap.set(nodeId, mutationObserver);
+  }
+}
+
+function detachNodeMeasurementObservers(nodeId: string) {
+  nodeResizeObserverMap.get(nodeId)?.disconnect();
+  nodeResizeObserverMap.delete(nodeId);
+  nodeMutationObserverMap.get(nodeId)?.disconnect();
+  nodeMutationObserverMap.delete(nodeId);
+}
+
+function clearNodeAnchorOffsets(nodeId: string) {
+  const nextAnchorOffsets = { ...measuredAnchorOffsets.value };
+  let didChange = false;
+
+  for (const anchorId of Object.keys(nextAnchorOffsets)) {
+    if (!anchorId.startsWith(`${nodeId}:`)) {
+      continue;
+    }
+    delete nextAnchorOffsets[anchorId];
+    didChange = true;
+  }
+
+  if (didChange) {
+    measuredAnchorOffsets.value = nextAnchorOffsets;
+  }
+}
+
+function scheduleAnchorMeasurement(nodeId?: string) {
+  if (nodeId) {
+    pendingAnchorMeasurementNodeIds.add(nodeId);
+  }
+
+  if (scheduledAnchorMeasurementFrame !== null) {
+    return;
+  }
+
+  if (typeof window === "undefined") {
+    measureAnchorOffsets(pendingAnchorMeasurementNodeIds.size > 0 ? Array.from(pendingAnchorMeasurementNodeIds) : undefined);
+    pendingAnchorMeasurementNodeIds.clear();
+    return;
+  }
+
+  scheduledAnchorMeasurementFrame = window.requestAnimationFrame(() => {
+    scheduledAnchorMeasurementFrame = null;
+    measureAnchorOffsets(pendingAnchorMeasurementNodeIds.size > 0 ? Array.from(pendingAnchorMeasurementNodeIds) : undefined);
+    pendingAnchorMeasurementNodeIds.clear();
+  });
+}
+
+function measureAnchorOffsets(nodeIds?: string[]) {
+  const nextAnchorOffsets = { ...measuredAnchorOffsets.value };
+  const measuredNodeIds = new Set(nodeIds ?? nodeElementMap.keys());
+  let didChange = false;
+
+  for (const nodeId of measuredNodeIds) {
+    for (const anchorId of Object.keys(nextAnchorOffsets)) {
+      if (!anchorId.startsWith(`${nodeId}:`)) {
+        continue;
+      }
+      delete nextAnchorOffsets[anchorId];
+      didChange = true;
+    }
+
+    const nodeElement = nodeElementMap.get(nodeId);
+    const node = props.document.nodes[nodeId];
+    if (!nodeElement) {
+      continue;
+    }
+
+    const nodeRect = nodeElement.getBoundingClientRect();
+    const scale = viewport.viewport.scale || 1;
+
+    for (const slotElement of nodeElement.querySelectorAll("[data-anchor-slot-id]")) {
+      if (!(slotElement instanceof HTMLElement)) {
+        continue;
+      }
+
+      const anchorId = slotElement.dataset.anchorSlotId;
+      if (!anchorId) {
+        continue;
+      }
+
+      const slotRect = slotElement.getBoundingClientRect();
+      const measuredOffset = {
+        offsetX: roundMeasuredOffset((slotRect.left + slotRect.width / 2 - nodeRect.left) / scale),
+        offsetY: roundMeasuredOffset((slotRect.top + slotRect.height / 2 - nodeRect.top) / scale),
+      };
+      const currentOffset = nextAnchorOffsets[anchorId];
+      if (
+        !currentOffset ||
+        currentOffset.offsetX !== measuredOffset.offsetX ||
+        currentOffset.offsetY !== measuredOffset.offsetY
+      ) {
+        didChange = true;
+      }
+      nextAnchorOffsets[anchorId] = measuredOffset;
+    }
+
+    if (node) {
+      const anchorModel = buildAnchorModel(nodeId, node);
+      const flowAnchorsToMeasure = [anchorModel.flowIn, anchorModel.flowOut].filter(
+        (anchor): anchor is NonNullable<typeof anchorModel.flowIn> => anchor !== null,
+      );
+
+      for (const flowAnchor of flowAnchorsToMeasure) {
+        const measuredOffset = resolveFlowAnchorOffset({
+          side: flowAnchor.side,
+          width: nodeElement.offsetWidth,
+          height: nodeElement.offsetHeight,
+        });
+        const anchorId = `${nodeId}:${flowAnchor.id}`;
+        const currentOffset = nextAnchorOffsets[anchorId];
+        if (
+          !currentOffset ||
+          currentOffset.offsetX !== measuredOffset.offsetX ||
+          currentOffset.offsetY !== measuredOffset.offsetY
+        ) {
+          didChange = true;
+        }
+        nextAnchorOffsets[anchorId] = measuredOffset;
+      }
+    }
+  }
+
+  if (didChange || Object.keys(nextAnchorOffsets).length !== Object.keys(measuredAnchorOffsets.value).length) {
+    measuredAnchorOffsets.value = nextAnchorOffsets;
+  }
+}
+
+function roundMeasuredOffset(value: number) {
+  return Math.round(value * 1000) / 1000;
 }
 
 function handleCanvasPointerDown(event: PointerEvent) {
@@ -468,9 +706,10 @@ function handleAnchorPointerDown(anchor: ProjectedCanvasAnchor) {
     canCompleteGraphConnection(props.document, activeConnection.value, {
       nodeId: anchor.nodeId,
       kind: anchor.kind,
+      stateKey: anchor.stateKey,
     })
   ) {
-    completePendingConnection(anchor.nodeId);
+    completePendingConnection(anchor);
     return;
   }
 
@@ -549,6 +788,14 @@ function createPendingConnection(anchor: ProjectedCanvasAnchor): PendingGraphCon
     };
   }
 
+  if (anchor.kind === "state-out" && anchor.stateKey) {
+    return {
+      sourceNodeId: anchor.nodeId,
+      sourceKind: "state-out",
+      sourceStateKey: anchor.stateKey,
+    };
+  }
+
   return null;
 }
 
@@ -556,11 +803,12 @@ function isSamePendingConnection(left: PendingGraphConnection | null, right: Pen
   return (
     left?.sourceNodeId === right?.sourceNodeId &&
     left?.sourceKind === right?.sourceKind &&
+    left?.sourceStateKey === right?.sourceStateKey &&
     left?.branchKey === right?.branchKey
   );
 }
 
-function completePendingConnection(targetNodeId: string) {
+function completePendingConnection(targetAnchor: ProjectedCanvasAnchor) {
   const connection = activeConnection.value;
   if (!connection) {
     return;
@@ -571,25 +819,32 @@ function completePendingConnection(targetNodeId: string) {
       emit("reconnect-route", {
         sourceNodeId: connection.sourceNodeId,
         branchKey: connection.branchKey,
-        nextTargetNodeId: targetNodeId,
+        nextTargetNodeId: targetAnchor.nodeId,
       });
     } else if (connection.currentTargetNodeId) {
       emit("reconnect-flow", {
         sourceNodeId: connection.sourceNodeId,
         currentTargetNodeId: connection.currentTargetNodeId,
-        nextTargetNodeId: targetNodeId,
+        nextTargetNodeId: targetAnchor.nodeId,
       });
     }
   } else if (connection.sourceKind === "route-out" && connection.branchKey) {
     emit("connect-route", {
       sourceNodeId: connection.sourceNodeId,
       branchKey: connection.branchKey,
-      targetNodeId,
+      targetNodeId: targetAnchor.nodeId,
+    });
+  } else if (connection.sourceKind === "state-out" && connection.sourceStateKey && targetAnchor.stateKey) {
+    emit("connect-state", {
+      sourceNodeId: connection.sourceNodeId,
+      sourceStateKey: connection.sourceStateKey,
+      targetNodeId: targetAnchor.nodeId,
+      targetStateKey: targetAnchor.stateKey,
     });
   } else {
     emit("connect-flow", {
       sourceNodeId: connection.sourceNodeId,
-      targetNodeId,
+      targetNodeId: targetAnchor.nodeId,
     });
   }
 
@@ -635,7 +890,12 @@ function resolveCanvasPoint(event: PointerEvent) {
 }
 
 function resolveEdgeTargetPoint(edge: ProjectedCanvasEdge) {
-  const targetAnchor = projectedAnchors.value.find((anchor) => anchor.nodeId === edge.target && anchor.kind === "flow-in");
+  const targetAnchor =
+    edge.kind === "data" && edge.state
+      ? projectedAnchors.value.find(
+          (anchor) => anchor.nodeId === edge.target && anchor.kind === "state-in" && anchor.stateKey === edge.state,
+        )
+      : projectedAnchors.value.find((anchor) => anchor.nodeId === edge.target && anchor.kind === "flow-in");
   return targetAnchor ? { x: targetAnchor.x, y: targetAnchor.y } : null;
 }
 
@@ -717,6 +977,16 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   pointer-events: none;
 }
 
+.editor-canvas__flow-hotspots {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  width: 4000px;
+  height: 3000px;
+  overflow: visible;
+  pointer-events: none;
+}
+
 .editor-canvas__edge-labels {
   position: absolute;
   inset: 0;
@@ -727,7 +997,7 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
 .editor-canvas__edge {
   fill: none;
   stroke: var(--editor-edge-stroke, rgba(217, 119, 6, 0.88));
-  stroke-width: 2.5;
+  stroke-width: 4.6;
   stroke-linecap: round;
   stroke-linejoin: round;
   pointer-events: stroke;
@@ -741,13 +1011,15 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
 .editor-canvas__edge--route {
   stroke: rgba(124, 58, 237, 0.88);
   stroke-dasharray: 10 8;
+  stroke-width: 4.2;
 }
 
 .editor-canvas__edge--data {
-  stroke: var(--editor-edge-stroke, rgba(217, 119, 6, 0.56));
-  stroke-width: 1.7;
-  stroke-dasharray: 0;
-  opacity: 0.92;
+  stroke: var(--editor-edge-stroke, rgba(37, 99, 235, 0.78));
+  stroke-width: 2.7;
+  stroke-dasharray: 10 10;
+  animation: editor-canvas-ant-line 1.2s linear infinite;
+  opacity: 0.94;
 }
 
 .editor-canvas__edge-label {
@@ -797,6 +1069,56 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   stroke-width: 3.2;
   opacity: 1;
   filter: drop-shadow(0 0 12px rgba(249, 115, 22, 0.34));
+}
+
+@keyframes editor-canvas-ant-line {
+  from {
+    stroke-dashoffset: 0;
+  }
+
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+
+.editor-canvas__flow-hotspot {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  pointer-events: auto;
+  cursor: crosshair;
+}
+
+.editor-canvas__flow-hotspot::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgba(190, 141, 72, 0);
+  box-shadow: inset 0 0 0 1px rgba(190, 141, 72, 0);
+  transition:
+    background 120ms ease,
+    box-shadow 120ms ease,
+    opacity 120ms ease;
+}
+
+.editor-canvas__flow-hotspot:hover::before {
+  background: rgba(190, 141, 72, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(190, 141, 72, 0.22);
+}
+
+.editor-canvas__flow-hotspot--connect-source::before {
+  background: rgba(37, 99, 235, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.3);
+}
+
+.editor-canvas__flow-hotspot--connect-target::before {
+  background: rgba(34, 197, 94, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.3);
+}
+
+.editor-canvas__flow-hotspot--top {
+  border-radius: 999px;
 }
 
 .editor-canvas__anchor {

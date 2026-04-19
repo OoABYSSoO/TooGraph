@@ -77,6 +77,7 @@ export type NodeCardViewModel = {
         previewTitle: string;
         displayModeLabel: string;
         persistFormatLabel: string;
+        connectedStateKey: string | null;
         connectedStateLabel: string | null;
         previewText: string;
         persistEnabled: boolean;
@@ -185,6 +186,7 @@ function buildBody(
     previewTitle: "Preview",
     displayModeLabel: formatOutputDisplayModeLabel(runtime?.outputDisplayMode?.trim() || node.config.displayMode),
     persistFormatLabel: formatOutputPersistFormatLabel(node.config.persistFormat),
+    connectedStateKey: connectedState,
     connectedStateLabel: connectedState ? getStateLabel(connectedState, stateSchema) : null,
     previewText: resolveOutputPreviewText({
       connectedState,

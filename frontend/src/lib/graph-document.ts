@@ -4,6 +4,7 @@ import { applyConditionBranchMapping, createConditionBranchKey } from "./conditi
 import {
   canConnectConditionRoute,
   canConnectFlowNodes,
+  canConnectStateBinding,
   canReconnectConditionRoute,
   canReconnectFlowEdge,
 } from "./graph-connections.ts";
@@ -349,6 +350,32 @@ export function connectFlowNodesInDocument<T extends GraphPayload | GraphDocumen
   const nextDocument = cloneGraphDocument(document);
   nextDocument.edges = [...nextDocument.edges, { source: sourceNodeId, target: targetNodeId }];
   return nextDocument;
+}
+
+export function connectStateBindingInDocument<T extends GraphPayload | GraphDocument>(
+  document: T,
+  sourceNodeId: string,
+  sourceStateKey: string,
+  targetNodeId: string,
+  targetStateKey: string,
+): T {
+  if (!canConnectStateBinding(document, sourceNodeId, sourceStateKey, targetNodeId, targetStateKey)) {
+    return document;
+  }
+
+  const nextDocument = cloneGraphDocument(document);
+  const nextTargetNode = nextDocument.nodes[targetNodeId];
+  const targetBindingIndex = nextTargetNode.reads.findIndex((binding) => binding.state === targetStateKey);
+  if (targetBindingIndex === -1) {
+    return document;
+  }
+
+  nextTargetNode.reads[targetBindingIndex] = {
+    ...nextTargetNode.reads[targetBindingIndex],
+    state: sourceStateKey,
+  };
+
+  return syncKnowledgeBaseSkillsInDocument(nextDocument);
 }
 
 export function connectConditionRouteInDocument<T extends GraphPayload | GraphDocument>(

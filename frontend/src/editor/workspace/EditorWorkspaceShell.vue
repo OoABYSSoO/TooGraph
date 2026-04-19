@@ -88,6 +88,7 @@
                 @remove-condition-branch="removeConditionBranchForTab(tab.tabId, $event.nodeId, $event.branchKey)"
                 @bind-port-state="bindNodePortStateForTab(tab.tabId, $event.nodeId, $event.side, $event.stateKey)"
                 @create-port-state="createNodePortStateForTab(tab.tabId, $event.nodeId, $event.side, $event.field)"
+                @connect-state="connectStateBindingForTab(tab.tabId, $event.sourceNodeId, $event.sourceStateKey, $event.targetNodeId, $event.targetStateKey)"
                 @connect-flow="connectFlowNodesForTab(tab.tabId, $event.sourceNodeId, $event.targetNodeId)"
                 @connect-route="connectConditionRouteForTab(tab.tabId, $event.sourceNodeId, $event.branchKey, $event.targetNodeId)"
                 @reconnect-flow="reconnectFlowEdgeForTab(tab.tabId, $event.sourceNodeId, $event.currentTargetNodeId, $event.nextTargetNodeId)"
@@ -175,6 +176,7 @@ import {
   cloneGraphDocument,
   connectConditionRouteInDocument,
   connectFlowNodesInDocument,
+  connectStateBindingInDocument,
   createDraftFromTemplate,
   createEmptyDraftGraph,
   reconnectConditionRouteInDocument,
@@ -876,6 +878,27 @@ function connectFlowNodesForTab(tabId: string, sourceNodeId: string, targetNodeI
   }
 
   const nextDocument = connectFlowNodesInDocument(document, sourceNodeId, targetNodeId);
+  if (nextDocument === document) {
+    return;
+  }
+
+  markDocumentDirty(tabId, nextDocument);
+  focusNodeForTab(tabId, targetNodeId);
+}
+
+function connectStateBindingForTab(
+  tabId: string,
+  sourceNodeId: string,
+  sourceStateKey: string,
+  targetNodeId: string,
+  targetStateKey: string,
+) {
+  const document = documentsByTabId.value[tabId];
+  if (!document) {
+    return;
+  }
+
+  const nextDocument = connectStateBindingInDocument(document, sourceNodeId, sourceStateKey, targetNodeId, targetStateKey);
   if (nextDocument === document) {
     return;
   }

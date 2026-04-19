@@ -86,11 +86,12 @@ const document: GraphPayload = {
   metadata: {},
 };
 
-test("canStartGraphConnection only starts from flow-out and route-out anchors", () => {
+test("canStartGraphConnection starts from flow, route, and state output anchors", () => {
   assert.equal(canStartGraphConnection("flow-out"), true);
   assert.equal(canStartGraphConnection("route-out"), true);
+  assert.equal(canStartGraphConnection("state-out"), true);
   assert.equal(canStartGraphConnection("flow-in"), false);
-  assert.equal(canStartGraphConnection("state-out"), false);
+  assert.equal(canStartGraphConnection("state-in"), false);
 });
 
 test("canCompleteGraphConnection allows flow-out sources to target flow-in anchors with valid flow semantics", () => {
@@ -219,5 +220,45 @@ test("canCompleteGraphConnection allows reconnecting an existing route edge to a
       kind: "flow-in",
     }),
     false,
+  );
+});
+
+test("canCompleteGraphConnection allows state-out sources to target a concrete state-in binding", () => {
+  const pending: PendingGraphConnection = {
+    sourceNodeId: "input_question",
+    sourceKind: "state-out",
+    sourceStateKey: "question",
+  };
+
+  assert.equal(
+    canCompleteGraphConnection(document, pending, {
+      nodeId: "answer_helper",
+      kind: "state-in",
+      stateKey: "question",
+    }),
+    false,
+  );
+
+  assert.equal(
+    canCompleteGraphConnection(
+      {
+        ...document,
+        nodes: {
+          ...document.nodes,
+          answer_helper: {
+            ...document.nodes.answer_helper,
+            reads: [{ state: "draft_question", required: true }],
+            writes: [],
+          },
+        },
+      },
+      pending,
+      {
+        nodeId: "answer_helper",
+        kind: "state-in",
+        stateKey: "draft_question",
+      },
+    ),
+    true,
   );
 });

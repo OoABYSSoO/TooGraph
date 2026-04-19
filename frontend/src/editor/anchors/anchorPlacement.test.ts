@@ -40,22 +40,26 @@ test("placeAnchors projects model anchors onto canvas coordinates", () => {
     id: "flow-in",
     x: 526,
     y: 252,
+    side: "left",
   });
   assert.deepEqual(placement.flowOut, {
     id: "flow-out",
     x: 874,
     y: 252,
+    side: "right",
   });
   assert.deepEqual(placement.stateInputs[0], {
     id: "state-in:question",
     stateKey: "question",
     x: 526,
-    y: 312,
+    y: 341,
+    side: "left",
   });
   assert.deepEqual(placement.stateOutputs[0], {
     id: "state-out:answer",
     stateKey: "answer",
-    x: 874,
-    y: 312,
+    x: 840,
+    y: 341,
+    side: "right",
   });
 });

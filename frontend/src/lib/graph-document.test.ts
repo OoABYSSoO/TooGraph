@@ -111,6 +111,61 @@ test("createEmptyDraftGraph creates an empty backend-native payload", () => {
   });
 });
 
+test("connectStateBindingInDocument rewires a target read binding to the source state", () => {
+  assert.equal(typeof graphDocument.connectStateBindingInDocument, "function");
+
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "State connect graph",
+    state_schema: {
+      question: { name: "question", description: "", type: "text", value: "", color: "#d97706" },
+      draft_question: { name: "draft_question", description: "", type: "text", value: "", color: "#2563eb" },
+    },
+    nodes: {
+      input_question: {
+        kind: "input",
+        name: "input_question",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [{ state: "question", mode: "replace" }],
+        config: { value: "" },
+      },
+      answer_helper: {
+        kind: "agent",
+        name: "answer_helper",
+        description: "",
+        ui: { position: { x: 100, y: 0 } },
+        reads: [{ state: "draft_question", required: true }],
+        writes: [],
+        config: {
+          skills: [],
+          systemInstruction: "",
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const nextDocument = graphDocument.connectStateBindingInDocument(
+    document,
+    "input_question",
+    "question",
+    "answer_helper",
+    "draft_question",
+  );
+
+  assert.deepEqual(nextDocument.nodes.answer_helper.reads, [{ state: "question", required: true }]);
+  assert.deepEqual(document.nodes.answer_helper.reads, [{ state: "draft_question", required: true }]);
+});
+
 test("updateOutputNodeConfigInDocument patches output config immutably", () => {
   assert.equal(typeof graphDocument.updateOutputNodeConfigInDocument, "function");
 

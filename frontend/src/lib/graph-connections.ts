@@ -4,7 +4,8 @@ export type GraphConnectionAnchorKind = "flow-in" | "flow-out" | "state-in" | "s
 
 export type PendingGraphConnection = {
   sourceNodeId: string;
-  sourceKind: Extract<GraphConnectionAnchorKind, "flow-out" | "route-out">;
+  sourceKind: Extract<GraphConnectionAnchorKind, "flow-out" | "route-out" | "state-out">;
+  sourceStateKey?: string;
   branchKey?: string;
   mode?: "create" | "reconnect";
   currentTargetNodeId?: string;
@@ -13,6 +14,7 @@ export type PendingGraphConnection = {
 export type GraphConnectionTarget = {
   nodeId: string;
   kind: GraphConnectionAnchorKind;
+  stateKey?: string;
 };
 
 function canNodeAcceptFlowTarget(
@@ -29,7 +31,35 @@ function canNodeAcceptFlowTarget(
 }
 
 export function canStartGraphConnection(anchorKind: GraphConnectionAnchorKind) {
-  return anchorKind === "flow-out" || anchorKind === "route-out";
+  return anchorKind === "flow-out" || anchorKind === "route-out" || anchorKind === "state-out";
+}
+
+export function canConnectStateBinding(
+  document: GraphPayload | GraphDocument,
+  sourceNodeId: string,
+  sourceStateKey: string,
+  targetNodeId: string,
+  targetStateKey: string,
+) {
+  const sourceNode = document.nodes[sourceNodeId];
+  const targetNode = document.nodes[targetNodeId];
+  if (!sourceNode || !targetNode || targetNode.kind === "input") {
+    return false;
+  }
+
+  if (!sourceStateKey || !targetStateKey || sourceStateKey === targetStateKey) {
+    return false;
+  }
+
+  if (!sourceNode.writes.some((binding) => binding.state === sourceStateKey)) {
+    return false;
+  }
+
+  if (!targetNode.reads.some((binding) => binding.state === targetStateKey)) {
+    return false;
+  }
+
+  return !targetNode.reads.some((binding) => binding.state === sourceStateKey);
 }
 
 export function canConnectFlowNodes(
@@ -106,7 +136,19 @@ export function canCompleteGraphConnection(
   pending: PendingGraphConnection | null,
   target: GraphConnectionTarget,
 ) {
-  if (!pending || target.kind !== "flow-in") {
+  if (!pending) {
+    return false;
+  }
+
+  if (pending.sourceKind === "state-out") {
+    return target.kind === "state-in" &&
+      typeof pending.sourceStateKey === "string" &&
+      typeof target.stateKey === "string"
+      ? canConnectStateBinding(document, pending.sourceNodeId, pending.sourceStateKey, target.nodeId, target.stateKey)
+      : false;
+  }
+
+  if (target.kind !== "flow-in") {
     return false;
   }
 
