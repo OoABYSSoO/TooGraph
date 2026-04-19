@@ -1,16 +1,13 @@
 import type { GraphNode, GraphPayload, InputNode, TemplateRecord } from "../types/node-system.ts";
 import type { RunDetail } from "../types/run.ts";
-import type { SkillDefinition } from "../types/skills.ts";
+import type { BuddyRunInputSource, BuddyRunTemplateBinding } from "../types/buddy.ts";
 import { GLOBAL_RUNTIME_MODEL_OPTION_VALUE } from "../lib/runtimeModelCatalog.ts";
 import { routeStreamingJsonStateText } from "../lib/streamingJsonStateRouter.ts";
+import { buildBuddyHomeContextValue, validateBuddyRunTemplateBinding } from "./buddyTemplateBindingModel.ts";
 
 export const BUDDY_TEMPLATE_ID = "buddy_autonomous_loop";
 export const BUDDY_REVIEW_TEMPLATE_ID = "buddy_autonomous_review";
-export const BUDDY_USER_MESSAGE_STATE_KEY = "state_1";
-export const BUDDY_HISTORY_STATE_KEY = "state_2";
-export const BUDDY_PAGE_CONTEXT_STATE_KEY = "state_3";
 export const BUDDY_REPLY_STATE_KEY = "state_4";
-export const BUDDY_MODE_STATE_KEY = "state_5";
 export const BUDDY_PROFILE_STATE_KEY = "state_6";
 export const BUDDY_POLICY_STATE_KEY = "state_7";
 export const BUDDY_MEMORY_CONTEXT_STATE_KEY = "state_8";
@@ -71,7 +68,6 @@ export type BuildBuddyChatGraphInput = {
   pageContext: string;
   buddyMode?: unknown;
   buddyModel?: unknown;
-  skillCatalog?: SkillDefinition[];
 };
 
 export type BuildBuddyReviewGraphInput = {
@@ -97,7 +93,11 @@ export function formatBuddyHistory(messages: BuddyChatMessage[], maxMessages = M
   return entries.map((message) => `${message.role === "user" ? "用户" : "伙伴"}: ${message.content}`).join("\n");
 }
 
-export function buildBuddyChatGraph(template: TemplateRecord, input: BuildBuddyChatGraphInput): GraphPayload {
+export function buildBuddyChatGraph(
+  template: TemplateRecord,
+  input: BuildBuddyChatGraphInput,
+  binding: BuddyRunTemplateBinding,
+): GraphPayload {
   const buddyMode = resolveBuddyMode(input.buddyMode);
   const graph: GraphPayload = {
     graph_id: null,
@@ -110,6 +110,7 @@ export function buildBuddyChatGraph(template: TemplateRecord, input: BuildBuddyC
       ...cloneJson(template.metadata),
       origin: "buddy",
       buddy_template_id: template.template_id,
+      buddy_template_binding: cloneJson(binding),
       buddy_mode: buddyMode,
       buddy_can_execute_actions: buddyMode === "full_access",
     },
@@ -117,24 +118,11 @@ export function buildBuddyChatGraph(template: TemplateRecord, input: BuildBuddyC
   applyBuddyModePolicy(graph, buddyMode);
   applyBuddyModelOverride(graph, input.buddyModel);
 
-  const historyValue = formatBuddyHistory(input.history);
-  const pageContextValue = input.pageContext.trim() || "当前页面上下文不可用。";
-  const skillCatalogSnapshot = buildBuddySkillCatalogSnapshot(input.skillCatalog ?? [], buddyMode);
-
-  setStateValueByNameOrKey(graph, "user_message", BUDDY_USER_MESSAGE_STATE_KEY, input.userMessage);
-  setStateValueByNameOrKey(graph, "conversation_history", BUDDY_HISTORY_STATE_KEY, historyValue);
-  setStateValueByNameOrKey(graph, "page_context", BUDDY_PAGE_CONTEXT_STATE_KEY, pageContextValue);
-  setStateValueByNameOrKey(graph, "buddy_mode", BUDDY_MODE_STATE_KEY, buddyMode);
-  setStateValueByName(graph, "skill_catalog_snapshot", skillCatalogSnapshot);
-  for (const stateName of ["buddy_reply", "visible_reply", "final_reply", "direct_reply", "denied_reply", "approval_prompt"]) {
-    setStateValueByName(graph, stateName, "");
+  const validation = validateBuddyRunTemplateBinding(template, binding);
+  if (!validation.valid) {
+    throw new Error(`Buddy run template binding is invalid: ${validation.issues.join(" ")}`);
   }
-
-  syncInputNodeValueByNameOrKey(graph, "user_message", BUDDY_USER_MESSAGE_STATE_KEY, input.userMessage);
-  syncInputNodeValueByNameOrKey(graph, "conversation_history", BUDDY_HISTORY_STATE_KEY, historyValue);
-  syncInputNodeValueByNameOrKey(graph, "page_context", BUDDY_PAGE_CONTEXT_STATE_KEY, pageContextValue);
-  syncInputNodeValueByNameOrKey(graph, "buddy_mode", BUDDY_MODE_STATE_KEY, buddyMode);
-  syncInputNodeValueByName(graph, "skill_catalog_snapshot", skillCatalogSnapshot);
+  applyBuddyRunTemplateBinding(graph, binding, buildBuddyRuntimeSourceValues(input));
   return graph;
 }
 
@@ -189,11 +177,6 @@ export function resolveBuddyMode(value: unknown): BuddyMode {
     return "full_access";
   }
   return DEFAULT_BUDDY_MODE;
-}
-
-export function buildBuddySkillCatalogSnapshot(skills: SkillDefinition[], buddyMode: BuddyMode) {
-  void buddyMode;
-  return skills.map((skill) => cloneJson(skill));
 }
 
 export function resolveBuddyReplyText(run: RunDetail): string {
@@ -383,16 +366,52 @@ export function resolveBuddyRunActivityFromRunEvent(
   };
 }
 
+type BuddyRuntimeSourceValues = Record<BuddyRunInputSource, unknown>;
+
+function buildBuddyRuntimeSourceValues(input: BuildBuddyChatGraphInput): BuddyRuntimeSourceValues {
+  return {
+    current_message: input.userMessage,
+    conversation_history: formatBuddyHistory(input.history),
+    page_context: input.pageContext.trim() || "当前页面上下文不可用。",
+    buddy_home_context: buildBuddyHomeContextValue(),
+  };
+}
+
+function applyBuddyRunTemplateBinding(
+  graph: GraphPayload,
+  binding: BuddyRunTemplateBinding,
+  sourceValues: BuddyRuntimeSourceValues,
+) {
+  for (const [nodeId, source] of Object.entries(binding.input_bindings ?? {})) {
+    const node = graph.nodes[nodeId];
+    if (!node || node.kind !== "input") {
+      throw new Error(`Buddy binding references a missing input node: ${nodeId}`);
+    }
+    if (node.writes.length !== 1) {
+      throw new Error(`Buddy binding input node must write exactly one state: ${nodeId}`);
+    }
+    const stateKey = node.writes[0].state;
+    if (!graph.state_schema[stateKey]) {
+      throw new Error(`Buddy binding input node writes a missing state: ${nodeId}`);
+    }
+    const value = sourceValues[source];
+    node.config = {
+      ...node.config,
+      value: cloneJson(value),
+    };
+    graph.state_schema[stateKey] = {
+      ...graph.state_schema[stateKey],
+      value: cloneJson(value),
+    };
+  }
+}
+
 function setStateValueByName(graph: GraphPayload, stateName: string, value: unknown) {
   const stateKey = findStateKeyByName(graph, stateName);
   if (!stateKey) {
     return;
   }
   setStateValue(graph, stateKey, value);
-}
-
-function setStateValueByNameOrKey(graph: GraphPayload, stateName: string, fallbackStateKey: string, value: unknown) {
-  setStateValue(graph, findStateKeyByName(graph, stateName) ?? fallbackStateKey, value);
 }
 
 function setStateValue(graph: GraphPayload, stateKey: string, value: unknown) {
@@ -411,10 +430,6 @@ function syncInputNodeValueByName(graph: GraphPayload, stateName: string, value:
     return;
   }
   syncInputNodeValue(graph, stateKey, value);
-}
-
-function syncInputNodeValueByNameOrKey(graph: GraphPayload, stateName: string, fallbackStateKey: string, value: unknown) {
-  syncInputNodeValue(graph, findStateKeyByName(graph, stateName) ?? fallbackStateKey, value);
 }
 
 function syncInputNodeValue(graph: GraphPayload, stateKey: string, value: unknown) {

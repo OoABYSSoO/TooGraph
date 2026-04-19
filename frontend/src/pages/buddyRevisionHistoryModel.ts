@@ -24,6 +24,7 @@ export const BUDDY_REVISION_HISTORY_TARGET_FILTERS = [
   "policy",
   "memory",
   "session_summary",
+  "run_template_binding",
 ] as const;
 export type BuddyRevisionHistoryTargetFilter = (typeof BUDDY_REVISION_HISTORY_TARGET_FILTERS)[number];
 

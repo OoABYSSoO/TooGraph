@@ -9,6 +9,7 @@ import type {
   BuddyPolicy,
   BuddyProfile,
   BuddyRevision,
+  BuddyRunTemplateBinding,
   BuddySessionSummary,
 } from "../types/buddy.ts";
 
@@ -75,6 +76,14 @@ export function fetchBuddySessionSummary() {
 
 export function updateBuddySessionSummary(payload: Partial<BuddySessionSummary>, changeReason: string) {
   return executeBuddyCommand<BuddySessionSummary>("session_summary.update", payload, changeReason);
+}
+
+export function fetchBuddyRunTemplateBinding() {
+  return apiGet<BuddyRunTemplateBinding>("/api/buddy/run-template-binding");
+}
+
+export function updateBuddyRunTemplateBinding(payload: BuddyRunTemplateBinding, changeReason: string) {
+  return executeBuddyCommand<BuddyRunTemplateBinding>("run_template_binding.update", payload, changeReason);
 }
 
 export function fetchBuddyChatSessions(includeDeleted = false) {

@@ -30,6 +30,20 @@ export type BuddySessionSummary = {
   updated_at: string;
 };
 
+export type BuddyRunInputSource = "current_message" | "conversation_history" | "page_context" | "buddy_home_context";
+
+export type BuddyRunTemplateBinding = {
+  version?: number;
+  template_id: string;
+  input_bindings: Record<string, BuddyRunInputSource>;
+  updated_at?: string;
+};
+
+export type BuddyRunTemplateBindingValidation = {
+  valid: boolean;
+  issues: string[];
+};
+
 export type BuddyChatSession = {
   session_id: string;
   title: string;

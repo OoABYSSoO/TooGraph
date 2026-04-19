@@ -314,11 +314,11 @@ import {
   deleteBuddyChatSession,
   fetchBuddyChatMessages,
   fetchBuddyChatSessions,
+  fetchBuddyRunTemplateBinding,
 } from "../api/buddy.ts";
 import { fetchTemplate, runGraph } from "../api/graphs.ts";
 import { cancelRun, fetchRun, resumeRun } from "../api/runs.ts";
 import { fetchSettings } from "../api/settings.ts";
-import { fetchSkillCatalog } from "../api/skills.ts";
 import { resolveOutputPreviewContent } from "../editor/nodes/outputPreviewContentModel.ts";
 import { formatRunDuration } from "../lib/run-display-name.ts";
 import { buildRuntimeModelOptions } from "../lib/runtimeModelCatalog.ts";
@@ -342,7 +342,6 @@ import {
 } from "./buddyPauseQueuePolicy.ts";
 import {
   BUDDY_REVIEW_TEMPLATE_ID,
-  BUDDY_TEMPLATE_ID,
   BUDDY_MODE_OPTIONS,
   DEFAULT_BUDDY_MODE,
   buildBuddyChatGraph,
@@ -1075,18 +1074,19 @@ async function processQueuedTurn(turn: BuddyQueuedTurn) {
 
   try {
     activeAbortController = new AbortController();
-    const [template, skillCatalog] = await Promise.all([
-      fetchTemplate(BUDDY_TEMPLATE_ID),
-      fetchSkillCatalog({ includeDisabled: true }),
-    ]);
-    const graph = buildBuddyChatGraph(template, {
-      userMessage: turn.userMessage,
-      history,
-      pageContext: buildPageContext(),
-      buddyMode: buddyMode.value,
-      buddyModel: buddyModelRef.value,
-      skillCatalog,
-    });
+    const binding = await fetchBuddyRunTemplateBinding();
+    const template = await fetchTemplate(binding.template_id);
+    const graph = buildBuddyChatGraph(
+      template,
+      {
+        userMessage: turn.userMessage,
+        history,
+        pageContext: buildPageContext(),
+        buddyMode: buddyMode.value,
+        buddyModel: buddyModelRef.value,
+      },
+      binding,
+    );
     setAssistantActivityText(assistantMessage.id, t("buddy.activity.starting"));
     const run = await runGraph(graph);
     activeRunId.value = run.run_id;

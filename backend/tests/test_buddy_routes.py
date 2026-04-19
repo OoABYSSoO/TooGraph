@@ -90,6 +90,61 @@ class BuddyRouteTests(unittest.TestCase):
         self.assertTrue(delete_response.json()["deleted"])
         self.assertEqual(sessions_after_delete_response.json(), [])
 
+    def test_run_template_binding_default_save_and_restore(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"):
+                with TestClient(app) as client:
+                    default_response = client.get("/api/buddy/run-template-binding")
+                    save_response = client.post(
+                        "/api/buddy/commands",
+                        json={
+                            "action": "run_template_binding.update",
+                            "payload": {
+                                "template_id": "custom_loop",
+                                "input_bindings": {
+                                    "input_prompt": "current_message",
+                                    "input_history": "conversation_history",
+                                },
+                            },
+                            "change_reason": "用户更新伙伴运行模板绑定。",
+                        },
+                    )
+                    saved_response = client.get("/api/buddy/run-template-binding")
+                    revisions = client.get(
+                        "/api/buddy/revisions",
+                        params={"target_type": "run_template_binding"},
+                    ).json()
+                    restore_response = client.post(f"/api/buddy/revisions/{revisions[-1]['revision_id']}/restore")
+                    restored_response = client.get("/api/buddy/run-template-binding")
+
+        self.assertEqual(default_response.status_code, 200)
+        self.assertEqual(default_response.json()["template_id"], "buddy_autonomous_loop")
+        self.assertEqual(default_response.json()["input_bindings"]["input_user_message"], "current_message")
+        self.assertEqual(save_response.status_code, 200)
+        self.assertEqual(save_response.json()["result"]["template_id"], "custom_loop")
+        self.assertEqual(saved_response.json()["template_id"], "custom_loop")
+        self.assertEqual(len(revisions), 1)
+        self.assertEqual(restore_response.status_code, 200)
+        self.assertEqual(restored_response.json()["template_id"], "buddy_autonomous_loop")
+
+    def test_run_template_binding_rejects_missing_current_message(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch.object(store, "BUDDY_HOME_DIR", Path(temp_dir) / "buddy_home"):
+                with TestClient(app) as client:
+                    response = client.post(
+                        "/api/buddy/commands",
+                        json={
+                            "action": "run_template_binding.update",
+                            "payload": {
+                                "template_id": "custom_loop",
+                                "input_bindings": {"input_history": "conversation_history"},
+                            },
+                        },
+                    )
+
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("current_message", response.json()["detail"])
+
 
 if __name__ == "__main__":
     unittest.main()
