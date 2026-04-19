@@ -199,7 +199,7 @@
           <ElPopover
             :visible="isStateEditorOpen(`input-primary-output:${view.body.primaryOutput.key}`) || isStateEditorConfirmOpen(`input-primary-output:${view.body.primaryOutput.key}`)"
             :placement="isStateEditorOpen(`input-primary-output:${view.body.primaryOutput.key}`) ? 'bottom-end' : 'top-end'"
-            :width="320"
+            :width="isStateEditorOpen(`input-primary-output:${view.body.primaryOutput.key}`) ? 320 : undefined"
             :show-arrow="false"
             :popper-style="stateEditorPopoverStyle"
             popper-class="node-card__state-editor-popper"
@@ -373,7 +373,7 @@
             <ElPopover
               :visible="isStateEditorOpen(`agent-input:${port.key}`) || isStateEditorConfirmOpen(`agent-input:${port.key}`)"
               :placement="isStateEditorOpen(`agent-input:${port.key}`) ? 'bottom-start' : 'top-start'"
-              :width="320"
+              :width="isStateEditorOpen(`agent-input:${port.key}`) ? 320 : undefined"
               :show-arrow="false"
               :popper-style="stateEditorPopoverStyle"
               popper-class="node-card__state-editor-popper"
@@ -426,7 +426,7 @@
             <ElPopover
               :visible="isStateEditorOpen(`agent-output:${port.key}`) || isStateEditorConfirmOpen(`agent-output:${port.key}`)"
               :placement="isStateEditorOpen(`agent-output:${port.key}`) ? 'bottom-end' : 'top-end'"
-              :width="320"
+              :width="isStateEditorOpen(`agent-output:${port.key}`) ? 320 : undefined"
               :show-arrow="false"
               :popper-style="stateEditorPopoverStyle"
               popper-class="node-card__state-editor-popper"
@@ -737,7 +737,7 @@
           v-if="view.body.connectedStateKey && view.body.connectedStateLabel"
           :visible="isStateEditorOpen(`output-input:${view.body.connectedStateKey}`) || isStateEditorConfirmOpen(`output-input:${view.body.connectedStateKey}`)"
           :placement="isStateEditorOpen(`output-input:${view.body.connectedStateKey}`) ? 'bottom-start' : 'top-start'"
-          :width="320"
+            :width="isStateEditorOpen(`output-input:${view.body.connectedStateKey}`) ? 320 : undefined"
           :show-arrow="false"
           :popper-style="stateEditorPopoverStyle"
           popper-class="node-card__state-editor-popper"
@@ -815,7 +815,7 @@
             <ElPopover
               :visible="isStateEditorOpen(`condition-input:${port.key}`) || isStateEditorConfirmOpen(`condition-input:${port.key}`)"
               :placement="isStateEditorOpen(`condition-input:${port.key}`) ? 'bottom-start' : 'top-start'"
-              :width="320"
+              :width="isStateEditorOpen(`condition-input:${port.key}`) ? 320 : undefined"
               :show-arrow="false"
               :popper-style="stateEditorPopoverStyle"
               popper-class="node-card__state-editor-popper"
@@ -2705,42 +2705,28 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
 .node-card__port-pill {
   --node-card-port-accent: rgba(217, 119, 6, 0.92);
   position: relative;
-  isolation: isolate;
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
   gap: 9px;
   min-height: 34px;
+  min-width: 132px;
   max-width: 100%;
-  border-radius: 0;
-  border: none;
+  border-radius: 999px;
+  border: 1px solid transparent;
   background: transparent;
-  padding: 0;
+  padding: 5px 10px;
   box-shadow: none;
   cursor: pointer;
-}
-
-.node-card__port-pill::before {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  inset: -6px -12px;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  background: transparent;
-  box-shadow: none;
-  opacity: 0;
-  pointer-events: none;
   transition:
-    opacity 140ms ease,
     border-color 140ms ease,
     background 140ms ease,
     box-shadow 140ms ease;
 }
 
-.node-card__port-pill-row:hover .node-card__port-pill::before,
-.node-card__port-pill--revealed::before {
-  opacity: 1;
+.node-card__port-pill:hover,
+.node-card__port-pill:focus-visible,
+.node-card__port-pill--revealed {
   border-color: rgba(154, 52, 18, 0.14);
   background: rgba(255, 250, 241, 0.94);
   box-shadow: 0 10px 22px rgba(60, 41, 20, 0.08);
@@ -2752,21 +2738,22 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
 
 .node-card__port-pill--input {
   justify-content: flex-start;
-  color: #1d4ed8;
+  color: #1f2937;
 }
 
 .node-card__port-pill--dock-start {
-  margin-left: calc(var(--node-card-inline-padding) * -1);
+  margin-left: calc(var(--node-card-inline-padding) * -1 - 10px);
 }
 
 .node-card__port-pill--dock-end {
-  margin-right: calc(var(--node-card-inline-padding) * -1);
+  margin-right: calc(var(--node-card-inline-padding) * -1 - 10px);
 }
 
 .node-card__port-pill-label {
   position: relative;
   display: inline-flex;
   align-items: center;
+  padding-inline: 0;
   overflow: visible;
   text-overflow: clip;
   white-space: nowrap;
@@ -3236,6 +3223,10 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
 }
 
 .node-card__confirm-hint {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
   white-space: nowrap;
   border-radius: 999px;
   border: 1px solid rgba(154, 52, 18, 0.16);
@@ -3260,6 +3251,8 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
 }
 
 .node-card__confirm-hint--state {
+  padding: 5px 10px;
+  letter-spacing: 0.12em;
   border-color: rgba(37, 99, 235, 0.16);
   background: rgba(239, 246, 255, 0.98);
   color: rgb(37, 99, 235);
