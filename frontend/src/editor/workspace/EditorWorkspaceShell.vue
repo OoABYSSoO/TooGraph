@@ -89,6 +89,18 @@
                 @remove-route="removeConditionRouteForTab(tab.tabId, $event.sourceNodeId, $event.branchKey)"
                 @update-output-config="updateOutputConfigForTab(tab.tabId, $event.nodeId, $event.patch)"
                 @update:node-position="(payload) => handleNodePositionUpdate(tab.tabId, payload)"
+                @open-node-creation-menu="openNodeCreationMenuForTab(tab.tabId, $event)"
+                @create-node-from-file="createNodeFromFileForTab(tab.tabId, $event)"
+              />
+              <EditorNodeCreationMenu
+                :open="Boolean(nodeCreationMenuState(tab.tabId)?.open)"
+                :entries="nodeCreationEntriesForTab(tab.tabId)"
+                :context="nodeCreationMenuState(tab.tabId)?.context ?? null"
+                :query="nodeCreationMenuState(tab.tabId)?.query ?? ''"
+                :position="nodeCreationMenuState(tab.tabId)?.position ?? null"
+                @update:query="updateNodeCreationQuery(tab.tabId, $event)"
+                @select-entry="createNodeFromMenuForTab(tab.tabId, $event)"
+                @close="closeNodeCreationMenu(tab.tabId)"
               />
               <div
                 v-if="feedbackForTab(tab.tabId)"
@@ -151,6 +163,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
+import { fetchPresets } from "@/api/presets";
 import { fetchKnowledgeBases } from "@/api/knowledge";
 import { fetchRun } from "@/api/runs";
 import { fetchSettings } from "@/api/settings";
@@ -159,6 +172,8 @@ import { fetchGraph, runGraph, saveGraph, validateGraph } from "@/api/graphs";
 import { resolveAgentRuntimeCatalog } from "@/editor/nodes/agentConfigModel";
 import EditorCanvas from "@/editor/canvas/EditorCanvas.vue";
 import type { NodeFocusRequest } from "@/editor/canvas/useNodeSelectionFocus";
+import { buildBuiltinNodeCreationEntries } from "@/editor/workspace/nodeCreationBuiltins";
+import { buildNodeCreationEntries } from "@/editor/workspace/nodeCreationMenuModel";
 import { resolveEditorRouteInstruction } from "@/lib/editor-route-sync";
 import {
   addConditionBranchToDocument,
@@ -197,9 +212,23 @@ import { useGraphDocumentStore } from "@/stores/graphDocument";
 import type { KnowledgeBaseRecord } from "@/types/knowledge";
 import type { SettingsPayload } from "@/types/settings";
 import type { SkillDefinition } from "@/types/skills";
-import type { AgentNode, ConditionNode, GraphDocument, GraphPayload, GraphPosition, InputNode, OutputNode, StateDefinition, TemplateRecord } from "@/types/node-system";
+import type {
+  AgentNode,
+  ConditionNode,
+  GraphDocument,
+  GraphPayload,
+  GraphPosition,
+  InputNode,
+  NodeCreationContext,
+  NodeCreationEntry,
+  OutputNode,
+  PresetDocument,
+  StateDefinition,
+  TemplateRecord,
+} from "@/types/node-system";
 
 import EditorCloseConfirmDialog from "./EditorCloseConfirmDialog.vue";
+import EditorNodeCreationMenu from "./EditorNodeCreationMenu.vue";
 import EditorStatePanel from "./EditorStatePanel.vue";
 import EditorTabBar from "./EditorTabBar.vue";
 import EditorWelcomeState from "./EditorWelcomeState.vue";
@@ -246,6 +275,18 @@ const settings = ref<SettingsPayload | null>(null);
 const skillDefinitions = ref<SkillDefinition[]>([]);
 const skillDefinitionsLoading = ref(true);
 const skillDefinitionsError = ref<string | null>(null);
+const persistedPresets = ref<PresetDocument[]>([]);
+const nodeCreationMenuByTabId = ref<
+  Record<
+    string,
+    {
+      open: boolean;
+      context: NodeCreationContext | null;
+      position: { x: number; y: number } | null;
+      query: string;
+    }
+  >
+>({});
 const runPollGenerationByTabId = new Map<string, number>();
 const runPollTimerByTabId = new Map<string, number>();
 
@@ -749,6 +790,68 @@ function editorGridStyle(tabId: string) {
   return {
     gridTemplateColumns: isStatePanelOpen(tabId) ? "minmax(0, 1fr) 380px" : "minmax(0,1fr) 56px",
   };
+}
+
+function nodeCreationMenuState(tabId: string) {
+  return nodeCreationMenuByTabId.value[tabId] ?? null;
+}
+
+function nodeCreationEntriesForTab(tabId: string): NodeCreationEntry[] {
+  const menuState = nodeCreationMenuState(tabId);
+  return buildNodeCreationEntries({
+    builtins: buildBuiltinNodeCreationEntries(),
+    presets: persistedPresets.value,
+    query: menuState?.query ?? "",
+    sourceValueType: menuState?.context?.sourceValueType ?? null,
+  });
+}
+
+function openNodeCreationMenuForTab(tabId: string, context: NodeCreationContext) {
+  nodeCreationMenuByTabId.value = {
+    ...nodeCreationMenuByTabId.value,
+    [tabId]: {
+      open: true,
+      context,
+      position:
+        typeof context.clientX === "number" && typeof context.clientY === "number"
+          ? { x: context.clientX, y: context.clientY }
+          : null,
+      query: "",
+    },
+  };
+}
+
+function closeNodeCreationMenu(tabId: string) {
+  nodeCreationMenuByTabId.value = {
+    ...nodeCreationMenuByTabId.value,
+    [tabId]: {
+      open: false,
+      context: null,
+      position: null,
+      query: "",
+    },
+  };
+}
+
+function updateNodeCreationQuery(tabId: string, query: string) {
+  const currentState = nodeCreationMenuState(tabId);
+  nodeCreationMenuByTabId.value = {
+    ...nodeCreationMenuByTabId.value,
+    [tabId]: {
+      open: currentState?.open ?? false,
+      context: currentState?.context ?? null,
+      position: currentState?.position ?? null,
+      query,
+    },
+  };
+}
+
+function createNodeFromMenuForTab(tabId: string, _entry: NodeCreationEntry) {
+  closeNodeCreationMenu(tabId);
+}
+
+function createNodeFromFileForTab(tabId: string, _payload: { file: File; position: GraphPosition }) {
+  closeNodeCreationMenu(tabId);
 }
 
 function handleNodePositionUpdate(tabId: string, payload: { nodeId: string; position: GraphPosition }) {
@@ -1353,6 +1456,10 @@ async function loadSkillDefinitions() {
   }
 }
 
+async function loadPersistedPresets() {
+  persistedPresets.value = await fetchPresets();
+}
+
 watch(
   workspace,
   (nextWorkspace) => {
@@ -1411,6 +1518,7 @@ onMounted(() => {
   void loadKnowledgeBases();
   void loadSettings();
   void loadSkillDefinitions();
+  void loadPersistedPresets();
   updateWorkspace(readPersistedEditorWorkspace());
   hydrated.value = true;
   ensureUnsavedTabDocuments();
