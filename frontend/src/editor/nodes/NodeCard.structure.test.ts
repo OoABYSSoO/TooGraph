@@ -46,6 +46,24 @@ test("NodeCard docks state pills against the card edges", () => {
   assert.match(componentSource, /\.node-card__port-pill--dock-end \{[\s\S]*margin-right:\s*calc\(var\(--node-card-inline-padding\) \* -1\);/);
 });
 
+test("NodeCard keeps state pill geometry but hides the pill chrome visually", () => {
+  assert.match(componentSource, /\.node-card__port-pill \{[\s\S]*display:\s*inline-flex;/);
+  assert.match(componentSource, /\.node-card__port-pill \{[\s\S]*align-items:\s*center;/);
+  assert.match(componentSource, /\.node-card__port-pill \{[\s\S]*border:\s*none;/);
+  assert.match(componentSource, /\.node-card__port-pill \{[\s\S]*background:\s*transparent;/);
+  assert.match(componentSource, /\.node-card__port-pill \{[\s\S]*box-shadow:\s*none;/);
+  assert.match(componentSource, /\.node-card__port-pill \{[\s\S]*border-radius:\s*0;/);
+  assert.match(componentSource, /\.node-card__port-pill \{[\s\S]*padding:\s*0;/);
+  assert.match(componentSource, /\.node-card__port-pill-anchor-slot \{[\s\S]*width:\s*14px;/);
+  assert.match(componentSource, /\.node-card__port-pill-anchor-slot \{[\s\S]*height:\s*14px;/);
+});
+
+test("NodeCard renders full state port labels without ellipsis clipping", () => {
+  assert.match(componentSource, /\.node-card__port-pill-label \{[\s\S]*overflow:\s*visible;/);
+  assert.match(componentSource, /\.node-card__port-pill-label \{[\s\S]*text-overflow:\s*clip;/);
+  assert.doesNotMatch(componentSource, /\.node-card__port-pill-label \{[\s\S]*text-overflow:\s*ellipsis;/);
+});
+
 test("NodeCard uses Element Plus segmented control on the same row as the input output pill", () => {
   const inputSectionMatch = componentSource.match(
     /<section v-if="view\.body\.kind === 'input'"[\s\S]*?<\/section>/,

@@ -1736,16 +1736,14 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 12px;
+  gap: 9px;
   min-height: 34px;
   max-width: 100%;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--node-card-port-accent) 22%, rgba(154, 52, 18, 0.1));
-  background: rgba(255, 250, 241, 0.9);
-  padding: 0 9px 0 16px;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.54),
-    0 8px 18px rgba(120, 53, 15, 0.07);
+  border-radius: 0;
+  border: none;
+  background: transparent;
+  padding: 0;
+  box-shadow: none;
 }
 
 .node-card__port-pill--output {
@@ -1755,7 +1753,6 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
 .node-card__port-pill--input {
   justify-content: flex-start;
   color: #1d4ed8;
-  padding: 0 16px 0 10px;
 }
 
 .node-card__port-pill--dock-start {
@@ -1767,8 +1764,8 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
 }
 
 .node-card__port-pill-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow: visible;
+  text-overflow: clip;
   white-space: nowrap;
   font-size: 1.02rem;
   font-weight: 600;
