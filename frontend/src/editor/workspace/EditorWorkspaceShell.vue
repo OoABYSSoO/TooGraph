@@ -73,6 +73,8 @@
                 @select-node="focusNodeForTab(tab.tabId, $event)"
                 @update-input-config="updateInputConfigForTab(tab.tabId, $event.nodeId, $event.patch)"
                 @update-input-state="updateStateField(tab.tabId, $event.stateKey, $event.patch)"
+                @rename-state="renameStateField(tab.tabId, $event.currentKey, $event.nextKey)"
+                @update-state="updateStateField(tab.tabId, $event.stateKey, $event.patch)"
                 @update-agent-config="updateAgentConfigForTab(tab.tabId, $event.nodeId, $event.patch)"
                 @update-condition-config="updateConditionConfigForTab(tab.tabId, $event.nodeId, $event.patch)"
                 @update-condition-branch="updateConditionBranchForTab(tab.tabId, $event.nodeId, $event.currentKey, $event.nextKey, $event.mappingKeys)"
@@ -80,6 +82,8 @@
                 @remove-condition-branch="removeConditionBranchForTab(tab.tabId, $event.nodeId, $event.branchKey)"
                 @bind-port-state="bindNodePortStateForTab(tab.tabId, $event.nodeId, $event.side, $event.stateKey)"
                 @create-port-state="createNodePortStateForTab(tab.tabId, $event.nodeId, $event.side, $event.field)"
+                @delete-node="deleteNodeForTab(tab.tabId, $event.nodeId)"
+                @save-node-preset="saveNodePresetForTab(tab.tabId, $event.nodeId)"
                 @connect-state="connectStateBindingForTab(tab.tabId, $event.sourceNodeId, $event.sourceStateKey, $event.targetNodeId, $event.targetStateKey)"
                 @connect-flow="connectFlowNodesForTab(tab.tabId, $event.sourceNodeId, $event.targetNodeId)"
                 @connect-route="connectConditionRouteForTab(tab.tabId, $event.sourceNodeId, $event.branchKey, $event.targetNodeId)"
@@ -163,7 +167,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
-import { fetchPresets } from "@/api/presets";
+import { fetchPreset, fetchPresets, savePreset } from "@/api/presets";
 import { fetchKnowledgeBases } from "@/api/knowledge";
 import { fetchRun } from "@/api/runs";
 import { fetchSettings } from "@/api/settings";
@@ -189,6 +193,7 @@ import {
   removeConditionRouteFromDocument,
   removeConditionBranchFromDocument,
   removeFlowEdgeFromDocument,
+  removeNodeFromDocument,
   syncKnowledgeBaseSkillsInDocument,
   updateAgentNodeConfigInDocument,
   updateConditionBranchInDocument,
@@ -1002,6 +1007,96 @@ function createNodePortStateForTab(tabId: string, nodeId: string, side: "input" 
 
   markDocumentDirty(tabId, nextDocument);
   focusNodeForTab(tabId, nodeId);
+}
+
+function deleteNodeForTab(tabId: string, nodeId: string) {
+  const document = documentsByTabId.value[tabId];
+  if (!document) {
+    return;
+  }
+
+  const deletedNodeName = document.nodes[nodeId]?.name ?? nodeId;
+  const nextDocument = removeNodeFromDocument(document, nodeId);
+  if (nextDocument === document) {
+    return;
+  }
+
+  markDocumentDirty(tabId, nextDocument);
+  if (focusedNodeIdByTabId.value[tabId] === nodeId) {
+    focusNodeForTab(tabId, null);
+  }
+  setMessageFeedbackForTab(tabId, {
+    tone: "neutral",
+    message: `Deleted ${deletedNodeName}.`,
+  });
+}
+
+function slugifyPresetBase(name: string) {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "") || "node";
+}
+
+function buildPresetPayloadForNode(document: GraphPayload | GraphDocument, nodeId: string): {
+  presetId: string;
+  sourcePresetId: string | null;
+  definition: PresetDocument["definition"];
+} | null {
+  const node = document.nodes[nodeId];
+  if (!node || node.kind !== "agent") {
+    return null;
+  }
+
+  const referencedStateKeys = Array.from(new Set([...node.reads.map((binding) => binding.state), ...node.writes.map((binding) => binding.state)]));
+  const stateSchema = Object.fromEntries(
+    referencedStateKeys
+      .map((stateKey) => [stateKey, document.state_schema[stateKey]] as const)
+      .filter((entry): entry is readonly [string, StateDefinition] => Boolean(entry[1])),
+  );
+
+  return {
+    presetId: `preset.local.${slugifyPresetBase(node.name)}.${crypto.randomUUID().slice(0, 6)}`,
+    sourcePresetId: null,
+    definition: {
+      label: node.name,
+      description: node.description,
+      state_schema: stateSchema,
+      node: structuredClone(node),
+    },
+  };
+}
+
+async function saveNodePresetForTab(tabId: string, nodeId: string) {
+  const document = documentsByTabId.value[tabId];
+  if (!document) {
+    return;
+  }
+
+  const payload = buildPresetPayloadForNode(document, nodeId);
+  if (!payload) {
+    setMessageFeedbackForTab(tabId, {
+      tone: "danger",
+      message: "Only agent nodes can be saved as presets.",
+    });
+    return;
+  }
+
+  try {
+    const saved = await savePreset(payload);
+    const savedPreset = await fetchPreset(saved.presetId);
+    persistedPresets.value = [savedPreset, ...persistedPresets.value.filter((preset) => preset.presetId !== savedPreset.presetId)];
+    setMessageFeedbackForTab(tabId, {
+      tone: "success",
+      message: `Saved preset ${savedPreset.definition.label || savedPreset.presetId}.`,
+    });
+  } catch (error) {
+    setMessageFeedbackForTab(tabId, {
+      tone: "danger",
+      message: error instanceof Error ? error.message : "Failed to save preset.",
+    });
+  }
 }
 
 function connectFlowNodesForTab(tabId: string, sourceNodeId: string, targetNodeId: string) {

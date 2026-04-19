@@ -112,6 +112,8 @@
           :selected="selection.selectedNodeId.value === nodeId"
           @update-input-config="emit('update-input-config', $event)"
           @update-input-state="emit('update-input-state', $event)"
+          @rename-state="emit('rename-state', $event)"
+          @update-state="emit('update-state', $event)"
           @update-agent-config="emit('update-agent-config', $event)"
           @update-condition-config="emit('update-condition-config', $event)"
           @update-condition-branch="emit('update-condition-branch', $event)"
@@ -119,6 +121,8 @@
           @remove-condition-branch="emit('remove-condition-branch', $event)"
           @bind-port-state="emit('bind-port-state', $event)"
           @create-port-state="emit('create-port-state', $event)"
+          @delete-node="emit('delete-node', $event)"
+          @save-node-preset="emit('save-node-preset', $event)"
           @update-output-config="emit('update-output-config', $event)"
         />
       </div>
@@ -207,6 +211,8 @@ const emit = defineEmits<{
   (event: "select-node", nodeId: string | null): void;
   (event: "update-input-config", payload: { nodeId: string; patch: Partial<InputNode["config"]> }): void;
   (event: "update-input-state", payload: { stateKey: string; patch: Partial<StateDefinition> }): void;
+  (event: "rename-state", payload: { currentKey: string; nextKey: string }): void;
+  (event: "update-state", payload: { stateKey: string; patch: Partial<StateDefinition> }): void;
   (event: "update-agent-config", payload: { nodeId: string; patch: Partial<AgentNode["config"]> }): void;
   (event: "update-condition-config", payload: { nodeId: string; patch: Partial<ConditionNode["config"]> }): void;
   (event: "update-condition-branch", payload: { nodeId: string; currentKey: string; nextKey: string; mappingKeys: string[] }): void;
@@ -214,6 +220,8 @@ const emit = defineEmits<{
   (event: "remove-condition-branch", payload: { nodeId: string; branchKey: string }): void;
   (event: "bind-port-state", payload: { nodeId: string; side: "input" | "output"; stateKey: string }): void;
   (event: "create-port-state", payload: { nodeId: string; side: "input" | "output"; field: { key: string; definition: StateDefinition } }): void;
+  (event: "delete-node", payload: { nodeId: string }): void;
+  (event: "save-node-preset", payload: { nodeId: string }): void;
   (event: "update-output-config", payload: { nodeId: string; patch: Partial<OutputNode["config"]> }): void;
   (event: "connect-flow", payload: { sourceNodeId: string; targetNodeId: string }): void;
   (event: "connect-state", payload: { sourceNodeId: string; sourceStateKey: string; targetNodeId: string; targetStateKey: string }): void;

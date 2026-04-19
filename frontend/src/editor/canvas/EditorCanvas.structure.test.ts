@@ -67,6 +67,17 @@ test("EditorCanvas emits node-creation intents for empty-canvas double click and
   assert.match(componentSource, /emit\("create-node-from-file",/);
 });
 
+test("EditorCanvas forwards node-card state editing and top-action events", () => {
+  assert.match(componentSource, /@rename-state="emit\('rename-state', \$event\)"/);
+  assert.match(componentSource, /@update-state="emit\('update-state', \$event\)"/);
+  assert.match(componentSource, /@delete-node="emit\('delete-node', \$event\)"/);
+  assert.match(componentSource, /@save-node-preset="emit\('save-node-preset', \$event\)"/);
+  assert.match(componentSource, /\(event: "rename-state", payload: \{ currentKey: string; nextKey: string \}\): void;/);
+  assert.match(componentSource, /\(event: "update-state", payload: \{ stateKey: string; patch: Partial<StateDefinition> \}\): void;/);
+  assert.match(componentSource, /\(event: "delete-node", payload: \{ nodeId: string \}\): void;/);
+  assert.match(componentSource, /\(event: "save-node-preset", payload: \{ nodeId: string \}\): void;/);
+});
+
 test("EditorCanvas opens the creation flow when output drags end on empty canvas", () => {
   assert.match(componentSource, /function openCreationMenuFromPendingConnection/);
   assert.match(componentSource, /activeConnection\.value\.sourceKind === "state-out"/);

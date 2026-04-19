@@ -144,12 +144,35 @@ test("NodeCard restores the legacy agent runtime control order with Element Plus
   assert.doesNotMatch(componentSource, /\.node-card__agent-thinking-icon \{[^}]*background:/);
 });
 
-test("NodeCard gives advanced panels an explicit collapsed affordance", () => {
-  assert.match(componentSource, /class="node-card__advanced-summary-copy"/);
-  assert.match(componentSource, /class="node-card__advanced-summary-label"/);
-  assert.match(componentSource, /class="node-card__advanced-summary-meta"/);
-  assert.match(componentSource, /class="node-card__advanced-summary-icon"/);
-  assert.match(componentSource, /\.node-card__advanced-panel\[open\]/);
-  assert.match(componentSource, /\.node-card__advanced-summary-icon \{/);
-  assert.match(componentSource, /\.node-card__advanced-panel\[open\] \.node-card__advanced-summary-icon \{/);
+test("NodeCard moves node actions into hoverable top buttons built from Element Plus icons and overlays", () => {
+  assert.match(componentSource, /import \{[\s\S]*ElButton,[\s\S]*ElPopover[\s\S]*\} from "element-plus";/);
+  assert.match(componentSource, /import \{[\s\S]*CollectionTag[\s\S]*Delete[\s\S]*Operation[\s\S]*\} from "@element-plus\/icons-vue";/);
+  assert.match(componentSource, /class="node-card__top-actions"/);
+  assert.match(componentSource, /node-card__top-action-button/);
+  assert.match(componentSource, /class="node-card__top-action-button node-card__top-action-button--advanced"/);
+  assert.match(componentSource, /class="node-card__top-action-button node-card__top-action-button--preset"/);
+  assert.match(componentSource, /class="node-card__top-action-button node-card__top-action-button--delete"/);
+  assert.match(componentSource, /@click\.stop="toggleAdvancedPanel"/);
+  assert.match(componentSource, /@click\.stop="confirmDeleteNode"/);
+  assert.match(componentSource, /@click\.stop="confirmSavePreset"/);
+  assert.doesNotMatch(componentSource, /<details class="node-card__advanced-panel"/);
+});
+
+test("NodeCard opens bound-state editing from a double click on the port label", () => {
+  assert.match(componentSource, /@dblclick\.stop="openStateEditor\(/);
+  assert.match(componentSource, /const stateEditorDraft = ref<StateFieldDraft \| null>\(null\);/);
+  assert.match(componentSource, /const activeStateEditorAnchorId = ref<string \| null>\(null\);/);
+  assert.match(componentSource, /emit\("rename-state", \{ currentKey:/);
+  assert.match(componentSource, /emit\("update-state", \{[\s\S]*stateKey:/);
+  assert.match(componentSource, /<ElPopover[\s\S]*:visible="isStateEditorOpen\(/);
+  assert.doesNotMatch(componentSource, /trigger="manual"/);
+  assert.match(componentSource, /StateDefaultValueEditor/);
+  assert.match(componentSource, /class="node-card__state-editor"/);
+});
+
+test("NodeCard declares top-action and state-edit events for canvas forwarding", () => {
+  assert.match(componentSource, /\(event: "rename-state", payload: \{ currentKey: string; nextKey: string \}\): void;/);
+  assert.match(componentSource, /\(event: "update-state", payload: \{ stateKey: string; patch: Partial<StateDefinition> \}\): void;/);
+  assert.match(componentSource, /\(event: "delete-node", payload: \{ nodeId: string \}\): void;/);
+  assert.match(componentSource, /\(event: "save-node-preset", payload: \{ nodeId: string \}\): void;/);
 });

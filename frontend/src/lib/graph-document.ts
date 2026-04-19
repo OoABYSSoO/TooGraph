@@ -534,6 +534,24 @@ export function reconnectConditionRouteInDocument<T extends GraphPayload | Graph
   return nextDocument;
 }
 
+export function removeNodeFromDocument<T extends GraphPayload | GraphDocument>(document: T, nodeId: string): T {
+  if (!document.nodes[nodeId]) {
+    return document;
+  }
+
+  const nextDocument = cloneGraphDocument(document);
+  delete nextDocument.nodes[nodeId];
+  nextDocument.edges = nextDocument.edges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId);
+  nextDocument.conditional_edges = nextDocument.conditional_edges
+    .filter((edge) => edge.source !== nodeId)
+    .map((edge) => ({
+      ...edge,
+      branches: Object.fromEntries(Object.entries(edge.branches).filter(([, targetNodeId]) => targetNodeId !== nodeId)),
+    }))
+    .filter((edge) => Object.keys(edge.branches).length > 0);
+  return nextDocument;
+}
+
 export function updateInputNodeConfigInDocument<T extends GraphPayload | GraphDocument>(
   document: T,
   nodeId: string,

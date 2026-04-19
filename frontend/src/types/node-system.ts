@@ -173,6 +173,12 @@ export type PresetDocument = {
   updatedAt: string | null;
 };
 
+export type PresetSaveResponse = {
+  presetId: string;
+  saved: boolean;
+  updatedAt: string | null;
+};
+
 export type NodeCreationContext = {
   position: GraphPosition;
   sourceNodeId?: string;

@@ -2093,3 +2093,135 @@ test("updateInputNodeConfigInDocument returns original document for non-input or
   assert.equal(unchangedInput, document);
   assert.equal(unchangedOutput, document);
 });
+
+test("removeNodeFromDocument prunes the node, flow edges, and route branches that target it", () => {
+  assert.equal(typeof graphDocument.removeNodeFromDocument, "function");
+
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Delete Node Graph",
+    state_schema: {
+      question: {
+        name: "question",
+        description: "",
+        type: "text",
+        value: "",
+        color: "#2563eb",
+      },
+      answer: {
+        name: "answer",
+        description: "",
+        type: "text",
+        value: "",
+        color: "#d97706",
+      },
+    },
+    nodes: {
+      input_question: {
+        kind: "input",
+        name: "input_question",
+        description: "Question input",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [{ state: "question", mode: "replace" }],
+        config: {
+          value: "",
+        },
+      },
+      answer_helper: {
+        kind: "agent",
+        name: "answer_helper",
+        description: "Answer helper",
+        ui: { position: { x: 180, y: 0 } },
+        reads: [{ state: "question", required: true }],
+        writes: [{ state: "answer", mode: "replace" }],
+        config: {
+          skills: [],
+          taskInstruction: "Answer the question",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "off",
+          temperature: 0.2,
+        },
+      },
+      route_result: {
+        kind: "condition",
+        name: "route_result",
+        description: "Route the result",
+        ui: { position: { x: 360, y: 0 } },
+        reads: [{ state: "answer", required: true }],
+        writes: [],
+        config: {
+          branches: ["continue", "retry"],
+          loopLimit: -1,
+          branchMapping: {},
+          rule: {
+            source: "answer",
+            operator: "exists",
+            value: null,
+          },
+        },
+      },
+      output_answer: {
+        kind: "output",
+        name: "output_answer",
+        description: "Output",
+        ui: { position: { x: 540, y: 0 } },
+        reads: [{ state: "answer", required: true }],
+        writes: [],
+        config: {
+          displayMode: "auto",
+          persistEnabled: false,
+          persistFormat: "auto",
+          fileNameTemplate: "",
+        },
+      },
+    },
+    edges: [
+      { source: "input_question", target: "answer_helper" },
+      { source: "answer_helper", target: "route_result" },
+      { source: "answer_helper", target: "output_answer" },
+    ],
+    conditional_edges: [
+      {
+        source: "route_result",
+        branches: {
+          continue: "output_answer",
+          retry: "answer_helper",
+        },
+      },
+    ],
+    metadata: {},
+  };
+
+  const nextDocument = graphDocument.removeNodeFromDocument(document, "answer_helper");
+
+  assert.notEqual(nextDocument, document);
+  assert.deepEqual(Object.keys(nextDocument.nodes).sort(), ["input_question", "output_answer", "route_result"]);
+  assert.deepEqual(nextDocument.edges, []);
+  assert.deepEqual(nextDocument.conditional_edges, [
+    {
+      source: "route_result",
+      branches: {
+        continue: "output_answer",
+      },
+    },
+  ]);
+});
+
+test("removeNodeFromDocument returns the original document when the node does not exist", () => {
+  assert.equal(typeof graphDocument.removeNodeFromDocument, "function");
+
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Delete Node No-op Graph",
+    state_schema: {},
+    nodes: {},
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const nextDocument = graphDocument.removeNodeFromDocument(document, "missing_node");
+  assert.equal(nextDocument, document);
+});
