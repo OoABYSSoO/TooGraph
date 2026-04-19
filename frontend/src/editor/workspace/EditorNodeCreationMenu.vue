@@ -1,8 +1,12 @@
 <template>
   <div
     v-if="open && position"
+    ref="menuRef"
     class="editor-node-creation-menu"
     :style="menuStyle"
+    data-node-popup-surface="true"
+    @pointerdown.stop
+    @click.stop
   >
     <div class="editor-node-creation-menu__header">
       <div>
@@ -39,7 +43,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { ElInput } from "element-plus";
 
 import type { NodeCreationContext, NodeCreationEntry } from "@/types/node-system";
@@ -51,6 +55,14 @@ const props = defineProps<{
   query: string;
   position: { x: number; y: number } | null;
 }>();
+
+const emit = defineEmits<{
+  (event: "update:query", value: string): void;
+  (event: "select-entry", entry: NodeCreationEntry): void;
+  (event: "close"): void;
+}>();
+
+const menuRef = ref<HTMLElement | null>(null);
 
 const menuStyle = computed(() => {
   if (!props.position) {
@@ -74,11 +86,66 @@ const menuStyle = computed(() => {
   };
 });
 
-defineEmits<{
-  (event: "update:query", value: string): void;
-  (event: "select-entry", entry: NodeCreationEntry): void;
-  (event: "close"): void;
-}>();
+function isMenuSurfaceTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+  return Boolean(menuRef.value?.contains(target));
+}
+
+function handleGlobalPointerDown(event: PointerEvent) {
+  if (!props.open || isMenuSurfaceTarget(event.target)) {
+    return;
+  }
+  emit("close");
+}
+
+function handleGlobalFocusIn(event: FocusEvent) {
+  if (!props.open || isMenuSurfaceTarget(event.target)) {
+    return;
+  }
+  emit("close");
+}
+
+function handleGlobalKeyDown(event: KeyboardEvent) {
+  if (!props.open || event.key !== "Escape") {
+    return;
+  }
+  emit("close");
+}
+
+function addGlobalListeners() {
+  document.addEventListener("pointerdown", handleGlobalPointerDown);
+  document.addEventListener("focusin", handleGlobalFocusIn);
+  document.addEventListener("keydown", handleGlobalKeyDown);
+}
+
+function removeGlobalListeners() {
+  document.removeEventListener("pointerdown", handleGlobalPointerDown);
+  document.removeEventListener("focusin", handleGlobalFocusIn);
+  document.removeEventListener("keydown", handleGlobalKeyDown);
+}
+
+onMounted(() => {
+  if (props.open) {
+    addGlobalListeners();
+  }
+});
+
+watch(
+  () => props.open,
+  (open) => {
+    if (open) {
+      addGlobalListeners();
+      return;
+    }
+    removeGlobalListeners();
+  },
+);
+
+onBeforeUnmount(() => {
+  removeGlobalListeners();
+});
 </script>
 
 <style scoped>
@@ -89,11 +156,12 @@ defineEmits<{
   max-width: calc(100vw - 24px);
   max-height: min(70vh, 420px);
   overflow: auto;
-  border: 1px solid rgba(154, 52, 18, 0.18);
-  border-radius: 20px;
+  border: 1px solid rgba(154, 52, 18, 0.16);
+  border-radius: 18px;
   background: rgba(255, 250, 241, 0.98);
   padding: 12px;
-  box-shadow: 0 24px 48px rgba(60, 41, 20, 0.18);
+  box-shadow: 0 20px 40px rgba(60, 41, 20, 0.12);
+  backdrop-filter: blur(12px);
 }
 
 .editor-node-creation-menu__header {
@@ -117,14 +185,25 @@ defineEmits<{
 }
 
 .editor-node-creation-menu__close {
-  border: 0;
-  background: transparent;
-  color: rgba(60, 41, 20, 0.7);
+  min-height: 32px;
+  border: 1px solid rgba(154, 52, 18, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.88);
+  color: rgba(60, 41, 20, 0.72);
+  padding: 0 12px;
   cursor: pointer;
 }
 
 .editor-node-creation-menu__search {
   margin-top: 12px;
+}
+
+:deep(.editor-node-creation-menu__search .el-input__wrapper) {
+  min-height: 40px;
+  border-radius: 14px;
+  border: 1px solid rgba(154, 52, 18, 0.16);
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: none;
 }
 
 .editor-node-creation-menu__entries {
@@ -136,12 +215,19 @@ defineEmits<{
 .editor-node-creation-menu__entry {
   display: grid;
   gap: 4px;
-  border: 1px solid rgba(154, 52, 18, 0.12);
+  border: 1px solid rgba(154, 52, 18, 0.14);
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.88);
   padding: 12px;
   text-align: left;
   cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.editor-node-creation-menu__entry:hover {
+  border-color: rgba(154, 52, 18, 0.22);
+  background: rgba(255, 252, 247, 0.98);
+  transform: translateY(-1px);
 }
 
 .editor-node-creation-menu__entry-family {

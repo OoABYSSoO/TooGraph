@@ -21,3 +21,18 @@ test("EditorNodeCreationMenu renders creation entries and emits selection events
   assert.match(componentSource, /\.editor-node-creation-menu \{[\s\S]*position:\s*fixed;/);
   assert.doesNotMatch(componentSource, /transform:\s*translate\(-20px,\s*-20px\)/);
 });
+
+test("EditorNodeCreationMenu matches the warm popup theme and closes when focus leaves it", () => {
+  assert.match(componentSource, /import \{ computed, onBeforeUnmount, onMounted, ref, watch \} from "vue";/);
+  assert.match(componentSource, /ref="menuRef"/);
+  assert.match(componentSource, /document\.addEventListener\("pointerdown", handleGlobalPointerDown\)/);
+  assert.match(componentSource, /document\.addEventListener\("focusin", handleGlobalFocusIn\)/);
+  assert.match(componentSource, /document\.addEventListener\("keydown", handleGlobalKeyDown\)/);
+  assert.match(componentSource, /document\.removeEventListener\("pointerdown", handleGlobalPointerDown\)/);
+  assert.match(componentSource, /document\.removeEventListener\("focusin", handleGlobalFocusIn\)/);
+  assert.match(componentSource, /document\.removeEventListener\("keydown", handleGlobalKeyDown\)/);
+  assert.match(componentSource, /\.editor-node-creation-menu \{[\s\S]*border:\s*1px solid rgba\(154,\s*52,\s*18,\s*0\.16\);/);
+  assert.match(componentSource, /\.editor-node-creation-menu \{[\s\S]*background:\s*rgba\(255,\s*250,\s*241,\s*0\.98\);/);
+  assert.match(componentSource, /\.editor-node-creation-menu \{[\s\S]*box-shadow:\s*0 20px 40px rgba\(60,\s*41,\s*20,\s*0\.12\);/);
+  assert.match(componentSource, /:deep\(.editor-node-creation-menu__search \.el-input__wrapper\)/);
+});

@@ -19,7 +19,7 @@
             <ElIcon><Operation /></ElIcon>
           </ElButton>
         </template>
-        <div class="node-card__top-popover">
+        <div class="node-card__top-popover" data-node-popup-surface="true">
           <div class="node-card__top-popover-title">Advanced</div>
           <div v-if="view.body.kind === 'agent'" class="node-card__advanced-popover-content">
             <label class="node-card__control-row">
@@ -171,7 +171,7 @@
                 />
               </span>
             </template>
-            <div v-if="stateEditorDraft" class="node-card__state-editor">
+            <div v-if="stateEditorDraft" class="node-card__state-editor" data-node-popup-surface="true">
               <div class="node-card__state-editor-title">Edit State</div>
               <label class="node-card__control-row">
                 <span class="node-card__control-label">Name</span>
@@ -347,7 +347,7 @@
                   <span class="node-card__port-pill-label" @dblclick.stop="openStateEditor(`agent-input:${port.key}`, port.key)">{{ port.label }}</span>
                 </span>
               </template>
-              <div v-if="stateEditorDraft" class="node-card__state-editor">
+              <div v-if="stateEditorDraft" class="node-card__state-editor" data-node-popup-surface="true">
                 <div class="node-card__state-editor-title">Edit State</div>
                 <label class="node-card__control-row">
                   <span class="node-card__control-label">Name</span>
@@ -407,7 +407,7 @@
                   />
                 </span>
               </template>
-              <div v-if="stateEditorDraft" class="node-card__state-editor">
+              <div v-if="stateEditorDraft" class="node-card__state-editor" data-node-popup-surface="true">
                 <div class="node-card__state-editor-title">Edit State</div>
                 <label class="node-card__control-row">
                   <span class="node-card__control-label">Name</span>
@@ -515,7 +515,7 @@
           + output
         </button>
       </div>
-      <div v-if="activePortPickerSide" class="node-card__port-picker" @pointerdown.stop @click.stop>
+      <div v-if="activePortPickerSide" class="node-card__port-picker" data-node-popup-surface="true" @pointerdown.stop @click.stop>
         <div class="node-card__port-picker-title">{{ portPickerTitle }}</div>
         <div v-if="portStateDraft" class="node-card__port-picker-form">
           <label class="node-card__control-row">
@@ -644,7 +644,7 @@
           </div>
         </div>
       </div>
-      <div v-if="isSkillPickerOpen" class="node-card__skill-picker" @pointerdown.stop @click.stop>
+      <div v-if="isSkillPickerOpen" class="node-card__skill-picker" data-node-popup-surface="true" @pointerdown.stop @click.stop>
         <div class="node-card__skill-picker-title">Add Skill</div>
         <div class="node-card__skill-picker-copy">这里只负责附加已有 skill，不在编排界面里编辑 skill 内容。</div>
         <div v-if="skillDefinitionsLoading" class="node-card__skill-panel-message">
@@ -729,7 +729,7 @@
               </span>
             </span>
           </template>
-          <div v-if="stateEditorDraft" class="node-card__state-editor">
+          <div v-if="stateEditorDraft" class="node-card__state-editor" data-node-popup-surface="true">
             <div class="node-card__state-editor-title">Edit State</div>
             <label class="node-card__control-row">
               <span class="node-card__control-label">Name</span>
@@ -814,7 +814,7 @@
                   <span class="node-card__port-pill-label" @dblclick.stop="openStateEditor(`condition-input:${port.key}`, port.key)">{{ port.label }}</span>
                 </span>
               </template>
-              <div v-if="stateEditorDraft" class="node-card__state-editor">
+              <div v-if="stateEditorDraft" class="node-card__state-editor" data-node-popup-surface="true">
                 <div class="node-card__state-editor-title">Edit State</div>
                 <label class="node-card__control-row">
                   <span class="node-card__control-label">Name</span>
@@ -988,7 +988,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { ElButton, ElIcon, ElInput, ElPopover } from "element-plus";
 import { Check, Collection, CollectionTag, Delete, Document, FolderOpened, Operation, Opportunity } from "@element-plus/icons-vue";
 
@@ -1283,6 +1283,7 @@ const agentTemperatureInput = computed(() => {
 const hasAdvancedSettings = computed(() => props.node.kind === "agent" || props.node.kind === "output");
 const canSavePreset = computed(() => props.node.kind === "agent");
 const isTopActionVisible = computed(() => props.selected || activeTopAction.value !== null);
+const hasFloatingPanelOpen = computed(() => activeTopAction.value !== null || activeStateEditorAnchorId.value !== null || activePortPickerSide.value !== null || isSkillPickerOpen.value);
 
 watch(
   () => (props.node.kind === "condition" ? props.node.config.loopLimit : null),
@@ -1319,7 +1320,22 @@ watch(
 );
 
 onBeforeUnmount(() => {
+  removeGlobalFloatingPanelListeners();
   clearTopActionTimeout();
+});
+
+onMounted(() => {
+  if (hasFloatingPanelOpen.value) {
+    addGlobalFloatingPanelListeners();
+  }
+});
+
+watch(hasFloatingPanelOpen, (open) => {
+  if (open) {
+    addGlobalFloatingPanelListeners();
+    return;
+  }
+  removeGlobalFloatingPanelListeners();
 });
 
 function emitOutputConfigPatch(patch: Partial<OutputNode["config"]>) {
@@ -1784,6 +1800,71 @@ function toggleAdvancedPanel() {
   closePortPicker();
   closeStateEditor();
   activeTopAction.value = activeTopAction.value === "advanced" ? null : "advanced";
+}
+
+function isFloatingPanelSurfaceTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  return Boolean(
+    target.closest(
+      [
+        "[data-top-action-surface='true']",
+        "[data-node-popup-surface='true']",
+        ".node-card__top-popover",
+        ".node-card__state-editor",
+        ".node-card__confirm-hint",
+        ".node-card__action-popover",
+        ".node-card__confirm-popover",
+        ".node-card__state-editor-popper",
+        ".node-card__agent-model-popper",
+      ].join(", "),
+    ),
+  );
+}
+
+function closeFloatingPanels() {
+  clearTopActionConfirmState();
+  if (activeTopAction.value === "advanced") {
+    activeTopAction.value = null;
+  }
+  closeStateEditor();
+  closePortPicker();
+  isSkillPickerOpen.value = false;
+}
+
+function handleGlobalFloatingPanelPointerDown(event: PointerEvent) {
+  if (!hasFloatingPanelOpen.value || isFloatingPanelSurfaceTarget(event.target)) {
+    return;
+  }
+  closeFloatingPanels();
+}
+
+function handleGlobalFloatingPanelFocusIn(event: FocusEvent) {
+  if (!hasFloatingPanelOpen.value || isFloatingPanelSurfaceTarget(event.target)) {
+    return;
+  }
+  closeFloatingPanels();
+}
+
+function handleGlobalFloatingPanelKeyDown(event: KeyboardEvent) {
+  if (!hasFloatingPanelOpen.value || event.key !== "Escape") {
+    return;
+  }
+  closeFloatingPanels();
+}
+
+function addGlobalFloatingPanelListeners() {
+  document.addEventListener("pointerdown", handleGlobalFloatingPanelPointerDown);
+  document.addEventListener("focusin", handleGlobalFloatingPanelFocusIn);
+  document.addEventListener("keydown", handleGlobalFloatingPanelKeyDown);
+}
+
+function removeGlobalFloatingPanelListeners() {
+  document.removeEventListener("pointerdown", handleGlobalFloatingPanelPointerDown);
+  document.removeEventListener("focusin", handleGlobalFloatingPanelFocusIn);
+  document.removeEventListener("keydown", handleGlobalFloatingPanelKeyDown);
 }
 
 function clearTopActionTimeout() {
@@ -2638,10 +2719,11 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
 .node-card__skill-picker {
   display: grid;
   gap: 10px;
-  border: 1px solid rgba(37, 99, 235, 0.14);
-  border-radius: 20px;
+  border: 1px solid rgba(154, 52, 18, 0.16);
+  border-radius: 18px;
   padding: 14px;
-  background: rgba(239, 246, 255, 0.56);
+  background: rgba(255, 250, 241, 0.98);
+  box-shadow: 0 20px 40px rgba(60, 41, 20, 0.12);
 }
 
 .node-card__skill-picker-title {
@@ -2676,11 +2758,18 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
   display: grid;
   gap: 6px;
   border-radius: 16px;
-  border: 1px solid rgba(37, 99, 235, 0.14);
-  background: rgba(255, 255, 255, 0.84);
+  border: 1px solid rgba(154, 52, 18, 0.14);
+  background: rgba(255, 255, 255, 0.88);
   padding: 12px 14px;
   text-align: left;
   cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.node-card__skill-option:hover {
+  border-color: rgba(154, 52, 18, 0.22);
+  background: rgba(255, 252, 247, 0.98);
+  transform: translateY(-1px);
 }
 
 .node-card__skill-option-title {
@@ -2740,10 +2829,11 @@ function handleConditionBranchEnter(_currentKey: string, event: KeyboardEvent) {
 .node-card__port-picker {
   display: grid;
   gap: 12px;
-  border: 1px solid rgba(154, 52, 18, 0.14);
-  border-radius: 20px;
+  border: 1px solid rgba(154, 52, 18, 0.16);
+  border-radius: 18px;
   padding: 14px;
-  background: rgba(255, 252, 247, 0.94);
+  background: rgba(255, 250, 241, 0.98);
+  box-shadow: 0 20px 40px rgba(60, 41, 20, 0.12);
 }
 
 .node-card__port-picker-title {

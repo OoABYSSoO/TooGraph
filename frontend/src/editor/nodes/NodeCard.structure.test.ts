@@ -192,3 +192,21 @@ test("NodeCard declares top-action and state-edit events for canvas forwarding",
   assert.match(componentSource, /\(event: "delete-node", payload: \{ nodeId: string \}\): void;/);
   assert.match(componentSource, /\(event: "save-node-preset", payload: \{ nodeId: string \}\): void;/);
 });
+
+test("NodeCard closes floating panels on focus loss and keeps popup surfaces on the warm theme", () => {
+  assert.match(componentSource, /import \{ computed, onBeforeUnmount, onMounted, ref, watch \} from "vue";/);
+  assert.match(componentSource, /const hasFloatingPanelOpen = computed\(\(\) =>/);
+  assert.match(componentSource, /document\.addEventListener\("pointerdown", handleGlobalFloatingPanelPointerDown\)/);
+  assert.match(componentSource, /document\.addEventListener\("focusin", handleGlobalFloatingPanelFocusIn\)/);
+  assert.match(componentSource, /document\.addEventListener\("keydown", handleGlobalFloatingPanelKeyDown\)/);
+  assert.match(componentSource, /document\.removeEventListener\("pointerdown", handleGlobalFloatingPanelPointerDown\)/);
+  assert.match(componentSource, /document\.removeEventListener\("focusin", handleGlobalFloatingPanelFocusIn\)/);
+  assert.match(componentSource, /document\.removeEventListener\("keydown", handleGlobalFloatingPanelKeyDown\)/);
+  assert.match(componentSource, /data-node-popup-surface="true"/);
+  assert.match(componentSource, /\.node-card__skill-picker \{[\s\S]*border:\s*1px solid rgba\(154,\s*52,\s*18,\s*0\.16\);/);
+  assert.match(componentSource, /\.node-card__skill-picker \{[\s\S]*background:\s*rgba\(255,\s*250,\s*241,\s*0\.98\);/);
+  assert.match(componentSource, /\.node-card__skill-picker \{[\s\S]*box-shadow:\s*0 20px 40px rgba\(60,\s*41,\s*20,\s*0\.12\);/);
+  assert.match(componentSource, /\.node-card__port-picker \{[\s\S]*border:\s*1px solid rgba\(154,\s*52,\s*18,\s*0\.16\);/);
+  assert.match(componentSource, /\.node-card__port-picker \{[\s\S]*background:\s*rgba\(255,\s*250,\s*241,\s*0\.98\);/);
+  assert.match(componentSource, /\.node-card__port-picker \{[\s\S]*box-shadow:\s*0 20px 40px rgba\(60,\s*41,\s*20,\s*0\.12\);/);
+});
