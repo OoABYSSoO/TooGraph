@@ -14,7 +14,7 @@ export type NodePortViewModel = {
 export type NodeConditionRouteOutputViewModel = {
   branch: string;
   routeTargetLabel: string | null;
-  tone: "success" | "danger" | "warning";
+  tone: "success" | "danger" | "warning" | "neutral";
 };
 
 export type BuildNodeCardViewModelOptions = {
@@ -327,8 +327,8 @@ function resolveConditionRouteTone(branch: string, index: number): NodeCondition
   if (normalizedBranch === "false") {
     return "danger";
   }
-  if (normalizedBranch === "exhausted") {
-    return "warning";
+  if (normalizedBranch === "exhausted" || normalizedBranch === "exausted") {
+    return "neutral";
   }
   if (index === 0) {
     return "success";

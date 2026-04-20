@@ -1,5 +1,9 @@
-import { buildConnectorCurvePath } from "./connectionCurvePath.ts";
-
+const FLOW_TERMINAL_OVERLAP = 28;
+const FLOW_TERMINAL_STAGGER = FLOW_TERMINAL_OVERLAP / 2;
+const FLOW_LANE_SPACING = 28;
+const DOWNSTREAM_CONTROL_MIN = 36;
+const DOWNSTREAM_CONTROL_MAX = 180;
+const DOWNSTREAM_CONTROL_RATIO = 0.32;
 const UPSTREAM_HORIZONTAL_CLEARANCE = 72;
 const UPSTREAM_TOP_CLEARANCE = 160;
 const UPSTREAM_NODE_TOP_GUTTER = 48;
@@ -14,44 +18,93 @@ export type SequenceFlowPathInput = {
   sourceNodeY?: number;
   targetNodeX?: number;
   targetNodeY?: number;
+  sourceLaneIndex?: number;
+  sourceLaneCount?: number;
+  targetLaneIndex?: number;
+  targetLaneCount?: number;
 };
 
 export function buildSequenceFlowPath(input: SequenceFlowPathInput) {
   const sourceReferenceX = input.sourceNodeX ?? input.sourceX;
   const targetReferenceX = input.targetNodeX ?? input.targetX;
+  const sourceLaneOffset = resolveLaneOffset(input.sourceLaneIndex, input.sourceLaneCount);
+  const targetLaneOffset = resolveLaneOffset(input.targetLaneIndex, input.targetLaneCount);
 
   if (targetReferenceX >= sourceReferenceX) {
-    return buildConnectorCurvePath({
-      sourceX: input.sourceX,
-      sourceY: input.sourceY,
-      targetX: input.targetX,
-      targetY: input.targetY,
-      sourceSide: "right",
-      targetSide: "left",
-    });
+    return buildLaneBezierPath(input, sourceLaneOffset, targetLaneOffset);
   }
 
-  const topY = resolveUpstreamTopY(input);
+  const topY = resolveUpstreamTopY(input, sourceLaneOffset, targetLaneOffset);
+  const startLeadX = input.sourceX + FLOW_TERMINAL_OVERLAP;
+  const sourceBranchX =
+    input.sourceX +
+    UPSTREAM_HORIZONTAL_CLEARANCE +
+    resolveTerminalStagger(input.sourceLaneIndex, input.sourceLaneCount);
+  const targetDropX =
+    input.targetX -
+    UPSTREAM_HORIZONTAL_CLEARANCE -
+    resolveTerminalStagger(input.targetLaneIndex, input.targetLaneCount);
+  const endLeadX = input.targetX - FLOW_TERMINAL_OVERLAP;
 
   return buildRoundedOrthogonalPath(
     [
       { x: input.sourceX, y: input.sourceY },
-      { x: input.sourceX + UPSTREAM_HORIZONTAL_CLEARANCE, y: input.sourceY },
-      { x: input.sourceX + UPSTREAM_HORIZONTAL_CLEARANCE, y: topY },
-      { x: input.targetX - UPSTREAM_HORIZONTAL_CLEARANCE, y: topY },
-      { x: input.targetX - UPSTREAM_HORIZONTAL_CLEARANCE, y: input.targetY },
+      { x: startLeadX, y: input.sourceY },
+      { x: sourceBranchX, y: input.sourceY },
+      { x: sourceBranchX, y: topY },
+      { x: targetDropX, y: topY },
+      { x: targetDropX, y: input.targetY },
+      { x: endLeadX, y: input.targetY },
       { x: input.targetX, y: input.targetY },
     ],
     UPSTREAM_CORNER_RADIUS,
   );
 }
 
-function resolveUpstreamTopY(input: SequenceFlowPathInput) {
+function buildLaneBezierPath(input: SequenceFlowPathInput, sourceLaneOffset: number, targetLaneOffset: number) {
+  const startLeadX = input.sourceX + FLOW_TERMINAL_OVERLAP;
+  const endLeadX = Math.max(input.targetX - FLOW_TERMINAL_OVERLAP, startLeadX + FLOW_TERMINAL_OVERLAP);
+  const laneDistance = endLeadX - startLeadX;
+
+  const controlSpan = resolveDownstreamControlSpan(laneDistance);
+
+  return [
+    `M ${roundCoordinate(input.sourceX)} ${roundCoordinate(input.sourceY)}`,
+    `L ${roundCoordinate(startLeadX)} ${roundCoordinate(input.sourceY)}`,
+    `C ${roundCoordinate(startLeadX + controlSpan)} ${roundCoordinate(input.sourceY + sourceLaneOffset)} ${roundCoordinate(endLeadX - controlSpan)} ${roundCoordinate(input.targetY + targetLaneOffset)} ${roundCoordinate(endLeadX)} ${roundCoordinate(input.targetY)}`,
+    `L ${roundCoordinate(input.targetX)} ${roundCoordinate(input.targetY)}`,
+  ].join(" ");
+}
+
+function resolveUpstreamTopY(input: SequenceFlowPathInput, sourceLaneOffset: number, targetLaneOffset: number) {
   if (input.sourceNodeY !== undefined && input.targetNodeY !== undefined) {
-    return Math.min(input.sourceNodeY, input.targetNodeY) - UPSTREAM_NODE_TOP_GUTTER;
+    return Math.min(input.sourceNodeY, input.targetNodeY) - UPSTREAM_NODE_TOP_GUTTER - sourceLaneOffset + targetLaneOffset;
   }
 
-  return Math.min(input.sourceY, input.targetY) - UPSTREAM_TOP_CLEARANCE;
+  return Math.min(input.sourceY, input.targetY) - UPSTREAM_TOP_CLEARANCE - sourceLaneOffset + targetLaneOffset;
+}
+
+function resolveLaneOffset(index?: number, count?: number) {
+  if (index === undefined || count === undefined || count <= 1) {
+    return 0;
+  }
+
+  return (index - (count - 1) / 2) * FLOW_LANE_SPACING;
+}
+
+function resolveTerminalStagger(index?: number, count?: number) {
+  if (index === undefined || count === undefined || count <= 1) {
+    return 0;
+  }
+
+  return index * FLOW_TERMINAL_STAGGER;
+}
+
+function resolveDownstreamControlSpan(distance: number) {
+  return Math.min(
+    Math.max(distance * DOWNSTREAM_CONTROL_RATIO, DOWNSTREAM_CONTROL_MIN),
+    Math.min(DOWNSTREAM_CONTROL_MAX, distance / 2),
+  );
 }
 
 function buildRoundedOrthogonalPath(points: Array<{ x: number; y: number }>, cornerRadius: number) {

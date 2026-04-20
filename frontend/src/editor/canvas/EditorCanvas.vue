@@ -43,6 +43,7 @@
           :key="`${edge.id}:highlight`"
           :d="edge.path"
           class="editor-canvas__edge-delete-highlight"
+          :style="edgeStyle(edge)"
           :class="{ 'editor-canvas__edge-delete-highlight--active': isFlowEdgeDeleteConfirmOpen(edge.id) }"
         />
         <path
@@ -232,6 +233,7 @@
             'editor-canvas__route-handle--success': resolveRouteHandleTone(anchor.branch) === 'success',
             'editor-canvas__route-handle--danger': resolveRouteHandleTone(anchor.branch) === 'danger',
             'editor-canvas__route-handle--warning': resolveRouteHandleTone(anchor.branch) === 'warning',
+            'editor-canvas__route-handle--neutral': resolveRouteHandleTone(anchor.branch) === 'neutral',
             'editor-canvas__flow-hotspot--connect-source': activeConnectionSourceAnchorId === anchor.id,
             'editor-canvas__route-handle--connect-source': activeConnectionSourceAnchorId === anchor.id,
           }"
@@ -938,8 +940,10 @@ function nodeStyle(position: GraphPosition) {
 
 function edgeStyle(edge: ProjectedCanvasEdge) {
   if (edge.kind === "route" && edge.branch) {
+    const accent = resolveRouteHandlePalette(edge.branch).accent;
     return {
-      "--editor-edge-stroke": withAlpha(resolveRouteHandlePalette(edge.branch).accent, 0.88),
+      "--editor-edge-stroke": withAlpha(accent, 0.88),
+      "--editor-edge-outline": withAlpha(accent, 0.16),
     };
   }
   if (!edge.color) {
@@ -973,6 +977,9 @@ function resolveRouteHandleTone(branch: string | undefined) {
   if (normalizedBranch === "false") {
     return "danger" as const;
   }
+  if (normalizedBranch === "exhausted" || normalizedBranch === "exausted") {
+    return "neutral" as const;
+  }
   return "warning" as const;
 }
 
@@ -994,6 +1001,15 @@ function resolveRouteHandlePalette(branch: string | undefined) {
       accent: "#dc2626",
       glow: "rgba(239, 68, 68, 0.18)",
       text: "rgba(185, 28, 28, 0.92)",
+    };
+  }
+  if (tone === "neutral") {
+    return {
+      fill: "rgba(245, 241, 234, 0.98)",
+      border: "rgba(120, 113, 108, 0.24)",
+      accent: "#78716c",
+      glow: "rgba(120, 113, 108, 0.18)",
+      text: "rgba(87, 83, 78, 0.92)",
     };
   }
   return {
@@ -2081,7 +2097,7 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
 
 .editor-canvas__edge-delete-highlight {
   fill: none;
-  stroke: rgba(201, 107, 31, 0.16);
+  stroke: var(--editor-edge-outline, rgba(201, 107, 31, 0.16));
   stroke-width: 7px;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -2222,6 +2238,13 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   --editor-flow-handle-border: rgba(245, 158, 11, 0.26);
   --editor-flow-handle-accent: #d97706;
   --editor-flow-handle-glow: rgba(245, 158, 11, 0.18);
+}
+
+.editor-canvas__route-handle--neutral {
+  --editor-flow-handle-fill: rgba(245, 241, 234, 0.98);
+  --editor-flow-handle-border: rgba(120, 113, 108, 0.24);
+  --editor-flow-handle-accent: #78716c;
+  --editor-flow-handle-glow: rgba(120, 113, 108, 0.18);
 }
 
 .editor-canvas__route-handle-label {

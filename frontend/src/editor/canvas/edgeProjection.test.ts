@@ -86,8 +86,8 @@ test("projectCanvasEdges creates projected flow edges from graph edges", () => {
       { id: "data:answer_helper:answer->output_answer", kind: "data", source: "answer_helper", target: "output_answer", state: "answer" },
     ],
   );
-  assert.match(projected[0]!.path, /^M .* C /);
-  assert.match(projected[1]!.path, /^M .* C /);
+  assert.match(projected[0]!.path, /^M .* L .* C .* L /);
+  assert.match(projected[1]!.path, /^M .* L .* C .* L /);
 });
 
 test("projectCanvasAnchors returns flow and state dots for visible nodes", () => {
@@ -253,6 +253,46 @@ test("projectCanvasEdges exposes branch metadata for condition routes", () => {
       targetNodeY: 120,
     }),
   );
+});
+
+test("projectCanvasEdges assigns separate routing lanes to sibling outgoing flow edges", () => {
+  const fanoutGraph: GraphPayload = {
+    ...graph,
+    nodes: {
+      ...graph.nodes,
+      reviewer: {
+        kind: "agent",
+        name: "reviewer",
+        description: "",
+        ui: { position: { x: 980, y: 420 } },
+        reads: [{ state: "answer", required: true }],
+        writes: [],
+        config: {
+          skills: [],
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "off",
+          temperature: 0,
+        },
+      },
+    },
+    edges: [
+      { source: "answer_helper", target: "output_answer" },
+      { source: "answer_helper", target: "reviewer" },
+    ],
+  };
+
+  const projected = projectCanvasEdges(fanoutGraph).filter((edge) => edge.kind === "flow");
+
+  assert.equal(projected.length, 2);
+  const primary = projected.find((edge) => edge.target === "output_answer");
+  const secondary = projected.find((edge) => edge.target === "reviewer");
+  assert.ok(primary?.routing);
+  assert.ok(secondary?.routing);
+  assert.equal(primary?.routing?.sourceLaneCount, 2);
+  assert.equal(secondary?.routing?.sourceLaneCount, 2);
+  assert.notEqual(primary?.routing?.sourceLaneIndex, secondary?.routing?.sourceLaneIndex);
 });
 
 test("projectCanvasEdges routes upstream flow edges over the cards", () => {

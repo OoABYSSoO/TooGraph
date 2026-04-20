@@ -386,6 +386,39 @@ test("buildNodeCardViewModel derives condition route target labels for proxy out
   ]);
 });
 
+test("buildNodeCardViewModel marks exhausted condition routes as neutral", () => {
+  const node: GraphNode = {
+    kind: "condition",
+    name: "retry_guard",
+    description: "Stop retry loops.",
+    ui: { position: { x: 780, y: 220 } },
+    reads: [{ state: "answer", required: true }],
+    writes: [],
+    config: {
+      branches: ["true", "false", "exhausted"],
+      loopLimit: 5,
+      branchMapping: {
+        true: "true",
+        false: "false",
+      },
+      rule: {
+        source: "answer",
+        operator: "exists",
+        value: null,
+      },
+    },
+  };
+
+  const model = buildNodeCardViewModel("retry_guard", node, stateSchema);
+
+  assert.equal(model.body.kind, "condition");
+  assert.deepEqual(model.body.routeOutputs.map((output) => ({ branch: output.branch, tone: output.tone })), [
+    { branch: "true", tone: "success" },
+    { branch: "false", tone: "danger" },
+    { branch: "exhausted", tone: "neutral" },
+  ]);
+});
+
 test("buildNodeCardViewModel derives unlimited loop label and multiple skills", () => {
   const node: GraphNode = {
     kind: "agent",

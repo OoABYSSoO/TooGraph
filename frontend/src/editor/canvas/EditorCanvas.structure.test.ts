@@ -76,6 +76,14 @@ test("EditorCanvas renders condition route outputs as right-side floating branch
   assert.match(componentSource, /\.editor-canvas__route-handle--success/);
   assert.match(componentSource, /\.editor-canvas__route-handle--danger/);
   assert.match(componentSource, /\.editor-canvas__route-handle--warning/);
+  assert.match(componentSource, /\.editor-canvas__route-handle--neutral/);
+});
+
+test("EditorCanvas renders exhausted route handles with warm gray neutral colors", () => {
+  assert.match(componentSource, /if \(normalizedBranch === "exhausted" \|\| normalizedBranch === "exausted"\) \{[\s\S]*return "neutral" as const;/);
+  assert.match(componentSource, /'editor-canvas__route-handle--neutral': resolveRouteHandleTone\(anchor\.branch\) === 'neutral'/);
+  assert.match(componentSource, /if \(tone === "neutral"\) \{[\s\S]*accent: "#78716c"/);
+  assert.match(componentSource, /\.editor-canvas__route-handle--neutral \{[\s\S]*--editor-flow-handle-accent:\s*#78716c;/);
 });
 
 test("EditorCanvas does not render inline label pills for data edges", () => {
@@ -148,11 +156,19 @@ test("EditorCanvas shows a clicked-position delete confirm for flow edges before
   assert.match(componentSource, /if \(edge\.kind === "flow" \|\| edge\.kind === "route"\) \{[\s\S]*startFlowEdgeDeleteConfirm\(edge, event\);[\s\S]*return;/);
   assert.match(componentSource, /emit\("remove-flow", \{[\s\S]*sourceNodeId: activeFlowEdgeDeleteConfirm\.value\.source,[\s\S]*targetNodeId: activeFlowEdgeDeleteConfirm\.value\.target,[\s\S]*\}\);/);
   assert.match(componentSource, /emit\("remove-route", \{[\s\S]*branchKey: activeFlowEdgeDeleteConfirm\.value\.branch/);
-  assert.match(componentSource, /\.editor-canvas__edge-delete-highlight \{[\s\S]*stroke:\s*rgba\(201,\s*107,\s*31,\s*0\.16\);/);
+  assert.match(componentSource, /\.editor-canvas__edge-delete-highlight \{[\s\S]*stroke:\s*var\(--editor-edge-outline, rgba\(201,\s*107,\s*31,\s*0\.16\)\);/);
   assert.match(componentSource, /\.editor-canvas__edge-delete-highlight \{[\s\S]*stroke-width:\s*7px;/);
   assert.match(componentSource, /\.editor-canvas__edge-delete-highlight--active \{[\s\S]*stroke:\s*rgba\(220,\s*38,\s*38,\s*0\.34\);/);
   assert.match(componentSource, /\.editor-canvas__edge-delete-highlight--active \{[\s\S]*stroke-width:\s*12px;/);
   assert.match(componentSource, /\.editor-canvas__edge-delete-highlight \{[\s\S]*pointer-events:\s*none;/);
+});
+
+test("EditorCanvas tints route edge outlines from the branch palette", () => {
+  assert.match(componentSource, /v-for="edge in projectedEdges\.filter\(\(edge\) => edge\.kind === 'flow' \|\| edge\.kind === 'route'\)"/);
+  assert.match(componentSource, /class="editor-canvas__edge-delete-highlight"[\s\S]*:style="edgeStyle\(edge\)"/);
+  assert.match(componentSource, /const accent = resolveRouteHandlePalette\(edge\.branch\)\.accent;/);
+  assert.match(componentSource, /"--editor-edge-outline": withAlpha\(accent, 0\.16\)/);
+  assert.match(componentSource, /\.editor-canvas__edge-delete-highlight \{[\s\S]*stroke:\s*var\(--editor-edge-outline, rgba\(201,\s*107,\s*31,\s*0\.16\)\);/);
 });
 
 test("EditorCanvas gives data edges the same two-step state editing entry pattern as state ports", () => {

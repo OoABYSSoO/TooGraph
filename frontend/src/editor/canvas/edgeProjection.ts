@@ -14,6 +14,14 @@ export type ProjectedCanvasEdge = {
   label?: string;
   state?: string;
   branch?: string;
+  routing?: ProjectedCanvasEdgeRouting;
+};
+
+export type ProjectedCanvasEdgeRouting = {
+  sourceLaneIndex: number;
+  sourceLaneCount: number;
+  targetLaneIndex: number;
+  targetLaneCount: number;
 };
 
 export type ProjectedCanvasAnchor = {
@@ -33,6 +41,7 @@ const CONDITION_NODE_WIDTH = 560;
 
 export function projectCanvasEdges(document: GraphPayload | GraphDocument): ProjectedCanvasEdge[] {
   const placements = buildNodePlacements(document);
+  const flowRoutingLookup = buildFlowRoutingLookup(document);
 
   const flowEdges = document.edges
     .map((edge) => {
@@ -43,11 +52,13 @@ export function projectCanvasEdges(document: GraphPayload | GraphDocument): Proj
       if (!source?.flowOut || !target?.flowIn) {
         return null;
       }
+      const routing = flowRoutingLookup.get(`flow:${edge.source}->${edge.target}`);
       return {
         id: `flow:${edge.source}->${edge.target}`,
         kind: "flow" as const,
         source: edge.source,
         target: edge.target,
+        routing,
         path: buildFlowPath(
           source.flowOut.x,
           source.flowOut.y,
@@ -57,6 +68,7 @@ export function projectCanvasEdges(document: GraphPayload | GraphDocument): Proj
           sourceNode?.ui.position.y,
           targetNode?.ui.position.x,
           targetNode?.ui.position.y,
+          routing,
         ),
       };
     })
@@ -77,12 +89,14 @@ export function projectCanvasEdges(document: GraphPayload | GraphDocument): Proj
         if (!routeSource || !target?.flowIn) {
           return null;
         }
+        const routing = flowRoutingLookup.get(`route:${edge.source}:${branch}->${targetNodeId}`);
         return {
           id: `route:${edge.source}:${branch}->${targetNodeId}`,
           kind: "route" as const,
           source: edge.source,
           target: targetNodeId,
           branch,
+          routing,
           path: buildFlowPath(
             routeSource.x,
             routeSource.y,
@@ -92,6 +106,7 @@ export function projectCanvasEdges(document: GraphPayload | GraphDocument): Proj
             sourceNode?.ui.position.y,
             targetNode?.ui.position.x,
             targetNode?.ui.position.y,
+            routing,
           ),
         };
       })
@@ -212,6 +227,7 @@ function buildFlowPath(
   sourceNodeY?: number,
   targetNodeX?: number,
   targetNodeY?: number,
+  routing?: ProjectedCanvasEdgeRouting,
 ) {
   return buildSequenceFlowPath({
     sourceX: startX,
@@ -222,7 +238,161 @@ function buildFlowPath(
     sourceNodeY,
     targetNodeX,
     targetNodeY,
+    sourceLaneIndex: routing?.sourceLaneIndex,
+    sourceLaneCount: routing?.sourceLaneCount,
+    targetLaneIndex: routing?.targetLaneIndex,
+    targetLaneCount: routing?.targetLaneCount,
   });
+}
+
+type FlowRoutingDescriptor = {
+  id: string;
+  kind: "flow" | "route";
+  source: string;
+  target: string;
+  branch?: string;
+  sourceNodeX: number;
+  sourceNodeY: number;
+  targetNodeX: number;
+  targetNodeY: number;
+};
+
+function buildFlowRoutingLookup(document: GraphPayload | GraphDocument) {
+  const descriptors: FlowRoutingDescriptor[] = [
+    ...document.edges.flatMap((edge) => {
+      const sourceNode = document.nodes[edge.source];
+      const targetNode = document.nodes[edge.target];
+      if (!sourceNode || !targetNode) {
+        return [];
+      }
+      return [
+        {
+          id: `flow:${edge.source}->${edge.target}`,
+          kind: "flow" as const,
+          source: edge.source,
+          target: edge.target,
+          sourceNodeX: sourceNode.ui.position.x,
+          sourceNodeY: sourceNode.ui.position.y,
+          targetNodeX: targetNode.ui.position.x,
+          targetNodeY: targetNode.ui.position.y,
+        },
+      ];
+    }),
+    ...document.conditional_edges.flatMap((edge) =>
+      Object.entries(edge.branches).flatMap(([branch, targetNodeId]) => {
+        const sourceNode = document.nodes[edge.source];
+        const targetNode = document.nodes[targetNodeId];
+        if (!sourceNode || !targetNode) {
+          return [];
+        }
+        return [
+          {
+            id: `route:${edge.source}:${branch}->${targetNodeId}`,
+            kind: "route" as const,
+            source: edge.source,
+            target: targetNodeId,
+            branch,
+            sourceNodeX: sourceNode.ui.position.x,
+            sourceNodeY: sourceNode.ui.position.y,
+            targetNodeX: targetNode.ui.position.x,
+            targetNodeY: targetNode.ui.position.y,
+          },
+        ];
+      }),
+    ),
+  ];
+
+  const routingByEdgeId = new Map<string, ProjectedCanvasEdgeRouting>();
+  const outgoingGroups = new Map<string, FlowRoutingDescriptor[]>();
+  const incomingGroups = new Map<string, FlowRoutingDescriptor[]>();
+
+  for (const descriptor of descriptors) {
+    const outgoing = outgoingGroups.get(descriptor.source) ?? [];
+    outgoing.push(descriptor);
+    outgoingGroups.set(descriptor.source, outgoing);
+
+    const incoming = incomingGroups.get(descriptor.target) ?? [];
+    incoming.push(descriptor);
+    incomingGroups.set(descriptor.target, incoming);
+  }
+
+  for (const descriptorsBySource of outgoingGroups.values()) {
+    descriptorsBySource.sort(compareOutgoingFlowDescriptors);
+    descriptorsBySource.forEach((descriptor, index) => {
+      routingByEdgeId.set(descriptor.id, {
+        ...(routingByEdgeId.get(descriptor.id) ?? {
+          sourceLaneIndex: 0,
+          sourceLaneCount: descriptorsBySource.length,
+          targetLaneIndex: 0,
+          targetLaneCount: 1,
+        }),
+        sourceLaneIndex: index,
+        sourceLaneCount: descriptorsBySource.length,
+      });
+    });
+  }
+
+  for (const descriptorsByTarget of incomingGroups.values()) {
+    descriptorsByTarget.sort(compareIncomingFlowDescriptors);
+    descriptorsByTarget.forEach((descriptor, index) => {
+      routingByEdgeId.set(descriptor.id, {
+        ...(routingByEdgeId.get(descriptor.id) ?? {
+          sourceLaneIndex: 0,
+          sourceLaneCount: 1,
+          targetLaneIndex: 0,
+          targetLaneCount: descriptorsByTarget.length,
+        }),
+        targetLaneIndex: index,
+        targetLaneCount: descriptorsByTarget.length,
+      });
+    });
+  }
+
+  return routingByEdgeId;
+}
+
+function compareOutgoingFlowDescriptors(left: FlowRoutingDescriptor, right: FlowRoutingDescriptor) {
+  return (
+    compareNumbers(left.targetNodeY, right.targetNodeY) ||
+    compareNumbers(left.targetNodeX, right.targetNodeX) ||
+    compareNumbers(resolveFlowDescriptorKindPriority(left), resolveFlowDescriptorKindPriority(right)) ||
+    compareNumbers(resolveFlowDescriptorBranchPriority(left.branch), resolveFlowDescriptorBranchPriority(right.branch)) ||
+    left.target.localeCompare(right.target) ||
+    left.id.localeCompare(right.id)
+  );
+}
+
+function compareIncomingFlowDescriptors(left: FlowRoutingDescriptor, right: FlowRoutingDescriptor) {
+  return (
+    compareNumbers(left.sourceNodeY, right.sourceNodeY) ||
+    compareNumbers(left.sourceNodeX, right.sourceNodeX) ||
+    compareNumbers(resolveFlowDescriptorKindPriority(left), resolveFlowDescriptorKindPriority(right)) ||
+    compareNumbers(resolveFlowDescriptorBranchPriority(left.branch), resolveFlowDescriptorBranchPriority(right.branch)) ||
+    left.source.localeCompare(right.source) ||
+    left.id.localeCompare(right.id)
+  );
+}
+
+function compareNumbers(left: number, right: number) {
+  return left - right;
+}
+
+function resolveFlowDescriptorKindPriority(descriptor: Pick<FlowRoutingDescriptor, "kind">) {
+  return descriptor.kind === "flow" ? 0 : 1;
+}
+
+function resolveFlowDescriptorBranchPriority(branch: string | undefined) {
+  const normalizedBranch = branch?.trim().toLowerCase() ?? "";
+  if (normalizedBranch === "true") {
+    return 0;
+  }
+  if (normalizedBranch === "false") {
+    return 1;
+  }
+  if (normalizedBranch === "exhausted" || normalizedBranch === "exausted") {
+    return 2;
+  }
+  return 3;
 }
 
 function buildDataPath(startX: number, startY: number, endX: number, endY: number) {

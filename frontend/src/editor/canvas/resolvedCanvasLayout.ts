@@ -1,5 +1,11 @@
 import type { GraphDocument, GraphPayload } from "../../types/node-system.ts";
-import { type ProjectedCanvasAnchor, type ProjectedCanvasEdge, projectCanvasAnchors, projectCanvasEdges } from "./edgeProjection.ts";
+import {
+  type ProjectedCanvasAnchor,
+  type ProjectedCanvasEdge,
+  type ProjectedCanvasEdgeRouting,
+  projectCanvasAnchors,
+  projectCanvasEdges,
+} from "./edgeProjection.ts";
 import { buildConnectorCurvePath } from "./connectionCurvePath.ts";
 import { buildSequenceFlowPath } from "./flowEdgePath.ts";
 
@@ -64,6 +70,7 @@ function resolveCanvasEdges(
           document.nodes[edge.source]?.ui.position.y,
           document.nodes[edge.target]?.ui.position.x,
           document.nodes[edge.target]?.ui.position.y,
+          edge.routing,
         ),
       };
     }
@@ -102,6 +109,7 @@ function resolveCanvasEdges(
         document.nodes[edge.source]?.ui.position.y,
         document.nodes[edge.target]?.ui.position.x,
         document.nodes[edge.target]?.ui.position.y,
+        edge.routing,
       ),
     };
   });
@@ -116,6 +124,7 @@ function buildFlowPath(
   sourceNodeY?: number,
   targetNodeX?: number,
   targetNodeY?: number,
+  routing?: ProjectedCanvasEdgeRouting,
 ) {
   return buildSequenceFlowPath({
     sourceX: startX,
@@ -126,6 +135,10 @@ function buildFlowPath(
     sourceNodeY,
     targetNodeX,
     targetNodeY,
+    sourceLaneIndex: routing?.sourceLaneIndex,
+    sourceLaneCount: routing?.sourceLaneCount,
+    targetLaneIndex: routing?.targetLaneIndex,
+    targetLaneCount: routing?.targetLaneCount,
   });
 }
 

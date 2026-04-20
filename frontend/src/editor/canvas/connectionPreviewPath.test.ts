@@ -5,7 +5,7 @@ import { buildPendingConnectionPreviewPath } from "./connectionPreviewPath.ts";
 import { buildConnectorCurvePath } from "./connectionCurvePath.ts";
 import { buildSequenceFlowPath } from "./flowEdgePath.ts";
 
-test("buildPendingConnectionPreviewPath builds the same curved preview for flow and route drags", () => {
+test("buildPendingConnectionPreviewPath uses the sequence-flow bezier preview for downstream flow and route drags", () => {
   const path = buildPendingConnectionPreviewPath({
     kind: "flow-out",
     sourceX: 100,
@@ -22,13 +22,11 @@ test("buildPendingConnectionPreviewPath builds the same curved preview for flow 
     targetY: 240,
   });
 
-  const expectedPath = buildConnectorCurvePath({
+  const expectedPath = buildSequenceFlowPath({
     sourceX: 100,
     sourceY: 120,
     targetX: 280,
     targetY: 240,
-    sourceSide: "right",
-    targetSide: "left",
   });
 
   assert.equal(path, expectedPath);
