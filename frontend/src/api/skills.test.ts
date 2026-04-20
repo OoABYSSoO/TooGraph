@@ -57,7 +57,7 @@ test("fetchSkillDefinitions requests the skill definitions endpoint", async () =
 
   const skillDefinitions = await fetchSkillDefinitions();
 
-  assert.equal(requestedUrl, "http://127.0.0.1:8765/api/skills/definitions");
+  assert.equal(requestedUrl, "/api/skills/definitions");
   assert.deepEqual(skillDefinitions, [
     {
       skillKey: "search_knowledge_base",

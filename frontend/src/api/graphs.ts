@@ -7,9 +7,7 @@ import type {
   TemplateRecord,
 } from "@/types/node-system";
 
-import { apiGet } from "./http";
-
-const API_BASE = "http://127.0.0.1:8765";
+import { apiGet, apiPost } from "./http.ts";
 
 export async function fetchTemplates(): Promise<TemplateRecord[]> {
   return apiGet<TemplateRecord[]>("/api/templates");
@@ -25,20 +23,6 @@ export async function fetchGraphs(): Promise<GraphDocument[]> {
 
 export async function fetchGraph(graphId: string): Promise<GraphDocument> {
   return apiGet<GraphDocument>(`/api/graphs/${graphId}`);
-}
-
-async function apiPost<T>(path: string, payload: unknown): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-  if (!response.ok) {
-    throw new Error(`POST ${path} failed with status ${response.status}`);
-  }
-  return response.json() as Promise<T>;
 }
 
 export async function saveGraph(payload: GraphPayload): Promise<GraphSaveResponse> {

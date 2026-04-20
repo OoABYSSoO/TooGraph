@@ -75,7 +75,7 @@
     "score_gate": {
       "kind": "condition",
       "name": "score_gate",
-      "description": "Route to pass or fail based on the numeric score.",
+      "description": "Route through true, false, or exhausted based on the numeric score.",
       "ui": {
         "position": { "x": 760, "y": 80 },
         "collapsed": false
@@ -84,10 +84,11 @@
         { "state": "score", "required": true }
       ],
       "config": {
-        "branches": ["pass", "fail"],
+        "branches": ["true", "false", "exhausted"],
+        "loopLimit": -1,
         "branchMapping": {
-          "true": "pass",
-          "false": "fail"
+          "true": "true",
+          "false": "false"
         },
         "rule": {
           "source": "score",
@@ -131,6 +132,24 @@
         "persistFormat": "auto",
         "fileNameTemplate": ""
       }
+    },
+    "output_exhausted": {
+      "kind": "output",
+      "name": "output_exhausted",
+      "description": "Show the exhausted-branch fallback value.",
+      "ui": {
+        "position": { "x": 1440, "y": 1040 },
+        "collapsed": false
+      },
+      "reads": [
+        { "state": "score", "required": true }
+      ],
+      "config": {
+        "displayMode": "auto",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
     }
   },
   "edges": [
@@ -143,8 +162,9 @@
     {
       "source": "score_gate",
       "branches": {
-        "pass": "output_pass",
-        "fail": "output_fail"
+        "true": "output_pass",
+        "false": "output_fail",
+        "exhausted": "output_exhausted"
       }
     }
   ],
