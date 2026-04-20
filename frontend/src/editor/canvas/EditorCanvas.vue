@@ -46,6 +46,14 @@
           :class="{ 'editor-canvas__edge-delete-highlight--active': isFlowEdgeDeleteConfirmOpen(edge.id) }"
         />
         <path
+          v-for="edge in projectedEdges.filter((edge) => edge.kind === 'data')"
+          :key="`${edge.id}:data-highlight`"
+          :d="edge.path"
+          class="editor-canvas__edge-data-highlight"
+          :style="edgeStyle(edge)"
+          :class="{ 'editor-canvas__edge-data-highlight--active': isDataEdgeStateInteractionOpen(edge) }"
+        />
+        <path
           v-for="edge in projectedEdges"
           :key="edge.id"
           :d="edge.path"
@@ -581,6 +589,10 @@ function isActiveDataEdge(edge: Pick<ProjectedCanvasEdge, "kind" | "source" | "t
   return edge.kind === "data" && edge.source === dataState.source && edge.target === dataState.target && edge.state === dataState.stateKey;
 }
 
+function isDataEdgeStateInteractionOpen(edge: Pick<ProjectedCanvasEdge, "kind" | "source" | "target" | "state">) {
+  return isActiveDataEdge(edge, activeDataEdgeStateConfirm.value) || isActiveDataEdge(edge, activeDataEdgeStateEditor.value);
+}
+
 watch(projectedEdges, (edges) => {
   if (selectedEdgeId.value && !edges.some((edge) => edge.id === selectedEdgeId.value)) {
     selectedEdgeId.value = null;
@@ -935,6 +947,8 @@ function edgeStyle(edge: ProjectedCanvasEdge) {
   }
   return {
     "--editor-edge-stroke": edge.color,
+    "--editor-edge-outline": withAlpha(edge.color, 0.18),
+    "--editor-edge-outline-active": withAlpha(edge.color, 0.32),
   };
 }
 
@@ -2081,6 +2095,24 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
 .editor-canvas__edge-delete-highlight--active {
   stroke: rgba(220, 38, 38, 0.34);
   stroke-width: 12px;
+}
+
+.editor-canvas__edge-data-highlight {
+  fill: none;
+  stroke: var(--editor-edge-outline, rgba(37, 99, 235, 0.18));
+  stroke-width: 6px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+  transition:
+    stroke 120ms ease,
+    stroke-width 120ms ease,
+    opacity 120ms ease;
+}
+
+.editor-canvas__edge-data-highlight--active {
+  stroke: var(--editor-edge-outline-active, rgba(37, 99, 235, 0.32));
+  stroke-width: 10px;
 }
 
 .editor-canvas__edge--flow {

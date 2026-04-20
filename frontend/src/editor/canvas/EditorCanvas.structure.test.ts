@@ -189,6 +189,18 @@ test("EditorCanvas gives data edges the same two-step state editing entry patter
   assert.match(componentSource, /emit\("remove-port-state", \{[\s\S]*nodeId: activeDataEdgeStateEditor\.value\.target,[\s\S]*side: "input",[\s\S]*stateKey: activeDataEdgeStateEditor\.value\.stateKey,[\s\S]*\}\);/);
 });
 
+test("EditorCanvas tints data edge outlines from the data edge state color", () => {
+  assert.match(componentSource, /v-for="edge in projectedEdges\.filter\(\(edge\) => edge\.kind === 'data'\)"/);
+  assert.match(componentSource, /class="editor-canvas__edge-data-highlight"/);
+  assert.match(componentSource, /:style="edgeStyle\(edge\)"/);
+  assert.match(componentSource, /'editor-canvas__edge-data-highlight--active': isDataEdgeStateInteractionOpen\(edge\)/);
+  assert.match(componentSource, /function isDataEdgeStateInteractionOpen\(edge: Pick<ProjectedCanvasEdge, "kind" \| "source" \| "target" \| "state">\)/);
+  assert.match(componentSource, /"--editor-edge-outline": withAlpha\(edge\.color, 0\.18\)/);
+  assert.match(componentSource, /"--editor-edge-outline-active": withAlpha\(edge\.color, 0\.32\)/);
+  assert.match(componentSource, /\.editor-canvas__edge-data-highlight \{[\s\S]*stroke:\s*var\(--editor-edge-outline,/);
+  assert.match(componentSource, /\.editor-canvas__edge-data-highlight--active \{[\s\S]*stroke:\s*var\(--editor-edge-outline-active,/);
+});
+
 test("EditorCanvas restores empty-canvas onboarding copy for node creation", () => {
   assert.match(componentSource, /Double click to create your first node/);
   assert.match(componentSource, /Drag from an output handle into empty space to get type-aware preset suggestions\./);
