@@ -26,6 +26,7 @@ from app.tools.model_provider_client import (
     discover_provider_models,
     post_streaming_json_with_fallback,
 )
+from app.tools.model_provider_http import build_auth_headers
 from app.tools.model_provider_openai import (
     coalesce_openai_chat_stream_response as _coalesce_openai_chat_stream_response,
     extract_openai_chat_stream_delta as _extract_openai_chat_stream_delta,
@@ -489,10 +490,13 @@ def _request_local_chat_completion(
     base_url = get_local_llm_base_url()
     if not base_url:
         raise RuntimeError("Local model provider is not configured. Configure it in the Model Providers page.")
-    headers = {
-        "Authorization": f"Bearer {get_local_llm_api_key()}",
-        "Content-Type": "application/json",
-    }
+    provider_config = _get_saved_local_provider_config()
+    auth_scheme = provider_config.get("auth_scheme")
+    headers = build_auth_headers(
+        api_key=str(provider_config.get("api_key") or ""),
+        auth_header=str(provider_config.get("auth_header") or "Authorization"),
+        auth_scheme="Bearer" if auth_scheme is None else str(auth_scheme),
+    )
     stream_payload = dict(request_payload)
     stream_payload["stream"] = True
     fallback_payload = dict(request_payload)

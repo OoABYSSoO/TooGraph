@@ -259,8 +259,8 @@ test("BuddyWidget renders assistant replies from parent graph output nodes only"
   assert.match(componentSource, /buildBuddyPublicOutputBindings/);
   assert.match(componentSource, /reduceBuddyPublicOutputEvent/);
   assert.match(componentSource, /publicOutput\?:/);
-  assert.match(componentSource, /buildPublicOutputMessageId\(controllerMessageId, outputNodeId\)/);
-  assert.match(componentSource, /upsertPublicOutputMessages/);
+  assert.match(componentSource, /buildPublicOutputMessageId\(controllerMessageId, output\.outputNodeId\)/);
+  assert.match(componentSource, /syncBuddyRunDisplayMessages/);
   assert.match(componentSource, /v-html="renderBuddyMarkdown\(message\.content\)"/);
   assert.match(componentSource, /class="buddy-widget__public-output-card"/);
   assert.match(componentSource, /addEventListener\("activity\.event"/);
@@ -268,12 +268,19 @@ test("BuddyWidget renders assistant replies from parent graph output nodes only"
   assert.doesNotMatch(componentSource, /resolveBuddyRunTraceFromRunEvent/);
 });
 
-test("BuddyWidget records and displays public output durations", () => {
+test("BuddyWidget renders output-segment run trace capsules instead of per-message duration chips", () => {
   assert.match(componentSource, /import \{ formatRunDuration \} from "\.\.\/lib\/run-display-name\.ts";/);
-  assert.match(componentSource, /formatPublicOutputDuration/);
-  assert.match(componentSource, /message\.publicOutput\.durationMs/);
-  assert.match(componentSource, /class="buddy-widget__public-output-duration"/);
+  assert.match(componentSource, /buildBuddyOutputTracePlan/);
+  assert.match(componentSource, /reduceBuddyOutputTraceEvent/);
+  assert.match(componentSource, /buildBuddyOutputTraceStateFromRunDetail/);
+  assert.match(componentSource, /outputTrace\?:/);
+  assert.match(componentSource, /class="buddy-widget__run-trace"/);
+  assert.match(componentSource, /class="buddy-widget__run-trace-summary"/);
+  assert.match(componentSource, /buddy-widget__run-trace-dot--running/);
+  assert.match(componentSource, /formatTraceDuration/);
+  assert.match(componentSource, /traceClockNowMs/);
   assert.match(componentSource, /buildRunNodeTimingByNodeIdFromRun/);
+  assert.doesNotMatch(componentSource, /formatPublicOutputDuration/);
   assert.doesNotMatch(componentSource, /runTraceStartedAtByKey/);
 });
 

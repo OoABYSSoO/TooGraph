@@ -103,6 +103,42 @@ class OpenAiCompatibleProviderRuntimeTests(unittest.TestCase):
                         self.assertEqual(local_llm.get_local_llm_api_key(), "sk-saved")
                         self.assertEqual(local_llm.get_local_route_model_names(force_refresh=False), ["saved-model"])
 
+    def test_local_chat_request_omits_authorization_header_without_api_key(self) -> None:
+        saved_settings = {
+            "model_providers": {
+                "local": {
+                    "base_url": "http://127.0.0.1:8888/v1",
+                    "models": [{"model": "gemma", "label": "Gemma"}],
+                }
+            }
+        }
+
+        with self._patched_local_provider_env():
+            local_llm, _model_catalog = self._reload_target_modules()
+            captured: dict[str, object] = {}
+
+            def fake_post_streaming_json_with_fallback(**kwargs):
+                captured["headers"] = kwargs["headers"]
+                return (
+                    {"id": "chatcmpl-1", "model": "gemma", "choices": [{"message": {"content": "ok"}}]},
+                    kwargs["stream_payload"],
+                    None,
+                    True,
+                )
+
+            with patch.object(local_llm, "load_app_settings", return_value=saved_settings):
+                with patch.object(
+                    local_llm,
+                    "post_streaming_json_with_fallback",
+                    side_effect=fake_post_streaming_json_with_fallback,
+                ):
+                    response = local_llm._request_local_chat_completion(
+                        {"model": "gemma", "messages": [{"role": "user", "content": "hi"}]}
+                    )
+
+        self.assertEqual(response["choices"][0]["message"]["content"], "ok")
+        self.assertEqual(captured["headers"], {"Content-Type": "application/json"})
+
     def test_build_model_catalog_reports_unconfigured_local_provider_template_without_saved_settings(self) -> None:
         runtime_config = {
             "display_model_name": "Llama 3.1 8B",

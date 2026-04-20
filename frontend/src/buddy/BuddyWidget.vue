@@ -203,20 +203,62 @@
               @cancel="cancelPausedBuddyRun"
             />
             <template v-else>
-              <div v-if="message.publicOutput" class="buddy-widget__public-output-meta">
-                <span
-                  v-if="message.publicOutput.durationMs !== null"
-                  class="buddy-widget__public-output-duration"
+              <section
+                v-if="message.role === 'assistant' && message.outputTrace"
+                class="buddy-widget__run-trace"
+                :class="`buddy-widget__run-trace--${message.outputTrace.status}`"
+              >
+                <button
+                  type="button"
+                  class="buddy-widget__run-trace-summary"
+                  :aria-expanded="isTraceMessageExpanded(message.id)"
+                  :aria-label="isTraceMessageExpanded(message.id) ? t('buddy.runTraceCollapse') : t('buddy.runTraceExpand')"
+                  @click="toggleTraceMessage(message.id)"
                 >
-                  {{ formatPublicOutputDuration(message.publicOutput.durationMs) }}
-                </span>
-                <span
-                  v-else-if="message.publicOutput.status === 'streaming'"
-                  class="buddy-widget__public-output-duration buddy-widget__public-output-duration--streaming"
+                  <span
+                    class="buddy-widget__run-trace-dot"
+                    :class="`buddy-widget__run-trace-dot--${message.outputTrace.status}`"
+                    aria-hidden="true"
+                  />
+                  <span class="buddy-widget__run-trace-title">
+                    {{ resolveTraceSegmentSummary(message.outputTrace) }}
+                  </span>
+                  <span class="buddy-widget__run-trace-duration">
+                    {{ formatTraceDuration(resolveTraceSegmentDurationMs(message.outputTrace)) }}
+                  </span>
+                  <span
+                    class="buddy-widget__run-trace-chevron"
+                    :class="{ 'buddy-widget__run-trace-chevron--expanded': isTraceMessageExpanded(message.id) }"
+                    aria-hidden="true"
+                  />
+                </button>
+                <div
+                  v-if="isTraceMessageExpanded(message.id)"
+                  class="buddy-widget__run-trace-detail"
                 >
-                  {{ t("buddy.outputStreaming") }}
-                </span>
-              </div>
+                  <ol class="buddy-widget__run-trace-list">
+                    <li
+                      v-for="record in message.outputTrace.records"
+                      :key="record.recordId"
+                      class="buddy-widget__run-trace-row"
+                    >
+                      <span
+                        class="buddy-widget__run-trace-dot buddy-widget__run-trace-dot--small"
+                        :class="`buddy-widget__run-trace-dot--${record.status}`"
+                        aria-hidden="true"
+                      />
+                      <span class="buddy-widget__run-trace-row-label">{{ record.label }}</span>
+                      <span class="buddy-widget__run-trace-row-duration">
+                        {{ formatTraceDuration(resolveTraceRecordDurationMs(record)) }}
+                      </span>
+                    </li>
+                  </ol>
+                  <div class="buddy-widget__run-trace-total">
+                    <span>{{ t("buddy.runTraceLabel") }}</span>
+                    <strong>{{ formatTraceDuration(resolveTraceSegmentDurationMs(message.outputTrace)) }}</strong>
+                  </div>
+                </div>
+              </section>
               <section
                 v-if="message.role === 'assistant' && message.publicOutput?.kind === 'card'"
                 class="buddy-widget__public-output-card"
@@ -361,6 +403,16 @@ import {
   type BuddyPublicOutputRuntimeState,
 } from "./buddyPublicOutput.ts";
 import {
+  buildBuddyOutputTracePlan,
+  buildBuddyOutputTraceStateFromRunDetail,
+  createBuddyOutputTraceRuntimeState,
+  listBuddyOutputTraceSegmentsForDisplay,
+  reduceBuddyOutputTraceEvent,
+  type BuddyOutputTraceRecord,
+  type BuddyOutputTraceRuntimeState,
+  type BuddyOutputTraceSegment,
+} from "./buddyOutputTrace.ts";
+import {
   BUDDY_POSITION_STORAGE_KEY,
   DEFAULT_BUDDY_MARGIN,
   DEFAULT_BUDDY_SIZE,
@@ -377,6 +429,7 @@ type BuddyMessage = BuddyChatMessage & {
   activityText?: string;
   runId?: string | null;
   publicOutput?: BuddyPublicOutputMetadata;
+  outputTrace?: BuddyOutputTraceSegment;
 };
 
 type BuddyPublicOutputMetadata = {
@@ -391,7 +444,7 @@ type BuddyPublicOutputMetadata = {
 };
 
 type BuddyMessagePatch = Partial<
-  Pick<BuddyMessage, "content" | "includeInContext" | "activityText" | "runId" | "publicOutput">
+  Pick<BuddyMessage, "content" | "includeInContext" | "activityText" | "runId" | "publicOutput" | "outputTrace">
 >;
 
 type BuddyQueuedTurn = {
@@ -464,6 +517,8 @@ const mascotMotion = ref<BuddyMascotMotion>("idle");
 const mascotFacing = ref<BuddyMascotFacing>("front");
 const messageListElement = ref<HTMLElement | null>(null);
 const debugDragging = ref(false);
+const traceClockNowMs = ref(Date.now());
+const expandedTraceMessageIds = ref<Set<string>>(new Set());
 const pointerDrag = ref<{
   pointerId: number;
   startX: number;
@@ -485,6 +540,7 @@ let buddyRoamStepTimerId: number | null = null;
 let buddyRoamTargetPosition: BuddyPosition | null = null;
 let buddyRoamSequenceId = 0;
 let buddyDebugActionTimerId: number | null = null;
+let traceClockTimerId: number | null = null;
 let pendingMascotLookPointer: { x: number; y: number } | null = null;
 let chatSessionInitializationPromise: Promise<void> | null = null;
 let chatSessionActivationGeneration = 0;
@@ -504,6 +560,9 @@ const isSessionSwitchLocked = computed(
   () =>
     queuedTurns.value.length > 0 ||
     activeRunId.value !== null,
+);
+const hasRunningTraceSegment = computed(() =>
+  messages.value.some((message) => message.outputTrace?.status === "running"),
 );
 const hasCurrentSessionContent = computed(() => messages.value.some((message) => message.content.trim()));
 const canCreateNewSession = computed(() => !isSessionSwitchLocked.value && hasCurrentSessionContent.value);
@@ -576,6 +635,7 @@ onBeforeUnmount(() => {
   clearAvatarSingleClickTimer();
   clearSpeakingIdleTimer();
   clearBuddyDebugActionTimer();
+  clearTraceClockTimer();
   cancelBuddyRoamTimers();
   cancelMascotLookFrame();
   closeEventSource();
@@ -605,6 +665,14 @@ watch(canBuddyRoam, (canRoam) => {
     return;
   }
   cancelBuddyRoamTimers();
+});
+
+watch(hasRunningTraceSegment, (hasRunning) => {
+  if (hasRunning) {
+    startTraceClockTimer();
+    return;
+  }
+  clearTraceClockTimer();
 });
 
 watch(mascotDebugRequest, (request) => {
@@ -913,6 +981,24 @@ function clearBuddyDebugActionTimer() {
     buddyDebugActionTimerId = null;
   }
   debugDragging.value = false;
+}
+
+function startTraceClockTimer() {
+  traceClockNowMs.value = Date.now();
+  if (traceClockTimerId !== null) {
+    return;
+  }
+  traceClockTimerId = window.setInterval(() => {
+    traceClockNowMs.value = Date.now();
+  }, 120);
+}
+
+function clearTraceClockTimer() {
+  if (traceClockTimerId === null) {
+    return;
+  }
+  window.clearInterval(traceClockTimerId);
+  traceClockTimerId = null;
 }
 
 function playMascotDebugMotion(motion: BuddyMascotMotion, durationMs: number, facing: BuddyMascotFacing) {
@@ -1245,8 +1331,10 @@ function handleBuddyRunAwaitingHuman(
 function finishBuddyVisibleRun(runDetail: RunDetail, assistantMessageId: string, sessionId: string, runId: string) {
   const graph = runDetail.graph_snapshot as unknown as GraphPayload;
   const publicOutputBindings = buildBuddyPublicOutputBindings(graph);
+  const outputTracePlan = buildBuddyOutputTracePlan(graph, publicOutputBindings);
+  const outputTraceState = buildBuddyOutputTraceStateFromRunDetail(runDetail, outputTracePlan, graph);
   const outputState = buildPublicOutputRuntimeStateFromRunDetail(runDetail, publicOutputBindings, graph);
-  const publicOutputMessages = upsertPublicOutputMessages(assistantMessageId, runId, outputState);
+  const { publicOutputMessages } = syncBuddyRunDisplayMessages(assistantMessageId, runId, outputTraceState, outputState);
   const includeReplyInContext = runDetail.status === "completed";
   const assistantMessage = messages.value.find((message) => message.id === assistantMessageId);
   if (assistantMessage) {
@@ -1676,12 +1764,22 @@ function startRunEventStream(
   }
 
   let publicOutputState = createBuddyPublicOutputRuntimeState();
+  const outputTracePlan = buildBuddyOutputTracePlan(graph, publicOutputBindings);
+  let outputTraceState = createBuddyOutputTraceRuntimeState(outputTracePlan);
   eventSource = new EventSource(streamUrl);
   const handleStreamingEvent = (eventType: string, event: Event) => {
     const payload = parseRunEventPayload(event);
     if (!payload) {
       return;
     }
+    outputTraceState = reduceBuddyOutputTraceEvent(
+      outputTraceState,
+      outputTracePlan,
+      graph,
+      eventType,
+      payload,
+      nowPublicOutputMs(),
+    );
     publicOutputState = reduceBuddyPublicOutputEvent(
       publicOutputState,
       publicOutputBindings,
@@ -1689,9 +1787,16 @@ function startRunEventStream(
       payload,
       nowPublicOutputMs(),
     );
-    const publicOutputMessages = upsertPublicOutputMessages(assistantMessageId, runId, publicOutputState);
+    const { publicOutputMessages, outputTraceMessages } = syncBuddyRunDisplayMessages(
+      assistantMessageId,
+      runId,
+      outputTraceState,
+      publicOutputState,
+    );
     if (publicOutputMessages.length > 0) {
       mood.value = "speaking";
+    }
+    if (publicOutputMessages.length > 0 || outputTraceMessages.length > 0) {
       const controllerMessage = messages.value.find((message) => message.id === assistantMessageId);
       if (controllerMessage) {
         controllerMessage.activityText = "";
@@ -1734,6 +1839,7 @@ function shouldRenderMessage(message: BuddyMessage) {
   return (
     message.role === "user" ||
     Boolean(message.content.trim()) ||
+    Boolean(message.outputTrace) ||
     shouldShowPausedRunCard(message)
   );
 }
@@ -1746,52 +1852,104 @@ function shouldShowPausedRunCard(message: BuddyMessage) {
   );
 }
 
-function upsertPublicOutputMessages(
+function syncBuddyRunDisplayMessages(
   controllerMessageId: string,
   runId: string,
+  outputTraceState: BuddyOutputTraceRuntimeState,
   outputState: BuddyPublicOutputRuntimeState,
 ) {
-  const upsertedMessages: BuddyMessage[] = [];
+  const existingMessages = new Map(messages.value.map((message) => [message.id, message]));
+  const displayPrefix = `${controllerMessageId}:`;
+  messages.value = messages.value.filter(
+    (message) => !message.id.startsWith(`${displayPrefix}trace:`) && !message.id.startsWith(`${displayPrefix}output:`),
+  );
+
+  const outputTraceMessages: BuddyMessage[] = [];
+  const publicOutputMessages: BuddyMessage[] = [];
+  const displayMessages: BuddyMessage[] = [];
+  const handledOutputNodeIds = new Set<string>();
+
+  for (const segment of listBuddyOutputTraceSegmentsForDisplay(outputTraceState)) {
+    const traceMessage = buildOutputTraceMessage(controllerMessageId, runId, segment, existingMessages);
+    displayMessages.push(traceMessage);
+    outputTraceMessages.push(traceMessage);
+    for (const outputNodeId of segment.outputNodeIds) {
+      const output = outputState.messagesByOutputNodeId[outputNodeId];
+      if (!output) {
+        continue;
+      }
+      const outputMessage = buildPublicOutputMessage(controllerMessageId, runId, output, existingMessages);
+      displayMessages.push(outputMessage);
+      publicOutputMessages.push(outputMessage);
+      handledOutputNodeIds.add(outputNodeId);
+    }
+  }
+
   for (const outputNodeId of outputState.order) {
+    if (handledOutputNodeIds.has(outputNodeId)) {
+      continue;
+    }
     const output = outputState.messagesByOutputNodeId[outputNodeId];
     if (!output) {
       continue;
     }
-    const messageId = buildPublicOutputMessageId(controllerMessageId, outputNodeId);
-    const content = renderPublicOutputContentForStorage(output);
-    const publicOutput = toBuddyPublicOutputMetadata(output);
-    const existing = messages.value.find((message) => message.id === messageId);
-    if (existing) {
-      existing.content = content;
-      existing.publicOutput = publicOutput;
-      existing.runId = runId;
-      existing.includeInContext = publicOutput.kind === "text" && publicOutput.status === "completed";
-      upsertedMessages.push(existing);
-      continue;
-    }
-    const nextMessage = {
-      ...createMessage("assistant", content, messageId, allocateBuddyMessageClientOrder()),
-      includeInContext: publicOutput.kind === "text" && publicOutput.status === "completed",
-      runId,
-      publicOutput,
-    };
-    messages.value.splice(resolvePublicOutputInsertionIndex(controllerMessageId), 0, nextMessage);
-    upsertedMessages.push(nextMessage);
+    const outputMessage = buildPublicOutputMessage(controllerMessageId, runId, output, existingMessages);
+    displayMessages.push(outputMessage);
+    publicOutputMessages.push(outputMessage);
   }
-  return upsertedMessages;
+
+  if (displayMessages.length > 0) {
+    messages.value.splice(resolveBuddyRunDisplayInsertionIndex(controllerMessageId), 0, ...displayMessages);
+  }
+  return { publicOutputMessages, outputTraceMessages };
+}
+
+function buildOutputTraceMessage(
+  controllerMessageId: string,
+  runId: string,
+  outputTrace: BuddyOutputTraceSegment,
+  existingMessages: Map<string, BuddyMessage>,
+) {
+  const messageId = buildOutputTraceMessageId(controllerMessageId, outputTrace.segmentId);
+  const existing = existingMessages.get(messageId);
+  const message =
+    existing ?? createMessage("assistant", "", messageId, allocateBuddyMessageClientOrder());
+  message.content = "";
+  message.outputTrace = outputTrace;
+  message.publicOutput = undefined;
+  message.runId = runId;
+  message.includeInContext = false;
+  return message;
+}
+
+function buildPublicOutputMessage(
+  controllerMessageId: string,
+  runId: string,
+  output: BuddyPublicOutputMessage,
+  existingMessages: Map<string, BuddyMessage>,
+) {
+  const messageId = buildPublicOutputMessageId(controllerMessageId, output.outputNodeId);
+  const publicOutput = toBuddyPublicOutputMetadata(output);
+  const message =
+    existingMessages.get(messageId)
+    ?? createMessage("assistant", renderPublicOutputContentForStorage(output), messageId, allocateBuddyMessageClientOrder());
+  message.content = renderPublicOutputContentForStorage(output);
+  message.publicOutput = publicOutput;
+  message.outputTrace = undefined;
+  message.runId = runId;
+  message.includeInContext = publicOutput.kind === "text" && publicOutput.status === "completed";
+  return message;
+}
+
+function buildOutputTraceMessageId(controllerMessageId: string, segmentId: string) {
+  return `${controllerMessageId}:trace:${segmentId}`;
 }
 
 function buildPublicOutputMessageId(controllerMessageId: string, outputNodeId: string) {
   return `${controllerMessageId}:output:${outputNodeId}`;
 }
 
-function resolvePublicOutputInsertionIndex(controllerMessageId: string) {
-  const outputPrefix = `${controllerMessageId}:output:`;
-  for (let index = messages.value.length - 1; index >= 0; index -= 1) {
-    if (messages.value[index]?.id.startsWith(outputPrefix)) {
-      return index + 1;
-    }
-  }
+function resolveBuddyRunDisplayInsertionIndex(controllerMessageId: string) {
   const controllerIndex = messages.value.findIndex((message) => message.id === controllerMessageId);
   return controllerIndex >= 0 ? controllerIndex + 1 : messages.value.length;
 }
@@ -1877,12 +2035,60 @@ function nowPublicOutputMs() {
   return Date.now();
 }
 
-function formatPublicOutputDuration(durationMs: number | null | undefined) {
-  return t("buddy.outputDuration", { duration: formatRunDuration(durationMs ?? undefined, { secondsFractionDigits: 2 }) });
-}
-
 function formatPublicOutputCardContent(content: string) {
   return content.trim() || t("buddy.emptyReply");
+}
+
+function isTraceMessageExpanded(messageId: string) {
+  return expandedTraceMessageIds.value.has(messageId);
+}
+
+function toggleTraceMessage(messageId: string) {
+  const next = new Set(expandedTraceMessageIds.value);
+  if (next.has(messageId)) {
+    next.delete(messageId);
+  } else {
+    next.add(messageId);
+  }
+  expandedTraceMessageIds.value = next;
+}
+
+function resolveTraceSegmentSummary(segment: BuddyOutputTraceSegment) {
+  if (segment.status === "running") {
+    return findCurrentTraceRecord(segment)?.label ?? segment.boundaryLabel;
+  }
+  if (segment.status === "failed") {
+    return t("buddy.runTraceFailed", { count: segment.records.length });
+  }
+  return t("buddy.runTraceCompleted", { count: segment.records.length });
+}
+
+function findCurrentTraceRecord(segment: BuddyOutputTraceSegment) {
+  return [...segment.records].reverse().find((record) => record.status === "running") ?? segment.records.at(-1) ?? null;
+}
+
+function resolveTraceSegmentDurationMs(segment: BuddyOutputTraceSegment) {
+  if (segment.durationMs !== null) {
+    return segment.durationMs;
+  }
+  if (segment.status === "running" && segment.startedAtMs !== null) {
+    return Math.max(0, traceClockNowMs.value - segment.startedAtMs);
+  }
+  return null;
+}
+
+function resolveTraceRecordDurationMs(record: BuddyOutputTraceRecord) {
+  if (record.durationMs !== null) {
+    return record.durationMs;
+  }
+  if (record.status === "running" && record.startedAtMs !== null) {
+    return Math.max(0, traceClockNowMs.value - record.startedAtMs);
+  }
+  return null;
+}
+
+function formatTraceDuration(durationMs: number | null | undefined) {
+  return formatRunDuration(durationMs ?? undefined, { secondsFractionDigits: 2 });
 }
 
 function stringifyPublicOutputContent(value: unknown) {
@@ -2736,6 +2942,155 @@ function formatErrorMessage(error: unknown): string {
 .buddy-widget__message--user .buddy-widget__message-bubble {
   background: rgba(154, 52, 18, 0.08);
   color: var(--toograph-text-strong);
+}
+
+.buddy-widget__run-trace {
+  width: min(100%, 330px);
+  display: grid;
+  gap: 7px;
+}
+
+.buddy-widget__run-trace-summary {
+  min-height: 34px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 6px 9px;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 999px;
+  background: rgba(247, 255, 250, 0.88);
+  color: rgba(45, 32, 21, 0.86);
+  box-shadow: 0 10px 26px rgba(24, 105, 70, 0.1);
+  cursor: pointer;
+}
+
+.buddy-widget__run-trace-summary:hover {
+  border-color: rgba(16, 185, 129, 0.34);
+  background: rgba(244, 255, 248, 0.98);
+}
+
+.buddy-widget__run-trace-title {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.buddy-widget__run-trace-duration,
+.buddy-widget__run-trace-row-duration {
+  color: rgba(70, 53, 38, 0.66);
+  font-family: var(--toograph-font-mono);
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.buddy-widget__run-trace-chevron {
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid rgba(70, 53, 38, 0.58);
+  border-bottom: 1.5px solid rgba(70, 53, 38, 0.58);
+  transform: rotate(45deg) translateY(-1px);
+  transition: transform 140ms ease;
+}
+
+.buddy-widget__run-trace-chevron--expanded {
+  transform: rotate(225deg) translateY(-1px);
+}
+
+.buddy-widget__run-trace-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12);
+}
+
+.buddy-widget__run-trace-dot--small {
+  width: 7px;
+  height: 7px;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.1);
+}
+
+.buddy-widget__run-trace-dot--running {
+  animation: buddy-run-trace-pulse 1.25s ease-in-out infinite;
+}
+
+.buddy-widget__run-trace-dot--failed {
+  background: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12);
+}
+
+.buddy-widget__run-trace-detail {
+  display: grid;
+  gap: 8px;
+  max-width: 100%;
+  padding: 10px;
+  border: 1px solid rgba(154, 52, 18, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 252, 247, 0.78);
+  box-shadow: 0 14px 34px rgba(60, 41, 20, 0.08);
+}
+
+.buddy-widget__run-trace-list {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.buddy-widget__run-trace-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  color: rgba(45, 32, 21, 0.82);
+}
+
+.buddy-widget__run-trace-row-label {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.buddy-widget__run-trace-total {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 7px;
+  border-top: 1px solid rgba(154, 52, 18, 0.1);
+  color: rgba(108, 82, 62, 0.72);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.buddy-widget__run-trace-total strong {
+  color: rgba(45, 32, 21, 0.82);
+  font-family: var(--toograph-font-mono);
+  font-size: 11px;
+}
+
+@keyframes buddy-run-trace-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.02);
+    transform: scale(1.12);
+  }
 }
 
 .buddy-widget__public-output-meta {
