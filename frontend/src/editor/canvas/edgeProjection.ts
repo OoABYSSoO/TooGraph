@@ -2,6 +2,7 @@ import type { GraphDocument, GraphNode, GraphPayload } from "../../types/node-sy
 import { buildAnchorModel } from "../anchors/anchorModel.ts";
 import { placeAnchors, type NodeFrame } from "../anchors/anchorPlacement.ts";
 import { buildConnectorCurvePath } from "./connectionCurvePath.ts";
+import { buildSequenceFlowPath } from "./flowEdgePath.ts";
 
 export type ProjectedCanvasEdge = {
   id: string;
@@ -37,6 +38,8 @@ export function projectCanvasEdges(document: GraphPayload | GraphDocument): Proj
     .map((edge) => {
       const source = placements.get(edge.source);
       const target = placements.get(edge.target);
+      const sourceNode = document.nodes[edge.source];
+      const targetNode = document.nodes[edge.target];
       if (!source?.flowOut || !target?.flowIn) {
         return null;
       }
@@ -45,7 +48,16 @@ export function projectCanvasEdges(document: GraphPayload | GraphDocument): Proj
         kind: "flow" as const,
         source: edge.source,
         target: edge.target,
-        path: buildFlowPath(source.flowOut.x, source.flowOut.y, target.flowIn.x, target.flowIn.y),
+        path: buildFlowPath(
+          source.flowOut.x,
+          source.flowOut.y,
+          target.flowIn.x,
+          target.flowIn.y,
+          sourceNode?.ui.position.x,
+          sourceNode?.ui.position.y,
+          targetNode?.ui.position.x,
+          targetNode?.ui.position.y,
+        ),
       };
     })
     .filter(Boolean) as ProjectedCanvasEdge[];
@@ -60,6 +72,8 @@ export function projectCanvasEdges(document: GraphPayload | GraphDocument): Proj
       .map(([branch, targetNodeId]) => {
         const routeSource = source.routeOutputs.find((candidate) => candidate.branch === branch);
         const target = placements.get(targetNodeId);
+        const sourceNode = document.nodes[edge.source];
+        const targetNode = document.nodes[targetNodeId];
         if (!routeSource || !target?.flowIn) {
           return null;
         }
@@ -69,7 +83,16 @@ export function projectCanvasEdges(document: GraphPayload | GraphDocument): Proj
           source: edge.source,
           target: targetNodeId,
           branch,
-          path: buildFlowPath(routeSource.x, routeSource.y, target.flowIn.x, target.flowIn.y),
+          path: buildFlowPath(
+            routeSource.x,
+            routeSource.y,
+            target.flowIn.x,
+            target.flowIn.y,
+            sourceNode?.ui.position.x,
+            sourceNode?.ui.position.y,
+            targetNode?.ui.position.x,
+            targetNode?.ui.position.y,
+          ),
         };
       })
       .filter(Boolean) as ProjectedCanvasEdge[];
@@ -92,7 +115,7 @@ export function projectCanvasEdges(document: GraphPayload | GraphDocument): Proj
         target: relation.target,
         color: document.state_schema[relation.state]?.color ?? undefined,
         state: relation.state,
-        path: buildFlowPath(sourceAnchor.x, sourceAnchor.y, targetAnchor.x, targetAnchor.y),
+        path: buildDataPath(sourceAnchor.x, sourceAnchor.y, targetAnchor.x, targetAnchor.y),
       };
     })
     .filter(Boolean) as ProjectedCanvasEdge[];
@@ -180,7 +203,29 @@ function buildNodeFrame(node: GraphNode): NodeFrame {
   };
 }
 
-function buildFlowPath(startX: number, startY: number, endX: number, endY: number) {
+function buildFlowPath(
+  startX: number,
+  startY: number,
+  endX: number,
+  endY: number,
+  sourceNodeX?: number,
+  sourceNodeY?: number,
+  targetNodeX?: number,
+  targetNodeY?: number,
+) {
+  return buildSequenceFlowPath({
+    sourceX: startX,
+    sourceY: startY,
+    targetX: endX,
+    targetY: endY,
+    sourceNodeX,
+    sourceNodeY,
+    targetNodeX,
+    targetNodeY,
+  });
+}
+
+function buildDataPath(startX: number, startY: number, endX: number, endY: number) {
   return buildConnectorCurvePath({
     sourceX: startX,
     sourceY: startY,

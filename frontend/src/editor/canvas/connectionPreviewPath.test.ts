@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { buildPendingConnectionPreviewPath } from "./connectionPreviewPath.ts";
 import { buildConnectorCurvePath } from "./connectionCurvePath.ts";
+import { buildSequenceFlowPath } from "./flowEdgePath.ts";
 
 test("buildPendingConnectionPreviewPath builds the same curved preview for flow and route drags", () => {
   const path = buildPendingConnectionPreviewPath({
@@ -32,4 +33,36 @@ test("buildPendingConnectionPreviewPath builds the same curved preview for flow 
 
   assert.equal(path, expectedPath);
   assert.equal(routePath, expectedPath);
+});
+
+test("buildPendingConnectionPreviewPath uses the upstream flow path for flow and route drags", () => {
+  const input = {
+    sourceX: 500,
+    sourceY: 220,
+    targetX: 200,
+    targetY: 180,
+  };
+
+  assert.equal(buildPendingConnectionPreviewPath({ kind: "flow-out", ...input }), buildSequenceFlowPath(input));
+  assert.equal(buildPendingConnectionPreviewPath({ kind: "route-out", ...input }), buildSequenceFlowPath(input));
+});
+
+test("buildPendingConnectionPreviewPath keeps data previews as state curves", () => {
+  assert.equal(
+    buildPendingConnectionPreviewPath({
+      kind: "state-out",
+      sourceX: 500,
+      sourceY: 220,
+      targetX: 200,
+      targetY: 180,
+    }),
+    buildConnectorCurvePath({
+      sourceX: 500,
+      sourceY: 220,
+      targetX: 200,
+      targetY: 180,
+      sourceSide: "right",
+      targetSide: "left",
+    }),
+  );
 });

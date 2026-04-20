@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { buildConnectorCurvePath } from "./connectionCurvePath.ts";
+import { buildSequenceFlowPath } from "./flowEdgePath.ts";
 import { projectCanvasAnchors, projectCanvasEdges } from "./edgeProjection.ts";
 import type { GraphPayload } from "../../types/node-system.ts";
 
@@ -242,13 +242,52 @@ test("projectCanvasEdges exposes branch metadata for condition routes", () => {
   assert.equal(routeEdge?.branch, "retry");
   assert.equal(
     routeEdge?.path,
-    buildConnectorCurvePath({
+    buildSequenceFlowPath({
       sourceX: 554,
       sourceY: 239,
       targetX: 486,
       targetY: 154,
-      sourceSide: "right",
-      targetSide: "left",
+      sourceNodeX: 0,
+      sourceNodeY: 0,
+      targetNodeX: 480,
+      targetNodeY: 120,
     }),
   );
+});
+
+test("projectCanvasEdges routes upstream flow edges over the cards", () => {
+  const upstreamGraph: GraphPayload = {
+    ...graph,
+    nodes: {
+      ...graph.nodes,
+      input_question: {
+        ...graph.nodes.input_question!,
+        ui: { position: { x: 520, y: 220 } },
+      },
+      answer_helper: {
+        ...graph.nodes.answer_helper!,
+        ui: { position: { x: 80, y: 220 } },
+      },
+    },
+    edges: [{ source: "input_question", target: "answer_helper" }],
+  };
+
+  const projected = projectCanvasEdges(upstreamGraph);
+  const flowEdge = projected.find((edge) => edge.id === "flow:input_question->answer_helper");
+
+  assert.ok(flowEdge);
+  assert.equal(
+    flowEdge.path,
+    buildSequenceFlowPath({
+      sourceX: 974,
+      sourceY: 254,
+      targetX: 86,
+      targetY: 254,
+      sourceNodeX: 520,
+      sourceNodeY: 220,
+      targetNodeX: 80,
+      targetNodeY: 220,
+    }),
+  );
+  assert.match(flowEdge.path, /^M .* Q /);
 });

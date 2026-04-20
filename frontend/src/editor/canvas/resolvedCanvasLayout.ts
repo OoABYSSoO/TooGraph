@@ -1,6 +1,7 @@
 import type { GraphDocument, GraphPayload } from "../../types/node-system.ts";
 import { type ProjectedCanvasAnchor, type ProjectedCanvasEdge, projectCanvasAnchors, projectCanvasEdges } from "./edgeProjection.ts";
 import { buildConnectorCurvePath } from "./connectionCurvePath.ts";
+import { buildSequenceFlowPath } from "./flowEdgePath.ts";
 
 export type MeasuredAnchorOffset = {
   offsetX: number;
@@ -54,7 +55,16 @@ function resolveCanvasEdges(
 
       return {
         ...edge,
-        path: buildFlowPath(sourceAnchor.x, sourceAnchor.y, targetAnchor.x, targetAnchor.y),
+        path: buildFlowPath(
+          sourceAnchor.x,
+          sourceAnchor.y,
+          targetAnchor.x,
+          targetAnchor.y,
+          document.nodes[edge.source]?.ui.position.x,
+          document.nodes[edge.source]?.ui.position.y,
+          document.nodes[edge.target]?.ui.position.x,
+          document.nodes[edge.target]?.ui.position.y,
+        ),
       };
     }
 
@@ -71,7 +81,7 @@ function resolveCanvasEdges(
 
       return {
         ...edge,
-        path: buildFlowPath(sourceAnchor.x, sourceAnchor.y, targetAnchor.x, targetAnchor.y),
+        path: buildDataPath(sourceAnchor.x, sourceAnchor.y, targetAnchor.x, targetAnchor.y),
       };
     }
 
@@ -83,12 +93,43 @@ function resolveCanvasEdges(
 
     return {
       ...edge,
-      path: buildFlowPath(sourceAnchor.x, sourceAnchor.y, targetAnchor.x, targetAnchor.y),
+      path: buildFlowPath(
+        sourceAnchor.x,
+        sourceAnchor.y,
+        targetAnchor.x,
+        targetAnchor.y,
+        document.nodes[edge.source]?.ui.position.x,
+        document.nodes[edge.source]?.ui.position.y,
+        document.nodes[edge.target]?.ui.position.x,
+        document.nodes[edge.target]?.ui.position.y,
+      ),
     };
   });
 }
 
-function buildFlowPath(startX: number, startY: number, endX: number, endY: number) {
+function buildFlowPath(
+  startX: number,
+  startY: number,
+  endX: number,
+  endY: number,
+  sourceNodeX?: number,
+  sourceNodeY?: number,
+  targetNodeX?: number,
+  targetNodeY?: number,
+) {
+  return buildSequenceFlowPath({
+    sourceX: startX,
+    sourceY: startY,
+    targetX: endX,
+    targetY: endY,
+    sourceNodeX,
+    sourceNodeY,
+    targetNodeX,
+    targetNodeY,
+  });
+}
+
+function buildDataPath(startX: number, startY: number, endX: number, endY: number) {
   return buildConnectorCurvePath({
     sourceX: startX,
     sourceY: startY,
