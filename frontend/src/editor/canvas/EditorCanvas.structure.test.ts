@@ -13,6 +13,17 @@ test("EditorCanvas binds the canvas surface styling to the viewport state", () =
   assert.match(componentSource, /const canvasSurfaceStyle = computed\(\(\) => resolveCanvasSurfaceStyle\(viewport\.viewport\)\);/);
 });
 
+test("EditorCanvas mounts a right-bottom minimap backed by measured node geometry", () => {
+  assert.match(componentSource, /import EditorMinimap from "\.\/EditorMinimap\.vue";/);
+  assert.match(componentSource, /const measuredNodeSizes = ref<Record<string, MeasuredNodeSize>>\(\{\}\);/);
+  assert.match(componentSource, /const canvasSize = ref\(\{ width: 0, height: 0 \}\);/);
+  assert.match(componentSource, /const minimapNodes = computed\(\(\) =>/);
+  assert.match(componentSource, /const minimapEdges = computed\(\(\) =>/);
+  assert.match(componentSource, /<EditorMinimap[\s\S]*class="editor-canvas__minimap"[\s\S]*:nodes="minimapNodes"[\s\S]*:edges="minimapEdges"[\s\S]*:viewport="viewport\.viewport"[\s\S]*:canvas-size="canvasSize"[\s\S]*@center-view="handleMinimapCenterView"/);
+  assert.match(componentSource, /function handleMinimapCenterView\(point: \{ worldX: number; worldY: number \}\)/);
+  assert.match(componentSource, /resolveViewportForMinimapCenter\(/);
+});
+
 test("EditorCanvas does not animate node transforms while dragging", () => {
   const nodeCssBlock = componentSource.match(/\.editor-canvas__node \{[^}]*\}/)?.[0] ?? "";
   assert.match(nodeCssBlock, /transition:\s*filter 180ms ease;/);
