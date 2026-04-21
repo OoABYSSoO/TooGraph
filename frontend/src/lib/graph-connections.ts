@@ -1,5 +1,5 @@
 import type { GraphDocument, GraphPayload } from "../types/node-system.ts";
-import { isVirtualAnyInputStateKey } from "./virtual-any-input.ts";
+import { isCreateAgentInputStateKey, isVirtualAnyInputStateKey } from "./virtual-any-input.ts";
 
 export type GraphConnectionAnchorKind = "flow-in" | "flow-out" | "state-in" | "state-out" | "route-out";
 
@@ -54,6 +54,10 @@ export function canConnectStateBinding(
 
   if (!sourceNode.writes.some((binding) => binding.state === sourceStateKey)) {
     return false;
+  }
+
+  if (isCreateAgentInputStateKey(targetStateKey)) {
+    return targetNode.kind === "agent" && !targetNode.reads.some((binding) => binding.state === sourceStateKey);
   }
 
   if (isVirtualAnyInputStateKey(targetStateKey)) {

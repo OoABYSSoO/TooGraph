@@ -303,3 +303,55 @@ test("canCompleteGraphConnection allows state outputs to target virtual any inpu
     false,
   );
 });
+
+test("canCompleteGraphConnection allows state outputs to target a transient new agent input", () => {
+  const pending: PendingGraphConnection = {
+    sourceNodeId: "input_question",
+    sourceKind: "state-out",
+    sourceStateKey: "question",
+  };
+  const createAgentInputStateKey = "__graphiteui_create_agent_input__";
+  const graphWithAgentMissingQuestion: GraphPayload = {
+    ...document,
+    nodes: {
+      ...document.nodes,
+      answer_helper: {
+        ...document.nodes.answer_helper,
+        reads: [{ state: "draft_question", required: true }],
+      },
+    },
+  };
+
+  assert.equal(
+    canCompleteGraphConnection(graphWithAgentMissingQuestion, pending, {
+      nodeId: "answer_helper",
+      kind: "state-in",
+      stateKey: createAgentInputStateKey,
+    }),
+    true,
+  );
+  assert.equal(
+    canCompleteGraphConnection(document, pending, {
+      nodeId: "answer_helper",
+      kind: "state-in",
+      stateKey: createAgentInputStateKey,
+    }),
+    false,
+  );
+  assert.equal(
+    canCompleteGraphConnection(document, pending, {
+      nodeId: "route_result",
+      kind: "state-in",
+      stateKey: createAgentInputStateKey,
+    }),
+    false,
+  );
+  assert.equal(
+    canCompleteGraphConnection(document, pending, {
+      nodeId: "output_answer",
+      kind: "state-in",
+      stateKey: createAgentInputStateKey,
+    }),
+    false,
+  );
+});

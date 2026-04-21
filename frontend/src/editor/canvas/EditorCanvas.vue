@@ -159,7 +159,13 @@
           @update:description="handleDataEdgeStateEditorDescriptionInput"
         />
         <div class="editor-canvas__edge-state-editor-actions">
-          <button type="button" class="editor-canvas__edge-state-editor-action" @pointerdown.stop @click.stop="removeDataEdgeSourceBinding">
+          <button
+            v-if="canRemoveDataEdgeSourceBinding()"
+            type="button"
+            class="editor-canvas__edge-state-editor-action"
+            @pointerdown.stop
+            @click.stop="removeDataEdgeSourceBinding"
+          >
             <ElIcon><Delete /></ElIcon>
             <span>Remove source ref</span>
           </button>
@@ -212,6 +218,7 @@
           :run-output-preview-text="runOutputPreviewByNodeId?.[nodeId]?.text ?? null"
           :run-output-display-mode="runOutputPreviewByNodeId?.[nodeId]?.displayMode ?? null"
           :run-failure-message="runFailureMessageByNodeId?.[nodeId] ?? null"
+          :pending-state-input-source="pendingAgentInputSourceByNodeId[nodeId] ?? null"
           :selected="selection.selectedNodeId.value === nodeId"
           @update-node-metadata="emit('update-node-metadata', $event)"
           @update-input-config="emit('update-input-config', $event)"
@@ -331,6 +338,7 @@ import {
   type StateFieldType,
 } from "@/editor/workspace/statePanelFields";
 import { canCompleteGraphConnection, canStartGraphConnection, type PendingGraphConnection } from "@/lib/graph-connections";
+import { CREATE_AGENT_INPUT_STATE_KEY } from "@/lib/virtual-any-input";
 import { resolveFocusedViewport } from "@/editor/canvas/focusNodeViewport";
 import { resolveViewportForMinimapCenter } from "./minimapModel";
 import { useNodeSelectionFocus, type NodeFocusRequest } from "./useNodeSelectionFocus";
@@ -397,6 +405,12 @@ type MeasuredNodeSize = {
   width: number;
   height: number;
 };
+type PendingStateInputSource = {
+  stateKey: string;
+  label: string;
+  stateColor: string;
+};
+const STATE_INPUT_HIT_PADDING = 8;
 const measuredNodeSizes = ref<Record<string, MeasuredNodeSize>>({});
 const canvasSize = ref({ width: 0, height: 0 });
 const viewport = useViewport();
@@ -518,7 +532,58 @@ const visibleProjectedEdgeIds = computed(
       }).map((edge) => edge.id),
     ),
 );
-const projectedAnchors = computed(() => resolvedCanvasLayout.value.anchors);
+const pendingAgentInputSourceByNodeId = computed<Record<string, PendingStateInputSource>>(() => {
+  const connection = pendingConnection.value;
+  if (connection?.sourceKind !== "state-out" || !connection.sourceStateKey) {
+    return {};
+  }
+
+  const sourceStateKey = connection.sourceStateKey;
+  const sourceState = props.document.state_schema[sourceStateKey];
+  const pendingSource = {
+    stateKey: sourceStateKey,
+    label: sourceState?.name?.trim() || sourceStateKey,
+    stateColor: sourceState?.color?.trim() || "#d97706",
+  };
+
+  return Object.fromEntries(
+    Object.entries(props.document.nodes)
+      .filter(([, node]) => node.kind === "agent")
+      .filter(([nodeId]) =>
+        canCompleteGraphConnection(props.document, connection, {
+          nodeId,
+          kind: "state-in",
+          stateKey: CREATE_AGENT_INPUT_STATE_KEY,
+        }),
+      )
+      .map(([nodeId]) => [nodeId, pendingSource]),
+  );
+});
+const baseProjectedAnchors = computed(() => resolvedCanvasLayout.value.anchors);
+const transientAgentInputAnchors = computed<ProjectedCanvasAnchor[]>(() =>
+  Object.entries(pendingAgentInputSourceByNodeId.value).flatMap(([nodeId, source]) => {
+    const node = props.document.nodes[nodeId];
+    const anchorId = `${nodeId}:state-in:${CREATE_AGENT_INPUT_STATE_KEY}`;
+    const measuredOffset = measuredAnchorOffsets.value[anchorId];
+    if (!node || !measuredOffset) {
+      return [];
+    }
+
+    return [
+      {
+        id: anchorId,
+        nodeId,
+        kind: "state-in" as const,
+        x: node.ui.position.x + measuredOffset.offsetX,
+        y: node.ui.position.y + measuredOffset.offsetY,
+        side: "left" as const,
+        color: source.stateColor,
+        stateKey: CREATE_AGENT_INPUT_STATE_KEY,
+      },
+    ];
+  }),
+);
+const projectedAnchors = computed(() => [...baseProjectedAnchors.value, ...transientAgentInputAnchors.value]);
 const flowAnchors = computed(() =>
   projectedAnchors.value.filter((anchor) => anchor.kind === "flow-in" || anchor.kind === "flow-out"),
 );
@@ -726,6 +791,12 @@ watch(projectedEdges, (edges) => {
   if (activeDataEdgeStateEditor.value && !edges.some((edge) => isActiveDataEdge(edge, activeDataEdgeStateEditor.value))) {
     closeDataEdgeStateEditor();
   }
+});
+
+watch(pendingAgentInputSourceByNodeId, () => {
+  void nextTick().then(() => {
+    scheduleAnchorMeasurement();
+  });
 });
 
 onMounted(() => {
@@ -1035,8 +1106,18 @@ function handleDataEdgeStateEditorTypeValue(value: string | number | boolean | u
   });
 }
 
+function canRemoveDataEdgeSourceBinding() {
+  if (!activeDataEdgeStateEditor.value) {
+    return false;
+  }
+  return props.document.nodes[activeDataEdgeStateEditor.value.source]?.kind === "agent";
+}
+
 function removeDataEdgeSourceBinding() {
   if (!activeDataEdgeStateEditor.value) {
+    return;
+  }
+  if (!canRemoveDataEdgeSourceBinding()) {
     return;
   }
   emit("remove-port-state", {
@@ -1064,11 +1145,13 @@ function removeDataEdgeBindings() {
     return;
   }
 
-  emit("remove-port-state", {
-    nodeId: activeDataEdgeStateEditor.value.source,
-    side: "output",
-    stateKey: activeDataEdgeStateEditor.value.stateKey,
-  });
+  if (canRemoveDataEdgeSourceBinding()) {
+    emit("remove-port-state", {
+      nodeId: activeDataEdgeStateEditor.value.source,
+      side: "output",
+      stateKey: activeDataEdgeStateEditor.value.stateKey,
+    });
+  }
   emit("remove-port-state", {
     nodeId: activeDataEdgeStateEditor.value.target,
     side: "input",
@@ -1657,8 +1740,12 @@ function handleCanvasDoubleClick(event: MouseEvent) {
 }
 
 function resolveAutoSnappedTargetAnchor(event: PointerEvent) {
-  if (!activeConnection.value || activeConnection.value.sourceKind === "state-out") {
+  if (!activeConnection.value) {
     return null;
+  }
+
+  if (activeConnection.value.sourceKind === "state-out") {
+    return resolveAutoSnappedStateTargetAnchor(event);
   }
 
   for (const anchor of flowAnchors.value) {
@@ -1683,6 +1770,44 @@ function resolveAutoSnappedTargetAnchor(event: PointerEvent) {
   }
 
   return null;
+}
+
+function resolveAutoSnappedStateTargetAnchor(event: PointerEvent) {
+  for (const anchor of pointAnchors.value) {
+    if (anchor.kind !== "state-in" || !eligibleTargetAnchorIds.value.has(anchor.id)) {
+      continue;
+    }
+    if (isPointerWithinAnchorHitElement(anchor, event)) {
+      return anchor;
+    }
+  }
+
+  return null;
+}
+
+function isPointerWithinAnchorHitElement(anchor: ProjectedCanvasAnchor, event: PointerEvent) {
+  const nodeElement = nodeElementMap.get(anchor.nodeId);
+  if (!nodeElement) {
+    return false;
+  }
+
+  for (const slotElement of nodeElement.querySelectorAll("[data-anchor-slot-id]")) {
+    if (!(slotElement instanceof HTMLElement) || slotElement.dataset.anchorSlotId !== anchor.id) {
+      continue;
+    }
+
+    const hitElement = slotElement.closest("[data-anchor-hitarea='true']");
+    const element = hitElement instanceof HTMLElement ? hitElement : slotElement;
+    const rect = element.getBoundingClientRect();
+    return (
+      event.clientX >= rect.left - STATE_INPUT_HIT_PADDING &&
+      event.clientX <= rect.right + STATE_INPUT_HIT_PADDING &&
+      event.clientY >= rect.top - STATE_INPUT_HIT_PADDING &&
+      event.clientY <= rect.bottom + STATE_INPUT_HIT_PADDING
+    );
+  }
+
+  return false;
 }
 
 function isPointerWithinFlowHotspot(anchor: ProjectedCanvasAnchor, event: PointerEvent) {
@@ -2185,8 +2310,10 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   position: absolute;
   inset: 0;
   z-index: 1;
+  box-sizing: border-box;
   display: grid;
   place-items: center;
+  padding-inline: clamp(16px, 6vw, 56px);
   pointer-events: none;
 }
 
@@ -2209,15 +2336,28 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
 
 .editor-canvas__empty-title {
   margin-top: 12px;
-  font-size: 2rem;
+  max-width: min(100%, 34rem);
+  font-size: clamp(1.35rem, 5vw, 2rem);
   font-weight: 600;
+  line-height: 1.22;
+  overflow-wrap: anywhere;
   color: rgba(35, 25, 18, 0.94);
 }
 
 .editor-canvas__empty-copy {
   margin-top: 8px;
-  max-width: 34rem;
+  max-width: min(100%, 34rem);
   color: rgba(60, 41, 20, 0.74);
+}
+
+@media (max-width: 640px) {
+  .editor-canvas__empty-title {
+    max-width: min(100%, 18rem);
+  }
+
+  .editor-canvas__empty-copy {
+    max-width: min(100%, 18rem);
+  }
 }
 
 .editor-canvas__edges {

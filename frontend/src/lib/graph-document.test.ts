@@ -371,6 +371,91 @@ test("connectStateBindingInDocument binds a virtual any input to the source stat
   }
 });
 
+test("connectStateBindingInDocument appends source state through a transient new agent input", () => {
+  const createAgentInputStateKey = "__graphiteui_create_agent_input__";
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Agent state create graph",
+    state_schema: {
+      question: { name: "question", description: "", type: "text", value: "", color: "#d97706" },
+      draft_question: { name: "draft_question", description: "", type: "text", value: "", color: "#2563eb" },
+    },
+    nodes: {
+      input_question: {
+        kind: "input",
+        name: "input_question",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [{ state: "question", mode: "replace" }],
+        config: { value: "" },
+      },
+      answer_helper: {
+        kind: "agent",
+        name: "answer_helper",
+        description: "",
+        ui: { position: { x: 100, y: 0 } },
+        reads: [{ state: "draft_question", required: true }],
+        writes: [],
+        config: {
+          skills: [],
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+      answer_gate: {
+        kind: "condition",
+        name: "answer_gate",
+        description: "",
+        ui: { position: { x: 220, y: 0 } },
+        reads: [],
+        writes: [],
+        config: {
+          branches: ["true", "false"],
+          loopLimit: 5,
+          branchMapping: {
+            true: "true",
+            false: "false",
+          },
+          rule: {
+            source: "",
+            operator: "exists",
+            value: null,
+          },
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const nextAgentDocument = graphDocument.connectStateBindingInDocument(
+    document,
+    "input_question",
+    "question",
+    "answer_helper",
+    createAgentInputStateKey,
+  );
+  const nextConditionDocument = graphDocument.connectStateBindingInDocument(
+    document,
+    "input_question",
+    "question",
+    "answer_gate",
+    createAgentInputStateKey,
+  );
+
+  assert.deepEqual(nextAgentDocument.nodes.answer_helper.reads, [
+    { state: "draft_question", required: true },
+    { state: "question", required: true },
+  ]);
+  assert.deepEqual(document.nodes.answer_helper.reads, [{ state: "draft_question", required: true }]);
+  assert.equal(nextConditionDocument, document);
+});
+
 test("updateOutputNodeConfigInDocument patches output config immutably", () => {
   assert.equal(typeof graphDocument.updateOutputNodeConfigInDocument, "function");
 

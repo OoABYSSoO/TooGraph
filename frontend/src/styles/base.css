@@ -1,0 +1,16 @@
+html,
+body,
+#app {
+  width: 100%;
+  min-height: 100%;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}

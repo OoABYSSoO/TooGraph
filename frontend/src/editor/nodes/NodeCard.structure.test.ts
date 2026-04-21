@@ -177,6 +177,25 @@ test("NodeCard opens agent add skill and port actions in themed popovers instead
   assert.doesNotMatch(agentSection, /<div v-if="isSkillPickerOpen" class="node-card__skill-picker"/);
 });
 
+test("NodeCard renders a visible transient new agent input capsule while state dragging", () => {
+  const agentSectionMatch = componentSource.match(
+    /<section v-else-if="view\.body\.kind === 'agent'"[\s\S]*?<\/section>/,
+  );
+  assert.ok(agentSectionMatch, "expected to find the agent node section");
+  const agentSection = agentSectionMatch[0];
+
+  assert.match(componentSource, /import \{ CREATE_AGENT_INPUT_STATE_KEY \} from "@\/lib\/virtual-any-input";/);
+  assert.match(componentSource, /pendingStateInputSource\?: \{ stateKey: string; label: string; stateColor: string \} \| null;/);
+  assert.match(agentSection, /v-if="pendingStateInputSource"/);
+  assert.match(agentSection, /node-card__port-pill--create/);
+  assert.match(agentSection, /node-card__port-pill-create-badge/);
+  assert.match(agentSection, />NEW</);
+  assert.match(agentSection, /\{\{ pendingStateInputSource\.label \}\}/);
+  assert.match(agentSection, /:data-anchor-slot-id="\`\$\{nodeId\}:state-in:\$\{CREATE_AGENT_INPUT_STATE_KEY\}\`"/);
+  assert.match(componentSource, /\.node-card__port-pill--create \{[\s\S]*background:/);
+  assert.match(componentSource, /\.node-card__port-pill-create-badge \{[\s\S]*letter-spacing:\s*0\.12em;/);
+});
+
 test("NodeCard moves node actions into hoverable top buttons built from Element Plus icons and overlays", () => {
   assert.match(componentSource, /import \{[\s\S]*ElButton,[\s\S]*ElPopover[\s\S]*\} from "element-plus";/);
   assert.match(componentSource, /import \{[\s\S]*CollectionTag[\s\S]*Delete[\s\S]*Operation[\s\S]*\} from "@element-plus\/icons-vue";/);

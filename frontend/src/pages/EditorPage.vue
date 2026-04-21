@@ -64,6 +64,9 @@ watch(
 
 <style scoped>
 .editor-page__loading {
+  box-sizing: border-box;
+  width: min(720px, calc(100% - 24px));
+  margin: 12px auto 0;
   border: 1px solid rgba(154, 52, 18, 0.14);
   border-radius: 24px;
   padding: 24px;

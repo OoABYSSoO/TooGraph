@@ -447,6 +447,7 @@
                   }"
                   :style="{ '--node-card-port-accent': port.stateColor }"
                   data-state-editor-trigger="true"
+                  data-anchor-hitarea="true"
                   @pointerenter="handleStateEditorPillPointerEnter(`agent-input:${port.key}`)"
                   @pointerleave="handleStateEditorPillPointerLeave(`agent-input:${port.key}`)"
                   @pointerdown.stop
@@ -494,6 +495,24 @@
                 @update:description="handleStateEditorDescriptionInput"
               />
             </ElPopover>
+          </div>
+          <div v-if="pendingStateInputSource" class="node-card__port-pill-row">
+            <span
+              class="node-card__port-pill node-card__port-pill--input node-card__port-pill--dock-start node-card__port-pill--create"
+              :style="{ '--node-card-port-accent': pendingStateInputSource.stateColor }"
+              data-anchor-hitarea="true"
+              @pointerdown.stop
+            >
+              <span
+                class="node-card__port-pill-anchor-slot node-card__port-pill-anchor-slot--leading"
+                :data-anchor-slot-id="`${nodeId}:state-in:${CREATE_AGENT_INPUT_STATE_KEY}`"
+                aria-hidden="true"
+              />
+              <span class="node-card__port-pill-create-badge">NEW</span>
+              <span class="node-card__port-pill-label">
+                <span class="node-card__port-pill-label-text">{{ pendingStateInputSource.label }}</span>
+              </span>
+            </span>
           </div>
         </div>
         <div class="node-card__port-column node-card__port-column--right">
@@ -872,6 +891,7 @@
               }"
               :style="{ '--node-card-port-accent': view.body.primaryInput.stateColor }"
               data-state-editor-trigger="true"
+              data-anchor-hitarea="true"
               @pointerenter="handleStateEditorPillPointerEnter(`output-input:${view.body.primaryInput.key}`)"
               @pointerleave="handleStateEditorPillPointerLeave(`output-input:${view.body.primaryInput.key}`)"
               @pointerdown.stop
@@ -981,6 +1001,7 @@
                     }"
                     :style="{ '--node-card-port-accent': view.body.primaryInput.stateColor }"
                     data-state-editor-trigger="true"
+                    data-anchor-hitarea="true"
                     @pointerenter="handleStateEditorPillPointerEnter(`condition-input:${view.body.primaryInput.key}`)"
                     @pointerleave="handleStateEditorPillPointerLeave(`condition-input:${view.body.primaryInput.key}`)"
                     @pointerdown.stop
@@ -1103,6 +1124,7 @@ import StateEditorPopover from "./StateEditorPopover.vue";
 import type { KnowledgeBaseRecord } from "@/types/knowledge";
 import type { AgentNode, ConditionNode, GraphNode, InputNode, OutputNode, StateDefinition } from "@/types/node-system";
 import type { SkillDefinition } from "@/types/skills";
+import { CREATE_AGENT_INPUT_STATE_KEY } from "@/lib/virtual-any-input";
 
 import { DEFAULT_AGENT_TEMPERATURE, buildAgentModelSelectOptions, normalizeAgentTemperature, resolveAgentModelSelection } from "./agentConfigModel";
 import {
@@ -1145,6 +1167,7 @@ const props = defineProps<{
   runOutputPreviewText?: string | null;
   runOutputDisplayMode?: string | null;
   runFailureMessage?: string | null;
+  pendingStateInputSource?: { stateKey: string; label: string; stateColor: string } | null;
   selected: boolean;
 }>();
 
@@ -3119,6 +3142,27 @@ function handleConditionRuleValueInput(event: Event) {
   border-color: rgba(154, 52, 18, 0.14);
   background: rgba(255, 250, 241, 0.94);
   box-shadow: 0 10px 22px rgba(60, 41, 20, 0.08);
+}
+
+.node-card__port-pill--create {
+  border-color: color-mix(in srgb, var(--node-card-port-accent) 34%, transparent);
+  background: color-mix(in srgb, var(--node-card-port-accent) 10%, rgba(255, 250, 241, 0.96));
+  color: #1f2937;
+  box-shadow: 0 10px 20px rgba(60, 41, 20, 0.08);
+}
+
+.node-card__port-pill-create-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  border-radius: 999px;
+  padding: 0 7px;
+  background: color-mix(in srgb, var(--node-card-port-accent) 16%, rgba(255, 255, 255, 0.92));
+  color: var(--node-card-port-accent);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  line-height: 1;
 }
 
 .node-card__port-pill--output {

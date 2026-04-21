@@ -9,7 +9,7 @@ import {
   canReconnectConditionRoute,
   canReconnectFlowEdge,
 } from "./graph-connections.ts";
-import { isVirtualAnyInputStateKey } from "./virtual-any-input.ts";
+import { isCreateAgentInputStateKey, isVirtualAnyInputStateKey } from "./virtual-any-input.ts";
 
 import type { AgentNode, ConditionNode, GraphDocument, GraphNode, GraphPayload, InputNode, OutputNode, TemplateRecord } from "../types/node-system.ts";
 
@@ -454,6 +454,14 @@ export function connectStateBindingInDocument<T extends GraphPayload | GraphDocu
 
   const nextDocument = cloneGraphDocument(document);
   const nextTargetNode = nextDocument.nodes[targetNodeId];
+  if (isCreateAgentInputStateKey(targetStateKey)) {
+    if (nextTargetNode.kind !== "agent") {
+      return document;
+    }
+    nextTargetNode.reads = [...nextTargetNode.reads, { state: sourceStateKey, required: true }];
+    return syncKnowledgeBaseSkillsInDocument(nextDocument);
+  }
+
   if (isVirtualAnyInputStateKey(targetStateKey)) {
     nextTargetNode.reads = [{ state: sourceStateKey, required: true }];
     if (nextTargetNode.kind === "condition" && !nextTargetNode.config.rule.source.trim()) {

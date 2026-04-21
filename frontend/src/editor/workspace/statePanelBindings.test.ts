@@ -137,11 +137,14 @@ test("removeStateBindingFromDocument removes existing read and write relations",
   const nextWriteDocument = removeStateBindingFromDocument(document, "answer", "answer_helper", "write");
   assert.deepEqual(nextWriteDocument.nodes.answer_helper.writes, []);
   assert.deepEqual(nextWriteDocument.edges, [{ source: "input_question", target: "answer_helper" }]);
+});
+
+test("removeStateBindingFromDocument never removes input node state outputs", () => {
+  const document = buildDocument();
 
   const nextInputWriteDocument = removeStateBindingFromDocument(document, "question", "input_question", "write");
-  assert.deepEqual(nextInputWriteDocument.nodes.input_question.writes, []);
-  assert.deepEqual(nextInputWriteDocument.edges, [
-    { source: "answer_helper", target: "score_gate" },
-    { source: "answer_helper", target: "output_answer" },
-  ]);
+
+  assert.equal(nextInputWriteDocument, document);
+  assert.deepEqual(nextInputWriteDocument.nodes.input_question.writes, [{ state: "question", mode: "replace" }]);
+  assert.deepEqual(nextInputWriteDocument.edges, document.edges);
 });

@@ -663,6 +663,7 @@ function handleTabsWheel(event: WheelEvent) {
 }
 
 .editor-tab-bar__controls-dock {
+  box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -793,12 +794,40 @@ function handleTabsWheel(event: WheelEvent) {
     font-size: 0.82rem;
   }
 
+  .editor-tab-bar__controls {
+    flex: 1 1 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow: visible;
+  }
+
+  .editor-tab-bar__controls-dock {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+    align-items: stretch;
+    overflow: visible;
+  }
+
+  .editor-tab-bar__state-pill,
+  .editor-tab-bar__action {
+    width: 100%;
+    min-width: 0;
+    padding-inline: 8px;
+    justify-content: center;
+  }
+
   .editor-tab-bar__select {
-    min-width: 128px;
+    width: 100%;
+    min-width: 0;
   }
 
   .editor-tab-bar__select--wide {
-    min-width: 148px;
+    min-width: 0;
+  }
+
+  .editor-tab-bar__action--primary {
+    grid-column: 3;
   }
 }
 </style>
