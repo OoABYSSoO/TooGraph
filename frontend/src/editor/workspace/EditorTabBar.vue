@@ -62,37 +62,39 @@
       </div>
 
       <div class="editor-tab-bar__controls">
-        <button
-          type="button"
-          class="editor-tab-bar__state-pill"
-          :class="{ 'editor-tab-bar__state-pill--active': isStatePanelOpen }"
-          @click="$emit('toggle-state-panel')"
-        >
-          <span>{{ copy.state }}</span>
-          <span class="editor-tab-bar__state-count">{{ activeStateCount }}</span>
-        </button>
+        <div class="editor-tab-bar__controls-dock">
+          <button
+            type="button"
+            class="editor-tab-bar__state-pill"
+            :class="{ 'editor-tab-bar__state-pill--active': isStatePanelOpen }"
+            @click="$emit('toggle-state-panel')"
+          >
+            <span>{{ copy.state }}</span>
+            <span class="editor-tab-bar__state-count">{{ activeStateCount }}</span>
+          </button>
 
-        <button type="button" class="editor-tab-bar__action" @click="$emit('create-new')">{{ copy.newGraph }}</button>
+          <button type="button" class="editor-tab-bar__action" @click="$emit('create-new')">{{ copy.newGraph }}</button>
 
-        <WorkspaceSelect
-          v-model="selectedTemplateId"
-          :options="templateOptions"
-          :placeholder="selectPlaceholders.template"
-          min-width-class-name="editor-tab-bar__select"
-        />
+          <WorkspaceSelect
+            v-model="selectedTemplateId"
+            :options="templateOptions"
+            :placeholder="selectPlaceholders.template"
+            min-width-class-name="editor-tab-bar__select"
+          />
 
-        <WorkspaceSelect
-          v-model="selectedGraphId"
-          :options="graphOptions"
-          :placeholder="selectPlaceholders.graph"
-          min-width-class-name="editor-tab-bar__select editor-tab-bar__select--wide"
-        />
+          <WorkspaceSelect
+            v-model="selectedGraphId"
+            :options="graphOptions"
+            :placeholder="selectPlaceholders.graph"
+            min-width-class-name="editor-tab-bar__select editor-tab-bar__select--wide"
+          />
 
-        <button type="button" class="editor-tab-bar__action" @click="$emit('save-active-graph')">{{ copy.save }}</button>
-        <button type="button" class="editor-tab-bar__action" @click="$emit('validate-active-graph')">{{ copy.validate }}</button>
-        <button type="button" class="editor-tab-bar__action editor-tab-bar__action--primary" @click="$emit('run-active-graph')">
-          {{ copy.run }}
-        </button>
+          <button type="button" class="editor-tab-bar__action" @click="$emit('save-active-graph')">{{ copy.save }}</button>
+          <button type="button" class="editor-tab-bar__action" @click="$emit('validate-active-graph')">{{ copy.validate }}</button>
+          <button type="button" class="editor-tab-bar__action editor-tab-bar__action--primary" @click="$emit('run-active-graph')">
+            {{ copy.run }}
+          </button>
+        </div>
       </div>
     </div>
   </header>
@@ -660,18 +662,33 @@ function handleTabsWheel(event: WheelEvent) {
   display: none;
 }
 
+.editor-tab-bar__controls-dock {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  border: 1px solid rgba(193, 151, 106, 0.2);
+  border-radius: 18px;
+  background: rgba(255, 250, 242, 0.76);
+  padding: 4px;
+  scrollbar-width: none;
+}
+
+.editor-tab-bar__controls-dock::-webkit-scrollbar {
+  display: none;
+}
+
 .editor-tab-bar__state-pill,
 .editor-tab-bar__action {
   flex: 0 0 auto;
   min-height: 36px;
-  border: 1px solid rgba(193, 151, 106, 0.28);
+  border: 1px solid transparent;
   border-radius: 14px;
-  background: rgba(255, 249, 239, 0.94);
+  background: transparent;
   padding: 8px 13px;
   color: rgba(90, 58, 34, 0.96);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.52),
-    0 1px 0 rgba(255, 255, 255, 0.14);
+  box-shadow: none;
 }
 
 .editor-tab-bar__state-pill {
@@ -686,6 +703,7 @@ function handleTabsWheel(event: WheelEvent) {
 
 .editor-tab-bar__state-pill:hover,
 .editor-tab-bar__action:hover {
+  border-color: rgba(154, 52, 18, 0.12);
   background: rgba(255, 250, 242, 0.99);
 }
 
@@ -722,16 +740,14 @@ function handleTabsWheel(event: WheelEvent) {
 }
 
 .editor-tab-bar__action--primary {
-  border-color: rgba(154, 52, 18, 0.24);
-  background: rgba(246, 211, 184, 0.56);
-  color: rgba(124, 45, 18, 0.98);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.14),
-    0 2px 6px rgba(154, 52, 18, 0.08);
+  border-color: rgba(154, 52, 18, 0.9);
+  background: rgba(154, 52, 18, 0.9);
+  color: rgba(255, 250, 242, 0.98);
+  box-shadow: none;
 }
 
 .editor-tab-bar__action--primary:hover {
-  background: rgba(246, 211, 184, 0.72);
+  background: rgba(124, 45, 18, 0.92);
 }
 
 @media (max-width: 1100px) {
@@ -754,6 +770,10 @@ function handleTabsWheel(event: WheelEvent) {
     width: 100%;
     justify-content: flex-start;
     padding-bottom: 2px;
+  }
+
+  .editor-tab-bar__controls-dock {
+    overflow-x: auto;
   }
 }
 

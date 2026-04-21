@@ -21,12 +21,11 @@ test("AppShell collapses to a persistent sidebar rail instead of hiding the side
 test("AppShell keeps collapsed navigation usable with compact labels and an in-rail toggle", () => {
   assert.match(componentSource, /app-shell__brand-mark/);
   assert.match(componentSource, /app-shell__brand-copy/);
-  assert.match(componentSource, /app-shell__link-short/);
+  assert.match(componentSource, /app-shell__link-icon/);
   assert.match(componentSource, /app-shell__link-label/);
   assert.match(componentSource, /:aria-label="isSidebarCollapsed \? '展开侧栏' : '收起侧栏'"/);
   assert.match(componentSource, /\.app-shell__sidebar--collapsed\s+\.app-shell__brand-copy \{[\s\S]*display:\s*none;/);
   assert.match(componentSource, /\.app-shell__sidebar--collapsed\s+\.app-shell__link-label \{[\s\S]*display:\s*none;/);
-  assert.match(componentSource, /\.app-shell__sidebar:not\(\.app-shell__sidebar--collapsed\)\s+\.app-shell__link-short \{[\s\S]*display:\s*none;/);
 });
 
 test("AppShell uses dynamic viewport height and keeps editor chrome inside the visible viewport", () => {
@@ -35,4 +34,19 @@ test("AppShell uses dynamic viewport height and keeps editor chrome inside the v
   assert.match(componentSource, /\.app-shell__sidebar \{[\s\S]*min-height:\s*0;[\s\S]*overflow-y:\s*auto;/);
   assert.match(componentSource, /\.app-shell__content--editor \{[\s\S]*height:\s*100%;/);
   assert.doesNotMatch(componentSource, /\.app-shell__content--editor \{[\s\S]*height:\s*100vh;/);
+});
+
+test("AppShell uses a low-noise ChatGPT-style brand rail with library icons", () => {
+  assert.match(componentSource, /import \{[\s\S]*ElIcon[\s\S]*\} from "element-plus";/);
+  assert.match(componentSource, /import \{[\s\S]*House[\s\S]*EditPen[\s\S]*Clock[\s\S]*Setting[\s\S]*\} from "@element-plus\/icons-vue";/);
+  assert.match(componentSource, /<div class="app-shell__brand-mark" aria-hidden="true">C<\/div>/);
+  assert.match(componentSource, /<h1 class="app-shell__title">GraphiteUI<\/h1>/);
+  assert.doesNotMatch(componentSource, /app-shell__note/);
+  assert.match(componentSource, /<ElIcon class="app-shell__link-icon"><House \/><\/ElIcon>/);
+  assert.match(componentSource, /<ElIcon class="app-shell__link-icon"><EditPen \/><\/ElIcon>/);
+  assert.match(componentSource, /<ElIcon class="app-shell__link-icon"><Clock \/><\/ElIcon>/);
+  assert.match(componentSource, /<ElIcon class="app-shell__link-icon"><Setting \/><\/ElIcon>/);
+  assert.match(componentSource, /\.app-shell__sidebar \{[\s\S]*background:\s*rgba\(250,\s*246,\s*239,\s*0\.72\);/);
+  assert.match(componentSource, /\.app-shell__link \{[\s\S]*border:\s*1px solid transparent;/);
+  assert.match(componentSource, /\.app-shell__link\.router-link-active \{[\s\S]*box-shadow:\s*inset 3px 0 0 rgba\(154,\s*52,\s*18,\s*0\.7\);/);
 });

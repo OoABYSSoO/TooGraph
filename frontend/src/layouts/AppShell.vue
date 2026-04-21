@@ -13,29 +13,28 @@
       }"
     >
       <div class="app-shell__brand">
-        <div class="app-shell__brand-mark" aria-hidden="true">G</div>
+        <div class="app-shell__brand-mark" aria-hidden="true">C</div>
         <div class="app-shell__brand-copy">
-          <div class="app-shell__eyebrow">GraphiteUI</div>
           <h1 class="app-shell__title">GraphiteUI</h1>
-          <p class="app-shell__note">面向 LangGraph 工作流的可视化编排工作台。</p>
+          <p class="app-shell__subtitle">Workflow Studio</p>
         </div>
       </div>
 
       <nav class="app-shell__nav">
         <RouterLink to="/" class="app-shell__link" title="首页">
-          <span class="app-shell__link-short" aria-hidden="true">首</span>
+          <ElIcon class="app-shell__link-icon"><House /></ElIcon>
           <span class="app-shell__link-label">首页</span>
         </RouterLink>
         <RouterLink to="/editor" class="app-shell__link" title="编辑器">
-          <span class="app-shell__link-short" aria-hidden="true">编</span>
+          <ElIcon class="app-shell__link-icon"><EditPen /></ElIcon>
           <span class="app-shell__link-label">编辑器</span>
         </RouterLink>
         <RouterLink to="/runs" class="app-shell__link" title="运行记录">
-          <span class="app-shell__link-short" aria-hidden="true">运</span>
+          <ElIcon class="app-shell__link-icon"><Clock /></ElIcon>
           <span class="app-shell__link-label">运行记录</span>
         </RouterLink>
         <RouterLink to="/settings" class="app-shell__link" title="设置">
-          <span class="app-shell__link-short" aria-hidden="true">设</span>
+          <ElIcon class="app-shell__link-icon"><Setting /></ElIcon>
           <span class="app-shell__link-label">设置</span>
         </RouterLink>
       </nav>
@@ -46,7 +45,10 @@
         :aria-label="isSidebarCollapsed ? '展开侧栏' : '收起侧栏'"
         @click="setSidebarCollapsed(!isSidebarCollapsed)"
       >
-        <span class="app-shell__collapse-icon" aria-hidden="true">{{ isSidebarCollapsed ? "›" : "‹" }}</span>
+        <ElIcon class="app-shell__collapse-icon" aria-hidden="true">
+          <Expand v-if="isSidebarCollapsed" />
+          <Fold v-else />
+        </ElIcon>
         <span class="app-shell__collapse-label">{{ isSidebarCollapsed ? "展开" : "收起侧栏" }}</span>
       </button>
     </aside>
@@ -58,6 +60,8 @@
 </template>
 
 <script setup lang="ts">
+import { ElIcon } from "element-plus";
+import { House, EditPen, Clock, Setting, Fold, Expand } from "@element-plus/icons-vue";
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 
@@ -111,11 +115,11 @@ watch(isSidebarCollapsed, (nextValue) => {
 
 .app-shell__sidebar {
   border-right: 1px solid rgba(154, 52, 18, 0.12);
-  padding: 24px 20px;
+  padding: 18px 12px;
   display: grid;
   align-content: start;
-  gap: 24px;
-  background: rgba(255, 252, 247, 0.78);
+  gap: 18px;
+  background: rgba(250, 246, 239, 0.72);
   backdrop-filter: blur(10px);
   min-height: 0;
   overflow: hidden;
@@ -126,27 +130,28 @@ watch(isSidebarCollapsed, (nextValue) => {
 
 .app-shell__sidebar--collapsed {
   justify-items: center;
-  gap: 18px;
-  padding: 18px 10px;
+  gap: 14px;
+  padding: 16px 10px;
 }
 
 .app-shell__brand {
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr);
+  grid-template-columns: 36px minmax(0, 1fr);
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
+  padding: 2px 4px 10px;
 }
 
 .app-shell__brand-mark {
   display: inline-flex;
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(154, 52, 18, 0.18);
-  border-radius: 16px;
-  background: rgba(255, 248, 240, 0.92);
+  border: 1px solid rgba(154, 52, 18, 0.14);
+  border-radius: 12px;
+  background: rgba(255, 250, 242, 0.9);
   color: rgba(154, 52, 18, 0.96);
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -158,63 +163,67 @@ watch(isSidebarCollapsed, (nextValue) => {
 }
 
 .app-shell__sidebar--collapsed .app-shell__brand {
-  grid-template-columns: 40px;
+  grid-template-columns: 36px;
+  padding-inline: 0;
 }
 
 .app-shell__sidebar--collapsed .app-shell__brand-copy {
   display: none;
 }
 
-.app-shell__eyebrow {
-  font-size: 0.72rem;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: rgba(154, 52, 18, 0.78);
-}
-
 .app-shell__title {
-  margin: 6px 0 0;
-  font-size: 1.5rem;
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.15;
 }
 
-.app-shell__note {
-  margin: 8px 0 0;
-  font-size: 0.92rem;
-  line-height: 1.5;
+.app-shell__subtitle {
+  margin: 4px 0 0;
+  font-size: 0.72rem;
+  line-height: 1.2;
   color: rgba(60, 41, 20, 0.68);
 }
 
 .app-shell__nav {
   width: 100%;
   display: grid;
-  gap: 10px;
+  gap: 4px;
 }
 
 .app-shell__link {
   display: inline-flex;
   min-width: 0;
-  min-height: 42px;
+  min-height: 38px;
   align-items: center;
   justify-content: flex-start;
-  gap: 8px;
-  border: 1px solid rgba(154, 52, 18, 0.14);
-  border-radius: 999px;
-  padding: 10px 14px;
+  gap: 10px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 8px 10px;
   color: inherit;
   text-decoration: none;
-  background: rgba(255, 255, 255, 0.72);
-  transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease;
+  background: transparent;
+  transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
 }
 
 .app-shell__link:hover {
-  border-color: rgba(154, 52, 18, 0.22);
-  background: rgba(255, 250, 242, 0.96);
+  border-color: rgba(154, 52, 18, 0.1);
+  background: rgba(255, 250, 242, 0.82);
 }
 
 .app-shell__link.router-link-active {
-  border-color: rgba(154, 52, 18, 0.28);
-  background: rgba(255, 248, 240, 0.92);
+  border-color: rgba(154, 52, 18, 0.12);
+  background: rgba(255, 248, 240, 0.9);
   color: rgb(154, 52, 18);
+  box-shadow: inset 3px 0 0 rgba(154, 52, 18, 0.7);
+}
+
+.app-shell__link-icon {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  font-size: 18px;
+  color: currentColor;
 }
 
 .app-shell__link-label {
@@ -222,10 +231,6 @@ watch(isSidebarCollapsed, (nextValue) => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.app-shell__sidebar:not(.app-shell__sidebar--collapsed) .app-shell__link-short {
-  display: none;
 }
 
 .app-shell__sidebar--collapsed .app-shell__link {
@@ -245,22 +250,23 @@ watch(isSidebarCollapsed, (nextValue) => {
   justify-content: center;
   gap: 8px;
   width: 100%;
-  min-height: 40px;
-  border-radius: 999px;
-  border: 1px solid rgba(154, 52, 18, 0.16);
-  background: rgba(255, 255, 255, 0.86);
+  min-height: 38px;
+  margin-top: auto;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: transparent;
   color: #3c2914;
   cursor: pointer;
   transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease;
 }
 
 .app-shell__collapse:hover {
-  border-color: rgba(154, 52, 18, 0.24);
-  background: rgba(255, 250, 242, 0.98);
+  border-color: rgba(154, 52, 18, 0.1);
+  background: rgba(255, 250, 242, 0.82);
 }
 
 .app-shell__collapse-icon {
-  font-size: 1.2rem;
+  font-size: 18px;
   line-height: 1;
 }
 
@@ -304,10 +310,6 @@ watch(isSidebarCollapsed, (nextValue) => {
   .app-shell__link-label,
   .app-shell__collapse-label {
     display: none;
-  }
-
-  .app-shell__sidebar:not(.app-shell__sidebar--collapsed) .app-shell__link-short {
-    display: inline;
   }
 
   .app-shell__link {

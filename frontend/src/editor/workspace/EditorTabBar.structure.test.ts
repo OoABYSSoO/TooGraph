@@ -33,6 +33,13 @@ test("EditorTabBar constrains the top chrome to the available editor width", () 
   assert.match(componentSource, /\.editor-tab-bar__tabs-shell \{[\s\S]*max-width:\s*100%;/);
 });
 
+test("EditorTabBar presents controls as a quiet grouped action dock", () => {
+  assert.match(componentSource, /class="editor-tab-bar__controls-dock"/);
+  assert.match(componentSource, /\.editor-tab-bar__controls-dock \{[\s\S]*border-radius:\s*18px;[\s\S]*background:\s*rgba\(255,\s*250,\s*242,\s*0\.76\);/);
+  assert.match(componentSource, /\.editor-tab-bar__action \{[\s\S]*border:\s*1px solid transparent;/);
+  assert.match(componentSource, /\.editor-tab-bar__action--primary \{[\s\S]*background:\s*rgba\(154,\s*52,\s*18,\s*0\.9\);/);
+});
+
 test("EditorTabBar exposes browser-like tab interactions", () => {
   assert.match(componentSource, /draggable="true"/);
   assert.match(componentSource, /@auxclick="handleTabAuxClick\(tab, \$event\)"/);
