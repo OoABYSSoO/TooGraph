@@ -439,8 +439,9 @@
             >
               <template #reference>
                 <span
-                  class="node-card__port-pill node-card__port-pill--input node-card__port-pill--dock-start node-card__port-pill--removable"
+                  class="node-card__port-pill node-card__port-pill--input node-card__port-pill--dock-start"
                   :class="{
+                    'node-card__port-pill--removable': !port.virtual,
                     'node-card__port-pill--revealed': isStateEditorPillRevealed(`agent-input:${port.key}`),
                     'node-card__port-pill--confirm': isStateEditorConfirmOpen(`agent-input:${port.key}`),
                   }"
@@ -449,7 +450,7 @@
                   @pointerenter="handleStateEditorPillPointerEnter(`agent-input:${port.key}`)"
                   @pointerleave="handleStateEditorPillPointerLeave(`agent-input:${port.key}`)"
                   @pointerdown.stop
-                  @click.stop="handleStateEditorActionClick(`agent-input:${port.key}`, port.key)"
+                  @click.stop="!port.virtual && handleStateEditorActionClick(`agent-input:${port.key}`, port.key)"
                 >
                   <span
                     class="node-card__port-pill-anchor-slot node-card__port-pill-anchor-slot--leading"
@@ -464,6 +465,7 @@
                     <ElIcon class="node-card__port-pill-confirm-icon"><Check /></ElIcon>
                   </span>
                   <button
+                    v-if="!port.virtual"
                     type="button"
                     class="node-card__port-pill-remove node-card__port-pill-remove--trailing"
                     :class="{ 'node-card__port-pill-remove--confirm': isRemovePortStateConfirmOpen(`agent-input:${port.key}`) }"
@@ -853,10 +855,10 @@
     <section v-else-if="view.body.kind === 'output'" class="node-card__body node-card__body--output">
       <div class="node-card__output-toolbar">
         <ElPopover
-          v-if="view.body.connectedStateKey && view.body.connectedStateLabel"
-          :visible="isStateEditorOpen(`output-input:${view.body.connectedStateKey}`) || isStateEditorConfirmOpen(`output-input:${view.body.connectedStateKey}`)"
-          :placement="isStateEditorOpen(`output-input:${view.body.connectedStateKey}`) ? 'bottom-start' : 'top-start'"
-            :width="isStateEditorOpen(`output-input:${view.body.connectedStateKey}`) ? 320 : undefined"
+          v-if="view.body.primaryInput"
+          :visible="isStateEditorOpen(`output-input:${view.body.primaryInput.key}`) || isStateEditorConfirmOpen(`output-input:${view.body.primaryInput.key}`)"
+          :placement="isStateEditorOpen(`output-input:${view.body.primaryInput.key}`) ? 'bottom-start' : 'top-start'"
+          :width="isStateEditorOpen(`output-input:${view.body.primaryInput.key}`) ? 320 : undefined"
           :show-arrow="false"
           :popper-style="stateEditorPopoverStyle"
           popper-class="node-card__state-editor-popper"
@@ -865,31 +867,31 @@
             <span
               class="node-card__port-pill node-card__port-pill--input node-card__port-pill--dock-start"
               :class="{
-                'node-card__port-pill--revealed': isStateEditorPillRevealed(`output-input:${view.body.connectedStateKey}`),
-                'node-card__port-pill--confirm': isStateEditorConfirmOpen(`output-input:${view.body.connectedStateKey}`),
-                }"
-                :style="{ '--node-card-port-accent': stateSchema[view.body.connectedStateKey]?.color ?? '#2563eb' }"
-                data-state-editor-trigger="true"
-                @pointerenter="handleStateEditorPillPointerEnter(`output-input:${view.body.connectedStateKey}`)"
-                @pointerleave="handleStateEditorPillPointerLeave(`output-input:${view.body.connectedStateKey}`)"
-                @pointerdown.stop
-                @click.stop="handleStateEditorActionClick(`output-input:${view.body.connectedStateKey}`, view.body.connectedStateKey)"
-              >
+                'node-card__port-pill--revealed': isStateEditorPillRevealed(`output-input:${view.body.primaryInput.key}`),
+                'node-card__port-pill--confirm': isStateEditorConfirmOpen(`output-input:${view.body.primaryInput.key}`),
+              }"
+              :style="{ '--node-card-port-accent': view.body.primaryInput.stateColor }"
+              data-state-editor-trigger="true"
+              @pointerenter="handleStateEditorPillPointerEnter(`output-input:${view.body.primaryInput.key}`)"
+              @pointerleave="handleStateEditorPillPointerLeave(`output-input:${view.body.primaryInput.key}`)"
+              @pointerdown.stop
+              @click.stop="!view.body.primaryInput.virtual && handleStateEditorActionClick(`output-input:${view.body.primaryInput.key}`, view.body.primaryInput.key)"
+            >
               <span
                 class="node-card__port-pill-anchor-slot node-card__port-pill-anchor-slot--leading"
-                :data-anchor-slot-id="`${nodeId}:state-in:${view.body.connectedStateKey}`"
+                :data-anchor-slot-id="`${nodeId}:state-in:${view.body.primaryInput.key}`"
                 aria-hidden="true"
               />
               <span
                 class="node-card__port-pill-label"
-                :class="{ 'node-card__port-pill-label--confirm': isStateEditorConfirmOpen(`output-input:${view.body.connectedStateKey}`) }"
+                :class="{ 'node-card__port-pill-label--confirm': isStateEditorConfirmOpen(`output-input:${view.body.primaryInput.key}`) }"
               >
-                <span class="node-card__port-pill-label-text">{{ view.body.connectedStateLabel }}</span>
+                <span class="node-card__port-pill-label-text">{{ view.body.primaryInput.label }}</span>
                 <ElIcon class="node-card__port-pill-confirm-icon"><Check /></ElIcon>
               </span>
             </span>
           </template>
-          <div v-if="isStateEditorConfirmOpen(`output-input:${view.body.connectedStateKey}`)" class="node-card__confirm-hint node-card__confirm-hint--state">Edit state?</div>
+          <div v-if="isStateEditorConfirmOpen(`output-input:${view.body.primaryInput.key}`)" class="node-card__confirm-hint node-card__confirm-hint--state">Edit state?</div>
           <StateEditorPopover
             v-else-if="stateEditorDraft"
             class="node-card__state-editor"
@@ -971,8 +973,9 @@
               >
                 <template #reference>
                   <span
-                    class="node-card__port-pill node-card__port-pill--input node-card__port-pill--dock-start node-card__port-pill--removable node-card__port-pill--condition-source"
+                    class="node-card__port-pill node-card__port-pill--input node-card__port-pill--dock-start node-card__port-pill--condition-source"
                     :class="{
+                      'node-card__port-pill--removable': !view.body.primaryInput.virtual,
                       'node-card__port-pill--revealed': isStateEditorPillRevealed(`condition-input:${view.body.primaryInput.key}`),
                       'node-card__port-pill--confirm': isStateEditorConfirmOpen(`condition-input:${view.body.primaryInput.key}`),
                     }"
@@ -981,7 +984,7 @@
                     @pointerenter="handleStateEditorPillPointerEnter(`condition-input:${view.body.primaryInput.key}`)"
                     @pointerleave="handleStateEditorPillPointerLeave(`condition-input:${view.body.primaryInput.key}`)"
                     @pointerdown.stop
-                    @click.stop="handleStateEditorActionClick(`condition-input:${view.body.primaryInput.key}`, view.body.primaryInput.key)"
+                    @click.stop="!view.body.primaryInput.virtual && handleStateEditorActionClick(`condition-input:${view.body.primaryInput.key}`, view.body.primaryInput.key)"
                   >
                     <span
                       class="node-card__port-pill-anchor-slot node-card__port-pill-anchor-slot--leading"
@@ -996,6 +999,7 @@
                       <ElIcon class="node-card__port-pill-confirm-icon"><Check /></ElIcon>
                     </span>
                     <button
+                      v-if="!view.body.primaryInput.virtual"
                       type="button"
                       class="node-card__port-pill-remove node-card__port-pill-remove--trailing"
                       :class="{ 'node-card__port-pill-remove--confirm': isRemovePortStateConfirmOpen(`condition-input:${view.body.primaryInput.key}`) }"

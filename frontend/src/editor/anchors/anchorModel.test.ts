@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { buildAnchorModel } from "./anchorModel.ts";
+import { VIRTUAL_ANY_INPUT_STATE_KEY } from "../../lib/virtual-any-input.ts";
 import type { GraphNode } from "../../types/node-system.ts";
 
 test("buildAnchorModel creates flow and state anchors for agent nodes", () => {
@@ -67,4 +68,56 @@ test("buildAnchorModel creates route outputs for condition nodes", () => {
   assert.equal(model.routeOutputs.length, 2);
   assert.equal(model.routeOutputs[0]?.id, "branch:continue");
   assert.equal(model.routeOutputs[1]?.id, "branch:retry");
+});
+
+test("buildAnchorModel exposes a virtual any state input for non-input nodes without reads", () => {
+  const emptyAgent: GraphNode = {
+    kind: "agent",
+    name: "empty_agent",
+    description: "Blank agent.",
+    ui: { position: { x: 520, y: 220 } },
+    reads: [],
+    writes: [],
+    config: {
+      skills: [],
+      taskInstruction: "",
+      modelSource: "global",
+      model: "",
+      thinkingMode: "on",
+      temperature: 0.2,
+    },
+  };
+  const emptyOutput: GraphNode = {
+    kind: "output",
+    name: "output",
+    description: "Preview output.",
+    ui: { position: { x: 920, y: 220 } },
+    reads: [],
+    writes: [],
+    config: {
+      displayMode: "auto",
+      persistEnabled: false,
+      persistFormat: "auto",
+      fileNameTemplate: "",
+    },
+  };
+  const inputNode: GraphNode = {
+    kind: "input",
+    name: "input",
+    description: "Provide input.",
+    ui: { position: { x: 80, y: 220 } },
+    reads: [],
+    writes: [{ state: "value", mode: "replace" }],
+    config: {
+      value: "",
+    },
+  };
+
+  const agentModel = buildAnchorModel("empty_agent", emptyAgent);
+  const outputModel = buildAnchorModel("output", emptyOutput);
+  const inputModel = buildAnchorModel("input", inputNode);
+
+  assert.deepEqual(agentModel.stateInputs.map((anchor) => anchor.stateKey), [VIRTUAL_ANY_INPUT_STATE_KEY]);
+  assert.deepEqual(outputModel.stateInputs.map((anchor) => anchor.stateKey), [VIRTUAL_ANY_INPUT_STATE_KEY]);
+  assert.deepEqual(inputModel.stateInputs, []);
 });

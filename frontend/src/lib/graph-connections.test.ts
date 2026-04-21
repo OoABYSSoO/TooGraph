@@ -6,6 +6,7 @@ import {
   canStartGraphConnection,
   type PendingGraphConnection,
 } from "./graph-connections.ts";
+import { VIRTUAL_ANY_INPUT_STATE_KEY } from "./virtual-any-input.ts";
 import type { GraphPayload } from "../types/node-system.ts";
 
 const document: GraphPayload = {
@@ -259,5 +260,46 @@ test("canCompleteGraphConnection allows state-out sources to target a concrete s
       },
     ),
     true,
+  );
+});
+
+test("canCompleteGraphConnection allows state outputs to target virtual any inputs on empty non-input nodes", () => {
+  const pending: PendingGraphConnection = {
+    sourceNodeId: "input_question",
+    sourceKind: "state-out",
+    sourceStateKey: "question",
+  };
+
+  assert.equal(
+    canCompleteGraphConnection(document, pending, {
+      nodeId: "route_result",
+      kind: "state-in",
+      stateKey: VIRTUAL_ANY_INPUT_STATE_KEY,
+    }),
+    true,
+  );
+  assert.equal(
+    canCompleteGraphConnection(document, pending, {
+      nodeId: "output_answer",
+      kind: "state-in",
+      stateKey: VIRTUAL_ANY_INPUT_STATE_KEY,
+    }),
+    true,
+  );
+  assert.equal(
+    canCompleteGraphConnection(document, pending, {
+      nodeId: "input_question",
+      kind: "state-in",
+      stateKey: VIRTUAL_ANY_INPUT_STATE_KEY,
+    }),
+    false,
+  );
+  assert.equal(
+    canCompleteGraphConnection(document, pending, {
+      nodeId: "answer_helper",
+      kind: "state-in",
+      stateKey: VIRTUAL_ANY_INPUT_STATE_KEY,
+    }),
+    false,
   );
 });

@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { buildNodeCardViewModel } from "./nodeCardViewModel.ts";
+import { VIRTUAL_ANY_INPUT_STATE_KEY } from "../../lib/virtual-any-input.ts";
 import type { GraphNode, StateDefinition } from "../../types/node-system.ts";
 
 const stateSchema: Record<string, StateDefinition> = {
@@ -134,6 +135,72 @@ test("buildNodeCardViewModel derives agent body, ports, and labels", () => {
   assert.equal(model.body.primaryInput?.typeLabel, "text");
   assert.deepEqual(model.stateSummary?.reads, ["question"]);
   assert.deepEqual(model.stateSummary?.writes, ["answer"]);
+});
+
+test("buildNodeCardViewModel exposes a virtual any input for empty non-input nodes", () => {
+  const emptyAgent: GraphNode = {
+    kind: "agent",
+    name: "empty_agent",
+    description: "Agent without state inputs.",
+    ui: { position: { x: 520, y: 220 } },
+    reads: [],
+    writes: [{ state: "answer", mode: "replace" }],
+    config: {
+      skills: [],
+      taskInstruction: "",
+      modelSource: "global",
+      model: "",
+      thinkingMode: "on",
+      temperature: 0.2,
+    },
+  };
+  const emptyOutput: GraphNode = {
+    kind: "output",
+    name: "output_answer",
+    description: "Preview the final answer.",
+    ui: { position: { x: 980, y: 220 } },
+    reads: [],
+    writes: [],
+    config: {
+      displayMode: "auto",
+      persistEnabled: false,
+      persistFormat: "auto",
+      fileNameTemplate: "",
+    },
+  };
+  const inputNode: GraphNode = {
+    kind: "input",
+    name: "input_question",
+    description: "Provide the user question.",
+    ui: { position: { x: 80, y: 220 } },
+    reads: [],
+    writes: [{ state: "question", mode: "replace" }],
+    config: {
+      value: "什么是 GraphiteUI？",
+    },
+  };
+
+  const agentModel = buildNodeCardViewModel("empty_agent", emptyAgent, stateSchema);
+  const outputModel = buildNodeCardViewModel("output_answer", emptyOutput, stateSchema);
+  const inputModel = buildNodeCardViewModel("input_question", inputNode, stateSchema);
+
+  assert.deepEqual(agentModel.inputs, [
+    {
+      key: VIRTUAL_ANY_INPUT_STATE_KEY,
+      label: "any",
+      typeLabel: "any",
+      stateColor: "#9a3412",
+      virtual: true,
+    },
+  ]);
+  assert.equal(agentModel.body.kind, "agent");
+  assert.equal(agentModel.body.primaryInput?.key, VIRTUAL_ANY_INPUT_STATE_KEY);
+  assert.equal(agentModel.body.primaryInput?.virtual, true);
+  assert.equal(outputModel.body.kind, "output");
+  assert.equal(outputModel.body.primaryInput?.key, VIRTUAL_ANY_INPUT_STATE_KEY);
+  assert.equal(outputModel.body.primaryInput?.virtual, true);
+  assert.equal(outputModel.body.connectedStateKey, null);
+  assert.deepEqual(inputModel.inputs, []);
 });
 
 test("buildNodeCardViewModel derives output preview source from state schema", () => {

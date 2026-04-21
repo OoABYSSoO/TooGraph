@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { reactive } from "vue";
 
 import * as graphDocument from "./graph-document.ts";
+import { VIRTUAL_ANY_INPUT_STATE_KEY } from "./virtual-any-input.ts";
 import type { GraphDocument, GraphPayload, TemplateRecord } from "../types/node-system.ts";
 
 const { cloneGraphDocument, createDraftFromTemplate, createEmptyDraftGraph, pruneUnreferencedStateSchemaInDocument } = graphDocument;
@@ -284,6 +285,90 @@ test("connectStateBindingInDocument rewires a target read binding to the source 
 
   assert.deepEqual(nextDocument.nodes.answer_helper.reads, [{ state: "question", required: true }]);
   assert.deepEqual(document.nodes.answer_helper.reads, [{ state: "draft_question", required: true }]);
+});
+
+test("connectStateBindingInDocument binds a virtual any input to the source state", () => {
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Virtual state connect graph",
+    state_schema: {
+      question: { name: "question", description: "", type: "text", value: "", color: "#d97706" },
+    },
+    nodes: {
+      input_question: {
+        kind: "input",
+        name: "input_question",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [{ state: "question", mode: "replace" }],
+        config: { value: "" },
+      },
+      answer_helper: {
+        kind: "agent",
+        name: "answer_helper",
+        description: "",
+        ui: { position: { x: 100, y: 0 } },
+        reads: [],
+        writes: [],
+        config: {
+          skills: [],
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+      answer_gate: {
+        kind: "condition",
+        name: "answer_gate",
+        description: "",
+        ui: { position: { x: 220, y: 0 } },
+        reads: [],
+        writes: [],
+        config: {
+          branches: ["true", "false"],
+          loopLimit: 5,
+          branchMapping: {
+            true: "true",
+            false: "false",
+          },
+          rule: {
+            source: "",
+            operator: "exists",
+            value: null,
+          },
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const nextAgentDocument = graphDocument.connectStateBindingInDocument(
+    document,
+    "input_question",
+    "question",
+    "answer_helper",
+    VIRTUAL_ANY_INPUT_STATE_KEY,
+  );
+  const nextConditionDocument = graphDocument.connectStateBindingInDocument(
+    document,
+    "input_question",
+    "question",
+    "answer_gate",
+    VIRTUAL_ANY_INPUT_STATE_KEY,
+  );
+
+  assert.deepEqual(nextAgentDocument.nodes.answer_helper.reads, [{ state: "question", required: true }]);
+  assert.deepEqual(document.nodes.answer_helper.reads, []);
+  assert.deepEqual(nextConditionDocument.nodes.answer_gate.reads, [{ state: "question", required: true }]);
+  assert.equal(nextConditionDocument.nodes.answer_gate.kind, "condition");
+  if (nextConditionDocument.nodes.answer_gate.kind === "condition") {
+    assert.equal(nextConditionDocument.nodes.answer_gate.config.rule.source, "question");
+  }
 });
 
 test("updateOutputNodeConfigInDocument patches output config immutably", () => {
