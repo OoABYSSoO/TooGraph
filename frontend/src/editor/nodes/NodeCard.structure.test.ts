@@ -500,6 +500,35 @@ test("NodeCard renders output previews through a rich content presenter while ke
   assert.match(componentSource, /view\.body\.kind === 'output' \? 340 : 280/);
 });
 
+test("NodeCard uses an Element Plus switch card for output persistence like the agent thinking control", () => {
+  const outputSectionMatch = componentSource.match(
+    /<section v-else-if="view\.body\.kind === 'output'"[\s\S]*?<\/section>/,
+  );
+  assert.ok(outputSectionMatch, "expected to find the output node section");
+  const outputSection = outputSectionMatch[0];
+
+  assert.match(componentSource, /import \{[\s\S]*DocumentChecked[\s\S]*Opportunity[\s\S]*\} from "@element-plus\/icons-vue";/);
+  assert.match(outputSection, /class="node-card__output-persist-card"/);
+  assert.match(outputSection, /class="node-card__output-persist-icon"/);
+  assert.match(outputSection, /<DocumentChecked \/>/);
+  assert.match(outputSection, /<ElSwitch/);
+  assert.match(outputSection, /class="node-card__output-persist-switch"/);
+  assert.match(outputSection, /:model-value="view\.body\.persistEnabled"/);
+  assert.match(outputSection, /:width="56"/);
+  assert.match(outputSection, /inline-prompt/);
+  assert.match(outputSection, /active-text="ON"/);
+  assert.match(outputSection, /inactive-text="OFF"/);
+  assert.match(outputSection, /@update:model-value="handleOutputPersistToggle"/);
+  assert.doesNotMatch(outputSection, /node-card__persist-button/);
+  assert.doesNotMatch(outputSection, /node-card__toggle/);
+  assert.match(componentSource, /function handleOutputPersistToggle\(value: string \| number \| boolean\)/);
+  assert.match(componentSource, /\.node-card__output-persist-card \{[\s\S]*grid-template-columns:\s*auto 56px;/);
+  assert.match(componentSource, /\.node-card__output-persist-card \{[\s\S]*min-height:\s*48px;/);
+  assert.match(componentSource, /\.node-card__output-persist-card \{[\s\S]*border-radius:\s*16px;/);
+  assert.match(componentSource, /\.node-card__output-persist-card \{[\s\S]*background:\s*rgba\(255,\s*255,\s*255,\s*0\.88\);/);
+  assert.match(componentSource, /\.node-card__output-persist-switch \{[\s\S]*--el-switch-on-color:\s*#c96b1f;/);
+});
+
 test("NodeCard closes floating panels on focus loss and keeps popup surfaces on the warm theme", () => {
   assert.match(componentSource, /import \{ computed, nextTick, onBeforeUnmount, onMounted, ref, watch \} from "vue";/);
   assert.match(componentSource, /const hasFloatingPanelOpen = computed\(/);

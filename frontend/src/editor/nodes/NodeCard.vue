@@ -879,20 +879,27 @@
           />
         </ElPopover>
         <span v-else class="node-card__port-label">Unbound</span>
-        <button
-          type="button"
-          class="node-card__persist-button"
-          :aria-pressed="view.body.persistEnabled"
-          @pointerdown.stop
-          @click.stop="toggleOutputPersist"
-        >
-          <span class="node-card__persist">
-            <span>{{ view.body.persistLabel }}</span>
-            <span class="node-card__toggle" :class="{ 'node-card__toggle--on': view.body.persistEnabled }">
-              <span class="node-card__toggle-thumb" />
-            </span>
+        <div class="node-card__output-persist-card">
+          <span
+            class="node-card__output-persist-icon"
+            :class="{ 'node-card__output-persist-icon--enabled': view.body.persistEnabled }"
+            aria-hidden="true"
+          >
+            <DocumentChecked />
           </span>
-        </button>
+          <ElSwitch
+            class="node-card__output-persist-switch"
+            :model-value="view.body.persistEnabled"
+            :width="56"
+            inline-prompt
+            active-text="ON"
+            inactive-text="OFF"
+            aria-label="Toggle output persistence"
+            @pointerdown.stop
+            @click.stop
+            @update:model-value="handleOutputPersistToggle"
+          />
+        </div>
       </div>
       <div class="node-card__surface node-card__surface--output">
         <div class="node-card__surface-meta">
@@ -1059,7 +1066,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { ElButton, ElIcon, ElInput, ElOption, ElPopover, ElSelect } from "element-plus";
-import { Check, Collection, CollectionTag, Delete, Document, FolderOpened, Operation, Opportunity } from "@element-plus/icons-vue";
+import { Check, Collection, CollectionTag, Delete, Document, DocumentChecked, FolderOpened, Operation, Opportunity } from "@element-plus/icons-vue";
 
 import StateDefaultValueEditor from "@/editor/workspace/StateDefaultValueEditor.vue";
 import StateEditorPopover from "./StateEditorPopover.vue";
@@ -1538,11 +1545,11 @@ function removeConditionBranch(branchKey: string) {
   });
 }
 
-function toggleOutputPersist() {
+function handleOutputPersistToggle(value: string | number | boolean) {
   if (props.node.kind !== "output") {
     return;
   }
-  emitOutputConfigPatch({ persistEnabled: !props.node.config.persistEnabled });
+  emitOutputConfigPatch({ persistEnabled: Boolean(value) });
 }
 
 function updateOutputDisplayMode(displayMode: OutputNode["config"]["displayMode"]) {
@@ -4054,41 +4061,62 @@ function handleConditionRuleValueInput(event: Event) {
   line-height: 1.55;
 }
 
-.node-card__persist {
-  display: inline-flex;
+.node-card__output-persist-card {
+  display: grid;
+  grid-template-columns: auto 56px;
   align-items: center;
+  justify-self: end;
+  min-height: 48px;
   gap: 10px;
-  font-size: 1rem;
-  color: rgba(60, 41, 20, 0.8);
+  border: 1px solid rgba(154, 52, 18, 0.14);
+  border-radius: 16px;
+  padding: 0 14px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
-.node-card__persist-button {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  cursor: pointer;
+.node-card__output-persist-card:hover {
+  border-color: rgba(154, 52, 18, 0.22);
+  background: rgba(255, 252, 247, 0.94);
 }
 
-.node-card__toggle {
-  width: 56px;
-  height: 32px;
-  border-radius: 999px;
-  background: rgba(154, 52, 18, 0.18);
-  padding: 4px;
+.node-card__output-persist-card:focus-within {
+  border-color: rgba(201, 107, 31, 0.32);
+  box-shadow:
+    0 0 0 3px rgba(201, 107, 31, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.node-card__output-persist-icon {
+  flex: none;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  min-width: max-content;
+  color: rgba(111, 67, 30, 0.72);
+  font-size: 0.84rem;
+  font-weight: 600;
+  transition: color 140ms ease;
 }
 
-.node-card__toggle--on {
-  justify-content: flex-end;
-  background: rgba(154, 52, 18, 0.72);
+.node-card__output-persist-icon::after {
+  content: "Save";
+  margin-left: 7px;
 }
 
-.node-card__toggle-thumb {
-  width: 24px;
-  height: 24px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.96);
+.node-card__output-persist-icon :deep(svg) {
+  width: 18px;
+  height: 18px;
+}
+
+.node-card__output-persist-icon--enabled {
+  color: #b45309;
+}
+
+.node-card__output-persist-switch {
+  justify-self: end;
+  --el-switch-on-color: #c96b1f;
+  --el-switch-off-color: rgba(154, 52, 18, 0.24);
 }
 
 .node-card__advanced {
