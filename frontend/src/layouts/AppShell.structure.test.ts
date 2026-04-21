@@ -28,3 +28,11 @@ test("AppShell keeps collapsed navigation usable with compact labels and an in-r
   assert.match(componentSource, /\.app-shell__sidebar--collapsed\s+\.app-shell__link-label \{[\s\S]*display:\s*none;/);
   assert.match(componentSource, /\.app-shell__sidebar:not\(\.app-shell__sidebar--collapsed\)\s+\.app-shell__link-short \{[\s\S]*display:\s*none;/);
 });
+
+test("AppShell uses dynamic viewport height and keeps editor chrome inside the visible viewport", () => {
+  assert.match(componentSource, /\.app-shell \{[\s\S]*min-height:\s*100dvh;/);
+  assert.match(componentSource, /\.app-shell--editor \{[\s\S]*height:\s*100dvh;[\s\S]*overflow:\s*hidden;/);
+  assert.match(componentSource, /\.app-shell__sidebar \{[\s\S]*min-height:\s*0;[\s\S]*overflow-y:\s*auto;/);
+  assert.match(componentSource, /\.app-shell__content--editor \{[\s\S]*height:\s*100%;/);
+  assert.doesNotMatch(componentSource, /\.app-shell__content--editor \{[\s\S]*height:\s*100vh;/);
+});

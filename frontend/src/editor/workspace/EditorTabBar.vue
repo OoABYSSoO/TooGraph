@@ -377,6 +377,10 @@ function handleTabsWheel(event: WheelEvent) {
   --editor-tab-gap: 12px;
   --editor-control-gap: 8px;
   position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   background: linear-gradient(180deg, rgba(244, 237, 225, 0.98) 0%, rgba(255, 248, 236, 0.98) 100%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.64),
@@ -384,7 +388,10 @@ function handleTabsWheel(event: WheelEvent) {
 }
 
 .editor-tab-bar__inner {
+  box-sizing: border-box;
   display: flex;
+  width: 100%;
+  max-width: 100%;
   min-width: 0;
   flex-wrap: wrap;
   align-items: center;
@@ -394,6 +401,7 @@ function handleTabsWheel(event: WheelEvent) {
 
 .editor-tab-bar__tabs-shell {
   min-width: 0;
+  max-width: 100%;
   flex: 1 1 520px;
 }
 
@@ -634,6 +642,7 @@ function handleTabsWheel(event: WheelEvent) {
 }
 
 .editor-tab-bar__controls {
+  box-sizing: border-box;
   display: flex;
   min-width: 0;
   max-width: 100%;

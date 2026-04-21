@@ -347,11 +347,15 @@ function handleStateTypeSelect(stateKey: string, value: string | number | boolea
 
 <style scoped>
 .editor-state-panel {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
   min-height: 0;
   height: 100%;
   border-left: 1px solid rgba(154, 52, 18, 0.16);
   background: rgba(255, 250, 241, 0.78);
   backdrop-filter: blur(20px);
+  overflow: hidden;
 }
 
 .editor-state-panel--open {

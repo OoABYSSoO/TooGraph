@@ -27,6 +27,12 @@ test("EditorTabBar keeps the workspace controls on a single horizontal row", () 
   assert.match(componentSource, /\.editor-tab-bar__controls \{[\s\S]*overflow-x: auto;/);
 });
 
+test("EditorTabBar constrains the top chrome to the available editor width", () => {
+  assert.match(componentSource, /\.editor-tab-bar \{[\s\S]*width:\s*100%;[\s\S]*max-width:\s*100%;[\s\S]*min-width:\s*0;/);
+  assert.match(componentSource, /\.editor-tab-bar__inner \{[\s\S]*box-sizing:\s*border-box;[\s\S]*width:\s*100%;[\s\S]*max-width:\s*100%;/);
+  assert.match(componentSource, /\.editor-tab-bar__tabs-shell \{[\s\S]*max-width:\s*100%;/);
+});
+
 test("EditorTabBar exposes browser-like tab interactions", () => {
   assert.match(componentSource, /draggable="true"/);
   assert.match(componentSource, /@auxclick="handleTabAuxClick\(tab, \$event\)"/);

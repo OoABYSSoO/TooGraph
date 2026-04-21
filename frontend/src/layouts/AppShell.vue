@@ -90,11 +90,19 @@ watch(isSidebarCollapsed, (nextValue) => {
 .app-shell {
   --app-sidebar-width: 240px;
   min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
   grid-template-columns: var(--app-sidebar-width) minmax(0, 1fr);
   background: linear-gradient(180deg, rgba(255, 250, 241, 0.98) 0%, rgba(248, 237, 219, 0.96) 100%);
   color: #3c2914;
   transition: grid-template-columns 180ms ease;
+}
+
+.app-shell--editor {
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .app-shell--collapsed {
@@ -109,7 +117,10 @@ watch(isSidebarCollapsed, (nextValue) => {
   gap: 24px;
   background: rgba(255, 252, 247, 0.78);
   backdrop-filter: blur(10px);
+  min-height: 0;
   overflow: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   transition: 180ms ease;
 }
 
@@ -264,12 +275,13 @@ watch(isSidebarCollapsed, (nextValue) => {
 
 .app-shell__content {
   min-width: 0;
+  min-height: 0;
   padding: 28px;
 }
 
 .app-shell__content--editor {
   padding: 0;
-  height: 100vh;
+  height: 100%;
   overflow: hidden;
 }
 
