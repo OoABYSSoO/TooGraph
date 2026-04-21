@@ -375,6 +375,7 @@ function handleTabsWheel(event: WheelEvent) {
   --editor-tab-width: 176px;
   --editor-tab-height: 40px;
   --editor-tab-gap: 12px;
+  --editor-control-gap: 8px;
   position: relative;
   background: linear-gradient(180deg, rgba(244, 237, 225, 0.98) 0%, rgba(255, 248, 236, 0.98) 100%);
   box-shadow:
@@ -385,15 +386,15 @@ function handleTabsWheel(event: WheelEvent) {
 .editor-tab-bar__inner {
   display: flex;
   min-width: 0;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 14px;
-  padding: 10px 16px 12px;
+  gap: 10px 14px;
+  padding: 10px clamp(10px, 1.4vw, 16px) 12px;
 }
 
 .editor-tab-bar__tabs-shell {
   min-width: 0;
-  flex: 1 1 auto;
+  flex: 1 1 520px;
 }
 
 .editor-tab-bar__tabs {
@@ -635,9 +636,12 @@ function handleTabsWheel(event: WheelEvent) {
 .editor-tab-bar__controls {
   display: flex;
   min-width: 0;
+  max-width: 100%;
+  flex: 0 1 auto;
   flex-wrap: nowrap;
   align-items: center;
-  gap: 8px;
+  justify-content: flex-end;
+  gap: var(--editor-control-gap);
   overflow-x: auto;
   padding: 0;
   scrollbar-width: none;
@@ -696,11 +700,11 @@ function handleTabsWheel(event: WheelEvent) {
 }
 
 .editor-tab-bar__select {
-  min-width: 180px;
+  min-width: clamp(132px, 14vw, 180px);
 }
 
 .editor-tab-bar__select--wide {
-  min-width: 200px;
+  min-width: clamp(148px, 16vw, 200px);
 }
 
 .editor-tab-bar__action {
@@ -724,6 +728,48 @@ function handleTabsWheel(event: WheelEvent) {
 @media (max-width: 1100px) {
   .editor-tab-bar {
     --editor-tab-width: 156px;
+  }
+}
+
+@media (max-width: 920px) {
+  .editor-tab-bar__inner {
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .editor-tab-bar__tabs-shell {
+    flex-basis: 100%;
+  }
+
+  .editor-tab-bar__controls {
+    width: 100%;
+    justify-content: flex-start;
+    padding-bottom: 2px;
+  }
+}
+
+@media (max-width: 640px) {
+  .editor-tab-bar {
+    --editor-tab-width: 132px;
+    --editor-tab-height: 36px;
+    --editor-tab-gap: 8px;
+    --editor-control-gap: 6px;
+  }
+
+  .editor-tab-bar__state-pill,
+  .editor-tab-bar__action {
+    min-height: 34px;
+    border-radius: 12px;
+    padding: 7px 10px;
+    font-size: 0.82rem;
+  }
+
+  .editor-tab-bar__select {
+    min-width: 128px;
+  }
+
+  .editor-tab-bar__select--wide {
+    min-width: 148px;
   }
 }
 </style>
