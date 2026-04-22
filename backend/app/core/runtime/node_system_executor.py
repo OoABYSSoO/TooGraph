@@ -416,6 +416,67 @@ def _execute_output_node(
     }
 
 
+def collect_output_boundaries(
+    graph: NodeSystemGraphDocument,
+    state: dict[str, Any],
+    active_edge_ids: set[str] | None = None,
+) -> None:
+    active_output_nodes = _resolve_active_output_nodes(graph, active_edge_ids or set())
+    state["output_previews"] = []
+    state["saved_outputs"] = []
+    final_results: list[Any] = []
+
+    for node_name, node in graph.nodes.items():
+        if not isinstance(node, NodeSystemOutputNode) or not node.reads:
+            continue
+        if active_output_nodes and node_name not in active_output_nodes:
+            continue
+
+        binding = node.reads[0]
+        body = _execute_output_node(
+            node_name,
+            node,
+            {binding.state: copy.deepcopy(state.get("state_values", {}).get(binding.state))},
+            state,
+        )
+        state["output_previews"] = [*state.get("output_previews", []), *body.get("output_previews", [])]
+        state["saved_outputs"] = [*state.get("saved_outputs", []), *body.get("saved_outputs", [])]
+        state.setdefault("node_status_map", {})[node_name] = "success"
+        if body.get("final_result") not in (None, "", [], {}):
+            final_results.append(body["final_result"])
+
+    if final_results:
+        state["final_result"] = str(final_results[-1])
+
+
+def _resolve_active_output_nodes(
+    graph: NodeSystemGraphDocument,
+    active_edge_ids: set[str],
+) -> set[str]:
+    if not active_edge_ids:
+        return set()
+
+    active_output_nodes: set[str] = set()
+    for edge in graph.edges:
+        target_node = graph.nodes.get(edge.target)
+        if (
+            isinstance(target_node, NodeSystemOutputNode)
+            and _build_regular_edge_id(edge.source, edge.target) in active_edge_ids
+        ):
+            active_output_nodes.add(edge.target)
+
+    for conditional_edge in graph.conditional_edges:
+        for branch, target in conditional_edge.branches.items():
+            target_node = graph.nodes.get(target)
+            if (
+                isinstance(target_node, NodeSystemOutputNode)
+                and _build_conditional_edge_id(conditional_edge.source, branch, target) in active_edge_ids
+            ):
+                active_output_nodes.add(target)
+
+    return active_output_nodes
+
+
 def _execute_condition_node(
     node: NodeSystemConditionNode,
     input_values: dict[str, Any],

@@ -47,12 +47,13 @@
 - condition 节点作为条件边的可视化代理，默认包含 true / false / exhausted 分支，并限制循环上限为 1-10，默认 5。
 - output 节点支持预览、展示模式和持久化开关。
 - run feedback 会同时反映在工作区反馈条、画布节点状态、active path 线条和 output latest run preview。
+- 运行记录中的 `node_executions` 只记录真实执行的 agent；input / output / condition 只作为边界状态、输出 artifact 和条件 route 参与反馈。
 
 ### 后端主链
 
 - FastAPI 提供 graphs / runs / templates / presets / settings / skills / knowledge / memories API。
 - validator 负责 node_system graph 的结构校验。
-- LangGraph runtime 是当前运行主链。
+- LangGraph runtime 是当前运行主链，并采用 agent-only 语义：只有 agent 注册为 LangGraph node，input / output / condition 不再写入 node execution。
 - 后端支持 LangGraph Python 源码导出接口。
 - 后端具备 interrupt / checkpoint / resume 能力，前端人类在环完整产品闭环仍在路线图中。
 

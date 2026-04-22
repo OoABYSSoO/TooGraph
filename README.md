@@ -26,6 +26,7 @@ GraphiteUI 是一个面向 LangGraph 风格 Agent 工作流的可视化编排与
 - graph 保存、校验、运行
 - run 列表和 run detail
 - 节点级执行状态、active path 高亮和 output preview
+- LangGraph runtime 只把 agent 编译为真实节点；input / output / condition 作为视觉边界和条件边代理
 - state snapshot、state events、skill outputs、knowledge summary
 - cycle summary / cycle iterations
 - 后端具备 LangGraph Python 源码导出接口
@@ -182,7 +183,6 @@ GraphiteUI/
 - memory 的写入、召回、展示和调试
 - cycles 更高级的终止策略和可视化
 - 知识库管理：更新、删除、重建索引、检索质量评估
-- Agent-only LangGraph runtime：只把 agent 编译成 LangGraph 节点，input / output / condition 退回 GraphiteUI 视觉边界和编排辅助
 
 ### 桌宠 Agent 与自动编排图
 

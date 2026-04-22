@@ -23,6 +23,7 @@ from typing_extensions import TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
+from app.core.langgraph.compiler import compile_graph_to_langgraph_plan
 from app.core.runtime.node_system_executor import (
     _apply_state_writes,
     _collect_node_inputs,
@@ -35,8 +36,10 @@ from app.core.schemas.node_system import NodeSystemGraphDocument
 
 GRAPH_PAYLOAD = {payload_literal}
 GRAPH = NodeSystemGraphDocument.model_validate(GRAPH_PAYLOAD)
-INTERRUPT_BEFORE = {interrupt_before_literal}
-INTERRUPT_AFTER = {interrupt_after_literal}
+BUILD_PLAN = compile_graph_to_langgraph_plan(GRAPH)
+RUNTIME_NODES = list(BUILD_PLAN.runtime_nodes)
+INTERRUPT_BEFORE = [node_name for node_name in {interrupt_before_literal} if node_name in RUNTIME_NODES]
+INTERRUPT_AFTER = [node_name for node_name in {interrupt_after_literal} if node_name in RUNTIME_NODES]
 
 
 def _replace(_current: Any, update: Any) -> Any:
@@ -51,6 +54,14 @@ def _build_state_schema():
     return TypedDict("ExportedGraphState", annotations, total=False)
 
 
+def _runtime_graph_endpoint(node_name: str) -> str:
+    if node_name == "__start__":
+        return START
+    if node_name == "__end__":
+        return END
+    return node_name
+
+
 def build_graph():
     runtime_state = create_initial_run_state(
         graph_id=GRAPH.graph_id or "exported_graph",
@@ -58,7 +69,9 @@ def build_graph():
         max_revision_round=int(GRAPH.metadata.get("max_revision_round", 1)),
     )
     _initialize_graph_state(GRAPH, runtime_state)
-    selected_branches: dict[str, str] = {{}}
+
+    if not RUNTIME_NODES and not BUILD_PLAN.runtime_condition_routes:
+        return None
 
     workflow = StateGraph(_build_state_schema())
 
@@ -74,49 +87,45 @@ def build_graph():
             body = _execute_node(GRAPH, node_name, node, input_values, runtime_state)
             outputs = dict(body.get("outputs", {{}}))
             _apply_state_writes(node_name, node.writes, outputs, runtime_state)
-            if body.get("selected_branch"):
-                selected_branches[node_name] = str(body["selected_branch"])
             return outputs
 
         return _call
 
-    def make_router(node_name: str):
-        def _route(_current_values: dict[str, Any]) -> str:
-            branch = str(selected_branches.pop(node_name, "") or "").strip()
+    def make_router(route):
+        condition_node = GRAPH.nodes[route.condition]
+
+        def _route(current_values: dict[str, Any]) -> str:
+            runtime_state["state_values"] = {{
+                **dict(runtime_state.get("state_values", {{}})),
+                **dict(current_values or {{}}),
+            }}
+            input_values, _state_reads = _collect_node_inputs(condition_node, runtime_state)
+            body = _execute_node(GRAPH, route.condition, condition_node, input_values, runtime_state)
+            branch = str(body.get("selected_branch") or "").strip()
             if not branch:
-                raise ValueError(f"Condition node '{{node_name}}' did not produce a selected branch.")
+                raise ValueError(f"Condition node '{{route.condition}}' did not produce a selected branch.")
             return branch
 
         return _route
 
-    for node_name in GRAPH.nodes:
+    for node_name in RUNTIME_NODES:
         workflow.add_node(node_name, make_node(node_name))
 
-    incoming_counts = {{node_name: 0 for node_name in GRAPH.nodes}}
-    outgoing_counts = {{node_name: 0 for node_name in GRAPH.nodes}}
-
-    for edge in GRAPH.edges:
+    for node_name in BUILD_PLAN.requirements.runtime_entry_nodes:
+        workflow.add_edge(START, node_name)
+    for edge in BUILD_PLAN.runtime_edges:
         workflow.add_edge(edge.source, edge.target)
-        incoming_counts[edge.target] = incoming_counts.get(edge.target, 0) + 1
-        outgoing_counts[edge.source] = outgoing_counts.get(edge.source, 0) + 1
-
-    for conditional_edge in GRAPH.conditional_edges:
+    for route in BUILD_PLAN.runtime_condition_routes:
         workflow.add_conditional_edges(
-            conditional_edge.source,
-            make_router(conditional_edge.source),
-            path_map=dict(conditional_edge.branches),
+            _runtime_graph_endpoint(route.source),
+            make_router(route),
+            path_map={{
+                branch: _runtime_graph_endpoint(target)
+                for branch, target in route.branches.items()
+            }},
         )
-        for _branch, target in conditional_edge.branches.items():
-            incoming_counts[target] = incoming_counts.get(target, 0) + 1
-            outgoing_counts[conditional_edge.source] = outgoing_counts.get(conditional_edge.source, 0) + 1
-
-    for node_name, incoming_count in incoming_counts.items():
-        if incoming_count == 0:
-            workflow.add_edge(START, node_name)
-
-    for node_name, outgoing_count in outgoing_counts.items():
-        if outgoing_count == 0:
-            workflow.add_edge(node_name, END)
+    for node_name in BUILD_PLAN.requirements.runtime_terminal_nodes:
+        workflow.add_edge(node_name, END)
 
     return workflow.compile(
         interrupt_before=INTERRUPT_BEFORE or None,
@@ -130,6 +139,8 @@ def invoke_graph(initial_state: dict[str, Any] | None = None) -> dict[str, Any]:
     for state_name, definition in GRAPH.state_schema.items():
         if state_name not in state_values:
             state_values[state_name] = definition.value
+    if compiled is None:
+        return state_values
     return compiled.invoke(state_values)
 
 

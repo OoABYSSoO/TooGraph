@@ -1,5 +1,15 @@
 # Agent-only LangGraph Runtime 语义设想
 
+## 实施状态
+
+2026-04-22 已完成后端运行时改造：
+
+- LangGraph `StateGraph` 只注册 agent 节点。
+- input 只负责初始 state 注入，不写入 `node_executions`。
+- output 由 output boundary collector 在运行结束后生成 preview / persisted output，不写入 `node_executions`。
+- condition 编译成 route callable，不写入 `node_executions`，但仍通过 active edge / cycle summary 表达分支和循环。
+- 历史 `backend/data/runs/*.json` 已按本次决策清空，不做旧 run 兼容迁移。
+
 ## 背景
 
 当前 GraphiteUI 的 `node_system` 里有四类节点：
@@ -277,7 +287,7 @@ collect_output_boundaries(graph, final_state, run_state)
 
 ### 旧运行记录语义会不同
 
-迁移后，新旧 run detail 的 `node_executions` 数量会不同。历史 run 可以保持原样，不强行重写。
+迁移后，新旧 run detail 的 `node_executions` 数量会不同。本次决策是不做旧 run 兼容迁移，直接清空历史运行记录，让后续运行记录全部采用 agent-only 语义。
 
 ## 推荐迁移路径
 
@@ -346,7 +356,7 @@ collect_output_boundaries(graph, final_state, run_state)
 
 > GraphiteUI 保存的是视觉图；LangGraph 执行的是由视觉图编译出的 agent-only runtime graph。
 
-短期不建议直接一次性重构全部 runtime。更稳的路径是先做 Runtime Plan，然后按 output、input、condition 的顺序逐步移出 LangGraph node。人类在环可以在这个目标语义下设计为 agent-only breakpoint，默认 `interrupt_after`。
+本次已直接落地目标语义：Runtime Plan 作为中间层，output/input/condition 都已从 LangGraph node 注册中移出。人类在环可以继续在这个语义下设计为 agent-only breakpoint，默认 `interrupt_after`。
 
 ## 暂不处理的范围
 
@@ -357,5 +367,4 @@ collect_output_boundaries(graph, final_state, run_state)
 - 新增 Human 节点。
 - 改动前端节点视觉形态。
 - 改动保存协议中的四类节点。
-- 重写历史 run 记录。
-- 一次性删除当前 runtime 中 input / output / condition 的执行逻辑。
+- 旧 run 兼容迁移。
