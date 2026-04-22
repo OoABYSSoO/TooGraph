@@ -15,6 +15,11 @@
   - 自动编排图
   - 规划后确认与边走边画两种未来模式
 
+- [future/2026-04-22-agent-only-langgraph-runtime.md](future/2026-04-22-agent-only-langgraph-runtime.md)
+  - 只让 agent 成为 LangGraph 真实节点
+  - input / output / condition 作为 GraphiteUI 视觉边界和编排辅助
+  - 对人类在环断点、output preview 和 runtime 编译层的影响
+
 ## 已清理
 
 - 迁移闭环记录：`task_plan.md`、`findings.md`、`progress.md`

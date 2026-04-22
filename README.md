@@ -182,6 +182,7 @@ GraphiteUI/
 - memory 的写入、召回、展示和调试
 - cycles 更高级的终止策略和可视化
 - 知识库管理：更新、删除、重建索引、检索质量评估
+- Agent-only LangGraph runtime：只把 agent 编译成 LangGraph 节点，input / output / condition 退回 GraphiteUI 视觉边界和编排辅助
 
 ### 桌宠 Agent 与自动编排图
 
