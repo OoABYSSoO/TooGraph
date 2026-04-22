@@ -7,7 +7,7 @@ import type {
   TemplateRecord,
 } from "@/types/node-system";
 
-import { apiGet, apiPost } from "./http.ts";
+import { apiGet, apiPost, apiPostText } from "./http.ts";
 
 export async function fetchTemplates(): Promise<TemplateRecord[]> {
   return apiGet<TemplateRecord[]>("/api/templates");
@@ -35,4 +35,8 @@ export async function validateGraph(payload: GraphPayload): Promise<GraphValidat
 
 export async function runGraph(payload: GraphPayload): Promise<GraphRunResponse> {
   return apiPost("/api/graphs/run", payload);
+}
+
+export async function exportLangGraphPython(payload: GraphPayload): Promise<string> {
+  return apiPostText("/api/graphs/export/langgraph-python", payload);
 }

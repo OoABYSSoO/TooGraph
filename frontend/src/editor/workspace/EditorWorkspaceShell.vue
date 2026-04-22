@@ -29,6 +29,7 @@
           @toggle-state-panel="toggleActiveStatePanel"
           @save-active-graph="saveActiveGraph"
           @validate-active-graph="validateActiveGraph"
+          @export-active-graph="exportActiveGraph"
           @run-active-graph="runActiveGraph"
         />
       </div>
@@ -174,7 +175,7 @@ import { fetchKnowledgeBases } from "@/api/knowledge";
 import { fetchRun } from "@/api/runs";
 import { fetchSettings } from "@/api/settings";
 import { fetchSkillDefinitions } from "@/api/skills";
-import { fetchGraph, runGraph, saveGraph, validateGraph } from "@/api/graphs";
+import { exportLangGraphPython, fetchGraph, runGraph, saveGraph, validateGraph } from "@/api/graphs";
 import { resolveAgentRuntimeCatalog } from "@/editor/nodes/agentConfigModel";
 import EditorCanvas from "@/editor/canvas/EditorCanvas.vue";
 import type { NodeFocusRequest } from "@/editor/canvas/useNodeSelectionFocus";
@@ -247,6 +248,7 @@ import { formatRunFeedback, formatValidationFeedback, type RunFeedback, type Wor
 import { buildRunNodeArtifactsModel } from "./runNodeArtifactsModel.ts";
 import { addStateBindingToDocument, removeStateBindingFromDocument } from "./statePanelBindings.ts";
 import { addStateFieldToDocument, deleteStateFieldFromDocument, insertStateFieldIntoDocument, renameStateFieldInDocument, updateStateFieldInDocument, type StateFieldDraft } from "./statePanelFields.ts";
+import { buildPythonExportFileName, downloadPythonSource } from "./pythonExportModel.ts";
 
 const props = defineProps<{
   routeMode: "root" | "new" | "existing";
@@ -1550,6 +1552,33 @@ async function validateActiveGraph() {
     setMessageFeedbackForTab(tab.tabId, {
       tone: "danger",
       message: error instanceof Error ? error.message : "Failed to validate graph.",
+    });
+  }
+}
+
+async function exportActiveGraph() {
+  const tab = activeTab.value;
+  if (!tab) {
+    return;
+  }
+  const document = documentsByTabId.value[tab.tabId];
+  if (!document) {
+    return;
+  }
+
+  try {
+    const exportDocument = cloneGraphDocument(document);
+    const source = await exportLangGraphPython(exportDocument);
+    const fileName = buildPythonExportFileName(exportDocument.name || tab.title);
+    downloadPythonSource(source, fileName);
+    setMessageFeedbackForTab(tab.tabId, {
+      tone: "success",
+      message: `Exported ${fileName}.`,
+    });
+  } catch (error) {
+    setMessageFeedbackForTab(tab.tabId, {
+      tone: "danger",
+      message: error instanceof Error ? error.message : "Failed to export Python code.",
     });
   }
 }

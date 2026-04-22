@@ -40,6 +40,12 @@ test("EditorTabBar presents controls as a quiet grouped action dock", () => {
   assert.match(componentSource, /\.editor-tab-bar__action--primary \{[\s\S]*background:\s*rgba\(154,\s*52,\s*18,\s*0\.9\);/);
 });
 
+test("EditorTabBar exposes a Python export action beside validation and run controls", () => {
+  assert.match(componentSource, /export-active-graph/);
+  assert.match(componentSource, /copy\.exportPython/);
+  assert.match(componentSource, /@click="\$emit\('export-active-graph'\)"/);
+});
+
 test("EditorTabBar exposes browser-like tab interactions", () => {
   assert.match(componentSource, /draggable="true"/);
   assert.match(componentSource, /@auxclick="handleTabAuxClick\(tab, \$event\)"/);

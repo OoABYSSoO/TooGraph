@@ -91,6 +91,7 @@
 
           <button type="button" class="editor-tab-bar__action" @click="$emit('save-active-graph')">{{ copy.save }}</button>
           <button type="button" class="editor-tab-bar__action" @click="$emit('validate-active-graph')">{{ copy.validate }}</button>
+          <button type="button" class="editor-tab-bar__action" @click="$emit('export-active-graph')">{{ copy.exportPython }}</button>
           <button type="button" class="editor-tab-bar__action editor-tab-bar__action--primary" @click="$emit('run-active-graph')">
             {{ copy.run }}
           </button>
@@ -135,6 +136,7 @@ const emit = defineEmits<{
   (event: "toggle-state-panel"): void;
   (event: "save-active-graph"): void;
   (event: "validate-active-graph"): void;
+  (event: "export-active-graph"): void;
   (event: "run-active-graph"): void;
 }>();
 
