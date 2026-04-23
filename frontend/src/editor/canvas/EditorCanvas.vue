@@ -1664,6 +1664,9 @@ function handleCanvasPointerMove(event: PointerEvent) {
         return;
       }
       nodeDrag.value.moved = true;
+      if (nodeDrag.value.captureElement && !nodeDrag.value.captureElement.hasPointerCapture(event.pointerId)) {
+        nodeDrag.value.captureElement.setPointerCapture(event.pointerId);
+      }
     }
     const deltaX = pointerDeltaX / viewport.viewport.scale;
     const deltaY = pointerDeltaY / viewport.viewport.scale;
@@ -1919,12 +1922,14 @@ function handleNodePointerDown(nodeId: string, event: PointerEvent) {
   }
   if (!preserveInlineEditorFocus) {
     canvasRef.value?.focus();
+    event.preventDefault();
   }
-  event.preventDefault();
   let captureElement: HTMLElement | null = null;
   if (event.currentTarget instanceof HTMLElement) {
-    event.currentTarget.setPointerCapture(event.pointerId);
     captureElement = event.currentTarget;
+    if (!preserveInlineEditorFocus) {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
   }
   clearCanvasTransientState();
   pendingConnection.value = null;

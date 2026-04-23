@@ -393,7 +393,8 @@ test("EditorCanvas opts mobile touch drags out of browser gestures", () => {
 });
 
 test("EditorCanvas captures node drags and batches drag writes with animation frames", () => {
-  assert.match(componentSource, /event\.preventDefault\(\);[\s\S]*event\.currentTarget\.setPointerCapture\(event\.pointerId\);[\s\S]*nodeDrag\.value = \{/);
+  assert.match(componentSource, /if \(!preserveInlineEditorFocus\) \{[\s\S]*event\.preventDefault\(\);[\s\S]*\}/);
+  assert.match(componentSource, /if \(!preserveInlineEditorFocus\) \{[\s\S]*event\.currentTarget\.setPointerCapture\(event\.pointerId\);[\s\S]*\}/);
   assert.match(componentSource, /let scheduledDragFrame: number \| null = null;/);
   assert.match(componentSource, /function scheduleDragFrame/);
   assert.match(componentSource, /window\.requestAnimationFrame\(\(\) => \{/);
@@ -428,5 +429,6 @@ test("EditorCanvas suppresses the residual click after a node drag so inline edi
   assert.match(componentSource, /event\.preventDefault\(\);/);
   assert.match(componentSource, /event\.stopPropagation\(\);/);
   assert.match(componentSource, /const preserveInlineEditorFocus =[\s\S]*target\.closest\("\[data-text-editor-trigger='true'\]"\)/);
-  assert.match(componentSource, /if \(!preserveInlineEditorFocus\) \{\s*canvasRef\.value\?\.focus\(\);\s*\}/);
+  assert.match(componentSource, /if \(!preserveInlineEditorFocus\) \{\s*canvasRef\.value\?\.focus\(\);\s*event\.preventDefault\(\);\s*\}/);
+  assert.match(componentSource, /if \(nodeDrag\.value\.captureElement && !nodeDrag\.value\.captureElement\.hasPointerCapture\(event\.pointerId\)\) \{[\s\S]*nodeDrag\.value\.captureElement\.setPointerCapture\(event\.pointerId\);[\s\S]*\}/);
 });
