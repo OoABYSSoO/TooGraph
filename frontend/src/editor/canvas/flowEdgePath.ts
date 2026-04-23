@@ -29,6 +29,10 @@ export function buildSequenceFlowPath(input: SequenceFlowPathInput) {
   const sourceLaneOffset = resolveLaneOffset(input.sourceLaneIndex, input.sourceLaneCount);
   const targetLaneOffset = resolveLaneOffset(input.targetLaneIndex, input.targetLaneCount);
 
+  if (shouldUseVerticalDropPath(input)) {
+    return buildVerticalDropPath(input, sourceLaneOffset, targetLaneOffset);
+  }
+
   if (input.targetX > input.sourceX) {
     return buildLaneBezierPath(input, sourceLaneOffset, targetLaneOffset);
   }
@@ -49,6 +53,31 @@ export function buildSequenceFlowPath(input: SequenceFlowPathInput) {
       { x: sourceBranchX, y: input.sourceY },
       { x: sourceBranchX, y: topY },
       { x: targetDropX, y: topY },
+      { x: targetDropX, y: input.targetY },
+      { x: endLeadX, y: input.targetY },
+      { x: input.targetX, y: input.targetY },
+    ],
+    UPSTREAM_CORNER_RADIUS,
+  );
+}
+
+function buildVerticalDropPath(input: SequenceFlowPathInput, sourceLaneOffset: number, targetLaneOffset: number) {
+  const startLeadX = input.sourceX + FLOW_TERMINAL_OVERLAP;
+  const sourceBranchX = resolveVerticalDropSourceRailX(input);
+  const transferY = resolveVerticalDropTransferY(input, sourceLaneOffset, targetLaneOffset);
+  const targetDropX =
+    input.targetX -
+    UPSTREAM_HORIZONTAL_CLEARANCE -
+    resolveTerminalStagger(input.targetLaneIndex, input.targetLaneCount);
+  const endLeadX = input.targetX - FLOW_TERMINAL_OVERLAP;
+
+  return buildRoundedOrthogonalPath(
+    [
+      { x: input.sourceX, y: input.sourceY },
+      { x: startLeadX, y: input.sourceY },
+      { x: sourceBranchX, y: input.sourceY },
+      { x: sourceBranchX, y: transferY },
+      { x: targetDropX, y: transferY },
       { x: targetDropX, y: input.targetY },
       { x: endLeadX, y: input.targetY },
       { x: input.targetX, y: input.targetY },
@@ -84,6 +113,37 @@ function buildTightBezierPath(input: SequenceFlowPathInput, sourceLaneOffset: nu
     `M ${roundCoordinate(input.sourceX)} ${roundCoordinate(input.sourceY)}`,
     `C ${roundCoordinate(input.sourceX + controlSpan)} ${roundCoordinate(input.sourceY + sourceLaneOffset)} ${roundCoordinate(input.targetX - controlSpan)} ${roundCoordinate(input.targetY + targetLaneOffset)} ${roundCoordinate(input.targetX)} ${roundCoordinate(input.targetY)}`,
   ].join(" ");
+}
+
+function shouldUseVerticalDropPath(input: SequenceFlowPathInput) {
+  if (input.targetY <= input.sourceY || input.targetX > input.sourceX) {
+    return false;
+  }
+  if (input.sourceNodeX === undefined || input.targetNodeX === undefined) {
+    return false;
+  }
+  return input.targetNodeX >= input.sourceNodeX;
+}
+
+function resolveVerticalDropSourceRailX(input: SequenceFlowPathInput) {
+  const sourceNodeWidthEstimate =
+    input.sourceNodeX !== undefined ? Math.max(input.sourceX - input.sourceNodeX, FLOW_TERMINAL_OVERLAP * 2) : 0;
+  const targetRightEstimate =
+    input.targetNodeX !== undefined && sourceNodeWidthEstimate > 0 ? input.targetNodeX + sourceNodeWidthEstimate : input.targetX;
+
+  return (
+    Math.max(input.sourceX, targetRightEstimate) +
+    UPSTREAM_HORIZONTAL_CLEARANCE +
+    resolveTerminalStagger(input.sourceLaneIndex, input.sourceLaneCount)
+  );
+}
+
+function resolveVerticalDropTransferY(input: SequenceFlowPathInput, sourceLaneOffset: number, targetLaneOffset: number) {
+  const midpointY = input.sourceY + (input.targetY - input.sourceY) / 2;
+  const targetApproachY =
+    input.targetNodeY !== undefined ? input.targetNodeY - UPSTREAM_NODE_TOP_GUTTER : Number.POSITIVE_INFINITY;
+
+  return Math.max(input.sourceY + FLOW_TERMINAL_OVERLAP, Math.min(midpointY, targetApproachY)) - sourceLaneOffset + targetLaneOffset;
 }
 
 function resolveUpstreamTopY(input: SequenceFlowPathInput, sourceLaneOffset: number, targetLaneOffset: number) {
