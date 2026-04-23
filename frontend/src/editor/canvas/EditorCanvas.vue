@@ -464,6 +464,7 @@ const activeDataEdgeStateConfirm = ref<{
 } | null>(null);
 const dataEdgeStateConfirmTimeoutRef = ref<number | null>(null);
 const activeDataEdgeStateEditor = ref<{
+  id: string;
   source: string;
   target: string;
   stateKey: string;
@@ -524,12 +525,29 @@ const edgeVisibilityRelatedNodeIds = computed(() => {
   }
   return nodeIds;
 });
+const forceVisibleProjectedEdgeIds = computed(() => {
+  const edgeIds = new Set<string>();
+  if (selectedEdgeId.value) {
+    edgeIds.add(selectedEdgeId.value);
+  }
+  if (activeDataEdgeStateConfirm.value?.id) {
+    edgeIds.add(activeDataEdgeStateConfirm.value.id);
+  }
+  if (activeDataEdgeStateEditor.value?.id) {
+    edgeIds.add(activeDataEdgeStateEditor.value.id);
+  }
+  if (activeFlowEdgeDeleteConfirm.value?.id) {
+    edgeIds.add(activeFlowEdgeDeleteConfirm.value.id);
+  }
+  return edgeIds;
+});
 const visibleProjectedEdgeIds = computed(
   () =>
     new Set(
       filterProjectedEdgesForVisibilityMode(projectedEdges.value, {
         mode: edgeVisibilityMode.value,
         relatedNodeIds: edgeVisibilityRelatedNodeIds.value,
+        forceVisibleEdgeIds: forceVisibleProjectedEdgeIds.value,
       }).map((edge) => edge.id),
     ),
 );
@@ -593,6 +611,10 @@ const pointAnchors = computed(() =>
   projectedAnchors.value.filter((anchor) => anchor.kind === "state-in" || anchor.kind === "state-out"),
 );
 const selectedReconnectConnection = computed<PendingGraphConnection | null>(() => {
+  if (activeFlowEdgeDeleteConfirm.value?.id === selectedEdgeId.value) {
+    return null;
+  }
+
   const edge = selectedEdgeId.value ? projectedEdges.value.find((candidate) => candidate.id === selectedEdgeId.value) : null;
   if (!edge || edge.kind === "data") {
     return null;
@@ -866,7 +888,11 @@ function clearFlowEdgeDeleteConfirmTimeout() {
 
 function clearFlowEdgeDeleteConfirmState() {
   clearFlowEdgeDeleteConfirmTimeout();
+  const confirmEdgeId = activeFlowEdgeDeleteConfirm.value?.id ?? null;
   activeFlowEdgeDeleteConfirm.value = null;
+  if (confirmEdgeId && selectedEdgeId.value === confirmEdgeId) {
+    selectedEdgeId.value = null;
+  }
 }
 
 function clearDataEdgeStateConfirmTimeout() {
@@ -878,13 +904,21 @@ function clearDataEdgeStateConfirmTimeout() {
 
 function clearDataEdgeStateConfirmState() {
   clearDataEdgeStateConfirmTimeout();
+  const confirmEdgeId = activeDataEdgeStateConfirm.value?.id ?? null;
   activeDataEdgeStateConfirm.value = null;
+  if (confirmEdgeId && activeDataEdgeStateEditor.value?.id !== confirmEdgeId && selectedEdgeId.value === confirmEdgeId) {
+    selectedEdgeId.value = null;
+  }
 }
 
 function closeDataEdgeStateEditor() {
+  const editorEdgeId = activeDataEdgeStateEditor.value?.id ?? null;
   activeDataEdgeStateEditor.value = null;
   dataEdgeStateDraft.value = null;
   dataEdgeStateError.value = null;
+  if (editorEdgeId && selectedEdgeId.value === editorEdgeId) {
+    selectedEdgeId.value = null;
+  }
 }
 
 function clearDataEdgeStateInteraction() {
@@ -910,10 +944,11 @@ function startFlowEdgeDeleteConfirm(edge: ProjectedCanvasEdge, event: PointerEve
     x: point.x,
     y: point.y,
   };
+  selectedEdgeId.value = edge.id;
   flowEdgeDeleteConfirmTimeoutRef.value = window.setTimeout(() => {
     flowEdgeDeleteConfirmTimeoutRef.value = null;
     if (activeFlowEdgeDeleteConfirm.value?.id === edge.id) {
-      activeFlowEdgeDeleteConfirm.value = null;
+      clearFlowEdgeDeleteConfirmState();
     }
   }, 2000);
 }
@@ -954,10 +989,11 @@ function startDataEdgeStateConfirm(edge: ProjectedCanvasEdge, event: PointerEven
     x: point.x,
     y: point.y,
   };
+  selectedEdgeId.value = edge.id;
   dataEdgeStateConfirmTimeoutRef.value = window.setTimeout(() => {
     dataEdgeStateConfirmTimeoutRef.value = null;
     if (activeDataEdgeStateConfirm.value?.id === edge.id) {
-      activeDataEdgeStateConfirm.value = null;
+      clearDataEdgeStateConfirmState();
     }
   }, 2000);
 }
@@ -992,6 +1028,7 @@ function openDataEdgeStateEditor() {
   }
 
   activeDataEdgeStateEditor.value = {
+    id: activeDataEdgeStateConfirm.value.id,
     source: activeDataEdgeStateConfirm.value.source,
     target: activeDataEdgeStateConfirm.value.target,
     stateKey: activeDataEdgeStateConfirm.value.stateKey,
@@ -2760,12 +2797,6 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   stroke-width: 3.8;
   stroke-dasharray: 16 18;
   animation: editor-canvas-flow-line 1.8s linear infinite;
-}
-
-.editor-canvas__edge--selected {
-  stroke: rgba(37, 99, 235, 0.96);
-  stroke-width: 3.4;
-  opacity: 1;
 }
 
 .editor-canvas__edge--active-run {

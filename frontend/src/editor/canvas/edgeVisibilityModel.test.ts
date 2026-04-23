@@ -49,6 +49,17 @@ test("flow mode shows normal sequence flow and condition route flow", () => {
   );
 });
 
+test("selected edges remain visible even when the current mode would hide them", () => {
+  assert.deepEqual(
+    filterProjectedEdgesForVisibilityMode(edges, {
+      mode: "flow",
+      relatedNodeIds: new Set(),
+      forceVisibleEdgeIds: new Set(["data:input:question->agent"]),
+    }).map((candidate) => candidate.id),
+    ["data:input:question->agent", "flow:input->agent", "flow:agent->output", "route:branch:true->agent", "route:branch:false->output"],
+  );
+});
+
 test("all mode shows every projected edge", () => {
   assert.deepEqual(
     visibleEdgeIds("all", []),
