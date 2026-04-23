@@ -14,6 +14,16 @@ These instructions apply to all work in this repository and should persist acros
 - `scripts/start.sh` remains the standard Bash wrapper for Linux, macOS, Git Bash, and WSL, and should stay behaviorally aligned with `scripts/start.mjs`.
 - If a task only involves documentation or other non-runtime changes, use judgment; for code changes, default to restarting with the standard restart flow above.
 
+## Local LLM Runtime
+
+- Standardize local LLM/runtime guidance on EZLLM.
+- Preferred local runtime flow:
+  - `pipx install ezllm`
+  - `ezllm start`
+  - `LOCAL_BASE_URL=http://127.0.0.1:8888/v1`
+- Keep GraphiteUI's own dev startup guidance on `npm run dev` and `node scripts/start.mjs`; those commands are not replaced by local runtime instructions.
+- `scripts/lm_core0.py`, `scripts/lm-server`, and `scripts/download_Gemma_gguf.py` should remain migration wrappers instead of carrying runtime implementations.
+
 ## UI Implementation Policy
 
 - For UI work, always prefer existing component libraries already used by the project before building custom components or controls.

@@ -221,7 +221,19 @@ Some directories are created on demand. Indexed knowledge base content lives in 
 
 ### Runtime Model And Tool Configuration
 
-Settings and runtime defaults are built from the backend model catalog and tool registry. Relevant environment variables include:
+Settings and runtime defaults are built from the backend model catalog and tool registry.
+
+For local runtime setup, prefer EZLLM:
+
+```bash
+pipx install ezllm
+ezllm start
+LOCAL_BASE_URL=http://127.0.0.1:8888/v1
+```
+
+Legacy local runtime scripts in `scripts/lm_core0.py`, `scripts/lm-server`, and `scripts/download_Gemma_gguf.py` are migration wrappers only and should not regain in-repo runtime behavior.
+
+Relevant environment variables include:
 
 - `LOCAL_BASE_URL`
 - `LOCAL_API_KEY`

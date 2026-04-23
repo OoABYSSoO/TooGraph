@@ -46,7 +46,7 @@ GraphiteUI 是一个面向 LangGraph 风格 Agent 工作流的可视化编排与
 
 - Node.js 20.9+
 - Python 3.11+
-- 可选：OpenAI-compatible API、本地 LLM 或 Ollama 类服务
+- 可选：OpenAI-compatible API 或 EZLLM 本地 runtime
 
 ### 安装依赖
 
@@ -123,13 +123,18 @@ make backend-dev
 make backend-health
 ```
 
-### 模型配置
+### 本地 runtime（EZLLM）
+
+推荐把本地模型 runtime 交给 EZLLM 管理：
 
 ```bash
-LOCAL_BASE_URL=http://localhost:11434
-LOCAL_API_KEY=sk-xxx
-LOCAL_TEXT_MODEL=gpt-4o
+pipx install ezllm
+ezllm start
+LOCAL_BASE_URL=http://127.0.0.1:8888/v1
+LOCAL_TEXT_MODEL=your-local-model
 ```
+
+如果你的 EZLLM 网关需要鉴权，再额外设置 `LOCAL_API_KEY`。GraphiteUI 自身的开发环境仍然使用上面的 `npm run dev` 或 `node scripts/start.mjs` 启动。
 
 也兼容这些别名：
 
