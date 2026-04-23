@@ -20,6 +20,9 @@ class EzllmMigrationWrapperTests(unittest.TestCase):
             check=False,
         )
 
+    def _read_script_text(self, relative_path: str) -> str:
+        return (REPO_ROOT / relative_path).read_text(encoding="utf-8")
+
     def test_lm_core0_wrapper_prints_ezllm_migration_instructions(self) -> None:
         result = self._run_python_script("scripts/lm_core0.py")
         combined_output = f"{result.stdout}\n{result.stderr}"
@@ -35,6 +38,16 @@ class EzllmMigrationWrapperTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("EZLLM", combined_output)
         self.assertIn("ezllm models download", combined_output)
+
+    def test_lm_server_wrapper_static_contract_points_to_ezllm(self) -> None:
+        script_text = self._read_script_text("scripts/lm-server")
+
+        self.assertIn("#!/usr/bin/env bash", script_text)
+        self.assertIn("EZLLM", script_text)
+        self.assertIn("pipx install ezllm", script_text)
+        self.assertIn("ezllm start", script_text)
+        self.assertIn("LOCAL_BASE_URL=http://127.0.0.1:8888/v1", script_text)
+        self.assertIn("exit 1", script_text)
 
 
 if __name__ == "__main__":
