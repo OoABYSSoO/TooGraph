@@ -47,6 +47,8 @@ test("BuddyWidget renders the animated inline mascot component", () => {
   assert.match(componentSource, /:tap-nonce="tapNonce"/);
   assert.match(componentSource, /:look-x="mascotLook\.x"/);
   assert.match(componentSource, /:look-y="mascotLook\.y"/);
+  assert.match(componentSource, /:virtual-cursor="virtualCursorEnabled && !virtualCursorDetached"/);
+  assert.match(componentSource, /:hide-sparkle="virtualCursorEnabled && virtualCursorDetached"/);
   assert.doesNotMatch(componentSource, /<img src="\/mascot\.svg"/);
 });
 
@@ -126,11 +128,32 @@ test("BuddyWidget listens for mascot debug actions requested from the Buddy page
   assert.match(componentSource, /import type \{ BuddyMascotDebugAction \} from "\.\/buddyMascotDebug\.ts";/);
   assert.match(componentSource, /import \{ useBuddyMascotDebugStore \} from "\.\.\/stores\/buddyMascotDebug\.ts";/);
   assert.match(componentSource, /const buddyMascotDebugStore = useBuddyMascotDebugStore\(\);/);
-  assert.match(componentSource, /const \{ latestRequest: mascotDebugRequest \} = storeToRefs\(buddyMascotDebugStore\);/);
+  assert.match(componentSource, /const \{ latestRequest: mascotDebugRequest, virtualCursorEnabled \} = storeToRefs\(buddyMascotDebugStore\);/);
   assert.match(componentSource, /watch\(mascotDebugRequest,\s*\(request\) => \{/);
   assert.match(componentSource, /triggerMascotDebugAction\(request\.action\);/);
   assert.doesNotMatch(componentSource, /class="buddy-widget__debug-panel"/);
   assert.doesNotMatch(componentSource, /shouldShowMascotDebugPanel/);
+});
+
+test("BuddyWidget renders a draggable virtual cursor and makes the mascot follow it", () => {
+  assert.match(componentSource, /const \{ latestRequest: mascotDebugRequest, virtualCursorEnabled \} = storeToRefs\(buddyMascotDebugStore\);/);
+  assert.match(componentSource, /v-if="virtualCursorEnabled"/);
+  assert.match(componentSource, /class="buddy-widget__virtual-cursor"/);
+  assert.match(componentSource, /src="\/buddy-cursor\.svg"/);
+  assert.match(componentSource, /:style="virtualCursorStyle"/);
+  assert.match(componentSource, /@pointerdown="handleVirtualCursorPointerDown"/);
+  assert.match(componentSource, /const virtualCursorPosition = ref/);
+  assert.match(componentSource, /const virtualCursorDetached = ref\(false\);/);
+  assert.match(componentSource, /const virtualCursorStyle = computed/);
+  assert.match(componentSource, /let virtualCursorDrag: \{/);
+  assert.match(componentSource, /function handleVirtualCursorPointerDown\(event: PointerEvent\)/);
+  assert.match(componentSource, /virtualCursorDetached\.value = true;/);
+  assert.match(componentSource, /buddy-widget__virtual-cursor--docked/);
+  assert.match(componentSource, /function handleVirtualCursorPointerMove\(event: PointerEvent\)/);
+  assert.match(componentSource, /function requestBuddyFollowVirtualCursor\(\)/);
+  assert.match(componentSource, /function runBuddyVirtualCursorFollowStep\(sequenceId: number\)/);
+  assert.match(componentSource, /resolveBuddyVirtualCursorFollowTargetPosition/);
+  assert.match(componentSource, /BUDDY_VIRTUAL_CURSOR_FOLLOW_MAX_DISTANCE_PX/);
 });
 
 test("BuddyWidget debug panel can trigger every mascot animation state without graph runs", () => {

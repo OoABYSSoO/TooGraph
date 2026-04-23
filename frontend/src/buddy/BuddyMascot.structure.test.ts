@@ -69,6 +69,8 @@ const separatedHeadPath =
   "M-55-61 C-25-66 25-66 55-61 C90-61 130-43 168-4 C196 22 214 66 218 116 C226 208 145 264 0 264 C-145 264-226 208-218 116 C-214 66-196 22-168-4 C-130-43-90-61-55-61Z";
 const elevatedSparklePath =
   "M0-180 C5-154 18-141 44-136 C18-131 5-118 0-92 C-5-118 -18-131 -44-136 C-18-141 -5-154 0-180Z";
+const cursorSparklePath =
+  "M0-184 C14-147 33-107 52-78 C27-77 13-66 0-48 C-13-66 -27-77 -52-78 C-33-107 -14-147 0-184Z";
 
 test("BuddyMascot renders the mascot as inline SVG animation parts", () => {
   assert.match(componentSource, /<svg[\s\S]*class="buddy-mascot__svg"/);
@@ -94,9 +96,35 @@ test("BuddyMascot uses true separated head, ears, and tail layers without masks"
 });
 
 test("BuddyMascot keeps the sparkle above the head without entering the head layer", () => {
-  assert.equal(extractPathData(componentSource, 'class="buddy-mascot__sparkle"'), elevatedSparklePath);
+  assert.match(componentSource, new RegExp(`const SPARKLE_STAR_PATH = "${elevatedSparklePath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`));
+  assert.match(componentSource, /class="buddy-mascot__sparkle"[\s\S]*:d="sparklePath"/);
   assert.match(componentSource, /id="buddyMascotSparkleGold" cx="0" cy="-136" r="56"/);
   assert.match(componentSource, /class="buddy-mascot__body"[\s\S]*class="buddy-mascot__sparkle-wrap"/);
+});
+
+test("BuddyMascot morphs the head sparkle into the selected virtual cursor shape", () => {
+  assert.match(componentSource, /virtualCursor\?: boolean;/);
+  assert.match(componentSource, /hideSparkle\?: boolean;/);
+  assert.match(componentSource, /v-show="!props\.hideSparkle"/);
+  assert.match(componentSource, /SPARKLE_STAR_PATH/);
+  assert.match(componentSource, /SPARKLE_CURSOR_PATH/);
+  assert.match(componentSource, /const sparklePath = ref<string>\(SPARKLE_STAR_PATH\);/);
+  assert.match(componentSource, /ref="sparkleAnimateElement"/);
+  assert.match(componentSource, /:d="sparklePath"/);
+  assert.match(componentSource, /v-if="sparkleMorphAnimation"/);
+  assert.match(componentSource, /sparkleAnimateElement\.value\?\.beginElement\(\);/);
+  assert.match(componentSource, /buddy-mascot--virtual-cursor/);
+  assert.match(componentSource, new RegExp(cursorSparklePath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+});
+
+test("BuddyMascot keeps the transformed virtual cursor visible instead of fading it out", () => {
+  const virtualCursorSparkleBlock = extractCssBlock(
+    componentSource,
+    ".buddy-mascot.buddy-mascot--virtual-cursor .buddy-mascot__sparkle-wrap",
+  );
+  assert.match(componentSource, /buddy-mascot-cursor-ready/);
+  assert.doesNotMatch(componentSource, /buddy-mascot-cursor-depart/);
+  assert.doesNotMatch(virtualCursorSparkleBlock, /opacity:\s*0;/);
 });
 
 test("BuddyMascot supports idle, thinking, speaking, dragging, and tap animations", () => {

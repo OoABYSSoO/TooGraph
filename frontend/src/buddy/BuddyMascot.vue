@@ -91,12 +91,26 @@
           </g>
         </g>
 
-        <g class="buddy-mascot__sparkle-wrap">
+        <g v-show="!props.hideSparkle" class="buddy-mascot__sparkle-wrap">
           <path
             class="buddy-mascot__sparkle"
             fill="url(#buddyMascotSparkleGold)"
-            d="M0-180 C5-154 18-141 44-136 C18-131 5-118 0-92 C-5-118 -18-131 -44-136 C-18-141 -5-154 0-180Z"
-          />
+            :d="sparklePath"
+          >
+            <animate
+              ref="sparkleAnimateElement"
+              v-if="sparkleMorphAnimation"
+              :key="sparkleMorphAnimation.key"
+              attributeName="d"
+              begin="indefinite"
+              :dur="`${sparkleMorphAnimation.durationMs}ms`"
+              fill="freeze"
+              calcMode="spline"
+              keyTimes="0;1"
+              keySplines="0.2 0.8 0.2 1"
+              :values="sparkleMorphAnimation.values"
+            />
+          </path>
         </g>
       </g>
     </svg>
@@ -119,6 +133,9 @@ const TAIL_CURVE_MICRO_DURATION_MS = 6800;
 const TAIL_IDLE_MIN_DWELL_MS = 5200;
 const TAIL_IDLE_MAX_DWELL_MS = 9000;
 const TAIL_KEY_SPLINE = "0.42 0 0.58 1";
+const SPARKLE_STAR_PATH = "M0-180 C5-154 18-141 44-136 C18-131 5-118 0-92 C-5-118 -18-131 -44-136 C-18-141 -5-154 0-180Z";
+const SPARKLE_CURSOR_PATH = "M0-184 C14-147 33-107 52-78 C27-77 13-66 0-48 C-13-66 -27-77 -52-78 C-33-107 -14-147 0-184Z";
+const SPARKLE_MORPH_DURATION_MS = 420;
 
 const TAIL_POSE_PATHS = {
   right: "M0 176 C54 214 104 166 154 160 C212 152 240 112 260 82 C270 66 278 60 282 62",
@@ -173,6 +190,8 @@ const props = withDefaults(
     tapNonce?: number;
     lookX?: number;
     lookY?: number;
+    virtualCursor?: boolean;
+    hideSparkle?: boolean;
   }>(),
   {
     mood: "idle",
@@ -182,6 +201,8 @@ const props = withDefaults(
     tapNonce: 0,
     lookX: 0,
     lookY: 0,
+    virtualCursor: false,
+    hideSparkle: false,
   },
 );
 
@@ -190,10 +211,15 @@ const tailBasePath = ref<string>(TAIL_POSE_PATHS.right);
 const tailSide = ref<TailSide>("right");
 const tailSwingAnimation = ref<{ key: number; values: string; durationMs: number; keyTimes: string; keySplines: string } | null>(null);
 const tailAnimateElement = ref<SVGAnimationElement | null>(null);
+const sparklePath = ref<string>(SPARKLE_STAR_PATH);
+const sparkleMorphAnimation = ref<{ key: number; values: string; durationMs: number } | null>(null);
+const sparkleAnimateElement = ref<SVGAnimationElement | null>(null);
 let tapTimeoutId: number | null = null;
 let tailDwellTimerId: number | null = null;
 let tailTransitionTimerId: number | null = null;
+let sparkleMorphTimerId: number | null = null;
 let tailAnimationKey = 0;
+let sparkleAnimationKey = 0;
 let tailTransitionStartedAtMs = 0;
 let tailTransitionFromPose: TailPose = "right";
 let tailTransitionTargetSide: TailSide | null = null;
@@ -207,6 +233,7 @@ const mascotClasses = computed(() => ({
   [`buddy-mascot--facing-${props.facing}`]: true,
   "buddy-mascot--dragging": props.dragging,
   "buddy-mascot--tap": tapAnimating.value && !props.dragging,
+  "buddy-mascot--virtual-cursor": props.virtualCursor,
 }));
 const eyeLookStyle = computed<Record<string, string>>(() => {
   const shouldTrackPointer = props.facing === "front";
@@ -220,11 +247,13 @@ const eyeLookStyle = computed<Record<string, string>>(() => {
 const tailCurveAnimationValues = computed(() => buildTailCurveMicroValues(tailSide.value));
 
 watch(() => props.tapNonce, triggerTapAnimation);
+watch(() => props.virtualCursor, syncSparklePath, { immediate: true });
 watch([effectiveMood, () => props.facing, () => props.dragging], syncTailTarget, { immediate: true });
 
 onBeforeUnmount(() => {
   clearTapTimeout();
   clearTailTimers();
+  clearSparkleMorphTimer();
 });
 
 function triggerTapAnimation(nextNonce: number, previousNonce: number | undefined) {
@@ -255,6 +284,47 @@ function clearTapTimeout() {
   }
   window.clearTimeout(tapTimeoutId);
   tapTimeoutId = null;
+}
+
+function syncSparklePath(enabled: boolean, previousEnabled: boolean | undefined) {
+  const targetPath = enabled ? SPARKLE_CURSOR_PATH : SPARKLE_STAR_PATH;
+  if (previousEnabled === undefined || typeof window === "undefined") {
+    clearSparkleMorphTimer();
+    sparklePath.value = targetPath;
+    sparkleMorphAnimation.value = null;
+    return;
+  }
+  if (sparklePath.value === targetPath) {
+    sparkleMorphAnimation.value = null;
+    return;
+  }
+
+  clearSparkleMorphTimer();
+  const startPath = sparklePath.value;
+  sparkleAnimationKey += 1;
+  sparkleMorphAnimation.value = {
+    key: sparkleAnimationKey,
+    values: `${startPath};${targetPath}`,
+    durationMs: SPARKLE_MORPH_DURATION_MS,
+  };
+  void nextTick(() => {
+    sparkleAnimateElement.value?.beginElement();
+  });
+
+  sparkleMorphTimerId = window.setTimeout(() => {
+    sparklePath.value = targetPath;
+    sparkleMorphAnimation.value = null;
+    sparkleMorphTimerId = null;
+  }, SPARKLE_MORPH_DURATION_MS);
+}
+
+function clearSparkleMorphTimer() {
+  if (sparkleMorphTimerId === null || typeof window === "undefined") {
+    sparkleMorphTimerId = null;
+    return;
+  }
+  window.clearTimeout(sparkleMorphTimerId);
+  sparkleMorphTimerId = null;
 }
 
 function syncTailTarget() {
@@ -555,6 +625,15 @@ function clampLookAxis(value: number | undefined) {
   transform-origin: 50% 50%;
 }
 
+.buddy-mascot.buddy-mascot--virtual-cursor .buddy-mascot__sparkle-wrap {
+  animation: buddy-mascot-cursor-ready 2.4s ease-in-out infinite;
+}
+
+.buddy-mascot.buddy-mascot--virtual-cursor .buddy-mascot__sparkle {
+  transform: translateY(-2px) scale(1.04);
+  filter: drop-shadow(0 6px 6px rgba(32, 24, 16, 0.16));
+}
+
 .buddy-mascot__left-ear {
   transform-origin: 78% 82%;
   transform: translate(var(--buddy-mascot-left-ear-x), var(--buddy-mascot-left-ear-y))
@@ -773,6 +852,16 @@ function clampLookAxis(value: number | undefined) {
   }
   50% {
     transform: translateY(-3px) rotate(4deg);
+  }
+}
+
+@keyframes buddy-mascot-cursor-ready {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-2deg);
+  }
+  50% {
+    transform: translateY(-3px) rotate(2deg);
   }
 }
 

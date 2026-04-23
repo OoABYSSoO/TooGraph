@@ -10,6 +10,7 @@ export type BuddyMascotDebugRequest = {
 
 export const useBuddyMascotDebugStore = defineStore("buddyMascotDebug", () => {
   const latestRequest = ref<BuddyMascotDebugRequest | null>(null);
+  const virtualCursorEnabled = ref(false);
   const nextRequestId = ref(0);
 
   function trigger(action: BuddyMascotDebugAction) {
@@ -20,8 +21,14 @@ export const useBuddyMascotDebugStore = defineStore("buddyMascotDebug", () => {
     };
   }
 
+  function setVirtualCursorEnabled(enabled: boolean) {
+    virtualCursorEnabled.value = enabled;
+  }
+
   return {
     latestRequest,
+    virtualCursorEnabled,
     trigger,
+    setVirtualCursorEnabled,
   };
 });

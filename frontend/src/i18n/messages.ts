@@ -808,6 +808,7 @@ const baseMessages = {
       title: "TooGraph 伙伴",
       open: "打开伙伴对话",
       dragHint: "拖拽移动，点击对话",
+      virtualCursor: "伙伴虚拟鼠标",
       modeLabel: "图操作档位",
       modes: {
         askFirst: "需确认",
@@ -1045,6 +1046,10 @@ const baseMessages = {
       },
       mascotDebug: {
         title: "桌宠动作调试",
+        virtualCursor: {
+          enable: "启用虚拟鼠标",
+          disable: "关闭虚拟鼠标",
+        },
         groups: {
           state: "状态",
           motion: "动作",
@@ -1868,6 +1873,7 @@ const baseMessages = {
       title: "TooGraph Buddy",
       open: "Open buddy chat",
       dragHint: "Drag to move, click to chat",
+      virtualCursor: "Buddy virtual cursor",
       modeLabel: "Graph tier",
       modes: {
         askFirst: "Ask first",
@@ -2105,6 +2111,10 @@ const baseMessages = {
       },
       mascotDebug: {
         title: "Mascot Action Debug",
+        virtualCursor: {
+          enable: "Enable virtual cursor",
+          disable: "Disable virtual cursor",
+        },
         groups: {
           state: "State",
           motion: "Motion",
