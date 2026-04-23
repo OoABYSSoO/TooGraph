@@ -17,6 +17,17 @@ test("resolveNodeRunPresentation marks non-current running nodes", () => {
   });
 });
 
+test("resolveNodeRunPresentation marks paused nodes with review glow classes", () => {
+  assert.deepEqual(resolveNodeRunPresentation("paused", false), {
+    haloClass: "editor-canvas__node-halo--paused",
+    shellClass: "editor-canvas__node--paused",
+  });
+  assert.deepEqual(resolveNodeRunPresentation("paused", true), {
+    haloClass: "editor-canvas__node-halo--paused-current",
+    shellClass: "editor-canvas__node--paused-current",
+  });
+});
+
 test("resolveNodeRunPresentation marks success and failed nodes", () => {
   assert.deepEqual(resolveNodeRunPresentation("success", false), {
     haloClass: null,
@@ -35,5 +46,4 @@ test("resolveNodeRunPresentation marks success and failed nodes", () => {
 test("resolveNodeRunPresentation ignores idle-like statuses", () => {
   assert.equal(resolveNodeRunPresentation(undefined, false), null);
   assert.equal(resolveNodeRunPresentation("idle", false), null);
-  assert.equal(resolveNodeRunPresentation("paused", false), null);
 });

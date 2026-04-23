@@ -500,6 +500,47 @@ class LangGraphMigrationTests(unittest.TestCase):
         self.assertEqual(result["output_previews"][0]["source_key"], "draft_answer")
         self.assertEqual(result["output_previews"][0]["value"], "draft_writer:请给 GraphiteUI 写一段简短的欢迎介绍。")
 
+    @patch("app.core.langgraph.runtime.save_run", lambda state: None)
+    @patch("app.core.runtime.node_system_executor.save_run", lambda state: None)
+    @patch("app.core.runtime.node_system_executor._generate_agent_response", _fake_generate_agent_response)
+    @patch("app.core.runtime.node_system_executor._invoke_skill", _fake_invoke_skill)
+    @patch("app.core.runtime.node_system_executor.get_skill_registry", _fake_skill_registry)
+    def test_human_review_resume_preserves_prior_status_and_output_previews(self):
+        graph = _load_human_review_demo_graph()
+
+        interrupted = execute_node_system_graph_langgraph(graph, persist_progress=False)
+        self.assertEqual(interrupted["status"], "awaiting_human")
+
+        resumed_state = create_initial_run_state(
+            graph_id=graph.graph_id or "test_graph",
+            graph_name=graph.name,
+            max_revision_round=1,
+        )
+        resumed_state["checkpoint_metadata"] = dict(interrupted["checkpoint_metadata"])
+        resumed_state["metadata"] = {"resolved_runtime_backend": "langgraph"}
+        resumed_state["node_status_map"] = dict(interrupted["node_status_map"])
+        resumed_state["output_previews"] = list(interrupted["output_previews"])
+        resumed_state["saved_outputs"] = list(interrupted.get("saved_outputs", []))
+        set_run_status(resumed_state, "resuming", resumed_from_run_id=interrupted["run_id"])
+
+        result = execute_node_system_graph_langgraph(
+            graph,
+            initial_state=resumed_state,
+            persist_progress=False,
+            resume_from_checkpoint=True,
+            resume_command={"human_feedback": "请更强调可视化编排。"},
+        )
+
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(result["node_status_map"]["draft_writer"], "success")
+        self.assertEqual(result["node_status_map"]["output_draft_answer"], "success")
+        self.assertEqual(result["node_status_map"]["revision_writer"], "success")
+        self.assertEqual(result["node_status_map"]["output_final_answer"], "success")
+        self.assertEqual(
+            [preview["node_id"] for preview in result["output_previews"]],
+            ["output_draft_answer", "output_final_answer"],
+        )
+
     def test_plain_edge_graph_validates_without_handle_fields(self):
         graph = NodeSystemGraphPayload.model_validate(
             {

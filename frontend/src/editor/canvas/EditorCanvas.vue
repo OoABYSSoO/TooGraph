@@ -2345,7 +2345,8 @@ function resolveEdgeTargetPoint(edge: ProjectedCanvasEdge) {
 }
 
 function resolveRunNodePresentationForNode(nodeId: string) {
-  return resolveNodeRunPresentation(props.runNodeStatusByNodeId?.[nodeId], props.currentRunNodeId === nodeId);
+  const status = isHumanReviewNode(nodeId) ? "paused" : props.runNodeStatusByNodeId?.[nodeId];
+  return resolveNodeRunPresentation(status, props.currentRunNodeId === nodeId);
 }
 
 function resolveRunNodeClassList(nodeId: string) {
@@ -3086,7 +3087,9 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
 }
 
 .editor-canvas__node-halo--running,
-.editor-canvas__node-halo--running-current {
+.editor-canvas__node-halo--running-current,
+.editor-canvas__node-halo--paused,
+.editor-canvas__node-halo--paused-current {
   opacity: 1;
   filter: blur(10px);
   transition: opacity 180ms ease, transform 180ms ease;
@@ -3114,6 +3117,28 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   animation: editor-canvas-node-execution-glow-pulse 0.95s ease-in-out infinite;
 }
 
+.editor-canvas__node-halo--paused {
+  background:
+    radial-gradient(
+      circle at 50% 20%,
+      rgba(245, 158, 11, 0.5) 0%,
+      rgba(217, 119, 6, 0.25) 34%,
+      rgba(217, 119, 6, 0) 64%
+    );
+  animation: editor-canvas-node-execution-glow-pulse 1.35s ease-in-out infinite;
+}
+
+.editor-canvas__node-halo--paused-current {
+  background:
+    radial-gradient(
+      circle at 50% 20%,
+      rgba(251, 191, 36, 0.7) 0%,
+      rgba(245, 158, 11, 0.34) 36%,
+      rgba(245, 158, 11, 0) 66%
+    );
+  animation: editor-canvas-node-execution-glow-pulse 1.05s ease-in-out infinite;
+}
+
 .editor-canvas__node--running {
   box-shadow:
     0 18px 36px rgba(60, 41, 20, 0.1),
@@ -3126,6 +3151,20 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
     0 20px 40px rgba(60, 41, 20, 0.12),
     0 0 0 1.5px rgba(16, 185, 129, 0.86),
     0 0 18px rgba(16, 185, 129, 0.32);
+}
+
+.editor-canvas__node--paused {
+  box-shadow:
+    0 18px 36px rgba(60, 41, 20, 0.1),
+    0 0 0 1.5px rgba(245, 158, 11, 0.62),
+    0 0 14px rgba(245, 158, 11, 0.2);
+}
+
+.editor-canvas__node--paused-current {
+  box-shadow:
+    0 20px 40px rgba(60, 41, 20, 0.12),
+    0 0 0 1.5px rgba(245, 158, 11, 0.86),
+    0 0 18px rgba(245, 158, 11, 0.3);
 }
 
 .editor-canvas__node--success {

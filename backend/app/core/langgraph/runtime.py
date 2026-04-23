@@ -73,7 +73,14 @@ def execute_node_system_graph_langgraph(
     set_run_status(state, "running")
     state["runtime_backend"] = "langgraph"
     state["started_at"] = utc_now_iso()
-    state["node_status_map"] = {node_name: "idle" for node_name in graph.nodes}
+    if resume_from_checkpoint:
+        node_status_map = dict(state.get("node_status_map") or {})
+        state["node_status_map"] = {
+            node_name: node_status_map.get(node_name, "idle")
+            for node_name in graph.nodes
+        }
+    else:
+        state["node_status_map"] = {node_name: "idle" for node_name in graph.nodes}
     state["metadata"] = dict(graph.metadata)
     state["metadata"]["resolved_runtime_backend"] = "langgraph"
     _initialize_graph_state(graph, state)

@@ -54,8 +54,12 @@ test("EditorCanvas restores legacy runtime feedback styling on node cards and ac
   assert.match(componentSource, /@keyframes editor-canvas-node-execution-glow-pulse/);
   assert.match(componentSource, /\.editor-canvas__node-halo--running \{[\s\S]*rgba\(52,\s*211,\s*153,\s*0\.52\)/);
   assert.match(componentSource, /\.editor-canvas__node-halo--running-current \{[\s\S]*rgba\(110,\s*231,\s*183,\s*0\.72\)/);
+  assert.match(componentSource, /\.editor-canvas__node-halo--paused \{[\s\S]*rgba\(245,\s*158,\s*11,\s*0\.5\)/);
+  assert.match(componentSource, /\.editor-canvas__node-halo--paused-current \{[\s\S]*rgba\(251,\s*191,\s*36,\s*0\.7\)/);
   assert.match(componentSource, /\.editor-canvas__node--running \{[\s\S]*0 0 0 1\.5px rgba\(16,\s*185,\s*129,\s*0\.62\)/);
   assert.match(componentSource, /\.editor-canvas__node--running-current \{[\s\S]*0 0 0 1\.5px rgba\(16,\s*185,\s*129,\s*0\.86\)/);
+  assert.match(componentSource, /\.editor-canvas__node--paused \{[\s\S]*0 0 0 1\.5px rgba\(245,\s*158,\s*11,\s*0\.62\)/);
+  assert.match(componentSource, /\.editor-canvas__node--paused-current \{[\s\S]*0 0 0 1\.5px rgba\(245,\s*158,\s*11,\s*0\.86\)/);
   assert.match(componentSource, /\.editor-canvas__node--success \{[\s\S]*0 0 0 1\.5px rgba\(180,\s*83,\s*9,\s*0\.34\)/);
   assert.match(componentSource, /\.editor-canvas__node--failed \{[\s\S]*0 0 0 1\.5px rgba\(239,\s*68,\s*68,\s*0\.56\)/);
   assert.match(componentSource, /\.editor-canvas__edge--active-run \{[\s\S]*stroke-width:\s*3px;/);
@@ -70,6 +74,7 @@ test("EditorCanvas treats awaiting-human current node as a persistent review nod
   assert.match(componentSource, /@open-human-review="emit\('open-human-review', \$event\)"/);
   assert.match(componentSource, /function isHumanReviewNode\(nodeId: string\)/);
   assert.match(componentSource, /props\.latestRunStatus === "awaiting_human" && props\.currentRunNodeId === nodeId/);
+  assert.match(componentSource, /isHumanReviewNode\(nodeId\) \? "paused" : props\.runNodeStatusByNodeId\?\.\[nodeId\]/);
   assert.match(componentSource, /function isNodeVisuallySelected\(nodeId: string\)/);
   assert.match(componentSource, /return selection\.selectedNodeId\.value === nodeId \|\| isHumanReviewNode\(nodeId\);/);
 });

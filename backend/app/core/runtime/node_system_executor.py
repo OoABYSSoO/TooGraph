@@ -422,8 +422,22 @@ def collect_output_boundaries(
     active_edge_ids: set[str] | None = None,
 ) -> None:
     active_output_nodes = _resolve_active_output_nodes(graph, active_edge_ids or set())
-    state["output_previews"] = []
-    state["saved_outputs"] = []
+    output_node_names = {
+        node_name
+        for node_name, node in graph.nodes.items()
+        if isinstance(node, NodeSystemOutputNode)
+    }
+    refreshed_output_nodes = active_output_nodes or output_node_names
+    state["output_previews"] = [
+        preview
+        for preview in state.get("output_previews", [])
+        if preview.get("node_id") not in refreshed_output_nodes
+    ]
+    state["saved_outputs"] = [
+        output
+        for output in state.get("saved_outputs", [])
+        if output.get("node_id") not in refreshed_output_nodes
+    ]
     final_results: list[Any] = []
 
     for node_name, node in graph.nodes.items():
