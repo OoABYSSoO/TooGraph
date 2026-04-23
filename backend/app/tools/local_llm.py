@@ -29,7 +29,13 @@ def _parse_float_env(name: str, default: float) -> float:
         return default
 
 
-LOCAL_LLM_BASE_URL = _env_first("LOCAL_BASE_URL", "OPENAI_BASE_URL", "LOCAL_LLM_BASE_URL", default="http://127.0.0.1:8888/v1").rstrip("/")
+LOCAL_LLM_BASE_URL = _env_first(
+    "EZLLM_BASE_URL",
+    "LOCAL_BASE_URL",
+    "OPENAI_BASE_URL",
+    "LOCAL_LLM_BASE_URL",
+    default="http://127.0.0.1:8888/v1",
+).rstrip("/")
 LOCAL_LLM_API_KEY = _env_first("LOCAL_API_KEY", "OPENAI_API_KEY", "LITELLM_MASTER_KEY", "LOCAL_LLM_API_KEY", default="sk-local")
 LOCAL_LLM_REQUEST_TIMEOUT_SEC = _parse_float_env("LOCAL_LLM_REQUEST_TIMEOUT_SEC", 180.0)
 ROOT_DIR = Path(__file__).resolve().parents[3]

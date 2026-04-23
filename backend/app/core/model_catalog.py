@@ -170,8 +170,8 @@ def build_model_catalog() -> dict[str, Any]:
         "providers": [
             {
                 "provider_id": "local",
-                "label": "Local Gateway",
-                "description": "Current GraphiteUI local model gateway. GraphiteUI sends provider/model refs here first, then the gateway routes to llama.cpp or future upstream vendors.",
+                "label": "EZLLM Runtime",
+                "description": "External EZLLM runtime used by GraphiteUI for local model routing, runtime metadata, logs, and provider fan-out.",
                 "transport": "openai-compatible",
                 "configured": True,
                 "base_url": LOCAL_LLM_BASE_URL,
