@@ -34,6 +34,10 @@ export type HumanReviewPanelModel = {
 };
 
 const stateFieldTypeSet = new Set<string>(STATE_FIELD_TYPE_OPTIONS);
+type RequiredStateMetadata = {
+  firstConsumerOrder: number;
+  consumerHits: number;
+};
 
 export function resolveHumanReviewStateValues(run: RunDetail | null): Record<string, unknown> {
   if (!run) {
@@ -76,8 +80,11 @@ export function buildHumanReviewPanelModel(
   const values = resolveHumanReviewStateValues(run);
   const currentNodeId = run?.current_node_id ?? null;
   const windowNodeIds = collectBreakpointWindowNodeIds(document, currentNodeId);
+  const orderedWindowNodeIds = Array.from(windowNodeIds);
   const predecessors = resolveGraphPredecessors(document);
+  const successors = resolveGraphSuccessors(document);
   const graphAvailability = resolveGraphStateAvailability(document, predecessors);
+  const conditionalDescendantNodeIds = resolveConditionalDescendantNodeIds(document, successors);
   const breakpointStateKeys = resolveBreakpointStateKeys(document, currentNodeId, graphAvailability);
   const availableStatesBeforeNode = resolveWindowStateAvailability(
     document,
@@ -85,11 +92,14 @@ export function buildHumanReviewPanelModel(
     windowNodeIds,
     currentNodeId,
     breakpointStateKeys,
+    graphAvailability.after,
+    conditionalDescendantNodeIds,
   );
-  const requiredCandidates: Array<{ stateKey: string }> = [];
+  const requiredCandidateKeys = new Set<string>();
   const requiredKeys = new Set<string>();
+  const requiredMetadataByKey = new Map<string, RequiredStateMetadata>();
 
-  for (const nodeId of windowNodeIds) {
+  for (const [consumerOrder, nodeId] of orderedWindowNodeIds.entries()) {
     const node = document.nodes[nodeId];
     if (!node) {
       continue;
@@ -101,7 +111,16 @@ export function buildHumanReviewPanelModel(
       if (binding.required === false) {
         continue;
       }
-      requiredCandidates.push({ stateKey: binding.state });
+      requiredCandidateKeys.add(binding.state);
+      const metadata = requiredMetadataByKey.get(binding.state);
+      if (metadata) {
+        metadata.consumerHits += 1;
+      } else {
+        requiredMetadataByKey.set(binding.state, {
+          firstConsumerOrder: consumerOrder,
+          consumerHits: 1,
+        });
+      }
       if (availableStatesBeforeNode.get(nodeId)?.has(binding.state)) {
         continue;
       }
@@ -113,7 +132,7 @@ export function buildHumanReviewPanelModel(
     Array.from(
       new Set([
         ...Object.keys(values),
-        ...requiredCandidates.map((candidate) => candidate.stateKey),
+        ...requiredCandidateKeys,
       ]),
     ),
     document,
@@ -134,7 +153,29 @@ export function buildHumanReviewPanelModel(
     };
   });
 
-  const requiredNow = allRows.filter((row) => requiredKeys.has(row.key));
+  const rowByKey = new Map(allRows.map((row) => [row.key, row]));
+  const requiredNow = Array.from(requiredKeys)
+    .map((key) => rowByKey.get(key))
+    .filter((row): row is HumanReviewRow => row !== undefined)
+    .sort((left, right) => {
+      const leftMetadata = requiredMetadataByKey.get(left.key);
+      const rightMetadata = requiredMetadataByKey.get(right.key);
+      const leftOrder = leftMetadata?.firstConsumerOrder ?? Number.MAX_SAFE_INTEGER;
+      const rightOrder = rightMetadata?.firstConsumerOrder ?? Number.MAX_SAFE_INTEGER;
+      if (leftOrder !== rightOrder) {
+        return leftOrder - rightOrder;
+      }
+      const leftHits = leftMetadata?.consumerHits ?? 0;
+      const rightHits = rightMetadata?.consumerHits ?? 0;
+      if (leftHits !== rightHits) {
+        return rightHits - leftHits;
+      }
+      const labelOrder = left.label.localeCompare(right.label);
+      if (labelOrder !== 0) {
+        return labelOrder;
+      }
+      return left.key.localeCompare(right.key);
+    });
   const otherRows = allRows.filter((row) => !requiredKeys.has(row.key));
   const firstBlockingRequiredKey = requiredNow.find(draftValueIsBlocking)?.key ?? null;
 
@@ -203,7 +244,13 @@ function collectBreakpointWindowNodeIds(document: GraphPayload | GraphDocument, 
     if (result.has(nodeId)) {
       continue;
     }
-    if (nodeId !== currentNodeId && breakpointNodeIds.has(nodeId)) {
+    const isDownstreamBreakpoint = nodeId !== currentNodeId && breakpointNodeIds.has(nodeId);
+    if (isDownstreamBreakpoint) {
+      const breakpointTiming = resolveAgentBreakpointTimingInDocument(document, nodeId);
+      if (breakpointTiming === "before") {
+        continue;
+      }
+      result.add(nodeId);
       continue;
     }
     result.add(nodeId);
@@ -256,6 +303,16 @@ function stateSetsEqual(left: Set<string>, right: Set<string>) {
   return true;
 }
 
+function unionStateSets(stateSets: Set<string>[]) {
+  const result = new Set<string>();
+  for (const stateSet of stateSets) {
+    for (const stateKey of stateSet) {
+      result.add(stateKey);
+    }
+  }
+  return result;
+}
+
 function resolveGraphStateAvailability(
   document: GraphPayload | GraphDocument,
   predecessors: Map<string, string[]>,
@@ -306,12 +363,33 @@ function resolveBreakpointStateKeys(
     : new Set(availability.after.get(currentNodeId) ?? []);
 }
 
+function resolveConditionalDescendantNodeIds(
+  document: GraphPayload | GraphDocument,
+  successors: Map<string, string[]>,
+) {
+  const result = new Set<string>();
+  const queue = document.conditional_edges.flatMap((edge) => Object.values(edge.branches));
+
+  while (queue.length > 0) {
+    const nodeId = queue.shift()!;
+    if (result.has(nodeId)) {
+      continue;
+    }
+    result.add(nodeId);
+    queue.push(...(successors.get(nodeId) ?? []));
+  }
+
+  return result;
+}
+
 function resolveWindowStateAvailability(
   document: GraphPayload | GraphDocument,
   predecessors: Map<string, string[]>,
   windowNodeIds: Set<string>,
   currentNodeId: string | null,
   breakpointStateKeys: Set<string>,
+  graphAvailabilityAfter: Map<string, Set<string>>,
+  conditionalDescendantNodeIds: Set<string>,
 ) {
   const before = new Map<string, Set<string>>();
   const after = new Map<string, Set<string>>();
@@ -331,7 +409,8 @@ function resolveWindowStateAvailability(
       if (nodeId === currentNodeId && windowIncludesCurrent) {
         nextBefore = new Set(breakpointStateKeys);
       } else {
-        const relevantPredecessors = (predecessors.get(nodeId) ?? []).filter(
+        const allPredecessors = predecessors.get(nodeId) ?? [];
+        const relevantPredecessors = allPredecessors.filter(
           (predecessorId) => windowNodeIds.has(predecessorId) || predecessorId === currentNodeId,
         );
         const sourceStateSets = relevantPredecessors.map((predecessorId) => {
@@ -340,10 +419,21 @@ function resolveWindowStateAvailability(
           }
           return after.get(predecessorId) ?? new Set<string>();
         });
-        nextBefore =
+        const localBefore =
           sourceStateSets.length === 0
             ? new Set<string>()
             : intersectStateSets(sourceStateSets);
+        const stableExternalBefore = unionStateSets(
+          allPredecessors
+            .filter(
+              (predecessorId) =>
+                !windowNodeIds.has(predecessorId) &&
+                predecessorId !== currentNodeId &&
+                !conditionalDescendantNodeIds.has(predecessorId),
+            )
+            .map((predecessorId) => graphAvailabilityAfter.get(predecessorId) ?? new Set<string>()),
+        );
+        nextBefore = unionStateSets([localBefore, stableExternalBefore]);
       }
       const nextAfter = applyNodeWrites(document, nodeId, nextBefore);
 

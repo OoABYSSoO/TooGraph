@@ -195,6 +195,7 @@ test("buildHumanReviewPanelModel does not block continue when required fields al
       manual_feedback: "Tighten the product wording.",
       pass_only_note: "Proceed with the approved branch.",
       retry_only_note: "Revise using the retry branch.",
+      approval_note: "Ship the approved follow-up.",
     },
   };
 
@@ -239,7 +240,12 @@ test("buildHumanReviewPanelModel ignores required reads on downstream output nod
         ui: { position: { x: 0, y: 0 } },
         reads: [{ state: "output_note", required: true }],
         writes: [],
-        config: { value: "" },
+        config: {
+          displayMode: "auto",
+          persistEnabled: false,
+          persistFormat: "auto",
+          fileNameTemplate: "",
+        },
       },
     },
     edges: [{ source: "input_question", target: "output_writer" }],
@@ -383,14 +389,13 @@ function createBranchingRun(): RunDetail {
   };
 }
 
-test("buildHumanReviewPanelModel includes condition reads and stops before the next breakpoint", () => {
+test("buildHumanReviewPanelModel includes condition reads through the next interrupt-after breakpoint node", () => {
   const panel = buildHumanReviewPanelModel(createBranchingRun(), createBranchingDocument());
 
   assert.deepEqual(
-    panel.requiredNow.map((row) => row.key).sort(),
-    ["manual_feedback", "pass_only_note", "retry_only_note", "score"].sort(),
+    panel.requiredNow.map((row) => row.key),
+    ["score", "manual_feedback", "pass_only_note", "retry_only_note", "approval_note"],
   );
-  assert.equal(panel.requiredNow.some((row) => row.key === "approval_note"), false);
 });
 
 test("buildHumanReviewPanelModel treats a state written on every branch as non-required", () => {
@@ -528,6 +533,155 @@ function createLoopWithoutWriterRun(): RunDetail {
   };
 }
 
+function createSharedUsagePriorityDocument(): GraphPayload {
+  return {
+    graph_id: null,
+    name: "Shared Usage Priority",
+    state_schema: {
+      alpha_single: {
+        name: "alpha_single",
+        description: "Consumed once",
+        type: "text",
+        value: "",
+        color: "#2563eb",
+      },
+      zeta_shared: {
+        name: "zeta_shared",
+        description: "Consumed twice",
+        type: "text",
+        value: "",
+        color: "#7c3aed",
+      },
+    },
+    nodes: {
+      review_entry: {
+        kind: "agent",
+        name: "review_entry",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [],
+        config: { skills: [], taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+      },
+      consumer_one: {
+        kind: "agent",
+        name: "consumer_one",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [
+          { state: "alpha_single", required: true },
+          { state: "zeta_shared", required: true },
+        ],
+        writes: [],
+        config: { skills: [], taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+      },
+      consumer_two: {
+        kind: "agent",
+        name: "consumer_two",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [{ state: "zeta_shared", required: true }],
+        writes: [],
+        config: { skills: [], taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+      },
+    },
+    edges: [
+      { source: "review_entry", target: "consumer_one" },
+      { source: "consumer_one", target: "consumer_two" },
+    ],
+    conditional_edges: [],
+    metadata: {
+      interrupt_after: ["review_entry"],
+    },
+  };
+}
+
+function createSharedUsagePriorityRun(): RunDetail {
+  return {
+    ...createRun(),
+    current_node_id: "review_entry",
+    node_status_map: { review_entry: "paused" },
+    artifacts: {
+      state_values: {},
+    },
+  };
+}
+
+function createOffWindowJoinDocument(): GraphPayload {
+  return {
+    graph_id: null,
+    name: "Off Window Join",
+    state_schema: {
+      auto_note: {
+        name: "auto_note",
+        description: "Written by a sibling machine node before the join",
+        type: "text",
+        value: "",
+        color: "#0f766e",
+      },
+    },
+    nodes: {
+      start: {
+        kind: "input",
+        name: "start",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [],
+        config: { value: "" },
+      },
+      current_breakpoint: {
+        kind: "agent",
+        name: "current_breakpoint",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [],
+        config: { skills: [], taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+      },
+      side_writer: {
+        kind: "agent",
+        name: "side_writer",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [{ state: "auto_note", mode: "replace" }],
+        config: { skills: [], taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+      },
+      join: {
+        kind: "agent",
+        name: "join",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [{ state: "auto_note", required: true }],
+        writes: [],
+        config: { skills: [], taskInstruction: "", modelSource: "global", model: "", thinkingMode: "on", temperature: 0.2 },
+      },
+    },
+    edges: [
+      { source: "start", target: "current_breakpoint" },
+      { source: "start", target: "side_writer" },
+      { source: "current_breakpoint", target: "join" },
+      { source: "side_writer", target: "join" },
+    ],
+    conditional_edges: [],
+    metadata: {
+      interrupt_after: ["current_breakpoint"],
+    },
+  };
+}
+
+function createOffWindowJoinRun(): RunDetail {
+  return {
+    ...createRun(),
+    current_node_id: "current_breakpoint",
+    node_status_map: { current_breakpoint: "paused" },
+    artifacts: {
+      state_values: {},
+    },
+  };
+}
+
 test("buildHumanReviewPanelModel keeps input-backed current reads out of requiredNow before the breakpoint window", () => {
   const panel = buildHumanReviewPanelModel(createInterruptBeforeRun(), createInterruptBeforeDocument());
 
@@ -545,4 +699,19 @@ test("buildHumanReviewPanelModel keeps loop reads required when a cycle has no s
     panel.requiredNow.map((row) => row.key),
     ["loop_note"],
   );
+});
+
+test("buildHumanReviewPanelModel prioritizes shared required states when first consumed together", () => {
+  const panel = buildHumanReviewPanelModel(createSharedUsagePriorityRun(), createSharedUsagePriorityDocument());
+
+  assert.deepEqual(
+    panel.requiredNow.map((row) => row.key),
+    ["zeta_shared", "alpha_single"],
+  );
+});
+
+test("buildHumanReviewPanelModel keeps off-window sibling writes available at a downstream join", () => {
+  const panel = buildHumanReviewPanelModel(createOffWindowJoinRun(), createOffWindowJoinDocument());
+
+  assert.equal(panel.requiredNow.some((row) => row.key === "auto_note"), false);
 });
