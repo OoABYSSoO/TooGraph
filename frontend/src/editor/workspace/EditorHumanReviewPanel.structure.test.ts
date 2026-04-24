@@ -58,5 +58,5 @@ test("EditorHumanReviewPanel renders an action-first breakpoint task panel", () 
 test("EditorHumanReviewPanel keeps the continue guard message near the action bar", () => {
   assert.match(componentSource, /const resumeGuardMessage = ref<string \| null>\(null\);/);
   assert.match(componentSource, /class="editor-human-review-panel__guard"/);
-  assert.match(componentSource, /还有 \$\{panelModel\.value\.requiredCount\} 项需要填写/);
+  assert.match(componentSource, /还有 \$\{remainingEmptyRequiredDraftCount\.value\} 项需要填写/);
 });

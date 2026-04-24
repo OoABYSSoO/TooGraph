@@ -149,10 +149,13 @@ const pauseContextKey = computed(() => {
   const resumeCount = String(props.run?.lifecycle?.resume_count ?? "no-resume-count");
   return `${runId}::${nodeId}::${checkpointId}::${pausedAt}::${threadId}::${checkpointNamespace}::${resumeCount}`;
 });
+const remainingEmptyRequiredDraftCount = computed(
+  () => panelModel.value.requiredNow.filter((row) => draftFor(row.key).trim().length === 0).length,
+);
 const firstBlockingDraftKey = computed(
   () => panelModel.value.requiredNow.find((row) => draftFor(row.key).trim().length === 0)?.key ?? null,
 );
-const hasBlockingRequiredDraft = computed(() => firstBlockingDraftKey.value !== null);
+const hasBlockingRequiredDraft = computed(() => remainingEmptyRequiredDraftCount.value > 0);
 
 watch(
   [pauseContextKey, () => panelModel.value.allRows] as const,
@@ -204,7 +207,7 @@ async function focusFirstBlockingField() {
 
 function handleResumeClick() {
   if (hasBlockingRequiredDraft.value) {
-    resumeGuardMessage.value = `还有 ${panelModel.value.requiredCount} 项需要填写`;
+    resumeGuardMessage.value = `还有 ${remainingEmptyRequiredDraftCount.value} 项需要填写`;
     void focusFirstBlockingField();
     return;
   }
