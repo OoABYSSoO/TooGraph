@@ -134,21 +134,39 @@ const emit = defineEmits<{
 const draftsByKey = ref<Record<string, string>>({});
 const otherRowsExpanded = ref(false);
 const resumeGuardMessage = ref<string | null>(null);
+const lastPauseContextKey = ref<string | null>(null);
 const requiredFieldRefs = new Map<string, HTMLTextAreaElement>();
 
 const panelModel = computed(() => buildHumanReviewPanelModel(props.run ?? null, props.document));
 const currentFocusNodeId = computed(() => props.run?.current_node_id ?? props.focusedNodeId ?? null);
+const pauseContextKey = computed(() => {
+  const runId = props.run?.run_id ?? "no-run";
+  const nodeId = props.run?.current_node_id ?? props.focusedNodeId ?? "no-node";
+  const checkpointId =
+    props.run?.checkpoint_metadata?.checkpoint_id ??
+    props.run?.lifecycle?.updated_at ??
+    props.run?.status ??
+    "no-checkpoint";
+  return `${runId}::${nodeId}::${checkpointId}`;
+});
 const firstBlockingDraftKey = computed(
   () => panelModel.value.requiredNow.find((row) => draftFor(row.key).trim().length === 0)?.key ?? null,
 );
 const hasBlockingRequiredDraft = computed(() => firstBlockingDraftKey.value !== null);
 
 watch(
-  () => panelModel.value.allRows,
-  (rows) => {
+  [pauseContextKey, () => panelModel.value.allRows] as const,
+  ([contextKey, rows]) => {
+    const contextChanged = lastPauseContextKey.value !== contextKey;
+    const previousDrafts = draftsByKey.value;
     draftsByKey.value = Object.fromEntries(
-      rows.map((row) => [row.key, draftsByKey.value[row.key] ?? row.draft]),
+      rows.map((row) => [row.key, contextChanged ? row.draft : previousDrafts[row.key] ?? row.draft]),
     );
+    if (contextChanged) {
+      resumeGuardMessage.value = null;
+      otherRowsExpanded.value = false;
+      lastPauseContextKey.value = contextKey;
+    }
   },
   { immediate: true },
 );
