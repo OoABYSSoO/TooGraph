@@ -1,77 +1,120 @@
 <template>
   <aside class="editor-human-review-panel">
-      <header class="editor-human-review-panel__header">
-        <div>
-          <div class="editor-human-review-panel__eyebrow">Human Review</div>
-          <h2 class="editor-human-review-panel__title">Paused Run</h2>
-          <p class="editor-human-review-panel__body">
-            Review the checkpoint state, adjust values, then continue the run.
-          </p>
-        </div>
-        <button type="button" class="editor-human-review-panel__collapse" aria-label="Collapse human review panel" @click="$emit('toggle')">
-          <ElIcon aria-hidden="true"><ArrowRight /></ElIcon>
+    <div class="editor-human-review-panel__surface">
+      <header class="editor-human-review-panel__action-bar">
+        <button
+          type="button"
+          class="editor-human-review-panel__resume"
+          :disabled="busy || !run || run.status !== 'awaiting_human'"
+          @click="handleResumeClick"
+        >
+          {{ busy ? "Continuing..." : "Continue Run" }}
         </button>
+        <div class="editor-human-review-panel__action-tools">
+          <button
+            v-if="currentFocusNodeId"
+            type="button"
+            class="editor-human-review-panel__focus"
+            @click="$emit('focus-node', currentFocusNodeId)"
+          >
+            聚焦
+          </button>
+          <button
+            type="button"
+            class="editor-human-review-panel__collapse"
+            aria-label="Collapse human review panel"
+            @click="$emit('toggle')"
+          >
+            <ElIcon aria-hidden="true"><ArrowRight /></ElIcon>
+          </button>
+        </div>
       </header>
 
-      <section v-if="run" class="editor-human-review-panel__run-card">
-        <span class="editor-human-review-panel__status">{{ run.status }}</span>
-        <strong>{{ pausedNodeLabel }}</strong>
-        <p>{{ pauseReason }}</p>
-      </section>
+      <p class="editor-human-review-panel__summary">{{ panelModel.summaryText }}</p>
+      <p v-if="resumeGuardMessage" class="editor-human-review-panel__guard">{{ resumeGuardMessage }}</p>
 
-      <div v-if="reviewRows.length === 0" class="editor-human-review-panel__empty">
-        No checkpoint state is available for review yet.
+      <div v-if="panelModel.requiredNow.length === 0" class="editor-human-review-panel__empty">
+        当前断点后没有需要人工补充的输入。
       </div>
 
-      <div v-else class="editor-human-review-panel__content">
+      <section v-else class="editor-human-review-panel__required-section">
         <article
-          v-for="row in reviewRows"
+          v-for="row in panelModel.requiredNow"
           :key="row.key"
-          class="editor-human-review-panel__state-card"
+          class="editor-human-review-panel__state-card editor-human-review-panel__state-card--required"
           :style="{ '--human-review-accent': row.color }"
         >
           <div class="editor-human-review-panel__state-head">
             <span class="editor-human-review-panel__state-dot" aria-hidden="true" />
             <div>
               <div class="editor-human-review-panel__state-label">{{ row.label }}</div>
-              <div class="editor-human-review-panel__state-key">{{ row.key }} · {{ row.type }}</div>
+              <div class="editor-human-review-panel__state-meta">{{ row.key }}</div>
             </div>
+            <span v-if="draftFor(row.key).trim().length === 0" class="editor-human-review-panel__required-badge">
+              待填写
+            </span>
           </div>
           <p v-if="row.description" class="editor-human-review-panel__state-description">{{ row.description }}</p>
           <textarea
+            :ref="(element) => setRequiredFieldRef(row.key, element)"
             class="editor-human-review-panel__textarea"
             rows="4"
             :value="draftFor(row.key)"
             @input="updateDraft(row.key, ($event.target as HTMLTextAreaElement).value)"
           />
         </article>
-      </div>
+      </section>
 
-      <footer class="editor-human-review-panel__footer">
-        <p v-if="error" class="editor-human-review-panel__error">{{ error }}</p>
+      <section class="editor-human-review-panel__other-section">
         <button
           type="button"
-          class="editor-human-review-panel__resume"
-          :disabled="busy || !run || run.status !== 'awaiting_human'"
-          @click="$emit('resume', buildResumePayload())"
+          class="editor-human-review-panel__other-toggle"
+          :disabled="panelModel.otherRows.length === 0"
+          @click="otherRowsExpanded = !otherRowsExpanded"
         >
-          {{ busy ? "Continuing..." : "Continue Run" }}
+          其他 state ({{ panelModel.otherRows.length }})
         </button>
-      </footer>
+        <div v-if="otherRowsExpanded && panelModel.otherRows.length > 0" class="editor-human-review-panel__other-list">
+          <article
+            v-for="row in panelModel.otherRows"
+            :key="row.key"
+            class="editor-human-review-panel__state-card"
+            :style="{ '--human-review-accent': row.color }"
+          >
+            <div class="editor-human-review-panel__state-head">
+              <span class="editor-human-review-panel__state-dot" aria-hidden="true" />
+              <div>
+                <div class="editor-human-review-panel__state-label">{{ row.label }}</div>
+                <div class="editor-human-review-panel__state-meta">{{ row.key }}</div>
+              </div>
+            </div>
+            <p v-if="row.description" class="editor-human-review-panel__state-description">{{ row.description }}</p>
+            <textarea
+              class="editor-human-review-panel__textarea"
+              rows="4"
+              :value="draftFor(row.key)"
+              @input="updateDraft(row.key, ($event.target as HTMLTextAreaElement).value)"
+            />
+          </article>
+        </div>
+      </section>
+
+      <p v-if="error" class="editor-human-review-panel__error">{{ error }}</p>
+    </div>
   </aside>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
-import { ElIcon } from "element-plus";
 import { ArrowRight } from "@element-plus/icons-vue";
+import { ElIcon } from "element-plus";
+import { computed, nextTick, ref, watch, type ComponentPublicInstance } from "vue";
 
 import type { GraphDocument, GraphPayload } from "@/types/node-system";
 import type { RunDetail } from "@/types/run";
 
 import {
+  buildHumanReviewPanelModel,
   buildHumanReviewResumePayload,
-  buildHumanReviewRows,
 } from "./humanReviewPanelModel.ts";
 
 const props = defineProps<{
@@ -82,27 +125,26 @@ const props = defineProps<{
   error?: string | null;
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
   (event: "toggle"): void;
   (event: "focus-node", nodeId: string): void;
   (event: "resume", payload: Record<string, unknown>): void;
 }>();
 
 const draftsByKey = ref<Record<string, string>>({});
-const reviewRows = computed(() => buildHumanReviewRows(props.run ?? null, props.document));
-const pausedNodeLabel = computed(() => {
-  const nodeId = props.run?.current_node_id ?? props.focusedNodeId ?? "";
-  if (!nodeId) {
-    return "No paused node";
-  }
-  return props.document.nodes[nodeId]?.name?.trim() || nodeId;
-});
-const pauseReason = computed(() => props.run?.lifecycle.pause_reason || "Waiting for human review.");
+const otherRowsExpanded = ref(false);
+const resumeGuardMessage = ref<string | null>(null);
+const requiredFieldRefs = new Map<string, HTMLTextAreaElement>();
+
+const panelModel = computed(() => buildHumanReviewPanelModel(props.run ?? null, props.document));
+const currentFocusNodeId = computed(() => props.run?.current_node_id ?? props.focusedNodeId ?? null);
 
 watch(
-  reviewRows,
+  () => panelModel.value.allRows,
   (rows) => {
-    draftsByKey.value = Object.fromEntries(rows.map((row) => [row.key, row.draft]));
+    draftsByKey.value = Object.fromEntries(
+      rows.map((row) => [row.key, draftsByKey.value[row.key] ?? row.draft]),
+    );
   },
   { immediate: true },
 );
@@ -112,63 +154,138 @@ function draftFor(stateKey: string) {
 }
 
 function updateDraft(stateKey: string, value: string) {
+  resumeGuardMessage.value = null;
   draftsByKey.value = {
     ...draftsByKey.value,
     [stateKey]: value,
   };
 }
 
-function buildResumePayload() {
-  return buildHumanReviewResumePayload(reviewRows.value, draftsByKey.value);
+function setRequiredFieldRef(stateKey: string, element: Element | ComponentPublicInstance | null) {
+  if (element instanceof HTMLTextAreaElement) {
+    requiredFieldRefs.set(stateKey, element);
+    return;
+  }
+  requiredFieldRefs.delete(stateKey);
+}
+
+async function focusFirstBlockingField() {
+  const blockingKey = panelModel.value.firstBlockingRequiredKey;
+  if (!blockingKey) {
+    return;
+  }
+  await nextTick();
+  const field = requiredFieldRefs.get(blockingKey);
+  field?.scrollIntoView({ block: "center", behavior: "smooth" });
+  field?.focus();
+}
+
+function handleResumeClick() {
+  if (panelModel.value.hasBlockingEmptyRequiredField) {
+    resumeGuardMessage.value = `还有 ${panelModel.value.requiredCount} 项需要填写`;
+    void focusFirstBlockingField();
+    return;
+  }
+  resumeGuardMessage.value = null;
+  emit("resume", buildHumanReviewResumePayload(panelModel.value.allRows, draftsByKey.value));
 }
 </script>
 
 <style scoped>
 .editor-human-review-panel {
-  min-width: 0;
-  height: 100%;
-}
-
-.editor-human-review-panel__header,
-.editor-human-review-panel__run-card,
-.editor-human-review-panel__state-card {
-  border: 1px solid rgba(154, 52, 18, 0.14);
-  border-radius: 22px;
-  background: rgba(255, 250, 241, 0.82);
-}
-
-.editor-human-review-panel__header {
   display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  padding: 12px;
+  background: transparent;
+}
+
+.editor-human-review-panel__surface {
+  box-sizing: border-box;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  gap: 12px;
+  overflow: auto;
+  padding: 14px;
+  border: 1px solid rgba(154, 52, 18, 0.14);
+  border-radius: 28px;
+  background: rgba(255, 252, 247, 0.98);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.editor-human-review-panel__action-bar {
+  display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 14px;
 }
 
-.editor-human-review-panel__eyebrow,
-.editor-human-review-panel__status,
-.editor-human-review-panel__state-key {
-  color: #9a3412;
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
+.editor-human-review-panel__action-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.editor-human-review-panel__title {
-  margin: 4px 0;
-  color: #1f2933;
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 1.15rem;
-}
-
-.editor-human-review-panel__body,
-.editor-human-review-panel__run-card p,
-.editor-human-review-panel__state-description,
-.editor-human-review-panel__empty {
+.editor-human-review-panel__summary,
+.editor-human-review-panel__guard {
   margin: 0;
-  color: rgba(74, 60, 45, 0.74);
-  font-size: 0.86rem;
+  padding: 0 4px;
+  font-size: 0.84rem;
   line-height: 1.45;
+  color: rgba(74, 60, 45, 0.78);
+}
+
+.editor-human-review-panel__guard {
+  color: #b45309;
+}
+
+.editor-human-review-panel__required-section,
+.editor-human-review-panel__other-list {
+  display: grid;
+  gap: 10px;
+}
+
+.editor-human-review-panel__other-section {
+  display: grid;
+  gap: 8px;
+}
+
+.editor-human-review-panel__resume {
+  min-height: 38px;
+  border: 1px solid rgba(217, 119, 6, 0.28);
+  border-radius: 999px;
+  background: #d97706;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 800;
+  padding: 0 16px;
+}
+
+.editor-human-review-panel__resume:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.editor-human-review-panel__other-toggle,
+.editor-human-review-panel__focus {
+  min-height: 32px;
+  border: 1px solid rgba(154, 52, 18, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 252, 247, 0.92);
+  color: rgba(120, 53, 15, 0.88);
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+.editor-human-review-panel__other-toggle:disabled {
+  cursor: default;
+  opacity: 0.56;
 }
 
 .editor-human-review-panel__collapse {
@@ -181,20 +298,16 @@ function buildResumePayload() {
   cursor: pointer;
 }
 
-.editor-human-review-panel__run-card {
-  margin-top: 10px;
-  padding: 12px 14px;
-}
-
-.editor-human-review-panel__content {
-  display: grid;
-  gap: 10px;
-  margin-top: 10px;
-  overflow: auto;
-}
-
 .editor-human-review-panel__state-card {
+  border: 1px solid rgba(154, 52, 18, 0.14);
+  border-radius: 22px;
+  background: rgba(255, 250, 241, 0.82);
   padding: 12px;
+}
+
+.editor-human-review-panel__state-card--required {
+  border-color: rgba(217, 119, 6, 0.22);
+  background: rgba(255, 250, 241, 0.94);
 }
 
 .editor-human-review-panel__state-head {
@@ -206,6 +319,7 @@ function buildResumePayload() {
 .editor-human-review-panel__state-dot {
   width: 10px;
   height: 10px;
+  flex: none;
   border-radius: 999px;
   background: var(--human-review-accent, #d97706);
 }
@@ -213,6 +327,34 @@ function buildResumePayload() {
 .editor-human-review-panel__state-label {
   color: #1f2933;
   font-weight: 800;
+}
+
+.editor-human-review-panel__state-meta {
+  color: rgba(154, 52, 18, 0.7);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.editor-human-review-panel__required-badge {
+  margin-left: auto;
+  border-radius: 999px;
+  border: 1px solid rgba(217, 119, 6, 0.18);
+  background: rgba(255, 247, 237, 0.92);
+  color: rgba(154, 52, 18, 0.9);
+  padding: 2px 8px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.editor-human-review-panel__state-description,
+.editor-human-review-panel__empty {
+  margin: 0;
+  color: rgba(74, 60, 45, 0.74);
+  font-size: 0.86rem;
+  line-height: 1.45;
 }
 
 .editor-human-review-panel__state-description {
@@ -234,33 +376,12 @@ function buildResumePayload() {
 }
 
 .editor-human-review-panel__empty {
-  margin-top: 10px;
-  padding: 14px;
-}
-
-.editor-human-review-panel__footer {
-  display: grid;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.editor-human-review-panel__resume {
-  border: 1px solid rgba(217, 119, 6, 0.28);
-  border-radius: 999px;
-  background: #d97706;
-  color: #fff;
-  cursor: pointer;
-  font-weight: 800;
-  padding: 11px 16px;
-}
-
-.editor-human-review-panel__resume:disabled {
-  cursor: wait;
-  opacity: 0.72;
+  padding: 0 4px;
 }
 
 .editor-human-review-panel__error {
   margin: 0;
+  padding: 0 4px;
   color: #b91c1c;
   font-size: 0.82rem;
 }
