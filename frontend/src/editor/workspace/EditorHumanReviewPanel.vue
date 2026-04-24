@@ -138,6 +138,10 @@ const requiredFieldRefs = new Map<string, HTMLTextAreaElement>();
 
 const panelModel = computed(() => buildHumanReviewPanelModel(props.run ?? null, props.document));
 const currentFocusNodeId = computed(() => props.run?.current_node_id ?? props.focusedNodeId ?? null);
+const firstBlockingDraftKey = computed(
+  () => panelModel.value.requiredNow.find((row) => draftFor(row.key).trim().length === 0)?.key ?? null,
+);
+const hasBlockingRequiredDraft = computed(() => firstBlockingDraftKey.value !== null);
 
 watch(
   () => panelModel.value.allRows,
@@ -170,7 +174,7 @@ function setRequiredFieldRef(stateKey: string, element: Element | ComponentPubli
 }
 
 async function focusFirstBlockingField() {
-  const blockingKey = panelModel.value.firstBlockingRequiredKey;
+  const blockingKey = firstBlockingDraftKey.value;
   if (!blockingKey) {
     return;
   }
@@ -181,7 +185,7 @@ async function focusFirstBlockingField() {
 }
 
 function handleResumeClick() {
-  if (panelModel.value.hasBlockingEmptyRequiredField) {
+  if (hasBlockingRequiredDraft.value) {
     resumeGuardMessage.value = `还有 ${panelModel.value.requiredCount} 项需要填写`;
     void focusFirstBlockingField();
     return;
