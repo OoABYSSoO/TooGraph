@@ -14,7 +14,7 @@ export type BuddyMascotMotionDebugConfig = {
 };
 
 export const DEFAULT_BUDDY_MASCOT_MOTION_DEBUG_CONFIG: BuddyMascotMotionDebugConfig = {
-  moveDurationMs: 420,
+  moveDurationMs: 360,
   stepPauseMs: 8,
 };
 

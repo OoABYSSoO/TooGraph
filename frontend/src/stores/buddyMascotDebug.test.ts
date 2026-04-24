@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { createPinia, setActivePinia } from "pinia";
 
+import { BUDDY_DEBUG_ACTION_GROUPS } from "../buddy/buddyMascotDebug.ts";
 import { useBuddyMascotDebugStore } from "./buddyMascotDebug.ts";
 
 test("buddy mascot debug store records requested actions as ordered events", () => {
@@ -35,7 +36,7 @@ test("buddy mascot debug store exposes live motion timing controls", () => {
   const store = useBuddyMascotDebugStore();
 
   assert.deepEqual(store.motionConfig, {
-    moveDurationMs: 420,
+    moveDurationMs: 360,
     stepPauseMs: 8,
   });
 
@@ -53,7 +54,16 @@ test("buddy mascot debug store exposes live motion timing controls", () => {
 
   store.resetMotionConfig();
   assert.deepEqual(store.motionConfig, {
-    moveDurationMs: 420,
+    moveDurationMs: 360,
     stepPauseMs: 8,
   });
+});
+
+test("buddy mascot debug actions expose each idle animation trigger", () => {
+  const actions = new Set(BUDDY_DEBUG_ACTION_GROUPS.flatMap((group) => group.actions.map((action) => action.action)));
+
+  assert.equal(actions.has("idle-tail-switch"), true);
+  assert.equal(actions.has("idle-random-move"), true);
+  assert.equal(actions.has("idle-virtual-cursor-orbit"), true);
+  assert.equal(actions.has("idle-virtual-cursor-chase"), true);
 });

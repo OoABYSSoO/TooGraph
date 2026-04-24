@@ -7,6 +7,10 @@ export type BuddyMascotDebugAction =
   | "dragging"
   | "hop"
   | "roam"
+  | "idle-tail-switch"
+  | "idle-random-move"
+  | "idle-virtual-cursor-orbit"
+  | "idle-virtual-cursor-chase"
   | "face-left"
   | "face-front"
   | "face-right";
@@ -36,6 +40,10 @@ export const BUDDY_DEBUG_ACTION_GROUPS: BuddyMascotDebugActionGroup[] = [
       { label: "Drag", action: "dragging" },
       { label: "Hop", action: "hop" },
       { label: "Roam", action: "roam" },
+      { label: "Tail Switch", action: "idle-tail-switch" },
+      { label: "Random Move", action: "idle-random-move" },
+      { label: "Cursor Orbit", action: "idle-virtual-cursor-orbit" },
+      { label: "Cursor Chase", action: "idle-virtual-cursor-chase" },
     ],
   },
   {
