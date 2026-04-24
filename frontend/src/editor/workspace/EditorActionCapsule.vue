@@ -141,6 +141,12 @@ defineEmits<{
   background: rgba(255, 246, 237, 0.98);
 }
 
+.editor-action-capsule__state-pill--active:hover {
+  border-color: rgba(154, 52, 18, 0.44);
+  background: rgba(255, 238, 222, 0.98);
+  color: rgba(126, 46, 11, 0.98);
+}
+
 .editor-action-capsule__run:hover {
   border-color: rgba(131, 43, 13, 0.96);
   background: rgba(131, 43, 13, 0.96);

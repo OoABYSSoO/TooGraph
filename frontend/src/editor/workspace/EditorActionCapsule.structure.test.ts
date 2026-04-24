@@ -41,13 +41,32 @@ test("EditorActionCapsule renders non-primary graph actions as icon buttons with
 });
 
 test("EditorActionCapsule styles the state pill state and interactive controls", () => {
-  assert.match(componentSource, /\.editor-action-capsule__state-pill--active\s*\{/);
-  assert.match(componentSource, /\.editor-action-capsule__state-count\s*\{/);
-  assert.match(componentSource, /\.editor-action-capsule__icon-button:hover\s*\{/);
-  assert.match(componentSource, /\.editor-action-capsule__state-pill:hover\s*\{/);
-  assert.match(componentSource, /\.editor-action-capsule__run:hover\s*\{/);
   assert.match(
     componentSource,
-    /\.editor-action-capsule__icon-button:focus-visible,\s*\.editor-action-capsule__state-pill:focus-visible,\s*\.editor-action-capsule__run:focus-visible\s*\{/,
+    /\.editor-action-capsule__state-pill--active\s*\{[\s\S]*border-color:\s*rgba\(154,\s*52,\s*18,\s*0\.44\);[\s\S]*background:\s*rgba\(255,\s*238,\s*222,\s*0\.98\);[\s\S]*color:\s*rgba\(126,\s*46,\s*11,\s*0\.98\);[\s\S]*\}/,
+  );
+  assert.match(
+    componentSource,
+    /\.editor-action-capsule__state-count\s*\{[\s\S]*display:\s*inline-flex;[\s\S]*min-width:\s*22px;[\s\S]*border-radius:\s*999px;[\s\S]*font-weight:\s*700;[\s\S]*\}/,
+  );
+  assert.match(
+    componentSource,
+    /\.editor-action-capsule__icon-button:hover\s*\{[\s\S]*border-color:\s*rgba\(193,\s*151,\s*106,\s*0\.34\);[\s\S]*background:\s*rgba\(255,\s*245,\s*232,\s*0\.96\);[\s\S]*\}/,
+  );
+  assert.match(
+    componentSource,
+    /\.editor-action-capsule__state-pill:hover\s*\{[\s\S]*border-color:\s*rgba\(154,\s*52,\s*18,\s*0\.28\);[\s\S]*background:\s*rgba\(255,\s*246,\s*237,\s*0\.98\);[\s\S]*\}/,
+  );
+  assert.match(
+    componentSource,
+    /\.editor-action-capsule__run:hover\s*\{[\s\S]*border-color:\s*rgba\(131,\s*43,\s*13,\s*0\.96\);[\s\S]*background:\s*rgba\(131,\s*43,\s*13,\s*0\.96\);[\s\S]*transform:\s*translateY\(-1px\);[\s\S]*\}/,
+  );
+  assert.match(
+    componentSource,
+    /\.editor-action-capsule__icon-button:focus-visible,\s*\.editor-action-capsule__state-pill:focus-visible,\s*\.editor-action-capsule__run:focus-visible\s*\{[\s\S]*outline:\s*none;[\s\S]*box-shadow:\s*0 0 0 3px rgba\(210,\s*162,\s*117,\s*0\.3\);[\s\S]*\}/,
+  );
+  assert.match(
+    componentSource,
+    /\.editor-action-capsule__state-pill--active:hover\s*\{[\s\S]*border-color:\s*rgba\(154,\s*52,\s*18,\s*0\.44\);[\s\S]*background:\s*rgba\(255,\s*238,\s*222,\s*0\.98\);[\s\S]*color:\s*rgba\(126,\s*46,\s*11,\s*0\.98\);[\s\S]*\}/,
   );
 });
