@@ -185,6 +185,33 @@ test("buildHumanReviewPanelModel promotes downstream missing inputs into require
   assert.equal(panel.firstBlockingRequiredKey, "manual_feedback");
 });
 
+test("buildHumanReviewPanelModel does not block continue when required fields already have values", () => {
+  const run = createBranchingRun();
+  run.artifacts = {
+    state_values: {
+      question: "What is GraphiteUI?",
+      draft: "GraphiteUI is a visual graph editor.",
+      score: 0.8,
+      manual_feedback: "Tighten the product wording.",
+    },
+  };
+
+  const panel = buildHumanReviewPanelModel(run, createBranchingDocument());
+
+  assert.equal(panel.hasBlockingEmptyRequiredField, false);
+  assert.equal(panel.firstBlockingRequiredKey, null);
+});
+
+test("buildHumanReviewPanelModel returns the no-input summary when nothing is required", () => {
+  const document = createDocument();
+  document.nodes.revision_writer.reads = [{ state: "draft", required: true }];
+
+  const panel = buildHumanReviewPanelModel(createRun(), document);
+
+  assert.equal(panel.requiredCount, 0);
+  assert.equal(panel.summaryText, "当前断点后没有需要人工补充的输入");
+});
+
 function createBranchingDocument(): GraphPayload {
   return {
     graph_id: null,

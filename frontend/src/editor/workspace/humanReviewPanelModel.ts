@@ -88,11 +88,17 @@ export function buildHumanReviewPanelModel(
   );
   const requiredCandidates: Array<{ stateKey: string }> = [];
   const requiredKeys = new Set<string>();
+  const blockingWriterKindsByState = new Map<string, Set<string>>();
 
   for (const nodeId of windowNodeIds) {
     const node = document.nodes[nodeId];
-    if (!node || (node.kind !== "agent" && node.kind !== "condition")) {
+    if (!node) {
       continue;
+    }
+    for (const binding of node.writes) {
+      const writerKinds = blockingWriterKindsByState.get(binding.state) ?? new Set<string>();
+      writerKinds.add(node.kind);
+      blockingWriterKindsByState.set(binding.state, writerKinds);
     }
     for (const binding of node.reads) {
       if (binding.required === false) {
@@ -133,7 +139,9 @@ export function buildHumanReviewPanelModel(
 
   const requiredNow = allRows.filter((row) => requiredKeys.has(row.key));
   const otherRows = allRows.filter((row) => !requiredKeys.has(row.key));
-  const firstBlockingRequiredKey = requiredNow.find(rowDraftIsEmpty)?.key ?? null;
+  const firstBlockingRequiredKey =
+    requiredNow.find((row) => draftValueIsBlocking(row) && requiredRowIsBlocking(row, blockingWriterKindsByState))?.key ??
+    null;
 
   return {
     requiredNow,
@@ -142,10 +150,7 @@ export function buildHumanReviewPanelModel(
     requiredCount: requiredNow.length,
     hasBlockingEmptyRequiredField: firstBlockingRequiredKey !== null,
     firstBlockingRequiredKey,
-    summaryText:
-      requiredNow.length === 0
-        ? "当前断点后没有需要人工补充的输入"
-        : `到下一个断点前，需人工填写 ${requiredNow.length} 项输入`,
+    summaryText: resolveSummaryText(requiredNow.length),
   };
 }
 
@@ -361,8 +366,22 @@ function resolveWindowStateAvailability(
   return before;
 }
 
-function rowDraftIsEmpty(row: HumanReviewRow) {
+function draftValueIsBlocking(row: HumanReviewRow) {
   return row.draft.trim().length === 0;
+}
+
+function requiredRowIsBlocking(row: HumanReviewRow, blockingWriterKindsByState: Map<string, Set<string>>) {
+  const writerKinds = blockingWriterKindsByState.get(row.key);
+  if (!writerKinds || writerKinds.size === 0) {
+    return true;
+  }
+  return writerKinds.has("input");
+}
+
+function resolveSummaryText(requiredCount: number) {
+  return requiredCount === 0
+    ? "当前断点后没有需要人工补充的输入"
+    : `到下一个断点前，需人工填写 ${requiredCount} 项输入`;
 }
 
 export function buildHumanReviewResumePayload(rows: HumanReviewRow[], draftsByKey: Record<string, string>) {
