@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDirectory = dirname(currentFilePath);
 const componentSource = readFileSync(resolve(currentDirectory, "EditorTabLauncherPanel.vue"), "utf8");
+const entryButtonMatches = componentSource.match(/class="editor-tab-launcher-panel__entry"/g) ?? [];
 const entryTitleMatches = componentSource.match(/class="editor-tab-launcher-panel__entry-title">/g) ?? [];
 
 test("EditorTabLauncherPanel offers blank, template, and existing-graph entry points behind the plus launcher", () => {
@@ -15,6 +16,7 @@ test("EditorTabLauncherPanel offers blank, template, and existing-graph entry po
   assert.match(componentSource, /@click="\$emit\('create-new'\)"/);
   assert.match(componentSource, /@click="toggleSection\('template'\)"/);
   assert.match(componentSource, /@click="toggleSection\('graph'\)"/);
+  assert.equal(entryButtonMatches.length, 3);
   assert.equal(entryTitleMatches.length, 3);
   assert.match(componentSource, /class="editor-tab-launcher-panel__entry-title">新建空白图</);
   assert.match(componentSource, /class="editor-tab-launcher-panel__entry-title">从模板新建</);
