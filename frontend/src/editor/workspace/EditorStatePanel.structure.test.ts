@@ -10,11 +10,18 @@ const componentSource = readFileSync(resolve(currentDirectory, "EditorStatePanel
 
 test("EditorStatePanel presents the right sidebar as a compact inspector", () => {
   assert.doesNotMatch(componentSource, /editor-state-panel__collapsed/);
+  assert.match(componentSource, /class="editor-state-panel__surface"/);
   assert.match(componentSource, /editor-state-panel__inspector-header/);
   assert.match(componentSource, /Graph Inspector/);
   assert.match(componentSource, /editor-state-panel__header-count/);
   assert.match(componentSource, /editor-state-panel__quick-action/);
   assert.doesNotMatch(componentSource, /State Panel/);
+  assert.match(componentSource, /\.editor-state-panel \{[\s\S]*padding:\s*12px;/);
+  assert.match(componentSource, /\.editor-state-panel \{[\s\S]*background:\s*transparent;/);
+  assert.match(componentSource, /\.editor-state-panel__surface \{[\s\S]*border:\s*1px solid rgba\(154,\s*52,\s*18,\s*0\.14\);/);
+  assert.match(componentSource, /\.editor-state-panel__surface \{[\s\S]*border-radius:\s*28px;[\s\S]*background:\s*rgba\(255,\s*252,\s*247,\s*0\.98\);/);
+  assert.match(componentSource, /\.editor-state-panel__surface \{[\s\S]*box-shadow:\s*none;/);
+  assert.match(componentSource, /\.editor-state-panel__surface \{[\s\S]*backdrop-filter:\s*none;/);
   assert.match(componentSource, /\.editor-state-panel__inspector-header \{[\s\S]*padding:\s*14px 14px 10px;/);
   assert.match(componentSource, /\.editor-state-panel__quick-action \{[\s\S]*border-radius:\s*999px;/);
 });
@@ -79,7 +86,7 @@ test("EditorStatePanel keeps detailed editing inside a soft inspector card", () 
   assert.match(componentSource, /\.editor-state-panel__field-grid \{[\s\S]*grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(min\(100%,\s*150px\),\s*1fr\)\);/);
   assert.match(componentSource, /\.editor-state-panel__content \{[\s\S]*overflow-x:\s*hidden;/);
   assert.match(componentSource, /\.editor-state-panel__content \{[\s\S]*scrollbar-gutter:\s*stable;/);
-  assert.match(componentSource, /\.editor-state-panel__content \{[\s\S]*padding:\s*0 12px 14px;/);
+  assert.match(componentSource, /\.editor-state-panel__content \{[\s\S]*padding:\s*0 2px 2px;/);
 });
 
 test("EditorStatePanel adds a collapsed run timeline section to each expanded state card", () => {

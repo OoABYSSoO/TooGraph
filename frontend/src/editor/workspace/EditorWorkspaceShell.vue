@@ -61,7 +61,7 @@
           class="editor-workspace-shell__editor"
           :class="{ 'editor-workspace-shell__editor--active': tab.tabId === workspace.activeTabId }"
         >
-          <div class="editor-workspace-shell__editor-grid" :style="editorGridStyle(tab.tabId)">
+          <div class="editor-workspace-shell__editor-grid">
             <div class="editor-workspace-shell__editor-main">
               <div v-if="loadingByTabId[tab.tabId]" class="editor-workspace-shell__status-card">
                 <div class="editor-workspace-shell__status-eyebrow">Graph</div>
@@ -157,34 +157,40 @@
               </div>
             </div>
 
-            <EditorHumanReviewPanel
-              v-if="isStatePanelOpen(tab.tabId) && sidePanelMode(tab.tabId) === 'human-review' && documentsByTabId[tab.tabId]"
-              :document="documentsByTabId[tab.tabId]!"
-              :run="latestRunDetailByTabId[tab.tabId] ?? null"
-              :focused-node-id="focusedNodeIdByTabId[tab.tabId] ?? null"
-              :busy="humanReviewBusyByTabId[tab.tabId] ?? false"
-              :error="humanReviewErrorByTabId[tab.tabId] ?? null"
-              @toggle="toggleStatePanel(tab.tabId)"
-              @focus-node="requestNodeFocusForTab(tab.tabId, $event)"
-              @resume="resumeHumanReviewRun(tab.tabId, $event)"
-            />
+            <div
+              v-if="isStatePanelOpen(tab.tabId) && documentsByTabId[tab.tabId]"
+              class="editor-workspace-shell__side-panel-layer"
+              :style="sidePanelLayerStyle(tab.tabId)"
+            >
+              <EditorHumanReviewPanel
+                v-if="sidePanelMode(tab.tabId) === 'human-review'"
+                :document="documentsByTabId[tab.tabId]!"
+                :run="latestRunDetailByTabId[tab.tabId] ?? null"
+                :focused-node-id="focusedNodeIdByTabId[tab.tabId] ?? null"
+                :busy="humanReviewBusyByTabId[tab.tabId] ?? false"
+                :error="humanReviewErrorByTabId[tab.tabId] ?? null"
+                @toggle="toggleStatePanel(tab.tabId)"
+                @focus-node="requestNodeFocusForTab(tab.tabId, $event)"
+                @resume="resumeHumanReviewRun(tab.tabId, $event)"
+              />
 
-            <EditorStatePanel
-              v-else-if="isStatePanelOpen(tab.tabId) && documentsByTabId[tab.tabId]"
-              :document="documentsByTabId[tab.tabId]!"
-              :run="latestRunDetailByTabId[tab.tabId] ?? null"
-              :focused-node-id="focusedNodeIdByTabId[tab.tabId] ?? null"
-              @toggle="toggleStatePanel(tab.tabId)"
-              @focus-node="requestNodeFocusForTab(tab.tabId, $event)"
-              @add-state="addStateField(tab.tabId)"
-              @delete-state="deleteStateField(tab.tabId, $event)"
-              @rename-state="renameStateField(tab.tabId, $event.currentKey, $event.nextKey)"
-              @update-state="updateStateField(tab.tabId, $event.stateKey, $event.patch)"
-              @add-reader="addStateReaderBinding(tab.tabId, $event.stateKey, $event.nodeId)"
-              @remove-reader="removeStateReaderBinding(tab.tabId, $event.stateKey, $event.nodeId)"
-              @add-writer="addStateWriterBinding(tab.tabId, $event.stateKey, $event.nodeId)"
-              @remove-writer="removeStateWriterBinding(tab.tabId, $event.stateKey, $event.nodeId)"
-            />
+              <EditorStatePanel
+                v-else
+                :document="documentsByTabId[tab.tabId]!"
+                :run="latestRunDetailByTabId[tab.tabId] ?? null"
+                :focused-node-id="focusedNodeIdByTabId[tab.tabId] ?? null"
+                @toggle="toggleStatePanel(tab.tabId)"
+                @focus-node="requestNodeFocusForTab(tab.tabId, $event)"
+                @add-state="addStateField(tab.tabId)"
+                @delete-state="deleteStateField(tab.tabId, $event)"
+                @rename-state="renameStateField(tab.tabId, $event.currentKey, $event.nextKey)"
+                @update-state="updateStateField(tab.tabId, $event.stateKey, $event.patch)"
+                @add-reader="addStateReaderBinding(tab.tabId, $event.stateKey, $event.nodeId)"
+                @remove-reader="removeStateReaderBinding(tab.tabId, $event.stateKey, $event.nodeId)"
+                @add-writer="addStateWriterBinding(tab.tabId, $event.stateKey, $event.nodeId)"
+                @remove-writer="removeStateWriterBinding(tab.tabId, $event.stateKey, $event.nodeId)"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -1055,11 +1061,9 @@ function toggleActiveStatePanel() {
   toggleStatePanel(tabId);
 }
 
-function editorGridStyle(tabId: string) {
+function sidePanelLayerStyle(tabId: string) {
   return {
-    gridTemplateColumns: isStatePanelOpen(tabId)
-      ? `minmax(0, 1fr) ${sidePanelOpenWidth(tabId)}`
-      : "minmax(0, 1fr)",
+    width: sidePanelOpenWidth(tabId),
   };
 }
 
@@ -2221,12 +2225,13 @@ onMounted(() => {
 }
 
 .editor-workspace-shell__editor-grid {
+  position: relative;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   height: 100%;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  transition: grid-template-columns 220ms ease;
 }
 
 .editor-workspace-shell__editor-main {
@@ -2234,6 +2239,23 @@ onMounted(() => {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+}
+
+.editor-workspace-shell__side-panel-layer {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 30;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  max-width: calc(100% - 24px);
+  pointer-events: none;
+}
+
+.editor-workspace-shell__side-panel-layer > :deep(*) {
+  pointer-events: auto;
 }
 
 .editor-workspace-shell__feedback {

@@ -1,41 +1,42 @@
 <template>
   <aside class="editor-state-panel" @pointerdown.capture="handleStatePanelPointerDown">
-    <header class="editor-state-panel__inspector-header">
-      <div>
-        <div class="editor-state-panel__eyebrow">Graph State</div>
-        <h2 class="editor-state-panel__title">Graph Inspector</h2>
-        <p class="editor-state-panel__body">Track state objects, bindings, and defaults in one compact panel.</p>
-      </div>
-      <div class="editor-state-panel__header-tools">
-        <span class="editor-state-panel__header-count">{{ view.count }}</span>
-        <button type="button" class="editor-state-panel__collapse" aria-label="Collapse state panel" @click="$emit('toggle')">
-          <ElIcon class="editor-state-panel__collapse-icon" aria-hidden="true"><ArrowRight /></ElIcon>
+    <div class="editor-state-panel__surface">
+      <header class="editor-state-panel__inspector-header">
+        <div>
+          <div class="editor-state-panel__eyebrow">Graph State</div>
+          <h2 class="editor-state-panel__title">Graph Inspector</h2>
+          <p class="editor-state-panel__body">Track state objects, bindings, and defaults in one compact panel.</p>
+        </div>
+        <div class="editor-state-panel__header-tools">
+          <span class="editor-state-panel__header-count">{{ view.count }}</span>
+          <button type="button" class="editor-state-panel__collapse" aria-label="Collapse state panel" @click="$emit('toggle')">
+            <ElIcon class="editor-state-panel__collapse-icon" aria-hidden="true"><ArrowRight /></ElIcon>
+          </button>
+        </div>
+      </header>
+
+      <div class="editor-state-panel__summary">
+        <div class="editor-state-panel__summary-stats" aria-label="State summary">
+          <div class="editor-state-panel__summary-stat">
+            <span>States</span>
+            <strong>{{ view.count }}</strong>
+          </div>
+          <div class="editor-state-panel__summary-stat">
+            <span>Reads</span>
+            <strong>{{ readerTotal }}</strong>
+          </div>
+          <div class="editor-state-panel__summary-stat">
+            <span>Writes</span>
+            <strong>{{ writerTotal }}</strong>
+          </div>
+        </div>
+        <button type="button" class="editor-state-panel__quick-action" @click="$emit('add-state')">
+          <ElIcon aria-hidden="true"><CirclePlus /></ElIcon>
+          <span>Add</span>
         </button>
       </div>
-    </header>
 
-    <div class="editor-state-panel__summary">
-      <div class="editor-state-panel__summary-stats" aria-label="State summary">
-        <div class="editor-state-panel__summary-stat">
-          <span>States</span>
-          <strong>{{ view.count }}</strong>
-        </div>
-        <div class="editor-state-panel__summary-stat">
-          <span>Reads</span>
-          <strong>{{ readerTotal }}</strong>
-        </div>
-        <div class="editor-state-panel__summary-stat">
-          <span>Writes</span>
-          <strong>{{ writerTotal }}</strong>
-        </div>
-      </div>
-      <button type="button" class="editor-state-panel__quick-action" @click="$emit('add-state')">
-        <ElIcon aria-hidden="true"><CirclePlus /></ElIcon>
-        <span>Add</span>
-      </button>
-    </div>
-
-    <div class="editor-state-panel__content">
+      <div class="editor-state-panel__content">
       <div v-if="view.rows.length === 0" class="editor-state-panel__empty">
         <div class="editor-state-panel__empty-title">{{ view.emptyTitle }}</div>
         <div class="editor-state-panel__empty-body">{{ view.emptyBody }}</div>
@@ -359,6 +360,7 @@
           </div>
         </article>
       </div>
+    </div>
   </aside>
 </template>
 
@@ -582,12 +584,26 @@ function handleStateColorSelect(stateKey: string, value: string | number | boole
   min-width: 0;
   min-height: 0;
   height: 100%;
-  border-left: 1px solid rgba(154, 52, 18, 0.16);
-  background: rgba(255, 250, 241, 0.78);
-  backdrop-filter: blur(20px);
-  overflow: hidden;
+  padding: 12px;
   display: flex;
   flex-direction: column;
+  background: transparent;
+}
+
+.editor-state-panel__surface {
+  box-sizing: border-box;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(154, 52, 18, 0.14);
+  border-radius: 28px;
+  background: rgba(255, 252, 247, 0.98);
+  box-shadow: none;
+  backdrop-filter: none;
 }
 
 .editor-state-panel__inspector-header {
@@ -654,7 +670,6 @@ function handleStateColorSelect(stateKey: string, value: string | number | boole
 }
 
 .editor-state-panel__summary {
-  margin: 0 12px 12px;
   border: 1px solid rgba(154, 52, 18, 0.1);
   border-radius: 20px;
   background: rgba(255, 250, 241, 0.62);
@@ -714,7 +729,7 @@ function handleStateColorSelect(stateKey: string, value: string | number | boole
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-gutter: stable;
-  padding: 0 12px 14px;
+  padding: 0 2px 2px;
   display: grid;
   gap: 10px;
   align-content: start;

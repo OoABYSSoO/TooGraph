@@ -21,19 +21,39 @@
       </div>
 
       <nav class="app-shell__nav">
-        <RouterLink to="/" class="app-shell__link" title="首页">
+        <RouterLink
+          to="/"
+          class="app-shell__link"
+          :class="{ 'app-shell__link--active': activeNavigationSection === 'home' }"
+          title="首页"
+        >
           <ElIcon class="app-shell__link-icon"><House /></ElIcon>
           <span class="app-shell__link-label">首页</span>
         </RouterLink>
-        <RouterLink to="/editor" class="app-shell__link" title="编辑器">
+        <RouterLink
+          to="/editor"
+          class="app-shell__link"
+          :class="{ 'app-shell__link--active': activeNavigationSection === 'editor' }"
+          title="编辑器"
+        >
           <ElIcon class="app-shell__link-icon"><EditPen /></ElIcon>
           <span class="app-shell__link-label">编辑器</span>
         </RouterLink>
-        <RouterLink to="/runs" class="app-shell__link" title="运行记录">
+        <RouterLink
+          to="/runs"
+          class="app-shell__link"
+          :class="{ 'app-shell__link--active': activeNavigationSection === 'runs' }"
+          title="运行记录"
+        >
           <ElIcon class="app-shell__link-icon"><Clock /></ElIcon>
           <span class="app-shell__link-label">运行记录</span>
         </RouterLink>
-        <RouterLink to="/settings" class="app-shell__link" title="设置">
+        <RouterLink
+          to="/settings"
+          class="app-shell__link"
+          :class="{ 'app-shell__link--active': activeNavigationSection === 'settings' }"
+          title="设置"
+        >
           <ElIcon class="app-shell__link-icon"><Setting /></ElIcon>
           <span class="app-shell__link-label">设置</span>
         </RouterLink>
@@ -65,13 +85,14 @@ import { House, EditPen, Clock, Setting, Fold, Expand } from "@element-plus/icon
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 
-import { resolveShellLayoutMode } from "@/lib/layout-mode";
+import { resolvePrimaryNavigationSection, resolveShellLayoutMode } from "@/lib/layout-mode";
 
 const SIDEBAR_STORAGE_KEY = "graphiteui:sidebar-collapsed";
 
 const route = useRoute();
 const isSidebarCollapsed = ref(false);
 
+const activeNavigationSection = computed(() => resolvePrimaryNavigationSection(route.path));
 const isEditorCanvasMode = computed(() => resolveShellLayoutMode(route.path) === "editor-canvas");
 
 function setSidebarCollapsed(nextValue: boolean) {
@@ -211,7 +232,8 @@ watch(isSidebarCollapsed, (nextValue) => {
   background: rgba(255, 250, 242, 0.82);
 }
 
-.app-shell__link.router-link-active {
+.app-shell__link.router-link-active,
+.app-shell__link.app-shell__link--active {
   border-color: rgba(154, 52, 18, 0.12);
   background: rgba(255, 248, 240, 0.9);
   color: rgb(154, 52, 18);

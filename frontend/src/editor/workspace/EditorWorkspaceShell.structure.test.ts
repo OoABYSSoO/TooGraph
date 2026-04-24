@@ -73,18 +73,25 @@ test("EditorWorkspaceShell wires node top-action events into state updates, node
   assert.match(componentSource, /persistedPresets\.value = \[savedPreset, \.\.\.persistedPresets\.value\.filter/);
 });
 
-test("EditorWorkspaceShell inherits editor height and adapts the state side panel width", () => {
+test("EditorWorkspaceShell floats the right side panel above the canvas while preserving responsive panel widths", () => {
   assert.match(componentSource, /\.editor-workspace-shell \{[\s\S]*--editor-state-panel-open-width:\s*clamp\(340px,\s*32vw,\s*480px\);/);
   assert.match(componentSource, /\.editor-workspace-shell \{[\s\S]*--editor-human-review-panel-open-width:\s*clamp\(360px,\s*34vw,\s*520px\);/);
   assert.match(componentSource, /\.editor-workspace-shell \{[\s\S]*height:\s*100%;/);
   assert.doesNotMatch(componentSource, /\.editor-workspace-shell \{[\s\S]*height:\s*100vh;/);
-  assert.match(componentSource, /v-if="isStatePanelOpen\(tab\.tabId\) && sidePanelMode\(tab\.tabId\) === 'human-review' && documentsByTabId\[tab\.tabId\]"/);
-  assert.match(componentSource, /v-else-if="isStatePanelOpen\(tab\.tabId\) && documentsByTabId\[tab\.tabId\]"/);
-  assert.match(componentSource, /gridTemplateColumns:\s*isStatePanelOpen\(tabId\)\s*\? `minmax\(0, 1fr\) \$\{sidePanelOpenWidth\(tabId\)\}`/);
-  assert.match(componentSource, /:\s*"minmax\(0, 1fr\)"/);
+  assert.match(componentSource, /class="editor-workspace-shell__side-panel-layer"/);
+  assert.match(componentSource, /v-if="isStatePanelOpen\(tab\.tabId\) && documentsByTabId\[tab\.tabId\]"/);
+  assert.match(componentSource, /<EditorHumanReviewPanel[\s\S]*v-if="sidePanelMode\(tab\.tabId\) === 'human-review'"/);
+  assert.match(componentSource, /<EditorStatePanel[\s\S]*v-else/);
+  assert.match(componentSource, /:style="sidePanelLayerStyle\(tab\.tabId\)"/);
+  assert.match(componentSource, /function sidePanelLayerStyle\(tabId: string\)/);
+  assert.match(componentSource, /width:\s*sidePanelOpenWidth\(tabId\),/);
   assert.doesNotMatch(componentSource, /56px/);
   assert.match(componentSource, /@media \(max-width:\s*760px\) \{[\s\S]*\.editor-workspace-shell \{[\s\S]*--editor-state-panel-open-width:\s*min\(320px,\s*calc\(100vw - var\(--app-sidebar-width\) - 24px\)\);/);
   assert.match(componentSource, /@media \(max-width:\s*760px\) \{[\s\S]*\.editor-workspace-shell \{[\s\S]*--editor-human-review-panel-open-width:\s*min\(360px,\s*calc\(100vw - var\(--app-sidebar-width\) - 24px\)\);/);
+  assert.match(componentSource, /\.editor-workspace-shell__editor-grid \{[\s\S]*position:\s*relative;[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\);/);
+  assert.match(componentSource, /\.editor-workspace-shell__side-panel-layer \{[\s\S]*position:\s*absolute;[\s\S]*top:\s*12px;[\s\S]*right:\s*12px;[\s\S]*bottom:\s*12px;[\s\S]*z-index:\s*30;/);
+  assert.match(componentSource, /\.editor-workspace-shell__side-panel-layer \{[\s\S]*max-width:\s*calc\(100% - 24px\);[\s\S]*pointer-events:\s*none;/);
+  assert.match(componentSource, /\.editor-workspace-shell__side-panel-layer > :deep\(\*\) \{[\s\S]*pointer-events:\s*auto;/);
 });
 
 test("EditorWorkspaceShell keeps top chrome and editor body from overflowing their container", () => {
@@ -117,13 +124,15 @@ test("EditorWorkspaceShell opens the right sidebar in Human Review mode for awai
   assert.match(componentSource, /function openHumanReviewPanelForTab\(tabId: string, nodeId: string \| null\)/);
   assert.match(componentSource, /@open-human-review="openHumanReviewPanelForTab\(tab\.tabId, \$event\.nodeId\)"/);
   assert.match(componentSource, /<EditorHumanReviewPanel/);
-  assert.match(componentSource, /v-if="isStatePanelOpen\(tab\.tabId\) && sidePanelMode\(tab\.tabId\) === 'human-review' && documentsByTabId\[tab\.tabId\]"/);
+  assert.match(componentSource, /class="editor-workspace-shell__side-panel-layer"/);
+  assert.match(componentSource, /v-if="isStatePanelOpen\(tab\.tabId\) && documentsByTabId\[tab\.tabId\]"/);
+  assert.match(componentSource, /<EditorHumanReviewPanel[\s\S]*v-if="sidePanelMode\(tab\.tabId\) === 'human-review'"/);
   assert.match(componentSource, /:run="latestRunDetailByTabId\[tab\.tabId\] \?\? null"/);
   assert.match(componentSource, /if \(run\.status === "awaiting_human" && run\.current_node_id\) \{/);
   assert.match(componentSource, /openHumanReviewPanelForTab\(tabId, run\.current_node_id\);/);
   assert.match(componentSource, /if \(visualRun\.status === "awaiting_human" && visualRun\.current_node_id\) \{/);
   assert.match(componentSource, /openHumanReviewPanelForTab\(tab\.tabId, visualRun\.current_node_id\);/);
-  assert.match(componentSource, /<EditorStatePanel[\s\S]*:run="latestRunDetailByTabId\[tab\.tabId\] \?\? null"/);
+  assert.match(componentSource, /<EditorStatePanel[\s\S]*v-else[\s\S]*:run="latestRunDetailByTabId\[tab\.tabId\] \?\? null"/);
 });
 
 test("EditorWorkspaceShell resumes restored pause snapshots against their original snapshot checkpoint", () => {

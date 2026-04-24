@@ -48,5 +48,11 @@ test("AppShell uses a low-noise ChatGPT-style brand rail with library icons", ()
   assert.match(componentSource, /<ElIcon class="app-shell__link-icon"><Setting \/><\/ElIcon>/);
   assert.match(componentSource, /\.app-shell__sidebar \{[\s\S]*background:\s*rgba\(250,\s*246,\s*239,\s*0\.72\);/);
   assert.match(componentSource, /\.app-shell__link \{[\s\S]*border:\s*1px solid transparent;/);
-  assert.match(componentSource, /\.app-shell__link\.router-link-active \{[\s\S]*box-shadow:\s*inset 3px 0 0 rgba\(154,\s*52,\s*18,\s*0\.7\);/);
+  assert.match(componentSource, /\.app-shell__link\.router-link-active,[\s\S]*\.app-shell__link\.app-shell__link--active \{[\s\S]*box-shadow:\s*inset 3px 0 0 rgba\(154,\s*52,\s*18,\s*0\.7\);/);
+});
+
+test("AppShell keeps the editor navigation entry active for graph-specific editor routes", () => {
+  assert.match(componentSource, /const activeNavigationSection = computed\(\(\) => resolvePrimaryNavigationSection\(route\.path\)\);/);
+  assert.match(componentSource, /<RouterLink[\s\S]*to="\/editor"[\s\S]*:class="\{ 'app-shell__link--active': activeNavigationSection === 'editor' \}"/);
+  assert.match(componentSource, /\.app-shell__link\.app-shell__link--active \{[\s\S]*box-shadow:\s*inset 3px 0 0 rgba\(154,\s*52,\s*18,\s*0\.7\);/);
 });
