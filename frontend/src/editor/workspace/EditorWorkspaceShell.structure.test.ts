@@ -95,7 +95,9 @@ test("EditorWorkspaceShell floats the right side panel above the canvas while pr
 });
 
 test("EditorWorkspaceShell keeps top chrome and editor body from overflowing their container", () => {
-  assert.match(componentSource, /\.editor-workspace-shell__chrome \{[\s\S]*min-width:\s*0;[\s\S]*max-width:\s*100%;/);
+  assert.match(componentSource, /\.editor-workspace-shell__workspace \{[\s\S]*position:\s*relative;/);
+  assert.match(componentSource, /\.editor-workspace-shell__chrome \{[\s\S]*position:\s*absolute;[\s\S]*inset:\s*0;[\s\S]*z-index:\s*40;/);
+  assert.match(componentSource, /\.editor-workspace-shell__chrome \{[\s\S]*pointer-events:\s*none;/);
   assert.match(componentSource, /\.editor-workspace-shell__body \{[\s\S]*min-width:\s*0;[\s\S]*overflow:\s*hidden;/);
   assert.match(componentSource, /\.editor-workspace-shell__editor-grid \{[\s\S]*min-width:\s*0;[\s\S]*overflow:\s*hidden;/);
 });
@@ -166,7 +168,9 @@ test("EditorWorkspaceShell renders the graph action controls as a detached capsu
 test("EditorWorkspaceShell pins the full action capsule to the desktop top-right and moves it onto a right-aligned second row on narrow screens", () => {
   assert.match(componentSource, /class="editor-workspace-shell__action-capsule-row"/);
   assert.match(componentSource, /\.editor-workspace-shell__action-capsule-row \{[\s\S]*position:\s*absolute;[\s\S]*top:\s*12px;[\s\S]*right:\s*12px;[\s\S]*z-index:\s*35;/);
-  assert.match(componentSource, /@media \(max-width:\s*920px\) \{[\s\S]*\.editor-workspace-shell__chrome \{[\s\S]*display:\s*grid;/);
+  assert.match(componentSource, /\.editor-workspace-shell__editor-main \{[\s\S]*--editor-canvas-floating-top-clearance:\s*72px;/);
+  assert.match(componentSource, /@media \(max-width:\s*920px\) \{[\s\S]*\.editor-workspace-shell__chrome \{[\s\S]*display:\s*grid;[\s\S]*padding:\s*12px;/);
+  assert.match(componentSource, /@media \(max-width:\s*920px\) \{[\s\S]*\.editor-workspace-shell__editor-main \{[\s\S]*--editor-canvas-floating-top-clearance:\s*124px;/);
   assert.match(componentSource, /@media \(max-width:\s*920px\) \{[\s\S]*\.editor-workspace-shell__action-capsule-row \{[\s\S]*position:\s*static;[\s\S]*display:\s*flex;[\s\S]*justify-content:\s*flex-end;/);
   assert.doesNotMatch(componentSource, /@media \(max-width:\s*920px\) \{[\s\S]*\.editor-workspace-shell__action-capsule-row \{[\s\S]*display:\s*none;/);
 });

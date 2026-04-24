@@ -23,9 +23,9 @@ test("EditorTabBar renames graphs inline from the tab strip instead of a separat
 });
 
 test("EditorTabBar constrains the top chrome to the available editor width", () => {
-  assert.match(componentSource, /\.editor-tab-bar \{[\s\S]*width:\s*100%;[\s\S]*max-width:\s*100%;[\s\S]*min-width:\s*0;/);
-  assert.match(componentSource, /\.editor-tab-bar__inner \{[\s\S]*box-sizing:\s*border-box;[\s\S]*width:\s*100%;[\s\S]*max-width:\s*100%;/);
-  assert.match(componentSource, /\.editor-tab-bar__tabs-shell \{[\s\S]*max-width:\s*100%;/);
+  assert.match(componentSource, /\.editor-tab-bar \{[\s\S]*display:\s*inline-flex;[\s\S]*max-width:\s*min\(100%,\s*var\(--editor-tab-strip-max-width\)\);[\s\S]*min-width:\s*0;/);
+  assert.match(componentSource, /\.editor-tab-bar__inner \{[\s\S]*box-sizing:\s*border-box;[\s\S]*display:\s*inline-flex;[\s\S]*width:\s*auto;/);
+  assert.match(componentSource, /\.editor-tab-bar__tabs-shell \{[\s\S]*width:\s*fit-content;[\s\S]*max-width:\s*min\(100%,\s*var\(--editor-tab-strip-max-width\)\);/);
 });
 
 test("EditorTabBar keeps only the tab strip and a browser-style plus launcher in the top row", () => {
@@ -71,18 +71,18 @@ test("EditorTabBar is built on Element Plus tabs instead of reka-ui primitives",
 });
 
 test("EditorTabBar keeps the plus launcher on the same visual strip as the tabs instead of a second toolbar row", () => {
-  assert.match(componentSource, /\.editor-tab-bar__strip \{[\s\S]*display:\s*flex;[\s\S]*align-items:\s*center;/);
-  assert.match(componentSource, /\.editor-tab-bar__tabs-shell \{[\s\S]*flex:\s*1 1 auto;/);
+  assert.match(componentSource, /\.editor-tab-bar__strip \{[\s\S]*display:\s*inline-flex;[\s\S]*max-width:\s*100%;/);
+  assert.match(componentSource, /\.editor-tab-bar__strip \{[\s\S]*align-items:\s*center;/);
+  assert.match(componentSource, /\.editor-tab-bar__tabs-shell \{[\s\S]*flex:\s*0 1 auto;/);
   assert.match(componentSource, /\.editor-tab-bar__add-tab \{[\s\S]*flex:\s*0 0 auto;/);
 });
 
-test("EditorTabBar reserves desktop room for the detached action capsule and releases it on the two-row breakpoint", () => {
-  assert.match(componentSource, /--editor-action-capsule-desktop-reserve:\s*clamp\(320px,\s*30vw,\s*368px\);/);
-  assert.match(
-    componentSource,
-    /\.editor-tab-bar__inner \{[\s\S]*padding:\s*12px calc\(var\(--editor-action-capsule-desktop-reserve\) \+ 12px\) 0 12px;/,
-  );
-  assert.match(componentSource, /@media \(max-width:\s*920px\) \{[\s\S]*\.editor-tab-bar__inner \{[\s\S]*padding-right:\s*12px;/);
+test("EditorTabBar behaves like a floating card group instead of reserving a full-width header lane", () => {
+  assert.match(componentSource, /--editor-tab-strip-max-width:\s*min\(980px,\s*calc\(100vw - var\(--app-sidebar-width\) - 220px\)\);/);
+  assert.match(componentSource, /\.editor-tab-bar \{[\s\S]*pointer-events:\s*auto;/);
+  assert.match(componentSource, /\.editor-tab-bar__inner \{[\s\S]*padding:\s*12px 0 0 12px;/);
+  assert.doesNotMatch(componentSource, /editor-action-capsule-desktop-reserve/);
+  assert.doesNotMatch(componentSource, /padding:\s*12px calc\(var\(--editor-action-capsule-desktop-reserve\) \+ 12px\) 0 12px;/);
 });
 
 test("EditorTabBar normalizes Element Plus tab spacing with shared size variables", () => {
