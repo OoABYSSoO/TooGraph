@@ -22,7 +22,6 @@ These instructions apply to all work in this repository and should persist acros
   - `ezllm start`
   - `LOCAL_BASE_URL=http://127.0.0.1:8888/v1`
 - Keep GraphiteUI's own dev startup guidance on `npm run dev` and `node scripts/start.mjs`; those commands are not replaced by local runtime instructions.
-- `scripts/lm_core0.py`, `scripts/lm-server`, and `scripts/download_Gemma_gguf.py` should remain migration wrappers instead of carrying runtime implementations.
 
 ## UI Implementation Policy
 
