@@ -52,6 +52,7 @@ test("EditorHumanReviewPanel renders an action-first breakpoint task panel", () 
   assert.doesNotMatch(componentSource, /Paused Run/);
   assert.doesNotMatch(componentSource, /editor-human-review-panel__footer/);
   assert.doesNotMatch(componentSource, /class="editor-human-review-panel__header"/);
+  assert.doesNotMatch(componentSource, /pauseReason/);
 });
 
 test("EditorHumanReviewPanel keeps the continue guard message near the action bar", () => {
