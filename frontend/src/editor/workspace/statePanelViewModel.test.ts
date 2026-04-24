@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { buildStatePanelViewModel } from "./statePanelViewModel.ts";
+import type { GraphPayload } from "@/types/node-system";
+import type { RunDetail } from "@/types/run";
 
 test("buildStatePanelViewModel returns sorted state rows with readable values", () => {
   const view = buildStatePanelViewModel({
@@ -237,3 +239,208 @@ test("buildStatePanelViewModel reports empty state cleanly", () => {
   assert.equal(view.emptyTitle, "No State Yet");
   assert.equal(view.emptyBody, "Graph state objects will appear here once the graph defines them.");
 });
+
+test("buildStatePanelViewModel groups the latest run state timeline per state row", () => {
+  const document: GraphPayload = {
+    graph_id: "graph-1",
+    name: "Timeline",
+    metadata: {},
+    state_schema: {
+      draft: {
+        name: "Draft",
+        description: "Draft answer.",
+        type: "text",
+        value: "",
+        color: "#d97706",
+      },
+      final: {
+        name: "Final",
+        description: "Final answer.",
+        type: "text",
+        value: "",
+        color: "#2563eb",
+      },
+    },
+    nodes: {
+      planner: {
+        kind: "agent",
+        name: "planner",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [{ state: "draft", mode: "replace" }],
+        config: {
+          skills: [],
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+      reviser: {
+        kind: "agent",
+        name: "reviser",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [{ state: "draft", required: true }],
+        writes: [
+          { state: "draft", mode: "replace" },
+          { state: "final", mode: "replace" },
+        ],
+        config: {
+          skills: [],
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+    },
+    edges: [{ source: "planner", target: "reviser" }],
+    conditional_edges: [],
+  };
+
+  const run = createRunDetail({
+    artifacts: {
+      state_events: [
+        {
+          node_id: "planner",
+          state_key: "draft",
+          output_key: "draft",
+          mode: "replace",
+          value: "first draft",
+          created_at: "2026-04-24T09:00:00Z",
+        },
+        {
+          node_id: "reviser",
+          state_key: "draft",
+          output_key: "draft",
+          mode: "replace",
+          value: "second draft",
+          created_at: "2026-04-24T09:00:05Z",
+        },
+        {
+          node_id: "reviser",
+          state_key: "final",
+          output_key: "final",
+          mode: "replace",
+          value: "done",
+          created_at: "2026-04-24T09:00:06Z",
+        },
+      ],
+    },
+  });
+
+  const view = buildStatePanelViewModel(document, run);
+  const draftRow = view.rows.find((row) => row.key === "draft");
+  const finalRow = view.rows.find((row) => row.key === "final");
+
+  assert.ok(draftRow);
+  assert.ok(finalRow);
+  assert.equal(draftRow.timelineSummary, "2 次变更 · 2 个节点");
+  assert.deepEqual(
+    draftRow.timelineEntries.map((entry) => ({
+      nodeLabel: entry.nodeLabel,
+      outputKey: entry.outputKey,
+      previousValuePreview: entry.previousValuePreview,
+      valuePreview: entry.valuePreview,
+      sequence: entry.sequence,
+    })),
+    [
+      {
+        nodeLabel: "planner",
+        outputKey: "draft",
+        previousValuePreview: null,
+        valuePreview: "first draft",
+        sequence: 1,
+      },
+      {
+        nodeLabel: "reviser",
+        outputKey: "draft",
+        previousValuePreview: "first draft",
+        valuePreview: "second draft",
+        sequence: 2,
+      },
+    ],
+  );
+  assert.equal(finalRow.timelineSummary, "1 次变更 · 1 个节点");
+  assert.equal(finalRow.timelineEntries[0]?.nodeLabel, "reviser");
+  assert.equal(finalRow.timelineEntries[0]?.valuePreview, "done");
+});
+
+function createRunDetail(overrides: Partial<RunDetail> = {}): RunDetail {
+  return {
+    run_id: "run-1",
+    graph_id: "graph-1",
+    graph_name: "Timeline",
+    status: "completed",
+    runtime_backend: "langgraph",
+    lifecycle: {
+      updated_at: "2026-04-24T09:00:06Z",
+      resume_count: 0,
+      pause_reason: null,
+      paused_at: null,
+      resumed_at: null,
+      resumed_from_run_id: null,
+    },
+    checkpoint_metadata: {
+      available: false,
+      checkpoint_id: null,
+      thread_id: null,
+      checkpoint_ns: null,
+      saver: null,
+      resume_source: null,
+    },
+    current_node_id: null,
+    revision_round: 0,
+    started_at: "2026-04-24T09:00:00Z",
+    completed_at: "2026-04-24T09:00:06Z",
+    duration_ms: 6000,
+    final_score: null,
+    metadata: {},
+    selected_skills: [],
+    skill_outputs: [],
+    evaluation_result: {},
+    knowledge_summary: "",
+    memory_summary: "",
+    final_result: "",
+    node_status_map: {},
+    node_executions: [],
+    warnings: [],
+    errors: [],
+    output_previews: [],
+    artifacts: {
+      skill_outputs: [],
+      output_previews: [],
+      saved_outputs: [],
+      exported_outputs: [],
+      node_outputs: {},
+      active_edge_ids: [],
+      state_events: [],
+      state_values: {},
+      cycle_iterations: [],
+      cycle_summary: {
+        has_cycle: false,
+        back_edges: [],
+        iteration_count: 0,
+        max_iterations: 0,
+        stop_reason: null,
+      },
+    },
+    state_snapshot: {
+      values: {},
+      last_writers: {},
+    },
+    graph_snapshot: {},
+    cycle_summary: {
+      has_cycle: false,
+      back_edges: [],
+      iteration_count: 0,
+      max_iterations: 0,
+      stop_reason: null,
+    },
+    ...overrides,
+  };
+}

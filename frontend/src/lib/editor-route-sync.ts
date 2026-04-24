@@ -1,5 +1,11 @@
 export type EditorRouteInstruction =
   | {
+      type: "restore-run";
+      runId: string;
+      snapshotId: string | null;
+      navigation: "replace";
+    }
+  | {
       type: "open-new";
       templateId: string | null;
       navigation: "replace";
@@ -17,6 +23,8 @@ export function resolveEditorRouteInstruction(params: {
   routeMode: "root" | "new" | "existing";
   routeGraphId: string | null;
   defaultTemplateId: string | null;
+  restoreRunId: string | null;
+  restoreSnapshotId: string | null;
   activeTabRouteSignature: string | null;
   routeSignature: string;
   handledRouteSignature: string | null;
@@ -34,6 +42,14 @@ export function resolveEditorRouteInstruction(params: {
   }
 
   if (params.routeMode === "new") {
+    if (params.restoreRunId) {
+      return {
+        type: "restore-run",
+        runId: params.restoreRunId,
+        snapshotId: params.restoreSnapshotId,
+        navigation: "replace",
+      };
+    }
     return {
       type: "open-new",
       templateId: params.defaultTemplateId,

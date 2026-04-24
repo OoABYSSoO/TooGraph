@@ -81,3 +81,16 @@ test("EditorStatePanel keeps detailed editing inside a soft inspector card", () 
   assert.match(componentSource, /\.editor-state-panel__content \{[\s\S]*scrollbar-gutter:\s*stable;/);
   assert.match(componentSource, /\.editor-state-panel__content \{[\s\S]*padding:\s*0 12px 14px;/);
 });
+
+test("EditorStatePanel adds a collapsed run timeline section to each expanded state card", () => {
+  assert.match(componentSource, /run\?: RunDetail \| null;/);
+  assert.match(componentSource, /buildStatePanelViewModel\(props\.document,\s*props\.run \?\? null\)/);
+  assert.match(componentSource, /class="editor-state-panel__timeline-toggle"/);
+  assert.match(componentSource, /运行轨迹/);
+  assert.match(componentSource, /timelineSummary/);
+  assert.match(componentSource, /timelineEntries/);
+  assert.match(componentSource, /toggleTimelineSection\(row\.key\)/);
+  assert.match(componentSource, /isTimelineSectionExpanded\(row\.key\)/);
+  assert.match(componentSource, /editor-state-panel__timeline-entry-value-change/);
+  assert.match(componentSource, /\.editor-state-panel__timeline \{[\s\S]*border-top:\s*1px solid rgba\(154,\s*52,\s*18,\s*0\.12\);/);
+});

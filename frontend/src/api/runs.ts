@@ -18,6 +18,13 @@ export async function fetchRun(runId: string): Promise<RunDetail> {
   return apiGet<RunDetail>(`/api/runs/${runId}`);
 }
 
-export async function resumeRun(runId: string, resume: Record<string, unknown>): Promise<{ run_id: string; status: string }> {
-  return apiPost(`/api/runs/${runId}/resume`, { resume });
+export async function resumeRun(
+  runId: string,
+  resume: Record<string, unknown>,
+  snapshotId?: string | null,
+): Promise<{ run_id: string; status: string }> {
+  return apiPost(`/api/runs/${runId}/resume`, {
+    resume,
+    ...(snapshotId?.trim() ? { snapshot_id: snapshotId.trim() } : {}),
+  });
 }

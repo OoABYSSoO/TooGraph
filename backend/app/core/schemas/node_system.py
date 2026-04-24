@@ -87,6 +87,8 @@ class ConditionOperator(str, Enum):
     LTE = "<="
     GT = ">"
     LT = "<"
+    CONTAINS = "contains"
+    NOT_CONTAINS = "not_contains"
     EXISTS = "exists"
 
 

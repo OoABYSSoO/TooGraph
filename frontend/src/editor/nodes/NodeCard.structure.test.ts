@@ -451,7 +451,15 @@ test("NodeCard renders condition nodes as clean control-flow proxies", () => {
   assert.match(conditionSection, /<span class="node-card__control-label">Max loops<\/span>/);
   assert.match(conditionSection, /view\.body\.operatorLabel/);
   assert.match(conditionSection, /view\.body\.valueLabel/);
+  assert.match(conditionSection, /:value="conditionRuleValueDraft"/);
+  assert.match(conditionSection, /@blur="commitConditionRuleValue"/);
+  assert.match(conditionSection, /@keydown\.enter\.prevent="handleConditionRuleValueEnter"/);
   assert.match(conditionSection, /conditionLoopLimitDraft/);
+  assert.match(componentSource, /const conditionRuleValueDraft = ref\(\"\"\);/);
+  assert.match(componentSource, /watch\(\s*\(\) => \(props\.node\.kind === "condition" \? props\.node\.config\.rule\.value : null\),[\s\S]*conditionRuleValueDraft\.value = ruleValue === null \|\| ruleValue === undefined \? "" : String\(ruleValue\);/);
+  assert.match(componentSource, /function handleConditionRuleValueInput\(event: Event\) \{[\s\S]*conditionRuleValueDraft\.value = target\.value;/);
+  assert.match(componentSource, /function commitConditionRuleValue\(\) \{[\s\S]*updateConditionRule\(\{ value: conditionRuleValueDraft\.value \}\);/);
+  assert.match(componentSource, /function handleConditionRuleValueEnter\(event: KeyboardEvent\) \{[\s\S]*target\.blur\(\);/);
   assert.match(conditionSection, /type="number"/);
   assert.match(conditionSection, /:min="CONDITION_LOOP_LIMIT_MIN"/);
   assert.match(conditionSection, /:max="CONDITION_LOOP_LIMIT_MAX"/);

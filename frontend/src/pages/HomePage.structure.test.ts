@@ -8,6 +8,8 @@ const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const componentSource = readFileSync(resolve(currentDirectory, "HomePage.vue"), "utf8");
 
 test("HomePage renders every loaded template instead of truncating the template panel", () => {
+  assert.match(componentSource, /import \{ formatRunDisplayName \} from "@\/lib\/run-display-name";/);
+  assert.match(componentSource, /\{\{ formatRunDisplayName\(run\) \}\}/);
   assert.match(componentSource, /v-for="template in templates"/);
   assert.doesNotMatch(componentSource, /templates\.slice\(0,\s*3\)/);
 });

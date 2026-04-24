@@ -6,6 +6,8 @@
       :route-mode="routeMode"
       :route-graph-id="requestedGraphId"
       :default-template-id="requestedTemplateId"
+      :restore-run-id="requestedRestoreRunId"
+      :restore-snapshot-id="requestedRestoreSnapshotId"
       :templates="graphStore.templates"
       :graphs="graphStore.graphs"
     />
@@ -34,6 +36,8 @@ const routeMode = computed<"root" | "new" | "existing">(() => {
   return "existing";
 });
 const requestedTemplateId = computed(() => asString(route.query.template));
+const requestedRestoreRunId = computed(() => asString(route.query.restoreRun));
+const requestedRestoreSnapshotId = computed(() => asString(route.query.snapshot));
 const requestedGraphId = computed(() => asString(route.params.graphId));
 function asString(value: unknown): string | null {
   if (typeof value === "string" && value.trim().length > 0) {

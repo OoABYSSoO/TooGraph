@@ -21,6 +21,8 @@ export const CONDITION_RULE_OPERATOR_OPTIONS: Array<{
   { value: "<=", label: "<=" },
   { value: ">", label: ">" },
   { value: "<", label: "<" },
+  { value: "contains", label: "contains" },
+  { value: "not_contains", label: "not contains" },
   { value: "exists", label: "exists" },
 ];
 

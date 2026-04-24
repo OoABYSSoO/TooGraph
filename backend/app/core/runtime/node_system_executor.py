@@ -161,6 +161,33 @@ def _initialize_graph_state(graph: NodeSystemGraphDocument, state: dict[str, Any
     }
 
 
+def append_run_snapshot(
+    state: dict[str, Any],
+    *,
+    snapshot_id: str,
+    kind: str,
+    label: str,
+) -> None:
+    snapshots = state.setdefault("run_snapshots", [])
+    snapshots.append(
+        {
+            "snapshot_id": snapshot_id,
+            "kind": kind,
+            "label": label,
+            "created_at": utc_now_iso(),
+            "status": state.get("status", ""),
+            "current_node_id": state.get("current_node_id"),
+            "checkpoint_metadata": copy.deepcopy(state.get("checkpoint_metadata", {})),
+            "state_snapshot": copy.deepcopy(state.get("state_snapshot", {})),
+            "graph_snapshot": copy.deepcopy(state.get("graph_snapshot", {})),
+            "artifacts": copy.deepcopy(state.get("artifacts", {})),
+            "node_status_map": copy.deepcopy(state.get("node_status_map", {})),
+            "output_previews": copy.deepcopy(state.get("output_previews", [])),
+            "final_result": str(state.get("final_result", "") or ""),
+        }
+    )
+
+
 def _collect_node_inputs(node: Any, state: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     resolved_inputs: dict[str, Any] = {}
     read_records: list[dict[str, Any]] = []
@@ -416,6 +443,39 @@ def _execute_output_node(
     }
 
 
+def _format_loop_limit_exhausted_output_value(value: Any) -> str:
+    if isinstance(value, str):
+        rendered = value
+    elif value is None:
+        rendered = ""
+    elif isinstance(value, (dict, list, tuple, bool)):
+        rendered = json.dumps(value, ensure_ascii=False)
+    else:
+        rendered = str(value)
+    return f"循环已达上限，最新的结果是：{rendered}"
+
+
+def _apply_loop_limit_exhausted_output_message(body: dict[str, Any]) -> dict[str, Any]:
+    preview_items = list(body.get("output_previews", []))
+    wrapped_final_result = _format_loop_limit_exhausted_output_value(
+        preview_items[0].get("value") if preview_items else body.get("final_result")
+    )
+    wrapped_previews: list[dict[str, Any]] = []
+    for preview in preview_items:
+        wrapped_previews.append(
+            {
+                **preview,
+                "display_mode": "text",
+                "value": wrapped_final_result,
+            }
+        )
+    return {
+        **body,
+        "output_previews": wrapped_previews,
+        "final_result": wrapped_final_result,
+    }
+
+
 def collect_output_boundaries(
     graph: NodeSystemGraphDocument,
     state: dict[str, Any],
@@ -453,6 +513,8 @@ def collect_output_boundaries(
             {binding.state: copy.deepcopy(state.get("state_values", {}).get(binding.state))},
             state,
         )
+        if state.get("loop_limit_exhaustion"):
+            body = _apply_loop_limit_exhausted_output_message(body)
         state["output_previews"] = [*state.get("output_previews", []), *body.get("output_previews", [])]
         state["saved_outputs"] = [*state.get("saved_outputs", []), *body.get("saved_outputs", [])]
         state.setdefault("node_status_map", {})[node_name] = "success"
@@ -702,6 +764,7 @@ def _resolve_reference(
 
 
 def _evaluate_condition_rule(left_value: Any, operator: str, right_value: Any) -> bool:
+    left_value, right_value = _normalize_condition_operands(left_value, right_value)
     if operator == "exists":
         return left_value not in (None, "", [], {})
     if operator == "==":
@@ -716,7 +779,45 @@ def _evaluate_condition_rule(left_value: Any, operator: str, right_value: Any) -
         return left_value >= right_value
     if operator == "<=":
         return left_value <= right_value
+    if operator == "contains":
+        return _coerce_condition_text(right_value) in _coerce_condition_text(left_value)
+    if operator == "not_contains":
+        return _coerce_condition_text(right_value) not in _coerce_condition_text(left_value)
     raise ValueError(f"Unsupported condition operator '{operator}'.")
+
+
+def _normalize_condition_operands(left_value: Any, right_value: Any) -> tuple[Any, Any]:
+    left_number = _parse_condition_number(left_value)
+    right_number = _parse_condition_number(right_value)
+    if left_number is not None and right_number is not None:
+        return left_number, right_number
+    return left_value, right_value
+
+
+def _parse_condition_number(value: Any) -> int | float | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return value
+    if not isinstance(value, str):
+        return None
+
+    trimmed = value.strip()
+    if not trimmed:
+        return None
+    if re.fullmatch(r"[+-]?\d+", trimmed):
+        return int(trimmed)
+    if re.fullmatch(r"[+-]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?", trimmed):
+        return float(trimmed)
+    return None
+
+
+def _coerce_condition_text(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    return str(value)
 
 
 def _resolve_branch_key(branches: list[str], branch_mapping: dict[str, str], condition_result: Any) -> str | None:

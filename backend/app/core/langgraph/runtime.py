@@ -22,6 +22,7 @@ from app.core.runtime.node_system_executor import (
     _refresh_run_artifacts,
     _select_active_outgoing_edges,
     _build_execution_edges,
+    append_run_snapshot,
     collect_output_boundaries,
 )
 from app.core.runtime.state import create_initial_run_state, set_run_status, touch_run_lifecycle, utc_now_iso
@@ -72,7 +73,8 @@ def execute_node_system_graph_langgraph(
     )
     set_run_status(state, "running")
     state["runtime_backend"] = "langgraph"
-    state["started_at"] = utc_now_iso()
+    state.setdefault("started_at", utc_now_iso())
+    state.pop("loop_limit_exhaustion", None)
     if resume_from_checkpoint:
         node_status_map = dict(state.get("node_status_map") or {})
         state["node_status_map"] = {
@@ -220,6 +222,12 @@ def execute_node_system_graph_langgraph(
         _finalize_langgraph_cycle_summary(state, cycle_tracker, active_edge_ids)
         _sync_checkpoint_metadata(state, checkpoint_saver, checkpoint_lookup_config)
         _refresh_run_artifacts(state, node_outputs, active_edge_ids, started_perf=started_perf)
+        append_run_snapshot(
+            state,
+            snapshot_id=_next_run_snapshot_id(state, "completed"),
+            kind="completed",
+            label="Completed",
+        )
         save_run(state)
         return state
     except Exception as exc:  # pragma: no cover - defensive runtime path
@@ -227,6 +235,12 @@ def execute_node_system_graph_langgraph(
         state.setdefault("errors", []).append(str(exc))
         _sync_checkpoint_metadata(state, checkpoint_saver, checkpoint_lookup_config)
         _refresh_run_artifacts(state, node_outputs, active_edge_ids, started_perf=started_perf)
+        append_run_snapshot(
+            state,
+            snapshot_id=_next_run_snapshot_id(state, "failed"),
+            kind="failed",
+            label="Failed",
+        )
         save_run(state)
         raise
 
@@ -421,11 +435,30 @@ def _build_langgraph_route_callable(
             edge_id = conditional_edge_ids.get((condition_name, selected_branch, visual_target))
             if edge_id:
                 selected_edge_ids.add(edge_id)
-                active_edge_ids.add(edge_id)
+            iteration = _current_cycle_iteration(cycle_tracker)
+            loop_limit_violation = _peek_condition_loop_limit_violation(cycle_tracker, sorted(selected_edge_ids))
+            if loop_limit_violation is not None:
+                max_iterations, source_node = loop_limit_violation
+                exhausted_visual_target = route.branch_targets.get("exhausted", "")
+                exhausted_edge_id = conditional_edge_ids.get((condition_name, "exhausted", exhausted_visual_target))
+                if route.branches.get("exhausted") and exhausted_visual_target and exhausted_edge_id:
+                    selected_branch = "exhausted"
+                    selected_edge_ids = {exhausted_edge_id}
+                    _mark_cycle_iteration_stop_reason(cycle_tracker, iteration, "max_iterations_exceeded")
+                    state["loop_limit_exhaustion"] = {
+                        "condition_node": source_node,
+                        "max_iterations": max_iterations,
+                    }
+                else:
+                    _mark_cycle_iteration_stop_reason(cycle_tracker, iteration, "max_iterations_exceeded")
+                    raise ValueError(
+                        f"Cycle execution exceeded loopLimit ({max_iterations}) for condition '{source_node}'. Add an exit branch or raise loopLimit."
+                    )
+            active_edge_ids.update(selected_edge_ids)
             _record_cycle_route_activity(
                 state=state,
                 cycle_tracker=cycle_tracker,
-                iteration=_current_cycle_iteration(cycle_tracker),
+                iteration=iteration,
                 selected_edge_ids=selected_edge_ids,
             )
             if persist_progress:
@@ -639,12 +672,23 @@ def _apply_waiting_state(
         collect_output_boundaries(graph, state, active_edge_ids)
     _sync_checkpoint_metadata(state, checkpoint_saver, checkpoint_lookup_config)
     _refresh_run_artifacts(state, node_outputs, active_edge_ids, started_perf=started_perf)
+    append_run_snapshot(
+        state,
+        snapshot_id=_next_run_snapshot_id(state, "pause"),
+        kind="pause",
+        label=f"Paused at {state.get('current_node_id') or 'unknown'}",
+    )
 
 
 def _clear_pending_interrupt_metadata(state: dict[str, Any]) -> None:
     metadata = state.setdefault("metadata", {})
     metadata.pop("pending_interrupt_nodes", None)
     metadata.pop("pending_interrupts", None)
+
+
+def _next_run_snapshot_id(state: dict[str, Any], kind: str) -> str:
+    existing = [item for item in state.get("run_snapshots", []) if item.get("kind") == kind]
+    return f"{kind}_{len(existing) + 1}"
 
 
 def _build_langgraph_cycle_tracker(
@@ -699,6 +743,13 @@ def _check_condition_loop_limit(
     cycle_tracker: dict[str, Any],
     next_iteration_edge_ids: list[str],
 ) -> tuple[int, str] | None:
+    return _peek_condition_loop_limit_violation(cycle_tracker, next_iteration_edge_ids)
+
+
+def _peek_condition_loop_limit_violation(
+    cycle_tracker: dict[str, Any],
+    next_iteration_edge_ids: list[str],
+) -> tuple[int, str] | None:
     back_edges_by_id = cycle_tracker.get("back_edges_by_id", {})
     loop_limits_by_source = cycle_tracker.get("loop_limits_by_source", {})
     loop_iterations_by_source = cycle_tracker.setdefault("loop_iterations_by_source", {})
@@ -714,9 +765,27 @@ def _check_condition_loop_limit(
         next_iteration = current_iteration + 1
         if next_iteration > limit:
             return limit, edge.source
-        loop_iterations_by_source[edge.source] = next_iteration
-
     return None
+
+
+def _advance_condition_loop_iterations(
+    cycle_tracker: dict[str, Any],
+    next_iteration_edge_ids: list[str],
+) -> None:
+    back_edges_by_id = cycle_tracker.get("back_edges_by_id", {})
+    loop_limits_by_source = cycle_tracker.get("loop_limits_by_source", {})
+    loop_iterations_by_source = cycle_tracker.setdefault("loop_iterations_by_source", {})
+
+    for edge_id in next_iteration_edge_ids:
+        edge = back_edges_by_id.get(edge_id)
+        if edge is None:
+            continue
+        limit = int(loop_limits_by_source.get(edge.source, -1) or -1)
+        if limit == -1:
+            continue
+        current_iteration = int(loop_iterations_by_source.get(edge.source, 1) or 1)
+        next_iteration = current_iteration + 1
+        loop_iterations_by_source[edge.source] = next_iteration
 
 
 def _current_cycle_iteration(cycle_tracker: dict[str, Any]) -> int:
@@ -750,6 +819,15 @@ def _ensure_cycle_iteration_record(
             set(records[iteration].get("incoming_edge_ids", [])) | set(incoming_edge_ids)
         )
     return records[iteration]
+
+
+def _mark_cycle_iteration_stop_reason(
+    cycle_tracker: dict[str, Any],
+    iteration: int,
+    stop_reason: str,
+) -> None:
+    record = _ensure_cycle_iteration_record(cycle_tracker, iteration, [])
+    record["stop_reason"] = stop_reason
 
 
 def _record_cycle_activity(
@@ -799,7 +877,7 @@ def _record_cycle_activity(
             f"Cycle execution made no state progress in iteration {iteration}. Add an exit branch or update a state value inside the loop."
         )
 
-    loop_limit_violation = _check_condition_loop_limit(cycle_tracker, next_iteration_edge_ids)
+    loop_limit_violation = _peek_condition_loop_limit_violation(cycle_tracker, next_iteration_edge_ids)
     if loop_limit_violation is not None:
         max_iterations, source_node = loop_limit_violation
         record["stop_reason"] = "max_iterations_exceeded"
@@ -815,6 +893,7 @@ def _record_cycle_activity(
             f"Cycle execution exceeded loopLimit ({max_iterations}) for condition '{source_node}'. Add an exit branch or raise loopLimit."
         )
 
+    _advance_condition_loop_iterations(cycle_tracker, next_iteration_edge_ids)
     next_iteration = iteration + 1
     cycle_tracker["current_iteration"] = next_iteration
     _ensure_cycle_iteration_record(cycle_tracker, next_iteration, next_iteration_edge_ids)
@@ -855,7 +934,7 @@ def _record_cycle_route_activity(
             f"Cycle execution made no state progress in iteration {iteration}. Add an exit branch or update a state value inside the loop."
         )
 
-    loop_limit_violation = _check_condition_loop_limit(cycle_tracker, next_iteration_edge_ids)
+    loop_limit_violation = _peek_condition_loop_limit_violation(cycle_tracker, next_iteration_edge_ids)
     if loop_limit_violation is not None:
         max_iterations, source_node = loop_limit_violation
         record["stop_reason"] = "max_iterations_exceeded"
@@ -871,6 +950,7 @@ def _record_cycle_route_activity(
             f"Cycle execution exceeded loopLimit ({max_iterations}) for condition '{source_node}'. Add an exit branch or raise loopLimit."
         )
 
+    _advance_condition_loop_iterations(cycle_tracker, next_iteration_edge_ids)
     next_iteration = iteration + 1
     cycle_tracker["current_iteration"] = next_iteration
     _ensure_cycle_iteration_record(cycle_tracker, next_iteration, next_iteration_edge_ids)
@@ -905,6 +985,8 @@ def _resolve_final_cycle_stop_reason(cycle_tracker: dict[str, Any]) -> str:
     if not records:
         return "completed"
     last_record = records[-1]
+    if last_record.get("stop_reason"):
+        return str(last_record["stop_reason"])
     if (
         last_record.get("incoming_edge_ids")
         and not last_record.get("executed_node_ids")

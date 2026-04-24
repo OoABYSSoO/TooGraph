@@ -38,19 +38,24 @@
           <p>当前没有运行记录。</p>
           <RouterLink class="runs-page__empty-action" :to="runsEmptyAction.href">{{ runsEmptyAction.label }}</RouterLink>
         </article>
-        <RouterLink v-for="run in runs" :key="run.run_id" class="runs-page__card" :to="`/runs/${run.run_id}`">
+        <article v-for="run in runs" :key="run.run_id" class="runs-page__card">
           <div class="runs-page__card-header">
-            <strong>{{ run.run_id }}</strong>
-            <span class="runs-page__detail">{{ runCardDetail }}</span>
+            <strong>{{ formatRunDisplayName(run) }}</strong>
+            <div class="runs-page__card-actions">
+              <RouterLink class="runs-page__detail-link" :to="`/runs/${run.run_id}`">{{ runCardDetail }}</RouterLink>
+              <RouterLink v-if="canRestoreRunSummary(run)" class="runs-page__restore-link" :to="resolveRunRestoreUrl(run.run_id)">
+                恢复编辑
+              </RouterLink>
+            </div>
           </div>
-          <p>{{ run.graph_name }}</p>
+          <p>{{ run.run_id }}</p>
           <div class="runs-page__badges">
             <span>{{ run.status }}</span>
             <span>revisions {{ run.revision_round }}</span>
             <span v-if="run.duration_ms">duration {{ run.duration_ms }}ms</span>
             <span v-if="run.final_score">score {{ run.final_score }}</span>
           </div>
-        </RouterLink>
+        </article>
       </section>
     </section>
   </AppShell>
@@ -61,6 +66,8 @@ import { onMounted, ref, watch } from "vue";
 import { ElOption, ElSelect } from "element-plus";
 
 import { fetchRuns } from "@/api/runs";
+import { formatRunDisplayName } from "@/lib/run-display-name";
+import { canRestoreRunSummary, resolveRunRestoreUrl } from "@/lib/run-restore";
 import AppShell from "@/layouts/AppShell.vue";
 import type { RunSummary } from "@/types/run";
 
@@ -163,10 +170,9 @@ watch([graphNameQuery, statusFilter], loadRuns);
 }
 
 .runs-page__card {
-  display: block;
+  display: grid;
+  gap: 8px;
   padding: 18px;
-  color: inherit;
-  text-decoration: none;
 }
 
 .runs-page__card-header {
@@ -176,11 +182,30 @@ watch([graphNameQuery, statusFilter], loadRuns);
   gap: 12px;
 }
 
-.runs-page__detail {
+.runs-page__card-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.runs-page__detail-link,
+.runs-page__restore-link {
   font-size: 0.76rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: rgb(154, 52, 18);
+  text-decoration: none;
+}
+
+.runs-page__restore-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  border: 1px solid rgba(154, 52, 18, 0.18);
+  border-radius: 999px;
+  padding: 0 10px;
+  background: rgba(255, 248, 240, 0.9);
 }
 
 .runs-page__card p,

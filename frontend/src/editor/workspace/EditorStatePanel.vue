@@ -293,6 +293,69 @@
                 />
               </div>
             </div>
+
+            <section class="editor-state-panel__timeline">
+              <button
+                type="button"
+                class="editor-state-panel__timeline-toggle"
+                :aria-expanded="isTimelineSectionExpanded(row.key)"
+                @click="toggleTimelineSection(row.key)"
+              >
+                <div class="editor-state-panel__timeline-toggle-copy">
+                  <span class="editor-state-panel__timeline-title">运行轨迹</span>
+                  <span class="editor-state-panel__timeline-summary">{{ row.timelineSummary }}</span>
+                </div>
+                <ElIcon
+                  class="editor-state-panel__timeline-toggle-indicator"
+                  :class="{ 'editor-state-panel__timeline-toggle-indicator--open': isTimelineSectionExpanded(row.key) }"
+                  aria-hidden="true"
+                >
+                  <ArrowDown />
+                </ElIcon>
+              </button>
+
+              <div v-if="isTimelineSectionExpanded(row.key)" class="editor-state-panel__timeline-body">
+                <div v-if="row.timelineEntries.length === 0" class="editor-state-panel__timeline-empty">
+                  {{ row.timelineEmptyBody }}
+                </div>
+
+                <ol v-else class="editor-state-panel__timeline-list">
+                  <li v-for="entry in row.timelineEntries" :key="`${row.key}-${entry.sequence}-${entry.nodeId}`" class="editor-state-panel__timeline-entry">
+                    <div class="editor-state-panel__timeline-entry-head">
+                      <button
+                        type="button"
+                        class="editor-state-panel__timeline-node"
+                        :class="{ 'editor-state-panel__timeline-node--active': props.focusedNodeId === entry.nodeId }"
+                        @click="$emit('focus-node', entry.nodeId)"
+                      >
+                        <span class="editor-state-panel__timeline-node-kind">{{ entry.nodeKindLabel }}</span>
+                        <span class="editor-state-panel__timeline-node-label">{{ entry.nodeLabel }}</span>
+                      </button>
+                      <div class="editor-state-panel__timeline-meta">
+                        <span class="editor-state-panel__timeline-meta-chip">#{{ entry.sequence }}</span>
+                        <span class="editor-state-panel__timeline-meta-chip">{{ entry.outputKey }}</span>
+                        <span class="editor-state-panel__timeline-meta-chip">{{ entry.modeLabel }}</span>
+                        <span v-if="entry.createdAtLabel" class="editor-state-panel__timeline-meta-time">{{ entry.createdAtLabel }}</span>
+                      </div>
+                    </div>
+
+                    <div class="editor-state-panel__timeline-entry-value-change">
+                      <template v-if="entry.previousValuePreview !== null">
+                        <div class="editor-state-panel__timeline-value-block">
+                          <span class="editor-state-panel__timeline-value-label">Before</span>
+                          <span class="editor-state-panel__timeline-value">{{ entry.previousValuePreview }}</span>
+                        </div>
+                        <span class="editor-state-panel__timeline-arrow" aria-hidden="true">→</span>
+                      </template>
+                      <div class="editor-state-panel__timeline-value-block">
+                        <span class="editor-state-panel__timeline-value-label">{{ entry.previousValuePreview !== null ? "After" : "Set to" }}</span>
+                        <span class="editor-state-panel__timeline-value">{{ entry.valuePreview }}</span>
+                      </div>
+                    </div>
+                  </li>
+                </ol>
+              </div>
+            </section>
           </div>
         </article>
       </div>
@@ -315,9 +378,11 @@ import {
 } from "./statePanelFields.ts";
 import { buildStatePanelViewModel } from "./statePanelViewModel";
 import type { GraphDocument, GraphPayload, StateDefinition } from "@/types/node-system";
+import type { RunDetail } from "@/types/run";
 
 const props = defineProps<{
   document: GraphPayload | GraphDocument;
+  run?: RunDetail | null;
   focusedNodeId?: string | null;
 }>();
 
@@ -334,10 +399,11 @@ const emit = defineEmits<{
   (event: "remove-writer", payload: { stateKey: string; nodeId: string }): void;
 }>();
 
-const view = computed(() => buildStatePanelViewModel(props.document));
+const view = computed(() => buildStatePanelViewModel(props.document, props.run ?? null));
 const readerTotal = computed(() => view.value.rows.reduce((total, row) => total + row.readerCount, 0));
 const writerTotal = computed(() => view.value.rows.reduce((total, row) => total + row.writerCount, 0));
 const expandedStateKeys = ref<Record<string, boolean>>({});
+const expandedTimelineKeys = ref<Record<string, boolean>>({});
 const readerFormOpenByKey = ref<Record<string, boolean>>({});
 const writerFormOpenByKey = ref<Record<string, boolean>>({});
 const activeStateDeleteKey = ref<string | null>(null);
@@ -361,6 +427,17 @@ function toggleStateRow(stateKey: string) {
   expandedStateKeys.value = {
     ...expandedStateKeys.value,
     [stateKey]: !isStateRowExpanded(stateKey),
+  };
+}
+
+function isTimelineSectionExpanded(stateKey: string) {
+  return expandedTimelineKeys.value[stateKey] ?? false;
+}
+
+function toggleTimelineSection(stateKey: string) {
+  expandedTimelineKeys.value = {
+    ...expandedTimelineKeys.value,
+    [stateKey]: !isTimelineSectionExpanded(stateKey),
   };
 }
 
@@ -907,6 +984,196 @@ function handleStateColorSelect(stateKey: string, value: string | number | boole
 .editor-state-panel__binding-groups {
   display: grid;
   gap: 10px;
+}
+
+.editor-state-panel__timeline {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid rgba(154, 52, 18, 0.12);
+  padding-top: 12px;
+}
+
+.editor-state-panel__timeline-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid rgba(154, 52, 18, 0.14);
+  border-radius: 16px;
+  background: rgba(255, 248, 240, 0.72);
+  padding: 10px 12px;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.editor-state-panel__timeline-toggle-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.editor-state-panel__timeline-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(154, 52, 18, 0.82);
+}
+
+.editor-state-panel__timeline-summary {
+  font-size: 0.84rem;
+  color: rgba(60, 41, 20, 0.78);
+}
+
+.editor-state-panel__timeline-toggle-indicator {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: 1px solid rgba(154, 52, 18, 0.12);
+  background: rgba(255, 252, 247, 0.92);
+  color: rgba(154, 52, 18, 0.78);
+  transition: transform 160ms ease;
+}
+
+.editor-state-panel__timeline-toggle-indicator--open {
+  transform: rotate(180deg);
+}
+
+.editor-state-panel__timeline-body {
+  display: grid;
+  gap: 10px;
+}
+
+.editor-state-panel__timeline-empty {
+  border: 1px dashed rgba(154, 52, 18, 0.18);
+  border-radius: 16px;
+  background: rgba(255, 250, 241, 0.66);
+  padding: 12px;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: rgba(60, 41, 20, 0.7);
+}
+
+.editor-state-panel__timeline-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.editor-state-panel__timeline-entry {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(154, 52, 18, 0.12);
+  border-radius: 16px;
+  background: rgba(255, 252, 247, 0.9);
+  padding: 10px;
+}
+
+.editor-state-panel__timeline-entry-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.editor-state-panel__timeline-node {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid rgba(154, 52, 18, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 250, 241, 0.94);
+  padding: 6px 10px;
+  color: #1f2937;
+  cursor: pointer;
+}
+
+.editor-state-panel__timeline-node--active {
+  border-color: rgba(217, 119, 6, 0.28);
+  background: rgba(255, 247, 237, 0.96);
+}
+
+.editor-state-panel__timeline-node-kind {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(154, 52, 18, 0.72);
+}
+
+.editor-state-panel__timeline-node-label {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.editor-state-panel__timeline-meta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.editor-state-panel__timeline-meta-chip,
+.editor-state-panel__timeline-meta-time {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  border-radius: 999px;
+  border: 1px solid rgba(154, 52, 18, 0.12);
+  background: rgba(255, 250, 241, 0.86);
+  padding: 0 8px;
+  font-size: 0.72rem;
+  color: rgba(60, 41, 20, 0.7);
+}
+
+.editor-state-panel__timeline-entry-value-change {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.editor-state-panel__timeline-value-block {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  flex: 1 1 180px;
+}
+
+.editor-state-panel__timeline-value-label {
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(154, 52, 18, 0.68);
+}
+
+.editor-state-panel__timeline-value {
+  display: block;
+  min-width: 0;
+  border-radius: 12px;
+  background: rgba(255, 248, 240, 0.82);
+  padding: 8px 10px;
+  color: #1f2937;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.editor-state-panel__timeline-arrow {
+  color: rgba(154, 52, 18, 0.58);
+  font-size: 0.9rem;
 }
 
 .editor-state-panel__binding-group {
