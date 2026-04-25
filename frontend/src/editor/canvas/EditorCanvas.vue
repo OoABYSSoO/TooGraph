@@ -39,14 +39,23 @@
         :class="{ 'editor-canvas__edge-view-button--active': edgeVisibilityMode === option.mode }"
         :title="option.title"
         :aria-pressed="edgeVisibilityMode === option.mode"
-        @click.stop="setEdgeVisibilityMode(option.mode)"
+        @click.stop="handleEdgeVisibilityModeClick(option.mode)"
       >
         {{ option.label }}
       </button>
     </div>
-    <div v-if="interactionLocked" class="editor-canvas__lock-banner" aria-live="polite">
+    <button
+      v-if="interactionLocked"
+      type="button"
+      class="editor-canvas__lock-banner"
+      aria-live="polite"
+      @pointerdown.stop
+      @click.stop="handleLockBannerClick"
+      @keydown.enter.prevent="handleLockBannerClick"
+      @keydown.space.prevent="handleLockBannerClick"
+    >
       Human Review Paused · Graph Locked
-    </div>
+    </button>
     <div class="editor-canvas__viewport" :style="viewportStyle">
       <div v-if="nodeEntries.length === 0" class="editor-canvas__empty-state">
         <div class="editor-canvas__empty-card">
@@ -798,6 +807,13 @@ function setEdgeVisibilityMode(mode: EdgeVisibilityMode) {
   clearCanvasTransientState();
 }
 
+function handleEdgeVisibilityModeClick(mode: EdgeVisibilityMode) {
+  if (guardLockedCanvasInteraction()) {
+    return;
+  }
+  setEdgeVisibilityMode(mode);
+}
+
 watch(projectedEdges, (edges) => {
   if (selectedEdgeId.value && !edges.some((edge) => edge.id === selectedEdgeId.value)) {
     selectedEdgeId.value = null;
@@ -818,6 +834,19 @@ watch(projectedEdges, (edges) => {
     closeDataEdgeStateEditor();
   }
 });
+
+watch(
+  () => props.interactionLocked,
+  (locked) => {
+    if (locked) {
+      clearCanvasTransientState();
+      pendingConnection.value = null;
+      pendingConnectionPoint.value = null;
+      autoSnappedTargetAnchor.value = null;
+      selectedEdgeId.value = null;
+    }
+  },
+);
 
 watch(pendingAgentInputSourceByNodeId, () => {
   void nextTick().then(() => {
@@ -957,6 +986,9 @@ function startFlowEdgeDeleteConfirm(edge: ProjectedCanvasEdge, event: PointerEve
 }
 
 function confirmFlowEdgeDelete() {
+  if (guardLockedCanvasInteraction()) {
+    return;
+  }
   if (!activeFlowEdgeDeleteConfirm.value) {
     return;
   }
@@ -1020,6 +1052,9 @@ function buildStateDraftFromSchema(stateKey: string): StateFieldDraft | null {
 }
 
 function openDataEdgeStateEditor() {
+  if (guardLockedCanvasInteraction()) {
+    return;
+  }
   if (!activeDataEdgeStateConfirm.value) {
     return;
   }
@@ -1085,6 +1120,9 @@ function syncDataEdgeStateDraft(nextDraft: StateFieldDraft) {
 }
 
 function handleDataEdgeStateEditorKeyInput(value: string | number) {
+  if (guardLockedCanvasInteraction()) {
+    return;
+  }
   if (typeof value !== "string" || !dataEdgeStateDraft.value) {
     return;
   }
@@ -1095,6 +1133,9 @@ function handleDataEdgeStateEditorKeyInput(value: string | number) {
 }
 
 function handleDataEdgeStateEditorNameInput(value: string | number) {
+  if (guardLockedCanvasInteraction()) {
+    return;
+  }
   if (typeof value !== "string" || !dataEdgeStateDraft.value) {
     return;
   }
@@ -1108,6 +1149,9 @@ function handleDataEdgeStateEditorNameInput(value: string | number) {
 }
 
 function handleDataEdgeStateEditorDescriptionInput(value: string | number) {
+  if (guardLockedCanvasInteraction()) {
+    return;
+  }
   if (typeof value !== "string" || !dataEdgeStateDraft.value) {
     return;
   }
@@ -1121,6 +1165,9 @@ function handleDataEdgeStateEditorDescriptionInput(value: string | number) {
 }
 
 function handleDataEdgeStateEditorColorInput(value: string | number) {
+  if (guardLockedCanvasInteraction()) {
+    return;
+  }
   if (typeof value !== "string" || !dataEdgeStateDraft.value) {
     return;
   }
@@ -1134,6 +1181,9 @@ function handleDataEdgeStateEditorColorInput(value: string | number) {
 }
 
 function handleDataEdgeStateEditorTypeValue(value: string | number | boolean | undefined) {
+  if (guardLockedCanvasInteraction()) {
+    return;
+  }
   if (typeof value !== "string" || !dataEdgeStateDraft.value) {
     return;
   }
@@ -2303,7 +2353,7 @@ function completePendingConnection(targetAnchor: ProjectedCanvasAnchor) {
 }
 
 function handleSelectedEdgeDelete() {
-  if (isGraphEditingLocked()) {
+  if (guardLockedCanvasInteraction()) {
     return;
   }
   const edge = selectedEdgeId.value ? projectedEdges.value.find((candidate) => candidate.id === selectedEdgeId.value) : null;
@@ -2373,6 +2423,27 @@ function isGraphEditingLocked() {
   return Boolean(props.interactionLocked);
 }
 
+function handleLockBannerClick() {
+  if (!props.currentRunNodeId) {
+    emit("locked-edit-attempt");
+    return;
+  }
+  emit("open-human-review", { nodeId: props.currentRunNodeId });
+}
+
+function guardLockedCanvasInteraction() {
+  if (!isGraphEditingLocked()) {
+    return false;
+  }
+  clearCanvasTransientState();
+  pendingConnection.value = null;
+  pendingConnectionPoint.value = null;
+  autoSnappedTargetAnchor.value = null;
+  selectedEdgeId.value = null;
+  emit("locked-edit-attempt");
+  return true;
+}
+
 function isLockedNodeEditTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) {
     return false;
@@ -2381,10 +2452,21 @@ function isLockedNodeEditTarget(target: EventTarget | null) {
   return Boolean(
     target.closest(
       [
+        "button",
+        "input",
+        "textarea",
+        "select",
+        "[role='button']",
+        "[data-top-action-surface='true']",
         "[data-state-editor-trigger='true']",
+        "[data-text-editor-trigger='true']",
+        "[data-node-popup-surface='true']",
         ".node-card__port-pill-remove",
         ".node-card__state-editor",
         ".node-card__state-editor-popper",
+        ".el-switch",
+        ".el-select",
+        ".el-input",
       ].join(", "),
     ),
   );
@@ -2395,10 +2477,10 @@ function handleLockedNodePointerCapture(nodeId: string, event: PointerEvent) {
     return;
   }
   const target = event.target;
-  if (target instanceof HTMLElement && target.closest("[data-human-review-action='true']")) {
-    return;
-  }
-  if (isLockedNodeEditTarget(target)) {
+  if (
+    (target instanceof HTMLElement && target.closest("[data-human-review-action='true']")) ||
+    isLockedNodeEditTarget(target)
+  ) {
     emit("locked-edit-attempt");
   }
   event.preventDefault();
@@ -2449,28 +2531,43 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
 
 .editor-canvas__lock-banner {
   position: absolute;
-  top: var(--editor-canvas-floating-top-clearance, 18px);
+  top: calc(var(--editor-canvas-floating-top-clearance, 18px) + 64px);
   left: 50%;
   z-index: 33;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: min(420px, calc(100vw - 56px));
+  appearance: none;
   transform: translateX(-50%);
-  padding: 10px 18px;
-  border: 1px solid rgba(154, 52, 18, 0.48);
+  padding: 14px 28px;
+  border: 1px solid rgba(255, 247, 237, 0.34);
   border-radius: 999px;
-  background: var(--graphite-glass-specular), var(--graphite-glass-lens), rgba(255, 247, 237, 0.78);
-  background-blend-mode: screen, screen, normal;
-  color: #7c2d12;
-  font-size: 0.8rem;
+  background: linear-gradient(135deg, rgba(154, 52, 18, 0.96), rgba(131, 43, 13, 0.94));
+  color: #fff7ed;
+  font-size: 0.92rem;
   font-weight: 800;
+  line-height: 1.1;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.72) inset,
-    0 0 0 4px rgba(234, 88, 12, 0.1),
-    0 14px 34px rgba(124, 45, 18, 0.16),
-    0 0 26px rgba(234, 88, 12, 0.2);
-  backdrop-filter: blur(28px) saturate(1.7) contrast(1.03);
+    0 0 0 1px rgba(255, 247, 237, 0.16) inset,
+    0 18px 42px rgba(124, 45, 18, 0.24),
+    0 0 34px rgba(217, 119, 6, 0.24);
+  backdrop-filter: blur(28px) saturate(1.4) contrast(1.08);
   animation: editor-canvas-lock-banner-breathe 2.4s ease-in-out infinite;
-  pointer-events: none;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.editor-canvas__lock-banner:hover,
+.editor-canvas__lock-banner:focus-visible {
+  border-color: rgba(255, 247, 237, 0.54);
+  outline: none;
+  box-shadow:
+    0 0 0 1px rgba(255, 247, 237, 0.22) inset,
+    0 20px 46px rgba(124, 45, 18, 0.3),
+    0 0 42px rgba(234, 88, 12, 0.34);
 }
 
 .editor-canvas__edge-view-toolbar {
@@ -3131,28 +3228,25 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   100% {
     transform: translateX(-50%) scale(1);
     box-shadow:
-      0 0 0 1px rgba(255, 255, 255, 0.72) inset,
-      0 0 0 4px rgba(234, 88, 12, 0.1),
-      0 14px 34px rgba(124, 45, 18, 0.16),
-      0 0 22px rgba(234, 88, 12, 0.16);
+      0 0 0 1px rgba(255, 247, 237, 0.16) inset,
+      0 18px 42px rgba(124, 45, 18, 0.24),
+      0 0 28px rgba(217, 119, 6, 0.22);
   }
 
   48% {
     transform: translateX(-50%) scale(1.018);
     box-shadow:
-      0 0 0 1px rgba(255, 255, 255, 0.84) inset,
-      0 0 0 5px rgba(234, 88, 12, 0.14),
-      0 18px 42px rgba(124, 45, 18, 0.22),
-      0 0 34px rgba(234, 88, 12, 0.32);
+      0 0 0 1px rgba(255, 247, 237, 0.26) inset,
+      0 22px 50px rgba(124, 45, 18, 0.32),
+      0 0 42px rgba(234, 88, 12, 0.34);
   }
 
   58% {
     transform: translateX(-50%) scale(1.006);
     box-shadow:
-      0 0 0 1px rgba(255, 255, 255, 0.78) inset,
-      0 0 0 4px rgba(234, 88, 12, 0.11),
-      0 14px 34px rgba(124, 45, 18, 0.18),
-      0 0 26px rgba(234, 88, 12, 0.22);
+      0 0 0 1px rgba(255, 247, 237, 0.2) inset,
+      0 18px 42px rgba(124, 45, 18, 0.26),
+      0 0 32px rgba(217, 119, 6, 0.26);
   }
 }
 

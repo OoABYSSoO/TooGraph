@@ -310,10 +310,35 @@ test("NodeCard shows a persistent human review capsule in the top action dock", 
   assert.match(componentSource, /humanReviewPending:\s*boolean;/);
   assert.match(componentSource, /v-if="humanReviewPending"/);
   assert.match(componentSource, /class="node-card__human-review-button"/);
-  assert.match(componentSource, /@click\.stop="\$emit\('open-human-review', \{ nodeId \}\)"/);
+  assert.match(componentSource, /@click\.stop="handleHumanReviewActionClick"/);
+  assert.match(componentSource, /function handleHumanReviewActionClick\(\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
   assert.match(componentSource, /Human Review/);
   assert.match(componentSource, /const isTopActionVisible = computed\(\(\) => props\.humanReviewPending \|\| props\.selected \|\| activeTopAction\.value !== null\);/);
   assert.match(componentSource, /\.node-card__human-review-button \{[\s\S]*background:\s*rgba\(217,\s*119,\s*6,\s*0\.12\);/);
+});
+
+test("NodeCard blocks every in-canvas control while graph editing is locked", () => {
+  assert.match(componentSource, /@pointerdown\.capture="handleLockedNodeCardInteractionCapture"/);
+  assert.match(componentSource, /@click\.capture="handleLockedNodeCardInteractionCapture"/);
+  assert.match(componentSource, /@keydown\.capture="handleLockedNodeCardInteractionCapture"/);
+  assert.match(componentSource, /function isLockedInteractiveTarget\(target: EventTarget \| null\)/);
+  assert.match(componentSource, /"button",[\s\S]*"input",[\s\S]*"textarea",[\s\S]*"\[role='button'\]"/);
+  assert.match(componentSource, /function closeLockedFloatingPanels\(\)/);
+  assert.match(componentSource, /function guardLockedGraphInteraction\(\)/);
+  assert.match(componentSource, /emit\("locked-edit-attempt"\);/);
+  assert.match(componentSource, /function handleLockedNodeCardInteractionCapture\(event: Event\)[\s\S]*if \(!isLockedInteractiveTarget\(event\.target\)\) \{[\s\S]*return;[\s\S]*\}/);
+  assert.match(componentSource, /function handleLockedNodeCardInteractionCapture\(event: Event\)[\s\S]*guardLockedGraphInteraction\(\);/);
+  assert.match(componentSource, /watch\(\s*\(\) => props\.interactionLocked,[\s\S]*closeLockedFloatingPanels\(\);/);
+  assert.match(componentSource, /function emitOutputConfigPatch\(patch: Partial<OutputNode\["config"\]>\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
+  assert.match(componentSource, /function emitInputConfigPatch\(patch: Partial<InputNode\["config"\]>\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
+  assert.match(componentSource, /function emitAgentConfigPatch\(patch: Partial<AgentNode\["config"\]>\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
+  assert.match(componentSource, /function emitConditionConfigPatch\(patch: Partial<ConditionNode\["config"\]>\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
+  assert.match(componentSource, /function handleAgentBreakpointToggle\(\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
+  assert.match(componentSource, /function toggleAdvancedPanel\(\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
+  assert.match(componentSource, /function toggleSkillPicker\(\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
+  assert.match(componentSource, /function openPortPicker\(side: "input" \| "output"\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
+  assert.match(componentSource, /function bindStateToPort\(stateKey: string\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
+  assert.match(componentSource, /function commitPortStateCreate\(\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
 });
 
 test("NodeCard reveals state pills on hover and opens state editing only after a confirm click", () => {

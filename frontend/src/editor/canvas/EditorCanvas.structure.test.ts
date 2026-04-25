@@ -119,9 +119,23 @@ test("EditorCanvas keeps paused human-review graphs viewable but read-only", () 
   assert.match(componentSource, /'editor-canvas--locked': interactionLocked/);
   assert.match(componentSource, /v-if="interactionLocked"/);
   assert.match(componentSource, /class="editor-canvas__lock-banner"/);
+  assert.match(componentSource, /<button[\s\S]*v-if="interactionLocked"[\s\S]*type="button"[\s\S]*class="editor-canvas__lock-banner"/);
+  assert.match(componentSource, /@click\.stop="handleLockBannerClick"/);
+  assert.match(componentSource, /@keydown\.enter\.prevent="handleLockBannerClick"/);
+  assert.match(componentSource, /@keydown\.space\.prevent="handleLockBannerClick"/);
   assert.match(componentSource, /Human Review Paused · Graph Locked/);
   assert.match(componentSource, /@keyframes editor-canvas-lock-banner-breathe/);
-  assert.match(componentSource, /\.editor-canvas__lock-banner \{[\s\S]*border:\s*1px solid rgba\(154,\s*52,\s*18,\s*0\.48\);/);
+  assert.match(componentSource, /function handleLockBannerClick\(\)[\s\S]*emit\("open-human-review", \{ nodeId: props\.currentRunNodeId \}\);/);
+  assert.match(componentSource, /\.editor-canvas__lock-banner \{[\s\S]*top:\s*calc\(var\(--editor-canvas-floating-top-clearance,\s*18px\) \+ 64px\);/);
+  assert.match(componentSource, /\.editor-canvas__lock-banner \{[\s\S]*min-width:\s*min\(420px,\s*calc\(100vw - 56px\)\);/);
+  assert.match(componentSource, /\.editor-canvas__lock-banner \{[\s\S]*justify-content:\s*center;/);
+  assert.match(componentSource, /\.editor-canvas__lock-banner \{[\s\S]*padding:\s*14px 28px;/);
+  assert.match(componentSource, /\.editor-canvas__lock-banner \{[\s\S]*font-size:\s*0\.92rem;/);
+  assert.match(componentSource, /\.editor-canvas__lock-banner \{[\s\S]*border:\s*1px solid rgba\(255,\s*247,\s*237,\s*0\.34\);/);
+  assert.match(componentSource, /\.editor-canvas__lock-banner \{[\s\S]*background:\s*linear-gradient\(135deg,\s*rgba\(154,\s*52,\s*18,\s*0\.96\),\s*rgba\(131,\s*43,\s*13,\s*0\.94\)\);/);
+  assert.match(componentSource, /\.editor-canvas__lock-banner \{[\s\S]*color:\s*#fff7ed;/);
+  assert.match(componentSource, /\.editor-canvas__lock-banner \{[\s\S]*cursor:\s*pointer;/);
+  assert.match(componentSource, /\.editor-canvas__lock-banner \{[\s\S]*pointer-events:\s*auto;/);
   assert.match(componentSource, /\.editor-canvas__lock-banner \{[\s\S]*animation:\s*editor-canvas-lock-banner-breathe 2\.4s ease-in-out infinite;/);
   assert.match(componentSource, /function isGraphEditingLocked\(\)/);
   assert.match(componentSource, /return Boolean\(props\.interactionLocked\);/);
@@ -131,17 +145,24 @@ test("EditorCanvas keeps paused human-review graphs viewable but read-only", () 
   assert.match(componentSource, /:interaction-locked="isGraphEditingLocked\(\)"/);
   assert.match(componentSource, /@locked-edit-attempt="emit\('locked-edit-attempt'\)"/);
   assert.match(componentSource, /function isLockedNodeEditTarget\(target: EventTarget \| null\)/);
+  assert.match(componentSource, /function guardLockedCanvasInteraction\(\)/);
+  assert.match(componentSource, /@click\.stop="handleEdgeVisibilityModeClick\(option\.mode\)"/);
+  assert.match(componentSource, /function handleEdgeVisibilityModeClick\(mode: EdgeVisibilityMode\)[\s\S]*if \(guardLockedCanvasInteraction\(\)\) \{[\s\S]*return;/);
+  assert.match(componentSource, /watch\(\s*\(\) => props\.interactionLocked,[\s\S]*clearCanvasTransientState\(\);/);
   assert.match(componentSource, /\[data-state-editor-trigger='true'\]/);
-  assert.match(componentSource, /if \(isLockedNodeEditTarget\(target\)\) \{[\s\S]*emit\("locked-edit-attempt"\);/);
+  assert.match(componentSource, /isLockedNodeEditTarget\(target\)[\s\S]*emit\("locked-edit-attempt"\);/);
   assert.match(componentSource, /if \(isGraphEditingLocked\(\)\) \{/);
+  assert.match(componentSource, /function confirmFlowEdgeDelete\(\)[\s\S]*if \(guardLockedCanvasInteraction\(\)\) \{[\s\S]*return;/);
+  assert.match(componentSource, /function openDataEdgeStateEditor\(\)[\s\S]*if \(guardLockedCanvasInteraction\(\)\) \{[\s\S]*return;/);
   assert.match(componentSource, /function handleCanvasDoubleClick\(event: MouseEvent\)[\s\S]*if \(isGraphEditingLocked\(\)\) \{[\s\S]*emit\("locked-edit-attempt"\);/);
   assert.match(componentSource, /function handleCanvasDrop\(event: DragEvent\)[\s\S]*if \(isGraphEditingLocked\(\)\) \{[\s\S]*emit\("locked-edit-attempt"\);/);
   assert.match(componentSource, /function handleEdgePointerDown\(edge: ProjectedCanvasEdge, event: PointerEvent\)[\s\S]*if \(isGraphEditingLocked\(\)\) \{[\s\S]*emit\("locked-edit-attempt"\);/);
   assert.match(componentSource, /function handleAnchorPointerDown\(anchor: ProjectedCanvasAnchor\)[\s\S]*if \(isGraphEditingLocked\(\)\) \{[\s\S]*emit\("locked-edit-attempt"\);/);
+  assert.match(componentSource, /function handleSelectedEdgeDelete\(\)[\s\S]*if \(guardLockedCanvasInteraction\(\)\) \{[\s\S]*return;/);
 });
 
 test("EditorCanvas lets top-left floating tools respect workspace overlay clearance", () => {
-  assert.match(componentSource, /\.editor-canvas__lock-banner \{[\s\S]*top:\s*var\(--editor-canvas-floating-top-clearance,\s*18px\);/);
+  assert.match(componentSource, /\.editor-canvas__lock-banner \{[\s\S]*top:\s*calc\(var\(--editor-canvas-floating-top-clearance,\s*18px\) \+ 64px\);/);
   assert.match(componentSource, /\.editor-canvas__edge-view-toolbar \{[\s\S]*top:\s*calc\(var\(--editor-canvas-floating-top-clearance,\s*18px\) \+ 18px\);/);
 });
 
@@ -241,7 +262,7 @@ test("EditorCanvas exposes a top-left capsule toolbar for edge visibility modes"
   assert.match(componentSource, /function isProjectedEdgeVisible\(edge: ProjectedCanvasEdge\)/);
   assert.match(componentSource, /class="editor-canvas__edge-view-toolbar"/);
   assert.match(componentSource, /v-for="option in EDGE_VISIBILITY_MODE_OPTIONS"/);
-  assert.match(componentSource, /setEdgeVisibilityMode\(option\.mode\)/);
+  assert.match(componentSource, /handleEdgeVisibilityModeClick\(option\.mode\)/);
   assert.match(componentSource, /\{\{ option\.label \}\}/);
   assert.match(componentSource, /v-show="isProjectedEdgeVisible\(edge\)"/);
   assert.match(
