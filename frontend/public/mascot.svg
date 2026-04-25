@@ -27,16 +27,14 @@
       id="mascotTail"
       fill="none"
       stroke="url(#catBlack)"
-      stroke-width="48"
+      stroke-width="42"
       stroke-linecap="round"
       stroke-linejoin="round"
-      d="M174 182
-         C268 174 324 106 314 29
-         C305 -38 252 -82 194 -72
-         C148-64 126-31 134 3
-         C142 35 166 48 191 50
-         C225 53 238 87 220 112
-         C204 134 167 141 138 122"
+      d="M162 178
+         C242 172 306 118 312 42
+         C319 -42 247 -100 174 -72
+         C123 -52 118 8 159 26
+         C190 40 220 20 218 -18"
     />
     <path
       id="mascotSparkle"
