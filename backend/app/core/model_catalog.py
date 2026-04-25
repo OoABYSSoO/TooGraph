@@ -235,7 +235,7 @@ def _build_local_provider_models(
     saved_settings: dict[str, Any],
     runtime_config: dict[str, Any] | None,
     force_refresh: bool,
-) -> tuple[list[dict[str, Any]], str]:
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str]:
     llama_config = _dict_or_empty(runtime_config.get("llama")) if isinstance(runtime_config, dict) else {}
     local_route_models = get_local_route_model_names(force_refresh=force_refresh, runtime_config=runtime_config)
     saved_local_models = list(provider.get("models") or [])
@@ -252,40 +252,31 @@ def _build_local_provider_models(
         else get_default_text_model(force_refresh=False)
     )
 
-    if local_route_models:
-        local_text_model = preferred_local_text_model if preferred_local_text_model in local_route_models else local_route_models[0]
-        source_models = [
-            {
-                "model": model_name,
-                "label": next(
-                    (
-                        saved_model["label"]
-                        for saved_model in saved_local_models
-                        if str(saved_model.get("model") or "").lower() == model_name.lower()
-                    ),
-                    model_name,
-                ),
-                "modalities": ["text"],
-                "reasoning": True,
-                "route_target": "",
-                "context_window": None,
-                "max_tokens": None,
-            }
-            for model_name in local_route_models
-        ]
+    saved_by_name = {str(model.get("model") or "").lower(): model for model in saved_local_models}
+    discovered_models = [
+        {
+            "model": model_name,
+            "label": saved_by_name.get(model_name.lower(), {}).get("label") or model_name,
+            "modalities": saved_by_name.get(model_name.lower(), {}).get("modalities") or ["text"],
+            "reasoning": True,
+            "route_target": saved_by_name.get(model_name.lower(), {}).get("route_target") or "",
+            "context_window": saved_by_name.get(model_name.lower(), {}).get("context_window"),
+            "max_tokens": saved_by_name.get(model_name.lower(), {}).get("max_tokens"),
+        }
+        for model_name in local_route_models
+    ]
+
+    if provider.get("saved"):
+        source_models = saved_local_models
+    elif discovered_models:
+        source_models = discovered_models
     elif saved_local_models:
-        local_text_model = (
-            preferred_local_text_model
-            if preferred_local_text_model in {model["model"] for model in saved_local_models}
-            else saved_local_models[0]["model"]
-        )
         source_models = saved_local_models
     else:
-        local_text_model = preferred_local_text_model
         source_models = [
             {
-                "model": local_text_model,
-                "label": local_text_model,
+                "model": preferred_local_text_model,
+                "label": preferred_local_text_model,
                 "modalities": ["text"],
                 "reasoning": True,
                 "route_target": "",
@@ -293,6 +284,22 @@ def _build_local_provider_models(
                 "max_tokens": None,
             }
         ]
+
+    selected_model_names = [str(model.get("model") or "").strip() for model in source_models if str(model.get("model") or "").strip()]
+    discovered_model_names = [str(model.get("model") or "").strip() for model in discovered_models if str(model.get("model") or "").strip()]
+    if selected_model_names:
+        local_text_model = (
+            preferred_local_text_model if preferred_local_text_model in selected_model_names else selected_model_names[0]
+        )
+    elif discovered_model_names:
+        local_text_model = (
+            preferred_local_text_model if preferred_local_text_model in discovered_model_names else discovered_model_names[0]
+        )
+    else:
+        local_text_model = preferred_local_text_model
+
+    if not discovered_models:
+        discovered_models = source_models
 
     local_context_window = llama_config.get("ctx_size") if isinstance(llama_config.get("ctx_size"), int) else None
     local_max_tokens = llama_config.get("n_predict") if isinstance(llama_config.get("n_predict"), int) else None
@@ -311,6 +318,16 @@ def _build_local_provider_models(
                 local_display_model_name=local_display_model_name,
             )
             for model in source_models
+        ],
+        [
+            _build_catalog_model(
+                "local",
+                model,
+                local_context_window=local_context_window,
+                local_max_tokens=local_max_tokens,
+                local_display_model_name=local_display_model_name,
+            )
+            for model in discovered_models
         ],
         local_text_model,
     )
@@ -351,6 +368,7 @@ def _build_provider_entry(
     provider: dict[str, Any],
     *,
     models: list[dict[str, Any]],
+    discovered_models: list[dict[str, Any]] | None = None,
     runtime_config: dict[str, Any] | None,
 ) -> dict[str, Any]:
     api_key_configured = bool(str(provider.get("api_key") or "").strip())
@@ -376,6 +394,7 @@ def _build_provider_entry(
         "saved": bool(provider.get("saved")),
         "api_key_configured": api_key_configured,
         "models": models,
+        "discovered_models": discovered_models if discovered_models is not None else models,
         "example_model_refs": provider.get("example_model_refs") or [],
         "template_group": provider.get("template_group") or "custom",
     }
@@ -398,9 +417,10 @@ def _resolve_default_model_ref(
         provider = provider_by_id.get(provider_id)
         if provider and provider.get("configured"):
             provider_models = [model["model"] for model in provider.get("models", [])]
-            if not provider_models or model_id in provider_models:
+            if model_id in provider_models:
                 return build_model_ref(provider_id, model_id)
-            return build_model_ref(provider_id, provider_models[0])
+            if provider_models:
+                return build_model_ref(provider_id, provider_models[0])
 
     for provider in provider_entries:
         if not provider.get("configured"):
@@ -443,16 +463,25 @@ def build_model_catalog(*, force_refresh: bool = False) -> dict[str, Any]:
     for provider_id in provider_ids:
         provider = _normalize_provider_config(provider_id, saved_providers.get(provider_id), runtime_config=runtime_config)
         if provider_id == "local":
-            catalog_models, local_text_model = _build_local_provider_models(
+            catalog_models, discovered_catalog_models, local_text_model = _build_local_provider_models(
                 provider,
                 saved_settings=saved_settings,
                 runtime_config=runtime_config,
                 force_refresh=force_refresh,
             )
         else:
-            model_items = _discover_provider_model_items(provider, force_refresh=force_refresh)
-            catalog_models = [_build_catalog_model(provider_id, model) for model in model_items]
-        provider_entries.append(_build_provider_entry(provider, models=catalog_models, runtime_config=runtime_config))
+            selected_model_items = list(provider.get("models") or [])
+            discovered_model_items = _discover_provider_model_items(provider, force_refresh=force_refresh)
+            catalog_models = [_build_catalog_model(provider_id, model) for model in selected_model_items]
+            discovered_catalog_models = [_build_catalog_model(provider_id, model) for model in discovered_model_items]
+        provider_entries.append(
+            _build_provider_entry(
+                provider,
+                models=catalog_models,
+                discovered_models=discovered_catalog_models,
+                runtime_config=runtime_config,
+            )
+        )
 
     if not local_text_model:
         local_text_model = get_default_text_model(force_refresh=False)

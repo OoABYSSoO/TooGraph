@@ -76,11 +76,13 @@ class OpenAiCompatibleProviderRuntimeTests(unittest.TestCase):
         with self._patched_local_provider_env(LOCAL_BASE_URL="http://127.0.0.1:8801/v1"):
             _local_llm, model_catalog = self._reload_target_modules()
 
-            with patch.object(model_catalog, "get_local_gateway_runtime_config", return_value=runtime_config):
-                with patch.object(model_catalog, "get_local_route_model_names", return_value=["llama-3.1-8b"]) as route_models:
-                    with patch.object(model_catalog, "get_default_text_model", return_value="llama-3.1-8b") as default_text_model:
-                        with patch.object(model_catalog, "get_default_video_model_name", return_value="llava-1.6"):
-                            catalog = model_catalog.build_model_catalog()
+            with patch.object(model_catalog, "load_app_settings", return_value={}):
+                with patch.object(model_catalog, "get_local_gateway_runtime_config", return_value=runtime_config):
+                    with patch.object(model_catalog, "get_local_llm_base_url", return_value="http://127.0.0.1:8801/v1"):
+                        with patch.object(model_catalog, "get_local_route_model_names", return_value=["llama-3.1-8b"]) as route_models:
+                            with patch.object(model_catalog, "get_default_text_model", return_value="llama-3.1-8b") as default_text_model:
+                                with patch.object(model_catalog, "get_default_video_model_name", return_value="llava-1.6"):
+                                    catalog = model_catalog.build_model_catalog()
 
         route_models.assert_called_once_with(force_refresh=False, runtime_config=runtime_config)
         default_text_model.assert_not_called()
@@ -168,7 +170,7 @@ class OpenAiCompatibleProviderRuntimeTests(unittest.TestCase):
 
         self.assertEqual(models, ["lm-local"])
 
-    def test_build_model_catalog_prefers_current_discovered_models_over_stale_saved_models(self) -> None:
+    def test_build_model_catalog_keeps_discovered_models_separate_from_saved_models(self) -> None:
         saved_settings = {
             "text_model_ref": "local/stale-model",
             "model_providers": {
@@ -188,8 +190,9 @@ class OpenAiCompatibleProviderRuntimeTests(unittest.TestCase):
                         catalog = model_catalog.build_model_catalog(force_refresh=True)
 
         local_provider = next(provider for provider in catalog["providers"] if provider["provider_id"] == "local")
-        self.assertEqual(catalog["default_text_model_ref"], "local/gemma-4-26b-a4b-it")
-        self.assertEqual([model["model"] for model in local_provider["models"]], ["gemma-4-26b-a4b-it"])
+        self.assertEqual(catalog["default_text_model_ref"], "local/stale-model")
+        self.assertEqual([model["model"] for model in local_provider["models"]], ["stale-model"])
+        self.assertEqual([model["model"] for model in local_provider["discovered_models"]], ["gemma-4-26b-a4b-it"])
 
     def test_build_model_catalog_includes_enabled_openai_provider_models(self) -> None:
         saved_settings = {

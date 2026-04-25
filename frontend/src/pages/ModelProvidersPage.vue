@@ -113,16 +113,6 @@
                     </div>
                   </div>
                   <div class="model-providers-page__provider-card-controls">
-                    <button
-                      type="button"
-                      class="model-providers-page__icon-button model-providers-page__refresh-icon-button"
-                      :disabled="discoveringProviderId === provider.provider_id || (isLoginProvider(provider) && !provider.auth_status?.authenticated)"
-                      :aria-label="t('settings.refreshModels')"
-                      :title="t('settings.refreshModels')"
-                      @click="handleDiscoverModels(provider.provider_id)"
-                    >
-                      <ElIcon aria-hidden="true"><Refresh /></ElIcon>
-                    </button>
                     <ElSwitch
                       v-model="provider.enabled"
                       class="model-providers-page__switch"
@@ -522,14 +512,6 @@
 
                 <div class="model-providers-page__provider-actions">
                   <button
-                    type="button"
-                    class="model-providers-page__button model-providers-page__button--primary"
-                    :disabled="discoveringProviderId === providerEditorDraft.provider_id || (isLoginProvider(providerEditorDraft) && !providerEditorDraft.auth_status?.authenticated)"
-                    @click="handleDiscoverModels(providerEditorDraft.provider_id)"
-                  >
-                    {{ discoveringProviderId === providerEditorDraft.provider_id ? t("settings.discoveringModels") : t("settings.refreshModels") }}
-                  </button>
-                  <button
                     v-if="providerEditorMode === 'add'"
                     type="button"
                     class="model-providers-page__button"
@@ -564,7 +546,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { ElIcon, ElMessage, ElOption, ElPopover, ElSelect, ElSwitch } from "element-plus";
-import { Check, CircleCheck, Close, CopyDocument, Plus, Refresh } from "@element-plus/icons-vue";
+import { Check, CircleCheck, Close, CopyDocument, Plus } from "@element-plus/icons-vue";
 import { useI18n } from "vue-i18n";
 
 import {
@@ -2016,25 +1998,6 @@ onBeforeUnmount(() => {
 
 .model-providers-page__icon-button:hover {
   background: rgba(255, 237, 213, 0.96);
-}
-
-.model-providers-page__refresh-icon-button {
-  width: 34px;
-  height: 34px;
-  border-radius: 999px;
-  border-color: rgba(37, 99, 235, 0.18);
-  background: rgba(239, 246, 255, 0.96);
-  color: rgb(37, 99, 235);
-}
-
-.model-providers-page__refresh-icon-button:hover:not(:disabled) {
-  border-color: rgba(37, 99, 235, 0.32);
-  background: rgba(219, 234, 254, 0.96);
-}
-
-.model-providers-page__refresh-icon-button:disabled {
-  opacity: 0.52;
-  cursor: not-allowed;
 }
 
 .model-providers-page__confirm-hint {

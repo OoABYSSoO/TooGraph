@@ -58,9 +58,12 @@ test("ModelProvidersPage applies provider changes immediately without a manual s
   assert.match(pageSource, /@click="handleRemoveProvider\(provider\.provider_id\)"/);
 });
 
-test("ModelProvidersPage refreshes discovered models instead of manually creating graph models", () => {
-  assert.match(pageSource, /settings\.refreshModels/);
+test("ModelProvidersPage discovers model options through add model instead of separate refresh controls", () => {
   assert.doesNotMatch(pageSource, /allow-create/);
+  assert.doesNotMatch(pageSource, /model-providers-page__refresh-icon-button/);
+  assert.doesNotMatch(pageSource, /<Refresh \/>/);
+  assert.doesNotMatch(pageSource, /@click="handleDiscoverModels\(provider\.provider_id\)"/);
+  assert.match(pageSource, /@click\.stop="handleAddProviderModel\(provider\)"/);
   assert.match(pageSource, /provider\.discovered_models = discoveredModels;/);
   assert.match(pageSource, /if \(options\.selectDiscovered\) \{[\s\S]*provider\.selected_models = discoveredModels;/);
   assert.match(pageSource, /await persistSettings\(/);
@@ -78,10 +81,8 @@ test("ModelProvidersPage keeps provider card controls on one row with capsule sw
   assert.match(pageSource, /:width="54"/);
   assert.match(pageSource, /inline-prompt/);
   assert.match(pageSource, /class="model-providers-page__provider-card-controls"/);
-  assert.match(pageSource, /class="model-providers-page__icon-button model-providers-page__refresh-icon-button"/);
-  assert.match(pageSource, /<Refresh \/>/);
-  assert.match(pageSource, /@click="handleDiscoverModels\(provider\.provider_id\)"/);
-  assert.match(pageSource, /model-providers-page__refresh-icon-button[\s\S]*model-providers-page__switch/);
+  assert.doesNotMatch(pageSource, /class="model-providers-page__icon-button model-providers-page__refresh-icon-button"/);
+  assert.doesNotMatch(pageSource, /<Refresh \/>/);
   assert.match(pageSource, /\.model-providers-page__provider-card \.model-providers-page__provider-actions \{[\s\S]*flex-wrap:\s*nowrap;/);
   assert.match(pageSource, /\.model-providers-page__provider-card \.model-providers-page__button \{[\s\S]*white-space:\s*nowrap;/);
   assert.doesNotMatch(pageSource, /class="model-providers-page__toggle"/);
@@ -165,7 +166,7 @@ test("ModelProvidersPage shows ChatGPT device-code entry as part of the normal l
 
 test("ModelProvidersPage uses toast feedback for ChatGPT copy attempts", () => {
   assert.match(pageSource, /import \{ ElIcon, ElMessage, ElOption, ElPopover, ElSelect, ElSwitch \} from "element-plus";/);
-  assert.match(pageSource, /import \{ Check, CircleCheck, Close, CopyDocument, Plus, Refresh \} from "@element-plus\/icons-vue";/);
+  assert.match(pageSource, /import \{ Check, CircleCheck, Close, CopyDocument, Plus \} from "@element-plus\/icons-vue";/);
   assert.match(pageSource, /function showCodexToast\(type: "success" \| "error", message: string\)/);
   assert.match(pageSource, /ElMessage\(\{[\s\S]*customClass:\s*"model-providers-page__copy-toast"[\s\S]*message,[\s\S]*\}\);/);
   assert.match(pageSource, /settings\.codexCodeCopyFailed/);

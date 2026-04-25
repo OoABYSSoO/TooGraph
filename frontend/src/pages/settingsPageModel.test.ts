@@ -163,6 +163,49 @@ test("buildProviderSavePayload omits api key fields for Codex login providers", 
   assert.equal(payload["openai-codex"].transport, "codex-responses");
 });
 
+test("buildProviderDraftsFromSettings keeps discovered model options separate from enabled models", () => {
+  const drafts = buildProviderDraftsFromSettings({
+    model: {
+      text_model: "gpt-5.5",
+      text_model_ref: "openai-codex/gpt-5.5",
+      video_model: "gpt-5.5",
+      video_model_ref: "openai-codex/gpt-5.5",
+    },
+    model_catalog: {
+      provider_templates: [],
+      providers: [
+        {
+          provider_id: "local",
+          label: "OpenAI-compatible Custom Provider",
+          description: "Local gateway",
+          transport: "openai-compatible",
+          configured: true,
+          enabled: true,
+          saved: true,
+          base_url: "http://127.0.0.1:8888/v1",
+          api_key_configured: true,
+          models: [],
+          discovered_models: [
+            {
+              model_ref: "local/lm-local",
+              model: "lm-local",
+              label: "lm-local",
+              modalities: ["text"],
+            },
+          ],
+          example_model_refs: [],
+        },
+      ],
+    },
+    revision: { max_revision_round: 1 },
+    evaluator: { default_score_threshold: 7.8, routes: [] },
+    tools: [],
+  });
+
+  assert.deepEqual(drafts.local.selected_models, []);
+  assert.deepEqual(drafts.local.discovered_models, ["lm-local"]);
+});
+
 test("listAddableProviderTemplates hides existing drafts", () => {
   const addable = listAddableProviderTemplates(
     {

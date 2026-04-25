@@ -41,6 +41,7 @@ export type SettingsModelProvider = {
   auth_status?: OpenAICodexAuthStatus;
   api_key_configured?: boolean;
   models: SettingsProviderModel[];
+  discovered_models?: SettingsProviderModel[];
   example_model_refs: string[];
   template_group?: string;
   gateway?: Record<string, unknown>;

@@ -159,6 +159,50 @@ class SettingsModelProviderTests(unittest.TestCase):
         self.assertEqual(response.json(), {"ok": True})
         build_payload.assert_called_once_with(force_refresh_models=False)
 
+    def test_catalog_keeps_local_discovered_models_out_of_enabled_models(self) -> None:
+        saved_settings = {
+            "text_model_ref": "openai-codex/gpt-5.5",
+            "video_model_ref": "openai-codex/gpt-5.5",
+            "model_providers": {
+                "local": {
+                    "label": "OpenAI-compatible Custom Provider",
+                    "transport": "openai-compatible",
+                    "base_url": "http://127.0.0.1:8888/v1",
+                    "enabled": True,
+                    "auth_header": "Authorization",
+                    "auth_scheme": "Bearer",
+                    "models": [],
+                },
+                "openai-codex": {
+                    "label": "OpenAI Codex / ChatGPT Login",
+                    "transport": "codex-responses",
+                    "base_url": "https://chatgpt.com/backend-api/codex",
+                    "enabled": True,
+                    "auth_mode": "chatgpt",
+                    "auth_header": "Authorization",
+                    "auth_scheme": "Bearer",
+                    "models": [{"model": "gpt-5.5", "label": "gpt-5.5"}],
+                },
+            },
+        }
+
+        from app.core import model_catalog
+
+        with patch.object(model_catalog, "load_app_settings", return_value=saved_settings):
+            with patch.object(model_catalog, "get_local_gateway_runtime_config", return_value=None):
+                with patch.object(model_catalog, "get_local_route_model_names", return_value=["lm-local"]):
+                    with patch.object(
+                        model_catalog,
+                        "get_codex_auth_status",
+                        return_value={"configured": True, "authenticated": True, "auth_mode": "chatgpt"},
+                    ):
+                        catalog = model_catalog.build_model_catalog(force_refresh=False)
+
+        local_provider = next(provider for provider in catalog["providers"] if provider["provider_id"] == "local")
+        self.assertEqual(local_provider["models"], [])
+        self.assertEqual([model["model"] for model in local_provider["discovered_models"]], ["lm-local"])
+        self.assertEqual(catalog["default_text_model_ref"], "openai-codex/gpt-5.5")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -67,26 +67,34 @@ export function buildProviderDraftsFromSettings(payload: SettingsPayload): Recor
   return Object.fromEntries(
     providers
       .filter((provider) => provider.configured || provider.saved || provider.provider_id === "local")
-      .map((provider) => [
-        provider.provider_id,
-        {
-          provider_id: provider.provider_id,
-          label: provider.label,
-          transport: provider.transport,
-          base_url: provider.base_url,
-          enabled: provider.enabled,
-          saved: Boolean(provider.saved),
-          auth_header: provider.auth_header ?? "Authorization",
-          auth_scheme: provider.auth_scheme ?? "Bearer",
-          auth_mode: provider.auth_mode ?? (provider.requires_login ? "chatgpt" : "api_key"),
-          requires_login: Boolean(provider.requires_login),
-          auth_status: provider.auth_status,
-          api_key: "",
-          api_key_configured: Boolean(provider.api_key_configured),
-          discovered_models: dedupeStrings(provider.models.map((model) => model.model)),
-          selected_models: dedupeStrings(provider.models.map((model) => model.model)),
-        },
-      ]),
+      .map((provider) => {
+        const enabledModels = dedupeStrings(provider.models.map((model) => model.model));
+        const discoveredModels = dedupeStrings(
+          (provider.discovered_models && provider.discovered_models.length > 0 ? provider.discovered_models : provider.models).map(
+            (model) => model.model,
+          ),
+        );
+        return [
+          provider.provider_id,
+          {
+            provider_id: provider.provider_id,
+            label: provider.label,
+            transport: provider.transport,
+            base_url: provider.base_url,
+            enabled: provider.enabled,
+            saved: Boolean(provider.saved),
+            auth_header: provider.auth_header ?? "Authorization",
+            auth_scheme: provider.auth_scheme ?? "Bearer",
+            auth_mode: provider.auth_mode ?? (provider.requires_login ? "chatgpt" : "api_key"),
+            requires_login: Boolean(provider.requires_login),
+            auth_status: provider.auth_status,
+            api_key: "",
+            api_key_configured: Boolean(provider.api_key_configured),
+            discovered_models: discoveredModels,
+            selected_models: enabledModels,
+          },
+        ];
+      }),
   );
 }
 
