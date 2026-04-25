@@ -100,6 +100,11 @@ test("ModelProvidersPage shows and edits provider models from each card", () => 
   assert.match(pageSource, /:visible="activeModelPickerProviderId === provider\.provider_id"/);
   assert.match(pageSource, /:popper-style="modelPickerPopoverStyle"/);
   assert.match(pageSource, /class="model-providers-page__model-picker"/);
+  assert.match(pageSource, /v-if="isProviderModelPickerLoading\(provider\)"/);
+  assert.match(pageSource, /class="model-providers-page__model-picker-loading"/);
+  assert.match(pageSource, /role="status"/);
+  assert.match(pageSource, /settings\.discoveringModels/);
+  assert.match(pageSource, /v-else-if="providerModelOptions\(provider\)\.length === 0"/);
   assert.match(pageSource, /@click\.stop="handleAddProviderModel\(provider\)"/);
   assert.match(pageSource, /v-for="modelName in providerModelOptions\(provider\)"/);
   assert.match(pageSource, /class="model-providers-page__model-picker-option"/);
@@ -107,9 +112,14 @@ test("ModelProvidersPage shows and edits provider models from each card", () => 
   assert.match(pageSource, /@click\.stop="toggleProviderModel\(provider, modelName\)"/);
   assert.match(pageSource, /<ElIcon v-if="isProviderModelSelected\(provider, modelName\)" aria-hidden="true"><Check \/><\/ElIcon>/);
   assert.match(pageSource, /const activeModelPickerProviderId = ref<string \| null>\(null\);/);
+  assert.match(pageSource, /const refreshingModelPickerProviderId = ref<string \| null>\(null\);/);
   assert.match(pageSource, /function providerModelOptions\(provider: ProviderDraft\)/);
+  assert.match(pageSource, /function isProviderModelPickerLoading\(provider: ProviderDraft\)/);
+  assert.match(pageSource, /function handleModelPickerVisibleChange\(provider: ProviderDraft, visible: boolean\) \{[\s\S]*if \(\s*refreshingModelPickerProviderId\.value === provider\.provider_id \|\|[\s\S]*discoveringProviderId\.value === provider\.provider_id[\s\S]*\) \{[\s\S]*activeModelPickerProviderId\.value = provider\.provider_id;/);
   assert.match(pageSource, /async function handleAddProviderModel\(provider: ProviderDraft\)/);
+  assert.match(pageSource, /refreshingModelPickerProviderId\.value = provider\.provider_id;/);
   assert.match(pageSource, /await handleDiscoverModels\(provider\.provider_id, \{ selectDiscovered: false \}\);/);
+  assert.match(pageSource, /finally \{[\s\S]*activeModelPickerProviderId\.value = provider\.provider_id;[\s\S]*refreshingModelPickerProviderId\.value = null;/);
   const addModelFunction = pageSource.match(/async function handleAddProviderModel\(provider: ProviderDraft\) \{[\s\S]*?\n\}/);
   assert.ok(addModelFunction, "expected add-model handler to exist");
   assert.doesNotMatch(addModelFunction[0], /provider\.selected_models|selectDiscovered:\s*true/);

@@ -186,12 +186,16 @@
                     </template>
                     <div class="model-providers-page__model-picker" @pointerdown.stop @click.stop>
                       <div class="model-providers-page__model-picker-title">{{ provider.label || provider.provider_id }}</div>
-                      <div v-if="providerModelOptions(provider).length === 0" class="model-providers-page__model-picker-empty">
+                      <div v-if="isProviderModelPickerLoading(provider)" class="model-providers-page__model-picker-loading" role="status">
+                        <span class="model-providers-page__model-picker-spinner" aria-hidden="true"></span>
+                        <span>{{ t("settings.discoveringModels") }}</span>
+                      </div>
+                      <div v-else-if="providerModelOptions(provider).length === 0" class="model-providers-page__model-picker-empty">
                         {{ t("settings.noModelsDiscovered") }}
                       </div>
                       <button
-                        v-for="modelName in providerModelOptions(provider)"
                         v-else
+                        v-for="modelName in providerModelOptions(provider)"
                         :key="`${provider.provider_id}-model-option-${modelName}`"
                         type="button"
                         class="model-providers-page__model-picker-option"
@@ -272,12 +276,16 @@
                     </template>
                     <div class="model-providers-page__model-picker" @pointerdown.stop @click.stop>
                       <div class="model-providers-page__model-picker-title">{{ provider.label || provider.provider_id }}</div>
-                      <div v-if="providerModelOptions(provider).length === 0" class="model-providers-page__model-picker-empty">
+                      <div v-if="isProviderModelPickerLoading(provider)" class="model-providers-page__model-picker-loading" role="status">
+                        <span class="model-providers-page__model-picker-spinner" aria-hidden="true"></span>
+                        <span>{{ t("settings.discoveringModels") }}</span>
+                      </div>
+                      <div v-else-if="providerModelOptions(provider).length === 0" class="model-providers-page__model-picker-empty">
                         {{ t("settings.noModelsDiscovered") }}
                       </div>
                       <button
-                        v-for="modelName in providerModelOptions(provider)"
                         v-else
+                        v-for="modelName in providerModelOptions(provider)"
                         :key="`${provider.provider_id}-model-option-${modelName}`"
                         type="button"
                         class="model-providers-page__model-picker-option"
@@ -600,6 +608,7 @@ const providerMessages = ref<Record<string, string>>({});
 const isSaving = ref(false);
 const discoveringProviderId = ref<string | null>(null);
 const activeModelPickerProviderId = ref<string | null>(null);
+const refreshingModelPickerProviderId = ref<string | null>(null);
 const activeLogoutConfirmProviderId = ref<string | null>(null);
 const logoutConfirmTimeoutRef = ref<number | null>(null);
 const codexLoginSession = ref<OpenAICodexAuthStartResponse | null>(null);
@@ -806,6 +815,10 @@ function isProviderModelSelected(provider: ProviderDraft, modelName: string) {
   return provider.selected_models.some((selectedModel) => selectedModel.trim().toLowerCase() === identity);
 }
 
+function isProviderModelPickerLoading(provider: ProviderDraft) {
+  return refreshingModelPickerProviderId.value === provider.provider_id || discoveringProviderId.value === provider.provider_id;
+}
+
 function toggleProviderModel(provider: ProviderDraft, modelName: string) {
   const normalizedModel = modelName.trim();
   if (!normalizedModel) {
@@ -840,14 +853,32 @@ function removeProviderModel(provider: ProviderDraft, modelName: string) {
 }
 
 function handleModelPickerVisibleChange(provider: ProviderDraft, visible: boolean) {
-  activeModelPickerProviderId.value = visible ? provider.provider_id : null;
+  if (visible) {
+    activeModelPickerProviderId.value = provider.provider_id;
+    return;
+  }
+  if (
+    refreshingModelPickerProviderId.value === provider.provider_id ||
+    discoveringProviderId.value === provider.provider_id
+  ) {
+    activeModelPickerProviderId.value = provider.provider_id;
+    return;
+  }
+  if (activeModelPickerProviderId.value === provider.provider_id) {
+    activeModelPickerProviderId.value = null;
+  }
 }
 
 async function handleAddProviderModel(provider: ProviderDraft) {
   activeModelPickerProviderId.value = provider.provider_id;
-  await handleDiscoverModels(provider.provider_id, { selectDiscovered: false });
-  if (providerModelOptions(provider).length > 0) {
+  refreshingModelPickerProviderId.value = provider.provider_id;
+  try {
+    await handleDiscoverModels(provider.provider_id, { selectDiscovered: false });
+  } finally {
     activeModelPickerProviderId.value = provider.provider_id;
+    if (refreshingModelPickerProviderId.value === provider.provider_id) {
+      refreshingModelPickerProviderId.value = null;
+    }
   }
 }
 
@@ -1905,6 +1936,30 @@ onBeforeUnmount(() => {
   line-height: 1.5;
 }
 
+.model-providers-page__model-picker-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  border: 1px solid rgba(37, 99, 235, 0.16);
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: rgba(239, 246, 255, 0.86);
+  color: rgb(37, 99, 235);
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.model-providers-page__model-picker-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(37, 99, 235, 0.18);
+  border-top-color: rgb(37, 99, 235);
+  border-radius: 999px;
+  animation: model-provider-spin 900ms linear infinite;
+}
+
 .model-providers-page__model-picker-option {
   display: inline-flex;
   align-items: center;
@@ -2091,6 +2146,7 @@ onBeforeUnmount(() => {
 
 @media (prefers-reduced-motion: reduce) {
   .model-providers-page__spinner,
+  .model-providers-page__model-picker-spinner,
   .model-providers-page__save-toast--saving .model-providers-page__save-toast-dot {
     animation: none;
   }
