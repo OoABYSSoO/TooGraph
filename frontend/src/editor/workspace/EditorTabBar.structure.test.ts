@@ -60,7 +60,8 @@ test("EditorTabBar exposes browser-like tab interactions", () => {
   assert.match(componentSource, /@auxclick="handleTabAuxClick\(tab, \$event\)"/);
   assert.match(componentSource, /@dragstart="handleTabDragStart\(tab, \$event\)"/);
   assert.match(componentSource, /@dragover\.prevent="handleTabDragOver\(tab, \$event\)"/);
-  assert.match(componentSource, /@wheel\.prevent="handleTabsWheel"/);
+  assert.match(componentSource, /@wheel="handleTabsWheel"/);
+  assert.doesNotMatch(componentSource, /@wheel\.prevent="handleTabsWheel"/);
   assert.match(componentSource, /scrollIntoView\(/);
 });
 
@@ -87,8 +88,11 @@ test("EditorTabBar behaves like a floating card group instead of reserving a ful
   assert.doesNotMatch(componentSource, /padding:\s*12px calc\(var\(--editor-action-capsule-desktop-reserve\) \+ 12px\) 0 12px;/);
 });
 
-test("EditorTabBar embeds left and right scroll buttons inside the tab lane", () => {
+test("EditorTabBar shows embedded scroll buttons only for directions that can page", () => {
   assert.match(componentSource, /import \{ ArrowLeft, ArrowRight, Plus \} from "@element-plus\/icons-vue";/);
+  assert.match(componentSource, /v-if="canScrollTabsBackward"/);
+  assert.match(componentSource, /v-if="canScrollTabsForward"/);
+  assert.doesNotMatch(componentSource, /v-if="tabsOverflowing"/);
   assert.match(componentSource, /class="editor-tab-bar__scroll-button editor-tab-bar__scroll-button--left"/);
   assert.match(componentSource, /class="editor-tab-bar__scroll-button editor-tab-bar__scroll-button--right"/);
   assert.match(componentSource, /aria-label="向左滚动标签页"/);
@@ -96,8 +100,23 @@ test("EditorTabBar embeds left and right scroll buttons inside the tab lane", ()
   assert.match(componentSource, /@click="scrollTabsBy\(-1\)"/);
   assert.match(componentSource, /@click="scrollTabsBy\(1\)"/);
   assert.match(componentSource, /function scrollTabsBy\(direction: -1 \| 1\)/);
-  assert.match(componentSource, /\.editor-tab-bar__tabs-shell \{[\s\S]*display:\s*grid;[\s\S]*grid-template-columns:\s*32px minmax\(0,\s*1fr\) 32px;/);
+  assert.match(componentSource, /const canScrollTabsBackward = ref\(false\);/);
+  assert.match(componentSource, /const canScrollTabsForward = ref\(false\);/);
+  assert.match(componentSource, /function updateTabsScrollState\(\)/);
+  assert.match(componentSource, /\.editor-tab-bar__tabs-shell \{[\s\S]*display:\s*flex;/);
   assert.match(componentSource, /\.editor-tab-bar__scroll-button \{[\s\S]*width:\s*32px;[\s\S]*height:\s*32px;/);
+});
+
+test("EditorTabBar maps regular wheel input onto the native tab scroller", () => {
+  assert.match(componentSource, /ref="tabsScroller"/);
+  assert.match(componentSource, /class="editor-tab-bar__tabs-scroller"/);
+  assert.match(componentSource, /const tabsScroller = ref<HTMLElement \| null>\(null\);/);
+  assert.match(componentSource, /const delta = Math\.abs\(event\.deltaX\) > Math\.abs\(event\.deltaY\) \? event\.deltaX : event\.deltaY;/);
+  assert.match(componentSource, /event\.preventDefault\(\);/);
+  assert.match(componentSource, /scrollContainer\.scrollLeft = nextScrollLeft;/);
+  assert.match(componentSource, /function resolveTabsScrollContainer\(root: HTMLElement \| null\)/);
+  assert.match(componentSource, /querySelector\("\.editor-tab-bar__tabs-scroller"\)/);
+  assert.doesNotMatch(componentSource, /querySelector\("\.el-tabs__nav-wrap"\)/);
 });
 
 test("EditorTabBar normalizes Element Plus tab spacing with shared size variables", () => {
@@ -108,12 +127,12 @@ test("EditorTabBar normalizes Element Plus tab spacing with shared size variable
   assert.match(componentSource, /--editor-tab-height:\s*\d+px;/);
   assert.match(componentSource, /--editor-tab-gap:\s*\d+px;/);
   assert.match(componentSource, /\.editor-tab-bar__tabs\s+:deep\(.el-tabs__nav\) \{[\s\S]*gap:\s*var\(--editor-tab-gap\);/);
-  assert.match(componentSource, /\.editor-tab-bar__tabs\s+:deep\(.el-tabs__nav-wrap\),[\s\S]*padding:\s*\d+px var\(--editor-tab-gap\);/);
-  assert.match(componentSource, /\.editor-tab-bar__tabs\s+:deep\(.el-tabs__nav-wrap\),[\s\S]*overflow-x:\s*auto;/);
-  assert.match(componentSource, /\.editor-tab-bar__tabs\s+:deep\(.el-tabs__nav-wrap\),[\s\S]*scrollbar-width:\s*thin;/);
-  assert.match(navWrapScrollbarBlock, /height:\s*8px;/);
-  assert.doesNotMatch(navWrapScrollbarBlock, /display:\s*none;/);
-  assert.match(componentSource, /\.editor-tab-bar__tabs \{[\s\S]*width:\s*100%;[\s\S]*min-width:\s*0;/);
+  assert.match(componentSource, /\.editor-tab-bar__tabs-scroller \{[\s\S]*overflow-x:\s*auto;/);
+  assert.match(componentSource, /\.editor-tab-bar__tabs-scroller \{[\s\S]*scrollbar-width:\s*thin;/);
+  assert.match(componentSource, /\.editor-tab-bar__tabs-scroller::-webkit-scrollbar \{[\s\S]*height:\s*8px;/);
+  assert.equal(navWrapScrollbarBlock, "");
+  assert.match(componentSource, /\.editor-tab-bar__tabs \{[\s\S]*width:\s*max-content;[\s\S]*min-width:\s*100%;[\s\S]*max-width:\s*none;/);
+  assert.match(componentSource, /\.editor-tab-bar__tabs\s+:deep\(.el-tabs__nav-wrap\),[\s\S]*overflow:\s*visible;/);
   assert.match(componentSource, /\.editor-tab-bar__tabs\s+:deep\(.el-tabs__item\) \{[\s\S]*margin:\s*0 !important;/);
   assert.match(componentSource, /\.editor-tab-bar__tabs\s+:deep\(.el-tabs__item\) \{[\s\S]*width:\s*var\(--editor-tab-width\);/);
   assert.match(componentSource, /\.editor-tab-bar__tabs\s+:deep\(.el-tabs__item\) \{[\s\S]*flex:\s*0 0 var\(--editor-tab-width\);/);
