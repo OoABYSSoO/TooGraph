@@ -25,6 +25,34 @@ test("ModelProvidersPage owns provider editing while Settings links to it", () =
   assert.match(settingsSource, /to="\/models"/);
 });
 
+test("ModelProvidersPage presents providers as cards before editing", () => {
+  assert.match(pageSource, /class="model-providers-page__provider-cards"/);
+  assert.match(pageSource, /v-for="provider in providerCardList"/);
+  assert.match(pageSource, /settings\.configuredProviders/);
+  assert.match(pageSource, /settings\.configureProvider/);
+  assert.match(pageSource, /@click="openAddProviderPanel"/);
+  assert.match(pageSource, /providerCardList = computed\(\(\) =>[\s\S]*provider\.provider_id !== "openai-codex"/);
+  assert.doesNotMatch(pageSource, /<section v-for="provider in providerDraftList"[\s\S]*class="model-providers-page__provider-editor"/);
+});
+
+test("ModelProvidersPage opens an add-provider panel and immediately pre-fills templates", () => {
+  assert.match(pageSource, /const providerEditorMode = ref<"none" \| "add" \| "edit">\("none"\);/);
+  assert.match(pageSource, /const pendingTemplateId = ref\(""\);/);
+  assert.match(pageSource, /const pendingProviderDraft = ref<ProviderDraft \| null>\(null\);/);
+  assert.match(pageSource, /v-if="providerEditorMode === 'add'"/);
+  assert.match(pageSource, /v-model="pendingTemplateId"[\s\S]*@change="handlePendingTemplateChange"/);
+  assert.match(pageSource, /function handlePendingTemplateChange\(\) \{[\s\S]*pendingProviderDraft\.value = buildProviderDraftFromTemplate\(template\);/);
+  assert.match(pageSource, /function commitPendingProvider\(\)/);
+});
+
+test("ModelProvidersPage hides engineering provider fields inside advanced settings", () => {
+  assert.match(pageSource, /<details class="model-providers-page__advanced-provider">/);
+  assert.match(pageSource, /settings\.advancedProviderSettings/);
+  assert.match(pageSource, /settings\.providerId[\s\S]*settings\.providerTransport[\s\S]*settings\.providerAuthHeader[\s\S]*settings\.providerAuthScheme/);
+  assert.match(pageSource, /v-if="showBaseUrlInPrimaryFields\(providerEditorDraft\)"/);
+  assert.match(pageSource, /v-else[\s\S]*settings\.providerBaseUrl/);
+});
+
 test("ModelProvidersPage shows ChatGPT device-code entry as part of the normal login flow", () => {
   assert.match(pageSource, /openCodexVerificationWindow\(\)/);
   assert.match(pageSource, /const authWindow = openCodexVerificationWindow\(\);[\s\S]*codexLoginSession\.value = await startOpenAICodexAuth\(\);[\s\S]*handleOpenCodexVerification\(authWindow\)/);
