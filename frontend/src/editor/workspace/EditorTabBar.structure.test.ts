@@ -133,11 +133,14 @@ test("EditorTabBar normalizes Element Plus tab spacing with shared size variable
   assert.match(componentSource, /--editor-tab-gap:\s*\d+px;/);
   assert.match(componentSource, /\.editor-tab-bar__tabs\s+:deep\(.el-tabs__nav\) \{[\s\S]*gap:\s*var\(--editor-tab-gap\);/);
   assert.match(componentSource, /\.editor-tab-bar__tabs-scroller \{[\s\S]*overflow-x:\s*auto;/);
+  assert.match(componentSource, /\.editor-tab-bar__tabs-scroller \{[\s\S]*padding:\s*6px 0;/);
+  assert.match(componentSource, /\.editor-tab-bar__tabs-scroller \{[\s\S]*margin:\s*-6px 0;/);
   assert.match(componentSource, /\.editor-tab-bar__tabs-scroller \{[\s\S]*scrollbar-width:\s*thin;/);
   assert.match(componentSource, /\.editor-tab-bar__tabs-scroller::-webkit-scrollbar \{[\s\S]*height:\s*8px;/);
   assert.equal(navWrapScrollbarBlock, "");
   assert.match(componentSource, /\.editor-tab-bar__tabs \{[\s\S]*width:\s*max-content;[\s\S]*min-width:\s*100%;[\s\S]*max-width:\s*none;/);
   assert.match(componentSource, /\.editor-tab-bar__tabs\s+:deep\(.el-tabs__nav-wrap\),[\s\S]*overflow:\s*visible;/);
+  assert.match(componentSource, /\.editor-tab-bar__tabs\s+:deep\(.el-tabs__nav-wrap\),[\s\S]*padding:\s*10px var\(--editor-tab-gap\);/);
   assert.match(componentSource, /\.editor-tab-bar__tabs\s+:deep\(.el-tabs__item\) \{[\s\S]*margin:\s*0 !important;/);
   assert.match(componentSource, /\.editor-tab-bar__tabs\s+:deep\(.el-tabs__item\) \{[\s\S]*width:\s*var\(--editor-tab-width\);/);
   assert.match(componentSource, /\.editor-tab-bar__tabs\s+:deep\(.el-tabs__item\) \{[\s\S]*flex:\s*0 0 var\(--editor-tab-width\);/);
@@ -148,18 +151,23 @@ test("EditorTabBar normalizes Element Plus tab spacing with shared size variable
 });
 
 test("EditorTabBar keeps the warm project palette instead of the default blue Element Plus theme", () => {
-  assert.match(componentSource, /\.editor-tab-bar \{[\s\S]*rgba\(244,\s*237,\s*225/);
+  assert.match(componentSource, /\.editor-tab-bar \{[\s\S]*--editor-tab-bar-paper:\s*var\(--graphite-glass-bg\);/);
   assert.match(componentSource, /\.editor-tab-bar__tab-shell \{[\s\S]*border-radius:\s*14px;/);
   assert.match(componentSource, /\.editor-tab-bar__tabs\s+:deep\(.el-tabs__item\.is-active\) \{/);
 });
 
 test("EditorTabBar makes the active tab visually dominant without adding seam layers", () => {
+  const activeTabBlock = componentSource.match(/\.editor-tab-bar__tab-shell--active \{[\s\S]*?\n\}/)?.[0] ?? "";
+
   assert.match(componentSource, /\.editor-tab-bar__tab-shell \{[\s\S]*border:\s*1px solid rgba\(213,\s*184,\s*146,\s*0\.62\);/);
   assert.match(componentSource, /\.editor-tab-bar__tab-shell \{[\s\S]*color:\s*rgba\(88,\s*61,\s*39,\s*0\.82\);/);
-  assert.match(componentSource, /\.editor-tab-bar__tab-shell--active \{[\s\S]*z-index:\s*2;/);
-  assert.match(componentSource, /\.editor-tab-bar__tab-shell--active \{[\s\S]*border-color:\s*rgba\(154,\s*52,\s*18,\s*0\.56\);/);
-  assert.match(componentSource, /\.editor-tab-bar__tab-shell--active \{[\s\S]*inset 0 3px 0 rgba\(154,\s*52,\s*18,\s*0\.82\)/);
-  assert.match(componentSource, /\.editor-tab-bar__tab-shell--active \{[\s\S]*0 12px 24px rgba\(154,\s*52,\s*18,\s*0\.2\)/);
+  assert.match(activeTabBlock, /z-index:\s*2;/);
+  assert.match(activeTabBlock, /border-color:\s*rgba\(154,\s*52,\s*18,\s*0\.52\);/);
+  assert.match(activeTabBlock, /inset 0 3px 0 rgba\(154,\s*52,\s*18,\s*0\.72\)/);
+  assert.doesNotMatch(activeTabBlock, /drop-shadow/);
+  assert.doesNotMatch(activeTabBlock, /\n\s*0 \d+px \d+px rgba\(154,\s*52,\s*18,/);
+  assert.doesNotMatch(activeTabBlock, /filter:/);
+  assert.doesNotMatch(activeTabBlock, /translateY\(-1px\)/);
   assert.match(componentSource, /\.editor-tab-bar__tab-shell--active \.editor-tab-bar__tab-title \{[\s\S]*font-weight:\s*700;/);
 });
 
@@ -171,9 +179,37 @@ test("EditorTabBar removes the old lower seam layers and keeps the active tab on
 });
 
 test("EditorTabBar uses a restrained paper-warm palette instead of heavy gold gradients", () => {
-  assert.match(componentSource, /\.editor-tab-bar__tabs-shell \{[\s\S]*background:\s*rgba\(236,\s*219,\s*190,\s*0\.95\);/);
-  assert.match(componentSource, /\.editor-tab-bar__tab-shell \{[\s\S]*linear-gradient\(180deg,\s*rgba\(250,\s*242,\s*228,\s*0\.98\)/);
-  assert.match(componentSource, /\.editor-tab-bar__tab-shell--active \{[\s\S]*linear-gradient\(180deg,\s*rgba\(255,\s*250,\s*242,\s*1\)/);
+  const tabShellBlock = componentSource.match(/\.editor-tab-bar__tab-shell \{[\s\S]*?\n\}/)?.[0] ?? "";
+  const activeTabBlock = componentSource.match(/\.editor-tab-bar__tab-shell--active \{[\s\S]*?\n\}/)?.[0] ?? "";
+
+  assert.match(
+    componentSource,
+    /\.editor-tab-bar__tabs-shell \{[\s\S]*background:\s*var\(--graphite-glass-specular\),\s*var\(--graphite-glass-lens\),\s*var\(--editor-tab-bar-paper\);/,
+  );
+  assert.match(componentSource, /\.editor-tab-bar__tabs-shell \{[\s\S]*background-blend-mode:\s*screen,\s*screen,\s*normal;/);
+  assert.match(componentSource, /\.editor-tab-bar__tabs-shell \{[\s\S]*padding:\s*8px;/);
+  assert.match(componentSource, /\.editor-tab-bar__tabs-shell \{[\s\S]*box-shadow:[\s\S]*var\(--graphite-glass-rim\);/);
+  assert.match(componentSource, /\.editor-tab-bar__tabs-shell \{[\s\S]*backdrop-filter:\s*blur\(28px\) saturate\(1\.65\) contrast\(1\.02\);/);
+  assert.match(tabShellBlock, /background:\s*rgba\(255,\s*255,\s*255,\s*0\.28\);/);
+  assert.match(activeTabBlock, /background:\s*rgba\(255,\s*255,\s*255,\s*0\.5\);/);
+  assert.doesNotMatch(tabShellBlock, /linear-gradient/);
+  assert.doesNotMatch(activeTabBlock, /linear-gradient/);
   assert.match(componentSource, /\.editor-tab-bar__tab-shell--active \{[\s\S]*color:\s*rgba\(111,\s*52,\s*22,\s*1\);/);
-  assert.match(componentSource, /rgba\(208,\s*177,\s*138,\s*0\.\d+\)/);
+  assert.match(componentSource, /border:\s*1px solid var\(--graphite-glass-border\);/);
+});
+
+test("EditorTabBar gives the plus launcher the same liquid glass light stack as the tab strip", () => {
+  assert.match(
+    componentSource,
+    /\.editor-tab-bar__add-tab \{[\s\S]*background:\s*var\(--graphite-glass-specular\),\s*var\(--graphite-glass-lens\),\s*var\(--graphite-glass-bg-strong\);/,
+  );
+  assert.match(componentSource, /\.editor-tab-bar__add-tab \{[\s\S]*background-blend-mode:\s*screen,\s*screen,\s*normal;/);
+});
+
+test("EditorTabBar lets the plus launcher popover use the panel glass surface instead of Element Plus chrome", () => {
+  assert.match(componentSource, /popper-class="editor-tab-bar__launcher-popper"/);
+  assert.match(componentSource, /:global\(\.editor-tab-bar__launcher-popper\.el-popper\) \{[\s\S]*border:\s*none;/);
+  assert.match(componentSource, /:global\(\.editor-tab-bar__launcher-popper\.el-popper\) \{[\s\S]*background:\s*transparent;/);
+  assert.match(componentSource, /:global\(\.editor-tab-bar__launcher-popper\.el-popper\) \{[\s\S]*box-shadow:\s*none;/);
+  assert.match(componentSource, /:global\(\.editor-tab-bar__launcher-popper \.el-popper__arrow\) \{[\s\S]*display:\s*none;/);
 });

@@ -50,7 +50,7 @@
           </div>
           <p>{{ run.run_id }}</p>
           <div class="runs-page__badges">
-            <span>{{ run.status }}</span>
+            <span :class="statusBadgeClass(run.status)">{{ run.status }}</span>
             <span>revisions {{ run.revision_round }}</span>
             <span v-if="run.duration_ms">duration {{ run.duration_ms }}ms</span>
             <span v-if="run.final_score">score {{ run.final_score }}</span>
@@ -98,6 +98,10 @@ async function loadRuns() {
 
 onMounted(loadRuns);
 watch([graphNameQuery, statusFilter], loadRuns);
+
+function statusBadgeClass(status: string) {
+  return `graphite-status-badge graphite-status-badge--${status.replaceAll("_", "-")}`;
+}
 </script>
 
 <style scoped>
@@ -110,10 +114,10 @@ watch([graphNameQuery, statusFilter], loadRuns);
 .runs-page__filters,
 .runs-page__card,
 .runs-page__empty {
-  border: 1px solid rgba(154, 52, 18, 0.14);
+  border: 1px solid var(--graphite-border);
   border-radius: 24px;
-  background: rgba(255, 252, 247, 0.88);
-  box-shadow: 0 18px 36px rgba(60, 41, 20, 0.08);
+  background: var(--graphite-surface-panel);
+  box-shadow: var(--graphite-shadow-panel);
 }
 
 .runs-page__hero,
@@ -131,6 +135,8 @@ watch([graphNameQuery, statusFilter], loadRuns);
 
 .runs-page__title {
   margin: 8px 0 10px;
+  color: var(--graphite-text-strong);
+  font-family: var(--graphite-font-display);
   font-size: 2rem;
 }
 
@@ -172,6 +178,7 @@ watch([graphNameQuery, statusFilter], loadRuns);
 .runs-page__card {
   display: grid;
   gap: 8px;
+  background: var(--graphite-surface-card);
   padding: 18px;
 }
 
@@ -214,6 +221,11 @@ watch([graphNameQuery, statusFilter], loadRuns);
   color: rgba(60, 41, 20, 0.72);
 }
 
+.runs-page__card p {
+  font-family: var(--graphite-font-mono);
+  font-size: 0.84rem;
+}
+
 .runs-page__empty {
   display: grid;
   gap: 14px;
@@ -239,10 +251,12 @@ watch([graphNameQuery, statusFilter], loadRuns);
 }
 
 .runs-page__badges span {
+  border: 1px solid var(--graphite-status-border, transparent);
   border-radius: 999px;
   padding: 4px 10px;
-  background: rgba(255, 248, 240, 0.92);
-  color: rgb(154, 52, 18);
+  background: var(--graphite-status-bg, rgba(255, 248, 240, 0.92));
+  color: var(--graphite-status-fg, rgb(154, 52, 18));
+  font-family: var(--graphite-font-mono);
   font-size: 0.84rem;
 }
 

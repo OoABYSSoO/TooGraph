@@ -376,7 +376,7 @@ function resolveTabsMaxScrollLeft(scrollContainer: HTMLElement) {
   --editor-tab-width: 176px;
   --editor-tab-height: 40px;
   --editor-tab-gap: 12px;
-  --editor-tab-bar-paper: rgba(244, 237, 225, 0.98);
+  --editor-tab-bar-paper: var(--graphite-glass-bg);
   position: relative;
   display: flex;
   box-sizing: border-box;
@@ -414,20 +414,25 @@ function resolveTabsMaxScrollLeft(scrollContainer: HTMLElement) {
   width: auto;
   max-width: var(--editor-tab-strip-max-width);
   flex: 1 1 auto;
-  border: 1px solid rgba(208, 177, 138, 0.88);
+  border: 1px solid var(--graphite-glass-border);
   border-radius: 20px;
-  background: rgba(236, 219, 190, 0.95);
-  padding: 6px;
+  background: var(--graphite-glass-specular), var(--graphite-glass-lens), var(--editor-tab-bar-paper);
+  background-blend-mode: screen, screen, normal;
+  padding: 8px;
   box-shadow:
-    inset 0 1px 0 rgba(255, 252, 247, 0.58),
-    0 1px 0 rgba(255, 255, 255, 0.2);
+    var(--graphite-glass-shadow),
+    var(--graphite-glass-highlight),
+    var(--graphite-glass-rim);
+  backdrop-filter: blur(28px) saturate(1.65) contrast(1.02);
 }
 
 .editor-tab-bar__tabs-scroller {
   flex: 1 1 auto;
   min-width: 0;
+  margin: -6px 0;
   overflow-x: auto;
   overflow-y: hidden;
+  padding: 6px 0;
   scrollbar-color: rgba(154, 52, 18, 0.28) transparent;
   scrollbar-gutter: stable;
   scrollbar-width: thin;
@@ -451,11 +456,25 @@ function resolveTabsMaxScrollLeft(scrollContainer: HTMLElement) {
   flex: 0 0 auto;
   width: 40px;
   height: 40px;
-  border: 1px solid rgba(208, 177, 138, 0.88);
+  border: 1px solid var(--graphite-glass-border);
   border-radius: 14px;
-  background: linear-gradient(180deg, rgba(255, 250, 242, 0.98) 0%, rgba(245, 233, 212, 0.95) 100%);
+  background: var(--graphite-glass-specular), var(--graphite-glass-lens), var(--graphite-glass-bg-strong);
+  background-blend-mode: screen, screen, normal;
   color: rgba(111, 52, 22, 0.94);
+  box-shadow: var(--graphite-glass-highlight), var(--graphite-glass-rim);
+  backdrop-filter: blur(24px) saturate(1.55) contrast(1.02);
   cursor: pointer;
+}
+
+:global(.editor-tab-bar__launcher-popper.el-popper) {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+}
+
+:global(.editor-tab-bar__launcher-popper .el-popper__arrow) {
+  display: none;
 }
 
 .editor-tab-bar__tabs {
@@ -481,7 +500,7 @@ function resolveTabsMaxScrollLeft(scrollContainer: HTMLElement) {
   width: max-content;
   max-width: none;
   overflow: visible;
-  padding: 8px var(--editor-tab-gap);
+  padding: 10px var(--editor-tab-gap);
 }
 
 .editor-tab-bar__tabs :deep(.el-tabs__nav-wrap::after),
@@ -550,7 +569,7 @@ function resolveTabsMaxScrollLeft(scrollContainer: HTMLElement) {
   padding: 0 14px 0 16px;
   border: 1px solid rgba(213, 184, 146, 0.62);
   border-radius: 14px;
-  background: linear-gradient(180deg, rgba(250, 242, 228, 0.98) 0%, rgba(245, 233, 212, 0.95) 100%);
+  background: rgba(255, 255, 255, 0.28);
   color: rgba(88, 61, 39, 0.82);
   box-shadow:
     inset 0 1px 0 rgba(255, 251, 244, 0.48),
@@ -565,7 +584,7 @@ function resolveTabsMaxScrollLeft(scrollContainer: HTMLElement) {
 }
 
 .editor-tab-bar__tab-shell:hover {
-  background: linear-gradient(180deg, rgba(255, 248, 237, 0.99) 0%, rgba(249, 237, 218, 0.97) 100%);
+  background: rgba(255, 255, 255, 0.38);
   border-color: rgba(177, 105, 46, 0.32);
   color: rgba(104, 55, 24, 0.98);
   box-shadow:
@@ -576,14 +595,15 @@ function resolveTabsMaxScrollLeft(scrollContainer: HTMLElement) {
 
 .editor-tab-bar__tab-shell--active {
   z-index: 2;
-  border-color: rgba(154, 52, 18, 0.56);
-  background: linear-gradient(180deg, rgba(255, 250, 242, 1) 0%, rgba(252, 233, 205, 1) 100%);
+  border-color: rgba(154, 52, 18, 0.52);
+  background: rgba(255, 255, 255, 0.5);
   color: rgba(111, 52, 22, 1);
   box-shadow:
-    inset 0 3px 0 rgba(154, 52, 18, 0.82),
+    inset 0 3px 0 rgba(154, 52, 18, 0.72),
     inset 0 1px 0 rgba(255, 255, 255, 0.94),
-    0 12px 24px rgba(154, 52, 18, 0.2),
-    0 0 0 1px rgba(154, 52, 18, 0.12);
+    inset 0 -1px 0 rgba(154, 52, 18, 0.06),
+    inset 0 0 0 1px rgba(154, 52, 18, 0.12);
+  transform: none;
 }
 
 .editor-tab-bar__tab-shell--active:hover {

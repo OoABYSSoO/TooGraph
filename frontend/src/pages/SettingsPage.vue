@@ -265,10 +265,10 @@ onMounted(loadSettings);
 .settings-page__hero,
 .settings-page__panel,
 .settings-page__empty {
-  border: 1px solid rgba(154, 52, 18, 0.14);
+  border: 1px solid var(--graphite-border);
   border-radius: 24px;
-  background: rgba(255, 252, 247, 0.88);
-  box-shadow: 0 18px 36px rgba(60, 41, 20, 0.08);
+  background: var(--graphite-surface-panel);
+  box-shadow: var(--graphite-shadow-panel);
 }
 
 .settings-page__hero,
@@ -277,6 +277,7 @@ onMounted(loadSettings);
 }
 
 .settings-page__panel {
+  background: var(--graphite-surface-card);
   padding: 20px;
 }
 
@@ -289,6 +290,8 @@ onMounted(loadSettings);
 
 .settings-page__title {
   margin: 8px 0 10px;
+  color: var(--graphite-text-strong);
+  font-family: var(--graphite-font-display);
   font-size: 2rem;
 }
 
@@ -335,6 +338,11 @@ onMounted(loadSettings);
   line-height: 1.6;
 }
 
+.settings-page__provider-url {
+  font-family: var(--graphite-font-mono);
+  font-size: 0.84rem;
+}
+
 .settings-page__actions {
   display: flex;
   align-items: center;
@@ -367,7 +375,7 @@ onMounted(loadSettings);
   border: 1px solid rgba(154, 52, 18, 0.12);
   border-radius: 16px;
   padding: 12px 14px;
-  background: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.62);
   margin-top: 10px;
 }
 
@@ -380,7 +388,7 @@ onMounted(loadSettings);
   border: 1px solid rgba(154, 52, 18, 0.12);
   border-radius: 18px;
   padding: 16px;
-  background: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.64);
 }
 
 .settings-page__provider-header {
@@ -398,10 +406,12 @@ onMounted(loadSettings);
 }
 
 .settings-page__badges span {
+  border: 1px solid rgba(154, 52, 18, 0.08);
   border-radius: 999px;
   padding: 4px 10px;
   background: rgba(255, 248, 240, 0.92);
   color: rgb(154, 52, 18);
+  font-family: var(--graphite-font-mono);
   font-size: 0.84rem;
 }
 

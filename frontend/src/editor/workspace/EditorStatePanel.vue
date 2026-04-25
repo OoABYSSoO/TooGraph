@@ -599,9 +599,9 @@ function handleStateColorSelect(stateKey: string, value: string | number | boole
   flex-direction: column;
   gap: 12px;
   overflow: hidden;
-  border: 1px solid rgba(154, 52, 18, 0.14);
+  border: 1px solid var(--graphite-border);
   border-radius: 28px;
-  background: rgba(255, 252, 247, 0.98);
+  background: var(--graphite-surface-panel);
   box-shadow: none;
   backdrop-filter: none;
 }
@@ -622,6 +622,7 @@ function handleStateColorSelect(stateKey: string, value: string | number | boole
 
 .editor-state-panel__title {
   margin: 6px 0 0;
+  font-family: var(--graphite-font-display);
   font-size: 1.12rem;
   color: #1f2937;
 }
@@ -764,7 +765,7 @@ function handleStateColorSelect(stateKey: string, value: string | number | boole
   min-width: 0;
   border: 1px solid rgba(154, 52, 18, 0.18);
   border-radius: 24px;
-  background: rgba(255, 252, 247, 0.92);
+  background: var(--graphite-surface-card);
   padding: 8px;
   display: grid;
   gap: 8px;

@@ -147,17 +147,28 @@ function emitWorldPointFromEvent(event: PointerEvent) {
   z-index: 30;
   width: 224px;
   height: 160px;
+  isolation: isolate;
   overflow: hidden;
-  border: 1px solid rgba(154, 94, 48, 0.28);
+  border: 1px solid var(--graphite-glass-border);
   border-radius: 18px;
-  background:
-    radial-gradient(circle at 1px 1px, rgba(217, 119, 6, 0.14) 1px, transparent 0) 0 0 / 14px 14px,
-    rgba(255, 248, 238, 0.9);
-  box-shadow: 0 18px 44px rgba(69, 45, 22, 0.16);
-  backdrop-filter: blur(10px);
+  background: var(--graphite-glass-bg);
+  box-shadow: var(--graphite-glass-shadow), var(--graphite-glass-highlight), var(--graphite-glass-rim);
+  backdrop-filter: blur(24px) saturate(1.6) contrast(1.02);
   cursor: grab;
   touch-action: none;
   transition: right 180ms ease;
+}
+
+.editor-minimap::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 1px;
+  z-index: 0;
+  border-radius: inherit;
+  background: var(--graphite-glass-specular), var(--graphite-glass-lens);
+  mix-blend-mode: screen;
+  opacity: 0.52;
 }
 
 .editor-minimap--dragging {
@@ -165,6 +176,8 @@ function emitWorldPointFromEvent(event: PointerEvent) {
 }
 
 .editor-minimap__surface {
+  position: relative;
+  z-index: 1;
   display: block;
   width: 100%;
   height: 100%;

@@ -2194,8 +2194,7 @@ onMounted(() => {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: radial-gradient(circle at top, rgba(154, 52, 18, 0.1), transparent 22%),
-    linear-gradient(180deg, #f5efe2 0%, #ede4d2 100%);
+  background: var(--graphite-page-bg);
 }
 
 .editor-workspace-shell__file-input {
@@ -2311,9 +2310,9 @@ onMounted(() => {
   border: 1px solid rgba(154, 52, 18, 0.16);
   border-radius: 20px;
   padding: 10px 14px;
-  background: rgba(255, 250, 241, 0.94);
-  box-shadow: 0 18px 32px rgba(60, 41, 20, 0.12);
-  backdrop-filter: blur(12px);
+  background: var(--graphite-glass-bg);
+  box-shadow: var(--graphite-glass-shadow), var(--graphite-glass-highlight);
+  backdrop-filter: blur(18px) saturate(1.35);
 }
 
 .editor-workspace-shell__feedback--success {

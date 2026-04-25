@@ -28,6 +28,11 @@ test("EditorCanvas mounts a right-bottom minimap backed by measured node geometr
 test("EditorMinimap can be displaced by workspace side panels", () => {
   assert.match(minimapSource, /\.editor-minimap \{[\s\S]*right:\s*calc\(22px \+ var\(--editor-canvas-minimap-right-clearance,\s*0px\)\);/);
   assert.match(minimapSource, /\.editor-minimap \{[\s\S]*transition:\s*right 180ms ease;/);
+  assert.match(minimapSource, /\.editor-minimap \{[\s\S]*background:\s*var\(--graphite-glass-bg\);/);
+  assert.match(minimapSource, /\.editor-minimap \{[\s\S]*box-shadow:\s*var\(--graphite-glass-shadow\),\s*var\(--graphite-glass-highlight\),\s*var\(--graphite-glass-rim\);/);
+  assert.match(minimapSource, /\.editor-minimap \{[\s\S]*backdrop-filter:\s*blur\(24px\) saturate\(1\.6\) contrast\(1\.02\);/);
+  assert.match(minimapSource, /\.editor-minimap::before \{[\s\S]*background:\s*var\(--graphite-glass-specular\),\s*var\(--graphite-glass-lens\);/);
+  assert.match(minimapSource, /\.editor-minimap__surface \{[\s\S]*position:\s*relative;[\s\S]*z-index:\s*1;/);
 });
 
 test("EditorCanvas does not animate node transforms while dragging", () => {
@@ -103,7 +108,7 @@ test("EditorCanvas keeps paused human-review graphs viewable but read-only", () 
 
 test("EditorCanvas lets top-left floating tools respect workspace overlay clearance", () => {
   assert.match(componentSource, /\.editor-canvas__lock-banner \{[\s\S]*top:\s*var\(--editor-canvas-floating-top-clearance,\s*18px\);/);
-  assert.match(componentSource, /\.editor-canvas__edge-view-toolbar \{[\s\S]*top:\s*var\(--editor-canvas-floating-top-clearance,\s*18px\);/);
+  assert.match(componentSource, /\.editor-canvas__edge-view-toolbar \{[\s\S]*top:\s*calc\(var\(--editor-canvas-floating-top-clearance,\s*18px\) \+ 18px\);/);
 });
 
 test("EditorCanvas renders condition route outputs as right-side floating branch handles", () => {
@@ -207,10 +212,16 @@ test("EditorCanvas exposes a top-left capsule toolbar for edge visibility modes"
   assert.match(componentSource, /v-show="isProjectedEdgeVisible\(edge\)"/);
   assert.match(
     componentSource,
-    /\.editor-canvas__edge-view-toolbar \{[\s\S]*position:\s*absolute;[\s\S]*left:\s*18px;[\s\S]*top:\s*var\(--editor-canvas-floating-top-clearance,\s*18px\);/,
+    /\.editor-canvas__edge-view-toolbar \{[\s\S]*position:\s*absolute;[\s\S]*left:\s*18px;[\s\S]*top:\s*calc\(var\(--editor-canvas-floating-top-clearance,\s*18px\) \+ 18px\);/,
   );
   assert.match(componentSource, /\.editor-canvas__edge-view-button \{[\s\S]*border-radius:\s*999px;/);
   assert.match(componentSource, /\.editor-canvas__edge-view-button--active \{[\s\S]*background:\s*rgba\(154,\s*52,\s*18,\s*0\.9\);/);
+  assert.match(componentSource, /\.editor-canvas__edge-view-toolbar \{[\s\S]*background:\s*var\(--graphite-glass-bg\);/);
+  assert.match(componentSource, /\.editor-canvas__edge-view-toolbar \{[\s\S]*box-shadow:[\s\S]*0 8px 20px rgba\(31,\s*28,\s*24,\s*0\.045\),[\s\S]*var\(--graphite-glass-highlight\),[\s\S]*var\(--graphite-glass-rim\);/);
+  assert.match(componentSource, /\.editor-canvas__edge-view-toolbar \{[\s\S]*backdrop-filter:\s*blur\(20px\) saturate\(1\.45\) contrast\(1\.01\);/);
+  assert.match(componentSource, /\.editor-canvas__edge-view-toolbar::before \{[\s\S]*background:\s*var\(--graphite-glass-specular\),\s*var\(--graphite-glass-lens\);/);
+  assert.match(componentSource, /\.editor-canvas__edge-view-toolbar::before \{[\s\S]*opacity:\s*0\.36;/);
+  assert.match(componentSource, /\.editor-canvas__edge-view-button \{[\s\S]*position:\s*relative;[\s\S]*z-index:\s*1;/);
 });
 
 test("EditorCanvas shows a clicked-position delete confirm for flow edges before removing them", () => {

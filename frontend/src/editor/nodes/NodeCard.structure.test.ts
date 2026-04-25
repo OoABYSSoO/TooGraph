@@ -275,8 +275,10 @@ test("NodeCard moves node actions into hoverable top buttons built from Element 
   assert.match(componentSource, /\.node-card__top-actions \{[\s\S]*padding:\s*8px;/);
   assert.match(componentSource, /\.node-card__top-actions \{[\s\S]*border:\s*1px solid rgba\(154,\s*52,\s*18,\s*0\.14\);/);
   assert.match(componentSource, /\.node-card__top-actions \{[\s\S]*border-radius:\s*999px;/);
-  assert.match(componentSource, /\.node-card__top-actions \{[\s\S]*background:\s*rgba\(255,\s*250,\s*241,\s*0\.94\);/);
-  assert.match(componentSource, /\.node-card__top-actions \{[\s\S]*box-shadow:\s*none;/);
+  assert.match(componentSource, /\.node-card__top-actions \{[\s\S]*background:\s*var\(--graphite-glass-bg\);/);
+  assert.match(componentSource, /\.node-card__top-actions \{[\s\S]*box-shadow:\s*var\(--graphite-glass-shadow\),\s*var\(--graphite-glass-highlight\),\s*var\(--graphite-glass-rim\);/);
+  assert.match(componentSource, /\.node-card__top-actions \{[\s\S]*backdrop-filter:\s*blur\(24px\) saturate\(1\.6\) contrast\(1\.02\);/);
+  assert.match(componentSource, /\.node-card__top-actions::before \{[\s\S]*background:\s*var\(--graphite-glass-specular\),\s*var\(--graphite-glass-lens\);/);
   assert.match(componentSource, /\.node-card__top-actions::after \{[\s\S]*bottom:\s*-12px;/);
   assert.match(componentSource, /\.node-card__top-actions::after \{[\s\S]*height:\s*12px;/);
   assert.match(componentSource, /\.node-card__top-actions:hover \{[\s\S]*opacity:\s*1;/);
@@ -295,6 +297,13 @@ test("NodeCard moves node actions into hoverable top buttons built from Element 
   assert.doesNotMatch(componentSource, /type="primary" @click\.stop="confirmSavePreset"/);
   assert.doesNotMatch(componentSource, /type="danger" @click\.stop="confirmDeleteNode"/);
   assert.doesNotMatch(componentSource, /<details class="node-card__advanced-panel"/);
+});
+
+test("NodeCard uses a calmer display hierarchy on the canvas", () => {
+  assert.match(componentSource, /\.node-card \{[\s\S]*background:\s*var\(--graphite-surface-card\);/);
+  assert.match(componentSource, /\.node-card__title \{[\s\S]*font-family:\s*var\(--graphite-font-display\);/);
+  assert.match(componentSource, /\.node-card__title \{[\s\S]*font-size:\s*1\.72rem;/);
+  assert.match(componentSource, /\.node-card__eyebrow \{[\s\S]*font-family:\s*var\(--graphite-font-mono\);/);
 });
 
 test("NodeCard shows a persistent human review capsule in the top action dock", () => {

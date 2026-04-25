@@ -19,3 +19,10 @@ test("RunsPage keeps run cards on detail navigation while exposing an explicit r
   assert.match(componentSource, /\{\{ runCardDetail \}\}/);
   assert.match(componentSource, /恢复编辑/);
 });
+
+test("RunsPage uses semantic status styling and keeps run identifiers monospace", () => {
+  assert.match(componentSource, /function statusBadgeClass\(status: string\)/);
+  assert.match(componentSource, /:class="statusBadgeClass\(run\.status\)"/);
+  assert.match(componentSource, /\.runs-page__badges span \{[\s\S]*background:\s*var\(--graphite-status-bg,/);
+  assert.match(componentSource, /\.runs-page__card p \{[\s\S]*font-family:\s*var\(--graphite-font-mono\);/);
+});
