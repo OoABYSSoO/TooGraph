@@ -27,6 +27,7 @@ test("buildNodeFromPreset preserves preset node semantics while replacing the ca
     sourcePresetId: null,
     createdAt: null,
     updatedAt: null,
+    status: "active",
     definition: {
       label: "Empty Agent Node",
       description: "Blank agent node.",
@@ -157,6 +158,7 @@ test("applyNodeCreationResult auto-creates a read binding for blank agent preset
     sourcePresetId: null,
     createdAt: null,
     updatedAt: null,
+    status: "active",
     definition: {
       label: "Empty Agent Node",
       description: "Blank agent node.",

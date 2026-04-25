@@ -11,6 +11,7 @@ const presets: PresetDocument[] = [
     sourcePresetId: null,
     createdAt: "2026-04-20T08:00:00Z",
     updatedAt: "2026-04-21T08:00:00Z",
+    status: "active",
     definition: {
       label: "Writing Agent",
       description: "Drafts polished copy.",
@@ -40,6 +41,7 @@ const presets: PresetDocument[] = [
     sourcePresetId: "output",
     createdAt: "2026-04-19T08:00:00Z",
     updatedAt: "2026-04-19T08:00:00Z",
+    status: "disabled",
     definition: {
       label: "Plain Output",
       description: "Shows final text.",

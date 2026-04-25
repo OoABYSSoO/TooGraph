@@ -43,6 +43,7 @@
       </section>
 
       <section class="skills-page__list">
+        <article v-if="actionError" class="skills-page__notice">{{ t("skills.actionFailed", { error: actionError }) }}</article>
         <article v-if="loading" class="skills-page__empty">{{ t("common.loading") }}</article>
         <article v-else-if="error" class="skills-page__empty">{{ t("common.failedToLoad", { error }) }}</article>
         <article v-else-if="filteredSkills.length === 0" class="skills-page__empty">{{ t("skills.empty") }}</article>
@@ -55,7 +56,7 @@
                 <h3>{{ skill.label }}</h3>
               </div>
               <div class="skills-page__status">
-                <span>{{ skill.status }}</span>
+                <span>{{ t(`skills.${skill.status}`) }}</span>
                 <span>{{ skill.runtimeRegistered ? t("skills.runtime") : t("common.off") }}</span>
                 <span v-if="skill.canManage">{{ t("skills.manageable") }}</span>
                 <span v-if="skill.canImport">{{ t("skills.importable") }}</span>
@@ -63,6 +64,46 @@
             </div>
 
             <p>{{ skill.description }}</p>
+
+            <div class="skills-page__actions" :aria-label="t('skills.actions')">
+              <button
+                v-if="skill.canImport"
+                type="button"
+                class="skills-page__action"
+                :disabled="actionSkillKey === skill.skillKey"
+                @click="importSkillIntoCatalog(skill)"
+              >
+                {{ t("skills.import") }}
+              </button>
+              <button
+                v-if="skill.canManage && skill.status === 'disabled'"
+                type="button"
+                class="skills-page__action"
+                :disabled="actionSkillKey === skill.skillKey"
+                @click="setSkillStatus(skill, 'active')"
+              >
+                {{ t("skills.enable") }}
+              </button>
+              <button
+                v-else-if="skill.canManage"
+                type="button"
+                class="skills-page__action"
+                :disabled="actionSkillKey === skill.skillKey"
+                @click="setSkillStatus(skill, 'disabled')"
+              >
+                {{ t("skills.disable") }}
+              </button>
+              <button
+                v-if="skill.canManage"
+                type="button"
+                class="skills-page__action"
+                :class="{ 'skills-page__action--danger': confirmingSkillDeleteKey === skill.skillKey }"
+                :disabled="actionSkillKey === skill.skillKey"
+                @click="deleteSkillFromCatalog(skill)"
+              >
+                {{ confirmingSkillDeleteKey === skill.skillKey ? t("skills.confirmDelete") : t("skills.delete") }}
+              </button>
+            </div>
 
             <div class="skills-page__source">
               <span>{{ t("skills.source") }}: {{ skill.sourceScope }} / {{ skill.sourceFormat }}</span>
@@ -127,7 +168,7 @@ import { computed, onMounted, ref } from "vue";
 import { ElInput, ElSegmented } from "element-plus";
 import { useI18n } from "vue-i18n";
 
-import { fetchSkillCatalog } from "@/api/skills";
+import { deleteSkill, fetchSkillCatalog, importSkill, updateSkillStatus } from "@/api/skills";
 import AppShell from "@/layouts/AppShell.vue";
 import type { SkillDefinition } from "@/types/skills";
 
@@ -141,6 +182,9 @@ import {
 const skills = ref<SkillDefinition[]>([]);
 const loading = ref(true);
 const error = ref<string | null>(null);
+const actionError = ref<string | null>(null);
+const actionSkillKey = ref<string | null>(null);
+const confirmingSkillDeleteKey = ref<string | null>(null);
 const query = ref("");
 const statusFilter = ref<SkillStatusFilter>("all");
 const { t } = useI18n();
@@ -157,12 +201,61 @@ const statusOptions = computed(() =>
 async function loadSkills() {
   loading.value = true;
   try {
-    skills.value = await fetchSkillCatalog();
+    skills.value = await fetchSkillCatalog({ includeDisabled: true });
     error.value = null;
+    actionError.value = null;
   } catch (fetchError) {
     error.value = fetchError instanceof Error ? fetchError.message : t("common.loading");
   } finally {
     loading.value = false;
+  }
+}
+
+function replaceSkill(updatedSkill: SkillDefinition) {
+  skills.value = skills.value.map((skill) => (skill.skillKey === updatedSkill.skillKey ? updatedSkill : skill));
+}
+
+async function importSkillIntoCatalog(skill: SkillDefinition) {
+  actionSkillKey.value = skill.skillKey;
+  actionError.value = null;
+  confirmingSkillDeleteKey.value = null;
+  try {
+    replaceSkill(await importSkill(skill.skillKey));
+  } catch (importError) {
+    actionError.value = importError instanceof Error ? importError.message : t("common.loading");
+  } finally {
+    actionSkillKey.value = null;
+  }
+}
+
+async function setSkillStatus(skill: SkillDefinition, status: SkillDefinition["status"]) {
+  actionSkillKey.value = skill.skillKey;
+  actionError.value = null;
+  confirmingSkillDeleteKey.value = null;
+  try {
+    replaceSkill(await updateSkillStatus(skill.skillKey, status));
+  } catch (updateError) {
+    actionError.value = updateError instanceof Error ? updateError.message : t("common.loading");
+  } finally {
+    actionSkillKey.value = null;
+  }
+}
+
+async function deleteSkillFromCatalog(skill: SkillDefinition) {
+  if (confirmingSkillDeleteKey.value !== skill.skillKey) {
+    confirmingSkillDeleteKey.value = skill.skillKey;
+    return;
+  }
+  actionSkillKey.value = skill.skillKey;
+  actionError.value = null;
+  try {
+    await deleteSkill(skill.skillKey);
+    skills.value = skills.value.filter((item) => item.skillKey !== skill.skillKey);
+    confirmingSkillDeleteKey.value = null;
+  } catch (deleteError) {
+    actionError.value = deleteError instanceof Error ? deleteError.message : t("common.loading");
+  } finally {
+    actionSkillKey.value = null;
   }
 }
 
@@ -182,7 +275,8 @@ onMounted(loadSkills);
 .skills-page__toolbar,
 .skills-page__metric,
 .skills-page__card,
-.skills-page__empty {
+.skills-page__empty,
+.skills-page__notice {
   min-width: 0;
   border: 1px solid var(--graphite-border);
   border-radius: 24px;
@@ -227,6 +321,7 @@ onMounted(loadSkills);
 .skills-page__body,
 .skills-page__card p,
 .skills-page__empty,
+.skills-page__notice,
 .skills-page__result-count,
 .skills-page__source,
 .skills-page__compatibility-empty {
@@ -240,26 +335,42 @@ onMounted(loadSkills);
   overflow-wrap: anywhere;
 }
 
-.skills-page__refresh {
+.skills-page__refresh,
+.skills-page__action {
   border: 1px solid rgba(154, 52, 18, 0.2);
   border-radius: 14px;
   padding: 10px 14px;
   background: rgba(255, 248, 240, 0.96);
   color: rgb(154, 52, 18);
   cursor: pointer;
+  font: inherit;
   transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease;
 }
 
-.skills-page__refresh:hover {
+.skills-page__refresh:hover,
+.skills-page__action:hover {
   border-color: rgba(154, 52, 18, 0.28);
   background: rgba(255, 250, 242, 1);
   transform: translateY(-1px);
 }
 
-.skills-page__refresh:disabled {
+.skills-page__refresh:disabled,
+.skills-page__action:disabled {
   cursor: not-allowed;
   opacity: 0.62;
   transform: none;
+}
+
+.skills-page__action--danger {
+  border-color: rgba(185, 28, 28, 0.24);
+  background: rgba(255, 245, 242, 0.96);
+  color: rgb(153, 27, 27);
+}
+
+.skills-page__refresh:focus-visible,
+.skills-page__action:focus-visible {
+  outline: 2px solid rgba(216, 166, 80, 0.5);
+  outline-offset: 2px;
 }
 
 .skills-page__overview {
@@ -321,12 +432,18 @@ onMounted(loadSkills);
   color: var(--graphite-accent-strong);
 }
 
+.skills-page__segments :deep(.el-segmented__item-selected) {
+  background: rgba(255, 248, 240, 0.96);
+  box-shadow: 0 8px 18px rgba(154, 52, 18, 0.12);
+}
+
 .skills-page__list {
   display: grid;
   gap: 12px;
 }
 
-.skills-page__empty {
+.skills-page__empty,
+.skills-page__notice {
   padding: 24px;
 }
 
@@ -359,10 +476,15 @@ onMounted(loadSkills);
 }
 
 .skills-page__status,
+.skills-page__actions,
 .skills-page__badges {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.skills-page__actions {
+  margin-top: -4px;
 }
 
 .skills-page__status span,
@@ -438,6 +560,10 @@ onMounted(loadSkills);
 
   .skills-page__refresh {
     width: 100%;
+  }
+
+  .skills-page__action {
+    flex: 1 1 120px;
   }
 
   .skills-page__title {

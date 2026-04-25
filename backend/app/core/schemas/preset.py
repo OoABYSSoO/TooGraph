@@ -1,8 +1,15 @@
 from __future__ import annotations
 
+from enum import Enum
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.schemas.node_system import NodeSystemNode, NodeSystemStateDefinition
+
+
+class NodeSystemPresetStatus(str, Enum):
+    ACTIVE = "active"
+    DISABLED = "disabled"
 
 
 class NodeSystemPresetDefinition(BaseModel):
@@ -25,6 +32,7 @@ class NodeSystemPresetPayload(BaseModel):
 class NodeSystemPresetDocument(NodeSystemPresetPayload):
     created_at: str | None = Field(default=None, alias="createdAt")
     updated_at: str | None = Field(default=None, alias="updatedAt")
+    status: NodeSystemPresetStatus = Field(default=NodeSystemPresetStatus.ACTIVE)
 
 
 class NodeSystemPresetListItem(BaseModel):

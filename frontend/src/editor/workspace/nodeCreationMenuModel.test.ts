@@ -49,6 +49,7 @@ const presets: PresetDocument[] = [
     sourcePresetId: null,
     createdAt: null,
     updatedAt: null,
+    status: "active",
     definition: {
       label: "Answer Text",
       description: "Answer a text question.",
@@ -84,6 +85,7 @@ const presets: PresetDocument[] = [
     sourcePresetId: null,
     createdAt: null,
     updatedAt: null,
+    status: "active",
     definition: {
       label: "Lookup KB",
       description: "Read from a knowledge base.",

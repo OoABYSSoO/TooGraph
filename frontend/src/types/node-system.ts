@@ -171,12 +171,18 @@ export type PresetDocument = {
   definition: PresetDefinition;
   createdAt: string | null;
   updatedAt: string | null;
+  status: "active" | "disabled";
 };
 
 export type PresetSaveResponse = {
   presetId: string;
   saved: boolean;
   updatedAt: string | null;
+};
+
+export type PresetDeleteResponse = {
+  presetId: string;
+  status: "deleted";
 };
 
 export type NodeCreationContext = {

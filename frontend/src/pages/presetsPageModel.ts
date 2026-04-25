@@ -56,6 +56,7 @@ function buildPresetSearchText(preset: PresetDocument): string {
   return [
     preset.presetId,
     preset.sourcePresetId ?? "",
+    preset.status,
     preset.definition.label,
     preset.definition.description,
     node.kind,

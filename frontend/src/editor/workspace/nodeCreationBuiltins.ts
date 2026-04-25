@@ -57,6 +57,7 @@ const BUILTIN_EMPTY_AGENT_PRESET: PresetDocument = {
   sourcePresetId: null,
   createdAt: null,
   updatedAt: null,
+  status: "active",
   definition: {
     label: "Empty Agent Node",
     description: "Blank agent node.",
@@ -88,6 +89,7 @@ const BUILTIN_EMPTY_CONDITION_PRESET: PresetDocument = {
   sourcePresetId: null,
   createdAt: null,
   updatedAt: null,
+  status: "active",
   definition: {
     label: "Condition Node",
     description: "Branch based on state.",

@@ -43,3 +43,13 @@ export async function apiPostText(path: string, payload: unknown): Promise<strin
   }
   return response.text();
 }
+
+export async function apiDelete<T>(path: string): Promise<T> {
+  const response = await fetch(buildApiUrl(path), {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    throw new Error(`DELETE ${path} failed with status ${response.status}`);
+  }
+  return response.json() as Promise<T>;
+}
