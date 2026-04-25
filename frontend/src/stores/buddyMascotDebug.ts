@@ -11,17 +11,32 @@ export type BuddyMascotDebugRequest = {
 export type BuddyMascotMotionDebugConfig = {
   moveDurationMs: number;
   stepPauseMs: number;
+  virtualCursorFlightSpeedPxPerS: number;
+  virtualCursorRotationSpeedDegPerS: number;
+  mascotLookRangeX: number;
+  mascotLookRangeY: number;
+  virtualCursorFollowMaxDistancePx: number;
 };
 
 export const DEFAULT_BUDDY_MASCOT_MOTION_DEBUG_CONFIG: BuddyMascotMotionDebugConfig = {
   moveDurationMs: 360,
   stepPauseMs: 8,
+  virtualCursorFlightSpeedPxPerS: 1200,
+  virtualCursorRotationSpeedDegPerS: 720,
+  mascotLookRangeX: 40,
+  mascotLookRangeY: 28,
+  virtualCursorFollowMaxDistancePx: 64,
 };
 
 const BUDDY_MASCOT_MOTION_CONFIG_STORAGE_KEY = "toograph:buddy-mascot-motion-debug-config";
 const BUDDY_MASCOT_MOTION_CONFIG_LIMITS = {
   moveDurationMs: { min: 120, max: 1200 },
   stepPauseMs: { min: 0, max: 240 },
+  virtualCursorFlightSpeedPxPerS: { min: 40, max: 1200 },
+  virtualCursorRotationSpeedDegPerS: { min: 90, max: 1440 },
+  mascotLookRangeX: { min: 8, max: 40 },
+  mascotLookRangeY: { min: 6, max: 28 },
+  virtualCursorFollowMaxDistancePx: { min: 32, max: 360 },
 } as const;
 
 export const useBuddyMascotDebugStore = defineStore("buddyMascotDebug", () => {
@@ -106,10 +121,42 @@ function normalizeMotionConfig(config: Partial<BuddyMascotMotionDebugConfig>): B
       BUDDY_MASCOT_MOTION_CONFIG_LIMITS.stepPauseMs.min,
       BUDDY_MASCOT_MOTION_CONFIG_LIMITS.stepPauseMs.max,
     ),
+    virtualCursorFlightSpeedPxPerS: clampMotionConfigValue(
+      config.virtualCursorFlightSpeedPxPerS,
+      DEFAULT_BUDDY_MASCOT_MOTION_DEBUG_CONFIG.virtualCursorFlightSpeedPxPerS,
+      BUDDY_MASCOT_MOTION_CONFIG_LIMITS.virtualCursorFlightSpeedPxPerS.min,
+      BUDDY_MASCOT_MOTION_CONFIG_LIMITS.virtualCursorFlightSpeedPxPerS.max,
+    ),
+    virtualCursorRotationSpeedDegPerS: clampMotionConfigValue(
+      config.virtualCursorRotationSpeedDegPerS,
+      DEFAULT_BUDDY_MASCOT_MOTION_DEBUG_CONFIG.virtualCursorRotationSpeedDegPerS,
+      BUDDY_MASCOT_MOTION_CONFIG_LIMITS.virtualCursorRotationSpeedDegPerS.min,
+      BUDDY_MASCOT_MOTION_CONFIG_LIMITS.virtualCursorRotationSpeedDegPerS.max,
+    ),
+    mascotLookRangeX: clampMotionConfigValue(
+      config.mascotLookRangeX,
+      DEFAULT_BUDDY_MASCOT_MOTION_DEBUG_CONFIG.mascotLookRangeX,
+      BUDDY_MASCOT_MOTION_CONFIG_LIMITS.mascotLookRangeX.min,
+      BUDDY_MASCOT_MOTION_CONFIG_LIMITS.mascotLookRangeX.max,
+    ),
+    mascotLookRangeY: clampMotionConfigValue(
+      config.mascotLookRangeY,
+      DEFAULT_BUDDY_MASCOT_MOTION_DEBUG_CONFIG.mascotLookRangeY,
+      BUDDY_MASCOT_MOTION_CONFIG_LIMITS.mascotLookRangeY.min,
+      BUDDY_MASCOT_MOTION_CONFIG_LIMITS.mascotLookRangeY.max,
+    ),
+    virtualCursorFollowMaxDistancePx: clampMotionConfigValue(
+      config.virtualCursorFollowMaxDistancePx,
+      DEFAULT_BUDDY_MASCOT_MOTION_DEBUG_CONFIG.virtualCursorFollowMaxDistancePx,
+      BUDDY_MASCOT_MOTION_CONFIG_LIMITS.virtualCursorFollowMaxDistancePx.min,
+      BUDDY_MASCOT_MOTION_CONFIG_LIMITS.virtualCursorFollowMaxDistancePx.max,
+    ),
   };
 }
 
-function clampMotionConfigValue(value: unknown, fallback: number, min: number, max: number) {
-  const numericValue = typeof value === "number" && Number.isFinite(value) ? Math.round(value) : fallback;
-  return Math.min(Math.max(numericValue, min), max);
+function clampMotionConfigValue(value: unknown, fallback: number, min: number, max: number, precision = 0) {
+  const numericValue = typeof value === "number" && Number.isFinite(value) ? value : fallback;
+  const clampedValue = Math.min(Math.max(numericValue, min), max);
+  const scale = 10 ** precision;
+  return Math.round(clampedValue * scale) / scale;
 }

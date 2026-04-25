@@ -329,6 +329,8 @@ test("BuddyMascot keeps tail curve breathing after large side transitions", () =
 test("BuddyMascot moves eye wrapper layers toward the pointer without replacing blink transforms", () => {
   assert.match(componentSource, /lookX\?: number;/);
   assert.match(componentSource, /lookY\?: number;/);
+  assert.match(componentSource, /lookRangeX\?: number;/);
+  assert.match(componentSource, /lookRangeY\?: number;/);
   assert.match(componentSource, /:style="eyeLookStyle"/);
   assert.match(componentSource, /class="buddy-mascot__look-eye buddy-mascot__look-eye--left"/);
   assert.match(componentSource, /class="buddy-mascot__look-eye buddy-mascot__look-eye--right"/);
@@ -337,8 +339,8 @@ test("BuddyMascot moves eye wrapper layers toward the pointer without replacing 
   assert.match(componentSource, /cx="-80" cy="82"/);
   assert.match(componentSource, /cx="80" cy="82"/);
   assert.match(componentSource, /const shouldTrackPointer = props\.facing === "front";/);
-  assert.match(componentSource, /const x = shouldTrackPointer \? clampLookAxis\(props\.lookX\) \* 18 : 0;/);
-  assert.match(componentSource, /const y = shouldTrackPointer \? clampLookAxis\(props\.lookY\) \* 12 : 0;/);
+  assert.match(componentSource, /const x = shouldTrackPointer \? clampLookAxis\(props\.lookX\) \* props\.lookRangeX : 0;/);
+  assert.match(componentSource, /const y = shouldTrackPointer \? clampLookAxis\(props\.lookY\) \* props\.lookRangeY : 0;/);
   assert.match(
     componentSource,
     /\.buddy-mascot__look-eye--left\s*\{[\s\S]*transform:\s*translate\(\s*calc\(var\(--buddy-mascot-look-x,\s*0px\) \+ var\(--buddy-mascot-left-eye-facing-x,\s*0px\)\),\s*calc\(var\(--buddy-mascot-look-y,\s*0px\) \+ var\(--buddy-mascot-eye-facing-y,\s*0px\)\)\s*\);/,
@@ -353,17 +355,29 @@ test("BuddyMascot moves eye wrapper layers toward the pointer without replacing 
   );
 });
 
-test("BuddyMascot shows outward drooped ears and dizzy spiral eyes in error mood", () => {
+test("BuddyMascot shows outward drooped ears and circular dizzy spiral eyes in error mood", () => {
   assert.match(extractCssBlock(componentSource, ".buddy-mascot--error .buddy-mascot__left-ear"), /animation:\s*buddy-mascot-error-ear-left 760ms ease-out both;/);
   assert.match(extractCssBlock(componentSource, ".buddy-mascot--error .buddy-mascot__right-ear"), /animation:\s*buddy-mascot-error-ear-right 760ms ease-out both;/);
   assert.match(componentSource, /class="buddy-mascot__dizzy-eye buddy-mascot__dizzy-eye--left"/);
   assert.match(componentSource, /class="buddy-mascot__dizzy-eye buddy-mascot__dizzy-eye--right"/);
+  assert.match(
+    componentSource,
+    /d="M-80 82 C-70 70 -50 74 -50 90 C-50 112 -76 124 -96 108 C-122 88 -110 48 -76 44 C-34 40 -12 88 -42 122"/,
+  );
+  assert.match(
+    componentSource,
+    /d="M80 82 C90 70 110 74 110 90 C110 112 84 124 64 108 C38 88 50 48 84 44 C126 40 148 88 118 122"/,
+  );
+  assert.doesNotMatch(componentSource, /m0-8 a8 8/);
+  assert.doesNotMatch(componentSource, /C-48 48 -48 116/);
+  assert.doesNotMatch(componentSource, /C112 48 112 116/);
   assert.match(extractCssBlock(componentSource, ".buddy-mascot__dizzy-eye"), /opacity:\s*0;/);
   assert.match(extractCssBlock(componentSource, ".buddy-mascot__dizzy-eye"), /stroke-width:\s*10;/);
   assert.match(extractCssBlock(componentSource, ".buddy-mascot--error .buddy-mascot__resting-eye"), /display:\s*none;/);
   assert.match(extractCssBlock(componentSource, ".buddy-mascot--error .buddy-mascot__resting-eye"), /opacity:\s*0;/);
   assert.match(extractCssBlock(componentSource, ".buddy-mascot--error .buddy-mascot__dizzy-eye"), /opacity:\s*1;/);
   assert.match(extractCssBlock(componentSource, ".buddy-mascot--error .buddy-mascot__dizzy-eye"), /animation:\s*buddy-mascot-error-eye-spin 920ms linear infinite;/);
+  assert.match(extractCssBlock(componentSource, ".buddy-mascot--error .buddy-mascot__dizzy-eye--right"), /animation-delay:\s*-230ms;/);
   assert.match(extractCssBlock(componentSource, ".buddy-mascot__dizzy-eye--left"), /transform-origin:\s*-80px 82px;/);
   assert.match(extractCssBlock(componentSource, ".buddy-mascot__dizzy-eye--right"), /transform-origin:\s*80px 82px;/);
   assert.match(componentSource, /rotate\(calc\(var\(--buddy-mascot-left-ear-rotate\) \+ -24deg\)\)/);

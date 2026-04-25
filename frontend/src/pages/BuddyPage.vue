@@ -512,6 +512,66 @@
                     @update:model-value="(value) => buddyMascotDebugStore.setMotionConfig({ stepPauseMs: Number(value) })"
                   />
                 </label>
+                <label class="buddy-page__debug-motion-field">
+                  <span>{{ t("buddyPage.mascotDebug.motion.virtualCursorSpeed") }}</span>
+                  <ElInputNumber
+                    :model-value="buddyMascotDebugStore.motionConfig.virtualCursorFlightSpeedPxPerS"
+                    :min="40"
+                    :max="1200"
+                    :step="10"
+                    controls-position="right"
+                    size="small"
+                    @update:model-value="(value) => buddyMascotDebugStore.setMotionConfig({ virtualCursorFlightSpeedPxPerS: Number(value) })"
+                  />
+                </label>
+                <label class="buddy-page__debug-motion-field">
+                  <span>{{ t("buddyPage.mascotDebug.motion.virtualCursorRotationSpeed") }}</span>
+                  <ElInputNumber
+                    :model-value="buddyMascotDebugStore.motionConfig.virtualCursorRotationSpeedDegPerS"
+                    :min="90"
+                    :max="1440"
+                    :step="30"
+                    controls-position="right"
+                    size="small"
+                    @update:model-value="(value) => buddyMascotDebugStore.setMotionConfig({ virtualCursorRotationSpeedDegPerS: Number(value) })"
+                  />
+                </label>
+                <label class="buddy-page__debug-motion-field">
+                  <span>{{ t("buddyPage.mascotDebug.motion.mascotLookRangeX") }}</span>
+                  <ElInputNumber
+                    :model-value="buddyMascotDebugStore.motionConfig.mascotLookRangeX"
+                    :min="8"
+                    :max="40"
+                    :step="2"
+                    controls-position="right"
+                    size="small"
+                    @update:model-value="(value) => buddyMascotDebugStore.setMotionConfig({ mascotLookRangeX: Number(value) })"
+                  />
+                </label>
+                <label class="buddy-page__debug-motion-field">
+                  <span>{{ t("buddyPage.mascotDebug.motion.mascotLookRangeY") }}</span>
+                  <ElInputNumber
+                    :model-value="buddyMascotDebugStore.motionConfig.mascotLookRangeY"
+                    :min="6"
+                    :max="28"
+                    :step="2"
+                    controls-position="right"
+                    size="small"
+                    @update:model-value="(value) => buddyMascotDebugStore.setMotionConfig({ mascotLookRangeY: Number(value) })"
+                  />
+                </label>
+                <label class="buddy-page__debug-motion-field">
+                  <span>{{ t("buddyPage.mascotDebug.motion.virtualCursorFollowRange") }}</span>
+                  <ElInputNumber
+                    :model-value="buddyMascotDebugStore.motionConfig.virtualCursorFollowMaxDistancePx"
+                    :min="32"
+                    :max="360"
+                    :step="10"
+                    controls-position="right"
+                    size="small"
+                    @update:model-value="(value) => buddyMascotDebugStore.setMotionConfig({ virtualCursorFollowMaxDistancePx: Number(value) })"
+                  />
+                </label>
               </div>
             </section>
             <div class="buddy-page__debug-grid">

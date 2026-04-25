@@ -1054,6 +1054,11 @@ const baseMessages = {
           title: "移动参数",
           moveDuration: "移动时长 ms",
           stepPause: "落地停顿 ms",
+          virtualCursorSpeed: "虚拟鼠标速度 px/s",
+          virtualCursorRotationSpeed: "虚拟鼠标旋转 deg/s",
+          mascotLookRangeX: "眼睛横向范围 px",
+          mascotLookRangeY: "眼睛纵向范围 px",
+          virtualCursorFollowRange: "伙伴跟随范围 px",
           reset: "重置",
         },
         groups: {
@@ -2125,6 +2130,11 @@ const baseMessages = {
           title: "Motion timing",
           moveDuration: "Move duration ms",
           stepPause: "Landing pause ms",
+          virtualCursorSpeed: "Virtual cursor speed px/s",
+          virtualCursorRotationSpeed: "Virtual cursor rotation deg/s",
+          mascotLookRangeX: "Eye horizontal range px",
+          mascotLookRangeY: "Eye vertical range px",
+          virtualCursorFollowRange: "Buddy follow range px",
           reset: "Reset",
         },
         groups: {

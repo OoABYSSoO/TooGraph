@@ -82,11 +82,11 @@
             />
             <g class="buddy-mascot__look-eye buddy-mascot__look-eye--left">
               <ellipse class="buddy-mascot__resting-eye buddy-mascot__resting-eye--left" cx="-80" cy="82" rx="24" ry="52" fill="url(#buddyMascotEyeGold)" />
-              <path class="buddy-mascot__dizzy-eye buddy-mascot__dizzy-eye--left" d="M-80 48 C-48 48 -48 116 -80 116 C-118 116 -118 54 -80 54 C-54 54 -54 100 -80 100 C-100 100 -100 70 -80 70" />
+              <path class="buddy-mascot__dizzy-eye buddy-mascot__dizzy-eye--left" d="M-80 82 C-70 70 -50 74 -50 90 C-50 112 -76 124 -96 108 C-122 88 -110 48 -76 44 C-34 40 -12 88 -42 122" />
             </g>
             <g class="buddy-mascot__look-eye buddy-mascot__look-eye--right">
               <ellipse class="buddy-mascot__resting-eye buddy-mascot__resting-eye--right" cx="80" cy="82" rx="24" ry="52" fill="url(#buddyMascotEyeGold)" />
-              <path class="buddy-mascot__dizzy-eye buddy-mascot__dizzy-eye--right" d="M80 48 C112 48 112 116 80 116 C42 116 42 54 80 54 C106 54 106 100 80 100 C60 100 60 70 80 70" />
+              <path class="buddy-mascot__dizzy-eye buddy-mascot__dizzy-eye--right" d="M80 82 C90 70 110 74 110 90 C110 112 84 124 64 108 C38 88 50 48 84 44 C126 40 148 88 118 122" />
             </g>
             <path class="buddy-mascot__drag-eye buddy-mascot__drag-eye--left" d="M-104 52 L-64 82 L-104 112" />
             <path class="buddy-mascot__drag-eye buddy-mascot__drag-eye--right" d="M104 52 L64 82 L104 112" />
@@ -191,6 +191,8 @@ const props = withDefaults(
     tailSwitchNonce?: number;
     lookX?: number;
     lookY?: number;
+    lookRangeX?: number;
+    lookRangeY?: number;
     virtualCursor?: boolean;
     hideSparkle?: boolean;
   }>(),
@@ -203,6 +205,8 @@ const props = withDefaults(
     tailSwitchNonce: 0,
     lookX: 0,
     lookY: 0,
+    lookRangeX: 18,
+    lookRangeY: 12,
     virtualCursor: false,
     hideSparkle: false,
   },
@@ -238,8 +242,8 @@ const mascotClasses = computed(() => ({
 }));
 const eyeLookStyle = computed<Record<string, string>>(() => {
   const shouldTrackPointer = props.facing === "front";
-  const x = shouldTrackPointer ? clampLookAxis(props.lookX) * 18 : 0;
-  const y = shouldTrackPointer ? clampLookAxis(props.lookY) * 12 : 0;
+  const x = shouldTrackPointer ? clampLookAxis(props.lookX) * props.lookRangeX : 0;
+  const y = shouldTrackPointer ? clampLookAxis(props.lookY) * props.lookRangeY : 0;
   return {
     "--buddy-mascot-look-x": `${x.toFixed(2)}px`,
     "--buddy-mascot-look-y": `${y.toFixed(2)}px`,
@@ -809,6 +813,10 @@ function clampLookAxis(value: number | undefined) {
 .buddy-mascot--error .buddy-mascot__dizzy-eye {
   opacity: 1;
   animation: buddy-mascot-error-eye-spin 920ms linear infinite;
+}
+
+.buddy-mascot--error .buddy-mascot__dizzy-eye--right {
+  animation-delay: -230ms;
 }
 
 .buddy-mascot--dragging .buddy-mascot__tail {
