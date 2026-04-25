@@ -51,6 +51,13 @@ test("Preset management labels localize node families in Chinese", () => {
   assert.equal(messages["en-US"].presets.agent, "Agent");
 });
 
+test("i18n messages localize preset persistence feedback", () => {
+  assert.equal(messages["zh-CN"].feedback.presetSaved, "已保存预设节点：{label}");
+  assert.equal(messages["zh-CN"].feedback.presetSaveFailed, "预设节点保存失败。");
+  assert.equal(messages["en-US"].feedback.presetSaved, "Saved preset node: {label}");
+  assert.equal(messages["en-US"].feedback.presetSaveFailed, "Failed to save preset node.");
+});
+
 test("new language packs use handwritten localized UI copy for high-traffic surfaces", () => {
   assert.equal(messages["zh-TW"].nav.runs, "執行記錄");
   assert.equal(messages["ja-JP"].editor.runGraph, "実行");

@@ -60,6 +60,7 @@ test("EditorWorkspaceShell can restore a past run into a new unsaved tab", () =>
 
 test("EditorWorkspaceShell wires node top-action events into state updates, node deletion, and preset persistence", () => {
   assert.match(componentSource, /import \{ fetchPreset, fetchPresets, savePreset \} from "@\/api\/presets";/);
+  assert.match(componentSource, /import \{ buildPresetPayloadForNode \} from "\.\/presetPersistence\.ts";/);
   assert.match(componentSource, /@update-node-metadata="updateNodeMetadataForTab\(tab\.tabId, \$event\.nodeId, \$event\.patch\)"/);
   assert.match(componentSource, /@rename-state="renameStateField\(tab\.tabId, \$event\.currentKey, \$event\.nextKey\)"/);
   assert.match(componentSource, /@update-state="updateStateField\(tab\.tabId, \$event\.stateKey, \$event\.patch\)"/);
@@ -71,6 +72,10 @@ test("EditorWorkspaceShell wires node top-action events into state updates, node
   assert.match(componentSource, /async function saveNodePresetForTab\(tabId: string, nodeId: string\)/);
   assert.match(componentSource, /function deleteNodeForTab\(tabId: string, nodeId: string\)/);
   assert.match(componentSource, /persistedPresets\.value = \[savedPreset, \.\.\.persistedPresets\.value\.filter/);
+  assert.doesNotMatch(componentSource, /node\.kind !== "agent"/);
+  assert.doesNotMatch(componentSource, /Only agent nodes can be saved as presets\./);
+  assert.match(componentSource, /showPresetSaveToast\("success", t\("feedback\.presetSaved"/);
+  assert.match(componentSource, /showPresetSaveToast\("error", error instanceof Error \? error\.message : t\("feedback\.presetSaveFailed"\)\)/);
 });
 
 test("EditorWorkspaceShell floats the right side panel above the canvas while preserving responsive panel widths", () => {

@@ -534,6 +534,8 @@ const baseMessages = {
       runResuming: "Run {runId} resuming.",
       iterations: " Iterations {count}/{max}.",
       nodeFailed: "Run failed on this node.",
+      presetSaved: "已保存预设节点：{label}",
+      presetSaveFailed: "预设节点保存失败。",
     },
   },
   "en-US": {
@@ -1052,6 +1054,8 @@ const baseMessages = {
       runResuming: "Run {runId} resuming.",
       iterations: " Iterations {count}/{max}.",
       nodeFailed: "Run failed on this node.",
+      presetSaved: "Saved preset node: {label}",
+      presetSaveFailed: "Failed to save preset node.",
     },
   },
 } as const;

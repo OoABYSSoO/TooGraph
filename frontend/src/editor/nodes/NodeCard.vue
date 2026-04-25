@@ -1584,7 +1584,7 @@ const agentTemperatureInput = computed(() => {
   return String(normalizeAgentTemperature(props.node.config.temperature));
 });
 const hasAdvancedSettings = computed(() => props.node.kind === "agent" || props.node.kind === "output");
-const canSavePreset = computed(() => props.node.kind === "agent");
+const canSavePreset = computed(() => Boolean(props.node));
 const isTopActionVisible = computed(() => props.humanReviewPending || props.selected || activeTopAction.value !== null);
 const hasFloatingPanelOpen = computed(
   () =>

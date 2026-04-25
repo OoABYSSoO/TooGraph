@@ -260,6 +260,7 @@ test("NodeCard moves node actions into hoverable top buttons built from Element 
   assert.match(componentSource, /placement="top"/);
   assert.match(componentSource, /:popper-style="confirmPopoverStyle"/);
   assert.match(componentSource, /t\("nodeCard\.savePresetQuestion"\)/);
+  assert.match(componentSource, /const canSavePreset = computed\(\(\) => Boolean\(props\.node\)\);/);
   assert.match(componentSource, /:visible="activeTopAction === 'delete'"/);
   assert.match(componentSource, /t\("nodeCard\.deleteNodeQuestion"\)/);
   assert.match(componentSource, /const confirmPopoverStyle = \{/);

@@ -282,6 +282,7 @@ import { addStateBindingToDocument, removeStateBindingFromDocument } from "./sta
 import { addStateFieldToDocument, deleteStateFieldFromDocument, insertStateFieldIntoDocument, renameStateFieldInDocument, updateStateFieldInDocument, type StateFieldDraft } from "./statePanelFields.ts";
 import { buildPythonExportFileName, downloadPythonSource } from "./pythonExportModel.ts";
 import { isGraphiteUiPythonExportFile, isGraphiteUiPythonExportSource } from "./pythonImportModel.ts";
+import { buildPresetPayloadForNode } from "./presetPersistence.ts";
 
 const props = defineProps<{
   routeMode: "root" | "new" | "existing";
@@ -1418,43 +1419,6 @@ function deleteNodeForTab(tabId: string, nodeId: string) {
   });
 }
 
-function slugifyPresetBase(name: string) {
-  return name
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "") || "node";
-}
-
-function buildPresetPayloadForNode(document: GraphPayload | GraphDocument, nodeId: string): {
-  presetId: string;
-  sourcePresetId: string | null;
-  definition: PresetDocument["definition"];
-} | null {
-  const node = document.nodes[nodeId];
-  if (!node || node.kind !== "agent") {
-    return null;
-  }
-
-  const referencedStateKeys = Array.from(new Set([...node.reads.map((binding) => binding.state), ...node.writes.map((binding) => binding.state)]));
-  const stateSchema = Object.fromEntries(
-    referencedStateKeys
-      .map((stateKey) => [stateKey, document.state_schema[stateKey]] as const)
-      .filter((entry): entry is readonly [string, StateDefinition] => Boolean(entry[1])),
-  );
-
-  return {
-    presetId: `preset.local.${slugifyPresetBase(node.name)}.${crypto.randomUUID().slice(0, 6)}`,
-    sourcePresetId: null,
-    definition: {
-      label: node.name,
-      description: node.description,
-      state_schema: stateSchema,
-      node: structuredClone(node),
-    },
-  };
-}
-
 async function saveNodePresetForTab(tabId: string, nodeId: string) {
   const document = documentsByTabId.value[tabId];
   if (!document) {
@@ -1465,25 +1429,41 @@ async function saveNodePresetForTab(tabId: string, nodeId: string) {
   if (!payload) {
     setMessageFeedbackForTab(tabId, {
       tone: "danger",
-      message: "Only agent nodes can be saved as presets.",
+      message: t("feedback.presetSaveFailed"),
     });
+    showPresetSaveToast("error", t("feedback.presetSaveFailed"));
     return;
   }
 
   try {
     const saved = await savePreset(payload);
     const savedPreset = await fetchPreset(saved.presetId);
+    const presetLabel = savedPreset.definition.label || savedPreset.presetId;
     persistedPresets.value = [savedPreset, ...persistedPresets.value.filter((preset) => preset.presetId !== savedPreset.presetId)];
     setMessageFeedbackForTab(tabId, {
       tone: "success",
-      message: `Saved preset ${savedPreset.definition.label || savedPreset.presetId}.`,
+      message: t("feedback.presetSaved", { label: presetLabel }),
     });
+    showPresetSaveToast("success", t("feedback.presetSaved", { label: presetLabel }));
   } catch (error) {
     setMessageFeedbackForTab(tabId, {
       tone: "danger",
-      message: error instanceof Error ? error.message : "Failed to save preset.",
+      message: error instanceof Error ? error.message : t("feedback.presetSaveFailed"),
     });
+    showPresetSaveToast("error", error instanceof Error ? error.message : t("feedback.presetSaveFailed"));
   }
+}
+
+function showPresetSaveToast(type: "success" | "error", message: string) {
+  ElMessage({
+    customClass: "editor-workspace-shell__preset-toast",
+    type,
+    duration: 3200,
+    grouping: true,
+    placement: "top",
+    showClose: true,
+    message,
+  });
 }
 
 function connectFlowNodesForTab(tabId: string, sourceNodeId: string, targetNodeId: string) {
@@ -2337,6 +2317,19 @@ onMounted(() => {
 :global(.editor-workspace-shell__locked-toast .el-message__icon) {
   color: #c2410c;
   font-size: 22px;
+}
+
+:global(.editor-workspace-shell__preset-toast.el-message) {
+  border: 1px solid rgba(154, 52, 18, 0.18);
+  border-radius: 16px;
+  background: rgba(255, 248, 240, 0.98);
+  box-shadow: 0 14px 34px rgba(60, 41, 20, 0.14);
+  backdrop-filter: blur(20px) saturate(1.45);
+}
+
+:global(.editor-workspace-shell__preset-toast .el-message__content) {
+  color: #7c2d12;
+  font-weight: 700;
 }
 
 @keyframes editor-workspace-shell-locked-toast-float {
