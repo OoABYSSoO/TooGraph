@@ -14,8 +14,8 @@
           <div class="model-providers-page__codex-main">
             <div>
               <div class="model-providers-page__eyebrow">{{ t("settings.codexLoginStatus") }}</div>
-              <h3>{{ t("settings.codexLogin") }}</h3>
-              <p>{{ t("settings.codexLoginHelp") }}</p>
+              <h3>{{ codexProvider.auth_status?.authenticated ? t("settings.codexLoggedInTitle") : t("settings.codexLogin") }}</h3>
+              <p>{{ codexProvider.auth_status?.authenticated ? t("settings.codexLoggedInHelp") : t("settings.codexLoginHelp") }}</p>
               <div class="model-providers-page__badges">
                 <span>{{ codexProvider.provider_id }}</span>
                 <span>{{ codexProvider.transport }}</span>
@@ -24,6 +24,7 @@
             </div>
             <div class="model-providers-page__codex-actions">
               <button
+                v-if="!codexProvider.auth_status?.authenticated"
                 type="button"
                 class="model-providers-page__button model-providers-page__button--primary"
                 :disabled="codexAuthBusy || Boolean(codexLoginSession)"
@@ -37,15 +38,10 @@
                       : t("settings.codexLogin")
                 }}
               </button>
-              <button
-                v-if="codexLoginSession"
-                type="button"
-                class="model-providers-page__button"
-                :disabled="codexAuthBusy"
-                @click="() => handlePollCodexLogin()"
-              >
-                {{ t("settings.codexCheckLogin") }}
-              </button>
+              <div v-else class="model-providers-page__connected-state" role="status">
+                <ElIcon aria-hidden="true"><CircleCheck /></ElIcon>
+                <span>{{ t("settings.codexLoggedIn") }}</span>
+              </div>
               <button
                 v-if="codexProvider.auth_status?.configured"
                 type="button"
@@ -59,10 +55,46 @@
           </div>
 
           <div v-if="codexLoginSession" class="model-providers-page__login-progress" role="status">
-            <span class="model-providers-page__spinner" aria-hidden="true"></span>
-            <div>
-              <strong>{{ t("settings.codexLoginWaiting") }}</strong>
-              <p>{{ t("settings.codexLoginWaitingBody") }}</p>
+            <div class="model-providers-page__login-progress-heading">
+              <span class="model-providers-page__spinner" aria-hidden="true"></span>
+              <div>
+                <strong>{{ t("settings.codexLoginWaiting") }}</strong>
+                <p>{{ t("settings.codexLoginWaitingBody") }}</p>
+              </div>
+            </div>
+            <div class="model-providers-page__login-steps">
+              <div class="model-providers-page__login-step">
+                <span class="model-providers-page__step-index">1</span>
+                <div>
+                  <strong>{{ t("settings.codexOpenVerificationStep") }}</strong>
+                  <p>{{ t("settings.codexOpenVerificationStepBody") }}</p>
+                </div>
+              </div>
+              <div class="model-providers-page__login-step">
+                <span class="model-providers-page__step-index">2</span>
+                <div class="model-providers-page__device-code-content">
+                  <strong>{{ t("settings.codexDeviceCodeStep") }}</strong>
+                  <p>{{ t("settings.codexDeviceCodeStepBody") }}</p>
+                  <div class="model-providers-page__device-code-row">
+                    <span class="model-providers-page__device-code">{{ codexLoginSession.user_code }}</span>
+                    <button
+                      type="button"
+                      class="model-providers-page__icon-button"
+                      :aria-label="t('settings.codexCopyDeviceCode')"
+                      :title="t('settings.codexCopyDeviceCode')"
+                      @click="handleCopyCodexCode"
+                    >
+                      <ElIcon aria-hidden="true"><CopyDocument /></ElIcon>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="model-providers-page__login-progress-footer">
+              <span>{{ t("settings.codexAutoDetectHint") }}</span>
+              <button type="button" class="model-providers-page__button" :disabled="codexAuthBusy" @click="() => handlePollCodexLogin()">
+                {{ t("settings.codexCheckLogin") }}
+              </button>
             </div>
           </div>
           <details v-if="codexLoginSession" class="model-providers-page__fallback-login">
@@ -74,9 +106,6 @@
               </button>
               <button type="button" class="model-providers-page__button" @click="handleCopyCodexVerificationUrl">
                 {{ t("settings.codexCopyVerificationUrl") }}
-              </button>
-              <button type="button" class="model-providers-page__button" @click="handleCopyCodexCode">
-                {{ t("settings.codexCopyCode") }}
               </button>
             </div>
           </details>
@@ -299,7 +328,8 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { ElOption, ElSelect } from "element-plus";
+import { ElIcon, ElMessage, ElOption, ElSelect } from "element-plus";
+import { CircleCheck, CopyDocument } from "@element-plus/icons-vue";
 import { useI18n } from "vue-i18n";
 
 import {
@@ -766,29 +796,41 @@ function handleOpenCodexVerification(authWindow: Window | null = null) {
   return Boolean(openedWindow);
 }
 
+function showCodexToast(type: "success" | "error", message: string) {
+  ElMessage({
+    customClass: "model-providers-page__copy-toast",
+    type,
+    duration: 2600,
+    grouping: true,
+    placement: "top",
+    showClose: false,
+    message,
+  });
+}
+
 async function handleCopyCodexVerificationUrl() {
   if (!codexLoginSession.value?.verification_url || !navigator.clipboard) {
-    setProviderMessage("openai-codex", t("settings.codexVerificationUrlCopyFailed"));
+    showCodexToast("error", t("settings.codexVerificationUrlCopyFailed"));
     return;
   }
   try {
     await navigator.clipboard.writeText(codexLoginSession.value.verification_url);
-    setProviderMessage("openai-codex", t("settings.codexVerificationUrlCopied"));
+    showCodexToast("success", t("settings.codexVerificationUrlCopied"));
   } catch {
-    setProviderMessage("openai-codex", t("settings.codexVerificationUrlCopyFailed"));
+    showCodexToast("error", t("settings.codexVerificationUrlCopyFailed"));
   }
 }
 
 async function handleCopyCodexCode() {
   if (!codexLoginSession.value?.user_code || !navigator.clipboard) {
-    setProviderMessage("openai-codex", t("settings.codexCodeCopyFailed"));
+    showCodexToast("error", t("settings.codexCodeCopyFailed"));
     return;
   }
   try {
     await navigator.clipboard.writeText(codexLoginSession.value.user_code);
-    setProviderMessage("openai-codex", t("settings.codexCodeCopied"));
+    showCodexToast("success", t("settings.codexCodeCopied"));
   } catch {
-    setProviderMessage("openai-codex", t("settings.codexCodeCopyFailed"));
+    showCodexToast("error", t("settings.codexCodeCopyFailed"));
   }
 }
 
@@ -939,6 +981,19 @@ onBeforeUnmount(stopCodexAutoPoll);
   justify-content: flex-end;
 }
 
+.model-providers-page__connected-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  border: 1px solid rgba(22, 101, 52, 0.16);
+  border-radius: 14px;
+  padding: 10px 14px;
+  background: rgba(240, 253, 244, 0.9);
+  color: rgb(22, 101, 52);
+  font-weight: 650;
+}
+
 .model-providers-page__panel label {
   display: grid;
   gap: 8px;
@@ -974,9 +1029,8 @@ onBeforeUnmount(stopCodexAutoPoll);
 }
 
 .model-providers-page__login-progress {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
+  display: grid;
+  gap: 14px;
   margin-top: 16px;
   border: 1px solid rgba(154, 52, 18, 0.12);
   border-radius: 16px;
@@ -984,13 +1038,86 @@ onBeforeUnmount(stopCodexAutoPoll);
   background: rgba(255, 255, 255, 0.64);
 }
 
+.model-providers-page__login-progress-heading,
+.model-providers-page__login-progress-footer,
+.model-providers-page__login-step,
+.model-providers-page__device-code-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.model-providers-page__login-progress-heading {
+  align-items: flex-start;
+}
+
 .model-providers-page__login-progress strong {
   color: var(--graphite-text-strong);
 }
 
 .model-providers-page__login-progress p,
+.model-providers-page__login-step p,
 .model-providers-page__fallback-login p {
   margin: 4px 0 0;
+}
+
+.model-providers-page__login-steps {
+  display: grid;
+  gap: 10px;
+}
+
+.model-providers-page__login-step {
+  align-items: flex-start;
+  border: 1px solid rgba(154, 52, 18, 0.1);
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(255, 248, 240, 0.42);
+}
+
+.model-providers-page__step-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: rgb(154, 52, 18);
+  color: rgb(255, 248, 240);
+  font-family: var(--graphite-font-mono);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.model-providers-page__device-code-content {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  width: 100%;
+}
+
+.model-providers-page__device-code-row {
+  justify-content: space-between;
+  min-height: 50px;
+  border: 1px solid rgba(154, 52, 18, 0.14);
+  border-radius: 14px;
+  padding: 8px 8px 8px 14px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.model-providers-page__device-code {
+  min-width: 0;
+  color: var(--graphite-text-strong);
+  font-family: var(--graphite-font-mono);
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+
+.model-providers-page__login-progress-footer {
+  justify-content: space-between;
+  color: rgba(60, 41, 20, 0.72);
 }
 
 .model-providers-page__spinner {
@@ -1082,6 +1209,28 @@ onBeforeUnmount(stopCodexAutoPoll);
   cursor: not-allowed;
 }
 
+.model-providers-page__icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(154, 52, 18, 0.16);
+  border-radius: 12px;
+  background: rgba(255, 248, 240, 0.96);
+  color: rgb(154, 52, 18);
+  cursor: pointer;
+}
+
+.model-providers-page__icon-button:hover {
+  background: rgba(255, 237, 213, 0.96);
+}
+
+:global(.model-providers-page__copy-toast) {
+  border-radius: 12px;
+}
+
 .model-providers-page__save-message,
 .model-providers-page__provider-message,
 .model-providers-page__provider-status {
@@ -1134,6 +1283,15 @@ onBeforeUnmount(stopCodexAutoPoll);
 
   .model-providers-page__codex-actions {
     justify-content: flex-start;
+  }
+
+  .model-providers-page__login-progress-footer,
+  .model-providers-page__device-code-row {
+    align-items: stretch;
+  }
+
+  .model-providers-page__login-progress-footer {
+    flex-direction: column;
   }
 
   .model-providers-page__add-provider,
