@@ -41,6 +41,14 @@ test("RunsPage presents a restrained dashboard toolbar with status segments and 
   assert.match(componentSource, /\.runs-page__overview-card \{[\s\S]*background:\s*rgba\(255,\s*255,\s*255,\s*0\.62\);/);
 });
 
+test("RunsPage gives status segments warm hover and selected states instead of Element Plus defaults", () => {
+  assert.match(componentSource, /\.runs-page__segments\s+:deep\(\.el-segmented__group\) \{[\s\S]*gap:\s*4px;/);
+  assert.match(componentSource, /\.runs-page__segments\s+:deep\(\.el-segmented__item:not\(\.is-selected\):hover\) \{[\s\S]*background:\s*rgba\(255,\s*255,\s*255,\s*0\.56\);/);
+  assert.match(componentSource, /\.runs-page__segments\s+:deep\(\.el-segmented__item\.is-selected\) \{[\s\S]*color:\s*var\(--graphite-accent-strong\);/);
+  assert.match(componentSource, /\.runs-page__segments\s+:deep\(\.el-segmented__item-selected\) \{[\s\S]*border:\s*1px solid rgba\(154,\s*52,\s*18,\s*0\.18\);/);
+  assert.match(componentSource, /\.runs-page__segments\s+:deep\(\.el-segmented__item-selected\) \{[\s\S]*box-shadow:\s*0 8px 18px rgba\(120,\s*53,\s*15,\s*0\.1\);/);
+});
+
 test("RunsPage renders run cards as clickable log rows with a clear status rail", () => {
   assert.match(componentSource, /class="runs-page__run-row"/);
   assert.match(componentSource, /role="link"/);
@@ -49,4 +57,14 @@ test("RunsPage renders run cards as clickable log rows with a clear status rail"
   assert.match(componentSource, /class="runs-page__status-rail"/);
   assert.match(componentSource, /\.runs-page__run-row:hover \{[\s\S]*transform:\s*translateY\(-1px\);/);
   assert.match(componentSource, /\.runs-page__status-rail \{[\s\S]*background:\s*var\(--graphite-status-fg,/);
+});
+
+test("RunsPage separates row navigation from card action clicks", () => {
+  assert.match(componentSource, /class="runs-page__detail-link"[\s\S]*@click\.stop="openRunDetail\(run\.run_id\)"/);
+  assert.match(componentSource, /class="runs-page__restore-link"[\s\S]*@click\.stop[\s\S]*:to="resolveRunRestoreUrl\(run\.run_id\)"/);
+  assert.doesNotMatch(componentSource, /class="runs-page__card-actions" @click\.stop/);
+});
+
+test("RunsPage gives clickable run cards pressed feedback", () => {
+  assert.match(componentSource, /\.runs-page__run-row:active \{[\s\S]*transform:\s*translateY\(0\) scale\(0\.995\);/);
 });

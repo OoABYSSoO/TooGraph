@@ -13,20 +13,19 @@ const entryIconMatches = componentSource.match(/class="editor-tab-launcher-panel
 const optionListMatches = componentSource.match(/class="editor-tab-launcher-panel__option-list"/g) ?? [];
 
 test("EditorTabLauncherPanel offers blank, template, and existing-graph entry points behind the plus launcher", () => {
-  assert.match(componentSource, /const expandedSection = ref<"template" \| "graph" \| null>\(null\);/);
+  assert.match(componentSource, /const activeView = ref<"root" \| "template" \| "graph">\("root"\);/);
   assert.match(componentSource, /@click="\$emit\('create-new'\)"/);
-  assert.match(componentSource, /@click="toggleSection\('template'\)"/);
-  assert.match(componentSource, /@click="toggleSection\('graph'\)"/);
+  assert.match(componentSource, /@click="openSecondaryView\('template'\)"/);
+  assert.match(componentSource, /@click="openSecondaryView\('graph'\)"/);
   assert.equal(entryButtonMatches.length, 3);
   assert.equal(entryTitleMatches.length, 3);
   assert.match(componentSource, /class="editor-tab-launcher-panel__entry-title">新建空白图</);
   assert.match(componentSource, /class="editor-tab-launcher-panel__entry-title">从模板新建</);
   assert.match(componentSource, /class="editor-tab-launcher-panel__entry-title">打开已有图</);
-  assert.equal(optionListMatches.length, 2);
-  assert.match(componentSource, /v-if="expandedSection === 'template'"[\s\S]*class="editor-tab-launcher-panel__option-list"/);
-  assert.match(componentSource, /v-for="option in templateOptions"[\s\S]*@click="selectTemplate\(option\.value\)"/);
-  assert.match(componentSource, /v-if="expandedSection === 'graph'"[\s\S]*class="editor-tab-launcher-panel__option-list"/);
-  assert.match(componentSource, /v-for="option in graphOptions"[\s\S]*@click="selectGraph\(option\.value\)"/);
+  assert.equal(optionListMatches.length, 1);
+  assert.match(componentSource, /v-if="activeView === 'root'"/);
+  assert.match(componentSource, /v-else/);
+  assert.match(componentSource, /v-for="option in activePageItems"[\s\S]*@click="selectActiveOption\(option\.value\)"/);
   assert.doesNotMatch(componentSource, /import WorkspaceSelect from/);
   assert.doesNotMatch(componentSource, /<WorkspaceSelect/);
 });
@@ -39,9 +38,30 @@ test("EditorTabLauncherPanel keeps the launcher light by using compact cards ins
   assert.doesNotMatch(componentSource, /position:\s*fixed;/);
 });
 
+test("EditorTabLauncherPanel secondary views expose a back affordance and avoid loading-only dead ends", () => {
+  assert.match(componentSource, /class="editor-tab-launcher-panel__back"/);
+  assert.match(componentSource, /@click="returnToRoot"/);
+  assert.match(componentSource, /返回/);
+  assert.match(componentSource, /const activeTitle = computed/);
+  assert.match(componentSource, /const activePlaceholder = computed/);
+  assert.match(componentSource, /v-if="activeOptions.length === 0"[\s\S]*\{\{ activePlaceholder \}\}/);
+  assert.doesNotMatch(componentSource, /Loading/);
+  assert.doesNotMatch(componentSource, /正在加载/);
+});
+
+test("EditorTabLauncherPanel paginates secondary menu options inside the popover", () => {
+  assert.match(componentSource, /const optionPageSize = 5;/);
+  assert.match(componentSource, /paginateWorkspaceOptions\(activeOptions\.value,\s*activePage\.value,\s*optionPageSize\)/);
+  assert.match(componentSource, /class="editor-tab-launcher-panel__pager"/);
+  assert.match(componentSource, /@click="goToPreviousPage"/);
+  assert.match(componentSource, /@click="goToNextPage"/);
+  assert.match(componentSource, /activePageModel\.page \+ 1/);
+  assert.match(componentSource, /activePageModel\.pageCount/);
+});
+
 test("EditorTabLauncherPanel uses the shared liquid glass visual language", () => {
   assert.match(componentSource, /import \{ ElIcon \} from "element-plus";/);
-  assert.match(componentSource, /import \{[\s\S]*ArrowRight[\s\S]*CollectionTag[\s\S]*DocumentAdd[\s\S]*FolderOpened[\s\S]*\} from "@element-plus\/icons-vue";/);
+  assert.match(componentSource, /import \{[\s\S]*ArrowLeft[\s\S]*ArrowRight[\s\S]*CollectionTag[\s\S]*DocumentAdd[\s\S]*FolderOpened[\s\S]*\} from "@element-plus\/icons-vue";/);
   assert.equal(entryIconMatches.length, 3);
   assert.match(componentSource, /<ElIcon><DocumentAdd \/><\/ElIcon>/);
   assert.match(componentSource, /<ElIcon><CollectionTag \/><\/ElIcon>/);
@@ -55,21 +75,28 @@ test("EditorTabLauncherPanel uses the shared liquid glass visual language", () =
   assert.match(componentSource, /\.editor-tab-launcher-panel \{[\s\S]*backdrop-filter:\s*blur\(26px\) saturate\(1\.55\) contrast\(1\.01\);/);
   assert.match(componentSource, /\.editor-tab-launcher-panel__entry \{[\s\S]*grid-template-columns:\s*40px minmax\(0,\s*1fr\) 18px;/);
   assert.match(componentSource, /\.editor-tab-launcher-panel__entry-icon \{[\s\S]*background:\s*rgba\(255,\s*255,\s*255,\s*0\.48\);/);
-  assert.match(componentSource, /\.editor-tab-launcher-panel__entry--active \{[\s\S]*border-color:\s*rgba\(154,\s*52,\s*18,\s*0\.42\);/);
-  assert.match(componentSource, /\.editor-tab-launcher-panel__entry-arrow--open \{[\s\S]*transform:\s*rotate\(90deg\);/);
   assert.match(componentSource, /\.editor-tab-launcher-panel__option \{[\s\S]*background:\s*rgba\(255,\s*255,\s*255,\s*0\.28\);/);
 });
 
-test("EditorTabLauncherPanel option rows emit immediately and collapse the expanded section", () => {
+test("EditorTabLauncherPanel option rows emit immediately and return to the root view", () => {
   assert.match(
     componentSource,
-    /function selectTemplate\(templateId: string\) \{[\s\S]*emit\("create-from-template", templateId\);[\s\S]*expandedSection\.value = null;[\s\S]*\}/,
-  );
-  assert.match(
-    componentSource,
-    /function selectGraph\(graphId: string\) \{[\s\S]*emit\("open-graph", graphId\);[\s\S]*expandedSection\.value = null;[\s\S]*\}/,
+    /function selectActiveOption\(optionId: string\) \{[\s\S]*if \(activeView\.value === "template"\) \{[\s\S]*emit\("create-from-template", optionId\);[\s\S]*\}[\s\S]*if \(activeView\.value === "graph"\) \{[\s\S]*emit\("open-graph", optionId\);[\s\S]*\}[\s\S]*returnToRoot\(\);[\s\S]*\}/,
   );
   assert.doesNotMatch(componentSource, /selectedTemplateId/);
   assert.doesNotMatch(componentSource, /selectedGraphId/);
-  assert.doesNotMatch(componentSource, /watch\(/);
+});
+
+test("EditorTabLauncherPanel resets secondary card navigation after the popover closes", () => {
+  assert.match(componentSource, /import \{ computed, ref, watch \} from "vue";/);
+  assert.match(componentSource, /open: boolean;/);
+  assert.match(
+    componentSource,
+    /watch\(\s*\(\) => props\.open,\s*\(nextOpen\) => \{[\s\S]*if \(!nextOpen\) \{[\s\S]*returnToRoot\(\);[\s\S]*\}[\s\S]*\},[\s\S]*\);/,
+  );
+});
+
+test("EditorTabLauncherPanel cards provide pressed feedback for responsive clicks", () => {
+  assert.match(componentSource, /\.editor-tab-launcher-panel__entry:active \{[\s\S]*transform:\s*translateY\(0\) scale\(0\.99\);/);
+  assert.match(componentSource, /\.editor-tab-launcher-panel__option:active \{[\s\S]*transform:\s*translateX\(1px\) scale\(0\.99\);/);
 });

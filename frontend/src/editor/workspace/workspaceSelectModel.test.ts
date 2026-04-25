@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   buildWorkspaceSelectOptions,
   hasWorkspaceSelectOptions,
+  paginateWorkspaceOptions,
   resolveWorkspaceSelectTriggerLabel,
 } from "./workspaceSelectModel.ts";
 
@@ -48,4 +49,25 @@ test("buildWorkspaceSelectOptions maps records to stable workspace options", () 
 test("hasWorkspaceSelectOptions reports disabled state from option length", () => {
   assert.equal(hasWorkspaceSelectOptions([]), false);
   assert.equal(hasWorkspaceSelectOptions([{ value: "hello_world", label: "Hello World" }]), true);
+});
+
+test("paginateWorkspaceOptions clamps pages and exposes pagination metadata", () => {
+  const page = paginateWorkspaceOptions(
+    [
+      { value: "a", label: "A" },
+      { value: "b", label: "B" },
+      { value: "c", label: "C" },
+      { value: "d", label: "D" },
+    ],
+    5,
+    2,
+  );
+
+  assert.deepEqual(page.items, [
+    { value: "c", label: "C" },
+    { value: "d", label: "D" },
+  ]);
+  assert.equal(page.page, 1);
+  assert.equal(page.pageCount, 2);
+  assert.equal(page.hasPagination, true);
 });

@@ -62,9 +62,9 @@
             <span>修订 {{ run.revision_round }}</span>
             <span v-if="run.final_score">score {{ run.final_score }}</span>
           </div>
-          <div class="runs-page__card-actions" @click.stop>
-            <button type="button" class="runs-page__detail-link" @click="openRunDetail(run.run_id)">{{ runCardDetail }}</button>
-            <RouterLink v-if="canRestoreRunSummary(run)" class="runs-page__restore-link" :to="resolveRunRestoreUrl(run.run_id)">
+          <div class="runs-page__card-actions">
+            <button type="button" class="runs-page__detail-link" @click.stop="openRunDetail(run.run_id)">{{ runCardDetail }}</button>
+            <RouterLink v-if="canRestoreRunSummary(run)" class="runs-page__restore-link" @click.stop :to="resolveRunRestoreUrl(run.run_id)">
               恢复编辑
             </RouterLink>
           </div>
@@ -304,16 +304,37 @@ function statusBadgeClass(status: string) {
 }
 
 .runs-page__segments :deep(.el-segmented__item) {
+  min-height: 32px;
   border-radius: 999px;
+  color: rgba(90, 58, 28, 0.74);
+  transition: background-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
 }
 
 .runs-page__segments :deep(.el-segmented__group) {
+  gap: 4px;
   min-width: max-content;
+}
+
+.runs-page__segments :deep(.el-segmented__item:not(.is-selected):hover) {
+  background: rgba(255, 255, 255, 0.56);
+  color: rgba(124, 45, 18, 0.92);
+}
+
+.runs-page__segments :deep(.el-segmented__item.is-selected) {
+  color: var(--graphite-accent-strong);
+  font-weight: 800;
 }
 
 .runs-page__segments :deep(.el-segmented__item-label) {
   padding: 0 10px;
   font-weight: 700;
+}
+
+.runs-page__segments :deep(.el-segmented__item-selected) {
+  border: 1px solid rgba(154, 52, 18, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 8px 18px rgba(120, 53, 15, 0.1);
 }
 
 .runs-page__list {
@@ -340,6 +361,10 @@ function statusBadgeClass(status: string) {
   background: rgba(255, 253, 249, 0.96);
   box-shadow: var(--graphite-shadow-hover);
   transform: translateY(-1px);
+}
+
+.runs-page__run-row:active {
+  transform: translateY(0) scale(0.995);
 }
 
 .runs-page__run-row:focus-visible {

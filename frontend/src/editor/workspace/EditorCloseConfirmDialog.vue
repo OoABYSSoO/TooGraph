@@ -6,32 +6,37 @@
     :close-on-click-modal="!busy"
     :close-on-press-escape="!busy"
     :modal-class="'editor-close-dialog__overlay'"
-    width="520px"
+    width="min(520px, calc(100vw - 32px))"
     append-to-body
     @update:model-value="handleOpenChange"
   >
     <div class="editor-close-dialog__content">
-        <div class="editor-close-dialog__eyebrow">Tab</div>
-        <h2 class="editor-close-dialog__title">关闭未保存的标签页？</h2>
-        <p class="editor-close-dialog__body">
-          这个标签页有未保存修改。你可以先保存，再关闭；也可以直接丢弃。
-          <span class="editor-close-dialog__tab-title">{{ tab?.title }}</span>
-        </p>
-
-        <div v-if="error" class="editor-close-dialog__error">{{ error }}</div>
-
-        <div class="editor-close-dialog__actions" :class="{ 'editor-close-dialog__actions--busy': busy }">
-          <ElButton class="editor-close-dialog__button editor-close-dialog__button--ghost" @click="$emit('cancel')">
-            取消
-          </ElButton>
-
-          <ElButton class="editor-close-dialog__button editor-close-dialog__button--ghost" @click="$emit('discard')">
-            不保存，直接关闭
-          </ElButton>
-
-          <ElButton class="editor-close-dialog__button" type="primary" @click="$emit('save-and-close')">保存并关闭</ElButton>
-        </div>
+      <div class="editor-close-dialog__meta">
+        <span class="editor-close-dialog__eyebrow">TAB</span>
+        <span class="editor-close-dialog__status-pill">未保存</span>
       </div>
+
+      <h2 class="editor-close-dialog__title">关闭未保存的标签页？</h2>
+      <p class="editor-close-dialog__body">这个标签页有未保存修改。你可以先保存后关闭，也可以直接丢弃。</p>
+
+      <div class="editor-close-dialog__tab-chip">{{ tab?.title }}</div>
+
+      <div v-if="error" class="editor-close-dialog__error">{{ error }}</div>
+
+      <div class="editor-close-dialog__actions" :class="{ 'editor-close-dialog__actions--busy': busy }">
+        <ElButton class="editor-close-dialog__button editor-close-dialog__button--cancel" @click="$emit('cancel')">
+          取消
+        </ElButton>
+
+        <ElButton class="editor-close-dialog__button editor-close-dialog__button--discard" @click="$emit('discard')">
+          不保存，直接关闭
+        </ElButton>
+
+        <ElButton class="editor-close-dialog__button editor-close-dialog__button--primary" type="primary" @click="$emit('save-and-close')">
+          保存并关闭
+        </ElButton>
+      </div>
+    </div>
   </ElDialog>
 </template>
 
@@ -60,56 +65,103 @@ function handleOpenChange(open: boolean) {
 </script>
 
 <style scoped>
-:deep(.editor-close-dialog__overlay) {
-  background: rgba(66, 31, 17, 0.18);
-  backdrop-filter: blur(8px);
+:global(.editor-close-dialog__overlay.el-overlay) {
+  background: rgba(42, 24, 14, 0.24);
+  backdrop-filter: blur(9px) saturate(0.95);
 }
 
-.editor-close-dialog :deep(.el-dialog) {
-  border-radius: 28px;
+:global(.editor-close-dialog.el-dialog) {
+  overflow: hidden;
+  border: 1px solid var(--graphite-glass-border);
+  border-radius: 26px;
   padding: 0;
-  background: rgba(255, 250, 241, 0.98);
-  box-shadow: 0 28px 80px rgba(66, 31, 17, 0.18);
+  background: var(--graphite-glass-specular), var(--graphite-glass-lens), var(--graphite-glass-bg-strong);
+  background-blend-mode: screen, screen, normal;
+  box-shadow:
+    0 24px 70px rgba(66, 31, 17, 0.16),
+    var(--graphite-glass-highlight),
+    var(--graphite-glass-rim);
+  backdrop-filter: blur(30px) saturate(1.55) contrast(1.02);
 }
 
-.editor-close-dialog :deep(.el-dialog__header) {
+:global(.editor-close-dialog.el-dialog .el-dialog__header) {
   display: none;
 }
 
-.editor-close-dialog :deep(.el-dialog__body) {
+:global(.editor-close-dialog.el-dialog .el-dialog__body) {
   padding: 0;
 }
 
 .editor-close-dialog__content {
-  border: 1px solid rgba(154, 52, 18, 0.18);
-  border-radius: 28px;
-  padding: 24px;
+  position: relative;
+  isolation: isolate;
+  padding: 26px;
+}
+
+.editor-close-dialog__content::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(circle at 16% 0%, rgba(255, 255, 255, 0.48), transparent 34%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.26), transparent 54%);
+  content: "";
+  pointer-events: none;
+}
+
+.editor-close-dialog__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .editor-close-dialog__eyebrow {
-  font-size: 0.76rem;
-  letter-spacing: 0.12em;
+  color: rgba(154, 52, 18, 0.78);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: rgba(154, 52, 18, 0.9);
+}
+
+.editor-close-dialog__status-pill {
+  border: 1px solid rgba(154, 52, 18, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.34);
+  color: rgba(124, 45, 18, 0.86);
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 4px 9px;
 }
 
 .editor-close-dialog__title {
-  margin: 10px 0 8px;
-  font-size: 1.9rem;
-  line-height: 1.15;
-  color: #1f2937;
+  margin: 14px 0 8px;
+  color: var(--graphite-text-strong);
+  font-family: var(--graphite-font-display);
+  font-size: 1.48rem;
+  line-height: 1.2;
 }
 
 .editor-close-dialog__body {
   margin: 0;
-  line-height: 1.6;
-  color: rgba(60, 41, 20, 0.76);
+  color: rgba(60, 41, 20, 0.68);
+  line-height: 1.55;
 }
 
-.editor-close-dialog__tab-title {
-  margin-left: 4px;
-  font-weight: 600;
-  color: #3c2914;
+.editor-close-dialog__tab-chip {
+  width: fit-content;
+  max-width: 100%;
+  overflow: hidden;
+  margin-top: 14px;
+  border: 1px solid rgba(154, 52, 18, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.4);
+  color: rgba(60, 41, 20, 0.9);
+  font-size: 0.84rem;
+  font-weight: 800;
+  padding: 7px 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .editor-close-dialog__error {
@@ -123,10 +175,11 @@ function handleOpenChange(open: boolean) {
 
 .editor-close-dialog__actions {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
-  gap: 12px;
   flex-wrap: wrap;
-  margin-top: 20px;
+  gap: 10px;
+  margin-top: 24px;
 }
 
 .editor-close-dialog__actions--busy {
@@ -135,34 +188,69 @@ function handleOpenChange(open: boolean) {
 }
 
 .editor-close-dialog__button {
-  --el-button-border-color: rgba(154, 52, 18, 0.18);
-  --el-button-bg-color: rgba(255, 248, 240, 0.96);
-  --el-button-text-color: rgb(154, 52, 18);
-  --el-button-hover-border-color: rgba(154, 52, 18, 0.24);
-  --el-button-hover-bg-color: rgba(255, 244, 240, 0.96);
-  --el-button-hover-text-color: rgb(154, 52, 18);
-  --el-button-active-border-color: rgba(154, 52, 18, 0.24);
-  --el-button-active-bg-color: rgba(255, 240, 232, 0.98);
-  --el-button-active-text-color: rgb(154, 52, 18);
-  border-radius: 999px;
   min-height: 40px;
+  border-radius: 999px;
   padding: 0 16px;
-  transition: transform 140ms ease;
+  font-weight: 800;
+  transition: box-shadow 150ms ease, transform 150ms ease;
 }
 
 .editor-close-dialog__button:hover {
   transform: translateY(-1px);
 }
 
-.editor-close-dialog__button--ghost {
-  --el-button-border-color: rgba(154, 52, 18, 0.14);
-  --el-button-bg-color: rgba(255, 255, 255, 0.72);
-  --el-button-text-color: rgba(60, 41, 20, 0.82);
+.editor-close-dialog__button:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.editor-close-dialog__button--cancel {
+  --el-button-border-color: transparent;
+  --el-button-bg-color: transparent;
+  --el-button-text-color: rgba(60, 41, 20, 0.62);
+  --el-button-hover-border-color: transparent;
+  --el-button-hover-bg-color: rgba(255, 255, 255, 0.28);
+  --el-button-hover-text-color: rgba(60, 41, 20, 0.82);
+  --el-button-active-border-color: transparent;
+  --el-button-active-bg-color: rgba(255, 255, 255, 0.22);
+  --el-button-active-text-color: rgba(60, 41, 20, 0.82);
+}
+
+.editor-close-dialog__button--discard {
+  --el-button-border-color: rgba(154, 52, 18, 0.16);
+  --el-button-bg-color: rgba(255, 255, 255, 0.34);
+  --el-button-text-color: rgba(124, 45, 18, 0.9);
   --el-button-hover-border-color: rgba(154, 52, 18, 0.18);
-  --el-button-hover-bg-color: rgba(255, 250, 241, 0.9);
-  --el-button-hover-text-color: rgba(60, 41, 20, 0.88);
+  --el-button-hover-bg-color: rgba(255, 255, 255, 0.5);
+  --el-button-hover-text-color: rgba(124, 45, 18, 0.96);
   --el-button-active-border-color: rgba(154, 52, 18, 0.18);
-  --el-button-active-bg-color: rgba(255, 248, 240, 0.92);
-  --el-button-active-text-color: rgba(60, 41, 20, 0.88);
+  --el-button-active-bg-color: rgba(255, 248, 240, 0.58);
+  --el-button-active-text-color: rgba(124, 45, 18, 0.96);
+}
+
+.editor-close-dialog__button--primary {
+  --el-button-border-color: rgba(154, 52, 18, 0.86);
+  --el-button-bg-color: rgb(154, 52, 18);
+  --el-button-text-color: rgba(255, 250, 241, 0.98);
+  --el-button-hover-border-color: rgba(124, 45, 18, 0.9);
+  --el-button-hover-bg-color: rgb(124, 45, 18);
+  --el-button-hover-text-color: rgba(255, 250, 241, 0.98);
+  --el-button-active-border-color: rgba(124, 45, 18, 0.9);
+  --el-button-active-bg-color: rgb(124, 45, 18);
+  --el-button-active-text-color: rgba(255, 250, 241, 0.98);
+  box-shadow: 0 10px 22px rgba(154, 52, 18, 0.18);
+}
+
+@media (max-width: 560px) {
+  .editor-close-dialog__content {
+    padding: 22px;
+  }
+
+  .editor-close-dialog__actions {
+    justify-content: stretch;
+  }
+
+  .editor-close-dialog__button {
+    flex: 1 1 auto;
+  }
 }
 </style>

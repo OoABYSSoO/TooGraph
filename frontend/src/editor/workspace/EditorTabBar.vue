@@ -87,6 +87,7 @@
           </template>
 
           <EditorTabLauncherPanel
+            :open="launcherPopoverOpen"
             :template-options="templateOptions"
             :graph-options="graphOptions"
             :template-placeholder="selectPlaceholders.template"

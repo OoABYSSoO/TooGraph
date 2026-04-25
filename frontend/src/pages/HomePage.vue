@@ -22,7 +22,7 @@
             <p>还没有运行记录。</p>
             <RouterLink class="home-empty__action" :to="runsEmptyAction.href">{{ runsEmptyAction.label }}</RouterLink>
           </div>
-          <RouterLink v-for="run in runs.slice(0, 5)" :key="run.run_id" class="home-card" :to="`/runs/${run.run_id}`">
+          <RouterLink v-for="run in visibleRunPage.items" :key="run.run_id" class="home-card" :to="`/runs/${run.run_id}`">
             <div class="home-card__header">
               <strong>{{ formatRunDisplayName(run) }}</strong>
               <span class="home-card__detail">{{ runCardDetail }}</span>
@@ -33,6 +33,13 @@
               <span>revisions {{ run.revision_round }}</span>
             </div>
           </RouterLink>
+          <div v-if="visibleRunPage.hasPagination" class="home-panel__pager">
+            <button type="button" :disabled="visibleRunPage.page === 0" @click="setRunPage(visibleRunPage.page - 1)">上一页</button>
+            <span>{{ visibleRunPage.page + 1 }} / {{ visibleRunPage.pageCount }}</span>
+            <button type="button" :disabled="visibleRunPage.page >= visibleRunPage.pageCount - 1" @click="setRunPage(visibleRunPage.page + 1)">
+              下一页
+            </button>
+          </div>
         </div>
       </article>
 
@@ -48,7 +55,7 @@
             <RouterLink class="home-empty__action" :to="templatesEmptyAction.href">{{ templatesEmptyAction.label }}</RouterLink>
           </div>
           <RouterLink
-            v-for="template in templates"
+            v-for="template in visibleTemplatePage.items"
             :key="template.template_id"
             class="home-card"
             :to="`/editor/new?template=${template.template_id}`"
@@ -57,6 +64,17 @@
             <strong>{{ template.label }}</strong>
             <p>{{ template.description }}</p>
           </RouterLink>
+          <div v-if="visibleTemplatePage.hasPagination" class="home-panel__pager">
+            <button type="button" :disabled="visibleTemplatePage.page === 0" @click="setTemplatePage(visibleTemplatePage.page - 1)">上一页</button>
+            <span>{{ visibleTemplatePage.page + 1 }} / {{ visibleTemplatePage.pageCount }}</span>
+            <button
+              type="button"
+              :disabled="visibleTemplatePage.page >= visibleTemplatePage.pageCount - 1"
+              @click="setTemplatePage(visibleTemplatePage.page + 1)"
+            >
+              下一页
+            </button>
+          </div>
         </div>
       </article>
 
@@ -71,7 +89,7 @@
             <p>当前还没有已保存图。</p>
             <RouterLink class="home-empty__action" :to="graphsEmptyAction.href">{{ graphsEmptyAction.label }}</RouterLink>
           </div>
-          <RouterLink v-for="graph in graphs.slice(0, 5)" :key="graph.graph_id" class="home-card" :to="`/editor/${graph.graph_id}`">
+          <RouterLink v-for="graph in visibleGraphPage.items" :key="graph.graph_id" class="home-card" :to="`/editor/${graph.graph_id}`">
             <div class="home-card__header">
               <strong>{{ graph.name }}</strong>
               <span class="home-card__detail">{{ graphCardDetail }}</span>
@@ -82,6 +100,17 @@
               <span>{{ countGraphEdgeTotal(graph) }} edges</span>
             </div>
           </RouterLink>
+          <div v-if="visibleGraphPage.hasPagination" class="home-panel__pager">
+            <button type="button" :disabled="visibleGraphPage.page === 0" @click="setGraphPage(visibleGraphPage.page - 1)">上一页</button>
+            <span>{{ visibleGraphPage.page + 1 }} / {{ visibleGraphPage.pageCount }}</span>
+            <button
+              type="button"
+              :disabled="visibleGraphPage.page >= visibleGraphPage.pageCount - 1"
+              @click="setGraphPage(visibleGraphPage.page + 1)"
+            >
+              下一页
+            </button>
+          </div>
         </div>
       </article>
     </section>
@@ -89,7 +118,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 
 import { fetchGraphs, fetchTemplates } from "@/api/graphs";
 import { fetchRuns } from "@/api/runs";
@@ -98,17 +127,28 @@ import AppShell from "@/layouts/AppShell.vue";
 import type { GraphDocument, TemplateRecord } from "@/types/node-system";
 import type { RunSummary } from "@/types/run";
 
-import { countGraphEdgeTotal, resolveWorkspaceCardDetail, resolveWorkspaceEmptyAction } from "./workspaceDashboardModel.ts";
+import {
+  countGraphEdgeTotal,
+  paginateWorkspacePanelItems,
+  resolveWorkspaceCardDetail,
+  resolveWorkspaceEmptyAction,
+} from "./workspaceDashboardModel.ts";
 
 const graphs = ref<GraphDocument[]>([]);
 const templates = ref<TemplateRecord[]>([]);
 const runs = ref<RunSummary[]>([]);
 const error = ref<string | null>(null);
+const runPage = ref(0);
+const templatePage = ref(0);
+const graphPage = ref(0);
 const runsEmptyAction = resolveWorkspaceEmptyAction("runs");
 const templatesEmptyAction = resolveWorkspaceEmptyAction("templates");
 const graphsEmptyAction = resolveWorkspaceEmptyAction("graphs");
 const runCardDetail = resolveWorkspaceCardDetail("runs");
 const graphCardDetail = resolveWorkspaceCardDetail("graphs");
+const visibleRunPage = computed(() => paginateWorkspacePanelItems(runs.value, runPage.value));
+const visibleTemplatePage = computed(() => paginateWorkspacePanelItems(templates.value, templatePage.value));
+const visibleGraphPage = computed(() => paginateWorkspacePanelItems(graphs.value, graphPage.value));
 
 onMounted(async () => {
   try {
@@ -124,6 +164,18 @@ onMounted(async () => {
 
 function statusBadgeClass(status: string) {
   return `graphite-status-badge graphite-status-badge--${status.replaceAll("_", "-")}`;
+}
+
+function setRunPage(nextPage: number) {
+  runPage.value = nextPage;
+}
+
+function setTemplatePage(nextPage: number) {
+  templatePage.value = nextPage;
+}
+
+function setGraphPage(nextPage: number) {
+  graphPage.value = nextPage;
 }
 </script>
 
@@ -220,6 +272,40 @@ function statusBadgeClass(status: string) {
   gap: 12px;
 }
 
+.home-panel__pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: rgba(60, 41, 20, 0.58);
+  font-size: 0.78rem;
+}
+
+.home-panel__pager button {
+  min-height: 30px;
+  border: 1px solid rgba(154, 52, 18, 0.14);
+  border-radius: 999px;
+  padding: 0 12px;
+  background: rgba(255, 248, 240, 0.82);
+  color: rgb(154, 52, 18);
+  cursor: pointer;
+  transition: border-color 150ms ease, background-color 150ms ease, transform 150ms ease;
+}
+
+.home-panel__pager button:not(:disabled):hover {
+  border-color: rgba(154, 52, 18, 0.24);
+  background: rgba(255, 244, 232, 0.98);
+}
+
+.home-panel__pager button:not(:disabled):active {
+  transform: scale(0.98);
+}
+
+.home-panel__pager button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .home-card,
 .home-empty {
   border: 1px solid rgba(154, 52, 18, 0.1);
@@ -231,6 +317,20 @@ function statusBadgeClass(status: string) {
 .home-card {
   color: inherit;
   text-decoration: none;
+  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.home-card:hover,
+.home-card:focus-visible {
+  border-color: rgba(154, 52, 18, 0.2);
+  background: rgba(255, 253, 249, 0.96);
+  box-shadow: var(--graphite-shadow-hover);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.home-card:active {
+  transform: translateY(0) scale(0.995);
 }
 
 .home-card__header {
