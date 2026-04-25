@@ -24,7 +24,7 @@
     <div
       class="editor-canvas__edge-view-toolbar"
       role="toolbar"
-      aria-label="线条显示模式"
+      :aria-label="t('edgeMode.toolbar')"
       @pointerdown.stop
       @pointerup.stop
       @dblclick.stop
@@ -32,7 +32,7 @@
       @wheel.stop
     >
       <button
-        v-for="option in EDGE_VISIBILITY_MODE_OPTIONS"
+        v-for="option in edgeVisibilityModeOptions"
         :key="option.mode"
         type="button"
         class="editor-canvas__edge-view-button"
@@ -54,14 +54,14 @@
       @keydown.enter.prevent="handleLockBannerClick"
       @keydown.space.prevent="handleLockBannerClick"
     >
-      Human Review Paused · Graph Locked
+      {{ t("editor.lockBanner") }}
     </button>
     <div class="editor-canvas__viewport" :style="viewportStyle">
       <div v-if="nodeEntries.length === 0" class="editor-canvas__empty-state">
         <div class="editor-canvas__empty-card">
-          <div class="editor-canvas__empty-eyebrow">Empty Canvas</div>
-          <div class="editor-canvas__empty-title">Double click to create your first node</div>
-          <div class="editor-canvas__empty-copy">Drag from an output handle into empty space to get type-aware preset suggestions.</div>
+          <div class="editor-canvas__empty-eyebrow">{{ t("editor.emptyCanvas") }}</div>
+          <div class="editor-canvas__empty-title">{{ t("editor.createFirstNode") }}</div>
+          <div class="editor-canvas__empty-copy">{{ t("editor.emptyCanvasHint") }}</div>
         </div>
       </div>
       <svg class="editor-canvas__edges" viewBox="0 0 4000 3000" preserveAspectRatio="none" aria-hidden="true">
@@ -146,7 +146,7 @@
         aria-hidden="true"
         @pointerdown.stop
       >
-        <div class="editor-canvas__confirm-hint editor-canvas__confirm-hint--state">Edit state?</div>
+        <div class="editor-canvas__confirm-hint editor-canvas__confirm-hint--state">{{ t("nodeCard.editStateQuestion") }}</div>
         <button
           type="button"
           class="editor-canvas__edge-state-button"
@@ -311,6 +311,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, toRef, watch } from "vue";
 import { Check } from "@element-plus/icons-vue";
+import { useI18n } from "vue-i18n";
 
 import { buildAnchorModel } from "@/editor/anchors/anchorModel";
 import EditorMinimap from "./EditorMinimap.vue";
@@ -325,7 +326,7 @@ import { resolveNodeRunPresentation } from "@/editor/canvas/runNodePresentation"
 import { resolveCanvasLayout, type MeasuredAnchorOffset } from "@/editor/canvas/resolvedCanvasLayout";
 import { resolveCanvasSurfaceStyle } from "@/editor/canvas/canvasSurfaceStyle";
 import {
-  EDGE_VISIBILITY_MODE_OPTIONS,
+  buildEdgeVisibilityModeOptions,
   filterProjectedEdgesForVisibilityMode,
   type EdgeVisibilityMode,
 } from "./edgeVisibilityModel";
@@ -366,6 +367,12 @@ const props = defineProps<{
   activeRunEdgeIds?: string[];
   interactionLocked?: boolean;
 }>();
+
+const { t, locale } = useI18n();
+const edgeVisibilityModeOptions = computed(() => {
+  locale.value;
+  return buildEdgeVisibilityModeOptions();
+});
 
 const emit = defineEmits<{
   (event: "update:node-position", payload: { nodeId: string; position: GraphPosition }): void;

@@ -19,9 +19,9 @@ test("EditorTabLauncherPanel offers blank, template, and existing-graph entry po
   assert.match(componentSource, /@click="openSecondaryView\('graph'\)"/);
   assert.equal(entryButtonMatches.length, 3);
   assert.equal(entryTitleMatches.length, 3);
-  assert.match(componentSource, /class="editor-tab-launcher-panel__entry-title">新建空白图</);
-  assert.match(componentSource, /class="editor-tab-launcher-panel__entry-title">从模板新建</);
-  assert.match(componentSource, /class="editor-tab-launcher-panel__entry-title">打开已有图</);
+  assert.match(componentSource, /class="editor-tab-launcher-panel__entry-title">\{\{ t\("launcher\.blankTitle"\) \}\}</);
+  assert.match(componentSource, /class="editor-tab-launcher-panel__entry-title">\{\{ t\("launcher\.templateTitle"\) \}\}</);
+  assert.match(componentSource, /class="editor-tab-launcher-panel__entry-title">\{\{ t\("launcher\.graphTitle"\) \}\}</);
   assert.equal(optionListMatches.length, 1);
   assert.match(componentSource, /v-if="activeView === 'root'"/);
   assert.match(componentSource, /v-else/);
@@ -41,7 +41,7 @@ test("EditorTabLauncherPanel keeps the launcher light by using compact cards ins
 test("EditorTabLauncherPanel secondary views expose a back affordance and avoid loading-only dead ends", () => {
   assert.match(componentSource, /class="editor-tab-launcher-panel__back"/);
   assert.match(componentSource, /@click="returnToRoot"/);
-  assert.match(componentSource, /返回/);
+  assert.match(componentSource, /t\("common\.back"\)/);
   assert.match(componentSource, /const activeTitle = computed/);
   assert.match(componentSource, /const activePlaceholder = computed/);
   assert.match(componentSource, /v-if="activeOptions.length === 0"[\s\S]*\{\{ activePlaceholder \}\}/);

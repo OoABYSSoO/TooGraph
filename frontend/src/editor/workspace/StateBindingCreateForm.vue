@@ -1,23 +1,23 @@
 <template>
   <div v-if="options.length === 0" class="state-binding-create-form__empty">
-    No eligible nodes are available for this relation.
+    {{ t("stateBinding.noEligibleNodes") }}
   </div>
 
   <div v-else class="state-binding-create-form">
     <label class="state-binding-create-form__field">
-      <span>{{ mode === "read" ? "Reader Node" : "Writer Node" }}</span>
-      <WorkspaceSelect v-model="selectedNodeId" :options="selectOptions" placeholder="Choose a node" />
+      <span>{{ mode === "read" ? t("stateBinding.readerNode") : t("stateBinding.writerNode") }}</span>
+      <WorkspaceSelect v-model="selectedNodeId" :options="selectOptions" :placeholder="t('stateBinding.chooseNode')" />
     </label>
 
     <div class="state-binding-create-form__actions">
-      <button type="button" class="state-binding-create-form__cancel" @click="$emit('cancel')">Cancel</button>
+      <button type="button" class="state-binding-create-form__cancel" @click="$emit('cancel')">{{ t("common.cancel") }}</button>
       <button
         type="button"
         class="state-binding-create-form__submit"
         :disabled="!selectedNodeId"
         @click="selectedNodeId && $emit('add', selectedNodeId)"
       >
-        {{ mode === "read" ? "Add Reader" : "Add Writer" }}
+        {{ mode === "read" ? t("stateBinding.addReader") : t("stateBinding.addWriter") }}
       </button>
     </div>
   </div>
@@ -25,6 +25,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 
 import WorkspaceSelect from "./WorkspaceSelect.vue";
 import type { StateBindingMode, StateBindingNodeOption } from "./statePanelBindings.ts";
@@ -33,6 +34,7 @@ const props = defineProps<{
   mode: StateBindingMode;
   options: StateBindingNodeOption[];
 }>();
+const { t } = useI18n();
 
 defineEmits<{
   (event: "add", nodeId: string): void;

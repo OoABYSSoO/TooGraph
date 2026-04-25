@@ -12,12 +12,12 @@
   >
     <div class="editor-close-dialog__content">
       <div class="editor-close-dialog__meta">
-        <span class="editor-close-dialog__eyebrow">TAB</span>
-        <span class="editor-close-dialog__status-pill">未保存</span>
+        <span class="editor-close-dialog__eyebrow">{{ t("closeDialog.eyebrow") }}</span>
+        <span class="editor-close-dialog__status-pill">{{ t("closeDialog.status") }}</span>
       </div>
 
-      <h2 class="editor-close-dialog__title">关闭未保存的标签页？</h2>
-      <p class="editor-close-dialog__body">这个标签页有未保存修改。你可以先保存后关闭，也可以直接丢弃。</p>
+      <h2 class="editor-close-dialog__title">{{ t("closeDialog.title") }}</h2>
+      <p class="editor-close-dialog__body">{{ t("closeDialog.body") }}</p>
 
       <div class="editor-close-dialog__tab-chip">{{ tab?.title }}</div>
 
@@ -25,15 +25,15 @@
 
       <div class="editor-close-dialog__actions" :class="{ 'editor-close-dialog__actions--busy': busy }">
         <ElButton class="editor-close-dialog__button editor-close-dialog__button--cancel" @click="$emit('cancel')">
-          取消
+          {{ t("common.cancel") }}
         </ElButton>
 
         <ElButton class="editor-close-dialog__button editor-close-dialog__button--discard" @click="$emit('discard')">
-          不保存，直接关闭
+          {{ t("closeDialog.discard") }}
         </ElButton>
 
         <ElButton class="editor-close-dialog__button editor-close-dialog__button--primary" type="primary" @click="$emit('save-and-close')">
-          保存并关闭
+          {{ t("closeDialog.saveAndClose") }}
         </ElButton>
       </div>
     </div>
@@ -42,6 +42,7 @@
 
 <script setup lang="ts">
 import { ElButton, ElDialog } from "element-plus";
+import { useI18n } from "vue-i18n";
 
 import type { EditorWorkspaceTab } from "@/lib/editor-workspace";
 
@@ -56,6 +57,8 @@ const emit = defineEmits<{
   (event: "discard"): void;
   (event: "cancel"): void;
 }>();
+
+const { t } = useI18n();
 
 function handleOpenChange(open: boolean) {
   if (!open && props.tab && !props.busy) {

@@ -4,13 +4,13 @@
       <header class="run-detail__hero">
         <div class="run-detail__hero-top">
           <div>
-            <div class="run-detail__eyebrow">Run Detail</div>
+            <div class="run-detail__eyebrow">{{ t("runDetail.eyebrow") }}</div>
             <h2 class="run-detail__title">{{ runDisplayName }}</h2>
-            <p class="run-detail__body">先看运行状态和最终产出，再展开节点过程、循环信息和原始 artifacts。</p>
+            <p class="run-detail__body">{{ t("runDetail.body") }}</p>
           </div>
         </div>
 
-        <div v-if="viewedRun" class="run-detail__status-console" aria-label="运行状态摘要">
+        <div v-if="viewedRun" class="run-detail__status-console" :aria-label="t('runDetail.statusSummary')">
           <article v-for="fact in runStatusFacts" :key="fact.key" class="run-detail__metric">
             <span>{{ fact.label }}</span>
             <strong
@@ -21,7 +21,7 @@
             </strong>
           </article>
           <article class="run-detail__metric">
-            <span>开始时间</span>
+            <span>{{ t("common.startedAt") }}</span>
             <strong class="run-detail__metric-value">{{ viewedRun ? formatRunDisplayTimestamp(viewedRun.started_at) : "—" }}</strong>
           </article>
         </div>
@@ -42,45 +42,45 @@
           </div>
           <RouterLink v-if="canRestore" class="run-detail__restore-link" :to="restoreEditorHref">
             <ElIcon class="run-detail__restore-icon" aria-hidden="true"><Promotion /></ElIcon>
-            <span>恢复编辑</span>
+            <span>{{ t("common.restoreEdit") }}</span>
           </RouterLink>
         </div>
       </header>
 
       <article v-if="error" class="run-detail__empty">
-        <p>加载失败：{{ error }}</p>
-        <button type="button" class="run-detail__retry" @click="loadRun(runId)">重新加载</button>
+        <p>{{ t("common.failedToLoad", { error }) }}</p>
+        <button type="button" class="run-detail__retry" @click="loadRun(runId)">{{ t("common.retry") }}</button>
       </article>
-      <article v-else-if="loading" class="run-detail__empty">Loading run…</article>
-      <article v-else-if="!run" class="run-detail__empty">没有找到运行记录。</article>
+      <article v-else-if="loading" class="run-detail__empty">{{ t("common.loadingRun") }}</article>
+      <article v-else-if="!run" class="run-detail__empty">{{ t("runDetail.noRun") }}</article>
       <template v-else>
         <article class="run-detail__panel run-detail__panel--result">
           <div class="run-detail__panel-heading">
             <div>
-              <span class="run-detail__section-kicker">Primary Output</span>
-              <h3>Final Result</h3>
+              <span class="run-detail__section-kicker">{{ t("runDetail.primaryOutput") }}</span>
+              <h3>{{ t("runDetail.finalResult") }}</h3>
             </div>
             <button type="button" class="run-detail__content-toggle" @click="toggleContentExpansion('final-result')">
-              {{ isContentExpanded("final-result") ? "收起" : "展开全部" }}
+              {{ isContentExpanded("final-result") ? t("common.collapse") : t("common.expandAll") }}
             </button>
           </div>
           <pre
             class="run-detail__content run-detail__content--result"
             :class="{ 'run-detail__content--expanded': isContentExpanded('final-result') }"
-          >{{ viewedRun?.final_result || "None" }}</pre>
+          >{{ viewedRun?.final_result || t("common.none") }}</pre>
         </article>
 
         <section class="run-detail__grid">
           <article v-if="cycleVisualization.hasCycle" class="run-detail__panel">
             <div class="run-detail__panel-heading">
               <div>
-                <span class="run-detail__section-kicker">Loop</span>
-                <h3>Cycle Summary</h3>
+                <span class="run-detail__section-kicker">{{ t("runDetail.loop") }}</span>
+                <h3>{{ t("runDetail.cycleSummary") }}</h3>
               </div>
             </div>
             <div class="run-detail__badges">
-              <span>{{ cycleVisualization.summary?.iteration_count ?? cycleVisualization.iterations.length }} iterations</span>
-              <span>max {{ cycleVisualization.summary?.max_iterations === -1 ? "unlimited" : cycleVisualization.summary?.max_iterations }}</span>
+                <span>{{ t("common.iterations", { count: cycleVisualization.summary?.iteration_count ?? cycleVisualization.iterations.length }) }}</span>
+                <span>{{ t("common.max", { value: cycleVisualization.summary?.max_iterations === -1 ? t("common.unlimited") : cycleVisualization.summary?.max_iterations }) }}</span>
               <span v-if="cycleVisualization.summary?.stop_reason">{{ formatCycleStopReason(cycleVisualization.summary.stop_reason) }}</span>
               <span v-for="edge in cycleVisualization.backEdges" :key="edge">{{ edge }}</span>
             </div>
@@ -92,18 +92,18 @@
           <article class="run-detail__panel">
             <div class="run-detail__panel-heading">
               <div>
-                <span class="run-detail__section-kicker">Context</span>
-                <h3>Supporting Artifacts</h3>
+                <span class="run-detail__section-kicker">{{ t("runDetail.context") }}</span>
+                <h3>{{ t("runDetail.supportingArtifacts") }}</h3>
               </div>
             </div>
             <div class="run-detail__info-grid">
               <div class="run-detail__info">
-                <span>Knowledge</span>
-                <strong class="run-detail__content">{{ viewedRun?.knowledge_summary || "None" }}</strong>
+                <span>{{ t("runDetail.knowledge") }}</span>
+                <strong class="run-detail__content">{{ viewedRun?.knowledge_summary || t("common.none") }}</strong>
               </div>
               <div class="run-detail__info">
-                <span>Memory</span>
-                <strong class="run-detail__content">{{ viewedRun?.memory_summary || "None" }}</strong>
+                <span>{{ t("runDetail.memory") }}</span>
+                <strong class="run-detail__content">{{ viewedRun?.memory_summary || t("common.none") }}</strong>
               </div>
             </div>
           </article>
@@ -112,8 +112,8 @@
         <article v-if="outputArtifacts.length > 0" class="run-detail__panel">
           <div class="run-detail__panel-heading">
             <div>
-              <span class="run-detail__section-kicker">Exports</span>
-              <h3>Output Artifacts</h3>
+              <span class="run-detail__section-kicker">{{ t("runDetail.exports") }}</span>
+              <h3>{{ t("runDetail.outputArtifacts") }}</h3>
             </div>
           </div>
           <div class="run-detail__artifacts">
@@ -121,11 +121,11 @@
               <div class="run-detail__subcard-heading">
                 <strong>{{ artifact.title }}</strong>
                 <button type="button" class="run-detail__content-toggle" @click="toggleContentExpansion(artifact.key)">
-                  {{ isContentExpanded(artifact.key) ? "收起" : "展开" }}
+                  {{ isContentExpanded(artifact.key) ? t("common.collapse") : t("common.expand") }}
                 </button>
               </div>
               <pre class="run-detail__content" :class="{ 'run-detail__content--expanded': isContentExpanded(artifact.key) }">{{
-                artifact.text || "None"
+                artifact.text || t("common.none")
               }}</pre>
               <div class="run-detail__badges">
                 <span>{{ artifact.displayMode }}</span>
@@ -139,42 +139,42 @@
         <article v-if="cycleVisualization.hasCycle && cycleVisualization.iterations.length > 0" class="run-detail__panel">
           <div class="run-detail__panel-heading">
             <div>
-              <span class="run-detail__section-kicker">Loop Detail</span>
-              <h3>Cycle Iterations</h3>
+              <span class="run-detail__section-kicker">{{ t("runDetail.loopDetail") }}</span>
+              <h3>{{ t("runDetail.cycleIterations") }}</h3>
             </div>
           </div>
           <div class="run-detail__list">
             <details v-for="iteration in cycleVisualization.iterations" :key="iteration.iteration" class="run-detail__subcard">
               <summary>
-                <strong>Iteration {{ iteration.iteration }}</strong>
-                <span>{{ iteration.executedNodeIds.length }} nodes · {{ iteration.activatedEdgeIds.length }} edges</span>
+                <strong>{{ t("common.iteration", { value: iteration.iteration }) }}</strong>
+                <span>{{ t("common.nodesCount", { count: iteration.executedNodeIds.length }) }} · {{ t("common.edgesCount", { count: iteration.activatedEdgeIds.length }) }}</span>
               </summary>
               <div class="run-detail__meta-groups">
                 <div class="run-detail__meta-group">
-                  <span class="run-detail__meta-title">Executed</span>
+                  <span class="run-detail__meta-title">{{ t("runDetail.executed") }}</span>
                   <div class="run-detail__badges">
-                    <span v-if="iteration.executedNodeIds.length === 0">None</span>
+                    <span v-if="iteration.executedNodeIds.length === 0">{{ t("common.none") }}</span>
                     <span v-for="nodeId in iteration.executedNodeIds" v-else :key="`executed-${iteration.iteration}-${nodeId}`">{{ nodeId }}</span>
                   </div>
                 </div>
                 <div class="run-detail__meta-group">
-                  <span class="run-detail__meta-title">Activated edges</span>
+                  <span class="run-detail__meta-title">{{ t("runDetail.activatedEdges") }}</span>
                   <div class="run-detail__badges">
-                    <span v-if="iteration.activatedEdgeIds.length === 0">None</span>
+                    <span v-if="iteration.activatedEdgeIds.length === 0">{{ t("common.none") }}</span>
                     <span v-for="edgeId in iteration.activatedEdgeIds" v-else :key="`edge-${iteration.iteration}-${edgeId}`">{{ edgeId }}</span>
                   </div>
                 </div>
                 <div class="run-detail__meta-group">
-                  <span class="run-detail__meta-title">Incoming edges</span>
+                  <span class="run-detail__meta-title">{{ t("runDetail.incomingEdges") }}</span>
                   <div class="run-detail__badges">
-                    <span v-if="iteration.incomingEdgeIds.length === 0">None</span>
+                    <span v-if="iteration.incomingEdgeIds.length === 0">{{ t("common.none") }}</span>
                     <span v-for="edgeId in iteration.incomingEdgeIds" v-else :key="`incoming-${iteration.iteration}-${edgeId}`">{{ edgeId }}</span>
                   </div>
                 </div>
                 <div class="run-detail__meta-group">
-                  <span class="run-detail__meta-title">Next iteration</span>
+                  <span class="run-detail__meta-title">{{ t("runDetail.nextIteration") }}</span>
                   <div class="run-detail__badges">
-                    <span v-if="iteration.nextIterationEdgeIds.length === 0">Loop exits here</span>
+                    <span v-if="iteration.nextIterationEdgeIds.length === 0">{{ t("runDetail.loopExitsHere") }}</span>
                     <span v-for="edgeId in iteration.nextIterationEdgeIds" v-else :key="`next-${iteration.iteration}-${edgeId}`">{{ edgeId }}</span>
                   </div>
                 </div>
@@ -186,8 +186,8 @@
         <article class="run-detail__panel">
           <div class="run-detail__panel-heading">
             <div>
-              <span class="run-detail__section-kicker">Node Timeline</span>
-              <h3>Timeline</h3>
+              <span class="run-detail__section-kicker">{{ t("runDetail.nodeTimeline") }}</span>
+              <h3>{{ t("runDetail.timeline") }}</h3>
             </div>
           </div>
           <div class="run-detail__timeline">
@@ -202,10 +202,10 @@
                   <strong>{{ execution.node_id }}</strong>
                   <span :class="statusBadgeClass(execution.status)">{{ execution.status }}</span>
                 </div>
-                <p>{{ execution.output_summary || execution.input_summary || "No summary." }}</p>
+                <p>{{ execution.output_summary || execution.input_summary || t("common.noSummary") }}</p>
                 <div class="run-detail__badges">
-                  <span>{{ execution.duration_ms }}ms</span>
-                  <span v-if="execution.artifacts.iteration">iteration {{ execution.artifacts.iteration }}</span>
+                  <span>{{ t("common.ms", { value: execution.duration_ms }) }}</span>
+                  <span v-if="execution.artifacts.iteration">{{ t("common.iteration", { value: execution.artifacts.iteration }) }}</span>
                   <span v-if="execution.artifacts.selected_branch">{{ execution.artifacts.selected_branch }}</span>
                 </div>
               </div>
@@ -222,6 +222,7 @@ import { Promotion } from "@element-plus/icons-vue";
 import { ElIcon } from "element-plus";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute } from "vue-router";
+import { useI18n } from "vue-i18n";
 
 import { fetchRun } from "@/api/runs";
 import { formatRunDisplayName, formatRunDisplayTimestamp } from "@/lib/run-display-name";
@@ -233,6 +234,7 @@ import type { RunDetail } from "@/types/run";
 import { buildRunStatusFacts, listRunOutputArtifacts, shouldPollRunStatus } from "./runDetailModel.ts";
 
 const route = useRoute();
+const { t, locale } = useI18n();
 const run = ref<RunDetail | null>(null);
 const loading = ref(false);
 const error = ref<string | null>(null);
@@ -263,7 +265,10 @@ const selectedSnapshotId = computed(() => {
 });
 const runDisplayName = computed(() => (run.value ? formatRunDisplayName(run.value) : runId.value));
 const viewedRun = computed(() => (run.value ? buildSnapshotScopedRun(run.value, selectedSnapshotId.value) : null));
-const runStatusFacts = computed(() => (viewedRun.value ? buildRunStatusFacts(viewedRun.value) : []));
+const runStatusFacts = computed(() => {
+  locale.value;
+  return viewedRun.value ? buildRunStatusFacts(viewedRun.value) : [];
+});
 const cycleVisualization = computed(() =>
   viewedRun.value ? buildCycleVisualization(viewedRun.value) : { hasCycle: false, summary: null, backEdges: [], iterations: [] },
 );
@@ -312,9 +317,9 @@ function clearPendingRunRequest() {
 
 function resolveRunFetchErrorMessage(fetchError: unknown) {
   if (fetchError instanceof Error && fetchError.name === "AbortError") {
-    return "加载运行记录超时，请重试。";
+    return t("runDetail.loadTimeout");
   }
-  return fetchError instanceof Error ? fetchError.message : "Failed to load run detail.";
+  return fetchError instanceof Error ? fetchError.message : t("common.loadingRun");
 }
 
 async function loadRun(nextRunId = runId.value) {
@@ -327,7 +332,7 @@ async function loadRun(nextRunId = runId.value) {
   if (!normalizedRunId) {
     run.value = null;
     loading.value = false;
-    error.value = "缺少运行记录 ID。";
+    error.value = t("runDetail.missingRunId");
     return;
   }
 
@@ -396,26 +401,26 @@ function resetRunView() {
 
 function snapshotLabel(kind: string, order: number) {
   if (kind === "pause") {
-    return `暂停结果 ${order}`;
+    return t("runDetail.pauseResult", { order });
   }
   if (kind === "completed") {
-    return "最终结果";
+    return t("runDetail.finalResult");
   }
   if (kind === "failed") {
-    return "失败结果";
+    return t("runDetail.failedResult");
   }
-  return `快照 ${order}`;
+  return t("runDetail.snapshot", { order });
 }
 
 function snapshotStatusLabel(status: string) {
   if (status === "awaiting_human") {
-    return "等待人工";
+    return t("runDetail.waitingHuman");
   }
   if (status === "completed") {
-    return "已完成";
+    return t("status.completed");
   }
   if (status === "failed") {
-    return "失败";
+    return t("status.failed");
   }
   return status;
 }

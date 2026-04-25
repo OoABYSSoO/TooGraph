@@ -12,7 +12,7 @@ test("RunsPage keeps run cards on detail navigation while exposing an explicit r
   assert.match(componentSource, /import \{ formatRunDisplayName, formatRunDisplayTimestamp, formatRunDuration \} from "@\/lib\/run-display-name";/);
   assert.match(componentSource, /import \{ canRestoreRunSummary, resolveRunRestoreUrl \} from "@\/lib\/run-restore";/);
   assert.match(componentSource, /buildRunRestoreTargets/);
-  assert.match(componentSource, /const runCardDetail = resolveRunsCardDetail\(\);/);
+  assert.match(componentSource, /const runCardDetail = computed\(\(\) => \{[\s\S]*return resolveRunsCardDetail\(\);/);
   assert.match(componentSource, /const router = useRouter\(\);/);
   assert.match(componentSource, /function openRunDetail\(runId: string\)/);
   assert.match(componentSource, /function handleRunRowKeydown\(event: KeyboardEvent, runId: string\)/);
@@ -20,7 +20,7 @@ test("RunsPage keeps run cards on detail navigation while exposing an explicit r
   assert.match(componentSource, /:to="restoreUrlForRun\(run\)"/);
   assert.match(componentSource, /\{\{ formatRunDisplayName\(run\) \}\}/);
   assert.match(componentSource, /\{\{ runCardDetail \}\}/);
-  assert.match(componentSource, /恢复编辑/);
+  assert.match(componentSource, /t\("common\.restoreEdit"\)/);
 });
 
 test("RunsPage lets each restorable card choose breakpoint or final-result restore targets", () => {
@@ -44,8 +44,8 @@ test("RunsPage uses semantic status styling and keeps run identifiers monospace"
 });
 
 test("RunsPage presents a restrained dashboard toolbar with status segments and overview metrics", () => {
-  assert.match(componentSource, /const statusOptions = RUN_STATUS_FILTER_OPTIONS;/);
-  assert.match(componentSource, /const runOverview = computed\(\(\) => buildRunStatusOverview\(runs\.value\)\);/);
+  assert.match(componentSource, /const statusOptions = computed\(\(\) => \{[\s\S]*return buildRunStatusFilterOptions\(\);/);
+  assert.match(componentSource, /const runOverview = computed\(\(\) => \{[\s\S]*return buildRunStatusOverview\(runs\.value\);/);
   assert.match(componentSource, /<ElInput[\s\S]*v-model="graphNameQuery"[\s\S]*class="runs-page__search"/);
   assert.match(componentSource, /<ElSegmented[\s\S]*v-model="statusFilter"[\s\S]*:options="statusOptions"/);
   assert.match(componentSource, /class="runs-page__refresh"[\s\S]*@click="loadRuns"/);

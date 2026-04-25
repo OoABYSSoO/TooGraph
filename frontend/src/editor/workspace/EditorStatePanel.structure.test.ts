@@ -12,7 +12,7 @@ test("EditorStatePanel presents the right sidebar as a compact inspector", () =>
   assert.doesNotMatch(componentSource, /editor-state-panel__collapsed/);
   assert.match(componentSource, /class="editor-state-panel__surface"/);
   assert.match(componentSource, /editor-state-panel__inspector-header/);
-  assert.match(componentSource, /Graph Inspector/);
+  assert.match(componentSource, /t\("statePanel\.title"\)/);
   assert.match(componentSource, /editor-state-panel__header-count/);
   assert.match(componentSource, /editor-state-panel__quick-action/);
   assert.doesNotMatch(componentSource, /State Panel/);
@@ -74,14 +74,14 @@ test("EditorStatePanel deletes states through the same two-click confirm pattern
   assert.match(componentSource, /:class="\{ 'editor-state-panel__card-delete--confirm': isStateDeleteConfirmOpen\(row\.key\) \}"/);
   assert.match(componentSource, /@click\.stop="handleStateDeleteActionClick\(row\.key\)"/);
   assert.match(componentSource, /<ElIcon v-if="isStateDeleteConfirmOpen\(row\.key\)" aria-hidden="true"><Check \/><\/ElIcon>/);
-  assert.match(componentSource, /<div class="editor-state-panel__confirm-hint editor-state-panel__confirm-hint--delete">Delete state\?<\/div>/);
+  assert.match(componentSource, /<div class="editor-state-panel__confirm-hint editor-state-panel__confirm-hint--delete">\{\{ t\("statePanel\.deleteStateQuestion"\) \}\}<\/div>/);
   assert.match(componentSource, /\.editor-state-panel__card-delete--confirm,\n\.editor-state-panel__card-delete--confirm:hover,\n\.editor-state-panel__card-delete--confirm:focus-visible \{[\s\S]*background:\s*rgb\(185,\s*28,\s*28\);/);
 });
 
 test("EditorStatePanel keeps detailed editing inside a soft inspector card", () => {
   assert.match(componentSource, /editor-state-panel__details-card/);
   assert.match(componentSource, /editor-state-panel__details-title/);
-  assert.match(componentSource, /<ElInput[\s\S]*aria-label="State key"[\s\S]*<ElInput[\s\S]*aria-label="State name"[\s\S]*<ElSelect[\s\S]*aria-label="State type"[\s\S]*<ElSelect[\s\S]*aria-label="State color"[\s\S]*<ElInput[\s\S]*aria-label="State description"[\s\S]*<StateDefaultValueEditor/);
+  assert.match(componentSource, /<ElInput[\s\S]*:aria-label="t\('nodeCard\.key'\)"[\s\S]*<ElInput[\s\S]*:aria-label="t\('nodeCard\.name'\)"[\s\S]*<ElSelect[\s\S]*:aria-label="t\('nodeCard\.type'\)"[\s\S]*<ElSelect[\s\S]*:aria-label="t\('nodeCard\.color'\)"[\s\S]*<ElInput[\s\S]*:aria-label="t\('nodeCard\.description'\)"[\s\S]*<StateDefaultValueEditor/);
   assert.match(componentSource, /function stateColorOptions\(stateKey: string\) \{[\s\S]*resolveStateColorOptions\(stateDefinition\(stateKey\)\?\.color \?\? ""\)/);
   assert.match(componentSource, /class="editor-state-panel__color-select graphite-select"/);
   assert.match(componentSource, /popper-class="graphite-select-popper editor-state-panel__select-popper"/);
@@ -100,7 +100,7 @@ test("EditorStatePanel adds a collapsed run timeline section to each expanded st
   assert.match(componentSource, /run\?: RunDetail \| null;/);
   assert.match(componentSource, /buildStatePanelViewModel\(props\.document,\s*props\.run \?\? null\)/);
   assert.match(componentSource, /class="editor-state-panel__timeline-toggle"/);
-  assert.match(componentSource, /运行轨迹/);
+  assert.match(componentSource, /t\("statePanel\.timeline"\)/);
   assert.match(componentSource, /timelineSummary/);
   assert.match(componentSource, /timelineEntries/);
   assert.match(componentSource, /toggleTimelineSection\(row\.key\)/);

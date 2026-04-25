@@ -38,7 +38,7 @@
                       :ref="setTabNameInput"
                       v-model="draftGraphName"
                       class="editor-tab-bar__tab-name-input"
-                      :aria-label="`重命名 ${tab.title}`"
+                      :aria-label="t('tab.rename', { title: tab.title })"
                       @click.stop
                       @blur="commitGraphName"
                       @keydown.enter.prevent="commitGraphName"
@@ -59,7 +59,7 @@
                       <button
                         type="button"
                         class="editor-tab-bar__close"
-                        aria-label="关闭标签页"
+                        :aria-label="t('tab.close')"
                         @mousedown.stop.prevent
                         @click.stop="$emit('close-tab', tab.tabId)"
                       >
@@ -81,7 +81,7 @@
           popper-class="editor-tab-bar__launcher-popper"
         >
           <template #reference>
-            <button type="button" class="editor-tab-bar__add-tab" aria-label="新建或打开图">
+            <button type="button" class="editor-tab-bar__add-tab" :aria-label="t('tab.add')">
               <ElIcon aria-hidden="true"><Plus /></ElIcon>
             </button>
           </template>
@@ -106,15 +106,16 @@
 import { Plus } from "@element-plus/icons-vue";
 import { ElIcon, ElPopover, ElTabPane, ElTabs } from "element-plus";
 import { computed, nextTick, ref, watch, type ComponentPublicInstance } from "vue";
+import { useI18n } from "vue-i18n";
 
 import type { EditorWorkspaceTab } from "@/lib/editor-workspace";
 import type { GraphDocument, TemplateRecord } from "@/types/node-system";
 import EditorTabLauncherPanel from "./EditorTabLauncherPanel.vue";
 import {
   buildEditorTabHint,
+  buildEditorTabBarCopy,
   resolveEditorTabBarSelectPlaceholders,
   resolveEditorTabDropPlacement,
-  ZH_EDITOR_TAB_BAR_COPY,
 } from "./editorTabBarModel";
 import { buildWorkspaceSelectOptions } from "./workspaceSelectModel";
 
@@ -145,7 +146,11 @@ const draggedTabId = ref<string | null>(null);
 const dropTargetTabId = ref<string | null>(null);
 const dropPlacement = ref<"before" | "after" | null>(null);
 const revealTabId = ref<string | null>(null);
-const copy = ZH_EDITOR_TAB_BAR_COPY;
+const { t, locale } = useI18n();
+const copy = computed(() => {
+  locale.value;
+  return buildEditorTabBarCopy();
+});
 const tabShellRefs = new Map<string, HTMLElement>();
 
 const templateOptions = computed(() =>
@@ -170,7 +175,7 @@ const selectPlaceholders = computed(() =>
   resolveEditorTabBarSelectPlaceholders({
     templateCount: templateOptions.value.length,
     graphCount: graphOptions.value.length,
-    copy,
+    copy: copy.value,
   }),
 );
 

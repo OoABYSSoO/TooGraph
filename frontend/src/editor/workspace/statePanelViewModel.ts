@@ -1,5 +1,6 @@
 import type { GraphDocument, GraphPayload } from "@/types/node-system";
 import type { RunDetail } from "@/types/run";
+import { translate } from "../../i18n/index.ts";
 import { sortStateKeysByFirstAppearance } from "./stateOrdering.ts";
 
 export type StatePanelTimelineEntryViewModel = {
@@ -75,8 +76,8 @@ export function buildStatePanelViewModel(document: GraphPayload | GraphDocument,
   return {
     count: rows.length,
     rows,
-    emptyTitle: "No State Yet",
-    emptyBody: "Graph state objects will appear here once the graph defines them.",
+    emptyTitle: translate("statePanel.emptyTitle"),
+    emptyBody: translate("statePanel.emptyBody"),
   };
 }
 
@@ -131,7 +132,7 @@ function summarizeStateTimelines(document: GraphPayload | GraphDocument, run: Ru
 
     timelineByState[stateKey] = {
       status: "available",
-      summary: `${entries.length} 次变更 · ${new Set(entries.map((entry) => entry.nodeId)).size} 个节点`,
+      summary: translate("statePanel.changes", { count: entries.length, nodes: new Set(entries.map((entry) => entry.nodeId)).size }),
       emptyBody: "",
       entries,
     };
@@ -173,16 +174,16 @@ function buildEmptyTimelineSummary(run: RunDetail | null): StateTimelineSummary 
   if (!run) {
     return {
       status: "unavailable",
-      summary: "暂无运行",
-      emptyBody: "还没有可回看的运行结果。",
+      summary: translate("statePanel.noRuns"),
+      emptyBody: translate("statePanel.noRunBody"),
       entries: [],
     };
   }
 
   return {
     status: "empty",
-    summary: "上次运行未写入",
-    emptyBody: "最近一次运行没有写入这个 state。",
+    summary: translate("statePanel.lastRunMissing"),
+    emptyBody: translate("statePanel.lastRunBody"),
     entries: [],
   };
 }

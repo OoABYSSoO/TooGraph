@@ -1,4 +1,5 @@
 import type { GraphDocument } from "../types/node-system.ts";
+import { translate } from "../i18n/index.ts";
 
 export type WorkspaceEmptyAction = {
   href: string;
@@ -21,17 +22,17 @@ export function resolveWorkspaceEmptyAction(kind: "runs" | "templates" | "graphs
     case "runs":
       return {
         href: "/editor",
-        label: "打开编排器",
+        label: translate("workspace.openEditor"),
       };
     case "templates":
       return {
         href: "/editor",
-        label: "更多模板",
+        label: translate("workspace.moreTemplates"),
       };
     default:
       return {
         href: "/editor/new",
-        label: "新建图",
+        label: translate("workspace.newGraph"),
       };
   }
 }
@@ -40,7 +41,7 @@ export function resolveWorkspaceCardDetail(kind: "runs" | "graphs") {
   switch (kind) {
     case "runs":
     case "graphs":
-      return "查看详情";
+      return translate("workspace.viewDetail");
   }
 }
 

@@ -2,8 +2,8 @@
   <div class="editor-tab-launcher-panel">
     <template v-if="activeView === 'root'">
       <div class="editor-tab-launcher-panel__header">
-        <div class="editor-tab-launcher-panel__eyebrow">新建图</div>
-        <div class="editor-tab-launcher-panel__hint">选择一个入口开始编辑</div>
+        <div class="editor-tab-launcher-panel__eyebrow">{{ t("launcher.title") }}</div>
+        <div class="editor-tab-launcher-panel__hint">{{ t("launcher.hint") }}</div>
       </div>
 
       <button type="button" class="editor-tab-launcher-panel__entry" @click="$emit('create-new')">
@@ -11,8 +11,8 @@
           <ElIcon><DocumentAdd /></ElIcon>
         </span>
         <div class="editor-tab-launcher-panel__entry-copy">
-          <div class="editor-tab-launcher-panel__entry-title">新建空白图</div>
-          <div class="editor-tab-launcher-panel__entry-meta">从空白工作流开始</div>
+          <div class="editor-tab-launcher-panel__entry-title">{{ t("launcher.blankTitle") }}</div>
+          <div class="editor-tab-launcher-panel__entry-meta">{{ t("launcher.blankMeta") }}</div>
         </div>
         <ElIcon class="editor-tab-launcher-panel__entry-arrow" aria-hidden="true"><ArrowRight /></ElIcon>
       </button>
@@ -22,8 +22,8 @@
           <ElIcon><CollectionTag /></ElIcon>
         </span>
         <div class="editor-tab-launcher-panel__entry-copy">
-          <div class="editor-tab-launcher-panel__entry-title">从模板新建</div>
-          <div class="editor-tab-launcher-panel__entry-meta">选择预设模板作为起点</div>
+          <div class="editor-tab-launcher-panel__entry-title">{{ t("launcher.templateTitle") }}</div>
+          <div class="editor-tab-launcher-panel__entry-meta">{{ t("launcher.templateMeta") }}</div>
         </div>
         <ElIcon class="editor-tab-launcher-panel__entry-arrow" aria-hidden="true"><ArrowRight /></ElIcon>
       </button>
@@ -33,8 +33,8 @@
           <ElIcon><FolderOpened /></ElIcon>
         </span>
         <div class="editor-tab-launcher-panel__entry-copy">
-          <div class="editor-tab-launcher-panel__entry-title">打开已有图</div>
-          <div class="editor-tab-launcher-panel__entry-meta">继续编辑已保存工作流</div>
+          <div class="editor-tab-launcher-panel__entry-title">{{ t("launcher.graphTitle") }}</div>
+          <div class="editor-tab-launcher-panel__entry-meta">{{ t("launcher.graphMeta") }}</div>
         </div>
         <ElIcon class="editor-tab-launcher-panel__entry-arrow" aria-hidden="true"><ArrowRight /></ElIcon>
       </button>
@@ -44,7 +44,7 @@
       <div class="editor-tab-launcher-panel__secondary-header">
         <button type="button" class="editor-tab-launcher-panel__back" @click="returnToRoot">
           <ElIcon aria-hidden="true"><ArrowLeft /></ElIcon>
-          <span>返回</span>
+          <span>{{ t("common.back") }}</span>
         </button>
         <div>
           <div class="editor-tab-launcher-panel__eyebrow">{{ activeTitle }}</div>
@@ -69,9 +69,9 @@
       </div>
 
       <div v-if="activePageModel.hasPagination" class="editor-tab-launcher-panel__pager">
-        <button type="button" :disabled="activePageModel.page === 0" @click="goToPreviousPage">上一页</button>
+        <button type="button" :disabled="activePageModel.page === 0" @click="goToPreviousPage">{{ t("common.pagePrevious") }}</button>
         <span>{{ activePageModel.page + 1 }} / {{ activePageModel.pageCount }}</span>
-        <button type="button" :disabled="activePageModel.page >= activePageModel.pageCount - 1" @click="goToNextPage">下一页</button>
+        <button type="button" :disabled="activePageModel.page >= activePageModel.pageCount - 1" @click="goToNextPage">{{ t("common.pageNext") }}</button>
       </div>
     </template>
   </div>
@@ -81,6 +81,7 @@
 import { ArrowLeft, ArrowRight, CollectionTag, DocumentAdd, FolderOpened } from "@element-plus/icons-vue";
 import { ElIcon } from "element-plus";
 import { computed, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 
 import { paginateWorkspaceOptions, type WorkspaceSelectOption } from "./workspaceSelectModel";
 
@@ -101,12 +102,13 @@ const emit = defineEmits<{
 const activeView = ref<"root" | "template" | "graph">("root");
 const activePage = ref(0);
 const optionPageSize = 5;
+const { t } = useI18n();
 
 const activeOptions = computed(() => (activeView.value === "template" ? props.templateOptions : props.graphOptions));
 const activePageModel = computed(() => paginateWorkspaceOptions(activeOptions.value, activePage.value, optionPageSize));
 const activePageItems = computed(() => activePageModel.value.items);
-const activeTitle = computed(() => (activeView.value === "template" ? "从模板新建" : "打开已有图"));
-const activeHint = computed(() => (activeOptions.value.length > 0 ? `${activeOptions.value.length} 个可选项` : activePlaceholder.value));
+const activeTitle = computed(() => (activeView.value === "template" ? t("launcher.templateActiveTitle") : t("launcher.graphActiveTitle")));
+const activeHint = computed(() => (activeOptions.value.length > 0 ? t("launcher.availableCount", { count: activeOptions.value.length }) : activePlaceholder.value));
 const activePlaceholder = computed(() => (activeView.value === "template" ? props.templatePlaceholder : props.graphPlaceholder));
 
 watch(

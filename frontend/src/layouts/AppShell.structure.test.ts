@@ -23,7 +23,7 @@ test("AppShell keeps collapsed navigation usable with compact labels and an in-r
   assert.match(componentSource, /app-shell__brand-copy/);
   assert.match(componentSource, /app-shell__link-icon/);
   assert.match(componentSource, /app-shell__link-label/);
-  assert.match(componentSource, /:aria-label="isSidebarCollapsed \? '展开侧栏' : '收起侧栏'"/);
+  assert.match(componentSource, /:aria-label="isSidebarCollapsed \? t\('nav\.expandSidebar'\) : t\('nav\.collapseSidebar'\)"/);
   assert.match(componentSource, /\.app-shell__sidebar--collapsed\s+\.app-shell__brand-copy \{[\s\S]*display:\s*none;/);
   assert.match(componentSource, /\.app-shell__sidebar--collapsed\s+\.app-shell__link-label \{[\s\S]*display:\s*none;/);
 });
@@ -46,10 +46,19 @@ test("AppShell uses a low-noise ChatGPT-style brand rail with library icons", ()
   assert.match(componentSource, /<ElIcon class="app-shell__link-icon"><EditPen \/><\/ElIcon>/);
   assert.match(componentSource, /<ElIcon class="app-shell__link-icon"><Clock \/><\/ElIcon>/);
   assert.match(componentSource, /<ElIcon class="app-shell__link-icon"><Setting \/><\/ElIcon>/);
+  assert.match(componentSource, /\{\{ t\("nav\.home"\) \}\}/);
+  assert.match(componentSource, /\{\{ t\("nav\.editor"\) \}\}/);
+  assert.match(componentSource, /\{\{ t\("nav\.runs"\) \}\}/);
+  assert.match(componentSource, /\{\{ t\("nav\.settings"\) \}\}/);
   assert.match(componentSource, /\.app-shell__sidebar \{[\s\S]*background:\s*var\(--graphite-glass-bg\);/);
   assert.match(componentSource, /\.app-shell__sidebar \{[\s\S]*backdrop-filter:\s*blur\(24px\) saturate\(1\.35\);/);
   assert.match(componentSource, /\.app-shell__link \{[\s\S]*border:\s*1px solid transparent;/);
   assert.match(componentSource, /\.app-shell__link\.router-link-active,[\s\S]*\.app-shell__link\.app-shell__link--active \{[\s\S]*box-shadow:\s*inset 3px 0 0 rgba\(154,\s*52,\s*18,\s*0\.7\);/);
+});
+
+test("AppShell exposes the global language switcher in the sidebar", () => {
+  assert.match(componentSource, /import LanguageSwitcher from "\.\/LanguageSwitcher\.vue";/);
+  assert.match(componentSource, /<LanguageSwitcher[\s\S]*:collapsed="isSidebarCollapsed"/);
 });
 
 test("AppShell keeps the editor navigation entry active for graph-specific editor routes", () => {

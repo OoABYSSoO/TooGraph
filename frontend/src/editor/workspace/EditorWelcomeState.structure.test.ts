@@ -10,5 +10,5 @@ const componentSource = readFileSync(resolve(currentDirectory, "EditorWelcomeSta
 
 test("EditorWelcomeState exposes Python graph import before a workspace tab exists", () => {
   assert.match(componentSource, /import-python-graph/);
-  assert.match(componentSource, /导入 Py 图/);
+  assert.match(componentSource, /t\("editorWelcome\.importPython"\)/);
 });

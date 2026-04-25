@@ -176,7 +176,7 @@ test("EditorWorkspaceShell locks graph editing while a run is awaiting human rev
     componentSource,
     /ElMessage\(\{[\s\S]*customClass:\s*"editor-workspace-shell__locked-toast",[\s\S]*type:\s*"warning",[\s\S]*duration:\s*4200,[\s\S]*grouping:\s*true,/,
   );
-  assert.match(componentSource, /图已锁定。请在右侧 Human Review 面板填写需要的输入，然后点击 Continue Run 继续。/);
+  assert.match(componentSource, /message:\s*t\("editor\.lockedToast"\)/);
   assert.match(componentSource, /@locked-edit-attempt="showGraphLockedEditToast"/);
   assert.match(componentSource, /:global\(\.editor-workspace-shell__locked-toast\.el-message\) \{[\s\S]*top:\s*50% !important;/);
   assert.match(componentSource, /:global\(\.editor-workspace-shell__locked-toast\.el-message\) \{[\s\S]*min-width:\s*min\(620px,\s*calc\(100vw - 40px\)\);/);

@@ -223,12 +223,12 @@ Some directories are created on demand. Indexed knowledge base content lives in 
 
 Settings and runtime defaults are built from the backend model catalog and tool registry.
 
-For local runtime setup, prefer EZLLM:
+For local or private model setup, use an OpenAI-compatible custom provider:
 
 ```bash
-pipx install ezllm
-ezllm start
-LOCAL_BASE_URL=http://127.0.0.1:8888/v1
+LOCAL_BASE_URL=http://127.0.0.1:8000/v1
+LOCAL_API_KEY=<optional api key>
+LOCAL_TEXT_MODEL=<model name exposed by your gateway>
 ```
 
 Legacy local runtime scripts in `scripts/lm_core0.py`, `scripts/lm-server`, and `scripts/download_Gemma_gguf.py` are migration wrappers only and should not regain in-repo runtime behavior.

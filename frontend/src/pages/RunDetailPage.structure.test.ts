@@ -15,7 +15,7 @@ test("RunDetailPage exposes a restore editor action when the loaded run can be r
   assert.match(componentSource, /import \{ buildSnapshotScopedRun, canRestoreRunDetail, resolveRunRestoreUrl, resolveRunSnapshot \} from "@\/lib\/run-restore";/);
   assert.match(componentSource, /const canRestore = computed\(\(\) => \(run\.value \? canRestoreRunDetail\(run\.value\) : false\)\);/);
   assert.match(componentSource, /const runDisplayName = computed\(\(\) => \(run\.value \? formatRunDisplayName\(run\.value\) : runId\.value\)\);/);
-  assert.match(componentSource, /const runStatusFacts = computed\(\(\) => \(viewedRun\.value \? buildRunStatusFacts\(viewedRun\.value\) : \[\]\)\);/);
+  assert.match(componentSource, /const runStatusFacts = computed\(\(\) => \{[\s\S]*return viewedRun\.value \? buildRunStatusFacts\(viewedRun\.value\) : \[\];/);
   assert.match(componentSource, /const selectedSnapshotId = computed/);
   assert.match(componentSource, /const snapshotOptions = computed/);
   assert.match(componentSource, /const restoreEditorHref = computed\(\(\) => \(run\.value \? resolveRunRestoreUrl\(run\.value\.run_id, selectedSnapshotId\.value\) : "\/editor\/new"\)\);/);
@@ -24,7 +24,7 @@ test("RunDetailPage exposes a restore editor action when the loaded run can be r
   assert.match(componentSource, /class="run-detail__restore-toolbar"/);
   assert.match(componentSource, /class="run-detail__restore-icon"/);
   assert.match(componentSource, /<Promotion \/>/);
-  assert.match(componentSource, /恢复编辑/);
+  assert.match(componentSource, /t\("common\.restoreEdit"\)/);
   assert.match(componentSource, /run-detail__snapshot-switcher/);
   assert.match(componentSource, /v-for="option in snapshotOptions"/);
 });
@@ -54,7 +54,7 @@ test("RunDetailPage prioritizes status facts and final result before dense diagn
   assert.match(componentSource, /v-for="fact in runStatusFacts"/);
   assert.match(componentSource, /class="run-detail__metric-value"/);
   assert.match(componentSource, /class="run-detail__panel run-detail__panel--result"/);
-  assert.match(componentSource, /Final Result/);
+  assert.match(componentSource, /t\("runDetail\.finalResult"\)/);
   assert.match(componentSource, /class="run-detail__content run-detail__content--result"/);
   assert.match(componentSource, /isContentExpanded\('final-result'\)/);
 });
@@ -73,7 +73,7 @@ test("RunDetailPage uses one immediate route watcher for loading run details", (
   assert.match(componentSource, /import \{ computed, onBeforeUnmount, ref, watch \} from "vue";/);
   assert.doesNotMatch(componentSource, /onMounted/);
   assert.match(componentSource, /const loading = ref\(false\);/);
-  assert.match(componentSource, /<article v-else-if="loading" class="run-detail__empty">Loading run…<\/article>/);
+  assert.match(componentSource, /<article v-else-if="loading" class="run-detail__empty">\{\{ t\("common\.loadingRun"\) \}\}<\/article>/);
   assert.doesNotMatch(componentSource, /v-else-if="!run" class="run-detail__empty">Loading run/);
   assert.match(componentSource, /watch\(\s*runId,[\s\S]*\{ immediate: true \},[\s\S]*\);/);
 });
@@ -87,6 +87,6 @@ test("RunDetailPage cancels stale detail requests and exposes retry after failur
   assert.match(componentSource, /const controller = new AbortController\(\);/);
   assert.match(componentSource, /fetchRun\(normalizedRunId, \{ signal: controller\.signal \}\)/);
   assert.match(componentSource, /if \(requestId !== activeRunRequestId\) \{/);
-  assert.match(componentSource, /加载运行记录超时，请重试。/);
+  assert.match(componentSource, /return t\("runDetail\.loadTimeout"\);/);
   assert.match(componentSource, /class="run-detail__retry"[\s\S]*@click="loadRun\(runId\)"/);
 });

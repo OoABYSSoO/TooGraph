@@ -31,7 +31,7 @@ test("EditorCloseConfirmDialog uses one shared glass card instead of nested whit
 
 test("EditorCloseConfirmDialog lowers the modal pressure while keeping the tab identity visible", () => {
   assert.match(componentSource, /:global\(\.editor-close-dialog__overlay\.el-overlay\) \{[\s\S]*background:\s*rgba\(42,\s*24,\s*14,\s*0\.24\);/);
-  assert.match(componentSource, /class="editor-close-dialog__status-pill">未保存<\/span>/);
+  assert.match(componentSource, /class="editor-close-dialog__status-pill">\{\{ t\("closeDialog\.status"\) \}\}<\/span>/);
   assert.match(componentSource, /class="editor-close-dialog__tab-chip"[\s\S]*\{\{ tab\?\.title \}\}/);
   assert.match(componentSource, /\.editor-close-dialog__title \{[\s\S]*font-size:\s*1\.48rem;/);
 });

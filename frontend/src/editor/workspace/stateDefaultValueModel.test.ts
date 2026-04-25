@@ -25,7 +25,7 @@ test("resolveStateDefaultValueEditorConfig returns typed editor modes", () => {
   assert.deepEqual(resolveStateDefaultValueEditorConfig("markdown"), {
     mode: "text",
     rows: 5,
-    placeholder: "Write markdown...",
+    placeholder: "输入 Markdown...",
   });
 });
 
@@ -44,14 +44,14 @@ test("parseStructuredStateDraft validates structured state types", () => {
   });
   assert.deepEqual(parseStructuredStateDraft("object", "[]"), {
     ok: false,
-    error: "This state type requires a JSON object.",
+    error: "这个 State 类型需要 JSON 对象。",
   });
   assert.deepEqual(parseStructuredStateDraft("array", "{}"), {
     ok: false,
-    error: "This state type requires a JSON array.",
+    error: "这个 State 类型需要 JSON 数组。",
   });
   assert.deepEqual(parseStructuredStateDraft("json", "{oops"), {
     ok: false,
-    error: "Default value must be valid JSON.",
+    error: "默认值必须是有效 JSON。",
   });
 });

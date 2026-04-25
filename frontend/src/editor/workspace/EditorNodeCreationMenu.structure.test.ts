@@ -17,7 +17,7 @@ test("EditorNodeCreationMenu renders creation entries and emits selection events
   assert.match(componentSource, /v-for="entry in entries"/);
   assert.match(componentSource, /@click="\$emit\('select-entry', entry\)"/);
   assert.match(componentSource, /@click="\$emit\('close'\)"/);
-  assert.match(componentSource, /No matching nodes or presets\./);
+  assert.match(componentSource, /t\("nodeCreation\.empty"\)/);
   assert.match(componentSource, /\.editor-node-creation-menu \{[\s\S]*position:\s*fixed;/);
   assert.doesNotMatch(componentSource, /transform:\s*translate\(-20px,\s*-20px\)/);
 });

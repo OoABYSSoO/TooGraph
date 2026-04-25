@@ -73,13 +73,13 @@ test("EditorHumanReviewPanel renders the focus action as a quiet secondary locat
 test("EditorHumanReviewPanel keeps the continue guard message near the action bar", () => {
   assert.match(componentSource, /const resumeGuardMessage = ref<string \| null>\(null\);/);
   assert.match(componentSource, /class="editor-human-review-panel__guard"/);
-  assert.match(componentSource, /还有 \$\{remainingEmptyRequiredDraftCount\.value\} 项需要填写/);
+  assert.match(componentSource, /resumeGuardMessage\.value = t\("humanReview\.guard", \{ count: remainingEmptyRequiredDraftCount\.value \}\);/);
 });
 
 test("EditorHumanReviewPanel does not offer collapse while a graph is paused for human review", () => {
   assert.match(componentSource, /const isPausedReview = computed\(\(\) => props\.run\?\.status === "awaiting_human"\);/);
   assert.match(componentSource, /v-if="!isPausedReview"/);
-  assert.match(componentSource, /aria-label="Collapse human review panel"/);
+  assert.match(componentSource, /:aria-label="t\('humanReview\.collapse'\)"/);
 });
 
 test("EditorHumanReviewPanel uses the shared right-side glass inspector surface", () => {

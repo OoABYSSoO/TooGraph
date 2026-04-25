@@ -1,24 +1,24 @@
 <template>
   <section class="editor-welcome">
     <header class="editor-welcome__hero">
-      <div class="editor-welcome__eyebrow">Workspace</div>
-      <h2 class="editor-welcome__title">从空白图、模板或已有图开始。</h2>
+      <div class="editor-welcome__eyebrow">{{ t("editorWelcome.eyebrow") }}</div>
+      <h2 class="editor-welcome__title">{{ t("editorWelcome.title") }}</h2>
       <p class="editor-welcome__body">
-        这里不是目录页，而是编排器真正的工作台。选择模板或已有图后，我们会直接进入新的 Vue 编辑器画布。
+        {{ t("editorWelcome.body") }}
       </p>
       <div class="editor-welcome__actions">
-        <button type="button" class="editor-welcome__primary" @click="$emit('create-new')">新建图</button>
-        <button type="button" class="editor-welcome__secondary" @click="$emit('import-python-graph')">导入 Py 图</button>
+        <button type="button" class="editor-welcome__primary" @click="$emit('create-new')">{{ t("editorWelcome.createNew") }}</button>
+        <button type="button" class="editor-welcome__secondary" @click="$emit('import-python-graph')">{{ t("editorWelcome.importPython") }}</button>
       </div>
     </header>
 
     <section class="editor-welcome__grid">
       <article class="editor-welcome__panel">
         <div class="editor-welcome__panel-header">
-          <h3>从模板创建</h3>
+          <h3>{{ t("editorWelcome.fromTemplate") }}</h3>
           <span>{{ filteredTemplates.length }} / {{ templates.length }}</span>
         </div>
-        <WorkspaceSearchField v-model="templateQuery" placeholder="搜索模板名、描述或 template_id" />
+        <WorkspaceSearchField v-model="templateQuery" :placeholder="t('editorWelcome.templateSearch')" />
         <div class="editor-welcome__panel-body">
           <button
             v-for="template in filteredTemplates"
@@ -32,19 +32,19 @@
               <strong>{{ template.label }}</strong>
               <p>{{ template.description }}</p>
             </div>
-            <span class="editor-welcome__card-action">打开模板</span>
+            <span class="editor-welcome__card-action">{{ t("editorWelcome.openTemplate") }}</span>
           </button>
-          <div v-if="templates.length === 0" class="editor-welcome__empty">当前没有可用模板。</div>
-          <div v-else-if="filteredTemplates.length === 0" class="editor-welcome__empty">没有匹配的模板结果。</div>
+          <div v-if="templates.length === 0" class="editor-welcome__empty">{{ t("editorWelcome.noTemplates") }}</div>
+          <div v-else-if="filteredTemplates.length === 0" class="editor-welcome__empty">{{ t("editorWelcome.noTemplateResults") }}</div>
         </div>
       </article>
 
       <article class="editor-welcome__panel">
         <div class="editor-welcome__panel-header">
-          <h3>打开已有图</h3>
+          <h3>{{ t("editorWelcome.openSavedGraph") }}</h3>
           <span>{{ filteredGraphs.length }} / {{ graphs.length }}</span>
         </div>
-        <WorkspaceSearchField v-model="graphQuery" placeholder="搜索图名或 graph_id" />
+        <WorkspaceSearchField v-model="graphQuery" :placeholder="t('editorWelcome.graphSearch')" />
         <div class="editor-welcome__panel-body">
           <button
             v-for="graph in filteredGraphs"
@@ -58,12 +58,12 @@
                 <strong>{{ graph.name }}</strong>
                 <p class="editor-welcome__graph-id">{{ graph.graph_id }}</p>
               </div>
-              <span>{{ graphNodeCount(graph) }} nodes / {{ graphEdgeCount(graph) }} edges</span>
+              <span>{{ t("common.nodesCount", { count: graphNodeCount(graph) }) }} / {{ t("common.edgesCount", { count: graphEdgeCount(graph) }) }}</span>
             </div>
-            <span class="editor-welcome__card-action">打开图</span>
+            <span class="editor-welcome__card-action">{{ t("editorWelcome.openGraph") }}</span>
           </button>
-          <div v-if="graphs.length === 0" class="editor-welcome__empty">当前没有已保存图。</div>
-          <div v-else-if="filteredGraphs.length === 0" class="editor-welcome__empty">没有匹配的图结果。</div>
+          <div v-if="graphs.length === 0" class="editor-welcome__empty">{{ t("editorWelcome.noGraphs") }}</div>
+          <div v-else-if="filteredGraphs.length === 0" class="editor-welcome__empty">{{ t("editorWelcome.noGraphResults") }}</div>
         </div>
       </article>
     </section>
@@ -72,6 +72,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 
 import type { GraphDocument, TemplateRecord } from "@/types/node-system";
 import {
@@ -97,6 +98,7 @@ const templateQuery = ref("");
 const graphQuery = ref("");
 const debouncedTemplateQuery = ref("");
 const debouncedGraphQuery = ref("");
+const { t } = useI18n();
 
 watch(templateQuery, (nextValue, _previousValue, onCleanup) => {
   const timeoutId = window.setTimeout(() => {

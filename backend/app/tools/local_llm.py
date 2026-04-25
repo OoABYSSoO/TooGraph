@@ -30,7 +30,6 @@ def _parse_float_env(name: str, default: float) -> float:
 
 
 LOCAL_LLM_BASE_URL = _env_first(
-    "EZLLM_BASE_URL",
     "LOCAL_BASE_URL",
     "OPENAI_BASE_URL",
     "LOCAL_LLM_BASE_URL",

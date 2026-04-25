@@ -1,5 +1,6 @@
 import type { GraphDocument, GraphPayload } from "@/types/node-system";
 import type { RunDetail } from "@/types/run";
+import { translate } from "../../i18n/index.ts";
 import {
   isAgentBreakpointEnabledInDocument,
   resolveAgentBreakpointTimingInDocument,
@@ -457,8 +458,8 @@ function draftValueIsBlocking(row: HumanReviewRow) {
 
 function resolveSummaryText(requiredCount: number) {
   return requiredCount === 0
-    ? "当前断点后没有需要人工补充的输入"
-    : `到下一个断点前，需人工填写 ${requiredCount} 项输入`;
+    ? translate("humanReview.summaryEmpty")
+    : translate("humanReview.summaryRequired", { count: requiredCount });
 }
 
 export function buildHumanReviewResumePayload(rows: HumanReviewRow[], draftsByKey: Record<string, string>) {

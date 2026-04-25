@@ -9,7 +9,7 @@
           @click="handleResumeClick"
         >
           <ElIcon class="editor-human-review-panel__resume-icon" aria-hidden="true"><VideoPlay /></ElIcon>
-          <span>{{ busy ? "Continuing..." : "Continue Run" }}</span>
+          <span>{{ busy ? t("humanReview.continuing") : t("humanReview.continueRun") }}</span>
         </button>
         <div class="editor-human-review-panel__action-tools">
           <button
@@ -19,13 +19,13 @@
             @click="$emit('focus-node', currentFocusNodeId)"
           >
             <ElIcon class="editor-human-review-panel__focus-icon" aria-hidden="true"><Coordinate /></ElIcon>
-            <span>聚焦</span>
+            <span>{{ t("common.focus") }}</span>
           </button>
           <button
             v-if="!isPausedReview"
             type="button"
             class="editor-human-review-panel__collapse"
-            aria-label="Collapse human review panel"
+            :aria-label="t('humanReview.collapse')"
             @click="$emit('toggle')"
           >
             <ElIcon aria-hidden="true"><ArrowRight /></ElIcon>
@@ -37,7 +37,7 @@
       <p v-if="resumeGuardMessage" class="editor-human-review-panel__guard">{{ resumeGuardMessage }}</p>
 
       <div v-if="panelModel.requiredNow.length === 0" class="editor-human-review-panel__empty">
-        当前断点后没有需要人工补充的输入。
+        {{ t("humanReview.empty") }}
       </div>
 
       <section v-else class="editor-human-review-panel__required-section">
@@ -54,7 +54,7 @@
               <div class="editor-human-review-panel__state-meta">{{ row.key }}</div>
             </div>
             <span v-if="draftFor(row.key).trim().length === 0" class="editor-human-review-panel__required-badge">
-              待填写
+              {{ t("common.required") }}
             </span>
           </div>
           <p v-if="row.description" class="editor-human-review-panel__state-description">{{ row.description }}</p>
@@ -75,7 +75,7 @@
           :disabled="panelModel.otherRows.length === 0"
           @click="otherRowsExpanded = !otherRowsExpanded"
         >
-          其他 state ({{ panelModel.otherRows.length }})
+          {{ t("common.otherState", { count: panelModel.otherRows.length }) }}
         </button>
         <div v-if="otherRowsExpanded && panelModel.otherRows.length > 0" class="editor-human-review-panel__other-list">
           <article
@@ -111,6 +111,7 @@
 import { ArrowRight, Coordinate, VideoPlay } from "@element-plus/icons-vue";
 import { ElIcon } from "element-plus";
 import { computed, nextTick, ref, watch, type ComponentPublicInstance } from "vue";
+import { useI18n } from "vue-i18n";
 
 import type { GraphDocument, GraphPayload } from "@/types/node-system";
 import type { RunDetail } from "@/types/run";
@@ -139,8 +140,12 @@ const otherRowsExpanded = ref(false);
 const resumeGuardMessage = ref<string | null>(null);
 const lastPauseContextKey = ref<string | null>(null);
 const requiredFieldRefs = new Map<string, HTMLTextAreaElement>();
+const { t, locale } = useI18n();
 
-const panelModel = computed(() => buildHumanReviewPanelModel(props.run ?? null, props.document));
+const panelModel = computed(() => {
+  locale.value;
+  return buildHumanReviewPanelModel(props.run ?? null, props.document);
+});
 const isPausedReview = computed(() => props.run?.status === "awaiting_human");
 const currentFocusNodeId = computed(() => props.run?.current_node_id ?? props.focusedNodeId ?? null);
 const pauseContextKey = computed(() => {
@@ -211,7 +216,7 @@ async function focusFirstBlockingField() {
 
 function handleResumeClick() {
   if (hasBlockingRequiredDraft.value) {
-    resumeGuardMessage.value = `还有 ${remainingEmptyRequiredDraftCount.value} 项需要填写`;
+    resumeGuardMessage.value = t("humanReview.guard", { count: remainingEmptyRequiredDraftCount.value });
     void focusFirstBlockingField();
     return;
   }

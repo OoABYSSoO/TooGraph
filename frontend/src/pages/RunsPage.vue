@@ -3,38 +3,38 @@
     <section class="runs-page">
       <header class="runs-page__header">
         <div>
-          <div class="runs-page__eyebrow">Runs</div>
-          <h2 class="runs-page__title">运行记录</h2>
-          <p class="runs-page__body">按状态、图名和时间快速定位一次运行，再进入详情查看产出与节点过程。</p>
+          <div class="runs-page__eyebrow">{{ t("runs.eyebrow") }}</div>
+          <h2 class="runs-page__title">{{ t("runs.title") }}</h2>
+          <p class="runs-page__body">{{ t("runs.body") }}</p>
         </div>
         <button type="button" class="runs-page__refresh" :disabled="loading" @click="loadRuns">
-          {{ loading ? "刷新中" : "刷新" }}
+          {{ loading ? t("runs.refreshing") : t("runs.refresh") }}
         </button>
       </header>
 
-      <section class="runs-page__overview" aria-label="运行概览">
+      <section class="runs-page__overview" :aria-label="t('runs.overviewLabel')">
         <article v-for="item in runOverview" :key="item.key" class="runs-page__overview-card">
           <span>{{ item.label }}</span>
           <strong>{{ item.value }}</strong>
         </article>
       </section>
 
-      <section class="runs-page__toolbar" aria-label="运行筛选">
+      <section class="runs-page__toolbar" :aria-label="t('runs.filterLabel')">
         <label class="runs-page__search-field">
-          <span>搜索图名</span>
-          <ElInput v-model="graphNameQuery" class="runs-page__search" placeholder="输入图名" clearable />
+          <span>{{ t("runs.searchGraphName") }}</span>
+          <ElInput v-model="graphNameQuery" class="runs-page__search" :placeholder="t('runs.searchPlaceholder')" clearable />
         </label>
         <div class="runs-page__status-filter">
-          <span>状态</span>
+          <span>{{ t("runs.statusFilter") }}</span>
           <ElSegmented v-model="statusFilter" class="runs-page__segments" :options="statusOptions" />
         </div>
       </section>
 
       <section class="runs-page__list">
-        <article v-if="loading" class="runs-page__empty">Loading runs…</article>
-        <article v-else-if="error" class="runs-page__empty">加载失败：{{ error }}</article>
+        <article v-if="loading" class="runs-page__empty">{{ t("common.loadingRuns") }}</article>
+        <article v-else-if="error" class="runs-page__empty">{{ t("common.failedToLoad", { error }) }}</article>
         <article v-else-if="runs.length === 0" class="runs-page__empty">
-          <p>当前没有运行记录。</p>
+          <p>{{ t("runs.empty") }}</p>
           <RouterLink class="runs-page__empty-action" :to="runsEmptyAction.href">{{ runsEmptyAction.label }}</RouterLink>
         </article>
         <article
@@ -44,7 +44,7 @@
           class="runs-page__run-row"
           role="link"
           tabindex="0"
-          :aria-label="`查看运行 ${formatRunDisplayName(run)}`"
+          :aria-label="t('runs.detailAria', { name: formatRunDisplayName(run) })"
           @click="openRunDetail(run.run_id)"
           @keydown="handleRunRowKeydown($event, run.run_id)"
         >
@@ -58,13 +58,13 @@
           </div>
           <div class="runs-page__run-meta">
             <span>{{ formatRunDisplayTimestamp(run.started_at) }}</span>
-            <span>耗时 {{ formatRunDuration(run.duration_ms) }}</span>
-            <span>修订 {{ run.revision_round }}</span>
-            <span v-if="run.final_score">score {{ run.final_score }}</span>
+            <span>{{ t("runs.elapsed", { duration: formatRunDuration(run.duration_ms) }) }}</span>
+            <span>{{ t("runs.revision", { revision: run.revision_round }) }}</span>
+            <span v-if="run.final_score">{{ t("common.score") }} {{ run.final_score }}</span>
           </div>
           <div class="runs-page__card-actions">
             <button type="button" class="runs-page__detail-link" @click.stop="openRunDetail(run.run_id)">{{ runCardDetail }}</button>
-            <div v-if="restoreTargetsForRun(run).length > 1" class="runs-page__restore-switch" aria-label="选择恢复快照">
+            <div v-if="restoreTargetsForRun(run).length > 1" class="runs-page__restore-switch" :aria-label="t('runs.restoreSnapshotAria')">
               <button
                 v-for="target in restoreTargetsForRun(run)"
                 :key="target.key"
@@ -79,7 +79,7 @@
             </div>
             <RouterLink v-if="canRestoreRunSummary(run)" class="runs-page__restore-link" @click.stop :to="restoreUrlForRun(run)">
               <ElIcon class="runs-page__restore-icon" aria-hidden="true"><Promotion /></ElIcon>
-              <span>恢复编辑</span>
+              <span>{{ t("common.restoreEdit") }}</span>
             </RouterLink>
           </div>
         </article>
@@ -93,6 +93,7 @@ import { Promotion } from "@element-plus/icons-vue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { ElIcon, ElInput, ElSegmented } from "element-plus";
+import { useI18n } from "vue-i18n";
 
 import { fetchRuns } from "@/api/runs";
 import { formatRunDisplayName, formatRunDisplayTimestamp, formatRunDuration } from "@/lib/run-display-name";
@@ -101,7 +102,7 @@ import AppShell from "@/layouts/AppShell.vue";
 import type { RunSummary } from "@/types/run";
 
 import {
-  RUN_STATUS_FILTER_OPTIONS,
+  buildRunStatusFilterOptions,
   buildRunRestoreTargets,
   buildRunStatusOverview,
   resolveRunsCardDetail,
@@ -109,16 +110,29 @@ import {
 } from "./runsPageModel.ts";
 
 const router = useRouter();
+const { t, locale } = useI18n();
 const runs = ref<RunSummary[]>([]);
 const loading = ref(true);
 const error = ref<string | null>(null);
 const graphNameQuery = ref("");
 const statusFilter = ref("");
-const statusOptions = RUN_STATUS_FILTER_OPTIONS;
+const statusOptions = computed(() => {
+  locale.value;
+  return buildRunStatusFilterOptions();
+});
 const selectedRestoreTargetByRunId = ref<Record<string, string>>({});
-const runsEmptyAction = resolveRunsEmptyAction();
-const runCardDetail = resolveRunsCardDetail();
-const runOverview = computed(() => buildRunStatusOverview(runs.value));
+const runsEmptyAction = computed(() => {
+  locale.value;
+  return resolveRunsEmptyAction();
+});
+const runCardDetail = computed(() => {
+  locale.value;
+  return resolveRunsCardDetail();
+});
+const runOverview = computed(() => {
+  locale.value;
+  return buildRunStatusOverview(runs.value);
+});
 let searchTimer: number | null = null;
 
 async function loadRuns() {
@@ -130,7 +144,7 @@ async function loadRuns() {
     });
     error.value = null;
   } catch (fetchError) {
-    error.value = fetchError instanceof Error ? fetchError.message : "Failed to load runs.";
+    error.value = fetchError instanceof Error ? fetchError.message : t("common.loadingRuns");
   } finally {
     loading.value = false;
   }

@@ -1,6 +1,7 @@
 import type { RunDetail } from "../types/run.ts";
 
 import { formatRunDuration } from "../lib/run-display-name.ts";
+import { translate } from "../i18n/index.ts";
 
 export type RunOutputArtifactCard = {
   key: string;
@@ -49,9 +50,9 @@ export function listRunOutputArtifacts(run: RunDetail): RunOutputArtifactCard[] 
 
 export function buildRunStatusFacts(run: RunDetail): RunStatusFact[] {
   return [
-    { key: "status", label: "状态", value: run.status, tone: "status" },
-    { key: "current", label: "当前节点", value: run.current_node_id?.trim() || "已结束", tone: "default" },
-    { key: "duration", label: "耗时", value: formatRunDuration(run.duration_ms), tone: "default" },
-    { key: "revision", label: "修订", value: String(run.revision_round), tone: "default" },
+    { key: "status", label: translate("runDetail.status"), value: run.status, tone: "status" },
+    { key: "current", label: translate("runDetail.currentNode"), value: run.current_node_id?.trim() || translate("runDetail.ended"), tone: "default" },
+    { key: "duration", label: translate("runDetail.duration"), value: formatRunDuration(run.duration_ms), tone: "default" },
+    { key: "revision", label: translate("runDetail.revision"), value: String(run.revision_round), tone: "default" },
   ];
 }

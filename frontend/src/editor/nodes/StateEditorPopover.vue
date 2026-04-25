@@ -1,24 +1,24 @@
 <template>
   <div class="node-card__state-editor node-state-editor" data-node-popup-surface="true">
-    <div class="node-state-editor__title">Edit State</div>
+    <div class="node-state-editor__title">{{ t("nodeCard.stateEditorTitle") }}</div>
 
     <div class="node-state-editor__grid">
       <div class="node-state-editor__field">
-        <span class="node-state-editor__field-label">Key</span>
-        <ElInput aria-label="Key" :model-value="draft.key" @update:model-value="$emit('update:key', String($event ?? ''))" />
+        <span class="node-state-editor__field-label">{{ t("nodeCard.key") }}</span>
+        <ElInput :aria-label="t('nodeCard.key')" :model-value="draft.key" @update:model-value="$emit('update:key', String($event ?? ''))" />
       </div>
 
       <div class="node-state-editor__field">
-        <span class="node-state-editor__field-label">Name</span>
-        <ElInput aria-label="Name" :model-value="draft.definition.name" @update:model-value="$emit('update:name', String($event ?? ''))" />
+        <span class="node-state-editor__field-label">{{ t("nodeCard.name") }}</span>
+        <ElInput :aria-label="t('nodeCard.name')" :model-value="draft.definition.name" @update:model-value="$emit('update:name', String($event ?? ''))" />
       </div>
 
       <div class="node-state-editor__field">
-        <span class="node-state-editor__field-label">Type</span>
+        <span class="node-state-editor__field-label">{{ t("nodeCard.type") }}</span>
         <ElSelect
           ref="typeSelectRef"
           class="node-state-editor__type-select graphite-select"
-          aria-label="Type"
+          :aria-label="t('nodeCard.type')"
           :model-value="draft.definition.type"
           :teleported="false"
           popper-class="graphite-select-popper node-state-editor__select-popper"
@@ -29,12 +29,12 @@
       </div>
 
       <div class="node-state-editor__field">
-        <span class="node-state-editor__field-label">Color</span>
+        <span class="node-state-editor__field-label">{{ t("nodeCard.color") }}</span>
         <div class="node-state-editor__color-select-shell">
           <ElSelect
             ref="colorSelectRef"
             class="node-state-editor__color-select graphite-select"
-            aria-label="Color"
+            :aria-label="t('nodeCard.color')"
             :model-value="draft.definition.color"
             :teleported="false"
             popper-class="graphite-select-popper node-state-editor__select-popper"
@@ -57,9 +57,9 @@
     </div>
 
     <div class="node-state-editor__field node-state-editor__field--full">
-      <span class="node-state-editor__field-label">Description</span>
+      <span class="node-state-editor__field-label">{{ t("nodeCard.description") }}</span>
       <ElInput
-        aria-label="Description"
+        :aria-label="t('nodeCard.description')"
         type="textarea"
         :rows="2"
         :model-value="draft.definition.description"
@@ -74,6 +74,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from "vue";
 import { ElInput, ElOption, ElSelect } from "element-plus";
+import { useI18n } from "vue-i18n";
 
 import type { StateColorOption, StateFieldDraft, StateFieldType } from "@/editor/workspace/statePanelFields";
 
@@ -92,6 +93,7 @@ const emit = defineEmits<{
   (event: "update:description", value: string): void;
 }>();
 
+const { t } = useI18n();
 const typeSelectRef = ref<{ blur?: () => void; toggleMenu?: () => void; expanded?: boolean } | null>(null);
 const colorSelectRef = ref<{ blur?: () => void; toggleMenu?: () => void; expanded?: boolean } | null>(null);
 

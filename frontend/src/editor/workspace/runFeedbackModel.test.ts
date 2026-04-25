@@ -81,7 +81,7 @@ test("formatValidationFeedback follows success and issue-list semantics", () => 
 
   assert.deepEqual(formatValidationFeedback(passing), {
     tone: "success",
-    message: "Validation passed.",
+    message: "校验通过。",
   });
   assert.deepEqual(formatValidationFeedback(failing), {
     tone: "danger",
@@ -147,7 +147,7 @@ test("formatRunFeedback formats active runs with current node and cycle summary"
   assert.equal(feedback.currentNodeLabel, "Answer Helper");
   assert.equal(
     feedback.message,
-    "Running Answer Helper. Done 1 · Active 1 · Pending 1 · Failed 0. Iterations 2/unlimited.",
+    "Running Answer Helper. Done 1 · Active 1 · Pending 1 · Failed 0. Iterations 2/无限制.",
   );
 });
 

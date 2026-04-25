@@ -170,8 +170,8 @@ def build_model_catalog() -> dict[str, Any]:
         "providers": [
             {
                 "provider_id": "local",
-                "label": "EZLLM Runtime",
-                "description": "External EZLLM runtime used by GraphiteUI for local model routing, runtime metadata, logs, and provider fan-out.",
+                "label": "OpenAI-compatible Custom Provider",
+                "description": "Custom OpenAI-compatible endpoint used by GraphiteUI for local or private model routing.",
                 "transport": "openai-compatible",
                 "configured": True,
                 "base_url": LOCAL_LLM_BASE_URL,

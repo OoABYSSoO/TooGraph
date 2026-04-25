@@ -1,6 +1,6 @@
 <template>
   <label v-if="editor.mode === 'boolean'" class="state-default-value-editor__field">
-    <span>Value</span>
+    <span>{{ t("common.value") }}</span>
     <button
       type="button"
       class="state-default-value-editor__toggle"
@@ -15,7 +15,7 @@
   </label>
 
   <label v-else-if="editor.mode === 'number'" class="state-default-value-editor__field">
-    <span>Value</span>
+    <span>{{ t("common.value") }}</span>
     <input
       type="number"
       class="state-default-value-editor__input"
@@ -27,7 +27,7 @@
 
   <div v-else-if="editor.mode === 'structured'" class="state-default-value-editor__structured">
     <label class="state-default-value-editor__field">
-      <span>Value</span>
+      <span>{{ t("common.value") }}</span>
       <textarea
         v-model="structuredDraft"
         class="state-default-value-editor__textarea"
@@ -37,14 +37,14 @@
     </label>
     <div class="state-default-value-editor__structured-footer">
       <div class="state-default-value-editor__hint" :class="{ 'state-default-value-editor__hint--error': Boolean(structuredError) }">
-        {{ structuredError ?? "Apply JSON to sync the structured value." }}
+        {{ structuredError ?? t("nodeCard.stateValueHint") }}
       </div>
-      <button type="button" class="state-default-value-editor__apply" @click="applyStructuredDraft">Apply JSON</button>
+      <button type="button" class="state-default-value-editor__apply" @click="applyStructuredDraft">{{ t("nodeCard.applyJson") }}</button>
     </div>
   </div>
 
   <label v-else class="state-default-value-editor__field">
-    <span>Value</span>
+    <span>{{ t("common.value") }}</span>
     <textarea
       class="state-default-value-editor__textarea"
       :rows="editor.rows"
@@ -57,6 +57,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 
 import { type StateFieldType } from "./statePanelFields.ts";
 import {
@@ -74,6 +75,7 @@ const emit = defineEmits<{
   (event: "update-value", value: unknown): void;
 }>();
 
+const { t } = useI18n();
 const editor = computed(() => resolveStateDefaultValueEditorConfig(props.field.type as StateFieldType));
 const structuredDraft = ref(stringifyStructuredStateValue(props.field.type as StateFieldType, props.field.value));
 const structuredError = ref<string | null>(null);
