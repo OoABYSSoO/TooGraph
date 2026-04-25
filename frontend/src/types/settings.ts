@@ -1,3 +1,36 @@
+export type ModelProviderTransport =
+  | "openai-compatible"
+  | "anthropic-messages"
+  | "gemini-generate-content";
+
+export type SettingsProviderModel = {
+  model_ref: string;
+  model: string;
+  label: string;
+  route_target?: string | null;
+  reasoning?: boolean;
+  modalities?: string[];
+  context_window?: number | null;
+  max_tokens?: number | null;
+};
+
+export type SettingsModelProvider = {
+  provider_id: string;
+  label: string;
+  description: string;
+  transport: ModelProviderTransport;
+  configured: boolean;
+  enabled: boolean;
+  base_url: string;
+  auth_header?: string;
+  auth_scheme?: string;
+  api_key_configured?: boolean;
+  models: SettingsProviderModel[];
+  example_model_refs: string[];
+  template_group?: string;
+  gateway?: Record<string, unknown>;
+};
+
 export type SettingsPayload = {
   model: {
     text_model: string;
@@ -11,37 +44,27 @@ export type SettingsPayload = {
     temperature: number;
   };
   model_catalog?: {
-    providers: Array<{
-      provider_id: string;
-      label: string;
-      description: string;
-      transport: string;
-      configured: boolean;
-      base_url: string;
-      api_key_configured?: boolean;
-      models: Array<{
-        model_ref: string;
-        model: string;
-        label: string;
-        route_target?: string | null;
-        reasoning?: boolean;
-        modalities?: string[];
-        context_window?: number | null;
-        max_tokens?: number | null;
-      }>;
-      example_model_refs: string[];
-      gateway?: Record<string, unknown>;
-    }>;
+    providers: SettingsModelProvider[];
+    provider_templates?: SettingsModelProvider[];
   };
   model_providers?: Record<
     string,
     {
       label?: string;
+      transport?: ModelProviderTransport;
       base_url: string;
       api_key?: string;
+      enabled?: boolean;
+      auth_header?: string;
+      auth_scheme?: string;
       models: Array<{
         model: string;
         label?: string;
+        route_target?: string | null;
+        reasoning?: boolean | null;
+        modalities?: string[];
+        context_window?: number | null;
+        max_tokens?: number | null;
       }>;
     }
   >;

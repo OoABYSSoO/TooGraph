@@ -44,14 +44,19 @@ test("updateSettings posts through the frontend api proxy", async () => {
       temperature: 0.2,
     },
     model_providers: {
-      local: {
-        label: "Local Gateway",
-        base_url: "http://127.0.0.1:8888/v1",
-        api_key: "sk-local",
+      openai: {
+        label: "OpenAI",
+        transport: "openai-compatible",
+        base_url: "https://api.openai.com/v1",
+        api_key: "sk-openai",
+        enabled: true,
+        auth_header: "Authorization",
+        auth_scheme: "Bearer",
         models: [
           {
-            model: "gemma-4-26b-a4b-it",
-            label: "Gemma 4 26B",
+            model: "gpt-4.1",
+            label: "GPT 4.1",
+            modalities: ["text"],
           },
         ],
       },
@@ -70,14 +75,19 @@ test("updateSettings posts through the frontend api proxy", async () => {
       temperature: 0.2,
     },
     model_providers: {
-      local: {
-        label: "Local Gateway",
-        base_url: "http://127.0.0.1:8888/v1",
-        api_key: "sk-local",
+      openai: {
+        label: "OpenAI",
+        transport: "openai-compatible",
+        base_url: "https://api.openai.com/v1",
+        api_key: "sk-openai",
+        enabled: true,
+        auth_header: "Authorization",
+        auth_scheme: "Bearer",
         models: [
           {
-            model: "gemma-4-26b-a4b-it",
-            label: "Gemma 4 26B",
+            model: "gpt-4.1",
+            label: "GPT 4.1",
+            modalities: ["text"],
           },
         ],
       },
@@ -103,14 +113,22 @@ test("discoverModelProviderModels posts discovery payload", async () => {
   }) as typeof fetch;
 
   const result = await discoverModelProviderModels({
-    base_url: "http://127.0.0.1:8888/v1",
-    api_key: "sk-local",
+    provider_id: "anthropic",
+    transport: "anthropic-messages",
+    base_url: "https://api.anthropic.com/v1",
+    api_key: "sk-ant",
+    auth_header: "x-api-key",
+    auth_scheme: "",
   });
 
   assert.equal(requestedUrl, "/api/settings/model-providers/discover");
   assert.deepEqual(requestedPayload, {
-    base_url: "http://127.0.0.1:8888/v1",
-    api_key: "sk-local",
+    provider_id: "anthropic",
+    transport: "anthropic-messages",
+    base_url: "https://api.anthropic.com/v1",
+    api_key: "sk-ant",
+    auth_header: "x-api-key",
+    auth_scheme: "",
   });
   assert.deepEqual(result, { models: ["gemma-4-26b-a4b-it"] });
 
