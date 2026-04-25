@@ -9,6 +9,7 @@ from typing import Any
 import httpx
 
 from app.core.storage.settings_store import load_app_settings
+from app.tools.model_provider_client import discover_provider_models
 
 
 def _env_first(*keys: str, default: str) -> str:
@@ -413,37 +414,13 @@ def generate_hello_greeting(state: dict[str, Any], params: dict[str, Any] | None
 
 
 def discover_openai_compatible_models(*, base_url: str, api_key: str = "", timeout_sec: float = 8.0) -> list[str]:
-    normalized_base_url = str(base_url or "").strip().rstrip("/")
-    if not normalized_base_url.startswith(("http://", "https://")):
-        raise RuntimeError("Base URL must start with http:// or https://.")
-
-    headers = {"Content-Type": "application/json"}
-    if str(api_key or "").strip():
-        headers["Authorization"] = f"Bearer {str(api_key).strip()}"
-
-    try:
-        with httpx.Client(timeout=timeout_sec, trust_env=False) as client:
-            response = client.get(f"{normalized_base_url}/models", headers=headers)
-            response.raise_for_status()
-            payload = response.json()
-    except httpx.HTTPStatusError as exc:
-        detail = exc.response.text.strip()
-        raise RuntimeError(f"Model discovery failed: HTTP {exc.response.status_code} {detail[:300]}") from exc
-    except httpx.HTTPError as exc:
-        raise RuntimeError(f"Model discovery failed: {exc}") from exc
-    except ValueError as exc:
-        raise RuntimeError(f"Model discovery returned invalid JSON: {exc}") from exc
-
-    data = payload.get("data") if isinstance(payload, dict) else None
-    if not isinstance(data, list):
-        raise RuntimeError("Model discovery returned an unexpected payload shape.")
-
-    model_ids = [
-        str(item.get("id") or "").strip()
-        for item in data
-        if isinstance(item, dict) and str(item.get("id") or "").strip()
-    ]
-    return _dedupe_strings(model_ids)
+    return discover_provider_models(
+        provider_id="local",
+        transport="openai-compatible",
+        base_url=base_url,
+        api_key=api_key,
+        timeout_sec=timeout_sec,
+    )
 
 
 def output_usage_introduction(state: dict[str, Any], params: dict[str, Any] | None = None) -> dict[str, Any]:
