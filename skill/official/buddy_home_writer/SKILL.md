@@ -1,13 +1,31 @@
 ---
-name: Buddy Home Writer
+name: 伙伴之家写入器
 description: Internal controlled Buddy Home writer that applies safe command-based memory, session summary, profile, policy, and report updates with revision records.
 ---
 
-# Buddy Home Writer
+# 伙伴之家写入器
 
 This is an internal TooGraph Skill used by Buddy autonomous review templates.
 
 It does not write files directly. It validates a small command list and calls the existing Buddy command/store path so every applied change creates a command record and revision.
+
+State inputs:
+
+- `autonomous_review`: Buddy autonomous review result or writeback plan used by the LLM to decide safe write commands.
+- `source_run_id`: optional source run ID for audit and revision linkage.
+
+LLM parameters:
+
+- `commands`: safe Buddy Home command array generated from the review.
+- `run_id`: optional source run ID copied into command records.
+
+State outputs:
+
+- `success`: whether all accepted commands were applied.
+- `result`: concise writeback summary.
+- `applied_commands`: applied command records and revisions.
+- `skipped_commands`: invalid, unsafe, or failed commands.
+- `revisions`: Buddy Home revisions created by this writeback.
 
 Allowed actions:
 

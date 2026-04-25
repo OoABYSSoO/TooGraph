@@ -33,6 +33,7 @@ export type SkillDefinition = {
   capabilityPolicy: SkillCapabilityPolicies;
   permissions: string[];
   runtime: SkillRuntimeSpec;
+  stateInputSchema?: SkillIoField[];
   inputSchema: SkillIoField[];
   outputSchema: SkillIoField[];
   llmNodeEligibility: string;

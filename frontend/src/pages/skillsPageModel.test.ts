@@ -12,6 +12,7 @@ const skills: SkillDefinition[] = [
     description: "Rewrite text with a specified style.",
     llmInstruction: "Rewrite the provided text.",
     schemaVersion: "toograph.skill/v1",
+    stateInputSchema: [{ key: "source_text", name: "Source Text", valueType: "text", required: true, description: "Bound graph state input" }],
     inputSchema: [{ key: "text", name: "Text", valueType: "text", required: true, description: "Source text" }],
     outputSchema: [{ key: "rewritten", name: "Rewritten", valueType: "text", required: false, description: "Result" }],
     runtime: { type: "python", entrypoint: "run.py" },
@@ -36,6 +37,7 @@ const skills: SkillDefinition[] = [
     description: "Installed skill that still needs a runtime manifest.",
     llmInstruction: "",
     schemaVersion: "toograph.skill/v1",
+    stateInputSchema: [],
     inputSchema: [],
     outputSchema: [],
     runtime: { type: "future", entrypoint: "" },
@@ -62,6 +64,7 @@ const skills: SkillDefinition[] = [
     description: "A buddy context profile.",
     llmInstruction: "",
     schemaVersion: "toograph.skill/v1",
+    stateInputSchema: [],
     inputSchema: [],
     outputSchema: [],
     runtime: { type: "none", entrypoint: "" },
@@ -100,6 +103,10 @@ test("filterSkillsForManagement searches skill metadata and permission fields", 
   assert.deepEqual(
     filterSkillsForManagement(skills, { query: "profile_context", status: "all" }).map((skill) => skill.skillKey),
     ["desktop_buddy_profile"],
+  );
+  assert.deepEqual(
+    filterSkillsForManagement(skills, { query: "bound graph state input", status: "all" }).map((skill) => skill.skillKey),
+    ["rewrite_text"],
   );
   assert.deepEqual(
     filterSkillsForManagement(skills, { query: "skill.json", status: "all" }).map((skill) => skill.skillKey),

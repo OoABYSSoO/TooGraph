@@ -50,6 +50,7 @@
         <RouterLink
           to="/runs"
           class="app-shell__link"
+          data-virtual-affordance-id="app.nav.runs"
           :class="{ 'app-shell__link--active': activeNavigationSection === 'runs' }"
           :title="t('nav.runs')"
         >

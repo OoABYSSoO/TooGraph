@@ -105,6 +105,11 @@ test("AppShell exposes model request logs as a primary sidebar destination", () 
   assert.match(componentSource, /<ElIcon class="app-shell__link-icon"><Tickets \/><\/ElIcon>/);
 });
 
+test("AppShell registers only non-buddy navigation affordances for virtual page operations", () => {
+  assert.match(componentSource, /to="\/runs"[\s\S]*data-virtual-affordance-id="app\.nav\.runs"/);
+  assert.doesNotMatch(componentSource, /data-virtual-affordance-id="app\.nav\.buddy"/);
+});
+
 test("AppShell exposes Buddy as a primary sidebar destination", () => {
   assert.match(componentSource, /import \{[\s\S]*ChatDotRound[\s\S]*\} from "@element-plus\/icons-vue";/);
   assert.match(componentSource, /to="\/buddy"[\s\S]*activeNavigationSection === 'buddy'[\s\S]*t\("nav\.buddy"\)/);

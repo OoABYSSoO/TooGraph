@@ -432,7 +432,11 @@ import {
   type SmoothNumberDisplayState,
 } from "../lib/smoothNumberDisplay.ts";
 import { useBuddyContextStore } from "../stores/buddyContext.ts";
-import { useBuddyMascotDebugStore } from "../stores/buddyMascotDebug.ts";
+import {
+  useBuddyMascotDebugStore,
+  type BuddyVirtualOperation,
+  type BuddyVirtualOperationRequest,
+} from "../stores/buddyMascotDebug.ts";
 import type { BuddyChatMessageRecord, BuddyChatSession } from "../types/buddy.ts";
 import type { GraphPayload } from "../types/node-system.ts";
 import type { RunDetail } from "../types/run.ts";
@@ -580,6 +584,10 @@ const BUDDY_VIRTUAL_CURSOR_DOCKED_SCALE = 0.72;
 const BUDDY_VIRTUAL_CURSOR_ACTIVE_SCALE = 1;
 const BUDDY_VIRTUAL_CURSOR_FOLLOW_TARGET_REACHED_DISTANCE_PX = 12;
 const BUDDY_VIRTUAL_CURSOR_FOLLOW_TARGET_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width * 1.25;
+const BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS = 80;
+const BUDDY_VIRTUAL_OPERATION_TARGET_SELECTORS: Record<string, string> = {
+  "app.nav.runs": '[data-virtual-affordance-id="app.nav.runs"]',
+};
 const VIRTUAL_CURSOR_STAR_PATH =
   "M0-72 C5-46 18-33 44-28 C18-23 5-10 0 16 C-5-10 -18-23 -44-28 C-18-33 -5-46 0-72Z";
 const VIRTUAL_CURSOR_SHAPE_PATH =
@@ -594,6 +602,7 @@ const buddyContextStore = useBuddyContextStore();
 const buddyMascotDebugStore = useBuddyMascotDebugStore();
 const {
   latestRequest: mascotDebugRequest,
+  latestVirtualOperationRequest,
   motionConfig: buddyMascotMotionConfig,
   virtualCursorEnabled,
 } = storeToRefs(buddyMascotDebugStore);
@@ -854,6 +863,10 @@ watch(mascotDebugRequest, (request) => {
     return;
   }
   triggerMascotDebugAction(request.action);
+});
+
+watch(latestVirtualOperationRequest, (request) => {
+  void executeVirtualOperationRequest(request);
 });
 
 function handleAvatarClick() {
@@ -2171,6 +2184,152 @@ function clampVirtualCursorFramePosition(positionValue: BuddyPosition): BuddyPos
   };
 }
 
+function handleBuddyVirtualUiOperationEvent(payload: Record<string, unknown>) {
+  const kind = normalizeVirtualOperationText(payload.kind);
+  if (kind !== "virtual_ui_operation") {
+    return;
+  }
+  const detail = recordFromUnknown(payload.detail);
+  const operation = recordFromUnknown(detail?.operation);
+  const operationKind = normalizeVirtualOperationText(operation?.kind);
+  const targetId = normalizeVirtualOperationText(operation?.target_id ?? operation?.targetId);
+  if (operationKind !== "click" || !targetId) {
+    return;
+  }
+  if (targetId !== "app.nav.runs") {
+    return;
+  }
+  buddyMascotDebugStore.requestVirtualOperation({
+    kind: "click",
+    targetId: "app.nav.runs",
+    cursorLifecycle: normalizeVirtualOperationCursorLifecycle(detail?.cursor_lifecycle ?? detail?.cursorLifecycle),
+  });
+}
+
+async function executeVirtualOperationRequest(request: BuddyVirtualOperationRequest | null) {
+  if (!request) {
+    return;
+  }
+  if (request.operation.kind === "click") {
+    await executeBuddyVirtualClickOperation(request.operation);
+  }
+}
+
+async function executeBuddyVirtualClickOperation(operation: BuddyVirtualOperation) {
+  const affordance = resolveVirtualOperationAffordance(operation.targetId);
+  if (!affordance) {
+    return;
+  }
+  stopBuddyIdleAnimation();
+  await ensureVirtualCursorReadyForOperation();
+  const cursorPosition = resolveVirtualCursorPositionForElement(affordance.element);
+  const flightWaitMs = moveVirtualCursorToWithArmedTransition(cursorPosition);
+  await waitForVirtualOperation(flightWaitMs);
+  dispatchVirtualClick(affordance.element);
+  if (operation.cursorLifecycle === "return_after_step" || operation.cursorLifecycle === "return_at_end") {
+    await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS);
+    buddyMascotDebugStore.setVirtualCursorEnabled(false);
+  }
+}
+
+function resolveVirtualOperationAffordance(targetId: string): { element: HTMLElement } | null {
+  if (targetId.startsWith("buddy.") || targetId === "app.nav.buddy") {
+    return null;
+  }
+  const selector = BUDDY_VIRTUAL_OPERATION_TARGET_SELECTORS[targetId];
+  if (!selector || typeof document === "undefined") {
+    return null;
+  }
+  const element = document.querySelector<HTMLElement>(selector);
+  if (!element) {
+    return null;
+  }
+  const rect = element.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) {
+    return null;
+  }
+  return { element };
+}
+
+async function ensureVirtualCursorReadyForOperation() {
+  if (!virtualCursorEnabled.value) {
+    buddyMascotDebugStore.setVirtualCursorEnabled(true);
+  }
+  if (virtualCursorPhase.value !== "active") {
+    await waitForVirtualOperation(BUDDY_VIRTUAL_CURSOR_MORPH_DURATION_MS + BUDDY_VIRTUAL_CURSOR_READY_FRAME_DELAY_MS);
+  }
+}
+
+function resolveVirtualCursorPositionForElement(element: HTMLElement): BuddyPosition {
+  const rect = element.getBoundingClientRect();
+  return clampVirtualCursorFramePosition({
+    x: rect.left + rect.width / 2 - BUDDY_VIRTUAL_CURSOR_SIZE.width / 2,
+    y: rect.top + rect.height / 2 - BUDDY_VIRTUAL_CURSOR_SIZE.height / 2,
+  });
+}
+
+function dispatchVirtualClick(element: HTMLElement) {
+  const rect = element.getBoundingClientRect();
+  const clientX = rect.left + rect.width / 2;
+  const clientY = rect.top + rect.height / 2;
+  dispatchVirtualPointerEvent(element, "pointerdown", clientX, clientY);
+  dispatchVirtualPointerEvent(element, "pointerup", clientX, clientY);
+  element.dispatchEvent(
+    new MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+      clientX,
+      clientY,
+      view: window,
+    }),
+  );
+}
+
+function dispatchVirtualPointerEvent(element: HTMLElement, type: "pointerdown" | "pointerup", clientX: number, clientY: number) {
+  const eventInit = {
+    bubbles: true,
+    cancelable: true,
+    clientX,
+    clientY,
+    pointerId: 1,
+    pointerType: "mouse",
+    button: 0,
+    buttons: type === "pointerdown" ? 1 : 0,
+    view: window,
+  };
+  if (typeof PointerEvent === "function") {
+    element.dispatchEvent(new PointerEvent(type, eventInit));
+    return;
+  }
+  element.dispatchEvent(new MouseEvent(type, eventInit));
+}
+
+function waitForVirtualOperation(timeoutMs: number) {
+  return new Promise<void>((resolve) => {
+    if (typeof window === "undefined") {
+      resolve();
+      return;
+    }
+    window.setTimeout(resolve, Math.max(0, Math.round(timeoutMs)));
+  });
+}
+
+function normalizeVirtualOperationCursorLifecycle(value: unknown): BuddyVirtualOperation["cursorLifecycle"] {
+  const normalized = normalizeVirtualOperationText(value);
+  if (normalized === "keep" || normalized === "return_after_step" || normalized === "return_at_end") {
+    return normalized;
+  }
+  return "return_after_step";
+}
+
+function normalizeVirtualOperationText(value: unknown) {
+  return String(value ?? "").trim();
+}
+
+function recordFromUnknown(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+
 function clampNumber(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
@@ -2887,6 +3046,9 @@ function startRunEventStream(
     const payload = parseRunEventPayload(event);
     if (!payload) {
       return;
+    }
+    if (eventType === "activity.event") {
+      handleBuddyVirtualUiOperationEvent(payload);
     }
     outputTraceState = reduceBuddyOutputTraceEvent(
       outputTraceState,

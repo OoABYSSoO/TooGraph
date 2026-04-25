@@ -29,7 +29,7 @@ def toograph_script_tester_before_llm(**payload: Any) -> dict[str, str]:
         context_lines.extend(referenced_file_lines)
     context_lines.extend(
         [
-            "TooGraph Script Tester guidance:",
+            "TooGraph 脚本测试器 guidance:",
             "- Generate only files and command.",
             "- files must be an array of objects with path and content; include the target script, generated tests, and minimal helper/config files.",
             "- command must be an argument array using an available allowed command, for example [\"python\", \"-m\", \"pytest\", \"-q\", \"test_target.py\"].",

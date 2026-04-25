@@ -151,7 +151,11 @@ def _parse_native_skill_manifest(path: Path, source_scope: SkillSourceScope) -> 
         schemaVersion=str(payload.get("schemaVersion") or payload.get("schema_version") or ""),
         version=str(payload.get("version") or ""),
         permissions=[str(item) for item in payload.get("permissions", [])],
-        runtime=_parse_runtime_spec(payload.get("runtime")),
+        runtime=_parse_runtime_spec(
+            payload.get("runtime"),
+            fallback_timeout_seconds=payload.get("timeoutSeconds") or payload.get("timeout_seconds"),
+        ),
+        stateInputSchema=_parse_io_fields(payload.get("stateInputSchema") or payload.get("state_input_schema") or []),
         inputSchema=_parse_io_fields(payload.get("inputSchema") or payload.get("input_schema") or []),
         outputSchema=_parse_io_fields(payload.get("outputSchema") or payload.get("output_schema") or []),
     )
@@ -179,6 +183,7 @@ def _parse_skill_file(path: Path, source_scope: SkillSourceScope) -> SkillDefini
     name = str(payload.get("name") or toograph.get("name") or skill_key)
     description = str(payload.get("description") or "").strip()
 
+    state_input_schema = _parse_io_fields(toograph.get("state_input_schema") or toograph.get("stateInputSchema") or [])
     input_schema = _parse_io_fields(toograph.get("input_schema", []))
     output_schema = _parse_io_fields(toograph.get("output_schema", []))
 
@@ -190,7 +195,11 @@ def _parse_skill_file(path: Path, source_scope: SkillSourceScope) -> SkillDefini
         schemaVersion=str(toograph.get("schema_version") or toograph.get("schemaVersion") or ""),
         version=str(toograph.get("version") or payload.get("version") or ""),
         permissions=[str(item) for item in toograph.get("permissions", [])],
-        runtime=_parse_runtime_spec(toograph.get("runtime")),
+        runtime=_parse_runtime_spec(
+            toograph.get("runtime"),
+            fallback_timeout_seconds=toograph.get("timeout_seconds") or toograph.get("timeoutSeconds"),
+        ),
+        stateInputSchema=state_input_schema,
         inputSchema=input_schema,
         outputSchema=output_schema,
     )
@@ -221,14 +230,21 @@ def _parse_io_fields(fields: list[dict]) -> list[SkillIoField]:
     return parsed_fields
 
 
-def _parse_runtime_spec(payload: object) -> SkillRuntimeSpec:
+def _parse_runtime_spec(payload: object, *, fallback_timeout_seconds: object = None) -> SkillRuntimeSpec:
     if not isinstance(payload, dict):
-        return SkillRuntimeSpec(type="none", entrypoint="")
+        return SkillRuntimeSpec(
+            type="none",
+            entrypoint="",
+            timeoutSeconds=_parse_float(fallback_timeout_seconds, 30.0),
+        )
     return SkillRuntimeSpec(
         type=str(payload.get("type") or "none"),
         entrypoint=str(payload.get("entrypoint") or ""),
         command=[str(item) for item in payload.get("command") or []],
-        timeoutSeconds=_parse_float(payload.get("timeoutSeconds") or payload.get("timeout_seconds"), 30.0),
+        timeoutSeconds=_parse_float(
+            payload.get("timeoutSeconds") or payload.get("timeout_seconds") or fallback_timeout_seconds,
+            30.0,
+        ),
     )
 
 

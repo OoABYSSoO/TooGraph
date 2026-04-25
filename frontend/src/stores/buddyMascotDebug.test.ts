@@ -31,6 +31,40 @@ test("buddy mascot debug store toggles the virtual cursor debug mode", () => {
   assert.equal(store.virtualCursorEnabled, false);
 });
 
+test("buddy mascot debug store records virtual operation requests", () => {
+  setActivePinia(createPinia());
+  const store = useBuddyMascotDebugStore();
+
+  store.requestVirtualOperation({
+    kind: "click",
+    targetId: "app.nav.runs",
+    cursorLifecycle: "return_after_step",
+  });
+  const firstRequest = store.latestVirtualOperationRequest;
+  store.requestVirtualOperation({
+    kind: "click",
+    targetId: "app.nav.runs",
+    cursorLifecycle: "keep",
+  });
+
+  assert.deepEqual(firstRequest, {
+    id: 1,
+    operation: {
+      kind: "click",
+      targetId: "app.nav.runs",
+      cursorLifecycle: "return_after_step",
+    },
+  });
+  assert.deepEqual(store.latestVirtualOperationRequest, {
+    id: 2,
+    operation: {
+      kind: "click",
+      targetId: "app.nav.runs",
+      cursorLifecycle: "keep",
+    },
+  });
+});
+
 test("buddy mascot debug store exposes live motion timing controls", () => {
   setActivePinia(createPinia());
   const store = useBuddyMascotDebugStore();

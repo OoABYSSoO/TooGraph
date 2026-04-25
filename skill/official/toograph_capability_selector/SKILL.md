@@ -1,11 +1,30 @@
 ---
-name: toograph_capability_selector
+name: TooGraph 能力选择器
 description: Use when a TooGraph workflow needs to choose one enabled graph template or Skill from a user requirement.
 ---
 
-# TooGraph Capability Selector
+# TooGraph 能力选择器
 
 `before_llm.py` lists the local enabled graph templates and enabled Skills in the LLM-node skill-input planning prompt. The model chooses one item from that catalog and passes it as the `capability` input. `after_llm.py` validates that choice against the current local catalog and returns exactly one normalized capability object.
+
+State inputs:
+
+- `requirement`: original user or workflow requirement.
+- `origin`: optional capability-selection origin, such as `buddy`.
+
+LLM parameters:
+
+- `requirement`: the requirement used for audit continuity.
+- `origin`: optional origin copied from state or defaulted to `buddy`.
+- `capability`: the single selected capability object.
+- `selection_reason`: concise reason for the selected item or for selecting none.
+- `rejected_candidates`: optional short list of rejected candidates and reasons.
+
+State outputs:
+
+- `capability`: normalized single capability object.
+- `found`: boolean branch flag.
+- `audit`: candidate and selection audit summary.
 
 Selection rules:
 
