@@ -20,7 +20,7 @@
           :title="isSidebarCollapsed ? t('nav.expandSidebar') : t('nav.collapseSidebar')"
           @click="setSidebarCollapsed(!isSidebarCollapsed)"
         >
-          C
+          <img class="app-shell__brand-logo" src="/logo.svg" alt="" aria-hidden="true" />
         </button>
         <div class="app-shell__brand-copy">
           <h1 class="app-shell__title">GraphiteUI</h1>
@@ -174,16 +174,20 @@ watch(isSidebarCollapsed, (nextValue) => {
   align-items: center;
   justify-content: center;
   border: 1px solid rgba(154, 52, 18, 0.14);
-  border-radius: 12px;
+  border-radius: 999px;
   background: var(--graphite-glass-bg-strong);
-  color: var(--graphite-accent);
   cursor: pointer;
-  font-family: inherit;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  padding: 0;
+  overflow: hidden;
+  padding: 2px;
   box-shadow: var(--graphite-glass-highlight);
   transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.app-shell__brand-logo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .app-shell__brand-mark:hover {

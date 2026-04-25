@@ -41,9 +41,10 @@ test("AppShell uses a low-noise ChatGPT-style brand rail with library icons", ()
   assert.match(componentSource, /import \{[\s\S]*ElIcon[\s\S]*\} from "element-plus";/);
   assert.match(componentSource, /import \{[\s\S]*House[\s\S]*EditPen[\s\S]*Clock[\s\S]*Setting[\s\S]*\} from "@element-plus\/icons-vue";/);
   assert.doesNotMatch(componentSource, /Fold|Expand/);
-  assert.match(componentSource, /<button[\s\S]*class="app-shell__brand-mark"[\s\S]*C[\s\S]*<\/button>/);
+  assert.match(componentSource, /<button[\s\S]*class="app-shell__brand-mark"[\s\S]*<img class="app-shell__brand-logo" src="\/logo\.svg" alt="" aria-hidden="true" \/>[\s\S]*<\/button>/);
   assert.match(componentSource, /<h1 class="app-shell__title">GraphiteUI<\/h1>/);
   assert.doesNotMatch(componentSource, /app-shell__note/);
+  assert.match(componentSource, /\.app-shell__brand-logo \{[\s\S]*object-fit:\s*contain;/);
   assert.match(componentSource, /<ElIcon class="app-shell__link-icon"><House \/><\/ElIcon>/);
   assert.match(componentSource, /<ElIcon class="app-shell__link-icon"><EditPen \/><\/ElIcon>/);
   assert.match(componentSource, /<ElIcon class="app-shell__link-icon"><Clock \/><\/ElIcon>/);
