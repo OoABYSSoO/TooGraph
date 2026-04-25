@@ -46,3 +46,22 @@ export function formatRunDisplayName(run: RunDisplayNameSource, options: RunDisp
   const graphName = run.graph_name?.trim() || "Untitled Graph";
   return `${graphName} · ${formatRunDisplayTimestamp(run.started_at, options)}`;
 }
+
+export function formatRunDuration(durationMs: number | null | undefined) {
+  if (!Number.isFinite(durationMs) || !durationMs || durationMs <= 0) {
+    return "—";
+  }
+  if (durationMs < 1000) {
+    return `${Math.round(durationMs)}ms`;
+  }
+  const totalSeconds = Math.round(durationMs / 1000);
+  if (totalSeconds < 10) {
+    return `${(durationMs / 1000).toFixed(1)}s`;
+  }
+  if (totalSeconds < 60) {
+    return `${totalSeconds}s`;
+  }
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
+}
