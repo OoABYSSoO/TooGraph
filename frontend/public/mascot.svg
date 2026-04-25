@@ -30,10 +30,10 @@
       stroke-width="30"
       stroke-linecap="round"
       stroke-linejoin="round"
-      d="M250 142
-         C298 132 328 88 324 42
-         C320 -2 284 -28 258 -14
-         C242 -4 248 16 268 18"
+      d="M204 154
+         C260 156 314 112 322 48
+         C330 -18 282 -58 238 -42
+         C210 -30 216 2 250 8"
     />
     <path
       id="mascotSparkle"
