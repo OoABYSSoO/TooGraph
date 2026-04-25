@@ -151,6 +151,14 @@ test("ModelProvidersPage opens provider configuration in a compact popover", () 
   const configPopover = pageSource.match(/class="model-providers-page__provider-editor-panel model-providers-page__provider-editor-panel--popover"[\s\S]*?<\/ElPopover>/);
   assert.ok(configPopover, "expected provider config popover content");
   assert.doesNotMatch(configPopover[0], /settings\.enabledModels/);
+  assert.match(configPopover[0], /class="model-providers-page__provider-form-field"/);
+  assert.match(configPopover[0], /class="model-providers-page__provider-field-label"/);
+  assert.match(configPopover[0], /class="model-providers-page__provider-text-input"/);
+  assert.match(configPopover[0], /class="model-providers-page__provider-editor-footer"/);
+  assert.match(configPopover[0], /class="model-providers-page__provider-editor-footer-actions"/);
+  assert.match(pageSource, /\.model-providers-page__provider-text-input \{[\s\S]*border-radius:\s*12px;[\s\S]*box-sizing:\s*border-box;/);
+  assert.match(pageSource, /\.model-providers-page__provider-editor-panel--popover \.model-providers-page__provider-form-field \{[\s\S]*margin-top:\s*0;/);
+  assert.match(pageSource, /\.model-providers-page__provider-editor-footer \{[\s\S]*justify-content:\s*space-between;/);
 });
 
 test("ModelProvidersPage opens an add-provider panel and immediately pre-fills templates", () => {

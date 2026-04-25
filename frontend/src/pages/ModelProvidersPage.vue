@@ -322,18 +322,29 @@
                         />
                       </div>
                       <div class="model-providers-page__provider-fields">
-                        <label>
-                          <span>{{ t("settings.providerLabel") }}</span>
-                          <input v-model.trim="provider.label" type="text" @change="handleProviderDraftChange" />
+                        <label class="model-providers-page__provider-form-field">
+                          <span class="model-providers-page__provider-field-label">{{ t("settings.providerLabel") }}</span>
+                          <input
+                            v-model.trim="provider.label"
+                            class="model-providers-page__provider-text-input"
+                            type="text"
+                            @change="handleProviderDraftChange"
+                          />
                         </label>
-                        <label v-if="showBaseUrlInPrimaryFields(provider)">
-                          <span>{{ t("settings.providerBaseUrl") }}</span>
-                          <input v-model.trim="provider.base_url" type="url" @change="handleProviderDraftChange" />
+                        <label v-if="showBaseUrlInPrimaryFields(provider)" class="model-providers-page__provider-form-field">
+                          <span class="model-providers-page__provider-field-label">{{ t("settings.providerBaseUrl") }}</span>
+                          <input
+                            v-model.trim="provider.base_url"
+                            class="model-providers-page__provider-text-input"
+                            type="url"
+                            @change="handleProviderDraftChange"
+                          />
                         </label>
-                        <label>
-                          <span>{{ t("settings.providerApiKey") }}</span>
+                        <label class="model-providers-page__provider-form-field">
+                          <span class="model-providers-page__provider-field-label">{{ t("settings.providerApiKey") }}</span>
                           <input
                             v-model.trim="provider.api_key"
+                            class="model-providers-page__provider-text-input"
                             type="password"
                             autocomplete="off"
                             :placeholder="provider.api_key_configured ? t('settings.keepExistingApiKey') : t('settings.optionalApiKey')"
@@ -345,19 +356,24 @@
                         <summary>{{ t("settings.advancedProviderSettings") }}</summary>
                         <div class="model-providers-page__provider-fields">
                           <template v-if="showBaseUrlInPrimaryFields(provider)"></template>
-                          <label v-else>
-                            <span>{{ t("settings.providerBaseUrl") }}</span>
-                            <input v-model.trim="provider.base_url" type="url" @change="handleProviderDraftChange" />
+                          <label v-else class="model-providers-page__provider-form-field">
+                            <span class="model-providers-page__provider-field-label">{{ t("settings.providerBaseUrl") }}</span>
+                            <input
+                              v-model.trim="provider.base_url"
+                              class="model-providers-page__provider-text-input"
+                              type="url"
+                              @change="handleProviderDraftChange"
+                            />
                           </label>
-                          <label>
-                            <span>{{ t("settings.providerId") }}</span>
-                            <input :value="provider.provider_id" type="text" disabled />
+                          <label class="model-providers-page__provider-form-field">
+                            <span class="model-providers-page__provider-field-label">{{ t("settings.providerId") }}</span>
+                            <input :value="provider.provider_id" class="model-providers-page__provider-text-input" type="text" disabled />
                           </label>
-                          <label>
-                            <span>{{ t("settings.providerTransport") }}</span>
+                          <label class="model-providers-page__provider-form-field">
+                            <span class="model-providers-page__provider-field-label">{{ t("settings.providerTransport") }}</span>
                             <ElSelect
                               v-model="provider.transport"
-                              class="model-providers-page__select graphite-select"
+                              class="model-providers-page__select model-providers-page__provider-select graphite-select"
                               :teleported="false"
                               popper-class="graphite-select-popper"
                               @change="handleProviderDraftChange"
@@ -368,31 +384,44 @@
                               <ElOption label="Codex Responses" value="codex-responses" />
                             </ElSelect>
                           </label>
-                          <label>
-                            <span>{{ t("settings.providerAuthHeader") }}</span>
-                            <input v-model.trim="provider.auth_header" type="text" @change="handleProviderDraftChange" />
+                          <label class="model-providers-page__provider-form-field">
+                            <span class="model-providers-page__provider-field-label">{{ t("settings.providerAuthHeader") }}</span>
+                            <input
+                              v-model.trim="provider.auth_header"
+                              class="model-providers-page__provider-text-input"
+                              type="text"
+                              @change="handleProviderDraftChange"
+                            />
                           </label>
-                          <label>
-                            <span>{{ t("settings.providerAuthScheme") }}</span>
-                            <input v-model.trim="provider.auth_scheme" type="text" @change="handleProviderDraftChange" />
+                          <label class="model-providers-page__provider-form-field">
+                            <span class="model-providers-page__provider-field-label">{{ t("settings.providerAuthScheme") }}</span>
+                            <input
+                              v-model.trim="provider.auth_scheme"
+                              class="model-providers-page__provider-text-input"
+                              type="text"
+                              @change="handleProviderDraftChange"
+                            />
                           </label>
                         </div>
                       </details>
-                      <div class="model-providers-page__provider-actions">
-                        <button
-                          v-if="provider.provider_id !== 'local'"
-                          type="button"
-                          class="model-providers-page__button"
-                          @click="handleRemoveProvider(provider.provider_id)"
-                        >
-                          {{ t("settings.removeProvider") }}
-                        </button>
-                        <button type="button" class="model-providers-page__button" @click="closeProviderEditorPanel">
-                          {{ t("common.close") }}
-                        </button>
+                      <div class="model-providers-page__provider-editor-footer">
                         <span v-if="providerMessages[provider.provider_id]" class="model-providers-page__provider-message">
                           {{ providerMessages[provider.provider_id] }}
                         </span>
+                        <span v-else></span>
+                        <div class="model-providers-page__provider-editor-footer-actions">
+                          <button
+                            v-if="provider.provider_id !== 'local'"
+                            type="button"
+                            class="model-providers-page__button model-providers-page__button--danger"
+                            @click="handleRemoveProvider(provider.provider_id)"
+                          >
+                            {{ t("settings.removeProvider") }}
+                          </button>
+                          <button type="button" class="model-providers-page__button" @click="closeProviderEditorPanel">
+                            {{ t("common.close") }}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </ElPopover>
@@ -1920,11 +1949,13 @@ onBeforeUnmount(() => {
 
 .model-providers-page__provider-editor-panel--popover {
   display: grid;
-  gap: 12px;
+  gap: 14px;
   margin-top: 0;
-  padding: 14px;
-  background: rgba(255, 251, 246, 0.96);
-  box-shadow: 0 18px 38px rgba(60, 41, 20, 0.14);
+  border: 1px solid rgba(154, 52, 18, 0.12);
+  border-radius: 18px;
+  padding: 16px;
+  background: linear-gradient(180deg, rgb(255, 255, 255), rgb(255, 250, 244));
+  box-shadow: 0 22px 46px rgba(60, 41, 20, 0.16);
 }
 
 :deep(.model-providers-page__provider-editor-popper.el-popper) {
@@ -1937,6 +1968,112 @@ onBeforeUnmount(() => {
 
 .model-providers-page__provider-editor-panel--popover .model-providers-page__provider-fields {
   grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.model-providers-page__provider-editor-panel--popover .model-providers-page__provider-editor-header {
+  align-items: center;
+  border-bottom: 1px solid rgba(154, 52, 18, 0.1);
+  padding-bottom: 12px;
+}
+
+.model-providers-page__provider-editor-panel--popover .model-providers-page__badges {
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.model-providers-page__provider-editor-panel--popover .model-providers-page__badges span {
+  padding: 3px 9px;
+  background: rgba(255, 248, 240, 0.84);
+  font-size: 0.78rem;
+}
+
+.model-providers-page__provider-editor-panel--popover .model-providers-page__provider-form-field {
+  display: grid;
+  gap: 6px;
+  margin-top: 0;
+  min-width: 0;
+}
+
+.model-providers-page__provider-field-label {
+  color: rgba(60, 41, 20, 0.7);
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.model-providers-page__provider-text-input {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid rgba(154, 52, 18, 0.16);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--graphite-text-strong);
+  box-sizing: border-box;
+  font: inherit;
+  outline: none;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background 160ms ease;
+}
+
+.model-providers-page__provider-text-input:focus-visible {
+  border-color: rgba(154, 52, 18, 0.34);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 0 0 3px rgba(154, 52, 18, 0.1);
+}
+
+.model-providers-page__provider-text-input:disabled {
+  color: rgba(60, 41, 20, 0.58);
+  background: rgba(255, 248, 240, 0.68);
+}
+
+.model-providers-page__provider-select :deep(.el-select__wrapper) {
+  min-height: 42px;
+  border-radius: 12px;
+  box-shadow: 0 0 0 1px rgba(154, 52, 18, 0.16) inset;
+}
+
+.model-providers-page__provider-editor-panel--popover .model-providers-page__advanced-provider {
+  margin-top: 0;
+  border-radius: 14px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.model-providers-page__provider-editor-panel--popover .model-providers-page__advanced-provider summary {
+  min-height: 42px;
+  padding: 0 12px;
+}
+
+.model-providers-page__provider-editor-panel--popover .model-providers-page__advanced-provider[open] {
+  padding-bottom: 12px;
+}
+
+.model-providers-page__provider-editor-panel--popover .model-providers-page__advanced-provider .model-providers-page__provider-fields {
+  padding: 0 12px;
+}
+
+.model-providers-page__provider-editor-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 2px;
+}
+
+.model-providers-page__provider-editor-footer-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.model-providers-page__provider-editor-footer .model-providers-page__button {
+  min-height: 40px;
+  padding: 9px 13px;
 }
 
 .model-providers-page__provider-empty {
