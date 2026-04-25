@@ -8,7 +8,8 @@
           :disabled="busy || !run || run.status !== 'awaiting_human'"
           @click="handleResumeClick"
         >
-          {{ busy ? "Continuing..." : "Continue Run" }}
+          <ElIcon class="editor-human-review-panel__resume-icon" aria-hidden="true"><VideoPlay /></ElIcon>
+          <span>{{ busy ? "Continuing..." : "Continue Run" }}</span>
         </button>
         <div class="editor-human-review-panel__action-tools">
           <button
@@ -17,9 +18,11 @@
             class="editor-human-review-panel__focus"
             @click="$emit('focus-node', currentFocusNodeId)"
           >
-            聚焦
+            <ElIcon class="editor-human-review-panel__focus-icon" aria-hidden="true"><Coordinate /></ElIcon>
+            <span>聚焦</span>
           </button>
           <button
+            v-if="!isPausedReview"
             type="button"
             class="editor-human-review-panel__collapse"
             aria-label="Collapse human review panel"
@@ -105,7 +108,7 @@
 </template>
 
 <script setup lang="ts">
-import { ArrowRight } from "@element-plus/icons-vue";
+import { ArrowRight, Coordinate, VideoPlay } from "@element-plus/icons-vue";
 import { ElIcon } from "element-plus";
 import { computed, nextTick, ref, watch, type ComponentPublicInstance } from "vue";
 
@@ -138,6 +141,7 @@ const lastPauseContextKey = ref<string | null>(null);
 const requiredFieldRefs = new Map<string, HTMLTextAreaElement>();
 
 const panelModel = computed(() => buildHumanReviewPanelModel(props.run ?? null, props.document));
+const isPausedReview = computed(() => props.run?.status === "awaiting_human");
 const currentFocusNodeId = computed(() => props.run?.current_node_id ?? props.focusedNodeId ?? null);
 const pauseContextKey = computed(() => {
   const runId = props.run?.run_id ?? "no-run";
@@ -285,14 +289,32 @@ function handleResumeClick() {
 }
 
 .editor-human-review-panel__resume {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   min-height: 38px;
-  border: 1px solid rgba(217, 119, 6, 0.28);
+  border: 1px solid rgba(126, 46, 11, 0.34);
   border-radius: 999px;
-  background: #d97706;
-  color: #fff;
+  background: rgba(154, 52, 18, 0.92);
+  color: rgba(255, 250, 242, 0.98);
   cursor: pointer;
   font-weight: 800;
-  padding: 0 16px;
+  padding: 0 17px 0 15px;
+  box-shadow: 0 10px 22px rgba(126, 46, 11, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  transition: background-color 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+  white-space: nowrap;
+}
+
+.editor-human-review-panel__resume-icon {
+  font-size: 0.94rem;
+}
+
+.editor-human-review-panel__resume:not(:disabled):hover {
+  border-color: rgba(120, 53, 15, 0.46);
+  background: rgba(131, 43, 13, 0.95);
+  box-shadow: 0 12px 24px rgba(126, 46, 11, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.26);
+  transform: translateY(-1px);
 }
 
 .editor-human-review-panel__resume:disabled {
@@ -300,8 +322,46 @@ function handleResumeClick() {
   opacity: 0.72;
 }
 
-.editor-human-review-panel__other-toggle,
+.editor-human-review-panel__resume:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(210, 162, 117, 0.32), 0 10px 22px rgba(126, 46, 11, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
 .editor-human-review-panel__focus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  border: 1px solid rgba(154, 52, 18, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 250, 242, 0.68);
+  color: rgba(120, 53, 15, 0.88);
+  padding: 0 11px 0 10px;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34);
+  transition: background-color 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+  white-space: nowrap;
+}
+
+.editor-human-review-panel__focus-icon {
+  font-size: 0.9rem;
+}
+
+.editor-human-review-panel__focus:hover {
+  border-color: rgba(154, 52, 18, 0.26);
+  background: rgba(255, 245, 232, 0.88);
+  box-shadow: 0 8px 18px rgba(126, 46, 11, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  transform: translateY(-1px);
+}
+
+.editor-human-review-panel__focus:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(210, 162, 117, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.34);
+}
+
+.editor-human-review-panel__other-toggle {
   min-height: 32px;
   border: 1px solid rgba(154, 52, 18, 0.16);
   border-radius: 999px;

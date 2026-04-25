@@ -29,6 +29,7 @@ def list_runs_endpoint(
             {
                 **run,
                 "restorable_snapshot_available": _has_restorable_graph_snapshot(run.get("graph_snapshot")),
+                "run_snapshot_options": _build_run_snapshot_options(run),
             }
         )
         for run in list_runs()
@@ -187,6 +188,31 @@ def _has_restorable_graph_snapshot(snapshot: Any) -> bool:
     except ValidationError:
         return False
     return True
+
+
+def _build_run_snapshot_options(run: dict[str, Any]) -> list[dict[str, Any]]:
+    snapshots = run.get("run_snapshots")
+    if not isinstance(snapshots, list):
+        return []
+
+    options: list[dict[str, Any]] = []
+    for snapshot in snapshots:
+        if not isinstance(snapshot, dict):
+            continue
+        snapshot_id = str(snapshot.get("snapshot_id") or "").strip()
+        kind = str(snapshot.get("kind") or "").strip()
+        if not snapshot_id or kind not in {"pause", "completed", "failed"}:
+            continue
+        options.append(
+            {
+                "snapshot_id": snapshot_id,
+                "kind": kind,
+                "label": str(snapshot.get("label") or snapshot_id),
+                "status": str(snapshot.get("status") or ""),
+                "current_node_id": snapshot.get("current_node_id"),
+            }
+        )
+    return options
 
 
 def _resolve_resume_snapshot(previous_run: dict[str, Any], snapshot_id: str | None) -> dict[str, Any] | None:

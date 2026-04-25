@@ -33,12 +33,15 @@
       <span class="editor-action-capsule__state-count">{{ activeStateCount }}</span>
     </button>
 
-    <button type="button" class="editor-action-capsule__run" @click="$emit('run-active-graph')">Run</button>
+    <button type="button" class="editor-action-capsule__run" @click="$emit('run-active-graph')">
+      <ElIcon class="editor-action-capsule__run-icon" aria-hidden="true"><VideoPlay /></ElIcon>
+      <span>Run</span>
+    </button>
   </div>
 </template>
 
 <script setup lang="ts">
-import { CircleCheck, CollectionTag, Download, Upload } from "@element-plus/icons-vue";
+import { CircleCheck, CollectionTag, Download, Upload, VideoPlay } from "@element-plus/icons-vue";
 import { ElIcon, ElTooltip } from "element-plus";
 
 defineProps<{
@@ -144,12 +147,19 @@ defineEmits<{
 }
 
 .editor-action-capsule__run {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   border: 1px solid rgba(154, 52, 18, 0.9);
   background: rgba(154, 52, 18, 0.92);
   color: rgba(255, 250, 242, 0.98);
   padding: 0 16px;
   font-weight: 700;
   cursor: pointer;
+}
+
+.editor-action-capsule__run-icon {
+  font-size: 0.95rem;
 }
 
 .editor-action-capsule__icon-button:hover {

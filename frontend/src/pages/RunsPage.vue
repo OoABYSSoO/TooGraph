@@ -64,8 +64,22 @@
           </div>
           <div class="runs-page__card-actions">
             <button type="button" class="runs-page__detail-link" @click.stop="openRunDetail(run.run_id)">{{ runCardDetail }}</button>
-            <RouterLink v-if="canRestoreRunSummary(run)" class="runs-page__restore-link" @click.stop :to="resolveRunRestoreUrl(run.run_id)">
-              恢复编辑
+            <div v-if="restoreTargetsForRun(run).length > 1" class="runs-page__restore-switch" aria-label="选择恢复快照">
+              <button
+                v-for="target in restoreTargetsForRun(run)"
+                :key="target.key"
+                type="button"
+                class="runs-page__restore-target"
+                :class="{ 'runs-page__restore-target--active': target.key === selectedRestoreTargetKey(run) }"
+                :title="target.detail"
+                @click.stop="selectRestoreTarget(run.run_id, target.key)"
+              >
+                {{ target.label }}
+              </button>
+            </div>
+            <RouterLink v-if="canRestoreRunSummary(run)" class="runs-page__restore-link" @click.stop :to="restoreUrlForRun(run)">
+              <ElIcon class="runs-page__restore-icon" aria-hidden="true"><Promotion /></ElIcon>
+              <span>恢复编辑</span>
             </RouterLink>
           </div>
         </article>
@@ -75,9 +89,10 @@
 </template>
 
 <script setup lang="ts">
+import { Promotion } from "@element-plus/icons-vue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { ElInput, ElSegmented } from "element-plus";
+import { ElIcon, ElInput, ElSegmented } from "element-plus";
 
 import { fetchRuns } from "@/api/runs";
 import { formatRunDisplayName, formatRunDisplayTimestamp, formatRunDuration } from "@/lib/run-display-name";
@@ -85,7 +100,13 @@ import { canRestoreRunSummary, resolveRunRestoreUrl } from "@/lib/run-restore";
 import AppShell from "@/layouts/AppShell.vue";
 import type { RunSummary } from "@/types/run";
 
-import { RUN_STATUS_FILTER_OPTIONS, buildRunStatusOverview, resolveRunsCardDetail, resolveRunsEmptyAction } from "./runsPageModel.ts";
+import {
+  RUN_STATUS_FILTER_OPTIONS,
+  buildRunRestoreTargets,
+  buildRunStatusOverview,
+  resolveRunsCardDetail,
+  resolveRunsEmptyAction,
+} from "./runsPageModel.ts";
 
 const router = useRouter();
 const runs = ref<RunSummary[]>([]);
@@ -94,6 +115,7 @@ const error = ref<string | null>(null);
 const graphNameQuery = ref("");
 const statusFilter = ref("");
 const statusOptions = RUN_STATUS_FILTER_OPTIONS;
+const selectedRestoreTargetByRunId = ref<Record<string, string>>({});
 const runsEmptyAction = resolveRunsEmptyAction();
 const runCardDetail = resolveRunsCardDetail();
 const runOverview = computed(() => buildRunStatusOverview(runs.value));
@@ -134,6 +156,32 @@ function handleRunRowKeydown(event: KeyboardEvent, runId: string) {
   }
   event.preventDefault();
   openRunDetail(runId);
+}
+
+function restoreTargetsForRun(run: RunSummary) {
+  return buildRunRestoreTargets(run);
+}
+
+function selectedRestoreTargetKey(run: RunSummary) {
+  const targets = restoreTargetsForRun(run);
+  const selectedKey = selectedRestoreTargetByRunId.value[run.run_id];
+  if (selectedKey && targets.some((target) => target.key === selectedKey)) {
+    return selectedKey;
+  }
+  return targets[0]?.key ?? "current";
+}
+
+function selectRestoreTarget(runId: string, targetKey: string) {
+  selectedRestoreTargetByRunId.value = {
+    ...selectedRestoreTargetByRunId.value,
+    [runId]: targetKey,
+  };
+}
+
+function restoreUrlForRun(run: RunSummary) {
+  const selectedKey = selectedRestoreTargetKey(run);
+  const target = restoreTargetsForRun(run).find((candidate) => candidate.key === selectedKey) ?? null;
+  return resolveRunRestoreUrl(run.run_id, target?.snapshotId ?? null);
 }
 
 onMounted(loadRuns);
@@ -200,6 +248,7 @@ function statusBadgeClass(status: string) {
 .runs-page__refresh,
 .runs-page__detail-link,
 .runs-page__restore-link,
+.runs-page__restore-target,
 .runs-page__empty-action {
   display: inline-flex;
   align-items: center;
@@ -222,6 +271,7 @@ function statusBadgeClass(status: string) {
 .runs-page__refresh:hover,
 .runs-page__detail-link:hover,
 .runs-page__restore-link:hover,
+.runs-page__restore-target:hover,
 .runs-page__empty-action:hover {
   border-color: rgba(154, 52, 18, 0.3);
   background: rgba(255, 244, 232, 0.98);
@@ -363,10 +413,6 @@ function statusBadgeClass(status: string) {
   transform: translateY(-1px);
 }
 
-.runs-page__run-row:active {
-  transform: translateY(0) scale(0.995);
-}
-
 .runs-page__run-row:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px rgba(210, 162, 117, 0.3), var(--graphite-shadow-hover);
@@ -450,6 +496,57 @@ function statusBadgeClass(status: string) {
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.runs-page__restore-switch {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(154, 52, 18, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 252, 247, 0.72);
+  padding: 3px;
+}
+
+.runs-page__restore-target {
+  max-width: 150px;
+  min-height: 28px;
+  overflow: hidden;
+  border-color: transparent;
+  background: transparent;
+  padding: 0 10px;
+  color: rgba(120, 53, 15, 0.76);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runs-page__restore-target--active,
+.runs-page__restore-target--active:hover {
+  border-color: rgba(154, 52, 18, 0.2);
+  background: rgba(255, 244, 232, 0.98);
+  color: rgba(126, 46, 11, 0.98);
+  box-shadow: 0 8px 16px rgba(120, 53, 15, 0.08);
+  transform: none;
+}
+
+.runs-page__restore-link {
+  border-color: rgba(154, 52, 18, 0.72);
+  background: rgba(154, 52, 18, 0.9);
+  color: rgba(255, 250, 242, 0.98);
+  box-shadow: 0 10px 18px rgba(120, 53, 15, 0.12);
+}
+
+.runs-page__restore-link:hover {
+  border-color: rgba(131, 43, 13, 0.94);
+  background: rgba(131, 43, 13, 0.96);
+  color: rgba(255, 250, 242, 0.98);
+}
+
+.runs-page__restore-icon {
+  margin-right: 6px;
+  font-size: 0.92rem;
 }
 
 .runs-page__empty {

@@ -91,6 +91,14 @@ class RunSnapshot(BaseModel):
     final_result: str = ""
 
 
+class RunSnapshotOption(BaseModel):
+    snapshot_id: str | None = None
+    kind: str
+    label: str
+    status: str
+    current_node_id: str | None = None
+
+
 class RunLifecycleRecord(BaseModel):
     updated_at: str = ""
     paused_at: str | None = None
@@ -147,6 +155,7 @@ class RunSummary(BaseModel):
     graph_name: str
     status: str
     restorable_snapshot_available: bool = False
+    run_snapshot_options: list[RunSnapshotOption] = Field(default_factory=list)
     runtime_backend: str = ""
     lifecycle: RunLifecycleRecord = Field(default_factory=RunLifecycleRecord)
     checkpoint_metadata: CheckpointMetadata = Field(default_factory=CheckpointMetadata)

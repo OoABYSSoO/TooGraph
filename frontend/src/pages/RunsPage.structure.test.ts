@@ -11,16 +11,29 @@ const componentSource = readFileSync(resolve(currentDirectory, "RunsPage.vue"), 
 test("RunsPage keeps run cards on detail navigation while exposing an explicit restore editor action", () => {
   assert.match(componentSource, /import \{ formatRunDisplayName, formatRunDisplayTimestamp, formatRunDuration \} from "@\/lib\/run-display-name";/);
   assert.match(componentSource, /import \{ canRestoreRunSummary, resolveRunRestoreUrl \} from "@\/lib\/run-restore";/);
-  assert.match(componentSource, /import \{ RUN_STATUS_FILTER_OPTIONS, buildRunStatusOverview, resolveRunsCardDetail, resolveRunsEmptyAction \} from "\.\/runsPageModel\.ts";/);
+  assert.match(componentSource, /buildRunRestoreTargets/);
   assert.match(componentSource, /const runCardDetail = resolveRunsCardDetail\(\);/);
   assert.match(componentSource, /const router = useRouter\(\);/);
   assert.match(componentSource, /function openRunDetail\(runId: string\)/);
   assert.match(componentSource, /function handleRunRowKeydown\(event: KeyboardEvent, runId: string\)/);
   assert.match(componentSource, /v-if="canRestoreRunSummary\(run\)"/);
-  assert.match(componentSource, /:to="resolveRunRestoreUrl\(run\.run_id\)"/);
+  assert.match(componentSource, /:to="restoreUrlForRun\(run\)"/);
   assert.match(componentSource, /\{\{ formatRunDisplayName\(run\) \}\}/);
   assert.match(componentSource, /\{\{ runCardDetail \}\}/);
   assert.match(componentSource, /恢复编辑/);
+});
+
+test("RunsPage lets each restorable card choose breakpoint or final-result restore targets", () => {
+  assert.match(componentSource, /const selectedRestoreTargetByRunId = ref<Record<string, string>>\(\{\}\);/);
+  assert.match(componentSource, /function restoreTargetsForRun\(run: RunSummary\)/);
+  assert.match(componentSource, /function selectedRestoreTargetKey\(run: RunSummary\)/);
+  assert.match(componentSource, /function selectRestoreTarget\(runId: string, targetKey: string\)/);
+  assert.match(componentSource, /function restoreUrlForRun\(run: RunSummary\)/);
+  assert.match(componentSource, /class="runs-page__restore-switch"/);
+  assert.match(componentSource, /v-for="target in restoreTargetsForRun\(run\)"/);
+  assert.match(componentSource, /:class="\{ 'runs-page__restore-target--active': target\.key === selectedRestoreTargetKey\(run\) \}"/);
+  assert.match(componentSource, /:title="target\.detail"/);
+  assert.match(componentSource, /@click\.stop="selectRestoreTarget\(run\.run_id, target\.key\)"/);
 });
 
 test("RunsPage uses semantic status styling and keeps run identifiers monospace", () => {
@@ -61,10 +74,11 @@ test("RunsPage renders run cards as clickable log rows with a clear status rail"
 
 test("RunsPage separates row navigation from card action clicks", () => {
   assert.match(componentSource, /class="runs-page__detail-link"[\s\S]*@click\.stop="openRunDetail\(run\.run_id\)"/);
-  assert.match(componentSource, /class="runs-page__restore-link"[\s\S]*@click\.stop[\s\S]*:to="resolveRunRestoreUrl\(run\.run_id\)"/);
+  assert.match(componentSource, /class="runs-page__restore-link"[\s\S]*@click\.stop[\s\S]*:to="restoreUrlForRun\(run\)"/);
   assert.doesNotMatch(componentSource, /class="runs-page__card-actions" @click\.stop/);
 });
 
-test("RunsPage gives clickable run cards pressed feedback", () => {
-  assert.match(componentSource, /\.runs-page__run-row:active \{[\s\S]*transform:\s*translateY\(0\) scale\(0\.995\);/);
+test("RunsPage does not press the whole row when nested restore controls are clicked", () => {
+  assert.doesNotMatch(componentSource, /\.runs-page__run-row:active/);
+  assert.doesNotMatch(componentSource, /scale\(0\.995\)/);
 });

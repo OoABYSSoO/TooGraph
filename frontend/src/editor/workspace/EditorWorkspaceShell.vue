@@ -146,7 +146,7 @@
               :style="sidePanelLayerStyle(tab.tabId)"
             >
               <EditorHumanReviewPanel
-                v-if="sidePanelMode(tab.tabId) === 'human-review'"
+                v-if="shouldShowHumanReviewPanel(tab.tabId)"
                 :document="documentsByTabId[tab.tabId]!"
                 :run="latestRunDetailByTabId[tab.tabId] ?? null"
                 :focused-node-id="focusedNodeIdByTabId[tab.tabId] ?? null"
@@ -958,7 +958,23 @@ function sidePanelMode(tabId: string) {
   return sidePanelModeByTabId.value[tabId] ?? "state";
 }
 
+function canShowHumanReviewPanel(tabId: string) {
+  return latestRunDetailByTabId.value[tabId]?.status === "awaiting_human";
+}
+
+function shouldShowHumanReviewPanel(tabId: string) {
+  return sidePanelMode(tabId) === "human-review" && canShowHumanReviewPanel(tabId);
+}
+
+function isHumanReviewPanelLockedOpen(tabId: string) {
+  return canShowHumanReviewPanel(tabId) && sidePanelMode(tabId) === "human-review";
+}
+
 function toggleStatePanel(tabId: string) {
+  if (isHumanReviewPanelLockedOpen(tabId)) {
+    showGraphLockedEditToast();
+    return;
+  }
   statePanelOpenByTabId.value = {
     ...statePanelOpenByTabId.value,
     [tabId]: !isStatePanelOpen(tabId),
@@ -966,6 +982,9 @@ function toggleStatePanel(tabId: string) {
 }
 
 function openHumanReviewPanelForTab(tabId: string, nodeId: string | null) {
+  if (!canShowHumanReviewPanel(tabId)) {
+    return;
+  }
   closeNodeCreationMenu(tabId);
   sidePanelModeByTabId.value = {
     ...sidePanelModeByTabId.value,
@@ -1034,6 +1053,11 @@ function toggleActiveStatePanel() {
     return;
   }
   const tabId = activeTab.value.tabId;
+  if (isHumanReviewPanelLockedOpen(tabId)) {
+    openHumanReviewPanelForTab(tabId, latestRunDetailByTabId.value[tabId]?.current_node_id ?? null);
+    showGraphLockedEditToast();
+    return;
+  }
   if (sidePanelMode(tabId) !== "state") {
     sidePanelModeByTabId.value = {
       ...sidePanelModeByTabId.value,

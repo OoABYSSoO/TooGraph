@@ -8,7 +8,6 @@
             <h2 class="run-detail__title">{{ runDisplayName }}</h2>
             <p class="run-detail__body">先看运行状态和最终产出，再展开节点过程、循环信息和原始 artifacts。</p>
           </div>
-          <RouterLink v-if="canRestore" class="run-detail__restore-link" :to="restoreEditorHref">恢复编辑</RouterLink>
         </div>
 
         <div v-if="viewedRun" class="run-detail__status-console" aria-label="运行状态摘要">
@@ -27,18 +26,24 @@
           </article>
         </div>
 
-        <div v-if="snapshotOptions.length > 0" class="run-detail__snapshot-switcher">
-          <button
-            v-for="option in snapshotOptions"
-            :key="option.snapshotId"
-            class="run-detail__snapshot-chip"
-            :class="{ 'run-detail__snapshot-chip--active': option.snapshotId === selectedSnapshotId }"
-            type="button"
-            @click="selectSnapshot(option.snapshotId)"
-          >
-            <span>{{ option.label }}</span>
-            <small>{{ option.statusLabel }}</small>
-          </button>
+        <div v-if="snapshotOptions.length > 0 || canRestore" class="run-detail__restore-toolbar">
+          <div v-if="snapshotOptions.length > 0" class="run-detail__snapshot-switcher">
+            <button
+              v-for="option in snapshotOptions"
+              :key="option.snapshotId"
+              class="run-detail__snapshot-chip"
+              :class="{ 'run-detail__snapshot-chip--active': option.snapshotId === selectedSnapshotId }"
+              type="button"
+              @click="selectSnapshot(option.snapshotId)"
+            >
+              <span>{{ option.label }}</span>
+              <small>{{ option.statusLabel }}</small>
+            </button>
+          </div>
+          <RouterLink v-if="canRestore" class="run-detail__restore-link" :to="restoreEditorHref">
+            <ElIcon class="run-detail__restore-icon" aria-hidden="true"><Promotion /></ElIcon>
+            <span>恢复编辑</span>
+          </RouterLink>
         </div>
       </header>
 
@@ -213,6 +218,8 @@
 </template>
 
 <script setup lang="ts">
+import { Promotion } from "@element-plus/icons-vue";
+import { ElIcon } from "element-plus";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 
@@ -462,6 +469,17 @@ function statusBadgeClass(status: string) {
   gap: 16px;
 }
 
+.run-detail__restore-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid rgba(154, 52, 18, 0.1);
+  border-radius: 22px;
+  background: rgba(255, 252, 247, 0.68);
+  padding: 8px;
+}
+
 .run-detail__panel {
   display: grid;
   gap: 16px;
@@ -522,6 +540,19 @@ function statusBadgeClass(status: string) {
   font-weight: 800;
 }
 
+.run-detail__restore-link {
+  flex: none;
+  border-color: rgba(154, 52, 18, 0.76);
+  background: rgba(154, 52, 18, 0.92);
+  color: rgba(255, 250, 242, 0.98);
+  box-shadow: 0 12px 22px rgba(120, 53, 15, 0.13);
+}
+
+.run-detail__restore-icon {
+  margin-right: 7px;
+  font-size: 0.96rem;
+}
+
 .run-detail__restore-link:hover,
 .run-detail__snapshot-chip:hover,
 .run-detail__content-toggle:hover,
@@ -529,6 +560,12 @@ function statusBadgeClass(status: string) {
   border-color: rgba(154, 52, 18, 0.3);
   background: rgba(255, 244, 232, 0.98);
   transform: translateY(-1px);
+}
+
+.run-detail__restore-link:hover {
+  border-color: rgba(131, 43, 13, 0.96);
+  background: rgba(131, 43, 13, 0.96);
+  color: rgba(255, 250, 242, 0.98);
 }
 
 .run-detail__status-console {
@@ -574,6 +611,7 @@ function statusBadgeClass(status: string) {
 .run-detail__snapshot-switcher {
   display: flex;
   flex-wrap: wrap;
+  flex: 1;
   gap: 10px;
 }
 
@@ -744,6 +782,7 @@ function statusBadgeClass(status: string) {
 
 @media (max-width: 640px) {
   .run-detail__hero-top,
+  .run-detail__restore-toolbar,
   .run-detail__panel-heading,
   .run-detail__subcard-heading,
   .run-detail__timeline-heading {

@@ -24,8 +24,10 @@ test("EditorHumanReviewPanel renders an action-first breakpoint task panel", () 
   assert.match(componentSource, /buildHumanReviewPanelModel/);
   assert.match(componentSource, /class="editor-human-review-panel__action-bar"/);
   assert.match(componentSource, /class="editor-human-review-panel__resume"/);
+  assert.match(componentSource, /class="editor-human-review-panel__resume-icon"[\s\S]*<VideoPlay \/>/);
   assert.match(componentSource, /@click="handleResumeClick"/);
   assert.match(componentSource, /class="editor-human-review-panel__focus"/);
+  assert.match(componentSource, /class="editor-human-review-panel__focus-icon"[\s\S]*<Coordinate \/>/);
   assert.match(componentSource, /@click="\$emit\('focus-node', currentFocusNodeId\)"/);
   assert.match(componentSource, /class="editor-human-review-panel__summary"/);
   assert.match(componentSource, /\{\{ panelModel\.summaryText \}\}/);
@@ -55,10 +57,29 @@ test("EditorHumanReviewPanel renders an action-first breakpoint task panel", () 
   assert.doesNotMatch(componentSource, /pauseReason/);
 });
 
+test("EditorHumanReviewPanel keeps the resume button aligned with the warm run action style", () => {
+  assert.match(componentSource, /import \{ ArrowRight, Coordinate, VideoPlay \} from "@element-plus\/icons-vue";/);
+  assert.match(componentSource, /\.editor-human-review-panel__resume \{[\s\S]*display:\s*inline-flex;/);
+  assert.match(componentSource, /\.editor-human-review-panel__resume \{[\s\S]*background:\s*rgba\(154,\s*52,\s*18,\s*0\.92\);/);
+  assert.doesNotMatch(componentSource, /\.editor-human-review-panel__resume \{[\s\S]*background:\s*#d97706;/);
+});
+
+test("EditorHumanReviewPanel renders the focus action as a quiet secondary locator button", () => {
+  assert.match(componentSource, /\.editor-human-review-panel__focus \{[\s\S]*display:\s*inline-flex;/);
+  assert.match(componentSource, /\.editor-human-review-panel__focus \{[\s\S]*background:\s*rgba\(255,\s*250,\s*242,\s*0\.68\);/);
+  assert.match(componentSource, /\.editor-human-review-panel__focus-icon \{[\s\S]*font-size:\s*0\.9rem;/);
+});
+
 test("EditorHumanReviewPanel keeps the continue guard message near the action bar", () => {
   assert.match(componentSource, /const resumeGuardMessage = ref<string \| null>\(null\);/);
   assert.match(componentSource, /class="editor-human-review-panel__guard"/);
   assert.match(componentSource, /还有 \$\{remainingEmptyRequiredDraftCount\.value\} 项需要填写/);
+});
+
+test("EditorHumanReviewPanel does not offer collapse while a graph is paused for human review", () => {
+  assert.match(componentSource, /const isPausedReview = computed\(\(\) => props\.run\?\.status === "awaiting_human"\);/);
+  assert.match(componentSource, /v-if="!isPausedReview"/);
+  assert.match(componentSource, /aria-label="Collapse human review panel"/);
 });
 
 test("EditorHumanReviewPanel uses the shared right-side glass inspector surface", () => {

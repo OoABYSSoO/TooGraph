@@ -80,7 +80,7 @@ test("EditorWorkspaceShell floats the right side panel above the canvas while pr
   assert.doesNotMatch(componentSource, /\.editor-workspace-shell \{[\s\S]*height:\s*100vh;/);
   assert.match(componentSource, /class="editor-workspace-shell__side-panel-layer"/);
   assert.match(componentSource, /v-if="isStatePanelOpen\(tab\.tabId\) && documentsByTabId\[tab\.tabId\]"/);
-  assert.match(componentSource, /<EditorHumanReviewPanel[\s\S]*v-if="sidePanelMode\(tab\.tabId\) === 'human-review'"/);
+  assert.match(componentSource, /<EditorHumanReviewPanel[\s\S]*v-if="shouldShowHumanReviewPanel\(tab\.tabId\)"/);
   assert.match(componentSource, /<EditorStatePanel[\s\S]*v-else/);
   assert.match(componentSource, /:style="sidePanelLayerStyle\(tab\.tabId\)"/);
   assert.match(componentSource, /class="editor-workspace-shell__editor-main"[\s\S]*:style="editorMainStyle\(tab\.tabId\)"/);
@@ -128,18 +128,34 @@ test("EditorWorkspaceShell imports marked GraphiteUI Python files as new graph t
 test("EditorWorkspaceShell opens the right sidebar in Human Review mode for awaiting-human runs", () => {
   assert.match(componentSource, /import EditorHumanReviewPanel from "\.\/EditorHumanReviewPanel\.vue";/);
   assert.match(componentSource, /const sidePanelModeByTabId = ref<Record<string, "state" \| "human-review">>\(\{\}\);/);
+  assert.match(componentSource, /function canShowHumanReviewPanel\(tabId: string\)/);
+  assert.match(componentSource, /function shouldShowHumanReviewPanel\(tabId: string\)/);
   assert.match(componentSource, /function openHumanReviewPanelForTab\(tabId: string, nodeId: string \| null\)/);
   assert.match(componentSource, /@open-human-review="openHumanReviewPanelForTab\(tab\.tabId, \$event\.nodeId\)"/);
   assert.match(componentSource, /<EditorHumanReviewPanel/);
   assert.match(componentSource, /class="editor-workspace-shell__side-panel-layer"/);
   assert.match(componentSource, /v-if="isStatePanelOpen\(tab\.tabId\) && documentsByTabId\[tab\.tabId\]"/);
-  assert.match(componentSource, /<EditorHumanReviewPanel[\s\S]*v-if="sidePanelMode\(tab\.tabId\) === 'human-review'"/);
+  assert.match(componentSource, /<EditorHumanReviewPanel[\s\S]*v-if="shouldShowHumanReviewPanel\(tab\.tabId\)"/);
   assert.match(componentSource, /:run="latestRunDetailByTabId\[tab\.tabId\] \?\? null"/);
   assert.match(componentSource, /if \(run\.status === "awaiting_human" && run\.current_node_id\) \{/);
   assert.match(componentSource, /openHumanReviewPanelForTab\(tabId, run\.current_node_id\);/);
   assert.match(componentSource, /if \(visualRun\.status === "awaiting_human" && visualRun\.current_node_id\) \{/);
   assert.match(componentSource, /openHumanReviewPanelForTab\(tab\.tabId, visualRun\.current_node_id\);/);
   assert.match(componentSource, /<EditorStatePanel[\s\S]*v-else[\s\S]*:run="latestRunDetailByTabId\[tab\.tabId\] \?\? null"/);
+});
+
+test("EditorWorkspaceShell keeps Human Review locked open while awaiting human input", () => {
+  const toggleStatePanelSource = componentSource.match(/function toggleStatePanel\(tabId: string\) \{[\s\S]*?\n\}/)?.[0] ?? "";
+  const toggleActiveStatePanelSource = componentSource.match(/function toggleActiveStatePanel\(\) \{[\s\S]*?function editorMainStyle/)?.[0] ?? "";
+  const openHumanReviewSource = componentSource.match(/function openHumanReviewPanelForTab\(tabId: string, nodeId: string \| null\) \{[\s\S]*?\n\}/)?.[0] ?? "";
+
+  assert.match(componentSource, /function isHumanReviewPanelLockedOpen\(tabId: string\)/);
+  assert.match(componentSource, /return canShowHumanReviewPanel\(tabId\) && sidePanelMode\(tabId\) === "human-review";/);
+  assert.match(toggleStatePanelSource, /if \(isHumanReviewPanelLockedOpen\(tabId\)\) \{/);
+  assert.match(toggleActiveStatePanelSource, /if \(isHumanReviewPanelLockedOpen\(tabId\)\) \{/);
+  assert.match(toggleActiveStatePanelSource, /openHumanReviewPanelForTab\(tabId, latestRunDetailByTabId\.value\[tabId\]\?\.current_node_id \?\? null\);/);
+  assert.match(openHumanReviewSource, /if \(!canShowHumanReviewPanel\(tabId\)\) \{/);
+  assert.match(openHumanReviewSource, /return;/);
 });
 
 test("EditorWorkspaceShell resumes restored pause snapshots against their original snapshot checkpoint", () => {

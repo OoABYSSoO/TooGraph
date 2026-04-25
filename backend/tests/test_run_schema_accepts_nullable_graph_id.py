@@ -24,6 +24,29 @@ class RunSchemaNullableGraphIdTests(unittest.TestCase):
         self.assertIsNone(summary.graph_id)
         self.assertEqual(summary.graph_name, "Unsaved Graph")
 
+    def test_run_summary_accepts_lightweight_snapshot_options(self) -> None:
+        summary = RunSummary.model_validate(
+            {
+                "run_id": "run_test",
+                "graph_id": None,
+                "graph_name": "Unsaved Graph",
+                "status": "completed",
+                "started_at": "2026-04-16T12:00:00Z",
+                "run_snapshot_options": [
+                    {
+                        "snapshot_id": "pause_1",
+                        "kind": "pause",
+                        "label": "Paused at writer",
+                        "status": "awaiting_human",
+                        "current_node_id": "writer",
+                    }
+                ],
+            }
+        )
+
+        self.assertEqual(summary.run_snapshot_options[0].snapshot_id, "pause_1")
+        self.assertEqual(summary.run_snapshot_options[0].kind, "pause")
+
     def test_run_detail_accepts_null_graph_id(self) -> None:
         detail = RunDetail.model_validate(
             {

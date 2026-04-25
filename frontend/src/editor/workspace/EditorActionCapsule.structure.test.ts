@@ -9,6 +9,7 @@ const currentDirectory = dirname(currentFilePath);
 const componentSource = readFileSync(resolve(currentDirectory, "EditorActionCapsule.vue"), "utf8");
 
 test("EditorActionCapsule keeps graph tools compact while preserving Run as the only primary action", () => {
+  assert.match(componentSource, /import \{ CircleCheck, CollectionTag, Download, Upload, VideoPlay \} from "@element-plus\/icons-vue";/);
   assert.match(componentSource, /import \{ ElIcon, ElTooltip \} from "element-plus";/);
   assert.match(
     componentSource,
@@ -16,6 +17,7 @@ test("EditorActionCapsule keeps graph tools compact while preserving Run as the 
   );
   assert.match(componentSource, /:class="\{ 'editor-action-capsule__state-pill--active': isStatePanelOpen \}"/);
   assert.match(componentSource, /<span class="editor-action-capsule__state-count">\{\{ activeStateCount \}\}<\/span>/);
+  assert.match(componentSource, /class="editor-action-capsule__run-icon"[\s\S]*<VideoPlay \/>/);
   assert.match(componentSource, /@click="\$emit\('toggle-state-panel'\)"/);
   assert.match(componentSource, /@click="\$emit\('run-active-graph'\)"/);
 });

@@ -74,6 +74,99 @@ class RunGraphSnapshotTest(unittest.TestCase):
                 self.assertTrue(runs[restorable_run["run_id"]]["restorable_snapshot_available"])
                 self.assertFalse(runs[malformed_run["run_id"]]["restorable_snapshot_available"])
 
+    def test_run_list_exposes_lightweight_snapshot_restore_options(self) -> None:
+        run = create_initial_run_state(
+            graph_id="graph_valid",
+            graph_name="可切换快照运行",
+            max_revision_round=1,
+        )
+        run["runtime_backend"] = "langgraph"
+        run["graph_snapshot"] = {
+            "graph_id": "graph_valid",
+            "name": "可切换快照运行",
+            "state_schema": {},
+            "nodes": {},
+            "edges": [],
+            "conditional_edges": [],
+            "metadata": {},
+        }
+        run["run_snapshots"] = [
+            {
+                "snapshot_id": "pause_1",
+                "kind": "pause",
+                "label": "Paused at writer",
+                "created_at": "2026-04-16T12:00:10Z",
+                "status": "awaiting_human",
+                "current_node_id": "writer",
+                "checkpoint_metadata": {"available": True},
+                "state_snapshot": {"values": {}, "last_writers": {}},
+                "graph_snapshot": run["graph_snapshot"],
+                "artifacts": {},
+                "node_status_map": {},
+                "output_previews": [],
+            },
+            {
+                "snapshot_id": "completed_1",
+                "kind": "completed",
+                "label": "Completed",
+                "created_at": "2026-04-16T12:00:20Z",
+                "status": "completed",
+                "current_node_id": None,
+                "checkpoint_metadata": {"available": True},
+                "state_snapshot": {"values": {}, "last_writers": {}},
+                "graph_snapshot": run["graph_snapshot"],
+                "artifacts": {},
+                "node_status_map": {},
+                "output_previews": [],
+            },
+        ]
+        set_run_status(run, "completed")
+        touch_run_lifecycle(run)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            graph_dir = root / "graphs"
+            run_dir = root / "runs"
+            checkpoint_dir = root / "checkpoints"
+            data_dir = root / "data"
+            db_path = data_dir / "graphiteui.db"
+
+            with (
+                patch("app.core.storage.database.DATA_DIR", data_dir),
+                patch("app.core.storage.database.DB_PATH", db_path),
+                patch("app.core.storage.database.GRAPH_DATA_DIR", graph_dir),
+                patch("app.core.storage.database.RUN_DATA_DIR", run_dir),
+                patch("app.core.storage.database.CHECKPOINT_DATA_DIR", checkpoint_dir),
+                patch("app.core.storage.run_store.RUN_DATA_DIR", run_dir),
+                patch("app.core.langgraph.checkpoints.CHECKPOINT_DATA_DIR", checkpoint_dir),
+            ):
+                save_run(run)
+
+                with TestClient(app) as client:
+                    response = client.get("/api/runs")
+
+                self.assertEqual(response.status_code, 200, response.text)
+                [run_summary] = response.json()
+                self.assertEqual(
+                    run_summary["run_snapshot_options"],
+                    [
+                        {
+                            "snapshot_id": "pause_1",
+                            "kind": "pause",
+                            "label": "Paused at writer",
+                            "status": "awaiting_human",
+                            "current_node_id": "writer",
+                        },
+                        {
+                            "snapshot_id": "completed_1",
+                            "kind": "completed",
+                            "label": "Completed",
+                            "status": "completed",
+                            "current_node_id": None,
+                        },
+                    ],
+                )
+
     def test_run_uses_request_payload_without_auto_saving_main_graph(self) -> None:
         template = load_template_record("cycle_counter_demo")
         payload = {
