@@ -46,8 +46,48 @@ LOCAL_RUNTIME_CONFIG_CACHE_TTL_SEC = 5.0
 _LOCAL_RUNTIME_CONFIG_CACHE: tuple[float, dict[str, Any] | None] | None = None
 
 
+def _get_saved_local_provider_config() -> dict[str, Any]:
+    saved_settings = load_app_settings()
+    providers = saved_settings.get("model_providers")
+    if not isinstance(providers, dict):
+        return {}
+    provider = providers.get("local")
+    return provider if isinstance(provider, dict) else {}
+
+
+def get_local_llm_base_url() -> str:
+    provider = _get_saved_local_provider_config()
+    saved_base_url = str(provider.get("base_url") or "").strip().rstrip("/")
+    return saved_base_url or LOCAL_LLM_BASE_URL
+
+
+def get_local_llm_api_key() -> str:
+    provider = _get_saved_local_provider_config()
+    saved_api_key = str(provider.get("api_key") or "").strip()
+    return saved_api_key or LOCAL_LLM_API_KEY
+
+
+def get_saved_local_provider_model_names() -> list[str]:
+    provider = _get_saved_local_provider_config()
+    models = provider.get("models")
+    if not isinstance(models, list):
+        return []
+    names: list[str] = []
+    for model in models:
+        if not isinstance(model, dict):
+            continue
+        name = str(model.get("model") or model.get("id") or "").strip()
+        if name:
+            names.append(name)
+    return _dedupe_strings(names)
+
+
+def has_local_llm_api_key_configured() -> bool:
+    return bool(get_local_llm_api_key().strip())
+
+
 def _get_gateway_base_url() -> str:
-    trimmed = LOCAL_LLM_BASE_URL.rstrip("/")
+    trimmed = get_local_llm_base_url().rstrip("/")
     return trimmed[:-3] if trimmed.endswith("/v1") else trimmed
 
 
@@ -111,6 +151,9 @@ def get_local_route_model_names() -> list[str]:
     ).strip()
     if configured_model:
         return [configured_model]
+    saved_models = get_saved_local_provider_model_names()
+    if saved_models:
+        return saved_models
     return [DEFAULT_LOCAL_MODEL_ALIAS]
 
 
@@ -185,13 +228,13 @@ def _extract_chat_completion_text(response_payload: dict[str, Any]) -> tuple[str
 
 def _request_local_chat_completion(request_payload: dict[str, Any]) -> dict[str, Any]:
     headers = {
-        "Authorization": f"Bearer {LOCAL_LLM_API_KEY}",
+        "Authorization": f"Bearer {get_local_llm_api_key()}",
         "Content-Type": "application/json",
     }
 
     try:
         with httpx.Client(timeout=LOCAL_LLM_REQUEST_TIMEOUT_SEC, trust_env=False) as client:
-            response = client.post(f"{LOCAL_LLM_BASE_URL}/chat/completions", headers=headers, json=request_payload)
+            response = client.post(f"{get_local_llm_base_url()}/chat/completions", headers=headers, json=request_payload)
             response.raise_for_status()
             payload = response.json()
     except httpx.HTTPStatusError as exc:  # pragma: no cover - network path
@@ -275,7 +318,7 @@ def _chat_with_local_model_with_meta(
         raise RuntimeError("Local LLM returned an empty response.")
 
     return content, {
-        "base_url": LOCAL_LLM_BASE_URL,
+        "base_url": get_local_llm_base_url(),
         "model": response_payload.get("model") or request_payload["model"],
         "provider_id": provider_id,
         "temperature": temperature,
@@ -331,7 +374,7 @@ def generate_hello_greeting(state: dict[str, Any], params: dict[str, Any] | None
             max_tokens=int(params.get("max_tokens", 120)),
         )
         llm_response: dict[str, Any] = {
-            "base_url": LOCAL_LLM_BASE_URL,
+            "base_url": get_local_llm_base_url(),
             "model": model_name,
         }
     except RuntimeError as exc:  # pragma: no cover - fallback path depends on local model availability
@@ -340,7 +383,7 @@ def generate_hello_greeting(state: dict[str, Any], params: dict[str, Any] | None
             "最后运行整条流程观察输出结果。"
         )
         llm_response = {
-            "base_url": LOCAL_LLM_BASE_URL,
+            "base_url": get_local_llm_base_url(),
             "model": model_name,
             "fallback": True,
             "reason": str(exc),
@@ -351,6 +394,40 @@ def generate_hello_greeting(state: dict[str, Any], params: dict[str, Any] | None
         "final_result": greeting,
         "llm_response": llm_response,
     }
+
+
+def discover_openai_compatible_models(*, base_url: str, api_key: str = "") -> list[str]:
+    normalized_base_url = str(base_url or "").strip().rstrip("/")
+    if not normalized_base_url.startswith(("http://", "https://")):
+        raise RuntimeError("Base URL must start with http:// or https://.")
+
+    headers = {"Content-Type": "application/json"}
+    if str(api_key or "").strip():
+        headers["Authorization"] = f"Bearer {str(api_key).strip()}"
+
+    try:
+        with httpx.Client(timeout=8.0, trust_env=False) as client:
+            response = client.get(f"{normalized_base_url}/models", headers=headers)
+            response.raise_for_status()
+            payload = response.json()
+    except httpx.HTTPStatusError as exc:
+        detail = exc.response.text.strip()
+        raise RuntimeError(f"Model discovery failed: HTTP {exc.response.status_code} {detail[:300]}") from exc
+    except httpx.HTTPError as exc:
+        raise RuntimeError(f"Model discovery failed: {exc}") from exc
+    except ValueError as exc:
+        raise RuntimeError(f"Model discovery returned invalid JSON: {exc}") from exc
+
+    data = payload.get("data") if isinstance(payload, dict) else None
+    if not isinstance(data, list):
+        raise RuntimeError("Model discovery returned an unexpected payload shape.")
+
+    model_ids = [
+        str(item.get("id") or "").strip()
+        for item in data
+        if isinstance(item, dict) and str(item.get("id") or "").strip()
+    ]
+    return _dedupe_strings(model_ids)
 
 
 def output_usage_introduction(state: dict[str, Any], params: dict[str, Any] | None = None) -> dict[str, Any]:

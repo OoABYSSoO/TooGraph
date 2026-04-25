@@ -64,6 +64,58 @@
             </div>
           </article>
 
+          <article v-if="providerDraft" class="settings-page__panel settings-page__panel--wide">
+            <div class="settings-page__panel-heading">
+              <h3>{{ t("settings.openAiCompatibleProvider") }}</h3>
+              <span v-if="providerDraft.api_key_configured" class="settings-page__provider-status">{{ t("settings.apiKeyStored") }}</span>
+            </div>
+            <label>
+              <span>{{ t("settings.providerLabel") }}</span>
+              <input v-model.trim="providerDraft.label" type="text" />
+            </label>
+            <label>
+              <span>{{ t("settings.providerBaseUrl") }}</span>
+              <input v-model.trim="providerDraft.base_url" type="url" placeholder="http://127.0.0.1:8888/v1" />
+            </label>
+            <label>
+              <span>{{ t("settings.providerApiKey") }}</span>
+              <input
+                v-model.trim="providerDraft.api_key"
+                type="password"
+                autocomplete="off"
+                :placeholder="providerDraft.api_key_configured ? t('settings.keepExistingApiKey') : t('settings.optionalApiKey')"
+              />
+            </label>
+            <div class="settings-page__provider-actions">
+              <button
+                type="button"
+                class="settings-page__button settings-page__button--primary"
+                :disabled="isDiscoveringModels"
+                @click="handleDiscoverModels"
+              >
+                {{ isDiscoveringModels ? t("settings.discoveringModels") : t("settings.discoverModels") }}
+              </button>
+              <span v-if="providerMessage" class="settings-page__provider-message">{{ providerMessage }}</span>
+            </div>
+            <label>
+              <span>{{ t("settings.enabledModels") }}</span>
+              <ElSelect
+                v-model="providerDraft.selected_models"
+                class="settings-page__select graphite-select"
+                multiple
+                filterable
+                allow-create
+                default-first-option
+                :reserve-keyword="false"
+                :teleported="false"
+                popper-class="graphite-select-popper"
+              >
+                <ElOption v-for="modelName in providerModelOptions" :key="modelName" :label="modelName" :value="modelName" />
+              </ElSelect>
+            </label>
+            <div class="settings-page__hint">{{ t("settings.providerHint") }}</div>
+          </article>
+
           <article class="settings-page__panel">
             <h3>{{ t("settings.revisionEvaluator") }}</h3>
             <div class="settings-page__info"><span>{{ t("settings.maxRevisionRounds") }}</span><strong>{{ settings.revision.max_revision_round }}</strong></div>
@@ -114,7 +166,7 @@ import { computed, onMounted, ref } from "vue";
 import { ElOption, ElSelect } from "element-plus";
 import { useI18n } from "vue-i18n";
 
-import { fetchSettings, updateSettings } from "@/api/settings";
+import { discoverModelProviderModels, fetchSettings, updateSettings } from "@/api/settings";
 import AppShell from "@/layouts/AppShell.vue";
 import type { SettingsPayload } from "@/types/settings";
 
@@ -126,13 +178,46 @@ type SettingsDraft = {
   thinking_enabled: boolean;
   temperature: number;
 };
+type LocalProviderDraft = {
+  label: string;
+  base_url: string;
+  api_key: string;
+  api_key_configured: boolean;
+  discovered_models: string[];
+  selected_models: string[];
+};
+type SettingsModel = NonNullable<SettingsPayload["model_catalog"]>["providers"][number]["models"][number];
+
+const DEFAULT_LOCAL_PROVIDER_LABEL = "OpenAI-compatible Custom Provider";
+const DEFAULT_LOCAL_PROVIDER_BASE_URL = "http://127.0.0.1:8888/v1";
 
 const settings = ref<SettingsPayload | null>(null);
 const draft = ref<SettingsDraft | null>(null);
+const providerDraft = ref<LocalProviderDraft | null>(null);
 const error = ref<string | null>(null);
 const saveMessage = ref<string | null>(null);
+const providerMessage = ref<string | null>(null);
 const isSaving = ref(false);
+const isDiscoveringModels = ref(false);
 const { t } = useI18n();
+
+function dedupeStrings(values: string[]) {
+  const items: string[] = [];
+  const seen = new Set<string>();
+  for (const rawValue of values) {
+    const value = rawValue.trim();
+    if (!value) {
+      continue;
+    }
+    const identity = value.toLowerCase();
+    if (seen.has(identity)) {
+      continue;
+    }
+    seen.add(identity);
+    items.push(value);
+  }
+  return items;
+}
 
 function buildDraftFromSettings(payload: SettingsPayload): SettingsDraft {
   return {
@@ -141,6 +226,10 @@ function buildDraftFromSettings(payload: SettingsPayload): SettingsDraft {
     thinking_enabled: payload.agent_runtime_defaults?.thinking_enabled ?? true,
     temperature: payload.agent_runtime_defaults?.temperature ?? 0.2,
   };
+}
+
+function getLocalProvider(payload: SettingsPayload) {
+  return payload.model_catalog?.providers.find((provider) => provider.provider_id === "local") ?? null;
 }
 
 function formatModelChoiceLabel(modelRef: string) {
@@ -157,6 +246,34 @@ function getConcreteModelName(model: {
   route_target?: string | null;
 }) {
   return model.route_target?.trim() || model.label?.trim() || model.model?.trim() || formatModelChoiceLabel(model.model_ref);
+}
+
+function getModelName(model: Pick<SettingsModel, "model" | "model_ref">) {
+  return model.model?.trim() || formatModelChoiceLabel(model.model_ref);
+}
+
+function buildProviderDraftFromSettings(payload: SettingsPayload): LocalProviderDraft {
+  const localProvider = getLocalProvider(payload);
+  const modelNames = dedupeStrings((localProvider?.models ?? []).map((model) => getModelName(model)));
+  return {
+    label: localProvider?.label ?? DEFAULT_LOCAL_PROVIDER_LABEL,
+    base_url: localProvider?.base_url ?? DEFAULT_LOCAL_PROVIDER_BASE_URL,
+    api_key: "",
+    api_key_configured: Boolean(localProvider?.api_key_configured),
+    discovered_models: modelNames,
+    selected_models: modelNames,
+  };
+}
+
+function providerDraftFingerprint(value: LocalProviderDraft | null) {
+  if (!value) {
+    return "";
+  }
+  return JSON.stringify({
+    label: value.label.trim() || DEFAULT_LOCAL_PROVIDER_LABEL,
+    base_url: value.base_url.trim().replace(/\/+$/, ""),
+    selected_models: dedupeStrings(value.selected_models),
+  });
 }
 
 function buildModelDisplayLookup(
@@ -185,7 +302,22 @@ function buildModelDisplayLookup(
 }
 
 const configuredModels = computed(
-  () => (settings.value?.model_catalog?.providers ?? []).filter((provider) => provider.configured).flatMap((provider) => provider.models),
+  () => {
+    const configuredProviderModels = (settings.value?.model_catalog?.providers ?? [])
+      .filter((provider) => provider.configured)
+      .flatMap((provider) => provider.models)
+      .filter((model) => !providerDraft.value || !model.model_ref.startsWith("local/"));
+
+    const localDraftModels =
+      providerDraft.value?.selected_models.map((modelName) => ({
+        model_ref: `local/${modelName}`,
+        model: modelName,
+        label: modelName,
+        route_target: null,
+      })) ?? [];
+
+    return [...localDraftModels, ...configuredProviderModels];
+  },
 );
 const modelDisplayLookup = computed(() => buildModelDisplayLookup(configuredModels.value));
 const configuredModelOptions = computed(() =>
@@ -201,6 +333,9 @@ const configuredModelOptions = computed(() =>
     ).values(),
   ),
 );
+const providerModelOptions = computed(() =>
+  dedupeStrings([...(providerDraft.value?.discovered_models ?? []), ...(providerDraft.value?.selected_models ?? [])]),
+);
 const thinkingMode = computed({
   get: () => (draft.value?.thinking_enabled ? "on" : "off"),
   set: (value: string) => {
@@ -214,16 +349,93 @@ const isDirty = computed(() => {
   if (!settings.value || !draft.value) {
     return false;
   }
-  return JSON.stringify(draft.value) !== JSON.stringify(buildDraftFromSettings(settings.value));
+  const runtimeChanged = JSON.stringify(draft.value) !== JSON.stringify(buildDraftFromSettings(settings.value));
+  const providerChanged =
+    providerDraftFingerprint(providerDraft.value) !== providerDraftFingerprint(buildProviderDraftFromSettings(settings.value)) ||
+    Boolean(providerDraft.value?.api_key.trim());
+  return runtimeChanged || providerChanged;
 });
+
+function extractLocalModelName(modelRef: string) {
+  const trimmed = modelRef.trim();
+  if (!trimmed) {
+    return "";
+  }
+  if (trimmed.includes("/") && !trimmed.startsWith("local/")) {
+    return "";
+  }
+  return trimmed.includes("/") ? trimmed.split("/").slice(1).join("/") : trimmed;
+}
+
+function alignDefaultModelsToProviderSelection(modelNames: string[]) {
+  if (!draft.value || modelNames.length === 0) {
+    return;
+  }
+  const selected = new Set(modelNames.map((modelName) => modelName.toLowerCase()));
+  const fallbackRef = `local/${modelNames[0]}`;
+  const textModelName = extractLocalModelName(draft.value.text_model_ref);
+  const videoModelName = extractLocalModelName(draft.value.video_model_ref);
+  if (textModelName && !selected.has(textModelName.toLowerCase())) {
+    draft.value.text_model_ref = fallbackRef;
+  }
+  if (videoModelName && !selected.has(videoModelName.toLowerCase())) {
+    draft.value.video_model_ref = fallbackRef;
+  }
+}
+
+function buildLocalProviderModelsForSave() {
+  if (!providerDraft.value || !draft.value) {
+    return [];
+  }
+  return dedupeStrings([
+    ...providerDraft.value.selected_models,
+    extractLocalModelName(draft.value.text_model_ref),
+    extractLocalModelName(draft.value.video_model_ref),
+  ]).map((modelName) => ({
+    model: modelName,
+    label: modelName,
+  }));
+}
 
 async function loadSettings() {
   try {
     settings.value = await fetchSettings();
     draft.value = buildDraftFromSettings(settings.value);
+    providerDraft.value = buildProviderDraftFromSettings(settings.value);
     error.value = null;
   } catch (fetchError) {
     error.value = fetchError instanceof Error ? fetchError.message : t("common.loadingSettings");
+  }
+}
+
+async function handleDiscoverModels() {
+  if (!providerDraft.value) {
+    return;
+  }
+  if (!providerDraft.value.base_url.trim()) {
+    providerMessage.value = t("settings.baseUrlRequired");
+    return;
+  }
+
+  try {
+    isDiscoveringModels.value = true;
+    providerMessage.value = null;
+    const result = await discoverModelProviderModels({
+      base_url: providerDraft.value.base_url,
+      api_key: providerDraft.value.api_key,
+    });
+    const discoveredModels = dedupeStrings(result.models);
+    providerDraft.value.discovered_models = discoveredModels;
+    providerDraft.value.selected_models = dedupeStrings([...providerDraft.value.selected_models, ...discoveredModels]);
+    alignDefaultModelsToProviderSelection(providerDraft.value.selected_models);
+    providerMessage.value =
+      discoveredModels.length > 0
+        ? t("settings.discoveredModelCount", { count: discoveredModels.length })
+        : t("settings.noModelsDiscovered");
+  } catch (discoverError) {
+    providerMessage.value = discoverError instanceof Error ? discoverError.message : t("common.failedToLoad", { error: "" });
+  } finally {
+    isDiscoveringModels.value = false;
   }
 }
 
@@ -244,8 +456,19 @@ async function handleSave() {
         thinking_enabled: draft.value.thinking_enabled,
         temperature: clampSettingsTemperature(draft.value.temperature),
       },
+      model_providers: providerDraft.value
+        ? {
+            local: {
+              label: providerDraft.value.label || DEFAULT_LOCAL_PROVIDER_LABEL,
+              base_url: providerDraft.value.base_url || DEFAULT_LOCAL_PROVIDER_BASE_URL,
+              api_key: providerDraft.value.api_key || undefined,
+              models: buildLocalProviderModelsForSave(),
+            },
+          }
+        : undefined,
     });
     draft.value = buildDraftFromSettings(settings.value);
+    providerDraft.value = buildProviderDraftFromSettings(settings.value);
     saveMessage.value = t("settings.saved");
     error.value = null;
   } catch (saveError) {
@@ -313,6 +536,21 @@ onMounted(loadSettings);
   margin-top: 0;
 }
 
+.settings-page__panel--wide {
+  grid-column: span 2;
+}
+
+.settings-page__panel-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settings-page__panel-heading h3 {
+  margin: 0;
+}
+
 .settings-page__panel label {
   display: grid;
   gap: 8px;
@@ -352,6 +590,14 @@ onMounted(loadSettings);
   margin-top: 14px;
 }
 
+.settings-page__provider-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+
 .settings-page__button {
   border: 1px solid rgba(154, 52, 18, 0.2);
   border-radius: 14px;
@@ -361,6 +607,11 @@ onMounted(loadSettings);
   cursor: pointer;
 }
 
+.settings-page__button--primary {
+  background: rgb(154, 52, 18);
+  color: rgb(255, 248, 240);
+}
+
 .settings-page__button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
@@ -368,6 +619,20 @@ onMounted(loadSettings);
 
 .settings-page__save-message {
   color: rgba(60, 41, 20, 0.72);
+}
+
+.settings-page__provider-message,
+.settings-page__provider-status {
+  color: rgba(60, 41, 20, 0.72);
+  font-size: 0.86rem;
+}
+
+.settings-page__provider-status {
+  border: 1px solid rgba(154, 52, 18, 0.12);
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: rgba(255, 248, 240, 0.92);
+  white-space: nowrap;
 }
 
 .settings-page__info {
@@ -420,6 +685,10 @@ onMounted(loadSettings);
 @media (max-width: 1100px) {
   .settings-page__grid {
     grid-template-columns: 1fr;
+  }
+
+  .settings-page__panel--wide {
+    grid-column: auto;
   }
 }
 </style>

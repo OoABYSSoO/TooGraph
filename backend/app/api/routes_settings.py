@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from app.core.model_catalog import (
     build_model_catalog,
@@ -11,8 +11,9 @@ from app.core.model_catalog import (
     normalize_model_ref,
     resolve_runtime_model_name,
 )
-from app.core.storage.settings_store import save_app_settings
+from app.core.storage.settings_store import load_app_settings, save_app_settings
 from app.tools.local_llm import (
+    discover_openai_compatible_models,
     get_default_agent_temperature,
     get_default_agent_thinking_enabled,
 )
@@ -37,11 +38,78 @@ class AgentRuntimeDefaultsPayload(BaseModel):
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
 
+class SettingsProviderModelPayload(BaseModel):
+    model: str = Field(min_length=1)
+    label: str | None = None
+
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
+
+
+class SettingsModelProviderPayload(BaseModel):
+    label: str | None = None
+    base_url: str = Field(alias="base_url", min_length=1)
+    api_key: str | None = Field(default=None, alias="api_key")
+    models: list[SettingsProviderModelPayload] = Field(default_factory=list)
+
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
+
+
 class SettingsUpdatePayload(BaseModel):
     model: SettingsModelPayload
     agent_runtime_defaults: AgentRuntimeDefaultsPayload = Field(alias="agent_runtime_defaults")
+    model_providers: dict[str, SettingsModelProviderPayload] | None = Field(default=None, alias="model_providers")
 
     model_config = ConfigDict(populate_by_name=True)
+
+
+class ModelDiscoveryPayload(BaseModel):
+    base_url: str = Field(alias="base_url", min_length=1)
+    api_key: str = Field(default="", alias="api_key")
+
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
+
+
+def _merge_model_providers(
+    existing_settings: dict,
+    incoming_providers: dict[str, SettingsModelProviderPayload] | None,
+) -> dict:
+    if incoming_providers is None:
+        return existing_settings
+
+    next_settings = dict(existing_settings)
+    existing_providers = next_settings.get("model_providers")
+    merged_providers = dict(existing_providers) if isinstance(existing_providers, dict) else {}
+
+    for provider_id, provider_payload in incoming_providers.items():
+        provider_key = str(provider_id or "").strip()
+        if not provider_key:
+            continue
+
+        existing_provider = merged_providers.get(provider_key)
+        existing_provider = existing_provider if isinstance(existing_provider, dict) else {}
+        incoming_api_key = str(provider_payload.api_key or "").strip()
+
+        provider_config = {
+            "label": provider_payload.label or existing_provider.get("label") or provider_key,
+            "base_url": str(provider_payload.base_url).strip().rstrip("/"),
+            "models": [
+                {
+                    "model": model_payload.model,
+                    "label": model_payload.label or model_payload.model,
+                }
+                for model_payload in provider_payload.models
+            ],
+        }
+
+        if incoming_api_key:
+            provider_config["api_key"] = incoming_api_key
+        elif existing_provider.get("api_key"):
+            provider_config["api_key"] = existing_provider["api_key"]
+
+        merged_providers[provider_key] = provider_config
+
+    next_settings["model_providers"] = merged_providers
+    return next_settings
 
 
 def _build_settings_payload() -> dict:
@@ -86,7 +154,9 @@ def update_settings_endpoint(payload: SettingsUpdatePayload) -> dict:
     if normalized_agent_model_ref != normalized_text_model_ref:
         normalized_text_model_ref = normalized_agent_model_ref
 
-    save_app_settings(
+    existing_settings = load_app_settings()
+    next_settings = _merge_model_providers(existing_settings, payload.model_providers)
+    next_settings.update(
         {
             "text_model_ref": normalized_text_model_ref,
             "video_model_ref": normalized_video_model_ref,
@@ -96,4 +166,14 @@ def update_settings_endpoint(payload: SettingsUpdatePayload) -> dict:
             },
         }
     )
+    save_app_settings(next_settings)
     return _build_settings_payload()
+
+
+@router.post("/model-providers/discover")
+def discover_model_provider_models_endpoint(payload: ModelDiscoveryPayload) -> dict:
+    try:
+        models = discover_openai_compatible_models(base_url=payload.base_url, api_key=payload.api_key)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"models": models}

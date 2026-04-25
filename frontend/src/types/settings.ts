@@ -18,15 +18,33 @@ export type SettingsPayload = {
       transport: string;
       configured: boolean;
       base_url: string;
+      api_key_configured?: boolean;
       models: Array<{
         model_ref: string;
         model: string;
         label: string;
         route_target?: string | null;
+        reasoning?: boolean;
+        modalities?: string[];
+        context_window?: number | null;
+        max_tokens?: number | null;
       }>;
       example_model_refs: string[];
+      gateway?: Record<string, unknown>;
     }>;
   };
+  model_providers?: Record<
+    string,
+    {
+      label?: string;
+      base_url: string;
+      api_key?: string;
+      models: Array<{
+        model: string;
+        label?: string;
+      }>;
+    }
+  >;
   revision: {
     max_revision_round: number;
   };

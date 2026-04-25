@@ -85,6 +85,43 @@ class OpenAiCompatibleProviderRuntimeTests(unittest.TestCase):
         self.assertEqual(local_provider["base_url"], "http://127.0.0.1:8801/v1")
         self.assertEqual(local_provider["gateway"], runtime_config)
 
+    def test_build_model_catalog_uses_saved_local_provider_and_handles_null_cloud_config(self) -> None:
+        saved_settings = {
+            "text_model_ref": "local/gemma-4-26b-a4b-it",
+            "video_model_ref": "local/gemma-4-26b-a4b-it",
+            "model_providers": {
+                "local": {
+                    "label": "Local Gateway",
+                    "base_url": "http://127.0.0.1:8888/v1",
+                    "api_key": "sk-local",
+                    "models": [
+                        {
+                            "model": "gemma-4-26b-a4b-it",
+                            "label": "Gemma 4 26B",
+                        }
+                    ],
+                }
+            },
+        }
+
+        with self._patched_local_provider_env(LOCAL_BASE_URL="http://127.0.0.1:8801/v1"):
+            _local_llm, model_catalog = self._reload_target_modules()
+
+            with patch.object(model_catalog, "load_app_settings", return_value=saved_settings):
+                with patch.object(model_catalog, "get_local_gateway_runtime_config", return_value={"cloud": None, "llama": None}):
+                    with patch.object(model_catalog, "get_local_route_model_names", return_value=[]):
+                        catalog = model_catalog.build_model_catalog()
+
+        local_provider = next(provider for provider in catalog["providers"] if provider["provider_id"] == "local")
+        openrouter_provider = next(provider for provider in catalog["providers"] if provider["provider_id"] == "openrouter")
+
+        self.assertEqual(local_provider["label"], "Local Gateway")
+        self.assertEqual(local_provider["base_url"], "http://127.0.0.1:8888/v1")
+        self.assertTrue(local_provider["api_key_configured"])
+        self.assertEqual(local_provider["models"][0]["model_ref"], "local/gemma-4-26b-a4b-it")
+        self.assertEqual(local_provider["models"][0]["label"], "Gemma 4 26B")
+        self.assertEqual(openrouter_provider["base_url"], "https://openrouter.ai/api/v1")
+
 
 if __name__ == "__main__":
     unittest.main()
