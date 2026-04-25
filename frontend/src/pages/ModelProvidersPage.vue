@@ -26,10 +26,16 @@
               <button
                 type="button"
                 class="model-providers-page__button model-providers-page__button--primary"
-                :disabled="codexAuthBusy"
+                :disabled="codexAuthBusy || Boolean(codexLoginSession)"
                 @click="handleStartCodexLogin"
               >
-                {{ codexAuthBusy ? t("settings.codexChecking") : t("settings.codexLogin") }}
+                {{
+                  codexLoginSession
+                    ? t("settings.codexLoginWaiting")
+                    : codexAuthBusy
+                      ? t("settings.codexChecking")
+                      : t("settings.codexLogin")
+                }}
               </button>
               <button
                 v-if="codexLoginSession"
@@ -39,22 +45,6 @@
                 @click="() => handlePollCodexLogin()"
               >
                 {{ t("settings.codexCheckLogin") }}
-              </button>
-              <button
-                v-if="codexLoginSession"
-                type="button"
-                class="model-providers-page__button"
-                @click="handleOpenCodexVerification"
-              >
-                {{ t("settings.codexOpenVerification") }}
-              </button>
-              <button
-                v-if="codexLoginSession"
-                type="button"
-                class="model-providers-page__button"
-                @click="handleCopyCodexCode"
-              >
-                {{ t("settings.codexCopyCode") }}
               </button>
               <button
                 v-if="codexProvider.auth_status?.configured"
@@ -68,16 +58,25 @@
             </div>
           </div>
 
-          <div v-if="codexLoginSession" class="model-providers-page__login-code">
-            <label>
-              <span>{{ t("settings.codexVerificationUrl") }}</span>
-              <input :value="codexLoginSession.verification_url" type="text" readonly />
-            </label>
-            <label>
-              <span>{{ t("settings.codexUserCode") }}</span>
-              <input :value="codexLoginSession.user_code" type="text" readonly />
-            </label>
+          <div v-if="codexLoginSession" class="model-providers-page__login-progress" role="status">
+            <span class="model-providers-page__spinner" aria-hidden="true"></span>
+            <div>
+              <strong>{{ t("settings.codexLoginWaiting") }}</strong>
+              <p>{{ t("settings.codexLoginWaitingBody") }}</p>
+            </div>
           </div>
+          <details v-if="codexLoginSession" class="model-providers-page__fallback-login">
+            <summary>{{ t("settings.codexFallbackLogin") }}</summary>
+            <p>{{ t("settings.codexFallbackLoginHint") }}</p>
+            <div class="model-providers-page__provider-actions model-providers-page__provider-actions--compact">
+              <button type="button" class="model-providers-page__button" @click="() => handleOpenCodexVerification()">
+                {{ t("settings.codexOpenVerification") }}
+              </button>
+              <button type="button" class="model-providers-page__button" @click="handleCopyCodexCode">
+                {{ t("settings.codexCopyCode") }}
+              </button>
+            </div>
+          </details>
           <div v-if="providerMessages['openai-codex']" class="model-providers-page__provider-message">
             {{ providerMessages["openai-codex"] }}
           </div>
@@ -678,19 +677,34 @@ function startCodexAutoPoll() {
   }, intervalSeconds * 1000);
 }
 
+function openCodexVerificationWindow() {
+  const authWindow = window.open("about:blank", "_blank");
+  if (authWindow) {
+    authWindow.opener = null;
+  }
+  return authWindow;
+}
+
 async function handleStartCodexLogin() {
   if (!ensureCodexProviderDraft()) {
     setProviderMessage("openai-codex", t("settings.codexProviderUnavailable"));
     return;
   }
+  const authWindow = openCodexVerificationWindow();
   try {
     codexAuthBusy.value = true;
     setProviderMessage("openai-codex", null);
     codexLoginSession.value = await startOpenAICodexAuth();
-    handleOpenCodexVerification();
+    handleOpenCodexVerification(authWindow);
+    if (!authWindow) {
+      setProviderMessage("openai-codex", t("settings.codexPopupBlocked"));
+    }
     startCodexAutoPoll();
     setProviderMessage("openai-codex", t("settings.codexLoginStarted"));
   } catch (authError) {
+    if (authWindow && !authWindow.closed) {
+      authWindow.close();
+    }
     setProviderMessage(
       "openai-codex",
       t("settings.codexLoginFailed", { error: authError instanceof Error ? authError.message : "" }),
@@ -734,8 +748,15 @@ async function handlePollCodexLogin(showPendingMessage = true) {
   }
 }
 
-function handleOpenCodexVerification() {
+function handleOpenCodexVerification(authWindow: Window | null = null) {
   if (!codexLoginSession.value?.verification_url) {
+    if (authWindow && !authWindow.closed) {
+      authWindow.close();
+    }
+    return;
+  }
+  if (authWindow && !authWindow.closed) {
+    authWindow.location.href = codexLoginSession.value.verification_url;
     return;
   }
   window.open(codexLoginSession.value.verification_url, "_blank", "noopener,noreferrer");
@@ -743,10 +764,15 @@ function handleOpenCodexVerification() {
 
 async function handleCopyCodexCode() {
   if (!codexLoginSession.value?.user_code || !navigator.clipboard) {
+    setProviderMessage("openai-codex", t("settings.codexCodeCopyFailed"));
     return;
   }
-  await navigator.clipboard.writeText(codexLoginSession.value.user_code);
-  setProviderMessage("openai-codex", t("settings.codexCodeCopied"));
+  try {
+    await navigator.clipboard.writeText(codexLoginSession.value.user_code);
+    setProviderMessage("openai-codex", t("settings.codexCodeCopied"));
+  } catch {
+    setProviderMessage("openai-codex", t("settings.codexCodeCopyFailed"));
+  }
 }
 
 async function handleLogoutCodex() {
@@ -888,6 +914,10 @@ onBeforeUnmount(stopCodexAutoPoll);
   gap: 10px;
 }
 
+.model-providers-page__provider-actions--compact {
+  margin-top: 10px;
+}
+
 .model-providers-page__codex-actions {
   justify-content: flex-end;
 }
@@ -916,16 +946,59 @@ onBeforeUnmount(stopCodexAutoPoll);
   width: 100%;
 }
 
-.model-providers-page__login-code,
 .model-providers-page__add-provider {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.36fr);
   gap: 12px;
   margin-top: 14px;
 }
 
 .model-providers-page__add-provider {
   grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.model-providers-page__login-progress {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 16px;
+  border: 1px solid rgba(154, 52, 18, 0.12);
+  border-radius: 16px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.64);
+}
+
+.model-providers-page__login-progress strong {
+  color: var(--graphite-text-strong);
+}
+
+.model-providers-page__login-progress p,
+.model-providers-page__fallback-login p {
+  margin: 4px 0 0;
+}
+
+.model-providers-page__spinner {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(154, 52, 18, 0.18);
+  border-top-color: rgb(154, 52, 18);
+  border-radius: 999px;
+  animation: model-provider-spin 900ms linear infinite;
+}
+
+.model-providers-page__fallback-login {
+  margin-top: 10px;
+  border: 1px solid rgba(154, 52, 18, 0.1);
+  border-radius: 14px;
+  padding: 10px 12px;
+  color: rgba(60, 41, 20, 0.72);
+  background: rgba(255, 248, 240, 0.48);
+}
+
+.model-providers-page__fallback-login summary {
+  color: rgb(154, 52, 18);
+  cursor: pointer;
+  font-weight: 650;
 }
 
 .model-providers-page__provider-editor-list {
@@ -1046,10 +1119,21 @@ onBeforeUnmount(stopCodexAutoPoll);
     justify-content: flex-start;
   }
 
-  .model-providers-page__login-code,
   .model-providers-page__add-provider,
   .model-providers-page__provider-fields {
     grid-template-columns: 1fr;
+  }
+}
+
+@keyframes model-provider-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .model-providers-page__spinner {
+    animation: none;
   }
 }
 </style>
