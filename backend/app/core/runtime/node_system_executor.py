@@ -25,10 +25,10 @@ from app.core.schemas.node_system import (
 from app.core.storage.run_store import save_run
 from app.skills.registry import get_skill_registry
 from app.tools.local_llm import (
-    _chat_with_local_model_with_meta,
     get_default_agent_temperature,
     get_default_agent_thinking_enabled,
 )
+from app.tools.model_provider_client import chat_with_model_ref_with_meta
 
 KNOWLEDGE_BASE_SKILL_KEY = "search_knowledge_base"
 
@@ -621,11 +621,10 @@ def _generate_agent_response(
         else "根据输入和技能结果完成输出。"
     )
 
-    content, llm_meta = _chat_with_local_model_with_meta(
+    content, llm_meta = chat_with_model_ref_with_meta(
+        model_ref=runtime_config["resolved_model_ref"],
         system_prompt=system_prompt,
         user_prompt=user_prompt,
-        model=runtime_config["runtime_model_name"],
-        provider_id=runtime_config["resolved_provider_id"],
         temperature=runtime_config["resolved_temperature"],
         thinking_enabled=runtime_config["resolved_thinking"],
     )

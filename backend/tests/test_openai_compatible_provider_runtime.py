@@ -10,6 +10,14 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from app.core.schemas.node_system import (
+    NodeSystemAgentConfig,
+    NodeSystemAgentNode,
+    NodeSystemNodeUi,
+    NodeSystemWriteBinding,
+    Position,
+)
+
 
 LOCAL_PROVIDER_ENV_KEYS = (
     "LOCAL_BASE_URL",
@@ -193,6 +201,41 @@ class OpenAiCompatibleProviderRuntimeTests(unittest.TestCase):
         self.assertTrue(openai_provider["enabled"])
         self.assertEqual(openai_provider["models"][0]["model_ref"], "openai/gpt-4.1")
         self.assertEqual(openai_provider["models"][0]["label"], "GPT 4.1")
+
+    def test_agent_response_uses_provider_aware_client_for_openai_ref(self) -> None:
+        from app.core.runtime import node_system_executor
+
+        runtime_config = {
+            "runtime_model_name": "gpt-4.1",
+            "resolved_model_ref": "openai/gpt-4.1",
+            "resolved_provider_id": "openai",
+            "resolved_temperature": 0.2,
+            "resolved_thinking": False,
+        }
+
+        node = NodeSystemAgentNode(
+            ui=NodeSystemNodeUi(position=Position(x=0, y=0)),
+            writes=[NodeSystemWriteBinding(state="answer")],
+            config=NodeSystemAgentConfig(taskInstruction="Answer as JSON."),
+        )
+
+        with patch.object(
+            node_system_executor,
+            "chat_with_model_ref_with_meta",
+            return_value=('{"answer":"ok"}', {"model": "gpt-4.1", "provider_id": "openai", "temperature": 0.2, "warnings": []}),
+        ) as chat:
+            payload, reasoning, warnings, updated = node_system_executor._generate_agent_response(
+                node=node,
+                input_values={"question": "hi"},
+                skill_context={},
+                runtime_config=runtime_config,
+            )
+
+        self.assertEqual(payload["answer"], "ok")
+        self.assertEqual(reasoning, "")
+        self.assertEqual(warnings, [])
+        self.assertEqual(updated["provider_id"], "openai")
+        chat.assert_called_once()
 
 
 if __name__ == "__main__":

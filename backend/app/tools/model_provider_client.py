@@ -9,8 +9,10 @@ from app.core.model_provider_templates import (
     TRANSPORT_ANTHROPIC_MESSAGES,
     TRANSPORT_GEMINI_GENERATE_CONTENT,
     TRANSPORT_OPENAI_COMPATIBLE,
+    get_provider_template,
     normalize_transport,
 )
+from app.core.storage.settings_store import load_app_settings
 
 
 ANTHROPIC_VERSION = "2023-06-01"
@@ -434,3 +436,57 @@ def chat_with_model_provider(
     meta["reasoning_format"] = None
     meta["base_url"] = normalized_base_url
     return content, meta
+
+
+def chat_with_model_ref_with_meta(
+    *,
+    model_ref: str,
+    system_prompt: str,
+    user_prompt: str,
+    temperature: float,
+    max_tokens: int | None = None,
+    thinking_enabled: bool = False,
+) -> tuple[str, dict[str, Any]]:
+    provider_id, model_name = model_ref.split("/", 1) if "/" in model_ref else ("local", model_ref)
+    provider_id = provider_id.strip() or "local"
+    model_name = model_name.strip()
+
+    if provider_id == "local":
+        from app.tools.local_llm import _chat_with_local_model_with_meta
+
+        return _chat_with_local_model_with_meta(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            model=model_name,
+            provider_id=provider_id,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            thinking_enabled=thinking_enabled,
+        )
+
+    saved_settings = load_app_settings()
+    saved_providers = saved_settings.get("model_providers")
+    saved_provider = saved_providers.get(provider_id) if isinstance(saved_providers, dict) else {}
+    saved_provider = saved_provider if isinstance(saved_provider, dict) else {}
+    template = get_provider_template(provider_id)
+    provider_config = {**template, **saved_provider}
+
+    auth_scheme = (
+        provider_config.get("auth_scheme")
+        if provider_config.get("auth_scheme") is not None
+        else template.get("auth_scheme", "Bearer")
+    )
+    return chat_with_model_provider(
+        provider_id=provider_id,
+        transport=str(provider_config.get("transport") or template["transport"]),
+        base_url=str(provider_config.get("base_url") or template["base_url"]),
+        api_key=str(provider_config.get("api_key") or ""),
+        model=model_name,
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        thinking_enabled=thinking_enabled,
+        auth_header=str(provider_config.get("auth_header") or template.get("auth_header") or "Authorization"),
+        auth_scheme=str(auth_scheme or ""),
+    )
