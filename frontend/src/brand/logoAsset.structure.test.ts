@@ -17,10 +17,10 @@ test("brand logo uses the gold ring as the exact icon boundary", () => {
 });
 
 test("brand logo includes a centered gold sparkle above the cat head", () => {
-  assert.match(logoSource, /<radialGradient id="sparkleGold" cx="0" cy="-192" r="56" gradientUnits="userSpaceOnUse">/);
-  assert.match(logoSource, /<path\s+id="logoSparkle"\s+fill="url\(#sparkleGold\)"\s+d="M0-236/);
-  assert.match(logoSource, /C5-210 18-197 44-192/);
-  assert.match(logoSource, /C18-187 5-174 0-148/);
-  assert.match(logoSource, /C-18-197 -5-210 0-236Z"/);
+  assert.match(logoSource, /<radialGradient id="sparkleGold" cx="0" cy="-106" r="56" gradientUnits="userSpaceOnUse">/);
+  assert.match(logoSource, /<path\s+id="logoSparkle"\s+fill="url\(#sparkleGold\)"\s+d="M0-150/);
+  assert.match(logoSource, /C5-124 18-111 44-106/);
+  assert.match(logoSource, /C18-101 5-88 0-62/);
+  assert.match(logoSource, /C-18-111 -5-124 0-150Z"/);
   assert.doesNotMatch(logoSource, /id="logoSparkle"[\s\S]*L44-192/);
 });
