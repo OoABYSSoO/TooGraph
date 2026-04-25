@@ -82,9 +82,11 @@
             />
             <g class="buddy-mascot__look-eye buddy-mascot__look-eye--left">
               <ellipse class="buddy-mascot__resting-eye buddy-mascot__resting-eye--left" cx="-80" cy="82" rx="24" ry="52" fill="url(#buddyMascotEyeGold)" />
+              <path class="buddy-mascot__dizzy-eye buddy-mascot__dizzy-eye--left" d="M-80 48 C-48 48 -48 116 -80 116 C-118 116 -118 54 -80 54 C-54 54 -54 100 -80 100 C-100 100 -100 70 -80 70" />
             </g>
             <g class="buddy-mascot__look-eye buddy-mascot__look-eye--right">
               <ellipse class="buddy-mascot__resting-eye buddy-mascot__resting-eye--right" cx="80" cy="82" rx="24" ry="52" fill="url(#buddyMascotEyeGold)" />
+              <path class="buddy-mascot__dizzy-eye buddy-mascot__dizzy-eye--right" d="M80 48 C112 48 112 116 80 116 C42 116 42 54 80 54 C106 54 106 100 80 100 C60 100 60 70 80 70" />
             </g>
             <path class="buddy-mascot__drag-eye buddy-mascot__drag-eye--left" d="M-104 52 L-64 82 L-104 112" />
             <path class="buddy-mascot__drag-eye buddy-mascot__drag-eye--right" d="M104 52 L64 82 L104 112" />
@@ -555,6 +557,7 @@ function clampLookAxis(value: number | undefined) {
 .buddy-mascot__right-ear,
 .buddy-mascot__look-eye,
 .buddy-mascot__resting-eye,
+.buddy-mascot__dizzy-eye,
 .buddy-mascot__drag-eye {
   transform-box: fill-box;
   transform-origin: center;
@@ -689,6 +692,26 @@ function clampLookAxis(value: number | undefined) {
   transition: opacity 120ms ease;
 }
 
+.buddy-mascot__dizzy-eye {
+  opacity: 0;
+  fill: none;
+  stroke: url(#buddyMascotEyeGold);
+  stroke-width: 10;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: opacity 120ms ease;
+}
+
+.buddy-mascot__dizzy-eye--left {
+  transform-box: view-box;
+  transform-origin: -80px 82px;
+}
+
+.buddy-mascot__dizzy-eye--right {
+  transform-box: view-box;
+  transform-origin: 80px 82px;
+}
+
 .buddy-mascot--idle .buddy-mascot__tail {
   animation: buddy-mascot-tail-sway 1.8s ease-in-out infinite;
 }
@@ -771,15 +794,21 @@ function clampLookAxis(value: number | undefined) {
 }
 
 .buddy-mascot--error .buddy-mascot__look-eye--left {
-  transform: translate(-4px, 12px) rotate(-10deg);
+  transform: translate(-4px, 10px);
 }
 
 .buddy-mascot--error .buddy-mascot__look-eye--right {
-  transform: translate(4px, 12px) rotate(10deg);
+  transform: translate(4px, 10px);
 }
 
 .buddy-mascot--error .buddy-mascot__resting-eye {
-  animation: buddy-mascot-error-eye-sad 680ms ease-out both;
+  display: none;
+  opacity: 0;
+}
+
+.buddy-mascot--error .buddy-mascot__dizzy-eye {
+  opacity: 1;
+  animation: buddy-mascot-error-eye-spin 920ms linear infinite;
 }
 
 .buddy-mascot--dragging .buddy-mascot__tail {
@@ -1076,7 +1105,7 @@ function clampLookAxis(value: number | undefined) {
   100% {
     transform: translate(var(--buddy-mascot-left-ear-x), calc(var(--buddy-mascot-left-ear-y) + 16px))
       scale(0.94)
-      rotate(calc(var(--buddy-mascot-left-ear-rotate) + 24deg));
+      rotate(calc(var(--buddy-mascot-left-ear-rotate) + -24deg));
   }
 }
 
@@ -1089,16 +1118,16 @@ function clampLookAxis(value: number | undefined) {
   100% {
     transform: translate(var(--buddy-mascot-right-ear-x), calc(var(--buddy-mascot-right-ear-y) + 16px))
       scale(0.94)
-      rotate(calc(var(--buddy-mascot-right-ear-rotate) + -24deg));
+      rotate(calc(var(--buddy-mascot-right-ear-rotate) + 24deg));
   }
 }
 
-@keyframes buddy-mascot-error-eye-sad {
+@keyframes buddy-mascot-error-eye-spin {
   0% {
-    transform: scaleY(1);
+    transform: rotate(0deg);
   }
   100% {
-    transform: scaleY(0.62);
+    transform: rotate(360deg);
   }
 }
 
