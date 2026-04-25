@@ -39,34 +39,46 @@ def resolve_runtime_model_name(model_ref: str | None, *, default_provider: str =
     return model_id
 
 
-def get_default_text_model_ref() -> str:
+def get_default_text_model_ref(*, force_refresh: bool = False) -> str:
     saved_settings = load_app_settings()
     saved_text_model_ref = str(saved_settings.get("text_model_ref") or "").strip()
     if saved_text_model_ref:
-        return normalize_model_ref(saved_text_model_ref, default_provider="local")
-    return normalize_model_ref(get_default_text_model(), default_provider="local")
+        saved_provider, saved_model = split_model_ref(saved_text_model_ref, default_provider="local")
+        local_route_models = get_local_route_model_names(force_refresh=force_refresh)
+        if saved_provider != "local" or not local_route_models or saved_model in local_route_models:
+            return normalize_model_ref(saved_text_model_ref, default_provider="local")
+        return build_model_ref("local", local_route_models[0])
+    return normalize_model_ref(get_default_text_model(force_refresh=force_refresh), default_provider="local")
 
 
-def get_default_video_model_name() -> str:
+def get_default_video_model_name(*, force_refresh: bool = False) -> str:
     saved_settings = load_app_settings()
     saved_video_model_ref = str(saved_settings.get("video_model_ref") or "").strip()
     if saved_video_model_ref:
-        return split_model_ref(saved_video_model_ref, default_provider="local")[1]
+        saved_provider, saved_model = split_model_ref(saved_video_model_ref, default_provider="local")
+        local_route_models = get_local_route_model_names(force_refresh=force_refresh)
+        if saved_provider != "local" or not local_route_models or saved_model in local_route_models:
+            return saved_model
+        return local_route_models[0]
     return (
         os.environ.get("LOCAL_VIDEO_MODEL")
         or os.environ.get("VIDEO_MODEL")
         or os.environ.get("LOCAL_MODEL_NAME")
         or os.environ.get("UPSTREAM_MODEL_NAME")
-        or get_default_text_model()
+        or get_default_text_model(force_refresh=force_refresh)
     )
 
 
-def get_default_video_model_ref() -> str:
+def get_default_video_model_ref(*, force_refresh: bool = False) -> str:
     saved_settings = load_app_settings()
     saved_video_model_ref = str(saved_settings.get("video_model_ref") or "").strip()
     if saved_video_model_ref:
-        return normalize_model_ref(saved_video_model_ref, default_provider="local")
-    return normalize_model_ref(get_default_video_model_name(), default_provider="local")
+        saved_provider, saved_model = split_model_ref(saved_video_model_ref, default_provider="local")
+        local_route_models = get_local_route_model_names(force_refresh=force_refresh)
+        if saved_provider != "local" or not local_route_models or saved_model in local_route_models:
+            return normalize_model_ref(saved_video_model_ref, default_provider="local")
+        return build_model_ref("local", local_route_models[0])
+    return normalize_model_ref(get_default_video_model_name(force_refresh=force_refresh), default_provider="local")
 
 
 def _dict_or_empty(value: Any) -> dict[str, Any]:
@@ -134,27 +146,27 @@ def _dedupe_local_provider_models(
     return deduped
 
 
-def build_model_catalog() -> dict[str, Any]:
+def build_model_catalog(*, force_refresh: bool = False) -> dict[str, Any]:
     saved_settings = load_app_settings()
     saved_local_provider = _get_saved_local_provider_config(saved_settings)
     saved_local_models = _get_saved_local_provider_models(saved_local_provider)
-    runtime_config = get_local_gateway_runtime_config()
+    runtime_config = get_local_gateway_runtime_config(force_refresh=force_refresh)
     llama_config = _dict_or_empty(runtime_config.get("llama")) if isinstance(runtime_config, dict) else {}
     cloud_config = _dict_or_empty(runtime_config.get("cloud")) if isinstance(runtime_config, dict) else {}
 
-    local_route_models = get_local_route_model_names()
+    local_route_models = get_local_route_model_names(force_refresh=force_refresh)
     saved_text_model_ref = str(saved_settings.get("text_model_ref") or "").strip()
     _saved_text_provider, saved_text_model = split_model_ref(saved_text_model_ref, default_provider="local")
-    preferred_local_text_model = saved_text_model if saved_text_model_ref else get_default_text_model()
-    if local_route_models and preferred_local_text_model in local_route_models:
-        local_text_model = preferred_local_text_model
+    preferred_local_text_model = saved_text_model if saved_text_model_ref else get_default_text_model(force_refresh=force_refresh)
+    if local_route_models:
+        local_text_model = preferred_local_text_model if preferred_local_text_model in local_route_models else local_route_models[0]
     elif saved_local_models and preferred_local_text_model in {model["model"] for model in saved_local_models}:
         local_text_model = preferred_local_text_model
     elif saved_local_models:
         local_text_model = saved_local_models[0]["model"]
     else:
         local_text_model = local_route_models[0] if local_route_models else preferred_local_text_model
-    local_video_model = get_default_video_model_name()
+    local_video_model = get_default_video_model_name(force_refresh=force_refresh)
     local_context_window = llama_config.get("ctx_size") if isinstance(llama_config, dict) else None
     local_max_tokens = llama_config.get("n_predict") if isinstance(llama_config, dict) else None
     local_display_model_name = (
@@ -162,31 +174,34 @@ def build_model_catalog() -> dict[str, Any]:
         if isinstance(runtime_config, dict) and runtime_config.get("display_model_name")
         else None
     )
+    saved_model_by_name = {model["model"]: model for model in saved_local_models}
     local_provider_models = [
-        {
-            "model_ref": build_model_ref("local", model["model"]),
-            "model": model["model"],
-            "label": model["label"],
-            "reasoning": True,
-            "modalities": ["text"],
-            "context_window": local_context_window if isinstance(local_context_window, int) else None,
-            "max_tokens": local_max_tokens if isinstance(local_max_tokens, int) else None,
-            "route_target": model["route_target"] or local_display_model_name,
-        }
-        for model in saved_local_models
-    ] + [
         {
             "model_ref": build_model_ref("local", model_name),
             "model": model_name,
-            "label": model_name,
+            "label": saved_model_by_name.get(model_name, {}).get("label") or model_name,
             "reasoning": True,
             "modalities": ["text"],
             "context_window": local_context_window if isinstance(local_context_window, int) else None,
             "max_tokens": local_max_tokens if isinstance(local_max_tokens, int) else None,
-            "route_target": local_display_model_name,
+            "route_target": saved_model_by_name.get(model_name, {}).get("route_target") or local_display_model_name,
         }
         for model_name in local_route_models
     ]
+    if not local_provider_models:
+        local_provider_models = [
+            {
+                "model_ref": build_model_ref("local", model["model"]),
+                "model": model["model"],
+                "label": model["label"],
+                "reasoning": True,
+                "modalities": ["text"],
+                "context_window": local_context_window if isinstance(local_context_window, int) else None,
+                "max_tokens": local_max_tokens if isinstance(local_max_tokens, int) else None,
+                "route_target": model["route_target"] or local_display_model_name,
+            }
+            for model in saved_local_models
+        ]
     local_provider_models = _dedupe_local_provider_models(
         local_provider_models,
         preferred_model_ref=build_model_ref("local", local_text_model),

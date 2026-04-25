@@ -6,8 +6,8 @@ import { fileURLToPath } from "node:url";
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDirectory = dirname(currentFilePath);
-const componentSource = readFileSync(resolve(currentDirectory, "EditorCanvas.vue"), "utf8");
-const minimapSource = readFileSync(resolve(currentDirectory, "EditorMinimap.vue"), "utf8");
+const componentSource = readFileSync(resolve(currentDirectory, "EditorCanvas.vue"), "utf8").replace(/\r\n/g, "\n");
+const minimapSource = readFileSync(resolve(currentDirectory, "EditorMinimap.vue"), "utf8").replace(/\r\n/g, "\n");
 
 test("EditorCanvas binds the canvas surface styling to the viewport state", () => {
   assert.match(componentSource, /class="editor-canvas"[\s\S]*:style="canvasSurfaceStyle"/);
@@ -45,6 +45,11 @@ test("EditorCanvas raises hovered and selected nodes above sibling cards", () =>
   assert.match(componentSource, /:class="\{ 'editor-canvas__node--selected': isNodeVisuallySelected\(nodeId\) \}"/);
   assert.match(componentSource, /<NodeCard[\s\S]*:class="resolveRunNodeClassList\(nodeId\)"/);
   assert.match(componentSource, /\.editor-canvas__node:hover,\n\.editor-canvas__node:focus-within,\n\.editor-canvas__node--selected \{[\s\S]*z-index:\s*8;/);
+});
+
+test("EditorCanvas forwards node model refresh requests to the workspace", () => {
+  assert.match(componentSource, /\(event: "refresh-agent-models"\): void;/);
+  assert.match(componentSource, /@refresh-agent-models="emit\('refresh-agent-models'\)"/);
 });
 
 test("EditorCanvas keeps state anchors and flow hotspots above hovered nodes", () => {

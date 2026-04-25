@@ -132,8 +132,12 @@ def get_local_gateway_runtime_config(*, force_refresh: bool = False) -> dict[str
     return runtime_config
 
 
-def get_local_route_model_names() -> list[str]:
-    runtime_config = get_local_gateway_runtime_config()
+def get_local_route_model_names(*, force_refresh: bool = False) -> list[str]:
+    discovered_models = get_current_local_model_names(force_refresh=force_refresh)
+    if discovered_models:
+        return discovered_models
+
+    runtime_config = get_local_gateway_runtime_config(force_refresh=force_refresh)
     llama_config = runtime_config.get("llama") if isinstance(runtime_config, dict) else None
     aliases = llama_config.get("local_route_model_names") if isinstance(llama_config, dict) else None
     if isinstance(aliases, list):
@@ -157,6 +161,18 @@ def get_local_route_model_names() -> list[str]:
     return [DEFAULT_LOCAL_MODEL_ALIAS]
 
 
+def get_current_local_model_names(*, force_refresh: bool = False) -> list[str]:
+    _ = force_refresh
+    try:
+        return discover_openai_compatible_models(
+            base_url=get_local_llm_base_url(),
+            api_key=get_local_llm_api_key(),
+            timeout_sec=2.0,
+        )
+    except RuntimeError:
+        return []
+
+
 def _extract_model_name_from_ref(model_ref: str | None) -> str:
     trimmed = str(model_ref or "").strip()
     if not trimmed:
@@ -164,12 +180,12 @@ def _extract_model_name_from_ref(model_ref: str | None) -> str:
     return trimmed.split("/")[-1].strip()
 
 
-def get_default_text_model() -> str:
+def get_default_text_model(*, force_refresh: bool = False) -> str:
     saved_settings = load_app_settings()
     saved_model_name = _extract_model_name_from_ref(saved_settings.get("text_model_ref"))
-    if saved_model_name:
+    aliases = get_local_route_model_names(force_refresh=force_refresh)
+    if saved_model_name and (not aliases or saved_model_name in aliases):
         return saved_model_name
-    aliases = get_local_route_model_names()
     return aliases[0] if aliases else DEFAULT_LOCAL_MODEL_ALIAS
 
 
@@ -396,7 +412,7 @@ def generate_hello_greeting(state: dict[str, Any], params: dict[str, Any] | None
     }
 
 
-def discover_openai_compatible_models(*, base_url: str, api_key: str = "") -> list[str]:
+def discover_openai_compatible_models(*, base_url: str, api_key: str = "", timeout_sec: float = 8.0) -> list[str]:
     normalized_base_url = str(base_url or "").strip().rstrip("/")
     if not normalized_base_url.startswith(("http://", "https://")):
         raise RuntimeError("Base URL must start with http:// or https://.")
@@ -406,7 +422,7 @@ def discover_openai_compatible_models(*, base_url: str, api_key: str = "") -> li
         headers["Authorization"] = f"Bearer {str(api_key).strip()}"
 
     try:
-        with httpx.Client(timeout=8.0, trust_env=False) as client:
+        with httpx.Client(timeout=timeout_sec, trust_env=False) as client:
             response = client.get(f"{normalized_base_url}/models", headers=headers)
             response.raise_for_status()
             payload = response.json()

@@ -620,6 +620,7 @@
             :placeholder="agentModelOptions.length === 0 ? t('nodeCard.noConfiguredModels') : t('nodeCard.selectModel')"
             :disabled="agentModelOptions.length === 0"
             popper-class="graphite-select-popper node-card__agent-model-popper"
+            @visible-change="handleAgentModelSelectVisibleChange"
             @update:model-value="handleAgentModelValueChange"
           >
             <ElOption
@@ -1275,6 +1276,7 @@ const emit = defineEmits<{
   (event: "save-node-preset", payload: { nodeId: string }): void;
   (event: "open-human-review", payload: { nodeId: string }): void;
   (event: "locked-edit-attempt"): void;
+  (event: "refresh-agent-models"): void;
 }>();
 
 const { t } = useI18n();
@@ -2862,6 +2864,12 @@ function handleAgentModelValueChange(nextValue: string | number | boolean | unde
   }
   emitAgentConfigPatch(resolveAgentModelSelection(normalizedValue, trimmedGlobalTextModelRef.value));
   collapseAgentModelSelect();
+}
+
+function handleAgentModelSelectVisibleChange(visible: boolean) {
+  if (visible) {
+    emit("refresh-agent-models");
+  }
 }
 
 function collapseAgentModelSelect() {

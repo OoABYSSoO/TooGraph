@@ -695,7 +695,7 @@ def _build_auto_system_prompt(
 
 
 def _resolve_agent_runtime_config(node: NodeSystemAgentNode) -> dict[str, Any]:
-    global_model_ref = get_default_text_model_ref()
+    global_model_ref = get_default_text_model_ref(force_refresh=True)
     global_thinking_enabled = get_default_agent_thinking_enabled()
     default_temperature = get_default_agent_temperature()
     override_model_ref = normalize_model_ref(node.config.model) if node.config.model.strip() else ""

@@ -127,6 +127,7 @@
                 @create-node-from-file="createNodeFromFileForTab(tab.tabId, $event)"
                 @open-human-review="openHumanReviewPanelForTab(tab.tabId, $event.nodeId)"
                 @locked-edit-attempt="showGraphLockedEditToast"
+                @refresh-agent-models="refreshAgentModels"
               />
               <EditorNodeCreationMenu
                 :open="Boolean(nodeCreationMenuState(tab.tabId)?.open)"
@@ -1969,6 +1970,7 @@ async function runActiveGraph() {
   }
 
   try {
+    await refreshAgentModels();
     const response = await runGraph(document);
     cancelRunPolling(tab.tabId);
     const generation = runPollGenerationByTabId.get(tab.tabId) ?? 0;
@@ -2088,6 +2090,10 @@ async function loadSettings() {
   } catch {
     settings.value = null;
   }
+}
+
+async function refreshAgentModels() {
+  await loadSettings();
 }
 
 async function loadSkillDefinitions() {

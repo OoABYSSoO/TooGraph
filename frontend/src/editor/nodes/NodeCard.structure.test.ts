@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDirectory = dirname(currentFilePath);
-const componentSource = readFileSync(resolve(currentDirectory, "NodeCard.vue"), "utf8");
+const componentSource = readFileSync(resolve(currentDirectory, "NodeCard.vue"), "utf8").replace(/\r\n/g, "\n");
 
 test("NodeCard does not render the reads and writes summary block", () => {
   assert.doesNotMatch(componentSource, /class="node-card__state-summary"/);
@@ -131,6 +131,7 @@ test("NodeCard restores the legacy agent runtime control order with Element Plus
   assert.match(agentSection, /<ElSelect/);
   assert.match(agentSection, /ref="agentModelSelectRef"/);
   assert.match(agentSection, /class="node-card__agent-model-select graphite-select"/);
+  assert.match(agentSection, /@visible-change="handleAgentModelSelectVisibleChange"/);
   assert.match(agentSection, /popper-class="graphite-select-popper node-card__agent-model-popper"/);
   assert.equal(
     [...agentSection.matchAll(/<ElPopover\s+trigger="hover"\s+placement="top-start"[\s\S]*?popper-class="node-card__agent-toggle-hint-popper"/g)]
@@ -187,6 +188,12 @@ test("NodeCard restores the legacy agent runtime control order with Element Plus
   assert.match(componentSource, /const agentModelSelectRef = ref<\{ blur\?: \(\) => void; toggleMenu\?: \(\) => void; expanded\?: boolean \} \| null>\(null\);/);
   assert.match(componentSource, /function collapseAgentModelSelect\(\) \{[\s\S]*if \(agentModelSelectRef\.value\?\.expanded\) \{[\s\S]*agentModelSelectRef\.value\.toggleMenu\?\.\(\);[\s\S]*\}[\s\S]*agentModelSelectRef\.value\?\.blur\?\.\(\);[\s\S]*\}/);
   assert.match(componentSource, /collapseAgentModelSelect\(\);/);
+});
+
+test("NodeCard asks the workspace to refresh models when the agent model select opens", () => {
+  assert.match(componentSource, /\(event: "refresh-agent-models"\): void;/);
+  assert.match(componentSource, /function handleAgentModelSelectVisibleChange\(visible: boolean\)/);
+  assert.match(componentSource, /if \(visible\) \{[\s\S]*emit\("refresh-agent-models"\);[\s\S]*\}/);
 });
 
 test("NodeCard opens agent add skill and port actions in themed popovers instead of inline panels", () => {

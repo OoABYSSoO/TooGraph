@@ -234,6 +234,7 @@
           @save-node-preset="emit('save-node-preset', $event)"
           @open-human-review="emit('open-human-review', $event)"
           @locked-edit-attempt="emit('locked-edit-attempt')"
+          @refresh-agent-models="emit('refresh-agent-models')"
           @update-output-config="emit('update-output-config', $event)"
         />
       </div>
@@ -397,6 +398,7 @@ const emit = defineEmits<{
   (event: "open-human-review", payload: { nodeId: string }): void;
   (event: "update-output-config", payload: { nodeId: string; patch: Partial<OutputNode["config"]> }): void;
   (event: "locked-edit-attempt"): void;
+  (event: "refresh-agent-models"): void;
   (event: "connect-flow", payload: { sourceNodeId: string; targetNodeId: string }): void;
   (event: "connect-state", payload: { sourceNodeId: string; sourceStateKey: string; targetNodeId: string; targetStateKey: string }): void;
   (event: "connect-route", payload: { sourceNodeId: string; branchKey: string; targetNodeId: string }): void;

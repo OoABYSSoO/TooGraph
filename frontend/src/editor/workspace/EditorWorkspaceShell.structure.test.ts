@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDirectory = dirname(currentFilePath);
-const componentSource = readFileSync(resolve(currentDirectory, "EditorWorkspaceShell.vue"), "utf8");
+const componentSource = readFileSync(resolve(currentDirectory, "EditorWorkspaceShell.vue"), "utf8").replace(/\r\n/g, "\n");
 
 test("EditorWorkspaceShell renders workspace panes without reka-ui tab primitives", () => {
   assert.doesNotMatch(componentSource, /from "reka-ui"/);
@@ -24,6 +24,12 @@ test("EditorWorkspaceShell wires canvas node-creation intents into a dedicated c
   assert.match(componentSource, /<EditorNodeCreationMenu/);
   assert.match(componentSource, /@select-entry="createNodeFromMenuForTab\(tab\.tabId, \$event\)"/);
   assert.match(componentSource, /@close="closeNodeCreationMenu\(tab\.tabId\)"/);
+});
+
+test("EditorWorkspaceShell refreshes settings when an agent model menu opens", () => {
+  assert.match(componentSource, /@refresh-agent-models="refreshAgentModels"/);
+  assert.match(componentSource, /async function refreshAgentModels\(\)/);
+  assert.match(componentSource, /settings\.value = await fetchSettings\(\)/);
 });
 
 test("EditorWorkspaceShell loads persisted presets for the node creation menu", () => {

@@ -112,10 +112,10 @@ def _merge_model_providers(
     return next_settings
 
 
-def _build_settings_payload() -> dict:
-    text_model_ref = get_default_text_model_ref()
-    video_model_ref = get_default_video_model_ref()
-    model_catalog = build_model_catalog()
+def _build_settings_payload(*, force_refresh_models: bool = False) -> dict:
+    text_model_ref = get_default_text_model_ref(force_refresh=force_refresh_models)
+    video_model_ref = get_default_video_model_ref(force_refresh=force_refresh_models)
+    model_catalog = build_model_catalog(force_refresh=force_refresh_models)
     return {
         "model": {
             "text_model": resolve_runtime_model_name(text_model_ref),
@@ -142,7 +142,7 @@ def _build_settings_payload() -> dict:
 
 @router.get("")
 def get_settings_endpoint() -> dict:
-    return _build_settings_payload()
+    return _build_settings_payload(force_refresh_models=True)
 
 
 @router.post("")
@@ -167,7 +167,7 @@ def update_settings_endpoint(payload: SettingsUpdatePayload) -> dict:
         }
     )
     save_app_settings(next_settings)
-    return _build_settings_payload()
+    return _build_settings_payload(force_refresh_models=True)
 
 
 @router.post("/model-providers/discover")

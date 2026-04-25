@@ -122,6 +122,44 @@ class OpenAiCompatibleProviderRuntimeTests(unittest.TestCase):
         self.assertEqual(local_provider["models"][0]["label"], "Gemma 4 26B")
         self.assertEqual(openrouter_provider["base_url"], "https://openrouter.ai/api/v1")
 
+    def test_local_route_models_auto_discover_openai_compatible_models(self) -> None:
+        with self._patched_local_provider_env(LOCAL_BASE_URL="http://127.0.0.1:8888/v1"):
+            local_llm, _model_catalog = self._reload_target_modules()
+
+            with patch.object(local_llm, "get_local_gateway_runtime_config", return_value=None):
+                with patch.object(
+                    local_llm,
+                    "discover_openai_compatible_models",
+                    return_value=["gemma-4-26b-a4b-it", "huihui-gemma-4-26b-a4b-it-abliterated"],
+                ) as discover:
+                    models = local_llm.get_local_route_model_names(force_refresh=True)
+
+        self.assertEqual(models, ["gemma-4-26b-a4b-it", "huihui-gemma-4-26b-a4b-it-abliterated"])
+        discover.assert_called_once_with(base_url="http://127.0.0.1:8888/v1", api_key="sk-local", timeout_sec=2.0)
+
+    def test_build_model_catalog_prefers_current_discovered_models_over_stale_saved_models(self) -> None:
+        saved_settings = {
+            "text_model_ref": "local/stale-model",
+            "model_providers": {
+                "local": {
+                    "base_url": "http://127.0.0.1:8888/v1",
+                    "models": [{"model": "stale-model", "label": "Stale Model"}],
+                }
+            },
+        }
+
+        with self._patched_local_provider_env(LOCAL_BASE_URL="http://127.0.0.1:8888/v1"):
+            _local_llm, model_catalog = self._reload_target_modules()
+
+            with patch.object(model_catalog, "load_app_settings", return_value=saved_settings):
+                with patch.object(model_catalog, "get_local_gateway_runtime_config", return_value={"cloud": None, "llama": None}):
+                    with patch.object(model_catalog, "get_local_route_model_names", return_value=["gemma-4-26b-a4b-it"]):
+                        catalog = model_catalog.build_model_catalog(force_refresh=True)
+
+        local_provider = next(provider for provider in catalog["providers"] if provider["provider_id"] == "local")
+        self.assertEqual(catalog["default_text_model_ref"], "local/gemma-4-26b-a4b-it")
+        self.assertEqual([model["model"] for model in local_provider["models"]], ["gemma-4-26b-a4b-it"])
+
 
 if __name__ == "__main__":
     unittest.main()
