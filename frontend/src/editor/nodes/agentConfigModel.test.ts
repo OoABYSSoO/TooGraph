@@ -44,13 +44,12 @@ test("buildAgentModelDisplayLookup disambiguates duplicate concrete model labels
   });
 });
 
-test("buildAgentModelSelectOptions keeps the resolved model at the front when it is not in the configured catalog", () => {
+test("buildAgentModelSelectOptions only exposes currently available catalog models", () => {
   const options = buildAgentModelSelectOptions("custom/provider-model", ["openai/gpt-5.4"], {
     "openai/gpt-5.4": "GPT-5.4",
   });
 
   assert.deepEqual(options, [
-    { value: "custom/provider-model", label: "provider-model" },
     { value: "openai/gpt-5.4", label: "GPT-5.4" },
   ]);
 });
@@ -130,6 +129,73 @@ test("resolveAgentRuntimeCatalog uses configured providers and the agent runtime
   assert.deepEqual(catalog.availableModelRefs, ["openai/gpt-5.4"]);
   assert.deepEqual(catalog.modelDisplayLookup, {
     "openai/gpt-5.4": "GPT-5.4",
+  });
+});
+
+test("resolveAgentRuntimeCatalog only exposes enabled configured providers", () => {
+  const catalog = resolveAgentRuntimeCatalog({
+    model: {
+      text_model: "gpt-5.4",
+      text_model_ref: "openai/gpt-5.4",
+      video_model: "veo",
+      video_model_ref: "google/veo",
+    },
+    agent_runtime_defaults: {
+      model: "openai/gpt-5.4",
+      thinking_enabled: true,
+      temperature: 0.2,
+    },
+    model_catalog: {
+      providers: [
+        {
+          provider_id: "openai-codex",
+          label: "ChatGPT",
+          description: "",
+          transport: "codex-responses",
+          configured: true,
+          enabled: false,
+          base_url: "https://chatgpt.com/backend-api/codex",
+          example_model_refs: [],
+          models: [
+            {
+              model_ref: "openai-codex/gpt-5.5",
+              model: "gpt-5.5",
+              label: "GPT-5.5",
+            },
+          ],
+        },
+        {
+          provider_id: "local",
+          label: "Local",
+          description: "",
+          transport: "openai-compatible",
+          configured: true,
+          enabled: true,
+          base_url: "http://127.0.0.1:8888/v1",
+          example_model_refs: [],
+          models: [
+            {
+              model_ref: "local/lm-local",
+              model: "lm-local",
+              label: "lm-local",
+            },
+          ],
+        },
+      ],
+    },
+    revision: {
+      max_revision_round: 2,
+    },
+    evaluator: {
+      default_score_threshold: 0.7,
+      routes: [],
+    },
+    tools: [],
+  });
+
+  assert.deepEqual(catalog.availableModelRefs, ["local/lm-local"]);
+  assert.deepEqual(catalog.modelDisplayLookup, {
+    "local/lm-local": "lm-local",
   });
 });
 

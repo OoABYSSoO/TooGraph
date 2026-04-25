@@ -8,12 +8,14 @@ const currentDirectory = dirname(fileURLToPath(import.meta.url));
 const pageSource = readFileSync(resolve(currentDirectory, "ModelProvidersPage.vue"), "utf8");
 const settingsSource = readFileSync(resolve(currentDirectory, "SettingsPage.vue"), "utf8");
 
-test("ModelProvidersPage makes ChatGPT Codex sign-in the primary model action", () => {
+test("ModelProvidersPage makes ChatGPT Codex sign-in the first provider card", () => {
   assert.match(pageSource, /settings\.codexLogin/);
   assert.match(pageSource, /settings\.codexLoginStatus/);
   assert.match(pageSource, /handleStartCodexLogin/);
-  assert.match(pageSource, /codex-login-card/);
+  assert.match(pageSource, /model-providers-page__provider-card--codex/);
+  assert.match(pageSource, /v-if="isLoginProvider\(provider\)"/);
   assert.match(pageSource, /discoverModelProviderModels/);
+  assert.doesNotMatch(pageSource, /codex-login-card/);
 });
 
 test("ModelProvidersPage owns provider editing while Settings links to it", () => {
@@ -31,8 +33,32 @@ test("ModelProvidersPage presents providers as cards before editing", () => {
   assert.match(pageSource, /settings\.configuredProviders/);
   assert.match(pageSource, /settings\.configureProvider/);
   assert.match(pageSource, /@click="openAddProviderPanel"/);
-  assert.match(pageSource, /providerCardList = computed\(\(\) =>[\s\S]*provider\.provider_id !== "openai-codex"/);
+  assert.match(pageSource, /providerCardList = computed\(\(\) =>[\s\S]*codexProvider\.value[\s\S]*provider\.provider_id !== "openai-codex"/);
   assert.doesNotMatch(pageSource, /<section v-for="provider in providerDraftList"[\s\S]*class="model-providers-page__provider-editor"/);
+});
+
+test("ModelProvidersPage applies provider changes immediately without a manual save button", () => {
+  assert.doesNotMatch(pageSource, /settings\.saveSettings/);
+  assert.doesNotMatch(pageSource, /class="model-providers-page__actions"/);
+  assert.match(pageSource, /async function persistSettings\(/);
+  assert.match(pageSource, /@change="handleRuntimeDraftChange"/);
+  assert.match(pageSource, /@change="handleProviderEnabledChange\(provider\)"/);
+  assert.match(pageSource, /@change="handleProviderDraftChange"/);
+  assert.match(pageSource, /@click="commitPendingProvider"/);
+  assert.match(pageSource, /@click="handleRemoveProvider\(provider\.provider_id\)"/);
+});
+
+test("ModelProvidersPage refreshes discovered models instead of manually creating graph models", () => {
+  assert.match(pageSource, /settings\.refreshModels/);
+  assert.doesNotMatch(pageSource, /allow-create/);
+  assert.match(pageSource, /provider\.discovered_models = discoveredModels;/);
+  assert.match(pageSource, /provider\.selected_models = discoveredModels;/);
+  assert.match(pageSource, /await persistSettings\(/);
+});
+
+test("ModelProvidersPage lets provider management occupy the full card grid", () => {
+  assert.match(pageSource, /\.model-providers-page__panel--wide \{[\s\S]*grid-column: 1 \/ -1;/);
+  assert.match(pageSource, /\.model-providers-page__provider-cards \{[\s\S]*repeat\(auto-fill, minmax\(260px, 1fr\)\)/);
 });
 
 test("ModelProvidersPage opens an add-provider panel and immediately pre-fills templates", () => {
@@ -78,7 +104,7 @@ test("ModelProvidersPage uses toast feedback for ChatGPT copy attempts", () => {
 });
 
 test("ModelProvidersPage hides the ChatGPT login action after sign-in", () => {
-  assert.match(pageSource, /v-if="!codexProvider\.auth_status\?\.authenticated"/);
+  assert.match(pageSource, /v-if="!provider\.auth_status\?\.authenticated"/);
   assert.match(pageSource, /v-else[\s\S]*class="model-providers-page__connected-state"/);
   assert.match(pageSource, /<ElIcon aria-hidden="true"><CircleCheck \/><\/ElIcon>/);
   assert.match(pageSource, /settings\.codexLoggedInTitle/);

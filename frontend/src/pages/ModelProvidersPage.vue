@@ -10,114 +10,6 @@
       <div v-if="error" class="model-providers-page__empty">{{ t("common.failedToLoad", { error }) }}</div>
       <div v-else-if="!settings || !draft" class="model-providers-page__empty">{{ t("common.loadingSettings") }}</div>
       <template v-else>
-        <article v-if="codexProvider" class="model-providers-page__panel model-providers-page__panel--primary codex-login-card">
-          <div class="model-providers-page__codex-main">
-            <div>
-              <div class="model-providers-page__eyebrow">{{ t("settings.codexLoginStatus") }}</div>
-              <h3>{{ codexProvider.auth_status?.authenticated ? t("settings.codexLoggedInTitle") : t("settings.codexLogin") }}</h3>
-              <p>{{ codexProvider.auth_status?.authenticated ? t("settings.codexLoggedInHelp") : t("settings.codexLoginHelp") }}</p>
-              <div class="model-providers-page__badges">
-                <span>{{ codexProvider.provider_id }}</span>
-                <span>{{ codexProvider.transport }}</span>
-                <span>{{ codexStatusLabel }}</span>
-              </div>
-            </div>
-            <div class="model-providers-page__codex-actions">
-              <button
-                v-if="!codexProvider.auth_status?.authenticated"
-                type="button"
-                class="model-providers-page__button model-providers-page__button--primary"
-                :disabled="codexAuthBusy || Boolean(codexLoginSession)"
-                @click="handleStartCodexLogin"
-              >
-                {{
-                  codexLoginSession
-                    ? t("settings.codexLoginWaiting")
-                    : codexAuthBusy
-                      ? t("settings.codexChecking")
-                      : t("settings.codexLogin")
-                }}
-              </button>
-              <div v-else class="model-providers-page__connected-state" role="status">
-                <ElIcon aria-hidden="true"><CircleCheck /></ElIcon>
-                <span>{{ t("settings.codexLoggedIn") }}</span>
-              </div>
-              <button
-                v-if="codexProvider.auth_status?.configured"
-                type="button"
-                class="model-providers-page__button"
-                :disabled="codexAuthBusy"
-                @click="handleLogoutCodex"
-              >
-                {{ t("settings.codexLogout") }}
-              </button>
-            </div>
-          </div>
-
-          <div v-if="codexLoginSession" class="model-providers-page__login-progress" role="status">
-            <div class="model-providers-page__login-progress-heading">
-              <span class="model-providers-page__spinner" aria-hidden="true"></span>
-              <div>
-                <strong>{{ t("settings.codexLoginWaiting") }}</strong>
-                <p>{{ t("settings.codexLoginWaitingBody") }}</p>
-              </div>
-            </div>
-            <div class="model-providers-page__login-steps">
-              <div class="model-providers-page__login-step">
-                <span class="model-providers-page__step-index">1</span>
-                <div>
-                  <strong>{{ t("settings.codexOpenVerificationStep") }}</strong>
-                  <p>{{ t("settings.codexOpenVerificationStepBody") }}</p>
-                </div>
-              </div>
-              <div class="model-providers-page__login-step">
-                <span class="model-providers-page__step-index">2</span>
-                <div class="model-providers-page__device-code-content">
-                  <strong>{{ t("settings.codexDeviceCodeStep") }}</strong>
-                  <p>{{ t("settings.codexDeviceCodeStepBody") }}</p>
-                  <div class="model-providers-page__device-code-row">
-                    <span class="model-providers-page__device-code">{{ codexLoginSession.user_code }}</span>
-                    <button
-                      type="button"
-                      class="model-providers-page__icon-button"
-                      :aria-label="t('settings.codexCopyDeviceCode')"
-                      :title="t('settings.codexCopyDeviceCode')"
-                      @click="handleCopyCodexCode"
-                    >
-                      <ElIcon aria-hidden="true"><CopyDocument /></ElIcon>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="model-providers-page__login-progress-footer">
-              <span>{{ t("settings.codexAutoDetectHint") }}</span>
-              <button type="button" class="model-providers-page__button" :disabled="codexAuthBusy" @click="() => handlePollCodexLogin()">
-                {{ t("settings.codexCheckLogin") }}
-              </button>
-            </div>
-          </div>
-          <details v-if="codexLoginSession" class="model-providers-page__fallback-login">
-            <summary>{{ t("settings.codexFallbackLogin") }}</summary>
-            <p>{{ t("settings.codexFallbackLoginHint") }}</p>
-            <div class="model-providers-page__provider-actions model-providers-page__provider-actions--compact">
-              <button type="button" class="model-providers-page__button" @click="() => handleOpenCodexVerification()">
-                {{ t("settings.codexOpenVerification") }}
-              </button>
-              <button type="button" class="model-providers-page__button" @click="handleCopyCodexVerificationUrl">
-                {{ t("settings.codexCopyVerificationUrl") }}
-              </button>
-            </div>
-          </details>
-          <div v-if="providerMessages['openai-codex']" class="model-providers-page__provider-message">
-            {{ providerMessages["openai-codex"] }}
-          </div>
-        </article>
-        <article v-else class="model-providers-page__panel codex-login-card">
-          <h3>{{ t("settings.codexLogin") }}</h3>
-          <p>{{ t("settings.codexProviderUnavailable") }}</p>
-        </article>
-
         <section class="model-providers-page__grid">
           <article class="model-providers-page__panel">
             <h3>{{ t("settings.defaultRuntime") }}</h3>
@@ -128,6 +20,7 @@
                 class="model-providers-page__select graphite-select"
                 :teleported="false"
                 popper-class="graphite-select-popper"
+                @change="handleRuntimeDraftChange"
               >
                 <ElOption v-for="option in configuredModelOptions" :key="option.value" :label="option.label" :value="option.value" />
               </ElSelect>
@@ -139,6 +32,7 @@
                 class="model-providers-page__select graphite-select"
                 :teleported="false"
                 popper-class="graphite-select-popper"
+                @change="handleRuntimeDraftChange"
               >
                 <ElOption v-for="option in configuredModelOptions" :key="option.value" :label="option.label" :value="option.value" />
               </ElSelect>
@@ -154,6 +48,7 @@
                 class="model-providers-page__select graphite-select"
                 :teleported="false"
                 popper-class="graphite-select-popper"
+                @change="handleRuntimeDraftChange"
               >
                 <ElOption :label="t('common.off')" value="off" />
                 <ElOption :label="t('common.on')" value="on" />
@@ -161,7 +56,7 @@
             </label>
             <label>
               <span>{{ t("settings.defaultTemperature") }}</span>
-              <input v-model.number="draft.temperature" type="number" min="0" max="2" step="0.1" />
+              <input v-model.number="draft.temperature" type="number" min="0" max="2" step="0.1" @change="handleRuntimeDraftChange" />
             </label>
             <div class="model-providers-page__hint">{{ t("settings.hint") }}</div>
           </article>
@@ -174,6 +69,7 @@
               </div>
               <div class="model-providers-page__panel-toolbar">
                 <span class="model-providers-page__provider-status">{{ configuredModelOptions.length }} {{ t("settings.availableModels") }}</span>
+                <span v-if="saveMessage" class="model-providers-page__save-message">{{ saveMessage }}</span>
                 <button type="button" class="model-providers-page__button model-providers-page__button--primary" @click="openAddProviderPanel">
                   {{ t("settings.addProvider") }}
                 </button>
@@ -181,27 +77,83 @@
             </div>
 
             <div class="model-providers-page__provider-cards">
-              <article v-for="provider in providerCardList" :key="provider.provider_id" class="model-providers-page__provider-card">
+              <article
+                v-for="provider in providerCardList"
+                :key="provider.provider_id"
+                class="model-providers-page__provider-card"
+                :class="{ 'model-providers-page__provider-card--codex': isLoginProvider(provider) }"
+              >
                 <div class="model-providers-page__provider-card-main">
                   <div>
-                    <strong>{{ provider.label || provider.provider_id }}</strong>
+                    <strong>{{
+                      isLoginProvider(provider)
+                        ? provider.auth_status?.authenticated
+                          ? t("settings.codexLoggedInTitle")
+                          : t("settings.codexLogin")
+                        : provider.label || provider.provider_id
+                    }}</strong>
                     <div class="model-providers-page__badges">
                       <span>{{ provider.provider_id }}</span>
                       <span>{{ provider.transport }}</span>
                       <span>{{ provider.enabled ? t("settings.enabledProvider") : t("settings.disabledProvider") }}</span>
+                      <span v-if="isLoginProvider(provider)">{{ providerAuthStatusLabel(provider) }}</span>
                       <span v-if="provider.api_key_configured">{{ t("settings.apiKeyStored") }}</span>
                     </div>
                   </div>
                   <label class="model-providers-page__toggle">
-                    <input v-model="provider.enabled" type="checkbox" @change="alignDefaultModelsToProviderSelection" />
+                    <input v-model="provider.enabled" type="checkbox" @change="handleProviderEnabledChange(provider)" />
                     <span>{{ provider.enabled ? t("common.on") : t("common.off") }}</span>
                   </label>
                 </div>
                 <div class="model-providers-page__provider-card-meta">
                   <span>{{ provider.selected_models.length }} {{ t("settings.availableModels") }}</span>
-                  <span>{{ provider.base_url || t("settings.providerBaseUrlNotSet") }}</span>
+                  <span>{{
+                    isLoginProvider(provider)
+                      ? provider.auth_status?.authenticated
+                        ? t("settings.codexLoggedInHelp")
+                        : t("settings.codexLoginHelp")
+                      : provider.base_url || t("settings.providerBaseUrlNotSet")
+                  }}</span>
                 </div>
-                <div class="model-providers-page__provider-actions">
+                <div v-if="isLoginProvider(provider)" class="model-providers-page__provider-actions">
+                  <button
+                    v-if="!provider.auth_status?.authenticated"
+                    type="button"
+                    class="model-providers-page__button model-providers-page__button--primary"
+                    :disabled="codexAuthBusy || Boolean(codexLoginSession)"
+                    @click="handleStartCodexLogin"
+                  >
+                    {{
+                      codexLoginSession
+                        ? t("settings.codexLoginWaiting")
+                        : codexAuthBusy
+                          ? t("settings.codexChecking")
+                          : t("settings.codexLogin")
+                    }}
+                  </button>
+                  <div v-else class="model-providers-page__connected-state" role="status">
+                    <ElIcon aria-hidden="true"><CircleCheck /></ElIcon>
+                    <span>{{ t("settings.codexLoggedIn") }}</span>
+                  </div>
+                  <button
+                    v-if="provider.auth_status?.configured"
+                    type="button"
+                    class="model-providers-page__button"
+                    :disabled="codexAuthBusy"
+                    @click="handleLogoutCodex"
+                  >
+                    {{ t("settings.codexLogout") }}
+                  </button>
+                  <button
+                    type="button"
+                    class="model-providers-page__button"
+                    :disabled="discoveringProviderId === provider.provider_id || !provider.auth_status?.authenticated"
+                    @click="handleDiscoverModels(provider.provider_id)"
+                  >
+                    {{ discoveringProviderId === provider.provider_id ? t("settings.discoveringModels") : t("settings.refreshModels") }}
+                  </button>
+                </div>
+                <div v-else class="model-providers-page__provider-actions">
                   <button type="button" class="model-providers-page__button" @click="openProviderEditor(provider.provider_id)">
                     {{ t("settings.configureProvider") }}
                   </button>
@@ -211,7 +163,7 @@
                     :disabled="discoveringProviderId === provider.provider_id || (isLoginProvider(provider) && !provider.auth_status?.authenticated)"
                     @click="handleDiscoverModels(provider.provider_id)"
                   >
-                    {{ discoveringProviderId === provider.provider_id ? t("settings.discoveringModels") : t("settings.discoverModels") }}
+                    {{ discoveringProviderId === provider.provider_id ? t("settings.discoveringModels") : t("settings.refreshModels") }}
                   </button>
                   <button
                     v-if="provider.provider_id !== 'local'"
@@ -225,6 +177,61 @@
                 <span v-if="providerMessages[provider.provider_id]" class="model-providers-page__provider-message">
                   {{ providerMessages[provider.provider_id] }}
                 </span>
+                <div v-if="isLoginProvider(provider) && codexLoginSession" class="model-providers-page__login-progress" role="status">
+                  <div class="model-providers-page__login-progress-heading">
+                    <span class="model-providers-page__spinner" aria-hidden="true"></span>
+                    <div>
+                      <strong>{{ t("settings.codexLoginWaiting") }}</strong>
+                      <p>{{ t("settings.codexLoginWaitingBody") }}</p>
+                    </div>
+                  </div>
+                  <div class="model-providers-page__login-steps">
+                    <div class="model-providers-page__login-step">
+                      <span class="model-providers-page__step-index">1</span>
+                      <div>
+                        <strong>{{ t("settings.codexOpenVerificationStep") }}</strong>
+                        <p>{{ t("settings.codexOpenVerificationStepBody") }}</p>
+                      </div>
+                    </div>
+                    <div class="model-providers-page__login-step">
+                      <span class="model-providers-page__step-index">2</span>
+                      <div class="model-providers-page__device-code-content">
+                        <strong>{{ t("settings.codexDeviceCodeStep") }}</strong>
+                        <p>{{ t("settings.codexDeviceCodeStepBody") }}</p>
+                        <div class="model-providers-page__device-code-row">
+                          <span class="model-providers-page__device-code">{{ codexLoginSession.user_code }}</span>
+                          <button
+                            type="button"
+                            class="model-providers-page__icon-button"
+                            :aria-label="t('settings.codexCopyDeviceCode')"
+                            :title="t('settings.codexCopyDeviceCode')"
+                            @click="handleCopyCodexCode"
+                          >
+                            <ElIcon aria-hidden="true"><CopyDocument /></ElIcon>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="model-providers-page__login-progress-footer">
+                    <span>{{ t("settings.codexAutoDetectHint") }}</span>
+                    <button type="button" class="model-providers-page__button" :disabled="codexAuthBusy" @click="() => handlePollCodexLogin()">
+                      {{ t("settings.codexCheckLogin") }}
+                    </button>
+                  </div>
+                  <details class="model-providers-page__fallback-login">
+                    <summary>{{ t("settings.codexFallbackLogin") }}</summary>
+                    <p>{{ t("settings.codexFallbackLoginHint") }}</p>
+                    <div class="model-providers-page__provider-actions model-providers-page__provider-actions--compact">
+                      <button type="button" class="model-providers-page__button" @click="() => handleOpenCodexVerification()">
+                        {{ t("settings.codexOpenVerification") }}
+                      </button>
+                      <button type="button" class="model-providers-page__button" @click="handleCopyCodexVerificationUrl">
+                        {{ t("settings.codexCopyVerificationUrl") }}
+                      </button>
+                    </div>
+                  </details>
+                </div>
               </article>
               <div v-if="providerCardList.length === 0" class="model-providers-page__provider-empty">
                 {{ t("settings.noConfiguredProviders") }}
@@ -274,18 +281,18 @@
                   </div>
                 </div>
                 <label class="model-providers-page__toggle">
-                  <input v-model="providerEditorDraft.enabled" type="checkbox" @change="alignDefaultModelsToProviderSelection" />
+                  <input v-model="providerEditorDraft.enabled" type="checkbox" @change="handleProviderDraftChange" />
                   <span>{{ providerEditorDraft.enabled ? t("common.on") : t("common.off") }}</span>
                 </label>
               </div>
                 <div class="model-providers-page__provider-fields">
                   <label>
                     <span>{{ t("settings.providerLabel") }}</span>
-                    <input v-model.trim="providerEditorDraft.label" type="text" />
+                    <input v-model.trim="providerEditorDraft.label" type="text" @change="handleProviderDraftChange" />
                   </label>
                   <label v-if="showBaseUrlInPrimaryFields(providerEditorDraft)">
                     <span>{{ t("settings.providerBaseUrl") }}</span>
-                    <input v-model.trim="providerEditorDraft.base_url" type="url" />
+                    <input v-model.trim="providerEditorDraft.base_url" type="url" @change="handleProviderDraftChange" />
                   </label>
                   <label v-if="!isLoginProvider(providerEditorDraft)">
                     <span>{{ t("settings.providerApiKey") }}</span>
@@ -294,6 +301,7 @@
                       type="password"
                       autocomplete="off"
                       :placeholder="providerEditorDraft.api_key_configured ? t('settings.keepExistingApiKey') : t('settings.optionalApiKey')"
+                      @change="handleProviderDraftChange"
                     />
                   </label>
                   <div v-if="isLoginProvider(providerEditorDraft)" class="model-providers-page__login-panel">
@@ -309,12 +317,11 @@
                       class="model-providers-page__select graphite-select"
                       multiple
                       filterable
-                      allow-create
                       default-first-option
                       :reserve-keyword="false"
                       :teleported="false"
                       popper-class="graphite-select-popper"
-                      @change="alignDefaultModelsToProviderSelection"
+                      @change="handleProviderDraftChange"
                     >
                       <ElOption
                         v-for="modelName in editorProviderModelOptions"
@@ -332,7 +339,12 @@
                     <template v-if="showBaseUrlInPrimaryFields(providerEditorDraft)"></template>
                     <label v-else>
                       <span>{{ t("settings.providerBaseUrl") }}</span>
-                      <input v-model.trim="providerEditorDraft.base_url" type="url" :disabled="isLoginProvider(providerEditorDraft)" />
+                      <input
+                        v-model.trim="providerEditorDraft.base_url"
+                        type="url"
+                        :disabled="isLoginProvider(providerEditorDraft)"
+                        @change="handleProviderDraftChange"
+                      />
                     </label>
                     <label>
                       <span>{{ t("settings.providerId") }}</span>
@@ -346,6 +358,7 @@
                         :teleported="false"
                         popper-class="graphite-select-popper"
                         :disabled="isLoginProvider(providerEditorDraft)"
+                        @change="handleProviderDraftChange"
                       >
                         <ElOption label="OpenAI-compatible" value="openai-compatible" />
                         <ElOption label="Anthropic Messages" value="anthropic-messages" />
@@ -355,11 +368,11 @@
                     </label>
                     <label v-if="!isLoginProvider(providerEditorDraft)">
                       <span>{{ t("settings.providerAuthHeader") }}</span>
-                      <input v-model.trim="providerEditorDraft.auth_header" type="text" />
+                      <input v-model.trim="providerEditorDraft.auth_header" type="text" @change="handleProviderDraftChange" />
                     </label>
                     <label v-if="!isLoginProvider(providerEditorDraft)">
                       <span>{{ t("settings.providerAuthScheme") }}</span>
-                      <input v-model.trim="providerEditorDraft.auth_scheme" type="text" />
+                      <input v-model.trim="providerEditorDraft.auth_scheme" type="text" @change="handleProviderDraftChange" />
                     </label>
                   </div>
                 </details>
@@ -371,7 +384,7 @@
                     :disabled="discoveringProviderId === providerEditorDraft.provider_id || (isLoginProvider(providerEditorDraft) && !providerEditorDraft.auth_status?.authenticated)"
                     @click="handleDiscoverModels(providerEditorDraft.provider_id)"
                   >
-                    {{ discoveringProviderId === providerEditorDraft.provider_id ? t("settings.discoveringModels") : t("settings.discoverModels") }}
+                    {{ discoveringProviderId === providerEditorDraft.provider_id ? t("settings.discoveringModels") : t("settings.refreshModels") }}
                   </button>
                   <button
                     v-if="providerEditorMode === 'add'"
@@ -400,12 +413,6 @@
           </article>
         </section>
 
-        <div class="model-providers-page__actions">
-          <button type="button" class="model-providers-page__button model-providers-page__button--primary" :disabled="!canSave" @click="handleSave">
-            {{ isSaving ? t("settings.saving") : t("settings.saveSettings") }}
-          </button>
-          <span v-if="saveMessage" class="model-providers-page__save-message">{{ saveMessage }}</span>
-        </div>
       </template>
     </section>
   </AppShell>
@@ -435,7 +442,6 @@ import {
   buildProviderSavePayload,
   clampSettingsTemperature,
   listAddableProviderTemplates,
-  providerDraftsFingerprint,
   type ProviderDraft,
 } from "./settingsPageModel.ts";
 
@@ -554,16 +560,19 @@ function buildModelDisplayLookup(
 
 const providerDraftList = computed(() =>
   Object.values(providerDrafts.value).sort((left, right) => {
-    if (left.provider_id === "local") return -1;
-    if (right.provider_id === "local") return 1;
     if (left.provider_id === "openai-codex") return -1;
     if (right.provider_id === "openai-codex") return 1;
+    if (left.provider_id === "local") return -1;
+    if (right.provider_id === "local") return 1;
     return left.label.localeCompare(right.label);
   }),
 );
-const providerCardList = computed(() =>
-  providerDraftList.value.filter((provider) => provider.provider_id !== "openai-codex"),
-);
+const providerCardList = computed(() => {
+  if (!codexProvider.value) {
+    return providerDraftList.value;
+  }
+  return [codexProvider.value, ...providerDraftList.value.filter((provider) => provider.provider_id !== "openai-codex")];
+});
 const addableProviderTemplates = computed(() =>
   settings.value ? listAddableProviderTemplates(settings.value, providerDrafts.value) : [],
 );
@@ -581,7 +590,7 @@ const editorProviderModelOptions = computed(() => {
   if (!provider) {
     return [];
   }
-  return dedupeStrings([...provider.discovered_models, ...provider.selected_models]);
+  return dedupeStrings(provider.discovered_models);
 });
 const codexTemplate = computed(() => {
   const providers = settings.value?.model_catalog?.providers ?? [];
@@ -630,27 +639,6 @@ const thinkingMode = computed({
     draft.value.thinking_enabled = value === "on";
   },
 });
-const isDirty = computed(() => {
-  if (!settings.value || !draft.value) {
-    return false;
-  }
-  const runtimeChanged = JSON.stringify(draft.value) !== JSON.stringify(buildDraftFromSettings(settings.value));
-  const providerChanged =
-    providerDraftsFingerprint(providerDrafts.value) !== providerDraftsFingerprint(buildProviderDraftsFromSettings(settings.value)) ||
-    Object.values(providerDrafts.value).some((provider) => Boolean(provider.api_key.trim()));
-  return runtimeChanged || providerChanged;
-});
-const canSave = computed(() => isDirty.value && !isSaving.value && configuredModelOptions.value.length > 0);
-const codexStatusLabel = computed(() => (codexProvider.value ? providerAuthStatusLabel(codexProvider.value) : t("settings.codexNotLoggedIn")));
-
-function providerModelOptions(providerId: string) {
-  const provider = providerDrafts.value[providerId];
-  if (!provider) {
-    return [];
-  }
-  return dedupeStrings([...provider.discovered_models, ...provider.selected_models]);
-}
-
 function isLoginProvider(provider: ProviderDraft) {
   return provider.requires_login || provider.auth_mode === "chatgpt";
 }
@@ -700,8 +688,10 @@ async function loadSettings() {
     settings.value = await fetchSettings();
     draft.value = buildDraftFromSettings(settings.value);
     providerDrafts.value = buildProviderDraftsFromSettings(settings.value);
+    ensureCodexProviderDraft();
     error.value = null;
     await refreshCodexAuthStatus();
+    ensureCodexProviderDraft();
   } catch (fetchError) {
     error.value = fetchError instanceof Error ? fetchError.message : t("common.loadingSettings");
   }
@@ -739,6 +729,66 @@ function setProviderMessage(providerId: string, message: string | null) {
   };
 }
 
+async function persistSettings() {
+  if (!draft.value) {
+    return;
+  }
+  const editingId = editingProviderId.value;
+  try {
+    isSaving.value = true;
+    saveMessage.value = t("settings.saving");
+    alignDefaultModelsToProviderSelection();
+    settings.value = await updateSettings({
+      model: {
+        text_model_ref: draft.value.text_model_ref,
+        video_model_ref: draft.value.video_model_ref,
+      },
+      agent_runtime_defaults: {
+        model: draft.value.text_model_ref,
+        thinking_enabled: draft.value.thinking_enabled,
+        temperature: clampSettingsTemperature(draft.value.temperature),
+      },
+      model_providers: buildProviderSavePayload(providerDrafts.value),
+    });
+    draft.value = buildDraftFromSettings(settings.value);
+    providerDrafts.value = buildProviderDraftsFromSettings(settings.value);
+    ensureCodexProviderDraft();
+    if (editingId && providerDrafts.value[editingId]) {
+      editingProviderId.value = editingId;
+      providerEditorMode.value = "edit";
+    } else if (providerEditorMode.value === "edit") {
+      closeProviderEditorPanel();
+    }
+    saveMessage.value = t("settings.saved");
+    error.value = null;
+  } catch (saveError) {
+    error.value = saveError instanceof Error ? saveError.message : t("common.failedToSave", { error: "" });
+    saveMessage.value = null;
+  } finally {
+    isSaving.value = false;
+  }
+}
+
+function handleRuntimeDraftChange() {
+  void persistSettings();
+}
+
+function handleProviderEnabledChange(provider: ProviderDraft) {
+  providerDrafts.value = {
+    ...providerDrafts.value,
+    [provider.provider_id]: provider,
+  };
+  alignDefaultModelsToProviderSelection();
+  void persistSettings();
+}
+
+function handleProviderDraftChange() {
+  alignDefaultModelsToProviderSelection();
+  if (providerEditorMode.value === "edit") {
+    void persistSettings();
+  }
+}
+
 function openAddProviderPanel() {
   providerEditorMode.value = "add";
   editingProviderId.value = null;
@@ -772,7 +822,7 @@ function handlePendingTemplateChange() {
   pendingProviderDraft.value = buildProviderDraftFromTemplate(template);
 }
 
-function commitPendingProvider() {
+async function commitPendingProvider() {
   if (!pendingProviderDraft.value) {
     return;
   }
@@ -786,9 +836,13 @@ function commitPendingProvider() {
   providerEditorMode.value = "edit";
   editingProviderId.value = provider.provider_id;
   alignDefaultModelsToProviderSelection();
+  const refreshed = await handleDiscoverModels(provider.provider_id);
+  if (!refreshed) {
+    await persistSettings();
+  }
 }
 
-function handleRemoveProvider(providerId: string) {
+async function handleRemoveProvider(providerId: string) {
   const nextDrafts = { ...providerDrafts.value };
   delete nextDrafts[providerId];
   providerDrafts.value = nextDrafts;
@@ -796,6 +850,7 @@ function handleRemoveProvider(providerId: string) {
     closeProviderEditorPanel();
   }
   alignDefaultModelsToProviderSelection();
+  await persistSettings();
 }
 
 function showBaseUrlInPrimaryFields(provider: ProviderDraft | null) {
@@ -818,15 +873,15 @@ async function handleDiscoverModels(providerId: string) {
     providerDrafts.value[providerId] ??
     (pendingProviderDraft.value?.provider_id === providerId ? pendingProviderDraft.value : null);
   if (!provider) {
-    return;
+    return false;
   }
   if (!provider.base_url.trim()) {
     setProviderMessage(providerId, t("settings.baseUrlRequired"));
-    return;
+    return false;
   }
   if (isLoginProvider(provider) && !provider.auth_status?.authenticated) {
     setProviderMessage(providerId, t("settings.codexLoginRequired"));
-    return;
+    return false;
   }
 
   try {
@@ -842,7 +897,7 @@ async function handleDiscoverModels(providerId: string) {
     });
     const discoveredModels = dedupeStrings(result.models);
     provider.discovered_models = discoveredModels;
-    provider.selected_models = dedupeStrings([...provider.selected_models, ...discoveredModels]);
+    provider.selected_models = discoveredModels;
     alignDefaultModelsToProviderSelection();
     setProviderMessage(
       providerId,
@@ -850,6 +905,10 @@ async function handleDiscoverModels(providerId: string) {
         ? t("settings.discoveredModelCount", { count: discoveredModels.length })
         : t("settings.noModelsDiscovered"),
     );
+    if (providerDrafts.value[providerId]) {
+      await persistSettings();
+    }
+    return true;
   } catch (discoverError) {
     setProviderMessage(
       providerId,
@@ -857,6 +916,7 @@ async function handleDiscoverModels(providerId: string) {
         error: discoverError instanceof Error ? discoverError.message : "",
       }),
     );
+    return false;
   } finally {
     discoveringProviderId.value = null;
   }
@@ -920,7 +980,7 @@ async function handlePollCodexLogin(showPendingMessage = true) {
       applyCodexAuthStatus(status);
       setProviderMessage("openai-codex", t("settings.codexLoginComplete"));
       await handleDiscoverModels("openai-codex");
-      await handleSave();
+      await persistSettings();
       return;
     }
     if (showPendingMessage) {
@@ -1002,6 +1062,7 @@ async function handleLogoutCodex() {
     const status = await logoutOpenAICodexAuth();
     applyCodexAuthStatus(status);
     setProviderMessage("openai-codex", t("settings.codexLoggedOut"));
+    await persistSettings();
   } catch (authError) {
     setProviderMessage(
       "openai-codex",
@@ -1009,37 +1070,6 @@ async function handleLogoutCodex() {
     );
   } finally {
     codexAuthBusy.value = false;
-  }
-}
-
-async function handleSave() {
-  if (!draft.value || configuredModelOptions.value.length === 0) {
-    return;
-  }
-  try {
-    isSaving.value = true;
-    saveMessage.value = null;
-    alignDefaultModelsToProviderSelection();
-    settings.value = await updateSettings({
-      model: {
-        text_model_ref: draft.value.text_model_ref,
-        video_model_ref: draft.value.video_model_ref,
-      },
-      agent_runtime_defaults: {
-        model: draft.value.text_model_ref,
-        thinking_enabled: draft.value.thinking_enabled,
-        temperature: clampSettingsTemperature(draft.value.temperature),
-      },
-      model_providers: buildProviderSavePayload(providerDrafts.value),
-    });
-    draft.value = buildDraftFromSettings(settings.value);
-    providerDrafts.value = buildProviderDraftsFromSettings(settings.value);
-    saveMessage.value = t("settings.saved");
-    error.value = null;
-  } catch (saveError) {
-    error.value = saveError instanceof Error ? saveError.message : t("common.failedToSave", { error: "" });
-  } finally {
-    isSaving.value = false;
   }
 }
 
@@ -1111,10 +1141,9 @@ onBeforeUnmount(stopCodexAutoPoll);
 }
 
 .model-providers-page__panel--wide {
-  grid-column: span 2;
+  grid-column: 1 / -1;
 }
 
-.model-providers-page__codex-main,
 .model-providers-page__panel-heading,
 .model-providers-page__provider-card-main,
 .model-providers-page__provider-editor-header,
@@ -1125,8 +1154,6 @@ onBeforeUnmount(stopCodexAutoPoll);
   gap: 16px;
 }
 
-.model-providers-page__codex-actions,
-.model-providers-page__actions,
 .model-providers-page__provider-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1144,10 +1171,6 @@ onBeforeUnmount(stopCodexAutoPoll);
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
-}
-
-.model-providers-page__codex-actions {
-  justify-content: flex-end;
 }
 
 .model-providers-page__connected-state {
@@ -1306,7 +1329,7 @@ onBeforeUnmount(stopCodexAutoPoll);
 
 .model-providers-page__provider-cards {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 12px;
   margin-top: 16px;
 }
@@ -1323,6 +1346,11 @@ onBeforeUnmount(stopCodexAutoPoll);
   display: grid;
   gap: 12px;
   padding: 14px;
+}
+
+.model-providers-page__provider-card--codex {
+  border-color: rgba(22, 101, 52, 0.18);
+  background: linear-gradient(135deg, rgba(240, 253, 244, 0.82), rgba(255, 255, 255, 0.68));
 }
 
 .model-providers-page__provider-card-main {
@@ -1478,18 +1506,9 @@ onBeforeUnmount(stopCodexAutoPoll);
     grid-template-columns: 1fr;
   }
 
-  .model-providers-page__panel--wide {
-    grid-column: auto;
-  }
-
-  .model-providers-page__codex-main,
   .model-providers-page__provider-card-main,
   .model-providers-page__provider-editor-header {
     display: grid;
-  }
-
-  .model-providers-page__codex-actions {
-    justify-content: flex-start;
   }
 
   .model-providers-page__login-progress-footer,

@@ -38,11 +38,10 @@ export function buildAgentModelSelectOptions(
   availableModelRefs: string[],
   modelDisplayLookup: Record<string, string>,
 ) {
-  const trimmedResolvedModel = resolvedModel.trim();
-  const candidates = trimmedResolvedModel ? [trimmedResolvedModel, ...availableModelRefs] : availableModelRefs;
+  void resolvedModel;
   const seen = new Set<string>();
 
-  return candidates.flatMap((modelRef) => {
+  return availableModelRefs.flatMap((modelRef) => {
     const trimmed = modelRef.trim();
     if (!trimmed || seen.has(trimmed)) {
       return [];
@@ -73,7 +72,7 @@ export function resolveAgentModelSelection(nextValue: string, globalTextModelRef
 
 export function resolveAgentRuntimeCatalog(settings: SettingsPayload | null | undefined) {
   const configuredModels = (settings?.model_catalog?.providers ?? [])
-    .filter((provider) => provider.configured)
+    .filter((provider) => provider.configured && provider.enabled !== false && (!provider.requires_login || provider.auth_status?.authenticated))
     .flatMap((provider) => provider.models);
 
   return {
