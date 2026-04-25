@@ -1,10 +1,23 @@
-export const SUPPORTED_LOCALES = ["zh-CN", "en-US"] as const;
+import { createAdditionalMessages } from "./additionalMessages.ts";
+
+export const SUPPORTED_LOCALES = ["zh-CN", "zh-TW", "en-US", "ja-JP", "ko-KR", "es-ES", "fr-FR", "de-DE"] as const;
 export type AppLocale = (typeof SUPPORTED_LOCALES)[number];
 
 export const DEFAULT_LOCALE: AppLocale = "zh-CN";
 export const LOCALE_STORAGE_KEY = "graphiteui:locale";
 
-export const messages = {
+export const LANGUAGE_OPTIONS = [
+  { locale: "zh-CN", label: "简体中文", shortLabel: "简" },
+  { locale: "zh-TW", label: "繁體中文", shortLabel: "繁" },
+  { locale: "en-US", label: "English", shortLabel: "EN" },
+  { locale: "ja-JP", label: "日本語", shortLabel: "日" },
+  { locale: "ko-KR", label: "한국어", shortLabel: "한" },
+  { locale: "es-ES", label: "Español", shortLabel: "ES" },
+  { locale: "fr-FR", label: "Français", shortLabel: "FR" },
+  { locale: "de-DE", label: "Deutsch", shortLabel: "DE" },
+] as const satisfies readonly { locale: AppLocale; label: string; shortLabel: string }[];
+
+const baseMessages = {
   "zh-CN": {
     app: {
       productName: "GraphiteUI",
@@ -17,7 +30,13 @@ export const messages = {
       current: "当前语言",
       switchTo: "切换到 {locale}",
       zhCN: "中文",
+      zhTW: "繁體中文",
       enUS: "English",
+      jaJP: "日本語",
+      koKR: "한국어",
+      esES: "Español",
+      frFR: "Français",
+      deDE: "Deutsch",
     },
     common: {
       state: "State",
@@ -443,7 +462,13 @@ export const messages = {
       current: "Current language",
       switchTo: "Switch to {locale}",
       zhCN: "中文",
+      zhTW: "繁體中文",
       enUS: "English",
+      jaJP: "日本語",
+      koKR: "한국어",
+      esES: "Español",
+      frFR: "Français",
+      deDE: "Deutsch",
     },
     common: {
       state: "State",
@@ -857,6 +882,11 @@ export const messages = {
       nodeFailed: "Run failed on this node.",
     },
   },
+} as const;
+
+export const messages = {
+  ...baseMessages,
+  ...createAdditionalMessages(baseMessages["zh-CN"], baseMessages["en-US"]),
 } as const;
 
 interface LocaleTree {

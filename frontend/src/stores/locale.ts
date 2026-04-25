@@ -2,10 +2,27 @@ import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 
 import { setI18nLocale } from "../i18n/index.ts";
-import { DEFAULT_LOCALE, LOCALE_STORAGE_KEY, type AppLocale, isSupportedLocale } from "../i18n/messages.ts";
+import {
+  DEFAULT_LOCALE,
+  LANGUAGE_OPTIONS,
+  LOCALE_STORAGE_KEY,
+  type AppLocale,
+  isSupportedLocale,
+} from "../i18n/messages.ts";
 
-function languageLooksChinese(language: string) {
-  return /^zh\b/i.test(language.trim());
+const browserLanguageMap: readonly [RegExp, AppLocale][] = [
+  [/^zh-(tw|hk|mo)\b/i, "zh-TW"],
+  [/^zh\b/i, "zh-CN"],
+  [/^en\b/i, "en-US"],
+  [/^ja\b/i, "ja-JP"],
+  [/^ko\b/i, "ko-KR"],
+  [/^es\b/i, "es-ES"],
+  [/^fr\b/i, "fr-FR"],
+  [/^de\b/i, "de-DE"],
+];
+
+function getLocaleOption(locale: AppLocale) {
+  return LANGUAGE_OPTIONS.find((option) => option.locale === locale) ?? LANGUAGE_OPTIONS[0];
 }
 
 export function toSupportedLocale(value: unknown): AppLocale {
@@ -16,11 +33,11 @@ export function resolveInitialLocale(savedLocale?: string | null, browserLanguag
   if (isSupportedLocale(savedLocale)) {
     return savedLocale;
   }
-  if (browserLanguage === "en-US" || String(browserLanguage ?? "").toLowerCase().startsWith("en-")) {
-    return "en-US";
-  }
-  if (browserLanguage && languageLooksChinese(browserLanguage)) {
-    return "zh-CN";
+  const language = String(browserLanguage ?? "").trim();
+  for (const [pattern, locale] of browserLanguageMap) {
+    if (pattern.test(language)) {
+      return locale;
+    }
   }
   return DEFAULT_LOCALE;
 }
@@ -49,18 +66,14 @@ function persistLocale(locale: AppLocale) {
 export const useLocaleStore = defineStore("locale", () => {
   const locale = ref<AppLocale>(resolveInitialLocale(readSavedLocale(), readBrowserLanguage()));
 
-  const currentLocaleLabel = computed(() => (locale.value === "zh-CN" ? "中文" : "English"));
-  const nextLocale = computed<AppLocale>(() => (locale.value === "zh-CN" ? "en-US" : "zh-CN"));
-  const nextLocaleLabel = computed(() => (nextLocale.value === "zh-CN" ? "中文" : "English"));
+  const currentLocaleOption = computed(() => getLocaleOption(locale.value));
+  const currentLocaleLabel = computed(() => currentLocaleOption.value.label);
+  const currentLocaleShortLabel = computed(() => currentLocaleOption.value.shortLabel);
 
   function setLocale(nextLocaleValue: AppLocale) {
     locale.value = toSupportedLocale(nextLocaleValue);
     setI18nLocale(locale.value);
     persistLocale(locale.value);
-  }
-
-  function toggleLocale() {
-    setLocale(nextLocale.value);
   }
 
   function hydrateLocale() {
@@ -69,11 +82,10 @@ export const useLocaleStore = defineStore("locale", () => {
 
   return {
     locale,
+    currentLocaleOption,
     currentLocaleLabel,
-    nextLocale,
-    nextLocaleLabel,
+    currentLocaleShortLabel,
     setLocale,
-    toggleLocale,
     hydrateLocale,
   };
 });
