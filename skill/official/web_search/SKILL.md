@@ -8,17 +8,16 @@ Use this skill when a workflow or buddy agent needs current public web informati
 The skill asks the search provider for extra candidates, then keeps fetching candidates until it saves the target number of readable local documents or runs out of candidates. It first uses a fast HTTP fetch; if that fails or produces no readable text, it uses Playwright browser rendering as a fallback.
 
 Lifecycle:
-- `before_llm.py` adds the current local date to the skill-input planning context.
+- `before_llm.py` adds the current local date to the Skill LLM output planning context.
 - `after_llm.py` receives the LLM-generated `query`, performs the search and page download, and returns structured outputs.
 
 State inputs:
 
 - `user_question`: current public web question or fact-checking need.
-- `search_context`: optional constraints such as region, time range, known facts, or preferred source hints.
 
-LLM parameters:
+LLM output:
 
-- `query`: required public web search query.
+- `query`: public web search query.
 
 State outputs:
 - `query`: actual query sent to the search provider.

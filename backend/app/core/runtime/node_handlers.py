@@ -175,7 +175,7 @@ def execute_agent_node(
         pending_skill_key = str(pending_permission_approval.get("skill_key") or "")
         pending_skill_inputs = pending_permission_approval.get("skill_inputs")
         generated_skill_inputs[pending_skill_key] = dict(pending_skill_inputs) if isinstance(pending_skill_inputs, dict) else {}
-        skill_input_reasoning = "Resuming approved risky Skill execution with stored Skill inputs."
+        skill_input_reasoning = "Resuming approved risky Skill execution with stored Skill LLM output."
     elif resolved_bindings:
         record_file_context_activity_events(
             state=state,
@@ -206,19 +206,19 @@ def execute_agent_node(
 
         started_at = perf_counter()
         skill_definition = skill_definitions.get(skill_key)
-        input_schema = list(getattr(skill_definition, "input_schema", []) or [])
+        input_schema = list(getattr(skill_definition, "llm_output_schema", []) or [])
         skill_inputs = dict(generated_skill_inputs.get(skill_key) or {})
-        missing_inputs = missing_required_skill_inputs(skill_inputs, input_schema)
+        missing_inputs = missing_skill_llm_output_fields(skill_inputs, input_schema)
         if missing_inputs:
             missing_label = ", ".join(missing_inputs)
             skill_result = {
                 "status": "failed",
-                "error_type": "missing_required_input",
-                "error": f"Missing required input(s) for skill '{skill_key}': {missing_label}.",
+                "error_type": "missing_skill_llm_output",
+                "error": f"Missing Skill LLM output field(s) for skill '{skill_key}': {missing_label}.",
                 "errors": [
                     {
-                        "type": "missing_required_input",
-                        "message": f"Missing required input '{input_key}'.",
+                        "type": "missing_skill_llm_output",
+                        "message": f"Missing Skill LLM output field '{input_key}'.",
                         "input": input_key,
                     }
                     for input_key in missing_inputs
@@ -705,7 +705,7 @@ def build_dynamic_skill_result_package(
     error_type: str,
     duration_ms: int,
 ) -> dict[str, Any]:
-    output_fields = list(getattr(skill_definition, "output_schema", []) or [])
+    output_fields = list(getattr(skill_definition, "state_output_schema", []) or [])
     outputs: dict[str, Any] = {}
     if output_fields:
         for field in output_fields:
@@ -825,10 +825,10 @@ def build_dynamic_subgraph_result_package(
     }
 
 
-def missing_required_skill_inputs(skill_inputs: dict[str, Any], input_schema: list[Any] | None) -> list[str]:
+def missing_skill_llm_output_fields(skill_inputs: dict[str, Any], input_schema: list[Any] | None) -> list[str]:
     missing: list[str] = []
     for field in input_schema or []:
-        if field.required and is_missing_skill_input_value(skill_inputs.get(field.key)):
+        if field.key not in skill_inputs or skill_inputs.get(field.key) is None:
             missing.append(field.key)
     return missing
 

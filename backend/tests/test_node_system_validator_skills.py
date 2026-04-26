@@ -29,8 +29,8 @@ def _agent_skill_definition(
         skillKey=skill_key,
         name=skill_key,
         runtime={"type": "python", "entrypoint": runtime_entrypoint or "run.py"},
-        inputSchema=input_schema or [],
-        outputSchema=output_schema or [SkillIoField(key="summary", name="Summary", valueType="text")],
+        llmOutputSchema=input_schema or [],
+        stateOutputSchema=output_schema or [SkillIoField(key="summary", name="Summary", valueType="text")],
         runtimeReady=True,
         runtimeRegistered=True,
         llmNodeEligibility=eligibility,
@@ -133,7 +133,7 @@ class NodeSystemValidatorSkillTests(unittest.TestCase):
         )
         definition = _agent_skill_definition(
             "summarize_text",
-            input_schema=[SkillIoField(key="text", name="Text", valueType="text", required=True)],
+            input_schema=[SkillIoField(key="text", name="Text", valueType="text")],
         )
 
         with (

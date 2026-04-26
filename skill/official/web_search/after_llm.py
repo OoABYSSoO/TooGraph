@@ -693,7 +693,7 @@ def main() -> None:
     except json.JSONDecodeError as exc:
         payload = {"query": "", "error": f"Invalid JSON input: {exc}"}
     if not isinstance(payload, dict):
-        payload = {"query": "", "error": "Skill input must be a JSON object."}
+        payload = {"query": "", "error": "Skill LLM output must be a JSON object."}
     result = web_search_skill(**payload)
     print(json.dumps(result, ensure_ascii=False))
 

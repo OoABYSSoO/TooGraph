@@ -214,7 +214,7 @@ test("buildNodeCardViewModel marks skill-managed output ports", () => {
     writes: [{ state: "search_artifacts", mode: "replace" }],
     config: {
       skillKey: "web_search",
-      taskInstruction: "准备技能输入。",
+      taskInstruction: "准备 LLM 输出。",
       modelSource: "global",
       model: "",
       thinkingMode: "high",
@@ -274,7 +274,7 @@ test("buildNodeCardViewModel marks skill-managed input ports", () => {
     writes: [],
     config: {
       skillKey: "web_search",
-      taskInstruction: "准备技能输入。",
+      taskInstruction: "准备 LLM 输出。",
       modelSource: "global",
       model: "",
       thinkingMode: "high",

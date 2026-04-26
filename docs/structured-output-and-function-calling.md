@@ -211,7 +211,7 @@ state_schema / skill schema
 它适合 TooGraph 的两个场景：
 
 - LLM 节点写普通 state。
-- LLM 节点为一个 Skill 生成入参。
+- LLM 节点为一个 Skill 生成结构化 LLM 输出。
 
 ## Hermes Agent 的实际做法
 
@@ -532,7 +532,7 @@ function calling 不是模型真的在运行函数。它是一种“模型声明
 
 1. 检查 `web_search` 是否存在、是否启用、是否允许当前运行来源使用。
 2. 把 `arguments` 解析成 JSON。
-3. 按 `web_search.inputSchema` 校验。
+3. 按 `web_search.llmOutputSchema` 校验。
 4. 检查网络权限或审批策略。
 5. 调用本地固定生命周期入口，例如 `after_llm.py` 或仍未迁移的脚本 runtime。
 6. 把结果写入工具结果消息、state、artifact 和 run detail。
@@ -603,8 +603,8 @@ TooGraph node_system / state_schema / skill schema
 
 provider 内部可以选择：
 
-- 用 structured output 让模型生成 skill input JSON。
-- 用 function calling 让模型生成一个“虚拟函数调用”，函数名就是当前唯一能力，参数就是 skill input。
+- 用 structured output 让模型生成符合 `llmOutputSchema` 的结构化 LLM 输出 JSON。
+- 用 function calling 让模型生成一个“虚拟函数调用”，函数名就是当前唯一能力，参数就是 `llmOutputSchema` 对应的结构化输出。
 - 用 prompt fallback 让模型输出 JSON。
 
 最终 TooGraph runtime 看到的都应该是同一种结果：
@@ -612,7 +612,7 @@ provider 内部可以选择：
 ```json
 {
   "skillKey": "web_search",
-  "input": {
+  "llmOutput": {
     "query": "..."
   }
 }
@@ -632,13 +632,13 @@ provider 内部可以选择：
 }
 ```
 
-此时 function calling 不需要让模型选择工具，只需要约束“如何填写这个技能的 input”。
+此时 function calling 不需要让模型选择工具，只需要约束“如何生成这个技能的 LLM 输出”。
 
 最合理的模型任务是：
 
 ```text
-根据当前 reads state、技能 description、有效 llmInstruction 和 inputSchema，
-生成 web_search 的入参 JSON。
+根据当前 reads state、技能 description、有效 llmInstruction 和 llmOutputSchema，
+生成 web_search 的结构化 LLM 输出 JSON。
 ```
 
 如果 provider 支持 JSON Schema structured output，优先使用：
@@ -671,7 +671,7 @@ provider 内部可以选择：
 }
 ```
 
-但运行时仍应把它还原为 TooGraph 的 skill input，然后走现有 skill runtime。
+但运行时仍应把它还原为 TooGraph 的结构化 LLM 输出，然后走现有 skill runtime。
 
 ### 动态 Capability State
 
@@ -682,18 +682,18 @@ provider 内部可以选择：
 ```text
 上游输出 capability state
   -> 下游 LLM 节点读取这个 capability descriptor
-  -> 根据该 capability 的公开 inputSchema 生成入参
+  -> 根据该 capability 的公开 llmOutputSchema 生成结构化 LLM 输出
   -> runtime 执行 capability
   -> 输出唯一 result_package state
 ```
 
-function calling 在这里最多还是“入参生成约束”，不是“自主多工具调用循环”。
+function calling 在这里最多还是“结构化输出生成约束”，不是“自主多工具调用循环”。
 
-因此 function calling 的抽象最好不要叫 `skill_calling`，而应是更通用的 capability input generation：
+因此 function calling 的抽象最好不要叫 `skill_calling`，而应是更通用的 capability LLM-output generation：
 
 ```text
 capability = static skill | dynamic capability state
-LLM generates capability input
+LLM generates capability LLM output
 runtime executes capability
 runtime writes mapped outputs or result_package
 ```
@@ -705,8 +705,8 @@ runtime writes mapped outputs or result_package
 唯一来源仍然是：
 
 - `state_schema`
-- Skill `inputSchema`
-- Skill `outputSchema`
+- Skill `llmOutputSchema`
+- Skill `stateOutputSchema`
 - Subgraph 公开 input/output schema
 
 不要新增平行协议，例如单独维护一套 function call schema。
@@ -798,7 +798,7 @@ Skill 执行还应记录：
 ### 可以增强的内容
 
 - LLM 节点写普通 state 时，使用 structured output schema。
-- LLM 节点生成 skill input 时，使用 structured output 或单 function call。
+- LLM 节点生成 Skill 结构化 LLM 输出时，使用 structured output 或单 function call。
 - 运行时把 validation error 写入 run detail 并支持有限 repair retry。
 - provider adapter 负责兼容不同模型的 schema 限制。
 

@@ -3,7 +3,7 @@
   "skillKey": "local_workspace_executor",
   "name": "本地工作区执行器",
   "description": "当用户需要在 TooGraph 本地工作区白名单内读取、列出、搜索、写入或执行一个明确路径时选择此技能。",
-  "llmInstruction": "你已绑定本地工作区执行器。根据当前图 state、节点任务和预读文件上下文生成一个受控本地操作。operation 只能是 read、list、search、write 或 execute。path 必须是仓库内相对路径。search 必须提供 query。write 必须提供 content，content 应该是要写入文件的完整最终内容；如果是在编辑已有文件，应基于预读上下文生成完整改后内容。execute 只执行 path 指向的脚本，不要伪造运行结果。默认只能写 backend/data、skill/user、graph_template/user 或 node_preset/user，默认只能执行 backend/data/tmp 或 skill/user 下的脚本；不要尝试访问 .git、.env 或 backend/data/settings。技能只返回 success 和 result。",
+  "llmInstruction": "你已绑定本地工作区执行器。根据当前图 state、节点任务和 Skill Pre-LLM Context 中的运行时文件摘要生成一个受控本地操作。operation 只能是 read、list、search、write 或 execute。path 必须是仓库内相对路径。search 必须提供 query。write 必须提供 content，content 应该是要写入文件的完整最终内容；如果是在编辑已有文件，应基于可用上下文生成完整改后内容。execute 只执行 path 指向的脚本，不要伪造运行结果。默认只能写 backend/data、skill/user、graph_template/user 或 node_preset/user，默认只能执行 backend/data/tmp 或 skill/user。不要尝试访问 .git、.env 或 backend/data/settings。技能只返回 success 和 result。",
   "version": "1.0.0",
   "timeoutSeconds": 120,
   "permissions": ["file_read", "file_write", "subprocess"],
@@ -12,55 +12,36 @@
       "key": "workspace_request",
       "name": "Workspace Request",
       "valueType": "text",
-      "required": true,
       "description": "用户或上游图节点希望在本地工作区完成的明确操作目标。"
-    },
-    {
-      "key": "target_path",
-      "name": "Target Path",
-      "valueType": "text",
-      "required": false,
-      "description": "可选仓库内相对路径；before_llm.py 会尝试预读相关文件并注入摘要。"
-    },
-    {
-      "key": "workspace_context",
-      "name": "Workspace Context",
-      "valueType": "markdown",
-      "required": false,
-      "description": "可选补充上下文，例如已有文件片段、约束或期望结果。"
     }
   ],
-  "inputSchema": [
+  "llmOutputSchema": [
     {
       "key": "path",
       "name": "Path",
       "valueType": "text",
-      "required": true,
       "description": "仓库内相对路径。read/list/search 使用仓库读策略；write 默认只允许 backend/data、skill/user、graph_template/user 或 node_preset/user；execute 默认只允许 backend/data/tmp 或 skill/user。"
     },
     {
       "key": "operation",
       "name": "Operation",
       "valueType": "text",
-      "required": true,
       "description": "要执行的操作：read、list、search、write 或 execute。"
     },
     {
       "key": "content",
       "name": "Content",
       "valueType": "text",
-      "required": false,
-      "description": "write 操作写入的完整最终文本内容；read 和 execute 不需要。"
+      "description": "write 操作写入的完整最终文本内容；其他操作返回空字符串。"
     },
     {
       "key": "query",
       "name": "Query",
       "valueType": "text",
-      "required": false,
-      "description": "search 操作使用的文本搜索词；其他操作不需要。"
+      "description": "search 操作使用的文本搜索词；其他操作返回空字符串。"
     }
   ],
-  "outputSchema": [
+  "stateOutputSchema": [
     {
       "key": "success",
       "name": "Success",

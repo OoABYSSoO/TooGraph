@@ -9,7 +9,7 @@ from app.core.runtime.agent_multimodal import collect_input_attachments, prepare
 from app.core.runtime.agent_prompt import format_graph_state_input_prompt_lines
 from app.core.runtime.agent_response_generation import _resolve_media_runtime_config, repair_structured_output_with_runtime_model
 from app.core.runtime.skill_bindings import ResolvedAgentSkillBinding
-from app.core.runtime.structured_output import build_skill_input_output_schema, validate_structured_output
+from app.core.runtime.structured_output import build_skill_llm_output_schema, validate_structured_output
 from app.core.schemas.node_system import NodeSystemAgentNode, NodeSystemStateDefinition
 from app.core.schemas.skills import SkillDefinition, SkillIoField
 from app.core.thinking_levels import resolve_effective_thinking_level
@@ -54,8 +54,9 @@ def generate_agent_skill_inputs(
         skill_definitions=skill_definitions,
         state_schema=state_schema,
         node=node,
+        runtime_context=resolve_skill_runtime_context(runtime_config),
     )
-    structured_output_schema = build_skill_input_output_schema(bindings, skill_definitions)
+    structured_output_schema = build_skill_llm_output_schema(bindings, skill_definitions)
     user_prompt = build_skill_input_user_prompt(node)
     thinking_level = runtime_config.get("resolved_thinking_level")
     if not isinstance(thinking_level, str):
@@ -147,10 +148,10 @@ def generate_agent_skill_inputs(
     }
     warnings = [*attachment_warnings, *llm_meta.get("warnings", []), *repair_meta.get("warnings", [])]
     if repair_error:
-        warnings.append(f"Skill input structured output repair failed: {repair_error}")
+        warnings.append(f"Skill LLM output repair failed: {repair_error}")
     if structured_output_validation_errors:
         warnings.append(
-            "Skill input structured output validation found mismatches: "
+            "Skill LLM output validation found mismatches: "
             + "; ".join(structured_output_validation_errors[:5])
         )
     return skill_inputs, reasoning, warnings, updated_runtime_config
@@ -163,14 +164,15 @@ def build_skill_input_system_prompt(
     skill_definitions: dict[str, SkillDefinition],
     state_schema: dict[str, NodeSystemStateDefinition] | None = None,
     node: NodeSystemAgentNode | None = None,
+    runtime_context: dict[str, Any] | None = None,
 ) -> str:
     resolved_state_schema = state_schema or {}
     parts = [
-        "You are the skill-input planning phase of a graph LLM node.",
-        "Choose concrete LLM parameter arguments for every bound skill from the current graph state and the skill schemas.",
+        "You are the Skill LLM-output planning phase of a graph LLM node.",
+        "Choose concrete structured LLM output for every bound skill from the current graph state and the skill schemas.",
         "Return only one JSON object. Do not add markdown fences or prose.",
         "The top-level keys must be skill keys. Each value must be a JSON object of arguments for that skill.",
-        "Do not summarize skill results. Do not answer the user here. Only produce LLM parameters described by llmParameterSchema.",
+        "Do not summarize skill results. Do not answer the user here. Only produce the structured LLM output described by llmOutputSchema.",
     ]
     if input_values:
         parts.append("\n== Graph State Inputs ==")
@@ -185,7 +187,7 @@ def build_skill_input_system_prompt(
         definition = skill_definitions.get(skill_key)
         parts.append(f"- skillKey: {skill_key}")
         if definition is None:
-            parts.append("  llmParameterSchema: []")
+            parts.append("  llmOutputSchema: []")
             example[skill_key] = {}
             continue
         if definition.name:
@@ -199,35 +201,34 @@ def build_skill_input_system_prompt(
             parts.append("  stateInputSchema:")
             for field in definition.state_input_schema:
                 parts.extend(format_skill_input_field_lines(field))
-        parts.append("  llmParameterSchema:")
-        for field in definition.input_schema:
+        parts.append("  llmOutputSchema:")
+        for field in definition.llm_output_schema:
             parts.extend(format_skill_input_field_lines(field))
         example[skill_key] = {
             field.key: example_skill_input_value(field)
-            for field in definition.input_schema
-            if field.required
+            for field in definition.llm_output_schema
         }
 
     before_llm_context_lines = format_skill_before_llm_context_lines(
-        input_values=input_values,
         bindings=bindings,
         skill_definitions=skill_definitions,
         node=node,
+        runtime_context=runtime_context,
     )
     if before_llm_context_lines:
         parts.extend(before_llm_context_lines)
 
-    parts.append("\n== Required JSON Shape ==")
+    parts.append("\n== Skill LLM Output JSON Shape ==")
     parts.append(json.dumps(example, ensure_ascii=False, indent=2))
     return "\n".join(parts)
 
 
 def format_skill_before_llm_context_lines(
     *,
-    input_values: dict[str, Any],
     bindings: list[ResolvedAgentSkillBinding],
     skill_definitions: dict[str, SkillDefinition],
     node: NodeSystemAgentNode | None = None,
+    runtime_context: dict[str, Any] | None = None,
 ) -> list[str]:
     entries: list[tuple[str, str]] = []
     for resolved_binding in bindings:
@@ -240,7 +241,7 @@ def format_skill_before_llm_context_lines(
             continue
         payload = {
             "skill_key": skill_key,
-            "graph_state": input_values,
+            "runtime_context": runtime_context or {},
             "task_instruction": node.config.task_instruction if node is not None else "",
         }
         context_payload = invoke_lifecycle_before_llm(
@@ -264,6 +265,16 @@ def format_skill_before_llm_context_lines(
     return lines
 
 
+def resolve_skill_runtime_context(runtime_config: dict[str, Any]) -> dict[str, Any]:
+    value = runtime_config.get("skill_runtime_context")
+    if isinstance(value, dict):
+        return dict(value)
+    value = runtime_config.get("runtime_context")
+    if isinstance(value, dict):
+        return dict(value)
+    return {}
+
+
 def format_before_llm_context_payload(payload: dict[str, Any]) -> str:
     if not isinstance(payload, dict):
         return ""
@@ -281,7 +292,7 @@ def build_skill_input_user_prompt(node: NodeSystemAgentNode) -> str:
     return (
         node.config.task_instruction
         if node.config.task_instruction
-        else "Generate skill LLM parameters from the graph state and skill schemas."
+        else "Generate structured Skill LLM output from the graph state and skill schemas."
     ).strip()
 
 
@@ -313,7 +324,6 @@ def format_skill_input_field_lines(field: SkillIoField) -> list[str]:
     if field.name and field.name != field.key:
         lines.append(f"      name: {field.name}")
     lines.append(f"      type: {field.value_type}")
-    lines.append(f"      required: {field.required}")
     if field.description:
         lines.append(f"      description: {field.description}")
     return lines

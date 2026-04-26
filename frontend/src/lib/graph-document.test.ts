@@ -38,15 +38,14 @@ const webSearchSkill: SkillDefinition = {
   permissions: ["network"],
   runtime: { type: "python", entrypoint: "run.py" },
   stateInputSchema: [
-    { key: "user_question", name: "User Question", valueType: "text", required: true, description: "Question to research." },
-    { key: "search_context", name: "Search Context", valueType: "markdown", required: false, description: "Extra search context." },
+    { key: "user_question", name: "User Question", valueType: "text", description: "Question to research." },
   ],
-  inputSchema: [{ key: "query", name: "Query", valueType: "text", required: true, description: "" }],
-  outputSchema: [
-    { key: "query", name: "Query", valueType: "text", required: false, description: "Search query." },
-    { key: "source_urls", name: "Source URLs", valueType: "json", required: false, description: "URLs." },
-    { key: "artifact_paths", name: "Artifact Paths", valueType: "file", required: false, description: "Files." },
-    { key: "errors", name: "Errors", valueType: "json", required: false, description: "Errors." },
+  llmOutputSchema: [{ key: "query", name: "Query", valueType: "text", description: "" }],
+  stateOutputSchema: [
+    { key: "query", name: "Query", valueType: "text", description: "Search query." },
+    { key: "source_urls", name: "Source URLs", valueType: "json", description: "URLs." },
+    { key: "artifact_paths", name: "Artifact Paths", valueType: "file", description: "Files." },
+    { key: "errors", name: "Errors", valueType: "json", description: "Errors." },
   ],
   llmNodeEligibility: "ready",
   llmNodeBlockers: [],
@@ -56,6 +55,11 @@ const webSearchSkill: SkillDefinition = {
   runtimeRegistered: true,
   status: "active",
   canManage: true,
+};
+
+const webSearchSkillWithoutStateInputs: SkillDefinition = {
+  ...webSearchSkill,
+  stateInputSchema: [],
 };
 
 const localWorkspaceExecutorSkill: SkillDefinition = {
@@ -71,14 +75,14 @@ const localWorkspaceExecutorSkill: SkillDefinition = {
   },
   permissions: ["file_read", "file_write", "subprocess"],
   runtime: { type: "python", entrypoint: "after_llm.py" },
-  inputSchema: [
-    { key: "path", name: "Path", valueType: "text", required: true, description: "" },
-    { key: "operation", name: "Operation", valueType: "text", required: true, description: "" },
-    { key: "content", name: "Content", valueType: "text", required: false, description: "" },
+  llmOutputSchema: [
+    { key: "path", name: "Path", valueType: "text", description: "" },
+    { key: "operation", name: "Operation", valueType: "text", description: "" },
+    { key: "content", name: "Content", valueType: "text", description: "" },
   ],
-  outputSchema: [
-    { key: "success", name: "Success", valueType: "boolean", required: false, description: "操作是否成功。" },
-    { key: "result", name: "Result", valueType: "markdown", required: false, description: "成功输出或失败报错内容。" },
+  stateOutputSchema: [
+    { key: "success", name: "Success", valueType: "boolean", description: "操作是否成功。" },
+    { key: "result", name: "Result", valueType: "markdown", description: "成功输出或失败报错内容。" },
   ],
   llmNodeEligibility: "ready",
   llmNodeBlockers: [],
@@ -539,7 +543,7 @@ test("updateAgentNodeConfigInDocument materializes attached skill outputs as man
       ...config,
       skillKey: "web_search",
     }),
-    { skillDefinitions: [webSearchSkill] },
+    { skillDefinitions: [webSearchSkillWithoutStateInputs] },
   );
 
   const node = nextDocument.nodes.search_agent;
@@ -644,7 +648,7 @@ test("updateAgentNodeConfigInDocument suspends free agent outputs while a static
     document,
     "search_agent",
     (config) => ({ ...config, skillKey: "web_search" }),
-    { skillDefinitions: [webSearchSkill] },
+    { skillDefinitions: [webSearchSkillWithoutStateInputs] },
   );
   const skillNode = withSkill.nodes.search_agent;
 
@@ -664,7 +668,7 @@ test("updateAgentNodeConfigInDocument suspends free agent outputs while a static
     connectedSkillDocument,
     "search_agent",
     (config) => ({ ...config, skillKey: "" }),
-    { skillDefinitions: [webSearchSkill] },
+    { skillDefinitions: [webSearchSkillWithoutStateInputs] },
   );
   const restoredNode = withoutSkill.nodes.search_agent;
 
@@ -799,11 +803,62 @@ test("updateAgentNodeConfigInDocument automatically binds matching skill state i
   assert.equal(node.kind, "agent");
   assert.deepEqual(node.reads, [
     { state: "user_question", required: true, binding: { kind: "skill_input", skillKey: "web_search", fieldKey: "user_question", managed: true } },
-    { state: "search_context", required: false, binding: { kind: "skill_input", skillKey: "web_search", fieldKey: "search_context", managed: true } },
     { state: "extra_notes", required: false },
   ]);
   assert.equal("inputMapping" in (node.config.skillBindings?.[0] ?? {}), false);
   assert.deepEqual(document.nodes.search_agent.reads, [{ state: "extra_notes", required: false }]);
+});
+
+test("updateAgentNodeConfigInDocument materializes missing skill state inputs", () => {
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Skill Missing Input Graph",
+    state_schema: {},
+    nodes: {
+      search_agent: {
+        kind: "agent",
+        name: "Search Agent",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [],
+        config: {
+          skillKey: "",
+          skillBindings: [],
+          skillInstructionBlocks: {},
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "high",
+          temperature: 0.2,
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const nextDocument = updateAgentNodeConfigInDocument(
+    document,
+    "search_agent",
+    (config) => ({
+      ...config,
+      skillKey: "web_search",
+    }),
+    { skillDefinitions: [webSearchSkill] },
+  );
+
+  const node = nextDocument.nodes.search_agent;
+  assert.equal(node.kind, "agent");
+  assert.deepEqual(node.reads, [
+    { state: "state_1", required: true, binding: { kind: "skill_input", skillKey: "web_search", fieldKey: "user_question", managed: true } },
+  ]);
+  assert.equal(nextDocument.state_schema.state_1?.name, "User Question");
+  assert.equal(nextDocument.state_schema.state_1?.description, "Question to research.");
+  assert.equal(nextDocument.state_schema.state_1?.type, "text");
+  assert.equal(nextDocument.state_schema.state_1?.value, "");
+  assert.deepEqual(document.nodes.search_agent.reads, []);
 });
 
 test("reconcileAgentSkillOutputBindingsInDocument prunes stale managed outputs for the attached skill schema", () => {

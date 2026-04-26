@@ -177,6 +177,7 @@ def test_langgraph_runtime_pauses_before_risky_skill_permission(monkeypatch) -> 
                     "operation": "write",
                     "path": "skill/user/demo/SKILL.md",
                     "content": "# Demo",
+                    "query": "",
                 }
             },
             "planned skill inputs",
@@ -221,6 +222,7 @@ def test_langgraph_runtime_resumes_permission_approval_with_stored_inputs(monkey
                     "operation": "write",
                     "path": "skill/user/demo/SKILL.md",
                     "content": "# Demo",
+                    "query": "",
                 }
             },
             "planned skill inputs",
@@ -251,11 +253,12 @@ def test_langgraph_runtime_resumes_permission_approval_with_stored_inputs(monkey
     assert resumed["status"] == "completed"
     assert planned_inputs_calls == 1
     assert invoked == [
-        {
-            "operation": "write",
-            "path": "skill/user/demo/SKILL.md",
-            "content": "# Demo",
-        }
+            {
+                "operation": "write",
+                "path": "skill/user/demo/SKILL.md",
+                "content": "# Demo",
+                "query": "",
+            }
     ]
     assert "pending_permission_approval" not in resumed["metadata"]
     assert resumed["permission_approvals"][0]["status"] == "approved"
@@ -281,6 +284,7 @@ def test_langgraph_runtime_propagates_permission_approval_through_subgraph(monke
                     "operation": "write",
                     "path": "skill/user/demo/SKILL.md",
                     "content": "# Demo",
+                    "query": "",
                 }
             },
             "planned skill inputs",
@@ -322,6 +326,7 @@ def test_langgraph_runtime_propagates_permission_approval_through_subgraph(monke
             "operation": "write",
             "path": "skill/user/demo/SKILL.md",
             "content": "# Demo",
+            "query": "",
         }
     ]
     assert resumed["state_values"]["dynamic_result"]["sourceKey"] == "local_workspace_executor"

@@ -3,24 +3,19 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-import re
 import sys
-from typing import Any, Iterable
+from typing import Any
 
 
 MAX_READ_CONTEXT_CHARS = 120_000
 MAX_CONTEXT_FILES = 5
 DENIED_ROOTS = [".git", ".env", "backend/data/settings"]
-PATH_PATTERN = re.compile(
-    r"(?:(?:backend|docs|skill|scripts|frontend|demo)/[^\s`'\"<>，。；、]+|README\.md|AGENTS\.md|package\.json|pyproject\.toml)"
-)
 
 
 def local_workspace_executor_before_llm(**payload: Any) -> dict[str, str]:
     repo_root = _repo_root()
-    graph_state = payload.get("graph_state") if isinstance(payload.get("graph_state"), dict) else {}
-    task_instruction = _task_instruction(payload)
-    candidate_paths = _candidate_paths(graph_state, task_instruction)
+    runtime_context = payload.get("runtime_context") if isinstance(payload.get("runtime_context"), dict) else {}
+    candidate_paths = _candidate_paths(runtime_context)
 
     lines = [
         "本地工作区执行器 policy:",
@@ -45,68 +40,37 @@ def local_workspace_executor_before_llm(**payload: Any) -> dict[str, str]:
     return {"context": "\n".join(lines)}
 
 
-def _task_instruction(payload: dict[str, Any]) -> str:
-    direct = payload.get("task_instruction")
-    if isinstance(direct, str):
-        return direct
-    node = payload.get("node")
-    if isinstance(node, dict) and isinstance(node.get("task_instruction"), str):
-        return str(node["task_instruction"])
-    return ""
-
-
-def _candidate_paths(graph_state: dict[str, Any], task_instruction: str) -> list[str]:
-    texts = list(_iter_strings(graph_state))
-    if task_instruction:
-        texts.append(_replace_placeholders(task_instruction, graph_state))
-
+def _candidate_paths(runtime_context: dict[str, Any]) -> list[str]:
     seen: set[str] = set()
     paths: list[str] = []
-    for text in texts:
-        for candidate in _paths_from_text(text):
-            if candidate not in seen:
-                seen.add(candidate)
-                paths.append(candidate)
+    for candidate in _iter_runtime_path_hints(runtime_context):
+        if candidate not in seen:
+            seen.add(candidate)
+            paths.append(candidate)
     return paths
 
 
-def _paths_from_text(text: str) -> Iterable[str]:
-    trimmed = _clean_path(text)
-    if _looks_like_path(trimmed):
-        yield trimmed
-    for match in PATH_PATTERN.finditer(text):
-        candidate = _clean_path(match.group(0))
-        if _looks_like_path(candidate):
-            yield candidate
+def _iter_runtime_path_hints(runtime_context: dict[str, Any]) -> list[str]:
+    values: list[str] = []
+    for key in ("candidate_paths", "referenced_paths", "file_paths", "paths"):
+        values.extend(_iter_strings(runtime_context.get(key)))
+    return [_clean_path(value) for value in values if _clean_path(value)]
 
 
-def _looks_like_path(value: str) -> bool:
-    if not value or "\n" in value or "\r" in value:
-        return False
-    if any(char.isspace() for char in value):
-        return False
-    if value in {"README.md", "AGENTS.md", "package.json", "pyproject.toml"}:
-        return True
-    return "/" in value and not value.startswith(("http://", "https://"))
-
-
-def _replace_placeholders(text: str, graph_state: dict[str, Any]) -> str:
-    next_text = text
-    for key, value in graph_state.items():
-        if isinstance(value, (str, int, float)):
-            next_text = next_text.replace(f"<{key}>", str(value))
-    return next_text
-
-
-def _iter_strings(value: Any) -> Iterable[str]:
+def _iter_strings(value: Any) -> list[str]:
     if isinstance(value, str):
-        yield value
-    elif isinstance(value, dict):
+        return [value]
+    if isinstance(value, dict):
+        values: list[str] = []
         for child in value.values():
-            yield from _iter_strings(child)
-    elif isinstance(value, list):
+            values.extend(_iter_strings(child))
+        return values
+    if isinstance(value, list):
+        values = []
         for child in value:
-            yield from _iter_strings(child)
+            values.extend(_iter_strings(child))
+        return values
+    return []
 
 
 def _format_path_context(repo_root: Path, raw_path: str) -> list[str]:

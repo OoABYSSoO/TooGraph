@@ -232,9 +232,9 @@ def _is_skill_hidden_from_capability_selector(payload: dict[str, Any]) -> bool:
 
 
 def _skill_readiness_error(skill_dir: Path, payload: dict[str, Any]) -> str:
-    output_schema = payload.get("outputSchema")
+    output_schema = payload.get("stateOutputSchema")
     if not isinstance(output_schema, list) or not output_schema:
-        return "missing outputSchema"
+        return "missing stateOutputSchema"
     if not (skill_dir / "after_llm.py").is_file():
         return "missing after_llm.py"
     return ""

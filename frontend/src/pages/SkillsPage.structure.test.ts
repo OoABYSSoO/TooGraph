@@ -54,8 +54,11 @@ test("SkillsPage surfaces Skill capability metadata without internal runtime sta
   assert.match(componentSource, /selectedSkill\.permissions/);
   assert.match(componentSource, /selectedSkill\.stateInputSchema/);
   assert.match(componentSource, /t\("skills\.stateInputSchema"\)/);
-  assert.match(componentSource, /t\("skills\.llmInputSchema"\)/);
+  assert.match(componentSource, /t\("skills\.llmOutputSchema"\)/);
   assert.match(componentSource, /t\("skills\.stateOutputSchema"\)/);
+  assert.doesNotMatch(componentSource, /field\.required/);
+  assert.doesNotMatch(componentSource, /t\("skills\.required"\)/);
+  assert.doesNotMatch(componentSource, /t\("skills\.optional"\)/);
   assert.doesNotMatch(componentSource, /selectedSkill\.runtimeReady/);
   assert.doesNotMatch(componentSource, /selectedSkill\.runtimeRegistered/);
   assert.doesNotMatch(componentSource, /selectedSkill\.runtime\.type/);

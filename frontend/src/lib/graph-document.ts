@@ -776,6 +776,10 @@ function reconcileAgentSkillStateInputBindings<T extends GraphPayload | GraphDoc
       managedReads.push(buildManagedSkillInputReadBinding(inferredStateKey, attachedSkillKey, field));
       continue;
     }
+
+    const materializedStateKey = createManagedSkillInputState(document, definition, field);
+    boundStateKeys.add(materializedStateKey);
+    managedReads.push(buildManagedSkillInputReadBinding(materializedStateKey, attachedSkillKey, field));
   }
 
   node.reads = [
@@ -815,7 +819,7 @@ function reconcileAgentSkillOutputBindings<T extends GraphPayload | GraphDocumen
   if (attachedSkillKey) {
     const definition = skillDefinitionMap.get(attachedSkillKey);
     if (definition) {
-      const activeOutputKeys = new Set(definition.outputSchema.map((field) => field.key));
+      const activeOutputKeys = new Set(definition.stateOutputSchema.map((field) => field.key));
       const staleManagedStateKeys = collectStaleManagedSkillOutputStateKeys(
         document,
         nodeId,
@@ -844,14 +848,14 @@ function reconcileAgentSkillOutputBindings<T extends GraphPayload | GraphDocumen
     node.writes = node.writes.filter((binding) => isManagedSkillOutputStateForNode(document, nodeId, binding.state, attachedSkillKey));
 
     const existingBinding = currentBindingBySkill.get(attachedSkillKey);
-    if (!definition?.outputSchema.length) {
+    if (!definition?.stateOutputSchema.length) {
       if (existingBinding && Object.keys(existingBinding.outputMapping ?? {}).length > 0) {
         nextSkillBindings.push(existingBinding);
         processedSkillKeys.add(attachedSkillKey);
       }
     } else {
       const outputMapping = { ...(existingBinding?.outputMapping ?? {}) };
-      for (const field of definition.outputSchema) {
+      for (const field of definition.stateOutputSchema) {
         const mappedState = outputMapping[field.key];
         if (mappedState && document.state_schema[mappedState]) {
           syncManagedSkillOutputStateDefinition(document, mappedState, definition, field);
@@ -1159,7 +1163,7 @@ function buildManagedSkillInputReadBinding(
 ): ReadBinding {
   return {
     state: stateKey,
-    required: Boolean(field.required),
+    required: true,
     binding: {
       kind: "skill_input",
       skillKey,
@@ -1215,6 +1219,23 @@ type SkillInputStateCandidate = {
   score: number;
   stateKey: string;
 };
+
+function createManagedSkillInputState(
+  document: GraphPayload | GraphDocument,
+  skill: SkillDefinition,
+  field: SkillIoField,
+) {
+  const stateType = normalizeSkillFieldStateType(field.valueType);
+  const stateField = buildNextMaterializedVirtualStateField(document, stateType);
+  document.state_schema[stateField.key] = {
+    ...stateField.definition,
+    name: field.name.trim() || field.key,
+    description: field.description.trim() || `${skill.name.trim() || skill.skillKey} input: ${field.key}`,
+    type: stateType,
+  };
+  rememberMaterializedStateKeyIndex(document, stateField.key);
+  return stateField.key;
+}
 
 function createManagedSkillOutputState(
   document: GraphPayload | GraphDocument,

@@ -10,15 +10,13 @@ Use this skill when a graph needs one explicit local workspace operation on one 
 State inputs:
 
 - `workspace_request`: the user's or upstream graph node's local workspace goal.
-- `target_path`: optional repository-relative path. `before_llm.py` can pre-read matching files.
-- `workspace_context`: optional extra constraints, snippets, or desired result notes.
 
-The LLM node generates only these LLM parameters:
+The LLM node generates only this structured LLM output:
 
 - `path`: repository-relative file path.
 - `operation`: `read`, `list`, `search`, `write`, or `execute`.
-- `content`: required only when `operation` is `write`; it must be the complete final file content.
-- `query`: required only when `operation` is `search`; it must be the text to search for.
+- `content`: complete final file content for `write`; return an empty string for other operations.
+- `query`: search text for `search`; return an empty string for other operations.
 
 The skill exposes these state outputs:
 
@@ -27,7 +25,7 @@ The skill exposes these state outputs:
 
 ## Pre-LLM Read Context
 
-`before_llm.py` reads existing repository files referenced by the graph state or node task instruction before the LLM plans the skill input. This works for ordinary repository paths, not only skill artifacts.
+`before_llm.py` may read existing repository files only when the TooGraph runtime passes explicit path hints in `runtime_context`. It does not inspect graph state to discover paths.
 
 Read context is intentionally broad enough for editing workflows, but it still refuses denied roots:
 

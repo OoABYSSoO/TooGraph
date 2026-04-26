@@ -28,7 +28,6 @@ class SkillIoField(BaseModel):
     key: str = Field(..., min_length=1)
     name: str = Field(..., min_length=1)
     value_type: str = Field(..., alias="valueType", min_length=1)
-    required: bool = False
     description: str = ""
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True, extra="forbid")
@@ -71,8 +70,8 @@ class SkillDefinition(BaseModel):
     permissions: list[str] = Field(default_factory=list)
     runtime: SkillRuntimeSpec = Field(default_factory=SkillRuntimeSpec)
     state_input_schema: list[SkillIoField] = Field(default_factory=list, alias="stateInputSchema")
-    input_schema: list[SkillIoField] = Field(default_factory=list, alias="inputSchema")
-    output_schema: list[SkillIoField] = Field(default_factory=list, alias="outputSchema")
+    llm_output_schema: list[SkillIoField] = Field(default_factory=list, alias="llmOutputSchema")
+    state_output_schema: list[SkillIoField] = Field(default_factory=list, alias="stateOutputSchema")
     llm_node_eligibility: SkillLlmNodeEligibility = Field(
         default=SkillLlmNodeEligibility.NEEDS_MANIFEST,
         alias="llmNodeEligibility",
