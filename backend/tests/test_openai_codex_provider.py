@@ -16,13 +16,26 @@ from app.main import app
 
 
 class FakeResponse:
-    def __init__(self, payload: dict[str, Any], status_code: int = 200, text: str = "") -> None:
+    def __init__(
+        self,
+        payload: dict[str, Any] | None,
+        status_code: int = 200,
+        text: str = "",
+        headers: dict[str, str] | None = None,
+        json_error: Exception | None = None,
+    ) -> None:
         self._payload = payload
         self.status_code = status_code
         self.text = text or str(payload)
+        self.headers = headers or {}
+        self._json_error = json_error
         self.request = httpx.Request("POST", "https://example.test")
 
     def json(self) -> dict[str, Any]:
+        if self._json_error:
+            raise self._json_error
+        if self._payload is None:
+            raise ValueError("invalid JSON")
         return self._payload
 
     def raise_for_status(self) -> None:
@@ -159,24 +172,33 @@ class OpenAICodexProviderTests(unittest.TestCase):
         self.assertEqual(request["params"], {"client_version": "1.0.0"})
         self.assertEqual(request["headers"]["Authorization"], "Bearer codex-access-token")
 
-    def test_chat_codex_responses_posts_responses_payload(self) -> None:
+    def test_chat_codex_responses_posts_streaming_responses_payload(self) -> None:
         from app.tools.model_provider_client import chat_with_model_provider
 
         fake_client = FakeHttpClient(
             [
                 FakeResponse(
-                    {
-                        "id": "resp_1",
-                        "model": "gpt-5.5",
-                        "output_text": "hello from codex",
-                        "usage": {"input_tokens": 4, "output_tokens": 3},
-                    }
+                    None,
+                    text=(
+                        'event: response.created\n'
+                        'data: {"type":"response.created","response":{"id":"resp_1","model":"gpt-5.5"}}\n\n'
+                        'event: response.output_text.delta\n'
+                        'data: {"type":"response.output_text.delta","delta":"hello from "}\n\n'
+                        'event: response.output_text.delta\n'
+                        'data: {"type":"response.output_text.delta","delta":"codex"}\n\n'
+                        'event: response.output_item.done\n'
+                        'data: {"type":"response.output_item.done","item":{"type":"message","content":[{"type":"output_text","text":"hello from codex"}]}}\n\n'
+                        'event: response.completed\n'
+                        'data: {"type":"response.completed","response":{"id":"resp_1","model":"gpt-5.5","usage":{"input_tokens":4,"output_tokens":3}}}\n\n'
+                    ),
+                    headers={"content-type": "text/event-stream"},
+                    json_error=ValueError("stream"),
                 )
             ]
         )
         with patch("app.tools.model_provider_client.resolve_codex_access_token", return_value="codex-access-token"):
             with patch("app.tools.model_provider_client.httpx.Client", return_value=fake_client):
-                with patch("app.tools.model_provider_client.append_model_request_log"):
+                with patch("app.tools.model_provider_client.append_model_request_log") as append_log:
                     content, meta = chat_with_model_provider(
                         provider_id="openai-codex",
                         transport="codex-responses",
@@ -199,7 +221,14 @@ class OpenAICodexProviderTests(unittest.TestCase):
         self.assertEqual(request["json"]["instructions"], "You are helpful.")
         self.assertEqual(request["json"]["input"], [{"role": "user", "content": "Say hello"}])
         self.assertEqual(request["json"]["store"], False)
+        self.assertEqual(request["json"]["stream"], True)
+        self.assertNotIn("temperature", request["json"])
         self.assertNotIn("max_output_tokens", request["json"])
+        logged_response = append_log.call_args.kwargs["response_raw"]
+        self.assertEqual(logged_response["output_text"], "hello from codex")
+        self.assertEqual(logged_response["_stream"]["event_count"], 5)
+        self.assertEqual(logged_response["_stream"]["output_chunks"], ["hello from ", "codex"])
+        self.assertIn("event: response.output_text.delta", logged_response["_stream"]["raw_text"])
 
     def test_chat_codex_responses_refreshes_once_after_unauthorized(self) -> None:
         from app.tools.model_provider_client import chat_with_model_provider

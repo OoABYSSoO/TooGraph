@@ -16,6 +16,17 @@ test("ModelLogsPage renders a themed paginated raw model request log", () => {
   assert.match(pageSource, /model-logs-page__entry/);
   assert.match(pageSource, /model-logs-page__request-raw/);
   assert.match(pageSource, /model-logs-page__response-raw/);
+  assert.match(pageSource, /<details class="model-logs-page__raw-panel model-logs-page__request-raw">/);
+  assert.match(pageSource, /model-logs-page__raw-summary/);
+  assert.match(pageSource, /rawRequestHint/);
+  assert.match(pageSource, /rawResponseHint/);
+  assert.match(pageSource, /getStreamSummary/);
+  assert.match(pageSource, /selectedStreamSummary/);
+  assert.match(pageSource, /streamMerged/);
+  assert.match(pageSource, /hasStreamRaw/);
+  assert.match(pageSource, /model-logs-page__raw-text/);
+  assert.match(pageSource, /formatReadableContent/);
+  assert.match(pageSource, /formatReadableReasoning/);
   assert.match(pageSource, /JSON\.stringify\(selectedLog\.request_raw, null, 2\)/);
   assert.match(pageSource, /JSON\.stringify\(selectedLog\.response_raw, null, 2\)/);
   assert.match(pageSource, /v-html="highlightJson\(formatRequestRaw\(selectedLog\)\)"/);
@@ -31,8 +42,8 @@ test("ModelLogsPage renders a themed paginated raw model request log", () => {
   assert.match(pageSource, /model-logs-page__json-string-line/);
   assert.doesNotMatch(pageSource, /model-logs-page__json-line-break/);
   assert.match(pageSource, /v-for="message in selectedLog\.messages"/);
-  assert.match(pageSource, /selectedLog\.reasoning/);
-  assert.match(pageSource, /selectedLog\.content/);
+  assert.match(pageSource, /log\.reasoning/);
+  assert.match(pageSource, /log\.content/);
   assert.match(pageSource, /\.model-logs-page__raw-grid \{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/);
   assert.match(pageSource, /@media \(max-width:\s*980px\) \{[\s\S]*\.model-logs-page__raw-grid \{[\s\S]*grid-template-columns:\s*1fr;/);
   assert.doesNotMatch(pageSource, /LM Core Monitor/);

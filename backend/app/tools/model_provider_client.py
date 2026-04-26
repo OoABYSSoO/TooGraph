@@ -617,6 +617,95 @@ def _extract_codex_responses_text(response_payload: dict[str, Any]) -> tuple[str
     return "\n".join(text_parts).strip(), "\n".join(reasoning_parts).strip()
 
 
+def _parse_sse_json_events(stream_text: str) -> list[dict[str, Any]]:
+    events: list[dict[str, Any]] = []
+    event_name = ""
+    data_lines: list[str] = []
+
+    def flush_event() -> None:
+        nonlocal event_name, data_lines
+        if not data_lines:
+            event_name = ""
+            return
+        data = "\n".join(data_lines).strip()
+        data_lines = []
+        if not data or data == "[DONE]":
+            event_name = ""
+            return
+        try:
+            payload = json.loads(data)
+        except ValueError:
+            event_name = ""
+            return
+        if isinstance(payload, dict):
+            if event_name and "_event" not in payload:
+                payload["_event"] = event_name
+            events.append(payload)
+        event_name = ""
+
+    for raw_line in stream_text.splitlines():
+        line = raw_line.rstrip("\r")
+        if not line:
+            flush_event()
+            continue
+        if line.startswith("event:"):
+            event_name = line[len("event:") :].strip()
+            continue
+        if line.startswith("data:"):
+            data_lines.append(line[len("data:") :].lstrip())
+    flush_event()
+    return events
+
+
+def _coalesce_codex_stream_response(stream_text: str) -> dict[str, Any]:
+    events = _parse_sse_json_events(stream_text)
+    if not events:
+        raise ValueError("Codex stream response did not include JSON events.")
+
+    response_payload: dict[str, Any] = {}
+    text_parts: list[str] = []
+    reasoning_parts: list[str] = []
+    for event in events:
+        event_type = str(event.get("type") or event.get("_event") or "").strip()
+        response = event.get("response")
+        if isinstance(response, dict):
+            response_payload.update(response)
+
+        delta = event.get("delta")
+        if isinstance(delta, str) and delta:
+            if "reasoning" in event_type:
+                reasoning_parts.append(delta)
+            elif "output_text" in event_type or event_type.endswith(".delta"):
+                text_parts.append(delta)
+
+        text = event.get("text")
+        if isinstance(text, str) and text and not text_parts and "output_text" in event_type:
+            text_parts.append(text)
+
+        item = event.get("item")
+        if isinstance(item, dict) and event_type in {"response.output_item.done", "response.output_item.added"}:
+            item_text, item_reasoning = _extract_codex_responses_text({"output": [item]})
+            if item_text and not text_parts:
+                text_parts.append(item_text)
+            if item_reasoning and not reasoning_parts:
+                reasoning_parts.append(item_reasoning)
+
+    if text_parts and not response_payload.get("output_text"):
+        response_payload["output_text"] = "".join(text_parts)
+    if reasoning_parts and not response_payload.get("reasoning"):
+        response_payload["reasoning"] = "".join(reasoning_parts)
+    if not response_payload:
+        response_payload = {"output_text": "".join(text_parts), "reasoning": "".join(reasoning_parts)}
+    response_payload["_stream"] = {
+        "event_count": len(events),
+        "events": events,
+        "output_chunks": text_parts,
+        "reasoning_chunks": reasoning_parts,
+        "raw_text": stream_text,
+    }
+    return response_payload
+
+
 def _post_codex_responses_once(
     *,
     base_url: str,
@@ -626,13 +715,18 @@ def _post_codex_responses_once(
 ) -> dict[str, Any]:
     try:
         with httpx.Client(timeout=DEFAULT_REQUEST_TIMEOUT_SEC, trust_env=False) as client:
+            headers = _build_auth_headers(api_key=access_token)
+            headers["Accept"] = "text/event-stream"
             response = client.post(
                 f"{base_url}/responses",
-                headers=_build_auth_headers(api_key=access_token),
+                headers=headers,
                 json=request_payload,
             )
             response.raise_for_status()
-            payload = response.json()
+            try:
+                payload = response.json()
+            except ValueError:
+                payload = _coalesce_codex_stream_response(response.text)
     except httpx.HTTPStatusError as exc:
         if exc.response.status_code == 401:
             raise CodexAuthExpiredError("Codex access token expired.") from exc
@@ -663,7 +757,7 @@ def _chat_codex_responses(
         "instructions": system_prompt,
         "input": [{"role": "user", "content": user_prompt}],
         "store": False,
-        "temperature": temperature,
+        "stream": True,
     }
     native_thinking_payload = build_native_thinking_payload(
         provider_id=provider_id,
