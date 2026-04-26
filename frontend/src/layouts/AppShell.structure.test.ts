@@ -90,3 +90,9 @@ test("AppShell exposes model provider management as a primary sidebar destinatio
   assert.match(componentSource, /to="\/models"[\s\S]*activeNavigationSection === 'models'[\s\S]*t\("nav\.models"\)/);
   assert.match(componentSource, /<ElIcon class="app-shell__link-icon"><DataLine \/><\/ElIcon>/);
 });
+
+test("AppShell exposes model request logs as a primary sidebar destination", () => {
+  assert.match(componentSource, /import \{[\s\S]*Tickets[\s\S]*\} from "@element-plus\/icons-vue";/);
+  assert.match(componentSource, /to="\/model-logs"[\s\S]*activeNavigationSection === 'modelLogs'[\s\S]*t\("nav\.modelLogs"\)/);
+  assert.match(componentSource, /<ElIcon class="app-shell__link-icon"><Tickets \/><\/ElIcon>/);
+});

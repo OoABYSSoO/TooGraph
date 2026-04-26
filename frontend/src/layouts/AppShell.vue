@@ -84,6 +84,15 @@
           <span class="app-shell__link-label">{{ t("nav.models") }}</span>
         </RouterLink>
         <RouterLink
+          to="/model-logs"
+          class="app-shell__link"
+          :class="{ 'app-shell__link--active': activeNavigationSection === 'modelLogs' }"
+          :title="t('nav.modelLogs')"
+        >
+          <ElIcon class="app-shell__link-icon"><Tickets /></ElIcon>
+          <span class="app-shell__link-label">{{ t("nav.modelLogs") }}</span>
+        </RouterLink>
+        <RouterLink
           to="/settings"
           class="app-shell__link"
           :class="{ 'app-shell__link--active': activeNavigationSection === 'settings' }"
@@ -105,7 +114,7 @@
 
 <script setup lang="ts">
 import { ElIcon } from "element-plus";
-import { House, EditPen, Clock, CollectionTag, DataLine, Opportunity, Setting } from "@element-plus/icons-vue";
+import { House, EditPen, Clock, CollectionTag, DataLine, Opportunity, Setting, Tickets } from "@element-plus/icons-vue";
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";

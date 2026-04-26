@@ -117,7 +117,7 @@ class ModelProviderClientTests(unittest.TestCase):
         fake_client, client_patch = self._patched_client(
             FakeResponse({"id": "chatcmpl_1", "model": "gpt-4.1", "choices": [{"message": {"content": "hello"}}]})
         )
-        with client_patch:
+        with client_patch, patch("app.tools.model_provider_client.append_model_request_log"):
             content, meta = chat_with_model_provider(
                 provider_id="openai",
                 transport="openai-compatible",
@@ -148,7 +148,7 @@ class ModelProviderClientTests(unittest.TestCase):
                 }
             )
         )
-        with client_patch:
+        with client_patch, patch("app.tools.model_provider_client.append_model_request_log"):
             content, meta = chat_with_model_provider(
                 provider_id="anthropic",
                 transport="anthropic-messages",
@@ -189,7 +189,7 @@ class ModelProviderClientTests(unittest.TestCase):
                 }
             )
         )
-        with client_patch:
+        with client_patch, patch("app.tools.model_provider_client.append_model_request_log"):
             content, meta = chat_with_model_provider(
                 provider_id="gemini",
                 transport="gemini-generate-content",

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from typing import Any
 
 import httpx
@@ -14,6 +15,7 @@ from app.core.model_provider_templates import (
     normalize_transport,
 )
 from app.core.storage.settings_store import load_app_settings
+from app.core.storage.model_log_store import append_model_request_log
 from app.core.thinking_levels import (
     THINKING_LEVEL_MEDIUM,
     THINKING_LEVEL_OFF,
@@ -33,6 +35,34 @@ DEFAULT_REQUEST_TIMEOUT_SEC = 180.0
 
 class CodexAuthExpiredError(RuntimeError):
     pass
+
+
+def _append_model_request_log_safely(
+    *,
+    provider_id: str,
+    transport: str,
+    model: str,
+    path: str,
+    request_raw: dict[str, Any],
+    response_raw: dict[str, Any],
+    started_at: float,
+    status_code: int | None = 200,
+    error: str | None = None,
+) -> None:
+    try:
+        append_model_request_log(
+            provider_id=provider_id,
+            transport=transport,
+            model=model,
+            path=path,
+            request_raw=request_raw,
+            response_raw=response_raw,
+            duration_ms=int((time.monotonic() - started_at) * 1000),
+            status_code=status_code,
+            error=error,
+        )
+    except Exception:
+        return
 
 
 def _normalize_base_url(base_url: str) -> str:
@@ -337,13 +367,39 @@ def _chat_openai_compatible(
     )
     request_payload.update(native_thinking_payload)
 
-    response_payload = _request_json(
-        method="POST",
-        url=f"{base_url}/chat/completions",
-        timeout_sec=DEFAULT_REQUEST_TIMEOUT_SEC,
-        headers=_build_auth_headers(api_key=api_key, auth_header=auth_header, auth_scheme=auth_scheme),
-        json_payload=request_payload,
-        error_label=f"{provider_id} request failed",
+    started_at = time.monotonic()
+    path = "/chat/completions"
+    try:
+        response_payload = _request_json(
+            method="POST",
+            url=f"{base_url}{path}",
+            timeout_sec=DEFAULT_REQUEST_TIMEOUT_SEC,
+            headers=_build_auth_headers(api_key=api_key, auth_header=auth_header, auth_scheme=auth_scheme),
+            json_payload=request_payload,
+            error_label=f"{provider_id} request failed",
+        )
+    except Exception as exc:
+        _append_model_request_log_safely(
+            provider_id=provider_id,
+            transport=TRANSPORT_OPENAI_COMPATIBLE,
+            model=model,
+            path=path,
+            request_raw=request_payload,
+            response_raw={"error": str(exc)},
+            started_at=started_at,
+            status_code=None,
+            error=str(exc),
+        )
+        raise
+    _append_model_request_log_safely(
+        provider_id=provider_id,
+        transport=TRANSPORT_OPENAI_COMPATIBLE,
+        model=model,
+        path=path,
+        request_raw=request_payload,
+        response_raw=response_payload,
+        started_at=started_at,
+        status_code=200,
     )
     content, reasoning = _extract_openai_chat_text(response_payload)
     return content, {
@@ -390,13 +446,39 @@ def _chat_anthropic(
         "messages": [{"role": "user", "content": user_prompt}],
     }
     request_payload.update(native_thinking_payload)
-    response_payload = _request_json(
-        method="POST",
-        url=f"{base_url}/messages",
-        timeout_sec=DEFAULT_REQUEST_TIMEOUT_SEC,
-        headers=_anthropic_headers(api_key),
-        json_payload=request_payload,
-        error_label=f"{provider_id} request failed",
+    started_at = time.monotonic()
+    path = "/messages"
+    try:
+        response_payload = _request_json(
+            method="POST",
+            url=f"{base_url}{path}",
+            timeout_sec=DEFAULT_REQUEST_TIMEOUT_SEC,
+            headers=_anthropic_headers(api_key),
+            json_payload=request_payload,
+            error_label=f"{provider_id} request failed",
+        )
+    except Exception as exc:
+        _append_model_request_log_safely(
+            provider_id=provider_id,
+            transport=TRANSPORT_ANTHROPIC_MESSAGES,
+            model=model,
+            path=path,
+            request_raw=request_payload,
+            response_raw={"error": str(exc)},
+            started_at=started_at,
+            status_code=None,
+            error=str(exc),
+        )
+        raise
+    _append_model_request_log_safely(
+        provider_id=provider_id,
+        transport=TRANSPORT_ANTHROPIC_MESSAGES,
+        model=model,
+        path=path,
+        request_raw=request_payload,
+        response_raw=response_payload,
+        started_at=started_at,
+        status_code=200,
     )
     return _extract_anthropic_text(response_payload), {
         "model": response_payload.get("model") or model,
@@ -452,13 +534,39 @@ def _chat_gemini(
         request_payload["generationConfig"].update(native_thinking_payload["generationConfig"])
 
     model_name = model.removeprefix("models/")
-    response_payload = _request_json(
-        method="POST",
-        url=f"{base_url}/models/{model_name}:generateContent",
-        timeout_sec=DEFAULT_REQUEST_TIMEOUT_SEC,
-        params={"key": str(api_key or "").strip()} if str(api_key or "").strip() else None,
-        json_payload=request_payload,
-        error_label=f"{provider_id} request failed",
+    started_at = time.monotonic()
+    path = f"/models/{model_name}:generateContent"
+    try:
+        response_payload = _request_json(
+            method="POST",
+            url=f"{base_url}{path}",
+            timeout_sec=DEFAULT_REQUEST_TIMEOUT_SEC,
+            params={"key": str(api_key or "").strip()} if str(api_key or "").strip() else None,
+            json_payload=request_payload,
+            error_label=f"{provider_id} request failed",
+        )
+    except Exception as exc:
+        _append_model_request_log_safely(
+            provider_id=provider_id,
+            transport=TRANSPORT_GEMINI_GENERATE_CONTENT,
+            model=model_name,
+            path=path,
+            request_raw=request_payload,
+            response_raw={"error": str(exc)},
+            started_at=started_at,
+            status_code=None,
+            error=str(exc),
+        )
+        raise
+    _append_model_request_log_safely(
+        provider_id=provider_id,
+        transport=TRANSPORT_GEMINI_GENERATE_CONTENT,
+        model=model_name,
+        path=path,
+        request_raw=request_payload,
+        response_raw=response_payload,
+        started_at=started_at,
+        status_code=200,
     )
     return _extract_gemini_text(response_payload), {
         "model": model_name,
@@ -565,21 +673,47 @@ def _chat_codex_responses(
     )
     request_payload.update(native_thinking_payload)
 
+    started_at = time.monotonic()
+    path = "/responses"
     access_token = resolve_codex_access_token()
     try:
-        response_payload = _post_codex_responses_once(
-            base_url=base_url,
-            access_token=access_token,
-            request_payload=request_payload,
+        try:
+            response_payload = _post_codex_responses_once(
+                base_url=base_url,
+                access_token=access_token,
+                request_payload=request_payload,
+                provider_id=provider_id,
+            )
+        except CodexAuthExpiredError:
+            response_payload = _post_codex_responses_once(
+                base_url=base_url,
+                access_token=refresh_codex_access_token(),
+                request_payload=request_payload,
+                provider_id=provider_id,
+            )
+    except Exception as exc:
+        _append_model_request_log_safely(
             provider_id=provider_id,
+            transport=TRANSPORT_CODEX_RESPONSES,
+            model=model,
+            path=path,
+            request_raw=request_payload,
+            response_raw={"error": str(exc)},
+            started_at=started_at,
+            status_code=None,
+            error=str(exc),
         )
-    except CodexAuthExpiredError:
-        response_payload = _post_codex_responses_once(
-            base_url=base_url,
-            access_token=refresh_codex_access_token(),
-            request_payload=request_payload,
-            provider_id=provider_id,
-        )
+        raise
+    _append_model_request_log_safely(
+        provider_id=provider_id,
+        transport=TRANSPORT_CODEX_RESPONSES,
+        model=model,
+        path=path,
+        request_raw=request_payload,
+        response_raw=response_payload,
+        started_at=started_at,
+        status_code=200,
+    )
 
     content, reasoning = _extract_codex_responses_text(response_payload)
     return content, {

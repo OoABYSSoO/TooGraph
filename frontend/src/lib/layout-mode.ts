@@ -1,5 +1,5 @@
 export type ShellLayoutMode = "standard" | "editor-canvas";
-export type PrimaryNavigationSection = "home" | "editor" | "presets" | "skills" | "models" | "runs" | "settings";
+export type PrimaryNavigationSection = "home" | "editor" | "presets" | "skills" | "models" | "modelLogs" | "runs" | "settings";
 
 export function resolveShellLayoutMode(pathname: string): ShellLayoutMode {
   if (pathname === "/editor") {
@@ -29,6 +29,9 @@ export function resolvePrimaryNavigationSection(pathname: string): PrimaryNaviga
   }
   if (pathname === "/models" || pathname.startsWith("/models/")) {
     return "models";
+  }
+  if (pathname === "/model-logs" || pathname.startsWith("/model-logs/")) {
+    return "modelLogs";
   }
   if (pathname === "/runs" || pathname.startsWith("/runs/")) {
     return "runs";

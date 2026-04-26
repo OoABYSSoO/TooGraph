@@ -12,6 +12,7 @@ RUN_DATA_DIR = DATA_DIR / "runs"
 CHECKPOINT_DATA_DIR = DATA_DIR / "checkpoints"
 SETTINGS_DATA_DIR = DATA_DIR / "settings"
 SKILL_STATE_DATA_DIR = DATA_DIR / "skills"
+MODEL_LOG_DATA_DIR = DATA_DIR / "model_logs"
 DB_PATH = DATA_DIR / "graphiteui.db"
 
 
