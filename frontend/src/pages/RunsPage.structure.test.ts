@@ -36,6 +36,15 @@ test("RunsPage lets each restorable card choose breakpoint or final-result resto
   assert.match(componentSource, /@click\.stop="selectRestoreTarget\(run\.run_id, target\.key\)"/);
 });
 
+test("RunsPage keeps the detail action immediately before restore edit after restore target choices", () => {
+  const actionsMatch = componentSource.match(/<div class="runs-page__card-actions">([\s\S]*?)<\/div>\s*<\/article>/);
+  assert.ok(actionsMatch, "expected to find run card actions");
+  assert.match(
+    actionsMatch[1],
+    /class="runs-page__restore-switch"[\s\S]*class="runs-page__detail-link"[\s\S]*class="runs-page__restore-link"/,
+  );
+});
+
 test("RunsPage uses semantic status styling and keeps run identifiers monospace", () => {
   assert.match(componentSource, /function statusBadgeClass\(status: string\)/);
   assert.match(componentSource, /:class="statusBadgeClass\(run\.status\)"/);

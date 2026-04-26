@@ -63,7 +63,6 @@
             <p class="runs-page__run-id">{{ run.run_id }}</p>
           </div>
           <div class="runs-page__card-actions">
-            <button type="button" class="runs-page__detail-link" @click.stop="openRunDetail(run.run_id)">{{ runCardDetail }}</button>
             <div v-if="restoreTargetsForRun(run).length > 1" class="runs-page__restore-switch" :aria-label="t('runs.restoreSnapshotAria')">
               <button
                 v-for="target in restoreTargetsForRun(run)"
@@ -77,6 +76,7 @@
                 {{ target.label }}
               </button>
             </div>
+            <button type="button" class="runs-page__detail-link" @click.stop="openRunDetail(run.run_id)">{{ runCardDetail }}</button>
             <RouterLink v-if="canRestoreRunSummary(run)" class="runs-page__restore-link" @click.stop :to="restoreUrlForRun(run)">
               <ElIcon class="runs-page__restore-icon" aria-hidden="true"><Promotion /></ElIcon>
               <span>{{ t("common.restoreEdit") }}</span>

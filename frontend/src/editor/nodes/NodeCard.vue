@@ -705,27 +705,6 @@
           <div class="node-card__confirm-hint node-card__confirm-hint--toggle">{{ t("nodeCard.setBreakpoint") }}</div>
         </ElPopover>
       </div>
-      <div
-        v-if="agentModelOptions.length > 0"
-        class="node-card__available-model-pills"
-        :aria-label="t('settings.availableModels')"
-        @pointerdown.stop
-        @click.stop
-      >
-        <button
-          v-for="option in agentModelOptions"
-          :key="`model-pill-${option.value}`"
-          type="button"
-          class="node-card__model-pill"
-          :class="{ 'node-card__model-pill--active': option.value === agentResolvedModelValue }"
-          :title="option.value === trimmedGlobalTextModelRef ? `${option.label} (${t('nodeCard.globalModelSuffix')})` : option.label"
-          @click.stop="handleAgentModelValueChange(option.value)"
-        >
-          <span class="node-card__model-pill-label">
-            {{ option.value === trimmedGlobalTextModelRef ? `${option.label} (${t('nodeCard.globalModelSuffix')})` : option.label }}
-          </span>
-        </button>
-      </div>
       <div class="node-card__action-row">
         <ElPopover
           v-if="showSkillPickerTrigger"
@@ -3812,59 +3791,6 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
   gap: 10px;
   align-items: center;
   justify-content: stretch;
-}
-
-.node-card__available-model-pills {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 7px;
-  min-width: 0;
-}
-
-.node-card__model-pill {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  max-width: 100%;
-  min-height: 30px;
-  border: 1px solid rgba(154, 52, 18, 0.16);
-  border-radius: 999px;
-  padding: 6px 11px;
-  background: rgba(255, 248, 240, 0.78);
-  color: rgba(60, 41, 20, 0.78);
-  font-size: 0.78rem;
-  font-weight: 750;
-  letter-spacing: 0;
-  cursor: pointer;
-  touch-action: manipulation;
-  transition:
-    background-color 160ms ease,
-    border-color 160ms ease,
-    color 160ms ease,
-    box-shadow 160ms ease;
-}
-
-.node-card__model-pill:hover {
-  border-color: rgba(154, 52, 18, 0.28);
-  background: rgba(255, 237, 213, 0.9);
-  color: #3c2914;
-}
-
-.node-card__model-pill--active {
-  border-color: rgba(154, 52, 18, 0.72);
-  background: rgb(154, 52, 18);
-  color: rgb(255, 248, 240);
-  box-shadow: 0 8px 18px rgba(154, 52, 18, 0.18);
-}
-
-.node-card__model-pill-label {
-  min-width: 0;
-  max-width: 100%;
-  overflow: hidden;
-  overflow-wrap: anywhere;
-  text-align: center;
-  line-height: 1.2;
 }
 
 .node-card__agent-model-select {

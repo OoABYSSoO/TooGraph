@@ -196,21 +196,22 @@ test("NodeCard asks the workspace to refresh models when the agent model select 
   assert.match(componentSource, /if \(visible\) \{[\s\S]*emit\("refresh-agent-models"\);[\s\S]*\}/);
 });
 
-test("NodeCard displays configured agent models as selectable capsules", () => {
+test("NodeCard keeps agent model selection in the dropdown without rendering duplicate model capsules", () => {
   const agentSectionMatch = componentSource.match(
     /<section v-else-if="view\.body\.kind === 'agent'"[\s\S]*?<\/section>/,
   );
   assert.ok(agentSectionMatch, "expected to find the agent node section");
   const agentSection = agentSectionMatch[0];
 
-  assert.match(agentSection, /class="node-card__available-model-pills"/);
+  assert.match(agentSection, /class="node-card__agent-model-select graphite-select"/);
   assert.match(agentSection, /v-for="option in agentModelOptions"/);
-  assert.match(agentSection, /class="node-card__model-pill"/);
-  assert.match(agentSection, /node-card__model-pill--active/);
-  assert.match(agentSection, /@click\.stop="handleAgentModelValueChange\(option\.value\)"/);
-  assert.match(componentSource, /\.node-card__available-model-pills \{/);
-  assert.match(componentSource, /\.node-card__model-pill \{/);
-  assert.match(componentSource, /\.node-card__model-pill--active \{/);
+  assert.match(agentSection, /@update:model-value="handleAgentModelValueChange"/);
+  assert.doesNotMatch(agentSection, /class="node-card__available-model-pills"/);
+  assert.doesNotMatch(agentSection, /class="node-card__model-pill"/);
+  assert.doesNotMatch(agentSection, /node-card__model-pill--active/);
+  assert.doesNotMatch(componentSource, /\.node-card__available-model-pills \{/);
+  assert.doesNotMatch(componentSource, /\.node-card__model-pill \{/);
+  assert.doesNotMatch(componentSource, /\.node-card__model-pill--active \{/);
 });
 
 test("NodeCard opens agent add skill and port actions in themed popovers instead of inline panels", () => {
