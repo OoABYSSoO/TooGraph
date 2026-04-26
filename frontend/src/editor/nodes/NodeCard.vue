@@ -1342,8 +1342,8 @@ const stateTypeOptions = STATE_FIELD_TYPE_OPTIONS;
 const conditionRuleOperatorOptions = CONDITION_RULE_OPERATOR_OPTIONS;
 type AgentThinkingControlMode = Exclude<AgentNode["config"]["thinkingMode"], "on">;
 const agentThinkingOptions = computed<Array<{ value: AgentThinkingControlMode; label: string }>>(() => [
-  { value: "auto", label: t("nodeCard.thinkingAuto") },
   { value: "off", label: t("nodeCard.thinkingOff") },
+  { value: "auto", label: t("nodeCard.thinkingAuto") },
   { value: "low", label: t("nodeCard.thinkingFast") },
   { value: "medium", label: t("nodeCard.thinkingBalanced") },
   { value: "high", label: t("nodeCard.thinkingDeep") },

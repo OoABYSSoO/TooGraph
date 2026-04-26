@@ -918,8 +918,8 @@ const configuredModelOptions = computed(() =>
   ),
 );
 const thinkingLevelOptions = computed<Array<{ value: AgentThinkingLevel; label: string }>>(() => [
-  { value: "auto", label: t("settings.thinkingAuto") },
   { value: "off", label: t("settings.thinkingOff") },
+  { value: "auto", label: t("settings.thinkingAuto") },
   { value: "low", label: t("settings.thinkingFast") },
   { value: "medium", label: t("settings.thinkingBalanced") },
   { value: "high", label: t("settings.thinkingDeep") },

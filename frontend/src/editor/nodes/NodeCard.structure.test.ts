@@ -176,7 +176,12 @@ test("NodeCard restores the legacy agent runtime control order with Element Plus
   assert.match(componentSource, /\.node-card__agent-thinking-icon \{[\s\S]*height:\s*20px;/);
   assert.doesNotMatch(componentSource, /\.node-card__agent-thinking-icon \{[^}]*background:/);
   assert.match(componentSource, /const agentThinkingOptions = computed/);
-  assert.match(componentSource, /value:\s*"auto"/);
+  const thinkingOptions = componentSource.match(/const agentThinkingOptions = computed[\s\S]*?\]\);/);
+  assert.ok(thinkingOptions, "expected agent thinking options");
+  assert.match(
+    thinkingOptions[0],
+    /value:\s*"off"[\s\S]*value:\s*"auto"[\s\S]*value:\s*"low"[\s\S]*value:\s*"medium"[\s\S]*value:\s*"high"[\s\S]*value:\s*"xhigh"/,
+  );
   assert.match(componentSource, /function normalizeAgentThinkingMode/);
   assert.match(componentSource, /agentBreakpointEnabled\?:\s*boolean;/);
   assert.match(componentSource, /agentBreakpointTiming\?:\s*"before" \| "after";/);
