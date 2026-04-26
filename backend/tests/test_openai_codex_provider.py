@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -14,6 +15,12 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.main import app
+
+PROXY_ENV = {
+    "HTTPS_PROXY": "http://127.0.0.1:7897",
+    "HTTP_PROXY": "http://127.0.0.1:7897",
+    "ALL_PROXY": "socks://127.0.0.1:7897/",
+}
 
 
 class FakeResponse:
@@ -88,6 +95,50 @@ class FakeHttpClient:
 
 
 class OpenAICodexProviderTests(unittest.TestCase):
+    def test_codex_auth_start_honors_environment_proxy_settings(self) -> None:
+        from app.tools.openai_codex_client import start_codex_device_login
+
+        fake_client = FakeHttpClient(
+            [
+                FakeResponse(
+                    {
+                        "device_auth_id": "device-1",
+                        "user_code": "ABCD-EFGH",
+                        "interval": "5",
+                    }
+                )
+            ]
+        )
+        with patch.dict(os.environ, PROXY_ENV, clear=False):
+            with patch("app.tools.openai_codex_client.httpx.Client", return_value=fake_client) as client_factory:
+                session = start_codex_device_login()
+
+        self.assertEqual(session["device_auth_id"], "device-1")
+        self.assertEqual(session["user_code"], "ABCD-EFGH")
+        self.assertEqual(client_factory.call_args.kwargs.get("proxy"), "http://127.0.0.1:7897")
+        self.assertIs(client_factory.call_args.kwargs.get("trust_env"), False)
+
+    def test_codex_auth_poll_and_exchange_honor_environment_proxy_settings(self) -> None:
+        from app.tools.openai_codex_client import poll_codex_device_login
+
+        fake_client = FakeHttpClient(
+            [
+                FakeResponse({"authorization_code": "code-1", "code_verifier": "verifier-1"}),
+                FakeResponse({"access_token": "access-token", "refresh_token": "refresh-token"}),
+            ]
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            auth_path = Path(temp_dir) / "openai_codex_auth.json"
+            with patch("app.tools.openai_codex_client.CODEX_AUTH_PATH", auth_path):
+                with patch.dict(os.environ, PROXY_ENV, clear=False):
+                    with patch("app.tools.openai_codex_client.httpx.Client", return_value=fake_client) as client_factory:
+                        status = poll_codex_device_login(device_auth_id="device-1", user_code="ABCD-EFGH")
+
+        self.assertEqual(status["status"], "authenticated")
+        self.assertTrue(status["authenticated"])
+        self.assertEqual([call.kwargs.get("proxy") for call in client_factory.call_args_list], ["http://127.0.0.1:7897", "http://127.0.0.1:7897"])
+        self.assertEqual([call.kwargs.get("trust_env") for call in client_factory.call_args_list], [False, False])
+
     def test_codex_auth_status_masks_stored_tokens(self) -> None:
         from app.tools.openai_codex_client import get_codex_auth_status, save_codex_auth_state
 
@@ -170,14 +221,17 @@ class OpenAICodexProviderTests(unittest.TestCase):
             ]
         )
         with patch("app.tools.model_provider_client.resolve_codex_access_token", return_value="codex-access-token"):
-            with patch("app.tools.model_provider_client.httpx.Client", return_value=fake_client):
-                models = discover_provider_models(
-                    provider_id="openai-codex",
-                    transport="codex-responses",
-                    base_url="https://chatgpt.com/backend-api/codex",
-                )
+            with patch.dict(os.environ, PROXY_ENV, clear=False):
+                with patch("app.tools.model_provider_client.httpx.Client", return_value=fake_client) as client_factory:
+                    models = discover_provider_models(
+                        provider_id="openai-codex",
+                        transport="codex-responses",
+                        base_url="https://chatgpt.com/backend-api/codex",
+                    )
 
         self.assertEqual(models, ["gpt-5.5"])
+        self.assertEqual(client_factory.call_args.kwargs.get("proxy"), "http://127.0.0.1:7897")
+        self.assertIs(client_factory.call_args.kwargs.get("trust_env"), False)
         request = fake_client.get_calls[0]
         self.assertEqual(
             request["url"],
@@ -211,22 +265,25 @@ class OpenAICodexProviderTests(unittest.TestCase):
             ]
         )
         with patch("app.tools.model_provider_client.resolve_codex_access_token", return_value="codex-access-token"):
-            with patch("app.tools.model_provider_client.httpx.Client", return_value=fake_client):
-                with patch("app.tools.model_provider_client.append_model_request_log") as append_log:
-                    content, meta = chat_with_model_provider(
-                        provider_id="openai-codex",
-                        transport="codex-responses",
-                        base_url="https://chatgpt.com/backend-api/codex",
-                        api_key="",
-                        model="gpt-5.5",
-                        system_prompt="You are helpful.",
-                        user_prompt="Say hello",
-                        temperature=0.2,
-                        max_tokens=64,
-                    )
+            with patch.dict(os.environ, PROXY_ENV, clear=False):
+                with patch("app.tools.model_provider_client.httpx.Client", return_value=fake_client) as client_factory:
+                    with patch("app.tools.model_provider_client.append_model_request_log") as append_log:
+                        content, meta = chat_with_model_provider(
+                            provider_id="openai-codex",
+                            transport="codex-responses",
+                            base_url="https://chatgpt.com/backend-api/codex",
+                            api_key="",
+                            model="gpt-5.5",
+                            system_prompt="You are helpful.",
+                            user_prompt="Say hello",
+                            temperature=0.2,
+                            max_tokens=64,
+                        )
 
         request = fake_client.post_calls[0]
         self.assertEqual(content, "hello from codex")
+        self.assertEqual(client_factory.call_args.kwargs.get("proxy"), "http://127.0.0.1:7897")
+        self.assertIs(client_factory.call_args.kwargs.get("trust_env"), False)
         self.assertEqual(meta["response_id"], "resp_1")
         self.assertEqual(meta["usage"], {"input_tokens": 4, "output_tokens": 3})
         self.assertEqual(request["url"], "https://chatgpt.com/backend-api/codex/responses")

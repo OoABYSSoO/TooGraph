@@ -24,6 +24,7 @@ from app.core.thinking_levels import (
 )
 from app.tools.openai_codex_client import (
     DEFAULT_CODEX_MODEL_IDS,
+    codex_http_client_kwargs,
     refresh_codex_access_token,
     resolve_codex_access_token,
 )
@@ -117,9 +118,10 @@ def _request_json(
     params: dict[str, str] | None = None,
     json_payload: dict[str, Any] | None = None,
     error_label: str,
+    client_kwargs: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     try:
-        with httpx.Client(timeout=timeout_sec, trust_env=False) as client:
+        with httpx.Client(**(client_kwargs or {"timeout": timeout_sec, "trust_env": False})) as client:
             if method == "GET":
                 response = client.get(url, headers=headers, params=params)
             elif method == "POST":
@@ -451,6 +453,7 @@ def discover_provider_models(
                 headers=_build_auth_headers(api_key=access_token),
                 params={"client_version": "1.0.0"},
                 error_label="Model discovery failed",
+                client_kwargs=codex_http_client_kwargs(timeout=timeout_sec),
             )
         except RuntimeError as exc:
             if "HTTP 401" in str(exc):
@@ -462,6 +465,7 @@ def discover_provider_models(
                     headers=_build_auth_headers(api_key=access_token),
                     params={"client_version": "1.0.0"},
                     error_label="Model discovery failed",
+                    client_kwargs=codex_http_client_kwargs(timeout=timeout_sec),
                 )
             else:
                 return list(DEFAULT_CODEX_MODEL_IDS)
@@ -1096,7 +1100,7 @@ def _post_codex_responses_once(
     on_delta: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     try:
-        with httpx.Client(timeout=DEFAULT_REQUEST_TIMEOUT_SEC, trust_env=False) as client:
+        with httpx.Client(**codex_http_client_kwargs(timeout=DEFAULT_REQUEST_TIMEOUT_SEC)) as client:
             headers = _build_auth_headers(api_key=access_token)
             headers["Accept"] = "text/event-stream"
             def handle_stream_event(event_payload: dict[str, Any]) -> None:
