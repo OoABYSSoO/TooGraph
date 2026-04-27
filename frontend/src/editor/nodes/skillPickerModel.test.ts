@@ -59,10 +59,54 @@ const skillDefinitions: SkillDefinition[] = [
   },
 ];
 
+const unavailableSkillDefinitions: SkillDefinition[] = [
+  skillDefinitions[0],
+  {
+    ...skillDefinitions[1],
+    skillKey: "desktop_companion_profile",
+    label: "Desktop Companion Profile",
+    targets: ["companion"],
+    kind: "profile",
+    mode: "context",
+    scope: "global",
+  },
+  {
+    ...skillDefinitions[1],
+    skillKey: "needs_configuration",
+    label: "Needs Configuration",
+    configured: false,
+  },
+  {
+    ...skillDefinitions[1],
+    skillKey: "unhealthy_skill",
+    label: "Unhealthy Skill",
+    healthy: false,
+  },
+  {
+    ...skillDefinitions[1],
+    skillKey: "runtime_pending",
+    label: "Runtime Pending",
+    runtimeRegistered: false,
+  },
+  {
+    ...skillDefinitions[1],
+    skillKey: "disabled_skill",
+    label: "Disabled Skill",
+    status: "disabled",
+  },
+];
+
 test("listAttachableSkillDefinitions filters already attached skill keys", () => {
   assert.deepEqual(
     listAttachableSkillDefinitions(skillDefinitions, ["search_knowledge_base"]),
     [skillDefinitions[1]],
+  );
+});
+
+test("listAttachableSkillDefinitions only exposes active healthy agent runtime skills", () => {
+  assert.deepEqual(
+    listAttachableSkillDefinitions(unavailableSkillDefinitions, []).map((definition) => definition.skillKey),
+    ["search_knowledge_base"],
   );
 });
 

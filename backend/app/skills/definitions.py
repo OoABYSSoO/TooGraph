@@ -40,7 +40,18 @@ class SkillDefinitionRecord:
 
 def list_skill_definitions(*, include_disabled: bool = False) -> list[SkillDefinition]:
     catalog = list_skill_catalog(include_disabled=include_disabled)
-    return [item for item in catalog if item.runtime_registered]
+    return [item for item in catalog if is_agent_attachable_skill(item)]
+
+
+def is_agent_attachable_skill(definition: SkillDefinition) -> bool:
+    return (
+        definition.status == SkillCatalogStatus.ACTIVE
+        and definition.runtime_ready
+        and definition.runtime_registered
+        and SkillTarget.AGENT_NODE in definition.targets
+        and definition.configured
+        and definition.healthy
+    )
 
 
 def list_skill_catalog(*, include_disabled: bool = True) -> list[SkillDefinition]:

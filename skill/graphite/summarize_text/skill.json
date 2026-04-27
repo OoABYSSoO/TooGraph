@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "graphite.skill/v1",
+  "skillKey": "summarize_text",
+  "label": "Summarize Text",
+  "description": "Condense long text into a concise summary, preserving key points.",
+  "version": "1.0.0",
+  "targets": ["agent_node"],
+  "kind": "atomic",
+  "mode": "tool",
+  "scope": "node",
+  "permissions": ["model_text"],
+  "inputSchema": [
+    {
+      "key": "text",
+      "label": "Text",
+      "valueType": "text",
+      "required": true,
+      "description": "The source text to summarize."
+    },
+    {
+      "key": "max_sentences",
+      "label": "Max Sentences",
+      "valueType": "text",
+      "required": false,
+      "description": "Maximum number of sentences in the summary (default 3)."
+    }
+  ],
+  "outputSchema": [
+    {
+      "key": "summary",
+      "label": "Summary",
+      "valueType": "text",
+      "description": "The condensed summary."
+    },
+    {
+      "key": "key_points",
+      "label": "Key Points",
+      "valueType": "json",
+      "description": "Array of extracted key points as strings."
+    }
+  ],
+  "supportedValueTypes": ["text"],
+  "sideEffects": ["model_call"],
+  "configured": true,
+  "healthy": true
+}

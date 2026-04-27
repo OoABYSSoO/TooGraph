@@ -749,6 +749,9 @@
               <div class="node-card__skill-option-title">{{ definition.label }}</div>
               <div class="node-card__skill-option-copy">{{ definition.description }}</div>
               <div class="node-card__skill-option-meta">
+                <span>{{ definition.kind }}</span>
+                <span>{{ definition.mode }}</span>
+                <span>{{ definition.scope }}</span>
                 <span v-if="definition.inputSchema.length > 0">{{ t("nodeCard.inputCount", { count: definition.inputSchema.length }) }}</span>
                 <span v-if="definition.outputSchema.length > 0">{{ t("nodeCard.outputCount", { count: definition.outputSchema.length }) }}</span>
               </div>
