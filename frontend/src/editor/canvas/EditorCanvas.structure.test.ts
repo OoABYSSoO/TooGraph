@@ -427,7 +427,8 @@ test("EditorCanvas gives data edges the same two-step state editing entry patter
   assert.match(componentSource, /@click\.stop="openDataEdgeStateEditor"/);
   assert.match(componentSource, /<div[\s\S]*v-if="activeDataEdgeStateEditor && dataEdgeStateDraft"[\s\S]*class="editor-canvas__edge-state-editor-shell"/);
   assert.match(componentSource, /<StateEditorPopover[\s\S]*:draft="dataEdgeStateDraft"[\s\S]*:error="dataEdgeStateError"[\s\S]*:type-options="stateTypeOptions"[\s\S]*:color-options="dataEdgeStateColorOptions"/);
-  assert.match(componentSource, /@update:key="handleDataEdgeStateEditorKeyInput"/);
+  assert.doesNotMatch(componentSource, /@update:key="handleDataEdgeStateEditorKeyInput"/);
+  assert.doesNotMatch(componentSource, /function handleDataEdgeStateEditorKeyInput/);
   assert.match(componentSource, /@update:name="handleDataEdgeStateEditorNameInput"/);
   assert.match(componentSource, /@update:type="handleDataEdgeStateEditorTypeValue"/);
   assert.match(componentSource, /@update:color="handleDataEdgeStateEditorColorInput"/);
@@ -485,13 +486,13 @@ test("EditorCanvas emits node-creation intents for empty-canvas double click and
 
 test("EditorCanvas forwards node-card state editing and top-action events", () => {
   assert.match(componentSource, /@update-node-metadata="emit\('update-node-metadata', \$event\)"/);
-  assert.match(componentSource, /@rename-state="emit\('rename-state', \$event\)"/);
+  assert.doesNotMatch(componentSource, /@rename-state="emit\('rename-state', \$event\)"/);
   assert.match(componentSource, /@update-state="emit\('update-state', \$event\)"/);
   assert.match(componentSource, /@remove-port-state="emit\('remove-port-state', \$event\)"/);
   assert.match(componentSource, /@delete-node="emit\('delete-node', \$event\)"/);
   assert.match(componentSource, /@save-node-preset="emit\('save-node-preset', \$event\)"/);
   assert.match(componentSource, /\(event: "update-node-metadata", payload: \{ nodeId: string; patch: Partial<Pick<InputNode \| AgentNode \| ConditionNode \| OutputNode, "name" \| "description">> \}\): void;/);
-  assert.match(componentSource, /\(event: "rename-state", payload: \{ currentKey: string; nextKey: string \}\): void;/);
+  assert.doesNotMatch(componentSource, /\(event: "rename-state"/);
   assert.match(componentSource, /\(event: "update-state", payload: \{ stateKey: string; patch: Partial<StateDefinition> \}\): void;/);
   assert.match(componentSource, /\(event: "remove-port-state", payload: \{ nodeId: string; side: "input" \| "output"; stateKey: string \}\): void;/);
   assert.match(componentSource, /\(event: "delete-node", payload: \{ nodeId: string \}\): void;/);

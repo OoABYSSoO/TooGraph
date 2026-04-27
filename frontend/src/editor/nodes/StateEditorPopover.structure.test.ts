@@ -11,7 +11,10 @@ const componentSource = readFileSync(resolve(currentDirectory, "StateEditorPopov
 test("StateEditorPopover uses compact metadata-first editing with Element Plus selects", () => {
   assert.match(componentSource, /import \{ computed, nextTick, ref \} from "vue";/);
   assert.match(componentSource, /import \{ ElInput, ElOption, ElSelect \} from "element-plus";/);
-  assert.match(componentSource, /<span class="node-state-editor__field-label">\{\{ t\("nodeCard\.key"\) \}\}<\/span>[\s\S]*<span class="node-state-editor__field-label">\{\{ t\("nodeCard\.name"\) \}\}<\/span>/);
+  assert.doesNotMatch(componentSource, /t\("nodeCard\.key"\)/);
+  assert.doesNotMatch(componentSource, /@update:model-value="\$emit\('update:key'/);
+  assert.doesNotMatch(componentSource, /\(event: "update:key", value: string\): void;/);
+  assert.match(componentSource, /<span class="node-state-editor__field-label">\{\{ t\("nodeCard\.name"\) \}\}<\/span>/);
   assert.match(componentSource, /<span class="node-state-editor__field-label">\{\{ t\("nodeCard\.type"\) \}\}<\/span>[\s\S]*<span class="node-state-editor__field-label">\{\{ t\("nodeCard\.color"\) \}\}<\/span>/);
   assert.match(componentSource, /class="node-state-editor__grid"/);
   assert.match(componentSource, /\.node-state-editor__grid \{[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/);

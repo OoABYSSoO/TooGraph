@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import unittest
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.runtime.node_system_executor import _build_auto_system_prompt, _parse_llm_json_response
 from app.core.schemas.node_system import NodeSystemStateDefinition, NodeSystemStateType

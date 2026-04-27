@@ -4,21 +4,21 @@
   "description": "Use a selected knowledge base to answer a user question with one grounded agent.",
   "default_graph_name": "知识库问答",
   "state_schema": {
-    "question": {
+    "state_1": {
       "name": "question",
       "description": "Question that should be answered from the knowledge base.",
       "type": "text",
       "value": "GraphiteUI 支持哪些核心能力？",
       "color": "#d97706"
     },
-    "knowledge_base": {
+    "state_2": {
       "name": "knowledge_base",
       "description": "Selected knowledge base for grounded answers.",
       "type": "knowledge_base",
       "value": "graphiteui-official",
       "color": "#0f766e"
     },
-    "answer": {
+    "state_3": {
       "name": "answer",
       "description": "Knowledge-base-grounded answer produced by the agent.",
       "type": "text",
@@ -36,7 +36,7 @@
         "collapsed": false
       },
       "writes": [
-        { "state": "question", "mode": "replace" }
+        { "state": "state_1", "mode": "replace" }
       ],
       "config": {
         "value": "GraphiteUI 支持哪些核心能力？"
@@ -51,7 +51,7 @@
         "collapsed": false
       },
       "writes": [
-        { "state": "knowledge_base", "mode": "replace" }
+        { "state": "state_2", "mode": "replace" }
       ],
       "config": {
         "value": "graphiteui-official"
@@ -66,11 +66,11 @@
         "collapsed": false
       },
       "reads": [
-        { "state": "question", "required": true },
-        { "state": "knowledge_base", "required": true }
+        { "state": "state_1", "required": true },
+        { "state": "state_2", "required": true }
       ],
       "writes": [
-        { "state": "answer", "mode": "replace" }
+        { "state": "state_3", "mode": "replace" }
       ],
       "config": {
         "skills": ["search_knowledge_base"],
@@ -86,7 +86,7 @@
         "collapsed": false
       },
       "reads": [
-        { "state": "answer", "required": true }
+        { "state": "state_3", "required": true }
       ],
       "config": {
         "displayMode": "markdown",
@@ -111,5 +111,7 @@
     }
   ],
   "conditional_edges": [],
-  "metadata": {}
+  "metadata": {
+    "graphiteui_state_key_counter": 3
+  }
 }

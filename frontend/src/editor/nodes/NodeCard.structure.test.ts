@@ -264,6 +264,10 @@ test("NodeCard opens agent add skill and port actions in themed popovers instead
   assert.match(componentSource, /\{ side: "input", label: "\+ input", toneClass: "node-card__action-pill--input", placement: "bottom-start" \}/);
   assert.match(componentSource, /\{ side: "output", label: "\+ output", toneClass: "node-card__action-pill--output", placement: "bottom-end" \}/);
   assert.match(agentSection, /<ElSelect[\s\S]*class="node-card__control-select graphite-select"[\s\S]*popper-class="graphite-select-popper node-card__port-picker-select-popper"/);
+  assert.doesNotMatch(agentSection, /t\("nodeCard\.key"\)/);
+  assert.doesNotMatch(agentSection, /portStateDraft\.key/);
+  assert.doesNotMatch(agentSection, /class="node-card__port-state-key"/);
+  assert.doesNotMatch(componentSource, /handlePortDraftKey/);
   assert.match(agentSection, /class="node-card__port-picker-color-option"/);
   assert.match(agentSection, /class="node-card__port-picker-color-dot"/);
   assert.match(componentSource, /const portStateColorOptions = computed\(\(\) => resolveStateColorOptions\(portStateDraft\.value\?\.definition\.color \?\? ""\)\);/);
@@ -432,8 +436,10 @@ test("NodeCard reveals state pills on hover and opens state editing only after a
   assert.match(componentSource, /if \(guardLockedStateEditAttempt\(\)\) \{[\s\S]*return;[\s\S]*\}/);
   assert.match(componentSource, /if \(activeStateEditorConfirmAnchorId\.value === anchorId\) \{[\s\S]*openStateEditor\(anchorId, stateKey\);[\s\S]*return;/);
   assert.match(componentSource, /startStateEditorConfirmWindow\(anchorId\);/);
-  assert.match(componentSource, /emit\("rename-state", \{ currentKey:/);
   assert.match(componentSource, /emit\("update-state", \{[\s\S]*stateKey:/);
+  assert.doesNotMatch(componentSource, /@update:key="handleStateEditorKeyInput"/);
+  assert.doesNotMatch(componentSource, /function handleStateEditorKeyInput/);
+  assert.doesNotMatch(componentSource, /emit\("rename-state"/);
   assert.match(
     componentSource,
     /<ElPopover[\s\S]*:visible="isStateEditorOpen\([^"]+\) \|\| isStateEditorConfirmOpen\([^"]+\)"/,
@@ -458,7 +464,7 @@ test("NodeCard reveals state pills on hover and opens state editing only after a
   assert.doesNotMatch(componentSource, /@cancel="closeStateEditor"/);
   assert.doesNotMatch(componentSource, /@save="commitStateEditor"/);
   assert.doesNotMatch(componentSource, /function commitStateEditor\(\)/);
-  assert.match(componentSource, /function syncStateEditorDraft\(nextDraft: StateFieldDraft, options\?: \{ allowInvalidKey\?: boolean \}\)/);
+  assert.match(componentSource, /function syncStateEditorDraft\(nextDraft: StateFieldDraft\)/);
   assert.doesNotMatch(componentSource, /trigger="manual"/);
   assert.match(componentSource, /StateDefaultValueEditor/);
   assert.match(componentSource, /class="node-card__state-editor"/);
@@ -691,7 +697,7 @@ test("NodeCard routes title and description editing through hoverable confirm tr
 
 test("NodeCard declares top-action and state-edit events for canvas forwarding", () => {
   assert.match(componentSource, /\(event: "update-node-metadata", payload: \{ nodeId: string; patch: Partial<Pick<GraphNode, "name" \| "description">> \}\): void;/);
-  assert.match(componentSource, /\(event: "rename-state", payload: \{ currentKey: string; nextKey: string \}\): void;/);
+  assert.doesNotMatch(componentSource, /\(event: "rename-state"/);
   assert.match(componentSource, /\(event: "update-state", payload: \{ stateKey: string; patch: Partial<StateDefinition> \}\): void;/);
   assert.match(componentSource, /\(event: "remove-port-state", payload: \{ nodeId: string; side: "input" \| "output"; stateKey: string \}\): void;/);
   assert.match(componentSource, /\(event: "delete-node", payload: \{ nodeId: string \}\): void;/);

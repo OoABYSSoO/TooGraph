@@ -322,7 +322,6 @@
               :error="stateEditorError"
               :type-options="stateTypeOptions"
               :color-options="stateColorOptions"
-              @update:key="handleStateEditorKeyInput"
               @update:name="handleStateEditorNameInput"
               @update:type="handleStateEditorTypeValue"
               @update:color="handleStateEditorColorInput"
@@ -514,7 +513,6 @@
                 :error="stateEditorError"
                 :type-options="stateTypeOptions"
                 :color-options="stateColorOptions"
-                @update:key="handleStateEditorKeyInput"
                 @update:name="handleStateEditorNameInput"
                 @update:type="handleStateEditorTypeValue"
                 @update:color="handleStateEditorColorInput"
@@ -603,7 +601,6 @@
                 :error="stateEditorError"
                 :type-options="stateTypeOptions"
                 :color-options="stateColorOptions"
-                @update:key="handleStateEditorKeyInput"
                 @update:name="handleStateEditorNameInput"
                 @update:type="handleStateEditorTypeValue"
                 @update:color="handleStateEditorColorInput"
@@ -793,14 +790,6 @@
             <div v-if="portStateDraft" class="node-card__port-picker-form">
               <div class="node-card__port-picker-grid">
                 <label class="node-card__control-row">
-                  <span class="node-card__control-label">{{ t("nodeCard.key") }}</span>
-                  <ElInput
-                    :aria-label="t('nodeCard.key')"
-                    :model-value="portStateDraft.key"
-                    @update:model-value="handlePortDraftKeyValue"
-                  />
-                </label>
-                <label class="node-card__control-row">
                   <span class="node-card__control-label">{{ t("nodeCard.name") }}</span>
                   <ElInput
                     :aria-label="t('nodeCard.name')"
@@ -908,7 +897,6 @@
               >
                 <span class="node-card__port-state-type">{{ stateRow.definition.type }}</span>
                 <span class="node-card__port-state-title">{{ stateRow.label }}</span>
-                <span class="node-card__port-state-key">{{ stateRow.key }}</span>
               </button>
               <div class="node-card__port-picker-actions">
                 <button
@@ -1001,7 +989,6 @@
             :error="stateEditorError"
             :type-options="stateTypeOptions"
             :color-options="stateColorOptions"
-            @update:key="handleStateEditorKeyInput"
             @update:name="handleStateEditorNameInput"
             @update:type="handleStateEditorTypeValue"
             @update:color="handleStateEditorColorInput"
@@ -1124,7 +1111,6 @@
                   :error="stateEditorError"
                   :type-options="stateTypeOptions"
                   :color-options="stateColorOptions"
-                  @update:key="handleStateEditorKeyInput"
                   @update:name="handleStateEditorNameInput"
                   @update:type="handleStateEditorTypeValue"
                   @update:color="handleStateEditorColorInput"
@@ -1264,7 +1250,6 @@ const emit = defineEmits<{
   (event: "update-node-metadata", payload: { nodeId: string; patch: Partial<Pick<GraphNode, "name" | "description">> }): void;
   (event: "update-input-config", payload: { nodeId: string; patch: Partial<InputNode["config"]> }): void;
   (event: "update-input-state", payload: { stateKey: string; patch: Partial<StateDefinition> }): void;
-  (event: "rename-state", payload: { currentKey: string; nextKey: string }): void;
   (event: "update-state", payload: { stateKey: string; patch: Partial<StateDefinition> }): void;
   (event: "remove-port-state", payload: { nodeId: string; side: "input" | "output"; stateKey: string }): void;
   (event: "update-output-config", payload: { nodeId: string; patch: Partial<OutputNode["config"]> }): void;
@@ -2038,27 +2023,6 @@ function handlePortDraftNameValue(value: string | number) {
   };
 }
 
-function handlePortDraftKeyInput(event: Event) {
-  const target = event.target;
-  if (!(target instanceof HTMLInputElement) || !portStateDraft.value) {
-    return;
-  }
-  handlePortDraftKeyValue(target.value);
-}
-
-function handlePortDraftKeyValue(value: string | number) {
-  if (guardLockedGraphInteraction()) {
-    return;
-  }
-  if (!portStateDraft.value) {
-    return;
-  }
-  portStateDraft.value = {
-    ...portStateDraft.value,
-    key: String(value ?? ""),
-  };
-}
-
 async function handlePortDraftTypeSelect(value: string | number | boolean | undefined) {
   if (guardLockedGraphInteraction()) {
     return;
@@ -2596,7 +2560,7 @@ function guardLockedStateEditAttempt() {
   return guardLockedGraphInteraction();
 }
 
-function syncStateEditorDraft(nextDraft: StateFieldDraft, options?: { allowInvalidKey?: boolean }) {
+function syncStateEditorDraft(nextDraft: StateFieldDraft) {
   if (guardLockedGraphInteraction()) {
     return;
   }
@@ -2609,28 +2573,17 @@ function syncStateEditorDraft(nextDraft: StateFieldDraft, options?: { allowInval
   stateEditorDraft.value = nextDraft;
 
   const currentStateKey = currentAnchorId.split(":").at(-1) ?? "";
-  const nextKey = nextDraft.key.trim();
-  if (!nextKey) {
+  if (!currentStateKey) {
     stateEditorError.value = t("nodeCard.stateKeyEmpty");
-    return;
-  }
-  if (nextKey !== currentStateKey && props.stateSchema[nextKey]) {
-    stateEditorError.value = t("nodeCard.stateKeyExists", { key: nextKey });
     return;
   }
 
   stateEditorError.value = null;
 
-  if (nextKey !== currentStateKey) {
-    emit("rename-state", { currentKey: currentStateKey, nextKey });
-    activeStateEditorAnchorId.value = [...currentAnchorId.split(":").slice(0, -1), nextKey].join(":");
-  }
-
-  void options;
   emit("update-state", {
-    stateKey: nextKey,
+    stateKey: currentStateKey,
     patch: {
-      name: nextDraft.definition.name.trim() || nextKey,
+      name: nextDraft.definition.name.trim() || currentStateKey,
       description: nextDraft.definition.description,
       type: nextDraft.definition.type,
       value: nextDraft.definition.value,
@@ -2649,17 +2602,7 @@ function handleStateEditorNameInput(value: string | number) {
       ...stateEditorDraft.value.definition,
       name: value,
     },
-  }, { allowInvalidKey: true });
-}
-
-function handleStateEditorKeyInput(value: string | number) {
-  if (!stateEditorDraft.value || typeof value !== "string") {
-    return;
-  }
-  syncStateEditorDraft({
-    ...stateEditorDraft.value,
-    key: value,
-  }, { allowInvalidKey: true });
+  });
 }
 
 function handleStateEditorDescriptionInput(value: string | number) {
@@ -2672,7 +2615,7 @@ function handleStateEditorDescriptionInput(value: string | number) {
       ...stateEditorDraft.value.definition,
       description: value,
     },
-  }, { allowInvalidKey: true });
+  });
 }
 
 function handleStateEditorColorInput(value: string | number) {
@@ -2685,7 +2628,7 @@ function handleStateEditorColorInput(value: string | number) {
       ...stateEditorDraft.value.definition,
       color: value,
     },
-  }, { allowInvalidKey: true });
+  });
 }
 
 function handleStateEditorTypeValue(value: string | number | boolean | undefined) {
@@ -2699,7 +2642,7 @@ function handleStateEditorTypeValue(value: string | number | boolean | undefined
       type: value,
       value: defaultValueForStateType(value as StateFieldType),
     },
-  }, { allowInvalidKey: true });
+  });
 }
 
 function toggleAdvancedPanel() {
@@ -4538,12 +4481,6 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
   font-size: 0.9rem;
   font-weight: 600;
   color: #1f2937;
-}
-
-.node-card__port-state-key {
-  font-size: 0.78rem;
-  line-height: 1.5;
-  color: rgba(60, 41, 20, 0.68);
 }
 
 .node-card__surface {

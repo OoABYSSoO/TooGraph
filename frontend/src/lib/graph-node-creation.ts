@@ -65,8 +65,7 @@ function buildTextInputStateKey(id: string) {
   return `${id}_value`;
 }
 
-function buildTextInputNode(id: string, position: GraphPosition): InputNode {
-  const stateKey = buildTextInputStateKey(id);
+function buildTextInputNode(id: string, position: GraphPosition, stateKey = buildTextInputStateKey(id)): InputNode {
   return {
     kind: "input",
     name: "Input",
@@ -97,11 +96,11 @@ function buildOutputNode(id: string, position: GraphPosition): OutputNode {
   };
 }
 
-export function buildGenericInputNode(params: { id: string; position: GraphPosition }): CreatedNodeResult {
-  const stateKey = buildTextInputStateKey(params.id);
+export function buildGenericInputNode(params: { id: string; position: GraphPosition; stateKey?: string }): CreatedNodeResult {
+  const stateKey = params.stateKey ?? buildTextInputStateKey(params.id);
   return {
     id: params.id,
-    node: buildTextInputNode(params.id, params.position),
+    node: buildTextInputNode(params.id, params.position, stateKey),
     state_schema: {
       [stateKey]: {
         ...defaultStateDefinitionForType(stateKey, "text"),
@@ -133,6 +132,7 @@ export function buildNodeFromPreset(preset: PresetDocument, params: { id: string
 export function buildInputNodeFromFile(params: {
   id: string;
   position: GraphPosition;
+  stateKey: string;
   fileName: string;
   mimeType: string;
   size: number;
@@ -140,7 +140,16 @@ export function buildInputNodeFromFile(params: {
   detectedType: string;
   encoding: "text" | "data_url";
 }): CreatedNodeResult {
-  const stateKey = params.detectedType === "knowledge_base" ? "knowledge_base" : params.detectedType === "text" ? "value" : params.detectedType;
+  const stateKey = params.stateKey;
+  const uploadedValue = JSON.stringify({
+    kind: "uploaded_file",
+    name: params.fileName,
+    mimeType: params.mimeType || "application/octet-stream",
+    size: params.size,
+    detectedType: params.detectedType,
+    content: params.content,
+    encoding: params.encoding,
+  });
   return {
     id: params.id,
     node: {
@@ -151,19 +160,15 @@ export function buildInputNodeFromFile(params: {
       reads: [],
       writes: [{ state: stateKey, mode: "replace" }],
       config: {
-        value: JSON.stringify({
-          kind: "uploaded_file",
-          name: params.fileName,
-          mimeType: params.mimeType || "application/octet-stream",
-          size: params.size,
-          detectedType: params.detectedType,
-          content: params.content,
-          encoding: params.encoding,
-        }),
+        value: uploadedValue,
       },
     },
     state_schema: {
-      [stateKey]: defaultStateDefinitionForType(stateKey, params.detectedType),
+      [stateKey]: {
+        ...defaultStateDefinitionForType(stateKey, params.detectedType),
+        name: params.fileName,
+        value: uploadedValue,
+      },
     },
   };
 }

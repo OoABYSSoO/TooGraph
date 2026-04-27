@@ -101,7 +101,6 @@
                 @update-node-metadata="updateNodeMetadataForTab(tab.tabId, $event.nodeId, $event.patch)"
                 @update-input-config="updateInputConfigForTab(tab.tabId, $event.nodeId, $event.patch)"
                 @update-input-state="updateStateField(tab.tabId, $event.stateKey, $event.patch)"
-                @rename-state="renameStateField(tab.tabId, $event.currentKey, $event.nextKey)"
                 @update-state="updateStateField(tab.tabId, $event.stateKey, $event.patch)"
                 @remove-port-state="removeNodePortStateForTab(tab.tabId, $event.nodeId, $event.side, $event.stateKey)"
                 @disconnect-data-edge="disconnectDataEdgeForTab(tab.tabId, $event.sourceNodeId, $event.targetNodeId, $event.stateKey, $event.mode)"
@@ -171,7 +170,6 @@
                 @focus-node="requestNodeFocusForTab(tab.tabId, $event)"
                 @add-state="addStateField(tab.tabId)"
                 @delete-state="deleteStateField(tab.tabId, $event)"
-                @rename-state="renameStateField(tab.tabId, $event.currentKey, $event.nextKey)"
                 @update-state="updateStateField(tab.tabId, $event.stateKey, $event.patch)"
                 @add-reader="addStateReaderBinding(tab.tabId, $event.stateKey, $event.nodeId)"
                 @remove-reader="removeStateReaderBinding(tab.tabId, $event.stateKey, $event.nodeId)"
@@ -296,10 +294,10 @@ import { buildRunNodeArtifactsModel } from "./runNodeArtifactsModel.ts";
 import { addStateBindingToDocument, removeStateBindingFromDocument } from "./statePanelBindings.ts";
 import {
   addStateFieldToDocument,
+  buildNextDefaultStateField,
   deleteStateFieldFromDocument,
   insertStateFieldIntoDocument,
   listStateFieldUsageLabels,
-  renameStateFieldInDocument,
   updateStateFieldInDocument,
   type StateFieldDraft,
 } from "./statePanelFields.ts";
@@ -1596,12 +1594,13 @@ function createNodePortStateForTab(tabId: string, nodeId: string, side: "input" 
     return;
   }
 
-  const nextDocumentWithState = insertStateFieldIntoDocument(document, field);
+  const stateField = buildNextDefaultStateField(document, field.definition);
+  const nextDocumentWithState = insertStateFieldIntoDocument(document, stateField);
   if (nextDocumentWithState === document) {
     return;
   }
 
-  const nextDocument = addStateBindingToDocument(nextDocumentWithState, field.key, nodeId, side === "input" ? "read" : "write");
+  const nextDocument = addStateBindingToDocument(nextDocumentWithState, stateField.key, nodeId, side === "input" ? "read" : "write");
   if (nextDocument === nextDocumentWithState) {
     return;
   }
@@ -1959,18 +1958,6 @@ function updateOutputConfigForTab(tabId: string, nodeId: string, patch: Partial<
 
   markDocumentDirty(tabId, nextDocument);
   focusNodeForTab(tabId, nodeId);
-}
-
-function renameStateField(tabId: string, currentKey: string, nextKey: string) {
-  const document = documentsByTabId.value[tabId];
-  if (!document) {
-    return;
-  }
-  const nextDocument = renameStateFieldInDocument(document, currentKey, nextKey);
-  if (nextDocument === document) {
-    return;
-  }
-  markDocumentDirty(tabId, nextDocument);
 }
 
 function updateStateField(tabId: string, stateKey: string, patch: Partial<StateDefinition>) {

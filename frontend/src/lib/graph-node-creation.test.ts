@@ -13,6 +13,7 @@ test("buildGenericInputNode creates an expanded input node that writes a default
   const result = buildGenericInputNode({
     id: "input_created",
     position: { x: 120, y: 240 },
+    stateKey: "state_3",
   });
 
   assert.equal(result.node.kind, "input");
@@ -20,8 +21,8 @@ test("buildGenericInputNode creates an expanded input node that writes a default
   assert.equal(result.node.ui.collapsed, false);
   assert.equal("expandedSize" in result.node.ui, false);
   assert.equal("collapsedSize" in result.node.ui, false);
-  assert.deepEqual(result.node.writes, [{ state: "input_created_value", mode: "replace" }]);
-  assert.deepEqual(result.state_schema.input_created_value, {
+  assert.deepEqual(result.node.writes, [{ state: "state_3", mode: "replace" }]);
+  assert.deepEqual(result.state_schema.state_3, {
     name: "Input",
     description: "",
     type: "text",

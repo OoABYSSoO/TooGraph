@@ -76,7 +76,8 @@ test("EditorWorkspaceShell wires node top-action events into state updates, node
   assert.match(componentSource, /import \{ fetchPreset, fetchPresets, savePreset \} from "@\/api\/presets";/);
   assert.match(componentSource, /import \{ buildPresetPayloadForNode \} from "\.\/presetPersistence\.ts";/);
   assert.match(componentSource, /@update-node-metadata="updateNodeMetadataForTab\(tab\.tabId, \$event\.nodeId, \$event\.patch\)"/);
-  assert.match(componentSource, /@rename-state="renameStateField\(tab\.tabId, \$event\.currentKey, \$event\.nextKey\)"/);
+  assert.doesNotMatch(componentSource, /@rename-state="renameStateField/);
+  assert.doesNotMatch(componentSource, /function renameStateField/);
   assert.match(componentSource, /@update-state="updateStateField\(tab\.tabId, \$event\.stateKey, \$event\.patch\)"/);
   assert.match(componentSource, /@remove-port-state="removeNodePortStateForTab\(tab\.tabId, \$event\.nodeId, \$event\.side, \$event\.stateKey\)"/);
   assert.match(componentSource, /@disconnect-data-edge="disconnectDataEdgeForTab\(tab\.tabId, \$event\.sourceNodeId, \$event\.targetNodeId, \$event\.stateKey, \$event\.mode\)"/);

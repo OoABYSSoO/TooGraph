@@ -107,15 +107,6 @@
 
             <div class="editor-state-panel__field-grid">
               <div class="editor-state-panel__field">
-                <span class="editor-state-panel__field-label">{{ t("nodeCard.key") }}</span>
-                <ElInput
-                  :aria-label="t('nodeCard.key')"
-                  :model-value="row.key"
-                  @change="commitStateRename(row.key, String($event ?? ''))"
-                />
-              </div>
-
-              <div class="editor-state-panel__field">
                 <span class="editor-state-panel__field-label">{{ t("nodeCard.name") }}</span>
                 <ElInput
                   :aria-label="t('nodeCard.name')"
@@ -396,7 +387,6 @@ const emit = defineEmits<{
   (event: "focus-node", nodeId: string): void;
   (event: "add-state"): void;
   (event: "delete-state", stateKey: string): void;
-  (event: "rename-state", payload: { currentKey: string; nextKey: string }): void;
   (event: "update-state", payload: { stateKey: string; patch: Partial<StateDefinition> }): void;
   (event: "add-reader", payload: { stateKey: string; nodeId: string }): void;
   (event: "remove-reader", payload: { stateKey: string; nodeId: string }): void;
@@ -504,7 +494,7 @@ function handleStatePanelPointerDown(event: PointerEvent) {
     return;
   }
   const target = event.target;
-  if (target instanceof HTMLElement && target.closest("[data-state-delete-surface='true']")) {
+  if (target instanceof Element && target.closest("[data-state-delete-surface='true']")) {
     return;
   }
   clearStateDeleteConfirmState();
@@ -562,14 +552,6 @@ function selectedStateColorStyle(stateKey: string) {
   return {
     backgroundColor: matchedOption?.swatch || definition?.color || "#d97706",
   };
-}
-
-function commitStateRename(currentKey: string, nextKey: string) {
-  const normalizedNextKey = nextKey.trim();
-  if (!normalizedNextKey || normalizedNextKey === currentKey) {
-    return;
-  }
-  emit("rename-state", { currentKey, nextKey: normalizedNextKey });
 }
 
 function handleStateTypeSelect(stateKey: string, value: string | number | boolean | undefined) {

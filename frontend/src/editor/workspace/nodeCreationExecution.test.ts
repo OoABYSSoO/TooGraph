@@ -86,6 +86,38 @@ test("createNodeFromCreationEntry builds the builtin empty agent preset and auto
   assert.deepEqual(result.document.edges, [{ source: "input_question", target: "agent_created" }]);
 });
 
+test("createNodeFromCreationEntry creates input boundary states with neutral system keys", () => {
+  const document = {
+    ...createBaseDocument(),
+    metadata: {
+      graphiteui_state_key_counter: 7,
+    },
+  };
+  const entry: NodeCreationEntry = {
+    id: "node-input",
+    family: "input",
+    label: "Input",
+    description: "Create a workflow input boundary.",
+    mode: "node",
+    origin: "builtin",
+    nodeKind: "input",
+    acceptsValueTypes: null,
+  };
+
+  const result = createNodeFromCreationEntry(document, {
+    entry,
+    createdNodeId: "input_created",
+    persistedPresets: [],
+    context: {
+      position: { x: 120, y: 160 },
+    },
+  });
+
+  assert.deepEqual(result.document.nodes.input_created.writes, [{ state: "state_8", mode: "replace" }]);
+  assert.equal(result.document.state_schema.state_8?.name, "Input");
+  assert.equal(result.document.metadata.graphiteui_state_key_counter, 8);
+});
+
 test("createNodeFromCreationEntry builds the builtin condition preset and auto-wires route edges", () => {
   const document = createBaseDocument();
   const entry: NodeCreationEntry = {
@@ -141,8 +173,10 @@ test("createNodeFromDroppedFile builds an input node from the uploaded asset env
 
   assert.equal(result.createdNodeId, "input_file_created");
   assert.equal(result.document.nodes.input_file_created.kind, "input");
-  assert.deepEqual(result.document.nodes.input_file_created.writes, [{ state: "image", mode: "replace" }]);
-  assert.equal(result.document.state_schema.image?.type, "image");
+  assert.deepEqual(result.document.nodes.input_file_created.writes, [{ state: "state_1", mode: "replace" }]);
+  assert.equal(result.document.state_schema.state_1?.name, "diagram.png");
+  assert.equal(result.document.state_schema.state_1?.type, "image");
+  assert.equal(result.document.metadata.graphiteui_state_key_counter, 1);
   assert.match(String(result.document.nodes.input_file_created.config.value), /"kind":"uploaded_file"/);
   assert.match(String(result.document.nodes.input_file_created.config.value), /"encoding":"data_url"/);
 });

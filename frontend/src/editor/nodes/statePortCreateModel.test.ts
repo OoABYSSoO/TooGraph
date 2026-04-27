@@ -3,11 +3,11 @@ import assert from "node:assert/strict";
 
 import { createStateDraftFromQuery, matchesStatePortSearch } from "./statePortCreateModel.ts";
 
-test("matchesStatePortSearch matches state names keys and descriptions", () => {
+test("matchesStatePortSearch matches state names and descriptions without relying on system keys", () => {
   assert.equal(
     matchesStatePortSearch(
       {
-        key: "review_notes",
+        key: "state_1",
         name: "Review Notes",
         description: "Freeform notes from human review.",
       },
@@ -18,7 +18,7 @@ test("matchesStatePortSearch matches state names keys and descriptions", () => {
   assert.equal(
     matchesStatePortSearch(
       {
-        key: "review_notes",
+        key: "state_1",
         name: "Review Notes",
         description: "Freeform notes from human review.",
       },
@@ -29,11 +29,22 @@ test("matchesStatePortSearch matches state names keys and descriptions", () => {
   assert.equal(
     matchesStatePortSearch(
       {
-        key: "review_notes",
+        key: "state_1",
         name: "Review Notes",
         description: "Freeform notes from human review.",
       },
       "answer",
+    ),
+    false,
+  );
+  assert.equal(
+    matchesStatePortSearch(
+      {
+        key: "legacy_semantic_key",
+        name: "Review Notes",
+        description: "",
+      },
+      "legacy",
     ),
     false,
   );
@@ -44,6 +55,19 @@ test("createStateDraftFromQuery creates a unique neutral state key from the whol
     key: "state_3",
     definition: {
       name: "Review Notes",
+      description: "",
+      type: "text",
+      value: "",
+      color: "",
+    },
+  });
+});
+
+test("createStateDraftFromQuery uses a neutral display name when the query is blank", () => {
+  assert.deepEqual(createStateDraftFromQuery("   ", ["state_1", "state_2"]), {
+    key: "state_3",
+    definition: {
+      name: "State 3",
       description: "",
       type: "text",
       value: "",

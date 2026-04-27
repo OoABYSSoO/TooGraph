@@ -87,6 +87,7 @@ function buildDocument(): GraphPayload {
 test("buildDefaultStateField returns a unique text state", () => {
   const field = buildDefaultStateField(["state_1", "state_2"]);
   assert.equal(field.key, "state_3");
+  assert.equal(field.definition.name, "State 3");
   assert.equal(field.definition.type, "text");
   assert.equal(field.definition.value, "");
 });
@@ -177,6 +178,22 @@ test("insertStateFieldIntoDocument adds an explicit state definition immutably",
   assert.equal(nextDocument.state_schema.review_notes.type, "markdown");
   assert.equal(nextDocument.state_schema.review_notes.name, "Review Notes");
   assert.equal(document.state_schema.review_notes, undefined);
+});
+
+test("insertStateFieldIntoDocument advances the neutral state key counter for explicit state keys", () => {
+  const document = buildDocument();
+  const nextDocument = insertStateFieldIntoDocument(document, {
+    key: "state_9",
+    definition: {
+      name: "Uploaded image",
+      description: "",
+      type: "image",
+      value: "",
+      color: "",
+    },
+  });
+
+  assert.equal(nextDocument.metadata.graphiteui_state_key_counter, 9);
 });
 
 test("updateStateFieldInDocument applies updater to existing definition", () => {

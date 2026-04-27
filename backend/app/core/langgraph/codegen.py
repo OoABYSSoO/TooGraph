@@ -18,6 +18,8 @@ from app.core.schemas.node_system import (
     StateWriteMode,
 )
 
+EDITOR_ONLY_METADATA_KEYS = {"graphiteui_state_key_counter"}
+
 
 def generate_langgraph_python_source(graph: NodeSystemGraphPayload) -> str:
     payload = _build_export_graph_payload(graph)
@@ -248,8 +250,13 @@ def _build_export_graph_payload(graph: NodeSystemGraphPayload) -> dict[str, Any]
             edge.model_dump(mode="json", by_alias=True)
             for edge in graph.conditional_edges
         ]
-    if graph.metadata:
-        payload["metadata"] = dict(graph.metadata)
+    runtime_metadata = {
+        key: value
+        for key, value in graph.metadata.items()
+        if key not in EDITOR_ONLY_METADATA_KEYS
+    }
+    if runtime_metadata:
+        payload["metadata"] = runtime_metadata
 
     return payload
 

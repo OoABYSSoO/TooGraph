@@ -167,7 +167,6 @@
           :error="dataEdgeStateError"
           :type-options="stateTypeOptions"
           :color-options="dataEdgeStateColorOptions"
-          @update:key="handleDataEdgeStateEditorKeyInput"
           @update:name="handleDataEdgeStateEditorNameInput"
           @update:type="handleDataEdgeStateEditorTypeValue"
           @update:color="handleDataEdgeStateEditorColorInput"
@@ -249,7 +248,6 @@
           @update-node-metadata="emit('update-node-metadata', $event)"
           @update-input-config="emit('update-input-config', $event)"
           @update-input-state="emit('update-input-state', $event)"
-          @rename-state="emit('rename-state', $event)"
           @update-state="emit('update-state', $event)"
           @remove-port-state="emit('remove-port-state', $event)"
           @update-agent-config="emit('update-agent-config', $event)"
@@ -462,7 +460,6 @@ const emit = defineEmits<{
   (event: "update-node-metadata", payload: { nodeId: string; patch: Partial<Pick<InputNode | AgentNode | ConditionNode | OutputNode, "name" | "description">> }): void;
   (event: "update-input-config", payload: { nodeId: string; patch: Partial<InputNode["config"]> }): void;
   (event: "update-input-state", payload: { stateKey: string; patch: Partial<StateDefinition> }): void;
-  (event: "rename-state", payload: { currentKey: string; nextKey: string }): void;
   (event: "update-state", payload: { stateKey: string; patch: Partial<StateDefinition> }): void;
   (event: "remove-port-state", payload: { nodeId: string; side: "input" | "output"; stateKey: string }): void;
   (event: "update-agent-config", payload: { nodeId: string; patch: Partial<AgentNode["config"]> }): void;
@@ -1241,48 +1238,22 @@ function syncDataEdgeStateDraft(nextDraft: StateFieldDraft) {
   dataEdgeStateDraft.value = nextDraft;
 
   const currentStateKey = currentEditor.stateKey;
-  const nextKey = nextDraft.key.trim();
-  if (!nextKey) {
+  if (!currentStateKey) {
     dataEdgeStateError.value = "State key cannot be empty.";
-    return;
-  }
-  if (nextKey !== currentStateKey && props.document.state_schema[nextKey]) {
-    dataEdgeStateError.value = `State key '${nextKey}' already exists.`;
     return;
   }
 
   dataEdgeStateError.value = null;
 
-  if (nextKey !== currentStateKey) {
-    emit("rename-state", { currentKey: currentStateKey, nextKey });
-    activeDataEdgeStateEditor.value = {
-      ...currentEditor,
-      stateKey: nextKey,
-    };
-  }
-
   emit("update-state", {
-    stateKey: nextKey,
+    stateKey: currentStateKey,
     patch: {
-      name: nextDraft.definition.name.trim() || nextKey,
+      name: nextDraft.definition.name.trim() || currentStateKey,
       description: nextDraft.definition.description,
       type: nextDraft.definition.type,
       value: nextDraft.definition.value,
       color: nextDraft.definition.color,
     },
-  });
-}
-
-function handleDataEdgeStateEditorKeyInput(value: string | number) {
-  if (guardLockedCanvasInteraction()) {
-    return;
-  }
-  if (typeof value !== "string" || !dataEdgeStateDraft.value) {
-    return;
-  }
-  syncDataEdgeStateDraft({
-    ...dataEdgeStateDraft.value,
-    key: value,
   });
 }
 

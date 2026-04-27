@@ -83,7 +83,7 @@ export function buildDefaultStateField(existingKeys: string[], startIndex = 1) {
   return {
     key,
     definition: {
-      name: key,
+      name: `State ${index}`,
       description: "",
       type: "text" as const,
       value: defaultValueForStateType("text"),
@@ -92,8 +92,26 @@ export function buildDefaultStateField(existingKeys: string[], startIndex = 1) {
   };
 }
 
-export function addStateFieldToDocument<T extends GraphPayload | GraphDocument>(document: T): T {
+export function buildNextDefaultStateField(
+  document: GraphPayload | GraphDocument,
+  definitionPatch: Partial<StateDefinition> = {},
+): StateFieldDraft {
   const nextField = buildDefaultStateField(Object.keys(document.state_schema), resolveNextDefaultStateKeyIndex(document));
+  const nextType = (definitionPatch.type ?? nextField.definition.type) as StateFieldType;
+  const hasValuePatch = Object.prototype.hasOwnProperty.call(definitionPatch, "value");
+  return {
+    key: nextField.key,
+    definition: {
+      ...nextField.definition,
+      ...definitionPatch,
+      type: nextType,
+      value: hasValuePatch ? definitionPatch.value : defaultValueForStateType(nextType),
+    },
+  };
+}
+
+export function addStateFieldToDocument<T extends GraphPayload | GraphDocument>(document: T): T {
+  const nextField = buildNextDefaultStateField(document);
   const nextDocument = insertStateFieldIntoDocument(document, nextField);
   if (nextDocument === document) {
     return document;
@@ -108,6 +126,7 @@ export function insertStateFieldIntoDocument<T extends GraphPayload | GraphDocum
   }
   const nextDocument = cloneGraphDocument(document);
   nextDocument.state_schema[field.key] = field.definition;
+  rememberDefaultStateKeyIndex(nextDocument, field.key);
   return nextDocument;
 }
 
@@ -214,7 +233,7 @@ function readHighestDefaultStateKeyIndex(keys: string[]) {
   }, 0);
 }
 
-function rememberDefaultStateKeyIndex(document: GraphPayload | GraphDocument, stateKey: string) {
+export function rememberDefaultStateKeyIndex(document: GraphPayload | GraphDocument, stateKey: string) {
   const match = stateKey.match(/^state_(\d+)$/);
   if (!match) {
     return;
