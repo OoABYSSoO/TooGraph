@@ -21,6 +21,7 @@
   - Updated the Agent Skill picker model and UI copy to show only attachable Agent-node Skills and display kind/mode/scope metadata.
   - Ran full backend and frontend verification, built the frontend, restarted dev with `npm run dev`, and checked frontend/backend Skill endpoints.
   - Created a commit with Chinese message `完善原生 Skill 的 Agent 附加规则`.
+  - Pushed `main` to `origin`.
 - Files created/modified:
   - task_plan.md
   - findings.md
@@ -47,8 +48,8 @@
 ## 5-Question Reboot Check
 | Question | Answer |
 |----------|--------|
-| Where am I? | Phase 5, ready to commit and push the verified Skill attachability slice. |
-| Where am I going? | Commit all relevant changes with a Chinese message and push `main`. |
+| Where am I? | Complete. |
+| Where am I going? | Ready for the next Skill refactor slice. |
 | What's the goal? | Make the native Skill system more coherent and usable from Agent nodes while preserving manual import and future Companion support. |
 | What have I learned? | Existing docs recommend one Skill system, target-specific usage, explicit Agent node binding, and workflow-first runtime semantics. |
 | What have I done? | Added native built-in Skill manifests, tightened Agent attachability rules in backend/frontend, verified, and restarted dev. |

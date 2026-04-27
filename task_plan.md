@@ -4,7 +4,7 @@
 Continue the GraphiteUI native Skill refactor after the foundation merge, focusing on the next smallest production slice that makes Skills useful from Agent nodes without reintroducing automatic external discovery.
 
 ## Current Phase
-Phase 5 in progress
+Complete
 
 ## Phases
 
@@ -39,8 +39,8 @@ Phase 5 in progress
 - [x] Run broader verification when touched surface warrants it.
 - [x] Restart dev environment with `npm run dev` after code changes.
 - [x] Commit all relevant tracked changes with a Chinese commit message.
-- [ ] Push the current branch.
-- **Status:** in_progress
+- [x] Push the current branch.
+- **Status:** complete
 
 ## Key Questions
 1. What parts of the native Skill foundation are already implemented?
