@@ -58,20 +58,37 @@ test("EditorCanvas raises hovered and selected nodes above sibling cards", () =>
   assert.match(componentSource, /\.editor-canvas__node:hover,\n\.editor-canvas__node:focus-within,\n\.editor-canvas__node--selected \{[\s\S]*z-index:\s*8;/);
 });
 
-test("EditorCanvas exposes corner handles for real node resizing", () => {
+test("EditorCanvas exposes invisible corner hotzones for real node resizing", () => {
   assert.match(componentSource, /import \{[\s\S]*NODE_RESIZE_HANDLES,[\s\S]*normalizeNodeSize,[\s\S]*resolveNodeResize,[\s\S]*type NodeResizeHandle[\s\S]*\} from "\.\/nodeResize\.ts";/);
   assert.match(componentSource, /\(event: "update:node-size", payload: \{ nodeId: string; position: GraphPosition; size: GraphNodeSize \}\): void;/);
   assert.match(componentSource, /const nodeResizeDrag = ref<\{/);
   assert.match(componentSource, /:style="nodeCardSizeStyle\(node\)"/);
-  assert.match(componentSource, /v-if="isNodeResizeHandleVisible\(nodeId\)"/);
+  assert.match(componentSource, /v-if="isNodeResizeHotzoneEnabled\(\)"/);
   assert.match(componentSource, /v-for="handle in NODE_RESIZE_HANDLES"/);
-  assert.match(componentSource, /data-node-resize-handle="true"/);
+  assert.match(componentSource, /data-node-resize-hotzone="true"/);
+  assert.match(componentSource, /aria-hidden="true"/);
   assert.match(componentSource, /@pointerdown\.stop\.prevent="handleNodeResizePointerDown\(nodeId, handle, \$event\)"/);
   assert.match(componentSource, /function handleNodeResizePointerDown\(nodeId: string, handle: NodeResizeHandle, event: PointerEvent\)/);
+  assert.match(componentSource, /function isNodeResizeHotzoneEnabled\(\) \{[\s\S]*return !isGraphEditingLocked\(\) && !activeConnection\.value;/);
+  assert.doesNotMatch(componentSource, /function isNodeResizeHotzoneEnabled\(nodeId: string\)/);
+  assert.doesNotMatch(componentSource, /nodeResizeDrag\.value\?\.nodeId === nodeId \|\| isNodeVisuallySelected\(nodeId\) \|\| hoveredNodeId\.value === nodeId/);
   assert.match(componentSource, /resolveNodeResize\(\{[\s\S]*handle: nodeResizeDrag\.value\.handle,/);
   assert.match(componentSource, /emit\("update:node-size"/);
-  assert.match(componentSource, /\.editor-canvas__resize-handle--nw,[\s\S]*\.editor-canvas__resize-handle--se \{[\s\S]*cursor:\s*nwse-resize;/);
-  assert.match(componentSource, /\.editor-canvas__resize-handle--ne,[\s\S]*\.editor-canvas__resize-handle--sw \{[\s\S]*cursor:\s*nesw-resize;/);
+  assert.match(componentSource, /\.editor-canvas__resize-hotzones \{[\s\S]*inset:\s*0;/);
+  assert.match(componentSource, /\.editor-canvas__resize-hotzone \{[\s\S]*width:\s*40px;[\s\S]*height:\s*40px;/);
+  assert.match(componentSource, /\.editor-canvas__resize-hotzone \{[\s\S]*background:\s*transparent;/);
+  assert.match(componentSource, /\.editor-canvas__resize-hotzone \{[\s\S]*border:\s*0;/);
+  assert.doesNotMatch(componentSource, /editor-canvas__resize-handle/);
+  assert.doesNotMatch(componentSource, /data-node-resize-handle/);
+  assert.doesNotMatch(componentSource, /:title="t\('canvasResize\.resizeNode'\)"/);
+  assert.match(componentSource, /\.editor-canvas__resize-hotzone--nw \{[\s\S]*top:\s*-6px;[\s\S]*left:\s*-6px;/);
+  assert.match(componentSource, /\.editor-canvas__resize-hotzone--ne \{[\s\S]*top:\s*-6px;[\s\S]*right:\s*-6px;/);
+  assert.match(componentSource, /\.editor-canvas__resize-hotzone--sw \{[\s\S]*bottom:\s*-6px;[\s\S]*left:\s*-6px;/);
+  assert.match(componentSource, /\.editor-canvas__resize-hotzone--se \{[\s\S]*right:\s*-6px;[\s\S]*bottom:\s*-6px;/);
+  assert.match(componentSource, /\.editor-canvas__resize-hotzone--nw,[\s\S]*\.editor-canvas__resize-hotzone--se \{[\s\S]*cursor:\s*nwse-resize;/);
+  assert.match(componentSource, /\.editor-canvas__resize-hotzone--ne,[\s\S]*\.editor-canvas__resize-hotzone--sw \{[\s\S]*cursor:\s*nesw-resize;/);
+  const northwestHotzoneCssBlock = componentSource.match(/\.editor-canvas__resize-hotzone--nw \{([\s\S]*?)\n\}/)?.[1] ?? "";
+  assert.doesNotMatch(northwestHotzoneCssBlock, /transform:/);
 });
 
 test("EditorCanvas forwards node model refresh requests to the workspace", () => {
@@ -253,7 +270,7 @@ test("EditorCanvas resolves rendered anchor geometry from measured node slot off
   assert.match(componentSource, /querySelectorAll\("\[data-anchor-slot-id\]"\)/);
 });
 
-test("EditorCanvas renders hover-only flow hotspots and distinguishes flowing flow edges from data ant lines", () => {
+test("EditorCanvas renders flow hotspots whose output visibility follows the edge mode", () => {
   assert.match(componentSource, /v-for="anchor in flowAnchors"/);
   assert.match(componentSource, /class="editor-canvas__flow-hotspot"/);
   assert.match(componentSource, /:style="\[flowHotspotStyle\(anchor\), flowHotspotConnectStyle\(anchor\)\]"/);
@@ -263,6 +280,11 @@ test("EditorCanvas renders hover-only flow hotspots and distinguishes flowing fl
   assert.match(componentSource, /'editor-canvas__flow-hotspot--outbound': anchor\.kind === 'flow-out'/);
   assert.match(componentSource, /'editor-canvas__flow-hotspot--visible': isFlowHotspotVisible\(anchor\)/);
   assert.match(componentSource, /anchor\.kind === "flow-out" \|\| anchor\.kind === "route-out"/);
+  assert.match(componentSource, /isOutputFlowHandleVisibleForEdgeMode\(\{[\s\S]*mode: edgeVisibilityMode\.value,[\s\S]*anchorKind: anchor\.kind,[\s\S]*\}\)/);
+  const flowHotspotVisibleBlock = componentSource.match(/function isFlowHotspotVisible\(anchor: ProjectedCanvasAnchor\) \{([\s\S]*?)\n\}/)?.[1] ?? "";
+  assert.doesNotMatch(flowHotspotVisibleBlock, /selection\.selectedNodeId\.value === anchor\.nodeId/);
+  assert.doesNotMatch(flowHotspotVisibleBlock, /hoveredNodeId\.value === anchor\.nodeId/);
+  assert.doesNotMatch(flowHotspotVisibleBlock, /hoveredFlowHandleNodeId\.value === anchor\.nodeId/);
   assert.match(componentSource, /\.editor-canvas__flow-hotspot--outbound::after \{[\s\S]*content:\s*"\+";/);
   assert.match(componentSource, /\.editor-canvas__flow-hotspot--visible::before \{[\s\S]*opacity:\s*1;/);
   assert.match(componentSource, /'editor-canvas__edge--flow': connectionPreview\.kind === 'flow'/);
@@ -281,6 +303,8 @@ test("EditorCanvas renders hover-only flow hotspots and distinguishes flowing fl
   assert.match(componentSource, /\.editor-canvas__edge--preview\.editor-canvas__edge--flow,\n\.editor-canvas__edge--preview\.editor-canvas__edge--route \{[\s\S]*stroke-dasharray:\s*16 18;/);
   assert.match(componentSource, /\.editor-canvas__flow-hotspot--connect-source::before \{[\s\S]*background:\s*var\(--editor-connection-source-fill,/);
   assert.match(componentSource, /\.editor-canvas__flow-hotspot--connect-target::before \{[\s\S]*background:\s*var\(--editor-connection-target-fill,/);
+  assert.match(componentSource, /\.editor-canvas__flow-hotspot \{[\s\S]*pointer-events:\s*none;/);
+  assert.match(componentSource, /\.editor-canvas__flow-hotspot--visible,[\s\S]*\.editor-canvas__flow-hotspot--connect-source,[\s\S]*\.editor-canvas__flow-hotspot--connect-target \{[\s\S]*pointer-events:\s*auto;/);
   assert.match(componentSource, /\.editor-canvas__anchor--connect-source \{[\s\S]*--editor-anchor-fill:\s*var\(--editor-connection-source-anchor,/);
   assert.match(componentSource, /\.editor-canvas__anchor--connect-target \{[\s\S]*--editor-anchor-fill:\s*var\(--editor-connection-target-anchor,/);
   assert.match(componentSource, /@keyframes editor-canvas-ant-line/);
@@ -296,12 +320,13 @@ test("EditorCanvas renders hover-only flow hotspots and distinguishes flowing fl
 });
 
 test("EditorCanvas exposes a top-left capsule toolbar for edge visibility modes", () => {
-  assert.match(componentSource, /import \{[\s\S]*buildEdgeVisibilityModeOptions,[\s\S]*filterProjectedEdgesForVisibilityMode,[\s\S]*type EdgeVisibilityMode[\s\S]*\} from "\.\/edgeVisibilityModel";/);
+  assert.match(componentSource, /import \{[\s\S]*buildEdgeVisibilityModeOptions,[\s\S]*filterProjectedEdgesForVisibilityMode,[\s\S]*isOutputFlowHandleVisibleForEdgeMode,[\s\S]*type EdgeVisibilityMode[\s\S]*\} from "\.\/edgeVisibilityModel";/);
   assert.match(componentSource, /const edgeVisibilityModeOptions = computed\(\(\) => \{[\s\S]*return buildEdgeVisibilityModeOptions\(\);/);
   assert.match(componentSource, /const edgeVisibilityMode = ref<EdgeVisibilityMode>\("smart"\);/);
-  assert.match(componentSource, /const edgeVisibilityRelatedNodeIds = computed\(\(\) =>/);
+  assert.doesNotMatch(componentSource, /const edgeVisibilityRelatedNodeIds = computed\(\(\) =>/);
   assert.match(componentSource, /const visibleProjectedEdgeIds = computed\(/);
   assert.match(componentSource, /filterProjectedEdgesForVisibilityMode\(projectedEdges\.value,/);
+  assert.doesNotMatch(componentSource, /relatedNodeIds:/);
   assert.match(componentSource, /function isProjectedEdgeVisible\(edge: ProjectedCanvasEdge\)/);
   assert.match(componentSource, /class="editor-canvas__edge-view-toolbar"/);
   assert.match(componentSource, /v-for="option in edgeVisibilityModeOptions"/);

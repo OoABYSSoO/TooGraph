@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   EDGE_VISIBILITY_MODE_OPTIONS,
   filterProjectedEdgesForVisibilityMode,
+  isOutputFlowHandleVisibleForEdgeMode,
   type EdgeVisibilityMode,
 } from "./edgeVisibilityModel.ts";
 import type { ProjectedCanvasEdge } from "./edgeProjection.ts";
@@ -31,11 +32,22 @@ test("smart mode shows data edges and condition route edges by default", () => {
   );
 });
 
-test("smart mode also shows flow edges related to hovered or selected nodes", () => {
+test("smart mode ignores hovered and selected nodes when choosing visible edges", () => {
   assert.deepEqual(
     visibleEdgeIds("smart", ["agent"]),
-    ["data:input:question->agent", "flow:input->agent", "flow:agent->output", "route:branch:true->agent", "route:branch:false->output"],
+    ["data:input:question->agent", "route:branch:true->agent", "route:branch:false->output"],
   );
+});
+
+test("output flow handles follow sequence edge visibility by mode", () => {
+  assert.equal(isOutputFlowHandleVisibleForEdgeMode({ mode: "smart", anchorKind: "route-out" }), true);
+  assert.equal(isOutputFlowHandleVisibleForEdgeMode({ mode: "smart", anchorKind: "flow-out" }), false);
+  assert.equal(isOutputFlowHandleVisibleForEdgeMode({ mode: "data", anchorKind: "route-out" }), false);
+  assert.equal(isOutputFlowHandleVisibleForEdgeMode({ mode: "data", anchorKind: "flow-out" }), false);
+  assert.equal(isOutputFlowHandleVisibleForEdgeMode({ mode: "flow", anchorKind: "route-out" }), true);
+  assert.equal(isOutputFlowHandleVisibleForEdgeMode({ mode: "flow", anchorKind: "flow-out" }), true);
+  assert.equal(isOutputFlowHandleVisibleForEdgeMode({ mode: "all", anchorKind: "route-out" }), true);
+  assert.equal(isOutputFlowHandleVisibleForEdgeMode({ mode: "all", anchorKind: "flow-out" }), true);
 });
 
 test("data mode shows only data flow lines", () => {

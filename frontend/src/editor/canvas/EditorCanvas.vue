@@ -241,18 +241,16 @@
           @refresh-agent-models="emit('refresh-agent-models')"
           @update-output-config="emit('update-output-config', $event)"
         />
-        <div v-if="isNodeResizeHandleVisible(nodeId)" class="editor-canvas__resize-handles">
-          <button
+        <div v-if="isNodeResizeHotzoneEnabled()" class="editor-canvas__resize-hotzones">
+          <div
             v-for="handle in NODE_RESIZE_HANDLES"
             :key="handle"
-            type="button"
-            data-node-resize-handle="true"
-            class="editor-canvas__resize-handle"
-            :class="`editor-canvas__resize-handle--${handle}`"
-            :aria-label="t('canvasResize.resizeNode')"
-            :title="t('canvasResize.resizeNode')"
+            data-node-resize-hotzone="true"
+            class="editor-canvas__resize-hotzone"
+            :class="`editor-canvas__resize-hotzone--${handle}`"
+            aria-hidden="true"
             @pointerdown.stop.prevent="handleNodeResizePointerDown(nodeId, handle, $event)"
-          />
+          ></div>
         </div>
       </div>
       <div class="editor-canvas__flow-hotspots" aria-hidden="true">
@@ -377,6 +375,7 @@ import {
 import {
   buildEdgeVisibilityModeOptions,
   filterProjectedEdgesForVisibilityMode,
+  isOutputFlowHandleVisibleForEdgeMode,
   type EdgeVisibilityMode,
 } from "./edgeVisibilityModel";
 import {
@@ -599,16 +598,6 @@ const conditionRouteTargetsByNodeId = computed(() =>
 );
 const resolvedCanvasLayout = computed(() => resolveCanvasLayout(props.document, measuredAnchorOffsets.value));
 const projectedEdges = computed(() => resolvedCanvasLayout.value.edges);
-const edgeVisibilityRelatedNodeIds = computed(() => {
-  const nodeIds = new Set<string>();
-  if (selection.selectedNodeId.value) {
-    nodeIds.add(selection.selectedNodeId.value);
-  }
-  if (hoveredNodeId.value) {
-    nodeIds.add(hoveredNodeId.value);
-  }
-  return nodeIds;
-});
 const forceVisibleProjectedEdgeIds = computed(() => {
   const edgeIds = new Set<string>();
   if (selectedEdgeId.value) {
@@ -630,7 +619,6 @@ const visibleProjectedEdgeIds = computed(
     new Set(
       filterProjectedEdgesForVisibilityMode(projectedEdges.value, {
         mode: edgeVisibilityMode.value,
-        relatedNodeIds: edgeVisibilityRelatedNodeIds.value,
         forceVisibleEdgeIds: forceVisibleProjectedEdgeIds.value,
       }).map((edge) => edge.id),
     ),
@@ -2261,11 +2249,8 @@ function handleNodeResizePointerDown(nodeId: string, handle: NodeResizeHandle, e
   };
 }
 
-function isNodeResizeHandleVisible(nodeId: string) {
-  if (isGraphEditingLocked() || activeConnection.value) {
-    return false;
-  }
-  return nodeResizeDrag.value?.nodeId === nodeId || isNodeVisuallySelected(nodeId) || hoveredNodeId.value === nodeId;
+function isNodeResizeHotzoneEnabled() {
+  return !isGraphEditingLocked() && !activeConnection.value;
 }
 
 function setHoveredNode(nodeId: string) {
@@ -2291,9 +2276,10 @@ function clearHoveredFlowHandleNode(nodeId: string) {
 function isFlowHotspotVisible(anchor: ProjectedCanvasAnchor) {
   if (anchor.kind === "flow-out" || anchor.kind === "route-out") {
     return (
-      selection.selectedNodeId.value === anchor.nodeId ||
-      hoveredNodeId.value === anchor.nodeId ||
-      hoveredFlowHandleNodeId.value === anchor.nodeId ||
+      isOutputFlowHandleVisibleForEdgeMode({
+        mode: edgeVisibilityMode.value,
+        anchorKind: anchor.kind,
+      }) ||
       activeConnectionSourceAnchorId.value === anchor.id
     );
   }
@@ -3296,9 +3282,15 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
 .editor-canvas__flow-hotspot {
   position: absolute;
   transform: translate(-50%, -50%);
-  pointer-events: auto;
+  pointer-events: none;
   cursor: crosshair;
   touch-action: none;
+}
+
+.editor-canvas__flow-hotspot--visible,
+.editor-canvas__flow-hotspot--connect-source,
+.editor-canvas__flow-hotspot--connect-target {
+  pointer-events: auto;
 }
 
 .editor-canvas__route-handle {
@@ -3537,69 +3529,51 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   z-index: 9;
 }
 
-.editor-canvas__resize-handles {
+.editor-canvas__resize-hotzones {
   pointer-events: none;
   position: absolute;
-  inset: -9px;
-  z-index: 20;
+  inset: 0;
+  z-index: 10;
 }
 
-.editor-canvas__resize-handle {
+.editor-canvas__resize-hotzone {
   position: absolute;
-  width: 16px;
-  height: 16px;
+  width: 40px;
+  height: 40px;
   padding: 0;
-  border: 1px solid rgba(154, 52, 18, 0.32);
-  border-radius: 999px;
-  background:
-    radial-gradient(circle at 45% 42%, rgba(255, 255, 255, 0.96) 0 34%, rgba(255, 247, 237, 0.88) 35% 100%);
-  box-shadow:
-    0 8px 18px rgba(60, 41, 20, 0.14),
-    0 0 0 3px rgba(255, 247, 237, 0.68);
+  border: 0;
+  background: transparent;
   pointer-events: auto;
   touch-action: none;
 }
 
-.editor-canvas__resize-handle:hover,
-.editor-canvas__resize-handle:focus-visible {
-  border-color: rgba(154, 52, 18, 0.52);
-  outline: none;
-  box-shadow:
-    0 10px 22px rgba(60, 41, 20, 0.18),
-    0 0 0 4px rgba(254, 215, 170, 0.42);
+.editor-canvas__resize-hotzone--nw {
+  top: -6px;
+  left: -6px;
 }
 
-.editor-canvas__resize-handle--nw {
-  top: 0;
-  left: 0;
-  transform: translate(-50%, -50%);
+.editor-canvas__resize-hotzone--ne {
+  top: -6px;
+  right: -6px;
 }
 
-.editor-canvas__resize-handle--ne {
-  top: 0;
-  right: 0;
-  transform: translate(50%, -50%);
+.editor-canvas__resize-hotzone--sw {
+  bottom: -6px;
+  left: -6px;
 }
 
-.editor-canvas__resize-handle--sw {
-  bottom: 0;
-  left: 0;
-  transform: translate(-50%, 50%);
+.editor-canvas__resize-hotzone--se {
+  right: -6px;
+  bottom: -6px;
 }
 
-.editor-canvas__resize-handle--se {
-  right: 0;
-  bottom: 0;
-  transform: translate(50%, 50%);
-}
-
-.editor-canvas__resize-handle--nw,
-.editor-canvas__resize-handle--se {
+.editor-canvas__resize-hotzone--nw,
+.editor-canvas__resize-hotzone--se {
   cursor: nwse-resize;
 }
 
-.editor-canvas__resize-handle--ne,
-.editor-canvas__resize-handle--sw {
+.editor-canvas__resize-hotzone--ne,
+.editor-canvas__resize-hotzone--sw {
   cursor: nesw-resize;
 }
 

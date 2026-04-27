@@ -3174,6 +3174,8 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
   background: var(--graphite-surface-card);
   box-shadow: 0 22px 40px rgba(60, 41, 20, 0.08);
   user-select: none;
+  display: flex;
+  flex-direction: column;
 }
 
 .node-card--condition {
@@ -3508,6 +3510,21 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
   padding: 18px var(--node-card-inline-padding) 24px;
   display: grid;
   gap: 14px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.node-card__body--input,
+.node-card__body--agent,
+.node-card__body--output {
+  display: flex;
+  flex-direction: column;
+}
+
+.node-card__body--input > .node-card__surface-textarea,
+.node-card__body--agent > .node-card__surface-textarea {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .node-card__port-row,
@@ -4514,7 +4531,10 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
 }
 
 .node-card__surface--output {
-  display: grid;
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
   gap: 14px;
 }
 
@@ -4724,7 +4744,10 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
 }
 
 .node-card__surface-textarea {
-  resize: vertical;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  resize: none;
   font: inherit;
 }
 
@@ -4739,7 +4762,8 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
 }
 
 .node-card__preview {
-  min-height: 146px;
+  flex: 1 1 auto;
+  min-height: 0;
   display: block;
   overflow: auto;
   border-radius: 20px;

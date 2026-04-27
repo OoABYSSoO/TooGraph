@@ -52,6 +52,22 @@ test("NodeCard accepts canvas-provided real dimensions through CSS variables", (
   assert.match(componentSource, /\.node-card--condition \{[\s\S]*width:\s*var\(--node-card-width,\s*560px\);/);
 });
 
+test("NodeCard stretches primary editable surfaces when the canvas resizes the node", () => {
+  assert.match(componentSource, /\.node-card \{[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*column;/);
+  assert.match(componentSource, /\.node-card__body \{[\s\S]*flex:\s*1 1 auto;[\s\S]*min-height:\s*0;/);
+  assert.match(
+    componentSource,
+    /\.node-card__body--input,[\s\S]*\.node-card__body--agent,[\s\S]*\.node-card__body--output \{[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*column;/,
+  );
+  assert.match(
+    componentSource,
+    /\.node-card__body--input > \.node-card__surface-textarea,[\s\S]*\.node-card__body--agent > \.node-card__surface-textarea \{[\s\S]*flex:\s*1 1 auto;[\s\S]*min-height:\s*0;/,
+  );
+  assert.match(componentSource, /\.node-card__surface-textarea \{[\s\S]*width:\s*100%;[\s\S]*height:\s*100%;[\s\S]*resize:\s*none;/);
+  assert.match(componentSource, /\.node-card__surface--output \{[\s\S]*flex:\s*1 1 auto;[\s\S]*min-height:\s*0;/);
+  assert.match(componentSource, /\.node-card__preview \{[\s\S]*flex:\s*1 1 auto;[\s\S]*min-height:\s*0;/);
+});
+
 test("NodeCard keeps state pill geometry but hides the pill chrome visually", () => {
   assert.match(componentSource, /\.node-card__port-pill \{[\s\S]*display:\s*inline-flex;/);
   assert.match(componentSource, /\.node-card__port-pill \{[\s\S]*align-items:\s*center;/);
