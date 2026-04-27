@@ -52,6 +52,16 @@ test("EditorCanvas forwards node model refresh requests to the workspace", () =>
   assert.match(componentSource, /@refresh-agent-models="emit\('refresh-agent-models'\)"/);
 });
 
+test("EditorCanvas lets editable node fields handle Backspace and Delete normally", () => {
+  assert.doesNotMatch(componentSource, /@keydown\.delete\.prevent=/);
+  assert.doesNotMatch(componentSource, /@keydown\.backspace\.prevent=/);
+  assert.match(componentSource, /@keydown\.delete="handleSelectedEdgeDelete"/);
+  assert.match(componentSource, /@keydown\.backspace="handleSelectedEdgeDelete"/);
+  assert.match(componentSource, /function handleSelectedEdgeDelete\(event: KeyboardEvent\)/);
+  assert.match(componentSource, /isEditableKeyboardEventTarget\(event\.target\)/);
+  assert.match(componentSource, /event\.preventDefault\(\);/);
+});
+
 test("EditorCanvas keeps state anchors and flow hotspots above hovered nodes", () => {
   assert.match(componentSource, /\.editor-canvas__anchors \{[\s\S]*z-index:\s*10;/);
   assert.match(componentSource, /\.editor-canvas__flow-hotspots \{[\s\S]*z-index:\s*11;/);
@@ -163,7 +173,7 @@ test("EditorCanvas keeps paused human-review graphs viewable but read-only", () 
   assert.match(componentSource, /function handleCanvasDrop\(event: DragEvent\)[\s\S]*if \(isGraphEditingLocked\(\)\) \{[\s\S]*emit\("locked-edit-attempt"\);/);
   assert.match(componentSource, /function handleEdgePointerDown\(edge: ProjectedCanvasEdge, event: PointerEvent\)[\s\S]*if \(isGraphEditingLocked\(\)\) \{[\s\S]*emit\("locked-edit-attempt"\);/);
   assert.match(componentSource, /function handleAnchorPointerDown\(anchor: ProjectedCanvasAnchor\)[\s\S]*if \(isGraphEditingLocked\(\)\) \{[\s\S]*emit\("locked-edit-attempt"\);/);
-  assert.match(componentSource, /function handleSelectedEdgeDelete\(\)[\s\S]*if \(guardLockedCanvasInteraction\(\)\) \{[\s\S]*return;/);
+  assert.match(componentSource, /function handleSelectedEdgeDelete\(event: KeyboardEvent\)[\s\S]*if \(guardLockedCanvasInteraction\(\)\) \{[\s\S]*return;/);
 });
 
 test("EditorCanvas lets top-left floating tools respect workspace overlay clearance", () => {

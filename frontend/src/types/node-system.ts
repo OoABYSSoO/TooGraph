@@ -5,11 +5,6 @@ export type GraphPosition = {
 
 export type NodeFamily = "input" | "output" | "agent" | "condition";
 
-export type NodeViewportSize = {
-  width?: number | null;
-  height?: number | null;
-};
-
 export type StateDefinition = {
   name: string;
   description: string;
@@ -33,8 +28,6 @@ export type AgentThinkingMode = "off" | "low" | "medium" | "high" | "xhigh" | "o
 export type NodeUi = {
   position: GraphPosition;
   collapsed?: boolean;
-  expandedSize?: NodeViewportSize | null;
-  collapsedSize?: NodeViewportSize | null;
 };
 
 export type InputNode = {

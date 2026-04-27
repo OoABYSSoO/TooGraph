@@ -14,8 +14,8 @@
     @pointermove="handleCanvasPointerMove"
     @pointerup="handleCanvasPointerUp"
     @pointercancel="handleCanvasPointerUp"
-    @keydown.delete.prevent="handleSelectedEdgeDelete"
-    @keydown.backspace.prevent="handleSelectedEdgeDelete"
+    @keydown.delete="handleSelectedEdgeDelete"
+    @keydown.backspace="handleSelectedEdgeDelete"
     @keydown.escape.prevent="clearCanvasTransientState"
     @wheel.prevent="handleWheel"
     @dragover.prevent="handleCanvasDragOver"
@@ -326,6 +326,7 @@ import { resolveEdgeRunPresentation } from "@/editor/canvas/runEdgePresentation"
 import { resolveNodeRunPresentation } from "@/editor/canvas/runNodePresentation";
 import { resolveCanvasLayout, type MeasuredAnchorOffset } from "@/editor/canvas/resolvedCanvasLayout";
 import { resolveCanvasSurfaceStyle } from "@/editor/canvas/canvasSurfaceStyle";
+import { isEditableKeyboardEventTarget } from "@/editor/canvas/canvasKeyboard";
 import {
   buildEdgeVisibilityModeOptions,
   filterProjectedEdgesForVisibilityMode,
@@ -2361,14 +2362,19 @@ function completePendingConnection(targetAnchor: ProjectedCanvasAnchor) {
   selectedEdgeId.value = null;
 }
 
-function handleSelectedEdgeDelete() {
+function handleSelectedEdgeDelete(event: KeyboardEvent) {
+  if (isEditableKeyboardEventTarget(event.target)) {
+    return;
+  }
   if (guardLockedCanvasInteraction()) {
+    event.preventDefault();
     return;
   }
   const edge = selectedEdgeId.value ? projectedEdges.value.find((candidate) => candidate.id === selectedEdgeId.value) : null;
   if (!edge) {
     return;
   }
+  event.preventDefault();
 
   if (edge.kind === "flow") {
     emit("remove-flow", {

@@ -28,13 +28,6 @@ class Position(BaseModel):
     y: float
 
 
-class NodeViewportSize(BaseModel):
-    width: float | None = None
-    height: float | None = None
-
-    model_config = ConfigDict(extra="ignore")
-
-
 class ValidationIssue(BaseModel):
     code: str
     message: str
@@ -153,8 +146,6 @@ class NodeSystemWriteBinding(BaseModel):
 class NodeSystemNodeUi(BaseModel):
     position: Position
     collapsed: bool = False
-    expanded_size: NodeViewportSize | None = Field(default=None, alias="expandedSize")
-    collapsed_size: NodeViewportSize | None = Field(default=None, alias="collapsedSize")
 
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
