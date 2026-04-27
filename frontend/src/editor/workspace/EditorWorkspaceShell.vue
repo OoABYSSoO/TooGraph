@@ -96,6 +96,7 @@
                 :run-failure-message-by-node-id="runFailureMessageByTabId[tab.tabId] ?? undefined"
                 :active-run-edge-ids="activeRunEdgeIdsByTabId[tab.tabId] ?? undefined"
                 :interaction-locked="isGraphInteractionLocked(tab.tabId)"
+                :initial-viewport="viewportByTabId[tab.tabId] ?? null"
                 @select-node="focusNodeForTab(tab.tabId, $event)"
                 @update-node-metadata="updateNodeMetadataForTab(tab.tabId, $event.nodeId, $event.patch)"
                 @update-input-config="updateInputConfigForTab(tab.tabId, $event.nodeId, $event.patch)"
@@ -123,6 +124,7 @@
                 @remove-route="removeConditionRouteForTab(tab.tabId, $event.sourceNodeId, $event.branchKey)"
                 @update-output-config="updateOutputConfigForTab(tab.tabId, $event.nodeId, $event.patch)"
                 @update:node-position="(payload) => handleNodePositionUpdate(tab.tabId, payload)"
+                @update:viewport="updateCanvasViewportForTab(tab.tabId, $event)"
                 @open-node-creation-menu="openNodeCreationMenuForTab(tab.tabId, $event)"
                 @create-node-from-file="createNodeFromFileForTab(tab.tabId, $event)"
                 @open-human-review="openHumanReviewPanelForTab(tab.tabId, $event.nodeId)"
@@ -241,17 +243,22 @@ import {
   createUnsavedWorkspaceTab,
   ensureSavedGraphTab,
   prunePersistedEditorDocumentDrafts,
+  prunePersistedEditorViewportDrafts,
   readPersistedEditorDocumentDraft,
+  readPersistedEditorViewportDraft,
   readPersistedEditorWorkspace,
   reorderWorkspaceTab,
   removePersistedEditorDocumentDraft,
+  removePersistedEditorViewportDraft,
   resolveEditorUrl,
   resolveWorkspaceTabUrl,
   writePersistedEditorDocumentDraft,
+  writePersistedEditorViewportDraft,
   writePersistedEditorWorkspace,
   type EditorWorkspaceTab,
   type PersistedEditorWorkspace,
 } from "@/lib/editor-workspace";
+import type { CanvasViewport } from "@/editor/canvas/canvasViewport";
 import { buildRestoredGraphFromRun, buildSnapshotScopedRun, canRestoreRunDetail, resolveRestoredRunTabTitle } from "@/lib/run-restore";
 import { useGraphDocumentStore } from "@/stores/graphDocument";
 import type { KnowledgeBaseRecord } from "@/types/knowledge";
@@ -321,6 +328,7 @@ const statePanelOpenByTabId = ref<Record<string, boolean>>({});
 const sidePanelModeByTabId = ref<Record<string, "state" | "human-review">>({});
 const focusedNodeIdByTabId = ref<Record<string, string | null>>({});
 const focusRequestByTabId = ref<Record<string, NodeFocusRequest | null>>({});
+const viewportByTabId = ref<Record<string, CanvasViewport>>({});
 const runNodeStatusByTabId = ref<Record<string, Record<string, string>>>({});
 const currentRunNodeIdByTabId = ref<Record<string, string | null>>({});
 const latestRunDetailByTabId = ref<Record<string, RunDetail | null>>({});
@@ -757,6 +765,43 @@ function registerDocumentForTab(tabId: string, graph: GraphPayload | GraphDocume
   }
 }
 
+function ensureTabViewportDrafts() {
+  const nextViewports = { ...viewportByTabId.value };
+  let changed = false;
+  for (const tab of workspace.value.tabs) {
+    if (nextViewports[tab.tabId]) {
+      continue;
+    }
+    const persistedViewport = readPersistedEditorViewportDraft(tab.tabId);
+    if (!persistedViewport) {
+      continue;
+    }
+    nextViewports[tab.tabId] = persistedViewport;
+    changed = true;
+  }
+  if (changed) {
+    viewportByTabId.value = nextViewports;
+  }
+}
+
+function updateCanvasViewportForTab(tabId: string, viewport: CanvasViewport) {
+  const previousViewport = viewportByTabId.value[tabId] ?? null;
+  if (
+    previousViewport &&
+    previousViewport.x === viewport.x &&
+    previousViewport.y === viewport.y &&
+    previousViewport.scale === viewport.scale
+  ) {
+    return;
+  }
+
+  viewportByTabId.value = {
+    ...viewportByTabId.value,
+    [tabId]: viewport,
+  };
+  writePersistedEditorViewportDraft(tabId, viewport);
+}
+
 function clearTabRuntime(tabId: string) {
   cancelRunPolling(tabId);
   cancelRunEventStreamForTab(tabId);
@@ -776,6 +821,8 @@ function clearTabRuntime(tabId: string) {
   delete nextFocusedNodes[tabId];
   const nextFocusRequests = { ...focusRequestByTabId.value };
   delete nextFocusRequests[tabId];
+  const nextViewports = { ...viewportByTabId.value };
+  delete nextViewports[tabId];
   const nextRunNodeStatus = { ...runNodeStatusByTabId.value };
   delete nextRunNodeStatus[tabId];
   const nextCurrentRunNode = { ...currentRunNodeIdByTabId.value };
@@ -802,6 +849,7 @@ function clearTabRuntime(tabId: string) {
   sidePanelModeByTabId.value = nextSidePanelModes;
   focusedNodeIdByTabId.value = nextFocusedNodes;
   focusRequestByTabId.value = nextFocusRequests;
+  viewportByTabId.value = nextViewports;
   runNodeStatusByTabId.value = nextRunNodeStatus;
   currentRunNodeIdByTabId.value = nextCurrentRunNode;
   latestRunDetailByTabId.value = nextLatestRuns;
@@ -1017,6 +1065,7 @@ function finalizeTabClose(tabId: string) {
   updateWorkspace(transition.workspace);
   writePersistedEditorWorkspace(transition.workspace);
   removePersistedEditorDocumentDraft(tabId);
+  removePersistedEditorViewportDraft(tabId);
   clearTabRuntime(tabId);
 
   if (transition.closedActiveTab) {
@@ -2239,6 +2288,7 @@ watch(
     }
     writePersistedEditorWorkspace(nextWorkspace);
     prunePersistedEditorDocumentDrafts(nextWorkspace.tabs.map((tab) => tab.tabId));
+    prunePersistedEditorViewportDrafts(nextWorkspace.tabs.map((tab) => tab.tabId));
   },
   { deep: true },
 );
@@ -2249,6 +2299,7 @@ watch(
     if (!hydrated.value) {
       return;
     }
+    ensureTabViewportDrafts();
     ensureUnsavedTabDocuments();
   },
   { deep: true },
@@ -2301,6 +2352,7 @@ onMounted(() => {
   void loadSkillDefinitions();
   void loadPersistedPresets();
   updateWorkspace(readPersistedEditorWorkspace());
+  ensureTabViewportDrafts();
   hydrated.value = true;
   ensureUnsavedTabDocuments();
   applyCurrentRouteInstruction();

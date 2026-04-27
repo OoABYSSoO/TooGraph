@@ -1,5 +1,12 @@
 import { computed, reactive } from "vue";
 
+import {
+  clampCanvasViewportScale,
+  DEFAULT_CANVAS_VIEWPORT,
+  normalizeCanvasViewport,
+  type CanvasViewport,
+} from "./canvasViewport.ts";
+
 type PanState = {
   pointerId: number | null;
   startX: number;
@@ -8,12 +15,9 @@ type PanState = {
   originY: number;
 };
 
-export function useViewport() {
-  const viewport = reactive({
-    x: 0,
-    y: 0,
-    scale: 1,
-  });
+export function useViewport(initialViewport?: CanvasViewport | null) {
+  const normalizedInitialViewport = normalizeCanvasViewport(initialViewport) ?? DEFAULT_CANVAS_VIEWPORT;
+  const viewport = reactive<CanvasViewport>({ ...normalizedInitialViewport });
 
   const panState = reactive<PanState>({
     pointerId: null,
@@ -50,12 +54,12 @@ export function useViewport() {
 
   function zoomBy(deltaY: number) {
     const direction = deltaY > 0 ? -0.08 : 0.08;
-    viewport.scale = clamp(viewport.scale + direction, 0.4, 2.2);
+    viewport.scale = clampCanvasViewportScale(viewport.scale + direction);
   }
 
   function zoomAt(input: { clientX: number; clientY: number; canvasLeft: number; canvasTop: number; nextScale: number }) {
     const currentScale = viewport.scale || 1;
-    const nextScale = clamp(input.nextScale, 0.4, 2.2);
+    const nextScale = clampCanvasViewportScale(input.nextScale);
     const anchorX = input.clientX - input.canvasLeft;
     const anchorY = input.clientY - input.canvasTop;
     const worldX = (anchorX - viewport.x) / currentScale;
@@ -69,7 +73,7 @@ export function useViewport() {
   function setViewport(nextViewport: { x: number; y: number; scale: number }) {
     viewport.x = nextViewport.x;
     viewport.y = nextViewport.y;
-    viewport.scale = clamp(nextViewport.scale, 0.4, 2.2);
+    viewport.scale = clampCanvasViewportScale(nextViewport.scale);
   }
 
   return {
@@ -82,8 +86,4 @@ export function useViewport() {
     zoomAt,
     setViewport,
   };
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), max);
 }

@@ -147,7 +147,7 @@ class NodeSystemNodeUi(BaseModel):
     position: Position
     collapsed: bool = False
 
-    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
 
 class NodeSystemInputConfig(BaseModel):

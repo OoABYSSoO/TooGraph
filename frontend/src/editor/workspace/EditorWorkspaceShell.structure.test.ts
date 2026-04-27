@@ -127,6 +127,19 @@ test("EditorWorkspaceShell routes menu selections and dropped files through the 
   assert.match(componentSource, /closeNodeCreationMenu\(tabId\)/);
 });
 
+test("EditorWorkspaceShell keeps canvas viewport state in local editor drafts", () => {
+  assert.match(componentSource, /readPersistedEditorViewportDraft/);
+  assert.match(componentSource, /writePersistedEditorViewportDraft/);
+  assert.match(componentSource, /prunePersistedEditorViewportDrafts/);
+  assert.match(componentSource, /removePersistedEditorViewportDraft/);
+  assert.match(componentSource, /const viewportByTabId = ref<Record<string, CanvasViewport>>\(\{\}\);/);
+  assert.match(componentSource, /:initial-viewport="viewportByTabId\[tab\.tabId\] \?\? null"/);
+  assert.match(componentSource, /@update:viewport="updateCanvasViewportForTab\(tab\.tabId, \$event\)"/);
+  assert.match(componentSource, /function ensureTabViewportDrafts\(\)/);
+  assert.match(componentSource, /function updateCanvasViewportForTab\(tabId: string, viewport: CanvasViewport\)/);
+  assert.match(componentSource, /writePersistedEditorViewportDraft\(tabId, viewport\)/);
+});
+
 test("EditorWorkspaceShell imports marked GraphiteUI Python files as new graph tabs", () => {
   assert.match(componentSource, /@import-python-graph="openPythonGraphImportDialog"/);
   assert.match(componentSource, /ref="pythonGraphImportInput"/);

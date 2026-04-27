@@ -575,6 +575,12 @@ const baseMessages = {
       all: "全量",
       allTitle: "显示全部线条",
     },
+    canvasZoom: {
+      toolbar: "画布缩放",
+      zoomOut: "缩小",
+      zoomIn: "放大",
+      reset: "重置为 100%",
+    },
     nodeCreation: {
       input: "Input",
       output: "Output",
@@ -1248,6 +1254,12 @@ const baseMessages = {
       sequenceTitle: "Show sequence flow and condition branch edges only",
       all: "All",
       allTitle: "Show all edges",
+    },
+    canvasZoom: {
+      toolbar: "Canvas zoom",
+      zoomOut: "Zoom out",
+      zoomIn: "Zoom in",
+      reset: "Reset to 100%",
     },
     nodeCreation: {
       input: "Input",

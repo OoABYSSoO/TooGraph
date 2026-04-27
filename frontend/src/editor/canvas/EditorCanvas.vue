@@ -44,6 +44,27 @@
         {{ option.label }}
       </button>
     </div>
+    <div
+      class="editor-canvas__zoom-toolbar"
+      role="toolbar"
+      :aria-label="t('canvasZoom.toolbar')"
+      @pointerdown.stop
+      @pointerup.stop
+      @dblclick.stop
+      @click.stop
+      @wheel.stop
+    >
+      <button type="button" class="editor-canvas__zoom-button" :aria-label="t('canvasZoom.zoomOut')" :title="t('canvasZoom.zoomOut')" @click.stop="handleZoomOut">
+        <ElIcon aria-hidden="true"><Minus /></ElIcon>
+      </button>
+      <span class="editor-canvas__zoom-label" aria-live="polite">{{ zoomPercentLabel }}</span>
+      <button type="button" class="editor-canvas__zoom-button" :aria-label="t('canvasZoom.zoomIn')" :title="t('canvasZoom.zoomIn')" @click.stop="handleZoomIn">
+        <ElIcon aria-hidden="true"><Plus /></ElIcon>
+      </button>
+      <button type="button" class="editor-canvas__zoom-button" :aria-label="t('canvasZoom.reset')" :title="t('canvasZoom.reset')" @click.stop="handleZoomReset">
+        <ElIcon aria-hidden="true"><RefreshLeft /></ElIcon>
+      </button>
+    </div>
     <button
       v-if="interactionLocked"
       type="button"
@@ -311,7 +332,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, toRef, watch } from "vue";
-import { Check } from "@element-plus/icons-vue";
+import { Check, Minus, Plus, RefreshLeft } from "@element-plus/icons-vue";
 import { useI18n } from "vue-i18n";
 
 import { buildAnchorModel } from "@/editor/anchors/anchorModel";
@@ -327,6 +348,7 @@ import { resolveNodeRunPresentation } from "@/editor/canvas/runNodePresentation"
 import { resolveCanvasLayout, type MeasuredAnchorOffset } from "@/editor/canvas/resolvedCanvasLayout";
 import { resolveCanvasSurfaceStyle } from "@/editor/canvas/canvasSurfaceStyle";
 import { isEditableKeyboardEventTarget } from "@/editor/canvas/canvasKeyboard";
+import { DEFAULT_CANVAS_VIEWPORT, type CanvasViewport } from "@/editor/canvas/canvasViewport";
 import {
   buildEdgeVisibilityModeOptions,
   filterProjectedEdgesForVisibilityMode,
@@ -368,6 +390,7 @@ const props = defineProps<{
   runFailureMessageByNodeId?: Record<string, string>;
   activeRunEdgeIds?: string[];
   interactionLocked?: boolean;
+  initialViewport?: CanvasViewport | null;
 }>();
 
 const { t, locale } = useI18n();
@@ -409,6 +432,7 @@ const emit = defineEmits<{
   (event: "remove-route", payload: { sourceNodeId: string; branchKey: string }): void;
   (event: "open-node-creation-menu", payload: { position: GraphPosition; sourceNodeId?: string; sourceAnchorKind?: "flow-out" | "route-out" | "state-out"; sourceBranchKey?: string; sourceStateKey?: string; sourceValueType?: string | null; clientX: number; clientY: number }): void;
   (event: "create-node-from-file", payload: { file: File; position: GraphPosition; clientX: number; clientY: number }): void;
+  (event: "update:viewport", payload: CanvasViewport): void;
 }>();
 
 const canvasRef = ref<HTMLElement | null>(null);
@@ -428,7 +452,7 @@ type PendingStateInputSource = {
 const STATE_INPUT_HIT_PADDING = 8;
 const measuredNodeSizes = ref<Record<string, MeasuredNodeSize>>({});
 const canvasSize = ref({ width: 0, height: 0 });
-const viewport = useViewport();
+const viewport = useViewport(props.initialViewport ?? undefined);
 const selection = useNodeSelectionFocus({
   externalSelectedNodeId: toRef(props, "selectedNodeId"),
   externalFocusRequest: toRef(props, "focusRequest"),
@@ -748,6 +772,7 @@ const canvasSurfaceStyle = computed(() => resolveCanvasSurfaceStyle(viewport.vie
 const viewportStyle = computed(() => ({
   transform: `translate(${viewport.viewport.x}px, ${viewport.viewport.y}px) scale(${viewport.viewport.scale})`,
 }));
+const zoomPercentLabel = computed(() => `${Math.round(viewport.viewport.scale * 100)}%`);
 const stateTypeOptions = STATE_FIELD_TYPE_OPTIONS;
 const flowEdgeDeleteConfirmStyle = computed(() => {
   if (!activeFlowEdgeDeleteConfirm.value) {
@@ -780,6 +805,18 @@ const dataEdgeStateEditorStyle = computed(() => {
   };
 });
 const dataEdgeStateColorOptions = computed(() => resolveStateColorOptions(dataEdgeStateDraft.value?.definition.color ?? ""));
+
+watch(
+  () => ({
+    x: viewport.viewport.x,
+    y: viewport.viewport.y,
+    scale: viewport.viewport.scale,
+  }),
+  (nextViewport) => {
+    emit("update:viewport", nextViewport);
+  },
+  { immediate: true },
+);
 
 function isFlowEdgeDeleteConfirmOpen(edgeId: string) {
   return activeFlowEdgeDeleteConfirm.value?.id === edgeId;
@@ -2126,6 +2163,37 @@ function isFlowHotspotVisible(anchor: ProjectedCanvasAnchor) {
   return eligibleTargetAnchorIds.value.has(anchor.id);
 }
 
+function zoomViewportAroundCanvasCenter(nextScale: number) {
+  const rect = canvasRef.value?.getBoundingClientRect();
+  if (!rect) {
+    viewport.setViewport({
+      ...viewport.viewport,
+      scale: nextScale,
+    });
+    return;
+  }
+
+  viewport.zoomAt({
+    clientX: rect.left + rect.width / 2,
+    clientY: rect.top + rect.height / 2,
+    canvasLeft: rect.left,
+    canvasTop: rect.top,
+    nextScale,
+  });
+}
+
+function handleZoomOut() {
+  zoomViewportAroundCanvasCenter(viewport.viewport.scale - 0.1);
+}
+
+function handleZoomIn() {
+  zoomViewportAroundCanvasCenter(viewport.viewport.scale + 0.1);
+}
+
+function handleZoomReset() {
+  viewport.setViewport(DEFAULT_CANVAS_VIEWPORT);
+}
+
 function handleWheel(event: WheelEvent) {
   viewport.zoomBy(event.deltaY);
 }
@@ -2657,6 +2725,80 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
 .editor-canvas__edge-view-button--active:hover {
   background: rgba(154, 52, 18, 0.9);
   color: rgba(255, 250, 242, 0.98);
+}
+
+.editor-canvas__zoom-toolbar {
+  position: absolute;
+  left: 18px;
+  top: calc(var(--editor-canvas-floating-top-clearance, 18px) + 62px);
+  z-index: 24;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+  padding: 5px;
+  border: 1px solid var(--graphite-glass-border);
+  border-radius: 999px;
+  background: var(--graphite-glass-bg);
+  box-shadow:
+    0 8px 20px rgba(31, 28, 24, 0.045),
+    var(--graphite-glass-highlight),
+    var(--graphite-glass-rim);
+  backdrop-filter: blur(20px) saturate(1.45) contrast(1.01);
+  cursor: default;
+  pointer-events: auto;
+}
+
+.editor-canvas__zoom-toolbar::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 1px;
+  z-index: 0;
+  border-radius: inherit;
+  background: var(--graphite-glass-specular), var(--graphite-glass-lens);
+  mix-blend-mode: screen;
+  opacity: 0.36;
+}
+
+.editor-canvas__zoom-button,
+.editor-canvas__zoom-label {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  border-radius: 999px;
+  color: rgba(73, 52, 34, 0.72);
+  font-size: 0.76rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.editor-canvas__zoom-button {
+  width: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.editor-canvas__zoom-button:hover {
+  background: rgba(154, 52, 18, 0.08);
+  color: rgba(75, 42, 18, 0.92);
+}
+
+.editor-canvas__zoom-label {
+  min-width: 48px;
+  padding: 0 8px;
+  background: rgba(255, 250, 242, 0.42);
+  font-variant-numeric: tabular-nums;
 }
 
 .editor-canvas__viewport {

@@ -9,16 +9,21 @@ import {
   createUnsavedWorkspaceTab,
   EDITOR_WORKSPACE_DOCUMENTS_STORAGE_KEY,
   EDITOR_WORKSPACE_STORAGE_KEY,
+  EDITOR_WORKSPACE_VIEWPORTS_STORAGE_KEY,
   ensureSavedGraphTab,
   isSameSavedGraph,
   prunePersistedEditorDocumentDrafts,
+  prunePersistedEditorViewportDrafts,
   readPersistedEditorDocumentDraft,
+  readPersistedEditorViewportDraft,
   readPersistedEditorWorkspace,
   reorderWorkspaceTab,
   removePersistedEditorDocumentDraft,
+  removePersistedEditorViewportDraft,
   resolveEditorUrl,
   resolveWorkspaceTabUrl,
   writePersistedEditorDocumentDraft,
+  writePersistedEditorViewportDraft,
   writePersistedEditorWorkspace,
   type PersistedEditorWorkspace,
 } from "./editor-workspace.ts";
@@ -134,6 +139,39 @@ test("persisted editor document drafts can be pruned and removed by tab id", () 
   removePersistedEditorDocumentDraft("tab_b");
 
   assert.equal(readPersistedEditorDocumentDraft("tab_b"), null);
+});
+
+test("persisted editor viewport drafts preserve canvas zoom state by tab id", () => {
+  const storage = createStorageMock();
+  Object.assign(globalThis, { localStorage: storage });
+
+  writePersistedEditorViewportDraft("tab_a", { x: -120, y: 40, scale: 1.4 });
+
+  assert.deepEqual(readPersistedEditorViewportDraft("tab_a"), { x: -120, y: 40, scale: 1.4 });
+  assert.match(storage.getItem(EDITOR_WORKSPACE_VIEWPORTS_STORAGE_KEY) ?? "", /"scale":1.4/);
+});
+
+test("persisted editor viewport drafts normalize invalid values and can be pruned", () => {
+  const storage = createStorageMock();
+  Object.assign(globalThis, { localStorage: storage });
+  storage.setItem(
+    EDITOR_WORKSPACE_VIEWPORTS_STORAGE_KEY,
+    JSON.stringify({
+      tab_a: { x: 10, y: 20, scale: 9 },
+      tab_b: { x: "bad", y: 0, scale: 1 },
+      tab_c: { x: -5, y: 12, scale: 0.75 },
+    }),
+  );
+
+  assert.deepEqual(readPersistedEditorViewportDraft("tab_a"), { x: 10, y: 20, scale: 2.2 });
+  assert.equal(readPersistedEditorViewportDraft("tab_b"), null);
+  prunePersistedEditorViewportDrafts(["tab_c"]);
+
+  assert.equal(readPersistedEditorViewportDraft("tab_a"), null);
+  assert.deepEqual(readPersistedEditorViewportDraft("tab_c"), { x: -5, y: 12, scale: 0.75 });
+
+  removePersistedEditorViewportDraft("tab_c");
+  assert.equal(readPersistedEditorViewportDraft("tab_c"), null);
 });
 
 test("resolveEditorUrl only uses graph id for saved graphs", () => {

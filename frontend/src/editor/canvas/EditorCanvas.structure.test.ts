@@ -295,6 +295,23 @@ test("EditorCanvas exposes a top-left capsule toolbar for edge visibility modes"
   assert.match(componentSource, /\.editor-canvas__edge-view-button \{[\s\S]*position:\s*relative;[\s\S]*z-index:\s*1;/);
 });
 
+test("EditorCanvas exposes page zoom controls and emits viewport draft updates", () => {
+  assert.match(componentSource, /initialViewport\?: CanvasViewport \| null;/);
+  assert.match(componentSource, /\(event: "update:viewport", payload: CanvasViewport\): void;/);
+  assert.match(componentSource, /const viewport = useViewport\(props\.initialViewport \?\? undefined\);/);
+  assert.match(componentSource, /watch\(\s*\(\) => \(\{[\s\S]*scale: viewport\.viewport\.scale,[\s\S]*emit\("update:viewport"/);
+  assert.match(componentSource, /class="editor-canvas__zoom-toolbar"/);
+  assert.match(componentSource, /@click\.stop="handleZoomOut"/);
+  assert.match(componentSource, /@click\.stop="handleZoomIn"/);
+  assert.match(componentSource, /@click\.stop="handleZoomReset"/);
+  assert.match(componentSource, /\{\{ zoomPercentLabel \}\}/);
+  assert.match(componentSource, /function handleZoomOut\(\)/);
+  assert.match(componentSource, /function handleZoomIn\(\)/);
+  assert.match(componentSource, /function handleZoomReset\(\)/);
+  assert.match(componentSource, /function zoomViewportAroundCanvasCenter\(nextScale: number\)/);
+  assert.match(componentSource, /\.editor-canvas__zoom-toolbar \{[\s\S]*position:\s*absolute;[\s\S]*left:\s*18px;/);
+});
+
 test("EditorCanvas shows a clicked-position delete confirm for flow edges before removing them", () => {
   assert.match(componentSource, /@pointerdown\.stop="handleEdgePointerDown\(edge, \$event\)"/);
   assert.match(componentSource, /const activeFlowEdgeDeleteConfirm = ref<\{/);

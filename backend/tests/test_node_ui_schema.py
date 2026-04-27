@@ -1,8 +1,12 @@
+import pytest
+from pydantic import ValidationError
+
 from app.core.schemas.node_system import NodeSystemGraphPayload
 
 
-def test_node_ui_accepts_but_drops_legacy_size_fields() -> None:
-    graph = NodeSystemGraphPayload.model_validate(
+def test_node_ui_rejects_legacy_size_fields() -> None:
+    with pytest.raises(ValidationError):
+        NodeSystemGraphPayload.model_validate(
         {
             "name": "Legacy UI",
             "state_schema": {
@@ -35,6 +39,3 @@ def test_node_ui_accepts_but_drops_legacy_size_fields() -> None:
             "metadata": {},
         }
     )
-
-    ui_payload = graph.model_dump(by_alias=True)["nodes"]["input_value"]["ui"]
-    assert ui_payload == {"position": {"x": 0.0, "y": 0.0}, "collapsed": True}
