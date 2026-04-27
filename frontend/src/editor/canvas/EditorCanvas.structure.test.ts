@@ -540,7 +540,7 @@ test("EditorCanvas snaps flow drags to eligible target node bodies before mouseu
 });
 
 test("EditorCanvas exposes transient new agent input anchors while state dragging", () => {
-  assert.match(componentSource, /import \{ CREATE_AGENT_INPUT_STATE_KEY, VIRTUAL_ANY_INPUT_STATE_KEY, VIRTUAL_ANY_OUTPUT_STATE_KEY \} from "@\/lib\/virtual-any-input";/);
+  assert.match(componentSource, /import \{[\s\S]*CREATE_AGENT_INPUT_STATE_KEY,[\s\S]*VIRTUAL_ANY_INPUT_STATE_KEY,[\s\S]*VIRTUAL_ANY_OUTPUT_COLOR,[\s\S]*VIRTUAL_ANY_OUTPUT_STATE_KEY,[\s\S]*\} from "@\/lib\/virtual-any-input";/);
   assert.match(componentSource, /const pendingAgentInputSourceByNodeId = computed<Record<string, PendingStateInputSource>>\(\(\) =>/);
   assert.match(componentSource, /canCompleteGraphConnection\(props\.document, connection, \{[\s\S]*stateKey: CREATE_AGENT_INPUT_STATE_KEY/);
   assert.match(componentSource, /:pending-state-input-source="pendingAgentInputSourceByNodeId\[nodeId\] \?\? null"/);
@@ -548,9 +548,24 @@ test("EditorCanvas exposes transient new agent input anchors while state draggin
   assert.match(componentSource, /const anchorId = `\$\{nodeId\}:state-in:\$\{CREATE_AGENT_INPUT_STATE_KEY\}`;/);
   assert.match(componentSource, /id: anchorId/);
   assert.match(componentSource, /stateKey: CREATE_AGENT_INPUT_STATE_KEY/);
-  assert.match(componentSource, /const baseProjectedAnchorsWithoutReplacedAnyInputs = computed\(\(\) =>/);
+  assert.match(componentSource, /const baseProjectedAnchorsWithoutVirtualCreatePorts = computed\(\(\) =>/);
   assert.match(componentSource, /anchor\.stateKey === VIRTUAL_ANY_INPUT_STATE_KEY &&[\s\S]*pendingAgentInputSourceByNodeId\.value\[anchor\.nodeId\]/);
-  assert.match(componentSource, /const projectedAnchors = computed\(\(\) => \[\.\.\.baseProjectedAnchorsWithoutReplacedAnyInputs\.value, \.\.\.transientAgentInputAnchors\.value\]\);/);
+  assert.match(componentSource, /const projectedAnchors = computed\(\(\) => \[\.\.\.baseProjectedAnchorsWithoutVirtualCreatePorts\.value, \.\.\.transientAgentInputAnchors\.value, \.\.\.transientAgentOutputAnchors\.value\]\);/);
+});
+
+test("EditorCanvas projects virtual agent output anchors only while the virtual output pill is visible or dragging", () => {
+  assert.match(componentSource, /:hovered="hoveredNodeId === nodeId"/);
+  assert.match(componentSource, /function isAgentCreateOutputAnchorVisible\(nodeId: string\)/);
+  assert.match(componentSource, /selection\.selectedNodeId\.value === nodeId/);
+  assert.match(componentSource, /hoveredNodeId\.value === nodeId/);
+  assert.match(componentSource, /pendingConnection\.value\?\.sourceStateKey === VIRTUAL_ANY_OUTPUT_STATE_KEY/);
+  assert.match(componentSource, /const transientAgentOutputAnchors = computed<ProjectedCanvasAnchor\[\]>\(\(\) =>/);
+  assert.match(componentSource, /node\.kind !== "agent"/);
+  assert.match(componentSource, /const anchorId = `\$\{nodeId\}:state-out:\$\{VIRTUAL_ANY_OUTPUT_STATE_KEY\}`;/);
+  assert.match(componentSource, /kind: "state-out" as const/);
+  assert.match(componentSource, /color: VIRTUAL_ANY_OUTPUT_COLOR/);
+  assert.match(componentSource, /stateKey: VIRTUAL_ANY_OUTPUT_STATE_KEY/);
+  assert.match(componentSource, /anchor\.stateKey === VIRTUAL_ANY_OUTPUT_STATE_KEY &&[\s\S]*!isAgentCreateOutputAnchorVisible\(anchor\.nodeId\)/);
 });
 
 test("EditorCanvas opens node creation from the virtual agent any output", () => {

@@ -250,6 +250,7 @@
           :pending-state-input-source="pendingAgentInputSourceByNodeId[nodeId] ?? null"
           :human-review-pending="isHumanReviewNode(nodeId)"
           :selected="isNodeVisuallySelected(nodeId)"
+          :hovered="hoveredNodeId === nodeId"
           :interaction-locked="isGraphEditingLocked()"
           @update-node-metadata="emit('update-node-metadata', $event)"
           @update-input-config="emit('update-input-config', $event)"
@@ -422,7 +423,12 @@ import {
   canStartGraphConnection,
   type PendingGraphConnection,
 } from "@/lib/graph-connections";
-import { CREATE_AGENT_INPUT_STATE_KEY, VIRTUAL_ANY_INPUT_STATE_KEY, VIRTUAL_ANY_OUTPUT_STATE_KEY } from "@/lib/virtual-any-input";
+import {
+  CREATE_AGENT_INPUT_STATE_KEY,
+  VIRTUAL_ANY_INPUT_STATE_KEY,
+  VIRTUAL_ANY_OUTPUT_COLOR,
+  VIRTUAL_ANY_OUTPUT_STATE_KEY,
+} from "@/lib/virtual-any-input";
 import { resolveFocusedViewport } from "@/editor/canvas/focusNodeViewport";
 import { resolveViewportForMinimapCenter } from "./minimapModel";
 import { useNodeSelectionFocus, type NodeFocusRequest } from "./useNodeSelectionFocus";
@@ -689,13 +695,30 @@ const pendingAgentInputSourceByNodeId = computed<Record<string, PendingStateInpu
   );
 });
 const baseProjectedAnchors = computed(() => resolvedCanvasLayout.value.anchors);
-const baseProjectedAnchorsWithoutReplacedAnyInputs = computed(() =>
+function isAgentCreateOutputAnchorVisible(nodeId: string) {
+  return (
+    selection.selectedNodeId.value === nodeId ||
+    hoveredNodeId.value === nodeId ||
+    (
+      pendingConnection.value?.sourceNodeId === nodeId &&
+      pendingConnection.value?.sourceKind === "state-out" &&
+      pendingConnection.value?.sourceStateKey === VIRTUAL_ANY_OUTPUT_STATE_KEY
+    )
+  );
+}
+
+const baseProjectedAnchorsWithoutVirtualCreatePorts = computed(() =>
   baseProjectedAnchors.value.filter(
     (anchor) =>
       !(
         anchor.kind === "state-in" &&
         anchor.stateKey === VIRTUAL_ANY_INPUT_STATE_KEY &&
         pendingAgentInputSourceByNodeId.value[anchor.nodeId]
+      ) &&
+      !(
+        anchor.kind === "state-out" &&
+        anchor.stateKey === VIRTUAL_ANY_OUTPUT_STATE_KEY &&
+        !isAgentCreateOutputAnchorVisible(anchor.nodeId)
       ),
   ),
 );
@@ -722,7 +745,33 @@ const transientAgentInputAnchors = computed<ProjectedCanvasAnchor[]>(() =>
     ];
   }),
 );
-const projectedAnchors = computed(() => [...baseProjectedAnchorsWithoutReplacedAnyInputs.value, ...transientAgentInputAnchors.value]);
+const transientAgentOutputAnchors = computed<ProjectedCanvasAnchor[]>(() =>
+  Object.entries(props.document.nodes).flatMap(([nodeId, node]) => {
+    if (node.kind !== "agent" || node.writes.length === 0 || !isAgentCreateOutputAnchorVisible(nodeId)) {
+      return [];
+    }
+
+    const anchorId = `${nodeId}:state-out:${VIRTUAL_ANY_OUTPUT_STATE_KEY}`;
+    const measuredOffset = measuredAnchorOffsets.value[anchorId];
+    if (!measuredOffset) {
+      return [];
+    }
+
+    return [
+      {
+        id: anchorId,
+        nodeId,
+        kind: "state-out" as const,
+        x: node.ui.position.x + measuredOffset.offsetX,
+        y: node.ui.position.y + measuredOffset.offsetY,
+        side: "right" as const,
+        color: VIRTUAL_ANY_OUTPUT_COLOR,
+        stateKey: VIRTUAL_ANY_OUTPUT_STATE_KEY,
+      },
+    ];
+  }),
+);
+const projectedAnchors = computed(() => [...baseProjectedAnchorsWithoutVirtualCreatePorts.value, ...transientAgentInputAnchors.value, ...transientAgentOutputAnchors.value]);
 const flowAnchors = computed(() =>
   projectedAnchors.value.filter((anchor) => anchor.kind === "flow-in" || anchor.kind === "flow-out"),
 );

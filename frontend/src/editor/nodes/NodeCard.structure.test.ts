@@ -256,8 +256,10 @@ test("NodeCard keeps skill actions below the agent while creating ports from plu
   assert.match(agentSection, /<ElPopover[\s\S]*:visible="isSkillPickerOpen"[\s\S]*popper-class="node-card__agent-add-popover-popper"/);
   assert.match(agentSection, /class="node-card__agent-add-popover node-card__skill-picker"/);
   assert.match(agentSection, /@click\.stop="toggleSkillPicker"/);
-  assert.match(agentSection, /@click\.stop="openPortStateCreate\('input'\)"/);
-  assert.match(agentSection, /@click\.stop="openPortStateCreate\('output'\)"/);
+  assert.match(agentSection, /@dblclick\.stop="openPortStateCreate\('input'\)"/);
+  assert.match(agentSection, /@dblclick\.stop="openPortStateCreate\('output'\)"/);
+  assert.doesNotMatch(agentSection, /@click\.stop="openPortStateCreate\('input'\)"/);
+  assert.doesNotMatch(agentSection, /@click\.stop="openPortStateCreate\('output'\)"/);
   assert.match(agentSection, /class="node-card__agent-create-port-popover node-card__port-picker"/);
   assert.match(agentSection, /class="node-card__port-pill node-card__port-pill--input node-card__port-pill--dock-start node-card__port-pill--create"/);
   assert.match(agentSection, /class="node-card__port-pill node-card__port-pill--output node-card__port-pill--dock-end node-card__port-pill--create"/);
@@ -284,21 +286,21 @@ test("NodeCard keeps skill actions below the agent while creating ports from plu
   assert.doesNotMatch(agentSection, /<div v-if="isSkillPickerOpen" class="node-card__skill-picker"/);
 });
 
-test("NodeCard renders plus input and plus output as agent port rows", () => {
+test("NodeCard renders plus input and plus output as virtual agent state port rows", () => {
   const agentSectionMatch = componentSource.match(
     /<section v-else-if="view\.body\.kind === 'agent'"[\s\S]*?<\/section>/,
   );
   assert.ok(agentSectionMatch, "expected to find the agent node section");
   const agentSection = agentSectionMatch[0];
 
-  assert.match(componentSource, /import \{ CREATE_AGENT_INPUT_STATE_KEY, VIRTUAL_ANY_OUTPUT_STATE_KEY \} from "@\/lib\/virtual-any-input";/);
+  assert.match(componentSource, /import \{[\s\S]*CREATE_AGENT_INPUT_STATE_KEY,[\s\S]*VIRTUAL_ANY_OUTPUT_COLOR,[\s\S]*VIRTUAL_ANY_OUTPUT_STATE_KEY[\s\S]*\} from "@\/lib\/virtual-any-input";/);
   assert.match(componentSource, /import \{ buildNodeCardViewModel, type NodePortViewModel \} from "\.\/nodeCardViewModel";/);
+  assert.match(componentSource, /hovered\?:\s*boolean;/);
+  assert.match(componentSource, /'node-card--hovered': hovered/);
   assert.match(componentSource, /pendingStateInputSource\?: \{ stateKey: string; label: string; stateColor: string \} \| null;/);
   assert.match(componentSource, /const agentInputPorts = computed<NodePortViewModel\[\]>\(\(\) =>/);
   assert.match(componentSource, /const agentOutputPorts = computed<NodePortViewModel\[\]>\(\(\) =>/);
   assert.match(componentSource, /filter\(\(port\) => !port\.virtual\)/);
-  assert.match(componentSource, /const agentHasVirtualOutputPort = computed\(\(\) =>/);
-  assert.match(componentSource, /function resolveAgentCreateOutputAnchorSlotId\(\)/);
   assert.match(componentSource, /VIRTUAL_ANY_OUTPUT_STATE_KEY/);
   assert.match(componentSource, /function openPortStateCreate\(side: "input" \| "output"\)/);
   assert.match(componentSource, /createStateDraftFromQuery\(side === "input" \? "Input" : "Output", Object\.keys\(props\.stateSchema\)\)/);
@@ -306,8 +308,11 @@ test("NodeCard renders plus input and plus output as agent port rows", () => {
   assert.match(agentSection, /v-for="port in agentOutputPorts"/);
   assert.match(agentSection, /data-agent-create-port="input"/);
   assert.match(agentSection, /data-agent-create-port="output"/);
+  assert.match(agentSection, /@click\.stop\s*\n/);
+  assert.match(agentSection, /@dblclick\.stop="openPortStateCreate\('input'\)"/);
+  assert.match(agentSection, /@dblclick\.stop="openPortStateCreate\('output'\)"/);
   assert.match(agentSection, /:data-anchor-slot-id="\`\$\{nodeId\}:state-in:\$\{CREATE_AGENT_INPUT_STATE_KEY\}\`"/);
-  assert.match(agentSection, /:data-anchor-slot-id="resolveAgentCreateOutputAnchorSlotId\(\)"/);
+  assert.match(agentSection, /:data-anchor-slot-id="\`\$\{nodeId\}:state-out:\$\{VIRTUAL_ANY_OUTPUT_STATE_KEY\}\`"/);
   assert.match(agentSection, /node-card__port-pill--create/);
   assert.match(agentSection, /\+ input/);
   assert.match(agentSection, /\+ output/);
@@ -315,10 +320,23 @@ test("NodeCard renders plus input and plus output as agent port rows", () => {
   assert.doesNotMatch(agentSection, /node-card__port-pill-create-badge/);
   assert.doesNotMatch(agentSection, /t\("common\.new"\)/);
   assert.doesNotMatch(agentSection, /\{\{ pendingStateInputSource\?\.label \}\}/);
-  assert.match(componentSource, /\.node-card__port-pill--create \{[\s\S]*background:/);
-  assert.match(componentSource, /\.node-card__port-pill-row--create \{[\s\S]*opacity:\s*0;/);
+  assert.match(componentSource, /\.node-card__port-pill--create \{[\s\S]*background:\s*transparent;/);
+  assert.match(componentSource, /\.node-card__port-pill--create \{[\s\S]*box-shadow:\s*none;/);
+  assert.match(componentSource, /\.node-card__port-pill--create \{[\s\S]*color:\s*var\(--node-card-port-accent\);/);
+  assert.doesNotMatch(componentSource, /\.node-card__port-pill--create \{[\s\S]*background:\s*color-mix/);
+  const createRowStyle = componentSource.match(/\.node-card__port-pill-row--create \{[\s\S]*?\}/);
+  assert.ok(createRowStyle, "expected create port row style");
+  assert.match(createRowStyle[0], /display:\s*none;/);
+  assert.doesNotMatch(createRowStyle[0], /max-height:/);
+  assert.doesNotMatch(createRowStyle[0], /opacity:/);
   assert.match(componentSource, /\.node-card:hover \.node-card__port-pill-row--create,/);
+  assert.match(componentSource, /\.node-card--hovered \.node-card__port-pill-row--create,/);
   assert.match(componentSource, /\.node-card--selected \.node-card__port-pill-row--create,/);
+  const visibleCreateRowStyle = componentSource.match(
+    /\.node-card:hover \.node-card__port-pill-row--create,[\s\S]*?\.node-card--floating-panel-open \.node-card__port-pill-row--create \{[\s\S]*?\}/,
+  );
+  assert.ok(visibleCreateRowStyle, "expected visible create port row style");
+  assert.match(visibleCreateRowStyle[0], /display:\s*flex;/);
 });
 
 test("NodeCard hides virtual agent output any behind the plus output row", () => {
@@ -330,6 +348,7 @@ test("NodeCard hides virtual agent output any behind the plus output row", () =>
   assert.match(agentOutputPortSection, /'node-card__port-pill--removable': !port\.virtual/);
   assert.match(componentSource, /const agentOutputPorts = computed<NodePortViewModel\[\]>\(\(\) =>[\s\S]*filter\(\(port\) => !port\.virtual\)/);
   assert.match(agentOutputPortSection, /data-agent-create-port="output"/);
+  assert.match(agentOutputPortSection, /:data-anchor-slot-id="\`\$\{nodeId\}:state-out:\$\{VIRTUAL_ANY_OUTPUT_STATE_KEY\}\`"/);
   assert.match(agentOutputPortSection, /@click\.stop="!port\.virtual && handleStateEditorActionClick/);
   assert.match(agentOutputPortSection, /v-if="!port\.virtual"[\s\S]*node-card__port-pill-remove/);
   assert.doesNotMatch(agentOutputPortSection, /node-card__port-pill-create-badge/);
