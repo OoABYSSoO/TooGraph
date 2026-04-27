@@ -22,9 +22,14 @@ GraphiteUI should follow that split:
 - Add provider template `openai-codex` with base URL `https://chatgpt.com/backend-api/codex`.
 - Store Codex OAuth credentials in a dedicated backend settings auth file, not in `app_settings.json`.
 - Never include access tokens or refresh tokens in `/api/settings` responses.
-- Implement a device-code login flow:
-  - Start login returns verification URL and user code.
-  - Poll completes token exchange and stores credentials.
+- Implement browser OAuth as the default login flow:
+  - Start login creates a PKCE verifier/challenge and opens `https://auth.openai.com/oauth/authorize`.
+  - The OAuth redirect uses the Codex-compatible local callback `http://localhost:1455/auth/callback`.
+  - The callback validates `state`, exchanges the authorization code, and stores credentials.
+  - Poll reports pending/authenticated/failed state to the settings page while the browser flow completes.
+- Keep fallback sign-in options hidden behind advanced controls:
+  - Device-code login remains available for environments where browser callback is blocked.
+  - Importing an existing local Codex CLI `~/.codex/auth.json` login is supported without mutating the Codex CLI auth file.
   - Status reports configured/expired/authenticated state.
   - Logout clears stored credentials.
 - Discover models by calling Codex model catalog with the stored access token.
@@ -36,9 +41,9 @@ GraphiteUI should follow that split:
 
 - Settings page shows `OpenAI Codex / ChatGPT 登录` as an addable provider.
 - Codex provider hides API-key fields and shows login controls instead:
-  - Login button
-  - verification URL and user code
-  - open/copy controls
+  - Primary ChatGPT web login button
+  - browser authorization progress and copy-link control
+  - advanced fallback controls for Codex CLI import and device-code login
   - login status
   - logout button
 - Model discovery for Codex can run after login and should auto-fill enabled models.
@@ -46,6 +51,6 @@ GraphiteUI should follow that split:
 
 ## Testing
 
-- Backend unit tests cover template registration, safe auth storage, device-code endpoints, model discovery fallback/parsing, Responses payload generation, and refresh-on-401 retry.
+- Backend unit tests cover template registration, safe auth storage, browser OAuth endpoints, hidden device-code fallback endpoints, Codex CLI auth import, model discovery fallback/parsing, Responses payload generation, and refresh-on-401 retry.
 - Frontend tests cover typed API calls, provider draft handling for login providers, and save payloads that do not send API-key fields for Codex.
 - Final verification runs targeted backend tests, frontend tests, frontend build, and `npm.cmd run dev`.

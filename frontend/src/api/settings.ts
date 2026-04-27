@@ -63,21 +63,46 @@ export type OpenAICodexAuthStartResponse = {
   interval?: number;
 };
 
+export type OpenAICodexBrowserAuthStartResponse = {
+  authorization_url: string;
+  callback_url: string;
+  state: string;
+  expires_in?: number;
+  interval?: number;
+};
+
 export type OpenAICodexAuthPollPayload = {
   device_auth_id: string;
   user_code: string;
 };
 
+export type OpenAICodexBrowserAuthPollPayload = {
+  state: string;
+};
+
 export type OpenAICodexAuthPollResponse = OpenAICodexAuthStatus & {
-  status?: "pending" | "authenticated" | string;
+  status?: "pending" | "authenticated" | "failed" | "expired" | "missing" | "configured" | string;
+  error?: string;
 };
 
 export async function startOpenAICodexAuth(): Promise<OpenAICodexAuthStartResponse> {
   return apiPost<OpenAICodexAuthStartResponse>("/api/settings/model-providers/openai-codex/auth/start", null);
 }
 
+export async function startOpenAICodexBrowserAuth(): Promise<OpenAICodexBrowserAuthStartResponse> {
+  return apiPost<OpenAICodexBrowserAuthStartResponse>("/api/settings/model-providers/openai-codex/auth/browser/start", null);
+}
+
 export async function pollOpenAICodexAuth(payload: OpenAICodexAuthPollPayload): Promise<OpenAICodexAuthPollResponse> {
   return apiPost<OpenAICodexAuthPollResponse>("/api/settings/model-providers/openai-codex/auth/poll", payload);
+}
+
+export async function pollOpenAICodexBrowserAuth(payload: OpenAICodexBrowserAuthPollPayload): Promise<OpenAICodexAuthPollResponse> {
+  return apiPost<OpenAICodexAuthPollResponse>("/api/settings/model-providers/openai-codex/auth/browser/poll", payload);
+}
+
+export async function importOpenAICodexCliAuth(): Promise<OpenAICodexAuthPollResponse> {
+  return apiPost<OpenAICodexAuthPollResponse>("/api/settings/model-providers/openai-codex/auth/codex-cli/import", null);
 }
 
 export async function fetchOpenAICodexAuthStatus(): Promise<OpenAICodexAuthStatus> {

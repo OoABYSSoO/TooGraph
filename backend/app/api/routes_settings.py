@@ -22,7 +22,10 @@ from app.tools.model_provider_client import discover_provider_models
 from app.tools.openai_codex_client import (
     clear_codex_auth_state,
     get_codex_auth_status,
+    import_codex_cli_auth_state,
     poll_codex_device_login,
+    poll_codex_browser_login,
+    start_codex_browser_login,
     start_codex_device_login,
 )
 from app.tools.registry import get_tool_registry
@@ -103,6 +106,12 @@ class ModelDiscoveryPayload(BaseModel):
 class CodexAuthPollPayload(BaseModel):
     device_auth_id: str = Field(alias="device_auth_id", min_length=1)
     user_code: str = Field(alias="user_code", min_length=1)
+
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
+
+
+class CodexBrowserAuthPollPayload(BaseModel):
+    state: str = Field(min_length=1)
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
@@ -259,6 +268,30 @@ def get_openai_codex_auth_status_endpoint() -> dict:
 def start_openai_codex_auth_endpoint() -> dict:
     try:
         return start_codex_device_login()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/model-providers/openai-codex/auth/browser/start")
+def start_openai_codex_browser_auth_endpoint() -> dict:
+    try:
+        return start_codex_browser_login()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/model-providers/openai-codex/auth/browser/poll")
+def poll_openai_codex_browser_auth_endpoint(payload: CodexBrowserAuthPollPayload) -> dict:
+    try:
+        return poll_codex_browser_login(state=payload.state)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/model-providers/openai-codex/auth/codex-cli/import")
+def import_openai_codex_cli_auth_endpoint() -> dict:
+    try:
+        return import_codex_cli_auth_state()
     except RuntimeError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

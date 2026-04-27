@@ -1,5 +1,6 @@
 export type ModelProviderTransport =
   | "openai-compatible"
+  | "responses"
   | "anthropic-messages"
   | "gemini-generate-content"
   | "codex-responses";
