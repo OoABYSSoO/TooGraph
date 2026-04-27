@@ -72,6 +72,7 @@ test("EditorStatePanel deletes states through the same two-click confirm pattern
   assert.match(componentSource, /activeStateDeleteKey\.value === stateKey[\s\S]*confirmStateDelete\(stateKey\);/);
   assert.match(componentSource, /data-state-delete-surface="true"/);
   assert.match(componentSource, /:class="\{ 'editor-state-panel__card-delete--confirm': isStateDeleteConfirmOpen\(row\.key\) \}"/);
+  assert.match(componentSource, /placement="top-end"/);
   assert.match(componentSource, /@click\.stop="handleStateDeleteActionClick\(row\.key\)"/);
   assert.match(componentSource, /<ElIcon v-if="isStateDeleteConfirmOpen\(row\.key\)" aria-hidden="true"><Check \/><\/ElIcon>/);
   assert.match(componentSource, /<div class="editor-state-panel__confirm-hint editor-state-panel__confirm-hint--delete">\{\{ t\("statePanel\.deleteStateQuestion"\) \}\}<\/div>/);

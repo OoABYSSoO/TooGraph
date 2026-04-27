@@ -78,7 +78,7 @@
             <span class="editor-state-panel__card-type">{{ row.typeLabel }}</span>
             <ElPopover
               :visible="isStateDeleteConfirmOpen(row.key)"
-              placement="top"
+              placement="top-end"
               :show-arrow="false"
               :popper-style="stateConfirmPopoverStyle"
               popper-class="editor-state-panel__confirm-popover editor-state-panel__confirm-popover--delete"
