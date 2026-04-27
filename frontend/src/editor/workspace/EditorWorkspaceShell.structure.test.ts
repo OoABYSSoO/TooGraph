@@ -96,6 +96,8 @@ test("EditorWorkspaceShell wires node top-action events into state updates, node
 test("EditorWorkspaceShell blocks deleting State definitions that are still referenced by nodes", () => {
   assert.match(componentSource, /import \{[\s\S]*deleteStateFieldFromDocument[\s\S]*listStateFieldUsageLabels[\s\S]*\} from "\.\/statePanelFields\.ts";/);
   assert.match(componentSource, /function deleteStateField\(tabId: string, stateKey: string\)/);
+  assert.match(componentSource, /if \(!document\.state_schema\[stateKey\]\) \{/);
+  assert.match(componentSource, /t\("statePanel\.deleteStateMissing"\)/);
   assert.match(componentSource, /const usageLabels = listStateFieldUsageLabels\(document, stateKey\);/);
   assert.match(componentSource, /if \(usageLabels\.length > 0\) \{/);
   assert.match(componentSource, /t\("statePanel\.deleteStateBlocked", \{ nodes: formatStateUsageLabelList\(usageLabels\) \}\)/);

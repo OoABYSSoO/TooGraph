@@ -367,7 +367,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { ElIcon, ElInput, ElOption, ElPopover, ElSelect } from "element-plus";
 import { ArrowDown, ArrowRight, Check, CirclePlus, Delete } from "@element-plus/icons-vue";
 import { useI18n } from "vue-i18n";
@@ -427,6 +427,15 @@ const stateConfirmPopoverStyle = {
 onBeforeUnmount(() => {
   clearStateDeleteConfirmTimeout();
 });
+
+watch(
+  () => Object.keys(props.document.state_schema).join("\u0000"),
+  () => {
+    if (activeStateDeleteKey.value && !props.document.state_schema[activeStateDeleteKey.value]) {
+      clearStateDeleteConfirmState();
+    }
+  },
+);
 
 function isStateRowExpanded(stateKey: string) {
   return expandedStateKeys.value[stateKey] ?? false;

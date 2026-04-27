@@ -27,6 +27,8 @@ export type StateColorOption = {
   swatch: string;
 };
 
+const STATE_KEY_COUNTER_METADATA_KEY = "graphiteui_state_key_counter";
+
 export const STATE_FIELD_TYPE_OPTIONS: StateFieldType[] = [
   "text",
   "number",
@@ -71,8 +73,8 @@ export function resolveStateColorOptions(currentColor: string): StateColorOption
   ];
 }
 
-export function buildDefaultStateField(existingKeys: string[]) {
-  let index = 1;
+export function buildDefaultStateField(existingKeys: string[], startIndex = 1) {
+  let index = Math.max(1, Math.floor(startIndex));
   while (existingKeys.includes(`state_${index}`)) {
     index += 1;
   }
@@ -91,8 +93,13 @@ export function buildDefaultStateField(existingKeys: string[]) {
 }
 
 export function addStateFieldToDocument<T extends GraphPayload | GraphDocument>(document: T): T {
-  const nextField = buildDefaultStateField(Object.keys(document.state_schema));
-  return insertStateFieldIntoDocument(document, nextField);
+  const nextField = buildDefaultStateField(Object.keys(document.state_schema), resolveNextDefaultStateKeyIndex(document));
+  const nextDocument = insertStateFieldIntoDocument(document, nextField);
+  if (nextDocument === document) {
+    return document;
+  }
+  rememberDefaultStateKeyIndex(nextDocument, nextField.key);
+  return nextDocument;
 }
 
 export function insertStateFieldIntoDocument<T extends GraphPayload | GraphDocument>(document: T, field: StateFieldDraft): T {
@@ -185,6 +192,41 @@ export function listStateFieldUsageLabels(document: GraphPayload | GraphDocument
   }
 
   return labels;
+}
+
+function resolveNextDefaultStateKeyIndex(document: GraphPayload | GraphDocument) {
+  return Math.max(readDefaultStateKeyCounter(document), readHighestDefaultStateKeyIndex(Object.keys(document.state_schema))) + 1;
+}
+
+function readDefaultStateKeyCounter(document: GraphPayload | GraphDocument) {
+  const value = document.metadata[STATE_KEY_COUNTER_METADATA_KEY];
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
+}
+
+function readHighestDefaultStateKeyIndex(keys: string[]) {
+  return keys.reduce((highest, key) => {
+    const match = key.match(/^state_(\d+)$/);
+    if (!match) {
+      return highest;
+    }
+    const index = Number(match[1]);
+    return Number.isInteger(index) && index > highest ? index : highest;
+  }, 0);
+}
+
+function rememberDefaultStateKeyIndex(document: GraphPayload | GraphDocument, stateKey: string) {
+  const match = stateKey.match(/^state_(\d+)$/);
+  if (!match) {
+    return;
+  }
+  const index = Number(match[1]);
+  if (!Number.isInteger(index) || index <= 0) {
+    return;
+  }
+  document.metadata = {
+    ...document.metadata,
+    [STATE_KEY_COUNTER_METADATA_KEY]: Math.max(readDefaultStateKeyCounter(document), index),
+  };
 }
 
 export function deleteStateFieldFromDocument<T extends GraphPayload | GraphDocument>(document: T, stateKey: string): T {

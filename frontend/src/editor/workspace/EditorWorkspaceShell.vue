@@ -2015,6 +2015,15 @@ function deleteStateField(tabId: string, stateKey: string) {
   if (!document) {
     return;
   }
+  if (!document.state_schema[stateKey]) {
+    const message = t("statePanel.deleteStateMissing");
+    setMessageFeedbackForTab(tabId, {
+      tone: "warning",
+      message,
+    });
+    showStateDeleteBlockedToast(message);
+    return;
+  }
   const usageLabels = listStateFieldUsageLabels(document, stateKey);
   if (usageLabels.length > 0) {
     const message = t("statePanel.deleteStateBlocked", { nodes: formatStateUsageLabelList(usageLabels) });

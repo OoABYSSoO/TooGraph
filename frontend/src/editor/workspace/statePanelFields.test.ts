@@ -150,6 +150,16 @@ test("addStateFieldToDocument inserts a new default field", () => {
   assert.equal(nextDocument.state_schema.state_1.type, "text");
 });
 
+test("addStateFieldToDocument does not reuse deleted default state keys in the same graph", () => {
+  const document = buildDocument();
+  const firstDocument = addStateFieldToDocument(document);
+  const deletedDocument = deleteStateFieldFromDocument(firstDocument, "state_1");
+  const secondDocument = addStateFieldToDocument(deletedDocument);
+
+  assert.equal(secondDocument.state_schema.state_1, undefined);
+  assert.ok(secondDocument.state_schema.state_2);
+});
+
 test("insertStateFieldIntoDocument adds an explicit state definition immutably", () => {
   const document = buildDocument();
   const nextDocument = insertStateFieldIntoDocument(document, {

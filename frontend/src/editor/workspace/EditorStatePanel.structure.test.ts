@@ -61,10 +61,14 @@ test("EditorStatePanel uses low-noise state rows with hover-revealed actions", (
 });
 
 test("EditorStatePanel deletes states through the same two-click confirm pattern as node actions", () => {
+  assert.match(componentSource, /import \{ computed, onBeforeUnmount, ref, watch \} from "vue";/);
   assert.match(componentSource, /import \{ ElIcon, ElInput, ElOption, ElPopover, ElSelect \} from "element-plus";/);
   assert.match(componentSource, /import \{[\s\S]*Check[\s\S]*Delete[\s\S]*\} from "@element-plus\/icons-vue";/);
   assert.match(componentSource, /const activeStateDeleteKey = ref<string \| null>\(null\);/);
   assert.match(componentSource, /const stateDeleteConfirmTimeoutRef = ref<number \| null>\(null\);/);
+  assert.match(componentSource, /watch\(\s*\(\) => Object\.keys\(props\.document\.state_schema\)\.join\("\\u0000"\)/);
+  assert.match(componentSource, /if \(activeStateDeleteKey\.value && !props\.document\.state_schema\[activeStateDeleteKey\.value\]\) \{/);
+  assert.match(componentSource, /clearStateDeleteConfirmState\(\);/);
   assert.match(componentSource, /function startStateDeleteConfirmWindow\(stateKey: string\)/);
   assert.match(componentSource, /function clearStateDeleteConfirmState\(\)/);
   assert.match(componentSource, /function handleStateDeleteActionClick\(stateKey: string\)/);
