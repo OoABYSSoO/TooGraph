@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import os
+from enum import Enum
+import json
 from pathlib import Path
+from typing import TypeVar
 
 import yaml
 
@@ -13,31 +15,19 @@ from app.core.schemas.skills import (
     SkillCompatibilityTarget,
     SkillDefinition,
     SkillIoField,
+    SkillKind,
+    SkillMode,
+    SkillScope,
     SkillSideEffect,
     SkillSourceFormat,
     SkillSourceScope,
+    SkillTarget,
 )
-from app.core.storage.skill_store import GRAPHITE_SKILLS_DIR, get_skill_status_map, list_managed_skill_keys
+from app.core.storage.skill_store import GRAPHITE_SKILLS_DIR, get_skill_status_map
 from app.skills.registry import get_skill_registry, list_runtime_skill_keys
 
 
-ROOT_DIR = Path(__file__).resolve().parents[3]
-HOME_DIR = Path.home()
-CLAUDE_EXTERNAL_DIRS = [
-    ROOT_DIR / ".claude" / "skills",
-    HOME_DIR / ".claude" / "skills",
-]
-OPENCLAW_EXTERNAL_DIRS = [
-    ROOT_DIR / ".agents" / "skills",
-    HOME_DIR / ".agents" / "skills",
-    HOME_DIR / ".openclaw" / "skills",
-    HOME_DIR / ".openclaw" / "workspace" / "skills",
-]
-CODEX_EXTERNAL_DIRS = [
-    Path(os.environ["CODEX_HOME"]) / "skills"
-    for _ in [0]
-    if os.environ.get("CODEX_HOME")
-]
+EnumValue = TypeVar("EnumValue", bound=Enum)
 
 
 @dataclass
@@ -78,6 +68,7 @@ def list_skill_catalog(*, include_disabled: bool = True) -> list[SkillDefinition
         runtime_registered = (
             skill_key in registry_keys and record.source_scope == SkillSourceScope.GRAPHITE_MANAGED and status == SkillCatalogStatus.ACTIVE
         )
+        runtime_ready = skill_key in runtime_supported_keys
         catalog.append(
             record.definition.model_copy(
                 deep=True,
@@ -85,6 +76,7 @@ def list_skill_catalog(*, include_disabled: bool = True) -> list[SkillDefinition
                     "source_format": record.source_format,
                     "source_scope": record.source_scope,
                     "source_path": record.source_path,
+                    "runtime_ready": runtime_ready,
                     "runtime_registered": runtime_registered,
                     "status": status if record.source_scope == SkillSourceScope.GRAPHITE_MANAGED else SkillCatalogStatus.ACTIVE,
                     "can_manage": record.source_scope == SkillSourceScope.GRAPHITE_MANAGED,
@@ -116,45 +108,44 @@ def _load_managed_skill_records() -> list[SkillDefinitionRecord]:
     records: list[SkillDefinitionRecord] = []
     for path in sorted((GRAPHITE_SKILLS_DIR / "claude_code").glob("*/SKILL.md")):
         records.append(_parse_skill_file(path, SkillSourceFormat.CLAUDE_CODE, SkillSourceScope.GRAPHITE_MANAGED))
+    for path in sorted((GRAPHITE_SKILLS_DIR / "graphite").glob("*/skill.json")):
+        records.append(_parse_native_skill_manifest(path, SkillSourceScope.GRAPHITE_MANAGED))
     return records
 
 
 def _load_external_skill_records() -> list[SkillDefinitionRecord]:
-    records: list[SkillDefinitionRecord] = []
-    managed_keys = list_managed_skill_keys()
-    for root, format_name in [
-        (GRAPHITE_SKILLS_DIR / "openclaw", SkillSourceFormat.OPENCLAW),
-        (GRAPHITE_SKILLS_DIR / "codex", SkillSourceFormat.CODEX),
-        (GRAPHITE_SKILLS_DIR / "graphite", SkillSourceFormat.GRAPHITE),
-    ]:
-        if not root.exists():
-            continue
-        for path in sorted(root.glob("*/SKILL.md")):
-            record = _parse_skill_file(path, format_name, SkillSourceScope.EXTERNAL)
-            if record.definition.skill_key not in managed_keys:
-                records.append(record)
-    for root in CLAUDE_EXTERNAL_DIRS:
-        if not root.exists():
-            continue
-        for path in sorted(root.glob("*/SKILL.md")):
-            record = _parse_skill_file(path, SkillSourceFormat.CLAUDE_CODE, SkillSourceScope.EXTERNAL)
-            if record.definition.skill_key not in managed_keys:
-                records.append(record)
-    for root in OPENCLAW_EXTERNAL_DIRS:
-        if not root.exists():
-            continue
-        for path in sorted(root.glob("*/SKILL.md")):
-            record = _parse_skill_file(path, SkillSourceFormat.OPENCLAW, SkillSourceScope.EXTERNAL)
-            if record.definition.skill_key not in managed_keys:
-                records.append(record)
-    for root in CODEX_EXTERNAL_DIRS:
-        if not root.exists():
-            continue
-        for path in sorted(root.glob("*/SKILL.md")):
-            record = _parse_skill_file(path, SkillSourceFormat.CODEX, SkillSourceScope.EXTERNAL)
-            if record.definition.skill_key not in managed_keys:
-                records.append(record)
-    return records
+    # Native GraphiteUI Skills are imported explicitly. Local Claude/OpenClaw/Codex
+    # directories are intentionally not auto-discovered into the product catalog.
+    return []
+
+
+def _parse_native_skill_manifest(path: Path, source_scope: SkillSourceScope) -> SkillDefinitionRecord:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    skill_key = str(payload.get("skillKey") or payload.get("skill_key") or path.parent.name)
+    label = str(payload.get("label") or payload.get("name") or skill_key)
+    definition = SkillDefinition(
+        skillKey=skill_key,
+        label=label,
+        description=str(payload.get("description") or "").strip(),
+        version=str(payload.get("version") or ""),
+        targets=_parse_enum_list(payload.get("targets"), SkillTarget, [SkillTarget.AGENT_NODE]),
+        kind=_parse_enum(payload.get("kind"), SkillKind, SkillKind.ATOMIC),
+        mode=_parse_enum(payload.get("mode"), SkillMode, SkillMode.TOOL),
+        scope=_parse_enum(payload.get("scope"), SkillScope, SkillScope.NODE),
+        permissions=[str(item) for item in payload.get("permissions", [])],
+        inputSchema=_parse_io_fields(payload.get("inputSchema") or payload.get("input_schema") or []),
+        outputSchema=_parse_io_fields(payload.get("outputSchema") or payload.get("output_schema") or []),
+        supportedValueTypes=[str(item) for item in payload.get("supportedValueTypes") or payload.get("supported_value_types") or []],
+        sideEffects=[SkillSideEffect(str(item)) for item in payload.get("sideEffects") or payload.get("side_effects") or []],
+        configured=bool(payload.get("configured", True)),
+        healthy=bool(payload.get("healthy", True)),
+    )
+    return SkillDefinitionRecord(
+        definition=definition,
+        source_format=SkillSourceFormat.GRAPHITE,
+        source_scope=source_scope,
+        source_path=str(path),
+    )
 
 
 def _parse_skill_file(path: Path, source_format: SkillSourceFormat, source_scope: SkillSourceScope) -> SkillDefinitionRecord:
@@ -167,32 +158,20 @@ def _parse_skill_file(path: Path, source_format: SkillSourceFormat, source_scope
     label = str(payload.get("name") or graphite.get("label") or skill_key)
     description = str(payload.get("description") or "").strip()
 
-    input_schema = [
-        SkillIoField(
-            key=str(field["key"]),
-            label=str(field.get("label") or field["key"]),
-            valueType=str(field.get("valueType") or field.get("value_type") or "text"),
-            required=bool(field.get("required", False)),
-            description=str(field.get("description") or ""),
-        )
-        for field in graphite.get("input_schema", [])
-    ]
-    output_schema = [
-        SkillIoField(
-            key=str(field["key"]),
-            label=str(field.get("label") or field["key"]),
-            valueType=str(field.get("valueType") or field.get("value_type") or "text"),
-            required=bool(field.get("required", False)),
-            description=str(field.get("description") or ""),
-        )
-        for field in graphite.get("output_schema", [])
-    ]
+    input_schema = _parse_io_fields(graphite.get("input_schema", []))
+    output_schema = _parse_io_fields(graphite.get("output_schema", []))
     side_effects = [SkillSideEffect(str(item)) for item in graphite.get("side_effects", [])]
 
     definition = SkillDefinition(
         skillKey=skill_key,
         label=label,
         description=description or body.splitlines()[0].strip() if body.strip() else "",
+        version=str(graphite.get("version") or payload.get("version") or ""),
+        targets=_parse_enum_list(graphite.get("targets"), SkillTarget, [SkillTarget.AGENT_NODE]),
+        kind=_parse_enum(graphite.get("kind"), SkillKind, SkillKind.ATOMIC),
+        mode=_parse_enum(graphite.get("mode"), SkillMode, SkillMode.TOOL),
+        scope=_parse_enum(graphite.get("scope"), SkillScope, SkillScope.NODE),
+        permissions=[str(item) for item in graphite.get("permissions", [])],
         inputSchema=input_schema,
         outputSchema=output_schema,
         supportedValueTypes=[str(item) for item in graphite.get("supported_value_types", [])],
@@ -204,6 +183,31 @@ def _parse_skill_file(path: Path, source_format: SkillSourceFormat, source_scope
         source_scope=source_scope,
         source_path=str(path),
     )
+
+
+def _parse_io_fields(fields: list[dict]) -> list[SkillIoField]:
+    return [
+        SkillIoField(
+            key=str(field["key"]),
+            label=str(field.get("label") or field["key"]),
+            valueType=str(field.get("valueType") or field.get("value_type") or "text"),
+            required=bool(field.get("required", False)),
+            description=str(field.get("description") or ""),
+        )
+        for field in fields
+    ]
+
+
+def _parse_enum(value: object, enum_type: type[EnumValue], fallback: EnumValue) -> EnumValue:
+    if value is None or value == "":
+        return fallback
+    return enum_type(str(value))
+
+
+def _parse_enum_list(values: object, enum_type: type[EnumValue], fallback: list[EnumValue]) -> list[EnumValue]:
+    if not values:
+        return [*fallback]
+    return [enum_type(str(value)) for value in values]
 
 
 def _split_frontmatter(raw: str, path: Path) -> tuple[str, str]:
