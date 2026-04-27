@@ -35,6 +35,14 @@ export function canStartGraphConnection(anchorKind: GraphConnectionAnchorKind) {
   return anchorKind === "flow-out" || anchorKind === "route-out" || anchorKind === "state-out";
 }
 
+export function canDisconnectSequenceEdgeForDataConnection(
+  document: GraphPayload | GraphDocument,
+  sourceNodeId: string,
+  targetNodeId: string,
+) {
+  return document.edges.some((edge) => edge.source === sourceNodeId && edge.target === targetNodeId);
+}
+
 export function canConnectStateBinding(
   document: GraphPayload | GraphDocument,
   sourceNodeId: string,

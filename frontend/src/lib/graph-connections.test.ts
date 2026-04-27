@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   canCompleteGraphConnection,
+  canDisconnectSequenceEdgeForDataConnection,
   canStartGraphConnection,
   type PendingGraphConnection,
 } from "./graph-connections.ts";
@@ -92,6 +93,12 @@ test("canStartGraphConnection starts from flow, route, and state output anchors"
   assert.equal(canStartGraphConnection("state-out"), true);
   assert.equal(canStartGraphConnection("flow-in"), false);
   assert.equal(canStartGraphConnection("state-in"), false);
+});
+
+test("canDisconnectSequenceEdgeForDataConnection follows existing sequence edges without requiring agent endpoints", () => {
+  assert.equal(canDisconnectSequenceEdgeForDataConnection(document, "input_question", "answer_helper"), true);
+  assert.equal(canDisconnectSequenceEdgeForDataConnection(document, "answer_helper", "input_question"), false);
+  assert.equal(canDisconnectSequenceEdgeForDataConnection(document, "input_question", "output_answer"), false);
 });
 
 test("canCompleteGraphConnection allows flow-out sources to target flow-in anchors with valid flow semantics", () => {

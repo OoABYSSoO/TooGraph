@@ -578,7 +578,7 @@ const baseMessages = {
     edgeState: {
       disconnectTitle: "断开连接",
       disconnectSingleStateHint: "移除目标节点上的这个 State 引用。",
-      disconnectMultiStateHint: "这两个 Agent 之间也有顺序连接，可以只移除此 State 引用，或只断开它们的顺序连接。",
+      disconnectMultiStateHint: "这两个节点之间也有顺序连接，可以只移除此 State 引用，或只断开它们的顺序连接。",
       removeStateReference: "只移除此 State 引用",
       disconnectState: "断开 State 连接",
       disconnectFlow: "断开节点顺序连接",
@@ -1266,7 +1266,7 @@ const baseMessages = {
     edgeState: {
       disconnectTitle: "Disconnect",
       disconnectSingleStateHint: "Remove this State reference from the target node.",
-      disconnectMultiStateHint: "These two agents also have a sequence edge. Remove only this State reference or only disconnect their sequence edge.",
+      disconnectMultiStateHint: "These two nodes also have a sequence edge. Remove only this State reference or only disconnect their sequence edge.",
       removeStateReference: "Remove this State reference",
       disconnectState: "Disconnect State line",
       disconnectFlow: "Disconnect sequence edge",

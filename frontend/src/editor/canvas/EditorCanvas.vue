@@ -412,7 +412,12 @@ import {
   type StateFieldDraft,
   type StateFieldType,
 } from "@/editor/workspace/statePanelFields";
-import { canCompleteGraphConnection, canStartGraphConnection, type PendingGraphConnection } from "@/lib/graph-connections";
+import {
+  canCompleteGraphConnection,
+  canDisconnectSequenceEdgeForDataConnection,
+  canStartGraphConnection,
+  type PendingGraphConnection,
+} from "@/lib/graph-connections";
 import { CREATE_AGENT_INPUT_STATE_KEY, VIRTUAL_ANY_INPUT_STATE_KEY } from "@/lib/virtual-any-input";
 import { resolveFocusedViewport } from "@/editor/canvas/focusNodeViewport";
 import { resolveViewportForMinimapCenter } from "./minimapModel";
@@ -1188,13 +1193,7 @@ function shouldOfferDataEdgeFlowDisconnect() {
     return false;
   }
 
-  const sourceNode = props.document.nodes[editor.source];
-  const targetNode = props.document.nodes[editor.target];
-  return (
-    sourceNode?.kind === "agent" &&
-    targetNode?.kind === "agent" &&
-    props.document.edges.some((edge) => edge.source === editor.source && edge.target === editor.target)
-  );
+  return canDisconnectSequenceEdgeForDataConnection(props.document, editor.source, editor.target);
 }
 
 function disconnectActiveDataEdgeStateReference() {

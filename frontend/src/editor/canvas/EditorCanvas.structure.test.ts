@@ -438,7 +438,9 @@ test("EditorCanvas gives data edges the same two-step state editing entry patter
   assert.match(componentSource, /@click\.stop="disconnectActiveDataEdgeStateReference"/);
   assert.match(componentSource, /@click\.stop="disconnectActiveDataEdgeFlow"/);
   assert.match(componentSource, /function shouldOfferDataEdgeFlowDisconnect\(\)/);
-  assert.match(componentSource, /props\.document\.edges\.some\(\(edge\) => edge\.source === editor\.source && edge\.target === editor\.target\)/);
+  assert.match(componentSource, /canDisconnectSequenceEdgeForDataConnection\(props\.document, editor\.source, editor\.target\)/);
+  assert.doesNotMatch(componentSource, /sourceNode\?\.kind === "agent"/);
+  assert.doesNotMatch(componentSource, /targetNode\?\.kind === "agent"/);
   assert.doesNotMatch(componentSource, /activeDataEdgePairStateCount\(\) > 1/);
   assert.match(componentSource, /function disconnectActiveDataEdgeStateReference\(\)/);
   assert.match(componentSource, /function disconnectActiveDataEdgeFlow\(\)/);
