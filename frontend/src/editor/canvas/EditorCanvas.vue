@@ -474,7 +474,6 @@ type PendingStateInputSource = {
   label: string;
   stateColor: string;
 };
-const STATE_INPUT_HIT_PADDING = 8;
 const measuredNodeSizes = ref<Record<string, MeasuredNodeSize>>({});
 const canvasSize = ref({ width: 0, height: 0 });
 const viewport = useViewport(props.initialViewport ?? undefined);
@@ -727,13 +726,7 @@ const activeConnectionSourceAnchorId = computed(() => {
 const eligibleTargetAnchorIds = computed(() =>
   new Set(
     projectedAnchors.value
-      .filter((anchor) =>
-        canCompleteGraphConnection(props.document, activeConnection.value, {
-          nodeId: anchor.nodeId,
-          kind: anchor.kind,
-          stateKey: anchor.stateKey,
-        }),
-      )
+      .filter((anchor) => canCompleteCanvasConnection(anchor))
       .map((anchor) => anchor.id),
   ),
 );
@@ -2043,13 +2036,7 @@ function resolveAutoSnappedTargetAnchor(event: PointerEvent) {
   }
 
   for (const [nodeId, nodeElement] of nodeElementMap.entries()) {
-    const rect = nodeElement.getBoundingClientRect();
-    if (
-      event.clientX >= rect.left &&
-      event.clientX <= rect.right &&
-      event.clientY >= rect.top &&
-      event.clientY <= rect.bottom
-    ) {
+    if (isPointerWithinNodeElement(nodeElement, event)) {
       const snappedAnchor = resolveEligibleTargetAnchorForNodeBody(nodeId);
       if (snappedAnchor) {
         return snappedAnchor;
@@ -2061,41 +2048,26 @@ function resolveAutoSnappedTargetAnchor(event: PointerEvent) {
 }
 
 function resolveAutoSnappedStateTargetAnchor(event: PointerEvent) {
-  for (const anchor of pointAnchors.value) {
-    if (anchor.kind !== "state-in" || !eligibleTargetAnchorIds.value.has(anchor.id)) {
-      continue;
-    }
-    if (isPointerWithinAnchorHitElement(anchor, event)) {
-      return anchor;
+  for (const [nodeId, nodeElement] of nodeElementMap.entries()) {
+    if (isPointerWithinNodeElement(nodeElement, event)) {
+      const snappedAnchor = resolveEligibleStateTargetAnchorForNodeBody(nodeId);
+      if (snappedAnchor) {
+        return snappedAnchor;
+      }
     }
   }
 
   return null;
 }
 
-function isPointerWithinAnchorHitElement(anchor: ProjectedCanvasAnchor, event: PointerEvent) {
-  const nodeElement = nodeElementMap.get(anchor.nodeId);
-  if (!nodeElement) {
-    return false;
-  }
-
-  for (const slotElement of nodeElement.querySelectorAll("[data-anchor-slot-id]")) {
-    if (!(slotElement instanceof HTMLElement) || slotElement.dataset.anchorSlotId !== anchor.id) {
-      continue;
-    }
-
-    const hitElement = slotElement.closest("[data-anchor-hitarea='true']");
-    const element = hitElement instanceof HTMLElement ? hitElement : slotElement;
-    const rect = element.getBoundingClientRect();
-    return (
-      event.clientX >= rect.left - STATE_INPUT_HIT_PADDING &&
-      event.clientX <= rect.right + STATE_INPUT_HIT_PADDING &&
-      event.clientY >= rect.top - STATE_INPUT_HIT_PADDING &&
-      event.clientY <= rect.bottom + STATE_INPUT_HIT_PADDING
-    );
-  }
-
-  return false;
+function isPointerWithinNodeElement(nodeElement: HTMLElement, event: PointerEvent) {
+  const rect = nodeElement.getBoundingClientRect();
+  return (
+    event.clientX >= rect.left &&
+    event.clientX <= rect.right &&
+    event.clientY >= rect.top &&
+    event.clientY <= rect.bottom
+  );
 }
 
 function isPointerWithinFlowHotspot(anchor: ProjectedCanvasAnchor, event: PointerEvent) {
@@ -2115,11 +2087,40 @@ function isPointerWithinFlowHotspot(anchor: ProjectedCanvasAnchor, event: Pointe
 }
 
 function resolveEligibleTargetAnchorForNodeBody(nodeId: string) {
+  if (activeConnection.value?.sourceKind === "state-out") {
+    return resolveEligibleStateTargetAnchorForNodeBody(nodeId);
+  }
+
   const candidateAnchor = projectedAnchors.value.find((anchor) => anchor.nodeId === nodeId && anchor.kind === "flow-in");
   if (!candidateAnchor || !eligibleTargetAnchorIds.value.has(candidateAnchor.id)) {
     return null;
   }
   return candidateAnchor;
+}
+
+function resolveEligibleStateTargetAnchorForNodeBody(nodeId: string) {
+  const candidateAnchor = projectedAnchors.value.find(
+    (anchor) =>
+      anchor.nodeId === nodeId &&
+      anchor.kind === "state-in" &&
+      anchor.stateKey === CREATE_AGENT_INPUT_STATE_KEY,
+  );
+  if (!candidateAnchor || !eligibleTargetAnchorIds.value.has(candidateAnchor.id)) {
+    return null;
+  }
+  return candidateAnchor;
+}
+
+function canCompleteCanvasConnection(anchor: ProjectedCanvasAnchor) {
+  if (activeConnection.value?.sourceKind === "state-out" && anchor.stateKey !== CREATE_AGENT_INPUT_STATE_KEY) {
+    return false;
+  }
+
+  return canCompleteGraphConnection(props.document, activeConnection.value, {
+    nodeId: anchor.nodeId,
+    kind: anchor.kind,
+    stateKey: anchor.stateKey,
+  });
 }
 
 function handleCanvasDragOver(event: DragEvent) {
@@ -2371,13 +2372,7 @@ function handleAnchorPointerDown(anchor: ProjectedCanvasAnchor) {
   clearCanvasTransientState();
   selection.selectNode(anchor.nodeId);
 
-  if (
-    canCompleteGraphConnection(props.document, activeConnection.value, {
-      nodeId: anchor.nodeId,
-      kind: anchor.kind,
-      stateKey: anchor.stateKey,
-    })
-  ) {
+  if (canCompleteCanvasConnection(anchor)) {
     completePendingConnection(anchor);
     return;
   }

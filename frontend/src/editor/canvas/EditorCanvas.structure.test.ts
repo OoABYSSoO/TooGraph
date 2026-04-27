@@ -536,13 +536,18 @@ test("EditorCanvas exposes transient new agent input anchors while state draggin
   assert.match(componentSource, /const projectedAnchors = computed\(\(\) => \[\.\.\.baseProjectedAnchors\.value, \.\.\.transientAgentInputAnchors\.value\]\);/);
 });
 
-test("EditorCanvas lets state drags snap to state input capsule hit areas", () => {
-  assert.match(componentSource, /const STATE_INPUT_HIT_PADDING = 8;/);
+test("EditorCanvas snaps state drags to transient agent inputs from the whole target node body", () => {
   assert.match(componentSource, /if \(activeConnection\.value\.sourceKind === "state-out"\) \{[\s\S]*return resolveAutoSnappedStateTargetAnchor\(event\);[\s\S]*\}/);
   assert.match(componentSource, /function resolveAutoSnappedStateTargetAnchor\(event: PointerEvent\)/);
-  assert.match(componentSource, /function isPointerWithinAnchorHitElement\(anchor: ProjectedCanvasAnchor, event: PointerEvent\)/);
-  assert.match(componentSource, /querySelectorAll\("\[data-anchor-slot-id\]"\)/);
-  assert.match(componentSource, /closest\("\[data-anchor-hitarea='true'\]"\)/);
+  assert.match(componentSource, /function resolveEligibleStateTargetAnchorForNodeBody\(nodeId: string\)/);
+  assert.match(componentSource, /anchor\.nodeId === nodeId &&[\s\S]*anchor\.kind === "state-in" &&[\s\S]*anchor\.stateKey === CREATE_AGENT_INPUT_STATE_KEY/);
+  assert.match(componentSource, /for \(const \[nodeId, nodeElement\] of nodeElementMap\.entries\(\)\) \{[\s\S]*if \(isPointerWithinNodeElement\(nodeElement, event\)\) \{[\s\S]*const snappedAnchor = resolveEligibleStateTargetAnchorForNodeBody\(nodeId\);[\s\S]*return snappedAnchor;/);
+  assert.match(componentSource, /function isPointerWithinNodeElement\(nodeElement: HTMLElement, event: PointerEvent\)/);
+  assert.match(componentSource, /if \(activeConnection\.value\?\.sourceKind === "state-out"\) \{[\s\S]*return resolveEligibleStateTargetAnchorForNodeBody\(nodeId\);[\s\S]*\}/);
+  assert.match(componentSource, /if \(activeConnection\.value\?\.sourceKind === "state-out" && anchor\.stateKey !== CREATE_AGENT_INPUT_STATE_KEY\) \{[\s\S]*return false;/);
+  assert.doesNotMatch(componentSource, /function isPointerWithinAnchorHitElement/);
+  assert.doesNotMatch(componentSource, /STATE_INPUT_HIT_PADDING/);
+  assert.doesNotMatch(componentSource, /closest\("\[data-anchor-hitarea='true'\]"\)/);
 });
 
 test("EditorCanvas disables text selection while a connection drag is active", () => {
