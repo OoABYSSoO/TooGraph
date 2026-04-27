@@ -20,7 +20,14 @@ test("buildGenericInputNode creates an expanded input node that writes a default
   assert.equal(result.node.ui.collapsed, false);
   assert.equal("expandedSize" in result.node.ui, false);
   assert.equal("collapsedSize" in result.node.ui, false);
-  assert.deepEqual(result.node.writes, [{ state: "value", mode: "replace" }]);
+  assert.deepEqual(result.node.writes, [{ state: "input_created_value", mode: "replace" }]);
+  assert.deepEqual(result.state_schema.input_created_value, {
+    name: "Input",
+    description: "",
+    type: "text",
+    value: "",
+    color: "",
+  });
 });
 
 test("buildNodeFromPreset preserves preset node semantics while replacing the canvas position", () => {

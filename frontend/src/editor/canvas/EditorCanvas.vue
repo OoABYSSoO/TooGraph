@@ -173,6 +173,33 @@
           @update:color="handleDataEdgeStateEditorColorInput"
           @update:description="handleDataEdgeStateEditorDescriptionInput"
         />
+        <div class="editor-canvas__edge-state-disconnect">
+          <div class="editor-canvas__edge-state-disconnect-title">{{ t("edgeState.disconnectTitle") }}</div>
+          <p class="editor-canvas__edge-state-disconnect-copy">
+            {{
+              shouldOfferDataEdgeFlowDisconnect()
+                ? t("edgeState.disconnectMultiStateHint")
+                : t("edgeState.disconnectSingleStateHint")
+            }}
+          </p>
+          <div class="editor-canvas__edge-state-disconnect-actions">
+            <button type="button" class="editor-canvas__edge-state-disconnect-button" @click.stop="disconnectActiveDataEdgeStateReference">
+              {{
+                shouldOfferDataEdgeFlowDisconnect()
+                  ? t("edgeState.removeStateReference")
+                  : t("edgeState.disconnectState")
+              }}
+            </button>
+            <button
+              v-if="shouldOfferDataEdgeFlowDisconnect()"
+              type="button"
+              class="editor-canvas__edge-state-disconnect-button editor-canvas__edge-state-disconnect-button--flow"
+              @click.stop="disconnectActiveDataEdgeFlow"
+            >
+              {{ t("edgeState.disconnectFlow") }}
+            </button>
+          </div>
+        </div>
       </div>
       <div
         v-for="[nodeId, node] in nodeEntries"
@@ -454,6 +481,7 @@ const emit = defineEmits<{
   (event: "reconnect-flow", payload: { sourceNodeId: string; currentTargetNodeId: string; nextTargetNodeId: string }): void;
   (event: "reconnect-route", payload: { sourceNodeId: string; branchKey: string; nextTargetNodeId: string }): void;
   (event: "remove-flow", payload: { sourceNodeId: string; targetNodeId: string }): void;
+  (event: "disconnect-data-edge", payload: { sourceNodeId: string; targetNodeId: string; stateKey: string; mode: "state" | "flow" }): void;
   (event: "remove-route", payload: { sourceNodeId: string; branchKey: string }): void;
   (event: "open-node-creation-menu", payload: { position: GraphPosition; sourceNodeId?: string; sourceAnchorKind?: "flow-out" | "route-out" | "state-out"; sourceBranchKey?: string; sourceStateKey?: string; sourceValueType?: string | null; clientX: number; clientY: number }): void;
   (event: "create-node-from-file", payload: { file: File; position: GraphPosition; clientX: number; clientY: number }): void;
@@ -1142,6 +1170,69 @@ function openDataEdgeStateEditor() {
   dataEdgeStateDraft.value = nextDraft;
   dataEdgeStateError.value = null;
   clearDataEdgeStateConfirmState();
+}
+
+function activeDataEdgePairStateCount() {
+  const editor = activeDataEdgeStateEditor.value;
+  if (!editor) {
+    return 0;
+  }
+
+  return projectedEdges.value.filter(
+    (edge) => edge.kind === "data" && edge.source === editor.source && edge.target === editor.target,
+  ).length;
+}
+
+function shouldOfferDataEdgeFlowDisconnect() {
+  const editor = activeDataEdgeStateEditor.value;
+  if (!editor) {
+    return false;
+  }
+
+  const sourceNode = props.document.nodes[editor.source];
+  const targetNode = props.document.nodes[editor.target];
+  return (
+    sourceNode?.kind === "agent" &&
+    targetNode?.kind === "agent" &&
+    activeDataEdgePairStateCount() > 1 &&
+    props.document.edges.some((edge) => edge.source === editor.source && edge.target === editor.target)
+  );
+}
+
+function disconnectActiveDataEdgeStateReference() {
+  if (guardLockedCanvasInteraction()) {
+    return;
+  }
+  const editor = activeDataEdgeStateEditor.value;
+  if (!editor) {
+    return;
+  }
+
+  emit("disconnect-data-edge", {
+    sourceNodeId: editor.source,
+    targetNodeId: editor.target,
+    stateKey: editor.stateKey,
+    mode: "state",
+  });
+  closeDataEdgeStateEditor();
+}
+
+function disconnectActiveDataEdgeFlow() {
+  if (guardLockedCanvasInteraction()) {
+    return;
+  }
+  const editor = activeDataEdgeStateEditor.value;
+  if (!editor) {
+    return;
+  }
+
+  emit("disconnect-data-edge", {
+    sourceNodeId: editor.source,
+    targetNodeId: editor.target,
+    stateKey: editor.stateKey,
+    mode: "flow",
+  });
+  closeDataEdgeStateEditor();
 }
 
 function syncDataEdgeStateDraft(nextDraft: StateFieldDraft) {
@@ -3116,6 +3207,71 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   gap: 10px;
   transform: translate(-50%, calc(-100% - 18px));
   pointer-events: auto;
+}
+
+.editor-canvas__edge-state-disconnect {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(220, 38, 38, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 247, 237, 0.94);
+  box-shadow: 0 14px 28px rgba(127, 29, 29, 0.12);
+  backdrop-filter: blur(18px);
+}
+
+.editor-canvas__edge-state-disconnect-title {
+  font-size: 0.78rem;
+  font-weight: 760;
+  color: rgba(127, 29, 29, 0.9);
+}
+
+.editor-canvas__edge-state-disconnect-copy {
+  margin: 0;
+  font-size: 0.74rem;
+  line-height: 1.45;
+  color: rgba(120, 53, 15, 0.76);
+}
+
+.editor-canvas__edge-state-disconnect-actions {
+  display: grid;
+  gap: 6px;
+}
+
+.editor-canvas__edge-state-disconnect-button {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid rgba(185, 28, 28, 0.2);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.86);
+  color: rgba(127, 29, 29, 0.9);
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 720;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.editor-canvas__edge-state-disconnect-button:hover {
+  border-color: rgba(185, 28, 28, 0.34);
+  background: rgba(254, 242, 242, 0.96);
+  color: rgb(127, 29, 29);
+  transform: translateY(-1px);
+}
+
+.editor-canvas__edge-state-disconnect-button--flow {
+  border-color: rgba(217, 119, 6, 0.24);
+  color: rgba(146, 64, 14, 0.92);
+}
+
+.editor-canvas__edge-state-disconnect-button--flow:hover {
+  border-color: rgba(217, 119, 6, 0.4);
+  background: rgba(255, 251, 235, 0.96);
+  color: rgb(146, 64, 14);
 }
 
 .editor-canvas__anchors {

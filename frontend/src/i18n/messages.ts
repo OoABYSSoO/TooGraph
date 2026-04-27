@@ -575,6 +575,14 @@ const baseMessages = {
       all: "全量",
       allTitle: "显示全部线条",
     },
+    edgeState: {
+      disconnectTitle: "断开连接",
+      disconnectSingleStateHint: "移除目标节点上的这个 State 引用。",
+      disconnectMultiStateHint: "这两个 Agent 之间有多条 State 线，可以只移除此引用，或断开它们的顺序连接。",
+      removeStateReference: "只移除此 State 引用",
+      disconnectState: "断开 State 连接",
+      disconnectFlow: "断开节点顺序连接",
+    },
     canvasZoom: {
       toolbar: "画布缩放",
       zoomOut: "缩小",
@@ -1254,6 +1262,14 @@ const baseMessages = {
       sequenceTitle: "Show sequence flow and condition branch edges only",
       all: "All",
       allTitle: "Show all edges",
+    },
+    edgeState: {
+      disconnectTitle: "Disconnect",
+      disconnectSingleStateHint: "Remove this State reference from the target node.",
+      disconnectMultiStateHint: "These two agents share multiple State lines. Remove only this reference or break their sequence connection.",
+      removeStateReference: "Remove this State reference",
+      disconnectState: "Disconnect State line",
+      disconnectFlow: "Disconnect sequence edge",
     },
     canvasZoom: {
       toolbar: "Canvas zoom",

@@ -61,14 +61,19 @@ function normalizeCreatedNodeUi(position: GraphPosition) {
   };
 }
 
+function buildTextInputStateKey(id: string) {
+  return `${id}_value`;
+}
+
 function buildTextInputNode(id: string, position: GraphPosition): InputNode {
+  const stateKey = buildTextInputStateKey(id);
   return {
     kind: "input",
     name: "Input",
     description: "Provide a value to the current workflow.",
     ui: normalizeCreatedNodeUi(position),
     reads: [],
-    writes: [{ state: "value", mode: "replace" }],
+    writes: [{ state: stateKey, mode: "replace" }],
     config: {
       value: "",
     },
@@ -93,10 +98,16 @@ function buildOutputNode(id: string, position: GraphPosition): OutputNode {
 }
 
 export function buildGenericInputNode(params: { id: string; position: GraphPosition }): CreatedNodeResult {
+  const stateKey = buildTextInputStateKey(params.id);
   return {
     id: params.id,
     node: buildTextInputNode(params.id, params.position),
-    state_schema: {},
+    state_schema: {
+      [stateKey]: {
+        ...defaultStateDefinitionForType(stateKey, "text"),
+        name: "Input",
+      },
+    },
   };
 }
 
