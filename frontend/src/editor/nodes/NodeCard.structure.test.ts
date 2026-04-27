@@ -309,6 +309,20 @@ test("NodeCard renders transient new agent input as a capsule or as the replacem
   assert.match(componentSource, /\.node-card__port-pill-create-badge \{[\s\S]*letter-spacing:\s*0\.12em;/);
 });
 
+test("NodeCard keeps virtual agent output any visually aligned with the default input any", () => {
+  const agentOutputPortMatch = componentSource.match(
+    /<div class="node-card__port-column node-card__port-column--right">[\s\S]*?<div class="node-card__agent-runtime-row">/,
+  );
+  assert.ok(agentOutputPortMatch, "expected to find the agent output port column");
+  const agentOutputPortSection = agentOutputPortMatch[0];
+
+  assert.match(agentOutputPortSection, /'node-card__port-pill--removable': !port\.virtual/);
+  assert.doesNotMatch(agentOutputPortSection, /'node-card__port-pill--create': port\.virtual/);
+  assert.doesNotMatch(agentOutputPortSection, /node-card__port-pill-create-badge/);
+  assert.match(agentOutputPortSection, /@click\.stop="!port\.virtual && handleStateEditorActionClick/);
+  assert.match(agentOutputPortSection, /v-if="!port\.virtual"[\s\S]*node-card__port-pill-remove/);
+});
+
 test("NodeCard moves node actions into hoverable top buttons built from Element Plus icons and overlays", () => {
   assert.match(componentSource, /import \{[\s\S]*ElButton,[\s\S]*ElPopover[\s\S]*\} from "element-plus";/);
   assert.match(componentSource, /import \{[\s\S]*CollectionTag[\s\S]*Delete[\s\S]*Operation[\s\S]*\} from "@element-plus\/icons-vue";/);

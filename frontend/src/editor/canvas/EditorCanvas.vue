@@ -172,7 +172,13 @@
           @update:color="handleDataEdgeStateEditorColorInput"
           @update:description="handleDataEdgeStateEditorDescriptionInput"
         />
-        <div class="editor-canvas__edge-state-disconnect">
+        <div v-if="isCreatedDataEdgeStateEditorOpen()" class="editor-canvas__edge-state-confirm-actions">
+          <button type="button" class="editor-canvas__edge-state-confirm-button" @click.stop="confirmCreatedDataEdgeStateEditor">
+            <ElIcon aria-hidden="true"><Check /></ElIcon>
+            <span>{{ t("common.confirm") }}</span>
+          </button>
+        </div>
+        <div v-else class="editor-canvas__edge-state-disconnect">
           <div class="editor-canvas__edge-state-disconnect-title">{{ t("edgeState.disconnectTitle") }}</div>
           <p class="editor-canvas__edge-state-disconnect-copy">
             {{
@@ -580,6 +586,7 @@ const activeDataEdgeStateEditor = ref<{
   source: string;
   target: string;
   stateKey: string;
+  mode: "edit" | "create";
   x: number;
   y: number;
 } | null>(null);
@@ -1192,6 +1199,7 @@ function openDataEdgeStateEditor() {
     source: activeDataEdgeStateConfirm.value.source,
     target: activeDataEdgeStateConfirm.value.target,
     stateKey: activeDataEdgeStateConfirm.value.stateKey,
+    mode: "edit",
     x: activeDataEdgeStateConfirm.value.x,
     y: activeDataEdgeStateConfirm.value.y,
   };
@@ -1218,11 +1226,20 @@ function openDataEdgeStateEditorFromRequest(request: NonNullable<typeof props.st
     source: request.sourceNodeId,
     target: request.targetNodeId,
     stateKey: request.stateKey,
+    mode: "create",
     x: request.position.x,
     y: request.position.y,
   };
   dataEdgeStateDraft.value = nextDraft;
   dataEdgeStateError.value = null;
+}
+
+function confirmCreatedDataEdgeStateEditor() {
+  closeDataEdgeStateEditor();
+}
+
+function isCreatedDataEdgeStateEditorOpen() {
+  return activeDataEdgeStateEditor.value?.mode === "create";
 }
 
 function buildDataEdgeId(sourceNodeId: string, stateKey: string, targetNodeId: string) {
@@ -3305,6 +3322,43 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   border-color: rgba(217, 119, 6, 0.4);
   background: rgba(255, 251, 235, 0.96);
   color: rgb(146, 64, 14);
+}
+
+.editor-canvas__edge-state-confirm-actions {
+  display: grid;
+  padding: 10px;
+  border: 1px solid rgba(37, 99, 235, 0.14);
+  border-radius: 8px;
+  background: rgba(248, 250, 252, 0.94);
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.1);
+  backdrop-filter: blur(18px);
+}
+
+.editor-canvas__edge-state-confirm-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid rgba(37, 99, 235, 0.22);
+  border-radius: 8px;
+  background: rgb(37, 99, 235);
+  color: #fff;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 760;
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+
+.editor-canvas__edge-state-confirm-button:hover {
+  border-color: rgba(29, 78, 216, 0.34);
+  background: rgb(29, 78, 216);
+  transform: translateY(-1px);
 }
 
 .editor-canvas__anchors {

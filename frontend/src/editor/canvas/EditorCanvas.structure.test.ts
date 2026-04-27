@@ -411,6 +411,7 @@ test("EditorCanvas gives data edges the same two-step state editing entry patter
   assert.match(componentSource, /stateEditorRequest\?: \{ requestId: string; sourceNodeId: string; targetNodeId: string; stateKey: string; position: GraphPosition \} \| null;/);
   assert.match(componentSource, /const activeDataEdgeStateConfirm = ref<\{/);
   assert.match(componentSource, /const activeDataEdgeStateEditor = ref<\{/);
+  assert.match(componentSource, /mode: "edit" \| "create";/);
   assert.match(componentSource, /const lastOpenedStateEditorRequestId = ref<string \| null>\(null\);/);
   assert.match(componentSource, /const dataEdgeStateDraft = ref<StateFieldDraft \| null>\(null\);/);
   assert.match(componentSource, /const dataEdgeStateError = ref<string \| null>\(null\);/);
@@ -420,11 +421,13 @@ test("EditorCanvas gives data edges the same two-step state editing entry patter
   assert.match(componentSource, /function startDataEdgeStateConfirm\(edge: ProjectedCanvasEdge, event: PointerEvent\)/);
   assert.match(componentSource, /function openDataEdgeStateEditor\(\)/);
   assert.match(componentSource, /function openDataEdgeStateEditorFromRequest\(request: NonNullable<typeof props\.stateEditorRequest>\)/);
+  assert.match(componentSource, /function confirmCreatedDataEdgeStateEditor\(\)/);
+  assert.match(componentSource, /function isCreatedDataEdgeStateEditorOpen\(\)/);
   assert.match(componentSource, /function syncDataEdgeStateDraft\(nextDraft: StateFieldDraft\)/);
   assert.match(componentSource, /watch\(\s*\(\) => props\.stateEditorRequest,[\s\S]*openDataEdgeStateEditorFromRequest\(request\);/);
   assert.match(componentSource, /selectedEdgeId\.value = edge\.id;[\s\S]*dataEdgeStateConfirmTimeoutRef\.value = window\.setTimeout/);
-  assert.match(componentSource, /activeDataEdgeStateEditor\.value = \{[\s\S]*id: activeDataEdgeStateConfirm\.value\.id,/);
-  assert.match(componentSource, /activeDataEdgeStateEditor\.value = \{[\s\S]*id: buildDataEdgeId\(request\.sourceNodeId, request\.stateKey, request\.targetNodeId\),/);
+  assert.match(componentSource, /activeDataEdgeStateEditor\.value = \{[\s\S]*id: activeDataEdgeStateConfirm\.value\.id,[\s\S]*mode: "edit",/);
+  assert.match(componentSource, /activeDataEdgeStateEditor\.value = \{[\s\S]*id: buildDataEdgeId\(request\.sourceNodeId, request\.stateKey, request\.targetNodeId\),[\s\S]*mode: "create",/);
   assert.match(componentSource, /if \(edge\.kind === "data"\) \{[\s\S]*startDataEdgeStateConfirm\(edge, event\);[\s\S]*return;/);
   assert.match(componentSource, /<div[\s\S]*v-if="activeDataEdgeStateConfirm"[\s\S]*class="editor-canvas__edge-state-confirm"/);
   assert.match(componentSource, /<div class="editor-canvas__confirm-hint editor-canvas__confirm-hint--state">\{\{ t\("nodeCard\.editStateQuestion"\) \}\}<\/div>/);
@@ -439,7 +442,10 @@ test("EditorCanvas gives data edges the same two-step state editing entry patter
   assert.match(componentSource, /@update:color="handleDataEdgeStateEditorColorInput"/);
   assert.match(componentSource, /@update:description="handleDataEdgeStateEditorDescriptionInput"/);
   assert.match(componentSource, /\(event: "disconnect-data-edge", payload: \{ sourceNodeId: string; targetNodeId: string; stateKey: string; mode: "state" \| "flow" \}\): void;/);
-  assert.match(componentSource, /class="editor-canvas__edge-state-disconnect"/);
+  assert.match(componentSource, /v-if="isCreatedDataEdgeStateEditorOpen\(\)"[\s\S]*class="editor-canvas__edge-state-confirm-actions"/);
+  assert.match(componentSource, /class="editor-canvas__edge-state-confirm-button"[\s\S]*@click\.stop="confirmCreatedDataEdgeStateEditor"/);
+  assert.match(componentSource, /\{\{ t\("common\.confirm"\) \}\}/);
+  assert.match(componentSource, /v-else[\s\S]*class="editor-canvas__edge-state-disconnect"/);
   assert.match(componentSource, /v-if="shouldOfferDataEdgeFlowDisconnect\(\)"/);
   assert.match(componentSource, /@click\.stop="disconnectActiveDataEdgeStateReference"/);
   assert.match(componentSource, /@click\.stop="disconnectActiveDataEdgeFlow"/);

@@ -558,7 +558,6 @@
                   class="node-card__port-pill node-card__port-pill--output node-card__port-pill--dock-end"
                   :class="{
                     'node-card__port-pill--removable': !port.virtual,
-                    'node-card__port-pill--create': port.virtual,
                     'node-card__port-pill--revealed': isStateEditorPillRevealed(`agent-output:${port.key}`),
                     'node-card__port-pill--confirm': isStateEditorConfirmOpen(`agent-output:${port.key}`),
                   }"
