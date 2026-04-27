@@ -166,23 +166,35 @@ export function renameStateFieldInDocument<T extends GraphPayload | GraphDocumen
   return nextDocument;
 }
 
+export function listStateFieldUsageLabels(document: GraphPayload | GraphDocument, stateKey: string): string[] {
+  const labels: string[] = [];
+  const seenNodeIds = new Set<string>();
+
+  for (const [nodeId, node] of Object.entries(document.nodes)) {
+    const usesState =
+      node.reads.some((binding) => binding.state === stateKey) ||
+      node.writes.some((binding) => binding.state === stateKey) ||
+      (node.kind === "condition" && node.config.rule.source === stateKey);
+
+    if (!usesState || seenNodeIds.has(nodeId)) {
+      continue;
+    }
+
+    seenNodeIds.add(nodeId);
+    labels.push(node.name.trim() || nodeId);
+  }
+
+  return labels;
+}
+
 export function deleteStateFieldFromDocument<T extends GraphPayload | GraphDocument>(document: T, stateKey: string): T {
-  if (!document.state_schema[stateKey]) {
+  if (!document.state_schema[stateKey] || listStateFieldUsageLabels(document, stateKey).length > 0) {
     return document;
   }
 
   const nextDocument = cloneGraphDocument(document);
   const { [stateKey]: _, ...restStateSchema } = nextDocument.state_schema;
   nextDocument.state_schema = restStateSchema;
-
-  for (const node of Object.values(nextDocument.nodes)) {
-    node.reads = node.reads.filter((binding) => binding.state !== stateKey);
-    node.writes = node.writes.filter((binding) => binding.state !== stateKey);
-
-    if (node.kind === "condition" && node.config.rule.source === stateKey) {
-      node.config.rule.source = node.reads[0]?.state ?? "";
-    }
-  }
 
   return nextDocument;
 }

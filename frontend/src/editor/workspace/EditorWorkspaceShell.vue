@@ -294,7 +294,15 @@ import EditorWelcomeState from "./EditorWelcomeState.vue";
 import { formatRunFeedback, formatValidationFeedback, type RunFeedback, type WorkspaceFeedbackTone } from "./runFeedbackModel.ts";
 import { buildRunNodeArtifactsModel } from "./runNodeArtifactsModel.ts";
 import { addStateBindingToDocument, removeStateBindingFromDocument } from "./statePanelBindings.ts";
-import { addStateFieldToDocument, deleteStateFieldFromDocument, insertStateFieldIntoDocument, renameStateFieldInDocument, updateStateFieldInDocument, type StateFieldDraft } from "./statePanelFields.ts";
+import {
+  addStateFieldToDocument,
+  deleteStateFieldFromDocument,
+  insertStateFieldIntoDocument,
+  listStateFieldUsageLabels,
+  renameStateFieldInDocument,
+  updateStateFieldInDocument,
+  type StateFieldDraft,
+} from "./statePanelFields.ts";
 import { buildPythonExportFileName, downloadPythonSource } from "./pythonExportModel.ts";
 import { isGraphiteUiPythonExportFile, isGraphiteUiPythonExportSource } from "./pythonImportModel.ts";
 import { buildPresetPayloadForNode } from "./presetPersistence.ts";
@@ -1980,9 +1988,41 @@ function updateStateField(tabId: string, stateKey: string, patch: Partial<StateD
   markDocumentDirty(tabId, nextDocument);
 }
 
+function formatStateDefinitionLabel(document: GraphPayload | GraphDocument, stateKey: string) {
+  return document.state_schema[stateKey]?.name.trim() || stateKey;
+}
+
+function formatStateUsageLabelList(labels: string[]) {
+  const visibleLabels = labels.slice(0, 3);
+  const remainingCount = labels.length - visibleLabels.length;
+  return remainingCount > 0 ? `${visibleLabels.join(", ")} +${remainingCount}` : visibleLabels.join(", ");
+}
+
+function showStateDeleteBlockedToast(message: string) {
+  ElMessage({
+    customClass: "editor-workspace-shell__state-delete-toast",
+    type: "warning",
+    duration: 4200,
+    grouping: true,
+    placement: "top",
+    showClose: true,
+    message,
+  });
+}
+
 function deleteStateField(tabId: string, stateKey: string) {
   const document = documentsByTabId.value[tabId];
   if (!document) {
+    return;
+  }
+  const usageLabels = listStateFieldUsageLabels(document, stateKey);
+  if (usageLabels.length > 0) {
+    const message = t("statePanel.deleteStateBlocked", { nodes: formatStateUsageLabelList(usageLabels) });
+    setMessageFeedbackForTab(tabId, {
+      tone: "warning",
+      message,
+    });
+    showStateDeleteBlockedToast(message);
     return;
   }
   const nextDocument = deleteStateFieldFromDocument(document, stateKey);
@@ -1990,6 +2030,10 @@ function deleteStateField(tabId: string, stateKey: string) {
     return;
   }
   markDocumentDirty(tabId, nextDocument);
+  setMessageFeedbackForTab(tabId, {
+    tone: "neutral",
+    message: t("statePanel.deleteStateDeleted", { state: formatStateDefinitionLabel(document, stateKey) }),
+  });
 }
 
 function removeStateWriterBinding(tabId: string, stateKey: string, nodeId: string) {
@@ -2558,6 +2602,19 @@ onMounted(() => {
 }
 
 :global(.editor-workspace-shell__preset-toast .el-message__content) {
+  color: #7c2d12;
+  font-weight: 700;
+}
+
+:global(.editor-workspace-shell__state-delete-toast.el-message) {
+  border: 1px solid rgba(154, 52, 18, 0.22);
+  border-radius: 16px;
+  background: rgba(255, 248, 240, 0.98);
+  box-shadow: 0 14px 34px rgba(60, 41, 20, 0.14);
+  backdrop-filter: blur(20px) saturate(1.45);
+}
+
+:global(.editor-workspace-shell__state-delete-toast .el-message__content) {
   color: #7c2d12;
   font-weight: 700;
 }
