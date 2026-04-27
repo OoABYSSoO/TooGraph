@@ -28,6 +28,11 @@ class Position(BaseModel):
     y: float
 
 
+class NodeSystemNodeSize(BaseModel):
+    width: float = Field(gt=0)
+    height: float = Field(gt=0)
+
+
 class ValidationIssue(BaseModel):
     code: str
     message: str
@@ -146,6 +151,7 @@ class NodeSystemWriteBinding(BaseModel):
 class NodeSystemNodeUi(BaseModel):
     position: Position
     collapsed: bool = False
+    size: NodeSystemNodeSize | None = None
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 

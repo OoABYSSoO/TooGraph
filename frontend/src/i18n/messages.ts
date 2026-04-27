@@ -581,6 +581,9 @@ const baseMessages = {
       zoomIn: "放大",
       reset: "重置为 100%",
     },
+    canvasResize: {
+      resizeNode: "调整节点大小",
+    },
     nodeCreation: {
       input: "Input",
       output: "Output",
@@ -1260,6 +1263,9 @@ const baseMessages = {
       zoomOut: "Zoom out",
       zoomIn: "Zoom in",
       reset: "Reset to 100%",
+    },
+    canvasResize: {
+      resizeNode: "Resize node",
     },
     nodeCreation: {
       input: "Input",

@@ -53,9 +53,25 @@ test("EditorCanvas does not animate node transforms while dragging", () => {
 });
 
 test("EditorCanvas raises hovered and selected nodes above sibling cards", () => {
-  assert.match(componentSource, /:class="\{ 'editor-canvas__node--selected': isNodeVisuallySelected\(nodeId\) \}"/);
+  assert.match(componentSource, /'editor-canvas__node--selected': isNodeVisuallySelected\(nodeId\)/);
   assert.match(componentSource, /<NodeCard[\s\S]*:class="resolveRunNodeClassList\(nodeId\)"/);
   assert.match(componentSource, /\.editor-canvas__node:hover,\n\.editor-canvas__node:focus-within,\n\.editor-canvas__node--selected \{[\s\S]*z-index:\s*8;/);
+});
+
+test("EditorCanvas exposes corner handles for real node resizing", () => {
+  assert.match(componentSource, /import \{[\s\S]*NODE_RESIZE_HANDLES,[\s\S]*normalizeNodeSize,[\s\S]*resolveNodeResize,[\s\S]*type NodeResizeHandle[\s\S]*\} from "\.\/nodeResize\.ts";/);
+  assert.match(componentSource, /\(event: "update:node-size", payload: \{ nodeId: string; position: GraphPosition; size: GraphNodeSize \}\): void;/);
+  assert.match(componentSource, /const nodeResizeDrag = ref<\{/);
+  assert.match(componentSource, /:style="nodeCardSizeStyle\(node\)"/);
+  assert.match(componentSource, /v-if="isNodeResizeHandleVisible\(nodeId\)"/);
+  assert.match(componentSource, /v-for="handle in NODE_RESIZE_HANDLES"/);
+  assert.match(componentSource, /data-node-resize-handle="true"/);
+  assert.match(componentSource, /@pointerdown\.stop\.prevent="handleNodeResizePointerDown\(nodeId, handle, \$event\)"/);
+  assert.match(componentSource, /function handleNodeResizePointerDown\(nodeId: string, handle: NodeResizeHandle, event: PointerEvent\)/);
+  assert.match(componentSource, /resolveNodeResize\(\{[\s\S]*handle: nodeResizeDrag\.value\.handle,/);
+  assert.match(componentSource, /emit\("update:node-size"/);
+  assert.match(componentSource, /\.editor-canvas__resize-handle--nw,[\s\S]*\.editor-canvas__resize-handle--se \{[\s\S]*cursor:\s*nwse-resize;/);
+  assert.match(componentSource, /\.editor-canvas__resize-handle--ne,[\s\S]*\.editor-canvas__resize-handle--sw \{[\s\S]*cursor:\s*nesw-resize;/);
 });
 
 test("EditorCanvas forwards node model refresh requests to the workspace", () => {
@@ -130,7 +146,7 @@ test("EditorCanvas restores legacy runtime feedback styling on node cards and ac
 });
 
 test("EditorCanvas treats awaiting-human current node as a persistent review node", () => {
-  assert.match(componentSource, /:class="\{ 'editor-canvas__node--selected': isNodeVisuallySelected\(nodeId\) \}"/);
+  assert.match(componentSource, /'editor-canvas__node--selected': isNodeVisuallySelected\(nodeId\)/);
   assert.match(componentSource, /:human-review-pending="isHumanReviewNode\(nodeId\)"/);
   assert.match(componentSource, /@open-human-review="emit\('open-human-review', \$event\)"/);
   assert.match(componentSource, /function isHumanReviewNode\(nodeId: string\)/);

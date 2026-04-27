@@ -3166,8 +3166,8 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
 .node-card {
   --node-card-inline-padding: 24px;
   position: relative;
-  width: 460px;
-  min-height: 260px;
+  width: var(--node-card-width, 460px);
+  min-height: var(--node-card-min-height, 260px);
   border: 1px solid rgba(154, 52, 18, 0.18);
   border-radius: 28px;
   overflow: visible;
@@ -3177,7 +3177,7 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
 }
 
 .node-card--condition {
-  width: 560px;
+  width: var(--node-card-width, 560px);
 }
 
 .node-card--selected {

@@ -124,6 +124,7 @@
                 @remove-route="removeConditionRouteForTab(tab.tabId, $event.sourceNodeId, $event.branchKey)"
                 @update-output-config="updateOutputConfigForTab(tab.tabId, $event.nodeId, $event.patch)"
                 @update:node-position="(payload) => handleNodePositionUpdate(tab.tabId, payload)"
+                @update:node-size="handleNodeSizeUpdate(tab.tabId, $event)"
                 @update:viewport="updateCanvasViewportForTab(tab.tabId, $event)"
                 @open-node-creation-menu="openNodeCreationMenuForTab(tab.tabId, $event)"
                 @create-node-from-file="createNodeFromFileForTab(tab.tabId, $event)"
@@ -270,6 +271,7 @@ import type {
   ConditionNode,
   GraphDocument,
   GraphNode,
+  GraphNodeSize,
   GraphPayload,
   GraphPosition,
   InputNode,
@@ -1445,6 +1447,29 @@ function handleNodePositionUpdate(tabId: string, payload: { nodeId: string; posi
 
   const nextDocument = cloneGraphDocument(document);
   nextDocument.nodes[payload.nodeId].ui.position = payload.position;
+  setDocumentForTab(tabId, nextDocument);
+
+  updateWorkspace(
+    applyDocumentMetaToWorkspaceTab(workspace.value, tabId, {
+      title: nextDocument.name,
+      dirty: true,
+      graphId: "graph_id" in nextDocument ? nextDocument.graph_id ?? null : null,
+    }),
+  );
+}
+
+function handleNodeSizeUpdate(tabId: string, payload: { nodeId: string; position: GraphPosition; size: GraphNodeSize }) {
+  if (guardGraphEditForTab(tabId)) {
+    return;
+  }
+  const document = documentsByTabId.value[tabId];
+  if (!document?.nodes[payload.nodeId]) {
+    return;
+  }
+
+  const nextDocument = cloneGraphDocument(document);
+  nextDocument.nodes[payload.nodeId].ui.position = payload.position;
+  nextDocument.nodes[payload.nodeId].ui.size = payload.size;
   setDocumentForTab(tabId, nextDocument);
 
   updateWorkspace(

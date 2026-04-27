@@ -32,6 +32,14 @@ test("EditorWorkspaceShell refreshes settings when an agent model menu opens", (
   assert.match(componentSource, /settings\.value = await fetchSettings\(\)/);
 });
 
+test("EditorWorkspaceShell persists node resize updates into the graph draft", () => {
+  assert.match(componentSource, /import type \{[\s\S]*GraphNodeSize[\s\S]*\} from "@\/types\/node-system";/);
+  assert.match(componentSource, /@update:node-size="handleNodeSizeUpdate\(tab\.tabId, \$event\)"/);
+  assert.match(componentSource, /function handleNodeSizeUpdate\(tabId: string, payload: \{ nodeId: string; position: GraphPosition; size: GraphNodeSize \}\)/);
+  assert.match(componentSource, /nextDocument\.nodes\[payload\.nodeId\]\.ui\.position = payload\.position;/);
+  assert.match(componentSource, /nextDocument\.nodes\[payload\.nodeId\]\.ui\.size = payload\.size;/);
+});
+
 test("EditorWorkspaceShell loads persisted presets for the node creation menu", () => {
   assert.match(componentSource, /import \{[\s\S]*fetchPresets[\s\S]*\} from "@\/api\/presets";/);
   assert.match(componentSource, /const persistedPresets = ref<PresetDocument\[\]>\(\[\]\);/);

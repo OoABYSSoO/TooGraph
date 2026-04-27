@@ -3,6 +3,11 @@ export type GraphPosition = {
   y: number;
 };
 
+export type GraphNodeSize = {
+  width: number;
+  height: number;
+};
+
 export type NodeFamily = "input" | "output" | "agent" | "condition";
 
 export type StateDefinition = {
@@ -28,6 +33,7 @@ export type AgentThinkingMode = "off" | "low" | "medium" | "high" | "xhigh" | "o
 export type NodeUi = {
   position: GraphPosition;
   collapsed?: boolean;
+  size?: GraphNodeSize | null;
 };
 
 export type InputNode = {

@@ -179,7 +179,10 @@
         :key="nodeId"
         :ref="(element) => registerNodeRef(nodeId, element)"
         class="editor-canvas__node"
-        :class="{ 'editor-canvas__node--selected': isNodeVisuallySelected(nodeId) }"
+        :class="{
+          'editor-canvas__node--selected': isNodeVisuallySelected(nodeId),
+          'editor-canvas__node--resizing': nodeResizeDrag?.nodeId === nodeId,
+        }"
         :style="nodeStyle(node.ui.position)"
         @pointerenter="setHoveredNode(nodeId)"
         @pointerleave="clearHoveredNode(nodeId)"
@@ -194,6 +197,7 @@
         />
         <NodeCard
           :class="resolveRunNodeClassList(nodeId)"
+          :style="nodeCardSizeStyle(node)"
           :node-id="nodeId"
           :node="node"
           :state-schema="document.state_schema"
@@ -237,6 +241,19 @@
           @refresh-agent-models="emit('refresh-agent-models')"
           @update-output-config="emit('update-output-config', $event)"
         />
+        <div v-if="isNodeResizeHandleVisible(nodeId)" class="editor-canvas__resize-handles">
+          <button
+            v-for="handle in NODE_RESIZE_HANDLES"
+            :key="handle"
+            type="button"
+            data-node-resize-handle="true"
+            class="editor-canvas__resize-handle"
+            :class="`editor-canvas__resize-handle--${handle}`"
+            :aria-label="t('canvasResize.resizeNode')"
+            :title="t('canvasResize.resizeNode')"
+            @pointerdown.stop.prevent="handleNodeResizePointerDown(nodeId, handle, $event)"
+          />
+        </div>
       </div>
       <div class="editor-canvas__flow-hotspots" aria-hidden="true">
         <div
@@ -352,6 +369,12 @@ import { resolveCanvasSurfaceStyle } from "@/editor/canvas/canvasSurfaceStyle";
 import { isEditableKeyboardEventTarget } from "@/editor/canvas/canvasKeyboard";
 import { DEFAULT_CANVAS_VIEWPORT, type CanvasViewport } from "@/editor/canvas/canvasViewport";
 import {
+  NODE_RESIZE_HANDLES,
+  normalizeNodeSize,
+  resolveNodeResize,
+  type NodeResizeHandle,
+} from "./nodeResize.ts";
+import {
   buildEdgeVisibilityModeOptions,
   filterProjectedEdgesForVisibilityMode,
   type EdgeVisibilityMode,
@@ -372,7 +395,7 @@ import { useViewport } from "./useViewport";
 import { isAgentBreakpointEnabledInDocument, resolveAgentBreakpointTimingInDocument } from "@/lib/graph-document";
 import type { KnowledgeBaseRecord } from "@/types/knowledge";
 import type { SkillDefinition } from "@/types/skills";
-import type { AgentNode, ConditionNode, GraphDocument, GraphNode, GraphPayload, GraphPosition, InputNode, OutputNode, StateDefinition } from "@/types/node-system";
+import type { AgentNode, ConditionNode, GraphDocument, GraphNode, GraphNodeSize, GraphPayload, GraphPosition, InputNode, OutputNode, StateDefinition } from "@/types/node-system";
 
 const props = defineProps<{
   document: GraphPayload | GraphDocument;
@@ -403,6 +426,7 @@ const edgeVisibilityModeOptions = computed(() => {
 
 const emit = defineEmits<{
   (event: "update:node-position", payload: { nodeId: string; position: GraphPosition }): void;
+  (event: "update:node-size", payload: { nodeId: string; position: GraphPosition; size: GraphNodeSize }): void;
   (event: "select-node", nodeId: string | null): void;
   (event: "update-node-metadata", payload: { nodeId: string; patch: Partial<Pick<InputNode | AgentNode | ConditionNode | OutputNode, "name" | "description">> }): void;
   (event: "update-input-config", payload: { nodeId: string; patch: Partial<InputNode["config"]> }): void;
@@ -477,6 +501,17 @@ const nodeDrag = ref<{
   captureElement: HTMLElement | null;
   moved: boolean;
 } | null>(null);
+const nodeResizeDrag = ref<{
+  nodeId: string;
+  pointerId: number;
+  handle: NodeResizeHandle;
+  startClientX: number;
+  startClientY: number;
+  originPosition: GraphPosition;
+  originSize: GraphNodeSize;
+  captureElement: HTMLElement | null;
+  moved: boolean;
+} | null>(null);
 const activeCanvasPointers = new Map<number, { clientX: number; clientY: number; pointerType: string }>();
 const pinchZoom = ref<{
   pointerIds: [number, number];
@@ -533,14 +568,15 @@ const nodeEntries = computed(() => Object.entries(props.document.nodes));
 const minimapNodes = computed(() =>
   nodeEntries.value.map(([nodeId, node]) => {
     const measuredSize = measuredNodeSizes.value[nodeId];
+    const storedSize = normalizeNodeSize(node.ui.size);
     const fallbackSize = resolveFallbackNodeSize(node);
     return {
       id: nodeId,
       kind: node.kind,
       x: node.ui.position.x,
       y: node.ui.position.y,
-      width: measuredSize?.width ?? fallbackSize.width,
-      height: measuredSize?.height ?? fallbackSize.height,
+      width: measuredSize?.width ?? storedSize?.width ?? fallbackSize.width,
+      height: measuredSize?.height ?? storedSize?.height ?? fallbackSize.height,
       selected: selection.selectedNodeId.value === nodeId,
       runState: resolveMinimapRunState(props.runNodeStatusByNodeId?.[nodeId]),
     };
@@ -1252,6 +1288,21 @@ function nodeStyle(position: GraphPosition) {
   };
 }
 
+function nodeCardSizeStyle(node: GraphNode) {
+  const size = normalizeNodeSize(node.ui.size);
+  if (!size) {
+    return undefined;
+  }
+  return {
+    "--node-card-width": `${size.width}px`,
+    "--node-card-min-height": `${size.height}px`,
+  };
+}
+
+function resolveNodeRenderedSize(nodeId: string, node: GraphNode): GraphNodeSize {
+  return measuredNodeSizes.value[nodeId] ?? normalizeNodeSize(node.ui.size) ?? resolveFallbackNodeSize(node);
+}
+
 function resolveFallbackNodeSize(node: GraphNode): MeasuredNodeSize {
   if (node.kind === "condition") {
     return { width: 560, height: 280 };
@@ -1831,6 +1882,34 @@ function handleCanvasPointerMove(event: PointerEvent) {
     });
     return;
   }
+  if (nodeResizeDrag.value && nodeResizeDrag.value.pointerId === event.pointerId) {
+    const pointerDeltaX = event.clientX - nodeResizeDrag.value.startClientX;
+    const pointerDeltaY = event.clientY - nodeResizeDrag.value.startClientY;
+    if (!nodeResizeDrag.value.moved) {
+      if (Math.abs(pointerDeltaX) <= 3 && Math.abs(pointerDeltaY) <= 3) {
+        return;
+      }
+      nodeResizeDrag.value.moved = true;
+      if (nodeResizeDrag.value.captureElement && !nodeResizeDrag.value.captureElement.hasPointerCapture(event.pointerId)) {
+        nodeResizeDrag.value.captureElement.setPointerCapture(event.pointerId);
+      }
+    }
+    const resizeResult = resolveNodeResize({
+      handle: nodeResizeDrag.value.handle,
+      originPosition: nodeResizeDrag.value.originPosition,
+      originSize: nodeResizeDrag.value.originSize,
+      deltaX: pointerDeltaX / viewport.viewport.scale,
+      deltaY: pointerDeltaY / viewport.viewport.scale,
+    });
+    const nodeId = nodeResizeDrag.value.nodeId;
+    scheduleDragFrame(() => {
+      emit("update:node-size", {
+        nodeId,
+        ...resizeResult,
+      });
+    });
+    return;
+  }
   if (nodeDrag.value && nodeDrag.value.pointerId === event.pointerId) {
     const pointerDeltaX = event.clientX - nodeDrag.value.startClientX;
     const pointerDeltaY = event.clientY - nodeDrag.value.startClientY;
@@ -1879,6 +1958,9 @@ function handleCanvasPointerUp(event: PointerEvent) {
   if (nodeDrag.value?.captureElement?.hasPointerCapture(event.pointerId)) {
     nodeDrag.value.captureElement.releasePointerCapture(event.pointerId);
   }
+  if (nodeResizeDrag.value?.captureElement?.hasPointerCapture(event.pointerId)) {
+    nodeResizeDrag.value.captureElement.releasePointerCapture(event.pointerId);
+  }
   if (activeConnection.value) {
     if (isGraphEditingLocked()) {
       pendingConnection.value = null;
@@ -1897,6 +1979,12 @@ function handleCanvasPointerUp(event: PointerEvent) {
       startSuppressedNodeClickWindow(nodeDrag.value.nodeId);
     }
     nodeDrag.value = null;
+  }
+  if (nodeResizeDrag.value && nodeResizeDrag.value.pointerId === event.pointerId) {
+    if (nodeResizeDrag.value.moved) {
+      startSuppressedNodeClickWindow(nodeResizeDrag.value.nodeId);
+    }
+    nodeResizeDrag.value = null;
   }
   viewport.endPan(event);
 }
@@ -2130,6 +2218,54 @@ function handleNodePointerDown(nodeId: string, event: PointerEvent) {
     captureElement,
     moved: false,
   };
+}
+
+function handleNodeResizePointerDown(nodeId: string, handle: NodeResizeHandle, event: PointerEvent) {
+  const node = props.document.nodes[nodeId];
+  if (!node) {
+    return;
+  }
+  if (isGraphEditingLocked()) {
+    event.preventDefault();
+    emit("locked-edit-attempt");
+    return;
+  }
+  if (activeConnection.value) {
+    return;
+  }
+
+  canvasRef.value?.focus();
+  let captureElement: HTMLElement | null = null;
+  if (event.currentTarget instanceof HTMLElement) {
+    captureElement = event.currentTarget;
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  clearCanvasTransientState();
+  pendingConnection.value = null;
+  pendingConnectionPoint.value = null;
+  cancelScheduledDragFrame();
+  selectedEdgeId.value = null;
+  nodeDrag.value = null;
+  selection.selectNode(nodeId);
+  nodeResizeDrag.value = {
+    nodeId,
+    pointerId: event.pointerId,
+    handle,
+    startClientX: event.clientX,
+    startClientY: event.clientY,
+    originPosition: { ...node.ui.position },
+    originSize: resolveNodeRenderedSize(nodeId, node),
+    captureElement,
+    moved: false,
+  };
+}
+
+function isNodeResizeHandleVisible(nodeId: string) {
+  if (isGraphEditingLocked() || activeConnection.value) {
+    return false;
+  }
+  return nodeResizeDrag.value?.nodeId === nodeId || isNodeVisuallySelected(nodeId) || hoveredNodeId.value === nodeId;
 }
 
 function setHoveredNode(nodeId: string) {
@@ -3395,6 +3531,76 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
 .editor-canvas__node:focus-within,
 .editor-canvas__node--selected {
   z-index: 8;
+}
+
+.editor-canvas__node--resizing {
+  z-index: 9;
+}
+
+.editor-canvas__resize-handles {
+  pointer-events: none;
+  position: absolute;
+  inset: -9px;
+  z-index: 20;
+}
+
+.editor-canvas__resize-handle {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 1px solid rgba(154, 52, 18, 0.32);
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 45% 42%, rgba(255, 255, 255, 0.96) 0 34%, rgba(255, 247, 237, 0.88) 35% 100%);
+  box-shadow:
+    0 8px 18px rgba(60, 41, 20, 0.14),
+    0 0 0 3px rgba(255, 247, 237, 0.68);
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.editor-canvas__resize-handle:hover,
+.editor-canvas__resize-handle:focus-visible {
+  border-color: rgba(154, 52, 18, 0.52);
+  outline: none;
+  box-shadow:
+    0 10px 22px rgba(60, 41, 20, 0.18),
+    0 0 0 4px rgba(254, 215, 170, 0.42);
+}
+
+.editor-canvas__resize-handle--nw {
+  top: 0;
+  left: 0;
+  transform: translate(-50%, -50%);
+}
+
+.editor-canvas__resize-handle--ne {
+  top: 0;
+  right: 0;
+  transform: translate(50%, -50%);
+}
+
+.editor-canvas__resize-handle--sw {
+  bottom: 0;
+  left: 0;
+  transform: translate(-50%, 50%);
+}
+
+.editor-canvas__resize-handle--se {
+  right: 0;
+  bottom: 0;
+  transform: translate(50%, 50%);
+}
+
+.editor-canvas__resize-handle--nw,
+.editor-canvas__resize-handle--se {
+  cursor: nwse-resize;
+}
+
+.editor-canvas__resize-handle--ne,
+.editor-canvas__resize-handle--sw {
+  cursor: nesw-resize;
 }
 
 @keyframes editor-canvas-lock-banner-breathe {
