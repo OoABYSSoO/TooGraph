@@ -1242,6 +1242,7 @@ import {
   parseConditionLoopLimitDraft,
 } from "./conditionLoopLimit";
 import { CONDITION_RULE_OPERATOR_OPTIONS } from "./conditionRuleEditorModel";
+import { buildInputKnowledgeBaseOptions, resolveSelectedKnowledgeBaseDescription } from "./inputKnowledgeBaseModel";
 import { isSwitchableInputBoundaryType, resolveNextInputValueForBoundaryType, resolveStateTypeForInputBoundary } from "./inputValueTypeModel";
 import { buildNodeCardViewModel, type NodePortViewModel } from "./nodeCardViewModel";
 import { resolveOutputPreviewContent } from "./outputPreviewContentModel";
@@ -1541,40 +1542,16 @@ const inputAssetDescription = computed(() => resolveUploadedAssetDescription(inp
 const showLegacyUploadedAssetHint = computed(
   () => showAssetUploadInput.value && !inputAssetEnvelope.value && inputValueText.value.trim().length > 0,
 );
-const inputKnowledgeBaseOptions = computed(() => {
-  const options = props.knowledgeBases.map((knowledgeBase) => ({
-    value: knowledgeBase.name,
-    label: knowledgeBase.label?.trim() || knowledgeBase.name,
-    description: knowledgeBase.description?.trim() || "",
-  }));
-
-  const currentValue = inputKnowledgeBaseValue.value.trim();
-  if (currentValue && !options.some((option) => option.value === currentValue)) {
-    return [
-      {
-        value: currentValue,
-        label: `${currentValue} (current)`,
-        description: "This knowledge base is no longer available in the imported catalog.",
-      },
-      ...options,
-    ];
-  }
-
-  return options;
-});
-const selectedKnowledgeBaseDescription = computed(() => {
-  if (!showKnowledgeBaseInput.value) {
-    return "";
-  }
-  const selectedOption = inputKnowledgeBaseOptions.value.find((option) => option.value === inputKnowledgeBaseValue.value);
-  if (selectedOption?.description) {
-    return selectedOption.description;
-  }
-  if (inputKnowledgeBaseOptions.value.length === 0) {
-    return t("nodeCard.importKnowledgeHint");
-  }
-  return t("nodeCard.pickKnowledgeHint");
-});
+const inputKnowledgeBaseOptions = computed(() => buildInputKnowledgeBaseOptions(props.knowledgeBases, inputKnowledgeBaseValue.value));
+const selectedKnowledgeBaseDescription = computed(() =>
+  resolveSelectedKnowledgeBaseDescription({
+    showKnowledgeBaseInput: showKnowledgeBaseInput.value,
+    selectedValue: inputKnowledgeBaseValue.value,
+    options: inputKnowledgeBaseOptions.value,
+    emptyOptionsDescription: t("nodeCard.importKnowledgeHint"),
+    fallbackDescription: t("nodeCard.pickKnowledgeHint"),
+  }),
+);
 const trimmedGlobalTextModelRef = computed(() => props.globalTextModelRef.trim());
 const agentResolvedModelValue = computed(() => {
   if (props.node.kind !== "agent") {

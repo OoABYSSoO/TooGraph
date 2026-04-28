@@ -147,6 +147,16 @@ test("NodeCard routes input value editing through the output state schema value"
   assert.doesNotMatch(componentSource, /return typeof props\.node\.config\.value === "string" \? props\.node\.config\.value : "";/);
 });
 
+test("NodeCard delegates knowledge base input presentation to a model", () => {
+  assert.match(componentSource, /from "\.\/inputKnowledgeBaseModel";/);
+  assert.match(componentSource, /buildInputKnowledgeBaseOptions\(props\.knowledgeBases, inputKnowledgeBaseValue\.value\)/);
+  assert.match(componentSource, /resolveSelectedKnowledgeBaseDescription\(\{/);
+  assert.match(componentSource, /showKnowledgeBaseInput: showKnowledgeBaseInput\.value/);
+  assert.match(componentSource, /selectedValue: inputKnowledgeBaseValue\.value/);
+  assert.doesNotMatch(componentSource, /label: `\$\{currentValue\} \(current\)`/);
+  assert.doesNotMatch(componentSource, /This knowledge base is no longer available in the imported catalog\./);
+});
+
 test("NodeCard does not expose manual system instruction editing for agent nodes", () => {
   const agentSectionMatch = componentSource.match(
     /<section v-else-if="view\.body\.kind === 'agent'"[\s\S]*?<\/section>/,
