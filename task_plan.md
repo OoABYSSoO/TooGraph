@@ -1,10 +1,10 @@
 # Task Plan: Repository Cleanup Execution Rounds 21-30
 
 ## Goal
-Run a ten-round conservative cleanup batch focused on `EditorCanvas.vue` pure projection and interaction-model helpers while preserving graph editing behavior, runtime visuals, drag/connect workflows, deletion behavior, and dev startup health.
+Run a ten-round conservative cleanup batch focused on `EditorCanvas.vue` pure projection and interaction-model helpers, then close the baseline interaction regressions in one larger pass while preserving graph editing behavior, runtime visuals, drag/connect workflows, deletion behavior, and dev startup health.
 
 ## Current Phase
-Phase 13 complete
+Phase 14 complete
 
 ## Phases
 
@@ -80,6 +80,19 @@ Phase 13 complete
 - [x] Push the branch.
 - **Status:** completed
 
+### Phase 14: Baseline Interaction Repair and Connection Model Consolidation
+- [x] Compare the current behavior against the pre-cleanup baseline around state auto-snapping and node creation context.
+- [x] Fix the virtual output pending-source regression that broke create-input snapping.
+- [x] Add focused regression coverage for preserving virtual output pending sources.
+- [x] Extract canvas connection interaction decisions into `canvasConnectionInteractionModel.ts`.
+- [x] Move auto-snap target/source selection and node-creation payload building out of `EditorCanvas.vue`.
+- [x] Add focused interaction-model coverage for virtual output creation payloads, create-input fallback anchors, and reverse virtual input snapping.
+- [x] Run focused interaction, structure, and unused-symbol checks.
+- [x] Run the full frontend test suite and production build.
+- [x] Restart the dev environment with `npm run dev` and verify frontend/backend health.
+- [x] Commit and push the consolidated interaction cleanup.
+- **Status:** completed
+
 ## Progress Estimate
 | Scope | Estimate |
 |-------|----------|
@@ -87,9 +100,9 @@ Phase 13 complete
 | P1 `NodeCard.vue` cleanup before this batch | About 49% complete. |
 | P2 `EditorCanvas.vue` cleanup before this batch | About 14% complete. |
 | Build/chunk warning remediation before this batch | About 80% complete. |
-| Overall roadmap cleanup after this batch | About 34% complete. |
+| Overall roadmap cleanup after this batch | About 35% complete after the interaction repair pass. |
 | P1 `NodeCard.vue` cleanup target after this batch | About 49% complete. |
-| P2 `EditorCanvas.vue` cleanup after this batch | About 24% complete. |
+| P2 `EditorCanvas.vue` cleanup after this batch | About 28% complete after extracting the connection interaction model. |
 | Build/chunk warning remediation after this batch | Warning elimination confirmed; no Vite large chunk warning in production build. |
 
 ## Decisions Made
@@ -105,6 +118,7 @@ Phase 13 complete
 - `EditorCanvas.vue` starts this batch at 4,226 lines.
 - The previous production build completed without a large chunk warning.
 - This batch leaves `EditorCanvas.vue` at 4,039 lines, down from 4,226 at the batch start.
+- The baseline interaction repair pass leaves `EditorCanvas.vue` at 3,848 lines by moving connection auto-snap and creation payload decisions into a tested model.
 - Do not commit runtime artifacts such as `backend/data/settings`, `.dev_*`, `dist`, or `.worktrees`.
 - After code changes, restart using `npm run dev`.
 
@@ -112,3 +126,4 @@ Phase 13 complete
 | Error | Attempt | Resolution |
 |-------|---------|------------|
 | Structure test still expected the old inline forced-edge-id block | Focused post-implementation run | Updated the assertion to verify the extracted `buildForceVisibleProjectedEdgeIds` boundary and flow confirm id input. |
+| Virtual any output drags no longer auto-snapped to new agent inputs after cleanup | Baseline comparison against `8017081` | Restored virtual output pending-source preservation in `buildPendingAgentInputSourceByNodeId`, added regression coverage, and extracted follow-up interaction helpers into `canvasConnectionInteractionModel.ts`. |

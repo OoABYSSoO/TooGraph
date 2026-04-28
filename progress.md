@@ -67,6 +67,56 @@
 ## Error Log
 | Timestamp | Error | Attempt | Resolution |
 |-----------|-------|---------|------------|
+
+## Session: 2026-04-28 Baseline Interaction Repair and Large Connection Cleanup
+
+### Phase 1: Baseline Regression Repair
+- **Status:** completed
+- Actions taken:
+  - Compared the broken interaction behavior against baseline commit `8017081`.
+  - Identified that virtual output drags stopped creating pending agent input sources because `buildPendingAgentInputSourceByNodeId` filtered them through concrete-only state-key logic.
+  - Added regression coverage for preserving `VIRTUAL_ANY_OUTPUT_STATE_KEY` pending sources.
+  - Fixed the pending-source model and committed/pushed `22aac3c 修复虚拟输出吸附回归`.
+
+### Phase 2: Larger Connection Interaction Consolidation
+- **Status:** completed
+- Actions taken:
+  - Added `canvasConnectionInteractionModel.test.ts` before the model existed and verified the focused test failed with `ERR_MODULE_NOT_FOUND`.
+  - Added `canvasConnectionInteractionModel.ts` for node-creation payloads, virtual create-input fallback anchors, state auto-snap row selection, reverse virtual output fallback anchors, and state target eligibility.
+  - Updated `EditorCanvas.vue` to delegate auto-snapping, connection-state value type lookup, and node creation payload construction to the new model.
+  - Updated `EditorCanvas.structure.test.ts` so structure coverage locks the new module boundary instead of requiring the old inline helper bodies.
+  - Reduced `EditorCanvas.vue` from 4,039 lines after the ten-round batch to 3,848 lines.
+
+### Phase 3: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused connection interaction, pending state port, virtual create port, and EditorCanvas structure tests.
+  - Ran frontend unused-symbol TypeScript verification.
+  - Ran the full frontend test suite.
+  - Ran the frontend production build and confirmed the large chunk warning did not return.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend returned HTTP 200 at `http://127.0.0.1:3477`.
+  - Confirmed the backend health route returned `{"status":"ok"}` at `http://127.0.0.1:8765/health`.
+
+### Phase 4: Commit and Push
+- **Status:** completed
+- Actions taken:
+  - Ran `git diff --check` and `git diff --cached --check` with no whitespace errors.
+  - Staged only source, tests, and planning files for the interaction cleanup.
+  - Committed the consolidated cleanup with Chinese message `抽取画布连接交互模型`.
+  - Pushed `main` to `origin/main`.
+
+## Test Results: Baseline Interaction Repair and Large Connection Cleanup
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red regression | `node --test frontend/src/editor/canvas/canvasPendingStatePortModel.test.ts` before the pending-source fix | Fails on missing virtual output pending source | Failed before the fix | Passed |
+| Pending state port model | `node --test frontend/src/editor/canvas/canvasPendingStatePortModel.test.ts` | Regression and existing tests pass | 5 passed | Passed |
+| Red interaction model | `node --test frontend/src/editor/canvas/canvasConnectionInteractionModel.test.ts` before implementation | Fails because the model file does not exist | Failed with `ERR_MODULE_NOT_FOUND` | Passed |
+| Focused canvas interaction set | `node --test frontend/src/editor/canvas/canvasConnectionInteractionModel.test.ts frontend/src/editor/canvas/canvasPendingStatePortModel.test.ts frontend/src/editor/canvas/canvasVirtualCreatePortModel.test.ts frontend/src/editor/canvas/EditorCanvas.structure.test.ts` | Focused interaction and structure tests pass | 70 passed | Passed |
+| Unused symbol check | `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No unused-symbol diagnostics | Exit 0, no diagnostics | Passed |
+| Full frontend tests | `node --test $(rg --files frontend/src -g '*.test.ts') frontend/vite.config.structure.test.ts` | All frontend tests pass | 750 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without large chunk warning | Exit 0, no large chunk warning | Passed |
+| Dev restart | `npm run dev` | Services start and respond | Frontend 200, backend `/health` ok | Passed |
 | 2026-04-28 | One structure test still searched for the old inline forced-visible-edge-id block. | Focused post-implementation suite. | Replaced it with an assertion that the flow delete confirm id is passed into `buildForceVisibleProjectedEdgeIds`. |
 
 ## Session: 2026-04-28 Rounds 18-20

@@ -427,7 +427,6 @@ import {
 import {
   buildConnectionPreviewModel,
   buildPendingConnectionFromAnchor,
-  isConcreteStateConnectionKey,
   isSamePendingConnection,
   resolveConnectionAccentColor,
   resolveConnectionPreviewStateKey,
@@ -469,7 +468,6 @@ import {
   buildMinimapNodeModel,
   buildNodeCardSizeStyle,
   buildNodeTransformStyle,
-  resolveFallbackNodeSize,
   resolveNodeRenderedSize,
   type MeasuredNodeSize,
 } from "./canvasNodePresentationModel";
@@ -488,6 +486,17 @@ import {
 import { buildPinchZoomStart, resolvePointerCenter, resolvePointerDistance } from "./canvasPinchZoomModel";
 import { buildCanvasViewportStyle, buildZoomPercentLabel } from "./canvasViewportDisplayModel";
 import {
+  buildCanvasNodeCreationMenuPayload,
+  isCanvasStateTargetAnchorAllowedForConnection,
+  resolveCanvasConcreteStateInputSourceAnchorAtPointerY,
+  resolveCanvasConcreteStateTargetAnchorAtPointerY,
+  resolveCanvasConnectionStateValueType,
+  resolveCanvasEligibleStateInputSourceAnchorForNodeBody,
+  resolveCanvasEligibleStateTargetAnchorForNodeBody,
+  resolveCanvasEligibleTargetAnchorForNodeBody,
+  type CanvasNodeCreationMenuPayload,
+} from "./canvasConnectionInteractionModel";
+import {
   resolveStateColorOptions,
   STATE_FIELD_TYPE_OPTIONS,
   type StateFieldDraft,
@@ -504,14 +513,10 @@ import {
   canCompleteGraphConnection,
   canDisconnectSequenceEdgeForDataConnection,
   canStartGraphConnection,
-  type GraphConnectionAnchorKind,
   type PendingGraphConnection,
 } from "@/lib/graph-connections";
 import {
   CREATE_AGENT_INPUT_STATE_KEY,
-  VIRTUAL_ANY_INPUT_STATE_KEY,
-  VIRTUAL_ANY_OUTPUT_COLOR,
-  VIRTUAL_ANY_OUTPUT_STATE_KEY,
 } from "@/lib/virtual-any-input";
 import { resolveFocusedViewport } from "@/editor/canvas/focusNodeViewport";
 import { resolveViewportForMinimapCenter } from "./minimapModel";
@@ -521,21 +526,6 @@ import { isAgentBreakpointEnabledInDocument, resolveAgentBreakpointTimingInDocum
 import type { KnowledgeBaseRecord } from "@/types/knowledge";
 import type { SkillDefinition } from "@/types/skills";
 import type { AgentNode, ConditionNode, GraphDocument, GraphNodeSize, GraphPayload, GraphPosition, InputNode, OutputNode, StateDefinition } from "@/types/node-system";
-
-type NodeCreationMenuPayload = {
-  position: GraphPosition;
-  sourceNodeId?: string;
-  sourceAnchorKind?: Extract<GraphConnectionAnchorKind, "flow-out" | "route-out" | "state-out">;
-  sourceBranchKey?: string;
-  sourceStateKey?: string;
-  sourceValueType?: string | null;
-  targetNodeId?: string;
-  targetAnchorKind?: Extract<GraphConnectionAnchorKind, "state-in">;
-  targetStateKey?: string;
-  targetValueType?: string | null;
-  clientX: number;
-  clientY: number;
-};
 
 const props = defineProps<{
   document: GraphPayload | GraphDocument;
@@ -560,7 +550,6 @@ const props = defineProps<{
 }>();
 
 const { t, locale } = useI18n();
-const STATE_TARGET_ROW_FALLBACK_GAP = 44;
 const edgeVisibilityModeOptions = computed(() => {
   locale.value;
   return buildEdgeVisibilityModeOptions();
@@ -600,7 +589,7 @@ const emit = defineEmits<{
   (event: "remove-flow", payload: { sourceNodeId: string; targetNodeId: string }): void;
   (event: "disconnect-data-edge", payload: { sourceNodeId: string; targetNodeId: string; stateKey: string; mode: "state" | "flow" }): void;
   (event: "remove-route", payload: { sourceNodeId: string; branchKey: string }): void;
-  (event: "open-node-creation-menu", payload: NodeCreationMenuPayload): void;
+  (event: "open-node-creation-menu", payload: CanvasNodeCreationMenuPayload): void;
   (event: "create-node-from-file", payload: { file: File; position: GraphPosition; clientX: number; clientY: number }): void;
   (event: "update:viewport", payload: CanvasViewport): void;
 }>();
@@ -1876,7 +1865,14 @@ function resolveAutoSnappedStateInputSourceAnchor(event: PointerEvent) {
     return null;
   }
 
-  const directStateInputSourceAnchor = resolveEligibleConcreteStateInputSourceAnchorAtPointer(nodeId, event);
+  const point = resolveCanvasPoint(event);
+  const directStateInputSourceAnchor = resolveCanvasConcreteStateInputSourceAnchorAtPointerY({
+    connection: activeConnection.value,
+    nodeId,
+    projectedAnchors: projectedAnchors.value,
+    pointerY: point.y,
+    canComplete: canCompleteCanvasConnection,
+  });
   if (directStateInputSourceAnchor) {
     return directStateInputSourceAnchor;
   }
@@ -1902,84 +1898,14 @@ function resolveAutoSnappedStateTargetAnchor(event: PointerEvent) {
 }
 
 function resolveEligibleStateInputSourceAnchorForNodeBody(nodeId: string) {
-  if (activeConnection.value?.sourceKind !== "state-in" || !activeConnection.value.sourceStateKey) {
-    return null;
-  }
-
-  const matchingOutputAnchor = projectedAnchors.value.find(
-    (anchor) =>
-      anchor.nodeId === nodeId &&
-      anchor.kind === "state-out" &&
-      anchor.stateKey === activeConnection.value?.sourceStateKey,
-  );
-  if (matchingOutputAnchor && canCompleteCanvasConnection(matchingOutputAnchor)) {
-    return matchingOutputAnchor;
-  }
-
-  const createOutputAnchor = projectedAnchors.value.find(
-    (anchor) =>
-      anchor.nodeId === nodeId &&
-      anchor.kind === "state-out" &&
-      anchor.stateKey === VIRTUAL_ANY_OUTPUT_STATE_KEY,
-  );
-  if (createOutputAnchor && canCompleteCanvasConnection(createOutputAnchor)) {
-    return createOutputAnchor;
-  }
-
-  const node = props.document.nodes[nodeId];
-  if (!node) {
-    return null;
-  }
-
-  const fallbackOutputAnchor = {
-    id: `${nodeId}:state-out:${VIRTUAL_ANY_OUTPUT_STATE_KEY}:reverse`,
+  return resolveCanvasEligibleStateInputSourceAnchorForNodeBody({
+    connection: activeConnection.value,
     nodeId,
-    kind: "state-out" as const,
-    x: node.ui.position.x + (measuredNodeSizes.value[nodeId]?.width ?? resolveFallbackNodeSize(node).width),
-    y: node.ui.position.y + 88,
-    side: "right" as const,
-    color: VIRTUAL_ANY_OUTPUT_COLOR,
-    stateKey: VIRTUAL_ANY_OUTPUT_STATE_KEY,
-  };
-  return canCompleteCanvasConnection(fallbackOutputAnchor) ? fallbackOutputAnchor : null;
-}
-
-function resolveEligibleConcreteStateInputSourceAnchorAtPointer(nodeId: string, event: PointerEvent) {
-  const concreteStateOutputAnchors = projectedAnchors.value
-    .filter(
-      (anchor) =>
-        anchor.nodeId === nodeId &&
-        anchor.kind === "state-out" &&
-        isConcreteStateConnectionKey(anchor.stateKey) &&
-        canCompleteCanvasConnection(anchor),
-    )
-    .sort((left, right) => left.y - right.y);
-  if (concreteStateOutputAnchors.length === 0) {
-    return null;
-  }
-
-  const point = resolveCanvasPoint(event);
-  const createOutputAnchor = projectedAnchors.value.find(
-    (anchor) =>
-      anchor.nodeId === nodeId &&
-      anchor.kind === "state-out" &&
-      anchor.stateKey === VIRTUAL_ANY_OUTPUT_STATE_KEY &&
-      canCompleteCanvasConnection(anchor),
-  );
-  for (let index = 0; index < concreteStateOutputAnchors.length; index += 1) {
-    const anchor = concreteStateOutputAnchors[index];
-    const previousAnchor = concreteStateOutputAnchors[index - 1];
-    const nextAnchor = concreteStateOutputAnchors[index + 1];
-    const previousY = previousAnchor?.y ?? anchor.y - STATE_TARGET_ROW_FALLBACK_GAP;
-    const nextY = nextAnchor?.y ?? createOutputAnchor?.y ?? anchor.y + STATE_TARGET_ROW_FALLBACK_GAP;
-    const upperBoundary = (previousY + anchor.y) / 2;
-    const lowerBoundary = (anchor.y + nextY) / 2;
-    if (point.y >= upperBoundary && point.y < lowerBoundary) {
-      return anchor;
-    }
-  }
-
-  return null;
+    node: props.document.nodes[nodeId],
+    projectedAnchors: projectedAnchors.value,
+    measuredNodeSize: measuredNodeSizes.value[nodeId],
+    canComplete: canCompleteCanvasConnection,
+  });
 }
 
 function isPointerWithinNodeElement(nodeElement: HTMLElement, event: PointerEvent) {
@@ -2009,135 +1935,51 @@ function isPointerWithinFlowHotspot(anchor: ProjectedCanvasAnchor, event: Pointe
 }
 
 function resolveEligibleTargetAnchorForNodeBody(nodeId: string) {
-  if (activeConnection.value?.sourceKind === "state-in") {
-    return resolveEligibleStateInputSourceAnchorForNodeBody(nodeId);
-  }
-
-  if (activeConnection.value?.sourceKind === "state-out") {
-    return resolveEligibleStateTargetAnchorForNodeBody(nodeId);
-  }
-
-  const candidateAnchor = projectedAnchors.value.find((anchor) => anchor.nodeId === nodeId && anchor.kind === "flow-in");
-  if (!candidateAnchor || !eligibleTargetAnchorIds.value.has(candidateAnchor.id)) {
-    return null;
-  }
-  return candidateAnchor;
+  return resolveCanvasEligibleTargetAnchorForNodeBody({
+    connection: activeConnection.value,
+    nodeId,
+    node: props.document.nodes[nodeId],
+    projectedAnchors: projectedAnchors.value,
+    baseProjectedAnchors: baseProjectedAnchors.value,
+    measuredAnchorOffsets: measuredAnchorOffsets.value,
+    measuredNodeSize: measuredNodeSizes.value[nodeId],
+    eligibleTargetAnchorIds: eligibleTargetAnchorIds.value,
+    pendingAgentInputSource: pendingAgentInputSourceByNodeId.value[nodeId] ?? null,
+    canComplete: canCompleteCanvasConnection,
+  });
 }
 
 function resolveEligibleConcreteStateTargetAnchorAtPointer(nodeId: string, event: PointerEvent) {
-  const concreteStateInputAnchors = projectedAnchors.value
-    .filter(
-      (anchor) =>
-        anchor.nodeId === nodeId &&
-        anchor.kind === "state-in" &&
-        anchor.stateKey !== CREATE_AGENT_INPUT_STATE_KEY &&
-        anchor.stateKey !== VIRTUAL_ANY_INPUT_STATE_KEY &&
-        isStateTargetAnchorAllowedForActiveConnection(anchor) &&
-        eligibleTargetAnchorIds.value.has(anchor.id),
-    )
-    .sort((left, right) => left.y - right.y);
-  if (concreteStateInputAnchors.length === 0) {
-    return null;
-  }
-
   const point = resolveCanvasPoint(event);
-  const createInputAnchor = resolveAgentCreateInputTargetAnchor(nodeId);
-  for (let index = 0; index < concreteStateInputAnchors.length; index += 1) {
-    const anchor = concreteStateInputAnchors[index];
-    const previousAnchor = concreteStateInputAnchors[index - 1];
-    const nextAnchor = concreteStateInputAnchors[index + 1];
-    const previousY = previousAnchor?.y ?? anchor.y - STATE_TARGET_ROW_FALLBACK_GAP;
-    const nextY = nextAnchor?.y ?? createInputAnchor?.y ?? anchor.y + STATE_TARGET_ROW_FALLBACK_GAP;
-    const upperBoundary = (previousY + anchor.y) / 2;
-    const lowerBoundary = (anchor.y + nextY) / 2;
-    if (point.y >= upperBoundary && point.y < lowerBoundary) {
-      return anchor;
-    }
-  }
-
-  return null;
+  return resolveCanvasConcreteStateTargetAnchorAtPointerY({
+    connection: activeConnection.value,
+    nodeId,
+    node: props.document.nodes[nodeId],
+    projectedAnchors: projectedAnchors.value,
+    baseProjectedAnchors: baseProjectedAnchors.value,
+    measuredAnchorOffsets: measuredAnchorOffsets.value,
+    pendingAgentInputSource: pendingAgentInputSourceByNodeId.value[nodeId] ?? null,
+    eligibleTargetAnchorIds: eligibleTargetAnchorIds.value,
+    pointerY: point.y,
+  });
 }
 
 function resolveEligibleStateTargetAnchorForNodeBody(nodeId: string) {
-  const createInputAnchor = resolveAgentCreateInputTargetAnchor(nodeId);
-  if (createInputAnchor && canCompleteCanvasConnection(createInputAnchor)) {
-    return createInputAnchor;
-  }
-
-  const candidateAnchor = projectedAnchors.value.find(
-    (anchor) =>
-      anchor.nodeId === nodeId &&
-      anchor.kind === "state-in" &&
-      isStateTargetAnchorAllowedForActiveConnection(anchor),
-  );
-  if (!candidateAnchor || !eligibleTargetAnchorIds.value.has(candidateAnchor.id)) {
-    return null;
-  }
-  return candidateAnchor;
-}
-
-function resolveAgentCreateInputTargetAnchor(nodeId: string): ProjectedCanvasAnchor | null {
-  const existingCreateInputAnchor = projectedAnchors.value.find(
-    (anchor) =>
-      anchor.nodeId === nodeId &&
-      anchor.kind === "state-in" &&
-      anchor.stateKey === CREATE_AGENT_INPUT_STATE_KEY,
-  );
-  if (existingCreateInputAnchor) {
-    return existingCreateInputAnchor;
-  }
-
-  const pendingSource = pendingAgentInputSourceByNodeId.value[nodeId];
-  const node = props.document.nodes[nodeId];
-  if (!pendingSource || !node || node.kind !== "agent") {
-    return null;
-  }
-
-  const fallbackInputAnchor = baseProjectedAnchors.value.find(
-    (anchor) =>
-      anchor.nodeId === nodeId &&
-      anchor.kind === "state-in" &&
-      anchor.stateKey === VIRTUAL_ANY_INPUT_STATE_KEY,
-  );
-  const measuredCreateInputOffset = measuredAnchorOffsets.value[`${nodeId}:state-in:${CREATE_AGENT_INPUT_STATE_KEY}`];
-  const existingInputAnchors = baseProjectedAnchors.value.filter(
-    (anchor) =>
-      anchor.nodeId === nodeId &&
-      anchor.kind === "state-in" &&
-      anchor.stateKey !== VIRTUAL_ANY_INPUT_STATE_KEY,
-  );
-  const lastInputAnchor = existingInputAnchors.at(-1);
-
-  return {
-    id: `${nodeId}:state-in:${CREATE_AGENT_INPUT_STATE_KEY}`,
+  return resolveCanvasEligibleStateTargetAnchorForNodeBody({
+    connection: activeConnection.value,
     nodeId,
-    kind: "state-in" as const,
-    x: measuredCreateInputOffset
-      ? node.ui.position.x + measuredCreateInputOffset.offsetX
-      : (fallbackInputAnchor?.x ?? lastInputAnchor?.x ?? node.ui.position.x + 6),
-    y: measuredCreateInputOffset
-      ? node.ui.position.y + measuredCreateInputOffset.offsetY
-      : (fallbackInputAnchor?.y ?? (lastInputAnchor ? lastInputAnchor.y + 44 : node.ui.position.y + 145)),
-    side: "left" as const,
-    color: pendingSource.stateColor,
-    stateKey: CREATE_AGENT_INPUT_STATE_KEY,
-  };
+    node: props.document.nodes[nodeId],
+    projectedAnchors: projectedAnchors.value,
+    baseProjectedAnchors: baseProjectedAnchors.value,
+    measuredAnchorOffsets: measuredAnchorOffsets.value,
+    pendingAgentInputSource: pendingAgentInputSourceByNodeId.value[nodeId] ?? null,
+    eligibleTargetAnchorIds: eligibleTargetAnchorIds.value,
+    canComplete: canCompleteCanvasConnection,
+  });
 }
 
 function isStateTargetAnchorAllowedForActiveConnection(anchor: ProjectedCanvasAnchor) {
-  if (activeConnection.value?.sourceKind !== "state-out") {
-    return true;
-  }
-
-  if (activeConnection.value?.sourceStateKey === VIRTUAL_ANY_OUTPUT_STATE_KEY) {
-    return anchor.kind === "state-in" && typeof anchor.stateKey === "string";
-  }
-
-  return (
-    anchor.stateKey === CREATE_AGENT_INPUT_STATE_KEY ||
-    anchor.stateKey === VIRTUAL_ANY_INPUT_STATE_KEY ||
-    anchor.stateKey === activeConnection.value?.sourceStateKey
-  );
+  return isCanvasStateTargetAnchorAllowedForConnection(activeConnection.value, anchor);
 }
 
 function canCompleteCanvasConnection(anchor: ProjectedCanvasAnchor) {
@@ -2495,13 +2337,6 @@ function handleAnchorPointerDown(anchor: ProjectedCanvasAnchor) {
   pendingConnectionPoint.value = { x: anchor.x, y: anchor.y };
 }
 
-function resolveConnectionStateValueType(stateKey: string | undefined) {
-  if (!stateKey || stateKey === VIRTUAL_ANY_INPUT_STATE_KEY || stateKey === VIRTUAL_ANY_OUTPUT_STATE_KEY || stateKey === CREATE_AGENT_INPUT_STATE_KEY) {
-    return null;
-  }
-  return props.document.state_schema[stateKey]?.type ?? null;
-}
-
 function openCreationMenuFromPendingConnection(event: PointerEvent) {
   if (isGraphEditingLocked()) {
     return;
@@ -2511,44 +2346,18 @@ function openCreationMenuFromPendingConnection(event: PointerEvent) {
     return;
   }
   clearCanvasTransientState();
-  const isStateCreationSource = connection.sourceKind === "state-out";
-  const isStateInputCreationTarget = connection.sourceKind === "state-in";
-  const isFlowCreationSource = connection.sourceKind === "flow-out";
-  const isRouteCreationSource = connection.sourceKind === "route-out";
-  if (!isStateCreationSource && !isStateInputCreationTarget && !isFlowCreationSource && !isRouteCreationSource) {
-    return;
-  }
-
-  if (connection.sourceKind === "state-in") {
-    emit("open-node-creation-menu", {
-      position: resolveCanvasPoint(event),
-      targetNodeId: connection.sourceNodeId,
-      targetAnchorKind: connection.sourceKind,
-      ...(connection.sourceStateKey ? { targetStateKey: connection.sourceStateKey } : {}),
-      targetValueType: resolveConnectionStateValueType(connection.sourceStateKey),
-      clientX: event.clientX,
-      clientY: event.clientY,
-    });
-
-    pendingConnection.value = null;
-    pendingConnectionPoint.value = null;
-    autoSnappedTargetAnchor.value = null;
-    setActiveConnectionHoverNode(null);
-    selectedEdgeId.value = null;
-    return;
-  }
-
-  const sourceAnchorKind = connection.sourceKind as Extract<GraphConnectionAnchorKind, "flow-out" | "route-out" | "state-out">;
-  emit("open-node-creation-menu", {
+  const payload = buildCanvasNodeCreationMenuPayload({
+    connection,
     position: resolveCanvasPoint(event),
-    sourceNodeId: connection.sourceNodeId,
-    sourceAnchorKind,
-    ...(connection.branchKey ? { sourceBranchKey: connection.branchKey } : {}),
-    ...(connection.sourceStateKey ? { sourceStateKey: connection.sourceStateKey } : {}),
-    sourceValueType: resolveConnectionStateValueType(connection.sourceStateKey),
     clientX: event.clientX,
     clientY: event.clientY,
+    stateSchema: props.document.state_schema,
   });
+  if (!payload) {
+    return;
+  }
+
+  emit("open-node-creation-menu", payload);
 
   pendingConnection.value = null;
   pendingConnectionPoint.value = null;
@@ -2630,7 +2439,7 @@ function completePendingConnection(targetAnchor: ProjectedCanvasAnchor) {
       sourceNodeId: targetAnchor.nodeId,
       targetNodeId: connection.sourceNodeId,
       targetStateKey: connection.sourceStateKey,
-      targetValueType: resolveConnectionStateValueType(connection.sourceStateKey),
+      targetValueType: resolveCanvasConnectionStateValueType(connection.sourceStateKey, props.document.state_schema),
     });
   } else {
     emit("connect-flow", {
