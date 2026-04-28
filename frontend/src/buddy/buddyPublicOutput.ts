@@ -72,7 +72,14 @@ export function resolveBuddyPublicOutputMessageKind(input: {
 }): BuddyPublicOutputMessageKind {
   const stateType = input.stateType.trim();
   const displayMode = String(input.displayMode ?? "").trim();
-  if (stateType === "markdown" || stateType === "text" || displayMode === "markdown" || displayMode === "plain") {
+  if (
+    stateType === "markdown" ||
+    stateType === "html" ||
+    stateType === "text" ||
+    displayMode === "markdown" ||
+    displayMode === "html" ||
+    displayMode === "plain"
+  ) {
     return "text";
   }
   return "card";

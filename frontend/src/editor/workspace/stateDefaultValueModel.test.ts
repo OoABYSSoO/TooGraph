@@ -27,6 +27,11 @@ test("resolveStateDefaultValueEditorConfig returns typed editor modes", () => {
     rows: 5,
     placeholder: "输入 Markdown...",
   });
+  assert.deepEqual(resolveStateDefaultValueEditorConfig("html"), {
+    mode: "text",
+    rows: 8,
+    placeholder: "<!doctype html>",
+  });
 });
 
 test("parseStructuredStateDraft validates structured state types", () => {

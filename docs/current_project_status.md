@@ -42,6 +42,7 @@
 - `promptVisible` 已移除。上下文边界由节点 `reads` 决定：LLM 节点只接收自己显式读取的 state。
 - `state_schema` 支持 `binding` 元数据，用来标记某个 state 是否由技能输出自动绑定。
 - `file` / `image` / `audio` / `video` 类型 state 的值是本地 artifact 路径、路径列表，或 `kind=local_folder` 的本地文件夹选择包；不再有单独的 `file_list`、`array` 或 `object` state 类型。LLM 节点接收 `file` state 时，会读取文本类文件并只把“文件名 + 原文全文”拼入模型上下文；图片、音频和视频路径会走多模态附件处理，不作为文本读取。
+- `html` 类型 state 是可渲染页面内容字符串。Output 节点的 `html` 显示模式和伙伴回复中的 HTML 内容都通过 sandbox iframe 渲染完整页面；默认不授予脚本、同源、表单、弹窗或顶层跳转权限。
 - Input 节点输出文件、图片、音频或视频时都写入本地路径；文件输入还可以切到“文件夹”模式，通过后端只读策略列出文件树，并在节点面板中勾选要注入的文件。Output 节点可通过 documents 预览展示这些 artifact。
 - 伙伴运行来源语义是 `metadata.origin=buddy`。新 Buddy 图不再写入 `buddy_run`、`buddy_permission_tier`、`buddy_graph_patch_drafts_enabled` 这类旧元数据；伙伴权限模式只写入运行 metadata，不作为 graph input state 注入；运行模板绑定会保存在 `metadata.buddy_template_binding` 供审计回看。后续新增策略字段必须保持显式、可审计，并避免重新创造第二套运行协议。
 

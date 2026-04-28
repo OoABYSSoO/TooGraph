@@ -1,4 +1,4 @@
-export type OutputPreviewContentKind = "plain" | "markdown" | "json" | "documents" | "package";
+export type OutputPreviewContentKind = "plain" | "markdown" | "html" | "json" | "documents" | "package";
 export type OutputPreviewRenderedContentKind = Exclude<OutputPreviewContentKind, "package">;
 
 export type OutputLinkedTextSegment =
@@ -115,6 +115,16 @@ function resolveBasicOutputPreviewContent(text: string, kind: OutputPreviewRende
     };
   }
 
+  if (kind === "html") {
+    return {
+      kind,
+      text: normalizedText,
+      html: normalizedText,
+      isEmpty: isOutputPreviewEmpty(normalizedText),
+      documentRefs: [],
+    };
+  }
+
   if (kind === "json") {
     return {
       kind,
@@ -156,6 +166,9 @@ export function resolveOutputPreviewDisplayMode(text: string, displayMode: strin
 function resolveBasicOutputPreviewDisplayMode(text: string, displayMode: string): OutputPreviewRenderedContentKind {
   if (displayMode === "markdown") {
     return "markdown";
+  }
+  if (displayMode === "html") {
+    return "html";
   }
   if (displayMode === "json") {
     return "json";
@@ -270,6 +283,9 @@ function resolveResultPackageOutputDisplayMode(
   const normalizedType = valueType.trim().toLowerCase();
   if (normalizedType === "markdown") {
     return "markdown";
+  }
+  if (normalizedType === "html") {
+    return "html";
   }
   if (normalizedType === "json" || normalizedType === "capability" || normalizedType === "result_package") {
     return "json";

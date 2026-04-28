@@ -34,6 +34,7 @@
         :class="{
           'node-card__preview--plain': outputPreviewContent.kind === 'plain',
           'node-card__preview--markdown': outputPreviewContent.kind === 'markdown',
+          'node-card__preview--html': outputPreviewContent.kind === 'html',
           'node-card__preview--json': outputPreviewContent.kind === 'json',
           'node-card__preview--documents': outputPreviewContent.kind === 'documents',
           'node-card__preview--package': outputPreviewContent.kind === 'package',
@@ -63,6 +64,7 @@
             class="node-card__preview-package-page"
             :class="{
               'node-card__preview-package-page--json': activePackagePage.kind === 'json',
+              'node-card__preview-package-page--html': activePackagePage.kind === 'html',
               'node-card__preview-package-page--documents': activePackagePage.kind === 'documents',
             }"
             role="tabpanel"
@@ -78,6 +80,12 @@
               v-if="activePackagePage.kind === 'documents' && activePackagePage.documentRefs.length > 0"
               :documents="activePackagePage.documentRefs"
             />
+            <SandboxedHtmlFrame
+              v-else-if="activePackagePage.kind === 'html'"
+              class="node-card__preview-html-frame"
+              :source="activePackagePage.html"
+              title="HTML output preview"
+            />
             <div
               v-else-if="activePackagePage.kind === 'markdown'"
               class="node-card__preview-markdown"
@@ -89,6 +97,12 @@
         <OutputDocumentPager
           v-else-if="outputPreviewContent.kind === 'documents' && outputPreviewContent.documentRefs.length > 0"
           :documents="outputPreviewContent.documentRefs"
+        />
+        <SandboxedHtmlFrame
+          v-else-if="outputPreviewContent.kind === 'html'"
+          class="node-card__preview-html-frame"
+          :source="outputPreviewContent.html"
+          title="HTML output preview"
         />
         <div
           v-else-if="outputPreviewContent.kind === 'markdown'"
@@ -108,6 +122,7 @@ import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import type { NodeCardViewModel } from "./nodeCardViewModel";
+import SandboxedHtmlFrame from "@/components/SandboxedHtmlFrame.vue";
 import OutputDocumentPager from "./OutputDocumentPager.vue";
 import OutputLinkedText from "./OutputLinkedText.vue";
 import type { OutputPreviewContent } from "./outputPreviewContentModel";
@@ -241,6 +256,18 @@ watch(
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 0.84rem;
   line-height: 1.58;
+}
+
+.node-card__preview--html {
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.node-card__preview-html-frame {
+  min-height: 280px;
+  overflow: hidden;
+  border: 1px solid rgba(154, 52, 18, 0.12);
+  border-radius: 12px;
 }
 
 .node-card__preview--package {

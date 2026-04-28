@@ -88,6 +88,18 @@ test("NodeCard accepts canvas-provided real dimensions through CSS variables", (
   assert.match(componentSource, /\.node-card--subgraph \{[\s\S]*width:\s*var\(--node-card-width,\s*820px\);/);
 });
 
+test("NodeCard exposes node text and primary state ports as virtual canvas affordances", () => {
+  assert.match(componentSource, /:node-id="nodeId"[\s\S]*:node-label="view\.title"/);
+  assert.match(componentSource, /:data-virtual-affordance-id="`editor\.canvas\.node\.\$\{nodeId\}\.title`"/);
+  assert.match(componentSource, /:data-virtual-affordance-label="`节点标题：\$\{view\.title \|\| nodeId\}`"/);
+  assert.match(componentSource, /:data-virtual-affordance-id="`editor\.canvas\.node\.\$\{nodeId\}\.description`"/);
+  assert.match(componentSource, /:data-virtual-affordance-label="`节点描述：\$\{view\.title \|\| nodeId\}`"/);
+  assert.match(primaryStatePortSource, /:data-virtual-affordance-id="virtualAffordanceId"/);
+  assert.match(primaryStatePortSource, /:data-virtual-affordance-label="virtualAffordanceLabel"/);
+  assert.match(primaryStatePortSource, /const virtualAffordanceId = computed/);
+  assert.match(primaryStatePortSource, /const virtualAffordanceLabel = computed/);
+});
+
 test("NodeCard renders a top-left run timing capsule", () => {
   assert.match(componentSource, /import \{[\s\S]*advanceSmoothNumberDisplay,[\s\S]*isSmoothNumberDisplaySettled,[\s\S]*\} from "@\/lib\/smoothNumberDisplay";/);
   assert.match(componentSource, /node-card__run-timing-capsule/);

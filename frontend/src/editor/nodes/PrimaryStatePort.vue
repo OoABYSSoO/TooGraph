@@ -28,6 +28,11 @@
           ]"
           :style="{ '--node-card-port-accent': portAccentColor }"
           :data-state-editor-trigger="canEditPort ? 'true' : undefined"
+          :data-virtual-affordance-id="virtualAffordanceId"
+          :data-virtual-affordance-label="virtualAffordanceLabel"
+          data-virtual-affordance-role="button"
+          data-virtual-affordance-zone="editor-canvas.port"
+          data-virtual-affordance-actions="click"
           data-anchor-hitarea="true"
           @pointerenter="emit('pointer-enter', anchorId)"
           @pointerleave="emit('pointer-leave', anchorId)"
@@ -166,6 +171,23 @@ const { t } = useI18n();
 const anchorSlotKind = computed(() => (props.side === "input" ? "state-in" : "state-out"));
 const anchorId = computed(() => (props.port ? `${props.anchorPrefix}:${props.port.key}` : ""));
 const anchorSlotId = computed(() => (props.port ? `${props.nodeId}:${anchorSlotKind.value}:${props.port.key}` : ""));
+const virtualAffordanceId = computed(() => {
+  if (!props.port) {
+    return "";
+  }
+  return props.port.virtual
+    ? `editor.canvas.node.${props.nodeId}.port.${props.side}.create`
+    : `editor.canvas.node.${props.nodeId}.port.${props.side}.${props.port.key}`;
+});
+const virtualAffordanceLabel = computed(() => {
+  if (!props.port) {
+    return "";
+  }
+  if (props.port.virtual) {
+    return `${props.side === "input" ? "创建输入状态" : "创建输出状态"}：${portLabel.value}`;
+  }
+  return `${props.side === "input" ? "输入状态" : "输出状态"}：${portLabel.value}`;
+});
 const portLabel = computed(() => {
   const port = props.port;
   if (!port) {

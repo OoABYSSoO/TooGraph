@@ -1110,7 +1110,7 @@ function showSaveSuccessToast(message: string) {
     customClass: "editor-workspace-shell__save-toast",
     type: "success",
     duration: 3200,
-    grouping: true,
+    grouping: false,
     placement: "top",
     showClose: false,
     message,
@@ -1400,7 +1400,6 @@ onMounted(() => {
 }
 
 :global(.editor-workspace-shell__save-toast.el-message) {
-  top: 46% !important;
   left: 50%;
   min-width: min(360px, calc(100vw - 40px));
   max-width: min(620px, calc(100vw - 40px));
@@ -1414,7 +1413,7 @@ onMounted(() => {
     0 24px 62px rgba(20, 83, 45, 0.24),
     0 0 42px rgba(34, 197, 94, 0.24);
   backdrop-filter: blur(26px) saturate(1.6) contrast(1.04);
-  transform: translate(-50%, -50%);
+  transform: translateX(-50%);
   animation: editor-workspace-shell-save-toast-float 3.2s ease forwards;
 }
 
@@ -1483,18 +1482,18 @@ onMounted(() => {
 @keyframes editor-workspace-shell-save-toast-float {
   0% {
     opacity: 0;
-    transform: translate(-50%, -36%) scale(0.96);
+    transform: translate(-50%, -10px) scale(0.96);
   }
 
   14%,
   68% {
     opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
+    transform: translate(-50%, 0) scale(1);
   }
 
   100% {
     opacity: 0;
-    transform: translate(-50%, -88%) scale(0.98);
+    transform: translate(-50%, -18px) scale(0.98);
   }
 }
 

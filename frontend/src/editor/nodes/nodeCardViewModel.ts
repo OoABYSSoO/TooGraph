@@ -623,6 +623,9 @@ function resolveConfiguredOutputDisplayMode(input: {
   if (isDocumentStateType(input.connectedStateType)) {
     return "documents";
   }
+  if (input.connectedStateType === "html") {
+    return "html";
+  }
   return input.runtimeDisplayMode?.trim() || input.configuredDisplayMode;
 }
 

@@ -149,6 +149,29 @@ test("EditorCanvas binds the canvas surface styling to the viewport state", () =
   assert.doesNotMatch(componentSource, /`\$\{Math\.round\(viewport\.viewport\.scale \* 100\)\}%`/);
 });
 
+test("EditorCanvas exposes canvas objects to the virtual page operation book", () => {
+  assert.match(componentSource, /data-virtual-affordance-id="editor\.canvas\.surface"/);
+  assert.match(componentSource, /data-virtual-affordance-label="图编辑器画布"/);
+  assert.match(componentSource, /data-virtual-affordance-zone="editor-canvas"/);
+  assert.match(componentSource, /data-virtual-affordance-actions="click"/);
+  assert.match(componentSource, /:data-virtual-affordance-id="`editor\.canvas\.edgeVisibility\.\$\{option\.mode\}`"/);
+  assert.match(componentSource, /data-virtual-affordance-id="editor\.canvas\.empty\.createFirstNode"/);
+  assert.match(componentSource, /:data-virtual-affordance-id="`editor\.canvas\.edge\.\$\{edge\.id\}`"/);
+  assert.match(componentSource, /:data-virtual-affordance-label="resolveCanvasVirtualEdgeLabel\(edge\)"/);
+  assert.match(componentSource, /:data-virtual-affordance-id="`editor\.canvas\.node\.\$\{nodeId\}`"/);
+  assert.match(componentSource, /:data-virtual-affordance-label="resolveCanvasVirtualNodeLabel\(nodeId, node\)"/);
+  assert.ok(
+    Array.from(componentSource.matchAll(/:data-virtual-affordance-id="`editor\.canvas\.anchor\.\$\{anchor\.id\}`"/g)).length >= 3,
+    "expected flow, route, and point anchors to expose virtual affordances",
+  );
+  assert.match(componentSource, /data-virtual-affordance-id="editor\.canvas\.zoom\.out"/);
+  assert.match(componentSource, /data-virtual-affordance-id="editor\.canvas\.zoom\.in"/);
+  assert.match(componentSource, /data-virtual-affordance-id="editor\.canvas\.zoom\.reset"/);
+  assert.match(componentSource, /function resolveCanvasVirtualNodeLabel\(nodeId: string, node: GraphNode\)/);
+  assert.match(componentSource, /function resolveCanvasVirtualEdgeLabel\(edge: ProjectedCanvasEdge\)/);
+  assert.match(componentSource, /function resolveCanvasVirtualAnchorLabel\(anchor: ProjectedCanvasAnchor\)/);
+});
+
 test("EditorCanvas can show an editing source capsule beside the edge visibility controls", () => {
   assert.match(componentSource, /sourceContextLabel\?: string \| null;/);
   assert.match(

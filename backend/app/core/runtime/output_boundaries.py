@@ -107,6 +107,8 @@ def resolve_result_package_output_display_mode(
     normalized_type = output_type.strip().lower()
     if normalized_type == "markdown":
         return "markdown"
+    if normalized_type == "html":
+        return "html"
     if normalized_type in {"json", "capability", "result_package"}:
         return "json"
     if normalized_type in {"file", "image", "audio", "video"}:

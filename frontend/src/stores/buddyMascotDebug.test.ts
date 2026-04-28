@@ -40,7 +40,6 @@ test("buddy mascot debug store records virtual operation requests", () => {
     commands: ["click app.nav.runs"],
     operations: [{ kind: "click", targetId: "app.nav.runs" }],
     cursorLifecycle: "return_after_step",
-    nextPagePath: "/runs",
     reason: "first",
   });
   const firstRequest = store.latestVirtualOperationRequest;
@@ -49,7 +48,6 @@ test("buddy mascot debug store records virtual operation requests", () => {
     commands: ["click app.nav.runs"],
     operations: [{ kind: "click", targetId: "app.nav.runs" }],
     cursorLifecycle: "keep",
-    nextPagePath: "/runs",
     reason: "second",
   });
 
@@ -60,7 +58,6 @@ test("buddy mascot debug store records virtual operation requests", () => {
       commands: ["click app.nav.runs"],
       operations: [{ kind: "click", targetId: "app.nav.runs" }],
       cursorLifecycle: "return_after_step",
-      nextPagePath: "/runs",
       reason: "first",
     },
   });
@@ -71,7 +68,6 @@ test("buddy mascot debug store records virtual operation requests", () => {
       commands: ["click app.nav.runs"],
       operations: [{ kind: "click", targetId: "app.nav.runs" }],
       cursorLifecycle: "keep",
-      nextPagePath: "/runs",
       reason: "second",
     },
   });

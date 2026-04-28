@@ -83,6 +83,42 @@ test("buildPageOperationBook filters buddy self surfaces and disabled targets", 
   assert.match(book.forbidden.join("\n"), /伙伴页面、伙伴浮窗、伙伴形象/);
 });
 
+test("buildPageOperationBook keeps editor canvas affordances addressable by semantic target id", () => {
+  const book = buildPageOperationBook({
+    snapshotId: "snapshot-canvas",
+    path: "/editor",
+    title: "图编辑器",
+    affordances: [
+      {
+        id: "editor.canvas.node.agent_1",
+        label: "节点：页面操作器",
+        role: "button",
+        zone: "editor-canvas.node",
+        actions: ["click"],
+        enabled: true,
+        visible: true,
+      },
+      {
+        id: "editor.canvas.anchor.agent_1:flow-out",
+        label: "连接点：页面操作器 流程输出",
+        role: "button",
+        zone: "editor-canvas.anchor",
+        actions: ["click"],
+        enabled: true,
+        visible: true,
+      },
+    ],
+  });
+
+  assert.deepEqual(
+    book.allowedOperations.map((item) => [item.targetId, item.commands]),
+    [
+      ["editor.canvas.node.agent_1", ["click editor.canvas.node.agent_1"]],
+      ["editor.canvas.anchor.agent_1:flow-out", ["click editor.canvas.anchor.agent_1:flow-out"]],
+    ],
+  );
+});
+
 test("formatPageOperationBookLines renders commands without selectors or coordinates", () => {
   const lines = formatPageOperationBookLines(
     buildPageOperationBook({

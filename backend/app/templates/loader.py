@@ -60,12 +60,13 @@ def save_user_template_record(graph_payload: NodeSystemGraphPayload) -> dict[str
     template_id = _generate_user_template_id()
     graph_data = graph_payload.model_dump(by_alias=True, mode="json")
     metadata = graph_data.get("metadata") if isinstance(graph_data.get("metadata"), dict) else {}
+    template_name = _resolve_unique_template_name(graph_payload.name)
     record = NodeSystemTemplate.model_validate(
         {
             "template_id": template_id,
-            "label": graph_data["name"],
+            "label": template_name,
             "description": str(metadata.get("description") or ""),
-            "default_graph_name": graph_data["name"],
+            "default_graph_name": template_name,
             "state_schema": graph_data["state_schema"],
             "nodes": graph_data["nodes"],
             "edges": graph_data["edges"],
@@ -211,3 +212,29 @@ def _generate_user_template_id() -> str:
 def _validate_template_id(template_id: str) -> None:
     if not template_id or template_id in {".", ".."} or "/" in template_id or "\\" in template_id:
         raise KeyError(template_id)
+
+
+def _resolve_unique_template_name(requested_name: str) -> str:
+    existing_name_keys: set[str] = set()
+    for record in list_template_records(include_disabled=True):
+        label = str(record.get("label") or "").strip()
+        default_graph_name = str(record.get("default_graph_name") or "").strip()
+        if label:
+            existing_name_keys.add(_name_key(label))
+        if default_graph_name:
+            existing_name_keys.add(_name_key(default_graph_name))
+    return _resolve_unique_name(requested_name, existing_name_keys)
+
+
+def _resolve_unique_name(requested_name: str, existing_name_keys: set[str]) -> str:
+    base_name = requested_name.strip()
+    candidate = base_name
+    suffix = 1
+    while _name_key(candidate) in existing_name_keys:
+        candidate = f"{base_name}_{suffix}"
+        suffix += 1
+    return candidate
+
+
+def _name_key(name: str) -> str:
+    return name.strip().casefold()

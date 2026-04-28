@@ -13,6 +13,7 @@ from app.core.schemas.node_system import (
     NodeSystemConditionConfig,
     NodeSystemGraphDocument,
     NodeSystemInputConfig,
+    NodeSystemOutputConfig,
     NodeSystemReadBinding,
     NodeSystemStateDefinition,
 )
@@ -28,6 +29,19 @@ class NodeSystemSchemaLegacyFieldRejectionTests(unittest.TestCase):
                     "defaultValue": "legacy",
                 }
             )
+
+    def test_state_definition_and_output_config_accept_html_rendering(self) -> None:
+        definition = NodeSystemStateDefinition.model_validate(
+            {
+                "name": "Rendered Page",
+                "type": "html",
+                "value": "<!doctype html><html><body><h1>Hi</h1></body></html>",
+            }
+        )
+        config = NodeSystemOutputConfig.model_validate({"displayMode": "html"})
+
+        self.assertEqual(definition.type.value, "html")
+        self.assertEqual(config.display_mode.value, "html")
 
     def test_input_config_rejects_default_value_alias(self) -> None:
         with self.assertRaises(ValidationError):

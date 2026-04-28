@@ -46,6 +46,7 @@ const STATE_FIELD_TYPE_VALUES = new Set([
   "number",
   "boolean",
   "markdown",
+  "html",
   "json",
   "image",
   "audio",

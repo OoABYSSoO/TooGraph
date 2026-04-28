@@ -54,3 +54,17 @@ test("StatePortList owns agent real state port rows and emits parent side effect
   assert.match(componentSource, /\.node-card__port-pill-row--create \{/);
   assert.match(componentSource, /\.node-card__port-pill--create \{/);
 });
+
+test("StatePortList exposes reusable state port operations to the virtual page operation book", () => {
+  const componentSource = readFileSync(resolve(currentDirectory, "StatePortList.vue"), "utf8").replace(/\r\n/g, "\n");
+
+  assert.match(componentSource, /:data-virtual-affordance-id="portVirtualAffordanceId\(port\)"/);
+  assert.match(componentSource, /:data-virtual-affordance-label="portVirtualAffordanceLabel\(port\)"/);
+  assert.match(componentSource, /:data-virtual-affordance-id="removePortVirtualAffordanceId\(port\)"/);
+  assert.match(componentSource, /:data-virtual-affordance-label="removePortVirtualAffordanceLabel\(port\)"/);
+  assert.match(componentSource, /:data-virtual-affordance-id="createPortVirtualAffordanceId"/);
+  assert.match(componentSource, /:data-virtual-affordance-label="createPortVirtualAffordanceLabel"/);
+  assert.match(componentSource, /data-virtual-affordance-zone="editor-canvas.port"/);
+  assert.match(componentSource, /function portVirtualAffordanceId\(port: NodePortViewModel\)/);
+  assert.match(componentSource, /const createPortVirtualAffordanceId = computed/);
+});

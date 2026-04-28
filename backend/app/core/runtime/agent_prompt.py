@@ -428,6 +428,11 @@ def format_state_output_contract_lines(state_type: NodeSystemStateType) -> list[
             "  output_format: markdown string inside the JSON value",
             "  output_rule: 这个字段的值必须是 Markdown 内容字符串；不要把整个 JSON 包进 Markdown 代码块。",
         ]
+    if state_type == NodeSystemStateType.HTML:
+        return [
+            "  output_format: HTML document string inside the JSON value",
+            "  output_rule: 这个字段的值必须是可渲染 HTML 内容字符串；不要把整个 JSON 包进 HTML 或 Markdown 代码块。",
+        ]
     if state_type == NodeSystemStateType.JSON:
         return [
             "  output_format: JSON value inside the JSON value",

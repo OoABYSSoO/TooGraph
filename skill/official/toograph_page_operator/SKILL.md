@@ -10,8 +10,7 @@ This official Skill validates one page-operation command sequence and asks TooGr
 Current phase:
 
 - Supports one operation per invocation.
-- Supports application navigation clicks only.
-- Supports the operation-book command `click app.nav.runs`.
+- Supports safe `click` commands from the current page operation book, including application navigation and editor canvas targets.
 - Rejects Buddy self surfaces such as the Buddy page, Buddy floating window, Buddy avatar, and debug controls.
 - Does not expose DOM selectors, screen coordinates, or low-level mouse trajectories to the LLM.
 
@@ -26,16 +25,15 @@ Runtime context:
 
 LLM output:
 
-- `commands`: array of command strings copied from the page operation book. Current phase supports `["click app.nav.runs"]`.
+- `commands`: array of command strings copied from the page operation book, such as `["click app.nav.library"]` or `["click editor.canvas.node.agent_1"]`.
 - `cursor_lifecycle`: virtual cursor lifecycle, such as `return_after_step`.
 - `reason`: short audit reason for choosing the command.
 
 State outputs:
 
 - `ok`: whether the semantic operation was accepted.
-- `next_page_path`: expected route after the operation.
 - `cursor_session_id`: reserved virtual cursor session ID.
 - `journal`: operation journal summary.
 - `error`: structured failure detail.
 
-`before_llm.py` injects the current page operation book from runtime context, not graph state. `after_llm.py` validates the LLM command list, returns the expected next page path, and emits a `virtual_ui_operation` activity event for the frontend runtime to execute.
+`before_llm.py` injects the current page operation book from runtime context, not graph state. `after_llm.py` validates the LLM command list and emits a `virtual_ui_operation` activity event for the frontend runtime to execute. Page routing is observed from the real UI after the operation, not returned as Skill state.

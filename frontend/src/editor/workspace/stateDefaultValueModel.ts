@@ -36,8 +36,13 @@ export function resolveStateDefaultValueEditorConfig(type: StateFieldType): Stat
 
   return {
     mode: "text",
-    rows: type === "markdown" ? 5 : 3,
-    placeholder: type === "markdown" ? translate("nodeCard.markdownPlaceholder") : translate("common.value"),
+    rows: type === "html" ? 8 : type === "markdown" ? 5 : 3,
+    placeholder:
+      type === "html"
+        ? "<!doctype html>"
+        : type === "markdown"
+          ? translate("nodeCard.markdownPlaceholder")
+          : translate("common.value"),
   };
 }
 

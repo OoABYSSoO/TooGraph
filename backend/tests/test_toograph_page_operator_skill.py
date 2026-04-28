@@ -52,7 +52,7 @@ class TooGraphPageOperatorSkillTests(unittest.TestCase):
         self.assertEqual(llm_output_types["commands"], "text_array")
         self.assertEqual(
             [field.key for field in definition.state_output_schema],
-            ["ok", "next_page_path", "cursor_session_id", "journal", "error"],
+            ["ok", "cursor_session_id", "journal", "error"],
         )
 
     def test_before_llm_returns_operation_book_without_buddy_targets(self) -> None:
@@ -81,6 +81,13 @@ class TooGraphPageOperatorSkillTests(unittest.TestCase):
                                 "resultHint": {"path": "/library"},
                             },
                             {
+                                "targetId": "editor.canvas.node.agent_1",
+                                "label": "节点：页面操作器",
+                                "role": "button",
+                                "commands": ["click editor.canvas.node.agent_1"],
+                                "resultHint": None,
+                            },
+                            {
                                 "targetId": "app.nav.buddy",
                                 "label": "伙伴",
                                 "role": "navigation-link",
@@ -104,8 +111,13 @@ class TooGraphPageOperatorSkillTests(unittest.TestCase):
         self.assertIn('"click app.nav.runs"', context)
         self.assertIn('"targetId": "app.nav.library"', context)
         self.assertIn('"click app.nav.library"', context)
+        self.assertIn('"targetId": "editor.canvas.node.agent_1"', context)
+        self.assertIn('"click editor.canvas.node.agent_1"', context)
         context_payload = json.loads(context)
-        self.assertEqual(context_payload["available_commands"], ["click app.nav.runs", "click app.nav.library"])
+        self.assertEqual(
+            context_payload["available_commands"],
+            ["click app.nav.runs", "click app.nav.library", "click editor.canvas.node.agent_1"],
+        )
         self.assertEqual(context_payload["output_contract"]["commands"], ["click app.nav.runs"])
         self.assertIn("伙伴页面、伙伴浮窗、伙伴形象", context)
         self.assertNotIn("app.nav.buddy", context)
@@ -124,16 +136,37 @@ class TooGraphPageOperatorSkillTests(unittest.TestCase):
         )
 
         self.assertEqual(result["ok"], True)
-        self.assertEqual(result["next_page_path"], "/runs")
+        self.assertNotIn("next_page_path", result)
         self.assertEqual(result["journal"][0]["target_id"], "app.nav.runs")
         event = result["activity_events"][0]
         self.assertEqual(event["kind"], "virtual_ui_operation")
         self.assertEqual(event["status"], "requested")
         self.assertEqual(event["detail"]["operation"]["kind"], "click")
         self.assertEqual(event["detail"]["operation"]["target_id"], "app.nav.runs")
+        self.assertNotIn("next_page_path", event["detail"])
+        self.assertNotIn("next_page_path", event["detail"]["operation_request"])
         self.assertEqual(event["detail"]["commands"], ["click app.nav.runs"])
         self.assertEqual(event["detail"]["reason"], "用户要打开运行历史页。")
         self.assertEqual(event["detail"]["cursor_lifecycle"], "return_after_step")
+
+    def test_after_llm_emits_virtual_click_event_for_canvas_targets(self) -> None:
+        result = _run_skill_script(
+            PAGE_OPERATOR_AFTER_LLM_PATH,
+            {
+                "page_path": "/editor",
+                "commands": ["click editor.canvas.node.agent_1"],
+                "cursor_lifecycle": "keep",
+                "reason": "用户要选中图中的节点。",
+            },
+        )
+
+        self.assertEqual(result["ok"], True)
+        self.assertEqual(result["journal"][0]["target_id"], "editor.canvas.node.agent_1")
+        event = result["activity_events"][0]
+        self.assertEqual(event["detail"]["operation"]["kind"], "click")
+        self.assertEqual(event["detail"]["operation"]["target_id"], "editor.canvas.node.agent_1")
+        self.assertEqual(event["detail"]["operation"]["target_label"], "editor.canvas.node.agent_1")
+        self.assertEqual(event["detail"]["cursor_lifecycle"], "keep")
 
     def test_after_llm_accepts_nested_commands_object_as_compatibility_fallback(self) -> None:
         result = _run_skill_script(
@@ -147,12 +180,12 @@ class TooGraphPageOperatorSkillTests(unittest.TestCase):
         )
 
         self.assertEqual(result["ok"], True)
-        self.assertEqual(result["next_page_path"], "/library")
+        self.assertNotIn("next_page_path", result)
         self.assertEqual(result["journal"][0]["target_id"], "app.nav.library")
         event = result["activity_events"][0]
         self.assertEqual(event["detail"]["commands"], ["click app.nav.library"])
         self.assertEqual(event["detail"]["operation"]["target_id"], "app.nav.library")
-        self.assertEqual(event["detail"]["operation_request"]["next_page_path"], "/library")
+        self.assertNotIn("next_page_path", event["detail"]["operation_request"])
 
     def test_after_llm_rejects_buddy_self_targets(self) -> None:
         result = _run_skill_script(
@@ -164,6 +197,7 @@ class TooGraphPageOperatorSkillTests(unittest.TestCase):
         )
 
         self.assertEqual(result["ok"], False)
+        self.assertNotIn("next_page_path", result)
         self.assertEqual(result["error"]["code"], "forbidden_self_surface")
         self.assertEqual(result["activity_events"][0]["kind"], "virtual_ui_operation")
         self.assertEqual(result["activity_events"][0]["status"], "failed")

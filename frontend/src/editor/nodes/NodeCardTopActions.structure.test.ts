@@ -23,6 +23,19 @@ test("NodeCardTopActions owns the top dock and advanced popover presentation", (
   assert.match(componentSource, /emit\('human-review'\)/);
 });
 
+test("NodeCardTopActions exposes every node action to the virtual page operation book", () => {
+  assert.match(componentSource, /nodeId: string;/);
+  assert.match(componentSource, /nodeLabel: string;/);
+  assert.match(componentSource, /:data-virtual-affordance-id="actionAffordanceId\('humanReview'\)"/);
+  assert.match(componentSource, /:data-virtual-affordance-id="actionAffordanceId\('advanced'\)"/);
+  assert.match(componentSource, /:data-virtual-affordance-id="actionAffordanceId\('editSubgraph'\)"/);
+  assert.match(componentSource, /:data-virtual-affordance-id="actionAffordanceId\('savePreset'\)"/);
+  assert.match(componentSource, /:data-virtual-affordance-id="actionAffordanceId\('delete'\)"/);
+  assert.match(componentSource, /data-virtual-affordance-zone="editor-canvas.node-action"/);
+  assert.match(componentSource, /function actionAffordanceId\(action: string\)/);
+  assert.match(componentSource, /function actionAffordanceLabel\(actionLabel: string\)/);
+});
+
 test("NodeCardTopActions owns advanced agent and output controls while emitting parent mutations", () => {
   assert.match(componentSource, /v-if="bodyKind === 'agent'"/);
   assert.match(componentSource, /v-else-if="bodyKind === 'output'"/);

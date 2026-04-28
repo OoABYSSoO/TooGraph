@@ -169,10 +169,19 @@ function resolveOutputNodeIdsForState(document: RunEventPreviewDocument | null |
 function resolveRunEventPreviewDisplayMode(document: RunEventPreviewDocument | null | undefined, nodeId: string) {
   const rawDisplayMode = document?.nodes[nodeId]?.config?.displayMode;
   const displayMode = typeof rawDisplayMode === "string" ? rawDisplayMode.trim() : "";
-  if (displayMode && displayMode !== "auto" && ["plain", "markdown", "json", "documents"].includes(displayMode)) {
+  if (displayMode && displayMode !== "auto" && ["plain", "markdown", "html", "json", "documents"].includes(displayMode)) {
     return displayMode;
   }
+  if (isHtmlOutputNode(document, nodeId)) {
+    return "html";
+  }
   return isDocumentOutputNode(document, nodeId) ? "documents" : "plain";
+}
+
+function isHtmlOutputNode(document: RunEventPreviewDocument | null | undefined, nodeId: string) {
+  const stateKey = document?.nodes[nodeId]?.reads?.[0]?.state?.trim();
+  const stateType = stateKey ? document?.state_schema?.[stateKey]?.type?.trim() : "";
+  return stateType === "html";
 }
 
 function isDocumentOutputNode(document: RunEventPreviewDocument | null | undefined, nodeId: string) {

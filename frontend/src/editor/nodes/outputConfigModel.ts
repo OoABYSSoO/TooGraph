@@ -12,6 +12,7 @@ export const OUTPUT_DISPLAY_MODE_OPTIONS: Array<OutputConfigOption<OutputDisplay
   { value: "auto", label: "AUTO" },
   { value: "plain", label: "PLAIN" },
   { value: "markdown", label: "MD" },
+  { value: "html", label: "HTML" },
   { value: "json", label: "JSON" },
   { value: "documents", label: "DOCS" },
 ];
@@ -27,6 +28,8 @@ export function formatOutputDisplayModeLabel(displayMode: string) {
   switch (displayMode) {
     case "markdown":
       return "MD";
+    case "html":
+      return "HTML";
     case "plain":
       return "PLAIN";
     case "json":

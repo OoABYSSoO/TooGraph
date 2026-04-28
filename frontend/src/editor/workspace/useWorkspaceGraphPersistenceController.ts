@@ -79,6 +79,15 @@ export function useWorkspaceGraphPersistenceController(input: WorkspaceGraphPers
     input.showSaveSuccessToast?.(message);
   }
 
+  function formatSaveSuccessMessage(kind: "graph" | "template", savedName: string, requestedName: string) {
+    const resolvedSavedName = savedName.trim();
+    const resolvedRequestedName = requestedName.trim();
+    if (resolvedRequestedName && resolvedSavedName !== resolvedRequestedName) {
+      return `Saved ${kind} "${resolvedSavedName}" because "${resolvedRequestedName}" already exists.`;
+    }
+    return `Saved ${kind} "${resolvedSavedName}".`;
+  }
+
   function renameActiveGraph(name: string) {
     const tab = input.activeTab.value;
     if (!tab) {
@@ -150,7 +159,7 @@ export function useWorkspaceGraphPersistenceController(input: WorkspaceGraphPers
         );
       }
 
-      setSaveSuccessFeedback(tabId, `Saved graph ${savedGraph.graph_id}.`);
+      setSaveSuccessFeedback(tabId, formatSaveSuccessMessage("graph", savedGraph.name, documentToSave.name));
       return response.saved;
     } catch (error) {
       input.setMessageFeedbackForTab(tabId, {
@@ -240,7 +249,7 @@ export function useWorkspaceGraphPersistenceController(input: WorkspaceGraphPers
       const savedTabId = nextWorkspace.activeTabId;
       if (savedTabId) {
         input.registerDocumentForTab(savedTabId, savedGraph);
-        setSaveSuccessFeedback(savedTabId, `Saved graph ${savedGraph.graph_id}.`);
+        setSaveSuccessFeedback(savedTabId, formatSaveSuccessMessage("graph", savedGraph.name, documentToSave.name));
       }
       await input.loadGraphs();
       input.syncRouteToTab(
@@ -294,7 +303,7 @@ export function useWorkspaceGraphPersistenceController(input: WorkspaceGraphPers
       }
       const response = await input.saveGraphAsTemplate(documentToSave);
       await input.loadTemplates();
-      setSaveSuccessFeedback(tab.tabId, `Saved template ${response.template_id}.`);
+      setSaveSuccessFeedback(tab.tabId, formatSaveSuccessMessage("template", response.template.label, documentToSave.name));
       return response.saved;
     } catch (error) {
       input.setMessageFeedbackForTab(tab.tabId, {

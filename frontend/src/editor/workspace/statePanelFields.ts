@@ -11,6 +11,7 @@ export type StateFieldType =
   | "number"
   | "boolean"
   | "markdown"
+  | "html"
   | "json"
   | "image"
   | "audio"
@@ -33,6 +34,7 @@ export const STATE_FIELD_TYPE_OPTIONS: StateFieldType[] = [
   "number",
   "boolean",
   "markdown",
+  "html",
   "json",
   "image",
   "audio",

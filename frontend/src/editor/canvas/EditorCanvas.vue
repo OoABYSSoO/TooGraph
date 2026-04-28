@@ -8,6 +8,11 @@
       'editor-canvas--locked': interactionLocked,
     }"
     :style="canvasSurfaceStyle"
+    data-virtual-affordance-id="editor.canvas.surface"
+    data-virtual-affordance-label="图编辑器画布"
+    data-virtual-affordance-role="button"
+    data-virtual-affordance-zone="editor-canvas"
+    data-virtual-affordance-actions="click"
     tabindex="0"
     @dblclick="handleCanvasDoubleClick"
     @pointerdown="handleCanvasPointerDown"
@@ -42,6 +47,11 @@
           :class="{ 'editor-canvas__edge-view-button--active': edgeVisibilityMode === option.mode }"
           :title="option.title"
           :aria-pressed="edgeVisibilityMode === option.mode"
+          :data-virtual-affordance-id="`editor.canvas.edgeVisibility.${option.mode}`"
+          :data-virtual-affordance-label="`边显示模式：${option.title || option.label}`"
+          data-virtual-affordance-role="button"
+          data-virtual-affordance-zone="editor-canvas.toolbar"
+          data-virtual-affordance-actions="click"
           @click.stop="handleEdgeVisibilityModeClick(option.mode)"
         >
           {{ option.label }}
@@ -56,6 +66,11 @@
       type="button"
       class="editor-canvas__lock-banner"
       aria-live="polite"
+      data-virtual-affordance-id="editor.canvas.lockBanner"
+      :data-virtual-affordance-label="t('editor.lockBanner')"
+      data-virtual-affordance-role="button"
+      data-virtual-affordance-zone="editor-canvas.lock"
+      data-virtual-affordance-actions="click"
       @pointerdown.stop
       @click.stop="handleLockBannerClick"
       @keydown.enter.prevent="handleLockBannerClick"
@@ -68,6 +83,11 @@
         <div
           ref="emptyCanvasPromptRef"
           class="editor-canvas__empty-card"
+          data-virtual-affordance-id="editor.canvas.empty.createFirstNode"
+          :data-virtual-affordance-label="t('editor.createFirstNode')"
+          data-virtual-affordance-role="button"
+          data-virtual-affordance-zone="editor-canvas.empty"
+          data-virtual-affordance-actions="click"
           tabindex="-1"
           @pointerdown.stop="focusEmptyCanvasPrompt"
         >
@@ -118,6 +138,11 @@
           :d="edge.path"
           class="editor-canvas__edge-hitarea"
           :class="edgeHitareaClassState(edge)"
+          :data-virtual-affordance-id="`editor.canvas.edge.${edge.id}`"
+          :data-virtual-affordance-label="resolveCanvasVirtualEdgeLabel(edge)"
+          data-virtual-affordance-role="button"
+          data-virtual-affordance-zone="editor-canvas.edge"
+          data-virtual-affordance-actions="click"
           @pointerdown.stop="handleEdgePointerDown(edge, $event)"
         />
       </svg>
@@ -214,6 +239,11 @@
           'editor-canvas__node--resizing': nodeResizeDrag?.nodeId === nodeId,
         }"
         :style="nodeStyle(node.ui.position)"
+        :data-virtual-affordance-id="`editor.canvas.node.${nodeId}`"
+        :data-virtual-affordance-label="resolveCanvasVirtualNodeLabel(nodeId, node)"
+        data-virtual-affordance-role="button"
+        data-virtual-affordance-zone="editor-canvas.node"
+        data-virtual-affordance-actions="click"
         @pointerenter="setHoveredNode(nodeId)"
         @pointerleave="clearHoveredNode(nodeId)"
         @pointerdown.capture="handleLockedNodePointerCapture(nodeId, $event)"
@@ -295,6 +325,11 @@
           class="editor-canvas__flow-hotspot"
           :style="[flowHotspotStyle(anchor), flowHotspotConnectStyle(anchor)]"
           :class="flowHotspotClassState(anchor)"
+          :data-virtual-affordance-id="`editor.canvas.anchor.${anchor.id}`"
+          :data-virtual-affordance-label="resolveCanvasVirtualAnchorLabel(anchor)"
+          data-virtual-affordance-role="button"
+          data-virtual-affordance-zone="editor-canvas.anchor"
+          data-virtual-affordance-actions="click"
           @pointerenter="setHoveredFlowHandleNode(anchor.nodeId)"
           @pointerleave="clearHoveredFlowHandleNode(anchor.nodeId)"
           @pointerdown.prevent.stop="handleAnchorPointerDown(anchor)"
@@ -307,6 +342,11 @@
           class="editor-canvas__flow-hotspot editor-canvas__flow-hotspot--outbound editor-canvas__route-handle"
           :class="routeHandleClassState(anchor)"
           :style="[routeHandleStyle(anchor), flowHotspotConnectStyle(anchor)]"
+          :data-virtual-affordance-id="`editor.canvas.anchor.${anchor.id}`"
+          :data-virtual-affordance-label="resolveCanvasVirtualAnchorLabel(anchor)"
+          data-virtual-affordance-role="button"
+          data-virtual-affordance-zone="editor-canvas.anchor"
+          data-virtual-affordance-actions="click"
           @pointerenter="setHoveredFlowHandleNode(anchor.nodeId)"
           @pointerleave="clearHoveredFlowHandleNode(anchor.nodeId)"
           @pointerdown.prevent.stop="handleAnchorPointerDown(anchor)"
@@ -328,6 +368,11 @@
             'editor-canvas__anchor--connect-source': isCanvasConnectionSourceAnchor(anchor, canvasInteractionStyleContext),
             'editor-canvas__anchor--connect-target': isCanvasConnectionTargetAnchor(anchor, canvasInteractionStyleContext),
           }"
+          :data-virtual-affordance-id="`editor.canvas.anchor.${anchor.id}`"
+          :data-virtual-affordance-label="resolveCanvasVirtualAnchorLabel(anchor)"
+          data-virtual-affordance-role="button"
+          data-virtual-affordance-zone="editor-canvas.anchor"
+          data-virtual-affordance-actions="click"
           r="5.5"
           @pointerenter="setHoveredPointAnchorNode(anchor.nodeId)"
           @pointerleave="clearHoveredPointAnchorNode(anchor.nodeId)"
@@ -346,14 +391,47 @@
         @click.stop
         @wheel.stop
       >
-        <button type="button" class="editor-canvas__zoom-button" :aria-label="t('canvasZoom.zoomOut')" :title="t('canvasZoom.zoomOut')" @click.stop="handleZoomOut">
+        <button
+          type="button"
+          class="editor-canvas__zoom-button"
+          :aria-label="t('canvasZoom.zoomOut')"
+          :title="t('canvasZoom.zoomOut')"
+          data-virtual-affordance-id="editor.canvas.zoom.out"
+          :data-virtual-affordance-label="t('canvasZoom.zoomOut')"
+          data-virtual-affordance-role="button"
+          data-virtual-affordance-zone="editor-canvas.toolbar"
+          data-virtual-affordance-actions="click"
+          @click.stop="handleZoomOut"
+        >
           <ElIcon aria-hidden="true"><Minus /></ElIcon>
         </button>
         <span class="editor-canvas__zoom-label" aria-live="polite">{{ zoomPercentLabel }}</span>
-        <button type="button" class="editor-canvas__zoom-button" :aria-label="t('canvasZoom.zoomIn')" :title="t('canvasZoom.zoomIn')" @click.stop="handleZoomIn">
+        <button
+          type="button"
+          class="editor-canvas__zoom-button"
+          :aria-label="t('canvasZoom.zoomIn')"
+          :title="t('canvasZoom.zoomIn')"
+          data-virtual-affordance-id="editor.canvas.zoom.in"
+          :data-virtual-affordance-label="t('canvasZoom.zoomIn')"
+          data-virtual-affordance-role="button"
+          data-virtual-affordance-zone="editor-canvas.toolbar"
+          data-virtual-affordance-actions="click"
+          @click.stop="handleZoomIn"
+        >
           <ElIcon aria-hidden="true"><Plus /></ElIcon>
         </button>
-        <button type="button" class="editor-canvas__zoom-button" :aria-label="t('canvasZoom.reset')" :title="t('canvasZoom.reset')" @click.stop="handleZoomReset">
+        <button
+          type="button"
+          class="editor-canvas__zoom-button"
+          :aria-label="t('canvasZoom.reset')"
+          :title="t('canvasZoom.reset')"
+          data-virtual-affordance-id="editor.canvas.zoom.reset"
+          :data-virtual-affordance-label="t('canvasZoom.reset')"
+          data-virtual-affordance-role="button"
+          data-virtual-affordance-zone="editor-canvas.toolbar"
+          data-virtual-affordance-actions="click"
+          @click.stop="handleZoomReset"
+        >
           <ElIcon aria-hidden="true"><RefreshLeft /></ElIcon>
         </button>
       </div>
@@ -923,6 +1001,40 @@ const zoomPercentLabel = computed(() => buildZoomPercentLabel(viewport.viewport.
 const stateTypeOptions = STATE_FIELD_TYPE_OPTIONS;
 const nodeStyle = buildNodeTransformStyle;
 const nodeCardSizeStyle = buildNodeCardSizeStyle;
+
+function resolveCanvasVirtualNodeLabel(nodeId: string, node: GraphNode) {
+  return `节点：${node.name || nodeId}`;
+}
+
+function resolveCanvasVirtualEdgeLabel(edge: ProjectedCanvasEdge) {
+  const sourceLabel = props.document.nodes[edge.source]?.name || edge.source;
+  const targetLabel = props.document.nodes[edge.target]?.name || edge.target;
+  if (edge.kind === "data") {
+    const stateName = edge.state ? props.document.state_schema[edge.state]?.name || edge.state : "状态";
+    return `状态连线：${sourceLabel} 到 ${targetLabel}，${stateName}`;
+  }
+  if (edge.kind === "route") {
+    return `分支连线：${sourceLabel} 到 ${targetLabel}，${edge.branch || "默认分支"}`;
+  }
+  return `流程连线：${sourceLabel} 到 ${targetLabel}`;
+}
+
+function resolveCanvasVirtualAnchorLabel(anchor: ProjectedCanvasAnchor) {
+  const nodeName = props.document.nodes[anchor.nodeId]?.name || anchor.nodeId;
+  if (anchor.kind === "flow-in") {
+    return `连接点：${nodeName} 流程输入`;
+  }
+  if (anchor.kind === "flow-out") {
+    return `连接点：${nodeName} 流程输出`;
+  }
+  if (anchor.kind === "route-out") {
+    return `连接点：${nodeName} 分支 ${anchor.branch || "默认"}`;
+  }
+  const stateName = anchor.stateKey ? props.document.state_schema[anchor.stateKey]?.name || anchor.stateKey : "状态";
+  return anchor.kind === "state-in"
+    ? `连接点：${nodeName} 状态输入 ${stateName}`
+    : `连接点：${nodeName} 状态输出 ${stateName}`;
+}
 
 watch(
   () => ({

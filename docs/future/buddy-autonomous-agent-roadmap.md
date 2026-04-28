@@ -753,7 +753,7 @@ LLM
 after_llm.py
   -> 校验命令、目标和权限
   -> 调用 TooGraph Virtual Operator Runtime 执行
-  -> 返回 ok、next_page_path、operation journal 和 cursor_session_id
+  -> 返回 ok、operation journal、cursor_session_id 和结构化错误
 
 Virtual Operator Runtime
   -> 解析 affordance
@@ -762,7 +762,7 @@ Virtual Operator Runtime
   -> 写入 operation journal、activity_events、必要的 diff / revision / undo 线索
 ```
 
-`after_llm.py` 是单次 Skill 调用的执行收口，但不拥有虚拟鼠标动画、DOM layout 计算、伙伴形象追随、用户接管或页面会话状态。虚拟鼠标移动属于 TooGraph 应用运行时和前端 Virtual Input Driver；Skill 只提交受控执行请求并接收结果。
+`after_llm.py` 是单次 Skill 调用的执行收口，但不拥有虚拟鼠标动画、DOM layout 计算、伙伴形象追随、用户接管、页面路径推断或页面会话状态。虚拟鼠标移动属于 TooGraph 应用运行时和前端 Virtual Input Driver；Skill 只提交受控执行请求并接收结果。操作后的页面状态由下一轮运行时页面操作书重新采集，不作为 Skill 的 `next_page_path` state 输出。
 
 虚拟鼠标是否回收由操作会话决定，而不是每个底层动作自动决定。单步页签切换可以在执行后飞回伙伴头顶；连续图编辑应保持同一个 `cursor_session_id`，等子图或操作链完成后再统一回收。
 
