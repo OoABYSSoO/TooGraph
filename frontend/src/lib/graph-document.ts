@@ -232,7 +232,7 @@ function buildNextMaterializedVirtualStateField(document: GraphPayload | GraphDo
   };
 }
 
-function bindMaterializedStateToSourceOutput(node: GraphNode | undefined, stateKey: string) {
+function bindStateToSourceOutput(node: GraphNode | undefined, stateKey: string) {
   if (!node) {
     return;
   }
@@ -790,15 +790,22 @@ export function connectStateBindingInDocument<T extends GraphPayload | GraphDocu
 
   const nextDocument = cloneGraphDocument(document);
   let resolvedSourceStateKey = sourceStateKey;
+  const nextTargetNode = nextDocument.nodes[targetNodeId];
   if (isVirtualAnyOutputStateKey(sourceStateKey)) {
-    const materializedState = buildNextMaterializedVirtualStateField(nextDocument);
-    nextDocument.state_schema[materializedState.key] = materializedState.definition;
-    rememberMaterializedStateKeyIndex(nextDocument, materializedState.key);
-    bindMaterializedStateToSourceOutput(nextDocument.nodes[sourceNodeId], materializedState.key);
-    resolvedSourceStateKey = materializedState.key;
+    if (isCreateAgentInputStateKey(targetStateKey) || isVirtualAnyInputStateKey(targetStateKey)) {
+      const materializedState = buildNextMaterializedVirtualStateField(nextDocument);
+      nextDocument.state_schema[materializedState.key] = materializedState.definition;
+      rememberMaterializedStateKeyIndex(nextDocument, materializedState.key);
+      resolvedSourceStateKey = materializedState.key;
+    } else {
+      if (!nextTargetNode.reads.some((binding) => binding.state === targetStateKey)) {
+        return document;
+      }
+      resolvedSourceStateKey = targetStateKey;
+    }
+    bindStateToSourceOutput(nextDocument.nodes[sourceNodeId], resolvedSourceStateKey);
   }
 
-  const nextTargetNode = nextDocument.nodes[targetNodeId];
   if (isCreateAgentInputStateKey(targetStateKey)) {
     if (nextTargetNode.kind !== "agent") {
       return document;

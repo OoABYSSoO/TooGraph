@@ -908,7 +908,7 @@ test("connectStateBindingInDocument materializes a virtual output before connect
   }
 });
 
-test("connectStateBindingInDocument materializes an empty input virtual output into a selected concrete input binding", () => {
+test("connectStateBindingInDocument adopts a selected concrete input binding for an empty input virtual output", () => {
   const document: GraphPayload = {
     graph_id: null,
     name: "Virtual input output to concrete input graph",
@@ -965,14 +965,15 @@ test("connectStateBindingInDocument materializes an empty input virtual output i
     "third",
   );
 
-  assert.deepEqual(nextDocument.nodes.empty_input.writes, [{ state: "state_5", mode: "replace" }]);
+  assert.deepEqual(nextDocument.nodes.empty_input.writes, [{ state: "third", mode: "replace" }]);
   assert.deepEqual(nextDocument.nodes.multi_input_agent.reads, [
     { state: "first", required: true },
     { state: "second", required: true },
-    { state: "state_5", required: true },
+    { state: "third", required: true },
     { state: "fourth", required: true },
   ]);
-  assert.equal(nextDocument.state_schema.state_5?.name, "state_5");
+  assert.equal(nextDocument.state_schema.state_5, undefined);
+  assert.equal(nextDocument.metadata.graphiteui_state_key_counter, 4);
   assert.deepEqual(nextDocument.edges, [{ source: "empty_input", target: "multi_input_agent" }]);
   assert.deepEqual(document.nodes.empty_input.writes, []);
   assert.deepEqual(document.nodes.multi_input_agent.reads.map((binding) => binding.state), ["first", "second", "third", "fourth"]);
