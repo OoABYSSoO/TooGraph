@@ -914,8 +914,13 @@ test("NodeCard renders output previews through a rich content presenter while ke
   const outputSection = outputSectionMatch[0];
 
   assert.match(componentSource, /import \{ resolveOutputPreviewContent \} from "\.\/outputPreviewContentModel";/);
+  assert.match(componentSource, /from "\.\/outputConfigModel";/);
+  assert.match(componentSource, /const outputDisplayModeOptions = OUTPUT_DISPLAY_MODE_OPTIONS;/);
+  assert.match(componentSource, /const outputPersistFormatOptions = OUTPUT_PERSIST_FORMAT_OPTIONS;/);
   assert.match(componentSource, /const outputPreviewContent = computed\(/);
-  assert.match(componentSource, /function isOutputDisplayModeActive[\s\S]*view\.value\.body\.kind === "output" && view\.value\.body\.displayMode === displayMode/);
+  assert.match(componentSource, /resolveOutputDisplayModeActive\(view\.value\.body\.kind === "output" \? view\.value\.body\.displayMode : null, displayMode\)/);
+  assert.match(componentSource, /resolveOutputPersistFormatActive\(props\.node\.kind === "output" \? props\.node\.config\.persistFormat : null, persistFormat\)/);
+  assert.match(componentSource, /resolveOutputFileNameTemplatePatch\(value\)/);
   assert.match(outputSection, /node-card__preview--markdown/);
   assert.match(outputSection, /v-html="outputPreviewContent\.html"/);
   assert.match(outputSection, /node-card__preview--json/);
