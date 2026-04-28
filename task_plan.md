@@ -1,7 +1,7 @@
-# Task Plan: Repository Cleanup Execution Round 9
+# Task Plan: Repository Cleanup Execution Round 10
 
 ## Goal
-Continue conservative `NodeCard.vue` cleanup by moving output-node advanced configuration options, labels, and patch helpers into a dedicated model while preserving output configuration behavior.
+Continue conservative `NodeCard.vue` cleanup by moving condition-rule draft and patch helpers into `conditionRuleEditorModel.ts` while preserving condition node behavior.
 
 ## Current Phase
 Complete
@@ -11,23 +11,23 @@ Complete
 ### Phase 1: Re-orientation
 - [x] Recover previous cleanup context.
 - [x] Confirm current git status.
-- [x] Inspect `NodeCard.vue` output advanced settings and related view-model label helpers.
+- [x] Inspect `NodeCard.vue` condition-rule draft handlers and the existing condition-rule model.
 - **Status:** completed
 
 ### Phase 2: Select Safe Refactor Slice
-- [x] Select output display/persist option lists, active-state checks, file-name patching, and output label formatting.
-- [x] Keep Element Plus controls, popover behavior, and emits inside `NodeCard.vue`.
-- [x] Add a small `outputConfigModel.ts` boundary reused by `NodeCard.vue` and `nodeCardViewModel.ts`.
+- [x] Select condition-rule value draft normalization, operator patching, value patching, and disabled-state logic.
+- [x] Keep DOM event handling, blur behavior, lock guards, and emits inside `NodeCard.vue`.
+- [x] Reuse `conditionRuleEditorModel.ts`.
 - **Status:** completed
 
 ### Phase 3: Implement Cleanup
-- [x] Add failing tests for output configuration model helpers.
-- [x] Move output option, label, active-state, and patch helpers into `outputConfigModel.ts`.
-- [x] Update `NodeCard.vue` and `nodeCardViewModel.ts` to call the model helpers.
+- [x] Add failing tests for condition-rule draft and patch helpers.
+- [x] Move condition-rule helpers into `conditionRuleEditorModel.ts`.
+- [x] Update `NodeCard.vue` to call the model helpers.
 - **Status:** completed
 
 ### Phase 4: Verification
-- [x] Run focused output config, node-card view-model, and NodeCard structure tests.
+- [x] Run focused condition-rule and NodeCard structure tests.
 - [x] Run TypeScript and meaningful frontend checks.
 - [x] Run the frontend production build.
 - [x] Restart the dev environment with `npm run dev`.
@@ -42,21 +42,21 @@ Complete
 ## Progress Estimate
 | Scope | Estimate |
 |-------|----------|
-| Overall roadmap cleanup before this round | About 19% complete. |
-| P1 `NodeCard.vue` cleanup before this round | About 45% complete. |
-| Low-risk model extraction subset before this round | About 92% complete. |
+| Overall roadmap cleanup before this round | About 20% complete. |
+| P1 `NodeCard.vue` cleanup before this round | About 46% complete. |
+| Low-risk model extraction subset before this round | About 95% complete. |
 | Build/chunk warning remediation before this round | About 80% complete. |
-| Overall roadmap cleanup after this round | About 20% complete. |
-| P1 `NodeCard.vue` cleanup after this round | About 46% complete. |
-| Low-risk model extraction subset after this round | About 95% complete. |
+| Overall roadmap cleanup after this round | About 21% complete. |
+| P1 `NodeCard.vue` cleanup after this round | About 47% complete. |
+| Low-risk model extraction subset after this round | About 97% complete. |
 | Build/chunk warning remediation after this round | About 80% complete. |
 
 ## Decisions Made
 | Decision | Rationale |
 |----------|-----------|
-| Continue `NodeCard.vue` P1 cleanup | Output advanced settings still have pure configuration rules and duplicated labels. |
-| Add `outputConfigModel.ts` | Output config options and labels should be shared by the component and view-model instead of duplicated. |
-| Leave emits and controls in `NodeCard.vue` | The component should still own UI interaction and event dispatch. |
+| Continue `NodeCard.vue` P1 cleanup | Condition rule draft handling is still pure enough to move safely. |
+| Reuse `conditionRuleEditorModel.ts` | It already owns condition rule options and editor-state derivation. |
+| Leave events and emits in `NodeCard.vue` | The component still owns DOM inputs, blur handling, lock guards, and dispatch. |
 
 ## Notes
 - Do not commit runtime artifacts such as `backend/data/settings`, `.dev_*`, `dist`, or `.worktrees`.

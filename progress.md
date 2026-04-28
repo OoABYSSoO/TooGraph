@@ -59,6 +59,71 @@
 | Timestamp | Error | Attempt | Resolution |
 |-----------|-------|---------|------------|
 
+## Session: 2026-04-28 Round 10
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Ran planning session catchup and read the completed round 9 plan/progress/findings.
+  - Confirmed the worktree starts clean on `main...origin/main`.
+  - Inspected `NodeCard.vue` condition-rule draft handlers.
+  - Inspected `conditionRuleEditorModel.ts` and its focused tests.
+
+### Phase 2: Select Safe Refactor Slice
+- **Status:** completed
+- Actions taken:
+  - Selected condition-rule value draft normalization, operator patching, value patching, and disabled-state logic.
+  - Decided to keep DOM event handling, blur behavior, lock guards, and emits inside `NodeCard.vue`.
+
+### Phase 3: Implement Cleanup
+- **Status:** completed
+- Actions taken:
+  - Added failing tests for condition-rule draft and patch helpers before production code.
+  - Ran `conditionRuleEditorModel.test.ts` and verified it fails because the new helper exports are missing.
+  - Updated `NodeCard.structure.test.ts` before component changes and verified it fails because `NodeCard.vue` still normalizes the rule value inline.
+  - Added condition-rule value draft, operator patch, value patch, and disabled-state helpers to `conditionRuleEditorModel.ts`.
+  - Updated `NodeCard.vue` to call the condition-rule model helpers.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused condition-rule model and NodeCard structure tests after implementation.
+  - Ran `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters`.
+  - Ran the full frontend node test suite.
+  - Ran the frontend production build; no large chunk warning was emitted.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend returned HTTP 200 at `http://127.0.0.1:3477`.
+  - Confirmed the backend health route returned HTTP 200 at `http://127.0.0.1:8765/health`.
+
+### Phase 5: Commit and Push
+- **Status:** completed
+- Actions taken:
+  - Checked git status after restart; only source/test/planning files are modified.
+  - Confirmed no untracked runtime or build artifacts are present.
+  - Ran `git diff --check` with no whitespace errors.
+  - Committed the cleanup as `8ef7e23` with Chinese message `抽取条件规则草稿逻辑`.
+  - Pushed `main` to `origin/main`.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red test | `node --test frontend/src/editor/nodes/conditionRuleEditorModel.test.ts` before implementation | Fails because the new condition-rule helpers are missing | Failed with missing `isConditionRuleValueInputDisabled` export | Passed |
+| Red structure test | `node --test frontend/src/editor/nodes/NodeCard.structure.test.ts` before component implementation | Fails because `NodeCard.vue` still owns condition-rule draft normalization | Failed on missing `resolveConditionRuleValueDraft(ruleValue)` call | Passed |
+| Focused frontend tests | `node --test frontend/src/editor/nodes/conditionRuleEditorModel.test.ts frontend/src/editor/nodes/NodeCard.structure.test.ts` | Touched surface tests pass | 42 passed | Passed |
+| Unused symbol check | `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No unused-symbol diagnostics | Exit 0, no diagnostics | Passed |
+| Full frontend tests | `node --test $(rg --files frontend/src -g '*.test.ts') frontend/vite.config.structure.test.ts` | All frontend tests pass | 691 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without chunk warning regressions | Exit 0, no large chunk warning | Passed |
+| Dev restart | `npm run dev` | Services start and respond | Frontend 200, backend `/health` 200 | Passed |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Tenth cleanup implementation, verification, dev restart, commit, and push are complete. |
+| Where am I going? | Ready for final handoff or the next cleanup slice. |
+| What's the goal? | Continue reducing `NodeCard.vue` concentration without changing editor behavior. |
+| What have I learned? | Condition-rule draft normalization and patch decisions are pure model concerns and fit `conditionRuleEditorModel.ts`. |
+| What have I done? | Extracted condition-rule draft, operator patch, value patch, and disabled-state helpers; added focused tests; ran full frontend checks, built, and restarted the app. |
+
 ## Session: 2026-04-28 Round 9
 
 ### Phase 1: Re-orientation
