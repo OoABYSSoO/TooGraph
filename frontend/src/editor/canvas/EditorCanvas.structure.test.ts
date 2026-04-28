@@ -17,6 +17,14 @@ function readCanvasNodePresentationModelSource() {
   return readFileSync(resolve(currentDirectory, "canvasNodePresentationModel.ts"), "utf8").replace(/\r\n/g, "\n");
 }
 
+function readCanvasDataEdgeStateModelSource() {
+  return readFileSync(resolve(currentDirectory, "canvasDataEdgeStateModel.ts"), "utf8").replace(/\r\n/g, "\n");
+}
+
+function readStateEditorModelSource() {
+  return readFileSync(resolve(currentDirectory, "../nodes/stateEditorModel.ts"), "utf8").replace(/\r\n/g, "\n");
+}
+
 function firstCssBlock(selector: string) {
   const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const matches = Array.from(componentSource.matchAll(new RegExp(`${escapedSelector} \\{[\\s\\S]*?\\n\\}`, "g")));
@@ -581,14 +589,21 @@ test("EditorCanvas tints route edge outlines from the branch palette", () => {
 });
 
 test("EditorCanvas gives data edges the same two-step state editing entry pattern as state ports with disconnect actions", () => {
+  const canvasDataEdgeStateModelSource = readCanvasDataEdgeStateModelSource();
+  const stateEditorModelSource = readStateEditorModelSource();
+
   assert.match(componentSource, /import StateEditorPopover from "@\/editor\/nodes\/StateEditorPopover\.vue";/);
+  assert.match(componentSource, /import \{[\s\S]*buildDataEdgeStateConfirmFromEdge,[\s\S]*buildDataEdgeStateEditorFromConfirm,[\s\S]*buildDataEdgeStateEditorFromRequest,[\s\S]*buildFloatingCanvasPointStyle,[\s\S]*isActiveDataEdge,[\s\S]*isDataEdgeStateInteractionOpen as resolveDataEdgeStateInteractionOpen,[\s\S]*type DataEdgeStateConfirmTarget,[\s\S]*type DataEdgeStateEditorTarget,[\s\S]*\} from "\.\/canvasDataEdgeStateModel";/);
+  assert.match(componentSource, /import \{[\s\S]*buildStateEditorDraftFromSchema,[\s\S]*resolveStateEditorUpdatePatch,[\s\S]*updateStateEditorDraftColor,[\s\S]*updateStateEditorDraftDescription,[\s\S]*updateStateEditorDraftName,[\s\S]*updateStateEditorDraftType,[\s\S]*\} from "@\/editor\/nodes\/stateEditorModel";/);
   assert.match(componentSource, /stateEditorRequest\?: \{ requestId: string; sourceNodeId: string; targetNodeId: string; stateKey: string; position: GraphPosition \} \| null;/);
-  assert.match(componentSource, /const activeDataEdgeStateConfirm = ref<\{/);
-  assert.match(componentSource, /const activeDataEdgeStateEditor = ref<\{/);
-  assert.match(componentSource, /mode: "edit" \| "create";/);
+  assert.match(componentSource, /const activeDataEdgeStateConfirm = ref<DataEdgeStateConfirmTarget \| null>\(null\);/);
+  assert.match(componentSource, /const activeDataEdgeStateEditor = ref<DataEdgeStateEditorTarget \| null>\(null\);/);
+  assert.match(canvasDataEdgeStateModelSource, /mode: "edit" \| "create";/);
   assert.match(componentSource, /const lastOpenedStateEditorRequestId = ref<string \| null>\(null\);/);
   assert.match(componentSource, /const dataEdgeStateDraft = ref<StateFieldDraft \| null>\(null\);/);
   assert.match(componentSource, /const dataEdgeStateError = ref<string \| null>\(null\);/);
+  assert.match(componentSource, /const dataEdgeStateConfirmStyle = computed\(\(\) => buildFloatingCanvasPointStyle\(activeDataEdgeStateConfirm\.value\)\);/);
+  assert.match(componentSource, /const dataEdgeStateEditorStyle = computed\(\(\) => buildFloatingCanvasPointStyle\(activeDataEdgeStateEditor\.value\)\);/);
   assert.match(componentSource, /const dataEdgeStateColorOptions = computed\(\(\) => resolveStateColorOptions\(dataEdgeStateDraft\.value\?\.definition\.color \?\? ""\)\);/);
   assert.match(componentSource, /const forceVisibleProjectedEdgeIds = computed\(\(\) => \{/);
   assert.match(componentSource, /forceVisibleEdgeIds: forceVisibleProjectedEdgeIds\.value/);
@@ -598,10 +613,21 @@ test("EditorCanvas gives data edges the same two-step state editing entry patter
   assert.match(componentSource, /function confirmCreatedDataEdgeStateEditor\(\)/);
   assert.match(componentSource, /function isCreatedDataEdgeStateEditorOpen\(\)/);
   assert.match(componentSource, /function syncDataEdgeStateDraft\(nextDraft: StateFieldDraft\)/);
+  assert.match(componentSource, /buildStateEditorDraftFromSchema\(activeDataEdgeStateConfirm\.value\.stateKey, props\.document\.state_schema\)/);
+  assert.match(componentSource, /buildStateEditorDraftFromSchema\(request\.stateKey, props\.document\.state_schema\)/);
+  assert.match(componentSource, /patch: resolveStateEditorUpdatePatch\(nextDraft, currentStateKey\)/);
+  assert.match(componentSource, /updateStateEditorDraftName\(dataEdgeStateDraft\.value, value\)/);
+  assert.match(componentSource, /updateStateEditorDraftDescription\(dataEdgeStateDraft\.value, value\)/);
+  assert.match(componentSource, /updateStateEditorDraftColor\(dataEdgeStateDraft\.value, value\)/);
+  assert.match(componentSource, /updateStateEditorDraftType\(dataEdgeStateDraft\.value, value\)/);
   assert.match(componentSource, /watch\(\s*\(\) => props\.stateEditorRequest,[\s\S]*openDataEdgeStateEditorFromRequest\(request\);/);
   assert.match(componentSource, /selectedEdgeId\.value = edge\.id;[\s\S]*dataEdgeStateConfirmTimeoutRef\.value = window\.setTimeout/);
-  assert.match(componentSource, /activeDataEdgeStateEditor\.value = \{[\s\S]*id: activeDataEdgeStateConfirm\.value\.id,[\s\S]*mode: "edit",/);
-  assert.match(componentSource, /activeDataEdgeStateEditor\.value = \{[\s\S]*id: buildDataEdgeId\(request\.sourceNodeId, request\.stateKey, request\.targetNodeId\),[\s\S]*mode: "create",/);
+  assert.match(componentSource, /const nextConfirm = buildDataEdgeStateConfirmFromEdge\(edge, point\);/);
+  assert.match(componentSource, /activeDataEdgeStateConfirm\.value = nextConfirm;/);
+  assert.match(componentSource, /activeDataEdgeStateEditor\.value = buildDataEdgeStateEditorFromConfirm\(activeDataEdgeStateConfirm\.value\);/);
+  assert.match(componentSource, /const nextEditor = buildDataEdgeStateEditorFromRequest\(request\);/);
+  assert.match(componentSource, /selectedEdgeId\.value = nextEditor\.id;/);
+  assert.match(componentSource, /activeDataEdgeStateEditor\.value = nextEditor;/);
   assert.match(componentSource, /if \(edge\.kind === "data"\) \{[\s\S]*startDataEdgeStateConfirm\(edge, event\);[\s\S]*return;/);
   assert.match(componentSource, /<div[\s\S]*v-if="activeDataEdgeStateConfirm"[\s\S]*class="editor-canvas__edge-state-confirm"/);
   assert.match(componentSource, /<div class="editor-canvas__confirm-hint editor-canvas__confirm-hint--state">\{\{ t\("nodeCard\.editStateQuestion"\) \}\}<\/div>/);
@@ -623,6 +649,18 @@ test("EditorCanvas gives data edges the same two-step state editing entry patter
   assert.match(componentSource, /v-if="shouldOfferDataEdgeFlowDisconnect\(\)"/);
   assert.match(componentSource, /@click\.stop="disconnectActiveDataEdgeStateReference"/);
   assert.match(componentSource, /@click\.stop="disconnectActiveDataEdgeFlow"/);
+  assert.match(canvasDataEdgeStateModelSource, /export function buildDataEdgeId/);
+  assert.match(canvasDataEdgeStateModelSource, /export function buildDataEdgeStateConfirmFromEdge/);
+  assert.match(canvasDataEdgeStateModelSource, /export function buildDataEdgeStateEditorFromConfirm/);
+  assert.match(canvasDataEdgeStateModelSource, /export function buildFloatingCanvasPointStyle/);
+  assert.match(canvasDataEdgeStateModelSource, /export function isDataEdgeStateInteractionOpen/);
+  assert.match(stateEditorModelSource, /export function buildStateEditorDraftFromSchema/);
+  assert.match(stateEditorModelSource, /export function resolveStateEditorUpdatePatch/);
+  assert.match(componentSource, /resolveDataEdgeStateInteractionOpen\(edge, \{[\s\S]*confirm: activeDataEdgeStateConfirm\.value,[\s\S]*editor: activeDataEdgeStateEditor\.value,[\s\S]*\}\)/);
+  assert.doesNotMatch(componentSource, /function buildStateDraftFromSchema/);
+  assert.doesNotMatch(componentSource, /function buildDataEdgeId/);
+  assert.doesNotMatch(componentSource, /function isActiveDataEdge/);
+  assert.doesNotMatch(componentSource, /defaultValueForStateType/);
   assert.match(componentSource, /function shouldOfferDataEdgeFlowDisconnect\(\)/);
   assert.match(componentSource, /canDisconnectSequenceEdgeForDataConnection\(props\.document, editor\.source, editor\.target\)/);
   assert.doesNotMatch(componentSource, /sourceNode\?\.kind === "agent"/);

@@ -435,12 +435,28 @@ import {
   type MeasuredNodeSize,
 } from "./canvasNodePresentationModel";
 import {
-  defaultValueForStateType,
+  buildDataEdgeStateConfirmFromEdge,
+  buildDataEdgeStateEditorFromConfirm,
+  buildDataEdgeStateEditorFromRequest,
+  buildFloatingCanvasPointStyle,
+  isActiveDataEdge,
+  isDataEdgeStateInteractionOpen as resolveDataEdgeStateInteractionOpen,
+  type DataEdgeStateConfirmTarget,
+  type DataEdgeStateEditorTarget,
+} from "./canvasDataEdgeStateModel";
+import {
   resolveStateColorOptions,
   STATE_FIELD_TYPE_OPTIONS,
   type StateFieldDraft,
-  type StateFieldType,
 } from "@/editor/workspace/statePanelFields";
+import {
+  buildStateEditorDraftFromSchema,
+  resolveStateEditorUpdatePatch,
+  updateStateEditorDraftColor,
+  updateStateEditorDraftDescription,
+  updateStateEditorDraftName,
+  updateStateEditorDraftType,
+} from "@/editor/nodes/stateEditorModel";
 import {
   canCompleteGraphConnection,
   canDisconnectSequenceEdgeForDataConnection,
@@ -624,24 +640,9 @@ const activeFlowEdgeDeleteConfirm = ref<{
   y: number;
 } | null>(null);
 const flowEdgeDeleteConfirmTimeoutRef = ref<number | null>(null);
-const activeDataEdgeStateConfirm = ref<{
-  id: string;
-  source: string;
-  target: string;
-  stateKey: string;
-  x: number;
-  y: number;
-} | null>(null);
+const activeDataEdgeStateConfirm = ref<DataEdgeStateConfirmTarget | null>(null);
 const dataEdgeStateConfirmTimeoutRef = ref<number | null>(null);
-const activeDataEdgeStateEditor = ref<{
-  id: string;
-  source: string;
-  target: string;
-  stateKey: string;
-  mode: "edit" | "create";
-  x: number;
-  y: number;
-} | null>(null);
+const activeDataEdgeStateEditor = ref<DataEdgeStateEditorTarget | null>(null);
 const lastOpenedStateEditorRequestId = ref<string | null>(null);
 const dataEdgeStateDraft = ref<StateFieldDraft | null>(null);
 const dataEdgeStateError = ref<string | null>(null);
@@ -1071,26 +1072,8 @@ const flowEdgeDeleteConfirmStyle = computed(() => {
     top: `${activeFlowEdgeDeleteConfirm.value.y}px`,
   };
 });
-const dataEdgeStateConfirmStyle = computed(() => {
-  if (!activeDataEdgeStateConfirm.value) {
-    return undefined;
-  }
-
-  return {
-    left: `${activeDataEdgeStateConfirm.value.x}px`,
-    top: `${activeDataEdgeStateConfirm.value.y}px`,
-  };
-});
-const dataEdgeStateEditorStyle = computed(() => {
-  if (!activeDataEdgeStateEditor.value) {
-    return undefined;
-  }
-
-  return {
-    left: `${activeDataEdgeStateEditor.value.x}px`,
-    top: `${activeDataEdgeStateEditor.value.y}px`,
-  };
-});
+const dataEdgeStateConfirmStyle = computed(() => buildFloatingCanvasPointStyle(activeDataEdgeStateConfirm.value));
+const dataEdgeStateEditorStyle = computed(() => buildFloatingCanvasPointStyle(activeDataEdgeStateEditor.value));
 const dataEdgeStateColorOptions = computed(() => resolveStateColorOptions(dataEdgeStateDraft.value?.definition.color ?? ""));
 
 watch(
@@ -1109,20 +1092,11 @@ function isFlowEdgeDeleteConfirmOpen(edgeId: string) {
   return activeFlowEdgeDeleteConfirm.value?.id === edgeId;
 }
 
-function isActiveDataEdge(edge: Pick<ProjectedCanvasEdge, "kind" | "source" | "target" | "state">, dataState: {
-  source: string;
-  target: string;
-  stateKey: string;
-} | null) {
-  if (!dataState) {
-    return false;
-  }
-
-  return edge.kind === "data" && edge.source === dataState.source && edge.target === dataState.target && edge.state === dataState.stateKey;
-}
-
 function isDataEdgeStateInteractionOpen(edge: Pick<ProjectedCanvasEdge, "kind" | "source" | "target" | "state">) {
-  return isActiveDataEdge(edge, activeDataEdgeStateConfirm.value) || isActiveDataEdge(edge, activeDataEdgeStateEditor.value);
+  return resolveDataEdgeStateInteractionOpen(edge, {
+    confirm: activeDataEdgeStateConfirm.value,
+    editor: activeDataEdgeStateEditor.value,
+  });
 }
 
 function isProjectedEdgeVisible(edge: ProjectedCanvasEdge) {
@@ -1361,20 +1335,14 @@ function confirmFlowEdgeDelete() {
 }
 
 function startDataEdgeStateConfirm(edge: ProjectedCanvasEdge, event: PointerEvent) {
-  if (edge.kind !== "data" || !edge.state) {
+  const point = resolveCanvasPoint(event);
+  const nextConfirm = buildDataEdgeStateConfirmFromEdge(edge, point);
+  if (!nextConfirm) {
     return;
   }
 
   clearDataEdgeStateConfirmTimeout();
-  const point = resolveCanvasPoint(event);
-  activeDataEdgeStateConfirm.value = {
-    id: edge.id,
-    source: edge.source,
-    target: edge.target,
-    stateKey: edge.state,
-    x: point.x,
-    y: point.y,
-  };
+  activeDataEdgeStateConfirm.value = nextConfirm;
   selectedEdgeId.value = edge.id;
   dataEdgeStateConfirmTimeoutRef.value = window.setTimeout(() => {
     dataEdgeStateConfirmTimeoutRef.value = null;
@@ -1382,24 +1350,6 @@ function startDataEdgeStateConfirm(edge: ProjectedCanvasEdge, event: PointerEven
       clearDataEdgeStateConfirmState();
     }
   }, 2000);
-}
-
-function buildStateDraftFromSchema(stateKey: string): StateFieldDraft | null {
-  const definition = props.document.state_schema[stateKey];
-  if (!definition) {
-    return null;
-  }
-
-  return {
-    key: stateKey,
-    definition: {
-      name: definition.name,
-      description: definition.description,
-      type: definition.type,
-      value: definition.value,
-      color: definition.color,
-    },
-  };
 }
 
 function openDataEdgeStateEditor() {
@@ -1410,21 +1360,13 @@ function openDataEdgeStateEditor() {
     return;
   }
 
-  const nextDraft = buildStateDraftFromSchema(activeDataEdgeStateConfirm.value.stateKey);
+  const nextDraft = buildStateEditorDraftFromSchema(activeDataEdgeStateConfirm.value.stateKey, props.document.state_schema);
   if (!nextDraft) {
     clearDataEdgeStateConfirmState();
     return;
   }
 
-  activeDataEdgeStateEditor.value = {
-    id: activeDataEdgeStateConfirm.value.id,
-    source: activeDataEdgeStateConfirm.value.source,
-    target: activeDataEdgeStateConfirm.value.target,
-    stateKey: activeDataEdgeStateConfirm.value.stateKey,
-    mode: "edit",
-    x: activeDataEdgeStateConfirm.value.x,
-    y: activeDataEdgeStateConfirm.value.y,
-  };
+  activeDataEdgeStateEditor.value = buildDataEdgeStateEditorFromConfirm(activeDataEdgeStateConfirm.value);
   dataEdgeStateDraft.value = nextDraft;
   dataEdgeStateError.value = null;
   clearDataEdgeStateConfirmState();
@@ -1435,23 +1377,16 @@ function openDataEdgeStateEditorFromRequest(request: NonNullable<typeof props.st
     return;
   }
 
-  const nextDraft = buildStateDraftFromSchema(request.stateKey);
+  const nextDraft = buildStateEditorDraftFromSchema(request.stateKey, props.document.state_schema);
   if (!nextDraft) {
     return;
   }
 
+  const nextEditor = buildDataEdgeStateEditorFromRequest(request);
   clearFlowEdgeDeleteConfirmState();
   clearDataEdgeStateConfirmState();
-  selectedEdgeId.value = buildDataEdgeId(request.sourceNodeId, request.stateKey, request.targetNodeId);
-  activeDataEdgeStateEditor.value = {
-    id: buildDataEdgeId(request.sourceNodeId, request.stateKey, request.targetNodeId),
-    source: request.sourceNodeId,
-    target: request.targetNodeId,
-    stateKey: request.stateKey,
-    mode: "create",
-    x: request.position.x,
-    y: request.position.y,
-  };
+  selectedEdgeId.value = nextEditor.id;
+  activeDataEdgeStateEditor.value = nextEditor;
   dataEdgeStateDraft.value = nextDraft;
   dataEdgeStateError.value = null;
 }
@@ -1462,10 +1397,6 @@ function confirmCreatedDataEdgeStateEditor() {
 
 function isCreatedDataEdgeStateEditorOpen() {
   return activeDataEdgeStateEditor.value?.mode === "create";
-}
-
-function buildDataEdgeId(sourceNodeId: string, stateKey: string, targetNodeId: string) {
-  return `data:${sourceNodeId}:${stateKey}->${targetNodeId}`;
 }
 
 function shouldOfferDataEdgeFlowDisconnect() {
@@ -1531,13 +1462,7 @@ function syncDataEdgeStateDraft(nextDraft: StateFieldDraft) {
 
   emit("update-state", {
     stateKey: currentStateKey,
-    patch: {
-      name: nextDraft.definition.name.trim() || currentStateKey,
-      description: nextDraft.definition.description,
-      type: nextDraft.definition.type,
-      value: nextDraft.definition.value,
-      color: nextDraft.definition.color,
-    },
+    patch: resolveStateEditorUpdatePatch(nextDraft, currentStateKey),
   });
 }
 
@@ -1548,13 +1473,7 @@ function handleDataEdgeStateEditorNameInput(value: string | number) {
   if (typeof value !== "string" || !dataEdgeStateDraft.value) {
     return;
   }
-  syncDataEdgeStateDraft({
-    ...dataEdgeStateDraft.value,
-    definition: {
-      ...dataEdgeStateDraft.value.definition,
-      name: value,
-    },
-  });
+  syncDataEdgeStateDraft(updateStateEditorDraftName(dataEdgeStateDraft.value, value));
 }
 
 function handleDataEdgeStateEditorDescriptionInput(value: string | number) {
@@ -1564,13 +1483,7 @@ function handleDataEdgeStateEditorDescriptionInput(value: string | number) {
   if (typeof value !== "string" || !dataEdgeStateDraft.value) {
     return;
   }
-  syncDataEdgeStateDraft({
-    ...dataEdgeStateDraft.value,
-    definition: {
-      ...dataEdgeStateDraft.value.definition,
-      description: value,
-    },
-  });
+  syncDataEdgeStateDraft(updateStateEditorDraftDescription(dataEdgeStateDraft.value, value));
 }
 
 function handleDataEdgeStateEditorColorInput(value: string | number) {
@@ -1580,13 +1493,7 @@ function handleDataEdgeStateEditorColorInput(value: string | number) {
   if (typeof value !== "string" || !dataEdgeStateDraft.value) {
     return;
   }
-  syncDataEdgeStateDraft({
-    ...dataEdgeStateDraft.value,
-    definition: {
-      ...dataEdgeStateDraft.value.definition,
-      color: value,
-    },
-  });
+  syncDataEdgeStateDraft(updateStateEditorDraftColor(dataEdgeStateDraft.value, value));
 }
 
 function handleDataEdgeStateEditorTypeValue(value: string | number | boolean | undefined) {
@@ -1596,14 +1503,7 @@ function handleDataEdgeStateEditorTypeValue(value: string | number | boolean | u
   if (typeof value !== "string" || !dataEdgeStateDraft.value) {
     return;
   }
-  syncDataEdgeStateDraft({
-    ...dataEdgeStateDraft.value,
-    definition: {
-      ...dataEdgeStateDraft.value.definition,
-      type: value,
-      value: defaultValueForStateType(value as StateFieldType),
-    },
-  });
+  syncDataEdgeStateDraft(updateStateEditorDraftType(dataEdgeStateDraft.value, value));
 }
 
 function handleMinimapCenterView(point: { worldX: number; worldY: number }) {
