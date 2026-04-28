@@ -12,12 +12,29 @@ test("router resets page scroll on route navigation while preserving browser bac
 });
 
 test("router exposes first-class management pages for presets and skills", () => {
-  assert.match(routerSource, /import PresetsPage from "@\/pages\/PresetsPage\.vue";/);
-  assert.match(routerSource, /import SkillsPage from "@\/pages\/SkillsPage\.vue";/);
-  assert.match(routerSource, /import ModelProvidersPage from "@\/pages\/ModelProvidersPage\.vue";/);
-  assert.match(routerSource, /import ModelLogsPage from "@\/pages\/ModelLogsPage\.vue";/);
+  assert.doesNotMatch(routerSource, /import \w+Page from "@\/pages\//);
+  assert.match(routerSource, /const PresetsPage = \(\) => import\("@\/pages\/PresetsPage\.vue"\);/);
+  assert.match(routerSource, /const SkillsPage = \(\) => import\("@\/pages\/SkillsPage\.vue"\);/);
+  assert.match(routerSource, /const ModelProvidersPage = \(\) => import\("@\/pages\/ModelProvidersPage\.vue"\);/);
+  assert.match(routerSource, /const ModelLogsPage = \(\) => import\("@\/pages\/ModelLogsPage\.vue"\);/);
   assert.match(routerSource, /\{ path: "\/presets", component: PresetsPage \}/);
   assert.match(routerSource, /\{ path: "\/skills", component: SkillsPage \}/);
   assert.match(routerSource, /\{ path: "\/models", component: ModelProvidersPage \}/);
   assert.match(routerSource, /\{ path: "\/model-logs", component: ModelLogsPage \}/);
+});
+
+test("router lazy-loads page components to keep the production entry chunk small", () => {
+  for (const pageName of [
+    "EditorPage",
+    "HomePage",
+    "ModelLogsPage",
+    "ModelProvidersPage",
+    "PresetsPage",
+    "RunDetailPage",
+    "RunsPage",
+    "SettingsPage",
+    "SkillsPage",
+  ]) {
+    assert.match(routerSource, new RegExp(`const ${pageName} = \\(\\) => import\\("@/pages/${pageName}\\.vue"\\);`));
+  }
 });

@@ -1,14 +1,14 @@
 import { createRouter, createWebHistory } from "vue-router";
 
-import EditorPage from "@/pages/EditorPage.vue";
-import HomePage from "@/pages/HomePage.vue";
-import ModelLogsPage from "@/pages/ModelLogsPage.vue";
-import ModelProvidersPage from "@/pages/ModelProvidersPage.vue";
-import PresetsPage from "@/pages/PresetsPage.vue";
-import RunDetailPage from "@/pages/RunDetailPage.vue";
-import RunsPage from "@/pages/RunsPage.vue";
-import SettingsPage from "@/pages/SettingsPage.vue";
-import SkillsPage from "@/pages/SkillsPage.vue";
+const EditorPage = () => import("@/pages/EditorPage.vue");
+const HomePage = () => import("@/pages/HomePage.vue");
+const ModelLogsPage = () => import("@/pages/ModelLogsPage.vue");
+const ModelProvidersPage = () => import("@/pages/ModelProvidersPage.vue");
+const PresetsPage = () => import("@/pages/PresetsPage.vue");
+const RunDetailPage = () => import("@/pages/RunDetailPage.vue");
+const RunsPage = () => import("@/pages/RunsPage.vue");
+const SettingsPage = () => import("@/pages/SettingsPage.vue");
+const SkillsPage = () => import("@/pages/SkillsPage.vue");
 
 export const router = createRouter({
   history: createWebHistory(),
