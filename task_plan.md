@@ -4,7 +4,7 @@
 Continue conservative `NodeCard.vue` cleanup by moving agent runtime input normalization into `agentConfigModel.ts` while preserving node behavior.
 
 ## Current Phase
-Phase 5 in progress
+Complete
 
 ## Phases
 
@@ -35,9 +35,9 @@ Phase 5 in progress
 
 ### Phase 5: Commit and Push
 - [x] Review diff for unrelated/runtime artifacts.
-- [ ] Commit with a Chinese commit message.
-- [ ] Push the branch.
-- **Status:** in_progress
+- [x] Commit with a Chinese commit message.
+- [x] Push the branch.
+- **Status:** completed
 
 ## Progress Estimate
 | Scope | Estimate |
