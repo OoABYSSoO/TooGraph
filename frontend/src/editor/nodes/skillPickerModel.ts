@@ -6,6 +6,10 @@ export type AttachedSkillBadge = {
   description: string;
 };
 
+export type AgentSkillPatch = {
+  skills: string[];
+};
+
 export function listAttachableSkillDefinitions(skillDefinitions: SkillDefinition[], attachedSkillKeys: string[]) {
   const attached = new Set(attachedSkillKeys);
   return skillDefinitions.filter((definition) => !attached.has(definition.skillKey) && isAgentAttachableSkillDefinition(definition));
@@ -33,4 +37,20 @@ export function resolveAttachedSkillBadges(attachedSkillKeys: string[], skillDef
       description: definition?.description ?? "",
     };
   });
+}
+
+export function resolveAttachAgentSkillPatch(attachedSkillKeys: string[], skillKey: string): AgentSkillPatch | null {
+  if (attachedSkillKeys.includes(skillKey)) {
+    return null;
+  }
+
+  return { skills: [...attachedSkillKeys, skillKey] };
+}
+
+export function resolveRemoveAgentSkillPatch(attachedSkillKeys: string[], skillKey: string): AgentSkillPatch | null {
+  if (!attachedSkillKeys.includes(skillKey)) {
+    return null;
+  }
+
+  return { skills: attachedSkillKeys.filter((candidateKey) => candidateKey !== skillKey) };
 }
