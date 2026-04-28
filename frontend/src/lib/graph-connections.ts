@@ -84,7 +84,7 @@ export function canConnectStateBinding(
       return targetNode.kind === "agent";
     }
     if (isVirtualAnyInputStateKey(targetStateKey)) {
-      return targetNode.reads.length === 0;
+      return targetNode.kind === "agent" || targetNode.reads.length === 0;
     }
     return targetNode.reads.some((binding) => binding.state === targetStateKey);
   }
@@ -114,7 +114,7 @@ export function canConnectStateBinding(
   }
 
   if (isVirtualAnyInputStateKey(targetStateKey)) {
-    return targetNode.reads.length === 0;
+    return targetNode.kind === "agent" ? !targetNode.reads.some((binding) => binding.state === sourceStateKey) : targetNode.reads.length === 0;
   }
 
   if (!targetNode.reads.some((binding) => binding.state === targetStateKey)) {

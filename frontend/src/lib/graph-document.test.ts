@@ -788,6 +788,74 @@ test("connectStateBindingInDocument appends source state through a transient new
   assert.equal(nextConditionDocument, document);
 });
 
+test("connectStateBindingInDocument appends source state through an agent virtual input", () => {
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Agent virtual input append graph",
+    state_schema: {
+      question: { name: "question", description: "", type: "text", value: "", color: "#d97706" },
+      answer: { name: "answer", description: "", type: "text", value: "", color: "#2563eb" },
+    },
+    nodes: {
+      input_question: {
+        kind: "input",
+        name: "input_question",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [{ state: "question", mode: "replace" }],
+        config: { value: "" },
+      },
+      input_answer: {
+        kind: "input",
+        name: "input_answer",
+        description: "",
+        ui: { position: { x: 0, y: 120 } },
+        reads: [],
+        writes: [{ state: "answer", mode: "replace" }],
+        config: { value: "" },
+      },
+      answer_helper: {
+        kind: "agent",
+        name: "answer_helper",
+        description: "",
+        ui: { position: { x: 100, y: 0 } },
+        reads: [{ state: "question", required: true }],
+        writes: [],
+        config: {
+          skills: [],
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+    },
+    edges: [{ source: "input_question", target: "answer_helper" }],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const nextDocument = graphDocument.connectStateBindingInDocument(
+    document,
+    "input_answer",
+    "answer",
+    "answer_helper",
+    VIRTUAL_ANY_INPUT_STATE_KEY,
+  );
+
+  assert.deepEqual(nextDocument.nodes.answer_helper.reads, [
+    { state: "question", required: true },
+    { state: "answer", required: true },
+  ]);
+  assert.deepEqual(nextDocument.edges, [
+    { source: "input_question", target: "answer_helper" },
+    { source: "input_answer", target: "answer_helper" },
+  ]);
+  assert.deepEqual(document.nodes.answer_helper.reads, [{ state: "question", required: true }]);
+});
+
 test("connectStateBindingInDocument materializes a virtual output before connecting existing targets", () => {
   const document: GraphPayload = {
     graph_id: null,

@@ -344,6 +344,47 @@ test("canCompleteGraphConnection allows reverse virtual input drags to target co
   );
 });
 
+test("canCompleteGraphConnection lets an agent virtual input append a second concrete state", () => {
+  const graphWithSecondInputSource: GraphPayload = {
+    ...document,
+    state_schema: {
+      question: { name: "question", description: "", type: "text", value: "", color: "#d97706" },
+      answer: { name: "answer", description: "", type: "text", value: "", color: "#2563eb" },
+    },
+    nodes: {
+      ...document.nodes,
+      input_answer: {
+        kind: "input",
+        name: "input_answer",
+        description: "",
+        ui: { position: { x: 0, y: 120 } },
+        reads: [],
+        writes: [{ state: "answer", mode: "replace" }],
+        config: { value: "" },
+      },
+    },
+    edges: [{ source: "input_question", target: "answer_helper" }],
+    conditional_edges: [],
+  };
+
+  assert.equal(
+    canCompleteGraphConnection(
+      graphWithSecondInputSource,
+      {
+        sourceNodeId: "answer_helper",
+        sourceKind: "state-in",
+        sourceStateKey: VIRTUAL_ANY_INPUT_STATE_KEY,
+      },
+      {
+        nodeId: "input_answer",
+        kind: "state-out",
+        stateKey: "answer",
+      },
+    ),
+    true,
+  );
+});
+
 test("canCompleteGraphConnection allows a concrete state input source to be replaced", () => {
   const replacementGraph: GraphPayload = {
     ...document,

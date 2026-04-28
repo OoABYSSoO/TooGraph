@@ -817,7 +817,10 @@ export function connectStateBindingInDocument<T extends GraphPayload | GraphDocu
   }
 
   if (isVirtualAnyInputStateKey(targetStateKey)) {
-    nextTargetNode.reads = [{ state: resolvedSourceStateKey, required: true }];
+    nextTargetNode.reads =
+      nextTargetNode.kind === "agent" && nextTargetNode.reads.length > 0
+        ? [...nextTargetNode.reads, { state: resolvedSourceStateKey, required: true }]
+        : [{ state: resolvedSourceStateKey, required: true }];
     if (nextTargetNode.kind === "condition") {
       nextTargetNode.config.rule.source = resolvedSourceStateKey;
     }
