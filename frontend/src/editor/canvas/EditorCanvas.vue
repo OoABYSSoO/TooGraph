@@ -257,6 +257,7 @@
           @update-input-state="emit('update-input-state', $event)"
           @update-state="emit('update-state', $event)"
           @remove-port-state="emit('remove-port-state', $event)"
+          @reorder-port-state="emit('reorder-port-state', $event)"
           @update-agent-config="emit('update-agent-config', $event)"
           @toggle-agent-breakpoint="emit('toggle-agent-breakpoint', $event)"
           @update-agent-breakpoint-timing="emit('update-agent-breakpoint-timing', $event)"
@@ -495,6 +496,7 @@ const emit = defineEmits<{
   (event: "update-input-state", payload: { stateKey: string; patch: Partial<StateDefinition> }): void;
   (event: "update-state", payload: { stateKey: string; patch: Partial<StateDefinition> }): void;
   (event: "remove-port-state", payload: { nodeId: string; side: "input" | "output"; stateKey: string }): void;
+  (event: "reorder-port-state", payload: { nodeId: string; side: "input" | "output"; stateKey: string; targetStateKey: string }): void;
   (event: "update-agent-config", payload: { nodeId: string; patch: Partial<AgentNode["config"]> }): void;
   (event: "toggle-agent-breakpoint", payload: { nodeId: string; enabled: boolean }): void;
   (event: "update-agent-breakpoint-timing", payload: { nodeId: string; timing: "before" | "after" }): void;

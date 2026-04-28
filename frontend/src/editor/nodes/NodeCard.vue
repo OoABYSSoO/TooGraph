@@ -565,14 +565,19 @@
                     'node-card__port-pill--removable': !port.virtual,
                     'node-card__port-pill--revealed': isStateEditorPillRevealed(`agent-input:${port.key}`),
                     'node-card__port-pill--confirm': isStateEditorConfirmOpen(`agent-input:${port.key}`),
+                    'node-card__port-pill--reordering': isPortReordering('input', port.key),
+                    'node-card__port-pill--reorder-target': isPortReorderTarget('input', port.key),
                   }"
                   :style="{ '--node-card-port-accent': port.stateColor }"
                   data-state-editor-trigger="true"
                   data-anchor-hitarea="true"
+                  :data-port-reorder-node-id="nodeId"
+                  data-port-reorder-side="input"
+                  :data-port-reorder-state-key="port.key"
                   @pointerenter="handleStateEditorPillPointerEnter(`agent-input:${port.key}`)"
                   @pointerleave="handleStateEditorPillPointerLeave(`agent-input:${port.key}`)"
-                  @pointerdown.stop
-                  @click.stop="!port.virtual && handleStateEditorActionClick(`agent-input:${port.key}`, port.key)"
+                  @pointerdown.stop="handlePortReorderPointerDown('input', port.key, $event)"
+                  @click.stop="handlePortStatePillClick(`agent-input:${port.key}`, port.key)"
                 >
                   <span
                     class="node-card__port-pill-anchor-slot node-card__port-pill-anchor-slot--leading"
@@ -763,13 +768,18 @@
                     'node-card__port-pill--removable': !port.virtual,
                     'node-card__port-pill--revealed': isStateEditorPillRevealed(`agent-output:${port.key}`),
                     'node-card__port-pill--confirm': isStateEditorConfirmOpen(`agent-output:${port.key}`),
+                    'node-card__port-pill--reordering': isPortReordering('output', port.key),
+                    'node-card__port-pill--reorder-target': isPortReorderTarget('output', port.key),
                   }"
                   :style="{ '--node-card-port-accent': port.stateColor }"
                   data-state-editor-trigger="true"
+                  :data-port-reorder-node-id="nodeId"
+                  data-port-reorder-side="output"
+                  :data-port-reorder-state-key="port.key"
                   @pointerenter="handleStateEditorPillPointerEnter(`agent-output:${port.key}`)"
                   @pointerleave="handleStateEditorPillPointerLeave(`agent-output:${port.key}`)"
-                  @pointerdown.stop
-                  @click.stop="!port.virtual && handleStateEditorActionClick(`agent-output:${port.key}`, port.key)"
+                  @pointerdown.stop="handlePortReorderPointerDown('output', port.key, $event)"
+                  @click.stop="handlePortStatePillClick(`agent-output:${port.key}`, port.key)"
                 >
                   <button
                     v-if="!port.virtual"
@@ -1401,6 +1411,9 @@ import {
 } from "@/editor/workspace/statePanelFields";
 
 type TextEditorField = "title" | "description";
+type PortReorderSide = "input" | "output";
+
+const PORT_REORDER_DRAG_THRESHOLD = 6;
 
 const props = defineProps<{
   nodeId: string;
@@ -1433,6 +1446,7 @@ const emit = defineEmits<{
   (event: "update-input-state", payload: { stateKey: string; patch: Partial<StateDefinition> }): void;
   (event: "update-state", payload: { stateKey: string; patch: Partial<StateDefinition> }): void;
   (event: "remove-port-state", payload: { nodeId: string; side: "input" | "output"; stateKey: string }): void;
+  (event: "reorder-port-state", payload: { nodeId: string; side: "input" | "output"; stateKey: string; targetStateKey: string }): void;
   (event: "update-output-config", payload: { nodeId: string; patch: Partial<OutputNode["config"]> }): void;
   (event: "update-agent-config", payload: { nodeId: string; patch: Partial<AgentNode["config"]> }): void;
   (event: "toggle-agent-breakpoint", payload: { nodeId: string; enabled: boolean }): void;
@@ -1569,6 +1583,16 @@ const textTriggerPointerState = ref<{
   startClientY: number;
   moved: boolean;
 } | null>(null);
+const portReorderPointerState = ref<{
+  side: PortReorderSide;
+  stateKey: string;
+  pointerId: number;
+  startClientX: number;
+  startClientY: number;
+  active: boolean;
+  targetStateKey: string | null;
+} | null>(null);
+const suppressNextPortPillClick = ref(false);
 const textEditorConfirmTimeoutRef = ref<number | null>(null);
 const textEditorFocusTimeoutRef = ref<number | null>(null);
 const titleEditorDraft = ref("");
@@ -1816,6 +1840,7 @@ onBeforeUnmount(() => {
   removeGlobalFloatingPanelListeners();
   clearTopActionTimeout();
   clearTextTriggerPointerState();
+  clearPortReorderPointerState();
   clearTextEditorConfirmTimeout();
   clearTextEditorFocusTimeout();
   clearStateEditorConfirmTimeout();
@@ -1840,6 +1865,7 @@ function closeLockedFloatingPanels() {
   clearTopActionTimeout();
   activeTopAction.value = null;
   clearTextTriggerPointerState();
+  clearPortReorderPointerState();
   clearTextEditorConfirmState();
   clearStateEditorConfirmState();
   clearRemovePortStateConfirmState();
@@ -2576,6 +2602,137 @@ function handleStateEditorPillPointerLeave(anchorId: string) {
   if (hoveredStateEditorPillAnchorId.value === anchorId) {
     hoveredStateEditorPillAnchorId.value = null;
   }
+}
+
+function clearPortReorderPointerState() {
+  window.removeEventListener("pointermove", handlePortReorderPointerMove);
+  window.removeEventListener("pointerup", handlePortReorderPointerUp);
+  window.removeEventListener("pointercancel", handlePortReorderPointerAbort);
+  portReorderPointerState.value = null;
+}
+
+function suppressNextPortPillClickOnce() {
+  suppressNextPortPillClick.value = true;
+  window.setTimeout(() => {
+    suppressNextPortPillClick.value = false;
+  }, 250);
+}
+
+function isPortReordering(side: PortReorderSide, stateKey: string) {
+  const pointerState = portReorderPointerState.value;
+  return Boolean(pointerState?.active && pointerState.side === side && pointerState.stateKey === stateKey);
+}
+
+function isPortReorderTarget(side: PortReorderSide, stateKey: string) {
+  const pointerState = portReorderPointerState.value;
+  return Boolean(pointerState?.active && pointerState.side === side && pointerState.targetStateKey === stateKey);
+}
+
+function resolvePortReorderTargetStateKey(side: "input" | "output", clientX: number, clientY: number) {
+  const element = document.elementFromPoint(clientX, clientY);
+  if (!(element instanceof Element)) {
+    return null;
+  }
+  const targetElement = element.closest("[data-port-reorder-state-key]") as HTMLElement | null;
+  if (!targetElement) {
+    return null;
+  }
+  if (targetElement.dataset.portReorderNodeId !== props.nodeId || targetElement.dataset.portReorderSide !== side) {
+    return null;
+  }
+
+  const stateKey = targetElement.dataset.portReorderStateKey;
+  return stateKey && stateKey !== portReorderPointerState.value?.stateKey ? stateKey : null;
+}
+
+function handlePortReorderPointerDown(side: "input" | "output", stateKey: string, event: PointerEvent) {
+  if (event.button !== 0 || guardLockedGraphInteraction()) {
+    return;
+  }
+
+  clearPortReorderPointerState();
+  portReorderPointerState.value = {
+    side,
+    stateKey,
+    pointerId: event.pointerId,
+    startClientX: event.clientX,
+    startClientY: event.clientY,
+    active: false,
+    targetStateKey: null,
+  };
+  window.addEventListener("pointermove", handlePortReorderPointerMove);
+  window.addEventListener("pointerup", handlePortReorderPointerUp);
+  window.addEventListener("pointercancel", handlePortReorderPointerAbort);
+}
+
+function handlePortReorderPointerMove(event: PointerEvent) {
+  const pointerState = portReorderPointerState.value;
+  if (!pointerState || pointerState.pointerId !== event.pointerId) {
+    return;
+  }
+
+  const deltaX = event.clientX - pointerState.startClientX;
+  const deltaY = event.clientY - pointerState.startClientY;
+  const shouldActivate =
+    pointerState.active || Math.hypot(deltaX, deltaY) >= PORT_REORDER_DRAG_THRESHOLD;
+  if (!shouldActivate) {
+    return;
+  }
+
+  event.preventDefault();
+  if (!pointerState.active) {
+    clearStateEditorConfirmState();
+    clearRemovePortStateConfirmState();
+    closeStateEditor();
+  }
+
+  portReorderPointerState.value = {
+    ...pointerState,
+    active: true,
+    targetStateKey: resolvePortReorderTargetStateKey(pointerState.side, event.clientX, event.clientY),
+  };
+}
+
+function handlePortReorderPointerUp(event: PointerEvent) {
+  const pointerState = portReorderPointerState.value;
+  if (!pointerState || pointerState.pointerId !== event.pointerId) {
+    return;
+  }
+
+  const targetStateKey = pointerState.active
+    ? resolvePortReorderTargetStateKey(pointerState.side, event.clientX, event.clientY) ?? pointerState.targetStateKey
+    : null;
+  if (pointerState.active) {
+    event.preventDefault();
+    suppressNextPortPillClickOnce();
+  }
+
+  clearPortReorderPointerState();
+  if (!targetStateKey) {
+    return;
+  }
+
+  emit("reorder-port-state", {
+    nodeId: props.nodeId,
+    side: pointerState.side,
+    stateKey: pointerState.stateKey,
+    targetStateKey,
+  });
+}
+
+function handlePortReorderPointerAbort(event: PointerEvent) {
+  const pointerState = portReorderPointerState.value;
+  if (pointerState?.pointerId === event.pointerId) {
+    clearPortReorderPointerState();
+  }
+}
+
+function handlePortStatePillClick(anchorId: string, stateKey: string | null | undefined) {
+  if (suppressNextPortPillClick.value) {
+    suppressNextPortPillClick.value = false;
+    return;
+  }
+  handleStateEditorActionClick(anchorId, stateKey);
 }
 
 function handleStateEditorActionClick(anchorId: string, stateKey: string | null | undefined) {
@@ -3700,6 +3857,22 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
   border-color: rgba(154, 52, 18, 0.14);
   background: rgba(255, 250, 241, 0.94);
   box-shadow: 0 10px 22px rgba(60, 41, 20, 0.08);
+}
+
+.node-card__port-pill[data-port-reorder-state-key] {
+  cursor: grab;
+  touch-action: none;
+}
+
+.node-card__port-pill--reordering {
+  cursor: grabbing;
+  opacity: 0.72;
+}
+
+.node-card__port-pill--reorder-target {
+  border-color: color-mix(in srgb, var(--node-card-port-accent) 46%, transparent);
+  background: color-mix(in srgb, var(--node-card-port-accent) 12%, transparent);
+  box-shadow: 0 10px 22px rgba(60, 41, 20, 0.1);
 }
 
 .node-card__port-pill--create {

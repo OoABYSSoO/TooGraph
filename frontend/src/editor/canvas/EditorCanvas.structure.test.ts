@@ -96,6 +96,11 @@ test("EditorCanvas forwards node model refresh requests to the workspace", () =>
   assert.match(componentSource, /@refresh-agent-models="emit\('refresh-agent-models'\)"/);
 });
 
+test("EditorCanvas forwards state pill reorder requests to the workspace", () => {
+  assert.match(componentSource, /\(event: "reorder-port-state", payload: \{ nodeId: string; side: "input" \| "output"; stateKey: string; targetStateKey: string \}\): void;/);
+  assert.match(componentSource, /@reorder-port-state="emit\('reorder-port-state', \$event\)"/);
+});
+
 test("EditorCanvas lets editable node fields handle Backspace and Delete normally", () => {
   assert.doesNotMatch(componentSource, /@keydown\.delete\.prevent=/);
   assert.doesNotMatch(componentSource, /@keydown\.backspace\.prevent=/);

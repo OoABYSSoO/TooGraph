@@ -113,6 +113,43 @@ export function clonePlainValue<T>(value: T): T {
   return structuredClone(normalizeCloneValue(value));
 }
 
+export function reorderNodePortStateInDocument<T extends GraphPayload | GraphDocument>(
+  document: T,
+  nodeId: string,
+  side: "input" | "output",
+  stateKey: string,
+  targetStateKey: string,
+): T {
+  if (stateKey === targetStateKey) {
+    return document;
+  }
+
+  const node = document.nodes[nodeId];
+  if (!node) {
+    return document;
+  }
+
+  const bindings = side === "input" ? node.reads : node.writes;
+  const sourceIndex = bindings.findIndex((binding) => binding.state === stateKey);
+  const targetIndex = bindings.findIndex((binding) => binding.state === targetStateKey);
+  if (sourceIndex === -1 || targetIndex === -1) {
+    return document;
+  }
+
+  const nextDocument = cloneGraphDocument(document);
+  const nextNode = nextDocument.nodes[nodeId];
+  if (side === "input") {
+    const nextBindings = [...nextNode.reads];
+    [nextBindings[sourceIndex], nextBindings[targetIndex]] = [nextBindings[targetIndex], nextBindings[sourceIndex]];
+    nextNode.reads = nextBindings;
+  } else {
+    const nextBindings = [...nextNode.writes];
+    [nextBindings[sourceIndex], nextBindings[targetIndex]] = [nextBindings[targetIndex], nextBindings[sourceIndex]];
+    nextNode.writes = nextBindings;
+  }
+  return nextDocument;
+}
+
 function defaultMaterializedStateValueForType(type: string): unknown {
   switch (type) {
     case "number":
