@@ -590,6 +590,19 @@ test("EditorCanvas exposes transient new agent input anchors while state draggin
   assert.match(componentSource, /const projectedAnchors = computed\(\(\) => \[\.\.\.baseProjectedAnchorsWithoutVirtualCreatePorts\.value, \.\.\.transientAgentCreateInputAnchors\.value, \.\.\.transientAgentInputAnchors\.value, \.\.\.transientAgentOutputAnchors\.value\]\);/);
 });
 
+test("EditorCanvas previews concrete target state while dragging from a virtual output", () => {
+  assert.match(componentSource, /type PendingStatePortPreview = \{/);
+  assert.match(componentSource, /function isConcreteStateConnectionKey\(stateKey: string \| null \| undefined\)/);
+  assert.match(componentSource, /function resolveStatePortPreview\(stateKey: string \| null \| undefined\)/);
+  assert.match(componentSource, /const pendingStateOutputTargetByNodeId = computed<Record<string, PendingStatePortPreview>>\(\(\) =>/);
+  assert.match(componentSource, /connection\.sourceStateKey !== VIRTUAL_ANY_OUTPUT_STATE_KEY/);
+  assert.match(componentSource, /const targetPreview = resolveStatePortPreview\(autoSnappedTargetAnchor\.value\?\.stateKey\);/);
+  assert.match(componentSource, /\[connection\.sourceNodeId\]: targetPreview/);
+  assert.match(componentSource, /:pending-state-output-target="pendingStateOutputTargetByNodeId\[nodeId\] \?\? null"/);
+  assert.match(componentSource, /const previewStateKey = resolveConnectionPreviewStateKey\(\);/);
+  assert.match(componentSource, /return props\.document\.state_schema\[previewStateKey\]\?\.color\?\.trim\(\) \|\| "#2563eb";/);
+});
+
 test("EditorCanvas projects visible plus input anchors when existing inputs hide the virtual input from the anchor model", () => {
   assert.match(componentSource, /function isAgentCreateInputAnchorVisible\(nodeId: string\)/);
   assert.match(componentSource, /shouldShowAgentCreateInputPortByDefault\(nodeId\)/);
@@ -678,6 +691,13 @@ test("EditorCanvas snaps state drags to transient or matching state inputs from 
   assert.doesNotMatch(componentSource, /function isPointerWithinAnchorHitElement/);
   assert.doesNotMatch(componentSource, /STATE_INPUT_HIT_PADDING/);
   assert.doesNotMatch(componentSource, /closest\("\[data-anchor-hitarea='true'\]"\)/);
+});
+
+test("EditorCanvas keeps created state confirm actions visually unframed", () => {
+  assert.match(componentSource, /\.editor-canvas__edge-state-confirm-actions \{[\s\S]*padding:\s*0;/);
+  assert.match(componentSource, /\.editor-canvas__edge-state-confirm-actions \{[\s\S]*border:\s*0;/);
+  assert.match(componentSource, /\.editor-canvas__edge-state-confirm-actions \{[\s\S]*background:\s*transparent;/);
+  assert.match(componentSource, /\.editor-canvas__edge-state-confirm-actions \{[\s\S]*box-shadow:\s*none;/);
 });
 
 test("EditorCanvas disables text selection while a connection drag is active", () => {

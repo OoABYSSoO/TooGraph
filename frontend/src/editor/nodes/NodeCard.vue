@@ -287,7 +287,9 @@
                   'node-card__port-pill--revealed': !view.body.primaryOutput.virtual && isStateEditorPillRevealed(`input-primary-output:${view.body.primaryOutput.key}`),
                   'node-card__port-pill--confirm': !view.body.primaryOutput.virtual && isStateEditorConfirmOpen(`input-primary-output:${view.body.primaryOutput.key}`),
                 }"
-                :style="{ '--node-card-port-accent': view.body.primaryOutput.stateColor }"
+                :style="{
+                  '--node-card-port-accent': view.body.primaryOutput.virtual ? (pendingStateOutputTarget?.stateColor ?? view.body.primaryOutput.stateColor) : view.body.primaryOutput.stateColor,
+                }"
                 data-state-editor-trigger="true"
                 data-anchor-hitarea="true"
                 @pointerenter="handleStateEditorPillPointerEnter(`input-primary-output:${view.body.primaryOutput.key}`)"
@@ -299,7 +301,9 @@
                   class="node-card__port-pill-label"
                   :class="{ 'node-card__port-pill-label--confirm': isStateEditorConfirmOpen(`input-primary-output:${view.body.primaryOutput.key}`) }"
                 >
-                  <span class="node-card__port-pill-label-text">{{ view.body.primaryOutput.label }}</span>
+                  <span class="node-card__port-pill-label-text">
+                    {{ view.body.primaryOutput.virtual ? (pendingStateOutputTarget?.label ?? view.body.primaryOutput.label) : view.body.primaryOutput.label }}
+                  </span>
                   <ElIcon class="node-card__port-pill-confirm-icon"><Check /></ElIcon>
                 </span>
                 <span
@@ -842,14 +846,14 @@
               >
                 <span
                   class="node-card__port-pill node-card__port-pill--output node-card__port-pill--dock-end node-card__port-pill--create"
-                  :style="{ '--node-card-port-accent': VIRTUAL_ANY_OUTPUT_COLOR }"
+                  :style="{ '--node-card-port-accent': pendingStateOutputTarget?.stateColor ?? VIRTUAL_ANY_OUTPUT_COLOR }"
                   data-agent-create-port="output"
                   data-anchor-hitarea="true"
                   @pointerdown.stop
                   @click.stop="openPortStateCreate('output')"
                 >
                   <span class="node-card__port-pill-label">
-                    <span class="node-card__port-pill-label-text">+ output</span>
+                    <span class="node-card__port-pill-label-text">{{ pendingStateOutputTarget?.label ?? '+ output' }}</span>
                   </span>
                   <span
                     class="node-card__port-pill-anchor-slot"
@@ -1468,6 +1472,7 @@ const props = defineProps<{
   runOutputDisplayMode?: string | null;
   runFailureMessage?: string | null;
   pendingStateInputSource?: { stateKey: string; label: string; stateColor: string } | null;
+  pendingStateOutputTarget?: { stateKey: string; label: string; stateColor: string } | null;
   humanReviewPending: boolean;
   selected: boolean;
   hovered?: boolean;

@@ -276,7 +276,7 @@ test("NodeCard keeps skill actions below the agent while creating ports from plu
   assert.match(agentSection, /class="node-card__port-pill node-card__port-pill--input node-card__port-pill--dock-start node-card__port-pill--create"/);
   assert.match(agentSection, /class="node-card__port-pill node-card__port-pill--output node-card__port-pill--dock-end node-card__port-pill--create"/);
   assert.match(agentSection, />\+ input</);
-  assert.match(agentSection, />\+ output</);
+  assert.match(agentSection, /pendingStateOutputTarget\?\.label \?\? '\+ output'/);
   assert.match(agentSection, /<ElSelect[\s\S]*class="node-card__control-select graphite-select"[\s\S]*popper-class="graphite-select-popper node-card__port-picker-select-popper"/);
   assert.doesNotMatch(agentSection, /t\("nodeCard\.key"\)/);
   assert.doesNotMatch(agentSection, /portStateDraft\.key/);
@@ -310,6 +310,7 @@ test("NodeCard renders plus input and plus output as virtual agent state port ro
   assert.match(componentSource, /hovered\?:\s*boolean;/);
   assert.match(componentSource, /'node-card--hovered': hovered/);
   assert.match(componentSource, /pendingStateInputSource\?: \{ stateKey: string; label: string; stateColor: string \} \| null;/);
+  assert.match(componentSource, /pendingStateOutputTarget\?: \{ stateKey: string; label: string; stateColor: string \} \| null;/);
   assert.match(componentSource, /const agentInputPorts = computed<NodePortViewModel\[\]>\(\(\) =>/);
   assert.match(componentSource, /const agentOutputPorts = computed<NodePortViewModel\[\]>\(\(\) =>/);
   assert.match(componentSource, /filter\(\(port\) => !port\.virtual\)/);
@@ -334,7 +335,8 @@ test("NodeCard renders plus input and plus output as virtual agent state port ro
   assert.match(agentSection, /:data-anchor-slot-id="\`\$\{nodeId\}:state-out:\$\{VIRTUAL_ANY_OUTPUT_STATE_KEY\}\`"/);
   assert.match(agentSection, /node-card__port-pill--create/);
   assert.match(agentSection, /\+ input/);
-  assert.match(agentSection, /\+ output/);
+  assert.match(agentSection, /pendingStateOutputTarget\?\.label \?\? '\+ output'/);
+  assert.match(agentSection, /pendingStateOutputTarget\?\.stateColor \?\? VIRTUAL_ANY_OUTPUT_COLOR/);
   assert.doesNotMatch(componentSource, /const shouldRenderPendingStateInputCapsule = computed/);
   assert.doesNotMatch(agentSection, /node-card__port-pill-create-badge/);
   assert.doesNotMatch(agentSection, /t\("common\.new"\)/);
@@ -412,6 +414,8 @@ test("NodeCard renders empty input outputs as virtual plus output create pills",
   const inputSection = inputSectionMatch[0];
 
   assert.match(inputSection, /'node-card__port-pill--create': view\.body\.primaryOutput\.virtual/);
+  assert.match(inputSection, /view\.body\.primaryOutput\.virtual \? \(pendingStateOutputTarget\?\.stateColor \?\? view\.body\.primaryOutput\.stateColor\) : view\.body\.primaryOutput\.stateColor/);
+  assert.match(inputSection, /view\.body\.primaryOutput\.virtual \? \(pendingStateOutputTarget\?\.label \?\? view\.body\.primaryOutput\.label\) : view\.body\.primaryOutput\.label/);
   assert.match(inputSection, /@click\.stop="view\.body\.primaryOutput\.virtual \? openPortStateCreate\('output'\) : handleStateEditorActionClick/);
   assert.match(inputSection, /:data-anchor-slot-id="\`\$\{nodeId\}:state-out:\$\{view\.body\.primaryOutput\.key\}\`"/);
   assert.match(inputSection, /view\.body\.primaryOutput\.virtual && isPortCreateOpen\('output'\) && portStateDraft/);

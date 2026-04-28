@@ -248,6 +248,7 @@
           :run-output-display-mode="runOutputPreviewByNodeId?.[nodeId]?.displayMode ?? null"
           :run-failure-message="runFailureMessageByNodeId?.[nodeId] ?? null"
           :pending-state-input-source="pendingAgentInputSourceByNodeId[nodeId] ?? null"
+          :pending-state-output-target="pendingStateOutputTargetByNodeId[nodeId] ?? null"
           :human-review-pending="isHumanReviewNode(nodeId)"
           :selected="isNodeVisuallySelected(nodeId)"
           :hovered="hoveredNodeId === nodeId || activeConnectionHoverNodeId === nodeId || hoveredPointAnchorNodeId === nodeId"
@@ -541,6 +542,11 @@ type PendingStateInputSource = {
   label: string;
   stateColor: string;
 };
+type PendingStatePortPreview = {
+  stateKey: string;
+  label: string;
+  stateColor: string;
+};
 const measuredNodeSizes = ref<Record<string, MeasuredNodeSize>>({});
 const canvasSize = ref({ width: 0, height: 0 });
 const viewport = useViewport(props.initialViewport ?? undefined);
@@ -695,6 +701,31 @@ const visibleProjectedEdgeIds = computed(
       }).map((edge) => edge.id),
     ),
 );
+function isConcreteStateConnectionKey(stateKey: string | null | undefined): stateKey is string {
+  return (
+    typeof stateKey === "string" &&
+    stateKey.length > 0 &&
+    stateKey !== CREATE_AGENT_INPUT_STATE_KEY &&
+    stateKey !== VIRTUAL_ANY_INPUT_STATE_KEY &&
+    stateKey !== VIRTUAL_ANY_OUTPUT_STATE_KEY
+  );
+}
+
+function resolveStatePortPreview(stateKey: string | null | undefined): PendingStatePortPreview | null {
+  if (!isConcreteStateConnectionKey(stateKey)) {
+    return null;
+  }
+  const state = props.document.state_schema[stateKey];
+  if (!state) {
+    return null;
+  }
+  return {
+    stateKey,
+    label: state.name?.trim() || stateKey,
+    stateColor: state.color?.trim() || "#d97706",
+  };
+}
+
 const pendingAgentInputSourceByNodeId = computed<Record<string, PendingStateInputSource>>(() => {
   const connection = pendingConnection.value;
   if (connection?.sourceKind !== "state-out" || !connection.sourceStateKey) {
@@ -721,6 +752,19 @@ const pendingAgentInputSourceByNodeId = computed<Record<string, PendingStateInpu
       )
       .map(([nodeId]) => [nodeId, pendingSource]),
   );
+});
+const pendingStateOutputTargetByNodeId = computed<Record<string, PendingStatePortPreview>>(() => {
+  const connection = pendingConnection.value;
+  if (connection?.sourceKind !== "state-out" || connection.sourceStateKey !== VIRTUAL_ANY_OUTPUT_STATE_KEY) {
+    return {};
+  }
+
+  const targetPreview = resolveStatePortPreview(autoSnappedTargetAnchor.value?.stateKey);
+  return targetPreview
+    ? {
+        [connection.sourceNodeId]: targetPreview,
+      }
+    : {};
 });
 const baseProjectedAnchors = computed(() => resolvedCanvasLayout.value.anchors);
 function shouldShowAgentCreateInputPortByDefault(nodeId: string) {
@@ -911,18 +955,33 @@ const eligibleTargetAnchorIds = computed(() =>
       .map((anchor) => anchor.id),
   ),
 );
-const activeConnectionAccentColor = computed(() => {
+function resolveConnectionPreviewStateKey() {
+  if (
+    activeConnection.value?.sourceKind === "state-out" &&
+    activeConnection.value.sourceStateKey === VIRTUAL_ANY_OUTPUT_STATE_KEY &&
+    isConcreteStateConnectionKey(autoSnappedTargetAnchor.value?.stateKey)
+  ) {
+    return autoSnappedTargetAnchor.value?.stateKey ?? null;
+  }
   if (
     (activeConnection.value?.sourceKind === "state-out" || activeConnection.value?.sourceKind === "state-in") &&
     activeConnection.value.sourceStateKey
   ) {
-    if (activeConnection.value.sourceStateKey === VIRTUAL_ANY_INPUT_STATE_KEY) {
+    return activeConnection.value.sourceStateKey;
+  }
+  return null;
+}
+
+const activeConnectionAccentColor = computed(() => {
+  const previewStateKey = resolveConnectionPreviewStateKey();
+  if (previewStateKey) {
+    if (previewStateKey === VIRTUAL_ANY_INPUT_STATE_KEY) {
       return VIRTUAL_ANY_INPUT_COLOR;
     }
-    if (activeConnection.value.sourceStateKey === VIRTUAL_ANY_OUTPUT_STATE_KEY) {
+    if (previewStateKey === VIRTUAL_ANY_OUTPUT_STATE_KEY) {
       return VIRTUAL_ANY_OUTPUT_COLOR;
     }
-    return props.document.state_schema[activeConnection.value.sourceStateKey]?.color?.trim() || "#2563eb";
+    return props.document.state_schema[previewStateKey]?.color?.trim() || "#2563eb";
   }
   if (activeConnection.value?.sourceKind === "route-out" && activeConnection.value.branchKey) {
     return resolveRouteHandlePalette(activeConnection.value.branchKey).accent;
@@ -3746,12 +3805,12 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
 
 .editor-canvas__edge-state-confirm-actions {
   display: grid;
-  padding: 10px;
-  border: 1px solid rgba(37, 99, 235, 0.14);
+  padding: 0;
+  border: 0;
   border-radius: 8px;
-  background: rgba(248, 250, 252, 0.94);
-  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.1);
-  backdrop-filter: blur(18px);
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
 }
 
 .editor-canvas__edge-state-confirm-button {

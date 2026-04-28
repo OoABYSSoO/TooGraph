@@ -156,6 +156,8 @@ test("EditorWorkspaceShell routes menu selections and dropped files through the 
   assert.match(componentSource, /function connectStateBindingForTab\(\s*tabId: string,\s*payload: \{ sourceNodeId: string; sourceStateKey: string; targetNodeId: string; targetStateKey: string; position: GraphPosition \},\s*\)/);
   assert.match(componentSource, /const createdStateKey = resolveCreatedVirtualOutputStateKey\(document, nextDocument, payload\.sourceNodeId, payload\.sourceStateKey\);/);
   assert.match(componentSource, /if \(createdStateKey\) \{[\s\S]*openCreatedStateEdgeEditorForTab\(\s*tabId,[\s\S]*sourceNodeId: payload\.sourceNodeId,[\s\S]*sourceStateKey: payload\.sourceStateKey,[\s\S]*createdStateKey,/);
+  assert.match(componentSource, /if \(previousDocument\.state_schema\[createdBinding\.state\]\) \{[\s\S]*return null;/);
+  assert.match(componentSource, /return nextDocument\.state_schema\[createdBinding\.state\] \? createdBinding\.state : null;/);
   assert.match(componentSource, /function connectStateInputSourceForTab/);
   assert.match(componentSource, /connectStateInputSourceToTarget\(document, payload\)/);
   assert.match(componentSource, /markDocumentDirty\(tabId, result\.document\)/);

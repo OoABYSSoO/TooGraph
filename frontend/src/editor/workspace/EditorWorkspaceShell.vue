@@ -1829,7 +1829,14 @@ function resolveCreatedVirtualOutputStateKey(
   }
 
   const previousOutputKeys = new Set(previousDocument.nodes[sourceNodeId]?.writes.map((binding) => binding.state) ?? []);
-  return nextDocument.nodes[sourceNodeId]?.writes.find((binding) => !previousOutputKeys.has(binding.state))?.state ?? null;
+  const createdBinding = nextDocument.nodes[sourceNodeId]?.writes.find((binding) => !previousOutputKeys.has(binding.state)) ?? null;
+  if (!createdBinding) {
+    return null;
+  }
+  if (previousDocument.state_schema[createdBinding.state]) {
+    return null;
+  }
+  return nextDocument.state_schema[createdBinding.state] ? createdBinding.state : null;
 }
 
 function connectStateInputSourceForTab(
