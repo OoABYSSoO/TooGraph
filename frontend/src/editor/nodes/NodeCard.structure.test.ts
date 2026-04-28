@@ -11,6 +11,7 @@ const createPopoverSource = readFileSync(resolve(currentDirectory, "StatePortCre
 const stateEditorModelSource = readFileSync(resolve(currentDirectory, "stateEditorModel.ts"), "utf8").replace(/\r\n/g, "\n");
 const textEditorComposableSource = readFileSync(resolve(currentDirectory, "useNodeCardTextEditor.ts"), "utf8").replace(/\r\n/g, "\n");
 const floatingPanelsComposableSource = readFileSync(resolve(currentDirectory, "useNodeFloatingPanels.ts"), "utf8").replace(/\r\n/g, "\n");
+const portReorderComposableSource = readFileSync(resolve(currentDirectory, "usePortReorder.ts"), "utf8").replace(/\r\n/g, "\n");
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const cssRuleBlock = (selector: string) => {
   const match = componentSource.match(new RegExp(`${escapeRegExp(selector)} \\{[\\s\\S]*?\\n\\}`));
@@ -913,18 +914,24 @@ test("NodeCard declares top-action and state-edit events for canvas forwarding",
 });
 
 test("NodeCard lets real agent state pills drag-reorder within their own side", () => {
-  assert.match(componentSource, /import \{[\s\S]*PORT_REORDER_DRAG_THRESHOLD,[\s\S]*buildPortReorderFloatingStyle,[\s\S]*buildPortReorderPreviewPorts,[\s\S]*buildPortReorderSelector,[\s\S]*resolvePortReorderTargetIndexFromElements,[\s\S]*type PortReorderPointerState,[\s\S]*\} from "\.\/portReorderModel";/);
-  assert.match(componentSource, /const portReorderPointerState = ref<PortReorderPointerState \| null>\(null\);/);
-  assert.match(componentSource, /const orderedAgentInputPorts = computed<NodePortViewModel\[\]>\(\(\) =>/);
-  assert.match(componentSource, /const orderedAgentOutputPorts = computed<NodePortViewModel\[\]>\(\(\) =>/);
-  assert.match(componentSource, /buildPortReorderPreviewPorts\("input", agentInputPorts\.value, portReorderPointerState\.value\)/);
-  assert.match(componentSource, /buildPortReorderPreviewPorts\("output", agentOutputPorts\.value, portReorderPointerState\.value\)/);
-  assert.match(componentSource, /function resolvePortReorderTargetIndex\(side: PortReorderSide, clientY: number\)/);
-  assert.match(componentSource, /document\.querySelectorAll<HTMLElement>\(buildPortReorderSelector\(props\.nodeId, side\)\)/);
-  assert.match(componentSource, /resolvePortReorderTargetIndexFromElements\(targetElements, pointerState\.stateKey, clientY\)/);
-  assert.match(componentSource, /const portReorderFloatingPort = computed/);
-  assert.match(componentSource, /const portReorderFloatingStyle = computed/);
-  assert.match(componentSource, /return buildPortReorderFloatingStyle\(pointerState, floatingPort\.port\.stateColor\);/);
+  assert.match(componentSource, /import \{ usePortReorder \} from "\.\/usePortReorder";/);
+  assert.match(componentSource, /const \{[\s\S]*clearPortReorderPointerState,[\s\S]*handlePortReorderPointerDown,[\s\S]*handlePortStatePillClick,[\s\S]*orderedInputPorts: orderedAgentInputPorts,[\s\S]*orderedOutputPorts: orderedAgentOutputPorts,[\s\S]*portReorderFloatingPort,[\s\S]*portReorderFloatingStyle,[\s\S]*\} = usePortReorder<NodePortViewModel>\(\{/);
+  assert.match(componentSource, /getPorts: \(side\) => \(side === "input" \? agentInputPorts\.value : agentOutputPorts\.value\),/);
+  assert.match(componentSource, /onActivateReorder: \(\) => \{[\s\S]*clearStateEditorConfirmState\(\);[\s\S]*clearRemovePortStateConfirmState\(\);[\s\S]*closeStateEditor\(\);[\s\S]*\},/);
+  assert.match(componentSource, /onPortPillClick: \(anchorId, stateKey\) => \{[\s\S]*handleStateEditorActionClick\(anchorId, stateKey\);[\s\S]*\},/);
+  assert.match(componentSource, /onReorder: \(payload\) => \{[\s\S]*emit\("reorder-port-state", payload\);[\s\S]*\},/);
+  assert.doesNotMatch(componentSource, /function handlePortReorderPointerDown/);
+  assert.doesNotMatch(componentSource, /window\.addEventListener\("pointermove", handlePortReorderPointerMove/);
+  assert.match(portReorderComposableSource, /PORT_REORDER_DRAG_THRESHOLD/);
+  assert.match(portReorderComposableSource, /const portReorderPointerState = ref<PortReorderPointerState \| null>\(null\);/);
+  assert.match(portReorderComposableSource, /const orderedInputPorts = computed/);
+  assert.match(portReorderComposableSource, /buildPortReorderPreviewPorts\("input", options\.getPorts\("input"\), portReorderPointerState\.value\)/);
+  assert.match(portReorderComposableSource, /const portReorderFloatingPort = computed/);
+  assert.match(portReorderComposableSource, /return buildPortReorderFloatingStyle\(pointerState, floatingPort\.port\.stateColor\);/);
+  assert.match(portReorderComposableSource, /function handlePortReorderPointerDown\(side: PortReorderSide, stateKey: string, event: PointerEvent\)/);
+  assert.match(portReorderComposableSource, /windowTarget\?\.addEventListener\("pointermove", handlePortReorderPointerMove as EventListener\)/);
+  assert.match(portReorderComposableSource, /resolvePortReorderTargetIndexFromElements\(targetElements, pointerState\.stateKey, clientY\)/);
+  assert.match(portReorderComposableSource, /options\.onReorder\(\{[\s\S]*nodeId: options\.getNodeId\(\),[\s\S]*side: pointerState\.side,[\s\S]*stateKey: pointerState\.stateKey,[\s\S]*targetIndex,[\s\S]*\}\);/);
   assert.match(componentSource, /<Teleport to="body">/);
   assert.match(componentSource, /data-port-reorder-node-id/);
   assert.match(componentSource, /data-port-reorder-side="input"/);
@@ -936,8 +943,6 @@ test("NodeCard lets real agent state pills drag-reorder within their own side", 
   assert.match(componentSource, /@pointerdown\.stop="handlePortReorderPointerDown\('output', port\.key, \$event\)"/);
   assert.match(componentSource, /@click\.stop="handlePortStatePillClick\(`agent-input:\$\{port\.key\}`, port\.key\)"/);
   assert.match(componentSource, /@click\.stop="handlePortStatePillClick\(`agent-output:\$\{port\.key\}`, port\.key\)"/);
-  assert.match(componentSource, /function handlePortReorderPointerDown\(side: "input" \| "output", stateKey: string, event: PointerEvent\)/);
-  assert.match(componentSource, /emit\("reorder-port-state", \{[\s\S]*nodeId: props\.nodeId,[\s\S]*side: pointerState\.side,[\s\S]*stateKey: pointerState\.stateKey,[\s\S]*targetIndex,[\s\S]*\}\);/);
   assert.match(componentSource, /\.node-card-port-reorder-move \{/);
   assert.match(componentSource, /\.node-card__port-pill--floating \{/);
   assert.match(componentSource, /\.node-card__port-pill--reorder-placeholder \{/);

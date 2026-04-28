@@ -40,7 +40,8 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 
 - `useNodeCardTextEditor.ts` 已先行承接标题/描述编辑确认、指针触发、焦点调度、草稿和 metadata patch 提交。
 - `useNodeFloatingPanels.ts` 已承接 roadmap 第 1 项中的 top action 确认定时器、全局 pointer/focus/keydown 外部关闭逻辑、state 编辑确认和删除绑定确认 active anchor/timer 状态。
-- roadmap 第 1 项剩余部分是进一步统一各类浮层的组件侧关闭编排；这些应继续按小步 controller 测试迁移，避免一次性改动 state 草稿和 graph mutation emit。
+- `usePortReorder.ts` 已承接 roadmap 第 2 项中的端口排序 pointer 状态、window listener 生命周期、拖拽激活、目标 index 解析、浮动胶囊投影、释放提交和拖拽后点击抑制。
+- roadmap 第 1 项剩余部分是进一步统一各类浮层的组件侧关闭编排；这部分跨 text editor、state editor、skill picker 和 port picker，后续应在更强 controller 覆盖下继续小步迁移，避免一次性改动 state 草稿和 graph mutation emit。
 
 不建议先做的事：
 

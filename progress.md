@@ -219,6 +219,58 @@
   - Committed the cleanup as `6a2c0e6` with Chinese message `抽取节点状态确认浮层状态`.
   - Pushed `main` to `origin/main`.
 
+## Session: 2026-04-28 Phase 19
+
+### Phase 1: Roadmap Sub-slice Selection
+- **Status:** completed
+- Actions taken:
+  - Continued the formal roadmap P1 sequence after `useNodeFloatingPanels`.
+  - Judged the remaining floating-panel close orchestration as higher risk because it spans text editor, state editor, skill picker, and port picker side effects.
+  - Selected `usePortReorder` as the next safer roadmap boundary because the pure reorder model and structure coverage already exist.
+  - Kept the event contract unchanged: `NodeCard.vue` still forwards `reorder-port-state` payloads with `nodeId`, side, state key, and target index.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `frontend/src/editor/nodes/usePortReorder.test.ts` before production code.
+  - Ran `node --test frontend/src/editor/nodes/usePortReorder.test.ts` and verified the expected red failure: `ERR_MODULE_NOT_FOUND` for `usePortReorder.ts`.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `usePortReorder.ts` to own pointer state, global pointer listener lifecycle, target resolution, floating pill projection, release-time reorder payloads, and suppressed pill clicks after drag.
+  - Updated `NodeCard.vue` to consume the composable while keeping locked-edit guard, state-editor cleanup, state-editor click forwarding, and `reorder-port-state` emits as callbacks.
+  - Updated `NodeCard.structure.test.ts` and the formal roadmap/finding notes for the new `usePortReorder` boundary.
+  - Confirmed `NodeCard.vue` is down to 4,652 lines after this extraction.
+
+### Phase 4: Focused Verification
+- **Status:** completed
+- Actions taken:
+  - Ran `node --test frontend/src/editor/nodes/usePortReorder.test.ts frontend/src/editor/nodes/portReorderModel.test.ts`.
+  - Result: 10 tests passed, 0 failed.
+  - Ran `node --test frontend/src/editor/nodes/usePortReorder.test.ts frontend/src/editor/nodes/portReorderModel.test.ts frontend/src/editor/nodes/NodeCard.structure.test.ts`.
+  - Result: 45 tests passed, 0 failed.
+
+### Phase 5: TypeScript Verification
+- **Status:** completed
+- Actions taken:
+  - Ran `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend`.
+  - First run failed because `NodeCard.vue` destructured unused global pointer handlers/pointer state, test source-element mocks did not satisfy `EventTarget`, and `document.querySelectorAll` needed local result narrowing.
+  - Fixed those type issues without changing the public port reorder event surface.
+  - Re-ran `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend`; result: exited 0 with no diagnostics.
+  - Re-ran focused port reorder/model/NodeCard structure tests; result: 45 tests passed, 0 failed.
+
+### Phase 6: Full Verification and Dev Restart
+- **Status:** completed
+- Actions taken:
+  - Ran `node --test $(rg --files frontend/src -g '*.test.ts') frontend/vite.config.structure.test.ts`.
+  - Result: 760 tests passed, 0 failed.
+  - Ran `npm run build` in `frontend`.
+  - Result: build passed with no Vite large chunk warning.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend returned HTTP 200 at `http://127.0.0.1:3477`.
+  - Confirmed the backend health route returned HTTP 200 at `http://127.0.0.1:8765/health`.
+
 ## Session: 2026-04-28 Baseline Interaction Repair and Large Connection Cleanup
 
 ### Phase 1: Baseline Regression Repair

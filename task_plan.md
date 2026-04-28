@@ -4,7 +4,7 @@
 Run a ten-round conservative cleanup batch focused on `EditorCanvas.vue` pure projection and interaction-model helpers, then close the baseline interaction regressions in one larger pass while preserving graph editing behavior, runtime visuals, drag/connect workflows, deletion behavior, and dev startup health.
 
 ## Current Phase
-Phase 18 in progress
+Phase 19 in progress
 
 ## Phases
 
@@ -145,6 +145,19 @@ Phase 18 in progress
 - [x] Commit and push the cleanup.
 - **Status:** completed
 
+### Phase 19: NodeCard Port Reorder Composable
+- [x] Continue the formal roadmap P1 sequence after `useNodeFloatingPanels`.
+- [x] Add failing composable coverage for port reorder pointer activation, target resolution, cleanup, and click suppression.
+- [x] Extract NodeCard port reorder pointer state, window listener lifecycle, floating-port projection, and commit handling into `usePortReorder.ts`.
+- [x] Update `NodeCard.vue` to consume the composable while preserving `reorder-port-state` event payloads and state-editor click behavior.
+- [x] Update structure tests and roadmap notes for the new `usePortReorder` boundary.
+- [x] Run focused port reorder and NodeCard structure tests.
+- [x] Run TypeScript unused-symbol verification.
+- [x] Run the full frontend test suite and production build.
+- [x] Restart the dev environment with `npm run dev` and verify frontend/backend health.
+- [ ] Commit and push the cleanup.
+- **Status:** in_progress
+
 ## Progress Estimate
 | Scope | Estimate |
 |-------|----------|
@@ -164,6 +177,8 @@ Phase 18 in progress
 | P1 `NodeCard.vue` cleanup after Phase 17 | About 57% complete after moving top-action and global outside-close floating-panel state into a tested composable. |
 | Overall roadmap cleanup after Phase 18 | About 43% complete after moving state edit/remove confirm refs and timers into `useNodeFloatingPanels`. |
 | P1 `NodeCard.vue` cleanup after Phase 18 | About 59% complete after moving state edit/remove confirm refs and timers into `useNodeFloatingPanels`. |
+| Overall roadmap cleanup after Phase 19 | Targeting about 44% complete once commit and push pass. |
+| P1 `NodeCard.vue` cleanup after Phase 19 | Targeting about 62% complete after moving port reorder interaction state into a tested composable. |
 
 ## Decisions Made
 | Decision | Rationale |
@@ -183,6 +198,7 @@ Phase 18 in progress
 - Phase 16 moves NodeCard title/description editing state into `useNodeCardTextEditor.ts`; `NodeCard.vue` drops from 5,095 to 4,930 lines before final verification.
 - Phase 17 starts the roadmap `useNodeFloatingPanels` step by moving top-action confirmation timers and global outside-panel close listener wiring into a tested composable; `NodeCard.vue` drops to 4,856 lines before final verification.
 - Phase 18 continues `useNodeFloatingPanels` by moving state edit/remove confirmation refs and timers; `NodeCard.vue` drops to 4,808 lines before final verification.
+- Phase 19 starts the roadmap `usePortReorder` step by moving pointer/listener/click-suppression state extraction from `NodeCard.vue`; `NodeCard.vue` drops to 4,652 lines before final verification.
 - Do not commit runtime artifacts such as `backend/data/settings`, `.dev_*`, `dist`, or `.worktrees`.
 - After code changes, restart using `npm run dev`.
 
@@ -191,3 +207,4 @@ Phase 18 in progress
 |-------|---------|------------|
 | Structure test still expected the old inline forced-edge-id block | Focused post-implementation run | Updated the assertion to verify the extracted `buildForceVisibleProjectedEdgeIds` boundary and flow confirm id input. |
 | Virtual any output drags no longer auto-snapped to new agent inputs after cleanup | Baseline comparison against `8017081` | Restored virtual output pending-source preservation in `buildPendingAgentInputSourceByNodeId`, added regression coverage, and extracted follow-up interaction helpers into `canvasConnectionInteractionModel.ts`. |
+| `vue-tsc` flagged unused NodeCard destructures and mock DOM type gaps after `usePortReorder` extraction | Phase 19 TypeScript verification | Stopped destructuring global pointer handlers/pointer state in `NodeCard.vue`, made test source elements satisfy `EventTarget`, and narrowed query results inside `usePortReorder.ts`. |
