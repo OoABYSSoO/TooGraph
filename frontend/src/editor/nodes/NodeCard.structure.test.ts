@@ -10,6 +10,7 @@ const componentSource = readFileSync(resolve(currentDirectory, "NodeCard.vue"), 
 const createPopoverSource = readFileSync(resolve(currentDirectory, "StatePortCreatePopover.vue"), "utf8").replace(/\r\n/g, "\n");
 const stateEditorModelSource = readFileSync(resolve(currentDirectory, "stateEditorModel.ts"), "utf8").replace(/\r\n/g, "\n");
 const textEditorComposableSource = readFileSync(resolve(currentDirectory, "useNodeCardTextEditor.ts"), "utf8").replace(/\r\n/g, "\n");
+const floatingPanelsComposableSource = readFileSync(resolve(currentDirectory, "useNodeFloatingPanels.ts"), "utf8").replace(/\r\n/g, "\n");
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const cssRuleBlock = (selector: string) => {
   const match = componentSource.match(new RegExp(`${escapeRegExp(selector)} \\{[\\s\\S]*?\\n\\}`));
@@ -478,10 +479,13 @@ test("NodeCard moves node actions into hoverable top buttons built from Element 
   assert.match(componentSource, /@click\.stop="toggleAdvancedPanel"/);
   assert.match(componentSource, /:show-arrow="false"/);
   assert.match(componentSource, /:popper-style="actionPopoverStyle"/);
-  assert.match(componentSource, /const activeTopAction = ref<"advanced" \| "delete" \| "preset" \| null>\(null\);/);
-  assert.match(componentSource, /const topActionTimeoutRef = ref<number \| null>\(null\);/);
-  assert.match(componentSource, /function clearTopActionConfirmState\(\)/);
-  assert.match(componentSource, /function startTopActionConfirmWindow\(action: "delete" \| "preset"\)/);
+  assert.match(componentSource, /import \{ useNodeFloatingPanels \} from "\.\/useNodeFloatingPanels";/);
+  assert.match(componentSource, /const \{[\s\S]*activeTopAction,[\s\S]*addGlobalFloatingPanelListeners,[\s\S]*clearTopActionConfirmState,[\s\S]*clearTopActionTimeout,[\s\S]*removeGlobalFloatingPanelListeners,[\s\S]*startTopActionConfirmWindow,[\s\S]*\} = useNodeFloatingPanels\(\{/);
+  assert.match(floatingPanelsComposableSource, /export type NodeTopAction = "advanced" \| "delete" \| "preset";/);
+  assert.match(floatingPanelsComposableSource, /const activeTopAction = ref<NodeTopAction \| null>\(null\);/);
+  assert.match(floatingPanelsComposableSource, /const topActionTimeoutRef = ref<unknown \| null>\(null\);/);
+  assert.match(floatingPanelsComposableSource, /function clearTopActionConfirmState\(\)/);
+  assert.match(floatingPanelsComposableSource, /function startTopActionConfirmWindow\(action: "delete" \| "preset"\)/);
   assert.match(componentSource, /if \(activeTopAction\.value === "delete"\) \{[\s\S]*confirmDeleteNode\(\);[\s\S]*return;/);
   assert.match(componentSource, /if \(activeTopAction\.value === "preset"\) \{[\s\S]*confirmSavePreset\(\);[\s\S]*return;/);
   assert.match(componentSource, /@click\.stop="handleDeleteActionClick"/);
@@ -998,12 +1002,17 @@ test("NodeCard uses an Element Plus switch card for output persistence like the 
 test("NodeCard closes floating panels on focus loss and keeps popup surfaces on the warm theme", () => {
   assert.match(componentSource, /import \{ computed, onBeforeUnmount, onMounted, ref, watch \} from "vue";/);
   assert.match(componentSource, /const hasFloatingPanelOpen = computed\(/);
-  assert.match(componentSource, /document\.addEventListener\("pointerdown", handleGlobalFloatingPanelPointerDown\)/);
-  assert.match(componentSource, /document\.addEventListener\("focusin", handleGlobalFloatingPanelFocusIn\)/);
-  assert.match(componentSource, /document\.addEventListener\("keydown", handleGlobalFloatingPanelKeyDown\)/);
-  assert.match(componentSource, /document\.removeEventListener\("pointerdown", handleGlobalFloatingPanelPointerDown\)/);
-  assert.match(componentSource, /document\.removeEventListener\("focusin", handleGlobalFloatingPanelFocusIn\)/);
-  assert.match(componentSource, /document\.removeEventListener\("keydown", handleGlobalFloatingPanelKeyDown\)/);
+  assert.match(componentSource, /isFloatingPanelOpen: \(\) => hasFloatingPanelOpen\.value,/);
+  assert.match(componentSource, /closeFloatingPanels: \(options\) => \{[\s\S]*closeFloatingPanels\(options\);[\s\S]*\},/);
+  assert.match(floatingPanelsComposableSource, /documentTarget\?\.addEventListener\("pointerdown", handleGlobalFloatingPanelPointerDown as EventListener\)/);
+  assert.match(floatingPanelsComposableSource, /documentTarget\?\.addEventListener\("focusin", handleGlobalFloatingPanelFocusIn as EventListener\)/);
+  assert.match(floatingPanelsComposableSource, /documentTarget\?\.addEventListener\("keydown", handleGlobalFloatingPanelKeyDown as EventListener\)/);
+  assert.match(floatingPanelsComposableSource, /documentTarget\?\.removeEventListener\("pointerdown", handleGlobalFloatingPanelPointerDown as EventListener\)/);
+  assert.match(floatingPanelsComposableSource, /documentTarget\?\.removeEventListener\("focusin", handleGlobalFloatingPanelFocusIn as EventListener\)/);
+  assert.match(floatingPanelsComposableSource, /documentTarget\?\.removeEventListener\("keydown", handleGlobalFloatingPanelKeyDown as EventListener\)/);
+  assert.match(floatingPanelsComposableSource, /function isFloatingPanelSurfaceTarget\(target: EventTarget \| null\)/);
+  assert.match(floatingPanelsComposableSource, /options\.closeFloatingPanels\(\{ commitTextEditor: true \}\);/);
+  assert.match(floatingPanelsComposableSource, /options\.closeFloatingPanels\(\{ commitTextEditor: false \}\);/);
   assert.match(componentSource, /data-node-popup-surface="true"/);
   assert.match(componentSource, /\.node-card__text-editor-popper/);
   assert.match(componentSource, /\.node-card__skill-picker \{[\s\S]*border:\s*1px solid rgba\(154,\s*52,\s*18,\s*0\.16\);/);

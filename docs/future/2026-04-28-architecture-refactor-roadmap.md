@@ -36,6 +36,12 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 4. 抽出节点主体组件：`AgentNodeBody.vue`、`InputNodeBody.vue`、`OutputNodeBody.vue`、`ConditionNodeBody.vue`。先拆 template 和 props/emit，不急着拆模型。
 5. 把 CSS 按组件自然迁移，避免继续让一个 scoped style 承担所有节点类型。
 
+当前执行进展：
+
+- `useNodeCardTextEditor.ts` 已先行承接标题/描述编辑确认、指针触发、焦点调度、草稿和 metadata patch 提交。
+- `useNodeFloatingPanels.ts` 已开始承接 roadmap 第 1 项中的 top action 确认定时器和全局 pointer/focus/keydown 外部关闭逻辑。
+- roadmap 第 1 项剩余部分是 state 编辑确认和删除绑定确认；这些应继续按小步 controller 测试迁移。
+
 不建议先做的事：
 
 - 不要先把所有节点配置塞进一个抽象 schema renderer。当前每类节点的交互差异很大，过早抽象会增加调试成本。

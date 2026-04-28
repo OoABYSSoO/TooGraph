@@ -118,6 +118,54 @@
   - Committed the cleanup as `f495a50` with Chinese message `抽取节点文本编辑交互`.
   - Pushed `main` to `origin/main`.
 
+## Session: 2026-04-28 Phase 17
+
+### Phase 1: Roadmap Realignment
+- **Status:** completed
+- Actions taken:
+  - Re-read `docs/future/2026-04-28-architecture-refactor-roadmap.md` after the user asked to follow the referenced plan document.
+  - Confirmed the formal roadmap is the source of truth, while root `task_plan.md`, `findings.md`, and `progress.md` are execution tracking files.
+  - Adjusted the next slice from port-state creation to the P1 roadmap item `useNodeFloatingPanels`.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `frontend/src/editor/nodes/useNodeFloatingPanels.test.ts` before production code.
+  - Ran `node --test frontend/src/editor/nodes/useNodeFloatingPanels.test.ts` and verified the expected red failure: `ERR_MODULE_NOT_FOUND` for `useNodeFloatingPanels.ts`.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `useNodeFloatingPanels.ts` to own top-action active state, confirm timeout lifecycle, floating-panel surface detection, outside pointer/focus/escape handling, and document listener wiring.
+  - Updated `NodeCard.vue` to consume the composable while keeping component-specific close behavior and preset/delete confirmation callbacks in the component.
+  - Updated `NodeCard.structure.test.ts` to verify the new roadmap boundary.
+  - Updated the formal roadmap document with the current P1 execution progress.
+  - Confirmed `NodeCard.vue` is down to 4,856 lines after this extraction.
+
+### Phase 4: Focused Verification
+- **Status:** completed
+- Actions taken:
+  - Ran `node --test frontend/src/editor/nodes/useNodeFloatingPanels.test.ts frontend/src/editor/nodes/NodeCard.structure.test.ts`.
+  - Result: 37 tests passed, 0 failed.
+  - Ran `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend`.
+  - Result: exited 0 with no diagnostics.
+
+### Phase 5: Full Verification and Dev Restart
+- **Status:** completed
+- Actions taken:
+  - Ran the full frontend test suite with `node --test $(rg --files frontend/src -g '*.test.ts') frontend/vite.config.structure.test.ts`.
+  - Result: 757 tests passed, 0 failed.
+  - Ran `npm run build` in `frontend`; the build completed without a Vite large chunk warning.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend returned HTTP 200 at `http://127.0.0.1:3477`.
+  - Confirmed the backend health route returned HTTP 200 at `http://127.0.0.1:8765/health`.
+  - Confirmed the restarted backend and frontend dev processes remained alive after a delayed check.
+
+### Phase 6: Commit and Push
+- **Status:** in_progress
+- Actions taken:
+  - Preparing final diff and whitespace checks before commit.
+
 ## Session: 2026-04-28 Baseline Interaction Repair and Large Connection Cleanup
 
 ### Phase 1: Baseline Regression Repair
