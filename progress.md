@@ -600,6 +600,74 @@
 | What have I learned? | Agent skill attach/remove patch decisions belong in `skillPickerModel.ts`; `NodeCard.vue` only needs picker state and dispatch responsibilities. |
 | What have I done? | Extracted skill attach/remove patch helpers, added focused tests, ran full frontend checks, built without chunk warnings, and restarted the app. |
 
+## Session: 2026-04-28 Round 13
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Ran planning session catchup and read the completed round 12 plan/progress/findings.
+  - Confirmed the worktree starts clean on `main...origin/main`.
+  - Inspected `EditorCanvas.vue`, existing canvas model files, and `EditorCanvas.structure.test.ts`.
+
+### Phase 2: Select Safe Refactor Slice
+- **Status:** completed
+- Actions taken:
+  - Selected route handle tone, palette, flow-out hotspot geometry, and route handle CSS variable style helpers.
+  - Decided to keep DOM events, connection state, pointer handling, and drag completion inside `EditorCanvas.vue`.
+
+### Phase 3: Implement Cleanup
+- **Status:** completed
+- Actions taken:
+  - Updated `task_plan.md` for the thirteenth cleanup round.
+  - Added failing tests for route handle tone, palette, flow-out hotspot style, and route handle style before production code.
+  - Ran the focused red tests and verified they fail because `routeHandleModel.ts` and the EditorCanvas model boundary are missing.
+  - Added `routeHandleModel.ts` with route handle tone, palette, and hotspot style helpers.
+  - Updated `EditorCanvas.vue` to call the route handle model helpers.
+  - Updated `EditorCanvas.structure.test.ts` to assert the new model boundary.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran the focused route handle model test after implementation.
+  - Ran the focused EditorCanvas structure test after implementation.
+  - Ran `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters`.
+  - Ran the full frontend node test suite.
+  - Ran the frontend production build; no large chunk warning was emitted.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend returned HTTP 200 at `http://127.0.0.1:3477`.
+  - Confirmed the backend health route returned HTTP 200 at `http://127.0.0.1:8765/health`.
+  - Confirmed the restarted `node scripts/start.mjs`, uvicorn, and Vite processes remained alive after a delayed check.
+
+### Phase 5: Commit and Push
+- **Status:** completed
+- Actions taken:
+  - Checked git status after restart; only source/test/planning files are modified.
+  - Confirmed no untracked runtime or build artifacts are present.
+  - Ran `git diff --check` with no whitespace errors.
+  - Committed the cleanup as `841911c` with Chinese message `抽取画布路由句柄展示逻辑`.
+  - Prepared the planning and findings updates for a Chinese progress commit and push.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red test | `node --test frontend/src/editor/canvas/routeHandleModel.test.ts` before implementation | Fails because the route handle model does not exist | Failed with `ERR_MODULE_NOT_FOUND` for `routeHandleModel.ts` | Passed |
+| Red structure test | `node --test frontend/src/editor/canvas/EditorCanvas.structure.test.ts` before implementation | Fails because `EditorCanvas.vue` still owns route handle helpers | Failed on missing `routeHandleModel` import and missing model file | Passed |
+| Route handle model | `node --test frontend/src/editor/canvas/routeHandleModel.test.ts` | Model tests pass | 4 passed | Passed |
+| EditorCanvas structure | `node --test frontend/src/editor/canvas/EditorCanvas.structure.test.ts` | Structure constraints pass | 59 passed | Passed |
+| Unused symbol check | `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No unused-symbol diagnostics | Exit 0, no diagnostics | Passed |
+| Full frontend tests | `node --test $(rg --files frontend/src -g '*.test.ts') frontend/vite.config.structure.test.ts` | All frontend tests pass | 699 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without chunk warning regressions | Exit 0, no large chunk warning | Passed |
+| Dev restart | `npm run dev` | Services start and respond | Frontend 200, backend `/health` 200 | Passed |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Thirteenth cleanup implementation, verification, dev restart, commit, and push are complete. |
+| Where am I going? | Ready for final handoff or the next cleanup slice. |
+| What's the goal? | Continue reducing high-concentration editor components without changing graph editing behavior. |
+| What have I learned? | Route handle tone, palette, and hotspot style are pure canvas presentation concerns and can live outside `EditorCanvas.vue`. |
+| What have I done? | Extracted route handle presentation helpers, added focused tests, ran full frontend checks, built without chunk warnings, and restarted the app. |
+
 ## Error Log
 | Timestamp | Error | Attempt | Resolution |
 |-----------|-------|---------|------------|
