@@ -149,9 +149,9 @@ test("EditorCanvas styles runtime feedback with one halo layer and a static node
   assert.doesNotMatch(componentSource, /\.editor-canvas__node-halo::(?:before|after)/);
   assert.doesNotMatch(componentSource, /editor-canvas__node-halo--running-current/);
   assert.doesNotMatch(componentSource, /editor-canvas__node-halo--paused-current/);
-  assert.match(componentSource, /\.editor-canvas__node-halo--running \{[\s\S]*--editor-canvas-node-halo-background-rest:\s*rgba\(16,\s*185,\s*129,\s*0\.14\)/);
+  assert.match(componentSource, /\.editor-canvas__node-halo--running \{[\s\S]*--editor-canvas-node-halo-background-rest:\s*rgba\(16,\s*185,\s*129,\s*0\.18\)/);
   assert.match(componentSource, /\.editor-canvas__node-halo--running \{[\s\S]*animation:\s*editor-canvas-running-halo-breathe 1\.35s ease-in-out infinite;/);
-  assert.match(componentSource, /\.editor-canvas__node-halo--paused \{[\s\S]*--editor-canvas-node-halo-background-rest:\s*rgba\(245,\s*158,\s*11,\s*0\.14\)/);
+  assert.match(componentSource, /\.editor-canvas__node-halo--paused \{[\s\S]*--editor-canvas-node-halo-background-rest:\s*rgba\(245,\s*158,\s*11,\s*0\.18\)/);
   assert.match(componentSource, /\.editor-canvas__node-halo--paused \{[\s\S]*animation:\s*editor-canvas-paused-halo-breathe 1\.55s ease-in-out infinite;/);
   const runningCardBlock = firstCssBlock(":global(.node-card.editor-canvas__node--running)");
   assert.match(runningCardBlock, /0 0 0 1\.5px rgba\(16,\s*185,\s*129,\s*0\.52\)/);

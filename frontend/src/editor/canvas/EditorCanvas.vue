@@ -4579,9 +4579,9 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   --editor-canvas-node-halo-scale-peak: 1.035;
   --editor-canvas-node-halo-scale-flicker: 1.004;
   --editor-canvas-node-halo-scale-afterglow: 1.026;
-  --editor-canvas-node-halo-background-rest: rgba(16, 185, 129, 0.14);
-  --editor-canvas-node-halo-background-peak: rgba(16, 185, 129, 0.26);
-  --editor-canvas-node-halo-background-flicker: rgba(16, 185, 129, 0.18);
+  --editor-canvas-node-halo-background-rest: rgba(16, 185, 129, 0.18);
+  --editor-canvas-node-halo-background-peak: rgba(16, 185, 129, 0.32);
+  --editor-canvas-node-halo-background-flicker: rgba(16, 185, 129, 0.22);
   animation: editor-canvas-running-halo-breathe 1.35s ease-in-out infinite;
 }
 
@@ -4597,9 +4597,9 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   --editor-canvas-node-halo-scale-peak: 1.035;
   --editor-canvas-node-halo-scale-flicker: 1.004;
   --editor-canvas-node-halo-scale-afterglow: 1.026;
-  --editor-canvas-node-halo-background-rest: rgba(245, 158, 11, 0.14);
-  --editor-canvas-node-halo-background-peak: rgba(245, 158, 11, 0.26);
-  --editor-canvas-node-halo-background-flicker: rgba(245, 158, 11, 0.18);
+  --editor-canvas-node-halo-background-rest: rgba(245, 158, 11, 0.18);
+  --editor-canvas-node-halo-background-peak: rgba(245, 158, 11, 0.32);
+  --editor-canvas-node-halo-background-flicker: rgba(245, 158, 11, 0.22);
   animation: editor-canvas-paused-halo-breathe 1.55s ease-in-out infinite;
 }
 
