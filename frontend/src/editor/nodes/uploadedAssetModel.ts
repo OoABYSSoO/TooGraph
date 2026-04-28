@@ -89,6 +89,50 @@ export function resolveUploadedAssetInputAccept(assetType: UploadedAssetType | n
   }
 }
 
+export function resolveUploadedAssetLabel(assetType: UploadedAssetType | null) {
+  switch (assetType) {
+    case "image":
+      return "image";
+    case "audio":
+      return "audio clip";
+    case "video":
+      return "video";
+    default:
+      return "file";
+  }
+}
+
+export function resolveUploadedAssetSummary(asset: UploadedAssetEnvelope | null) {
+  if (!asset) {
+    return "";
+  }
+  return `${asset.mimeType} · ${Math.max(1, Math.round(asset.size / 1024))} KB`;
+}
+
+export function resolveUploadedAssetTextPreview(asset: UploadedAssetEnvelope | null) {
+  if (!asset || asset.encoding !== "text") {
+    return "";
+  }
+  return asset.content.slice(0, 3000);
+}
+
+export function resolveUploadedAssetDescription(asset: UploadedAssetEnvelope | null, assetType: UploadedAssetType | null) {
+  if (asset) {
+    return `Stored as ${asset.detectedType} upload. ${resolveUploadedAssetSummary(asset)}`;
+  }
+
+  switch (assetType) {
+    case "image":
+      return "Upload a reference image for this workflow.";
+    case "audio":
+      return "Upload an audio clip that this workflow should read.";
+    case "video":
+      return "Upload a video asset that this workflow should inspect.";
+    default:
+      return "Upload a file to seed this workflow.";
+  }
+}
+
 async function fileToDataUrl(file: File) {
   const base64 = bytesToBase64(new Uint8Array(await file.arrayBuffer()));
   return `data:${file.type || "application/octet-stream"};base64,${base64}`;

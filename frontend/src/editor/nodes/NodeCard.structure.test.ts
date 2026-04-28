@@ -114,6 +114,12 @@ test("NodeCard uses Element Plus segmented control on the same row as the input 
   assert.match(inputSection, /:options="inputTypeOptions"/);
   assert.match(inputSection, /:model-value="inputBoundarySelection"/);
   assert.match(inputSection, /:disabled="Boolean\(inputAssetEnvelope\)"/);
+  assert.match(componentSource, /from "\.\/uploadedAssetModel";/);
+  assert.match(componentSource, /resolveUploadedAssetLabel\(inputAssetType\.value\)/);
+  assert.match(componentSource, /resolveUploadedAssetSummary\(inputAssetEnvelope\.value\)/);
+  assert.match(componentSource, /resolveUploadedAssetTextPreview\(inputAssetEnvelope\.value\)/);
+  assert.match(componentSource, /resolveUploadedAssetDescription\(inputAssetEnvelope\.value, inputAssetType\.value\)/);
+  assert.doesNotMatch(componentSource, /return `Stored as \$\{asset\.detectedType\} upload\. \$\{inputAssetSummary\.value\}`;/);
   assert.match(inputSection, /<template #default="\{ item \}">/);
   assert.match(inputSection, /class="node-card__input-boundary-icon-wrap"/);
   assert.match(inputSection, /<component :is="item\.icon" class="node-card__input-boundary-icon" aria-hidden="true" \/>/);
