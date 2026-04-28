@@ -110,10 +110,13 @@
   - Confirmed the restarted backend and frontend dev processes remained alive after a delayed check.
 
 ### Phase 6: Commit and Push
-- **Status:** in_progress
+- **Status:** completed
 - Actions taken:
   - Checked git status after restart; only source, test, and planning files are modified or untracked.
   - Confirmed no runtime logs or build output are listed for commit.
+  - Ran `git diff --check` and `git diff --cached --check` with no whitespace errors.
+  - Committed the cleanup as `f495a50` with Chinese message `抽取节点文本编辑交互`.
+  - Pushed `main` to `origin/main`.
 
 ## Session: 2026-04-28 Baseline Interaction Repair and Large Connection Cleanup
 
