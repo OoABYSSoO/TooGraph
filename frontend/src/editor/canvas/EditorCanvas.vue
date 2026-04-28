@@ -415,11 +415,18 @@ import {
   type EdgeVisibilityMode,
 } from "./edgeVisibilityModel";
 import {
-  buildFlowOutHotspotStyle,
   buildRouteHandleStyle,
   resolveRouteHandlePalette,
   resolveRouteHandleTone,
 } from "./routeHandleModel";
+import {
+  buildConnectionPreviewStyle,
+  buildFlowHotspotStyle,
+  buildFlowHotspotConnectStyle,
+  buildPointAnchorStyle,
+  buildPointAnchorConnectStyle,
+  buildProjectedEdgeStyle,
+} from "./canvasInteractionStyleModel";
 import {
   defaultValueForStateType,
   resolveStateColorOptions,
@@ -1046,28 +1053,9 @@ const connectionPreview = computed(() => {
     }),
   };
 });
-const connectionPreviewStyle = computed(() => {
-  const accent = activeConnectionAccentColor.value;
-  if (!connectionPreview.value) {
-    return undefined;
-  }
-
-  if (connectionPreview.value.kind === "data") {
-    return {
-      "--editor-connection-preview-stroke": withAlpha(accent, 0.82),
-    };
-  }
-
-  if (connectionPreview.value.kind === "route") {
-    return {
-      "--editor-connection-preview-stroke": withAlpha(accent, 0.78),
-    };
-  }
-
-  return {
-    "--editor-connection-preview-stroke": withAlpha(accent, 0.76),
-  };
-});
+const connectionPreviewStyle = computed(() =>
+  buildConnectionPreviewStyle(connectionPreview.value?.kind ?? null, activeConnectionAccentColor.value),
+);
 const canvasSurfaceStyle = computed(() => resolveCanvasSurfaceStyle(viewport.viewport));
 const viewportStyle = computed(() => ({
   transform: `translate(${viewport.viewport.x}px, ${viewport.viewport.y}px) scale(${viewport.viewport.scale})`,
@@ -1684,114 +1672,21 @@ function handleMinimapCenterView(point: { worldX: number; worldY: number }) {
   canvasRef.value?.focus();
 }
 
+const canvasInteractionStyleContext = computed(() => ({
+  activeConnectionSourceAnchorId: activeConnectionSourceAnchorId.value,
+  eligibleTargetAnchorIds: eligibleTargetAnchorIds.value,
+  activeConnectionSourceKind: activeConnection.value?.sourceKind ?? null,
+  activeConnectionAccentColor: activeConnectionAccentColor.value,
+}));
+const edgeStyle = buildProjectedEdgeStyle;
+const flowHotspotStyle = buildFlowHotspotStyle;
 const routeHandleStyle = buildRouteHandleStyle;
+const anchorStyle = buildPointAnchorStyle;
 
-function edgeStyle(edge: ProjectedCanvasEdge) {
-  if (edge.kind === "route" && edge.branch) {
-    const accent = resolveRouteHandlePalette(edge.branch).accent;
-    return {
-      "--editor-edge-stroke": withAlpha(accent, 0.88),
-      "--editor-edge-outline": withAlpha(accent, 0.16),
-    };
-  }
-  if (!edge.color) {
-    return undefined;
-  }
-  return {
-    "--editor-edge-stroke": edge.color,
-    "--editor-edge-outline": withAlpha(edge.color, 0.18),
-    "--editor-edge-outline-active": withAlpha(edge.color, 0.32),
-  };
-}
-
-function withAlpha(hexColor: string, alpha: number) {
-  const normalized = hexColor.trim();
-  const hex = normalized.startsWith("#") ? normalized.slice(1) : normalized;
-  if (!/^[0-9a-fA-F]{6}$/.test(hex)) {
-    return `rgba(37, 99, 235, ${alpha})`;
-  }
-
-  const red = Number.parseInt(hex.slice(0, 2), 16);
-  const green = Number.parseInt(hex.slice(2, 4), 16);
-  const blue = Number.parseInt(hex.slice(4, 6), 16);
-  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
-}
-
-function flowHotspotStyle(anchor: ProjectedCanvasAnchor) {
-  const isVertical = anchor.side === "left" || anchor.side === "right";
-  let left = anchor.x;
-  let top = anchor.y;
-  let width = isVertical ? 22 : 86;
-  let height = isVertical ? 86 : 22;
-
-  if (anchor.kind === "flow-out" && anchor.side === "right") {
-    return buildFlowOutHotspotStyle(anchor);
-  } else if (anchor.kind === "flow-in" && anchor.side === "left") {
-    left -= 18;
-    width = 42;
-    height = 82;
-  }
-
-  return {
-    left: `${left}px`,
-    top: `${top}px`,
-    width: `${width}px`,
-    height: `${height}px`,
-  };
-}
-
-function flowHotspotConnectStyle(anchor: ProjectedCanvasAnchor) {
-  const isSource = activeConnectionSourceAnchorId.value === anchor.id;
-  const isTarget = eligibleTargetAnchorIds.value.has(anchor.id);
-  if (!isSource && !isTarget) {
-    return undefined;
-  }
-
-  const accent = activeConnectionAccentColor.value;
-  if (activeConnection.value?.sourceKind === "state-out") {
-    return {
-      "--editor-connection-source-fill": withAlpha(accent, 0.16),
-      "--editor-connection-source-border": withAlpha(accent, 0.34),
-      "--editor-connection-source-glow": withAlpha(accent, 0.14),
-      "--editor-connection-source-symbol": withAlpha(accent, 0.96),
-      "--editor-connection-target-fill": withAlpha(accent, 0.12),
-      "--editor-connection-target-border": withAlpha(accent, 0.28),
-      "--editor-connection-target-glow": withAlpha(accent, 0.16),
-      "--editor-connection-target-anchor": withAlpha(accent, 0.92),
-    };
-  }
-
-  return undefined;
-}
-
-function anchorStyle(anchor: ProjectedCanvasAnchor) {
-  if (!anchor.color) {
-    return undefined;
-  }
-  return {
-    "--editor-anchor-fill": anchor.color,
-  };
-}
-
-function anchorConnectStyle(anchor: ProjectedCanvasAnchor) {
-  const isSource = activeConnectionSourceAnchorId.value === anchor.id;
-  const isTarget = eligibleTargetAnchorIds.value.has(anchor.id);
-  if (!isSource && !isTarget) {
-    return undefined;
-  }
-
-  const accent = activeConnectionAccentColor.value;
-  if (activeConnection.value?.sourceKind === "state-out") {
-    return {
-      "--editor-connection-source-anchor": withAlpha(accent, 0.96),
-      "--editor-connection-source-stroke": withAlpha(accent, 0.24),
-      "--editor-connection-target-anchor": withAlpha(accent, 0.92),
-      "--editor-connection-target-stroke": withAlpha(accent, 0.18),
-    };
-  }
-
-  return undefined;
-}
+const flowHotspotConnectStyle = (anchor: ProjectedCanvasAnchor) =>
+  buildFlowHotspotConnectStyle(anchor, canvasInteractionStyleContext.value);
+const anchorConnectStyle = (anchor: ProjectedCanvasAnchor) =>
+  buildPointAnchorConnectStyle(anchor, canvasInteractionStyleContext.value);
 
 function registerNodeRef(nodeId: string, element: unknown) {
   if (element instanceof HTMLElement) {

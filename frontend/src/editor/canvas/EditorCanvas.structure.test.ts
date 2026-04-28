@@ -9,6 +9,10 @@ const currentDirectory = dirname(currentFilePath);
 const componentSource = readFileSync(resolve(currentDirectory, "EditorCanvas.vue"), "utf8").replace(/\r\n/g, "\n");
 const minimapSource = readFileSync(resolve(currentDirectory, "EditorMinimap.vue"), "utf8").replace(/\r\n/g, "\n");
 
+function readCanvasInteractionStyleModelSource() {
+  return readFileSync(resolve(currentDirectory, "canvasInteractionStyleModel.ts"), "utf8").replace(/\r\n/g, "\n");
+}
+
 function firstCssBlock(selector: string) {
   const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const matches = Array.from(componentSource.matchAll(new RegExp(`${escapedSelector} \\{[\\s\\S]*?\\n\\}`, "g")));
@@ -126,8 +130,19 @@ test("EditorCanvas keeps state anchors and flow hotspots above hovered nodes", (
 });
 
 test("EditorCanvas styles typed anchors and edges from projected state colors", () => {
+  const canvasInteractionStyleModelSource = readCanvasInteractionStyleModelSource();
+
   assert.match(componentSource, /:style="edgeStyle\(edge\)"/);
   assert.match(componentSource, /:style="\[anchorStyle\(anchor\), anchorConnectStyle\(anchor\)\]"/);
+  assert.match(componentSource, /import \{[\s\S]*buildPointAnchorStyle,[\s\S]*buildPointAnchorConnectStyle,[\s\S]*buildProjectedEdgeStyle,[\s\S]*\} from "\.\/canvasInteractionStyleModel";/);
+  assert.match(componentSource, /const edgeStyle = buildProjectedEdgeStyle;/);
+  assert.match(componentSource, /const anchorStyle = buildPointAnchorStyle;/);
+  assert.match(componentSource, /const anchorConnectStyle = \(anchor: ProjectedCanvasAnchor\) =>\s*buildPointAnchorConnectStyle\(anchor, canvasInteractionStyleContext\.value\);/);
+  assert.match(canvasInteractionStyleModelSource, /export function buildPointAnchorStyle/);
+  assert.match(canvasInteractionStyleModelSource, /export function buildProjectedEdgeStyle/);
+  assert.doesNotMatch(componentSource, /function anchorStyle\(anchor: ProjectedCanvasAnchor\)/);
+  assert.doesNotMatch(componentSource, /function anchorConnectStyle\(anchor: ProjectedCanvasAnchor\)/);
+  assert.doesNotMatch(componentSource, /function edgeStyle\(edge: ProjectedCanvasEdge\)/);
 });
 
 test("EditorCanvas renders anchors in a dedicated overlay layer above nodes", () => {
@@ -321,6 +336,8 @@ test("EditorCanvas lets top-left floating tools respect workspace overlay cleara
 });
 
 test("EditorCanvas renders condition route outputs as right-side floating branch handles", () => {
+  const canvasInteractionStyleModelSource = readCanvasInteractionStyleModelSource();
+
   assert.match(componentSource, /const routeHandles = computed\(\(\) => projectedAnchors\.value\.filter\(\(anchor\) => anchor\.kind === "route-out"\)\);/);
   assert.match(componentSource, /<div class="editor-canvas__route-handles" aria-hidden="true">/);
   assert.match(componentSource, /v-for="anchor in routeHandles"/);
@@ -335,9 +352,10 @@ test("EditorCanvas renders condition route outputs as right-side floating branch
   assert.match(componentSource, /@pointerenter="setHoveredFlowHandleNode\(anchor\.nodeId\)"/);
   assert.match(componentSource, /@pointerleave="clearHoveredFlowHandleNode\(anchor\.nodeId\)"/);
   assert.match(componentSource, /\.editor-canvas__route-handles \{[\s\S]*z-index:\s*12;/);
-  assert.match(componentSource, /import \{[\s\S]*buildFlowOutHotspotStyle,[\s\S]*buildRouteHandleStyle,[\s\S]*resolveRouteHandleTone,[\s\S]*\} from "\.\/routeHandleModel";/);
+  assert.match(componentSource, /import \{[\s\S]*buildRouteHandleStyle,[\s\S]*resolveRouteHandleTone,[\s\S]*\} from "\.\/routeHandleModel";/);
   assert.match(componentSource, /const routeHandleStyle = buildRouteHandleStyle;/);
-  assert.match(componentSource, /return buildFlowOutHotspotStyle\(anchor\);/);
+  assert.match(canvasInteractionStyleModelSource, /return buildFlowOutHotspotStyle\(anchor\);/);
+  assert.doesNotMatch(componentSource, /buildFlowOutHotspotStyle/);
   assert.doesNotMatch(componentSource, /FLOW_OUT_HOTSPOT_GEOMETRY/);
   assert.doesNotMatch(componentSource, /function resolveFlowOutHotspotStyle\(anchor: ProjectedCanvasAnchor\)/);
   assert.match(componentSource, /\.editor-canvas__flow-hotspot--visible::before \{[\s\S]*var\(--editor-flow-handle-fill,/);
@@ -382,6 +400,8 @@ test("EditorCanvas delays clearing node hover state so hover-dependent node chro
 });
 
 test("EditorCanvas renders output flow hotspots only for allowed modes and interacted nodes", () => {
+  const canvasInteractionStyleModelSource = readCanvasInteractionStyleModelSource();
+
   assert.match(componentSource, /v-for="anchor in flowAnchors"/);
   assert.match(componentSource, /class="editor-canvas__flow-hotspot"/);
   assert.match(componentSource, /:style="\[flowHotspotStyle\(anchor\), flowHotspotConnectStyle\(anchor\)\]"/);
@@ -406,7 +426,14 @@ test("EditorCanvas renders output flow hotspots only for allowed modes and inter
   assert.doesNotMatch(componentSource, /edge\.kind === 'route'[\s\S]*url\(#editor-canvas-arrow-route\)/);
   assert.doesNotMatch(componentSource, /editor-canvas-arrow-flow/);
   assert.match(componentSource, /const activeConnectionAccentColor = computed\(\(\) =>/);
-  assert.match(componentSource, /function withAlpha\(hexColor: string, alpha: number\)/);
+  assert.match(componentSource, /import \{[\s\S]*buildConnectionPreviewStyle,[\s\S]*buildFlowHotspotStyle,[\s\S]*buildFlowHotspotConnectStyle,[\s\S]*\} from "\.\/canvasInteractionStyleModel";/);
+  assert.match(componentSource, /const flowHotspotStyle = buildFlowHotspotStyle;/);
+  assert.match(componentSource, /const flowHotspotConnectStyle = \(anchor: ProjectedCanvasAnchor\) =>\s*buildFlowHotspotConnectStyle\(anchor, canvasInteractionStyleContext\.value\);/);
+  assert.match(componentSource, /const connectionPreviewStyle = computed\(\(\) =>\s*buildConnectionPreviewStyle\(connectionPreview\.value\?\.kind \?\? null, activeConnectionAccentColor\.value\)/);
+  assert.match(canvasInteractionStyleModelSource, /export function withAlpha\(hexColor: string, alpha: number\)/);
+  assert.doesNotMatch(componentSource, /function withAlpha\(hexColor: string, alpha: number\)/);
+  assert.doesNotMatch(componentSource, /function flowHotspotStyle\(anchor: ProjectedCanvasAnchor\)/);
+  assert.doesNotMatch(componentSource, /function flowHotspotConnectStyle\(anchor: ProjectedCanvasAnchor\)/);
   assert.match(componentSource, /\.editor-canvas__edge--data \{[\s\S]*animation:\s*editor-canvas-ant-line 1\.2s linear infinite;/);
   assert.match(componentSource, /\.editor-canvas__edge--flow \{[\s\S]*animation:\s*editor-canvas-flow-line 1\.8s linear infinite;/);
   assert.match(componentSource, /\.editor-canvas__edge--route \{[\s\S]*stroke-dasharray:\s*18 22;/);
@@ -516,10 +543,13 @@ test("EditorCanvas keeps selected edge color unchanged and uses outline layers f
 });
 
 test("EditorCanvas tints route edge outlines from the branch palette", () => {
+  const canvasInteractionStyleModelSource = readCanvasInteractionStyleModelSource();
+
   assert.match(componentSource, /v-for="edge in projectedEdges\.filter\(\(edge\) => edge\.kind === 'flow' \|\| edge\.kind === 'route'\)"/);
   assert.match(componentSource, /class="editor-canvas__edge-delete-highlight"[\s\S]*:style="edgeStyle\(edge\)"/);
-  assert.match(componentSource, /const accent = resolveRouteHandlePalette\(edge\.branch\)\.accent;/);
-  assert.match(componentSource, /"--editor-edge-outline": withAlpha\(accent, 0\.16\)/);
+  assert.match(componentSource, /const edgeStyle = buildProjectedEdgeStyle;/);
+  assert.match(canvasInteractionStyleModelSource, /const accent = resolveRouteHandlePalette\(edge\.branch\)\.accent;/);
+  assert.match(canvasInteractionStyleModelSource, /"--editor-edge-outline": withAlpha\(accent, 0\.16\)/);
   assert.match(componentSource, /\.editor-canvas__edge-delete-highlight \{[\s\S]*stroke:\s*var\(--editor-edge-outline, rgba\(201,\s*107,\s*31,\s*0\.16\)\);/);
 });
 
@@ -576,13 +606,15 @@ test("EditorCanvas gives data edges the same two-step state editing entry patter
 });
 
 test("EditorCanvas tints data edge outlines from the data edge state color", () => {
+  const canvasInteractionStyleModelSource = readCanvasInteractionStyleModelSource();
+
   assert.match(componentSource, /v-for="edge in projectedEdges\.filter\(\(edge\) => edge\.kind === 'data'\)"/);
   assert.match(componentSource, /class="editor-canvas__edge-data-highlight"/);
   assert.match(componentSource, /:style="edgeStyle\(edge\)"/);
   assert.match(componentSource, /'editor-canvas__edge-data-highlight--active': isDataEdgeStateInteractionOpen\(edge\)/);
   assert.match(componentSource, /function isDataEdgeStateInteractionOpen\(edge: Pick<ProjectedCanvasEdge, "kind" \| "source" \| "target" \| "state">\)/);
-  assert.match(componentSource, /"--editor-edge-outline": withAlpha\(edge\.color, 0\.18\)/);
-  assert.match(componentSource, /"--editor-edge-outline-active": withAlpha\(edge\.color, 0\.32\)/);
+  assert.match(canvasInteractionStyleModelSource, /"--editor-edge-outline": withAlpha\(edge\.color, 0\.18\)/);
+  assert.match(canvasInteractionStyleModelSource, /"--editor-edge-outline-active": withAlpha\(edge\.color, 0\.32\)/);
   assert.match(componentSource, /\.editor-canvas__edge-data-highlight \{[\s\S]*stroke:\s*var\(--editor-edge-outline,/);
   assert.match(componentSource, /\.editor-canvas__edge-data-highlight--active \{[\s\S]*stroke:\s*var\(--editor-edge-outline-active,/);
 });
