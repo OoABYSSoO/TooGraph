@@ -287,14 +287,6 @@
             @pointerdown.stop.prevent="handleNodeResizePointerDown(nodeId, handle, $event)"
           ></div>
         </div>
-        <div v-if="isNodeResizeHandleVisible(nodeId)" class="editor-canvas__resize-handles" aria-hidden="true">
-          <span
-            v-for="handle in NODE_RESIZE_HANDLES"
-            :key="handle"
-            class="editor-canvas__resize-handle"
-            :class="`editor-canvas__resize-handle--${handle}`"
-          ></span>
-        </div>
       </div>
       <div class="editor-canvas__flow-hotspots" aria-hidden="true">
         <div
@@ -2861,14 +2853,6 @@ function isNodeResizeHotzoneEnabled() {
   return !isGraphEditingLocked() && !activeConnection.value;
 }
 
-function isNodeResizeHandleVisible(nodeId: string) {
-  return !isGraphEditingLocked() && !activeConnection.value && (
-    nodeResizeDrag.value?.nodeId === nodeId ||
-    isNodeVisuallySelected(nodeId) ||
-    hoveredNodeId.value === nodeId
-  );
-}
-
 function clearScheduledHoveredNodeRelease() {
   if (hoveredNodeReleaseTimeoutRef.value !== null && typeof window !== "undefined") {
     window.clearTimeout(hoveredNodeReleaseTimeoutRef.value);
@@ -4403,50 +4387,6 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   bottom: -6px;
 }
 
-.editor-canvas__resize-handles {
-  pointer-events: none;
-  position: absolute;
-  inset: 0;
-  z-index: 11;
-}
-
-.editor-canvas__resize-handle {
-  position: absolute;
-  width: 16px;
-  height: 16px;
-  border: 1px solid rgba(154, 52, 18, 0.32);
-  border-radius: 999px;
-  background:
-    radial-gradient(circle at 45% 42%, rgba(255, 255, 255, 0.96) 0 34%, rgba(255, 247, 237, 0.88) 35% 100%);
-  box-shadow:
-    0 8px 18px rgba(60, 41, 20, 0.14),
-    0 0 0 3px rgba(255, 247, 237, 0.68);
-}
-
-.editor-canvas__resize-handle--nw {
-  top: 0;
-  left: 0;
-  transform: translate(-50%, -50%);
-}
-
-.editor-canvas__resize-handle--ne {
-  top: 0;
-  right: 0;
-  transform: translate(50%, -50%);
-}
-
-.editor-canvas__resize-handle--sw {
-  bottom: 0;
-  left: 0;
-  transform: translate(-50%, 50%);
-}
-
-.editor-canvas__resize-handle--se {
-  right: 0;
-  bottom: 0;
-  transform: translate(50%, 50%);
-}
-
 .editor-canvas__resize-hotzone--nw,
 .editor-canvas__resize-hotzone--se {
   cursor: nwse-resize;
@@ -4786,7 +4726,7 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   animation: editor-canvas-paused-halo-breathe 2.05s ease-in-out infinite;
 }
 
-:deep(.editor-canvas__node--running) {
+:global(.node-card.editor-canvas__node--running) {
   --editor-canvas-node-card-shadow-rest:
     0 18px 36px rgba(60, 41, 20, 0.1),
     0 0 0 1.5px rgba(16, 185, 129, 0.62),
@@ -4803,7 +4743,7 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   animation: editor-canvas-running-card-breathe 2.2s ease-in-out infinite;
 }
 
-:deep(.editor-canvas__node--running-current) {
+:global(.node-card.editor-canvas__node--running-current) {
   --editor-canvas-node-card-shadow-rest:
     0 20px 40px rgba(60, 41, 20, 0.12),
     0 0 0 1.5px rgba(16, 185, 129, 0.86),
@@ -4820,7 +4760,7 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   animation: editor-canvas-running-card-breathe 1.85s ease-in-out infinite;
 }
 
-:deep(.editor-canvas__node--paused) {
+:global(.node-card.editor-canvas__node--paused) {
   --editor-canvas-node-card-shadow-rest:
     0 18px 36px rgba(60, 41, 20, 0.1),
     0 0 0 1.5px rgba(245, 158, 11, 0.62),
@@ -4837,7 +4777,7 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   animation: editor-canvas-paused-card-breathe 2.45s ease-in-out infinite;
 }
 
-:deep(.editor-canvas__node--paused-current) {
+:global(.node-card.editor-canvas__node--paused-current) {
   --editor-canvas-node-card-shadow-rest:
     0 20px 40px rgba(60, 41, 20, 0.12),
     0 0 0 1.5px rgba(245, 158, 11, 0.86),
@@ -4860,10 +4800,10 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   .editor-canvas__node-halo--running-current::before,
   .editor-canvas__node-halo--paused::before,
   .editor-canvas__node-halo--paused-current::before,
-  :deep(.editor-canvas__node--running),
-  :deep(.editor-canvas__node--running-current),
-  :deep(.editor-canvas__node--paused),
-  :deep(.editor-canvas__node--paused-current),
+  :global(.node-card.editor-canvas__node--running),
+  :global(.node-card.editor-canvas__node--running-current),
+  :global(.node-card.editor-canvas__node--paused),
+  :global(.node-card.editor-canvas__node--paused-current),
   .editor-canvas__edge--active-run,
   .editor-canvas__edge--flow.editor-canvas__edge--active-run,
   .editor-canvas__edge--route.editor-canvas__edge--active-run,
@@ -4872,13 +4812,13 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   }
 }
 
-:deep(.editor-canvas__node--success) {
+:global(.node-card.editor-canvas__node--success) {
   box-shadow:
     0 18px 36px rgba(60, 41, 20, 0.1),
     0 0 0 1.5px rgba(180, 83, 9, 0.34);
 }
 
-:deep(.editor-canvas__node--failed) {
+:global(.node-card.editor-canvas__node--failed) {
   box-shadow:
     0 18px 36px rgba(60, 41, 20, 0.1),
     0 0 0 1.5px rgba(239, 68, 68, 0.56);

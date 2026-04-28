@@ -94,22 +94,9 @@ test("EditorCanvas exposes invisible corner hotzones for real node resizing", ()
   assert.match(componentSource, /\.editor-canvas__resize-hotzone--ne,[\s\S]*\.editor-canvas__resize-hotzone--sw \{[\s\S]*cursor:\s*nesw-resize;/);
   const northwestHotzoneCssBlock = componentSource.match(/\.editor-canvas__resize-hotzone--nw \{([\s\S]*?)\n\}/)?.[1] ?? "";
   assert.doesNotMatch(northwestHotzoneCssBlock, /transform:/);
-});
-
-test("EditorCanvas shows selected or hovered nodes with discoverable resize corner affordances", () => {
-  assert.match(componentSource, /v-if="isNodeResizeHandleVisible\(nodeId\)"/);
-  assert.match(componentSource, /class="editor-canvas__resize-handles"/);
-  assert.match(componentSource, /class="editor-canvas__resize-handle"/);
-  assert.match(componentSource, /aria-hidden="true"/);
-  assert.match(componentSource, /function isNodeResizeHandleVisible\(nodeId: string\)/);
-  assert.match(componentSource, /return !isGraphEditingLocked\(\) && !activeConnection\.value && \(/);
-  assert.match(componentSource, /nodeResizeDrag\.value\?\.nodeId === nodeId/);
-  assert.match(componentSource, /isNodeVisuallySelected\(nodeId\)/);
-  assert.match(componentSource, /hoveredNodeId\.value === nodeId/);
-  assert.match(componentSource, /\.editor-canvas__resize-handles \{[\s\S]*pointer-events:\s*none;/);
-  assert.match(componentSource, /\.editor-canvas__resize-handle \{[\s\S]*width:\s*16px;[\s\S]*height:\s*16px;/);
-  assert.match(componentSource, /\.editor-canvas__resize-handle--nw \{[\s\S]*transform:\s*translate\(-50%,\s*-50%\);/);
-  assert.match(componentSource, /\.editor-canvas__resize-handle--se \{[\s\S]*transform:\s*translate\(50%,\s*50%\);/);
+  assert.doesNotMatch(componentSource, /isNodeResizeHandleVisible/);
+  assert.doesNotMatch(componentSource, /editor-canvas__resize-handles/);
+  assert.doesNotMatch(componentSource, /editor-canvas__resize-handle/);
 });
 
 test("EditorCanvas forwards node model refresh requests to the workspace", () => {
@@ -164,16 +151,17 @@ test("EditorCanvas restores legacy runtime feedback styling on node cards and ac
   assert.match(componentSource, /\.editor-canvas__node-halo--paused-current \{[\s\S]*--editor-canvas-node-halo-border-rest:\s*rgba\(245,\s*158,\s*11,\s*0\.72\)/);
   assert.match(componentSource, /\.editor-canvas__node-halo--paused-current \{[\s\S]*border:\s*1\.5px solid var\(--editor-canvas-node-halo-border-rest\)/);
   assert.match(componentSource, /\.editor-canvas__node-halo--paused-current::before \{[\s\S]*animation:\s*editor-canvas-paused-halo-breathe 2\.05s ease-in-out infinite;/);
-  assert.match(componentSource, /:deep\(\.editor-canvas__node--running\) \{[\s\S]*0 0 0 1\.5px rgba\(16,\s*185,\s*129,\s*0\.62\)/);
-  assert.match(componentSource, /:deep\(\.editor-canvas__node--running\) \{[\s\S]*animation:\s*editor-canvas-running-card-breathe 2\.2s ease-in-out infinite;/);
-  assert.match(componentSource, /:deep\(\.editor-canvas__node--running-current\) \{[\s\S]*0 0 0 1\.5px rgba\(16,\s*185,\s*129,\s*0\.86\)/);
-  assert.match(componentSource, /:deep\(\.editor-canvas__node--running-current\) \{[\s\S]*animation:\s*editor-canvas-running-card-breathe 1\.85s ease-in-out infinite;/);
-  assert.match(componentSource, /:deep\(\.editor-canvas__node--paused\) \{[\s\S]*0 0 0 1\.5px rgba\(245,\s*158,\s*11,\s*0\.62\)/);
-  assert.match(componentSource, /:deep\(\.editor-canvas__node--paused\) \{[\s\S]*animation:\s*editor-canvas-paused-card-breathe 2\.45s ease-in-out infinite;/);
-  assert.match(componentSource, /:deep\(\.editor-canvas__node--paused-current\) \{[\s\S]*0 0 0 1\.5px rgba\(245,\s*158,\s*11,\s*0\.86\)/);
-  assert.match(componentSource, /:deep\(\.editor-canvas__node--paused-current\) \{[\s\S]*animation:\s*editor-canvas-paused-card-breathe 2\.05s ease-in-out infinite;/);
-  assert.match(componentSource, /:deep\(\.editor-canvas__node--success\) \{[\s\S]*0 0 0 1\.5px rgba\(180,\s*83,\s*9,\s*0\.34\)/);
-  assert.match(componentSource, /:deep\(\.editor-canvas__node--failed\) \{[\s\S]*0 0 0 1\.5px rgba\(239,\s*68,\s*68,\s*0\.56\)/);
+  assert.match(componentSource, /:global\(\.node-card\.editor-canvas__node--running\) \{[\s\S]*0 0 0 1\.5px rgba\(16,\s*185,\s*129,\s*0\.62\)/);
+  assert.match(componentSource, /:global\(\.node-card\.editor-canvas__node--running\) \{[\s\S]*animation:\s*editor-canvas-running-card-breathe 2\.2s ease-in-out infinite;/);
+  assert.match(componentSource, /:global\(\.node-card\.editor-canvas__node--running-current\) \{[\s\S]*0 0 0 1\.5px rgba\(16,\s*185,\s*129,\s*0\.86\)/);
+  assert.match(componentSource, /:global\(\.node-card\.editor-canvas__node--running-current\) \{[\s\S]*animation:\s*editor-canvas-running-card-breathe 1\.85s ease-in-out infinite;/);
+  assert.match(componentSource, /:global\(\.node-card\.editor-canvas__node--paused\) \{[\s\S]*0 0 0 1\.5px rgba\(245,\s*158,\s*11,\s*0\.62\)/);
+  assert.match(componentSource, /:global\(\.node-card\.editor-canvas__node--paused\) \{[\s\S]*animation:\s*editor-canvas-paused-card-breathe 2\.45s ease-in-out infinite;/);
+  assert.match(componentSource, /:global\(\.node-card\.editor-canvas__node--paused-current\) \{[\s\S]*0 0 0 1\.5px rgba\(245,\s*158,\s*11,\s*0\.86\)/);
+  assert.match(componentSource, /:global\(\.node-card\.editor-canvas__node--paused-current\) \{[\s\S]*animation:\s*editor-canvas-paused-card-breathe 2\.05s ease-in-out infinite;/);
+  assert.match(componentSource, /:global\(\.node-card\.editor-canvas__node--success\) \{[\s\S]*0 0 0 1\.5px rgba\(180,\s*83,\s*9,\s*0\.34\)/);
+  assert.match(componentSource, /:global\(\.node-card\.editor-canvas__node--failed\) \{[\s\S]*0 0 0 1\.5px rgba\(239,\s*68,\s*68,\s*0\.56\)/);
+  assert.doesNotMatch(componentSource, /:deep\(\.editor-canvas__node--(?:running|running-current|paused|paused-current|success|failed)\)/);
   assert.doesNotMatch(componentSource, /\.editor-canvas__node-halo--success/);
   assert.doesNotMatch(componentSource, /\.editor-canvas__node-halo--failed/);
   assert.match(componentSource, /\.editor-canvas__edge--active-run \{[\s\S]*stroke-width:\s*3px;/);
@@ -249,12 +237,13 @@ test("EditorCanvas renders runtime node halos as full rounded rectangle rings", 
 
 test("EditorCanvas styles runtime node card classes across the NodeCard component boundary", () => {
   assert.match(componentSource, /<NodeCard[\s\S]*:class="resolveRunNodeClassList\(nodeId\)"/);
-  assert.match(componentSource, /:deep\(\.editor-canvas__node--running\) \{/);
-  assert.match(componentSource, /:deep\(\.editor-canvas__node--running-current\) \{/);
-  assert.match(componentSource, /:deep\(\.editor-canvas__node--paused\) \{/);
-  assert.match(componentSource, /:deep\(\.editor-canvas__node--paused-current\) \{/);
-  assert.match(componentSource, /:deep\(\.editor-canvas__node--success\) \{/);
-  assert.match(componentSource, /:deep\(\.editor-canvas__node--failed\) \{/);
+  assert.match(componentSource, /:global\(\.node-card\.editor-canvas__node--running\) \{/);
+  assert.match(componentSource, /:global\(\.node-card\.editor-canvas__node--running-current\) \{/);
+  assert.match(componentSource, /:global\(\.node-card\.editor-canvas__node--paused\) \{/);
+  assert.match(componentSource, /:global\(\.node-card\.editor-canvas__node--paused-current\) \{/);
+  assert.match(componentSource, /:global\(\.node-card\.editor-canvas__node--success\) \{/);
+  assert.match(componentSource, /:global\(\.node-card\.editor-canvas__node--failed\) \{/);
+  assert.doesNotMatch(componentSource, /:deep\(\.editor-canvas__node--(?:running|running-current|paused|paused-current|success|failed)\)/);
   assert.doesNotMatch(componentSource, /\.editor-canvas__node-halo--success/);
   assert.doesNotMatch(componentSource, /\.editor-canvas__node-halo--failed/);
 });
