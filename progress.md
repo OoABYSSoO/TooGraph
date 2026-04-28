@@ -107,6 +107,13 @@
   - Restarted the local dev environment with root `npm run dev`.
   - Confirmed the frontend returned HTTP 200 at `http://127.0.0.1:3477`.
   - Confirmed the backend health route returned HTTP 200 at `http://127.0.0.1:8765/health`.
+
+### Phase 6: Commit and Push
+- **Status:** completed
+- Actions taken:
+  - Ran `git diff --check` and `git diff --cached --check`; both exited 0.
+  - Committed the cleanup as `89fb8be` with Chinese message `抽取节点状态端口列表组件`.
+  - Pushed `main` to `origin/main`.
   - Confirmed the restarted backend and frontend dev processes remained alive after a delayed check.
 
 ### Phase 6: Commit and Push

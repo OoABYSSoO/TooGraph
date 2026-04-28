@@ -167,8 +167,8 @@ Phase 20 in progress
 - [x] Run focused StatePortList, NodeCard structure, port reorder, and TypeScript checks.
 - [x] Run the full frontend test suite and production build.
 - [x] Restart the dev environment with `npm run dev` and verify frontend/backend health.
-- [ ] Commit and push the cleanup.
-- **Status:** in_progress
+- [x] Commit and push the cleanup.
+- **Status:** completed
 
 ## Progress Estimate
 | Scope | Estimate |
@@ -191,8 +191,8 @@ Phase 20 in progress
 | P1 `NodeCard.vue` cleanup after Phase 18 | About 59% complete after moving state edit/remove confirm refs and timers into `useNodeFloatingPanels`. |
 | Overall roadmap cleanup after Phase 19 | About 44% complete after moving port reorder interaction state into a tested composable. |
 | P1 `NodeCard.vue` cleanup after Phase 19 | About 62% complete after moving port reorder interaction state into a tested composable. |
-| Overall roadmap cleanup after Phase 20 | Targeting about 45% complete once commit and push pass. |
-| P1 `NodeCard.vue` cleanup after Phase 20 | Targeting about 65% complete after moving agent real state port list markup into `StatePortList.vue`. |
+| Overall roadmap cleanup after Phase 20 | About 45% complete after moving agent real state port list markup into `StatePortList.vue`. |
+| P1 `NodeCard.vue` cleanup after Phase 20 | About 65% complete after moving agent real state port list markup into `StatePortList.vue`. |
 
 ## Decisions Made
 | Decision | Rationale |
