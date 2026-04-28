@@ -145,18 +145,22 @@ test("EditorCanvas restores legacy runtime feedback styling on node cards and ac
   assert.match(componentSource, /\.editor-canvas__node-halo--running \{[\s\S]*border:\s*1\.5px solid var\(--editor-canvas-node-halo-border-rest\)/);
   assert.match(componentSource, /\.editor-canvas__node-halo--running \{[\s\S]*animation:\s*editor-canvas-running-halo-ring-breathe 2\.2s ease-in-out infinite;/);
   assert.match(componentSource, /\.editor-canvas__node-halo--running::before \{[\s\S]*animation:\s*editor-canvas-running-halo-breathe 2\.2s ease-in-out infinite;/);
+  assert.match(componentSource, /\.editor-canvas__node-halo--running::after \{[\s\S]*animation:\s*editor-canvas-running-halo-pulse 2\.2s ease-in-out infinite;/);
   assert.match(componentSource, /\.editor-canvas__node-halo--running-current \{[\s\S]*--editor-canvas-node-halo-border-rest:\s*rgba\(16,\s*185,\s*129,\s*0\.72\)/);
   assert.match(componentSource, /\.editor-canvas__node-halo--running-current \{[\s\S]*border:\s*1\.5px solid var\(--editor-canvas-node-halo-border-rest\)/);
   assert.match(componentSource, /\.editor-canvas__node-halo--running-current \{[\s\S]*animation:\s*editor-canvas-running-halo-ring-breathe 1\.85s ease-in-out infinite;/);
   assert.match(componentSource, /\.editor-canvas__node-halo--running-current::before \{[\s\S]*animation:\s*editor-canvas-running-halo-breathe 1\.85s ease-in-out infinite;/);
+  assert.match(componentSource, /\.editor-canvas__node-halo--running-current::after \{[\s\S]*animation:\s*editor-canvas-running-halo-pulse 1\.85s ease-in-out infinite;/);
   assert.match(componentSource, /\.editor-canvas__node-halo--paused \{[\s\S]*--editor-canvas-node-halo-border-rest:\s*rgba\(245,\s*158,\s*11,\s*0\.58\)/);
   assert.match(componentSource, /\.editor-canvas__node-halo--paused \{[\s\S]*border:\s*1\.5px solid var\(--editor-canvas-node-halo-border-rest\)/);
   assert.match(componentSource, /\.editor-canvas__node-halo--paused \{[\s\S]*animation:\s*editor-canvas-paused-halo-ring-breathe 2\.45s ease-in-out infinite;/);
   assert.match(componentSource, /\.editor-canvas__node-halo--paused::before \{[\s\S]*animation:\s*editor-canvas-paused-halo-breathe 2\.45s ease-in-out infinite;/);
+  assert.match(componentSource, /\.editor-canvas__node-halo--paused::after \{[\s\S]*animation:\s*editor-canvas-paused-halo-pulse 2\.45s ease-in-out infinite;/);
   assert.match(componentSource, /\.editor-canvas__node-halo--paused-current \{[\s\S]*--editor-canvas-node-halo-border-rest:\s*rgba\(245,\s*158,\s*11,\s*0\.72\)/);
   assert.match(componentSource, /\.editor-canvas__node-halo--paused-current \{[\s\S]*border:\s*1\.5px solid var\(--editor-canvas-node-halo-border-rest\)/);
   assert.match(componentSource, /\.editor-canvas__node-halo--paused-current \{[\s\S]*animation:\s*editor-canvas-paused-halo-ring-breathe 2\.05s ease-in-out infinite;/);
   assert.match(componentSource, /\.editor-canvas__node-halo--paused-current::before \{[\s\S]*animation:\s*editor-canvas-paused-halo-breathe 2\.05s ease-in-out infinite;/);
+  assert.match(componentSource, /\.editor-canvas__node-halo--paused-current::after \{[\s\S]*animation:\s*editor-canvas-paused-halo-pulse 2\.05s ease-in-out infinite;/);
   assert.match(componentSource, /:global\(\.node-card\.editor-canvas__node--running\) \{[\s\S]*0 0 0 1\.5px rgba\(16,\s*185,\s*129,\s*0\.62\)/);
   assert.match(componentSource, /:global\(\.node-card\.editor-canvas__node--running\) \{[\s\S]*animation:\s*editor-canvas-running-card-breathe 2\.2s ease-in-out infinite;/);
   assert.match(componentSource, /:global\(\.node-card\.editor-canvas__node--running-current\) \{[\s\S]*0 0 0 1\.5px rgba\(16,\s*185,\s*129,\s*0\.86\)/);
@@ -186,6 +190,14 @@ test("EditorCanvas restores legacy runtime feedback styling on node cards and ac
     componentSource,
     /@media \(prefers-reduced-motion:\s*reduce\) \{[\s\S]*\.editor-canvas__node-halo--running,[\s\S]*\.editor-canvas__node-halo--running-current,[\s\S]*\.editor-canvas__node-halo--paused,[\s\S]*\.editor-canvas__node-halo--paused-current,[\s\S]*\.editor-canvas__node-halo--running::before,[\s\S]*\.editor-canvas__edge--active-run \{[\s\S]*animation:\s*none;/,
   );
+  assert.match(
+    componentSource,
+    /@media \(prefers-reduced-motion:\s*reduce\) \{[\s\S]*\.editor-canvas__node-halo--running::after,[\s\S]*\.editor-canvas__node-halo--running-current::after \{[\s\S]*animation:\s*editor-canvas-running-halo-pulse-reduced 3\.4s ease-in-out infinite;/,
+  );
+  assert.match(
+    componentSource,
+    /@media \(prefers-reduced-motion:\s*reduce\) \{[\s\S]*\.editor-canvas__node-halo--paused::after,[\s\S]*\.editor-canvas__node-halo--paused-current::after \{[\s\S]*animation:\s*editor-canvas-paused-halo-pulse-reduced 3\.6s ease-in-out infinite;/,
+  );
 });
 
 test("EditorCanvas aligns runtime node halos to the actual node card corner radius", () => {
@@ -211,9 +223,13 @@ test("EditorCanvas breathes the runtime node halo ring without moving node cards
   assert.match(runningCurrentHalo, /animation:\s*editor-canvas-running-halo-ring-breathe 1\.85s ease-in-out infinite;/);
   assert.match(pausedHalo, /animation:\s*editor-canvas-paused-halo-ring-breathe 2\.45s ease-in-out infinite;/);
   assert.match(pausedCurrentHalo, /animation:\s*editor-canvas-paused-halo-ring-breathe 2\.05s ease-in-out infinite;/);
+  assert.match(componentSource, /\.editor-canvas__node-halo \{[\s\S]*z-index:\s*0;/);
+  assert.match(componentSource, /\.editor-canvas__node > :global\(\.node-card\) \{[\s\S]*z-index:\s*1;/);
   assert.match(componentSource, /\.editor-canvas__node-halo \{[\s\S]*will-change:\s*opacity, filter, transform, border-color, background, box-shadow;/);
   assert.match(componentSource, /\.editor-canvas__node-halo--running::before[\s\S]*animation:\s*editor-canvas-running-halo-breathe 2\.2s ease-in-out infinite;/);
+  assert.match(componentSource, /\.editor-canvas__node-halo--running::after[\s\S]*animation:\s*editor-canvas-running-halo-pulse 2\.2s ease-in-out infinite;/);
   assert.match(componentSource, /\.editor-canvas__node-halo--paused-current::before[\s\S]*animation:\s*editor-canvas-paused-halo-breathe 2\.05s ease-in-out infinite;/);
+  assert.match(componentSource, /\.editor-canvas__node-halo--paused-current::after[\s\S]*animation:\s*editor-canvas-paused-halo-pulse 2\.05s ease-in-out infinite;/);
 });
 
 test("EditorCanvas makes runtime node halo breathing visibly pulse the full ring glow", () => {
@@ -241,6 +257,16 @@ test("EditorCanvas makes runtime node halo breathing visibly pulse the full ring
   assert.match(componentSource, /\.editor-canvas__node-halo--running-current \{[\s\S]*--editor-canvas-node-halo-ring-scale-peak:/);
   assert.match(componentSource, /\.editor-canvas__node-halo--paused-current \{[\s\S]*--editor-canvas-node-halo-ring-scale-peak:/);
   assert.match(componentSource, /\.editor-canvas__node-halo::before \{[\s\S]*will-change:\s*opacity, filter, transform, box-shadow;/);
+  assert.match(
+    componentSource,
+    /@keyframes editor-canvas-running-halo-pulse \{[\s\S]*transform:\s*scale\(var\(--editor-canvas-node-halo-pulse-scale-rest,\s*0\.98\)\);[\s\S]*transform:\s*scale\(var\(--editor-canvas-node-halo-pulse-scale-peak,\s*1\.08\)\);[\s\S]*box-shadow:\s*var\(--editor-canvas-node-halo-pulse-shadow-peak\);/,
+  );
+  assert.match(
+    componentSource,
+    /@keyframes editor-canvas-paused-halo-pulse \{[\s\S]*transform:\s*scale\(var\(--editor-canvas-node-halo-pulse-scale-rest,\s*0\.98\)\);[\s\S]*transform:\s*scale\(var\(--editor-canvas-node-halo-pulse-scale-peak,\s*1\.08\)\);[\s\S]*box-shadow:\s*var\(--editor-canvas-node-halo-pulse-shadow-peak\);/,
+  );
+  assert.match(componentSource, /\.editor-canvas__node-halo::after \{[\s\S]*border:\s*var\(--editor-canvas-node-halo-pulse-width,\s*2\.5px\) solid var\(--editor-canvas-node-halo-border-rest\);/);
+  assert.match(componentSource, /\.editor-canvas__node-halo::after \{[\s\S]*will-change:\s*opacity, transform, border-color, box-shadow;/);
 });
 
 test("EditorCanvas renders runtime node halos as full rounded rectangle rings", () => {

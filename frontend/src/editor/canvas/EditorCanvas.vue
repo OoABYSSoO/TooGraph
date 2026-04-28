@@ -4595,6 +4595,102 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   }
 }
 
+@keyframes editor-canvas-running-halo-pulse {
+  0%,
+  100% {
+    opacity: var(--editor-canvas-node-halo-pulse-opacity-rest, 0.46);
+    transform: scale(var(--editor-canvas-node-halo-pulse-scale-rest, 0.98));
+    border-color: var(--editor-canvas-node-halo-border-rest);
+    box-shadow: var(--editor-canvas-node-halo-pulse-shadow-rest);
+  }
+
+  42% {
+    opacity: var(--editor-canvas-node-halo-pulse-opacity-peak, 1);
+    transform: scale(var(--editor-canvas-node-halo-pulse-scale-peak, 1.08));
+    border-color: var(--editor-canvas-node-halo-border-peak);
+    box-shadow: var(--editor-canvas-node-halo-pulse-shadow-peak);
+  }
+
+  56% {
+    opacity: var(--editor-canvas-node-halo-pulse-opacity-flicker, 0.62);
+    transform: scale(var(--editor-canvas-node-halo-pulse-scale-flicker, 1.01));
+    border-color: var(--editor-canvas-node-halo-border-flicker);
+    box-shadow: var(--editor-canvas-node-halo-pulse-shadow-flicker);
+  }
+
+  68% {
+    opacity: var(--editor-canvas-node-halo-pulse-opacity-afterglow, 0.92);
+    transform: scale(var(--editor-canvas-node-halo-pulse-scale-afterglow, 1.055));
+    border-color: var(--editor-canvas-node-halo-border-peak);
+    box-shadow: var(--editor-canvas-node-halo-pulse-shadow-peak);
+  }
+}
+
+@keyframes editor-canvas-paused-halo-pulse {
+  0%,
+  100% {
+    opacity: var(--editor-canvas-node-halo-pulse-opacity-rest, 0.44);
+    transform: scale(var(--editor-canvas-node-halo-pulse-scale-rest, 0.98));
+    border-color: var(--editor-canvas-node-halo-border-rest);
+    box-shadow: var(--editor-canvas-node-halo-pulse-shadow-rest);
+  }
+
+  46% {
+    opacity: var(--editor-canvas-node-halo-pulse-opacity-peak, 1);
+    transform: scale(var(--editor-canvas-node-halo-pulse-scale-peak, 1.08));
+    border-color: var(--editor-canvas-node-halo-border-peak);
+    box-shadow: var(--editor-canvas-node-halo-pulse-shadow-peak);
+  }
+
+  60% {
+    opacity: var(--editor-canvas-node-halo-pulse-opacity-flicker, 0.64);
+    transform: scale(var(--editor-canvas-node-halo-pulse-scale-flicker, 1.01));
+    border-color: var(--editor-canvas-node-halo-border-flicker);
+    box-shadow: var(--editor-canvas-node-halo-pulse-shadow-flicker);
+  }
+
+  72% {
+    opacity: var(--editor-canvas-node-halo-pulse-opacity-afterglow, 0.9);
+    transform: scale(var(--editor-canvas-node-halo-pulse-scale-afterglow, 1.055));
+    border-color: var(--editor-canvas-node-halo-border-peak);
+    box-shadow: var(--editor-canvas-node-halo-pulse-shadow-peak);
+  }
+}
+
+@keyframes editor-canvas-running-halo-pulse-reduced {
+  0%,
+  100% {
+    opacity: var(--editor-canvas-node-halo-pulse-opacity-rest, 0.48);
+    transform: scale(1);
+    border-color: var(--editor-canvas-node-halo-border-rest);
+    box-shadow: var(--editor-canvas-node-halo-pulse-shadow-rest);
+  }
+
+  50% {
+    opacity: var(--editor-canvas-node-halo-pulse-opacity-peak, 0.9);
+    transform: scale(1);
+    border-color: var(--editor-canvas-node-halo-border-peak);
+    box-shadow: var(--editor-canvas-node-halo-pulse-shadow-peak);
+  }
+}
+
+@keyframes editor-canvas-paused-halo-pulse-reduced {
+  0%,
+  100% {
+    opacity: var(--editor-canvas-node-halo-pulse-opacity-rest, 0.48);
+    transform: scale(1);
+    border-color: var(--editor-canvas-node-halo-border-rest);
+    box-shadow: var(--editor-canvas-node-halo-pulse-shadow-rest);
+  }
+
+  50% {
+    opacity: var(--editor-canvas-node-halo-pulse-opacity-peak, 0.9);
+    transform: scale(1);
+    border-color: var(--editor-canvas-node-halo-border-peak);
+    box-shadow: var(--editor-canvas-node-halo-pulse-shadow-peak);
+  }
+}
+
 @keyframes editor-canvas-running-card-breathe {
   0%,
   100% {
@@ -4637,7 +4733,7 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   --editor-canvas-node-halo-outset: 6px;
   position: absolute;
   inset: calc(-1 * var(--editor-canvas-node-halo-outset, 6px));
-  z-index: -1;
+  z-index: 0;
   border-radius: calc(var(--node-card-radius, 28px) + var(--editor-canvas-node-halo-outset, 6px));
   box-sizing: border-box;
   border: 1.5px solid var(--editor-canvas-node-halo-border-rest);
@@ -4656,9 +4752,20 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   will-change: opacity, filter, transform, border-color, background, box-shadow;
 }
 
-.editor-canvas__node-halo::before {
+.editor-canvas__node > :global(.node-card) {
+  position: relative;
+  z-index: 1;
+}
+
+.editor-canvas__node-halo::before,
+.editor-canvas__node-halo::after {
   content: "";
   position: absolute;
+  transform-origin: center;
+  pointer-events: none;
+}
+
+.editor-canvas__node-halo::before {
   inset: var(--editor-canvas-node-halo-aura-inset, -4px);
   border-radius: calc(var(--node-card-radius, 28px) + var(--editor-canvas-node-halo-outset, 6px) + 4px);
   background: var(--editor-canvas-node-halo-background-rest);
@@ -4666,9 +4773,18 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   opacity: 0.72;
   filter: blur(var(--editor-canvas-node-halo-blur-rest, 8px));
   transform: scale(var(--editor-canvas-node-halo-scale-rest, 0.98));
-  transform-origin: center;
-  pointer-events: none;
   will-change: opacity, filter, transform, box-shadow;
+}
+
+.editor-canvas__node-halo::after {
+  inset: var(--editor-canvas-node-halo-pulse-inset, -5px);
+  border-radius: calc(var(--node-card-radius, 28px) + var(--editor-canvas-node-halo-outset, 6px) + 8px);
+  box-sizing: border-box;
+  border: var(--editor-canvas-node-halo-pulse-width, 2.5px) solid var(--editor-canvas-node-halo-border-rest);
+  opacity: var(--editor-canvas-node-halo-pulse-opacity-rest, 0.46);
+  transform: scale(var(--editor-canvas-node-halo-pulse-scale-rest, 0.98));
+  box-shadow: var(--editor-canvas-node-halo-pulse-shadow-rest);
+  will-change: opacity, transform, border-color, box-shadow;
 }
 
 .editor-canvas__node-halo--running,
@@ -4704,6 +4820,16 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   --editor-canvas-node-halo-ring-scale-peak: 1.024;
   --editor-canvas-node-halo-ring-scale-flicker: 1.006;
   --editor-canvas-node-halo-ring-scale-afterglow: 1.016;
+  --editor-canvas-node-halo-pulse-inset: -7px;
+  --editor-canvas-node-halo-pulse-width: 2.5px;
+  --editor-canvas-node-halo-pulse-opacity-rest: 0.48;
+  --editor-canvas-node-halo-pulse-opacity-peak: 1;
+  --editor-canvas-node-halo-pulse-opacity-flicker: 0.64;
+  --editor-canvas-node-halo-pulse-opacity-afterglow: 0.92;
+  --editor-canvas-node-halo-pulse-scale-rest: 0.98;
+  --editor-canvas-node-halo-pulse-scale-peak: 1.095;
+  --editor-canvas-node-halo-pulse-scale-flicker: 1.012;
+  --editor-canvas-node-halo-pulse-scale-afterglow: 1.06;
   --editor-canvas-node-halo-background-rest: rgba(16, 185, 129, 0.02);
   --editor-canvas-node-halo-background-peak: rgba(16, 185, 129, 0.13);
   --editor-canvas-node-halo-background-flicker: rgba(16, 185, 129, 0.05);
@@ -4727,12 +4853,26 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   --editor-canvas-node-halo-shadow-flicker:
     0 0 0 5px rgba(16, 185, 129, 0.14),
     0 0 34px rgba(16, 185, 129, 0.34);
+  --editor-canvas-node-halo-pulse-shadow-rest:
+    0 0 0 3px rgba(16, 185, 129, 0.1),
+    0 0 20px rgba(16, 185, 129, 0.26);
+  --editor-canvas-node-halo-pulse-shadow-peak:
+    0 0 0 11px rgba(16, 185, 129, 0.28),
+    0 0 58px rgba(16, 185, 129, 0.68),
+    0 0 96px rgba(16, 185, 129, 0.3);
+  --editor-canvas-node-halo-pulse-shadow-flicker:
+    0 0 0 5px rgba(16, 185, 129, 0.16),
+    0 0 34px rgba(16, 185, 129, 0.38);
   border: 1.5px solid var(--editor-canvas-node-halo-border-rest);
   animation: editor-canvas-running-halo-ring-breathe 2.2s ease-in-out infinite;
 }
 
 .editor-canvas__node-halo--running::before {
   animation: editor-canvas-running-halo-breathe 2.2s ease-in-out infinite;
+}
+
+.editor-canvas__node-halo--running::after {
+  animation: editor-canvas-running-halo-pulse 2.2s ease-in-out infinite;
 }
 
 .editor-canvas__node-halo--running-current {
@@ -4760,6 +4900,16 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   --editor-canvas-node-halo-ring-scale-peak: 1.03;
   --editor-canvas-node-halo-ring-scale-flicker: 1.008;
   --editor-canvas-node-halo-ring-scale-afterglow: 1.02;
+  --editor-canvas-node-halo-pulse-inset: -8px;
+  --editor-canvas-node-halo-pulse-width: 3px;
+  --editor-canvas-node-halo-pulse-opacity-rest: 0.56;
+  --editor-canvas-node-halo-pulse-opacity-peak: 1;
+  --editor-canvas-node-halo-pulse-opacity-flicker: 0.7;
+  --editor-canvas-node-halo-pulse-opacity-afterglow: 0.96;
+  --editor-canvas-node-halo-pulse-scale-rest: 0.98;
+  --editor-canvas-node-halo-pulse-scale-peak: 1.115;
+  --editor-canvas-node-halo-pulse-scale-flicker: 1.014;
+  --editor-canvas-node-halo-pulse-scale-afterglow: 1.07;
   --editor-canvas-node-halo-background-rest: rgba(16, 185, 129, 0.025);
   --editor-canvas-node-halo-background-peak: rgba(16, 185, 129, 0.16);
   --editor-canvas-node-halo-background-flicker: rgba(16, 185, 129, 0.065);
@@ -4783,12 +4933,26 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   --editor-canvas-node-halo-shadow-flicker:
     0 0 0 6px rgba(16, 185, 129, 0.16),
     0 0 42px rgba(16, 185, 129, 0.42);
+  --editor-canvas-node-halo-pulse-shadow-rest:
+    0 0 0 4px rgba(16, 185, 129, 0.14),
+    0 0 26px rgba(16, 185, 129, 0.34);
+  --editor-canvas-node-halo-pulse-shadow-peak:
+    0 0 0 14px rgba(16, 185, 129, 0.34),
+    0 0 70px rgba(16, 185, 129, 0.78),
+    0 0 118px rgba(16, 185, 129, 0.34);
+  --editor-canvas-node-halo-pulse-shadow-flicker:
+    0 0 0 6px rgba(16, 185, 129, 0.2),
+    0 0 42px rgba(16, 185, 129, 0.46);
   border: 1.5px solid var(--editor-canvas-node-halo-border-rest);
   animation: editor-canvas-running-halo-ring-breathe 1.85s ease-in-out infinite;
 }
 
 .editor-canvas__node-halo--running-current::before {
   animation: editor-canvas-running-halo-breathe 1.85s ease-in-out infinite;
+}
+
+.editor-canvas__node-halo--running-current::after {
+  animation: editor-canvas-running-halo-pulse 1.85s ease-in-out infinite;
 }
 
 .editor-canvas__node-halo--paused {
@@ -4816,6 +4980,16 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   --editor-canvas-node-halo-ring-scale-peak: 1.026;
   --editor-canvas-node-halo-ring-scale-flicker: 1.006;
   --editor-canvas-node-halo-ring-scale-afterglow: 1.016;
+  --editor-canvas-node-halo-pulse-inset: -7px;
+  --editor-canvas-node-halo-pulse-width: 2.5px;
+  --editor-canvas-node-halo-pulse-opacity-rest: 0.46;
+  --editor-canvas-node-halo-pulse-opacity-peak: 1;
+  --editor-canvas-node-halo-pulse-opacity-flicker: 0.64;
+  --editor-canvas-node-halo-pulse-opacity-afterglow: 0.9;
+  --editor-canvas-node-halo-pulse-scale-rest: 0.98;
+  --editor-canvas-node-halo-pulse-scale-peak: 1.095;
+  --editor-canvas-node-halo-pulse-scale-flicker: 1.012;
+  --editor-canvas-node-halo-pulse-scale-afterglow: 1.06;
   --editor-canvas-node-halo-background-rest: rgba(245, 158, 11, 0.02);
   --editor-canvas-node-halo-background-peak: rgba(245, 158, 11, 0.13);
   --editor-canvas-node-halo-background-flicker: rgba(245, 158, 11, 0.05);
@@ -4839,12 +5013,26 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   --editor-canvas-node-halo-shadow-flicker:
     0 0 0 5px rgba(245, 158, 11, 0.14),
     0 0 34px rgba(245, 158, 11, 0.32);
+  --editor-canvas-node-halo-pulse-shadow-rest:
+    0 0 0 3px rgba(245, 158, 11, 0.1),
+    0 0 20px rgba(245, 158, 11, 0.24);
+  --editor-canvas-node-halo-pulse-shadow-peak:
+    0 0 0 11px rgba(245, 158, 11, 0.28),
+    0 0 58px rgba(245, 158, 11, 0.64),
+    0 0 96px rgba(245, 158, 11, 0.28);
+  --editor-canvas-node-halo-pulse-shadow-flicker:
+    0 0 0 5px rgba(245, 158, 11, 0.16),
+    0 0 34px rgba(245, 158, 11, 0.36);
   border: 1.5px solid var(--editor-canvas-node-halo-border-rest);
   animation: editor-canvas-paused-halo-ring-breathe 2.45s ease-in-out infinite;
 }
 
 .editor-canvas__node-halo--paused::before {
   animation: editor-canvas-paused-halo-breathe 2.45s ease-in-out infinite;
+}
+
+.editor-canvas__node-halo--paused::after {
+  animation: editor-canvas-paused-halo-pulse 2.45s ease-in-out infinite;
 }
 
 .editor-canvas__node-halo--paused-current {
@@ -4872,6 +5060,16 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   --editor-canvas-node-halo-ring-scale-peak: 1.032;
   --editor-canvas-node-halo-ring-scale-flicker: 1.008;
   --editor-canvas-node-halo-ring-scale-afterglow: 1.02;
+  --editor-canvas-node-halo-pulse-inset: -8px;
+  --editor-canvas-node-halo-pulse-width: 3px;
+  --editor-canvas-node-halo-pulse-opacity-rest: 0.54;
+  --editor-canvas-node-halo-pulse-opacity-peak: 1;
+  --editor-canvas-node-halo-pulse-opacity-flicker: 0.7;
+  --editor-canvas-node-halo-pulse-opacity-afterglow: 0.96;
+  --editor-canvas-node-halo-pulse-scale-rest: 0.98;
+  --editor-canvas-node-halo-pulse-scale-peak: 1.115;
+  --editor-canvas-node-halo-pulse-scale-flicker: 1.014;
+  --editor-canvas-node-halo-pulse-scale-afterglow: 1.07;
   --editor-canvas-node-halo-background-rest: rgba(245, 158, 11, 0.025);
   --editor-canvas-node-halo-background-peak: rgba(245, 158, 11, 0.16);
   --editor-canvas-node-halo-background-flicker: rgba(245, 158, 11, 0.065);
@@ -4895,12 +5093,26 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   --editor-canvas-node-halo-shadow-flicker:
     0 0 0 6px rgba(245, 158, 11, 0.16),
     0 0 42px rgba(245, 158, 11, 0.4);
+  --editor-canvas-node-halo-pulse-shadow-rest:
+    0 0 0 4px rgba(245, 158, 11, 0.14),
+    0 0 26px rgba(245, 158, 11, 0.32);
+  --editor-canvas-node-halo-pulse-shadow-peak:
+    0 0 0 14px rgba(245, 158, 11, 0.34),
+    0 0 70px rgba(245, 158, 11, 0.74),
+    0 0 118px rgba(245, 158, 11, 0.32);
+  --editor-canvas-node-halo-pulse-shadow-flicker:
+    0 0 0 6px rgba(245, 158, 11, 0.2),
+    0 0 42px rgba(245, 158, 11, 0.44);
   border: 1.5px solid var(--editor-canvas-node-halo-border-rest);
   animation: editor-canvas-paused-halo-ring-breathe 2.05s ease-in-out infinite;
 }
 
 .editor-canvas__node-halo--paused-current::before {
   animation: editor-canvas-paused-halo-breathe 2.05s ease-in-out infinite;
+}
+
+.editor-canvas__node-halo--paused-current::after {
+  animation: editor-canvas-paused-halo-pulse 2.05s ease-in-out infinite;
 }
 
 :global(.node-card.editor-canvas__node--running) {
@@ -4990,6 +5202,16 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   .editor-canvas__edge--route.editor-canvas__edge--active-run,
   .editor-canvas__edge--data.editor-canvas__edge--active-run {
     animation: none;
+  }
+
+  .editor-canvas__node-halo--running::after,
+  .editor-canvas__node-halo--running-current::after {
+    animation: editor-canvas-running-halo-pulse-reduced 3.4s ease-in-out infinite;
+  }
+
+  .editor-canvas__node-halo--paused::after,
+  .editor-canvas__node-halo--paused-current::after {
+    animation: editor-canvas-paused-halo-pulse-reduced 3.6s ease-in-out infinite;
   }
 }
 
