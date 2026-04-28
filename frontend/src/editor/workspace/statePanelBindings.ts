@@ -39,8 +39,14 @@ export function addStateBindingToDocument<T extends GraphPayload | GraphDocument
   const nextNode = nextDocument.nodes[nodeId];
 
   if (mode === "read") {
-    if (nextNode.kind === "agent" || nextNode.kind === "condition") {
+    if (nextNode.kind === "agent") {
       nextNode.reads = [...nextNode.reads, { state: stateKey, required: false }];
+      return nextDocument;
+    }
+
+    if (nextNode.kind === "condition") {
+      nextNode.reads = [{ state: stateKey, required: true }];
+      nextNode.config.rule.source = stateKey;
       return nextDocument;
     }
 
@@ -127,8 +133,11 @@ function hasSharedStateBinding(sourceNode: GraphNode, targetNode: GraphNode) {
 
 function canNodeBindState(node: GraphNode, stateKey: string, mode: StateBindingMode) {
   if (mode === "read") {
-    if (node.kind === "agent" || node.kind === "condition") {
+    if (node.kind === "agent") {
       return !node.reads.some((binding) => binding.state === stateKey);
+    }
+    if (node.kind === "condition") {
+      return node.reads[0]?.state !== stateKey;
     }
     if (node.kind === "output") {
       return node.reads[0]?.state !== stateKey;

@@ -10,11 +10,10 @@ import {
 import { VIRTUAL_ANY_OUTPUT_STATE_KEY } from "./virtual-any-input.ts";
 import type { GraphPayload, PresetDocument } from "../types/node-system.ts";
 
-test("buildGenericInputNode creates an expanded input node that writes a default value state", () => {
+test("buildGenericInputNode creates an expanded input node with an empty virtual output slot", () => {
   const result = buildGenericInputNode({
     id: "input_created",
     position: { x: 120, y: 240 },
-    stateKey: "state_3",
   });
 
   assert.equal(result.node.kind, "input");
@@ -22,14 +21,8 @@ test("buildGenericInputNode creates an expanded input node that writes a default
   assert.equal(result.node.ui.collapsed, false);
   assert.equal("expandedSize" in result.node.ui, false);
   assert.equal("collapsedSize" in result.node.ui, false);
-  assert.deepEqual(result.node.writes, [{ state: "state_3", mode: "replace" }]);
-  assert.deepEqual(result.state_schema.state_3, {
-    name: "Input",
-    description: "",
-    type: "text",
-    value: "",
-    color: "#7c3aed",
-  });
+  assert.deepEqual(result.node.writes, []);
+  assert.deepEqual(result.state_schema, {});
 });
 
 test("buildNodeFromPreset preserves preset node semantics while replacing the canvas position", () => {
@@ -283,4 +276,55 @@ test("applyNodeCreationResult materializes a virtual agent any output when it sp
   });
   assert.equal(result.document.metadata.graphiteui_state_key_counter, 3);
   assert.deepEqual(result.document.edges, [{ source: "empty_agent", target: "output_created" }]);
+});
+
+test("applyNodeCreationResult materializes a virtual input output when it spawns a target node", () => {
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Creation Graph",
+    state_schema: {},
+    nodes: {
+      empty_input: {
+        kind: "input",
+        name: "Empty Input",
+        description: "",
+        ui: { position: { x: 0, y: 0 }, collapsed: false },
+        reads: [],
+        writes: [],
+        config: {
+          value: "",
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {
+      graphiteui_state_key_counter: 4,
+    },
+  };
+
+  const createdOutput = buildGenericOutputNode({
+    id: "output_created",
+    position: { x: 260, y: 0 },
+  });
+  const result = applyNodeCreationResult(document, {
+    createdNodeId: createdOutput.id,
+    createdNode: createdOutput.node,
+    mergedStateSchema: createdOutput.state_schema,
+    context: {
+      position: { x: 260, y: 0 },
+      sourceNodeId: "empty_input",
+      sourceAnchorKind: "state-out",
+      sourceStateKey: VIRTUAL_ANY_OUTPUT_STATE_KEY,
+      sourceValueType: "text",
+    },
+  });
+
+  assert.equal(result.createdStateKey, "state_5");
+  assert.deepEqual(result.document.nodes.empty_input.writes, [{ state: "state_5", mode: "replace" }]);
+  assert.deepEqual(result.document.nodes.output_created.reads, [{ state: "state_5", required: true }]);
+  assert.equal(result.document.nodes.output_created.name, "Empty Input output");
+  assert.equal(result.document.state_schema.state_5?.name, "Empty Input output");
+  assert.equal(result.document.metadata.graphiteui_state_key_counter, 5);
+  assert.deepEqual(result.document.edges, [{ source: "empty_input", target: "output_created" }]);
 });

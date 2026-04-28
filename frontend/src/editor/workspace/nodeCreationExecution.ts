@@ -58,25 +58,16 @@ export function createNodeFromCreationEntry<T extends GraphPayload | GraphDocume
     createGraphNodeId(input.entry.nodeKind ?? input.entry.family ?? (input.entry.mode === "preset" ? "preset" : "node"));
 
   if (input.entry.mode === "node" && input.entry.nodeKind === "input") {
-    const stateField = buildNextDefaultStateField(document, {
-      name: "Input",
-      type: "text",
-    });
     const created = buildGenericInputNode({
       id: createdNodeId,
       position: input.context?.position ?? { x: 0, y: 0 },
-      stateKey: stateField.key,
     });
-    const result = applyNodeCreationResult(document, {
+    return applyNodeCreationResult(document, {
       createdNodeId,
       createdNode: created.node,
-      mergedStateSchema: {
-        [stateField.key]: stateField.definition,
-      },
+      mergedStateSchema: created.state_schema,
       context: input.context ?? null,
     });
-    rememberDefaultStateKeyIndex(result.document, stateField.key);
-    return result;
   }
 
   if (input.entry.mode === "node" && input.entry.nodeKind === "output") {

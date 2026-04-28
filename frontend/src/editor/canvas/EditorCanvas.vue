@@ -709,7 +709,7 @@ function shouldShowAgentCreateInputPortByDefault(nodeId: string) {
 
 function shouldShowAgentCreateOutputPortByDefault(nodeId: string) {
   const node = props.document.nodes[nodeId];
-  return node?.kind === "agent" && node.writes.length === 0;
+  return (node?.kind === "agent" || node?.kind === "input") && node.writes.length === 0;
 }
 
 function isAgentCreateInputAnchorVisible(nodeId: string) {
@@ -2442,7 +2442,11 @@ function isStateTargetAnchorAllowedForActiveConnection(anchor: ProjectedCanvasAn
     return true;
   }
 
-  return anchor.stateKey === CREATE_AGENT_INPUT_STATE_KEY || anchor.stateKey === activeConnection.value?.sourceStateKey;
+  return (
+    anchor.stateKey === CREATE_AGENT_INPUT_STATE_KEY ||
+    anchor.stateKey === VIRTUAL_ANY_INPUT_STATE_KEY ||
+    anchor.stateKey === activeConnection.value?.sourceStateKey
+  );
 }
 
 function canCompleteCanvasConnection(anchor: ProjectedCanvasAnchor) {

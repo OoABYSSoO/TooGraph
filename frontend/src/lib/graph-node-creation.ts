@@ -69,18 +69,14 @@ function normalizeCreatedNodeUi(position: GraphPosition) {
   };
 }
 
-function buildTextInputStateKey(id: string) {
-  return `${id}_value`;
-}
-
-function buildTextInputNode(id: string, position: GraphPosition, stateKey = buildTextInputStateKey(id)): InputNode {
+function buildTextInputNode(position: GraphPosition): InputNode {
   return {
     kind: "input",
     name: "Input",
     description: "Provide a value to the current workflow.",
     ui: normalizeCreatedNodeUi(position),
     reads: [],
-    writes: [{ state: stateKey, mode: "replace" }],
+    writes: [],
     config: {
       value: "",
     },
@@ -104,17 +100,11 @@ function buildOutputNode(id: string, position: GraphPosition): OutputNode {
   };
 }
 
-export function buildGenericInputNode(params: { id: string; position: GraphPosition; stateKey?: string }): CreatedNodeResult {
-  const stateKey = params.stateKey ?? buildTextInputStateKey(params.id);
+export function buildGenericInputNode(params: { id: string; position: GraphPosition }): CreatedNodeResult {
   return {
     id: params.id,
-    node: buildTextInputNode(params.id, params.position, stateKey),
-    state_schema: {
-      [stateKey]: {
-        ...defaultStateDefinitionForType(stateKey, "text"),
-        name: "Input",
-      },
-    },
+    node: buildTextInputNode(params.position),
+    state_schema: {},
   };
 }
 
@@ -195,18 +185,28 @@ function bindCreatedStateToNode(node: GraphNode, stateKey: string) {
     return;
   }
 
-  if (node.kind === "agent" || node.kind === "condition") {
+  if (node.kind === "condition") {
+    node.reads = [{ state: stateKey, required: true }];
+    node.config.rule.source = stateKey;
+    return;
+  }
+
+  if (node.kind === "agent") {
     if (!node.reads.some((binding) => binding.state === stateKey)) {
       node.reads = [...node.reads, { state: stateKey, required: true }];
-    }
-    if (node.kind === "condition" && !node.config.rule.source.trim()) {
-      node.config.rule.source = stateKey;
     }
   }
 }
 
 function bindCreatedStateToSourceNode(node: GraphNode | undefined, stateKey: string) {
-  if (!node || node.kind !== "agent") {
+  if (!node) {
+    return;
+  }
+  if (node.kind === "input") {
+    node.writes = [{ state: stateKey, mode: "replace" }];
+    return;
+  }
+  if (node.kind !== "agent") {
     return;
   }
   if (!node.writes.some((binding) => binding.state === stateKey)) {

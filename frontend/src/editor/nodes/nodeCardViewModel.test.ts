@@ -162,7 +162,7 @@ test("buildNodeCardViewModel derives agent body, ports, and labels", () => {
   assert.deepEqual(model.stateSummary?.writes, ["answer"]);
 });
 
-test("buildNodeCardViewModel exposes a virtual any input for empty non-input nodes", () => {
+test("buildNodeCardViewModel exposes a virtual plus input for empty non-input nodes", () => {
   const emptyAgent: GraphNode = {
     kind: "agent",
     name: "empty_agent",
@@ -193,6 +193,27 @@ test("buildNodeCardViewModel exposes a virtual any input for empty non-input nod
       fileNameTemplate: "",
     },
   };
+  const emptyCondition: GraphNode = {
+    kind: "condition",
+    name: "answer_gate",
+    description: "Route by answer state.",
+    ui: { position: { x: 740, y: 220 } },
+    reads: [],
+    writes: [],
+    config: {
+      branches: ["continue", "stop"],
+      loopLimit: 5,
+      branchMapping: {
+        continue: "continue",
+        stop: "stop",
+      },
+      rule: {
+        source: "",
+        operator: "exists",
+        value: null,
+      },
+    },
+  };
   const inputNode: GraphNode = {
     kind: "input",
     name: "input_question",
@@ -207,14 +228,15 @@ test("buildNodeCardViewModel exposes a virtual any input for empty non-input nod
 
   const agentModel = buildNodeCardViewModel("empty_agent", emptyAgent, stateSchema);
   const outputModel = buildNodeCardViewModel("output_answer", emptyOutput, stateSchema);
+  const conditionModel = buildNodeCardViewModel("answer_gate", emptyCondition, stateSchema);
   const inputModel = buildNodeCardViewModel("input_question", inputNode, stateSchema);
 
   assert.deepEqual(agentModel.inputs, [
     {
       key: VIRTUAL_ANY_INPUT_STATE_KEY,
-      label: "any",
-      typeLabel: "any",
-      stateColor: "#9a3412",
+      label: "+ input",
+      typeLabel: "+ input",
+      stateColor: "#16a34a",
       virtual: true,
     },
   ]);
@@ -224,11 +246,16 @@ test("buildNodeCardViewModel exposes a virtual any input for empty non-input nod
   assert.equal(outputModel.body.kind, "output");
   assert.equal(outputModel.body.primaryInput?.key, VIRTUAL_ANY_INPUT_STATE_KEY);
   assert.equal(outputModel.body.primaryInput?.virtual, true);
+  assert.equal(outputModel.body.primaryInput?.label, "+ input");
   assert.equal(outputModel.body.connectedStateKey, null);
+  assert.equal(conditionModel.body.kind, "condition");
+  assert.equal(conditionModel.body.primaryInput?.key, VIRTUAL_ANY_INPUT_STATE_KEY);
+  assert.equal(conditionModel.body.primaryInput?.virtual, true);
+  assert.equal(conditionModel.body.primaryInput?.label, "+ input");
   assert.deepEqual(inputModel.inputs, []);
 });
 
-test("buildNodeCardViewModel exposes a virtual any output for empty agent outputs", () => {
+test("buildNodeCardViewModel exposes virtual plus outputs for empty agent and input outputs", () => {
   const emptyAgent: GraphNode = {
     kind: "agent",
     name: "empty_agent",
@@ -245,21 +272,46 @@ test("buildNodeCardViewModel exposes a virtual any output for empty agent output
       temperature: 0.2,
     },
   };
+  const emptyInput: GraphNode = {
+    kind: "input",
+    name: "empty_input",
+    description: "Input without a state output.",
+    ui: { position: { x: 80, y: 220 } },
+    reads: [],
+    writes: [],
+    config: {
+      value: "",
+    },
+  };
 
-  const model = buildNodeCardViewModel("empty_agent", emptyAgent, stateSchema);
+  const agentModel = buildNodeCardViewModel("empty_agent", emptyAgent, stateSchema);
+  const inputModel = buildNodeCardViewModel("empty_input", emptyInput, stateSchema);
 
-  assert.deepEqual(model.outputs, [
+  assert.deepEqual(agentModel.outputs, [
     {
       key: VIRTUAL_ANY_OUTPUT_STATE_KEY,
-      label: "any",
-      typeLabel: "any",
+      label: "+ output",
+      typeLabel: "+ output",
       stateColor: "#9a3412",
       virtual: true,
     },
   ]);
-  assert.equal(model.body.kind, "agent");
-  assert.equal(model.body.primaryOutput?.key, VIRTUAL_ANY_OUTPUT_STATE_KEY);
-  assert.equal(model.body.primaryOutput?.virtual, true);
+  assert.equal(agentModel.body.kind, "agent");
+  assert.equal(agentModel.body.primaryOutput?.key, VIRTUAL_ANY_OUTPUT_STATE_KEY);
+  assert.equal(agentModel.body.primaryOutput?.virtual, true);
+  assert.deepEqual(inputModel.outputs, [
+    {
+      key: VIRTUAL_ANY_OUTPUT_STATE_KEY,
+      label: "+ output",
+      typeLabel: "+ output",
+      stateColor: "#9a3412",
+      virtual: true,
+    },
+  ]);
+  assert.equal(inputModel.body.kind, "input");
+  assert.equal(inputModel.body.primaryOutput?.key, VIRTUAL_ANY_OUTPUT_STATE_KEY);
+  assert.equal(inputModel.body.primaryOutput?.virtual, true);
+  assert.equal(inputModel.body.valueText, "");
 });
 
 test("buildNodeCardViewModel derives output preview source from state schema", () => {

@@ -655,7 +655,7 @@ export function connectStateBindingInDocument<T extends GraphPayload | GraphDocu
 
   if (isVirtualAnyInputStateKey(targetStateKey)) {
     nextTargetNode.reads = [{ state: sourceStateKey, required: true }];
-    if (nextTargetNode.kind === "condition" && !nextTargetNode.config.rule.source.trim()) {
+    if (nextTargetNode.kind === "condition") {
       nextTargetNode.config.rule.source = sourceStateKey;
     }
     addImplicitFlowEdgeForStateConnection(nextDocument, sourceNodeId, targetNodeId);
@@ -671,6 +671,9 @@ export function connectStateBindingInDocument<T extends GraphPayload | GraphDocu
     ...nextTargetNode.reads[targetBindingIndex],
     state: sourceStateKey,
   };
+  if (nextTargetNode.kind === "condition") {
+    nextTargetNode.config.rule.source = sourceStateKey;
+  }
 
   addImplicitFlowEdgeForStateConnection(nextDocument, sourceNodeId, targetNodeId);
   return syncKnowledgeBaseSkillsInDocument(nextDocument);

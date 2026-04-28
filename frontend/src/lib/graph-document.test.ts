@@ -431,6 +431,64 @@ test("connectStateBindingInDocument rewires a target read binding to the source 
   assert.deepEqual(document.nodes.answer_helper.reads, [{ state: "draft_question", required: true }]);
 });
 
+test("connectStateBindingInDocument rewires condition input and rule source as a single input", () => {
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Condition rewire graph",
+    state_schema: {
+      question: { name: "question", description: "", type: "text", value: "", color: "#d97706" },
+      draft_question: { name: "draft_question", description: "", type: "text", value: "", color: "#2563eb" },
+    },
+    nodes: {
+      input_question: {
+        kind: "input",
+        name: "input_question",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [{ state: "question", mode: "replace" }],
+        config: { value: "" },
+      },
+      answer_gate: {
+        kind: "condition",
+        name: "answer_gate",
+        description: "",
+        ui: { position: { x: 100, y: 0 } },
+        reads: [{ state: "draft_question", required: true }],
+        writes: [],
+        config: {
+          branches: ["true", "false"],
+          loopLimit: 5,
+          branchMapping: { true: "true", false: "false" },
+          rule: {
+            source: "draft_question",
+            operator: "exists",
+            value: null,
+          },
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const nextDocument = graphDocument.connectStateBindingInDocument(
+    document,
+    "input_question",
+    "question",
+    "answer_gate",
+    "draft_question",
+  );
+
+  assert.deepEqual(nextDocument.nodes.answer_gate.reads, [{ state: "question", required: true }]);
+  assert.equal(nextDocument.nodes.answer_gate.kind, "condition");
+  if (nextDocument.nodes.answer_gate.kind === "condition") {
+    assert.equal(nextDocument.nodes.answer_gate.config.rule.source, "question");
+  }
+  assert.deepEqual(document.nodes.answer_gate.reads, [{ state: "draft_question", required: true }]);
+});
+
 test("connectStateBindingInDocument binds a virtual any input to the source state", () => {
   const document: GraphPayload = {
     graph_id: null,

@@ -122,7 +122,7 @@ test("buildAnchorModel exposes a virtual any state input for non-input nodes wit
   assert.deepEqual(inputModel.stateInputs, []);
 });
 
-test("buildAnchorModel exposes a virtual any state output for agent nodes without writes", () => {
+test("buildAnchorModel exposes a virtual plus output for empty agent and input nodes without writes", () => {
   const emptyAgent: GraphNode = {
     kind: "agent",
     name: "empty_agent",
@@ -153,10 +153,23 @@ test("buildAnchorModel exposes a virtual any state output for agent nodes withou
       fileNameTemplate: "",
     },
   };
+  const emptyInput: GraphNode = {
+    kind: "input",
+    name: "empty_input",
+    description: "Provide input.",
+    ui: { position: { x: 80, y: 220 } },
+    reads: [],
+    writes: [],
+    config: {
+      value: "",
+    },
+  };
 
   const agentModel = buildAnchorModel("empty_agent", emptyAgent);
   const outputModel = buildAnchorModel("output", outputNode);
+  const inputModel = buildAnchorModel("empty_input", emptyInput);
 
   assert.deepEqual(agentModel.stateOutputs.map((anchor) => anchor.stateKey), [VIRTUAL_ANY_OUTPUT_STATE_KEY]);
+  assert.deepEqual(inputModel.stateOutputs.map((anchor) => anchor.stateKey), [VIRTUAL_ANY_OUTPUT_STATE_KEY]);
   assert.deepEqual(outputModel.stateOutputs, []);
 });

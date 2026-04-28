@@ -363,6 +363,41 @@ test("NodeCard hides virtual agent output any behind the plus output row", () =>
   assert.doesNotMatch(agentOutputPortSection, /node-card__port-pill-create-badge/);
 });
 
+test("NodeCard renders condition and output virtual inputs as plus input create pills", () => {
+  const outputSectionMatch = componentSource.match(
+    /<section v-else-if="view\.body\.kind === 'output'"[\s\S]*?<\/section>/,
+  );
+  const conditionSectionMatch = componentSource.match(
+    /<section v-else-if="view\.body\.kind === 'condition'"[\s\S]*?<\/section>/,
+  );
+  assert.ok(outputSectionMatch, "expected to find the output node section");
+  assert.ok(conditionSectionMatch, "expected to find the condition node section");
+  const outputSection = outputSectionMatch[0];
+  const conditionSection = conditionSectionMatch[0];
+
+  assert.match(outputSection, /'node-card__port-pill--create': view\.body\.primaryInput\.virtual/);
+  assert.match(conditionSection, /'node-card__port-pill--create': view\.body\.primaryInput\.virtual/);
+  assert.match(outputSection, /:data-anchor-slot-id="\`\$\{nodeId\}:state-in:\$\{view\.body\.primaryInput\.key\}\`"/);
+  assert.match(conditionSection, /:data-anchor-slot-id="\`\$\{nodeId\}:state-in:\$\{view\.body\.primaryInput\.key\}\`"/);
+  assert.doesNotMatch(outputSection, />any</);
+  assert.doesNotMatch(conditionSection, />any</);
+});
+
+test("NodeCard renders empty input outputs as virtual plus output create pills", () => {
+  const inputSectionMatch = componentSource.match(
+    /<section v-if="view\.body\.kind === 'input'"[\s\S]*?<\/section>/,
+  );
+  assert.ok(inputSectionMatch, "expected to find the input node section");
+  const inputSection = inputSectionMatch[0];
+
+  assert.match(inputSection, /'node-card__port-pill--create': view\.body\.primaryOutput\.virtual/);
+  assert.match(inputSection, /@click\.stop="view\.body\.primaryOutput\.virtual \? openPortStateCreate\('output'\) : handleStateEditorActionClick/);
+  assert.match(inputSection, /:data-anchor-slot-id="\`\$\{nodeId\}:state-out:\$\{view\.body\.primaryOutput\.key\}\`"/);
+  assert.match(inputSection, /view\.body\.primaryOutput\.virtual && isPortCreateOpen\('output'\) && portStateDraft/);
+  assert.match(inputSection, /class="node-card__agent-create-port-popover node-card__port-picker"/);
+  assert.doesNotMatch(inputSection, />any</);
+});
+
 test("NodeCard moves node actions into hoverable top buttons built from Element Plus icons and overlays", () => {
   assert.match(componentSource, /import \{[\s\S]*ElButton,[\s\S]*ElPopover[\s\S]*\} from "element-plus";/);
   assert.match(componentSource, /import \{[\s\S]*CollectionTag[\s\S]*Delete[\s\S]*Operation[\s\S]*\} from "@element-plus\/icons-vue";/);
@@ -471,7 +506,7 @@ test("NodeCard reveals state pills on hover and opens state editing only after a
   assert.match(componentSource, /interactionLocked\?: boolean;/);
   assert.match(componentSource, /\(event: "locked-edit-attempt"\): void;/);
   assert.match(componentSource, /import StateEditorPopover from "\.\/StateEditorPopover\.vue";/);
-  assert.match(componentSource, /@click\.stop="handleStateEditorActionClick\(/);
+  assert.match(componentSource, /@click\.stop="[^"]*handleStateEditorActionClick\(/);
   assert.match(componentSource, /const stateEditorDraft = ref<StateFieldDraft \| null>\(null\);/);
   assert.match(componentSource, /const activeStateEditorAnchorId = ref<string \| null>\(null\);/);
   assert.match(componentSource, /const activeStateEditorConfirmAnchorId = ref<string \| null>\(null\);/);

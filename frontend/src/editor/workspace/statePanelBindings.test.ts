@@ -102,7 +102,7 @@ test("listStateBindingNodeOptions follows current reader and writer rules", () =
   );
 });
 
-test("addStateBindingToDocument appends agent readers and replaces output readers", () => {
+test("addStateBindingToDocument appends agent readers and replaces single-input readers", () => {
   const document = buildDocument();
 
   const nextAgentDocument = addStateBindingToDocument(document, "review", "answer_helper", "read");
@@ -112,6 +112,13 @@ test("addStateBindingToDocument appends agent readers and replaces output reader
 
   const nextOutputDocument = addStateBindingToDocument(document, "review", "output_answer", "read");
   assert.deepEqual(nextOutputDocument.nodes.output_answer.reads, [{ state: "review", required: true }]);
+
+  const nextConditionDocument = addStateBindingToDocument(document, "review", "score_gate", "read");
+  assert.deepEqual(nextConditionDocument.nodes.score_gate.reads, [{ state: "review", required: true }]);
+  assert.equal(nextConditionDocument.nodes.score_gate.kind, "condition");
+  if (nextConditionDocument.nodes.score_gate.kind === "condition") {
+    assert.equal(nextConditionDocument.nodes.score_gate.config.rule.source, "review");
+  }
 });
 
 test("addStateBindingToDocument appends agent writers and replaces input writers", () => {
