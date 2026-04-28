@@ -1,5 +1,81 @@
 # Progress Log
 
+## Session: 2026-04-28 Round 16
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Ran planning session catchup and recovered the previous round's final verification context.
+  - Confirmed the worktree started clean on `main...origin/main`.
+  - Inspected `EditorCanvas.vue` data-edge state confirm/editor logic, existing canvas structure tests, and `stateEditorModel.ts`.
+
+### Phase 2: Select Safe Refactor Slice
+- **Status:** completed
+- Actions taken:
+  - Selected data-edge id construction, floating position styles, active edge matching, confirm/editor projection, and request-to-editor projection as the next pure canvas slice.
+  - Decided to reuse `stateEditorModel.ts` for state draft construction, immutable draft field updates, type defaulting, and update patch creation.
+  - Kept timers, lock guards, request watchers, selected-edge state, disconnect decisions, and emits inside `EditorCanvas.vue`.
+
+### Phase 3: Implement Cleanup
+- **Status:** completed
+- Actions taken:
+  - Updated `task_plan.md` for the sixteenth cleanup round.
+  - Added `canvasDataEdgeStateModel.test.ts` before production code.
+  - Updated `EditorCanvas.structure.test.ts` to assert the new canvas data-edge state model boundary and `stateEditorModel` reuse.
+  - Ran the focused red tests and verified they fail because `canvasDataEdgeStateModel.ts` is missing.
+  - Added `canvasDataEdgeStateModel.ts` with data-edge id, floating style, confirm/editor projection, request projection, and active interaction helpers.
+  - Updated `EditorCanvas.vue` to use the new data-edge model and existing `stateEditorModel` helpers.
+  - Removed duplicated local state draft construction, update patch construction, data-edge id construction, and draft field mutation logic from `EditorCanvas.vue`.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran the focused canvas data-edge state model test after implementation.
+  - Ran the focused EditorCanvas structure test after implementation.
+  - Ran the existing state editor model test after implementation.
+  - Ran `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters`.
+  - Ran the full frontend node test suite.
+  - Ran the frontend production build; no large chunk warning was emitted.
+  - Ran `git diff --check` with no whitespace errors.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend returned HTTP 200 at `http://127.0.0.1:3477`.
+  - Confirmed the backend health route returned HTTP 200 at `http://127.0.0.1:8765/health`.
+  - Confirmed the restarted `node scripts/start.mjs`, uvicorn, and Vite processes remained alive after a delayed check.
+
+### Phase 5: Commit and Push
+- **Status:** completed
+- Actions taken:
+  - Reviewed the source diff and confirmed no unrelated runtime artifacts are included.
+  - Committed the source and tests as `7078b0c` with Chinese message `抽取画布数据边状态逻辑`.
+  - Prepared planning, findings, and progress updates for a Chinese progress commit.
+  - Pushed the branch after committing the progress updates.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red model test | `node --test frontend/src/editor/canvas/canvasDataEdgeStateModel.test.ts` before implementation | Fails because the canvas data-edge state model does not exist | Failed with `ERR_MODULE_NOT_FOUND` for `canvasDataEdgeStateModel.ts` | Passed |
+| Red structure test | `node --test frontend/src/editor/canvas/EditorCanvas.structure.test.ts` before implementation | Fails because the new component boundary model is missing | Failed with `ENOENT` for `canvasDataEdgeStateModel.ts` | Passed |
+| Canvas data-edge state model | `node --test frontend/src/editor/canvas/canvasDataEdgeStateModel.test.ts` | Model tests pass | 5 passed | Passed |
+| EditorCanvas structure | `node --test frontend/src/editor/canvas/EditorCanvas.structure.test.ts` | Structure constraints pass | 59 passed | Passed |
+| State editor model | `node --test frontend/src/editor/nodes/stateEditorModel.test.ts` | Existing shared state editor model tests pass | 5 passed | Passed |
+| Unused symbol check | `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No unused-symbol diagnostics | Exit 0, no diagnostics | Passed |
+| Full frontend tests | `node --test $(rg --files frontend/src -g '*.test.ts') frontend/vite.config.structure.test.ts` | All frontend tests pass | 715 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without chunk warning regressions | Exit 0, no large chunk warning | Passed |
+| Dev restart | `npm run dev` | Services start and respond | Frontend 200, backend `/health` 200, delayed process check alive | Passed |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Sixteenth cleanup implementation, verification, dev restart, source commit, planning update, and push are complete. |
+| Where am I going? | Ready for handoff or the next cleanup slice. |
+| What's the goal? | Continue reducing high-concentration editor components without changing graph editing behavior. |
+| What have I learned? | Data-edge state editing has a pure projection boundary, and the canvas can share the same state editor model already used by NodeCard. |
+| What have I done? | Extracted canvas data-edge state helpers, reused `stateEditorModel`, added focused tests, ran full frontend checks, built without chunk warnings, restarted the app, and committed source changes. |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+
 ## Session: 2026-04-28 Round 15
 
 ### Phase 1: Re-orientation
