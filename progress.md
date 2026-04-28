@@ -107,10 +107,12 @@
   - Confirmed the backend health route returned HTTP 200 at `http://127.0.0.1:8765/health`.
 
 ### Phase 5: Commit and Push
-- **Status:** in_progress
+- **Status:** completed
 - Actions taken:
   - Checked git status after restart; only source/test/planning changes are visible, no runtime logs or build output are staged.
   - Ran `git diff --check` with no whitespace errors.
+  - Committed the cleanup as `ca3fd06` with Chinese message `抽取状态编辑模型逻辑`.
+  - Pushed `main` to `origin/main`.
 
 ## Test Results
 | Test | Input | Expected | Actual | Status |
@@ -123,6 +125,15 @@
 | Frontend production build | `npm run build` in `frontend` | Build succeeds | Exit 0 with existing large chunk warning | Passed |
 | Dev restart | `npm run dev` | Services start and respond | Frontend 200, backend `/health` 200 | Passed |
 | Whitespace check | `git diff --check` | No whitespace errors | Exit 0 | Passed |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Fourth cleanup implementation, verification, dev restart, commit, and push are complete. |
+| Where am I going? | Ready for final handoff or the next cleanup slice. |
+| What's the goal? | Continue reducing NodeCard concentration without changing editor behavior. |
+| What have I learned? | Existing state editing has a clean pure-model boundary around draft construction, immutable field updates, anchor parsing, and update patch creation. |
+| What have I done? | Extracted state editor model helpers, added focused tests, updated structure assertions, and verified/restarted the app. |
 
 ## Error Log
 | Timestamp | Error | Attempt | Resolution |
