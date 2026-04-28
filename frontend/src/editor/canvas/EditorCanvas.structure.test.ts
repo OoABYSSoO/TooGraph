@@ -198,19 +198,20 @@ test("EditorCanvas aligns runtime node halos to the actual node card corner radi
   );
 });
 
-test("EditorCanvas keeps runtime node halo ring geometry fixed while the aura breathes", () => {
+test("EditorCanvas breathes the runtime node halo ring without moving node cards", () => {
   const runningHalo = lastCssBlock(".editor-canvas__node-halo--running");
   const runningCurrentHalo = lastCssBlock(".editor-canvas__node-halo--running-current");
   const pausedHalo = lastCssBlock(".editor-canvas__node-halo--paused");
   const pausedCurrentHalo = lastCssBlock(".editor-canvas__node-halo--paused-current");
+  const nodeCssBlock = componentSource.match(/\.editor-canvas__node \{[^}]*\}/)?.[0] ?? "";
 
-  for (const haloBlock of [runningHalo, runningCurrentHalo, pausedHalo, pausedCurrentHalo]) {
-    assert.doesNotMatch(haloBlock, /transform:/);
-  }
+  assert.doesNotMatch(nodeCssBlock, /animation:/);
+  assert.doesNotMatch(nodeCssBlock, /transform 180ms ease/);
   assert.match(runningHalo, /animation:\s*editor-canvas-running-halo-ring-breathe 2\.2s ease-in-out infinite;/);
   assert.match(runningCurrentHalo, /animation:\s*editor-canvas-running-halo-ring-breathe 1\.85s ease-in-out infinite;/);
   assert.match(pausedHalo, /animation:\s*editor-canvas-paused-halo-ring-breathe 2\.45s ease-in-out infinite;/);
   assert.match(pausedCurrentHalo, /animation:\s*editor-canvas-paused-halo-ring-breathe 2\.05s ease-in-out infinite;/);
+  assert.match(componentSource, /\.editor-canvas__node-halo \{[\s\S]*will-change:\s*opacity, filter, transform, border-color, background, box-shadow;/);
   assert.match(componentSource, /\.editor-canvas__node-halo--running::before[\s\S]*animation:\s*editor-canvas-running-halo-breathe 2\.2s ease-in-out infinite;/);
   assert.match(componentSource, /\.editor-canvas__node-halo--paused-current::before[\s\S]*animation:\s*editor-canvas-paused-halo-breathe 2\.05s ease-in-out infinite;/);
 });
@@ -226,17 +227,19 @@ test("EditorCanvas makes runtime node halo breathing visibly pulse the full ring
   );
   assert.match(
     componentSource,
-    /@keyframes editor-canvas-running-halo-ring-breathe \{[\s\S]*border-color:\s*var\(--editor-canvas-node-halo-border-peak\);[\s\S]*box-shadow:\s*var\(--editor-canvas-node-halo-ring-shadow-peak\);/,
+    /@keyframes editor-canvas-running-halo-ring-breathe \{[\s\S]*opacity:\s*var\(--editor-canvas-node-halo-ring-opacity-rest,\s*0\.72\);[\s\S]*filter:\s*blur\(var\(--editor-canvas-node-halo-ring-blur-rest,\s*0px\)\);[\s\S]*transform:\s*scale\(var\(--editor-canvas-node-halo-ring-scale-rest,\s*0\.986\)\);[\s\S]*transform:\s*scale\(var\(--editor-canvas-node-halo-ring-scale-peak,\s*1\.024\)\);[\s\S]*border-color:\s*var\(--editor-canvas-node-halo-border-peak\);[\s\S]*box-shadow:\s*var\(--editor-canvas-node-halo-ring-shadow-peak\);/,
   );
   assert.match(
     componentSource,
-    /@keyframes editor-canvas-paused-halo-ring-breathe \{[\s\S]*border-color:\s*var\(--editor-canvas-node-halo-border-peak\);[\s\S]*box-shadow:\s*var\(--editor-canvas-node-halo-ring-shadow-flicker\);/,
+    /@keyframes editor-canvas-paused-halo-ring-breathe \{[\s\S]*opacity:\s*var\(--editor-canvas-node-halo-ring-opacity-rest,\s*0\.7\);[\s\S]*filter:\s*blur\(var\(--editor-canvas-node-halo-ring-blur-rest,\s*0px\)\);[\s\S]*transform:\s*scale\(var\(--editor-canvas-node-halo-ring-scale-rest,\s*0\.986\)\);[\s\S]*transform:\s*scale\(var\(--editor-canvas-node-halo-ring-scale-peak,\s*1\.026\)\);[\s\S]*border-color:\s*var\(--editor-canvas-node-halo-border-peak\);[\s\S]*box-shadow:\s*var\(--editor-canvas-node-halo-ring-shadow-flicker\);/,
   );
   assert.match(componentSource, /\.editor-canvas__node-halo::before \{[\s\S]*inset:\s*var\(--editor-canvas-node-halo-aura-inset,\s*-4px\);/);
   assert.match(componentSource, /\.editor-canvas__node-halo--running-current \{[\s\S]*--editor-canvas-node-halo-shadow-peak:/);
   assert.match(componentSource, /\.editor-canvas__node-halo--paused-current \{[\s\S]*--editor-canvas-node-halo-scale-peak:/);
   assert.match(componentSource, /\.editor-canvas__node-halo--running-current \{[\s\S]*--editor-canvas-node-halo-ring-shadow-peak:/);
   assert.match(componentSource, /\.editor-canvas__node-halo--paused-current \{[\s\S]*--editor-canvas-node-halo-ring-shadow-peak:/);
+  assert.match(componentSource, /\.editor-canvas__node-halo--running-current \{[\s\S]*--editor-canvas-node-halo-ring-scale-peak:/);
+  assert.match(componentSource, /\.editor-canvas__node-halo--paused-current \{[\s\S]*--editor-canvas-node-halo-ring-scale-peak:/);
   assert.match(componentSource, /\.editor-canvas__node-halo::before \{[\s\S]*will-change:\s*opacity, filter, transform, box-shadow;/);
 });
 
