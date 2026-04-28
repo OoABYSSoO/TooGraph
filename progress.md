@@ -464,6 +464,74 @@
 | What have I learned? | Uploaded asset label, summary, text preview, and empty-state copy are pure presentation concerns that fit `uploadedAssetModel.ts`. |
 | What have I done? | Extracted uploaded asset presentation helpers, added focused tests, ran full frontend checks, built, and restarted the app. |
 
+## Session: 2026-04-28 Round 11
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Ran planning session catchup and read the completed round 10 plan/progress/findings.
+  - Confirmed the worktree starts clean on `main...origin/main`.
+  - Inspected `conditionLoopLimit.ts`, its focused tests, and condition loop-limit handling in `NodeCard.vue`.
+
+### Phase 2: Select Safe Refactor Slice
+- **Status:** completed
+- Actions taken:
+  - Selected condition loop-limit draft formatting, invalid-draft reset, no-op detection, and config patch creation.
+  - Decided to keep DOM event handling, blur behavior, lock guards, and emits inside `NodeCard.vue`.
+
+### Phase 3: Implement Cleanup
+- **Status:** completed
+- Actions taken:
+  - Updated `task_plan.md` for the eleventh cleanup round.
+  - Added failing tests for condition loop-limit draft formatting and commit decisions before production code.
+  - Ran the focused red tests and verified they fail because the new `conditionLoopLimit.ts` exports and NodeCard model boundary are missing.
+  - Added `resolveConditionLoopLimitDraft` and `resolveConditionLoopLimitPatch` to `conditionLoopLimit.ts`.
+  - Updated `NodeCard.vue` to call the loop-limit model helpers.
+  - Updated `NodeCard.structure.test.ts` to assert the new model boundary.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran the focused condition loop-limit test after implementation.
+  - Ran the focused NodeCard structure test after implementation.
+  - Ran `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters`.
+  - Ran the full frontend node test suite.
+  - Ran the frontend production build; no large chunk warning was emitted.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend returned HTTP 200 at `http://127.0.0.1:3477`.
+  - Confirmed the backend health route returned HTTP 200 at `http://127.0.0.1:8765/health`.
+  - Confirmed the restarted `node scripts/start.mjs`, uvicorn, and Vite processes remained alive after a delayed check.
+
+### Phase 5: Commit and Push
+- **Status:** completed
+- Actions taken:
+  - Checked git status after restart; only source/test/planning files are modified.
+  - Confirmed no untracked runtime or build artifacts are present.
+  - Ran `git diff --check` with no whitespace errors.
+  - Committed the cleanup as `9ce6aa3` with Chinese message `抽取条件循环限制提交逻辑`.
+  - Recorded the planning and findings updates for a separate Chinese commit and push.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red test | `node --test frontend/src/editor/nodes/conditionLoopLimit.test.ts` before implementation | Fails because new loop-limit draft helpers are missing | Failed with missing `resolveConditionLoopLimitDraft` export | Passed |
+| Red structure test | `node --test frontend/src/editor/nodes/NodeCard.structure.test.ts` before implementation | Fails because `NodeCard.vue` still owns loop-limit commit decisions | Failed on missing `resolveConditionLoopLimitDraft(loopLimit)` boundary | Passed |
+| Condition loop-limit model | `node --test frontend/src/editor/nodes/conditionLoopLimit.test.ts` | Model tests pass | 3 passed | Passed |
+| NodeCard structure | `node --test frontend/src/editor/nodes/NodeCard.structure.test.ts` | Structure constraints pass | 35 passed | Passed |
+| Unused symbol check | `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No unused-symbol diagnostics | Exit 0, no diagnostics | Passed |
+| Full frontend tests | `node --test $(rg --files frontend/src -g '*.test.ts') frontend/vite.config.structure.test.ts` | All frontend tests pass | 693 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without chunk warning regressions | Exit 0, no large chunk warning | Passed |
+| Dev restart | `npm run dev` | Services start and respond | Frontend 200, backend `/health` 200 | Passed |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Eleventh cleanup implementation, verification, dev restart, commit, and push are complete. |
+| Where am I going? | Ready for final handoff or the next cleanup slice. |
+| What's the goal? | Continue reducing `NodeCard.vue` concentration without changing editor behavior. |
+| What have I learned? | Condition loop-limit draft formatting and commit decisions belong in `conditionLoopLimit.ts`; `NodeCard.vue` only needs DOM and dispatch responsibilities. |
+| What have I done? | Extracted condition loop-limit draft/patch helpers, added focused tests, ran full frontend checks, built without chunk warnings, and restarted the app. |
+
 ## Error Log
 | Timestamp | Error | Attempt | Resolution |
 |-----------|-------|---------|------------|
