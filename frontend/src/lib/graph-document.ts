@@ -118,9 +118,9 @@ export function reorderNodePortStateInDocument<T extends GraphPayload | GraphDoc
   nodeId: string,
   side: "input" | "output",
   stateKey: string,
-  targetStateKey: string,
+  targetIndex: number,
 ): T {
-  if (stateKey === targetStateKey) {
+  if (!Number.isFinite(targetIndex)) {
     return document;
   }
 
@@ -131,20 +131,28 @@ export function reorderNodePortStateInDocument<T extends GraphPayload | GraphDoc
 
   const bindings = side === "input" ? node.reads : node.writes;
   const sourceIndex = bindings.findIndex((binding) => binding.state === stateKey);
-  const targetIndex = bindings.findIndex((binding) => binding.state === targetStateKey);
-  if (sourceIndex === -1 || targetIndex === -1) {
+  if (sourceIndex === -1) {
+    return document;
+  }
+
+  const previewIndex = Math.max(0, Math.min(Math.floor(targetIndex), bindings.length - 1));
+  const previewBindings = [...bindings];
+  const [previewBinding] = previewBindings.splice(sourceIndex, 1);
+  previewBindings.splice(previewIndex, 0, previewBinding);
+  if (previewBindings.every((binding, index) => binding.state === bindings[index]?.state)) {
     return document;
   }
 
   const nextDocument = cloneGraphDocument(document);
   const nextNode = nextDocument.nodes[nodeId];
+  const clonedBindings = side === "input" ? nextNode.reads : nextNode.writes;
+  const remainingBindings = clonedBindings.filter((_, index) => index !== sourceIndex);
+  const nextIndex = Math.max(0, Math.min(Math.floor(targetIndex), remainingBindings.length));
+  const nextBindings = [...remainingBindings];
+  nextBindings.splice(nextIndex, 0, clonedBindings[sourceIndex]);
   if (side === "input") {
-    const nextBindings = [...nextNode.reads];
-    [nextBindings[sourceIndex], nextBindings[targetIndex]] = [nextBindings[targetIndex], nextBindings[sourceIndex]];
     nextNode.reads = nextBindings;
   } else {
-    const nextBindings = [...nextNode.writes];
-    [nextBindings[sourceIndex], nextBindings[targetIndex]] = [nextBindings[targetIndex], nextBindings[sourceIndex]];
     nextNode.writes = nextBindings;
   }
   return nextDocument;

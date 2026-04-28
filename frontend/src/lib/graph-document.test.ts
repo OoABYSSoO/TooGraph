@@ -118,7 +118,7 @@ test("reorderNodePortStateInDocument swaps input bindings within the same node",
     metadata: {},
   };
 
-  const nextDocument = reorderNodePortStateInDocument(document, "answer_agent", "input", "second", "first");
+  const nextDocument = reorderNodePortStateInDocument(document, "answer_agent", "input", "second", 0);
 
   assert.deepEqual(nextDocument.nodes.answer_agent.reads.map((binding) => binding.state), ["second", "first", "third"]);
   assert.deepEqual(nextDocument.nodes.answer_agent.writes.map((binding) => binding.state), ["answer"]);
@@ -160,12 +160,54 @@ test("reorderNodePortStateInDocument swaps output bindings without crossing side
     metadata: {},
   };
 
-  const nextDocument = reorderNodePortStateInDocument(document, "writer_agent", "output", "summary", "draft");
-  const unchangedDocument = reorderNodePortStateInDocument(document, "writer_agent", "input", "summary", "input");
+  const nextDocument = reorderNodePortStateInDocument(document, "writer_agent", "output", "summary", 0);
+  const unchangedDocument = reorderNodePortStateInDocument(document, "writer_agent", "input", "summary", 0);
 
   assert.deepEqual(nextDocument.nodes.writer_agent.writes.map((binding) => binding.state), ["summary", "draft"]);
   assert.deepEqual(nextDocument.nodes.writer_agent.reads.map((binding) => binding.state), ["input"]);
   assert.equal(unchangedDocument, document);
+});
+
+test("reorderNodePortStateInDocument moves bindings to an insertion index for drag previews", () => {
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Move ordering",
+    state_schema: {
+      first: { name: "first", description: "", type: "text", value: "", color: "#d97706" },
+      second: { name: "second", description: "", type: "text", value: "", color: "#2563eb" },
+      third: { name: "third", description: "", type: "text", value: "", color: "#7c3aed" },
+      answer: { name: "answer", description: "", type: "text", value: "", color: "#10b981" },
+    },
+    nodes: {
+      answer_agent: {
+        kind: "agent",
+        name: "Answer Agent",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [
+          { state: "first", required: true },
+          { state: "second", required: true },
+          { state: "third", required: true },
+        ],
+        writes: [{ state: "answer", mode: "replace" }],
+        config: {
+          skills: [],
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "off",
+          temperature: 0.2,
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const nextDocument = reorderNodePortStateInDocument(document, "answer_agent", "input", "second", 2);
+
+  assert.deepEqual(nextDocument.nodes.answer_agent.reads.map((binding) => binding.state), ["first", "third", "second"]);
 });
 
 test("createDraftFromTemplate accepts Vue reactive template records", () => {

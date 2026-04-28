@@ -545,7 +545,8 @@
     <section v-else-if="view.body.kind === 'agent'" class="node-card__body node-card__body--agent">
       <div class="node-card__port-grid">
         <div class="node-card__port-column">
-          <div v-for="port in agentInputPorts" :key="port.key" class="node-card__port-pill-row">
+          <TransitionGroup name="node-card-port-reorder" tag="div" class="node-card__port-reorder-stack">
+          <div v-for="port in orderedAgentInputPorts" :key="port.key" class="node-card__port-pill-row">
             <ElPopover
               :visible="
                 isStateEditorOpen(`agent-input:${port.key}`) ||
@@ -566,7 +567,7 @@
                     'node-card__port-pill--revealed': isStateEditorPillRevealed(`agent-input:${port.key}`),
                     'node-card__port-pill--confirm': isStateEditorConfirmOpen(`agent-input:${port.key}`),
                     'node-card__port-pill--reordering': isPortReordering('input', port.key),
-                    'node-card__port-pill--reorder-target': isPortReorderTarget('input', port.key),
+                    'node-card__port-pill--reorder-placeholder': isPortReorderPlaceholder('input', port.key),
                   }"
                   :style="{ '--node-card-port-accent': port.stateColor }"
                   data-state-editor-trigger="true"
@@ -621,6 +622,7 @@
               />
             </ElPopover>
           </div>
+          </TransitionGroup>
           <ElPopover
             :visible="isPortCreateOpen('input')"
             placement="bottom-start"
@@ -748,7 +750,8 @@
           </ElPopover>
         </div>
         <div class="node-card__port-column node-card__port-column--right">
-          <div v-for="port in agentOutputPorts" :key="port.key" class="node-card__port-pill-row node-card__port-pill-row--right">
+          <TransitionGroup name="node-card-port-reorder" tag="div" class="node-card__port-reorder-stack node-card__port-reorder-stack--right">
+          <div v-for="port in orderedAgentOutputPorts" :key="port.key" class="node-card__port-pill-row node-card__port-pill-row--right">
             <ElPopover
               :visible="
                 isStateEditorOpen(`agent-output:${port.key}`) ||
@@ -769,7 +772,7 @@
                     'node-card__port-pill--revealed': isStateEditorPillRevealed(`agent-output:${port.key}`),
                     'node-card__port-pill--confirm': isStateEditorConfirmOpen(`agent-output:${port.key}`),
                     'node-card__port-pill--reordering': isPortReordering('output', port.key),
-                    'node-card__port-pill--reorder-target': isPortReorderTarget('output', port.key),
+                    'node-card__port-pill--reorder-placeholder': isPortReorderPlaceholder('output', port.key),
                   }"
                   :style="{ '--node-card-port-accent': port.stateColor }"
                   data-state-editor-trigger="true"
@@ -823,6 +826,7 @@
               />
             </ElPopover>
           </div>
+          </TransitionGroup>
           <ElPopover
             :visible="isPortCreateOpen('output')"
             placement="bottom-end"
@@ -1372,6 +1376,30 @@
       <div class="node-card__runtime-note-text">{{ view.runtimeNote.text }}</div>
     </div>
   </article>
+  <Teleport to="body">
+    <span
+      v-if="portReorderFloatingPort"
+      class="node-card__port-pill node-card__port-pill--floating node-card__port-pill--removable"
+      :class="{
+        'node-card__port-pill--input': portReorderFloatingPort.side === 'input',
+        'node-card__port-pill--output': portReorderFloatingPort.side === 'output',
+      }"
+      :style="portReorderFloatingStyle"
+      aria-hidden="true"
+    >
+      <span
+        v-if="portReorderFloatingPort.side === 'input'"
+        class="node-card__port-pill-anchor-slot node-card__port-pill-anchor-slot--leading"
+      />
+      <span class="node-card__port-pill-label">
+        <span class="node-card__port-pill-label-text">{{ portReorderFloatingPort.port.label }}</span>
+      </span>
+      <span
+        v-if="portReorderFloatingPort.side === 'output'"
+        class="node-card__port-pill-anchor-slot"
+      />
+    </span>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
@@ -1412,6 +1440,12 @@ import {
 
 type TextEditorField = "title" | "description";
 type PortReorderSide = "input" | "output";
+type PortReorderRect = {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+};
 
 const PORT_REORDER_DRAG_THRESHOLD = 6;
 
@@ -1446,7 +1480,7 @@ const emit = defineEmits<{
   (event: "update-input-state", payload: { stateKey: string; patch: Partial<StateDefinition> }): void;
   (event: "update-state", payload: { stateKey: string; patch: Partial<StateDefinition> }): void;
   (event: "remove-port-state", payload: { nodeId: string; side: "input" | "output"; stateKey: string }): void;
-  (event: "reorder-port-state", payload: { nodeId: string; side: "input" | "output"; stateKey: string; targetStateKey: string }): void;
+  (event: "reorder-port-state", payload: { nodeId: string; side: "input" | "output"; stateKey: string; targetIndex: number }): void;
   (event: "update-output-config", payload: { nodeId: string; patch: Partial<OutputNode["config"]> }): void;
   (event: "update-agent-config", payload: { nodeId: string; patch: Partial<AgentNode["config"]> }): void;
   (event: "toggle-agent-breakpoint", payload: { nodeId: string; enabled: boolean }): void;
@@ -1550,6 +1584,8 @@ const agentInputPorts = computed<NodePortViewModel[]>(() =>
 const agentOutputPorts = computed<NodePortViewModel[]>(() =>
   view.value.body.kind === "agent" ? view.value.outputs.filter((port) => !port.virtual) : [],
 );
+const orderedAgentInputPorts = computed<NodePortViewModel[]>(() => buildPortReorderPreviewPorts("input", agentInputPorts.value));
+const orderedAgentOutputPorts = computed<NodePortViewModel[]>(() => buildPortReorderPreviewPorts("output", agentOutputPorts.value));
 const shouldShowAgentCreateInputPort = computed(() => agentInputPorts.value.length === 0);
 const shouldShowAgentCreateOutputPort = computed(() => agentOutputPorts.value.length === 0);
 const agentCreateInputAnchorStateKey = computed(() =>
@@ -1589,8 +1625,12 @@ const portReorderPointerState = ref<{
   pointerId: number;
   startClientX: number;
   startClientY: number;
+  currentClientX: number;
+  currentClientY: number;
+  pointerOffsetY: number;
+  sourceRect: PortReorderRect;
   active: boolean;
-  targetStateKey: string | null;
+  targetIndex: number | null;
 } | null>(null);
 const suppressNextPortPillClick = ref(false);
 const textEditorConfirmTimeoutRef = ref<number | null>(null);
@@ -1614,6 +1654,32 @@ const portStateSelectedColorStyle = computed(() => {
   const matchedOption = portStateColorOptions.value.find((option) => option.value === selectedColor);
   return {
     backgroundColor: matchedOption?.swatch || selectedColor || "#d97706",
+  };
+});
+const portReorderFloatingPort = computed<{ side: PortReorderSide; port: NodePortViewModel } | null>(() => {
+  const pointerState = portReorderPointerState.value;
+  if (!pointerState?.active) {
+    return null;
+  }
+
+  const ports = pointerState.side === "input" ? agentInputPorts.value : agentOutputPorts.value;
+  const port = ports.find((candidate) => candidate.key === pointerState.stateKey);
+  return port ? { side: pointerState.side, port } : null;
+});
+const portReorderFloatingStyle = computed(() => {
+  const pointerState = portReorderPointerState.value;
+  const floatingPort = portReorderFloatingPort.value;
+  if (!pointerState || !floatingPort) {
+    return {};
+  }
+
+  const top = pointerState.currentClientY - pointerState.pointerOffsetY;
+  return {
+    "--node-card-port-accent": floatingPort.port.stateColor,
+    left: `${pointerState.sourceRect.left}px`,
+    top: `${top}px`,
+    width: `${pointerState.sourceRect.width}px`,
+    height: `${pointerState.sourceRect.height}px`,
   };
 });
 const showKnowledgeBaseInput = computed(() => view.value.body.kind === "input" && view.value.body.editorMode === "knowledge_base");
@@ -2623,30 +2689,90 @@ function isPortReordering(side: PortReorderSide, stateKey: string) {
   return Boolean(pointerState?.active && pointerState.side === side && pointerState.stateKey === stateKey);
 }
 
-function isPortReorderTarget(side: PortReorderSide, stateKey: string) {
+function isPortReorderPlaceholder(side: PortReorderSide, stateKey: string) {
   const pointerState = portReorderPointerState.value;
-  return Boolean(pointerState?.active && pointerState.side === side && pointerState.targetStateKey === stateKey);
+  return Boolean(pointerState?.active && pointerState.side === side && pointerState.stateKey === stateKey);
 }
 
-function resolvePortReorderTargetStateKey(side: "input" | "output", clientX: number, clientY: number) {
-  const element = document.elementFromPoint(clientX, clientY);
-  if (!(element instanceof Element)) {
-    return null;
+function buildPortReorderPreviewPorts(side: PortReorderSide, ports: NodePortViewModel[]) {
+  const pointerState = portReorderPointerState.value;
+  if (!pointerState?.active || pointerState.side !== side || pointerState.targetIndex === null) {
+    return ports;
   }
-  const targetElement = element.closest("[data-port-reorder-state-key]") as HTMLElement | null;
-  if (!targetElement) {
-    return null;
+
+  const sourceIndex = ports.findIndex((port) => port.key === pointerState.stateKey);
+  if (sourceIndex === -1) {
+    return ports;
   }
-  if (targetElement.dataset.portReorderNodeId !== props.nodeId || targetElement.dataset.portReorderSide !== side) {
+
+  const sourcePort = ports[sourceIndex];
+  const remainingPorts = ports.filter((port) => port.key !== pointerState.stateKey);
+  const targetIndex = Math.max(0, Math.min(pointerState.targetIndex, remainingPorts.length));
+  return [
+    ...remainingPorts.slice(0, targetIndex),
+    sourcePort,
+    ...remainingPorts.slice(targetIndex),
+  ];
+}
+
+function escapePortReorderSelectorValue(value: string) {
+  return typeof CSS !== "undefined" && typeof CSS.escape === "function"
+    ? CSS.escape(value)
+    : value.replace(/["\\]/g, "\\$&");
+}
+
+function resolvePortReorderTargetIndex(side: PortReorderSide, clientY: number) {
+  const pointerState = portReorderPointerState.value;
+  if (!pointerState || pointerState.side !== side) {
     return null;
   }
 
-  const stateKey = targetElement.dataset.portReorderStateKey;
-  return stateKey && stateKey !== portReorderPointerState.value?.stateKey ? stateKey : null;
+  const selector = [
+    `[data-port-reorder-node-id="${escapePortReorderSelectorValue(props.nodeId)}"]`,
+    `[data-port-reorder-side="${side}"]`,
+    "[data-port-reorder-state-key]",
+  ].join("");
+  const targetElements = Array.from(document.querySelectorAll<HTMLElement>(selector))
+    .filter((element) => element.dataset.portReorderStateKey !== pointerState.stateKey)
+    .sort((left, right) => left.getBoundingClientRect().top - right.getBoundingClientRect().top);
+  if (targetElements.length === 0) {
+    return 0;
+  }
+
+  const firstTargetAfterPointer = targetElements.findIndex((element) => {
+    const rect = element.getBoundingClientRect();
+    return clientY < rect.top + rect.height / 2;
+  });
+  return firstTargetAfterPointer === -1 ? targetElements.length : firstTargetAfterPointer;
+}
+
+function resolvePortReorderInitialTargetIndex(side: PortReorderSide, stateKey: string) {
+  const ports = side === "input" ? agentInputPorts.value : agentOutputPorts.value;
+  const sourceIndex = ports.findIndex((port) => port.key === stateKey);
+  return sourceIndex === -1 ? null : sourceIndex;
+}
+
+function resolvePortReorderSourceRect(event: PointerEvent): PortReorderRect | null {
+  if (!(event.currentTarget instanceof HTMLElement)) {
+    return null;
+  }
+
+  const rect = event.currentTarget.getBoundingClientRect();
+  return {
+    left: rect.left,
+    top: rect.top,
+    width: rect.width,
+    height: rect.height,
+  };
 }
 
 function handlePortReorderPointerDown(side: "input" | "output", stateKey: string, event: PointerEvent) {
   if (event.button !== 0 || guardLockedGraphInteraction()) {
+    return;
+  }
+  const sourceRect = resolvePortReorderSourceRect(event);
+  const targetIndex = resolvePortReorderInitialTargetIndex(side, stateKey);
+  if (!sourceRect || targetIndex === null) {
     return;
   }
 
@@ -2657,8 +2783,12 @@ function handlePortReorderPointerDown(side: "input" | "output", stateKey: string
     pointerId: event.pointerId,
     startClientX: event.clientX,
     startClientY: event.clientY,
+    currentClientX: event.clientX,
+    currentClientY: event.clientY,
+    pointerOffsetY: event.clientY - sourceRect.top,
+    sourceRect,
     active: false,
-    targetStateKey: null,
+    targetIndex,
   };
   window.addEventListener("pointermove", handlePortReorderPointerMove);
   window.addEventListener("pointerup", handlePortReorderPointerUp);
@@ -2689,7 +2819,9 @@ function handlePortReorderPointerMove(event: PointerEvent) {
   portReorderPointerState.value = {
     ...pointerState,
     active: true,
-    targetStateKey: resolvePortReorderTargetStateKey(pointerState.side, event.clientX, event.clientY),
+    currentClientX: event.clientX,
+    currentClientY: event.clientY,
+    targetIndex: resolvePortReorderTargetIndex(pointerState.side, event.clientY) ?? pointerState.targetIndex,
   };
 }
 
@@ -2699,8 +2831,8 @@ function handlePortReorderPointerUp(event: PointerEvent) {
     return;
   }
 
-  const targetStateKey = pointerState.active
-    ? resolvePortReorderTargetStateKey(pointerState.side, event.clientX, event.clientY) ?? pointerState.targetStateKey
+  const targetIndex = pointerState.active
+    ? resolvePortReorderTargetIndex(pointerState.side, event.clientY) ?? pointerState.targetIndex
     : null;
   if (pointerState.active) {
     event.preventDefault();
@@ -2708,7 +2840,7 @@ function handlePortReorderPointerUp(event: PointerEvent) {
   }
 
   clearPortReorderPointerState();
-  if (!targetStateKey) {
+  if (targetIndex === null) {
     return;
   }
 
@@ -2716,7 +2848,7 @@ function handlePortReorderPointerUp(event: PointerEvent) {
     nodeId: props.nodeId,
     side: pointerState.side,
     stateKey: pointerState.stateKey,
-    targetStateKey,
+    targetIndex,
   });
 }
 
@@ -3778,6 +3910,18 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
   text-align: right;
 }
 
+.node-card__port-reorder-stack {
+  display: grid;
+}
+
+.node-card__port-reorder-stack--right {
+  justify-items: end;
+}
+
+.node-card-port-reorder-move {
+  transition: transform 150ms ease;
+}
+
 .node-card__port-pill-row {
   display: flex;
   align-items: center;
@@ -3866,13 +4010,28 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
 
 .node-card__port-pill--reordering {
   cursor: grabbing;
-  opacity: 0.72;
 }
 
-.node-card__port-pill--reorder-target {
+.node-card__port-pill--reorder-placeholder {
   border-color: color-mix(in srgb, var(--node-card-port-accent) 46%, transparent);
-  background: color-mix(in srgb, var(--node-card-port-accent) 12%, transparent);
-  box-shadow: 0 10px 22px rgba(60, 41, 20, 0.1);
+  background: color-mix(in srgb, var(--node-card-port-accent) 8%, transparent);
+  box-shadow: none;
+}
+
+.node-card__port-pill--reorder-placeholder > * {
+  opacity: 0;
+}
+
+.node-card__port-pill--floating {
+  position: fixed;
+  z-index: 5000;
+  margin: 0;
+  pointer-events: none;
+  cursor: grabbing;
+  border-color: color-mix(in srgb, var(--node-card-port-accent) 42%, transparent);
+  background: rgba(255, 250, 241, 0.97);
+  box-shadow: 0 16px 34px rgba(60, 41, 20, 0.16);
+  transform: translateZ(0);
 }
 
 .node-card__port-pill--create {

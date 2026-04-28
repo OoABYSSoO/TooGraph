@@ -80,14 +80,14 @@ test("EditorWorkspaceShell wires node top-action events into state updates, node
   assert.doesNotMatch(componentSource, /function renameStateField/);
   assert.match(componentSource, /@update-state="updateStateField\(tab\.tabId, \$event\.stateKey, \$event\.patch\)"/);
   assert.match(componentSource, /@remove-port-state="removeNodePortStateForTab\(tab\.tabId, \$event\.nodeId, \$event\.side, \$event\.stateKey\)"/);
-  assert.match(componentSource, /@reorder-port-state="reorderNodePortStateForTab\(tab\.tabId, \$event\.nodeId, \$event\.side, \$event\.stateKey, \$event\.targetStateKey\)"/);
+  assert.match(componentSource, /@reorder-port-state="reorderNodePortStateForTab\(tab\.tabId, \$event\.nodeId, \$event\.side, \$event\.stateKey, \$event\.targetIndex\)"/);
   assert.match(componentSource, /@disconnect-data-edge="disconnectDataEdgeForTab\(tab\.tabId, \$event\.sourceNodeId, \$event\.targetNodeId, \$event\.stateKey, \$event\.mode\)"/);
   assert.match(componentSource, /@delete-node="deleteNodeForTab\(tab\.tabId, \$event\.nodeId\)"/);
   assert.match(componentSource, /@save-node-preset="saveNodePresetForTab\(tab\.tabId, \$event\.nodeId\)"/);
   assert.match(componentSource, /function updateNodeMetadataForTab\(tabId: string, nodeId: string, patch: Partial<Pick<GraphNode, "name" \| "description">>\)/);
   assert.match(componentSource, /function removeNodePortStateForTab\(tabId: string, nodeId: string, side: "input" \| "output", stateKey: string\)/);
-  assert.match(componentSource, /function reorderNodePortStateForTab\(tabId: string, nodeId: string, side: "input" \| "output", stateKey: string, targetStateKey: string\)/);
-  assert.match(componentSource, /reorderNodePortStateInDocument\(document, nodeId, side, stateKey, targetStateKey\)/);
+  assert.match(componentSource, /function reorderNodePortStateForTab\(tabId: string, nodeId: string, side: "input" \| "output", stateKey: string, targetIndex: number\)/);
+  assert.match(componentSource, /reorderNodePortStateInDocument\(document, nodeId, side, stateKey, targetIndex\)/);
   assert.match(componentSource, /function disconnectDataEdgeForTab\(tabId: string, sourceNodeId: string, targetNodeId: string, stateKey: string, mode: "state" \| "flow"\)/);
   assert.match(componentSource, /async function saveNodePresetForTab\(tabId: string, nodeId: string\)/);
   assert.match(componentSource, /function deleteNodeForTab\(tabId: string, nodeId: string\)/);

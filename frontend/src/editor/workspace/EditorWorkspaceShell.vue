@@ -104,7 +104,7 @@
                 @update-input-state="updateStateField(tab.tabId, $event.stateKey, $event.patch)"
                 @update-state="updateStateField(tab.tabId, $event.stateKey, $event.patch)"
                 @remove-port-state="removeNodePortStateForTab(tab.tabId, $event.nodeId, $event.side, $event.stateKey)"
-                @reorder-port-state="reorderNodePortStateForTab(tab.tabId, $event.nodeId, $event.side, $event.stateKey, $event.targetStateKey)"
+                @reorder-port-state="reorderNodePortStateForTab(tab.tabId, $event.nodeId, $event.side, $event.stateKey, $event.targetIndex)"
                 @disconnect-data-edge="disconnectDataEdgeForTab(tab.tabId, $event.sourceNodeId, $event.targetNodeId, $event.stateKey, $event.mode)"
                 @update-agent-config="updateAgentConfigForTab(tab.tabId, $event.nodeId, $event.patch)"
                 @toggle-agent-breakpoint="toggleAgentBreakpointForTab(tab.tabId, $event.nodeId, $event.enabled)"
@@ -1637,13 +1637,13 @@ function removeNodePortStateForTab(tabId: string, nodeId: string, side: "input" 
   focusNodeForTab(tabId, nodeId);
 }
 
-function reorderNodePortStateForTab(tabId: string, nodeId: string, side: "input" | "output", stateKey: string, targetStateKey: string) {
+function reorderNodePortStateForTab(tabId: string, nodeId: string, side: "input" | "output", stateKey: string, targetIndex: number) {
   const document = documentsByTabId.value[tabId];
   if (!document) {
     return;
   }
 
-  const nextDocument = reorderNodePortStateInDocument(document, nodeId, side, stateKey, targetStateKey);
+  const nextDocument = reorderNodePortStateInDocument(document, nodeId, side, stateKey, targetIndex);
   if (nextDocument === document) {
     return;
   }
