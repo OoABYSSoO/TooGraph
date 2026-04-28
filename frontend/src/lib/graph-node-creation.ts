@@ -4,8 +4,6 @@ import { isCreateAgentInputStateKey, isVirtualAnyInputStateKey, isVirtualAnyOutp
 import { canConnectStateInputSource, filterReplacedStateInputSourceEdges } from "./graph-connections.ts";
 
 import type {
-  AgentNode,
-  ConditionNode,
   GraphDocument,
   GraphNode,
   GraphPayload,
@@ -98,7 +96,7 @@ function buildTextInputNode(position: GraphPosition): InputNode {
   };
 }
 
-function buildOutputNode(id: string, position: GraphPosition): OutputNode {
+function buildOutputNode(position: GraphPosition): OutputNode {
   return {
     kind: "output",
     name: "Output",
@@ -126,7 +124,7 @@ export function buildGenericInputNode(params: { id: string; position: GraphPosit
 export function buildGenericOutputNode(params: { id: string; position: GraphPosition }): CreatedNodeResult {
   return {
     id: params.id,
-    node: buildOutputNode(params.id, params.position),
+    node: buildOutputNode(params.position),
     state_schema: {},
   };
 }

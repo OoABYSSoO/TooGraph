@@ -1848,46 +1848,6 @@ function emitConditionConfigPatch(patch: Partial<ConditionNode["config"]>) {
   emit("update-condition-config", { nodeId: props.nodeId, patch });
 }
 
-function emitConditionBranchUpdate(currentKey: string, nextKey: string, mappingKeys: string[]) {
-  if (guardLockedGraphInteraction()) {
-    return;
-  }
-  if (props.node.kind !== "condition") {
-    return;
-  }
-  emit("update-condition-branch", {
-    nodeId: props.nodeId,
-    currentKey,
-    nextKey,
-    mappingKeys,
-  });
-}
-
-function addConditionBranch() {
-  if (guardLockedGraphInteraction()) {
-    return;
-  }
-  if (props.node.kind !== "condition") {
-    return;
-  }
-  emit("add-condition-branch", {
-    nodeId: props.nodeId,
-  });
-}
-
-function removeConditionBranch(branchKey: string) {
-  if (guardLockedGraphInteraction()) {
-    return;
-  }
-  if (props.node.kind !== "condition") {
-    return;
-  }
-  emit("remove-condition-branch", {
-    nodeId: props.nodeId,
-    branchKey,
-  });
-}
-
 function handleOutputPersistToggle(value: string | number | boolean) {
   if (props.node.kind !== "output") {
     return;
@@ -1909,14 +1869,6 @@ function updateOutputPersistFormat(persistFormat: OutputNode["config"]["persistF
 
 function isOutputPersistFormatActive(persistFormat: OutputNode["config"]["persistFormat"]) {
   return props.node.kind === "output" && props.node.config.persistFormat === persistFormat;
-}
-
-function handleOutputFileNameInput(event: Event) {
-  const target = event.target;
-  if (!(target instanceof HTMLInputElement)) {
-    return;
-  }
-  emitOutputConfigPatch({ fileNameTemplate: target.value });
 }
 
 function handleOutputFileNameInputValue(value: string | number) {
@@ -1998,14 +1950,6 @@ function closePortPicker() {
   portStateError.value = null;
 }
 
-function handlePortDraftNameInput(event: Event) {
-  const target = event.target;
-  if (!(target instanceof HTMLInputElement) || !portStateDraft.value) {
-    return;
-  }
-  handlePortDraftNameValue(target.value);
-}
-
 function handlePortDraftNameValue(value: string | number) {
   if (guardLockedGraphInteraction()) {
     return;
@@ -2040,14 +1984,6 @@ function handlePortDraftTypeSelect(value: string | number | boolean | undefined)
   };
 }
 
-function handlePortDraftDescriptionInput(event: Event) {
-  const target = event.target;
-  if (!(target instanceof HTMLTextAreaElement) || !portStateDraft.value) {
-    return;
-  }
-  handlePortDraftDescriptionValue(target.value);
-}
-
 function handlePortDraftDescriptionValue(value: string | number) {
   if (guardLockedGraphInteraction()) {
     return;
@@ -2062,14 +1998,6 @@ function handlePortDraftDescriptionValue(value: string | number) {
       description: String(value ?? ""),
     },
   };
-}
-
-function handlePortDraftColorInput(event: Event) {
-  const target = event.target;
-  if (!(target instanceof HTMLInputElement) || !portStateDraft.value) {
-    return;
-  }
-  updatePortDraftColor(target.value);
 }
 
 function handlePortDraftColorSelect(value: string | number | boolean | undefined) {
@@ -3048,16 +2976,6 @@ function updateAgentThinkingMode(thinkingMode: AgentNode["config"]["thinkingMode
   emitAgentConfigPatch({ thinkingMode });
 }
 
-function handleAgentBreakpointToggle() {
-  if (guardLockedGraphInteraction()) {
-    return;
-  }
-  if (props.node.kind !== "agent") {
-    return;
-  }
-  emit("toggle-agent-breakpoint", { nodeId: props.nodeId, enabled: !props.agentBreakpointEnabled });
-}
-
 function handleAgentBreakpointToggleValue(value: string | number | boolean) {
   if (guardLockedGraphInteraction()) {
     return;
@@ -3076,18 +2994,6 @@ function handleAgentBreakpointTimingSelect(nextValue: string | number | boolean 
     return;
   }
   emit("update-agent-breakpoint-timing", { nodeId: props.nodeId, timing: nextValue });
-}
-
-function handleAgentTemperatureInput(event: Event) {
-  const target = event.target;
-  if (!(target instanceof HTMLInputElement)) {
-    return;
-  }
-  const nextValue = target.value === "" ? DEFAULT_AGENT_TEMPERATURE : Number(target.value);
-  if (!Number.isFinite(nextValue)) {
-    return;
-  }
-  emitAgentConfigPatch({ temperature: normalizeAgentTemperature(nextValue) });
 }
 
 function handleAgentTemperatureInputValue(value: string | number) {

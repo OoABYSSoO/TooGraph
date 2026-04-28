@@ -223,8 +223,8 @@ test("NodeCard restores the legacy agent runtime control order with Element Plus
   assert.match(componentSource, /agentBreakpointTiming\?:\s*"before" \| "after";/);
   assert.match(componentSource, /\(event: "toggle-agent-breakpoint", payload: \{ nodeId: string; enabled: boolean \}\): void;/);
   assert.match(componentSource, /\(event: "update-agent-breakpoint-timing", payload: \{ nodeId: string; timing: "before" \| "after" \}\): void;/);
-  assert.match(componentSource, /function handleAgentBreakpointToggle\(\) \{[\s\S]*emit\("toggle-agent-breakpoint", \{ nodeId: props\.nodeId, enabled: !props\.agentBreakpointEnabled \}\);[\s\S]*\}/);
   assert.match(componentSource, /function handleAgentBreakpointToggleValue\(value: string \| number \| boolean\) \{/);
+  assert.match(componentSource, /emit\("toggle-agent-breakpoint", \{ nodeId: props\.nodeId, enabled: value \}\);/);
   assert.match(componentSource, /class="node-card__breakpoint-timing-select graphite-select"/);
   assert.match(componentSource, /:model-value="agentBreakpointTimingValue"/);
   assert.match(componentSource, /@update:model-value="handleAgentBreakpointTimingSelect"/);
@@ -531,7 +531,7 @@ test("NodeCard blocks every in-canvas control while graph editing is locked", ()
   assert.match(componentSource, /function emitInputConfigPatch\(patch: Partial<InputNode\["config"\]>\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
   assert.match(componentSource, /function emitAgentConfigPatch\(patch: Partial<AgentNode\["config"\]>\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
   assert.match(componentSource, /function emitConditionConfigPatch\(patch: Partial<ConditionNode\["config"\]>\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
-  assert.match(componentSource, /function handleAgentBreakpointToggle\(\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
+  assert.match(componentSource, /function handleAgentBreakpointToggleValue\(value: string \| number \| boolean\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
   assert.match(componentSource, /function toggleAdvancedPanel\(\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
   assert.match(componentSource, /function toggleSkillPicker\(\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);
   assert.match(componentSource, /function openPortStateCreate\(side: "input" \| "output"\)[\s\S]*if \(guardLockedGraphInteraction\(\)\) \{[\s\S]*return;/);

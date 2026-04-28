@@ -1,45 +1,51 @@
 # Progress Log
 
-## Session: 2026-04-27
+## Session: 2026-04-28
 
-### Phase 1: Current State Alignment
-- **Status:** complete
-- **Started:** 2026-04-27
+### Phase 1: Repository Inventory
+- **Status:** completed
+- **Started:** 2026-04-28
 - Actions taken:
-  - Continued from the merged native Skill foundation context.
-  - Read planning-with-files instructions and ran session catchup.
-  - Re-read native Skill and Skill taxonomy docs.
-  - Re-read the previous native Skill foundation implementation plan.
-  - Replaced previous project-review planning files with this Skill refactor continuation plan.
-  - Inspected backend Skill schemas, store, catalog parsing, upload routes, runtime registry, graph validator, and node executor.
-  - Inspected frontend Skill types/API/model, Skill page model tests, Agent node picker model/tests, and NodeCard picker rendering.
-  - Added failing backend tests for native built-in manifests, agent-attachable definitions, and validation diagnostics.
-  - Added failing frontend test for Agent Skill picker eligibility filtering.
-  - Added native `skill.json` manifests for the five existing runtime-registered built-in Skills.
-  - Updated backend Skill definitions to return only active, healthy, configured, runtime-registered Agent-node Skills for `/api/skills/definitions`.
-  - Updated graph validation to report companion-only, unconfigured, unhealthy, disabled, and not-runtime-registered Skill references on Agent nodes.
-  - Updated the Agent Skill picker model and UI copy to show only attachable Agent-node Skills and display kind/mode/scope metadata.
-  - Ran full backend and frontend verification, built the frontend, restarted dev with `npm run dev`, and checked frontend/backend Skill endpoints.
-  - Created a commit with Chinese message `完善原生 Skill 的 Agent 附加规则`.
-  - Pushed `main` to `origin`.
-- Files created/modified:
-  - task_plan.md
-  - findings.md
-  - progress.md
+  - Started an architecture audit for redundancy, unused code, and extraction candidates.
+  - Ran planning session catchup and found previous Skill-refactor planning files.
+  - Replaced previous planning context with this repository audit plan.
+  - Inspected root/frontend package scripts and backend requirements.
+  - Collected largest frontend/backend files by line count.
+
+### Phase 2: Redundancy and Dead-Code Signals
+- **Status:** completed
+- Actions taken:
+  - Confirmed no tracked Python cache, frontend build output, or dev log artifacts.
+  - Checked stale TODO/legacy/dead-code signals and identified `scripts/lm_core1.py` as the largest suspicious script candidate.
+  - Ran `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters`.
+  - Removed unused frontend handlers/imports and updated the corresponding structure test.
+  - Deleted the unreferenced retired local runtime script `scripts/lm_core1.py`; the tested migration wrapper scripts remain.
+
+### Phase 3: Abstraction Candidates
+- **Status:** completed
+- Actions taken:
+  - Mapped the main oversized frontend surfaces: node card, canvas, and workspace shell.
+  - Mapped the main oversized backend surfaces: model provider client, node executor, and LangGraph runtime.
+  - Wrote the long-term refactor roadmap in `docs/future/2026-04-28-architecture-refactor-roadmap.md`.
+  - Updated `docs/README.md` to include the roadmap.
+
+### Phase 4: Verification and Wrap-Up
+- **Status:** completed
+- Actions taken:
+  - Ran full frontend tests, backend tests, TypeScript unused-symbol check, and frontend production build.
+  - Restarted the local dev environment with `npm run dev`.
+  - Confirmed frontend and backend health checks returned HTTP 200.
 
 ## Test Results
 | Test | Input | Expected | Actual | Status |
 |------|-------|----------|--------|--------|
-| `PYTHONPATH=backend python -m pytest backend/tests/test_skill_upload_import_routes.py -q` | New backend Skill eligibility tests | Fail before implementation | 3 failed, 4 passed | expected fail |
-| `node --test frontend/src/editor/nodes/skillPickerModel.test.ts` | New frontend picker eligibility test | Fail before implementation | 1 failed, 2 passed | expected fail |
-| `PYTHONPATH=backend python -m pytest backend/tests/test_skill_upload_import_routes.py -q` | Backend Skill eligibility implementation | Pass | 7 passed, 2 warnings | pass |
-| `node --test frontend/src/editor/nodes/skillPickerModel.test.ts` | Frontend picker eligibility implementation | Pass | 3 passed | pass |
-| `node --test frontend/src/editor/nodes/skillPickerModel.test.ts frontend/src/editor/nodes/NodeCard.structure.test.ts frontend/src/pages/skillsPageModel.test.ts frontend/src/api/skills.test.ts` | Frontend Skill/NodeCard targeted coverage | Pass | 38 passed | pass |
-| `PYTHONPATH=backend python -m pytest backend/tests -q` | Full backend test suite | Pass | 131 passed, 2 warnings | pass |
-| `node --test $(find frontend/src -name '*.test.ts' -o -name '*.structure.test.ts') frontend/vite.config.structure.test.ts` | Full frontend Node test suite | Pass | 562 passed | pass |
-| `npm run build --prefix frontend` | Frontend production build | Pass | Built with existing Vite chunk-size warning | pass |
-| `npm run dev` | Standard dev restart | Running | Frontend `http://127.0.0.1:3477`, backend `http://127.0.0.1:8765` | pass |
-| `curl` smoke checks | Frontend and Skill APIs | HTTP 200 and native definitions | Frontend 200, catalog 200, definitions: 5 `graphite_definition` items | pass |
+| Frontend unused symbol check | `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` | No unused-symbol diagnostics | Passed with no output after cleanup | Passed |
+| Focused frontend tests | `node --test frontend/src/editor/nodes/NodeCard.structure.test.ts frontend/src/lib/graph-node-creation.test.ts` | Structure and creation tests pass | 45 passed | Passed |
+| Local runtime migration wrapper tests | `PYTHONPATH=backend python -m pytest backend/tests/test_openai_compatible_migration_wrappers.py -q` | Retired wrapper guidance still works | 3 passed | Passed |
+| Full frontend tests | `node --test $(rg --files frontend/src -g '*.test.ts') frontend/vite.config.structure.test.ts` | All frontend tests pass | 647 passed | Passed |
+| Full backend tests | `PYTHONPATH=backend python -m pytest backend/tests -q` | All backend tests pass | 139 passed, 2 warnings | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds | Passed with existing Vite large chunk warning | Passed |
+| Dev restart | `npm run dev` | Frontend/backend restart and respond | Frontend 200, backend 200 | Passed |
 
 ## Error Log
 | Timestamp | Error | Attempt | Resolution |
@@ -48,8 +54,8 @@
 ## 5-Question Reboot Check
 | Question | Answer |
 |----------|--------|
-| Where am I? | Complete. |
-| Where am I going? | Ready for the next Skill refactor slice. |
-| What's the goal? | Make the native Skill system more coherent and usable from Agent nodes while preserving manual import and future Companion support. |
-| What have I learned? | Existing docs recommend one Skill system, target-specific usage, explicit Agent node binding, and workflow-first runtime semantics. |
-| What have I done? | Added native built-in Skill manifests, tightened Agent attachability rules in backend/frontend, verified, and restarted dev. |
+| Where am I? | Audit, cleanup, verification, and dev restart are complete. |
+| Where am I going? | Commit and push all audit and cleanup changes. |
+| What's the goal? | Produce an architecture-level assessment of code redundancy and refactor opportunities. |
+| What have I learned? | Core complexity is concentrated in NodeCard, EditorCanvas, EditorWorkspaceShell, model provider client, node executor, and LangGraph runtime. |
+| What have I done? | Removed safe dead code, deleted the retired unreferenced runtime script, documented the architecture roadmap, and verified the repository. |

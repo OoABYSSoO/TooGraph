@@ -1,43 +1,45 @@
-# Findings & Decisions
+# Findings & Decisions: Repository Architecture Audit
 
 ## Requirements
-- Continue the native Skill refactor implementation.
-- Preserve the product direction already discussed: native GraphiteUI Skill packages, manual upload/import, explicit Agent node usage, future Companion loadouts, and no default external auto-discovery.
-- Commit and push completed work when the slice is verified.
+- Review the repository for redundant code, unused code, and extractable modules.
+- Judge with an architect-level standard: maintainability, boundaries, coupling, testability, and refactor risk.
+- Prefer evidence-backed recommendations over speculative rewrites.
 
 ## Research Findings
-- `docs/future/2026-04-27-native-skill-system.md` defines Skill as a native, installable, diagnosable, permissioned ability package with `skill.json` as the machine-readable truth source and `SKILL.md` as model-facing guidance/compatibility material.
-- The same doc recommends workflow-first Skill design, Agent node explicit references, manual import, visible installed/enabled/configured/runtimeReady/healthy states, and later Run Detail Skill call records.
-- `docs/future/2026-04-27-skill-product-taxonomy.md` keeps `Skill / 技能` as the unified product term and uses `targets`, `kind`, `mode`, and `scope` to distinguish Agent node Skills, Companion Skills, Shared Skills, atomic/workflow/profile/context abilities, and runtime behavior.
-- The previous implementation plan `docs/superpowers/plans/2026-04-27-native-skill-foundation.md` says the merged foundation already added native `skill.json` upload/import, stopped default external discovery, extended catalog metadata, and updated Skill management filters/status display.
-- Repository status was clean before starting this continuation task.
-- Backend catalog/import code already supports native `skill/graphite/<key>/skill.json`, legacy managed `skill/claude_code/<key>/SKILL.md`, upload by zip/folder, and intentionally returns no external auto-discovered records.
-- Runtime registration is still driven by hard-coded Python functions in `backend/app/skills/registry.py`; only managed Skill keys that match these runtime keys are runnable.
-- Agent node config is still `skills: list[str]` in both backend and frontend schemas. Validator/runtime/compiler all iterate raw strings.
-- Agent Skill picker currently receives `/api/skills/definitions`, which is active/runtime-registered by default, but the frontend picker itself only removes already-attached keys. It does not enforce `targets.includes("agent_node")`, `configured`, `healthy`, or explain why a Skill is unavailable.
-- Backend validation only checks whether an attached Skill key is runtime-registered. It does not yet validate target suitability, manifest health/configuration, or structured mode/trigger/config references.
-- Implemented slice: the five built-in runtime Skills now have native GraphiteUI manifests, `/api/skills/definitions` returns only active/configured/healthy/runtime-registered Agent-node Skills, graph validation reports non-attachable Agent Skill references, and the Agent picker mirrors the same eligibility rule.
+- Repository is frontend-heavy: `git ls-files` line count across TS/Vue/Python/CSS is about 79k lines.
+- The largest frontend files are `frontend/src/editor/nodes/NodeCard.vue` at 5,383 lines, `frontend/src/editor/canvas/EditorCanvas.vue` at 4,672 lines, and `frontend/src/editor/workspace/EditorWorkspaceShell.vue` at 2,873 lines. These are likely the highest leverage architecture review targets.
+- The largest backend runtime files are `backend/app/tools/model_provider_client.py` at 1,380 lines, `backend/app/core/runtime/node_system_executor.py` at 1,226 lines, and `backend/app/core/langgraph/runtime.py` at 1,041 lines.
+- Root scripts are minimal: root `package.json` delegates only to `scripts/start.mjs`; frontend has build/dev/preview only. This reduces orchestration ambiguity.
+- Frontend dependencies are intentionally small: Vue, Vue Router, Pinia, Vue I18n, Element Plus, and icons. Most complexity is application code, not dependency sprawl.
+- Backend dependencies are also small and expected for this product: FastAPI, Pydantic, LangGraph, OpenAI, httpx, YAML, BeautifulSoup, multipart upload.
+- No tracked `__pycache__`, `.pyc`, `dist`, or `.dev_*` files were found.
+- Static unused-code check with `vue-tsc --noUnusedLocals --noUnusedParameters` found a small set of truly unused frontend symbols. Safe cleanup was applied in `NodeCard.vue`, `WorkspaceSearchField.vue`, and `graph-node-creation.ts`.
+- Removed `scripts/lm_core1.py`: it was 1,989 lines, unreferenced by tracked scripts/frontend/backend/docs/README, and conflicted with the current OpenAI-compatible provider migration strategy already expressed by `lm_core0.py`, `download_Gemma_gguf.py`, and `lm-server`.
+- `NodeCard.vue` mixes node chrome, state-port editing, text editing, runtime controls, skill picker, input value editor, output preview, condition editing, port drag-reorder, and CSS in one component. This is the most urgent frontend extraction candidate.
+- `EditorCanvas.vue` mixes rendering, viewport, pan/zoom/pinch, minimap coordination, node drag/resize, anchor measurement, connection snapping/completion, edge editing popovers, lock handling, and run presentation. It should be split by interaction model rather than by visual section.
+- `EditorWorkspaceShell.vue` mixes tab persistence, draft persistence, route sync, run polling/SSE, graph mutation forwarding, state panel actions, creation menu actions, import/export, and user feedback. It is a shell in name but currently owns too much application orchestration.
+- Backend runtime concentration is similar: `model_provider_client.py`, `node_system_executor.py`, and `core/langgraph/runtime.py` each contain multiple layers of responsibilities that should be separated only after behavior tests cover the boundaries.
+
+## Candidate Areas To Inspect
+- Frontend graph editor: `frontend/src/editor/canvas`, `frontend/src/editor/nodes`, `frontend/src/editor/workspace`.
+- Frontend pages/models/API wrappers: `frontend/src/pages`, `frontend/src/api`, `frontend/src/lib`.
+- Backend runtime and graph execution: `backend/app/core`, `backend/app/api`, `backend/app/skills`.
+- Scripts and dev orchestration: `scripts`, root `package.json`, `frontend/package.json`, backend requirements.
 
 ## Technical Decisions
 | Decision | Rationale |
 |----------|-----------|
-| Inspect implementation before selecting the next slice | The foundation branch was merged externally, so local code is authoritative for what remains. |
-| Prefer tests around the missing end-to-end contract | Skill behavior touches persistence, UI filtering, and Agent node configuration, so regressions are likely without tests. |
-| Implement Agent attachability before structured Skill references | The current graph schema still stores `skills: list[str]`; filtering and validation can improve safety immediately without forcing a broad graph migration. |
-| Add native manifests for existing runtime Skills without deleting legacy `SKILL.md` packages | Native `skill.json` becomes the catalog truth while legacy files remain useful as model-facing documentation and compatibility material. |
+| Do not start by deleting code | Static signals alone can be misleading in a UI-heavy codebase with dynamic routing and tests. |
+| Prioritize modules with high size and high coupling | Those create the most maintenance drag and refactor risk. |
 
 ## Issues Encountered
 | Issue | Resolution |
 |-------|------------|
+| `vue-tsc` unused check failed on stale handlers and imports | Removed the unused symbols and updated the structure test that asserted the previous handler shape. |
 
-## Candidate Next Slices
-- Agent node Skill binding polish: add structured Skill references with mode/trigger/config while preserving legacy `skills: string[]` graph compatibility.
-- Skill manifest validation/diagnostics: add validate/install split, conflict preview, and richer import errors.
-- Skill usage visibility: show which graphs/nodes reference a Skill from the management page.
-- Companion loadout foundation: add data model and settings UI for future desktop pet Skill usage without granting broad permissions by default.
-- Skill execution observability: show actual Skill invocations, inputs, outputs, timing, errors, and artifacts in Run Detail.
-
-## Visual/Browser Findings
-- Dev server restarted on `http://127.0.0.1:3477`; frontend and `/api/skills/catalog` returned HTTP 200.
-- `/api/skills/definitions` returned 5 Agent-attachable built-in Skills, all from `graphite_definition`.
-- Playwright is not installed in this repository, so no browser screenshot was captured for this small picker-copy/metadata change.
+## Final Recommendations
+- Next engineering slice should be `NodeCard.vue` extraction, starting with floating panel state and port reorder logic.
+- The second slice should be `EditorCanvas.vue` connection/measurement extraction.
+- The third slice should be `EditorWorkspaceShell.vue` run stream and draft persistence extraction.
+- Backend refactor should begin with `model_provider_client.py` because its protocol boundaries are clearer than executor/runtime semantics.
+- Avoid a broad rewrite; move pure functions first, keep public APIs as thin compatibility facades, and preserve current tests during each extraction.
