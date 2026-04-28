@@ -1,15 +1,15 @@
-export function resolveNodeRunPresentation(status: string | undefined, isCurrentRunNode: boolean) {
+export function resolveNodeRunPresentation(status: string | undefined, _isCurrentRunNode: boolean) {
   if (status === "running" || status === "resuming") {
     return {
-      haloClass: isCurrentRunNode ? "editor-canvas__node-halo--running-current" : "editor-canvas__node-halo--running",
-      shellClass: isCurrentRunNode ? "editor-canvas__node--running-current" : "editor-canvas__node--running",
+      haloClass: "editor-canvas__node-halo--running",
+      shellClass: "editor-canvas__node--running",
     };
   }
 
   if (status === "paused") {
     return {
-      haloClass: isCurrentRunNode ? "editor-canvas__node-halo--paused-current" : "editor-canvas__node-halo--paused",
-      shellClass: isCurrentRunNode ? "editor-canvas__node--paused-current" : "editor-canvas__node--paused",
+      haloClass: "editor-canvas__node-halo--paused",
+      shellClass: "editor-canvas__node--paused",
     };
   }
 

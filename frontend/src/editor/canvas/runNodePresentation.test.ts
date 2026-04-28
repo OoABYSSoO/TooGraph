@@ -3,14 +3,11 @@ import test from "node:test";
 
 import { resolveNodeRunPresentation } from "./runNodePresentation.ts";
 
-test("resolveNodeRunPresentation marks current running nodes distinctly", () => {
+test("resolveNodeRunPresentation uses one running presentation for current and non-current nodes", () => {
   assert.deepEqual(resolveNodeRunPresentation("running", true), {
-    haloClass: "editor-canvas__node-halo--running-current",
-    shellClass: "editor-canvas__node--running-current",
+    haloClass: "editor-canvas__node-halo--running",
+    shellClass: "editor-canvas__node--running",
   });
-});
-
-test("resolveNodeRunPresentation marks non-current running nodes", () => {
   assert.deepEqual(resolveNodeRunPresentation("running", false), {
     haloClass: "editor-canvas__node-halo--running",
     shellClass: "editor-canvas__node--running",
@@ -23,8 +20,8 @@ test("resolveNodeRunPresentation marks paused nodes with review glow classes", (
     shellClass: "editor-canvas__node--paused",
   });
   assert.deepEqual(resolveNodeRunPresentation("paused", true), {
-    haloClass: "editor-canvas__node-halo--paused-current",
-    shellClass: "editor-canvas__node--paused-current",
+    haloClass: "editor-canvas__node-halo--paused",
+    shellClass: "editor-canvas__node--paused",
   });
 });
 

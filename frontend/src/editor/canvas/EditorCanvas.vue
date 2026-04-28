@@ -4450,306 +4450,116 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
 @keyframes editor-canvas-running-halo-breathe {
   0%,
   100% {
-    opacity: 0.42;
+    opacity: var(--editor-canvas-node-halo-opacity-rest, 0.48);
     filter: blur(var(--editor-canvas-node-halo-blur-rest, 8px));
-    transform: scale(var(--editor-canvas-node-halo-scale-rest, 0.94));
+    transform: scale(var(--editor-canvas-node-halo-scale-rest, 0.985));
     background: var(--editor-canvas-node-halo-background-rest);
-    box-shadow: var(--editor-canvas-node-halo-shadow-rest);
   }
 
-  44% {
-    opacity: 1;
-    filter: blur(var(--editor-canvas-node-halo-blur-peak, 13px));
-    transform: scale(var(--editor-canvas-node-halo-scale-peak, 1.04));
+  42% {
+    opacity: var(--editor-canvas-node-halo-opacity-peak, 0.9);
+    filter: blur(var(--editor-canvas-node-halo-blur-peak, 11px));
+    transform: scale(var(--editor-canvas-node-halo-scale-peak, 1.035));
     background: var(--editor-canvas-node-halo-background-peak);
-    box-shadow: var(--editor-canvas-node-halo-shadow-peak);
   }
 
-  55% {
-    opacity: 0.58;
-    filter: blur(var(--editor-canvas-node-halo-blur-flicker, 10px));
-    transform: scale(var(--editor-canvas-node-halo-scale-flicker, 1.012));
+  56% {
+    opacity: var(--editor-canvas-node-halo-opacity-flicker, 0.62);
+    filter: blur(var(--editor-canvas-node-halo-blur-flicker, 8px));
+    transform: scale(var(--editor-canvas-node-halo-scale-flicker, 1.004));
     background: var(--editor-canvas-node-halo-background-flicker);
-    box-shadow: var(--editor-canvas-node-halo-shadow-flicker);
   }
 
   66% {
-    opacity: 0.94;
-    filter: blur(var(--editor-canvas-node-halo-blur-peak, 13px));
+    opacity: var(--editor-canvas-node-halo-opacity-afterglow, 0.82);
+    filter: blur(var(--editor-canvas-node-halo-blur-peak, 11px));
     transform: scale(var(--editor-canvas-node-halo-scale-afterglow, 1.026));
     background: var(--editor-canvas-node-halo-background-peak);
-    box-shadow: var(--editor-canvas-node-halo-shadow-peak);
   }
 }
 
 @keyframes editor-canvas-paused-halo-breathe {
   0%,
   100% {
-    opacity: 0.42;
+    opacity: var(--editor-canvas-node-halo-opacity-rest, 0.48);
     filter: blur(var(--editor-canvas-node-halo-blur-rest, 8px));
-    transform: scale(var(--editor-canvas-node-halo-scale-rest, 0.94));
+    transform: scale(var(--editor-canvas-node-halo-scale-rest, 0.985));
     background: var(--editor-canvas-node-halo-background-rest);
-    box-shadow: var(--editor-canvas-node-halo-shadow-rest);
   }
 
   46% {
-    opacity: 1;
-    filter: blur(var(--editor-canvas-node-halo-blur-peak, 14px));
-    transform: scale(var(--editor-canvas-node-halo-scale-peak, 1.075));
+    opacity: var(--editor-canvas-node-halo-opacity-peak, 0.88);
+    filter: blur(var(--editor-canvas-node-halo-blur-peak, 11px));
+    transform: scale(var(--editor-canvas-node-halo-scale-peak, 1.035));
     background: var(--editor-canvas-node-halo-background-peak);
-    box-shadow: var(--editor-canvas-node-halo-shadow-peak);
   }
 
   58% {
-    opacity: 0.58;
+    opacity: var(--editor-canvas-node-halo-opacity-flicker, 0.62);
     filter: blur(var(--editor-canvas-node-halo-blur-flicker, 10px));
-    transform: scale(var(--editor-canvas-node-halo-scale-flicker, 1.012));
+    transform: scale(var(--editor-canvas-node-halo-scale-flicker, 1.004));
     background: var(--editor-canvas-node-halo-background-flicker);
-    box-shadow: var(--editor-canvas-node-halo-shadow-flicker);
   }
 
   70% {
-    opacity: 0.94;
-    filter: blur(var(--editor-canvas-node-halo-blur-peak, 14px));
+    opacity: var(--editor-canvas-node-halo-opacity-afterglow, 0.82);
+    filter: blur(var(--editor-canvas-node-halo-blur-peak, 11px));
     transform: scale(var(--editor-canvas-node-halo-scale-afterglow, 1.026));
     background: var(--editor-canvas-node-halo-background-peak);
-    box-shadow: var(--editor-canvas-node-halo-shadow-peak);
   }
 }
 
-@keyframes editor-canvas-running-halo-ring-breathe {
+@keyframes editor-canvas-running-halo-breathe-reduced {
   0%,
   100% {
-    opacity: var(--editor-canvas-node-halo-ring-opacity-rest, 0.72);
-    filter: blur(var(--editor-canvas-node-halo-ring-blur-rest, 0px));
-    transform: scale(var(--editor-canvas-node-halo-ring-scale-rest, 0.986));
-    border-color: var(--editor-canvas-node-halo-border-rest);
-    background: var(--editor-canvas-node-halo-background-rest);
-    box-shadow: var(--editor-canvas-node-halo-ring-shadow-rest);
-  }
-
-  44% {
-    opacity: var(--editor-canvas-node-halo-ring-opacity-peak, 1);
-    filter: blur(var(--editor-canvas-node-halo-ring-blur-peak, 0.8px));
-    transform: scale(var(--editor-canvas-node-halo-ring-scale-peak, 1.024));
-    border-color: var(--editor-canvas-node-halo-border-peak);
-    background: var(--editor-canvas-node-halo-background-peak);
-    box-shadow: var(--editor-canvas-node-halo-ring-shadow-peak);
-  }
-
-  55% {
-    opacity: var(--editor-canvas-node-halo-ring-opacity-flicker, 0.78);
-    filter: blur(var(--editor-canvas-node-halo-ring-blur-flicker, 0.25px));
-    transform: scale(var(--editor-canvas-node-halo-ring-scale-flicker, 1.006));
-    border-color: var(--editor-canvas-node-halo-border-flicker);
-    background: var(--editor-canvas-node-halo-background-flicker);
-    box-shadow: var(--editor-canvas-node-halo-ring-shadow-flicker);
-  }
-
-  66% {
-    opacity: var(--editor-canvas-node-halo-ring-opacity-afterglow, 0.94);
-    filter: blur(var(--editor-canvas-node-halo-ring-blur-peak, 0.8px));
-    transform: scale(var(--editor-canvas-node-halo-ring-scale-afterglow, 1.016));
-    border-color: var(--editor-canvas-node-halo-border-peak);
-    background: var(--editor-canvas-node-halo-background-peak);
-    box-shadow: var(--editor-canvas-node-halo-ring-shadow-peak);
-  }
-}
-
-@keyframes editor-canvas-paused-halo-ring-breathe {
-  0%,
-  100% {
-    opacity: var(--editor-canvas-node-halo-ring-opacity-rest, 0.7);
-    filter: blur(var(--editor-canvas-node-halo-ring-blur-rest, 0px));
-    transform: scale(var(--editor-canvas-node-halo-ring-scale-rest, 0.986));
-    border-color: var(--editor-canvas-node-halo-border-rest);
-    background: var(--editor-canvas-node-halo-background-rest);
-    box-shadow: var(--editor-canvas-node-halo-ring-shadow-rest);
-  }
-
-  46% {
-    opacity: var(--editor-canvas-node-halo-ring-opacity-peak, 1);
-    filter: blur(var(--editor-canvas-node-halo-ring-blur-peak, 0.9px));
-    transform: scale(var(--editor-canvas-node-halo-ring-scale-peak, 1.026));
-    border-color: var(--editor-canvas-node-halo-border-peak);
-    background: var(--editor-canvas-node-halo-background-peak);
-    box-shadow: var(--editor-canvas-node-halo-ring-shadow-peak);
-  }
-
-  58% {
-    opacity: var(--editor-canvas-node-halo-ring-opacity-flicker, 0.8);
-    filter: blur(var(--editor-canvas-node-halo-ring-blur-flicker, 0.3px));
-    transform: scale(var(--editor-canvas-node-halo-ring-scale-flicker, 1.006));
-    border-color: var(--editor-canvas-node-halo-border-flicker);
-    background: var(--editor-canvas-node-halo-background-flicker);
-    box-shadow: var(--editor-canvas-node-halo-ring-shadow-flicker);
-  }
-
-  70% {
-    opacity: var(--editor-canvas-node-halo-ring-opacity-afterglow, 0.94);
-    filter: blur(var(--editor-canvas-node-halo-ring-blur-peak, 0.9px));
-    transform: scale(var(--editor-canvas-node-halo-ring-scale-afterglow, 1.016));
-    border-color: var(--editor-canvas-node-halo-border-peak);
-    background: var(--editor-canvas-node-halo-background-peak);
-    box-shadow: var(--editor-canvas-node-halo-ring-shadow-peak);
-  }
-}
-
-@keyframes editor-canvas-running-halo-pulse {
-  0%,
-  100% {
-    opacity: var(--editor-canvas-node-halo-pulse-opacity-rest, 0.46);
-    transform: scale(var(--editor-canvas-node-halo-pulse-scale-rest, 0.98));
-    border-color: var(--editor-canvas-node-halo-border-rest);
-    box-shadow: var(--editor-canvas-node-halo-pulse-shadow-rest);
-  }
-
-  42% {
-    opacity: var(--editor-canvas-node-halo-pulse-opacity-peak, 1);
-    transform: scale(var(--editor-canvas-node-halo-pulse-scale-peak, 1.08));
-    border-color: var(--editor-canvas-node-halo-border-peak);
-    box-shadow: var(--editor-canvas-node-halo-pulse-shadow-peak);
-  }
-
-  56% {
-    opacity: var(--editor-canvas-node-halo-pulse-opacity-flicker, 0.62);
-    transform: scale(var(--editor-canvas-node-halo-pulse-scale-flicker, 1.01));
-    border-color: var(--editor-canvas-node-halo-border-flicker);
-    box-shadow: var(--editor-canvas-node-halo-pulse-shadow-flicker);
-  }
-
-  68% {
-    opacity: var(--editor-canvas-node-halo-pulse-opacity-afterglow, 0.92);
-    transform: scale(var(--editor-canvas-node-halo-pulse-scale-afterglow, 1.055));
-    border-color: var(--editor-canvas-node-halo-border-peak);
-    box-shadow: var(--editor-canvas-node-halo-pulse-shadow-peak);
-  }
-}
-
-@keyframes editor-canvas-paused-halo-pulse {
-  0%,
-  100% {
-    opacity: var(--editor-canvas-node-halo-pulse-opacity-rest, 0.44);
-    transform: scale(var(--editor-canvas-node-halo-pulse-scale-rest, 0.98));
-    border-color: var(--editor-canvas-node-halo-border-rest);
-    box-shadow: var(--editor-canvas-node-halo-pulse-shadow-rest);
-  }
-
-  46% {
-    opacity: var(--editor-canvas-node-halo-pulse-opacity-peak, 1);
-    transform: scale(var(--editor-canvas-node-halo-pulse-scale-peak, 1.08));
-    border-color: var(--editor-canvas-node-halo-border-peak);
-    box-shadow: var(--editor-canvas-node-halo-pulse-shadow-peak);
-  }
-
-  60% {
-    opacity: var(--editor-canvas-node-halo-pulse-opacity-flicker, 0.64);
-    transform: scale(var(--editor-canvas-node-halo-pulse-scale-flicker, 1.01));
-    border-color: var(--editor-canvas-node-halo-border-flicker);
-    box-shadow: var(--editor-canvas-node-halo-pulse-shadow-flicker);
-  }
-
-  72% {
-    opacity: var(--editor-canvas-node-halo-pulse-opacity-afterglow, 0.9);
-    transform: scale(var(--editor-canvas-node-halo-pulse-scale-afterglow, 1.055));
-    border-color: var(--editor-canvas-node-halo-border-peak);
-    box-shadow: var(--editor-canvas-node-halo-pulse-shadow-peak);
-  }
-}
-
-@keyframes editor-canvas-running-halo-pulse-reduced {
-  0%,
-  100% {
-    opacity: var(--editor-canvas-node-halo-pulse-opacity-rest, 0.48);
+    opacity: var(--editor-canvas-node-halo-opacity-rest, 0.48);
+    filter: blur(var(--editor-canvas-node-halo-blur-rest, 8px));
     transform: scale(1);
-    border-color: var(--editor-canvas-node-halo-border-rest);
-    box-shadow: var(--editor-canvas-node-halo-pulse-shadow-rest);
+    background: var(--editor-canvas-node-halo-background-rest);
   }
 
   50% {
-    opacity: var(--editor-canvas-node-halo-pulse-opacity-peak, 0.9);
+    opacity: var(--editor-canvas-node-halo-opacity-peak, 0.9);
+    filter: blur(var(--editor-canvas-node-halo-blur-peak, 11px));
     transform: scale(1);
-    border-color: var(--editor-canvas-node-halo-border-peak);
-    box-shadow: var(--editor-canvas-node-halo-pulse-shadow-peak);
+    background: var(--editor-canvas-node-halo-background-peak);
   }
 }
 
-@keyframes editor-canvas-paused-halo-pulse-reduced {
+@keyframes editor-canvas-paused-halo-breathe-reduced {
   0%,
   100% {
-    opacity: var(--editor-canvas-node-halo-pulse-opacity-rest, 0.48);
+    opacity: var(--editor-canvas-node-halo-opacity-rest, 0.48);
+    filter: blur(var(--editor-canvas-node-halo-blur-rest, 8px));
     transform: scale(1);
-    border-color: var(--editor-canvas-node-halo-border-rest);
-    box-shadow: var(--editor-canvas-node-halo-pulse-shadow-rest);
+    background: var(--editor-canvas-node-halo-background-rest);
   }
 
   50% {
-    opacity: var(--editor-canvas-node-halo-pulse-opacity-peak, 0.9);
+    opacity: var(--editor-canvas-node-halo-opacity-peak, 0.88);
+    filter: blur(var(--editor-canvas-node-halo-blur-peak, 11px));
     transform: scale(1);
-    border-color: var(--editor-canvas-node-halo-border-peak);
-    box-shadow: var(--editor-canvas-node-halo-pulse-shadow-peak);
-  }
-}
-
-@keyframes editor-canvas-running-card-breathe {
-  0%,
-  100% {
-    box-shadow: var(--editor-canvas-node-card-shadow-rest);
-  }
-
-  46% {
-    box-shadow: var(--editor-canvas-node-card-shadow-peak);
-  }
-
-  56% {
-    box-shadow: var(--editor-canvas-node-card-shadow-flicker);
-  }
-
-  66% {
-    box-shadow: var(--editor-canvas-node-card-shadow-peak);
-  }
-}
-
-@keyframes editor-canvas-paused-card-breathe {
-  0%,
-  100% {
-    box-shadow: var(--editor-canvas-node-card-shadow-rest);
-  }
-
-  48% {
-    box-shadow: var(--editor-canvas-node-card-shadow-peak);
-  }
-
-  60% {
-    box-shadow: var(--editor-canvas-node-card-shadow-flicker);
-  }
-
-  70% {
-    box-shadow: var(--editor-canvas-node-card-shadow-peak);
+    background: var(--editor-canvas-node-halo-background-peak);
   }
 }
 
 .editor-canvas__node-halo {
-  --editor-canvas-node-halo-outset: 6px;
+  --editor-canvas-node-halo-outset: 5px;
   position: absolute;
-  inset: calc(-1 * var(--editor-canvas-node-halo-outset, 6px));
+  inset: calc(-1 * var(--editor-canvas-node-halo-outset, 5px));
   z-index: 0;
-  border-radius: calc(var(--node-card-radius, 28px) + var(--editor-canvas-node-halo-outset, 6px));
+  border-radius: calc(var(--node-card-radius, 28px) + var(--editor-canvas-node-halo-outset, 5px));
   box-sizing: border-box;
-  border: 1.5px solid var(--editor-canvas-node-halo-border-rest);
+  border: 0;
   background: var(--editor-canvas-node-halo-background-rest);
-  box-shadow: var(
-    --editor-canvas-node-halo-ring-shadow-rest,
-    0 0 0 1px var(--editor-canvas-node-halo-ring-shadow, rgba(16, 185, 129, 0.08)),
-    0 0 18px var(--editor-canvas-node-halo-ring-glow, rgba(16, 185, 129, 0.18))
-  );
+  box-shadow: none;
   pointer-events: none;
-  opacity: var(--editor-canvas-node-halo-ring-opacity-rest, 1);
-  filter: blur(var(--editor-canvas-node-halo-ring-blur-rest, 0px));
-  transform: scale(var(--editor-canvas-node-halo-ring-scale-rest, 1));
+  opacity: var(--editor-canvas-node-halo-opacity-rest, 0.48);
+  filter: blur(var(--editor-canvas-node-halo-blur-rest, 8px));
+  transform: scale(var(--editor-canvas-node-halo-scale-rest, 0.985));
   transform-origin: center;
-  transition: opacity 180ms ease, filter 180ms ease, transform 180ms ease, border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
-  will-change: opacity, filter, transform, border-color, background, box-shadow;
+  transition: opacity 160ms ease, filter 160ms ease, transform 160ms ease, background 160ms ease;
+  will-change: opacity, filter, transform, background;
 }
 
 .editor-canvas__node > :global(.node-card) {
@@ -4757,446 +4567,58 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   z-index: 1;
 }
 
-.editor-canvas__node-halo::before,
-.editor-canvas__node-halo::after {
-  content: "";
-  position: absolute;
-  transform-origin: center;
-  pointer-events: none;
-}
-
-.editor-canvas__node-halo::before {
-  inset: var(--editor-canvas-node-halo-aura-inset, -4px);
-  border-radius: calc(var(--node-card-radius, 28px) + var(--editor-canvas-node-halo-outset, 6px) + 4px);
-  background: var(--editor-canvas-node-halo-background-rest);
-  box-shadow: var(--editor-canvas-node-halo-shadow-rest);
-  opacity: 0.72;
-  filter: blur(var(--editor-canvas-node-halo-blur-rest, 8px));
-  transform: scale(var(--editor-canvas-node-halo-scale-rest, 0.98));
-  will-change: opacity, filter, transform, box-shadow;
-}
-
-.editor-canvas__node-halo::after {
-  inset: var(--editor-canvas-node-halo-pulse-inset, -5px);
-  border-radius: calc(var(--node-card-radius, 28px) + var(--editor-canvas-node-halo-outset, 6px) + 8px);
-  box-sizing: border-box;
-  border: var(--editor-canvas-node-halo-pulse-width, 2.5px) solid var(--editor-canvas-node-halo-border-rest);
-  opacity: var(--editor-canvas-node-halo-pulse-opacity-rest, 0.46);
-  transform: scale(var(--editor-canvas-node-halo-pulse-scale-rest, 0.98));
-  box-shadow: var(--editor-canvas-node-halo-pulse-shadow-rest);
-  will-change: opacity, transform, border-color, box-shadow;
-}
-
-.editor-canvas__node-halo--running,
-.editor-canvas__node-halo--running-current,
-.editor-canvas__node-halo--paused,
-.editor-canvas__node-halo--paused-current {
-  border-color: var(--editor-canvas-node-halo-border-rest);
-  background: var(--editor-canvas-node-halo-background-rest);
-}
-
 .editor-canvas__node-halo--running {
-  --editor-canvas-node-halo-blur-rest: 8px;
-  --editor-canvas-node-halo-blur-peak: 22px;
-  --editor-canvas-node-halo-blur-flicker: 12px;
-  --editor-canvas-node-halo-aura-inset: -10px;
-  --editor-canvas-node-halo-scale-rest: 0.94;
-  --editor-canvas-node-halo-scale-peak: 1.075;
-  --editor-canvas-node-halo-scale-flicker: 1.006;
-  --editor-canvas-node-halo-scale-afterglow: 1.05;
-  --editor-canvas-node-halo-border-rest: rgba(16, 185, 129, 0.42);
-  --editor-canvas-node-halo-border-peak: rgba(16, 185, 129, 0.62);
-  --editor-canvas-node-halo-border-flicker: rgba(16, 185, 129, 0.5);
-  --editor-canvas-node-halo-ring-shadow: rgba(16, 185, 129, 0.05);
-  --editor-canvas-node-halo-ring-glow: rgba(16, 185, 129, 0.1);
-  --editor-canvas-node-halo-ring-opacity-rest: 0.58;
-  --editor-canvas-node-halo-ring-opacity-peak: 0.82;
-  --editor-canvas-node-halo-ring-opacity-flicker: 0.64;
-  --editor-canvas-node-halo-ring-opacity-afterglow: 0.74;
-  --editor-canvas-node-halo-ring-blur-rest: 0px;
-  --editor-canvas-node-halo-ring-blur-peak: 0.8px;
-  --editor-canvas-node-halo-ring-blur-flicker: 0.25px;
-  --editor-canvas-node-halo-ring-scale-rest: 0.986;
-  --editor-canvas-node-halo-ring-scale-peak: 1.024;
-  --editor-canvas-node-halo-ring-scale-flicker: 1.006;
-  --editor-canvas-node-halo-ring-scale-afterglow: 1.016;
-  --editor-canvas-node-halo-pulse-inset: -7px;
-  --editor-canvas-node-halo-pulse-width: 2.5px;
-  --editor-canvas-node-halo-pulse-opacity-rest: 0.36;
-  --editor-canvas-node-halo-pulse-opacity-peak: 0.82;
-  --editor-canvas-node-halo-pulse-opacity-flicker: 0.48;
-  --editor-canvas-node-halo-pulse-opacity-afterglow: 0.72;
-  --editor-canvas-node-halo-pulse-scale-rest: 0.98;
-  --editor-canvas-node-halo-pulse-scale-peak: 1.095;
-  --editor-canvas-node-halo-pulse-scale-flicker: 1.012;
-  --editor-canvas-node-halo-pulse-scale-afterglow: 1.06;
-  --editor-canvas-node-halo-background-rest: rgba(16, 185, 129, 0.012);
-  --editor-canvas-node-halo-background-peak: rgba(16, 185, 129, 0.08);
-  --editor-canvas-node-halo-background-flicker: rgba(16, 185, 129, 0.035);
-  --editor-canvas-node-halo-ring-shadow-rest:
-    0 0 0 1px rgba(16, 185, 129, 0.06),
-    0 0 18px rgba(16, 185, 129, 0.12);
-  --editor-canvas-node-halo-ring-shadow-peak:
-    0 0 0 4px rgba(16, 185, 129, 0.18),
-    0 0 46px rgba(16, 185, 129, 0.36),
-    0 0 78px rgba(16, 185, 129, 0.16);
-  --editor-canvas-node-halo-ring-shadow-flicker:
-    0 0 0 2px rgba(16, 185, 129, 0.1),
-    0 0 28px rgba(16, 185, 129, 0.22);
-  --editor-canvas-node-halo-shadow-rest:
-    0 0 0 2px rgba(16, 185, 129, 0.05),
-    0 0 16px rgba(16, 185, 129, 0.1);
-  --editor-canvas-node-halo-shadow-peak:
-    0 0 0 12px rgba(16, 185, 129, 0.16),
-    0 0 64px rgba(16, 185, 129, 0.38),
-    0 0 110px rgba(16, 185, 129, 0.16);
-  --editor-canvas-node-halo-shadow-flicker:
-    0 0 0 5px rgba(16, 185, 129, 0.08),
-    0 0 34px rgba(16, 185, 129, 0.2);
-  --editor-canvas-node-halo-pulse-shadow-rest:
-    0 0 0 3px rgba(16, 185, 129, 0.07),
-    0 0 20px rgba(16, 185, 129, 0.16);
-  --editor-canvas-node-halo-pulse-shadow-peak:
-    0 0 0 11px rgba(16, 185, 129, 0.18),
-    0 0 58px rgba(16, 185, 129, 0.42),
-    0 0 96px rgba(16, 185, 129, 0.18);
-  --editor-canvas-node-halo-pulse-shadow-flicker:
-    0 0 0 5px rgba(16, 185, 129, 0.1),
-    0 0 34px rgba(16, 185, 129, 0.24);
-  border: 1.5px solid var(--editor-canvas-node-halo-border-rest);
-  animation: editor-canvas-running-halo-ring-breathe 1.65s ease-in-out infinite;
-}
-
-.editor-canvas__node-halo--running::before {
-  animation: editor-canvas-running-halo-breathe 1.65s ease-in-out infinite;
-}
-
-.editor-canvas__node-halo--running::after {
-  animation: editor-canvas-running-halo-pulse 1.65s ease-in-out infinite;
-}
-
-.editor-canvas__node-halo--running-current {
-  --editor-canvas-node-halo-blur-rest: 9px;
-  --editor-canvas-node-halo-blur-peak: 26px;
-  --editor-canvas-node-halo-blur-flicker: 14px;
-  --editor-canvas-node-halo-aura-inset: -14px;
-  --editor-canvas-node-halo-scale-rest: 0.94;
-  --editor-canvas-node-halo-scale-peak: 1.09;
-  --editor-canvas-node-halo-scale-flicker: 1.008;
-  --editor-canvas-node-halo-scale-afterglow: 1.06;
-  --editor-canvas-node-halo-border-rest: rgba(16, 185, 129, 0.56);
-  --editor-canvas-node-halo-border-peak: rgba(16, 185, 129, 0.76);
-  --editor-canvas-node-halo-border-flicker: rgba(16, 185, 129, 0.62);
-  --editor-canvas-node-halo-ring-shadow: rgba(16, 185, 129, 0.08);
-  --editor-canvas-node-halo-ring-glow: rgba(16, 185, 129, 0.14);
-  --editor-canvas-node-halo-ring-opacity-rest: 0.62;
-  --editor-canvas-node-halo-ring-opacity-peak: 0.86;
-  --editor-canvas-node-halo-ring-opacity-flicker: 0.68;
-  --editor-canvas-node-halo-ring-opacity-afterglow: 0.78;
-  --editor-canvas-node-halo-ring-blur-rest: 0px;
-  --editor-canvas-node-halo-ring-blur-peak: 1px;
-  --editor-canvas-node-halo-ring-blur-flicker: 0.35px;
-  --editor-canvas-node-halo-ring-scale-rest: 0.984;
-  --editor-canvas-node-halo-ring-scale-peak: 1.03;
-  --editor-canvas-node-halo-ring-scale-flicker: 1.008;
-  --editor-canvas-node-halo-ring-scale-afterglow: 1.02;
-  --editor-canvas-node-halo-pulse-inset: -8px;
-  --editor-canvas-node-halo-pulse-width: 3px;
-  --editor-canvas-node-halo-pulse-opacity-rest: 0.44;
-  --editor-canvas-node-halo-pulse-opacity-peak: 0.88;
-  --editor-canvas-node-halo-pulse-opacity-flicker: 0.54;
-  --editor-canvas-node-halo-pulse-opacity-afterglow: 0.78;
-  --editor-canvas-node-halo-pulse-scale-rest: 0.98;
-  --editor-canvas-node-halo-pulse-scale-peak: 1.115;
-  --editor-canvas-node-halo-pulse-scale-flicker: 1.014;
-  --editor-canvas-node-halo-pulse-scale-afterglow: 1.07;
-  --editor-canvas-node-halo-background-rest: rgba(16, 185, 129, 0.016);
-  --editor-canvas-node-halo-background-peak: rgba(16, 185, 129, 0.1);
-  --editor-canvas-node-halo-background-flicker: rgba(16, 185, 129, 0.045);
-  --editor-canvas-node-halo-ring-shadow-rest:
-    0 0 0 2px rgba(16, 185, 129, 0.1),
-    0 0 24px rgba(16, 185, 129, 0.2);
-  --editor-canvas-node-halo-ring-shadow-peak:
-    0 0 0 5px rgba(16, 185, 129, 0.24),
-    0 0 58px rgba(16, 185, 129, 0.48),
-    0 0 96px rgba(16, 185, 129, 0.2);
-  --editor-canvas-node-halo-ring-shadow-flicker:
-    0 0 0 3px rgba(16, 185, 129, 0.14),
-    0 0 36px rgba(16, 185, 129, 0.28);
-  --editor-canvas-node-halo-shadow-rest:
-    0 0 0 3px rgba(16, 185, 129, 0.07),
-    0 0 22px rgba(16, 185, 129, 0.14);
-  --editor-canvas-node-halo-shadow-peak:
-    0 0 0 15px rgba(16, 185, 129, 0.2),
-    0 0 78px rgba(16, 185, 129, 0.48),
-    0 0 128px rgba(16, 185, 129, 0.2);
-  --editor-canvas-node-halo-shadow-flicker:
-    0 0 0 6px rgba(16, 185, 129, 0.1),
-    0 0 42px rgba(16, 185, 129, 0.26);
-  --editor-canvas-node-halo-pulse-shadow-rest:
-    0 0 0 4px rgba(16, 185, 129, 0.1),
-    0 0 26px rgba(16, 185, 129, 0.22);
-  --editor-canvas-node-halo-pulse-shadow-peak:
-    0 0 0 14px rgba(16, 185, 129, 0.24),
-    0 0 70px rgba(16, 185, 129, 0.54),
-    0 0 118px rgba(16, 185, 129, 0.22);
-  --editor-canvas-node-halo-pulse-shadow-flicker:
-    0 0 0 6px rgba(16, 185, 129, 0.14),
-    0 0 42px rgba(16, 185, 129, 0.3);
-  border: 1.5px solid var(--editor-canvas-node-halo-border-rest);
-  animation: editor-canvas-running-halo-ring-breathe 1.35s ease-in-out infinite;
-}
-
-.editor-canvas__node-halo--running-current::before {
+  --editor-canvas-node-halo-opacity-rest: 0.5;
+  --editor-canvas-node-halo-opacity-peak: 0.9;
+  --editor-canvas-node-halo-opacity-flicker: 0.62;
+  --editor-canvas-node-halo-opacity-afterglow: 0.82;
+  --editor-canvas-node-halo-blur-rest: 7px;
+  --editor-canvas-node-halo-blur-peak: 11px;
+  --editor-canvas-node-halo-blur-flicker: 8px;
+  --editor-canvas-node-halo-scale-rest: 0.985;
+  --editor-canvas-node-halo-scale-peak: 1.035;
+  --editor-canvas-node-halo-scale-flicker: 1.004;
+  --editor-canvas-node-halo-scale-afterglow: 1.026;
+  --editor-canvas-node-halo-background-rest: rgba(16, 185, 129, 0.14);
+  --editor-canvas-node-halo-background-peak: rgba(16, 185, 129, 0.26);
+  --editor-canvas-node-halo-background-flicker: rgba(16, 185, 129, 0.18);
   animation: editor-canvas-running-halo-breathe 1.35s ease-in-out infinite;
 }
 
-.editor-canvas__node-halo--running-current::after {
-  animation: editor-canvas-running-halo-pulse 1.35s ease-in-out infinite;
-}
-
 .editor-canvas__node-halo--paused {
-  --editor-canvas-node-halo-blur-rest: 8px;
-  --editor-canvas-node-halo-blur-peak: 22px;
-  --editor-canvas-node-halo-blur-flicker: 12px;
-  --editor-canvas-node-halo-aura-inset: -10px;
-  --editor-canvas-node-halo-scale-rest: 0.94;
-  --editor-canvas-node-halo-scale-peak: 1.075;
-  --editor-canvas-node-halo-scale-flicker: 1.006;
-  --editor-canvas-node-halo-scale-afterglow: 1.05;
-  --editor-canvas-node-halo-border-rest: rgba(245, 158, 11, 0.42);
-  --editor-canvas-node-halo-border-peak: rgba(245, 158, 11, 0.62);
-  --editor-canvas-node-halo-border-flicker: rgba(245, 158, 11, 0.5);
-  --editor-canvas-node-halo-ring-shadow: rgba(245, 158, 11, 0.05);
-  --editor-canvas-node-halo-ring-glow: rgba(245, 158, 11, 0.1);
-  --editor-canvas-node-halo-ring-opacity-rest: 0.56;
-  --editor-canvas-node-halo-ring-opacity-peak: 0.82;
-  --editor-canvas-node-halo-ring-opacity-flicker: 0.64;
-  --editor-canvas-node-halo-ring-opacity-afterglow: 0.74;
-  --editor-canvas-node-halo-ring-blur-rest: 0px;
-  --editor-canvas-node-halo-ring-blur-peak: 0.9px;
-  --editor-canvas-node-halo-ring-blur-flicker: 0.3px;
-  --editor-canvas-node-halo-ring-scale-rest: 0.986;
-  --editor-canvas-node-halo-ring-scale-peak: 1.026;
-  --editor-canvas-node-halo-ring-scale-flicker: 1.006;
-  --editor-canvas-node-halo-ring-scale-afterglow: 1.016;
-  --editor-canvas-node-halo-pulse-inset: -7px;
-  --editor-canvas-node-halo-pulse-width: 2.5px;
-  --editor-canvas-node-halo-pulse-opacity-rest: 0.34;
-  --editor-canvas-node-halo-pulse-opacity-peak: 0.82;
-  --editor-canvas-node-halo-pulse-opacity-flicker: 0.48;
-  --editor-canvas-node-halo-pulse-opacity-afterglow: 0.72;
-  --editor-canvas-node-halo-pulse-scale-rest: 0.98;
-  --editor-canvas-node-halo-pulse-scale-peak: 1.095;
-  --editor-canvas-node-halo-pulse-scale-flicker: 1.012;
-  --editor-canvas-node-halo-pulse-scale-afterglow: 1.06;
-  --editor-canvas-node-halo-background-rest: rgba(245, 158, 11, 0.012);
-  --editor-canvas-node-halo-background-peak: rgba(245, 158, 11, 0.08);
-  --editor-canvas-node-halo-background-flicker: rgba(245, 158, 11, 0.035);
-  --editor-canvas-node-halo-ring-shadow-rest:
-    0 0 0 1px rgba(245, 158, 11, 0.06),
-    0 0 18px rgba(245, 158, 11, 0.12);
-  --editor-canvas-node-halo-ring-shadow-peak:
-    0 0 0 4px rgba(245, 158, 11, 0.18),
-    0 0 46px rgba(245, 158, 11, 0.34),
-    0 0 78px rgba(245, 158, 11, 0.14);
-  --editor-canvas-node-halo-ring-shadow-flicker:
-    0 0 0 2px rgba(245, 158, 11, 0.1),
-    0 0 28px rgba(245, 158, 11, 0.2);
-  --editor-canvas-node-halo-shadow-rest:
-    0 0 0 2px rgba(245, 158, 11, 0.05),
-    0 0 16px rgba(245, 158, 11, 0.1);
-  --editor-canvas-node-halo-shadow-peak:
-    0 0 0 12px rgba(245, 158, 11, 0.16),
-    0 0 64px rgba(245, 158, 11, 0.36),
-    0 0 110px rgba(245, 158, 11, 0.14);
-  --editor-canvas-node-halo-shadow-flicker:
-    0 0 0 5px rgba(245, 158, 11, 0.08),
-    0 0 34px rgba(245, 158, 11, 0.19);
-  --editor-canvas-node-halo-pulse-shadow-rest:
-    0 0 0 3px rgba(245, 158, 11, 0.07),
-    0 0 20px rgba(245, 158, 11, 0.15);
-  --editor-canvas-node-halo-pulse-shadow-peak:
-    0 0 0 11px rgba(245, 158, 11, 0.18),
-    0 0 58px rgba(245, 158, 11, 0.4),
-    0 0 96px rgba(245, 158, 11, 0.16);
-  --editor-canvas-node-halo-pulse-shadow-flicker:
-    0 0 0 5px rgba(245, 158, 11, 0.1),
-    0 0 34px rgba(245, 158, 11, 0.22);
-  border: 1.5px solid var(--editor-canvas-node-halo-border-rest);
-  animation: editor-canvas-paused-halo-ring-breathe 1.85s ease-in-out infinite;
-}
-
-.editor-canvas__node-halo--paused::before {
-  animation: editor-canvas-paused-halo-breathe 1.85s ease-in-out infinite;
-}
-
-.editor-canvas__node-halo--paused::after {
-  animation: editor-canvas-paused-halo-pulse 1.85s ease-in-out infinite;
-}
-
-.editor-canvas__node-halo--paused-current {
-  --editor-canvas-node-halo-blur-rest: 9px;
-  --editor-canvas-node-halo-blur-peak: 26px;
-  --editor-canvas-node-halo-blur-flicker: 14px;
-  --editor-canvas-node-halo-aura-inset: -14px;
-  --editor-canvas-node-halo-scale-rest: 0.94;
-  --editor-canvas-node-halo-scale-peak: 1.09;
-  --editor-canvas-node-halo-scale-flicker: 1.008;
-  --editor-canvas-node-halo-scale-afterglow: 1.06;
-  --editor-canvas-node-halo-border-rest: rgba(245, 158, 11, 0.56);
-  --editor-canvas-node-halo-border-peak: rgba(245, 158, 11, 0.76);
-  --editor-canvas-node-halo-border-flicker: rgba(245, 158, 11, 0.62);
-  --editor-canvas-node-halo-ring-shadow: rgba(245, 158, 11, 0.08);
-  --editor-canvas-node-halo-ring-glow: rgba(245, 158, 11, 0.14);
-  --editor-canvas-node-halo-ring-opacity-rest: 0.6;
-  --editor-canvas-node-halo-ring-opacity-peak: 0.86;
-  --editor-canvas-node-halo-ring-opacity-flicker: 0.68;
-  --editor-canvas-node-halo-ring-opacity-afterglow: 0.78;
-  --editor-canvas-node-halo-ring-blur-rest: 0px;
-  --editor-canvas-node-halo-ring-blur-peak: 1px;
-  --editor-canvas-node-halo-ring-blur-flicker: 0.35px;
-  --editor-canvas-node-halo-ring-scale-rest: 0.984;
-  --editor-canvas-node-halo-ring-scale-peak: 1.032;
-  --editor-canvas-node-halo-ring-scale-flicker: 1.008;
-  --editor-canvas-node-halo-ring-scale-afterglow: 1.02;
-  --editor-canvas-node-halo-pulse-inset: -8px;
-  --editor-canvas-node-halo-pulse-width: 3px;
-  --editor-canvas-node-halo-pulse-opacity-rest: 0.42;
-  --editor-canvas-node-halo-pulse-opacity-peak: 0.88;
-  --editor-canvas-node-halo-pulse-opacity-flicker: 0.54;
-  --editor-canvas-node-halo-pulse-opacity-afterglow: 0.78;
-  --editor-canvas-node-halo-pulse-scale-rest: 0.98;
-  --editor-canvas-node-halo-pulse-scale-peak: 1.115;
-  --editor-canvas-node-halo-pulse-scale-flicker: 1.014;
-  --editor-canvas-node-halo-pulse-scale-afterglow: 1.07;
-  --editor-canvas-node-halo-background-rest: rgba(245, 158, 11, 0.016);
-  --editor-canvas-node-halo-background-peak: rgba(245, 158, 11, 0.1);
-  --editor-canvas-node-halo-background-flicker: rgba(245, 158, 11, 0.045);
-  --editor-canvas-node-halo-ring-shadow-rest:
-    0 0 0 2px rgba(245, 158, 11, 0.1),
-    0 0 24px rgba(245, 158, 11, 0.18);
-  --editor-canvas-node-halo-ring-shadow-peak:
-    0 0 0 5px rgba(245, 158, 11, 0.24),
-    0 0 58px rgba(245, 158, 11, 0.46),
-    0 0 96px rgba(245, 158, 11, 0.18);
-  --editor-canvas-node-halo-ring-shadow-flicker:
-    0 0 0 3px rgba(245, 158, 11, 0.14),
-    0 0 36px rgba(245, 158, 11, 0.26);
-  --editor-canvas-node-halo-shadow-rest:
-    0 0 0 3px rgba(245, 158, 11, 0.07),
-    0 0 22px rgba(245, 158, 11, 0.13);
-  --editor-canvas-node-halo-shadow-peak:
-    0 0 0 15px rgba(245, 158, 11, 0.2),
-    0 0 78px rgba(245, 158, 11, 0.46),
-    0 0 128px rgba(245, 158, 11, 0.18);
-  --editor-canvas-node-halo-shadow-flicker:
-    0 0 0 6px rgba(245, 158, 11, 0.1),
-    0 0 42px rgba(245, 158, 11, 0.24);
-  --editor-canvas-node-halo-pulse-shadow-rest:
-    0 0 0 4px rgba(245, 158, 11, 0.1),
-    0 0 26px rgba(245, 158, 11, 0.2);
-  --editor-canvas-node-halo-pulse-shadow-peak:
-    0 0 0 14px rgba(245, 158, 11, 0.24),
-    0 0 70px rgba(245, 158, 11, 0.52),
-    0 0 118px rgba(245, 158, 11, 0.2);
-  --editor-canvas-node-halo-pulse-shadow-flicker:
-    0 0 0 6px rgba(245, 158, 11, 0.14),
-    0 0 42px rgba(245, 158, 11, 0.28);
-  border: 1.5px solid var(--editor-canvas-node-halo-border-rest);
-  animation: editor-canvas-paused-halo-ring-breathe 1.55s ease-in-out infinite;
-}
-
-.editor-canvas__node-halo--paused-current::before {
+  --editor-canvas-node-halo-opacity-rest: 0.5;
+  --editor-canvas-node-halo-opacity-peak: 0.88;
+  --editor-canvas-node-halo-opacity-flicker: 0.62;
+  --editor-canvas-node-halo-opacity-afterglow: 0.8;
+  --editor-canvas-node-halo-blur-rest: 7px;
+  --editor-canvas-node-halo-blur-peak: 11px;
+  --editor-canvas-node-halo-blur-flicker: 8px;
+  --editor-canvas-node-halo-scale-rest: 0.985;
+  --editor-canvas-node-halo-scale-peak: 1.035;
+  --editor-canvas-node-halo-scale-flicker: 1.004;
+  --editor-canvas-node-halo-scale-afterglow: 1.026;
+  --editor-canvas-node-halo-background-rest: rgba(245, 158, 11, 0.14);
+  --editor-canvas-node-halo-background-peak: rgba(245, 158, 11, 0.26);
+  --editor-canvas-node-halo-background-flicker: rgba(245, 158, 11, 0.18);
   animation: editor-canvas-paused-halo-breathe 1.55s ease-in-out infinite;
 }
 
-.editor-canvas__node-halo--paused-current::after {
-  animation: editor-canvas-paused-halo-pulse 1.55s ease-in-out infinite;
-}
-
 :global(.node-card.editor-canvas__node--running) {
-  --editor-canvas-node-card-shadow-rest:
+  box-shadow:
     0 18px 36px rgba(60, 41, 20, 0.1),
-    0 0 0 1.5px rgba(16, 185, 129, 0.46),
-    0 0 14px rgba(16, 185, 129, 0.14);
-  --editor-canvas-node-card-shadow-peak:
-    0 22px 44px rgba(60, 41, 20, 0.12),
-    0 0 0 1.5px rgba(16, 185, 129, 0.58),
-    0 0 24px rgba(16, 185, 129, 0.22);
-  --editor-canvas-node-card-shadow-flicker:
-    0 18px 36px rgba(60, 41, 20, 0.1),
-    0 0 0 1.5px rgba(16, 185, 129, 0.5),
-    0 0 16px rgba(16, 185, 129, 0.16);
-  box-shadow: var(--editor-canvas-node-card-shadow-rest);
-  animation: editor-canvas-running-card-breathe 1.65s ease-in-out infinite;
-}
-
-:global(.node-card.editor-canvas__node--running-current) {
-  --editor-canvas-node-card-shadow-rest:
-    0 20px 40px rgba(60, 41, 20, 0.12),
-    0 0 0 1.5px rgba(16, 185, 129, 0.62),
-    0 0 18px rgba(16, 185, 129, 0.22);
-  --editor-canvas-node-card-shadow-peak:
-    0 24px 48px rgba(60, 41, 20, 0.14),
-    0 0 0 1.5px rgba(16, 185, 129, 0.72),
-    0 0 30px rgba(16, 185, 129, 0.3);
-  --editor-canvas-node-card-shadow-flicker:
-    0 20px 40px rgba(60, 41, 20, 0.12),
-    0 0 0 1.5px rgba(16, 185, 129, 0.58),
-    0 0 20px rgba(16, 185, 129, 0.24);
-  box-shadow: var(--editor-canvas-node-card-shadow-rest);
-  animation: editor-canvas-running-card-breathe 1.35s ease-in-out infinite;
+    0 0 0 1.5px rgba(16, 185, 129, 0.52);
 }
 
 :global(.node-card.editor-canvas__node--paused) {
-  --editor-canvas-node-card-shadow-rest:
+  box-shadow:
     0 18px 36px rgba(60, 41, 20, 0.1),
-    0 0 0 1.5px rgba(245, 158, 11, 0.46),
-    0 0 14px rgba(245, 158, 11, 0.13);
-  --editor-canvas-node-card-shadow-peak:
-    0 22px 44px rgba(60, 41, 20, 0.12),
-    0 0 0 1.5px rgba(245, 158, 11, 0.58),
-    0 0 24px rgba(245, 158, 11, 0.21);
-  --editor-canvas-node-card-shadow-flicker:
-    0 18px 36px rgba(60, 41, 20, 0.1),
-    0 0 0 1.5px rgba(245, 158, 11, 0.5),
-    0 0 16px rgba(245, 158, 11, 0.15);
-  box-shadow: var(--editor-canvas-node-card-shadow-rest);
-  animation: editor-canvas-paused-card-breathe 1.85s ease-in-out infinite;
-}
-
-:global(.node-card.editor-canvas__node--paused-current) {
-  --editor-canvas-node-card-shadow-rest:
-    0 20px 40px rgba(60, 41, 20, 0.12),
-    0 0 0 1.5px rgba(245, 158, 11, 0.62),
-    0 0 18px rgba(245, 158, 11, 0.2);
-  --editor-canvas-node-card-shadow-peak:
-    0 24px 48px rgba(60, 41, 20, 0.14),
-    0 0 0 1.5px rgba(245, 158, 11, 0.72),
-    0 0 30px rgba(245, 158, 11, 0.28);
-  --editor-canvas-node-card-shadow-flicker:
-    0 20px 40px rgba(60, 41, 20, 0.12),
-    0 0 0 1.5px rgba(245, 158, 11, 0.58),
-    0 0 20px rgba(245, 158, 11, 0.22);
-  box-shadow: var(--editor-canvas-node-card-shadow-rest);
-  animation: editor-canvas-paused-card-breathe 1.55s ease-in-out infinite;
+    0 0 0 1.5px rgba(245, 158, 11, 0.52);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .editor-canvas__lock-banner,
-  .editor-canvas__node-halo--running,
-  .editor-canvas__node-halo--running-current,
-  .editor-canvas__node-halo--paused,
-  .editor-canvas__node-halo--paused-current,
-  .editor-canvas__node-halo--running::before,
-  .editor-canvas__node-halo--running-current::before,
-  .editor-canvas__node-halo--paused::before,
-  .editor-canvas__node-halo--paused-current::before,
   :global(.node-card.editor-canvas__node--running),
-  :global(.node-card.editor-canvas__node--running-current),
   :global(.node-card.editor-canvas__node--paused),
-  :global(.node-card.editor-canvas__node--paused-current),
   .editor-canvas__edge--active-run,
   .editor-canvas__edge--flow.editor-canvas__edge--active-run,
   .editor-canvas__edge--route.editor-canvas__edge--active-run,
@@ -5204,14 +4626,12 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
     animation: none;
   }
 
-  .editor-canvas__node-halo--running::after,
-  .editor-canvas__node-halo--running-current::after {
-    animation: editor-canvas-running-halo-pulse-reduced 2.4s ease-in-out infinite;
+  .editor-canvas__node-halo--running {
+    animation: editor-canvas-running-halo-breathe-reduced 2.4s ease-in-out infinite;
   }
 
-  .editor-canvas__node-halo--paused::after,
-  .editor-canvas__node-halo--paused-current::after {
-    animation: editor-canvas-paused-halo-pulse-reduced 2.6s ease-in-out infinite;
+  .editor-canvas__node-halo--paused {
+    animation: editor-canvas-paused-halo-breathe-reduced 2.6s ease-in-out infinite;
   }
 }
 
