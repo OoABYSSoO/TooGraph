@@ -78,7 +78,7 @@ test("buildPageOperationBook filters buddy self surfaces and disabled targets", 
     ],
   });
 
-  assert.deepEqual(book.allowedOperations.map((item) => item.targetId), ["app.nav.runs"]);
+  assert.deepEqual(book.allowedOperations.map((item) => item.targetId), ["app.nav.runs", "editor.graph.playback"]);
   assert.deepEqual(book.unavailable.map((item) => item.targetId), ["settings.disabled"]);
   assert.match(book.forbidden.join("\n"), /伙伴页面、伙伴浮窗、伙伴形象/);
 });
@@ -115,8 +115,39 @@ test("buildPageOperationBook keeps editor canvas affordances addressable by sema
     [
       ["editor.canvas.node.agent_1", ["click editor.canvas.node.agent_1"]],
       ["editor.canvas.anchor.agent_1:flow-out", ["click editor.canvas.anchor.agent_1:flow-out"]],
+      ["editor.graph.playback", ["graph_edit editor.graph.playback"]],
     ],
   );
+});
+
+test("buildPageOperationBook exposes graph edit playback as an editor-page semantic operation", () => {
+  const book = buildPageOperationBook({
+    snapshotId: "snapshot-graph-edit",
+    path: "/editor/new",
+    title: "图编辑器",
+    affordances: [
+      {
+        id: "editor.canvas.surface",
+        label: "图编辑器画布",
+        role: "button",
+        zone: "editor-canvas",
+        actions: ["click"],
+        enabled: true,
+        visible: true,
+      },
+    ],
+  });
+
+  const graphEditOperation = book.allowedOperations.find((operation) => operation.targetId === "editor.graph.playback");
+
+  assert.deepEqual(graphEditOperation, {
+    targetId: "editor.graph.playback",
+    label: "图编辑回放",
+    role: "button",
+    commands: ["graph_edit editor.graph.playback"],
+    resultHint: null,
+  });
+  assert.match(formatPageOperationBookLines(book).join("\n"), /graph_edit editor\.graph\.playback/);
 });
 
 test("formatPageOperationBookLines renders commands without selectors or coordinates", () => {

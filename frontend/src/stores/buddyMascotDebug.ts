@@ -78,7 +78,14 @@ export const useBuddyMascotDebugStore = defineStore("buddyMascotDebug", () => {
       request: {
         ...request,
         commands: [...request.commands],
-        operations: request.operations.map((operation) => ({ ...operation })),
+        operations: request.operations.map((operation) =>
+          operation.kind === "graph_edit"
+            ? {
+                ...operation,
+                graphEditIntents: operation.graphEditIntents.map((intent) => ({ ...intent })),
+              }
+            : { ...operation },
+        ),
       },
     };
   }

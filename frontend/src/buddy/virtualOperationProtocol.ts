@@ -1,3 +1,5 @@
+import type { GraphEditIntent } from "../editor/workspace/graphEditPlaybackModel.ts";
+
 export type BuddyVirtualOperationCursorLifecycle = "keep" | "return_after_step" | "return_at_end";
 
 export type BuddyVirtualClickOperation = {
@@ -32,13 +34,20 @@ export type BuddyVirtualWaitOperation = {
   option: string;
 };
 
+export type BuddyVirtualGraphEditOperation = {
+  kind: "graph_edit";
+  targetId: string;
+  graphEditIntents: GraphEditIntent[];
+};
+
 export type BuddyVirtualOperation =
   | BuddyVirtualClickOperation
   | BuddyVirtualFocusOperation
   | BuddyVirtualClearOperation
   | BuddyVirtualTypeOperation
   | BuddyVirtualPressOperation
-  | BuddyVirtualWaitOperation;
+  | BuddyVirtualWaitOperation
+  | BuddyVirtualGraphEditOperation;
 
 export type BuddyVirtualOperationPlan = {
   version: 1;
@@ -106,6 +115,14 @@ function listOperations(value: unknown): BuddyVirtualOperation[] {
     if (!targetId || isBuddySelfTarget(targetId)) {
       return [];
     }
+    if (kind === "graph_edit") {
+      const graphEditIntents = listGraphEditIntents(record.graph_edit_intents ?? record.graphEditIntents);
+      if (graphEditIntents.length === 0) {
+        return [];
+      }
+      operations.push({ kind: "graph_edit", targetId, graphEditIntents });
+      continue;
+    }
     if (kind === "click" || kind === "focus" || kind === "clear") {
       operations.push({ kind, targetId });
       continue;
@@ -121,6 +138,135 @@ function listOperations(value: unknown): BuddyVirtualOperation[] {
     return [];
   }
   return operations;
+}
+
+function listGraphEditIntents(value: unknown): GraphEditIntent[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const intents: GraphEditIntent[] = [];
+  for (const item of value) {
+    const record = recordFromUnknown(item);
+    if (!record) {
+      continue;
+    }
+    const intent = normalizeGraphEditIntent(record);
+    if (intent) {
+      intents.push(intent);
+    }
+  }
+  return intents;
+}
+
+function normalizeGraphEditIntent(record: Record<string, unknown>): GraphEditIntent | null {
+  const kind = normalizeText(record.kind);
+  if (kind === "create_node") {
+    const nodeType = normalizeText(record.nodeType ?? record.node_type);
+    const ref = normalizeText(record.ref);
+    if (!ref || !isGraphEditNodeType(nodeType)) {
+      return null;
+    }
+    const intent: GraphEditIntent = {
+      kind: "create_node",
+      ref,
+      nodeType,
+    };
+    assignOptionalText(intent, "title", record.title);
+    assignOptionalText(intent, "description", record.description);
+    assignOptionalText(intent, "taskInstruction", record.taskInstruction);
+    assignOptionalText(intent, "positionHint", record.positionHint);
+    const position = normalizeGraphEditPosition(record.position);
+    if (position) {
+      intent.position = position;
+    }
+    return intent;
+  }
+  if (kind === "update_node") {
+    const nodeRef = normalizeText(record.nodeRef ?? record.node_ref);
+    if (!nodeRef) {
+      return null;
+    }
+    const intent: GraphEditIntent = {
+      kind: "update_node",
+      nodeRef,
+    };
+    assignOptionalText(intent, "title", record.title);
+    assignOptionalText(intent, "description", record.description);
+    assignOptionalText(intent, "taskInstruction", record.taskInstruction);
+    return intent;
+  }
+  if (kind === "create_state") {
+    const ref = normalizeText(record.ref);
+    if (!ref) {
+      return null;
+    }
+    const intent: GraphEditIntent = {
+      kind: "create_state",
+      ref,
+    };
+    assignOptionalText(intent, "name", record.name);
+    assignOptionalText(intent, "description", record.description);
+    assignOptionalText(intent, "valueType", record.valueType ?? record.value_type);
+    assignOptionalText(intent, "color", record.color);
+    if ("value" in record) {
+      intent.value = record.value;
+    }
+    return intent;
+  }
+  if (kind === "bind_state") {
+    const nodeRef = normalizeText(record.nodeRef ?? record.node_ref);
+    const stateRef = normalizeText(record.stateRef ?? record.state_ref);
+    const mode = normalizeText(record.mode);
+    if (!nodeRef || !stateRef || (mode !== "read" && mode !== "write")) {
+      return null;
+    }
+    return {
+      kind: "bind_state",
+      nodeRef,
+      stateRef,
+      mode,
+      ...(record.required === true ? { required: true } : {}),
+    };
+  }
+  if (kind === "connect_nodes") {
+    const sourceRef = normalizeText(record.sourceRef ?? record.source_ref);
+    const targetRef = normalizeText(record.targetRef ?? record.target_ref);
+    if (!sourceRef || !targetRef) {
+      return null;
+    }
+    return {
+      kind: "connect_nodes",
+      sourceRef,
+      targetRef,
+    };
+  }
+  return null;
+}
+
+function isGraphEditNodeType(value: string): value is "input" | "agent" | "output" | "condition" {
+  return value === "input" || value === "agent" || value === "output" || value === "condition";
+}
+
+function normalizeGraphEditPosition(value: unknown) {
+  const record = recordFromUnknown(value);
+  if (!record) {
+    return null;
+  }
+  const position: { x?: number; y?: number } = {};
+  if (typeof record.x === "number" && Number.isFinite(record.x)) {
+    position.x = record.x;
+  }
+  if (typeof record.y === "number" && Number.isFinite(record.y)) {
+    position.y = record.y;
+  }
+  return Object.keys(position).length > 0 ? position : null;
+}
+
+function assignOptionalText(target: object, key: string, value: unknown) {
+  const text = normalizeText(value);
+  if (text) {
+    (target as Record<string, unknown>)[key] = text;
+  }
 }
 
 function listText(value: unknown): string[] {

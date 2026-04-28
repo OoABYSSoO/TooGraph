@@ -250,12 +250,11 @@ def execute_agent_node(
                 else:
                     skill_invoke_kwargs: dict[str, Any] = {}
                     if callable_accepts_keyword_func(invoke_skill_func, "context"):
-                        invocation_index = _next_skill_artifact_invocation_index(state, node_name, skill_key)
-                        skill_invoke_kwargs["context"] = create_skill_artifact_context(
-                            run_id=str(state.get("run_id") or "run"),
-                            node_id=node_name,
+                        skill_invoke_kwargs["context"] = _build_skill_invocation_context(
+                            state=state,
+                            node_name=node_name,
                             skill_key=skill_key,
-                            invocation_index=invocation_index,
+                            runtime_config=runtime_config,
                         )
                     skill_result = invoke_skill_func(skill_func, skill_inputs, **skill_invoke_kwargs)
             else:
@@ -307,12 +306,11 @@ def execute_agent_node(
                     }
                 skill_invoke_kwargs: dict[str, Any] = {}
                 if callable_accepts_keyword_func(invoke_skill_func, "context"):
-                    invocation_index = _next_skill_artifact_invocation_index(state, node_name, skill_key)
-                    skill_invoke_kwargs["context"] = create_skill_artifact_context(
-                        run_id=str(state.get("run_id") or "run"),
-                        node_id=node_name,
+                    skill_invoke_kwargs["context"] = _build_skill_invocation_context(
+                        state=state,
+                        node_name=node_name,
                         skill_key=skill_key,
-                        invocation_index=invocation_index,
+                        runtime_config=runtime_config,
                     )
                 skill_result = invoke_skill_func(skill_func, skill_inputs, **skill_invoke_kwargs)
         duration_ms = int((perf_counter() - started_at) * 1000)
@@ -857,6 +855,26 @@ def is_missing_skill_input_value(value: Any) -> bool:
     if isinstance(value, str) and not value.strip():
         return True
     return False
+
+
+def _build_skill_invocation_context(
+    *,
+    state: dict[str, Any],
+    node_name: str,
+    skill_key: str,
+    runtime_config: dict[str, Any],
+) -> dict[str, Any]:
+    invocation_index = _next_skill_artifact_invocation_index(state, node_name, skill_key)
+    context = create_skill_artifact_context(
+        run_id=str(state.get("run_id") or "run"),
+        node_id=node_name,
+        skill_key=skill_key,
+        invocation_index=invocation_index,
+    )
+    skill_runtime_context = runtime_config.get("skill_runtime_context")
+    if isinstance(skill_runtime_context, dict):
+        context["skill_runtime_context"] = dict(skill_runtime_context)
+    return context
 
 
 def _resolve_skill_invocation_status(skill_key: str, skill_result: dict[str, Any]) -> tuple[str, str]:
