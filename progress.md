@@ -1,5 +1,80 @@
 # Progress Log
 
+## Session: 2026-04-28 Round 17
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Ran planning session catchup and recovered the previous round's final verification context.
+  - Confirmed the worktree started clean on `main...origin/main`.
+  - Inspected `EditorCanvas.vue` connection preview, active source anchor, preview color, and pending connection helpers.
+
+### Phase 2: Select Safe Refactor Slice
+- **Status:** completed
+- Actions taken:
+  - Selected concrete-state key detection, pending connection creation, pending connection identity, active source anchor id lookup, preview state key resolution, accent color resolution, and connection preview model construction.
+  - Decided to keep pointer handlers, auto-snapping, connection completion, selected-edge state, node-creation menu payloads, and graph mutation emits inside `EditorCanvas.vue`.
+
+### Phase 3: Implement Cleanup
+- **Status:** completed
+- Actions taken:
+  - Updated `task_plan.md` for the seventeenth cleanup round.
+  - Added `canvasConnectionModel.test.ts` before production code.
+  - Updated `EditorCanvas.structure.test.ts` to assert the new canvas connection model boundary.
+  - Ran the focused red tests and verified they fail because `canvasConnectionModel.ts` is missing.
+  - Added `canvasConnectionModel.ts` with concrete state key, pending connection, source anchor, preview state, accent color, and preview path model helpers.
+  - Updated `EditorCanvas.vue` to call the canvas connection model while keeping interaction orchestration local.
+  - Removed duplicated local connection preview and pending connection helpers from `EditorCanvas.vue`.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran the focused canvas connection model test after implementation.
+  - Ran the focused connection preview path test after implementation.
+  - Ran the focused EditorCanvas structure test after implementation.
+  - Ran `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters`.
+  - Ran the full frontend node test suite.
+  - Ran the frontend production build; no large chunk warning was emitted.
+  - Ran `git diff --check` with no whitespace errors.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend returned HTTP 200 at `http://127.0.0.1:3477`.
+  - Confirmed the backend health route returned HTTP 200 at `http://127.0.0.1:8765/health`.
+  - Confirmed the restarted `node scripts/start.mjs`, uvicorn, and Vite processes remained alive after a delayed check.
+
+### Phase 5: Commit and Push
+- **Status:** completed
+- Actions taken:
+  - Reviewed the source diff and confirmed no unrelated runtime artifacts are included.
+  - Committed the source and tests as `9fccb69` with Chinese message `抽取画布连接预览逻辑`.
+  - Prepared planning, findings, and progress updates for a Chinese progress commit.
+  - Pushed the branch after committing the progress updates.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red model test | `node --test frontend/src/editor/canvas/canvasConnectionModel.test.ts` before implementation | Fails because the canvas connection model does not exist | Failed with `ERR_MODULE_NOT_FOUND` for `canvasConnectionModel.ts` | Passed |
+| Red structure test | `node --test frontend/src/editor/canvas/EditorCanvas.structure.test.ts` before implementation | Fails because the new component boundary model is missing | Failed with `ENOENT` for `canvasConnectionModel.ts` | Passed |
+| Canvas connection model | `node --test frontend/src/editor/canvas/canvasConnectionModel.test.ts` | Model tests pass | 6 passed | Passed |
+| Connection preview path | `node --test frontend/src/editor/canvas/connectionPreviewPath.test.ts` | Existing preview path tests pass | 4 passed | Passed |
+| EditorCanvas structure | `node --test frontend/src/editor/canvas/EditorCanvas.structure.test.ts` | Structure constraints pass | 59 passed | Passed |
+| Unused symbol check | `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No unused-symbol diagnostics | Exit 0, no diagnostics | Passed |
+| Full frontend tests | `node --test $(rg --files frontend/src -g '*.test.ts') frontend/vite.config.structure.test.ts` | All frontend tests pass | 721 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without chunk warning regressions | Exit 0, no large chunk warning | Passed |
+| Dev restart | `npm run dev` | Services start and respond | Frontend 200, backend `/health` 200, delayed process check alive | Passed |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Seventeenth cleanup implementation, verification, dev restart, source commit, planning update, and push are complete. |
+| Where am I going? | Ready for handoff or the next cleanup slice. |
+| What's the goal? | Continue reducing high-concentration editor components without changing graph editing behavior. |
+| What have I learned? | Connection preview and pending connection setup are pure projection concerns and can be tested outside the canvas component. |
+| What have I done? | Extracted canvas connection helpers, added focused tests, ran full frontend checks, built without chunk warnings, restarted the app, and committed source changes. |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+
 ## Session: 2026-04-28 Round 16
 
 ### Phase 1: Re-orientation
