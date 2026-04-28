@@ -4509,6 +4509,7 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   inset: calc(-1 * var(--editor-canvas-node-halo-outset, 6px));
   z-index: -1;
   border-radius: calc(var(--node-card-radius, 28px) + var(--editor-canvas-node-halo-outset, 6px));
+  box-sizing: border-box;
   pointer-events: none;
 }
 
@@ -4523,50 +4524,42 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
 }
 
 .editor-canvas__node-halo--running {
-  background:
-    radial-gradient(
-      circle at 50% 20%,
-      rgba(52, 211, 153, 0.52) 0%,
-      rgba(16, 185, 129, 0.28) 34%,
-      rgba(16, 185, 129, 0) 64%
-    );
+  border: 1.5px solid rgba(16, 185, 129, 0.68);
+  background: rgba(16, 185, 129, 0.035);
+  box-shadow:
+    0 0 0 4px rgba(16, 185, 129, 0.1),
+    0 0 24px rgba(16, 185, 129, 0.28);
   animation: editor-canvas-running-halo-breathe 2.2s ease-in-out infinite;
 }
 
 .editor-canvas__node-halo--running-current {
-  background:
-    radial-gradient(
-      circle at 50% 20%,
-      rgba(110, 231, 183, 0.72) 0%,
-      rgba(16, 185, 129, 0.38) 36%,
-      rgba(16, 185, 129, 0) 66%
-    );
+  border: 1.5px solid rgba(16, 185, 129, 0.86);
+  background: rgba(16, 185, 129, 0.05);
+  box-shadow:
+    0 0 0 5px rgba(16, 185, 129, 0.14),
+    0 0 32px rgba(16, 185, 129, 0.36);
   animation: editor-canvas-running-halo-breathe 1.85s ease-in-out infinite;
 }
 
 .editor-canvas__node-halo--paused {
-  background:
-    radial-gradient(
-      circle at 50% 20%,
-      rgba(245, 158, 11, 0.5) 0%,
-      rgba(217, 119, 6, 0.25) 34%,
-      rgba(217, 119, 6, 0) 64%
-    );
+  border: 1.5px solid rgba(245, 158, 11, 0.68);
+  background: rgba(245, 158, 11, 0.035);
+  box-shadow:
+    0 0 0 4px rgba(245, 158, 11, 0.1),
+    0 0 24px rgba(245, 158, 11, 0.28);
   animation: editor-canvas-paused-halo-breathe 2.45s ease-in-out infinite;
 }
 
 .editor-canvas__node-halo--paused-current {
-  background:
-    radial-gradient(
-      circle at 50% 20%,
-      rgba(251, 191, 36, 0.7) 0%,
-      rgba(245, 158, 11, 0.34) 36%,
-      rgba(245, 158, 11, 0) 66%
-    );
+  border: 1.5px solid rgba(245, 158, 11, 0.86);
+  background: rgba(245, 158, 11, 0.05);
+  box-shadow:
+    0 0 0 5px rgba(245, 158, 11, 0.14),
+    0 0 32px rgba(245, 158, 11, 0.36);
   animation: editor-canvas-paused-halo-breathe 2.05s ease-in-out infinite;
 }
 
-.editor-canvas__node--running {
+:deep(.editor-canvas__node--running) {
   --editor-canvas-node-card-shadow-rest:
     0 18px 36px rgba(60, 41, 20, 0.1),
     0 0 0 1.5px rgba(16, 185, 129, 0.62),
@@ -4583,7 +4576,7 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   animation: editor-canvas-running-card-breathe 2.2s ease-in-out infinite;
 }
 
-.editor-canvas__node--running-current {
+:deep(.editor-canvas__node--running-current) {
   --editor-canvas-node-card-shadow-rest:
     0 20px 40px rgba(60, 41, 20, 0.12),
     0 0 0 1.5px rgba(16, 185, 129, 0.86),
@@ -4600,7 +4593,7 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   animation: editor-canvas-running-card-breathe 1.85s ease-in-out infinite;
 }
 
-.editor-canvas__node--paused {
+:deep(.editor-canvas__node--paused) {
   --editor-canvas-node-card-shadow-rest:
     0 18px 36px rgba(60, 41, 20, 0.1),
     0 0 0 1.5px rgba(245, 158, 11, 0.62),
@@ -4617,7 +4610,7 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   animation: editor-canvas-paused-card-breathe 2.45s ease-in-out infinite;
 }
 
-.editor-canvas__node--paused-current {
+:deep(.editor-canvas__node--paused-current) {
   --editor-canvas-node-card-shadow-rest:
     0 20px 40px rgba(60, 41, 20, 0.12),
     0 0 0 1.5px rgba(245, 158, 11, 0.86),
@@ -4640,10 +4633,10 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   .editor-canvas__node-halo--running-current,
   .editor-canvas__node-halo--paused,
   .editor-canvas__node-halo--paused-current,
-  .editor-canvas__node--running,
-  .editor-canvas__node--running-current,
-  .editor-canvas__node--paused,
-  .editor-canvas__node--paused-current,
+  :deep(.editor-canvas__node--running),
+  :deep(.editor-canvas__node--running-current),
+  :deep(.editor-canvas__node--paused),
+  :deep(.editor-canvas__node--paused-current),
   .editor-canvas__edge--active-run,
   .editor-canvas__edge--flow.editor-canvas__edge--active-run,
   .editor-canvas__edge--route.editor-canvas__edge--active-run,
@@ -4652,13 +4645,13 @@ function resolveRunEdgePresentationForEdge(edgeId: string) {
   }
 }
 
-.editor-canvas__node--success {
+:deep(.editor-canvas__node--success) {
   box-shadow:
     0 18px 36px rgba(60, 41, 20, 0.1),
     0 0 0 1.5px rgba(180, 83, 9, 0.34);
 }
 
-.editor-canvas__node--failed {
+:deep(.editor-canvas__node--failed) {
   box-shadow:
     0 18px 36px rgba(60, 41, 20, 0.1),
     0 0 0 1.5px rgba(239, 68, 68, 0.56);
