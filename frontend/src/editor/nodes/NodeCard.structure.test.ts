@@ -7,6 +7,12 @@ import { fileURLToPath } from "node:url";
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDirectory = dirname(currentFilePath);
 const componentSource = readFileSync(resolve(currentDirectory, "NodeCard.vue"), "utf8").replace(/\r\n/g, "\n");
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const cssRuleBlock = (selector: string) => {
+  const match = componentSource.match(new RegExp(`${escapeRegExp(selector)} \\{[\\s\\S]*?\\n\\}`));
+  assert.ok(match, `expected to find CSS rule block for ${selector}`);
+  return match[0];
+};
 
 test("NodeCard does not render the reads and writes summary block", () => {
   assert.doesNotMatch(componentSource, /class="node-card__state-summary"/);
@@ -81,10 +87,15 @@ test("NodeCard keeps state pill geometry but hides the pill chrome visually", ()
 });
 
 test("NodeCard clips long state port labels inside the pill", () => {
-  assert.match(componentSource, /\.node-card__port-pill-label \{[\s\S]*overflow:\s*hidden;/);
-  assert.match(componentSource, /\.node-card__port-pill-label \{[\s\S]*text-overflow:\s*ellipsis;/);
-  assert.match(componentSource, /\.node-card__port-pill-label-text \{[\s\S]*text-overflow:\s*ellipsis;/);
-  assert.doesNotMatch(componentSource, /\.node-card__port-pill-label \{[\s\S]*overflow:\s*visible;/);
+  const labelBlock = cssRuleBlock(".node-card__port-pill-label");
+  const labelTextBlock = cssRuleBlock(".node-card__port-pill-label-text");
+  assert.match(labelBlock, /overflow:\s*hidden;/);
+  assert.match(labelBlock, /text-overflow:\s*ellipsis;/);
+  assert.match(labelBlock, /line-height:\s*1\.2;/);
+  assert.match(labelTextBlock, /text-overflow:\s*ellipsis;/);
+  assert.match(labelTextBlock, /line-height:\s*1\.2;/);
+  assert.doesNotMatch(labelBlock, /line-height:\s*1;/);
+  assert.doesNotMatch(labelBlock, /overflow:\s*visible;/);
 });
 
 test("NodeCard uses Element Plus segmented control on the same row as the input output pill", () => {

@@ -3820,7 +3820,7 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
   white-space: nowrap;
   font-size: 1.02rem;
   font-weight: 600;
-  line-height: 1;
+  line-height: 1.2;
   cursor: pointer;
 }
 
@@ -3831,6 +3831,7 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  line-height: 1.2;
   transition: opacity 140ms ease;
 }
 
