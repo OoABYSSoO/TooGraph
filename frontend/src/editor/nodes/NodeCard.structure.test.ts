@@ -288,7 +288,8 @@ test("NodeCard keeps skill actions below the agent while creating ports from plu
   assert.match(createPopoverSource, /class="node-card__port-picker-color-option"/);
   assert.match(createPopoverSource, /class="node-card__port-picker-color-dot"/);
   assert.match(createPopoverSource, /const colorOptions = computed\(\(\) => resolveStateColorOptions\(props\.draft\.definition\.color \?\? ""\)\);/);
-  assert.match(componentSource, /const agentAddPopoverStyle = \{/);
+  assert.match(componentSource, /const transparentPopoverStyle = \{/);
+  assert.match(componentSource, /const agentAddPopoverStyle = transparentPopoverStyle;/);
   assert.match(componentSource, /"--el-popover-bg-color":\s*"transparent"/);
   assert.match(componentSource, /\.node-card__agent-add-popover \{[\s\S]*background:\s*rgba\(255,\s*244,\s*232,\s*0\.96\);/);
   assert.match(createPopoverSource, /\.node-card__agent-create-port-popover \{[\s\S]*background:\s*rgba\(255,\s*244,\s*232,\s*0\.96\);/);
@@ -462,7 +463,8 @@ test("NodeCard moves node actions into hoverable top buttons built from Element 
   assert.match(componentSource, /:visible="activeTopAction === 'delete'"/);
   assert.match(componentSource, /t\("nodeCard\.deleteNodeQuestion"\)/);
   assert.match(componentSource, /const confirmPopoverStyle = \{/);
-  assert.match(componentSource, /const actionPopoverStyle = \{/);
+  assert.match(componentSource, /const transparentPopoverStyle = \{/);
+  assert.match(componentSource, /const actionPopoverStyle = transparentPopoverStyle;/);
   assert.match(componentSource, /"--el-popover-bg-color":\s*"transparent"/);
   assert.match(componentSource, /node-card__top-action-button--confirm/);
   assert.match(componentSource, /\.node-card \{[\s\S]*overflow:\s*visible;/);
@@ -593,7 +595,8 @@ test("NodeCard reveals state pills on hover and opens state editing only after a
   assert.doesNotMatch(componentSource, /trigger="manual"/);
   assert.match(createPopoverSource, /StateDefaultValueEditor/);
   assert.match(componentSource, /class="node-card__state-editor"/);
-  assert.match(componentSource, /const stateEditorPopoverStyle = \{/);
+  assert.match(componentSource, /const transparentPopoverStyle = \{/);
+  assert.match(componentSource, /const stateEditorPopoverStyle = transparentPopoverStyle;/);
   assert.match(componentSource, /"--el-popover-bg-color":\s*"transparent"/);
   assert.match(componentSource, /"--el-popover-border-color":\s*"transparent"/);
   assert.match(componentSource, /"--el-popover-padding":\s*"0px"/);
@@ -833,14 +836,18 @@ test("NodeCard declares top-action and state-edit events for canvas forwarding",
 });
 
 test("NodeCard lets real agent state pills drag-reorder within their own side", () => {
-  assert.match(componentSource, /const PORT_REORDER_DRAG_THRESHOLD = 6;/);
-  assert.match(componentSource, /const portReorderPointerState = ref<\{/);
+  assert.match(componentSource, /import \{[\s\S]*PORT_REORDER_DRAG_THRESHOLD,[\s\S]*buildPortReorderFloatingStyle,[\s\S]*buildPortReorderPreviewPorts,[\s\S]*buildPortReorderSelector,[\s\S]*resolvePortReorderTargetIndexFromElements,[\s\S]*type PortReorderPointerState,[\s\S]*\} from "\.\/portReorderModel";/);
+  assert.match(componentSource, /const portReorderPointerState = ref<PortReorderPointerState \| null>\(null\);/);
   assert.match(componentSource, /const orderedAgentInputPorts = computed<NodePortViewModel\[\]>\(\(\) =>/);
   assert.match(componentSource, /const orderedAgentOutputPorts = computed<NodePortViewModel\[\]>\(\(\) =>/);
-  assert.match(componentSource, /function buildPortReorderPreviewPorts\(side: PortReorderSide, ports: NodePortViewModel\[\]\)/);
+  assert.match(componentSource, /buildPortReorderPreviewPorts\("input", agentInputPorts\.value, portReorderPointerState\.value\)/);
+  assert.match(componentSource, /buildPortReorderPreviewPorts\("output", agentOutputPorts\.value, portReorderPointerState\.value\)/);
   assert.match(componentSource, /function resolvePortReorderTargetIndex\(side: PortReorderSide, clientY: number\)/);
+  assert.match(componentSource, /document\.querySelectorAll<HTMLElement>\(buildPortReorderSelector\(props\.nodeId, side\)\)/);
+  assert.match(componentSource, /resolvePortReorderTargetIndexFromElements\(targetElements, pointerState\.stateKey, clientY\)/);
   assert.match(componentSource, /const portReorderFloatingPort = computed/);
   assert.match(componentSource, /const portReorderFloatingStyle = computed/);
+  assert.match(componentSource, /return buildPortReorderFloatingStyle\(pointerState, floatingPort\.port\.stateColor\);/);
   assert.match(componentSource, /<Teleport to="body">/);
   assert.match(componentSource, /data-port-reorder-node-id/);
   assert.match(componentSource, /data-port-reorder-side="input"/);

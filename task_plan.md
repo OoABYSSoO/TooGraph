@@ -1,54 +1,57 @@
-# Task Plan: Repository Architecture Audit
+# Task Plan: Repository Cleanup Execution
 
 ## Goal
-Evaluate the GraphiteUI repository with an architect-level lens and identify redundant code, unused code, duplicated patterns, oversized modules, and candidates for safer extraction or refactor.
+Clean up the GraphiteUI codebase by implementing conservative, behavior-preserving refactors based on the existing architecture audit, while keeping the application functional and verified.
 
 ## Current Phase
-Complete
+Phase 4: Verification
 
 ## Phases
 
-### Phase 1: Repository Inventory
-- [x] Inspect package structure, scripts, and runtime boundaries.
-- [x] Identify largest and most frequently changed frontend/backend modules.
-- [x] Map major feature areas and ownership boundaries.
+### Phase 1: Re-orientation
+- [x] Re-read architecture reports and current planning context.
+- [x] Inspect the highest-priority cleanup target from the roadmap.
+- [x] Confirm current git status and verification commands.
 - **Status:** completed
 
-### Phase 2: Redundancy and Dead-Code Signals
-- [x] Look for unused exports, duplicate helpers, stale wrappers, and orphaned assets/docs.
-- [x] Compare test coverage against suspected dead or duplicated areas.
-- [x] Separate safe cleanup candidates from behavior-sensitive refactors.
+### Phase 2: Select Safe Refactor Slice
+- [x] Identify duplicated or over-concentrated logic with clear test coverage.
+- [x] Avoid broad rewrites or behavior-sensitive runtime changes.
+- [x] Choose the smallest useful extraction or cleanup.
 - **Status:** completed
 
-### Phase 3: Abstraction Candidates
-- [x] Identify components/files that mix too many responsibilities.
-- [x] Find repeated UI, graph, API, and backend storage/runtime patterns.
-- [x] Propose extraction boundaries that match existing project style.
+### Phase 3: Implement Cleanup
+- [x] Add or identify relevant regression coverage before production edits.
+- [x] Refactor the selected code path without changing public behavior.
+- [x] Keep changes scoped to touched modules.
 - **Status:** completed
 
-### Phase 4: Architecture Assessment
-- [x] Prioritize findings by risk, payoff, and implementation cost.
-- [x] Produce a concrete recommendation list.
-- [x] Note which changes should be implemented immediately versus planned.
+### Phase 4: Verification
+- [x] Run focused tests for the touched surface.
+- [x] Run the smallest meaningful broader frontend/backend checks.
+- [x] Restart the dev environment with `npm run dev` after code changes.
 - **Status:** completed
 
-### Phase 5: Wrap-Up
-- [x] Run relevant lightweight verification if files are modified.
-- [x] Commit and push any documentation or cleanup changes made during the audit.
-- **Status:** completed
+### Phase 5: Commit and Push
+- [ ] Review git diff for unrelated/runtime artifacts.
+- [ ] Commit with a Chinese commit message.
+- [ ] Push the branch.
+- **Status:** in_progress
 
 ## Key Questions
-1. Which areas are materially harder to maintain because files own too many responsibilities?
-2. Which duplicated patterns can be extracted without creating premature abstraction?
-3. Which suspected unused code is safe to delete, and which needs runtime confirmation?
-4. What should be the next refactor slice with the best risk/payoff ratio?
+1. Which roadmap recommendation can be implemented safely in one pass?
+2. Which duplicated state or interaction logic can be extracted without changing UI behavior?
+3. Which tests prove the editor still works after cleanup?
+4. Are any generated/runtime artifacts present that must stay uncommitted?
 
 ## Decisions Made
 | Decision | Rationale |
 |----------|-----------|
-| Start with an audit rather than broad refactoring | The request is architectural evaluation; large refactors should be justified by evidence first. |
-| Preserve existing product behavior during this pass | The repo is active and graph-editor behavior is sensitive. |
-| Treat frontend graph editor and backend runtime as separate architecture domains | They have different failure modes and refactor boundaries. |
+| Use the existing architecture roadmap as the starting point | It already identifies risk-ranked cleanup targets. |
+| Prefer frontend NodeCard cleanup first | The roadmap marks it as P1 and it has existing structure/model tests. |
+| Preserve behavior over reducing line count aggressively | The user explicitly prioritized functional stability. |
+| Extract NodeCard port reorder helpers first | The logic has a clear boundary and can receive focused model tests. |
+| Share identical transparent popover style objects | This removes exact duplication without changing template bindings. |
 
 ## Errors Encountered
 | Error | Attempt | Resolution |
@@ -56,4 +59,4 @@ Complete
 
 ## Notes
 - Do not commit runtime artifacts such as `backend/data/settings`, `.dev_*`, `dist`, or `.worktrees`.
-- If code changes are made, restart using `npm run dev`.
+- After code changes, restart using `npm run dev`.
