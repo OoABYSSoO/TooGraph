@@ -662,9 +662,12 @@ test("EditorCanvas opens node creation from the virtual agent any output", () =>
 test("EditorCanvas snaps state drags to transient or matching state inputs from the whole target node body", () => {
   assert.match(componentSource, /if \(activeConnection\.value\.sourceKind === "state-out"\) \{[\s\S]*return resolveAutoSnappedStateTargetAnchor\(event\);[\s\S]*\}/);
   assert.match(componentSource, /function resolveAutoSnappedStateTargetAnchor\(event: PointerEvent\)/);
+  assert.match(componentSource, /function resolveEligibleConcreteStateTargetAnchorAtPointer\(nodeId: string, event: PointerEvent\)/);
+  assert.match(componentSource, /const directStateTargetAnchor = resolveEligibleConcreteStateTargetAnchorAtPointer\(nodeId, event\);[\s\S]*if \(directStateTargetAnchor\) \{[\s\S]*return directStateTargetAnchor;/);
   assert.match(componentSource, /function resolveEligibleStateTargetAnchorForNodeBody\(nodeId: string\)/);
   assert.match(componentSource, /function resolveAgentCreateInputTargetAnchor\(nodeId: string\)/);
   assert.match(componentSource, /function isStateTargetAnchorAllowedForActiveConnection\(anchor: ProjectedCanvasAnchor\)/);
+  assert.match(componentSource, /activeConnection\.value\?\.sourceStateKey === VIRTUAL_ANY_OUTPUT_STATE_KEY/);
   assert.match(componentSource, /anchor\.stateKey === CREATE_AGENT_INPUT_STATE_KEY \|\|[\s\S]*anchor\.stateKey === VIRTUAL_ANY_INPUT_STATE_KEY \|\|[\s\S]*anchor\.stateKey === activeConnection\.value\?\.sourceStateKey/);
   assert.match(componentSource, /const createInputAnchor = resolveAgentCreateInputTargetAnchor\(nodeId\);[\s\S]*if \(createInputAnchor && canCompleteCanvasConnection\(createInputAnchor\)\) \{[\s\S]*return createInputAnchor;/);
   assert.match(componentSource, /const fallbackInputAnchor = baseProjectedAnchors\.value[\s\S]*anchor\.stateKey === VIRTUAL_ANY_INPUT_STATE_KEY/);

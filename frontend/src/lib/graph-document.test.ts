@@ -908,6 +908,76 @@ test("connectStateBindingInDocument materializes a virtual output before connect
   }
 });
 
+test("connectStateBindingInDocument materializes an empty input virtual output into a selected concrete input binding", () => {
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Virtual input output to concrete input graph",
+    state_schema: {
+      first: { name: "first", description: "", type: "text", value: "", color: "#d97706" },
+      second: { name: "second", description: "", type: "text", value: "", color: "#2563eb" },
+      third: { name: "third", description: "", type: "text", value: "", color: "#7c3aed" },
+      fourth: { name: "fourth", description: "", type: "text", value: "", color: "#10b981" },
+    },
+    nodes: {
+      empty_input: {
+        kind: "input",
+        name: "empty_input",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [],
+        config: { value: "" },
+      },
+      multi_input_agent: {
+        kind: "agent",
+        name: "multi_input_agent",
+        description: "",
+        ui: { position: { x: 220, y: 0 } },
+        reads: [
+          { state: "first", required: true },
+          { state: "second", required: true },
+          { state: "third", required: true },
+          { state: "fourth", required: true },
+        ],
+        writes: [],
+        config: {
+          skills: [],
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "off",
+          temperature: 0.2,
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {
+      graphiteui_state_key_counter: 4,
+    },
+  };
+
+  const nextDocument = graphDocument.connectStateBindingInDocument(
+    document,
+    "empty_input",
+    VIRTUAL_ANY_OUTPUT_STATE_KEY,
+    "multi_input_agent",
+    "third",
+  );
+
+  assert.deepEqual(nextDocument.nodes.empty_input.writes, [{ state: "state_5", mode: "replace" }]);
+  assert.deepEqual(nextDocument.nodes.multi_input_agent.reads, [
+    { state: "first", required: true },
+    { state: "second", required: true },
+    { state: "state_5", required: true },
+    { state: "fourth", required: true },
+  ]);
+  assert.equal(nextDocument.state_schema.state_5?.name, "state_5");
+  assert.deepEqual(nextDocument.edges, [{ source: "empty_input", target: "multi_input_agent" }]);
+  assert.deepEqual(document.nodes.empty_input.writes, []);
+  assert.deepEqual(document.nodes.multi_input_agent.reads.map((binding) => binding.state), ["first", "second", "third", "fourth"]);
+});
+
 test("connectStateBindingInDocument restores ordering for an existing matching state binding", () => {
   const document: GraphPayload = {
     graph_id: null,

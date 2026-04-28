@@ -79,7 +79,7 @@ export function canConnectStateBinding(
     if (isVirtualAnyInputStateKey(targetStateKey)) {
       return targetNode.reads.length === 0;
     }
-    return false;
+    return targetNode.reads.some((binding) => binding.state === targetStateKey);
   }
 
   if (!canResolveStateConnectionWriter(document, sourceNodeId, sourceStateKey, targetNodeId)) {

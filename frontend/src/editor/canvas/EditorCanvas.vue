@@ -482,6 +482,7 @@ const props = defineProps<{
 }>();
 
 const { t, locale } = useI18n();
+const STATE_TARGET_ROW_FALLBACK_GAP = 44;
 const edgeVisibilityModeOptions = computed(() => {
   locale.value;
   return buildEdgeVisibilityModeOptions();
@@ -2367,6 +2368,11 @@ function resolveAutoSnappedStateInputSourceAnchor(event: PointerEvent) {
 function resolveAutoSnappedStateTargetAnchor(event: PointerEvent) {
   const nodeId = resolveNodeIdAtPointer(event);
   if (nodeId) {
+    const directStateTargetAnchor = resolveEligibleConcreteStateTargetAnchorAtPointer(nodeId, event);
+    if (directStateTargetAnchor) {
+      return directStateTargetAnchor;
+    }
+
     const snappedAnchor = resolveEligibleStateTargetAnchorForNodeBody(nodeId);
     if (snappedAnchor) {
       return snappedAnchor;
@@ -2470,6 +2476,40 @@ function resolveEligibleTargetAnchorForNodeBody(nodeId: string) {
   return candidateAnchor;
 }
 
+function resolveEligibleConcreteStateTargetAnchorAtPointer(nodeId: string, event: PointerEvent) {
+  const concreteStateInputAnchors = projectedAnchors.value
+    .filter(
+      (anchor) =>
+        anchor.nodeId === nodeId &&
+        anchor.kind === "state-in" &&
+        anchor.stateKey !== CREATE_AGENT_INPUT_STATE_KEY &&
+        anchor.stateKey !== VIRTUAL_ANY_INPUT_STATE_KEY &&
+        isStateTargetAnchorAllowedForActiveConnection(anchor) &&
+        eligibleTargetAnchorIds.value.has(anchor.id),
+    )
+    .sort((left, right) => left.y - right.y);
+  if (concreteStateInputAnchors.length === 0) {
+    return null;
+  }
+
+  const point = resolveCanvasPoint(event);
+  const createInputAnchor = resolveAgentCreateInputTargetAnchor(nodeId);
+  for (let index = 0; index < concreteStateInputAnchors.length; index += 1) {
+    const anchor = concreteStateInputAnchors[index];
+    const previousAnchor = concreteStateInputAnchors[index - 1];
+    const nextAnchor = concreteStateInputAnchors[index + 1];
+    const previousY = previousAnchor?.y ?? anchor.y - STATE_TARGET_ROW_FALLBACK_GAP;
+    const nextY = nextAnchor?.y ?? createInputAnchor?.y ?? anchor.y + STATE_TARGET_ROW_FALLBACK_GAP;
+    const upperBoundary = (previousY + anchor.y) / 2;
+    const lowerBoundary = (anchor.y + nextY) / 2;
+    if (point.y >= upperBoundary && point.y < lowerBoundary) {
+      return anchor;
+    }
+  }
+
+  return null;
+}
+
 function resolveEligibleStateTargetAnchorForNodeBody(nodeId: string) {
   const createInputAnchor = resolveAgentCreateInputTargetAnchor(nodeId);
   if (createInputAnchor && canCompleteCanvasConnection(createInputAnchor)) {
@@ -2539,6 +2579,10 @@ function resolveAgentCreateInputTargetAnchor(nodeId: string): ProjectedCanvasAnc
 function isStateTargetAnchorAllowedForActiveConnection(anchor: ProjectedCanvasAnchor) {
   if (activeConnection.value?.sourceKind !== "state-out") {
     return true;
+  }
+
+  if (activeConnection.value?.sourceStateKey === VIRTUAL_ANY_OUTPUT_STATE_KEY) {
+    return anchor.kind === "state-in" && typeof anchor.stateKey === "string";
   }
 
   return (
