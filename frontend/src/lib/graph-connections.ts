@@ -18,6 +18,13 @@ export type GraphConnectionTarget = {
   stateKey?: string;
 };
 
+type StateInputSourceReplacement = {
+  sourceNodeId: string;
+  targetNodeId: string;
+  previousStateKey: string;
+  nextStateKey: string;
+};
+
 function canNodeAcceptFlowTarget(
   sourceNode: GraphPayload["nodes"][string],
   targetNode: GraphPayload["nodes"][string],
@@ -82,14 +89,23 @@ export function canConnectStateBinding(
     return targetNode.reads.some((binding) => binding.state === targetStateKey);
   }
 
-  if (!canResolveStateConnectionWriter(document, sourceNodeId, sourceStateKey, targetNodeId)) {
+  const replacement = isConcreteStateInputKey(targetStateKey)
+    ? {
+        sourceNodeId,
+        targetNodeId,
+        previousStateKey: targetStateKey,
+        nextStateKey: sourceStateKey,
+      }
+    : null;
+
+  if (!canResolveStateConnectionWriter(document, sourceNodeId, sourceStateKey, targetNodeId, replacement)) {
     return false;
   }
 
   if (sourceStateKey === targetStateKey) {
     return (
       targetNode.reads.some((binding) => binding.state === sourceStateKey) &&
-      shouldAddImplicitFlowEdgeForStateConnection(document, sourceNodeId, targetNodeId)
+      shouldAddImplicitFlowEdgeForStateConnection(document, sourceNodeId, targetNodeId, replacement)
     );
   }
 
@@ -123,11 +139,12 @@ export function shouldAddImplicitFlowEdgeForStateConnection(
   document: GraphPayload | GraphDocument,
   sourceNodeId: string,
   targetNodeId: string,
+  replacement: StateInputSourceReplacement | null = null,
 ) {
-  if (sourceNodeId === targetNodeId || canReachNode(document, sourceNodeId, targetNodeId)) {
+  if (sourceNodeId === targetNodeId || canReachNode(document, sourceNodeId, targetNodeId, replacement)) {
     return false;
   }
-  if (canReachNode(document, targetNodeId, sourceNodeId)) {
+  if (canReachNode(document, targetNodeId, sourceNodeId, replacement)) {
     return false;
   }
   return canConnectFlowNodes(document, sourceNodeId, targetNodeId);
@@ -138,17 +155,18 @@ function canResolveStateConnectionWriter(
   sourceNodeId: string,
   sourceStateKey: string,
   targetNodeId: string,
+  replacement: StateInputSourceReplacement | null = null,
 ) {
   if (sourceNodeId === targetNodeId) {
     return false;
   }
 
-  const includeImplicitFlowEdge = shouldAddImplicitFlowEdgeForStateConnection(document, sourceNodeId, targetNodeId);
-  if (!includeImplicitFlowEdge && !canReachNode(document, sourceNodeId, targetNodeId)) {
+  const includeImplicitFlowEdge = shouldAddImplicitFlowEdgeForStateConnection(document, sourceNodeId, targetNodeId, replacement);
+  if (!includeImplicitFlowEdge && !canReachNode(document, sourceNodeId, targetNodeId, replacement)) {
     return false;
   }
 
-  const successors = buildSuccessorMap(document);
+  const successors = buildSuccessorMap(document, replacement);
   if (includeImplicitFlowEdge) {
     successors.set(sourceNodeId, [...(successors.get(sourceNodeId) ?? []), targetNodeId]);
   }
@@ -172,16 +190,71 @@ function canResolveStateConnectionWriter(
   return remainingWriters.length === 1 && remainingWriters[0] === sourceNodeId;
 }
 
-function canReachNode(document: GraphPayload | GraphDocument, sourceNodeId: string, targetNodeId: string) {
-  return collectReachableNodes(sourceNodeId, buildSuccessorMap(document)).has(targetNodeId);
+function isConcreteStateInputKey(stateKey: string) {
+  return !isCreateAgentInputStateKey(stateKey) && !isVirtualAnyInputStateKey(stateKey) && !isVirtualAnyOutputStateKey(stateKey);
 }
 
-function buildSuccessorMap(document: GraphPayload | GraphDocument) {
+function nodeWritesState(document: GraphPayload | GraphDocument, nodeId: string, stateKey: string) {
+  return document.nodes[nodeId]?.writes.some((binding) => binding.state === stateKey) ?? false;
+}
+
+function shouldRemoveReplacedStateInputSourceEdge(
+  document: GraphPayload | GraphDocument,
+  edge: GraphPayload["edges"][number],
+  replacement: StateInputSourceReplacement | null,
+) {
+  if (!replacement || edge.target !== replacement.targetNodeId || edge.source === replacement.sourceNodeId) {
+    return false;
+  }
+
+  if (!nodeWritesState(document, edge.source, replacement.previousStateKey)) {
+    return false;
+  }
+
+  if (replacement.previousStateKey === replacement.nextStateKey) {
+    return true;
+  }
+
+  const sourceNode = document.nodes[edge.source];
+  const targetNode = document.nodes[replacement.targetNodeId];
+  if (!sourceNode || !targetNode) {
+    return true;
+  }
+
+  const remainingReadKeys = targetNode.reads
+    .map((binding) => binding.state)
+    .filter((stateKey) => stateKey !== replacement.previousStateKey);
+  return !sourceNode.writes.some((binding) => remainingReadKeys.includes(binding.state));
+}
+
+export function filterReplacedStateInputSourceEdges<T extends GraphPayload | GraphDocument>(
+  document: T,
+  replacement: StateInputSourceReplacement | null,
+): T["edges"] {
+  if (!replacement) {
+    return document.edges;
+  }
+  return document.edges.filter((edge) => !shouldRemoveReplacedStateInputSourceEdge(document, edge, replacement)) as T["edges"];
+}
+
+function canReachNode(
+  document: GraphPayload | GraphDocument,
+  sourceNodeId: string,
+  targetNodeId: string,
+  replacement: StateInputSourceReplacement | null = null,
+) {
+  return collectReachableNodes(sourceNodeId, buildSuccessorMap(document, replacement)).has(targetNodeId);
+}
+
+function buildSuccessorMap(document: GraphPayload | GraphDocument, replacement: StateInputSourceReplacement | null = null) {
   const successors = new Map<string, string[]>();
   for (const nodeId of Object.keys(document.nodes)) {
     successors.set(nodeId, []);
   }
   for (const edge of document.edges) {
+    if (shouldRemoveReplacedStateInputSourceEdge(document, edge, replacement)) {
+      continue;
+    }
     successors.set(edge.source, [...(successors.get(edge.source) ?? []), edge.target]);
   }
   for (const conditionalEdge of document.conditional_edges) {

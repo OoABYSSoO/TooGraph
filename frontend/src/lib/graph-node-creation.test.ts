@@ -510,6 +510,77 @@ test("connectStateInputSourceToTarget wires an empty input node upstream of a co
   assert.deepEqual(result.document.edges, [{ source: "empty_input", target: "answer_helper" }]);
 });
 
+test("connectStateInputSourceToTarget replaces the previous source edge for a concrete state input", () => {
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Replace Reverse Creation Graph",
+    state_schema: {
+      question: {
+        name: "question",
+        description: "",
+        type: "text",
+        value: "",
+        color: "#d97706",
+      },
+    },
+    nodes: {
+      original_input: {
+        kind: "input",
+        name: "Original Input",
+        description: "",
+        ui: { position: { x: 0, y: 0 }, collapsed: false },
+        reads: [],
+        writes: [{ state: "question", mode: "replace" }],
+        config: {
+          value: "",
+        },
+      },
+      empty_input: {
+        kind: "input",
+        name: "Empty Input",
+        description: "",
+        ui: { position: { x: 0, y: 120 }, collapsed: false },
+        reads: [],
+        writes: [],
+        config: {
+          value: "",
+        },
+      },
+      answer_helper: {
+        kind: "agent",
+        name: "answer_helper",
+        description: "",
+        ui: { position: { x: 240, y: 0 }, collapsed: false },
+        reads: [{ state: "question", required: true }],
+        writes: [],
+        config: {
+          skills: [],
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "on",
+          temperature: 0.2,
+        },
+      },
+    },
+    edges: [{ source: "original_input", target: "answer_helper" }],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const result = connectStateInputSourceToTarget(document, {
+    sourceNodeId: "empty_input",
+    targetNodeId: "answer_helper",
+    targetStateKey: "question",
+    targetValueType: "text",
+  });
+
+  assert.deepEqual(result.document.nodes.empty_input.writes, [{ state: "question", mode: "replace" }]);
+  assert.deepEqual(result.document.nodes.answer_helper.reads, [{ state: "question", required: true }]);
+  assert.deepEqual(result.document.edges, [{ source: "empty_input", target: "answer_helper" }]);
+  assert.deepEqual(document.edges, [{ source: "original_input", target: "answer_helper" }]);
+});
+
 test("connectStateInputSourceToTarget materializes a virtual input through an existing agent writer", () => {
   const document: GraphPayload = {
     graph_id: null,
