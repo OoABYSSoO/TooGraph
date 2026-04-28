@@ -148,6 +148,60 @@
 | What have I learned? | Route-level dynamic imports dramatically reduce the app entry chunk; Element Plus is best kept as a stable cacheable vendor chunk instead of per-component manual chunks. |
 | What have I done? | Added lazy route page loading, stable vendor chunks, a 1000 kB warning threshold, structure tests, and full verification. |
 
+## Session: 2026-04-28 Round 6
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Ran planning session catchup and read the completed round 5 plan/progress/findings.
+  - Confirmed the worktree starts clean on `main...origin/main`.
+  - Inspected `agentConfigModel.ts`, its tests, and the remaining agent runtime handlers in `NodeCard.vue`.
+
+### Phase 2: Select Safe Refactor Slice
+- **Status:** completed
+- Actions taken:
+  - Selected thinking-mode normalization and temperature input parsing as the next low-risk NodeCard extraction.
+  - Decided to keep component guards, emits, and select blur behavior inside `NodeCard.vue`.
+
+### Phase 3: Implement Cleanup
+- **Status:** completed
+- Actions taken:
+  - Updated `task_plan.md` for the sixth cleanup round.
+  - Added failing tests for thinking mode normalization and temperature input parsing before production code.
+  - Ran `agentConfigModel.test.ts` and verified it fails because `normalizeAgentThinkingMode` is not exported yet.
+  - Added `AgentThinkingControlMode`, `normalizeAgentThinkingMode`, and `resolveAgentTemperatureInputValue` to `agentConfigModel.ts`.
+  - Updated `NodeCard.vue` to call the agent config model helpers.
+  - Updated `NodeCard.structure.test.ts` to assert the new model boundary.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran the focused agent config model test after implementation.
+  - Ran the focused NodeCard structure test after implementation.
+  - Ran `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters`.
+  - Ran the full frontend node test suite.
+  - Ran the frontend production build.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend returned HTTP 200 at `http://127.0.0.1:3477`.
+  - Confirmed the backend health route returned HTTP 200 at `http://127.0.0.1:8765/health`.
+
+### Phase 5: Commit and Push
+- **Status:** in_progress
+- Actions taken:
+  - Checked git status after restart; only source/test/planning files are modified.
+  - Confirmed no untracked runtime or build artifacts are present.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red test | `node --test frontend/src/editor/nodes/agentConfigModel.test.ts` before implementation | Fails because new agent config helpers are missing | Failed with missing `normalizeAgentThinkingMode` export | Passed |
+| Agent config model | `node --test frontend/src/editor/nodes/agentConfigModel.test.ts` | Model tests pass | 10 passed | Passed |
+| NodeCard structure | `node --test frontend/src/editor/nodes/NodeCard.structure.test.ts` | Structure constraints pass | 34 passed | Passed |
+| Unused symbol check | `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No unused-symbol diagnostics | Exit 0, no diagnostics | Passed |
+| Full frontend tests | `node --test $(rg --files frontend/src -g '*.test.ts') frontend/vite.config.structure.test.ts` | All frontend tests pass | 678 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without chunk warning regressions | Exit 0, no large chunk warning | Passed |
+| Dev restart | `npm run dev` | Services start and respond | Frontend 200, backend `/health` 200 | Passed |
+
 ## Error Log
 | Timestamp | Error | Attempt | Resolution |
 |-----------|-------|---------|------------|

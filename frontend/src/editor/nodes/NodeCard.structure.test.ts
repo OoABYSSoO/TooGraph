@@ -220,7 +220,11 @@ test("NodeCard restores the legacy agent runtime control order with Element Plus
     /value:\s*"off"[\s\S]*label:\s*t\("nodeCard\.thinkingOff"\)[\s\S]*value:\s*"low"[\s\S]*label:\s*t\("nodeCard\.thinkingLow"\)[\s\S]*value:\s*"medium"[\s\S]*label:\s*t\("nodeCard\.thinkingMedium"\)[\s\S]*value:\s*"high"[\s\S]*label:\s*t\("nodeCard\.thinkingHigh"\)[\s\S]*value:\s*"xhigh"[\s\S]*label:\s*t\("nodeCard\.thinkingExtraHigh"\)/,
   );
   assert.doesNotMatch(thinkingOptions[0], /value:\s*"auto"/);
-  assert.match(componentSource, /function normalizeAgentThinkingMode/);
+  assert.match(componentSource, /from "\.\/agentConfigModel";/);
+  assert.match(componentSource, /normalizeAgentThinkingMode\(props\.node\.config\.thinkingMode\)/);
+  assert.match(componentSource, /resolveAgentTemperatureInputValue\(value\)/);
+  assert.doesNotMatch(componentSource, /function normalizeAgentThinkingMode/);
+  assert.doesNotMatch(componentSource, /const nextValue = typeof value === "number" \? value : value === "" \? DEFAULT_AGENT_TEMPERATURE : Number\(value\);/);
   assert.match(componentSource, /agentBreakpointEnabled\?:\s*boolean;/);
   assert.match(componentSource, /agentBreakpointTiming\?:\s*"before" \| "after";/);
   assert.match(componentSource, /\(event: "toggle-agent-breakpoint", payload: \{ nodeId: string; enabled: boolean \}\): void;/);

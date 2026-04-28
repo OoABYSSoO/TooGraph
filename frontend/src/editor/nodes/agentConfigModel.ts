@@ -2,9 +2,32 @@ import type { SettingsPayload } from "../../types/settings.ts";
 
 export const DEFAULT_AGENT_TEMPERATURE = 0.2;
 
+export type AgentThinkingControlMode = "off" | "low" | "medium" | "high" | "xhigh";
+
 export function normalizeAgentTemperature(value: number | undefined) {
   const numeric = typeof value === "number" && Number.isFinite(value) ? value : DEFAULT_AGENT_TEMPERATURE;
   return Math.min(2, Math.max(0, numeric));
+}
+
+export function resolveAgentTemperatureInputValue(value: string | number) {
+  const nextValue = typeof value === "number" ? value : value === "" ? DEFAULT_AGENT_TEMPERATURE : Number(value);
+  if (!Number.isFinite(nextValue)) {
+    return null;
+  }
+  return normalizeAgentTemperature(nextValue);
+}
+
+export function normalizeAgentThinkingMode(value: string | null | undefined): AgentThinkingControlMode {
+  if (value === "off" || value === "low" || value === "medium" || value === "high" || value === "xhigh") {
+    return value;
+  }
+  if (value === "minimal") {
+    return "low";
+  }
+  if (value === "on") {
+    return "medium";
+  }
+  return "off";
 }
 
 export function buildAgentModelDisplayLookup(
