@@ -7,6 +7,7 @@ import {
   buildFlowEdgeDeleteConfirmStyle,
   isFlowEdgeDeleteConfirmActive,
   resolveFlowEdgeDeleteAction,
+  resolveFlowEdgeDeleteActionFromEdge,
 } from "./flowEdgeDeleteModel.ts";
 
 const flowEdge: ProjectedCanvasEdge = {
@@ -87,4 +88,19 @@ test("flow edge delete model resolves route and flow delete actions", () => {
     targetNodeId: "target",
   });
   assert.equal(resolveFlowEdgeDeleteAction(null), null);
+});
+
+test("flow edge delete model resolves keyboard delete actions from projected edges", () => {
+  assert.deepEqual(resolveFlowEdgeDeleteActionFromEdge(routeEdge), {
+    kind: "route",
+    sourceNodeId: "condition",
+    branchKey: "pass",
+  });
+  assert.deepEqual(resolveFlowEdgeDeleteActionFromEdge(flowEdge), {
+    kind: "flow",
+    sourceNodeId: "source",
+    targetNodeId: "target",
+  });
+  assert.equal(resolveFlowEdgeDeleteActionFromEdge(dataEdge), null);
+  assert.equal(resolveFlowEdgeDeleteActionFromEdge({ ...routeEdge, branch: undefined }), null);
 });

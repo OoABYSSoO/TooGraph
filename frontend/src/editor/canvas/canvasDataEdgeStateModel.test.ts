@@ -7,9 +7,11 @@ import {
   buildDataEdgeStateConfirmFromEdge,
   buildDataEdgeStateEditorFromConfirm,
   buildDataEdgeStateEditorFromRequest,
+  buildDataEdgeStateDisconnectPayload,
   buildFloatingCanvasPointStyle,
   isActiveDataEdge,
   isDataEdgeStateInteractionOpen,
+  shouldOfferDataEdgeFlowDisconnect,
 } from "./canvasDataEdgeStateModel.ts";
 
 const dataEdge: ProjectedCanvasEdge = {
@@ -94,4 +96,30 @@ test("data-edge state model matches active data-edge interactions", () => {
   assert.equal(isActiveDataEdge(dataEdge, null), false);
   assert.equal(isDataEdgeStateInteractionOpen(dataEdge, { confirm: null, editor }), true);
   assert.equal(isDataEdgeStateInteractionOpen({ ...dataEdge, state: "other" }, { confirm, editor }), false);
+});
+
+test("data-edge state model resolves disconnect availability and payloads", () => {
+  const editor = buildDataEdgeStateEditorFromRequest({
+    sourceNodeId: "agent",
+    targetNodeId: "output",
+    stateKey: "answer",
+    position: { x: 12, y: 18 },
+  });
+
+  assert.equal(shouldOfferDataEdgeFlowDisconnect({ editor, canDisconnectFlow: () => true }), true);
+  assert.equal(shouldOfferDataEdgeFlowDisconnect({ editor: null, canDisconnectFlow: () => true }), false);
+  assert.equal(shouldOfferDataEdgeFlowDisconnect({ editor, canDisconnectFlow: () => false }), false);
+  assert.deepEqual(buildDataEdgeStateDisconnectPayload(editor, "state"), {
+    sourceNodeId: "agent",
+    targetNodeId: "output",
+    stateKey: "answer",
+    mode: "state",
+  });
+  assert.deepEqual(buildDataEdgeStateDisconnectPayload(editor, "flow"), {
+    sourceNodeId: "agent",
+    targetNodeId: "output",
+    stateKey: "answer",
+    mode: "flow",
+  });
+  assert.equal(buildDataEdgeStateDisconnectPayload(null, "state"), null);
 });

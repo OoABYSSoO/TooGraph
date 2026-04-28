@@ -7,7 +7,7 @@ import {
   VIRTUAL_ANY_OUTPUT_STATE_KEY,
 } from "../../lib/virtual-any-input.ts";
 import { buildPendingConnectionPreviewPath } from "./connectionPreviewPath.ts";
-import type { ProjectedCanvasAnchor } from "./edgeProjection.ts";
+import type { ProjectedCanvasAnchor, ProjectedCanvasEdge } from "./edgeProjection.ts";
 import { resolveRouteHandlePalette } from "./routeHandleModel.ts";
 
 export type CanvasConnectionPreviewKind = "flow" | "route" | "data";
@@ -157,6 +157,42 @@ export function buildConnectionPreviewModel(input: {
       targetX: input.pendingPoint.x,
       targetY: input.pendingPoint.y,
     }),
+  };
+}
+
+export function resolveSelectedReconnectConnection(input: {
+  selectedEdgeId: string | null;
+  activeFlowEdgeDeleteConfirmId?: string | null;
+  edges: readonly ProjectedCanvasEdge[];
+}): PendingGraphConnection | null {
+  if (input.activeFlowEdgeDeleteConfirmId === input.selectedEdgeId) {
+    return null;
+  }
+
+  const edge = input.selectedEdgeId ? input.edges.find((candidate) => candidate.id === input.selectedEdgeId) : null;
+  if (!edge || edge.kind === "data") {
+    return null;
+  }
+
+  if (edge.kind === "route" && edge.branch) {
+    return {
+      sourceNodeId: edge.source,
+      sourceKind: "route-out",
+      branchKey: edge.branch,
+      mode: "reconnect",
+      currentTargetNodeId: edge.target,
+    };
+  }
+
+  if (edge.kind !== "flow") {
+    return null;
+  }
+
+  return {
+    sourceNodeId: edge.source,
+    sourceKind: "flow-out",
+    mode: "reconnect",
+    currentTargetNodeId: edge.target,
   };
 }
 

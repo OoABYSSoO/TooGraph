@@ -17,6 +17,10 @@ function readCanvasNodePresentationModelSource() {
   return readFileSync(resolve(currentDirectory, "canvasNodePresentationModel.ts"), "utf8").replace(/\r\n/g, "\n");
 }
 
+function readCanvasMinimapEdgeModelSource() {
+  return readFileSync(resolve(currentDirectory, "canvasMinimapEdgeModel.ts"), "utf8").replace(/\r\n/g, "\n");
+}
+
 function readCanvasDataEdgeStateModelSource() {
   return readFileSync(resolve(currentDirectory, "canvasDataEdgeStateModel.ts"), "utf8").replace(/\r\n/g, "\n");
 }
@@ -37,6 +41,26 @@ function readFlowEdgeDeleteModelSource() {
   return readFileSync(resolve(currentDirectory, "flowEdgeDeleteModel.ts"), "utf8").replace(/\r\n/g, "\n");
 }
 
+function readCanvasPendingStatePortModelSource() {
+  return readFileSync(resolve(currentDirectory, "canvasPendingStatePortModel.ts"), "utf8").replace(/\r\n/g, "\n");
+}
+
+function readCanvasVirtualCreatePortModelSource() {
+  return readFileSync(resolve(currentDirectory, "canvasVirtualCreatePortModel.ts"), "utf8").replace(/\r\n/g, "\n");
+}
+
+function readCanvasPinchZoomModelSource() {
+  return readFileSync(resolve(currentDirectory, "canvasPinchZoomModel.ts"), "utf8").replace(/\r\n/g, "\n");
+}
+
+function readCanvasViewportDisplayModelSource() {
+  return readFileSync(resolve(currentDirectory, "canvasViewportDisplayModel.ts"), "utf8").replace(/\r\n/g, "\n");
+}
+
+function readEdgeVisibilityModelSource() {
+  return readFileSync(resolve(currentDirectory, "edgeVisibilityModel.ts"), "utf8").replace(/\r\n/g, "\n");
+}
+
 function readStateEditorModelSource() {
   return readFileSync(resolve(currentDirectory, "../nodes/stateEditorModel.ts"), "utf8").replace(/\r\n/g, "\n");
 }
@@ -48,15 +72,26 @@ function firstCssBlock(selector: string) {
 }
 
 test("EditorCanvas binds the canvas surface styling to the viewport state", () => {
+  const canvasViewportDisplayModelSource = readCanvasViewportDisplayModelSource();
+
   assert.match(componentSource, /class="editor-canvas"[\s\S]*:style="canvasSurfaceStyle"/);
   assert.match(componentSource, /const canvasSurfaceStyle = computed\(\(\) => resolveCanvasSurfaceStyle\(viewport\.viewport\)\);/);
+  assert.match(componentSource, /import \{ buildCanvasViewportStyle, buildZoomPercentLabel \} from "\.\/canvasViewportDisplayModel";/);
+  assert.match(componentSource, /const viewportStyle = computed\(\(\) => buildCanvasViewportStyle\(viewport\.viewport\)\);/);
+  assert.match(componentSource, /const zoomPercentLabel = computed\(\(\) => buildZoomPercentLabel\(viewport\.viewport\.scale\)\);/);
+  assert.match(canvasViewportDisplayModelSource, /export function buildCanvasViewportStyle/);
+  assert.match(canvasViewportDisplayModelSource, /export function buildZoomPercentLabel/);
+  assert.doesNotMatch(componentSource, /transform: `translate\(\$\{viewport\.viewport\.x\}px, \$\{viewport\.viewport\.y\}px\) scale\(\$\{viewport\.viewport\.scale\}\)`/);
+  assert.doesNotMatch(componentSource, /`\$\{Math\.round\(viewport\.viewport\.scale \* 100\)\}%`/);
 });
 
 test("EditorCanvas mounts a right-bottom minimap backed by measured node geometry", () => {
   const canvasNodePresentationModelSource = readCanvasNodePresentationModelSource();
+  const canvasMinimapEdgeModelSource = readCanvasMinimapEdgeModelSource();
 
   assert.match(componentSource, /import EditorMinimap from "\.\/EditorMinimap\.vue";/);
   assert.match(componentSource, /import \{[\s\S]*buildMinimapNodeModel,[\s\S]*type MeasuredNodeSize,[\s\S]*\} from "\.\/canvasNodePresentationModel";/);
+  assert.match(componentSource, /import \{ buildMinimapEdgeModels \} from "\.\/canvasMinimapEdgeModel";/);
   assert.match(componentSource, /const measuredNodeSizes = ref<Record<string, MeasuredNodeSize>>\(\{\}\);/);
   assert.match(componentSource, /const canvasSize = ref\(\{ width: 0, height: 0 \}\);/);
   assert.match(componentSource, /const minimapNodes = computed\(\(\) =>\s*nodeEntries\.value\.map\(\(\[nodeId, node\]\) =>\s*buildMinimapNodeModel\(\{/);
@@ -66,8 +101,9 @@ test("EditorCanvas mounts a right-bottom minimap backed by measured node geometr
   assert.match(canvasNodePresentationModelSource, /export function buildMinimapNodeModel/);
   assert.doesNotMatch(componentSource, /const measuredSize = measuredNodeSizes\.value\[nodeId\];/);
   assert.doesNotMatch(componentSource, /const fallbackSize = resolveFallbackNodeSize\(node\);/);
-  assert.match(componentSource, /const minimapEdges = computed\(\(\) =>/);
-  assert.match(componentSource, /const minimapEdges = computed\(\(\) =>[\s\S]*projectedEdges\.value[\s\S]*\.filter\(\(edge\) => visibleProjectedEdgeIds\.value\.has\(edge\.id\)\)/);
+  assert.match(componentSource, /const minimapEdges = computed\(\(\) =>\s*buildMinimapEdgeModels\(\{[\s\S]*edges: projectedEdges\.value,[\s\S]*visibleEdgeIds: visibleProjectedEdgeIds\.value,[\s\S]*\}\)/);
+  assert.match(canvasMinimapEdgeModelSource, /export function buildMinimapEdgeModels/);
+  assert.doesNotMatch(componentSource, /const minimapEdges = computed\(\(\) =>[\s\S]*projectedEdges\.value[\s\S]*\.filter\(\(edge\) => visibleProjectedEdgeIds\.value\.has\(edge\.id\)\)/);
   assert.match(componentSource, /<EditorMinimap[\s\S]*class="editor-canvas__minimap"[\s\S]*:nodes="minimapNodes"[\s\S]*:edges="minimapEdges"[\s\S]*:viewport="viewport\.viewport"[\s\S]*:canvas-size="canvasSize"[\s\S]*@center-view="handleMinimapCenterView"/);
   assert.match(componentSource, /function handleMinimapCenterView\(point: \{ worldX: number; worldY: number \}\)/);
   assert.match(componentSource, /resolveViewportForMinimapCenter\(/);
@@ -166,12 +202,20 @@ test("EditorCanvas forwards state pill reorder requests to the workspace", () =>
 });
 
 test("EditorCanvas lets editable node fields handle Backspace and Delete normally", () => {
+  const flowEdgeDeleteModelSource = readFlowEdgeDeleteModelSource();
+
   assert.doesNotMatch(componentSource, /@keydown\.delete\.prevent=/);
   assert.doesNotMatch(componentSource, /@keydown\.backspace\.prevent=/);
   assert.match(componentSource, /@keydown\.delete="handleSelectedEdgeDelete"/);
   assert.match(componentSource, /@keydown\.backspace="handleSelectedEdgeDelete"/);
   assert.match(componentSource, /function handleSelectedEdgeDelete\(event: KeyboardEvent\)/);
   assert.match(componentSource, /isEditableKeyboardEventTarget\(event\.target\)/);
+  assert.match(componentSource, /const action = resolveFlowEdgeDeleteActionFromEdge\(edge\);/);
+  assert.match(componentSource, /if \(action\.kind === "route"\) \{[\s\S]*emit\("remove-route", \{[\s\S]*branchKey: action\.branchKey/);
+  assert.match(componentSource, /emit\("remove-flow", \{[\s\S]*sourceNodeId: action\.sourceNodeId,[\s\S]*targetNodeId: action\.targetNodeId/);
+  assert.match(flowEdgeDeleteModelSource, /export function resolveFlowEdgeDeleteActionFromEdge/);
+  assert.doesNotMatch(componentSource, /if \(edge\.kind === "flow"\) \{[\s\S]*sourceNodeId: edge\.source,[\s\S]*targetNodeId: edge\.target/);
+  assert.doesNotMatch(componentSource, /else if \(edge\.kind === "route" && edge\.branch\)/);
   assert.match(componentSource, /event\.preventDefault\(\);/);
 });
 
@@ -493,7 +537,7 @@ test("EditorCanvas renders output flow hotspots only for allowed modes and inter
   assert.doesNotMatch(componentSource, /connectionPreview\.kind === 'route' \? 'url\(#editor-canvas-arrow-preview\)'/);
   assert.doesNotMatch(componentSource, /edge\.kind === 'route'[\s\S]*url\(#editor-canvas-arrow-route\)/);
   assert.doesNotMatch(componentSource, /editor-canvas-arrow-flow/);
-  assert.match(componentSource, /import \{[\s\S]*buildConnectionPreviewModel,[\s\S]*buildPendingConnectionFromAnchor,[\s\S]*isConcreteStateConnectionKey,[\s\S]*isSamePendingConnection,[\s\S]*resolveConnectionAccentColor,[\s\S]*resolveConnectionPreviewStateKey,[\s\S]*resolveConnectionSourceAnchorId,[\s\S]*\} from "\.\/canvasConnectionModel";/);
+  assert.match(componentSource, /import \{[\s\S]*buildConnectionPreviewModel,[\s\S]*buildPendingConnectionFromAnchor,[\s\S]*isConcreteStateConnectionKey,[\s\S]*isSamePendingConnection,[\s\S]*resolveConnectionAccentColor,[\s\S]*resolveConnectionPreviewStateKey,[\s\S]*resolveConnectionSourceAnchorId,[\s\S]*resolveSelectedReconnectConnection,[\s\S]*\} from "\.\/canvasConnectionModel";/);
   assert.match(componentSource, /const connectionPreviewStateKey = computed\(\(\) =>\s*resolveConnectionPreviewStateKey\(\{/);
   assert.match(componentSource, /const activeConnectionAccentColor = computed\(\(\) =>\s*resolveConnectionAccentColor\(\{/);
   assert.match(componentSource, /import \{[\s\S]*buildConnectionPreviewStyle,[\s\S]*buildFlowHotspotStyle,[\s\S]*buildFlowHotspotConnectStyle,[\s\S]*\} from "\.\/canvasInteractionStyleModel";/);
@@ -501,9 +545,11 @@ test("EditorCanvas renders output flow hotspots only for allowed modes and inter
   assert.match(componentSource, /const flowHotspotConnectStyle = \(anchor: ProjectedCanvasAnchor\) =>\s*buildFlowHotspotConnectStyle\(anchor, canvasInteractionStyleContext\.value\);/);
   assert.match(componentSource, /const connectionPreviewStyle = computed\(\(\) =>\s*buildConnectionPreviewStyle\(connectionPreview\.value\?\.kind \?\? null, activeConnectionAccentColor\.value\)/);
   assert.match(componentSource, /const activeConnectionSourceAnchorId = computed\(\(\) =>\s*resolveConnectionSourceAnchorId\(activeConnection\.value, projectedAnchors\.value\)/);
+  assert.match(componentSource, /const selectedReconnectConnection = computed<PendingGraphConnection \| null>\(\(\) =>\s*resolveSelectedReconnectConnection\(\{[\s\S]*selectedEdgeId: selectedEdgeId\.value,[\s\S]*activeFlowEdgeDeleteConfirmId: activeFlowEdgeDeleteConfirm\.value\?\.id,[\s\S]*edges: projectedEdges\.value,[\s\S]*\}\)/);
   assert.match(componentSource, /const connectionPreview = computed\(\(\) =>\s*buildConnectionPreviewModel\(\{/);
   assert.match(componentSource, /sourceAnchor: projectedAnchors\.value\.find\(\(anchor\) => anchor\.id === activeConnectionSourceAnchorId\.value\) \?\? null,/);
   assert.match(canvasConnectionModelSource, /export function buildConnectionPreviewModel/);
+  assert.match(canvasConnectionModelSource, /export function resolveSelectedReconnectConnection/);
   assert.match(canvasConnectionModelSource, /buildPendingConnectionPreviewPath\(\{/);
   assert.match(canvasInteractionStyleModelSource, /export function withAlpha\(hexColor: string, alpha: number\)/);
   assert.doesNotMatch(componentSource, /function withAlpha\(hexColor: string, alpha: number\)/);
@@ -535,10 +581,15 @@ test("EditorCanvas renders output flow hotspots only for allowed modes and inter
 });
 
 test("EditorCanvas exposes a top-left capsule toolbar for edge visibility modes", () => {
-  assert.match(componentSource, /import \{[\s\S]*buildEdgeVisibilityModeOptions,[\s\S]*filterProjectedEdgesForVisibilityMode,[\s\S]*shouldShowOutputFlowHandle,[\s\S]*type EdgeVisibilityMode[\s\S]*\} from "\.\/edgeVisibilityModel";/);
+  const edgeVisibilityModelSource = readEdgeVisibilityModelSource();
+
+  assert.match(componentSource, /import \{[\s\S]*buildEdgeVisibilityModeOptions,[\s\S]*buildForceVisibleProjectedEdgeIds,[\s\S]*filterProjectedEdgesForVisibilityMode,[\s\S]*shouldShowOutputFlowHandle,[\s\S]*type EdgeVisibilityMode[\s\S]*\} from "\.\/edgeVisibilityModel";/);
   assert.match(componentSource, /const edgeVisibilityModeOptions = computed\(\(\) => \{[\s\S]*return buildEdgeVisibilityModeOptions\(\);/);
   assert.match(componentSource, /const edgeVisibilityMode = ref<EdgeVisibilityMode>\("smart"\);/);
   assert.doesNotMatch(componentSource, /const edgeVisibilityRelatedNodeIds = computed\(\(\) =>/);
+  assert.match(componentSource, /const forceVisibleProjectedEdgeIds = computed\(\(\) => buildForceVisibleProjectedEdgeIds\(\{[\s\S]*selectedEdgeId: selectedEdgeId\.value,[\s\S]*dataEdgeStateConfirmId: activeDataEdgeStateConfirm\.value\?\.id,[\s\S]*dataEdgeStateEditorId: activeDataEdgeStateEditor\.value\?\.id,[\s\S]*flowEdgeDeleteConfirmId: activeFlowEdgeDeleteConfirm\.value\?\.id,[\s\S]*\}\)\);/);
+  assert.match(edgeVisibilityModelSource, /export function buildForceVisibleProjectedEdgeIds/);
+  assert.doesNotMatch(componentSource, /const forceVisibleProjectedEdgeIds = computed\(\(\) => \{[\s\S]*const edgeIds = new Set<string>\(\)/);
   assert.match(componentSource, /const visibleProjectedEdgeIds = computed\(/);
   assert.match(componentSource, /filterProjectedEdgesForVisibilityMode\(projectedEdges\.value,/);
   assert.doesNotMatch(componentSource, /relatedNodeIds:/);
@@ -589,14 +640,13 @@ test("EditorCanvas shows a clicked-position delete confirm for flow edges before
   const flowEdgeDeleteModelSource = readFlowEdgeDeleteModelSource();
 
   assert.match(componentSource, /@pointerdown\.stop="handleEdgePointerDown\(edge, \$event\)"/);
-  assert.match(componentSource, /import \{[\s\S]*buildFlowEdgeDeleteConfirmFromEdge,[\s\S]*buildFlowEdgeDeleteConfirmStyle,[\s\S]*isFlowEdgeDeleteConfirmActive,[\s\S]*resolveFlowEdgeDeleteAction,[\s\S]*type FlowEdgeDeleteConfirmTarget,[\s\S]*\} from "\.\/flowEdgeDeleteModel";/);
+  assert.match(componentSource, /import \{[\s\S]*buildFlowEdgeDeleteConfirmFromEdge,[\s\S]*buildFlowEdgeDeleteConfirmStyle,[\s\S]*isFlowEdgeDeleteConfirmActive,[\s\S]*resolveFlowEdgeDeleteAction,[\s\S]*resolveFlowEdgeDeleteActionFromEdge,[\s\S]*type FlowEdgeDeleteConfirmTarget,[\s\S]*\} from "\.\/flowEdgeDeleteModel";/);
   assert.match(componentSource, /const activeFlowEdgeDeleteConfirm = ref<FlowEdgeDeleteConfirmTarget \| null>\(null\);/);
   assert.match(componentSource, /function isFlowEdgeDeleteConfirmOpen\(edgeId: string\)/);
   assert.match(componentSource, /function clearFlowEdgeDeleteConfirmState\(\)/);
   assert.match(componentSource, /function startFlowEdgeDeleteConfirm\(edge: ProjectedCanvasEdge, event: PointerEvent\)/);
   assert.match(componentSource, /function confirmFlowEdgeDelete\(\)/);
-  assert.match(componentSource, /if \(activeFlowEdgeDeleteConfirm\.value\?\.id === selectedEdgeId\.value\) \{[\s\S]*return null;/);
-  assert.match(componentSource, /if \(activeFlowEdgeDeleteConfirm\.value\?\.id\) \{[\s\S]*edgeIds\.add\(activeFlowEdgeDeleteConfirm\.value\.id\);/);
+  assert.match(componentSource, /flowEdgeDeleteConfirmId: activeFlowEdgeDeleteConfirm\.value\?\.id/);
   assert.match(componentSource, /const flowEdgeDeleteConfirmStyle = computed\(\(\) => buildFlowEdgeDeleteConfirmStyle\(activeFlowEdgeDeleteConfirm\.value\)\);/);
   assert.match(componentSource, /return isFlowEdgeDeleteConfirmActive\(activeFlowEdgeDeleteConfirm\.value, edgeId\);/);
   assert.match(componentSource, /const nextConfirm = buildFlowEdgeDeleteConfirmFromEdge\(edge, point\);/);
@@ -613,6 +663,7 @@ test("EditorCanvas shows a clicked-position delete confirm for flow edges before
   assert.match(componentSource, /emit\("remove-flow", \{[\s\S]*sourceNodeId: action\.sourceNodeId,[\s\S]*targetNodeId: action\.targetNodeId,[\s\S]*\}\);/);
   assert.match(flowEdgeDeleteModelSource, /export function buildFlowEdgeDeleteConfirmFromEdge/);
   assert.match(flowEdgeDeleteModelSource, /export function resolveFlowEdgeDeleteAction/);
+  assert.match(flowEdgeDeleteModelSource, /export function resolveFlowEdgeDeleteActionFromEdge/);
   assert.doesNotMatch(componentSource, /activeFlowEdgeDeleteConfirm\.value = \{[\s\S]*kind: edge\.kind === "route" \? "route" : "flow"/);
   assert.doesNotMatch(componentSource, /activeFlowEdgeDeleteConfirm\.value\.kind === "route" && activeFlowEdgeDeleteConfirm\.value\.branch/);
   assert.match(componentSource, /\.editor-canvas__edge-delete-highlight \{[\s\S]*stroke:\s*var\(--editor-edge-outline, rgba\(201,\s*107,\s*31,\s*0\.16\)\);/);
@@ -645,7 +696,7 @@ test("EditorCanvas gives data edges the same two-step state editing entry patter
   const stateEditorModelSource = readStateEditorModelSource();
 
   assert.match(componentSource, /import StateEditorPopover from "@\/editor\/nodes\/StateEditorPopover\.vue";/);
-  assert.match(componentSource, /import \{[\s\S]*buildDataEdgeStateConfirmFromEdge,[\s\S]*buildDataEdgeStateEditorFromConfirm,[\s\S]*buildDataEdgeStateEditorFromRequest,[\s\S]*buildFloatingCanvasPointStyle,[\s\S]*isActiveDataEdge,[\s\S]*isDataEdgeStateInteractionOpen as resolveDataEdgeStateInteractionOpen,[\s\S]*type DataEdgeStateConfirmTarget,[\s\S]*type DataEdgeStateEditorTarget,[\s\S]*\} from "\.\/canvasDataEdgeStateModel";/);
+  assert.match(componentSource, /import \{[\s\S]*buildDataEdgeStateConfirmFromEdge,[\s\S]*buildDataEdgeStateDisconnectPayload,[\s\S]*buildDataEdgeStateEditorFromConfirm,[\s\S]*buildDataEdgeStateEditorFromRequest,[\s\S]*buildFloatingCanvasPointStyle,[\s\S]*isActiveDataEdge,[\s\S]*isDataEdgeStateInteractionOpen as resolveDataEdgeStateInteractionOpen,[\s\S]*shouldOfferDataEdgeFlowDisconnect as resolveShouldOfferDataEdgeFlowDisconnect,[\s\S]*type DataEdgeStateConfirmTarget,[\s\S]*type DataEdgeStateEditorTarget,[\s\S]*\} from "\.\/canvasDataEdgeStateModel";/);
   assert.match(componentSource, /import \{[\s\S]*buildStateEditorDraftFromSchema,[\s\S]*resolveStateEditorUpdatePatch,[\s\S]*updateStateEditorDraftColor,[\s\S]*updateStateEditorDraftDescription,[\s\S]*updateStateEditorDraftName,[\s\S]*updateStateEditorDraftType,[\s\S]*\} from "@\/editor\/nodes\/stateEditorModel";/);
   assert.match(componentSource, /stateEditorRequest\?: \{ requestId: string; sourceNodeId: string; targetNodeId: string; stateKey: string; position: GraphPosition \} \| null;/);
   assert.match(componentSource, /const activeDataEdgeStateConfirm = ref<DataEdgeStateConfirmTarget \| null>\(null\);/);
@@ -657,7 +708,7 @@ test("EditorCanvas gives data edges the same two-step state editing entry patter
   assert.match(componentSource, /const dataEdgeStateConfirmStyle = computed\(\(\) => buildFloatingCanvasPointStyle\(activeDataEdgeStateConfirm\.value\)\);/);
   assert.match(componentSource, /const dataEdgeStateEditorStyle = computed\(\(\) => buildFloatingCanvasPointStyle\(activeDataEdgeStateEditor\.value\)\);/);
   assert.match(componentSource, /const dataEdgeStateColorOptions = computed\(\(\) => resolveStateColorOptions\(dataEdgeStateDraft\.value\?\.definition\.color \?\? ""\)\);/);
-  assert.match(componentSource, /const forceVisibleProjectedEdgeIds = computed\(\(\) => \{/);
+  assert.match(componentSource, /const forceVisibleProjectedEdgeIds = computed\(\(\) => buildForceVisibleProjectedEdgeIds\(\{/);
   assert.match(componentSource, /forceVisibleEdgeIds: forceVisibleProjectedEdgeIds\.value/);
   assert.match(componentSource, /function startDataEdgeStateConfirm\(edge: ProjectedCanvasEdge, event: PointerEvent\)/);
   assert.match(componentSource, /function openDataEdgeStateEditor\(\)/);
@@ -703,9 +754,11 @@ test("EditorCanvas gives data edges the same two-step state editing entry patter
   assert.match(componentSource, /@click\.stop="disconnectActiveDataEdgeFlow"/);
   assert.match(canvasDataEdgeStateModelSource, /export function buildDataEdgeId/);
   assert.match(canvasDataEdgeStateModelSource, /export function buildDataEdgeStateConfirmFromEdge/);
+  assert.match(canvasDataEdgeStateModelSource, /export function buildDataEdgeStateDisconnectPayload/);
   assert.match(canvasDataEdgeStateModelSource, /export function buildDataEdgeStateEditorFromConfirm/);
   assert.match(canvasDataEdgeStateModelSource, /export function buildFloatingCanvasPointStyle/);
   assert.match(canvasDataEdgeStateModelSource, /export function isDataEdgeStateInteractionOpen/);
+  assert.match(canvasDataEdgeStateModelSource, /export function shouldOfferDataEdgeFlowDisconnect/);
   assert.match(stateEditorModelSource, /export function buildStateEditorDraftFromSchema/);
   assert.match(stateEditorModelSource, /export function resolveStateEditorUpdatePatch/);
   assert.match(componentSource, /resolveDataEdgeStateInteractionOpen\(edge, \{[\s\S]*confirm: activeDataEdgeStateConfirm\.value,[\s\S]*editor: activeDataEdgeStateEditor\.value,[\s\S]*\}\)/);
@@ -714,12 +767,16 @@ test("EditorCanvas gives data edges the same two-step state editing entry patter
   assert.doesNotMatch(componentSource, /function isActiveDataEdge/);
   assert.doesNotMatch(componentSource, /defaultValueForStateType/);
   assert.match(componentSource, /function shouldOfferDataEdgeFlowDisconnect\(\)/);
-  assert.match(componentSource, /canDisconnectSequenceEdgeForDataConnection\(props\.document, editor\.source, editor\.target\)/);
+  assert.match(componentSource, /return resolveShouldOfferDataEdgeFlowDisconnect\(\{[\s\S]*editor,[\s\S]*canDisconnectFlow: \(sourceNodeId, targetNodeId\) => canDisconnectSequenceEdgeForDataConnection\(props\.document, sourceNodeId, targetNodeId\),[\s\S]*\}\);/);
   assert.doesNotMatch(componentSource, /sourceNode\?\.kind === "agent"/);
   assert.doesNotMatch(componentSource, /targetNode\?\.kind === "agent"/);
   assert.doesNotMatch(componentSource, /activeDataEdgePairStateCount\(\) > 1/);
   assert.match(componentSource, /function disconnectActiveDataEdgeStateReference\(\)/);
   assert.match(componentSource, /function disconnectActiveDataEdgeFlow\(\)/);
+  assert.match(componentSource, /const payload = buildDataEdgeStateDisconnectPayload\(activeDataEdgeStateEditor\.value, "state"\);/);
+  assert.match(componentSource, /const payload = buildDataEdgeStateDisconnectPayload\(activeDataEdgeStateEditor\.value, "flow"\);/);
+  assert.match(componentSource, /emit\("disconnect-data-edge", payload\);/);
+  assert.doesNotMatch(componentSource, /sourceNodeId: editor\.source,[\s\S]*targetNodeId: editor\.target,[\s\S]*stateKey: editor\.stateKey,[\s\S]*mode: "state"/);
 });
 
 test("EditorCanvas tints data edge outlines from the data edge state color", () => {
@@ -832,30 +889,38 @@ test("EditorCanvas snaps flow drags to eligible target node bodies before mouseu
 });
 
 test("EditorCanvas exposes transient new agent input anchors while state dragging", () => {
-  assert.match(componentSource, /import \{[\s\S]*CREATE_AGENT_INPUT_STATE_KEY,[\s\S]*VIRTUAL_ANY_INPUT_COLOR,[\s\S]*VIRTUAL_ANY_INPUT_STATE_KEY,[\s\S]*VIRTUAL_ANY_OUTPUT_COLOR,[\s\S]*VIRTUAL_ANY_OUTPUT_STATE_KEY,[\s\S]*\} from "@\/lib\/virtual-any-input";/);
-  assert.match(componentSource, /const pendingAgentInputSourceByNodeId = computed<Record<string, PendingStateInputSource>>\(\(\) =>/);
-  assert.match(componentSource, /canCompleteGraphConnection\(props\.document, connection, \{[\s\S]*stateKey: CREATE_AGENT_INPUT_STATE_KEY/);
+  const canvasPendingStatePortModelSource = readCanvasPendingStatePortModelSource();
+  const canvasVirtualCreatePortModelSource = readCanvasVirtualCreatePortModelSource();
+
+  assert.match(componentSource, /import \{[\s\S]*CREATE_AGENT_INPUT_STATE_KEY,[\s\S]*VIRTUAL_ANY_INPUT_STATE_KEY,[\s\S]*VIRTUAL_ANY_OUTPUT_COLOR,[\s\S]*VIRTUAL_ANY_OUTPUT_STATE_KEY,[\s\S]*\} from "@\/lib\/virtual-any-input";/);
+  assert.doesNotMatch(componentSource, /VIRTUAL_ANY_INPUT_COLOR,/);
+  assert.match(componentSource, /import \{[\s\S]*buildPendingAgentInputSourceByNodeId,[\s\S]*buildPendingStateInputSourceTargetByNodeId,[\s\S]*buildPendingStateOutputTargetByNodeId,[\s\S]*type PendingStateInputSource,[\s\S]*type PendingStatePortPreview,[\s\S]*\} from "\.\/canvasPendingStatePortModel";/);
+  assert.match(componentSource, /import \{[\s\S]*buildTransientAgentCreateInputAnchors,[\s\S]*buildTransientAgentInputAnchors,[\s\S]*buildTransientAgentOutputAnchors,[\s\S]*filterBaseProjectedAnchorsForVirtualCreatePorts,[\s\S]*isAgentCreateInputAnchorVisible as resolveAgentCreateInputAnchorVisible,[\s\S]*isAgentCreateOutputAnchorVisible as resolveAgentCreateOutputAnchorVisible,[\s\S]*\} from "\.\/canvasVirtualCreatePortModel";/);
+  assert.match(componentSource, /const pendingAgentInputSourceByNodeId = computed<Record<string, PendingStateInputSource>>\(\(\) =>\s*buildPendingAgentInputSourceByNodeId\(\{/);
+  assert.match(componentSource, /canCompleteAgentInput: \(nodeId\) =>\s*canCompleteGraphConnection\(props\.document, pendingConnection\.value, \{[\s\S]*stateKey: CREATE_AGENT_INPUT_STATE_KEY/);
   assert.match(componentSource, /:pending-state-input-source="pendingAgentInputSourceByNodeId\[nodeId\] \?\? null"/);
-  assert.match(componentSource, /const transientAgentInputAnchors = computed<ProjectedCanvasAnchor\[\]>\(\(\) =>/);
-  assert.match(componentSource, /const anchorId = `\$\{nodeId\}:state-in:\$\{CREATE_AGENT_INPUT_STATE_KEY\}`;/);
-  assert.match(componentSource, /id: anchorId/);
-  assert.match(componentSource, /stateKey: CREATE_AGENT_INPUT_STATE_KEY/);
-  assert.match(componentSource, /const baseProjectedAnchorsWithoutVirtualCreatePorts = computed\(\(\) =>/);
-  assert.match(componentSource, /anchor\.stateKey === VIRTUAL_ANY_INPUT_STATE_KEY &&[\s\S]*pendingAgentInputSourceByNodeId\.value\[anchor\.nodeId\]/);
+  assert.match(componentSource, /const transientAgentInputAnchors = computed<ProjectedCanvasAnchor\[\]>\(\(\) =>\s*buildTransientAgentInputAnchors\(\{/);
+  assert.match(componentSource, /const baseProjectedAnchorsWithoutVirtualCreatePorts = computed\(\(\) =>\s*filterBaseProjectedAnchorsForVirtualCreatePorts\(\{/);
+  assert.match(canvasPendingStatePortModelSource, /export function buildPendingAgentInputSourceByNodeId/);
+  assert.match(canvasVirtualCreatePortModelSource, /export function shouldShowAgentCreateInputPortByDefault/);
+  assert.match(canvasVirtualCreatePortModelSource, /export function shouldShowAgentCreateOutputPortByDefault/);
+  assert.match(canvasVirtualCreatePortModelSource, /export function buildTransientAgentInputAnchors/);
+  assert.match(canvasVirtualCreatePortModelSource, /export function filterBaseProjectedAnchorsForVirtualCreatePorts/);
+  assert.doesNotMatch(componentSource, /anchor\.stateKey === VIRTUAL_ANY_INPUT_STATE_KEY &&[\s\S]*pendingAgentInputSourceByNodeId\.value\[anchor\.nodeId\]/);
   assert.match(componentSource, /const projectedAnchors = computed\(\(\) => \[\.\.\.baseProjectedAnchorsWithoutVirtualCreatePorts\.value, \.\.\.transientAgentCreateInputAnchors\.value, \.\.\.transientAgentInputAnchors\.value, \.\.\.transientAgentOutputAnchors\.value\]\);/);
 });
 
 test("EditorCanvas previews concrete target state while dragging from a virtual output", () => {
   const canvasConnectionModelSource = readCanvasConnectionModelSource();
+  const canvasPendingStatePortModelSource = readCanvasPendingStatePortModelSource();
 
-  assert.match(componentSource, /type PendingStatePortPreview = \{/);
-  assert.match(componentSource, /import \{[\s\S]*isConcreteStateConnectionKey,[\s\S]*\} from "\.\/canvasConnectionModel";/);
-  assert.match(componentSource, /function resolveStatePortPreview\(stateKey: string \| null \| undefined\)/);
-  assert.match(componentSource, /const pendingStateOutputTargetByNodeId = computed<Record<string, PendingStatePortPreview>>\(\(\) =>/);
-  assert.match(componentSource, /connection\.sourceStateKey !== VIRTUAL_ANY_OUTPUT_STATE_KEY/);
-  assert.match(componentSource, /const targetPreview = resolveStatePortPreview\(autoSnappedTargetAnchor\.value\?\.stateKey\);/);
-  assert.match(componentSource, /\[connection\.sourceNodeId\]: targetPreview/);
+  assert.match(componentSource, /type PendingStatePortPreview,/);
+  assert.doesNotMatch(componentSource, /type PendingStatePortPreview = \{/);
+  assert.match(componentSource, /const pendingStateOutputTargetByNodeId = computed<Record<string, PendingStatePortPreview>>\(\(\) =>\s*buildPendingStateOutputTargetByNodeId\(\{/);
+  assert.match(componentSource, /autoSnappedTargetStateKey: autoSnappedTargetAnchor\.value\?\.stateKey,/);
   assert.match(componentSource, /:pending-state-output-target="pendingStateOutputTargetByNodeId\[nodeId\] \?\? null"/);
+  assert.match(canvasPendingStatePortModelSource, /export function resolveStatePortPreview/);
+  assert.match(canvasPendingStatePortModelSource, /export function buildPendingStateOutputTargetByNodeId/);
   assert.match(componentSource, /const connectionPreviewStateKey = computed\(\(\) =>\s*resolveConnectionPreviewStateKey\(\{/);
   assert.match(componentSource, /autoSnappedTargetStateKey: autoSnappedTargetAnchor\.value\?\.stateKey,/);
   assert.match(componentSource, /previewStateKey: connectionPreviewStateKey\.value,/);
@@ -863,16 +928,16 @@ test("EditorCanvas previews concrete target state while dragging from a virtual 
   assert.match(canvasConnectionModelSource, /export function isConcreteStateConnectionKey/);
   assert.match(canvasConnectionModelSource, /stateSchema\[input\.previewStateKey\]\?\.color\?\.trim\(\) \|\| "#2563eb"/);
   assert.doesNotMatch(componentSource, /function isConcreteStateConnectionKey/);
+  assert.doesNotMatch(componentSource, /function resolveStatePortPreview/);
   assert.doesNotMatch(componentSource, /function resolveConnectionPreviewStateKey/);
 });
 
 test("EditorCanvas snaps reverse virtual input drags to concrete state output pills with state preview", () => {
   const canvasConnectionModelSource = readCanvasConnectionModelSource();
+  const canvasPendingStatePortModelSource = readCanvasPendingStatePortModelSource();
 
-  assert.match(componentSource, /const pendingStateInputSourceTargetByNodeId = computed<Record<string, PendingStatePortPreview>>\(\(\) =>/);
-  assert.match(componentSource, /connection\?\.sourceKind !== "state-in" \|\| connection\.sourceStateKey !== VIRTUAL_ANY_INPUT_STATE_KEY/);
-  assert.match(componentSource, /const sourcePreview = resolveStatePortPreview\(autoSnappedTargetAnchor\.value\?\.stateKey\);/);
-  assert.match(componentSource, /\[connection\.sourceNodeId\]: sourcePreview/);
+  assert.match(componentSource, /const pendingStateInputSourceTargetByNodeId = computed<Record<string, PendingStatePortPreview>>\(\(\) =>\s*buildPendingStateInputSourceTargetByNodeId\(\{/);
+  assert.match(canvasPendingStatePortModelSource, /export function buildPendingStateInputSourceTargetByNodeId/);
   assert.match(componentSource, /:pending-state-input-target="pendingStateInputSourceTargetByNodeId\[nodeId\] \?\? null"/);
   assert.match(componentSource, /function resolveEligibleConcreteStateInputSourceAnchorAtPointer\(nodeId: string, event: PointerEvent\)/);
   assert.match(componentSource, /const directStateInputSourceAnchor = resolveEligibleConcreteStateInputSourceAnchorAtPointer\(nodeId, event\);[\s\S]*if \(directStateInputSourceAnchor\) \{[\s\S]*return directStateInputSourceAnchor;/);
@@ -882,17 +947,14 @@ test("EditorCanvas snaps reverse virtual input drags to concrete state output pi
 });
 
 test("EditorCanvas projects visible plus input anchors when existing inputs hide the virtual input from the anchor model", () => {
+  const canvasVirtualCreatePortModelSource = readCanvasVirtualCreatePortModelSource();
+
   assert.match(componentSource, /function isAgentCreateInputAnchorVisible\(nodeId: string\)/);
-  assert.match(componentSource, /shouldShowAgentCreateInputPortByDefault\(nodeId\)/);
-  assert.match(componentSource, /selection\.selectedNodeId\.value === nodeId/);
-  assert.match(componentSource, /hoveredNodeId\.value === nodeId/);
-  assert.match(componentSource, /activeConnectionHoverNodeId\.value === nodeId/);
-  assert.match(componentSource, /const transientAgentCreateInputAnchors = computed<ProjectedCanvasAnchor\[\]>\(\(\) =>/);
-  assert.match(componentSource, /node\.kind !== "agent" \|\|[\s\S]*node\.reads\.length === 0 \|\|[\s\S]*pendingAgentInputSourceByNodeId\.value\[nodeId\] \|\|[\s\S]*!isAgentCreateInputAnchorVisible\(nodeId\)/);
-  assert.match(componentSource, /const anchorId = `\$\{nodeId\}:state-in:\$\{VIRTUAL_ANY_INPUT_STATE_KEY\}`;/);
-  assert.match(componentSource, /kind: "state-in" as const/);
-  assert.match(componentSource, /color: VIRTUAL_ANY_INPUT_COLOR/);
-  assert.match(componentSource, /stateKey: VIRTUAL_ANY_INPUT_STATE_KEY/);
+  assert.match(componentSource, /return resolveAgentCreateInputAnchorVisible\(\{[\s\S]*nodeId,[\s\S]*node: props\.document\.nodes\[nodeId\],[\s\S]*selectedNodeId: selection\.selectedNodeId\.value,[\s\S]*hoveredNodeId: hoveredNodeId\.value,[\s\S]*activeConnectionHoverNodeId: activeConnectionHoverNodeId\.value,[\s\S]*pendingConnection: pendingConnection\.value,[\s\S]*\}\);/);
+  assert.match(componentSource, /const transientAgentCreateInputAnchors = computed<ProjectedCanvasAnchor\[\]>\(\(\) =>\s*buildTransientAgentCreateInputAnchors\(\{/);
+  assert.match(canvasVirtualCreatePortModelSource, /export function isAgentCreateInputAnchorVisible/);
+  assert.match(canvasVirtualCreatePortModelSource, /export function buildTransientAgentCreateInputAnchors/);
+  assert.doesNotMatch(componentSource, /node\.kind !== "agent" \|\|[\s\S]*node\.reads\.length === 0 \|\|[\s\S]*pendingAgentInputSourceByNodeId\.value\[nodeId\] \|\|[\s\S]*!isAgentCreateInputAnchorVisible\(nodeId\)/);
 });
 
 test("EditorCanvas measures only rendered anchor slots so hidden virtual input capsules cannot create stale offsets", () => {
@@ -926,21 +988,15 @@ test("EditorCanvas keeps node port capsules visible while their state anchor dot
 });
 
 test("EditorCanvas projects virtual agent output anchors only while the virtual output pill is visible or dragging", () => {
+  const canvasVirtualCreatePortModelSource = readCanvasVirtualCreatePortModelSource();
+
   assert.match(componentSource, /:hovered="hoveredNodeId === nodeId \|\| activeConnectionHoverNodeId === nodeId \|\| hoveredPointAnchorNodeId === nodeId"/);
   assert.match(componentSource, /function isAgentCreateOutputAnchorVisible\(nodeId: string\)/);
-  assert.match(componentSource, /const node = props\.document\.nodes\[nodeId\];[\s\S]*\(node\?\.kind === "agent" \|\| node\?\.kind === "input"\) && node\.writes\.length === 0/);
-  assert.match(componentSource, /selection\.selectedNodeId\.value === nodeId/);
-  assert.match(componentSource, /hoveredNodeId\.value === nodeId/);
-  assert.match(componentSource, /hoveredPointAnchorNodeId\.value === nodeId/);
-  assert.match(componentSource, /activeConnectionHoverNodeId\.value === nodeId/);
-  assert.match(componentSource, /pendingConnection\.value\?\.sourceStateKey === VIRTUAL_ANY_OUTPUT_STATE_KEY/);
-  assert.match(componentSource, /const transientAgentOutputAnchors = computed<ProjectedCanvasAnchor\[\]>\(\(\) =>/);
-  assert.match(componentSource, /node\.kind !== "agent"/);
-  assert.match(componentSource, /const anchorId = `\$\{nodeId\}:state-out:\$\{VIRTUAL_ANY_OUTPUT_STATE_KEY\}`;/);
-  assert.match(componentSource, /kind: "state-out" as const/);
-  assert.match(componentSource, /color: VIRTUAL_ANY_OUTPUT_COLOR/);
-  assert.match(componentSource, /stateKey: VIRTUAL_ANY_OUTPUT_STATE_KEY/);
-  assert.match(componentSource, /anchor\.stateKey === VIRTUAL_ANY_OUTPUT_STATE_KEY &&[\s\S]*!isAgentCreateOutputAnchorVisible\(anchor\.nodeId\)/);
+  assert.match(componentSource, /return resolveAgentCreateOutputAnchorVisible\(\{[\s\S]*nodeId,[\s\S]*node: props\.document\.nodes\[nodeId\],[\s\S]*selectedNodeId: selection\.selectedNodeId\.value,[\s\S]*hoveredNodeId: hoveredNodeId\.value,[\s\S]*hoveredPointAnchorNodeId: hoveredPointAnchorNodeId\.value,[\s\S]*activeConnectionHoverNodeId: activeConnectionHoverNodeId\.value,[\s\S]*pendingConnection: pendingConnection\.value,[\s\S]*\}\);/);
+  assert.match(componentSource, /const transientAgentOutputAnchors = computed<ProjectedCanvasAnchor\[\]>\(\(\) =>\s*buildTransientAgentOutputAnchors\(\{/);
+  assert.match(canvasVirtualCreatePortModelSource, /export function isAgentCreateOutputAnchorVisible/);
+  assert.match(canvasVirtualCreatePortModelSource, /export function buildTransientAgentOutputAnchors/);
+  assert.doesNotMatch(componentSource, /anchor\.stateKey === VIRTUAL_ANY_OUTPUT_STATE_KEY &&[\s\S]*!isAgentCreateOutputAnchorVisible\(anchor\.nodeId\)/);
 });
 
 test("EditorCanvas opens node creation from the virtual agent any output", () => {
@@ -1009,15 +1065,23 @@ test("EditorCanvas opts mobile touch drags out of browser gestures", () => {
 });
 
 test("EditorCanvas supports two-finger pinch zoom on mobile without changing single-pointer gestures", () => {
+  const canvasPinchZoomModelSource = readCanvasPinchZoomModelSource();
+
+  assert.match(componentSource, /import \{ buildPinchZoomStart, resolvePointerCenter, resolvePointerDistance \} from "\.\/canvasPinchZoomModel";/);
   assert.match(componentSource, /const activeCanvasPointers = new Map<number, \{ clientX: number; clientY: number; pointerType: string \}>\(\);/);
   assert.match(componentSource, /const pinchZoom = ref<\{/);
   assert.match(componentSource, /function beginPinchZoomIfReady\(\)/);
-  assert.match(componentSource, /pointer\.pointerType === "touch"/);
+  assert.match(componentSource, /const nextPinchZoom = buildPinchZoomStart\(\{[\s\S]*pointers: Array\.from\(activeCanvasPointers\.entries\(\)\),[\s\S]*currentScale: viewport\.viewport\.scale,[\s\S]*\}\);/);
   assert.match(componentSource, /viewport\.endPan\(\);/);
-  assert.match(componentSource, /startScale: viewport\.viewport\.scale/);
+  assert.match(componentSource, /pinchZoom\.value = nextPinchZoom;/);
   assert.match(componentSource, /function updatePinchZoom\(\)/);
   assert.match(componentSource, /viewport\.zoomAt\(\{/);
   assert.match(componentSource, /nextScale: pinch\.startScale \* \(nextDistance \/ pinch\.startDistance\)/);
+  assert.match(canvasPinchZoomModelSource, /export function buildPinchZoomStart/);
+  assert.match(canvasPinchZoomModelSource, /export function resolvePointerDistance/);
+  assert.match(canvasPinchZoomModelSource, /export function resolvePointerCenter/);
+  assert.doesNotMatch(componentSource, /function resolvePointerDistance/);
+  assert.doesNotMatch(componentSource, /function resolvePointerCenter/);
   assert.match(componentSource, /if \(event\.pointerType === "touch"\) \{/);
   assert.match(componentSource, /if \(pinchZoom\.value\) \{[\s\S]*event\.preventDefault\(\);[\s\S]*scheduleDragFrame\(\(\) => \{[\s\S]*updatePinchZoom\(\);/);
   assert.match(componentSource, /if \(pinchZoom\.value\?\.pointerIds\.includes\(event\.pointerId\)\) \{[\s\S]*clearPinchZoom\(\);[\s\S]*viewport\.endPan\(\);[\s\S]*return;/);

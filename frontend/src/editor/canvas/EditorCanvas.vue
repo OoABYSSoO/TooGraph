@@ -407,13 +407,13 @@ import {
 } from "./nodeResize.ts";
 import {
   buildEdgeVisibilityModeOptions,
+  buildForceVisibleProjectedEdgeIds,
   filterProjectedEdgesForVisibilityMode,
   shouldShowOutputFlowHandle,
   type EdgeVisibilityMode,
 } from "./edgeVisibilityModel";
 import {
   buildRouteHandleStyle,
-  resolveRouteHandlePalette,
   resolveRouteHandleTone,
 } from "./routeHandleModel";
 import {
@@ -432,8 +432,25 @@ import {
   resolveConnectionAccentColor,
   resolveConnectionPreviewStateKey,
   resolveConnectionSourceAnchorId,
+  resolveSelectedReconnectConnection,
 } from "./canvasConnectionModel";
+import { buildMinimapEdgeModels } from "./canvasMinimapEdgeModel";
 import { buildConditionRouteTargetsByNodeId } from "./conditionRouteTargetsModel";
+import {
+  buildPendingAgentInputSourceByNodeId,
+  buildPendingStateInputSourceTargetByNodeId,
+  buildPendingStateOutputTargetByNodeId,
+  type PendingStateInputSource,
+  type PendingStatePortPreview,
+} from "./canvasPendingStatePortModel";
+import {
+  buildTransientAgentCreateInputAnchors,
+  buildTransientAgentInputAnchors,
+  buildTransientAgentOutputAnchors,
+  filterBaseProjectedAnchorsForVirtualCreatePorts,
+  isAgentCreateInputAnchorVisible as resolveAgentCreateInputAnchorVisible,
+  isAgentCreateOutputAnchorVisible as resolveAgentCreateOutputAnchorVisible,
+} from "./canvasVirtualCreatePortModel";
 import {
   isCanvasNodeVisuallySelected,
   isHumanReviewRunNode,
@@ -445,6 +462,7 @@ import {
   buildFlowEdgeDeleteConfirmStyle,
   isFlowEdgeDeleteConfirmActive,
   resolveFlowEdgeDeleteAction,
+  resolveFlowEdgeDeleteActionFromEdge,
   type FlowEdgeDeleteConfirmTarget,
 } from "./flowEdgeDeleteModel";
 import {
@@ -457,14 +475,18 @@ import {
 } from "./canvasNodePresentationModel";
 import {
   buildDataEdgeStateConfirmFromEdge,
+  buildDataEdgeStateDisconnectPayload,
   buildDataEdgeStateEditorFromConfirm,
   buildDataEdgeStateEditorFromRequest,
   buildFloatingCanvasPointStyle,
   isActiveDataEdge,
   isDataEdgeStateInteractionOpen as resolveDataEdgeStateInteractionOpen,
+  shouldOfferDataEdgeFlowDisconnect as resolveShouldOfferDataEdgeFlowDisconnect,
   type DataEdgeStateConfirmTarget,
   type DataEdgeStateEditorTarget,
 } from "./canvasDataEdgeStateModel";
+import { buildPinchZoomStart, resolvePointerCenter, resolvePointerDistance } from "./canvasPinchZoomModel";
+import { buildCanvasViewportStyle, buildZoomPercentLabel } from "./canvasViewportDisplayModel";
 import {
   resolveStateColorOptions,
   STATE_FIELD_TYPE_OPTIONS,
@@ -487,7 +509,6 @@ import {
 } from "@/lib/graph-connections";
 import {
   CREATE_AGENT_INPUT_STATE_KEY,
-  VIRTUAL_ANY_INPUT_COLOR,
   VIRTUAL_ANY_INPUT_STATE_KEY,
   VIRTUAL_ANY_OUTPUT_COLOR,
   VIRTUAL_ANY_OUTPUT_STATE_KEY,
@@ -589,16 +610,6 @@ const nodeElementMap = new Map<string, HTMLElement>();
 const nodeResizeObserverMap = new Map<string, ResizeObserver>();
 const nodeMutationObserverMap = new Map<string, MutationObserver>();
 const measuredAnchorOffsets = ref<Record<string, MeasuredAnchorOffset>>({});
-type PendingStateInputSource = {
-  stateKey: string;
-  label: string;
-  stateColor: string;
-};
-type PendingStatePortPreview = {
-  stateKey: string;
-  label: string;
-  stateColor: string;
-};
 const measuredNodeSizes = ref<Record<string, MeasuredNodeSize>>({});
 const canvasSize = ref({ width: 0, height: 0 });
 const viewport = useViewport(props.initialViewport ?? undefined);
@@ -683,34 +694,20 @@ const minimapNodes = computed(() =>
   ),
 );
 const minimapEdges = computed(() =>
-  projectedEdges.value
-    .filter((edge) => visibleProjectedEdgeIds.value.has(edge.id))
-    .map((edge) => ({
-      id: edge.id,
-      kind: edge.kind,
-      path: edge.path,
-      color: edge.kind === "route" ? resolveRouteHandlePalette(edge.branch).accent : edge.color,
-    })),
+  buildMinimapEdgeModels({
+    edges: projectedEdges.value,
+    visibleEdgeIds: visibleProjectedEdgeIds.value,
+  }),
 );
 const conditionRouteTargetsByNodeId = computed(() => buildConditionRouteTargetsByNodeId(props.document));
 const resolvedCanvasLayout = computed(() => resolveCanvasLayout(props.document, measuredAnchorOffsets.value));
 const projectedEdges = computed(() => resolvedCanvasLayout.value.edges);
-const forceVisibleProjectedEdgeIds = computed(() => {
-  const edgeIds = new Set<string>();
-  if (selectedEdgeId.value) {
-    edgeIds.add(selectedEdgeId.value);
-  }
-  if (activeDataEdgeStateConfirm.value?.id) {
-    edgeIds.add(activeDataEdgeStateConfirm.value.id);
-  }
-  if (activeDataEdgeStateEditor.value?.id) {
-    edgeIds.add(activeDataEdgeStateEditor.value.id);
-  }
-  if (activeFlowEdgeDeleteConfirm.value?.id) {
-    edgeIds.add(activeFlowEdgeDeleteConfirm.value.id);
-  }
-  return edgeIds;
-});
+const forceVisibleProjectedEdgeIds = computed(() => buildForceVisibleProjectedEdgeIds({
+  selectedEdgeId: selectedEdgeId.value,
+  dataEdgeStateConfirmId: activeDataEdgeStateConfirm.value?.id,
+  dataEdgeStateEditorId: activeDataEdgeStateEditor.value?.id,
+  flowEdgeDeleteConfirmId: activeFlowEdgeDeleteConfirm.value?.id,
+}));
 const visibleProjectedEdgeIds = computed(
   () =>
     new Set(
@@ -720,208 +717,85 @@ const visibleProjectedEdgeIds = computed(
       }).map((edge) => edge.id),
     ),
 );
-function resolveStatePortPreview(stateKey: string | null | undefined): PendingStatePortPreview | null {
-  if (!isConcreteStateConnectionKey(stateKey)) {
-    return null;
-  }
-  const state = props.document.state_schema[stateKey];
-  if (!state) {
-    return null;
-  }
-  return {
-    stateKey,
-    label: state.name?.trim() || stateKey,
-    stateColor: state.color?.trim() || "#d97706",
-  };
-}
-
-const pendingAgentInputSourceByNodeId = computed<Record<string, PendingStateInputSource>>(() => {
-  const connection = pendingConnection.value;
-  if (connection?.sourceKind !== "state-out" || !connection.sourceStateKey) {
-    return {};
-  }
-
-  const sourceStateKey = connection.sourceStateKey;
-  const sourceState = props.document.state_schema[sourceStateKey];
-  const pendingSource = {
-    stateKey: sourceStateKey,
-    label: sourceState?.name?.trim() || sourceStateKey,
-    stateColor: sourceState?.color?.trim() || "#d97706",
-  };
-
-  return Object.fromEntries(
-    Object.entries(props.document.nodes)
-      .filter(([, node]) => node.kind === "agent")
-      .filter(([nodeId]) =>
-        canCompleteGraphConnection(props.document, connection, {
-          nodeId,
-          kind: "state-in",
-          stateKey: CREATE_AGENT_INPUT_STATE_KEY,
-        }),
-      )
-      .map(([nodeId]) => [nodeId, pendingSource]),
-  );
-});
-const pendingStateInputSourceTargetByNodeId = computed<Record<string, PendingStatePortPreview>>(() => {
-  const connection = pendingConnection.value;
-  if (connection?.sourceKind !== "state-in" || connection.sourceStateKey !== VIRTUAL_ANY_INPUT_STATE_KEY) {
-    return {};
-  }
-
-  const sourcePreview = resolveStatePortPreview(autoSnappedTargetAnchor.value?.stateKey);
-  return sourcePreview
-    ? {
-        [connection.sourceNodeId]: sourcePreview,
-      }
-    : {};
-});
-const pendingStateOutputTargetByNodeId = computed<Record<string, PendingStatePortPreview>>(() => {
-  const connection = pendingConnection.value;
-  if (connection?.sourceKind !== "state-out" || connection.sourceStateKey !== VIRTUAL_ANY_OUTPUT_STATE_KEY) {
-    return {};
-  }
-
-  const targetPreview = resolveStatePortPreview(autoSnappedTargetAnchor.value?.stateKey);
-  return targetPreview
-    ? {
-        [connection.sourceNodeId]: targetPreview,
-      }
-    : {};
-});
+const pendingAgentInputSourceByNodeId = computed<Record<string, PendingStateInputSource>>(() =>
+  buildPendingAgentInputSourceByNodeId({
+    document: props.document,
+    connection: pendingConnection.value,
+    canCompleteAgentInput: (nodeId) =>
+      canCompleteGraphConnection(props.document, pendingConnection.value, {
+        nodeId,
+        kind: "state-in",
+        stateKey: CREATE_AGENT_INPUT_STATE_KEY,
+      }),
+  }),
+);
+const pendingStateInputSourceTargetByNodeId = computed<Record<string, PendingStatePortPreview>>(() =>
+  buildPendingStateInputSourceTargetByNodeId({
+    connection: pendingConnection.value,
+    stateSchema: props.document.state_schema,
+    autoSnappedTargetStateKey: autoSnappedTargetAnchor.value?.stateKey,
+  }),
+);
+const pendingStateOutputTargetByNodeId = computed<Record<string, PendingStatePortPreview>>(() =>
+  buildPendingStateOutputTargetByNodeId({
+    connection: pendingConnection.value,
+    stateSchema: props.document.state_schema,
+    autoSnappedTargetStateKey: autoSnappedTargetAnchor.value?.stateKey,
+  }),
+);
 const baseProjectedAnchors = computed(() => resolvedCanvasLayout.value.anchors);
-function shouldShowAgentCreateInputPortByDefault(nodeId: string) {
-  const node = props.document.nodes[nodeId];
-  return node?.kind === "agent" && node.reads.length === 0;
-}
-
-function shouldShowAgentCreateOutputPortByDefault(nodeId: string) {
-  const node = props.document.nodes[nodeId];
-  return (node?.kind === "agent" || node?.kind === "input") && node.writes.length === 0;
-}
 
 function isAgentCreateInputAnchorVisible(nodeId: string) {
-  return (
-    shouldShowAgentCreateInputPortByDefault(nodeId) ||
-    selection.selectedNodeId.value === nodeId ||
-    hoveredNodeId.value === nodeId ||
-    hoveredPointAnchorNodeId.value === nodeId ||
-    activeConnectionHoverNodeId.value === nodeId ||
-    (
-      pendingConnection.value?.sourceNodeId === nodeId &&
-      pendingConnection.value?.sourceKind === "state-in" &&
-      pendingConnection.value?.sourceStateKey === VIRTUAL_ANY_INPUT_STATE_KEY
-    )
-  );
+  return resolveAgentCreateInputAnchorVisible({
+    nodeId,
+    node: props.document.nodes[nodeId],
+    selectedNodeId: selection.selectedNodeId.value,
+    hoveredNodeId: hoveredNodeId.value,
+    hoveredPointAnchorNodeId: hoveredPointAnchorNodeId.value,
+    activeConnectionHoverNodeId: activeConnectionHoverNodeId.value,
+    pendingConnection: pendingConnection.value,
+  });
 }
 
 function isAgentCreateOutputAnchorVisible(nodeId: string) {
-  return (
-    shouldShowAgentCreateOutputPortByDefault(nodeId) ||
-    selection.selectedNodeId.value === nodeId ||
-    hoveredNodeId.value === nodeId ||
-    hoveredPointAnchorNodeId.value === nodeId ||
-    activeConnectionHoverNodeId.value === nodeId ||
-    (
-      pendingConnection.value?.sourceNodeId === nodeId &&
-      pendingConnection.value?.sourceKind === "state-out" &&
-      pendingConnection.value?.sourceStateKey === VIRTUAL_ANY_OUTPUT_STATE_KEY
-    )
-  );
+  return resolveAgentCreateOutputAnchorVisible({
+    nodeId,
+    node: props.document.nodes[nodeId],
+    selectedNodeId: selection.selectedNodeId.value,
+    hoveredNodeId: hoveredNodeId.value,
+    hoveredPointAnchorNodeId: hoveredPointAnchorNodeId.value,
+    activeConnectionHoverNodeId: activeConnectionHoverNodeId.value,
+    pendingConnection: pendingConnection.value,
+  });
 }
 
 const baseProjectedAnchorsWithoutVirtualCreatePorts = computed(() =>
-  baseProjectedAnchors.value.filter(
-    (anchor) =>
-      !(
-        anchor.kind === "state-in" &&
-        anchor.stateKey === VIRTUAL_ANY_INPUT_STATE_KEY &&
-        pendingAgentInputSourceByNodeId.value[anchor.nodeId]
-      ) &&
-      !(
-        anchor.kind === "state-out" &&
-        anchor.stateKey === VIRTUAL_ANY_OUTPUT_STATE_KEY &&
-        !isAgentCreateOutputAnchorVisible(anchor.nodeId)
-      ),
-  ),
+  filterBaseProjectedAnchorsForVirtualCreatePorts({
+    anchors: baseProjectedAnchors.value,
+    pendingAgentInputSourceByNodeId: pendingAgentInputSourceByNodeId.value,
+    isAgentCreateOutputAnchorVisible,
+  }),
 );
 const transientAgentCreateInputAnchors = computed<ProjectedCanvasAnchor[]>(() =>
-  Object.entries(props.document.nodes).flatMap(([nodeId, node]) => {
-    if (
-      node.kind !== "agent" ||
-      node.reads.length === 0 ||
-      pendingAgentInputSourceByNodeId.value[nodeId] ||
-      !isAgentCreateInputAnchorVisible(nodeId)
-    ) {
-      return [];
-    }
-
-    const anchorId = `${nodeId}:state-in:${VIRTUAL_ANY_INPUT_STATE_KEY}`;
-    const measuredOffset = measuredAnchorOffsets.value[anchorId];
-    if (!measuredOffset) {
-      return [];
-    }
-
-    return [
-      {
-        id: anchorId,
-        nodeId,
-        kind: "state-in" as const,
-        x: node.ui.position.x + measuredOffset.offsetX,
-        y: node.ui.position.y + measuredOffset.offsetY,
-        side: "left" as const,
-        color: VIRTUAL_ANY_INPUT_COLOR,
-        stateKey: VIRTUAL_ANY_INPUT_STATE_KEY,
-      },
-    ];
+  buildTransientAgentCreateInputAnchors({
+    document: props.document,
+    measuredAnchorOffsets: measuredAnchorOffsets.value,
+    pendingAgentInputSourceByNodeId: pendingAgentInputSourceByNodeId.value,
+    isAgentCreateInputAnchorVisible,
   }),
 );
 const transientAgentInputAnchors = computed<ProjectedCanvasAnchor[]>(() =>
-  Object.entries(pendingAgentInputSourceByNodeId.value).flatMap(([nodeId, source]) => {
-    const node = props.document.nodes[nodeId];
-    const anchorId = `${nodeId}:state-in:${CREATE_AGENT_INPUT_STATE_KEY}`;
-    const measuredOffset = measuredAnchorOffsets.value[anchorId];
-    if (!node || !measuredOffset) {
-      return [];
-    }
-
-    return [
-      {
-        id: anchorId,
-        nodeId,
-        kind: "state-in" as const,
-        x: node.ui.position.x + measuredOffset.offsetX,
-        y: node.ui.position.y + measuredOffset.offsetY,
-        side: "left" as const,
-        color: source.stateColor,
-        stateKey: CREATE_AGENT_INPUT_STATE_KEY,
-      },
-    ];
+  buildTransientAgentInputAnchors({
+    document: props.document,
+    measuredAnchorOffsets: measuredAnchorOffsets.value,
+    pendingAgentInputSourceByNodeId: pendingAgentInputSourceByNodeId.value,
   }),
 );
 const transientAgentOutputAnchors = computed<ProjectedCanvasAnchor[]>(() =>
-  Object.entries(props.document.nodes).flatMap(([nodeId, node]) => {
-    if (node.kind !== "agent" || node.writes.length === 0 || !isAgentCreateOutputAnchorVisible(nodeId)) {
-      return [];
-    }
-
-    const anchorId = `${nodeId}:state-out:${VIRTUAL_ANY_OUTPUT_STATE_KEY}`;
-    const measuredOffset = measuredAnchorOffsets.value[anchorId];
-    if (!measuredOffset) {
-      return [];
-    }
-
-    return [
-      {
-        id: anchorId,
-        nodeId,
-        kind: "state-out" as const,
-        x: node.ui.position.x + measuredOffset.offsetX,
-        y: node.ui.position.y + measuredOffset.offsetY,
-        side: "right" as const,
-        color: VIRTUAL_ANY_OUTPUT_COLOR,
-        stateKey: VIRTUAL_ANY_OUTPUT_STATE_KEY,
-      },
-    ];
+  buildTransientAgentOutputAnchors({
+    document: props.document,
+    measuredAnchorOffsets: measuredAnchorOffsets.value,
+    isAgentCreateOutputAnchorVisible,
   }),
 );
 const projectedAnchors = computed(() => [...baseProjectedAnchorsWithoutVirtualCreatePorts.value, ...transientAgentCreateInputAnchors.value, ...transientAgentInputAnchors.value, ...transientAgentOutputAnchors.value]);
@@ -932,33 +806,13 @@ const routeHandles = computed(() => projectedAnchors.value.filter((anchor) => an
 const pointAnchors = computed(() =>
   projectedAnchors.value.filter((anchor) => anchor.kind === "state-in" || anchor.kind === "state-out"),
 );
-const selectedReconnectConnection = computed<PendingGraphConnection | null>(() => {
-  if (activeFlowEdgeDeleteConfirm.value?.id === selectedEdgeId.value) {
-    return null;
-  }
-
-  const edge = selectedEdgeId.value ? projectedEdges.value.find((candidate) => candidate.id === selectedEdgeId.value) : null;
-  if (!edge || edge.kind === "data") {
-    return null;
-  }
-
-  if (edge.kind === "route" && edge.branch) {
-    return {
-      sourceNodeId: edge.source,
-      sourceKind: "route-out",
-      branchKey: edge.branch,
-      mode: "reconnect",
-      currentTargetNodeId: edge.target,
-    };
-  }
-
-  return {
-    sourceNodeId: edge.source,
-    sourceKind: "flow-out",
-    mode: "reconnect",
-    currentTargetNodeId: edge.target,
-  };
-});
+const selectedReconnectConnection = computed<PendingGraphConnection | null>(() =>
+  resolveSelectedReconnectConnection({
+    selectedEdgeId: selectedEdgeId.value,
+    activeFlowEdgeDeleteConfirmId: activeFlowEdgeDeleteConfirm.value?.id,
+    edges: projectedEdges.value,
+  }),
+);
 const activeConnection = computed(() => pendingConnection.value ?? selectedReconnectConnection.value);
 const activeConnectionSourceAnchorId = computed(() =>
   resolveConnectionSourceAnchorId(activeConnection.value, projectedAnchors.value),
@@ -994,10 +848,8 @@ const connectionPreviewStyle = computed(() =>
   buildConnectionPreviewStyle(connectionPreview.value?.kind ?? null, activeConnectionAccentColor.value),
 );
 const canvasSurfaceStyle = computed(() => resolveCanvasSurfaceStyle(viewport.viewport));
-const viewportStyle = computed(() => ({
-  transform: `translate(${viewport.viewport.x}px, ${viewport.viewport.y}px) scale(${viewport.viewport.scale})`,
-}));
-const zoomPercentLabel = computed(() => `${Math.round(viewport.viewport.scale * 100)}%`);
+const viewportStyle = computed(() => buildCanvasViewportStyle(viewport.viewport));
+const zoomPercentLabel = computed(() => buildZoomPercentLabel(viewport.viewport.scale));
 const stateTypeOptions = STATE_FIELD_TYPE_OPTIONS;
 const nodeStyle = buildNodeTransformStyle;
 const nodeCardSizeStyle = buildNodeCardSizeStyle;
@@ -1333,28 +1185,22 @@ function isCreatedDataEdgeStateEditorOpen() {
 
 function shouldOfferDataEdgeFlowDisconnect() {
   const editor = activeDataEdgeStateEditor.value;
-  if (!editor) {
-    return false;
-  }
-
-  return canDisconnectSequenceEdgeForDataConnection(props.document, editor.source, editor.target);
+  return resolveShouldOfferDataEdgeFlowDisconnect({
+    editor,
+    canDisconnectFlow: (sourceNodeId, targetNodeId) => canDisconnectSequenceEdgeForDataConnection(props.document, sourceNodeId, targetNodeId),
+  });
 }
 
 function disconnectActiveDataEdgeStateReference() {
   if (guardLockedCanvasInteraction()) {
     return;
   }
-  const editor = activeDataEdgeStateEditor.value;
-  if (!editor) {
+  const payload = buildDataEdgeStateDisconnectPayload(activeDataEdgeStateEditor.value, "state");
+  if (!payload) {
     return;
   }
 
-  emit("disconnect-data-edge", {
-    sourceNodeId: editor.source,
-    targetNodeId: editor.target,
-    stateKey: editor.stateKey,
-    mode: "state",
-  });
+  emit("disconnect-data-edge", payload);
   closeDataEdgeStateEditor();
 }
 
@@ -1362,17 +1208,12 @@ function disconnectActiveDataEdgeFlow() {
   if (guardLockedCanvasInteraction()) {
     return;
   }
-  const editor = activeDataEdgeStateEditor.value;
-  if (!editor) {
+  const payload = buildDataEdgeStateDisconnectPayload(activeDataEdgeStateEditor.value, "flow");
+  if (!payload) {
     return;
   }
 
-  emit("disconnect-data-edge", {
-    sourceNodeId: editor.source,
-    targetNodeId: editor.target,
-    stateKey: editor.stateKey,
-    mode: "flow",
-  });
+  emit("disconnect-data-edge", payload);
   closeDataEdgeStateEditor();
 }
 
@@ -1706,44 +1547,17 @@ function clearPinchZoom() {
   activeCanvasPointers.clear();
 }
 
-function resolvePointerDistance(left: { clientX: number; clientY: number }, right: { clientX: number; clientY: number }) {
-  return Math.hypot(right.clientX - left.clientX, right.clientY - left.clientY);
-}
-
-function resolvePointerCenter(left: { clientX: number; clientY: number }, right: { clientX: number; clientY: number }) {
-  return {
-    clientX: (left.clientX + right.clientX) / 2,
-    clientY: (left.clientY + right.clientY) / 2,
-  };
-}
-
 function beginPinchZoomIfReady() {
-  const touchPointers = Array.from(activeCanvasPointers.entries()).filter(([, pointer]) => pointer.pointerType === "touch");
-  if (touchPointers.length < 2) {
+  const nextPinchZoom = buildPinchZoomStart({
+    pointers: Array.from(activeCanvasPointers.entries()),
+    currentScale: viewport.viewport.scale,
+  });
+  if (!nextPinchZoom) {
     return false;
   }
 
-  const [leftEntry, rightEntry] = touchPointers;
-  if (!leftEntry || !rightEntry) {
-    return false;
-  }
-
-  const [, leftPointer] = leftEntry;
-  const [, rightPointer] = rightEntry;
-  const startDistance = resolvePointerDistance(leftPointer, rightPointer);
-  if (startDistance <= 0) {
-    return false;
-  }
-
-  const center = resolvePointerCenter(leftPointer, rightPointer);
   viewport.endPan();
-  pinchZoom.value = {
-    pointerIds: [leftEntry[0], rightEntry[0]],
-    startDistance,
-    startScale: viewport.viewport.scale,
-    centerClientX: center.clientX,
-    centerClientY: center.clientY,
-  };
+  pinchZoom.value = nextPinchZoom;
   return true;
 }
 
@@ -2840,23 +2654,22 @@ function handleSelectedEdgeDelete(event: KeyboardEvent) {
     return;
   }
   const edge = selectedEdgeId.value ? projectedEdges.value.find((candidate) => candidate.id === selectedEdgeId.value) : null;
-  if (!edge) {
+  const action = resolveFlowEdgeDeleteActionFromEdge(edge);
+  if (!action) {
     return;
   }
   event.preventDefault();
 
-  if (edge.kind === "flow") {
-    emit("remove-flow", {
-      sourceNodeId: edge.source,
-      targetNodeId: edge.target,
-    });
-  } else if (edge.kind === "route" && edge.branch) {
+  if (action.kind === "route") {
     emit("remove-route", {
-      sourceNodeId: edge.source,
-      branchKey: edge.branch,
+      sourceNodeId: action.sourceNodeId,
+      branchKey: action.branchKey,
     });
   } else {
-    return;
+    emit("remove-flow", {
+      sourceNodeId: action.sourceNodeId,
+      targetNodeId: action.targetNodeId,
+    });
   }
 
   selectedEdgeId.value = null;

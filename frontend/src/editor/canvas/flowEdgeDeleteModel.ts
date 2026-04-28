@@ -70,3 +70,29 @@ export function resolveFlowEdgeDeleteAction(confirm: FlowEdgeDeleteConfirmTarget
     targetNodeId: confirm.target,
   };
 }
+
+export function resolveFlowEdgeDeleteActionFromEdge(
+  edge: Pick<ProjectedCanvasEdge, "kind" | "source" | "target" | "branch"> | null | undefined,
+): FlowEdgeDeleteAction | null {
+  if (!edge) {
+    return null;
+  }
+
+  if (edge.kind === "route" && edge.branch) {
+    return {
+      kind: "route",
+      sourceNodeId: edge.source,
+      branchKey: edge.branch,
+    };
+  }
+
+  if (edge.kind === "flow") {
+    return {
+      kind: "flow",
+      sourceNodeId: edge.source,
+      targetNodeId: edge.target,
+    };
+  }
+
+  return null;
+}
