@@ -517,6 +517,7 @@ test("EditorCanvas forwards node-card state editing and top-action events", () =
   assert.match(componentSource, /\(event: "remove-port-state", payload: \{ nodeId: string; side: "input" \| "output"; stateKey: string \}\): void;/);
   assert.match(componentSource, /\(event: "delete-node", payload: \{ nodeId: string \}\): void;/);
   assert.match(componentSource, /\(event: "save-node-preset", payload: \{ nodeId: string \}\): void;/);
+  assert.match(componentSource, /\(event: "connect-state", payload: \{ sourceNodeId: string; sourceStateKey: string; targetNodeId: string; targetStateKey: string; position: GraphPosition \}\): void;/);
 });
 
 test("EditorCanvas opens the creation flow when output drags end on empty canvas", () => {
@@ -665,6 +666,7 @@ test("EditorCanvas snaps state drags to transient or matching state inputs from 
   assert.match(componentSource, /function isPointerWithinNodeElement\(nodeElement: HTMLElement, event: PointerEvent\)/);
   assert.match(componentSource, /if \(activeConnection\.value\?\.sourceKind === "state-out"\) \{[\s\S]*return resolveEligibleStateTargetAnchorForNodeBody\(nodeId\);[\s\S]*\}/);
   assert.match(componentSource, /if \(activeConnection\.value\?\.sourceKind === "state-out" && !isStateTargetAnchorAllowedForActiveConnection\(anchor\)\) \{[\s\S]*return false;/);
+  assert.match(componentSource, /emit\("connect-state", \{[\s\S]*sourceNodeId: connection\.sourceNodeId,[\s\S]*sourceStateKey: connection\.sourceStateKey,[\s\S]*targetNodeId: targetAnchor\.nodeId,[\s\S]*targetStateKey: targetAnchor\.stateKey,[\s\S]*position: \{ x: targetAnchor\.x, y: targetAnchor\.y \},/);
   assert.doesNotMatch(componentSource, /function isPointerWithinAnchorHitElement/);
   assert.doesNotMatch(componentSource, /STATE_INPUT_HIT_PADDING/);
   assert.doesNotMatch(componentSource, /closest\("\[data-anchor-hitarea='true'\]"\)/);

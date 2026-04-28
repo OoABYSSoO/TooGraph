@@ -10,13 +10,24 @@ import {
   canReconnectFlowEdge,
   shouldAddImplicitFlowEdgeForStateConnection,
 } from "./graph-connections.ts";
-import { isCreateAgentInputStateKey, isVirtualAnyInputStateKey } from "./virtual-any-input.ts";
+import { isCreateAgentInputStateKey, isVirtualAnyInputStateKey, isVirtualAnyOutputStateKey } from "./virtual-any-input.ts";
 
-import type { AgentNode, ConditionNode, GraphDocument, GraphNode, GraphPayload, InputNode, OutputNode, TemplateRecord } from "../types/node-system.ts";
+import type { AgentNode, ConditionNode, GraphDocument, GraphNode, GraphPayload, InputNode, OutputNode, StateDefinition, TemplateRecord } from "../types/node-system.ts";
 
 export type AgentBreakpointTiming = "before" | "after";
 
 const DEFAULT_EDITOR_SEED_TEMPLATE_ID = "hello_world";
+const STATE_KEY_COUNTER_METADATA_KEY = "graphiteui_state_key_counter";
+const DEFAULT_MATERIALIZED_STATE_COLORS = [
+  "#d97706",
+  "#2563eb",
+  "#7c3aed",
+  "#10b981",
+  "#0891b2",
+  "#e11d48",
+  "#475569",
+  "#9a3412",
+];
 
 export function createDraftFromTemplate(template: TemplateRecord): GraphPayload {
   const rawTemplate = toRaw(template) as TemplateRecord;
@@ -100,6 +111,96 @@ export function cloneGraphDocument<T extends GraphPayload | GraphDocument>(docum
 
 export function clonePlainValue<T>(value: T): T {
   return structuredClone(normalizeCloneValue(value));
+}
+
+function defaultMaterializedStateValueForType(type: string): unknown {
+  switch (type) {
+    case "number":
+      return 0;
+    case "boolean":
+      return false;
+    case "object":
+    case "json":
+      return {};
+    case "array":
+    case "file_list":
+      return [];
+    default:
+      return "";
+  }
+}
+
+function readDefaultStateKeyCounter(document: GraphPayload | GraphDocument) {
+  const value = document.metadata[STATE_KEY_COUNTER_METADATA_KEY];
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
+}
+
+function readHighestDefaultStateKeyIndex(keys: string[]) {
+  return keys.reduce((highest, key) => {
+    const match = key.match(/^state_(\d+)$/);
+    if (!match) {
+      return highest;
+    }
+    const index = Number(match[1]);
+    return Number.isInteger(index) && index > highest ? index : highest;
+  }, 0);
+}
+
+function rememberMaterializedStateKeyIndex(document: GraphPayload | GraphDocument, stateKey: string) {
+  const match = stateKey.match(/^state_(\d+)$/);
+  if (!match) {
+    return;
+  }
+  const index = Number(match[1]);
+  if (!Number.isInteger(index) || index <= 0) {
+    return;
+  }
+  document.metadata = {
+    ...document.metadata,
+    [STATE_KEY_COUNTER_METADATA_KEY]: Math.max(readDefaultStateKeyCounter(document), index),
+  };
+}
+
+function resolveMaterializedStateColor(stateKey: string, existingKeys: string[]) {
+  const match = stateKey.match(/^state_(\d+)$/);
+  const seed = match ? Number(match[1]) - 1 : existingKeys.length;
+  const normalizedSeed = Number.isInteger(seed) && seed >= 0 ? seed : 0;
+  return DEFAULT_MATERIALIZED_STATE_COLORS[normalizedSeed % DEFAULT_MATERIALIZED_STATE_COLORS.length] ?? "#d97706";
+}
+
+function buildNextMaterializedVirtualStateField(document: GraphPayload | GraphDocument, stateType = "text") {
+  const existingKeys = Object.keys(document.state_schema);
+  let index = Math.max(readDefaultStateKeyCounter(document), readHighestDefaultStateKeyIndex(existingKeys)) + 1;
+  while (existingKeys.includes(`state_${index}`)) {
+    index += 1;
+  }
+  const key = `state_${index}`;
+  return {
+    key,
+    definition: {
+      name: key,
+      description: "",
+      type: stateType,
+      value: defaultMaterializedStateValueForType(stateType),
+      color: resolveMaterializedStateColor(key, existingKeys),
+    } satisfies StateDefinition,
+  };
+}
+
+function bindMaterializedStateToSourceOutput(node: GraphNode | undefined, stateKey: string) {
+  if (!node) {
+    return;
+  }
+  if (node.kind === "input") {
+    node.writes = [{ state: stateKey, mode: "replace" }];
+    return;
+  }
+  if (node.kind !== "agent") {
+    return;
+  }
+  if (!node.writes.some((binding) => binding.state === stateKey)) {
+    node.writes = [...node.writes, { state: stateKey, mode: "replace" }];
+  }
 }
 
 function normalizeCloneValue<T>(value: T, seen = new WeakMap<object, unknown>()): T {
@@ -643,20 +744,29 @@ export function connectStateBindingInDocument<T extends GraphPayload | GraphDocu
   }
 
   const nextDocument = cloneGraphDocument(document);
+  let resolvedSourceStateKey = sourceStateKey;
+  if (isVirtualAnyOutputStateKey(sourceStateKey)) {
+    const materializedState = buildNextMaterializedVirtualStateField(nextDocument);
+    nextDocument.state_schema[materializedState.key] = materializedState.definition;
+    rememberMaterializedStateKeyIndex(nextDocument, materializedState.key);
+    bindMaterializedStateToSourceOutput(nextDocument.nodes[sourceNodeId], materializedState.key);
+    resolvedSourceStateKey = materializedState.key;
+  }
+
   const nextTargetNode = nextDocument.nodes[targetNodeId];
   if (isCreateAgentInputStateKey(targetStateKey)) {
     if (nextTargetNode.kind !== "agent") {
       return document;
     }
-    nextTargetNode.reads = [...nextTargetNode.reads, { state: sourceStateKey, required: true }];
+    nextTargetNode.reads = [...nextTargetNode.reads, { state: resolvedSourceStateKey, required: true }];
     addImplicitFlowEdgeForStateConnection(nextDocument, sourceNodeId, targetNodeId);
     return syncKnowledgeBaseSkillsInDocument(nextDocument);
   }
 
   if (isVirtualAnyInputStateKey(targetStateKey)) {
-    nextTargetNode.reads = [{ state: sourceStateKey, required: true }];
+    nextTargetNode.reads = [{ state: resolvedSourceStateKey, required: true }];
     if (nextTargetNode.kind === "condition") {
-      nextTargetNode.config.rule.source = sourceStateKey;
+      nextTargetNode.config.rule.source = resolvedSourceStateKey;
     }
     addImplicitFlowEdgeForStateConnection(nextDocument, sourceNodeId, targetNodeId);
     return syncKnowledgeBaseSkillsInDocument(nextDocument);
@@ -669,10 +779,10 @@ export function connectStateBindingInDocument<T extends GraphPayload | GraphDocu
 
   nextTargetNode.reads[targetBindingIndex] = {
     ...nextTargetNode.reads[targetBindingIndex],
-    state: sourceStateKey,
+    state: resolvedSourceStateKey,
   };
   if (nextTargetNode.kind === "condition") {
-    nextTargetNode.config.rule.source = sourceStateKey;
+    nextTargetNode.config.rule.source = resolvedSourceStateKey;
   }
 
   addImplicitFlowEdgeForStateConnection(nextDocument, sourceNodeId, targetNodeId);

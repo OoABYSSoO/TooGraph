@@ -511,7 +511,7 @@ const emit = defineEmits<{
   (event: "locked-edit-attempt"): void;
   (event: "refresh-agent-models"): void;
   (event: "connect-flow", payload: { sourceNodeId: string; targetNodeId: string }): void;
-  (event: "connect-state", payload: { sourceNodeId: string; sourceStateKey: string; targetNodeId: string; targetStateKey: string }): void;
+  (event: "connect-state", payload: { sourceNodeId: string; sourceStateKey: string; targetNodeId: string; targetStateKey: string; position: GraphPosition }): void;
   (event: "connect-state-input-source", payload: { sourceNodeId: string; targetNodeId: string; targetStateKey: string; targetValueType?: string | null }): void;
   (event: "connect-route", payload: { sourceNodeId: string; branchKey: string; targetNodeId: string }): void;
   (event: "reconnect-flow", payload: { sourceNodeId: string; currentTargetNodeId: string; nextTargetNodeId: string }): void;
@@ -3049,6 +3049,7 @@ function completePendingConnection(targetAnchor: ProjectedCanvasAnchor) {
       sourceStateKey: connection.sourceStateKey,
       targetNodeId: targetAnchor.nodeId,
       targetStateKey: targetAnchor.stateKey,
+      position: { x: targetAnchor.x, y: targetAnchor.y },
     });
   } else if (connection.sourceKind === "state-in" && connection.sourceStateKey) {
     emit("connect-state-input-source", {

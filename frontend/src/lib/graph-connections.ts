@@ -1,5 +1,5 @@
 import type { GraphDocument, GraphPayload } from "../types/node-system.ts";
-import { isCreateAgentInputStateKey, isVirtualAnyInputStateKey } from "./virtual-any-input.ts";
+import { isCreateAgentInputStateKey, isVirtualAnyInputStateKey, isVirtualAnyOutputStateKey } from "./virtual-any-input.ts";
 
 export type GraphConnectionAnchorKind = "flow-in" | "flow-out" | "state-in" | "state-out" | "route-out";
 
@@ -60,7 +60,25 @@ export function canConnectStateBinding(
     return false;
   }
 
-  if (!sourceNode.writes.some((binding) => binding.state === sourceStateKey)) {
+  const isVirtualOutputSource =
+    isVirtualAnyOutputStateKey(sourceStateKey) &&
+    (sourceNode.kind === "agent" || sourceNode.kind === "input") &&
+    sourceNode.writes.length === 0;
+
+  if (!isVirtualOutputSource && !sourceNode.writes.some((binding) => binding.state === sourceStateKey)) {
+    return false;
+  }
+
+  if (isVirtualOutputSource) {
+    if (!canResolveVirtualOutputConnectionOrder(document, sourceNodeId, targetNodeId)) {
+      return false;
+    }
+    if (isCreateAgentInputStateKey(targetStateKey)) {
+      return targetNode.kind === "agent";
+    }
+    if (isVirtualAnyInputStateKey(targetStateKey)) {
+      return targetNode.reads.length === 0;
+    }
     return false;
   }
 
@@ -88,6 +106,17 @@ export function canConnectStateBinding(
   }
 
   return !targetNode.reads.some((binding) => binding.state === sourceStateKey);
+}
+
+function canResolveVirtualOutputConnectionOrder(
+  document: GraphPayload | GraphDocument,
+  sourceNodeId: string,
+  targetNodeId: string,
+) {
+  if (sourceNodeId === targetNodeId) {
+    return false;
+  }
+  return canReachNode(document, sourceNodeId, targetNodeId) || shouldAddImplicitFlowEdgeForStateConnection(document, sourceNodeId, targetNodeId);
 }
 
 export function shouldAddImplicitFlowEdgeForStateConnection(

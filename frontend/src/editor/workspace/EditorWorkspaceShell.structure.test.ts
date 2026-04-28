@@ -143,11 +143,16 @@ test("EditorWorkspaceShell keeps top chrome and editor body from overflowing the
 test("EditorWorkspaceShell routes menu selections and dropped files through the node-creation execution helpers", () => {
   assert.match(componentSource, /import \{ createNodeFromCreationEntry, createNodeFromDroppedFile \} from "\.\/nodeCreationExecution\.ts";/);
   assert.match(componentSource, /import \{ connectStateInputSourceToTarget \} from "@\/lib\/graph-node-creation";/);
+  assert.match(componentSource, /import \{ isVirtualAnyOutputStateKey \} from "@\/lib\/virtual-any-input";/);
   assert.match(componentSource, /const dataEdgeStateEditorRequestByTabId = ref<Record<string, DataEdgeStateEditorRequest \| null>>\(\{\}\);/);
   assert.match(componentSource, /:state-editor-request="dataEdgeStateEditorRequestByTabId\[tab\.tabId\] \?\? null"/);
+  assert.match(componentSource, /@connect-state="connectStateBindingForTab\(tab\.tabId, \$event\)"/);
   assert.match(componentSource, /@connect-state-input-source="connectStateInputSourceForTab\(tab\.tabId, \$event\)"/);
   assert.match(componentSource, /const result = createNodeFromCreationEntry\(document, \{/);
   assert.match(componentSource, /const result = await createNodeFromDroppedFile\(document, \{/);
+  assert.match(componentSource, /function connectStateBindingForTab\(\s*tabId: string,\s*payload: \{ sourceNodeId: string; sourceStateKey: string; targetNodeId: string; targetStateKey: string; position: GraphPosition \},\s*\)/);
+  assert.match(componentSource, /const createdStateKey = resolveCreatedVirtualOutputStateKey\(document, nextDocument, payload\.sourceNodeId, payload\.sourceStateKey\);/);
+  assert.match(componentSource, /if \(createdStateKey\) \{[\s\S]*openCreatedStateEdgeEditorForTab\(\s*tabId,[\s\S]*sourceNodeId: payload\.sourceNodeId,[\s\S]*sourceStateKey: payload\.sourceStateKey,[\s\S]*createdStateKey,/);
   assert.match(componentSource, /function connectStateInputSourceForTab/);
   assert.match(componentSource, /connectStateInputSourceToTarget\(document, payload\)/);
   assert.match(componentSource, /markDocumentDirty\(tabId, result\.document\)/);

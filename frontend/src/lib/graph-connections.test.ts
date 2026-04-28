@@ -8,7 +8,7 @@ import {
   canStartGraphConnection,
   type PendingGraphConnection,
 } from "./graph-connections.ts";
-import { CREATE_AGENT_INPUT_STATE_KEY, VIRTUAL_ANY_INPUT_STATE_KEY } from "./virtual-any-input.ts";
+import { CREATE_AGENT_INPUT_STATE_KEY, VIRTUAL_ANY_INPUT_STATE_KEY, VIRTUAL_ANY_OUTPUT_STATE_KEY } from "./virtual-any-input.ts";
 import type { GraphPayload } from "../types/node-system.ts";
 
 const document: GraphPayload = {
@@ -388,6 +388,82 @@ test("canCompleteGraphConnection allows state outputs to target a transient new 
       kind: "state-in",
       stateKey: CREATE_AGENT_INPUT_STATE_KEY,
     }),
+    false,
+  );
+});
+
+test("canCompleteGraphConnection allows virtual state outputs to materialize into eligible existing targets", () => {
+  const pending: PendingGraphConnection = {
+    sourceNodeId: "answer_helper",
+    sourceKind: "state-out",
+    sourceStateKey: VIRTUAL_ANY_OUTPUT_STATE_KEY,
+  };
+  const graphWithReviewAgent: GraphPayload = {
+    ...document,
+    nodes: {
+      ...document.nodes,
+      review_agent: {
+        kind: "agent",
+        name: "review_agent",
+        description: "",
+        ui: { position: { x: 480, y: 0 } },
+        reads: [{ state: "question", required: true }],
+        writes: [],
+        config: {
+          skills: [],
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "off",
+          temperature: 0,
+        },
+      },
+    },
+  };
+
+  assert.equal(
+    canCompleteGraphConnection(graphWithReviewAgent, pending, {
+      nodeId: "review_agent",
+      kind: "state-in",
+      stateKey: CREATE_AGENT_INPUT_STATE_KEY,
+    }),
+    true,
+  );
+  assert.equal(
+    canCompleteGraphConnection(graphWithReviewAgent, pending, {
+      nodeId: "route_result",
+      kind: "state-in",
+      stateKey: VIRTUAL_ANY_INPUT_STATE_KEY,
+    }),
+    true,
+  );
+  assert.equal(
+    canCompleteGraphConnection(graphWithReviewAgent, pending, {
+      nodeId: "output_answer",
+      kind: "state-in",
+      stateKey: VIRTUAL_ANY_INPUT_STATE_KEY,
+    }),
+    true,
+  );
+  assert.equal(
+    canCompleteGraphConnection(
+      {
+        ...graphWithReviewAgent,
+        nodes: {
+          ...graphWithReviewAgent.nodes,
+          output_answer: {
+            ...graphWithReviewAgent.nodes.output_answer,
+            reads: [{ state: "question", required: true }],
+          },
+        },
+      },
+      pending,
+      {
+        nodeId: "output_answer",
+        kind: "state-in",
+        stateKey: VIRTUAL_ANY_INPUT_STATE_KEY,
+      },
+    ),
     false,
   );
 });
