@@ -598,7 +598,9 @@ test("NodeCard adds mirrored remove-binding buttons to non-output state pills", 
   assert.match(componentSource, /\.node-card__port-pill-remove--leading \{[\s\S]*left:\s*7px;/);
   assert.match(componentSource, /\.node-card__port-pill-remove--trailing \{[\s\S]*right:\s*7px;/);
   assert.match(componentSource, /\.node-card__port-pill-remove--confirm,\n\.node-card__port-pill-remove--confirm:hover,\n\.node-card__port-pill-remove--confirm:focus-visible \{/);
-  assert.match(componentSource, /\.node-card__port-pill--confirm \.node-card__port-pill-remove \{[\s\S]*opacity:\s*0;/);
+  assert.match(componentSource, /\.node-card__port-pill-remove \{[\s\S]*z-index:\s*2;/);
+  assert.match(componentSource, /\.node-card__port-pill--confirm \.node-card__port-pill-remove \{[^}]*opacity:\s*1;/);
+  assert.match(componentSource, /\.node-card__port-pill--confirm \.node-card__port-pill-remove \{[^}]*pointer-events:\s*auto;/);
   assert.match(componentSource, /\.node-card__confirm-hint--remove \{[\s\S]*background:\s*rgba\(255,\s*248,\s*248,\s*0\.98\);/);
 });
 

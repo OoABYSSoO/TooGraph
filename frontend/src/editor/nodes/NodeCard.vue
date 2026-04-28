@@ -3651,6 +3651,7 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
 .node-card__port-pill-remove {
   position: absolute;
   top: 50%;
+  z-index: 2;
   flex: none;
   display: inline-flex;
   align-items: center;
@@ -3702,8 +3703,8 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
 }
 
 .node-card__port-pill--confirm .node-card__port-pill-remove {
-  opacity: 0;
-  pointer-events: none;
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .node-card__port-pill-label {
