@@ -30,15 +30,15 @@ test("resolveNodeRunPresentation marks paused nodes with review glow classes", (
 
 test("resolveNodeRunPresentation marks success and failed nodes", () => {
   assert.deepEqual(resolveNodeRunPresentation("success", false), {
-    haloClass: null,
+    haloClass: "editor-canvas__node-halo--success",
     shellClass: "editor-canvas__node--success",
   });
   assert.deepEqual(resolveNodeRunPresentation("completed", false), {
-    haloClass: null,
+    haloClass: "editor-canvas__node-halo--success",
     shellClass: "editor-canvas__node--success",
   });
   assert.deepEqual(resolveNodeRunPresentation("failed", false), {
-    haloClass: null,
+    haloClass: "editor-canvas__node-halo--failed",
     shellClass: "editor-canvas__node--failed",
   });
 });

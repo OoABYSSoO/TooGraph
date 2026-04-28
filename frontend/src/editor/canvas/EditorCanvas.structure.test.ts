@@ -159,6 +159,8 @@ test("EditorCanvas restores legacy runtime feedback styling on node cards and ac
   assert.match(componentSource, /:deep\(\.editor-canvas__node--paused-current\) \{[\s\S]*animation:\s*editor-canvas-paused-card-breathe 2\.05s ease-in-out infinite;/);
   assert.match(componentSource, /:deep\(\.editor-canvas__node--success\) \{[\s\S]*0 0 0 1\.5px rgba\(180,\s*83,\s*9,\s*0\.34\)/);
   assert.match(componentSource, /:deep\(\.editor-canvas__node--failed\) \{[\s\S]*0 0 0 1\.5px rgba\(239,\s*68,\s*68,\s*0\.56\)/);
+  assert.match(componentSource, /\.editor-canvas__node-halo--success \{[\s\S]*--editor-canvas-node-halo-border-rest:\s*rgba\(180,\s*83,\s*9,\s*0\.48\)/);
+  assert.match(componentSource, /\.editor-canvas__node-halo--failed \{[\s\S]*--editor-canvas-node-halo-border-rest:\s*rgba\(239,\s*68,\s*68,\s*0\.62\)/);
   assert.match(componentSource, /\.editor-canvas__edge--active-run \{[\s\S]*stroke-width:\s*3px;/);
   assert.match(componentSource, /\.editor-canvas__edge--active-run \{[\s\S]*opacity:\s*1;/);
   assert.match(componentSource, /\.editor-canvas__edge--active-run \{[\s\S]*filter:\s*drop-shadow\(0 0 10px var\(--editor-edge-stroke,\s*rgba\(16,\s*185,\s*129,\s*0\.38\)\)\);/);
@@ -204,12 +206,13 @@ test("EditorCanvas keeps runtime node halo ring geometry fixed while the aura br
 test("EditorCanvas makes runtime node halo breathing visibly pulse the full ring glow", () => {
   assert.match(
     componentSource,
-    /@keyframes editor-canvas-running-halo-breathe \{[\s\S]*transform:\s*scale\(var\(--editor-canvas-node-halo-scale-rest,\s*0\.986\)\);[\s\S]*box-shadow:\s*var\(--editor-canvas-node-halo-shadow-peak\);/,
+    /@keyframes editor-canvas-running-halo-breathe \{[\s\S]*transform:\s*scale\(var\(--editor-canvas-node-halo-scale-rest,\s*0\.98\)\);[\s\S]*box-shadow:\s*var\(--editor-canvas-node-halo-shadow-peak\);/,
   );
   assert.match(
     componentSource,
-    /@keyframes editor-canvas-paused-halo-breathe \{[\s\S]*transform:\s*scale\(var\(--editor-canvas-node-halo-scale-peak,\s*1\.014\)\);[\s\S]*background:\s*var\(--editor-canvas-node-halo-background-flicker\);/,
+    /@keyframes editor-canvas-paused-halo-breathe \{[\s\S]*transform:\s*scale\(var\(--editor-canvas-node-halo-scale-peak,\s*1\.04\)\);[\s\S]*background:\s*var\(--editor-canvas-node-halo-background-flicker\);/,
   );
+  assert.match(componentSource, /\.editor-canvas__node-halo::before \{[\s\S]*inset:\s*var\(--editor-canvas-node-halo-aura-inset,\s*-4px\);/);
   assert.match(componentSource, /\.editor-canvas__node-halo--running-current \{[\s\S]*--editor-canvas-node-halo-shadow-peak:/);
   assert.match(componentSource, /\.editor-canvas__node-halo--paused-current \{[\s\S]*--editor-canvas-node-halo-scale-peak:/);
   assert.match(componentSource, /\.editor-canvas__node-halo::before \{[\s\S]*will-change:\s*opacity, filter, transform, box-shadow;/);
@@ -237,6 +240,8 @@ test("EditorCanvas styles runtime node card classes across the NodeCard componen
   assert.match(componentSource, /:deep\(\.editor-canvas__node--paused-current\) \{/);
   assert.match(componentSource, /:deep\(\.editor-canvas__node--success\) \{/);
   assert.match(componentSource, /:deep\(\.editor-canvas__node--failed\) \{/);
+  assert.match(componentSource, /\.editor-canvas__node-halo--success \{/);
+  assert.match(componentSource, /\.editor-canvas__node-halo--failed \{/);
 });
 
 test("EditorCanvas treats awaiting-human current node as a persistent review node", () => {
