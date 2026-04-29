@@ -977,7 +977,8 @@ test("EditorCanvas opens the creation flow when output drags end on empty canvas
   const canvasConnectionInteractionModelSource = readCanvasConnectionInteractionModelSource();
 
   assert.match(componentSource, /function openCreationMenuFromPendingConnection/);
-  assert.match(componentSource, /const creationMenuRequest = resolveCanvasPendingConnectionCreationMenuRequest\(\{/);
+  assert.match(componentSource, /const creationMenuAction = resolveCanvasPendingConnectionCreationMenuAction\(\{/);
+  assert.match(componentSource, /case "open-creation-menu":[\s\S]*emit\("open-node-creation-menu", creationMenuAction\.payload\);/);
   assert.match(canvasConnectionInteractionModelSource, /connection\.sourceKind === "state-out"/);
   assert.match(canvasConnectionInteractionModelSource, /connection\.sourceKind === "flow-out"/);
   assert.match(canvasConnectionInteractionModelSource, /connection\.sourceKind === "route-out"/);
@@ -1207,11 +1208,11 @@ test("EditorCanvas opens node creation from the virtual agent any output", () =>
   const canvasConnectionInteractionModelSource = readCanvasConnectionInteractionModelSource();
 
   assert.match(canvasConnectionModelSource, /connection\?\.sourceKind === "state-out" &&[\s\S]*connection\.sourceStateKey === VIRTUAL_ANY_OUTPUT_STATE_KEY/);
-  assert.match(componentSource, /import \{[\s\S]*resolveCanvasPendingConnectionCreationMenuRequest,[\s\S]*type CanvasNodeCreationMenuPayload,[\s\S]*\} from "\.\/canvasConnectionInteractionModel";/);
-  assert.match(componentSource, /const creationMenuRequest = resolveCanvasPendingConnectionCreationMenuRequest\(\{[\s\S]*connection,[\s\S]*position: resolveCanvasPoint\(event\),[\s\S]*stateSchema: props\.document\.state_schema,[\s\S]*\}\);/);
-  assert.match(componentSource, /emit\("open-node-creation-menu", creationMenuRequest\.payload\);/);
-  assert.match(componentSource, /if \(creationMenuRequest\.clearConnectionInteraction\) \{[\s\S]*clearConnectionInteractionState\(\);[\s\S]*\}/);
-  assert.match(componentSource, /if \(creationMenuRequest\.clearSelectedEdge\) \{[\s\S]*selectedEdgeId\.value = null;[\s\S]*\}/);
+  assert.match(componentSource, /import \{[\s\S]*resolveCanvasPendingConnectionCreationMenuAction,[\s\S]*type CanvasNodeCreationMenuPayload,[\s\S]*\} from "\.\/canvasConnectionInteractionModel";/);
+  assert.match(componentSource, /const creationMenuAction = resolveCanvasPendingConnectionCreationMenuAction\(\{[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*connection: activeConnection\.value,[\s\S]*position: resolveCanvasPoint\(event\),[\s\S]*stateSchema: props\.document\.state_schema,[\s\S]*\}\);/);
+  assert.match(componentSource, /emit\("open-node-creation-menu", creationMenuAction\.payload\);/);
+  assert.match(componentSource, /if \(creationMenuAction\.clearConnectionInteraction\) \{[\s\S]*clearConnectionInteractionState\(\);[\s\S]*\}/);
+  assert.match(componentSource, /if \(creationMenuAction\.clearSelectedEdge\) \{[\s\S]*selectedEdgeId\.value = null;[\s\S]*\}/);
   assert.doesNotMatch(componentSource, /buildCanvasNodeCreationMenuPayload/);
   assert.match(canvasConnectionInteractionModelSource, /sourceStateKey: connection\.sourceStateKey/);
   assert.match(canvasConnectionInteractionModelSource, /sourceValueType: resolveCanvasConnectionStateValueType\(connection\.sourceStateKey, input\.stateSchema\)/);

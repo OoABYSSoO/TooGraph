@@ -490,7 +490,7 @@ import {
   resolveCanvasDragOverDropEffect,
   resolveCanvasDropCreationAction,
   resolveCanvasNodePointerDownConnectionAction,
-  resolveCanvasPendingConnectionCreationMenuRequest,
+  resolveCanvasPendingConnectionCreationMenuAction,
   type CanvasAnchorPointerDownAction,
   type CanvasNodeCreationMenuPayload,
 } from "./canvasConnectionInteractionModel";
@@ -1825,31 +1825,36 @@ function applyAnchorPointerDownSetup(
 }
 
 function openCreationMenuFromPendingConnection(event: PointerEvent) {
-  if (isGraphEditingLocked()) {
-    return;
-  }
-  const connection = activeConnection.value;
-  if (!connection) {
-    return;
-  }
-  clearCanvasTransientState();
-  const creationMenuRequest = resolveCanvasPendingConnectionCreationMenuRequest({
-    connection,
+  const creationMenuAction = resolveCanvasPendingConnectionCreationMenuAction({
+    interactionLocked: isGraphEditingLocked(),
+    connection: activeConnection.value,
     position: resolveCanvasPoint(event),
     clientX: event.clientX,
     clientY: event.clientY,
     stateSchema: props.document.state_schema,
   });
-  if (!creationMenuRequest) {
-    return;
+  switch (creationMenuAction.type) {
+    case "ignore-locked":
+    case "ignore-missing-connection":
+      return;
+    case "ignore-empty-request":
+      if (creationMenuAction.clearCanvasTransientState) {
+        clearCanvasTransientState();
+      }
+      return;
+    case "open-creation-menu":
+      break;
+  }
+  if (creationMenuAction.clearCanvasTransientState) {
+    clearCanvasTransientState();
   }
 
-  emit("open-node-creation-menu", creationMenuRequest.payload);
+  emit("open-node-creation-menu", creationMenuAction.payload);
 
-  if (creationMenuRequest.clearConnectionInteraction) {
+  if (creationMenuAction.clearConnectionInteraction) {
     clearConnectionInteractionState();
   }
-  if (creationMenuRequest.clearSelectedEdge) {
+  if (creationMenuAction.clearSelectedEdge) {
     selectedEdgeId.value = null;
   }
 }

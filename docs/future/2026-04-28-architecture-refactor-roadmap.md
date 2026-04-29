@@ -158,6 +158,7 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 - 2026-04-30：`canvasLockedInteractionModel.ts` 已承担锁定节点 pointer capture 的 no-op/捕获策略，`EditorCanvas.vue` 仍保留 DOM 目标判断、事件副作用、focus、清理、选中和 emit 执行。
 - 2026-04-30：`canvasLockedInteractionModel.ts` 继续承担通用锁定交互 guard 的 allow/block 与清理策略，`EditorCanvas.vue` 仍保留实际清理调用、选中边 mutation 和 locked-attempt emit。
 - 2026-04-30：`canvasEdgePointerInteractionModel.ts` 已承担 edge pointer-down 的锁定、flow/route 删除确认、data-edge 状态确认和选中边 fallback 策略，`EditorCanvas.vue` 仍保留实际 confirm/composable 调用与选中态副作用。
+- 2026-04-30：`canvasConnectionInteractionModel.ts` 已承担 pending connection 创建菜单 action 路由，`EditorCanvas.vue` 仍保留 canvas 坐标输入、实际 open-node-creation-menu emit 和 cleanup 执行。
 
 ## 优先级路线
 
