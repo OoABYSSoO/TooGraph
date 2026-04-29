@@ -468,6 +468,7 @@ import {
   isCanvasStateTargetAnchorAllowedForConnection,
   resolveCanvasAutoSnappedTargetAnchor as resolveCanvasAutoSnappedTargetAnchorModel,
   resolveCanvasEligibleTargetAnchorForNodeBody,
+  resolveCanvasConnectionPointerMoveRequest,
   resolveCanvasConnectionPointerUpAction,
   resolveCanvasNodePointerDownConnectionAction,
   resolveCanvasPendingConnectionCreationMenuRequest,
@@ -1159,13 +1160,21 @@ function handleCanvasPointerMove(event: PointerEvent) {
     }
   }
   if (activeConnection.value) {
-    syncActiveConnectionHoverNode(event);
-    scheduleDragFrame(() => {
-      updatePendingConnectionTarget({
-        targetAnchor: resolveAutoSnappedTargetAnchor(event),
-        fallbackPoint: resolveCanvasPoint(event),
-      });
+    const connectionPointerMoveRequest = resolveCanvasConnectionPointerMoveRequest({
+      connection: activeConnection.value,
+      hoverNodeId: resolveNodeIdAtPointer(event),
+      targetAnchor: resolveAutoSnappedTargetAnchor(event),
+      fallbackPoint: resolveCanvasPoint(event),
     });
+    if (connectionPointerMoveRequest) {
+      setActiveConnectionHoverNode(connectionPointerMoveRequest.hoverNodeId);
+      scheduleDragFrame(() => {
+        updatePendingConnectionTarget({
+          targetAnchor: connectionPointerMoveRequest.targetAnchor,
+          fallbackPoint: connectionPointerMoveRequest.fallbackPoint,
+        });
+      });
+    }
     return;
   }
   if (handleNodeDragResizePointerMove(event)) {
@@ -1232,15 +1241,6 @@ function handleCanvasDoubleClick(event: MouseEvent) {
     clientX: event.clientX,
     clientY: event.clientY,
   });
-}
-
-function syncActiveConnectionHoverNode(event: PointerEvent) {
-  if (!activeConnection.value) {
-    setActiveConnectionHoverNode(null);
-    return;
-  }
-
-  setActiveConnectionHoverNode(resolveNodeIdAtPointer(event));
 }
 
 function resolveNodeIdAtPointer(event: PointerEvent) {

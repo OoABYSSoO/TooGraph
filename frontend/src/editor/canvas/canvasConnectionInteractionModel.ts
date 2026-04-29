@@ -50,6 +50,12 @@ export type CanvasConnectionPointerUpAction =
   | { type: "complete-connection"; targetAnchor: ProjectedCanvasAnchor }
   | { type: "open-creation-menu" };
 
+export type CanvasConnectionPointerMoveRequest = {
+  hoverNodeId: string | null;
+  targetAnchor: ProjectedCanvasAnchor | null;
+  fallbackPoint: GraphPosition;
+};
+
 export type CanvasNodePointerDownConnectionAction =
   | {
       type: "complete-connection";
@@ -179,6 +185,23 @@ export function resolveCanvasNodePointerDownConnectionAction(input: {
     targetAnchor: input.targetAnchor,
     preventDefault: true,
     focusCanvas: !input.preserveInlineEditorFocus,
+  };
+}
+
+export function resolveCanvasConnectionPointerMoveRequest(input: {
+  connection: PendingGraphConnection | null;
+  hoverNodeId: string | null;
+  targetAnchor: ProjectedCanvasAnchor | null;
+  fallbackPoint: GraphPosition;
+}): CanvasConnectionPointerMoveRequest | null {
+  if (!input.connection) {
+    return null;
+  }
+
+  return {
+    hoverNodeId: input.hoverNodeId,
+    targetAnchor: input.targetAnchor,
+    fallbackPoint: input.fallbackPoint,
   };
 }
 

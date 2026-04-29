@@ -19,6 +19,7 @@ import {
   resolveCanvasConnectionPointerUpAction,
   resolveCanvasConnectionStateValueType,
   resolveCanvasEligibleTargetAnchorForNodeBody,
+  resolveCanvasConnectionPointerMoveRequest,
   resolveCanvasNodePointerDownConnectionAction,
 } from "./canvasConnectionInteractionModel.ts";
 
@@ -228,6 +229,37 @@ test("canvas connection interaction model resolves node pointer-down connection 
       targetAnchor,
       preventDefault: true,
       focusCanvas: false,
+    },
+  );
+});
+
+test("canvas connection interaction model resolves pointer-move preview requests", () => {
+  const targetAnchor = flowAnchor("target", 440, 180);
+  const connection: PendingGraphConnection = {
+    sourceNodeId: "writer",
+    sourceKind: "flow-out",
+  };
+
+  assert.equal(
+    resolveCanvasConnectionPointerMoveRequest({
+      connection: null,
+      hoverNodeId: "target",
+      targetAnchor,
+      fallbackPoint: { x: 480, y: 240 },
+    }),
+    null,
+  );
+  assert.deepEqual(
+    resolveCanvasConnectionPointerMoveRequest({
+      connection,
+      hoverNodeId: "target",
+      targetAnchor,
+      fallbackPoint: { x: 480, y: 240 },
+    }),
+    {
+      hoverNodeId: "target",
+      targetAnchor,
+      fallbackPoint: { x: 480, y: 240 },
     },
   );
 });

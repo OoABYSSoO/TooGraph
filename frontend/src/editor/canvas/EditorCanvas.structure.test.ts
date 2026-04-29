@@ -977,7 +977,8 @@ test("EditorCanvas snaps flow drags to eligible target node bodies before mouseu
   assert.match(componentSource, /import \{[\s\S]*resolveCanvasAutoSnappedTargetAnchor as resolveCanvasAutoSnappedTargetAnchorModel,[\s\S]*\} from "\.\/canvasConnectionInteractionModel";/);
   assert.match(componentSource, /function resolveAutoSnappedTargetAnchor\(event: PointerEvent\)/);
   assert.match(componentSource, /function resolveEligibleTargetAnchorForNodeBody\(nodeId: string\)/);
-  assert.match(componentSource, /if \(activeConnection\.value\) \{[\s\S]*updatePendingConnectionTarget\(\{[\s\S]*targetAnchor: resolveAutoSnappedTargetAnchor\(event\),[\s\S]*fallbackPoint: resolveCanvasPoint\(event\),/);
+  assert.match(componentSource, /if \(activeConnection\.value\) \{[\s\S]*const connectionPointerMoveRequest = resolveCanvasConnectionPointerMoveRequest\(\{[\s\S]*targetAnchor: resolveAutoSnappedTargetAnchor\(event\),[\s\S]*fallbackPoint: resolveCanvasPoint\(event\),/);
+  assert.match(componentSource, /updatePendingConnectionTarget\(\{[\s\S]*targetAnchor: connectionPointerMoveRequest\.targetAnchor,[\s\S]*fallbackPoint: connectionPointerMoveRequest\.fallbackPoint,/);
   assert.match(canvasConnectionInteractionsSource, /autoSnappedTargetAnchor\.value = input\.targetAnchor;/);
   assert.match(canvasConnectionInteractionsSource, /pendingConnectionPoint\.value = input\.targetAnchor[\s\S]*\? \{ x: input\.targetAnchor\.x, y: input\.targetAnchor\.y \}[\s\S]*: input\.fallbackPoint;/);
   assert.match(componentSource, /const connectionPointerUpAction = resolveCanvasConnectionPointerUpAction\(\{[\s\S]*connection: activeConnection\.value,[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*autoSnappedTargetAnchor: autoSnappedTargetAnchor\.value,[\s\S]*\}\);/);
@@ -1081,17 +1082,21 @@ test("EditorCanvas measures only rendered anchor slots so hidden virtual input c
 });
 
 test("EditorCanvas keeps transient input capsules aligned while dragging over node bodies on touch", () => {
+  const canvasConnectionInteractionModelSource = readCanvasConnectionInteractionModelSource();
   const canvasConnectionInteractionsSource = readCanvasConnectionInteractionsSource();
 
   assert.doesNotMatch(componentSource, /const activeConnectionHoverNodeId = ref<string \| null>\(null\);/);
   assert.match(canvasConnectionInteractionsSource, /const activeConnectionHoverNodeId = ref<string \| null>\(null\);/);
   assert.match(componentSource, /:hovered="hoveredNodeId === nodeId \|\| activeConnectionHoverNodeId === nodeId \|\| hoveredPointAnchorNodeId === nodeId"/);
-  assert.match(componentSource, /function syncActiveConnectionHoverNode\(event: PointerEvent\)/);
+  assert.doesNotMatch(componentSource, /function syncActiveConnectionHoverNode\(event: PointerEvent\)/);
   assert.match(componentSource, /function resolveNodeIdAtPointer\(event: PointerEvent\)/);
   assert.match(componentSource, /onActiveConnectionHoverNodeChange: \(\{ previousNodeId, nextNodeId \}\) => \{[\s\S]*if \(previousNodeId\) \{[\s\S]*scheduleAnchorMeasurement\(previousNodeId\);[\s\S]*if \(nextNodeId\) \{[\s\S]*void nextTick\(\)\.then\(\(\) => \{[\s\S]*scheduleAnchorMeasurement\(nextNodeId\);/);
   assert.match(canvasConnectionInteractionsSource, /function setActiveConnectionHoverNode\(nodeId: string \| null\)/);
-  assert.match(componentSource, /if \(activeConnection\.value\) \{[\s\S]*syncActiveConnectionHoverNode\(event\);[\s\S]*updatePendingConnectionTarget\(\{/);
-  assert.match(componentSource, /setActiveConnectionHoverNode\(null\);/);
+  assert.match(canvasConnectionInteractionModelSource, /export type CanvasConnectionPointerMoveRequest/);
+  assert.match(canvasConnectionInteractionModelSource, /export function resolveCanvasConnectionPointerMoveRequest/);
+  assert.match(componentSource, /const connectionPointerMoveRequest = resolveCanvasConnectionPointerMoveRequest\(\{[\s\S]*connection: activeConnection\.value,[\s\S]*hoverNodeId: resolveNodeIdAtPointer\(event\),[\s\S]*targetAnchor: resolveAutoSnappedTargetAnchor\(event\),[\s\S]*fallbackPoint: resolveCanvasPoint\(event\),[\s\S]*\}\);/);
+  assert.match(componentSource, /setActiveConnectionHoverNode\(connectionPointerMoveRequest\.hoverNodeId\);/);
+  assert.match(componentSource, /updatePendingConnectionTarget\(\{[\s\S]*targetAnchor: connectionPointerMoveRequest\.targetAnchor,[\s\S]*fallbackPoint: connectionPointerMoveRequest\.fallbackPoint,[\s\S]*\}\);/);
 });
 
 test("EditorCanvas keeps node port capsules visible while their state anchor dots are hovered", () => {

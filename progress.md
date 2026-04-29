@@ -1,5 +1,76 @@
 # Progress Log
 
+## Session: 2026-04-29 Phase 38
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Confirmed Phase 37 was committed and pushed as `8d775e7`.
+  - Re-read the formal roadmap, active plan, latest findings, and progress memory.
+  - Inspected `handleCanvasPointerMove`, the active-connection hover sync helper, and adjacent connection interaction tests.
+  - Selected the next P2 Canvas boundary: active-connection pointer-move preview request projection.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `resolveCanvasConnectionPointerMoveRequest` model expectations before production code.
+  - Updated `EditorCanvas.structure.test.ts` to require the new pointer-move request boundary and removal of the old local hover-sync helper.
+  - Verified the expected red failure: the model export was missing and the component still had the old inline pointer-move branch.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `CanvasConnectionPointerMoveRequest` and `resolveCanvasConnectionPointerMoveRequest` to `canvasConnectionInteractionModel.ts`.
+  - Updated `EditorCanvas.vue` to build a request from the active connection, DOM-resolved hover node, auto-snap target anchor, and canvas fallback point.
+  - Removed `syncActiveConnectionHoverNode` while keeping DOM node hit-testing, pointer-to-canvas conversion, auto-snap resolution, RAF scheduling, and preview state update execution in the component.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused model and structure tests.
+  - Ran the broader Canvas and graph-connection regression set.
+  - Ran TypeScript unused-symbol verification from `frontend`.
+  - Ran the full frontend `node --test` suite.
+  - Ran the frontend production build; no large chunk warning was emitted.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed backend `/health` returned `{"status":"ok"}` and the frontend entry returned HTML.
+  - Captured a headless Chrome screenshot after a virtual-time wait and confirmed the workspace rendered normally.
+
+### Phase 5: Continuation Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated overall roadmap cleanup at about 65%.
+  - Recalculated P2 `EditorCanvas.vue` cleanup at about 62%.
+  - Opened Phase 39 automatically because total roadmap progress is below 100%.
+  - Selected the next candidate boundary as anchor pointer-down routing between locked-edit, completion, ignored anchor, and start/toggle behavior.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red focused tests | `node --test frontend/src/editor/canvas/canvasConnectionInteractionModel.test.ts frontend/src/editor/canvas/EditorCanvas.structure.test.ts` before implementation | Fails because pointer-move request export and component wiring do not exist | Failed on missing export and structure assertions | Passed |
+| Focused model/structure tests | Same focused files after implementation | All focused tests pass | 72 passed | Passed |
+| Focused Canvas and graph regression | `node --test` over Canvas connection, drag/resize, edge, and graph document tests | Related interaction tests pass | 172 passed | Passed |
+| Unused symbol check | `./node_modules/.bin/vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No diagnostics | Exit 0 | Passed |
+| Full frontend tests | `node --test $(rg --files src vite.config.structure.test.ts | rg '\.test\.ts$')` in `frontend` | All frontend tests pass | 798 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without a large chunk warning | Exit 0, no Vite chunk warning | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTML returned, backend `/health` ok | Passed |
+| Browser smoke | Headless Chrome screenshot with virtual-time wait | Workspace renders normally | Workspace UI rendered | Passed |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Phase 38 implementation, verification, docs update, and dev restart are complete. |
+| Where am I going? | Phase 39 is open for active-connection anchor pointer-down request extraction. |
+| What's the goal? | Continue reducing `EditorCanvas.vue` connection interaction ownership without changing drag, snap, create-node, or connection-completion behavior. |
+| What have I learned? | Pointer-move preview updates have a clean request boundary as long as DOM hit-testing, pointer conversion, and RAF scheduling stay in the component. |
+| What have I done? | Extracted pointer-move preview request projection, added regression coverage, verified the full frontend suite, built, restarted, and visually smoked the app. |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-29 | `require("playwright")` failed because the package is not installed in `frontend` | Phase 38 browser smoke | Used installed `google-chrome` headless screenshot instead. |
+| 2026-04-29 | First headless Chrome screenshot showed only the warm app background | Phase 38 browser smoke | Re-ran with `--virtual-time-budget=7000`; the second screenshot rendered the workspace normally. |
+
 ## Session: 2026-04-29 Phase 37
 
 ### Phase 1: Re-orientation
