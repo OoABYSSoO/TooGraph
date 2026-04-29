@@ -45,6 +45,10 @@ function readCanvasRunPresentationModelSource() {
   return readFileSync(resolve(currentDirectory, "canvasRunPresentationModel.ts"), "utf8").replace(/\r\n/g, "\n");
 }
 
+function readCanvasLockedInteractionModelSource() {
+  return readFileSync(resolve(currentDirectory, "canvasLockedInteractionModel.ts"), "utf8").replace(/\r\n/g, "\n");
+}
+
 function readFlowEdgeDeleteModelSource() {
   return readFileSync(resolve(currentDirectory, "flowEdgeDeleteModel.ts"), "utf8").replace(/\r\n/g, "\n");
 }
@@ -449,6 +453,7 @@ test("EditorCanvas treats awaiting-human current node as a persistent review nod
 });
 
 test("EditorCanvas keeps paused human-review graphs viewable but read-only", () => {
+  const canvasLockedInteractionModelSource = readCanvasLockedInteractionModelSource();
   const canvasConnectionInteractionModelSource = readCanvasConnectionInteractionModelSource();
   const canvasEdgeInteractionsSource = readCanvasEdgeInteractionsSource();
   const edgeVisibilityModelSource = readEdgeVisibilityModelSource();
@@ -487,6 +492,11 @@ test("EditorCanvas keeps paused human-review graphs viewable but read-only", () 
   assert.match(componentSource, /@locked-edit-attempt="emit\('locked-edit-attempt'\)"/);
   assert.match(componentSource, /function isLockedNodeEditTarget\(target: EventTarget \| null\)/);
   assert.match(componentSource, /function guardLockedCanvasInteraction\(\)/);
+  assert.match(canvasLockedInteractionModelSource, /export function resolveLockedNodePointerCaptureAction/);
+  assert.match(componentSource, /const lockedNodePointerCaptureAction = resolveLockedNodePointerCaptureAction\(\{[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*nodeId,[\s\S]*shouldNotifyLockedAttempt,[\s\S]*\}\);/);
+  assert.match(componentSource, /case "capture-locked-node":[\s\S]*if \(lockedNodePointerCaptureAction\.emitLockedEditAttempt\) \{[\s\S]*emit\("locked-edit-attempt"\);/);
+  assert.match(componentSource, /if \(lockedNodePointerCaptureAction\.preventDefault\) \{[\s\S]*event\.preventDefault\(\);/);
+  assert.match(componentSource, /selection\.selectNode\(lockedNodePointerCaptureAction\.selectNodeId\);/);
   assert.match(componentSource, /@click\.stop="handleEdgeVisibilityModeClick\(option\.mode\)"/);
   assert.match(edgeVisibilityModelSource, /export function resolveEdgeVisibilityModeClickAction/);
   assert.match(componentSource, /const edgeVisibilityModeClickAction = resolveEdgeVisibilityModeClickAction\(\{[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*currentMode: edgeVisibilityMode\.value,[\s\S]*requestedMode: mode,[\s\S]*\}\);/);

@@ -460,6 +460,7 @@ import {
   resolveRunNodeClassListForCanvasNode,
   resolveRunNodePresentationForCanvasNode,
 } from "./canvasRunPresentationModel";
+import { resolveLockedNodePointerCaptureAction } from "./canvasLockedInteractionModel";
 import { resolveSelectedEdgeKeyboardDeleteAction } from "./flowEdgeDeleteModel";
 import {
   buildMinimapNodeModel,
@@ -2039,23 +2040,44 @@ function isLockedNodeEditTarget(target: EventTarget | null) {
 }
 
 function handleLockedNodePointerCapture(nodeId: string, event: PointerEvent) {
-  if (!isGraphEditingLocked()) {
-    return;
-  }
   const target = event.target;
-  if (
+  const shouldNotifyLockedAttempt = Boolean(
     (target instanceof HTMLElement && target.closest("[data-human-review-action='true']")) ||
-    isLockedNodeEditTarget(target)
-  ) {
+      isLockedNodeEditTarget(target),
+  );
+  const lockedNodePointerCaptureAction = resolveLockedNodePointerCaptureAction({
+    interactionLocked: isGraphEditingLocked(),
+    nodeId,
+    shouldNotifyLockedAttempt,
+  });
+  switch (lockedNodePointerCaptureAction.type) {
+    case "ignore-unlocked":
+      return;
+    case "capture-locked-node":
+      break;
+  }
+  if (lockedNodePointerCaptureAction.emitLockedEditAttempt) {
     emit("locked-edit-attempt");
   }
-  event.preventDefault();
-  event.stopPropagation();
-  canvasRef.value?.focus();
-  clearCanvasTransientState();
-  clearPendingConnection();
-  selectedEdgeId.value = null;
-  selection.selectNode(nodeId);
+  if (lockedNodePointerCaptureAction.preventDefault) {
+    event.preventDefault();
+  }
+  if (lockedNodePointerCaptureAction.stopPropagation) {
+    event.stopPropagation();
+  }
+  if (lockedNodePointerCaptureAction.focusCanvas) {
+    canvasRef.value?.focus();
+  }
+  if (lockedNodePointerCaptureAction.clearCanvasTransientState) {
+    clearCanvasTransientState();
+  }
+  if (lockedNodePointerCaptureAction.clearPendingConnection) {
+    clearPendingConnection();
+  }
+  if (lockedNodePointerCaptureAction.clearSelectedEdge) {
+    selectedEdgeId.value = null;
+  }
+  selection.selectNode(lockedNodePointerCaptureAction.selectNodeId);
 }
 
 function resolveRunEdgePresentationForEdge(edgeId: string) {
