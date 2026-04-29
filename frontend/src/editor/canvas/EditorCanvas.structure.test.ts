@@ -77,6 +77,10 @@ function readCanvasViewportDisplayModelSource() {
   return readFileSync(resolve(currentDirectory, "canvasViewportDisplayModel.ts"), "utf8").replace(/\r\n/g, "\n");
 }
 
+function readCanvasViewportInteractionModelSource() {
+  return readFileSync(resolve(currentDirectory, "canvasViewportInteractionModel.ts"), "utf8").replace(/\r\n/g, "\n");
+}
+
 function readCanvasNodeDragResizeModelSource() {
   return readFileSync(resolve(currentDirectory, "canvasNodeDragResizeModel.ts"), "utf8").replace(/\r\n/g, "\n");
 }
@@ -685,6 +689,8 @@ test("EditorCanvas exposes a top-left capsule toolbar for edge visibility modes"
 });
 
 test("EditorCanvas exposes page zoom controls and emits viewport draft updates", () => {
+  const canvasViewportInteractionModelSource = readCanvasViewportInteractionModelSource();
+
   assert.match(componentSource, /initialViewport\?: CanvasViewport \| null;/);
   assert.match(componentSource, /\(event: "update:viewport", payload: CanvasViewport\): void;/);
   assert.match(componentSource, /const viewport = useViewport\(props\.initialViewport \?\? undefined\);/);
@@ -699,11 +705,14 @@ test("EditorCanvas exposes page zoom controls and emits viewport draft updates",
   assert.match(componentSource, /function handleZoomReset\(\)/);
   assert.match(componentSource, /function zoomViewportAroundCanvasCenter\(nextScale: number\)/);
   assert.match(componentSource, /@wheel\.prevent="handleWheel"/);
-  assert.match(componentSource, /function resolveWheelZoomDelta\(event: WheelEvent\)/);
-  assert.match(componentSource, /function handleWheel\(event: WheelEvent\)[\s\S]*viewport\.zoomAt\(\{/);
-  assert.match(componentSource, /clientX:\s*event\.clientX/);
-  assert.match(componentSource, /clientY:\s*event\.clientY/);
-  assert.match(componentSource, /nextScale:\s*viewport\.viewport\.scale \+ wheelZoomDelta/);
+  assert.match(componentSource, /import \{ resolveCanvasWheelZoomRequest \} from "\.\/canvasViewportInteractionModel";/);
+  assert.match(canvasViewportInteractionModelSource, /export function resolveWheelZoomDelta/);
+  assert.match(canvasViewportInteractionModelSource, /export function resolveCanvasWheelZoomRequest/);
+  assert.match(componentSource, /const wheelZoomRequest = resolveCanvasWheelZoomRequest\(\{[\s\S]*deltaY: event\.deltaY,[\s\S]*currentScale: viewport\.viewport\.scale,[\s\S]*clientX: event\.clientX,[\s\S]*clientY: event\.clientY,[\s\S]*canvasRect: canvasRef\.value\?\.getBoundingClientRect\(\) \?\? null,[\s\S]*\}\);/);
+  assert.match(componentSource, /case "set-scale":[\s\S]*viewport\.setViewport\(\{[\s\S]*scale: wheelZoomRequest\.nextScale,[\s\S]*\}\);/);
+  assert.match(componentSource, /case "zoom-at":[\s\S]*viewport\.zoomAt\(\{[\s\S]*clientX: wheelZoomRequest\.clientX,[\s\S]*clientY: wheelZoomRequest\.clientY,[\s\S]*canvasLeft: wheelZoomRequest\.canvasLeft,[\s\S]*canvasTop: wheelZoomRequest\.canvasTop,[\s\S]*nextScale: wheelZoomRequest\.nextScale,[\s\S]*\}\);/);
+  assert.doesNotMatch(componentSource, /function resolveWheelZoomDelta\(event: WheelEvent\)/);
+  assert.doesNotMatch(componentSource, /const direction = event\.deltaY > 0 \? -1 : 1;/);
   assert.doesNotMatch(componentSource, /\.editor-canvas__zoom-toolbar \{[\s\S]*position:\s*absolute;[\s\S]*left:\s*18px;/);
 });
 

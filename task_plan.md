@@ -4,7 +4,7 @@
 Run a ten-round conservative cleanup batch focused on `EditorCanvas.vue` pure projection and interaction-model helpers, then close the baseline interaction regressions in one larger pass while preserving graph editing behavior, runtime visuals, drag/connect workflows, deletion behavior, and dev startup health.
 
 ## Current Phase
-Phase 43 in progress
+Phase 44 in progress
 
 ## Autonomous Continuation Gate
 - After every completed cleanup phase, re-read `docs/future/2026-04-28-architecture-refactor-roadmap.md`, `task_plan.md`, `findings.md`, and `progress.md`, then recalculate the total roadmap progress and the active area progress.
@@ -405,12 +405,21 @@ Phase 43 in progress
 - **Status:** completed
 
 ### Phase 43: EditorCanvas Wheel Zoom Request Gate
-- [ ] Re-read the formal roadmap, Phase 42 findings, and current wheel zoom flow before changing code.
-- [ ] Inspect whether the next safest `EditorCanvas.vue` boundary is a pure wheel zoom request model around zero-delta ignore, scale delta, and pointer-centered zoom inputs.
-- [ ] Add focused red tests for the selected wheel zoom request boundary before production changes.
-- [ ] Keep actual canvas DOM rect lookup, viewport mutation, wheel event binding, panning, connection, node drag/resize, and graph mutation emits behaviorally stable.
-- [ ] Run focused Canvas viewport/pinch/structure tests, TypeScript checks, full frontend tests, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
-- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 43.
+- [x] Re-read the formal roadmap, Phase 42 findings, and current wheel zoom flow before changing code.
+- [x] Inspect whether the next safest `EditorCanvas.vue` boundary is a pure wheel zoom request model around zero-delta ignore, scale delta, and pointer-centered zoom inputs.
+- [x] Add focused red tests for the selected wheel zoom request boundary before production changes.
+- [x] Keep actual canvas DOM rect lookup, viewport mutation, wheel event binding, panning, connection, node drag/resize, and graph mutation emits behaviorally stable.
+- [x] Run focused Canvas viewport/pinch/structure tests, TypeScript checks, full frontend tests, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
+- [x] If total roadmap progress is below 100%, automatically open the next phase after Phase 43.
+- **Status:** completed
+
+### Phase 44: EditorCanvas Empty Canvas Double-Click Creation Gate
+- [ ] Re-read the formal roadmap, Phase 43 findings, and current empty-canvas double-click creation flow before changing code.
+- [ ] Inspect whether the next safest `EditorCanvas.vue` boundary is a creation request model around locked edit, ignored interactive targets, and empty-canvas menu opening.
+- [ ] Add focused red tests for the selected double-click creation boundary before production changes.
+- [ ] Keep actual DOM target inspection, canvas coordinate conversion, `open-node-creation-menu` emit, dropped-file creation, panning, connection, node drag/resize, and graph mutation emits behaviorally stable.
+- [ ] Run focused Canvas creation/structure and connection tests, TypeScript checks, full frontend tests, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
+- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 44.
 - **Status:** in progress
 
 ## Progress Estimate
@@ -503,6 +512,9 @@ Phase 43 in progress
 | Overall roadmap cleanup after Phase 42 | About 69% complete after moving canvas pointer-down pan/pinch setup routing into `canvasPinchZoomModel.ts`. |
 | P2 `EditorCanvas.vue` cleanup after Phase 42 | About 70% complete after extracting touch pinch versus pan setup policy while preserving pointer snapshot storage, pinch startup, viewport pan execution, and DOM side effects in the component. |
 | Current continuation gate after Phase 42 | Total roadmap progress is below 100%, so Phase 43 is automatically opened for the next safe P2 Canvas wheel zoom request boundary. |
+| Overall roadmap cleanup after Phase 43 | About 70% complete after moving wheel zoom request projection into `canvasViewportInteractionModel.ts`. |
+| P2 `EditorCanvas.vue` cleanup after Phase 43 | About 71% complete after extracting zero-delta ignore, scale delta, pointer-centered zoom request, and no-rect set-scale fallback while preserving actual viewport mutation in the component. |
+| Current continuation gate after Phase 43 | Total roadmap progress is below 100%, so Phase 44 is automatically opened for the next safe P2 Canvas empty-canvas double-click creation boundary. |
 
 ## Decisions Made
 | Decision | Rationale |
@@ -546,6 +558,7 @@ Phase 43 in progress
 - Phase 40 moves node-resize pointer-down routing into `canvasNodeDragResizeModel.ts`; `EditorCanvas.vue` is 3,198 lines because setup policy wiring is explicit, and it still keeps DOM focus, pointer capture, selected-edge cleanup, selection, rendered-size lookup, and resize drag creation in the component.
 - Phase 41 moves node pointer-down drag setup routing into `canvasNodeDragResizeModel.ts`; `EditorCanvas.vue` is 3,233 lines because active-connection completion remains explicitly interleaved, and it still keeps DOM focus, pointer capture, selected-edge cleanup, pending connection cleanup, selection, and `startNodeDrag` execution in the component.
 - Phase 42 moves canvas pointer-down pan/pinch setup routing into `canvasPinchZoomModel.ts`; `EditorCanvas.vue` is 3,255 lines because setup policy wiring is explicit, and it still keeps pointer snapshot storage, pinch startup, DOM focus/preventDefault, pointer capture, transient cleanup, selection clearing, and viewport pan execution in the component.
+- Phase 43 moves wheel zoom request projection into `canvasViewportInteractionModel.ts`; `EditorCanvas.vue` is 3,252 lines and keeps canvas DOM rect lookup, actual `viewport.setViewport` / `viewport.zoomAt` execution, wheel event binding, and viewport draft emits in the component.
 - Do not commit runtime artifacts such as `backend/data/settings`, `.dev_*`, `dist`, or `.worktrees`.
 - After code changes, restart using `npm run dev`.
 

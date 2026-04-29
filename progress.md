@@ -1,5 +1,74 @@
 # Progress Log
 
+## Session: 2026-04-29 Phase 43
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Confirmed Phase 42 was committed and pushed as `519183e`.
+  - Re-read the formal roadmap, active plan, latest findings, and current wheel zoom flow.
+  - Inspected `handleWheel`, the existing viewport display model, and page zoom structure coverage.
+  - Selected the next P2 Canvas boundary: wheel zoom request projection.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `canvasViewportInteractionModel.test.ts` before the production model existed.
+  - Updated `EditorCanvas.structure.test.ts` to require the new wheel zoom request model boundary.
+  - Verified the expected red failure: the model file was missing and the component still owned inline wheel delta/request logic.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `canvasViewportInteractionModel.ts` with `resolveWheelZoomDelta` and `resolveCanvasWheelZoomRequest`.
+  - Updated `EditorCanvas.vue` to resolve wheel zoom requests before dispatching `viewport.setViewport` or `viewport.zoomAt`.
+  - Kept canvas DOM rect lookup, actual viewport mutation, wheel event binding, and viewport draft emits inside the component.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused viewport interaction model and structure tests.
+  - Ran the broader Canvas viewport, pinch, drag/resize, connection, edge, and graph regression set.
+  - Ran TypeScript unused-symbol verification from `frontend`.
+  - Ran the full frontend `node --test` suite.
+  - Ran the frontend production build; no large chunk warning was emitted.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed backend `/health` returned `{"status":"ok"}` and the frontend entry returned HTTP 200.
+  - Captured a headless Chrome screenshot after a virtual-time wait and confirmed the workspace rendered normally.
+
+### Phase 5: Continuation Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated overall roadmap cleanup at about 70%.
+  - Recalculated P2 `EditorCanvas.vue` cleanup at about 71%.
+  - Opened Phase 44 automatically because total roadmap progress is below 100%.
+  - Selected the next candidate boundary as empty-canvas double-click creation routing around locked edit, ignored targets, and menu opening.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red focused tests | `node --test frontend/src/editor/canvas/canvasViewportInteractionModel.test.ts frontend/src/editor/canvas/EditorCanvas.structure.test.ts` before implementation | Fails because viewport interaction model and component wiring do not exist | Failed on missing model file and structure assertions | Passed |
+| Focused model/structure tests | Same focused files after implementation | All focused tests pass | 62 passed | Passed |
+| Focused Canvas and graph regression | `node --test` over Canvas viewport, pinch, drag/resize, connection, edge, and graph document tests | Related interaction tests pass | 187 passed | Passed |
+| Unused symbol check | `./node_modules/.bin/vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No diagnostics | Exit 0 | Passed |
+| Full frontend tests | `node --test $(rg --files src vite.config.structure.test.ts | rg '\.test\.ts$')` in `frontend` | All frontend tests pass | 804 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without a large chunk warning | Exit 0, no Vite chunk warning | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+| Browser smoke | Headless Chrome screenshot with virtual-time wait | Workspace renders normally | Workspace UI rendered | Passed |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Phase 43 implementation, verification, docs update, and dev restart are complete. |
+| Where am I going? | Phase 44 is open for empty-canvas double-click creation request extraction. |
+| What's the goal? | Continue reducing `EditorCanvas.vue` interaction ownership without changing drag, resize, snap, create-node, pan/zoom, or connection-completion behavior. |
+| What have I learned? | Wheel zoom has a clean model boundary around request projection; viewport mutation should remain component/composable-owned. |
+| What have I done? | Extracted wheel zoom request projection, added focused tests, verified the full frontend suite, built, restarted, and visually smoked the app. |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+
 ## Session: 2026-04-29 Phase 42
 
 ### Phase 1: Re-orientation

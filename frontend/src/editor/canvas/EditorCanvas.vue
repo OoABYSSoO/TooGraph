@@ -471,6 +471,7 @@ import { useCanvasNodeMeasurements } from "./useCanvasNodeMeasurements";
 import { buildPinchZoomStart, resolveCanvasPointerDownAction, resolvePointerCenter, resolvePointerDistance } from "./canvasPinchZoomModel";
 import type { CanvasPointerDownAction } from "./canvasPinchZoomModel";
 import { buildCanvasViewportStyle, buildZoomPercentLabel } from "./canvasViewportDisplayModel";
+import { resolveCanvasWheelZoomRequest } from "./canvasViewportInteractionModel";
 import {
   isCanvasStateTargetAnchorAllowedForConnection,
   resolveCanvasAutoSnappedTargetAnchor as resolveCanvasAutoSnappedTargetAnchorModel,
@@ -1651,36 +1652,32 @@ function handleZoomReset() {
   viewport.setViewport(DEFAULT_CANVAS_VIEWPORT);
 }
 
-function resolveWheelZoomDelta(event: WheelEvent) {
-  if (event.deltaY === 0) {
-    return 0;
-  }
-  const direction = event.deltaY > 0 ? -1 : 1;
-  return direction * 0.08;
-}
-
 function handleWheel(event: WheelEvent) {
-  const wheelZoomDelta = resolveWheelZoomDelta(event);
-  if (wheelZoomDelta === 0) {
-    return;
-  }
-
-  const rect = canvasRef.value?.getBoundingClientRect();
-  if (!rect) {
-    viewport.setViewport({
-      ...viewport.viewport,
-      scale: viewport.viewport.scale + wheelZoomDelta,
-    });
-    return;
-  }
-
-  viewport.zoomAt({
+  const wheelZoomRequest = resolveCanvasWheelZoomRequest({
+    deltaY: event.deltaY,
+    currentScale: viewport.viewport.scale,
     clientX: event.clientX,
     clientY: event.clientY,
-    canvasLeft: rect.left,
-    canvasTop: rect.top,
-    nextScale: viewport.viewport.scale + wheelZoomDelta,
+    canvasRect: canvasRef.value?.getBoundingClientRect() ?? null,
   });
+  switch (wheelZoomRequest.type) {
+    case "ignore":
+      return;
+    case "set-scale":
+      viewport.setViewport({
+        ...viewport.viewport,
+        scale: wheelZoomRequest.nextScale,
+      });
+      return;
+    case "zoom-at":
+      viewport.zoomAt({
+        clientX: wheelZoomRequest.clientX,
+        clientY: wheelZoomRequest.clientY,
+        canvasLeft: wheelZoomRequest.canvasLeft,
+        canvasTop: wheelZoomRequest.canvasTop,
+        nextScale: wheelZoomRequest.nextScale,
+      });
+  }
 }
 
 function handleEdgePointerDown(edge: ProjectedCanvasEdge, event: PointerEvent) {
