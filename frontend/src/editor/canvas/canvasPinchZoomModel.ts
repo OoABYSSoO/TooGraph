@@ -12,6 +12,23 @@ export type CanvasPinchZoomStart = {
   centerClientY: number;
 };
 
+type CanvasPointerDownSetupPolicy = {
+  focusCanvas?: true;
+  preventDefault: true;
+  removeWindowSelection: true;
+  setPointerCapture?: true;
+  cancelScheduledDragFrame?: true;
+  clearCanvasTransientState: true;
+  clearPendingConnection: true;
+  clearSelectedEdge: true;
+  clearSelection: true;
+  beginPan?: true;
+};
+
+export type CanvasPointerDownAction =
+  | ({ type: "start-pinch-zoom" } & CanvasPointerDownSetupPolicy)
+  | ({ type: "start-pan" } & CanvasPointerDownSetupPolicy);
+
 export function resolvePointerDistance(left: Pick<CanvasPointerSnapshot, "clientX" | "clientY">, right: Pick<CanvasPointerSnapshot, "clientX" | "clientY">) {
   return Math.hypot(right.clientX - left.clientX, right.clientY - left.clientY);
 }
@@ -20,6 +37,33 @@ export function resolvePointerCenter(left: Pick<CanvasPointerSnapshot, "clientX"
   return {
     clientX: (left.clientX + right.clientX) / 2,
     clientY: (left.clientY + right.clientY) / 2,
+  };
+}
+
+export function resolveCanvasPointerDownAction(input: { startedPinchZoom: boolean }): CanvasPointerDownAction {
+  const sharedSetup = {
+    preventDefault: true,
+    removeWindowSelection: true,
+    clearCanvasTransientState: true,
+    clearPendingConnection: true,
+    clearSelectedEdge: true,
+    clearSelection: true,
+  } as const;
+
+  if (input.startedPinchZoom) {
+    return {
+      type: "start-pinch-zoom",
+      ...sharedSetup,
+    };
+  }
+
+  return {
+    type: "start-pan",
+    focusCanvas: true,
+    ...sharedSetup,
+    setPointerCapture: true,
+    cancelScheduledDragFrame: true,
+    beginPan: true,
   };
 }
 

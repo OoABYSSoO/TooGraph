@@ -4,7 +4,7 @@
 Run a ten-round conservative cleanup batch focused on `EditorCanvas.vue` pure projection and interaction-model helpers, then close the baseline interaction regressions in one larger pass while preserving graph editing behavior, runtime visuals, drag/connect workflows, deletion behavior, and dev startup health.
 
 ## Current Phase
-Phase 42 in progress
+Phase 43 in progress
 
 ## Autonomous Continuation Gate
 - After every completed cleanup phase, re-read `docs/future/2026-04-28-architecture-refactor-roadmap.md`, `task_plan.md`, `findings.md`, and `progress.md`, then recalculate the total roadmap progress and the active area progress.
@@ -396,12 +396,21 @@ Phase 42 in progress
 - **Status:** completed
 
 ### Phase 42: EditorCanvas Canvas Pointer-Down Pan Setup Gate
-- [ ] Re-read the formal roadmap, Phase 41 findings, and current canvas pointer-down pan/pinch setup flow before changing code.
-- [ ] Inspect whether the next safest `EditorCanvas.vue` boundary is a canvas pointer-down action model around touch pinch start versus pan start setup policy.
-- [ ] Add focused red tests for the selected canvas pointer-down boundary before production changes.
-- [ ] Keep actual DOM focus/preventDefault, pointer capture, pointer snapshot storage, selection clearing, pending connection cleanup, pinch zoom startup, viewport pan execution, and graph mutation emits behaviorally stable.
-- [ ] Run focused Canvas viewport/pinch/drag/connection tests, TypeScript checks, full frontend tests, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
-- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 42.
+- [x] Re-read the formal roadmap, Phase 41 findings, and current canvas pointer-down pan/pinch setup flow before changing code.
+- [x] Inspect whether the next safest `EditorCanvas.vue` boundary is a canvas pointer-down action model around touch pinch start versus pan start setup policy.
+- [x] Add focused red tests for the selected canvas pointer-down boundary before production changes.
+- [x] Keep actual DOM focus/preventDefault, pointer capture, pointer snapshot storage, selection clearing, pending connection cleanup, pinch zoom startup, viewport pan execution, and graph mutation emits behaviorally stable.
+- [x] Run focused Canvas viewport/pinch/drag/connection tests, TypeScript checks, full frontend tests, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
+- [x] If total roadmap progress is below 100%, automatically open the next phase after Phase 42.
+- **Status:** completed
+
+### Phase 43: EditorCanvas Wheel Zoom Request Gate
+- [ ] Re-read the formal roadmap, Phase 42 findings, and current wheel zoom flow before changing code.
+- [ ] Inspect whether the next safest `EditorCanvas.vue` boundary is a pure wheel zoom request model around zero-delta ignore, scale delta, and pointer-centered zoom inputs.
+- [ ] Add focused red tests for the selected wheel zoom request boundary before production changes.
+- [ ] Keep actual canvas DOM rect lookup, viewport mutation, wheel event binding, panning, connection, node drag/resize, and graph mutation emits behaviorally stable.
+- [ ] Run focused Canvas viewport/pinch/structure tests, TypeScript checks, full frontend tests, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
+- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 43.
 - **Status:** in progress
 
 ## Progress Estimate
@@ -491,6 +500,9 @@ Phase 42 in progress
 | Overall roadmap cleanup after Phase 41 | About 68% complete after moving node pointer-down drag setup routing into `canvasNodeDragResizeModel.ts`. |
 | P2 `EditorCanvas.vue` cleanup after Phase 41 | About 68% complete after extracting missing-node, locked-edit, inline-editor focus preservation, and start-drag setup policy while preserving active-connection completion and drag execution in the component. |
 | Current continuation gate after Phase 41 | Total roadmap progress is below 100%, so Phase 42 is automatically opened for the next safe P2 Canvas canvas pointer-down pan/pinch setup boundary. |
+| Overall roadmap cleanup after Phase 42 | About 69% complete after moving canvas pointer-down pan/pinch setup routing into `canvasPinchZoomModel.ts`. |
+| P2 `EditorCanvas.vue` cleanup after Phase 42 | About 70% complete after extracting touch pinch versus pan setup policy while preserving pointer snapshot storage, pinch startup, viewport pan execution, and DOM side effects in the component. |
+| Current continuation gate after Phase 42 | Total roadmap progress is below 100%, so Phase 43 is automatically opened for the next safe P2 Canvas wheel zoom request boundary. |
 
 ## Decisions Made
 | Decision | Rationale |
@@ -533,6 +545,7 @@ Phase 42 in progress
 - Phase 39 moves anchor pointer-down routing into `canvasConnectionInteractionModel.ts`; `EditorCanvas.vue` is 3,165 lines because explicit setup policy wiring is more verbose, and it still keeps DOM focus, selection, transient cleanup, text-selection clearing, start/toggle execution, and completion emits in the component.
 - Phase 40 moves node-resize pointer-down routing into `canvasNodeDragResizeModel.ts`; `EditorCanvas.vue` is 3,198 lines because setup policy wiring is explicit, and it still keeps DOM focus, pointer capture, selected-edge cleanup, selection, rendered-size lookup, and resize drag creation in the component.
 - Phase 41 moves node pointer-down drag setup routing into `canvasNodeDragResizeModel.ts`; `EditorCanvas.vue` is 3,233 lines because active-connection completion remains explicitly interleaved, and it still keeps DOM focus, pointer capture, selected-edge cleanup, pending connection cleanup, selection, and `startNodeDrag` execution in the component.
+- Phase 42 moves canvas pointer-down pan/pinch setup routing into `canvasPinchZoomModel.ts`; `EditorCanvas.vue` is 3,255 lines because setup policy wiring is explicit, and it still keeps pointer snapshot storage, pinch startup, DOM focus/preventDefault, pointer capture, transient cleanup, selection clearing, and viewport pan execution in the component.
 - Do not commit runtime artifacts such as `backend/data/settings`, `.dev_*`, `dist`, or `.worktrees`.
 - After code changes, restart using `npm run dev`.
 

@@ -1225,7 +1225,7 @@ test("EditorCanvas opts mobile touch drags out of browser gestures", () => {
 test("EditorCanvas supports two-finger pinch zoom on mobile without changing single-pointer gestures", () => {
   const canvasPinchZoomModelSource = readCanvasPinchZoomModelSource();
 
-  assert.match(componentSource, /import \{ buildPinchZoomStart, resolvePointerCenter, resolvePointerDistance \} from "\.\/canvasPinchZoomModel";/);
+  assert.match(componentSource, /import \{ buildPinchZoomStart, resolveCanvasPointerDownAction, resolvePointerCenter, resolvePointerDistance \} from "\.\/canvasPinchZoomModel";/);
   assert.match(componentSource, /const activeCanvasPointers = new Map<number, \{ clientX: number; clientY: number; pointerType: string \}>\(\);/);
   assert.match(componentSource, /const pinchZoom = ref<\{/);
   assert.match(componentSource, /function beginPinchZoomIfReady\(\)/);
@@ -1236,11 +1236,18 @@ test("EditorCanvas supports two-finger pinch zoom on mobile without changing sin
   assert.match(componentSource, /viewport\.zoomAt\(\{/);
   assert.match(componentSource, /nextScale: pinch\.startScale \* \(nextDistance \/ pinch\.startDistance\)/);
   assert.match(canvasPinchZoomModelSource, /export function buildPinchZoomStart/);
+  assert.match(canvasPinchZoomModelSource, /export type CanvasPointerDownAction/);
+  assert.match(canvasPinchZoomModelSource, /export function resolveCanvasPointerDownAction/);
   assert.match(canvasPinchZoomModelSource, /export function resolvePointerDistance/);
   assert.match(canvasPinchZoomModelSource, /export function resolvePointerCenter/);
   assert.doesNotMatch(componentSource, /function resolvePointerDistance/);
   assert.doesNotMatch(componentSource, /function resolvePointerCenter/);
   assert.match(componentSource, /if \(event\.pointerType === "touch"\) \{/);
+  assert.match(componentSource, /const canvasPointerDownAction = resolveCanvasPointerDownAction\(\{ startedPinchZoom \}\);/);
+  assert.match(componentSource, /function applyCanvasPointerDownSetup\([\s\S]*action: CanvasPointerDownAction,[\s\S]*event: PointerEvent,[\s\S]*\)/);
+  assert.match(componentSource, /if \(action\.focusCanvas\) \{[\s\S]*canvasRef\.value\?\.focus\(\);/);
+  assert.match(componentSource, /if \(action\.setPointerCapture\) \{[\s\S]*canvasRef\.value\?\.setPointerCapture\(event\.pointerId\);/);
+  assert.match(componentSource, /if \(action\.beginPan\) \{[\s\S]*viewport\.beginPan\(event\);/);
   assert.match(componentSource, /if \(pinchZoom\.value\) \{[\s\S]*event\.preventDefault\(\);[\s\S]*scheduleDragFrame\(\(\) => \{[\s\S]*updatePinchZoom\(\);/);
   assert.match(componentSource, /if \(pinchZoom\.value\?\.pointerIds\.includes\(event\.pointerId\)\) \{[\s\S]*clearPinchZoom\(\);[\s\S]*viewport\.endPan\(\);[\s\S]*return;/);
 });

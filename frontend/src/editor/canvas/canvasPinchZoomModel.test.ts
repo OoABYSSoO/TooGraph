@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   buildPinchZoomStart,
+  resolveCanvasPointerDownAction,
   resolvePointerCenter,
   resolvePointerDistance,
 } from "./canvasPinchZoomModel.ts";
@@ -44,4 +45,29 @@ test("canvas pinch zoom model starts only with two touch pointers and positive d
     }),
     null,
   );
+});
+
+test("canvas pinch zoom model resolves pointer-down pan and pinch setup actions", () => {
+  assert.deepEqual(resolveCanvasPointerDownAction({ startedPinchZoom: true }), {
+    type: "start-pinch-zoom",
+    preventDefault: true,
+    removeWindowSelection: true,
+    clearCanvasTransientState: true,
+    clearPendingConnection: true,
+    clearSelectedEdge: true,
+    clearSelection: true,
+  });
+  assert.deepEqual(resolveCanvasPointerDownAction({ startedPinchZoom: false }), {
+    type: "start-pan",
+    focusCanvas: true,
+    preventDefault: true,
+    removeWindowSelection: true,
+    setPointerCapture: true,
+    cancelScheduledDragFrame: true,
+    clearCanvasTransientState: true,
+    clearPendingConnection: true,
+    clearSelectedEdge: true,
+    clearSelection: true,
+    beginPan: true,
+  });
 });

@@ -468,7 +468,8 @@ import {
 import { useCanvasEdgeInteractions } from "./useCanvasEdgeInteractions";
 import { useCanvasConnectionInteraction } from "./useCanvasConnectionInteraction";
 import { useCanvasNodeMeasurements } from "./useCanvasNodeMeasurements";
-import { buildPinchZoomStart, resolvePointerCenter, resolvePointerDistance } from "./canvasPinchZoomModel";
+import { buildPinchZoomStart, resolveCanvasPointerDownAction, resolvePointerCenter, resolvePointerDistance } from "./canvasPinchZoomModel";
+import type { CanvasPointerDownAction } from "./canvasPinchZoomModel";
 import { buildCanvasViewportStyle, buildZoomPercentLabel } from "./canvasViewportDisplayModel";
 import {
   isCanvasStateTargetAnchorAllowedForConnection,
@@ -1124,32 +1125,53 @@ function updatePinchZoom() {
 }
 
 function handleCanvasPointerDown(event: PointerEvent) {
+  let startedPinchZoom = false;
   if (event.pointerType === "touch") {
     activeCanvasPointers.set(event.pointerId, {
       clientX: event.clientX,
       clientY: event.clientY,
       pointerType: event.pointerType,
     });
-    if (beginPinchZoomIfReady()) {
-      event.preventDefault();
-      window.getSelection()?.removeAllRanges();
-      clearCanvasTransientState();
-      clearPendingConnection();
-      selectedEdgeId.value = null;
-      selection.clearSelection();
-      return;
-    }
+    startedPinchZoom = beginPinchZoomIfReady();
   }
-  canvasRef.value?.focus();
-  event.preventDefault();
-  window.getSelection()?.removeAllRanges();
-  canvasRef.value?.setPointerCapture(event.pointerId);
-  cancelScheduledDragFrame();
-  clearCanvasTransientState();
-  clearPendingConnection();
-  selectedEdgeId.value = null;
-  selection.clearSelection();
-  viewport.beginPan(event);
+  const canvasPointerDownAction = resolveCanvasPointerDownAction({ startedPinchZoom });
+  applyCanvasPointerDownSetup(canvasPointerDownAction, event);
+}
+
+function applyCanvasPointerDownSetup(
+  action: CanvasPointerDownAction,
+  event: PointerEvent,
+) {
+  if (action.focusCanvas) {
+    canvasRef.value?.focus();
+  }
+  if (action.preventDefault) {
+    event.preventDefault();
+  }
+  if (action.removeWindowSelection) {
+    window.getSelection()?.removeAllRanges();
+  }
+  if (action.setPointerCapture) {
+    canvasRef.value?.setPointerCapture(event.pointerId);
+  }
+  if (action.cancelScheduledDragFrame) {
+    cancelScheduledDragFrame();
+  }
+  if (action.clearCanvasTransientState) {
+    clearCanvasTransientState();
+  }
+  if (action.clearPendingConnection) {
+    clearPendingConnection();
+  }
+  if (action.clearSelectedEdge) {
+    selectedEdgeId.value = null;
+  }
+  if (action.clearSelection) {
+    selection.clearSelection();
+  }
+  if (action.beginPan) {
+    viewport.beginPan(event);
+  }
 }
 
 function handleCanvasPointerMove(event: PointerEvent) {
