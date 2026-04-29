@@ -492,6 +492,10 @@ test("EditorCanvas keeps paused human-review graphs viewable but read-only", () 
   assert.match(componentSource, /@locked-edit-attempt="emit\('locked-edit-attempt'\)"/);
   assert.match(componentSource, /function isLockedNodeEditTarget\(target: EventTarget \| null\)/);
   assert.match(componentSource, /function guardLockedCanvasInteraction\(\)/);
+  assert.match(canvasLockedInteractionModelSource, /export function resolveLockedCanvasInteractionGuardAction/);
+  assert.match(componentSource, /const lockedCanvasInteractionGuardAction = resolveLockedCanvasInteractionGuardAction\(\{[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*\}\);/);
+  assert.match(componentSource, /case "block-locked-interaction":[\s\S]*if \(lockedCanvasInteractionGuardAction\.clearCanvasTransientState\) \{[\s\S]*clearCanvasTransientState\(\);/);
+  assert.match(componentSource, /if \(lockedCanvasInteractionGuardAction\.emitLockedEditAttempt\) \{[\s\S]*emit\("locked-edit-attempt"\);/);
   assert.match(canvasLockedInteractionModelSource, /export function resolveLockedNodePointerCaptureAction/);
   assert.match(componentSource, /const lockedNodePointerCaptureAction = resolveLockedNodePointerCaptureAction\(\{[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*nodeId,[\s\S]*shouldNotifyLockedAttempt,[\s\S]*\}\);/);
   assert.match(componentSource, /case "capture-locked-node":[\s\S]*if \(lockedNodePointerCaptureAction\.emitLockedEditAttempt\) \{[\s\S]*emit\("locked-edit-attempt"\);/);

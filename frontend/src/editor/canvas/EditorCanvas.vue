@@ -460,7 +460,10 @@ import {
   resolveRunNodeClassListForCanvasNode,
   resolveRunNodePresentationForCanvasNode,
 } from "./canvasRunPresentationModel";
-import { resolveLockedNodePointerCaptureAction } from "./canvasLockedInteractionModel";
+import {
+  resolveLockedCanvasInteractionGuardAction,
+  resolveLockedNodePointerCaptureAction,
+} from "./canvasLockedInteractionModel";
 import { resolveSelectedEdgeKeyboardDeleteAction } from "./flowEdgeDeleteModel";
 import {
   buildMinimapNodeModel,
@@ -2001,13 +2004,27 @@ function handleLockBannerClick() {
 }
 
 function guardLockedCanvasInteraction() {
-  if (!isGraphEditingLocked()) {
-    return false;
+  const lockedCanvasInteractionGuardAction = resolveLockedCanvasInteractionGuardAction({
+    interactionLocked: isGraphEditingLocked(),
+  });
+  switch (lockedCanvasInteractionGuardAction.type) {
+    case "allow-interaction":
+      return false;
+    case "block-locked-interaction":
+      break;
   }
-  clearCanvasTransientState();
-  clearPendingConnection();
-  selectedEdgeId.value = null;
-  emit("locked-edit-attempt");
+  if (lockedCanvasInteractionGuardAction.clearCanvasTransientState) {
+    clearCanvasTransientState();
+  }
+  if (lockedCanvasInteractionGuardAction.clearPendingConnection) {
+    clearPendingConnection();
+  }
+  if (lockedCanvasInteractionGuardAction.clearSelectedEdge) {
+    selectedEdgeId.value = null;
+  }
+  if (lockedCanvasInteractionGuardAction.emitLockedEditAttempt) {
+    emit("locked-edit-attempt");
+  }
   return true;
 }
 

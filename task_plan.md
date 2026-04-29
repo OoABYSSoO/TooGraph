@@ -4,7 +4,7 @@
 Run a ten-round conservative cleanup batch focused on `EditorCanvas.vue` pure projection and interaction-model helpers, then close the baseline interaction regressions in one larger pass while preserving graph editing behavior, runtime visuals, drag/connect workflows, deletion behavior, and dev startup health.
 
 ## Current Phase
-Phase 51 in progress
+Phase 52 in progress
 
 ## Autonomous Continuation Gate
 - After every completed cleanup phase, re-read `docs/future/2026-04-28-architecture-refactor-roadmap.md`, `task_plan.md`, `findings.md`, and `progress.md`, then recalculate the total roadmap progress and the active area progress.
@@ -477,12 +477,21 @@ Phase 51 in progress
 - **Status:** completed
 
 ### Phase 51: EditorCanvas Locked Interaction Guard Gate
-- [ ] Re-read the formal roadmap, Phase 50 findings, and current generic locked-canvas interaction guard before changing code.
-- [ ] Inspect whether the next safest `EditorCanvas.vue` boundary is a generic locked-interaction guard action model around unlocked no-op, locked-attempt emit, transient cleanup, pending connection cleanup, selected-edge clearing, and canvas focus/selection preservation.
-- [ ] Add focused red tests for the selected locked-interaction guard boundary before production changes.
-- [ ] Keep actual `emit("locked-edit-attempt")`, cleanup execution, DOM event handlers, connection, panning, node drag/resize, and graph mutation emits behaviorally stable.
-- [ ] Run focused locked-interaction/structure and Canvas regression tests, TypeScript checks, full frontend tests or justified targeted regression, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
-- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 51.
+- [x] Re-read the formal roadmap, Phase 50 findings, and current generic locked-canvas interaction guard before changing code.
+- [x] Inspect whether the next safest `EditorCanvas.vue` boundary is a generic locked-interaction guard action model around unlocked no-op, locked-attempt emit, transient cleanup, pending connection cleanup, selected-edge clearing, and canvas focus/selection preservation.
+- [x] Add focused red tests for the selected locked-interaction guard boundary before production changes.
+- [x] Keep actual `emit("locked-edit-attempt")`, cleanup execution, DOM event handlers, connection, panning, node drag/resize, and graph mutation emits behaviorally stable.
+- [x] Run focused locked-interaction/structure and Canvas regression tests, TypeScript checks, full frontend tests or justified targeted regression, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
+- [x] If total roadmap progress is below 100%, automatically open the next phase after Phase 51.
+- **Status:** completed
+
+### Phase 52: EditorCanvas Edge Pointer Down Gate
+- [ ] Re-read the formal roadmap, Phase 51 findings, and current edge pointer-down flow before changing code.
+- [ ] Inspect whether the next safest `EditorCanvas.vue` boundary is an edge pointer-down action model around locked edit, flow/route delete confirm, data-edge state confirm, selected-edge toggle, selected-edge preview, and selection cleanup policy.
+- [ ] Add focused red tests for the selected edge pointer-down boundary before production changes.
+- [ ] Keep actual `event.preventDefault`, canvas focus, transient cleanup, pending connection cleanup, edge confirm composable calls, selected-edge ref mutation, pending connection point mutation, selection clearing, panning, connection, node drag/resize, and graph mutation emits behaviorally stable.
+- [ ] Run focused edge-pointer/structure and Canvas regression tests, TypeScript checks, full frontend tests or justified targeted regression, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
+- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 52.
 - **Status:** in progress
 
 ## Progress Estimate
@@ -599,6 +608,9 @@ Phase 51 in progress
 | Overall roadmap cleanup after Phase 50 | About 77% complete after moving locked-node pointer capture policy into `canvasLockedInteractionModel.ts`. |
 | P2 `EditorCanvas.vue` cleanup after Phase 50 | About 78% complete after extracting locked-node capture/no-op decisions while preserving DOM target classification and actual pointer side effects in the component. |
 | Current continuation gate after Phase 50 | Total roadmap progress is below 100%, so Phase 51 is automatically opened for the next safe P2 Canvas locked-interaction guard boundary. |
+| Overall roadmap cleanup after Phase 51 | About 78% complete after moving generic locked-interaction guard cleanup policy into `canvasLockedInteractionModel.ts`. |
+| P2 `EditorCanvas.vue` cleanup after Phase 51 | About 79% complete after extracting shared locked guard no-op/block decisions while preserving actual cleanup and emit execution in the component. |
+| Current continuation gate after Phase 51 | Total roadmap progress is below 100%, so Phase 52 is automatically opened for the next safe P2 Canvas edge pointer-down boundary. |
 
 ## Decisions Made
 | Decision | Rationale |
@@ -645,6 +657,7 @@ Phase 51 in progress
 - Phase 43 moves wheel zoom request projection into `canvasViewportInteractionModel.ts`; `EditorCanvas.vue` is 3,252 lines and keeps canvas DOM rect lookup, actual `viewport.setViewport` / `viewport.zoomAt` execution, wheel event binding, and viewport draft emits in the component.
 - Phase 44 moves empty-canvas double-click creation routing into `canvasConnectionInteractionModel.ts`; `EditorCanvas.vue` is 3,259 lines because the decision switch is explicit, and it still keeps DOM target inspection, canvas coordinate conversion, and the actual `open-node-creation-menu` emit in the component.
 - Phase 50 moves locked-node pointer capture decisions into `canvasLockedInteractionModel.ts`; `EditorCanvas.vue` keeps DOM target classification, actual event prevention/propagation, focus, transient cleanup, selected-edge cleanup, pending connection cleanup, node selection, and emits in the component.
+- Phase 51 moves generic locked-interaction guard decisions into `canvasLockedInteractionModel.ts`; `EditorCanvas.vue` keeps actual cleanup calls, selected-edge mutation, and locked-attempt emit execution in the component.
 - Do not commit runtime artifacts such as `backend/data/settings`, `.dev_*`, `dist`, or `.worktrees`.
 - After code changes, restart using `npm run dev`.
 
