@@ -4,7 +4,7 @@
 Run a ten-round conservative cleanup batch focused on `EditorCanvas.vue` pure projection and interaction-model helpers, then close the baseline interaction regressions in one larger pass while preserving graph editing behavior, runtime visuals, drag/connect workflows, deletion behavior, and dev startup health.
 
 ## Current Phase
-Phase 33 in progress
+Phase 34 in progress
 
 ## Autonomous Continuation Gate
 - After every completed cleanup phase, re-read `docs/future/2026-04-28-architecture-refactor-roadmap.md`, `task_plan.md`, `findings.md`, and `progress.md`, then recalculate the total roadmap progress and the active area progress.
@@ -315,12 +315,21 @@ Phase 33 in progress
 - **Status:** completed
 
 ### Phase 33: EditorCanvas Connection Completion Action Gate
-- [ ] Re-read the formal roadmap, Phase 32 findings, and current connection completion emit branches before changing code.
-- [ ] Inspect whether the next safest `EditorCanvas.vue` boundary is a pure completion-action model for `connect-flow`, `connect-route`, `connect-state`, `connect-state-input-source`, `reconnect-flow`, and `reconnect-route`.
-- [ ] Add focused red tests for the selected completion-action boundary before production changes.
-- [ ] Keep actual emits, active connection refs, auto-snap target selection, node creation payloads, panning, node drag/resize, and DOM measurement behaviorally stable.
+- [x] Re-read the formal roadmap, Phase 32 findings, and current connection completion emit branches before changing code.
+- [x] Inspect whether the next safest `EditorCanvas.vue` boundary is a pure completion-action model for `connect-flow`, `connect-route`, `connect-state`, `connect-state-input-source`, `reconnect-flow`, and `reconnect-route`.
+- [x] Add focused red tests for the selected completion-action boundary before production changes.
+- [x] Keep actual emits, active connection refs, auto-snap target selection, node creation payloads, panning, node drag/resize, and DOM measurement behaviorally stable.
+- [x] Run focused Canvas and graph-connection tests, TypeScript checks, full frontend tests, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
+- [x] If total roadmap progress is below 100%, automatically open the next phase after Phase 33.
+- **Status:** completed
+
+### Phase 34: EditorCanvas Auto-Snap Resolver Gate
+- [ ] Re-read the formal roadmap, Phase 33 findings, and current auto-snap resolver functions before changing code.
+- [ ] Inspect whether the next safest `EditorCanvas.vue` boundary is a pure resolver model for flow target, state target, reverse state input source, and node-body target anchor selection.
+- [ ] Add focused red tests for the selected auto-snap resolver boundary before production changes.
+- [ ] Keep DOM pointer coordinate conversion, active connection refs, node creation payloads, completion emits, panning, node drag/resize, and DOM measurement behaviorally stable.
 - [ ] Run focused Canvas and graph-connection tests, TypeScript checks, full frontend tests, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
-- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 33.
+- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 34.
 - **Status:** in progress
 
 ## Progress Estimate
@@ -383,6 +392,9 @@ Phase 33 in progress
 | Overall roadmap cleanup after Phase 32 | About 59% complete after moving connection interaction refs, pending start/toggle, preview point updates, auto-snap target storage, and connection-hover node state into `useCanvasConnectionInteraction.ts`. |
 | P2 `EditorCanvas.vue` cleanup after Phase 32 | About 49% complete after extracting connection state lifecycle while preserving auto-snap selection, node creation payloads, and completion emits. |
 | Current continuation gate after Phase 32 | Total roadmap progress is below 100%, so Phase 33 is automatically opened for the next safe P2 Canvas connection-completion boundary. |
+| Overall roadmap cleanup after Phase 33 | About 60% complete after moving connection completion action projection into `canvasConnectionCompletionModel.ts`. |
+| P2 `EditorCanvas.vue` cleanup after Phase 33 | About 51% complete after extracting the completion action mapping while preserving actual emits and auto-snap selection in `EditorCanvas.vue`. |
+| Current continuation gate after Phase 33 | Total roadmap progress is below 100%, so Phase 34 is automatically opened for the next safe P2 Canvas auto-snap resolver boundary. |
 
 ## Decisions Made
 | Decision | Rationale |
@@ -416,6 +428,7 @@ Phase 33 in progress
 - Phase 30 closes the low-risk `NodeCard.vue` P1 gate and starts P2 by moving node drag/resize move projection into `canvasNodeDragResizeModel.ts`; `EditorCanvas.vue` drops to 3,332 lines while keeping pointer capture, animation-frame batching, connection completion, and emits in the component.
 - Phase 31 continues P2 by moving node drag/resize refs, pointer-capture release, drag/resize scheduling, and residual click suppression into `useCanvasNodeDragResize.ts`; `EditorCanvas.vue` drops to 3,267 lines while keeping selection, active connection cleanup, panning, DOM measurement, and graph mutation emits in the component.
 - Phase 32 moves connection interaction refs, pending connection start/toggle, preview point updates, auto-snap target storage, and active connection hover node state into `useCanvasConnectionInteraction.ts`; `EditorCanvas.vue` drops to 3,238 lines while keeping auto-snap selection, connection completion emits, node creation payloads, panning, node drag/resize, and DOM measurement in the component.
+- Phase 33 moves completion action projection for `connect-flow`, `connect-route`, `connect-state`, `connect-state-input-source`, `reconnect-flow`, and `reconnect-route` into `canvasConnectionCompletionModel.ts`; `EditorCanvas.vue` drops to 3,224 lines while keeping actual `emit` dispatch, active connection refs, auto-snap selection, node creation payloads, panning, node drag/resize, and DOM measurement in the component.
 - Do not commit runtime artifacts such as `backend/data/settings`, `.dev_*`, `dist`, or `.worktrees`.
 - After code changes, restart using `npm run dev`.
 
@@ -431,3 +444,5 @@ Phase 33 in progress
 | Unescaped backticks in `rg` shell commands triggered `/bin/bash: line 1: NodeCard.vue: command not found` | Phase 28 source inspection and plan sanity-check commands | Re-ran inspection with safer quoting; no code was changed by the failed shell interpolation. |
 | Fresh screenshot tooling probe found no `chromium`, `playwright`, or `puppeteer` available from the current shell | Final visual-check refresh after dev restart | Kept the Phase 28 screenshots already captured earlier in this round and used fresh HTTP health checks for final dev verification. |
 | `vue-tsc` flagged an unused `nodeDrag` destructure after the Phase 31 composable extraction | Phase 31 TypeScript verification | Stopped destructuring `nodeDrag` in `EditorCanvas.vue` and updated the structure test to assert that the drag ref stays owned by the composable. |
+| Vue `emit` overloads rejected a union event name from `CanvasConnectionCompletionAction` | Phase 33 TypeScript verification | Kept action projection pure, but emitted through an explicit `switch` in `EditorCanvas.vue` so each overload stays type-safe. |
+| Unescaped backticks in an `rg` shell command triggered `/bin/bash: line 1: emit: command not found` | Phase 33 planning verification | Re-ran the search with single-quoted shell text; no files were changed by the failed read-only command. |

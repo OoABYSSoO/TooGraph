@@ -78,6 +78,7 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 - `canvasNodeDragResizeModel.ts` 已承接节点拖拽/缩放 move 阶段的阈值判断、viewport-scale 投影、rounding 和 resize result projection；`EditorCanvas.vue` 仍保留 pointer capture、animation-frame batching、connection completion 和 graph mutation emits。
 - `useCanvasNodeDragResize.ts` 已承接节点拖拽/缩放 refs、pointer capture release、scheduled update dispatch、拖拽后残留 click 抑制和 teardown；`EditorCanvas.vue` 仍保留 selection、active connection cleanup、auto-snap、connection completion、panning、DOM measurement 和 graph mutation emits。
 - `useCanvasConnectionInteraction.ts` 已承接 pending connection refs、preview point、auto-snapped target ref、active connection hover node ref、从 anchor 启停 pending connection、preview point 更新和 hover-change 通知；`EditorCanvas.vue` 仍保留 auto-snap target selection、node creation payload、connection completion emit mapping、panning、node drag/resize 和 DOM measurement。
+- `canvasConnectionCompletionModel.ts` 已承接 connection completion action projection：从 active connection 和 target anchor 纯计算 `connect-flow`、`connect-route`、`connect-state`、`connect-state-input-source`、`reconnect-flow`、`reconnect-route` payload；`EditorCanvas.vue` 仍保留实际 `emit` dispatch、auto-snap target selection、node creation payload、panning、node drag/resize 和 DOM measurement。
 
 ### 3. `EditorWorkspaceShell.vue`
 

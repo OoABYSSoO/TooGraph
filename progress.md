@@ -283,6 +283,78 @@
 | 2026-04-29 | `useCanvasConnectionInteraction.ts` initially imported `./canvasConnectionModel` without the `.ts` extension | First focused green run | Updated the import to `./canvasConnectionModel.ts`, matching Node test resolution. |
 | 2026-04-29 | The auto-snap target unit test used strict object identity against a Vue-ref-wrapped object | First focused green run | Changed the assertion to compare structure with `assert.deepEqual`. |
 
+## Session: 2026-04-29 Phase 33
+
+### Phase 1: Connection Completion Action Boundary
+- **Status:** completed
+- Actions taken:
+  - Re-read the formal roadmap, task plan, findings, and Phase 32 progress.
+  - Selected the pure P2 Canvas boundary around completion action projection for `connect-flow`, `connect-route`, `connect-state`, `connect-state-input-source`, `reconnect-flow`, and `reconnect-route`.
+  - Kept actual Vue emits, active connection refs, auto-snap target selection, node creation payloads, panning, node drag/resize, DOM measurement, and graph mutation side effects in `EditorCanvas.vue`.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `canvasConnectionCompletionModel.test.ts` before the completion model existed.
+  - Updated `EditorCanvas.structure.test.ts` to require `EditorCanvas.vue` to delegate action projection to a completion model.
+  - Ran the focused tests and verified the expected red failure: missing `canvasConnectionCompletionModel.ts`.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `canvasConnectionCompletionModel.ts` with a typed `CanvasConnectionCompletionAction` union and pure `resolveCanvasConnectionCompletionAction`.
+  - Updated `EditorCanvas.vue` so `completePendingConnection` resolves the action through the model and dispatches actual Vue emits through a small typed switch.
+  - Updated structure assertions that previously locked inline completion emit branches into `EditorCanvas.vue`.
+  - Reduced `EditorCanvas.vue` from 3,238 lines to 3,224 lines.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused completion model and `EditorCanvas` structure tests.
+  - Ran focused Canvas regression tests covering completion, connection interaction, auto-snap, node creation payloads, node drag/resize, and edge interactions.
+  - Ran TypeScript unused-symbol verification from the `frontend` directory.
+  - Ran the full frontend source test suite and the Vite structure test in one Node test invocation.
+  - Ran the frontend production build; no Vite large chunk warning was emitted.
+  - Restarted the dev environment with root `npm run dev`.
+  - Confirmed the frontend returned HTTP 200 at `http://127.0.0.1:3477/editor/new`.
+  - Confirmed the backend health route returned HTTP 200 with `{"status":"ok"}`.
+  - Captured a Chrome headless screenshot of `/editor/new` and sampled the PNG as nonblank.
+
+### Phase 5: Progress Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated total roadmap progress at about 60%.
+  - Recalculated P2 `EditorCanvas.vue` cleanup at about 51%.
+  - Confirmed the build/chunk warning remains resolved because the production build emitted no large chunk warning.
+  - Opened Phase 34 because total roadmap progress remains below 100%.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red focused test | `node --test frontend/src/editor/canvas/canvasConnectionCompletionModel.test.ts frontend/src/editor/canvas/EditorCanvas.structure.test.ts` before implementation | Fails because the completion model does not exist | Failed with missing `canvasConnectionCompletionModel.ts` | Passed |
+| Focused completion structure | Same command after implementation | Completion action model and structure boundary pass | 63 passed | Passed |
+| Focused Canvas related suite | `node --test` over completion, interaction, auto-snap, node drag/resize, and edge interaction tests | Related Canvas behavior/model tests pass | 89 passed | Passed |
+| TypeScript unused-symbol check | `cd frontend && ./node_modules/.bin/vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` | No diagnostics | Exit 0, no diagnostics | Passed |
+| Full frontend tests | `node --test $(rg --files src vite.config.structure.test.ts | rg '\.test\.ts$')` in `frontend` | All frontend tests pass | 789 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without chunk-warning regression | Exit 0, no large chunk warning | Passed |
+| Dev restart and health | `npm run dev`, then HTTP checks | Services start and respond | Frontend `/editor/new` 200, backend `/health` 200 ok | Passed |
+| Browser visual smoke | Google Chrome headless screenshot of `/editor/new` | Page renders nonblank | 1440x1000 PNG, sampledColors=221 | Passed |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Phase 33 implementation, verification, dev restart, browser smoke, commit, and push are complete. |
+| Where am I going? | Phase 34 is open for a safe auto-snap resolver boundary. |
+| What's the goal? | Continue reducing `EditorCanvas.vue` responsibility concentration while preserving auto-snap, node creation context, connection completion, drag/resize behavior, and runtime UI. |
+| What have I learned? | Completion emit payload mapping is a safe pure model boundary, but the Vue `emit` call itself should stay in the component as a typed switch. |
+| What have I done? | Extracted `canvasConnectionCompletionModel.ts`, added focused tests, verified full frontend behavior, built without chunk warnings, restarted the app, and opened the next continuation phase. |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-29 | Vue `emit` overloads rejected a union event name from `CanvasConnectionCompletionAction` | First TypeScript verification | Kept the pure action model and changed `EditorCanvas.vue` to emit through an explicit `switch` per action type. |
+| 2026-04-29 | Unescaped backticks in an `rg` shell command triggered `/bin/bash: line 1: emit: command not found` | Phase 33 planning verification | Re-ran the search with single-quoted shell text; no files were changed by the failed read-only command. |
+
 ## Session: 2026-04-29 Phase 29
 
 ### Phase 1: Re-orientation

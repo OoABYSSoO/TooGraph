@@ -469,12 +469,15 @@ import {
   isCanvasStateTargetAnchorAllowedForConnection,
   resolveCanvasConcreteStateInputSourceAnchorAtPointerY,
   resolveCanvasConcreteStateTargetAnchorAtPointerY,
-  resolveCanvasConnectionStateValueType,
   resolveCanvasEligibleStateInputSourceAnchorForNodeBody,
   resolveCanvasEligibleStateTargetAnchorForNodeBody,
   resolveCanvasEligibleTargetAnchorForNodeBody,
   type CanvasNodeCreationMenuPayload,
 } from "./canvasConnectionInteractionModel";
+import {
+  resolveCanvasConnectionCompletionAction,
+  type CanvasConnectionCompletionAction,
+} from "./canvasConnectionCompletionModel";
 import { STATE_FIELD_TYPE_OPTIONS } from "@/editor/workspace/statePanelFields";
 import {
   canCompleteGraphConnection,
@@ -1794,58 +1797,41 @@ function completePendingConnection(targetAnchor: ProjectedCanvasAnchor) {
     return;
   }
 
-  if (connection.mode === "reconnect") {
-    if (connection.sourceKind === "route-out" && connection.branchKey) {
-      emit("reconnect-route", {
-        sourceNodeId: connection.sourceNodeId,
-        branchKey: connection.branchKey,
-        nextTargetNodeId: targetAnchor.nodeId,
-      });
-    } else if (connection.currentTargetNodeId) {
-      emit("reconnect-flow", {
-        sourceNodeId: connection.sourceNodeId,
-        currentTargetNodeId: connection.currentTargetNodeId,
-        nextTargetNodeId: targetAnchor.nodeId,
-      });
-    }
-  } else if (connection.sourceKind === "route-out" && connection.branchKey) {
-    emit("connect-route", {
-      sourceNodeId: connection.sourceNodeId,
-      branchKey: connection.branchKey,
-      targetNodeId: targetAnchor.nodeId,
-    });
-  } else if (connection.sourceKind === "state-out" && connection.sourceStateKey && targetAnchor.stateKey) {
-    emit("connect-state", {
-      sourceNodeId: connection.sourceNodeId,
-      sourceStateKey: connection.sourceStateKey,
-      targetNodeId: targetAnchor.nodeId,
-      targetStateKey: targetAnchor.stateKey,
-      position: { x: targetAnchor.x, y: targetAnchor.y },
-    });
-  } else if (connection.sourceKind === "state-in" && connection.sourceStateKey && targetAnchor.kind === "state-out" && targetAnchor.stateKey) {
-    emit("connect-state", {
-      sourceNodeId: targetAnchor.nodeId,
-      sourceStateKey: targetAnchor.stateKey,
-      targetNodeId: connection.sourceNodeId,
-      targetStateKey: connection.sourceStateKey,
-      position: { x: targetAnchor.x, y: targetAnchor.y },
-    });
-  } else if (connection.sourceKind === "state-in" && connection.sourceStateKey) {
-    emit("connect-state-input-source", {
-      sourceNodeId: targetAnchor.nodeId,
-      targetNodeId: connection.sourceNodeId,
-      targetStateKey: connection.sourceStateKey,
-      targetValueType: resolveCanvasConnectionStateValueType(connection.sourceStateKey, props.document.state_schema),
-    });
-  } else {
-    emit("connect-flow", {
-      sourceNodeId: connection.sourceNodeId,
-      targetNodeId: targetAnchor.nodeId,
-    });
-  }
+  const completionAction = resolveCanvasConnectionCompletionAction({
+    connection,
+    targetAnchor,
+    stateSchema: props.document.state_schema,
+  });
+  emitCanvasConnectionCompletionAction(completionAction);
 
   clearConnectionInteractionState();
   selectedEdgeId.value = null;
+}
+
+function emitCanvasConnectionCompletionAction(action: CanvasConnectionCompletionAction | null) {
+  if (!action) {
+    return;
+  }
+  switch (action.type) {
+    case "connect-flow":
+      emit("connect-flow", action.payload);
+      break;
+    case "connect-state":
+      emit("connect-state", action.payload);
+      break;
+    case "connect-state-input-source":
+      emit("connect-state-input-source", action.payload);
+      break;
+    case "connect-route":
+      emit("connect-route", action.payload);
+      break;
+    case "reconnect-flow":
+      emit("reconnect-flow", action.payload);
+      break;
+    case "reconnect-route":
+      emit("reconnect-route", action.payload);
+      break;
+  }
 }
 
 function handleSelectedEdgeDelete(event: KeyboardEvent) {
