@@ -4,7 +4,7 @@
 Run a ten-round conservative cleanup batch focused on `EditorCanvas.vue` pure projection and interaction-model helpers, then close the baseline interaction regressions in one larger pass while preserving graph editing behavior, runtime visuals, drag/connect workflows, deletion behavior, and dev startup health.
 
 ## Current Phase
-Phase 31 in progress
+Phase 32 in progress
 
 ## Autonomous Continuation Gate
 - After every completed cleanup phase, re-read `docs/future/2026-04-28-architecture-refactor-roadmap.md`, `task_plan.md`, `findings.md`, and `progress.md`, then recalculate the total roadmap progress and the active area progress.
@@ -298,11 +298,20 @@ Phase 31 in progress
 - **Status:** completed
 
 ### Phase 31: EditorCanvas Node Drag/Resize Continuation
-- [ ] Continue P2 after `canvasNodeDragResizeModel.ts` by inspecting whether the remaining node drag/resize state can move into a small composable without touching connection completion or auto-snap.
-- [ ] Add focused red tests for the selected next Canvas boundary before production changes.
-- [ ] Keep automatic snapping, node creation payloads, connection completion, DOM measurement, pointer capture, and graph mutation emits behaviorally stable.
+- [x] Continue P2 after `canvasNodeDragResizeModel.ts` by inspecting whether the remaining node drag/resize state can move into a small composable without touching connection completion or auto-snap.
+- [x] Add focused red tests for the selected next Canvas boundary before production changes.
+- [x] Keep automatic snapping, node creation payloads, connection completion, DOM measurement, pointer capture, and graph mutation emits behaviorally stable.
+- [x] Run focused Canvas tests, TypeScript checks, full frontend tests, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
+- [x] If total roadmap progress is below 100%, automatically open the next phase after Phase 31.
+- **Status:** completed
+
+### Phase 32: EditorCanvas Connection Interaction Controller Gate
+- [ ] Re-read the formal roadmap and Phase 31 findings before making more P2 Canvas changes.
+- [ ] Inspect whether the next safest `EditorCanvas.vue` boundary is a connection interaction composable around pending connection refs, hover target, auto-snap state, and completion coordination.
+- [ ] Add focused red tests for the chosen controller boundary before production changes.
+- [ ] Preserve baseline-sensitive behavior: automatic snapping, new-node naming/context payloads, reverse input drags, connection completion, node drag/resize, panning, DOM measurement, and graph mutation emits.
 - [ ] Run focused Canvas tests, TypeScript checks, full frontend tests, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
-- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 31.
+- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 32.
 - **Status:** in progress
 
 ## Progress Estimate
@@ -359,6 +368,9 @@ Phase 31 in progress
 | P1 `NodeCard.vue` cleanup after Phase 30 | About 98% complete for low-risk presentation/composable extraction; remaining parent orchestration is intentionally deferred pending stronger controller coverage. |
 | P2 `EditorCanvas.vue` cleanup after Phase 30 | About 43% complete after moving node drag/resize threshold and viewport-scale projection into `canvasNodeDragResizeModel.ts`. |
 | Current continuation gate after Phase 30 | Total roadmap progress is below 100%, so Phase 31 is automatically opened for the next safe P2 Canvas slice. |
+| Overall roadmap cleanup after Phase 31 | About 58% complete after moving node drag/resize refs, pointer-capture release, scheduled drag emits, and residual click suppression into `useCanvasNodeDragResize.ts`. |
+| P2 `EditorCanvas.vue` cleanup after Phase 31 | About 46% complete after pairing the node drag/resize pure model with a tested composable while leaving connection completion and graph emits stable. |
+| Current continuation gate after Phase 31 | Total roadmap progress is below 100%, so Phase 32 is automatically opened for the next safe P2 Canvas boundary. |
 
 ## Decisions Made
 | Decision | Rationale |
@@ -390,6 +402,7 @@ Phase 31 in progress
 - Phase 28 moves condition body presentation into `ConditionNodeBody.vue` and the top action/advanced popover presentation into `NodeCardTopActions.vue`; `NodeCard.vue` drops to 2,577 lines while keeping condition drafts, action confirmations, config handlers, lock guards, and graph/state emits in the parent.
 - Phase 29 moves primary input/output state-port presentation into `PrimaryStatePort.vue` and the port-reorder floating preview into `FloatingStatePortPill.vue`; `NodeCard.vue` drops to 1,988 lines while keeping state drafts, port validation, lock guards, and graph/state emits in the parent.
 - Phase 30 closes the low-risk `NodeCard.vue` P1 gate and starts P2 by moving node drag/resize move projection into `canvasNodeDragResizeModel.ts`; `EditorCanvas.vue` drops to 3,332 lines while keeping pointer capture, animation-frame batching, connection completion, and emits in the component.
+- Phase 31 continues P2 by moving node drag/resize refs, pointer-capture release, drag/resize scheduling, and residual click suppression into `useCanvasNodeDragResize.ts`; `EditorCanvas.vue` drops to 3,267 lines while keeping selection, active connection cleanup, panning, DOM measurement, and graph mutation emits in the component.
 - Do not commit runtime artifacts such as `backend/data/settings`, `.dev_*`, `dist`, or `.worktrees`.
 - After code changes, restart using `npm run dev`.
 
@@ -404,3 +417,4 @@ Phase 31 in progress
 | `ConditionNodeBody.vue` and `NodeCardTopActions.vue` were missing during the Phase 28 red test | First focused structure run before implementation | Added both child components and reran focused structure/model tests successfully. |
 | Unescaped backticks in `rg` shell commands triggered `/bin/bash: line 1: NodeCard.vue: command not found` | Phase 28 source inspection and plan sanity-check commands | Re-ran inspection with safer quoting; no code was changed by the failed shell interpolation. |
 | Fresh screenshot tooling probe found no `chromium`, `playwright`, or `puppeteer` available from the current shell | Final visual-check refresh after dev restart | Kept the Phase 28 screenshots already captured earlier in this round and used fresh HTTP health checks for final dev verification. |
+| `vue-tsc` flagged an unused `nodeDrag` destructure after the Phase 31 composable extraction | Phase 31 TypeScript verification | Stopped destructuring `nodeDrag` in `EditorCanvas.vue` and updated the structure test to assert that the drag ref stays owned by the composable. |

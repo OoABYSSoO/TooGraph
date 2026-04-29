@@ -140,6 +140,77 @@
 |-----------|-------|---------|------------|
 | 2026-04-29 | `vue-tsc` rejected `emit` calls scheduled in closures because `update` could still be nullable across the callback boundary | Ran TypeScript unused-symbol verification after model extraction | Captured `resizeUpdate` and `dragUpdate` as narrowed constants before scheduling the animation-frame callback. |
 
+## Session: 2026-04-29 Phase 31
+
+### Phase 1: Canvas Drag/Resize Controller Boundary
+- **Status:** completed
+- Actions taken:
+  - Re-read the formal roadmap, task plan, findings, and Phase 30 progress.
+  - Selected the next safe P2 Canvas slice: node drag/resize refs, pointer capture release, scheduled drag/resize emits, and residual click suppression.
+  - Kept selection, active connection cleanup, auto-snap, connection completion, panning, DOM measurement, and graph mutation emits inside `EditorCanvas.vue`.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `useCanvasNodeDragResize.test.ts` before the composable existed.
+  - Updated `EditorCanvas.structure.test.ts` to require the new composable boundary and to verify that node drag/resize move math still comes from `canvasNodeDragResizeModel.ts`.
+  - Ran the focused tests and verified the expected red failure: missing `useCanvasNodeDragResize.ts`.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `useCanvasNodeDragResize.ts` with node drag and resize refs, start handlers, pointer-move dispatch, pointer-capture release, finish handling, residual click suppression, and teardown.
+  - Updated `EditorCanvas.vue` to consume the composable and remove local node drag/resize refs plus local residual-click suppression state.
+  - Updated structure tests so `EditorCanvas.vue` no longer has to expose `nodeDrag`; the drag ref remains owned by the composable.
+  - Reduced `EditorCanvas.vue` from 3,332 lines to 3,267 lines.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused composable and `EditorCanvas` structure tests.
+  - Ran focused Canvas regression tests covering node drag/resize, node resize projection, connection auto-snap, connection model, node measurements, and edge interactions.
+  - Ran TypeScript unused-symbol verification from the `frontend` directory.
+  - Ran the full frontend source test suite and the Vite structure test in one Node test invocation.
+  - Ran the frontend production build; no Vite large chunk warning was emitted.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed `/editor/new` returned HTTP 200 and backend `/health` returned `{"status":"ok"}`.
+  - Captured a Google Chrome headless screenshot for `/editor/new` at 1440x1000 and confirmed it was nonblank by sampled color count.
+  - Confirmed the restarted backend and frontend processes remained alive after a delayed check.
+
+### Phase 5: Progress Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated total roadmap progress at about 58%.
+  - Recalculated P2 `EditorCanvas.vue` cleanup at about 46%.
+  - Confirmed the build/chunk warning remains resolved because the production build emitted no large chunk warning.
+  - Opened Phase 32 because total roadmap progress remains below 100%.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red focused test | `node --test frontend/src/editor/canvas/useCanvasNodeDragResize.test.ts frontend/src/editor/canvas/EditorCanvas.structure.test.ts` before implementation | Fails because the composable does not exist | Failed with missing `useCanvasNodeDragResize.ts` | Passed |
+| Focused drag/resize structure | Same command after implementation | New composable boundary passes | 62 passed | Passed |
+| Focused Canvas related suite | `node --test` over node drag/resize, nodeResize, EditorCanvas structure, connection, measurements, and edge interactions | Related Canvas behavior/model tests pass | 84 passed | Passed |
+| TypeScript unused-symbol check | `cd frontend && ./node_modules/.bin/vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` | No diagnostics | Exit 0, no diagnostics | Passed |
+| Full frontend tests | `node --test $(rg --files src vite.config.structure.test.ts | rg '\.test\.ts$')` in `frontend` | All frontend tests pass | 782 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without chunk-warning regression | Exit 0, no large chunk warning | Passed |
+| Dev restart and health | `npm run dev`, then HTTP checks | Services start and respond | Frontend `/editor/new` 200, backend `/health` 200 ok | Passed |
+| Browser visual smoke | Google Chrome headless screenshot of `/editor/new` | Page renders nonblank | 1440x1000 PNG, sampledColors=207 | Passed |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Phase 31 implementation, verification, dev restart, commit, and push are complete. |
+| Where am I going? | Phase 32 is open for the next safe P2 Canvas boundary. |
+| What's the goal? | Continue reducing `EditorCanvas.vue` responsibility concentration while preserving auto-snap, node creation context, drag/resize behavior, and runtime UI. |
+| What have I learned? | Node drag/resize interaction state can move into a composable after the pure move model exists, but connection completion and graph mutation emits should remain at the component boundary for now. |
+| What have I done? | Extracted `useCanvasNodeDragResize.ts`, added focused tests, verified full frontend behavior, built without chunk warnings, restarted the app, and opened the next continuation phase. |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-29 | `vue-tsc` flagged `nodeDrag` as an unused `EditorCanvas.vue` destructure after moving drag state into the composable | Ran TypeScript unused-symbol verification after implementation | Removed the unused destructure and updated structure tests to confirm `nodeDrag` remains internal to `useCanvasNodeDragResize.ts`. |
+
 ## Session: 2026-04-29 Phase 29
 
 ### Phase 1: Re-orientation
