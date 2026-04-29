@@ -332,7 +332,7 @@
           data-virtual-affordance-actions="click"
           @pointerenter="setHoveredFlowHandleNode(anchor.nodeId)"
           @pointerleave="clearHoveredFlowHandleNode(anchor.nodeId)"
-          @pointerdown.prevent.stop="handleAnchorPointerDown(anchor)"
+          @pointerdown.prevent.stop="handleAnchorPointerDown(anchor, $event)"
         />
       </div>
       <div class="editor-canvas__route-handles" aria-hidden="true">
@@ -349,7 +349,7 @@
           data-virtual-affordance-actions="click"
           @pointerenter="setHoveredFlowHandleNode(anchor.nodeId)"
           @pointerleave="clearHoveredFlowHandleNode(anchor.nodeId)"
-          @pointerdown.prevent.stop="handleAnchorPointerDown(anchor)"
+          @pointerdown.prevent.stop="handleAnchorPointerDown(anchor, $event)"
         >
           <span class="editor-canvas__route-handle-label">{{ anchor.branch }}</span>
         </div>
@@ -376,7 +376,7 @@
           r="5.5"
           @pointerenter="setHoveredPointAnchorNode(anchor.nodeId)"
           @pointerleave="clearHoveredPointAnchorNode(anchor.nodeId)"
-          @pointerdown.prevent.stop="handleAnchorPointerDown(anchor)"
+          @pointerdown.prevent.stop="handleAnchorPointerDown(anchor, $event)"
         />
       </svg>
     </div>
@@ -600,6 +600,8 @@ import type { SkillDefinition } from "@/types/skills";
 import type { RunNodeTiming } from "../workspace/runNodeTimingModel.ts";
 import type { AgentNode, ConditionNode, GraphDocument, GraphNode, GraphNodeSize, GraphPayload, GraphPosition, InputNode, OutputNode, StateDefinition } from "@/types/node-system";
 
+const TOOGRAPH_VIRTUAL_EMPTY_CANVAS_POINTER_EVENT_KEY = "__toographVirtualEmptyCanvasPointerEvent";
+
 const props = defineProps<{
   document: GraphPayload | GraphDocument;
   knowledgeBases: KnowledgeBaseRecord[];
@@ -768,6 +770,7 @@ const connectionInteraction = useCanvasConnectionInteraction({
 const {
   pendingConnection,
   pendingConnectionPoint,
+  pendingConnectionPointerId,
   autoSnappedTargetAnchor,
   activeConnectionHoverNodeId,
   clearPendingConnection,
@@ -776,6 +779,7 @@ const {
   startOrTogglePendingConnectionFromAnchor,
   updatePendingConnectionTarget,
   setPendingConnectionPoint,
+  isForeignPendingConnectionPointer,
   setActiveConnectionHoverNode,
 } = connectionInteraction;
 const selectedEdgeId = ref<string | null>(null);
@@ -1249,6 +1253,13 @@ const anchorConnectStyle = (anchor: ProjectedCanvasAnchor) =>
   buildPointAnchorConnectStyle(anchor, canvasInteractionStyleContext.value);
 
 function handleCanvasPointerDown(event: PointerEvent) {
+  if (activeConnection.value && isForeignPendingConnectionPointer(event.pointerId)) {
+    canvasRef.value?.focus();
+    event.preventDefault();
+    canvasRef.value?.setPointerCapture(event.pointerId);
+    viewport.beginPan(event);
+    return;
+  }
   const startedPinchZoom = trackTouchPointerDown(event);
   const canvasPointerDownAction = resolveCanvasPointerDownAction({
     startedPinchZoom,
@@ -1304,11 +1315,12 @@ function handleCanvasPointerMove(event: PointerEvent) {
   ) {
     return;
   }
-  if (activeConnection.value) {
+  if (activeConnection.value && !isForeignPendingConnectionPointer(event.pointerId)) {
+    const forceEmptyCanvasDrop = isVirtualEmptyCanvasPointerEvent(event);
     const connectionPointerMoveRequest = resolveCanvasConnectionPointerMoveRequest({
       connection: activeConnection.value,
       hoverNodeId: resolveNodeIdAtPointer(event),
-      targetAnchor: resolveAutoSnappedTargetAnchor(event),
+      targetAnchor: forceEmptyCanvasDrop ? null : resolveAutoSnappedTargetAnchor(event),
       fallbackPoint: resolveCanvasPoint(event),
     });
     if (connectionPointerMoveRequest) {
@@ -1355,11 +1367,11 @@ function handleCanvasPointerUp(event: PointerEvent) {
     canvasRef.value.releasePointerCapture(event.pointerId);
   }
   releaseNodeDragResizePointerCapture(event.pointerId);
-  if (activeConnection.value) {
+  if (activeConnection.value && !isForeignPendingConnectionPointer(event.pointerId)) {
     const connectionPointerUpAction = resolveCanvasConnectionPointerUpAction({
       connection: activeConnection.value,
       interactionLocked: isGraphEditingLocked(),
-      autoSnappedTargetAnchor: autoSnappedTargetAnchor.value,
+      autoSnappedTargetAnchor: isVirtualEmptyCanvasPointerEvent(event) ? null : autoSnappedTargetAnchor.value,
     });
     switch (connectionPointerUpAction?.type) {
       case "clear-connection-interaction":
@@ -1442,6 +1454,10 @@ function resolveAutoSnappedTargetAnchor(event: PointerEvent) {
     pendingAgentInputSourceByNodeId: pendingAgentInputSourceByNodeId.value,
     canComplete: canCompleteCanvasConnection,
   });
+}
+
+function isVirtualEmptyCanvasPointerEvent(event: PointerEvent) {
+  return (event as PointerEvent & Record<string, unknown>)[TOOGRAPH_VIRTUAL_EMPTY_CANVAS_POINTER_EVENT_KEY] === true;
 }
 
 function isPointerWithinNodeElement(nodeElement: HTMLElement, event: PointerEvent) {
@@ -1852,7 +1868,7 @@ function applyEdgePointerDownBaseAction(action: {
   }
 }
 
-function handleAnchorPointerDown(anchor: ProjectedCanvasAnchor) {
+function handleAnchorPointerDown(anchor: ProjectedCanvasAnchor, event: PointerEvent) {
   const anchorPointerDownAction = resolveCanvasAnchorPointerDownAction({
     interactionLocked: isGraphEditingLocked(),
     anchor,
@@ -1875,7 +1891,7 @@ function handleAnchorPointerDown(anchor: ProjectedCanvasAnchor) {
       if (anchorPointerDownAction.clearWindowSelection) {
         window.getSelection()?.removeAllRanges();
       }
-      const pendingConnectionResult = startOrTogglePendingConnectionFromAnchor(anchor);
+      const pendingConnectionResult = startOrTogglePendingConnectionFromAnchor(anchor, event.pointerId);
       if (pendingConnectionResult.status !== "ignored") {
         selectedEdgeId.value = null;
       }

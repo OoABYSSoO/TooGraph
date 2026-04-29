@@ -826,6 +826,11 @@ const baseMessages = {
       open: "打开伙伴对话",
       dragHint: "拖拽移动，点击对话",
       virtualCursor: "伙伴虚拟鼠标",
+      virtualOperation: {
+        running: "伙伴正在操作画布",
+        stopping: "正在停止伙伴操作",
+        stop: "停止伙伴操作",
+      },
       modeLabel: "图操作档位",
       modes: {
         askFirst: "需确认",
@@ -1919,6 +1924,11 @@ const baseMessages = {
       open: "Open buddy chat",
       dragHint: "Drag to move, click to chat",
       virtualCursor: "Buddy virtual cursor",
+      virtualOperation: {
+        running: "Buddy is operating the canvas",
+        stopping: "Stopping Buddy operation",
+        stop: "Stop Buddy operation",
+      },
       modeLabel: "Graph tier",
       modes: {
         askFirst: "Ask first",

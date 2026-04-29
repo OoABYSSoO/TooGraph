@@ -31,6 +31,32 @@ test("useCanvasConnectionInteraction starts and toggles pending connections from
   assert.equal(controller.pendingConnectionPoint.value, null);
 });
 
+test("useCanvasConnectionInteraction keeps the pointer that owns a pending connection", () => {
+  const controller = useCanvasConnectionInteraction();
+  const anchor = createAnchor({
+    id: "agent:flow-out",
+    nodeId: "agent",
+    kind: "flow-out",
+    x: 180,
+    y: 220,
+    side: "right",
+  });
+
+  const started = controller.startOrTogglePendingConnectionFromAnchor(anchor, 9001);
+
+  assert.equal(started.status, "started");
+  assert.equal(controller.pendingConnectionPointerId.value, 9001);
+  assert.equal(controller.isPendingConnectionPointer(9001), true);
+  assert.equal(controller.isPendingConnectionPointer(1), false);
+  assert.equal(controller.isForeignPendingConnectionPointer(1), true);
+
+  controller.clearPendingConnection();
+
+  assert.equal(controller.pendingConnectionPointerId.value, null);
+  assert.equal(controller.isPendingConnectionPointer(1), true);
+  assert.equal(controller.isForeignPendingConnectionPointer(1), false);
+});
+
 test("useCanvasConnectionInteraction updates auto-snap targets without losing fallback pointer points", () => {
   const controller = useCanvasConnectionInteraction();
   const targetAnchor = createAnchor({

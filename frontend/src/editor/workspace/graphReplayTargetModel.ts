@@ -11,6 +11,10 @@ import type {
   GraphEditIntent,
   GraphEditNodeType,
 } from "./graphEditPlaybackModel.ts";
+import {
+  resolveNodeCreationGesturePositionForFinalPosition,
+  type NodeCreationPlacementContext,
+} from "./nodeCreationPlacement.ts";
 
 export type GraphReplayTargetParseResult = {
   graph: GraphPayload | GraphDocument | null;
@@ -296,6 +300,12 @@ function buildCreateNodeIntent(
   nodeType: GraphEditNodeType,
   creationSource: GraphEditCreateNodeIntent["creationSource"] | null = null,
 ): GraphEditCreateNodeIntent {
+  const position = resolveNodeCreationGesturePositionForFinalPosition({
+    nodeId,
+    node,
+    finalPosition: node.ui.position,
+    context: placementContextFromCreationSource(creationSource),
+  });
   return {
     kind: "create_node",
     ref: nodeId,
@@ -304,9 +314,26 @@ function buildCreateNodeIntent(
     title: node.name,
     description: node.description,
     taskInstruction: node.kind === "agent" ? agentTaskInstruction(node) : "",
-    position: node.ui.position,
+    position,
     creationSource: creationSource ?? undefined,
   };
+}
+
+function placementContextFromCreationSource(
+  creationSource: GraphEditCreateNodeIntent["creationSource"] | null,
+): NodeCreationPlacementContext {
+  if (creationSource?.kind === "state") {
+    return {
+      sourceAnchorKind: "state-out",
+      sourceStateKey: creationSource.stateRef,
+    };
+  }
+  if (creationSource?.kind === "flow") {
+    return {
+      sourceAnchorKind: "flow-out",
+    };
+  }
+  return {};
 }
 
 function graphEditNodeType(node: GraphNode): GraphEditNodeType | null {

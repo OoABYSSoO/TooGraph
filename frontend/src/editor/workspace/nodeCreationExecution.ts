@@ -11,6 +11,7 @@ import {
 import { createDraftFromTemplate } from "../../lib/graph-document.ts";
 import type {
   GraphDocument,
+  GraphNode,
   GraphPayload,
   GraphPosition,
   NodeCreationContext,
@@ -20,6 +21,7 @@ import type {
 } from "../../types/node-system.ts";
 
 import { resolveBuiltinNodeCreationPreset } from "./nodeCreationBuiltins.ts";
+import { resolveNodeCreationFinalPositionFromGesture } from "./nodeCreationPlacement.ts";
 import { buildNextDefaultStateField, rememberDefaultStateKeyIndex } from "./statePanelFields.ts";
 
 type CreateNodeFromCreationEntryInput = {
@@ -62,6 +64,35 @@ function resolveCreationTemplate(entry: NodeCreationEntry, templates: TemplateRe
   return templates.find((template) => template.template_id === entry.templateId) ?? null;
 }
 
+function resolveCreatedNodeForCreationContext(
+  nodeId: string,
+  node: GraphNode,
+  context?: NodeCreationContext | null,
+): GraphNode {
+  return {
+    ...node,
+    ui: {
+      ...node.ui,
+      position: resolveNodeCreationFinalPositionFromGesture({
+        nodeId,
+        node,
+        context,
+      }),
+    },
+  };
+}
+
+function applyCreatedNodePlacement<T extends { node: GraphNode }>(
+  created: T,
+  nodeId: string,
+  context?: NodeCreationContext | null,
+): T {
+  return {
+    ...created,
+    node: resolveCreatedNodeForCreationContext(nodeId, created.node, context),
+  };
+}
+
 export function createNodeFromCreationEntry<T extends GraphPayload | GraphDocument>(
   document: T,
   input: CreateNodeFromCreationEntryInput,
@@ -71,10 +102,14 @@ export function createNodeFromCreationEntry<T extends GraphPayload | GraphDocume
     createGraphNodeId(input.entry.nodeKind ?? input.entry.family ?? (input.entry.mode === "preset" ? "preset" : "node"));
 
   if (input.entry.mode === "node" && input.entry.nodeKind === "input") {
-    const created = buildGenericInputNode({
-      id: createdNodeId,
-      position: input.context?.position ?? { x: 0, y: 0 },
-    });
+    const created = applyCreatedNodePlacement(
+      buildGenericInputNode({
+        id: createdNodeId,
+        position: input.context?.position ?? { x: 0, y: 0 },
+      }),
+      createdNodeId,
+      input.context,
+    );
     return applyNodeCreationResult(document, {
       createdNodeId,
       createdNode: created.node,
@@ -84,10 +119,14 @@ export function createNodeFromCreationEntry<T extends GraphPayload | GraphDocume
   }
 
   if (input.entry.mode === "node" && input.entry.nodeKind === "output") {
-    const created = buildGenericOutputNode({
-      id: createdNodeId,
-      position: input.context?.position ?? { x: 0, y: 0 },
-    });
+    const created = applyCreatedNodePlacement(
+      buildGenericOutputNode({
+        id: createdNodeId,
+        position: input.context?.position ?? { x: 0, y: 0 },
+      }),
+      createdNodeId,
+      input.context,
+    );
     return applyNodeCreationResult(document, {
       createdNodeId,
       createdNode: created.node,
@@ -107,11 +146,15 @@ export function createNodeFromCreationEntry<T extends GraphPayload | GraphDocume
       sourceTemplateId: template.template_id,
       sourceTemplateSource: template.source ?? "official",
     };
-    const created = buildSubgraphNodeFromGraph(graph, {
-      id: createdNodeId,
-      position: input.context?.position ?? { x: 0, y: 0 },
-      targetDocument: document,
-    });
+    const created = applyCreatedNodePlacement(
+      buildSubgraphNodeFromGraph(graph, {
+        id: createdNodeId,
+        position: input.context?.position ?? { x: 0, y: 0 },
+        targetDocument: document,
+      }),
+      createdNodeId,
+      input.context,
+    );
     return applyNodeCreationResult(document, {
       createdNodeId,
       createdNode: created.node,
@@ -125,10 +168,14 @@ export function createNodeFromCreationEntry<T extends GraphPayload | GraphDocume
     throw new Error(`Unable to resolve creation preset for ${input.entry.id}.`);
   }
 
-  const created = buildNodeFromPreset(preset, {
-    id: createdNodeId,
-    position: input.context?.position ?? { x: 0, y: 0 },
-  });
+  const created = applyCreatedNodePlacement(
+    buildNodeFromPreset(preset, {
+      id: createdNodeId,
+      position: input.context?.position ?? { x: 0, y: 0 },
+    }),
+    createdNodeId,
+    input.context,
+  );
   return applyNodeCreationResult(document, {
     createdNodeId,
     createdNode: created.node,

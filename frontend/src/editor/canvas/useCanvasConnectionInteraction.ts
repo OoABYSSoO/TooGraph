@@ -25,12 +25,14 @@ export type PendingConnectionStartResult =
 export function useCanvasConnectionInteraction(input: CanvasConnectionInteractionInput = {}) {
   const pendingConnection = ref<PendingGraphConnection | null>(null);
   const pendingConnectionPoint = ref<CanvasConnectionPreviewPoint | null>(null);
+  const pendingConnectionPointerId = ref<number | null>(null);
   const autoSnappedTargetAnchor = ref<ProjectedCanvasAnchor | null>(null);
   const activeConnectionHoverNodeId = ref<string | null>(null);
 
   function clearPendingConnection() {
     pendingConnection.value = null;
     pendingConnectionPoint.value = null;
+    pendingConnectionPointerId.value = null;
   }
 
   function clearConnectionPreviewState() {
@@ -43,7 +45,7 @@ export function useCanvasConnectionInteraction(input: CanvasConnectionInteractio
     clearConnectionPreviewState();
   }
 
-  function startOrTogglePendingConnectionFromAnchor(anchor: ProjectedCanvasAnchor): PendingConnectionStartResult {
+  function startOrTogglePendingConnectionFromAnchor(anchor: ProjectedCanvasAnchor, pointerId: number | null = null): PendingConnectionStartResult {
     const nextPendingConnection = buildPendingConnectionFromAnchor(anchor);
     if (!nextPendingConnection) {
       return { status: "ignored" };
@@ -56,6 +58,7 @@ export function useCanvasConnectionInteraction(input: CanvasConnectionInteractio
 
     pendingConnection.value = nextPendingConnection;
     pendingConnectionPoint.value = { x: anchor.x, y: anchor.y };
+    pendingConnectionPointerId.value = pointerId;
     return { status: "started", connection: nextPendingConnection };
   }
 
@@ -71,6 +74,14 @@ export function useCanvasConnectionInteraction(input: CanvasConnectionInteractio
 
   function setPendingConnectionPoint(point: CanvasConnectionPreviewPoint | null) {
     pendingConnectionPoint.value = point;
+  }
+
+  function isPendingConnectionPointer(pointerId: number) {
+    return pendingConnectionPointerId.value === null || pendingConnectionPointerId.value === pointerId;
+  }
+
+  function isForeignPendingConnectionPointer(pointerId: number) {
+    return pendingConnectionPointerId.value !== null && pendingConnectionPointerId.value !== pointerId;
   }
 
   function setActiveConnectionHoverNode(nodeId: string | null) {
@@ -89,6 +100,7 @@ export function useCanvasConnectionInteraction(input: CanvasConnectionInteractio
   return {
     pendingConnection,
     pendingConnectionPoint,
+    pendingConnectionPointerId,
     autoSnappedTargetAnchor,
     activeConnectionHoverNodeId,
     clearPendingConnection,
@@ -97,6 +109,8 @@ export function useCanvasConnectionInteraction(input: CanvasConnectionInteractio
     startOrTogglePendingConnectionFromAnchor,
     updatePendingConnectionTarget,
     setPendingConnectionPoint,
+    isPendingConnectionPointer,
+    isForeignPendingConnectionPointer,
     setActiveConnectionHoverNode,
   };
 }

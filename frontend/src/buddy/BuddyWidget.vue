@@ -51,6 +51,25 @@
       </svg>
     </button>
     <div
+      v-if="virtualOperationStatus"
+      class="buddy-widget__virtual-operation-banner"
+      :class="`buddy-widget__virtual-operation-banner--${virtualOperationStatus.tone}`"
+      role="status"
+      aria-live="assertive"
+    >
+      <span class="buddy-widget__virtual-operation-pulse" aria-hidden="true"></span>
+      <span class="buddy-widget__virtual-operation-label">{{ virtualOperationStatus.label }}</span>
+      <button
+        type="button"
+        class="buddy-widget__virtual-operation-stop"
+        :title="t('buddy.virtualOperation.stop')"
+        :aria-label="t('buddy.virtualOperation.stop')"
+        @click="interruptVirtualOperation"
+      >
+        <span class="buddy-widget__virtual-operation-stop-icon" aria-hidden="true"></span>
+      </button>
+    </div>
+    <div
       class="buddy-widget__anchor"
       :class="[
         `buddy-widget__anchor--${panelPlacement}`,
@@ -423,7 +442,7 @@ import { Check, Clock, Close, Delete, FullScreen, Plus, Promotion, SemiSelect } 
 import { ElButton, ElInput } from "element-plus";
 import { ElIcon, ElOption, ElPopover, ElSelect } from "element-plus";
 import { storeToRefs } from "pinia";
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 
@@ -573,6 +592,16 @@ type VirtualCursorPhase = "hidden" | "launching" | "active" | "returning";
 type BuddyIdleAnimationAction = "tail-switch" | "random-move" | "virtual-cursor-orbit" | "virtual-cursor-chase";
 type BuddyIdleRunOptions = { force?: boolean };
 type VirtualCursorIdleActionMode = "none" | "orbit" | "chase";
+type BuddyVirtualOperationStatus = {
+  label: string;
+  tone: "active" | "stopping";
+};
+type BuddyVirtualOperationToken = {
+  id: number;
+  interrupted: boolean;
+  interruptPromise: Promise<void>;
+  interrupt: () => void;
+};
 type BuddyModelOption = {
   value: string;
   label: string;
@@ -613,6 +642,12 @@ const BUDDY_VIRTUAL_CURSOR_ACTIVE_SCALE = 1;
 const BUDDY_VIRTUAL_CURSOR_FOLLOW_TARGET_REACHED_DISTANCE_PX = 12;
 const BUDDY_VIRTUAL_CURSOR_FOLLOW_TARGET_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width * 1.25;
 const BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS = 80;
+const BUDDY_VIRTUAL_OPERATION_TYPE_CHARACTER_DELAY_MS = 18;
+const BUDDY_VIRTUAL_POINTER_ID = 9001;
+const TOOGRAPH_VIRTUAL_POINTER_EVENT_KEY = "__toographVirtualPointerEvent";
+const TOOGRAPH_VIRTUAL_EMPTY_CANVAS_POINTER_EVENT_KEY = "__toographVirtualEmptyCanvasPointerEvent";
+const BUDDY_GRAPH_EDIT_PLAYBACK_TARGET_WAIT_MS = 2400;
+const BUDDY_GRAPH_EDIT_PLAYBACK_TARGET_RETRY_MS = 80;
 const VIRTUAL_CURSOR_STAR_PATH =
   "M0-72 C5-46 18-33 44-28 C18-23 5-10 0 16 C-5-10 -18-23 -44-28 C-18-33 -5-46 0-72Z";
 const VIRTUAL_CURSOR_SHAPE_PATH =
@@ -645,6 +680,8 @@ const virtualCursorRotateDurationMs = ref(BUDDY_VIRTUAL_CURSOR_ROTATE_TRANSITION
 const virtualCursorDetached = ref(false);
 const virtualCursorDragging = ref(false);
 const virtualCursorIdleActionMode = ref<VirtualCursorIdleActionMode>("none");
+const virtualOperationStatus = ref<BuddyVirtualOperationStatus | null>(null);
+const activeVirtualOperationToken = shallowRef<BuddyVirtualOperationToken | null>(null);
 const isPanelOpen = ref(false);
 const draft = ref("");
 const avatarHopCycle = ref(0);
@@ -694,6 +731,7 @@ let virtualCursorDrag: {
   startY: number;
   startPosition: BuddyPosition;
 } | null = null;
+let virtualOperationTokenId = 0;
 let suppressNextClick = false;
 let eventSource: EventSource | null = null;
 let activeAbortController: AbortController | null = null;
@@ -2256,14 +2294,84 @@ async function executeVirtualOperationRequest(request: BuddyVirtualOperationRequ
 
 async function executeVirtualOperationCommands(operationPlan: BuddyVirtualOperationPlan) {
   stopBuddyIdleAnimation();
-  await ensureVirtualCursorReadyForOperation();
-  for (const operation of operationPlan.operations) {
-    await executeBuddyVirtualOperationCommand(operation);
+  const token = beginVirtualOperation();
+  try {
+    await ensureVirtualCursorReadyForOperation();
+    for (const operation of operationPlan.operations) {
+      if (isVirtualOperationInterrupted(token)) {
+        break;
+      }
+      await executeBuddyVirtualOperationCommand(operation);
+    }
+    if (!isVirtualOperationInterrupted(token) && (operationPlan.cursorLifecycle === "return_after_step" || operationPlan.cursorLifecycle === "return_at_end")) {
+      await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS, activeVirtualOperationToken.value);
+      if (!isVirtualOperationInterrupted(token)) {
+        buddyMascotDebugStore.setVirtualCursorEnabled(false);
+      }
+    }
+    if (isVirtualOperationInterrupted(token)) {
+      buddyMascotDebugStore.setVirtualCursorEnabled(false);
+    }
+  } finally {
+    finishVirtualOperation(token);
   }
-  if (operationPlan.cursorLifecycle === "return_after_step" || operationPlan.cursorLifecycle === "return_at_end") {
-    await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS);
-    buddyMascotDebugStore.setVirtualCursorEnabled(false);
+}
+
+function beginVirtualOperation(): BuddyVirtualOperationToken {
+  activeVirtualOperationToken.value?.interrupt();
+  const token = createBuddyVirtualOperationToken();
+  activeVirtualOperationToken.value = token;
+  virtualOperationStatus.value = {
+    label: t("buddy.virtualOperation.running"),
+    tone: "active",
+  };
+  return token;
+}
+
+function createBuddyVirtualOperationToken(): BuddyVirtualOperationToken {
+  let resolveInterrupt: () => void = () => undefined;
+  const interruptPromise = new Promise<void>((resolve) => {
+    resolveInterrupt = resolve;
+  });
+  const token: BuddyVirtualOperationToken = {
+    id: ++virtualOperationTokenId,
+    interrupted: false,
+    interruptPromise,
+    interrupt: () => {
+      if (token.interrupted) {
+        return;
+      }
+      token.interrupted = true;
+      resolveInterrupt();
+    },
+  };
+  return token;
+}
+
+function interruptVirtualOperation() {
+  const token = activeVirtualOperationToken.value;
+  if (!token) {
+    return;
   }
+  token.interrupt();
+  virtualCursorDragging.value = false;
+  virtualOperationStatus.value = {
+    label: t("buddy.virtualOperation.stopping"),
+    tone: "stopping",
+  };
+}
+
+function finishVirtualOperation(token: BuddyVirtualOperationToken) {
+  if (activeVirtualOperationToken.value !== token) {
+    return;
+  }
+  activeVirtualOperationToken.value = null;
+  virtualOperationStatus.value = null;
+  virtualCursorDragging.value = false;
+}
+
+function isVirtualOperationInterrupted(token: BuddyVirtualOperationToken | null) {
+  return !token || token.interrupted || activeVirtualOperationToken.value !== token;
 }
 
 async function executeBuddyVirtualOperationCommand(operation: BuddyVirtualOperation) {
@@ -2296,11 +2404,15 @@ async function executeBuddyVirtualClickOperation(operation: BuddyVirtualOperatio
   if (!("targetId" in operation)) {
     return;
   }
+  const token = activeVirtualOperationToken.value;
   const affordance = resolveVirtualOperationAffordance(operation.targetId);
   if (!affordance) {
     return;
   }
   await moveVirtualCursorToElement(affordance.element);
+  if (isVirtualOperationInterrupted(token)) {
+    return;
+  }
   dispatchVirtualClick(affordance.element);
 }
 
@@ -2308,11 +2420,15 @@ async function executeBuddyVirtualFocusOperation(operation: BuddyVirtualOperatio
   if (!("targetId" in operation)) {
     return;
   }
+  const token = activeVirtualOperationToken.value;
   const affordance = resolveVirtualOperationAffordance(operation.targetId);
   if (!affordance) {
     return;
   }
   await moveVirtualCursorToElement(affordance.element);
+  if (isVirtualOperationInterrupted(token)) {
+    return;
+  }
   affordance.element.focus();
 }
 
@@ -2333,24 +2449,31 @@ async function executeBuddyVirtualTypeOperation(operation: BuddyVirtualOperation
   if (!("targetId" in operation) || operation.kind !== "type" || !operation.text) {
     return;
   }
+  const token = activeVirtualOperationToken.value;
   await executeBuddyVirtualFocusOperation(operation);
+  if (isVirtualOperationInterrupted(token)) {
+    return;
+  }
   const input = resolveVirtualOperationTextInput(operation.targetId);
   if (!input) {
     return;
   }
-  input.value = `${input.value}${operation.text}`;
-  dispatchVirtualInputEvents(input, "insertText", operation.text);
+  await typeVirtualText(input, operation.text);
 }
 
 async function executeBuddyVirtualPressOperation(operation: BuddyVirtualOperation) {
   if (!("targetId" in operation) || operation.kind !== "press" || !operation.key) {
     return;
   }
+  const token = activeVirtualOperationToken.value;
   const affordance = resolveVirtualOperationAffordance(operation.targetId);
   if (!affordance) {
     return;
   }
   await moveVirtualCursorToElement(affordance.element);
+  if (isVirtualOperationInterrupted(token)) {
+    return;
+  }
   affordance.element.focus();
   affordance.element.dispatchEvent(new KeyboardEvent("keydown", { key: operation.key, bubbles: true }));
   affordance.element.dispatchEvent(new KeyboardEvent("keyup", { key: operation.key, bubbles: true }));
@@ -2379,9 +2502,13 @@ async function executeBuddyVirtualGraphEditOperation(operation: BuddyVirtualOper
   if (operation.kind !== "graph_edit") {
     return;
   }
+  const token = activeVirtualOperationToken.value;
   const affordance = resolveVirtualOperationAffordance(operation.targetId);
   if (affordance) {
     await moveVirtualCursorToElement(affordance.element);
+    if (isVirtualOperationInterrupted(token)) {
+      return;
+    }
   }
   const requestId = `graph-edit-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
   const response = requestGraphEditPlaybackPlan({
@@ -2393,16 +2520,35 @@ async function executeBuddyVirtualGraphEditOperation(operation: BuddyVirtualOper
   }
   const playbackState = createGraphEditPlaybackUiState();
   await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS);
-  for (const step of response.playbackSteps) {
-    const targetElement = resolveGraphEditPlaybackStepElement(step, playbackState) ?? affordance?.element ?? null;
+  if (isVirtualOperationInterrupted(token)) {
+    return;
+  }
+  for (let stepIndex = 0; stepIndex < response.playbackSteps.length; stepIndex += 1) {
+    if (isVirtualOperationInterrupted(token)) {
+      break;
+    }
+    const step = response.playbackSteps[stepIndex]!;
+    const targetElement = await resolveGraphEditPlaybackStepElementWithRetry(step, playbackState, token);
+    if (isVirtualOperationInterrupted(token)) {
+      break;
+    }
+    if (shouldSkipGraphEditPlaybackTextStep(step, response.playbackSteps, stepIndex, playbackState, targetElement)) {
+      continue;
+    }
+    if (shouldSkipGraphEditPlaybackConnectionStep(step, playbackState)) {
+      continue;
+    }
     if (isGraphEditPlaybackDragStep(step)) {
       await executeGraphEditPlaybackDragStep(step, targetElement, playbackState);
     } else if (targetElement) {
-      await moveVirtualCursorToElement(targetElement);
+      await moveVirtualCursorToGraphEditStep(step, targetElement);
+    }
+    if (isVirtualOperationInterrupted(token)) {
+      break;
     }
     if (step.kind === "open_node_creation_menu") {
       if (!step.sourceAnchorKind && targetElement) {
-        dispatchVirtualDoubleClick(targetElement);
+        dispatchVirtualDoubleClick(targetElement, resolveGraphEditPlaybackPositionClientPoint(step));
       }
     } else if (step.kind === "choose_node_type" && targetElement) {
       const beforeNodeIds = listGraphEditPlaybackNodeAffordanceIds();
@@ -2445,24 +2591,38 @@ async function executeGraphEditPlaybackDragStep(
   if (!targetElement) {
     return;
   }
-  await moveVirtualCursorToElement(targetElement);
   const resolvedStep = resolveAliasedGraphEditPlaybackStep(step, playbackState);
+  await moveVirtualCursorToGraphEditStep(resolvedStep, targetElement);
   virtualCursorDragging.value = true;
   await dispatchVirtualGraphDragPointerEvents(resolvedStep, targetElement);
   virtualCursorDragging.value = false;
 }
 
 async function dispatchVirtualGraphDragPointerEvents(step: GraphEditPlaybackStep, targetElement: HTMLElement) {
+  const token = activeVirtualOperationToken.value;
   const pointerSurface = resolveVirtualOperationAffordance("editor.canvas.surface")?.element ?? targetElement;
   const startPoint = resolveElementCenterPoint(targetElement);
   const endPoint = resolveGraphEditPlaybackDragEndPoint(step) ?? startPoint;
+  const forceEmptyCanvasDrop = shouldForceGraphEditPlaybackEmptyCanvasDrop(step);
   dispatchVirtualPointerEvent(targetElement, "pointerdown", startPoint.x, startPoint.y);
   const dragPoints = buildVirtualDragPoints(startPoint, endPoint);
   for (const point of dragPoints) {
-    dispatchVirtualPointerEvent(pointerSurface, "pointermove", point.x, point.y);
+    if (isVirtualOperationInterrupted(token)) {
+      break;
+    }
+    dispatchVirtualPointerEvent(pointerSurface, "pointermove", point.x, point.y, { forceEmptyCanvasDrop });
     await waitForVirtualOperation(moveVirtualCursorToClientPoint(point, { durationMs: 80 }));
   }
-  dispatchVirtualPointerEvent(pointerSurface, "pointerup", endPoint.x, endPoint.y);
+  dispatchVirtualPointerEvent(pointerSurface, "pointerup", endPoint.x, endPoint.y, { forceEmptyCanvasDrop });
+}
+
+function shouldForceGraphEditPlaybackEmptyCanvasDrop(step: GraphEditPlaybackStep) {
+  const endTarget = typeof step.endTarget === "string" ? step.endTarget : "";
+  return (
+    (step.kind === "drag_state_edge_to_canvas" || step.kind === "draw_flow_edge") &&
+    Boolean(step.position) &&
+    (!endTarget || endTarget === "editor.canvas.surface" || endTarget === "editor.canvas.empty.createFirstNode")
+  );
 }
 
 function buildVirtualDragPoints(startPoint: BuddyPosition, endPoint: BuddyPosition) {
@@ -2480,14 +2640,31 @@ function buildVirtualDragPoints(startPoint: BuddyPosition, endPoint: BuddyPositi
 
 function resolveGraphEditPlaybackDragEndPoint(step: GraphEditPlaybackStep): BuddyPosition | null {
   const endTarget = typeof step.endTarget === "string" ? step.endTarget : "";
+  const positionPoint = resolveGraphEditPlaybackPositionClientPoint(step);
+  if (positionPoint && (!endTarget || endTarget === "editor.canvas.surface" || endTarget === "editor.canvas.empty.createFirstNode")) {
+    return positionPoint;
+  }
   if (endTarget) {
     const endAffordance = resolveVirtualOperationAffordance(endTarget);
     if (endAffordance) {
       return resolveElementCenterPoint(endAffordance.element);
     }
+    const anchorFallbackPoint = resolveGraphEditPlaybackAnchorNodeFallbackPoint(endTarget);
+    if (anchorFallbackPoint) {
+      return anchorFallbackPoint;
+    }
   }
   const surface = resolveVirtualOperationAffordance("editor.canvas.surface");
   return surface ? resolveElementCenterPoint(surface.element) : null;
+}
+
+function resolveGraphEditPlaybackAnchorNodeFallbackPoint(targetId: string) {
+  const nodeId = /^editor\.canvas\.anchor\.([^:]+):/.exec(targetId)?.[1] ?? "";
+  if (!nodeId) {
+    return null;
+  }
+  const nodeAffordance = resolveVirtualOperationAffordance(`editor.canvas.node.${nodeId}`);
+  return nodeAffordance ? resolveElementCenterPoint(nodeAffordance.element) : null;
 }
 
 function requestGraphEditPlaybackPlan(input: { requestId: string; graphEditIntents: GraphEditIntent[] }): GraphEditPlaybackPlanRequestResponse | null {
@@ -2507,6 +2684,25 @@ function requestGraphEditPlaybackPlan(input: { requestId: string; graphEditInten
   return detail.response;
 }
 
+async function resolveGraphEditPlaybackStepElementWithRetry(
+  step: GraphEditPlaybackStep,
+  playbackState: GraphEditPlaybackUiState,
+  token: BuddyVirtualOperationToken | null,
+) {
+  const deadlineMs = Date.now() + BUDDY_GRAPH_EDIT_PLAYBACK_TARGET_WAIT_MS;
+  while (!isVirtualOperationInterrupted(token) && Date.now() <= deadlineMs) {
+    const targetElement = resolveGraphEditPlaybackStepElement(step, playbackState);
+    if (targetElement) {
+      return targetElement;
+    }
+    await waitForVirtualOperation(BUDDY_GRAPH_EDIT_PLAYBACK_TARGET_RETRY_MS);
+  }
+  if (isVirtualOperationInterrupted(token)) {
+    return null;
+  }
+  return resolveGraphEditPlaybackStepElement(step, playbackState);
+}
+
 function resolveGraphEditPlaybackStepElement(step: GraphEditPlaybackStep, playbackState: GraphEditPlaybackUiState): HTMLElement | null {
   const targetId = resolveAliasedGraphEditPlaybackTarget(step.target, playbackState);
   const exactAffordance = resolveVirtualOperationAffordance(targetId);
@@ -2514,13 +2710,24 @@ function resolveGraphEditPlaybackStepElement(step: GraphEditPlaybackStep, playba
     return exactAffordance.element;
   }
   if (targetId.startsWith("editor.canvas.")) {
-    return resolveVirtualOperationAffordance(targetId)?.element ?? null;
+    return resolveVirtualOperationAffordance(targetId)?.element ?? resolveGraphEditPlaybackStepFallbackElement(step, playbackState);
   }
   const nodeId = resolveGraphEditPlaybackTargetNodeId(targetId);
   if (nodeId) {
     return resolveVirtualOperationAffordance(`editor.canvas.node.${nodeId}`)?.element ?? null;
   }
-  return resolveVirtualOperationAffordance("editor.canvas.surface")?.element ?? null;
+  return resolveGraphEditPlaybackStepFallbackElement(step, playbackState);
+}
+
+function resolveGraphEditPlaybackStepFallbackElement(step: GraphEditPlaybackStep, playbackState: GraphEditPlaybackUiState): HTMLElement | null {
+  const targetId = resolveAliasedGraphEditPlaybackTarget(step.target, playbackState);
+  if (targetId === "editor.canvas.empty.createFirstNode") {
+    return resolveVirtualOperationAffordance("editor.canvas.surface")?.element ?? null;
+  }
+  if ((step.kind === "move_virtual_cursor" || step.kind === "open_node_creation_menu") && targetId === "editor.canvas.surface") {
+    return resolveVirtualOperationAffordance("editor.canvas.surface")?.element ?? null;
+  }
+  return null;
 }
 
 function resolveGraphEditPlaybackTargetNodeId(targetId: string): string {
@@ -2532,6 +2739,8 @@ function resolveAliasedGraphEditPlaybackStep(step: GraphEditPlaybackStep, playba
     ...step,
     target: resolveAliasedGraphEditPlaybackTarget(step.target, playbackState),
     endTarget: step.endTarget ? resolveAliasedGraphEditPlaybackTarget(step.endTarget, playbackState) : undefined,
+    nodeId: step.nodeId ? playbackState.nodeIdAliases.get(step.nodeId) ?? step.nodeId : undefined,
+    stateKey: step.stateKey ? playbackState.stateKeyAliases.get(step.stateKey) ?? step.stateKey : undefined,
     sourceNodeId: step.sourceNodeId ? playbackState.nodeIdAliases.get(step.sourceNodeId) ?? step.sourceNodeId : undefined,
     sourceStateKey: step.sourceStateKey ? playbackState.stateKeyAliases.get(step.sourceStateKey) ?? step.sourceStateKey : undefined,
   };
@@ -2554,6 +2763,71 @@ function resolveAliasedGraphEditPlaybackTarget(targetId: string, playbackState: 
 
 function replaceAllLiteral(value: string, search: string, replacement: string) {
   return value.split(search).join(replacement);
+}
+
+function shouldSkipGraphEditPlaybackTextStep(
+  step: GraphEditPlaybackStep,
+  steps: GraphEditPlaybackStep[],
+  stepIndex: number,
+  playbackState: GraphEditPlaybackUiState,
+  targetElement: HTMLElement | null,
+) {
+  if (step.kind === "focus_node_field") {
+    const nextStep = steps[stepIndex + 1];
+    return Boolean(
+      nextStep?.kind === "type_node_field" &&
+        nextStep.target === step.target &&
+        isGraphEditPlaybackTextAlreadyCurrent(nextStep, playbackState, targetElement),
+    );
+  }
+  if (step.kind === "type_node_field") {
+    return isGraphEditPlaybackTextAlreadyCurrent(step, playbackState, targetElement);
+  }
+  return false;
+}
+
+function shouldSkipGraphEditPlaybackConnectionStep(step: GraphEditPlaybackStep, playbackState: GraphEditPlaybackUiState) {
+  const edgeTargetId =
+    step.kind === "drag_state_edge_to_node"
+      ? resolveGraphEditPlaybackDataEdgeTarget(step, playbackState)
+      : step.kind === "draw_flow_edge"
+        ? resolveGraphEditPlaybackFlowEdgeTarget(step, playbackState)
+        : "";
+  return Boolean(edgeTargetId && hasVirtualOperationAffordanceElement(edgeTargetId));
+}
+
+function resolveGraphEditPlaybackDataEdgeTarget(step: GraphEditPlaybackStep, playbackState: GraphEditPlaybackUiState) {
+  const resolvedStep = resolveAliasedGraphEditPlaybackStep(step, playbackState);
+  if (resolvedStep.kind !== "drag_state_edge_to_node" || !resolvedStep.sourceNodeId || !resolvedStep.nodeId) {
+    return "";
+  }
+  const stateKey = resolvedStep.sourceStateKey || resolvedStep.stateKey || "";
+  if (!stateKey) {
+    return "";
+  }
+  return `editor.canvas.edge.data:${resolvedStep.sourceNodeId}:${stateKey}->${resolvedStep.nodeId}`;
+}
+
+function resolveGraphEditPlaybackFlowEdgeTarget(step: GraphEditPlaybackStep, playbackState: GraphEditPlaybackUiState) {
+  const resolvedStep = resolveAliasedGraphEditPlaybackStep(step, playbackState);
+  if (resolvedStep.kind !== "draw_flow_edge" || !resolvedStep.sourceNodeId || !resolvedStep.nodeId) {
+    return "";
+  }
+  return `editor.canvas.edge.flow:${resolvedStep.sourceNodeId}->${resolvedStep.nodeId}`;
+}
+
+function isGraphEditPlaybackTextAlreadyCurrent(
+  step: GraphEditPlaybackStep,
+  playbackState: GraphEditPlaybackUiState,
+  targetElement: HTMLElement | null,
+) {
+  const expectedText = normalizeVirtualText(step.value ?? "");
+  const targetId = resolveAliasedGraphEditPlaybackTarget(step.target, playbackState);
+  const input = resolveVirtualOperationTextInput(targetId);
+  if (input) {
+    return normalizeVirtualText(input.value) === expectedText;
+  }
+  return normalizeVirtualText(targetElement?.textContent ?? "") === expectedText;
 }
 
 async function focusGraphEditPlaybackField(
@@ -2582,8 +2856,7 @@ async function typeGraphEditPlaybackField(step: GraphEditPlaybackStep, playbackS
   }
   await moveVirtualCursorToElement(input);
   input.focus();
-  input.value = step.value ?? "";
-  dispatchVirtualInputEvents(input, "insertReplacementText", step.value ?? "");
+  await replaceVirtualText(input, step.value ?? "");
   if (targetId.endsWith(".title") || targetId.endsWith(".description")) {
     await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS);
     dispatchGraphEditPlaybackTextCommit(input, targetId);
@@ -2682,34 +2955,50 @@ function resolveVirtualOperationAffordance(targetId: string): { element: HTMLEle
   if (typeof document === "undefined") {
     return null;
   }
-  const element = document.querySelector<HTMLElement>(`[data-virtual-affordance-id="${escapeVirtualOperationTargetId(targetId)}"]`);
-  if (!element) {
-    return null;
+  const affordanceElements = queryVirtualOperationAffordanceElements(targetId);
+  let visibleElement: HTMLElement | null = null;
+  for (const element of affordanceElements) {
+    const rect = element.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) {
+      continue;
+    }
+    visibleElement = element;
   }
-  const rect = element.getBoundingClientRect();
-  if (rect.width <= 0 || rect.height <= 0) {
-    return null;
+  return visibleElement ? { element: visibleElement } : null;
+}
+
+function hasVirtualOperationAffordanceElement(targetId: string) {
+  if (targetId.startsWith("buddy.") || targetId === "app.nav.buddy" || typeof document === "undefined") {
+    return false;
   }
-  return { element };
+  return queryVirtualOperationAffordanceElements(targetId).length > 0;
+}
+
+function queryVirtualOperationAffordanceElements(targetId: string) {
+  return document.querySelectorAll<HTMLElement>(`[data-virtual-affordance-id="${escapeVirtualOperationTargetId(targetId)}"]`);
 }
 
 function resolveVirtualOperationTextInput(targetId: string): HTMLInputElement | HTMLTextAreaElement | null {
   const affordance = resolveVirtualOperationAffordance(targetId);
+  if (affordance) {
+    return resolveVirtualOperationTextInputElement(affordance.element) ?? resolveVirtualOperationTextInputAffordance(`${targetId}.input`);
+  }
+  return resolveVirtualOperationTextInputAffordance(`${targetId}.input`);
+}
+
+function resolveVirtualOperationTextInputAffordance(targetId: string): HTMLInputElement | HTMLTextAreaElement | null {
+  const affordance = resolveVirtualOperationAffordance(targetId);
   if (!affordance) {
-    const inputAffordance = resolveVirtualOperationAffordance(`${targetId}.input`);
-    if (!inputAffordance) {
-      return null;
-    }
-    if (isVirtualOperationTextInputElement(inputAffordance.element)) {
-      return inputAffordance.element;
-    }
-    const nestedInput = inputAffordance.element.querySelector<HTMLInputElement | HTMLTextAreaElement>("input, textarea");
-    return nestedInput && isVirtualOperationTextInputElement(nestedInput) ? nestedInput : null;
+    return null;
   }
-  if (isVirtualOperationTextInputElement(affordance.element)) {
-    return affordance.element;
+  return resolveVirtualOperationTextInputElement(affordance.element);
+}
+
+function resolveVirtualOperationTextInputElement(element: HTMLElement): HTMLInputElement | HTMLTextAreaElement | null {
+  if (isVirtualOperationTextInputElement(element)) {
+    return element;
   }
-  const input = affordance.element.querySelector<HTMLInputElement | HTMLTextAreaElement>("input, textarea");
+  const input = element.querySelector<HTMLInputElement | HTMLTextAreaElement>("input, textarea");
   return input && isVirtualOperationTextInputElement(input) ? input : null;
 }
 
@@ -2732,6 +3021,59 @@ function resolveElementCenterPoint(element: HTMLElement): BuddyPosition {
   return {
     x: rect.left + rect.width / 2,
     y: rect.top + rect.height / 2,
+  };
+}
+
+async function moveVirtualCursorToGraphEditStep(step: GraphEditPlaybackStep, element: HTMLElement) {
+  const positionPoint = resolveGraphEditPlaybackPositionClientPoint(step);
+  if (positionPoint && (step.kind === "move_virtual_cursor" || step.kind === "open_node_creation_menu")) {
+    await waitForVirtualOperation(moveVirtualCursorToClientPoint(positionPoint));
+    return;
+  }
+  await moveVirtualCursorToElement(element);
+}
+
+function resolveGraphEditPlaybackPositionClientPoint(step: GraphEditPlaybackStep): BuddyPosition | null {
+  const position = step.position;
+  if (!position || typeof position.x !== "number" || typeof position.y !== "number") {
+    return null;
+  }
+  const canvas = resolveVirtualOperationAffordance("editor.canvas.surface")?.element;
+  const viewportElement = canvas?.querySelector<HTMLElement>(".editor-canvas__viewport") ?? null;
+  if (!canvas) {
+    return null;
+  }
+  const canvasRect = canvas.getBoundingClientRect();
+  const viewportTransform = resolveGraphEditPlaybackViewportTransform(viewportElement);
+  return {
+    x: canvasRect.left + viewportTransform.x + position.x * viewportTransform.scaleX,
+    y: canvasRect.top + viewportTransform.y + position.y * viewportTransform.scaleY,
+  };
+}
+
+function resolveGraphEditPlaybackViewportTransform(viewportElement: HTMLElement | null) {
+  if (!viewportElement || typeof window === "undefined" || typeof window.getComputedStyle !== "function") {
+    return { x: 0, y: 0, scaleX: 1, scaleY: 1 };
+  }
+  const transform = window.getComputedStyle(viewportElement).transform;
+  if (!transform || transform === "none") {
+    return { x: 0, y: 0, scaleX: 1, scaleY: 1 };
+  }
+  try {
+    if (typeof DOMMatrixReadOnly === "function") {
+      const matrix = new DOMMatrixReadOnly(transform);
+      return { x: matrix.e, y: matrix.f, scaleX: matrix.a || 1, scaleY: matrix.d || 1 };
+    }
+  } catch {
+    // Fall through to the lightweight matrix parser below.
+  }
+  const matrixMatch = transform.match(/^matrix\(([^)]+)\)$/);
+  const values = matrixMatch?.[1]?.split(",").map((value) => Number(value.trim())) ?? [];
+  return {
+    x: Number.isFinite(values[4]) ? values[4]! : 0,
+    y: Number.isFinite(values[5]) ? values[5]! : 0,
+    scaleX: Number.isFinite(values[0]) && values[0] !== 0 ? values[0]! : 1,
+    scaleY: Number.isFinite(values[3]) && values[3] !== 0 ? values[3]! : 1,
   };
 }
 
@@ -2775,12 +3117,12 @@ function dispatchVirtualClick(element: HTMLElement) {
   );
 }
 
-function dispatchVirtualDoubleClick(element: HTMLElement) {
+function dispatchVirtualDoubleClick(element: HTMLElement, point?: BuddyPosition | null) {
   const rect = element.getBoundingClientRect();
-  const clientX = rect.left + rect.width / 2;
-  const clientY = rect.top + rect.height / 2;
-  dispatchVirtualPointerTap(element);
-  dispatchVirtualPointerTap(element);
+  const clientX = point?.x ?? rect.left + rect.width / 2;
+  const clientY = point?.y ?? rect.top + rect.height / 2;
+  dispatchVirtualPointerTap(element, point);
+  dispatchVirtualPointerTap(element, point);
   element.dispatchEvent(
     new MouseEvent("dblclick", {
       bubbles: true,
@@ -2792,12 +3134,39 @@ function dispatchVirtualDoubleClick(element: HTMLElement) {
   );
 }
 
-function dispatchVirtualPointerTap(element: HTMLElement) {
+function dispatchVirtualPointerTap(element: HTMLElement, point?: BuddyPosition | null) {
   const rect = element.getBoundingClientRect();
-  const clientX = rect.left + rect.width / 2;
-  const clientY = rect.top + rect.height / 2;
+  const clientX = point?.x ?? rect.left + rect.width / 2;
+  const clientY = point?.y ?? rect.top + rect.height / 2;
   dispatchVirtualPointerEvent(element, "pointerdown", clientX, clientY);
   dispatchVirtualPointerEvent(element, "pointerup", clientX, clientY);
+}
+
+async function replaceVirtualText(element: HTMLInputElement | HTMLTextAreaElement, text: string) {
+  const token = activeVirtualOperationToken.value;
+  if (element.value) {
+    while (element.value && !isVirtualOperationInterrupted(token)) {
+      element.value = element.value.slice(0, -1);
+      dispatchVirtualInputEvents(element, "deleteContentBackward", "");
+      await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_TYPE_CHARACTER_DELAY_MS);
+    }
+  }
+  if (isVirtualOperationInterrupted(token)) {
+    return;
+  }
+  await typeVirtualText(element, text);
+}
+
+async function typeVirtualText(element: HTMLInputElement | HTMLTextAreaElement, text: string) {
+  const token = activeVirtualOperationToken.value;
+  for (const character of text) {
+    if (isVirtualOperationInterrupted(token)) {
+      break;
+    }
+    element.value = `${element.value}${character}`;
+    dispatchVirtualInputEvents(element, "insertText", character);
+    await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_TYPE_CHARACTER_DELAY_MS);
+  }
 }
 
 function dispatchVirtualInputEvents(element: HTMLInputElement | HTMLTextAreaElement, inputType: string, data: string) {
@@ -2809,32 +3178,73 @@ function dispatchVirtualInputEvents(element: HTMLInputElement | HTMLTextAreaElem
   element.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
-function dispatchVirtualPointerEvent(element: HTMLElement, type: "pointerdown" | "pointermove" | "pointerup", clientX: number, clientY: number) {
+function normalizeVirtualText(value: unknown) {
+  return String(value ?? "").replace(/\r\n/g, "\n").trim();
+}
+
+function dispatchVirtualPointerEvent(
+  element: HTMLElement,
+  type: "pointerdown" | "pointermove" | "pointerup",
+  clientX: number,
+  clientY: number,
+  options: { forceEmptyCanvasDrop?: boolean } = {},
+) {
   const eventInit = {
     bubbles: true,
     cancelable: true,
     clientX,
     clientY,
-    pointerId: 1,
+    pointerId: BUDDY_VIRTUAL_POINTER_ID,
     pointerType: "mouse",
     button: 0,
     buttons: type === "pointerup" ? 0 : 1,
     view: window,
   };
   if (typeof PointerEvent === "function") {
-    element.dispatchEvent(new PointerEvent(type, eventInit));
+    element.dispatchEvent(markVirtualPointerEvent(new PointerEvent(type, eventInit), options));
     return;
   }
-  element.dispatchEvent(new MouseEvent(type, eventInit));
+  element.dispatchEvent(markVirtualPointerEvent(new MouseEvent(type, eventInit), options));
 }
 
-function waitForVirtualOperation(timeoutMs: number) {
+function markVirtualPointerEvent<T extends Event>(event: T, options: { forceEmptyCanvasDrop?: boolean } = {}): T {
+  Object.defineProperty(event, TOOGRAPH_VIRTUAL_POINTER_EVENT_KEY, {
+    configurable: true,
+    value: true,
+  });
+  if (options.forceEmptyCanvasDrop) {
+    Object.defineProperty(event, TOOGRAPH_VIRTUAL_EMPTY_CANVAS_POINTER_EVENT_KEY, {
+      configurable: true,
+      value: true,
+    });
+  }
+  return event;
+}
+
+function waitForVirtualOperation(timeoutMs: number, token: BuddyVirtualOperationToken | null = activeVirtualOperationToken.value) {
   return new Promise<void>((resolve) => {
     if (typeof window === "undefined") {
       resolve();
       return;
     }
-    window.setTimeout(resolve, Math.max(0, Math.round(timeoutMs)));
+    if (token?.interrupted) {
+      resolve();
+      return;
+    }
+    let settled = false;
+    let timeoutId: number | null = null;
+    const finishWait = () => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+      resolve();
+    };
+    timeoutId = window.setTimeout(finishWait, Math.max(0, Math.round(timeoutMs)));
+    token?.interruptPromise.then(finishWait);
   });
 }
 
@@ -4464,6 +4874,96 @@ function formatErrorMessage(error: unknown): string {
     drop-shadow(0 0 2px rgba(255, 251, 235, 0.9));
 }
 
+.buddy-widget__virtual-operation-banner {
+  position: fixed;
+  left: 50%;
+  top: calc(var(--editor-canvas-floating-top-clearance, 18px) + 64px);
+  z-index: 4528;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-width: min(420px, calc(100vw - 56px));
+  max-width: min(620px, calc(100vw - 56px));
+  padding: 14px 16px 14px 24px;
+  border: 1px solid rgba(255, 247, 237, 0.34);
+  border-radius: 999px;
+  color: #fff7ed;
+  background: linear-gradient(135deg, rgba(154, 52, 18, 0.96), rgba(131, 43, 13, 0.94));
+  box-shadow:
+    0 0 0 1px rgba(255, 247, 237, 0.16) inset,
+    0 18px 42px rgba(124, 45, 18, 0.24),
+    0 0 34px rgba(217, 119, 6, 0.24);
+  translate: -50% 0;
+  pointer-events: auto;
+  backdrop-filter: blur(28px) saturate(1.4) contrast(1.08);
+  animation: buddy-widget-virtual-operation-breathe 2.4s ease-in-out infinite;
+}
+
+.buddy-widget__virtual-operation-banner--stopping {
+  background: linear-gradient(135deg, rgba(180, 83, 9, 0.98), rgba(154, 52, 18, 0.96));
+}
+
+.buddy-widget__virtual-operation-pulse {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #fed7aa;
+  box-shadow: 0 0 0 6px rgba(255, 247, 237, 0.16);
+  animation: buddy-widget-virtual-operation-pulse 1.1s ease-in-out infinite;
+  flex: 0 0 auto;
+}
+
+.buddy-widget__virtual-operation-label {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.buddy-widget__virtual-operation-stop {
+  appearance: none;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid rgba(255, 247, 237, 0.42);
+  border-radius: 999px;
+  color: #fff7ed;
+  background: rgba(255, 247, 237, 0.12);
+  cursor: pointer;
+}
+
+.buddy-widget__virtual-operation-stop:hover {
+  border-color: rgba(255, 247, 237, 0.74);
+  background: rgba(255, 247, 237, 0.22);
+}
+
+.buddy-widget__virtual-operation-stop-icon {
+  position: relative;
+  display: block;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid currentColor;
+  border-radius: 999px;
+}
+
+.buddy-widget__virtual-operation-stop-icon::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: currentColor;
+  transform: translate(-50%, -50%);
+}
+
 .buddy-widget__avatar {
   appearance: none;
   position: relative;
@@ -4542,6 +5042,11 @@ function formatErrorMessage(error: unknown): string {
   box-shadow: 0 0 0 3px rgba(210, 162, 117, 0.3);
 }
 
+.buddy-widget__virtual-operation-stop:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.28);
+}
+
 @keyframes buddy-widget-avatar-hop-path-a {
   0%,
   100% {
@@ -4575,6 +5080,41 @@ function formatErrorMessage(error: unknown): string {
   }
   50% {
     transform: translateY(-4px) rotate(-2deg);
+  }
+}
+
+@keyframes buddy-widget-virtual-operation-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 5px rgba(255, 247, 237, 0.08);
+  }
+  50% {
+    box-shadow: 0 0 0 9px rgba(255, 247, 237, 0.2);
+  }
+}
+
+@keyframes buddy-widget-virtual-operation-breathe {
+  0%,
+  100% {
+    scale: 1;
+    box-shadow:
+      0 0 0 1px rgba(255, 247, 237, 0.16) inset,
+      0 18px 42px rgba(124, 45, 18, 0.24),
+      0 0 28px rgba(217, 119, 6, 0.22);
+  }
+  48% {
+    scale: 1.018;
+    box-shadow:
+      0 0 0 1px rgba(255, 247, 237, 0.26) inset,
+      0 22px 50px rgba(124, 45, 18, 0.32),
+      0 0 42px rgba(234, 88, 12, 0.34);
+  }
+  58% {
+    scale: 1.006;
+    box-shadow:
+      0 0 0 1px rgba(255, 247, 237, 0.2) inset,
+      0 18px 42px rgba(124, 45, 18, 0.26),
+      0 0 32px rgba(217, 119, 6, 0.26);
   }
 }
 
