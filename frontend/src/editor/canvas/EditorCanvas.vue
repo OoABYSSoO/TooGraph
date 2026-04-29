@@ -467,10 +467,7 @@ import { buildCanvasViewportStyle, buildZoomPercentLabel } from "./canvasViewpor
 import {
   buildCanvasNodeCreationMenuPayload,
   isCanvasStateTargetAnchorAllowedForConnection,
-  resolveCanvasConcreteStateInputSourceAnchorAtPointerY,
-  resolveCanvasConcreteStateTargetAnchorAtPointerY,
-  resolveCanvasEligibleStateInputSourceAnchorForNodeBody,
-  resolveCanvasEligibleStateTargetAnchorForNodeBody,
+  resolveCanvasAutoSnappedTargetAnchor as resolveCanvasAutoSnappedTargetAnchorModel,
   resolveCanvasEligibleTargetAnchorForNodeBody,
   type CanvasNodeCreationMenuPayload,
 } from "./canvasConnectionInteractionModel";
@@ -1247,80 +1244,18 @@ function resolveNodeIdAtPointer(event: PointerEvent) {
 }
 
 function resolveAutoSnappedTargetAnchor(event: PointerEvent) {
-  if (!activeConnection.value) {
-    return null;
-  }
-
-  if (activeConnection.value.sourceKind === "state-in") {
-    return resolveAutoSnappedStateInputSourceAnchor(event);
-  }
-
-  if (activeConnection.value.sourceKind === "state-out") {
-    return resolveAutoSnappedStateTargetAnchor(event);
-  }
-
-  for (const anchor of flowAnchors.value) {
-    if (isPointerWithinFlowHotspot(anchor, event) && eligibleTargetAnchorIds.value.has(anchor.id)) {
-      return anchor;
-    }
-  }
-
-  const nodeId = resolveNodeIdAtPointer(event);
-  if (nodeId) {
-    const snappedAnchor = resolveEligibleTargetAnchorForNodeBody(nodeId);
-    if (snappedAnchor) {
-      return snappedAnchor;
-    }
-  }
-
-  return null;
-}
-
-function resolveAutoSnappedStateInputSourceAnchor(event: PointerEvent) {
-  const nodeId = resolveNodeIdAtPointer(event);
-  if (!nodeId) {
-    return null;
-  }
-
-  const point = resolveCanvasPoint(event);
-  const directStateInputSourceAnchor = resolveCanvasConcreteStateInputSourceAnchorAtPointerY({
+  return resolveCanvasAutoSnappedTargetAnchorModel({
     connection: activeConnection.value,
-    nodeId,
+    nodeIdAtPointer: resolveNodeIdAtPointer(event),
+    canvasPoint: resolveCanvasPoint(event),
+    flowAnchors: flowAnchors.value,
     projectedAnchors: projectedAnchors.value,
-    pointerY: point.y,
-    canComplete: canCompleteCanvasConnection,
-  });
-  if (directStateInputSourceAnchor) {
-    return directStateInputSourceAnchor;
-  }
-
-  return resolveEligibleStateInputSourceAnchorForNodeBody(nodeId);
-}
-
-function resolveAutoSnappedStateTargetAnchor(event: PointerEvent) {
-  const nodeId = resolveNodeIdAtPointer(event);
-  if (nodeId) {
-    const directStateTargetAnchor = resolveEligibleConcreteStateTargetAnchorAtPointer(nodeId, event);
-    if (directStateTargetAnchor) {
-      return directStateTargetAnchor;
-    }
-
-    const snappedAnchor = resolveEligibleStateTargetAnchorForNodeBody(nodeId);
-    if (snappedAnchor) {
-      return snappedAnchor;
-    }
-  }
-
-  return null;
-}
-
-function resolveEligibleStateInputSourceAnchorForNodeBody(nodeId: string) {
-  return resolveCanvasEligibleStateInputSourceAnchorForNodeBody({
-    connection: activeConnection.value,
-    nodeId,
-    node: props.document.nodes[nodeId],
-    projectedAnchors: projectedAnchors.value,
-    measuredNodeSize: measuredNodeSizes.value[nodeId],
+    baseProjectedAnchors: baseProjectedAnchors.value,
+    nodes: props.document.nodes,
+    measuredAnchorOffsets: measuredAnchorOffsets.value,
+    measuredNodeSizes: measuredNodeSizes.value,
+    eligibleTargetAnchorIds: eligibleTargetAnchorIds.value,
+    pendingAgentInputSourceByNodeId: pendingAgentInputSourceByNodeId.value,
     canComplete: canCompleteCanvasConnection,
   });
 }
@@ -1335,22 +1270,6 @@ function isPointerWithinNodeElement(nodeElement: HTMLElement, event: PointerEven
   );
 }
 
-function isPointerWithinFlowHotspot(anchor: ProjectedCanvasAnchor, event: PointerEvent) {
-  const hotspot = flowHotspotStyle(anchor);
-  const left = parseFloat(hotspot.left);
-  const top = parseFloat(hotspot.top);
-  const width = parseFloat(hotspot.width);
-  const height = parseFloat(hotspot.height);
-  const point = resolveCanvasPoint(event);
-
-  return (
-    point.x >= left - width / 2 &&
-    point.x <= left + width / 2 &&
-    point.y >= top - height / 2 &&
-    point.y <= top + height / 2
-  );
-}
-
 function resolveEligibleTargetAnchorForNodeBody(nodeId: string) {
   return resolveCanvasEligibleTargetAnchorForNodeBody({
     connection: activeConnection.value,
@@ -1362,35 +1281,6 @@ function resolveEligibleTargetAnchorForNodeBody(nodeId: string) {
     measuredNodeSize: measuredNodeSizes.value[nodeId],
     eligibleTargetAnchorIds: eligibleTargetAnchorIds.value,
     pendingAgentInputSource: pendingAgentInputSourceByNodeId.value[nodeId] ?? null,
-    canComplete: canCompleteCanvasConnection,
-  });
-}
-
-function resolveEligibleConcreteStateTargetAnchorAtPointer(nodeId: string, event: PointerEvent) {
-  const point = resolveCanvasPoint(event);
-  return resolveCanvasConcreteStateTargetAnchorAtPointerY({
-    connection: activeConnection.value,
-    nodeId,
-    node: props.document.nodes[nodeId],
-    projectedAnchors: projectedAnchors.value,
-    baseProjectedAnchors: baseProjectedAnchors.value,
-    measuredAnchorOffsets: measuredAnchorOffsets.value,
-    pendingAgentInputSource: pendingAgentInputSourceByNodeId.value[nodeId] ?? null,
-    eligibleTargetAnchorIds: eligibleTargetAnchorIds.value,
-    pointerY: point.y,
-  });
-}
-
-function resolveEligibleStateTargetAnchorForNodeBody(nodeId: string) {
-  return resolveCanvasEligibleStateTargetAnchorForNodeBody({
-    connection: activeConnection.value,
-    nodeId,
-    node: props.document.nodes[nodeId],
-    projectedAnchors: projectedAnchors.value,
-    baseProjectedAnchors: baseProjectedAnchors.value,
-    measuredAnchorOffsets: measuredAnchorOffsets.value,
-    pendingAgentInputSource: pendingAgentInputSourceByNodeId.value[nodeId] ?? null,
-    eligibleTargetAnchorIds: eligibleTargetAnchorIds.value,
     canComplete: canCompleteCanvasConnection,
   });
 }

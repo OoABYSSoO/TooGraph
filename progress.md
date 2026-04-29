@@ -355,6 +355,77 @@
 | 2026-04-29 | Vue `emit` overloads rejected a union event name from `CanvasConnectionCompletionAction` | First TypeScript verification | Kept the pure action model and changed `EditorCanvas.vue` to emit through an explicit `switch` per action type. |
 | 2026-04-29 | Unescaped backticks in an `rg` shell command triggered `/bin/bash: line 1: emit: command not found` | Phase 33 planning verification | Re-ran the search with single-quoted shell text; no files were changed by the failed read-only command. |
 
+## Session: 2026-04-29 Phase 34
+
+### Phase 1: Auto-Snap Resolver Boundary
+- **Status:** completed
+- Actions taken:
+  - Re-read the formal roadmap, task plan, findings, and Phase 33 progress.
+  - Selected the pure P2 Canvas boundary around high-level auto-snap target resolution.
+  - Kept DOM hit-testing, pointer-to-canvas coordinate conversion, actual completion emits, node creation menu emits, panning, node drag/resize, DOM measurement, and graph mutation side effects in `EditorCanvas.vue`.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added focused tests in `canvasConnectionInteractionModel.test.ts` for flow hotspot selection, node-body fallback snapping, reverse state-input row selection, and state-output create-input fallback snapping.
+  - Updated `EditorCanvas.structure.test.ts` to require `EditorCanvas.vue` to delegate auto-snap target selection to `canvasConnectionInteractionModel.ts`.
+  - Ran the focused tests and verified the expected red failure: missing `resolveCanvasAutoSnappedTargetAnchor` exports and model boundary.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `resolveCanvasAutoSnappedTargetAnchor`, state-specific auto-snap resolvers, flow hotspot resolution, and canvas-point hotspot checks to `canvasConnectionInteractionModel.ts`.
+  - Updated `EditorCanvas.vue` so `resolveAutoSnappedTargetAnchor(event)` only supplies `nodeIdAtPointer`, `canvasPoint`, candidate anchors, measured data, and the existing `canCompleteCanvasConnection` callback to the model.
+  - Removed local `EditorCanvas.vue` helpers for flow hotspot hit-testing, reverse state input auto-snap, state target auto-snap, and concrete state target pointer resolution.
+  - Reduced `EditorCanvas.vue` from 3,224 lines to 3,114 lines.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused connection interaction model and `EditorCanvas` structure tests.
+  - Ran focused Canvas and graph-connection regression tests covering auto-snap, completion, node creation payloads, graph connection rules, graph document mutations, node drag/resize, and edge interactions.
+  - Ran TypeScript unused-symbol verification from the `frontend` directory.
+  - Ran the full frontend source test suite and the Vite structure test in one Node test invocation.
+  - Ran the frontend production build; no Vite large chunk warning was emitted.
+  - Restarted the dev environment with root `npm run dev`.
+  - Confirmed the frontend returned HTTP 200 at `http://127.0.0.1:3477/editor/new`.
+  - Confirmed the backend health route returned HTTP 200 with `{"status":"ok"}`.
+  - Captured a Chrome headless screenshot of `/editor/new` and sampled the PNG as nonblank.
+
+### Phase 5: Progress Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated total roadmap progress at about 61%.
+  - Recalculated P2 `EditorCanvas.vue` cleanup at about 54%.
+  - Confirmed the build/chunk warning remains resolved because the production build emitted no large chunk warning.
+  - Opened Phase 35 because total roadmap progress remains below 100%.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red focused test | `node --test frontend/src/editor/canvas/canvasConnectionInteractionModel.test.ts frontend/src/editor/canvas/EditorCanvas.structure.test.ts` before implementation | Fails because the auto-snap resolver model boundary does not exist | Failed with missing `resolveCanvasAutoSnappedTargetAnchor` export and structure assertions | Passed |
+| Focused auto-snap structure | Same command after implementation | Auto-snap resolver model and structure boundary pass | 66 passed | Passed |
+| Focused Canvas and graph related suite | `node --test` over connection, auto-snap, graph-connection, graph-document, node drag/resize, and edge interaction tests | Related behavior/model tests pass | 165 passed | Passed |
+| TypeScript unused-symbol check | `cd frontend && ./node_modules/.bin/vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` | No diagnostics | Exit 0, no diagnostics | Passed |
+| Full frontend tests | `node --test $(rg --files src vite.config.structure.test.ts | rg '\.test\.ts$')` in `frontend` | All frontend tests pass | 791 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without chunk-warning regression | Exit 0, no large chunk warning | Passed |
+| Dev restart and health | `npm run dev`, then HTTP checks | Services start and respond | Frontend `/editor/new` 200, backend `/health` 200 ok | Passed |
+| Browser visual smoke | Google Chrome headless screenshot of `/editor/new` | Page renders nonblank | 1440x1000 PNG, sampledColors=221 | Passed |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Phase 34 implementation, verification, dev restart, browser smoke, commit, and push are complete. |
+| Where am I going? | Phase 35 is open for a safe connection creation-menu coordination boundary. |
+| What's the goal? | Continue reducing `EditorCanvas.vue` responsibility concentration while preserving auto-snap, node creation context, connection completion, drag/resize behavior, and runtime UI. |
+| What have I learned? | Auto-snap target selection is safe to model once the component supplies DOM-derived node hit results and canvas coordinates. |
+| What have I done? | Extracted high-level auto-snap resolution into `canvasConnectionInteractionModel.ts`, added focused tests, verified full frontend behavior, built without chunk warnings, restarted the app, and opened the next continuation phase. |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-29 | Structure tests still expected local `EditorCanvas.vue` auto-snap helper names after the resolver extraction | First focused green run | Updated the assertions to lock the new `canvasConnectionInteractionModel.ts` resolver boundary instead of the previous local helper layout. |
+
 ## Session: 2026-04-29 Phase 29
 
 ### Phase 1: Re-orientation
