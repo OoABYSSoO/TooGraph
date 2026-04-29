@@ -495,7 +495,7 @@ import {
   type CanvasNodeCreationMenuPayload,
 } from "./canvasConnectionInteractionModel";
 import {
-  resolveCanvasConnectionCompletionRequest,
+  resolveCanvasConnectionCompletionExecutionAction,
   type CanvasConnectionCompletionAction,
 } from "./canvasConnectionCompletionModel";
 import { STATE_FIELD_TYPE_OPTIONS } from "@/editor/workspace/statePanelFields";
@@ -1883,29 +1883,27 @@ function focusNode(nodeId: string) {
 }
 
 function completePendingConnection(targetAnchor: ProjectedCanvasAnchor) {
-  if (isGraphEditingLocked()) {
-    return;
-  }
-  const connection = activeConnection.value;
-  if (!connection) {
-    return;
-  }
-
-  const completionRequest = resolveCanvasConnectionCompletionRequest({
-    connection,
+  const completionAction = resolveCanvasConnectionCompletionExecutionAction({
+    interactionLocked: isGraphEditingLocked(),
+    connection: activeConnection.value,
     targetAnchor,
     stateSchema: props.document.state_schema,
   });
-  if (!completionRequest) {
-    return;
+
+  switch (completionAction.type) {
+    case "ignore-locked":
+    case "ignore-missing-connection":
+      return;
+    case "complete-connection":
+      break;
   }
 
-  emitCanvasConnectionCompletionAction(completionRequest.action);
+  emitCanvasConnectionCompletionAction(completionAction.action);
 
-  if (completionRequest.clearConnectionInteraction) {
+  if (completionAction.clearConnectionInteraction) {
     clearConnectionInteractionState();
   }
-  if (completionRequest.clearSelectedEdge) {
+  if (completionAction.clearSelectedEdge) {
     selectedEdgeId.value = null;
   }
 }

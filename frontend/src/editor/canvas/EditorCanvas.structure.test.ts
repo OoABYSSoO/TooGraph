@@ -513,12 +513,16 @@ test("EditorCanvas keeps paused human-review graphs viewable but read-only", () 
   assert.match(componentSource, /watch\(\s*\(\) => props\.interactionLocked,[\s\S]*clearCanvasTransientState\(\);/);
   assert.match(componentSource, /\[data-state-editor-trigger='true'\]/);
   assert.match(componentSource, /isLockedNodeEditTarget\(target\)[\s\S]*emit\("locked-edit-attempt"\);/);
-  assert.match(componentSource, /if \(isGraphEditingLocked\(\)\) \{/);
+  assert.match(componentSource, /interactionLocked: isGraphEditingLocked\(\)/);
   assert.match(componentSource, /guardLockedInteraction: guardLockedCanvasInteraction/);
   assert.match(canvasEdgeInteractionsSource, /function confirmFlowEdgeDelete\(\)[\s\S]*if \(input\.guardLockedInteraction\(\)\) \{[\s\S]*return;/);
   assert.match(canvasEdgeInteractionsSource, /function openDataEdgeStateEditor\(\)[\s\S]*if \(input\.guardLockedInteraction\(\)\) \{[\s\S]*return;/);
-  assert.match(componentSource, /function handleCanvasDoubleClick\(event: MouseEvent\)[\s\S]*if \(isGraphEditingLocked\(\)\) \{[\s\S]*emit\("locked-edit-attempt"\);/);
-  assert.match(componentSource, /function handleCanvasDrop\(event: DragEvent\)[\s\S]*if \(isGraphEditingLocked\(\)\) \{[\s\S]*emit\("locked-edit-attempt"\);/);
+  assert.match(canvasConnectionInteractionModelSource, /export function resolveCanvasDoubleClickCreationAction/);
+  assert.match(componentSource, /function handleCanvasDoubleClick\(event: MouseEvent\)[\s\S]*const doubleClickCreationAction = resolveCanvasDoubleClickCreationAction\(\{[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*\}\);/);
+  assert.match(componentSource, /case "locked-edit-attempt":[\s\S]*emit\("locked-edit-attempt"\);[\s\S]*return;/);
+  assert.match(canvasConnectionInteractionModelSource, /export function resolveCanvasDropCreationAction/);
+  assert.match(componentSource, /function handleCanvasDrop\(event: DragEvent\)[\s\S]*const dropCreationAction = resolveCanvasDropCreationAction\(\{[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*\}\);/);
+  assert.match(componentSource, /case "locked-edit-attempt":[\s\S]*emit\("locked-edit-attempt"\);[\s\S]*return;/);
   assert.match(canvasEdgePointerInteractionModelSource, /export function resolveCanvasEdgePointerDownAction/);
   assert.match(componentSource, /const edgePointerDownAction = resolveCanvasEdgePointerDownAction\(\{[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*edge,[\s\S]*selectedEdgeId: selectedEdgeId\.value,[\s\S]*\}\);/);
   assert.match(componentSource, /case "locked-edit-attempt":[\s\S]*event\.preventDefault\(\);[\s\S]*emit\("locked-edit-attempt"\);[\s\S]*return;/);
@@ -1028,20 +1032,21 @@ test("EditorCanvas snaps reverse input drags to existing upstream writer node bo
 test("EditorCanvas delegates connection completion action projection to a model", () => {
   const canvasConnectionCompletionModelSource = readCanvasConnectionCompletionModelSource();
 
-  assert.match(componentSource, /import \{[\s\S]*resolveCanvasConnectionCompletionRequest,[\s\S]*type CanvasConnectionCompletionAction,[\s\S]*\} from "\.\/canvasConnectionCompletionModel";/);
+  assert.match(componentSource, /import \{[\s\S]*resolveCanvasConnectionCompletionExecutionAction,[\s\S]*type CanvasConnectionCompletionAction,[\s\S]*\} from "\.\/canvasConnectionCompletionModel";/);
   assert.match(canvasConnectionCompletionModelSource, /export type CanvasConnectionCompletionAction/);
   assert.match(canvasConnectionCompletionModelSource, /export function resolveCanvasConnectionCompletionAction/);
   assert.match(canvasConnectionCompletionModelSource, /export function resolveCanvasConnectionCompletionRequest/);
+  assert.match(canvasConnectionCompletionModelSource, /export function resolveCanvasConnectionCompletionExecutionAction/);
   assert.match(canvasConnectionCompletionModelSource, /type: "connect-flow"/);
   assert.match(canvasConnectionCompletionModelSource, /type: "connect-route"/);
   assert.match(canvasConnectionCompletionModelSource, /type: "connect-state"/);
   assert.match(canvasConnectionCompletionModelSource, /type: "connect-state-input-source"/);
   assert.match(canvasConnectionCompletionModelSource, /type: "reconnect-flow"/);
   assert.match(canvasConnectionCompletionModelSource, /type: "reconnect-route"/);
-  assert.match(componentSource, /const completionRequest = resolveCanvasConnectionCompletionRequest\(\{/);
-  assert.match(componentSource, /emitCanvasConnectionCompletionAction\(completionRequest\.action\);/);
-  assert.match(componentSource, /if \(completionRequest\.clearConnectionInteraction\) \{[\s\S]*clearConnectionInteractionState\(\);[\s\S]*\}/);
-  assert.match(componentSource, /if \(completionRequest\.clearSelectedEdge\) \{[\s\S]*selectedEdgeId\.value = null;[\s\S]*\}/);
+  assert.match(componentSource, /const completionAction = resolveCanvasConnectionCompletionExecutionAction\(\{[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*connection: activeConnection\.value,[\s\S]*targetAnchor,[\s\S]*stateSchema: props\.document\.state_schema,[\s\S]*\}\);/);
+  assert.match(componentSource, /case "complete-connection":[\s\S]*emitCanvasConnectionCompletionAction\(completionAction\.action\);/);
+  assert.match(componentSource, /if \(completionAction\.clearConnectionInteraction\) \{[\s\S]*clearConnectionInteractionState\(\);[\s\S]*\}/);
+  assert.match(componentSource, /if \(completionAction\.clearSelectedEdge\) \{[\s\S]*selectedEdgeId\.value = null;[\s\S]*\}/);
   assert.match(componentSource, /function emitCanvasConnectionCompletionAction\(action: CanvasConnectionCompletionAction \| null\)/);
   assert.doesNotMatch(componentSource, /resolveCanvasConnectionCompletionAction/);
   assert.doesNotMatch(componentSource, /targetValueType: resolveCanvasConnectionStateValueType\(connection\.sourceStateKey, props\.document\.state_schema\)/);

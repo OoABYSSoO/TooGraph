@@ -4,7 +4,7 @@
 Run a ten-round conservative cleanup batch focused on `EditorCanvas.vue` pure projection and interaction-model helpers, then close the baseline interaction regressions in one larger pass while preserving graph editing behavior, runtime visuals, drag/connect workflows, deletion behavior, and dev startup health.
 
 ## Current Phase
-Phase 54 in progress
+Phase 55 in progress
 
 ## Autonomous Continuation Gate
 - After every completed cleanup phase, re-read `docs/future/2026-04-28-architecture-refactor-roadmap.md`, `task_plan.md`, `findings.md`, and `progress.md`, then recalculate the total roadmap progress and the active area progress.
@@ -504,12 +504,21 @@ Phase 54 in progress
 - **Status:** completed
 
 ### Phase 54: EditorCanvas Connection Completion Gate
-- [ ] Re-read the formal roadmap, Phase 53 findings, and current pending-connection completion flow before changing code.
-- [ ] Inspect whether the next safest `EditorCanvas.vue` boundary is a connection-completion action model around locked/no-connection ignore, empty-request ignore, completion emit action, and cleanup policy.
-- [ ] Add focused red tests for the selected connection-completion boundary before production changes.
-- [ ] Keep actual completion emit dispatch, selected-edge cleanup, connection cleanup, panning, node drag/resize, and graph mutation emits behaviorally stable.
-- [ ] Run focused completion/structure and Canvas regression tests, TypeScript checks, full frontend tests or justified targeted regression, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
-- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 54.
+- [x] Re-read the formal roadmap, Phase 53 findings, and current pending-connection completion flow before changing code.
+- [x] Inspect whether the next safest `EditorCanvas.vue` boundary is a connection-completion action model around locked/no-connection ignore, empty-request ignore, completion emit action, and cleanup policy.
+- [x] Add focused red tests for the selected connection-completion boundary before production changes.
+- [x] Keep actual completion emit dispatch, selected-edge cleanup, connection cleanup, panning, node drag/resize, and graph mutation emits behaviorally stable.
+- [x] Run focused completion/structure and Canvas regression tests, TypeScript checks, full frontend tests or justified targeted regression, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
+- [x] If total roadmap progress is below 100%, automatically open the next phase after Phase 54.
+- **Status:** completed
+
+### Phase 55: EditorCanvas Zoom Button Scale Gate
+- [ ] Re-read the formal roadmap, Phase 54 findings, and current viewport zoom button flow before changing code.
+- [ ] Inspect whether the next safest `EditorCanvas.vue` boundary is a viewport zoom button action model around zoom-out, zoom-in, reset, scale clamping, and rounded scale values.
+- [ ] Add focused red tests for the selected viewport zoom-button boundary before production changes.
+- [ ] Keep actual viewport mutation, wheel zoom, minimap center zoom, panning, pinch zoom, viewport draft emits, and graph interaction behavior stable.
+- [ ] Run focused viewport/structure and Canvas regression tests, TypeScript checks, full frontend tests or justified targeted regression, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
+- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 55.
 - **Status:** in progress
 
 ## Progress Estimate
@@ -635,6 +644,10 @@ Phase 54 in progress
 | Overall roadmap cleanup after Phase 53 | About 80% complete after moving pending-connection creation-menu action routing into `canvasConnectionInteractionModel.ts`. |
 | P2 `EditorCanvas.vue` cleanup after Phase 53 | About 81% complete after extracting locked/no-connection/open-menu cleanup policy while preserving actual emit and cleanup execution in the component. |
 | Current continuation gate after Phase 53 | Total roadmap progress is below 100%, so Phase 54 is automatically opened for the next safe P2 Canvas connection-completion boundary. |
+| Overall roadmap cleanup after Phase 54 | About 81% complete after moving locked/no-connection connection-completion execution routing into `canvasConnectionCompletionModel.ts`. |
+| P2 `EditorCanvas.vue` cleanup after Phase 54 | About 82% complete after extracting completion execution action selection while preserving actual emit dispatch and cleanup execution in the component. |
+| Current continuation gate after Phase 54 | Total roadmap progress is below 100%, so Phase 55 is automatically opened for the next safe P2 Canvas viewport zoom-button boundary. |
+| P2 `EditorCanvas.vue` cleanup target for Phase 55 | About 83% if zoom button scale calculation moves into `canvasViewportInteractionModel.ts` without changing viewport mutation behavior. |
 
 ## Decisions Made
 | Decision | Rationale |
@@ -684,6 +697,7 @@ Phase 54 in progress
 - Phase 51 moves generic locked-interaction guard decisions into `canvasLockedInteractionModel.ts`; `EditorCanvas.vue` keeps actual cleanup calls, selected-edge mutation, and locked-attempt emit execution in the component.
 - Phase 52 moves edge pointer-down routing into `canvasEdgePointerInteractionModel.ts`; `EditorCanvas.vue` keeps actual focus, cleanup, confirm composable calls, selected-edge mutation, pending connection point mutation, selection clearing, and locked-attempt emit execution.
 - Phase 53 moves pending-connection creation-menu routing into `canvasConnectionInteractionModel.ts`; `EditorCanvas.vue` keeps canvas point/event inputs, actual `open-node-creation-menu` emit, connection cleanup, and selected-edge cleanup execution.
+- Phase 54 moves connection-completion execution routing into `canvasConnectionCompletionModel.ts`; `EditorCanvas.vue` keeps actual typed emit dispatch, connection cleanup, selected-edge cleanup, and graph mutation behavior.
 - Do not commit runtime artifacts such as `backend/data/settings`, `.dev_*`, `dist`, or `.worktrees`.
 - After code changes, restart using `npm run dev`.
 
@@ -706,3 +720,4 @@ Phase 54 in progress
 | First Phase 38 browser screenshot captured only the app background | Phase 38 browser smoke | Re-ran headless Chrome with `--virtual-time-budget=7000`; the second screenshot rendered the workspace normally. |
 | Playwright package was unavailable for the Phase 38 screenshot helper | Phase 38 browser smoke | Used the installed `google-chrome` headless screenshot command instead. |
 | First browser screenshot after Phase 35 dev restart captured only the app background | Phase 35 browser smoke | Re-ran headless Chrome with a virtual-time budget; the second screenshot rendered the workspace normally. |
+| Structure test still expected a direct `if (isGraphEditingLocked())` guard after lock handling had moved into action models | Phase 54 focused green run | Updated the assertion to verify delegated locked action routing for double-click/drop and connection-completion execution instead of relying on a broad inline guard substring. |
