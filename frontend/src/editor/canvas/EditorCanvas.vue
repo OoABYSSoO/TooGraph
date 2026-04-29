@@ -397,7 +397,7 @@ import { resolveEdgeRunPresentation } from "@/editor/canvas/runEdgePresentation"
 import { resolveCanvasLayout } from "@/editor/canvas/resolvedCanvasLayout";
 import { resolveCanvasSurfaceStyle } from "@/editor/canvas/canvasSurfaceStyle";
 import { isEditableKeyboardEventTarget } from "@/editor/canvas/canvasKeyboard";
-import { DEFAULT_CANVAS_VIEWPORT, type CanvasViewport } from "@/editor/canvas/canvasViewport";
+import { type CanvasViewport } from "@/editor/canvas/canvasViewport";
 import {
   NODE_RESIZE_HANDLES,
   type NodeResizeHandle,
@@ -478,7 +478,11 @@ import { useCanvasNodeMeasurements } from "./useCanvasNodeMeasurements";
 import { buildPinchZoomStart, resolveCanvasPointerDownAction, resolvePointerCenter, resolvePointerDistance } from "./canvasPinchZoomModel";
 import type { CanvasPointerDownAction } from "./canvasPinchZoomModel";
 import { buildCanvasViewportStyle, buildZoomPercentLabel } from "./canvasViewportDisplayModel";
-import { resolveCanvasWheelZoomRequest } from "./canvasViewportInteractionModel";
+import {
+  resolveCanvasWheelZoomRequest,
+  resolveCanvasZoomButtonAction,
+  type CanvasZoomButtonControl,
+} from "./canvasViewportInteractionModel";
 import {
   isCanvasStateTargetAnchorAllowedForConnection,
   resolveCanvasAutoSnappedTargetAnchor as resolveCanvasAutoSnappedTargetAnchorModel,
@@ -1666,16 +1670,31 @@ function zoomViewportAroundCanvasCenter(nextScale: number) {
   });
 }
 
+function handleZoomButton(control: CanvasZoomButtonControl) {
+  const zoomButtonAction = resolveCanvasZoomButtonAction({
+    control,
+    currentScale: viewport.viewport.scale,
+  });
+  switch (zoomButtonAction.type) {
+    case "zoom-around-center":
+      zoomViewportAroundCanvasCenter(zoomButtonAction.nextScale);
+      return;
+    case "reset-viewport":
+      viewport.setViewport(zoomButtonAction.viewport);
+      return;
+  }
+}
+
 function handleZoomOut() {
-  zoomViewportAroundCanvasCenter(viewport.viewport.scale - 0.1);
+  handleZoomButton("zoom-out");
 }
 
 function handleZoomIn() {
-  zoomViewportAroundCanvasCenter(viewport.viewport.scale + 0.1);
+  handleZoomButton("zoom-in");
 }
 
 function handleZoomReset() {
-  viewport.setViewport(DEFAULT_CANVAS_VIEWPORT);
+  handleZoomButton("reset");
 }
 
 function handleWheel(event: WheelEvent) {
