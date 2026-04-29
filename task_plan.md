@@ -4,7 +4,7 @@
 Run a ten-round conservative cleanup batch focused on `EditorCanvas.vue` pure projection and interaction-model helpers, then close the baseline interaction regressions in one larger pass while preserving graph editing behavior, runtime visuals, drag/connect workflows, deletion behavior, and dev startup health.
 
 ## Current Phase
-Phase 30 in progress
+Phase 31 in progress
 
 ## Autonomous Continuation Gate
 - After every completed cleanup phase, re-read `docs/future/2026-04-28-architecture-refactor-roadmap.md`, `task_plan.md`, `findings.md`, and `progress.md`, then recalculate the total roadmap progress and the active area progress.
@@ -286,12 +286,23 @@ Phase 30 in progress
 - **Status:** completed
 
 ### Phase 30: NodeCard P1 Completion Gate and Next-Roadmap Slice Selection
-- [ ] Re-read the formal roadmap and decide whether remaining `NodeCard.vue` code is intentional orchestration or still safe P1 presentation debt.
-- [ ] If a safe NodeCard residual boundary remains, add focused red tests and extract it without changing graph mutation behavior.
-- [ ] If P1 is effectively closed, open the next safest P2/P3 roadmap slice and document why it is safer than further NodeCard surgery.
-- [ ] Preserve baseline-sensitive interactions: automatic snapping, node creation context/naming, state editor confirm windows, port creation, and drag reorder.
-- [ ] Run focused tests for the selected boundary, then full verification, dev restart, commit, push, and re-evaluate total progress.
-- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 30.
+- [x] Re-read the formal roadmap and decide whether remaining `NodeCard.vue` code is intentional orchestration or still safe P1 presentation debt.
+- [x] Decide that remaining `NodeCard.vue` state drafts, validation, confirmation windows, lock guards, and graph/state emits should stay parent-owned until stronger controller coverage exists.
+- [x] Open the next safest P2 roadmap slice because P1 low-risk presentation extraction is effectively closed.
+- [x] Add focused red tests for the selected P2 boundary: node drag/resize threshold, viewport-scale projection, and resize result projection.
+- [x] Extract the node drag/resize pure move model into `canvasNodeDragResizeModel.ts` while preserving DOM pointer capture, animation-frame batching, and emits in `EditorCanvas.vue`.
+- [x] Preserve baseline-sensitive interactions: automatic snapping, node creation context/naming, state editor confirm windows, port creation, and drag reorder.
+- [x] Run focused tests for the selected boundary, full verification, production build, dev restart, browser smoke, and re-evaluate total progress.
+- [x] If total roadmap progress is below 100%, automatically open the next phase after Phase 30.
+- [x] Commit and push the cleanup and planning updates.
+- **Status:** completed
+
+### Phase 31: EditorCanvas Node Drag/Resize Continuation
+- [ ] Continue P2 after `canvasNodeDragResizeModel.ts` by inspecting whether the remaining node drag/resize state can move into a small composable without touching connection completion or auto-snap.
+- [ ] Add focused red tests for the selected next Canvas boundary before production changes.
+- [ ] Keep automatic snapping, node creation payloads, connection completion, DOM measurement, pointer capture, and graph mutation emits behaviorally stable.
+- [ ] Run focused Canvas tests, TypeScript checks, full frontend tests, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
+- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 31.
 - **Status:** in progress
 
 ## Progress Estimate
@@ -344,6 +355,10 @@ Phase 30 in progress
 | Overall roadmap cleanup after Phase 29 | About 56% complete after moving primary state-port presentation and floating reorder preview out of `NodeCard.vue`. |
 | P1 `NodeCard.vue` cleanup after Phase 29 | About 96% complete after reducing `NodeCard.vue` from 2,577 to 1,988 lines while leaving state drafts, lock guards, and graph emits in the parent. |
 | Current continuation gate after Phase 29 | Total roadmap progress is below 100%, so Phase 30 is automatically opened to finish the P1 gate or select the next safest P2/P3 slice. |
+| Overall roadmap cleanup after Phase 30 | About 57% complete after closing the low-risk NodeCard P1 gate and starting P2 with a node drag/resize pure move model. |
+| P1 `NodeCard.vue` cleanup after Phase 30 | About 98% complete for low-risk presentation/composable extraction; remaining parent orchestration is intentionally deferred pending stronger controller coverage. |
+| P2 `EditorCanvas.vue` cleanup after Phase 30 | About 43% complete after moving node drag/resize threshold and viewport-scale projection into `canvasNodeDragResizeModel.ts`. |
+| Current continuation gate after Phase 30 | Total roadmap progress is below 100%, so Phase 31 is automatically opened for the next safe P2 Canvas slice. |
 
 ## Decisions Made
 | Decision | Rationale |
@@ -374,6 +389,7 @@ Phase 30 in progress
 - Phase 27 moves the output node body presentation into `OutputNodeBody.vue`; `NodeCard.vue` drops to 3,373 lines while keeping output preview derivation, output config handlers, lock guards, and state/config emits in the parent.
 - Phase 28 moves condition body presentation into `ConditionNodeBody.vue` and the top action/advanced popover presentation into `NodeCardTopActions.vue`; `NodeCard.vue` drops to 2,577 lines while keeping condition drafts, action confirmations, config handlers, lock guards, and graph/state emits in the parent.
 - Phase 29 moves primary input/output state-port presentation into `PrimaryStatePort.vue` and the port-reorder floating preview into `FloatingStatePortPill.vue`; `NodeCard.vue` drops to 1,988 lines while keeping state drafts, port validation, lock guards, and graph/state emits in the parent.
+- Phase 30 closes the low-risk `NodeCard.vue` P1 gate and starts P2 by moving node drag/resize move projection into `canvasNodeDragResizeModel.ts`; `EditorCanvas.vue` drops to 3,332 lines while keeping pointer capture, animation-frame batching, connection completion, and emits in the component.
 - Do not commit runtime artifacts such as `backend/data/settings`, `.dev_*`, `dist`, or `.worktrees`.
 - After code changes, restart using `npm run dev`.
 

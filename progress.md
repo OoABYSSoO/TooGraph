@@ -68,6 +68,78 @@
 | Timestamp | Error | Attempt | Resolution |
 |-----------|-------|---------|------------|
 
+## Session: 2026-04-29 Phase 30
+
+### Phase 1: NodeCard P1 Completion Gate
+- **Status:** completed
+- Actions taken:
+  - Re-read the formal roadmap, current task plan, findings, and progress log.
+  - Confirmed `NodeCard.vue` is down to 1,988 lines and its remaining logic is mostly state draft synchronization, validation, confirmation windows, lock guards, and graph/state mutation emits.
+  - Decided further NodeCard extraction is no longer the safest next slice without stronger controller coverage.
+  - Selected the next P2 Canvas slice: node drag/resize pure move projection.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `canvasNodeDragResizeModel.test.ts` before the production model existed.
+  - Updated `EditorCanvas.structure.test.ts` to require the new drag/resize model boundary.
+  - Ran the focused tests and verified the expected red failure: missing `canvasNodeDragResizeModel.ts`.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `canvasNodeDragResizeModel.ts` with pure drag/resize move helpers for activation threshold, viewport-scale projection, rounded node position, and resize result projection.
+  - Updated `EditorCanvas.vue` to consume `resolveNodeDragMove` and `resolveNodeResizeDragMove`.
+  - Kept DOM pointer capture, animation-frame scheduling, connection completion, panning, and graph mutation emits inside `EditorCanvas.vue`.
+  - Reduced `EditorCanvas.vue` from 3,363 lines to 3,332 lines.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused drag/resize model and `EditorCanvas` structure tests.
+  - Ran focused Canvas interaction tests covering connection auto-snap, connection model, node measurements, edge interactions, node resize, and the new drag/resize model.
+  - Ran TypeScript unused-symbol verification from the `frontend` directory.
+  - Ran the full frontend source test suite and the Vite structure test.
+  - Ran the frontend production build; no Vite large chunk warning was emitted.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed `/editor/new` returned HTTP 200 and backend `/health` returned `{"status":"ok"}`.
+  - Captured a Chrome headless screenshot for `/editor/new` at 1440x1000 and confirmed it was nonblank by sampled color count.
+
+### Phase 5: Progress Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated total roadmap progress at about 57%.
+  - Marked low-risk `NodeCard.vue` P1 extraction as about 98% complete and intentionally gated.
+  - Recalculated P2 `EditorCanvas.vue` cleanup at about 43%.
+  - Opened Phase 31 because total roadmap progress remains below 100%.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red focused test | `node --test frontend/src/editor/canvas/canvasNodeDragResizeModel.test.ts frontend/src/editor/canvas/EditorCanvas.structure.test.ts` before implementation | Fails because the drag/resize model does not exist | Failed with `ERR_MODULE_NOT_FOUND` and missing model file | Passed |
+| Focused drag/resize structure | Same command after implementation | New model boundary passes | 63 passed | Passed |
+| Focused Canvas related suite | `node --test` over drag/resize, nodeResize, EditorCanvas structure, connection, measurements, and edge interactions | Related Canvas behavior/model tests pass | 81 passed | Passed |
+| TypeScript unused-symbol check | `cd frontend && ./node_modules/.bin/vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` | No diagnostics | Exit 0, no diagnostics | Passed |
+| Full frontend source tests | `node --test $(rg --files frontend/src | rg '\.test\.ts$')` | All frontend source tests pass | 776 passed | Passed |
+| Vite structure tests | `node --test frontend/vite.config.structure.test.ts` | Vite structure tests pass | 3 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without chunk-warning regression | Exit 0, no large chunk warning | Passed |
+| Dev restart and health | `npm run dev`, then HTTP checks | Services start and respond | Frontend `/editor/new` 200, backend `/health` 200 ok | Passed |
+| Browser visual smoke | Chrome headless screenshot of `/editor/new` | Page renders nonblank | 1440x1000 PNG, sampledColors=318 | Passed |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Phase 30 implementation, verification, dev restart, commit, and push are complete. |
+| Where am I going? | Phase 31 is open for the next safe P2 Canvas slice. |
+| What's the goal? | Continue reducing high-concentration editor code while preserving auto-snap, node creation context, drag/resize behavior, and runtime UI. |
+| What have I learned? | Node drag/resize move math is pure enough to test outside `EditorCanvas.vue`; pointer capture and graph emits should remain component-owned for now. |
+| What have I done? | Closed the NodeCard P1 gate, extracted `canvasNodeDragResizeModel.ts`, verified full frontend behavior, built without chunk warnings, and restarted the app. |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-29 | `vue-tsc` rejected `emit` calls scheduled in closures because `update` could still be nullable across the callback boundary | Ran TypeScript unused-symbol verification after model extraction | Captured `resizeUpdate` and `dragUpdate` as narrowed constants before scheduling the animation-frame callback. |
+
 ## Session: 2026-04-29 Phase 29
 
 ### Phase 1: Re-orientation

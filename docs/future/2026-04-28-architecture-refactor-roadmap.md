@@ -70,6 +70,13 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 4. `useEdgeInteraction`：flow edge 删除确认、data edge state 编辑、edge selection。
 5. 保留 `EditorCanvas.vue` 作为组合层：只负责 template 绑定和各 composable 的 wiring。
 
+当前执行进展：
+
+- `useCanvasNodeMeasurements.ts` 已承接节点 DOM 注册、ResizeObserver/MutationObserver、anchor slot 测量、flow anchor fallback 测量和 measured size 清理。
+- `useCanvasEdgeInteractions.ts` 已承接 flow/route 删除确认、data edge state 编辑请求、disconnect/update emits 和缺失 edge 清理。
+- `canvasConnectionInteractionModel.ts`、`canvasConnectionModel.ts`、`canvasPendingStatePortModel.ts` 等纯模型已承接连接预览、自动吸附候选、虚拟端口创建上下文和新节点创建 payload 的可测试决策。
+- `canvasNodeDragResizeModel.ts` 已承接节点拖拽/缩放 move 阶段的阈值判断、viewport-scale 投影、rounding 和 resize result projection；`EditorCanvas.vue` 仍保留 pointer capture、animation-frame batching、connection completion 和 graph mutation emits。
+
 ### 3. `EditorWorkspaceShell.vue`
 
 现状：`EditorWorkspaceShell.vue` 接近 2.9k 行，承担 workspace tab、草稿持久化、route sync、run polling/SSE、图 mutation 转发、state panel、创建菜单、import/export、human review 和反馈条。

@@ -69,6 +69,10 @@ function readCanvasViewportDisplayModelSource() {
   return readFileSync(resolve(currentDirectory, "canvasViewportDisplayModel.ts"), "utf8").replace(/\r\n/g, "\n");
 }
 
+function readCanvasNodeDragResizeModelSource() {
+  return readFileSync(resolve(currentDirectory, "canvasNodeDragResizeModel.ts"), "utf8").replace(/\r\n/g, "\n");
+}
+
 function readEdgeVisibilityModelSource() {
   return readFileSync(resolve(currentDirectory, "edgeVisibilityModel.ts"), "utf8").replace(/\r\n/g, "\n");
 }
@@ -160,12 +164,16 @@ test("EditorCanvas raises hovered and selected nodes above sibling cards", () =>
 
 test("EditorCanvas exposes invisible corner hotzones for real node resizing", () => {
   const canvasNodePresentationModelSource = readCanvasNodePresentationModelSource();
+  const canvasNodeDragResizeModelSource = readCanvasNodeDragResizeModelSource();
 
-  assert.match(componentSource, /import \{[\s\S]*NODE_RESIZE_HANDLES,[\s\S]*resolveNodeResize,[\s\S]*type NodeResizeHandle[\s\S]*\} from "\.\/nodeResize\.ts";/);
+  assert.match(componentSource, /import \{[\s\S]*NODE_RESIZE_HANDLES,[\s\S]*type NodeResizeHandle[\s\S]*\} from "\.\/nodeResize\.ts";/);
+  assert.doesNotMatch(componentSource, /import \{[\s\S]*resolveNodeResize,[\s\S]*\} from "\.\/nodeResize\.ts";/);
   assert.doesNotMatch(componentSource, /normalizeNodeSize/);
+  assert.match(componentSource, /import \{[\s\S]*resolveNodeDragMove,[\s\S]*resolveNodeResizeDragMove,[\s\S]*type CanvasNodeDragState,[\s\S]*type CanvasNodeResizeDragState[\s\S]*\} from "\.\/canvasNodeDragResizeModel\.ts";/);
   assert.match(componentSource, /import \{[\s\S]*buildNodeCardSizeStyle,[\s\S]*buildNodeTransformStyle,[\s\S]*resolveNodeRenderedSize,[\s\S]*\} from "\.\/canvasNodePresentationModel";/);
   assert.match(componentSource, /\(event: "update:node-size", payload: \{ nodeId: string; position: GraphPosition; size: GraphNodeSize \}\): void;/);
-  assert.match(componentSource, /const nodeResizeDrag = ref<\{/);
+  assert.match(componentSource, /const nodeDrag = ref<CanvasNodeDragState \| null>\(null\);/);
+  assert.match(componentSource, /const nodeResizeDrag = ref<CanvasNodeResizeDragState \| null>\(null\);/);
   assert.match(componentSource, /:style="nodeCardSizeStyle\(node\)"/);
   assert.match(componentSource, /const nodeStyle = buildNodeTransformStyle;/);
   assert.match(componentSource, /const nodeCardSizeStyle = buildNodeCardSizeStyle;/);
@@ -184,9 +192,15 @@ test("EditorCanvas exposes invisible corner hotzones for real node resizing", ()
   assert.match(componentSource, /@pointerdown\.stop\.prevent="handleNodeResizePointerDown\(nodeId, handle, \$event\)"/);
   assert.match(componentSource, /function handleNodeResizePointerDown\(nodeId: string, handle: NodeResizeHandle, event: PointerEvent\)/);
   assert.match(componentSource, /function isNodeResizeHotzoneEnabled\(\) \{[\s\S]*return !isGraphEditingLocked\(\) && !activeConnection\.value;/);
+  assert.match(componentSource, /const resizeResult = resolveNodeResizeDragMove\(\{[\s\S]*drag: nodeResizeDrag\.value,[\s\S]*viewportScale: viewport\.viewport\.scale,/);
+  assert.match(componentSource, /const dragResult = resolveNodeDragMove\(\{[\s\S]*drag: nodeDrag\.value,[\s\S]*viewportScale: viewport\.viewport\.scale,/);
+  assert.match(canvasNodeDragResizeModelSource, /export function resolveNodeDragMove/);
+  assert.match(canvasNodeDragResizeModelSource, /export function resolveNodeResizeDragMove/);
   assert.doesNotMatch(componentSource, /function isNodeResizeHotzoneEnabled\(nodeId: string\)/);
   assert.doesNotMatch(componentSource, /nodeResizeDrag\.value\?\.nodeId === nodeId \|\| isNodeVisuallySelected\(nodeId\) \|\| hoveredNodeId\.value === nodeId/);
-  assert.match(componentSource, /resolveNodeResize\(\{[\s\S]*handle: nodeResizeDrag\.value\.handle,/);
+  assert.doesNotMatch(componentSource, /const deltaX = pointerDeltaX \/ viewport\.viewport\.scale;/);
+  assert.doesNotMatch(componentSource, /const deltaY = pointerDeltaY \/ viewport\.viewport\.scale;/);
+  assert.doesNotMatch(componentSource, /resolveNodeResize\(\{[\s\S]*handle: nodeResizeDrag\.value\.handle,/);
   assert.match(componentSource, /emit\("update:node-size"/);
   assert.match(componentSource, /\.editor-canvas__resize-hotzones \{[\s\S]*inset:\s*0;/);
   assert.match(componentSource, /\.editor-canvas__resize-hotzone \{[\s\S]*width:\s*40px;[\s\S]*height:\s*40px;/);
@@ -1143,17 +1157,21 @@ test("EditorCanvas captures node drags and batches drag writes with animation fr
 });
 
 test("EditorCanvas suppresses the residual click after a node drag so inline editors do not open on release", () => {
+  const canvasNodeDragResizeModelSource = readCanvasNodeDragResizeModelSource();
+
   assert.match(componentSource, /@click\.capture="handleNodeClickCapture\(nodeId, \$event\)"/);
   assert.match(componentSource, /const suppressedNodeClickId = ref<string \| null>\(null\);/);
   assert.match(componentSource, /const suppressedNodeClickTimeoutRef = ref<number \| null>\(null\);/);
-  assert.match(componentSource, /moved:\s*boolean;/);
-  assert.match(componentSource, /const pointerDeltaX = event\.clientX - nodeDrag\.value\.startClientX;/);
-  assert.match(componentSource, /const pointerDeltaY = event\.clientY - nodeDrag\.value\.startClientY;/);
-  assert.match(componentSource, /if \(!nodeDrag\.value\.moved\) \{/);
-  assert.match(componentSource, /if \(Math\.abs\(pointerDeltaX\) <= 3 && Math\.abs\(pointerDeltaY\) <= 3\) \{\s*return;\s*\}/);
-  assert.match(componentSource, /nodeDrag\.value\.moved = true;/);
-  assert.match(componentSource, /const deltaX = pointerDeltaX \/ viewport\.viewport\.scale;/);
-  assert.match(componentSource, /const deltaY = pointerDeltaY \/ viewport\.viewport\.scale;/);
+  assert.match(componentSource, /const nodeDrag = ref<CanvasNodeDragState \| null>\(null\);/);
+  assert.match(componentSource, /const dragResult = resolveNodeDragMove\(\{[\s\S]*drag: nodeDrag\.value,[\s\S]*pointer: event,[\s\S]*viewportScale: viewport\.viewport\.scale,/);
+  assert.match(canvasNodeDragResizeModelSource, /moved:\s*boolean;/);
+  assert.match(canvasNodeDragResizeModelSource, /const pointerDeltaX = input\.pointer\.clientX - input\.drag\.startClientX;/);
+  assert.match(canvasNodeDragResizeModelSource, /const pointerDeltaY = input\.pointer\.clientY - input\.drag\.startClientY;/);
+  assert.match(canvasNodeDragResizeModelSource, /NODE_POINTER_ACTIVATION_THRESHOLD = 3/);
+  assert.match(canvasNodeDragResizeModelSource, /Math\.abs\(pointerDeltaX\) <= activationThreshold && Math\.abs\(pointerDeltaY\) <= activationThreshold/);
+  assert.match(canvasNodeDragResizeModelSource, /const drag = input\.drag\.moved \? input\.drag : \{ \.\.\.input\.drag, moved: true \};/);
+  assert.match(canvasNodeDragResizeModelSource, /x: Math\.round\(drag\.originX \+ pointerDeltaX \/ scale\)/);
+  assert.match(canvasNodeDragResizeModelSource, /y: Math\.round\(drag\.originY \+ pointerDeltaY \/ scale\)/);
   assert.match(componentSource, /if \(nodeDrag\.value\.moved\) \{[\s\S]*startSuppressedNodeClickWindow\(nodeDrag\.value\.nodeId\);/);
   assert.match(componentSource, /function clearSuppressedNodeClickWindow\(\) \{/);
   assert.match(componentSource, /window\.clearTimeout\(suppressedNodeClickTimeoutRef\.value\);/);
