@@ -13,6 +13,7 @@ const textEditorComposableSource = readFileSync(resolve(currentDirectory, "useNo
 const floatingPanelsComposableSource = readFileSync(resolve(currentDirectory, "useNodeFloatingPanels.ts"), "utf8").replace(/\r\n/g, "\n");
 const portReorderComposableSource = readFileSync(resolve(currentDirectory, "usePortReorder.ts"), "utf8").replace(/\r\n/g, "\n");
 const agentSkillPickerSource = readFileSync(resolve(currentDirectory, "AgentSkillPicker.vue"), "utf8").replace(/\r\n/g, "\n");
+const agentRuntimeControlsSource = readFileSync(resolve(currentDirectory, "AgentRuntimeControls.vue"), "utf8").replace(/\r\n/g, "\n");
 const statePortListSource = readFileSync(resolve(currentDirectory, "StatePortList.vue"), "utf8").replace(/\r\n/g, "\n");
 const portListSurfaceSource = `${componentSource}\n${statePortListSource}`;
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -35,9 +36,9 @@ test("NodeCard renders output state pills with an integrated anchor slot", () =>
   assert.doesNotMatch(componentSource, /class="node-card__port-pill-anchor"/);
   assert.doesNotMatch(componentSource, /view\.body\.primaryOutput\.typeLabel/);
   const rightOutputColumnStart = componentSource.indexOf('<div class="node-card__port-column node-card__port-column--right">');
-  const agentRuntimeRowStart = componentSource.indexOf('<div class="node-card__agent-runtime-row">', rightOutputColumnStart);
-  assert.ok(rightOutputColumnStart >= 0 && agentRuntimeRowStart > rightOutputColumnStart, "expected to find the right-side output port column");
-  const rightOutputColumn = componentSource.slice(rightOutputColumnStart, agentRuntimeRowStart);
+  const agentRuntimeControlsStart = componentSource.indexOf("<AgentRuntimeControls", rightOutputColumnStart);
+  assert.ok(rightOutputColumnStart >= 0 && agentRuntimeControlsStart > rightOutputColumnStart, "expected to find the right-side output port column");
+  const rightOutputColumn = componentSource.slice(rightOutputColumnStart, agentRuntimeControlsStart);
   assert.doesNotMatch(rightOutputColumn, /port\.typeLabel/);
 });
 
@@ -183,57 +184,59 @@ test("NodeCard restores the legacy agent runtime control order with Element Plus
   assert.ok(agentSectionMatch, "expected to find the agent node section");
   const agentSection = agentSectionMatch[0];
 
-  assert.match(agentSection, /class="node-card__agent-runtime-row"/);
-  assert.match(agentSection, /class="node-card__agent-model-select-shell"/);
-  assert.match(agentSection, /@pointerdown\.stop/);
-  assert.match(agentSection, /@click\.stop/);
-  assert.match(agentSection, /<ElSelect/);
-  assert.match(agentSection, /ref="agentModelSelectRef"/);
-  assert.match(agentSection, /class="node-card__agent-model-select graphite-select"/);
-  assert.match(agentSection, /@visible-change="handleAgentModelSelectVisibleChange"/);
-  assert.match(agentSection, /popper-class="graphite-select-popper node-card__agent-model-popper"/);
+  assert.match(componentSource, /import AgentRuntimeControls from "\.\/AgentRuntimeControls\.vue";/);
+  assert.match(agentSection, /<AgentRuntimeControls[\s\S]*ref="agentRuntimeControlsRef"[\s\S]*:model-value="agentResolvedModelValue \|\| undefined"[\s\S]*:model-options="agentModelOptions"[\s\S]*:global-model-ref="trimmedGlobalTextModelRef"[\s\S]*:thinking-mode-value="agentThinkingModeValue"[\s\S]*:thinking-options="agentThinkingOptions"[\s\S]*:thinking-enabled="agentThinkingEnabled"[\s\S]*:breakpoint-enabled="Boolean\(agentBreakpointEnabled\)"[\s\S]*:confirm-popover-style="confirmPopoverStyle"[\s\S]*@model-visible-change="handleAgentModelSelectVisibleChange"[\s\S]*@update:model-value="handleAgentModelValueChange"[\s\S]*@update:thinking-mode="handleAgentThinkingModeSelect"[\s\S]*@update:breakpoint-enabled="handleAgentBreakpointToggleValue"/);
+  assert.match(agentRuntimeControlsSource, /class="node-card__agent-runtime-row"/);
+  assert.match(agentRuntimeControlsSource, /class="node-card__agent-model-select-shell"/);
+  assert.match(agentRuntimeControlsSource, /@pointerdown\.stop/);
+  assert.match(agentRuntimeControlsSource, /@click\.stop/);
+  assert.match(agentRuntimeControlsSource, /<ElSelect/);
+  assert.match(agentRuntimeControlsSource, /ref="agentModelSelectRef"/);
+  assert.match(agentRuntimeControlsSource, /class="node-card__agent-model-select graphite-select"/);
+  assert.match(agentRuntimeControlsSource, /@visible-change="emit\('model-visible-change', \$event\)"/);
+  assert.match(agentRuntimeControlsSource, /popper-class="graphite-select-popper node-card__agent-model-popper"/);
   assert.equal(
-    [...agentSection.matchAll(/<ElPopover\s+trigger="hover"\s+placement="top-start"[\s\S]*?popper-class="node-card__agent-toggle-hint-popper"/g)]
+    [...agentRuntimeControlsSource.matchAll(/<ElPopover\s+trigger="hover"\s+placement="top-start"[\s\S]*?popper-class="node-card__agent-toggle-hint-popper"/g)]
       .length,
     2,
   );
-  assert.match(agentSection, /class="node-card__agent-toggle-card node-card__agent-toggle-card--thinking"/);
-  assert.match(agentSection, /class="node-card__agent-thinking-icon"/);
-  assert.match(agentSection, /<ElSelect/);
-  assert.match(agentSection, /class="node-card__agent-thinking-select graphite-select"/);
-  assert.match(agentSection, /:model-value="agentThinkingModeValue"/);
-  assert.match(agentSection, /v-for="option in agentThinkingOptions"/);
-  assert.match(agentSection, /@update:model-value="handleAgentThinkingModeSelect"/);
-  assert.doesNotMatch(agentSection, /class="node-card__agent-toggle-switch node-card__agent-thinking-switch"/);
-  assert.match(agentSection, /class="node-card__confirm-hint node-card__confirm-hint--toggle">\{\{ t\("nodeCard\.thinkingMode"\) \}\}<\/div>/);
-  assert.match(agentSection, /class="node-card__agent-toggle-card node-card__agent-toggle-card--breakpoint"/);
-  assert.match(agentSection, /class="node-card__agent-breakpoint-icon"/);
-  assert.match(agentSection, /class="node-card__agent-toggle-switch node-card__agent-breakpoint-switch"/);
-  assert.match(agentSection, /:model-value="agentBreakpointEnabled"/);
-  assert.match(agentSection, /@update:model-value="handleAgentBreakpointToggleValue"/);
-  assert.match(agentSection, /class="node-card__confirm-hint node-card__confirm-hint--toggle">\{\{ t\("nodeCard\.setBreakpoint"\) \}\}<\/div>/);
-  assert.doesNotMatch(agentSection, /class="node-card__agent-breakpoint-button"/);
-  assert.doesNotMatch(agentSection, /node-card__agent-thinking-inline/);
-  assert.doesNotMatch(agentSection, /node-card__agent-thinking-shell/);
-  assert.doesNotMatch(agentSection, /class="node-card__agent-thinking-label"/);
-  assert.doesNotMatch(agentSection, /class="node-card__agent-thinking-state"/);
-  assert.doesNotMatch(agentSection, />Thinking</);
-  assert.doesNotMatch(agentSection, /class="node-card__chip-row"/);
-  assert.doesNotMatch(agentSection, /class="node-card__agent-thinking-toggle"/);
-  assert.match(componentSource, /\.node-card__agent-runtime-row \{[\s\S]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);/);
-  assert.match(componentSource, /\.node-card__agent-model-select-shell \{[\s\S]*width:\s*100%;/);
-  assert.match(componentSource, /\.node-card__agent-toggle-card \{/);
-  assert.match(componentSource, /\.node-card__agent-toggle-card \{[\s\S]*grid-template-columns:\s*20px\s*56px;/);
-  assert.match(componentSource, /\.node-card__agent-toggle-card--thinking \{[\s\S]*grid-template-columns:\s*20px\s*minmax\(0,\s*1fr\);/);
-  assert.match(componentSource, /\.node-card__agent-toggle-card \{[\s\S]*width:\s*100%;/);
-  assert.match(componentSource, /\.node-card__agent-toggle-card \{[\s\S]*min-height:\s*48px;/);
-  assert.match(componentSource, /\.node-card__agent-toggle-card \{[\s\S]*border-radius:\s*16px;/);
-  assert.match(componentSource, /\.node-card__agent-toggle-card \{[\s\S]*background:\s*rgba\(255,\s*255,\s*255,\s*0\.88\);/);
-  assert.match(componentSource, /\.node-card__agent-toggle-card \{[\s\S]*padding:\s*0 14px;/);
-  assert.match(componentSource, /\.node-card__confirm-hint--toggle \{[\s\S]*background:\s*rgb\(255,\s*247,\s*237\);/);
-  assert.match(componentSource, /\.node-card__agent-thinking-icon \{[\s\S]*width:\s*20px;/);
-  assert.match(componentSource, /\.node-card__agent-thinking-icon \{[\s\S]*height:\s*20px;/);
-  assert.doesNotMatch(componentSource, /\.node-card__agent-thinking-icon \{[^}]*background:/);
+  assert.match(agentRuntimeControlsSource, /class="node-card__agent-toggle-card node-card__agent-toggle-card--thinking"/);
+  assert.match(agentRuntimeControlsSource, /class="node-card__agent-thinking-icon"/);
+  assert.match(agentRuntimeControlsSource, /<ElSelect/);
+  assert.match(agentRuntimeControlsSource, /class="node-card__agent-thinking-select graphite-select"/);
+  assert.match(agentRuntimeControlsSource, /:model-value="thinkingModeValue"/);
+  assert.match(agentRuntimeControlsSource, /v-for="option in thinkingOptions"/);
+  assert.match(agentRuntimeControlsSource, /@update:model-value="emit\('update:thinking-mode', \$event\)"/);
+  assert.doesNotMatch(agentRuntimeControlsSource, /class="node-card__agent-toggle-switch node-card__agent-thinking-switch"/);
+  assert.match(agentRuntimeControlsSource, /class="node-card__confirm-hint node-card__confirm-hint--toggle">\{\{ t\("nodeCard\.thinkingMode"\) \}\}<\/div>/);
+  assert.match(agentRuntimeControlsSource, /class="node-card__agent-toggle-card node-card__agent-toggle-card--breakpoint"/);
+  assert.match(agentRuntimeControlsSource, /class="node-card__agent-breakpoint-icon"/);
+  assert.match(agentRuntimeControlsSource, /class="node-card__agent-toggle-switch node-card__agent-breakpoint-switch"/);
+  assert.match(agentRuntimeControlsSource, /:model-value="breakpointEnabled"/);
+  assert.match(agentRuntimeControlsSource, /@update:model-value="emit\('update:breakpoint-enabled', \$event\)"/);
+  assert.match(agentRuntimeControlsSource, /class="node-card__confirm-hint node-card__confirm-hint--toggle">\{\{ t\("nodeCard\.setBreakpoint"\) \}\}<\/div>/);
+  assert.doesNotMatch(agentRuntimeControlsSource, /class="node-card__agent-breakpoint-button"/);
+  assert.doesNotMatch(agentRuntimeControlsSource, /node-card__agent-thinking-inline/);
+  assert.doesNotMatch(agentRuntimeControlsSource, /node-card__agent-thinking-shell/);
+  assert.doesNotMatch(agentRuntimeControlsSource, /class="node-card__agent-thinking-label"/);
+  assert.doesNotMatch(agentRuntimeControlsSource, /class="node-card__agent-thinking-state"/);
+  assert.doesNotMatch(agentRuntimeControlsSource, />Thinking</);
+  assert.doesNotMatch(agentRuntimeControlsSource, /class="node-card__chip-row"/);
+  assert.doesNotMatch(agentRuntimeControlsSource, /class="node-card__agent-thinking-toggle"/);
+  assert.match(agentRuntimeControlsSource, /\.node-card__agent-runtime-row \{[\s\S]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);/);
+  assert.match(agentRuntimeControlsSource, /\.node-card__agent-model-select-shell \{[\s\S]*width:\s*100%;/);
+  assert.match(agentRuntimeControlsSource, /\.node-card__agent-toggle-card \{/);
+  assert.match(agentRuntimeControlsSource, /\.node-card__agent-toggle-card \{[\s\S]*grid-template-columns:\s*20px\s*56px;/);
+  assert.match(agentRuntimeControlsSource, /\.node-card__agent-toggle-card--thinking \{[\s\S]*grid-template-columns:\s*20px\s*minmax\(0,\s*1fr\);/);
+  assert.match(agentRuntimeControlsSource, /\.node-card__agent-toggle-card \{[\s\S]*width:\s*100%;/);
+  assert.match(agentRuntimeControlsSource, /\.node-card__agent-toggle-card \{[\s\S]*min-height:\s*48px;/);
+  assert.match(agentRuntimeControlsSource, /\.node-card__agent-toggle-card \{[\s\S]*border-radius:\s*16px;/);
+  assert.match(agentRuntimeControlsSource, /\.node-card__agent-toggle-card \{[\s\S]*background:\s*rgba\(255,\s*255,\s*255,\s*0\.88\);/);
+  assert.match(agentRuntimeControlsSource, /\.node-card__agent-toggle-card \{[\s\S]*padding:\s*0 14px;/);
+  assert.match(agentRuntimeControlsSource, /\.node-card__confirm-hint--toggle \{[\s\S]*background:\s*rgb\(255,\s*247,\s*237\);/);
+  assert.match(agentRuntimeControlsSource, /\.node-card__agent-thinking-icon \{[\s\S]*width:\s*20px;/);
+  assert.match(agentRuntimeControlsSource, /\.node-card__agent-thinking-icon \{[\s\S]*height:\s*20px;/);
+  assert.doesNotMatch(agentRuntimeControlsSource, /\.node-card__agent-thinking-icon \{[^}]*background:/);
   assert.match(componentSource, /const agentThinkingOptions = computed/);
   const thinkingOptions = componentSource.match(/const agentThinkingOptions = computed[\s\S]*?\]\);/);
   assert.ok(thinkingOptions, "expected agent thinking options");
@@ -258,9 +261,10 @@ test("NodeCard restores the legacy agent runtime control order with Element Plus
   assert.match(componentSource, /@update:model-value="handleAgentBreakpointTimingSelect"/);
   assert.match(componentSource, /t\('nodeCard\.runAfter'\)/);
   assert.match(componentSource, /t\('nodeCard\.runBefore'\)/);
-  assert.match(componentSource, /const agentModelSelectRef = ref<\{ blur\?: \(\) => void; toggleMenu\?: \(\) => void; expanded\?: boolean \} \| null>\(null\);/);
-  assert.match(componentSource, /function collapseAgentModelSelect\(\) \{[\s\S]*if \(agentModelSelectRef\.value\?\.expanded\) \{[\s\S]*agentModelSelectRef\.value\.toggleMenu\?\.\(\);[\s\S]*\}[\s\S]*agentModelSelectRef\.value\?\.blur\?\.\(\);[\s\S]*\}/);
+  assert.match(componentSource, /const agentRuntimeControlsRef = ref<\{ collapseModelSelect\?: \(\) => void \} \| null>\(null\);/);
+  assert.match(componentSource, /function collapseAgentModelSelect\(\) \{[\s\S]*agentRuntimeControlsRef\.value\?\.collapseModelSelect\?\.\(\);[\s\S]*\}/);
   assert.match(componentSource, /collapseAgentModelSelect\(\);/);
+  assert.doesNotMatch(agentSection, /class="node-card__agent-runtime-row"/);
 });
 
 test("NodeCard asks the workspace to refresh models when the agent model select opens", () => {
@@ -276,8 +280,9 @@ test("NodeCard keeps agent model selection in the dropdown without rendering dup
   assert.ok(agentSectionMatch, "expected to find the agent node section");
   const agentSection = agentSectionMatch[0];
 
-  assert.match(agentSection, /class="node-card__agent-model-select graphite-select"/);
-  assert.match(agentSection, /v-for="option in agentModelOptions"/);
+  assert.match(agentSection, /<AgentRuntimeControls/);
+  assert.match(agentRuntimeControlsSource, /class="node-card__agent-model-select graphite-select"/);
+  assert.match(agentRuntimeControlsSource, /v-for="option in modelOptions"/);
   assert.match(agentSection, /@update:model-value="handleAgentModelValueChange"/);
   assert.doesNotMatch(agentSection, /class="node-card__available-model-pills"/);
   assert.doesNotMatch(agentSection, /class="node-card__model-pill"/);
@@ -421,9 +426,9 @@ test("NodeCard constrains long state port labels without pushing anchor slots ou
 
 test("NodeCard hides virtual agent output any behind the plus output row", () => {
   const rightOutputColumnStart = componentSource.indexOf('<div class="node-card__port-column node-card__port-column--right">');
-  const agentRuntimeRowStart = componentSource.indexOf('<div class="node-card__agent-runtime-row">', rightOutputColumnStart);
-  assert.ok(rightOutputColumnStart >= 0 && agentRuntimeRowStart > rightOutputColumnStart, "expected to find the agent output port column");
-  const agentOutputPortSection = componentSource.slice(rightOutputColumnStart, agentRuntimeRowStart);
+  const agentRuntimeControlsStart = componentSource.indexOf("<AgentRuntimeControls", rightOutputColumnStart);
+  assert.ok(rightOutputColumnStart >= 0 && agentRuntimeControlsStart > rightOutputColumnStart, "expected to find the agent output port column");
+  const agentOutputPortSection = componentSource.slice(rightOutputColumnStart, agentRuntimeControlsStart);
 
   assert.match(statePortListSource, /'node-card__port-pill--removable': !port\.virtual/);
   assert.match(componentSource, /const agentOutputPorts = computed<NodePortViewModel\[\]>\(\(\) =>[\s\S]*filter\(\(port\) => !port\.virtual\)/);
@@ -994,7 +999,8 @@ test("NodeCard uses an Element Plus switch card for output persistence like the 
   assert.ok(outputSectionMatch, "expected to find the output node section");
   const outputSection = outputSectionMatch[0];
 
-  assert.match(componentSource, /import \{[\s\S]*DocumentChecked[\s\S]*Opportunity[\s\S]*\} from "@element-plus\/icons-vue";/);
+  assert.match(componentSource, /import \{[\s\S]*DocumentChecked[\s\S]*\} from "@element-plus\/icons-vue";/);
+  assert.match(agentRuntimeControlsSource, /import \{ Flag, Opportunity \} from "@element-plus\/icons-vue";/);
   assert.match(outputSection, /class="node-card__output-persist-card"/);
   assert.match(outputSection, /class="node-card__output-persist-icon"/);
   assert.match(outputSection, /<DocumentChecked \/>/);

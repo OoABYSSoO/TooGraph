@@ -468,6 +468,44 @@
 | Dev restart | `npm run dev` | Services start and respond | Frontend 200, backend `/health` 200 | Passed |
 | Visual check | Headless Chrome screenshot of `/editor/new` | Editor route renders without obvious layout regression | Screenshot captured at `/tmp/graphiteui-editor-phase23.png` | Passed |
 
+## Session: 2026-04-29 Phase 24
+
+### Phase 24: Agent Runtime Controls Component
+- **Status:** completed
+- Actions taken:
+  - Re-read the formal roadmap and planning memory before changing code.
+  - Added `frontend/src/editor/nodes/AgentRuntimeControls.structure.test.ts` and updated `NodeCard.structure.test.ts` before production changes.
+  - Verified the expected red failure: `AgentRuntimeControls.vue` did not exist and `NodeCard.vue` still rendered the agent runtime controls inline.
+  - Added `AgentRuntimeControls.vue` to own the agent model select, thinking-mode select card, breakpoint switch card, model-select collapse ref, and local runtime-control styles.
+  - Updated `NodeCard.vue` to pass derived runtime-control data and parent-owned handlers into the component.
+  - Kept model option derivation, refresh-model emit, thinking/breakpoint handlers, lock guards, and agent config/breakpoint emits in `NodeCard.vue`.
+  - Confirmed `NodeCard.vue` is down to 3,954 lines after this extraction.
+  - Recalculated total roadmap cleanup at about 48% and P1 `NodeCard.vue` cleanup at about 73%.
+  - Because total roadmap cleanup is still below 100%, opened Phase 25 automatically for the `AgentNodeBody.vue` wrapper slice.
+
+### Phase 24 Verification
+- **Status:** completed
+- Actions taken:
+  - Ran `node --test frontend/src/editor/nodes/AgentRuntimeControls.structure.test.ts frontend/src/editor/nodes/NodeCard.structure.test.ts frontend/src/editor/nodes/agentConfigModel.test.ts`.
+  - Ran `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend`.
+  - Ran `node --test $(rg --files frontend/src -g '*.test.ts') frontend/vite.config.structure.test.ts`.
+  - Ran `npm run build` in `frontend`; no Vite large chunk warning was emitted.
+  - Restarted the dev environment with root `npm run dev`.
+  - Confirmed the frontend returned HTTP 200 at `http://127.0.0.1:3477/editor/new`.
+  - Confirmed the backend health route returned HTTP 200 at `http://127.0.0.1:8765/health`.
+  - Captured a headless Chrome screenshot of `http://127.0.0.1:3477/editor/new` and checked for obvious layout regressions.
+
+## Test Results: Phase 24
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red structure tests | `node --test frontend/src/editor/nodes/AgentRuntimeControls.structure.test.ts frontend/src/editor/nodes/NodeCard.structure.test.ts` before implementation | Fails because `AgentRuntimeControls.vue` is missing and NodeCard still owns runtime-control markup | Failed with `ENOENT` for `AgentRuntimeControls.vue` | Passed |
+| Focused runtime controls suite | `node --test frontend/src/editor/nodes/AgentRuntimeControls.structure.test.ts frontend/src/editor/nodes/NodeCard.structure.test.ts frontend/src/editor/nodes/agentConfigModel.test.ts` | Touched structure and model tests pass | 46 passed | Passed |
+| Unused symbol check | `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No unused-symbol diagnostics | Exit 0, no diagnostics | Passed |
+| Full frontend tests | `node --test $(rg --files frontend/src -g '*.test.ts') frontend/vite.config.structure.test.ts` | All frontend tests pass | 763 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without large chunk warning | Exit 0, no large chunk warning | Passed |
+| Dev restart | `npm run dev` | Services start and respond | Frontend `/editor/new` 200, backend `/health` 200 | Passed |
+| Visual check | Headless Chrome screenshot of `/editor/new` | Editor route renders without obvious layout regression | Screenshot captured at `/tmp/graphiteui-editor-phase24-wait.png` | Passed |
+
 ## Session: 2026-04-28 Baseline Interaction Repair and Large Connection Cleanup
 
 ### Phase 1: Baseline Regression Repair
