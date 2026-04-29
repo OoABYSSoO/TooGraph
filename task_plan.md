@@ -4,7 +4,7 @@
 Run a ten-round conservative cleanup batch focused on `EditorCanvas.vue` pure projection and interaction-model helpers, then close the baseline interaction regressions in one larger pass while preserving graph editing behavior, runtime visuals, drag/connect workflows, deletion behavior, and dev startup health.
 
 ## Current Phase
-Phase 56 in progress
+Phase 57 in progress
 
 ## Autonomous Continuation Gate
 - After every completed cleanup phase, re-read `docs/future/2026-04-28-architecture-refactor-roadmap.md`, `task_plan.md`, `findings.md`, and `progress.md`, then recalculate the total roadmap progress and the active area progress.
@@ -522,12 +522,21 @@ Phase 56 in progress
 - **Status:** completed
 
 ### Phase 56: EditorCanvas Minimap Center View Gate
-- [ ] Re-read the formal roadmap, Phase 55 findings, and current minimap center-view flow before changing code.
-- [ ] Inspect whether the next safest `EditorCanvas.vue` boundary is a minimap center-view action model around empty canvas-size ignore and centered viewport projection.
-- [ ] Add focused red tests for the selected minimap center-view boundary before production changes.
-- [ ] Keep actual canvas size refresh, viewport mutation, minimap drag/click behavior, zoom button behavior, wheel zoom, panning, pinch zoom, and graph interactions stable.
-- [ ] Run focused minimap/structure and Canvas regression tests, TypeScript checks, full frontend tests or justified targeted regression, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
-- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 56.
+- [x] Re-read the formal roadmap, Phase 55 findings, and current minimap center-view flow before changing code.
+- [x] Inspect whether the next safest `EditorCanvas.vue` boundary is a minimap center-view action model around empty canvas-size ignore and centered viewport projection.
+- [x] Add focused red tests for the selected minimap center-view boundary before production changes.
+- [x] Keep actual canvas size refresh, viewport mutation, minimap drag/click behavior, zoom button behavior, wheel zoom, panning, pinch zoom, and graph interactions stable.
+- [x] Run focused minimap/structure and Canvas regression tests, TypeScript checks, full frontend tests or justified targeted regression, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
+- [x] If total roadmap progress is below 100%, automatically open the next phase after Phase 56.
+- **Status:** completed
+
+### Phase 57: EditorCanvas Focus Node Viewport Gate
+- [ ] Re-read the formal roadmap, Phase 56 findings, and current external node-focus viewport flow before changing code.
+- [ ] Inspect whether the next safest `EditorCanvas.vue` boundary is a focus-node viewport action model around missing target ignore and focused viewport projection.
+- [ ] Add focused red tests for the selected focus-node viewport boundary before production changes.
+- [ ] Keep actual node selection, DOM rect/element measurement, viewport mutation, minimap, zoom controls, panning, and graph interactions stable.
+- [ ] Run focused focus-viewport/structure and Canvas regression tests, TypeScript checks, full frontend tests or justified targeted regression, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
+- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 57.
 - **Status:** in progress
 
 ## Progress Estimate
@@ -661,6 +670,10 @@ Phase 56 in progress
 | P2 `EditorCanvas.vue` cleanup after Phase 55 | About 83% complete after extracting zoom-out/zoom-in/reset decision logic while preserving actual viewport mutation in the component. |
 | Current continuation gate after Phase 55 | Total roadmap progress is below 100%, so Phase 56 is automatically opened for the next safe P2 Canvas minimap center-view boundary. |
 | P2 `EditorCanvas.vue` cleanup target for Phase 56 | About 84% if minimap center-view empty-size ignore and viewport projection move into `minimapModel.ts` without changing minimap event behavior. |
+| Overall roadmap cleanup after Phase 56 | About 83% complete after moving minimap center-view action projection into `minimapModel.ts`. |
+| P2 `EditorCanvas.vue` cleanup after Phase 56 | About 84% complete after extracting empty-size ignore and centered viewport projection while preserving actual viewport mutation and focus execution in the component. |
+| Current continuation gate after Phase 56 | Total roadmap progress is below 100%, so Phase 57 is automatically opened for the next safe P2 Canvas focus-node viewport boundary. |
+| P2 `EditorCanvas.vue` cleanup target for Phase 57 | About 85% if focus-node missing-target ignore and viewport projection move into `focusNodeViewport.ts` without changing selection or DOM measurement behavior. |
 
 ## Decisions Made
 | Decision | Rationale |
@@ -712,6 +725,7 @@ Phase 56 in progress
 - Phase 53 moves pending-connection creation-menu routing into `canvasConnectionInteractionModel.ts`; `EditorCanvas.vue` keeps canvas point/event inputs, actual `open-node-creation-menu` emit, connection cleanup, and selected-edge cleanup execution.
 - Phase 54 moves connection-completion execution routing into `canvasConnectionCompletionModel.ts`; `EditorCanvas.vue` keeps actual typed emit dispatch, connection cleanup, selected-edge cleanup, and graph mutation behavior.
 - Phase 55 moves zoom button scale/reset action projection into `canvasViewportInteractionModel.ts`; `EditorCanvas.vue` keeps actual center zoom execution, viewport reset mutation, wheel zoom execution, and viewport draft emits.
+- Phase 56 moves minimap center-view action projection into `minimapModel.ts`; `EditorCanvas.vue` keeps canvas size refresh, actual viewport mutation, canvas focus execution, and minimap event binding.
 - Do not commit runtime artifacts such as `backend/data/settings`, `.dev_*`, `dist`, or `.worktrees`.
 - After code changes, restart using `npm run dev`.
 

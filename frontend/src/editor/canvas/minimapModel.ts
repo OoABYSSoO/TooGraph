@@ -79,6 +79,10 @@ export type BuildEditorMinimapModelInput = {
   fitRatio?: number;
 };
 
+export type MinimapCenterViewAction =
+  | { type: "ignore-empty-canvas-size" }
+  | { type: "set-viewport"; viewport: EditorMinimapViewport };
+
 const DEFAULT_BOUNDS_PADDING = 180;
 const DEFAULT_FIT_RATIO = 0.88;
 
@@ -133,6 +137,28 @@ export function resolveViewportForMinimapCenter(input: {
     x: roundCoordinate(input.canvasWidth / 2 - input.worldX * input.viewportScale),
     y: roundCoordinate(input.canvasHeight / 2 - input.worldY * input.viewportScale),
     scale: input.viewportScale,
+  };
+}
+
+export function resolveMinimapCenterViewAction(input: {
+  worldX: number;
+  worldY: number;
+  viewportScale: number;
+  canvasSize: EditorMinimapSize;
+}): MinimapCenterViewAction {
+  if (input.canvasSize.width <= 0 || input.canvasSize.height <= 0) {
+    return { type: "ignore-empty-canvas-size" };
+  }
+
+  return {
+    type: "set-viewport",
+    viewport: resolveViewportForMinimapCenter({
+      worldX: input.worldX,
+      worldY: input.worldY,
+      viewportScale: input.viewportScale,
+      canvasWidth: input.canvasSize.width,
+      canvasHeight: input.canvasSize.height,
+    }),
   };
 }
 

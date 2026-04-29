@@ -513,7 +513,7 @@ import {
   CREATE_AGENT_INPUT_STATE_KEY,
 } from "@/lib/virtual-any-input";
 import { resolveFocusedViewport } from "@/editor/canvas/focusNodeViewport";
-import { resolveViewportForMinimapCenter } from "./minimapModel";
+import { resolveMinimapCenterViewAction } from "./minimapModel";
 import { useNodeSelectionFocus, type NodeFocusRequest } from "./useNodeSelectionFocus";
 import { useViewport } from "./useViewport";
 import { isAgentBreakpointEnabledInDocument, resolveAgentBreakpointTimingInDocument } from "@/lib/graph-document";
@@ -1031,19 +1031,19 @@ function startDataEdgeStateConfirm(edge: ProjectedCanvasEdge, event: PointerEven
 
 function handleMinimapCenterView(point: { worldX: number; worldY: number }) {
   updateCanvasSize();
-  if (canvasSize.value.width <= 0 || canvasSize.value.height <= 0) {
-    return;
+  const minimapCenterViewAction = resolveMinimapCenterViewAction({
+    worldX: point.worldX,
+    worldY: point.worldY,
+    viewportScale: viewport.viewport.scale,
+    canvasSize: canvasSize.value,
+  });
+  switch (minimapCenterViewAction.type) {
+    case "ignore-empty-canvas-size":
+      return;
+    case "set-viewport":
+      viewport.setViewport(minimapCenterViewAction.viewport);
+      break;
   }
-
-  viewport.setViewport(
-    resolveViewportForMinimapCenter({
-      worldX: point.worldX,
-      worldY: point.worldY,
-      viewportScale: viewport.viewport.scale,
-      canvasWidth: canvasSize.value.width,
-      canvasHeight: canvasSize.value.height,
-    }),
-  );
   canvasRef.value?.focus();
 }
 

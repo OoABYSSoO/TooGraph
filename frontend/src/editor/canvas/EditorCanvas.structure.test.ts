@@ -21,6 +21,10 @@ function readCanvasMinimapEdgeModelSource() {
   return readFileSync(resolve(currentDirectory, "canvasMinimapEdgeModel.ts"), "utf8").replace(/\r\n/g, "\n");
 }
 
+function readMinimapModelSource() {
+  return readFileSync(resolve(currentDirectory, "minimapModel.ts"), "utf8").replace(/\r\n/g, "\n");
+}
+
 function readCanvasDataEdgeStateModelSource() {
   return readFileSync(resolve(currentDirectory, "canvasDataEdgeStateModel.ts"), "utf8").replace(/\r\n/g, "\n");
 }
@@ -128,6 +132,7 @@ test("EditorCanvas binds the canvas surface styling to the viewport state", () =
 test("EditorCanvas mounts a right-bottom minimap backed by measured node geometry", () => {
   const canvasNodePresentationModelSource = readCanvasNodePresentationModelSource();
   const canvasMinimapEdgeModelSource = readCanvasMinimapEdgeModelSource();
+  const minimapModelSource = readMinimapModelSource();
   const canvasNodeMeasurementsSource = readCanvasNodeMeasurementsSource();
 
   assert.match(componentSource, /import EditorMinimap from "\.\/EditorMinimap\.vue";/);
@@ -150,7 +155,12 @@ test("EditorCanvas mounts a right-bottom minimap backed by measured node geometr
   assert.doesNotMatch(componentSource, /const minimapEdges = computed\(\(\) =>[\s\S]*projectedEdges\.value[\s\S]*\.filter\(\(edge\) => visibleProjectedEdgeIds\.value\.has\(edge\.id\)\)/);
   assert.match(componentSource, /<EditorMinimap[\s\S]*class="editor-canvas__minimap"[\s\S]*:nodes="minimapNodes"[\s\S]*:edges="minimapEdges"[\s\S]*:viewport="viewport\.viewport"[\s\S]*:canvas-size="canvasSize"[\s\S]*@center-view="handleMinimapCenterView"/);
   assert.match(componentSource, /function handleMinimapCenterView\(point: \{ worldX: number; worldY: number \}\)/);
-  assert.match(componentSource, /resolveViewportForMinimapCenter\(/);
+  assert.match(minimapModelSource, /export function resolveMinimapCenterViewAction/);
+  assert.match(componentSource, /const minimapCenterViewAction = resolveMinimapCenterViewAction\(\{[\s\S]*worldX: point\.worldX,[\s\S]*worldY: point\.worldY,[\s\S]*viewportScale: viewport\.viewport\.scale,[\s\S]*canvasSize: canvasSize\.value,[\s\S]*\}\);/);
+  assert.match(componentSource, /case "ignore-empty-canvas-size":[\s\S]*return;/);
+  assert.match(componentSource, /case "set-viewport":[\s\S]*viewport\.setViewport\(minimapCenterViewAction\.viewport\);/);
+  assert.doesNotMatch(componentSource, /if \(canvasSize\.value\.width <= 0 \|\| canvasSize\.value\.height <= 0\) \{/);
+  assert.doesNotMatch(componentSource, /resolveViewportForMinimapCenter\(\{[\s\S]*canvasWidth: canvasSize\.value\.width,[\s\S]*canvasHeight: canvasSize\.value\.height/);
 });
 
 test("EditorCanvas stacks zoom controls above the minimap at the bottom right", () => {

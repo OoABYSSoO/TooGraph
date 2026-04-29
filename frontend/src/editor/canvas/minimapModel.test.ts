@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   buildEditorMinimapModel,
   mapMinimapPointToWorld,
+  resolveMinimapCenterViewAction,
   resolveViewportForMinimapCenter,
 } from "./minimapModel.ts";
 
@@ -75,6 +76,30 @@ test("mapMinimapPointToWorld and resolveViewportForMinimapCenter keep minimap dr
       canvasHeight: 250,
     }),
     { x: -750, y: -375, scale: 2 },
+  );
+});
+
+test("resolveMinimapCenterViewAction ignores empty canvas sizes and projects centered viewports", () => {
+  assert.deepEqual(
+    resolveMinimapCenterViewAction({
+      worldX: 500,
+      worldY: 250,
+      viewportScale: 2,
+      canvasSize: { width: 0, height: 250 },
+    }),
+    { type: "ignore-empty-canvas-size" },
+  );
+  assert.deepEqual(
+    resolveMinimapCenterViewAction({
+      worldX: 500,
+      worldY: 250,
+      viewportScale: 2,
+      canvasSize: { width: 500, height: 250 },
+    }),
+    {
+      type: "set-viewport",
+      viewport: { x: -750, y: -375, scale: 2 },
+    },
   );
 });
 
