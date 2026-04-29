@@ -73,7 +73,7 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 当前执行进展：
 
 - `useCanvasNodeMeasurements.ts` 已承接节点 DOM 注册、ResizeObserver/MutationObserver、anchor slot 测量、flow anchor fallback 测量和 measured size 清理。
-- `useCanvasEdgeInteractions.ts` 已承接 flow/route 删除确认、data edge state 编辑请求、disconnect/update emits 和缺失 edge 清理。
+- `useCanvasEdgeInteractions.ts` 已承接 flow/route 删除确认、data edge state 编辑请求、disconnect/update emits 和缺失 edge 清理；`flowEdgeDeleteModel.ts` 已承接 selected-edge keyboard delete 的 editable-target / locked / missing / non-deletable / flow-route delete action projection。
 - `canvasConnectionInteractionModel.ts`、`canvasConnectionModel.ts`、`canvasPendingStatePortModel.ts` 等纯模型已承接连接预览、自动吸附候选、虚拟端口创建上下文和新节点创建 payload 的可测试决策。
 - `canvasNodeDragResizeModel.ts` 已承接节点拖拽/缩放 move 阶段的阈值判断、viewport-scale 投影、rounding、resize result projection，以及 node-resize/node pointer-down 的 missing-node / locked-edit / active-connection / inline-editor focus / start-resize / start-drag 路由；`EditorCanvas.vue` 仍保留 pointer capture、animation-frame batching、connection completion、rendered-size lookup、drag/resize execution 和 graph mutation emits。
 - `canvasPinchZoomModel.ts` 已承接双指缩放起点计算、pointer distance/center 计算，以及 canvas pointer-down 在 pinch cleanup 与 pan startup 之间的 setup action 决策；`EditorCanvas.vue` 仍保留 pointer snapshot storage、DOM focus/preventDefault、pointer capture、viewport pan/zoom execution 和 transient cleanup execution。

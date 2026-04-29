@@ -4,7 +4,7 @@
 Run a ten-round conservative cleanup batch focused on `EditorCanvas.vue` pure projection and interaction-model helpers, then close the baseline interaction regressions in one larger pass while preserving graph editing behavior, runtime visuals, drag/connect workflows, deletion behavior, and dev startup health.
 
 ## Current Phase
-Phase 47 in progress
+Phase 48 in progress
 
 ## Autonomous Continuation Gate
 - After every completed cleanup phase, re-read `docs/future/2026-04-28-architecture-refactor-roadmap.md`, `task_plan.md`, `findings.md`, and `progress.md`, then recalculate the total roadmap progress and the active area progress.
@@ -441,12 +441,21 @@ Phase 47 in progress
 - **Status:** completed
 
 ### Phase 47: EditorCanvas Selected Edge Keyboard Delete Gate
-- [ ] Re-read the formal roadmap, Phase 46 findings, and current selected-edge keyboard delete flow before changing code.
-- [ ] Inspect whether the next safest `EditorCanvas.vue` boundary is a keyboard-delete action model around editable target ignore, locked edit, missing selected edge, no-op non-deletable edge, and flow/route delete payload.
-- [ ] Add focused red tests for the selected keyboard-delete boundary before production changes.
-- [ ] Keep actual `event.preventDefault`, `remove-flow` / `remove-route` emits, selected-edge clearing, pending connection point clearing, panning, connection, node drag/resize, and graph mutation emits behaviorally stable.
-- [ ] Run focused edge/keyboard/structure and Canvas regression tests, TypeScript checks, full frontend tests or justified targeted regression, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
-- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 47.
+- [x] Re-read the formal roadmap, Phase 46 findings, and current selected-edge keyboard delete flow before changing code.
+- [x] Inspect whether the next safest `EditorCanvas.vue` boundary is a keyboard-delete action model around editable target ignore, locked edit, missing selected edge, no-op non-deletable edge, and flow/route delete payload.
+- [x] Add focused red tests for the selected keyboard-delete boundary before production changes.
+- [x] Keep actual `event.preventDefault`, `remove-flow` / `remove-route` emits, selected-edge clearing, pending connection point clearing, panning, connection, node drag/resize, and graph mutation emits behaviorally stable.
+- [x] Run focused edge/keyboard/structure and Canvas regression tests, TypeScript checks, full frontend tests or justified targeted regression, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
+- [x] If total roadmap progress is below 100%, automatically open the next phase after Phase 47.
+- **Status:** completed
+
+### Phase 48: EditorCanvas Edge Visibility Mode Click Gate
+- [ ] Re-read the formal roadmap, Phase 47 findings, and current edge visibility toolbar flow before changing code.
+- [ ] Inspect whether the next safest `EditorCanvas.vue` boundary is an edge-visibility click action model around locked edit, same-mode no-op, and mode-change cleanup policy.
+- [ ] Add focused red tests for the selected edge visibility boundary before production changes.
+- [ ] Keep actual toolbar event binding, locked-interaction guard side effects, edge mode ref mutation, selected-edge clearing, pending connection clearing, transient canvas cleanup, panning, connection, node drag/resize, and graph mutation emits behaviorally stable.
+- [ ] Run focused edge visibility/structure and Canvas regression tests, TypeScript checks, full frontend tests or justified targeted regression, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
+- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 48.
 - **Status:** in progress
 
 ## Progress Estimate
@@ -551,6 +560,9 @@ Phase 47 in progress
 | Overall roadmap cleanup after Phase 46 | About 73% complete after moving drag-over drop-effect selection into `canvasConnectionInteractionModel.ts`. |
 | P2 `EditorCanvas.vue` cleanup after Phase 46 | About 74% complete after extracting locked-edit and dragged-file copy/none drop-effect decisions while preserving the actual `dataTransfer.dropEffect` mutation in the component. |
 | Current continuation gate after Phase 46 | Total roadmap progress is below 100%, so Phase 47 is automatically opened for the next safe P2 Canvas selected-edge keyboard delete boundary. |
+| Overall roadmap cleanup after Phase 47 | About 74% complete after moving selected-edge keyboard delete routing into `flowEdgeDeleteModel.ts`. |
+| P2 `EditorCanvas.vue` cleanup after Phase 47 | About 75% complete after extracting editable-target, locked-edit, missing-edge, non-deletable-edge, and flow/route keyboard delete decisions while preserving actual `preventDefault`, emits, and state cleanup in the component. |
+| Current continuation gate after Phase 47 | Total roadmap progress is below 100%, so Phase 48 is automatically opened for the next safe P2 Canvas edge visibility toolbar click boundary. |
 
 ## Decisions Made
 | Decision | Rationale |

@@ -8,6 +8,7 @@ import {
   isFlowEdgeDeleteConfirmActive,
   resolveFlowEdgeDeleteAction,
   resolveFlowEdgeDeleteActionFromEdge,
+  resolveSelectedEdgeKeyboardDeleteAction,
 } from "./flowEdgeDeleteModel.ts";
 
 const flowEdge: ProjectedCanvasEdge = {
@@ -103,4 +104,64 @@ test("flow edge delete model resolves keyboard delete actions from projected edg
   });
   assert.equal(resolveFlowEdgeDeleteActionFromEdge(dataEdge), null);
   assert.equal(resolveFlowEdgeDeleteActionFromEdge({ ...routeEdge, branch: undefined }), null);
+});
+
+test("flow edge delete model resolves selected-edge keyboard delete routing", () => {
+  const edges = [flowEdge, routeEdge, dataEdge];
+
+  assert.deepEqual(
+    resolveSelectedEdgeKeyboardDeleteAction({
+      isEditableTarget: true,
+      interactionLocked: false,
+      selectedEdgeId: flowEdge.id,
+      edges,
+    }),
+    { type: "ignore-editable-target" },
+  );
+  assert.deepEqual(
+    resolveSelectedEdgeKeyboardDeleteAction({
+      isEditableTarget: false,
+      interactionLocked: true,
+      selectedEdgeId: flowEdge.id,
+      edges,
+    }),
+    { type: "locked-edit-attempt", preventDefault: true },
+  );
+  assert.deepEqual(
+    resolveSelectedEdgeKeyboardDeleteAction({
+      isEditableTarget: false,
+      interactionLocked: false,
+      selectedEdgeId: null,
+      edges,
+    }),
+    { type: "ignore-missing-edge" },
+  );
+  assert.deepEqual(
+    resolveSelectedEdgeKeyboardDeleteAction({
+      isEditableTarget: false,
+      interactionLocked: false,
+      selectedEdgeId: dataEdge.id,
+      edges,
+    }),
+    { type: "ignore-non-deletable-edge" },
+  );
+  assert.deepEqual(
+    resolveSelectedEdgeKeyboardDeleteAction({
+      isEditableTarget: false,
+      interactionLocked: false,
+      selectedEdgeId: routeEdge.id,
+      edges,
+    }),
+    {
+      type: "delete-edge",
+      preventDefault: true,
+      clearSelectedEdge: true,
+      clearPendingConnectionPoint: true,
+      action: {
+        kind: "route",
+        sourceNodeId: "condition",
+        branchKey: "pass",
+      },
+    },
+  );
 });

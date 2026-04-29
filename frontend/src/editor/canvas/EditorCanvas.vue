@@ -458,7 +458,7 @@ import {
   resolveRunNodeClassListForCanvasNode,
   resolveRunNodePresentationForCanvasNode,
 } from "./canvasRunPresentationModel";
-import { resolveFlowEdgeDeleteActionFromEdge } from "./flowEdgeDeleteModel";
+import { resolveSelectedEdgeKeyboardDeleteAction } from "./flowEdgeDeleteModel";
 import {
   buildMinimapNodeModel,
   buildNodeCardSizeStyle,
@@ -1874,20 +1874,27 @@ function emitCanvasConnectionCompletionAction(action: CanvasConnectionCompletion
 }
 
 function handleSelectedEdgeDelete(event: KeyboardEvent) {
-  if (isEditableKeyboardEventTarget(event.target)) {
-    return;
+  const selectedEdgeKeyboardDeleteAction = resolveSelectedEdgeKeyboardDeleteAction({
+    isEditableTarget: isEditableKeyboardEventTarget(event.target),
+    interactionLocked: isGraphEditingLocked(),
+    selectedEdgeId: selectedEdgeId.value,
+    edges: projectedEdges.value,
+  });
+  switch (selectedEdgeKeyboardDeleteAction.type) {
+    case "ignore-editable-target":
+    case "ignore-missing-edge":
+    case "ignore-non-deletable-edge":
+      return;
+    case "locked-edit-attempt":
+      guardLockedCanvasInteraction();
+      event.preventDefault();
+      return;
+    case "delete-edge":
+      event.preventDefault();
+      break;
   }
-  if (guardLockedCanvasInteraction()) {
-    event.preventDefault();
-    return;
-  }
-  const edge = selectedEdgeId.value ? projectedEdges.value.find((candidate) => candidate.id === selectedEdgeId.value) : null;
-  const action = resolveFlowEdgeDeleteActionFromEdge(edge);
-  if (!action) {
-    return;
-  }
-  event.preventDefault();
 
+  const action = selectedEdgeKeyboardDeleteAction.action;
   if (action.kind === "route") {
     emit("remove-route", {
       sourceNodeId: action.sourceNodeId,
@@ -1900,8 +1907,12 @@ function handleSelectedEdgeDelete(event: KeyboardEvent) {
     });
   }
 
-  selectedEdgeId.value = null;
-  setPendingConnectionPoint(null);
+  if (selectedEdgeKeyboardDeleteAction.clearSelectedEdge) {
+    selectedEdgeId.value = null;
+  }
+  if (selectedEdgeKeyboardDeleteAction.clearPendingConnectionPoint) {
+    setPendingConnectionPoint(null);
+  }
 }
 
 function resolveCanvasPoint(event: { clientX: number; clientY: number }) {

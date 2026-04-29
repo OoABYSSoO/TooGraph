@@ -1,5 +1,74 @@
 # Progress Log
 
+## Session: 2026-04-30 Phase 47
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Confirmed Phase 46 was committed and pushed as `03c76a6`.
+  - Re-read the formal roadmap, active plan, latest findings, and current selected-edge keyboard delete flow.
+  - Inspected `handleSelectedEdgeDelete`, `flowEdgeDeleteModel.ts`, `canvasKeyboard.ts`, and existing edge-delete structure coverage.
+  - Selected the next P2 Canvas boundary: selected-edge keyboard delete routing.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `resolveSelectedEdgeKeyboardDeleteAction` model expectations before production code.
+  - Updated `EditorCanvas.structure.test.ts` to require the keyboard delete action model boundary.
+  - Verified the expected red failure: the model export was missing and the component still owned editable-target, locked, edge lookup, and delete-action projection.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `SelectedEdgeKeyboardDeleteAction` and `resolveSelectedEdgeKeyboardDeleteAction` to `flowEdgeDeleteModel.ts`.
+  - Updated `EditorCanvas.vue` so `handleSelectedEdgeDelete` delegates branch selection and delete payload projection to the model.
+  - Kept actual `event.preventDefault`, locked guard side effects, `remove-flow` / `remove-route` emits, selected-edge clearing, and pending connection point cleanup inside the component.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused flow-edge delete model and structure tests.
+  - Ran the broader edge, keyboard, Canvas connection, and graph regression set.
+  - Ran TypeScript unused-symbol verification from `frontend`.
+  - Ran the full frontend `node --test` suite.
+  - Ran the frontend production build; no large chunk warning was emitted.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed backend `/health` returned `{"status":"ok"}` and the frontend entry returned HTTP 200.
+  - Captured a headless Chrome screenshot after a virtual-time wait and confirmed the workspace rendered normally.
+
+### Phase 5: Continuation Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated overall roadmap cleanup at about 74%.
+  - Recalculated P2 `EditorCanvas.vue` cleanup at about 75%.
+  - Opened Phase 48 automatically because total roadmap progress is below 100%.
+  - Selected the next candidate boundary as edge visibility toolbar click routing around locked edit, same-mode no-op, and mode-change cleanup policy.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red focused tests | `node --test frontend/src/editor/canvas/flowEdgeDeleteModel.test.ts frontend/src/editor/canvas/EditorCanvas.structure.test.ts` before implementation | Fails because selected-edge keyboard delete export and component wiring do not exist | Failed on missing export and structure assertions | Passed |
+| Focused model/structure tests | Same focused files after implementation | All focused tests pass | 65 passed | Passed |
+| Focused edge/keyboard/Canvas regression | `node --test` over flow-edge delete, keyboard, edge interactions, Canvas connection, and graph document tests | Related interaction tests pass | 174 passed | Passed |
+| Unused symbol check | `./node_modules/.bin/vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No diagnostics | Exit 0 | Passed |
+| Full frontend tests | `node --test $(rg --files src vite.config.structure.test.ts | rg '\.test\.ts$')` in `frontend` | All frontend tests pass | 808 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without a large chunk warning | Exit 0, no Vite chunk warning | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+| Browser smoke | Headless Chrome screenshot with virtual-time wait | Workspace renders normally | Workspace UI rendered | Passed |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Phase 47 implementation, verification, docs update, and dev restart are complete. |
+| Where am I going? | Phase 48 is open for edge visibility toolbar click action extraction. |
+| What's the goal? | Continue reducing `EditorCanvas.vue` interaction ownership without changing drag, resize, snap, create-node, pan/zoom, edge deletion, or connection-completion behavior. |
+| What have I learned? | Keyboard edge delete has a clear action projection boundary; actual keyboard event side effects and Vue emits should remain component-owned. |
+| What have I done? | Extracted selected-edge keyboard delete routing, added focused tests, verified the full frontend suite, built, restarted, and visually smoked the app. |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+
 ## Session: 2026-04-30 Phase 46
 
 ### Phase 1: Re-orientation

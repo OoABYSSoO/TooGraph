@@ -266,11 +266,14 @@ test("EditorCanvas lets editable node fields handle Backspace and Delete normall
   assert.match(componentSource, /@keydown\.delete="handleSelectedEdgeDelete"/);
   assert.match(componentSource, /@keydown\.backspace="handleSelectedEdgeDelete"/);
   assert.match(componentSource, /function handleSelectedEdgeDelete\(event: KeyboardEvent\)/);
-  assert.match(componentSource, /isEditableKeyboardEventTarget\(event\.target\)/);
-  assert.match(componentSource, /const action = resolveFlowEdgeDeleteActionFromEdge\(edge\);/);
+  assert.match(flowEdgeDeleteModelSource, /export function resolveSelectedEdgeKeyboardDeleteAction/);
+  assert.match(componentSource, /const selectedEdgeKeyboardDeleteAction = resolveSelectedEdgeKeyboardDeleteAction\(\{[\s\S]*isEditableTarget: isEditableKeyboardEventTarget\(event\.target\),[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*selectedEdgeId: selectedEdgeId\.value,[\s\S]*edges: projectedEdges\.value,[\s\S]*\}\);/);
+  assert.match(componentSource, /case "locked-edit-attempt":[\s\S]*guardLockedCanvasInteraction\(\);[\s\S]*return;/);
+  assert.match(componentSource, /case "delete-edge":[\s\S]*const action = selectedEdgeKeyboardDeleteAction\.action;[\s\S]*event\.preventDefault\(\);/);
   assert.match(componentSource, /if \(action\.kind === "route"\) \{[\s\S]*emit\("remove-route", \{[\s\S]*branchKey: action\.branchKey/);
   assert.match(componentSource, /emit\("remove-flow", \{[\s\S]*sourceNodeId: action\.sourceNodeId,[\s\S]*targetNodeId: action\.targetNodeId/);
   assert.match(flowEdgeDeleteModelSource, /export function resolveFlowEdgeDeleteActionFromEdge/);
+  assert.doesNotMatch(componentSource, /const edge = selectedEdgeId\.value \? projectedEdges\.value\.find/);
   assert.doesNotMatch(componentSource, /if \(edge\.kind === "flow"\) \{[\s\S]*sourceNodeId: edge\.source,[\s\S]*targetNodeId: edge\.target/);
   assert.doesNotMatch(componentSource, /else if \(edge\.kind === "route" && edge\.branch\)/);
   assert.match(componentSource, /event\.preventDefault\(\);/);
@@ -447,6 +450,7 @@ test("EditorCanvas treats awaiting-human current node as a persistent review nod
 test("EditorCanvas keeps paused human-review graphs viewable but read-only", () => {
   const canvasConnectionInteractionModelSource = readCanvasConnectionInteractionModelSource();
   const canvasEdgeInteractionsSource = readCanvasEdgeInteractionsSource();
+  const flowEdgeDeleteModelSource = readFlowEdgeDeleteModelSource();
 
   assert.match(componentSource, /interactionLocked\?: boolean;/);
   assert.match(componentSource, /'editor-canvas--locked': interactionLocked/);
@@ -494,7 +498,8 @@ test("EditorCanvas keeps paused human-review graphs viewable but read-only", () 
   assert.match(canvasConnectionInteractionModelSource, /export function resolveCanvasAnchorPointerDownAction/);
   assert.match(componentSource, /const anchorPointerDownAction = resolveCanvasAnchorPointerDownAction\(\{[\s\S]*interactionLocked: isGraphEditingLocked\(\),[\s\S]*anchor,[\s\S]*canComplete: canCompleteCanvasConnection\(anchor\),[\s\S]*canStart: canStartGraphConnection\(anchor\.kind\),[\s\S]*\}\);/);
   assert.match(componentSource, /case "locked-edit-attempt":[\s\S]*emit\("locked-edit-attempt"\);[\s\S]*return;/);
-  assert.match(componentSource, /function handleSelectedEdgeDelete\(event: KeyboardEvent\)[\s\S]*if \(guardLockedCanvasInteraction\(\)\) \{[\s\S]*return;/);
+  assert.match(flowEdgeDeleteModelSource, /type: "locked-edit-attempt"/);
+  assert.match(componentSource, /case "locked-edit-attempt":[\s\S]*guardLockedCanvasInteraction\(\);[\s\S]*return;/);
 });
 
 test("EditorCanvas lets top-left floating tools respect workspace overlay clearance", () => {
@@ -721,7 +726,7 @@ test("EditorCanvas shows a clicked-position delete confirm for flow edges before
   const canvasEdgeInteractionsSource = readCanvasEdgeInteractionsSource();
 
   assert.match(componentSource, /@pointerdown\.stop="handleEdgePointerDown\(edge, \$event\)"/);
-  assert.match(componentSource, /import \{ resolveFlowEdgeDeleteActionFromEdge \} from "\.\/flowEdgeDeleteModel";/);
+  assert.match(componentSource, /import \{ resolveSelectedEdgeKeyboardDeleteAction \} from "\.\/flowEdgeDeleteModel";/);
   assert.match(componentSource, /import \{ useCanvasEdgeInteractions \} from "\.\/useCanvasEdgeInteractions";/);
   assert.match(componentSource, /const edgeInteractions = useCanvasEdgeInteractions\(\{/);
   assert.match(componentSource, /activeFlowEdgeDeleteConfirm,[\s\S]*flowEdgeDeleteConfirmStyle,[\s\S]*clearFlowEdgeDeleteConfirmState,[\s\S]*confirmFlowEdgeDelete,[\s\S]*isFlowEdgeDeleteConfirmOpen,/);
