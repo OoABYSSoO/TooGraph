@@ -114,6 +114,19 @@ class ModelProviderClientTests(unittest.TestCase):
         self.assertNotIn("def _parse_gemini_model_ids(", client_source)
         self.assertNotIn("def _parse_codex_model_ids(", client_source)
 
+    def test_openai_compatible_chat_transport_is_isolated_from_provider_client(self) -> None:
+        spec = importlib.util.find_spec("app.tools.model_provider_openai")
+        self.assertIsNotNone(spec, "OpenAI-compatible chat transport should live in a dedicated module")
+
+        from app.tools import model_provider_client
+
+        client_source = Path(model_provider_client.__file__ or "").read_text(encoding="utf-8")
+        self.assertIn("model_provider_openai", client_source)
+        self.assertIn("def _chat_openai_compatible(", client_source)
+        self.assertNotIn("def _extract_openai_chat_text(", client_source)
+        self.assertNotIn("def _extract_openai_chat_stream_delta(", client_source)
+        self.assertNotIn("def _coalesce_openai_chat_stream_response(", client_source)
+
     def test_discovers_openai_compatible_models_with_bearer_header(self) -> None:
         from app.tools.model_provider_client import discover_provider_models
 

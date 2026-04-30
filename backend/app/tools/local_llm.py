@@ -19,10 +19,12 @@ from app.core.thinking_levels import (
 from app.core.storage.model_log_store import append_model_request_log
 from app.core.storage.settings_store import load_app_settings
 from app.tools.model_provider_client import (
-    _coalesce_openai_chat_stream_response,
-    _extract_openai_chat_stream_delta,
     discover_provider_models,
     post_streaming_json_with_fallback,
+)
+from app.tools.model_provider_openai import (
+    coalesce_openai_chat_stream_response as _coalesce_openai_chat_stream_response,
+    extract_openai_chat_stream_delta as _extract_openai_chat_stream_delta,
 )
 
 

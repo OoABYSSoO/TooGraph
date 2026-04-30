@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import time
 from typing import Any, Callable
 
@@ -27,7 +26,7 @@ from app.tools.openai_codex_client import (
     refresh_codex_access_token,
     resolve_codex_access_token,
 )
-from app.tools import model_provider_discovery
+from app.tools import model_provider_discovery, model_provider_openai
 from app.tools.model_provider_http import (
     ANTHROPIC_VERSION,
     DEFAULT_REQUEST_TIMEOUT_SEC,
@@ -39,6 +38,10 @@ from app.tools.model_provider_http import (
     post_streaming_json_with_fallback,
     read_streaming_response_text as _read_streaming_response_text,
 )
+from app.tools.model_provider_response_parsing import (
+    normalize_message_text as _normalize_message_text,
+    parse_sse_json_events as _parse_sse_json_events,
+)
 
 
 class CodexAuthExpiredError(RuntimeError):
@@ -47,41 +50,6 @@ class CodexAuthExpiredError(RuntimeError):
 
 def _append_model_request_log_safely(**kwargs: Any) -> None:
     append_model_request_log_safely(**kwargs, log_writer=append_model_request_log)
-
-
-def _normalize_message_text(value: Any) -> str:
-    if value is None:
-        return ""
-    if isinstance(value, str):
-        return value
-    if isinstance(value, list):
-        parts = [_normalize_message_text(item) for item in value]
-        return "\n".join(part for part in parts if part).strip()
-    if isinstance(value, dict):
-        for key in ("text", "content", "reasoning_content", "reasoning"):
-            candidate = value.get(key)
-            if candidate:
-                return _normalize_message_text(candidate)
-        return json.dumps(value, ensure_ascii=False)
-    return str(value)
-
-
-def _extract_openai_chat_text(response_payload: dict[str, Any]) -> tuple[str, str]:
-    choices = response_payload.get("choices")
-    if isinstance(choices, list) and choices:
-        first_choice = choices[0] if isinstance(choices[0], dict) else {}
-        message = first_choice.get("message") if isinstance(first_choice, dict) else {}
-        if isinstance(message, dict):
-            content = _normalize_message_text(message.get("content")).strip()
-            reasoning = _normalize_message_text(
-                message.get("reasoning_content") or message.get("reasoning")
-            ).strip()
-            return content, reasoning
-
-    return (
-        _normalize_message_text(response_payload.get("content")).strip(),
-        _normalize_message_text(response_payload.get("reasoning")).strip(),
-    )
 
 
 def _extract_anthropic_text(response_payload: dict[str, Any]) -> str:
@@ -149,79 +117,22 @@ def _chat_openai_compatible(
     thinking_level: str,
     on_delta: Callable[[str], None] | None = None,
 ) -> tuple[str, dict[str, Any]]:
-    request_payload: dict[str, Any] = {
-        "model": model,
-        "temperature": temperature,
-        "stream": True,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-    }
-    if max_tokens is not None:
-        request_payload["max_tokens"] = max_tokens
-    native_thinking_payload = build_native_thinking_payload(
+    return model_provider_openai.chat_openai_compatible(
         provider_id=provider_id,
-        transport=TRANSPORT_OPENAI_COMPATIBLE,
+        base_url=base_url,
+        api_key=api_key,
         model=model,
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        auth_header=auth_header,
+        auth_scheme=auth_scheme,
         thinking_level=thinking_level,
+        append_request_log=_append_model_request_log_safely,
+        post_streaming_json_with_fallback_fn=post_streaming_json_with_fallback,
+        on_delta=on_delta,
     )
-    request_payload.update(native_thinking_payload)
-
-    started_at = time.monotonic()
-    path = "/chat/completions"
-    fallback_payload = {**request_payload, "stream": False}
-    logged_request_payload = request_payload
-    stream_fallback_error: str | None = None
-    try:
-        response_payload, logged_request_payload, stream_fallback_error, _used_stream = post_streaming_json_with_fallback(
-            stream_url=f"{base_url}{path}",
-            timeout_sec=DEFAULT_REQUEST_TIMEOUT_SEC,
-            headers=_build_auth_headers(api_key=api_key, auth_header=auth_header, auth_scheme=auth_scheme),
-            stream_payload=request_payload,
-            fallback_payload=fallback_payload,
-            parse_stream=_coalesce_openai_chat_stream_response,
-            error_label=f"{provider_id} request failed",
-            on_delta=on_delta,
-            extract_stream_delta=_extract_openai_chat_stream_delta,
-        )
-    except Exception as exc:
-        _append_model_request_log_safely(
-            provider_id=provider_id,
-            transport=TRANSPORT_OPENAI_COMPATIBLE,
-            model=model,
-            path=path,
-            request_raw=logged_request_payload,
-            response_raw={"error": str(exc)},
-            started_at=started_at,
-            status_code=None,
-            error=str(exc),
-        )
-        raise
-    _append_model_request_log_safely(
-        provider_id=provider_id,
-        transport=TRANSPORT_OPENAI_COMPATIBLE,
-        model=model,
-        path=path,
-        request_raw=logged_request_payload,
-        response_raw=response_payload,
-        started_at=started_at,
-        status_code=200,
-    )
-    content, reasoning = _extract_openai_chat_text(response_payload)
-    return content, {
-        "model": response_payload.get("model") or model,
-        "provider_id": provider_id,
-        "temperature": temperature,
-        "reasoning": reasoning,
-        "usage": response_payload.get("usage"),
-        "timings": response_payload.get("timings"),
-        "response_id": response_payload.get("id"),
-        "thinking_enabled": bool(native_thinking_payload),
-        "thinking_level": thinking_level,
-        "reasoning_format": "reasoning_effort" if native_thinking_payload else None,
-        "stream_fallback_error": stream_fallback_error,
-    }
 
 
 def _chat_anthropic(
@@ -447,57 +358,6 @@ def _extract_codex_responses_text(response_payload: dict[str, Any]) -> tuple[str
     return "\n".join(text_parts).strip(), "\n".join(reasoning_parts).strip()
 
 
-def _parse_sse_json_events(stream_text: str) -> list[dict[str, Any]]:
-    events: list[dict[str, Any]] = []
-    event_name = ""
-    data_lines: list[str] = []
-
-    def flush_event() -> None:
-        nonlocal event_name, data_lines
-        if not data_lines:
-            event_name = ""
-            return
-        data = "\n".join(data_lines).strip()
-        data_lines = []
-        if not data or data == "[DONE]":
-            event_name = ""
-            return
-        try:
-            payload = json.loads(data)
-        except ValueError:
-            event_name = ""
-            return
-        if isinstance(payload, dict):
-            if event_name and "_event" not in payload:
-                payload["_event"] = event_name
-            events.append(payload)
-        event_name = ""
-
-    for raw_line in stream_text.splitlines():
-        line = raw_line.rstrip("\r")
-        if not line:
-            flush_event()
-            continue
-        if line.startswith("event:"):
-            event_name = line[len("event:") :].strip()
-            continue
-        if line.startswith("data:"):
-            data_lines.append(line[len("data:") :].lstrip())
-    flush_event()
-    return events
-
-
-def _extract_openai_chat_stream_delta(event: dict[str, Any]) -> str:
-    choices = event.get("choices")
-    if not isinstance(choices, list) or not choices:
-        return ""
-    first_choice = choices[0] if isinstance(choices[0], dict) else {}
-    source = first_choice.get("delta") or first_choice.get("message") or {}
-    if not isinstance(source, dict):
-        return ""
-    return _normalize_message_text(source.get("content"))
-
-
 def _extract_anthropic_stream_delta(event: dict[str, Any]) -> str:
     delta = event.get("delta")
     if not isinstance(delta, dict):
@@ -537,63 +397,6 @@ def _extract_codex_stream_delta(event: dict[str, Any]) -> str:
     if isinstance(text, str) and text and "output_text" in event_type:
         return text
     return ""
-
-
-def _coalesce_openai_chat_stream_response(stream_text: str) -> dict[str, Any]:
-    events = _parse_sse_json_events(stream_text)
-    if not events:
-        raise ValueError("OpenAI-compatible stream response did not include JSON events.")
-
-    response_id = ""
-    response_model = ""
-    usage: dict[str, Any] | None = None
-    finish_reason: str | None = None
-    text_parts: list[str] = []
-    reasoning_parts: list[str] = []
-    for event in events:
-        response_id = str(event.get("id") or response_id)
-        response_model = str(event.get("model") or response_model)
-        if isinstance(event.get("usage"), dict):
-            usage = event["usage"]
-        choices = event.get("choices")
-        if not isinstance(choices, list) or not choices:
-            continue
-        first_choice = choices[0] if isinstance(choices[0], dict) else {}
-        finish_reason = first_choice.get("finish_reason") or finish_reason
-        source = first_choice.get("delta") or first_choice.get("message") or {}
-        if not isinstance(source, dict):
-            continue
-        content = _normalize_message_text(source.get("content"))
-        reasoning = _normalize_message_text(source.get("reasoning_content") or source.get("reasoning"))
-        if content:
-            text_parts.append(content)
-        if reasoning:
-            reasoning_parts.append(reasoning)
-
-    if not text_parts and not reasoning_parts:
-        raise ValueError("OpenAI-compatible stream response did not include text deltas.")
-
-    message: dict[str, Any] = {"content": "".join(text_parts)}
-    if reasoning_parts:
-        message["reasoning_content"] = "".join(reasoning_parts)
-    choice: dict[str, Any] = {"message": message}
-    if finish_reason is not None:
-        choice["finish_reason"] = finish_reason
-    payload: dict[str, Any] = {"choices": [choice]}
-    if response_id:
-        payload["id"] = response_id
-    if response_model:
-        payload["model"] = response_model
-    if usage:
-        payload["usage"] = usage
-    payload["_stream"] = {
-        "event_count": len(events),
-        "events": events,
-        "output_chunks": text_parts,
-        "reasoning_chunks": reasoning_parts,
-        "raw_text": stream_text,
-    }
-    return payload
 
 
 def _coalesce_anthropic_stream_response(stream_text: str) -> dict[str, Any]:
