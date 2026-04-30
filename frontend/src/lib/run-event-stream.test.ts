@@ -7,6 +7,7 @@ import {
   listRunEventOutputKeys,
   parseRunEventPayloadData,
   resolveRunEventNodeId,
+  resolveRunEventPreviewNodeIds,
   resolveRunEventText,
   shouldPollRunStatus,
 } from "./run-event-stream.ts";
@@ -50,6 +51,30 @@ test("listRunEventOutputKeys normalizes keys and preserves fallback when keys ar
   assert.deepEqual(listRunEventOutputKeys({ output_keys: ["answer", 2, "", null] }), ["answer", "2", "null"]);
   assert.deepEqual(listRunEventOutputKeys({ output_keys: "answer" }, ["fallback"]), ["fallback"]);
   assert.deepEqual(listRunEventOutputKeys({}, ["fallback"]), ["fallback"]);
+});
+
+test("resolveRunEventPreviewNodeIds maps output keys to output nodes and preserves fallback behavior", () => {
+  const document = {
+    nodes: {
+      agent_writer: {
+        kind: "agent",
+        reads: [{ state: "answer" }],
+      },
+      output_answer: {
+        kind: "output",
+        reads: [{ state: "answer" }],
+      },
+      output_summary: {
+        kind: "output",
+        reads: [{ state: "summary" }],
+      },
+    },
+  };
+
+  assert.deepEqual(resolveRunEventPreviewNodeIds(document, ["answer"], "fallback_node"), ["output_answer"]);
+  assert.deepEqual(resolveRunEventPreviewNodeIds(document, ["missing"], "fallback_node"), ["fallback_node"]);
+  assert.deepEqual(resolveRunEventPreviewNodeIds(null, ["answer"], "fallback_node"), ["fallback_node"]);
+  assert.deepEqual(resolveRunEventPreviewNodeIds(document, [], ""), []);
 });
 
 test("buildLiveStreamingOutput preserves live output merge semantics", () => {

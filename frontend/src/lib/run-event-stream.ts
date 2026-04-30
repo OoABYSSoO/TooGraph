@@ -9,6 +9,10 @@ export type LiveStreamingOutput = {
   updatedAt: string;
 };
 
+export type RunEventPreviewDocument = {
+  nodes: Record<string, { kind?: string; reads?: Array<{ state?: string | null }> }>;
+};
+
 export function buildRunEventStreamUrl(runId: string) {
   const normalizedRunId = runId.trim();
   return normalizedRunId ? `/api/runs/${normalizedRunId}/events` : null;
@@ -37,6 +41,22 @@ export function resolveRunEventText(payload: RunEventPayload, fallback = "") {
 
 export function listRunEventOutputKeys(payload: RunEventPayload, fallback: string[] = []) {
   return Array.isArray(payload.output_keys) ? payload.output_keys.map((key) => String(key)).filter(Boolean) : fallback;
+}
+
+export function resolveRunEventPreviewNodeIds(
+  document: RunEventPreviewDocument | null | undefined,
+  outputKeys: string[],
+  fallbackNodeId: string,
+) {
+  const outputKeySet = new Set(outputKeys);
+  const targetNodeIds =
+    document && outputKeys.length > 0
+      ? Object.entries(document.nodes)
+          .filter(([, node]) => node.kind === "output" && node.reads?.some((read) => typeof read.state === "string" && outputKeySet.has(read.state)))
+          .map(([nodeId]) => nodeId)
+      : [];
+
+  return targetNodeIds.length > 0 ? targetNodeIds : fallbackNodeId ? [fallbackNodeId] : [];
 }
 
 export function buildLiveStreamingOutput(

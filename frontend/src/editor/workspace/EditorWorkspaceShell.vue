@@ -270,6 +270,7 @@ import {
   listRunEventOutputKeys,
   parseRunEventPayloadData,
   resolveRunEventNodeId,
+  resolveRunEventPreviewNodeIds,
   resolveRunEventText,
   shouldPollRunStatus,
 } from "@/lib/run-event-stream";
@@ -542,17 +543,6 @@ function parseRunEventPayload(event: Event) {
   return event instanceof MessageEvent ? parseRunEventPayloadData(event.data) : null;
 }
 
-function resolveStreamingOutputNodeIds(tabId: string, outputKeys: string[]) {
-  const document = documentsByTabId.value[tabId];
-  if (!document || outputKeys.length === 0) {
-    return [];
-  }
-  const outputKeySet = new Set(outputKeys);
-  return Object.entries(document.nodes)
-    .filter(([, node]) => node.kind === "output" && node.reads.some((read) => outputKeySet.has(read.state)))
-    .map(([nodeId]) => nodeId);
-}
-
 function applyStreamingOutputPreviewToTab(tabId: string, payload: Record<string, unknown>) {
   const text = resolveRunEventText(payload);
   if (!text) {
@@ -560,8 +550,7 @@ function applyStreamingOutputPreviewToTab(tabId: string, payload: Record<string,
   }
   const outputKeys = listRunEventOutputKeys(payload);
   const fallbackNodeId = resolveRunEventNodeId(payload);
-  const targetNodeIds = resolveStreamingOutputNodeIds(tabId, outputKeys);
-  const previewNodeIds = targetNodeIds.length > 0 ? targetNodeIds : fallbackNodeId ? [fallbackNodeId] : [];
+  const previewNodeIds = resolveRunEventPreviewNodeIds(documentsByTabId.value[tabId], outputKeys, fallbackNodeId);
   if (previewNodeIds.length === 0) {
     return;
   }
