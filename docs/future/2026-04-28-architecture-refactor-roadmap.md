@@ -178,7 +178,8 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 - `runtime/llm_output_parser.py` 已承接 output key alias 构造、LLM JSON response parsing 和 fallback parsing；`node_system_executor.py` 继续通过兼容别名调用。
 - `runtime/execution_graph.py` 已承接 `ExecutionEdge`、cycle detection、regular/conditional edge id construction、execution edge expansion 和 active outgoing edge selection；`node_system_executor.py` 保留旧私有 helper 入口，`core/langgraph/runtime.py` 已直接依赖新模块。
 - `runtime/state_io.py` 已承接 graph state initialization、node input collection、state write application、writer records、state events 和 write change records；`node_system_executor.py` 保留旧私有 helper 入口，`core/langgraph/runtime.py` 与导出的 LangGraph Python 源码已直接依赖新模块。
-- Phase 102 后 `node_system_executor.py` 从 1,226 行降到 811 行；执行主流程、副作用、output artifact、streaming delta 和快照仍留在 executor，后续应继续优先抽取 output artifact 或 run artifact refresh helper。
+- `runtime/output_artifacts.py` 已承接 loop-limit output value formatting、output preview/final-result wrapping 和 active output-node resolution；`node_system_executor.py` 保留旧私有 helper 入口，output boundary collection 和 output persistence side effects 仍留在 executor。
+- Phase 103 后 `node_system_executor.py` 从 1,226 行降到 755 行；执行主流程、副作用、output boundary collection、streaming delta 和快照仍留在 executor，后续应继续优先抽取 run artifact refresh 或 output boundary collection helper。
 
 ### 3. `core/langgraph/runtime.py`
 
@@ -271,7 +272,7 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 
 先拆 `model_provider_client.py`，再拆 `node_system_executor.py`，最后拆 LangGraph runtime。理由：provider client 的协议边界最清晰，executor 和 LangGraph runtime 对产品语义影响更大。
 
-当前 P4 进展：`model_provider_client.py` 的共享 HTTP/request 层、provider discovery 层、OpenAI-compatible chat transport、Anthropic messages transport、Gemini generate-content transport、Codex responses transport 和共享 response parsing 已完成抽取；`node_system_executor.py` 的 condition evaluation、agent prompt、LLM output parser、execution graph 和 state I/O helper 已完成抽取；LangGraph runtime 仍待迁移。
+当前 P4 进展：`model_provider_client.py` 的共享 HTTP/request 层、provider discovery 层、OpenAI-compatible chat transport、Anthropic messages transport、Gemini generate-content transport、Codex responses transport 和共享 response parsing 已完成抽取；`node_system_executor.py` 的 condition evaluation、agent prompt、LLM output parser、execution graph、state I/O 和 output artifact helper 已完成抽取；LangGraph runtime 仍待迁移。
 
 ## 架构红线
 

@@ -33,6 +33,11 @@ from app.core.runtime.llm_output_parser import (
     parse_llm_json_response as _parse_llm_json_response,
     read_parsed_output_value as _read_parsed_output_value,
 )
+from app.core.runtime.output_artifacts import (
+    apply_loop_limit_exhausted_output_message as _apply_loop_limit_exhausted_output_message,
+    format_loop_limit_exhausted_output_value as _format_loop_limit_exhausted_output_value,
+    resolve_active_output_nodes as _resolve_active_output_nodes,
+)
 from app.core.runtime.output_boundary_utils import save_output_value
 from app.core.runtime.knowledge_retrieval import retrieve_knowledge_base_context
 from app.core.runtime.run_events import publish_run_event
@@ -428,39 +433,6 @@ def _execute_output_node(
     }
 
 
-def _format_loop_limit_exhausted_output_value(value: Any) -> str:
-    if isinstance(value, str):
-        rendered = value
-    elif value is None:
-        rendered = ""
-    elif isinstance(value, (dict, list, tuple, bool)):
-        rendered = json.dumps(value, ensure_ascii=False)
-    else:
-        rendered = str(value)
-    return f"循环已达上限，最新的结果是：{rendered}"
-
-
-def _apply_loop_limit_exhausted_output_message(body: dict[str, Any]) -> dict[str, Any]:
-    preview_items = list(body.get("output_previews", []))
-    wrapped_final_result = _format_loop_limit_exhausted_output_value(
-        preview_items[0].get("value") if preview_items else body.get("final_result")
-    )
-    wrapped_previews: list[dict[str, Any]] = []
-    for preview in preview_items:
-        wrapped_previews.append(
-            {
-                **preview,
-                "display_mode": "text",
-                "value": wrapped_final_result,
-            }
-        )
-    return {
-        **body,
-        "output_previews": wrapped_previews,
-        "final_result": wrapped_final_result,
-    }
-
-
 def collect_output_boundaries(
     graph: NodeSystemGraphDocument,
     state: dict[str, Any],
@@ -508,34 +480,6 @@ def collect_output_boundaries(
 
     if final_results:
         state["final_result"] = str(final_results[-1])
-
-
-def _resolve_active_output_nodes(
-    graph: NodeSystemGraphDocument,
-    active_edge_ids: set[str],
-) -> set[str]:
-    if not active_edge_ids:
-        return set()
-
-    active_output_nodes: set[str] = set()
-    for edge in graph.edges:
-        target_node = graph.nodes.get(edge.target)
-        if (
-            isinstance(target_node, NodeSystemOutputNode)
-            and _build_regular_edge_id(edge.source, edge.target) in active_edge_ids
-        ):
-            active_output_nodes.add(edge.target)
-
-    for conditional_edge in graph.conditional_edges:
-        for branch, target in conditional_edge.branches.items():
-            target_node = graph.nodes.get(target)
-            if (
-                isinstance(target_node, NodeSystemOutputNode)
-                and _build_conditional_edge_id(conditional_edge.source, branch, target) in active_edge_ids
-            ):
-                active_output_nodes.add(target)
-
-    return active_output_nodes
 
 
 def _execute_condition_node(
