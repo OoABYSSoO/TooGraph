@@ -109,6 +109,7 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 - `run-event-stream.ts` 已继续承接 queued/running/resuming run polling status 语义；`EditorWorkspaceShell.vue` 和 `RunDetailPage.vue` 仍保留 polling timer cadence、abort behavior、EventSource close behavior、human-review opening、terminal run persistence 和实际 UI state mutation。
 - `run-event-stream.ts` 已继续承接 run event payload 的 node id、text 和 output key projection；`EditorWorkspaceShell.vue` 和 `RunDetailPage.vue` 仍保留 EventSource 生命周期、preview state writes、graph mutation、polling timers、restore/human-review behavior 和实际 UI state mutation。
 - `run-event-stream.ts` 已继续承接 workspace streaming output preview target projection：output keys 匹配 output node reads，并在没有匹配项时回退到 payload node id；`EditorWorkspaceShell.vue` 仍保留 preview ref assignment、EventSource lifecycle、graph mutation、polling timers 和 live display state。
+- `run-event-stream.ts` 已继续承接 streaming output preview map patch projection：按目标 node ids 生成 immutable plain preview entries；`EditorWorkspaceShell.vue` 仍保留 preview ref assignment、EventSource lifecycle、graph mutation、polling timers 和 live display state。
 
 ## 后端重点
 
@@ -195,6 +196,7 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 - 2026-04-30：`run-event-stream.ts` 已继续承担 queued/running/resuming run polling status classification；workspace/run detail 仍保留 timer cadence、abort、EventSource closure、human-review opening、terminal persistence 和 UI state mutation。
 - 2026-04-30：`run-event-stream.ts` 已继续承担 run event payload node id trimming、explicit text/fallback selection 和 output key normalization；workspace/run detail 仍保留 preview writes、stream lifecycle、graph mutation、polling、restore 和 human-review behavior。
 - 2026-04-30：`run-event-stream.ts` 已继续承担 streaming output preview target node projection；workspace shell 仍保留 preview ref assignment、stream lifecycle、graph mutation、polling 和 live display state。
+- 2026-04-30：`run-event-stream.ts` 已继续承担 streaming output preview map patch construction；workspace shell 仍保留 preview ref assignment、stream lifecycle、graph mutation、polling 和 live display state。
 
 ## 优先级路线
 

@@ -13,6 +13,11 @@ export type RunEventPreviewDocument = {
   nodes: Record<string, { kind?: string; reads?: Array<{ state?: string | null }> }>;
 };
 
+export type RunEventOutputPreviewEntry = {
+  text: string;
+  displayMode: string | null;
+};
+
 export function buildRunEventStreamUrl(runId: string) {
   const normalizedRunId = runId.trim();
   return normalizedRunId ? `/api/runs/${normalizedRunId}/events` : null;
@@ -57,6 +62,21 @@ export function resolveRunEventPreviewNodeIds(
       : [];
 
   return targetNodeIds.length > 0 ? targetNodeIds : fallbackNodeId ? [fallbackNodeId] : [];
+}
+
+export function buildRunEventOutputPreviewByNodeId(
+  currentPreviewByNodeId: Record<string, RunEventOutputPreviewEntry>,
+  previewNodeIds: string[],
+  text: string,
+) {
+  const nextPreviewByNodeId = { ...currentPreviewByNodeId };
+  for (const nodeId of previewNodeIds) {
+    nextPreviewByNodeId[nodeId] = {
+      text,
+      displayMode: "plain",
+    };
+  }
+  return nextPreviewByNodeId;
 }
 
 export function buildLiveStreamingOutput(

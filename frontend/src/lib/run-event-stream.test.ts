@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   buildLiveStreamingOutput,
+  buildRunEventOutputPreviewByNodeId,
   buildRunEventStreamUrl,
   listRunEventOutputKeys,
   parseRunEventPayloadData,
@@ -75,6 +76,39 @@ test("resolveRunEventPreviewNodeIds maps output keys to output nodes and preserv
   assert.deepEqual(resolveRunEventPreviewNodeIds(document, ["missing"], "fallback_node"), ["fallback_node"]);
   assert.deepEqual(resolveRunEventPreviewNodeIds(null, ["answer"], "fallback_node"), ["fallback_node"]);
   assert.deepEqual(resolveRunEventPreviewNodeIds(document, [], ""), []);
+});
+
+test("buildRunEventOutputPreviewByNodeId writes plain previews without mutating existing entries", () => {
+  const currentPreview = {
+    existing_output: {
+      text: "old",
+      displayMode: "markdown",
+    },
+  };
+
+  const nextPreview = buildRunEventOutputPreviewByNodeId(currentPreview, ["output_answer", "output_summary"], "new text");
+
+  assert.deepEqual(nextPreview, {
+    existing_output: {
+      text: "old",
+      displayMode: "markdown",
+    },
+    output_answer: {
+      text: "new text",
+      displayMode: "plain",
+    },
+    output_summary: {
+      text: "new text",
+      displayMode: "plain",
+    },
+  });
+  assert.notEqual(nextPreview, currentPreview);
+  assert.deepEqual(currentPreview, {
+    existing_output: {
+      text: "old",
+      displayMode: "markdown",
+    },
+  });
 });
 
 test("buildLiveStreamingOutput preserves live output merge semantics", () => {

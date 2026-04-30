@@ -266,6 +266,7 @@ import {
 } from "@/lib/editor-workspace";
 import type { CanvasViewport } from "@/editor/canvas/canvasViewport";
 import {
+  buildRunEventOutputPreviewByNodeId,
   buildRunEventStreamUrl,
   listRunEventOutputKeys,
   parseRunEventPayloadData,
@@ -555,13 +556,7 @@ function applyStreamingOutputPreviewToTab(tabId: string, payload: Record<string,
     return;
   }
   const currentPreview = runOutputPreviewByTabId.value[tabId] ?? {};
-  const nextPreview = { ...currentPreview };
-  for (const nodeId of previewNodeIds) {
-    nextPreview[nodeId] = {
-      text,
-      displayMode: "plain",
-    };
-  }
+  const nextPreview = buildRunEventOutputPreviewByNodeId(currentPreview, previewNodeIds, text);
   runOutputPreviewByTabId.value = {
     ...runOutputPreviewByTabId.value,
     [tabId]: nextPreview,
