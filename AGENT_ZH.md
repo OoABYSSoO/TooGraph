@@ -85,9 +85,9 @@
   - `buddy_self_review` 是后台复盘路径：它应产生 memory 和 evolution plan，而不是静默修改 Buddy Home 或图资产。
   - `toograph_skill_creation_workflow` 是图表达创建工作流的参考模式：clarify、confirm examples、generate files、test、review、approve，然后通过受控 capability calls 写入。
 - Buddy 图编排有两个目标模式：
-  - 通过 draft patch、validator、diff/preview、human approval、GraphCommandBus-style application、graph revision 和 undo/redo 修改当前图。
+  - 通过应用内虚拟 UI playback 或已验证 command draft 修改当前图，并保留 diff/preview、必要的 human approval、graph revision 和 undo/redo。
   - 根据用户目标创建新的图模板或可复用子图，验证它，可选试运行它，预览它，请求批准，然后保存为用户模板，供后续 capability selection 发现。
-- 当前 Buddy baseline 已包括动态 subgraph breakpoint 传播，以及 Buddy 悬浮窗口复用标准 `awaiting_human` pause/resume cards。Pause UI 应在请求补充用户输入前显示当前已产出内容和上下文。剩余最高优先级 Buddy 基础设施包括完成 Buddy page/recovery/refusal/cancel flows、文件写入/删除和脚本执行的动态低层 approval、graph command/revision plumbing、Buddy Home writeback templates，以及统一的低层 `activity_events`。
+- 当前 Buddy baseline 已包括动态 subgraph breakpoint 传播、Buddy 悬浮窗口复用标准 `awaiting_human` pause/resume cards、Buddy Home 通过 command/revision 写回，以及应用内虚拟图回放。Pause UI 应在请求补充用户输入前显示当前已产出内容和上下文。剩余最高优先级 Buddy 基础设施包括虚拟 UI operation journal / activity events、graph diff / revision / undo / redo plumbing、编辑已有图、运行/结果校验、上下文预算，以及更完整的低层操作摘要。
 - Buddy 自演化应优先选择窄且可逆的改进：memory updates、session summaries、Skill revisions、graph patch drafts、reusable subgraph/template proposals 和 policy suggestions。更高风险改动，如 graph edits、file writes、script execution、network access、automation creation 或 persona/policy changes，需要显式 approval 和可恢复 revisions。
 
 ## Skill 包边界
@@ -120,7 +120,7 @@
 
 - 自动行为必须可见、可逆、可审计。重要副作用应留下 run detail entries、artifact records、warnings/errors、buddy action logs、revision IDs、diffs 或 undo records。
 - 需要人工 review 时，review 应是图/模板/命令流的一部分，而不是隐藏的 UI-only prompt。Approval 必须在应用其授权的副作用之前发生。
-- Buddy 和 agent graph edits 必须通过 TooGraph 的 command path、validator、audit trail 和 undo/redo 系统。不要模拟 DOM 点击或隐式修改 graph JSON。
+- Buddy 和 agent graph edits 必须通过 TooGraph 的 editor action / command path、validator、audit trail 和 undo/redo 系统。应用内虚拟 UI playback 可以可见地派发编辑器交互，但不能成为隐藏 DOM 点击绕路，也不能隐式修改 graph JSON。
 
 ## Buddy Memory 与上下文卫生
 

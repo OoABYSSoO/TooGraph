@@ -1,9 +1,11 @@
 import {
   cloneGraphDocument,
+  connectConditionRouteInDocument,
   connectFlowNodesInDocument,
   updateAgentNodeConfigInDocument,
   updateNodeMetadataInDocument,
 } from "../../lib/graph-document.ts";
+import { buildFixedConditionConfig } from "../../lib/condition-protocol.ts";
 import { addStateBindingToDocument } from "./statePanelBindings.ts";
 import {
   buildNextDefaultStateField,
@@ -18,6 +20,7 @@ import {
 import type {
   AgentNode,
   ConditionNode,
+  GraphCorePayload,
   GraphDocument,
   GraphNode,
   GraphPayload,
@@ -25,20 +28,22 @@ import type {
   InputNode,
   OutputNode,
   StateDefinition,
+  SubgraphNode,
 } from "../../types/node-system.ts";
 
 export const GRAPH_EDIT_PLAYBACK_CAPABILITY_MANUAL = [
   "Graph Edit Playback capability:",
   "- LLM 输出产品语义，不输出浏览器实现细节或 UI 点击手法。",
-  "- 支持 create_node: 创建 input、agent、output、condition 节点，并提供 title、description、taskInstruction、positionHint。",
+  "- 支持 create_node: 创建 input、agent、output、condition、subgraph 节点，并提供 title、description、taskInstruction、positionHint。",
   "- 支持 create_state: 创建 state，并提供 name、description、valueType、value。",
   "- 支持 bind_state: 把 state 绑定到节点 read/write 端口。",
   "- 支持 connect_nodes: 连接两个节点的流程边。",
+  "- 支持 connect_route: 连接 condition 节点的 true/false/exhausted 分支路由。",
   "- 支持 update_node: 修改已有节点标题、简介或 Agent 任务说明。",
   "- 执行器会把语义命令编译成可见 UI playback 和可审计 graph commands。",
 ].join("\n");
 
-export type GraphEditNodeType = "input" | "agent" | "output" | "condition";
+export type GraphEditNodeType = "input" | "agent" | "output" | "condition" | "subgraph";
 export type GraphEditStateBindingMode = "read" | "write";
 export type GraphEditWriteBindingMode = "replace" | "append";
 export type GraphEditNodeCreationSource =
@@ -74,6 +79,7 @@ export type GraphEditCreateNodeIntent = {
   title?: string;
   description?: string;
   taskInstruction?: string;
+  subgraphGraph?: GraphCorePayload;
   position?: Partial<GraphPosition> | null;
   positionHint?: string;
   creationSource?: GraphEditNodeCreationSource;
@@ -116,12 +122,20 @@ export type GraphEditConnectNodesIntent = {
   targetRef: string;
 };
 
+export type GraphEditConnectRouteIntent = {
+  kind: "connect_route";
+  sourceRef: string;
+  branchKey: string;
+  targetRef: string;
+};
+
 export type GraphEditIntent =
   | GraphEditCreateNodeIntent
   | GraphEditUpdateNodeIntent
   | GraphEditCreateStateIntent
   | GraphEditBindStateIntent
-  | GraphEditConnectNodesIntent;
+  | GraphEditConnectNodesIntent
+  | GraphEditConnectRouteIntent;
 
 export type GraphEditIntentPackage = {
   operations: GraphEditIntent[];
@@ -140,6 +154,7 @@ export type GraphEditCreateNodeCommand = GraphEditCommandBase & {
   title: string;
   description: string;
   taskInstruction: string;
+  subgraphGraph: GraphCorePayload | null;
   position: GraphPosition;
   positionHint: string;
   menuTarget: string;
@@ -190,12 +205,22 @@ export type GraphEditConnectNodesCommand = GraphEditCommandBase & {
   targetNodeId: string;
 };
 
+export type GraphEditConnectRouteCommand = GraphEditCommandBase & {
+  kind: "connect_route";
+  sourceRef: string;
+  sourceNodeId: string;
+  branchKey: string;
+  targetRef: string;
+  targetNodeId: string;
+};
+
 export type GraphEditCommand =
   | GraphEditCreateNodeCommand
   | GraphEditUpdateNodeCommand
   | GraphEditCreateStateCommand
   | GraphEditBindStateCommand
-  | GraphEditConnectNodesCommand;
+  | GraphEditConnectNodesCommand
+  | GraphEditConnectRouteCommand;
 
 export type GraphEditPlaybackStep = {
   kind:
@@ -226,7 +251,8 @@ export type GraphEditPlaybackStep = {
   nodeType?: GraphEditNodeType;
   sourceNodeId?: string;
   sourceStateKey?: string;
-  sourceAnchorKind?: "state-out" | "flow-out";
+  sourceAnchorKind?: "state-out" | "flow-out" | "route-out";
+  branchKey?: string;
 };
 
 export type GraphEditPlaybackPlan = {
@@ -348,6 +374,8 @@ function compileGraphEditIntent(
       return compileBindStateCommand(operation, index, context, issues);
     case "connect_nodes":
       return compileConnectNodesCommand(operation, index, context, issues);
+    case "connect_route":
+      return compileConnectRouteCommand(operation, index, context, issues);
   }
 }
 
@@ -413,6 +441,9 @@ function compileCreateNodeCommand(
   const positionIndex = context.nextPositionIndex;
   context.nextPositionIndex += 1;
   const title = compactText(operation.title) || defaultNodeTitle(operation.nodeType);
+  const subgraphGraph = operation.nodeType === "subgraph"
+    ? cloneGraphCorePayload(operation.subgraphGraph ?? emptyGraphCorePayload())
+    : null;
   const defaultPosition = normalizePosition(operation.position, positionIndex);
   const position = hasExplicitPosition(operation.position)
     ? defaultPosition
@@ -422,6 +453,7 @@ function compileCreateNodeCommand(
         title,
         description: compactText(operation.description),
         taskInstruction: compactText(operation.taskInstruction),
+        subgraphGraph,
         finalPosition: defaultPosition,
         creationSource,
       });
@@ -434,6 +466,7 @@ function compileCreateNodeCommand(
     title,
     description: compactText(operation.description),
     taskInstruction: compactText(operation.taskInstruction),
+    subgraphGraph,
     position,
     positionHint: compactText(operation.positionHint),
     menuTarget: creationSource ? "editor.canvas.surface" : isFirstNode ? "editor.canvas.empty.createFirstNode" : "editor.canvas.surface",
@@ -579,6 +612,41 @@ function compileConnectNodesCommand(
   };
 }
 
+function compileConnectRouteCommand(
+  operation: GraphEditConnectRouteIntent,
+  index: number,
+  context: CompilerContext,
+  issues: string[],
+): GraphEditConnectRouteCommand | null {
+  const sourceRef = compactText(operation.sourceRef);
+  const targetRef = compactText(operation.targetRef);
+  const branchKey = compactText(operation.branchKey);
+  const sourceNodeId = resolveNodeRef(context, sourceRef);
+  const targetNodeId = resolveNodeRef(context, targetRef);
+  if (!sourceNodeId) {
+    issues.push(`operations[${index}] connect_route references unknown source node: ${sourceRef}.`);
+  }
+  if (!branchKey) {
+    issues.push(`operations[${index}] connect_route requires branchKey.`);
+  }
+  if (!targetNodeId) {
+    issues.push(`operations[${index}] connect_route references unknown target node: ${targetRef}.`);
+  }
+  if (!sourceNodeId || !branchKey || !targetNodeId) {
+    return null;
+  }
+  return {
+    kind: "connect_route",
+    commandId: `graph-command-${index + 1}`,
+    sourceRef,
+    sourceNodeId,
+    branchKey,
+    targetRef,
+    targetNodeId,
+    summary: `Connect ${sourceNodeId}.${branchKey} route to ${targetNodeId}.`,
+  };
+}
+
 function buildPlaybackStepsForCommands(commands: GraphEditCommand[]): GraphEditPlaybackStep[] {
   const steps: GraphEditPlaybackStep[] = [];
   for (let index = 0; index < commands.length; index += 1) {
@@ -686,6 +754,19 @@ function buildPlaybackStepsForCommand(command: GraphEditCommand): GraphEditPlayb
           label: command.summary,
           sourceNodeId: command.sourceNodeId,
           nodeId: command.targetNodeId,
+        },
+      ];
+    case "connect_route":
+      return [
+        {
+          kind: "draw_flow_edge",
+          target: routeAnchorTarget(command.sourceNodeId, command.branchKey),
+          endTarget: flowInputAnchorTarget(command.targetNodeId),
+          label: command.summary,
+          sourceNodeId: command.sourceNodeId,
+          nodeId: command.targetNodeId,
+          sourceAnchorKind: "route-out",
+          branchKey: command.branchKey,
         },
       ];
   }
@@ -939,6 +1020,10 @@ function flowInputAnchorTarget(nodeId: string) {
   return `editor.canvas.anchor.${nodeId}:flow-in`;
 }
 
+function routeAnchorTarget(nodeId: string, branchKey: string) {
+  return `editor.canvas.anchor.${nodeId}:branch:${branchKey}`;
+}
+
 function stateAnchorTarget(nodeId: string, direction: "in" | "out", stateKey: string) {
   return `editor.canvas.anchor.${nodeId}:state-${direction}:${stateKey}`;
 }
@@ -967,6 +1052,8 @@ function applyGraphEditCommand<T extends GraphPayload | GraphDocument>(document:
       return bindStateInDocument(document, command);
     case "connect_nodes":
       return connectFlowNodesInDocument(document, command.sourceNodeId, command.targetNodeId);
+    case "connect_route":
+      return connectConditionRouteInDocument(document, command.sourceNodeId, command.branchKey, command.targetNodeId);
   }
 }
 
@@ -1059,6 +1146,7 @@ function buildGraphNodeFromCommand(command: GraphEditCreateNodeCommand): GraphNo
     title: command.title,
     description: command.description,
     taskInstruction: command.taskInstruction,
+    subgraphGraph: command.subgraphGraph,
     position: command.position,
   });
 }
@@ -1068,6 +1156,7 @@ function buildGraphNodeFromCreationFields(input: {
   title: string;
   description: string;
   taskInstruction: string;
+  subgraphGraph?: GraphCorePayload | null;
   position: GraphPosition;
 }): GraphNode {
   switch (input.nodeType) {
@@ -1104,12 +1193,7 @@ function buildGraphNodeFromCreationFields(input: {
         ui: { position: input.position, collapsed: false },
         reads: [],
         writes: [],
-        config: {
-          branches: ["true", "false"],
-          loopLimit: 1,
-          branchMapping: { true: "true", false: "false" },
-          rule: { source: "", operator: "exists", value: null },
-        },
+        config: buildFixedConditionConfig({ source: "", operator: "exists", value: null }),
       } satisfies ConditionNode;
     case "agent":
       return {
@@ -1128,6 +1212,18 @@ function buildGraphNodeFromCreationFields(input: {
           temperature: 0.2,
         },
       } satisfies AgentNode;
+    case "subgraph":
+      return {
+        kind: "subgraph",
+        name: input.title,
+        description: input.description || "Embedded graph instance.",
+        ui: { position: input.position, collapsed: false },
+        reads: [],
+        writes: [],
+        config: {
+          graph: cloneGraphCorePayload(input.subgraphGraph ?? emptyGraphCorePayload()),
+        },
+      } satisfies SubgraphNode;
   }
 }
 
@@ -1170,6 +1266,7 @@ function resolveDefaultNodeCreationGesturePosition(input: {
   title: string;
   description: string;
   taskInstruction: string;
+  subgraphGraph: GraphCorePayload | null;
   finalPosition: GraphPosition;
   creationSource: GraphEditNodeCreationSourceCommand | null;
 }): GraphPosition {
@@ -1178,6 +1275,7 @@ function resolveDefaultNodeCreationGesturePosition(input: {
     title: input.title,
     description: input.description,
     taskInstruction: input.taskInstruction,
+    subgraphGraph: input.subgraphGraph,
     position: input.finalPosition,
   });
   return resolveNodeCreationGesturePositionForFinalPosition({
@@ -1222,7 +1320,23 @@ function defaultNodeTitle(nodeType: GraphEditNodeType): string {
       return "Output";
     case "condition":
       return "Condition";
+    case "subgraph":
+      return "Subgraph";
   }
+}
+
+function emptyGraphCorePayload(): GraphCorePayload {
+  return {
+    state_schema: {},
+    nodes: {},
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+}
+
+function cloneGraphCorePayload(graph: GraphCorePayload): GraphCorePayload {
+  return JSON.parse(JSON.stringify(graph)) as GraphCorePayload;
 }
 
 function slugFromText(value: string): string {

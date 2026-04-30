@@ -85,9 +85,9 @@ These instructions apply to all work in this repository and should persist acros
   - `buddy_self_review` is the background review path: it should produce memory and evolution plans, not silently mutate Buddy Home or graph assets.
   - `toograph_skill_creation_workflow` is the reference pattern for graph-expressed creation workflows: clarify, confirm examples, generate files, test, review, approve, then write through controlled capability calls.
 - Buddy graph orchestration has two target modes:
-  - Modify the current graph through a draft patch, validator, diff/preview, human approval, GraphCommandBus-style application, graph revision, and undo/redo.
+  - Modify the current graph through app-native virtual UI playback or a validated command draft, with diff/preview, human approval when needed, graph revision, and undo/redo.
   - Create a new graph template or reusable subgraph from a user goal, validate it, optionally test-run it, preview it, ask for approval, then save it as a user template that later capability selection can discover.
-- The established Buddy baseline now includes dynamic subgraph breakpoint propagation and Buddy floating-window reuse of standard `awaiting_human` pause/resume cards. Pause UIs should show the current produced content and context before asking for supplemental user input. The remaining highest-priority Buddy infrastructure is completing Buddy page/recovery/refusal/cancel flows, dynamic low-level approval for file writes/deletes and script execution, graph command/revision plumbing, Buddy Home writeback templates, and unified low-level `activity_events`.
+- The established Buddy baseline now includes dynamic subgraph breakpoint propagation, Buddy floating-window reuse of standard `awaiting_human` pause/resume cards, Buddy Home writeback through command/revision paths, and app-native virtual graph replay. Pause UIs should show the current produced content and context before asking for supplemental user input. The remaining highest-priority Buddy infrastructure is virtual UI operation journals/activity events, graph diff/revision/undo/redo plumbing, editing existing graphs, run/result validation, context budgeting, and richer low-level operation summaries.
 - Buddy self-evolution should prefer narrow, reversible improvements first: memory updates, session summaries, Skill revisions, graph patch drafts, reusable subgraph/template proposals, and policy suggestions. Riskier changes such as graph edits, file writes, script execution, network access, automation creation, or persona/policy changes require explicit approval and recoverable revisions.
 
 ## Skill Package Boundaries
@@ -120,7 +120,7 @@ These instructions apply to all work in this repository and should persist acros
 
 - Automatic behavior should be visible, reversible, and auditable. Important side effects should leave run detail entries, artifact records, warnings/errors, buddy action logs, revision IDs, diffs, or undo records as appropriate.
 - Human review should be part of the graph/template/command flow when required, not a hidden UI-only prompt. Approval should happen before applying the side effect it authorizes.
-- Buddy and agent graph edits must go through TooGraph's command path, validator, audit trail, and undo/redo system. Do not simulate DOM clicks or mutate graph JSON invisibly.
+- Buddy and agent graph edits must go through TooGraph's editor action/command path, validator, audit trail, and undo/redo system. App-native virtual UI playback may visibly dispatch editor interactions, but it must not be a hidden DOM-click bypass or invisible graph JSON mutation.
 
 ## Buddy Memory and Context Hygiene
 

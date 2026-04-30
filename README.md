@@ -86,11 +86,12 @@ TooGraph 的推荐模型配置入口是 Model Providers 页面。你可以在界
 - 项目自带 `knowledge/TooGraph-official/` 作为 TooGraph 官方知识库源文档。
 - 后端支持 knowledge base 导入、切分、FTS 检索和 catalog 查询。
 - Git 管理的官方 Skill 定义来自 `skill/official/<skill_key>/` 文件夹；用户自定义 Skill 写入 `skill/user/<skill_key>/`。两类 Skill 包都可以进入 Git 管理；当前环境的启用状态只写入被忽略的 `skill/settings.json`，缺失时程序会按现有 Skill 自动生成和补齐。
-- 当前官方 Skill 包包括 `web_search`、`toograph_capability_selector`、`toograph_skill_builder`、`toograph_script_tester` 和 `local_workspace_executor`。
+- 当前官方 Skill 包包括 `web_search`、`toograph_capability_selector`、`toograph_page_operator`、`toograph_skill_builder`、`toograph_script_tester`、`local_workspace_executor` 和内部 `buddy_home_writer`。
 - `web_search` 使用 `before_llm.py` 在技能入参规划前补充当前日期，使用 `after_llm.py` 执行联网搜索、引用整理、可选网页正文抓取、本地 source document artifact 输出，并把原文网址写入下载后的本地文档。
 - `toograph_capability_selector` 使用 `before_llm.py` 列出当前启用的图模板和可选 Skill 清单，再用 `after_llm.py` 校验并规范化模型选择的单个 `capability` state。
+- `toograph_page_operator` 读取当前页面操作书，支持普通页面 click 和编辑器 `graph_edit editor.graph.playback`，让 Buddy 通过应用内虚拟鼠标/键盘可见地执行页面操作。
 - `toograph_skill_builder` 使用 `before_llm.py` 注入当前 Skill 编写指南，生成 `skill_key`、`skill.json`、`SKILL.md`、`before_llm.py`、`after_llm.py` 和可选 `requirements.txt` 内容；它不负责写入、测试、修复或启用生成的 Skill。
-- `toograph_script_tester` 接收 Python 脚本源码和 LLM 生成的 pytest 用例，在临时目录运行测试并返回状态、摘要、stdout、stderr、退出码和结构化错误；它声明 `pytest` 依赖且需要执行确认。
+- `toograph_script_tester` 接收脚本内容和测试目标，由 LLM 生成临时测试工作区并运行允许的测试命令；它不再只限定 Python/pytest，执行前仍受当前图或 Buddy 权限模式约束。
 - `local_workspace_executor` 会在技能入参规划前预读节点任务或 state 中提到的仓库文件；运行时只处理一个路径上的 `read` / `write` / `execute` 操作，输出收束为 `success` 和 `result`。写入只允许 `backend/data`、`skill/user`、`graph_template/user` 或 `node_preset/user`，执行只允许 `backend/data/tmp` 或 `skill/user`，并对 `.git`、`.env`、`backend/data/settings` 做硬拒绝；它涉及本地写入和进程执行，是否暂停确认由当前图或 Buddy 的 `需确认` / `完全访问` 模式决定。
 - Output 节点可以读取 `local_path` 指向的本地 artifact，按类型预览文档、图片和视频。
 
@@ -324,7 +325,7 @@ TooGraph/
 
 `buddy_autonomous_review` 是当前 Buddy 的后台自主复盘路径：可见回复完成后由前端用 run snapshot 启动，模型自行判断是否需要低风险写回 Buddy Home，并通过 `buddy_home_writer` 走 command / revision 路径留下可回滚记录。
 
-`toograph_skill_creation_workflow` 是创建用户自定义 Skill 的官方流程模板：它会检查已有能力、澄清需求、让用户确认示例输入输出，调用 `toograph_skill_builder` 生成 `skill_key` / `skill.json` / `SKILL.md` / `before_llm.py` / `after_llm.py` / `requirements.txt`，再用 `toograph_script_tester` 测试 Python 生命周期脚本；测试失败会回到构建节点修复，最后只有在用户明确批准后才通过 `local_workspace_executor` 写入 `skill/user/<skill_key>/`。
+`toograph_skill_creation_workflow` 是创建用户自定义 Skill 的官方流程模板：它会检查已有能力、澄清需求、让用户确认示例输入输出，调用 `toograph_skill_builder` 生成 `skill_key` / `skill.json` / `SKILL.md` / `before_llm.py` / `after_llm.py` / `requirements.txt`，再用 `toograph_script_tester` 测试生命周期脚本或相关文件；测试失败会回到构建节点修复，最后只有在用户明确批准后才通过 `local_workspace_executor` 写入 `skill/user/<skill_key>/`。
 
 ## 文档与知识库
 
@@ -337,15 +338,14 @@ TooGraph/
 
 ## 未来方向
 
-- 继续强化运行事件可观测性，让 Editor、Run Activity、Output 和 Run Detail 更完整地复盘一次执行。
-- 继续打磨 Model Providers，在界面中完成更多 OpenAI-compatible 网关、云端 Provider、模型发现和默认模型选择能力。
-- 强化 Human Review 的审计信息、批量输入体验和多断点恢复路径。
-- 完善知识库管理，包括更新、删除、重建索引、检索质量评估和引用展示。
-- 扩展 memory 的写入、召回、展示和调试能力。
-- 增加端到端 UI 测试，覆盖编辑器、运行记录、断点暂停和多语言切换。
+- 补齐 Buddy 原生虚拟 UI 操作的 operation journal、activity events、graph diff、revision、undo/redo、失败重试和运行结果归因。
+- 扩展 Buddy 编辑已有图的能力：选择、移动、重命名、改配置、选 Skill、调整连接、删除、恢复、运行和基于错误继续修复。
+- 扩展页面操作书覆盖范围，让 Buddy 能跨技能页、运行历史、编辑器、模型日志等页面先导航再操作目标内容。
+- 继续完善上下文预算、`result_package` 摘要、大 artifact 按需展开和只读 fanout 并行。
+- 将内部 `agent` kind 的用户心智迁移为 LLM 节点，同时保持 `node_system` 协议唯一。
+- 完善知识库更新、删除、重建索引、检索质量评估和引用展示。
+- 增加端到端 UI 测试，覆盖编辑器、运行记录、断点暂停、Buddy 虚拟操作和多语言切换。
 - 梳理桌面端、Docker 或单机部署流程，降低非开发环境的启动成本。
-- 继续完善应用图标、桌面端图标和品牌资产。
-- 推进可见、可撤销、可审计的自动编排能力，让 Agent 可以在授权下辅助创建和调整 graph。
 
 ### 伙伴 Agent 与自动编排图
 
@@ -355,7 +355,7 @@ TooGraph/
 
 TooGraph 的长期方向不只是提供一个可视化画布，而是提供一个可见、可控、可验证的 Agent 协作层。这里的 Agent 是由一整张 graph 表达出来的运行体，而不是某一个单独节点；单个 LLM 节点只承担一次模型判断、一次结构化输出或一次能力调用准备。
 
-伙伴 Agent 可以作为轻量交互入口，停靠在画布或侧栏附近，用 HTML/CSS、SVG 或前端动画表达待机、观察、思考、建议、执行、等待确认、完成和失败等状态。它不应该模拟 DOM 点击，而应该通过明确的图编辑命令操作 TooGraph，例如创建节点、连接 state、连接流程线、打开面板、校验 graph、运行 graph 和保存 graph。
+伙伴 Agent 可以作为轻量交互入口，停靠在画布或侧栏附近，用 HTML/CSS、SVG 或前端动画表达待机、观察、思考、建议、执行、等待确认、完成和失败等状态。当前方向是应用内原生虚拟操作：伙伴读取结构化页面操作书和 affordance 清单，控制自己的虚拟鼠标/键盘可见地触发 TooGraph 编辑器已有交互路径；持久图变更仍要进入验证、审计、diff、revision 和 undo/redo 路径，不能绕过协议直接隐式改 graph JSON。
 
 自动编排图可以分为两种模式：
 

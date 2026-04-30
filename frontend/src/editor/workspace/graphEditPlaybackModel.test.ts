@@ -116,6 +116,30 @@ test("buildGraphEditPlaybackPlan compiles graph intentions without exposing mous
   assert.doesNotMatch(GRAPH_EDIT_PLAYBACK_CAPABILITY_MANUAL, /double-click|双击|CSS selector|坐标/i);
 });
 
+test("applyGraphEditPlaybackPlan creates condition nodes with the fixed graph protocol defaults", () => {
+  const plan = buildGraphEditPlaybackPlan(emptyDocument(), {
+    operations: [
+      {
+        kind: "create_node",
+        ref: "gate",
+        nodeType: "condition",
+        title: "继续判断",
+      },
+    ],
+  });
+
+  const result = applyGraphEditPlaybackPlan(emptyDocument(), plan);
+  const conditionNode = result.document.nodes.condition_gate;
+
+  assert.equal(conditionNode?.kind, "condition");
+  if (conditionNode?.kind !== "condition") {
+    return;
+  }
+  assert.deepEqual(conditionNode.config.branches, ["true", "false", "exhausted"]);
+  assert.equal(conditionNode.config.loopLimit, 5);
+  assert.deepEqual(conditionNode.config.branchMapping, { true: "true", false: "false" });
+});
+
 test("buildGraphEditPlaybackPlan targets precise editor affordances for human-like replay", () => {
   const plan = buildGraphEditPlaybackPlan(emptyDocument(), {
     operations: [

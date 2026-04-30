@@ -45,23 +45,24 @@ Skill 链路已经做到：
 - Skill 启用状态写入本地 `skill/settings.json`，不写进 Skill 包定义。
 - `web_search` 支持联网搜索、网页正文抓取和本地 source document 输出。
 - `toograph_capability_selector` 支持从启用模板和启用 Skill 中选择并校验一个能力。
+- `toograph_page_operator` 支持读取当前页面操作书，执行普通页面 click，并在编辑器页发起 `graph_edit editor.graph.playback` 可见回放。
 - `toograph_skill_builder` 支持生成用户 Skill 包文件内容。
 - `toograph_script_tester` 支持在临时目录生成并执行允许命令的测试工作区。
 - `local_workspace_executor` 支持在路径白名单内读取、写入一个文件或执行一个脚本。
+- 内部 `buddy_home_writer` 支持 Buddy Home 低风险写回的 command / revision 路径。
 
 ## 后续路线图
 
 仍然明确属于后续工作的方向包括：
 
-- 动态能力审批：声明 `file_write`、删除类权限或 `subprocess` 的 Skill 会按图或 Buddy 的 `需确认` / `完全访问` 模式进入标准 `awaiting_human` 或自动放行。
-- Buddy 暂停交互：浮窗已把续跑收敛到暂停卡片内的单一操作区，仍需补齐拒绝、取消、刷新后找回、暂停期间队列策略和 Buddy 页面运行/确认视图。
-- Buddy Home 写回：把记忆、用户资料、会话摘要、自我复盘报告、能力使用统计和策略建议表达为显式图模板、受控 Skill、command、revision 和审批流程。
-- 子图运行详情：补齐父子图审计聚合、动态子图断点定位、scope path 展示和从缩略图跳转到内部节点。
-- 低层 `activity_events`：让文件读取、搜索、命令执行、脚本测试、写入、下载、图编辑和 Skill/subgraph 执行都能产生程序化摘要，并在 Buddy 浮窗和 Run Detail 中复用展示。
-- 图编辑命令流：清理或重建 `graph_patch.draft` stub，补齐图补丁预览、GraphCommandBus、graph revision、undo/redo 和完整审计。
+- Buddy 原生虚拟 UI 操作：补齐 operation journal、activity events、graph diff、revision、undo/redo、失败重试和运行结果归因。
+- 编辑已有图：支持选择、移动、重命名、改配置、选 Skill、调整连接、删除、恢复、运行和基于错误继续修复。
+- 页面操作书扩展：覆盖技能页、运行历史、模型日志、模板库等页面，让 Buddy 可以跨页面导航后再操作目标内容。
+- 子图运行详情：继续增强动态子图断点定位、scope path 展示和从缩略图跳转到内部节点。
+- 低层 `activity_events`：继续扩展伙伴虚拟 UI 操作、图变更、运行点击和结果归因的程序化摘要，并在 Buddy 浮窗和 Run Detail 中复用展示。
 - 知识库更新、删除、重建索引和检索质量增强。
 - LangGraph Python 源码预览、下载和导入校验体验完善。
 - 内部 `agent` kind 命名逐步迁移为 LLM 节点语义。
-- 增加端到端 UI 测试，覆盖编辑器、运行记录、断点暂停、Buddy 和多语言切换。
+- 增加端到端 UI 测试，覆盖编辑器、运行记录、断点暂停、Buddy 虚拟操作和多语言切换。
 
 伙伴 Agent 的长期目标是成为 TooGraph 的协作入口：先能解释当前图和校验问题，再能在用户确认后生成图草案、创建节点、连接边、运行校验，最终演进到受控、可见、可撤销、可审计的自动编排。
