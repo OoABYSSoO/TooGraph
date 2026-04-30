@@ -78,6 +78,7 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 - `canvasNodeDragResizeModel.ts` 已承接节点拖拽/缩放 move 阶段的阈值判断、viewport-scale 投影、rounding、resize result projection，以及 node-resize/node pointer-down 的 missing-node / locked-edit / active-connection / inline-editor focus / start-resize / start-drag 路由；`EditorCanvas.vue` 仍保留 pointer capture、animation-frame batching、connection completion、rendered-size lookup、drag/resize execution 和 graph mutation emits。
 - `canvasPinchZoomModel.ts` 已承接双指缩放起点计算、pointer distance/center 计算，以及 canvas pointer-down 在 pinch cleanup 与 pan startup 之间的 setup action 决策；`EditorCanvas.vue` 仍保留 pointer snapshot storage、DOM focus/preventDefault、pointer capture、viewport pan/zoom execution 和 transient cleanup execution。
 - `canvasViewportInteractionModel.ts` 已承接 wheel zoom delta、zero-delta ignore、pointer-centered zoom request、无 canvas rect 时的 set-scale fallback，以及 zoom button 的 zoom-out/zoom-in clamped scale projection 和 reset viewport action selection；`EditorCanvas.vue` 仍保留 DOM rect lookup、实际 viewport mutation、wheel event binding 和 viewport draft emits。
+- `focusNodeViewport.ts` 已承接外部节点聚焦的 missing-target ignore 与 focused viewport projection；`EditorCanvas.vue` 仍保留 node lookup、DOM rect/element measurement、实际 selection mutation 和 viewport mutation。
 - `canvasRunPresentationModel.ts` 已承接 awaiting-human run node presentation、human-review visual selection 和 lock-banner click action projection；`EditorCanvas.vue` 仍保留实际 button event binding、emit dispatch 和锁定态副作用。
 - `minimapModel.ts` 已承接 minimap 模型投影、minimap point-to-world 映射、center-view viewport projection，以及 center-view 的 empty canvas-size ignore action；`EditorCanvas.vue` 仍保留 canvas size refresh、实际 viewport mutation、canvas focus execution 和 minimap event binding。
 - `useCanvasNodeDragResize.ts` 已承接节点拖拽/缩放 refs、pointer capture release、scheduled update dispatch、拖拽后残留 click 抑制和 teardown；`EditorCanvas.vue` 仍保留 selection、active connection cleanup、auto-snap、connection completion、panning、DOM measurement 和 graph mutation emits。
@@ -163,6 +164,7 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 - 2026-04-30：`canvasConnectionCompletionModel.ts` 已继续承担 connection completion execution routing 的 locked/no-connection ignore 与 complete cleanup policy，`EditorCanvas.vue` 仍保留实际 typed emit dispatch、连接清理和 selected-edge mutation。
 - 2026-04-30：`canvasViewportInteractionModel.ts` 已继续承担 zoom button 的 clamped scale/reset action routing，`EditorCanvas.vue` 仍保留实际 canvas-center zoom、viewport reset mutation 和 viewport draft emit。
 - 2026-04-30：`minimapModel.ts` 已继续承担 minimap center-view 的 empty-size ignore 与 centered viewport action，`EditorCanvas.vue` 仍保留 canvas size refresh、实际 viewport mutation 和 focus execution。
+- 2026-04-30：`focusNodeViewport.ts` 已承担外部节点聚焦的 missing-target ignore 与 focused viewport action projection，`EditorCanvas.vue` 仍保留 node lookup、DOM measurement、selection 和 viewport mutation execution。
 
 ## 优先级路线
 

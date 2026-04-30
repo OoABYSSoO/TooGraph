@@ -93,6 +93,10 @@ function readCanvasViewportInteractionModelSource() {
   return readFileSync(resolve(currentDirectory, "canvasViewportInteractionModel.ts"), "utf8").replace(/\r\n/g, "\n");
 }
 
+function readFocusNodeViewportModelSource() {
+  return readFileSync(resolve(currentDirectory, "focusNodeViewport.ts"), "utf8").replace(/\r\n/g, "\n");
+}
+
 function readCanvasNodeDragResizeModelSource() {
   return readFileSync(resolve(currentDirectory, "canvasNodeDragResizeModel.ts"), "utf8").replace(/\r\n/g, "\n");
 }
@@ -182,6 +186,21 @@ test("EditorCanvas stacks zoom controls above the minimap at the bottom right", 
   assert.match(minimapSource, /\.editor-minimap \{[\s\S]*backdrop-filter:\s*blur\(24px\) saturate\(1\.6\) contrast\(1\.02\);/);
   assert.match(minimapSource, /\.editor-minimap::before \{[\s\S]*background:\s*var\(--graphite-glass-specular\),\s*var\(--graphite-glass-lens\);/);
   assert.match(minimapSource, /\.editor-minimap__surface \{[\s\S]*position:\s*relative;[\s\S]*z-index:\s*1;/);
+});
+
+test("EditorCanvas delegates external node focus viewport projection to a model", () => {
+  const focusNodeViewportModelSource = readFocusNodeViewportModelSource();
+
+  assert.match(componentSource, /import \{ resolveFocusedNodeViewportAction \} from "@\/editor\/canvas\/focusNodeViewport";/);
+  assert.match(focusNodeViewportModelSource, /export function resolveFocusedViewport/);
+  assert.match(focusNodeViewportModelSource, /export function resolveFocusedNodeViewportAction/);
+  assert.match(componentSource, /function focusNode\(nodeId: string\)/);
+  assert.match(componentSource, /const canvasRect = canvas\?\.getBoundingClientRect\(\) \?\? null;/);
+  assert.match(componentSource, /const focusedNodeViewportAction = resolveFocusedNodeViewportAction\(\{[\s\S]*currentScale: viewport\.viewport\.scale,[\s\S]*canvasSize: canvasRect \? \{ width: canvasRect\.width, height: canvasRect\.height \} : null,[\s\S]*nodePosition: node\?\.ui\.position \?\? null,[\s\S]*nodeSize: element \? \{ width: element\.offsetWidth, height: element\.offsetHeight \} : null,[\s\S]*\}\);/);
+  assert.match(componentSource, /case "ignore-missing-target":[\s\S]*return;/);
+  assert.match(componentSource, /case "set-viewport":[\s\S]*selection\.selectNode\(nodeId\);[\s\S]*viewport\.setViewport\(focusedNodeViewportAction\.viewport\);/);
+  assert.doesNotMatch(componentSource, /if \(!node \|\| !canvas \|\| !element\) \{/);
+  assert.doesNotMatch(componentSource, /resolveFocusedViewport\(\{[\s\S]*nodeX:/);
 });
 
 test("EditorCanvas does not animate node transforms while dragging", () => {

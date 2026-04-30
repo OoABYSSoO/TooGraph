@@ -4,7 +4,7 @@
 Run a ten-round conservative cleanup batch focused on `EditorCanvas.vue` pure projection and interaction-model helpers, then close the baseline interaction regressions in one larger pass while preserving graph editing behavior, runtime visuals, drag/connect workflows, deletion behavior, and dev startup health.
 
 ## Current Phase
-Phase 57 in progress
+Phase 58 in progress
 
 ## Autonomous Continuation Gate
 - After every completed cleanup phase, re-read `docs/future/2026-04-28-architecture-refactor-roadmap.md`, `task_plan.md`, `findings.md`, and `progress.md`, then recalculate the total roadmap progress and the active area progress.
@@ -531,12 +531,21 @@ Phase 57 in progress
 - **Status:** completed
 
 ### Phase 57: EditorCanvas Focus Node Viewport Gate
-- [ ] Re-read the formal roadmap, Phase 56 findings, and current external node-focus viewport flow before changing code.
-- [ ] Inspect whether the next safest `EditorCanvas.vue` boundary is a focus-node viewport action model around missing target ignore and focused viewport projection.
-- [ ] Add focused red tests for the selected focus-node viewport boundary before production changes.
-- [ ] Keep actual node selection, DOM rect/element measurement, viewport mutation, minimap, zoom controls, panning, and graph interactions stable.
-- [ ] Run focused focus-viewport/structure and Canvas regression tests, TypeScript checks, full frontend tests or justified targeted regression, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
-- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 57.
+- [x] Re-read the formal roadmap, Phase 56 findings, and current external node-focus viewport flow before changing code.
+- [x] Inspect whether the next safest `EditorCanvas.vue` boundary is a focus-node viewport action model around missing target ignore and focused viewport projection.
+- [x] Add focused red tests for the selected focus-node viewport boundary before production changes.
+- [x] Keep actual node selection, DOM rect/element measurement, viewport mutation, minimap, zoom controls, panning, and graph interactions stable.
+- [x] Run focused focus-viewport/structure and Canvas regression tests, TypeScript checks, full frontend tests or justified targeted regression, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
+- [x] If total roadmap progress is below 100%, automatically open the next phase after Phase 57.
+- **Status:** completed
+
+### Phase 58: EditorCanvas Pinch Zoom Update Gate
+- [ ] Re-read the formal roadmap, Phase 57 findings, and current `updatePinchZoom` flow before changing code.
+- [ ] Inspect whether the next safest `EditorCanvas.vue` boundary is a pinch-zoom update action model around missing pinch/target cleanup, non-positive distance ignore, and zoom request projection.
+- [ ] Add focused red tests for the selected pinch-zoom update boundary before production changes.
+- [ ] Keep actual active pointer cache updates, DOM canvas rect lookup, viewport `zoomAt`, pinch cleanup execution, panning, connection pointer move, node drag/resize, and graph interactions stable.
+- [ ] Run focused pinch/structure and Canvas regression tests, TypeScript checks, full frontend tests or justified targeted regression, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
+- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 58.
 - **Status:** in progress
 
 ## Progress Estimate
@@ -674,6 +683,10 @@ Phase 57 in progress
 | P2 `EditorCanvas.vue` cleanup after Phase 56 | About 84% complete after extracting empty-size ignore and centered viewport projection while preserving actual viewport mutation and focus execution in the component. |
 | Current continuation gate after Phase 56 | Total roadmap progress is below 100%, so Phase 57 is automatically opened for the next safe P2 Canvas focus-node viewport boundary. |
 | P2 `EditorCanvas.vue` cleanup target for Phase 57 | About 85% if focus-node missing-target ignore and viewport projection move into `focusNodeViewport.ts` without changing selection or DOM measurement behavior. |
+| Overall roadmap cleanup after Phase 57 | About 84% complete after moving focus-node viewport action projection into `focusNodeViewport.ts`. |
+| P2 `EditorCanvas.vue` cleanup after Phase 57 | About 85% complete after extracting missing-target ignore and focused viewport projection while preserving actual node selection, DOM measurement, and viewport mutation in the component. |
+| Current continuation gate after Phase 57 | Total roadmap progress is below 100%, so Phase 58 is automatically opened for the next safe P2 Canvas pinch-zoom update boundary. |
+| P2 `EditorCanvas.vue` cleanup target for Phase 58 | About 86% if pinch-zoom update cleanup/ignore/zoom request projection moves into `canvasPinchZoomModel.ts` without changing active pointer tracking or actual viewport mutation. |
 
 ## Decisions Made
 | Decision | Rationale |
@@ -726,6 +739,7 @@ Phase 57 in progress
 - Phase 54 moves connection-completion execution routing into `canvasConnectionCompletionModel.ts`; `EditorCanvas.vue` keeps actual typed emit dispatch, connection cleanup, selected-edge cleanup, and graph mutation behavior.
 - Phase 55 moves zoom button scale/reset action projection into `canvasViewportInteractionModel.ts`; `EditorCanvas.vue` keeps actual center zoom execution, viewport reset mutation, wheel zoom execution, and viewport draft emits.
 - Phase 56 moves minimap center-view action projection into `minimapModel.ts`; `EditorCanvas.vue` keeps canvas size refresh, actual viewport mutation, canvas focus execution, and minimap event binding.
+- Phase 57 moves focus-node viewport action projection into `focusNodeViewport.ts`; `EditorCanvas.vue` keeps node lookup, DOM rect/element measurement, actual node selection, and viewport mutation.
 - Do not commit runtime artifacts such as `backend/data/settings`, `.dev_*`, `dist`, or `.worktrees`.
 - After code changes, restart using `npm run dev`.
 

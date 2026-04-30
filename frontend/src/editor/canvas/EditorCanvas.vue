@@ -512,7 +512,7 @@ import {
 import {
   CREATE_AGENT_INPUT_STATE_KEY,
 } from "@/lib/virtual-any-input";
-import { resolveFocusedViewport } from "@/editor/canvas/focusNodeViewport";
+import { resolveFocusedNodeViewportAction } from "@/editor/canvas/focusNodeViewport";
 import { resolveMinimapCenterViewAction } from "./minimapModel";
 import { useNodeSelectionFocus, type NodeFocusRequest } from "./useNodeSelectionFocus";
 import { useViewport } from "./useViewport";
@@ -1882,23 +1882,21 @@ function focusNode(nodeId: string) {
   const node = props.document.nodes[nodeId];
   const canvas = canvasRef.value;
   const element = nodeElementMap.get(nodeId);
-  if (!node || !canvas || !element) {
-    return;
+  const canvasRect = canvas?.getBoundingClientRect() ?? null;
+  const focusedNodeViewportAction = resolveFocusedNodeViewportAction({
+    currentScale: viewport.viewport.scale,
+    canvasSize: canvasRect ? { width: canvasRect.width, height: canvasRect.height } : null,
+    nodePosition: node?.ui.position ?? null,
+    nodeSize: element ? { width: element.offsetWidth, height: element.offsetHeight } : null,
+  });
+  switch (focusedNodeViewportAction.type) {
+    case "ignore-missing-target":
+      return;
+    case "set-viewport":
+      selection.selectNode(nodeId);
+      viewport.setViewport(focusedNodeViewportAction.viewport);
+      return;
   }
-
-  selection.selectNode(nodeId);
-  const canvasRect = canvas.getBoundingClientRect();
-  viewport.setViewport(
-    resolveFocusedViewport({
-      currentScale: viewport.viewport.scale,
-      canvasWidth: canvasRect.width,
-      canvasHeight: canvasRect.height,
-      nodeX: node.ui.position.x,
-      nodeY: node.ui.position.y,
-      nodeWidth: element.offsetWidth,
-      nodeHeight: element.offsetHeight,
-    }),
-  );
 }
 
 function completePendingConnection(targetAnchor: ProjectedCanvasAnchor) {
