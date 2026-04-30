@@ -14,6 +14,7 @@ from app.core.runtime.agent_prompt import (
     format_state_prompt_lines as _format_state_prompt_lines,
 )
 from app.core.runtime.agent_runtime_config import resolve_agent_runtime_config
+from app.core.runtime.agent_response_generation import generate_agent_response
 from app.core.runtime.condition_eval import (
     coerce_condition_text as _coerce_condition_text,
     evaluate_condition_rule as _evaluate_condition_rule,
@@ -295,69 +296,19 @@ def _generate_agent_response(
     state_schema: dict[str, NodeSystemStateDefinition] | None = None,
     on_delta: Any | None = None,
 ) -> tuple[dict[str, Any], str, list[str], dict[str, Any]]:
-    output_keys = [binding.state for binding in node.writes]
-    if not output_keys:
-        return {"summary": ""}, "", [], runtime_config
-
-    system_prompt = _build_effective_system_prompt(
-        output_keys,
+    return generate_agent_response(
+        node,
         input_values,
         skill_context,
+        runtime_config,
         state_schema=state_schema,
+        on_delta=on_delta,
+        build_effective_system_prompt_func=_build_effective_system_prompt,
+        chat_with_local_model_with_meta_func=_chat_with_local_model_with_meta,
+        chat_with_model_ref_with_meta_func=chat_with_model_ref_with_meta,
+        parse_llm_json_response_func=_parse_llm_json_response,
+        build_output_key_aliases_func=_build_output_key_aliases,
     )
-    user_prompt = (
-        node.config.task_instruction
-        if node.config.task_instruction
-        else "根据输入和技能结果完成输出。"
-    )
-
-    thinking_level = runtime_config.get("resolved_thinking_level")
-    if not isinstance(thinking_level, str):
-        thinking_level = "medium" if runtime_config.get("resolved_thinking") else "off"
-
-    if runtime_config.get("resolved_provider_id") == "local":
-        content, llm_meta = _chat_with_local_model_with_meta(
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            model=runtime_config["runtime_model_name"],
-            provider_id="local",
-            temperature=runtime_config["resolved_temperature"],
-            thinking_enabled=runtime_config["resolved_thinking"],
-            thinking_level=thinking_level,
-            on_delta=on_delta,
-        )
-    else:
-        content, llm_meta = chat_with_model_ref_with_meta(
-            model_ref=runtime_config["resolved_model_ref"],
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            temperature=runtime_config["resolved_temperature"],
-            thinking_enabled=runtime_config["resolved_thinking"],
-            thinking_level=thinking_level,
-            on_delta=on_delta,
-        )
-
-    parsed_fields = _parse_llm_json_response(
-        content,
-        output_keys,
-        output_key_aliases=_build_output_key_aliases(output_keys, state_schema or {}),
-    )
-    response_payload: dict[str, Any] = {"summary": content, **parsed_fields}
-    reasoning = str(llm_meta.get("reasoning") or "").strip()
-    updated_runtime_config = {
-        **runtime_config,
-        "provider_model": llm_meta.get("model", runtime_config["runtime_model_name"]),
-        "provider_id": llm_meta.get("provider_id", runtime_config["resolved_provider_id"]),
-        "provider_temperature": llm_meta.get("temperature", runtime_config["resolved_temperature"]),
-        "provider_reasoning_format": llm_meta.get("reasoning_format"),
-        "provider_thinking_enabled": bool(llm_meta.get("thinking_enabled")),
-        "provider_thinking_level": llm_meta.get("thinking_level", thinking_level),
-        "provider_reasoning_captured": bool(reasoning),
-        "provider_response_id": llm_meta.get("response_id"),
-        "provider_usage": llm_meta.get("usage"),
-        "provider_timings": llm_meta.get("timings"),
-    }
-    return response_payload, reasoning, llm_meta.get("warnings", []), updated_runtime_config
 
 
 def _resolve_agent_runtime_config(node: NodeSystemAgentNode) -> dict[str, Any]:
