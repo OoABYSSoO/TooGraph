@@ -1,5 +1,58 @@
 # Progress Log
 
+## Session: 2026-04-30 Phase 129
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Continued automatically after commit `39e39a4` because the full-roadmap progress is below 100%.
+  - Re-read the formal roadmap, Phase 128 findings, and remaining high-line-count files.
+  - Chose the `EditorWorkspaceShell.vue` run lifecycle slice because the shell still owned polling generations, timers, EventSource lifecycle, streaming preview application, Human Review await handling, terminal persistence, and retry feedback.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `useWorkspaceRunLifecycleController.test.ts` covering EventSource output preview updates, awaiting-human polling/Human Review opening, active-run follow-up polling, stale generation cancellation/teardown, and retry feedback on polling errors.
+  - Verified the expected red failure because `useWorkspaceRunLifecycleController.ts` did not exist yet.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `useWorkspaceRunLifecycleController.ts`.
+  - Updated `EditorWorkspaceShell.vue` to delegate run polling timers, polling generation checks, EventSource startup/teardown, live output preview writes, terminal run persistence, Human Review await routing, and polling retry feedback to the controller.
+  - Kept run invocation/resume orchestration in `useWorkspaceRunController.ts`, visual-state writes in `useWorkspaceRunVisualState.ts`, terminal state document mutation in `useWorkspaceDocumentState.ts`, and graph/node creation semantics unchanged.
+  - Updated structure tests to lock the run lifecycle controller boundary.
+  - Reduced `EditorWorkspaceShell.vue` from 1,365 to 1,263 lines.
+
+### Phase 4: Verification and Progress Gate
+- **Status:** completed
+- Actions taken:
+  - Ran focused run lifecycle, workspace-shell structure, run controller, and run-event-stream tests.
+  - Ran TypeScript unused-symbol verification.
+  - Ran the full frontend test suite and production build.
+  - Confirmed the production build still has no Vite large chunk warning.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend entry returned HTTP 200 and backend `/health` returned `{"status":"ok"}`.
+  - Confirmed the previous dev session exited after the restart.
+  - Recalculated the full roadmap at about 98.7%, frontend-focused progress at about 95-96%, and P3 `EditorWorkspaceShell.vue` progress at about 99%.
+  - Opened Phase 130 automatically because the full roadmap is still below 100%.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red controller test | `node --test src/editor/workspace/useWorkspaceRunLifecycleController.test.ts` before implementation | Fails because the run lifecycle controller module is missing | Failed with missing module import | Passed |
+| Focused frontend tests | `node --test src/editor/workspace/useWorkspaceRunLifecycleController.test.ts src/editor/workspace/EditorWorkspaceShell.structure.test.ts src/editor/workspace/useWorkspaceRunController.test.ts src/lib/run-event-stream.test.ts` | Focused run lifecycle and existing run stream semantics pass | 55 passed | Passed |
+| TypeScript check | `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` | No type or unused-symbol errors | Exit 0 after EventSource interface alignment | Passed |
+| Full frontend tests | `node --test $(rg --files src -g '*.test.ts' \| sort) vite.config.structure.test.ts` | Full frontend suite passes | 920 passed | Passed |
+| Production build | `npm run build` in `frontend` | Build succeeds with no large chunk warning | Exit 0; Vite build completed | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | Structure tests still expected old inline run preview writes and terminal persistence calls in `EditorWorkspaceShell.vue` | First focused structure run after shell integration | Updated the assertions to verify `useWorkspaceRunLifecycleController.ts` owns streaming preview writes and terminal persistence calls. |
+| 2026-04-30 | `vue-tsc` rejected the custom EventSource interface because `onerror` did not match the browser `EventSource` callback signature | First TypeScript verification | Changed the controller and test fake `onerror` type to accept the native `Event` parameter. |
+
 ## Session: 2026-04-30 Phase 128
 
 ### Phase 1: Re-orientation

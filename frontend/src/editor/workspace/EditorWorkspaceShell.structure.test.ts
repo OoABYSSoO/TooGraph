@@ -24,6 +24,7 @@ const graphPersistenceControllerSource = readWorkspaceSource("useWorkspaceGraphP
 const pythonImportControllerSource = readWorkspaceSource("useWorkspacePythonImportController.ts");
 const presetControllerSource = readWorkspaceSource("useWorkspacePresetController.ts");
 const nodeCreationControllerSource = readWorkspaceSource("useWorkspaceNodeCreationController.ts");
+const runLifecycleControllerSource = readWorkspaceSource("useWorkspaceRunLifecycleController.ts");
 
 test("EditorWorkspaceShell renders workspace panes without reka-ui tab primitives", () => {
   assert.doesNotMatch(componentSource, /from "reka-ui"/);
@@ -291,22 +292,22 @@ test("EditorWorkspaceShell opens the right sidebar in Human Review mode for awai
   assert.match(componentSource, /v-if="isStatePanelOpen\(tab\.tabId\) && documentsByTabId\[tab\.tabId\]"/);
   assert.match(componentSource, /<EditorHumanReviewPanel[\s\S]*v-if="shouldShowHumanReviewPanel\(tab\.tabId\)"/);
   assert.match(componentSource, /:run="latestRunDetailByTabId\[tab\.tabId\] \?\? null"/);
-  assert.match(componentSource, /if \(run\.status === "awaiting_human" && run\.current_node_id\) \{/);
-  assert.match(componentSource, /openHumanReviewPanelForTab\(tabId, run\.current_node_id\);/);
+  assert.match(runLifecycleControllerSource, /if \(run\.status === "awaiting_human" && run\.current_node_id\) \{/);
+  assert.match(runLifecycleControllerSource, /input\.openHumanReviewPanelForTab\(tabId, run\.current_node_id\);/);
   assert.match(componentSource, /if \(visualRun\.status === "awaiting_human" && visualRun\.current_node_id\) \{/);
   assert.match(componentSource, /openHumanReviewPanelForTab\(tab\.tabId, visualRun\.current_node_id\);/);
   assert.match(componentSource, /<EditorStatePanel[\s\S]*v-else[\s\S]*:run="latestRunDetailByTabId\[tab\.tabId\] \?\? null"/);
 });
 
 test("EditorWorkspaceShell delegates run event stream parsing and URL projection to the shared model", () => {
-  assert.match(componentSource, /import \{[\s\S]*buildRunEventOutputPreviewUpdate,[\s\S]*buildRunEventStreamUrl,[\s\S]*parseRunEventPayload,[\s\S]*shouldPollRunStatus[\s\S]*\} from "@\/lib\/run-event-stream";/);
-  assert.match(componentSource, /const streamUrl = buildRunEventStreamUrl\(runId\);/);
-  assert.match(componentSource, /new EventSource\(streamUrl\)/);
+  assert.match(runLifecycleControllerSource, /import \{[\s\S]*buildRunEventOutputPreviewUpdate,[\s\S]*buildRunEventStreamUrl,[\s\S]*parseRunEventPayload,[\s\S]*shouldPollRunStatus[\s\S]*\} from "\.\.\/\.\.\/lib\/run-event-stream\.ts";/);
+  assert.match(runLifecycleControllerSource, /const streamUrl = buildRunEventStreamUrl\(runId\);/);
+  assert.match(runLifecycleControllerSource, /return new EventSource\(url\);/);
   assert.doesNotMatch(componentSource, /function parseRunEventPayload\(event: Event\)/);
-  assert.doesNotMatch(componentSource, /parseRunEventPayloadData\(event\.data\)/);
-  assert.match(componentSource, /const nextPreview = buildRunEventOutputPreviewUpdate\(documentsByTabId\.value\[tabId\], currentPreview, payload\);/);
-  assert.match(componentSource, /preserveMissing: shouldPollRunStatus\(run\.status\)/);
-  assert.match(componentSource, /if \(shouldPollRunStatus\(run\.status\)\) \{/);
+  assert.doesNotMatch(runLifecycleControllerSource, /parseRunEventPayloadData\(event\.data\)/);
+  assert.match(runLifecycleControllerSource, /const nextPreview = buildRunEventOutputPreviewUpdate\(input\.documentsByTabId\.value\[tabId\], currentPreview, payload\);/);
+  assert.match(runLifecycleControllerSource, /preserveMissing: shouldPollRunStatus\(run\.status\)/);
+  assert.match(runLifecycleControllerSource, /if \(shouldPollRunStatus\(run\.status\)\) \{/);
   assert.doesNotMatch(componentSource, /function isActiveRunStatus\(status: string \| null \| undefined\)/);
   assert.doesNotMatch(componentSource, /function resolveStreamingOutputNodeIds/);
   assert.doesNotMatch(componentSource, /resolveRunEventText\(payload\)/);
@@ -383,12 +384,14 @@ test("EditorWorkspaceShell removes the persistent bottom-left status feedback ov
 });
 
 test("EditorWorkspaceShell subscribes to run events for live output previews", () => {
-  assert.match(componentSource, /const runEventSourceByTabId = new Map<string, EventSource>\(\);/);
-  assert.match(componentSource, /function startRunEventStreamForTab\(tabId: string, runId: string\)/);
-  assert.match(componentSource, /new EventSource\(streamUrl\)/);
-  assert.match(componentSource, /addEventListener\("node\.output\.delta"/);
-  assert.match(componentSource, /function applyStreamingOutputPreviewToTab/);
-  assert.match(componentSource, /buildRunEventOutputPreviewUpdate/);
+  assert.match(componentSource, /import \{ useWorkspaceRunLifecycleController \} from "\.\/useWorkspaceRunLifecycleController\.ts";/);
+  assert.match(componentSource, /useWorkspaceRunLifecycleController\(\{[\s\S]*documentsByTabId,[\s\S]*runOutputPreviewByTabId,[\s\S]*restoredRunSnapshotIdByTabId,[\s\S]*fetchRun,[\s\S]*applyRunVisualStateToTab,[\s\S]*openHumanReviewPanelForTab,[\s\S]*persistRunStateValuesForTab,[\s\S]*setMessageFeedbackForTab,[\s\S]*\}\);/);
+  assert.match(runLifecycleControllerSource, /const runEventSourceByTabId = new Map<string, RunEventSourceLike>\(\);/);
+  assert.match(runLifecycleControllerSource, /function startRunEventStreamForTab\(tabId: string, runId: string\)/);
+  assert.match(runLifecycleControllerSource, /return new EventSource\(url\);/);
+  assert.match(runLifecycleControllerSource, /addEventListener\("node\.output\.delta"/);
+  assert.match(runLifecycleControllerSource, /function applyStreamingOutputPreviewToTab/);
+  assert.match(runLifecycleControllerSource, /buildRunEventOutputPreviewUpdate/);
   assert.match(componentSource, /useWorkspaceRunController\(\{[\s\S]*startRunEventStreamForTab,[\s\S]*\}\);/);
   assert.match(runControllerSource, /input\.startRunEventStreamForTab\(tabId, runId\);/);
 });
@@ -466,7 +469,7 @@ test("EditorWorkspaceShell delegates tab runtime record cleanup to the runtime m
 test("EditorWorkspaceShell delegates tab runtime feedback and preview writes to the runtime model", () => {
   const setFeedbackSource = runVisualStateSource;
   const applyPreviewSource =
-    componentSource.match(/function applyStreamingOutputPreviewToTab\([\s\S]*?\n\}\n\nfunction startRunEventStreamForTab/)?.[0] ?? "";
+    runLifecycleControllerSource.match(/function applyStreamingOutputPreviewToTab\([\s\S]*?\n  \}/)?.[0] ?? "";
 
   assert.match(
     componentSource,
@@ -474,18 +477,18 @@ test("EditorWorkspaceShell delegates tab runtime feedback and preview writes to 
   );
   assert.match(componentSource, /import \{ useWorkspaceRunVisualState, type WorkspaceRunFeedback \} from "\.\/useWorkspaceRunVisualState\.ts";/);
   assert.match(setFeedbackSource, /input\.feedbackByTabId\.value = setTabScopedRecordEntry\(input\.feedbackByTabId\.value, tabId, feedback\);/);
-  assert.match(applyPreviewSource, /runOutputPreviewByTabId\.value = setTabScopedRecordEntry\(runOutputPreviewByTabId\.value, tabId, nextPreview\);/);
+  assert.match(applyPreviewSource, /input\.runOutputPreviewByTabId\.value = setTabScopedRecordEntry\(input\.runOutputPreviewByTabId\.value, tabId, nextPreview\);/);
   assert.match(
     runVisualStateSource,
     /input\.runOutputPreviewByTabId\.value = setTabScopedRecordEntry\(\s*input\.runOutputPreviewByTabId\.value,\s*tabId,\s*mergeRunOutputPreviewByNodeId/,
   );
   assert.doesNotMatch(setFeedbackSource, /input\.feedbackByTabId\.value = \{/);
-  assert.doesNotMatch(applyPreviewSource, /runOutputPreviewByTabId\.value = \{/);
+  assert.doesNotMatch(applyPreviewSource, /input\.runOutputPreviewByTabId\.value = \{/);
 });
 
 test("EditorWorkspaceShell delegates run visual tab-state writes to the runtime model", () => {
   const applyRunVisualSource = runVisualStateSource;
-  const pollRunSource = componentSource.match(/async function pollRunForTab\([\s\S]*?\n\}\n\nfunction ensureUnsavedTabDocuments/)?.[0] ?? "";
+  const pollRunSource = runLifecycleControllerSource;
 
   assert.match(
     applyRunVisualSource,
@@ -509,11 +512,11 @@ test("EditorWorkspaceShell delegates run visual tab-state writes to the runtime 
   );
   assert.match(
     pollRunSource,
-    /applyRunVisualStateToTab\(tabId, run, documentsByTabId\.value\[tabId\], run, \{ preserveMissing: shouldPollRunStatus\(run\.status\) \}\);/,
+    /input\.applyRunVisualStateToTab\(tabId, run, input\.documentsByTabId\.value\[tabId\], run, \{ preserveMissing: shouldPollRunStatus\(run\.status\) \}\);/,
   );
   assert.match(
     pollRunSource,
-    /restoredRunSnapshotIdByTabId\.value = setTabScopedRecordEntry\(restoredRunSnapshotIdByTabId\.value, tabId, null\);/,
+    /input\.restoredRunSnapshotIdByTabId\.value = setTabScopedRecordEntry\(input\.restoredRunSnapshotIdByTabId\.value, tabId, null\);/,
   );
   assert.doesNotMatch(componentSource, /function applyRunVisualStateToTab\(/);
   assert.doesNotMatch(pollRunSource, /\[tabId\]: run,/);
@@ -684,7 +687,8 @@ test("EditorWorkspaceShell persists terminal run state values into the graph dra
   assert.match(documentStateSource, /function persistRunStateValuesForTab\(tabId: string, run: RunDetail\)/);
   assert.match(documentStateSource, /const nextDocument = applyRunWrittenStateValuesToDocument\(document, run\);/);
   assert.match(documentStateSource, /if \(nextDocument !== document\) \{[\s\S]*setDocumentForTab\(tabId, nextDocument\);[\s\S]*\}/);
-  assert.match(componentSource, /persistRunStateValuesForTab\(tabId, run\);/);
+  assert.match(componentSource, /persistRunStateValuesForTab,/);
+  assert.match(runLifecycleControllerSource, /input\.persistRunStateValuesForTab\(tabId, run\);/);
 });
 
 test("EditorWorkspaceShell delegates graph persistence actions to a workspace controller", () => {

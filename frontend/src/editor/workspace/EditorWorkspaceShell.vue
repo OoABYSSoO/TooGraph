@@ -231,12 +231,6 @@ import {
   type PersistedEditorWorkspace,
 } from "@/lib/editor-workspace";
 import type { CanvasViewport } from "@/editor/canvas/canvasViewport";
-import {
-  buildRunEventOutputPreviewUpdate,
-  buildRunEventStreamUrl,
-  parseRunEventPayload,
-  shouldPollRunStatus,
-} from "@/lib/run-event-stream";
 import { buildRestoredGraphFromRun, buildSnapshotScopedRun, canRestoreRunDetail, resolveRestoredRunTabTitle } from "@/lib/run-restore";
 import { useGraphDocumentStore } from "@/stores/graphDocument";
 import type { KnowledgeBaseRecord } from "@/types/knowledge";
@@ -277,6 +271,7 @@ import { useWorkspaceNodeCreationController } from "./useWorkspaceNodeCreationCo
 import { useWorkspacePresetController } from "./useWorkspacePresetController.ts";
 import { useWorkspacePythonImportController } from "./useWorkspacePythonImportController.ts";
 import { useWorkspaceRouteController } from "./useWorkspaceRouteController.ts";
+import { useWorkspaceRunLifecycleController } from "./useWorkspaceRunLifecycleController.ts";
 import { useWorkspaceRunController } from "./useWorkspaceRunController.ts";
 import { useWorkspaceRunVisualState, type WorkspaceRunFeedback } from "./useWorkspaceRunVisualState.ts";
 import { useWorkspaceSidePanelController } from "./useWorkspaceSidePanelController.ts";
@@ -337,9 +332,6 @@ const skillDefinitionsLoading = ref(true);
 const skillDefinitionsError = ref<string | null>(null);
 const persistedPresets = ref<PresetDocument[]>([]);
 const nodeCreationMenuByTabId = ref<Record<string, NodeCreationMenuState>>({});
-const runPollGenerationByTabId = new Map<string, number>();
-const runPollTimerByTabId = new Map<string, number>();
-const runEventSourceByTabId = new Map<string, EventSource>();
 
 const templateById = computed(() => new Map(props.templates.map((template) => [template.template_id, template])));
 const graphById = computed(() => new Map(props.graphs.map((graph) => [graph.graph_id, graph])));
@@ -415,6 +407,23 @@ const {
   updateWorkspace,
   setMessageFeedbackForTab,
   guardGraphEditForTab,
+});
+const {
+  cancelRunEventStreamForTab,
+  cancelRunPolling,
+  getRunGeneration,
+  pollRunForTab,
+  startRunEventStreamForTab,
+  teardownRunLifecycle,
+} = useWorkspaceRunLifecycleController({
+  documentsByTabId,
+  runOutputPreviewByTabId,
+  restoredRunSnapshotIdByTabId,
+  fetchRun,
+  applyRunVisualStateToTab,
+  openHumanReviewPanelForTab,
+  persistRunStateValuesForTab,
+  setMessageFeedbackForTab,
 });
 const activeTabRouteSignature = computed(() => {
   const tab = activeTab.value;
@@ -586,119 +595,13 @@ const { runActiveGraph, resumeHumanReviewRun } = useWorkspaceRunController({
   runGraph,
   resumeRun,
   cancelRunPolling,
-  getRunGeneration: (tabId) => runPollGenerationByTabId.get(tabId) ?? 0,
+  getRunGeneration,
   startRunEventStreamForTab,
   pollRunForTab,
   setFeedbackForTab,
   setMessageFeedbackForTab,
   translate: (key, params) => t(key, params ?? {}),
 });
-
-function cancelRunPolling(tabId: string) {
-  runPollGenerationByTabId.set(tabId, (runPollGenerationByTabId.get(tabId) ?? 0) + 1);
-  const timerId = runPollTimerByTabId.get(tabId);
-  if (typeof timerId === "number") {
-    window.clearTimeout(timerId);
-    runPollTimerByTabId.delete(tabId);
-  }
-}
-
-function cancelRunEventStreamForTab(tabId: string) {
-  runEventSourceByTabId.get(tabId)?.close();
-  runEventSourceByTabId.delete(tabId);
-}
-
-function applyStreamingOutputPreviewToTab(tabId: string, payload: Record<string, unknown>) {
-  const currentPreview = runOutputPreviewByTabId.value[tabId] ?? {};
-  const nextPreview = buildRunEventOutputPreviewUpdate(documentsByTabId.value[tabId], currentPreview, payload);
-  if (!nextPreview) {
-    return;
-  }
-  runOutputPreviewByTabId.value = setTabScopedRecordEntry(runOutputPreviewByTabId.value, tabId, nextPreview);
-}
-
-function startRunEventStreamForTab(tabId: string, runId: string) {
-  cancelRunEventStreamForTab(tabId);
-  const streamUrl = buildRunEventStreamUrl(runId);
-  if (!streamUrl || typeof EventSource === "undefined") {
-    return;
-  }
-  const source = new EventSource(streamUrl);
-  runEventSourceByTabId.set(tabId, source);
-  source.addEventListener("node.output.delta", (event) => {
-    const payload = parseRunEventPayload(event);
-    if (payload) {
-      applyStreamingOutputPreviewToTab(tabId, payload);
-    }
-  });
-  source.addEventListener("node.output.completed", (event) => {
-    const payload = parseRunEventPayload(event);
-    if (payload) {
-      applyStreamingOutputPreviewToTab(tabId, payload);
-    }
-  });
-  source.addEventListener("run.completed", () => {
-    cancelRunEventStreamForTab(tabId);
-    void pollRunForTab(tabId, runId);
-  });
-  source.addEventListener("run.failed", () => {
-    cancelRunEventStreamForTab(tabId);
-    void pollRunForTab(tabId, runId);
-  });
-  source.onerror = () => {
-    if (runEventSourceByTabId.get(tabId) === source) {
-      cancelRunEventStreamForTab(tabId);
-    }
-  };
-}
-
-function scheduleRunPoll(tabId: string, runId: string, delayMs: number, generation: number) {
-  const timerId = window.setTimeout(() => {
-    void pollRunForTab(tabId, runId, generation);
-  }, delayMs);
-  runPollTimerByTabId.set(tabId, timerId);
-}
-
-async function pollRunForTab(tabId: string, runId: string, generation = runPollGenerationByTabId.get(tabId) ?? 0) {
-  if ((runPollGenerationByTabId.get(tabId) ?? 0) !== generation) {
-    return;
-  }
-
-  try {
-    const run = await fetchRun(runId);
-    if ((runPollGenerationByTabId.get(tabId) ?? 0) !== generation) {
-      return;
-    }
-
-    applyRunVisualStateToTab(tabId, run, documentsByTabId.value[tabId], run, { preserveMissing: shouldPollRunStatus(run.status) });
-    restoredRunSnapshotIdByTabId.value = setTabScopedRecordEntry(restoredRunSnapshotIdByTabId.value, tabId, null);
-
-    if (run.status === "awaiting_human" && run.current_node_id) {
-      openHumanReviewPanelForTab(tabId, run.current_node_id);
-    }
-
-    if (shouldPollRunStatus(run.status)) {
-      scheduleRunPoll(tabId, runId, 500, generation);
-      return;
-    }
-
-    persistRunStateValuesForTab(tabId, run);
-    runPollTimerByTabId.delete(tabId);
-    cancelRunEventStreamForTab(tabId);
-  } catch (error) {
-    if ((runPollGenerationByTabId.get(tabId) ?? 0) !== generation) {
-      return;
-    }
-
-    setMessageFeedbackForTab(tabId, {
-      tone: "warning",
-      message: error instanceof Error ? error.message : "Failed to load run detail.",
-      activeRunId: runId,
-      activeRunStatus: "running",
-    });
-    scheduleRunPoll(tabId, runId, 1000, generation);
-  }
-}
 
 function updateWorkspace(nextWorkspace: PersistedEditorWorkspace) {
   workspace.value = nextWorkspace;
@@ -1071,12 +974,7 @@ watch(
 );
 
 onBeforeUnmount(() => {
-  for (const tabId of Array.from(runEventSourceByTabId.keys())) {
-    cancelRunEventStreamForTab(tabId);
-  }
-  for (const tabId of Array.from(runPollTimerByTabId.keys())) {
-    cancelRunPolling(tabId);
-  }
+  teardownRunLifecycle();
 });
 
 onMounted(() => {
