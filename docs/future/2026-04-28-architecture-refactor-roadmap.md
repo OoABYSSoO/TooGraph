@@ -170,6 +170,7 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 - 2026-04-30：`canvasPinchZoomModel.ts` 已继续承担 touch pointer-move 的 tracked-pointer update、pinch preventDefault、scheduled update 和 stop routing，`EditorCanvas.vue` 仍保留 active pointer cache mutation、event side effects、schedule execution、connection pointer move、node drag/resize 和 panning。
 - 2026-04-30：`canvasViewportInteractionModel.ts` 已继续承担 pan pointer-move 的 schedule/no-op routing，`EditorCanvas.vue` 仍保留 actual `scheduleDragFrame` 和 `viewport.movePan(event)` execution。
 - 2026-04-30：`canvasViewportInteractionModel.ts` 已继续承担 canvas world point projection 的 missing-canvas fallback 与 viewport-relative coordinate math，`EditorCanvas.vue` 仍保留 DOM rect lookup、pending connection fallback input 和 connection/menu/drop consumer wiring。
+- 2026-04-30：`canvasViewportInteractionModel.ts` 已继续承担 canvas size update 的 missing-element、unchanged-size 和 update-size routing，`EditorCanvas.vue` 仍保留 DOM client size reads、`ResizeObserver` lifecycle、minimap consumers 和 actual `canvasSize` ref mutation。
 
 ## 优先级路线
 

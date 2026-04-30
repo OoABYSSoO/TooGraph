@@ -14,6 +14,11 @@ type CanvasWorldPoint = {
   y: number;
 };
 
+type CanvasSizeSnapshot = {
+  width: number;
+  height: number;
+};
+
 const CANVAS_ZOOM_BUTTON_SCALE_STEP = 0.1;
 
 export type CanvasWheelZoomRequest =
@@ -37,6 +42,11 @@ export type CanvasZoomButtonAction =
 export type CanvasPanPointerMoveAction =
   | { type: "continue-pointer-move" }
   | { type: "schedule-pan-move" };
+
+export type CanvasSizeUpdateAction =
+  | { type: "ignore-missing-element" }
+  | { type: "ignore-unchanged-size" }
+  | { type: "update-size"; size: CanvasSizeSnapshot };
 
 export function resolveWheelZoomDelta(deltaY: number) {
   if (deltaY === 0) {
@@ -102,6 +112,21 @@ export function resolveCanvasPanPointerMoveAction(input: { isPanning: boolean })
   }
 
   return { type: "continue-pointer-move" };
+}
+
+export function resolveCanvasSizeUpdateAction(input: {
+  currentSize: CanvasSizeSnapshot;
+  nextSize: CanvasSizeSnapshot | null;
+}): CanvasSizeUpdateAction {
+  if (!input.nextSize) {
+    return { type: "ignore-missing-element" };
+  }
+
+  if (input.currentSize.width === input.nextSize.width && input.currentSize.height === input.nextSize.height) {
+    return { type: "ignore-unchanged-size" };
+  }
+
+  return { type: "update-size", size: input.nextSize };
 }
 
 export function resolveCanvasWorldPoint(input: {

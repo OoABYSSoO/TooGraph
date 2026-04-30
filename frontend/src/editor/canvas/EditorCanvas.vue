@@ -480,6 +480,7 @@ import type { CanvasPointerDownAction } from "./canvasPinchZoomModel";
 import { buildCanvasViewportStyle, buildZoomPercentLabel } from "./canvasViewportDisplayModel";
 import {
   resolveCanvasPanPointerMoveAction,
+  resolveCanvasSizeUpdateAction,
   resolveCanvasWheelZoomRequest,
   resolveCanvasWorldPoint,
   resolveCanvasZoomButtonAction,
@@ -991,16 +992,23 @@ onBeforeUnmount(() => {
 
 function updateCanvasSize() {
   const element = canvasRef.value;
-  if (!element) {
-    return;
-  }
+  const canvasSizeUpdateAction = resolveCanvasSizeUpdateAction({
+    currentSize: canvasSize.value,
+    nextSize: element
+      ? {
+          width: element.clientWidth,
+          height: element.clientHeight,
+        }
+      : null,
+  });
 
-  const nextSize = {
-    width: element.clientWidth,
-    height: element.clientHeight,
-  };
-  if (canvasSize.value.width !== nextSize.width || canvasSize.value.height !== nextSize.height) {
-    canvasSize.value = nextSize;
+  switch (canvasSizeUpdateAction.type) {
+    case "ignore-missing-element":
+    case "ignore-unchanged-size":
+      return;
+    case "update-size":
+      canvasSize.value = canvasSizeUpdateAction.size;
+      return;
   }
 }
 

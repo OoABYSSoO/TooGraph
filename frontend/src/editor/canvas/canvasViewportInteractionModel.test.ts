@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   resolveCanvasPanPointerMoveAction,
+  resolveCanvasSizeUpdateAction,
   resolveCanvasWheelZoomRequest,
   resolveCanvasWorldPoint,
   resolveCanvasZoomButtonAction,
@@ -88,6 +89,30 @@ test("canvas viewport interaction model resolves pan pointer-move actions", () =
   assert.deepEqual(resolveCanvasPanPointerMoveAction({ isPanning: true }), {
     type: "schedule-pan-move",
   });
+});
+
+test("canvas viewport interaction model resolves canvas size update actions", () => {
+  assert.deepEqual(
+    resolveCanvasSizeUpdateAction({
+      currentSize: { width: 100, height: 80 },
+      nextSize: null,
+    }),
+    { type: "ignore-missing-element" },
+  );
+  assert.deepEqual(
+    resolveCanvasSizeUpdateAction({
+      currentSize: { width: 100, height: 80 },
+      nextSize: { width: 100, height: 80 },
+    }),
+    { type: "ignore-unchanged-size" },
+  );
+  assert.deepEqual(
+    resolveCanvasSizeUpdateAction({
+      currentSize: { width: 100, height: 80 },
+      nextSize: { width: 120, height: 90 },
+    }),
+    { type: "update-size", size: { width: 120, height: 90 } },
+  );
 });
 
 test("canvas viewport interaction model resolves canvas world points", () => {
