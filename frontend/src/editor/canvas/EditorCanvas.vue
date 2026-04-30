@@ -392,7 +392,7 @@ import { useI18n } from "vue-i18n";
 import EditorMinimap from "./EditorMinimap.vue";
 import NodeCard from "@/editor/nodes/NodeCard.vue";
 import StateEditorPopover from "@/editor/nodes/StateEditorPopover.vue";
-import { type ProjectedCanvasAnchor, type ProjectedCanvasEdge } from "@/editor/canvas/edgeProjection";
+import { groupProjectedCanvasAnchors, type ProjectedCanvasAnchor, type ProjectedCanvasEdge } from "@/editor/canvas/edgeProjection";
 import { resolveEdgeRunPresentation } from "@/editor/canvas/runEdgePresentation";
 import { resolveCanvasLayout } from "@/editor/canvas/resolvedCanvasLayout";
 import { resolveCanvasSurfaceStyle } from "@/editor/canvas/canvasSurfaceStyle";
@@ -849,13 +849,10 @@ const transientAgentOutputAnchors = computed<ProjectedCanvasAnchor[]>(() =>
   }),
 );
 const projectedAnchors = computed(() => [...baseProjectedAnchorsWithoutVirtualCreatePorts.value, ...transientAgentCreateInputAnchors.value, ...transientAgentInputAnchors.value, ...transientAgentOutputAnchors.value]);
-const flowAnchors = computed(() =>
-  projectedAnchors.value.filter((anchor) => anchor.kind === "flow-in" || anchor.kind === "flow-out"),
-);
-const routeHandles = computed(() => projectedAnchors.value.filter((anchor) => anchor.kind === "route-out"));
-const pointAnchors = computed(() =>
-  projectedAnchors.value.filter((anchor) => anchor.kind === "state-in" || anchor.kind === "state-out"),
-);
+const projectedAnchorGroups = computed(() => groupProjectedCanvasAnchors(projectedAnchors.value));
+const flowAnchors = computed(() => projectedAnchorGroups.value.flowAnchors);
+const routeHandles = computed(() => projectedAnchorGroups.value.routeHandles);
+const pointAnchors = computed(() => projectedAnchorGroups.value.pointAnchors);
 const selectedReconnectConnection = computed<PendingGraphConnection | null>(() =>
   resolveSelectedReconnectConnection({
     selectedEdgeId: selectedEdgeId.value,

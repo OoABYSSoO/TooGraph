@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { buildSequenceFlowPath } from "./flowEdgePath.ts";
-import { projectCanvasAnchors, projectCanvasEdges } from "./edgeProjection.ts";
+import { groupProjectedCanvasAnchors, projectCanvasAnchors, projectCanvasEdges } from "./edgeProjection.ts";
 import type { GraphPayload } from "../../types/node-system.ts";
 
 const graph: GraphPayload = {
@@ -121,6 +121,22 @@ test("projectCanvasAnchors returns flow and state dots for visible nodes", () =>
   assert.ok(anchors.some((anchor) => anchor.kind === "flow-in" && anchor.nodeId === "answer_helper"));
   assert.ok(anchors.some((anchor) => anchor.kind === "state-out" && anchor.stateKey === "question" && anchor.color === "#d97706"));
   assert.ok(anchors.some((anchor) => anchor.kind === "state-in" && anchor.stateKey === "question" && anchor.color === "#d97706"));
+});
+
+test("groupProjectedCanvasAnchors separates flow, route, and point anchors", () => {
+  const anchors = [
+    { id: "flow-in:agent", nodeId: "agent", kind: "flow-in", x: 1, y: 1, side: "left" },
+    { id: "flow-out:agent", nodeId: "agent", kind: "flow-out", x: 2, y: 2, side: "right" },
+    { id: "route-out:condition:true", nodeId: "condition", kind: "route-out", x: 3, y: 3, side: "right" },
+    { id: "state-in:agent:question", nodeId: "agent", kind: "state-in", x: 4, y: 4, side: "left" },
+    { id: "state-out:agent:answer", nodeId: "agent", kind: "state-out", x: 5, y: 5, side: "right" },
+  ] satisfies ReturnType<typeof projectCanvasAnchors>;
+
+  const groups = groupProjectedCanvasAnchors(anchors);
+
+  assert.deepEqual(groups.flowAnchors.map((anchor) => anchor.id), ["flow-in:agent", "flow-out:agent"]);
+  assert.deepEqual(groups.routeHandles.map((anchor) => anchor.id), ["route-out:condition:true"]);
+  assert.deepEqual(groups.pointAnchors.map((anchor) => anchor.id), ["state-in:agent:question", "state-out:agent:answer"]);
 });
 
 test("projectCanvasEdges colors data links from the state schema", () => {

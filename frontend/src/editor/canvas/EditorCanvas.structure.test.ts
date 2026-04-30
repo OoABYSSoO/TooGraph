@@ -345,6 +345,8 @@ test("EditorCanvas styles typed anchors and edges from projected state colors", 
 
 test("EditorCanvas renders anchors in a dedicated overlay layer above nodes", () => {
   assert.match(componentSource, /<svg class="editor-canvas__anchors"[\s\S]*<circle[\s\S]*v-for="anchor in pointAnchors"/);
+  assert.match(componentSource, /const pointAnchors = computed\(\(\) => projectedAnchorGroups\.value\.pointAnchors\);/);
+  assert.doesNotMatch(componentSource, /const pointAnchors = computed\(\(\) =>\s*projectedAnchors\.value\.filter\(\(anchor\) => anchor\.kind === "state-in" \|\| anchor\.kind === "state-out"\),\s*\);/);
 });
 
 test("EditorCanvas styles runtime feedback with one halo layer and a static node outline", () => {
@@ -584,7 +586,10 @@ test("EditorCanvas renders condition route outputs as right-side floating branch
   const canvasInteractionStyleModelSource = readCanvasInteractionStyleModelSource();
   const conditionRouteTargetsModelSource = readConditionRouteTargetsModelSource();
 
-  assert.match(componentSource, /const routeHandles = computed\(\(\) => projectedAnchors\.value\.filter\(\(anchor\) => anchor\.kind === "route-out"\)\);/);
+  assert.match(componentSource, /import \{[\s\S]*groupProjectedCanvasAnchors,[\s\S]*type ProjectedCanvasAnchor,[\s\S]*type ProjectedCanvasEdge[\s\S]*\} from "@\/editor\/canvas\/edgeProjection";/);
+  assert.match(componentSource, /const projectedAnchorGroups = computed\(\(\) => groupProjectedCanvasAnchors\(projectedAnchors\.value\)\);/);
+  assert.match(componentSource, /const routeHandles = computed\(\(\) => projectedAnchorGroups\.value\.routeHandles\);/);
+  assert.doesNotMatch(componentSource, /const routeHandles = computed\(\(\) => projectedAnchors\.value\.filter\(\(anchor\) => anchor\.kind === "route-out"\)\);/);
   assert.match(componentSource, /import \{[\s\S]*buildConditionRouteTargetsByNodeId[\s\S]*\} from "\.\/conditionRouteTargetsModel";/);
   assert.match(componentSource, /const conditionRouteTargetsByNodeId = computed\(\(\) => buildConditionRouteTargetsByNodeId\(props\.document\)\);/);
   assert.match(conditionRouteTargetsModelSource, /export function buildConditionRouteTargets/);
@@ -660,6 +665,8 @@ test("EditorCanvas renders output flow hotspots only for allowed modes and inter
   const edgeVisibilityModelSource = readEdgeVisibilityModelSource();
 
   assert.match(componentSource, /v-for="anchor in flowAnchors"/);
+  assert.match(componentSource, /const flowAnchors = computed\(\(\) => projectedAnchorGroups\.value\.flowAnchors\);/);
+  assert.doesNotMatch(componentSource, /const flowAnchors = computed\(\(\) =>\s*projectedAnchors\.value\.filter\(\(anchor\) => anchor\.kind === "flow-in" \|\| anchor\.kind === "flow-out"\),\s*\);/);
   assert.match(componentSource, /class="editor-canvas__flow-hotspot"/);
   assert.match(componentSource, /:style="\[flowHotspotStyle\(anchor\), flowHotspotConnectStyle\(anchor\)\]"/);
   assert.match(componentSource, /@pointerenter="setHoveredNode\(nodeId\)"/);
