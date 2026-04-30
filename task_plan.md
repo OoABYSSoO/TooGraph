@@ -4,7 +4,7 @@
 Run a ten-round conservative cleanup batch focused on `EditorCanvas.vue` pure projection and interaction-model helpers, then close the baseline interaction regressions in one larger pass while preserving graph editing behavior, runtime visuals, drag/connect workflows, deletion behavior, and dev startup health.
 
 ## Current Phase
-Phase 70 in progress
+Phase 71 in progress
 
 ## Autonomous Continuation Gate
 - After every completed cleanup phase, re-read `docs/future/2026-04-28-architecture-refactor-roadmap.md`, `task_plan.md`, `findings.md`, and `progress.md`, then recalculate the total roadmap progress and the active area progress.
@@ -648,12 +648,21 @@ Phase 70 in progress
 - **Status:** completed
 
 ### Phase 70: EditorCanvas Projected Edge Layer Grouping
-- [ ] Re-read the formal roadmap, Phase 69 findings, and current projected-edge SVG layer grouping before changing code.
-- [ ] Inspect whether the next safest `EditorCanvas.vue` boundary is flow/route/data edge grouping from `projectedEdges`.
-- [ ] Add focused red tests for projected edge layer grouping before production changes.
-- [ ] Keep SVG layer ordering, delete highlights, selected-edge hitareas, edge classes, and pointer handlers stable.
-- [ ] Run focused edge projection/structure and Canvas regression tests, TypeScript checks, full frontend tests or justified targeted regression, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
-- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 70.
+- [x] Re-read the formal roadmap, Phase 69 findings, and current projected-edge SVG layer grouping before changing code.
+- [x] Inspect whether the next safest `EditorCanvas.vue` boundary is flow/route/data edge grouping from `projectedEdges`.
+- [x] Add focused red tests for projected edge layer grouping before production changes.
+- [x] Keep SVG layer ordering, delete highlights, selected-edge hitareas, edge classes, and pointer handlers stable.
+- [x] Run focused edge projection/structure and Canvas regression tests, TypeScript checks, full frontend tests, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
+- [x] If total roadmap progress is below 100%, automatically open the next phase after Phase 70.
+- **Status:** completed
+
+### Phase 71: EditorCanvas Projected Edge Class Projection
+- [ ] Re-read the formal roadmap, Phase 70 findings, and remaining edge-kind class bindings in `EditorCanvas.vue`.
+- [ ] Inspect whether the next safest `EditorCanvas.vue` boundary is projected edge class and hitarea class projection.
+- [ ] Add focused red tests for projected edge class projection before production changes.
+- [ ] Keep selected-edge state, active-run edge state, connection preview classes, hitarea classes, SVG ordering, and pointer handlers stable.
+- [ ] Run focused interaction-style/structure and Canvas regression tests, TypeScript checks, full frontend tests or justified targeted regression, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
+- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 71.
 - **Status:** in progress
 
 ## Progress Estimate
@@ -843,6 +852,10 @@ Phase 70 in progress
 | P2 `EditorCanvas.vue` cleanup after Phase 69 | About 97% complete after extracting flow/route/point anchor grouping while preserving transient anchors, eligibility, and overlay rendering. |
 | Current continuation gate after Phase 69 | Total roadmap progress is below 100%, so Phase 70 is automatically opened for the next safe P2 Canvas projected-edge layer grouping boundary. |
 | P2 `EditorCanvas.vue` cleanup target for Phase 70 | About 98% if flow/route/data projected-edge grouping moves into `edgeProjection.ts` without changing SVG layer ordering, edge hitareas, or selected-edge behavior. |
+| Overall roadmap cleanup after Phase 70 | About 97% complete after moving projected edge layer grouping into `edgeProjection.ts`. |
+| P2 `EditorCanvas.vue` cleanup after Phase 70 | About 98% complete after extracting flow/route and data edge grouping while preserving SVG layer ordering and hitareas. |
+| Current continuation gate after Phase 70 | Total roadmap progress is below 100%, so Phase 71 is automatically opened for the next safe P2 Canvas projected-edge class projection boundary. |
+| P2 `EditorCanvas.vue` cleanup target for Phase 71 | About 99% if projected edge class and hitarea class mapping moves into `canvasInteractionStyleModel.ts` without changing selected-edge, active-run, preview, or hitarea behavior. |
 
 ## Decisions Made
 | Decision | Rationale |
@@ -908,6 +921,7 @@ Phase 70 in progress
 - Phase 67 moves active-source and eligible-target anchor class-state checks into `canvasInteractionStyleModel.ts`; `EditorCanvas.vue` keeps the style context, pointer handlers, and anchor overlay rendering.
 - Phase 68 moves connection completion eligibility routing into `canvasConnectionInteractionModel.ts`; `EditorCanvas.vue` keeps active connection refs, graph document input, auto-snap callers, and completion emits.
 - Phase 69 moves projected anchor grouping into `edgeProjection.ts`; `EditorCanvas.vue` keeps transient anchor construction, connection eligibility, overlay rendering, and pointer handlers.
+- Phase 70 moves projected edge layer grouping into `edgeProjection.ts`; `EditorCanvas.vue` keeps SVG layer ordering, selected-edge state, edge hitarea handlers, and edge class bindings.
 - Do not commit runtime artifacts such as `backend/data/settings`, `.dev_*`, `dist`, or `.worktrees`.
 - After code changes, restart using `npm run dev`.
 

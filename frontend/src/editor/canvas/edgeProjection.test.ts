@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { buildSequenceFlowPath } from "./flowEdgePath.ts";
-import { groupProjectedCanvasAnchors, projectCanvasAnchors, projectCanvasEdges } from "./edgeProjection.ts";
+import { groupProjectedCanvasAnchors, groupProjectedCanvasEdges, projectCanvasAnchors, projectCanvasEdges } from "./edgeProjection.ts";
 import type { GraphPayload } from "../../types/node-system.ts";
 
 const graph: GraphPayload = {
@@ -112,6 +112,19 @@ test("projectCanvasEdges creates projected flow edges from graph edges", () => {
       targetNodeY: 220,
     }),
   );
+});
+
+test("groupProjectedCanvasEdges separates flow-route and data edges", () => {
+  const edges = [
+    { id: "flow:input->agent", kind: "flow", source: "input", target: "agent", path: "M 0 0" },
+    { id: "route:condition:true->output", kind: "route", source: "condition", target: "output", branch: "true", path: "M 1 1" },
+    { id: "data:agent:answer->output", kind: "data", source: "agent", target: "output", state: "answer", path: "M 2 2" },
+  ] satisfies ReturnType<typeof projectCanvasEdges>;
+
+  const groups = groupProjectedCanvasEdges(edges);
+
+  assert.deepEqual(groups.flowRouteEdges.map((edge) => edge.id), ["flow:input->agent", "route:condition:true->output"]);
+  assert.deepEqual(groups.dataEdges.map((edge) => edge.id), ["data:agent:answer->output"]);
 });
 
 test("projectCanvasAnchors returns flow and state dots for visible nodes", () => {

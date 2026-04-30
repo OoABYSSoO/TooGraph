@@ -77,7 +77,7 @@
           }"
         />
         <path
-          v-for="edge in projectedEdges.filter((edge) => edge.kind === 'flow' || edge.kind === 'route')"
+          v-for="edge in flowRouteEdges"
           :key="`${edge.id}:highlight`"
           v-show="isProjectedCanvasEdgeVisible(edge, visibleProjectedEdgeIds)"
           :d="edge.path"
@@ -86,7 +86,7 @@
           :class="{ 'editor-canvas__edge-delete-highlight--active': isFlowEdgeDeleteConfirmOpen(edge.id) }"
         />
         <path
-          v-for="edge in projectedEdges.filter((edge) => edge.kind === 'data')"
+          v-for="edge in dataEdges"
           :key="`${edge.id}:data-highlight`"
           v-show="isProjectedCanvasEdgeVisible(edge, visibleProjectedEdgeIds)"
           :d="edge.path"
@@ -392,7 +392,7 @@ import { useI18n } from "vue-i18n";
 import EditorMinimap from "./EditorMinimap.vue";
 import NodeCard from "@/editor/nodes/NodeCard.vue";
 import StateEditorPopover from "@/editor/nodes/StateEditorPopover.vue";
-import { groupProjectedCanvasAnchors, type ProjectedCanvasAnchor, type ProjectedCanvasEdge } from "@/editor/canvas/edgeProjection";
+import { groupProjectedCanvasAnchors, groupProjectedCanvasEdges, type ProjectedCanvasAnchor, type ProjectedCanvasEdge } from "@/editor/canvas/edgeProjection";
 import { resolveEdgeRunPresentation } from "@/editor/canvas/runEdgePresentation";
 import { resolveCanvasLayout } from "@/editor/canvas/resolvedCanvasLayout";
 import { resolveCanvasSurfaceStyle } from "@/editor/canvas/canvasSurfaceStyle";
@@ -752,6 +752,9 @@ const minimapEdges = computed(() =>
 const conditionRouteTargetsByNodeId = computed(() => buildConditionRouteTargetsByNodeId(props.document));
 const resolvedCanvasLayout = computed(() => resolveCanvasLayout(props.document, measuredAnchorOffsets.value));
 const projectedEdges = computed(() => resolvedCanvasLayout.value.edges);
+const projectedEdgeGroups = computed(() => groupProjectedCanvasEdges(projectedEdges.value));
+const flowRouteEdges = computed(() => projectedEdgeGroups.value.flowRouteEdges);
+const dataEdges = computed(() => projectedEdgeGroups.value.dataEdges);
 const forceVisibleProjectedEdgeIds = computed(() => buildForceVisibleProjectedEdgeIds({
   selectedEdgeId: selectedEdgeId.value,
   dataEdgeStateConfirmId: activeDataEdgeStateConfirm.value?.id,

@@ -86,6 +86,7 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 - `canvasConnectionCompletionModel.ts` 已承接 connection completion action projection、completion request cleanup policy 和 completion execution routing：从 active connection、target anchor 和锁定态纯计算 locked/no-connection ignore、`connect-flow`、`connect-route`、`connect-state`、`connect-state-input-source`、`reconnect-flow`、`reconnect-route` payload，并明确完成后清理连接交互状态/已选边；`EditorCanvas.vue` 仍保留实际 `emit` dispatch 和 imperative cleanup execution。
 - `canvasConnectionInteractionModel.ts` 已进一步承接高层 auto-snap target resolution、pending connection creation-menu request、empty-canvas double-click creation request、file-drop creation request、drag-over drop-effect request、pointer-up route decision、active-connection node pointer-down route decision、pointer-move preview request 与 anchor pointer-down route decision：flow hotspot、node body fallback、reverse state input source、state output target、create-input fallback、node creation payload、打开菜单后的清理策略、empty-canvas locked/ignored/open-menu 分支、file-drop locked/ignored/missing-file/create-from-file 分支、drag-over copy/none drop-effect 分支、locked cleanup / snapped completion / creation-menu 分支选择、node body snap completion / continue pointer-down 分支、hover node / target anchor / fallback point 预览请求，以及 locked-edit / complete / ignore / start-toggle anchor 分支已可测试；`EditorCanvas.vue` 仍保留 DOM hit-test、pointer-to-canvas 坐标转换、dataTransfer 访问和 mutation、RAF 调度、actual emits、panning、node drag/resize 和 DOM measurement。
 - `edgeProjection.ts` 已继续承接 projected anchor 的 flow/route/point 分组；`EditorCanvas.vue` 仍保留 transient anchor construction、connection eligibility、overlay rendering 和 pointer handlers。
+- `edgeProjection.ts` 已继续承接 projected edge 的 flow/route 与 data 分层分组；`EditorCanvas.vue` 仍保留 SVG layer ordering、selected-edge state、hitarea handlers 和 edge class bindings。
 
 ### 3. `EditorWorkspaceShell.vue`
 
@@ -178,6 +179,7 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 - 2026-04-30：`canvasInteractionStyleModel.ts` 已继续承担 active-source 和 eligible-target anchor class-state checks，`EditorCanvas.vue` 仍保留 style context、overlay rendering 和 pointer handlers。
 - 2026-04-30：`canvasConnectionInteractionModel.ts` 已继续承担 connection completion eligibility routing，`EditorCanvas.vue` 仍保留 active connection refs、graph document input、auto-snap callers 和 completion emits。
 - 2026-04-30：`edgeProjection.ts` 已继续承担 projected anchor grouping，`EditorCanvas.vue` 仍保留 transient anchor construction、connection eligibility、anchor overlay rendering 和 pointer handlers。
+- 2026-04-30：`edgeProjection.ts` 已继续承担 projected edge layer grouping，`EditorCanvas.vue` 仍保留 SVG layer ordering、selected-edge state、edge hitarea handlers 和 edge class bindings。
 
 ## 优先级路线
 

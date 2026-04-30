@@ -21,6 +21,10 @@ function readCanvasMinimapEdgeModelSource() {
   return readFileSync(resolve(currentDirectory, "canvasMinimapEdgeModel.ts"), "utf8").replace(/\r\n/g, "\n");
 }
 
+function readEdgeProjectionSource() {
+  return readFileSync(resolve(currentDirectory, "edgeProjection.ts"), "utf8").replace(/\r\n/g, "\n");
+}
+
 function readMinimapModelSource() {
   return readFileSync(resolve(currentDirectory, "minimapModel.ts"), "utf8").replace(/\r\n/g, "\n");
 }
@@ -341,6 +345,20 @@ test("EditorCanvas styles typed anchors and edges from projected state colors", 
   assert.doesNotMatch(componentSource, /function anchorStyle\(anchor: ProjectedCanvasAnchor\)/);
   assert.doesNotMatch(componentSource, /function anchorConnectStyle\(anchor: ProjectedCanvasAnchor\)/);
   assert.doesNotMatch(componentSource, /function edgeStyle\(edge: ProjectedCanvasEdge\)/);
+});
+
+test("EditorCanvas groups projected edges through the projection model for SVG layers", () => {
+  const edgeProjectionSource = readEdgeProjectionSource();
+
+  assert.match(componentSource, /import \{[\s\S]*groupProjectedCanvasAnchors,[\s\S]*groupProjectedCanvasEdges,[\s\S]*type ProjectedCanvasAnchor,[\s\S]*type ProjectedCanvasEdge[\s\S]*\} from "@\/editor\/canvas\/edgeProjection";/);
+  assert.match(componentSource, /const projectedEdgeGroups = computed\(\(\) => groupProjectedCanvasEdges\(projectedEdges\.value\)\);/);
+  assert.match(componentSource, /const flowRouteEdges = computed\(\(\) => projectedEdgeGroups\.value\.flowRouteEdges\);/);
+  assert.match(componentSource, /const dataEdges = computed\(\(\) => projectedEdgeGroups\.value\.dataEdges\);/);
+  assert.match(componentSource, /v-for="edge in flowRouteEdges"/);
+  assert.match(componentSource, /v-for="edge in dataEdges"/);
+  assert.match(edgeProjectionSource, /export function groupProjectedCanvasEdges/);
+  assert.doesNotMatch(componentSource, /projectedEdges\.filter\(\(edge\) => edge\.kind === 'flow' \|\| edge\.kind === 'route'\)/);
+  assert.doesNotMatch(componentSource, /projectedEdges\.filter\(\(edge\) => edge\.kind === 'data'\)/);
 });
 
 test("EditorCanvas renders anchors in a dedicated overlay layer above nodes", () => {
@@ -860,7 +878,7 @@ test("EditorCanvas shows a clicked-position delete confirm for flow edges before
   assert.match(canvasEdgeInteractionsSource, /const nextConfirm = buildFlowEdgeDeleteConfirmFromEdge\(edge, point\);/);
   assert.match(canvasEdgeInteractionsSource, /const action = resolveFlowEdgeDeleteAction\(activeFlowEdgeDeleteConfirm\.value\);/);
   assert.match(canvasEdgeInteractionsSource, /input\.setSelectedEdgeId\(edge\.id\);[\s\S]*flowEdgeDeleteConfirmTimeoutRef\.value = timeoutScheduler\.setTimeout/);
-  assert.match(componentSource, /<path[\s\S]*v-for="edge in projectedEdges\.filter\(\(edge\) => edge\.kind === 'flow' \|\| edge\.kind === 'route'\)"[\s\S]*class="editor-canvas__edge-delete-highlight"/);
+  assert.match(componentSource, /<path[\s\S]*v-for="edge in flowRouteEdges"[\s\S]*class="editor-canvas__edge-delete-highlight"/);
   assert.match(componentSource, /'editor-canvas__edge-delete-highlight--active': isFlowEdgeDeleteConfirmOpen\(edge\.id\)/);
   assert.match(componentSource, /<div[\s\S]*v-if="activeFlowEdgeDeleteConfirm"[\s\S]*class="editor-canvas__edge-delete-confirm"/);
   assert.match(componentSource, /<div class="editor-canvas__confirm-hint editor-canvas__confirm-hint--remove">Delete edge\?<\/div>/);
@@ -891,7 +909,7 @@ test("EditorCanvas keeps selected edge color unchanged and uses outline layers f
 test("EditorCanvas tints route edge outlines from the branch palette", () => {
   const canvasInteractionStyleModelSource = readCanvasInteractionStyleModelSource();
 
-  assert.match(componentSource, /v-for="edge in projectedEdges\.filter\(\(edge\) => edge\.kind === 'flow' \|\| edge\.kind === 'route'\)"/);
+  assert.match(componentSource, /v-for="edge in flowRouteEdges"/);
   assert.match(componentSource, /class="editor-canvas__edge-delete-highlight"[\s\S]*:style="edgeStyle\(edge\)"/);
   assert.match(componentSource, /const edgeStyle = buildProjectedEdgeStyle;/);
   assert.match(canvasInteractionStyleModelSource, /const accent = resolveRouteHandlePalette\(edge\.branch\)\.accent;/);
@@ -992,7 +1010,7 @@ test("EditorCanvas tints data edge outlines from the data edge state color", () 
   const canvasInteractionStyleModelSource = readCanvasInteractionStyleModelSource();
   const canvasEdgeInteractionsSource = readCanvasEdgeInteractionsSource();
 
-  assert.match(componentSource, /v-for="edge in projectedEdges\.filter\(\(edge\) => edge\.kind === 'data'\)"/);
+  assert.match(componentSource, /v-for="edge in dataEdges"/);
   assert.match(componentSource, /class="editor-canvas__edge-data-highlight"/);
   assert.match(componentSource, /:style="edgeStyle\(edge\)"/);
   assert.match(componentSource, /'editor-canvas__edge-data-highlight--active': isDataEdgeStateInteractionOpen\(edge\)/);
