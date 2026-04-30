@@ -17,13 +17,12 @@ from app.core.runtime.execution_graph import (
     build_execution_edges,
     select_active_outgoing_edges,
 )
+from app.core.runtime.run_artifacts import append_run_snapshot, refresh_run_artifacts
 from app.core.runtime.run_events import publish_run_event
 from app.core.runtime.state_io import apply_state_writes, collect_node_inputs, initialize_graph_state
 from app.core.runtime.node_system_executor import (
     _execute_node,
     _persist_run_progress,
-    _refresh_run_artifacts,
-    append_run_snapshot,
     collect_output_boundaries,
 )
 from app.core.runtime.state import create_initial_run_state, set_run_status, touch_run_lifecycle, utc_now_iso
@@ -119,7 +118,7 @@ def execute_node_system_graph_langgraph(
         collect_output_boundaries(graph, state, active_edge_ids)
         _finalize_langgraph_cycle_summary(state, cycle_tracker, active_edge_ids)
         _sync_checkpoint_metadata(state, checkpoint_saver, checkpoint_lookup_config)
-        _refresh_run_artifacts(state, node_outputs, active_edge_ids, started_perf=started_perf)
+        refresh_run_artifacts(state, node_outputs, active_edge_ids, started_perf=started_perf)
         save_run(state)
         publish_run_event(str(state.get("run_id") or ""), "run.completed", {"status": "completed"})
         return state
@@ -223,7 +222,7 @@ def execute_node_system_graph_langgraph(
         collect_output_boundaries(graph, state, active_edge_ids)
         _finalize_langgraph_cycle_summary(state, cycle_tracker, active_edge_ids)
         _sync_checkpoint_metadata(state, checkpoint_saver, checkpoint_lookup_config)
-        _refresh_run_artifacts(state, node_outputs, active_edge_ids, started_perf=started_perf)
+        refresh_run_artifacts(state, node_outputs, active_edge_ids, started_perf=started_perf)
         append_run_snapshot(
             state,
             snapshot_id=_next_run_snapshot_id(state, "completed"),
@@ -237,7 +236,7 @@ def execute_node_system_graph_langgraph(
         set_run_status(state, "failed")
         state.setdefault("errors", []).append(str(exc))
         _sync_checkpoint_metadata(state, checkpoint_saver, checkpoint_lookup_config)
-        _refresh_run_artifacts(state, node_outputs, active_edge_ids, started_perf=started_perf)
+        refresh_run_artifacts(state, node_outputs, active_edge_ids, started_perf=started_perf)
         append_run_snapshot(
             state,
             snapshot_id=_next_run_snapshot_id(state, "failed"),
@@ -679,7 +678,7 @@ def _apply_waiting_state(
     if active_edge_ids:
         collect_output_boundaries(graph, state, active_edge_ids)
     _sync_checkpoint_metadata(state, checkpoint_saver, checkpoint_lookup_config)
-    _refresh_run_artifacts(state, node_outputs, active_edge_ids, started_perf=started_perf)
+    refresh_run_artifacts(state, node_outputs, active_edge_ids, started_perf=started_perf)
     append_run_snapshot(
         state,
         snapshot_id=_next_run_snapshot_id(state, "pause"),
