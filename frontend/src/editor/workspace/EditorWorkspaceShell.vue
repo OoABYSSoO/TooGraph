@@ -283,9 +283,9 @@ import { setTabScopedRecordEntry } from "./editorTabRuntimeModel.ts";
 import type { WorkspaceSidePanelMode } from "./workspaceSidePanelModel.ts";
 import { downloadPythonSource } from "./pythonExportModel.ts";
 import { isGraphiteUiPythonExportFile, isGraphiteUiPythonExportSource } from "./pythonImportModel.ts";
-import { buildPresetPayloadForNode } from "./presetPersistence.ts";
 import { useWorkspaceDocumentState } from "./useWorkspaceDocumentState.ts";
 import { useWorkspaceGraphPersistenceController } from "./useWorkspaceGraphPersistenceController.ts";
+import { useWorkspacePresetController } from "./useWorkspacePresetController.ts";
 import { useWorkspacePythonImportController } from "./useWorkspacePythonImportController.ts";
 import { useWorkspaceRouteController } from "./useWorkspaceRouteController.ts";
 import { useWorkspaceRunController } from "./useWorkspaceRunController.ts";
@@ -505,6 +505,15 @@ const {
   importGraphFromPythonSource,
   isGraphiteUiPythonExportSource,
   setMessageFeedbackForTab,
+});
+const { saveNodePresetForTab } = useWorkspacePresetController({
+  documentsByTabId,
+  persistedPresets,
+  savePreset,
+  fetchPreset,
+  setMessageFeedbackForTab,
+  showPresetSaveToast,
+  translate: (key, params) => t(key, params ?? {}),
 });
 const {
   activateTab,
@@ -1048,41 +1057,6 @@ const {
   openCreatedStateEdgeEditorForTab,
   translate: t,
 });
-
-async function saveNodePresetForTab(tabId: string, nodeId: string) {
-  const document = documentsByTabId.value[tabId];
-  if (!document) {
-    return;
-  }
-
-  const payload = buildPresetPayloadForNode(document, nodeId);
-  if (!payload) {
-    setMessageFeedbackForTab(tabId, {
-      tone: "danger",
-      message: t("feedback.presetSaveFailed"),
-    });
-    showPresetSaveToast("error", t("feedback.presetSaveFailed"));
-    return;
-  }
-
-  try {
-    const saved = await savePreset(payload);
-    const savedPreset = await fetchPreset(saved.presetId);
-    const presetLabel = savedPreset.definition.label || savedPreset.presetId;
-    persistedPresets.value = [savedPreset, ...persistedPresets.value.filter((preset) => preset.presetId !== savedPreset.presetId)];
-    setMessageFeedbackForTab(tabId, {
-      tone: "success",
-      message: t("feedback.presetSaved", { label: presetLabel }),
-    });
-    showPresetSaveToast("success", t("feedback.presetSaved", { label: presetLabel }));
-  } catch (error) {
-    setMessageFeedbackForTab(tabId, {
-      tone: "danger",
-      message: error instanceof Error ? error.message : t("feedback.presetSaveFailed"),
-    });
-    showPresetSaveToast("error", error instanceof Error ? error.message : t("feedback.presetSaveFailed"));
-  }
-}
 
 function showPresetSaveToast(type: "success" | "error", message: string) {
   ElMessage({

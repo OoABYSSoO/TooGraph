@@ -22,6 +22,7 @@ const routeControllerSource = readWorkspaceSource("useWorkspaceRouteController.t
 const runControllerSource = readWorkspaceSource("useWorkspaceRunController.ts");
 const graphPersistenceControllerSource = readWorkspaceSource("useWorkspaceGraphPersistenceController.ts");
 const pythonImportControllerSource = readWorkspaceSource("useWorkspacePythonImportController.ts");
+const presetControllerSource = readWorkspaceSource("useWorkspacePresetController.ts");
 
 test("EditorWorkspaceShell renders workspace panes without reka-ui tab primitives", () => {
   assert.doesNotMatch(componentSource, /from "reka-ui"/);
@@ -94,7 +95,7 @@ test("EditorWorkspaceShell can restore a past run into a new unsaved tab", () =>
 
 test("EditorWorkspaceShell wires node top-action events into state updates, node deletion, and preset persistence", () => {
   assert.match(componentSource, /import \{ fetchPreset, fetchPresets, savePreset \} from "@\/api\/presets";/);
-  assert.match(componentSource, /import \{ buildPresetPayloadForNode \} from "\.\/presetPersistence\.ts";/);
+  assert.match(componentSource, /import \{ useWorkspacePresetController \} from "\.\/useWorkspacePresetController\.ts";/);
   assert.match(componentSource, /@update-node-metadata="updateNodeMetadataForTab\(tab\.tabId, \$event\.nodeId, \$event\.patch\)"/);
   assert.doesNotMatch(componentSource, /@rename-state="renameStateField/);
   assert.doesNotMatch(componentSource, /function renameStateField/);
@@ -109,12 +110,18 @@ test("EditorWorkspaceShell wires node top-action events into state updates, node
   assert.match(graphMutationActionsSource, /function reorderNodePortStateForTab\(tabId: string, nodeId: string, side: "input" \| "output", stateKey: string, targetIndex: number\)/);
   assert.match(graphMutationActionsSource, /reorderNodePortStateInDocument\(document, nodeId, side, stateKey, targetIndex\)/);
   assert.match(graphMutationActionsSource, /function disconnectDataEdgeForTab\(tabId: string, sourceNodeId: string, targetNodeId: string, stateKey: string, mode: "state" \| "flow"\)/);
-  assert.match(componentSource, /async function saveNodePresetForTab\(tabId: string, nodeId: string\)/);
   assert.match(graphMutationActionsSource, /function deleteNodeForTab\(tabId: string, nodeId: string\)/);
-  assert.match(componentSource, /persistedPresets\.value = \[savedPreset, \.\.\.persistedPresets\.value\.filter/);
+  assert.match(componentSource, /const \{ saveNodePresetForTab \} = useWorkspacePresetController\(\{/);
+  assert.match(componentSource, /useWorkspacePresetController\(\{[\s\S]*documentsByTabId,[\s\S]*persistedPresets,[\s\S]*savePreset,[\s\S]*fetchPreset,[\s\S]*showPresetSaveToast,[\s\S]*translate: \(key, params\) => t\(key, params \?\? \{\}\),[\s\S]*\}\);/);
+  assert.match(presetControllerSource, /buildPresetPayloadForNode\(toRaw\(document\), nodeId\)/);
+  assert.match(presetControllerSource, /const saved = await input\.savePreset\(payload\);/);
+  assert.match(presetControllerSource, /const savedPreset = await input\.fetchPreset\(saved\.presetId\);/);
+  assert.match(presetControllerSource, /input\.persistedPresets\.value = \[/);
+  assert.match(presetControllerSource, /input\.showPresetSaveToast\("success", message\);/);
+  assert.doesNotMatch(componentSource, /async function saveNodePresetForTab\(tabId: string, nodeId: string\)/);
+  assert.doesNotMatch(componentSource, /buildPresetPayloadForNode\(document, nodeId\)/);
   assert.doesNotMatch(componentSource, /Only agent nodes can be saved as presets\./);
-  assert.match(componentSource, /showPresetSaveToast\("success", t\("feedback\.presetSaved"/);
-  assert.match(componentSource, /showPresetSaveToast\("error", error instanceof Error \? error\.message : t\("feedback\.presetSaveFailed"\)\)/);
+  assert.match(presetControllerSource, /input\.showPresetSaveToast\("error", message\);/);
 });
 
 test("EditorWorkspaceShell delegates graph mutation actions to a workspace composable", () => {

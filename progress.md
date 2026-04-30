@@ -1,5 +1,58 @@
 # Progress Log
 
+## Session: 2026-04-30 Phase 127
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Continued automatically after commit `f9405a5` because the full-roadmap progress is below 100%.
+  - Re-read the formal roadmap, Phase 126 findings, and remaining high-line-count files.
+  - Chose the `EditorWorkspaceShell.vue` preset-save slice because it is a narrow node top-action flow and does not touch canvas auto-snapping, node creation naming/context, Human Review, or low-level run polling/SSE.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `useWorkspacePresetController.test.ts` covering successful agent preset save, refreshed persisted preset list, success feedback/toast, and missing-node failure feedback/toast.
+  - Verified the expected red failure because `useWorkspacePresetController.ts` did not exist yet.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `useWorkspacePresetController.ts`.
+  - Updated `EditorWorkspaceShell.vue` to consume the preset controller for `saveNodePresetForTab`.
+  - Kept node top-action event wiring, preset API imports, and Element Plus toast rendering injected from the shell.
+  - Unwrapped Vue reactive graph documents with `toRaw` before preset payload cloning so `structuredClone` does not receive a reactive proxy.
+  - Updated structure tests to lock the new preset controller boundary.
+  - Reduced `EditorWorkspaceShell.vue` from 1,498 to 1,472 lines.
+
+### Phase 4: Verification and Progress Gate
+- **Status:** completed
+- Actions taken:
+  - Ran focused preset controller and workspace-shell structure tests.
+  - Ran TypeScript unused-symbol verification.
+  - Ran the full frontend test suite and production build.
+  - Confirmed the production build still has no Vite large chunk warning.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend entry returned HTTP 200 and backend `/health` returned `{"status":"ok"}`.
+  - Confirmed the previous dev session exited after the restart.
+  - Recalculated the full roadmap at about 98.2%, frontend-focused progress at about 93-94%, and P3 `EditorWorkspaceShell.vue` progress at about 97%.
+  - Opened Phase 128 automatically because the full roadmap is still below 100%.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red controller test | `node --test src/editor/workspace/useWorkspacePresetController.test.ts` before implementation | Fails because the preset controller module is missing | Failed with missing module import | Passed |
+| Focused frontend tests | `node --test src/editor/workspace/useWorkspacePresetController.test.ts src/editor/workspace/EditorWorkspaceShell.structure.test.ts` | Focused preset controller and structure tests pass | 39 passed | Passed |
+| TypeScript check | `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` | No type or unused-symbol errors | Exit 0 | Passed |
+| Full frontend tests | `node --test $(rg --files src -g '*.test.ts' \| sort) vite.config.structure.test.ts` | Full frontend suite passes | 910 passed | Passed |
+| Production build | `npm run build` in `frontend` | Build succeeds with no large chunk warning | Exit 0; Vite build completed | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | `structuredClone` rejected the reactive node object while the new controller test saved a preset from a Vue `ref` document map | First green run after adding the controller | Unwrapped the graph document with `toRaw` before passing it into `buildPresetPayloadForNode`. |
+
 ## Session: 2026-04-30 Phase 126
 
 ### Phase 1: Re-orientation
