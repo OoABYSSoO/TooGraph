@@ -12,6 +12,7 @@ import { normalizeInputBoundaryConfigType } from "../../lib/input-boundary.ts";
 import type { GraphNode, StateDefinition } from "../../types/node-system.ts";
 import type { SkillDefinition } from "../../types/skills.ts";
 import { resolveDisplayAgentSkillInstructionBlocks } from "./skillPickerModel.ts";
+import { resolveNodeDisplayDescription, resolveNodeDisplayTitle } from "./nodeDefaultTextModel.ts";
 
 export type NodePortViewModel = {
   key: string;
@@ -196,8 +197,8 @@ export function buildNodeCardViewModel(
     nodeId,
     kind: node.kind,
     kindLabel: formatNodeKindLabel(node.kind),
-    title: node.name,
-    description: node.description?.trim() || "No description yet.",
+    title: resolveNodeDisplayTitle(node.kind, node.name),
+    description: resolveNodeDisplayDescription(node.kind, node.description),
     inputs,
     outputs,
     branches,

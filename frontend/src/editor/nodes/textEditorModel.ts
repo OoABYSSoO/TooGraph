@@ -1,3 +1,10 @@
+import {
+  isDefaultNodeDescription,
+  isDefaultNodeTitle,
+  resolveNodeEditableDescription,
+  resolveNodeEditableTitle,
+} from "./nodeDefaultTextModel.ts";
+
 export type TextEditorField = "title" | "description";
 
 export type TextEditorDrafts = {
@@ -6,6 +13,7 @@ export type TextEditorDrafts = {
 };
 
 export type TextEditorMetadata = {
+  kind?: string;
   name: string;
   description: string;
 };
@@ -22,8 +30,8 @@ export const TEXT_TRIGGER_MOVE_THRESHOLD = 3;
 
 export function buildTextEditorDrafts(metadata: TextEditorMetadata): TextEditorDrafts {
   return {
-    title: metadata.name,
-    description: metadata.description,
+    title: resolveNodeEditableTitle(metadata.kind, metadata.name),
+    description: resolveNodeEditableDescription(metadata.kind, metadata.description),
   };
 }
 
@@ -104,7 +112,13 @@ export function resolveTextEditorMetadataPatch(
 ) {
   const nextValue = draftValue.trim();
   if (field === "title") {
+    if (!nextValue && isDefaultNodeTitle(metadata.kind, metadata.name)) {
+      return { name: "" };
+    }
     return nextValue && nextValue !== metadata.name ? { name: nextValue } : null;
+  }
+  if (!nextValue && isDefaultNodeDescription(metadata.kind, metadata.description)) {
+    return { description: "" };
   }
   return nextValue !== metadata.description ? { description: nextValue } : null;
 }

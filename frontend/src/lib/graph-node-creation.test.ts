@@ -108,8 +108,21 @@ test("buildGenericInputNode creates an expanded input node with an empty virtual
   assert.equal(result.node.ui.collapsed, false);
   assert.equal("expandedSize" in result.node.ui, false);
   assert.equal("collapsedSize" in result.node.ui, false);
+  assert.equal(result.node.name, "");
+  assert.equal(result.node.description, "");
   assert.deepEqual(result.node.writes, []);
   assert.deepEqual(result.state_schema, {});
+});
+
+test("buildGenericOutputNode stores empty metadata so default text remains display-only", () => {
+  const result = buildGenericOutputNode({
+    id: "output_created",
+    position: { x: 240, y: 120 },
+  });
+
+  assert.equal(result.node.kind, "output");
+  assert.equal(result.node.name, "");
+  assert.equal(result.node.description, "");
 });
 
 test("buildNodeFromPreset preserves preset node semantics while replacing the canvas position", () => {

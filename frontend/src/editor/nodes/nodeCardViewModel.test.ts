@@ -45,6 +45,47 @@ test("buildNodeCardViewModel derives input body and output label", () => {
   assert.equal(model.body.primaryOutput?.typeLabel, "text");
 });
 
+test("buildNodeCardViewModel displays generic input defaults as placeholders for empty metadata", () => {
+  const node: GraphNode = {
+    kind: "input",
+    name: "",
+    description: "",
+    ui: { position: { x: 80, y: 220 } },
+    reads: [],
+    writes: [],
+    config: {
+      value: "",
+    },
+  };
+
+  const model = buildNodeCardViewModel("input_created", node, stateSchema);
+
+  assert.equal(model.title, "Input");
+  assert.equal(model.description, "Provide a value to the current workflow.");
+});
+
+test("buildNodeCardViewModel displays generic output defaults as placeholders for empty metadata", () => {
+  const node: GraphNode = {
+    kind: "output",
+    name: "",
+    description: "",
+    ui: { position: { x: 260, y: 220 } },
+    reads: [],
+    writes: [],
+    config: {
+      displayMode: "auto",
+      persistEnabled: false,
+      persistFormat: "auto",
+      fileNameTemplate: "",
+    },
+  };
+
+  const model = buildNodeCardViewModel("output_created", node, stateSchema);
+
+  assert.equal(model.title, "Output");
+  assert.equal(model.description, "Preview or persist the current workflow result.");
+});
+
 test("buildNodeCardViewModel treats input node state schema value as the visible input value", () => {
   const node: GraphNode = {
     kind: "input",

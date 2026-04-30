@@ -9,6 +9,7 @@
         'buddy-widget__virtual-cursor--launching': virtualCursorPhase === 'launching',
         'buddy-widget__virtual-cursor--returning': virtualCursorPhase === 'returning',
         'buddy-widget__virtual-cursor--floating': shouldFloatVirtualCursor,
+        'buddy-widget__virtual-cursor--operation-active': isVirtualOperationRunning,
       }"
       :style="virtualCursorStyle"
       :title="t('buddy.virtualCursor')"
@@ -491,6 +492,10 @@ import { buildBuddyPageContext } from "./buddyPageContext.ts";
 import { buildPageOperationBook, collectPageOperationSnapshot } from "./pageOperationAffordances.ts";
 import { resolveBuddyVirtualOperationPlanFromActivityEvent } from "./virtualOperationProtocol.ts";
 import type { BuddyVirtualOperationPlan } from "./virtualOperationProtocol.ts";
+import {
+  resolveBuddyVirtualOperationUserAction,
+  shouldHandleVirtualCursorPointerDown,
+} from "./buddyVirtualOperationInteractionPolicy.ts";
 import { findLatestRecoverablePausedRunMessage, isRecoverablePausedRunStatus } from "./buddyPausedRunRecovery.ts";
 import {
   resolveBuddyComposerDecision,
@@ -682,6 +687,7 @@ const virtualCursorDragging = ref(false);
 const virtualCursorIdleActionMode = ref<VirtualCursorIdleActionMode>("none");
 const virtualOperationStatus = ref<BuddyVirtualOperationStatus | null>(null);
 const activeVirtualOperationToken = shallowRef<BuddyVirtualOperationToken | null>(null);
+const isVirtualOperationRunning = computed(() => Boolean(activeVirtualOperationToken.value));
 const isPanelOpen = ref(false);
 const draft = ref("");
 const avatarHopCycle = ref(0);
@@ -943,6 +949,13 @@ watch(latestVirtualOperationRequest, (request) => {
 });
 
 function handleAvatarClick() {
+  const action = resolveBuddyVirtualOperationUserAction({
+    isOperationRunning: isVirtualOperationRunning.value,
+    source: "avatar_click",
+  });
+  if (!action.allowDefaultAction) {
+    return;
+  }
   stopBuddyIdleAnimation({ closeVirtualCursor: true });
   if (mood.value === "error") {
     mood.value = "idle";
@@ -1095,11 +1108,16 @@ function deactivateVirtualCursor() {
 }
 
 function handleVirtualCursorPointerDown(event: PointerEvent) {
-  event.preventDefault();
-  event.stopPropagation();
-  if (virtualCursorPhase.value !== "active") {
+  if (
+    !shouldHandleVirtualCursorPointerDown({
+      isOperationRunning: isVirtualOperationRunning.value,
+      phase: virtualCursorPhase.value,
+    })
+  ) {
     return;
   }
+  event.preventDefault();
+  event.stopPropagation();
   cancelBuddyRoamTimers();
   clearBuddyDebugActionTimer();
   clearVirtualCursorDrag();
@@ -2349,6 +2367,13 @@ function createBuddyVirtualOperationToken(): BuddyVirtualOperationToken {
 }
 
 function interruptVirtualOperation() {
+  const action = resolveBuddyVirtualOperationUserAction({
+    isOperationRunning: isVirtualOperationRunning.value,
+    source: "stop_button",
+  });
+  if (!action.interruptOperation) {
+    return;
+  }
   const token = activeVirtualOperationToken.value;
   if (!token) {
     return;
@@ -4872,6 +4897,11 @@ function formatErrorMessage(error: unknown): string {
     drop-shadow(0 4px 7px rgba(40, 32, 20, 0.26))
     drop-shadow(0 0 8px rgba(242, 201, 104, 0.36))
     drop-shadow(0 0 2px rgba(255, 251, 235, 0.9));
+}
+
+.buddy-widget__virtual-cursor--operation-active {
+  pointer-events: none;
+  cursor: default;
 }
 
 .buddy-widget__virtual-operation-banner {

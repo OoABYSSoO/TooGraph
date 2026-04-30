@@ -86,8 +86,8 @@ function normalizeCreatedNodeUi(position: GraphPosition) {
 function buildTextInputNode(position: GraphPosition): InputNode {
   return {
     kind: "input",
-    name: "Input",
-    description: "Provide a value to the current workflow.",
+    name: "",
+    description: "",
     ui: normalizeCreatedNodeUi(position),
     reads: [],
     writes: [],
@@ -100,8 +100,8 @@ function buildTextInputNode(position: GraphPosition): InputNode {
 function buildOutputNode(position: GraphPosition): OutputNode {
   return {
     kind: "output",
-    name: "Output",
-    description: "Preview or persist the current workflow result.",
+    name: "",
+    description: "",
     ui: normalizeCreatedNodeUi(position),
     reads: [],
     writes: [],
