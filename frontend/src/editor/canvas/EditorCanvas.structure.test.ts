@@ -89,6 +89,10 @@ function readCanvasPinchZoomModelSource() {
   return readFileSync(resolve(currentDirectory, "canvasPinchZoomModel.ts"), "utf8").replace(/\r\n/g, "\n");
 }
 
+function readCanvasPinchZoomStateSource() {
+  return readFileSync(resolve(currentDirectory, "useCanvasPinchZoomState.ts"), "utf8").replace(/\r\n/g, "\n");
+}
+
 function readCanvasViewportDisplayModelSource() {
   return readFileSync(resolve(currentDirectory, "canvasViewportDisplayModel.ts"), "utf8").replace(/\r\n/g, "\n");
 }
@@ -1432,20 +1436,23 @@ test("EditorCanvas opts mobile touch drags out of browser gestures", () => {
 
 test("EditorCanvas supports two-finger pinch zoom on mobile without changing single-pointer gestures", () => {
   const canvasPinchZoomModelSource = readCanvasPinchZoomModelSource();
+  const canvasPinchZoomStateSource = readCanvasPinchZoomStateSource();
 
-  assert.match(componentSource, /import \{ buildPinchZoomStart, resolveCanvasPinchPointerReleaseAction, resolveCanvasPinchZoomUpdateAction, resolveCanvasPointerDownAction, resolveCanvasTouchPointerMoveAction \} from "\.\/canvasPinchZoomModel";/);
-  assert.match(componentSource, /const activeCanvasPointers = new Map<number, \{ clientX: number; clientY: number; pointerType: string \}>\(\);/);
-  assert.match(componentSource, /const pinchZoom = ref<\{/);
-  assert.match(componentSource, /function beginPinchZoomIfReady\(\)/);
-  assert.match(componentSource, /const nextPinchZoom = buildPinchZoomStart\(\{[\s\S]*pointers: Array\.from\(activeCanvasPointers\.entries\(\)\),[\s\S]*currentScale: viewport\.viewport\.scale,[\s\S]*\}\);/);
-  assert.match(componentSource, /viewport\.endPan\(\);/);
-  assert.match(componentSource, /pinchZoom\.value = nextPinchZoom;/);
-  assert.match(componentSource, /function updatePinchZoom\(\)/);
-  assert.match(componentSource, /const pinchZoomUpdateAction = resolveCanvasPinchZoomUpdateAction\(\{[\s\S]*pinch,[\s\S]*leftPointer,[\s\S]*rightPointer,[\s\S]*canvasRect,[\s\S]*\}\);/);
-  assert.match(componentSource, /case "ignore-missing-pinch":[\s\S]*return;/);
-  assert.match(componentSource, /case "clear-pinch-zoom":[\s\S]*clearPinchZoom\(\);[\s\S]*return;/);
-  assert.match(componentSource, /case "ignore-non-positive-distance":[\s\S]*return;/);
-  assert.match(componentSource, /case "zoom-at":[\s\S]*viewport\.zoomAt\(pinchZoomUpdateAction\.request\);/);
+  assert.match(componentSource, /import \{ useCanvasPinchZoomState \} from "\.\/useCanvasPinchZoomState";/);
+  assert.match(componentSource, /import \{ resolveCanvasPointerDownAction \} from "\.\/canvasPinchZoomModel";/);
+  assert.match(componentSource, /const pinchZoomState = useCanvasPinchZoomState\(\{[\s\S]*currentScale: \(\) => viewport\.viewport\.scale,[\s\S]*getCanvasRect: \(\) => canvasRef\.value\?\.getBoundingClientRect\(\) \?\? null,[\s\S]*scheduleDragFrame,[\s\S]*endPan: \(\) => viewport\.endPan\(\),[\s\S]*zoomAt: \(request\) => viewport\.zoomAt\(request\),[\s\S]*\}\);/);
+  assert.match(canvasPinchZoomStateSource, /const activeCanvasPointers = new Map<number, CanvasPointerSnapshot>\(\);/);
+  assert.match(canvasPinchZoomStateSource, /const pinchZoom = ref<CanvasPinchZoomStart \| null>\(null\);/);
+  assert.match(canvasPinchZoomStateSource, /function beginPinchZoomIfReady\(\)/);
+  assert.match(canvasPinchZoomStateSource, /const nextPinchZoom = buildPinchZoomStart\(\{[\s\S]*pointers: Array\.from\(activeCanvasPointers\.entries\(\)\),[\s\S]*currentScale: input\.currentScale\(\),[\s\S]*\}\);/);
+  assert.match(canvasPinchZoomStateSource, /input\.endPan\(\);/);
+  assert.match(canvasPinchZoomStateSource, /pinchZoom\.value = nextPinchZoom;/);
+  assert.match(canvasPinchZoomStateSource, /function updatePinchZoom\(\)/);
+  assert.match(canvasPinchZoomStateSource, /const pinchZoomUpdateAction = resolveCanvasPinchZoomUpdateAction\(\{[\s\S]*pinch,[\s\S]*leftPointer,[\s\S]*rightPointer,[\s\S]*canvasRect,[\s\S]*\}\);/);
+  assert.match(canvasPinchZoomStateSource, /case "ignore-missing-pinch":[\s\S]*return;/);
+  assert.match(canvasPinchZoomStateSource, /case "clear-pinch-zoom":[\s\S]*clearPinchZoom\(\);[\s\S]*return;/);
+  assert.match(canvasPinchZoomStateSource, /case "ignore-non-positive-distance":[\s\S]*return;/);
+  assert.match(canvasPinchZoomStateSource, /case "zoom-at":[\s\S]*input\.zoomAt\(pinchZoomUpdateAction\.request\);/);
   assert.match(canvasPinchZoomModelSource, /export function buildPinchZoomStart/);
   assert.match(canvasPinchZoomModelSource, /export type CanvasPointerDownAction/);
   assert.match(canvasPinchZoomModelSource, /export function resolveCanvasPointerDownAction/);
@@ -1460,19 +1467,20 @@ test("EditorCanvas supports two-finger pinch zoom on mobile without changing sin
   assert.doesNotMatch(componentSource, /function resolvePointerDistance/);
   assert.doesNotMatch(componentSource, /function resolvePointerCenter/);
   assert.doesNotMatch(componentSource, /nextScale: pinch\.startScale \* \(nextDistance \/ pinch\.startDistance\)/);
-  assert.match(componentSource, /if \(event\.pointerType === "touch"\) \{/);
+  assert.match(componentSource, /const startedPinchZoom = trackTouchPointerDown\(event\);/);
   assert.match(componentSource, /const canvasPointerDownAction = resolveCanvasPointerDownAction\(\{ startedPinchZoom \}\);/);
   assert.match(componentSource, /function applyCanvasPointerDownSetup\([\s\S]*action: CanvasPointerDownAction,[\s\S]*event: PointerEvent,[\s\S]*\)/);
   assert.match(componentSource, /if \(action\.focusCanvas\) \{[\s\S]*canvasRef\.value\?\.focus\(\);/);
   assert.match(componentSource, /if \(action\.setPointerCapture\) \{[\s\S]*canvasRef\.value\?\.setPointerCapture\(event\.pointerId\);/);
   assert.match(componentSource, /if \(action\.beginPan\) \{[\s\S]*viewport\.beginPan\(event\);/);
-  assert.match(componentSource, /const touchPointerMoveAction = resolveCanvasTouchPointerMoveAction\(\{[\s\S]*pointerType: event\.pointerType,[\s\S]*isTrackedPointer: activeCanvasPointers\.has\(event\.pointerId\),[\s\S]*hasPinchZoom: Boolean\(pinchZoom\.value\),[\s\S]*\}\);/);
-  assert.match(componentSource, /case "track-touch-pointer":[\s\S]*activeCanvasPointers\.set\(event\.pointerId,[\s\S]*clientX: event\.clientX,[\s\S]*clientY: event\.clientY,[\s\S]*pointerType: event\.pointerType,/);
-  assert.match(componentSource, /if \(touchPointerMoveAction\.preventDefault\) \{[\s\S]*event\.preventDefault\(\);/);
-  assert.match(componentSource, /if \(touchPointerMoveAction\.schedulePinchZoomUpdate\) \{[\s\S]*scheduleDragFrame\(\(\) => \{[\s\S]*updatePinchZoom\(\);/);
-  assert.match(componentSource, /if \(touchPointerMoveAction\.stopPointerMove\) \{[\s\S]*return;/);
+  assert.match(canvasPinchZoomStateSource, /const touchPointerMoveAction = resolveCanvasTouchPointerMoveAction\(\{[\s\S]*pointerType: pointer\.pointerType,[\s\S]*isTrackedPointer: activeCanvasPointers\.has\(pointer\.pointerId\),[\s\S]*hasPinchZoom: Boolean\(pinchZoom\.value\),[\s\S]*\}\);/);
+  assert.match(canvasPinchZoomStateSource, /case "track-touch-pointer":[\s\S]*setCanvasPointer\(pointer\);/);
+  assert.match(canvasPinchZoomStateSource, /if \(touchPointerMoveAction\.preventDefault\) \{[\s\S]*preventDefault\(\);/);
+  assert.match(canvasPinchZoomStateSource, /if \(touchPointerMoveAction\.schedulePinchZoomUpdate\) \{[\s\S]*input\.scheduleDragFrame\(\(\) => \{[\s\S]*updatePinchZoom\(\);/);
+  assert.match(componentSource, /handleTouchPointerMove\(event, \(\) => \{[\s\S]*event\.preventDefault\(\);/);
   assert.doesNotMatch(componentSource, /if \(event\.pointerType === "touch" && activeCanvasPointers\.has\(event\.pointerId\)\) \{/);
-  assert.match(componentSource, /const pinchPointerReleaseAction = resolveCanvasPinchPointerReleaseAction\(\{[\s\S]*pinch: pinchZoom\.value,[\s\S]*pointerId: event\.pointerId,[\s\S]*\}\);/);
+  assert.match(componentSource, /const pinchPointerReleaseAction = releaseCanvasPointer\(event\.pointerId\);/);
+  assert.match(canvasPinchZoomStateSource, /return resolveCanvasPinchPointerReleaseAction\(\{[\s\S]*pinch: pinchZoom\.value,[\s\S]*pointerId,[\s\S]*\}\);/);
   assert.match(componentSource, /case "end-pinch-zoom":[\s\S]*clearPinchZoom\(\);[\s\S]*viewport\.endPan\(\);[\s\S]*return;/);
   assert.match(componentSource, /case "continue-pointer-up":[\s\S]*break;/);
   assert.doesNotMatch(componentSource, /if \(pinchZoom\.value\?\.pointerIds\.includes\(event\.pointerId\)\) \{/);

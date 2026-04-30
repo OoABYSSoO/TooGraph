@@ -282,6 +282,7 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 - 2026-04-30：`useWorkspacePythonImportController.ts` 已承接 Python graph import controller，`EditorWorkspaceShell.vue` 从 1553 行降到 1498 行；dropped-file node creation fallback、node creation from files、route sync dependency、graph mutation 和 API imports 仍保持 shell-owned。
 - 2026-04-30：`useWorkspaceEditGuardController.ts` 已承接 awaiting-human edit lock checks、locked-edit toast callback trigger、node position dirty commits 和 node size dirty commits；`EditorWorkspaceShell.vue` 仍保留 Element Plus toast 渲染、i18n 和 canvas/template 事件绑定。
 - 2026-04-30：`useCanvasHoverState.ts` 已承接 node hover release timer、point-anchor hover ref 和 flow-handle hover ref；`useCanvasAnimationFrameScheduler.ts` 已承接 drag-frame requestAnimationFrame batching、flush 和 cancellation；`EditorCanvas.vue` 从 3396 行降到 3319 行，并继续保留 pointer routing、auto-snap、connection completion、viewport mutation 和 graph emits。
+- 2026-04-30：`useCanvasPinchZoomState.ts` 已承接 active touch pointer cache、pinch zoom ref、pinch start/update/release 和 touch-move scheduled update；`EditorCanvas.vue` 从 3319 行降到 3251 行，并继续保留 DOM event side effects、panning lifecycle、viewport `zoomAt`、connection pointer-up 和 node drag/resize release。
 
 ## 优先级路线
 
@@ -314,7 +315,7 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 
 先拆 `model_provider_client.py`，再拆 `node_system_executor.py`，最后拆 LangGraph runtime。理由：provider client 的协议边界最清晰，executor 和 LangGraph runtime 对产品语义影响更大。
 
-当前 P4 进展：`model_provider_client.py` 的共享 HTTP/request 层、provider discovery 层、OpenAI-compatible chat transport、Anthropic messages transport、Gemini generate-content transport、Codex responses transport 和共享 response parsing 已完成抽取；`node_system_executor.py` 的 condition evaluation、agent prompt、LLM output parser、execution graph、state I/O、output artifact、run artifact、input boundary、output boundary、agent streaming、reference resolution、skill invocation、agent runtime config、agent response generation、node handler、run progress 和 runtime summary helper 已完成抽取；LangGraph runtime 已开始复用共享 summary helper，并已迁出 checkpoint/runtime metadata helper、waiting-state interrupt helper 和 cycle helper。Phase 133 后，后端 P4 约 95% 完成；全路线总进度约 99.2%，因为 frontend P2/P1 仍有尾部大文件工作。
+当前 P4 进展：`model_provider_client.py` 的共享 HTTP/request 层、provider discovery 层、OpenAI-compatible chat transport、Anthropic messages transport、Gemini generate-content transport、Codex responses transport 和共享 response parsing 已完成抽取；`node_system_executor.py` 的 condition evaluation、agent prompt、LLM output parser、execution graph、state I/O、output artifact、run artifact、input boundary、output boundary、agent streaming、reference resolution、skill invocation、agent runtime config、agent response generation、node handler、run progress 和 runtime summary helper 已完成抽取；LangGraph runtime 已开始复用共享 summary helper，并已迁出 checkpoint/runtime metadata helper、waiting-state interrupt helper 和 cycle helper。Phase 134 后，后端 P4 约 95% 完成；全路线总进度约 99.3%，因为 frontend P2/P1 仍有尾部大文件工作。
 
 ## 架构红线
 
