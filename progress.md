@@ -1,5 +1,60 @@
 # Progress Log
 
+## Session: 2026-04-30 Phase 115
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Continued automatically after commit `0c25e61` because the full-roadmap progress is below 100%.
+  - Re-read the formal roadmap, Phase 114 findings, and remaining LangGraph runtime checkpoint/runtime clusters.
+  - Chose checkpoint runtime/metadata helpers because they are self-contained and heavily covered by existing checkpoint/resume migration tests.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `backend/tests/test_langgraph_checkpoint_runtime.py` covering initial checkpoint metadata, resume checkpoint id propagation, missing thread id failure, unavailable checkpoint sync, and available checkpoint id sync.
+  - Verified the expected red failure because `app.core.langgraph.checkpoint_runtime` did not exist yet.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `backend/app/core/langgraph/checkpoint_runtime.py`.
+  - Moved checkpoint runtime config construction, checkpoint lookup config construction, initial checkpoint metadata normalization, and checkpoint metadata sync from saver out of `core/langgraph/runtime.py`.
+  - Updated `core/langgraph/runtime.py` to import the moved helpers as `_build_checkpoint_runtime` and `_sync_checkpoint_metadata`, preserving existing call sites.
+  - Reduced `core/langgraph/runtime.py` from 1,032 lines to 974 lines.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused checkpoint runtime and LangGraph migration tests.
+  - Ran `git diff --check`.
+  - Ran the full backend test suite.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend entry returned HTTP 200 and backend `/health` returned `{"status":"ok"}`.
+  - Confirmed the previous dev session exited after the restart.
+
+### Phase 5: Honest Progress Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated the full roadmap at about 95.5%.
+  - Recalculated the frontend-focused roadmap at about 83-85%; unchanged because Phase 115 was backend-only.
+  - Recalculated P3 `EditorWorkspaceShell.vue` cleanup at about 82%; unchanged.
+  - Recalculated P4 backend cleanup at about 88-90% after extracting LangGraph checkpoint runtime/metadata helpers.
+  - Opened Phase 116 automatically because the full roadmap is still below 100%.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red module test | `PYTHONPATH=backend pytest backend/tests/test_langgraph_checkpoint_runtime.py -q` before implementation | Fails because the checkpoint runtime module is missing | Failed with missing module import | Passed |
+| Focused runtime tests | `PYTHONPATH=backend pytest backend/tests/test_langgraph_checkpoint_runtime.py backend/tests/test_langgraph_migration.py -q` | Checkpoint helper and LangGraph behavior stay unchanged | 43 passed | Passed |
+| Whitespace check + full backend tests | `git diff --check && PYTHONPATH=backend pytest backend/tests -q` | No whitespace errors and all backend tests pass | 188 passed, 2 existing warnings | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | None | Phase 115 | No implementation errors beyond the expected red missing-module failure. |
+
 ## Session: 2026-04-30 Phase 114
 
 ### Phase 1: Re-orientation

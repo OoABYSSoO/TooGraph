@@ -11,6 +11,10 @@ from langgraph.types import Command
 from typing_extensions import TypedDict
 
 from app.core.langgraph.checkpoints import JsonCheckpointSaver
+from app.core.langgraph.checkpoint_runtime import (
+    build_checkpoint_runtime as _build_checkpoint_runtime,
+    sync_checkpoint_metadata as _sync_checkpoint_metadata,
+)
 from app.core.langgraph.compiler import compile_graph_to_langgraph_plan
 from app.core.runtime.execution_graph import (
     CycleDetector,
@@ -496,68 +500,6 @@ def _build_langgraph_state_schema(graph: NodeSystemGraphDocument):
         for state_name in graph.state_schema
     }
     return TypedDict("GraphiteUILangGraphState", annotations, total=False)
-
-
-def _build_checkpoint_runtime(
-    *,
-    graph: NodeSystemGraphDocument,
-    state: dict[str, Any],
-) -> tuple[JsonCheckpointSaver, dict[str, Any], dict[str, Any]]:
-    checkpoint_metadata = dict(state.get("checkpoint_metadata", {}))
-    thread_id = str(checkpoint_metadata.get("thread_id") or state.get("run_id") or "").strip()
-    checkpoint_ns = str(checkpoint_metadata.get("checkpoint_ns") or "").strip()
-    checkpoint_id = str(checkpoint_metadata.get("checkpoint_id") or "").strip()
-    if not thread_id:
-        raise ValueError("LangGraph runtime requires checkpoint_metadata.thread_id.")
-    checkpoint_ns = checkpoint_ns or ""
-
-    state.setdefault("checkpoint_metadata", {})
-    state["checkpoint_metadata"].update(
-        {
-            "available": bool(checkpoint_id),
-            "checkpoint_id": checkpoint_id or None,
-            "thread_id": thread_id,
-            "checkpoint_ns": checkpoint_ns,
-            "saver": "json_checkpoint_saver",
-        }
-    )
-
-    checkpoint_saver = JsonCheckpointSaver()
-    runtime_config = {
-        "configurable": {
-            "thread_id": thread_id,
-            "checkpoint_ns": checkpoint_ns,
-        }
-    }
-    if checkpoint_id:
-        runtime_config["configurable"]["checkpoint_id"] = checkpoint_id
-
-    checkpoint_lookup_config = {
-        "configurable": {
-            "thread_id": thread_id,
-            "checkpoint_ns": checkpoint_ns,
-        }
-    }
-    return checkpoint_saver, runtime_config, checkpoint_lookup_config
-
-
-def _sync_checkpoint_metadata(
-    state: dict[str, Any],
-    checkpoint_saver: JsonCheckpointSaver,
-    checkpoint_lookup_config: dict[str, Any],
-) -> None:
-    checkpoint_tuple = checkpoint_saver.get_tuple(checkpoint_lookup_config)
-    checkpoint_metadata = state.setdefault("checkpoint_metadata", {})
-    configurable = dict(checkpoint_lookup_config.get("configurable") or {})
-    checkpoint_metadata["thread_id"] = configurable.get("thread_id")
-    checkpoint_metadata["checkpoint_ns"] = configurable.get("checkpoint_ns")
-    checkpoint_metadata["saver"] = "json_checkpoint_saver"
-    if checkpoint_tuple is None:
-        checkpoint_metadata["available"] = False
-        checkpoint_metadata["checkpoint_id"] = None
-        return
-    checkpoint_metadata["available"] = True
-    checkpoint_metadata["checkpoint_id"] = checkpoint_tuple.config.get("configurable", {}).get("checkpoint_id")
 
 
 def _persist_langgraph_progress(

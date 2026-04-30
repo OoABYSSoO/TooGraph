@@ -196,6 +196,12 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 
 现状：LangGraph 构建、checkpoint、human review interrupt、cycle tracker、progress persistence 和最终 summary 都在一个文件。
 
+当前执行进展：
+
+- `runtime/runtime_summaries.py` 已承接 LangGraph node step input/output summary 的 first non-empty value selection；`core/langgraph/runtime.py` 保留 `_summarize_values` 兼容别名。
+- `core/langgraph/checkpoint_runtime.py` 已承接 checkpoint runtime config construction、checkpoint lookup config construction、initial checkpoint metadata normalization 和 checkpoint metadata sync from saver；`core/langgraph/runtime.py` 保留 `_build_checkpoint_runtime` 与 `_sync_checkpoint_metadata` 兼容别名。
+- Phase 115 后 `core/langgraph/runtime.py` 从约 1,040 行降到 974 行；waiting-state interrupt helpers、cycle tracker 和 execution callables 仍留在 runtime。
+
 推荐目标结构：
 
 - `langgraph/build_runtime.py`：构建 graph node/route callable。
@@ -283,7 +289,7 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 
 先拆 `model_provider_client.py`，再拆 `node_system_executor.py`，最后拆 LangGraph runtime。理由：provider client 的协议边界最清晰，executor 和 LangGraph runtime 对产品语义影响更大。
 
-当前 P4 进展：`model_provider_client.py` 的共享 HTTP/request 层、provider discovery 层、OpenAI-compatible chat transport、Anthropic messages transport、Gemini generate-content transport、Codex responses transport 和共享 response parsing 已完成抽取；`node_system_executor.py` 的 condition evaluation、agent prompt、LLM output parser、execution graph、state I/O、output artifact、run artifact、input boundary、output boundary、agent streaming、reference resolution、skill invocation、agent runtime config、agent response generation、node handler、run progress 和 runtime summary helper 已完成抽取；LangGraph runtime 已开始复用共享 summary helper，后续重点迁移 checkpoint/runtime helper。
+当前 P4 进展：`model_provider_client.py` 的共享 HTTP/request 层、provider discovery 层、OpenAI-compatible chat transport、Anthropic messages transport、Gemini generate-content transport、Codex responses transport 和共享 response parsing 已完成抽取；`node_system_executor.py` 的 condition evaluation、agent prompt、LLM output parser、execution graph、state I/O、output artifact、run artifact、input boundary、output boundary、agent streaming、reference resolution、skill invocation、agent runtime config、agent response generation、node handler、run progress 和 runtime summary helper 已完成抽取；LangGraph runtime 已开始复用共享 summary helper，并已迁出 checkpoint/runtime metadata helper，后续重点迁移 waiting-state interrupt helper 与 cycle helper。
 
 ## 架构红线
 
