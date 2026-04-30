@@ -4,6 +4,10 @@ import inspect
 from typing import Any
 
 from app.core.model_catalog import get_default_text_model_ref, normalize_model_ref, resolve_runtime_model_name
+from app.core.runtime.agent_streaming import (
+    build_agent_stream_delta_callback as _build_agent_stream_delta_callback,
+    finalize_agent_stream_delta as _finalize_agent_stream_delta,
+)
 from app.core.runtime.agent_prompt import (
     build_auto_system_prompt as _build_auto_system_prompt,
     build_effective_system_prompt as _build_effective_system_prompt,
@@ -55,7 +59,7 @@ from app.core.runtime.state_io import (
     collect_node_inputs as _collect_node_inputs,
     initialize_graph_state as _initialize_graph_state,
 )
-from app.core.runtime.state import touch_run_lifecycle, utc_now_iso
+from app.core.runtime.state import touch_run_lifecycle
 from app.core.schemas.node_system import (
     NodeSystemAgentNode,
     NodeSystemConditionNode,
@@ -256,71 +260,6 @@ def _callable_accepts_keyword(func: Any, keyword: str) -> bool:
     except (TypeError, ValueError):
         return True
     return keyword in parameters or any(parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values())
-
-
-def _build_agent_stream_delta_callback(
-    *,
-    state: dict[str, Any],
-    node_name: str,
-    output_keys: list[str],
-):
-    run_id = str(state.get("run_id") or "").strip()
-    if not run_id:
-        return None
-
-    text_parts: list[str] = []
-    chunk_count = 0
-
-    def _on_delta(delta: str) -> None:
-        nonlocal chunk_count
-        chunk_text = str(delta or "")
-        if not chunk_text:
-            return
-        chunk_count += 1
-        text_parts.append(chunk_text)
-        full_text = "".join(text_parts)
-        stream_record = {
-            "node_id": node_name,
-            "output_keys": list(output_keys),
-            "text": full_text,
-            "chunk_count": chunk_count,
-            "completed": False,
-            "updated_at": utc_now_iso(),
-        }
-        state.setdefault("streaming_outputs", {})[node_name] = stream_record
-        publish_run_event(
-            run_id,
-            "node.output.delta",
-            {
-                **stream_record,
-                "delta": chunk_text,
-                "chunk_index": chunk_count,
-            },
-        )
-
-    return _on_delta
-
-
-def _finalize_agent_stream_delta(
-    *,
-    state: dict[str, Any],
-    node_name: str,
-    output_values: dict[str, Any],
-) -> None:
-    stream_record = state.setdefault("streaming_outputs", {}).get(node_name)
-    if not isinstance(stream_record, dict):
-        return
-    stream_record["completed"] = True
-    stream_record["updated_at"] = utc_now_iso()
-    stream_record["output_values"] = copy.deepcopy(output_values)
-    publish_run_event(
-        str(state.get("run_id") or ""),
-        "node.output.completed",
-        {
-            **stream_record,
-            "output_values": copy.deepcopy(output_values),
-        },
-    )
 
 
 def _execute_condition_node(

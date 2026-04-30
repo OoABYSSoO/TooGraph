@@ -182,7 +182,8 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 - `runtime/run_artifacts.py` 已承接 run artifact refresh、exported output saved-file matching、state snapshot refresh、knowledge summary building 和 run snapshot append/deep-copy behavior；`node_system_executor.py` 保留 `_refresh_run_artifacts` 与 `_build_knowledge_summary` 兼容入口，`core/langgraph/runtime.py` 已直接依赖新模块。
 - `runtime/input_boundary.py` 已承接 first-truthy selection 和 input boundary JSON coercion；`node_system_executor.py` 保留旧私有 helper 入口。
 - `runtime/output_boundaries.py` 已承接 output node execution、output preview construction、output persistence calls、active output refresh filtering、saved output filtering 和 final result selection；`node_system_executor.py` 保留 `collect_output_boundaries` 与 `_execute_output_node` 兼容入口，`core/langgraph/runtime.py` 已直接依赖新模块。
-- Phase 106 后 `node_system_executor.py` 从 1,226 行降到 547 行；执行主流程、副作用、agent streaming delta 和 node handler 仍留在 executor，后续应继续优先抽取 streaming delta、reference/skill helper 或 node handler。
+- `runtime/agent_streaming.py` 已承接 streamed delta accumulation、streaming output record updates、node.output.delta/node.output.completed run events 和 output value deep-copying；`node_system_executor.py` 保留旧私有 helper 入口。
+- Phase 107 后 `node_system_executor.py` 从 1,226 行降到 486 行；执行主流程、副作用、reference/skill helper 和 node handler 仍留在 executor，后续应继续优先抽取 reference/skill helper 或 node handler。
 
 ### 3. `core/langgraph/runtime.py`
 
@@ -275,7 +276,7 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 
 先拆 `model_provider_client.py`，再拆 `node_system_executor.py`，最后拆 LangGraph runtime。理由：provider client 的协议边界最清晰，executor 和 LangGraph runtime 对产品语义影响更大。
 
-当前 P4 进展：`model_provider_client.py` 的共享 HTTP/request 层、provider discovery 层、OpenAI-compatible chat transport、Anthropic messages transport、Gemini generate-content transport、Codex responses transport 和共享 response parsing 已完成抽取；`node_system_executor.py` 的 condition evaluation、agent prompt、LLM output parser、execution graph、state I/O、output artifact、run artifact、input boundary 和 output boundary helper 已完成抽取；LangGraph runtime 仍待迁移。
+当前 P4 进展：`model_provider_client.py` 的共享 HTTP/request 层、provider discovery 层、OpenAI-compatible chat transport、Anthropic messages transport、Gemini generate-content transport、Codex responses transport 和共享 response parsing 已完成抽取；`node_system_executor.py` 的 condition evaluation、agent prompt、LLM output parser、execution graph、state I/O、output artifact、run artifact、input boundary、output boundary 和 agent streaming helper 已完成抽取；LangGraph runtime 仍待迁移。
 
 ## 架构红线
 
