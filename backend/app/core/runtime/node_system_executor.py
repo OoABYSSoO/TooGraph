@@ -64,6 +64,7 @@ from app.core.runtime.run_artifacts import (
     build_knowledge_summary as _build_knowledge_summary,
     refresh_run_artifacts as _refresh_run_artifacts,
 )
+from app.core.runtime.run_progress import persist_run_progress
 from app.core.runtime.run_events import publish_run_event
 from app.core.runtime.state_io import (
     apply_state_writes as _apply_state_writes,
@@ -104,18 +105,15 @@ def _persist_run_progress(
     *,
     started_perf: float,
 ) -> None:
-    _refresh_run_artifacts(state, node_outputs, active_edge_ids, started_perf=started_perf)
-    touch_run_lifecycle(state)
-    save_run(state)
-    publish_run_event(
-        str(state.get("run_id") or ""),
-        "run.updated",
-        {
-            "status": state.get("status"),
-            "current_node_id": state.get("current_node_id"),
-            "duration_ms": state.get("duration_ms"),
-            "updated_at": state.get("lifecycle", {}).get("updated_at") if isinstance(state.get("lifecycle"), dict) else None,
-        },
+    persist_run_progress(
+        state,
+        node_outputs,
+        active_edge_ids,
+        started_perf=started_perf,
+        refresh_run_artifacts_func=_refresh_run_artifacts,
+        touch_run_lifecycle_func=touch_run_lifecycle,
+        save_run_func=save_run,
+        publish_run_event_func=publish_run_event,
     )
 
 

@@ -1,5 +1,60 @@
 # Progress Log
 
+## Session: 2026-04-30 Phase 112
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Continued automatically after commit `c0fee00` because the full-roadmap progress is below 100%.
+  - Re-read the formal roadmap, Phase 111 findings, and remaining executor run-progress/facade clusters.
+  - Chose run progress persistence because the side-effect sequence can move behind injected dependencies while preserving the old runtime call surface.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `backend/tests/test_runtime_progress_persistence.py` covering run artifact refresh arguments, lifecycle touch, save call, and `run.updated` event payload construction.
+  - Verified the expected red failure because `app.core.runtime.run_progress` did not exist yet.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `backend/app/core/runtime/run_progress.py`.
+  - Moved run artifact refresh, lifecycle touch, save, and `run.updated` event publishing out of `node_system_executor.py`.
+  - Kept `node_system_executor._persist_run_progress` as a thin dependency-injection facade so runtime callers and patch seams still work.
+  - Reduced `node_system_executor.py` from 252 lines to 250 lines while isolating the side-effect boundary.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused run progress and LangGraph migration tests.
+  - Ran `git diff --check`.
+  - Ran the full backend test suite.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend entry returned HTTP 200 and backend `/health` returned `{"status":"ok"}`.
+  - Confirmed the previous dev session exited after the restart.
+
+### Phase 5: Honest Progress Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated the full roadmap at about 93.5%.
+  - Recalculated the frontend-focused roadmap at about 83-85%; unchanged because Phase 112 was backend-only.
+  - Recalculated P3 `EditorWorkspaceShell.vue` cleanup at about 82%; unchanged.
+  - Recalculated P4 backend cleanup at about 82-84% after isolating run progress persistence.
+  - Opened Phase 113 automatically because the full roadmap is still below 100%.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red structure/import test | `PYTHONPATH=backend pytest backend/tests/test_runtime_progress_persistence.py -q` before implementation | Fails because the run progress module is missing | Failed with missing module import | Passed |
+| Focused runtime tests | `PYTHONPATH=backend pytest backend/tests/test_runtime_progress_persistence.py backend/tests/test_langgraph_migration.py -q` | Run progress and LangGraph behavior stay unchanged | 40 passed | Passed |
+| Whitespace check + full backend tests | `git diff --check && PYTHONPATH=backend pytest backend/tests -q` | No whitespace errors and all backend tests pass | 181 passed, 2 existing warnings | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | None | Phase 112 | No implementation errors beyond the expected red module-import failure. |
+
 ## Session: 2026-04-30 Phase 111
 
 ### Phase 1: Re-orientation
