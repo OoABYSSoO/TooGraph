@@ -4,7 +4,7 @@
 Run a ten-round conservative cleanup batch focused on `EditorCanvas.vue` pure projection and interaction-model helpers, then close the baseline interaction regressions in one larger pass while preserving graph editing behavior, runtime visuals, drag/connect workflows, deletion behavior, and dev startup health.
 
 ## Current Phase
-Phase 66 in progress
+Phase 67 in progress
 
 ## Autonomous Continuation Gate
 - After every completed cleanup phase, re-read `docs/future/2026-04-28-architecture-refactor-roadmap.md`, `task_plan.md`, `findings.md`, and `progress.md`, then recalculate the total roadmap progress and the active area progress.
@@ -612,12 +612,21 @@ Phase 66 in progress
 - **Status:** completed
 
 ### Phase 66: EditorCanvas Projected Edge Visibility Gate
-- [ ] Re-read the formal roadmap, Phase 65 findings, and current projected-edge visibility flow before changing code.
-- [ ] Inspect whether the next safest `EditorCanvas.vue` boundary is the projected-edge visibility membership check around `visibleProjectedEdgeIds`.
-- [ ] Add focused red tests for the projected-edge visibility gate before production changes.
-- [ ] Keep `visibleProjectedEdgeIds` computation, edge projection, SVG rendering, selected edge state, and anchor overlay rendering stable.
-- [ ] Run focused edge visibility/structure and Canvas regression tests, TypeScript checks, full frontend tests or justified targeted regression, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
-- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 66.
+- [x] Re-read the formal roadmap, Phase 65 findings, and current projected-edge visibility flow before changing code.
+- [x] Inspect whether the next safest `EditorCanvas.vue` boundary is the projected-edge visibility membership check around `visibleProjectedEdgeIds`.
+- [x] Add focused red tests for the projected-edge visibility gate before production changes.
+- [x] Keep `visibleProjectedEdgeIds` computation, edge projection, SVG rendering, selected edge state, and anchor overlay rendering stable.
+- [x] Run focused edge visibility/structure and Canvas regression tests, TypeScript checks, full frontend tests or justified targeted regression, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
+- [x] If total roadmap progress is below 100%, automatically open the next phase after Phase 66.
+- **Status:** completed
+
+### Phase 67: EditorCanvas Anchor Connection Class State
+- [ ] Re-read the formal roadmap, Phase 66 findings, and current anchor/flow hotspot class state flow before changing code.
+- [ ] Inspect whether the next safest `EditorCanvas.vue` boundary is active-source and eligible-target class projection for flow hotspots and state anchors.
+- [ ] Add focused red tests for the selected class-state boundary before production changes.
+- [ ] Keep active connection source ref, eligible target ids, connection styling context, pointer handlers, and anchor overlay rendering stable.
+- [ ] Run focused interaction-style/structure and Canvas regression tests, TypeScript checks, full frontend tests or justified targeted regression, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
+- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 67.
 - **Status:** in progress
 
 ## Progress Estimate
@@ -791,6 +800,10 @@ Phase 66 in progress
 | P2 `EditorCanvas.vue` cleanup after Phase 65 | About 93% complete after extracting selected/hovered/active-source hotspot decisions while preserving anchor overlay rendering. |
 | Current continuation gate after Phase 65 | Total roadmap progress is below 100%, so Phase 66 is automatically opened for the next safe P2 Canvas projected-edge visibility boundary. |
 | P2 `EditorCanvas.vue` cleanup target for Phase 66 | About 94% if projected-edge visibility membership moves into `edgeVisibilityModel.ts` without changing visible edge id computation or SVG rendering. |
+| Overall roadmap cleanup after Phase 66 | About 93% complete after moving projected-edge visibility membership into `edgeVisibilityModel.ts`. |
+| P2 `EditorCanvas.vue` cleanup after Phase 66 | About 94% complete after removing the local projected-edge visibility helper while preserving SVG edge rendering. |
+| Current continuation gate after Phase 66 | Total roadmap progress is below 100%, so Phase 67 is automatically opened for the next safe P2 Canvas anchor connection class-state boundary. |
+| P2 `EditorCanvas.vue` cleanup target for Phase 67 | About 95% if active-source and eligible-target class-state checks move into `canvasInteractionStyleModel.ts` without changing connection styling or anchor overlay behavior. |
 
 ## Decisions Made
 | Decision | Rationale |
@@ -852,6 +865,7 @@ Phase 66 in progress
 - Phase 63 moves canvas size update action projection into `canvasViewportInteractionModel.ts`; `EditorCanvas.vue` keeps DOM client size reads, `ResizeObserver` lifecycle, and actual `canvasSize` ref mutation.
 - Phase 64 moves selected-edge target point projection into `canvasEdgePointerInteractionModel.ts`; `EditorCanvas.vue` keeps projected anchor ref access and actual pending connection point mutation.
 - Phase 65 moves flow/route hotspot visibility projection into `edgeVisibilityModel.ts`; `EditorCanvas.vue` keeps selected/hovered refs, active connection source ref, eligible target ids, and anchor overlay rendering.
+- Phase 66 moves projected-edge visibility membership into `edgeVisibilityModel.ts`; `EditorCanvas.vue` keeps visible edge id computation, projected edge rendering, selected edge state, and hitarea handlers.
 - Do not commit runtime artifacts such as `backend/data/settings`, `.dev_*`, `dist`, or `.worktrees`.
 - After code changes, restart using `npm run dev`.
 

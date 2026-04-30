@@ -731,25 +731,26 @@ test("EditorCanvas renders output flow hotspots only for allowed modes and inter
 test("EditorCanvas exposes a top-left capsule toolbar for edge visibility modes", () => {
   const edgeVisibilityModelSource = readEdgeVisibilityModelSource();
 
-  assert.match(componentSource, /import \{[\s\S]*buildEdgeVisibilityModeOptions,[\s\S]*buildForceVisibleProjectedEdgeIds,[\s\S]*filterProjectedEdgesForVisibilityMode,[\s\S]*isCanvasFlowHotspotVisible,[\s\S]*resolveEdgeVisibilityModeClickAction,[\s\S]*type EdgeVisibilityMode[\s\S]*\} from "\.\/edgeVisibilityModel";/);
+  assert.match(componentSource, /import \{[\s\S]*buildEdgeVisibilityModeOptions,[\s\S]*buildForceVisibleProjectedEdgeIds,[\s\S]*filterProjectedEdgesForVisibilityMode,[\s\S]*isCanvasFlowHotspotVisible,[\s\S]*isProjectedCanvasEdgeVisible,[\s\S]*resolveEdgeVisibilityModeClickAction,[\s\S]*type EdgeVisibilityMode[\s\S]*\} from "\.\/edgeVisibilityModel";/);
   assert.match(componentSource, /const edgeVisibilityModeOptions = computed\(\(\) => \{[\s\S]*return buildEdgeVisibilityModeOptions\(\);/);
   assert.match(componentSource, /const edgeVisibilityMode = ref<EdgeVisibilityMode>\("smart"\);/);
   assert.doesNotMatch(componentSource, /const edgeVisibilityRelatedNodeIds = computed\(\(\) =>/);
   assert.match(componentSource, /const forceVisibleProjectedEdgeIds = computed\(\(\) => buildForceVisibleProjectedEdgeIds\(\{[\s\S]*selectedEdgeId: selectedEdgeId\.value,[\s\S]*dataEdgeStateConfirmId: activeDataEdgeStateConfirm\.value\?\.id,[\s\S]*dataEdgeStateEditorId: activeDataEdgeStateEditor\.value\?\.id,[\s\S]*flowEdgeDeleteConfirmId: activeFlowEdgeDeleteConfirm\.value\?\.id,[\s\S]*\}\)\);/);
   assert.match(edgeVisibilityModelSource, /export function buildForceVisibleProjectedEdgeIds/);
   assert.match(edgeVisibilityModelSource, /export function isCanvasFlowHotspotVisible/);
+  assert.match(edgeVisibilityModelSource, /export function isProjectedCanvasEdgeVisible/);
   assert.doesNotMatch(componentSource, /const forceVisibleProjectedEdgeIds = computed\(\(\) => \{[\s\S]*const edgeIds = new Set<string>\(\)/);
   assert.match(componentSource, /const visibleProjectedEdgeIds = computed\(/);
   assert.match(componentSource, /filterProjectedEdgesForVisibilityMode\(projectedEdges\.value,/);
   assert.doesNotMatch(componentSource, /relatedNodeIds:/);
-  assert.match(componentSource, /function isProjectedEdgeVisible\(edge: ProjectedCanvasEdge\)/);
+  assert.doesNotMatch(componentSource, /function isProjectedEdgeVisible\(edge: ProjectedCanvasEdge\)/);
   assert.match(componentSource, /class="editor-canvas__edge-view-toolbar"/);
   assert.match(componentSource, /v-for="option in edgeVisibilityModeOptions"/);
   assert.match(componentSource, /handleEdgeVisibilityModeClick\(option\.mode\)/);
   assert.match(componentSource, /case "change-mode":[\s\S]*edgeVisibilityMode\.value = edgeVisibilityModeClickAction\.mode;[\s\S]*selectedEdgeId\.value = null;[\s\S]*clearPendingConnection\(\);[\s\S]*clearCanvasTransientState\(\);/);
   assert.doesNotMatch(componentSource, /function setEdgeVisibilityMode\(mode: EdgeVisibilityMode\)/);
   assert.match(componentSource, /\{\{ option\.label \}\}/);
-  assert.match(componentSource, /v-show="isProjectedEdgeVisible\(edge\)"/);
+  assert.match(componentSource, /v-show="isProjectedCanvasEdgeVisible\(edge, visibleProjectedEdgeIds\)"/);
   assert.match(
     componentSource,
     /\.editor-canvas__edge-view-toolbar \{[\s\S]*position:\s*absolute;[\s\S]*left:\s*18px;[\s\S]*top:\s*calc\(var\(--editor-canvas-floating-top-clearance,\s*18px\) \+ 18px\);/,

@@ -79,7 +79,7 @@
         <path
           v-for="edge in projectedEdges.filter((edge) => edge.kind === 'flow' || edge.kind === 'route')"
           :key="`${edge.id}:highlight`"
-          v-show="isProjectedEdgeVisible(edge)"
+          v-show="isProjectedCanvasEdgeVisible(edge, visibleProjectedEdgeIds)"
           :d="edge.path"
           class="editor-canvas__edge-delete-highlight"
           :style="edgeStyle(edge)"
@@ -88,7 +88,7 @@
         <path
           v-for="edge in projectedEdges.filter((edge) => edge.kind === 'data')"
           :key="`${edge.id}:data-highlight`"
-          v-show="isProjectedEdgeVisible(edge)"
+          v-show="isProjectedCanvasEdgeVisible(edge, visibleProjectedEdgeIds)"
           :d="edge.path"
           class="editor-canvas__edge-data-highlight"
           :style="edgeStyle(edge)"
@@ -97,7 +97,7 @@
         <path
           v-for="edge in projectedEdges"
           :key="edge.id"
-          v-show="isProjectedEdgeVisible(edge)"
+          v-show="isProjectedCanvasEdgeVisible(edge, visibleProjectedEdgeIds)"
           :d="edge.path"
           class="editor-canvas__edge"
           :style="edgeStyle(edge)"
@@ -112,7 +112,7 @@
         <path
           v-for="edge in projectedEdges"
           :key="`${edge.id}:hitarea`"
-          v-show="isProjectedEdgeVisible(edge)"
+          v-show="isProjectedCanvasEdgeVisible(edge, visibleProjectedEdgeIds)"
           :d="edge.path"
           class="editor-canvas__edge-hitarea"
           :class="{
@@ -414,6 +414,7 @@ import {
   buildForceVisibleProjectedEdgeIds,
   filterProjectedEdgesForVisibilityMode,
   isCanvasFlowHotspotVisible,
+  isProjectedCanvasEdgeVisible,
   resolveEdgeVisibilityModeClickAction,
   type EdgeVisibilityMode,
 } from "./edgeVisibilityModel";
@@ -912,10 +913,6 @@ watch(
   },
   { immediate: true },
 );
-
-function isProjectedEdgeVisible(edge: ProjectedCanvasEdge) {
-  return visibleProjectedEdgeIds.value.has(edge.id);
-}
 
 function handleEdgeVisibilityModeClick(mode: EdgeVisibilityMode) {
   const edgeVisibilityModeClickAction = resolveEdgeVisibilityModeClickAction({

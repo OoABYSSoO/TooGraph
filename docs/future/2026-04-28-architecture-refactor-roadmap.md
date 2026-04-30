@@ -173,6 +173,7 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 - 2026-04-30：`canvasViewportInteractionModel.ts` 已继续承担 canvas size update 的 missing-element、unchanged-size 和 update-size routing，`EditorCanvas.vue` 仍保留 DOM client size reads、`ResizeObserver` lifecycle、minimap consumers 和 actual `canvasSize` ref mutation。
 - 2026-04-30：`canvasEdgePointerInteractionModel.ts` 已继续承担 selected-edge target point projection 的 data/flow target anchor lookup，`EditorCanvas.vue` 仍保留 projected anchor ref access、selected-edge mutation 和 actual pending connection point mutation。
 - 2026-04-30：`edgeVisibilityModel.ts` 已继续承担 canvas flow/route hotspot visibility projection，`EditorCanvas.vue` 仍保留 selected/hovered refs、active connection source ref、eligible target ids 和 anchor overlay rendering。
+- 2026-04-30：`edgeVisibilityModel.ts` 已继续承担 projected-edge visibility membership，`EditorCanvas.vue` 仍保留 visible edge id computation、projected edge rendering、selected-edge state 和 hitarea handlers。
 
 ## 优先级路线
 

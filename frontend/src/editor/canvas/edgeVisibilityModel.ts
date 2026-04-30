@@ -163,6 +163,10 @@ export function isCanvasFlowHotspotVisible(input: {
   return input.eligibleTargetAnchorIds.has(input.anchor.id);
 }
 
+export function isProjectedCanvasEdgeVisible(edge: ProjectedCanvasEdge, visibleEdgeIds: ReadonlySet<string>) {
+  return visibleEdgeIds.has(edge.id);
+}
+
 export function resolveEdgeVisibilityModeClickAction(input: {
   interactionLocked: boolean;
   currentMode: EdgeVisibilityMode;
