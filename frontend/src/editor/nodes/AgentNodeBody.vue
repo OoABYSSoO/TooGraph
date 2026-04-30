@@ -243,6 +243,24 @@ defineExpose({
 </script>
 
 <style scoped>
+.node-card__port-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  width: 100%;
+  gap: 8px;
+}
+
+.node-card__port-column {
+  display: grid;
+  min-width: 0;
+  width: 100%;
+}
+
+.node-card__port-column--right {
+  justify-items: end;
+}
+
 .node-card__surface {
   min-height: 120px;
   border: 1px solid rgba(154, 52, 18, 0.12);
