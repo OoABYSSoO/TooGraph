@@ -301,6 +301,7 @@ import EditorNodeCreationMenu from "./EditorNodeCreationMenu.vue";
 import EditorStatePanel from "./EditorStatePanel.vue";
 import EditorTabBar from "./EditorTabBar.vue";
 import EditorWelcomeState from "./EditorWelcomeState.vue";
+import { buildNextCanvasViewportDrafts, listTabsMissingViewportDrafts } from "./editorDraftPersistenceModel.ts";
 import { formatRunFeedback, formatValidationFeedback, type RunFeedback, type WorkspaceFeedbackTone } from "./runFeedbackModel.ts";
 import { buildRunNodeArtifactsModel, mergeRunOutputPreviewByNodeId } from "./runNodeArtifactsModel.ts";
 import { applyRunWrittenStateValuesToDocument } from "./runStatePersistence.ts";
@@ -765,39 +766,27 @@ function registerDocumentForTab(tabId: string, graph: GraphPayload | GraphDocume
 }
 
 function ensureTabViewportDrafts() {
-  const nextViewports = { ...viewportByTabId.value };
-  let changed = false;
-  for (const tab of workspace.value.tabs) {
-    if (nextViewports[tab.tabId]) {
-      continue;
-    }
-    const persistedViewport = readPersistedEditorViewportDraft(tab.tabId);
+  let nextViewports = viewportByTabId.value;
+  for (const tabId of listTabsMissingViewportDrafts(workspace.value.tabs, viewportByTabId.value)) {
+    const persistedViewport = readPersistedEditorViewportDraft(tabId);
     if (!persistedViewport) {
       continue;
     }
-    nextViewports[tab.tabId] = persistedViewport;
-    changed = true;
+    nextViewports = buildNextCanvasViewportDrafts(nextViewports, tabId, persistedViewport) ?? nextViewports;
   }
-  if (changed) {
+
+  if (nextViewports !== viewportByTabId.value) {
     viewportByTabId.value = nextViewports;
   }
 }
 
 function updateCanvasViewportForTab(tabId: string, viewport: CanvasViewport) {
-  const previousViewport = viewportByTabId.value[tabId] ?? null;
-  if (
-    previousViewport &&
-    previousViewport.x === viewport.x &&
-    previousViewport.y === viewport.y &&
-    previousViewport.scale === viewport.scale
-  ) {
+  const nextViewports = buildNextCanvasViewportDrafts(viewportByTabId.value, tabId, viewport);
+  if (!nextViewports) {
     return;
   }
 
-  viewportByTabId.value = {
-    ...viewportByTabId.value,
-    [tabId]: viewport,
-  };
+  viewportByTabId.value = nextViewports;
   writePersistedEditorViewportDraft(tabId, viewport);
 }
 

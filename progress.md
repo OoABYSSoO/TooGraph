@@ -1,5 +1,75 @@
 # Progress Log
 
+## Session: 2026-04-30 Phase 80
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Confirmed Phase 79 was committed and pushed as `d748291`.
+  - Re-read the formal roadmap and latest P3 findings.
+  - Inspected remaining run-event lifecycle code and chose not to force EventSource lifecycle extraction.
+  - Selected the first draft persistence slice: viewport draft hydration/update decisions.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `editorDraftPersistenceModel.test.ts` coverage for missing viewport draft tab selection and immutable viewport draft updates.
+  - Updated `EditorWorkspaceShell.structure.test.ts` to require the new model boundary and reject inline viewport equality checks.
+  - Verified the expected red failure before implementation because the model file did not exist and the shell still owned the viewport draft decisions.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `frontend/src/editor/workspace/editorDraftPersistenceModel.ts`.
+  - Moved missing viewport tab selection and immutable viewport update/no-op decisions into the model.
+  - Updated `EditorWorkspaceShell.vue` to keep actual persisted viewport reads/writes and ref assignment while delegating pure decisions.
+  - Kept route sync, tab registration, localStorage writes, graph mutation, restore behavior, human-review opening, and run-event stream behavior stable.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused draft persistence model and workspace structure tests.
+  - Ran related workspace persistence, route sync, run event stream, run detail structure, and run state persistence regression tests.
+  - Ran TypeScript unused-symbol verification from `frontend`.
+  - Ran the full frontend `node --test` suite.
+  - Ran the frontend production build; no large chunk warning was emitted.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed backend `/health` returned `{"status":"ok"}` and the frontend entry returned HTTP 200.
+  - Captured a headless Chrome screenshot and confirmed the workspace rendered normally.
+
+### Phase 5: Continuation Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated overall roadmap cleanup at about 99.85%.
+  - Recalculated P3 `EditorWorkspaceShell.vue` cleanup at about 42%.
+  - Opened Phase 81 automatically because total roadmap progress is still below 100%.
+  - Selected the next candidate as document draft hydration decisions.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red focused tests | `node --test frontend/src/editor/workspace/editorDraftPersistenceModel.test.ts frontend/src/editor/workspace/EditorWorkspaceShell.structure.test.ts` before implementation | Fails because the draft persistence model does not exist and shell still owns viewport decisions | Failed on missing module and structure assertion | Passed |
+| Focused model/structure tests | Same focused files after implementation | All focused tests pass | 30 passed | Passed |
+| Focused workspace regression | `node --test` over draft persistence model, workspace structure, editor workspace, route sync, run event stream, run detail structure, and run state persistence tests | Related workspace persistence and run stream tests pass | 76 passed | Passed |
+| Unused symbol check | `./node_modules/.bin/vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No diagnostics | Exit 0 | Passed |
+| Full frontend tests | `node --test $(rg --files src vite.config.structure.test.ts | rg '\.test\.ts$')` in `frontend` | All frontend tests pass | 850 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without a large chunk warning | Exit 0, no Vite chunk warning | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+| Browser smoke | Headless Chrome screenshot with virtual-time wait | Workspace renders normally | Workspace UI rendered | Passed |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Phase 80 implementation, verification, docs update, and dev restart are complete. |
+| Where am I going? | Phase 81 is open for document draft hydration decisions. |
+| What's the goal? | Continue P3 shell cleanup while preserving route sync, local draft persistence, graph open/save, restore, and run stream behavior. |
+| What have I learned? | Viewport draft decisions are pure enough to move safely; actual localStorage reads/writes should remain shell-owned for now. |
+| What have I done? | Extracted viewport draft decision helpers, added focused tests, verified the full frontend suite, built, restarted, and visually smoked the app. |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+
 ## Session: 2026-04-30 Phase 79
 
 ### Phase 1: Re-orientation

@@ -172,6 +172,12 @@ test("EditorWorkspaceShell routes menu selections and dropped files through the 
 });
 
 test("EditorWorkspaceShell keeps canvas viewport state in local editor drafts", () => {
+  const ensureViewportSource =
+    componentSource.match(/function ensureTabViewportDrafts\(\) \{[\s\S]*?\n\}\n\nfunction updateCanvasViewportForTab/)?.[0] ?? "";
+  const updateViewportSource =
+    componentSource.match(/function updateCanvasViewportForTab\(tabId: string, viewport: CanvasViewport\) \{[\s\S]*?\n\}\n\nfunction clearTabRuntime/)?.[0] ?? "";
+
+  assert.match(componentSource, /import \{[\s\S]*buildNextCanvasViewportDrafts,[\s\S]*listTabsMissingViewportDrafts[\s\S]*\} from "\.\/editorDraftPersistenceModel\.ts";/);
   assert.match(componentSource, /readPersistedEditorViewportDraft/);
   assert.match(componentSource, /writePersistedEditorViewportDraft/);
   assert.match(componentSource, /prunePersistedEditorViewportDrafts/);
@@ -181,6 +187,10 @@ test("EditorWorkspaceShell keeps canvas viewport state in local editor drafts", 
   assert.match(componentSource, /@update:viewport="updateCanvasViewportForTab\(tab\.tabId, \$event\)"/);
   assert.match(componentSource, /function ensureTabViewportDrafts\(\)/);
   assert.match(componentSource, /function updateCanvasViewportForTab\(tabId: string, viewport: CanvasViewport\)/);
+  assert.match(ensureViewportSource, /for \(const tabId of listTabsMissingViewportDrafts\(workspace\.value\.tabs, viewportByTabId\.value\)\)/);
+  assert.doesNotMatch(ensureViewportSource, /for \(const tab of workspace\.value\.tabs\)/);
+  assert.match(updateViewportSource, /const nextViewports = buildNextCanvasViewportDrafts\(viewportByTabId\.value, tabId, viewport\);/);
+  assert.doesNotMatch(updateViewportSource, /previousViewport\.x === viewport\.x/);
   assert.match(componentSource, /writePersistedEditorViewportDraft\(tabId, viewport\)/);
 });
 
