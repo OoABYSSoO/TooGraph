@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import importlib.util
 import sys
 import unittest
 from pathlib import Path
@@ -85,6 +86,20 @@ class ModelProviderClientTests(unittest.TestCase):
     def _patched_client(self, response: FakeResponse):
         fake_client = FakeHttpClient(response)
         return fake_client, patch("app.tools.model_provider_client.httpx.Client", return_value=fake_client)
+
+    def test_http_request_helpers_are_isolated_from_provider_client(self) -> None:
+        spec = importlib.util.find_spec("app.tools.model_provider_http")
+        self.assertIsNotNone(spec, "model provider HTTP helpers should live in a dedicated module")
+
+        from app.tools import model_provider_client
+        from app.tools import model_provider_http
+
+        client_source = Path(model_provider_client.__file__ or "").read_text(encoding="utf-8")
+        self.assertIs(model_provider_client._normalize_base_url, model_provider_http.normalize_base_url)
+        self.assertIs(model_provider_client._build_auth_headers, model_provider_http.build_auth_headers)
+        self.assertIs(model_provider_client.post_streaming_json_with_fallback, model_provider_http.post_streaming_json_with_fallback)
+        self.assertNotIn("def _request_json(", client_source)
+        self.assertNotIn("def post_streaming_json_with_fallback(", client_source)
 
     def test_discovers_openai_compatible_models_with_bearer_header(self) -> None:
         from app.tools.model_provider_client import discover_provider_models

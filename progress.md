@@ -1,5 +1,59 @@
 # Progress Log
 
+## Session: 2026-04-30 Phase 94
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Continued automatically because the recalibrated full-roadmap progress is below 100%.
+  - Re-read the roadmap, Phase 93 findings, backend provider tests, and `model_provider_client.py`.
+  - Chose the first P4 provider-client slice because backend cleanup was the largest honest progress gap.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added backend structure coverage requiring shared HTTP/request helpers to live in `app.tools.model_provider_http`.
+  - Verified the expected red failure because the module did not exist and `model_provider_client.py` still owned the helper definitions.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `backend/app/tools/model_provider_http.py`.
+  - Moved base URL normalization, auth header construction, Anthropic headers, string dedupe, request JSON handling, request-error formatting, model request log safety, SSE event reading, and streaming JSON fallback into the new module.
+  - Kept `model_provider_client.py` as the public API and provider orchestration layer, including compatibility aliases for existing imports and test patch points.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran the focused red/green structure test.
+  - Ran model-provider, OpenAI-compatible local runtime, Codex provider, and model request log tests.
+  - Ran the full backend test suite.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend entry returned HTTP 200 and backend `/health` returned `{"status":"ok"}`.
+
+### Phase 5: Honest Progress Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated the full roadmap at about 74-75%.
+  - Recalculated the frontend-focused roadmap at about 83-85%; unchanged because Phase 94 was backend-only.
+  - Recalculated P3 `EditorWorkspaceShell.vue` cleanup at about 82%; unchanged.
+  - Recalculated P4 backend cleanup at about 6-8% after the first `model_provider_client.py` helper extraction.
+  - Opened Phase 95 automatically because the full roadmap is still below 100%.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red structure test | `PYTHONPATH=backend pytest backend/tests/test_model_provider_client.py::ModelProviderClientTests::test_http_request_helpers_are_isolated_from_provider_client -q` before implementation | Fails because `model_provider_http` is missing | Failed with missing module assertion | Passed |
+| Focused structure test | Same command after implementation | Structure test passes | 1 passed | Passed |
+| Provider regression tests | `PYTHONPATH=backend pytest backend/tests/test_model_provider_client.py backend/tests/test_openai_compatible_provider_runtime.py backend/tests/test_openai_codex_provider.py backend/tests/test_model_request_logs.py -q` | Provider behavior stays unchanged | 39 passed, 2 existing warnings | Passed |
+| Full backend tests | `PYTHONPATH=backend pytest backend/tests -q` | All backend tests pass | 140 passed, 2 existing warnings | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | Existing provider tests patched `app.tools.model_provider_client.append_model_request_log` after the log helper moved | Phase 94 focused regression run | Added a compatibility adapter in `model_provider_client.py` that delegates to `model_provider_http.append_model_request_log_safely` while preserving the old patch seam. |
+
 ## Session: 2026-04-30 Phase 93
 
 ### Phase 1: Re-orientation
