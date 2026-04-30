@@ -6,10 +6,10 @@ Run a ten-round conservative cleanup batch focused on `EditorCanvas.vue` pure pr
 ## Progress Accuracy Note
 - The earlier `99.x%` values are no longer treated as the true total optimization progress. They reflected the active frontend cleanup batch getting close to its own tail, not the whole architecture roadmap.
 - The honest full-roadmap progress must include P0 cleanup, P1 `NodeCard.vue`, P2 `EditorCanvas.vue`, P3 `EditorWorkspaceShell.vue`, and P4 backend runtime/provider cleanup.
-- Current conservative estimate after Phase 117: full roadmap is about 98% complete; frontend-focused roadmap is about 83-85% complete; P3 `EditorWorkspaceShell.vue` is about 82% complete; backend P4 is about 95% started.
+- Current conservative estimate after Phase 118 reassessment: full roadmap is about 94-95% complete; frontend-focused roadmap is about 83-85% complete; P3 `EditorWorkspaceShell.vue` is about 82% complete; backend P4 is about 95% complete.
 
 ## Current Phase
-Phase 118 in progress
+Phase 119 in progress
 
 ## Autonomous Continuation Gate
 - After every completed cleanup phase, re-read `docs/future/2026-04-28-architecture-refactor-roadmap.md`, `task_plan.md`, `findings.md`, and `progress.md`, then recalculate the total roadmap progress and the active area progress.
@@ -1077,12 +1077,21 @@ Phase 118 in progress
 - **Status:** completed
 
 ### Phase 118: Final Backend P4 Verification and Remaining Roadmap Reassessment
-- [ ] Re-read the formal roadmap, Phase 117 findings, and remaining high-line-count frontend/backend files.
-- [ ] Recalculate whether backend P4 is effectively complete and decide if the remaining roadmap work is frontend P3/P2 tail work or final cleanup.
-- [ ] Add focused red tests before any production changes.
-- [ ] Preserve cycle summaries, checkpoint/resume behavior, provider behavior, output boundary behavior, frontend graph interactions, and visual layout.
-- [ ] Run focused tests, full backend/frontend verification as needed, dev restart, commit, push, and final progress re-evaluation.
-- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 118 and re-judge total progress.
+- [x] Re-read the formal roadmap, Phase 117 findings, and remaining high-line-count frontend/backend files.
+- [x] Recalculate whether backend P4 is effectively complete and decide if the remaining roadmap work is frontend P3/P2 tail work or final cleanup.
+- [x] Add focused red tests before any production changes.
+- [x] Preserve cycle summaries, checkpoint/resume behavior, provider behavior, output boundary behavior, frontend graph interactions, and visual layout.
+- [x] Run focused tests, full backend/frontend verification as needed, dev restart, commit, push, and final progress re-evaluation.
+- [x] If total roadmap progress is below 100%, automatically open the next phase after Phase 118 and re-judge total progress.
+- **Status:** completed
+
+### Phase 119: Frontend Tail Reassessment
+- [ ] Re-read the formal roadmap, Phase 118 findings, and remaining frontend high-line-count files.
+- [ ] Choose the safest remaining frontend tail slice from `EditorWorkspaceShell.vue`, `EditorCanvas.vue`, or `NodeCard.vue`.
+- [ ] Add focused red tests before production changes.
+- [ ] Preserve graph editing interactions, auto-snapping, node creation naming/context, runtime visuals, provider behavior, output boundary behavior, and visual layout.
+- [ ] Run focused frontend/backend verification as needed, dev restart, commit, push, and progress re-evaluation.
+- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 119 and re-judge total progress.
 - **Status:** in progress
 
 ## Progress Estimate
@@ -1505,6 +1514,12 @@ Phase 118 in progress
 | P4 backend cleanup after Phase 117 | About 95% complete. `core/langgraph/runtime.py` is now 528 lines, with cycle tracker construction, loop-limit tracking, route/activity recording, cycle record serialization, and final cycle summaries isolated in `cycle_tracker.py`. |
 | Current continuation gate after Phase 117 | Total roadmap progress is still below 100%, so Phase 118 is automatically opened for final backend P4 verification and remaining roadmap reassessment. |
 | P4 cleanup target for Phase 118 | About 96-98% P4 if remaining LangGraph runtime facade cleanup is safe; otherwise reassess the final 2% as frontend P3/P2 tail work. |
+| Full roadmap cleanup after Phase 118 reassessment | About 94-95% complete. The previous Phase 117 total estimate of 98% was too aggressive because `EditorWorkspaceShell.vue` (2,055 lines), `EditorCanvas.vue` (3,396 lines), and `NodeCard.vue` (1,988 lines) still carry frontend tail work. |
+| Frontend roadmap cleanup after Phase 118 | Still about 83-85%; no frontend source changed in Phase 118. |
+| P3 `EditorWorkspaceShell.vue` cleanup after Phase 118 | Still about 82%; no workspace shell changes in this phase. |
+| P4 backend cleanup after Phase 118 | About 95% complete. `node_system_executor.py` is 240 lines, `model_provider_client.py` is 333 lines, and `core/langgraph/runtime.py` is 528 lines after the backend extraction run. |
+| Current continuation gate after Phase 118 | Total roadmap progress is still below 100%, so Phase 119 is automatically opened for frontend tail reassessment. |
+| Frontend cleanup target for Phase 119 | About 85-88% frontend-focused if the next safe `EditorWorkspaceShell.vue`, `EditorCanvas.vue`, or `NodeCard.vue` tail slice moves out without interaction changes. |
 
 ## Decisions Made
 | Decision | Rationale |

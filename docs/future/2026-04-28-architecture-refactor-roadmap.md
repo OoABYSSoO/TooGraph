@@ -291,7 +291,7 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 
 先拆 `model_provider_client.py`，再拆 `node_system_executor.py`，最后拆 LangGraph runtime。理由：provider client 的协议边界最清晰，executor 和 LangGraph runtime 对产品语义影响更大。
 
-当前 P4 进展：`model_provider_client.py` 的共享 HTTP/request 层、provider discovery 层、OpenAI-compatible chat transport、Anthropic messages transport、Gemini generate-content transport、Codex responses transport 和共享 response parsing 已完成抽取；`node_system_executor.py` 的 condition evaluation、agent prompt、LLM output parser、execution graph、state I/O、output artifact、run artifact、input boundary、output boundary、agent streaming、reference resolution、skill invocation、agent runtime config、agent response generation、node handler、run progress 和 runtime summary helper 已完成抽取；LangGraph runtime 已开始复用共享 summary helper，并已迁出 checkpoint/runtime metadata helper、waiting-state interrupt helper 和 cycle helper。后续应做 P4 final verification/reassessment，再决定是否回到 frontend P3/P2 tail work。
+当前 P4 进展：`model_provider_client.py` 的共享 HTTP/request 层、provider discovery 层、OpenAI-compatible chat transport、Anthropic messages transport、Gemini generate-content transport、Codex responses transport 和共享 response parsing 已完成抽取；`node_system_executor.py` 的 condition evaluation、agent prompt、LLM output parser、execution graph、state I/O、output artifact、run artifact、input boundary、output boundary、agent streaming、reference resolution、skill invocation、agent runtime config、agent response generation、node handler、run progress 和 runtime summary helper 已完成抽取；LangGraph runtime 已开始复用共享 summary helper，并已迁出 checkpoint/runtime metadata helper、waiting-state interrupt helper 和 cycle helper。Phase 118 复盘后，后端 P4 约 95% 完成，但全路线总进度需校准到约 94-95%，因为 frontend P3/P2/P1 仍有尾部大文件工作。
 
 ## 架构红线
 
