@@ -454,6 +454,8 @@ import {
 import { useCanvasEdgeInteractions } from "./useCanvasEdgeInteractions";
 import { useCanvasConnectionInteraction } from "./useCanvasConnectionInteraction";
 import { useCanvasNodeMeasurements } from "./useCanvasNodeMeasurements";
+import { useCanvasAnimationFrameScheduler } from "./useCanvasAnimationFrameScheduler";
+import { useCanvasHoverState } from "./useCanvasHoverState";
 import { buildPinchZoomStart, resolveCanvasPinchPointerReleaseAction, resolveCanvasPinchZoomUpdateAction, resolveCanvasPointerDownAction, resolveCanvasTouchPointerMoveAction } from "./canvasPinchZoomModel";
 import type { CanvasPointerDownAction } from "./canvasPinchZoomModel";
 import { buildCanvasViewportStyle, buildZoomPercentLabel } from "./canvasViewportDisplayModel";
@@ -573,6 +575,11 @@ const emit = defineEmits<{
 const canvasRef = ref<HTMLElement | null>(null);
 const canvasSize = ref({ width: 0, height: 0 });
 const viewport = useViewport(props.initialViewport ?? undefined);
+const {
+  cancelScheduledDragFrame,
+  flushScheduledDragFrame,
+  scheduleDragFrame,
+} = useCanvasAnimationFrameScheduler();
 const nodeMeasurements = useCanvasNodeMeasurements({
   document: () => props.document,
   viewportScale: () => viewport.viewport.scale,
@@ -585,6 +592,20 @@ const {
   scheduleAnchorMeasurement,
   teardownNodeMeasurements,
 } = nodeMeasurements;
+const {
+  clearHoveredFlowHandleNode,
+  clearHoveredNode,
+  clearHoveredPointAnchorNode,
+  clearScheduledHoveredNodeRelease,
+  hoveredFlowHandleNodeId,
+  hoveredNodeId,
+  hoveredPointAnchorNodeId,
+  setHoveredFlowHandleNode,
+  setHoveredNode,
+  setHoveredPointAnchorNode,
+} = useCanvasHoverState({
+  scheduleAnchorMeasurement,
+});
 const selection = useNodeSelectionFocus({
   externalSelectedNodeId: toRef(props, "selectedNodeId"),
   externalFocusRequest: toRef(props, "focusRequest"),
@@ -655,13 +676,6 @@ const pinchZoom = ref<{
 } | null>(null);
 const selectedEdgeId = ref<string | null>(null);
 const edgeVisibilityMode = ref<EdgeVisibilityMode>("smart");
-const NODE_HOVER_RELEASE_DELAY_MS = 2000;
-const hoveredNodeId = ref<string | null>(null);
-const hoveredNodeReleaseTimeoutRef = ref<number | null>(null);
-const hoveredPointAnchorNodeId = ref<string | null>(null);
-const hoveredFlowHandleNodeId = ref<string | null>(null);
-let scheduledDragFrame: number | null = null;
-let pendingDragFrameCallback: (() => void) | null = null;
 let canvasResizeObserver: ResizeObserver | null = null;
 
 const edgeInteractions = useCanvasEdgeInteractions({
@@ -1068,41 +1082,6 @@ const routeHandleClassState = (anchor: ProjectedCanvasAnchor) =>
   });
 const anchorConnectStyle = (anchor: ProjectedCanvasAnchor) =>
   buildPointAnchorConnectStyle(anchor, canvasInteractionStyleContext.value);
-
-function scheduleDragFrame(callback: () => void) {
-  pendingDragFrameCallback = callback;
-
-  if (scheduledDragFrame !== null) {
-    return;
-  }
-
-  scheduledDragFrame = window.requestAnimationFrame(() => {
-    scheduledDragFrame = null;
-    const pendingCallback = pendingDragFrameCallback;
-    pendingDragFrameCallback = null;
-    pendingCallback?.();
-  });
-}
-
-function flushScheduledDragFrame() {
-  if (scheduledDragFrame === null) {
-    return;
-  }
-
-  window.cancelAnimationFrame(scheduledDragFrame);
-  scheduledDragFrame = null;
-  const pendingCallback = pendingDragFrameCallback;
-  pendingDragFrameCallback = null;
-  pendingCallback?.();
-}
-
-function cancelScheduledDragFrame() {
-  if (scheduledDragFrame !== null) {
-    window.cancelAnimationFrame(scheduledDragFrame);
-    scheduledDragFrame = null;
-  }
-  pendingDragFrameCallback = null;
-}
 
 function clearPinchZoom() {
   pinchZoom.value = null;
@@ -1591,62 +1570,6 @@ function applyNodeResizePointerDownSetup(
 
 function isNodeResizeHotzoneEnabled() {
   return !isGraphEditingLocked() && !activeConnection.value;
-}
-
-function clearScheduledHoveredNodeRelease() {
-  if (hoveredNodeReleaseTimeoutRef.value !== null && typeof window !== "undefined") {
-    window.clearTimeout(hoveredNodeReleaseTimeoutRef.value);
-  }
-  hoveredNodeReleaseTimeoutRef.value = null;
-}
-
-function setHoveredNode(nodeId: string) {
-  clearScheduledHoveredNodeRelease();
-  hoveredNodeId.value = nodeId;
-  scheduleAnchorMeasurement(nodeId);
-}
-
-function clearHoveredNode(nodeId: string) {
-  if (hoveredNodeId.value !== nodeId) {
-    return;
-  }
-
-  clearScheduledHoveredNodeRelease();
-  if (typeof window === "undefined") {
-    hoveredNodeId.value = null;
-    scheduleAnchorMeasurement(nodeId);
-    return;
-  }
-
-  hoveredNodeReleaseTimeoutRef.value = window.setTimeout(() => {
-    hoveredNodeReleaseTimeoutRef.value = null;
-    if (hoveredNodeId.value === nodeId) {
-      hoveredNodeId.value = null;
-      scheduleAnchorMeasurement(nodeId);
-    }
-  }, NODE_HOVER_RELEASE_DELAY_MS);
-}
-
-function setHoveredPointAnchorNode(nodeId: string) {
-  hoveredPointAnchorNodeId.value = nodeId;
-  scheduleAnchorMeasurement(nodeId);
-}
-
-function clearHoveredPointAnchorNode(nodeId: string) {
-  if (hoveredPointAnchorNodeId.value === nodeId) {
-    hoveredPointAnchorNodeId.value = null;
-    scheduleAnchorMeasurement(nodeId);
-  }
-}
-
-function setHoveredFlowHandleNode(nodeId: string) {
-  hoveredFlowHandleNodeId.value = nodeId;
-}
-
-function clearHoveredFlowHandleNode(nodeId: string) {
-  if (hoveredFlowHandleNodeId.value === nodeId) {
-    hoveredFlowHandleNodeId.value = null;
-  }
 }
 
 function isFlowHotspotVisible(anchor: ProjectedCanvasAnchor) {

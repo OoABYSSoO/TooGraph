@@ -1,5 +1,59 @@
 # Progress Log
 
+## Session: 2026-04-30 Phase 133
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Continued automatically after commit `d9b22e1` because the full-roadmap progress is below 100%.
+  - Re-read the formal roadmap, Phase 132 findings, and remaining high-line-count files.
+  - Chose the `EditorCanvas.vue` hover/RAF scheduler slice because it only moves local refs, timers, and requestAnimationFrame batching without touching auto-snap, connection completion, or node creation payload semantics.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `useCanvasHoverState.test.ts` covering delayed node hover release, stale release cancellation, point-anchor hover clearing, and flow-handle hover clearing.
+  - Added `useCanvasAnimationFrameScheduler.test.ts` covering latest-callback batching, immediate flush, and cancellation.
+  - Verified the expected red failure because both composable modules were missing.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `useCanvasHoverState.ts` for node hover release timers, point-anchor hover refs, flow-handle hover refs, and anchor-measurement callbacks.
+  - Added `useCanvasAnimationFrameScheduler.ts` for canvas drag-frame scheduling, flush, and cancellation.
+  - Updated `EditorCanvas.vue` to consume both composables while keeping template event names and existing pointer/connection behavior unchanged.
+  - Updated structure tests to lock the new composable boundaries.
+  - Reduced `EditorCanvas.vue` from 3,396 to 3,319 lines.
+
+### Phase 4: Verification and Progress Gate
+- **Status:** completed
+- Actions taken:
+  - Ran focused hover/scheduler composable and `EditorCanvas` structure tests.
+  - Ran TypeScript unused-symbol verification.
+  - Ran the full frontend test suite and production build.
+  - Confirmed the production build still has no Vite large chunk warning.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend entry returned HTTP 200 and backend `/health` returned `{"status":"ok"}`.
+  - Recalculated the full roadmap at about 99.2%, frontend-focused progress at about 98%, and P2 `EditorCanvas.vue` residual cleanup at about 98-99%.
+  - Opened Phase 134 automatically because the full roadmap is still below 100%.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red composable tests | `node --test src/editor/canvas/useCanvasHoverState.test.ts src/editor/canvas/useCanvasAnimationFrameScheduler.test.ts` before implementation | Fail because both composable modules are missing | Failed with missing module imports | Passed |
+| Focused frontend tests | `node --test src/editor/canvas/useCanvasHoverState.test.ts src/editor/canvas/useCanvasAnimationFrameScheduler.test.ts src/editor/canvas/EditorCanvas.structure.test.ts` | Hover/scheduler composables and canvas structure tests pass | 68 passed after updating one stale structure assertion | Passed |
+| TypeScript check | `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` | No type or unused-symbol errors | Exit 0 | Passed |
+| Full frontend tests | `node --test $(rg --files src -g '*.test.ts' \| sort) vite.config.structure.test.ts` | Full frontend suite passes | 937 passed | Passed |
+| Production build | `npm run build` in `frontend` | Build succeeds with no large chunk warning | Exit 0; Vite build completed | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | New hover/scheduler composable tests failed with missing module imports | Red test before implementation | Added `useCanvasHoverState.ts` and `useCanvasAnimationFrameScheduler.ts`. |
+| 2026-04-30 | Structure test still expected `hoveredPointAnchorNodeId` to be declared directly inside `EditorCanvas.vue` | First focused structure run after component integration | Updated the assertion to verify `useCanvasHoverState.ts` owns the point-anchor hover ref and handlers. |
+| 2026-04-30 | A read-only `rg` inspection command used unescaped backticks and failed in the shell | Documentation/progress inspection | Re-ran the search with safer quoting; no files were changed by the failed command. |
+
 ## Session: 2026-04-30 Phase 132
 
 ### Phase 1: Re-orientation
