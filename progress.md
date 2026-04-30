@@ -1,5 +1,60 @@
 # Progress Log
 
+## Session: 2026-04-30 Phase 109
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Continued automatically after commit `df18bdb` because the full-roadmap progress is below 100%.
+  - Re-read the formal roadmap, Phase 108 findings, and remaining executor agent runtime/node-handler clusters.
+  - Chose agent runtime config resolution because it is a mostly pure boundary and can preserve the old executor patch seams with dependency injection.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `backend/tests/test_agent_runtime_config.py` covering global model defaults, override model selection, thinking-level resolution, temperature propagation, and local progress/reasoning flags.
+  - Verified the expected red failure because `app.core.runtime.agent_runtime_config` did not exist yet.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `backend/app/core/runtime/agent_runtime_config.py`.
+  - Moved model/provider selection, thinking-level resolution, temperature bounds, runtime model name derivation, and local request flags out of `node_system_executor.py`.
+  - Kept `node_system_executor._resolve_agent_runtime_config` as a thin dependency-injection facade so existing tests and patch seams still work.
+  - Reduced `node_system_executor.py` from 417 lines to 388 lines.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused agent runtime config, thinking-level, and LangGraph migration tests.
+  - Ran `git diff --check`.
+  - Ran the full backend test suite.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend entry returned HTTP 200 and backend `/health` returned `{"status":"ok"}`.
+
+### Phase 5: Honest Progress Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated the full roadmap at about 91%.
+  - Recalculated the frontend-focused roadmap at about 83-85%; unchanged because Phase 109 was backend-only.
+  - Recalculated P3 `EditorWorkspaceShell.vue` cleanup at about 82%; unchanged.
+  - Recalculated P4 backend cleanup at about 73-76% after isolating agent runtime config resolution.
+  - Opened Phase 110 automatically because the full roadmap is still below 100%.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red structure/import test | `PYTHONPATH=backend pytest backend/tests/test_agent_runtime_config.py -q` before implementation | Fails because the agent runtime config module is missing | Failed with missing module import | Passed |
+| Focused runtime tests | `PYTHONPATH=backend pytest backend/tests/test_agent_runtime_config.py backend/tests/test_thinking_levels.py backend/tests/test_langgraph_migration.py -q` | Runtime config, thinking-level, and LangGraph behavior stay unchanged | 46 passed | Passed |
+| Whitespace check | `git diff --check` | No whitespace errors | Exit 0 | Passed |
+| Full backend tests | `PYTHONPATH=backend pytest backend/tests -q` | All backend tests pass | 174 passed, 2 existing warnings | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | None | Phase 109 | No implementation errors beyond the expected red module-import failure. |
+
 ## Session: 2026-04-30 Phase 108
 
 ### Phase 1: Re-orientation

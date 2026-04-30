@@ -13,6 +13,7 @@ from app.core.runtime.agent_prompt import (
     format_state_output_contract_lines as _format_state_output_contract_lines,
     format_state_prompt_lines as _format_state_prompt_lines,
 )
+from app.core.runtime.agent_runtime_config import resolve_agent_runtime_config
 from app.core.runtime.condition_eval import (
     coerce_condition_text as _coerce_condition_text,
     evaluate_condition_rule as _evaluate_condition_rule,
@@ -360,47 +361,17 @@ def _generate_agent_response(
 
 
 def _resolve_agent_runtime_config(node: NodeSystemAgentNode) -> dict[str, Any]:
-    global_model_ref = get_default_text_model_ref(force_refresh=True)
-    global_thinking_enabled = get_default_agent_thinking_enabled()
-    global_thinking_level = get_default_agent_thinking_level()
-    default_temperature = get_default_agent_temperature()
-    override_model_ref = normalize_model_ref(node.config.model) if node.config.model.strip() else ""
-
-    resolved_model = (
-        override_model_ref
-        if node.config.model_source.value == "override" and override_model_ref
-        else global_model_ref
+    return resolve_agent_runtime_config(
+        node,
+        get_default_text_model_ref_func=get_default_text_model_ref,
+        get_default_agent_thinking_enabled_func=get_default_agent_thinking_enabled,
+        get_default_agent_thinking_level_func=get_default_agent_thinking_level,
+        get_default_agent_temperature_func=get_default_agent_temperature,
+        normalize_model_ref_func=normalize_model_ref,
+        resolve_runtime_model_name_func=resolve_runtime_model_name,
+        normalize_thinking_level_func=normalize_thinking_level,
+        resolve_effective_thinking_level_func=resolve_effective_thinking_level,
     )
-    resolved_temperature = max(0.0, min(float(node.config.temperature), 2.0))
-    resolved_provider_id, _resolved_model_name = resolved_model.split("/", 1) if "/" in resolved_model else ("local", resolved_model)
-    runtime_model_name = resolve_runtime_model_name(resolved_model)
-    configured_thinking_level = normalize_thinking_level(node.config.thinking_mode.value)
-    resolved_thinking_level = resolve_effective_thinking_level(
-        configured_level=configured_thinking_level,
-        provider_id=resolved_provider_id,
-        model=runtime_model_name,
-    )
-    resolved_thinking = resolved_thinking_level != "off"
-
-    return {
-        "model_source": node.config.model_source.value,
-        "configured_model_ref": override_model_ref,
-        "thinking_mode": node.config.thinking_mode.value,
-        "configured_thinking_level": normalize_thinking_level(node.config.thinking_mode.value),
-        "configured_temperature": node.config.temperature,
-        "global_model_ref": global_model_ref,
-        "global_thinking_enabled": global_thinking_enabled,
-        "global_thinking_level": global_thinking_level,
-        "default_temperature": default_temperature,
-        "resolved_model_ref": resolved_model,
-        "resolved_provider_id": resolved_provider_id,
-        "resolved_thinking": resolved_thinking,
-        "resolved_thinking_level": resolved_thinking_level,
-        "resolved_temperature": resolved_temperature,
-        "runtime_model_name": runtime_model_name,
-        "request_return_progress": resolved_thinking and resolved_provider_id == "local",
-        "request_reasoning_format": "auto" if resolved_thinking and resolved_provider_id == "local" else None,
-    }
 
 
 def _summarize_inputs(input_values: dict[str, Any]) -> str:
