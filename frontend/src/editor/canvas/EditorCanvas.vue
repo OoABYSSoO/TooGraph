@@ -298,8 +298,8 @@
             'editor-canvas__flow-hotspot--outbound': anchor.kind === 'flow-out',
             'editor-canvas__flow-hotspot--inbound': anchor.kind === 'flow-in',
             'editor-canvas__flow-hotspot--visible': isFlowHotspotVisible(anchor),
-            'editor-canvas__flow-hotspot--connect-source': activeConnectionSourceAnchorId === anchor.id,
-            'editor-canvas__flow-hotspot--connect-target': eligibleTargetAnchorIds.has(anchor.id),
+            'editor-canvas__flow-hotspot--connect-source': isCanvasConnectionSourceAnchor(anchor, canvasInteractionStyleContext),
+            'editor-canvas__flow-hotspot--connect-target': isCanvasConnectionTargetAnchor(anchor, canvasInteractionStyleContext),
             'editor-canvas__flow-hotspot--top': anchor.side === 'top',
           }"
           @pointerenter="setHoveredFlowHandleNode(anchor.nodeId)"
@@ -318,8 +318,8 @@
             'editor-canvas__route-handle--danger': resolveRouteHandleTone(anchor.branch) === 'danger',
             'editor-canvas__route-handle--warning': resolveRouteHandleTone(anchor.branch) === 'warning',
             'editor-canvas__route-handle--neutral': resolveRouteHandleTone(anchor.branch) === 'neutral',
-            'editor-canvas__flow-hotspot--connect-source': activeConnectionSourceAnchorId === anchor.id,
-            'editor-canvas__route-handle--connect-source': activeConnectionSourceAnchorId === anchor.id,
+            'editor-canvas__flow-hotspot--connect-source': isCanvasConnectionSourceAnchor(anchor, canvasInteractionStyleContext),
+            'editor-canvas__route-handle--connect-source': isCanvasConnectionSourceAnchor(anchor, canvasInteractionStyleContext),
           }"
           :style="[routeHandleStyle(anchor), flowHotspotConnectStyle(anchor)]"
           @pointerenter="setHoveredFlowHandleNode(anchor.nodeId)"
@@ -340,8 +340,8 @@
           :class="{
             'editor-canvas__anchor--state': anchor.kind === 'state-in' || anchor.kind === 'state-out',
             'editor-canvas__anchor--route': anchor.kind === 'route-out',
-            'editor-canvas__anchor--connect-source': activeConnectionSourceAnchorId === anchor.id,
-            'editor-canvas__anchor--connect-target': eligibleTargetAnchorIds.has(anchor.id),
+            'editor-canvas__anchor--connect-source': isCanvasConnectionSourceAnchor(anchor, canvasInteractionStyleContext),
+            'editor-canvas__anchor--connect-target': isCanvasConnectionTargetAnchor(anchor, canvasInteractionStyleContext),
           }"
           r="5.5"
           @pointerenter="setHoveredPointAnchorNode(anchor.nodeId)"
@@ -429,6 +429,8 @@ import {
   buildPointAnchorStyle,
   buildPointAnchorConnectStyle,
   buildProjectedEdgeStyle,
+  isCanvasConnectionSourceAnchor,
+  isCanvasConnectionTargetAnchor,
 } from "./canvasInteractionStyleModel";
 import {
   buildConnectionPreviewModel,

@@ -4,7 +4,7 @@
 Run a ten-round conservative cleanup batch focused on `EditorCanvas.vue` pure projection and interaction-model helpers, then close the baseline interaction regressions in one larger pass while preserving graph editing behavior, runtime visuals, drag/connect workflows, deletion behavior, and dev startup health.
 
 ## Current Phase
-Phase 67 in progress
+Phase 68 in progress
 
 ## Autonomous Continuation Gate
 - After every completed cleanup phase, re-read `docs/future/2026-04-28-architecture-refactor-roadmap.md`, `task_plan.md`, `findings.md`, and `progress.md`, then recalculate the total roadmap progress and the active area progress.
@@ -621,12 +621,21 @@ Phase 67 in progress
 - **Status:** completed
 
 ### Phase 67: EditorCanvas Anchor Connection Class State
-- [ ] Re-read the formal roadmap, Phase 66 findings, and current anchor/flow hotspot class state flow before changing code.
-- [ ] Inspect whether the next safest `EditorCanvas.vue` boundary is active-source and eligible-target class projection for flow hotspots and state anchors.
-- [ ] Add focused red tests for the selected class-state boundary before production changes.
-- [ ] Keep active connection source ref, eligible target ids, connection styling context, pointer handlers, and anchor overlay rendering stable.
-- [ ] Run focused interaction-style/structure and Canvas regression tests, TypeScript checks, full frontend tests or justified targeted regression, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
-- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 67.
+- [x] Re-read the formal roadmap, Phase 66 findings, and current anchor/flow hotspot class state flow before changing code.
+- [x] Inspect whether the next safest `EditorCanvas.vue` boundary is active-source and eligible-target class projection for flow hotspots and state anchors.
+- [x] Add focused red tests for the selected class-state boundary before production changes.
+- [x] Keep active connection source ref, eligible target ids, connection styling context, pointer handlers, and anchor overlay rendering stable.
+- [x] Run focused interaction-style/structure and Canvas regression tests, TypeScript checks, full frontend tests or justified targeted regression, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
+- [x] If total roadmap progress is below 100%, automatically open the next phase after Phase 67.
+- **Status:** completed
+
+### Phase 68: EditorCanvas Connection Completion Eligibility Gate
+- [ ] Re-read the formal roadmap, Phase 67 findings, and current `canCompleteCanvasConnection` flow before changing code.
+- [ ] Inspect whether the next safest `EditorCanvas.vue` boundary is active connection target eligibility around state-target allowance and graph completion checks.
+- [ ] Add focused red tests for the connection completion eligibility gate before production changes.
+- [ ] Keep active connection ref, graph document input, projected anchors, auto-snap behavior, node creation payloads, and completion emits stable.
+- [ ] Run focused connection interaction/graph connection/structure tests, TypeScript checks, full frontend tests or justified targeted regression, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
+- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 68.
 - **Status:** in progress
 
 ## Progress Estimate
@@ -804,6 +813,10 @@ Phase 67 in progress
 | P2 `EditorCanvas.vue` cleanup after Phase 66 | About 94% complete after removing the local projected-edge visibility helper while preserving SVG edge rendering. |
 | Current continuation gate after Phase 66 | Total roadmap progress is below 100%, so Phase 67 is automatically opened for the next safe P2 Canvas anchor connection class-state boundary. |
 | P2 `EditorCanvas.vue` cleanup target for Phase 67 | About 95% if active-source and eligible-target class-state checks move into `canvasInteractionStyleModel.ts` without changing connection styling or anchor overlay behavior. |
+| Overall roadmap cleanup after Phase 67 | About 94% complete after moving active-source and eligible-target class-state checks into `canvasInteractionStyleModel.ts`. |
+| P2 `EditorCanvas.vue` cleanup after Phase 67 | About 95% complete after removing direct class-state membership checks from anchor and flow hotspot template bindings. |
+| Current continuation gate after Phase 67 | Total roadmap progress is below 100%, so Phase 68 is automatically opened for the next safe P2 Canvas connection completion eligibility boundary. |
+| P2 `EditorCanvas.vue` cleanup target for Phase 68 | About 96% if `canCompleteCanvasConnection` eligibility routing moves into `canvasConnectionInteractionModel.ts` without changing auto-snap, node creation, or completion emits. |
 
 ## Decisions Made
 | Decision | Rationale |
@@ -866,6 +879,7 @@ Phase 67 in progress
 - Phase 64 moves selected-edge target point projection into `canvasEdgePointerInteractionModel.ts`; `EditorCanvas.vue` keeps projected anchor ref access and actual pending connection point mutation.
 - Phase 65 moves flow/route hotspot visibility projection into `edgeVisibilityModel.ts`; `EditorCanvas.vue` keeps selected/hovered refs, active connection source ref, eligible target ids, and anchor overlay rendering.
 - Phase 66 moves projected-edge visibility membership into `edgeVisibilityModel.ts`; `EditorCanvas.vue` keeps visible edge id computation, projected edge rendering, selected edge state, and hitarea handlers.
+- Phase 67 moves active-source and eligible-target anchor class-state checks into `canvasInteractionStyleModel.ts`; `EditorCanvas.vue` keeps the style context, pointer handlers, and anchor overlay rendering.
 - Do not commit runtime artifacts such as `backend/data/settings`, `.dev_*`, `dist`, or `.worktrees`.
 - After code changes, restart using `npm run dev`.
 
