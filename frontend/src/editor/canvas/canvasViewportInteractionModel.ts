@@ -9,6 +9,11 @@ type CanvasRectSnapshot = {
   top: number;
 };
 
+type CanvasWorldPoint = {
+  x: number;
+  y: number;
+};
+
 const CANVAS_ZOOM_BUTTON_SCALE_STEP = 0.1;
 
 export type CanvasWheelZoomRequest =
@@ -97,6 +102,23 @@ export function resolveCanvasPanPointerMoveAction(input: { isPanning: boolean })
   }
 
   return { type: "continue-pointer-move" };
+}
+
+export function resolveCanvasWorldPoint(input: {
+  clientX: number;
+  clientY: number;
+  canvasRect: CanvasRectSnapshot | null;
+  viewport: CanvasViewport;
+  fallbackPoint: CanvasWorldPoint | null;
+}): CanvasWorldPoint {
+  if (!input.canvasRect) {
+    return input.fallbackPoint ?? { x: 0, y: 0 };
+  }
+
+  return {
+    x: (input.clientX - input.canvasRect.left - input.viewport.x) / input.viewport.scale,
+    y: (input.clientY - input.canvasRect.top - input.viewport.y) / input.viewport.scale,
+  };
 }
 
 function normalizeZoomButtonScale(scale: number) {

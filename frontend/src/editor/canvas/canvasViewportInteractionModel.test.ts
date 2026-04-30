@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   resolveCanvasPanPointerMoveAction,
   resolveCanvasWheelZoomRequest,
+  resolveCanvasWorldPoint,
   resolveCanvasZoomButtonAction,
   resolveWheelZoomDelta,
 } from "./canvasViewportInteractionModel.ts";
@@ -87,4 +88,37 @@ test("canvas viewport interaction model resolves pan pointer-move actions", () =
   assert.deepEqual(resolveCanvasPanPointerMoveAction({ isPanning: true }), {
     type: "schedule-pan-move",
   });
+});
+
+test("canvas viewport interaction model resolves canvas world points", () => {
+  assert.deepEqual(
+    resolveCanvasWorldPoint({
+      clientX: 100,
+      clientY: 80,
+      canvasRect: null,
+      viewport: { x: 20, y: 30, scale: 2 },
+      fallbackPoint: { x: 8, y: 9 },
+    }),
+    { x: 8, y: 9 },
+  );
+  assert.deepEqual(
+    resolveCanvasWorldPoint({
+      clientX: 100,
+      clientY: 80,
+      canvasRect: null,
+      viewport: { x: 20, y: 30, scale: 2 },
+      fallbackPoint: null,
+    }),
+    { x: 0, y: 0 },
+  );
+  assert.deepEqual(
+    resolveCanvasWorldPoint({
+      clientX: 210,
+      clientY: 170,
+      canvasRect: { left: 10, top: 20 },
+      viewport: { x: 40, y: 30, scale: 2 },
+      fallbackPoint: { x: 8, y: 9 },
+    }),
+    { x: 80, y: 60 },
+  );
 });

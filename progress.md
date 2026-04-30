@@ -1,5 +1,75 @@
 # Progress Log
 
+## Session: 2026-04-30 Phase 62
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Confirmed Phase 61 was committed and pushed as `89c0ebb`.
+  - Re-read the formal roadmap, active plan, latest findings, and current `resolveCanvasPoint` flow.
+  - Inspected `canvasViewportInteractionModel.ts`, viewport interaction tests, and `EditorCanvas.structure.test.ts`.
+  - Selected the next P2 Canvas boundary: canvas point projection.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `resolveCanvasWorldPoint` expectations for missing canvas fallback, null fallback default, and viewport-relative projection.
+  - Updated `EditorCanvas.structure.test.ts` to require delegated canvas point projection.
+  - Verified the expected red failure: the model export and component wiring did not exist yet.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `resolveCanvasWorldPoint` in `canvasViewportInteractionModel.ts`.
+  - Updated `EditorCanvas.vue` so `resolveCanvasPoint` keeps DOM rect lookup in the component and delegates fallback/projection math to the model.
+  - Kept pending connection fallback input, event coordinate inputs, connection/menu/drop consumers, and graph interactions stable.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused viewport interaction model and structure tests.
+  - Ran broader viewport, pinch, connection interaction, connection completion, and structure regression tests.
+  - Ran TypeScript unused-symbol verification from `frontend`.
+  - Ran the full frontend `node --test` suite.
+  - Ran the frontend production build; no large chunk warning was emitted.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed backend `/health` returned `{"status":"ok"}` and the frontend entry returned HTTP 200.
+  - Captured a headless Chrome screenshot after a virtual-time wait and confirmed the workspace rendered normally.
+
+### Phase 5: Continuation Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated overall roadmap cleanup at about 89%.
+  - Recalculated P2 `EditorCanvas.vue` cleanup at about 90%.
+  - Opened Phase 63 automatically because total roadmap progress is below 100%.
+  - Selected the next candidate boundary as canvas size update decisions around missing element and changed-size/no-op routing.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red focused tests | `node --test frontend/src/editor/canvas/canvasViewportInteractionModel.test.ts frontend/src/editor/canvas/EditorCanvas.structure.test.ts` before implementation | Fails because canvas world point export and component wiring do not exist | Failed on missing export and structure assertions | Passed |
+| Focused model/structure tests | Same focused files after implementation | All focused tests pass | 66 passed | Passed |
+| Focused Canvas regression | `node --test` over viewport, pinch, connection interaction, connection completion, and EditorCanvas structure tests | Related coordinate/connection tests pass | 95 passed | Passed |
+| Unused symbol check | `./node_modules/.bin/vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No diagnostics | Exit 0 | Passed |
+| Full frontend tests | `node --test $(rg --files src vite.config.structure.test.ts | rg '\.test\.ts$')` in `frontend` | All frontend tests pass | 824 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without a large chunk warning | Exit 0, no Vite chunk warning | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+| Browser smoke | Headless Chrome screenshot with virtual-time wait | Workspace renders normally | Workspace UI rendered | Passed |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Phase 62 implementation, verification, docs update, and dev restart are complete. |
+| Where am I going? | Phase 63 is open for canvas size update decision extraction. |
+| What's the goal? | Continue reducing `EditorCanvas.vue` viewport ownership without changing DOM measurement, minimap sizing, connection/menu/drop consumers, or graph editing behavior. |
+| What have I learned? | Canvas point projection is pure viewport math; DOM rect lookup and pending fallback inputs should stay component-owned. |
+| What have I done? | Extracted canvas point projection, added focused tests, verified the full frontend suite, built, restarted, and visually smoked the app. |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 Phase 62 | First browser screenshot captured only the background layer | Initial headless Chrome screenshot after dev restart | Re-ran headless Chrome with `--virtual-time-budget=5000`; the workspace rendered normally. |
+
 ## Session: 2026-04-30 Phase 61
 
 ### Phase 1: Re-orientation

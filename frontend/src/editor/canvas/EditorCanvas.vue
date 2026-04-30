@@ -481,6 +481,7 @@ import { buildCanvasViewportStyle, buildZoomPercentLabel } from "./canvasViewpor
 import {
   resolveCanvasPanPointerMoveAction,
   resolveCanvasWheelZoomRequest,
+  resolveCanvasWorldPoint,
   resolveCanvasZoomButtonAction,
   type CanvasZoomButtonControl,
 } from "./canvasViewportInteractionModel";
@@ -2015,15 +2016,14 @@ function handleSelectedEdgeDelete(event: KeyboardEvent) {
 }
 
 function resolveCanvasPoint(event: { clientX: number; clientY: number }) {
-  const canvas = canvasRef.value;
-  if (!canvas) {
-    return pendingConnectionPoint.value ?? { x: 0, y: 0 };
-  }
-  const rect = canvas.getBoundingClientRect();
-  return {
-    x: (event.clientX - rect.left - viewport.viewport.x) / viewport.viewport.scale,
-    y: (event.clientY - rect.top - viewport.viewport.y) / viewport.viewport.scale,
-  };
+  const canvasRect = canvasRef.value?.getBoundingClientRect() ?? null;
+  return resolveCanvasWorldPoint({
+    clientX: event.clientX,
+    clientY: event.clientY,
+    canvasRect,
+    viewport: viewport.viewport,
+    fallbackPoint: pendingConnectionPoint.value,
+  });
 }
 
 function resolveEdgeTargetPoint(edge: ProjectedCanvasEdge) {
