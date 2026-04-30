@@ -54,13 +54,14 @@ test("NodeCard renders input state pills with leading anchor slots", () => {
   assert.match(primaryStatePortSource, /class="node-card__port-pill-anchor-slot node-card__port-pill-anchor-slot--leading"/);
 });
 
-test("AgentNodeBody stacks input and output state pill lanes on separate rows", () => {
+test("AgentNodeBody keeps input and output state pill lanes in paired equal columns", () => {
   assert.match(agentNodeBodySource, /<div class="node-card__port-grid">/);
   assert.match(agentNodeBodySource, /<div class="node-card__port-column">[\s\S]*<StatePortList[\s\S]*side="input"/);
   assert.match(agentNodeBodySource, /<div class="node-card__port-column node-card__port-column--right">[\s\S]*<StatePortList[\s\S]*side="output"/);
-  assert.match(agentNodeBodySource, /\.node-card__port-grid \{[\s\S]*display:\s*grid;[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\);/);
-  assert.doesNotMatch(agentNodeBodySource, /\.node-card__port-grid \{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s+minmax\(0,\s*1fr\);/);
-  assert.match(agentNodeBodySource, /\.node-card__port-column \{[\s\S]*display:\s*grid;[\s\S]*min-width:\s*0;/);
+  assert.match(agentNodeBodySource, /\.node-card__port-grid \{[\s\S]*display:\s*grid;[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/);
+  assert.match(agentNodeBodySource, /\.node-card__port-grid \{[\s\S]*column-gap:\s*24px;/);
+  assert.doesNotMatch(agentNodeBodySource, /grid-template-columns:\s*minmax\(0,\s*1fr\);/);
+  assert.match(agentNodeBodySource, /\.node-card__port-column \{[\s\S]*display:\s*grid;[\s\S]*min-width:\s*0;[\s\S]*width:\s*100%;[\s\S]*gap:\s*6px;/);
   assert.match(agentNodeBodySource, /\.node-card__port-column--right \{[\s\S]*justify-items:\s*end;/);
 });
 

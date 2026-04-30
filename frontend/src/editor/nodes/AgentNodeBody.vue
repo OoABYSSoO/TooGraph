@@ -245,16 +245,17 @@ defineExpose({
 <style scoped>
 .node-card__port-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
   width: 100%;
-  gap: 8px;
+  column-gap: 24px;
 }
 
 .node-card__port-column {
   display: grid;
   min-width: 0;
   width: 100%;
+  gap: 6px;
 }
 
 .node-card__port-column--right {
