@@ -4,7 +4,10 @@ import test from "node:test";
 import {
   buildLiveStreamingOutput,
   buildRunEventStreamUrl,
+  listRunEventOutputKeys,
   parseRunEventPayloadData,
+  resolveRunEventNodeId,
+  resolveRunEventText,
   shouldPollRunStatus,
 } from "./run-event-stream.ts";
 
@@ -29,6 +32,24 @@ test("parseRunEventPayloadData returns object payloads and ignores invalid event
   });
   assert.equal(parseRunEventPayloadData("not json"), null);
   assert.equal(parseRunEventPayloadData('"string"'), null);
+});
+
+test("resolveRunEventNodeId trims node ids and skips missing ids", () => {
+  assert.equal(resolveRunEventNodeId({ node_id: " output_1 " }), "output_1");
+  assert.equal(resolveRunEventNodeId({ node_id: null }), "");
+  assert.equal(resolveRunEventNodeId({}), "");
+});
+
+test("resolveRunEventText preserves explicit text and only uses fallback when text is absent", () => {
+  assert.equal(resolveRunEventText({ text: "ready", delta: " ignored" }, "fallback"), "ready");
+  assert.equal(resolveRunEventText({ text: "", delta: " ignored" }, "fallback"), "");
+  assert.equal(resolveRunEventText({ delta: " chunk" }, "fallback"), "fallback");
+});
+
+test("listRunEventOutputKeys normalizes keys and preserves fallback when keys are absent", () => {
+  assert.deepEqual(listRunEventOutputKeys({ output_keys: ["answer", 2, "", null] }), ["answer", "2", "null"]);
+  assert.deepEqual(listRunEventOutputKeys({ output_keys: "answer" }, ["fallback"]), ["fallback"]);
+  assert.deepEqual(listRunEventOutputKeys({}, ["fallback"]), ["fallback"]);
 });
 
 test("buildLiveStreamingOutput preserves live output merge semantics", () => {

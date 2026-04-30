@@ -251,6 +251,7 @@ import {
   buildLiveStreamingOutput,
   buildRunEventStreamUrl,
   parseRunEventPayloadData,
+  resolveRunEventNodeId,
   shouldPollRunStatus,
   type LiveStreamingOutput,
 } from "@/lib/run-event-stream";
@@ -359,7 +360,7 @@ function parseRunEventPayload(event: Event) {
 }
 
 function updateLiveStreamingOutput(payload: Record<string, unknown>, completed = false) {
-  const currentNodeId = String(payload.node_id ?? "").trim();
+  const currentNodeId = resolveRunEventNodeId(payload);
   const nextOutput = buildLiveStreamingOutput(liveStreamingOutputs.value[currentNodeId], payload, completed);
   if (!nextOutput) {
     return;

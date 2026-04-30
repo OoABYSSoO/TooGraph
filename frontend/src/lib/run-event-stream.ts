@@ -27,23 +27,30 @@ export function parseRunEventPayloadData(data: unknown): RunEventPayload | null 
   }
 }
 
+export function resolveRunEventNodeId(payload: RunEventPayload) {
+  return String(payload.node_id ?? "").trim();
+}
+
+export function resolveRunEventText(payload: RunEventPayload, fallback = "") {
+  return typeof payload.text === "string" ? payload.text : fallback;
+}
+
+export function listRunEventOutputKeys(payload: RunEventPayload, fallback: string[] = []) {
+  return Array.isArray(payload.output_keys) ? payload.output_keys.map((key) => String(key)).filter(Boolean) : fallback;
+}
+
 export function buildLiveStreamingOutput(
   current: LiveStreamingOutput | null | undefined,
   payload: RunEventPayload,
   completed = false,
 ): LiveStreamingOutput | null {
-  const nodeId = String(payload.node_id ?? "").trim();
+  const nodeId = resolveRunEventNodeId(payload);
   if (!nodeId) {
     return null;
   }
 
-  const text =
-    typeof payload.text === "string"
-      ? payload.text
-      : `${current?.text ?? ""}${typeof payload.delta === "string" ? payload.delta : ""}`;
-  const outputKeys = Array.isArray(payload.output_keys)
-    ? payload.output_keys.map((key) => String(key)).filter(Boolean)
-    : current?.outputKeys ?? [];
+  const text = resolveRunEventText(payload, `${current?.text ?? ""}${typeof payload.delta === "string" ? payload.delta : ""}`);
+  const outputKeys = listRunEventOutputKeys(payload, current?.outputKeys ?? []);
 
   return {
     nodeId,

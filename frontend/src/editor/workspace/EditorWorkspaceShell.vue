@@ -265,7 +265,14 @@ import {
   type PersistedEditorWorkspace,
 } from "@/lib/editor-workspace";
 import type { CanvasViewport } from "@/editor/canvas/canvasViewport";
-import { buildRunEventStreamUrl, parseRunEventPayloadData, shouldPollRunStatus } from "@/lib/run-event-stream";
+import {
+  buildRunEventStreamUrl,
+  listRunEventOutputKeys,
+  parseRunEventPayloadData,
+  resolveRunEventNodeId,
+  resolveRunEventText,
+  shouldPollRunStatus,
+} from "@/lib/run-event-stream";
 import { buildRestoredGraphFromRun, buildSnapshotScopedRun, canRestoreRunDetail, resolveRestoredRunTabTitle } from "@/lib/run-restore";
 import { useGraphDocumentStore } from "@/stores/graphDocument";
 import type { KnowledgeBaseRecord } from "@/types/knowledge";
@@ -547,14 +554,12 @@ function resolveStreamingOutputNodeIds(tabId: string, outputKeys: string[]) {
 }
 
 function applyStreamingOutputPreviewToTab(tabId: string, payload: Record<string, unknown>) {
-  const text = typeof payload.text === "string" ? payload.text : "";
+  const text = resolveRunEventText(payload);
   if (!text) {
     return;
   }
-  const outputKeys = Array.isArray(payload.output_keys)
-    ? payload.output_keys.map((key) => String(key)).filter(Boolean)
-    : [];
-  const fallbackNodeId = String(payload.node_id ?? "").trim();
+  const outputKeys = listRunEventOutputKeys(payload);
+  const fallbackNodeId = resolveRunEventNodeId(payload);
   const targetNodeIds = resolveStreamingOutputNodeIds(tabId, outputKeys);
   const previewNodeIds = targetNodeIds.length > 0 ? targetNodeIds : fallbackNodeId ? [fallbackNodeId] : [];
   if (previewNodeIds.length === 0) {

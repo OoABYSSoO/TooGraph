@@ -1,5 +1,77 @@
 # Progress Log
 
+## Session: 2026-04-30 Phase 75
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Confirmed Phase 74 was committed and pushed as `ed2906b`.
+  - Re-read the formal roadmap and latest P3 findings for the run event stream boundary.
+  - Inspected duplicated run event payload node id, text, and output-key projection in `EditorWorkspaceShell.vue`, `RunDetailPage.vue`, and `run-event-stream.ts`.
+  - Selected the next P3 shell boundary: shared low-risk output payload projection helpers.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `resolveRunEventNodeId`, `resolveRunEventText`, and `listRunEventOutputKeys` coverage to `run-event-stream.test.ts`.
+  - Updated workspace/run-detail structure tests to require shared payload projection helper usage.
+  - Verified the expected red failure before implementation because the shared helpers did not exist and components still parsed payload fields inline.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added shared run event node id, text, and output-key projection helpers to `frontend/src/lib/run-event-stream.ts`.
+  - Updated `buildLiveStreamingOutput` to use the shared helpers while preserving explicit empty text, delta append, output-key fallback, completion, chunk count, and timestamp behavior.
+  - Updated `EditorWorkspaceShell.vue` to delegate streaming preview text, output key, and fallback node id projection to the shared model.
+  - Updated `RunDetailPage.vue` to delegate live streaming output lookup node id projection to the shared model.
+  - Kept EventSource lifecycle, polling timers, restore behavior, human-review opening, graph mutation, live preview state writes, and UI mutation in the owning components.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused shared model, workspace structure, and run detail structure tests.
+  - Ran related run API, run event stream, run detail model, run node artifact, run feedback, workspace structure, and run detail structure regression tests.
+  - Ran TypeScript unused-symbol verification from `frontend`.
+  - Ran the full frontend `node --test` suite.
+  - Ran the frontend production build; no large chunk warning was emitted.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed backend `/health` returned `{"status":"ok"}` and the frontend entry returned HTTP 200.
+  - Captured a headless Chrome screenshot with `google-chrome` and confirmed the workspace rendered normally.
+
+### Phase 5: Continuation Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated overall roadmap cleanup at about 99.4%.
+  - Recalculated P3 `EditorWorkspaceShell.vue` cleanup at about 20%.
+  - Opened Phase 76 automatically because total roadmap progress is still below 100%.
+  - Selected the next candidate boundary as workspace streaming output target projection.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red focused tests | `node --test frontend/src/lib/run-event-stream.test.ts frontend/src/editor/workspace/EditorWorkspaceShell.structure.test.ts frontend/src/pages/RunDetailPage.structure.test.ts` before implementation | Fails because shared payload projection helpers and component delegation do not exist | Failed on missing export and structure assertions | Passed |
+| Focused model/structure tests | Same focused files after implementation | All focused tests pass | 41 passed | Passed |
+| Focused run/workspace regression | `node --test` over run-event stream, run detail, run node artifacts, run feedback, workspace structure, run detail structure, and run API tests | Related run streaming and polling tests pass | 54 passed | Passed |
+| Unused symbol check | `./node_modules/.bin/vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No diagnostics | Exit 0 | Passed |
+| Full frontend tests | `node --test $(rg --files src vite.config.structure.test.ts | rg '\.test\.ts$')` in `frontend` | All frontend tests pass | 842 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without a large chunk warning | Exit 0, no Vite chunk warning | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+| Browser smoke | Headless Chrome screenshot with virtual-time wait | Workspace renders normally | Workspace UI rendered | Passed |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Phase 75 implementation, verification, docs update, and dev restart are complete. |
+| Where am I going? | Phase 76 is open for workspace streaming output target projection. |
+| What's the goal? | Continue P3 shell cleanup while keeping stream lifecycle, polling, restore, human review, graph mutation, and live preview writes stable. |
+| What have I learned? | The shared run event model can safely own payload field normalization; component-owned code should still perform preview writes and stream lifecycle control. |
+| What have I done? | Extracted node id/text/output-key projection helpers, added focused tests, verified the full frontend suite, built, restarted, and visually smoked the app. |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | `chromium` command not found during browser smoke | Initial headless screenshot command | Re-ran the same screenshot smoke with `/usr/bin/google-chrome`; screenshot succeeded. |
+
 ## Session: 2026-04-30 Phase 74
 
 ### Phase 1: Re-orientation
