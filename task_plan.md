@@ -6,10 +6,10 @@ Run a ten-round conservative cleanup batch focused on `EditorCanvas.vue` pure pr
 ## Progress Accuracy Note
 - The earlier `99.x%` values are no longer treated as the true total optimization progress. They reflected the active frontend cleanup batch getting close to its own tail, not the whole architecture roadmap.
 - The honest full-roadmap progress must include P0 cleanup, P1 `NodeCard.vue`, P2 `EditorCanvas.vue`, P3 `EditorWorkspaceShell.vue`, and P4 backend runtime/provider cleanup.
-- Current conservative estimate after Phase 138: full roadmap is about 99.7% complete; frontend-focused roadmap is about 98.2% complete; P2 `EditorCanvas.vue` residual cleanup is about 99% complete; P3 `EditorWorkspaceShell.vue` is about 99.8% complete; backend P4 is about 98% complete.
+- Current conservative estimate after Phase 139: full roadmap is about 99.8% complete; frontend-focused roadmap is about 98.2% complete; P2 `EditorCanvas.vue` residual cleanup is about 99% complete; P3 `EditorWorkspaceShell.vue` is about 99.8% complete; backend P4 is about 99% complete.
 
 ## Current Phase
-Phase 139 in progress
+Phase 140 in progress
 
 ## Autonomous Continuation Gate
 - After every completed cleanup phase, re-read `docs/future/2026-04-28-architecture-refactor-roadmap.md`, `task_plan.md`, `findings.md`, and `progress.md`, then recalculate the total roadmap progress and the active area progress.
@@ -1266,12 +1266,21 @@ Phase 139 in progress
 - **Status:** completed
 
 ### Phase 139: Frontend Tail Continuation Gate
-- [ ] Re-read the formal roadmap, Phase 138 findings, and remaining frontend/backend high-line-count files.
+- [x] Re-read the formal roadmap, Phase 138 findings, and remaining frontend/backend high-line-count files.
+- [x] Choose the next safest remaining tail slice from `EditorCanvas.vue` residual setup/action wrappers, `NodeCard.vue` residual orchestration, `EditorWorkspaceShell.vue` residual wrapper/watch wiring, or the final backend P4 facade tail.
+- [x] Add focused red tests before production changes.
+- [x] Preserve graph editing interactions, auto-snapping, node creation naming/context, Human Review behavior, runtime visuals, provider behavior, output boundary behavior, and visual layout.
+- [x] Run focused frontend/backend verification as needed, dev restart, commit, push, and progress re-evaluation.
+- [x] If total roadmap progress is below 100%, automatically open the next phase after Phase 139 and re-judge total progress.
+- **Status:** completed
+
+### Phase 140: Frontend Tail Continuation Gate
+- [ ] Re-read the formal roadmap, Phase 139 findings, and remaining frontend/backend high-line-count files.
 - [ ] Choose the next safest remaining tail slice from `EditorCanvas.vue` residual setup/action wrappers, `NodeCard.vue` residual orchestration, `EditorWorkspaceShell.vue` residual wrapper/watch wiring, or the final backend P4 facade tail.
 - [ ] Add focused red tests before production changes.
 - [ ] Preserve graph editing interactions, auto-snapping, node creation naming/context, Human Review behavior, runtime visuals, provider behavior, output boundary behavior, and visual layout.
 - [ ] Run focused frontend/backend verification as needed, dev restart, commit, push, and progress re-evaluation.
-- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 139 and re-judge total progress.
+- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 140 and re-judge total progress.
 - **Status:** in progress
 
 ## Progress Estimate
@@ -1820,6 +1829,12 @@ Phase 139 in progress
 | P4 backend cleanup after Phase 138 | About 98% complete after moving after-breakpoint node-map construction and compiled interrupt-before merging into `runtime_setup.py`; `runtime.py` line count rose from 481 to 483 because explicit imports/calls cost two lines while responsibilities moved out. |
 | Current continuation gate after Phase 138 | Total roadmap progress is still below 100%, so Phase 139 is automatically opened for the next safe frontend or final backend tail slice. |
 | Frontend/backend cleanup target for Phase 139 | About 99.8% total if a final runtime initialization/finalization helper, tiny canvas setup wrapper, or NodeCard residual can move out with focused regression coverage and full verification. |
+| Full roadmap cleanup after Phase 139 | About 99.8% complete after extracting LangGraph runtime state preparation while preserving new-run initialization, checkpoint resume status preservation, input boundary status marking, runtime setup, and dev startup behavior. |
+| Frontend roadmap cleanup after Phase 139 | Still about 98.2%; this phase was backend-only and did not touch frontend editor files. |
+| P2 `EditorCanvas.vue` cleanup after Phase 139 | Still about 99%; this phase was backend-only and did not touch canvas interaction code. |
+| P4 backend cleanup after Phase 139 | About 99% complete after moving new/resumed LangGraph runtime state preparation into `runtime_setup.py`; `runtime.py` dropped from 483 to 467 lines. |
+| Current continuation gate after Phase 139 | Total roadmap progress is still below 100%, so Phase 140 is automatically opened for the next final tail slice. |
+| Frontend/backend cleanup target for Phase 140 | About 99.9% total if one final runtime finalization helper, tiny canvas setup wrapper, or NodeCard residual can move out with focused regression coverage and full verification. |
 
 ## Decisions Made
 | Decision | Rationale |

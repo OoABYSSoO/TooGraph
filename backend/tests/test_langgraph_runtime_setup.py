@@ -16,6 +16,7 @@ from app.core.langgraph.runtime_setup import (
     build_langgraph_execution_edge_indexes,
     build_langgraph_state_schema,
     mark_input_boundaries_success,
+    prepare_langgraph_runtime_state,
     runtime_graph_endpoint,
 )
 from app.core.schemas.node_system import NodeSystemGraphPayload
@@ -120,6 +121,31 @@ class LangGraphRuntimeSetupTest(unittest.TestCase):
         schema = build_langgraph_state_schema(_build_graph())
 
         self.assertIn("answer", schema.__annotations__)
+
+    def test_prepare_langgraph_runtime_state_initializes_new_run_state(self) -> None:
+        state = prepare_langgraph_runtime_state(_build_graph(), None, resume_from_checkpoint=False)
+
+        self.assertEqual(state["runtime_backend"], "langgraph")
+        self.assertEqual(state["node_status_map"]["input_answer"], "success")
+        self.assertEqual(state["node_status_map"]["agent_answer"], "idle")
+        self.assertEqual(state["metadata"]["resolved_runtime_backend"], "langgraph")
+        self.assertIn("started_at", state)
+
+    def test_prepare_langgraph_runtime_state_preserves_resume_node_statuses(self) -> None:
+        state = {
+            "node_status_map": {
+                "input_answer": "running",
+                "agent_answer": "success",
+                "stale_node": "success",
+            },
+            "state_values": {},
+        }
+
+        prepared = prepare_langgraph_runtime_state(_build_graph(), state, resume_from_checkpoint=True)
+
+        self.assertIs(prepared, state)
+        self.assertEqual(prepared["node_status_map"], {"input_answer": "success", "agent_answer": "success"})
+        self.assertEqual(prepared["metadata"]["resolved_runtime_backend"], "langgraph")
 
 
 if __name__ == "__main__":

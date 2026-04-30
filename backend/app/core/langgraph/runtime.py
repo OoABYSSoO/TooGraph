@@ -47,7 +47,7 @@ from app.core.langgraph.runtime_setup import (
     build_compiled_interrupt_before as _build_compiled_interrupt_before,
     build_langgraph_execution_edge_indexes as _build_langgraph_execution_edge_indexes,
     build_langgraph_state_schema as _build_langgraph_state_schema,
-    mark_input_boundaries_success as _mark_input_boundaries_success,
+    prepare_langgraph_runtime_state as _prepare_langgraph_runtime_state,
     runtime_graph_endpoint as _runtime_graph_endpoint,
 )
 from app.core.runtime.execution_graph import (
@@ -58,11 +58,11 @@ from app.core.runtime.output_boundaries import collect_output_boundaries
 from app.core.runtime.run_artifacts import append_run_snapshot, refresh_run_artifacts
 from app.core.runtime.run_events import publish_run_event
 from app.core.runtime.runtime_summaries import summarize_first_value as _summarize_values
-from app.core.runtime.state_io import apply_state_writes, collect_node_inputs, initialize_graph_state
+from app.core.runtime.state_io import apply_state_writes, collect_node_inputs
 from app.core.runtime.node_system_executor import (
     _execute_node,
 )
-from app.core.runtime.state import create_initial_run_state, set_run_status, touch_run_lifecycle, utc_now_iso
+from app.core.runtime.state import set_run_status, touch_run_lifecycle, utc_now_iso
 from app.core.schemas.node_system import NodeSystemGraphDocument
 from app.core.storage.run_store import save_run
 
@@ -80,27 +80,11 @@ def execute_node_system_graph_langgraph(
         raise NotImplementedError("; ".join(build_plan.requirements.unsupported_reasons))
 
     started_perf = time.perf_counter()
-    state = initial_state or create_initial_run_state(
-        graph_id=graph.graph_id,
-        graph_name=graph.name,
-        max_revision_round=int(graph.metadata.get("max_revision_round", 1)),
+    state = _prepare_langgraph_runtime_state(
+        graph,
+        initial_state,
+        resume_from_checkpoint=resume_from_checkpoint,
     )
-    set_run_status(state, "running")
-    state["runtime_backend"] = "langgraph"
-    state.setdefault("started_at", utc_now_iso())
-    state.pop("loop_limit_exhaustion", None)
-    if resume_from_checkpoint:
-        node_status_map = dict(state.get("node_status_map") or {})
-        state["node_status_map"] = {
-            node_name: node_status_map.get(node_name, "idle")
-            for node_name in graph.nodes
-        }
-    else:
-        state["node_status_map"] = {node_name: "idle" for node_name in graph.nodes}
-    state["metadata"] = dict(graph.metadata)
-    state["metadata"]["resolved_runtime_backend"] = "langgraph"
-    initialize_graph_state(graph, state)
-    _mark_input_boundaries_success(graph, state)
     checkpoint_saver, runtime_config, checkpoint_lookup_config = _build_checkpoint_runtime(graph=graph, state=state)
 
     execution_edges = build_execution_edges(graph)
