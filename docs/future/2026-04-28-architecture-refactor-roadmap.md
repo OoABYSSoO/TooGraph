@@ -121,6 +121,7 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 - `EditorWorkspaceShell.vue` 本地已集中 dirty graph document commit：位置、尺寸、重命名和普通 dirty 写入共享 `commitDirtyDocumentForTab`；graph mutator calls、edit guards、draft writes、save behavior 和 route sync 仍保持 shell-owned。
 - `editorTabRuntimeModel.ts` 已继续承接 document、side-panel 与 focus/focus-request 的 tab-scoped set writes；`EditorWorkspaceShell.vue` 仍保留 persisted document draft writes、panel mode decisions、human-review lock/open policy 和 focus request sequencing。
 - `EditorWorkspaceShell.vue` 本地已继续集中 simple graph mutation commit：state binding、port binding/reorder、flow/route connect/reconnect/remove、node config、condition/output config、state field update 等简单 handler 共享 `commitDocumentMutationForTab` 的 document lookup、no-op、dirty commit 和 optional focus sequencing；node creation、delete、save/open 与 human-review routing 仍保持 shell-owned。
+- `useWorkspaceGraphMutationActions.ts` 已承接更完整的 graph mutation action layer：state binding、port binding/reorder、data-edge disconnect、create-port state、node deletion、flow/route connect/reconnect/remove、state input source connect、node/config/state field update/delete 等 handler；`EditorWorkspaceShell.vue` 仍保留 save/open routing、node creation execution、preset persistence、run lifecycle、human-review routing、route sync 和 draft persistence。
 
 ## 后端重点
 
@@ -218,6 +219,7 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 - 2026-04-30：`EditorWorkspaceShell.vue` 已集中 dirty graph document commit helper；位置、尺寸、重命名和 dirty 写入复用同一 metadata update path，graph mutation helpers 和 save/open routing 后续仍可继续拆分。
 - 2026-04-30：`editorTabRuntimeModel.ts` 已继续覆盖 document、side-panel、focused-node 和 focus-request tab-state writes；workspace shell 仍保留实际 draft persistence、panel routing、human-review lock policy 和 focus sequencing。
 - 2026-04-30：`EditorWorkspaceShell.vue` 已集中 simple graph mutation commit helper；简单图 mutation handlers 复用 document lookup、no-op detection、dirty commit 和 focus sequencing，复杂 node creation/delete/save/open/human-review flows 暂不移动。
+- 2026-04-30：`useWorkspaceGraphMutationActions.ts` 已承接 broader graph mutation action layer，`EditorWorkspaceShell.vue` 从 2462 行降到约 2055 行；save/open、node creation execution、run lifecycle 和 human-review routing 后续仍需单独拆分。
 
 ## 优先级路线
 

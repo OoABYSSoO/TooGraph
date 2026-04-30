@@ -1,5 +1,64 @@
 # Progress Log
 
+## Session: 2026-04-30 Phase 93
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Continued automatically because the recalibrated full-roadmap progress is below 100%.
+  - Re-read the roadmap, Phase 92 findings, and remaining `EditorWorkspaceShell.vue` graph mutation handlers.
+  - Accepted the user's updated risk tolerance and chose the larger `useGraphMutationActions` roadmap slice.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added structure coverage requiring `EditorWorkspaceShell.vue` to import and destructure `useWorkspaceGraphMutationActions`.
+  - Verified the expected red failure because the composable did not exist and graph mutation handlers were still local to the shell.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `frontend/src/editor/workspace/useWorkspaceGraphMutationActions.ts`.
+  - Moved state binding, port binding/reorder, data-edge disconnect, create-port state, node deletion, flow/route connect/reconnect/remove, state binding connect, reverse input-source connect, node config, condition config/branch, output config, state field update, state deletion, and writer removal handlers out of `EditorWorkspaceShell.vue`.
+  - Kept save/open routing, node creation execution, preset persistence, run lifecycle, human-review routing, route sync, and draft persistence in the shell.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran the focused structure test and updated older shell-ownership assertions to point at the new composable source.
+  - Ran TypeScript unused-symbol verification from `frontend`.
+  - Ran related workspace, tab runtime, node creation, state panel, graph document, graph node creation, canvas auto-snap, run stream, and run state tests.
+  - Ran the full frontend `node --test` suite.
+  - Ran the frontend production build; no large chunk warning was emitted.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed backend `/health` returned `{"status":"ok"}` and the frontend entry returned HTTP 200.
+  - Captured a headless Chrome screenshot and confirmed the home workspace rendered normally.
+
+### Phase 5: Honest Progress Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated the full roadmap at about 72-73%; this remains bounded by P4 backend cleanup still being effectively 0%.
+  - Recalculated the frontend-focused roadmap at about 83-85%.
+  - Recalculated P3 `EditorWorkspaceShell.vue` cleanup at about 82% after completing the `useGraphMutationActions` slice.
+  - Opened Phase 94 automatically because the full roadmap is still below 100%.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Focused structure test | `node --test frontend/src/editor/workspace/EditorWorkspaceShell.structure.test.ts` | Workspace structure tests pass | 36 passed | Passed |
+| Unused symbol check | `./node_modules/.bin/vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No diagnostics | Exit 0 | Passed |
+| Related high-risk regression | `node --test` over workspace structure/runtime, node creation, state panel, graph document, graph node creation, canvas auto-snap, run stream, and run state tests | Related graph mutation and interaction tests pass | 173 passed | Passed |
+| Full frontend tests | `node --test $(rg --files src vite.config.structure.test.ts \| rg '\.test\.ts$')` in `frontend` | All frontend tests pass | 878 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without a large chunk warning | Exit 0, no Vite chunk warning | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+| Browser smoke | Headless Chrome screenshot with virtual-time wait | App renders normally | Home workspace UI rendered | Passed |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | Structure tests still expected graph mutation helpers to be local to `EditorWorkspaceShell.vue` after the composable extraction | Phase 93 focused green run | Updated those assertions to read and verify `useWorkspaceGraphMutationActions.ts` while keeping template event wiring assertions in the shell test. |
+| 2026-04-30 | The simple graph mutation structure regex did not account for nested function indentation inside the composable factory | Phase 93 focused green run | Relaxed the regex boundary to match the indented composable helper layout. |
+
 ## Session: 2026-04-30 Phase 92
 
 ### Phase 1: Re-orientation

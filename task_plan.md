@@ -6,10 +6,10 @@ Run a ten-round conservative cleanup batch focused on `EditorCanvas.vue` pure pr
 ## Progress Accuracy Note
 - The earlier `99.x%` values are no longer treated as the true total optimization progress. They reflected the active frontend cleanup batch getting close to its own tail, not the whole architecture roadmap.
 - The honest full-roadmap progress must include P0 cleanup, P1 `NodeCard.vue`, P2 `EditorCanvas.vue`, P3 `EditorWorkspaceShell.vue`, and P4 backend runtime/provider cleanup.
-- Current conservative estimate after Phase 92: full roadmap is about 71-72% complete; frontend-focused roadmap is about 81-83% complete; P3 `EditorWorkspaceShell.vue` is about 74% complete; backend P4 is effectively 0% started.
+- Current conservative estimate after Phase 93: full roadmap is about 72-73% complete; frontend-focused roadmap is about 83-85% complete; P3 `EditorWorkspaceShell.vue` is about 82% complete; backend P4 is effectively 0% started.
 
 ## Current Phase
-Phase 93 in progress
+Phase 94 in progress
 
 ## Autonomous Continuation Gate
 - After every completed cleanup phase, re-read `docs/future/2026-04-28-architecture-refactor-roadmap.md`, `task_plan.md`, `findings.md`, and `progress.md`, then recalculate the total roadmap progress and the active area progress.
@@ -851,12 +851,22 @@ Phase 93 in progress
 - **Status:** completed
 
 ### Phase 93: Next Workspace Shell Boundary Selection
-- [ ] Re-read the formal roadmap, Phase 92 findings, and remaining P3 shell orchestration code.
-- [ ] Choose the next safest boundary from narrow save/open routing, human-review controller routing, or a higher-coverage graph mutation action helper.
+- [x] Re-read the formal roadmap, Phase 92 findings, and remaining P3 shell orchestration code.
+- [x] Choose the next boundary: a higher-coverage graph mutation action composable.
+- [x] Add focused red structure coverage before production changes.
+- [x] Extract `useWorkspaceGraphMutationActions.ts` for state binding, port binding/reorder, node deletion, state deletion, flow/route connect/reconnect/remove, node config, condition config, output config, and state field updates.
+- [x] Preserve automatic snapping, new-node naming/context, graph mutation payloads, route sync, draft persistence, run stream behavior, human-review resume behavior, and visual layout.
+- [x] Run focused workspace/runtime tests, TypeScript checks, full frontend tests, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
+- [x] Because total roadmap progress is below 100%, automatically open the next phase after Phase 93 and re-judge total progress.
+- **Status:** completed
+
+### Phase 94: Next Roadmap Boundary Selection
+- [ ] Re-read the formal roadmap, Phase 93 findings, and remaining high-line-count files.
+- [ ] Choose the next safest boundary from P3 save/open routing, P3 node-creation flow, P3 human-review routing, or the first P4 backend provider/runtime slice.
 - [ ] Add focused red tests before production changes.
-- [ ] Preserve automatic snapping, new-node naming/context, graph mutation payloads, route sync, draft persistence, run stream behavior, human-review resume behavior, and visual layout.
-- [ ] Run focused workspace/runtime tests, TypeScript checks, full frontend tests when needed, production build, dev restart, browser smoke, commit, push, and progress re-evaluation.
-- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 93 and re-judge total progress.
+- [ ] Preserve automatic snapping, new-node naming/context, graph mutation payloads, route sync, draft persistence, run stream behavior, human-review resume behavior, backend provider behavior, and visual layout.
+- [ ] Run focused tests, TypeScript/backend checks as appropriate, full verification when needed, dev restart, browser smoke for frontend changes, commit, push, and progress re-evaluation.
+- [ ] If total roadmap progress is below 100%, automatically open the next phase after Phase 94 and re-judge total progress.
 - **Status:** in progress
 
 ## Progress Estimate
@@ -1130,6 +1140,11 @@ Phase 93 in progress
 | P3 `EditorWorkspaceShell.vue` cleanup after Phase 92 | About 74% complete after removing repeated document lookup, no-op detection, dirty commit, and focus sequencing from simple graph mutation handlers. |
 | Current continuation gate after Phase 92 | Total roadmap progress is still below 100%, so Phase 93 is automatically opened for the next safe P3 shell boundary. |
 | P3 `EditorWorkspaceShell.vue` cleanup target for Phase 93 | About 76% of P3 if a narrow save/open routing, human-review controller routing, or higher-coverage graph mutation action helper can move out safely. |
+| Full roadmap cleanup after Phase 93 | About 72-73% complete when P4 backend work is counted; the graph mutation composable is a large P3 frontend step but backend provider/executor/runtime cleanup remains unstarted. |
+| Frontend roadmap cleanup after Phase 93 | About 83-85% complete across P1/P2/P3 after moving the workspace graph mutation action layer into `useWorkspaceGraphMutationActions.ts`. |
+| P3 `EditorWorkspaceShell.vue` cleanup after Phase 93 | About 82% complete after extracting the `useGraphMutationActions` roadmap slice while keeping save/open, node creation menu execution, human-review routing, and run lifecycle in the shell. |
+| Current continuation gate after Phase 93 | Total roadmap progress is still below 100%, so Phase 94 is automatically opened for the next safe P3/P4 boundary. |
+| P3/P4 cleanup target for Phase 94 | About 84% P3 if save/open, node-creation flow, or human-review routing can move out safely, or about 2-4% P4 if the first backend provider/runtime slice starts with behavior coverage. |
 
 ## Decisions Made
 | Decision | Rationale |
