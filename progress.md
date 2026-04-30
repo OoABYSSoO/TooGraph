@@ -1,5 +1,59 @@
 # Progress Log
 
+## Session: 2026-04-30 Phase 97
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Continued automatically after commit `1178132` because the full-roadmap progress is below 100%.
+  - Inspected remaining Anthropic, Gemini, and Codex transport clusters.
+  - Chose Anthropic messages because it mirrors the already extracted OpenAI transport shape and has focused provider-client coverage.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added structure coverage requiring Anthropic chat transport helpers to live in `app.tools.model_provider_anthropic`.
+  - Verified the expected red failure because the module did not exist.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `backend/app/tools/model_provider_anthropic.py`.
+  - Moved Anthropic request payload construction, stream delta extraction, stream coalescing, response text extraction, fallback metadata, and request logging calls into the new transport module.
+  - Kept `_chat_anthropic` as the client compatibility facade and injected the existing request-log and streaming fallback seams.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran the focused red/green structure test.
+  - Ran provider client and model request log regression tests.
+  - Ran the full backend test suite.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend entry returned HTTP 200 and backend `/health` returned `{"status":"ok"}`.
+
+### Phase 5: Honest Progress Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated the full roadmap at about 77-78%.
+  - Recalculated the frontend-focused roadmap at about 83-85%; unchanged because Phase 97 was backend-only.
+  - Recalculated P3 `EditorWorkspaceShell.vue` cleanup at about 82%; unchanged.
+  - Recalculated P4 backend cleanup at about 20-23% after isolating the Anthropic messages transport.
+  - Opened Phase 98 automatically because the full roadmap is still below 100%.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red structure test | `PYTHONPATH=backend pytest backend/tests/test_model_provider_client.py::ModelProviderClientTests::test_anthropic_chat_transport_is_isolated_from_provider_client -q` before implementation | Fails because `model_provider_anthropic` is missing | Failed with missing module assertion | Passed |
+| Focused structure test | Same command after implementation | Structure test passes | 1 passed | Passed |
+| Provider regression tests | `PYTHONPATH=backend pytest backend/tests/test_model_provider_client.py backend/tests/test_model_request_logs.py -q` | Provider client behavior and request-log behavior stay unchanged | 19 passed, 2 existing warnings | Passed |
+| Full backend tests | `PYTHONPATH=backend pytest backend/tests -q` | All backend tests pass | 143 passed, 2 existing warnings | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | None | Phase 97 | No implementation errors beyond the expected red structure failure. |
+
 ## Session: 2026-04-30 Phase 96
 
 ### Phase 1: Re-orientation
