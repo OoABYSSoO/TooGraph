@@ -1,5 +1,74 @@
 # Progress Log
 
+## Session: 2026-04-30 Phase 60
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Confirmed Phase 59 was committed and pushed as `89ea95b`.
+  - Re-read the formal roadmap, active plan, latest findings, and current touch branch in `handleCanvasPointerMove`.
+  - Inspected `canvasPinchZoomModel.ts`, `canvasPinchZoomModel.test.ts`, and pinch/viewport structure coverage.
+  - Selected the next P2 Canvas boundary: touch pointer-move action projection.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `resolveCanvasTouchPointerMoveAction` expectations before production code.
+  - Updated `EditorCanvas.structure.test.ts` to require delegated touch pointer-move routing.
+  - Verified the expected red failure: the touch pointer-move export and component wiring did not exist yet.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `CanvasTouchPointerMoveAction` and `resolveCanvasTouchPointerMoveAction` in `canvasPinchZoomModel.ts`.
+  - Updated `EditorCanvas.vue` so touch pointer moves delegate tracked-pointer, pinch preventDefault, scheduled pinch update, and stop/continue decisions to the model.
+  - Kept active pointer cache mutation, event `preventDefault`, scheduled `updatePinchZoom`, connection pointer move, node drag/resize, and panning inside `EditorCanvas.vue`.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused pinch model and structure tests.
+  - Ran broader pinch, viewport display/interaction, minimap, focus, selection, and structure regression tests.
+  - Ran TypeScript unused-symbol verification from `frontend`.
+  - Ran the full frontend `node --test` suite.
+  - Ran the frontend production build; no large chunk warning was emitted.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed backend `/health` returned `{"status":"ok"}` and the frontend entry returned HTTP 200.
+  - Captured a headless Chrome screenshot after a virtual-time wait and confirmed the workspace rendered normally.
+
+### Phase 5: Continuation Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated overall roadmap cleanup at about 87%.
+  - Recalculated P2 `EditorCanvas.vue` cleanup at about 88%.
+  - Opened Phase 61 automatically because total roadmap progress is below 100%.
+  - Selected the next candidate boundary as pan pointer-move routing around panning/no-op after touch, connection, and node drag/resize handling.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red focused tests | `node --test frontend/src/editor/canvas/canvasPinchZoomModel.test.ts frontend/src/editor/canvas/EditorCanvas.structure.test.ts` before implementation | Fails because touch pointer-move export and component wiring do not exist | Failed on missing export and structure assertions | Passed |
+| Focused model/structure tests | Same focused files after implementation | All focused tests pass | 67 passed | Passed |
+| Focused Canvas regression | `node --test` over pinch, viewport display/interaction, minimap, focus, selection, and EditorCanvas structure tests | Related pinch/viewport tests pass | 83 passed | Passed |
+| Unused symbol check | `./node_modules/.bin/vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No diagnostics | Exit 0 | Passed |
+| Full frontend tests | `node --test $(rg --files src vite.config.structure.test.ts | rg '\.test\.ts$')` in `frontend` | All frontend tests pass | 822 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without a large chunk warning | Exit 0, no Vite chunk warning | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+| Browser smoke | Headless Chrome screenshot with virtual-time wait | Workspace renders normally | Workspace UI rendered | Passed |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Phase 60 implementation, verification, docs update, and dev restart are complete. |
+| Where am I going? | Phase 61 is open for pan pointer-move action projection. |
+| What's the goal? | Continue reducing `EditorCanvas.vue` pointer-move ownership without changing touch pinch, connection pointer move, node drag/resize, panning, or graph editing behavior. |
+| What have I learned? | Touch pointer-move has a clean model boundary around tracking and pinch scheduling policy; actual pointer cache mutation and event side effects should remain component-owned. |
+| What have I done? | Extracted touch pointer-move actions, added focused tests, verified the full frontend suite, built, restarted, and visually smoked the app. |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+
 ## Session: 2026-04-30 Phase 59
 
 ### Phase 1: Re-orientation

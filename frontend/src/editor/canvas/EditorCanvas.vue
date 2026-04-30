@@ -475,7 +475,7 @@ import {
 import { useCanvasEdgeInteractions } from "./useCanvasEdgeInteractions";
 import { useCanvasConnectionInteraction } from "./useCanvasConnectionInteraction";
 import { useCanvasNodeMeasurements } from "./useCanvasNodeMeasurements";
-import { buildPinchZoomStart, resolveCanvasPinchPointerReleaseAction, resolveCanvasPinchZoomUpdateAction, resolveCanvasPointerDownAction } from "./canvasPinchZoomModel";
+import { buildPinchZoomStart, resolveCanvasPinchPointerReleaseAction, resolveCanvasPinchZoomUpdateAction, resolveCanvasPointerDownAction, resolveCanvasTouchPointerMoveAction } from "./canvasPinchZoomModel";
 import type { CanvasPointerDownAction } from "./canvasPinchZoomModel";
 import { buildCanvasViewportStyle, buildZoomPercentLabel } from "./canvasViewportDisplayModel";
 import {
@@ -1192,19 +1192,31 @@ function applyCanvasPointerDownSetup(
 }
 
 function handleCanvasPointerMove(event: PointerEvent) {
-  if (event.pointerType === "touch" && activeCanvasPointers.has(event.pointerId)) {
-    activeCanvasPointers.set(event.pointerId, {
-      clientX: event.clientX,
-      clientY: event.clientY,
-      pointerType: event.pointerType,
-    });
-    if (pinchZoom.value) {
-      event.preventDefault();
-      scheduleDragFrame(() => {
-        updatePinchZoom();
+  const touchPointerMoveAction = resolveCanvasTouchPointerMoveAction({
+    pointerType: event.pointerType,
+    isTrackedPointer: activeCanvasPointers.has(event.pointerId),
+    hasPinchZoom: Boolean(pinchZoom.value),
+  });
+  switch (touchPointerMoveAction.type) {
+    case "continue-pointer-move":
+      break;
+    case "track-touch-pointer":
+      activeCanvasPointers.set(event.pointerId, {
+        clientX: event.clientX,
+        clientY: event.clientY,
+        pointerType: event.pointerType,
       });
-      return;
-    }
+      if (touchPointerMoveAction.preventDefault) {
+        event.preventDefault();
+      }
+      if (touchPointerMoveAction.schedulePinchZoomUpdate) {
+        scheduleDragFrame(() => {
+          updatePinchZoom();
+        });
+      }
+      if (touchPointerMoveAction.stopPointerMove) {
+        return;
+      }
   }
   if (activeConnection.value) {
     const connectionPointerMoveRequest = resolveCanvasConnectionPointerMoveRequest({

@@ -30,6 +30,15 @@ export type CanvasPinchPointerReleaseAction =
   | { type: "end-pinch-zoom" }
   | { type: "continue-pointer-up" };
 
+export type CanvasTouchPointerMoveAction =
+  | { type: "continue-pointer-move" }
+  | {
+      type: "track-touch-pointer";
+      preventDefault: boolean;
+      schedulePinchZoomUpdate: boolean;
+      stopPointerMove: boolean;
+    };
+
 type CanvasPointerDownSetupPolicy = {
   focusCanvas?: true;
   preventDefault: true;
@@ -156,4 +165,21 @@ export function resolveCanvasPinchPointerReleaseAction(input: {
   }
 
   return { type: "continue-pointer-up" };
+}
+
+export function resolveCanvasTouchPointerMoveAction(input: {
+  pointerType: string;
+  isTrackedPointer: boolean;
+  hasPinchZoom: boolean;
+}): CanvasTouchPointerMoveAction {
+  if (input.pointerType !== "touch" || !input.isTrackedPointer) {
+    return { type: "continue-pointer-move" };
+  }
+
+  return {
+    type: "track-touch-pointer",
+    preventDefault: input.hasPinchZoom,
+    schedulePinchZoomUpdate: input.hasPinchZoom,
+    stopPointerMove: input.hasPinchZoom,
+  };
 }
