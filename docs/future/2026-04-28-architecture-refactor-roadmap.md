@@ -153,7 +153,8 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 - `model_provider_openai.py` 已承接 OpenAI-compatible chat request payload、stream delta extraction、stream coalescing、response text extraction、fallback metadata 和 request logging 调用；`model_provider_response_parsing.py` 已承接共享 message text normalization 和 SSE JSON event parsing。`model_provider_client._chat_openai_compatible` 仍作为兼容门面，并注入旧 request-log / streaming fallback patch 接缝。
 - `model_provider_anthropic.py` 已承接 Anthropic messages request payload、thinking token budget handling、stream delta extraction、stream coalescing、response text extraction、fallback metadata 和 request logging 调用；`model_provider_client._chat_anthropic` 仍作为兼容门面，并注入旧 request-log / streaming fallback patch 接缝。
 - `model_provider_gemini.py` 已承接 Gemini generate-content request payload、model path normalization、stream/fallback params、stream delta extraction、stream coalescing、response text extraction、fallback metadata 和 request logging 调用；`model_provider_client._chat_gemini` 仍作为兼容门面，并注入旧 request-log / streaming fallback patch 接缝。
-- Phase 98 后 `model_provider_client.py` 从 1,380 行降到 549 行；下一步应继续拆 Codex transport 或清理 provider facade，而不是同时移动 executor/runtime 语义。
+- `model_provider_codex.py` 已承接 Codex responses response-text extraction、stream delta extraction、stream coalescing、one-shot responses POST、token-expiry retry、request logging 和 response metadata；`model_provider_client._chat_codex_responses` 仍作为兼容门面，并注入 Codex token resolve/refresh 与 request-log patch 接缝。
+- Phase 99 后 `model_provider_client.py` 从 1,380 行降到 333 行；下一步应清理 provider facade 或进入 executor/runtime 纯 helper，而不是同时移动多个运行语义。
 
 ### 2. `node_system_executor.py`
 
@@ -261,7 +262,7 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 
 先拆 `model_provider_client.py`，再拆 `node_system_executor.py`，最后拆 LangGraph runtime。理由：provider client 的协议边界最清晰，executor 和 LangGraph runtime 对产品语义影响更大。
 
-当前 P4 进展：`model_provider_client.py` 的共享 HTTP/request 层、provider discovery 层、OpenAI-compatible chat transport、Anthropic messages transport、Gemini generate-content transport 和共享 response parsing 已完成抽取；Codex transport、executor 和 LangGraph runtime 仍待迁移。
+当前 P4 进展：`model_provider_client.py` 的共享 HTTP/request 层、provider discovery 层、OpenAI-compatible chat transport、Anthropic messages transport、Gemini generate-content transport、Codex responses transport 和共享 response parsing 已完成抽取；executor 和 LangGraph runtime 仍待迁移。
 
 ## 架构红线
 
