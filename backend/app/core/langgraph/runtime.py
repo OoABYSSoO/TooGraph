@@ -28,13 +28,15 @@ from app.core.langgraph.cycle_tracker import (
     resolve_cycle_summary_max_iterations as _resolve_cycle_summary_max_iterations,
     serialize_cycle_records as _serialize_cycle_records,
 )
+from app.core.langgraph.finalization import (
+    finalize_completed_langgraph_state as _finalize_completed_langgraph_state,
+    finalize_failed_langgraph_state as _finalize_failed_langgraph_state,
+)
 from app.core.langgraph.interrupts import (
     AFTER_BREAKPOINT_NODE_PREFIX,
     after_breakpoint_node_name as _after_breakpoint_node_name,
     apply_waiting_state as _apply_waiting_state,
-    clear_pending_interrupt_metadata as _clear_pending_interrupt_metadata,
     is_waiting_for_human as _is_waiting_for_human,
-    next_run_snapshot_id as _next_run_snapshot_id,
     resolve_interrupt_configuration as _resolve_interrupt_configuration,
     serialize_pending_interrupts as _serialize_pending_interrupts,
     snapshot_has_interrupt_payload as _snapshot_has_interrupt_payload,
@@ -54,9 +56,6 @@ from app.core.runtime.execution_graph import (
     build_execution_edges,
     select_active_outgoing_edges,
 )
-from app.core.runtime.output_boundaries import collect_output_boundaries
-from app.core.runtime.run_artifacts import append_run_snapshot, refresh_run_artifacts
-from app.core.runtime.run_events import publish_run_event
 from app.core.runtime.runtime_summaries import summarize_first_value as _summarize_values
 from app.core.runtime.state_io import apply_state_writes, collect_node_inputs
 from app.core.runtime.node_system_executor import (
@@ -105,16 +104,18 @@ def execute_node_system_graph_langgraph(
         )
 
     if not build_plan.runtime_nodes and not build_plan.runtime_condition_routes:
-        _clear_pending_interrupt_metadata(state)
-        set_run_status(state, "completed")
-        state["current_node_id"] = None
-        collect_output_boundaries(graph, state, active_edge_ids)
-        _finalize_langgraph_cycle_summary(state, cycle_tracker, active_edge_ids)
-        _sync_checkpoint_metadata(state, checkpoint_saver, checkpoint_lookup_config)
-        refresh_run_artifacts(state, node_outputs, active_edge_ids, started_perf=started_perf)
-        save_run(state)
-        publish_run_event(str(state.get("run_id") or ""), "run.completed", {"status": "completed"})
-        return state
+        return _finalize_completed_langgraph_state(
+            graph,
+            state,
+            active_edge_ids,
+            cycle_tracker,
+            node_outputs,
+            started_perf=started_perf,
+            checkpoint_saver=checkpoint_saver,
+            checkpoint_lookup_config=checkpoint_lookup_config,
+            append_snapshot=False,
+            save_run_func=save_run,
+        )
 
     workflow = StateGraph(_build_langgraph_state_schema(graph))
     for node_name in build_plan.runtime_nodes:
@@ -209,38 +210,28 @@ def execute_node_system_graph_langgraph(
             )
             save_run(state)
             return state
-        _clear_pending_interrupt_metadata(state)
-        set_run_status(state, "completed")
-        state["current_node_id"] = None
-        collect_output_boundaries(graph, state, active_edge_ids)
-        _finalize_langgraph_cycle_summary(state, cycle_tracker, active_edge_ids)
-        _sync_checkpoint_metadata(state, checkpoint_saver, checkpoint_lookup_config)
-        refresh_run_artifacts(state, node_outputs, active_edge_ids, started_perf=started_perf)
-        append_run_snapshot(
+        return _finalize_completed_langgraph_state(
+            graph,
             state,
-            snapshot_id=_next_run_snapshot_id(state, "completed"),
-            kind="completed",
-            label="Completed",
+            active_edge_ids,
+            cycle_tracker,
+            node_outputs,
+            started_perf=started_perf,
+            checkpoint_saver=checkpoint_saver,
+            checkpoint_lookup_config=checkpoint_lookup_config,
+            append_snapshot=True,
+            save_run_func=save_run,
         )
-        save_run(state)
-        publish_run_event(str(state.get("run_id") or ""), "run.completed", {"status": "completed"})
-        return state
     except Exception as exc:  # pragma: no cover - defensive runtime path
-        set_run_status(state, "failed")
-        state.setdefault("errors", []).append(str(exc))
-        _sync_checkpoint_metadata(state, checkpoint_saver, checkpoint_lookup_config)
-        refresh_run_artifacts(state, node_outputs, active_edge_ids, started_perf=started_perf)
-        append_run_snapshot(
+        _finalize_failed_langgraph_state(
             state,
-            snapshot_id=_next_run_snapshot_id(state, "failed"),
-            kind="failed",
-            label="Failed",
-        )
-        save_run(state)
-        publish_run_event(
-            str(state.get("run_id") or ""),
-            "run.failed",
-            {"status": "failed", "error": str(exc)},
+            node_outputs,
+            active_edge_ids,
+            exc=exc,
+            started_perf=started_perf,
+            checkpoint_saver=checkpoint_saver,
+            checkpoint_lookup_config=checkpoint_lookup_config,
+            save_run_func=save_run,
         )
         raise
 

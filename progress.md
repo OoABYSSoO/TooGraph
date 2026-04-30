@@ -1,5 +1,49 @@
 # Progress Log
 
+## Session: 2026-04-30 Phase 140
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Continued automatically after commit `ce00683` because the full-roadmap progress is below 100%.
+  - Re-read the formal roadmap, Phase 139 findings, and remaining frontend/backend high-line-count files.
+  - Chose the LangGraph finalization slice because completed/failed run cleanup was the remaining duplicated backend P4 tail, and it can preserve `runtime.save_run` patchability through explicit dependency injection.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `backend/tests/test_langgraph_finalization.py` covering completed finalization side-effect order and failed finalization error/snapshot/event behavior.
+  - Verified the expected red failure because `app.core.langgraph.finalization` did not exist yet.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `backend/app/core/langgraph/finalization.py`.
+  - Moved completed and failed LangGraph run finalization out of `runtime.py`.
+  - Updated `core/langgraph/runtime.py` to call the finalization helpers while passing its `save_run` symbol explicitly, preserving existing tests that patch `app.core.langgraph.runtime.save_run`.
+  - Reduced `backend/app/core/langgraph/runtime.py` from 467 to 458 lines.
+
+### Phase 4: Verification and Progress Gate
+- **Status:** completed
+- Actions taken:
+  - Ran focused backend LangGraph/runtime regression tests.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend entry returned HTTP 200 and backend `/health` returned `{"status":"ok"}`.
+  - Recalculated the full roadmap at about 99.9%, frontend-focused progress at about 98.2%, P2 `EditorCanvas.vue` residual cleanup at about 99%, and backend P4 at about 99.5%.
+  - Opened Phase 141 automatically because the full roadmap is still just below 100%.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red backend test | `python -m pytest backend/tests/test_langgraph_finalization.py` before implementation | Fails because the LangGraph finalization module is missing | Failed with `ModuleNotFoundError: No module named 'app.core.langgraph.finalization'` | Passed |
+| Focused backend tests | `python -m pytest backend/tests/test_langgraph_finalization.py backend/tests/test_langgraph_runtime_setup.py backend/tests/test_langgraph_progress.py backend/tests/test_langgraph_migration.py backend/tests/test_langgraph_checkpoint_runtime.py backend/tests/test_langgraph_interrupts.py backend/tests/test_langgraph_cycle_tracker.py backend/tests/test_runtime_summaries.py` | Finalization, setup, progress, migration, checkpoint, interrupt, cycle, and summary tests pass | 67 passed | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | New LangGraph finalization backend test failed with a missing module import | Red test before implementation | Added `finalization.py`, wired `runtime.py` to use it, and reran focused backend tests successfully. |
+
 ## Session: 2026-04-30 Phase 139
 
 ### Phase 1: Re-orientation
