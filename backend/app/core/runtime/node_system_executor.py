@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import copy
 import inspect
-import json
 from typing import Any
 
 from app.core.model_catalog import get_default_text_model_ref, normalize_model_ref, resolve_runtime_model_name
@@ -26,6 +25,10 @@ from app.core.runtime.execution_graph import (
     build_execution_edges as _build_execution_edges,
     build_regular_edge_id as _build_regular_edge_id,
     select_active_outgoing_edges as _select_active_outgoing_edges,
+)
+from app.core.runtime.input_boundary import (
+    coerce_input_boundary_value as _coerce_input_boundary_value,
+    first_truthy as _first_truthy,
 )
 from app.core.runtime.llm_output_parser import (
     build_output_key_aliases as _build_output_key_aliases,
@@ -627,27 +630,3 @@ def _summarize_outputs(output_values: dict[str, Any], final_result: Any) -> str:
     if output_values:
         return str({key: str(value)[:80] for key, value in output_values.items()})[:160]
     return "no outputs"
-
-
-def _first_truthy(values: Any) -> Any:
-    for value in values:
-        if value:
-            return value
-    return None
-
-
-def _coerce_input_boundary_value(value: Any, state_type: NodeSystemStateType) -> Any:
-    if not isinstance(value, str):
-        return value
-
-    try:
-        parsed = json.loads(value)
-        if state_type in {NodeSystemStateType.NUMBER, NodeSystemStateType.BOOLEAN, NodeSystemStateType.OBJECT, NodeSystemStateType.ARRAY, NodeSystemStateType.JSON, NodeSystemStateType.FILE_LIST}:
-            return parsed
-        if state_type in {NodeSystemStateType.IMAGE, NodeSystemStateType.AUDIO, NodeSystemStateType.VIDEO, NodeSystemStateType.FILE} and isinstance(parsed, dict) and parsed.get("kind") == "uploaded_file":
-            return parsed
-        if state_type == NodeSystemStateType.KNOWLEDGE_BASE:
-            return value
-        return value
-    except json.JSONDecodeError:
-        return value
