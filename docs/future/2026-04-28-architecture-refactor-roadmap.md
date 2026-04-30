@@ -216,7 +216,8 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 - `core/langgraph/interrupts.py` 已承接 breakpoint node name wrapping/unwrapping、interrupt metadata normalization、waiting-for-human detection、pending interrupt serialization、waiting state mutation、pending interrupt metadata cleanup 和 pause/completion snapshot id allocation；`core/langgraph/runtime.py` 保留相关私有兼容别名。
 - `core/langgraph/cycle_tracker.py` 已承接 cycle tracker construction、condition loop-limit collection/resolution、loop iteration advancement、cycle iteration records、node/route activity recording、no-state-change 和 max-iteration failure projection、cycle record serialization、final stop reason resolution 和 final cycle summary projection；`core/langgraph/runtime.py` 保留相关私有兼容别名。
 - `core/langgraph/runtime_setup.py` 已承接 LangGraph state schema/reducer construction、sentinel endpoint mapping、input boundary status marking 和 after-breakpoint passthrough callable setup；`core/langgraph/runtime.py` 继续保留图构建、node/route callable、checkpoint、interrupt、cycle、progress persistence 和 output boundary execution。
-- Phase 135 后 `core/langgraph/runtime.py` 从约 1,040 行降到 499 行；execution callables 和图构建主流程仍留在 runtime，checkpoint、interrupt、cycle 和 setup helper 已迁出。
+- `core/langgraph/progress.py` 已承接 LangGraph progress persistence wrapper，保证 checkpoint metadata sync 先于 run progress persistence；`core/langgraph/runtime.py` 继续决定何时在 graph 初始化、node callable、route callable 和失败路径触发持久化。
+- Phase 136 后 `core/langgraph/runtime.py` 从约 1,040 行降到 486 行；execution callables 和图构建主流程仍留在 runtime，checkpoint、interrupt、cycle、setup 和 progress helper 已迁出。
 
 推荐目标结构：
 
@@ -316,7 +317,7 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 
 先拆 `model_provider_client.py`，再拆 `node_system_executor.py`，最后拆 LangGraph runtime。理由：provider client 的协议边界最清晰，executor 和 LangGraph runtime 对产品语义影响更大。
 
-当前 P4 进展：`model_provider_client.py` 的共享 HTTP/request 层、provider discovery 层、OpenAI-compatible chat transport、Anthropic messages transport、Gemini generate-content transport、Codex responses transport 和共享 response parsing 已完成抽取；`node_system_executor.py` 的 condition evaluation、agent prompt、LLM output parser、execution graph、state I/O、output artifact、run artifact、input boundary、output boundary、agent streaming、reference resolution、skill invocation、agent runtime config、agent response generation、node handler、run progress 和 runtime summary helper 已完成抽取；LangGraph runtime 已开始复用共享 summary helper，并已迁出 checkpoint/runtime metadata helper、waiting-state interrupt helper、cycle helper 和 runtime setup helper。Phase 135 后，后端 P4 约 96% 完成；全路线总进度约 99.4%，因为 frontend P2/P1 仍有尾部大文件工作。
+当前 P4 进展：`model_provider_client.py` 的共享 HTTP/request 层、provider discovery 层、OpenAI-compatible chat transport、Anthropic messages transport、Gemini generate-content transport、Codex responses transport 和共享 response parsing 已完成抽取；`node_system_executor.py` 的 condition evaluation、agent prompt、LLM output parser、execution graph、state I/O、output artifact、run artifact、input boundary、output boundary、agent streaming、reference resolution、skill invocation、agent runtime config、agent response generation、node handler、run progress 和 runtime summary helper 已完成抽取；LangGraph runtime 已开始复用共享 summary helper，并已迁出 checkpoint/runtime metadata helper、waiting-state interrupt helper、cycle helper、runtime setup helper 和 progress helper。Phase 136 后，后端 P4 约 97% 完成；全路线总进度约 99.5%，因为 frontend P2/P1 仍有尾部大文件工作。
 
 ## 架构红线
 

@@ -41,6 +41,7 @@ from app.core.langgraph.interrupts import (
     snapshot_has_interrupt_payload as _snapshot_has_interrupt_payload,
     source_node_from_after_breakpoint as _source_node_from_after_breakpoint,
 )
+from app.core.langgraph.progress import persist_langgraph_progress as _persist_langgraph_progress
 from app.core.langgraph.runtime_setup import (
     build_after_breakpoint_passthrough_callable as _build_after_breakpoint_passthrough_callable,
     build_langgraph_state_schema as _build_langgraph_state_schema,
@@ -58,7 +59,6 @@ from app.core.runtime.runtime_summaries import summarize_first_value as _summari
 from app.core.runtime.state_io import apply_state_writes, collect_node_inputs, initialize_graph_state
 from app.core.runtime.node_system_executor import (
     _execute_node,
-    _persist_run_progress,
 )
 from app.core.runtime.state import create_initial_run_state, set_run_status, touch_run_lifecycle, utc_now_iso
 from app.core.schemas.node_system import NodeSystemGraphDocument
@@ -484,16 +484,3 @@ def _build_langgraph_route_callable(
             return selected_branch
 
     return _route
-
-
-def _persist_langgraph_progress(
-    state: dict[str, Any],
-    node_outputs: dict[str, dict[str, Any]],
-    active_edge_ids: set[str],
-    *,
-    started_perf: float,
-    checkpoint_saver: JsonCheckpointSaver,
-    checkpoint_lookup_config: dict[str, Any],
-) -> None:
-    _sync_checkpoint_metadata(state, checkpoint_saver, checkpoint_lookup_config)
-    _persist_run_progress(state, node_outputs, active_edge_ids, started_perf=started_perf)
