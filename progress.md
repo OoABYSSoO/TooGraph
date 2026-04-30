@@ -1,5 +1,57 @@
 # Progress Log
 
+## Session: 2026-04-30 Phase 131
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Continued automatically after commit `cf30b70` because the full-roadmap progress is below 100%.
+  - Re-read the formal roadmap, Phase 130 findings, and remaining high-line-count files.
+  - Chose the `EditorWorkspaceShell.vue` resource-loading slice because the shell still owned knowledge-base, settings, skill-definition, and persisted-preset refs plus their loading/refresh functions.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `useWorkspaceResourceController.test.ts` covering successful resource loading into refs, existing fallback behavior on knowledge/settings/skill failures, and agent model refresh through settings reload.
+  - Verified the expected red failure because `useWorkspaceResourceController.ts` did not exist yet.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `useWorkspaceResourceController.ts`.
+  - Updated `EditorWorkspaceShell.vue` to consume resource refs and `refreshAgentModels` from the controller while keeping template binding names unchanged.
+  - Replaced the four on-mounted resource load calls with `loadInitialWorkspaceResources`.
+  - Updated structure tests to lock the resource controller boundary.
+  - Reduced `EditorWorkspaceShell.vue` from 1,169 to 1,135 lines.
+
+### Phase 4: Verification and Progress Gate
+- **Status:** completed
+- Actions taken:
+  - Ran focused resource controller and workspace-shell structure tests.
+  - Ran TypeScript unused-symbol verification.
+  - Ran the full frontend test suite and production build.
+  - Confirmed the production build still has no Vite large chunk warning.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend entry returned HTTP 200 and backend `/health` returned `{"status":"ok"}`.
+  - Confirmed the previous dev session exited after the restart.
+  - Recalculated the full roadmap at about 99.0%, frontend-focused progress at about 97%, and P3 `EditorWorkspaceShell.vue` progress at about 99.7%.
+  - Opened Phase 132 automatically because the full roadmap is still below 100%.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red controller test | `node --test src/editor/workspace/useWorkspaceResourceController.test.ts` before implementation | Fails because the resource controller module is missing | Failed with missing module import | Passed |
+| Focused frontend tests | `node --test src/editor/workspace/useWorkspaceResourceController.test.ts src/editor/workspace/EditorWorkspaceShell.structure.test.ts` | Resource controller and shell structure tests pass | 40 passed | Passed |
+| TypeScript check | `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` | No type or unused-symbol errors | Exit 0 after fixture type cleanup | Passed |
+| Full frontend tests | `node --test $(rg --files src -g '*.test.ts' \| sort) vite.config.structure.test.ts` | Full frontend suite passes | 927 passed | Passed |
+| Production build | `npm run build` in `frontend` | Build succeeds with no large chunk warning | Exit 0; Vite build completed | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | `vue-tsc` flagged incomplete resource test fixtures for knowledge bases, settings, and skill definitions | First TypeScript verification | Replaced ad hoc test objects with fixtures matching the real frontend resource types. |
+
 ## Session: 2026-04-30 Phase 130
 
 ### Phase 1: Re-orientation

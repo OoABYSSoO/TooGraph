@@ -26,6 +26,7 @@ const presetControllerSource = readWorkspaceSource("useWorkspacePresetController
 const nodeCreationControllerSource = readWorkspaceSource("useWorkspaceNodeCreationController.ts");
 const runLifecycleControllerSource = readWorkspaceSource("useWorkspaceRunLifecycleController.ts");
 const openControllerSource = readWorkspaceSource("useWorkspaceOpenController.ts");
+const resourceControllerSource = readWorkspaceSource("useWorkspaceResourceController.ts");
 
 test("EditorWorkspaceShell renders workspace panes without reka-ui tab primitives", () => {
   assert.doesNotMatch(componentSource, /from "reka-ui"/);
@@ -50,9 +51,12 @@ test("EditorWorkspaceShell wires canvas node-creation intents into a dedicated c
 });
 
 test("EditorWorkspaceShell refreshes settings when an agent model menu opens", () => {
+  assert.match(componentSource, /import \{ useWorkspaceResourceController \} from "\.\/useWorkspaceResourceController\.ts";/);
   assert.match(componentSource, /@refresh-agent-models="refreshAgentModels"/);
-  assert.match(componentSource, /async function refreshAgentModels\(\)/);
-  assert.match(componentSource, /settings\.value = await fetchSettings\(\)/);
+  assert.match(componentSource, /const \{[\s\S]*settings,[\s\S]*refreshAgentModels,[\s\S]*\} = useWorkspaceResourceController\(\{/);
+  assert.match(resourceControllerSource, /async function refreshAgentModels\(\)/);
+  assert.match(resourceControllerSource, /await loadSettings\(\);/);
+  assert.match(resourceControllerSource, /settings\.value = await input\.fetchSettings\(\)/);
 });
 
 test("EditorWorkspaceShell persists node resize updates into the graph draft", () => {
@@ -65,9 +69,10 @@ test("EditorWorkspaceShell persists node resize updates into the graph draft", (
 
 test("EditorWorkspaceShell loads persisted presets for the node creation menu", () => {
   assert.match(componentSource, /import \{[\s\S]*fetchPresets[\s\S]*\} from "@\/api\/presets";/);
-  assert.match(componentSource, /const persistedPresets = ref<PresetDocument\[\]>\(\[\]\);/);
-  assert.match(componentSource, /async function loadPersistedPresets\(\)/);
-  assert.match(componentSource, /persistedPresets\.value = await fetchPresets\(\)/);
+  assert.match(componentSource, /const \{[\s\S]*persistedPresets,[\s\S]*loadInitialWorkspaceResources,[\s\S]*\} = useWorkspaceResourceController\(\{/);
+  assert.match(resourceControllerSource, /const persistedPresets = ref<PresetDocument\[\]>\(\[\]\);/);
+  assert.match(resourceControllerSource, /async function loadPersistedPresets\(\)/);
+  assert.match(resourceControllerSource, /persistedPresets\.value = await input\.fetchPresets\(\)/);
 });
 
 test("EditorWorkspaceShell seeds plain new tabs from the baseline default template", () => {

@@ -225,16 +225,12 @@ import {
 } from "@/lib/editor-workspace";
 import type { CanvasViewport } from "@/editor/canvas/canvasViewport";
 import { useGraphDocumentStore } from "@/stores/graphDocument";
-import type { KnowledgeBaseRecord } from "@/types/knowledge";
 import type { RunDetail } from "@/types/run";
-import type { SettingsPayload } from "@/types/settings";
-import type { SkillDefinition } from "@/types/skills";
 import type {
   GraphDocument,
   GraphNodeSize,
   GraphPayload,
   GraphPosition,
-  PresetDocument,
   TemplateRecord,
 } from "@/types/node-system";
 
@@ -258,6 +254,7 @@ import { useWorkspaceNodeCreationController } from "./useWorkspaceNodeCreationCo
 import { useWorkspaceOpenController } from "./useWorkspaceOpenController.ts";
 import { useWorkspacePresetController } from "./useWorkspacePresetController.ts";
 import { useWorkspacePythonImportController } from "./useWorkspacePythonImportController.ts";
+import { useWorkspaceResourceController } from "./useWorkspaceResourceController.ts";
 import { useWorkspaceRouteController } from "./useWorkspaceRouteController.ts";
 import { useWorkspaceRunLifecycleController } from "./useWorkspaceRunLifecycleController.ts";
 import { useWorkspaceRunController } from "./useWorkspaceRunController.ts";
@@ -313,13 +310,22 @@ const runFailureMessageByTabId = ref<Record<string, Record<string, string>>>({})
 const activeRunEdgeIdsByTabId = ref<Record<string, string[]>>({});
 const feedbackByTabId = ref<Record<string, WorkspaceRunFeedback | null>>({});
 const routeRestoreError = ref<string | null>(null);
-const knowledgeBases = ref<KnowledgeBaseRecord[]>([]);
-const settings = ref<SettingsPayload | null>(null);
-const skillDefinitions = ref<SkillDefinition[]>([]);
-const skillDefinitionsLoading = ref(true);
-const skillDefinitionsError = ref<string | null>(null);
-const persistedPresets = ref<PresetDocument[]>([]);
 const nodeCreationMenuByTabId = ref<Record<string, NodeCreationMenuState>>({});
+const {
+  knowledgeBases,
+  settings,
+  skillDefinitions,
+  skillDefinitionsLoading,
+  skillDefinitionsError,
+  persistedPresets,
+  loadInitialWorkspaceResources,
+  refreshAgentModels,
+} = useWorkspaceResourceController({
+  fetchKnowledgeBases,
+  fetchSettings,
+  fetchSkillDefinitions,
+  fetchPresets,
+});
 
 const graphById = computed(() => new Map(props.graphs.map((graph) => [graph.graph_id, graph])));
 const agentRuntimeCatalog = computed(() => resolveAgentRuntimeCatalog(settings.value));
@@ -784,43 +790,6 @@ function showStateDeleteBlockedToast(message: string) {
   });
 }
 
-async function loadKnowledgeBases() {
-  try {
-    knowledgeBases.value = await fetchKnowledgeBases();
-  } catch {
-    knowledgeBases.value = [];
-  }
-}
-
-async function loadSettings() {
-  try {
-    settings.value = await fetchSettings();
-  } catch {
-    settings.value = null;
-  }
-}
-
-async function refreshAgentModels() {
-  await loadSettings();
-}
-
-async function loadSkillDefinitions() {
-  try {
-    skillDefinitionsLoading.value = true;
-    skillDefinitions.value = await fetchSkillDefinitions();
-    skillDefinitionsError.value = null;
-  } catch (error) {
-    skillDefinitions.value = [];
-    skillDefinitionsError.value = error instanceof Error ? error.message : "Failed to load skills.";
-  } finally {
-    skillDefinitionsLoading.value = false;
-  }
-}
-
-async function loadPersistedPresets() {
-  persistedPresets.value = await fetchPresets();
-}
-
 watch(
   workspace,
   (nextWorkspace) => {
@@ -884,10 +853,7 @@ onBeforeUnmount(() => {
 });
 
 onMounted(() => {
-  void loadKnowledgeBases();
-  void loadSettings();
-  void loadSkillDefinitions();
-  void loadPersistedPresets();
+  loadInitialWorkspaceResources();
   updateWorkspace(readPersistedEditorWorkspace());
   ensureTabViewportDrafts();
   hydrated.value = true;
