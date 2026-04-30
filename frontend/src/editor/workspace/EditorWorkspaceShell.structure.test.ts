@@ -23,6 +23,7 @@ const runControllerSource = readWorkspaceSource("useWorkspaceRunController.ts");
 const graphPersistenceControllerSource = readWorkspaceSource("useWorkspaceGraphPersistenceController.ts");
 const pythonImportControllerSource = readWorkspaceSource("useWorkspacePythonImportController.ts");
 const presetControllerSource = readWorkspaceSource("useWorkspacePresetController.ts");
+const nodeCreationControllerSource = readWorkspaceSource("useWorkspaceNodeCreationController.ts");
 
 test("EditorWorkspaceShell renders workspace panes without reka-ui tab primitives", () => {
   assert.doesNotMatch(componentSource, /from "reka-ui"/);
@@ -36,8 +37,8 @@ test("EditorWorkspaceShell renders workspace panes without reka-ui tab primitive
 test("EditorWorkspaceShell wires canvas node-creation intents into a dedicated creation menu component", () => {
   assert.match(componentSource, /import EditorNodeCreationMenu from "\.\/EditorNodeCreationMenu\.vue";/);
   assert.match(
-    componentSource,
-    /import \{[\s\S]*buildClosedNodeCreationMenuState,[\s\S]*buildCreatedStateEdgeEditorRequest,[\s\S]*buildOpenNodeCreationMenuState,[\s\S]*buildUpdatedNodeCreationMenuQuery[\s\S]*\} from "@\/editor\/workspace\/nodeCreationMenuModel";/,
+    nodeCreationControllerSource,
+    /import \{[\s\S]*buildClosedNodeCreationMenuState,[\s\S]*buildCreatedStateEdgeEditorRequest,[\s\S]*buildOpenNodeCreationMenuState,[\s\S]*buildUpdatedNodeCreationMenuQuery[\s\S]*\} from "\.\/nodeCreationMenuModel\.ts";/,
   );
   assert.match(componentSource, /@open-node-creation-menu="openNodeCreationMenuForTab\(tab\.tabId, \$event\)"/);
   assert.match(componentSource, /@create-node-from-file="createNodeFromFileForTab\(tab\.tabId, \$event\)"/);
@@ -195,21 +196,23 @@ test("EditorWorkspaceShell keeps top chrome and editor body from overflowing the
 });
 
 test("EditorWorkspaceShell routes menu selections and dropped files through the node-creation execution helpers", () => {
-  assert.match(componentSource, /import \{ createNodeFromCreationEntry, createNodeFromDroppedFile \} from "\.\/nodeCreationExecution\.ts";/);
+  assert.match(componentSource, /import \{ useWorkspaceNodeCreationController \} from "\.\/useWorkspaceNodeCreationController\.ts";/);
   assert.match(graphMutationActionsSource, /import \{ connectStateInputSourceToTarget \} from "@\/lib\/graph-node-creation";/);
   assert.match(graphMutationActionsSource, /import \{ isVirtualAnyOutputStateKey \} from "@\/lib\/virtual-any-input";/);
   assert.match(componentSource, /const dataEdgeStateEditorRequestByTabId = ref<Record<string, DataEdgeStateEditorRequest \| null>>\(\{\}\);/);
   assert.match(componentSource, /:state-editor-request="dataEdgeStateEditorRequestByTabId\[tab\.tabId\] \?\? null"/);
   assert.match(componentSource, /@connect-state="connectStateBindingForTab\(tab\.tabId, \$event\)"/);
   assert.match(componentSource, /@connect-state-input-source="connectStateInputSourceForTab\(tab\.tabId, \$event\)"/);
-  assert.match(componentSource, /const result = createNodeFromCreationEntry\(document, \{/);
-  assert.match(componentSource, /const result = await createNodeFromDroppedFile\(document, \{/);
-  assert.match(componentSource, /nodeCreationMenuByTabId\.value = setTabScopedRecordEntry\(nodeCreationMenuByTabId\.value, tabId, buildOpenNodeCreationMenuState\(context\)\);/);
-  assert.match(componentSource, /nodeCreationMenuByTabId\.value = setTabScopedRecordEntry\(nodeCreationMenuByTabId\.value, tabId, buildClosedNodeCreationMenuState\(\)\);/);
   assert.match(
     componentSource,
-    /nodeCreationMenuByTabId\.value = setTabScopedRecordEntry\(\s*nodeCreationMenuByTabId\.value,\s*tabId,\s*buildUpdatedNodeCreationMenuQuery\(currentState, query\),\s*\);/,
+    /const \{[\s\S]*createNodeFromFileForTab,[\s\S]*createNodeFromMenuForTab,[\s\S]*nodeCreationEntriesForTab,[\s\S]*nodeCreationMenuState,[\s\S]*openCreatedStateEdgeEditorForTab,[\s\S]*openNodeCreationMenuForTab,[\s\S]*updateNodeCreationQuery,[\s\S]*\} = useWorkspaceNodeCreationController\(\{/,
   );
+  assert.match(componentSource, /useWorkspaceNodeCreationController\(\{[\s\S]*documentsByTabId,[\s\S]*dataEdgeStateEditorRequestByTabId,[\s\S]*nodeCreationMenuByTabId,[\s\S]*persistedPresets,[\s\S]*guardGraphEditForTab,[\s\S]*markDocumentDirty,[\s\S]*setMessageFeedbackForTab,[\s\S]*importPythonGraphFile,[\s\S]*isGraphiteUiPythonExportFile,[\s\S]*\}\);/);
+  assert.match(nodeCreationControllerSource, /const result = createNodeFromCreationEntry\(document, \{/);
+  assert.match(nodeCreationControllerSource, /const result = await createNodeFromDroppedFile\(document, \{/);
+  assert.match(nodeCreationControllerSource, /buildOpenNodeCreationMenuState\(context\)/);
+  assert.match(nodeCreationControllerSource, /buildClosedNodeCreationMenuState\(\)/);
+  assert.match(nodeCreationControllerSource, /buildUpdatedNodeCreationMenuQuery\(currentState, query\)/);
   assert.doesNotMatch(componentSource, /typeof context\.clientX === "number" && typeof context\.clientY === "number"/);
   assert.match(graphMutationActionsSource, /function connectStateBindingForTab\(\s*tabId: string,\s*payload: \{ sourceNodeId: string; sourceStateKey: string; targetNodeId: string; targetStateKey: string; position: GraphPosition \},\s*\)/);
   assert.match(graphMutationActionsSource, /const createdStateKey = resolveCreatedVirtualOutputStateKey\(document, nextDocument, payload\.sourceNodeId, payload\.sourceStateKey\);/);
@@ -219,19 +222,22 @@ test("EditorWorkspaceShell routes menu selections and dropped files through the 
   assert.match(graphMutationActionsSource, /function connectStateInputSourceForTab/);
   assert.match(graphMutationActionsSource, /connectStateInputSourceToTarget\(document, payload\)/);
   assert.match(graphMutationActionsSource, /input\.markDocumentDirty\(tabId, result\.document\)/);
-  assert.match(componentSource, /openCreatedStateEdgeEditorForTab\(tabId, menuState\.context, result\)/);
-  assert.match(componentSource, /function openCreatedStateEdgeEditorForTab/);
-  assert.match(componentSource, /createdStateKey: string \| null/);
-  assert.match(componentSource, /const editorRequest = buildCreatedStateEdgeEditorRequest\(context, result, Date\.now\(\)\);/);
+  assert.match(nodeCreationControllerSource, /openCreatedStateEdgeEditorForTab\(tabId, menuState\.context, result\)/);
+  assert.match(nodeCreationControllerSource, /function openCreatedStateEdgeEditorForTab/);
+  assert.match(nodeCreationControllerSource, /createdStateKey: string \| null/);
+  assert.match(nodeCreationControllerSource, /const editorRequest = buildCreatedStateEdgeEditorRequest\(context, result, input\.now\?\.\(\) \?\? Date\.now\(\)\);/);
   assert.match(
-    componentSource,
-    /dataEdgeStateEditorRequestByTabId\.value = setTabScopedRecordEntry\(\s*dataEdgeStateEditorRequestByTabId\.value,\s*tabId,\s*editorRequest,\s*\);/,
+    nodeCreationControllerSource,
+    /input\.dataEdgeStateEditorRequestByTabId\.value = setTabScopedRecordEntry\(\s*input\.dataEdgeStateEditorRequestByTabId\.value,\s*tabId,\s*editorRequest,\s*\);/,
   );
+  assert.doesNotMatch(componentSource, /createNodeFromCreationEntry\(document, \{/);
+  assert.doesNotMatch(componentSource, /createNodeFromDroppedFile\(document, \{/);
+  assert.doesNotMatch(componentSource, /buildOpenNodeCreationMenuState\(context\)/);
   assert.doesNotMatch(componentSource, /const sourceNodeId = context\.targetNodeId \? result\.createdNodeId : context\.sourceNodeId;/);
   assert.doesNotMatch(componentSource, /const targetNodeId = context\.targetNodeId \?\? result\.createdNodeId;/);
   assert.doesNotMatch(componentSource, /focusNodeForTab\(tabId, result\.createdNodeId\)/);
   assert.doesNotMatch(componentSource, /requestNodeFocusForTab\(tabId, result\.createdNodeId\)/);
-  assert.match(componentSource, /closeNodeCreationMenu\(tabId\)/);
+  assert.match(nodeCreationControllerSource, /closeNodeCreationMenu\(tabId\)/);
 });
 
 test("EditorWorkspaceShell keeps canvas viewport state in local editor drafts", () => {

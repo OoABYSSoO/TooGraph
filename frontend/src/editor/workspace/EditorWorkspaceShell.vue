@@ -211,17 +211,7 @@ import { exportLangGraphPython, fetchGraph, importGraphFromPythonSource, runGrap
 import { resolveAgentRuntimeCatalog } from "@/editor/nodes/agentConfigModel";
 import EditorCanvas from "@/editor/canvas/EditorCanvas.vue";
 import type { NodeFocusRequest } from "@/editor/canvas/useNodeSelectionFocus";
-import { buildBuiltinNodeCreationEntries } from "@/editor/workspace/nodeCreationBuiltins";
-import {
-  buildClosedNodeCreationMenuState,
-  buildCreatedStateEdgeEditorRequest,
-  buildNodeCreationEntries,
-  buildOpenNodeCreationMenuState,
-  buildUpdatedNodeCreationMenuQuery,
-  type CreatedStateEdgeEditorRequest,
-  type NodeCreationMenuState,
-} from "@/editor/workspace/nodeCreationMenuModel";
-import { createNodeFromCreationEntry, createNodeFromDroppedFile } from "./nodeCreationExecution.ts";
+import type { CreatedStateEdgeEditorRequest, NodeCreationMenuState } from "@/editor/workspace/nodeCreationMenuModel";
 import {
   cloneGraphDocument,
   createEditorSeedDraftGraph,
@@ -258,8 +248,6 @@ import type {
   GraphNodeSize,
   GraphPayload,
   GraphPosition,
-  NodeCreationContext,
-  NodeCreationEntry,
   PresetDocument,
   TemplateRecord,
 } from "@/types/node-system";
@@ -285,6 +273,7 @@ import { downloadPythonSource } from "./pythonExportModel.ts";
 import { isGraphiteUiPythonExportFile, isGraphiteUiPythonExportSource } from "./pythonImportModel.ts";
 import { useWorkspaceDocumentState } from "./useWorkspaceDocumentState.ts";
 import { useWorkspaceGraphPersistenceController } from "./useWorkspaceGraphPersistenceController.ts";
+import { useWorkspaceNodeCreationController } from "./useWorkspaceNodeCreationController.ts";
 import { useWorkspacePresetController } from "./useWorkspacePresetController.ts";
 import { useWorkspacePythonImportController } from "./useWorkspacePythonImportController.ts";
 import { useWorkspaceRouteController } from "./useWorkspaceRouteController.ts";
@@ -370,6 +359,10 @@ const activeStateCount = computed(() => {
   }
   return Object.keys(document.state_schema ?? {}).length;
 });
+let closeNodeCreationMenuFromController: ((tabId: string) => void) | null = null;
+function closeNodeCreationMenu(tabId: string) {
+  closeNodeCreationMenuFromController?.(tabId);
+}
 const {
   activeStatePanelOpen,
   isStatePanelOpen,
@@ -506,6 +499,27 @@ const {
   isGraphiteUiPythonExportSource,
   setMessageFeedbackForTab,
 });
+const {
+  closeNodeCreationMenu: closeNodeCreationMenuController,
+  createNodeFromFileForTab,
+  createNodeFromMenuForTab,
+  nodeCreationEntriesForTab,
+  nodeCreationMenuState,
+  openCreatedStateEdgeEditorForTab,
+  openNodeCreationMenuForTab,
+  updateNodeCreationQuery,
+} = useWorkspaceNodeCreationController({
+  documentsByTabId,
+  dataEdgeStateEditorRequestByTabId,
+  nodeCreationMenuByTabId,
+  persistedPresets,
+  guardGraphEditForTab,
+  markDocumentDirty,
+  setMessageFeedbackForTab,
+  importPythonGraphFile,
+  isGraphiteUiPythonExportFile,
+});
+closeNodeCreationMenuFromController = closeNodeCreationMenuController;
 const { saveNodePresetForTab } = useWorkspacePresetController({
   documentsByTabId,
   persistedPresets,
@@ -863,127 +877,6 @@ function guardGraphEditForTab(tabId: string) {
   }
   showGraphLockedEditToast();
   return true;
-}
-
-function nodeCreationMenuState(tabId: string) {
-  return nodeCreationMenuByTabId.value[tabId] ?? null;
-}
-
-function nodeCreationEntriesForTab(tabId: string): NodeCreationEntry[] {
-  const menuState = nodeCreationMenuState(tabId);
-  const context = menuState?.context ?? null;
-  return buildNodeCreationEntries({
-    builtins: buildBuiltinNodeCreationEntries(),
-    presets: persistedPresets.value,
-    query: menuState?.query ?? "",
-    sourceValueType: context?.sourceValueType ?? context?.targetValueType ?? null,
-    sourceAnchorKind: context?.sourceAnchorKind ?? context?.targetAnchorKind ?? null,
-  });
-}
-
-function openNodeCreationMenuForTab(tabId: string, context: NodeCreationContext) {
-  if (guardGraphEditForTab(tabId)) {
-    return;
-  }
-  nodeCreationMenuByTabId.value = setTabScopedRecordEntry(nodeCreationMenuByTabId.value, tabId, buildOpenNodeCreationMenuState(context));
-}
-
-function closeNodeCreationMenu(tabId: string) {
-  nodeCreationMenuByTabId.value = setTabScopedRecordEntry(nodeCreationMenuByTabId.value, tabId, buildClosedNodeCreationMenuState());
-}
-
-function updateNodeCreationQuery(tabId: string, query: string) {
-  const currentState = nodeCreationMenuState(tabId);
-  nodeCreationMenuByTabId.value = setTabScopedRecordEntry(
-    nodeCreationMenuByTabId.value,
-    tabId,
-    buildUpdatedNodeCreationMenuQuery(currentState, query),
-  );
-}
-
-function createNodeFromMenuForTab(tabId: string, _entry: NodeCreationEntry) {
-  if (guardGraphEditForTab(tabId)) {
-    closeNodeCreationMenu(tabId);
-    return;
-  }
-  const document = documentsByTabId.value[tabId];
-  const menuState = nodeCreationMenuState(tabId);
-  if (!document || !menuState?.context) {
-    closeNodeCreationMenu(tabId);
-    return;
-  }
-
-  try {
-    const result = createNodeFromCreationEntry(document, {
-      entry: _entry,
-      context: menuState.context,
-      persistedPresets: persistedPresets.value,
-    });
-    markDocumentDirty(tabId, result.document);
-    openCreatedStateEdgeEditorForTab(tabId, menuState.context, result);
-    setMessageFeedbackForTab(tabId, {
-      tone: "neutral",
-      message: `Created ${result.document.nodes[result.createdNodeId]?.name ?? _entry.label}.`,
-    });
-    closeNodeCreationMenu(tabId);
-  } catch (error) {
-    setMessageFeedbackForTab(tabId, {
-      tone: "warning",
-      message: error instanceof Error ? error.message : "Failed to create node.",
-    });
-  }
-}
-
-function openCreatedStateEdgeEditorForTab(
-  tabId: string,
-  context: NodeCreationContext,
-  result: { createdNodeId: string; createdStateKey: string | null },
-) {
-  const editorRequest = buildCreatedStateEdgeEditorRequest(context, result, Date.now());
-  if (!editorRequest) {
-    return;
-  }
-
-  dataEdgeStateEditorRequestByTabId.value = setTabScopedRecordEntry(
-    dataEdgeStateEditorRequestByTabId.value,
-    tabId,
-    editorRequest,
-  );
-}
-
-async function createNodeFromFileForTab(tabId: string, _payload: { file: File; position: GraphPosition }) {
-  if (guardGraphEditForTab(tabId)) {
-    closeNodeCreationMenu(tabId);
-    return;
-  }
-  const document = documentsByTabId.value[tabId];
-  if (!document) {
-    closeNodeCreationMenu(tabId);
-    return;
-  }
-
-  try {
-    if (isGraphiteUiPythonExportFile(_payload.file) && (await importPythonGraphFile(_payload.file, { fallbackToFileNode: true }))) {
-      closeNodeCreationMenu(tabId);
-      return;
-    }
-
-    const result = await createNodeFromDroppedFile(document, {
-      file: _payload.file,
-      position: _payload.position,
-    });
-    markDocumentDirty(tabId, result.document);
-    setMessageFeedbackForTab(tabId, {
-      tone: "neutral",
-      message: `Created ${result.document.nodes[result.createdNodeId]?.name ?? "input node"} from ${_payload.file.name}.`,
-    });
-  } catch (error) {
-    setMessageFeedbackForTab(tabId, {
-      tone: "warning",
-      message: error instanceof Error ? error.message : "Failed to create input node from file.",
-    });
-  }
-  closeNodeCreationMenu(tabId);
 }
 
 function handleNodePositionUpdate(tabId: string, payload: { nodeId: string; position: GraphPosition }) {

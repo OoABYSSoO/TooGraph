@@ -1,5 +1,59 @@
 # Progress Log
 
+## Session: 2026-04-30 Phase 128
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Continued automatically after commit `bc91a8a` because the full-roadmap progress is below 100%.
+  - Re-read the formal roadmap, Phase 127 findings, and remaining high-line-count files.
+  - Chose the `EditorWorkspaceShell.vue` node creation controller slice because it removes a larger orchestration cluster while continuing to reuse the existing `nodeCreationExecution.ts` semantics that protect auto-snap payloads and new-node naming/context.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `useWorkspaceNodeCreationController.test.ts` covering menu open/query/close, builtin menu creation, created-state edge editor request ids, GraphiteUI Python export import short-circuit, and uploaded-file input node fallback creation.
+  - Verified the expected red failure because `useWorkspaceNodeCreationController.ts` did not exist yet.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `useWorkspaceNodeCreationController.ts`.
+  - Updated `EditorWorkspaceShell.vue` to delegate node creation menu state, menu entries, menu selection creation, created-state edge editor requests, and dropped-file node creation to the controller.
+  - Kept actual node creation semantics in `nodeCreationExecution.ts`, Python import behavior in the existing import controller, and graph dirty writes injected from the shell.
+  - Updated structure tests to lock the controller boundary instead of the old inline shell implementation.
+  - Reduced `EditorWorkspaceShell.vue` from 1,472 to 1,365 lines.
+
+### Phase 4: Verification and Progress Gate
+- **Status:** completed
+- Actions taken:
+  - Ran focused node creation controller, workspace-shell structure, node creation execution, and node creation menu model tests.
+  - Ran TypeScript unused-symbol verification; first pass caught test-only type issues, then passed after tightening the test fixture types.
+  - Ran the full frontend test suite and production build.
+  - Confirmed the production build still has no Vite large chunk warning.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend entry returned HTTP 200 and backend `/health` returned `{"status":"ok"}`.
+  - Confirmed the previous dev session exited after the restart.
+  - Recalculated the full roadmap at about 98.5%, frontend-focused progress at about 94-95%, and P3 `EditorWorkspaceShell.vue` progress at about 98%.
+  - Opened Phase 129 automatically because the full roadmap is still below 100%.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red controller test | `node --test src/editor/workspace/useWorkspaceNodeCreationController.test.ts` before implementation | Fails because the node creation controller module is missing | Failed with missing module import | Passed |
+| Focused frontend tests | `node --test src/editor/workspace/useWorkspaceNodeCreationController.test.ts src/editor/workspace/EditorWorkspaceShell.structure.test.ts src/editor/workspace/nodeCreationExecution.test.ts src/editor/workspace/nodeCreationMenuModel.test.ts` | Focused node creation controller and existing node creation semantics pass | 60 passed | Passed |
+| TypeScript check | `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` | No type or unused-symbol errors | Exit 0 after test fixture type cleanup | Passed |
+| Full frontend tests | `node --test $(rg --files src -g '*.test.ts' \| sort) vite.config.structure.test.ts` | Full frontend suite passes | 915 passed | Passed |
+| Production build | `npm run build` in `frontend` | Build succeeds with no large chunk warning | Exit 0; Vite build completed | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | Node test runner could not resolve `@/editor` imports from the new controller | First green run after adding the controller | Switched the controller imports to the same relative-path style used by nearby workspace controllers. |
+| 2026-04-30 | Structure tests still expected old inline node creation imports and menu-state writes in `EditorWorkspaceShell.vue` | First focused structure run after shell integration | Updated the assertions to verify the new `useWorkspaceNodeCreationController.ts` boundary. |
+| 2026-04-30 | `vue-tsc` flagged an unused test type and an overly narrow empty-object ref in the new controller test | First TypeScript verification | Removed the unused type and typed the created-state request ref as `Record<string, CreatedStateEdgeEditorRequest | null>`. |
+
 ## Session: 2026-04-30 Phase 127
 
 ### Phase 1: Re-orientation
