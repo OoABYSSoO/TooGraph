@@ -413,8 +413,8 @@ import {
   buildEdgeVisibilityModeOptions,
   buildForceVisibleProjectedEdgeIds,
   filterProjectedEdgesForVisibilityMode,
+  isCanvasFlowHotspotVisible,
   resolveEdgeVisibilityModeClickAction,
-  shouldShowOutputFlowHandle,
   type EdgeVisibilityMode,
 } from "./edgeVisibilityModel";
 import {
@@ -1660,25 +1660,16 @@ function clearHoveredFlowHandleNode(nodeId: string) {
   }
 }
 
-function isOutputFlowHandleNodeInteracted(nodeId: string) {
-  return (
-    selection.selectedNodeId.value === nodeId ||
-    hoveredNodeId.value === nodeId ||
-    hoveredFlowHandleNodeId.value === nodeId
-  );
-}
-
 function isFlowHotspotVisible(anchor: ProjectedCanvasAnchor) {
-  if (anchor.kind === "flow-out" || anchor.kind === "route-out") {
-    return shouldShowOutputFlowHandle({
-      mode: edgeVisibilityMode.value,
-      anchorKind: anchor.kind,
-      isNodeInteracted: isOutputFlowHandleNodeInteracted(anchor.nodeId),
-      isActiveConnectionSource: activeConnectionSourceAnchorId.value === anchor.id,
-    });
-  }
-
-  return eligibleTargetAnchorIds.value.has(anchor.id);
+  return isCanvasFlowHotspotVisible({
+    mode: edgeVisibilityMode.value,
+    anchor,
+    selectedNodeId: selection.selectedNodeId.value,
+    hoveredNodeId: hoveredNodeId.value,
+    hoveredFlowHandleNodeId: hoveredFlowHandleNodeId.value,
+    activeConnectionSourceAnchorId: activeConnectionSourceAnchorId.value,
+    eligibleTargetAnchorIds: eligibleTargetAnchorIds.value,
+  });
 }
 
 function zoomViewportAroundCanvasCenter(nextScale: number) {

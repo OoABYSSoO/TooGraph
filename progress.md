@@ -1,5 +1,73 @@
 # Progress Log
 
+## Session: 2026-04-30 Phase 65
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Confirmed Phase 64 was committed and pushed as `f714994`.
+  - Re-read the formal roadmap, active plan, latest findings, and current `isFlowHotspotVisible` flow.
+  - Selected the next P2 Canvas boundary: flow/route hotspot visibility projection.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `isCanvasFlowHotspotVisible` expectations for smart/flow modes, selected nodes, active connection sources, and eligible target anchors.
+  - Updated `EditorCanvas.structure.test.ts` to require delegated hotspot visibility and no local output-flow interaction helper.
+  - Verified the expected red failure before implementation because the model export and component wiring did not exist yet.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `isCanvasFlowHotspotVisible` and its anchor input type in `edgeVisibilityModel.ts`.
+  - Updated `EditorCanvas.vue` so `isFlowHotspotVisible` delegates selected/hovered/active-source and eligible-target decisions to the model.
+  - Removed the local `isOutputFlowHandleNodeInteracted` helper while keeping refs, anchor overlay rendering, and graph interactions in the component.
+
+### Phase 4: Verification
+- **Status:** completed
+- Actions taken:
+  - Ran focused edge visibility and structure tests.
+  - Ran broader edge visibility, connection interaction, connection model, anchor model, and structure regression tests.
+  - Ran TypeScript unused-symbol verification from `frontend`.
+  - Ran the full frontend `node --test` suite.
+  - Ran the frontend production build; no large chunk warning was emitted.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed backend `/health` returned `{"status":"ok"}` and the frontend entry returned HTTP 200.
+  - Captured a headless Chrome screenshot and confirmed the workspace rendered normally.
+
+### Phase 5: Continuation Gate
+- **Status:** completed
+- Actions taken:
+  - Recalculated overall roadmap cleanup at about 92%.
+  - Recalculated P2 `EditorCanvas.vue` cleanup at about 93%.
+  - Opened Phase 66 automatically because total roadmap progress is below 100%.
+  - Selected the next candidate boundary as projected-edge visibility membership.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red focused tests | `node --test frontend/src/editor/canvas/edgeVisibilityModel.test.ts frontend/src/editor/canvas/EditorCanvas.structure.test.ts` before implementation | Fails because hotspot visibility export and component wiring do not exist | Failed on missing export and structure assertions | Passed |
+| Focused model/structure tests | Same focused files after implementation | All focused tests pass | 73 passed | Passed |
+| Focused Canvas regression | `node --test` over edge visibility, connection interaction, connection model, anchor model, and EditorCanvas structure tests | Related hotspot/connection tests pass | 97 passed | Passed |
+| Unused symbol check | `./node_modules/.bin/vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` in `frontend` | No diagnostics | Exit 0 | Passed |
+| Full frontend tests | `node --test $(rg --files src vite.config.structure.test.ts | rg '\.test\.ts$')` in `frontend` | All frontend tests pass | 827 passed | Passed |
+| Frontend production build | `npm run build` in `frontend` | Build succeeds without a large chunk warning | Exit 0, no Vite chunk warning | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+| Browser smoke | Headless Chrome screenshot with virtual-time wait | Workspace renders normally | Workspace UI rendered | Passed |
+
+## 5-Question Reboot Check
+| Question | Answer |
+|----------|--------|
+| Where am I? | Phase 65 implementation, verification, docs update, and dev restart are complete. |
+| Where am I going? | Phase 66 is open for projected-edge visibility membership extraction. |
+| What's the goal? | Continue reducing `EditorCanvas.vue` visibility decision ownership without changing SVG edge rendering, anchor overlay behavior, or graph editing interactions. |
+| What have I learned? | Flow/route hotspot visibility is pure mode/ref-set projection; selected/hovered refs and anchor overlay rendering should remain component-owned. |
+| What have I done? | Extracted hotspot visibility projection, added focused tests, verified the full frontend suite, built, restarted, and visually smoked the app. |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+
 ## Session: 2026-04-30 Phase 64
 
 ### Phase 1: Re-orientation

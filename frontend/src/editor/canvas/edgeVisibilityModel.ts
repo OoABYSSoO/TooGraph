@@ -20,6 +20,12 @@ export type EdgeVisibilityModeClickAction =
       clearCanvasTransientState: true;
     };
 
+export type CanvasFlowHotspotVisibilityAnchor = {
+  id: string;
+  nodeId: string;
+  kind: string;
+};
+
 export function buildEdgeVisibilityModeOptions(): EdgeVisibilityModeOption[] {
   return [
     {
@@ -131,6 +137,30 @@ export function shouldShowOutputFlowHandle(options: {
     }) &&
     (options.isNodeInteracted || options.isActiveConnectionSource)
   );
+}
+
+export function isCanvasFlowHotspotVisible(input: {
+  mode: EdgeVisibilityMode;
+  anchor: CanvasFlowHotspotVisibilityAnchor;
+  selectedNodeId?: string | null;
+  hoveredNodeId?: string | null;
+  hoveredFlowHandleNodeId?: string | null;
+  activeConnectionSourceAnchorId?: string | null;
+  eligibleTargetAnchorIds: ReadonlySet<string>;
+}) {
+  if (input.anchor.kind === "flow-out" || input.anchor.kind === "route-out") {
+    return shouldShowOutputFlowHandle({
+      mode: input.mode,
+      anchorKind: input.anchor.kind,
+      isNodeInteracted:
+        input.selectedNodeId === input.anchor.nodeId ||
+        input.hoveredNodeId === input.anchor.nodeId ||
+        input.hoveredFlowHandleNodeId === input.anchor.nodeId,
+      isActiveConnectionSource: input.activeConnectionSourceAnchorId === input.anchor.id,
+    });
+  }
+
+  return input.eligibleTargetAnchorIds.has(input.anchor.id);
 }
 
 export function resolveEdgeVisibilityModeClickAction(input: {

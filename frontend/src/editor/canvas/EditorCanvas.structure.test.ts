@@ -651,6 +651,7 @@ test("EditorCanvas renders output flow hotspots only for allowed modes and inter
   const canvasInteractionStyleModelSource = readCanvasInteractionStyleModelSource();
   const canvasConnectionModelSource = readCanvasConnectionModelSource();
   const canvasConnectionInteractionsSource = readCanvasConnectionInteractionsSource();
+  const edgeVisibilityModelSource = readEdgeVisibilityModelSource();
 
   assert.match(componentSource, /v-for="anchor in flowAnchors"/);
   assert.match(componentSource, /class="editor-canvas__flow-hotspot"/);
@@ -660,10 +661,10 @@ test("EditorCanvas renders output flow hotspots only for allowed modes and inter
   assert.match(componentSource, /const hoveredNodeId = ref<string \| null>\(null\);/);
   assert.match(componentSource, /'editor-canvas__flow-hotspot--outbound': anchor\.kind === 'flow-out'/);
   assert.match(componentSource, /'editor-canvas__flow-hotspot--visible': isFlowHotspotVisible\(anchor\)/);
-  assert.match(componentSource, /anchor\.kind === "flow-out" \|\| anchor\.kind === "route-out"/);
-  assert.match(componentSource, /shouldShowOutputFlowHandle\(\{[\s\S]*mode: edgeVisibilityMode\.value,[\s\S]*anchorKind: anchor\.kind,[\s\S]*isNodeInteracted: isOutputFlowHandleNodeInteracted\(anchor\.nodeId\),[\s\S]*isActiveConnectionSource: activeConnectionSourceAnchorId\.value === anchor\.id,[\s\S]*\}\)/);
+  assert.match(edgeVisibilityModelSource, /input\.anchor\.kind === "flow-out" \|\| input\.anchor\.kind === "route-out"/);
+  assert.match(componentSource, /return isCanvasFlowHotspotVisible\(\{[\s\S]*mode: edgeVisibilityMode\.value,[\s\S]*anchor,[\s\S]*selectedNodeId: selection\.selectedNodeId\.value,[\s\S]*hoveredNodeId: hoveredNodeId\.value,[\s\S]*hoveredFlowHandleNodeId: hoveredFlowHandleNodeId\.value,[\s\S]*activeConnectionSourceAnchorId: activeConnectionSourceAnchorId\.value,[\s\S]*eligibleTargetAnchorIds: eligibleTargetAnchorIds\.value,[\s\S]*\}\);/);
   const flowHotspotVisibleBlock = componentSource.match(/function isFlowHotspotVisible\(anchor: ProjectedCanvasAnchor\) \{([\s\S]*?)\n\}/)?.[1] ?? "";
-  assert.match(componentSource, /function isOutputFlowHandleNodeInteracted\(nodeId: string\) \{[\s\S]*selection\.selectedNodeId\.value === nodeId[\s\S]*hoveredNodeId\.value === nodeId[\s\S]*hoveredFlowHandleNodeId\.value === nodeId/);
+  assert.doesNotMatch(componentSource, /function isOutputFlowHandleNodeInteracted\(nodeId: string\)/);
   assert.doesNotMatch(flowHotspotVisibleBlock, /selection\.selectedNodeId\.value === anchor\.nodeId/);
   assert.doesNotMatch(flowHotspotVisibleBlock, /hoveredNodeId\.value === anchor\.nodeId/);
   assert.doesNotMatch(flowHotspotVisibleBlock, /hoveredFlowHandleNodeId\.value === anchor\.nodeId/);
@@ -730,12 +731,13 @@ test("EditorCanvas renders output flow hotspots only for allowed modes and inter
 test("EditorCanvas exposes a top-left capsule toolbar for edge visibility modes", () => {
   const edgeVisibilityModelSource = readEdgeVisibilityModelSource();
 
-  assert.match(componentSource, /import \{[\s\S]*buildEdgeVisibilityModeOptions,[\s\S]*buildForceVisibleProjectedEdgeIds,[\s\S]*filterProjectedEdgesForVisibilityMode,[\s\S]*resolveEdgeVisibilityModeClickAction,[\s\S]*shouldShowOutputFlowHandle,[\s\S]*type EdgeVisibilityMode[\s\S]*\} from "\.\/edgeVisibilityModel";/);
+  assert.match(componentSource, /import \{[\s\S]*buildEdgeVisibilityModeOptions,[\s\S]*buildForceVisibleProjectedEdgeIds,[\s\S]*filterProjectedEdgesForVisibilityMode,[\s\S]*isCanvasFlowHotspotVisible,[\s\S]*resolveEdgeVisibilityModeClickAction,[\s\S]*type EdgeVisibilityMode[\s\S]*\} from "\.\/edgeVisibilityModel";/);
   assert.match(componentSource, /const edgeVisibilityModeOptions = computed\(\(\) => \{[\s\S]*return buildEdgeVisibilityModeOptions\(\);/);
   assert.match(componentSource, /const edgeVisibilityMode = ref<EdgeVisibilityMode>\("smart"\);/);
   assert.doesNotMatch(componentSource, /const edgeVisibilityRelatedNodeIds = computed\(\(\) =>/);
   assert.match(componentSource, /const forceVisibleProjectedEdgeIds = computed\(\(\) => buildForceVisibleProjectedEdgeIds\(\{[\s\S]*selectedEdgeId: selectedEdgeId\.value,[\s\S]*dataEdgeStateConfirmId: activeDataEdgeStateConfirm\.value\?\.id,[\s\S]*dataEdgeStateEditorId: activeDataEdgeStateEditor\.value\?\.id,[\s\S]*flowEdgeDeleteConfirmId: activeFlowEdgeDeleteConfirm\.value\?\.id,[\s\S]*\}\)\);/);
   assert.match(edgeVisibilityModelSource, /export function buildForceVisibleProjectedEdgeIds/);
+  assert.match(edgeVisibilityModelSource, /export function isCanvasFlowHotspotVisible/);
   assert.doesNotMatch(componentSource, /const forceVisibleProjectedEdgeIds = computed\(\(\) => \{[\s\S]*const edgeIds = new Set<string>\(\)/);
   assert.match(componentSource, /const visibleProjectedEdgeIds = computed\(/);
   assert.match(componentSource, /filterProjectedEdgesForVisibilityMode\(projectedEdges\.value,/);
