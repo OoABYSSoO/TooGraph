@@ -3,13 +3,30 @@ from __future__ import annotations
 import copy
 import inspect
 import json
-import re
 import time
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any
 
 from app.core.model_catalog import get_default_text_model_ref, normalize_model_ref, resolve_runtime_model_name
+from app.core.runtime.agent_prompt import (
+    build_auto_system_prompt as _build_auto_system_prompt,
+    build_effective_system_prompt as _build_effective_system_prompt,
+    format_state_output_contract_lines as _format_state_output_contract_lines,
+    format_state_prompt_lines as _format_state_prompt_lines,
+)
+from app.core.runtime.condition_eval import (
+    coerce_condition_text as _coerce_condition_text,
+    evaluate_condition_rule as _evaluate_condition_rule,
+    normalize_condition_operands as _normalize_condition_operands,
+    parse_condition_number as _parse_condition_number,
+    resolve_branch_key as _resolve_branch_key,
+)
+from app.core.runtime.llm_output_parser import (
+    build_output_key_aliases as _build_output_key_aliases,
+    parse_llm_json_response as _parse_llm_json_response,
+    read_parsed_output_value as _read_parsed_output_value,
+)
 from app.core.runtime.output_boundary_utils import save_output_value
 from app.core.runtime.knowledge_retrieval import retrieve_knowledge_base_context
 from app.core.runtime.run_events import publish_run_event
@@ -782,135 +799,6 @@ def _generate_agent_response(
     return response_payload, reasoning, llm_meta.get("warnings", []), updated_runtime_config
 
 
-def _build_effective_system_prompt(
-    output_keys: list[str],
-    input_values: dict[str, Any],
-    skill_context: dict[str, Any],
-    *,
-    state_schema: dict[str, NodeSystemStateDefinition] | None = None,
-) -> str:
-    return _build_auto_system_prompt(output_keys, input_values, skill_context, state_schema=state_schema)
-
-
-def _build_auto_system_prompt(
-    output_keys: list[str],
-    input_values: dict[str, Any],
-    skill_context: dict[str, Any],
-    *,
-    state_schema: dict[str, NodeSystemStateDefinition] | None = None,
-) -> str:
-    resolved_state_schema = state_schema or {}
-    parts = [
-        "你是一个工作流处理节点。根据输入和技能结果完成用户的任务指令。",
-        "严格返回一个 JSON 对象，不要加 markdown 围栏或任何前缀。",
-    ]
-
-    if input_values:
-        parts.append("\n== Graph State Inputs ==")
-        for key, value in input_values.items():
-            display = str(value)
-            if len(display) > 200:
-                display = display[:200] + "..."
-            parts.extend(_format_state_prompt_lines(key, resolved_state_schema.get(key), value=display))
-
-    if skill_context:
-        parts.append("\n== Skill Results ==")
-        for skill_key, result in skill_context.items():
-            parts.append(f"[{skill_key}]")
-            if isinstance(result, dict):
-                for result_key, result_value in result.items():
-                    display = str(result_value)
-                    if len(display) > 300:
-                        display = display[:300] + "..."
-                    parts.append(f"  {result_key}: {display}")
-            else:
-                parts.append(f"  {result}")
-
-    example = json.dumps({key: "..." for key in output_keys}, ensure_ascii=False)
-    parts.append("\n== 必须返回的 JSON 字段 ==")
-    for key in output_keys:
-        parts.extend(_format_state_prompt_lines(key, resolved_state_schema.get(key), include_output_contract=True))
-    parts.append("\n== 必须返回的 JSON 格式 ==")
-    parts.append(example)
-    parts.append("每个字段必须使用上方的 key；name 只用于理解字段语义。")
-    return "\n".join(parts)
-
-
-def _format_state_prompt_lines(
-    key: str,
-    definition: NodeSystemStateDefinition | None,
-    *,
-    value: str | None = None,
-    include_output_contract: bool = False,
-) -> list[str]:
-    if definition is None and value is not None:
-        return [f"- {key}: {value}"]
-
-    lines = [f"- key: {key}"]
-    if definition is not None:
-        name = definition.name.strip()
-        if name and name != key:
-            lines.append(f"  name: {name}")
-        lines.append(f"  type: {definition.type.value}")
-        description = definition.description.strip()
-        if description:
-            lines.append(f"  description: {description}")
-        if include_output_contract:
-            lines.extend(_format_state_output_contract_lines(definition.type))
-    if value is not None:
-        lines.append(f"  value: {value}")
-    return lines
-
-
-def _format_state_output_contract_lines(state_type: NodeSystemStateType) -> list[str]:
-    if state_type == NodeSystemStateType.MARKDOWN:
-        return [
-            "  output_format: markdown string inside the JSON value",
-            "  output_rule: 这个字段的值必须是 Markdown 内容字符串；不要把整个 JSON 包进 Markdown 代码块。",
-        ]
-    if state_type in {NodeSystemStateType.JSON, NodeSystemStateType.OBJECT}:
-        return [
-            "  output_format: JSON object inside the JSON value",
-            "  output_rule: 这个字段的值必须是对象；不要把对象再序列化成字符串。",
-        ]
-    if state_type in {NodeSystemStateType.ARRAY, NodeSystemStateType.FILE_LIST}:
-        return [
-            "  output_format: JSON array inside the JSON value",
-            "  output_rule: 这个字段的值必须是数组；不要把数组再序列化成字符串。",
-        ]
-    if state_type == NodeSystemStateType.NUMBER:
-        return ["  output_format: JSON number"]
-    if state_type == NodeSystemStateType.BOOLEAN:
-        return ["  output_format: JSON boolean"]
-    return ["  output_format: JSON string"]
-
-
-def _build_output_key_aliases(
-    output_keys: list[str],
-    state_schema: dict[str, NodeSystemStateDefinition],
-) -> dict[str, list[str]]:
-    name_counts: dict[str, int] = {}
-    aliases: dict[str, list[str]] = {}
-    candidate_names: list[str] = []
-    for key in output_keys:
-        definition = state_schema.get(key)
-        if definition is None:
-            continue
-        name = definition.name.strip()
-        if name and name != key:
-            candidate_names.append(name)
-    for name in candidate_names:
-        name_counts[name] = name_counts.get(name, 0) + 1
-    for key in output_keys:
-        definition = state_schema.get(key)
-        if definition is None:
-            continue
-        name = definition.name.strip()
-        if name and name != key and name_counts.get(name, 0) == 1:
-            aliases[key] = [name]
-    return aliases
-
-
 def _resolve_agent_runtime_config(node: NodeSystemAgentNode) -> dict[str, Any]:
     global_model_ref = get_default_text_model_ref(force_refresh=True)
     global_thinking_enabled = get_default_agent_thinking_enabled()
@@ -990,86 +878,6 @@ def _resolve_reference(
     return reference
 
 
-def _evaluate_condition_rule(left_value: Any, operator: str, right_value: Any) -> bool:
-    left_value, right_value = _normalize_condition_operands(left_value, right_value)
-    if operator == "exists":
-        return left_value not in (None, "", [], {})
-    if operator == "==":
-        return left_value == right_value
-    if operator == "!=":
-        return left_value != right_value
-    if operator == ">":
-        return left_value > right_value
-    if operator == "<":
-        return left_value < right_value
-    if operator == ">=":
-        return left_value >= right_value
-    if operator == "<=":
-        return left_value <= right_value
-    if operator == "contains":
-        return _coerce_condition_text(right_value) in _coerce_condition_text(left_value)
-    if operator == "not_contains":
-        return _coerce_condition_text(right_value) not in _coerce_condition_text(left_value)
-    raise ValueError(f"Unsupported condition operator '{operator}'.")
-
-
-def _normalize_condition_operands(left_value: Any, right_value: Any) -> tuple[Any, Any]:
-    left_number = _parse_condition_number(left_value)
-    right_number = _parse_condition_number(right_value)
-    if left_number is not None and right_number is not None:
-        return left_number, right_number
-    return left_value, right_value
-
-
-def _parse_condition_number(value: Any) -> int | float | None:
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, (int, float)):
-        return value
-    if not isinstance(value, str):
-        return None
-
-    trimmed = value.strip()
-    if not trimmed:
-        return None
-    if re.fullmatch(r"[+-]?\d+", trimmed):
-        return int(trimmed)
-    if re.fullmatch(r"[+-]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?", trimmed):
-        return float(trimmed)
-    return None
-
-
-def _coerce_condition_text(value: Any) -> str:
-    if value is None:
-        return ""
-    if isinstance(value, str):
-        return value
-    return str(value)
-
-
-def _resolve_branch_key(branches: list[str], branch_mapping: dict[str, str], condition_result: Any) -> str | None:
-    lookup_keys = [
-        str(condition_result).lower(),
-        str(condition_result),
-    ]
-    for lookup_key in lookup_keys:
-        if lookup_key in branch_mapping:
-            return branch_mapping[lookup_key]
-
-    if isinstance(condition_result, bool):
-        bool_key = "true" if condition_result else "false"
-        if bool_key in branches:
-            return bool_key
-        if len(branches) >= 2:
-            return branches[0] if condition_result else branches[1]
-
-    normalized_matches = {branch.lower(): branch for branch in branches}
-    for lookup_key in lookup_keys:
-        if lookup_key.lower() in normalized_matches:
-            return normalized_matches[lookup_key.lower()]
-    return None
-
-
 def _select_active_outgoing_edges(outgoing_edges: list[ExecutionEdge], body: dict[str, Any]) -> set[str]:
     selected_branch = body.get("selected_branch")
     active_edges: set[str] = set()
@@ -1082,77 +890,14 @@ def _select_active_outgoing_edges(outgoing_edges: list[ExecutionEdge], body: dic
     return active_edges
 
 
-def _parse_llm_json_response(
-    content: str,
-    output_keys: list[str],
-    *,
-    output_key_aliases: dict[str, list[str]] | None = None,
-) -> dict[str, Any]:
-    aliases = output_key_aliases or {}
-    if not content:
-        return {key: "" for key in output_keys}
-    cleaned = re.sub(r"^\s*```(?:json)?\s*\n?", "", content)
-    cleaned = re.sub(r"\n?\s*```\s*$", "", cleaned).strip()
-
-    candidate_payloads = [cleaned]
-    json_start = cleaned.find("{")
-    json_end = cleaned.rfind("}")
-    if json_start != -1 and json_end > json_start:
-        candidate_payloads.append(cleaned[json_start : json_end + 1].strip())
-
-    for candidate in candidate_payloads:
-        try:
-            parsed = json.loads(candidate)
-            if isinstance(parsed, dict):
-                return {key: _read_parsed_output_value(parsed, key, aliases) for key in output_keys}
-        except json.JSONDecodeError:
-            continue
-
-    key_value_matches: dict[str, str] = {}
-    for line in cleaned.splitlines():
-        match = re.match(r'^\s*["\']?([A-Za-z0-9_\-]+)["\']?\s*[:：]\s*(.+?)\s*$', line)
-        if not match:
-            continue
-        key, value = match.groups()
-        if key in output_keys:
-            key_value_matches[key] = value.strip().strip('"').strip("'")
-
-    if key_value_matches:
-        return {
-            key: key_value_matches.get(key, "")
-            for key in output_keys
-        }
-
-    if len(output_keys) == 1:
-        key = output_keys[0]
-        single_match = re.match(rf'^\s*{re.escape(key)}\s*[:：]\s*(.+?)\s*$', cleaned, flags=re.IGNORECASE | re.DOTALL)
-        if single_match:
-            return {key: single_match.group(1).strip()}
-
-    try:
-        parsed = json.loads(cleaned)
-        if isinstance(parsed, dict):
-            return {key: _read_parsed_output_value(parsed, key, aliases) for key in output_keys}
-    except json.JSONDecodeError:
-        pass
-    return {key: cleaned for key in output_keys}
-
-
-def _read_parsed_output_value(parsed: dict[str, Any], output_key: str, aliases: dict[str, list[str]]) -> Any:
-    if output_key in parsed:
-        return parsed.get(output_key)
-    for alias in aliases.get(output_key, []):
-        if alias in parsed:
-            return parsed.get(alias)
-    return None
-
-
 def _build_regular_edge_id(source: str, target: str) -> str:
     return f"edge:{source}:{target}"
 
 
 def _build_conditional_edge_id(source: str, branch: str, target: str) -> str:
     return f"conditional:{source}:{branch}->{target}"
+
+
 def _build_knowledge_summary(skill_outputs: list[dict[str, Any]]) -> str:
     lines: list[str] = []
     for skill_output in skill_outputs:

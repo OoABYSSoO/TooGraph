@@ -171,6 +171,13 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 
 拆分原则：先移动纯函数和测试，再移动副作用函数。不要先重写执行模型。
 
+当前执行进展：
+
+- `runtime/condition_eval.py` 已承接 condition 操作符、数值归一化、文本 coercion 和 branch key resolution；`node_system_executor.py` 保留 `_evaluate_condition_rule` 等兼容别名。
+- `runtime/agent_prompt.py` 已承接 agent system prompt、state prompt lines 和输出 contract 文案构造；`node_system_executor.py` 保留旧私有 helper 入口。
+- `runtime/llm_output_parser.py` 已承接 output key alias 构造、LLM JSON response parsing 和 fallback parsing；`node_system_executor.py` 继续通过兼容别名调用。
+- Phase 100 后 `node_system_executor.py` 从 1,226 行降到 969 行；执行主流程、state I/O、副作用、output artifact、streaming delta 和快照仍留在 executor，后续应继续优先抽取纯 execution edge/cycle 或 state I/O helper。
+
 ### 3. `core/langgraph/runtime.py`
 
 现状：LangGraph 构建、checkpoint、human review interrupt、cycle tracker、progress persistence 和最终 summary 都在一个文件。
@@ -262,7 +269,7 @@ GraphiteUI 当前最大的问题不是依赖膨胀，也不是目录混乱，而
 
 先拆 `model_provider_client.py`，再拆 `node_system_executor.py`，最后拆 LangGraph runtime。理由：provider client 的协议边界最清晰，executor 和 LangGraph runtime 对产品语义影响更大。
 
-当前 P4 进展：`model_provider_client.py` 的共享 HTTP/request 层、provider discovery 层、OpenAI-compatible chat transport、Anthropic messages transport、Gemini generate-content transport、Codex responses transport 和共享 response parsing 已完成抽取；executor 和 LangGraph runtime 仍待迁移。
+当前 P4 进展：`model_provider_client.py` 的共享 HTTP/request 层、provider discovery 层、OpenAI-compatible chat transport、Anthropic messages transport、Gemini generate-content transport、Codex responses transport 和共享 response parsing 已完成抽取；`node_system_executor.py` 的 condition evaluation、agent prompt 和 LLM output parser 纯 helper 已完成抽取；LangGraph runtime 仍待迁移。
 
 ## 架构红线
 
