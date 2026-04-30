@@ -14,6 +14,7 @@ function readWorkspaceSource(fileName: string) {
 
 const componentSource = readWorkspaceSource("EditorWorkspaceShell.vue");
 const graphMutationActionsSource = readWorkspaceSource("useWorkspaceGraphMutationActions.ts");
+const sidePanelControllerSource = readWorkspaceSource("useWorkspaceSidePanelController.ts");
 
 test("EditorWorkspaceShell renders workspace panes without reka-ui tab primitives", () => {
   assert.doesNotMatch(componentSource, /from "reka-ui"/);
@@ -154,10 +155,11 @@ test("EditorWorkspaceShell floats the right side panel above the canvas while pr
   assert.match(componentSource, /<EditorStatePanel[\s\S]*v-else/);
   assert.match(componentSource, /:style="sidePanelLayerStyle\(tab\.tabId\)"/);
   assert.match(componentSource, /class="editor-workspace-shell__editor-main"[\s\S]*:style="editorMainStyle\(tab\.tabId\)"/);
-  assert.match(componentSource, /function editorMainStyle\(tabId: string\)/);
-  assert.match(componentSource, /"--editor-canvas-minimap-right-clearance":\s*`calc\(\$\{sidePanelOpenWidth\(tabId\)\} \+ 12px\)`/);
-  assert.match(componentSource, /function sidePanelLayerStyle\(tabId: string\)/);
-  assert.match(componentSource, /width:\s*sidePanelOpenWidth\(tabId\),/);
+  assert.match(componentSource, /import \{ useWorkspaceSidePanelController \} from "\.\/useWorkspaceSidePanelController\.ts";/);
+  assert.match(sidePanelControllerSource, /function editorMainStyle\(tabId: string\)/);
+  assert.match(sidePanelControllerSource, /"--editor-canvas-minimap-right-clearance":\s*`calc\(\$\{sidePanelOpenWidth\(tabId\)\} \+ 12px\)`/);
+  assert.match(sidePanelControllerSource, /function sidePanelLayerStyle\(tabId: string\)/);
+  assert.match(sidePanelControllerSource, /width:\s*sidePanelOpenWidth\(tabId\),/);
   assert.doesNotMatch(componentSource, /56px/);
   assert.match(componentSource, /@media \(max-width:\s*760px\) \{[\s\S]*\.editor-workspace-shell \{[\s\S]*--editor-state-panel-open-width:\s*min\(320px,\s*calc\(100vw - var\(--app-sidebar-width\) - 24px\)\);/);
   assert.match(componentSource, /@media \(max-width:\s*760px\) \{[\s\S]*\.editor-workspace-shell \{[\s\S]*--editor-human-review-panel-open-width:\s*var\(--editor-state-panel-open-width\);/);
@@ -250,10 +252,10 @@ test("EditorWorkspaceShell imports marked GraphiteUI Python files as new graph t
 
 test("EditorWorkspaceShell opens the right sidebar in Human Review mode for awaiting-human runs", () => {
   assert.match(componentSource, /import EditorHumanReviewPanel from "\.\/EditorHumanReviewPanel\.vue";/);
-  assert.match(componentSource, /const sidePanelModeByTabId = ref<Record<string, "state" \| "human-review">>\(\{\}\);/);
-  assert.match(componentSource, /function canShowHumanReviewPanel\(tabId: string\)/);
-  assert.match(componentSource, /function shouldShowHumanReviewPanel\(tabId: string\)/);
-  assert.match(componentSource, /function openHumanReviewPanelForTab\(tabId: string, nodeId: string \| null\)/);
+  assert.match(componentSource, /import type \{ WorkspaceSidePanelMode \} from "\.\/workspaceSidePanelModel\.ts";/);
+  assert.match(componentSource, /import \{ useWorkspaceSidePanelController \} from "\.\/useWorkspaceSidePanelController\.ts";/);
+  assert.match(componentSource, /const sidePanelModeByTabId = ref<Record<string, WorkspaceSidePanelMode>>\(\{\}\);/);
+  assert.match(componentSource, /const \{[\s\S]*shouldShowHumanReviewPanel,[\s\S]*openHumanReviewPanelForTab,[\s\S]*\} = useWorkspaceSidePanelController\(\{/);
   assert.match(componentSource, /@open-human-review="openHumanReviewPanelForTab\(tab\.tabId, \$event\.nodeId\)"/);
   assert.match(componentSource, /<EditorHumanReviewPanel/);
   assert.match(componentSource, /class="editor-workspace-shell__side-panel-layer"/);
@@ -291,17 +293,21 @@ test("EditorWorkspaceShell delegates run event stream parsing and URL projection
 });
 
 test("EditorWorkspaceShell keeps Human Review locked open while awaiting human input", () => {
-  const toggleStatePanelSource = componentSource.match(/function toggleStatePanel\(tabId: string\) \{[\s\S]*?\n\}/)?.[0] ?? "";
-  const toggleActiveStatePanelSource = componentSource.match(/function toggleActiveStatePanel\(\) \{[\s\S]*?function editorMainStyle/)?.[0] ?? "";
-  const openHumanReviewSource = componentSource.match(/function openHumanReviewPanelForTab\(tabId: string, nodeId: string \| null\) \{[\s\S]*?\n\}/)?.[0] ?? "";
+  const toggleStatePanelSource = sidePanelControllerSource.match(/function toggleStatePanel\(tabId: string\) \{[\s\S]*?\n\}/)?.[0] ?? "";
+  const toggleActiveStatePanelSource =
+    sidePanelControllerSource.match(/function toggleActiveStatePanel\(\) \{[\s\S]*?function sidePanelOpenWidth/)?.[0] ?? "";
+  const openHumanReviewSource =
+    sidePanelControllerSource.match(/function openHumanReviewPanelForTab\(tabId: string, nodeId: string \| null\) \{[\s\S]*?\n\}/)?.[0] ?? "";
 
-  assert.match(componentSource, /function isHumanReviewPanelLockedOpen\(tabId: string\)/);
-  assert.match(componentSource, /return canShowHumanReviewPanel\(tabId\) && sidePanelMode\(tabId\) === "human-review";/);
+  assert.match(sidePanelControllerSource, /function isHumanReviewPanelLockedOpen\(tabId: string\)/);
+  assert.match(sidePanelControllerSource, /return canShowHumanReviewPanel\(tabId\) && sidePanelMode\(tabId\) === "human-review";/);
   assert.match(toggleStatePanelSource, /if \(isHumanReviewPanelLockedOpen\(tabId\)\) \{/);
   assert.match(toggleActiveStatePanelSource, /if \(isHumanReviewPanelLockedOpen\(tabId\)\) \{/);
-  assert.match(toggleActiveStatePanelSource, /openHumanReviewPanelForTab\(tabId, latestRunDetailByTabId\.value\[tabId\]\?\.current_node_id \?\? null\);/);
+  assert.match(toggleActiveStatePanelSource, /openHumanReviewPanelForTab\(tabId, input\.latestRunDetailByTabId\.value\[tabId\]\?\.current_node_id \?\? null\);/);
   assert.match(openHumanReviewSource, /if \(!canShowHumanReviewPanel\(tabId\)\) \{/);
   assert.match(openHumanReviewSource, /return;/);
+  assert.doesNotMatch(componentSource, /function toggleStatePanel\(tabId: string\)/);
+  assert.doesNotMatch(componentSource, /function toggleActiveStatePanel\(\)/);
 });
 
 test("EditorWorkspaceShell resumes restored pause snapshots against their original snapshot checkpoint", () => {
@@ -525,28 +531,27 @@ test("EditorWorkspaceShell delegates panel and focus tab-state writes to the run
   const setDocumentSource =
     componentSource.match(/function setDocumentForTab\(tabId: string, nextDocument: GraphPayload \| GraphDocument\) \{[\s\S]*?\n\}\n\nfunction persistRunStateValuesForTab/)?.[0] ??
     "";
-  const panelFocusSource =
-    componentSource.match(/function toggleStatePanel\(tabId: string\) \{[\s\S]*?\n\}\n\nfunction editorMainStyle/)?.[0] ?? "";
+  const panelFocusSource = sidePanelControllerSource;
 
   assert.match(setDocumentSource, /documentsByTabId\.value = setTabScopedRecordEntry\(documentsByTabId\.value, tabId, syncedDocument\);/);
   assert.match(
     panelFocusSource,
-    /statePanelOpenByTabId\.value = setTabScopedRecordEntry\(statePanelOpenByTabId\.value, tabId, !isStatePanelOpen\(tabId\)\);/,
+    /input\.statePanelOpenByTabId\.value = setTabScopedRecordEntry\(input\.statePanelOpenByTabId\.value, tabId, !isStatePanelOpen\(tabId\)\);/,
   );
-  assert.match(panelFocusSource, /sidePanelModeByTabId\.value = setTabScopedRecordEntry\(sidePanelModeByTabId\.value, tabId, "human-review"\);/);
-  assert.match(panelFocusSource, /statePanelOpenByTabId\.value = setTabScopedRecordEntry\(statePanelOpenByTabId\.value, tabId, true\);/);
-  assert.match(panelFocusSource, /focusedNodeIdByTabId\.value = setTabScopedRecordEntry\(focusedNodeIdByTabId\.value, tabId, nodeId\);/);
-  assert.match(panelFocusSource, /focusRequestByTabId\.value = setTabScopedRecordEntry\(focusRequestByTabId\.value, tabId, null\);/);
+  assert.match(panelFocusSource, /input\.sidePanelModeByTabId\.value = setTabScopedRecordEntry\(input\.sidePanelModeByTabId\.value, tabId, "human-review"\);/);
+  assert.match(panelFocusSource, /input\.statePanelOpenByTabId\.value = setTabScopedRecordEntry\(input\.statePanelOpenByTabId\.value, tabId, true\);/);
+  assert.match(panelFocusSource, /input\.focusedNodeIdByTabId\.value = setTabScopedRecordEntry\(input\.focusedNodeIdByTabId\.value, tabId, nodeId\);/);
+  assert.match(panelFocusSource, /input\.focusRequestByTabId\.value = setTabScopedRecordEntry\(input\.focusRequestByTabId\.value, tabId, null\);/);
   assert.match(
     panelFocusSource,
-    /focusRequestByTabId\.value = setTabScopedRecordEntry\(\s*focusRequestByTabId\.value,\s*tabId,\s*\{\s*nodeId,\s*sequence: previousSequence \+ 1,\s*\}\s*\);/,
+    /input\.focusRequestByTabId\.value = setTabScopedRecordEntry\(\s*input\.focusRequestByTabId\.value,\s*tabId,\s*\{\s*nodeId,\s*sequence: previousSequence \+ 1,\s*\}\s*\);/,
   );
-  assert.match(panelFocusSource, /sidePanelModeByTabId\.value = setTabScopedRecordEntry\(sidePanelModeByTabId\.value, tabId, "state"\);/);
+  assert.match(panelFocusSource, /input\.sidePanelModeByTabId\.value = setTabScopedRecordEntry\(input\.sidePanelModeByTabId\.value, tabId, "state"\);/);
   assert.doesNotMatch(setDocumentSource, /documentsByTabId\.value = \{/);
-  assert.doesNotMatch(panelFocusSource, /statePanelOpenByTabId\.value = \{/);
-  assert.doesNotMatch(panelFocusSource, /sidePanelModeByTabId\.value = \{/);
-  assert.doesNotMatch(panelFocusSource, /focusedNodeIdByTabId\.value = \{/);
-  assert.doesNotMatch(panelFocusSource, /focusRequestByTabId\.value = \{/);
+  assert.doesNotMatch(panelFocusSource, /input\.statePanelOpenByTabId\.value = \{/);
+  assert.doesNotMatch(panelFocusSource, /input\.sidePanelModeByTabId\.value = \{/);
+  assert.doesNotMatch(panelFocusSource, /input\.focusedNodeIdByTabId\.value = \{/);
+  assert.doesNotMatch(panelFocusSource, /input\.focusRequestByTabId\.value = \{/);
 });
 
 test("EditorWorkspaceShell centralizes dirty graph document commits", () => {

@@ -1,5 +1,57 @@
 # Progress Log
 
+## Session: 2026-04-30 Phase 119
+
+### Phase 1: Re-orientation
+- **Status:** completed
+- Actions taken:
+  - Continued automatically after commit `d216b80` because the full-roadmap progress is below 100%.
+  - Re-read the formal roadmap, Phase 118 findings, and the remaining frontend high-line-count files.
+  - Chose the `EditorWorkspaceShell.vue` side-panel/Human Review/focus slice because it avoids canvas auto-snapping and node-creation naming/context paths.
+
+### Phase 2: Red Tests
+- **Status:** completed
+- Actions taken:
+  - Added `workspaceSidePanelModel.test.ts` for pure tab state defaults and Human Review gating; confirmed it failed before the model existed.
+  - Added `useWorkspaceSidePanelController.test.ts` for side-panel toggling, Human Review locked-open behavior, focus request sequencing, and panel layout styles; confirmed it failed before the composable existed.
+
+### Phase 3: Implementation
+- **Status:** completed
+- Actions taken:
+  - Added `workspaceSidePanelModel.ts`.
+  - Added `useWorkspaceSidePanelController.ts`.
+  - Updated `EditorWorkspaceShell.vue` to consume the side-panel controller while preserving template event names, graph mutation routing, node creation execution, run lifecycle, draft persistence, and toast rendering in the shell.
+  - Updated structure tests to lock the new controller boundary.
+  - Reduced `EditorWorkspaceShell.vue` from 2,055 to 1,977 lines.
+
+### Phase 4: Verification and Progress Gate
+- **Status:** completed
+- Actions taken:
+  - Ran focused side-panel, controller, and workspace-shell structure tests.
+  - Ran TypeScript unused-symbol verification; first pass caught unused destructured controller members, then the shell destructuring was narrowed and the check passed.
+  - Ran the full frontend test suite and production build.
+  - Restarted the local dev environment with root `npm run dev`.
+  - Confirmed the frontend entry returned HTTP 200 and backend `/health` returned `{"status":"ok"}`.
+  - Confirmed the previous dev session exited after the restart.
+  - Recalculated the full roadmap at about 95-96%, frontend-focused progress at about 85-87%, and P3 `EditorWorkspaceShell.vue` progress at about 86%.
+  - Opened Phase 120 automatically because the full roadmap is still below 100%.
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Red pure model test | `node --test src/editor/workspace/workspaceSidePanelModel.test.ts` before implementation | Fails because the side-panel model module is missing | Failed with missing module import | Passed |
+| Red controller test | `node --test src/editor/workspace/useWorkspaceSidePanelController.test.ts` before implementation | Fails because the controller module is missing | Failed with missing module import | Passed |
+| Focused frontend tests | `node --test src/editor/workspace/useWorkspaceSidePanelController.test.ts src/editor/workspace/workspaceSidePanelModel.test.ts src/editor/workspace/EditorWorkspaceShell.structure.test.ts` | Focused controller/model/structure tests pass | 47 passed | Passed |
+| TypeScript check | `npx vue-tsc --noEmit --noUnusedLocals --noUnusedParameters` | No type or unused-symbol errors | Exit 0 after narrowing unused destructuring | Passed |
+| Full frontend tests | `node --test $(rg --files src -g '*.test.ts' \| sort) vite.config.structure.test.ts` | Full frontend suite passes | 889 passed | Passed |
+| Production build | `npm run build` in `frontend` | Build succeeds with no large chunk warning | Exit 0; Vite build completed | Passed |
+| Dev restart | `npm run dev` at repo root | Services restart and respond | Frontend HTTP 200, backend `/health` ok | Passed |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-04-30 | `vue-tsc` reported unused destructured controller members in `EditorWorkspaceShell.vue` | First TypeScript verification after extraction | Removed unused shell destructuring while keeping the helpers available inside the controller and covered by controller tests. |
+
 ## Session: 2026-04-30 Phase 118
 
 ### Phase 1: Reassessment
