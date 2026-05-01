@@ -452,7 +452,8 @@ test("NodeCard renders plus input and plus output as virtual agent state port ro
 
 test("NodeCard constrains long state port labels without pushing anchor slots outside cards", () => {
   assert.match(portListSurfaceSource, /\.node-card__port-pill \{[\s\S]*box-sizing:\s*border-box;/);
-  assert.match(portListSurfaceSource, /\.node-card__port-pill \{[\s\S]*max-width:\s*min\(100%,\s*var\(--node-card-port-pill-max-width,\s*188px\)\);/);
+  assert.match(portListSurfaceSource, /\.node-card__port-pill \{[\s\S]*max-width:\s*min\(100%,\s*var\(--node-card-port-pill-max-width,\s*240px\)\);/);
+  assert.match(conditionNodeBodySource, /\.node-card__port-pill--condition-source \{[\s\S]*--node-card-port-pill-max-width:\s*260px;/);
   assert.match(portListSurfaceSource, /\.node-card__port-pill-label \{[\s\S]*min-width:\s*0;/);
   assert.match(portListSurfaceSource, /\.node-card__port-pill-label \{[\s\S]*overflow:\s*hidden;/);
   assert.match(portListSurfaceSource, /\.node-card__port-pill-label-text \{[\s\S]*overflow:\s*hidden;[\s\S]*text-overflow:\s*ellipsis;[\s\S]*white-space:\s*nowrap;/);

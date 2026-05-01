@@ -349,7 +349,7 @@ const conditionInputAnchorId = computed(() =>
   gap: 9px;
   min-height: 34px;
   min-width: 132px;
-  max-width: min(100%, var(--node-card-port-pill-max-width, 188px));
+  max-width: min(100%, var(--node-card-port-pill-max-width, 240px));
   border-radius: 999px;
   border: 1px solid transparent;
   background: transparent;
@@ -364,8 +364,8 @@ const conditionInputAnchorId = computed(() =>
 }
 
 .node-card__port-pill--condition-source {
-  --node-card-port-pill-max-width: 212px;
-  min-width: 212px;
+  --node-card-port-pill-max-width: 260px;
+  min-width: 260px;
 }
 
 .node-card__port-pill:focus-visible,

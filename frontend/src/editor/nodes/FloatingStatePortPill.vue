@@ -47,7 +47,7 @@ defineProps<{
   gap: 9px;
   min-height: 34px;
   min-width: 132px;
-  max-width: min(100%, var(--node-card-port-pill-max-width, 188px));
+  max-width: min(100%, var(--node-card-port-pill-max-width, 240px));
   border-radius: 999px;
   border: 1px solid transparent;
   background: transparent;
