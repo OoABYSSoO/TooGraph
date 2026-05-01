@@ -183,6 +183,10 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertIn("output_final_answer", template.nodes)
         self.assertIn("output_exhausted_answer", template.nodes)
 
+        planner = template.nodes["plan_search_query"]
+        self.assertIn("current_date", planner.config.task_instruction)
+        self.assertIn("current_year", planner.config.task_instruction)
+
         search_node = template.nodes["web_search_agent"]
         self.assertEqual(search_node.config.skills, ["web_search"])
         self.assertEqual(len(search_node.config.skill_bindings), 1)

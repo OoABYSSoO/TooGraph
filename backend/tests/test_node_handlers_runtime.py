@@ -6,11 +6,26 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.core.runtime.node_handlers import execute_agent_node, execute_condition_node, execute_input_node
+from datetime import datetime, timezone
+
+from app.core.runtime.node_handlers import (
+    _enrich_time_sensitive_web_search_query,
+    execute_agent_node,
+    execute_condition_node,
+    execute_input_node,
+)
 from app.core.schemas.node_system import NodeSystemAgentNode, NodeSystemConditionNode, NodeSystemInputNode, NodeSystemStateDefinition
 
 
 class NodeHandlersRuntimeTests(unittest.TestCase):
+    def test_time_sensitive_web_search_query_includes_current_date_anchor(self) -> None:
+        query = _enrich_time_sensitive_web_search_query(
+            "今天的日期和北京天气",
+            now=datetime(2026, 5, 1, 13, 28, 44, tzinfo=timezone.utc),
+        )
+
+        self.assertEqual(query, "今天的日期和北京天气 2026-05-01")
+
     def test_execute_input_node_coerces_outputs_and_final_result(self) -> None:
         state_schema = {
             "payload": NodeSystemStateDefinition.model_validate({"type": "json", "value": '{"ok": true}'}),
@@ -244,8 +259,9 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             first_truthy_func=lambda values: next((value for value in values if value), None),
         )
 
-        self.assertEqual(captured_inputs["query"], "今天的日期和北京天气")
-        self.assertEqual(result["skill_outputs"][0]["inputs"]["query"], "今天的日期和北京天气")
+        self.assertTrue(str(captured_inputs["query"]).startswith("今天的日期和北京天气 "))
+        self.assertRegex(str(captured_inputs["query"]), r"\d{4}-\d{2}-\d{2}$")
+        self.assertEqual(result["skill_outputs"][0]["inputs"]["query"], captured_inputs["query"])
         self.assertEqual(result["outputs"]["answer"], "联网结果")
 
     def test_execute_agent_node_surfaces_failed_skill_result_status(self) -> None:

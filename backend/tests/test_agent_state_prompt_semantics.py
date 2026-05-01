@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import unittest
 import sys
 from pathlib import Path
@@ -12,6 +13,21 @@ from app.core.schemas.node_system import NodeSystemStateDefinition, NodeSystemSt
 
 
 class AgentStatePromptSemanticTests(unittest.TestCase):
+    def test_auto_prompt_includes_runtime_date_context_for_time_sensitive_work(self) -> None:
+        prompt = build_auto_system_prompt(
+            ["answer"],
+            {"question": "帮我查最新模型发布日期"},
+            {},
+            state_schema={"answer": NodeSystemStateDefinition(type=NodeSystemStateType.TEXT)},
+            now=datetime(2026, 5, 1, 13, 28, 44, tzinfo=timezone.utc),
+        )
+
+        self.assertIn("== Runtime Context ==", prompt)
+        self.assertIn("current_date: 2026-05-01", prompt)
+        self.assertIn("current_year: 2026", prompt)
+        self.assertIn("current_weekday: Friday", prompt)
+        self.assertIn("把 current_date 作为“今天、最新、当前、最近、发布日期、价格、新闻、版本”等问题的时间锚点", prompt)
+
     def test_auto_prompt_includes_state_names_for_inputs_and_required_outputs(self) -> None:
         state_schema = {
             "question_state": NodeSystemStateDefinition(

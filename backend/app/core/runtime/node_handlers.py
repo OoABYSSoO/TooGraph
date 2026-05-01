@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from datetime import datetime
 from time import perf_counter
 from typing import Any, Callable
 
@@ -239,7 +240,51 @@ def _with_default_web_search_query(
     if not default_query:
         return skill_inputs
 
-    return {**skill_inputs, "query": default_query}
+    return {**skill_inputs, "query": _enrich_time_sensitive_web_search_query(default_query)}
+
+
+def _enrich_time_sensitive_web_search_query(query: str, *, now: datetime | None = None) -> str:
+    normalized_query = _compact_text(query)
+    if not normalized_query:
+        return ""
+    current_time = now.astimezone() if now is not None else datetime.now().astimezone()
+    current_date = current_time.date().isoformat()
+    if current_date in normalized_query:
+        return normalized_query
+    if not _looks_time_sensitive_query(normalized_query):
+        return normalized_query
+    return f"{normalized_query} {current_date}"
+
+
+def _looks_time_sensitive_query(query: str) -> bool:
+    query_lower = query.lower()
+    time_sensitive_terms = (
+        "今天",
+        "今日",
+        "现在",
+        "当前",
+        "最新",
+        "最近",
+        "近期",
+        "发布日期",
+        "发布时间",
+        "价格",
+        "新闻",
+        "版本",
+        "更新",
+        "today",
+        "current",
+        "latest",
+        "recent",
+        "release date",
+        "released",
+        "price",
+        "pricing",
+        "news",
+        "version",
+        "update",
+    )
+    return any(term in query_lower for term in time_sensitive_terms)
 
 
 def _build_web_search_query_from_instruction(instruction: Any) -> str:

@@ -86,7 +86,7 @@
       ],
       "config": {
         "skills": [],
-        "taskInstruction": "读取 request，生成一个适合联网搜索的英文或中英混合搜索 query。目标是找到权威来源，确认发布日期和模型亮点。只返回 JSON，字段 search_query 为搜索词，不要解释。"
+        "taskInstruction": "读取 request，结合 Runtime Context 里的 current_date 和 current_year，生成一个适合联网搜索的英文或中英混合搜索 query。目标是找到权威来源，确认发布日期和模型亮点；如果 request 包含最新、当前、今天、发布日期、版本、价格或新闻等时效性意图，搜索词必须包含当前年份或明确日期锚点。只返回 JSON，字段 search_query 为搜索词，不要解释。"
       }
     },
     "web_search_agent": {
