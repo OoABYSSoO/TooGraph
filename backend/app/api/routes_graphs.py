@@ -16,8 +16,10 @@ from app.core.runtime.state import create_initial_run_state, set_run_status, tou
 from app.core.schemas.node_system import (
     GraphSaveResponse,
     GraphValidationResponse,
+    NodeSystemAgentNode,
     NodeSystemGraphDocument,
     NodeSystemGraphPayload,
+    NodeSystemOutputNode,
 )
 from app.core.storage.graph_store import list_graphs, load_graph, save_graph
 from app.core.storage.run_store import save_run
@@ -42,12 +44,76 @@ def _parse_graph_request(payload: dict[str, Any]) -> NodeSystemGraphPayload:
 
 
 def _build_runtime_graph_document(graph_payload: NodeSystemGraphPayload) -> NodeSystemGraphDocument:
+    graph_payload = _repair_legacy_web_research_loop_output_writes(graph_payload)
     runtime_graph_id = graph_payload.graph_id or f"runtime_graph_{uuid4().hex[:10]}"
     return NodeSystemGraphDocument.model_validate(
         {
             **graph_payload.model_dump(exclude={"graph_id"}, by_alias=True, mode="json"),
             "graph_id": runtime_graph_id,
         }
+    )
+
+
+def _repair_legacy_web_research_loop_output_writes(
+    graph_payload: NodeSystemGraphPayload,
+) -> NodeSystemGraphPayload:
+    graph = graph_payload.model_copy(deep=True)
+    final_state = _state_key_by_semantic_name(graph, "final_answer")
+    exhausted_state = _state_key_by_semantic_name(graph, "exhausted_answer")
+    if not final_state or not exhausted_state:
+        return graph
+
+    final_writer = graph.nodes.get("final_answer_writer")
+    exhausted_writer = graph.nodes.get("exhausted_answer_writer")
+    final_output = graph.nodes.get("output_final_answer")
+    exhausted_output = graph.nodes.get("output_exhausted_answer")
+    if (
+        not isinstance(final_writer, NodeSystemAgentNode)
+        or not isinstance(exhausted_writer, NodeSystemAgentNode)
+        or not isinstance(final_output, NodeSystemOutputNode)
+        or not isinstance(exhausted_output, NodeSystemOutputNode)
+    ):
+        return graph
+    if not _node_reads_state(final_output, final_state) or not _node_reads_state(exhausted_output, exhausted_state):
+        return graph
+    if not _conditional_branch_targets(graph, false_target="final_answer_writer", exhausted_target="exhausted_answer_writer"):
+        return graph
+    if _single_write_state(final_writer) != exhausted_state or _single_write_state(exhausted_writer) != final_state:
+        return graph
+
+    final_writer.writes[0].state = final_state
+    exhausted_writer.writes[0].state = exhausted_state
+    return graph
+
+
+def _state_key_by_semantic_name(graph_payload: NodeSystemGraphPayload, state_name: str) -> str | None:
+    return next(
+        (
+            state_key
+            for state_key, definition in graph_payload.state_schema.items()
+            if definition.name == state_name
+        ),
+        None,
+    )
+
+
+def _single_write_state(node: NodeSystemAgentNode) -> str | None:
+    return node.writes[0].state if len(node.writes) == 1 else None
+
+
+def _node_reads_state(node: NodeSystemOutputNode, state_key: str) -> bool:
+    return any(binding.state == state_key for binding in node.reads)
+
+
+def _conditional_branch_targets(
+    graph_payload: NodeSystemGraphPayload,
+    *,
+    false_target: str,
+    exhausted_target: str,
+) -> bool:
+    return any(
+        edge.branches.get("false") == false_target and edge.branches.get("exhausted") == exhausted_target
+        for edge in graph_payload.conditional_edges
     )
 
 
