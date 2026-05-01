@@ -11,8 +11,8 @@
           <ElIcon><DocumentAdd /></ElIcon>
         </span>
         <div class="editor-tab-launcher-panel__entry-copy">
-          <div class="editor-tab-launcher-panel__entry-title">{{ t("launcher.blankTitle") }}</div>
-          <div class="editor-tab-launcher-panel__entry-meta">{{ t("launcher.blankMeta") }}</div>
+          <div class="editor-tab-launcher-panel__entry-title">{{ blankEntryTitle }}</div>
+          <div class="editor-tab-launcher-panel__entry-meta">{{ blankEntryMeta }}</div>
         </div>
         <ElIcon class="editor-tab-launcher-panel__entry-arrow" aria-hidden="true"><ArrowRight /></ElIcon>
       </button>
@@ -113,6 +113,7 @@ const props = defineProps<{
   graphOptions: WorkspaceSelectOption[];
   templatePlaceholder: string;
   graphPlaceholder: string;
+  blankGraphOpen: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -134,6 +135,8 @@ const activePageItems = computed(() => activePageModel.value.items);
 const activeTitle = computed(() => (activeView.value === "template" ? t("launcher.templateActiveTitle") : t("launcher.graphActiveTitle")));
 const activeHint = computed(() => (activeOptions.value.length > 0 ? t("launcher.availableCount", { count: activeOptions.value.length }) : activePlaceholder.value));
 const activePlaceholder = computed(() => (activeView.value === "template" ? props.templatePlaceholder : props.graphPlaceholder));
+const blankEntryTitle = computed(() => (props.blankGraphOpen ? t("launcher.blankOpenTitle") : t("launcher.blankTitle")));
+const blankEntryMeta = computed(() => (props.blankGraphOpen ? t("launcher.blankOpenMeta") : t("launcher.blankMeta")));
 
 watch(
   () => props.open,

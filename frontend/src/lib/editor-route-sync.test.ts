@@ -22,6 +22,42 @@ test("resolveEditorRouteInstruction opens a new draft on initial /editor/new loa
   });
 });
 
+test("resolveEditorRouteInstruction opens a blank draft for an empty /editor workspace", () => {
+  const instruction = resolveEditorRouteInstruction({
+    routeMode: "root",
+    routeGraphId: null,
+    defaultTemplateId: null,
+    restoreRunId: null,
+    restoreSnapshotId: null,
+    activeTabRouteSignature: null,
+    routeSignature: "root",
+    handledRouteSignature: null,
+  });
+
+  assert.deepEqual(instruction, {
+    type: "open-new",
+    templateId: null,
+    navigation: "replace",
+  });
+});
+
+test("resolveEditorRouteInstruction keeps /editor on the restored active workspace tab", () => {
+  const instruction = resolveEditorRouteInstruction({
+    routeMode: "root",
+    routeGraphId: null,
+    defaultTemplateId: null,
+    restoreRunId: null,
+    restoreSnapshotId: null,
+    activeTabRouteSignature: "existing:graph_123",
+    routeSignature: "root",
+    handledRouteSignature: null,
+  });
+
+  assert.deepEqual(instruction, {
+    type: "noop",
+  });
+});
+
 test("resolveEditorRouteInstruction opens a template draft on initial /editor/new?template=... load", () => {
   const instruction = resolveEditorRouteInstruction({
     routeMode: "new",

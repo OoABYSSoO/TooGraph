@@ -169,6 +169,20 @@ function createExistingTab(overrides: Partial<EditorWorkspaceTab> = {}): EditorW
   };
 }
 
+function createBlankTab(overrides: Partial<EditorWorkspaceTab> = {}): EditorWorkspaceTab {
+  return {
+    tabId: "tab_blank",
+    kind: "new",
+    graphId: null,
+    title: "Untitled Graph",
+    dirty: false,
+    templateId: null,
+    defaultTemplateId: null,
+    subgraphSource: null,
+    ...overrides,
+  };
+}
+
 test("useWorkspaceOpenController opens new template tabs and syncs the route", () => {
   const harness = createHarness();
 
@@ -206,6 +220,63 @@ test("useWorkspaceOpenController opens plain new tabs as blank graphs", () => {
     metadata: {},
   });
   assert.equal(harness.handledRouteSignature.value, "new:");
+});
+
+test("useWorkspaceOpenController reuses an already-open blank new tab", () => {
+  const harness = createHarness();
+  const blankTab = createBlankTab();
+  const savedTab = createExistingTab();
+  harness.workspace.value = {
+    activeTabId: savedTab.tabId,
+    tabs: [blankTab, savedTab],
+  };
+  harness.documentsByTabId.value = {
+    [blankTab.tabId]: {
+      graph_id: null,
+      name: "Untitled Graph",
+      state_schema: {},
+      nodes: {},
+      edges: [],
+      conditional_edges: [],
+      metadata: {},
+    },
+  };
+
+  harness.controller.openNewTab(null, "push");
+
+  assert.equal(harness.workspace.value.tabs.length, 2);
+  assert.equal(harness.workspace.value.activeTabId, blankTab.tabId);
+  assert.equal(harness.routeSyncs[0]?.mode, "push");
+  assert.equal(harness.routeSyncs[0]?.tab.kind, "new");
+  assert.equal(harness.handledRouteSignature.value, "new:");
+});
+
+test("useWorkspaceOpenController creates a fresh blank tab when the existing new tab has edits", () => {
+  const harness = createHarness();
+  const editedTab = createBlankTab({ tabId: "tab_edited", dirty: true, title: "Edited draft" });
+  harness.workspace.value = {
+    activeTabId: editedTab.tabId,
+    tabs: [editedTab],
+  };
+  harness.documentsByTabId.value = {
+    [editedTab.tabId]: {
+      graph_id: null,
+      name: "Edited draft",
+      state_schema: {
+        message: { name: "message", description: "", type: "text", value: "", color: "#d97706" },
+      },
+      nodes: {},
+      edges: [],
+      conditional_edges: [],
+      metadata: {},
+    },
+  };
+
+  harness.controller.openNewTab(null, "push");
+
+  assert.equal(harness.workspace.value.tabs.length, 2);
+  assert.notEqual(harness.workspace.value.activeTabId, editedTab.tabId);
+  assert.equal(harness.workspace.value.tabs[1]?.kind, "new");
 });
 
 test("useWorkspaceOpenController rebuilds clean template tabs from the template default graph name", () => {

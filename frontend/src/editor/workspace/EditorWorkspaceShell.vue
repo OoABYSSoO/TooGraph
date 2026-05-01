@@ -21,14 +21,10 @@
         <h2>{{ t("runDetail.restoreSnapshotFailed") }}</h2>
         <p>{{ routeRestoreError }}</p>
       </div>
-      <EditorWelcomeState
-        :templates="templates"
-        :graphs="graphs"
-        @create-new="openNewTab(null)"
-        @import-python-graph="openPythonGraphImportDialog"
-        @open-template="openNewTab"
-        @open-graph="openExistingGraph"
-      />
+      <div v-else class="editor-workspace-shell__status-card">
+        <div class="editor-workspace-shell__status-eyebrow">{{ t("common.graph") }}</div>
+        <h2>{{ t("common.loadingGraph") }}</h2>
+      </div>
     </div>
 
     <div v-else class="editor-workspace-shell__workspace">
@@ -371,7 +367,6 @@ import EditorNodeCreationMenu from "./EditorNodeCreationMenu.vue";
 import EditorRunActivityPanel from "./EditorRunActivityPanel.vue";
 import EditorStatePanel from "./EditorStatePanel.vue";
 import EditorTabBar from "./EditorTabBar.vue";
-import EditorWelcomeState from "./EditorWelcomeState.vue";
 import {
   resolveWorkspaceDraftPersistenceRequest,
   shouldRunWorkspaceDraftHydration,
@@ -854,6 +849,14 @@ async function loadExistingGraphIntoTab(tabId: string, graphId: string) {
 function openExistingGraph(graphId: string, navigation: "push" | "replace" | "none" = "push") {
   openExistingGraphFromController(graphId, navigation);
 }
+
+function ensureWorkspaceHasCanvas() {
+  if (!hydrated.value || workspace.value.tabs.length > 0 || props.restoreRunId) {
+    return;
+  }
+  openNewTab(null, "replace");
+}
+
 const { applyCurrentRouteInstruction, syncRouteToUrl, syncRouteToTab } = useWorkspaceRouteController({
   routeMode: () => props.routeMode,
   routeGraphId: () => props.routeGraphId ?? null,
@@ -1485,6 +1488,13 @@ watch(
   },
 );
 
+watch(
+  () => workspace.value.tabs.length,
+  () => {
+    ensureWorkspaceHasCanvas();
+  },
+);
+
 onBeforeUnmount(() => {
   window.removeEventListener("toograph:graph-edit-playback-plan-request", handleGraphEditPlaybackPlanRequest as EventListener);
   window.removeEventListener("toograph:graph-edit-playback-apply-command", handleGraphEditPlaybackApplyCommand as EventListener);
@@ -1501,6 +1511,7 @@ onMounted(() => {
   hydrated.value = true;
   ensureUnsavedTabDocuments();
   applyCurrentRouteInstruction();
+  ensureWorkspaceHasCanvas();
 });
 </script>
 

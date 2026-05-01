@@ -94,6 +94,7 @@
             :graph-options="graphOptions"
             :template-placeholder="selectPlaceholders.template"
             :graph-placeholder="selectPlaceholders.graph"
+            :blank-graph-open="blankGraphOpen"
             @create-new="handleLauncherCreateNew"
             @import-python-graph="handleLauncherImportPythonGraph"
             @open-graph-replay-debug="handleLauncherOpenGraphReplayDebug"
@@ -112,7 +113,7 @@ import { ElIcon, ElPopover, ElTabPane, ElTabs } from "element-plus";
 import { computed, nextTick, ref, watch, type ComponentPublicInstance } from "vue";
 import { useI18n } from "vue-i18n";
 
-import type { EditorWorkspaceTab } from "@/lib/editor-workspace";
+import { isReusableBlankWorkspaceTab, type EditorWorkspaceTab } from "@/lib/editor-workspace";
 import type { GraphDocument, TemplateRecord } from "@/types/node-system";
 import EditorTabLauncherPanel from "./EditorTabLauncherPanel.vue";
 import {
@@ -176,6 +177,7 @@ const graphOptions = computed(() =>
     })),
   ),
 );
+const blankGraphOpen = computed(() => props.tabs.some((tab) => isReusableBlankWorkspaceTab(tab)));
 
 const selectPlaceholders = computed(() =>
   resolveEditorTabBarSelectPlaceholders({

@@ -14,6 +14,9 @@ const optionListMatches = componentSource.match(/class="editor-tab-launcher-pane
 
 test("EditorTabLauncherPanel offers creation, import, replay, template, and existing-graph entry points behind the plus launcher", () => {
   assert.match(componentSource, /const activeView = ref<"root" \| "template" \| "graph">\("root"\);/);
+  assert.match(componentSource, /blankGraphOpen: boolean;/);
+  assert.match(componentSource, /const blankEntryTitle = computed/);
+  assert.match(componentSource, /const blankEntryMeta = computed/);
   assert.match(componentSource, /@click="\$emit\('create-new'\)"/);
   assert.match(componentSource, /@click="\$emit\('import-python-graph'\)"/);
   assert.match(componentSource, /@click="\$emit\('open-graph-replay-debug'\)"/);
@@ -21,7 +24,8 @@ test("EditorTabLauncherPanel offers creation, import, replay, template, and exis
   assert.match(componentSource, /@click="openSecondaryView\('graph'\)"/);
   assert.equal(entryButtonMatches.length, 5);
   assert.equal(entryTitleMatches.length, 5);
-  assert.match(componentSource, /class="editor-tab-launcher-panel__entry-title">\{\{ t\("launcher\.blankTitle"\) \}\}</);
+  assert.match(componentSource, /class="editor-tab-launcher-panel__entry-title">\{\{ blankEntryTitle \}\}</);
+  assert.match(componentSource, /class="editor-tab-launcher-panel__entry-meta">\{\{ blankEntryMeta \}\}</);
   assert.match(componentSource, /class="editor-tab-launcher-panel__entry-title">\{\{ t\("launcher\.importPythonTitle"\) \}\}</);
   assert.match(componentSource, /class="editor-tab-launcher-panel__entry-title">\{\{ t\("launcher\.graphReplayTitle"\) \}\}</);
   assert.match(componentSource, /class="editor-tab-launcher-panel__entry-title">\{\{ t\("launcher\.templateTitle"\) \}\}</);

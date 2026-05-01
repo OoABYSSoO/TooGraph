@@ -144,6 +144,12 @@ test("EditorWorkspaceShell creates blank plain new tabs while preserving explici
   assert.doesNotMatch(componentSource, /createEditorSeedDraftGraph/);
 });
 
+test("EditorWorkspaceShell opens directly into a canvas instead of rendering the old welcome page", () => {
+  assert.doesNotMatch(componentSource, /EditorWelcomeState/);
+  assert.match(componentSource, /ensureWorkspaceHasCanvas\(\);/);
+  assert.match(componentSource, /openNewTab\(null, "replace"\);/);
+});
+
 test("EditorWorkspaceShell can restore a past run into a new unsaved tab", () => {
   assert.match(componentSource, /restoreRunId\?: string \| null;/);
   assert.match(componentSource, /restoreSnapshotId\?: string \| null;/);

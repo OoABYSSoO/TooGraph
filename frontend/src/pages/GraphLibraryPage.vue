@@ -1,5 +1,12 @@
 <template>
   <AppShell>
+    <input
+      ref="pythonGraphImportInput"
+      class="graph-library-page__file-input"
+      type="file"
+      accept=".py,text/x-python,text/plain"
+      @change="handlePythonGraphImportSelection"
+    />
     <section class="graph-library-page">
       <header class="graph-library-page__hero">
         <div>
@@ -7,9 +14,17 @@
           <h2 class="graph-library-page__title">{{ t("graphLibrary.title") }}</h2>
           <p class="graph-library-page__body">{{ t("graphLibrary.body") }}</p>
         </div>
-        <button type="button" class="graph-library-page__refresh" :disabled="loading" @click="loadCatalog">
-          {{ loading ? t("graphLibrary.refreshing") : t("graphLibrary.refresh") }}
-        </button>
+        <div class="graph-library-page__quick-actions" role="group" :aria-label="t('graphLibrary.quickActions')">
+          <button type="button" class="graph-library-page__primary-action" @click="openBlankEditorGraph">
+            {{ t("graphLibrary.newBlankGraph") }}
+          </button>
+          <button type="button" class="graph-library-page__secondary-action" @click="openPythonGraphImportDialog">
+            {{ t("graphLibrary.importPython") }}
+          </button>
+          <button type="button" class="graph-library-page__secondary-action" :disabled="loading" @click="loadCatalog">
+            {{ loading ? t("graphLibrary.refreshing") : t("graphLibrary.refresh") }}
+          </button>
+        </div>
       </header>
 
       <section class="graph-library-page__overview" :aria-label="t('graphLibrary.overviewLabel')">
@@ -88,29 +103,39 @@
                   {{ t("graphLibrary.empty") }}
                 </article>
                 <article v-for="item in column.items" :key="itemKey(item)" class="graph-library-page__card">
-                  <div class="graph-library-page__card-heading">
-                    <div>
-                      <div class="graph-library-page__id">{{ item.id }}</div>
-                      <h3>{{ item.title }}</h3>
-                      <p>{{ item.description || t("common.none") }}</p>
+                  <button
+                    type="button"
+                    class="graph-library-page__card-open"
+                    :aria-label="openItemLabel(item)"
+                    @click="openLibraryItem(item)"
+                  >
+                    <div class="graph-library-page__card-heading">
+                      <div>
+                        <div class="graph-library-page__id">{{ item.id }}</div>
+                        <h3>{{ item.title }}</h3>
+                        <p>{{ item.description || t("common.none") }}</p>
+                      </div>
+                      <div class="graph-library-page__badges">
+                        <span>{{ t(`graphLibrary.${item.kind}`) }}</span>
+                        <span>{{ t(`graphLibrary.${item.source}`) }}</span>
+                        <span>{{ t(`graphLibrary.${item.status}`) }}</span>
+                        <span v-if="!item.canManage" class="graph-library-page__badge--readonly">
+                          {{ t("graphLibrary.readOnlyOfficial") }}
+                        </span>
+                      </div>
                     </div>
-                    <div class="graph-library-page__badges">
-                      <span>{{ t(`graphLibrary.${item.kind}`) }}</span>
-                      <span>{{ t(`graphLibrary.${item.source}`) }}</span>
-                      <span>{{ t(`graphLibrary.${item.status}`) }}</span>
-                      <span v-if="!item.canManage" class="graph-library-page__badge--readonly">
-                        {{ t("graphLibrary.readOnlyOfficial") }}
-                      </span>
+
+                    <div class="graph-library-page__card-bottom">
+                      <div class="graph-library-page__meta">
+                        <span>{{ t("graphLibrary.nodes", { count: item.nodeCount }) }}</span>
+                        <span>{{ t("graphLibrary.edges", { count: item.edgeCount }) }}</span>
+                        <span>{{ t("graphLibrary.states", { count: item.stateCount }) }}</span>
+                      </div>
+                      <span class="graph-library-page__open-hint">{{ openItemHint(item) }}</span>
                     </div>
-                  </div>
+                  </button>
 
-                  <div class="graph-library-page__meta">
-                    <span>{{ t("graphLibrary.nodes", { count: item.nodeCount }) }}</span>
-                    <span>{{ t("graphLibrary.edges", { count: item.edgeCount }) }}</span>
-                    <span>{{ t("graphLibrary.states", { count: item.stateCount }) }}</span>
-                  </div>
-
-                  <div class="graph-library-page__actions" :aria-label="t('graphLibrary.actions')">
+                  <div class="graph-library-page__actions" role="group" :aria-label="t('graphLibrary.actions')" @click.stop>
                     <template v-if="item.canManage">
                       <label class="graph-library-page__toggle">
                         <span>
@@ -147,6 +172,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
 import { ElInput, ElSwitch } from "element-plus";
 import { useI18n } from "vue-i18n";
 
@@ -155,11 +181,20 @@ import {
   deleteTemplate,
   fetchGraphs,
   fetchTemplates,
+  importGraphFromPythonSource,
   updateGraphStatus,
   updateTemplateStatus,
 } from "@/api/graphs";
+import { isTooGraphPythonExportSource } from "@/editor/workspace/pythonImportModel";
 import AppShell from "@/layouts/AppShell.vue";
-import type { GraphCatalogStatus, GraphDocument, TemplateRecord } from "@/types/node-system";
+import { cloneGraphDocument, createDraftFromTemplate } from "@/lib/graph-document";
+import {
+  createUnsavedWorkspaceTab,
+  readPersistedEditorWorkspace,
+  writePersistedEditorDocumentDraft,
+  writePersistedEditorWorkspace,
+} from "@/lib/editor-workspace";
+import type { GraphCatalogStatus, GraphDocument, GraphPayload, TemplateRecord } from "@/types/node-system";
 
 import {
   buildGraphLibraryItems,
@@ -177,9 +212,11 @@ const error = ref<string | null>(null);
 const actionError = ref<string | null>(null);
 const actionItemKey = ref<string | null>(null);
 const confirmingDeleteKey = ref<string | null>(null);
+const pythonGraphImportInput = ref<HTMLInputElement | null>(null);
 const query = ref("");
 const statusFilter = ref<GraphLibraryStatusFilter>("all");
 const { t } = useI18n();
+const router = useRouter();
 
 const items = computed(() => buildGraphLibraryItems(graphs.value, templates.value));
 const overview = computed(() => buildGraphLibraryOverview(items.value));
@@ -232,6 +269,98 @@ function itemKey(item: GraphLibraryItem): string {
 
 function enabledToggleLabel(item: GraphLibraryItem): string {
   return item.status === "active" ? t("graphLibrary.disable") : t("graphLibrary.enable");
+}
+
+function openBlankEditorGraph() {
+  void router.push("/editor/new");
+}
+
+function openLibraryItem(item: GraphLibraryItem) {
+  if (item.kind === "graph") {
+    void router.push(`/editor/${encodeURIComponent(item.id)}`);
+    return;
+  }
+  const template = templates.value.find((candidate) => candidate.template_id === item.id) ?? null;
+  if (!template) {
+    return;
+  }
+  openTemplateDraft(template);
+  void router.push(`/editor/new?template=${encodeURIComponent(item.id)}`);
+}
+
+function openItemLabel(item: GraphLibraryItem): string {
+  return item.kind === "graph"
+    ? t("graphLibrary.openGraphLabel", { name: item.title })
+    : t("graphLibrary.openTemplateLabel", { name: item.title });
+}
+
+function openItemHint(item: GraphLibraryItem): string {
+  return item.kind === "graph" ? t("graphLibrary.openGraph") : t("graphLibrary.useTemplate");
+}
+
+function openPythonGraphImportDialog() {
+  pythonGraphImportInput.value?.click();
+}
+
+async function handlePythonGraphImportSelection(event: Event) {
+  const target = event.target instanceof HTMLInputElement ? event.target : null;
+  const file = target?.files?.[0] ?? null;
+  if (target) {
+    target.value = "";
+  }
+  if (!file) {
+    return;
+  }
+
+  actionError.value = null;
+  try {
+    const source = await file.text();
+    if (!isTooGraphPythonExportSource(source)) {
+      actionError.value = t("graphLibrary.importPythonNotExport", { file: file.name });
+      return;
+    }
+    openImportedGraphDraft(await importGraphFromPythonSource(source), file.name);
+    void router.push("/editor/new");
+  } catch (importError) {
+    actionError.value = importError instanceof Error ? importError.message : t("graphLibrary.importPythonFailed");
+  }
+}
+
+function openImportedGraphDraft(graph: GraphPayload, fileName: string) {
+  const importedGraph = cloneGraphDocument({
+    ...graph,
+    graph_id: null,
+    name: graph.name?.trim() || fileName.replace(/\.py$/i, "") || "Imported Graph",
+  });
+  const tab = {
+    ...createUnsavedWorkspaceTab({
+      kind: "new",
+      title: importedGraph.name,
+    }),
+    dirty: true,
+  };
+  const workspace = readPersistedEditorWorkspace();
+  writePersistedEditorDocumentDraft(tab.tabId, importedGraph);
+  writePersistedEditorWorkspace({
+    activeTabId: tab.tabId,
+    tabs: [...workspace.tabs, tab],
+  });
+}
+
+function openTemplateDraft(template: TemplateRecord) {
+  const draft = createDraftFromTemplate(template);
+  const tab = createUnsavedWorkspaceTab({
+    kind: "template",
+    title: template.label,
+    templateId: template.template_id,
+    defaultTemplateId: template.template_id,
+  });
+  const workspace = readPersistedEditorWorkspace();
+  writePersistedEditorDocumentDraft(tab.tabId, draft);
+  writePersistedEditorWorkspace({
+    activeTabId: tab.tabId,
+    tabs: [...workspace.tabs, tab],
+  });
 }
 
 function replaceGraph(updatedGraph: GraphDocument) {
@@ -307,6 +436,10 @@ onMounted(loadCatalog);
   overflow-x: hidden;
 }
 
+.graph-library-page__file-input {
+  display: none;
+}
+
 .graph-library-page__hero,
 .graph-library-page__toolbar,
 .graph-library-page__metric,
@@ -323,6 +456,7 @@ onMounted(loadCatalog);
 .graph-library-page__hero > *,
 .graph-library-page__search-field,
 .graph-library-page__filter-group,
+.graph-library-page__card-open,
 .graph-library-page__card-heading > * {
   min-width: 0;
 }
@@ -369,7 +503,16 @@ onMounted(loadCatalog);
   overflow-wrap: anywhere;
 }
 
-.graph-library-page__refresh,
+.graph-library-page__quick-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.graph-library-page__primary-action,
+.graph-library-page__secondary-action,
 .graph-library-page__empty-action,
 .graph-library-page__action {
   border: 1px solid rgba(154, 52, 18, 0.2);
@@ -383,7 +526,19 @@ onMounted(loadCatalog);
   transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease;
 }
 
-.graph-library-page__refresh:hover,
+.graph-library-page__primary-action {
+  background: rgb(154, 52, 18);
+  color: rgb(255, 252, 247);
+  box-shadow: 0 10px 20px rgba(154, 52, 18, 0.14);
+}
+
+.graph-library-page__primary-action:hover {
+  border-color: rgba(154, 52, 18, 0.4);
+  background: rgb(132, 45, 16);
+  transform: translateY(-1px);
+}
+
+.graph-library-page__secondary-action:hover,
 .graph-library-page__empty-action:hover,
 .graph-library-page__action:hover {
   border-color: rgba(154, 52, 18, 0.28);
@@ -391,7 +546,7 @@ onMounted(loadCatalog);
   transform: translateY(-1px);
 }
 
-.graph-library-page__refresh:disabled,
+.graph-library-page__secondary-action:disabled,
 .graph-library-page__action:disabled {
   cursor: not-allowed;
   opacity: 0.62;
@@ -404,9 +559,11 @@ onMounted(loadCatalog);
   color: rgb(153, 27, 27);
 }
 
-.graph-library-page__refresh:focus-visible,
+.graph-library-page__primary-action:focus-visible,
+.graph-library-page__secondary-action:focus-visible,
 .graph-library-page__empty-action:focus-visible,
 .graph-library-page__action:focus-visible,
+.graph-library-page__card-open:focus-visible,
 .graph-library-page__filter-tab:focus-visible {
   outline: 2px solid rgba(216, 166, 80, 0.5);
   outline-offset: 2px;
@@ -537,6 +694,7 @@ onMounted(loadCatalog);
 }
 
 .graph-library-page__column-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -551,10 +709,33 @@ onMounted(loadCatalog);
 
 .graph-library-page__card {
   display: grid;
-  gap: 14px;
-  padding: 18px;
+  gap: 10px;
+  padding: 0;
   background: var(--toograph-surface-card);
   box-shadow: var(--graph-library-card-shadow);
+  overflow: hidden;
+}
+
+.graph-library-page__card-open {
+  display: grid;
+  gap: 14px;
+  width: 100%;
+  border: 0;
+  padding: 18px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: background-color 160ms ease;
+}
+
+.graph-library-page__card-open:hover {
+  background: rgba(255, 248, 240, 0.5);
+}
+
+.graph-library-page__card-open:active {
+  background: rgba(255, 245, 234, 0.72);
 }
 
 .graph-library-page__card-heading {
@@ -566,6 +747,14 @@ onMounted(loadCatalog);
 .graph-library-page__card h3 {
   margin: 6px 0 8px;
   color: var(--toograph-text-strong);
+}
+
+.graph-library-page__card-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
 }
 
 .graph-library-page__badges,
@@ -602,8 +791,20 @@ onMounted(loadCatalog);
   font-size: 0.82rem;
 }
 
+.graph-library-page__open-hint {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: rgba(154, 52, 18, 0.08);
+  color: rgb(154, 52, 18);
+  font-size: 0.82rem;
+}
+
 .graph-library-page__actions {
   align-items: center;
+  border-top: 1px solid rgba(154, 52, 18, 0.08);
+  padding: 10px 18px 14px;
+  background: rgba(255, 255, 255, 0.28);
 }
 
 .graph-library-page__toggle {
@@ -625,6 +826,12 @@ onMounted(loadCatalog);
   background: rgba(248, 250, 252, 0.72);
 }
 
+@media (max-width: 1280px) {
+  .graph-library-page__column-list {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 1180px) {
   .graph-library-page__overview {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -639,19 +846,30 @@ onMounted(loadCatalog);
   .graph-library-page__columns {
     grid-template-columns: 1fr;
   }
+
+  .graph-library-page__column-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 700px) {
   .graph-library-page__hero,
-  .graph-library-page__card-heading {
+  .graph-library-page__card-heading,
+  .graph-library-page__card-bottom {
     display: grid;
   }
 
-  .graph-library-page__refresh {
+  .graph-library-page__quick-actions,
+  .graph-library-page__primary-action,
+  .graph-library-page__secondary-action {
     width: 100%;
   }
 
   .graph-library-page__overview {
+    grid-template-columns: 1fr;
+  }
+
+  .graph-library-page__column-list {
     grid-template-columns: 1fr;
   }
 

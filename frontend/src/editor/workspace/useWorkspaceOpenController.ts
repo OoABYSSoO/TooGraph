@@ -12,6 +12,7 @@ import {
   applyDocumentMetaToWorkspaceTab,
   createUnsavedWorkspaceTab,
   ensureSavedGraphTab,
+  isReusableBlankWorkspaceTab,
   readPersistedEditorDocumentDraft,
   type EditorWorkspaceTab,
   type PersistedEditorWorkspace,
@@ -74,6 +75,30 @@ export function useWorkspaceOpenController(input: WorkspaceOpenControllerInput) 
     return createEmptyDraftGraph(tab.title);
   }
 
+  function findReusableBlankTab() {
+    return (
+      input.workspace.value.tabs.find((tab) =>
+        isReusableBlankWorkspaceTab(tab, input.documentsByTabId.value[tab.tabId] ?? null),
+      ) ?? null
+    );
+  }
+
+  function activateReusableBlankTab(tab: EditorWorkspaceTab, navigation: RouteNavigation) {
+    if (!input.documentsByTabId.value[tab.tabId]) {
+      input.registerDocumentForTab(tab.tabId, createDraftForTab(tab));
+    }
+
+    input.updateWorkspace({
+      ...input.workspace.value,
+      activeTabId: tab.tabId,
+    });
+
+    if (navigation !== "none") {
+      input.syncRouteToTab(tab, navigation === "replace" ? "replace" : "push");
+    }
+    input.handledRouteSignature.value = "new:";
+  }
+
   function ensureUnsavedTabDocuments() {
     for (const tab of listTabsMissingDocumentDrafts(input.workspace.value.tabs, input.documentsByTabId.value)) {
       const persistedDraft = readDocumentDraft(tab.tabId);
@@ -83,6 +108,14 @@ export function useWorkspaceOpenController(input: WorkspaceOpenControllerInput) 
   }
 
   function openNewTab(templateId: string | null, navigation: RouteNavigation = "push") {
+    if (!templateId) {
+      const reusableBlankTab = findReusableBlankTab();
+      if (reusableBlankTab) {
+        activateReusableBlankTab(reusableBlankTab, navigation);
+        return;
+      }
+    }
+
     const template = templateId ? input.templates().find((candidate) => candidate.template_id === templateId) ?? null : null;
     const draft = template ? createDraftFromTemplate(template) : createEmptyDraftGraph();
     const tab = createUnsavedWorkspaceTab({
