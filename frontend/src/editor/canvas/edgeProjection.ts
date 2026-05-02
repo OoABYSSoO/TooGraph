@@ -2,7 +2,7 @@ import type { GraphDocument, GraphNode, GraphPayload } from "../../types/node-sy
 import { buildAnchorModel } from "../anchors/anchorModel.ts";
 import { placeAnchors, type NodeFrame } from "../anchors/anchorPlacement.ts";
 import { buildConnectorCurvePath } from "./connectionCurvePath.ts";
-import { buildSequenceFlowPath } from "./flowEdgePath.ts";
+import { buildSelfFeedbackFlowPath, buildSequenceFlowPath } from "./flowEdgePath.ts";
 
 export type ProjectedCanvasEdge = {
   id: string;
@@ -167,6 +167,7 @@ export function projectCanvasEdges(document: GraphPayload | GraphDocument): Proj
           sourceNode?.ui.position.y,
           targetNode?.ui.position.x,
           targetNode?.ui.position.y,
+          relation.source === relation.target,
         ),
       };
     })
@@ -441,7 +442,21 @@ function buildDataPath(
   sourceNodeY?: number,
   targetNodeX?: number,
   targetNodeY?: number,
+  isSelfFeedback = false,
 ) {
+  if (isSelfFeedback) {
+    return buildSelfFeedbackFlowPath({
+      sourceX: startX,
+      sourceY: startY,
+      targetX: endX,
+      targetY: endY,
+      sourceNodeX,
+      sourceNodeY,
+      targetNodeX,
+      targetNodeY,
+    });
+  }
+
   if (endX <= startX) {
     return buildSequenceFlowPath({
       sourceX: startX,
@@ -490,7 +505,7 @@ function collectProjectedDataRelations(document: GraphPayload | GraphDocument): 
   for (const [nodeId, node] of Object.entries(document.nodes)) {
     for (const binding of node.reads) {
       const candidateWriters = (writersByState.get(binding.state) ?? []).filter(
-        (writerId) => writerId !== nodeId && reachability.get(writerId)?.has(nodeId),
+        (writerId) => writerId === nodeId || reachability.get(writerId)?.has(nodeId),
       );
       if (candidateWriters.length === 0) {
         continue;

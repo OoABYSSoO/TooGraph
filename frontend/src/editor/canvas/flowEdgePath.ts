@@ -61,6 +61,36 @@ export function buildSequenceFlowPath(input: SequenceFlowPathInput) {
   );
 }
 
+export function buildSelfFeedbackFlowPath(input: SequenceFlowPathInput) {
+  const sourceLaneOffset = resolveLaneOffset(input.sourceLaneIndex, input.sourceLaneCount);
+  const targetLaneOffset = resolveLaneOffset(input.targetLaneIndex, input.targetLaneCount);
+  const topY = resolveUpstreamTopY(input, sourceLaneOffset, targetLaneOffset);
+  const startLeadX = input.sourceX + FLOW_TERMINAL_OVERLAP;
+  const sourceBranchX =
+    input.sourceX +
+    UPSTREAM_HORIZONTAL_CLEARANCE +
+    resolveTerminalStagger(input.sourceLaneIndex, input.sourceLaneCount);
+  const targetDropX =
+    input.targetX -
+    UPSTREAM_HORIZONTAL_CLEARANCE -
+    resolveTerminalStagger(input.targetLaneIndex, input.targetLaneCount);
+  const endLeadX = input.targetX - FLOW_TERMINAL_OVERLAP;
+
+  return buildRoundedOrthogonalPath(
+    [
+      { x: input.sourceX, y: input.sourceY },
+      { x: startLeadX, y: input.sourceY },
+      { x: sourceBranchX, y: input.sourceY },
+      { x: sourceBranchX, y: topY },
+      { x: targetDropX, y: topY },
+      { x: targetDropX, y: input.targetY },
+      { x: endLeadX, y: input.targetY },
+      { x: input.targetX, y: input.targetY },
+    ],
+    UPSTREAM_CORNER_RADIUS,
+  );
+}
+
 function buildVerticalDropPath(input: SequenceFlowPathInput, sourceLaneOffset: number, targetLaneOffset: number) {
   const startLeadX = input.sourceX + FLOW_TERMINAL_OVERLAP;
   const sourceBranchX = resolveVerticalDropSourceRailX(input);

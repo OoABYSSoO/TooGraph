@@ -257,6 +257,33 @@ test("projectCanvasEdges shows the web research search query flowing from the pl
   assert.equal(queryEdge.id, "data:plan_search_query:state_2->web_search_agent");
 });
 
+test("projectCanvasEdges shows a self feedback data edge for nodes that read and write the same state", () => {
+  const template = JSON.parse(
+    readFileSync(new URL("../../../../backend/app/templates/web_research_loop.json", import.meta.url), "utf8"),
+  ) as GraphPayload;
+  for (const node of Object.values(template.nodes)) {
+    node.reads ??= [];
+    node.writes ??= [];
+  }
+
+  const projected = projectCanvasEdges(template);
+  const feedbackEdge = projected.find(
+    (edge) =>
+      edge.kind === "data" &&
+      edge.source === "assess_search_sufficiency" &&
+      edge.target === "assess_search_sufficiency" &&
+      edge.state === "state_4",
+  );
+
+  assert.ok(feedbackEdge);
+  assert.equal(feedbackEdge.id, "data:assess_search_sufficiency:state_4->assess_search_sufficiency");
+  assert.equal(feedbackEdge.color, "#7c3aed");
+  assert.equal(
+    feedbackEdge.path,
+    "M 2540 425 L 2568 425 L 2594 425 Q 2612 425 2612 407 L 2612 250 Q 2612 232 2594 232 L 2072 232 Q 2054 232 2054 250 L 2054 539 Q 2054 557 2072 557 L 2098 557 L 2126 557",
+  );
+});
+
 test("projectCanvasEdges exposes branch metadata for condition routes", () => {
   const routeGraph: GraphPayload = {
     graph_id: null,
