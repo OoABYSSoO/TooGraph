@@ -403,7 +403,6 @@ function createRunDetail(overrides: Partial<RunDetail> = {}): RunDetail {
     selected_skills: [],
     skill_outputs: [],
     evaluation_result: {},
-    knowledge_summary: "",
     memory_summary: "",
     final_result: "",
     node_status_map: {},

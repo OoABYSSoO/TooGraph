@@ -89,16 +89,16 @@ function createSkillDefinition(): SkillDefinition {
     mode: "sync",
     scope: "project",
     permissions: [],
-    runtime: { type: "builtin", entrypoint: "skill_a" },
-    health: { type: "builtin" },
+    runtime: { type: "python", entrypoint: "run.py" },
+    health: { type: "none" },
     inputSchema: [],
     outputSchema: [],
     supportedValueTypes: [],
     sideEffects: [],
     agentNodeEligibility: "ready",
     agentNodeBlockers: [],
-    sourceFormat: "python",
-    sourceScope: "project",
+    sourceFormat: "skill",
+    sourceScope: "installed",
     sourcePath: "",
     runtimeReady: true,
     runtimeRegistered: true,
@@ -106,7 +106,6 @@ function createSkillDefinition(): SkillDefinition {
     healthy: true,
     status: "ready",
     canManage: true,
-    canImport: true,
   };
 }
 

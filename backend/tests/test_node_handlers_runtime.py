@@ -6,10 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from datetime import datetime, timezone
-
 from app.core.runtime.node_handlers import (
-    _enrich_time_sensitive_web_search_query,
     execute_agent_node,
     execute_condition_node,
     execute_input_node,
@@ -18,14 +15,6 @@ from app.core.schemas.node_system import NodeSystemAgentNode, NodeSystemConditio
 
 
 class NodeHandlersRuntimeTests(unittest.TestCase):
-    def test_time_sensitive_web_search_query_includes_current_date_anchor(self) -> None:
-        query = _enrich_time_sensitive_web_search_query(
-            "今天的日期和北京天气",
-            now=datetime(2026, 5, 1, 13, 28, 44, tzinfo=timezone.utc),
-        )
-
-        self.assertEqual(query, "今天的日期和北京天气 2026-05-01")
-
     def test_execute_input_node_coerces_outputs_and_final_result(self) -> None:
         state_schema = {
             "payload": NodeSystemStateDefinition.model_validate({"type": "json", "value": '{"ok": true}'}),
@@ -89,7 +78,6 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
 
     def test_execute_agent_node_invokes_skills_streaming_and_generation(self) -> None:
         state_schema = {
-            "kb": NodeSystemStateDefinition.model_validate({"type": "knowledge_base"}),
             "question": NodeSystemStateDefinition.model_validate({"type": "text"}),
             "answer": NodeSystemStateDefinition.model_validate({"type": "text"}),
         }
@@ -98,9 +86,9 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "kind": "agent",
                 "name": "writer",
                 "ui": {"position": {"x": 0, "y": 0}},
-                "reads": [{"state": "kb"}, {"state": "question"}],
+                "reads": [{"state": "question"}],
                 "writes": [{"state": "answer"}],
-                "config": {"skills": ["search_knowledge_base", "custom"]},
+                "config": {"skills": ["custom"]},
             }
         )
         finalized: dict[str, object] = {}
@@ -108,20 +96,11 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         result = execute_agent_node(
             state_schema,
             node,
-            {"kb": "docs", "question": "q"},
+            {"question": "q"},
             {"state": {}},
             node_name="writer",
             state={"run_id": "run-1"},
-            knowledge_base_skill_key="search_knowledge_base",
-            get_skill_registry_func=lambda *, include_disabled: {
-                "search_knowledge_base": object(),
-                "custom": object(),
-            },
-            retrieve_knowledge_base_context_func=lambda *, knowledge_base, query, limit: {
-                "knowledge_base": knowledge_base,
-                "query": query,
-                "limit": limit,
-            },
+            get_skill_registry_func=lambda *, include_disabled: {"custom": object()},
             invoke_skill_func=lambda skill_func, skill_inputs: {"echo": skill_inputs["question"]},
             resolve_agent_runtime_config_func=lambda agent_node: {"runtime": "initial"},
             build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: "delta",
@@ -138,15 +117,57 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
 
         self.assertEqual(result["outputs"], {"answer": "value"})
         self.assertEqual(result["reasoning"], "reason")
-        self.assertEqual(result["selected_skills"], ["search_knowledge_base", "custom"])
-        self.assertEqual(result["skill_outputs"][0]["inputs"], {"knowledge_base": "docs", "query": "q"})
-        self.assertEqual(result["skill_outputs"][1]["outputs"], {"echo": "q"})
+        self.assertEqual(result["selected_skills"], ["custom"])
+        self.assertEqual(result["skill_outputs"][0]["inputs"], {"question": "q"})
+        self.assertEqual(result["skill_outputs"][0]["outputs"], {"echo": "q"})
         self.assertEqual(result["runtime_config"]["runtime"], "updated")
         self.assertEqual(result["runtime_config"]["kwargs"]["on_delta"], "delta")
         self.assertEqual(result["runtime_config"]["kwargs"]["state_schema"], state_schema)
         self.assertEqual(result["warnings"], ["warn"])
         self.assertEqual(result["final_result"], "value")
         self.assertEqual(finalized, {"answer": "value"})
+
+    def test_execute_agent_node_treats_knowledge_base_state_as_normal_skill_input(self) -> None:
+        state_schema = {
+            "kb": NodeSystemStateDefinition.model_validate({"type": "knowledge_base"}),
+            "question": NodeSystemStateDefinition.model_validate({"type": "text"}),
+            "answer": NodeSystemStateDefinition.model_validate({"type": "text"}),
+        }
+        node = NodeSystemAgentNode.model_validate(
+            {
+                "kind": "agent",
+                "name": "writer",
+                "ui": {"position": {"x": 0, "y": 0}},
+                "reads": [{"state": "kb"}, {"state": "question"}],
+                "writes": [{"state": "answer"}],
+                "config": {"skills": ["custom_retrieval"]},
+            }
+        )
+
+        result = execute_agent_node(
+            state_schema,
+            node,
+            {"kb": "docs", "question": "q"},
+            {"state": {}},
+            node_name="writer",
+            state={"run_id": "run-1"},
+            get_skill_registry_func=lambda *, include_disabled: {"custom_retrieval": object()},
+            invoke_skill_func=lambda skill_func, skill_inputs: {"context": skill_inputs["question"]},
+            resolve_agent_runtime_config_func=lambda agent_node: {},
+            build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
+            callable_accepts_keyword_func=lambda func, keyword: False,
+            generate_agent_response_func=lambda agent_node, input_values, skill_context, runtime_config, **kwargs: (
+                {"answer": skill_context["custom_retrieval"]["context"]},
+                "",
+                [],
+                runtime_config,
+            ),
+            finalize_agent_stream_delta_func=lambda *, state, node_name, output_values: None,
+            first_truthy_func=lambda values: next((value for value in values if value), None),
+        )
+
+        self.assertEqual(result["skill_outputs"][0]["inputs"], {"kb": "docs", "question": "q"})
+        self.assertEqual(result["outputs"], {"answer": "q"})
 
     def test_execute_agent_node_maps_bound_skill_outputs_into_state_outputs(self) -> None:
         state_schema = {
@@ -214,7 +235,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         self.assertEqual(result["skill_outputs"][0]["state_writes"], {"summary_text": "Long text / 2"})
         self.assertEqual(result["skill_outputs"][0]["status"], "succeeded")
 
-    def test_execute_agent_node_uses_task_instruction_as_default_web_search_query(self) -> None:
+    def test_execute_agent_node_does_not_special_case_web_search_inputs(self) -> None:
         state_schema = {
             "name": NodeSystemStateDefinition.model_validate({"type": "text"}),
             "answer": NodeSystemStateDefinition.model_validate({"type": "text"}),
@@ -259,12 +280,11 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             first_truthy_func=lambda values: next((value for value in values if value), None),
         )
 
-        self.assertTrue(str(captured_inputs["query"]).startswith("今天的日期和北京天气 "))
-        self.assertRegex(str(captured_inputs["query"]), r"\d{4}-\d{2}-\d{2}$")
-        self.assertEqual(result["skill_outputs"][0]["inputs"]["query"], captured_inputs["query"])
+        self.assertEqual(captured_inputs, {"name": "GraphiteUI 用户"})
+        self.assertEqual(result["skill_outputs"][0]["inputs"], {"name": "GraphiteUI 用户"})
         self.assertEqual(result["outputs"]["answer"], "联网结果")
 
-    def test_execute_agent_node_enriches_explicit_web_search_query_with_date_anchor(self) -> None:
+    def test_execute_agent_node_keeps_bound_skill_inputs_unchanged(self) -> None:
         state_schema = {
             "question": NodeSystemStateDefinition.model_validate({"type": "text"}),
             "answer": NodeSystemStateDefinition.model_validate({"type": "text"}),
@@ -314,9 +334,8 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             first_truthy_func=lambda values: next((value for value in values if value), None),
         )
 
-        self.assertTrue(str(captured_inputs["query"]).startswith("最新模型发布日期 "))
-        self.assertRegex(str(captured_inputs["query"]), r"\d{4}-\d{2}-\d{2}$")
-        self.assertEqual(result["skill_outputs"][0]["inputs"]["query"], captured_inputs["query"])
+        self.assertEqual(captured_inputs["query"], "最新模型发布日期")
+        self.assertEqual(result["skill_outputs"][0]["inputs"]["query"], "最新模型发布日期")
 
     def test_execute_agent_node_surfaces_failed_skill_result_status(self) -> None:
         state_schema = {

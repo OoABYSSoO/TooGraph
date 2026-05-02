@@ -179,7 +179,6 @@ export type RunDetail = RunSummary & {
   selected_skills: string[];
   skill_outputs: Array<Record<string, unknown>>;
   evaluation_result: Record<string, unknown>;
-  knowledge_summary: string;
   memory_summary: string;
   final_result: string;
   node_status_map: Record<string, string>;

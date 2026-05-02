@@ -120,10 +120,6 @@
             </div>
             <div class="run-detail__info-grid">
               <div class="run-detail__info">
-                <span>{{ t("runDetail.knowledge") }}</span>
-                <strong class="run-detail__content">{{ viewedRun?.knowledge_summary || t("common.none") }}</strong>
-              </div>
-              <div class="run-detail__info">
                 <span>{{ t("runDetail.memory") }}</span>
                 <strong class="run-detail__content">{{ viewedRun?.memory_summary || t("common.none") }}</strong>
               </div>

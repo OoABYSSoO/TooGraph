@@ -9,6 +9,8 @@ export type SkillIoField = {
 export type SkillRuntimeSpec = {
   type: string;
   entrypoint: string;
+  command?: string[];
+  timeoutSeconds?: number;
 };
 
 export type SkillHealthSpec = {
@@ -43,7 +45,6 @@ export type SkillDefinition = {
   healthy: boolean;
   status: string;
   canManage: boolean;
-  canImport: boolean;
 };
 
 export type SkillFileNode = {

@@ -62,8 +62,8 @@ def _native_skill_manifest(
         "healthy": healthy,
     }
     if runtime_entrypoint is not None:
-        manifest["runtime"] = {"type": "builtin", "entrypoint": runtime_entrypoint}
-        manifest["health"] = {"type": "builtin"}
+        manifest["runtime"] = {"type": "python", "entrypoint": runtime_entrypoint}
+        manifest["health"] = {"type": "none"}
     return json.dumps(
         manifest,
         ensure_ascii=False,
@@ -98,10 +98,11 @@ Imported skill body.
 
 def _patch_skill_storage(skills_dir: Path, state_dir: Path):
     return (
-        patch("app.core.storage.skill_store.GRAPHITE_SKILLS_DIR", skills_dir),
+        patch("app.core.storage.skill_store.SKILLS_DIR", skills_dir),
         patch("app.core.storage.skill_store.SKILL_STATE_DATA_DIR", state_dir),
         patch("app.core.storage.skill_store.SKILL_STATE_PATH", state_dir / "registry_states.json"),
-        patch("app.skills.definitions.GRAPHITE_SKILLS_DIR", skills_dir),
+        patch("app.skills.definitions.SKILLS_DIR", skills_dir),
+        patch("app.skills.registry.SKILLS_DIR", skills_dir),
     )
 
 
@@ -148,7 +149,7 @@ def _write_native_skill(
     healthy: bool = True,
     runtime: bool = True,
 ) -> None:
-    skill_dir = skills_dir / "graphite" / skill_key
+    skill_dir = skills_dir / skill_key
     skill_dir.mkdir(parents=True, exist_ok=True)
     (skill_dir / "skill.json").write_text(
         _native_skill_manifest(
@@ -156,15 +157,17 @@ def _write_native_skill(
             targets=targets,
             configured=configured,
             healthy=healthy,
-            runtime_entrypoint=skill_key if runtime else None,
+            runtime_entrypoint="run.py" if runtime else None,
         ),
         encoding="utf-8",
     )
     (skill_dir / "SKILL.md").write_text(f"# {skill_key}\n", encoding="utf-8")
+    if runtime:
+        (skill_dir / "run.py").write_text("import json\nprint(json.dumps({'summary': 'ok'}))\n", encoding="utf-8")
 
 
 class SkillUploadImportRouteTests(unittest.TestCase):
-    def test_builtin_runtime_skills_prefer_native_graphite_manifests(self) -> None:
+    def test_default_catalog_only_loads_installed_root_skill_folders(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             state_dir = Path(temp_dir) / "data" / "skills"
             with _test_client_with_skill_state(state_dir) as client:
@@ -172,21 +175,16 @@ class SkillUploadImportRouteTests(unittest.TestCase):
 
                 self.assertEqual(response.status_code, 200)
                 catalog_items = {item["skillKey"]: item for item in response.json()}
-                for skill_key in [
-                    "search_knowledge_base",
-                    "summarize_text",
-                    "extract_json_fields",
-                    "translate_text",
-                    "rewrite_text",
-                ]:
-                    self.assertEqual(catalog_items[skill_key]["sourceFormat"], "graphite_definition")
-                    self.assertEqual(catalog_items[skill_key]["sourceScope"], "graphite_managed")
-                    self.assertEqual(catalog_items[skill_key]["targets"], ["agent_node"])
-                    self.assertTrue(catalog_items[skill_key]["runtimeReady"])
-                    self.assertTrue(catalog_items[skill_key]["runtimeRegistered"])
-                    self.assertNotIn("compatibility", catalog_items[skill_key])
+                self.assertEqual(sorted(catalog_items), ["web_search"])
+                self.assertEqual(catalog_items["web_search"]["sourceFormat"], "skill")
+                self.assertEqual(catalog_items["web_search"]["sourceScope"], "installed")
+                self.assertEqual(catalog_items["web_search"]["targets"], ["agent_node", "companion"])
+                self.assertTrue(catalog_items["web_search"]["runtimeReady"])
+                self.assertTrue(catalog_items["web_search"]["runtimeRegistered"])
+                self.assertTrue(catalog_items["web_search"]["sourcePath"].endswith("/skill/web_search/skill.json"))
+                self.assertNotIn("compatibility", catalog_items["web_search"])
 
-    def test_native_skill_json_upload_imports_graphite_skill_package(self) -> None:
+    def test_native_skill_json_upload_imports_installed_skill_package(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             skills_dir = temp_path / "skill"
@@ -200,8 +198,8 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertEqual(response.status_code, 200)
                 payload = response.json()
                 self.assertEqual(payload["skillKey"], "video_understanding")
-                self.assertEqual(payload["sourceFormat"], "graphite_definition")
-                self.assertEqual(payload["sourceScope"], "graphite_managed")
+                self.assertEqual(payload["sourceFormat"], "skill")
+                self.assertEqual(payload["sourceScope"], "installed")
                 self.assertEqual(payload["targets"], ["agent_node", "companion"])
                 self.assertEqual(payload["kind"], "workflow")
                 self.assertEqual(payload["mode"], "workflow")
@@ -211,13 +209,13 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertFalse(payload["runtimeReady"])
                 self.assertFalse(payload["runtimeRegistered"])
                 self.assertEqual(payload["agentNodeEligibility"], "needs_manifest")
-                self.assertIn("Skill manifest is missing a builtin runtime entrypoint.", payload["agentNodeBlockers"])
+                self.assertIn("Skill manifest is missing a script runtime entrypoint.", payload["agentNodeBlockers"])
                 self.assertTrue(payload["configured"])
                 self.assertTrue(payload["healthy"])
 
-                imported_path = skills_dir / "graphite" / "video_understanding" / "skill.json"
+                imported_path = skills_dir / "video_understanding" / "skill.json"
                 self.assertTrue(imported_path.exists())
-                self.assertTrue((skills_dir / "graphite" / "video_understanding" / "workflow.json").exists())
+                self.assertTrue((skills_dir / "video_understanding" / "workflow.json").exists())
 
                 catalog_response = client.get("/api/skills/catalog?include_disabled=true")
                 self.assertEqual(catalog_response.status_code, 200)
@@ -286,12 +284,12 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertEqual(payload["skillKey"], "uploaded_zip_skill")
                 self.assertEqual(payload["status"], "active")
                 self.assertTrue(payload["canManage"])
-                self.assertFalse(payload["canImport"])
-                self.assertEqual(payload["sourceScope"], "graphite_managed")
+                self.assertNotIn("canImport", payload)
+                self.assertEqual(payload["sourceScope"], "installed")
 
-                imported_path = skills_dir / "claude_code" / "uploaded_zip_skill" / "SKILL.md"
+                imported_path = skills_dir / "uploaded_zip_skill" / "SKILL.md"
                 self.assertTrue(imported_path.exists())
-                self.assertTrue((skills_dir / "claude_code" / "uploaded_zip_skill" / "helper.py").exists())
+                self.assertTrue((skills_dir / "uploaded_zip_skill" / "helper.py").exists())
 
                 catalog_response = client.get("/api/skills/catalog?include_disabled=true")
                 self.assertEqual(catalog_response.status_code, 200)
@@ -320,30 +318,35 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertEqual(response.status_code, 200)
                 payload = response.json()
                 self.assertEqual(payload["skillKey"], "uploaded_folder_skill")
-                self.assertTrue((skills_dir / "claude_code" / "uploaded_folder_skill" / "SKILL.md").exists())
-                self.assertTrue((skills_dir / "claude_code" / "uploaded_folder_skill" / "helper.py").exists())
+                self.assertTrue((skills_dir / "uploaded_folder_skill" / "SKILL.md").exists())
+                self.assertTrue((skills_dir / "uploaded_folder_skill" / "helper.py").exists())
 
-    def test_catalog_does_not_auto_discover_external_skill_directories(self) -> None:
+    def test_catalog_ignores_legacy_platform_wrapper_directories(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             skills_dir = temp_path / "skill"
             state_dir = temp_path / "data" / "skills"
-            external_skill_dir = skills_dir / "openclaw" / "tavily-search"
-            external_skill_dir.mkdir(parents=True)
-            (external_skill_dir / "SKILL.md").write_text(_skill_markdown("tavily-search"), encoding="utf-8")
+            legacy_platform_skill_dir = skills_dir / "openclaw" / "tavily-search"
+            legacy_platform_skill_dir.mkdir(parents=True)
+            (legacy_platform_skill_dir / "SKILL.md").write_text(_skill_markdown("tavily-search"), encoding="utf-8")
+            direct_skill_dir = skills_dir / "direct-skill"
+            direct_skill_dir.mkdir(parents=True)
+            (direct_skill_dir / "SKILL.md").write_text(_skill_markdown("direct-skill"), encoding="utf-8")
 
             with _test_client_with_skill_storage(skills_dir, state_dir) as client:
                 catalog_response = client.get("/api/skills/catalog?include_disabled=true")
 
                 self.assertEqual(catalog_response.status_code, 200)
-                self.assertNotIn("tavily-search", [item["skillKey"] for item in catalog_response.json()])
+                skill_keys = [item["skillKey"] for item in catalog_response.json()]
+                self.assertIn("direct-skill", skill_keys)
+                self.assertNotIn("tavily-search", skill_keys)
 
     def test_definitions_endpoint_only_returns_agent_attachable_runtime_skills(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             skills_dir = temp_path / "skill"
             state_dir = temp_path / "data" / "skills"
-            _write_native_skill(skills_dir, "search_knowledge_base", targets=["agent_node"])
+            _write_native_skill(skills_dir, "web_search", targets=["agent_node"])
             _write_native_skill(skills_dir, "extract_json_fields", targets=["agent_node"], runtime=False)
             _write_native_skill(skills_dir, "rewrite_text", targets=["companion"])
             _write_native_skill(skills_dir, "summarize_text", targets=["agent_node"], configured=False)
@@ -353,7 +356,7 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 response = client.get("/api/skills/definitions")
 
                 self.assertEqual(response.status_code, 200)
-                self.assertEqual([item["skillKey"] for item in response.json()], ["search_knowledge_base"])
+                self.assertEqual([item["skillKey"] for item in response.json()], ["web_search"])
 
     def test_graph_validation_reports_non_attachable_agent_skills(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

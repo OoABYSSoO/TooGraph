@@ -31,14 +31,15 @@ class SkillManifestContractTests(unittest.TestCase):
                         "outputSchema": [
                             {"key": "summary", "label": "Summary", "valueType": "text"}
                         ],
-                        "runtime": {"type": "builtin", "entrypoint": "summarize_text"},
-                        "health": {"type": "builtin"},
+                        "runtime": {"type": "python", "entrypoint": "run.py"},
+                        "health": {"type": "none"},
                     }
                 ),
                 encoding="utf-8",
             )
+            (skill_dir / "run.py").write_text("print('{}')\n", encoding="utf-8")
 
-            definition = _parse_native_skill_manifest(manifest, SkillSourceScope.GRAPHITE_MANAGED).definition
+            definition = _parse_native_skill_manifest(manifest, SkillSourceScope.INSTALLED).definition
 
         self.assertNotIn("compatibility", definition.model_dump(by_alias=True))
 
@@ -60,19 +61,20 @@ class SkillManifestContractTests(unittest.TestCase):
                         "outputSchema": [
                             {"key": "normalized_shots", "label": "Normalized Shots", "valueType": "json"}
                         ],
-                        "runtime": {"type": "builtin", "entrypoint": "normalize_storyboard_shots"},
-                        "health": {"type": "builtin"},
+                        "runtime": {"type": "python", "entrypoint": "run.py"},
+                        "health": {"type": "none"},
                     }
                 ),
                 encoding="utf-8",
             )
+            (skill_dir / "run.py").write_text("print('{}')\n", encoding="utf-8")
 
-            definition = _parse_native_skill_manifest(manifest, SkillSourceScope.GRAPHITE_MANAGED).definition
+            definition = _parse_native_skill_manifest(manifest, SkillSourceScope.INSTALLED).definition
 
         self.assertEqual(definition.schema_version, "graphite.skill/v1")
-        self.assertEqual(definition.runtime.type, "builtin")
-        self.assertEqual(definition.runtime.entrypoint, "normalize_storyboard_shots")
-        self.assertEqual(definition.health.type, "builtin")
+        self.assertEqual(definition.runtime.type, "python")
+        self.assertEqual(definition.runtime.entrypoint, "run.py")
+        self.assertEqual(definition.health.type, "none")
         self.assertEqual(definition.agent_node_eligibility, SkillAgentNodeEligibility.READY)
         self.assertEqual(definition.agent_node_blockers, [])
 
@@ -96,7 +98,7 @@ class SkillManifestContractTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            definition = _parse_native_skill_manifest(manifest, SkillSourceScope.GRAPHITE_MANAGED).definition
+            definition = _parse_native_skill_manifest(manifest, SkillSourceScope.INSTALLED).definition
 
         self.assertEqual(definition.agent_node_eligibility, SkillAgentNodeEligibility.INCOMPATIBLE)
         self.assertIn("Skill target does not include agent_node.", definition.agent_node_blockers)
@@ -118,20 +120,21 @@ class SkillManifestContractTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            definition = _parse_native_skill_manifest(manifest, SkillSourceScope.GRAPHITE_MANAGED).definition
+            definition = _parse_native_skill_manifest(manifest, SkillSourceScope.INSTALLED).definition
 
         self.assertEqual(definition.agent_node_eligibility, SkillAgentNodeEligibility.NEEDS_MANIFEST)
-        self.assertIn("Skill manifest is missing a builtin runtime entrypoint.", definition.agent_node_blockers)
+        self.assertIn("Skill manifest is missing a script runtime entrypoint.", definition.agent_node_blockers)
 
     def test_web_search_manifest_is_agent_and_companion_ready_with_network_permissions(self) -> None:
-        manifest = Path(__file__).resolve().parents[2] / "skill" / "graphite" / "web_search" / "skill.json"
+        manifest = Path(__file__).resolve().parents[2] / "skill" / "web_search" / "skill.json"
 
-        definition = _parse_native_skill_manifest(manifest, SkillSourceScope.GRAPHITE_MANAGED).definition
+        definition = _parse_native_skill_manifest(manifest, SkillSourceScope.INSTALLED).definition
 
         self.assertEqual(definition.skill_key, "web_search")
         self.assertIn(SkillTarget.AGENT_NODE, definition.targets)
         self.assertIn(SkillTarget.COMPANION, definition.targets)
-        self.assertEqual(definition.runtime.entrypoint, "web_search")
+        self.assertEqual(definition.runtime.type, "python")
+        self.assertEqual(definition.runtime.entrypoint, "run.py")
         self.assertEqual(definition.agent_node_eligibility, SkillAgentNodeEligibility.READY)
         self.assertIn("network", definition.permissions)
         self.assertIn(SkillSideEffect.NETWORK, definition.side_effects)

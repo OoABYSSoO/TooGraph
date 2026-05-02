@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import re
-from datetime import datetime
 from time import perf_counter
 from typing import Any, Callable
 
@@ -10,7 +8,6 @@ from app.core.runtime.agent_runtime_config import resolve_agent_runtime_config
 from app.core.runtime.agent_response_generation import generate_agent_response
 from app.core.runtime.condition_eval import evaluate_condition_rule, resolve_branch_key
 from app.core.runtime.input_boundary import coerce_input_boundary_value, first_truthy
-from app.core.runtime.knowledge_retrieval import retrieve_knowledge_base_context
 from app.core.runtime.reference_resolution import resolve_condition_source
 from app.core.runtime.skill_bindings import build_skill_inputs, map_skill_outputs, normalize_agent_skill_bindings
 from app.core.runtime.skill_invocation import callable_accepts_keyword, invoke_skill
@@ -19,12 +16,8 @@ from app.core.schemas.node_system import (
     NodeSystemConditionNode,
     NodeSystemInputNode,
     NodeSystemStateDefinition,
-    NodeSystemStateType,
 )
 from app.skills.registry import get_skill_registry
-
-KNOWLEDGE_BASE_SKILL_KEY = "search_knowledge_base"
-WEB_SEARCH_SKILL_KEY = "web_search"
 
 
 def execute_input_node(
@@ -85,9 +78,7 @@ def execute_agent_node(
     *,
     node_name: str,
     state: dict[str, Any],
-    knowledge_base_skill_key: str = KNOWLEDGE_BASE_SKILL_KEY,
     get_skill_registry_func: Callable[..., dict[str, Any]] = get_skill_registry,
-    retrieve_knowledge_base_context_func: Callable[..., dict[str, Any]] = retrieve_knowledge_base_context,
     invoke_skill_func: Callable[..., dict[str, Any]] = invoke_skill,
     resolve_agent_runtime_config_func: Callable[..., dict[str, Any]] = resolve_agent_runtime_config,
     build_agent_stream_delta_callback_func: Callable[..., Any] = build_agent_stream_delta_callback,
@@ -105,23 +96,6 @@ def execute_agent_node(
     warnings: list[str] = []
     runtime_config = resolve_agent_runtime_config_func(node)
 
-    knowledge_read = next(
-        (
-            binding.state
-            for binding in node.reads
-            if state_schema[binding.state].type == NodeSystemStateType.KNOWLEDGE_BASE
-        ),
-        None,
-    )
-    query_read = next(
-        (
-            binding.state
-            for binding in node.reads
-            if binding.state != knowledge_read and state_schema[binding.state].type in {NodeSystemStateType.TEXT, NodeSystemStateType.MARKDOWN}
-        ),
-        None,
-    )
-
     mapped_skill_outputs: dict[str, Any] = {}
     for binding in normalize_agent_skill_bindings(node):
         skill_key = binding.skill_key
@@ -130,21 +104,8 @@ def execute_agent_node(
             raise ValueError(f"Skill '{skill_key}' is not registered.")
 
         started_at = perf_counter()
-        if skill_key == knowledge_base_skill_key and not binding.input_mapping:
-            skill_inputs = {
-                "knowledge_base": input_values.get(knowledge_read) if knowledge_read else None,
-                "query": input_values.get(query_read) if query_read else None,
-            }
-            skill_result = retrieve_knowledge_base_context_func(
-                knowledge_base=skill_inputs.get("knowledge_base"),
-                query=skill_inputs.get("query"),
-                limit=3,
-            )
-        else:
-            skill_inputs = build_skill_inputs(binding, input_values)
-            if skill_key == WEB_SEARCH_SKILL_KEY:
-                skill_inputs = _with_default_web_search_query(skill_inputs, node)
-            skill_result = invoke_skill_func(skill_func, skill_inputs)
+        skill_inputs = build_skill_inputs(binding, input_values)
+        skill_result = invoke_skill_func(skill_func, skill_inputs)
         duration_ms = int((perf_counter() - started_at) * 1000)
         state_writes = map_skill_outputs(binding, skill_result)
         skill_status, skill_error = _resolve_skill_invocation_status(skill_key, skill_result)
@@ -212,100 +173,6 @@ def execute_agent_node(
         "warnings": list(dict.fromkeys(warnings)),
         "final_result": first_truthy_func(output_values.values()) or response_payload.get("summary") or "",
     }
-
-
-def _with_default_web_search_query(
-    skill_inputs: dict[str, Any],
-    node: NodeSystemAgentNode,
-) -> dict[str, Any]:
-    explicit_query = _compact_text(skill_inputs.get("query"))
-    if explicit_query:
-        return {**skill_inputs, "query": _enrich_time_sensitive_web_search_query(explicit_query)}
-
-    default_query = _build_web_search_query_from_instruction(node.config.task_instruction)
-    if not default_query:
-        for key in ("question", "input", "text", "prompt", "instruction"):
-            default_query = _compact_text(skill_inputs.get(key))
-            if default_query:
-                break
-
-    if not default_query:
-        text_values = [
-            _compact_text(value)
-            for value in skill_inputs.values()
-            if isinstance(value, str) and _compact_text(value)
-        ]
-        if len(text_values) == 1:
-            default_query = text_values[0]
-
-    if not default_query:
-        return skill_inputs
-
-    return {**skill_inputs, "query": _enrich_time_sensitive_web_search_query(default_query)}
-
-
-def _enrich_time_sensitive_web_search_query(query: str, *, now: datetime | None = None) -> str:
-    normalized_query = _compact_text(query)
-    if not normalized_query:
-        return ""
-    current_time = now.astimezone() if now is not None else datetime.now().astimezone()
-    current_date = current_time.date().isoformat()
-    if current_date in normalized_query:
-        return normalized_query
-    if not _looks_time_sensitive_query(normalized_query):
-        return normalized_query
-    return f"{normalized_query} {current_date}"
-
-
-def _looks_time_sensitive_query(query: str) -> bool:
-    query_lower = query.lower()
-    time_sensitive_terms = (
-        "今天",
-        "今日",
-        "现在",
-        "当前",
-        "最新",
-        "最近",
-        "近期",
-        "发布日期",
-        "发布时间",
-        "价格",
-        "新闻",
-        "版本",
-        "更新",
-        "today",
-        "current",
-        "latest",
-        "recent",
-        "release date",
-        "released",
-        "price",
-        "pricing",
-        "news",
-        "version",
-        "update",
-    )
-    return any(term in query_lower for term in time_sensitive_terms)
-
-
-def _build_web_search_query_from_instruction(instruction: Any) -> str:
-    query = _compact_text(instruction)
-    if not query:
-        return ""
-
-    query = re.sub(r"^(请|帮我|帮忙|麻烦你)\s*", "", query)
-    for prefix in ("联网搜索", "在线搜索", "网络搜索", "搜索一下", "搜索", "查询一下", "查询", "查一下", "查找"):
-        if query.startswith(prefix):
-            query = query[len(prefix) :].lstrip(" ，,。:：；;")
-            break
-
-    query = re.sub(
-        r"^(并|然后|再)?\s*(请|帮我|帮忙)?\s*(告知|告诉我|告诉|回答|说明|输出|总结|分析)\s*",
-        "",
-        query,
-    )
-    return _compact_text(query)
-
 
 def _resolve_skill_invocation_status(skill_key: str, skill_result: dict[str, Any]) -> tuple[str, str]:
     status = _compact_text(skill_result.get("status")).lower()

@@ -19,10 +19,6 @@ export async function fetchSkillFileContent(skillKey: string, path: string): Pro
   return apiGet<SkillFileContentResponse>(`/api/skills/${skillKey}/files/content?path=${encodeURIComponent(path)}`);
 }
 
-export async function importSkill(skillKey: string): Promise<SkillDefinition> {
-  return apiPost<SkillDefinition>(`/api/skills/${skillKey}/import`, null);
-}
-
 export async function importSkillUpload(files: File[], relativePaths: string[] = []): Promise<SkillDefinition> {
   const payload = new FormData();
   files.forEach((file) => {

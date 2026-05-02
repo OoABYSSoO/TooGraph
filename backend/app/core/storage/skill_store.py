@@ -13,26 +13,21 @@ from app.core.storage.json_file_utils import read_json_file, write_json_file
 
 
 ROOT_DIR = Path(__file__).resolve().parents[4]
-GRAPHITE_SKILLS_DIR = ROOT_DIR / "skill"
+SKILLS_DIR = ROOT_DIR / "skill"
 SKILL_STATE_PATH = SKILL_STATE_DATA_DIR / "registry_states.json"
 
 
-def graphite_managed_skill_path_for(skill_key: str) -> Path:
-    return GRAPHITE_SKILLS_DIR / "claude_code" / skill_key / "SKILL.md"
-
-
-def graphite_native_skill_path_for(skill_key: str) -> Path:
-    return GRAPHITE_SKILLS_DIR / "graphite" / skill_key / "skill.json"
+def skill_directory_for(skill_key: str) -> Path:
+    return SKILLS_DIR / skill_key
 
 
 def list_managed_skill_keys() -> set[str]:
-    claude_root = GRAPHITE_SKILLS_DIR / "claude_code"
-    graphite_root = GRAPHITE_SKILLS_DIR / "graphite"
     keys: set[str] = set()
-    if claude_root.exists():
-        keys.update(path.parent.name for path in claude_root.glob("*/SKILL.md"))
-    if graphite_root.exists():
-        keys.update(path.parent.name for path in graphite_root.glob("*/skill.json"))
+    if not SKILLS_DIR.exists():
+        return keys
+    for path in SKILLS_DIR.iterdir():
+        if path.is_dir() and ((path / "skill.json").is_file() or (path / "SKILL.md").is_file()):
+            keys.add(path.name)
     return keys
 
 
@@ -61,16 +56,11 @@ def clear_skill_status(skill_key: str) -> None:
 
 
 def delete_skill(skill_key: str) -> None:
-    for root in [
-        GRAPHITE_SKILLS_DIR / "claude_code" / skill_key,
-        GRAPHITE_SKILLS_DIR / "openclaw" / skill_key,
-        GRAPHITE_SKILLS_DIR / "codex" / skill_key,
-        GRAPHITE_SKILLS_DIR / "graphite" / skill_key,
-    ]:
-        if root.is_file():
-            root.unlink()
-        elif root.is_dir():
-            shutil.rmtree(root)
+    root = skill_directory_for(skill_key)
+    if root.is_file():
+        root.unlink()
+    elif root.is_dir():
+        shutil.rmtree(root)
     clear_skill_status(skill_key)
 
 
@@ -80,16 +70,6 @@ def disable_skill(skill_key: str) -> None:
 
 def enable_skill(skill_key: str) -> None:
     set_skill_status(skill_key, SkillCatalogStatus.ACTIVE)
-
-
-def import_skill_from_source(skill_key: str, source_path: str) -> Path:
-    source = Path(source_path)
-    destination = graphite_native_skill_path_for(skill_key) if source.name == "skill.json" else graphite_managed_skill_path_for(skill_key)
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    source_dir = source.parent if source.is_file() else source
-    shutil.copytree(source_dir, destination.parent, dirs_exist_ok=True)
-    enable_skill(skill_key)
-    return destination
 
 
 def extract_skill_archive(archive_path: Path, destination: Path) -> Path:
@@ -159,9 +139,7 @@ def _derive_skill_key(skill_file: Path) -> str:
 
 
 def _managed_skill_directory_for(skill_key: str, skill_file: Path) -> Path:
-    if skill_file.name == "skill.json":
-        return graphite_native_skill_path_for(skill_key).parent
-    return graphite_managed_skill_path_for(skill_key).parent
+    return skill_directory_for(skill_key)
 
 
 def _validate_skill_key(skill_key: str) -> str:

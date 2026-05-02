@@ -123,7 +123,7 @@ const presets: PresetDocument[] = [
         ],
         writes: [],
         config: {
-          skills: ["search_knowledge_base"],
+          skills: ["web_search"],
           taskInstruction: "",
           modelSource: "global",
           model: "",

@@ -110,11 +110,12 @@
   "supportedValueTypes": ["text", "markdown", "json"],
   "sideEffects": ["network", "secret_read"],
   "runtime": {
-    "type": "builtin",
-    "entrypoint": "web_search"
+    "type": "python",
+    "entrypoint": "run.py",
+    "timeoutSeconds": 30
   },
   "health": {
-    "type": "builtin"
+    "type": "none"
   },
   "configured": true,
   "healthy": true

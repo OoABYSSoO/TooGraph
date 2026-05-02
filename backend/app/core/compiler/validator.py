@@ -11,15 +11,11 @@ from app.core.schemas.node_system import (
     NodeSystemGraphEdge,
     NodeSystemInputNode,
     NodeSystemOutputNode,
-    NodeSystemStateType,
     ValidationIssue,
 )
 from app.core.schemas.skills import SkillAgentNodeEligibility, SkillCatalogStatus, SkillDefinition, SkillTarget
 from app.skills.definitions import get_skill_catalog_registry
 from app.skills.registry import get_skill_registry
-
-KNOWLEDGE_BASE_SKILL_KEY = "search_knowledge_base"
-
 
 def validate_graph(graph: NodeSystemGraphDocument) -> GraphValidationResponse:
     issues: list[ValidationIssue] = []
@@ -142,20 +138,6 @@ def _validate_agent_node(
     skill_catalog: dict[str, SkillDefinition],
 ) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
-    knowledge_reads = [
-        binding.state
-        for binding in node.reads
-        if state_schema.get(binding.state) and state_schema[binding.state].type == NodeSystemStateType.KNOWLEDGE_BASE
-    ]
-    if len(knowledge_reads) > 1:
-        issues.append(
-            ValidationIssue(
-                code="agent_multiple_knowledge_base_inputs",
-                message=f"Agent node '{node_name}' can read at most one knowledge base state.",
-                path=f"nodes.{node_name}.reads",
-            )
-        )
-
     skill_refs = _iter_agent_skill_refs(node_name, node)
     for skill_key, skill_path in skill_refs:
         definition = skill_catalog.get(skill_key)
@@ -229,8 +211,7 @@ def _validate_agent_node(
                 )
             )
 
-        runtime_entrypoint = definition.runtime.entrypoint or skill_key
-        if runtime_entrypoint not in runtime_skill_keys or not definition.runtime_registered:
+        if skill_key not in runtime_skill_keys or not definition.runtime_registered:
             issues.append(
                 ValidationIssue(
                     code="agent_skill_not_runtime_registered",
@@ -241,48 +222,6 @@ def _validate_agent_node(
                     path=skill_path,
                 )
             )
-
-    knowledge_skill_count = sum(1 for skill_key, _path in skill_refs if skill_key == KNOWLEDGE_BASE_SKILL_KEY)
-    if knowledge_reads:
-        if knowledge_skill_count != 1:
-            issues.append(
-                ValidationIssue(
-                    code="agent_knowledge_skill_missing",
-                    message=(
-                        f"Agent node '{node_name}' reads a knowledge base state, but must attach exactly one "
-                        f"'{KNOWLEDGE_BASE_SKILL_KEY}' skill."
-                    ),
-                    path=f"nodes.{node_name}.config.skills",
-                )
-            )
-
-        query_reads = [
-            binding.state
-            for binding in node.reads
-            if binding.state not in knowledge_reads
-            and state_schema.get(binding.state)
-            and state_schema[binding.state].type in {NodeSystemStateType.TEXT, NodeSystemStateType.MARKDOWN}
-        ]
-        if not query_reads:
-            issues.append(
-                ValidationIssue(
-                    code="agent_knowledge_query_input_missing",
-                    message=(
-                        f"Agent node '{node_name}' reads a knowledge base state, but has no text-like state to use as the query."
-                    ),
-                    path=f"nodes.{node_name}.reads",
-                )
-            )
-    elif knowledge_skill_count:
-        issues.append(
-            ValidationIssue(
-                code="agent_knowledge_skill_without_binding",
-                message=(
-                    f"Agent node '{node_name}' attaches '{KNOWLEDGE_BASE_SKILL_KEY}', but no knowledge base state is bound."
-                ),
-                path=f"nodes.{node_name}.config.skills",
-            )
-        )
 
     issues.extend(_validate_agent_skill_bindings(node_name, node, state_schema, skill_catalog))
 

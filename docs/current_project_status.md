@@ -60,8 +60,9 @@
 ### 知识库与技能
 
 - knowledge base 可以通过 input 节点进入图。
-- agent 读取 knowledge base state 时会同步显式挂载 `search_knowledge_base`。
-- skills definitions 与 knowledge base catalog 都有真实接口。
+- agent 读取 knowledge base state 不再隐式挂载内置知识库 skill；检索能力需要以 `skill/<skill_key>` 文件夹加 `skill.json` manifest 的形式显式安装和绑定。
+- skills catalog/definitions 与 knowledge base catalog 都有真实接口。
+- 当前默认 skill 只保留 `web_search`，运行逻辑位于 `skill/web_search` 文件夹内，由 manifest 驱动的通用脚本运行器执行。
 - GraphiteUI / Python / LangGraph 三套正式知识库都能导入并检索。
 
 ## 当前技术栈

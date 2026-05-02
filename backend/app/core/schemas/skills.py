@@ -18,15 +18,11 @@ class SkillSideEffect(str, Enum):
 
 
 class SkillSourceFormat(str, Enum):
-    GRAPHITE = "graphite_definition"
-    CLAUDE_CODE = "claude_code"
-    OPENCLAW = "openclaw"
-    CODEX = "codex"
+    SKILL = "skill"
 
 
 class SkillSourceScope(str, Enum):
-    GRAPHITE_MANAGED = "graphite_managed"
-    EXTERNAL = "external"
+    INSTALLED = "installed"
 
 
 class SkillTarget(str, Enum):
@@ -80,14 +76,16 @@ class SkillIoField(BaseModel):
 
 
 class SkillRuntimeSpec(BaseModel):
-    type: str = "builtin"
+    type: str = "none"
     entrypoint: str = ""
+    command: list[str] = Field(default_factory=list)
+    timeout_seconds: float = Field(default=30.0, alias="timeoutSeconds")
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
 
 class SkillHealthSpec(BaseModel):
-    type: str = "builtin"
+    type: str = "none"
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
@@ -114,8 +112,8 @@ class SkillDefinition(BaseModel):
         alias="agentNodeEligibility",
     )
     agent_node_blockers: list[str] = Field(default_factory=list, alias="agentNodeBlockers")
-    source_format: SkillSourceFormat = Field(default=SkillSourceFormat.GRAPHITE, alias="sourceFormat")
-    source_scope: SkillSourceScope = Field(default=SkillSourceScope.GRAPHITE_MANAGED, alias="sourceScope")
+    source_format: SkillSourceFormat = Field(default=SkillSourceFormat.SKILL, alias="sourceFormat")
+    source_scope: SkillSourceScope = Field(default=SkillSourceScope.INSTALLED, alias="sourceScope")
     source_path: str = Field(default="", alias="sourcePath")
     runtime_ready: bool = Field(default=False, alias="runtimeReady")
     runtime_registered: bool = Field(default=False, alias="runtimeRegistered")
@@ -123,7 +121,6 @@ class SkillDefinition(BaseModel):
     healthy: bool = True
     status: SkillCatalogStatus = Field(default=SkillCatalogStatus.ACTIVE)
     can_manage: bool = Field(default=False, alias="canManage")
-    can_import: bool = Field(default=False, alias="canImport")
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 

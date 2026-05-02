@@ -79,7 +79,6 @@ function createRun(overrides: Partial<RunDetail> = {}): RunDetail {
     selected_skills: [],
     skill_outputs: [],
     evaluation_result: {},
-    knowledge_summary: "",
     memory_summary: "",
     final_result: "# Answer\n\nPersist me.",
     node_status_map: {},

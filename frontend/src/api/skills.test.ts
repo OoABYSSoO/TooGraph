@@ -7,7 +7,6 @@ import {
   fetchSkillFileContent,
   fetchSkillFiles,
   fetchSkillDefinitions,
-  importSkill,
   importSkillUpload,
   updateSkillStatus,
 } from "./skills.ts";
@@ -22,9 +21,9 @@ test("fetchSkillDefinitions requests the skill definitions endpoint", async () =
     return new Response(
       JSON.stringify([
         {
-          skillKey: "search_knowledge_base",
-          label: "Search Knowledge Base",
-          description: "Searches imported knowledge bases.",
+          skillKey: "web_search",
+          label: "Web Search",
+          description: "Searches the web.",
           schemaVersion: "graphite.skill/v1",
           inputSchema: [
             {
@@ -32,40 +31,39 @@ test("fetchSkillDefinitions requests the skill definitions endpoint", async () =
               label: "Query",
               valueType: "text",
               required: true,
-              description: "Knowledge lookup query.",
+              description: "Web search query.",
             },
           ],
           outputSchema: [
             {
-              key: "results",
-              label: "Results",
+              key: "summary",
+              label: "Summary",
               valueType: "json",
               required: true,
-              description: "Search result set.",
+              description: "Search result summary.",
             },
           ],
-          supportedValueTypes: ["text", "knowledge_base"],
-          sideEffects: ["knowledge_read"],
+          supportedValueTypes: ["text", "json"],
+          sideEffects: ["network"],
           version: "1.0.0",
           targets: ["agent_node"],
           kind: "atomic",
           mode: "tool",
           scope: "node",
-          permissions: ["knowledge_read"],
-          runtime: { type: "builtin", entrypoint: "search_knowledge_base" },
-          health: { type: "builtin" },
+          permissions: ["network"],
+          runtime: { type: "python", entrypoint: "run.py" },
+          health: { type: "none" },
           agentNodeEligibility: "ready",
           agentNodeBlockers: [],
-          sourceFormat: "graphite_definition",
-          sourceScope: "graphite_managed",
-          sourcePath: "/skills/search_knowledge_base",
+          sourceFormat: "skill",
+          sourceScope: "installed",
+          sourcePath: "/skills/web_search/skill.json",
           runtimeReady: true,
           runtimeRegistered: true,
           configured: true,
           healthy: true,
           status: "active",
           canManage: true,
-          canImport: false,
         },
       ]),
       {
@@ -82,9 +80,9 @@ test("fetchSkillDefinitions requests the skill definitions endpoint", async () =
   assert.equal(requestedUrl, "/api/skills/definitions");
   assert.deepEqual(skillDefinitions, [
     {
-      skillKey: "search_knowledge_base",
-      label: "Search Knowledge Base",
-      description: "Searches imported knowledge bases.",
+      skillKey: "web_search",
+      label: "Web Search",
+      description: "Searches the web.",
       schemaVersion: "graphite.skill/v1",
       inputSchema: [
         {
@@ -92,40 +90,39 @@ test("fetchSkillDefinitions requests the skill definitions endpoint", async () =
           label: "Query",
           valueType: "text",
           required: true,
-          description: "Knowledge lookup query.",
+          description: "Web search query.",
         },
       ],
       outputSchema: [
         {
-          key: "results",
-          label: "Results",
+          key: "summary",
+          label: "Summary",
           valueType: "json",
           required: true,
-          description: "Search result set.",
+          description: "Search result summary.",
         },
       ],
-      supportedValueTypes: ["text", "knowledge_base"],
-      sideEffects: ["knowledge_read"],
+      supportedValueTypes: ["text", "json"],
+      sideEffects: ["network"],
       version: "1.0.0",
       targets: ["agent_node"],
       kind: "atomic",
       mode: "tool",
       scope: "node",
-      permissions: ["knowledge_read"],
-      runtime: { type: "builtin", entrypoint: "search_knowledge_base" },
-      health: { type: "builtin" },
+      permissions: ["network"],
+      runtime: { type: "python", entrypoint: "run.py" },
+      health: { type: "none" },
       agentNodeEligibility: "ready",
       agentNodeBlockers: [],
-      sourceFormat: "graphite_definition",
-      sourceScope: "graphite_managed",
-      sourcePath: "/skills/search_knowledge_base",
+      sourceFormat: "skill",
+      sourceScope: "installed",
+      sourcePath: "/skills/web_search/skill.json",
       runtimeReady: true,
       runtimeRegistered: true,
       configured: true,
       healthy: true,
       status: "active",
       canManage: true,
-      canImport: false,
     },
   ]);
 
@@ -214,7 +211,7 @@ test("skill file helpers request tree and content endpoints", async () => {
   }
 });
 
-test("skill management helpers call import, status, and delete endpoints", async () => {
+test("skill management helpers call status and delete endpoints", async () => {
   const requests: Array<{ url: string; method: string | undefined; body: string | null }> = [];
 
   globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
@@ -232,13 +229,11 @@ test("skill management helpers call import, status, and delete endpoints", async
   }) as typeof fetch;
 
   try {
-    await importSkill("rewrite_text");
     await updateSkillStatus("rewrite_text", "disabled");
     await updateSkillStatus("rewrite_text", "active");
     await deleteSkill("rewrite_text");
 
     assert.deepEqual(requests, [
-      { url: "/api/skills/rewrite_text/import", method: "POST", body: "null" },
       { url: "/api/skills/rewrite_text/disable", method: "POST", body: "null" },
       { url: "/api/skills/rewrite_text/enable", method: "POST", body: "null" },
       { url: "/api/skills/rewrite_text", method: "DELETE", body: null },

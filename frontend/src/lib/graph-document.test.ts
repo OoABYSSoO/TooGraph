@@ -240,7 +240,7 @@ test("cloneGraphDocument accepts Vue reactive graph documents", () => {
 });
 
 test("cloneGraphDocument unwraps nested reactive arrays inside graph documents", () => {
-  const reactiveSkills = reactive(["search_knowledge_base"]) as unknown as string[];
+  const reactiveSkills = reactive(["web_search"]) as unknown as string[];
   const graph: GraphDocument = {
     graph_id: "graph_nested_reactive",
     name: "Nested Reactive",
@@ -284,7 +284,7 @@ test("cloneGraphDocument unwraps nested reactive arrays inside graph documents",
 
   assert.equal(clonedNode.kind, "agent");
   assert.equal(reactiveNode.kind, "agent");
-  assert.deepEqual(clonedNode.config.skills, ["search_knowledge_base"]);
+  assert.deepEqual(clonedNode.config.skills, ["web_search"]);
   assert.notEqual(clonedNode.config.skills, reactiveNode.config.skills);
 });
 
@@ -1611,9 +1611,7 @@ test("updateNodeMetadataInDocument patches node name and description immutably",
   assert.equal(document.nodes.answer_helper.description, "Answer the question directly.");
 });
 
-test("syncKnowledgeBaseSkillsInDocument derives search_knowledge_base from agent knowledge bindings", () => {
-  assert.equal(typeof graphDocument.syncKnowledgeBaseSkillsInDocument, "function");
-
+test("connectStateBindingInDocument does not rewrite agent skills for knowledge-base states", () => {
   const document: GraphPayload = {
     graph_id: null,
     name: "Knowledge Agent Graph",
@@ -1634,18 +1632,24 @@ test("syncKnowledgeBaseSkillsInDocument derives search_knowledge_base from agent
       },
     },
     nodes: {
+      input_kb: {
+        kind: "input",
+        name: "input_kb",
+        description: "",
+        ui: { position: { x: -160, y: 0 } },
+        reads: [],
+        writes: [{ state: "kb", mode: "replace" }],
+        config: { value: "" },
+      },
       research_helper: {
         kind: "agent",
         name: "research_helper",
         description: "Answer with workspace knowledge.",
         ui: { position: { x: 0, y: 0 } },
-        reads: [
-          { state: "kb", required: true },
-          { state: "question", required: true },
-        ],
+        reads: [{ state: "question", required: true }],
         writes: [],
         config: {
-          skills: ["markdown_formatter"],
+          skills: ["markdown_formatter", "custom_retrieval"],
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -1659,129 +1663,20 @@ test("syncKnowledgeBaseSkillsInDocument derives search_knowledge_base from agent
     metadata: {},
   };
 
-  const nextDocument = graphDocument.syncKnowledgeBaseSkillsInDocument(document);
+  const nextDocument = graphDocument.connectStateBindingInDocument(
+    document,
+    "input_kb",
+    "kb",
+    "research_helper",
+    CREATE_AGENT_INPUT_STATE_KEY,
+  );
 
   assert.notEqual(nextDocument, document);
   assert.equal(nextDocument.nodes.research_helper.kind, "agent");
-  assert.equal(document.nodes.research_helper.kind, "agent");
   if (nextDocument.nodes.research_helper.kind !== "agent") {
     throw new Error("Expected research_helper to remain an agent node");
   }
-  if (document.nodes.research_helper.kind !== "agent") {
-    throw new Error("Expected research_helper to remain an agent node");
-  }
-  assert.deepEqual(nextDocument.nodes.research_helper.config.skills, ["markdown_formatter", "search_knowledge_base"]);
-  assert.deepEqual(document.nodes.research_helper.config.skills, ["markdown_formatter"]);
-});
-
-test("syncKnowledgeBaseSkillsInDocument prunes search_knowledge_base when agent no longer has a usable knowledge query", () => {
-  assert.equal(typeof graphDocument.syncKnowledgeBaseSkillsInDocument, "function");
-
-  const missingQueryDocument: GraphPayload = {
-    graph_id: null,
-    name: "Knowledge Agent No Query Graph",
-    state_schema: {
-      kb: {
-        name: "kb",
-        description: "Workspace knowledge base",
-        type: "knowledge_base",
-        value: "",
-        color: "#2563eb",
-      },
-    },
-    nodes: {
-      research_helper: {
-        kind: "agent",
-        name: "research_helper",
-        description: "Answer with workspace knowledge.",
-        ui: { position: { x: 0, y: 0 } },
-        reads: [{ state: "kb", required: true }],
-        writes: [],
-        config: {
-          skills: ["markdown_formatter", "search_knowledge_base"],
-          taskInstruction: "",
-          modelSource: "global",
-          model: "",
-          thinkingMode: "on",
-          temperature: 0.2,
-        },
-      },
-    },
-    edges: [],
-    conditional_edges: [],
-    metadata: {},
-  };
-
-  const nextMissingQueryDocument = graphDocument.syncKnowledgeBaseSkillsInDocument(missingQueryDocument);
-
-  assert.notEqual(nextMissingQueryDocument, missingQueryDocument);
-  assert.equal(nextMissingQueryDocument.nodes.research_helper.kind, "agent");
-  if (nextMissingQueryDocument.nodes.research_helper.kind !== "agent") {
-    throw new Error("Expected research_helper to remain an agent node");
-  }
-  assert.deepEqual(nextMissingQueryDocument.nodes.research_helper.config.skills, ["markdown_formatter"]);
-
-  const multiKnowledgeDocument: GraphPayload = {
-    graph_id: null,
-    name: "Knowledge Agent Multi KB Graph",
-    state_schema: {
-      question: {
-        name: "question",
-        description: "User question",
-        type: "text",
-        value: "",
-        color: "#d97706",
-      },
-      kb_primary: {
-        name: "kb_primary",
-        description: "Primary knowledge base",
-        type: "knowledge_base",
-        value: "",
-        color: "#2563eb",
-      },
-      kb_secondary: {
-        name: "kb_secondary",
-        description: "Secondary knowledge base",
-        type: "knowledge_base",
-        value: "",
-        color: "#1d4ed8",
-      },
-    },
-    nodes: {
-      research_helper: {
-        kind: "agent",
-        name: "research_helper",
-        description: "Answer with workspace knowledge.",
-        ui: { position: { x: 0, y: 0 } },
-        reads: [
-          { state: "question", required: true },
-          { state: "kb_primary", required: true },
-          { state: "kb_secondary", required: false },
-        ],
-        writes: [],
-        config: {
-          skills: ["search_knowledge_base"],
-          taskInstruction: "",
-          modelSource: "global",
-          model: "",
-          thinkingMode: "on",
-          temperature: 0.2,
-        },
-      },
-    },
-    edges: [],
-    conditional_edges: [],
-    metadata: {},
-  };
-
-  const nextMultiKnowledgeDocument = graphDocument.syncKnowledgeBaseSkillsInDocument(multiKnowledgeDocument);
-
-  assert.notEqual(nextMultiKnowledgeDocument, multiKnowledgeDocument);
-  assert.equal(nextMultiKnowledgeDocument.nodes.research_helper.kind, "agent");
-  if (nextMultiKnowledgeDocument.nodes.research_helper.kind !== "agent") {
-    throw new Error("Expected research_helper to remain an agent node");
-  }
-  assert.deepEqual(nextMultiKnowledgeDocument.nodes.research_helper.config.skills, []);
+  assert.deepEqual(nextDocument.nodes.research_helper.config.skills, ["markdown_formatter", "custom_retrieval"]);
 });
 
 test("updateConditionNodeConfigInDocument patches condition config immutably and normalizes loop limits", () => {

@@ -11,16 +11,16 @@ import type { SkillDefinition } from "../../types/skills.ts";
 
 const skillDefinitions: SkillDefinition[] = [
   {
-    skillKey: "search_knowledge_base",
-    label: "Search Knowledge Base",
-    description: "Searches imported knowledge bases.",
+    skillKey: "web_search",
+    label: "Web Search",
+    description: "Searches the public web.",
     schemaVersion: "graphite.skill/v1",
     inputSchema: [],
     outputSchema: [],
-    supportedValueTypes: ["text", "knowledge_base"],
-    sideEffects: ["knowledge_read"],
-    runtime: { type: "builtin", entrypoint: "search_knowledge_base" },
-    health: { type: "builtin" },
+    supportedValueTypes: ["text", "json"],
+    sideEffects: ["network"],
+    runtime: { type: "python", entrypoint: "run.py" },
+    health: { type: "none" },
     agentNodeEligibility: "ready",
     agentNodeBlockers: [],
     version: "1.0.0",
@@ -28,17 +28,16 @@ const skillDefinitions: SkillDefinition[] = [
     kind: "atomic",
     mode: "tool",
     scope: "node",
-    permissions: ["knowledge_read"],
-    sourceFormat: "graphite_definition",
-    sourceScope: "graphite_managed",
-    sourcePath: "/skills/search_knowledge_base",
+    permissions: ["network"],
+    sourceFormat: "skill",
+    sourceScope: "installed",
+    sourcePath: "/skills/web_search/skill.json",
     runtimeReady: true,
     runtimeRegistered: true,
     configured: true,
     healthy: true,
     status: "active",
     canManage: true,
-    canImport: false,
   },
   {
     skillKey: "append_usage_introduction",
@@ -49,8 +48,8 @@ const skillDefinitions: SkillDefinition[] = [
     outputSchema: [],
     supportedValueTypes: ["text"],
     sideEffects: ["none"],
-    runtime: { type: "builtin", entrypoint: "append_usage_introduction" },
-    health: { type: "builtin" },
+    runtime: { type: "python", entrypoint: "run.py" },
+    health: { type: "none" },
     agentNodeEligibility: "ready",
     agentNodeBlockers: [],
     version: "1.0.0",
@@ -59,16 +58,15 @@ const skillDefinitions: SkillDefinition[] = [
     mode: "tool",
     scope: "node",
     permissions: [],
-    sourceFormat: "graphite_definition",
-    sourceScope: "graphite_managed",
-    sourcePath: "/skills/append_usage_introduction",
+    sourceFormat: "skill",
+    sourceScope: "installed",
+    sourcePath: "/skills/append_usage_introduction/skill.json",
     runtimeReady: true,
     runtimeRegistered: true,
     configured: true,
     healthy: true,
     status: "active",
     canManage: true,
-    canImport: false,
   },
 ];
 
@@ -112,13 +110,13 @@ const unavailableSkillDefinitions: SkillDefinition[] = [
     skillKey: "needs_manifest",
     label: "Needs Manifest",
     agentNodeEligibility: "needs_manifest",
-    agentNodeBlockers: ["Skill manifest is missing a builtin runtime entrypoint."],
+    agentNodeBlockers: ["Skill manifest is missing a script runtime entrypoint."],
   },
 ];
 
 test("listAttachableSkillDefinitions filters already attached skill keys", () => {
   assert.deepEqual(
-    listAttachableSkillDefinitions(skillDefinitions, ["search_knowledge_base"]),
+    listAttachableSkillDefinitions(skillDefinitions, ["web_search"]),
     [skillDefinitions[1]],
   );
 });
@@ -126,7 +124,7 @@ test("listAttachableSkillDefinitions filters already attached skill keys", () =>
 test("listAttachableSkillDefinitions only exposes active healthy agent runtime skills", () => {
   assert.deepEqual(
     listAttachableSkillDefinitions(unavailableSkillDefinitions, []).map((definition) => definition.skillKey),
-    ["search_knowledge_base"],
+    ["web_search"],
   );
 });
 
@@ -149,15 +147,15 @@ test("resolveAttachedSkillBadges preserves attached order and falls back to raw 
 });
 
 test("resolveAttachAgentSkillPatch appends new skills and ignores duplicates", () => {
-  assert.deepEqual(resolveAttachAgentSkillPatch(["search_knowledge_base"], "append_usage_introduction"), {
-    skills: ["search_knowledge_base", "append_usage_introduction"],
+  assert.deepEqual(resolveAttachAgentSkillPatch(["web_search"], "append_usage_introduction"), {
+    skills: ["web_search", "append_usage_introduction"],
   });
-  assert.equal(resolveAttachAgentSkillPatch(["search_knowledge_base"], "search_knowledge_base"), null);
+  assert.equal(resolveAttachAgentSkillPatch(["web_search"], "web_search"), null);
 });
 
 test("resolveRemoveAgentSkillPatch removes existing skills and ignores missing keys", () => {
-  assert.deepEqual(resolveRemoveAgentSkillPatch(["search_knowledge_base", "append_usage_introduction"], "search_knowledge_base"), {
+  assert.deepEqual(resolveRemoveAgentSkillPatch(["web_search", "append_usage_introduction"], "web_search"), {
     skills: ["append_usage_introduction"],
   });
-  assert.equal(resolveRemoveAgentSkillPatch(["search_knowledge_base"], "append_usage_introduction"), null);
+  assert.equal(resolveRemoveAgentSkillPatch(["web_search"], "append_usage_introduction"), null);
 });

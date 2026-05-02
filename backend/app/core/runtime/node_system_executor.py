@@ -53,7 +53,6 @@ from app.core.runtime.output_boundaries import (
     collect_output_boundaries,
     execute_output_node as _execute_output_node,
 )
-from app.core.runtime.knowledge_retrieval import retrieve_knowledge_base_context
 from app.core.runtime.reference_resolution import (
     read_path as _read_path,
     resolve_condition_source as _resolve_condition_source,
@@ -61,7 +60,6 @@ from app.core.runtime.reference_resolution import (
 )
 from app.core.runtime.run_artifacts import (
     append_run_snapshot,
-    build_knowledge_summary as _build_knowledge_summary,
     refresh_run_artifacts as _refresh_run_artifacts,
 )
 from app.core.runtime.run_progress import persist_run_progress
@@ -98,9 +96,6 @@ from app.tools.local_llm import (
 )
 from app.core.thinking_levels import normalize_thinking_level, resolve_effective_thinking_level
 from app.tools.model_provider_client import chat_with_model_ref_with_meta
-
-KNOWLEDGE_BASE_SKILL_KEY = "search_knowledge_base"
-
 
 def _persist_run_progress(
     state: dict[str, Any],
@@ -174,9 +169,7 @@ def _execute_agent_node(
         graph_context,
         node_name=node_name,
         state=state,
-        knowledge_base_skill_key=KNOWLEDGE_BASE_SKILL_KEY,
         get_skill_registry_func=get_skill_registry,
-        retrieve_knowledge_base_context_func=retrieve_knowledge_base_context,
         invoke_skill_func=_invoke_skill,
         resolve_agent_runtime_config_func=_resolve_agent_runtime_config,
         build_agent_stream_delta_callback_func=_build_agent_stream_delta_callback,

@@ -36,20 +36,6 @@ def _load_hello_world_graph() -> NodeSystemGraphPayload:
     )
 
 
-def _load_knowledge_base_validation_graph() -> NodeSystemGraphPayload:
-    template = NodeSystemTemplate.model_validate(load_template_record("knowledge_base_validation"))
-    return NodeSystemGraphPayload.model_validate(
-        {
-            "name": template.default_graph_name,
-            "state_schema": template.state_schema,
-            "nodes": template.nodes,
-            "edges": template.edges,
-            "conditional_edges": template.conditional_edges,
-            "metadata": template.metadata,
-        }
-    )
-
-
 def _load_conditional_edge_validation_graph() -> NodeSystemGraphPayload:
     template = NodeSystemTemplate.model_validate(load_template_record("conditional_edge_validation"))
     return NodeSystemGraphPayload.model_validate(
@@ -108,7 +94,7 @@ def _load_web_research_loop_graph() -> NodeSystemGraphPayload:
 
 def _fake_skill_registry(*, include_disabled: bool = False):
     _ = include_disabled
-    return {"search_knowledge_base": object(), "web_search": object()}
+    return {"web_search": object()}
 
 
 def _fake_invoke_skill(skill_func, skill_inputs):
@@ -175,34 +161,6 @@ def _fake_generate_agent_response_no_change(node, input_values, skill_context, r
         for binding in node.writes
     }
     return outputs, "", [], runtime_config
-
-
-def _fake_retrieve_knowledge_base_context(*, knowledge_base, query, limit=3):
-    return {
-        "knowledge_base": knowledge_base or "graphiteui-official",
-        "query": query or "",
-        "result_count": min(int(limit or 3), 1),
-        "context": "stubbed knowledge context",
-        "results": [
-            {
-                "title": "Stub Document",
-                "section": "Overview",
-                "summary": "Stub summary",
-                "source": "stub://graphiteui",
-                "url": "stub://graphiteui",
-                "score": 1.0,
-            }
-        ],
-        "citations": [
-            {
-                "index": 1,
-                "title": "Stub Document",
-                "section": "Overview",
-                "source": "stub://graphiteui",
-                "url": "stub://graphiteui",
-            }
-        ],
-    }
 
 
 def _build_cycle_graph() -> NodeSystemGraphPayload:
@@ -491,11 +449,6 @@ class LangGraphMigrationTests(unittest.TestCase):
         self.assertEqual(result["state_snapshot"]["values"][name_key], "人工确认后的名称")
         self.assertEqual(result["state_snapshot"]["values"][greeting_key], "greeting_agent:人工确认后的名称")
         self.assertNotIn("pending_interrupt_nodes", result.get("metadata", {}))
-
-    def test_knowledge_base_validation_template_still_valid(self):
-        graph = _load_knowledge_base_validation_graph()
-        validation = validate_graph(graph)
-        self.assertTrue(validation.valid, validation.model_dump())
 
     def test_conditional_edge_validation_template_still_valid(self):
         graph = _load_conditional_edge_validation_graph()
@@ -1024,11 +977,6 @@ class LangGraphMigrationTests(unittest.TestCase):
             "读取输入 counter，并严格只返回 JSON：{\"counter\": 当前 counter + 1}。不要输出任何解释。",
         )
 
-    def test_knowledge_base_validation_has_no_langgraph_support_issues(self):
-        graph = _load_knowledge_base_validation_graph()
-        reasons = get_langgraph_runtime_unsupported_reasons(graph)
-        self.assertEqual(reasons, [])
-
     @patch("app.core.runtime.node_system_executor._generate_agent_response", _fake_generate_agent_response)
     @patch("app.core.runtime.node_system_executor._invoke_skill", _fake_invoke_skill)
     @patch("app.core.runtime.node_system_executor.get_skill_registry", _fake_skill_registry)
@@ -1320,24 +1268,6 @@ class LangGraphMigrationTests(unittest.TestCase):
         self.assertEqual(state["cycle_summary"]["stop_reason"], "empty_iteration")
         self.assertEqual(state["cycle_summary"]["iteration_count"], 2)
         self.assertEqual(state["cycle_iterations"][-1]["stop_reason"], "empty_iteration")
-
-    @patch("app.core.langgraph.runtime.save_run", lambda state: None)
-    @patch("app.core.runtime.node_system_executor.save_run", lambda state: None)
-    @patch("app.core.runtime.node_system_executor._generate_agent_response", _fake_generate_agent_response)
-    @patch("app.core.runtime.node_system_executor.retrieve_knowledge_base_context", _fake_retrieve_knowledge_base_context)
-    def test_knowledge_base_validation_langgraph_runtime(self):
-        graph = _load_knowledge_base_validation_graph()
-        answer_key = _state_key_by_name(graph, "answer")
-        result = execute_node_system_graph_langgraph(graph, persist_progress=False)
-
-        self.assertEqual(result["status"], "completed")
-        self.assertEqual(result["runtime_backend"], "langgraph")
-        self.assertEqual(len(result["node_executions"]), 1)
-        self.assertEqual({item["node_type"] for item in result["node_executions"]}, {"agent"})
-        self.assertIn("search_knowledge_base", result["selected_skills"])
-        self.assertEqual(len(result["skill_outputs"]), 1)
-        self.assertTrue(result["knowledge_summary"])
-        self.assertIn(answer_key, result["state_snapshot"]["values"])
 
     @patch("app.core.langgraph.runtime.save_run", lambda state: None)
     @patch("app.core.runtime.node_system_executor.save_run", lambda state: None)

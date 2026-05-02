@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import os
+import sys
 from datetime import datetime
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
@@ -20,6 +22,7 @@ def web_search_skill(**skill_inputs: Any) -> dict[str, Any]:
     query = _compact_text(skill_inputs.get("query"))
     if not query:
         return _empty_response(query=query, status="failed", error="Search query is required.")
+    query = _enrich_time_sensitive_web_search_query(query)
 
     max_results = _parse_int(skill_inputs.get("max_results"), default=DEFAULT_MAX_RESULTS, minimum=1, maximum=MAX_RESULTS)
     search_depth = _parse_search_depth(skill_inputs.get("search_depth"))
@@ -230,6 +233,50 @@ def _parse_float(value: object, *, default: float) -> float:
     return parsed if parsed > 0 else default
 
 
+def _enrich_time_sensitive_web_search_query(query: str, *, now: datetime | None = None) -> str:
+    normalized_query = _compact_text(query)
+    if not normalized_query:
+        return ""
+    current_time = now.astimezone() if now is not None else datetime.now().astimezone()
+    current_date = current_time.date().isoformat()
+    if current_date in normalized_query:
+        return normalized_query
+    if not _looks_time_sensitive_query(normalized_query):
+        return normalized_query
+    return f"{normalized_query} {current_date}"
+
+
+def _looks_time_sensitive_query(query: str) -> bool:
+    query_lower = query.lower()
+    time_sensitive_terms = (
+        "今天",
+        "今日",
+        "现在",
+        "当前",
+        "最新",
+        "最近",
+        "近期",
+        "发布日期",
+        "发布时间",
+        "价格",
+        "新闻",
+        "版本",
+        "更新",
+        "today",
+        "current",
+        "latest",
+        "recent",
+        "release date",
+        "released",
+        "price",
+        "pricing",
+        "news",
+        "version",
+        "update",
+    )
+    return any(term in query_lower for term in time_sensitive_terms)
+
+
 def _compact_text(value: object) -> str:
     if value is None:
         return ""
@@ -248,3 +295,18 @@ def _resolve_duckduckgo_url(href: str) -> str:
         target = parse_qs(parsed.query).get("uddg", [""])[0]
         return unquote(target)
     return href
+
+
+def main() -> None:
+    try:
+        payload = json.loads(sys.stdin.read() or "{}")
+    except json.JSONDecodeError as exc:
+        payload = {"query": "", "error": f"Invalid JSON input: {exc}"}
+    if not isinstance(payload, dict):
+        payload = {"query": "", "error": "Skill input must be a JSON object."}
+    result = web_search_skill(**payload)
+    print(json.dumps(result, ensure_ascii=False))
+
+
+if __name__ == "__main__":
+    main()

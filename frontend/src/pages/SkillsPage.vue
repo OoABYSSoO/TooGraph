@@ -133,20 +133,10 @@
                 <span v-if="!selectedSkill.configured" class="skills-page__status-warning">{{ t("skills.notConfigured") }}</span>
                 <span v-if="!selectedSkill.healthy" class="skills-page__status-warning">{{ t("skills.unhealthy") }}</span>
                 <span v-if="selectedSkill.canManage">{{ t("skills.manageable") }}</span>
-                <span v-if="selectedSkill.canImport">{{ t("skills.importable") }}</span>
               </div>
             </header>
 
             <div class="skills-page__actions" :aria-label="t('skills.actions')">
-              <button
-                v-if="selectedSkill.canImport"
-                type="button"
-                class="skills-page__action"
-                :disabled="actionSkillKey === selectedSkill.skillKey"
-                @click="importSkillIntoCatalog(selectedSkill)"
-              >
-                {{ t("skills.import") }}
-              </button>
               <button
                 v-if="selectedSkill.canManage"
                 type="button"
@@ -309,7 +299,6 @@ import {
   fetchSkillCatalog,
   fetchSkillFileContent,
   fetchSkillFiles,
-  importSkill,
   importSkillUpload,
   updateSkillStatus,
 } from "@/api/skills";
@@ -402,19 +391,6 @@ function selectSkill(skillKey: string) {
 
 function enabledToggleLabel(skill: SkillDefinition) {
   return skill.status === "active" ? t("skills.disable") : t("skills.enable");
-}
-
-async function importSkillIntoCatalog(skill: SkillDefinition) {
-  actionSkillKey.value = skill.skillKey;
-  actionError.value = null;
-  confirmingSkillDeleteKey.value = null;
-  try {
-    replaceSkill(await importSkill(skill.skillKey));
-  } catch (importError) {
-    actionError.value = importError instanceof Error ? importError.message : t("common.loading");
-  } finally {
-    actionSkillKey.value = null;
-  }
 }
 
 async function importUploadedSkill(event: Event, mode: "archive" | "folder") {

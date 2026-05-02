@@ -174,7 +174,6 @@ class RunDetail(RunSummary):
     selected_skills: list[str] = Field(default_factory=list)
     skill_outputs: list[dict[str, Any]] = Field(default_factory=list)
     evaluation_result: dict[str, Any] = Field(default_factory=dict)
-    knowledge_summary: str = ""
     memory_summary: str = ""
     final_result: str = ""
     node_status_map: dict[str, str] = Field(default_factory=dict)

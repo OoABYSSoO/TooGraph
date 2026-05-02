@@ -8,7 +8,6 @@ import {
   writePersistedEditorDocumentDraft,
   writePersistedEditorViewportDraft,
 } from "../../lib/editor-workspace.ts";
-import { syncKnowledgeBaseSkillsInDocument } from "../../lib/graph-document.ts";
 import type { GraphDocument, GraphPayload } from "../../types/node-system.ts";
 import type { RunDetail } from "../../types/run.ts";
 
@@ -34,9 +33,8 @@ type WorkspaceDocumentStateInput = {
 
 export function useWorkspaceDocumentState(input: WorkspaceDocumentStateInput) {
   function setDocumentForTab(tabId: string, nextDocument: GraphPayload | GraphDocument) {
-    const syncedDocument = syncKnowledgeBaseSkillsInDocument(nextDocument);
-    input.documentsByTabId.value = setTabScopedRecordEntry(input.documentsByTabId.value, tabId, syncedDocument);
-    writePersistedEditorDocumentDraft(tabId, syncedDocument);
+    input.documentsByTabId.value = setTabScopedRecordEntry(input.documentsByTabId.value, tabId, nextDocument);
+    writePersistedEditorDocumentDraft(tabId, nextDocument);
   }
 
   function registerDocumentForTab(tabId: string, graph: GraphPayload | GraphDocument) {

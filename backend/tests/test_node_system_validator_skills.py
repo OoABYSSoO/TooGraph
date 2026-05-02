@@ -31,7 +31,7 @@ def _agent_skill_definition(
         skillKey=skill_key,
         label=skill_key,
         targets=targets or [SkillTarget.AGENT_NODE],
-        runtime={"type": "builtin", "entrypoint": runtime_entrypoint or skill_key},
+        runtime={"type": "python", "entrypoint": runtime_entrypoint or "run.py"},
         inputSchema=input_schema or [],
         outputSchema=output_schema or [SkillIoField(key="summary", label="Summary", valueType="text")],
         runtimeReady=True,
@@ -96,7 +96,7 @@ class NodeSystemValidatorSkillTests(unittest.TestCase):
         definition = _agent_skill_definition(
             "legacy_skill",
             eligibility=SkillAgentNodeEligibility.NEEDS_MANIFEST,
-            blockers=["Skill manifest is missing a builtin runtime entrypoint."],
+            blockers=["Skill manifest is missing a script runtime entrypoint."],
         )
 
         with (
@@ -155,18 +155,6 @@ class NodeSystemValidatorSkillTests(unittest.TestCase):
             validation = validate_graph(graph)
 
         self.assertIn("agent_skill_required_input_missing", [issue.code for issue in validation.issues])
-
-    def test_runtime_entrypoint_can_register_a_skill_key_alias(self) -> None:
-        graph = _graph_with_agent_config({"skills": ["public_summary"]})
-        definition = _agent_skill_definition("public_summary", runtime_entrypoint="summarize_text")
-
-        with (
-            patch("app.core.compiler.validator.get_skill_registry", return_value={"summarize_text": object()}),
-            patch("app.core.compiler.validator.get_skill_catalog_registry", return_value={"public_summary": definition}),
-        ):
-            validation = validate_graph(graph)
-
-        self.assertNotIn("agent_skill_not_runtime_registered", [issue.code for issue in validation.issues])
 
     def test_binding_only_skill_still_goes_through_agent_node_validation(self) -> None:
         graph = _graph_with_agent_config(

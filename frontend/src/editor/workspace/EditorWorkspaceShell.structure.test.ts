@@ -439,7 +439,7 @@ test("EditorWorkspaceShell persists graph document drafts across route changes a
   assert.match(loadExistingSource, /const hydrationSource = resolveExistingGraphDocumentHydrationSource\(\{ persistedDraft, cachedGraph: null \}\);/);
   assert.match(openExistingSource, /nextTabId &&[\s\S]*shouldHydrateExistingGraphDocument\(\{[\s\S]*hasDocument: Boolean\(input\.documentsByTabId\.value\[nextTabId\]\),[\s\S]*isLoading: Boolean\(input\.loadingByTabId\.value\[nextTabId\]\),[\s\S]*\}\)/);
   assert.match(openExistingSource, /const hydrationSource = resolveExistingGraphDocumentHydrationSource\(\{ persistedDraft, cachedGraph: graph \}\);/);
-  assert.match(documentStateSource, /writePersistedEditorDocumentDraft\(tabId, syncedDocument\);/);
+  assert.match(documentStateSource, /writePersistedEditorDocumentDraft\(tabId, nextDocument\);/);
   assert.match(componentSource, /removeDocumentDraft: removePersistedEditorDocumentDraft,/);
   assert.match(tabLifecycleControllerSource, /input\.removeDocumentDraft\(tabId\);/);
   assert.match(componentSource, /prunePersistedEditorDocumentDrafts\(persistenceRequest\.tabIds\);/);
@@ -539,7 +539,7 @@ test("EditorWorkspaceShell delegates document load tab-state writes to the runti
   const loadExistingSource =
     openControllerSource.match(/async function loadExistingGraphIntoTab\(tabId: string, graphId: string\) \{[\s\S]*?\n  \}/)?.[0] ?? "";
 
-  assert.match(registerDocumentSource, /input\.documentsByTabId\.value = setTabScopedRecordEntry\(input\.documentsByTabId\.value, tabId, syncedDocument\);/);
+  assert.match(registerDocumentSource, /input\.documentsByTabId\.value = setTabScopedRecordEntry\(input\.documentsByTabId\.value, tabId, nextDocument\);/);
   assert.match(registerDocumentSource, /input\.loadingByTabId\.value = setTabScopedRecordEntry\(input\.loadingByTabId\.value, tabId, false\);/);
   assert.match(registerDocumentSource, /input\.errorByTabId\.value = setTabScopedRecordEntry\(input\.errorByTabId\.value, tabId, null\);/);
   assert.match(loadExistingSource, /input\.loadingByTabId\.value = setTabScopedRecordEntry\(input\.loadingByTabId\.value, tabId, true\);/);
@@ -609,7 +609,7 @@ test("EditorWorkspaceShell delegates panel and focus tab-state writes to the run
   const setDocumentSource = documentStateSource;
   const panelFocusSource = sidePanelControllerSource;
 
-  assert.match(setDocumentSource, /input\.documentsByTabId\.value = setTabScopedRecordEntry\(input\.documentsByTabId\.value, tabId, syncedDocument\);/);
+  assert.match(setDocumentSource, /input\.documentsByTabId\.value = setTabScopedRecordEntry\(input\.documentsByTabId\.value, tabId, nextDocument\);/);
   assert.match(
     panelFocusSource,
     /input\.statePanelOpenByTabId\.value = setTabScopedRecordEntry\(input\.statePanelOpenByTabId\.value, tabId, !isStatePanelOpen\(tabId\)\);/,

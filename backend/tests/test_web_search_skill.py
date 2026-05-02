@@ -3,20 +3,44 @@ from __future__ import annotations
 import os
 import sys
 import unittest
+import importlib.util
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.skills.builtin.web_search import web_search_skill
 from app.skills.registry import get_skill_registry
 
 
+WEB_SEARCH_RUN_PATH = Path(__file__).resolve().parents[2] / "skill" / "web_search" / "run.py"
+
+
+def _load_web_search_module():
+    spec = importlib.util.spec_from_file_location("graphiteui_web_search_skill_test", WEB_SEARCH_RUN_PATH)
+    if spec is None or spec.loader is None:
+        raise AssertionError("Could not load web_search skill script.")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 class WebSearchSkillTests(unittest.TestCase):
+    def test_web_search_skill_owns_time_sensitive_query_date_anchor(self) -> None:
+        web_search = _load_web_search_module()
+
+        query = web_search._enrich_time_sensitive_web_search_query(
+            "最新模型发布日期",
+            now=datetime(2026, 5, 1, 13, 28, 44, tzinfo=timezone.utc),
+        )
+
+        self.assertEqual(query, "最新模型发布日期 2026-05-01")
+
     def test_web_search_skill_normalizes_tavily_results_when_api_key_is_configured(self) -> None:
+        web_search = _load_web_search_module()
         with (
             patch.dict(os.environ, {"TAVILY_API_KEY": "tvly-test"}, clear=True),
-            patch("app.skills.builtin.web_search._search_with_tavily") as tavily_search,
+            patch.object(web_search, "_search_with_tavily") as tavily_search,
         ):
             tavily_search.return_value = {
                 "answer": "GraphiteUI is a visual workflow studio.",
@@ -30,7 +54,7 @@ class WebSearchSkillTests(unittest.TestCase):
                 ],
             }
 
-            result = web_search_skill(
+            result = web_search.web_search_skill(
                 query="GraphiteUI workflow studio",
                 max_results="2",
                 search_depth="advanced",
@@ -54,9 +78,10 @@ class WebSearchSkillTests(unittest.TestCase):
         self.assertIn("[1] GraphiteUI Docs", result["context"])
 
     def test_web_search_skill_falls_back_to_duckduckgo_without_api_key(self) -> None:
+        web_search = _load_web_search_module()
         with (
             patch.dict(os.environ, {}, clear=True),
-            patch("app.skills.builtin.web_search._search_with_duckduckgo") as duckduckgo_search,
+            patch.object(web_search, "_search_with_duckduckgo") as duckduckgo_search,
         ):
             duckduckgo_search.return_value = {
                 "results": [
@@ -68,7 +93,7 @@ class WebSearchSkillTests(unittest.TestCase):
                 ]
             }
 
-            result = web_search_skill(query="fallback search", max_results=1)
+            result = web_search.web_search_skill(query="fallback search", max_results=1)
 
         duckduckgo_search.assert_called_once_with(
             query="fallback search",
@@ -84,7 +109,8 @@ class WebSearchSkillTests(unittest.TestCase):
         self.assertIn("Search date:", result["context"])
 
     def test_web_search_skill_returns_structured_error_for_missing_query(self) -> None:
-        result = web_search_skill(query="   ")
+        web_search = _load_web_search_module()
+        result = web_search.web_search_skill(query="   ")
 
         self.assertEqual(result["status"], "failed")
         self.assertEqual(result["result_count"], 0)

@@ -63,14 +63,12 @@ test("SkillsPage surfaces native Skill taxonomy and readiness metadata", () => {
   assert.match(componentSource, /t\("skills\.agentNodeBlockers"\)/);
 });
 
-test("SkillsPage exposes import, status, and delete management actions with local button styling", () => {
+test("SkillsPage exposes upload, status, and delete management actions with local button styling", () => {
   assert.match(componentSource, /const confirmingSkillDeleteKey = ref<string \| null>\(null\);/);
-  assert.match(componentSource, /async function importSkillIntoCatalog/);
   assert.match(componentSource, /async function setSkillEnabled/);
   assert.match(componentSource, /async function setSkillStatus/);
   assert.match(componentSource, /async function deleteSkillFromCatalog/);
   assert.match(componentSource, /async function importUploadedSkill/);
-  assert.match(componentSource, /importSkill\(skill\.skillKey\)/);
   assert.match(componentSource, /importSkillUpload\(files, relativePaths\)/);
   assert.match(componentSource, /updateSkillStatus\(skill\.skillKey, status\)/);
   assert.match(componentSource, /deleteSkill\(skill\.skillKey\)/);
@@ -81,7 +79,6 @@ test("SkillsPage exposes import, status, and delete management actions with loca
   assert.match(componentSource, /webkitdirectory/);
   assert.match(componentSource, /t\("skills\.importArchive"\)/);
   assert.match(componentSource, /t\("skills\.importFolder"\)/);
-  assert.match(componentSource, /t\("skills\.import"\)/);
   assert.match(componentSource, /t\("skills\.enable"\)/);
   assert.match(componentSource, /t\("skills\.disable"\)/);
   assert.match(componentSource, /t\("skills\.delete"\)/);

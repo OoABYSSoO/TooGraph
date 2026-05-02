@@ -12,10 +12,8 @@ from app.core.storage.skill_store import (
     enable_skill,
     extract_skill_archive,
     import_skill_from_directory,
-    import_skill_from_source,
 )
 from app.skills.definitions import (
-    get_external_skill_catalog_registry,
     get_skill_catalog_registry,
     list_skill_catalog,
     list_skill_definitions,
@@ -62,20 +60,6 @@ async def import_uploaded_skill_endpoint(
     if definition is None:
         raise HTTPException(status_code=500, detail=f"Imported Skill '{skill_key}' could not be loaded.")
     return definition
-
-
-@router.post("/{skill_key}/import", response_model=SkillDefinition)
-def import_skill_endpoint(skill_key: str) -> SkillDefinition:
-    definition = get_external_skill_catalog_registry().get(skill_key)
-    if definition is None:
-        raise HTTPException(status_code=404, detail=f"External skill '{skill_key}' does not exist.")
-    if not definition.can_import:
-        raise HTTPException(
-            status_code=400,
-            detail="This skill is discoverable only. Import is available only for runtime-supported skills.",
-        )
-    import_skill_from_source(skill_key=skill_key, source_path=definition.source_path)
-    return get_skill_catalog_registry(include_disabled=True)[skill_key]
 
 
 @router.post("/{skill_key}/disable", response_model=SkillDefinition)

@@ -6,8 +6,6 @@ from typing import Any
 
 from app.core.runtime.state import utc_now_iso
 
-KNOWLEDGE_BASE_SKILL_KEY = "search_knowledge_base"
-
 
 def refresh_run_artifacts(
     state: dict[str, Any],
@@ -60,7 +58,6 @@ def refresh_run_artifacts(
         "values": state_values,
         "last_writers": state_last_writers,
     }
-    state["knowledge_summary"] = build_knowledge_summary(state.get("skill_outputs", []))
 
 
 def append_run_snapshot(
@@ -88,28 +85,3 @@ def append_run_snapshot(
             "final_result": str(state.get("final_result", "") or ""),
         }
     )
-
-
-def build_knowledge_summary(skill_outputs: list[dict[str, Any]]) -> str:
-    lines: list[str] = []
-    for skill_output in skill_outputs:
-        if skill_output.get("skill_key") != KNOWLEDGE_BASE_SKILL_KEY:
-            continue
-        outputs = skill_output.get("outputs") or {}
-        knowledge_base = outputs.get("knowledge_base") or "unknown"
-        query = outputs.get("query") or ""
-        citations = outputs.get("citations") or []
-        header = f"Knowledge Base: {knowledge_base}"
-        if query:
-            header += f"\nQuery: {query}"
-        lines.append(header)
-        if citations:
-            for citation in citations[:6]:
-                lines.append(
-                    f"- {citation.get('title') or 'Untitled'}"
-                    f" | {citation.get('section') or 'Overview'}"
-                    f" | {citation.get('url') or citation.get('source') or ''}"
-                )
-        else:
-            lines.append("- No citations returned.")
-    return "\n\n".join(lines).strip()

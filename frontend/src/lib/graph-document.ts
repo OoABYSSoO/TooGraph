@@ -281,10 +281,6 @@ function normalizeCloneValue<T>(value: T, seen = new WeakMap<object, unknown>())
   return normalizedObject as T;
 }
 
-function areSkillKeyListsEqual(left: string[], right: string[]) {
-  return left.length === right.length && left.every((skillKey, index) => skillKey === right[index]);
-}
-
 function normalizeInterruptNodeList(value: unknown): string[] {
   if (Array.isArray(value)) {
     return Array.from(new Set(value.map((item) => String(item).trim()).filter(Boolean)));
@@ -439,104 +435,6 @@ function updateAgentBreakpointMetadata<T extends GraphPayload | GraphDocument>(
 
   nextDocument.metadata = nextMetadata;
   return nextDocument;
-}
-
-function isKnowledgeBaseSkill(skillKey: string) {
-  return skillKey === "search_knowledge_base";
-}
-
-function pickAgentKnowledgeQueryStateKey(
-  node: AgentNode,
-  stateSchema: Record<string, GraphPayload["state_schema"][string]>,
-  knowledgeBaseStateKey: string,
-) {
-  const candidateReads = node.reads.filter((binding) => binding.state !== knowledgeBaseStateKey).filter((binding) => {
-    const stateDefinition = stateSchema[binding.state];
-    return stateDefinition?.type === "text" || stateDefinition?.type === "any";
-  });
-  const preferredKeys = ["question", "query", "input"];
-
-  for (const key of preferredKeys) {
-    if (candidateReads.some((binding) => binding.state === key)) {
-      return key;
-    }
-  }
-
-  const preferredTextRead = candidateReads.find((binding) => binding.required) ?? candidateReads[0];
-  return preferredTextRead?.state ?? null;
-}
-
-function syncKnowledgeBaseSkillOnAgentNode(
-  node: AgentNode,
-  stateSchema: GraphPayload["state_schema"],
-): AgentNode {
-  const skillsWithoutKnowledgeBase = node.config.skills.filter((skillKey) => !isKnowledgeBaseSkill(skillKey));
-  const knowledgeBaseStateKeys = Array.from(
-    new Set(
-      node.reads
-        .filter((binding) => stateSchema[binding.state]?.type === "knowledge_base")
-        .map((binding) => binding.state),
-    ),
-  );
-
-  if (knowledgeBaseStateKeys.length !== 1) {
-    return areSkillKeyListsEqual(skillsWithoutKnowledgeBase, node.config.skills)
-      ? node
-      : {
-          ...node,
-          config: {
-            ...node.config,
-            skills: skillsWithoutKnowledgeBase,
-          },
-        };
-  }
-
-  const queryStateKey = pickAgentKnowledgeQueryStateKey(node, stateSchema, knowledgeBaseStateKeys[0]);
-  if (!queryStateKey) {
-    return areSkillKeyListsEqual(skillsWithoutKnowledgeBase, node.config.skills)
-      ? node
-      : {
-          ...node,
-          config: {
-            ...node.config,
-            skills: skillsWithoutKnowledgeBase,
-          },
-        };
-  }
-
-  void queryStateKey;
-  const nextSkills = [...skillsWithoutKnowledgeBase, "search_knowledge_base"];
-  return areSkillKeyListsEqual(nextSkills, node.config.skills)
-    ? node
-    : {
-        ...node,
-        config: {
-          ...node.config,
-          skills: nextSkills,
-        },
-      };
-}
-
-export function syncKnowledgeBaseSkillsInDocument<T extends GraphPayload | GraphDocument>(document: T): T {
-  let nextDocument: T | null = null;
-
-  for (const [nodeId, node] of Object.entries(document.nodes)) {
-    if (node.kind !== "agent") {
-      continue;
-    }
-
-    const nextNode = syncKnowledgeBaseSkillOnAgentNode(node, document.state_schema);
-    if (nextNode === node) {
-      continue;
-    }
-
-    if (!nextDocument) {
-      nextDocument = cloneGraphDocument(document);
-    }
-    nextDocument.nodes[nodeId] = nextNode;
-  }
-
-  return nextDocument ?? document;
 }
 
 export function updateOutputNodeConfigInDocument<T extends GraphPayload | GraphDocument>(
@@ -814,7 +712,7 @@ export function connectStateBindingInDocument<T extends GraphPayload | GraphDocu
     }
     nextTargetNode.reads = [...nextTargetNode.reads, { state: resolvedSourceStateKey, required: true }];
     addImplicitFlowEdgeForStateConnection(nextDocument, sourceNodeId, targetNodeId);
-    return syncKnowledgeBaseSkillsInDocument(nextDocument);
+    return nextDocument;
   }
 
   if (isVirtualAnyInputStateKey(targetStateKey)) {
@@ -826,7 +724,7 @@ export function connectStateBindingInDocument<T extends GraphPayload | GraphDocu
       nextTargetNode.config.rule.source = resolvedSourceStateKey;
     }
     addImplicitFlowEdgeForStateConnection(nextDocument, sourceNodeId, targetNodeId);
-    return syncKnowledgeBaseSkillsInDocument(nextDocument);
+    return nextDocument;
   }
 
   const targetBindingIndex = nextTargetNode.reads.findIndex((binding) => binding.state === targetStateKey);
@@ -849,7 +747,7 @@ export function connectStateBindingInDocument<T extends GraphPayload | GraphDocu
     nextStateKey: resolvedSourceStateKey,
   });
   addImplicitFlowEdgeForStateConnection(nextDocument, sourceNodeId, targetNodeId);
-  return syncKnowledgeBaseSkillsInDocument(nextDocument);
+  return nextDocument;
 }
 
 function addImplicitFlowEdgeForStateConnection<T extends GraphPayload | GraphDocument>(
