@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+from pathlib import Path
 import sys
 from typing import Any
 
@@ -623,6 +624,14 @@ def _resolve_page_path(skill_inputs: dict[str, Any], runtime_context: dict[str, 
 
 
 def _load_runtime_context_from_environment() -> dict[str, Any]:
+    file_path = os.environ.get("TOOGRAPH_SKILL_RUNTIME_CONTEXT_FILE", "")
+    if file_path:
+        try:
+            parsed = json.loads(Path(file_path).read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            parsed = {}
+        if isinstance(parsed, dict):
+            return parsed
     raw = os.environ.get("TOOGRAPH_SKILL_RUNTIME_CONTEXT", "")
     if not raw:
         return {}

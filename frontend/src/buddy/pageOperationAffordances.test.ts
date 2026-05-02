@@ -150,6 +150,34 @@ test("buildPageOperationBook exposes graph edit playback as an editor-page seman
   assert.match(formatPageOperationBookLines(book).join("\n"), /graph_edit editor\.graph\.playback/);
 });
 
+test("buildPageOperationBook covers official end-to-end page operation flow targets", () => {
+  const book = buildPageOperationBook({
+    snapshotId: "snapshot-target-flows",
+    path: "/editor",
+    title: "图编辑器",
+    affordances: [
+      { id: "app.nav.runs", label: "运行记录", role: "navigation-link", actions: ["click"], enabled: true, visible: true },
+      { id: "app.nav.library", label: "图与模板", role: "navigation-link", actions: ["click"], enabled: true, visible: true },
+      { id: "runs.run.run_123.openDetail", label: "打开运行 run_123", role: "navigation-link", actions: ["click"], enabled: true, visible: true },
+      { id: "library.action.newBlankGraph", label: "新建空白图", role: "button", actions: ["click"], enabled: true, visible: true },
+      { id: "library.graph.graph_1.open", label: "打开图：日报生成", role: "button", actions: ["click"], enabled: true, visible: true },
+      { id: "editor.action.runActiveGraph", label: "运行当前图", role: "button", actions: ["click"], enabled: true, visible: true },
+      { id: "editor.canvas.node.agent_1", label: "节点：生成日报", role: "button", actions: ["click"], enabled: true, visible: true },
+    ],
+  });
+
+  const targets = new Set(book.allowedOperations.map((operation) => operation.targetId));
+
+  assert.equal(targets.has("app.nav.runs"), true);
+  assert.equal(targets.has("app.nav.library"), true);
+  assert.equal(targets.has("runs.run.run_123.openDetail"), true);
+  assert.equal(targets.has("library.action.newBlankGraph"), true);
+  assert.equal(targets.has("library.graph.graph_1.open"), true);
+  assert.equal(targets.has("editor.action.runActiveGraph"), true);
+  assert.equal(targets.has("editor.canvas.node.agent_1"), true);
+  assert.equal(targets.has("editor.graph.playback"), true);
+});
+
 test("formatPageOperationBookLines renders commands without selectors or coordinates", () => {
   const lines = formatPageOperationBookLines(
     buildPageOperationBook({
