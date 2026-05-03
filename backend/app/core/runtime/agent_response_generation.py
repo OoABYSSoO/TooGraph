@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
+from app.core.runtime.agent_multimodal import collect_input_attachments
 from app.core.runtime.agent_prompt import build_effective_system_prompt
 from app.core.runtime.llm_output_parser import build_output_key_aliases, parse_llm_json_response
 from app.core.schemas.node_system import NodeSystemAgentNode, NodeSystemStateDefinition
@@ -27,6 +28,7 @@ def generate_agent_response(
     if not output_keys:
         return {"summary": ""}, "", [], runtime_config
 
+    input_attachments = collect_input_attachments(input_values, state_schema=state_schema)
     system_prompt = build_effective_system_prompt_func(
         output_keys,
         input_values,
@@ -53,6 +55,7 @@ def generate_agent_response(
             thinking_enabled=runtime_config["resolved_thinking"],
             thinking_level=thinking_level,
             on_delta=on_delta,
+            input_attachments=input_attachments,
         )
     else:
         content, llm_meta = chat_with_model_ref_with_meta_func(
@@ -63,6 +66,7 @@ def generate_agent_response(
             thinking_enabled=runtime_config["resolved_thinking"],
             thinking_level=thinking_level,
             on_delta=on_delta,
+            input_attachments=input_attachments,
         )
 
     parsed_fields = parse_llm_json_response_func(

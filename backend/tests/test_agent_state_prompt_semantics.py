@@ -164,6 +164,37 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
         self.assertIn(full_url, prompt)
         self.assertIn("引用链接必须完整复制 URL", prompt)
 
+    def test_auto_prompt_summarizes_uploaded_image_without_data_url_payload(self) -> None:
+        image_payload = {
+            "kind": "uploaded_file",
+            "name": "reference.png",
+            "mimeType": "image/png",
+            "size": 42,
+            "detectedType": "image",
+            "encoding": "data_url",
+            "content": "data:image/png;base64,AAAABBBB",
+        }
+
+        prompt = build_auto_system_prompt(
+            ["answer"],
+            {"reference_image": image_payload},
+            {},
+            state_schema={
+                "reference_image": NodeSystemStateDefinition(
+                    name="参考图片",
+                    type=NodeSystemStateType.IMAGE,
+                    value="",
+                ),
+                "answer": NodeSystemStateDefinition(type=NodeSystemStateType.TEXT),
+            },
+        )
+
+        self.assertIn("reference.png", prompt)
+        self.assertIn("image/png", prompt)
+        self.assertIn("<data-url mime=image/png chars=", prompt)
+        self.assertNotIn("data:image/png;base64", prompt)
+        self.assertNotIn("AAAABBBB", prompt)
+
     def test_llm_json_response_can_map_unique_state_name_alias_back_to_output_key(self) -> None:
         parsed = parse_llm_json_response(
             '{"最终答案": "这是中文语义字段返回的内容"}',

@@ -253,6 +253,43 @@ class ModelProviderClientTests(unittest.TestCase):
         self.assertEqual(requested["json"]["stream"], True)
         self.assertEqual(requested["json"]["messages"][0], {"role": "system", "content": "sys"})
 
+    def test_chat_openai_compatible_sends_image_attachments_as_content_parts(self) -> None:
+        from app.tools.model_provider_client import chat_with_model_provider
+
+        fake_client, client_patch = self._patched_client(
+            FakeResponse({"id": "chatcmpl_1", "model": "gpt-4.1", "choices": [{"message": {"content": "hello"}}]})
+        )
+        with client_patch, patch("app.tools.model_provider_client.append_model_request_log"):
+            content, _meta = chat_with_model_provider(
+                provider_id="openai",
+                transport="openai-compatible",
+                base_url="https://api.openai.com/v1",
+                api_key="sk-openai",
+                model="gpt-4.1",
+                system_prompt="sys",
+                user_prompt="user",
+                temperature=0.2,
+                input_attachments=[
+                    {
+                        "type": "image",
+                        "state_key": "reference_image",
+                        "name": "reference.png",
+                        "mime_type": "image/png",
+                        "data_url": "data:image/png;base64,AAAABBBB",
+                    }
+                ],
+            )
+
+        requested = fake_client.post_calls[0]
+        self.assertEqual(content, "hello")
+        self.assertEqual(
+            requested["json"]["messages"][1]["content"],
+            [
+                {"type": "text", "text": "user"},
+                {"type": "image_url", "image_url": {"url": "data:image/png;base64,AAAABBBB"}},
+            ],
+        )
+
     def test_chat_openai_compatible_coalesces_streaming_response(self) -> None:
         from app.tools.model_provider_client import chat_with_model_provider
 

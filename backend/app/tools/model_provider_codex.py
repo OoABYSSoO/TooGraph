@@ -13,6 +13,7 @@ from app.tools.model_provider_http import (
     parse_json_or_stream_text,
     read_streaming_response_text,
 )
+from app.tools.model_provider_multimodal import build_codex_responses_user_content
 from app.tools.model_provider_response_parsing import normalize_message_text, parse_sse_json_events
 from app.tools.openai_codex_client import codex_http_client_kwargs
 
@@ -177,11 +178,12 @@ def chat_codex_responses(
     refresh_access_token: Callable[[], str],
     append_request_log: Callable[..., None],
     on_delta: Callable[[str], None] | None = None,
+    input_attachments: list[dict[str, Any]] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     request_payload: dict[str, Any] = {
         "model": model,
         "instructions": system_prompt,
-        "input": [{"role": "user", "content": user_prompt}],
+        "input": [{"role": "user", "content": build_codex_responses_user_content(user_prompt, input_attachments)}],
         "store": False,
         "stream": True,
     }

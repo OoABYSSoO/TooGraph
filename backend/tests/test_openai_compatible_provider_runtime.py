@@ -203,6 +203,47 @@ class OpenAiCompatibleProviderRuntimeTests(unittest.TestCase):
         self.assertEqual(sent_payloads[0]["stream"], True)
         self.assertEqual(meta["reasoning_format"], "local-gateway:deepseek")
 
+    def test_local_gateway_sends_image_attachments_as_openai_content_parts(self) -> None:
+        with self._patched_local_provider_env(LOCAL_BASE_URL="http://127.0.0.1:8888/v1"):
+            local_llm, _model_catalog = self._reload_target_modules()
+
+            sent_payloads: list[dict[str, object]] = []
+
+            def fake_request(payload: dict[str, object]) -> dict[str, object]:
+                sent_payloads.append(dict(payload))
+                return {
+                    "id": "chatcmpl-1",
+                    "model": "vision-model",
+                    "choices": [{"message": {"content": '{"answer":"ok"}'}}],
+                }
+
+            with patch.object(local_llm, "get_local_gateway_runtime_config", return_value=None):
+                with patch.object(local_llm, "_request_local_chat_completion", side_effect=fake_request):
+                    content, _meta = local_llm._chat_with_local_model_with_meta(
+                        system_prompt="sys",
+                        user_prompt="Describe the image.",
+                        model="vision-model",
+                        thinking_enabled=False,
+                        input_attachments=[
+                            {
+                                "type": "image",
+                                "state_key": "reference_image",
+                                "name": "reference.png",
+                                "mime_type": "image/png",
+                                "data_url": "data:image/png;base64,AAAABBBB",
+                            }
+                        ],
+                    )
+
+        self.assertEqual(content, '{"answer":"ok"}')
+        self.assertEqual(
+            sent_payloads[0]["messages"][1]["content"],
+            [
+                {"type": "text", "text": "Describe the image."},
+                {"type": "image_url", "image_url": {"url": "data:image/png;base64,AAAABBBB"}},
+            ],
+        )
+
     def test_lm_studio_thinking_payload_uses_reasoning_effort_when_advertised(self) -> None:
         class FakeResponse:
             def raise_for_status(self) -> None:

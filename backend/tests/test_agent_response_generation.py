@@ -7,7 +7,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.runtime.agent_response_generation import generate_agent_response
-from app.core.schemas.node_system import NodeSystemAgentNode
+from app.core.schemas.node_system import NodeSystemAgentNode, NodeSystemStateDefinition, NodeSystemStateType
 
 
 def _agent_node(*, writes: list[dict[str, str]], task_instruction: str = "") -> NodeSystemAgentNode:
@@ -78,6 +78,57 @@ class AgentResponseGenerationTests(unittest.TestCase):
         self.assertEqual(updated_config["provider_model"], "test-model")
         self.assertEqual(updated_config["provider_id"], "local")
         self.assertEqual(updated_config["provider_thinking_level"], "medium")
+
+    def test_routes_image_inputs_as_model_attachments_without_prompting_base64(self) -> None:
+        captured: dict[str, object] = {}
+        image_payload = {
+            "kind": "uploaded_file",
+            "name": "reference.png",
+            "mimeType": "image/png",
+            "size": 42,
+            "detectedType": "image",
+            "encoding": "data_url",
+            "content": "data:image/png;base64,AAAABBBB",
+        }
+
+        def chat_with_local_model_with_meta_func(**kwargs):
+            captured.update(kwargs)
+            return ('{"answer": "ok"}', {"warnings": []})
+
+        payload, _reasoning, warnings, _updated_config = generate_agent_response(
+            _agent_node(writes=[{"state": "answer"}], task_instruction="描述图片。"),
+            {"reference_image": image_payload},
+            {},
+            {
+                "resolved_provider_id": "local",
+                "runtime_model_name": "vision-model",
+                "resolved_temperature": 0.2,
+                "resolved_thinking": False,
+                "resolved_thinking_level": "off",
+                "resolved_model_ref": "local/vision-model",
+            },
+            state_schema={
+                "reference_image": NodeSystemStateDefinition(
+                    name="参考图片",
+                    type=NodeSystemStateType.IMAGE,
+                ),
+                "answer": NodeSystemStateDefinition(type=NodeSystemStateType.TEXT),
+            },
+            chat_with_local_model_with_meta_func=chat_with_local_model_with_meta_func,
+            parse_llm_json_response_func=lambda content, output_keys, *, output_key_aliases: {"answer": "ok"},
+            build_output_key_aliases_func=lambda output_keys, state_schema: {"answer": ["answer"]},
+        )
+
+        self.assertEqual(payload["answer"], "ok")
+        self.assertEqual(warnings, [])
+        system_prompt = str(captured["system_prompt"])
+        self.assertIn("reference.png", system_prompt)
+        self.assertNotIn("data:image/png;base64", system_prompt)
+        attachments = captured["input_attachments"]
+        self.assertEqual(len(attachments), 1)
+        self.assertEqual(attachments[0]["type"], "image")
+        self.assertEqual(attachments[0]["state_key"], "reference_image")
+        self.assertEqual(attachments[0]["data_url"], image_payload["content"])
 
     def test_routes_configured_provider_and_captures_metadata(self) -> None:
         def chat_with_model_ref_with_meta_func(**kwargs):

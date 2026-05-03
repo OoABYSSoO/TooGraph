@@ -25,6 +25,7 @@ from app.tools.model_provider_openai import (
     coalesce_openai_chat_stream_response as _coalesce_openai_chat_stream_response,
     extract_openai_chat_stream_delta as _extract_openai_chat_stream_delta,
 )
+from app.tools.model_provider_multimodal import build_openai_user_content
 
 
 def _env_first(*keys: str, default: str) -> str:
@@ -525,6 +526,7 @@ def _chat_with_local_model_with_meta(
     thinking_enabled: bool = False,
     thinking_level: str | None = None,
     on_delta: Callable[[str], None] | None = None,
+    input_attachments: list[dict[str, Any]] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     request_payload: dict[str, Any] = {
         "model": model or get_default_text_model(),
@@ -532,7 +534,7 @@ def _chat_with_local_model_with_meta(
         "stream": True,
         "messages": [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
+            {"role": "user", "content": build_openai_user_content(user_prompt, input_attachments)},
         ],
     }
     if max_tokens is not None:

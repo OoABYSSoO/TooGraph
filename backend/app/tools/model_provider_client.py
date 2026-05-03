@@ -73,6 +73,7 @@ def _chat_openai_compatible(
     auth_scheme: str,
     thinking_level: str,
     on_delta: Callable[[str], None] | None = None,
+    input_attachments: list[dict[str, Any]] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     return model_provider_openai.chat_openai_compatible(
         provider_id=provider_id,
@@ -89,6 +90,7 @@ def _chat_openai_compatible(
         append_request_log=_append_model_request_log_safely,
         post_streaming_json_with_fallback_fn=post_streaming_json_with_fallback,
         on_delta=on_delta,
+        input_attachments=input_attachments,
     )
 
 
@@ -104,6 +106,7 @@ def _chat_anthropic(
     max_tokens: int | None,
     thinking_level: str,
     on_delta: Callable[[str], None] | None = None,
+    input_attachments: list[dict[str, Any]] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     return model_provider_anthropic.chat_anthropic(
         provider_id=provider_id,
@@ -118,6 +121,7 @@ def _chat_anthropic(
         append_request_log=_append_model_request_log_safely,
         post_streaming_json_with_fallback_fn=post_streaming_json_with_fallback,
         on_delta=on_delta,
+        input_attachments=input_attachments,
     )
 
 
@@ -133,6 +137,7 @@ def _chat_gemini(
     max_tokens: int | None,
     thinking_level: str,
     on_delta: Callable[[str], None] | None = None,
+    input_attachments: list[dict[str, Any]] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     return model_provider_gemini.chat_gemini(
         provider_id=provider_id,
@@ -147,6 +152,7 @@ def _chat_gemini(
         append_request_log=_append_model_request_log_safely,
         post_streaming_json_with_fallback_fn=post_streaming_json_with_fallback,
         on_delta=on_delta,
+        input_attachments=input_attachments,
     )
 
 
@@ -160,6 +166,7 @@ def _chat_codex_responses(
     temperature: float,
     thinking_level: str,
     on_delta: Callable[[str], None] | None = None,
+    input_attachments: list[dict[str, Any]] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     return model_provider_codex.chat_codex_responses(
         provider_id=provider_id,
@@ -173,6 +180,7 @@ def _chat_codex_responses(
         refresh_access_token=refresh_codex_access_token,
         append_request_log=_append_model_request_log_safely,
         on_delta=on_delta,
+        input_attachments=input_attachments,
     )
 
 
@@ -192,6 +200,7 @@ def chat_with_model_provider(
     auth_header: str = "Authorization",
     auth_scheme: str = "Bearer",
     on_delta: Callable[[str], None] | None = None,
+    input_attachments: list[dict[str, Any]] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     normalized_transport = normalize_transport(transport)
     normalized_base_url = _normalize_base_url(base_url)
@@ -215,6 +224,7 @@ def chat_with_model_provider(
             auth_scheme=auth_scheme,
             thinking_level=resolved_thinking_level,
             on_delta=on_delta,
+            input_attachments=input_attachments,
         )
     elif normalized_transport == TRANSPORT_ANTHROPIC_MESSAGES:
         content, meta = _chat_anthropic(
@@ -228,6 +238,7 @@ def chat_with_model_provider(
             max_tokens=max_tokens,
             thinking_level=resolved_thinking_level,
             on_delta=on_delta,
+            input_attachments=input_attachments,
         )
     elif normalized_transport == TRANSPORT_GEMINI_GENERATE_CONTENT:
         content, meta = _chat_gemini(
@@ -241,6 +252,7 @@ def chat_with_model_provider(
             max_tokens=max_tokens,
             thinking_level=resolved_thinking_level,
             on_delta=on_delta,
+            input_attachments=input_attachments,
         )
     elif normalized_transport == TRANSPORT_CODEX_RESPONSES:
         content, meta = _chat_codex_responses(
@@ -252,6 +264,7 @@ def chat_with_model_provider(
             temperature=temperature,
             thinking_level=resolved_thinking_level,
             on_delta=on_delta,
+            input_attachments=input_attachments,
         )
     else:  # pragma: no cover - guarded by normalize_transport
         raise RuntimeError(f"Unsupported provider transport: {normalized_transport}")
@@ -283,6 +296,7 @@ def chat_with_model_ref_with_meta(
     thinking_enabled: bool = False,
     thinking_level: str | None = None,
     on_delta: Callable[[str], None] | None = None,
+    input_attachments: list[dict[str, Any]] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     provider_id, model_name = model_ref.split("/", 1) if "/" in model_ref else ("local", model_ref)
     provider_id = provider_id.strip() or "local"
@@ -301,6 +315,7 @@ def chat_with_model_ref_with_meta(
             thinking_enabled=thinking_enabled,
             thinking_level=thinking_level,
             on_delta=on_delta,
+            input_attachments=input_attachments,
         )
 
     saved_settings = load_app_settings()
@@ -330,4 +345,5 @@ def chat_with_model_ref_with_meta(
         auth_header=str(provider_config.get("auth_header") or template.get("auth_header") or "Authorization"),
         auth_scheme=str(auth_scheme or ""),
         on_delta=on_delta,
+        input_attachments=input_attachments,
     )
