@@ -140,6 +140,16 @@ def _looks_like_source_reference(item: Any) -> bool:
     return has_locator and has_reference_metadata
 
 
+def _next_state_event_sequence(state_events: list[dict[str, Any]]) -> int:
+    max_sequence = 0
+    for event in state_events:
+        try:
+            max_sequence = max(max_sequence, int(event.get("sequence", 0)))
+        except (TypeError, ValueError):
+            continue
+    return max_sequence + 1
+
+
 def apply_state_writes(
     node_name: str,
     write_bindings: list[Any],
@@ -160,11 +170,13 @@ def apply_state_writes(
             value = copy.deepcopy(raw_value)
         changed = previous_value != value
         state_values[binding.state] = value
+        event_sequence = _next_state_event_sequence(state_events)
+        created_at = utc_now_iso()
         writer_record = {
             "node_id": node_name,
             "output_key": binding.state,
             "mode": binding.mode.value,
-            "updated_at": utc_now_iso(),
+            "updated_at": created_at,
         }
         state_last_writers[binding.state] = writer_record
         state_events.append(
@@ -173,8 +185,10 @@ def apply_state_writes(
                 "state_key": binding.state,
                 "output_key": binding.state,
                 "mode": binding.mode.value,
+                "previous_value": previous_value,
                 "value": value,
-                "created_at": utc_now_iso(),
+                "sequence": event_sequence,
+                "created_at": created_at,
             }
         )
         write_records.append(
@@ -182,7 +196,10 @@ def apply_state_writes(
                 "state_key": binding.state,
                 "output_key": binding.state,
                 "mode": binding.mode.value,
+                "previous_value": previous_value,
                 "value": value,
+                "sequence": event_sequence,
+                "created_at": created_at,
                 "changed": changed,
             }
         )

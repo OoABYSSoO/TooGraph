@@ -150,14 +150,35 @@ class RuntimeStateIoTests(unittest.TestCase):
         write_records = apply_state_writes("agent_1", write_bindings, output_values, state)
 
         self.assertEqual(
-            write_records,
             [
-                {"state_key": "answer", "output_key": "answer", "mode": "replace", "value": "new", "changed": True},
+                {
+                    "state_key": record["state_key"],
+                    "output_key": record["output_key"],
+                    "mode": record["mode"],
+                    "previous_value": record["previous_value"],
+                    "value": record["value"],
+                    "sequence": record["sequence"],
+                    "changed": record["changed"],
+                }
+                for record in write_records
+            ],
+            [
+                {
+                    "state_key": "answer",
+                    "output_key": "answer",
+                    "mode": "replace",
+                    "previous_value": "old",
+                    "value": "new",
+                    "sequence": 1,
+                    "changed": True,
+                },
                 {
                     "state_key": "payload",
                     "output_key": "payload",
                     "mode": "replace",
+                    "previous_value": None,
                     "value": {"items": [1]},
+                    "sequence": 2,
                     "changed": True,
                 },
             ],
@@ -227,6 +248,28 @@ class RuntimeStateIoTests(unittest.TestCase):
             [item["title"] for item in state["state_values"]["evidence_links"]],
             ["First", "Second", "Third", "Fourth"],
         )
+
+    def test_apply_state_writes_records_previous_value_and_sequence_for_activity_feed(self) -> None:
+        mode = SimpleNamespace(value="replace")
+        write_bindings = [SimpleNamespace(state="answer", mode=mode)]
+        state = {
+            "state_values": {"answer": "old"},
+            "state_events": [{"sequence": 1, "state_key": "question"}],
+        }
+
+        records = apply_state_writes(
+            "agent_writer",
+            write_bindings,
+            {"answer": "new"},
+            state,
+        )
+
+        self.assertEqual(records[0]["previous_value"], "old")
+        self.assertEqual(records[0]["value"], "new")
+        self.assertEqual(records[0]["sequence"], 2)
+        self.assertEqual(state["state_events"][-1]["previous_value"], "old")
+        self.assertEqual(state["state_events"][-1]["value"], "new")
+        self.assertEqual(state["state_events"][-1]["sequence"], 2)
 
 
 if __name__ == "__main__":
