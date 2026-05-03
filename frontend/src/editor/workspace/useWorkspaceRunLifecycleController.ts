@@ -44,6 +44,7 @@ type WorkspaceRunLifecycleControllerInput = {
   ) => void;
   openHumanReviewPanelForTab: (tabId: string, nodeId: string | null) => void;
   persistRunStateValuesForTab: (tabId: string, run: RunDetail) => void;
+  clearRunActivityPanelHintForTab: (tabId: string) => void;
   setMessageFeedbackForTab: (
     tabId: string,
     feedback: { tone: WorkspaceRunFeedback["tone"]; message: string; activeRunId?: string | null; activeRunStatus?: string | null },
@@ -84,7 +85,7 @@ export function useWorkspaceRunLifecycleController(input: WorkspaceRunLifecycleC
 
   function appendRunActivityEventToTab(tabId: string, eventType: string, payload: Record<string, unknown>) {
     const currentActivity = input.runActivityByTabId.value[tabId] ?? { entries: [], autoFollow: true };
-    const nextActivity = appendRunActivityEvent(currentActivity, { eventType, payload });
+    const nextActivity = appendRunActivityEvent(currentActivity, { eventType, payload }, buildStateNameByKey(input.documentsByTabId.value[tabId]));
     if (nextActivity === currentActivity) {
       return;
     }
@@ -93,7 +94,7 @@ export function useWorkspaceRunLifecycleController(input: WorkspaceRunLifecycleC
 
   function reconcileRunActivityFromRun(tabId: string, run: RunDetail) {
     input.runActivityByTabId.value = setTabScopedRecordEntry(input.runActivityByTabId.value, tabId, {
-      entries: buildRunActivityEntriesFromRun(run),
+      entries: buildRunActivityEntriesFromRun(run, buildStateNameByKey(input.documentsByTabId.value[tabId])),
       autoFollow: input.runActivityByTabId.value[tabId]?.autoFollow ?? true,
     });
   }
@@ -153,10 +154,12 @@ export function useWorkspaceRunLifecycleController(input: WorkspaceRunLifecycleC
       handleRunEvent(tabId, "node.reasoning.completed", event);
     });
     source.addEventListener("run.completed", () => {
+      input.clearRunActivityPanelHintForTab(tabId);
       cancelRunEventStreamForTab(tabId);
       void pollRunForTab(tabId, runId);
     });
     source.addEventListener("run.failed", () => {
+      input.clearRunActivityPanelHintForTab(tabId);
       cancelRunEventStreamForTab(tabId);
       void pollRunForTab(tabId, runId);
     });
@@ -199,6 +202,9 @@ export function useWorkspaceRunLifecycleController(input: WorkspaceRunLifecycleC
 
       input.persistRunStateValuesForTab(tabId, run);
       reconcileRunActivityFromRun(tabId, run);
+      if (isFinishedRunStatus(run.status)) {
+        input.clearRunActivityPanelHintForTab(tabId);
+      }
       runPollTimerByTabId.delete(tabId);
       cancelRunEventStreamForTab(tabId);
     } catch (error) {
@@ -233,4 +239,16 @@ export function useWorkspaceRunLifecycleController(input: WorkspaceRunLifecycleC
     startRunEventStreamForTab,
     teardownRunLifecycle,
   };
+}
+
+function buildStateNameByKey(document: GraphPayload | GraphDocument | undefined) {
+  const stateNameByKey: Record<string, string> = {};
+  for (const [stateKey, definition] of Object.entries(document?.state_schema ?? {})) {
+    stateNameByKey[stateKey] = definition.name?.trim() || stateKey;
+  }
+  return stateNameByKey;
+}
+
+function isFinishedRunStatus(status: string | null | undefined) {
+  return status === "completed" || status === "failed";
 }

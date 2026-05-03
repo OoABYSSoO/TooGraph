@@ -515,6 +515,7 @@ const {
   applyRunVisualStateToTab,
   openHumanReviewPanelForTab,
   persistRunStateValuesForTab,
+  clearRunActivityPanelHintForTab,
   setMessageFeedbackForTab,
 });
 const activeTabRouteSignature = computed(() => {

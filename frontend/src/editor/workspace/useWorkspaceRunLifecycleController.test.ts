@@ -98,6 +98,7 @@ function createHarness(options: { fetchRun?: () => Promise<RunDetail> } = {}) {
   const visualStates: Array<{ tabId: string; status: string; preserveMissing: boolean | undefined }> = [];
   const openedHumanReview: Array<{ tabId: string; nodeId: string | null }> = [];
   const persistedRuns: Array<{ tabId: string; runId: string }> = [];
+  const clearedRunActivityHints: string[] = [];
   const timeoutDelays: number[] = [];
   const clearedTimeouts: number[] = [];
   let nextTimeoutId = 10;
@@ -129,6 +130,9 @@ function createHarness(options: { fetchRun?: () => Promise<RunDetail> } = {}) {
     persistRunStateValuesForTab: (tabId, run) => {
       persistedRuns.push({ tabId, runId: run.run_id });
     },
+    clearRunActivityPanelHintForTab: (tabId) => {
+      clearedRunActivityHints.push(tabId);
+    },
     setMessageFeedbackForTab: (tabId, nextFeedback) => {
       feedback.push({ tabId, feedback: nextFeedback });
     },
@@ -139,6 +143,7 @@ function createHarness(options: { fetchRun?: () => Promise<RunDetail> } = {}) {
     controller,
     eventSources,
     feedback,
+    clearedRunActivityHints,
     openedHumanReview,
     persistedRuns,
     restoredRunSnapshotIdByTabId,
@@ -202,11 +207,11 @@ test("useWorkspaceRunLifecycleController appends node and state activity events 
     output_answer: { text: "Final answer", displayMode: "plain" },
   });
   assert.deepEqual(
-    harness.runActivityByTabId.value.tab_a.entries.map((entry) => ({ kind: entry.kind, stateKey: entry.stateKey, preview: entry.preview, active: entry.active })),
+    harness.runActivityByTabId.value.tab_a.entries.map((entry) => ({ kind: entry.kind, title: entry.title, stateKey: entry.stateKey, preview: entry.preview, active: entry.active })),
     [
-      { kind: "node-started", stateKey: null, preview: "agent running", active: false },
-      { kind: "state-updated", stateKey: "answer", preview: "Final answer", active: false },
-      { kind: "reasoning", stateKey: null, preview: "Checked sources", active: true },
+      { kind: "node-started", title: "agent_1 running", stateKey: null, preview: "agent running", active: false },
+      { kind: "state-updated", title: "Answer", stateKey: "answer", preview: "Final answer", active: false },
+      { kind: "reasoning", title: "agent_1 reasoning", stateKey: null, preview: "Checked sources", active: true },
     ],
   );
 });
@@ -248,9 +253,20 @@ test("useWorkspaceRunLifecycleController reconciles terminal run activity from s
   await harness.controller.pollRunForTab("tab_a", "run_1");
 
   assert.deepEqual(
-    harness.runActivityByTabId.value.tab_a.entries.map((entry) => ({ kind: entry.kind, sequence: entry.sequence, preview: entry.preview })),
-    [{ kind: "state-updated", sequence: 3, preview: "Stored answer" }],
+    harness.runActivityByTabId.value.tab_a.entries.map((entry) => ({ kind: entry.kind, title: entry.title, sequence: entry.sequence, preview: entry.preview })),
+    [{ kind: "state-updated", title: "Answer", sequence: 3, preview: "Stored answer" }],
   );
+  assert.deepEqual(harness.clearedRunActivityHints, ["tab_a"]);
+});
+
+test("useWorkspaceRunLifecycleController clears run activity hints when the event stream reports a terminal run", () => {
+  const harness = createHarness();
+
+  harness.controller.startRunEventStreamForTab("tab_a", "run_1");
+  harness.eventSources[0]?.emit("run.completed");
+
+  assert.deepEqual(harness.clearedRunActivityHints, ["tab_a"]);
+  assert.equal(harness.eventSources[0]?.closed, true);
 });
 
 test("useWorkspaceRunLifecycleController schedules follow-up polling for active runs", async () => {

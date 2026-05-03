@@ -29,6 +29,21 @@ test("appendRunActivityEvent appends node streams and state updates in event ord
   );
 });
 
+test("appendRunActivityEvent titles state updates with state names when available", () => {
+  let state: RunActivityState = { entries: [], autoFollow: true };
+  state = appendRunActivityEvent(
+    state,
+    {
+      eventType: "state.updated",
+      payload: { node_id: "agent", state_key: "answer", value: "Hello", sequence: 1, created_at: "2026-05-03T01:00:02Z" },
+    },
+    { answer: "Final Answer" },
+  );
+
+  assert.equal(state.entries[0]?.title, "Final Answer");
+  assert.equal(state.entries[0]?.stateKey, "answer");
+});
+
 test("appendRunActivityEvent updates the current stream entry for repeated node output chunks", () => {
   let state: RunActivityState = { entries: [], autoFollow: true };
   state = appendRunActivityEvent(state, {
@@ -80,5 +95,30 @@ test("buildRunActivityEntriesFromRun replays stored state events for completed r
   assert.deepEqual(
     buildRunActivityEntriesFromRun(run).map((entry) => ({ kind: entry.kind, stateKey: entry.stateKey, preview: entry.preview })),
     [{ kind: "state-updated", stateKey: "answer", preview: "Hello" }],
+  );
+});
+
+test("buildRunActivityEntriesFromRun titles stored state events with state names", () => {
+  const run = {
+    run_id: "run_1",
+    artifacts: {
+      state_events: [
+        {
+          node_id: "agent",
+          state_key: "state_2",
+          output_key: "poem_zh",
+          mode: "replace",
+          value: "短诗",
+          sequence: 1,
+          created_at: "2026-05-03T01:00:02Z",
+        },
+      ],
+    },
+    node_executions: [],
+  } as unknown as RunDetail;
+
+  assert.deepEqual(
+    buildRunActivityEntriesFromRun(run, { state_2: "poem_zh" }).map((entry) => ({ title: entry.title, stateKey: entry.stateKey })),
+    [{ title: "poem_zh", stateKey: "state_2" }],
   );
 });

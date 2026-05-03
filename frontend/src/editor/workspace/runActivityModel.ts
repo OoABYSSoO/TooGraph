@@ -1,6 +1,7 @@
 import type { RunDetail } from "@/types/run";
 
 export type RunActivityKind = "node-started" | "node-stream" | "state-updated" | "node-completed" | "node-failed" | "reasoning";
+export type RunActivityStateNameByKey = Record<string, string | null | undefined>;
 
 export type RunActivityEntry = {
   id: string;
@@ -26,8 +27,12 @@ export type RunActivityIncomingEvent = {
   payload: Record<string, unknown>;
 };
 
-export function appendRunActivityEvent(state: RunActivityState, event: RunActivityIncomingEvent): RunActivityState {
-  const entry = buildRunActivityEntry(event, state.entries.length + 1);
+export function appendRunActivityEvent(
+  state: RunActivityState,
+  event: RunActivityIncomingEvent,
+  stateNameByKey: RunActivityStateNameByKey = {},
+): RunActivityState {
+  const entry = buildRunActivityEntry(event, state.entries.length + 1, stateNameByKey);
   if (!entry) {
     return state;
   }
@@ -48,7 +53,7 @@ export function appendRunActivityEvent(state: RunActivityState, event: RunActivi
   };
 }
 
-export function buildRunActivityEntriesFromRun(run: RunDetail): RunActivityEntry[] {
+export function buildRunActivityEntriesFromRun(run: RunDetail, stateNameByKey: RunActivityStateNameByKey = {}): RunActivityEntry[] {
   const stateEvents = run.artifacts?.state_events ?? [];
   return stateEvents.map((event, index) => ({
     id: `state-${event.sequence ?? index + 1}-${event.node_id}-${event.state_key}`,
@@ -56,7 +61,7 @@ export function buildRunActivityEntriesFromRun(run: RunDetail): RunActivityEntry
     nodeId: event.node_id,
     nodeType: null,
     stateKey: event.state_key,
-    title: event.state_key,
+    title: resolveStateTitle(event.state_key, stateNameByKey),
     preview: formatActivityValue(event.value),
     detail: event,
     createdAt: event.created_at ?? "",
@@ -65,7 +70,7 @@ export function buildRunActivityEntriesFromRun(run: RunDetail): RunActivityEntry
   }));
 }
 
-function buildRunActivityEntry(event: RunActivityIncomingEvent, sequence: number): RunActivityEntry | null {
+function buildRunActivityEntry(event: RunActivityIncomingEvent, sequence: number, stateNameByKey: RunActivityStateNameByKey): RunActivityEntry | null {
   const payload = event.payload;
   const nodeId = normalizeText(payload.node_id);
   const nodeType = normalizeText(payload.node_type) || null;
@@ -84,7 +89,7 @@ function buildRunActivityEntry(event: RunActivityIncomingEvent, sequence: number
       nodeId,
       nodeType,
       stateKey,
-      stateKey,
+      resolveStateTitle(stateKey, stateNameByKey),
       formatActivityValue(payload.value),
       payload,
       createdAt,
@@ -149,6 +154,11 @@ function findMergeableStreamEntryIndex(entries: RunActivityEntry[], streamEntry:
 
 function normalizeText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function resolveStateTitle(stateKey: string, stateNameByKey: RunActivityStateNameByKey) {
+  const stateName = stateNameByKey[stateKey]?.trim();
+  return stateName || stateKey;
 }
 
 function formatActivityValue(value: unknown) {
