@@ -58,6 +58,7 @@ from app.core.runtime.execution_graph import (
 )
 from app.core.runtime.runtime_summaries import summarize_first_value as _summarize_values
 from app.core.runtime.state_io import apply_state_writes, collect_node_inputs
+from app.core.runtime.run_events import publish_run_event
 from app.core.runtime.node_system_executor import (
     _execute_node,
 )
@@ -263,6 +264,16 @@ def _build_langgraph_node_callable(
                 **dict(state.get("state_values", {})),
                 **dict(current_values or {}),
             }
+            publish_run_event(
+                str(state.get("run_id") or ""),
+                "node.started",
+                {
+                    "node_id": node_name,
+                    "node_type": node.kind,
+                    "status": "running",
+                    "started_at": utc_now_iso(),
+                },
+            )
             if persist_progress:
                 _persist_langgraph_progress(
                     state,
@@ -283,6 +294,22 @@ def _build_langgraph_node_callable(
                 node_outputs[node_name] = outputs
                 state_writes = apply_state_writes(node_name, node.writes, outputs, state)
                 graph_updates = {write["state_key"]: write["value"] for write in state_writes}
+                for write in state_writes:
+                    publish_run_event(
+                        str(state.get("run_id") or ""),
+                        "state.updated",
+                        {
+                            "node_id": node_name,
+                            "node_type": node.kind,
+                            "state_key": write["state_key"],
+                            "output_key": write["output_key"],
+                            "mode": write.get("mode", "replace"),
+                            "value": write.get("value"),
+                            "previous_value": write.get("previous_value"),
+                            "changed": bool(write.get("changed")),
+                            "sequence": write.get("sequence"),
+                        },
+                    )
                 state["node_status_map"][node_name] = "success"
                 if body.get("selected_skills"):
                     state["selected_skills"] = [*state.get("selected_skills", []), *body["selected_skills"]]
@@ -330,6 +357,17 @@ def _build_langgraph_node_callable(
                     selected_edge_ids=selected_edge_ids,
                     state_writes=state_writes,
                 )
+                publish_run_event(
+                    str(state.get("run_id") or ""),
+                    "node.completed",
+                    {
+                        "node_id": node_name,
+                        "node_type": node.kind,
+                        "status": "success",
+                        "duration_ms": duration_ms,
+                        "output_keys": list(outputs.keys()),
+                    },
+                )
                 if persist_progress:
                     _persist_langgraph_progress(
                         state,
@@ -373,6 +411,17 @@ def _build_langgraph_node_callable(
                         checkpoint_saver=checkpoint_saver,
                         checkpoint_lookup_config=checkpoint_lookup_config,
                     )
+                publish_run_event(
+                    str(state.get("run_id") or ""),
+                    "node.failed",
+                    {
+                        "node_id": node_name,
+                        "node_type": node.kind,
+                        "status": "failed",
+                        "duration_ms": duration_ms,
+                        "error": str(exc),
+                    },
+                )
                 raise
 
     return _call
