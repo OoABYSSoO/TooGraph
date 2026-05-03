@@ -59,6 +59,13 @@
       "type": "text",
       "value": "",
       "color": "#ca8a04"
+    },
+    "state_9": {
+      "name": "source_documents",
+      "description": "Fetched source page document references produced by the web_search skill for Output-side local artifact preview.",
+      "type": "json",
+      "value": [],
+      "color": "#1d4ed8"
     }
   },
   "nodes": {
@@ -110,7 +117,8 @@
         { "state": "state_2", "required": true }
       ],
       "writes": [
-        { "state": "state_3", "mode": "replace" }
+        { "state": "state_3", "mode": "replace" },
+        { "state": "state_9", "mode": "replace" }
       ],
       "config": {
         "skills": ["web_search"],
@@ -121,13 +129,19 @@
             "inputMapping": {
               "query": "state_2"
             },
+            "outputMapping": {
+              "source_documents": "state_9"
+            },
             "config": {
               "max_results": 5,
-              "search_depth": "basic"
+              "search_depth": "basic",
+              "fetch_pages": "true",
+              "max_pages": 5,
+              "max_chars_per_page": 200000
             }
           }
         ],
-        "taskInstruction": "根据 search_query 和 web_search 技能结果整理本轮搜索报告。保留本轮搜索词、搜索日期、最相关证据摘要和完整引用链接；如果没有可靠结果，明确写出缺口。"
+        "taskInstruction": "根据 search_query 和 web_search 技能结果整理本轮搜索报告。保留本轮搜索词、搜索日期、最相关证据摘要、完整引用链接，以及 web_search 返回的本地 source_documents 路径摘要。搜索报告只写关键证据和缺口，不要粘贴完整网页正文；完整原文已经由技能保存为 source_documents，可由 Output 节点翻页查看。如果没有可靠结果或网页正文抓取失败，明确写出缺口和失败来源。"
       }
     },
     "assess_search_sufficiency": {
@@ -142,7 +156,8 @@
         { "state": "state_1", "required": true },
         { "state": "state_2", "required": true },
         { "state": "state_3", "required": true },
-        { "state": "state_4", "required": false }
+        { "state": "state_4", "required": false },
+        { "state": "state_9", "required": false }
       ],
       "writes": [
         { "state": "state_4", "mode": "replace" },
@@ -153,7 +168,7 @@
       ],
       "config": {
         "skills": [],
-        "taskInstruction": "根据 request、search_query、search_result 和已有 research_notes 合并本轮证据，判断是否已经足够回答。必须覆盖 request 要求的关键事实、时间、数字、结论、限制条件和引用依据，优先使用官方或高可信来源。证据不足时将 needs_more_search 设为 true，并在 next_search_focus 中写清下一轮应补查的具体缺口；证据足够时将 needs_more_search 设为 false 并生成 final_answer。无论是否继续，都维护 research_notes，并在 exhausted_answer 中保留循环耗尽时可用的谨慎答案。不要编造证据中没有确认的事实。"
+        "taskInstruction": "根据 request、search_query、search_result、source_documents 和已有 research_notes 合并本轮证据，判断是否已经足够回答。必须覆盖 request 要求的关键事实、时间、数字、结论、限制条件和引用依据，优先使用官方或高可信来源。把可复查的 URL 和本地 source_documents 路径写进 research_notes，便于运行记录回看原文；但不要把完整网页正文粘贴进 research_notes。证据不足时将 needs_more_search 设为 true，并在 next_search_focus 中写清下一轮应补查的具体缺口；证据足够时将 needs_more_search 设为 false 并生成 final_answer。无论是否继续，都维护 research_notes，并在 exhausted_answer 中保留循环耗尽时可用的谨慎答案。不要编造证据中没有确认的事实。"
       }
     },
     "need_more_search_check": {
@@ -216,6 +231,24 @@
         "persistFormat": "auto",
         "fileNameTemplate": ""
       }
+    },
+    "output_source_documents": {
+      "kind": "output",
+      "name": "output_source_documents",
+      "description": "Show fetched source page artifact references with pageable local document previews.",
+      "ui": {
+        "position": { "x": 1440, "y": 820 },
+        "collapsed": false
+      },
+      "reads": [
+        { "state": "state_9", "required": false }
+      ],
+      "config": {
+        "displayMode": "json",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
     }
   },
   "edges": [
@@ -230,6 +263,10 @@
     {
       "source": "web_search_agent",
       "target": "assess_search_sufficiency"
+    },
+    {
+      "source": "web_search_agent",
+      "target": "output_source_documents"
     },
     {
       "source": "assess_search_sufficiency",
@@ -247,6 +284,6 @@
     }
   ],
   "metadata": {
-    "graphiteui_state_key_counter": 8
+    "graphiteui_state_key_counter": 9
   }
 }

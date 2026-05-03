@@ -236,6 +236,67 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         self.assertEqual(result["skill_outputs"][0]["state_writes"], {"summary_text": "Long text / 2"})
         self.assertEqual(result["skill_outputs"][0]["status"], "succeeded")
 
+    def test_execute_agent_node_preserves_mapped_skill_output_when_response_omits_that_state(self) -> None:
+        state_schema = {
+            "query": NodeSystemStateDefinition.model_validate({"type": "text"}),
+            "search_report": NodeSystemStateDefinition.model_validate({"type": "markdown"}),
+            "source_documents": NodeSystemStateDefinition.model_validate({"type": "json"}),
+        }
+        node = NodeSystemAgentNode.model_validate(
+            {
+                "kind": "agent",
+                "name": "web_search_agent",
+                "ui": {"position": {"x": 0, "y": 0}},
+                "reads": [{"state": "query"}],
+                "writes": [{"state": "search_report"}, {"state": "source_documents"}],
+                "config": {
+                    "skills": ["web_search"],
+                    "skillBindings": [
+                        {
+                            "skillKey": "web_search",
+                            "inputMapping": {"query": "query"},
+                            "outputMapping": {"source_documents": "source_documents"},
+                        }
+                    ],
+                },
+            }
+        )
+        source_documents = [
+            {
+                "title": "Article",
+                "url": "https://example.com/article",
+                "local_path": "run_1/web_search/doc_001.md",
+            }
+        ]
+
+        result = execute_agent_node(
+            state_schema,
+            node,
+            {"query": "GraphiteUI"},
+            {"state": {}},
+            node_name="web_search_agent",
+            state={"run_id": "run-1"},
+            get_skill_registry_func=lambda *, include_disabled: {"web_search": object()},
+            invoke_skill_func=lambda skill_func, skill_inputs: {
+                "status": "succeeded",
+                "source_documents": source_documents,
+            },
+            resolve_agent_runtime_config_func=lambda agent_node: {},
+            build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
+            callable_accepts_keyword_func=lambda func, keyword: False,
+            generate_agent_response_func=lambda agent_node, input_values, skill_context, runtime_config, **kwargs: (
+                {"search_report": "report"},
+                "",
+                [],
+                runtime_config,
+            ),
+            finalize_agent_stream_delta_func=lambda *, state, node_name, output_values: None,
+            first_truthy_func=lambda values: next((value for value in values if value), None),
+        )
+
+        self.assertEqual(result["outputs"]["search_report"], "report")
+        self.assertEqual(result["outputs"]["source_documents"], source_documents)
+
     def test_execute_agent_node_does_not_special_case_web_search_inputs(self) -> None:
         state_schema = {
             "name": NodeSystemStateDefinition.model_validate({"type": "text"}),

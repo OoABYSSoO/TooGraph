@@ -160,12 +160,11 @@ def execute_agent_node(
     warnings.extend(response_warnings)
 
     output_values = dict(mapped_skill_outputs)
-    output_values.update(
-        {
-            state_name: response_payload.get(state_name)
-            for state_name in output_keys
-        }
-    )
+    for state_name in output_keys:
+        if state_name in response_payload:
+            output_values[state_name] = response_payload.get(state_name)
+        elif state_name not in output_values:
+            output_values[state_name] = None
     finalize_agent_stream_delta_func(
         state=state,
         node_name=node_name,
