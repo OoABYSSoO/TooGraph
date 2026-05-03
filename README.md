@@ -274,11 +274,12 @@ GraphiteUI/
 
 内置模板位于 `backend/app/templates/`：
 
-- `hello_world.json`
-- `human_review_demo.json`
-- `knowledge_base_validation.json`
 - `conditional_edge_validation.json`
 - `cycle_counter_demo.json`
+- `hello_world.json`
+- `human_review_demo.json`
+- `poem_generator.json`
+- `web_research_loop.json`
 
 ## 文档与知识库
 

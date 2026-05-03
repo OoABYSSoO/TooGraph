@@ -49,8 +49,9 @@
             :active-state-count="activeStateCount"
             :is-state-panel-open="activeStatePanelOpen"
             :is-run-activity-panel-open="activeRunActivityPanelOpen"
+            :has-run-activity-hint="activeRunActivityPanelHint"
             @toggle-state-panel="toggleActiveStatePanel"
-            @toggle-run-activity-panel="toggleActiveRunActivityPanel"
+            @toggle-run-activity-panel="toggleActiveRunActivityPanelFromActionCapsule"
             @save-active-graph="saveActiveGraph"
             @validate-active-graph="validateActiveGraph"
             @import-python-graph="openPythonGraphImportDialog"
@@ -318,6 +319,7 @@ const runOutputPreviewByTabId = ref<Record<string, Record<string, { text: string
 const runFailureMessageByTabId = ref<Record<string, Record<string, string>>>({});
 const activeRunEdgeIdsByTabId = ref<Record<string, string[]>>({});
 const runActivityByTabId = ref<Record<string, RunActivityState>>({});
+const runActivityHintByTabId = ref<Record<string, boolean>>({});
 const feedbackByTabId = ref<Record<string, WorkspaceRunFeedback | null>>({});
 const routeRestoreError = ref<string | null>(null);
 const nodeCreationMenuByTabId = ref<Record<string, NodeCreationMenuState>>({});
@@ -399,7 +401,6 @@ const {
   shouldShowRunActivityPanel,
   toggleStatePanel,
   openHumanReviewPanelForTab,
-  openRunActivityPanelForTab,
   focusNodeForTab,
   requestNodeFocusForTab,
   toggleActiveStatePanel,
@@ -416,6 +417,35 @@ const {
   closeNodeCreationMenu,
   showGraphLockedEditToast,
 });
+const activeRunActivityPanelHint = computed(() => {
+  const tab = activeTab.value;
+  return Boolean(tab && runActivityHintByTabId.value[tab.tabId] && !activeRunActivityPanelOpen.value);
+});
+
+function markRunActivityPanelHintForTab(tabId: string) {
+  runActivityHintByTabId.value = {
+    ...runActivityHintByTabId.value,
+    [tabId]: !shouldShowRunActivityPanel(tabId),
+  };
+}
+
+function clearRunActivityPanelHintForTab(tabId: string) {
+  if (!runActivityHintByTabId.value[tabId]) {
+    return;
+  }
+  runActivityHintByTabId.value = {
+    ...runActivityHintByTabId.value,
+    [tabId]: false,
+  };
+}
+
+function toggleActiveRunActivityPanelFromActionCapsule() {
+  const tab = activeTab.value;
+  if (tab) {
+    clearRunActivityPanelHintForTab(tab.tabId);
+  }
+  toggleActiveRunActivityPanel();
+}
 const {
   feedbackForTab,
   applyRunVisualStateToTab,
@@ -725,7 +755,7 @@ const { runActiveGraph, resumeHumanReviewRun } = useWorkspaceRunController({
   getRunGeneration,
   startRunEventStreamForTab,
   pollRunForTab,
-  openRunActivityPanelForTab,
+  markRunActivityPanelHintForTab,
   setFeedbackForTab,
   setMessageFeedbackForTab,
   translate: (key, params) => t(key, params ?? {}),

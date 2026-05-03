@@ -36,7 +36,10 @@
     <button
       type="button"
       class="editor-action-capsule__state-pill"
-      :class="{ 'editor-action-capsule__state-pill--active': isRunActivityPanelOpen }"
+      :class="{
+        'editor-action-capsule__state-pill--active': isRunActivityPanelOpen,
+        'editor-action-capsule__state-pill--hint': hasRunActivityHint && !isRunActivityPanelOpen,
+      }"
       @click="$emit('toggle-run-activity-panel')"
     >
       <span>{{ t("editor.runActivityPanel") }}</span>
@@ -58,6 +61,7 @@ defineProps<{
   activeStateCount: number;
   isStatePanelOpen: boolean;
   isRunActivityPanelOpen: boolean;
+  hasRunActivityHint: boolean;
 }>();
 
 defineEmits<{
@@ -146,6 +150,13 @@ const { t } = useI18n();
   color: rgba(126, 46, 11, 0.98);
 }
 
+.editor-action-capsule__state-pill--hint {
+  border-color: rgba(37, 99, 235, 0.42);
+  background: rgba(239, 246, 255, 0.96);
+  color: rgba(30, 64, 175, 0.96);
+  animation: editor-action-capsule-run-activity-pulse 1.1s ease-in-out infinite;
+}
+
 .editor-action-capsule__state-count {
   display: inline-flex;
   align-items: center;
@@ -192,6 +203,12 @@ const { t } = useI18n();
   color: rgba(126, 46, 11, 0.98);
 }
 
+.editor-action-capsule__state-pill--hint:hover {
+  border-color: rgba(37, 99, 235, 0.5);
+  background: rgba(219, 234, 254, 0.98);
+  color: rgba(30, 64, 175, 0.98);
+}
+
 .editor-action-capsule__run:hover {
   border-color: rgba(131, 43, 13, 0.96);
   background: rgba(131, 43, 13, 0.96);
@@ -203,5 +220,23 @@ const { t } = useI18n();
 .editor-action-capsule__run:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px rgba(210, 162, 117, 0.3);
+}
+
+@keyframes editor-action-capsule-run-activity-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.16);
+  }
+
+  50% {
+    box-shadow: 0 0 0 5px rgba(37, 99, 235, 0.18);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .editor-action-capsule__state-pill--hint {
+    animation: none;
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.14);
+  }
 }
 </style>

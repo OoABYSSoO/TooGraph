@@ -293,11 +293,12 @@ Resume support exists for runs with available LangGraph checkpoints and valid gr
 
 Current templates in `backend/app/templates/`:
 
-- `hello_world.json`
-- `knowledge_base_validation.json`
 - `conditional_edge_validation.json`
 - `cycle_counter_demo.json`
+- `hello_world.json`
 - `human_review_demo.json`
+- `poem_generator.json`
+- `web_research_loop.json`
 
 ## Working Expectations For Agents
 

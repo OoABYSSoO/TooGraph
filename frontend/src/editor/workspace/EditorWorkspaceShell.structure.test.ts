@@ -728,8 +728,8 @@ test("EditorWorkspaceShell renders the graph action controls as a detached capsu
   const editorTabBarUsage = componentSource.match(/<EditorTabBar[\s\S]*?\/>/)?.[0] ?? "";
 
   assert.match(componentSource, /import EditorActionCapsule from "\.\/EditorActionCapsule\.vue";/);
-  assert.match(componentSource, /<EditorActionCapsule[\s\S]*:active-state-count="activeStateCount"[\s\S]*:is-state-panel-open="activeStatePanelOpen"[\s\S]*:is-run-activity-panel-open="activeRunActivityPanelOpen"/);
-  assert.match(componentSource, /@toggle-run-activity-panel="toggleActiveRunActivityPanel"/);
+  assert.match(componentSource, /<EditorActionCapsule[\s\S]*:active-state-count="activeStateCount"[\s\S]*:is-state-panel-open="activeStatePanelOpen"[\s\S]*:is-run-activity-panel-open="activeRunActivityPanelOpen"[\s\S]*:has-run-activity-hint="activeRunActivityPanelHint"/);
+  assert.match(componentSource, /@toggle-run-activity-panel="toggleActiveRunActivityPanelFromActionCapsule"/);
   assert.match(componentSource, /@save-active-graph="saveActiveGraph"/);
   assert.match(componentSource, /@validate-active-graph="validateActiveGraph"/);
   assert.match(componentSource, /@import-python-graph="openPythonGraphImportDialog"/);
@@ -755,21 +755,23 @@ test("EditorWorkspaceShell mounts Run Activity as a realtime side panel beside S
   assert.match(tabLifecycleControllerSource, /clearRecord\(input\.runActivityByTabId, tabId\);/);
 });
 
-test("EditorWorkspaceShell opens Run Activity automatically when a run starts or resumes", () => {
+test("EditorWorkspaceShell hints Run Activity instead of opening it when a run starts or resumes", () => {
+  assert.doesNotMatch(componentSource, /openRunActivityPanelForTab/);
+  assert.match(componentSource, /const runActivityHintByTabId = ref<Record<string, boolean>>\(\{\}\);/);
+  assert.match(componentSource, /const activeRunActivityPanelHint = computed\(\(\) => \{/);
+  assert.match(componentSource, /function markRunActivityPanelHintForTab\(tabId: string\)/);
+  assert.match(componentSource, /function toggleActiveRunActivityPanelFromActionCapsule\(\)/);
   assert.match(
     componentSource,
-    /const \{[\s\S]*openRunActivityPanelForTab,[\s\S]*toggleActiveRunActivityPanel,[\s\S]*\} = useWorkspaceSidePanelController\(\{/,
-  );
-  assert.match(
-    componentSource,
-    /useWorkspaceRunController\(\{[\s\S]*startRunEventStreamForTab,[\s\S]*pollRunForTab,[\s\S]*openRunActivityPanelForTab,[\s\S]*setFeedbackForTab,[\s\S]*\}\);/,
+    /useWorkspaceRunController\(\{[\s\S]*startRunEventStreamForTab,[\s\S]*pollRunForTab,[\s\S]*markRunActivityPanelHintForTab,[\s\S]*setFeedbackForTab,[\s\S]*\}\);/,
   );
   assert.match(sidePanelControllerSource, /function openRunActivityPanelForTab\(tabId: string\)/);
   assert.match(sidePanelControllerSource, /if \(isHumanReviewPanelLockedOpen\(tabId\)\) \{[\s\S]*return;/);
   assert.match(sidePanelControllerSource, /input\.sidePanelModeByTabId\.value = setTabScopedRecordEntry\(input\.sidePanelModeByTabId\.value, tabId, "run-activity"\);/);
   assert.match(sidePanelControllerSource, /input\.statePanelOpenByTabId\.value = setTabScopedRecordEntry\(input\.statePanelOpenByTabId\.value, tabId, true\);/);
-  assert.match(runControllerSource, /input\.openRunActivityPanelForTab\(tab\.tabId\);/);
-  assert.match(runControllerSource, /input\.openRunActivityPanelForTab\(tabId\);/);
+  assert.match(runControllerSource, /input\.markRunActivityPanelHintForTab\(tab\.tabId\);/);
+  assert.match(runControllerSource, /input\.markRunActivityPanelHintForTab\(tabId\);/);
+  assert.doesNotMatch(runControllerSource, /input\.openRunActivityPanelForTab/);
 });
 
 test("EditorWorkspaceShell lays out the tab strip tight to the right action capsule", () => {

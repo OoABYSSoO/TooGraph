@@ -85,7 +85,7 @@ function createRunHarness() {
   const cancelledPolling: string[] = [];
   const streams: Array<{ tabId: string; runId: string }> = [];
   const polls: Array<{ tabId: string; runId: string; generation: number }> = [];
-  const openedRunActivityPanels: string[] = [];
+  const runActivityHints: string[] = [];
   let generation = 7;
 
   const controller = useWorkspaceRunController({
@@ -125,8 +125,8 @@ function createRunHarness() {
     pollRunForTab: (tabId, runId, nextGeneration) => {
       polls.push({ tabId, runId, generation: nextGeneration });
     },
-    openRunActivityPanelForTab: (tabId) => {
-      openedRunActivityPanels.push(tabId);
+    markRunActivityPanelHintForTab: (tabId) => {
+      runActivityHints.push(tabId);
     },
     setFeedbackForTab: (tabId, feedback) => {
       feedbackByTabId.value = { ...feedbackByTabId.value, [tabId]: feedback };
@@ -166,7 +166,7 @@ function createRunHarness() {
     cancelledPolling,
     streams,
     polls,
-    openedRunActivityPanels,
+    runActivityHints,
     controller,
   };
 }
@@ -188,7 +188,7 @@ test("useWorkspaceRunController runs the latest document after model refresh and
   assert.equal(harness.humanReviewErrorByTabId.value.tab_a, null);
   assert.equal(harness.feedbackByTabId.value.tab_a?.activeRunId, "run_started");
   assert.equal(harness.feedbackByTabId.value.tab_a?.summary.idle, 2);
-  assert.deepEqual(harness.openedRunActivityPanels, ["tab_a"]);
+  assert.deepEqual(harness.runActivityHints, ["tab_a"]);
   assert.deepEqual(harness.streams, [{ tabId: "tab_a", runId: "run_started" }]);
   assert.deepEqual(harness.polls, [{ tabId: "tab_a", runId: "run_started", generation: 8 }]);
 });
@@ -213,7 +213,7 @@ test("useWorkspaceRunController resumes Human Review runs with the restored snap
   assert.equal(harness.humanReviewBusyByTabId.value.tab_a, false);
   assert.equal(harness.humanReviewErrorByTabId.value.tab_a, null);
   assert.equal(harness.feedbackByTabId.value.tab_a?.activeRunId, "run_resumed");
-  assert.deepEqual(harness.openedRunActivityPanels, ["tab_a"]);
+  assert.deepEqual(harness.runActivityHints, ["tab_a"]);
   assert.deepEqual(harness.streams, [{ tabId: "tab_a", runId: "run_resumed" }]);
   assert.deepEqual(harness.polls, [{ tabId: "tab_a", runId: "run_resumed", generation: 8 }]);
 });

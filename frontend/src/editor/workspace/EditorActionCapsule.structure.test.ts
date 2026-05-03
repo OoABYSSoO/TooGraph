@@ -16,13 +16,17 @@ test("EditorActionCapsule keeps graph tools compact while preserving Run as the 
     /class="editor-action-capsule__tools"[\s\S]*class="editor-action-capsule__state-pill"[\s\S]*t\("editor\.statePanel"\)[\s\S]*class="editor-action-capsule__state-pill"[\s\S]*t\("editor\.runActivityPanel"\)[\s\S]*class="editor-action-capsule__run"/,
   );
   assert.match(componentSource, /:class="\{ 'editor-action-capsule__state-pill--active': isStatePanelOpen \}"/);
-  assert.match(componentSource, /:class="\{ 'editor-action-capsule__state-pill--active': isRunActivityPanelOpen \}"/);
+  assert.match(
+    componentSource,
+    /:class="\{[\s\S]*'editor-action-capsule__state-pill--active': isRunActivityPanelOpen,[\s\S]*'editor-action-capsule__state-pill--hint': hasRunActivityHint && !isRunActivityPanelOpen,[\s\S]*\}"/,
+  );
   assert.match(componentSource, /<span class="editor-action-capsule__state-count">\{\{ activeStateCount \}\}<\/span>/);
   assert.match(componentSource, /class="editor-action-capsule__run-icon"[\s\S]*<VideoPlay \/>/);
   assert.match(componentSource, /@click="\$emit\('toggle-state-panel'\)"/);
   assert.match(componentSource, /@click="\$emit\('toggle-run-activity-panel'\)"/);
   assert.match(componentSource, /@click="\$emit\('run-active-graph'\)"/);
   assert.match(componentSource, /isRunActivityPanelOpen: boolean;/);
+  assert.match(componentSource, /hasRunActivityHint: boolean;/);
   assert.match(componentSource, /\(event: "toggle-run-activity-panel"\): void;/);
 });
 
@@ -63,6 +67,9 @@ test("EditorActionCapsule styles the state pill state and interactive controls",
     componentSource,
     /\.editor-action-capsule__state-pill--active\s*\{[\s\S]*border-color:\s*rgba\(154,\s*52,\s*18,\s*0\.44\);[\s\S]*background:\s*rgba\(255,\s*238,\s*222,\s*0\.98\);[\s\S]*color:\s*rgba\(126,\s*46,\s*11,\s*0\.98\);[\s\S]*\}/,
   );
+  assert.match(componentSource, /\.editor-action-capsule__state-pill--hint\s*\{[\s\S]*animation:\s*editor-action-capsule-run-activity-pulse/);
+  assert.match(componentSource, /@keyframes editor-action-capsule-run-activity-pulse/);
+  assert.match(componentSource, /@media \(prefers-reduced-motion:\s*reduce\)/);
   assert.match(
     componentSource,
     /\.editor-action-capsule__state-count\s*\{[\s\S]*display:\s*inline-flex;[\s\S]*min-width:\s*22px;[\s\S]*border-radius:\s*999px;[\s\S]*font-weight:\s*700;[\s\S]*\}/,
