@@ -1,9 +1,9 @@
 <template>
-  <section class="node-card__document-pager" aria-label="Local documents">
+  <section class="node-card__document-pager" aria-label="Local documents" @pointerdown.stop @click.stop>
     <div class="node-card__document-pager-head">
       <div class="node-card__document-pager-title">
         <strong>{{ activeDocument?.title || t("common.none") }}</strong>
-        <a v-if="activeDocument?.url" :href="activeDocument.url" target="_blank" rel="noreferrer">{{ activeDocument.url }}</a>
+        <a v-if="activeDocument?.url" :href="activeDocument.url" target="_blank" rel="noreferrer" @pointerdown.stop @click.stop>{{ activeDocument.url }}</a>
       </div>
       <div class="node-card__document-pager-controls">
         <button
@@ -11,7 +11,8 @@
           class="node-card__document-pager-button"
           :disabled="activeIndex <= 0"
           :aria-label="t('common.pagePrevious')"
-          @click="activeIndex -= 1"
+          @pointerdown.stop
+          @click.stop="activeIndex -= 1"
         >
           <ElIcon aria-hidden="true"><ArrowLeft /></ElIcon>
         </button>
@@ -21,7 +22,8 @@
           class="node-card__document-pager-button"
           :disabled="activeIndex >= documents.length - 1"
           :aria-label="t('common.pageNext')"
-          @click="activeIndex += 1"
+          @pointerdown.stop
+          @click.stop="activeIndex += 1"
         >
           <ElIcon aria-hidden="true"><ArrowRight /></ElIcon>
         </button>
