@@ -66,6 +66,13 @@
       "type": "json",
       "value": [],
       "color": "#1d4ed8"
+    },
+    "state_10": {
+      "name": "evidence_links",
+      "description": "Structured web evidence links used by the final summary, with title, URL, and supported claim.",
+      "type": "json",
+      "value": [],
+      "color": "#059669"
     }
   },
   "nodes": {
@@ -118,6 +125,7 @@
       ],
       "writes": [
         { "state": "state_3", "mode": "replace" },
+        { "state": "state_10", "mode": "replace" },
         { "state": "state_9", "mode": "replace" }
       ],
       "config": {
@@ -130,6 +138,7 @@
               "query": "state_2"
             },
             "outputMapping": {
+              "citations": "state_10",
               "source_documents": "state_9"
             },
             "config": {
@@ -141,7 +150,7 @@
             }
           }
         ],
-        "taskInstruction": "根据 search_query 和 web_search 技能结果整理本轮搜索报告。保留本轮搜索词、搜索日期、最相关证据摘要、完整引用链接，以及 web_search 返回的本地 source_documents 路径摘要。搜索报告只写关键证据和缺口，不要粘贴完整网页正文；完整原文已经由技能保存为 source_documents，可由 Output 节点翻页查看。如果没有可靠结果或网页正文抓取失败，明确写出缺口和失败来源。"
+        "taskInstruction": "根据 search_query 和 web_search 技能结果整理本轮搜索报告。保留本轮搜索词、搜索日期、最相关证据摘要、完整引用链接，以及 web_search 返回的本地 source_documents 路径摘要。同步维护 evidence_links：每条证据至少包含 title、url、evidence 或 supports 字段，用来说明该链接支撑了什么事实。搜索报告只写关键证据和缺口，不要粘贴完整网页正文；完整原文已经由技能保存为 source_documents，可由 Output 节点翻页查看。如果没有可靠结果或网页正文抓取失败，明确写出缺口和失败来源。"
       }
     },
     "assess_search_sufficiency": {
@@ -156,10 +165,12 @@
         { "state": "state_1", "required": true },
         { "state": "state_2", "required": true },
         { "state": "state_3", "required": true },
+        { "state": "state_10", "required": false },
         { "state": "state_4", "required": false },
         { "state": "state_9", "required": false }
       ],
       "writes": [
+        { "state": "state_10", "mode": "replace" },
         { "state": "state_4", "mode": "replace" },
         { "state": "state_5", "mode": "replace" },
         { "state": "state_8", "mode": "replace" },
@@ -168,7 +179,7 @@
       ],
       "config": {
         "skills": [],
-        "taskInstruction": "根据 request、search_query、search_result、source_documents 和已有 research_notes 合并本轮证据，判断是否已经足够回答。必须覆盖 request 要求的关键事实、时间、数字、结论、限制条件和引用依据，优先使用官方或高可信来源。把可复查的 URL 和本地 source_documents 路径写进 research_notes，便于运行记录回看原文；但不要把完整网页正文粘贴进 research_notes。证据不足时将 needs_more_search 设为 true，并在 next_search_focus 中写清下一轮应补查的具体缺口；证据足够时将 needs_more_search 设为 false 并生成 final_answer。无论是否继续，都维护 research_notes，并在 exhausted_answer 中保留循环耗尽时可用的谨慎答案。不要编造证据中没有确认的事实。"
+        "taskInstruction": "根据 request、search_query、search_result、evidence_links、source_documents 和已有 research_notes 合并本轮证据，判断是否已经足够回答。必须覆盖 request 要求的关键事实、时间、数字、结论、限制条件和引用依据，优先使用官方或高可信来源。把可复查的 URL 和本地 source_documents 路径写进 research_notes，便于运行记录回看原文；但不要把完整网页正文粘贴进 research_notes。同步输出三段最终结果所需数据：final_answer 是面向用户的总结内容；evidence_links 是最终答案实际使用的证据网页链接列表，每条包含 title、url、evidence 或 supports；source_documents 保持为本地原文文档引用列表，让 Output 节点读取文件正文。证据不足时将 needs_more_search 设为 true，并在 next_search_focus 中写清下一轮应补查的具体缺口；证据足够时将 needs_more_search 设为 false 并生成 final_answer。无论是否继续，都维护 research_notes，并在 exhausted_answer 中保留循环耗尽时可用的谨慎答案。不要编造证据中没有确认的事实。"
       }
     },
     "need_more_search_check": {
@@ -201,7 +212,7 @@
       "name": "output_final_answer",
       "description": "Show the final grounded research answer.",
       "ui": {
-        "position": { "x": 3480, "y": 120 },
+        "position": { "x": 3480, "y": 40 },
         "collapsed": false
       },
       "reads": [
@@ -214,12 +225,30 @@
         "fileNameTemplate": ""
       }
     },
+    "output_evidence_links": {
+      "kind": "output",
+      "name": "output_evidence_links",
+      "description": "Show the structured evidence web links used by the final answer.",
+      "ui": {
+        "position": { "x": 3480, "y": 500 },
+        "collapsed": false
+      },
+      "reads": [
+        { "state": "state_10", "required": false }
+      ],
+      "config": {
+        "displayMode": "json",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    },
     "output_exhausted_answer": {
       "kind": "output",
       "name": "output_exhausted_answer",
       "description": "Show the best-effort answer when the search loop reaches its limit.",
       "ui": {
-        "position": { "x": 3480, "y": 660 },
+        "position": { "x": 3480, "y": 1420 },
         "collapsed": false
       },
       "reads": [
@@ -235,16 +264,16 @@
     "output_source_documents": {
       "kind": "output",
       "name": "output_source_documents",
-      "description": "Show fetched source page artifact references with pageable local document previews.",
+      "description": "Read fetched source page artifact files and show their full local document content with pagination.",
       "ui": {
-        "position": { "x": 1440, "y": 820 },
+        "position": { "x": 3480, "y": 960 },
         "collapsed": false
       },
       "reads": [
         { "state": "state_9", "required": false }
       ],
       "config": {
-        "displayMode": "json",
+        "displayMode": "documents",
         "persistEnabled": false,
         "persistFormat": "auto",
         "fileNameTemplate": ""
@@ -265,7 +294,11 @@
       "target": "assess_search_sufficiency"
     },
     {
-      "source": "web_search_agent",
+      "source": "assess_search_sufficiency",
+      "target": "output_evidence_links"
+    },
+    {
+      "source": "assess_search_sufficiency",
       "target": "output_source_documents"
     },
     {
@@ -284,6 +317,6 @@
     }
   ],
   "metadata": {
-    "graphiteui_state_key_counter": 9
+    "graphiteui_state_key_counter": 10
   }
 }

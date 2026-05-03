@@ -18,6 +18,7 @@ test("output config options preserve NodeCard advanced control presentation", ()
     { value: "plain", label: "PLAIN" },
     { value: "markdown", label: "MD" },
     { value: "json", label: "JSON" },
+    { value: "documents", label: "DOCS" },
   ]);
   assert.deepEqual(OUTPUT_PERSIST_FORMAT_OPTIONS, [
     { value: "auto", label: "AUTO" },
@@ -32,6 +33,7 @@ test("output config label helpers preserve view-model labels", () => {
   assert.equal(formatOutputDisplayModeLabel("plain"), "PLAIN");
   assert.equal(formatOutputDisplayModeLabel("markdown"), "MD");
   assert.equal(formatOutputDisplayModeLabel("json"), "JSON");
+  assert.equal(formatOutputDisplayModeLabel("documents"), "DOCS");
   assert.equal(formatOutputDisplayModeLabel("unexpected"), "AUTO");
 
   assert.equal(formatOutputPersistFormatLabel("auto"), "AUTO");

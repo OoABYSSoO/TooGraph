@@ -150,7 +150,7 @@ test("listRunOutputArtifacts keeps skill artifact document references for paged 
             label: "Source Documents",
             source_kind: "state",
             source_key: "source_documents",
-            display_mode: "json",
+            display_mode: "documents",
             persist_enabled: false,
             persist_format: "auto",
             value: [
@@ -185,6 +185,7 @@ test("listRunOutputArtifacts keeps skill artifact document references for paged 
     }),
   );
 
+  assert.equal(artifacts[0].displayMode, "documents");
   assert.deepEqual(artifacts[0].documentRefs, [
     {
       title: "Article One",
@@ -218,6 +219,60 @@ test("normalizeArtifactDocumentReferences ignores values without safe local path
         localPath: "run_1/a.md",
         contentType: "text/markdown",
         charCount: null,
+      },
+    ],
+  );
+});
+
+test("normalizeArtifactDocumentReferences accepts arrays and structured objects with local_path", () => {
+  assert.deepEqual(
+    normalizeArtifactDocumentReferences(["run_1/search/doc_000.md"]),
+    [
+      {
+        title: "Document 1",
+        url: "",
+        localPath: "run_1/search/doc_000.md",
+        contentType: "text/markdown",
+        charCount: null,
+      },
+    ],
+  );
+
+  assert.deepEqual(
+    normalizeArtifactDocumentReferences({
+      source_documents: [
+        {
+          title: "Nested",
+          url: "https://example.com/source",
+          local_path: "run_1/search/doc_001.md",
+          content_type: "text/markdown",
+        },
+      ],
+    }),
+    [
+      {
+        title: "Nested",
+        url: "https://example.com/source",
+        localPath: "run_1/search/doc_001.md",
+        contentType: "text/markdown",
+        charCount: null,
+      },
+    ],
+  );
+
+  assert.deepEqual(
+    normalizeArtifactDocumentReferences({
+      title: "Single",
+      local_path: "run_1/search/doc_002.md",
+      charCount: 42,
+    }),
+    [
+      {
+        title: "Single",
+        url: "",
+        localPath: "run_1/search/doc_002.md",
+        contentType: "text/markdown",
+        charCount: 42,
       },
     ],
   );

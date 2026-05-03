@@ -280,7 +280,7 @@ test("projectCanvasEdges shows a self feedback data edge for nodes that read and
   assert.equal(feedbackEdge.color, "#7c3aed");
   assert.equal(
     feedbackEdge.path,
-    "M 2540 425 L 2568 425 L 2594 425 Q 2612 425 2612 407 L 2612 250 Q 2612 232 2594 232 L 2072 232 Q 2054 232 2054 250 L 2054 539 Q 2054 557 2072 557 L 2098 557 L 2126 557",
+    "M 2540 469 L 2568 469 L 2594 469 Q 2612 469 2612 451 L 2612 250 Q 2612 232 2594 232 L 2072 232 Q 2054 232 2054 250 L 2054 583 Q 2054 601 2072 601 L 2098 601 L 2126 601",
   );
 });
 

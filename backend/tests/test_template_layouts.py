@@ -188,6 +188,7 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertIn("web_search_agent", template.nodes)
         self.assertIn("assess_search_sufficiency", template.nodes)
         self.assertIn("need_more_search_check", template.nodes)
+        self.assertIn("output_evidence_links", template.nodes)
         self.assertIn("output_source_documents", template.nodes)
         self.assertNotIn("final_answer_writer", template.nodes)
         self.assertNotIn("exhausted_answer_writer", template.nodes)
@@ -211,15 +212,21 @@ class TemplateLayoutTests(unittest.TestCase):
         )
         self.assertEqual(
             search_node.config.skill_bindings[0].output_mapping,
-            {"source_documents": state_by_name["source_documents"]},
+            {
+                "citations": state_by_name["evidence_links"],
+                "source_documents": state_by_name["source_documents"],
+            },
         )
         self.assertEqual(search_node.config.skill_bindings[0].config.get("fetch_pages"), "true")
         self.assertEqual(search_node.config.skill_bindings[0].config.get("max_pages"), 5)
+        self.assertIn(state_by_name["evidence_links"], [binding.state for binding in search_node.writes])
         self.assertIn(state_by_name["source_documents"], [binding.state for binding in search_node.writes])
 
         assessor = template.nodes["assess_search_sufficiency"]
+        self.assertIn(state_by_name["evidence_links"], [binding.state for binding in assessor.reads])
         self.assertIn(state_by_name["research_notes"], [binding.state for binding in assessor.reads])
         self.assertIn(state_by_name["source_documents"], [binding.state for binding in assessor.reads])
+        self.assertIn(state_by_name["evidence_links"], [binding.state for binding in assessor.writes])
         self.assertIn(state_by_name["research_notes"], [binding.state for binding in assessor.writes])
         self.assertIn(state_by_name["needs_more_search"], [binding.state for binding in assessor.writes])
         self.assertIn(state_by_name["next_search_focus"], [binding.state for binding in assessor.writes])
@@ -227,11 +234,19 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertIn(state_by_name["final_answer"], [binding.state for binding in assessor.writes])
         self.assertIn(state_by_name["exhausted_answer"], [binding.state for binding in assessor.writes])
 
+        evidence_output = template.nodes["output_evidence_links"]
+        self.assertEqual(evidence_output.reads[0].state, state_by_name["evidence_links"])
+        self.assertEqual(evidence_output.config.display_mode.value, "json")
+        self.assertIn(
+            ("assess_search_sufficiency", "output_evidence_links"),
+            [(edge.source, edge.target) for edge in template.edges],
+        )
+
         source_output = template.nodes["output_source_documents"]
         self.assertEqual(source_output.reads[0].state, state_by_name["source_documents"])
-        self.assertEqual(source_output.config.display_mode.value, "json")
+        self.assertEqual(source_output.config.display_mode.value, "documents")
         self.assertIn(
-            ("web_search_agent", "output_source_documents"),
+            ("assess_search_sufficiency", "output_source_documents"),
             [(edge.source, edge.target) for edge in template.edges],
         )
 

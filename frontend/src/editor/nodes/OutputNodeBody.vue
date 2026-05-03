@@ -35,6 +35,7 @@
           'node-card__preview--plain': outputPreviewContent.kind === 'plain',
           'node-card__preview--markdown': outputPreviewContent.kind === 'markdown',
           'node-card__preview--json': outputPreviewContent.kind === 'json',
+          'node-card__preview--documents': outputPreviewContent.kind === 'documents',
           'node-card__preview--empty': outputPreviewContent.isEmpty,
         }"
       >
@@ -148,6 +149,15 @@ const { t } = useI18n();
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 0.84rem;
   line-height: 1.55;
+}
+
+.node-card__preview--documents .node-card__preview-text {
+  border-left: 3px solid rgba(37, 99, 235, 0.46);
+  padding-left: 12px;
+  color: rgba(30, 64, 175, 0.92);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.84rem;
+  line-height: 1.58;
 }
 
 .node-card__preview-markdown {

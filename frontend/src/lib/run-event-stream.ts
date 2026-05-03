@@ -10,7 +10,7 @@ export type LiveStreamingOutput = {
 };
 
 export type RunEventPreviewDocument = {
-  nodes: Record<string, { kind?: string; reads?: Array<{ state?: string | null }> }>;
+  nodes: Record<string, { kind?: string; reads?: Array<{ state?: string | null }>; config?: Record<string, unknown> | null }>;
 };
 
 export type RunEventOutputPreviewEntry = {
@@ -72,12 +72,13 @@ export function buildRunEventOutputPreviewByNodeId(
   currentPreviewByNodeId: Record<string, RunEventOutputPreviewEntry>,
   previewNodeIds: string[],
   text: string,
+  document?: RunEventPreviewDocument | null,
 ) {
   const nextPreviewByNodeId = { ...currentPreviewByNodeId };
   for (const nodeId of previewNodeIds) {
     nextPreviewByNodeId[nodeId] = {
       text,
-      displayMode: "plain",
+      displayMode: resolveRunEventPreviewDisplayMode(document, nodeId),
     };
   }
   return nextPreviewByNodeId;
@@ -100,7 +101,13 @@ export function buildRunEventOutputPreviewUpdate(
     return null;
   }
 
-  return buildRunEventOutputPreviewByNodeId(currentPreviewByNodeId, previewNodeIds, text);
+  return buildRunEventOutputPreviewByNodeId(currentPreviewByNodeId, previewNodeIds, text, document);
+}
+
+function resolveRunEventPreviewDisplayMode(document: RunEventPreviewDocument | null | undefined, nodeId: string) {
+  const rawDisplayMode = document?.nodes[nodeId]?.config?.displayMode;
+  const displayMode = typeof rawDisplayMode === "string" ? rawDisplayMode.trim() : "";
+  return displayMode && ["plain", "markdown", "json", "documents"].includes(displayMode) ? displayMode : "plain";
 }
 
 export function buildLiveStreamingOutput(

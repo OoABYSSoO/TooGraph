@@ -13,6 +13,7 @@ export const OUTPUT_DISPLAY_MODE_OPTIONS: Array<OutputConfigOption<OutputDisplay
   { value: "plain", label: "PLAIN" },
   { value: "markdown", label: "MD" },
   { value: "json", label: "JSON" },
+  { value: "documents", label: "DOCS" },
 ];
 
 export const OUTPUT_PERSIST_FORMAT_OPTIONS: Array<OutputConfigOption<OutputPersistFormat>> = [
@@ -30,6 +31,8 @@ export function formatOutputDisplayModeLabel(displayMode: string) {
       return "PLAIN";
     case "json":
       return "JSON";
+    case "documents":
+      return "DOCS";
     default:
       return "AUTO";
   }

@@ -178,6 +178,32 @@ test("buildRunEventOutputPreviewUpdate projects payloads into next preview maps 
   assert.equal(buildRunEventOutputPreviewUpdate(document, currentPreview, { text: "missing target" }), null);
 });
 
+test("buildRunEventOutputPreviewUpdate preserves configured document output display mode", () => {
+  const document = {
+    nodes: {
+      output_sources: {
+        kind: "output",
+        reads: [{ state: "source_documents" }],
+        config: { displayMode: "documents" },
+      },
+    },
+  };
+
+  assert.deepEqual(
+    buildRunEventOutputPreviewUpdate(document, {}, {
+      text: '[{"title":"Article","local_path":"run_1/search/doc_001.md"}]',
+      output_keys: ["source_documents"],
+      node_id: "web_search_agent",
+    }),
+    {
+      output_sources: {
+        text: '[{"title":"Article","local_path":"run_1/search/doc_001.md"}]',
+        displayMode: "documents",
+      },
+    },
+  );
+});
+
 test("buildLiveStreamingOutput preserves live output merge semantics", () => {
   const current = {
     nodeId: "output",

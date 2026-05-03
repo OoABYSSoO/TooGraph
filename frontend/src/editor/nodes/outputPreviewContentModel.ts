@@ -1,4 +1,4 @@
-export type OutputPreviewContentKind = "plain" | "markdown" | "json";
+export type OutputPreviewContentKind = "plain" | "markdown" | "json" | "documents";
 
 export type OutputPreviewContent = {
   kind: OutputPreviewContentKind;
@@ -35,6 +35,15 @@ export function resolveOutputPreviewContent(text: string, displayMode: string): 
     };
   }
 
+  if (kind === "documents") {
+    return {
+      kind,
+      text: formatDocumentPreview(normalizedText),
+      html: "",
+      isEmpty: isOutputPreviewEmpty(normalizedText),
+    };
+  }
+
   return {
     kind: "plain",
     text: normalizedText,
@@ -49,6 +58,9 @@ export function resolveOutputPreviewDisplayMode(text: string, displayMode: strin
   }
   if (displayMode === "json") {
     return "json";
+  }
+  if (displayMode === "documents") {
+    return "documents";
   }
   if (displayMode === "plain") {
     return "plain";
@@ -85,6 +97,119 @@ function formatJsonPreview(text: string) {
   } catch {
     return text;
   }
+}
+
+function formatDocumentPreview(text: string) {
+  const documents = parseDocumentPreviewRecords(text);
+  if (documents === null) {
+    return text;
+  }
+  if (documents.length === 0) {
+    return "No local source documents.";
+  }
+
+  const availableCount = documents.filter((document) => document.localPath).length;
+  const header = `${availableCount} local source document${availableCount === 1 ? "" : "s"}`;
+  const lines = [header];
+  documents.forEach((document, index) => {
+    lines.push(`${index + 1}. ${document.title || `Document ${index + 1}`}`);
+    if (document.url) {
+      lines.push(`   URL: ${document.url}`);
+    }
+    if (document.localPath) {
+      lines.push(`   Local: ${document.localPath}`);
+    }
+    if (document.charCount !== null) {
+      lines.push(`   Size: ${document.charCount} chars`);
+    }
+    if (!document.localPath && document.error) {
+      lines.push(`   Unavailable: ${document.error}`);
+    }
+  });
+  return lines.join("\n");
+}
+
+type DocumentPreviewRecord = {
+  title: string;
+  url: string;
+  localPath: string;
+  charCount: number | null;
+  error: string;
+};
+
+function parseDocumentPreviewRecords(text: string): DocumentPreviewRecord[] | null {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(trimmed);
+    const documents: DocumentPreviewRecord[] = [];
+    collectDocumentPreviewRecords(parsed, documents, false);
+    return documents;
+  } catch {
+    return null;
+  }
+}
+
+function collectDocumentPreviewRecords(value: unknown, documents: DocumentPreviewRecord[], allowStringPath: boolean) {
+  if (typeof value === "string") {
+    if (allowStringPath) {
+      appendDocumentPreviewRecord({ local_path: value }, documents);
+    }
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectDocumentPreviewRecords(item, documents, true);
+    }
+    return;
+  }
+
+  if (!value || typeof value !== "object") {
+    return;
+  }
+
+  const record = value as Record<string, unknown>;
+  if (record.local_path !== undefined) {
+    appendDocumentPreviewRecord(record, documents);
+    return;
+  }
+
+  for (const nestedValue of Object.values(record)) {
+    collectDocumentPreviewRecords(nestedValue, documents, false);
+  }
+}
+
+function appendDocumentPreviewRecord(record: Record<string, unknown>, documents: DocumentPreviewRecord[]) {
+  const localPath = normalizePreviewLocalPath(record.local_path);
+  if (!localPath) {
+    return;
+  }
+  documents.push({
+    title: normalizePreviewText(record.title) || `Document ${documents.length + 1}`,
+    url: normalizePreviewText(record.url),
+    localPath,
+    charCount: normalizePreviewNumber(record.char_count ?? record.charCount),
+    error: normalizePreviewText(record.error),
+  });
+}
+
+function normalizePreviewText(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizePreviewLocalPath(value: unknown) {
+  const path = normalizePreviewText(value).replaceAll("\\", "/");
+  if (!path || path.startsWith("/") || path.split("/").some((part) => !part || part === "." || part === "..")) {
+    return "";
+  }
+  return path;
+}
+
+function normalizePreviewNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
 function looksLikeMarkdown(text: string) {

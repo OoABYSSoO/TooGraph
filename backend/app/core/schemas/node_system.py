@@ -100,6 +100,7 @@ class DisplayMode(str, Enum):
     PLAIN = "plain"
     MARKDOWN = "markdown"
     JSON = "json"
+    DOCUMENTS = "documents"
 
 
 class PersistFormat(str, Enum):

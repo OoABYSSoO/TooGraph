@@ -92,7 +92,7 @@ export type OutputNode = {
   reads: ReadBinding[];
   writes: WriteBinding[];
   config: {
-    displayMode: "auto" | "plain" | "markdown" | "json";
+    displayMode: "auto" | "plain" | "markdown" | "json" | "documents";
     persistEnabled: boolean;
     persistFormat: "txt" | "md" | "json" | "auto";
     fileNameTemplate: string;

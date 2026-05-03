@@ -371,6 +371,38 @@ test("buildNodeCardViewModel shows the auto-detected output display format", () 
   assert.equal(model.body.displayModeLabel, "JSON");
 });
 
+test("buildNodeCardViewModel exposes configured document output display format", () => {
+  const node: GraphNode = {
+    kind: "output",
+    name: "output_sources",
+    description: "Preview fetched source documents.",
+    ui: { position: { x: 980, y: 420 } },
+    reads: [{ state: "source_documents", required: false }],
+    writes: [],
+    config: {
+      displayMode: "documents",
+      persistEnabled: false,
+      persistFormat: "auto",
+      fileNameTemplate: "",
+    },
+  };
+
+  const model = buildNodeCardViewModel("output_sources", node, {
+    ...stateSchema,
+    source_documents: {
+      name: "source_documents",
+      description: "",
+      type: "json",
+      value: [{ title: "Article", local_path: "run_1/search/doc_001.md" }],
+      color: "#1d4ed8",
+    },
+  });
+
+  assert.equal(model.body.kind, "output");
+  assert.equal(model.body.displayMode, "documents");
+  assert.equal(model.body.displayModeLabel, "DOCS");
+});
+
 test("buildNodeCardViewModel uses the legacy output empty state when no upstream state is connected", () => {
   const node: GraphNode = {
     kind: "output",

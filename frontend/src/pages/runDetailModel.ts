@@ -55,27 +55,59 @@ export function listRunOutputArtifacts(run: RunDetail): RunOutputArtifactCard[] 
 }
 
 export function normalizeArtifactDocumentReferences(value: unknown): ArtifactDocumentReference[] {
-  if (!Array.isArray(value)) {
-    return [];
+  const references: ArtifactDocumentReference[] = [];
+  collectArtifactDocumentReferences(value, references, false);
+  return references;
+}
+
+function collectArtifactDocumentReferences(value: unknown, references: ArtifactDocumentReference[], allowStringPath: boolean) {
+  if (typeof value === "string") {
+    if (allowStringPath) {
+      appendArtifactDocumentReference(
+        {
+          title: "",
+          url: "",
+          local_path: value,
+        },
+        references,
+      );
+    }
+    return;
   }
-  return value.flatMap((item, index) => {
-    if (!item || typeof item !== "object") {
-      return [];
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectArtifactDocumentReferences(item, references, true);
     }
-    const record = item as Record<string, unknown>;
-    const localPath = normalizeLocalArtifactPath(record.local_path ?? record.localPath ?? record.path);
-    if (!localPath) {
-      return [];
-    }
-    return [
-      {
-        title: normalizeText(record.title) || `Document ${index + 1}`,
-        url: normalizeText(record.url),
-        localPath,
-        contentType: normalizeText(record.content_type ?? record.contentType) || "text/markdown",
-        charCount: normalizeNumber(record.char_count ?? record.charCount),
-      },
-    ];
+    return;
+  }
+
+  if (!value || typeof value !== "object") {
+    return;
+  }
+
+  const record = value as Record<string, unknown>;
+  if (record.local_path !== undefined) {
+    appendArtifactDocumentReference(record, references);
+    return;
+  }
+
+  for (const nestedValue of Object.values(record)) {
+    collectArtifactDocumentReferences(nestedValue, references, false);
+  }
+}
+
+function appendArtifactDocumentReference(record: Record<string, unknown>, references: ArtifactDocumentReference[]) {
+  const localPath = normalizeLocalArtifactPath(record.local_path);
+  if (!localPath) {
+    return;
+  }
+  references.push({
+    title: normalizeText(record.title) || `Document ${references.length + 1}`,
+    url: normalizeText(record.url),
+    localPath,
+    contentType: normalizeText(record.content_type ?? record.contentType) || "text/markdown",
+    charCount: normalizeNumber(record.char_count ?? record.charCount),
   });
 }
 
