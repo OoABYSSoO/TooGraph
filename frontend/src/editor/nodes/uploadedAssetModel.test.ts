@@ -5,6 +5,7 @@ import {
   createUploadedAssetEnvelope,
   detectUploadedAssetTypeFromFileName,
   resolveUploadedAssetDescription,
+  resolveUploadedAssetInputAccept,
   tryParseUploadedAssetEnvelope,
   resolveUploadedAssetLabel,
   resolveUploadedAssetSummary,
@@ -16,6 +17,8 @@ test("detectUploadedAssetTypeFromFileName matches legacy input upload type rules
   assert.equal(detectUploadedAssetTypeFromFileName("scene.png"), "image");
   assert.equal(detectUploadedAssetTypeFromFileName("voice.mp3"), "audio");
   assert.equal(detectUploadedAssetTypeFromFileName("demo.webm"), "video");
+  assert.equal(detectUploadedAssetTypeFromFileName("mobile-upload", "video/mp4"), "video");
+  assert.equal(detectUploadedAssetTypeFromFileName("IMG_0001", "video/quicktime"), "video");
   assert.equal(detectUploadedAssetTypeFromFileName("notes.md"), "file");
   assert.equal(detectUploadedAssetTypeFromFileName("archive.bin"), "file");
 });
@@ -60,6 +63,9 @@ test("uploaded asset presentation helpers preserve NodeCard display text", () =>
   assert.equal(resolveUploadedAssetLabel("video"), "video");
   assert.equal(resolveUploadedAssetLabel("file"), "file");
   assert.equal(resolveUploadedAssetLabel(null), "file");
+  assert.match(resolveUploadedAssetInputAccept("video"), /video\/\*/);
+  assert.match(resolveUploadedAssetInputAccept("video"), /\.mov/);
+  assert.match(resolveUploadedAssetInputAccept("image"), /\.heic/);
   assert.equal(resolveUploadedAssetSummary(textAsset), "text/plain · 2 KB");
   assert.equal(resolveUploadedAssetTextPreview(textAsset), "a".repeat(3000));
   assert.equal(resolveUploadedAssetDescription(textAsset, "file"), "Stored as file upload. text/plain · 2 KB");
@@ -109,4 +115,14 @@ test("createUploadedAssetEnvelope serializes media uploads as data URLs", async 
   assert.equal(envelope.detectedType, "image");
   assert.equal(envelope.encoding, "data_url");
   assert.match(envelope.content, /^data:image\/png;base64,/);
+});
+
+test("createUploadedAssetEnvelope detects mobile videos from MIME type when names lack extensions", async () => {
+  const file = new File([Uint8Array.from([1, 2, 3])], "mobile-upload", { type: "video/mp4" });
+
+  const envelope = await createUploadedAssetEnvelope(file);
+
+  assert.equal(envelope.detectedType, "video");
+  assert.equal(envelope.encoding, "data_url");
+  assert.match(envelope.content, /^data:video\/mp4;base64,/);
 });

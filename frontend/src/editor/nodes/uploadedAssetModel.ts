@@ -14,15 +14,26 @@ export function isUploadedAssetStateType(stateType: string): stateType is Upload
   return stateType === "image" || stateType === "audio" || stateType === "video" || stateType === "file";
 }
 
-export function detectUploadedAssetTypeFromFileName(fileName: string): UploadedAssetType {
-  const normalized = fileName.toLowerCase();
-  if (/\.(png|jpg|jpeg|gif|webp|bmp|svg)$/.test(normalized)) {
+export function detectUploadedAssetTypeFromFileName(fileName: string, mimeType = ""): UploadedAssetType {
+  const normalizedMimeType = mimeType.toLowerCase().trim();
+  if (normalizedMimeType.startsWith("image/")) {
     return "image";
   }
-  if (/\.(mp3|wav|ogg|m4a|aac|flac)$/.test(normalized)) {
+  if (normalizedMimeType.startsWith("audio/")) {
     return "audio";
   }
-  if (/\.(mp4|mov|webm|mkv|avi|m4v)$/.test(normalized)) {
+  if (normalizedMimeType.startsWith("video/")) {
+    return "video";
+  }
+
+  const normalized = fileName.toLowerCase();
+  if (/\.(png|jpg|jpeg|gif|webp|bmp|svg|heic|heif)$/.test(normalized)) {
+    return "image";
+  }
+  if (/\.(mp3|wav|ogg|m4a|aac|flac|opus|amr)$/.test(normalized)) {
+    return "audio";
+  }
+  if (/\.(mp4|mov|webm|mkv|avi|m4v|3gp|3gpp|ogv|mpg|mpeg)$/.test(normalized)) {
     return "video";
   }
   return "file";
@@ -62,7 +73,7 @@ export function tryParseUploadedAssetEnvelope(value: unknown): UploadedAssetEnve
 }
 
 export async function createUploadedAssetEnvelope(file: File): Promise<UploadedAssetEnvelope> {
-  const detectedType = detectUploadedAssetTypeFromFileName(file.name);
+  const detectedType = detectUploadedAssetTypeFromFileName(file.name, file.type);
   const encoding = detectedType === "file" ? "text" : "data_url";
 
   return {
@@ -79,11 +90,11 @@ export async function createUploadedAssetEnvelope(file: File): Promise<UploadedA
 export function resolveUploadedAssetInputAccept(assetType: UploadedAssetType | null) {
   switch (assetType) {
     case "image":
-      return "image/*";
+      return "image/*,.png,.jpg,.jpeg,.gif,.webp,.bmp,.svg,.heic,.heif";
     case "audio":
-      return "audio/*";
+      return "audio/*,.mp3,.wav,.ogg,.m4a,.aac,.flac,.opus,.amr";
     case "video":
-      return "video/*";
+      return "video/*,.mp4,.mov,.m4v,.webm,.mkv,.avi,.3gp,.3gpp,.ogv,.mpg,.mpeg";
     default:
       return "";
   }
@@ -134,6 +145,15 @@ export function resolveUploadedAssetDescription(asset: UploadedAssetEnvelope | n
 }
 
 async function fileToDataUrl(file: File) {
+  if (typeof FileReader !== "undefined") {
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.addEventListener("load", () => resolve(String(reader.result || "")));
+      reader.addEventListener("error", () => reject(reader.error || new Error("Failed to read file.")));
+      reader.readAsDataURL(file);
+    });
+  }
+
   const base64 = bytesToBase64(new Uint8Array(await file.arrayBuffer()));
   return `data:${file.type || "application/octet-stream"};base64,${base64}`;
 }

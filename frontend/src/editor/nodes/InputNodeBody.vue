@@ -43,24 +43,29 @@
     </div>
     <div v-else-if="showAssetUploadInput" class="node-card__input-upload">
       <input
+        :id="inputAssetInputId"
         ref="inputAssetInputRef"
         class="node-card__sr-only"
         type="file"
         :accept="inputAssetAccept"
         @change="emit('asset-file-change', $event)"
       />
-      <button
+      <label
         v-if="!inputAssetEnvelope"
-        type="button"
         class="node-card__asset-dropzone"
+        :for="inputAssetInputId"
+        role="button"
+        tabindex="0"
         @pointerdown.stop
-        @click.stop="openInputAssetPicker"
+        @click.stop
+        @keydown.enter.prevent="openInputAssetPicker"
+        @keydown.space.prevent="openInputAssetPicker"
         @dragover.prevent
         @drop.prevent="emit('asset-drop', $event)"
       >
         <span class="node-card__asset-dropzone-title">Drop {{ inputAssetLabel }} here</span>
         <span class="node-card__asset-dropzone-copy">Or click to choose a file from your device.</span>
-      </button>
+      </label>
       <div
         v-else
         class="node-card__asset-preview-card"
@@ -68,14 +73,18 @@
         @drop.prevent="emit('asset-drop', $event)"
       >
         <div class="node-card__asset-actions">
-          <button
-            type="button"
+          <label
             class="node-card__asset-action"
+            :for="inputAssetInputId"
+            role="button"
+            tabindex="0"
             @pointerdown.stop
-            @click.stop="openInputAssetPicker"
+            @click.stop
+            @keydown.enter.prevent="openInputAssetPicker"
+            @keydown.space.prevent="openInputAssetPicker"
           >
             Replace
-          </button>
+          </label>
           <button
             type="button"
             class="node-card__asset-action node-card__asset-action--danger"
@@ -183,6 +192,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 const inputAssetInputRef = ref<HTMLInputElement | null>(null);
+const inputAssetInputId = `node-card-asset-input-${Math.random().toString(36).slice(2)}`;
 
 function openInputAssetPicker() {
   inputAssetInputRef.value?.click();

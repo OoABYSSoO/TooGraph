@@ -18,14 +18,15 @@ test("InputNodeBody owns input presentation and forwards parent side effects", (
   assert.match(componentSource, /<slot name="primary-output" \/>/);
   assert.match(componentSource, /v-if="showKnowledgeBaseInput"[\s\S]*class="node-card__surface node-card__input-picker"[\s\S]*<ElSelect[\s\S]*:model-value="inputKnowledgeBaseValue \|\| undefined"[\s\S]*@update:model-value="emit\('update:knowledge-base', \$event\)"/);
   assert.match(componentSource, /<ElOption v-for="option in inputKnowledgeBaseOptions"/);
-  assert.match(componentSource, /v-else-if="showAssetUploadInput"[\s\S]*class="node-card__input-upload"[\s\S]*ref="inputAssetInputRef"[\s\S]*@change="emit\('asset-file-change', \$event\)"[\s\S]*@click\.stop="openInputAssetPicker"[\s\S]*@drop\.prevent="emit\('asset-drop', \$event\)"/);
+  assert.match(componentSource, /v-else-if="showAssetUploadInput"[\s\S]*class="node-card__input-upload"[\s\S]*ref="inputAssetInputRef"[\s\S]*@change="emit\('asset-file-change', \$event\)"[\s\S]*<label[\s\S]*class="node-card__asset-dropzone"[\s\S]*:for="inputAssetInputId"[\s\S]*@drop\.prevent="emit\('asset-drop', \$event\)"/);
+  assert.match(componentSource, /<label[\s\S]*class="node-card__asset-action"[\s\S]*:for="inputAssetInputId"[\s\S]*Replace[\s\S]*<\/label>/);
   assert.match(componentSource, /v-if="inputAssetEnvelope\.detectedType === 'image' && inputAssetEnvelope\.encoding === 'data_url'"/);
   assert.match(componentSource, /v-else-if="inputAssetEnvelope\.detectedType === 'audio' && inputAssetEnvelope\.encoding === 'data_url'"/);
   assert.match(componentSource, /v-else-if="inputAssetEnvelope\.detectedType === 'video' && inputAssetEnvelope\.encoding === 'data_url'"/);
   assert.match(componentSource, /@click\.stop="emit\('clear-asset'\)"/);
   assert.match(componentSource, /v-else-if="isInputValueEditable"[\s\S]*class="node-card__surface node-card__surface-textarea"[\s\S]*:value="inputValueText"[\s\S]*@input="emit\('input-value', \$event\)"/);
   assert.match(componentSource, /<div v-else class="node-card__surface node-card__surface--tall">\{\{ body\.valueText \|\| t\("nodeCard\.emptyInput"\) \}\}<\/div>/);
-  assert.match(componentSource, /function openInputAssetPicker\(\) \{[\s\S]*inputAssetInputRef\.value\?\.click\(\);[\s\S]*\}/);
+  assert.match(componentSource, /const inputAssetInputId = `node-card-asset-input-\$\{Math\.random\(\)\.toString\(36\)\.slice\(2\)\}`;/);
   assert.match(componentSource, /\.node-card__input-body \{[\s\S]*display:\s*flex;[\s\S]*flex:\s*1 1 auto;/);
   assert.match(componentSource, /\.node-card__input-boundary-toggle \{/);
   assert.match(componentSource, /\.node-card__asset-dropzone \{/);
