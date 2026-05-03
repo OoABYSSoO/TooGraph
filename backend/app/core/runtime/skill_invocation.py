@@ -12,9 +12,14 @@ def callable_accepts_keyword(func: Any, keyword: str) -> bool:
     return keyword in parameters or any(parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values())
 
 
-def invoke_skill(skill_func: Any, skill_inputs: dict[str, Any]) -> dict[str, Any]:
+def invoke_skill(skill_func: Any, skill_inputs: dict[str, Any], context: dict[str, Any] | None = None) -> dict[str, Any]:
+    skill_context = dict(context or {})
+    invoke_method = getattr(skill_func, "invoke", None)
+    if callable(invoke_method):
+        return invoke_method(skill_inputs, context=skill_context)
+
     signature = inspect.signature(skill_func)
     parameters = list(signature.parameters.values())
     if len(parameters) >= 2:
-        return skill_func({}, skill_inputs)
+        return skill_func(skill_context, skill_inputs)
     return skill_func(**skill_inputs)

@@ -3,7 +3,12 @@ import test from "node:test";
 
 import type { RunDetail } from "../types/run.ts";
 
-import { buildRunStatusFacts, formatRunArtifactValue, listRunOutputArtifacts } from "./runDetailModel.ts";
+import {
+  buildRunStatusFacts,
+  formatRunArtifactValue,
+  listRunOutputArtifacts,
+  normalizeArtifactDocumentReferences,
+} from "./runDetailModel.ts";
 
 function createRunDetail(overrides: Partial<RunDetail> = {}): RunDetail {
   return {
@@ -127,8 +132,95 @@ test("listRunOutputArtifacts maps exported outputs into renderable cards", () =>
       displayMode: "markdown",
       persistLabel: "persist md",
       fileName: "answer.md",
+      documentRefs: [],
     },
   ]);
+});
+
+test("listRunOutputArtifacts keeps skill artifact document references for paged display", () => {
+  const artifacts = listRunOutputArtifacts(
+    createRunDetail({
+      artifacts: {
+        skill_outputs: [],
+        output_previews: [],
+        saved_outputs: [],
+        exported_outputs: [
+          {
+            node_id: "output_sources",
+            label: "Source Documents",
+            source_kind: "state",
+            source_key: "source_documents",
+            display_mode: "json",
+            persist_enabled: false,
+            persist_format: "auto",
+            value: [
+              {
+                title: "Article One",
+                url: "https://example.com/one",
+                local_path: "run_1/search/doc_001.md",
+                content_type: "text/markdown",
+                char_count: 1200,
+              },
+              {
+                title: "",
+                url: "https://example.com/two",
+                local_path: "run_1/search/doc_002.md",
+              },
+            ],
+          },
+        ],
+        node_outputs: {},
+        active_edge_ids: [],
+        state_events: [],
+        state_values: {},
+        cycle_iterations: [],
+        cycle_summary: {
+          has_cycle: false,
+          back_edges: [],
+          iteration_count: 0,
+          max_iterations: 0,
+          stop_reason: null,
+        },
+      },
+    }),
+  );
+
+  assert.deepEqual(artifacts[0].documentRefs, [
+    {
+      title: "Article One",
+      url: "https://example.com/one",
+      localPath: "run_1/search/doc_001.md",
+      contentType: "text/markdown",
+      charCount: 1200,
+    },
+    {
+      title: "Document 2",
+      url: "https://example.com/two",
+      localPath: "run_1/search/doc_002.md",
+      contentType: "text/markdown",
+      charCount: null,
+    },
+  ]);
+});
+
+test("normalizeArtifactDocumentReferences ignores values without safe local paths", () => {
+  assert.deepEqual(
+    normalizeArtifactDocumentReferences([
+      { title: "A", local_path: "run_1/a.md" },
+      { title: "B", path: "../outside.md" },
+      { title: "C", local_path: "/absolute.md" },
+      { title: "D" },
+    ]),
+    [
+      {
+        title: "A",
+        url: "",
+        localPath: "run_1/a.md",
+        contentType: "text/markdown",
+        charCount: null,
+      },
+    ],
+  );
 });
 
 test("buildRunStatusFacts keeps the primary run facts compact and status-first", () => {

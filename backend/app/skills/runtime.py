@@ -33,13 +33,11 @@ class ScriptSkillRunner:
             raise ValueError("Command runtime must provide a command.")
 
     def __call__(self, **skill_inputs: Any) -> dict[str, Any]:
+        return self.invoke(skill_inputs)
+
+    def invoke(self, skill_inputs: dict[str, Any], *, context: dict[str, Any] | None = None) -> dict[str, Any]:
         command = self._build_command()
-        env = {
-            **os.environ,
-            "GRAPHITE_SKILL_KEY": self.skill_key,
-            "GRAPHITE_SKILL_DIR": str(self.skill_dir),
-            "GRAPHITE_SKILL_ENTRYPOINT": str(self.entrypoint_path),
-        }
+        env = self._build_environment(context or {})
         try:
             completed = subprocess.run(
                 command,
@@ -70,6 +68,21 @@ class ScriptSkillRunner:
         if not isinstance(payload, dict):
             return _failed_result("Skill script stdout must be a JSON object.")
         return payload
+
+    def _build_environment(self, context: dict[str, Any]) -> dict[str, str]:
+        env = {
+            **os.environ,
+            "GRAPHITE_SKILL_KEY": self.skill_key,
+            "GRAPHITE_SKILL_DIR": str(self.skill_dir),
+            "GRAPHITE_SKILL_ENTRYPOINT": str(self.entrypoint_path),
+        }
+        artifact_dir = str(context.get("artifact_dir") or "").strip()
+        artifact_relative_dir = str(context.get("artifact_relative_dir") or "").strip()
+        if artifact_dir:
+            env["GRAPHITE_SKILL_ARTIFACT_DIR"] = artifact_dir
+        if artifact_relative_dir:
+            env["GRAPHITE_SKILL_ARTIFACT_RELATIVE_DIR"] = artifact_relative_dir
+        return env
 
     def _build_command(self) -> list[str]:
         if self.command:

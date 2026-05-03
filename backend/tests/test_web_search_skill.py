@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import os
 import sys
+import tempfile
+import threading
 import unittest
 import importlib.util
 from datetime import datetime, timezone
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from unittest.mock import patch
 
@@ -108,6 +111,62 @@ class WebSearchSkillTests(unittest.TestCase):
         self.assertIn("Fallback Result", result["summary"])
         self.assertIn("Search date:", result["context"])
 
+    def test_web_search_skill_fetches_pages_to_local_artifacts_when_requested(self) -> None:
+        web_search = _load_web_search_module()
+        server = _start_article_server(
+            """
+            <html>
+              <head><title>Full Article Title</title></head>
+              <body>
+                <nav>Navigation should not dominate extraction.</nav>
+                <main>
+                  <h1>Full Article Title</h1>
+                  <p>Detailed evidence paragraph with enough information for later review.</p>
+                  <p>Second paragraph containing source facts and publication details.</p>
+                </main>
+              </body>
+            </html>
+            """
+        )
+        try:
+            article_url = f"http://127.0.0.1:{server.server_port}/article"
+            with tempfile.TemporaryDirectory() as temp_dir:
+                artifact_dir = Path(temp_dir) / "run_1" / "searcher" / "web_search" / "invocation_001"
+                with (
+                    patch.dict(
+                        os.environ,
+                        {
+                            "GRAPHITE_SKILL_ARTIFACT_DIR": str(artifact_dir),
+                            "GRAPHITE_SKILL_ARTIFACT_RELATIVE_DIR": "run_1/searcher/web_search/invocation_001",
+                        },
+                        clear=True,
+                    ),
+                    patch.object(web_search, "_search_with_duckduckgo") as duckduckgo_search,
+                ):
+                    duckduckgo_search.return_value = {
+                        "results": [
+                            {
+                                "title": "Search Result Title",
+                                "url": article_url,
+                                "content": "Search result snippet.",
+                            }
+                        ]
+                    }
+
+                    result = web_search.web_search_skill(query="full article", max_results=1, fetch_pages="true", max_pages=1)
+
+                document_path = artifact_dir / "doc_001.md"
+                self.assertEqual(result["status"], "succeeded")
+                self.assertEqual(len(result["source_documents"]), 1)
+                self.assertEqual(result["source_documents"][0]["local_path"], "run_1/searcher/web_search/invocation_001/doc_001.md")
+                self.assertEqual(result["source_documents"][0]["url"], article_url)
+                self.assertTrue(document_path.is_file())
+                self.assertIn("Detailed evidence paragraph", document_path.read_text(encoding="utf-8"))
+                self.assertIn("Local document: run_1/searcher/web_search/invocation_001/doc_001.md", result["context"])
+        finally:
+            server.shutdown()
+            server.server_close()
+
     def test_web_search_skill_returns_structured_error_for_missing_query(self) -> None:
         web_search = _load_web_search_module()
         result = web_search.web_search_skill(query="   ")
@@ -121,6 +180,29 @@ class WebSearchSkillTests(unittest.TestCase):
         registry = get_skill_registry(include_disabled=True)
 
         self.assertIn("web_search", registry)
+
+
+class _ArticleHandler(BaseHTTPRequestHandler):
+    article_html = ""
+
+    def do_GET(self) -> None:  # noqa: N802 - required by BaseHTTPRequestHandler
+        body = self.article_html.encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, format: str, *args: object) -> None:
+        return
+
+
+def _start_article_server(html: str) -> ThreadingHTTPServer:
+    handler = type("GraphiteUITestArticleHandler", (_ArticleHandler,), {"article_html": html})
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    return server
 
 
 if __name__ == "__main__":

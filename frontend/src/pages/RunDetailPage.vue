@@ -138,11 +138,17 @@
             <div v-for="artifact in outputArtifacts" :key="artifact.key" class="run-detail__subcard">
               <div class="run-detail__subcard-heading">
                 <strong>{{ artifact.title }}</strong>
-                <button type="button" class="run-detail__content-toggle" @click="toggleContentExpansion(artifact.key)">
+                <button
+                  v-if="artifact.documentRefs.length === 0"
+                  type="button"
+                  class="run-detail__content-toggle"
+                  @click="toggleContentExpansion(artifact.key)"
+                >
                   {{ isContentExpanded(artifact.key) ? t("common.collapse") : t("common.expand") }}
                 </button>
               </div>
-              <pre class="run-detail__content" :class="{ 'run-detail__content--expanded': isContentExpanded(artifact.key) }">{{
+              <ArtifactDocumentPager :documents="artifact.documentRefs" v-if="artifact.documentRefs.length > 0" />
+              <pre v-else class="run-detail__content" :class="{ 'run-detail__content--expanded': isContentExpanded(artifact.key) }">{{
                 artifact.text || t("common.none")
               }}</pre>
               <div class="run-detail__badges">
@@ -258,6 +264,7 @@ import { buildSnapshotScopedRun, canRestoreRunDetail, resolveRunRestoreUrl, reso
 import type { RunDetail } from "@/types/run";
 
 import { buildRunStatusFacts, listRunOutputArtifacts } from "./runDetailModel.ts";
+import ArtifactDocumentPager from "./ArtifactDocumentPager.vue";
 
 const route = useRoute();
 const { t, locale } = useI18n();

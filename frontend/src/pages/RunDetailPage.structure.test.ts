@@ -69,6 +69,13 @@ test("RunDetailPage supports restrained expandable long content cards", () => {
   assert.match(componentSource, /\.run-detail__content--expanded \{[\s\S]*max-height:\s*none;/);
 });
 
+test("RunDetailPage renders skill artifact document lists with a paged reader", () => {
+  assert.match(componentSource, /import ArtifactDocumentPager from "\.\/ArtifactDocumentPager\.vue";/);
+  assert.match(componentSource, /v-if="artifact\.documentRefs\.length > 0"/);
+  assert.match(componentSource, /<ArtifactDocumentPager\s+:documents="artifact\.documentRefs"/);
+  assert.match(componentSource, /v-else\s+class="run-detail__content"/);
+});
+
 test("RunDetailPage uses one immediate route watcher for loading run details", () => {
   assert.match(componentSource, /import \{ computed, onBeforeUnmount, ref, watch \} from "vue";/);
   assert.doesNotMatch(componentSource, /onMounted/);

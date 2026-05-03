@@ -10,6 +10,15 @@ export type RunOutputArtifactCard = {
   displayMode: string;
   persistLabel: string;
   fileName: string | null;
+  documentRefs: ArtifactDocumentReference[];
+};
+
+export type ArtifactDocumentReference = {
+  title: string;
+  url: string;
+  localPath: string;
+  contentType: string;
+  charCount: number | null;
 };
 
 export type RunStatusFact = {
@@ -41,7 +50,49 @@ export function listRunOutputArtifacts(run: RunDetail): RunOutputArtifactCard[] 
     displayMode: output.display_mode?.trim() || "auto",
     persistLabel: output.persist_enabled ? `persist ${output.persist_format ?? "txt"}` : "preview only",
     fileName: output.saved_file?.file_name ?? null,
+    documentRefs: normalizeArtifactDocumentReferences(output.value),
   }));
+}
+
+export function normalizeArtifactDocumentReferences(value: unknown): ArtifactDocumentReference[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.flatMap((item, index) => {
+    if (!item || typeof item !== "object") {
+      return [];
+    }
+    const record = item as Record<string, unknown>;
+    const localPath = normalizeLocalArtifactPath(record.local_path ?? record.localPath ?? record.path);
+    if (!localPath) {
+      return [];
+    }
+    return [
+      {
+        title: normalizeText(record.title) || `Document ${index + 1}`,
+        url: normalizeText(record.url),
+        localPath,
+        contentType: normalizeText(record.content_type ?? record.contentType) || "text/markdown",
+        charCount: normalizeNumber(record.char_count ?? record.charCount),
+      },
+    ];
+  });
+}
+
+function normalizeLocalArtifactPath(value: unknown) {
+  const path = normalizeText(value).replaceAll("\\", "/");
+  if (!path || path.startsWith("/") || path.split("/").some((part) => !part || part === "." || part === "..")) {
+    return "";
+  }
+  return path;
+}
+
+function normalizeText(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
 export function buildRunStatusFacts(run: RunDetail): RunStatusFact[] {

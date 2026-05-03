@@ -37,6 +37,27 @@
       "valueType": "text",
       "required": false,
       "description": "When true and Tavily is configured, includes raw extracted content in results."
+    },
+    {
+      "key": "fetch_pages",
+      "label": "Fetch Pages",
+      "valueType": "text",
+      "required": false,
+      "description": "When true, fetch result pages and store extracted article text as local skill artifacts."
+    },
+    {
+      "key": "max_pages",
+      "label": "Max Pages",
+      "valueType": "text",
+      "required": false,
+      "description": "Number of result pages to fetch when fetch_pages is true. Defaults to 5 and is capped at 10."
+    },
+    {
+      "key": "max_chars_per_page",
+      "label": "Max Chars Per Page",
+      "valueType": "text",
+      "required": false,
+      "description": "Maximum extracted characters to store per fetched page. Defaults to 200000 and is capped at 1500000."
     }
   ],
   "outputSchema": [
@@ -99,6 +120,12 @@
       "label": "Citations",
       "valueType": "json",
       "description": "Compact citation list with index, title, and URL."
+    },
+    {
+      "key": "source_documents",
+      "label": "Source Documents",
+      "valueType": "json",
+      "description": "Fetched page document references with local artifact paths, URLs, titles, and fetch status."
     },
     {
       "key": "error",

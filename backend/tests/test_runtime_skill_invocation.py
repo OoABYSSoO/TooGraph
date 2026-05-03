@@ -70,6 +70,51 @@ class RuntimeSkillInvocationTests(unittest.TestCase):
 
             self.assertEqual(invoke_skill(runner, {"text": "hello"}), {"status": "succeeded", "echo": "hello"})
 
+    def test_script_skill_runner_passes_artifact_context_as_environment_only(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            skill_dir = Path(temp_dir) / "artifact_echo"
+            artifact_dir = Path(temp_dir) / "artifacts" / "run_1" / "writer" / "web_search" / "invocation_001"
+            skill_dir.mkdir()
+            entrypoint = skill_dir / "run.py"
+            entrypoint.write_text(
+                "\n".join(
+                    [
+                        "import json",
+                        "import os",
+                        "import sys",
+                        "payload = json.loads(sys.stdin.read() or '{}')",
+                        "print(json.dumps({",
+                        "  'status': 'succeeded',",
+                        "  'payload_keys': sorted(payload.keys()),",
+                        "  'artifact_dir': os.environ.get('GRAPHITE_SKILL_ARTIFACT_DIR'),",
+                        "  'artifact_relative_dir': os.environ.get('GRAPHITE_SKILL_ARTIFACT_RELATIVE_DIR'),",
+                        "}))",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            runner = ScriptSkillRunner(
+                skill_key="artifact_echo",
+                skill_dir=skill_dir,
+                runtime_type="python",
+                entrypoint="run.py",
+            )
+
+            result = invoke_skill(
+                runner,
+                {"text": "hello"},
+                context={
+                    "artifact_dir": str(artifact_dir),
+                    "artifact_relative_dir": "run_1/writer/web_search/invocation_001",
+                },
+            )
+
+        self.assertEqual(result["status"], "succeeded")
+        self.assertEqual(result["payload_keys"], ["text"])
+        self.assertEqual(result["artifact_dir"], str(artifact_dir))
+        self.assertEqual(result["artifact_relative_dir"], "run_1/writer/web_search/invocation_001")
+
     def test_script_skill_runner_rejects_entrypoints_outside_skill_folder(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             skill_dir = Path(temp_dir) / "unsafe"

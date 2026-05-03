@@ -8,6 +8,7 @@ from app.api.routes_model_logs import router as model_logs_router
 from app.api.routes_presets import router as presets_router
 from app.api.routes_runs import router as runs_router
 from app.api.routes_settings import router as settings_router
+from app.api.routes_skill_artifacts import router as skill_artifacts_router
 from app.api.routes_skills import router as skills_router
 from app.api.routes_templates import router as templates_router
 from app.core.storage.database import initialize_storage
@@ -33,6 +34,7 @@ app.include_router(model_logs_router)
 app.include_router(presets_router)
 app.include_router(runs_router)
 app.include_router(settings_router)
+app.include_router(skill_artifacts_router)
 app.include_router(skills_router)
 app.include_router(templates_router)
 

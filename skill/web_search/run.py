@@ -4,6 +4,7 @@ import json
 import os
 import sys
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
@@ -16,6 +17,11 @@ DUCKDUCKGO_SEARCH_URL = "https://duckduckgo.com/html/"
 DEFAULT_MAX_RESULTS = 5
 MAX_RESULTS = 20
 DEFAULT_TIMEOUT_SECONDS = 15.0
+DEFAULT_MAX_PAGES = 5
+MAX_PAGES = 10
+DEFAULT_MAX_CHARS_PER_PAGE = 200_000
+MAX_CHARS_PER_PAGE = 1_500_000
+PAGE_FETCH_USER_AGENT = "GraphiteUI/1.0 (+https://github.com/AbyssBadger0/GraphiteUI)"
 
 
 def web_search_skill(**skill_inputs: Any) -> dict[str, Any]:
@@ -27,6 +33,14 @@ def web_search_skill(**skill_inputs: Any) -> dict[str, Any]:
     max_results = _parse_int(skill_inputs.get("max_results"), default=DEFAULT_MAX_RESULTS, minimum=1, maximum=MAX_RESULTS)
     search_depth = _parse_search_depth(skill_inputs.get("search_depth"))
     include_raw_content = _parse_bool(skill_inputs.get("include_raw_content"))
+    fetch_pages = _parse_bool(skill_inputs.get("fetch_pages"))
+    max_pages = _parse_int(skill_inputs.get("max_pages"), default=DEFAULT_MAX_PAGES, minimum=1, maximum=MAX_PAGES)
+    max_chars_per_page = _parse_int(
+        skill_inputs.get("max_chars_per_page"),
+        default=DEFAULT_MAX_CHARS_PER_PAGE,
+        minimum=1000,
+        maximum=MAX_CHARS_PER_PAGE,
+    )
     timeout_seconds = _parse_float(skill_inputs.get("timeout_seconds"), default=DEFAULT_TIMEOUT_SECONDS)
     api_key = _resolve_tavily_api_key(skill_inputs)
     provider = "tavily" if api_key else "duckduckgo"
@@ -55,6 +69,13 @@ def web_search_skill(**skill_inputs: Any) -> dict[str, Any]:
         {"index": index, "title": result["title"], "url": result["url"]}
         for index, result in enumerate(results, start=1)
     ]
+    source_documents = _fetch_source_documents(
+        results,
+        fetch_pages=fetch_pages,
+        max_pages=max_pages,
+        max_chars_per_page=max_chars_per_page,
+        timeout_seconds=timeout_seconds,
+    )
     searched_at = _current_search_timestamp()
     searched_date = searched_at[:10]
     return {
@@ -65,9 +86,10 @@ def web_search_skill(**skill_inputs: Any) -> dict[str, Any]:
         "searched_at": searched_at,
         "searched_date": searched_date,
         "summary": _build_summary(str(raw_response.get("answer") or ""), results),
-        "context": _build_context(results, searched_at=searched_at, searched_date=searched_date),
+        "context": _build_context(results, source_documents=source_documents, searched_at=searched_at, searched_date=searched_date),
         "results": results,
         "citations": citations,
+        "source_documents": source_documents,
         "error": "",
     }
 
@@ -158,6 +180,154 @@ def _normalize_results(raw_results: object, *, max_results: int) -> list[dict[st
     return normalized
 
 
+def _fetch_source_documents(
+    results: list[dict[str, Any]],
+    *,
+    fetch_pages: bool,
+    max_pages: int,
+    max_chars_per_page: int,
+    timeout_seconds: float,
+) -> list[dict[str, Any]]:
+    if not fetch_pages or not results:
+        return []
+    artifact_dir = _compact_text(os.getenv("GRAPHITE_SKILL_ARTIFACT_DIR"))
+    artifact_relative_dir = _compact_text(os.getenv("GRAPHITE_SKILL_ARTIFACT_RELATIVE_DIR")).replace("\\", "/").strip("/")
+    if not artifact_dir or not artifact_relative_dir:
+        return [
+            {
+                "index": 1,
+                "title": results[0].get("title", ""),
+                "url": results[0].get("url", ""),
+                "status": "failed",
+                "error": "Skill artifact directory is not configured.",
+            }
+        ]
+
+    output_dir = Path(artifact_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    documents: list[dict[str, Any]] = []
+    for index, result in enumerate(results[:max_pages], start=1):
+        documents.append(
+            _fetch_and_store_source_document(
+                result,
+                index=index,
+                output_dir=output_dir,
+                artifact_relative_dir=artifact_relative_dir,
+                max_chars=max_chars_per_page,
+                timeout_seconds=timeout_seconds,
+            )
+        )
+    return documents
+
+
+def _fetch_and_store_source_document(
+    result: dict[str, Any],
+    *,
+    index: int,
+    output_dir: Path,
+    artifact_relative_dir: str,
+    max_chars: int,
+    timeout_seconds: float,
+) -> dict[str, Any]:
+    title = _compact_text(result.get("title")) or f"Source {index}"
+    url = _compact_text(result.get("url"))
+    document: dict[str, Any] = {
+        "index": index,
+        "title": title,
+        "url": url,
+        "status": "failed",
+        "error": "",
+    }
+    try:
+        parsed_url = urlparse(url)
+        if parsed_url.scheme not in {"http", "https"}:
+            raise ValueError("Only http and https source URLs can be fetched.")
+        fetched_at = _current_search_timestamp()
+        extracted_title, page_text = _load_source_page_text(
+            url=url,
+            fallback_title=title,
+            raw_content=_compact_multiline_text(result.get("raw_content")),
+            timeout_seconds=timeout_seconds,
+        )
+        page_text = _truncate_text(page_text, max_chars)
+        if not page_text:
+            raise ValueError("Fetched page did not contain readable text.")
+        document_title = extracted_title or title
+        file_name = f"doc_{index:03d}.md"
+        document_path = output_dir / file_name
+        document_path.write_text(
+            _render_source_document_markdown(
+                title=document_title,
+                url=url,
+                fetched_at=fetched_at,
+                content=page_text,
+            ),
+            encoding="utf-8",
+        )
+        return {
+            **document,
+            "title": document_title,
+            "status": "succeeded",
+            "error": "",
+            "local_path": f"{artifact_relative_dir}/{file_name}",
+            "content_type": "text/markdown",
+            "char_count": len(page_text),
+            "fetched_at": fetched_at,
+            "excerpt": _truncate_text(page_text, 800),
+        }
+    except Exception as exc:
+        return {
+            **document,
+            "error": str(exc),
+        }
+
+
+def _load_source_page_text(
+    *,
+    url: str,
+    fallback_title: str,
+    raw_content: str,
+    timeout_seconds: float,
+) -> tuple[str, str]:
+    if raw_content:
+        return fallback_title, raw_content
+    headers = {"User-Agent": PAGE_FETCH_USER_AGENT}
+    with httpx.Client(timeout=timeout_seconds, follow_redirects=True) as client:
+        response = client.get(url, headers=headers)
+        response.raise_for_status()
+        content_type = response.headers.get("Content-Type", "")
+        html = response.text
+    return _extract_readable_page_text(html, content_type=content_type, fallback_title=fallback_title)
+
+
+def _extract_readable_page_text(html: str, *, content_type: str, fallback_title: str) -> tuple[str, str]:
+    if "html" not in content_type.lower():
+        return fallback_title, _compact_multiline_text(html)
+    soup = BeautifulSoup(html, "html.parser")
+    for selector in ("script", "style", "noscript", "svg", "nav", "header", "footer", "form", "aside"):
+        for node in soup.select(selector):
+            node.decompose()
+    title = _compact_text(soup.title.get_text(" ", strip=True) if soup.title else "") or fallback_title
+    body = soup.select_one("article") or soup.select_one("main") or soup.select_one("[role='main']") or soup.body or soup
+    return title, _compact_multiline_text(body.get_text("\n", strip=True))
+
+
+def _render_source_document_markdown(*, title: str, url: str, fetched_at: str, content: str) -> str:
+    return "\n".join(
+        [
+            f"# {title}",
+            "",
+            f"Source URL: {url}",
+            f"Fetched at: {fetched_at}",
+            "",
+            "---",
+            "",
+            content,
+            "",
+        ]
+    )
+
+
 def _build_summary(answer: str, results: list[dict[str, Any]]) -> str:
     answer = _compact_text(answer)
     if answer:
@@ -171,15 +341,35 @@ def _build_summary(answer: str, results: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
-def _build_context(results: list[dict[str, Any]], *, searched_at: str, searched_date: str) -> str:
+def _build_context(
+    results: list[dict[str, Any]],
+    *,
+    source_documents: list[dict[str, Any]] | None = None,
+    searched_at: str,
+    searched_date: str,
+) -> str:
     context_blocks = [
         f"Search executed at: {searched_at}\nSearch date: {searched_date}",
     ]
+    source_by_url = {
+        _compact_text(document.get("url")): document
+        for document in source_documents or []
+        if _compact_text(document.get("url"))
+    }
     for index, result in enumerate(results, start=1):
         content = _compact_text(result.get("content"))
         raw_content = _compact_text(result.get("raw_content"))
         body = raw_content or content
-        context_blocks.append(f"[{index}] {result['title']}\nURL: {result['url']}\n{body}".strip())
+        document = source_by_url.get(_compact_text(result.get("url")))
+        document_lines: list[str] = []
+        if document and document.get("status") == "succeeded":
+            document_lines.append(f"Local document: {document.get('local_path')}")
+            excerpt = _compact_multiline_text(document.get("excerpt"))
+            if excerpt:
+                document_lines.append(f"Fetched excerpt:\n{excerpt}")
+        elif document and document.get("error"):
+            document_lines.append(f"Local document unavailable: {document.get('error')}")
+        context_blocks.append(f"[{index}] {result['title']}\nURL: {result['url']}\n{body}\n" + "\n".join(document_lines).strip())
     return "\n\n".join(context_blocks)
 
 
@@ -196,6 +386,7 @@ def _empty_response(*, query: str, provider: str = "none", status: str, error: s
         "context": "",
         "results": [],
         "citations": [],
+        "source_documents": [],
         "error": error,
     }
 
@@ -281,6 +472,29 @@ def _compact_text(value: object) -> str:
     if value is None:
         return ""
     return " ".join(str(value).strip().split())
+
+
+def _compact_multiline_text(value: object) -> str:
+    if value is None:
+        return ""
+    lines = [line.strip() for line in str(value).replace("\r\n", "\n").replace("\r", "\n").split("\n")]
+    compacted: list[str] = []
+    previous_empty = False
+    for line in lines:
+        if not line:
+            if not previous_empty and compacted:
+                compacted.append("")
+            previous_empty = True
+            continue
+        compacted.append(" ".join(line.split()))
+        previous_empty = False
+    return "\n".join(compacted).strip()
+
+
+def _truncate_text(text: str, max_chars: int) -> str:
+    if len(text) <= max_chars:
+        return text
+    return f"{text[:max_chars].rstrip()}\n\n[Content truncated by web_search skill at {max_chars} characters.]"
 
 
 def _current_search_timestamp() -> str:

@@ -17,6 +17,7 @@ from app.core.schemas.node_system import (
     NodeSystemInputNode,
     NodeSystemStateDefinition,
 )
+from app.core.storage.skill_artifact_store import create_skill_artifact_context
 from app.skills.registry import get_skill_registry
 
 
@@ -97,7 +98,7 @@ def execute_agent_node(
     runtime_config = resolve_agent_runtime_config_func(node)
 
     mapped_skill_outputs: dict[str, Any] = {}
-    for binding in normalize_agent_skill_bindings(node):
+    for invocation_index, binding in enumerate(normalize_agent_skill_bindings(node), start=1):
         skill_key = binding.skill_key
         skill_func = registry.get(skill_key)
         if skill_func is None:
@@ -105,7 +106,15 @@ def execute_agent_node(
 
         started_at = perf_counter()
         skill_inputs = build_skill_inputs(binding, input_values)
-        skill_result = invoke_skill_func(skill_func, skill_inputs)
+        skill_invoke_kwargs: dict[str, Any] = {}
+        if callable_accepts_keyword_func(invoke_skill_func, "context"):
+            skill_invoke_kwargs["context"] = create_skill_artifact_context(
+                run_id=str(state.get("run_id") or "run"),
+                node_id=node_name,
+                skill_key=skill_key,
+                invocation_index=invocation_index,
+            )
+        skill_result = invoke_skill_func(skill_func, skill_inputs, **skill_invoke_kwargs)
         duration_ms = int((perf_counter() - started_at) * 1000)
         state_writes = map_skill_outputs(binding, skill_result)
         skill_status, skill_error = _resolve_skill_invocation_status(skill_key, skill_result)
