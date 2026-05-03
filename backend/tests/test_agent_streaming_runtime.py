@@ -45,6 +45,24 @@ class AgentStreamingRuntimeTests(unittest.TestCase):
         self.assertEqual(publish.call_args_list[0].args[2]["delta"], "hello")
         self.assertEqual(publish.call_args_list[1].args[2]["chunk_index"], 2)
 
+    def test_stream_delta_callback_accepts_state_stream_metadata(self) -> None:
+        state = {"run_id": "run_1"}
+
+        with patch("app.core.runtime.agent_streaming.publish_run_event") as publish:
+            callback = build_agent_stream_delta_callback(
+                state=state,
+                node_name="agent",
+                output_keys=["greeting_zh", "greeting_en"],
+                stream_state_keys=["greeting_zh", "greeting_en"],
+            )
+            self.assertIsNotNone(callback)
+            callback('{"greeting_zh":"你好')
+
+        payload = publish.call_args.args[2]
+        self.assertEqual(payload["output_keys"], ["greeting_zh", "greeting_en"])
+        self.assertEqual(payload["stream_state_keys"], ["greeting_zh", "greeting_en"])
+        self.assertEqual(payload["text"], '{"greeting_zh":"你好')
+
     def test_finalize_agent_stream_delta_marks_record_completed_and_publishes_outputs(self) -> None:
         state = {
             "run_id": "run_1",
@@ -75,6 +93,31 @@ class AgentStreamingRuntimeTests(unittest.TestCase):
         self.assertEqual(publish.call_args.args[0], "run_1")
         self.assertEqual(publish.call_args.args[1], "node.output.completed")
         self.assertEqual(publish.call_args.args[2]["output_values"], {"answer": {"text": "hello"}})
+
+    def test_finalize_agent_stream_delta_publishes_reasoning_summary_when_available(self) -> None:
+        state = {
+            "run_id": "run_1",
+            "streaming_outputs": {
+                "agent": {
+                    "node_id": "agent",
+                    "output_keys": ["answer"],
+                    "text": '{"answer":"ok"}',
+                    "chunk_count": 1,
+                    "completed": False,
+                }
+            },
+        }
+
+        with patch("app.core.runtime.agent_streaming.publish_run_event") as publish:
+            finalize_agent_stream_delta(
+                state=state,
+                node_name="agent",
+                output_values={"answer": "ok"},
+                reasoning="Checked the input and selected a greeting.",
+            )
+
+        self.assertEqual(publish.call_args_list[-1].args[1], "node.reasoning.completed")
+        self.assertEqual(publish.call_args_list[-1].args[2]["reasoning"], "Checked the input and selected a greeting.")
 
 
 if __name__ == "__main__":

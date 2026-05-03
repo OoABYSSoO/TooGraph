@@ -12,6 +12,7 @@ def build_agent_stream_delta_callback(
     state: dict[str, Any],
     node_name: str,
     output_keys: list[str],
+    stream_state_keys: list[str] | None = None,
 ):
     run_id = str(state.get("run_id") or "").strip()
     if not run_id:
@@ -31,6 +32,7 @@ def build_agent_stream_delta_callback(
         stream_record = {
             "node_id": node_name,
             "output_keys": list(output_keys),
+            "stream_state_keys": list(stream_state_keys or output_keys),
             "text": full_text,
             "chunk_count": chunk_count,
             "completed": False,
@@ -55,6 +57,7 @@ def finalize_agent_stream_delta(
     state: dict[str, Any],
     node_name: str,
     output_values: dict[str, Any],
+    reasoning: str | None = None,
 ) -> None:
     stream_record = state.setdefault("streaming_outputs", {}).get(node_name)
     if not isinstance(stream_record, dict):
@@ -70,3 +73,14 @@ def finalize_agent_stream_delta(
             "output_values": copy.deepcopy(output_values),
         },
     )
+    reasoning_text = str(reasoning or "").strip()
+    if reasoning_text:
+        publish_run_event(
+            str(state.get("run_id") or ""),
+            "node.reasoning.completed",
+            {
+                "node_id": node_name,
+                "reasoning": reasoning_text,
+                "updated_at": utc_now_iso(),
+            },
+        )

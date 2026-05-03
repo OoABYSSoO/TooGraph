@@ -141,11 +141,14 @@ def execute_agent_node(
         )
 
     output_keys = [binding.state for binding in node.writes]
-    stream_delta_callback = build_agent_stream_delta_callback_func(
-        state=state,
-        node_name=node_name,
-        output_keys=output_keys,
-    )
+    stream_delta_kwargs: dict[str, Any] = {
+        "state": state,
+        "node_name": node_name,
+        "output_keys": output_keys,
+    }
+    if callable_accepts_keyword_func(build_agent_stream_delta_callback_func, "stream_state_keys"):
+        stream_delta_kwargs["stream_state_keys"] = output_keys
+    stream_delta_callback = build_agent_stream_delta_callback_func(**stream_delta_kwargs)
 
     generate_kwargs: dict[str, Any] = {}
     if callable_accepts_keyword_func(generate_agent_response_func, "on_delta"):
@@ -170,11 +173,14 @@ def execute_agent_node(
             output_values[state_name] = response_payload.get(state_name)
         elif state_name not in output_values:
             output_values[state_name] = None
-    finalize_agent_stream_delta_func(
-        state=state,
-        node_name=node_name,
-        output_values=output_values,
-    )
+    finalize_kwargs: dict[str, Any] = {
+        "state": state,
+        "node_name": node_name,
+        "output_values": output_values,
+    }
+    if callable_accepts_keyword_func(finalize_agent_stream_delta_func, "reasoning"):
+        finalize_kwargs["reasoning"] = response_reasoning
+    finalize_agent_stream_delta_func(**finalize_kwargs)
 
     return {
         "outputs": output_values,
