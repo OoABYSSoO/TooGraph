@@ -62,7 +62,7 @@ function buildRunActivityEntry(event: RunActivityIncomingEvent, sequence: number
   if (event.eventType === "node.started") {
     return createEntry("node-started", sequence, nodeId, nodeType, null, `${nodeId} running`, "agent running", payload, createdAt);
   }
-  if (event.eventType === "node.output.delta") {
+  if (event.eventType === "node.output.delta" || event.eventType === "node.output.completed") {
     return createEntry("node-stream", sequence, nodeId, nodeType, null, `${nodeId} stream`, normalizeText(payload.text), payload, createdAt);
   }
   if (event.eventType === "state.updated") {

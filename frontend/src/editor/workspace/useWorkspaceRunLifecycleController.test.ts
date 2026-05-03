@@ -5,6 +5,7 @@ import { ref } from "vue";
 import type { GraphPayload } from "@/types/node-system";
 import type { RunDetail } from "@/types/run";
 
+import type { RunActivityState } from "./runActivityModel.ts";
 import { useWorkspaceRunLifecycleController } from "./useWorkspaceRunLifecycleController.ts";
 import type { WorkspaceRunFeedback } from "./useWorkspaceRunVisualState.ts";
 
@@ -90,6 +91,7 @@ function runDetail(status: string, patch: Partial<RunDetail> = {}): RunDetail {
 function createHarness(options: { fetchRun?: () => Promise<RunDetail> } = {}) {
   const documentsByTabId = ref<Record<string, GraphPayload>>({ tab_a: createDocument() });
   const runOutputPreviewByTabId = ref<Record<string, Record<string, { text: string; displayMode: string | null }>>>({});
+  const runActivityByTabId = ref<Record<string, RunActivityState>>({});
   const restoredRunSnapshotIdByTabId = ref<Record<string, string | null>>({ tab_a: "snapshot_1" });
   const eventSources: FakeEventSource[] = [];
   const feedback: Array<{ tabId: string; feedback: Partial<WorkspaceRunFeedback> }> = [];
@@ -103,6 +105,7 @@ function createHarness(options: { fetchRun?: () => Promise<RunDetail> } = {}) {
   const controller = useWorkspaceRunLifecycleController({
     documentsByTabId,
     runOutputPreviewByTabId,
+    runActivityByTabId,
     restoredRunSnapshotIdByTabId,
     fetchRun: options.fetchRun ?? (async () => runDetail("completed")),
     createEventSource: () => {
@@ -139,6 +142,7 @@ function createHarness(options: { fetchRun?: () => Promise<RunDetail> } = {}) {
     openedHumanReview,
     persistedRuns,
     restoredRunSnapshotIdByTabId,
+    runActivityByTabId,
     runOutputPreviewByTabId,
     timeoutDelays,
     visualStates,
@@ -159,6 +163,46 @@ test("useWorkspaceRunLifecycleController streams output preview updates through 
   assert.deepEqual(harness.runOutputPreviewByTabId.value.tab_a, {
     output_answer: { text: "hello", displayMode: "plain" },
   });
+  assert.deepEqual(
+    harness.runActivityByTabId.value.tab_a.entries.map((entry) => ({ kind: entry.kind, nodeId: entry.nodeId, preview: entry.preview })),
+    [{ kind: "node-stream", nodeId: "agent_1", preview: "hello" }],
+  );
+});
+
+test("useWorkspaceRunLifecycleController appends node and state activity events in stream order", () => {
+  const harness = createHarness();
+
+  harness.controller.startRunEventStreamForTab("tab_a", "run_1");
+  harness.eventSources[0]?.emit(
+    "node.started",
+    new MessageEvent("node.started", {
+      data: JSON.stringify({ node_id: "agent_1", node_type: "agent", created_at: "2026-05-03T01:00:00Z" }),
+    }),
+  );
+  harness.eventSources[0]?.emit(
+    "state.updated",
+    new MessageEvent("state.updated", {
+      data: JSON.stringify({ node_id: "agent_1", state_key: "answer", value: "Final answer", sequence: 1, created_at: "2026-05-03T01:00:01Z" }),
+    }),
+  );
+  harness.eventSources[0]?.emit(
+    "node.reasoning.completed",
+    new MessageEvent("node.reasoning.completed", {
+      data: JSON.stringify({ node_id: "agent_1", reasoning: "Checked sources", created_at: "2026-05-03T01:00:02Z" }),
+    }),
+  );
+
+  assert.deepEqual(harness.runOutputPreviewByTabId.value.tab_a, {
+    output_answer: { text: "Final answer", displayMode: "plain" },
+  });
+  assert.deepEqual(
+    harness.runActivityByTabId.value.tab_a.entries.map((entry) => ({ kind: entry.kind, stateKey: entry.stateKey, preview: entry.preview, active: entry.active })),
+    [
+      { kind: "node-started", stateKey: null, preview: "agent running", active: false },
+      { kind: "state-updated", stateKey: "answer", preview: "Final answer", active: false },
+      { kind: "reasoning", stateKey: null, preview: "Checked sources", active: true },
+    ],
+  );
 });
 
 test("useWorkspaceRunLifecycleController polls awaiting-human runs and opens Human Review", async () => {
@@ -172,6 +216,35 @@ test("useWorkspaceRunLifecycleController polls awaiting-human runs and opens Hum
   assert.deepEqual(harness.openedHumanReview, [{ tabId: "tab_a", nodeId: "agent_review" }]);
   assert.deepEqual(harness.persistedRuns, [{ tabId: "tab_a", runId: "run_1" }]);
   assert.equal(harness.restoredRunSnapshotIdByTabId.value.tab_a, null);
+});
+
+test("useWorkspaceRunLifecycleController reconciles terminal run activity from stored state events", async () => {
+  const harness = createHarness({
+    fetchRun: async () =>
+      runDetail("completed", {
+        artifacts: {
+          outputs: [],
+          state_events: [
+            {
+              node_id: "agent_1",
+              state_key: "answer",
+              output_key: "answer",
+              mode: "replace",
+              value: "Stored answer",
+              sequence: 3,
+              created_at: "2026-05-03T01:00:03Z",
+            },
+          ],
+        },
+      }),
+  });
+
+  await harness.controller.pollRunForTab("tab_a", "run_1");
+
+  assert.deepEqual(
+    harness.runActivityByTabId.value.tab_a.entries.map((entry) => ({ kind: entry.kind, sequence: entry.sequence, preview: entry.preview })),
+    [{ kind: "state-updated", sequence: 3, preview: "Stored answer" }],
+  );
 });
 
 test("useWorkspaceRunLifecycleController schedules follow-up polling for active runs", async () => {

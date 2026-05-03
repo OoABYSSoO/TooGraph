@@ -11,6 +11,11 @@ import {
 } from "../../lib/run-event-stream.ts";
 
 import { setTabScopedRecordEntry } from "./editorTabRuntimeModel.ts";
+import {
+  appendRunActivityEvent,
+  buildRunActivityEntriesFromRun,
+  type RunActivityState,
+} from "./runActivityModel.ts";
 import type { WorkspaceRunFeedback } from "./useWorkspaceRunVisualState.ts";
 
 type RunOutputPreviewByNodeId = Record<string, { text: string; displayMode: string | null }>;
@@ -24,6 +29,7 @@ type RunEventSourceLike = {
 type WorkspaceRunLifecycleControllerInput = {
   documentsByTabId: Ref<Record<string, GraphPayload | GraphDocument>>;
   runOutputPreviewByTabId: Ref<Record<string, RunOutputPreviewByNodeId>>;
+  runActivityByTabId: Ref<Record<string, RunActivityState>>;
   restoredRunSnapshotIdByTabId: Ref<Record<string, string | null>>;
   fetchRun: (runId: string) => Promise<RunDetail>;
   createEventSource?: (url: string) => RunEventSourceLike | null;
@@ -76,6 +82,33 @@ export function useWorkspaceRunLifecycleController(input: WorkspaceRunLifecycleC
     input.runOutputPreviewByTabId.value = setTabScopedRecordEntry(input.runOutputPreviewByTabId.value, tabId, nextPreview);
   }
 
+  function appendRunActivityEventToTab(tabId: string, eventType: string, payload: Record<string, unknown>) {
+    const currentActivity = input.runActivityByTabId.value[tabId] ?? { entries: [], autoFollow: true };
+    const nextActivity = appendRunActivityEvent(currentActivity, { eventType, payload });
+    if (nextActivity === currentActivity) {
+      return;
+    }
+    input.runActivityByTabId.value = setTabScopedRecordEntry(input.runActivityByTabId.value, tabId, nextActivity);
+  }
+
+  function reconcileRunActivityFromRun(tabId: string, run: RunDetail) {
+    input.runActivityByTabId.value = setTabScopedRecordEntry(input.runActivityByTabId.value, tabId, {
+      entries: buildRunActivityEntriesFromRun(run),
+      autoFollow: input.runActivityByTabId.value[tabId]?.autoFollow ?? true,
+    });
+  }
+
+  function handleRunEvent(tabId: string, eventType: string, event: Event, options: { updateOutputPreview?: boolean } = {}) {
+    const payload = parseRunEventPayload(event);
+    if (!payload) {
+      return;
+    }
+    if (options.updateOutputPreview) {
+      applyStreamingOutputPreviewToTab(tabId, payload);
+    }
+    appendRunActivityEventToTab(tabId, eventType, payload);
+  }
+
   function createEventSource(url: string) {
     if (input.createEventSource) {
       return input.createEventSource(url);
@@ -98,17 +131,26 @@ export function useWorkspaceRunLifecycleController(input: WorkspaceRunLifecycleC
     }
 
     runEventSourceByTabId.set(tabId, source);
+    source.addEventListener("node.started", (event) => {
+      handleRunEvent(tabId, "node.started", event);
+    });
     source.addEventListener("node.output.delta", (event) => {
-      const payload = parseRunEventPayload(event);
-      if (payload) {
-        applyStreamingOutputPreviewToTab(tabId, payload);
-      }
+      handleRunEvent(tabId, "node.output.delta", event, { updateOutputPreview: true });
     });
     source.addEventListener("node.output.completed", (event) => {
-      const payload = parseRunEventPayload(event);
-      if (payload) {
-        applyStreamingOutputPreviewToTab(tabId, payload);
-      }
+      handleRunEvent(tabId, "node.output.completed", event, { updateOutputPreview: true });
+    });
+    source.addEventListener("state.updated", (event) => {
+      handleRunEvent(tabId, "state.updated", event, { updateOutputPreview: true });
+    });
+    source.addEventListener("node.completed", (event) => {
+      handleRunEvent(tabId, "node.completed", event);
+    });
+    source.addEventListener("node.failed", (event) => {
+      handleRunEvent(tabId, "node.failed", event);
+    });
+    source.addEventListener("node.reasoning.completed", (event) => {
+      handleRunEvent(tabId, "node.reasoning.completed", event);
     });
     source.addEventListener("run.completed", () => {
       cancelRunEventStreamForTab(tabId);
@@ -156,6 +198,7 @@ export function useWorkspaceRunLifecycleController(input: WorkspaceRunLifecycleC
       }
 
       input.persistRunStateValuesForTab(tabId, run);
+      reconcileRunActivityFromRun(tabId, run);
       runPollTimerByTabId.delete(tabId);
       cancelRunEventStreamForTab(tabId);
     } catch (error) {

@@ -270,12 +270,7 @@ import { useWorkspaceRunVisualState, type WorkspaceRunFeedback } from "./useWork
 import { useWorkspaceSidePanelController } from "./useWorkspaceSidePanelController.ts";
 import { useWorkspaceTabLifecycleController } from "./useWorkspaceTabLifecycleController.ts";
 import { useWorkspaceGraphMutationActions } from "./useWorkspaceGraphMutationActions.ts";
-import { setTabScopedRecordEntry } from "./editorTabRuntimeModel.ts";
-import {
-  appendRunActivityEvent,
-  type RunActivityIncomingEvent,
-  type RunActivityState,
-} from "./runActivityModel.ts";
+import type { RunActivityState } from "./runActivityModel.ts";
 
 type DataEdgeStateEditorRequest = CreatedStateEdgeEditorRequest;
 
@@ -420,13 +415,6 @@ const {
   closeNodeCreationMenu,
   showGraphLockedEditToast,
 });
-function appendRunActivityEventForTab(tabId: string, event: RunActivityIncomingEvent) {
-  runActivityByTabId.value = setTabScopedRecordEntry(
-    runActivityByTabId.value,
-    tabId,
-    appendRunActivityEvent(runActivityByTabId.value[tabId] ?? { entries: [], autoFollow: true }, event),
-  );
-}
 const {
   feedbackForTab,
   applyRunVisualStateToTab,
@@ -490,6 +478,7 @@ const {
 } = useWorkspaceRunLifecycleController({
   documentsByTabId,
   runOutputPreviewByTabId,
+  runActivityByTabId,
   restoredRunSnapshotIdByTabId,
   fetchRun,
   applyRunVisualStateToTab,
@@ -727,6 +716,7 @@ const { runActiveGraph, resumeHumanReviewRun } = useWorkspaceRunController({
   runOutputPreviewByTabId,
   runFailureMessageByTabId,
   activeRunEdgeIdsByTabId,
+  runActivityByTabId,
   refreshAgentModels,
   runGraph,
   resumeRun,

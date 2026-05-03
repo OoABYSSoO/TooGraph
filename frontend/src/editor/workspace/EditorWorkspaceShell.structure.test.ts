@@ -742,7 +742,7 @@ test("EditorWorkspaceShell renders the graph action controls as a detached capsu
 
 test("EditorWorkspaceShell mounts Run Activity as a realtime side panel beside State", () => {
   assert.match(componentSource, /import EditorRunActivityPanel from "\.\/EditorRunActivityPanel\.vue";/);
-  assert.match(componentSource, /import \{[\s\S]*appendRunActivityEvent,[\s\S]*type RunActivityState[\s\S]*\} from "\.\/runActivityModel\.ts";/);
+  assert.match(componentSource, /import type \{ RunActivityState \} from "\.\/runActivityModel\.ts";/);
   assert.match(componentSource, /const runActivityByTabId = ref<Record<string, RunActivityState>>\(\{\}\);/);
   assert.match(
     componentSource,
