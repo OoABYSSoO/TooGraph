@@ -99,7 +99,7 @@ def execute_agent_node(
     runtime_config = resolve_agent_runtime_config_func(node)
 
     mapped_skill_outputs: dict[str, Any] = {}
-    for invocation_index, binding in enumerate(normalize_agent_skill_bindings(node), start=1):
+    for binding in normalize_agent_skill_bindings(node):
         skill_key = binding.skill_key
         skill_func = registry.get(skill_key)
         if skill_func is None:
@@ -109,6 +109,7 @@ def execute_agent_node(
         skill_inputs = build_skill_inputs(binding, input_values)
         skill_invoke_kwargs: dict[str, Any] = {}
         if callable_accepts_keyword_func(invoke_skill_func, "context"):
+            invocation_index = _next_skill_artifact_invocation_index(state, node_name, skill_key)
             skill_invoke_kwargs["context"] = create_skill_artifact_context(
                 run_id=str(state.get("run_id") or "run"),
                 node_id=node_name,
@@ -185,6 +186,23 @@ def execute_agent_node(
         "warnings": list(dict.fromkeys(warnings)),
         "final_result": first_truthy_func(output_values.values()) or response_payload.get("summary") or "",
     }
+
+
+def _next_skill_artifact_invocation_index(state: dict[str, Any], node_name: str, skill_key: str) -> int:
+    raw_counters = state.get("skill_invocation_counts")
+    if not isinstance(raw_counters, dict):
+        raw_counters = {}
+        state["skill_invocation_counts"] = raw_counters
+
+    counter_key = f"{node_name}:{skill_key}"
+    try:
+        current_index = int(raw_counters.get(counter_key, 0))
+    except (TypeError, ValueError):
+        current_index = 0
+    next_index = max(0, current_index) + 1
+    raw_counters[counter_key] = next_index
+    return next_index
+
 
 def _resolve_skill_invocation_status(skill_key: str, skill_result: dict[str, Any]) -> tuple[str, str]:
     status = _compact_text(skill_result.get("status")).lower()

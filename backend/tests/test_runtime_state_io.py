@@ -199,6 +199,35 @@ class RuntimeStateIoTests(unittest.TestCase):
         self.assertEqual(write_records[0]["mode"], "append")
         self.assertTrue(write_records[0]["changed"])
 
+    def test_apply_state_writes_reindexes_appended_source_reference_lists(self) -> None:
+        mode = SimpleNamespace(value="append")
+        write_bindings = [SimpleNamespace(state="evidence_links", mode=mode)]
+        output_values = {
+            "evidence_links": [
+                {"index": 1, "title": "Third", "url": "https://example.com/3"},
+                {"index": 2, "title": "Fourth", "url": "https://example.com/4"},
+            ]
+        }
+        state = {
+            "state_values": {
+                "evidence_links": [
+                    {"index": 1, "title": "First", "url": "https://example.com/1"},
+                    {"index": 2, "title": "Second", "url": "https://example.com/2"},
+                ]
+            }
+        }
+
+        apply_state_writes("web_search_agent", write_bindings, output_values, state)
+
+        self.assertEqual(
+            [item["index"] for item in state["state_values"]["evidence_links"]],
+            [1, 2, 3, 4],
+        )
+        self.assertEqual(
+            [item["title"] for item in state["state_values"]["evidence_links"]],
+            ["First", "Second", "Third", "Fourth"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

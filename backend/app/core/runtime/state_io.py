@@ -103,11 +103,11 @@ def append_state_value(previous_value: Any, next_value: Any) -> Any:
 
     if isinstance(previous, list):
         if isinstance(value, list):
-            return previous + value
-        return previous + [value]
+            return _reindex_source_reference_list(previous + value)
+        return _reindex_source_reference_list(previous + [value])
 
     if previous is None or previous == "" or previous == {}:
-        return value if isinstance(value, list) else [value]
+        return _reindex_source_reference_list(value) if isinstance(value, list) else [value]
 
     if isinstance(previous, str) and isinstance(value, str):
         return "\n\n".join(part for part in [previous.strip(), value.strip()] if part)
@@ -118,8 +118,26 @@ def append_state_value(previous_value: Any, next_value: Any) -> Any:
         return merged
 
     if isinstance(value, list):
-        return [previous] + value
-    return [previous, value]
+        return _reindex_source_reference_list([previous] + value)
+    return _reindex_source_reference_list([previous, value])
+
+
+def _reindex_source_reference_list(value: list[Any]) -> list[Any]:
+    if not value or not all(_looks_like_source_reference(item) for item in value):
+        return value
+    return [{**item, "index": index} for index, item in enumerate(value, start=1)]
+
+
+def _looks_like_source_reference(item: Any) -> bool:
+    if not isinstance(item, dict) or "index" not in item:
+        return False
+    try:
+        int(item["index"])
+    except (TypeError, ValueError):
+        return False
+    has_locator = bool(item.get("url")) or bool(item.get("local_path"))
+    has_reference_metadata = any(key in item for key in ("title", "snippet", "status", "error", "local_path"))
+    return has_locator and has_reference_metadata
 
 
 def apply_state_writes(

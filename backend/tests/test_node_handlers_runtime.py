@@ -518,6 +518,73 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         self.assertEqual(context["skill_key"], "web_search")
         self.assertTrue(str(context["artifact_relative_dir"]).startswith("run-1/searcher/web_search/invocation_001"))
 
+    def test_execute_agent_node_increments_skill_artifact_invocation_context_across_repeated_node_runs(self) -> None:
+        state_schema = {
+            "query": NodeSystemStateDefinition.model_validate({"type": "text"}),
+            "answer": NodeSystemStateDefinition.model_validate({"type": "text"}),
+        }
+        node = NodeSystemAgentNode.model_validate(
+            {
+                "kind": "agent",
+                "name": "searcher",
+                "ui": {"position": {"x": 0, "y": 0}},
+                "reads": [{"state": "query"}],
+                "writes": [{"state": "answer"}],
+                "config": {
+                    "skills": ["web_search"],
+                    "skillBindings": [
+                        {
+                            "skillKey": "web_search",
+                            "inputMapping": {"query": "query"},
+                        }
+                    ],
+                },
+            }
+        )
+        run_state: dict[str, object] = {"run_id": "run-1"}
+        captured_contexts: list[dict[str, object]] = []
+
+        def invoke_skill_func(skill_func: object, skill_inputs: dict[str, object], *, context=None) -> dict[str, object]:
+            captured_contexts.append(context or {})
+            return {"status": "succeeded", "summary": "联网结果"}
+
+        for _ in range(2):
+            execute_agent_node(
+                state_schema,
+                node,
+                {"query": "GraphiteUI"},
+                {"state": {}},
+                node_name="searcher",
+                state=run_state,
+                get_skill_registry_func=lambda *, include_disabled: {
+                    "web_search": object(),
+                },
+                invoke_skill_func=invoke_skill_func,
+                resolve_agent_runtime_config_func=lambda agent_node: {},
+                build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
+                callable_accepts_keyword_func=callable_accepts_keyword,
+                generate_agent_response_func=lambda agent_node, input_values, skill_context, runtime_config, **kwargs: (
+                    {"answer": skill_context["web_search"]["summary"]},
+                    "",
+                    [],
+                    runtime_config,
+                ),
+                finalize_agent_stream_delta_func=lambda *, state, node_name, output_values: None,
+                first_truthy_func=lambda values: next((value for value in values if value), None),
+            )
+
+        self.assertEqual(len(captured_contexts), 2)
+        self.assertTrue(
+            str(captured_contexts[0]["artifact_relative_dir"]).startswith(
+                "run-1/searcher/web_search/invocation_001"
+            )
+        )
+        self.assertTrue(
+            str(captured_contexts[1]["artifact_relative_dir"]).startswith(
+                "run-1/searcher/web_search/invocation_002"
+            )
+        )
+
     def test_execute_agent_node_surfaces_failed_skill_result_status(self) -> None:
         state_schema = {
             "name": NodeSystemStateDefinition.model_validate({"type": "text"}),
