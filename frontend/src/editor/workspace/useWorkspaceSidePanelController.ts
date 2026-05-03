@@ -99,6 +99,15 @@ export function useWorkspaceSidePanelController(input: WorkspaceSidePanelControl
     focusNodeForTab(tabId, nodeId);
   }
 
+  function openRunActivityPanelForTab(tabId: string) {
+    if (isHumanReviewPanelLockedOpen(tabId)) {
+      return;
+    }
+    input.closeNodeCreationMenu(tabId);
+    input.sidePanelModeByTabId.value = setTabScopedRecordEntry(input.sidePanelModeByTabId.value, tabId, "run-activity");
+    input.statePanelOpenByTabId.value = setTabScopedRecordEntry(input.statePanelOpenByTabId.value, tabId, true);
+  }
+
   function toggleActiveStatePanel() {
     const tab = input.activeTab.value;
     if (!tab) {
@@ -131,8 +140,7 @@ export function useWorkspaceSidePanelController(input: WorkspaceSidePanelControl
       return;
     }
     if (sidePanelMode(tabId) !== "run-activity") {
-      input.sidePanelModeByTabId.value = setTabScopedRecordEntry(input.sidePanelModeByTabId.value, tabId, "run-activity");
-      input.statePanelOpenByTabId.value = setTabScopedRecordEntry(input.statePanelOpenByTabId.value, tabId, true);
+      openRunActivityPanelForTab(tabId);
       return;
     }
     input.sidePanelModeByTabId.value = setTabScopedRecordEntry(input.sidePanelModeByTabId.value, tabId, "run-activity");
@@ -176,6 +184,7 @@ export function useWorkspaceSidePanelController(input: WorkspaceSidePanelControl
     isHumanReviewPanelLockedOpen,
     toggleStatePanel,
     openHumanReviewPanelForTab,
+    openRunActivityPanelForTab,
     focusNodeForTab,
     requestNodeFocusForTab,
     toggleActiveStatePanel,
