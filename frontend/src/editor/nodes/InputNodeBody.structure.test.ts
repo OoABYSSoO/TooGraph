@@ -18,8 +18,11 @@ test("InputNodeBody owns input presentation and forwards parent side effects", (
   assert.match(componentSource, /<slot name="primary-output" \/>/);
   assert.match(componentSource, /v-if="showKnowledgeBaseInput"[\s\S]*class="node-card__surface node-card__input-picker"[\s\S]*<ElSelect[\s\S]*:model-value="inputKnowledgeBaseValue \|\| undefined"[\s\S]*@update:model-value="emit\('update:knowledge-base', \$event\)"/);
   assert.match(componentSource, /<ElOption v-for="option in inputKnowledgeBaseOptions"/);
-  assert.match(componentSource, /<label[\s\S]*class="node-card__asset-dropzone"[\s\S]*@drop\.prevent="emit\('asset-drop', \$event\)"[\s\S]*<input[\s\S]*ref="inputAssetInputRef"[\s\S]*class="node-card__asset-native-input"[\s\S]*type="file"[\s\S]*@change="emit\('asset-file-change', \$event\)"/);
-  assert.match(componentSource, /<label[\s\S]*class="node-card__asset-action"[\s\S]*<input[\s\S]*ref="inputAssetInputRef"[\s\S]*class="node-card__asset-native-input node-card__asset-native-input--action"[\s\S]*type="file"[\s\S]*@change="emit\('asset-file-change', \$event\)"[\s\S]*Replace[\s\S]*<\/label>/);
+  assert.match(componentSource, /<label[\s\S]*class="node-card__asset-dropzone"[\s\S]*@click\.stop="handleAssetUploadSurfaceClick"[\s\S]*@drop\.prevent="emit\('asset-drop', \$event\)"[\s\S]*<input[\s\S]*ref="inputAssetInputRef"[\s\S]*class="node-card__asset-native-input"[\s\S]*type="file"[\s\S]*@change="emit\('asset-file-change', \$event\)"/);
+  assert.match(componentSource, /<label[\s\S]*class="node-card__asset-action"[\s\S]*@click\.stop="handleAssetUploadSurfaceClick"[\s\S]*<input[\s\S]*ref="inputAssetInputRef"[\s\S]*class="node-card__asset-native-input node-card__asset-native-input--action"[\s\S]*type="file"[\s\S]*@change="emit\('asset-file-change', \$event\)"[\s\S]*Replace[\s\S]*<\/label>/);
+  assert.doesNotMatch(componentSource, /class="node-card__asset-native-input"[\s\S]{0,260}@click\.stop/);
+  assert.match(componentSource, /function handleAssetUploadSurfaceClick\(event: MouseEvent\) \{[\s\S]*if \(event\.target instanceof HTMLInputElement\) \{[\s\S]*return;[\s\S]*\}[\s\S]*openInputAssetPicker\(\);[\s\S]*\}/);
+  assert.match(componentSource, /function openInputAssetPicker\(\) \{[\s\S]*const input = inputAssetInputRef\.value;[\s\S]*showPicker\(\);[\s\S]*return;[\s\S]*input\.click\(\);[\s\S]*\}/);
   assert.match(componentSource, /v-if="inputAssetEnvelope\.detectedType === 'image' && inputAssetEnvelope\.encoding === 'data_url'"/);
   assert.match(componentSource, /v-else-if="inputAssetEnvelope\.detectedType === 'audio' && inputAssetEnvelope\.encoding === 'data_url'"/);
   assert.match(componentSource, /v-else-if="inputAssetEnvelope\.detectedType === 'video' && inputAssetEnvelope\.encoding === 'data_url'"/);

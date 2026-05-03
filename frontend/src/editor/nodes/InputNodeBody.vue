@@ -48,7 +48,7 @@
         role="button"
         tabindex="0"
         @pointerdown.stop
-        @click.stop
+        @click.stop="handleAssetUploadSurfaceClick"
         @keydown.enter.prevent="openInputAssetPicker"
         @keydown.space.prevent="openInputAssetPicker"
         @dragover.prevent
@@ -62,7 +62,6 @@
           :accept="inputAssetAccept"
           :aria-label="`Upload ${inputAssetLabel}`"
           @pointerdown.stop
-          @click.stop
           @dragover.prevent
           @drop.prevent.stop="emit('asset-drop', $event)"
           @change="emit('asset-file-change', $event)"
@@ -82,7 +81,7 @@
             role="button"
             tabindex="0"
             @pointerdown.stop
-            @click.stop
+            @click.stop="handleAssetUploadSurfaceClick"
             @keydown.enter.prevent="openInputAssetPicker"
             @keydown.space.prevent="openInputAssetPicker"
           >
@@ -94,7 +93,6 @@
               :accept="inputAssetAccept"
               aria-label="Replace uploaded file"
               @pointerdown.stop
-              @click.stop
               @change="emit('asset-file-change', $event)"
             />
             Replace
@@ -207,8 +205,30 @@ const emit = defineEmits<{
 const { t } = useI18n();
 const inputAssetInputRef = ref<HTMLInputElement | null>(null);
 
+function handleAssetUploadSurfaceClick(event: MouseEvent) {
+  if (event.target instanceof HTMLInputElement) {
+    return;
+  }
+  openInputAssetPicker();
+}
+
 function openInputAssetPicker() {
-  inputAssetInputRef.value?.click();
+  const input = inputAssetInputRef.value;
+  if (!input) {
+    return;
+  }
+
+  const pickerInput = input as HTMLInputElement & { showPicker?: () => void };
+  if (typeof pickerInput.showPicker === "function") {
+    try {
+      pickerInput.showPicker();
+      return;
+    } catch {
+      // Fall back to the long-supported click path for browsers without showPicker support.
+    }
+  }
+
+  input.click();
 }
 </script>
 

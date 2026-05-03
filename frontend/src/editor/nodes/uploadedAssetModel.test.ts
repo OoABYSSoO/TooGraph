@@ -66,6 +66,8 @@ test("uploaded asset presentation helpers preserve NodeCard display text", () =>
   assert.match(resolveUploadedAssetInputAccept("video"), /video\/\*/);
   assert.match(resolveUploadedAssetInputAccept("video"), /\.mov/);
   assert.match(resolveUploadedAssetInputAccept("image"), /\.heic/);
+  assert.equal(resolveUploadedAssetInputAccept("file"), "");
+  assert.equal(resolveUploadedAssetInputAccept(null), "");
   assert.equal(resolveUploadedAssetSummary(textAsset), "text/plain · 2 KB");
   assert.equal(resolveUploadedAssetTextPreview(textAsset), "a".repeat(3000));
   assert.equal(resolveUploadedAssetDescription(textAsset, "file"), "Stored as file upload. text/plain · 2 KB");
