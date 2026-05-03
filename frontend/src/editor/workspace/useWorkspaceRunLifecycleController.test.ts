@@ -81,7 +81,7 @@ function runDetail(status: string, patch: Partial<RunDetail> = {}): RunDetail {
     warnings: [],
     errors: [],
     output_previews: [],
-    artifacts: { outputs: [], state_events: [] },
+    artifacts: { output_previews: [], state_events: [] },
     state_snapshot: { values: {}, last_writers: {} },
     graph_snapshot: {},
     ...patch,
@@ -223,7 +223,7 @@ test("useWorkspaceRunLifecycleController reconciles terminal run activity from s
     fetchRun: async () =>
       runDetail("completed", {
         artifacts: {
-          outputs: [],
+          output_previews: [],
           state_events: [
             {
               node_id: "agent_1",
