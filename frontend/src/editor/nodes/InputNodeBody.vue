@@ -6,7 +6,6 @@
         :model-value="inputBoundarySelection"
         :options="inputTypeOptions"
         :aria-label="t('nodeCard.inputBoundaryMode')"
-        :disabled="Boolean(inputAssetEnvelope)"
         @pointerdown.stop
         @click.stop
         @update:model-value="emit('update:boundary-selection', $event)"

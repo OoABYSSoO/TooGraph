@@ -53,6 +53,24 @@ test("resolveNextInputValueForBoundaryType follows legacy input switching rules"
     }),
     "keep me",
   );
+  assert.equal(
+    resolveNextInputValueForBoundaryType({
+      nextType: "text",
+      currentType: "video",
+      currentValue: JSON.stringify({ kind: "uploaded_file", detectedType: "video" }),
+      knowledgeBaseNames: [],
+    }),
+    "",
+  );
+  assert.equal(
+    resolveNextInputValueForBoundaryType({
+      nextType: "text",
+      currentType: "file",
+      currentValue: JSON.stringify({ kind: "uploaded_file", detectedType: "file" }),
+      knowledgeBaseNames: [],
+    }),
+    "",
+  );
 });
 
 test("isSwitchableInputBoundaryType exposes the manual input picker types", () => {

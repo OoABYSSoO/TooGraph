@@ -144,7 +144,7 @@ test("NodeCard delegates input body presentation while keeping the output state 
   assert.match(inputNodeBodySource, /class="node-card__input-boundary-toggle"/);
   assert.match(inputNodeBodySource, /:options="inputTypeOptions"/);
   assert.match(inputNodeBodySource, /:model-value="inputBoundarySelection"/);
-  assert.match(inputNodeBodySource, /:disabled="Boolean\(inputAssetEnvelope\)"/);
+  assert.doesNotMatch(inputNodeBodySource, /:disabled="Boolean\(inputAssetEnvelope\)"/);
   assert.match(componentSource, /from "\.\/uploadedAssetModel";/);
   assert.match(componentSource, /resolveUploadedAssetLabel\(inputAssetType\.value\)/);
   assert.match(componentSource, /resolveUploadedAssetSummary\(inputAssetEnvelope\.value\)/);

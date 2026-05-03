@@ -24,9 +24,17 @@ export function resolveNextInputValueForBoundaryType(input: {
     return "";
   }
 
+  if (isUploadedAssetBoundaryType(input.currentType)) {
+    return "";
+  }
+
   return typeof input.currentValue === "string" ? input.currentValue : "";
 }
 
 export function isSwitchableInputBoundaryType(type: string): type is Extract<InputBoundaryType, "text" | "file" | "knowledge_base"> {
   return type === "text" || type === "file" || type === "knowledge_base";
+}
+
+function isUploadedAssetBoundaryType(type: string | null) {
+  return type === "file" || type === "image" || type === "audio" || type === "video";
 }

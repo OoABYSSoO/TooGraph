@@ -14,7 +14,8 @@ test("InputNodeBody owns input presentation and forwards parent side effects", (
   assert.match(componentSource, /defineEmits<\{[\s\S]*\(event: "update:boundary-selection", value: string \| number \| boolean\): void;[\s\S]*\(event: "update:knowledge-base", value: string \| number \| boolean \| undefined\): void;[\s\S]*\(event: "asset-file-change", inputEvent: Event\): void;[\s\S]*\(event: "asset-drop", dragEvent: DragEvent\): void;[\s\S]*\(event: "clear-asset"\): void;[\s\S]*\(event: "input-value", inputEvent: Event\): void;[\s\S]*\}>/);
   assert.match(componentSource, /<div class="node-card__input-body">/);
   assert.match(componentSource, /<div class="node-card__port-row node-card__port-row--single node-card__port-row--input-boundary">/);
-  assert.match(componentSource, /<ElSegmented[\s\S]*class="node-card__input-boundary-toggle"[\s\S]*:model-value="inputBoundarySelection"[\s\S]*:options="inputTypeOptions"[\s\S]*:disabled="Boolean\(inputAssetEnvelope\)"[\s\S]*@update:model-value="emit\('update:boundary-selection', \$event\)"/);
+  assert.match(componentSource, /<ElSegmented[\s\S]*class="node-card__input-boundary-toggle"[\s\S]*:model-value="inputBoundarySelection"[\s\S]*:options="inputTypeOptions"[\s\S]*@update:model-value="emit\('update:boundary-selection', \$event\)"/);
+  assert.doesNotMatch(componentSource, /:disabled="Boolean\(inputAssetEnvelope\)"/);
   assert.match(componentSource, /<slot name="primary-output" \/>/);
   assert.match(componentSource, /v-if="showKnowledgeBaseInput"[\s\S]*class="node-card__surface node-card__input-picker"[\s\S]*<ElSelect[\s\S]*:model-value="inputKnowledgeBaseValue \|\| undefined"[\s\S]*@update:model-value="emit\('update:knowledge-base', \$event\)"/);
   assert.match(componentSource, /<ElOption v-for="option in inputKnowledgeBaseOptions"/);
