@@ -127,6 +127,14 @@ def _state_key_by_name(graph: NodeSystemGraphPayload, state_name: str) -> str:
     raise AssertionError(f"State named {state_name!r} not found")
 
 
+def _hello_world_greeting_keys(graph: NodeSystemGraphPayload) -> list[str]:
+    return [
+        _state_key_by_name(graph, "greeting_zh"),
+        _state_key_by_name(graph, "greeting_en"),
+        _state_key_by_name(graph, "greeting_ja"),
+    ]
+
+
 _FAIL_ONCE_STATE = {"failed": False}
 
 
@@ -257,11 +265,11 @@ class LangGraphMigrationTests(unittest.TestCase):
     def test_hello_world_build_plan(self):
         graph = _load_hello_world_graph()
         name_key = _state_key_by_name(graph, "name")
-        greeting_key = _state_key_by_name(graph, "greeting")
+        greeting_zh_key, greeting_en_key, greeting_ja_key = _hello_world_greeting_keys(graph)
         plan = compile_graph_to_langgraph_plan(graph)
         self.assertEqual(plan.name, "Hello World")
         self.assertEqual(set(plan.requirements.entry_nodes), {"input_name"})
-        self.assertEqual(set(plan.requirements.terminal_nodes), {"output_greeting"})
+        self.assertEqual(set(plan.requirements.terminal_nodes), {"output_greeting_zh", "output_greeting_en", "output_greeting_ja"})
         self.assertEqual(set(plan.requirements.runtime_entry_nodes), {"greeting_agent"})
         self.assertEqual(set(plan.requirements.runtime_terminal_nodes), {"greeting_agent"})
         self.assertEqual(set(plan.runtime_nodes), {"greeting_agent"})
@@ -272,7 +280,11 @@ class LangGraphMigrationTests(unittest.TestCase):
         )
         self.assertEqual(
             [boundary.model_dump(by_alias=True) for boundary in plan.output_boundaries],
-            [{"node": "output_greeting", "state": greeting_key}],
+            [
+                {"node": "output_greeting_zh", "state": greeting_zh_key},
+                {"node": "output_greeting_en", "state": greeting_en_key},
+                {"node": "output_greeting_ja", "state": greeting_ja_key},
+            ],
         )
         self.assertEqual(plan.requirements.skill_keys, [])
         self.assertEqual(plan.requirements.unsupported_reasons, [])
@@ -308,7 +320,7 @@ class LangGraphMigrationTests(unittest.TestCase):
     def test_hello_world_runtime_prefers_state_schema_value_for_input_nodes(self):
         graph = _load_hello_world_graph()
         name_key = _state_key_by_name(graph, "name")
-        greeting_key = _state_key_by_name(graph, "greeting")
+        greeting_zh_key, greeting_en_key, greeting_ja_key = _hello_world_greeting_keys(graph)
         graph.state_schema[name_key].value = "来自 state_schema 的名称"
         graph.nodes["input_name"].config.value = "来自节点 config 的旧值"
 
@@ -323,12 +335,19 @@ class LangGraphMigrationTests(unittest.TestCase):
         self.assertEqual({item["node_id"] for item in result["node_executions"]}, {"greeting_agent"})
         self.assertEqual({item["node_type"] for item in result["node_executions"]}, {"agent"})
         self.assertEqual(result["cycle_summary"]["has_cycle"], False)
-        self.assertEqual(result["output_previews"][0]["node_id"], "output_greeting")
-        self.assertEqual(result["output_previews"][0]["source_key"], greeting_key)
-        self.assertEqual(result["output_previews"][0]["value"], "greeting_agent:来自 state_schema 的名称")
+        self.assertEqual(
+            [(preview["node_id"], preview["source_key"], preview["value"]) for preview in result["output_previews"]],
+            [
+                ("output_greeting_zh", greeting_zh_key, "greeting_agent:来自 state_schema 的名称"),
+                ("output_greeting_en", greeting_en_key, "greeting_agent:来自 state_schema 的名称"),
+                ("output_greeting_ja", greeting_ja_key, "greeting_agent:来自 state_schema 的名称"),
+            ],
+        )
         self.assertEqual(result["node_status_map"]["input_name"], "success")
-        self.assertEqual(result["node_status_map"]["output_greeting"], "success")
-        self.assertIn(greeting_key, result["state_snapshot"]["values"])
+        self.assertEqual(result["node_status_map"]["output_greeting_zh"], "success")
+        self.assertEqual(result["node_status_map"]["output_greeting_en"], "success")
+        self.assertEqual(result["node_status_map"]["output_greeting_ja"], "success")
+        self.assertTrue({greeting_zh_key, greeting_en_key, greeting_ja_key}.issubset(result["state_snapshot"]["values"]))
 
     @patch("app.core.langgraph.runtime.save_run", lambda state: None)
     @patch("app.core.runtime.node_system_executor.save_run", lambda state: None)
@@ -371,7 +390,7 @@ class LangGraphMigrationTests(unittest.TestCase):
         self.assertEqual(result["runtime_backend"], "langgraph")
         self.assertEqual(result["lifecycle"]["resume_count"], 1)
         self.assertEqual(result["lifecycle"]["resumed_from_run_id"], initial_state["run_id"])
-        self.assertIn(_state_key_by_name(graph, "greeting"), result["state_snapshot"]["values"])
+        self.assertTrue(set(_hello_world_greeting_keys(graph)).issubset(result["state_snapshot"]["values"]))
 
     @patch("app.core.langgraph.runtime.save_run", lambda state: None)
     @patch("app.core.runtime.node_system_executor.save_run", lambda state: None)
@@ -403,7 +422,7 @@ class LangGraphMigrationTests(unittest.TestCase):
     @patch("app.core.runtime.node_system_executor.get_skill_registry", _fake_skill_registry)
     def test_langgraph_interrupt_after_agent_collects_output_preview(self):
         graph = _load_hello_world_graph()
-        greeting_key = _state_key_by_name(graph, "greeting")
+        greeting_zh_key, greeting_en_key, greeting_ja_key = _hello_world_greeting_keys(graph)
         payload = graph.model_dump(by_alias=True)
         payload["metadata"] = {"interrupt_after": ["greeting_agent"]}
         interrupt_graph = NodeSystemGraphPayload.model_validate(payload)
@@ -413,10 +432,17 @@ class LangGraphMigrationTests(unittest.TestCase):
         self.assertEqual(result["status"], "awaiting_human")
         self.assertEqual(result["current_node_id"], "greeting_agent")
         self.assertEqual(result["node_status_map"]["greeting_agent"], "success")
-        self.assertEqual(result["state_snapshot"]["values"][greeting_key], "greeting_agent:GraphiteUI 用户")
-        self.assertEqual(result["output_previews"][0]["node_id"], "output_greeting")
-        self.assertEqual(result["output_previews"][0]["source_key"], greeting_key)
-        self.assertEqual(result["output_previews"][0]["value"], "greeting_agent:GraphiteUI 用户")
+        self.assertEqual(result["state_snapshot"]["values"][greeting_zh_key], "greeting_agent:GraphiteUI 用户")
+        self.assertEqual(result["state_snapshot"]["values"][greeting_en_key], "greeting_agent:GraphiteUI 用户")
+        self.assertEqual(result["state_snapshot"]["values"][greeting_ja_key], "greeting_agent:GraphiteUI 用户")
+        self.assertEqual(
+            [(preview["node_id"], preview["source_key"], preview["value"]) for preview in result["output_previews"]],
+            [
+                ("output_greeting_zh", greeting_zh_key, "greeting_agent:GraphiteUI 用户"),
+                ("output_greeting_en", greeting_en_key, "greeting_agent:GraphiteUI 用户"),
+                ("output_greeting_ja", greeting_ja_key, "greeting_agent:GraphiteUI 用户"),
+            ],
+        )
 
     @patch("app.core.langgraph.runtime.save_run", lambda state: None)
     @patch("app.core.runtime.node_system_executor.save_run", lambda state: None)
@@ -426,7 +452,7 @@ class LangGraphMigrationTests(unittest.TestCase):
     def test_langgraph_interrupt_resume_accepts_human_state_updates(self):
         graph = _load_hello_world_graph()
         name_key = _state_key_by_name(graph, "name")
-        greeting_key = _state_key_by_name(graph, "greeting")
+        greeting_zh_key, greeting_en_key, greeting_ja_key = _hello_world_greeting_keys(graph)
         payload = graph.model_dump(by_alias=True)
         payload["metadata"] = {"interrupt_before": ["greeting_agent"]}
         interrupt_graph = NodeSystemGraphPayload.model_validate(payload)
@@ -456,7 +482,9 @@ class LangGraphMigrationTests(unittest.TestCase):
         self.assertEqual(result["lifecycle"]["resume_count"], 1)
         self.assertEqual(result["lifecycle"]["resumed_from_run_id"], interrupted["run_id"])
         self.assertEqual(result["state_snapshot"]["values"][name_key], "人工确认后的名称")
-        self.assertEqual(result["state_snapshot"]["values"][greeting_key], "greeting_agent:人工确认后的名称")
+        self.assertEqual(result["state_snapshot"]["values"][greeting_zh_key], "greeting_agent:人工确认后的名称")
+        self.assertEqual(result["state_snapshot"]["values"][greeting_en_key], "greeting_agent:人工确认后的名称")
+        self.assertEqual(result["state_snapshot"]["values"][greeting_ja_key], "greeting_agent:人工确认后的名称")
         self.assertNotIn("pending_interrupt_nodes", result.get("metadata", {}))
 
     def test_conditional_edge_validation_template_still_valid(self):
@@ -991,7 +1019,7 @@ class LangGraphMigrationTests(unittest.TestCase):
     @patch("app.core.runtime.node_system_executor.get_skill_registry", _fake_skill_registry)
     def test_exported_langgraph_python_source_is_executable(self):
         graph = _load_hello_world_graph()
-        greeting_key = _state_key_by_name(graph, "greeting")
+        greeting_keys = _hello_world_greeting_keys(graph)
         source = generate_langgraph_python_source(graph)
         self.assertIn("def build_graph()", source)
         self.assertIn("def invoke_graph", source)
@@ -1001,7 +1029,8 @@ class LangGraphMigrationTests(unittest.TestCase):
         namespace: dict[str, object] = {}
         exec(source, namespace, namespace)
         result = namespace["invoke_graph"]()
-        self.assertIn(greeting_key, result)
+        for greeting_key in greeting_keys:
+            self.assertIn(greeting_key, result)
 
     def test_exported_langgraph_invoke_clears_non_input_initial_values(self):
         graph = NodeSystemGraphPayload.model_validate(
@@ -1040,13 +1069,15 @@ class LangGraphMigrationTests(unittest.TestCase):
     def test_exported_langgraph_payload_keeps_only_runtime_fields(self):
         graph = _load_hello_world_graph()
         name_key = _state_key_by_name(graph, "name")
-        greeting_key = _state_key_by_name(graph, "greeting")
+        greeting_zh_key, greeting_en_key, greeting_ja_key = _hello_world_greeting_keys(graph)
         payload = _build_export_graph_payload(graph)
 
         self.assertNotIn("graph_id", payload)
         self.assertNotIn("metadata", payload)
         self.assertEqual(payload["state_schema"][name_key], {"value": "GraphiteUI 用户"})
-        self.assertEqual(payload["state_schema"][greeting_key], {"value": ""})
+        self.assertEqual(payload["state_schema"][greeting_zh_key], {"value": ""})
+        self.assertEqual(payload["state_schema"][greeting_en_key], {"value": ""})
+        self.assertEqual(payload["state_schema"][greeting_ja_key], {"value": ""})
         self.assertEqual(
             payload["nodes"]["input_name"],
             {
@@ -1059,15 +1090,29 @@ class LangGraphMigrationTests(unittest.TestCase):
             {
                 "kind": "agent",
                 "reads": [{"state": name_key}],
-                "writes": [{"state": greeting_key}],
-                "config": {"taskInstruction": "读取输入 name，用中文生成一句简短、友好的欢迎语。只输出问候内容，不要解释。"},
+                "writes": [{"state": greeting_zh_key}, {"state": greeting_en_key}, {"state": greeting_ja_key}],
+                "config": {"taskInstruction": "读取输入 name，为同一个对象分别生成简短、自然的中文、英文、日文问候。每个输出字段只写对应语言的一句话，不要解释。"},
             },
         )
         self.assertEqual(
-            payload["nodes"]["output_greeting"],
+            payload["nodes"]["output_greeting_zh"],
             {
                 "kind": "output",
-                "reads": [{"state": greeting_key}],
+                "reads": [{"state": greeting_zh_key}],
+            },
+        )
+        self.assertEqual(
+            payload["nodes"]["output_greeting_en"],
+            {
+                "kind": "output",
+                "reads": [{"state": greeting_en_key}],
+            },
+        )
+        self.assertEqual(
+            payload["nodes"]["output_greeting_ja"],
+            {
+                "kind": "output",
+                "reads": [{"state": greeting_ja_key}],
             },
         )
 

@@ -213,12 +213,19 @@ function normalizePreviewNumber(value: unknown) {
 }
 
 function looksLikeMarkdown(text: string) {
-  return /^\s{0,3}#{1,6}\s+\S/m.test(text) || /^\s*[-*]\s+\S/m.test(text) || /\*\*[^*]+\*\*/.test(text) || /`[^`]+`/.test(text);
+  return (
+    /^\s{0,3}#{1,6}\s+\S/m.test(text) ||
+    /^\s*[-*]\s+\S/m.test(text) ||
+    /\*\*[^*]+\*\*/.test(text) ||
+    /`[^`]+`/.test(text) ||
+    hasMarkdownTable(text)
+  );
 }
 
 function renderSafeMarkdown(text: string) {
   const html: string[] = [];
   let listOpen = false;
+  const lines = text.replace(/\r\n/g, "\n").split("\n");
 
   const closeList = () => {
     if (!listOpen) {
@@ -228,10 +235,19 @@ function renderSafeMarkdown(text: string) {
     listOpen = false;
   };
 
-  for (const rawLine of text.replace(/\r\n/g, "\n").split("\n")) {
+  for (let index = 0; index < lines.length; index += 1) {
+    const rawLine = lines[index] ?? "";
     const line = rawLine.trimEnd();
     if (!line.trim()) {
       closeList();
+      continue;
+    }
+
+    const tableBlock = parseMarkdownTableBlock(lines, index);
+    if (tableBlock) {
+      closeList();
+      html.push(tableBlock.html);
+      index = tableBlock.endIndex;
       continue;
     }
 
@@ -259,6 +275,63 @@ function renderSafeMarkdown(text: string) {
 
   closeList();
   return html.join("");
+}
+
+function hasMarkdownTable(text: string) {
+  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  for (let index = 0; index < lines.length - 1; index += 1) {
+    if (parseMarkdownTableBlock(lines, index)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function parseMarkdownTableBlock(lines: string[], startIndex: number): { html: string; endIndex: number } | null {
+  const header = splitMarkdownTableRow(lines[startIndex] ?? "");
+  const separator = splitMarkdownTableRow(lines[startIndex + 1] ?? "");
+  if (header.length === 0 || separator.length !== header.length || !separator.every(isMarkdownTableSeparatorCell)) {
+    return null;
+  }
+
+  const bodyRows: string[][] = [];
+  let endIndex = startIndex + 1;
+  for (let index = startIndex + 2; index < lines.length; index += 1) {
+    const cells = splitMarkdownTableRow(lines[index] ?? "");
+    if (cells.length === 0) {
+      break;
+    }
+    bodyRows.push(normalizeMarkdownTableCells(cells, header.length));
+    endIndex = index;
+  }
+
+  const headHtml = `<thead><tr>${header.map((cell) => `<th>${renderInlineMarkdown(cell)}</th>`).join("")}</tr></thead>`;
+  const bodyHtml =
+    bodyRows.length > 0
+      ? `<tbody>${bodyRows.map((row) => `<tr>${row.map((cell) => `<td>${renderInlineMarkdown(cell)}</td>`).join("")}</tr>`).join("")}</tbody>`
+      : "";
+  return {
+    html: `<table>${headHtml}${bodyHtml}</table>`,
+    endIndex,
+  };
+}
+
+function splitMarkdownTableRow(line: string) {
+  const trimmed = line.trim();
+  if (!trimmed.includes("|")) {
+    return [];
+  }
+  const normalized = trimmed.replace(/^\|/, "").replace(/\|$/, "");
+  const cells = normalized.split("|").map((cell) => cell.trim());
+  return cells.length >= 2 ? cells : [];
+}
+
+function isMarkdownTableSeparatorCell(cell: string) {
+  return /^:?-{3,}:?$/.test(cell.trim());
+}
+
+function normalizeMarkdownTableCells(cells: string[], columnCount: number) {
+  return Array.from({ length: columnCount }, (_value, index) => cells[index] ?? "");
 }
 
 function renderInlineMarkdown(text: string) {

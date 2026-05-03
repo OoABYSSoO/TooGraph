@@ -194,6 +194,30 @@ const { t } = useI18n();
   padding-left: 1.1rem;
 }
 
+.node-card__preview-markdown :deep(table) {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.72);
+  font-size: 0.88rem;
+  white-space: normal;
+}
+
+.node-card__preview-markdown :deep(th),
+.node-card__preview-markdown :deep(td) {
+  border: 1px solid rgba(154, 52, 18, 0.16);
+  padding: 0.42rem 0.58rem;
+  vertical-align: top;
+}
+
+.node-card__preview-markdown :deep(th) {
+  background: rgba(154, 52, 18, 0.08);
+  color: rgba(69, 45, 25, 0.92);
+  font-weight: 700;
+}
+
 .node-card__preview-markdown :deep(code) {
   border-radius: 6px;
   background: rgba(154, 52, 18, 0.08);

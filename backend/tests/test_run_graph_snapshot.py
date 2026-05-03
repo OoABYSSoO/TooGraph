@@ -23,6 +23,14 @@ def _state_key_by_name(template: dict, state_name: str) -> str:
     raise AssertionError(f"State named {state_name!r} not found")
 
 
+def _hello_world_greeting_entries(template: dict) -> list[tuple[str, str, str]]:
+    return [
+        ("output_greeting_zh", "greeting_zh", _state_key_by_name(template, "greeting_zh")),
+        ("output_greeting_en", "greeting_en", _state_key_by_name(template, "greeting_en")),
+        ("output_greeting_ja", "greeting_ja", _state_key_by_name(template, "greeting_ja")),
+    ]
+
+
 class RunGraphSnapshotTest(unittest.TestCase):
     def test_run_list_exposes_restore_flag_only_for_valid_graph_snapshots(self) -> None:
         restorable_run = create_initial_run_state(
@@ -244,7 +252,8 @@ class RunGraphSnapshotTest(unittest.TestCase):
     def test_resume_uses_saved_run_snapshot_instead_of_current_graph_store(self) -> None:
         template = load_template_record("hello_world")
         name_key = _state_key_by_name(template, "name")
-        greeting_key = _state_key_by_name(template, "greeting")
+        greeting_entries = _hello_world_greeting_entries(template)
+        greeting_keys = [entry[2] for entry in greeting_entries]
         graph_snapshot = {
             "graph_id": "runtime_snapshot_graph",
             "name": template["default_graph_name"],
@@ -272,30 +281,32 @@ class RunGraphSnapshotTest(unittest.TestCase):
         previous_run["node_status_map"] = {
             "input_name": "success",
             "greeting_agent": "success",
-            "output_greeting": "success",
+            **{node_id: "success" for node_id, _label, _state_key in greeting_entries},
         }
         previous_run["output_previews"] = [
             {
-                "node_id": "output_greeting",
-                "label": "greeting",
+                "node_id": node_id,
+                "label": label,
                 "source_kind": "state",
-                "source_key": greeting_key,
+                "source_key": state_key,
                 "display_mode": "markdown",
                 "persist_enabled": False,
                 "persist_format": "auto",
                 "value": "上一轮输出",
             }
+            for node_id, label, state_key in greeting_entries
         ]
         previous_run["artifacts"] = {
             **previous_run.get("artifacts", {}),
             "output_previews": list(previous_run["output_previews"]),
             "exported_outputs": [
                 {
-                    **previous_run["output_previews"][0],
+                    **preview,
                     "saved_file": None,
                 }
+                for preview in previous_run["output_previews"]
             ],
-            "active_edge_ids": ["edge:greeting_agent:output_greeting"],
+            "active_edge_ids": [f"edge:greeting_agent:{node_id}" for node_id, _label, _state_key in greeting_entries],
         }
         touch_run_lifecycle(previous_run)
 
@@ -339,19 +350,23 @@ class RunGraphSnapshotTest(unittest.TestCase):
                 self.assertEqual(response.json()["run_id"], previous_run["run_id"])
                 self.assertEqual(captured["graph_id"], "runtime_snapshot_graph")
                 self.assertEqual(captured["graph_name"], "Hello World")
-                self.assertEqual(captured["state_keys"], sorted([greeting_key, name_key]))
+                self.assertEqual(captured["state_keys"], sorted([*greeting_keys, name_key]))
                 self.assertEqual(captured["resume_command"], {name_key: "人工确认"})
                 initial_state = captured["initial_state"]
                 self.assertIsInstance(initial_state, dict)
                 self.assertEqual(initial_state["node_status_map"]["greeting_agent"], "success")
-                self.assertEqual(initial_state["output_previews"][0]["node_id"], "output_greeting")
-                self.assertEqual(initial_state["artifacts"]["exported_outputs"][0]["node_id"], "output_greeting")
-                self.assertEqual(initial_state["artifacts"]["active_edge_ids"], ["edge:greeting_agent:output_greeting"])
+                self.assertEqual(initial_state["output_previews"][0]["node_id"], "output_greeting_zh")
+                self.assertEqual(initial_state["artifacts"]["exported_outputs"][0]["node_id"], "output_greeting_zh")
+                self.assertEqual(
+                    initial_state["artifacts"]["active_edge_ids"],
+                    [f"edge:greeting_agent:{node_id}" for node_id, _label, _state_key in greeting_entries],
+                )
 
     def test_resume_can_target_a_historical_pause_snapshot(self) -> None:
         template = load_template_record("hello_world")
         name_key = _state_key_by_name(template, "name")
-        greeting_key = _state_key_by_name(template, "greeting")
+        greeting_entries = _hello_world_greeting_entries(template)
+        greeting_zh_key = greeting_entries[0][2]
         graph_snapshot = {
             "graph_id": "runtime_snapshot_graph",
             "name": template["default_graph_name"],
@@ -393,7 +408,7 @@ class RunGraphSnapshotTest(unittest.TestCase):
                 "state_snapshot": {
                     "values": {
                         name_key: "GraphiteUI",
-                        greeting_key: "draft",
+                        **{state_key: "draft" for _node_id, _label, state_key in greeting_entries},
                     },
                     "last_writers": {},
                 },
@@ -401,15 +416,16 @@ class RunGraphSnapshotTest(unittest.TestCase):
                 "artifacts": {
                     "output_previews": [
                         {
-                            "node_id": "output_greeting",
-                            "label": "Greeting",
+                            "node_id": node_id,
+                            "label": label,
                             "source_kind": "state",
-                            "source_key": greeting_key,
+                            "source_key": state_key,
                             "display_mode": "text",
                             "persist_enabled": False,
                             "persist_format": "auto",
                             "value": "draft",
                         }
+                        for node_id, label, state_key in greeting_entries
                     ],
                     "exported_outputs": [],
                     "active_edge_ids": ["edge:input_name:greeting_agent"],
@@ -420,15 +436,16 @@ class RunGraphSnapshotTest(unittest.TestCase):
                 },
                 "output_previews": [
                     {
-                        "node_id": "output_greeting",
-                        "label": "Greeting",
+                        "node_id": node_id,
+                        "label": label,
                         "source_kind": "state",
-                        "source_key": greeting_key,
+                        "source_key": state_key,
                         "display_mode": "text",
                         "persist_enabled": False,
                         "persist_format": "auto",
                         "value": "draft",
                     }
+                    for node_id, label, state_key in greeting_entries
                 ],
                 "final_result": "draft",
             }
@@ -437,20 +454,21 @@ class RunGraphSnapshotTest(unittest.TestCase):
         previous_run["final_result"] = "final"
         previous_run["output_previews"] = [
             {
-                "node_id": "output_greeting",
-                "label": "Greeting",
+                "node_id": node_id,
+                "label": label,
                 "source_kind": "state",
-                "source_key": greeting_key,
+                "source_key": state_key,
                 "display_mode": "text",
                 "persist_enabled": False,
                 "persist_format": "auto",
                 "value": "final",
             }
+            for node_id, label, state_key in greeting_entries
         ]
         previous_run["artifacts"] = {
             "output_previews": list(previous_run["output_previews"]),
             "exported_outputs": [],
-            "active_edge_ids": ["edge:greeting_agent:output_greeting"],
+            "active_edge_ids": [f"edge:greeting_agent:{node_id}" for node_id, _label, _state_key in greeting_entries],
         }
         touch_run_lifecycle(previous_run)
 
@@ -494,6 +512,7 @@ class RunGraphSnapshotTest(unittest.TestCase):
                 self.assertEqual(initial_state["current_node_id"], "greeting_agent")
                 self.assertEqual(initial_state["checkpoint_metadata"]["checkpoint_id"], "checkpoint-pause")
                 self.assertEqual(initial_state["output_previews"][0]["value"], "draft")
+                self.assertEqual(initial_state["output_previews"][0]["source_key"], greeting_zh_key)
                 self.assertEqual(initial_state["final_result"], "draft")
                 self.assertEqual(captured["resume_command"], {name_key: "人工确认"})
 

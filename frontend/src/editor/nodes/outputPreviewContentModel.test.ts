@@ -21,6 +21,16 @@ test("resolveOutputPreviewContent renders safe markdown without exposing raw HTM
   assert.doesNotMatch(preview.html, /<script>/);
 });
 
+test("resolveOutputPreviewContent renders markdown tables as safe table markup", () => {
+  const preview = resolveOutputPreviewContent("| 语言 | 问候 |\n| --- | --- |\n| 中文 | **你好** |\n| English | `Hello` |", "markdown");
+
+  assert.equal(preview.kind, "markdown");
+  assert.match(preview.html, /<table>/);
+  assert.match(preview.html, /<thead><tr><th>语言<\/th><th>问候<\/th><\/tr><\/thead>/);
+  assert.match(preview.html, /<tbody><tr><td>中文<\/td><td><strong>你好<\/strong><\/td><\/tr><tr><td>English<\/td><td><code>Hello<\/code><\/td><\/tr><\/tbody>/);
+  assert.doesNotMatch(preview.html, /<p>\| 语言 \| 问候 \|<\/p>/);
+});
+
 test("resolveOutputPreviewContent keeps ordinary previews as plain text", () => {
   const preview = resolveOutputPreviewContent("Connected to answer. Run the graph to preview/export it.", "auto");
 
@@ -74,6 +84,7 @@ test("resolveOutputPreviewContent treats active waiting output as an empty previ
 test("resolveOutputPreviewDisplayMode exposes the effective auto-detected format", () => {
   assert.equal(resolveOutputPreviewDisplayMode('{"answer":"GraphiteUI"}', "auto"), "json");
   assert.equal(resolveOutputPreviewDisplayMode("# Final answer", "auto"), "markdown");
+  assert.equal(resolveOutputPreviewDisplayMode("| A | B |\n| --- | --- |\n| 1 | 2 |", "auto"), "markdown");
   assert.equal(resolveOutputPreviewDisplayMode("# Final answer", "plain"), "plain");
   assert.equal(resolveOutputPreviewDisplayMode("[]", "documents"), "documents");
 });

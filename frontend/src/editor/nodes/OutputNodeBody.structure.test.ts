@@ -29,5 +29,7 @@ test("OutputNodeBody owns output presentation and forwards parent side effects",
   assert.match(componentSource, /\.node-card__output-body \{[\s\S]*display:\s*flex;[\s\S]*flex:\s*1 1 auto;/);
   assert.match(componentSource, /\.node-card__surface--output \{[\s\S]*flex:\s*1 1 auto;[\s\S]*min-height:\s*0;/);
   assert.match(componentSource, /\.node-card__preview \{[\s\S]*flex:\s*1 1 auto;[\s\S]*overflow:\s*auto;/);
+  assert.match(componentSource, /\.node-card__preview-markdown :deep\(table\) \{[\s\S]*border-collapse:\s*collapse;/);
+  assert.match(componentSource, /\.node-card__preview-markdown :deep\(th\),[\s\S]*\.node-card__preview-markdown :deep\(td\) \{[\s\S]*border:\s*1px solid/);
   assert.match(componentSource, /\.node-card__output-persist-card \{[\s\S]*grid-template-columns:\s*auto 56px;/);
 });

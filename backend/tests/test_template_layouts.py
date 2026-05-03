@@ -88,6 +88,24 @@ class TemplateLayoutTests(unittest.TestCase):
 
         self.assertEqual(failures, [], "\n".join(failures))
 
+    def test_hello_world_template_writes_multiple_language_greetings(self):
+        template = next(
+            NodeSystemTemplate.model_validate(record)
+            for record in list_template_records()
+            if record["template_id"] == "hello_world"
+        )
+
+        state_names = [definition.name for definition in template.state_schema.values()]
+        self.assertEqual(state_names, ["name", "greeting_zh", "greeting_en", "greeting_ja"])
+        self.assertEqual(
+            [binding.state for binding in template.nodes["greeting_agent"].writes],
+            ["state_2", "state_3", "state_4"],
+        )
+        self.assertEqual(
+            {node_id for node_id, node in template.nodes.items() if node.kind == "output"},
+            {"output_greeting_zh", "output_greeting_en", "output_greeting_ja"},
+        )
+
     def test_condition_templates_use_current_proxy_branch_shape(self):
         failures: list[str] = []
         expected_branches = ["true", "false", "exhausted"]
