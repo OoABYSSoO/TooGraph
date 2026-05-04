@@ -1,0 +1,466 @@
+{
+  "template_id": "game_ad_creative_factory",
+  "label": "游戏广告创意工厂",
+  "description": "Collect game-market signals and public ad media for a generic game genre, analyze local videos, then produce a creative brief, scripts, storyboard package, video prompts, and review results.",
+  "default_graph_name": "游戏广告创意工厂",
+  "state_schema": {
+    "state_1": {
+      "name": "genre",
+      "description": "Game genre or creative category to research. SLG is only the default input and can be replaced.",
+      "type": "text",
+      "value": "SLG",
+      "color": "#7c3aed"
+    },
+    "state_2": {
+      "name": "search_terms",
+      "description": "Optional ad-library search terms. Leave empty to use genre as the primary term.",
+      "type": "text",
+      "value": "",
+      "color": "#2563eb"
+    },
+    "state_3": {
+      "name": "country",
+      "description": "Ad Library country code.",
+      "type": "text",
+      "value": "US",
+      "color": "#0f766e"
+    },
+    "state_4": {
+      "name": "days_back",
+      "description": "Lookback window for public ad-library search URLs.",
+      "type": "number",
+      "value": 7,
+      "color": "#d97706"
+    },
+    "state_5": {
+      "name": "creative_goal",
+      "description": "Creative objective and constraints for the final package.",
+      "type": "markdown",
+      "value": "为这个游戏品类生成可测试的 15 秒移动广告创意，包括 brief、多版本脚本、图片分镜、两类视频生成提示词和评审结果。",
+      "color": "#be123c"
+    },
+    "state_6": {
+      "name": "variants_count",
+      "description": "Number of script variants to request.",
+      "type": "number",
+      "value": 3,
+      "color": "#0891b2"
+    },
+    "state_7": {
+      "name": "research_summary",
+      "description": "Summary returned by the game ad research collector.",
+      "type": "markdown",
+      "value": "",
+      "color": "#059669"
+    },
+    "state_8": {
+      "name": "rss_items",
+      "description": "RSS/news context collected by the skill.",
+      "type": "array",
+      "value": [],
+      "color": "#16a34a"
+    },
+    "state_9": {
+      "name": "ad_items",
+      "description": "Ad-library search records and discovered public video URLs.",
+      "type": "array",
+      "value": [],
+      "color": "#ea580c"
+    },
+    "state_10": {
+      "name": "downloaded_video_files",
+      "description": "Downloaded public video artifact records with local_path values.",
+      "type": "array",
+      "value": [],
+      "color": "#1d4ed8"
+    },
+    "state_11": {
+      "name": "source_documents",
+      "description": "Local source documents and manifests produced by the collector.",
+      "type": "array",
+      "value": [],
+      "color": "#475569"
+    },
+    "state_12": {
+      "name": "video_analysis_results",
+      "description": "Structured video and ad analysis results.",
+      "type": "json",
+      "value": [],
+      "color": "#9333ea"
+    },
+    "state_13": {
+      "name": "pattern_summary",
+      "description": "Cross-video creative pattern summary.",
+      "type": "markdown",
+      "value": "",
+      "color": "#0d9488"
+    },
+    "state_14": {
+      "name": "creative_brief",
+      "description": "Actionable creative brief for the selected game genre.",
+      "type": "markdown",
+      "value": "",
+      "color": "#b45309"
+    },
+    "state_15": {
+      "name": "script_variants",
+      "description": "Generated script variants as structured JSON.",
+      "type": "json",
+      "value": [],
+      "color": "#c026d3"
+    },
+    "state_16": {
+      "name": "storyboard_package",
+      "description": "Image storyboard package for the generated scripts.",
+      "type": "markdown",
+      "value": "",
+      "color": "#db2777"
+    },
+    "state_17": {
+      "name": "video_prompt_package",
+      "description": "Two styles of video-generation prompts derived from the scripts and storyboard.",
+      "type": "markdown",
+      "value": "",
+      "color": "#0284c7"
+    },
+    "state_18": {
+      "name": "review_results",
+      "description": "Creative review scores and decision.",
+      "type": "json",
+      "value": [],
+      "color": "#dc2626"
+    },
+    "state_19": {
+      "name": "needs_revision",
+      "description": "Whether the generated creative package should be revised.",
+      "type": "boolean",
+      "value": false,
+      "color": "#f97316"
+    },
+    "state_20": {
+      "name": "revision_feedback",
+      "description": "Review feedback to apply on the next generation loop.",
+      "type": "markdown",
+      "value": "",
+      "color": "#f59e0b"
+    },
+    "state_21": {
+      "name": "best_variant",
+      "description": "Best reviewed script variant.",
+      "type": "json",
+      "value": {},
+      "color": "#4f46e5"
+    },
+    "state_22": {
+      "name": "final_summary",
+      "description": "Final creative package summary.",
+      "type": "markdown",
+      "value": "",
+      "color": "#15803d"
+    }
+  },
+  "nodes": {
+    "input_genre": {
+      "kind": "input",
+      "name": "input_genre",
+      "description": "Choose the game genre or category.",
+      "ui": { "position": { "x": 80, "y": 80 }, "collapsed": false },
+      "writes": [{ "state": "state_1", "mode": "replace" }],
+      "config": { "value": "SLG", "boundaryType": "text" }
+    },
+    "input_country": {
+      "kind": "input",
+      "name": "input_country",
+      "description": "Choose the ad-library country code.",
+      "ui": { "position": { "x": 80, "y": 440 }, "collapsed": false },
+      "writes": [{ "state": "state_3", "mode": "replace" }],
+      "config": { "value": "US", "boundaryType": "text" }
+    },
+    "input_search_terms": {
+      "kind": "input",
+      "name": "input_search_terms",
+      "description": "Optional extra search terms for ad-library discovery.",
+      "ui": { "position": { "x": 80, "y": 800 }, "collapsed": false },
+      "writes": [{ "state": "state_2", "mode": "replace" }],
+      "config": { "value": "", "boundaryType": "text" }
+    },
+    "input_creative_goal": {
+      "kind": "input",
+      "name": "input_creative_goal",
+      "description": "Describe the creative output requirements.",
+      "ui": { "position": { "x": 80, "y": 1160 }, "collapsed": false },
+      "writes": [{ "state": "state_5", "mode": "replace" }],
+      "config": {
+        "value": "为这个游戏品类生成可测试的 15 秒移动广告创意，包括 brief、多版本脚本、图片分镜、两类视频生成提示词和评审结果。",
+        "boundaryType": "markdown"
+      }
+    },
+    "input_variants_count": {
+      "kind": "input",
+      "name": "input_variants_count",
+      "description": "Set the requested script variant count.",
+      "ui": { "position": { "x": 80, "y": 1520 }, "collapsed": false },
+      "writes": [{ "state": "state_6", "mode": "replace" }],
+      "config": { "value": 3, "boundaryType": "number" }
+    },
+    "input_days_back": {
+      "kind": "input",
+      "name": "input_days_back",
+      "description": "Set the ad-library lookback window.",
+      "ui": { "position": { "x": 80, "y": 1880 }, "collapsed": false },
+      "writes": [{ "state": "state_4", "mode": "replace" }],
+      "config": { "value": 7, "boundaryType": "number" }
+    },
+    "collect_game_market_signals": {
+      "kind": "agent",
+      "name": "collect_game_market_signals",
+      "description": "Collect public game-market RSS context and public ad media artifacts.",
+      "ui": { "position": { "x": 720, "y": 440 }, "collapsed": false },
+      "reads": [
+        { "state": "state_1", "required": true },
+        { "state": "state_2", "required": false },
+        { "state": "state_3", "required": false },
+        { "state": "state_4", "required": false }
+      ],
+      "writes": [
+        { "state": "state_7", "mode": "replace" },
+        { "state": "state_8", "mode": "replace" },
+        { "state": "state_9", "mode": "replace" },
+        { "state": "state_10", "mode": "replace" },
+        { "state": "state_11", "mode": "replace" }
+      ],
+      "config": {
+        "skills": ["game_ad_research_collector"],
+        "skillBindings": [
+          {
+            "skillKey": "game_ad_research_collector",
+            "trigger": "before_agent",
+            "inputMapping": {
+              "genre": "state_1",
+              "search_terms": "state_2",
+              "country": "state_3",
+              "days_back": "state_4"
+            },
+            "outputMapping": {
+              "summary": "state_7",
+              "rss_items": "state_8",
+              "ad_items": "state_9",
+              "downloaded_files": "state_10",
+              "source_documents": "state_11"
+            },
+            "config": {
+              "top_fetch_per_term": 2,
+              "max_news_items": 12,
+              "enable_rss": "true",
+              "enable_ads": "true",
+              "use_playwright": "true"
+            }
+          }
+        ],
+        "taskInstruction": "根据 game_ad_research_collector 技能结果，保留 research_summary、rss_items、ad_items、downloaded_video_files、source_documents。summary 要说明采集到的新闻数量、广告搜索记录、下载视频 local_path，以及任何 warning。不要编造 URL 或本地路径。"
+      }
+    },
+    "analyze_video_patterns": {
+      "kind": "agent",
+      "name": "analyze_video_patterns",
+      "description": "Analyze downloaded local videos and summarize reusable creative patterns.",
+      "ui": { "position": { "x": 1360, "y": 440 }, "collapsed": false },
+      "reads": [
+        { "state": "state_1", "required": true },
+        { "state": "state_7", "required": false },
+        { "state": "state_8", "required": false },
+        { "state": "state_9", "required": false },
+        { "state": "state_10", "required": false },
+        { "state": "state_11", "required": false }
+      ],
+      "writes": [
+        { "state": "state_12", "mode": "replace" },
+        { "state": "state_13", "mode": "replace" }
+      ],
+      "config": {
+        "skills": [],
+        "taskInstruction": "分析 downloaded_video_files 中的本地视频 artifact；如果没有视频，则基于 ad_items、rss_items 和 source_documents 做文本侧分析。输出 video_analysis_results 为 JSON 数组，每项包含 source、local_path、hook、visual_structure、gameplay_or_story_moment、emotion_trigger、cta、risks。输出 pattern_summary 为中文 markdown，总结可复用广告模式、常见开场、节奏、视觉符号和避免事项。"
+      }
+    },
+    "build_creative_brief": {
+      "kind": "agent",
+      "name": "build_creative_brief",
+      "description": "Build an actionable creative brief from research and pattern analysis.",
+      "ui": { "position": { "x": 2000, "y": 440 }, "collapsed": false },
+      "reads": [
+        { "state": "state_1", "required": true },
+        { "state": "state_5", "required": true },
+        { "state": "state_8", "required": false },
+        { "state": "state_9", "required": false },
+        { "state": "state_12", "required": false },
+        { "state": "state_13", "required": false }
+      ],
+      "writes": [{ "state": "state_14", "mode": "replace" }],
+      "config": {
+        "skills": [],
+        "taskInstruction": "为 genre 和 creative_goal 生成一份可执行 creative_brief。必须包含目标受众、核心冲突、情绪钩子、前三秒 hook、角色/场景建议、画面节奏、差异化方向、素材证据引用、风险限制。用中文 markdown 输出。"
+      }
+    },
+    "generate_creative_package": {
+      "kind": "agent",
+      "name": "generate_creative_package",
+      "description": "Generate script variants, storyboard package, and video prompts.",
+      "ui": { "position": { "x": 2640, "y": 440 }, "collapsed": false },
+      "reads": [
+        { "state": "state_1", "required": true },
+        { "state": "state_5", "required": true },
+        { "state": "state_6", "required": false },
+        { "state": "state_14", "required": true },
+        { "state": "state_20", "required": false }
+      ],
+      "writes": [
+        { "state": "state_15", "mode": "replace" },
+        { "state": "state_16", "mode": "replace" },
+        { "state": "state_17", "mode": "replace" }
+      ],
+      "config": {
+        "skills": [],
+        "taskInstruction": "基于 creative_brief、variants_count 和 revision_feedback 生成创意包。script_variants 必须是 JSON 数组，每项包含 variant_id、title、angle、target_emotion、15s_shots、voiceover_en、on_screen_text_en、cta_en、test_hypothesis。storyboard_package 用中文 markdown 输出每个版本的关键帧、镜头、构图、角色、UI 文案、图片生成提示词。video_prompt_package 用中文 markdown 输出每个版本两类视频提示词：一类是 15 秒连续视频提示词，一类是基于分镜的分段视频提示词。英文广告台词和屏幕文案保持英文。"
+      }
+    },
+    "review_creative_package": {
+      "kind": "agent",
+      "name": "review_creative_package",
+      "description": "Score generated creative package and decide whether to revise.",
+      "ui": { "position": { "x": 3280, "y": 440 }, "collapsed": false },
+      "reads": [
+        { "state": "state_5", "required": true },
+        { "state": "state_14", "required": true },
+        { "state": "state_15", "required": true },
+        { "state": "state_16", "required": true },
+        { "state": "state_17", "required": true }
+      ],
+      "writes": [
+        { "state": "state_18", "mode": "replace" },
+        { "state": "state_19", "mode": "replace" },
+        { "state": "state_20", "mode": "replace" },
+        { "state": "state_21", "mode": "replace" },
+        { "state": "state_22", "mode": "replace" }
+      ],
+      "config": {
+        "skills": [],
+        "taskInstruction": "评审创意包。review_results 输出 JSON 数组，每项包含 variant_id、hook_score、clarity_score、genre_fit_score、production_feasibility_score、risk_score、total_score、feedback。best_variant 输出最高分版本。needs_revision 当最高分低于 7.8 或存在严重制作/合规风险时为 true，否则 false。revision_feedback 用中文 markdown 给出下一轮具体修改点。final_summary 用中文 markdown 汇总最佳版本、评分、brief、脚本、分镜和视频提示词入口。"
+      }
+    },
+    "creative_revision_check": {
+      "kind": "condition",
+      "name": "creative_revision_check",
+      "description": "Loop once or twice when review asks for revision.",
+      "ui": { "position": { "x": 3920, "y": 440 }, "collapsed": false },
+      "reads": [{ "state": "state_19", "required": false }],
+      "writes": [],
+      "config": {
+        "branches": ["true", "false", "exhausted"],
+        "loopLimit": 2,
+        "branchMapping": { "true": "true", "false": "false" },
+        "rule": {
+          "source": "state_19",
+          "operator": "==",
+          "value": true
+        }
+      }
+    },
+    "output_downloaded_videos": {
+      "kind": "output",
+      "name": "output_downloaded_videos",
+      "description": "Preview downloaded local video artifacts.",
+      "ui": { "position": { "x": 4560, "y": 80 }, "collapsed": false },
+      "reads": [{ "state": "state_10", "required": false }],
+      "config": { "displayMode": "documents", "persistEnabled": false, "persistFormat": "auto", "fileNameTemplate": "" }
+    },
+    "output_source_documents": {
+      "kind": "output",
+      "name": "output_source_documents",
+      "description": "Preview local source documents and manifests.",
+      "ui": { "position": { "x": 4560, "y": 512 }, "collapsed": false },
+      "reads": [{ "state": "state_11", "required": false }],
+      "config": { "displayMode": "documents", "persistEnabled": false, "persistFormat": "auto", "fileNameTemplate": "" }
+    },
+    "output_final_summary": {
+      "kind": "output",
+      "name": "output_final_summary",
+      "description": "Show final creative summary.",
+      "ui": { "position": { "x": 4560, "y": 944 }, "collapsed": false },
+      "reads": [{ "state": "state_22", "required": false }],
+      "config": { "displayMode": "markdown", "persistEnabled": false, "persistFormat": "auto", "fileNameTemplate": "" }
+    },
+    "output_creative_brief": {
+      "kind": "output",
+      "name": "output_creative_brief",
+      "description": "Show creative brief.",
+      "ui": { "position": { "x": 4560, "y": 1376 }, "collapsed": false },
+      "reads": [{ "state": "state_14", "required": false }],
+      "config": { "displayMode": "markdown", "persistEnabled": false, "persistFormat": "auto", "fileNameTemplate": "" }
+    },
+    "output_script_variants": {
+      "kind": "output",
+      "name": "output_script_variants",
+      "description": "Show structured script variants.",
+      "ui": { "position": { "x": 4560, "y": 1808 }, "collapsed": false },
+      "reads": [{ "state": "state_15", "required": false }],
+      "config": { "displayMode": "json", "persistEnabled": false, "persistFormat": "auto", "fileNameTemplate": "" }
+    },
+    "output_storyboard_package": {
+      "kind": "output",
+      "name": "output_storyboard_package",
+      "description": "Show storyboard package.",
+      "ui": { "position": { "x": 4560, "y": 2240 }, "collapsed": false },
+      "reads": [{ "state": "state_16", "required": false }],
+      "config": { "displayMode": "markdown", "persistEnabled": false, "persistFormat": "auto", "fileNameTemplate": "" }
+    },
+    "output_video_prompt_package": {
+      "kind": "output",
+      "name": "output_video_prompt_package",
+      "description": "Show video prompt package.",
+      "ui": { "position": { "x": 4560, "y": 2672 }, "collapsed": false },
+      "reads": [{ "state": "state_17", "required": false }],
+      "config": { "displayMode": "markdown", "persistEnabled": false, "persistFormat": "auto", "fileNameTemplate": "" }
+    },
+    "output_review_results": {
+      "kind": "output",
+      "name": "output_review_results",
+      "description": "Show review results.",
+      "ui": { "position": { "x": 4560, "y": 3104 }, "collapsed": false },
+      "reads": [{ "state": "state_18", "required": false }],
+      "config": { "displayMode": "json", "persistEnabled": false, "persistFormat": "auto", "fileNameTemplate": "" }
+    }
+  },
+  "edges": [
+    { "source": "input_genre", "target": "collect_game_market_signals" },
+    { "source": "input_country", "target": "collect_game_market_signals" },
+    { "source": "input_search_terms", "target": "collect_game_market_signals" },
+    { "source": "input_days_back", "target": "collect_game_market_signals" },
+    { "source": "collect_game_market_signals", "target": "analyze_video_patterns" },
+    { "source": "analyze_video_patterns", "target": "build_creative_brief" },
+    { "source": "input_creative_goal", "target": "build_creative_brief" },
+    { "source": "build_creative_brief", "target": "generate_creative_package" },
+    { "source": "input_variants_count", "target": "generate_creative_package" },
+    { "source": "generate_creative_package", "target": "review_creative_package" },
+    { "source": "review_creative_package", "target": "creative_revision_check" },
+    { "source": "review_creative_package", "target": "output_downloaded_videos" },
+    { "source": "review_creative_package", "target": "output_source_documents" },
+    { "source": "output_final_summary", "target": "output_creative_brief" },
+    { "source": "output_creative_brief", "target": "output_script_variants" },
+    { "source": "output_script_variants", "target": "output_storyboard_package" },
+    { "source": "output_storyboard_package", "target": "output_video_prompt_package" },
+    { "source": "output_video_prompt_package", "target": "output_review_results" }
+  ],
+  "conditional_edges": [
+    {
+      "source": "creative_revision_check",
+      "branches": {
+        "true": "generate_creative_package",
+        "false": "output_final_summary",
+        "exhausted": "output_review_results"
+      }
+    }
+  ],
+  "metadata": {
+    "graphiteui_state_key_counter": 22
+  }
+}

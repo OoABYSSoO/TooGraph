@@ -1,0 +1,159 @@
+{
+  "schemaVersion": "graphite.skill/v1",
+  "skillKey": "game_ad_research_collector",
+  "label": "Game Ad Research Collector",
+  "description": "Collect game-market RSS context, build public ad-library search URLs, optionally scrape public video media, download authorized videos, and return local artifact paths.",
+  "version": "1.0.0",
+  "targets": ["agent_node", "companion"],
+  "kind": "atomic",
+  "mode": "tool",
+  "scope": "node",
+  "permissions": ["network", "file_write", "subprocess"],
+  "inputSchema": [
+    {
+      "key": "genre",
+      "label": "Genre",
+      "valueType": "text",
+      "required": true,
+      "description": "Game genre or creative category to research, for example SLG, RPG, puzzle, or 4X strategy."
+    },
+    {
+      "key": "search_terms",
+      "label": "Search Terms",
+      "valueType": "text",
+      "required": false,
+      "description": "Comma-separated, newline-separated, or JSON-array ad-library search terms. Defaults to the genre."
+    },
+    {
+      "key": "country",
+      "label": "Country",
+      "valueType": "text",
+      "required": false,
+      "description": "Facebook Ad Library country code. Defaults to US."
+    },
+    {
+      "key": "days_back",
+      "label": "Days Back",
+      "valueType": "text",
+      "required": false,
+      "description": "Lookback window in days for ad-library search URLs. Defaults to 7."
+    },
+    {
+      "key": "top_fetch_per_term",
+      "label": "Top Fetch Per Term",
+      "valueType": "text",
+      "required": false,
+      "description": "Maximum video URLs to download per ad-library search term. Defaults to 2 and is capped at 10."
+    },
+    {
+      "key": "feed_urls",
+      "label": "Feed URLs",
+      "valueType": "text",
+      "required": false,
+      "description": "Optional RSS/Atom feed URLs as newline-separated text, comma-separated text, JSON array, or JSON object."
+    },
+    {
+      "key": "max_news_items",
+      "label": "Max News Items",
+      "valueType": "text",
+      "required": false,
+      "description": "Maximum RSS items to fetch across feeds. Defaults to 12 and is capped at 50."
+    },
+    {
+      "key": "enable_rss",
+      "label": "Enable RSS",
+      "valueType": "text",
+      "required": false,
+      "description": "When false, skips RSS/news collection."
+    },
+    {
+      "key": "enable_ads",
+      "label": "Enable Ads",
+      "valueType": "text",
+      "required": false,
+      "description": "When false, skips Facebook Ad Library collection."
+    },
+    {
+      "key": "use_playwright",
+      "label": "Use Playwright",
+      "valueType": "text",
+      "required": false,
+      "description": "When true, attempts dynamic public ad-library media discovery with Playwright."
+    },
+    {
+      "key": "timeout_seconds",
+      "label": "Timeout Seconds",
+      "valueType": "text",
+      "required": false,
+      "description": "HTTP timeout per request. Defaults to 20 seconds."
+    }
+  ],
+  "outputSchema": [
+    {
+      "key": "status",
+      "label": "Status",
+      "valueType": "text",
+      "description": "succeeded, partial, or failed."
+    },
+    {
+      "key": "genre",
+      "label": "Genre",
+      "valueType": "text",
+      "description": "Genre used for this collection run."
+    },
+    {
+      "key": "summary",
+      "label": "Summary",
+      "valueType": "markdown",
+      "description": "Compact execution summary and artifact location."
+    },
+    {
+      "key": "rss_items",
+      "label": "RSS Items",
+      "valueType": "json",
+      "description": "Fetched RSS/Atom items with titles, links, summaries, and local article documents."
+    },
+    {
+      "key": "ad_items",
+      "label": "Ad Items",
+      "valueType": "json",
+      "description": "Ad-library search records with search URLs, discovered video URLs, downloaded local videos, and warnings."
+    },
+    {
+      "key": "downloaded_files",
+      "label": "Downloaded Files",
+      "valueType": "json",
+      "description": "Downloaded video artifact references with local_path, filename, content_type, source URL, and size."
+    },
+    {
+      "key": "source_documents",
+      "label": "Source Documents",
+      "valueType": "json",
+      "description": "Local markdown/json document artifacts for RSS articles and collection manifests."
+    },
+    {
+      "key": "warnings",
+      "label": "Warnings",
+      "valueType": "json",
+      "description": "Non-fatal collection warnings such as optional Playwright availability."
+    },
+    {
+      "key": "error",
+      "label": "Error",
+      "valueType": "text",
+      "description": "Error message when status is failed."
+    }
+  ],
+  "supportedValueTypes": ["text", "markdown", "json"],
+  "sideEffects": ["network", "file_write", "subprocess"],
+  "runtime": {
+    "type": "python",
+    "entrypoint": "run.py",
+    "timeoutSeconds": 240
+  },
+  "health": {
+    "type": "none"
+  },
+  "configured": true,
+  "healthy": true
+}

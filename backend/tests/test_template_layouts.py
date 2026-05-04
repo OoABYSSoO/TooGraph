@@ -355,3 +355,83 @@ class TemplateLayoutTests(unittest.TestCase):
         output_node = template.nodes["output_downloaded_video"]
         self.assertEqual(output_node.reads[0].state, state_by_name["downloaded_video_files"])
         self.assertEqual(output_node.config.display_mode.value, "documents")
+
+    def test_game_ad_creative_factory_template_models_generic_game_research_workflow(self):
+        template = next(
+            NodeSystemTemplate.model_validate(record)
+            for record in list_template_records()
+            if record["template_id"] == "game_ad_creative_factory"
+        )
+        state_by_name = {
+            definition.name: state_key
+            for state_key, definition in template.state_schema.items()
+        }
+
+        self.assertEqual(template.default_graph_name, "游戏广告创意工厂")
+        self.assertEqual(template.state_schema[state_by_name["genre"]].value, "SLG")
+        self.assertIn("collect_game_market_signals", template.nodes)
+        self.assertIn("analyze_video_patterns", template.nodes)
+        self.assertIn("build_creative_brief", template.nodes)
+        self.assertIn("generate_creative_package", template.nodes)
+        self.assertIn("review_creative_package", template.nodes)
+        self.assertIn("creative_revision_check", template.nodes)
+        self.assertIn("output_downloaded_videos", template.nodes)
+
+        collector = template.nodes["collect_game_market_signals"]
+        self.assertEqual(collector.config.skills, ["game_ad_research_collector"])
+        self.assertEqual(collector.config.skill_bindings[0].skill_key, "game_ad_research_collector")
+        self.assertEqual(
+            collector.config.skill_bindings[0].input_mapping,
+            {
+                "genre": state_by_name["genre"],
+                "search_terms": state_by_name["search_terms"],
+                "country": state_by_name["country"],
+                "days_back": state_by_name["days_back"],
+            },
+        )
+        self.assertEqual(
+            collector.config.skill_bindings[0].output_mapping,
+            {
+                "summary": state_by_name["research_summary"],
+                "rss_items": state_by_name["rss_items"],
+                "ad_items": state_by_name["ad_items"],
+                "downloaded_files": state_by_name["downloaded_video_files"],
+                "source_documents": state_by_name["source_documents"],
+            },
+        )
+        self.assertEqual(collector.config.skill_bindings[0].config.get("top_fetch_per_term"), 2)
+        self.assertEqual(collector.config.skill_bindings[0].config.get("enable_ads"), "true")
+
+        analyzer = template.nodes["analyze_video_patterns"]
+        self.assertIn(state_by_name["downloaded_video_files"], [binding.state for binding in analyzer.reads])
+        self.assertIn(state_by_name["video_analysis_results"], [binding.state for binding in analyzer.writes])
+        self.assertIn(state_by_name["pattern_summary"], [binding.state for binding in analyzer.writes])
+
+        generator = template.nodes["generate_creative_package"]
+        self.assertIn(state_by_name["creative_brief"], [binding.state for binding in generator.reads])
+        self.assertIn(state_by_name["script_variants"], [binding.state for binding in generator.writes])
+        self.assertIn(state_by_name["storyboard_package"], [binding.state for binding in generator.writes])
+        self.assertIn(state_by_name["video_prompt_package"], [binding.state for binding in generator.writes])
+
+        condition = template.nodes["creative_revision_check"]
+        self.assertEqual(condition.config.loop_limit, 2)
+        self.assertEqual(condition.config.rule.source, state_by_name["needs_revision"])
+        self.assertEqual(condition.config.rule.operator.value, "==")
+        self.assertEqual(condition.config.rule.value, True)
+        conditional_edge = next(edge for edge in template.conditional_edges if edge.source == "creative_revision_check")
+        self.assertEqual(
+            conditional_edge.branches,
+            {
+                "true": "generate_creative_package",
+                "false": "output_final_summary",
+                "exhausted": "output_review_results",
+            },
+        )
+
+        output_videos = template.nodes["output_downloaded_videos"]
+        self.assertEqual(output_videos.reads[0].state, state_by_name["downloaded_video_files"])
+        self.assertEqual(output_videos.config.display_mode.value, "documents")
+
+        serialized_template = json.dumps(template.model_dump(mode="json"), ensure_ascii=False)
+        self.assertNotIn("Whiteout Survival", serialized_template)
+        self.assertNotIn("Last War", serialized_template)

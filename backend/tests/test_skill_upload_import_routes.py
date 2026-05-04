@@ -175,7 +175,10 @@ class SkillUploadImportRouteTests(unittest.TestCase):
 
                 self.assertEqual(response.status_code, 200)
                 catalog_items = {item["skillKey"]: item for item in response.json()}
-                self.assertEqual(sorted(catalog_items), ["web_media_downloader", "web_search"])
+                self.assertEqual(
+                    sorted(catalog_items),
+                    ["game_ad_research_collector", "web_media_downloader", "web_search"],
+                )
                 self.assertEqual(catalog_items["web_search"]["sourceFormat"], "skill")
                 self.assertEqual(catalog_items["web_search"]["sourceScope"], "installed")
                 self.assertEqual(catalog_items["web_search"]["targets"], ["agent_node", "companion"])
@@ -190,6 +193,17 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertTrue(catalog_items["web_media_downloader"]["runtimeRegistered"])
                 self.assertTrue(catalog_items["web_media_downloader"]["sourcePath"].endswith("/skill/web_media_downloader/skill.json"))
                 self.assertNotIn("compatibility", catalog_items["web_media_downloader"])
+                self.assertEqual(catalog_items["game_ad_research_collector"]["sourceFormat"], "skill")
+                self.assertEqual(catalog_items["game_ad_research_collector"]["sourceScope"], "installed")
+                self.assertEqual(catalog_items["game_ad_research_collector"]["targets"], ["agent_node", "companion"])
+                self.assertTrue(catalog_items["game_ad_research_collector"]["runtimeReady"])
+                self.assertTrue(catalog_items["game_ad_research_collector"]["runtimeRegistered"])
+                self.assertTrue(
+                    catalog_items["game_ad_research_collector"]["sourcePath"].endswith(
+                        "/skill/game_ad_research_collector/skill.json"
+                    )
+                )
+                self.assertNotIn("compatibility", catalog_items["game_ad_research_collector"])
 
     def test_native_skill_json_upload_imports_installed_skill_package(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
