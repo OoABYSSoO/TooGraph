@@ -27,6 +27,21 @@ test("CompanionPet does not render a status dot on top of the mascot", () => {
   assert.doesNotMatch(componentSource, /companion-pet__status-dot/);
 });
 
+test("CompanionPet renders the animated inline mascot component", () => {
+  assert.match(componentSource, /import CompanionMascot from "\.\/CompanionMascot\.vue";/);
+  assert.match(componentSource, /<CompanionMascot/);
+  assert.match(componentSource, /:mood="mood"/);
+  assert.match(componentSource, /:dragging="isDragging"/);
+  assert.match(componentSource, /:tap-nonce="tapNonce"/);
+  assert.doesNotMatch(componentSource, /<img src="\/mascot\.svg"/);
+});
+
+test("CompanionPet tracks dragging and click pulses for mascot animation", () => {
+  assert.match(componentSource, /const isDragging = computed\(\(\) => Boolean\(pointerDrag\.value\?\.moved\)\);/);
+  assert.match(componentSource, /const tapNonce = ref\(0\);/);
+  assert.match(componentSource, /tapNonce\.value \+= 1;/);
+});
+
 test("CompanionPet exposes permission tiers with only advisory mode enabled", () => {
   assert.match(componentSource, /<ElSelect[\s\S]*v-model="companionMode"/);
   assert.match(componentSource, /v-for="option in COMPANION_MODE_OPTIONS"/);

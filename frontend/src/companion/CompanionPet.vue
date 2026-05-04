@@ -106,13 +106,12 @@
       <button
         type="button"
         class="companion-pet__avatar"
-        :class="`companion-pet__avatar--${mood}`"
         :title="t('companion.dragHint')"
         :aria-label="t('companion.open')"
         @pointerdown="handlePointerDown"
         @click="handleAvatarClick"
       >
-        <img src="/mascot.svg" alt="" draggable="false" />
+        <CompanionMascot :mood="mood" :dragging="isDragging" :tap-nonce="tapNonce" />
       </button>
     </div>
   </div>
@@ -131,6 +130,7 @@ import { buildRunEventStreamUrl, parseRunEventPayload, shouldPollRunStatus } fro
 import { useCompanionContextStore } from "../stores/companionContext.ts";
 import type { RunDetail } from "../types/run.ts";
 
+import CompanionMascot from "./CompanionMascot.vue";
 import { buildCompanionPageContext } from "./companionPageContext.ts";
 import {
   COMPANION_TEMPLATE_ID,
@@ -177,6 +177,7 @@ const companionMode = ref<CompanionMode>(DEFAULT_COMPANION_MODE);
 const messages = ref<CompanionMessage[]>([]);
 const errorMessage = ref("");
 const mood = ref<CompanionMood>("idle");
+const tapNonce = ref(0);
 const activeRunId = ref<string | null>(null);
 const messageListElement = ref<HTMLElement | null>(null);
 const pointerDrag = ref<{
@@ -192,6 +193,7 @@ let eventSource: EventSource | null = null;
 let activeAbortController: AbortController | null = null;
 
 const isBusy = computed(() => mood.value === "thinking" || mood.value === "speaking");
+const isDragging = computed(() => Boolean(pointerDrag.value?.moved));
 const companionModeLabel = computed(() => {
   const option = COMPANION_MODE_OPTIONS.find((candidate) => candidate.value === companionMode.value);
   return option ? `${t(option.labelKey)} - ${t(option.descriptionKey)}` : t("companion.modes.advisory");
@@ -248,6 +250,7 @@ function handleAvatarClick() {
     suppressNextClick = false;
     return;
   }
+  tapNonce.value += 1;
   isPanelOpen.value = !isPanelOpen.value;
   if (isPanelOpen.value) {
     void scrollMessagesToBottom();
@@ -570,28 +573,6 @@ function isPersistedMessage(value: unknown): value is CompanionChatMessage {
   box-shadow: 0 0 0 3px rgba(210, 162, 117, 0.3);
 }
 
-.companion-pet__avatar img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  user-select: none;
-  transform-origin: 50% 62%;
-  animation: companion-idle 4.8s ease-in-out infinite;
-}
-
-.companion-pet__avatar--thinking img {
-  animation: companion-thinking 900ms ease-in-out infinite;
-}
-
-.companion-pet__avatar--speaking img {
-  animation: companion-speaking 640ms ease-in-out infinite;
-}
-
-.companion-pet__avatar--error {
-  filter: saturate(0.85);
-}
-
 .companion-pet__panel,
 .companion-pet__bubble {
   position: absolute;
@@ -858,36 +839,6 @@ function isPersistedMessage(value: unknown): value is CompanionChatMessage {
   left: 0;
 }
 
-@keyframes companion-idle {
-  0%,
-  100% {
-    transform: translateY(0) rotate(0deg);
-  }
-  50% {
-    transform: translateY(-4px) rotate(-1.2deg);
-  }
-}
-
-@keyframes companion-thinking {
-  0%,
-  100% {
-    transform: translateY(0) scale(1);
-  }
-  50% {
-    transform: translateY(-3px) scale(1.03);
-  }
-}
-
-@keyframes companion-speaking {
-  0%,
-  100% {
-    transform: translateY(0) rotate(-1deg);
-  }
-  50% {
-    transform: translateY(-5px) rotate(1deg);
-  }
-}
-
 @media (max-width: 560px) {
   .companion-pet__panel {
     width: calc(100vw - 32px);
@@ -902,7 +853,6 @@ function isPersistedMessage(value: unknown): value is CompanionChatMessage {
 @media (prefers-reduced-motion: reduce) {
   .companion-pet__anchor,
   .companion-pet__avatar,
-  .companion-pet__avatar img,
   .companion-pet__icon-button,
   .companion-pet__send {
     animation: none;
