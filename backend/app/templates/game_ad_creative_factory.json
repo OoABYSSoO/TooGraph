@@ -437,18 +437,16 @@
     { "source": "input_days_back", "target": "collect_game_market_signals" },
     { "source": "collect_game_market_signals", "target": "analyze_video_patterns" },
     { "source": "analyze_video_patterns", "target": "build_creative_brief" },
-    { "source": "input_creative_goal", "target": "build_creative_brief" },
     { "source": "build_creative_brief", "target": "generate_creative_package" },
-    { "source": "input_variants_count", "target": "generate_creative_package" },
     { "source": "generate_creative_package", "target": "review_creative_package" },
     { "source": "review_creative_package", "target": "creative_revision_check" },
     { "source": "review_creative_package", "target": "output_downloaded_videos" },
     { "source": "review_creative_package", "target": "output_source_documents" },
-    { "source": "output_final_summary", "target": "output_creative_brief" },
-    { "source": "output_creative_brief", "target": "output_script_variants" },
-    { "source": "output_script_variants", "target": "output_storyboard_package" },
-    { "source": "output_storyboard_package", "target": "output_video_prompt_package" },
-    { "source": "output_video_prompt_package", "target": "output_review_results" }
+    { "source": "review_creative_package", "target": "output_creative_brief" },
+    { "source": "review_creative_package", "target": "output_script_variants" },
+    { "source": "review_creative_package", "target": "output_storyboard_package" },
+    { "source": "review_creative_package", "target": "output_video_prompt_package" },
+    { "source": "review_creative_package", "target": "output_review_results" }
   ],
   "conditional_edges": [
     {

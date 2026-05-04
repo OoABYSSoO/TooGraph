@@ -7,7 +7,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.core.schemas.node_system import NodeSystemInputNode, NodeSystemTemplate
+from app.core.compiler.validator import validate_graph
+from app.core.schemas.node_system import NodeSystemGraphDocument, NodeSystemInputNode, NodeSystemTemplate
 from app.templates.loader import list_template_records
 
 
@@ -87,6 +88,36 @@ class TemplateLayoutTests(unittest.TestCase):
                         )
 
         self.assertEqual(failures, [], "\n".join(failures))
+
+    def test_templates_are_valid_runtime_graphs(self):
+        failures: list[str] = []
+
+        for record in list_template_records():
+            template = NodeSystemTemplate.model_validate(record)
+            graph = template.model_dump(mode="json", by_alias=True)
+            graph["graph_id"] = f"template_{template.template_id}"
+            graph["name"] = template.default_graph_name
+            graph.pop("template_id", None)
+            graph.pop("label", None)
+            graph.pop("description", None)
+            graph.pop("default_graph_name", None)
+            validation = validate_graph(NodeSystemGraphDocument.model_validate(graph))
+            if not validation.valid:
+                issues = "; ".join(f"{issue.code}:{issue.path}" for issue in validation.issues)
+                failures.append(f"{template.template_id}: {issues}")
+
+        self.assertEqual(failures, [], "\n".join(failures))
+
+    def test_game_ad_creative_factory_does_not_shortcut_downstream_agents(self):
+        template = next(
+            NodeSystemTemplate.model_validate(record)
+            for record in list_template_records()
+            if record["template_id"] == "game_ad_creative_factory"
+        )
+
+        edge_pairs = {(edge.source, edge.target) for edge in template.edges}
+        self.assertNotIn(("input_creative_goal", "build_creative_brief"), edge_pairs)
+        self.assertNotIn(("input_variants_count", "generate_creative_package"), edge_pairs)
 
     def test_hello_world_template_writes_multiple_language_greetings(self):
         template = next(
