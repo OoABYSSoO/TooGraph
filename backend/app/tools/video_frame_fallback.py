@@ -73,16 +73,18 @@ def extract_video_frame_attachments(
 ) -> list[dict[str, Any]]:
     data_url = str(attachment.get("data_url") or "").strip()
     mime_type, encoded = split_data_url(data_url)
-    if not mime_type.startswith("video/") or not encoded:
-        raise RuntimeError("Video fallback requires a video data URL attachment.")
+    source_path = _resolve_source_video_path(attachment)
+    if source_path is None and (not mime_type.startswith("video/") or not encoded):
+        raise RuntimeError("Video fallback requires a video data URL attachment or local filesystem path.")
 
     requested_frame_count = max(1, min(int(frame_count or DEFAULT_VIDEO_FRAME_COUNT), MAX_VIDEO_FRAME_COUNT))
-    video_bytes = base64.b64decode(encoded)
-    suffix = _suffix_for_mime_type(mime_type)
     with tempfile.TemporaryDirectory(prefix="graphite_video_frames_") as temp_dir_name:
         temp_dir = Path(temp_dir_name)
-        video_path = temp_dir / f"input{suffix}"
-        video_path.write_bytes(video_bytes)
+        if source_path is None:
+            video_path = temp_dir / f"input{_suffix_for_mime_type(mime_type)}"
+            video_path.write_bytes(base64.b64decode(encoded))
+        else:
+            video_path = source_path
         duration = _probe_video_duration(video_path)
         frame_paths = _extract_frame_files(video_path, temp_dir, duration=duration, frame_count=requested_frame_count)
         return [
@@ -96,6 +98,19 @@ def split_data_url(data_url: str) -> tuple[str, str]:
     if not separator or not head.startswith("data:"):
         return "", ""
     return head[5:].split(";", 1)[0].strip(), data.strip()
+
+
+def _resolve_source_video_path(attachment: dict[str, Any]) -> Path | None:
+    filesystem_path = str(attachment.get("filesystem_path") or "").strip()
+    if not filesystem_path:
+        return None
+    path = Path(filesystem_path)
+    if not path.is_file():
+        raise RuntimeError("Video fallback local filesystem path does not exist.")
+    mime_type = str(attachment.get("mime_type") or "").strip().lower()
+    if mime_type and not mime_type.startswith("video/"):
+        raise RuntimeError("Video fallback local filesystem path must reference a video attachment.")
+    return path
 
 
 def _extract_frame_files(
