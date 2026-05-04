@@ -745,6 +745,7 @@ const baseMessages = {
       runTimeout: "桌宠对话运行超时。",
       emptyReply: "这次没有拿到可显示的回复。",
       errorReply: "运行失败：{error}",
+      queueStatus: "还有 {count} 条消息在队列中。",
     },
     feedback: {
       validationPassed: "校验通过。",
@@ -1488,6 +1489,7 @@ const baseMessages = {
       runTimeout: "Companion chat run timed out.",
       emptyReply: "No displayable reply was returned.",
       errorReply: "Run failed: {error}",
+      queueStatus: "{count} message(s) queued.",
     },
     feedback: {
       validationPassed: "Validation passed.",

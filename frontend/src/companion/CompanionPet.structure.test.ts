@@ -64,13 +64,26 @@ test("CompanionPet builds advisory page context from the shared editor snapshot"
 test("CompanionPet returns speaking replies to idle so the next message can be typed", () => {
   assert.match(
     componentSource,
-    /if \(mood\.value === "speaking"\) \{[\s\S]*window\.setTimeout\(\(\) => \{[\s\S]*if \(mood\.value === "speaking"\) \{[\s\S]*mood\.value = "idle";[\s\S]*\}, 1400\);/,
+    /if \(mood\.value === "speaking" && queuedTurns\.value\.length === 0\) \{[\s\S]*scheduleSpeakingIdle\(\);[\s\S]*\}/,
   );
+  assert.match(componentSource, /speakingIdleTimerId = window\.setTimeout\(\(\) => \{[\s\S]*mood\.value = "idle";[\s\S]*\}, 1400\);/);
+  assert.match(componentSource, /clearSpeakingIdleTimer\(\);/);
   assert.doesNotMatch(componentSource, /if \(!isBusy\.value\) \{[\s\S]*mood\.value = "idle";/);
 });
 
+test("CompanionPet keeps the composer enabled and queues sends while a reply is running", () => {
+  assert.doesNotMatch(componentSource, /class="companion-pet__input"[\s\S]*:disabled="isBusy"/);
+  assert.match(componentSource, /class="companion-pet__send"[\s\S]*:disabled="!draft\.trim\(\)"/);
+  assert.doesNotMatch(componentSource, /if \(!userMessage \|\| isBusy\.value\)/);
+  assert.match(componentSource, /const queuedTurns = ref<CompanionQueuedTurn\[\]>\(\[\]\);/);
+  assert.match(componentSource, /queuedTurns\.value\.push\(\{[\s\S]*userMessageId:[\s\S]*userMessage:/);
+  assert.match(componentSource, /void drainCompanionQueue\(\);/);
+  assert.match(componentSource, /while \(queuedTurns\.value\.length > 0\)/);
+});
+
 test("CompanionPet keeps runtime error replies out of model context and persisted history", () => {
-  assert.match(componentSource, /const history = messages\.value\.filter\(isContextMessage\)\.map\(\(\{ role, content \}\) => \(\{ role, content \}\)\);/);
+  assert.match(componentSource, /const history = buildHistoryBeforeMessage\(turn\.userMessageId\);/);
+  assert.match(componentSource, /return previousMessages\.filter\(isContextMessage\)\.map\(\(\{ role, content \}\) => \(\{ role, content \}\)\);/);
   assert.match(componentSource, /nextMessages[\s\S]*\.filter\(isPersistableMessageForStorage\)[\s\S]*\.slice\(-24\)[\s\S]*\.map\(\(\{ role, content, includeInContext \}\) => \(\{ role, content, includeInContext \}\)\)/);
   assert.match(componentSource, /updateAssistantMessage\(assistantMessage\.id, t\("companion\.errorReply", \{ error: message \}\), \{ includeInContext: false \}\);/);
 });
