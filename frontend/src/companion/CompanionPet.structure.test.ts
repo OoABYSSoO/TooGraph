@@ -14,13 +14,16 @@ function extractCssBlock(selector: string) {
   return match?.[1] ?? "";
 }
 
-test("CompanionPet renders the mascot without a circular avatar frame", () => {
+test("CompanionPet renders the mascot without a circular avatar frame and keeps a soft ground shadow", () => {
   const avatarBlock = extractCssBlock(".companion-pet__avatar");
 
   assert.match(avatarBlock, /border:\s*0;/);
   assert.match(avatarBlock, /background:\s*transparent;/);
   assert.match(avatarBlock, /box-shadow:\s*none;/);
   assert.doesNotMatch(avatarBlock, /border-radius:\s*999px/);
+  assert.match(componentSource, /\.companion-pet__avatar::before\s*\{[\s\S]*radial-gradient/);
+  assert.match(componentSource, /\.companion-pet__avatar::before\s*\{[\s\S]*filter:\s*blur\(10px\);/);
+  assert.match(componentSource, /\.companion-pet__avatar > \.companion-mascot\s*\{[\s\S]*z-index:\s*1;/);
 });
 
 test("CompanionPet does not render a status dot on top of the mascot", () => {

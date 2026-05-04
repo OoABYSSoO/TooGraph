@@ -7,7 +7,7 @@
       focusable="false"
     >
       <defs>
-        <radialGradient id="companionMascotSparkleGold" cx="0" cy="-106" r="56" gradientUnits="userSpaceOnUse">
+        <radialGradient id="companionMascotSparkleGold" cx="0" cy="-136" r="56" gradientUnits="userSpaceOnUse">
           <stop offset="0%" stop-color="#f2c968" />
           <stop offset="62%" stop-color="#dfad50" />
           <stop offset="100%" stop-color="#c89136" />
@@ -38,14 +38,6 @@
           d="M206 154 C240 154 268 136 282 108"
         />
 
-        <g class="companion-mascot__sparkle-wrap">
-          <path
-            class="companion-mascot__sparkle"
-            fill="url(#companionMascotSparkleGold)"
-            d="M0-150 C5-124 18-111 44-106 C18-101 5-88 0-62 C-5-88 -18-101 -44-106 C-18-111 -5-124 0-150Z"
-          />
-        </g>
-
         <g class="companion-mascot__body">
           <path
             class="companion-mascot__left-ear"
@@ -66,6 +58,14 @@
           <ellipse class="companion-mascot__resting-eye companion-mascot__resting-eye--right" cx="80" cy="82" rx="24" ry="52" fill="url(#companionMascotEyeGold)" />
           <path class="companion-mascot__drag-eye companion-mascot__drag-eye--left" d="M-104 52 L-64 82 L-104 112" />
           <path class="companion-mascot__drag-eye companion-mascot__drag-eye--right" d="M104 52 L64 82 L104 112" />
+        </g>
+
+        <g class="companion-mascot__sparkle-wrap">
+          <path
+            class="companion-mascot__sparkle"
+            fill="url(#companionMascotSparkleGold)"
+            d="M0-180 C5-154 18-141 44-136 C18-131 5-118 0-92 C-5-118 -18-131 -44-136 C-18-141 -5-154 0-180Z"
+          />
         </g>
       </g>
     </svg>
@@ -230,6 +230,10 @@ function clearTapTimeout() {
   animation: companion-mascot-thinking-body 1.15s ease-in-out infinite;
 }
 
+.companion-mascot--thinking .companion-mascot__tail {
+  animation: companion-mascot-tail-thinking 920ms ease-in-out infinite;
+}
+
 .companion-mascot--thinking .companion-mascot__sparkle {
   animation: companion-mascot-star-flip 1.22s ease-in-out infinite;
 }
@@ -244,6 +248,10 @@ function clearTapTimeout() {
 
 .companion-mascot--speaking .companion-mascot__body {
   animation: companion-mascot-speaking-body 640ms ease-in-out infinite;
+}
+
+.companion-mascot--speaking .companion-mascot__tail {
+  animation: companion-mascot-tail-speaking 560ms ease-in-out infinite;
 }
 
 .companion-mascot--speaking .companion-mascot__sparkle {
@@ -386,6 +394,16 @@ function clearTapTimeout() {
   }
 }
 
+@keyframes companion-mascot-tail-thinking {
+  0%,
+  100% {
+    transform: rotate(4deg);
+  }
+  50% {
+    transform: rotate(12deg);
+  }
+}
+
 @keyframes companion-mascot-star-flip {
   0%,
   100% {
@@ -417,6 +435,19 @@ function clearTapTimeout() {
   50% {
     transform: scale(1.16);
     filter: brightness(1.18);
+  }
+}
+
+@keyframes companion-mascot-tail-speaking {
+  0%,
+  100% {
+    transform: rotate(-3deg);
+  }
+  38% {
+    transform: rotate(18deg);
+  }
+  72% {
+    transform: rotate(5deg);
   }
 }
 
@@ -463,10 +494,10 @@ function clearTapTimeout() {
 @keyframes companion-mascot-drag-body {
   0%,
   100% {
-    transform: translateY(6px) scaleX(1.06) scaleY(0.9) rotate(-5deg);
+    transform: translateY(1px) scaleX(0.96) scaleY(1.04) rotate(-5deg);
   }
   50% {
-    transform: translateY(2px) scaleX(1.02) scaleY(0.94) rotate(5deg);
+    transform: translateY(-2px) scaleX(0.98) scaleY(1.02) rotate(5deg);
   }
 }
 
