@@ -60,3 +60,17 @@ test("CompanionPet builds advisory page context from the shared editor snapshot"
   assert.match(componentSource, /const companionContextStore = useCompanionContextStore\(\);/);
   assert.match(componentSource, /return buildCompanionPageContext\(\{[\s\S]*routePath: route\.fullPath,[\s\S]*editor: companionContextStore\.editorSnapshot,[\s\S]*activeCompanionRunId: activeRunId\.value,[\s\S]*\}\);/);
 });
+
+test("CompanionPet returns speaking replies to idle so the next message can be typed", () => {
+  assert.match(
+    componentSource,
+    /if \(mood\.value === "speaking"\) \{[\s\S]*window\.setTimeout\(\(\) => \{[\s\S]*if \(mood\.value === "speaking"\) \{[\s\S]*mood\.value = "idle";[\s\S]*\}, 1400\);/,
+  );
+  assert.doesNotMatch(componentSource, /if \(!isBusy\.value\) \{[\s\S]*mood\.value = "idle";/);
+});
+
+test("CompanionPet keeps runtime error replies out of model context and persisted history", () => {
+  assert.match(componentSource, /const history = messages\.value\.filter\(isContextMessage\)\.map\(\(\{ role, content \}\) => \(\{ role, content \}\)\);/);
+  assert.match(componentSource, /nextMessages[\s\S]*\.filter\(isPersistableMessageForStorage\)[\s\S]*\.slice\(-24\)[\s\S]*\.map\(\(\{ role, content, includeInContext \}\) => \(\{ role, content, includeInContext \}\)\)/);
+  assert.match(componentSource, /updateAssistantMessage\(assistantMessage\.id, t\("companion\.errorReply", \{ error: message \}\), \{ includeInContext: false \}\);/);
+});

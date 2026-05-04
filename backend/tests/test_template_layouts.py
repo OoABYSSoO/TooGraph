@@ -433,8 +433,13 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertIn(state_by_name["page_context"], [binding.state for binding in agent.reads])
         self.assertIn(state_by_name["companion_mode"], [binding.state for binding in agent.reads])
         self.assertEqual([binding.state for binding in agent.writes], [state_by_name["companion_reply"]])
+        self.assertIn("全局主桌宠 Agent", agent.config.task_instruction)
+        self.assertIn("不是图内普通 agent 节点", agent.config.task_instruction)
         self.assertIn("只允许陪伴聊天", agent.config.task_instruction)
         self.assertIn("提供建议", agent.config.task_instruction)
+        self.assertIn("先内部判断用户意图", agent.config.task_instruction)
+        self.assertIn("闲聊", agent.config.task_instruction)
+        self.assertIn("图操作请求", agent.config.task_instruction)
         self.assertIn("不能新建图", agent.config.task_instruction)
         self.assertIn("不能运行图", agent.config.task_instruction)
 

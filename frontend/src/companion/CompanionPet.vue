@@ -158,6 +158,8 @@ type CompanionMessage = CompanionChatMessage & {
   id: string;
 };
 
+type CompanionMessagePatch = Partial<Pick<CompanionMessage, "content" | "includeInContext">>;
+
 type CompanionMood = "idle" | "thinking" | "speaking" | "error";
 
 const COMPANION_HISTORY_STORAGE_KEY = "graphiteui:companion-history";
@@ -232,7 +234,12 @@ watch(
   (nextMessages) => {
     window.localStorage.setItem(
       COMPANION_HISTORY_STORAGE_KEY,
-      JSON.stringify(nextMessages.slice(-24).map(({ role, content }) => ({ role, content }))),
+      JSON.stringify(
+        nextMessages
+          .filter(isPersistableMessageForStorage)
+          .slice(-24)
+          .map(({ role, content, includeInContext }) => ({ role, content, includeInContext })),
+      ),
     );
   },
   { deep: true },
@@ -312,7 +319,7 @@ async function sendMessage() {
   isPanelOpen.value = true;
   draft.value = "";
 
-  const history = messages.value.map(({ role, content }) => ({ role, content }));
+  const history = messages.value.filter(isContextMessage).map(({ role, content }) => ({ role, content }));
   messages.value.push(createMessage("user", userMessage));
   const assistantMessage = createMessage("assistant", "");
   messages.value.push(assistantMessage);
@@ -346,13 +353,13 @@ async function sendMessage() {
     mood.value = "error";
     const message = error instanceof Error ? error.message : t("companion.runFailed");
     errorMessage.value = message;
-    updateAssistantMessage(assistantMessage.id, t("companion.errorReply", { error: message }));
+    updateAssistantMessage(assistantMessage.id, t("companion.errorReply", { error: message }), { includeInContext: false });
   } finally {
     closeEventSource();
     activeRunId.value = null;
     if (mood.value === "speaking") {
       window.setTimeout(() => {
-        if (!isBusy.value) {
+        if (mood.value === "speaking") {
           mood.value = "idle";
         }
       }, 1400);
@@ -449,12 +456,13 @@ function closeEventSource() {
   eventSource = null;
 }
 
-function updateAssistantMessage(messageId: string, content: string) {
+function updateAssistantMessage(messageId: string, content: string, patch: CompanionMessagePatch = {}) {
   const target = messages.value.find((message) => message.id === messageId);
   if (!target) {
     return;
   }
   target.content = content;
+  Object.assign(target, patch);
 }
 
 async function scrollMessagesToBottom() {
@@ -480,6 +488,14 @@ function createMessage(role: CompanionChatMessage["role"], content: string): Com
     role,
     content,
   };
+}
+
+function isContextMessage(message: CompanionMessage): boolean {
+  return message.includeInContext !== false;
+}
+
+function isPersistableMessageForStorage(message: CompanionMessage): boolean {
+  return message.includeInContext !== false;
 }
 
 function resolveViewport() {
@@ -516,7 +532,9 @@ function isPersistedMessage(value: unknown): value is CompanionChatMessage {
     value !== null &&
     !Array.isArray(value) &&
     ((value as CompanionChatMessage).role === "user" || (value as CompanionChatMessage).role === "assistant") &&
-    typeof (value as CompanionChatMessage).content === "string"
+    typeof (value as CompanionChatMessage).content === "string" &&
+    ((value as CompanionChatMessage).includeInContext === undefined ||
+      typeof (value as CompanionChatMessage).includeInContext === "boolean")
   );
 }
 </script>
