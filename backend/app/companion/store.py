@@ -37,6 +37,29 @@ DEFAULT_SESSION_SUMMARY = {
     "updated_at": "",
 }
 
+TRANSIENT_MARKERS = (
+    "base64,",
+    "data:image/",
+    "data:video/",
+    "data:audio/",
+    "data:application/",
+    "临时",
+    "一次性",
+    "下载这个",
+    "报错全文",
+)
+PREFERENCE_MARKERS = (
+    "以后",
+    "总是",
+    "默认",
+    "我希望",
+    "我喜欢",
+    "回答我",
+    "先给结论",
+    "不要",
+    "记住",
+)
+
 
 def load_profile() -> dict[str, Any]:
     return _read_dict(PROFILE_PATH, DEFAULT_PROFILE)
@@ -118,6 +141,39 @@ def save_session_summary(payload: dict[str, Any], *, changed_by: str, change_rea
     _write_with_revision("session_summary", "session_summary", "update", previous, next_value, changed_by, change_reason)
     _write_json(SESSION_SUMMARY_PATH, next_value)
     return load_session_summary()
+
+
+def curate_memory_from_turn(user_message: str, assistant_reply: str, *, changed_by: str = "memory_curator") -> dict[str, Any]:
+    normalized = f"{user_message}\n{assistant_reply}".strip()
+    normalized_lower = normalized.lower()
+    if not normalized or any(marker in normalized_lower for marker in TRANSIENT_MARKERS):
+        return {"created": [], "updated": [], "skipped": True}
+    if not any(marker in normalized for marker in PREFERENCE_MARKERS):
+        return {"created": [], "updated": [], "skipped": True}
+
+    content = _summarize_memory_content(user_message)
+    existing = _find_similar_enabled_memory(content)
+    if existing:
+        updated = update_memory(
+            existing["id"],
+            {"content": content, "confidence": max(float(existing.get("confidence") or 0), 0.75)},
+            changed_by=changed_by,
+            change_reason="自动记忆整理更新已有记忆。",
+        )
+        return {"created": [], "updated": [updated], "skipped": False}
+
+    created = create_memory(
+        {
+            "type": "preference",
+            "title": "用户偏好",
+            "content": content,
+            "confidence": 0.75,
+            "source": {"kind": "companion_chat", "message_ids": []},
+        },
+        changed_by=changed_by,
+        change_reason="自动记忆整理。",
+    )
+    return {"created": [created], "updated": [], "skipped": False}
 
 
 def list_revisions(target_type: str | None = None, target_id: str | None = None) -> list[dict[str, Any]]:
@@ -207,6 +263,18 @@ def _find_memory_index(memories: list[dict[str, Any]], memory_id: str) -> int:
         if memory.get("id") == memory_id:
             return index
     raise KeyError(memory_id)
+
+
+def _summarize_memory_content(user_message: str) -> str:
+    return user_message.strip()[:300]
+
+
+def _find_similar_enabled_memory(content: str) -> dict[str, Any] | None:
+    for memory in list_memories():
+        if memory.get("type") == "preference" and str(memory.get("title")) == "用户偏好":
+            if str(memory.get("content"))[:24] == content[:24]:
+                return memory
+    return None
 
 
 def _clean_dict(payload: dict[str, Any]) -> dict[str, Any]:

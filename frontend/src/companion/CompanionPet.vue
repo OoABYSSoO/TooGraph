@@ -127,6 +127,7 @@ import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 
 import {
+  curateCompanionMemoryTurn,
   fetchCompanionMemories,
   fetchCompanionPolicy,
   fetchCompanionProfile,
@@ -398,6 +399,12 @@ async function processQueuedTurn(turn: CompanionQueuedTurn) {
     if (runDetail.status === "failed") {
       errorMessage.value = runDetail.errors?.[0] ?? t("companion.runFailed");
     }
+    if (runDetail.status !== "failed" && finalReply) {
+      void curateCompletedTurnMemory({
+        user_message: turn.userMessage,
+        assistant_reply: finalReply,
+      });
+    }
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
       return;
@@ -588,6 +595,13 @@ async function fetchSelfConfigContext(): Promise<Partial<CompanionSelfConfigCont
     };
   } catch {
     return {};
+  }
+}
+
+async function curateCompletedTurnMemory(payload: { user_message: string; assistant_reply: string }) {
+  try {
+    await curateCompanionMemoryTurn(payload);
+  } catch {
   }
 }
 

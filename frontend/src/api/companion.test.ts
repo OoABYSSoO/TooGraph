@@ -1,7 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { createCompanionMemory, fetchCompanionProfile, restoreCompanionRevision, updateCompanionProfile } from "./companion.ts";
+import {
+  createCompanionMemory,
+  curateCompanionMemoryTurn,
+  fetchCompanionProfile,
+  restoreCompanionRevision,
+  updateCompanionProfile,
+} from "./companion.ts";
 
 const originalFetch = globalThis.fetch;
 
@@ -33,5 +39,22 @@ test("companion API creates memories and restores revisions", async () => {
 
   assert.equal(requests[0].url, "/api/companion/memories");
   assert.equal(requests[1].url, "/api/companion/revisions/rev_1/restore");
+  globalThis.fetch = originalFetch;
+});
+
+test("companion API curates a completed chat turn into memories", async () => {
+  const requests: Array<{ url: string; body: unknown }> = [];
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    requests.push({ url: String(input), body: init?.body ? JSON.parse(String(init.body)) : null });
+    return new Response(JSON.stringify({ created: [], updated: [], skipped: true }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }) as typeof fetch;
+
+  await curateCompanionMemoryTurn({ user_message: "以后先给结论。", assistant_reply: "明白。" });
+
+  assert.equal(requests[0].url, "/api/companion/memories/curate-turn");
+  assert.deepEqual(requests[0].body, { user_message: "以后先给结论。", assistant_reply: "明白。" });
   globalThis.fetch = originalFetch;
 });

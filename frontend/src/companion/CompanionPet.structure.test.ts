@@ -101,3 +101,13 @@ test("CompanionPet injects backend self config context without blocking chat on 
   assert.match(componentSource, /function formatPolicyForPrompt/);
   assert.match(componentSource, /function formatMemoriesForPrompt/);
 });
+
+test("CompanionPet asks the memory curator to evaluate completed replies without blocking the queue", () => {
+  assert.match(componentSource, /curateCompanionMemoryTurn/);
+  assert.match(
+    componentSource,
+    /if \(runDetail\.status !== "failed" && finalReply\) \{[\s\S]*void curateCompletedTurnMemory\(\{[\s\S]*user_message: turn\.userMessage,[\s\S]*assistant_reply: finalReply,[\s\S]*\}\);[\s\S]*\}/,
+  );
+  assert.match(componentSource, /async function curateCompletedTurnMemory/);
+  assert.match(componentSource, /catch \{[\s\S]*\}/);
+});

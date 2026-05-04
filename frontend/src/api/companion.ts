@@ -32,6 +32,13 @@ export function createCompanionMemory(payload: Pick<CompanionMemory, "type" | "t
   return apiPost<CompanionMemory>("/api/companion/memories", payload);
 }
 
+export function curateCompanionMemoryTurn(payload: { user_message: string; assistant_reply: string }) {
+  return apiPost<{ created: CompanionMemory[]; updated: CompanionMemory[]; skipped: boolean }>(
+    "/api/companion/memories/curate-turn",
+    payload,
+  );
+}
+
 export function updateCompanionMemory(memoryId: string, payload: Partial<CompanionMemory>, changeReason: string) {
   return apiPatch<CompanionMemory>(`/api/companion/memories/${memoryId}`, { ...payload, change_reason: changeReason });
 }
