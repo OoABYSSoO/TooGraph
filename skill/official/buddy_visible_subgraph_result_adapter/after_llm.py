@@ -14,15 +14,138 @@ def buddy_visible_subgraph_result_adapter(**skill_inputs: Any) -> dict[str, Any]
             detail={"selected_capability": selected},
         )
 
-    visible_result = _normalize_result_package(skill_inputs.get("visible_operation_result"))
-    if not visible_result:
-        return _failed(
-            code="invalid_visible_operation_result",
-            message="visible_operation_result 必须是页面操作 workflow 返回的 result_package。",
-            detail={"visible_operation_result": skill_inputs.get("visible_operation_result")},
+    user_goal = _compact_text(skill_inputs.get("user_goal"))
+    operation_result = _normalize_json_object(skill_inputs.get("operation_result"))
+    if operation_result:
+        return _wrap_direct_template_operation(
+            selected=selected,
+            user_goal=user_goal,
+            operation_result=operation_result,
+            operation_report=_normalize_json_object(skill_inputs.get("operation_report")),
+            page_operation_context=_normalize_json_object(skill_inputs.get("page_operation_context")),
         )
 
-    user_goal = _compact_text(skill_inputs.get("user_goal"))
+    page_operation_final_reply = _compact_text(skill_inputs.get("page_operation_final_reply"))
+    page_operation_workflow_report = _normalize_json_object(skill_inputs.get("page_operation_workflow_report"))
+    if page_operation_final_reply or page_operation_workflow_report:
+        return _wrap_page_operation_workflow_outputs(
+            selected=selected,
+            user_goal=user_goal,
+            final_reply=page_operation_final_reply,
+            operation_report=page_operation_workflow_report,
+        )
+
+    visible_result = _normalize_result_package(skill_inputs.get("visible_operation_result"))
+    if visible_result:
+        return _wrap_result_package(
+            selected=selected,
+            user_goal=user_goal,
+            visible_result=visible_result,
+        )
+
+    return _failed(
+        code="invalid_visible_operation_result",
+        message="需要 operation_result 或页面操作 workflow 输出，才能适配可见图模板结果。",
+        detail={
+            "operation_result": skill_inputs.get("operation_result"),
+            "page_operation_final_reply": skill_inputs.get("page_operation_final_reply"),
+            "page_operation_workflow_report": skill_inputs.get("page_operation_workflow_report"),
+            "visible_operation_result": skill_inputs.get("visible_operation_result"),
+        },
+    )
+
+
+def _wrap_direct_template_operation(
+    *,
+    selected: dict[str, Any],
+    user_goal: str,
+    operation_result: dict[str, Any],
+    operation_report: dict[str, Any],
+    page_operation_context: dict[str, Any],
+) -> dict[str, Any]:
+    source_key = selected["key"]
+    source_name = selected.get("name") or source_key
+    status = _operation_status(operation_result)
+    error = _compact_text(operation_result.get("error") or operation_report.get("error"))
+    latest_run = _latest_foreground_run(page_operation_context)
+    final_reply = _direct_template_final_reply(
+        source_name=source_name,
+        operation_result=operation_result,
+        latest_run=latest_run,
+        error=error,
+    )
+    report_value = {
+        "operation_result": operation_result,
+        "operation_report": operation_report,
+        "page_operation_context": page_operation_context,
+        "latest_foreground_run": latest_run,
+    }
+    package = _base_package(
+        selected=selected,
+        user_goal=user_goal,
+        visible_operation_capability="toograph_page_operator",
+        status="failed" if _is_failure_status(status) or error else status,
+        final_reply=final_reply,
+        operation_report=report_value,
+        visible_operation_result=operation_result,
+        duration_ms=_coerce_int(operation_result.get("durationMs") or operation_result.get("duration_ms")),
+        error=error,
+        error_type=_compact_text(operation_result.get("errorType") or operation_result.get("error_type")),
+        final_reply_name="可见模板运行回复",
+        final_reply_description="页面操作 Skill 在运行目标模板后得到的用户可见摘要。",
+        operation_report_name="可见模板运行报告",
+        operation_report_description="固定模板运行 Skill 和前端续跑返回的结构化操作报告。",
+        visible_result_name="固定模板页面操作结果",
+        visible_result_description="toograph_page_operator 触发并等待目标模板运行后的原始操作结果。",
+    )
+    return _success(package, selected=selected, source_name=source_name, visible_operation_source="toograph_page_operator")
+
+
+def _wrap_page_operation_workflow_outputs(
+    *,
+    selected: dict[str, Any],
+    user_goal: str,
+    final_reply: str,
+    operation_report: dict[str, Any],
+) -> dict[str, Any]:
+    source_key = selected["key"]
+    source_name = selected.get("name") or source_key
+    error = _compact_text(operation_report.get("error"))
+    status = _compact_text(operation_report.get("status"))
+    if not status:
+        status = "failed" if error or operation_report.get("goal_completed") is False else "succeeded"
+    package = _base_package(
+        selected=selected,
+        user_goal=user_goal,
+        visible_operation_capability="toograph_page_operation_workflow",
+        status="failed" if _is_failure_status(status) or error else status,
+        final_reply=final_reply,
+        operation_report=operation_report,
+        visible_operation_result=operation_report,
+        duration_ms=_coerce_int(operation_report.get("durationMs") or operation_report.get("duration_ms")),
+        error=error,
+        error_type=_compact_text(operation_report.get("errorType") or operation_report.get("error_type")),
+        final_reply_name="页面操作回复",
+        final_reply_description="页面操作 workflow 生成的用户可见回复。",
+        operation_report_name="页面操作报告",
+        operation_report_description="页面操作 workflow 返回的结构化报告。",
+        visible_result_name="页面操作 workflow 报告",
+        visible_result_description="toograph_page_operation_workflow 的结构化输出报告。",
+    )
+    return _success(
+        package,
+        selected=selected,
+        source_name=source_name,
+        visible_operation_source="toograph_page_operation_workflow",
+    )
+
+
+def _wrap_result_package(
+    *,
+    selected: dict[str, Any],
+    user_goal: str,
+    visible_result: dict[str, Any],
+) -> dict[str, Any]:
     source_key = selected["key"]
     source_name = selected.get("name") or source_key
     status = _compact_text(visible_result.get("status")) or "succeeded"
@@ -33,41 +156,94 @@ def buddy_visible_subgraph_result_adapter(**skill_inputs: Any) -> dict[str, Any]
     final_reply = _output_value(visible_outputs.get("final_reply"))
     operation_report = _output_value(visible_outputs.get("operation_report"))
 
-    package = {
+    package = _base_package(
+        selected=selected,
+        user_goal=user_goal,
+        visible_operation_capability="toograph_page_operation_workflow",
+        status="failed" if _is_failure_status(status) or error else status,
+        final_reply=final_reply,
+        operation_report=operation_report,
+        visible_operation_result=visible_result,
+        duration_ms=duration_ms,
+        error=error,
+        error_type=error_type,
+        final_reply_name="可见模板运行回复",
+        final_reply_description="页面操作 workflow 在运行目标模板后生成的用户可见回复。",
+        operation_report_name="可见模板运行报告",
+        operation_report_description="页面操作 workflow 返回的结构化运行报告。",
+        visible_result_name="可见页面操作结果包",
+        visible_result_description="内部 toograph_page_operation_workflow 的完整 result_package。",
+        visible_result_type="result_package",
+    )
+    return _success(package, selected=selected, source_name=source_name, visible_operation_source=visible_result.get("sourceKey"))
+
+
+def _base_package(
+    *,
+    selected: dict[str, Any],
+    user_goal: str,
+    visible_operation_capability: str,
+    status: str,
+    final_reply: Any,
+    operation_report: Any,
+    visible_operation_result: Any,
+    duration_ms: int,
+    error: str,
+    error_type: str,
+    final_reply_name: str,
+    final_reply_description: str,
+    operation_report_name: str,
+    operation_report_description: str,
+    visible_result_name: str,
+    visible_result_description: str,
+    visible_result_type: str = "json",
+) -> dict[str, Any]:
+    source_key = selected["key"]
+    source_name = selected.get("name") or source_key
+    return {
         "kind": "result_package",
         "sourceType": "subgraph",
         "sourceKey": source_key,
         "sourceName": source_name,
-        "status": "failed" if status == "failed" or error else status,
+        "status": status or "succeeded",
         "inputs": {
             "user_goal": user_goal,
             "target_capability": selected,
-            "visible_operation_capability": "toograph_page_operation_workflow",
+            "visible_operation_capability": visible_operation_capability,
         },
         "outputs": {
             "final_reply": {
-                "name": "可见模板运行回复",
-                "description": "页面操作 workflow 在运行目标模板后生成的用户可见回复。",
+                "name": final_reply_name,
+                "description": final_reply_description,
                 "type": "markdown",
                 "value": final_reply,
             },
             "operation_report": {
-                "name": "可见模板运行报告",
-                "description": "页面操作 workflow 返回的结构化运行报告。",
+                "name": operation_report_name,
+                "description": operation_report_description,
                 "type": "json",
                 "value": operation_report,
             },
             "visible_operation_result": {
-                "name": "可见页面操作结果包",
-                "description": "内部 toograph_page_operation_workflow 的完整 result_package。",
-                "type": "result_package",
-                "value": visible_result,
+                "name": visible_result_name,
+                "description": visible_result_description,
+                "type": visible_result_type,
+                "value": visible_operation_result,
             },
         },
         "durationMs": duration_ms,
         "error": error,
         "errorType": error_type,
     }
+
+
+def _success(
+    package: dict[str, Any],
+    *,
+    selected: dict[str, Any],
+    source_name: str,
+    visible_operation_source: Any,
+) -> dict[str, Any]:
     return {
         "ok": True,
         "result_package": package,
@@ -79,10 +255,10 @@ def buddy_visible_subgraph_result_adapter(**skill_inputs: Any) -> dict[str, Any]
                 "status": "failed" if package["status"] == "failed" else "succeeded",
                 "detail": {
                     "target_capability": selected,
-                    "visible_operation_source": visible_result.get("sourceKey"),
+                    "visible_operation_source": visible_operation_source,
                     "status": package["status"],
                 },
-                "error": error or None,
+                "error": package.get("error") or None,
             }
         ],
     }
@@ -133,6 +309,20 @@ def _normalize_selected_capability(value: Any) -> dict[str, Any]:
     }
 
 
+def _normalize_json_object(value: Any) -> dict[str, Any]:
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return {}
+        try:
+            return _normalize_json_object(json.loads(stripped))
+        except json.JSONDecodeError:
+            return {}
+    if isinstance(value, dict):
+        return dict(value)
+    return {}
+
+
 def _normalize_result_package(value: Any) -> dict[str, Any]:
     if isinstance(value, str):
         stripped = value.strip()
@@ -147,6 +337,49 @@ def _normalize_result_package(value: Any) -> dict[str, Any]:
     if value.get("kind") != "result_package":
         return {}
     return dict(value)
+
+
+def _operation_status(operation_result: dict[str, Any]) -> str:
+    triggered_status = _compact_text(operation_result.get("triggered_run_status"))
+    if triggered_status:
+        if triggered_status == "completed":
+            return "succeeded"
+        return "failed" if _is_failure_status(triggered_status) else triggered_status
+    status = _compact_text(operation_result.get("status"))
+    return status or "succeeded"
+
+
+def _is_failure_status(status: str) -> bool:
+    return status.lower() in {"failed", "failure", "error", "cancelled", "canceled", "interrupted"}
+
+
+def _latest_foreground_run(page_operation_context: dict[str, Any]) -> dict[str, Any]:
+    page_facts = page_operation_context.get("page_facts")
+    if not isinstance(page_facts, dict):
+        return {}
+    latest = page_facts.get("latestForegroundRun")
+    return dict(latest) if isinstance(latest, dict) else {}
+
+
+def _direct_template_final_reply(
+    *,
+    source_name: str,
+    operation_result: dict[str, Any],
+    latest_run: dict[str, Any],
+    error: str,
+) -> str:
+    result_summary = _compact_text(latest_run.get("resultSummary"))
+    if result_summary:
+        return result_summary
+    if error:
+        return f"运行图模板 {source_name} 时失败：{error}"
+    triggered_run_id = _compact_text(operation_result.get("triggered_run_id") or latest_run.get("runId"))
+    triggered_status = _compact_text(operation_result.get("triggered_run_status") or latest_run.get("status"))
+    if triggered_run_id:
+        if triggered_status:
+            return f"已通过页面操作运行图模板 {source_name}，运行 {triggered_run_id} 状态：{triggered_status}。"
+        return f"已通过页面操作运行图模板 {source_name}，运行 {triggered_run_id} 已创建。"
+    return f"已通过页面操作请求运行图模板 {source_name}。"
 
 
 def _output_value(value: Any) -> Any:

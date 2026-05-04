@@ -229,6 +229,14 @@ def _store_pending_page_operation_continuation(state: dict[str, Any], detail: di
         if value:
             pending[key] = value
     state.setdefault("metadata", {})["pending_page_operation_continuation"] = pending
+    root_state = _root_run_state(state)
+    if root_state is not state:
+        root_pending = dict(pending)
+        if isinstance(root_pending.get("resume_state_keys"), list):
+            root_pending["resume_state_keys"] = list(root_pending["resume_state_keys"])
+        if isinstance(root_pending.get("subgraph_path"), list):
+            root_pending["subgraph_path"] = list(root_pending["subgraph_path"])
+        root_state.setdefault("metadata", {})["pending_page_operation_continuation"] = root_pending
 
 
 def _list_text(value: Any) -> list[str]:

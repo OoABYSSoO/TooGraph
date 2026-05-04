@@ -3,7 +3,7 @@
   "skillKey": "buddy_visible_subgraph_result_adapter",
   "name": "伙伴可见子图结果适配器",
   "description": "Internal adapter that wraps a visible page-operation template run back into the originally selected Buddy subgraph capability result package.",
-  "llmInstruction": "你已绑定伙伴可见子图结果适配器。只把上游 capability_selection_audit.selected、visible_subgraph_operation_result、user_message/request_understanding.user_goal 复制进结构化参数：selected_capability、visible_operation_result、user_goal、reason。不要改写运行结果，不要总结，不要发明 run id 或输出字段。",
+  "llmInstruction": "你已绑定伙伴可见子图结果适配器。只把上游 capability_selection_audit.selected、operation_result、page_operation_context、operation_report、visible_page_operation_final_reply、visible_page_operation_report、user_message/request_understanding.user_goal 复制进结构化参数；不要改写运行结果，不要总结，不要发明 run id 或输出字段。若是固定模板运行 Skill 分支，复制 operation_result/page_operation_context/operation_report；若是页面操作 workflow 分支，复制 page_operation_final_reply/page_operation_workflow_report。",
   "version": "0.1.0",
   "timeoutSeconds": 30,
   "permissions": [],
@@ -18,10 +18,34 @@
       "description": "能力选择审计，其中 selected 表示原始目标 subgraph capability。"
     },
     {
-      "key": "visible_subgraph_operation_result",
-      "name": "Visible Subgraph Operation Result",
-      "valueType": "result_package",
-      "description": "内部页面操作 workflow 返回的 result_package。"
+      "key": "operation_result",
+      "name": "Operation Result",
+      "valueType": "json",
+      "description": "固定模板运行 Skill 完成后由前端续跑注入的页面操作结果。"
+    },
+    {
+      "key": "page_operation_context",
+      "name": "Page Operation Context",
+      "valueType": "json",
+      "description": "页面操作完成后刷新得到的页面事实和最新前台运行摘要。"
+    },
+    {
+      "key": "operation_report",
+      "name": "Operation Report",
+      "valueType": "json",
+      "description": "页面操作完成后的结构化操作报告。"
+    },
+    {
+      "key": "visible_page_operation_final_reply",
+      "name": "Visible Page Operation Final Reply",
+      "valueType": "markdown",
+      "description": "页面操作 workflow 子图输出的最终回复。"
+    },
+    {
+      "key": "visible_page_operation_report",
+      "name": "Visible Page Operation Report",
+      "valueType": "json",
+      "description": "页面操作 workflow 子图输出的结构化报告。"
     },
     {
       "key": "user_message",
@@ -44,10 +68,40 @@
       "description": "从 capability_selection_audit.selected 复制的原始目标能力，必须是 kind=subgraph。"
     },
     {
+      "key": "operation_result",
+      "name": "Operation Result",
+      "valueType": "json",
+      "description": "固定模板运行 Skill 分支的原始页面操作结果。"
+    },
+    {
+      "key": "page_operation_context",
+      "name": "Page Operation Context",
+      "valueType": "json",
+      "description": "固定模板运行 Skill 分支刷新后的页面事实。"
+    },
+    {
+      "key": "operation_report",
+      "name": "Operation Report",
+      "valueType": "json",
+      "description": "固定模板运行 Skill 分支的结构化操作报告。"
+    },
+    {
+      "key": "page_operation_final_reply",
+      "name": "Page Operation Final Reply",
+      "valueType": "markdown",
+      "description": "页面操作 workflow 分支输出的最终回复。"
+    },
+    {
+      "key": "page_operation_workflow_report",
+      "name": "Page Operation Workflow Report",
+      "valueType": "json",
+      "description": "页面操作 workflow 分支输出的结构化报告。"
+    },
+    {
       "key": "visible_operation_result",
       "name": "Visible Operation Result",
       "valueType": "json",
-      "description": "从 visible_subgraph_operation_result 复制的完整页面操作 result_package。"
+      "description": "兼容输入：页面操作 workflow 返回的完整 result_package。"
     },
     {
       "key": "user_goal",
