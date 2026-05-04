@@ -57,6 +57,15 @@
           <span class="app-shell__link-label">{{ t("nav.runs") }}</span>
         </RouterLink>
         <RouterLink
+          to="/companion"
+          class="app-shell__link"
+          :class="{ 'app-shell__link--active': activeNavigationSection === 'companion' }"
+          :title="t('nav.companion')"
+        >
+          <ElIcon class="app-shell__link-icon"><ChatDotRound /></ElIcon>
+          <span class="app-shell__link-label">{{ t("nav.companion") }}</span>
+        </RouterLink>
+        <RouterLink
           to="/presets"
           class="app-shell__link"
           :class="{ 'app-shell__link--active': activeNavigationSection === 'presets' }"
@@ -114,7 +123,7 @@
 
 <script setup lang="ts">
 import { ElIcon } from "element-plus";
-import { House, EditPen, Clock, CollectionTag, DataLine, Opportunity, Setting, Tickets } from "@element-plus/icons-vue";
+import { ChatDotRound, House, EditPen, Clock, CollectionTag, DataLine, Opportunity, Setting, Tickets } from "@element-plus/icons-vue";
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
