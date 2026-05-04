@@ -2,12 +2,15 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import type { RunDetail } from "../types/run.ts";
-import type { TemplateRecord } from "../types/node-system.ts";
+import type { AgentNode, InputNode, TemplateRecord } from "../types/node-system.ts";
 
 import {
+  COMPANION_MODE_OPTIONS,
+  COMPANION_MODE_STATE_KEY,
   COMPANION_REPLY_STATE_KEY,
   buildCompanionChatGraph,
   formatCompanionHistory,
+  resolveCompanionMode,
   resolveCompanionReplyText,
 } from "./companionChatGraph.ts";
 
@@ -22,6 +25,7 @@ function createTemplate(): TemplateRecord {
       state_2: { name: "conversation_history", description: "", type: "markdown", value: "", color: "#0f766e" },
       state_3: { name: "page_context", description: "", type: "markdown", value: "", color: "#2563eb" },
       state_4: { name: "companion_reply", description: "", type: "markdown", value: "", color: "#d97706" },
+      state_5: { name: "companion_mode", description: "", type: "text", value: "advisory", color: "#7c3aed" },
     },
     nodes: {
       input_user_message: {
@@ -51,6 +55,15 @@ function createTemplate(): TemplateRecord {
         writes: [{ state: "state_3", mode: "replace" }],
         config: { value: "" },
       },
+      input_companion_mode: {
+        kind: "input",
+        name: "input_companion_mode",
+        description: "",
+        ui: { position: { x: 80, y: 1280 }, collapsed: false },
+        reads: [],
+        writes: [{ state: "state_5", mode: "replace" }],
+        config: { value: "" },
+      },
       companion_reply_agent: {
         kind: "agent",
         name: "companion_reply_agent",
@@ -60,10 +73,12 @@ function createTemplate(): TemplateRecord {
           { state: "state_1", required: true },
           { state: "state_2", required: false },
           { state: "state_3", required: false },
+          { state: "state_5", required: true },
         ],
         writes: [{ state: "state_4", mode: "replace" }],
         config: {
-          skills: [],
+          skills: ["graph_editor"],
+          skillBindings: [{ skillKey: "graph_editor", enabled: true }],
           taskInstruction: "",
           modelSource: "global",
           model: "",
@@ -90,11 +105,20 @@ function createTemplate(): TemplateRecord {
       { source: "input_user_message", target: "companion_reply_agent" },
       { source: "input_conversation_history", target: "companion_reply_agent" },
       { source: "input_page_context", target: "companion_reply_agent" },
+      { source: "input_companion_mode", target: "companion_reply_agent" },
       { source: "companion_reply_agent", target: "output_companion_reply" },
     ],
     conditional_edges: [],
     metadata: {},
   };
+}
+
+function assertInputNode(node: TemplateRecord["nodes"][string]): asserts node is InputNode {
+  assert.equal(node.kind, "input");
+}
+
+function assertAgentNode(node: TemplateRecord["nodes"][string]): asserts node is AgentNode {
+  assert.equal(node.kind, "agent");
 }
 
 test("formatCompanionHistory keeps a compact readable transcript", () => {
@@ -107,11 +131,30 @@ test("formatCompanionHistory keeps a compact readable transcript", () => {
   );
 });
 
+test("companion mode options expose only advisory as selectable", () => {
+  assert.deepEqual(
+    COMPANION_MODE_OPTIONS.map((option) => ({ value: option.value, disabled: option.disabled })),
+    [
+      { value: "advisory", disabled: false },
+      { value: "approval", disabled: true },
+      { value: "unrestricted", disabled: true },
+    ],
+  );
+});
+
+test("resolveCompanionMode falls back to advisory for unavailable tiers", () => {
+  assert.equal(resolveCompanionMode("advisory"), "advisory");
+  assert.equal(resolveCompanionMode("approval"), "advisory");
+  assert.equal(resolveCompanionMode("unrestricted"), "advisory");
+  assert.equal(resolveCompanionMode("unknown"), "advisory");
+});
+
 test("buildCompanionChatGraph injects the current message, history, and page context", () => {
   const graph = buildCompanionChatGraph(createTemplate(), {
     userMessage: "帮我看当前页面",
     history: [{ role: "assistant", content: "我在。" }],
     pageContext: "当前路径: /editor",
+    companionMode: "unrestricted",
   });
 
   assert.equal(graph.graph_id, null);
@@ -119,9 +162,18 @@ test("buildCompanionChatGraph injects the current message, history, and page con
   assert.equal(graph.state_schema.state_1.value, "帮我看当前页面");
   assert.equal(graph.state_schema.state_2.value, "桌宠: 我在。");
   assert.equal(graph.state_schema.state_3.value, "当前路径: /editor");
+  assert.equal(graph.state_schema[COMPANION_MODE_STATE_KEY].value, "advisory");
   assert.equal(graph.state_schema[COMPANION_REPLY_STATE_KEY].value, "");
-  assert.equal(graph.nodes.input_user_message.kind, "input");
+  assertInputNode(graph.nodes.input_user_message);
+  assertInputNode(graph.nodes.input_companion_mode);
   assert.equal(graph.nodes.input_user_message.config.value, "帮我看当前页面");
+  assert.equal(graph.nodes.input_companion_mode.config.value, "advisory");
+  assert.equal(graph.metadata.companion_mode, "advisory");
+  assert.equal(graph.metadata.companion_permission_tier, 1);
+  assert.equal(graph.metadata.companion_can_execute_actions, false);
+  assertAgentNode(graph.nodes.companion_reply_agent);
+  assert.deepEqual(graph.nodes.companion_reply_agent.config.skills, []);
+  assert.deepEqual(graph.nodes.companion_reply_agent.config.skillBindings, []);
 });
 
 test("resolveCompanionReplyText prefers the companion reply state over fallback text", () => {

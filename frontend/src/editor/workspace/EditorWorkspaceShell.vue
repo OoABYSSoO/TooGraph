@@ -233,6 +233,7 @@ import {
   type PersistedEditorWorkspace,
 } from "@/lib/editor-workspace";
 import type { CanvasViewport } from "@/editor/canvas/canvasViewport";
+import { useCompanionContextStore } from "@/stores/companionContext";
 import { useGraphDocumentStore } from "@/stores/graphDocument";
 import type { RunDetail } from "@/types/run";
 import type {
@@ -288,6 +289,7 @@ const props = defineProps<{
 const router = useRouter();
 const route = useRoute();
 const graphStore = useGraphDocumentStore();
+const companionContextStore = useCompanionContextStore();
 const { t } = useI18n();
 
 const workspace = ref<PersistedEditorWorkspace>({
@@ -459,6 +461,19 @@ const {
   runFailureMessageByTabId,
   activeRunEdgeIdsByTabId,
   feedbackByTabId,
+});
+const activeCompanionEditorSnapshot = computed(() => {
+  const tab = activeTab.value;
+  if (!tab) {
+    return null;
+  }
+
+  return {
+    activeTabTitle: tab.title,
+    document: documentsByTabId.value[tab.tabId] ?? null,
+    focusedNodeId: focusedNodeIdByTabId.value[tab.tabId] ?? null,
+    feedback: feedbackForTab(tab.tabId),
+  };
 });
 const {
   registerDocumentForTab,
@@ -841,6 +856,12 @@ function showStateDeleteBlockedToast(message: string) {
 }
 
 watch(
+  activeCompanionEditorSnapshot,
+  (snapshot) => companionContextStore.setEditorSnapshot(snapshot),
+  { immediate: true, deep: true },
+);
+
+watch(
   workspace,
   (nextWorkspace) => {
     const persistenceRequest = resolveWorkspaceDraftPersistenceRequest({ hydrated: hydrated.value, workspace: nextWorkspace });
@@ -899,6 +920,7 @@ watch(
 );
 
 onBeforeUnmount(() => {
+  companionContextStore.clearEditorSnapshot();
   teardownRunLifecycle();
 });
 

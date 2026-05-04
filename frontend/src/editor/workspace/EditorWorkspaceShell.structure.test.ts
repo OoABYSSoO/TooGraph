@@ -38,6 +38,17 @@ test("EditorWorkspaceShell renders workspace panes without reka-ui tab primitive
   assert.match(componentSource, /editor-workspace-shell__editor--active/);
 });
 
+test("EditorWorkspaceShell publishes the active editor snapshot for advisory companion context", () => {
+  assert.match(componentSource, /import \{ useCompanionContextStore \} from "@\/stores\/companionContext";/);
+  assert.match(componentSource, /const companionContextStore = useCompanionContextStore\(\);/);
+  assert.match(componentSource, /const activeCompanionEditorSnapshot = computed\(\(\) => \{/);
+  assert.match(componentSource, /document: documentsByTabId\.value\[tab\.tabId\] \?\? null,/);
+  assert.match(componentSource, /focusedNodeId: focusedNodeIdByTabId\.value\[tab\.tabId\] \?\? null,/);
+  assert.match(componentSource, /feedback: feedbackForTab\(tab\.tabId\),/);
+  assert.match(componentSource, /watch\([\s\S]*activeCompanionEditorSnapshot,[\s\S]*companionContextStore\.setEditorSnapshot\(snapshot\),[\s\S]*\{ immediate: true, deep: true \},[\s\S]*\);/);
+  assert.match(componentSource, /onBeforeUnmount\(\(\) => \{[\s\S]*companionContextStore\.clearEditorSnapshot\(\);/);
+});
+
 test("EditorWorkspaceShell wires canvas node-creation intents into a dedicated creation menu component", () => {
   assert.match(componentSource, /import EditorNodeCreationMenu from "\.\/EditorNodeCreationMenu\.vue";/);
   assert.match(

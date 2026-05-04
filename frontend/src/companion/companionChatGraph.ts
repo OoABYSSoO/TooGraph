@@ -1,4 +1,4 @@
-import type { GraphPayload, InputNode, TemplateRecord } from "../types/node-system.ts";
+import type { AgentNode, GraphPayload, InputNode, TemplateRecord } from "../types/node-system.ts";
 import type { RunDetail } from "../types/run.ts";
 
 export const COMPANION_TEMPLATE_ID = "companion_chat_loop";
@@ -6,9 +6,40 @@ export const COMPANION_USER_MESSAGE_STATE_KEY = "state_1";
 export const COMPANION_HISTORY_STATE_KEY = "state_2";
 export const COMPANION_PAGE_CONTEXT_STATE_KEY = "state_3";
 export const COMPANION_REPLY_STATE_KEY = "state_4";
+export const COMPANION_MODE_STATE_KEY = "state_5";
 export const MAX_COMPANION_HISTORY_MESSAGES = 12;
+export const DEFAULT_COMPANION_MODE = "advisory";
 
 export type CompanionChatRole = "user" | "assistant";
+export type CompanionMode = "advisory" | "approval" | "unrestricted";
+
+export type CompanionModeOption = {
+  value: CompanionMode;
+  labelKey: string;
+  descriptionKey: string;
+  disabled: boolean;
+};
+
+export const COMPANION_MODE_OPTIONS: CompanionModeOption[] = [
+  {
+    value: "advisory",
+    labelKey: "companion.modes.advisory",
+    descriptionKey: "companion.modeDescriptions.advisory",
+    disabled: false,
+  },
+  {
+    value: "approval",
+    labelKey: "companion.modes.approval",
+    descriptionKey: "companion.modeDescriptions.approval",
+    disabled: true,
+  },
+  {
+    value: "unrestricted",
+    labelKey: "companion.modes.unrestricted",
+    descriptionKey: "companion.modeDescriptions.unrestricted",
+    disabled: true,
+  },
+];
 
 export type CompanionChatMessage = {
   role: CompanionChatRole;
@@ -19,6 +50,7 @@ export type BuildCompanionChatGraphInput = {
   userMessage: string;
   history: CompanionChatMessage[];
   pageContext: string;
+  companionMode?: unknown;
 };
 
 export function formatCompanionHistory(messages: CompanionChatMessage[], maxMessages = MAX_COMPANION_HISTORY_MESSAGES) {
@@ -38,6 +70,7 @@ export function formatCompanionHistory(messages: CompanionChatMessage[], maxMess
 }
 
 export function buildCompanionChatGraph(template: TemplateRecord, input: BuildCompanionChatGraphInput): GraphPayload {
+  const companionMode = resolveCompanionMode(input.companionMode);
   const graph: GraphPayload = {
     graph_id: null,
     name: template.default_graph_name,
@@ -49,6 +82,9 @@ export function buildCompanionChatGraph(template: TemplateRecord, input: BuildCo
       ...cloneJson(template.metadata),
       companion_template_id: template.template_id,
       companion_run: true,
+      companion_mode: companionMode,
+      companion_permission_tier: 1,
+      companion_can_execute_actions: false,
     },
   };
 
@@ -56,12 +92,19 @@ export function buildCompanionChatGraph(template: TemplateRecord, input: BuildCo
   setStateValue(graph, COMPANION_HISTORY_STATE_KEY, formatCompanionHistory(input.history));
   setStateValue(graph, COMPANION_PAGE_CONTEXT_STATE_KEY, input.pageContext.trim() || "当前页面上下文不可用。");
   setStateValue(graph, COMPANION_REPLY_STATE_KEY, "");
+  setStateValue(graph, COMPANION_MODE_STATE_KEY, companionMode);
 
   syncInputNodeValue(graph, COMPANION_USER_MESSAGE_STATE_KEY, input.userMessage);
   syncInputNodeValue(graph, COMPANION_HISTORY_STATE_KEY, graph.state_schema[COMPANION_HISTORY_STATE_KEY]?.value ?? "");
   syncInputNodeValue(graph, COMPANION_PAGE_CONTEXT_STATE_KEY, graph.state_schema[COMPANION_PAGE_CONTEXT_STATE_KEY]?.value ?? "");
+  syncInputNodeValue(graph, COMPANION_MODE_STATE_KEY, companionMode);
+  enforceAdvisoryCompanionGraph(graph);
 
   return graph;
+}
+
+export function resolveCompanionMode(value: unknown): CompanionMode {
+  return value === DEFAULT_COMPANION_MODE ? DEFAULT_COMPANION_MODE : DEFAULT_COMPANION_MODE;
 }
 
 export function resolveCompanionReplyText(run: RunDetail): string {
@@ -120,6 +163,19 @@ function syncInputNodeValue(graph: GraphPayload, stateKey: string, value: unknow
       value,
     };
   }
+}
+
+function enforceAdvisoryCompanionGraph(graph: GraphPayload) {
+  const agentNode = graph.nodes.companion_reply_agent;
+  if (!agentNode || agentNode.kind !== "agent") {
+    return;
+  }
+  const companionAgent = agentNode as AgentNode;
+  companionAgent.config = {
+    ...companionAgent.config,
+    skills: [],
+    skillBindings: [],
+  };
 }
 
 function resolveOutputPreviewValue(previews: RunDetail["output_previews"] | undefined) {

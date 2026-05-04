@@ -26,3 +26,19 @@ test("CompanionPet renders the mascot without a circular avatar frame", () => {
 test("CompanionPet does not render a status dot on top of the mascot", () => {
   assert.doesNotMatch(componentSource, /companion-pet__status-dot/);
 });
+
+test("CompanionPet exposes permission tiers with only advisory mode enabled", () => {
+  assert.match(componentSource, /<ElSelect[\s\S]*v-model="companionMode"/);
+  assert.match(componentSource, /v-for="option in COMPANION_MODE_OPTIONS"/);
+  assert.match(componentSource, /:disabled="option\.disabled"/);
+  assert.match(componentSource, /companionModeLabel/);
+  assert.doesNotMatch(componentSource, /companionMode\s*=\s*"approval"/);
+  assert.doesNotMatch(componentSource, /companionMode\s*=\s*"unrestricted"/);
+});
+
+test("CompanionPet builds advisory page context from the shared editor snapshot", () => {
+  assert.match(componentSource, /import \{ buildCompanionPageContext \} from "\.\/companionPageContext\.ts";/);
+  assert.match(componentSource, /import \{ useCompanionContextStore \} from "\.\.\/stores\/companionContext\.ts";/);
+  assert.match(componentSource, /const companionContextStore = useCompanionContextStore\(\);/);
+  assert.match(componentSource, /return buildCompanionPageContext\(\{[\s\S]*routePath: route\.fullPath,[\s\S]*editor: companionContextStore\.editorSnapshot,[\s\S]*activeCompanionRunId: activeRunId\.value,[\s\S]*\}\);/);
+});

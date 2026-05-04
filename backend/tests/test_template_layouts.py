@@ -226,6 +226,28 @@ class TemplateLayoutTests(unittest.TestCase):
             "Human review feedback should be edited from the review panel after pause, not from an Input node.",
         )
 
+    def test_companion_chat_loop_is_advisory_only(self):
+        template = next(
+            NodeSystemTemplate.model_validate(record)
+            for record in list_template_records()
+            if record["template_id"] == "companion_chat_loop"
+        )
+        state_by_name = {
+            definition.name: state_key
+            for state_key, definition in template.state_schema.items()
+        }
+
+        self.assertEqual(template.state_schema[state_by_name["companion_mode"]].value, "advisory")
+        self.assertEqual(template.nodes["input_companion_mode"].config.value, "advisory")
+        self.assertIn(
+            state_by_name["companion_mode"],
+            [binding.state for binding in template.nodes["companion_reply_agent"].reads],
+        )
+        self.assertEqual(template.nodes["companion_reply_agent"].config.skills, [])
+        self.assertEqual(template.nodes["companion_reply_agent"].config.skill_bindings, [])
+        self.assertIn("第一档", template.nodes["companion_reply_agent"].config.task_instruction)
+        self.assertIn("不能修改图", template.nodes["companion_reply_agent"].config.task_instruction)
+
     def test_web_research_loop_template_models_generic_search_retry_flow(self):
         template = next(
             NodeSystemTemplate.model_validate(record)
@@ -401,7 +423,7 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(template.default_graph_name, "桌宠对话循环")
         self.assertEqual(
             list(state_by_name.keys()),
-            ["user_message", "conversation_history", "page_context", "companion_reply"],
+            ["user_message", "conversation_history", "page_context", "companion_reply", "companion_mode"],
         )
         agent = template.nodes["companion_reply_agent"]
         self.assertEqual(agent.kind, "agent")
@@ -409,7 +431,12 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertIn(state_by_name["user_message"], [binding.state for binding in agent.reads])
         self.assertIn(state_by_name["conversation_history"], [binding.state for binding in agent.reads])
         self.assertIn(state_by_name["page_context"], [binding.state for binding in agent.reads])
+        self.assertIn(state_by_name["companion_mode"], [binding.state for binding in agent.reads])
         self.assertEqual([binding.state for binding in agent.writes], [state_by_name["companion_reply"]])
+        self.assertIn("只允许陪伴聊天", agent.config.task_instruction)
+        self.assertIn("提供建议", agent.config.task_instruction)
+        self.assertIn("不能新建图", agent.config.task_instruction)
+        self.assertIn("不能运行图", agent.config.task_instruction)
 
         output_node = template.nodes["output_companion_reply"]
         self.assertEqual(output_node.reads[0].state, state_by_name["companion_reply"])
