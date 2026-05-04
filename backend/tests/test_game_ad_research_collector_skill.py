@@ -6,8 +6,10 @@ import sys
 import tempfile
 import threading
 import unittest
+from datetime import date
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -82,6 +84,91 @@ class GameAdResearchCollectorSkillTests(unittest.TestCase):
             server.shutdown()
             server.server_close()
 
+    def test_downloads_ad_video_with_playwright_context_cookies(self) -> None:
+        collector = _load_game_ad_module()
+        server = _start_research_server()
+        try:
+            video_url = f"http://127.0.0.1:{server.server_port}/protected-video.mp4"
+            with tempfile.TemporaryDirectory() as temp_dir:
+                artifact_dir = Path(temp_dir) / "run_1" / "agent" / "game_ad_research_collector" / "invocation_001"
+                discovery_result = SimpleNamespace(
+                    video_urls=[video_url],
+                    cookies=[
+                        {
+                            "name": "session",
+                            "value": "ok",
+                            "domain": "127.0.0.1",
+                            "path": "/",
+                        }
+                    ],
+                    warning="",
+                    user_agent="DemoBrowser/1.0",
+                )
+                with (
+                    patch.dict(
+                        os.environ,
+                        {
+                            "GRAPHITE_SKILL_ARTIFACT_DIR": str(artifact_dir),
+                            "GRAPHITE_SKILL_ARTIFACT_RELATIVE_DIR": "run_1/agent/game_ad_research_collector/invocation_001",
+                        },
+                        clear=True,
+                    ),
+                    patch.object(collector, "_discover_public_ad_videos_with_playwright", return_value=discovery_result),
+                ):
+                    result = collector.game_ad_research_collector_skill(
+                        genre="SLG",
+                        enable_ads="true",
+                        enable_rss="false",
+                        use_playwright="true",
+                        top_fetch_per_term="1",
+                    )
+
+                self.assertEqual(result["status"], "succeeded")
+                self.assertEqual(result["downloaded_count"], 1)
+                downloaded_file = result["downloaded_files"][0]
+                self.assertEqual(downloaded_file["source"], "facebook_ad_library")
+                self.assertEqual(downloaded_file["content_type"], "video/mp4")
+                self.assertTrue(downloaded_file["local_path"].endswith("/videos/01-01-slg.mp4"))
+                self.assertEqual((artifact_dir / "videos" / downloaded_file["filename"]).read_bytes(), b"fake-protected-video")
+        finally:
+            server.shutdown()
+            server.server_close()
+
+    def test_rejects_html_response_when_url_only_mentions_video_in_query(self) -> None:
+        collector = _load_game_ad_module()
+        server = _start_research_server()
+        try:
+            with tempfile.TemporaryDirectory() as temp_dir:
+                destination = Path(temp_dir) / "fake.mp4"
+                record = collector._download_video(
+                    f"http://127.0.0.1:{server.server_port}/ads/library/?media_type=video",
+                    destination=destination,
+                    timeout_seconds=5.0,
+                    artifact_relative_dir="run_1/agent/videos",
+                )
+
+                self.assertEqual(record["status"], "failed")
+                self.assertIn("not a video", record["error"])
+                self.assertFalse(destination.exists())
+        finally:
+            server.shutdown()
+            server.server_close()
+
+    def test_facebook_ad_library_url_matches_demo_search_shape(self) -> None:
+        collector = _load_game_ad_module()
+
+        url = collector._build_facebook_ad_library_url(
+            "SLG",
+            country="US",
+            start_date=date(2026, 4, 27),
+            end_date=date(2026, 5, 4),
+        )
+
+        self.assertIn("media_type=all", url)
+        self.assertIn("sort_data%5Bdirection%5D=desc", url)
+        self.assertIn("sort_data%5Bmode%5D=total_impressions", url)
+        self.assertIn("q=SLG", url)
+
     def test_game_ad_research_collector_skill_is_runtime_registered(self) -> None:
         registry = get_skill_registry(include_disabled=True)
 
@@ -116,6 +203,15 @@ class _ResearchHandler(BaseHTTPRequestHandler):
             </html>
             """
             self._send(200, "text/html; charset=utf-8", body)
+            return
+        if self.path.startswith("/protected-video.mp4"):
+            if "session=ok" not in self.headers.get("Cookie", ""):
+                self._send(403, "text/plain", b"missing cookie")
+                return
+            self._send(200, "video/mp4", b"fake-protected-video")
+            return
+        if self.path.startswith("/ads/library/"):
+            self._send(200, "text/html; charset=utf-8", b"<html>not video</html>")
             return
         self._send(404, "text/plain", b"not found")
 

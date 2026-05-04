@@ -30,6 +30,7 @@ MAX_TOP_FETCH_PER_TERM = 10
 MAX_NEWS_ITEMS = 50
 MAX_ERROR_CHARS = 1200
 USER_AGENT = "GraphiteUI/1.0 game_ad_research_collector"
+BROWSER_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 VIDEO_EXTS = {".3gp", ".avi", ".flv", ".m4v", ".mkv", ".mov", ".mp4", ".mpeg", ".mpg", ".ogv", ".webm"}
 
 @dataclass(frozen=True)
@@ -45,6 +46,14 @@ class CollectorConfig:
     enable_ads: bool
     use_playwright: bool
     timeout_seconds: float
+
+
+@dataclass(frozen=True)
+class PlaywrightVideoDiscovery:
+    video_urls: list[str]
+    cookies: list[dict[str, Any]]
+    warning: str
+    user_agent: str = BROWSER_USER_AGENT
 
 
 class _TextExtractor(HTMLParser):
@@ -328,15 +337,26 @@ def _collect_ad_items(
         discovered_video_urls: list[str] = []
         ad_warning = ""
         if cfg.use_playwright:
-            discovered_video_urls, ad_warning = _discover_public_ad_videos_with_playwright(
+            discovery = _discover_public_ad_videos_with_playwright(
                 search_url,
                 top_n=cfg.top_fetch_per_term,
                 timeout_seconds=cfg.timeout_seconds,
             )
+            if isinstance(discovery, tuple):
+                discovered_video_urls, ad_warning = discovery
+                download_cookies: list[dict[str, Any]] = []
+                download_user_agent = USER_AGENT
+            else:
+                discovered_video_urls = list(getattr(discovery, "video_urls", []) or [])
+                ad_warning = _compact_text(getattr(discovery, "warning", ""))
+                download_cookies = list(getattr(discovery, "cookies", []) or [])
+                download_user_agent = _compact_text(getattr(discovery, "user_agent", "")) or BROWSER_USER_AGENT
             if ad_warning:
                 warnings.append(ad_warning)
         else:
             ad_warning = "Playwright ad discovery skipped because use_playwright is false."
+            download_cookies = []
+            download_user_agent = USER_AGENT
         downloaded_files: list[dict[str, Any]] = []
         failed_downloads: list[dict[str, Any]] = []
         for video_index, video_url in enumerate(discovered_video_urls[: cfg.top_fetch_per_term], start=1):
@@ -346,6 +366,9 @@ def _collect_ad_items(
                 destination=destination,
                 timeout_seconds=cfg.timeout_seconds,
                 artifact_relative_dir=f"{artifact_relative_dir}/videos",
+                cookies=download_cookies,
+                referer=search_url,
+                user_agent=download_user_agent,
             )
             if record["status"] == "downloaded":
                 downloaded_files.append(record)
@@ -373,54 +396,66 @@ def _discover_public_ad_videos_with_playwright(
     *,
     top_n: int,
     timeout_seconds: float,
-) -> tuple[list[str], str]:
+) -> PlaywrightVideoDiscovery:
     try:
         from playwright.sync_api import sync_playwright
     except Exception as exc:
-        return [], f"Playwright is not available for ad discovery: {exc}"
+        return PlaywrightVideoDiscovery(video_urls=[], cookies=[], warning=f"Playwright is not available for ad discovery: {exc}")
 
     discovered: list[str] = []
+    cookies: list[dict[str, Any]] = []
     try:
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch(headless=True)
-            context = browser.new_context(user_agent=USER_AGENT)
-            page = context.new_page()
+            context = None
+            try:
+                context = browser.new_context(user_agent=BROWSER_USER_AGENT, locale="en-US")
+                page = context.new_page()
 
-            def on_response(response: Any) -> None:
-                response_url = str(getattr(response, "url", "") or "")
-                headers = getattr(response, "headers", {}) or {}
-                content_type = str(headers.get("content-type") or "").lower()
-                if _is_video_url(response_url) or "video" in content_type:
-                    discovered.append(response_url)
+                def on_response(response: Any) -> None:
+                    response_url = str(getattr(response, "url", "") or "")
+                    headers = getattr(response, "headers", {}) or {}
+                    content_type = str(headers.get("content-type") or "").lower()
+                    request = getattr(response, "request", None)
+                    resource_type = str(getattr(request, "resource_type", "") or "").lower()
+                    if resource_type == "media" or _is_video_url(response_url) or "video" in content_type:
+                        discovered.append(response_url)
 
-            page.on("response", on_response)
-            page.goto(url, wait_until="domcontentloaded", timeout=max(10_000, int(timeout_seconds * 1000)))
-            page.wait_for_timeout(3000)
-            for _round in range(4):
-                dom_urls = page.evaluate(
-                    """() => {
-                        const urls = [];
-                        for (const video of Array.from(document.querySelectorAll('video'))) {
-                            if (video.currentSrc) urls.push(video.currentSrc);
-                            if (video.src) urls.push(video.src);
-                            for (const source of Array.from(video.querySelectorAll('source'))) {
-                                if (source.src) urls.push(source.src);
+                page.on("response", on_response)
+                page.goto(url, wait_until="domcontentloaded", timeout=max(10_000, int(timeout_seconds * 1000)))
+                page.wait_for_timeout(3000)
+                for _round in range(4):
+                    dom_urls = page.evaluate(
+                        """() => {
+                            const urls = [];
+                            for (const video of Array.from(document.querySelectorAll('video'))) {
+                                if (video.currentSrc) urls.push(video.currentSrc);
+                                if (video.src) urls.push(video.src);
+                                for (const source of Array.from(video.querySelectorAll('source'))) {
+                                    if (source.src) urls.push(source.src);
+                                }
                             }
-                        }
-                        return urls;
-                    }"""
-                )
-                if isinstance(dom_urls, list):
-                    discovered.extend(str(item) for item in dom_urls)
-                if len(_dedupe_strings(discovered)) >= top_n:
-                    break
-                page.mouse.wheel(0, 1800)
-                page.wait_for_timeout(1200)
-            context.close()
-            browser.close()
+                            return urls;
+                        }"""
+                    )
+                    if isinstance(dom_urls, list):
+                        discovered.extend(str(item) for item in dom_urls)
+                    if len(_dedupe_strings(discovered)) >= top_n:
+                        break
+                    page.mouse.wheel(0, 1800)
+                    page.wait_for_timeout(1200)
+                cookies = [dict(item) for item in context.cookies()]
+            finally:
+                if context is not None:
+                    context.close()
+                browser.close()
     except Exception as exc:
-        return _dedupe_video_urls(discovered), f"Playwright ad discovery failed: {str(exc)[:MAX_ERROR_CHARS]}"
-    return _dedupe_video_urls(discovered), ""
+        return PlaywrightVideoDiscovery(
+            video_urls=_dedupe_video_urls(discovered),
+            cookies=cookies,
+            warning=f"Playwright ad discovery failed: {str(exc)[:MAX_ERROR_CHARS]}",
+        )
+    return PlaywrightVideoDiscovery(video_urls=_dedupe_video_urls(discovered), cookies=cookies, warning="")
 
 
 def _build_facebook_ad_library_url(term: str, *, country: str, start_date: date, end_date: date) -> str:
@@ -429,13 +464,37 @@ def _build_facebook_ad_library_url(term: str, *, country: str, start_date: date,
         "ad_type": "all",
         "country": country,
         "is_targeted_country": "false",
-        "media_type": "video",
+        "media_type": "all",
         "q": term,
         "search_type": "keyword_unordered",
+        "sort_data[direction]": "desc",
+        "sort_data[mode]": "total_impressions",
         "start_date[min]": start_date.isoformat(),
         "start_date[max]": end_date.isoformat(),
     }
     return "https://www.facebook.com/ads/library/?" + urllib.parse.urlencode(params)
+
+
+def _cookie_header_for_url(cookies: list[dict[str, Any]], url: str) -> str:
+    parsed = urllib.parse.urlparse(url)
+    host = (parsed.hostname or "").lower()
+    request_path = parsed.path or "/"
+    pairs: list[str] = []
+    for cookie in cookies:
+        name = _compact_text(cookie.get("name"))
+        value = _compact_text(cookie.get("value"))
+        if not name:
+            continue
+        domain = _compact_text(cookie.get("domain")).lstrip(".").lower()
+        if domain and host != domain and not host.endswith(f".{domain}"):
+            continue
+        path = _compact_text(cookie.get("path")) or "/"
+        if not request_path.startswith(path):
+            continue
+        if cookie.get("secure") and parsed.scheme != "https":
+            continue
+        pairs.append(f"{name}={value}")
+    return "; ".join(pairs)
 
 
 def _download_video(
@@ -444,12 +503,24 @@ def _download_video(
     destination: Path,
     timeout_seconds: float,
     artifact_relative_dir: str,
+    cookies: list[dict[str, Any]] | None = None,
+    referer: str = "",
+    user_agent: str = USER_AGENT,
 ) -> dict[str, Any]:
-    request = Request(url, headers={"User-Agent": USER_AGENT, "Accept": "*/*"})
+    headers = {"User-Agent": user_agent or USER_AGENT, "Accept": "*/*"}
+    if referer:
+        headers["Referer"] = referer
+    cookie_header = _cookie_header_for_url(cookies or [], url)
+    if cookie_header:
+        headers["Cookie"] = cookie_header
+    request = Request(url, headers=headers)
     try:
-        with urlopen(request, timeout=timeout_seconds) as response, destination.open("wb") as handle:
-            shutil.copyfileobj(response, handle)
+        with urlopen(request, timeout=timeout_seconds) as response:
             content_type = response.headers.get("content-type") or mimetypes.guess_type(destination.name)[0] or "video/mp4"
+            if "video" not in content_type.lower() and not _is_video_url(url):
+                raise OSError(f"Download response is not a video: {content_type}")
+            with destination.open("wb") as handle:
+                shutil.copyfileobj(response, handle)
         return {
             "status": "downloaded",
             "url": url,
@@ -461,7 +532,7 @@ def _download_video(
             "content_type": content_type,
         }
     except (HTTPError, URLError, TimeoutError, OSError) as exc:
-        if destination.exists() and destination.stat().st_size == 0:
+        if destination.exists():
             destination.unlink()
         return {
             "status": "failed",
@@ -666,7 +737,7 @@ def _is_video_url(url: str) -> bool:
     if suffix in VIDEO_EXTS:
         return True
     lowered = url.lower()
-    return "video" in lowered and not lowered.startswith("blob:")
+    return any(marker in lowered for marker in ("bytestart", "mime_type=video", "content-type=video", "content_type=video"))
 
 
 def _is_http_url(url: str) -> bool:

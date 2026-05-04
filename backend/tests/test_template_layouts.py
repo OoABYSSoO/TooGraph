@@ -430,7 +430,7 @@ class TemplateLayoutTests(unittest.TestCase):
                 "source_documents": state_by_name["source_documents"],
             },
         )
-        self.assertEqual(collector.config.skill_bindings[0].config.get("top_fetch_per_term"), 2)
+        self.assertEqual(collector.config.skill_bindings[0].config.get("top_fetch_per_term"), 1)
         self.assertEqual(collector.config.skill_bindings[0].config.get("enable_ads"), "true")
 
         analyzer = template.nodes["analyze_video_patterns"]

@@ -253,6 +253,55 @@ class AgentResponseGenerationTests(unittest.TestCase):
         self.assertNotIn("data_url", attachments[1])
         self.assertEqual(attachments[1]["file_url"], video_path.resolve().as_uri())
 
+    def test_does_not_route_skill_result_artifacts_as_model_attachments(self) -> None:
+        captured: dict[str, object] = {}
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            artifact_root = Path(temp_dir) / "skill_artifacts"
+            video_path = artifact_root / "run_1" / "collector" / "videos" / "clip.mp4"
+            video_path.parent.mkdir(parents=True)
+            video_path.write_bytes(b"fake-mp4")
+
+            def chat_with_local_model_with_meta_func(**kwargs):
+                captured.update(kwargs)
+                return ('{"answer": "ok"}', {"warnings": []})
+
+            with patch("app.core.storage.skill_artifact_store.SKILL_ARTIFACT_DATA_DIR", artifact_root):
+                payload, _reasoning, warnings, _updated_config = generate_agent_response(
+                    _agent_node(writes=[{"state": "answer"}], task_instruction="整理技能结果。"),
+                    {"genre": "SLG"},
+                    {
+                        "game_ad_research_collector": {
+                            "downloaded_files": [
+                                {
+                                    "filename": "clip.mp4",
+                                    "local_path": "run_1/collector/videos/clip.mp4",
+                                    "content_type": "video/mp4",
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "resolved_provider_id": "local",
+                        "runtime_model_name": "text-model",
+                        "resolved_temperature": 0.2,
+                        "resolved_thinking": False,
+                        "resolved_thinking_level": "off",
+                        "resolved_model_ref": "local/text-model",
+                    },
+                    state_schema={
+                        "genre": NodeSystemStateDefinition(type=NodeSystemStateType.TEXT),
+                        "answer": NodeSystemStateDefinition(type=NodeSystemStateType.TEXT),
+                    },
+                    chat_with_local_model_with_meta_func=chat_with_local_model_with_meta_func,
+                    parse_llm_json_response_func=lambda content, output_keys, *, output_key_aliases: {"answer": "ok"},
+                    build_output_key_aliases_func=lambda output_keys, state_schema: {"answer": ["answer"]},
+                )
+
+        self.assertEqual(payload["answer"], "ok")
+        self.assertEqual(warnings, [])
+        self.assertEqual(captured["input_attachments"], [])
+
     def test_global_agent_uses_default_video_model_when_media_attachments_are_present(self) -> None:
         captured: dict[str, object] = {}
         image_payload = {
@@ -302,56 +351,6 @@ class AgentResponseGenerationTests(unittest.TestCase):
         self.assertEqual(updated_config["resolved_model_ref"], "local/video-model")
         self.assertEqual(updated_config["runtime_model_name"], "video-model")
         self.assertEqual(updated_config["media_model_ref"], "local/video-model")
-
-    def test_routes_skill_result_artifact_media_as_model_attachments(self) -> None:
-        captured: dict[str, object] = {}
-
-        with tempfile.TemporaryDirectory() as temp_dir:
-            artifact_root = Path(temp_dir) / "skill_artifacts"
-            video_path = artifact_root / "run_1" / "download" / "clip.mp4"
-            video_path.parent.mkdir(parents=True)
-            video_path.write_bytes(b"fake-mp4")
-
-            def chat_with_local_model_with_meta_func(**kwargs):
-                captured.update(kwargs)
-                return ('{"answer": "ok"}', {"warnings": []})
-
-            with patch("app.core.storage.skill_artifact_store.SKILL_ARTIFACT_DATA_DIR", artifact_root):
-                payload, _reasoning, warnings, _updated_config = generate_agent_response(
-                    _agent_node(writes=[{"state": "answer"}], task_instruction="分析技能下载的视频。"),
-                    {"question": "分析视频"},
-                    {
-                        "web_media_downloader": {
-                            "downloaded_files": [
-                                {
-                                    "filename": "clip.mp4",
-                                    "local_path": "run_1/download/clip.mp4",
-                                    "content_type": "video/mp4",
-                                }
-                            ]
-                        }
-                    },
-                    {
-                        "resolved_provider_id": "local",
-                        "runtime_model_name": "vision-model",
-                        "resolved_temperature": 0.2,
-                        "resolved_thinking": False,
-                        "resolved_thinking_level": "off",
-                        "resolved_model_ref": "local/vision-model",
-                    },
-                    chat_with_local_model_with_meta_func=chat_with_local_model_with_meta_func,
-                    parse_llm_json_response_func=lambda content, output_keys, *, output_key_aliases: {"answer": "ok"},
-                    build_output_key_aliases_func=lambda output_keys, state_schema: {"answer": ["answer"]},
-                )
-
-        self.assertEqual(payload["answer"], "ok")
-        self.assertEqual(warnings, [])
-        attachments = captured["input_attachments"]
-        self.assertEqual(len(attachments), 1)
-        self.assertEqual(attachments[0]["type"], "video")
-        self.assertEqual(attachments[0]["state_key"], "skill_results")
-        self.assertNotIn("data_url", attachments[0])
-        self.assertEqual(attachments[0]["file_url"], video_path.resolve().as_uri())
 
     def test_routes_configured_provider_and_captures_metadata(self) -> None:
         def chat_with_model_ref_with_meta_func(**kwargs):

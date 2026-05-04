@@ -34,11 +34,7 @@ def generate_agent_response(
     if not output_keys:
         return {"summary": ""}, "", [], runtime_config
 
-    attachment_values = dict(input_values)
-    if skill_context:
-        skill_context_key = "skill_results" if "skill_results" not in attachment_values else "__skill_results__"
-        attachment_values[skill_context_key] = skill_context
-    raw_input_attachments = collect_input_attachments(attachment_values, state_schema=state_schema)
+    raw_input_attachments = collect_input_attachments(input_values, state_schema=state_schema)
     input_attachments, attachment_warnings, attachment_meta = prepare_model_input_attachments(raw_input_attachments)
     runtime_config = _resolve_media_runtime_config(
         runtime_config,

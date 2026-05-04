@@ -339,6 +339,63 @@ class OpenAiCompatibleProviderRuntimeTests(unittest.TestCase):
         self.assertEqual(meta["video_fallback"], {"used": True, "frame_count": 1, "video_count": 1})
         self.assertTrue(any("Native video request failed" in warning for warning in meta["warnings"]))
 
+    def test_local_gateway_retries_without_media_when_frame_file_urls_are_rejected(self) -> None:
+        with self._patched_local_provider_env(LOCAL_BASE_URL="http://127.0.0.1:8888/v1"):
+            local_llm, _model_catalog = self._reload_target_modules()
+
+            sent_payloads: list[dict[str, object]] = []
+            frame_attachments = [
+                {
+                    "type": "image",
+                    "state_key": "clip#frame_001",
+                    "name": "clip_frame_001.jpg",
+                    "mime_type": "image/jpeg",
+                    "file_url": "file:///tmp/clip_frame_001.jpg",
+                }
+            ]
+
+            def fake_request(payload: dict[str, object]) -> dict[str, object]:
+                sent_payloads.append(dict(payload))
+                if len(sent_payloads) == 1:
+                    raise RuntimeError("Local LLM request failed: unsupported content[].type")
+                if len(sent_payloads) == 2:
+                    raise RuntimeError("Local LLM request failed: file:// URLs are not allowed unless --media-path is specified")
+                return {
+                    "id": "chatcmpl-1",
+                    "model": "vision-model",
+                    "choices": [{"message": {"content": '{"answer":"text-only ok"}'}}],
+                }
+
+            with patch.object(local_llm, "get_local_gateway_runtime_config", return_value=None):
+                with patch.object(local_llm, "_request_local_chat_completion", side_effect=fake_request):
+                    with patch.object(
+                        local_llm,
+                        "build_video_frame_fallback_attachments",
+                        return_value=(frame_attachments, {"used": True, "frame_count": 1, "video_count": 1}),
+                    ):
+                        content, meta = local_llm._chat_with_local_model_with_meta(
+                            system_prompt="sys",
+                            user_prompt="Describe the video.",
+                            model="vision-model",
+                            thinking_enabled=False,
+                            input_attachments=[
+                                {
+                                    "type": "video",
+                                    "state_key": "clip",
+                                    "name": "clip.mp4",
+                                    "mime_type": "video/mp4",
+                                    "file_url": "file:///tmp/clip.mp4",
+                                }
+                            ],
+                        )
+
+        self.assertEqual(content, '{"answer":"text-only ok"}')
+        self.assertEqual(sent_payloads[0]["messages"][1]["content"][1]["type"], "video_url")
+        self.assertEqual(sent_payloads[1]["messages"][1]["content"][1]["type"], "image_url")
+        self.assertEqual(sent_payloads[2]["messages"][1]["content"], "Describe the video.")
+        self.assertEqual(meta["video_fallback"], {"used": True, "frame_count": 1, "video_count": 1, "text_only_retry": True})
+        self.assertTrue(any("retried without media attachments" in warning for warning in meta["warnings"]))
+
     def test_lm_studio_thinking_payload_uses_reasoning_effort_when_advertised(self) -> None:
         class FakeResponse:
             def raise_for_status(self) -> None:

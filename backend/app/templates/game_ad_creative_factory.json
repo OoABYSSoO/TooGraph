@@ -249,7 +249,7 @@
               "source_documents": "state_11"
             },
             "config": {
-              "top_fetch_per_term": 2,
+              "top_fetch_per_term": 1,
               "max_news_items": 12,
               "enable_rss": "true",
               "enable_ads": "true",
