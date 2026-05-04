@@ -594,17 +594,36 @@ test("BuddyWidget builds page context from the shared editor snapshot", () => {
 
 test("BuddyWidget resumes page operation runs after virtual UI execution", () => {
   assert.match(componentSource, /import \{[\s\S]*buildPageOperationResult,[\s\S]*buildPageOperationResumePayload,[\s\S]*canAutoResumePageOperationRun,[\s\S]*findAutoResumablePageOperationRequestId,[\s\S]*\} from "\.\/pageOperationResume\.ts";/);
+  assert.match(componentSource, /const backgroundTemplateOperation = resolveBackgroundTemplateRunOperation\(operationPlan\);/);
   assert.match(componentSource, /buddyMascotDebugStore\.beginVirtualOperationRunAttribution\(operationPlan\);[\s\S]*status = await executeVirtualOperationCommands\(operationPlan\);[\s\S]*triggeredRun = await waitForVirtualOperationTriggeredRun\(operationPlan\);[\s\S]*triggeredRunDetail = triggeredRun \? await waitForTriggeredRunCompletion\(triggeredRun\) : null;/);
   assert.match(componentSource, /const pageOperationContextAfterBase = buildPageOperationRuntimeContext\(\{ latestForegroundRun \}\);/);
   assert.match(componentSource, /buildPageOperationResult\(\{[\s\S]*operationPlan,[\s\S]*routeBefore,[\s\S]*routeAfter: route\.fullPath,[\s\S]*pageOperationContextBefore: pageOperationContextBefore\.skillRuntimeContext,[\s\S]*pageOperationContextAfter: pageOperationContextAfterBase\.skillRuntimeContext,[\s\S]*triggeredRunId: triggeredRun\?\.runId \?\? null,[\s\S]*triggeredGraphId: triggeredRun\?\.graphId \?\? null,[\s\S]*triggeredRunInitialStatus: triggeredRun\?\.initialStatus \?\? null,[\s\S]*triggeredRunStatus: triggeredRunDetail\?\.status \?\? triggeredRun\?\.initialStatus \?\? null,[\s\S]*triggeredRunFinalResult: triggeredRunDetail\?\.final_result \?\? null,[\s\S]*\}\);/);
   assert.match(componentSource, /const pageOperationContextAfter = buildPageOperationRuntimeContext\(\{[\s\S]*latestOperationReport: operationResult\.operation_report,[\s\S]*latestForegroundRun,[\s\S]*\}\);/);
-  assert.match(componentSource, /async function waitForTriggeredRunCompletion\(triggeredRun: BuddyVirtualOperationTriggeredRun\): Promise<RunDetail \| null> \{[\s\S]*latestRun = await fetchRun\(triggeredRun\.runId\);[\s\S]*if \(!shouldPollRunStatus\(latestRun\.status\)\) \{/);
+  assert.match(componentSource, /async function waitForTriggeredRunCompletion\([\s\S]*triggeredRun: BuddyVirtualOperationTriggeredRun,[\s\S]*Promise<RunDetail \| null> \{[\s\S]*latestRun = await fetchRun\(triggeredRun\.runId\);[\s\S]*if \(!shouldPollRunStatus\(latestRun\.status\)\) \{/);
   assert.match(componentSource, /async function maybeAutoResumePageOperationRun\(/);
   assert.match(componentSource, /const runDetail = await fetchRun\(operationPlan\.runId\);[\s\S]*canAutoResumePageOperationRun\(runDetail, operationPlan\.operationRequestId\)/);
   assert.match(componentSource, /await resumeRun\([\s\S]*operationPlan\.runId,[\s\S]*buildPageOperationResumePayload\(\{[\s\S]*operationResult,[\s\S]*pageContext: pageOperationContextAfter\.pageContext,[\s\S]*pageOperationContext: pageOperationContextAfter\.skillRuntimeContext,[\s\S]*\}\),[\s\S]*\);/);
 });
 
-test("BuddyWidget runs template targets through a fixed virtual page operation sequence", () => {
+test("BuddyWidget runs template targets in the background unless follow mode requests visible playback", () => {
+  assert.match(componentSource, /import \{ fetchTemplate, fetchTemplates, runGraph \} from "\.\.\/api\/graphs\.ts";/);
+  assert.match(componentSource, /import \{ buildBuddyTemplateRunGraph \} from "\.\/buddyTemplateRunGraph\.ts";/);
+  assert.match(componentSource, /const BUDDY_VIRTUAL_OPERATION_FOLLOW_STORAGE_KEY = "toograph:buddy-virtual-operation-follow";/);
+  assert.match(componentSource, /const virtualOperationFollowEnabled = ref\(readStoredVirtualOperationFollowEnabled\(\)\);/);
+  assert.match(componentSource, /function resolveBackgroundTemplateRunOperation\(/);
+  assert.match(componentSource, /if \(virtualOperationFollowEnabled\.value\) \{[\s\S]*return null;[\s\S]*\}/);
+  assert.match(componentSource, /async function executeBuddyBackgroundRunTemplateOperation\(/);
+  assert.match(componentSource, /const \{ graph \} = buildBuddyTemplateRunGraph\(template,/);
+  assert.match(componentSource, /runGraph\(attachPageOperationRuntimeContext\(graph, pageOperationContext\.skillRuntimeContext\)\)/);
+  assert.match(componentSource, /buddyMascotDebugStore\.recordVirtualOperationTriggeredRun\(triggeredRun\);/);
+  assert.match(componentSource, /syncBackgroundTemplateRunDisplay\(operationPlan, runDetail, execution\.graph\)/);
+  assert.match(componentSource, /class="buddy-widget__virtual-operation-follow"/);
+  assert.match(componentSource, /class="buddy-widget__follow-control"/);
+  assert.match(componentSource, /class="buddy-widget__follow-toggle"/);
+  assert.match(componentSource, /function toggleVirtualOperationFollow\(\)/);
+});
+
+test("BuddyWidget keeps a fixed visible virtual page operation sequence for followed template runs", () => {
   assert.match(componentSource, /case "run_template":[\s\S]*await executeBuddyVirtualRunTemplateOperation\(operation\);/);
   assert.match(componentSource, /async function executeBuddyVirtualRunTemplateOperation\(operation: BuddyVirtualOperation\)/);
   assert.match(componentSource, /await clickVirtualOperationTargetWithRetry\("app\.nav\.library", token\);/);
@@ -711,6 +730,9 @@ test("BuddyWidget renders output-segment run trace capsules instead of per-messa
   assert.match(componentSource, /outputTrace\?:/);
   assert.match(componentSource, /class="buddy-widget__run-trace"/);
   assert.match(componentSource, /class="buddy-widget__run-trace-summary"/);
+  assert.match(componentSource, /class="buddy-widget__run-trace-open"/);
+  assert.match(componentSource, /function openRunPlayback\(runId: string \| null \| undefined\)/);
+  assert.match(componentSource, /router\.push\(resolveRunRestoreUrl\(normalizedRunId\)\)/);
   assert.match(componentSource, /buddy-widget__run-trace-dot--running/);
   assert.match(componentSource, /formatTraceDuration/);
   assert.match(componentSource, /traceClockNowMs/);
@@ -871,7 +893,7 @@ test("BuddyWidget does not surface paused runs as an in-chat action card", () =>
   assert.match(componentSource, /void persistBuddyMessage\(sessionId,[\s\S]*runId:\s*run\.run_id,[\s\S]*includeInContext:\s*false/);
 });
 
-test("BuddyWidget persists awaiting-human paused run placeholders outside model context", () => {
+test("BuddyWidget persists only conversational awaiting-human pauses outside model context", () => {
   assert.match(componentSource, /type BuddyPauseHandlingOptions = \{[\s\S]*persist\?: boolean;[\s\S]*\};/);
   assert.match(componentSource, /handleBuddyRunAwaitingHuman\(runDetail,\s*assistantMessage\.id,\s*\{ persist: true \}\)/);
   assert.match(componentSource, /handleBuddyRunAwaitingHuman\(resumedRunDetail,\s*assistantMessageId,\s*\{ persist: true \}\)/);
@@ -881,8 +903,28 @@ test("BuddyWidget persists awaiting-human paused run placeholders outside model 
   );
   assert.match(
     componentSource,
-    /if \(options\.persist && activeSessionId\.value\) \{[\s\S]*persistBuddyMessage\(activeSessionId\.value,[\s\S]*runId:\s*run\.run_id,[\s\S]*includeInContext:\s*!isAutoResumablePageOperationPause/,
+    /if \(options\.persist && activeSessionId\.value && !isAutoResumablePageOperationPause\) \{[\s\S]*persistBuddyMessage\(activeSessionId\.value,[\s\S]*runId:\s*run\.run_id,[\s\S]*includeInContext:\s*!isAutoResumablePageOperationPause/,
   );
+});
+
+test("BuddyWidget finishes auto-resumed page-operation runs back into the chat reply", () => {
+  assert.match(
+    componentSource,
+    /const completedTriggeredRunDetail = await waitForTriggeredRunCompletion\(triggeredRun,[\s\S]*\);[\s\S]*triggeredRunDetail = completedTriggeredRunDetail;[\s\S]*if \(completedTriggeredRunDetail\) \{[\s\S]*promoteBackgroundTemplateRunResultToBuddyReply\(operationPlan,\s*completedTriggeredRunDetail,\s*execution\.graph\);[\s\S]*\}[\s\S]*status = isVirtualOperationInterrupted\(token\) \? "interrupted" : "succeeded";/,
+  );
+  assert.match(componentSource, /function promoteBackgroundTemplateRunResultToBuddyReply\(/);
+  assert.match(componentSource, /function findPrimaryCompletedTextPublicOutput\(/);
+  assert.match(
+    componentSource,
+    /const assistantMessageId = resolveBuddyRunControllerMessageId\(operationPlan\.runId\);[\s\S]*const sessionId = activeSessionId\.value;[\s\S]*resetPausedBuddyPause\(\);[\s\S]*await finishAutoResumedPageOperationRun\(\{[\s\S]*runId:\s*response\.run_id,[\s\S]*assistantMessageId,[\s\S]*sessionId,[\s\S]*graph:[\s\S]*runDetail\.graph_snapshot/,
+  );
+  assert.match(componentSource, /async function finishAutoResumedPageOperationRun\(/);
+  assert.match(
+    componentSource,
+    /const resumedRunDetail = await pollRunUntilFinished\(runId,\s*controller\.signal\);[\s\S]*clearAutoResumingPageOperationPlaceholder\(assistantMessageId,\s*runId\);[\s\S]*finishBuddyVisibleRun\(resumedRunDetail,\s*assistantMessageId,\s*sessionId,\s*runId,\s*\{ includeOutputTrace: false \}\);/,
+  );
+  assert.doesNotMatch(extractSourceBetween("async function finishAutoResumedPageOperationRun(", "function clearAutoResumingPageOperationPlaceholder"), /startRunEventStream/);
+  assert.match(componentSource, /function clearAutoResumingPageOperationPlaceholder\(assistantMessageId: string, runId: string\)/);
 });
 
 test("BuddyWidget recovers awaiting-human paused runs after session activation", () => {

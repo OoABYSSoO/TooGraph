@@ -896,6 +896,8 @@ const workspaceOpenController = useWorkspaceOpenController({
   fetchRun,
   applyRunVisualStateToTab,
   openHumanReviewPanelForTab,
+  startRunEventStreamForTab,
+  pollRunForTab,
   syncRouteToTab,
 });
 ensureUnsavedTabDocumentsFromController = workspaceOpenController.ensureUnsavedTabDocuments;

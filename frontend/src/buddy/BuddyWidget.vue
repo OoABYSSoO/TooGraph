@@ -62,6 +62,16 @@
       <span class="buddy-widget__virtual-operation-label">{{ virtualOperationStatus.label }}</span>
       <button
         type="button"
+        class="buddy-widget__virtual-operation-follow"
+        :class="{ 'buddy-widget__virtual-operation-follow--active': virtualOperationFollowEnabled }"
+        :title="virtualOperationFollowEnabled ? t('buddy.virtualOperation.followingTitle') : t('buddy.virtualOperation.followTitle')"
+        :aria-pressed="virtualOperationFollowEnabled"
+        @click="toggleVirtualOperationFollow"
+      >
+        {{ virtualOperationFollowEnabled ? t("buddy.virtualOperation.following") : t("buddy.virtualOperation.follow") }}
+      </button>
+      <button
+        type="button"
         class="buddy-widget__virtual-operation-stop"
         :title="t('buddy.virtualOperation.stop')"
         :aria-label="t('buddy.virtualOperation.stop')"
@@ -249,6 +259,18 @@
                 </ElOption>
               </ElSelect>
             </div>
+            <div class="buddy-widget__follow-control" :title="virtualOperationFollowEnabled ? t('buddy.virtualOperation.followingTitle') : t('buddy.virtualOperation.followTitle')">
+              <span class="buddy-widget__control-label">{{ t("buddy.virtualOperation.follow") }}</span>
+              <button
+                type="button"
+                class="buddy-widget__follow-toggle"
+                :class="{ 'buddy-widget__follow-toggle--active': virtualOperationFollowEnabled }"
+                :aria-pressed="virtualOperationFollowEnabled"
+                @click="toggleVirtualOperationFollow"
+              >
+                {{ virtualOperationFollowEnabled ? t("buddy.virtualOperation.following") : t("buddy.virtualOperation.follow") }}
+              </button>
+            </div>
           </div>
         </header>
 
@@ -273,30 +295,42 @@
                 class="buddy-widget__run-trace"
                 :class="`buddy-widget__run-trace--${message.outputTrace.status}`"
               >
-                <button
-                  type="button"
-                  class="buddy-widget__run-trace-summary"
-                  :aria-expanded="isTraceMessageExpanded(message.id)"
-                  :aria-label="isTraceMessageExpanded(message.id) ? t('buddy.runTraceCollapse') : t('buddy.runTraceExpand')"
-                  @click="toggleTraceMessage(message.id)"
-                >
-                  <span
-                    class="buddy-widget__run-trace-dot"
-                    :class="`buddy-widget__run-trace-dot--${message.outputTrace.status}`"
-                    aria-hidden="true"
-                  />
-                  <span class="buddy-widget__run-trace-title">
-                    {{ resolveTraceSegmentSummary(message.outputTrace) }}
-                  </span>
-                  <span class="buddy-widget__run-trace-duration">
-                    {{ formatTraceDuration(buildTraceSegmentDurationKey(message.id), resolveTraceSegmentDurationMs(message.outputTrace)) }}
-                  </span>
-                  <span
-                    class="buddy-widget__run-trace-chevron"
-                    :class="{ 'buddy-widget__run-trace-chevron--expanded': isTraceMessageExpanded(message.id) }"
-                    aria-hidden="true"
-                  />
-                </button>
+                <div class="buddy-widget__run-trace-summary-row">
+                  <button
+                    type="button"
+                    class="buddy-widget__run-trace-summary"
+                    :aria-expanded="isTraceMessageExpanded(message.id)"
+                    :aria-label="isTraceMessageExpanded(message.id) ? t('buddy.runTraceCollapse') : t('buddy.runTraceExpand')"
+                    @click="toggleTraceMessage(message.id)"
+                  >
+                    <span
+                      class="buddy-widget__run-trace-dot"
+                      :class="`buddy-widget__run-trace-dot--${message.outputTrace.status}`"
+                      aria-hidden="true"
+                    />
+                    <span class="buddy-widget__run-trace-title">
+                      {{ resolveTraceSegmentSummary(message.outputTrace) }}
+                    </span>
+                    <span class="buddy-widget__run-trace-duration">
+                      {{ formatTraceDuration(buildTraceSegmentDurationKey(message.id), resolveTraceSegmentDurationMs(message.outputTrace)) }}
+                    </span>
+                    <span
+                      class="buddy-widget__run-trace-chevron"
+                      :class="{ 'buddy-widget__run-trace-chevron--expanded': isTraceMessageExpanded(message.id) }"
+                      aria-hidden="true"
+                    />
+                  </button>
+                  <button
+                    v-if="message.runId"
+                    type="button"
+                    class="buddy-widget__run-trace-open"
+                    :title="t('buddy.attachRun')"
+                    :aria-label="t('buddy.attachRun')"
+                    @click="openRunPlayback(message.runId)"
+                  >
+                    <ElIcon><Promotion /></ElIcon>
+                  </button>
+                </div>
                 <div
                   v-if="isTraceMessageExpanded(message.id)"
                   class="buddy-widget__run-trace-detail"
@@ -431,7 +465,7 @@ import { ElIcon, ElOption, ElPopover, ElSelect } from "element-plus";
 import { storeToRefs } from "pinia";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 
 import {
   appendBuddyChatMessage,
@@ -441,12 +475,13 @@ import {
   fetchBuddyChatSessions,
   fetchBuddyRunTemplateBinding,
 } from "../api/buddy.ts";
-import { fetchTemplate, runGraph } from "../api/graphs.ts";
+import { fetchTemplate, fetchTemplates, runGraph } from "../api/graphs.ts";
 import { cancelRun, fetchRun, resumeRun } from "../api/runs.ts";
 import { fetchSettings } from "../api/settings.ts";
 import SandboxedHtmlFrame from "../components/SandboxedHtmlFrame.vue";
 import { resolveOutputPreviewContent } from "../editor/nodes/outputPreviewContentModel.ts";
 import { formatRunDuration } from "../lib/run-display-name.ts";
+import { resolveRunRestoreUrl } from "../lib/run-restore.ts";
 import { buildRuntimeModelOptions } from "../lib/runtimeModelCatalog.ts";
 import { buildRunEventStreamUrl, parseRunEventPayload, shouldPollRunStatus } from "../lib/run-event-stream.ts";
 import { buildRunNodeTimingByNodeIdFromRun } from "../lib/runTelemetryProjection.ts";
@@ -465,7 +500,7 @@ import {
 } from "../stores/buddyMascotDebug.ts";
 import { buildBuddyBubblePreviewLabel } from "./buddyBubblePreviewModel.ts";
 import type { BuddyChatMessageRecord, BuddyChatSession } from "../types/buddy.ts";
-import type { GraphPayload, GraphPosition } from "../types/node-system.ts";
+import type { GraphPayload, GraphPosition, TemplateRecord } from "../types/node-system.ts";
 import type { RunDetail } from "../types/run.ts";
 import type { SettingsPayload } from "../types/settings.ts";
 
@@ -481,6 +516,7 @@ import {
 } from "./buddyMessageMetadata.ts";
 import { buildBuddyPageContext } from "./buddyPageContext.ts";
 import {
+  attachPageOperationRuntimeContext,
   buildPageOperationRuntimeContext as buildPageOperationSkillRuntimeContext,
   collectPageOperationSnapshot,
 } from "./pageOperationAffordances.ts";
@@ -534,6 +570,7 @@ import {
   type BuddyOutputTraceRuntimeState,
   type BuddyOutputTraceSegment,
 } from "./buddyOutputTrace.ts";
+import { buildBuddyTemplateRunGraph } from "./buddyTemplateRunGraph.ts";
 import {
   BUDDY_POSITION_STORAGE_KEY,
   DEFAULT_BUDDY_MARGIN,
@@ -622,10 +659,24 @@ type BuddyPageOperationRuntimeContextOptions = {
   latestOperationReport?: Record<string, unknown> | null;
   latestForegroundRun?: BuddyPageOperationForegroundRun | null;
 };
+type BuddyBackgroundTemplateRunExecution = {
+  triggeredRun: BuddyVirtualOperationTriggeredRun;
+  graph: GraphPayload;
+};
+type BuddyAutoResumedPageOperationFinishOptions = {
+  runId: string;
+  assistantMessageId: string;
+  sessionId: string;
+  graph: GraphPayload;
+};
+type BuddyFinishVisibleRunOptions = {
+  includeOutputTrace?: boolean;
+};
 
 const BUDDY_HISTORY_STORAGE_KEY = "toograph:buddy-history";
 const BUDDY_ACTIVE_SESSION_STORAGE_KEY = "toograph:buddy-active-session";
 const BUDDY_MODEL_STORAGE_KEY = "toograph:buddy-model";
+const BUDDY_VIRTUAL_OPERATION_FOLLOW_STORAGE_KEY = "toograph:buddy-virtual-operation-follow";
 const DRAG_THRESHOLD_PX = 4;
 const AVATAR_SINGLE_CLICK_DELAY_MS = 220;
 const RUN_POLL_INTERVAL_MS = 700;
@@ -640,6 +691,8 @@ const BUDDY_ROAM_TARGET_MIN_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width;
 const BUDDY_ROAM_TARGET_MAX_DISTANCE_PX = DEFAULT_BUDDY_SIZE.width * 3;
 const BUDDY_ROAM_TARGET_REACHED_DISTANCE_PX = 1;
 const BUDDY_VIRTUAL_CURSOR_SIZE = { width: 42, height: 42 };
+const BUDDY_CAPABILITY_PASSTHROUGH_OUTPUT_NODE_ID = "output_capability_passthrough";
+const BUDDY_CAPABILITY_PASSTHROUGH_STATE_KEY = "capability_result.final_reply";
 const BUDDY_IDLE_VIRTUAL_CURSOR_CHASE_LOOP_PERIOD_MS = 1600;
 const BUDDY_IDLE_VIRTUAL_CURSOR_CHASE_LOOP_RADIUS_PX = BUDDY_VIRTUAL_CURSOR_SIZE.width * 0.86;
 const BUDDY_IDLE_VIRTUAL_CURSOR_CHASE_LOOP_Y_RADIUS_PX = BUDDY_IDLE_VIRTUAL_CURSOR_CHASE_LOOP_RADIUS_PX * 0.62;
@@ -685,6 +738,7 @@ const TRACE_DURATION_SMOOTH_OPTIONS = {
 } as const;
 const { t } = useI18n();
 const route = useRoute();
+const router = useRouter();
 const buddyContextStore = useBuddyContextStore();
 const buddyMascotDebugStore = useBuddyMascotDebugStore();
 const {
@@ -708,6 +762,7 @@ const virtualCursorDetached = ref(false);
 const virtualCursorDragging = ref(false);
 const virtualCursorIdleActionMode = ref<VirtualCursorIdleActionMode>("none");
 const virtualOperationStatus = ref<BuddyVirtualOperationStatus | null>(null);
+const virtualOperationFollowEnabled = ref(readStoredVirtualOperationFollowEnabled());
 const activeVirtualOperationToken = shallowRef<BuddyVirtualOperationToken | null>(null);
 const isVirtualOperationRunning = computed(() => Boolean(activeVirtualOperationToken.value));
 const isPanelOpen = ref(false);
@@ -2339,11 +2394,39 @@ async function executeVirtualOperationRequest(request: BuddyVirtualOperationRequ
   let triggeredRun: BuddyVirtualOperationTriggeredRun | null = null;
   let triggeredRunDetail: RunDetail | null = null;
   try {
-    buddyMascotDebugStore.beginVirtualOperationRunAttribution(operationPlan);
-    status = await executeVirtualOperationCommands(operationPlan);
-    if (status !== "interrupted") {
-      triggeredRun = await waitForVirtualOperationTriggeredRun(operationPlan);
-      triggeredRunDetail = triggeredRun ? await waitForTriggeredRunCompletion(triggeredRun) : null;
+    const backgroundTemplateOperation = resolveBackgroundTemplateRunOperation(operationPlan);
+    if (backgroundTemplateOperation) {
+      const token = beginBackgroundVirtualOperation();
+      try {
+        const execution = await executeBuddyBackgroundRunTemplateOperation(
+          operationPlan,
+          backgroundTemplateOperation,
+          pageOperationContextBefore,
+        );
+        triggeredRun = execution.triggeredRun;
+        if (isVirtualOperationInterrupted(token)) {
+          status = "interrupted";
+        } else {
+          const completedTriggeredRunDetail = await waitForTriggeredRunCompletion(triggeredRun, {
+            token,
+            onSnapshot: (runDetail) => syncBackgroundTemplateRunDisplay(operationPlan, runDetail, execution.graph),
+          });
+          triggeredRunDetail = completedTriggeredRunDetail;
+          if (completedTriggeredRunDetail) {
+            promoteBackgroundTemplateRunResultToBuddyReply(operationPlan, completedTriggeredRunDetail, execution.graph);
+          }
+          status = isVirtualOperationInterrupted(token) ? "interrupted" : "succeeded";
+        }
+      } finally {
+        finishVirtualOperation(token);
+      }
+    } else {
+      buddyMascotDebugStore.beginVirtualOperationRunAttribution(operationPlan);
+      status = await executeVirtualOperationCommands(operationPlan);
+      if (status !== "interrupted") {
+        triggeredRun = await waitForVirtualOperationTriggeredRun(operationPlan);
+        triggeredRunDetail = triggeredRun ? await waitForTriggeredRunCompletion(triggeredRun) : null;
+      }
     }
   } catch (caughtError) {
     status = "failed";
@@ -2414,6 +2497,8 @@ async function maybeAutoResumePageOperationRun(
   if (!canAutoResumePageOperationRun(runDetail, operationPlan.operationRequestId)) {
     return;
   }
+  const assistantMessageId = resolveBuddyRunControllerMessageId(operationPlan.runId);
+  const sessionId = activeSessionId.value;
   const response = await resumeRun(
     operationPlan.runId,
     buildPageOperationResumePayload({
@@ -2423,6 +2508,88 @@ async function maybeAutoResumePageOperationRun(
     }),
   );
   activeRunId.value = response.run_id;
+  resetPausedBuddyPause();
+  if (!assistantMessageId || !sessionId) {
+    activeRunId.value = null;
+    return;
+  }
+  await finishAutoResumedPageOperationRun({
+    runId: response.run_id,
+    assistantMessageId,
+    sessionId,
+    graph: runDetail.graph_snapshot as unknown as GraphPayload,
+  });
+}
+
+function resolveBackgroundTemplateRunOperation(
+  operationPlan: BuddyVirtualOperationPlan,
+): Extract<BuddyVirtualOperation, { kind: "run_template" }> | null {
+  if (virtualOperationFollowEnabled.value) {
+    return null;
+  }
+  if (operationPlan.operations.length !== 1) {
+    return null;
+  }
+  const operation = operationPlan.operations[0];
+  return operation?.kind === "run_template" ? operation : null;
+}
+
+async function executeBuddyBackgroundRunTemplateOperation(
+  operationPlan: BuddyVirtualOperationPlan,
+  operation: Extract<BuddyVirtualOperation, { kind: "run_template" }>,
+  pageOperationContext: ReturnType<typeof buildPageOperationRuntimeContext>,
+): Promise<BuddyBackgroundTemplateRunExecution> {
+  const operationRequestId = String(operationPlan.operationRequestId ?? "").trim();
+  if (!operationRequestId) {
+    throw new Error("缺少页面操作请求 ID。");
+  }
+  const template = await fetchBuddyVirtualRunTemplate(operation);
+  const { graph } = buildBuddyTemplateRunGraph(template, {
+    inputText: operation.inputText,
+    operationRequestId,
+    templateId: operation.templateId || template.template_id,
+    templateName: operation.templateName || template.label || template.default_graph_name,
+  });
+  const response = await runGraph(attachPageOperationRuntimeContext(graph, pageOperationContext.skillRuntimeContext));
+  const triggeredRun: BuddyVirtualOperationTriggeredRun = {
+    operationRequestId,
+    targetId: operation.runTargetId || "editor.action.runActiveGraph",
+    tabId: "background",
+    runId: response.run_id,
+    graphId: graph.graph_id ?? null,
+    initialStatus: response.status,
+  };
+  buddyMascotDebugStore.recordVirtualOperationTriggeredRun(triggeredRun);
+  return { triggeredRun, graph };
+}
+
+async function fetchBuddyVirtualRunTemplate(operation: Extract<BuddyVirtualOperation, { kind: "run_template" }>) {
+  if (operation.templateId) {
+    try {
+      return await fetchTemplate(operation.templateId);
+    } catch {
+      // Fall back to visible-search semantics below when the template id is stale or unavailable.
+    }
+  }
+  const templates = await fetchTemplates();
+  const expectedTexts = [operation.templateId, operation.templateName, operation.searchText]
+    .map(normalizeTemplateRunMatchText)
+    .filter(Boolean);
+  const matchedTemplate = templates.find((template) => templateMatchesVirtualRunTarget(template, expectedTexts));
+  if (!matchedTemplate) {
+    throw new Error(`找不到目标图模板：${operation.templateName || operation.templateId || operation.searchText}`);
+  }
+  return matchedTemplate;
+}
+
+function templateMatchesVirtualRunTarget(template: TemplateRecord, expectedTexts: string[]) {
+  if (expectedTexts.length === 0) {
+    return false;
+  }
+  const haystack = normalizeTemplateRunMatchText(
+    `${template.template_id} ${template.label} ${template.default_graph_name} ${template.description}`,
+  );
+  return expectedTexts.some((text) => haystack.includes(text));
 }
 
 function beginVirtualOperation(): BuddyVirtualOperationToken {
@@ -2431,6 +2598,18 @@ function beginVirtualOperation(): BuddyVirtualOperationToken {
   activeVirtualOperationToken.value = token;
   virtualOperationStatus.value = {
     label: t("buddy.virtualOperation.running"),
+    tone: "active",
+  };
+  return token;
+}
+
+function beginBackgroundVirtualOperation(): BuddyVirtualOperationToken {
+  stopBuddyIdleAnimation();
+  activeVirtualOperationToken.value?.interrupt();
+  const token = createBuddyVirtualOperationToken();
+  activeVirtualOperationToken.value = token;
+  virtualOperationStatus.value = {
+    label: t("buddy.virtualOperation.backgroundRunning"),
     tone: "active",
   };
   return token;
@@ -2494,19 +2673,30 @@ async function waitForVirtualOperationTriggeredRun(
   return buddyMascotDebugStore.resolveVirtualOperationTriggeredRun(operationRequestId);
 }
 
-async function waitForTriggeredRunCompletion(triggeredRun: BuddyVirtualOperationTriggeredRun): Promise<RunDetail | null> {
+async function waitForTriggeredRunCompletion(
+  triggeredRun: BuddyVirtualOperationTriggeredRun,
+  options: {
+    token?: BuddyVirtualOperationToken | null;
+    onSnapshot?: (runDetail: RunDetail) => void;
+  } = {},
+): Promise<RunDetail | null> {
   const deadline = Date.now() + BUDDY_PAGE_OPERATION_TRIGGERED_RUN_MAX_WAIT_MS;
   let latestRun: RunDetail | null = null;
-  while (Date.now() <= deadline) {
+  while (!(options.token && isVirtualOperationInterrupted(options.token)) && Date.now() <= deadline) {
     try {
       latestRun = await fetchRun(triggeredRun.runId);
+      options.onSnapshot?.(latestRun);
       if (!shouldPollRunStatus(latestRun.status)) {
         return latestRun;
       }
     } catch {
       return latestRun;
     }
-    await waitForFrontendObservation(RUN_POLL_INTERVAL_MS);
+    if (options.token) {
+      await waitForVirtualOperation(RUN_POLL_INTERVAL_MS, options.token);
+    } else {
+      await waitForFrontendObservation(RUN_POLL_INTERVAL_MS);
+    }
   }
   return latestRun;
 }
@@ -4046,6 +4236,67 @@ async function resumePausedBuddyRunFromChatReply(userMessage: string, assistantM
   }
 }
 
+async function finishAutoResumedPageOperationRun({
+  runId,
+  assistantMessageId,
+  sessionId,
+  graph,
+}: BuddyAutoResumedPageOperationFinishOptions) {
+  clearSpeakingIdleTimer();
+  errorMessage.value = "";
+  mood.value = "thinking";
+  setAssistantActivityText(assistantMessageId, t("buddy.activity.resuming"));
+  const controller = new AbortController();
+  activeAbortController = controller;
+
+  try {
+    const resumedRunDetail = await pollRunUntilFinished(runId, controller.signal);
+    if (resumedRunDetail.status === "awaiting_human") {
+      handleBuddyRunAwaitingHuman(resumedRunDetail, assistantMessageId, { persist: true });
+      return;
+    }
+    clearAutoResumingPageOperationPlaceholder(assistantMessageId, runId);
+    finishBuddyVisibleRun(resumedRunDetail, assistantMessageId, sessionId, runId, { includeOutputTrace: false });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      return;
+    }
+    mood.value = "error";
+    const message = error instanceof Error ? error.message : t("buddy.runFailed");
+    errorMessage.value = message;
+    removeBuddyRunDisplayMessages(assistantMessageId);
+    updateAssistantMessage(assistantMessageId, t("buddy.errorReply", { error: formatErrorMessage(error) }), {
+      includeInContext: false,
+      runId,
+    });
+    void persistBuddyMessage(sessionId, messages.value.find((entry) => entry.id === assistantMessageId), {
+      runId,
+      includeInContext: false,
+    });
+  } finally {
+    closeEventSource();
+    if (!pausedBuddyRun.value) {
+      activeRunId.value = null;
+    }
+    if (activeAbortController === controller) {
+      activeAbortController = null;
+    }
+    scheduleBuddySpeakingIdleIfNeeded();
+    await scrollMessagesToBottom();
+  }
+}
+
+function clearAutoResumingPageOperationPlaceholder(assistantMessageId: string, runId: string) {
+  const message = messages.value.find((entry) => entry.id === assistantMessageId);
+  if (!message || message.content.trim() !== t("buddy.pause.autoResumingPageOperation")) {
+    return;
+  }
+  updateAssistantMessage(assistantMessageId, "", {
+    includeInContext: false,
+    runId,
+  });
+}
+
 async function cancelPausedBuddyRun() {
   const run = pausedBuddyRun.value;
   const assistantMessageId = pausedBuddyAssistantMessageId.value;
@@ -4109,7 +4360,7 @@ function handleBuddyRunAwaitingHuman(
     includeInContext: !isAutoResumablePageOperationPause,
     runId: run.run_id,
   });
-  if (options.persist && activeSessionId.value) {
+  if (options.persist && activeSessionId.value && !isAutoResumablePageOperationPause) {
     void persistBuddyMessage(activeSessionId.value, messages.value.find((message) => message.id === assistantMessageId), {
       runId: run.run_id,
       includeInContext: !isAutoResumablePageOperationPause,
@@ -4117,11 +4368,19 @@ function handleBuddyRunAwaitingHuman(
   }
 }
 
-function finishBuddyVisibleRun(runDetail: RunDetail, assistantMessageId: string, sessionId: string, runId: string) {
+function finishBuddyVisibleRun(
+  runDetail: RunDetail,
+  assistantMessageId: string,
+  sessionId: string,
+  runId: string,
+  options: BuddyFinishVisibleRunOptions = {},
+) {
   const graph = runDetail.graph_snapshot as unknown as GraphPayload;
   const publicOutputBindings = buildBuddyPublicOutputBindings(graph);
   const outputTracePlan = buildBuddyOutputTracePlan(graph, publicOutputBindings);
-  const outputTraceState = buildBuddyOutputTraceStateFromRunDetail(runDetail, outputTracePlan, graph);
+  const outputTraceState = options.includeOutputTrace === false
+    ? createEmptyBuddyOutputTraceRuntimeState()
+    : buildBuddyOutputTraceStateFromRunDetail(runDetail, outputTracePlan, graph);
   const outputState = buildPublicOutputRuntimeStateFromRunDetail(runDetail, publicOutputBindings, graph);
   const { publicOutputMessages, outputTraceMessages } = syncBuddyRunDisplayMessages(assistantMessageId, runId, outputTraceState, outputState);
   const includeReplyInContext = runDetail.status === "completed";
@@ -4524,6 +4783,24 @@ function hydrateBuddyModel() {
   buddyModelRef.value = window.localStorage.getItem(BUDDY_MODEL_STORAGE_KEY)?.trim() ?? "";
 }
 
+function readStoredVirtualOperationFollowEnabled() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  return window.localStorage.getItem(BUDDY_VIRTUAL_OPERATION_FOLLOW_STORAGE_KEY) === "1";
+}
+
+function persistVirtualOperationFollowEnabled(enabled: boolean) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    window.localStorage.setItem(BUDDY_VIRTUAL_OPERATION_FOLLOW_STORAGE_KEY, enabled ? "1" : "0");
+  } catch {
+    // The follow preference is optional; losing it should not block a Buddy run.
+  }
+}
+
 async function loadBuddyModelOptions() {
   buddyModelLoadError.value = "";
   try {
@@ -4754,6 +5031,126 @@ function syncStreamingBuddyRunDisplay(
   return { publicOutputMessages, outputTraceMessages };
 }
 
+function syncBackgroundTemplateRunDisplay(
+  operationPlan: BuddyVirtualOperationPlan,
+  runDetail: RunDetail,
+  graph: GraphPayload,
+) {
+  const publicOutputBindings = buildBuddyPublicOutputBindings(graph);
+  const outputTracePlan = buildBuddyOutputTracePlan(graph, publicOutputBindings);
+  const outputTraceState = buildBuddyOutputTraceStateFromRunDetail(runDetail, outputTracePlan, graph);
+  const outputState = buildPublicOutputRuntimeStateFromRunDetail(runDetail, publicOutputBindings, graph);
+  syncBuddyRunDisplayMessages(
+    buildBackgroundTemplateRunDisplayControllerId(operationPlan, runDetail.run_id),
+    runDetail.run_id,
+    outputTraceState,
+    outputState,
+  );
+  void scrollMessagesToBottom();
+}
+
+function promoteBackgroundTemplateRunResultToBuddyReply(
+  operationPlan: BuddyVirtualOperationPlan,
+  runDetail: RunDetail,
+  graph: GraphPayload,
+) {
+  if (runDetail.status !== "completed") {
+    return;
+  }
+  const parentRunId = String(operationPlan.runId ?? "").trim();
+  const assistantMessageId = resolveBuddyRunControllerMessageId(parentRunId);
+  if (!parentRunId || !assistantMessageId) {
+    return;
+  }
+  const outputBindings = buildBuddyPublicOutputBindings(graph);
+  const outputState = buildPublicOutputRuntimeStateFromRunDetail(runDetail, outputBindings, graph);
+  const primaryOutput = findPrimaryCompletedTextPublicOutput(outputState);
+  if (!primaryOutput) {
+    return;
+  }
+
+  removeBuddyRunDisplayMessages(buildBackgroundTemplateRunDisplayControllerId(operationPlan, runDetail.run_id));
+  clearAutoResumingPageOperationPlaceholder(assistantMessageId, parentRunId);
+  const promotedOutput = buildPromotedCapabilityPassthroughOutput(primaryOutput);
+  const promotedOutputState = createBuddyPublicOutputRuntimeState();
+  promotedOutputState.order.push(promotedOutput.outputNodeId);
+  promotedOutputState.messagesByOutputNodeId[promotedOutput.outputNodeId] = promotedOutput;
+  const { publicOutputMessages } = syncBuddyRunDisplayMessages(
+    assistantMessageId,
+    parentRunId,
+    createEmptyBuddyOutputTraceRuntimeState(),
+    promotedOutputState,
+  );
+  if (publicOutputMessages.length === 0) {
+    return;
+  }
+  const controllerMessage = messages.value.find((message) => message.id === assistantMessageId);
+  if (controllerMessage) {
+    controllerMessage.activityText = "";
+    controllerMessage.runId = parentRunId;
+    controllerMessage.includeInContext = false;
+  }
+  mood.value = "speaking";
+  void scrollMessagesToBottom();
+}
+
+function findPrimaryCompletedTextPublicOutput(
+  outputState: BuddyPublicOutputRuntimeState,
+): BuddyPublicOutputMessage | null {
+  for (const outputNodeId of outputState.order) {
+    const output = outputState.messagesByOutputNodeId[outputNodeId];
+    if (output?.kind === "text" && output.status === "completed" && stringifyPublicOutputContent(output.content).trim()) {
+      return output;
+    }
+  }
+  return null;
+}
+
+function buildPromotedCapabilityPassthroughOutput(output: BuddyPublicOutputMessage): BuddyPublicOutputMessage {
+  return {
+    ...output,
+    outputNodeId: BUDDY_CAPABILITY_PASSTHROUGH_OUTPUT_NODE_ID,
+    outputNodeName: "能力结果",
+    stateKey: BUDDY_CAPABILITY_PASSTHROUGH_STATE_KEY,
+    stateName: "final_reply",
+    stateType: "markdown",
+    displayMode: "markdown",
+    kind: "text",
+  };
+}
+
+function buildBackgroundTemplateRunDisplayControllerId(operationPlan: BuddyVirtualOperationPlan, runId: string) {
+  const parentControllerMessageId = resolveBuddyRunControllerMessageId(operationPlan.runId ?? "");
+  const operationRequestId = String(operationPlan.operationRequestId ?? "").trim();
+  const suffix = operationRequestId || runId;
+  return parentControllerMessageId ? `${parentControllerMessageId}:target:${suffix}` : `buddy-target-run:${suffix}`;
+}
+
+function createEmptyBuddyOutputTraceRuntimeState(): BuddyOutputTraceRuntimeState {
+  return {
+    order: [],
+    segmentsById: {},
+    activeSegmentId: null,
+    nextSegmentIndex: 0,
+  };
+}
+
+function resolveBuddyRunControllerMessageId(runId: string) {
+  const normalizedRunId = runId.trim();
+  if (!normalizedRunId) {
+    return "";
+  }
+  return (
+    messages.value.find(
+      (message) =>
+        message.role === "assistant" &&
+        message.runId === normalizedRunId &&
+        !message.outputTrace &&
+        !message.publicOutput,
+    )?.id ?? ""
+  );
+}
+
 function syncBuddyRunDisplayMessages(
   controllerMessageId: string,
   runId: string,
@@ -4850,7 +5247,22 @@ function buildPublicOutputMessageId(controllerMessageId: string, outputNodeId: s
 
 function resolveBuddyRunDisplayInsertionIndex(controllerMessageId: string) {
   const controllerIndex = messages.value.findIndex((message) => message.id === controllerMessageId);
-  return controllerIndex >= 0 ? controllerIndex + 1 : messages.value.length;
+  if (controllerIndex >= 0) {
+    return controllerIndex + 1;
+  }
+  const targetMarkerIndex = controllerMessageId.indexOf(":target:");
+  if (targetMarkerIndex > 0) {
+    const parentControllerMessageId = controllerMessageId.slice(0, targetMarkerIndex);
+    const parentIndex = messages.value.findIndex((message) => message.id === parentControllerMessageId);
+    if (parentIndex >= 0) {
+      let insertionIndex = parentIndex + 1;
+      while (messages.value[insertionIndex]?.id.startsWith(`${parentControllerMessageId}:`)) {
+        insertionIndex += 1;
+      }
+      return insertionIndex;
+    }
+  }
+  return messages.value.length;
 }
 
 function toBuddyPublicOutputMetadata(output: BuddyPublicOutputMessage): BuddyPublicOutputMetadata {
@@ -4950,6 +5362,19 @@ function toggleTraceMessage(messageId: string) {
     next.add(messageId);
   }
   expandedTraceMessageIds.value = next;
+}
+
+function openRunPlayback(runId: string | null | undefined) {
+  const normalizedRunId = String(runId ?? "").trim();
+  if (!normalizedRunId) {
+    return;
+  }
+  void router.push(resolveRunRestoreUrl(normalizedRunId));
+}
+
+function toggleVirtualOperationFollow() {
+  virtualOperationFollowEnabled.value = !virtualOperationFollowEnabled.value;
+  persistVirtualOperationFollowEnabled(virtualOperationFollowEnabled.value);
 }
 
 function resolveTraceSegmentSummary(segment: BuddyOutputTraceSegment) {
@@ -5551,6 +5976,26 @@ function formatErrorMessage(error: unknown): string {
   white-space: nowrap;
 }
 
+.buddy-widget__virtual-operation-follow {
+  appearance: none;
+  min-width: 52px;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 247, 237, 0.38);
+  border-radius: 999px;
+  color: #fff7ed;
+  background: rgba(255, 247, 237, 0.1);
+  font-size: 12px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.buddy-widget__virtual-operation-follow:hover,
+.buddy-widget__virtual-operation-follow--active {
+  border-color: rgba(255, 247, 237, 0.74);
+  background: rgba(255, 247, 237, 0.24);
+}
+
 .buddy-widget__virtual-operation-stop {
   appearance: none;
   position: relative;
@@ -5842,12 +6287,13 @@ function formatErrorMessage(error: unknown): string {
 .buddy-widget__runtime-controls {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(116px, 136px);
+  grid-template-columns: minmax(0, 1fr) minmax(116px, 136px) minmax(64px, 76px);
   gap: 8px;
 }
 
 .buddy-widget__model,
-.buddy-widget__mode {
+.buddy-widget__mode,
+.buddy-widget__follow-control {
   display: grid;
   gap: 4px;
   min-width: 0;
@@ -5878,6 +6324,26 @@ function formatErrorMessage(error: unknown): string {
   box-shadow:
     0 0 0 1px rgba(154, 52, 18, 0.22) inset,
     0 0 0 3px rgba(210, 162, 117, 0.22);
+}
+
+.buddy-widget__follow-toggle {
+  appearance: none;
+  min-height: 30px;
+  border: 1px solid rgba(154, 52, 18, 0.14);
+  border-radius: 8px;
+  color: rgba(120, 53, 15, 0.78);
+  background: rgba(255, 255, 255, 0.66);
+  font-size: 12px;
+  font-weight: 850;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.62);
+}
+
+.buddy-widget__follow-toggle:hover,
+.buddy-widget__follow-toggle--active {
+  border-color: rgba(154, 52, 18, 0.28);
+  color: rgba(154, 52, 18, 0.96);
+  background: rgba(255, 248, 240, 0.96);
 }
 
 :global(.buddy-widget__select-popper.el-popper) {
@@ -6258,6 +6724,13 @@ function formatErrorMessage(error: unknown): string {
   gap: 7px;
 }
 
+.buddy-widget__run-trace-summary-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+}
+
 .buddy-widget__run-trace-summary {
   min-height: 34px;
   display: grid;
@@ -6278,6 +6751,25 @@ function formatErrorMessage(error: unknown): string {
 .buddy-widget__run-trace-summary:hover {
   border-color: rgba(16, 185, 129, 0.34);
   background: rgba(244, 255, 248, 0.98);
+}
+
+.buddy-widget__run-trace-open {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(154, 52, 18, 0.16);
+  border-radius: 999px;
+  color: rgba(154, 52, 18, 0.82);
+  background: rgba(255, 248, 240, 0.9);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.buddy-widget__run-trace-open:hover {
+  border-color: rgba(154, 52, 18, 0.3);
+  background: rgba(255, 247, 237, 0.98);
 }
 
 .buddy-widget__run-trace-title {

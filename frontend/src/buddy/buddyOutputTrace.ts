@@ -239,7 +239,7 @@ export function buildBuddyOutputTraceStateFromRunDetail(
   for (const item of timeline) {
     state = reduceBuddyOutputTraceEvent(state, plan, graph, item.eventType, item.payload, item.timeMs);
   }
-  return state;
+  return pruneInactiveTerminalOutputSegments(state, run);
 }
 
 export function listBuddyOutputTraceSegmentsForDisplay(state: BuddyOutputTraceRuntimeState): BuddyOutputTraceSegment[] {
@@ -285,6 +285,60 @@ function applyActivityEvent(
     subgraphNodeId: subgraphNodeId || null,
     summary: normalizeText(payload.summary),
   });
+}
+
+function pruneInactiveTerminalOutputSegments(
+  state: BuddyOutputTraceRuntimeState,
+  run: RunDetail,
+): BuddyOutputTraceRuntimeState {
+  if (!isTerminalTraceRunStatus(run.status)) {
+    return state;
+  }
+  const producedOutputNodeIds = new Set(listRunDetailOutputPreviewNodeIds(run));
+  if (producedOutputNodeIds.size === 0) {
+    return state;
+  }
+
+  let changed = false;
+  const segmentsById = { ...state.segmentsById };
+  for (const segmentId of state.order) {
+    const segment = state.segmentsById[segmentId];
+    if (!segment) {
+      continue;
+    }
+    const producedBySegment = segment.outputNodeIds.some((outputNodeId) => producedOutputNodeIds.has(outputNodeId));
+    if (producedBySegment) {
+      continue;
+    }
+    changed = true;
+    segmentsById[segmentId] = {
+      ...segment,
+      status: "idle",
+      startedAtMs: null,
+      completedAtMs: null,
+      durationMs: null,
+      records: [],
+    };
+  }
+  if (!changed) {
+    return state;
+  }
+  const activeSegment = state.activeSegmentId ? segmentsById[state.activeSegmentId] : null;
+  return {
+    ...state,
+    activeSegmentId: activeSegment?.status === "idle" ? null : state.activeSegmentId,
+    segmentsById,
+  };
+}
+
+function listRunDetailOutputPreviewNodeIds(run: RunDetail) {
+  return [...(run.output_previews ?? []), ...(run.artifacts?.output_previews ?? [])]
+    .map((preview) => normalizeText(preview.node_id))
+    .filter(Boolean);
+}
+
+function isTerminalTraceRunStatus(status: string | null | undefined) {
+  return status === "completed" || status === "failed" || status === "cancelled";
 }
 
 function upsertRecordInSegment(
