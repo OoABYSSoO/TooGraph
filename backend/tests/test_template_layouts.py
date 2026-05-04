@@ -398,7 +398,7 @@ class TemplateLayoutTests(unittest.TestCase):
             for state_key, definition in template.state_schema.items()
         }
 
-        self.assertEqual(template.default_graph_name, "游戏广告创意工厂")
+        self.assertEqual(template.default_graph_name, "广告创意分析demo模板")
         self.assertEqual(template.state_schema[state_by_name["genre"]].value, "SLG")
         self.assertIn("collect_game_market_signals", template.nodes)
         self.assertIn("analyze_video_patterns", template.nodes)

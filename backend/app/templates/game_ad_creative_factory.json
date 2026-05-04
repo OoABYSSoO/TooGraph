@@ -1,8 +1,8 @@
 {
   "template_id": "game_ad_creative_factory",
-  "label": "游戏广告创意工厂",
-  "description": "Collect game-market signals and public ad media for a generic game genre, analyze local videos, then produce a creative brief, scripts, storyboard package, video prompts, and review results.",
-  "default_graph_name": "游戏广告创意工厂",
+  "label": "广告创意分析demo模板",
+  "description": "Download and preview public ad videos for a generic game genre, analyze local video artifacts, then produce a creative brief, scripts, storyboard package, video prompts, and review results.",
+  "default_graph_name": "广告创意分析demo模板",
   "state_schema": {
     "state_1": {
       "name": "genre",

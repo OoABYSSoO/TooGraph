@@ -47,7 +47,7 @@
 - agent 节点支持模型选择、thinking 开关、skills、输入引用、输出引用、temperature 和保存 preset。
 - condition 节点作为条件边的可视化代理，默认包含 true / false / exhausted 分支，并限制循环上限为 1-10，默认 5。
 - output 节点支持预览、展示模式和持久化开关。
-- output 节点支持读取 `local_path` 本地 skill artifact，按文档列表翻页展示正文，并保留原始网页链接。
+- output 节点支持读取 `local_path` 本地 skill artifact，并按 artifact 类型展示文档、图片和视频。
 - run feedback 会同时反映在工作区反馈条、画布节点状态、active path 线条、Run Activity 面板和 output latest run preview。
 - 运行事件通过 SSE/EventSource 单向推送到前端；Output 节点会根据流式 payload 的 state key 只更新自己读取的 state。
 - 运行记录中的 `node_executions` 只记录真实执行的 agent；input / output / condition 只作为边界状态、输出 artifact 和条件 route 参与反馈。
@@ -65,9 +65,12 @@
 - knowledge base 可以通过 input 节点进入图。
 - agent 读取 knowledge base state 不再隐式挂载内置知识库 skill；检索能力需要以 `skill/<skill_key>` 文件夹加 `skill.json` manifest 的形式显式安装和绑定。
 - skills catalog/definitions 与 knowledge base catalog 都有真实接口。
-- 当前默认 skill 只保留 `web_search`，运行逻辑、manifest、说明文档和脚本都位于 `skill/web_search` 文件夹内，由 manifest 驱动的通用脚本运行器执行。
+- 当前内置 skill 包括 `web_search`、`web_media_downloader` 和 `game_ad_research_collector`，运行逻辑、manifest、说明文档和脚本都位于各自的 `skill/<skill_key>` 文件夹内，由 manifest 驱动的通用脚本运行器执行。
 - `web_search` 支持 Tavily 优先、DuckDuckGo HTML fallback、日期上下文注入、搜索结果引用、网页正文抓取和 source document 本地 artifact 输出。
+- `web_media_downloader` 支持下载公开或用户授权的网页媒体，并返回可由 Output 节点展示的本地 artifact 路径。
+- `game_ad_research_collector` 支持采集游戏市场 RSS、生成广告库搜索记录、发现/下载公开视频广告素材，并把视频和来源文档作为本地 artifact 返回。
 - 内置 `web_research_loop` 模板已经对齐 `web_search` 的三类关键产物：最终答案、证据链接、本地 source documents。
+- 内置 `广告创意分析demo模板` 已作为当前广告创意分析基线模板，跑通“采集资料 -> 下载视频 -> 分析视频 -> 生成广告创意包 -> Output 展示本地视频/文档”的完整链路。
 - GraphiteUI / Python / LangGraph 三套正式知识库都能导入并检索。
 
 ## 当前技术栈
@@ -86,7 +89,7 @@
 
 - Memory 正式写入、召回和展示
 - 人类在环的更完整审计闭环和多断点恢复体验
-- LangGraph Python 导出入口、源码预览和下载 UI
+- LangGraph Python 源码预览、下载和导入校验体验完善
 - cycles 更高级的终止策略和可视化
 - 更强的 knowledge base 管理能力
 - Agent / Companion Skill 的更完整权限、健康检查、测试和图内配置体验
