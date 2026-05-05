@@ -1,5 +1,7 @@
 import type {
   CompanionCommandResponse,
+  CompanionGraphPatchDraft,
+  CompanionGraphPatchDraftPayload,
   CompanionMemory,
   CompanionPolicy,
   CompanionProfile,
@@ -91,4 +93,8 @@ export function restoreCompanionRevision(revisionId: string) {
     "User restored a companion revision from the Companion page.",
     revisionId,
   );
+}
+
+export function createCompanionGraphPatchDraft(payload: CompanionGraphPatchDraftPayload, changeReason: string) {
+  return executeCompanionCommand<CompanionGraphPatchDraft>("graph_patch.draft", payload, changeReason);
 }
