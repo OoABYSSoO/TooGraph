@@ -16,9 +16,9 @@
   - 自动编排图作为补充设想，服从新的权限边界
 
 - [future/2026-05-05-companion-self-config-memory-design.md](future/2026-05-05-companion-self-config-memory-design.md)
-  - 侧边栏 Companion 页面与后端自我设定数据层
-  - 自动记忆整理，不询问、不提供关闭开关
-  - 每次更新备份旧设定，支持历史版本和恢复
+  - 侧边栏 Companion 页面、图模板驱动的自我设定/记忆更新、后端存储原语
+  - 自动记忆整理由指定图/模板触发，不询问、不提供关闭开关
+  - 每次更新备份旧设定，返回 revision 和可展示结果
 
 - [future/2026-04-27-skill-product-taxonomy.md](future/2026-04-27-skill-product-taxonomy.md)
   - Agent Skill 与 Companion Skill 的产品边界
@@ -41,3 +41,6 @@
 - 当前状态写在 `docs/current_project_status.md`。
 - 长期设想保留在 `docs/future/`，并在 README 中保留摘要。
 - 如果某份文档只是某个阶段的临时计划，阶段结束后应删除或折叠进当前状态文档。
+- 如果旧文档和 `AGENTS.md` 中的图优先、Skill 自包含、显式权限、artifact 输出、审计和记忆卫生准则冲突，以 `AGENTS.md` 为准，并尽快修正文档。
+- 文档不能把已经拒绝的实现路线写成当前方案；仍有参考价值的旧内容应标为补充、约束或历史背景。
+- 新增长期文档时，应明确它服务于当前正式能力、长期设想还是被更高优先级文档约束的补充方案。

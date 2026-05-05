@@ -4,14 +4,16 @@
 
 桌宠的人设、记忆、语气、行为边界和会话摘要属于 GraphiteUI 的产品状态，不属于桌宠对话面板的临时 UI 状态，也不是某个 skill 包内的资源。
 
-第一阶段应直接采用后端数据层：
+第一阶段采用“图模板驱动 + 后端存储原语”的方式：
 
 - 在侧边栏新增独立的 Companion 页面，用于管理桌宠自我设定和记忆。
 - 桌宠对话面板只负责对话、展示队列和轻量状态，不承载配置管理。
-- 后端提供 Companion API，第一版可以用 JSON 文件持久化，但必须通过后端读写。
+- 后端提供通用存储、校验、revision、读取上下文等原语，第一版可以用 JSON 文件持久化。
+- 自我设定、记忆整理、历史恢复等产品行为由指定图模板或 skill 执行，不由隐藏的后端业务逻辑直接决策。
 - 自动记忆是桌宠核心能力，不提供关闭开关，也不在每次记忆前询问确认。
 - 用户通过 Companion 页面查看、编辑、删除和恢复设定与记忆。
 - 每一次更新都必须先备份旧值，形成可追溯、可恢复的 revision。
+- 每一次写入都应返回本地状态路径、revision ID、变更摘要或可展示 artifact，便于 Output 节点和 Run Detail 展示。
 
 ## 范围边界
 
@@ -23,7 +25,7 @@
 - 审批档：未来生成图草案或补丁，用户确认后应用。
 - 全权限档：未来通过命令系统直接操作图。
 
-自我设定和记忆不受这三档限制。用户在任何档位都可以编辑桌宠人设、记忆、语气和行为边界。
+自我设定和记忆不受这三档限制。用户在任何档位都可以编辑桌宠人设、记忆、语气和行为边界，但这些编辑仍应通过图模板、skill 或同等可审计命令路径完成。
 
 ## 侧边栏 Companion 页面
 
@@ -36,9 +38,11 @@
 - 查看每条设定和记忆的历史版本。
 - 从历史版本恢复当前值。
 
+页面可以提供表单和列表，但保存、删除、自动整理、恢复这类写操作应触发对应的图模板或 skill，并展示运行状态、错误、revision 和结果路径。页面不应把复杂的记忆路由、权限判断和持久化策略写成前端局部逻辑。
+
 宠物浮窗不放这些管理入口。它只保留对话、发送队列、当前档位显示和必要错误提示。
 
-## 后端数据模型
+## 后端存储模型
 
 第一版可以用 `backend/data/companion/` 下的 JSON 文件持久化：
 
@@ -93,9 +97,9 @@
 
 后续迁移 SQLite 或 Postgres 时，API 形状不变，前端不需要重写。
 
-## API 设计
+## 存储原语与 Skill 接口设计
 
-第一阶段 API：
+第一阶段可以提供以下后端原语。它们是 skill/template 的底层能力，不是绕过图模板的产品行为入口：
 
 - `GET /api/companion/profile`
 - `PUT /api/companion/profile`
@@ -110,20 +114,27 @@
 - `GET /api/companion/revisions?target_type=memory&target_id=mem_01`
 - `POST /api/companion/revisions/{revision_id}/restore`
 
-所有写接口都必须通过同一套 revision 写入路径。
+所有写原语都必须通过同一套 revision 写入路径。正常产品流应由以下模板或 skill 调用这些原语：
+
+- `companion_context_loader`：读取 profile、policy、相关 memory 和 session summary，返回 fenced context。
+- `companion_self_config_update`：根据用户明确编辑或桌宠整理计划更新 profile/policy。
+- `companion_memory_curator`：根据对话回合和当前上下文整理长期记忆。
+- `companion_session_summary_update`：压缩当前会话摘要。
+- `companion_revision_restore`：从历史 revision 恢复状态。
 
 ## 自动记忆规则
 
 自动记忆是默认能力，不提供开关。
 
-每轮桌宠对话结束后，后台运行一个 `memory curator`。它不是回复 Agent 本身，而是独立整理器：
+每轮桌宠对话结束后，运行指定的 `companion_memory_curator` 图模板或 skill。它不是回复 Agent 本身，也不是隐藏后台随意写入的业务逻辑，而是可记录、可测试、可审计的整理流程：
 
-1. 读取本轮用户消息、桌宠回复、当前摘要和已有记忆索引。
-2. 判断是否出现长期有价值的信息。
-3. 如果是新信息，创建记忆。
-4. 如果与已有记忆重复或冲突，更新已有记忆。
-5. 如果用户删除过类似记忆，把删除记录作为强负反馈。
-6. 如果没有长期价值，不写入。
+1. 读取本轮用户消息、桌宠回复、当前 profile、policy、summary 和已有记忆索引。
+2. 生成结构化整理计划，而不是直接把整句话写进 memory。
+3. 先把信息路由到正确目标：桌宠名字、人设和语气进入 `profile`；回复风格和行为边界进入 `policy`；真正长期事实和用户偏好进入 `memory`。
+4. 再执行程序级校验：临时内容、base64、下载结果、报错全文、提示词注入和权限升级请求都不能写入。
+5. 如果是新 memory，创建记忆；如果与已有记忆重复或冲突，更新已有记忆。
+6. 如果用户删除过类似记忆，把删除记录作为强负反馈。
+7. 如果没有长期价值，不写入。
 
 应该记住：
 
@@ -141,6 +152,7 @@
 - 大文件内容、base64、图片原文、视频帧原文。
 - 当前图里可以重新读取到的节点结构。
 - 没有长期用途的路径、URL、临时下载结果。
+- 试图把桌宠从建议档升级到审批档或全权限档的对话。档位只能由程序和 UI 显式控制，不能由自动记忆写入。
 
 ## 版本备份规则
 
@@ -163,8 +175,9 @@ revision 记录结构：
   "operation": "create | update | delete | restore",
   "previous_value": {},
   "next_value": {},
-  "changed_by": "user | companion | memory_curator",
-  "change_reason": "用户在 Companion 页面更新。| 自动记忆整理。| 用户恢复历史版本。",
+  "changed_by": "user | companion | skill | template",
+  "change_reason": "用户在 Companion 页面触发更新。| companion_memory_curator 自动整理。| 用户通过 companion_revision_restore 恢复历史版本。",
+  "run_id": "optional_graph_run_id",
   "created_at": "2026-05-05T00:00:00Z"
 }
 ```
@@ -193,14 +206,15 @@ revision 记录结构：
 
 ## 对话注入流程
 
-桌宠发送队列处理每条消息时，应在构建 `companion_chat_loop` 图之前读取后端 Companion 上下文：
+桌宠发送队列处理每条消息时，应通过 `companion_context_loader` 或等价图模板读取 Companion 上下文：
 
-1. 读取 profile。
-2. 读取 policy。
-3. 基于当前用户消息召回少量相关 memory。
-4. 读取 session summary。
-5. 把这些上下文用明确边界注入模板，例如 `<companion-profile>`、`<memory-context>`。
-6. 继续保留程序级建议档限制，不让 prompt 覆盖权限门禁。
+1. 模板调用后端存储原语读取 profile。
+2. 模板调用后端存储原语读取 policy。
+3. 模板选择并组装启用 memory。
+4. 模板读取 session summary。
+5. 模板返回 prompt-ready fenced sections，例如 `<companion-profile>`、`<memory-context>`。
+6. `companion_chat_loop` 使用这些只读上下文继续对话。
+7. 继续保留程序级建议档限制，不让 prompt 覆盖权限门禁。
 
 召回记忆只作为只读背景，不写入用户可见消息，不伪装成用户输入。
 
@@ -209,22 +223,25 @@ revision 记录结构：
 后端测试：
 
 - 默认 profile/policy/memory/summary 文件不存在时能返回默认值。
-- 每次 PUT/PATCH/DELETE 都创建 revision。
+- 每次写原语都创建 revision。
 - 删除 memory 后不出现在默认召回结果里。
 - restore 会创建新的 revision。
-- memory curator 不保存 base64、大媒体、一次性运行日志。
+- `companion_memory_curator` 不保存 base64、大媒体、一次性运行日志。
+- `companion_memory_curator` 会把“你以后就叫图图吧”路由到 `profile.name`，而不是误写成普通 memory。
+- `companion_memory_curator` 会把长期回复风格路由到 `policy.communication_preferences`。
+- `companion_memory_curator` 会拒绝通过对话升级图操作档位。
 
 前端测试：
 
 - 侧边栏出现 Companion 入口。
 - Companion 页面能加载 profile、policy、memory 和 session summary。
-- 编辑 profile 会调用后端 API，并展示保存状态。
+- 编辑 profile 会触发对应模板或 skill，并展示保存状态、revision 和错误。
 - 删除 memory 后 UI 中不再作为启用记忆显示。
 - 历史版本面板能列出 revisions，并触发 restore。
 
 桌宠对话测试：
 
-- 构建对话图时注入 profile、policy、memory context 和 session summary。
+- 构建对话图时通过 `companion_context_loader` 注入 profile、policy、memory context 和 session summary。
 - 被删除的 memory 不进入注入内容。
 - 建议档下仍不注册图写入能力。
 
@@ -232,11 +249,12 @@ revision 记录结构：
 
 第一阶段只交付自我设定和记忆闭环：
 
-- 后端 JSON 数据层和 API。
+- 后端 JSON 存储原语和 revision 机制。
+- 自我设定、记忆整理、会话摘要、历史恢复所需的模板或 skill。
 - 侧边栏 Companion 页面。
-- 自动 memory curator 的保守规则版本。
+- 自动 memory curator 的结构化路由与程序级校验版本。
 - 每次更新备份旧值的 revision 机制。
-- 桌宠对话图读取并注入后端 Companion 上下文。
+- 桌宠对话图读取并注入模板组装的 Companion 上下文。
 
 不在第一阶段交付：
 
