@@ -48,6 +48,23 @@ These instructions apply to all work in this repository and should persist acros
 - Prefer automatic, discoverable behavior over hidden manual steps when it improves the user's workflow, but make side effects visible and reversible.
 - Before finishing, run the smallest meaningful verification set for the changed surface; for UI work, include a visual check when practical. Clearly report any skipped or failing verification.
 
+## Graph-First Product Architecture
+
+- GraphiteUI product behavior should be framed by graph templates whenever practical. Persistent operations, local file edits, memory updates, companion self-configuration, and other side effects should happen because a designated graph/template ran, not because hidden product-specific imperative code made the decision.
+- Keep node responsibilities clear:
+  - Agent nodes reason, plan, classify intent, and produce structured outputs.
+  - Skill nodes execute controlled capabilities and side effects, such as writing local files, updating memory stores, downloading resources, or creating revisions.
+  - Output nodes display, preview, export, or link results. They should not own persistent mutation logic.
+- Backend code should provide reusable primitives, storage APIs, validators, revision mechanisms, and skill runtimes. Avoid burying product behavior such as companion memory policy, persona update rules, or workflow decisions directly in backend endpoints when the behavior can be expressed as a graph/template.
+- Companion behavior, memory management, persona updates, and file-edit workflows should be modeled as auditable graph flows: input/context -> agent planning -> optional validation/approval -> skill execution -> output display.
+- Low-level operations should remain visible and replayable through graph runs. When a feature needs to modify local documents, profile data, policy data, memories, templates, or other local state, prefer adding or reusing a skill plus a template that performs the operation and returns clear artifacts such as local file paths, diffs, revision IDs, and status messages.
+
+## Skill Package Boundaries
+
+- A skill package should contain all resources needed by that skill: code, prompts, schemas, helper scripts, assets, examples, and local instructions.
+- Do not require unrelated backend modifications, global side files, or external assets for a skill to work unless the user explicitly approves that dependency.
+- If a skill needs persistent outputs, return local file paths or structured artifact references so downstream graph nodes and output nodes can display them.
+
 ## Notes
 
 - `scripts/start.mjs` and `scripts/start.sh` should both release occupied frontend/backend ports before starting services again.
