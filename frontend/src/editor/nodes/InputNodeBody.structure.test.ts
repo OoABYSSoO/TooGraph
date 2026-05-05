@@ -24,9 +24,10 @@ test("InputNodeBody owns input presentation and forwards parent side effects", (
   assert.doesNotMatch(componentSource, /class="node-card__asset-native-input"[\s\S]{0,260}@click\.stop/);
   assert.match(componentSource, /function handleAssetUploadSurfaceClick\(event: MouseEvent\) \{[\s\S]*if \(event\.target instanceof HTMLInputElement\) \{[\s\S]*return;[\s\S]*\}[\s\S]*openInputAssetPicker\(\);[\s\S]*\}/);
   assert.match(componentSource, /function openInputAssetPicker\(\) \{[\s\S]*const input = inputAssetInputRef\.value;[\s\S]*showPicker\(\);[\s\S]*return;[\s\S]*input\.click\(\);[\s\S]*\}/);
-  assert.match(componentSource, /v-if="inputAssetEnvelope\.detectedType === 'image' && inputAssetEnvelope\.encoding === 'data_url'"/);
-  assert.match(componentSource, /v-else-if="inputAssetEnvelope\.detectedType === 'audio' && inputAssetEnvelope\.encoding === 'data_url'"/);
-  assert.match(componentSource, /v-else-if="inputAssetEnvelope\.detectedType === 'video' && inputAssetEnvelope\.encoding === 'data_url'"/);
+  assert.match(componentSource, /inputAssetPreviewUrl: string;/);
+  assert.match(componentSource, /v-if="inputAssetEnvelope\.detectedType === 'image' && inputAssetPreviewUrl"/);
+  assert.match(componentSource, /v-else-if="inputAssetEnvelope\.detectedType === 'audio' && inputAssetPreviewUrl"/);
+  assert.match(componentSource, /v-else-if="inputAssetEnvelope\.detectedType === 'video' && inputAssetPreviewUrl"/);
   assert.match(componentSource, /@click\.stop="emit\('clear-asset'\)"/);
   assert.match(componentSource, /v-else-if="isInputValueEditable"[\s\S]*class="node-card__surface node-card__surface-textarea"[\s\S]*:value="inputValueText"[\s\S]*@input="emit\('input-value', \$event\)"/);
   assert.match(componentSource, /<div v-else class="node-card__surface node-card__surface--tall">\{\{ body\.valueText \|\| t\("nodeCard\.emptyInput"\) \}\}<\/div>/);

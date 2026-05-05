@@ -433,7 +433,22 @@ class TemplateLayoutTests(unittest.TestCase):
                 "companion_policy",
                 "companion_memory_context",
                 "companion_session_summary",
+                "companion_memory_update_result",
             ],
+        )
+        loader = template.nodes["load_companion_context"]
+        self.assertEqual(loader.kind, "agent")
+        self.assertEqual(loader.config.skills, ["companion_state"])
+        self.assertEqual(loader.config.skill_bindings[0].skill_key, "companion_state")
+        self.assertEqual(loader.config.skill_bindings[0].config.get("operation"), "load_context")
+        self.assertEqual(
+            loader.config.skill_bindings[0].output_mapping,
+            {
+                "profile": state_by_name["companion_profile"],
+                "policy": state_by_name["companion_policy"],
+                "memory_context": state_by_name["companion_memory_context"],
+                "session_summary": state_by_name["companion_session_summary"],
+            },
         )
         agent = template.nodes["companion_reply_agent"]
         self.assertEqual(agent.kind, "agent")
@@ -457,6 +472,17 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertIn("图操作请求", agent.config.task_instruction)
         self.assertIn("不能新建图", agent.config.task_instruction)
         self.assertIn("不能运行图", agent.config.task_instruction)
+
+        curator = template.nodes["curate_companion_memory"]
+        self.assertEqual(curator.kind, "agent")
+        self.assertEqual(curator.config.skills, ["companion_state"])
+        self.assertEqual(curator.config.skill_bindings[0].skill_key, "companion_state")
+        self.assertEqual(curator.config.skill_bindings[0].config.get("operation"), "curate_turn")
+        self.assertEqual(
+            curator.config.skill_bindings[0].output_mapping,
+            {"memory_update_result": state_by_name["companion_memory_update_result"]},
+        )
+        self.assertEqual([binding.state for binding in curator.writes], [state_by_name["companion_memory_update_result"]])
 
         output_node = template.nodes["output_companion_reply"]
         self.assertEqual(output_node.reads[0].state, state_by_name["companion_reply"])

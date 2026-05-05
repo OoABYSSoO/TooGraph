@@ -6,8 +6,17 @@ export type UploadedAssetEnvelope = {
   mimeType: string;
   size: number;
   detectedType: UploadedAssetType;
-  content: string;
-  encoding: "text" | "data_url";
+  localPath: string;
+  contentType: string;
+  textPreview?: string;
+  encoding: "local_path";
+};
+
+export type UploadedAssetUploadResult = {
+  local_path: string;
+  filename: string;
+  content_type: string;
+  size: number;
 };
 
 const IMAGE_ACCEPT = "image/*,.png,.jpg,.jpeg,.gif,.webp,.bmp,.svg,.heic,.heif";
@@ -82,6 +91,7 @@ export function tryParseUploadedAssetEnvelope(value: unknown): UploadedAssetEnve
   const candidate = parsed as Partial<UploadedAssetEnvelope>;
   const detectedType = String(candidate.detectedType ?? "");
   const encoding = candidate.encoding;
+  const localPath = String(candidate.localPath ?? "");
   if (
     candidate.kind !== "uploaded_file" ||
     typeof candidate.name !== "string" ||
@@ -89,8 +99,9 @@ export function tryParseUploadedAssetEnvelope(value: unknown): UploadedAssetEnve
     typeof candidate.size !== "number" ||
     !Number.isFinite(candidate.size) ||
     !isUploadedAssetStateType(detectedType) ||
-    typeof candidate.content !== "string" ||
-    (encoding !== "text" && encoding !== "data_url")
+    typeof localPath !== "string" ||
+    !localPath.trim() ||
+    encoding !== "local_path"
   ) {
     return null;
   }
@@ -101,23 +112,31 @@ export function tryParseUploadedAssetEnvelope(value: unknown): UploadedAssetEnve
     mimeType: candidate.mimeType,
     size: candidate.size,
     detectedType,
-    content: candidate.content,
+    localPath: localPath.trim(),
+    contentType: String(candidate.contentType ?? candidate.mimeType ?? "application/octet-stream"),
+    textPreview: typeof candidate.textPreview === "string" ? candidate.textPreview : undefined,
     encoding,
   };
 }
 
-export async function createUploadedAssetEnvelope(file: File): Promise<UploadedAssetEnvelope> {
+export async function createUploadedAssetEnvelope(
+  file: File,
+  uploadFile: (file: File) => Promise<UploadedAssetUploadResult>,
+): Promise<UploadedAssetEnvelope> {
   const detectedType = detectUploadedAssetTypeFromFileName(file.name, file.type);
-  const encoding = detectedType === "file" && isTextLikeUploadedFile(file) ? "text" : "data_url";
+  const upload = await uploadFile(file);
+  const textPreview = detectedType === "file" && isTextLikeUploadedFile(file) ? (await file.text()).slice(0, 3000) : undefined;
 
   return {
     kind: "uploaded_file",
-    name: file.name,
-    mimeType: file.type || "application/octet-stream",
-    size: file.size,
+    name: upload.filename || file.name,
+    mimeType: file.type || upload.content_type || "application/octet-stream",
+    size: upload.size || file.size,
     detectedType,
-    content: encoding === "text" ? await file.text() : await fileToDataUrl(file),
-    encoding,
+    localPath: upload.local_path,
+    contentType: upload.content_type || file.type || "application/octet-stream",
+    textPreview,
+    encoding: "local_path",
   };
 }
 
@@ -155,10 +174,10 @@ export function resolveUploadedAssetSummary(asset: UploadedAssetEnvelope | null)
 }
 
 export function resolveUploadedAssetTextPreview(asset: UploadedAssetEnvelope | null) {
-  if (!asset || asset.encoding !== "text") {
+  if (!asset?.textPreview) {
     return "";
   }
-  return asset.content.slice(0, 3000);
+  return asset.textPreview.slice(0, 3000);
 }
 
 export function resolveUploadedAssetDescription(asset: UploadedAssetEnvelope | null, assetType: UploadedAssetType | null) {
@@ -176,20 +195,6 @@ export function resolveUploadedAssetDescription(asset: UploadedAssetEnvelope | n
     default:
       return "Upload a file to seed this workflow.";
   }
-}
-
-async function fileToDataUrl(file: File) {
-  if (typeof FileReader !== "undefined") {
-    return new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.addEventListener("load", () => resolve(String(reader.result || "")));
-      reader.addEventListener("error", () => reject(reader.error || new Error("Failed to read file.")));
-      reader.readAsDataURL(file);
-    });
-  }
-
-  const base64 = bytesToBase64(new Uint8Array(await file.arrayBuffer()));
-  return `data:${file.type || "application/octet-stream"};base64,${base64}`;
 }
 
 function isTextLikeUploadedFile(file: File) {
@@ -212,17 +217,6 @@ function isTextLikeUploadedFile(file: File) {
   return /\.(txt|md|markdown|csv|tsv|json|jsonl|yaml|yml|xml|html|htm|css|js|jsx|ts|tsx|py|java|c|cc|cpp|h|hpp|cs|go|rs|rb|php|sh|bash|zsh|fish|bat|cmd|ps1|sql|log|ini|toml|env|gitignore)$/i.test(
     file.name,
   );
-}
-
-function bytesToBase64(bytes: Uint8Array) {
-  let binary = "";
-  const chunkSize = 0x8000;
-
-  for (let index = 0; index < bytes.length; index += chunkSize) {
-    binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
-  }
-
-  return btoa(binary);
 }
 
 function tryParseJson(value: string) {

@@ -55,7 +55,6 @@ class VideoFrameFallbackTests(unittest.TestCase):
             self.assertLessEqual(len(frames), 2)
             self.assertEqual(frames[0]["type"], "image")
             self.assertEqual(frames[0]["mime_type"], "image/jpeg")
-            self.assertNotIn("data_url", frames[0])
             self.assertTrue(frames[0]["file_url"].startswith("file://"))
             self.assertTrue(Path(frames[0]["filesystem_path"]).is_file())
         self.assertEqual(frames[0]["source"]["type"], "video_frame")

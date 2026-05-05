@@ -28,13 +28,6 @@ class CompanionMemoryPayload(CompanionUpdatePayload):
     content: str = Field(min_length=1)
 
 
-class CompanionCurateTurnPayload(BaseModel):
-    user_message: str = Field(alias="user_message")
-    assistant_reply: str = Field(alias="assistant_reply")
-
-    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
-
-
 @router.get("/profile")
 def get_profile_endpoint() -> dict[str, Any]:
     return store.load_profile()
@@ -63,11 +56,6 @@ def list_memories_endpoint(include_deleted: bool = Query(default=False)) -> list
 @router.post("/memories")
 def create_memory_endpoint(payload: CompanionMemoryPayload) -> dict[str, Any]:
     return store.create_memory(payload.data(), changed_by="user", change_reason=payload.change_reason)
-
-
-@router.post("/memories/curate-turn")
-def curate_memory_turn_endpoint(payload: CompanionCurateTurnPayload) -> dict[str, Any]:
-    return store.curate_memory_from_turn(payload.user_message, payload.assistant_reply, changed_by="memory_curator")
 
 
 @router.patch("/memories/{memory_id}")

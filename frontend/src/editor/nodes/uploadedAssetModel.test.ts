@@ -30,8 +30,10 @@ test("tryParseUploadedAssetEnvelope accepts legacy uploaded file payloads", () =
     mimeType: "text/plain",
     size: 12,
     detectedType: "file",
-    content: "hello world",
-    encoding: "text",
+    localPath: "uploads/notes.txt",
+    contentType: "text/plain",
+    textPreview: "hello world",
+    encoding: "local_path",
   });
 
   assert.deepEqual(tryParseUploadedAssetEnvelope(payload), {
@@ -40,8 +42,10 @@ test("tryParseUploadedAssetEnvelope accepts legacy uploaded file payloads", () =
     mimeType: "text/plain",
     size: 12,
     detectedType: "file",
-    content: "hello world",
-    encoding: "text",
+    localPath: "uploads/notes.txt",
+    contentType: "text/plain",
+    textPreview: "hello world",
+    encoding: "local_path",
   });
   assert.equal(tryParseUploadedAssetEnvelope("{oops"), null);
   assert.equal(tryParseUploadedAssetEnvelope({ kind: "uploaded_file", name: 123 }), null);
@@ -54,8 +58,10 @@ test("uploaded asset presentation helpers preserve NodeCard display text", () =>
     mimeType: "text/plain",
     size: 1536,
     detectedType: "file",
-    content: "a".repeat(3500),
-    encoding: "text",
+    localPath: "uploads/notes.txt",
+    contentType: "text/plain",
+    textPreview: "a".repeat(3500),
+    encoding: "local_path",
   };
 
   assert.equal(resolveUploadedAssetLabel("image"), "image");
@@ -97,10 +103,15 @@ test("uploaded asset description helper returns empty-state copy by target type"
   assert.equal(resolveUploadedAssetDescription(null, null), "Upload a file to seed this workflow.");
 });
 
-test("createUploadedAssetEnvelope keeps text-like files as inline text", async () => {
+test("createUploadedAssetEnvelope stores text-like files as local upload records with preview text", async () => {
   const file = new File(["hello GraphiteUI"], "notes.txt", { type: "text/plain" });
 
-  const envelope = await createUploadedAssetEnvelope(file);
+  const envelope = await createUploadedAssetEnvelope(file, async (uploadFile) => ({
+    local_path: `uploads/${uploadFile.name}`,
+    filename: uploadFile.name,
+    content_type: uploadFile.type,
+    size: uploadFile.size,
+  }));
 
   assert.deepEqual(envelope, {
     kind: "uploaded_file",
@@ -108,39 +119,58 @@ test("createUploadedAssetEnvelope keeps text-like files as inline text", async (
     mimeType: "text/plain",
     size: file.size,
     detectedType: "file",
-    content: "hello GraphiteUI",
-    encoding: "text",
+    localPath: "uploads/notes.txt",
+    contentType: "text/plain",
+    textPreview: "hello GraphiteUI",
+    encoding: "local_path",
   });
 });
 
-test("createUploadedAssetEnvelope serializes binary documents as data URLs", async () => {
+test("createUploadedAssetEnvelope stores binary documents as local upload records", async () => {
   const file = new File([Uint8Array.from([0x25, 0x50, 0x44, 0x46])], "brief.pdf", { type: "application/pdf" });
 
-  const envelope = await createUploadedAssetEnvelope(file);
+  const envelope = await createUploadedAssetEnvelope(file, async (uploadFile) => ({
+    local_path: `uploads/${uploadFile.name}`,
+    filename: uploadFile.name,
+    content_type: uploadFile.type,
+    size: uploadFile.size,
+  }));
 
   assert.equal(envelope.kind, "uploaded_file");
   assert.equal(envelope.detectedType, "file");
-  assert.equal(envelope.encoding, "data_url");
-  assert.match(envelope.content, /^data:application\/pdf;base64,/);
+  assert.equal(envelope.encoding, "local_path");
+  assert.equal(envelope.localPath, "uploads/brief.pdf");
+  assert.equal("content" in envelope, false);
 });
 
-test("createUploadedAssetEnvelope serializes media uploads as data URLs", async () => {
+test("createUploadedAssetEnvelope stores media uploads as local upload records", async () => {
   const file = new File([Uint8Array.from([1, 2, 3])], "preview.png", { type: "image/png" });
 
-  const envelope = await createUploadedAssetEnvelope(file);
+  const envelope = await createUploadedAssetEnvelope(file, async (uploadFile) => ({
+    local_path: `uploads/${uploadFile.name}`,
+    filename: uploadFile.name,
+    content_type: uploadFile.type,
+    size: uploadFile.size,
+  }));
 
   assert.equal(envelope.kind, "uploaded_file");
   assert.equal(envelope.detectedType, "image");
-  assert.equal(envelope.encoding, "data_url");
-  assert.match(envelope.content, /^data:image\/png;base64,/);
+  assert.equal(envelope.encoding, "local_path");
+  assert.equal(envelope.localPath, "uploads/preview.png");
+  assert.equal("content" in envelope, false);
 });
 
 test("createUploadedAssetEnvelope detects mobile videos from MIME type when names lack extensions", async () => {
   const file = new File([Uint8Array.from([1, 2, 3])], "mobile-upload", { type: "video/mp4" });
 
-  const envelope = await createUploadedAssetEnvelope(file);
+  const envelope = await createUploadedAssetEnvelope(file, async (uploadFile) => ({
+    local_path: `uploads/${uploadFile.name}`,
+    filename: uploadFile.name,
+    content_type: uploadFile.type,
+    size: uploadFile.size,
+  }));
 
   assert.equal(envelope.detectedType, "video");
-  assert.equal(envelope.encoding, "data_url");
-  assert.match(envelope.content, /^data:video\/mp4;base64,/);
+  assert.equal(envelope.encoding, "local_path");
+  assert.equal(envelope.localPath, "uploads/mobile-upload");
 });

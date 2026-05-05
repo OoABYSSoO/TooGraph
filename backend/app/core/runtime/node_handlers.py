@@ -141,6 +141,28 @@ def execute_agent_node(
         )
 
     output_keys = [binding.state for binding in node.writes]
+    write_modes = {binding.state: binding.mode for binding in node.writes}
+    if output_keys and all(state_name in mapped_skill_outputs for state_name in output_keys):
+        output_values = dict(mapped_skill_outputs)
+        finalize_kwargs: dict[str, Any] = {
+            "state": state,
+            "node_name": node_name,
+            "output_values": output_values,
+        }
+        if callable_accepts_keyword_func(finalize_agent_stream_delta_func, "reasoning"):
+            finalize_kwargs["reasoning"] = response_reasoning
+        finalize_agent_stream_delta_func(**finalize_kwargs)
+        return {
+            "outputs": output_values,
+            "response": response_payload,
+            "reasoning": response_reasoning,
+            "selected_skills": selected_skills,
+            "skill_outputs": skill_outputs,
+            "runtime_config": runtime_config,
+            "warnings": list(dict.fromkeys(warnings)),
+            "final_result": first_truthy_func(output_values.values()) or "",
+        }
+
     stream_delta_kwargs: dict[str, Any] = {
         "state": state,
         "node_name": node_name,
@@ -165,7 +187,6 @@ def execute_agent_node(
     warnings.extend(response_warnings)
 
     output_values = dict(mapped_skill_outputs)
-    write_modes = {binding.state: binding.mode for binding in node.writes}
     for state_name in output_keys:
         if state_name in mapped_skill_outputs and write_modes.get(state_name) == StateWriteMode.APPEND:
             continue

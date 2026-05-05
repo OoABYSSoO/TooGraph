@@ -53,20 +53,6 @@ class CompanionRouteTests(unittest.TestCase):
         self.assertEqual(restore_response.status_code, 200)
         self.assertFalse(restore_response.json()["current_value"]["deleted"])
 
-    def test_memory_curator_endpoint_remembers_stable_preference(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            with patch.object(store, "COMPANION_DATA_DIR", Path(temp_dir)):
-                with TestClient(app) as client:
-                    curate_response = client.post(
-                        "/api/companion/memories/curate-turn",
-                        json={"user_message": "以后回答我先给结论。", "assistant_reply": "明白。"},
-                    )
-                    memories_response = client.get("/api/companion/memories")
-
-        self.assertEqual(curate_response.status_code, 200)
-        self.assertFalse(curate_response.json()["skipped"])
-        self.assertEqual(len(memories_response.json()), 1)
-
 
 if __name__ == "__main__":
     unittest.main()

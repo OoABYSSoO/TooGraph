@@ -1,0 +1,103 @@
+{
+  "schemaVersion": "graphite.skill/v1",
+  "skillKey": "companion_state",
+  "label": "Companion State",
+  "description": "Load and curate the floating companion profile, policy, memories, and session summary from local companion files.",
+  "version": "1.0.0",
+  "targets": ["agent_node", "companion"],
+  "kind": "atomic",
+  "mode": "tool",
+  "scope": "node",
+  "permissions": ["file_read", "file_write"],
+  "inputSchema": [
+    {
+      "key": "operation",
+      "label": "Operation",
+      "valueType": "text",
+      "required": true,
+      "description": "load_context or curate_turn."
+    },
+    {
+      "key": "user_message",
+      "label": "User Message",
+      "valueType": "text",
+      "required": false,
+      "description": "Current companion chat user message."
+    },
+    {
+      "key": "assistant_reply",
+      "label": "Assistant Reply",
+      "valueType": "text",
+      "required": false,
+      "description": "Completed companion reply to curate."
+    }
+  ],
+  "outputSchema": [
+    {
+      "key": "status",
+      "label": "Status",
+      "valueType": "text",
+      "description": "succeeded or failed."
+    },
+    {
+      "key": "profile",
+      "label": "Profile",
+      "valueType": "markdown",
+      "description": "Prompt-ready companion profile section."
+    },
+    {
+      "key": "policy",
+      "label": "Policy",
+      "valueType": "markdown",
+      "description": "Prompt-ready companion behavior policy section."
+    },
+    {
+      "key": "memory_context",
+      "label": "Memory Context",
+      "valueType": "markdown",
+      "description": "Prompt-ready long-term companion memory section."
+    },
+    {
+      "key": "session_summary",
+      "label": "Session Summary",
+      "valueType": "markdown",
+      "description": "Prompt-ready compact session summary."
+    },
+    {
+      "key": "memory_update_result",
+      "label": "Memory Update Result",
+      "valueType": "json",
+      "description": "Structured result from curating a completed turn."
+    },
+    {
+      "key": "snapshot",
+      "label": "Snapshot",
+      "valueType": "json",
+      "description": "Raw companion state snapshot."
+    },
+    {
+      "key": "warnings",
+      "label": "Warnings",
+      "valueType": "json",
+      "description": "Non-fatal warnings."
+    },
+    {
+      "key": "error",
+      "label": "Error",
+      "valueType": "text",
+      "description": "Error message when status is failed."
+    }
+  ],
+  "supportedValueTypes": ["text", "markdown", "json"],
+  "sideEffects": ["file_read", "file_write"],
+  "runtime": {
+    "type": "python",
+    "entrypoint": "run.py",
+    "timeoutSeconds": 15
+  },
+  "health": {
+    "type": "none"
+  },
+  "configured": true,
+  "healthy": true
+}

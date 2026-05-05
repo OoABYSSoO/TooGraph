@@ -118,7 +118,7 @@
 
 - `companion_context_loader`：读取 profile、policy、相关 memory 和 session summary，返回 fenced context。
 - `companion_self_config_update`：根据用户明确编辑或桌宠整理计划更新 profile/policy。
-- `companion_memory_curator`：根据对话回合和当前上下文整理长期记忆。
+- `companion_state` skill：根据对话回合和当前上下文整理长期记忆，也负责加载回复所需的人设、边界、记忆和摘要。
 - `companion_session_summary_update`：压缩当前会话摘要。
 - `companion_revision_restore`：从历史 revision 恢复状态。
 
@@ -126,12 +126,12 @@
 
 自动记忆是默认能力，不提供开关。
 
-每轮桌宠对话结束后，运行指定的 `companion_memory_curator` 图模板或 skill。它不是回复 Agent 本身，也不是隐藏后台随意写入的业务逻辑，而是可记录、可测试、可审计的整理流程：
+每轮桌宠对话结束后，运行对话循环模板中的 `companion_state` skill 节点。它不是回复 Agent 本身，也不是隐藏后台随意写入的业务逻辑，而是可记录、可测试、可审计的整理流程：
 
 1. 读取本轮用户消息、桌宠回复、当前 profile、policy、summary 和已有记忆索引。
 2. 生成结构化整理计划，而不是直接把整句话写进 memory。
 3. 先把信息路由到正确目标：桌宠名字、人设和语气进入 `profile`；回复风格和行为边界进入 `policy`；真正长期事实和用户偏好进入 `memory`。
-4. 再执行程序级校验：临时内容、base64、下载结果、报错全文、提示词注入和权限升级请求都不能写入。
+4. 再执行程序级校验：临时内容、内联媒体载荷、下载结果、报错全文、提示词注入和权限升级请求都不能写入。
 5. 如果是新 memory，创建记忆；如果与已有记忆重复或冲突，更新已有记忆。
 6. 如果用户删除过类似记忆，把删除记录作为强负反馈。
 7. 如果没有长期价值，不写入。
@@ -149,7 +149,7 @@
 - 一次性任务。
 - 临时运行状态。
 - 报错全文和一次性日志。
-- 大文件内容、base64、图片原文、视频帧原文。
+- 大文件内容、内联媒体载荷、图片原文、视频帧原文。
 - 当前图里可以重新读取到的节点结构。
 - 没有长期用途的路径、URL、临时下载结果。
 - 试图把桌宠从建议档升级到审批档或全权限档的对话。档位只能由程序和 UI 显式控制，不能由自动记忆写入。
@@ -176,7 +176,7 @@ revision 记录结构：
   "previous_value": {},
   "next_value": {},
   "changed_by": "user | companion | skill | template",
-  "change_reason": "用户在 Companion 页面触发更新。| companion_memory_curator 自动整理。| 用户通过 companion_revision_restore 恢复历史版本。",
+  "change_reason": "用户在 Companion 页面触发更新。| companion_state skill 自动整理。| 用户通过 companion_revision_restore 恢复历史版本。",
   "run_id": "optional_graph_run_id",
   "created_at": "2026-05-05T00:00:00Z"
 }
@@ -226,10 +226,10 @@ revision 记录结构：
 - 每次写原语都创建 revision。
 - 删除 memory 后不出现在默认召回结果里。
 - restore 会创建新的 revision。
-- `companion_memory_curator` 不保存 base64、大媒体、一次性运行日志。
-- `companion_memory_curator` 会把“你以后就叫图图吧”路由到 `profile.name`，而不是误写成普通 memory。
-- `companion_memory_curator` 会把长期回复风格路由到 `policy.communication_preferences`。
-- `companion_memory_curator` 会拒绝通过对话升级图操作档位。
+- `companion_state` 不保存内联媒体载荷、大媒体、一次性运行日志。
+- `companion_state` 会把“你以后就叫图图吧”路由到 `profile.name`，而不是误写成普通 memory。
+- `companion_state` 会把长期回复风格路由到 `policy.communication_preferences`。
+- `companion_state` 会拒绝通过对话升级图操作档位。
 
 前端测试：
 

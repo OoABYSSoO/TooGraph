@@ -1,4 +1,5 @@
-import { createUploadedAssetEnvelope } from "../nodes/uploadedAssetModel.ts";
+import { uploadSkillArtifactFile } from "../../api/skillArtifacts.ts";
+import { createUploadedAssetEnvelope, type UploadedAssetUploadResult } from "../nodes/uploadedAssetModel.ts";
 import {
   applyNodeCreationResult,
   buildGenericInputNode,
@@ -29,6 +30,7 @@ type CreateNodeFromDroppedFileInput = {
   file: File;
   position: GraphPosition;
   createdNodeId?: string;
+  uploadFile?: (file: File) => Promise<UploadedAssetUploadResult>;
 };
 
 function createGraphNodeId(prefix: string) {
@@ -105,7 +107,7 @@ export async function createNodeFromDroppedFile<T extends GraphPayload | GraphDo
   input: CreateNodeFromDroppedFileInput,
 ) {
   const createdNodeId = input.createdNodeId ?? createGraphNodeId("input");
-  const envelope = await createUploadedAssetEnvelope(input.file);
+  const envelope = await createUploadedAssetEnvelope(input.file, input.uploadFile ?? uploadSkillArtifactFile);
   const stateField = buildNextDefaultStateField(document, {
     name: envelope.name,
     type: envelope.detectedType,
@@ -117,8 +119,10 @@ export async function createNodeFromDroppedFile<T extends GraphPayload | GraphDo
     fileName: envelope.name,
     mimeType: envelope.mimeType,
     size: envelope.size,
-    content: envelope.content,
     detectedType: envelope.detectedType,
+    localPath: envelope.localPath,
+    contentType: envelope.contentType,
+    textPreview: envelope.textPreview,
     encoding: envelope.encoding,
   });
   const result = applyNodeCreationResult(document, {

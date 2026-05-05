@@ -235,24 +235,18 @@ test("buildCompanionChatGraph injects the current message, history, and page con
   assert.deepEqual(graph.nodes.companion_reply_agent.config.skillBindings, []);
 });
 
-test("buildCompanionChatGraph injects backend companion self config context", () => {
+test("buildCompanionChatGraph leaves companion self config states for graph template skills", () => {
   const graph = buildCompanionChatGraph(createTemplate(), {
     userMessage: "你好",
     history: [],
     pageContext: "当前路径: /editor/new",
     companionMode: "advisory",
-    selfConfigContext: {
-      profile: "名字: 小石墨",
-      policy: "建议档，只能建议。",
-      memoryContext: "用户喜欢先给结论。",
-      sessionSummary: "正在讨论桌宠记忆。",
-    },
   });
 
-  assert.match(String(graph.state_schema.state_6.value), /<companion-profile>/);
-  assert.match(String(graph.state_schema.state_7.value), /<companion-policy>/);
-  assert.match(String(graph.state_schema.state_8.value), /<memory-context>/);
-  assert.match(String(graph.state_schema.state_9.value), /<session-summary>/);
+  assert.equal(graph.state_schema.state_6.value, "");
+  assert.equal(graph.state_schema.state_7.value, "");
+  assert.equal(graph.state_schema.state_8.value, "");
+  assert.equal(graph.state_schema.state_9.value, "");
 });
 
 test("resolveCompanionReplyText prefers the companion reply state over fallback text", () => {

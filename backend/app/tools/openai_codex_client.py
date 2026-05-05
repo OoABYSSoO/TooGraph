@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 import hashlib
 import json
 import os
@@ -53,6 +52,7 @@ CODEX_JWT_AUTH_CLAIM_PATH = "https://api.openai.com/auth"
 _browser_login_lock = threading.Lock()
 _browser_login_sessions: dict[str, dict[str, Any]] = {}
 _browser_callback_server: ThreadingHTTPServer | None = None
+_URL_TOKEN_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
 
 
 CODEX_BROWSER_SUCCESS_HTML = """<!doctype html>
@@ -119,13 +119,48 @@ def _normalize_int(value: Any, fallback: int) -> int:
         return fallback
 
 
-def _base64url_encode(raw: bytes) -> str:
-    return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+def _url_token_encode(raw: bytes) -> str:
+    chars: list[str] = []
+    for index in range(0, len(raw), 3):
+        chunk = raw[index : index + 3]
+        first = chunk[0]
+        second = chunk[1] if len(chunk) > 1 else 0
+        third = chunk[2] if len(chunk) > 2 else 0
+        packed = (first << 16) | (second << 8) | third
+        chars.append(_URL_TOKEN_ALPHABET[(packed >> 18) & 0x3F])
+        chars.append(_URL_TOKEN_ALPHABET[(packed >> 12) & 0x3F])
+        if len(chunk) > 1:
+            chars.append(_URL_TOKEN_ALPHABET[(packed >> 6) & 0x3F])
+        if len(chunk) > 2:
+            chars.append(_URL_TOKEN_ALPHABET[packed & 0x3F])
+    return "".join(chars)
+
+
+def _url_token_decode(value: str) -> bytes:
+    clean = value.strip().rstrip("=")
+    decoded = bytearray()
+    for index in range(0, len(clean), 4):
+        chunk = clean[index : index + 4]
+        if len(chunk) == 1:
+            raise ValueError("Invalid URL token segment.")
+        padded = chunk.ljust(4, "A")
+        packed = 0
+        for char in padded:
+            token_index = _URL_TOKEN_ALPHABET.find(char)
+            if token_index < 0:
+                raise ValueError("Invalid URL token character.")
+            packed = (packed << 6) | token_index
+        decoded.append((packed >> 16) & 0xFF)
+        if len(chunk) > 2:
+            decoded.append((packed >> 8) & 0xFF)
+        if len(chunk) > 3:
+            decoded.append(packed & 0xFF)
+    return bytes(decoded)
 
 
 def _generate_pkce_pair() -> tuple[str, str]:
-    verifier = _base64url_encode(secrets.token_bytes(32))
-    challenge = _base64url_encode(hashlib.sha256(verifier.encode("ascii")).digest())
+    verifier = _url_token_encode(secrets.token_bytes(32))
+    challenge = _url_token_encode(hashlib.sha256(verifier.encode("ascii")).digest())
     return verifier, challenge
 
 
@@ -134,8 +169,7 @@ def _decode_jwt_claims(token: Any) -> dict[str, Any]:
         return {}
     try:
         payload_segment = token.split(".")[1]
-        padded = payload_segment + "=" * (-len(payload_segment) % 4)
-        decoded = base64.urlsafe_b64decode(padded.encode("ascii"))
+        decoded = _url_token_decode(payload_segment)
         claims = json.loads(decoded.decode("utf-8"))
     except Exception:
         return {}

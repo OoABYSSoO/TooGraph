@@ -32,7 +32,7 @@ class ModelRequestLogTests(unittest.TestCase):
                             {"role": "system", "content": "sys"},
                             {
                                 "role": "user",
-                                "content": [{"type": "image_url", "image_url": {"url": "data:image/png;base64,abcd"}}],
+                                "content": [{"type": "image_url", "image_url": {"url": "data:image/png,abcd"}}],
                             },
                         ],
                     },
@@ -60,10 +60,10 @@ class ModelRequestLogTests(unittest.TestCase):
         self.assertEqual(entry["content"], "hello")
         self.assertEqual(
             entry["request_raw"]["messages"][1]["content"][0]["image_url"]["url"],
-            "<data-url mime=image/png chars=26>",
+            "<inline-media-reference mime=image/png chars=19>",
         )
 
-    def test_sanitizes_inline_base64_media_payloads(self) -> None:
+    def test_sanitizes_large_inline_media_payloads(self) -> None:
         from app.core.storage.model_log_store import sanitize_payload_for_log
 
         payload = {
@@ -86,7 +86,7 @@ class ModelRequestLogTests(unittest.TestCase):
 
         self.assertEqual(
             sanitized["contents"][0]["parts"][0]["inline_data"]["data"],
-            "<base64-data mime=video/mp4 chars=2048>",
+            "<inline-media-data mime=video/mp4 chars=2048>",
         )
 
     def test_model_logs_route_returns_paginated_payload(self) -> None:

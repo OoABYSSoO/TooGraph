@@ -73,7 +73,7 @@ def sanitize_payload_for_log(value: Any) -> Any:
     if isinstance(value, dict):
         inline_media_mime_type = _resolve_inline_media_mime_type(value)
         return {
-            str(key): _summarize_inline_base64_data(raw_value, inline_media_mime_type)
+            str(key): _summarize_inline_media_data(raw_value, inline_media_mime_type)
             if str(key) == "data" and inline_media_mime_type
             else (
                 sanitize_media_value_for_log(raw_value)
@@ -85,7 +85,7 @@ def sanitize_payload_for_log(value: Any) -> Any:
     if isinstance(value, list):
         return [sanitize_payload_for_log(item) for item in value]
     if isinstance(value, str) and value.startswith("data:"):
-        return summarize_data_url(value)
+        return summarize_inline_media_reference(value)
     return value
 
 
@@ -94,18 +94,18 @@ def sanitize_media_value_for_log(value: Any) -> Any:
         return [sanitize_media_value_for_log(item) for item in value]
     if isinstance(value, str):
         if value.startswith("data:"):
-            return summarize_data_url(value)
+            return summarize_inline_media_reference(value)
         if value.startswith("file://"):
             return f"<file-url {value[7:]}>"
     return sanitize_payload_for_log(value)
 
 
-def summarize_data_url(url: str) -> str:
-    head, _sep, _tail = url.partition(",")
+def summarize_inline_media_reference(url: str) -> str:
+    head, _separator, _payload = url.partition(",")
     mime = "unknown"
     if head.startswith("data:"):
         mime = head[5:].split(";", 1)[0] or "unknown"
-    return f"<data-url mime={mime} chars={len(url)}>"
+    return f"<inline-media-reference mime={mime} chars={len(url)}>"
 
 
 def _resolve_inline_media_mime_type(value: dict[str, Any]) -> str:
@@ -114,9 +114,9 @@ def _resolve_inline_media_mime_type(value: dict[str, Any]) -> str:
     return mime_type if mime_type.startswith(("image/", "video/", "audio/")) else ""
 
 
-def _summarize_inline_base64_data(value: Any, mime_type: str) -> Any:
+def _summarize_inline_media_data(value: Any, mime_type: str) -> Any:
     if isinstance(value, str) and len(value) > 256:
-        return f"<base64-data mime={mime_type} chars={len(value)}>"
+        return f"<inline-media-data mime={mime_type} chars={len(value)}>"
     return sanitize_payload_for_log(value)
 
 

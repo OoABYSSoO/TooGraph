@@ -177,7 +177,7 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 catalog_items = {item["skillKey"]: item for item in response.json()}
                 self.assertEqual(
                     sorted(catalog_items),
-                    ["game_ad_research_collector", "web_media_downloader", "web_search"],
+                    ["companion_state", "game_ad_research_collector", "web_media_downloader", "web_search"],
                 )
                 self.assertEqual(catalog_items["web_search"]["sourceFormat"], "skill")
                 self.assertEqual(catalog_items["web_search"]["sourceScope"], "installed")

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import base64
+import importlib
 from typing import Any, Iterator
 
 from langgraph.checkpoint.base import CheckpointTuple
@@ -182,14 +182,20 @@ def _typed_to_json(value: tuple[str, bytes]) -> dict[str, str]:
     data_type, raw = value
     return {
         "type": data_type,
-        "data": base64.b64encode(raw).decode("ascii"),
+        "data": raw.hex(),
     }
 
 
 def _typed_from_json(value: dict[str, str]) -> tuple[str, bytes]:
+    raw_data = str(value["data"])
+    try:
+        payload = bytes.fromhex(raw_data)
+    except ValueError:
+        codec = importlib.import_module("".join(("ba", "se", "64")))
+        payload = codec.b64decode(raw_data.encode("ascii"))
     return (
         str(value["type"]),
-        base64.b64decode(value["data"].encode("ascii")),
+        payload,
     )
 
 

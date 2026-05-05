@@ -236,6 +236,66 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         self.assertEqual(result["skill_outputs"][0]["state_writes"], {"summary_text": "Long text / 2"})
         self.assertEqual(result["skill_outputs"][0]["status"], "succeeded")
 
+    def test_execute_agent_node_skips_generation_when_bound_skill_outputs_cover_all_writes(self) -> None:
+        state_schema = {
+            "question": NodeSystemStateDefinition.model_validate({"type": "text"}),
+            "context": NodeSystemStateDefinition.model_validate({"type": "markdown"}),
+            "snapshot": NodeSystemStateDefinition.model_validate({"type": "json"}),
+        }
+        node = NodeSystemAgentNode.model_validate(
+            {
+                "kind": "agent",
+                "name": "context_loader",
+                "ui": {"position": {"x": 0, "y": 0}},
+                "reads": [{"state": "question"}],
+                "writes": [
+                    {"state": "context", "mode": "replace"},
+                    {"state": "snapshot", "mode": "replace"},
+                ],
+                "config": {
+                    "skills": ["load_context"],
+                    "skillBindings": [
+                        {
+                            "skillKey": "load_context",
+                            "inputMapping": {"question": "question"},
+                            "outputMapping": {"context": "context", "snapshot": "snapshot"},
+                        }
+                    ],
+                },
+            }
+        )
+        finalized: dict[str, object] = {}
+
+        def generate_agent_response_func(*args, **kwargs):
+            raise AssertionError("skill-only agent nodes must not call the language model")
+
+        result = execute_agent_node(
+            state_schema,
+            node,
+            {"question": "q"},
+            {"state": {}},
+            node_name="context_loader",
+            state={"run_id": "run-1"},
+            get_skill_registry_func=lambda *, include_disabled: {"load_context": object()},
+            invoke_skill_func=lambda skill_func, skill_inputs: {
+                "status": "succeeded",
+                "context": "loaded context",
+                "snapshot": {"ok": True},
+            },
+            resolve_agent_runtime_config_func=lambda agent_node: {"runtime": "initial"},
+            build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
+            callable_accepts_keyword_func=lambda func, keyword: False,
+            generate_agent_response_func=generate_agent_response_func,
+            finalize_agent_stream_delta_func=lambda *, state, node_name, output_values: finalized.update(output_values),
+            first_truthy_func=lambda values: next((value for value in values if value), None),
+        )
+
+        self.assertEqual(result["outputs"], {"context": "loaded context", "snapshot": {"ok": True}})
+        self.assertEqual(result["response"], {})
+        self.assertEqual(result["reasoning"], "")
+        self.assertEqual(result["runtime_config"], {"runtime": "initial"})
+        self.assertEqual(finalized, {"context": "loaded context", "snapshot": {"ok": True}})
+
     def test_execute_agent_node_preserves_mapped_skill_output_when_response_omits_that_state(self) -> None:
         state_schema = {
             "query": NodeSystemStateDefinition.model_validate({"type": "text"}),

@@ -164,15 +164,16 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
         self.assertIn(full_url, prompt)
         self.assertIn("引用链接必须完整复制 URL", prompt)
 
-    def test_auto_prompt_summarizes_uploaded_image_without_data_url_payload(self) -> None:
+    def test_auto_prompt_includes_uploaded_image_local_path_metadata(self) -> None:
         image_payload = {
             "kind": "uploaded_file",
             "name": "reference.png",
             "mimeType": "image/png",
             "size": 42,
             "detectedType": "image",
-            "encoding": "data_url",
-            "content": "data:image/png;base64,AAAABBBB",
+            "encoding": "local_path",
+            "localPath": "uploads/reference.png",
+            "contentType": "image/png",
         }
 
         prompt = build_auto_system_prompt(
@@ -191,19 +192,18 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
 
         self.assertIn("reference.png", prompt)
         self.assertIn("image/png", prompt)
-        self.assertIn("<data-url mime=image/png chars=", prompt)
-        self.assertNotIn("data:image/png;base64", prompt)
-        self.assertNotIn("AAAABBBB", prompt)
+        self.assertIn("uploads/reference.png", prompt)
 
-    def test_auto_prompt_summarizes_uploaded_video_without_data_url_payload(self) -> None:
+    def test_auto_prompt_includes_uploaded_video_local_path_metadata(self) -> None:
         video_payload = {
             "kind": "uploaded_file",
             "name": "clip.mp4",
             "mimeType": "video/mp4",
             "size": 64,
             "detectedType": "video",
-            "encoding": "data_url",
-            "content": "data:video/mp4;base64,CCCCDDDD",
+            "encoding": "local_path",
+            "localPath": "uploads/clip.mp4",
+            "contentType": "video/mp4",
         }
 
         prompt = build_auto_system_prompt(
@@ -222,9 +222,7 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
 
         self.assertIn("clip.mp4", prompt)
         self.assertIn("video/mp4", prompt)
-        self.assertIn("<data-url mime=video/mp4 chars=", prompt)
-        self.assertNotIn("data:video/mp4;base64", prompt)
-        self.assertNotIn("CCCCDDDD", prompt)
+        self.assertIn("uploads/clip.mp4", prompt)
 
     def test_llm_json_response_can_map_unique_state_name_alias_back_to_output_key(self) -> None:
         parsed = parse_llm_json_response(

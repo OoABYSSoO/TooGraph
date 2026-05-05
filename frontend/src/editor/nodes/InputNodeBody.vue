@@ -107,25 +107,25 @@
         </div>
 
         <div
-          v-if="inputAssetEnvelope.detectedType === 'image' && inputAssetEnvelope.encoding === 'data_url'"
+          v-if="inputAssetEnvelope.detectedType === 'image' && inputAssetPreviewUrl"
           class="node-card__asset-media-shell"
         >
-          <img :src="inputAssetEnvelope.content" :alt="inputAssetEnvelope.name" class="node-card__asset-image" />
+          <img :src="inputAssetPreviewUrl" :alt="inputAssetEnvelope.name" class="node-card__asset-image" />
         </div>
         <div
-          v-else-if="inputAssetEnvelope.detectedType === 'audio' && inputAssetEnvelope.encoding === 'data_url'"
+          v-else-if="inputAssetEnvelope.detectedType === 'audio' && inputAssetPreviewUrl"
           class="node-card__asset-media-shell node-card__asset-media-shell--audio"
         >
           <audio controls class="node-card__asset-audio">
-            <source :src="inputAssetEnvelope.content" :type="inputAssetEnvelope.mimeType" />
+            <source :src="inputAssetPreviewUrl" :type="inputAssetEnvelope.mimeType" />
           </audio>
         </div>
         <div
-          v-else-if="inputAssetEnvelope.detectedType === 'video' && inputAssetEnvelope.encoding === 'data_url'"
+          v-else-if="inputAssetEnvelope.detectedType === 'video' && inputAssetPreviewUrl"
           class="node-card__asset-media-shell"
         >
           <video controls class="node-card__asset-video">
-            <source :src="inputAssetEnvelope.content" :type="inputAssetEnvelope.mimeType" />
+            <source :src="inputAssetPreviewUrl" :type="inputAssetEnvelope.mimeType" />
           </video>
         </div>
         <div v-else class="node-card__asset-file">
@@ -180,6 +180,7 @@ defineProps<{
   inputAssetSummary: string;
   inputAssetTextPreview: string;
   inputAssetDescription: string;
+  inputAssetPreviewUrl: string;
   inputAssetAccept: string;
   inputAssetLabel: string;
   inputKnowledgeBaseOptions: InputKnowledgeBaseOption[];

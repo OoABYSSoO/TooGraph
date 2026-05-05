@@ -148,9 +148,11 @@ export function buildInputNodeFromFile(params: {
   fileName: string;
   mimeType: string;
   size: number;
-  content: string;
   detectedType: string;
-  encoding: "text" | "data_url";
+  localPath: string;
+  contentType: string;
+  textPreview?: string;
+  encoding: "local_path";
 }): CreatedNodeResult {
   const stateKey = params.stateKey;
   const uploadedValue = JSON.stringify({
@@ -159,7 +161,9 @@ export function buildInputNodeFromFile(params: {
     mimeType: params.mimeType || "application/octet-stream",
     size: params.size,
     detectedType: params.detectedType,
-    content: params.content,
+    localPath: params.localPath,
+    contentType: params.contentType || params.mimeType || "application/octet-stream",
+    textPreview: params.textPreview,
     encoding: params.encoding,
   });
   return {

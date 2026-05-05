@@ -55,31 +55,6 @@ class CompanionStoreTests(unittest.TestCase):
         self.assertEqual(restored["target_type"], "memory")
         self.assertEqual(restored["current_value"]["deleted"], False)
 
-    def test_curator_skips_transient_and_base64_content(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            with patch.object(store, "COMPANION_DATA_DIR", Path(temp_dir)):
-                result = store.curate_memory_from_turn(
-                    user_message="临时下载这个视频 data:video/mp4;base64,AAAA",
-                    assistant_reply="已经下载。",
-                    changed_by="memory_curator",
-                )
-                self.assertEqual(result["created"], [])
-                self.assertEqual(store.list_memories(), [])
-
-    def test_curator_remembers_stable_preference(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            with patch.object(store, "COMPANION_DATA_DIR", Path(temp_dir)):
-                result = store.curate_memory_from_turn(
-                    user_message="以后回答我都先给结论，再给细节。",
-                    assistant_reply="明白。",
-                    changed_by="memory_curator",
-                )
-                memories = store.list_memories()
-
-        self.assertEqual(len(memories), 1)
-        self.assertIn("先给结论", memories[0]["content"])
-        self.assertEqual(result["created"][0]["id"], memories[0]["id"])
-
 
 if __name__ == "__main__":
     unittest.main()

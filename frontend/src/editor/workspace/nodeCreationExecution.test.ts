@@ -170,6 +170,12 @@ test("createNodeFromDroppedFile builds an input node from the uploaded asset env
     file,
     position: { x: 140, y: 200 },
     createdNodeId: "input_file_created",
+    uploadFile: async (uploadFile) => ({
+      local_path: `uploads/${uploadFile.name}`,
+      filename: uploadFile.name,
+      content_type: uploadFile.type,
+      size: uploadFile.size,
+    }),
   });
 
   assert.equal(result.createdNodeId, "input_file_created");
@@ -179,5 +185,6 @@ test("createNodeFromDroppedFile builds an input node from the uploaded asset env
   assert.equal(result.document.state_schema.state_1?.type, "image");
   assert.equal(result.document.metadata.graphiteui_state_key_counter, 1);
   assert.match(String(result.document.nodes.input_file_created.config.value), /"kind":"uploaded_file"/);
-  assert.match(String(result.document.nodes.input_file_created.config.value), /"encoding":"data_url"/);
+  assert.match(String(result.document.nodes.input_file_created.config.value), /"encoding":"local_path"/);
+  assert.match(String(result.document.nodes.input_file_created.config.value), /"localPath":"uploads\/diagram\.png"/);
 });

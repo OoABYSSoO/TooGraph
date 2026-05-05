@@ -139,6 +139,7 @@
         :input-asset-summary="inputAssetSummary"
         :input-asset-text-preview="inputAssetTextPreview"
         :input-asset-description="inputAssetDescription"
+        :input-asset-preview-url="inputAssetPreviewUrl"
         :input-asset-accept="inputAssetAccept"
         :input-asset-label="inputAssetLabel"
         :input-knowledge-base-options="inputKnowledgeBaseOptions"
@@ -403,6 +404,7 @@ import PrimaryStatePort from "./PrimaryStatePort.vue";
 import type { KnowledgeBaseRecord } from "@/types/knowledge";
 import type { AgentNode, ConditionNode, GraphNode, InputNode, OutputNode, StateDefinition } from "@/types/node-system";
 import type { SkillDefinition } from "@/types/skills";
+import { buildSkillArtifactFileUrl, uploadSkillArtifactFile } from "@/api/skillArtifacts";
 import { CREATE_AGENT_INPUT_STATE_KEY, VIRTUAL_ANY_INPUT_STATE_KEY, VIRTUAL_ANY_OUTPUT_COLOR, VIRTUAL_ANY_OUTPUT_STATE_KEY } from "@/lib/virtual-any-input";
 
 import {
@@ -755,6 +757,13 @@ const inputAssetLabel = computed(() => resolveUploadedAssetLabel(inputAssetType.
 const inputAssetSummary = computed(() => resolveUploadedAssetSummary(inputAssetEnvelope.value));
 const inputAssetTextPreview = computed(() => resolveUploadedAssetTextPreview(inputAssetEnvelope.value));
 const inputAssetDescription = computed(() => resolveUploadedAssetDescription(inputAssetEnvelope.value, inputAssetType.value));
+const inputAssetPreviewUrl = computed(() => {
+  const asset = inputAssetEnvelope.value;
+  if (!asset || !asset.localPath || !["image", "audio", "video"].includes(asset.detectedType)) {
+    return "";
+  }
+  return buildSkillArtifactFileUrl(asset.localPath);
+});
 const showLegacyUploadedAssetHint = computed(
   () => showAssetUploadInput.value && !inputAssetEnvelope.value && inputValueText.value.trim().length > 0,
 );
@@ -1613,7 +1622,7 @@ async function commitInputAssetFile(file: File | null) {
   }
 
   try {
-    const envelope = await createUploadedAssetEnvelope(file);
+    const envelope = await createUploadedAssetEnvelope(file, uploadSkillArtifactFile);
     const nextStateType = resolveStateTypeForInputBoundary(envelope.detectedType) as StateFieldType;
     if (stateKey) {
       emitInputStatePatch(stateKey, {

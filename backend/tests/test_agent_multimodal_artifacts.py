@@ -44,7 +44,6 @@ class AgentMultimodalArtifactTests(unittest.TestCase):
 
             def extract_video_frame_attachments_func(attachment, *, frame_count, output_dir):
                 self.assertEqual(attachment["filesystem_path"], str(video_path))
-                self.assertNotIn("data_url", attachment)
                 self.assertEqual(frame_count, 4)
                 self.assertTrue(str(output_dir))
                 frame_path = Path(output_dir) / "clip_frame_001.jpg"
@@ -80,7 +79,6 @@ class AgentMultimodalArtifactTests(unittest.TestCase):
             )
 
         self.assertEqual(prepared[0]["type"], "image")
-        self.assertNotIn("data_url", prepared[0])
         self.assertTrue(str(prepared[0]["file_url"]).startswith("file://"))
         self.assertEqual(
             warnings,

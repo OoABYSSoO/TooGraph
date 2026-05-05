@@ -94,8 +94,6 @@ def _normalize_media_attachments(input_attachments: list[dict[str, Any]] | None)
         attachment_type = str(attachment.get("type") or "").strip().lower()
         if attachment_type not in {"image", "video"}:
             continue
-        if str(attachment.get("data_url") or "").strip().startswith("data:"):
-            raise ValueError("Model media attachments must use file_url, url, or filesystem_path; data_url is not supported.")
         url = _attachment_url(attachment)
         if not url:
             continue

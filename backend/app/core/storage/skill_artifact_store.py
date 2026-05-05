@@ -4,6 +4,7 @@ import mimetypes
 from pathlib import Path, PurePosixPath
 import re
 from typing import Any
+from uuid import uuid4
 
 from app.core.storage.database import DATA_DIR
 
@@ -71,6 +72,21 @@ def read_skill_artifact_file_metadata(relative_path: str) -> dict[str, Any]:
     }
 
 
+def create_uploaded_skill_artifact(*, file_name: str, content_type: str, payload: bytes) -> dict[str, Any]:
+    safe_name = _safe_upload_filename(file_name)
+    relative_path = f"uploads/{uuid4().hex[:12]}-{safe_name}"
+    target = resolve_skill_artifact_path(relative_path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(payload)
+    stored_type = content_type.strip() or mimetypes.guess_type(safe_name)[0] or "application/octet-stream"
+    return {
+        "local_path": relative_path,
+        "filename": safe_name,
+        "content_type": stored_type,
+        "size": len(payload),
+    }
+
+
 def resolve_skill_artifact_path(relative_path: str) -> Path:
     normalized_path = normalize_skill_artifact_relative_path(relative_path)
     root = SKILL_ARTIFACT_DATA_DIR.resolve()
@@ -91,6 +107,12 @@ def normalize_skill_artifact_relative_path(relative_path: str) -> str:
 def _safe_segment(value: str, *, fallback: str) -> str:
     segment = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(value or "").strip()).strip("._-")
     return segment or fallback
+
+
+def _safe_upload_filename(value: str) -> str:
+    filename = Path(str(value or "").replace("\\", "/")).name.strip()
+    filename = re.sub(r"[^A-Za-z0-9_. -]+", "_", filename).strip(" ._-")
+    return filename or "upload.bin"
 
 
 def _guess_text_content_type(path: Path) -> str:
