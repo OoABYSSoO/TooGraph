@@ -9,7 +9,12 @@ from app.core.runtime.agent_response_generation import generate_agent_response
 from app.core.runtime.condition_eval import evaluate_condition_rule, resolve_branch_key
 from app.core.runtime.input_boundary import coerce_input_boundary_value, first_truthy
 from app.core.runtime.reference_resolution import resolve_condition_source
-from app.core.runtime.skill_bindings import build_skill_inputs, map_skill_outputs, normalize_agent_skill_bindings
+from app.core.runtime.skill_bindings import (
+    build_skill_inputs,
+    map_skill_outputs,
+    missing_required_skill_inputs,
+    resolve_agent_skill_bindings,
+)
 from app.core.runtime.skill_invocation import callable_accepts_keyword, invoke_skill
 from app.core.schemas.node_system import (
     NodeSystemAgentNode,
@@ -19,6 +24,7 @@ from app.core.schemas.node_system import (
     StateWriteMode,
 )
 from app.core.storage.skill_artifact_store import create_skill_artifact_context
+from app.skills.definitions import get_skill_definition_registry
 from app.skills.registry import get_skill_registry
 
 
@@ -81,6 +87,7 @@ def execute_agent_node(
     node_name: str,
     state: dict[str, Any],
     get_skill_registry_func: Callable[..., dict[str, Any]] = get_skill_registry,
+    get_skill_definition_registry_func: Callable[..., dict[str, Any]] = get_skill_definition_registry,
     invoke_skill_func: Callable[..., dict[str, Any]] = invoke_skill,
     resolve_agent_runtime_config_func: Callable[..., dict[str, Any]] = resolve_agent_runtime_config,
     build_agent_stream_delta_callback_func: Callable[..., Any] = build_agent_stream_delta_callback,
@@ -97,30 +104,58 @@ def execute_agent_node(
     response_reasoning = ""
     warnings: list[str] = []
     runtime_config = resolve_agent_runtime_config_func(node)
+    skill_definitions = get_skill_definition_registry_func(include_disabled=False)
 
     mapped_skill_outputs: dict[str, Any] = {}
-    for binding in normalize_agent_skill_bindings(node, input_values=input_values, state_schema=state_schema):
+    for resolved_binding in resolve_agent_skill_bindings(node, input_values=input_values, state_schema=state_schema):
+        binding = resolved_binding.binding
         skill_key = binding.skill_key
         skill_func = registry.get(skill_key)
         if skill_func is None:
             raise ValueError(f"Skill '{skill_key}' is not registered.")
 
         started_at = perf_counter()
-        skill_inputs = build_skill_inputs(binding, input_values)
-        skill_invoke_kwargs: dict[str, Any] = {}
-        if callable_accepts_keyword_func(invoke_skill_func, "context"):
-            invocation_index = _next_skill_artifact_invocation_index(state, node_name, skill_key)
-            skill_invoke_kwargs["context"] = create_skill_artifact_context(
-                run_id=str(state.get("run_id") or "run"),
-                node_id=node_name,
-                skill_key=skill_key,
-                invocation_index=invocation_index,
-            )
-        skill_result = invoke_skill_func(skill_func, skill_inputs, **skill_invoke_kwargs)
+        skill_definition = skill_definitions.get(skill_key)
+        input_schema = list(getattr(skill_definition, "input_schema", []) or [])
+        skill_inputs = build_skill_inputs(
+            binding,
+            input_values,
+            binding_source=resolved_binding.source,
+            state_schema=state_schema,
+            input_schema=input_schema,
+        )
+        missing_inputs = (
+            missing_required_skill_inputs(skill_inputs, input_schema)
+            if resolved_binding.source == "skill_state"
+            else []
+        )
+        if missing_inputs:
+            missing_label = ", ".join(missing_inputs)
+            skill_result = {
+                "status": "failed",
+                "error_type": "missing_required_input",
+                "error": f"Missing required input(s) for skill '{skill_key}': {missing_label}.",
+                "missing_inputs": missing_inputs,
+                "recoverable": True,
+            }
+        else:
+            skill_invoke_kwargs: dict[str, Any] = {}
+            if callable_accepts_keyword_func(invoke_skill_func, "context"):
+                invocation_index = _next_skill_artifact_invocation_index(state, node_name, skill_key)
+                skill_invoke_kwargs["context"] = create_skill_artifact_context(
+                    run_id=str(state.get("run_id") or "run"),
+                    node_id=node_name,
+                    skill_key=skill_key,
+                    invocation_index=invocation_index,
+                )
+            skill_result = invoke_skill_func(skill_func, skill_inputs, **skill_invoke_kwargs)
         duration_ms = int((perf_counter() - started_at) * 1000)
         state_writes = map_skill_outputs(binding, skill_result)
         skill_status, skill_error = _resolve_skill_invocation_status(skill_key, skill_result)
-        if skill_status == "failed":
+        skill_error_type = _resolve_skill_error_type(skill_result)
+        if missing_inputs:
+            warnings.append(f"Skill '{skill_key}' failed before execution: {skill_error or 'Unknown error.'}")
+        elif skill_status == "failed":
             warnings.append(f"Skill '{skill_key}' failed: {skill_error or 'Unknown error.'}")
         mapped_skill_outputs.update(state_writes)
         selected_skills.append(skill_key)
@@ -130,6 +165,7 @@ def execute_agent_node(
                 "skill_name": skill_key,
                 "skill_key": skill_key,
                 "trigger": binding.trigger,
+                "binding_source": resolved_binding.source,
                 "inputs": skill_inputs,
                 "outputs": skill_result,
                 "output_mapping": dict(binding.output_mapping),
@@ -137,6 +173,7 @@ def execute_agent_node(
                 "duration_ms": duration_ms,
                 "status": skill_status,
                 "error": skill_error,
+                "error_type": skill_error_type,
             }
         )
 
@@ -241,6 +278,16 @@ def _resolve_skill_invocation_status(skill_key: str, skill_result: dict[str, Any
     if error:
         return "failed", error
     return "succeeded", ""
+
+
+def _resolve_skill_error_type(skill_result: dict[str, Any]) -> str:
+    explicit = _compact_text(skill_result.get("error_type"))
+    if explicit:
+        return explicit
+    error = _compact_text(skill_result.get("error")).lower()
+    if "required" in error and ("missing" in error or "required input" in error or "query" in error):
+        return "missing_required_input"
+    return ""
 
 
 def _compact_text(value: Any) -> str:

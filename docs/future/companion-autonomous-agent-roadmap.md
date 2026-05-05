@@ -128,6 +128,8 @@ effective_skills = agent.config.skills ∪ state_schema[type=skill] 输入中的
 - 合并时按 `skillKey` 去重，保留卡片 skills 的既有顺序，再追加 state 输入中的新 skill。
 - `skill` state 只表达“允许使用的技能”，不等于安装、启用或授权。
 - 真正执行前仍必须通过 skill registry、运行时注册状态、健康状态、`runPolicies` 和 run detail 记录；只有 `runPolicies` 声明需要审批时才要求审批结果。
+- 动态技能没有显式 `inputMapping` 时，由 Agent runtime 按 skill `inputSchema` 解析实际脚本入参：优先读取 `tool_input` / `proposed_tool_input` 这类参数对象，其次读取与 schema 字段同名的 state，例如 `query`。模板不应为每个可能技能硬编码专属入参映射。
+- 如果动态技能缺少必填入参，runtime 必须返回 `status=failed`、`error_type=missing_required_input`、`missing_inputs` 和 `recoverable=true`，并且不启动脚本；后续图节点根据该结构决定修复、澄清或停止。
 - 不引入 union/intersection 配置；默认就是并集，避免过度设计和迁移成本。
 
 ## 自主决策 Skill
@@ -161,6 +163,7 @@ effective_skills = agent.config.skills ∪ state_schema[type=skill] 输入中的
   -> 调用 autonomous_decision
   -> 将 selected_skill 写入 allowed_skills 这个 skill state
   -> Agent 节点合并卡片 skills 与 skill state 输入
+  -> Agent runtime 按 inputSchema 从 tool_input / 同名 state 解析并校验脚本入参
   -> 若需要审批则进入 request_approval_agent，并通过 interrupt_after 暂停
   -> 用户恢复运行时通过 approval_granted 控制是否继续
   -> 调用被授权 skill
@@ -212,6 +215,7 @@ effective_skills = agent.config.skills ∪ state_schema[type=skill] 输入中的
 - 模板已经表达受控路由、多轮循环、审批暂停和记忆整理；桌宠入口已经默认选择该模板并注入真实 skill catalog snapshot。
 - LangGraph runtime 已原生支持 `condition -> condition` 条件链；模板可以直接表达“缺能力判断 -> 直接回复判断 -> 审批判断”等多级路由，不需要插入兼容用的代理 agent。
 - `web_search` 是桌宠默认可自主选择且无需确认的联网检索能力，用于“今天的 AI 新闻”等时效性问题；其他需要审批的技能在 advisory 档不会被自主选择。
+- `tool_execution_agent` 不需要为每个候选 skill 写死 `skillBindings`；动态技能脚本入参由 runtime 根据 `tool_input`、同名 state 和 skill `inputSchema` 自动解析，并把缺参、权限、未注册或执行失败作为结构化工具结果交给后续评估节点。
 - `final_reply` 是协议级稳定最终回复状态；直接回复、拒绝回复和工具评估等互斥条件分支可以共同写入它，汇合后的记忆整理和输出节点只读取它。
 - 缺能力时只产出 `missing_skill_proposal`，不会静默安装或启用新 skill；后续必须交给 `graphite_skill_builder` 和用户确认路径。
 - 审批恢复通过图状态 `approval_granted` 表达，不引入第二套桌宠运行协议。
@@ -234,6 +238,7 @@ effective_skills = agent.config.skills ∪ state_schema[type=skill] 输入中的
 
 - 图节点声明 skill。
 - `skillBindings` 声明输入输出映射。
+- 对来自 `skill` state 的动态技能，Agent runtime 在没有显式 `skillBindings.inputMapping` 时按 `inputSchema` 从 `tool_input` 和同名 state 生成具体脚本参数。
 - runtime 调用 skill。
 - skill 输出进入图状态和 run detail。
 - LLM 根据结构化上下文生成回复。

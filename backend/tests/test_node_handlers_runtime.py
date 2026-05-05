@@ -13,6 +13,7 @@ from app.core.runtime.node_handlers import (
 )
 from app.core.runtime.skill_invocation import callable_accepts_keyword
 from app.core.schemas.node_system import NodeSystemAgentNode, NodeSystemConditionNode, NodeSystemInputNode, NodeSystemStateDefinition
+from app.core.schemas.skills import SkillDefinition, SkillIoField
 
 
 class NodeHandlersRuntimeTests(unittest.TestCase):
@@ -209,6 +210,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "web_search": "web_search",
                 "local_file": "local_file",
             },
+            get_skill_definition_registry_func=lambda *, include_disabled: {},
             invoke_skill_func=invoke_skill_func,
             resolve_agent_runtime_config_func=lambda agent_node: {},
             build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
@@ -226,6 +228,133 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         self.assertEqual(invoked, ["web_search", "local_file"])
         self.assertEqual(result["selected_skills"], ["web_search", "local_file"])
         self.assertEqual(result["outputs"], {"answer": "web_search,local_file"})
+
+    def test_execute_agent_node_resolves_dynamic_skill_inputs_from_tool_input(self) -> None:
+        state_schema = {
+            "allowed_skills": NodeSystemStateDefinition.model_validate({"type": "skill"}),
+            "tool_input": NodeSystemStateDefinition.model_validate({"type": "json"}),
+            "query": NodeSystemStateDefinition.model_validate({"type": "text"}),
+            "answer": NodeSystemStateDefinition.model_validate({"type": "text"}),
+        }
+        node = NodeSystemAgentNode.model_validate(
+            {
+                "kind": "agent",
+                "name": "tool_executor",
+                "ui": {"position": {"x": 0, "y": 0}},
+                "reads": [{"state": "allowed_skills"}, {"state": "tool_input"}, {"state": "query"}],
+                "writes": [{"state": "answer"}],
+                "config": {"skills": []},
+            }
+        )
+        captured_inputs: list[dict[str, object]] = []
+
+        result = execute_agent_node(
+            state_schema,
+            node,
+            {
+                "allowed_skills": {"skillKey": "web_search"},
+                "tool_input": {"query": "Wuthering Waves latest version", "max_results": "8"},
+                "query": "fallback query",
+            },
+            {"state": {}},
+            node_name="tool_executor",
+            state={"run_id": "run-1"},
+            get_skill_registry_func=lambda *, include_disabled: {"web_search": "web_search"},
+            get_skill_definition_registry_func=lambda *, include_disabled: {
+                "web_search": SkillDefinition(
+                    skillKey="web_search",
+                    label="Web Search",
+                    inputSchema=[
+                        SkillIoField(key="query", label="Query", valueType="text", required=True),
+                        SkillIoField(key="max_results", label="Max Results", valueType="text"),
+                    ],
+                    outputSchema=[SkillIoField(key="summary", label="Summary", valueType="markdown")],
+                    runtimeReady=True,
+                    runtimeRegistered=True,
+                )
+            },
+            invoke_skill_func=lambda skill_func, skill_inputs: captured_inputs.append(dict(skill_inputs))
+            or {"status": "succeeded", "summary": "searched"},
+            resolve_agent_runtime_config_func=lambda agent_node: {},
+            build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
+            callable_accepts_keyword_func=lambda func, keyword: False,
+            generate_agent_response_func=lambda agent_node, input_values, skill_context, runtime_config, **kwargs: (
+                {"answer": skill_context["web_search"]["summary"]},
+                "",
+                [],
+                runtime_config,
+            ),
+            finalize_agent_stream_delta_func=lambda *, state, node_name, output_values: None,
+            first_truthy_func=lambda values: next((value for value in values if value), None),
+        )
+
+        self.assertEqual(captured_inputs, [{"query": "Wuthering Waves latest version", "max_results": "8"}])
+        self.assertEqual(result["skill_outputs"][0]["binding_source"], "skill_state")
+        self.assertEqual(
+            result["skill_outputs"][0]["inputs"],
+            {"query": "Wuthering Waves latest version", "max_results": "8"},
+        )
+        self.assertEqual(result["outputs"], {"answer": "searched"})
+
+    def test_execute_agent_node_reports_missing_dynamic_skill_input_without_invoking_script(self) -> None:
+        state_schema = {
+            "allowed_skills": NodeSystemStateDefinition.model_validate({"type": "skill"}),
+            "tool_input": NodeSystemStateDefinition.model_validate({"type": "json"}),
+            "answer": NodeSystemStateDefinition.model_validate({"type": "text"}),
+        }
+        node = NodeSystemAgentNode.model_validate(
+            {
+                "kind": "agent",
+                "name": "tool_executor",
+                "ui": {"position": {"x": 0, "y": 0}},
+                "reads": [{"state": "allowed_skills"}, {"state": "tool_input"}],
+                "writes": [{"state": "answer"}],
+                "config": {"skills": []},
+            }
+        )
+        invoked: list[str] = []
+
+        result = execute_agent_node(
+            state_schema,
+            node,
+            {"allowed_skills": {"skillKey": "web_search"}, "tool_input": {}},
+            {"state": {}},
+            node_name="tool_executor",
+            state={"run_id": "run-1"},
+            get_skill_registry_func=lambda *, include_disabled: {"web_search": "web_search"},
+            get_skill_definition_registry_func=lambda *, include_disabled: {
+                "web_search": SkillDefinition(
+                    skillKey="web_search",
+                    label="Web Search",
+                    inputSchema=[
+                        SkillIoField(key="query", label="Query", valueType="text", required=True),
+                    ],
+                    outputSchema=[SkillIoField(key="error", label="Error", valueType="text")],
+                    runtimeReady=True,
+                    runtimeRegistered=True,
+                )
+            },
+            invoke_skill_func=lambda skill_func, skill_inputs: invoked.append(str(skill_func)) or {},
+            resolve_agent_runtime_config_func=lambda agent_node: {},
+            build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
+            callable_accepts_keyword_func=lambda func, keyword: False,
+            generate_agent_response_func=lambda agent_node, input_values, skill_context, runtime_config, **kwargs: (
+                {"answer": skill_context["web_search"]["error"]},
+                "",
+                [],
+                runtime_config,
+            ),
+            finalize_agent_stream_delta_func=lambda *, state, node_name, output_values: None,
+            first_truthy_func=lambda values: next((value for value in values if value), None),
+        )
+
+        self.assertEqual(invoked, [])
+        self.assertEqual(result["selected_skills"], ["web_search"])
+        self.assertEqual(result["skill_outputs"][0]["binding_source"], "skill_state")
+        self.assertEqual(result["skill_outputs"][0]["status"], "failed")
+        self.assertEqual(result["skill_outputs"][0]["error_type"], "missing_required_input")
+        self.assertIn("query", result["skill_outputs"][0]["error"])
+        self.assertIn("Skill 'web_search' failed before execution", result["warnings"][0])
 
     def test_execute_agent_node_maps_bound_skill_outputs_into_state_outputs(self) -> None:
         state_schema = {

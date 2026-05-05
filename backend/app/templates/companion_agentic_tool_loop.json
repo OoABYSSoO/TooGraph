@@ -1010,7 +1010,7 @@
       "config": {
         "skills": [],
         "skillBindings": [],
-        "taskInstruction": "本节点的可用技能来自 allowed_skills 这个 skill state。运行时会把 allowed_skills 与卡片 skills 做并集合并。读取动态技能结果、tool_input 和 query，整理为 tool_result；如果技能失败，明确写出失败原因和可恢复建议。",
+        "taskInstruction": "本节点的可用技能来自 allowed_skills 这个 skill state。运行时会把 allowed_skills 与卡片 skills 做并集合并，并按技能 inputSchema 优先从 tool_input、其次从同名 state（例如 query）解析脚本入参。读取动态技能结果，整理为 tool_result；如果技能失败，必须保留 status、error、error_type、missing_inputs、recoverable 和可恢复建议，不要把运行时参数错误包装成事实性搜索失败。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "medium",
@@ -1043,7 +1043,7 @@
       "config": {
         "skills": [],
         "skillBindings": [],
-        "taskInstruction": "评估 tool_result 是否足以回答 user_message。写入 tool_assessment、needs_more_tools 和 final_reply。只有在仍缺少明确能力且还可以通过已授权技能补齐时，needs_more_tools 才为 true；否则输出最终桌宠回复。不要编造工具结果中没有的事实。",
+        "taskInstruction": "评估 tool_result 是否足以回答 user_message。写入 tool_assessment、needs_more_tools 和 final_reply。只有在仍缺少明确能力且还可以通过已授权技能补齐时，needs_more_tools 才为 true；否则输出最终桌宠回复。若 tool_result 显示 error_type 为 missing_required_input、permission_denied、skill_not_found，或同一 skill 出现相同错误，不要盲目继续循环；应给出可恢复建议、请求澄清/审批或停止。不要编造工具结果中没有的事实。",
         "modelSource": "global",
         "model": "",
         "thinkingMode": "medium",

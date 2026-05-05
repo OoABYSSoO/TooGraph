@@ -83,7 +83,7 @@
 - `web_media_downloader` 支持下载公开或用户授权的网页媒体，并返回可由 Output 节点展示的本地 artifact 路径。
 - `game_ad_research_collector` 支持采集游戏市场 RSS、生成广告库搜索记录、发现/下载公开视频广告素材，并把视频和来源文档作为本地 artifact 返回。
 - `autonomous_decision` 是 control/context 技能，负责根据技能目录和 `runPolicies` 决定直接回复、执行已授权技能、请求审批或提出缺失技能草案，不直接执行工具或产生副作用。
-- `skill` state 可以把 `autonomous_decision` 选出的技能作为显式图状态传给下游 Agent 节点；这些动态技能与 Agent 卡片 skills 一视同仁，执行前仍走 registry、运行时状态、runPolicies 和需要时的审批校验。
+- `skill` state 可以把 `autonomous_decision` 选出的技能作为显式图状态传给下游 Agent 节点；这些动态技能与 Agent 卡片 skills 一视同仁，执行前仍走 registry、运行时状态、runPolicies 和需要时的审批校验。动态技能没有显式 `inputMapping` 时，Agent runtime 会按 skill `inputSchema` 优先从 `tool_input`、其次从同名 state 解析脚本入参；缺少必填入参时返回结构化失败而不启动脚本。
 - `companion_agentic_tool_loop` 模板已进入桌宠入口主链，串起人设/记忆读取、意图规划、`autonomous_decision`、审批暂停、`skill` state 动态执行、工具结果评估、互斥分支写入 `final_reply`、多轮退出和同模板内记忆整理写回。
 
 ## 当前技术栈

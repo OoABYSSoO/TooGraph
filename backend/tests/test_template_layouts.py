@@ -372,10 +372,13 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertIn(state_by_name["query"], [binding.state for binding in tool_executor.reads])
         self.assertIn(state_by_name["tool_input"], [binding.state for binding in tool_executor.reads])
         self.assertIn(state_by_name["tool_result"], [binding.state for binding in tool_executor.writes])
+        self.assertIn("按技能 inputSchema", tool_executor.config.task_instruction)
+        self.assertIn("error_type", tool_executor.config.task_instruction)
 
         self.assertIn(state_by_name["final_reply"], [binding.state for binding in template.nodes["compose_direct_reply"].writes])
         self.assertIn(state_by_name["final_reply"], [binding.state for binding in template.nodes["compose_denied_reply"].writes])
         self.assertIn(state_by_name["final_reply"], [binding.state for binding in template.nodes["assess_tool_result"].writes])
+        self.assertIn("相同错误", template.nodes["assess_tool_result"].config.task_instruction)
 
         conditional_edges = {edge.source: edge.branches for edge in template.conditional_edges}
         self.assertEqual(
