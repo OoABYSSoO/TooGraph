@@ -1,0 +1,80 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+
+import { buildGraphEditPlaybackAuditSummary } from "./graphEditPlaybackAudit.ts";
+
+test("buildGraphEditPlaybackAuditSummary records applied graph commands", () => {
+  const summary = buildGraphEditPlaybackAuditSummary({
+    requestId: "graph-edit-123",
+    planOk: true,
+    planIssues: [],
+    commandCount: 3,
+    playbackStepCount: 12,
+    interrupted: false,
+    applyResults: [
+      { commandId: "graph-command-1", ok: true, applied: true, issues: [] },
+      { commandId: "graph-command-2", ok: true, applied: true, issues: [] },
+      { commandId: "graph-command-3", ok: true, applied: true, issues: [] },
+    ],
+  });
+
+  assert.deepEqual(summary, {
+    request_id: "graph-edit-123",
+    status: "succeeded",
+    command_count: 3,
+    applied_command_count: 3,
+    failed_command_count: 0,
+    playback_step_count: 12,
+    issues: [],
+    failed_commands: [],
+  });
+});
+
+test("buildGraphEditPlaybackAuditSummary keeps failed command evidence", () => {
+  const summary = buildGraphEditPlaybackAuditSummary({
+    requestId: "graph-edit-failed",
+    planOk: true,
+    planIssues: [],
+    commandCount: 2,
+    playbackStepCount: 8,
+    interrupted: false,
+    applyResults: [
+      { commandId: "graph-command-1", ok: true, applied: true, issues: [] },
+      { commandId: "graph-command-2", ok: false, applied: false, issues: ["State already exists."] },
+    ],
+  });
+
+  assert.equal(summary.status, "failed");
+  assert.equal(summary.applied_command_count, 1);
+  assert.equal(summary.failed_command_count, 1);
+  assert.deepEqual(summary.issues, ["State already exists."]);
+  assert.deepEqual(summary.failed_commands, [{ command_id: "graph-command-2", issues: ["State already exists."] }]);
+});
+
+test("buildGraphEditPlaybackAuditSummary marks invalid plans and interruptions", () => {
+  assert.equal(
+    buildGraphEditPlaybackAuditSummary({
+      requestId: "graph-edit-invalid",
+      planOk: false,
+      planIssues: ["operations[0] create_node requires ref."],
+      commandCount: 0,
+      playbackStepCount: 0,
+      interrupted: false,
+      applyResults: [],
+    }).status,
+    "failed",
+  );
+
+  assert.equal(
+    buildGraphEditPlaybackAuditSummary({
+      requestId: "graph-edit-stopped",
+      planOk: true,
+      planIssues: [],
+      commandCount: 3,
+      playbackStepCount: 12,
+      interrupted: true,
+      applyResults: [{ commandId: "graph-command-1", ok: true, applied: true, issues: [] }],
+    }).status,
+    "interrupted",
+  );
+});

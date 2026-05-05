@@ -304,6 +304,24 @@ class RunRouteTests(unittest.TestCase):
                 "triggered_run_initial_status": "queued",
                 "triggered_run_status": "completed",
                 "triggered_run_result_summary": "已拿到《鸣潮》最新资讯摘要。",
+                "retry_chain": [
+                    {
+                        "kind": "affordance",
+                        "target_id": "app.nav.library",
+                        "attempts": 4,
+                        "status": "resolved",
+                        "elapsed_ms": 360,
+                    }
+                ],
+                "artifact_refs": [
+                    {
+                        "title": "Brief",
+                        "artifact_kind": "saved_output",
+                        "path": "runs/run_search/brief.md",
+                        "file_name": "brief.md",
+                        "source_key": "brief",
+                    }
+                ],
                 "input_text": "鸣潮最新资讯",
                 "failure_category": None,
                 "error": None,
@@ -320,6 +338,24 @@ class RunRouteTests(unittest.TestCase):
                 "triggered_run_initial_status": "queued",
                 "triggered_run_status": "completed",
                 "triggered_run_result_summary": "已拿到《鸣潮》最新资讯摘要。",
+                "retry_chain": [
+                    {
+                        "kind": "affordance",
+                        "target_id": "app.nav.library",
+                        "attempts": 4,
+                        "status": "resolved",
+                        "elapsed_ms": 360,
+                    }
+                ],
+                "artifact_refs": [
+                    {
+                        "title": "Brief",
+                        "artifact_kind": "saved_output",
+                        "path": "runs/run_search/brief.md",
+                        "file_name": "brief.md",
+                        "source_key": "brief",
+                    }
+                ],
                 "input_text": "鸣潮最新资讯",
                 "failure_category": None,
                 "error": None,
@@ -350,7 +386,10 @@ class RunRouteTests(unittest.TestCase):
         self.assertEqual(completion_event["detail"]["operation"]["kind"], "run_template")
         self.assertEqual(completion_event["detail"]["operation"]["search_text"], "advanced_web_research_loop")
         self.assertEqual(completion_event["detail"]["operation_report"]["triggered_run_id"], "run_search")
+        self.assertEqual(completion_event["detail"]["retry_chain"][0]["attempts"], 4)
+        self.assertEqual(completion_event["detail"]["operation_report"]["retry_chain"][0]["target_id"], "app.nav.library")
         self.assertEqual(completion_event["detail"]["triggered_run"]["status"], "completed")
+        self.assertEqual(completion_event["detail"]["triggered_run"]["artifact_refs"][0]["path"], "runs/run_search/brief.md")
         self.assertEqual(saved_run["artifacts"]["activity_events"][-1], completion_event)
         publish_run_event.assert_any_call("run_paused", "activity.event", completion_event)
         resume_worker.assert_called_once()

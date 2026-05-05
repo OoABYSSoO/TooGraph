@@ -31,12 +31,20 @@ def record_page_operation_resume_activity(
         operation_report = _compact_page_operation_report(operation_result)
 
     status = _normalize_page_operation_status(operation_result.get("status"))
+    artifact_refs = _compact_artifact_refs(operation_report.get("artifact_refs") or operation_result.get("artifact_refs"))
+    if artifact_refs:
+        operation_report["artifact_refs"] = artifact_refs
+    retry_chain = _compact_retry_chain(operation_report.get("retry_chain") or operation_result.get("retry_chain"))
+    if retry_chain:
+        operation_report["retry_chain"] = retry_chain
     operation = _infer_page_operation(operation_result, operation_report)
     failure_category = _resolve_page_operation_failure_category(operation_result, operation_report, status)
     detail: dict[str, Any] = {
         "operation_request_id": operation_request_id,
         "operation": operation,
         "operation_report": operation_report,
+        "artifact_refs": artifact_refs,
+        "retry_chain": retry_chain,
         "page_snapshots": {
             "before": _compact_page_operation_snapshot(operation_result.get("page_snapshot_before")),
             "after": _compact_page_operation_snapshot(operation_result.get("page_snapshot_after")),
@@ -51,6 +59,7 @@ def record_page_operation_resume_activity(
             "result_summary": _compact_text(
                 operation_report.get("triggered_run_result_summary") or operation_result.get("triggered_run_result_summary")
             ),
+            "artifact_refs": artifact_refs,
         },
     }
     if failure_category:
@@ -108,12 +117,61 @@ def _compact_page_operation_report(operation_result: dict[str, Any]) -> dict[str
         "triggered_run_status",
         "triggered_run_result_summary",
         "triggered_run_final_result",
+        "artifact_refs",
+        "retry_chain",
         "input_text",
         "graph_edit_summary",
         "failure_category",
         "error",
     )
     return {key: copy.deepcopy(operation_result.get(key)) for key in keys if key in operation_result}
+
+
+def _compact_artifact_refs(value: Any) -> list[dict[str, str]]:
+    if not isinstance(value, list):
+        return []
+    keys = (
+        "title",
+        "artifact_kind",
+        "path",
+        "local_path",
+        "file_name",
+        "source_key",
+        "node_id",
+        "format",
+        "content_type",
+    )
+    refs: list[dict[str, str]] = []
+    for item in value[:50]:
+        if not isinstance(item, dict):
+            continue
+        ref = {key: _compact_text(item.get(key)) for key in keys if _compact_text(item.get(key))}
+        if ref:
+            refs.append(ref)
+    return refs
+
+
+def _compact_retry_chain(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    records: list[dict[str, Any]] = []
+    for item in value[:50]:
+        if not isinstance(item, dict):
+            continue
+        record = {
+            "kind": _compact_text(item.get("kind")),
+            "target_id": _compact_text(item.get("target_id") or item.get("targetId")),
+            "status": _compact_text(item.get("status")),
+        }
+        attempts = _optional_int(item.get("attempts"))
+        elapsed_ms = _optional_int(item.get("elapsed_ms") if item.get("elapsed_ms") is not None else item.get("elapsedMs"))
+        if attempts is not None:
+            record["attempts"] = max(1, attempts)
+        if elapsed_ms is not None and elapsed_ms >= 0:
+            record["elapsed_ms"] = elapsed_ms
+        if record["kind"] and record["target_id"] and record["status"]:
+            records.append(record)
+    return records
 
 
 def _compact_page_operation_snapshot(value: Any) -> dict[str, Any] | None:
@@ -168,6 +226,11 @@ def _resolve_page_operation_failure_category(
     triggered_status = _compact_text(operation_report.get("triggered_run_status") or operation_result.get("triggered_run_status"))
     if triggered_status == "failed":
         return "target_run_failed"
+    retry_chain = _compact_retry_chain(operation_report.get("retry_chain") or operation_result.get("retry_chain"))
+    if any(record.get("status") == "missing" for record in retry_chain):
+        return "target_not_found"
+    if retry_chain and _compact_text(operation_report.get("error") or operation_result.get("error")):
+        return "frontend_retry_failed"
     if _compact_text(operation_report.get("error") or operation_result.get("error")):
         return "frontend_operation_failed"
     return "operation_failed"
@@ -195,6 +258,13 @@ def _list_text(value: Any) -> list[str]:
     if not isinstance(value, list):
         return []
     return [_compact_text(item) for item in value if _compact_text(item)]
+
+
+def _optional_int(value: Any) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _compact_text(value: Any) -> str:

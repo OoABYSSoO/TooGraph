@@ -84,3 +84,34 @@ test("buildBuddyOutputTraceTreeRows renders main and subgraph records as an inde
   );
 });
 
+test("buildBuddyOutputTraceTreeRows exposes activity evidence labels", () => {
+  const segment: BuddyOutputTraceSegment = {
+    segmentId: "boundary:final",
+    boundaryNodeId: "final",
+    boundaryLabel: "主图输出",
+    outputNodeIds: ["output_final"],
+    status: "completed",
+    startedAtMs: 1000,
+    completedAtMs: 1300,
+    durationMs: 300,
+    records: [
+      {
+        ...baseRecord,
+        kind: "activity",
+        recordId: "record_activity",
+        runtimeKey: "activity:1:main_a",
+        label: "A / Virtual template run",
+        nodeId: "main_a",
+        nodeType: "activity",
+        subgraphNodeId: null,
+        artifactLabels: ["artifacts: 2", "retries: 5"],
+        triggeredRunId: "run_report",
+      },
+    ],
+  };
+
+  const rows = buildBuddyOutputTraceTreeRows(segment, { rootLabel: "主图开始" });
+
+  assert.deepEqual(rows[1].artifactLabels, ["artifacts: 2", "retries: 5"]);
+  assert.equal(rows[1].evidenceRunId, "run_report");
+});

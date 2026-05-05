@@ -91,6 +91,18 @@ test("RunDetailPage renders the aggregated parent and subgraph timeline", () => 
   assert.match(componentSource, /v-for="label in item\.artifactLabels"/);
 });
 
+test("RunDetailPage exposes operation journal entries from the dedicated journal API", () => {
+  assert.match(componentSource, /import \{ fetchOperationJournal \} from "@\/api\/operationJournal";/);
+  assert.match(componentSource, /import \{ buildOperationJournalDisplayItems \} from "\.\/operationJournalModel\.ts";/);
+  assert.match(componentSource, /const operationJournal = ref/);
+  assert.match(componentSource, /const operationJournalItems = computed\(\(\) => buildOperationJournalDisplayItems\(operationJournal\.value\?\.entries \?\? \[\]\)\);/);
+  assert.match(componentSource, /fetchOperationJournal\(\{ runId: normalizedRunId, size: 100 \}, \{ signal: controller\.signal \}\)/);
+  assert.match(componentSource, /class="run-detail__panel run-detail__panel--operation-journal"/);
+  assert.match(componentSource, /v-for="item in operationJournalItems"/);
+  assert.match(componentSource, /t\("runDetail\.operationJournal"\)/);
+  assert.match(componentSource, /t\("runDetail\.operationJournalTitle"\)/);
+});
+
 test("RunDetailPage uses one immediate route watcher for loading run details", () => {
   assert.match(componentSource, /import \{ computed, onBeforeUnmount, ref, watch \} from "vue";/);
   assert.doesNotMatch(componentSource, /onMounted/);

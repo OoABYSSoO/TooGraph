@@ -2,6 +2,7 @@ export type VirtualOperationActivitySummary = {
   label: string;
   summary: string;
   artifactLabels: string[];
+  triggeredRunId?: string;
 };
 
 export function summarizeVirtualOperationActivity(event: {
@@ -17,6 +18,7 @@ export function summarizeVirtualOperationActivity(event: {
   const operation = resolveOperation(detail);
   const operationKind = normalizeText(operation.kind);
   const operationReport = recordFromUnknown(detail.operation_report ?? detail.operationReport);
+  const triggeredRunId = resolveTriggeredRunId(operationReport);
   const failureCategory = normalizeText(detail.failure_category ?? detail.failureCategory);
   const targetId = normalizeText(operation.target_id ?? operation.targetId ?? detail.target_id ?? detail.targetId);
   const requestId = normalizeText(
@@ -34,9 +36,12 @@ export function summarizeVirtualOperationActivity(event: {
       operationKind ? `operation: ${operationKind}` : "",
       resolveTemplateArtifactLabel(operation),
       targetId ? `target: ${targetId}` : "",
-      resolveTriggeredRunArtifactLabel(operationReport),
+      resolveTriggeredRunArtifactLabel(operationReport, triggeredRunId),
+      resolveArtifactRefCountLabel(detail, operationReport),
+      resolveRetryCountLabel(detail, operationReport),
       requestId ? `request: ${requestId}` : "",
     ].filter(Boolean),
+    ...(triggeredRunId ? { triggeredRunId } : {}),
   };
 }
 
@@ -149,13 +154,52 @@ function resolveTriggeredRunSummaryPart(operationReport: Record<string, unknown>
   return `Run: ${runId}${status ? ` ${status}` : ""}`;
 }
 
-function resolveTriggeredRunArtifactLabel(operationReport: Record<string, unknown>) {
-  const runId = normalizeText(operationReport.triggered_run_id ?? operationReport.triggeredRunId);
+function resolveTriggeredRunId(operationReport: Record<string, unknown>) {
+  return normalizeText(operationReport.triggered_run_id ?? operationReport.triggeredRunId);
+}
+
+function resolveTriggeredRunArtifactLabel(operationReport: Record<string, unknown>, runId: string) {
   if (!runId) {
     return "";
   }
   const status = normalizeText(operationReport.triggered_run_status ?? operationReport.triggeredRunStatus);
   return `run: ${runId}${status ? ` ${status}` : ""}`;
+}
+
+function resolveArtifactRefCountLabel(detail: Record<string, unknown>, operationReport: Record<string, unknown>) {
+  const count = countArtifactRefs(
+    detail.artifact_refs
+      ?? detail.artifactRefs
+      ?? operationReport.artifact_refs
+      ?? operationReport.artifactRefs
+      ?? recordFromUnknown(operationReport.triggered_run ?? operationReport.triggeredRun).artifact_refs
+      ?? recordFromUnknown(operationReport.triggered_run ?? operationReport.triggeredRun).artifactRefs,
+  );
+  return count > 0 ? `artifacts: ${count}` : "";
+}
+
+function countArtifactRefs(value: unknown) {
+  return Array.isArray(value) ? value.filter((item) => Object.keys(recordFromUnknown(item)).length > 0).length : 0;
+}
+
+function resolveRetryCountLabel(detail: Record<string, unknown>, operationReport: Record<string, unknown>) {
+  const count = countRetryAttempts(
+    detail.retry_chain
+      ?? detail.retryChain
+      ?? operationReport.retry_chain
+      ?? operationReport.retryChain,
+  );
+  return count > 0 ? `retries: ${count}` : "";
+}
+
+function countRetryAttempts(value: unknown) {
+  if (!Array.isArray(value)) {
+    return 0;
+  }
+  return value.reduce((total, item) => {
+    const attempts = normalizeNumber(recordFromUnknown(item).attempts);
+    return total + Math.max(0, (attempts ?? 1) - 1);
+  }, 0);
 }
 
 function normalizeText(value: unknown) {

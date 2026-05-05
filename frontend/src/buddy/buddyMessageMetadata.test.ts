@@ -42,6 +42,39 @@ test("buildOutputTraceBuddyMessageMetadata stores trace segments as buddy messag
 
 test("resolveOutputTraceBuddyMessageMetadata restores only valid trace metadata", () => {
   assert.deepEqual(resolveOutputTraceBuddyMessageMetadata({ kind: "output_trace", outputTrace }), outputTrace);
+  assert.deepEqual(
+    resolveOutputTraceBuddyMessageMetadata({
+      kind: "output_trace",
+      outputTrace: {
+        ...outputTrace,
+        records: [{ ...outputTrace.records[0], artifactLabels: ["artifacts: 2"], triggeredRunId: "run_report" }],
+      },
+    }),
+    {
+      ...outputTrace,
+      records: [{ ...outputTrace.records[0], artifactLabels: ["artifacts: 2"], triggeredRunId: "run_report" }],
+    },
+  );
   assert.equal(resolveOutputTraceBuddyMessageMetadata({ kind: "text", outputTrace }), null);
   assert.equal(resolveOutputTraceBuddyMessageMetadata({ kind: "output_trace", outputTrace: { segmentId: "segment_1" } }), null);
+  assert.equal(
+    resolveOutputTraceBuddyMessageMetadata({
+      kind: "output_trace",
+      outputTrace: {
+        ...outputTrace,
+        records: [{ ...outputTrace.records[0], artifactLabels: "artifacts: 2" }],
+      },
+    }),
+    null,
+  );
+  assert.equal(
+    resolveOutputTraceBuddyMessageMetadata({
+      kind: "output_trace",
+      outputTrace: {
+        ...outputTrace,
+        records: [{ ...outputTrace.records[0], triggeredRunId: 123 }],
+      },
+    }),
+    null,
+  );
 });

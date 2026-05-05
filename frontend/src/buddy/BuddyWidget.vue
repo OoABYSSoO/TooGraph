@@ -341,7 +341,22 @@
                         :class="`buddy-widget__run-trace-dot--${row.status}`"
                         aria-hidden="true"
                       />
-                      <span class="buddy-widget__run-trace-row-label">{{ row.label }}</span>
+                      <span class="buddy-widget__run-trace-row-main">
+                        <span class="buddy-widget__run-trace-row-label">{{ row.label }}</span>
+                        <span v-if="row.artifactLabels.length > 0" class="buddy-widget__run-trace-row-evidence">
+                          <span v-for="label in row.artifactLabels" :key="`${row.rowId}-${label}`">{{ label }}</span>
+                        </span>
+                      </span>
+                      <button
+                        v-if="row.evidenceRunId"
+                        type="button"
+                        class="buddy-widget__run-trace-row-evidence-open"
+                        :title="t('buddy.openEvidenceRun')"
+                        :aria-label="t('buddy.openEvidenceRun')"
+                        @click="openTraceEvidenceRun(row.evidenceRunId)"
+                      >
+                        <ElIcon><Promotion /></ElIcon>
+                      </button>
                       <button
                         v-if="row.playbackTarget && message.runId"
                         type="button"
@@ -512,6 +527,11 @@ import type { SettingsPayload } from "../types/settings.ts";
 import BuddyMascot from "./BuddyMascot.vue";
 import type { BuddyMascotDebugAction } from "./buddyMascotDebug.ts";
 import {
+  buildGraphEditPlaybackAuditSummary,
+  type GraphEditPlaybackAuditApplyResult,
+  type GraphEditPlaybackAuditSummary,
+} from "./graphEditPlaybackAudit.ts";
+import {
   buildOutputTraceBuddyMessageMetadata,
   resolveOutputTraceBuddyMessageMetadata,
 } from "./buddyMessageMetadata.ts";
@@ -522,12 +542,15 @@ import {
   collectPageOperationSnapshot,
 } from "./pageOperationAffordances.ts";
 import {
+  buildPageOperationArtifactRefs,
   buildPageOperationResult,
   buildPageOperationResumePayload,
   canAutoResumePageOperationRun,
   findAutoResumablePageOperationRequestId,
   type PageOperationResult,
   type PageOperationResultStatus,
+  type PageOperationRetryKind,
+  type PageOperationRetryRecord,
 } from "./pageOperationResume.ts";
 import { resolveBuddyVirtualOperationPlanFromActivityEvent } from "./virtualOperationProtocol.ts";
 import type { BuddyVirtualOperationPlan } from "./virtualOperationProtocol.ts";
@@ -643,9 +666,15 @@ type BuddyVirtualOperationStatus = {
   label: string;
   tone: "active" | "stopping";
 };
+type BuddyVirtualOperationCommandResult = {
+  status: PageOperationResultStatus;
+  graphEditSummary: Record<string, unknown> | null;
+  retryChain: PageOperationRetryRecord[];
+};
 type BuddyVirtualOperationToken = {
   id: number;
   interrupted: boolean;
+  retryChain: PageOperationRetryRecord[];
   interruptPromise: Promise<void>;
   interrupt: () => void;
 };
@@ -2396,6 +2425,8 @@ async function executeVirtualOperationRequest(request: BuddyVirtualOperationRequ
   let error: string | null = null;
   let triggeredRun: BuddyVirtualOperationTriggeredRun | null = null;
   let triggeredRunDetail: RunDetail | null = null;
+  let graphEditSummary: Record<string, unknown> | null = null;
+  let retryChain: PageOperationRetryRecord[] = [];
   try {
     const backgroundTemplateOperation = resolveBackgroundTemplateRunOperation(operationPlan);
     if (backgroundTemplateOperation) {
@@ -2420,10 +2451,13 @@ async function executeVirtualOperationRequest(request: BuddyVirtualOperationRequ
       }
     } else {
       buddyMascotDebugStore.beginVirtualOperationRunAttribution(operationPlan);
-      status = await executeVirtualOperationCommands(operationPlan);
+      const commandResult = await executeVirtualOperationCommands(operationPlan);
+      status = commandResult.status;
+      graphEditSummary = commandResult.graphEditSummary;
+      retryChain = commandResult.retryChain;
       triggeredRun = await waitForVirtualOperationTriggeredRun(operationPlan);
       triggeredRunDetail = triggeredRun ? await waitForTriggeredRunCompletion(triggeredRun) : null;
-      if (triggeredRunDetail && !shouldPollRunStatus(triggeredRunDetail.status)) {
+      if (status !== "failed" && triggeredRunDetail && !shouldPollRunStatus(triggeredRunDetail.status)) {
         status = triggeredRunDetail.status === "failed" ? "failed" : "succeeded";
       }
     }
@@ -2446,6 +2480,9 @@ async function executeVirtualOperationRequest(request: BuddyVirtualOperationRequ
     triggeredRunInitialStatus: triggeredRun?.initialStatus ?? null,
     triggeredRunStatus: triggeredRunDetail?.status ?? triggeredRun?.initialStatus ?? null,
     triggeredRunFinalResult: triggeredRunDetail?.final_result ?? null,
+    artifactRefs: buildPageOperationArtifactRefs(triggeredRunDetail),
+    retryChain,
+    graphEditSummary,
     error,
   });
   const pageOperationContextAfter = buildPageOperationRuntimeContext({
@@ -2455,16 +2492,20 @@ async function executeVirtualOperationRequest(request: BuddyVirtualOperationRequ
   await maybeAutoResumePageOperationRun(operationPlan, operationResult, pageOperationContextAfter);
 }
 
-async function executeVirtualOperationCommands(operationPlan: BuddyVirtualOperationPlan): Promise<PageOperationResultStatus> {
+async function executeVirtualOperationCommands(operationPlan: BuddyVirtualOperationPlan): Promise<BuddyVirtualOperationCommandResult> {
   stopBuddyIdleAnimation();
   const token = beginVirtualOperation();
+  let graphEditSummary: Record<string, unknown> | null = null;
   try {
     await ensureVirtualCursorReadyForOperation();
     for (const operation of operationPlan.operations) {
       if (isVirtualOperationInterrupted(token)) {
         break;
       }
-      await executeBuddyVirtualOperationCommand(operation);
+      const commandResult = await executeBuddyVirtualOperationCommand(operation);
+      if (commandResult?.graphEditSummary) {
+        graphEditSummary = commandResult.graphEditSummary;
+      }
     }
     if (!isVirtualOperationInterrupted(token) && (operationPlan.cursorLifecycle === "return_after_step" || operationPlan.cursorLifecycle === "return_at_end")) {
       await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS, activeVirtualOperationToken.value);
@@ -2475,10 +2516,27 @@ async function executeVirtualOperationCommands(operationPlan: BuddyVirtualOperat
     if (isVirtualOperationInterrupted(token)) {
       buddyMascotDebugStore.setVirtualCursorEnabled(false);
     }
-    return isVirtualOperationInterrupted(token) ? "interrupted" : "succeeded";
+    return {
+      status: resolveVirtualOperationCommandStatus(token, graphEditSummary),
+      graphEditSummary,
+      retryChain: [...token.retryChain],
+    };
   } finally {
     finishVirtualOperation(token);
   }
+}
+
+function resolveVirtualOperationCommandStatus(
+  token: BuddyVirtualOperationToken,
+  graphEditSummary: Record<string, unknown> | null,
+): PageOperationResultStatus {
+  if (isVirtualOperationInterrupted(token)) {
+    return "interrupted";
+  }
+  if (graphEditSummary?.status === "failed") {
+    return "failed";
+  }
+  return "succeeded";
 }
 
 async function maybeAutoResumePageOperationRun(
@@ -2619,6 +2677,7 @@ function createBuddyVirtualOperationToken(): BuddyVirtualOperationToken {
   const token: BuddyVirtualOperationToken = {
     id: ++virtualOperationTokenId,
     interrupted: false,
+    retryChain: [],
     interruptPromise,
     interrupt: () => {
       if (token.interrupted) {
@@ -2737,32 +2796,33 @@ function isVirtualOperationInterrupted(token: BuddyVirtualOperationToken | null)
   return !token || token.interrupted || activeVirtualOperationToken.value !== token;
 }
 
-async function executeBuddyVirtualOperationCommand(operation: BuddyVirtualOperation) {
+async function executeBuddyVirtualOperationCommand(
+  operation: BuddyVirtualOperation,
+): Promise<{ graphEditSummary: GraphEditPlaybackAuditSummary } | null> {
   switch (operation.kind) {
     case "click":
       await executeBuddyVirtualClickOperation(operation);
-      return;
+      return null;
     case "focus":
       await executeBuddyVirtualFocusOperation(operation);
-      return;
+      return null;
     case "clear":
       await executeBuddyVirtualClearOperation(operation);
-      return;
+      return null;
     case "type":
       await executeBuddyVirtualTypeOperation(operation);
-      return;
+      return null;
     case "press":
       await executeBuddyVirtualPressOperation(operation);
-      return;
+      return null;
     case "wait":
       await executeBuddyVirtualWaitOperation(operation);
-      return;
+      return null;
     case "graph_edit":
-      await executeBuddyVirtualGraphEditOperation(operation);
-      return;
+      return { graphEditSummary: await executeBuddyVirtualGraphEditOperation(operation) };
     case "run_template":
       await executeBuddyVirtualRunTemplateOperation(operation);
-      return;
+      return null;
   }
 }
 
@@ -2771,15 +2831,7 @@ async function executeBuddyVirtualClickOperation(operation: BuddyVirtualOperatio
     return;
   }
   const token = activeVirtualOperationToken.value;
-  const affordance = resolveVirtualOperationAffordance(operation.targetId);
-  if (!affordance) {
-    return;
-  }
-  await moveVirtualCursorToElement(affordance.element);
-  if (isVirtualOperationInterrupted(token)) {
-    return;
-  }
-  dispatchVirtualClick(affordance.element);
+  await clickVirtualOperationTargetWithRetry(operation.targetId, token);
 }
 
 async function executeBuddyVirtualFocusOperation(operation: BuddyVirtualOperation) {
@@ -2787,9 +2839,9 @@ async function executeBuddyVirtualFocusOperation(operation: BuddyVirtualOperatio
     return;
   }
   const token = activeVirtualOperationToken.value;
-  const affordance = resolveVirtualOperationAffordance(operation.targetId);
+  const affordance = await waitForVirtualOperationAffordance(operation.targetId, token);
   if (!affordance) {
-    return;
+    throw new Error(`找不到可见页面目标：${operation.targetId}`);
   }
   await moveVirtualCursorToElement(affordance.element);
   if (isVirtualOperationInterrupted(token)) {
@@ -2803,9 +2855,9 @@ async function executeBuddyVirtualClearOperation(operation: BuddyVirtualOperatio
     return;
   }
   await executeBuddyVirtualFocusOperation(operation);
-  const input = resolveVirtualOperationTextInput(operation.targetId);
+  const input = await waitForVirtualOperationTextInput(operation.targetId, activeVirtualOperationToken.value);
   if (!input) {
-    return;
+    throw new Error(`找不到可编辑页面目标：${operation.targetId}`);
   }
   input.value = "";
   dispatchVirtualInputEvents(input, "deleteContentBackward", "");
@@ -2820,9 +2872,9 @@ async function executeBuddyVirtualTypeOperation(operation: BuddyVirtualOperation
   if (isVirtualOperationInterrupted(token)) {
     return;
   }
-  const input = resolveVirtualOperationTextInput(operation.targetId);
+  const input = await waitForVirtualOperationTextInput(operation.targetId, token);
   if (!input) {
-    return;
+    throw new Error(`找不到可编辑页面目标：${operation.targetId}`);
   }
   await typeVirtualText(input, operation.text);
 }
@@ -2832,9 +2884,9 @@ async function executeBuddyVirtualPressOperation(operation: BuddyVirtualOperatio
     return;
   }
   const token = activeVirtualOperationToken.value;
-  const affordance = resolveVirtualOperationAffordance(operation.targetId);
+  const affordance = await waitForVirtualOperationAffordance(operation.targetId, token);
   if (!affordance) {
-    return;
+    throw new Error(`找不到可见页面目标：${operation.targetId}`);
   }
   await moveVirtualCursorToElement(affordance.element);
   if (isVirtualOperationInterrupted(token)) {
@@ -2861,7 +2913,9 @@ async function executeBuddyVirtualRunTemplateOperation(operation: BuddyVirtualOp
   if (isVirtualOperationInterrupted(token)) {
     return;
   }
-  await waitForRoutePath("/library", token);
+  if (!(await waitForRoutePath("/library", token))) {
+    throw new Error("页面没有进入目标路径：/library");
+  }
   if (isVirtualOperationInterrupted(token)) {
     return;
   }
@@ -2888,7 +2942,9 @@ async function executeBuddyVirtualRunTemplateOperation(operation: BuddyVirtualOp
     return;
   }
   dispatchVirtualClick(templateAffordance.element);
-  await waitForRoutePath("/editor", token);
+  if (!(await waitForRoutePath("/editor", token))) {
+    throw new Error("页面没有进入目标路径：/editor");
+  }
   if (isVirtualOperationInterrupted(token)) {
     return;
   }
@@ -2923,16 +2979,32 @@ type GraphEditPlaybackApplyCommandResponse = {
   issues: string[];
 };
 
-async function executeBuddyVirtualGraphEditOperation(operation: BuddyVirtualOperation) {
+async function executeBuddyVirtualGraphEditOperation(operation: BuddyVirtualOperation): Promise<GraphEditPlaybackAuditSummary> {
   if (operation.kind !== "graph_edit") {
-    return;
+    return buildGraphEditPlaybackAuditSummary({
+      requestId: "",
+      planOk: false,
+      planIssues: ["Operation is not a graph_edit request."],
+      commandCount: 0,
+      playbackStepCount: 0,
+      interrupted: false,
+      applyResults: [],
+    });
   }
   const token = activeVirtualOperationToken.value;
   const affordance = resolveVirtualOperationAffordance(operation.targetId);
   if (affordance) {
     await moveVirtualCursorToElement(affordance.element);
     if (isVirtualOperationInterrupted(token)) {
-      return;
+      return buildGraphEditPlaybackAuditSummary({
+        requestId: "",
+        planOk: true,
+        planIssues: [],
+        commandCount: 0,
+        playbackStepCount: 0,
+        interrupted: true,
+        applyResults: [],
+      });
     }
   }
   const requestId = `graph-edit-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -2941,14 +3013,31 @@ async function executeBuddyVirtualGraphEditOperation(operation: BuddyVirtualOper
     graphEditIntents: operation.graphEditIntents,
   });
   if (!response?.ok) {
-    return;
+    return buildGraphEditPlaybackAuditSummary({
+      requestId,
+      planOk: false,
+      planIssues: response?.issues.length ? response.issues : ["Graph edit playback plan request failed."],
+      commandCount: response?.graphCommands.length ?? 0,
+      playbackStepCount: response?.playbackSteps.length ?? 0,
+      interrupted: false,
+      applyResults: [],
+    });
   }
   setGraphEditPlaybackRunning(true);
   const playbackState = createGraphEditPlaybackUiState();
+  const applyResults: GraphEditPlaybackAuditApplyResult[] = [];
   try {
     await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS);
     if (isVirtualOperationInterrupted(token)) {
-      return;
+      return buildGraphEditPlaybackAuditSummary({
+        requestId,
+        planOk: true,
+        planIssues: response.issues,
+        commandCount: response.graphCommands.length,
+        playbackStepCount: response.playbackSteps.length,
+        interrupted: true,
+        applyResults,
+      });
     }
     for (let stepIndex = 0; stepIndex < response.playbackSteps.length; stepIndex += 1) {
       if (isVirtualOperationInterrupted(token)) {
@@ -2995,7 +3084,13 @@ async function executeBuddyVirtualGraphEditOperation(operation: BuddyVirtualOper
         await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS);
         rememberCreatedStateAlias(step, beforeStateKeys, playbackState);
       } else if (step.kind === "apply_graph_command") {
-        dispatchGraphEditPlaybackApplyCommand(step, response.graphCommands, playbackState);
+        const applyResponse = dispatchGraphEditPlaybackApplyCommand(step, response.graphCommands, playbackState);
+        applyResults.push({
+          commandId: step.commandId ?? "",
+          ok: applyResponse?.ok === true,
+          applied: applyResponse?.applied === true,
+          issues: applyResponse?.issues.length ? applyResponse.issues : applyResponse ? [] : ["Graph edit command did not return a response."],
+        });
       }
       await waitForVirtualOperation(resolveGraphEditPlaybackStepDelayMs(step));
     }
@@ -3003,6 +3098,15 @@ async function executeBuddyVirtualGraphEditOperation(operation: BuddyVirtualOper
     setGraphEditPlaybackRunning(false);
   }
   virtualCursorDragging.value = false;
+  return buildGraphEditPlaybackAuditSummary({
+    requestId,
+    planOk: true,
+    planIssues: response.issues,
+    commandCount: response.graphCommands.length,
+    playbackStepCount: response.playbackSteps.length,
+    interrupted: isVirtualOperationInterrupted(token),
+    applyResults,
+  });
 }
 
 function isGraphEditPlaybackDragStep(step: GraphEditPlaybackStep) {
@@ -3199,18 +3303,34 @@ async function resolveGraphEditPlaybackStepElementWithRetry(
   playbackState: GraphEditPlaybackUiState,
   token: BuddyVirtualOperationToken | null,
 ) {
+  const startedAt = Date.now();
+  const targetId = resolveAliasedGraphEditPlaybackTarget(step.target, playbackState);
   const deadlineMs = Date.now() + BUDDY_GRAPH_EDIT_PLAYBACK_TARGET_WAIT_MS;
+  let attempts = 0;
   while (!isVirtualOperationInterrupted(token) && Date.now() <= deadlineMs) {
+    attempts += 1;
     const targetElement = resolveGraphEditPlaybackStepElement(step, playbackState);
     if (targetElement) {
+      recordVirtualOperationRetry(token, buildVirtualOperationRetryRecord("graph_edit_step", targetId, attempts, "resolved", startedAt));
       return targetElement;
     }
     await waitForVirtualOperation(BUDDY_GRAPH_EDIT_PLAYBACK_TARGET_RETRY_MS);
   }
+  const targetElement = resolveGraphEditPlaybackStepElement(step, playbackState);
+  recordVirtualOperationRetry(
+    token,
+    buildVirtualOperationRetryRecord(
+      "graph_edit_step",
+      targetId,
+      attempts,
+      isVirtualOperationInterrupted(token) ? "interrupted" : targetElement ? "resolved" : "missing",
+      startedAt,
+    ),
+  );
   if (isVirtualOperationInterrupted(token)) {
     return null;
   }
-  return resolveGraphEditPlaybackStepElement(step, playbackState);
+  return targetElement;
 }
 
 function resolveGraphEditPlaybackStepElement(step: GraphEditPlaybackStep, playbackState: GraphEditPlaybackUiState): HTMLElement | null {
@@ -3547,46 +3667,115 @@ async function clickVirtualOperationTargetWithRetry(targetId: string, token: Bud
   await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_CLICK_SETTLE_MS, token);
 }
 
+function recordVirtualOperationRetry(token: BuddyVirtualOperationToken | null, record: PageOperationRetryRecord) {
+  if (!token) {
+    return;
+  }
+  token.retryChain.push(record);
+}
+
+function buildVirtualOperationRetryRecord(
+  kind: PageOperationRetryKind,
+  targetId: string,
+  attempts: number,
+  status: PageOperationRetryRecord["status"],
+  startedAt: number,
+): PageOperationRetryRecord {
+  return {
+    kind,
+    target_id: targetId,
+    attempts: Math.max(1, attempts),
+    status,
+    elapsed_ms: Math.max(0, Date.now() - startedAt),
+  };
+}
+
 async function waitForVirtualOperationAffordance(targetId: string, token: BuddyVirtualOperationToken | null) {
+  const startedAt = Date.now();
   const deadline = Date.now() + BUDDY_VIRTUAL_OPERATION_TARGET_WAIT_MS;
+  let attempts = 0;
   while (!isVirtualOperationInterrupted(token) && Date.now() <= deadline) {
+    attempts += 1;
     const affordance = resolveVirtualOperationAffordance(targetId);
     if (affordance) {
+      recordVirtualOperationRetry(token, buildVirtualOperationRetryRecord("affordance", targetId, attempts, "resolved", startedAt));
       return affordance;
     }
     await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_TARGET_RETRY_MS, token);
     await nextTick();
   }
-  return resolveVirtualOperationAffordance(targetId);
+  const affordance = resolveVirtualOperationAffordance(targetId);
+  recordVirtualOperationRetry(
+    token,
+    buildVirtualOperationRetryRecord(
+      "affordance",
+      targetId,
+      attempts,
+      isVirtualOperationInterrupted(token) ? "interrupted" : affordance ? "resolved" : "missing",
+      startedAt,
+    ),
+  );
+  return affordance;
 }
 
 async function waitForVirtualOperationTextInput(targetId: string, token: BuddyVirtualOperationToken | null) {
+  const startedAt = Date.now();
   const deadline = Date.now() + BUDDY_VIRTUAL_OPERATION_TARGET_WAIT_MS;
+  let attempts = 0;
   while (!isVirtualOperationInterrupted(token) && Date.now() <= deadline) {
+    attempts += 1;
     const input = resolveVirtualOperationTextInput(targetId);
     if (input) {
+      recordVirtualOperationRetry(token, buildVirtualOperationRetryRecord("text_input", targetId, attempts, "resolved", startedAt));
       return input;
     }
     await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_TARGET_RETRY_MS, token);
     await nextTick();
   }
-  return resolveVirtualOperationTextInput(targetId);
+  const input = resolveVirtualOperationTextInput(targetId);
+  recordVirtualOperationRetry(
+    token,
+    buildVirtualOperationRetryRecord(
+      "text_input",
+      targetId,
+      attempts,
+      isVirtualOperationInterrupted(token) ? "interrupted" : input ? "resolved" : "missing",
+      startedAt,
+    ),
+  );
+  return input;
 }
 
 async function waitForTemplateRunTargetAffordance(operation: BuddyVirtualOperation, token: BuddyVirtualOperationToken | null) {
   if (operation.kind !== "run_template") {
     return null;
   }
+  const targetId = operation.targetId || operation.templateId || operation.templateName || operation.searchText || "template";
+  const startedAt = Date.now();
   const deadline = Date.now() + BUDDY_VIRTUAL_OPERATION_TARGET_WAIT_MS;
+  let attempts = 0;
   while (!isVirtualOperationInterrupted(token) && Date.now() <= deadline) {
+    attempts += 1;
     const affordance = resolveTemplateRunTargetAffordance(operation);
     if (affordance) {
+      recordVirtualOperationRetry(token, buildVirtualOperationRetryRecord("template_target", targetId, attempts, "resolved", startedAt));
       return affordance;
     }
     await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_TARGET_RETRY_MS, token);
     await nextTick();
   }
-  return resolveTemplateRunTargetAffordance(operation);
+  const affordance = resolveTemplateRunTargetAffordance(operation);
+  recordVirtualOperationRetry(
+    token,
+    buildVirtualOperationRetryRecord(
+      "template_target",
+      targetId,
+      attempts,
+      isVirtualOperationInterrupted(token) ? "interrupted" : affordance ? "resolved" : "missing",
+      startedAt,
+    ),
+  );
+  return affordance;
 }
 
 async function fillTemplateRunInputNode(
@@ -3608,28 +3797,58 @@ async function fillTemplateRunInputNode(
 }
 
 async function waitForTemplateRunInputTextInput(token: BuddyVirtualOperationToken | null) {
+  const startedAt = Date.now();
   const deadline = Date.now() + BUDDY_VIRTUAL_OPERATION_TARGET_WAIT_MS;
+  let attempts = 0;
   while (!isVirtualOperationInterrupted(token) && Date.now() <= deadline) {
+    attempts += 1;
     const input = resolveTemplateRunInputTextInput();
     if (input) {
+      recordVirtualOperationRetry(token, buildVirtualOperationRetryRecord("template_input", "editor.template.input", attempts, "resolved", startedAt));
       return input;
     }
     await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_TARGET_RETRY_MS, token);
     await nextTick();
   }
-  return resolveTemplateRunInputTextInput();
+  const input = resolveTemplateRunInputTextInput();
+  recordVirtualOperationRetry(
+    token,
+    buildVirtualOperationRetryRecord(
+      "template_input",
+      "editor.template.input",
+      attempts,
+      isVirtualOperationInterrupted(token) ? "interrupted" : input ? "resolved" : "missing",
+      startedAt,
+    ),
+  );
+  return input;
 }
 
 async function waitForRoutePath(expectedPath: string, token: BuddyVirtualOperationToken | null) {
+  const startedAt = Date.now();
   const deadline = Date.now() + BUDDY_VIRTUAL_OPERATION_TARGET_WAIT_MS;
+  let attempts = 0;
   while (!isVirtualOperationInterrupted(token) && Date.now() <= deadline) {
+    attempts += 1;
     await nextTick();
     if (routeMatchesVirtualOperationTargetPath(route.fullPath, expectedPath)) {
+      recordVirtualOperationRetry(token, buildVirtualOperationRetryRecord("route", expectedPath, attempts, "resolved", startedAt));
       return true;
     }
     await waitForVirtualOperation(BUDDY_VIRTUAL_OPERATION_TARGET_RETRY_MS, token);
   }
-  return routeMatchesVirtualOperationTargetPath(route.fullPath, expectedPath);
+  const matched = routeMatchesVirtualOperationTargetPath(route.fullPath, expectedPath);
+  recordVirtualOperationRetry(
+    token,
+    buildVirtualOperationRetryRecord(
+      "route",
+      expectedPath,
+      attempts,
+      isVirtualOperationInterrupted(token) ? "interrupted" : matched ? "resolved" : "missing",
+      startedAt,
+    ),
+  );
+  return matched;
 }
 
 function resolveTemplateRunTargetAffordance(operation: Extract<BuddyVirtualOperation, { kind: "run_template" }>) {
@@ -5198,6 +5417,14 @@ function openRunPlayback(runId: string | null | undefined) {
   void router.push(resolveRunRestoreUrl(normalizedRunId));
 }
 
+function openTraceEvidenceRun(runId: string | null | undefined) {
+  const normalizedRunId = String(runId ?? "").trim();
+  if (!normalizedRunId) {
+    return;
+  }
+  void router.push(`/runs/${encodeURIComponent(normalizedRunId)}`);
+}
+
 function toggleVirtualOperationFollow() {
   virtualOperationFollowEnabled.value = !virtualOperationFollowEnabled.value;
   persistVirtualOperationFollowEnabled(virtualOperationFollowEnabled.value);
@@ -6579,7 +6806,8 @@ function formatErrorMessage(error: unknown): string {
   background: rgba(244, 255, 248, 0.98);
 }
 
-.buddy-widget__run-trace-row-open {
+.buddy-widget__run-trace-row-open,
+.buddy-widget__run-trace-row-evidence-open {
   appearance: none;
   display: grid;
   place-items: center;
@@ -6593,7 +6821,8 @@ function formatErrorMessage(error: unknown): string {
   flex: 0 0 auto;
 }
 
-.buddy-widget__run-trace-row-open:hover {
+.buddy-widget__run-trace-row-open:hover,
+.buddy-widget__run-trace-row-evidence-open:hover {
   border-color: rgba(154, 52, 18, 0.3);
   background: rgba(255, 247, 237, 0.98);
 }
@@ -6712,6 +6941,35 @@ function formatErrorMessage(error: unknown): string {
   font-size: 12px;
   font-weight: 650;
   line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.buddy-widget__run-trace-row-main {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.buddy-widget__run-trace-row-evidence {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.buddy-widget__run-trace-row-evidence span {
+  max-width: 100%;
+  overflow: hidden;
+  padding: 2px 5px;
+  border: 1px solid rgba(154, 52, 18, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 247, 237, 0.72);
+  color: rgba(108, 82, 62, 0.78);
+  font-family: var(--toograph-font-mono);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.15;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

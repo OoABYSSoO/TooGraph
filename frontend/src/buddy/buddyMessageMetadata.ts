@@ -54,7 +54,15 @@ function isBuddyOutputTraceRecord(value: unknown): value is BuddyOutputTraceReco
     isNullableNumber(value.durationMs) &&
     (value.nodeId === null || typeof value.nodeId === "string") &&
     typeof value.nodeType === "string" &&
-    (value.subgraphNodeId === null || typeof value.subgraphNodeId === "string")
+    (value.subgraphNodeId === null || typeof value.subgraphNodeId === "string") &&
+    (
+      value.artifactLabels === undefined ||
+      (Array.isArray(value.artifactLabels) && value.artifactLabels.every((item) => typeof item === "string"))
+    ) &&
+    (
+      value.triggeredRunId === undefined ||
+      typeof value.triggeredRunId === "string"
+    )
   );
 }
 

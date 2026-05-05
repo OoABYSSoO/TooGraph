@@ -23,6 +23,8 @@ export type BuddyOutputTraceTreeRow = {
   durationMs: number | null;
   record: BuddyOutputTraceRecord | null;
   playbackTarget: BuddyOutputTraceTreePlaybackTarget | null;
+  artifactLabels: string[];
+  evidenceRunId: string | null;
 };
 
 export function buildBuddyOutputTraceTreeRows(
@@ -42,6 +44,8 @@ export function buildBuddyOutputTraceTreeRows(
       durationMs: segment.durationMs,
       record: null,
       playbackTarget: { kind: "run", nodeId: null },
+      artifactLabels: [],
+      evidenceRunId: null,
     },
   ];
 
@@ -60,6 +64,8 @@ export function buildBuddyOutputTraceTreeRows(
       durationMs: record.durationMs,
       record,
       playbackTarget: isSubgraphHeader ? { kind: "subgraph", nodeId: subgraphHeaderId || record.nodeId } : null,
+      artifactLabels: record.artifactLabels ?? [],
+      evidenceRunId: normalizeText(record.triggeredRunId) || null,
     });
   }
 
@@ -90,3 +96,6 @@ function resolveTreeRecordLabel(record: BuddyOutputTraceRecord, subgraphLabelByI
   return label.startsWith(prefix) ? label.slice(prefix.length).trim() || label : label;
 }
 
+function normalizeText(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}

@@ -26,6 +26,26 @@ def record_operation_journal_event(*, run_id: str, event: dict[str, Any]) -> dic
     operation = _compact_record(detail.get("operation")) or _first_operation_from_request(operation_request)
     operation_report = _compact_record(detail.get("operation_report") or detail.get("operationReport"))
     triggered_run = _compact_record(detail.get("triggered_run") or detail.get("triggeredRun"))
+    artifact_refs = _compact_artifact_refs(
+        detail.get("artifact_refs")
+        or detail.get("artifactRefs")
+        or operation_report.get("artifact_refs")
+        or operation_report.get("artifactRefs")
+        or triggered_run.get("artifact_refs")
+        or triggered_run.get("artifactRefs")
+    )
+    if artifact_refs and "artifact_refs" not in triggered_run:
+        triggered_run["artifact_refs"] = artifact_refs
+    if artifact_refs:
+        operation_report["artifact_refs"] = artifact_refs
+    retry_chain = _compact_retry_chain(
+        detail.get("retry_chain")
+        or detail.get("retryChain")
+        or operation_report.get("retry_chain")
+        or operation_report.get("retryChain")
+    )
+    if retry_chain:
+        operation_report["retry_chain"] = retry_chain
     page_snapshots = _compact_record(detail.get("page_snapshots") or detail.get("pageSnapshots"))
     journal = _compact_list(detail.get("journal"))
     entry = {
@@ -45,6 +65,8 @@ def record_operation_journal_event(*, run_id: str, event: dict[str, Any]) -> dic
         "operation_report": operation_report,
         "page_snapshots": page_snapshots,
         "triggered_run": triggered_run,
+        "artifact_refs": artifact_refs,
+        "retry_chain": retry_chain,
         "failure_category": _compact_text(detail.get("failure_category") or detail.get("failureCategory")),
         "error": _compact_text(event.get("error") or detail.get("error")),
         "journal": journal,
@@ -162,6 +184,53 @@ def _compact_record(value: Any) -> dict[str, Any]:
 
 def _compact_list(value: Any) -> list[Any]:
     return json.loads(json.dumps(value, ensure_ascii=False, default=str)) if isinstance(value, list) else []
+
+
+def _compact_artifact_refs(value: Any) -> list[dict[str, str]]:
+    if not isinstance(value, list):
+        return []
+    keys = (
+        "title",
+        "artifact_kind",
+        "path",
+        "local_path",
+        "file_name",
+        "source_key",
+        "node_id",
+        "format",
+        "content_type",
+    )
+    refs: list[dict[str, str]] = []
+    for item in value[:50]:
+        if not isinstance(item, dict):
+            continue
+        ref = {key: _compact_text(item.get(key)) for key in keys if _compact_text(item.get(key))}
+        if ref:
+            refs.append(ref)
+    return refs
+
+
+def _compact_retry_chain(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    records: list[dict[str, Any]] = []
+    for item in value[:50]:
+        if not isinstance(item, dict):
+            continue
+        record = {
+            "kind": _compact_text(item.get("kind")),
+            "target_id": _compact_text(item.get("target_id") or item.get("targetId")),
+            "status": _compact_text(item.get("status")),
+        }
+        attempts = _optional_int(item.get("attempts"))
+        elapsed_ms = _optional_int(item.get("elapsed_ms") if item.get("elapsed_ms") is not None else item.get("elapsedMs"))
+        if attempts is not None:
+            record["attempts"] = max(1, attempts)
+        if elapsed_ms is not None and elapsed_ms >= 0:
+            record["elapsed_ms"] = elapsed_ms
+        if record["kind"] and record["target_id"] and record["status"]:
+            records.append(record)
+    return records
 
 
 def _compact_text_list(value: Any) -> list[str]:

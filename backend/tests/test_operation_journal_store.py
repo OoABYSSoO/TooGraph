@@ -173,6 +173,80 @@ class OperationJournalStoreTests(unittest.TestCase):
         self.assertEqual(latest["triggered_run"]["status"], "completed")
         self.assertEqual(latest["page_snapshots"]["before"]["path"], "/library")
 
+    def test_operation_journal_preserves_compact_artifact_refs(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            journal_path = Path(temp_dir) / "operation_journal.jsonl"
+            with patch("app.core.storage.operation_journal_store.OPERATION_JOURNAL_PATH", journal_path):
+                entry = record_operation_journal_event(
+                    run_id="run_parent",
+                    event={
+                        "sequence": 2,
+                        "kind": "virtual_ui_operation",
+                        "summary": "Virtual run_template succeeded.",
+                        "node_id": "run_visible_template_operation",
+                        "status": "succeeded",
+                        "created_at": "2026-05-18T10:00:12Z",
+                        "detail": {
+                            "operation_request_id": "vop_template",
+                            "operation": {
+                                "kind": "run_template",
+                                "target_id": "library.template.advanced_web_research_loop.open",
+                            },
+                            "operation_report": {
+                                "operation_request_id": "vop_template",
+                                "status": "succeeded",
+                                "triggered_run_id": "run_search",
+                                "retry_chain": [
+                                    {
+                                        "kind": "affordance",
+                                        "target_id": "app.nav.library",
+                                        "attempts": 4,
+                                        "status": "resolved",
+                                        "elapsed_ms": 360,
+                                        "debug_payload": {"selector": "not compact"},
+                                    }
+                                ],
+                                "artifact_refs": [
+                                    {
+                                        "title": "Brief",
+                                        "artifact_kind": "saved_output",
+                                        "path": "runs/run_search/brief.md",
+                                        "file_name": "brief.md",
+                                        "source_key": "brief",
+                                        "node_id": "output_brief",
+                                        "format": "md",
+                                        "unexpected_large_value": {"body": "not part of the compact journal contract"},
+                                    },
+                                    {
+                                        "title": "Chart",
+                                        "artifact_kind": "image",
+                                        "local_path": "runs/run_search/chart.png",
+                                        "file_name": "chart.png",
+                                        "content_type": "image/png",
+                                    },
+                                ],
+                            },
+                            "triggered_run": {
+                                "run_id": "run_search",
+                                "status": "completed",
+                            },
+                        },
+                    },
+                )
+
+                result = list_operation_journal_entries(operation_request_id="vop_template")
+
+        self.assertIsNotNone(entry)
+        assert entry is not None
+        self.assertEqual(entry["artifact_refs"][0]["path"], "runs/run_search/brief.md")
+        self.assertNotIn("unexpected_large_value", entry["artifact_refs"][0])
+        self.assertEqual(entry["artifact_refs"][1]["local_path"], "runs/run_search/chart.png")
+        self.assertEqual(entry["retry_chain"][0]["target_id"], "app.nav.library")
+        self.assertEqual(entry["retry_chain"][0]["attempts"], 4)
+        self.assertNotIn("debug_payload", entry["retry_chain"][0])
+        self.assertEqual(result["entries"][0]["artifact_refs"], entry["artifact_refs"])
+        self.assertEqual(result["entries"][0]["retry_chain"], entry["retry_chain"])
+
 
 if __name__ == "__main__":
     unittest.main()

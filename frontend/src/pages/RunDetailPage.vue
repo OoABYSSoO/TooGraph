@@ -101,6 +101,42 @@
           </div>
         </article>
 
+        <article v-if="operationJournalVisible" class="run-detail__panel run-detail__panel--operation-journal">
+          <div class="run-detail__panel-heading">
+            <div>
+              <span class="run-detail__section-kicker">{{ t("runDetail.operationJournal") }}</span>
+              <h3>{{ t("runDetail.operationJournalTitle") }}</h3>
+            </div>
+            <span class="run-detail__journal-count">
+              {{ t("runDetail.operationJournalCount", { count: operationJournal?.total ?? operationJournalItems.length }) }}
+            </span>
+          </div>
+          <p v-if="operationJournalError" class="run-detail__muted">{{ t("common.failedToLoad", { error: operationJournalError }) }}</p>
+          <p v-else-if="operationJournalLoading" class="run-detail__muted">{{ t("common.loading") }}</p>
+          <div v-else class="run-detail__operation-journal-list">
+            <section v-for="item in operationJournalItems" :key="item.key" class="run-detail__operation-card">
+              <span class="run-detail__operation-rail" :class="statusBadgeClass(item.status)" aria-hidden="true"></span>
+              <div class="run-detail__operation-body">
+                <div class="run-detail__timeline-heading">
+                  <div class="run-detail__timeline-title">
+                    <strong>{{ item.pathLabel }}</strong>
+                    <small>{{ item.title }}</small>
+                  </div>
+                  <span :class="statusBadgeClass(item.status)">{{ item.status }}</span>
+                </div>
+                <p>{{ item.summary || t("common.noSummary") }}</p>
+                <div class="run-detail__badges">
+                  <span v-for="label in item.badges" :key="`${item.key}-${label}`">{{ label }}</span>
+                </div>
+                <details class="run-detail__operation-detail">
+                  <summary>{{ t("common.details") }}</summary>
+                  <pre class="run-detail__content run-detail__operation-detail-content">{{ item.detailText || t("common.none") }}</pre>
+                </details>
+              </div>
+            </section>
+          </div>
+        </article>
+
         <section class="run-detail__grid">
           <article v-if="cycleVisualization.hasCycle" class="run-detail__panel">
             <div class="run-detail__panel-heading">
@@ -261,6 +297,7 @@ import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 
+import { fetchOperationJournal } from "@/api/operationJournal";
 import { fetchRun } from "@/api/runs";
 import {
   buildLiveStreamingOutput,
@@ -274,9 +311,11 @@ import { formatRunDisplayName, formatRunDisplayTimestamp } from "@/lib/run-displ
 import AppShell from "@/layouts/AppShell.vue";
 import { buildCycleVisualization, describeCycleStopReason, formatCycleStopReason } from "@/lib/run-cycle-visualization";
 import { buildSnapshotScopedRun, canRestoreRunDetail, resolveRunRestoreUrl, resolveRunSnapshot } from "@/lib/run-restore";
+import type { OperationJournalPage } from "@/types/operationJournal";
 import type { RunDetail } from "@/types/run";
 
 import { buildRunAggregatedTimeline, buildRunStatusFacts, listRunOutputArtifacts } from "./runDetailModel.ts";
+import { buildOperationJournalDisplayItems } from "./operationJournalModel.ts";
 import ArtifactDocumentPager from "./ArtifactDocumentPager.vue";
 
 const route = useRoute();
@@ -287,6 +326,9 @@ const error = ref<string | null>(null);
 const selectedSnapshotIdDraft = ref<string | null>(null);
 const expandedContentKeys = ref<Set<string>>(new Set());
 const liveStreamingOutputs = ref<Record<string, LiveStreamingOutput>>({});
+const operationJournal = ref<OperationJournalPage | null>(null);
+const operationJournalLoading = ref(false);
+const operationJournalError = ref<string | null>(null);
 const runId = computed(() => String(route.params.runId ?? ""));
 const runDetailRequestTimeoutMs = 10_000;
 const snapshotOptions = computed(() => {
@@ -321,6 +363,10 @@ const cycleVisualization = computed(() =>
 );
 const outputArtifacts = computed(() => (viewedRun.value ? listRunOutputArtifacts(viewedRun.value) : []));
 const aggregatedTimeline = computed(() => (viewedRun.value ? buildRunAggregatedTimeline(viewedRun.value) : []));
+const operationJournalItems = computed(() => buildOperationJournalDisplayItems(operationJournal.value?.entries ?? []));
+const operationJournalVisible = computed(() =>
+  operationJournalLoading.value || Boolean(operationJournalError.value) || operationJournalItems.value.length > 0,
+);
 const liveStreamingOutputItems = computed(() =>
   Object.values(liveStreamingOutputs.value).sort((left, right) => left.nodeId.localeCompare(right.nodeId)),
 );
@@ -330,6 +376,8 @@ let pollTimer: number | null = null;
 let activeRunRequestId = 0;
 let activeRunController: AbortController | null = null;
 let activeRunTimeout: number | null = null;
+let activeOperationJournalRequestId = 0;
+let activeOperationJournalController: AbortController | null = null;
 let runEventSource: EventSource | null = null;
 
 function selectSnapshot(snapshotId: string) {
@@ -365,6 +413,11 @@ function clearPendingRunRequest() {
     window.clearTimeout(activeRunTimeout);
     activeRunTimeout = null;
   }
+}
+
+function clearPendingOperationJournalRequest() {
+  activeOperationJournalController?.abort();
+  activeOperationJournalController = null;
 }
 
 function closeRunEventStream() {
@@ -406,6 +459,12 @@ function startRunEventStream(nextRunId: string) {
       updateLiveStreamingOutput(payload, true);
     }
   });
+  source.addEventListener("activity.event", (event) => {
+    const payload = parseRunEventPayload(event);
+    if (String(payload?.kind ?? "").trim() === "virtual_ui_operation") {
+      void loadOperationJournal(normalizedRunId);
+    }
+  });
   source.addEventListener("run.completed", () => {
     void loadRun(normalizedRunId);
     closeRunEventStream();
@@ -432,6 +491,46 @@ function resolveRunFetchErrorMessage(fetchError: unknown) {
   return fetchError instanceof Error ? fetchError.message : t("common.loadingRun");
 }
 
+async function loadOperationJournal(nextRunId = runId.value) {
+  const requestId = activeOperationJournalRequestId + 1;
+  activeOperationJournalRequestId = requestId;
+  clearPendingOperationJournalRequest();
+
+  const normalizedRunId = nextRunId.trim();
+  if (!normalizedRunId) {
+    operationJournal.value = null;
+    operationJournalLoading.value = false;
+    operationJournalError.value = null;
+    return;
+  }
+
+  const controller = new AbortController();
+  activeOperationJournalController = controller;
+  operationJournalLoading.value = !operationJournal.value;
+  operationJournalError.value = null;
+
+  try {
+    const nextJournal = await fetchOperationJournal({ runId: normalizedRunId, size: 100 }, { signal: controller.signal });
+    if (requestId !== activeOperationJournalRequestId) {
+      return;
+    }
+    operationJournal.value = nextJournal;
+  } catch (fetchError) {
+    if (requestId !== activeOperationJournalRequestId) {
+      return;
+    }
+    operationJournal.value = null;
+    operationJournalError.value = resolveRunFetchErrorMessage(fetchError);
+  } finally {
+    if (requestId === activeOperationJournalRequestId) {
+      operationJournalLoading.value = false;
+      if (activeOperationJournalController === controller) {
+        activeOperationJournalController = null;
+      }
+    }
+  }
+}
+
 async function loadRun(nextRunId = runId.value) {
   const requestId = activeRunRequestId + 1;
   activeRunRequestId = requestId;
@@ -441,6 +540,7 @@ async function loadRun(nextRunId = runId.value) {
   const normalizedRunId = nextRunId.trim();
   if (!normalizedRunId) {
     run.value = null;
+    operationJournal.value = null;
     loading.value = false;
     error.value = t("runDetail.missingRunId");
     return;
@@ -462,6 +562,7 @@ async function loadRun(nextRunId = runId.value) {
     }
     run.value = nextRun;
     error.value = null;
+    void loadOperationJournal(normalizedRunId);
     if (shouldPollRunStatus(nextRun.status)) {
       pollTimer = window.setTimeout(() => {
         void loadRun(normalizedRunId);
@@ -474,6 +575,7 @@ async function loadRun(nextRunId = runId.value) {
       return;
     }
     run.value = null;
+    operationJournal.value = null;
     error.value = resolveRunFetchErrorMessage(fetchError);
   } finally {
     if (requestId === activeRunRequestId) {
@@ -501,14 +603,21 @@ watch(
 
 onBeforeUnmount(() => {
   activeRunRequestId += 1;
+  activeOperationJournalRequestId += 1;
   clearRunPollTimer();
   clearPendingRunRequest();
+  clearPendingOperationJournalRequest();
   closeRunEventStream();
 });
 
 function resetRunView() {
+  activeOperationJournalRequestId += 1;
+  clearPendingOperationJournalRequest();
   run.value = null;
   error.value = null;
+  operationJournal.value = null;
+  operationJournalLoading.value = false;
+  operationJournalError.value = null;
   selectedSnapshotIdDraft.value = null;
   expandedContentKeys.value = new Set();
   liveStreamingOutputs.value = {};
@@ -617,6 +726,11 @@ function statusBadgeClass(status: string) {
 .run-detail__panel--live {
   border-color: rgba(37, 99, 235, 0.22);
   background: rgba(247, 251, 255, 0.92);
+}
+
+.run-detail__panel--operation-journal {
+  border-color: rgba(14, 116, 144, 0.18);
+  background: rgba(246, 253, 255, 0.9);
 }
 
 .run-detail__eyebrow,
@@ -806,6 +920,7 @@ function statusBadgeClass(status: string) {
 .run-detail__list,
 .run-detail__artifacts,
 .run-detail__live-list,
+.run-detail__operation-journal-list,
 .run-detail__timeline,
 .run-detail__info-grid,
 .run-detail__meta-groups {
@@ -815,6 +930,7 @@ function statusBadgeClass(status: string) {
 
 .run-detail__subcard,
 .run-detail__live-card,
+.run-detail__operation-card,
 .run-detail__info,
 .run-detail__timeline-item {
   border: 1px solid rgba(154, 52, 18, 0.12);
@@ -826,6 +942,45 @@ function statusBadgeClass(status: string) {
 .run-detail__live-card {
   border-color: rgba(37, 99, 235, 0.16);
   background: rgba(255, 255, 255, 0.76);
+}
+
+.run-detail__operation-card {
+  display: grid;
+  grid-template-columns: 5px minmax(0, 1fr);
+  gap: 14px;
+  border-color: rgba(14, 116, 144, 0.14);
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.run-detail__operation-rail {
+  width: 5px;
+  border-radius: 999px;
+  background: var(--toograph-status-fg, rgb(14, 116, 144));
+}
+
+.run-detail__operation-body {
+  min-width: 0;
+}
+
+.run-detail__operation-card .run-detail__badges span {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.run-detail__operation-card .run-detail__timeline-heading > span {
+  width: fit-content;
+}
+
+.run-detail__journal-count {
+  align-self: flex-start;
+  border: 1px solid rgba(14, 116, 144, 0.18);
+  border-radius: 999px;
+  padding: 5px 10px;
+  background: rgba(236, 254, 255, 0.8);
+  color: rgb(14, 116, 144);
+  font-family: var(--toograph-font-mono);
+  font-size: 0.8rem;
+  font-weight: 800;
 }
 
 .run-detail__live-heading {
@@ -901,6 +1056,25 @@ function statusBadgeClass(status: string) {
 
 .run-detail__content--expanded {
   max-height: none;
+}
+
+.run-detail__operation-detail {
+  margin-top: 12px;
+}
+
+.run-detail__operation-detail summary {
+  color: rgba(14, 116, 144, 0.9);
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.run-detail__operation-detail-content {
+  margin-top: 10px;
+  border: 1px solid rgba(14, 116, 144, 0.12);
+  border-radius: 16px;
+  padding: 14px;
+  background: rgba(248, 250, 252, 0.92);
 }
 
 .run-detail__subcard summary {

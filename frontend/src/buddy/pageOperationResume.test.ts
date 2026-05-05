@@ -2,10 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  buildPageOperationArtifactRefs,
   buildPageOperationResult,
   buildPageOperationResumePayload,
   canAutoResumePageOperationRun,
 } from "./pageOperationResume.ts";
+import type { RunDetail } from "../types/run.ts";
 
 const expectedContinuation = {
   mode: "auto_resume_after_ui_operation" as const,
@@ -86,6 +88,8 @@ test("buildPageOperationResult captures route, snapshots, commands, and target i
     triggered_run_status: "completed",
     triggered_run_result_summary: null,
     triggered_run_final_result: null,
+    artifact_refs: [],
+    retry_chain: [],
     input_text: null,
     graph_edit_summary: null,
     operation_report: {
@@ -102,12 +106,134 @@ test("buildPageOperationResult captures route, snapshots, commands, and target i
       triggered_run_status: "completed",
       triggered_run_result_summary: null,
       triggered_run_final_result: null,
+      artifact_refs: [],
+      retry_chain: [],
       input_text: null,
       graph_edit_summary: null,
       error: null,
     },
     error: null,
   });
+});
+
+test("buildPageOperationArtifactRefs extracts saved files and nested local artifact references", () => {
+  const refs = buildPageOperationArtifactRefs({
+    artifacts: {
+      exported_outputs: [
+        {
+          node_id: "output_brief",
+          label: "Brief",
+          source_kind: "state",
+          source_key: "brief",
+          display_mode: "markdown",
+          persist_enabled: true,
+          persist_format: "md",
+          value: {
+            evidence: {
+              title: "Evidence pack",
+              local_path: "runs/run_search/evidence.md",
+              content_type: "text/markdown",
+              char_count: 128,
+              size: 512,
+            },
+          },
+          saved_file: {
+            node_id: "output_brief",
+            source_key: "brief",
+            path: "runs/run_search/brief.md",
+            format: "md",
+            file_name: "brief.md",
+          },
+        },
+        {
+          node_id: "output_chart",
+          label: "Chart",
+          source_kind: "state",
+          source_key: "chart",
+          display_mode: "image",
+          persist_enabled: false,
+          persist_format: "png",
+          value: {
+            image: {
+              local_path: "runs/run_search/chart.png",
+              content_type: "image/png",
+              filename: "chart.png",
+            },
+          },
+        },
+      ],
+    },
+  } as RunDetail);
+
+  assert.deepEqual(refs, [
+    {
+      title: "Brief",
+      artifact_kind: "saved_output",
+      path: "runs/run_search/brief.md",
+      local_path: null,
+      file_name: "brief.md",
+      source_key: "brief",
+      node_id: "output_brief",
+      format: "md",
+      content_type: null,
+    },
+    {
+      title: "Evidence pack",
+      artifact_kind: "document",
+      path: null,
+      local_path: "runs/run_search/evidence.md",
+      file_name: "evidence.md",
+      source_key: "brief",
+      node_id: "output_brief",
+      format: null,
+      content_type: "text/markdown",
+    },
+    {
+      title: "Chart",
+      artifact_kind: "image",
+      path: null,
+      local_path: "runs/run_search/chart.png",
+      file_name: "chart.png",
+      source_key: "chart",
+      node_id: "output_chart",
+      format: null,
+      content_type: "image/png",
+    },
+  ]);
+});
+
+test("buildPageOperationResult records retry chain and classifies missing frontend targets", () => {
+  const retryChain = [
+    {
+      kind: "affordance" as const,
+      target_id: "app.nav.library",
+      attempts: 4,
+      status: "missing" as const,
+      elapsed_ms: 1200,
+    },
+  ];
+  const result = buildPageOperationResult({
+    operationPlan: {
+      version: 1,
+      operationRequestId: "vop_retry_failed",
+      commands: ["click app.nav.library"],
+      operations: [{ kind: "click", targetId: "app.nav.library" }],
+      cursorLifecycle: "return_after_step",
+      expectedContinuation,
+      reason: "打开图与模板。",
+    },
+    status: "failed",
+    routeBefore: "/",
+    routeAfter: "/",
+    pageOperationContextBefore,
+    pageOperationContextAfter,
+    retryChain,
+    error: "找不到可见页面目标：app.nav.library",
+  });
+
+  assert.equal(result.failure_category, "target_not_found");
+  assert.deepEqual(result.retry_chain, retryChain);
+  assert.deepEqual(result.operation_report.retry_chain, retryChain);
 });
 
 test("buildPageOperationResult records template run input text", () => {
@@ -143,6 +269,19 @@ test("buildPageOperationResult records template run input text", () => {
 });
 
 test("buildPageOperationResult records compact triggered run outputs in the report", () => {
+  const artifactRefs = [
+    {
+      title: "Brief",
+      artifact_kind: "saved_output",
+      path: "runs/run_search/brief.md",
+      local_path: null,
+      file_name: "brief.md",
+      source_key: "brief",
+      node_id: "output_brief",
+      format: "md",
+      content_type: null,
+    },
+  ];
   const result = buildPageOperationResult({
     operationPlan: {
       version: 1,
@@ -190,12 +329,15 @@ test("buildPageOperationResult records compact triggered run outputs in the repo
     triggeredRunInitialStatus: "queued",
     triggeredRunStatus: "completed",
     triggeredRunFinalResult: "# 《鸣潮》最新资讯汇总\n\n完整结果正文。",
+    artifactRefs,
   });
 
   assert.equal(result.triggered_run_result_summary, "已拿到《鸣潮》最新资讯摘要。");
   assert.equal(result.triggered_run_final_result, "# 《鸣潮》最新资讯汇总\n\n完整结果正文。");
+  assert.deepEqual(result.artifact_refs, artifactRefs);
   assert.equal(result.operation_report.triggered_run_result_summary, "已拿到《鸣潮》最新资讯摘要。");
   assert.equal(result.operation_report.triggered_run_final_result, "# 《鸣潮》最新资讯汇总\n\n完整结果正文。");
+  assert.deepEqual(result.operation_report.artifact_refs, artifactRefs);
   assert.equal("page_snapshot_after" in result.operation_report, false);
 });
 

@@ -396,6 +396,7 @@ test("BuddyWidget lets the buddy pick up idle-created virtual cursors after catc
 
 test("BuddyWidget executes virtual UI operation events through the virtual cursor", () => {
   assert.match(componentSource, /import \{ resolveBuddyVirtualOperationPlanFromActivityEvent \} from "\.\/virtualOperationProtocol\.ts";/);
+  assert.match(componentSource, /import \{[\s\S]*buildGraphEditPlaybackAuditSummary,[\s\S]*type GraphEditPlaybackAuditApplyResult,[\s\S]*type GraphEditPlaybackAuditSummary,[\s\S]*\} from "\.\/graphEditPlaybackAudit\.ts";/);
   assert.match(componentSource, /latestVirtualOperationRequest,/);
   assert.match(componentSource, /watch\(latestVirtualOperationRequest,\s*\(request\) => \{/);
   assert.match(componentSource, /executeVirtualOperationRequest\(request\);/);
@@ -404,9 +405,15 @@ test("BuddyWidget executes virtual UI operation events through the virtual curso
   assert.match(componentSource, /const operationPlan = resolveBuddyVirtualOperationPlanFromActivityEvent\(payload\);/);
   assert.match(componentSource, /buddyMascotDebugStore\.requestVirtualOperation\(operationPlan\);/);
   assert.match(componentSource, /function executeVirtualOperationRequest\(request: BuddyVirtualOperationRequest \| null\)/);
+  assert.match(componentSource, /let graphEditSummary: Record<string, unknown> \| null = null;/);
+  assert.match(componentSource, /let retryChain: PageOperationRetryRecord\[\] = \[\];/);
+  assert.match(componentSource, /graphEditSummary = commandResult\.graphEditSummary;/);
+  assert.match(componentSource, /retryChain = commandResult\.retryChain;/);
+  assert.match(componentSource, /graphEditSummary,/);
+  assert.match(componentSource, /retryChain,/);
   assert.match(componentSource, /async function executeVirtualOperationCommands\(operationPlan:/);
   assert.match(componentSource, /for \(const operation of operationPlan\.operations\)/);
-  assert.match(componentSource, /async function executeBuddyVirtualOperationCommand\(operation: BuddyVirtualOperation\)/);
+  assert.match(componentSource, /async function executeBuddyVirtualOperationCommand\([\s\S]*operation: BuddyVirtualOperation,[\s\S]*\): Promise<\{ graphEditSummary: GraphEditPlaybackAuditSummary \} \| null>/);
   assert.match(componentSource, /case "focus":[\s\S]*executeBuddyVirtualFocusOperation/);
   assert.match(componentSource, /case "clear":[\s\S]*executeBuddyVirtualClearOperation/);
   assert.match(componentSource, /case "type":[\s\S]*executeBuddyVirtualTypeOperation/);
@@ -436,7 +443,9 @@ test("BuddyWidget executes virtual UI operation events through the virtual curso
   assert.match(componentSource, /function shouldSkipGraphEditPlaybackTextStep\(/);
   assert.match(componentSource, /if \(step\.kind === "choose_node_type" && targetElement\) \{[\s\S]*const beforeNodeIds = listGraphEditPlaybackNodeAffordanceIds\(\);[\s\S]*dispatchVirtualClick\(targetElement\);[\s\S]*rememberCreatedNodeAlias\(step, beforeNodeIds, playbackState\);/);
   assert.match(componentSource, /if \(step\.kind === "commit_state_field" && targetElement\) \{[\s\S]*const beforeStateKeys = listGraphEditPlaybackPortStateKeys\(step, playbackState\);[\s\S]*dispatchVirtualClick\(targetElement\);[\s\S]*rememberCreatedStateAlias\(step, beforeStateKeys, playbackState\);/);
-  assert.match(componentSource, /if \(step\.kind === "apply_graph_command"\) \{[\s\S]*dispatchGraphEditPlaybackApplyCommand\(step, response\.graphCommands, playbackState\);[\s\S]*\}/);
+  assert.match(componentSource, /const applyResults: GraphEditPlaybackAuditApplyResult\[\] = \[\];/);
+  assert.match(componentSource, /if \(step\.kind === "apply_graph_command"\) \{[\s\S]*const applyResponse = dispatchGraphEditPlaybackApplyCommand\(step, response\.graphCommands, playbackState\);[\s\S]*applyResults\.push\(/);
+  assert.match(componentSource, /return buildGraphEditPlaybackAuditSummary\(\{[\s\S]*requestId,[\s\S]*applyResults,[\s\S]*\}\);/);
   assert.match(componentSource, /graphCommands: GraphEditCommand\[\];/);
   assert.doesNotMatch(componentSource, /dispatchGraphEditPlaybackOpenMenu/);
   assert.doesNotMatch(componentSource, /toograph:graph-edit-playback-open-node-menu/);
@@ -489,6 +498,7 @@ test("BuddyWidget can interrupt virtual operations and skips graph connections t
   assert.match(componentSource, /\.buddy-widget__virtual-operation-stop-icon::before\s*\{[\s\S]*width:\s*8px;[\s\S]*height:\s*8px;/);
   assert.match(componentSource, /@keyframes buddy-widget-virtual-operation-breathe/);
   assert.match(componentSource, /type BuddyVirtualOperationToken = \{/);
+  assert.match(componentSource, /retryChain: PageOperationRetryRecord\[\];/);
   assert.match(componentSource, /const virtualOperationStatus = ref<BuddyVirtualOperationStatus \| null>\(null\);/);
   assert.match(componentSource, /import \{[\s\S]*shallowRef[\s\S]*\} from "vue";/);
   assert.match(componentSource, /const activeVirtualOperationToken = shallowRef<BuddyVirtualOperationToken \| null>\(null\);/);
@@ -499,6 +509,7 @@ test("BuddyWidget can interrupt virtual operations and skips graph connections t
   assert.match(componentSource, /resolveGraphEditPlaybackStepElementWithRetry\(step, playbackState, token\)/);
   assert.match(componentSource, /function resolveGraphEditPlaybackStepElementWithRetry\([\s\S]*step: GraphEditPlaybackStep,[\s\S]*playbackState: GraphEditPlaybackUiState,[\s\S]*token: BuddyVirtualOperationToken \| null,[\s\S]*\)/);
   assert.match(componentSource, /while \(!isVirtualOperationInterrupted\(token\) && Date\.now\(\) <= deadlineMs\) \{/);
+  assert.match(componentSource, /recordVirtualOperationRetry\(token,\s*buildVirtualOperationRetryRecord\("graph_edit_step"/);
   assert.match(componentSource, /if \(isVirtualOperationInterrupted\(token\)\) \{[\s\S]*return null;/);
   assert.match(componentSource, /shouldSkipGraphEditPlaybackConnectionStep\(step, playbackState\)/);
   assert.match(componentSource, /function hasVirtualOperationAffordanceElement\(targetId: string\)/);
@@ -593,11 +604,11 @@ test("BuddyWidget builds page context from the shared editor snapshot", () => {
 });
 
 test("BuddyWidget resumes page operation runs after virtual UI execution", () => {
-  assert.match(componentSource, /import \{[\s\S]*buildPageOperationResult,[\s\S]*buildPageOperationResumePayload,[\s\S]*canAutoResumePageOperationRun,[\s\S]*findAutoResumablePageOperationRequestId,[\s\S]*\} from "\.\/pageOperationResume\.ts";/);
+  assert.match(componentSource, /import \{[\s\S]*buildPageOperationArtifactRefs,[\s\S]*buildPageOperationResult,[\s\S]*buildPageOperationResumePayload,[\s\S]*canAutoResumePageOperationRun,[\s\S]*findAutoResumablePageOperationRequestId,[\s\S]*type PageOperationRetryRecord,[\s\S]*\} from "\.\/pageOperationResume\.ts";/);
   assert.match(componentSource, /const backgroundTemplateOperation = resolveBackgroundTemplateRunOperation\(operationPlan\);/);
-  assert.match(componentSource, /buddyMascotDebugStore\.beginVirtualOperationRunAttribution\(operationPlan\);[\s\S]*status = await executeVirtualOperationCommands\(operationPlan\);[\s\S]*triggeredRun = await waitForVirtualOperationTriggeredRun\(operationPlan\);[\s\S]*triggeredRunDetail = triggeredRun \? await waitForTriggeredRunCompletion\(triggeredRun\) : null;/);
+  assert.match(componentSource, /buddyMascotDebugStore\.beginVirtualOperationRunAttribution\(operationPlan\);[\s\S]*const commandResult = await executeVirtualOperationCommands\(operationPlan\);[\s\S]*status = commandResult\.status;[\s\S]*graphEditSummary = commandResult\.graphEditSummary;[\s\S]*triggeredRun = await waitForVirtualOperationTriggeredRun\(operationPlan\);[\s\S]*triggeredRunDetail = triggeredRun \? await waitForTriggeredRunCompletion\(triggeredRun\) : null;/);
   assert.match(componentSource, /const pageOperationContextAfterBase = buildPageOperationRuntimeContext\(\{ latestForegroundRun \}\);/);
-  assert.match(componentSource, /buildPageOperationResult\(\{[\s\S]*operationPlan,[\s\S]*routeBefore,[\s\S]*routeAfter: route\.fullPath,[\s\S]*pageOperationContextBefore: pageOperationContextBefore\.skillRuntimeContext,[\s\S]*pageOperationContextAfter: pageOperationContextAfterBase\.skillRuntimeContext,[\s\S]*triggeredRunId: triggeredRun\?\.runId \?\? null,[\s\S]*triggeredGraphId: triggeredRun\?\.graphId \?\? null,[\s\S]*triggeredRunInitialStatus: triggeredRun\?\.initialStatus \?\? null,[\s\S]*triggeredRunStatus: triggeredRunDetail\?\.status \?\? triggeredRun\?\.initialStatus \?\? null,[\s\S]*triggeredRunFinalResult: triggeredRunDetail\?\.final_result \?\? null,[\s\S]*\}\);/);
+  assert.match(componentSource, /buildPageOperationResult\(\{[\s\S]*operationPlan,[\s\S]*routeBefore,[\s\S]*routeAfter: route\.fullPath,[\s\S]*pageOperationContextBefore: pageOperationContextBefore\.skillRuntimeContext,[\s\S]*pageOperationContextAfter: pageOperationContextAfterBase\.skillRuntimeContext,[\s\S]*triggeredRunId: triggeredRun\?\.runId \?\? null,[\s\S]*triggeredGraphId: triggeredRun\?\.graphId \?\? null,[\s\S]*triggeredRunInitialStatus: triggeredRun\?\.initialStatus \?\? null,[\s\S]*triggeredRunStatus: triggeredRunDetail\?\.status \?\? triggeredRun\?\.initialStatus \?\? null,[\s\S]*triggeredRunFinalResult: triggeredRunDetail\?\.final_result \?\? null,[\s\S]*artifactRefs: buildPageOperationArtifactRefs\(triggeredRunDetail\),[\s\S]*retryChain,[\s\S]*graphEditSummary,[\s\S]*\}\);/);
   assert.match(componentSource, /const pageOperationContextAfter = buildPageOperationRuntimeContext\(\{[\s\S]*latestOperationReport: operationResult\.operation_report,[\s\S]*latestForegroundRun,[\s\S]*\}\);/);
   assert.match(componentSource, /async function waitForTriggeredRunCompletion\([\s\S]*triggeredRun: BuddyVirtualOperationTriggeredRun,[\s\S]*Promise<RunDetail \| null> \{[\s\S]*latestRun = await fetchRun\(triggeredRun\.runId\);[\s\S]*if \(!shouldPollRunStatus\(latestRun\.status\)\) \{/);
   assert.match(componentSource, /async function maybeAutoResumePageOperationRun\(/);
@@ -735,6 +746,12 @@ test("BuddyWidget renders output-segment run trace capsules instead of per-messa
   assert.match(componentSource, /class="buddy-widget__run-trace-row-open"/);
   assert.match(componentSource, /v-if="row\.playbackTarget && message\.runId"/);
   assert.match(componentSource, /@click="openTraceTreeRowPlayback\(message\.runId, row\)"/);
+  assert.match(componentSource, /v-for="label in row\.artifactLabels"/);
+  assert.match(componentSource, /class="buddy-widget__run-trace-row-evidence"/);
+  assert.match(componentSource, /v-if="row\.evidenceRunId"/);
+  assert.match(componentSource, /@click="openTraceEvidenceRun\(row\.evidenceRunId\)"/);
+  assert.match(componentSource, /function openTraceEvidenceRun\(runId: string \| null \| undefined\)/);
+  assert.match(componentSource, /router\.push\(`\/runs\/\$\{encodeURIComponent\(normalizedRunId\)\}`\)/);
   assert.doesNotMatch(componentSource, /class="buddy-widget__run-trace-open"/);
   assert.match(componentSource, /function openTraceTreeRowPlayback\(runId: string \| null \| undefined, row: BuddyOutputTraceTreeRow\)/);
   assert.match(componentSource, /router\.push\(resolveRunRestoreUrl\(normalizedRunId\)\)/);

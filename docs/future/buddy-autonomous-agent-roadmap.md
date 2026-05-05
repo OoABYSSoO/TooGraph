@@ -31,11 +31,11 @@
 
 待做：
 
-- 扩展 operation journal：基础 JSONL 存储和 `/api/operation-journal` 查询已能按 operation id 关联 request/completion，并记录 run id、节点 id、子图路径、目标 affordance、输入文本、前后页面快照、目标 run 结果和失败原因；后续补 retry chain、artifact refs 详情、前端浏览入口和长期存储迁移策略。
-- 将 Graph Edit Playback 结果、等待事件和前端重试链路补齐到同一 `virtual_ui_operation` journal 链路；请求阶段和 auto-resume 完成/失败阶段已经能通过同一个 operation id 同时进入 run activity 和独立 journal。
-- 在运行详情和 Buddy 胶囊中继续补充 graph edit diff/revision、失败恢复入口和 artifact 链接；触发的目标 run id/status 已进入完成态摘要。
-- 将前端 affordance 失配和重试失败归并到统一 failure category；Skill 预检失败已经覆盖目标不存在、页面快照过期、权限阻止和输入绑定失败，auto-resume 结果已经覆盖目标 run 失败、用户中断和前端执行失败。
-- 为“跟随/不跟随”模式补齐端到端稳定性测试：用户切换页面、拖动伙伴、查看运行记录或编辑其他图时，后台结果获取不能受影响。
+- 扩展 operation journal：基础 JSONL 存储和 `/api/operation-journal` 查询已能按 operation id 关联 request/completion，并记录 run id、节点 id、子图路径、目标 affordance、输入文本、前后页面快照、目标 run 结果、失败原因、artifact refs 和前端 retry chain；运行详情页已能读取 journal 并展示虚拟 UI 操作链路、artifact refs 详情和 retry 计数；后续补长期存储迁移策略。
+- 将 Graph Edit Playback 结果、等待事件和前端重试链路补齐到同一 `virtual_ui_operation` journal 链路；请求阶段和 auto-resume 完成/失败阶段已经能通过同一个 operation id 同时进入 run activity 和独立 journal，Graph Edit Playback 已写入 request id、命令数、已应用命令数、失败命令数、播放步骤数和 issues，前端等待重试已写入 retry chain。
+- 在运行详情和 Buddy 胶囊中继续补充 graph edit diff/revision、失败恢复入口和 artifact 链接；运行详情 operation journal 已展示触发 run 的 artifact refs，触发的目标 run id/status 已进入完成态摘要，Buddy 胶囊已内联展示虚拟操作的 artifact 数量、前端 retry 证据标签和可点击目标 run 入口。
+- 将前端 affordance 失配和重试失败归并到统一 failure category；Skill 预检失败已经覆盖目标不存在、页面快照过期、权限阻止和输入绑定失败，auto-resume 结果已经覆盖目标 run 失败、用户中断和前端执行失败，前端缺失目标已归类为 `target_not_found`，带重试证据的前端执行错误已归类为 `frontend_retry_failed`。
+- 为“跟随/不跟随”模式补齐端到端稳定性测试：Playwright 覆盖了后台模板证据在切换页面、查看运行记录、进入编辑器和拖动伙伴后仍保留，以及跟随开关持久化后不影响已恢复的后台证据。
 
 ### 2. 图编辑 revision、diff 和 undo/redo
 

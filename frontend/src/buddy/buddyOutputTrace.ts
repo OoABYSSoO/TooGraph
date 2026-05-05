@@ -36,6 +36,8 @@ export type BuddyOutputTraceRecord = {
   subgraphNodeId: string | null;
   aggregateSubgraphNodeId?: string | null;
   summary?: string;
+  artifactLabels?: string[];
+  triggeredRunId?: string;
 };
 
 export type BuddyOutputTraceSegment = {
@@ -286,6 +288,8 @@ function applyActivityEvent(
     nodeType: "activity",
     subgraphNodeId: subgraphNodeId || null,
     summary: virtualOperation?.summary || normalizeText(payload.summary),
+    artifactLabels: virtualOperation?.artifactLabels ?? [],
+    triggeredRunId: virtualOperation?.triggeredRunId,
   });
 }
 
