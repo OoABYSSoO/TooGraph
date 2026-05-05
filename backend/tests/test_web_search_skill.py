@@ -69,12 +69,10 @@ class WebSearchSkillTests(unittest.TestCase):
             api_key="tvly-test",
             timeout_seconds=15.0,
         )
-        self.assertEqual(set(result), {"context", "source_urls", "artifact_paths", "errors"})
+        self.assertEqual(set(result), {"source_urls", "artifact_paths", "errors"})
         self.assertEqual(result["source_urls"], ["https://example.com/docs"])
         self.assertEqual(result["artifact_paths"], [])
         self.assertEqual(result["errors"], [])
-        self.assertIn("GraphiteUI is a visual workflow studio.", result["context"])
-        self.assertIn("[1] GraphiteUI Docs", result["context"])
 
     def test_web_search_skill_falls_back_to_duckduckgo_without_api_key(self) -> None:
         web_search = _load_web_search_module()
@@ -99,12 +97,10 @@ class WebSearchSkillTests(unittest.TestCase):
             max_results=5,
             timeout_seconds=15.0,
         )
-        self.assertEqual(set(result), {"context", "source_urls", "artifact_paths", "errors"})
+        self.assertEqual(set(result), {"source_urls", "artifact_paths", "errors"})
         self.assertEqual(result["source_urls"], ["https://example.org/fallback"])
         self.assertEqual(result["artifact_paths"], [])
         self.assertEqual(result["errors"], [])
-        self.assertIn("Fallback Result", result["context"])
-        self.assertIn("Search date:", result["context"])
 
     def test_web_search_skill_fetches_pages_to_local_artifacts_when_requested(self) -> None:
         web_search = _load_web_search_module()
@@ -151,12 +147,14 @@ class WebSearchSkillTests(unittest.TestCase):
                     result = web_search.web_search_skill(query="full article")
 
                 document_path = artifact_dir / "doc_001.md"
-                self.assertEqual(set(result), {"context", "source_urls", "artifact_paths", "errors"})
+                self.assertEqual(set(result), {"source_urls", "artifact_paths", "errors"})
                 self.assertEqual(result["artifact_paths"], ["run_1/searcher/web_search/invocation_001/doc_001.md"])
                 self.assertEqual(result["errors"], [])
                 self.assertTrue(document_path.is_file())
-                self.assertIn("Detailed evidence paragraph", document_path.read_text(encoding="utf-8"))
-                self.assertIn("Local document: run_1/searcher/web_search/invocation_001/doc_001.md", result["context"])
+                document_text = document_path.read_text(encoding="utf-8")
+                self.assertIn("Detailed evidence paragraph", document_text)
+                self.assertNotIn("Source URL:", document_text)
+                self.assertNotIn("Fetched at:", document_text)
         finally:
             server.shutdown()
             server.server_close()
@@ -165,8 +163,7 @@ class WebSearchSkillTests(unittest.TestCase):
         web_search = _load_web_search_module()
         result = web_search.web_search_skill(query="   ")
 
-        self.assertEqual(set(result), {"context", "source_urls", "artifact_paths", "errors"})
-        self.assertEqual(result["context"], "")
+        self.assertEqual(set(result), {"source_urls", "artifact_paths", "errors"})
         self.assertEqual(result["source_urls"], [])
         self.assertEqual(result["artifact_paths"], [])
         self.assertEqual(result["errors"], ["Search query is required."])

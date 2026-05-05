@@ -26,11 +26,10 @@ PAGE_FETCH_USER_AGENT = "GraphiteUI/1.0 (+https://github.com/AbyssBadger0/Graphi
 def web_search_skill(**skill_inputs: Any) -> dict[str, Any]:
     query = _compact_text(skill_inputs.get("query"))
     if not query:
-        return _final_response(context="", source_urls=[], artifact_paths=[], errors=["Search query is required."])
+        return _final_response(source_urls=[], artifact_paths=[], errors=["Search query is required."])
     query = _enrich_time_sensitive_web_search_query(query)
 
     api_key = _resolve_tavily_api_key(skill_inputs)
-    provider = "tavily" if api_key else "duckduckgo"
 
     try:
         if api_key:
@@ -49,7 +48,7 @@ def web_search_skill(**skill_inputs: Any) -> dict[str, Any]:
                 timeout_seconds=DEFAULT_TIMEOUT_SECONDS,
             )
     except Exception as exc:
-        return _final_response(context="", source_urls=[], artifact_paths=[], errors=[str(exc)])
+        return _final_response(source_urls=[], artifact_paths=[], errors=[str(exc)])
 
     results = _normalize_results(raw_response.get("results", []), max_results=DEFAULT_MAX_RESULTS)
     source_documents = _fetch_source_documents(
@@ -69,17 +68,7 @@ def web_search_skill(**skill_inputs: Any) -> dict[str, Any]:
         for document in source_documents
         if document.get("status") == "failed" and document.get("error")
     ]
-    searched_at = _current_search_timestamp()
-    searched_date = searched_at[:10]
-    context = _build_context(
-        results,
-        answer=str(raw_response.get("answer") or ""),
-        provider=provider,
-        source_documents=source_documents,
-        searched_at=searched_at,
-        searched_date=searched_date,
-    )
-    return _final_response(context=context, source_urls=source_urls, artifact_paths=artifact_paths, errors=errors)
+    return _final_response(source_urls=source_urls, artifact_paths=artifact_paths, errors=errors)
 
 
 def _search_with_tavily(
@@ -221,7 +210,6 @@ def _fetch_and_store_source_document(
         parsed_url = urlparse(url)
         if parsed_url.scheme not in {"http", "https"}:
             raise ValueError("Only http and https source URLs can be fetched.")
-        fetched_at = _current_search_timestamp()
         extracted_title, page_text = _load_source_page_text(
             url=url,
             fallback_title=title,
@@ -234,25 +222,13 @@ def _fetch_and_store_source_document(
         document_title = extracted_title or title
         file_name = f"doc_{index:03d}.md"
         document_path = output_dir / file_name
-        document_path.write_text(
-            _render_source_document_markdown(
-                title=document_title,
-                url=url,
-                fetched_at=fetched_at,
-                content=page_text,
-            ),
-            encoding="utf-8",
-        )
+        document_path.write_text(_render_source_document_markdown(content=page_text), encoding="utf-8")
         return {
             **document,
             "title": document_title,
             "status": "succeeded",
             "error": "",
             "local_path": f"{artifact_relative_dir}/{file_name}",
-            "content_type": "text/markdown",
-            "char_count": len(page_text),
-            "fetched_at": fetched_at,
-            "excerpt": _truncate_text(page_text, 800),
         }
     except Exception as exc:
         return {
@@ -291,68 +267,17 @@ def _extract_readable_page_text(html: str, *, content_type: str, fallback_title:
     return title, _compact_multiline_text(body.get_text("\n", strip=True))
 
 
-def _render_source_document_markdown(*, title: str, url: str, fetched_at: str, content: str) -> str:
-    return "\n".join(
-        [
-            f"# {title}",
-            "",
-            f"Source URL: {url}",
-            f"Fetched at: {fetched_at}",
-            "",
-            "---",
-            "",
-            content,
-            "",
-        ]
-    )
-
-
-def _build_context(
-    results: list[dict[str, Any]],
-    *,
-    answer: str,
-    provider: str,
-    source_documents: list[dict[str, Any]] | None = None,
-    searched_at: str,
-    searched_date: str,
-) -> str:
-    context_blocks = [
-        f"Search provider: {provider}\nSearch executed at: {searched_at}\nSearch date: {searched_date}",
-    ]
-    answer = _compact_text(answer)
-    if answer:
-        context_blocks.append(f"Provider answer:\n{answer}")
-    source_by_url = {
-        _compact_text(document.get("url")): document
-        for document in source_documents or []
-        if _compact_text(document.get("url"))
-    }
-    for index, result in enumerate(results, start=1):
-        content = _compact_text(result.get("content"))
-        raw_content = _compact_text(result.get("raw_content"))
-        body = raw_content or content
-        document = source_by_url.get(_compact_text(result.get("url")))
-        document_lines: list[str] = []
-        if document and document.get("status") == "succeeded":
-            document_lines.append(f"Local document: {document.get('local_path')}")
-            excerpt = _compact_multiline_text(document.get("excerpt"))
-            if excerpt:
-                document_lines.append(f"Fetched excerpt:\n{excerpt}")
-        elif document and document.get("error"):
-            document_lines.append(f"Local document unavailable: {document.get('error')}")
-        context_blocks.append(f"[{index}] {result['title']}\nURL: {result['url']}\n{body}\n" + "\n".join(document_lines).strip())
-    return "\n\n".join(context_blocks)
+def _render_source_document_markdown(*, content: str) -> str:
+    return f"{content.rstrip()}\n"
 
 
 def _final_response(
     *,
-    context: str,
     source_urls: list[str],
     artifact_paths: list[str],
     errors: list[str],
 ) -> dict[str, Any]:
     return {
-        "context": context,
         "source_urls": source_urls,
         "artifact_paths": artifact_paths,
         "errors": errors,
@@ -434,10 +359,6 @@ def _truncate_text(text: str, max_chars: int) -> str:
     if len(text) <= max_chars:
         return text
     return f"{text[:max_chars].rstrip()}\n\n[Content truncated by web_search skill at {max_chars} characters.]"
-
-
-def _current_search_timestamp() -> str:
-    return datetime.now().astimezone().isoformat(timespec="seconds")
 
 
 def _resolve_duckduckgo_url(href: str) -> str:

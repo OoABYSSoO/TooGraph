@@ -19,13 +19,16 @@ def coerce_input_boundary_value(value: Any, state_type: NodeSystemStateType) -> 
 
     try:
         parsed = json.loads(value)
+        if state_type == NodeSystemStateType.FILE:
+            return _coerce_file_reference(parsed)
+        if state_type == NodeSystemStateType.FILE_LIST:
+            return _coerce_file_reference_list(parsed)
         if state_type in {
             NodeSystemStateType.NUMBER,
             NodeSystemStateType.BOOLEAN,
             NodeSystemStateType.OBJECT,
             NodeSystemStateType.ARRAY,
             NodeSystemStateType.JSON,
-            NodeSystemStateType.FILE_LIST,
             NodeSystemStateType.SKILL,
         }:
             return parsed
@@ -35,7 +38,6 @@ def coerce_input_boundary_value(value: Any, state_type: NodeSystemStateType) -> 
                 NodeSystemStateType.IMAGE,
                 NodeSystemStateType.AUDIO,
                 NodeSystemStateType.VIDEO,
-                NodeSystemStateType.FILE,
             }
             and isinstance(parsed, dict)
             and parsed.get("kind") == "uploaded_file"
@@ -46,3 +48,15 @@ def coerce_input_boundary_value(value: Any, state_type: NodeSystemStateType) -> 
         return value
     except json.JSONDecodeError:
         return value
+
+
+def _coerce_file_reference(value: Any) -> Any:
+    if isinstance(value, dict) and value.get("kind") == "uploaded_file":
+        return first_truthy([value.get("localPath"), value.get("local_path"), value.get("path")]) or value
+    return value
+
+
+def _coerce_file_reference_list(value: Any) -> Any:
+    if not isinstance(value, list):
+        return value
+    return [_coerce_file_reference(item) for item in value]

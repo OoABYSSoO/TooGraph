@@ -43,6 +43,8 @@
 - Agent 节点提示词区域支持技能说明胶囊，胶囊可编辑、可随技能移除。
 - 旧内置模板已删除，旧模板运行入口兼容修补已删除。
 - 旧技能包已删除，只保留新的 `web_search`。
+- `file` / `file_list` state 已采用路径透传语义；Agent 节点会读取文件并只把文件名与原文全文放入模型上下文。
+- `web_search` 不再输出 `context`，只输出 `source_urls`、`artifact_paths` 和 `errors`。
 
 尚未完成：
 
@@ -75,7 +77,7 @@
   "skillKey": "web_search",
   "name": "联网搜索",
   "description": "当任务需要获取最新公开网页信息、新闻、版本内容、引用来源或网页正文时使用。不负责最终总结。",
-  "agentInstruction": "你已经绑定了联网搜索技能。请根据任务决定 query、max_results、search_depth 和 fetch_pages，然后运行技能；不要在本节点整理最终结论。",
+  "agentInstruction": "你已经绑定了联网搜索技能。请根据任务决定 query，然后运行技能；不要在本节点整理最终结论。",
   "kind": "atomic",
   "mode": "tool",
   "scope": "node",
@@ -166,8 +168,8 @@ intent_agent
   -> decision_agent 选择 web_search
   -> allowed_skills: [{ skillKey: "web_search" }]
   -> search_agent 绑定 allowed_skills，决定 query="鸣潮 最新版本 更新内容" 并运行 web_search
-  -> search_result / source_urls / artifact_paths / errors
-  -> summary_agent 根据搜索结果总结版本内容
+  -> source_urls / artifact_paths / errors
+  -> summary_agent 读取 artifact_paths 对应原文文件，总结版本内容
   -> final_reply
 ```
 
@@ -197,6 +199,8 @@ Agent 节点提示词区域中，绑定的技能以胶囊展示。
 - 大体量或不适合进 prompt 的内容可以设置 `promptVisible=false`。
 - Output 节点可以展示本地 artifact、网址、错误和摘要。
 - 用户仍能像普通 state 一样查看和编辑这些 state。
+- 如果输出是下游 Agent 需要阅读的正文材料，应绑定为 `file` 或 `file_list`，让 Agent 通过路径读取文件全文。
+- 文件态进入 Agent prompt 时只包含文件名和原文全文；本地路径、来源网址、抓取时间、provider 和运行元数据不进入模型上下文。
 
 示例：
 
@@ -211,6 +215,43 @@ Agent 节点提示词区域中，绑定的技能以胶囊展示。
     "outputKey": "source_urls"
   }
 }
+```
+
+`web_search` 的推荐绑定：
+
+```json
+[
+  {
+    "name": "web_search_source_urls",
+    "type": "json",
+    "promptVisible": false,
+    "binding": {
+      "kind": "skill_output",
+      "skillKey": "web_search",
+      "outputKey": "source_urls"
+    }
+  },
+  {
+    "name": "web_search_artifact_paths",
+    "type": "file_list",
+    "promptVisible": true,
+    "binding": {
+      "kind": "skill_output",
+      "skillKey": "web_search",
+      "outputKey": "artifact_paths"
+    }
+  },
+  {
+    "name": "web_search_errors",
+    "type": "json",
+    "promptVisible": false,
+    "binding": {
+      "kind": "skill_output",
+      "skillKey": "web_search",
+      "outputKey": "errors"
+    }
+  }
+]
 ```
 
 ## `autonomous_decision`
@@ -301,7 +342,7 @@ function call 未来可以作为某些模型的适配层，但不能绕过 Graph
 - `approval_granted`
 - `final_reply`
 - `companion_session_summary`
-- 必要的绑定输出 state，例如 `source_urls`、`artifact_paths`、`errors`
+- 必要的绑定输出 state，例如 `source_urls`、`artifact_paths`、`errors`；其中 `artifact_paths` 应使用 `file_list`。
 
 推荐节点职责：
 

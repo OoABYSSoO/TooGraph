@@ -156,17 +156,20 @@ export function buildInputNodeFromFile(params: {
   encoding: "local_path";
 }): CreatedNodeResult {
   const stateKey = params.stateKey;
-  const uploadedValue = JSON.stringify({
-    kind: "uploaded_file",
-    name: params.fileName,
-    mimeType: params.mimeType || "application/octet-stream",
-    size: params.size,
-    detectedType: params.detectedType,
-    localPath: params.localPath,
-    contentType: params.contentType || params.mimeType || "application/octet-stream",
-    textPreview: params.textPreview,
-    encoding: params.encoding,
-  });
+  const uploadedValue =
+    params.detectedType === "file"
+      ? params.localPath
+      : JSON.stringify({
+          kind: "uploaded_file",
+          name: params.fileName,
+          mimeType: params.mimeType || "application/octet-stream",
+          size: params.size,
+          detectedType: params.detectedType,
+          localPath: params.localPath,
+          contentType: params.contentType || params.mimeType || "application/octet-stream",
+          textPreview: params.textPreview,
+          encoding: params.encoding,
+        });
   return {
     id: params.id,
     node: {

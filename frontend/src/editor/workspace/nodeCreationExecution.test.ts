@@ -188,3 +188,28 @@ test("createNodeFromDroppedFile builds an input node from the uploaded asset env
   assert.match(String(result.document.nodes.input_file_created.config.value), /"encoding":"local_path"/);
   assert.match(String(result.document.nodes.input_file_created.config.value), /"localPath":"uploads\/diagram\.png"/);
 });
+
+test("createNodeFromDroppedFile stores generic file input nodes as local paths", async () => {
+  const document = createBaseDocument();
+  const file = new File(["full document text"], "notes.txt", { type: "text/plain" });
+
+  const result = await createNodeFromDroppedFile(document, {
+    file,
+    position: { x: 140, y: 200 },
+    createdNodeId: "input_text_created",
+    uploadFile: async (uploadFile) => ({
+      local_path: `uploads/${uploadFile.name}`,
+      filename: uploadFile.name,
+      content_type: uploadFile.type,
+      size: uploadFile.size,
+    }),
+  });
+
+  assert.equal(result.createdNodeId, "input_text_created");
+  assert.equal(result.document.nodes.input_text_created.kind, "input");
+  assert.deepEqual(result.document.nodes.input_text_created.writes, [{ state: "state_1", mode: "replace" }]);
+  assert.equal(result.document.state_schema.state_1?.name, "notes.txt");
+  assert.equal(result.document.state_schema.state_1?.type, "file");
+  assert.equal(result.document.state_schema.state_1?.value, "uploads/notes.txt");
+  assert.equal(result.document.nodes.input_text_created.config.value, "uploads/notes.txt");
+});

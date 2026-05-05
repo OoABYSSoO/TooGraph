@@ -41,12 +41,20 @@ def create_skill_artifact_context(
 
 
 def read_skill_artifact_text(relative_path: str) -> dict[str, Any]:
+    return _read_skill_artifact_text(relative_path, max_bytes=MAX_SKILL_ARTIFACT_READ_BYTES)
+
+
+def read_skill_artifact_text_for_prompt(relative_path: str) -> dict[str, Any]:
+    return _read_skill_artifact_text(relative_path, max_bytes=None)
+
+
+def _read_skill_artifact_text(relative_path: str, *, max_bytes: int | None) -> dict[str, Any]:
     normalized_path = normalize_skill_artifact_relative_path(relative_path)
     target = resolve_skill_artifact_path(normalized_path)
     if not target.is_file():
         raise FileNotFoundError(f"Skill artifact '{normalized_path}' does not exist.")
     size = target.stat().st_size
-    if size > MAX_SKILL_ARTIFACT_READ_BYTES:
+    if max_bytes is not None and size > max_bytes:
         raise ValueError(f"Skill artifact '{normalized_path}' is too large to preview.")
     content_type = _guess_text_content_type(target)
     return {

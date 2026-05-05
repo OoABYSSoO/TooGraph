@@ -5,6 +5,7 @@ from typing import Any
 
 from app.core.runtime.agent_multimodal import normalize_uploaded_file_envelope
 from app.core.schemas.node_system import NodeSystemStateDefinition, NodeSystemStateType
+from app.core.storage.skill_artifact_store import read_skill_artifact_text_for_prompt
 
 
 def build_effective_system_prompt(
@@ -35,6 +36,10 @@ def build_auto_system_prompt(
         for key, value in input_values.items():
             definition = resolved_state_schema.get(key)
             if definition is not None and not definition.prompt_visible:
+                continue
+            if _is_file_prompt_state(definition):
+                parts.extend(format_state_prompt_lines(key, definition))
+                parts.extend(format_file_state_prompt_lines(value))
                 continue
             display = format_prompt_value(value)
             parts.extend(format_state_prompt_lines(key, definition, value=display))
@@ -87,6 +92,95 @@ def sanitize_prompt_value(value: Any) -> Any:
     if isinstance(value, str) and value.startswith("data:"):
         return f"<inline-media-reference chars={len(value)}>"
     return value
+
+
+def format_file_state_prompt_lines(value: Any) -> list[str]:
+    references = _collect_file_state_references(value)
+    if not references:
+        return ["  value: "]
+
+    lines: list[str] = []
+    for index, reference in enumerate(references):
+        if index > 0:
+            lines.append("")
+        local_path = reference["local_path"]
+        requested_name = reference.get("name", "")
+        try:
+            artifact = read_skill_artifact_text_for_prompt(local_path)
+            file_name = requested_name or str(artifact.get("name") or _filename_from_local_path(local_path))
+            content = str(artifact.get("content") or "")
+        except Exception:
+            file_name = requested_name or _filename_from_local_path(local_path)
+            content = "[文件读取失败：文件不存在或无法读取。]"
+        lines.append(f"  文件名：{file_name}")
+        lines.append("  原文：")
+        lines.append(content)
+    return lines
+
+
+def _is_file_prompt_state(definition: NodeSystemStateDefinition | None) -> bool:
+    return definition is not None and definition.type in {NodeSystemStateType.FILE, NodeSystemStateType.FILE_LIST}
+
+
+def _collect_file_state_references(value: Any) -> list[dict[str, str]]:
+    references: list[dict[str, str]] = []
+    _append_file_state_references(value, references)
+    return references
+
+
+def _append_file_state_references(value: Any, references: list[dict[str, str]]) -> None:
+    envelope = normalize_uploaded_file_envelope(value)
+    if envelope is not None:
+        _append_file_record(envelope, references)
+        return
+    if isinstance(value, str):
+        parsed = _parse_file_state_json(value)
+        if parsed is not None:
+            _append_file_state_references(parsed, references)
+            return
+        trimmed = value.strip()
+        if trimmed:
+            references.append({"local_path": trimmed})
+        return
+    if isinstance(value, dict):
+        _append_file_record(value, references)
+        return
+    if isinstance(value, list):
+        for item in value:
+            _append_file_state_references(item, references)
+
+
+def _append_file_record(record: dict[str, Any], references: list[dict[str, str]]) -> None:
+    local_path = _first_non_empty_string(record, ("local_path", "localPath", "path"))
+    if not local_path:
+        return
+    name = _first_non_empty_string(record, ("filename", "name"))
+    reference = {"local_path": local_path}
+    if name:
+        reference["name"] = name
+    references.append(reference)
+
+
+def _parse_file_state_json(value: str) -> Any | None:
+    trimmed = value.strip()
+    if not trimmed.startswith(("{", "[")):
+        return None
+    try:
+        return json.loads(trimmed)
+    except json.JSONDecodeError:
+        return None
+
+
+def _first_non_empty_string(record: dict[str, Any], keys: tuple[str, ...]) -> str:
+    for key in keys:
+        value = record.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ""
+
+
+def _filename_from_local_path(local_path: str) -> str:
+    return str(local_path).replace("\\", "/").rstrip("/").rsplit("/", 1)[-1] or "document"
 
 
 def example_output_value_for_state(definition: NodeSystemStateDefinition | None) -> Any:

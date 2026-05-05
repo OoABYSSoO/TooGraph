@@ -27,11 +27,19 @@ class RuntimeInputBoundaryTests(unittest.TestCase):
         self.assertEqual(coerce_input_boundary_value("{invalid", NodeSystemStateType.JSON), "{invalid")
 
     def test_coerce_input_boundary_value_parses_uploaded_file_payloads_for_file_types(self) -> None:
-        payload = '{"kind": "uploaded_file", "name": "image.png"}'
+        payload = '{"kind": "uploaded_file", "name": "image.png", "localPath": "uploads/image.png"}'
 
         self.assertEqual(
             coerce_input_boundary_value(payload, NodeSystemStateType.IMAGE),
-            {"kind": "uploaded_file", "name": "image.png"},
+            {"kind": "uploaded_file", "name": "image.png", "localPath": "uploads/image.png"},
+        )
+        self.assertEqual(coerce_input_boundary_value(payload, NodeSystemStateType.FILE), "uploads/image.png")
+        self.assertEqual(
+            coerce_input_boundary_value(
+                '[{"kind": "uploaded_file", "localPath": "uploads/a.md"}, "uploads/b.md"]',
+                NodeSystemStateType.FILE_LIST,
+            ),
+            ["uploads/a.md", "uploads/b.md"],
         )
         self.assertEqual(coerce_input_boundary_value(payload, NodeSystemStateType.TEXT), payload)
 

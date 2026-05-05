@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.core.runtime.agent_prompt import build_auto_system_prompt
 from app.core.runtime.llm_output_parser import parse_llm_json_response
 from app.core.schemas.node_system import NodeSystemStateDefinition, NodeSystemStateType
+from app.core.storage.skill_artifact_store import create_uploaded_skill_artifact, resolve_skill_artifact_path
 
 
 class AgentStatePromptSemanticTests(unittest.TestCase):
@@ -177,26 +178,70 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
         self.assertIn("不要编造技能结果中不存在的事实", prompt)
         self.assertIn("searched_date: 2026-05-01", prompt)
 
-    def test_auto_prompt_preserves_complete_web_search_context(self) -> None:
-        full_url = "https://www.cnbc.com/2026/04/23/openai-announces-latest-artificial-intelligence-model.html"
-        long_context = (
-            "Search executed at: 2026-05-01T21:28:44+08:00\n"
-            + "Evidence prefix. " * 40
-            + "\n[2] OpenAI announces GPT-5.5, its latest artificial intelligence model - CNBC\n"
-            + f"URL: {full_url}\n"
-            + "OpenAI on Thursday announced its latest artificial intelligence model, GPT-5.5."
+    def test_auto_prompt_expands_file_states_to_filename_and_full_text(self) -> None:
+        first_artifact = create_uploaded_skill_artifact(
+            file_name="primary.md",
+            content_type="text/markdown",
+            payload=b"Primary evidence line one.\nPrimary evidence line two.",
         )
+        second_artifact = create_uploaded_skill_artifact(
+            file_name="secondary.md",
+            content_type="text/markdown",
+            payload=b"Secondary evidence body for the downstream summarizer.",
+        )
+        artifact_paths = [first_artifact["local_path"], second_artifact["local_path"]]
+        try:
+            prompt = build_auto_system_prompt(
+                ["answer"],
+                {
+                    "primary_doc": first_artifact["local_path"],
+                    "source_documents": [second_artifact["local_path"]],
+                },
+                {},
+                state_schema={
+                    "primary_doc": NodeSystemStateDefinition(
+                        name="Primary document",
+                        type=NodeSystemStateType.FILE,
+                    ),
+                    "source_documents": NodeSystemStateDefinition(
+                        name="Source documents",
+                        type=NodeSystemStateType.FILE_LIST,
+                    ),
+                    "answer": NodeSystemStateDefinition(type=NodeSystemStateType.MARKDOWN),
+                },
+            )
+
+            self.assertIn("文件名：", prompt)
+            self.assertIn(Path(first_artifact["local_path"]).name, prompt)
+            self.assertIn(Path(second_artifact["local_path"]).name, prompt)
+            self.assertIn("Primary evidence line one.\nPrimary evidence line two.", prompt)
+            self.assertIn("Secondary evidence body for the downstream summarizer.", prompt)
+            self.assertNotIn(first_artifact["local_path"], prompt)
+            self.assertNotIn(second_artifact["local_path"], prompt)
+            self.assertNotIn("uploads/", prompt)
+        finally:
+            for relative_path in artifact_paths:
+                resolve_skill_artifact_path(relative_path).unlink(missing_ok=True)
+
+    def test_auto_prompt_does_not_leak_file_paths_when_file_state_cannot_be_read(self) -> None:
+        missing_path = "uploads/missing-local-document.md"
 
         prompt = build_auto_system_prompt(
             ["answer"],
-            {"search_result": long_context},
-            {"web_search": {"context": long_context}},
-            state_schema={"answer": NodeSystemStateDefinition(type=NodeSystemStateType.MARKDOWN)},
+            {"primary_doc": missing_path},
+            {},
+            state_schema={
+                "primary_doc": NodeSystemStateDefinition(
+                    name="Primary document",
+                    type=NodeSystemStateType.FILE,
+                ),
+                "answer": NodeSystemStateDefinition(type=NodeSystemStateType.MARKDOWN),
+            },
         )
 
-        self.assertIn(long_context, prompt)
-        self.assertIn(full_url, prompt)
-        self.assertIn("引用链接必须完整复制 URL", prompt)
+        self.assertIn("文件读取失败", prompt)
+        self.assertNotIn(missing_path, prompt)
+        self.assertNotIn("Skill artifact", prompt)
 
     def test_auto_prompt_includes_uploaded_image_local_path_metadata(self) -> None:
         image_payload = {
