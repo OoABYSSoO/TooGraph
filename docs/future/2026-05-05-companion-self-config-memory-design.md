@@ -118,7 +118,8 @@
 
 - `companion_context_loader`：读取 profile、policy、相关 memory 和 session summary，返回 fenced context。
 - `companion_self_config_update`：根据用户明确编辑或桌宠整理计划更新 profile/policy。
-- `companion_state` skill：根据对话回合和当前上下文整理长期记忆，也负责加载回复所需的人设、边界、记忆和摘要。
+- `local_file` 基础技能：执行模板显式声明的白名单文件读取、写入和 revision 记录，不拥有桌宠记忆策略。
+- `companion_chat_loop` 模板：根据对话回合和当前上下文整理长期记忆，显式选择 profile、policy、memory 和 summary 文件路径，并把下一版完整 JSON 交给 `local_file` 写入。
 - `companion_session_summary_update`：压缩当前会话摘要。
 - `companion_revision_restore`：从历史 revision 恢复状态。
 
@@ -126,7 +127,7 @@
 
 自动记忆是默认能力，不提供开关。
 
-每轮桌宠对话结束后，运行对话循环模板中的 `companion_state` skill 节点。它不是回复 Agent 本身，也不是隐藏后台随意写入的业务逻辑，而是可记录、可测试、可审计的整理流程：
+每轮桌宠对话结束后，运行对话循环模板中的整理 Agent 和后续 `local_file` 写入节点。整理 Agent 不是回复 Agent 本身，`local_file` 也不是隐藏后台随意写入的业务逻辑；整条链路是可记录、可测试、可审计的图流程：
 
 1. 读取本轮用户消息、桌宠回复、当前 profile、policy、summary 和已有记忆索引。
 2. 生成结构化整理计划，而不是直接把整句话写进 memory。
@@ -176,7 +177,7 @@ revision 记录结构：
   "previous_value": {},
   "next_value": {},
   "changed_by": "user | companion | skill | template",
-  "change_reason": "用户在 Companion 页面触发更新。| companion_state skill 自动整理。| 用户通过 companion_revision_restore 恢复历史版本。",
+  "change_reason": "用户在 Companion 页面触发更新。| companion_chat_loop 模板自动整理。| 用户通过 companion_revision_restore 恢复历史版本。",
   "run_id": "optional_graph_run_id",
   "created_at": "2026-05-05T00:00:00Z"
 }
@@ -226,10 +227,10 @@ revision 记录结构：
 - 每次写原语都创建 revision。
 - 删除 memory 后不出现在默认召回结果里。
 - restore 会创建新的 revision。
-- `companion_state` 不保存内联媒体载荷、大媒体、一次性运行日志。
-- `companion_state` 会把“你以后就叫图图吧”路由到 `profile.name`，而不是误写成普通 memory。
-- `companion_state` 会把长期回复风格路由到 `policy.communication_preferences`。
-- `companion_state` 会拒绝通过对话升级图操作档位。
+- `local_file` 拒绝读取或写入白名单外路径、settings、日志、构建产物、`.git`、`node_modules` 等不应由图模板触碰的位置。
+- `companion_chat_loop` 整理 Agent 会把“你以后就叫图图吧”路由到 `profile.name`，而不是误写成普通 memory。
+- `companion_chat_loop` 整理 Agent 会把长期回复风格路由到 `policy.communication_preferences`。
+- `companion_chat_loop` 整理 Agent 会拒绝通过对话升级图操作档位，且 `local_file` 只执行模板声明的文件写入。
 
 前端测试：
 

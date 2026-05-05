@@ -177,21 +177,32 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 catalog_items = {item["skillKey"]: item for item in response.json()}
                 self.assertEqual(
                     sorted(catalog_items),
-                    ["companion_state", "game_ad_research_collector", "web_media_downloader", "web_search"],
+                    ["game_ad_research_collector", "local_file", "web_media_downloader", "web_search"],
                 )
+                source_path = {
+                    key: item["sourcePath"].replace("\\", "/")
+                    for key, item in catalog_items.items()
+                }
                 self.assertEqual(catalog_items["web_search"]["sourceFormat"], "skill")
                 self.assertEqual(catalog_items["web_search"]["sourceScope"], "installed")
                 self.assertEqual(catalog_items["web_search"]["targets"], ["agent_node", "companion"])
                 self.assertTrue(catalog_items["web_search"]["runtimeReady"])
                 self.assertTrue(catalog_items["web_search"]["runtimeRegistered"])
-                self.assertTrue(catalog_items["web_search"]["sourcePath"].endswith("/skill/web_search/skill.json"))
+                self.assertTrue(source_path["web_search"].endswith("/skill/web_search/skill.json"))
                 self.assertNotIn("compatibility", catalog_items["web_search"])
+                self.assertEqual(catalog_items["local_file"]["sourceFormat"], "skill")
+                self.assertEqual(catalog_items["local_file"]["sourceScope"], "installed")
+                self.assertEqual(catalog_items["local_file"]["targets"], ["agent_node"])
+                self.assertTrue(catalog_items["local_file"]["runtimeReady"])
+                self.assertTrue(catalog_items["local_file"]["runtimeRegistered"])
+                self.assertTrue(source_path["local_file"].endswith("/skill/local_file/skill.json"))
+                self.assertNotIn("compatibility", catalog_items["local_file"])
                 self.assertEqual(catalog_items["web_media_downloader"]["sourceFormat"], "skill")
                 self.assertEqual(catalog_items["web_media_downloader"]["sourceScope"], "installed")
                 self.assertEqual(catalog_items["web_media_downloader"]["targets"], ["agent_node", "companion"])
                 self.assertTrue(catalog_items["web_media_downloader"]["runtimeReady"])
                 self.assertTrue(catalog_items["web_media_downloader"]["runtimeRegistered"])
-                self.assertTrue(catalog_items["web_media_downloader"]["sourcePath"].endswith("/skill/web_media_downloader/skill.json"))
+                self.assertTrue(source_path["web_media_downloader"].endswith("/skill/web_media_downloader/skill.json"))
                 self.assertNotIn("compatibility", catalog_items["web_media_downloader"])
                 self.assertEqual(catalog_items["game_ad_research_collector"]["sourceFormat"], "skill")
                 self.assertEqual(catalog_items["game_ad_research_collector"]["sourceScope"], "installed")
@@ -199,7 +210,7 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertTrue(catalog_items["game_ad_research_collector"]["runtimeReady"])
                 self.assertTrue(catalog_items["game_ad_research_collector"]["runtimeRegistered"])
                 self.assertTrue(
-                    catalog_items["game_ad_research_collector"]["sourcePath"].endswith(
+                    source_path["game_ad_research_collector"].endswith(
                         "/skill/game_ad_research_collector/skill.json"
                     )
                 )

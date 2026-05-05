@@ -1,0 +1,172 @@
+{
+  "schemaVersion": "graphite.skill/v1",
+  "skillKey": "local_file",
+  "label": "Local File",
+  "description": "Read and write whitelisted local text or JSON files for graph templates.",
+  "version": "1.0.0",
+  "targets": ["agent_node"],
+  "kind": "atomic",
+  "mode": "tool",
+  "scope": "node",
+  "permissions": ["file_read", "file_write"],
+  "inputSchema": [
+    {
+      "key": "operation",
+      "label": "Operation",
+      "valueType": "text",
+      "required": true,
+      "description": "read_text, read_json, write_text, or write_json."
+    },
+    {
+      "key": "path",
+      "label": "Path",
+      "valueType": "text",
+      "required": true,
+      "description": "Repository-relative path inside the configured local file allowlist."
+    },
+    {
+      "key": "content",
+      "label": "Content",
+      "valueType": "json",
+      "required": false,
+      "description": "Text or JSON content to write."
+    },
+    {
+      "key": "default_value",
+      "label": "Default Value",
+      "valueType": "json",
+      "required": false,
+      "description": "Fallback content returned when a read target does not exist."
+    },
+    {
+      "key": "section_tag",
+      "label": "Section Tag",
+      "valueType": "text",
+      "required": false,
+      "description": "Optional XML-style tag used to wrap prompt_section output."
+    },
+    {
+      "key": "empty_message",
+      "label": "Empty Message",
+      "valueType": "text",
+      "required": false,
+      "description": "Prompt body to use when JSON content is an empty object, array, or blank string."
+    },
+    {
+      "key": "allowed_roots",
+      "label": "Allowed Roots",
+      "valueType": "json",
+      "required": false,
+      "description": "Optional list of safe repo-relative roots. Values must stay under the built-in allowlist."
+    },
+    {
+      "key": "revision_path",
+      "label": "Revision Path",
+      "valueType": "text",
+      "required": false,
+      "description": "Optional JSON file path that receives revision records before writes."
+    },
+    {
+      "key": "revision_target_type",
+      "label": "Revision Target Type",
+      "valueType": "text",
+      "required": false,
+      "description": "Type stored in revision records."
+    },
+    {
+      "key": "revision_target_id",
+      "label": "Revision Target ID",
+      "valueType": "text",
+      "required": false,
+      "description": "Target identifier stored in revision records."
+    },
+    {
+      "key": "changed_by",
+      "label": "Changed By",
+      "valueType": "text",
+      "required": false,
+      "description": "Actor stored in revision records."
+    },
+    {
+      "key": "change_reason",
+      "label": "Change Reason",
+      "valueType": "text",
+      "required": false,
+      "description": "Reason stored in revision records."
+    }
+  ],
+  "outputSchema": [
+    {
+      "key": "status",
+      "label": "Status",
+      "valueType": "text",
+      "description": "succeeded or failed."
+    },
+    {
+      "key": "path",
+      "label": "Path",
+      "valueType": "text",
+      "description": "Normalized repository-relative file path."
+    },
+    {
+      "key": "exists",
+      "label": "Exists",
+      "valueType": "json",
+      "description": "Whether a read target existed before default fallback."
+    },
+    {
+      "key": "content",
+      "label": "Content",
+      "valueType": "text",
+      "description": "Text content or serialized JSON content."
+    },
+    {
+      "key": "json_content",
+      "label": "JSON Content",
+      "valueType": "json",
+      "description": "Parsed JSON content for JSON reads and writes."
+    },
+    {
+      "key": "prompt_section",
+      "label": "Prompt Section",
+      "valueType": "markdown",
+      "description": "Content optionally wrapped in section_tag for prompt injection."
+    },
+    {
+      "key": "write_result",
+      "label": "Write Result",
+      "valueType": "json",
+      "description": "Structured file write metadata."
+    },
+    {
+      "key": "revision",
+      "label": "Revision",
+      "valueType": "json",
+      "description": "Revision record written before the file update, when configured."
+    },
+    {
+      "key": "warnings",
+      "label": "Warnings",
+      "valueType": "json",
+      "description": "Non-fatal warnings."
+    },
+    {
+      "key": "error",
+      "label": "Error",
+      "valueType": "text",
+      "description": "Error message when status is failed."
+    }
+  ],
+  "supportedValueTypes": ["text", "markdown", "json"],
+  "sideEffects": ["file_read", "file_write"],
+  "runtime": {
+    "type": "python",
+    "entrypoint": "run.py",
+    "timeoutSeconds": 15
+  },
+  "health": {
+    "type": "none"
+  },
+  "configured": true,
+  "healthy": true
+}
