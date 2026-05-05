@@ -591,13 +591,7 @@ function resolveTraceNode(graph: GraphPayload | null | undefined, nodeId: string
 }
 
 function listVisibleTraceRecords(records: BuddyOutputTraceRecord[]) {
-  const subgraphIdsWithInnerRecords = new Set(
-    records.map((record) => record.subgraphNodeId).filter((value): value is string => Boolean(value)),
-  );
-  return records.filter((record) => {
-    const aggregateSubgraphNodeId = record.aggregateSubgraphNodeId?.trim();
-    return !aggregateSubgraphNodeId || !subgraphIdsWithInnerRecords.has(aggregateSubgraphNodeId);
-  });
+  return records;
 }
 
 function buildTraceTimelineFromRunDetail(run: RunDetail) {

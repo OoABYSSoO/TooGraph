@@ -895,6 +895,7 @@ const baseMessages = {
       runTraceElapsed: "耗时 {duration}",
       runTraceExpand: "展开运行过程",
       runTraceCollapse: "收起运行过程",
+      runTraceMainGraph: "主图开始",
       runTraceCompleted: "{count} 个步骤",
       runTraceFailed: "{count} 个步骤失败",
       activity: {
@@ -2015,6 +2016,7 @@ const baseMessages = {
       runTraceElapsed: "Elapsed {duration}",
       runTraceExpand: "Expand run trace",
       runTraceCollapse: "Collapse run trace",
+      runTraceMainGraph: "Main graph start",
       runTraceCompleted: "{count} steps",
       runTraceFailed: "{count} failed steps",
       activity: {

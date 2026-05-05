@@ -320,16 +320,6 @@
                       aria-hidden="true"
                     />
                   </button>
-                  <button
-                    v-if="message.runId"
-                    type="button"
-                    class="buddy-widget__run-trace-open"
-                    :title="t('buddy.attachRun')"
-                    :aria-label="t('buddy.attachRun')"
-                    @click="openRunPlayback(message.runId)"
-                  >
-                    <ElIcon><Promotion /></ElIcon>
-                  </button>
                 </div>
                 <div
                   v-if="isTraceMessageExpanded(message.id)"
@@ -337,18 +327,33 @@
                 >
                   <ol class="buddy-widget__run-trace-list">
                     <li
-                      v-for="record in message.outputTrace.records"
-                      :key="record.recordId"
+                      v-for="row in buildTraceTreeRows(message.outputTrace)"
+                      :key="row.rowId"
                       class="buddy-widget__run-trace-row"
+                      :class="[
+                        `buddy-widget__run-trace-row--${row.kind}`,
+                        { 'buddy-widget__run-trace-row--nested': row.depth > 0 },
+                      ]"
+                      :style="traceTreeRowStyle(row)"
                     >
                       <span
                         class="buddy-widget__run-trace-dot buddy-widget__run-trace-dot--small"
-                        :class="`buddy-widget__run-trace-dot--${record.status}`"
+                        :class="`buddy-widget__run-trace-dot--${row.status}`"
                         aria-hidden="true"
                       />
-                      <span class="buddy-widget__run-trace-row-label">{{ record.label }}</span>
+                      <span class="buddy-widget__run-trace-row-label">{{ row.label }}</span>
+                      <button
+                        v-if="row.playbackTarget && message.runId"
+                        type="button"
+                        class="buddy-widget__run-trace-row-open"
+                        :title="t('buddy.attachRun')"
+                        :aria-label="t('buddy.attachRun')"
+                        @click="openTraceTreeRowPlayback(message.runId, row)"
+                      >
+                        <ElIcon><Promotion /></ElIcon>
+                      </button>
                       <span class="buddy-widget__run-trace-row-duration">
-                        {{ formatTraceDuration(buildTraceRecordDurationKey(message.id, record.recordId), resolveTraceRecordDurationMs(record)) }}
+                        {{ formatTraceDuration(buildTraceTreeRowDurationKey(message.id, row), resolveTraceTreeRowDurationMs(row)) }}
                       </span>
                     </li>
                   </ol>
@@ -566,10 +571,13 @@ import {
   createBuddyPendingOutputTraceRuntimeState,
   listBuddyOutputTraceSegmentsForDisplay,
   reduceBuddyOutputTraceEvent,
-  type BuddyOutputTraceRecord,
   type BuddyOutputTraceRuntimeState,
   type BuddyOutputTraceSegment,
 } from "./buddyOutputTrace.ts";
+import {
+  buildBuddyOutputTraceTreeRows,
+  type BuddyOutputTraceTreeRow,
+} from "./buddyOutputTraceTree.ts";
 import { buildBuddyTemplateRunGraph } from "./buddyTemplateRunGraph.ts";
 import {
   BUDDY_POSITION_STORAGE_KEY,
@@ -5036,6 +5044,10 @@ function syncBackgroundTemplateRunDisplay(
   runDetail: RunDetail,
   graph: GraphPayload,
 ) {
+  const parentControllerMessageId = resolveBuddyRunControllerMessageId(operationPlan.runId ?? "");
+  if (parentControllerMessageId) {
+    removeBuddyRunDisplayMessages(parentControllerMessageId);
+  }
   const publicOutputBindings = buildBuddyPublicOutputBindings(graph);
   const outputTracePlan = buildBuddyOutputTracePlan(graph, publicOutputBindings);
   const outputTraceState = buildBuddyOutputTraceStateFromRunDetail(runDetail, outputTracePlan, graph);
@@ -5364,6 +5376,23 @@ function toggleTraceMessage(messageId: string) {
   expandedTraceMessageIds.value = next;
 }
 
+function buildTraceTreeRows(segment: BuddyOutputTraceSegment) {
+  return buildBuddyOutputTraceTreeRows(segment, { rootLabel: t("buddy.runTraceMainGraph") });
+}
+
+function traceTreeRowStyle(row: BuddyOutputTraceTreeRow) {
+  return {
+    "--buddy-run-trace-depth": String(Math.max(0, row.depth)),
+  };
+}
+
+function openTraceTreeRowPlayback(runId: string | null | undefined, row: BuddyOutputTraceTreeRow) {
+  if (!row.playbackTarget) {
+    return;
+  }
+  openRunPlayback(runId);
+}
+
 function openRunPlayback(runId: string | null | undefined) {
   const normalizedRunId = String(runId ?? "").trim();
   if (!normalizedRunId) {
@@ -5395,8 +5424,8 @@ function resolveTraceSegmentDurationMs(segment: BuddyOutputTraceSegment) {
   return resolveTraceSegmentDurationMsAt(segment, traceClockNowMs.value);
 }
 
-function resolveTraceRecordDurationMs(record: BuddyOutputTraceRecord) {
-  return resolveTraceRecordDurationMsAt(record, traceClockNowMs.value);
+function resolveTraceTreeRowDurationMs(row: BuddyOutputTraceTreeRow) {
+  return resolveTraceTreeRowDurationMsAt(row, traceClockNowMs.value);
 }
 
 function resolveTraceSegmentDurationMsAt(segment: BuddyOutputTraceSegment, nowMs: number) {
@@ -5409,12 +5438,12 @@ function resolveTraceSegmentDurationMsAt(segment: BuddyOutputTraceSegment, nowMs
   return null;
 }
 
-function resolveTraceRecordDurationMsAt(record: BuddyOutputTraceRecord, nowMs: number) {
-  if (record.durationMs !== null) {
-    return record.durationMs;
+function resolveTraceTreeRowDurationMsAt(row: BuddyOutputTraceTreeRow, nowMs: number) {
+  if (row.durationMs !== null) {
+    return row.durationMs;
   }
-  if (record.status === "running" && record.startedAtMs !== null) {
-    return Math.max(0, nowMs - record.startedAtMs);
+  if (row.status === "running" && row.startedAtMs !== null) {
+    return Math.max(0, nowMs - row.startedAtMs);
   }
   return null;
 }
@@ -5423,8 +5452,8 @@ function buildTraceSegmentDurationKey(messageId: string) {
   return `segment:${messageId}`;
 }
 
-function buildTraceRecordDurationKey(messageId: string, recordId: string) {
-  return `record:${messageId}:${recordId}`;
+function buildTraceTreeRowDurationKey(messageId: string, row: BuddyOutputTraceTreeRow) {
+  return `tree:${messageId}:${row.rowId}`;
 }
 
 function collectTraceDurationTargets(nowMs: number) {
@@ -5440,12 +5469,12 @@ function collectTraceDurationTargets(nowMs: number) {
         animateInitial: message.outputTrace.status === "running",
       };
     }
-    for (const record of message.outputTrace.records) {
-      const recordDurationMs = resolveTraceRecordDurationMsAt(record, nowMs);
-      if (recordDurationMs !== null) {
-        targets[buildTraceRecordDurationKey(message.id, record.recordId)] = {
-          durationMs: recordDurationMs,
-          animateInitial: record.status === "running",
+    for (const row of buildTraceTreeRows(message.outputTrace)) {
+      const rowDurationMs = resolveTraceTreeRowDurationMsAt(row, nowMs);
+      if (rowDurationMs !== null) {
+        targets[buildTraceTreeRowDurationKey(message.id, row)] = {
+          durationMs: rowDurationMs,
+          animateInitial: row.status === "running",
         };
       }
     }
@@ -6753,12 +6782,12 @@ function formatErrorMessage(error: unknown): string {
   background: rgba(244, 255, 248, 0.98);
 }
 
-.buddy-widget__run-trace-open {
+.buddy-widget__run-trace-row-open {
   appearance: none;
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 22px;
+  height: 22px;
   border: 1px solid rgba(154, 52, 18, 0.16);
   border-radius: 999px;
   color: rgba(154, 52, 18, 0.82);
@@ -6767,7 +6796,7 @@ function formatErrorMessage(error: unknown): string {
   flex: 0 0 auto;
 }
 
-.buddy-widget__run-trace-open:hover {
+.buddy-widget__run-trace-row-open:hover {
   border-color: rgba(154, 52, 18, 0.3);
   background: rgba(255, 247, 237, 0.98);
 }
@@ -6847,11 +6876,37 @@ function formatErrorMessage(error: unknown): string {
 }
 
 .buddy-widget__run-trace-row {
+  --buddy-run-trace-depth: 0;
+  position: relative;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 8px;
+  padding-left: calc(var(--buddy-run-trace-depth) * 16px);
   color: rgba(45, 32, 21, 0.82);
+}
+
+.buddy-widget__run-trace-row--nested::before {
+  content: "";
+  position: absolute;
+  left: calc((var(--buddy-run-trace-depth) - 1) * 16px + 4px);
+  top: -7px;
+  bottom: -7px;
+  width: 10px;
+  border-left: 1px solid rgba(154, 52, 18, 0.14);
+  border-bottom: 1px solid rgba(154, 52, 18, 0.14);
+  border-bottom-left-radius: 6px;
+  pointer-events: none;
+}
+
+.buddy-widget__run-trace-row--root,
+.buddy-widget__run-trace-row--subgraph {
+  color: rgba(45, 32, 21, 0.9);
+}
+
+.buddy-widget__run-trace-row--root .buddy-widget__run-trace-row-label,
+.buddy-widget__run-trace-row--subgraph .buddy-widget__run-trace-row-label {
+  font-weight: 800;
 }
 
 .buddy-widget__run-trace-row-label {

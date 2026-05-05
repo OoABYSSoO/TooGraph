@@ -158,7 +158,7 @@ test("reduceBuddyOutputTraceEvent maps branched nodes to their nearest downstrea
   assert.deepEqual(segments[0].records.map((record) => record.label), ["C", "E"]);
 });
 
-test("reduceBuddyOutputTraceEvent renders subgraph inner rows as parent slash child and hides aggregate rows", () => {
+test("reduceBuddyOutputTraceEvent keeps subgraph headers before indented inner rows", () => {
   const graph = fiveNodeGraph();
   graph.nodes.research = {
     kind: "subgraph",
@@ -222,7 +222,7 @@ test("reduceBuddyOutputTraceEvent renders subgraph inner rows as parent slash ch
   state = reduceBuddyOutputTraceEvent(state, plan, graph, "node.completed", { node_id: "research", node_type: "subgraph", duration_ms: 900 }, 1900);
 
   const [segment] = listBuddyOutputTraceSegmentsForDisplay(state);
-  assert.deepEqual(segment.records.map((record) => record.label), ["Research / Search"]);
+  assert.deepEqual(segment.records.map((record) => record.label), ["Research", "Research / Search"]);
   assert.equal(segment.durationMs, 900);
 });
 
