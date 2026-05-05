@@ -823,6 +823,7 @@ const {
 } = useWorkspaceGraphMutationActions({
   documentsByTabId,
   focusedNodeIdByTabId,
+  skillDefinitions,
   markDocumentDirty,
   focusNodeForTab,
   setMessageFeedbackForTab,

@@ -5,6 +5,7 @@ import { reactive } from "vue";
 import * as graphDocument from "./graph-document.ts";
 import { CREATE_AGENT_INPUT_STATE_KEY, VIRTUAL_ANY_INPUT_STATE_KEY, VIRTUAL_ANY_OUTPUT_STATE_KEY } from "./virtual-any-input.ts";
 import type { GraphDocument, GraphPayload, TemplateRecord } from "../types/node-system.ts";
+import type { SkillDefinition } from "../types/skills.ts";
 
 const {
   cloneGraphDocument,
@@ -16,9 +17,48 @@ const {
   reorderNodePortStateInDocument,
   resolveEditorSeedTemplate,
   resolveAgentBreakpointTimingInDocument,
+  updateAgentNodeConfigInDocument,
   updateAgentBreakpointInDocument,
   updateAgentBreakpointTimingInDocument,
 } = graphDocument;
+
+const webSearchSkill: SkillDefinition = {
+  skillKey: "web_search",
+  name: "联网搜索",
+  description: "Search the public web.",
+  agentInstruction: "Decide a query and run web_search.",
+  schemaVersion: "graphite.skill/v1",
+  version: "1.0.0",
+  runPolicies: {
+    default: { discoverable: true, autoSelectable: false, requiresApproval: false },
+    origins: {},
+  },
+  kind: "atomic",
+  mode: "tool",
+  scope: "node",
+  permissions: ["network"],
+  runtime: { type: "python", entrypoint: "run.py" },
+  health: { type: "none" },
+  inputSchema: [{ key: "query", label: "Query", valueType: "text", required: true, description: "" }],
+  outputSchema: [
+    { key: "source_urls", label: "Source URLs", valueType: "json", required: false, description: "URLs." },
+    { key: "artifact_paths", label: "Artifact Paths", valueType: "file_list", required: false, description: "Files." },
+    { key: "errors", label: "Errors", valueType: "json", required: false, description: "Errors." },
+  ],
+  supportedValueTypes: ["text", "json"],
+  sideEffects: ["network"],
+  agentNodeEligibility: "ready",
+  agentNodeBlockers: [],
+  sourceFormat: "skill",
+  sourceScope: "installed",
+  sourcePath: "/skills/web_search/skill.json",
+  runtimeReady: true,
+  runtimeRegistered: true,
+  configured: true,
+  healthy: true,
+  status: "active",
+  canManage: true,
+};
 
 const template: TemplateRecord = {
   template_id: "starter_graph",
@@ -286,6 +326,77 @@ test("cloneGraphDocument unwraps nested reactive arrays inside graph documents",
   assert.equal(reactiveNode.kind, "agent");
   assert.deepEqual(clonedNode.config.skills, ["web_search"]);
   assert.notEqual(clonedNode.config.skills, reactiveNode.config.skills);
+});
+
+test("updateAgentNodeConfigInDocument materializes attached skill outputs as managed state writes", () => {
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Skill Output Binding Graph",
+    state_schema: {},
+    nodes: {
+      search_agent: {
+        kind: "agent",
+        name: "Search Agent",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [],
+        config: {
+          skills: [],
+          skillBindings: [],
+          skillInstructionBlocks: {},
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "high",
+          temperature: 0.2,
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const nextDocument = updateAgentNodeConfigInDocument(
+    document,
+    "search_agent",
+    (config) => ({
+      ...config,
+      skills: ["web_search"],
+    }),
+    { skillDefinitions: [webSearchSkill] },
+  );
+
+  const node = nextDocument.nodes.search_agent;
+  assert.equal(node.kind, "agent");
+  assert.deepEqual(node.writes.map((binding) => binding.state), ["state_1", "state_2", "state_3"]);
+  assert.deepEqual(node.config.skillBindings, [
+    {
+      skillKey: "web_search",
+      trigger: "before_agent",
+      inputMapping: {},
+      outputMapping: {
+        source_urls: "state_1",
+        artifact_paths: "state_2",
+        errors: "state_3",
+      },
+      config: {},
+    },
+  ]);
+  assert.equal(nextDocument.state_schema.state_1?.name, "联网搜索 Source URLs");
+  assert.equal(nextDocument.state_schema.state_1?.type, "json");
+  assert.equal(nextDocument.state_schema.state_1?.promptVisible, false);
+  assert.equal(nextDocument.state_schema.state_2?.type, "file_list");
+  assert.equal(nextDocument.state_schema.state_2?.promptVisible, true);
+  assert.deepEqual(nextDocument.state_schema.state_2?.binding, {
+    kind: "skill_output",
+    skillKey: "web_search",
+    nodeId: "search_agent",
+    fieldKey: "artifact_paths",
+    managed: true,
+  });
+  assert.deepEqual(document.nodes.search_agent.writes, []);
 });
 
 test("createEmptyDraftGraph creates an empty backend-native payload", () => {

@@ -19,6 +19,7 @@
 - Agent 节点卡片上手动添加的 skill，与通过 `skill` 类型 state 输入传入的 skill 按并集合并，一视同仁。
 - 添加到 Agent 节点的 skill 会在节点提示词编辑区生成可编辑的技能说明胶囊；移除 skill 时对应胶囊会移除。
 - 胶囊内容是节点级覆盖，不会反向写回技能包原始文档。
+- 在 Agent 节点卡片添加带 `outputSchema` 的 skill 时，前端会自动创建 managed skill output state、添加到该节点输出端口，并写入 `skillBindings.outputMapping`，让运行时能把技能结果透传给下游节点。
 - `state_schema` 支持 `promptVisible=false`。这类 state 可以参与图运行和技能输出透传，但不会进入 Agent 的模型提示词上下文。
 - `state_schema` 支持 `binding` 元数据，用来标记某个 state 是否由技能输出自动绑定。
 - `file` / `file_list` 类型 state 的值是本地 artifact 路径或路径列表。Agent 节点接收这类 state 时，会读取文件并只把“文件名 + 原文全文”拼入模型上下文，不暴露本地路径、来源网址、抓取时间或运行元数据。
@@ -62,6 +63,6 @@
 - 用新结构手工重建桌宠自主循环模板。
 - 设计并实现真正的 `autonomous_decision` 技能，用于根据技能目录、用户意图和运行策略选择技能，但不直接执行技能。
 - 设计并实现 `graphite_skill_builder`，用于在用户确认后生成符合 GraphiteUI 项目结构的 skill 草案。
-- 完成技能输出绑定 state 的 UI 管理与更完整的图运行展示。
+- 完成更完整的图运行展示。
 - 完成桌宠审批恢复 UI、图补丁预览、GraphCommandBus、revision、undo 和审计闭环。
 - 将人设、记忆、会话摘要等长期状态更新表达为可审计的图模板流程，而不是隐藏产品逻辑。

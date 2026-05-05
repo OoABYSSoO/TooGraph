@@ -701,7 +701,7 @@ test("EditorWorkspaceShell centralizes simple graph mutation commits", () => {
     connectFlowSource,
     /commitDocumentMutationForTab\(\s*tabId,\s*\(document\) => connectFlowNodesInDocument\(document, sourceNodeId, targetNodeId\),\s*\{\s*focusNodeId: targetNodeId,\s*\}\s*\);/,
   );
-  assert.match(updateAgentSource, /commitDocumentMutationForTab\(\s*tabId,[\s\S]*updateAgentNodeConfigInDocument\(document, nodeId, \(current\) => \(\{[\s\S]*\.\.\.current,[\s\S]*\.\.\.patch,[\s\S]*\}\)\),[\s\S]*focusNodeId: nodeId,[\s\S]*\);/);
+  assert.match(updateAgentSource, /commitDocumentMutationForTab\(\s*tabId,[\s\S]*updateAgentNodeConfigInDocument\(document, nodeId, \(current\) => \(\{[\s\S]*\.\.\.current,[\s\S]*\.\.\.patch,[\s\S]*\}\), \{ skillDefinitions: input\.skillDefinitions\.value \}\),[\s\S]*focusNodeId: nodeId,[\s\S]*\);/);
   assert.match(updateStateFieldSource, /commitDocumentMutationForTab\(\s*tabId,[\s\S]*updateStateFieldInDocument\(document, stateKey, \(current\) => \(\{[\s\S]*\.\.\.current,[\s\S]*\.\.\.patch,[\s\S]*\}\)\),[\s\S]*\);/);
   assert.doesNotMatch(addStateReaderSource, /const nextDocument = addStateBindingToDocument/);
   assert.doesNotMatch(bindPortSource, /const nextDocument = addStateBindingToDocument/);

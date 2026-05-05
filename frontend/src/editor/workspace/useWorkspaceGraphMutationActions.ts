@@ -35,6 +35,7 @@ import type {
   OutputNode,
   StateDefinition,
 } from "@/types/node-system";
+import type { SkillDefinition } from "@/types/skills";
 
 import { addStateBindingToDocument, removeStateBindingFromDocument } from "./statePanelBindings.ts";
 import {
@@ -56,6 +57,7 @@ type WorkspaceGraphMutationMessage = {
 type WorkspaceGraphMutationActionsInput = {
   documentsByTabId: Ref<Record<string, GraphPayload | GraphDocument>>;
   focusedNodeIdByTabId: Ref<Record<string, string | null>>;
+  skillDefinitions: Ref<SkillDefinition[]>;
   markDocumentDirty: (tabId: string, nextDocument: GraphPayload | GraphDocument) => void;
   focusNodeForTab: (tabId: string, nodeId: string | null) => void;
   setMessageFeedbackForTab: (tabId: string, feedback: WorkspaceGraphMutationMessage) => void;
@@ -368,7 +370,7 @@ export function useWorkspaceGraphMutationActions(input: WorkspaceGraphMutationAc
         updateAgentNodeConfigInDocument(document, nodeId, (current) => ({
           ...current,
           ...patch,
-        })),
+        }), { skillDefinitions: input.skillDefinitions.value }),
       {
         focusNodeId: nodeId,
       },

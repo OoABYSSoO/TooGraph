@@ -36,6 +36,14 @@ export type WriteBinding = {
   mode?: "replace" | "append";
 };
 
+export type AgentSkillBinding = {
+  skillKey: string;
+  trigger?: "before_agent";
+  inputMapping?: Record<string, string>;
+  outputMapping?: Record<string, string>;
+  config?: Record<string, unknown>;
+};
+
 export type AgentThinkingMode = "off" | "low" | "medium" | "high" | "xhigh" | "on";
 
 export type NodeUi = {
@@ -68,7 +76,7 @@ export type AgentNode = {
   writes: WriteBinding[];
   config: {
     skills: string[];
-    skillBindings?: unknown[];
+    skillBindings?: AgentSkillBinding[];
     skillInstructionBlocks?: Record<string, AgentSkillInstructionBlock>;
     taskInstruction: string;
     modelSource: "global" | "override";

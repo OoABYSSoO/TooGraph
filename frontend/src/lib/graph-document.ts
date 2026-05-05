@@ -14,7 +14,19 @@ import {
 import { isCreateAgentInputStateKey, isVirtualAnyInputStateKey, isVirtualAnyOutputStateKey } from "./virtual-any-input.ts";
 import { resolveInputNodeVirtualOutputType } from "./input-boundary.ts";
 
-import type { AgentNode, ConditionNode, GraphDocument, GraphNode, GraphPayload, InputNode, OutputNode, StateDefinition, TemplateRecord } from "../types/node-system.ts";
+import type {
+  AgentNode,
+  AgentSkillBinding,
+  ConditionNode,
+  GraphDocument,
+  GraphNode,
+  GraphPayload,
+  InputNode,
+  OutputNode,
+  StateDefinition,
+  TemplateRecord,
+} from "../types/node-system.ts";
+import type { SkillDefinition, SkillIoField } from "../types/skills.ts";
 
 export type AgentBreakpointTiming = "before" | "after";
 
@@ -29,6 +41,23 @@ const DEFAULT_MATERIALIZED_STATE_COLORS = [
   "#475569",
   "#9a3412",
 ];
+const STATE_FIELD_TYPE_VALUES = new Set([
+  "text",
+  "number",
+  "boolean",
+  "object",
+  "array",
+  "markdown",
+  "json",
+  "file_list",
+  "image",
+  "audio",
+  "video",
+  "file",
+  "knowledge_base",
+  "skill",
+]);
+const PROMPT_VISIBLE_SKILL_OUTPUT_TYPES = new Set(["file", "file_list"]);
 
 export function createDraftFromTemplate(template: TemplateRecord): GraphPayload {
   const rawTemplate = toRaw(template) as TemplateRecord;
@@ -493,6 +522,7 @@ export function updateAgentNodeConfigInDocument<T extends GraphPayload | GraphDo
   document: T,
   nodeId: string,
   updater: (current: AgentNode["config"]) => AgentNode["config"],
+  options: { skillDefinitions?: SkillDefinition[] } = {},
 ): T {
   const node = document.nodes[nodeId];
   if (!node || node.kind !== "agent") {
@@ -511,7 +541,172 @@ export function updateAgentNodeConfigInDocument<T extends GraphPayload | GraphDo
   }
 
   nextNode.config = nextConfig;
+  reconcileAgentSkillOutputBindings(nextDocument, nodeId, options.skillDefinitions ?? []);
   return nextDocument;
+}
+
+function reconcileAgentSkillOutputBindings<T extends GraphPayload | GraphDocument>(
+  document: T,
+  nodeId: string,
+  skillDefinitions: SkillDefinition[],
+) {
+  const node = document.nodes[nodeId];
+  if (!node || node.kind !== "agent") {
+    return;
+  }
+
+  const skillDefinitionMap = new Map(skillDefinitions.map((definition) => [definition.skillKey, definition]));
+  const attachedSkillKeys = new Set(node.config.skills);
+  const currentBindings = normalizeAgentSkillBindings(node.config.skillBindings);
+  const currentBindingBySkill = new Map(currentBindings.map((binding) => [binding.skillKey, binding]));
+  const removedManagedStateKeys = collectRemovedManagedSkillOutputStateKeys(document, nodeId, currentBindings, attachedSkillKeys);
+  const nextSkillBindings: AgentSkillBinding[] = [];
+  const processedSkillKeys = new Set<string>();
+
+  if (removedManagedStateKeys.size > 0) {
+    node.writes = node.writes.filter((binding) => !removedManagedStateKeys.has(binding.state));
+  }
+
+  for (const skillKey of node.config.skills) {
+    const definition = skillDefinitionMap.get(skillKey);
+    const existingBinding = currentBindingBySkill.get(skillKey);
+    if (!definition?.outputSchema.length) {
+      if (existingBinding && Object.keys(existingBinding.outputMapping ?? {}).length > 0) {
+        nextSkillBindings.push(existingBinding);
+      }
+      continue;
+    }
+
+    const outputMapping = { ...(existingBinding?.outputMapping ?? {}) };
+    for (const field of definition.outputSchema) {
+      const mappedState = outputMapping[field.key];
+      if (mappedState && document.state_schema[mappedState]) {
+        ensureAgentWriteBinding(node, mappedState);
+        continue;
+      }
+
+      const existingStateKey = findExistingSkillOutputState(document, nodeId, skillKey, field.key);
+      const stateKey = existingStateKey ?? createManagedSkillOutputState(document, nodeId, definition, field);
+      outputMapping[field.key] = stateKey;
+      ensureAgentWriteBinding(node, stateKey);
+    }
+
+    nextSkillBindings.push({
+      skillKey,
+      trigger: existingBinding?.trigger ?? "before_agent",
+      inputMapping: existingBinding?.inputMapping ?? {},
+      outputMapping,
+      config: existingBinding?.config ?? {},
+    });
+    processedSkillKeys.add(skillKey);
+  }
+
+  for (const binding of currentBindings) {
+    if (!attachedSkillKeys.has(binding.skillKey) || processedSkillKeys.has(binding.skillKey)) {
+      continue;
+    }
+    nextSkillBindings.push(binding);
+  }
+
+  node.config.skillBindings = nextSkillBindings;
+}
+
+function normalizeAgentSkillBindings(value: AgentNode["config"]["skillBindings"]): AgentSkillBinding[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((binding) => ({
+      skillKey: String(binding.skillKey ?? "").trim(),
+      trigger: binding.trigger ?? "before_agent",
+      inputMapping: { ...(binding.inputMapping ?? {}) },
+      outputMapping: { ...(binding.outputMapping ?? {}) },
+      config: { ...(binding.config ?? {}) },
+    }))
+    .filter((binding) => binding.skillKey);
+}
+
+function collectRemovedManagedSkillOutputStateKeys(
+  document: GraphPayload | GraphDocument,
+  nodeId: string,
+  currentBindings: AgentSkillBinding[],
+  attachedSkillKeys: Set<string>,
+) {
+  const removedStateKeys = new Set<string>();
+  for (const binding of currentBindings) {
+    if (attachedSkillKeys.has(binding.skillKey)) {
+      continue;
+    }
+    for (const stateKey of Object.values(binding.outputMapping ?? {})) {
+      const stateBinding = document.state_schema[stateKey]?.binding;
+      if (
+        stateBinding?.kind === "skill_output" &&
+        stateBinding.skillKey === binding.skillKey &&
+        stateBinding.nodeId === nodeId &&
+        stateBinding.managed !== false
+      ) {
+        removedStateKeys.add(stateKey);
+      }
+    }
+  }
+  return removedStateKeys;
+}
+
+function ensureAgentWriteBinding(node: AgentNode, stateKey: string) {
+  if (node.writes.some((binding) => binding.state === stateKey)) {
+    return;
+  }
+  node.writes = [...node.writes, { state: stateKey, mode: "replace" }];
+}
+
+function findExistingSkillOutputState(
+  document: GraphPayload | GraphDocument,
+  nodeId: string,
+  skillKey: string,
+  fieldKey: string,
+) {
+  return Object.entries(document.state_schema).find(([, definition]) => {
+    const binding = definition.binding;
+    return (
+      binding?.kind === "skill_output" &&
+      binding.skillKey === skillKey &&
+      binding.nodeId === nodeId &&
+      binding.fieldKey === fieldKey
+    );
+  })?.[0] ?? null;
+}
+
+function createManagedSkillOutputState(
+  document: GraphPayload | GraphDocument,
+  nodeId: string,
+  skill: SkillDefinition,
+  field: SkillIoField,
+) {
+  const stateType = normalizeSkillOutputStateType(field.valueType);
+  const stateField = buildNextMaterializedVirtualStateField(document, stateType);
+  const skillName = skill.name.trim() || skill.skillKey;
+  const fieldLabel = field.label.trim() || field.key;
+  document.state_schema[stateField.key] = {
+    ...stateField.definition,
+    name: `${skillName} ${fieldLabel}`,
+    description: field.description.trim() || `${skillName} output: ${field.key}`,
+    type: stateType,
+    promptVisible: PROMPT_VISIBLE_SKILL_OUTPUT_TYPES.has(stateType),
+    binding: {
+      kind: "skill_output",
+      skillKey: skill.skillKey,
+      nodeId,
+      fieldKey: field.key,
+      managed: true,
+    },
+  };
+  rememberMaterializedStateKeyIndex(document, stateField.key);
+  return stateField.key;
+}
+
+function normalizeSkillOutputStateType(valueType: string) {
+  const normalized = valueType.trim();
+  return STATE_FIELD_TYPE_VALUES.has(normalized) ? normalized : "json";
 }
 
 export function updateConditionNodeConfigInDocument<T extends GraphPayload | GraphDocument>(
