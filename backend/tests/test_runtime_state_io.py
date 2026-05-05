@@ -29,6 +29,11 @@ class RuntimeStateIoTests(unittest.TestCase):
                     "payload": {"name": "Payload", "type": "object", "value": {"items": [1]}},
                     "items": {"name": "Items", "type": "array", "value": [1]},
                     "files": {"name": "Files", "type": "file_list", "value": [{"path": "old.txt"}]},
+                    "allowed_skills": {
+                        "name": "Allowed Skills",
+                        "type": "skill",
+                        "value": [{"skillKey": "web_search"}],
+                    },
                 },
                 "nodes": {
                     "input_question": {
@@ -46,6 +51,7 @@ class RuntimeStateIoTests(unittest.TestCase):
                             {"state": "payload"},
                             {"state": "items"},
                             {"state": "files"},
+                            {"state": "allowed_skills"},
                         ],
                     },
                 },
@@ -62,6 +68,7 @@ class RuntimeStateIoTests(unittest.TestCase):
                 "payload": {"previous": True},
                 "items": ["previous"],
                 "files": [{"path": "previous.txt"}],
+                "allowed_skills": [{"skillKey": "previous"}],
                 "obsolete": "remove me",
             },
             "state_last_writers": {"question": {"node_id": "input"}},
@@ -80,6 +87,7 @@ class RuntimeStateIoTests(unittest.TestCase):
                 "payload": {},
                 "items": [],
                 "files": [],
+                "allowed_skills": [],
             },
         )
         self.assertEqual(state["state_snapshot"]["values"], state["state_values"])

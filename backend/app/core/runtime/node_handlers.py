@@ -99,7 +99,7 @@ def execute_agent_node(
     runtime_config = resolve_agent_runtime_config_func(node)
 
     mapped_skill_outputs: dict[str, Any] = {}
-    for binding in normalize_agent_skill_bindings(node):
+    for binding in normalize_agent_skill_bindings(node, input_values=input_values, state_schema=state_schema):
         skill_key = binding.skill_key
         skill_func = registry.get(skill_key)
         if skill_func is None:

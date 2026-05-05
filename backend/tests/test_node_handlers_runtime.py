@@ -170,6 +170,63 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         self.assertEqual(result["skill_outputs"][0]["inputs"], {"kb": "docs", "question": "q"})
         self.assertEqual(result["outputs"], {"answer": "q"})
 
+    def test_execute_agent_node_invokes_union_of_card_and_skill_state_inputs(self) -> None:
+        state_schema = {
+            "allowed_skills": NodeSystemStateDefinition.model_validate({"type": "skill"}),
+            "question": NodeSystemStateDefinition.model_validate({"type": "text"}),
+            "answer": NodeSystemStateDefinition.model_validate({"type": "text"}),
+        }
+        node = NodeSystemAgentNode.model_validate(
+            {
+                "kind": "agent",
+                "name": "writer",
+                "ui": {"position": {"x": 0, "y": 0}},
+                "reads": [{"state": "allowed_skills"}, {"state": "question"}],
+                "writes": [{"state": "answer"}],
+                "config": {"skills": ["web_search"]},
+            }
+        )
+        invoked: list[str] = []
+
+        def invoke_skill_func(skill_func: str, skill_inputs: dict[str, object]) -> dict[str, object]:
+            invoked.append(skill_func)
+            return {"status": "succeeded", "summary": f"{skill_func} result"}
+
+        result = execute_agent_node(
+            state_schema,
+            node,
+            {
+                "allowed_skills": [
+                    {"skillKey": "local_file", "label": "Local File"},
+                    {"skill_key": "web_search"},
+                ],
+                "question": "q",
+            },
+            {"state": {}},
+            node_name="writer",
+            state={"run_id": "run-1"},
+            get_skill_registry_func=lambda *, include_disabled: {
+                "web_search": "web_search",
+                "local_file": "local_file",
+            },
+            invoke_skill_func=invoke_skill_func,
+            resolve_agent_runtime_config_func=lambda agent_node: {},
+            build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
+            callable_accepts_keyword_func=lambda func, keyword: False,
+            generate_agent_response_func=lambda agent_node, input_values, skill_context, runtime_config, **kwargs: (
+                {"answer": ",".join(skill_context)},
+                "",
+                [],
+                runtime_config,
+            ),
+            finalize_agent_stream_delta_func=lambda *, state, node_name, output_values: None,
+            first_truthy_func=lambda values: next((value for value in values if value), None),
+        )
+
+        self.assertEqual(invoked, ["web_search", "local_file"])
+        self.assertEqual(result["selected_skills"], ["web_search", "local_file"])
+        self.assertEqual(result["outputs"], {"answer": "web_search,local_file"})
+
     def test_execute_agent_node_maps_bound_skill_outputs_into_state_outputs(self) -> None:
         state_schema = {
             "source_text": NodeSystemStateDefinition.model_validate({"type": "text"}),

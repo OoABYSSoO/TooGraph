@@ -22,6 +22,11 @@ test("resolveStateDefaultValueEditorConfig returns typed editor modes", () => {
     rows: 5,
     placeholder: "{}",
   });
+  assert.deepEqual(resolveStateDefaultValueEditorConfig("skill"), {
+    mode: "structured",
+    rows: 5,
+    placeholder: "[]",
+  });
   assert.deepEqual(resolveStateDefaultValueEditorConfig("markdown"), {
     mode: "text",
     rows: 5,
@@ -42,9 +47,17 @@ test("parseStructuredStateDraft validates structured state types", () => {
     ok: true,
     value: [],
   });
+  assert.deepEqual(parseStructuredStateDraft("skill", '[{"skillKey":"web_search"}]'), {
+    ok: true,
+    value: [{ skillKey: "web_search" }],
+  });
   assert.deepEqual(parseStructuredStateDraft("object", "[]"), {
     ok: false,
     error: "这个 State 类型需要 JSON 对象。",
+  });
+  assert.deepEqual(parseStructuredStateDraft("skill", "{}"), {
+    ok: false,
+    error: "这个 State 类型需要 JSON 数组。",
   });
   assert.deepEqual(parseStructuredStateDraft("array", "{}"), {
     ok: false,

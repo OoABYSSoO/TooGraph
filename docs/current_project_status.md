@@ -9,6 +9,7 @@
 - `node_system` 是唯一正式图协议，`state_schema` 是唯一正式节点输入输出数据源。
 - 桌宠自主 Agent 方向以 `docs/future/companion-autonomous-agent-roadmap.md` 为唯一参考。
 - Skill 系统已收束为统一能力库：不再按 Agent 节点和桌宠拆分两类 skill，也不再使用 skill `targets`。
+- `state_schema` 支持 `skill` 类型；Agent 节点会把卡片手动添加的 skills 与 state 输入传入的 skill / skill[] 做并集合并。
 
 ## 当前正式能力
 
@@ -79,6 +80,7 @@
 - `web_media_downloader` 支持下载公开或用户授权的网页媒体，并返回可由 Output 节点展示的本地 artifact 路径。
 - `game_ad_research_collector` 支持采集游戏市场 RSS、生成广告库搜索记录、发现/下载公开视频广告素材，并把视频和来源文档作为本地 artifact 返回。
 - `autonomous_decision` 是 control/context 技能，负责根据技能目录和 `runPolicies` 决定直接回复、执行已授权技能、请求审批或提出缺失技能草案，不直接执行工具或产生副作用。
+- `skill` state 可以把 `autonomous_decision` 选出的技能作为显式图状态传给下游 Agent 节点；这些动态技能与 Agent 卡片 skills 一视同仁，执行前仍走 registry、运行时状态和审批校验。
 
 ## 当前技术栈
 

@@ -11,7 +11,10 @@ import {
   parseStateValueInput,
   renameStateFieldInDocument,
   STATE_COLOR_OPTIONS,
+  STATE_FIELD_TYPE_OPTIONS,
   updateStateFieldInDocument,
+  defaultValueForStateType,
+  formatStateValueInput,
 } from "./statePanelFields.ts";
 import type { GraphPayload } from "@/types/node-system";
 
@@ -255,4 +258,11 @@ test("parseStateValueInput coerces values by state type", () => {
   assert.deepEqual(parseStateValueInput("json", "{\"ok\":true}"), { ok: true });
   assert.deepEqual(parseStateValueInput("array", "[1,2]"), [1, 2]);
   assert.equal(parseStateValueInput("text", "hello"), "hello");
+});
+
+test("skill state type is available and uses structured skill descriptors", () => {
+  assert.ok(STATE_FIELD_TYPE_OPTIONS.includes("skill"));
+  assert.deepEqual(defaultValueForStateType("skill"), []);
+  assert.equal(formatStateValueInput("skill", [{ skillKey: "web_search" }]), '[\n  {\n    "skillKey": "web_search"\n  }\n]');
+  assert.deepEqual(parseStateValueInput("skill", '[{"skillKey":"local_file"}]'), [{ skillKey: "local_file" }]);
 });

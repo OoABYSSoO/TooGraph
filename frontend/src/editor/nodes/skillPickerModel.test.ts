@@ -24,7 +24,6 @@ const skillDefinitions: SkillDefinition[] = [
     agentNodeEligibility: "ready",
     agentNodeBlockers: [],
     version: "1.0.0",
-    targets: ["agent_node"],
     kind: "atomic",
     mode: "tool",
     scope: "node",
@@ -53,7 +52,6 @@ const skillDefinitions: SkillDefinition[] = [
     agentNodeEligibility: "ready",
     agentNodeBlockers: [],
     version: "1.0.0",
-    targets: ["agent_node"],
     kind: "atomic",
     mode: "tool",
     scope: "node",
@@ -76,7 +74,6 @@ const unavailableSkillDefinitions: SkillDefinition[] = [
     ...skillDefinitions[1],
     skillKey: "desktop_companion_profile",
     label: "Desktop Companion Profile",
-    targets: ["companion"],
     kind: "profile",
     mode: "context",
     scope: "global",
@@ -124,7 +121,7 @@ test("listAttachableSkillDefinitions filters already attached skill keys", () =>
 test("listAttachableSkillDefinitions only exposes active healthy agent runtime skills", () => {
   assert.deepEqual(
     listAttachableSkillDefinitions(unavailableSkillDefinitions, []).map((definition) => definition.skillKey),
-    ["web_search"],
+    ["web_search", "desktop_companion_profile"],
   );
 });
 

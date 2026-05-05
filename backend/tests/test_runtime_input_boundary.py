@@ -16,6 +16,10 @@ class RuntimeInputBoundaryTests(unittest.TestCase):
         self.assertEqual(coerce_input_boundary_value("true", NodeSystemStateType.BOOLEAN), True)
         self.assertEqual(coerce_input_boundary_value('{"items": [1]}', NodeSystemStateType.OBJECT), {"items": [1]})
         self.assertEqual(coerce_input_boundary_value("[1, 2]", NodeSystemStateType.ARRAY), [1, 2])
+        self.assertEqual(
+            coerce_input_boundary_value('[{"skillKey": "web_search"}]', NodeSystemStateType.SKILL),
+            [{"skillKey": "web_search"}],
+        )
 
     def test_coerce_input_boundary_value_preserves_text_and_knowledge_base_strings(self) -> None:
         self.assertEqual(coerce_input_boundary_value('{"text": "value"}', NodeSystemStateType.TEXT), '{"text": "value"}')

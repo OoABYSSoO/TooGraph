@@ -11,7 +11,7 @@ from app.core.runtime.skill_bindings import (
     map_skill_outputs,
     normalize_agent_skill_bindings,
 )
-from app.core.schemas.node_system import NodeSystemAgentNode
+from app.core.schemas.node_system import NodeSystemAgentNode, NodeSystemStateDefinition
 
 
 class RuntimeSkillBindingsTests(unittest.TestCase):
@@ -59,6 +59,58 @@ class RuntimeSkillBindingsTests(unittest.TestCase):
         self.assertEqual(bindings[0].output_mapping, {"summary": "summary_text"})
         self.assertEqual(bindings[0].config, {"max_sentences": 4})
         self.assertEqual(bindings[1].input_mapping, {})
+
+    def test_skill_state_inputs_union_with_attached_agent_skills(self) -> None:
+        node = NodeSystemAgentNode.model_validate(
+            {
+                "kind": "agent",
+                "ui": {"position": {"x": 0, "y": 0}},
+                "reads": [{"state": "allowed_skills"}],
+                "config": {"skills": ["web_search"]},
+            }
+        )
+        state_schema = {
+            "allowed_skills": NodeSystemStateDefinition.model_validate({"type": "skill"}),
+        }
+
+        bindings = normalize_agent_skill_bindings(
+            node,
+            input_values={
+                "allowed_skills": [
+                    {"skillKey": "local_file", "label": "Local File"},
+                    {"skill_key": "web_search"},
+                    "web_media_downloader",
+                ]
+            },
+            state_schema=state_schema,
+        )
+
+        self.assertEqual([binding.skill_key for binding in bindings], ["web_search", "local_file", "web_media_downloader"])
+
+    def test_skill_state_inputs_ignore_non_skill_state_values(self) -> None:
+        node = NodeSystemAgentNode.model_validate(
+            {
+                "kind": "agent",
+                "ui": {"position": {"x": 0, "y": 0}},
+                "reads": [{"state": "allowed_skills"}, {"state": "raw_json"}],
+                "config": {"skills": []},
+            }
+        )
+        state_schema = {
+            "allowed_skills": NodeSystemStateDefinition.model_validate({"type": "skill"}),
+            "raw_json": NodeSystemStateDefinition.model_validate({"type": "json"}),
+        }
+
+        bindings = normalize_agent_skill_bindings(
+            node,
+            input_values={
+                "allowed_skills": {"skillKey": "web_search"},
+                "raw_json": {"skillKey": "local_file"},
+            },
+            state_schema=state_schema,
+        )
+
+        self.assertEqual([binding.skill_key for binding in bindings], ["web_search"])
 
     def test_build_skill_inputs_combines_state_mapping_and_config(self) -> None:
         node = NodeSystemAgentNode.model_validate(
