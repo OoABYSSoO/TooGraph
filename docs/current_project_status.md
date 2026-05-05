@@ -72,12 +72,13 @@
 - knowledge base 可以通过 input 节点进入图。
 - agent 读取 knowledge base state，不再隐式挂载内置知识库 skill；检索能力需要以 `skill/<skill_key>` 文件夹加 `skill.json` manifest 的形式显式安装和绑定。
 - skills catalog/definitions 与 knowledge base catalog 都有真实接口。
-- 当前内置 skill 包括 `local_file`、`web_search`、`web_media_downloader` 和 `game_ad_research_collector`。
+- 当前内置 skill 包括 `local_file`、`web_search`、`web_media_downloader`、`game_ad_research_collector` 和 `autonomous_decision`。
 - skill manifest 使用 `runPolicies` 描述默认和运行来源策略；旧 `targets` 字段已废弃。
 - `local_file` 是受白名单约束的基础本地文件读写技能，当前用于桌宠人设、策略、记忆和会话摘要的显式图模板读写闭环。
 - `web_search` 支持 Tavily 优先、DuckDuckGo HTML fallback、日期上下文注入、搜索结果引用、网页正文抓取和 source document 本地 artifact 输出。
 - `web_media_downloader` 支持下载公开或用户授权的网页媒体，并返回可由 Output 节点展示的本地 artifact 路径。
 - `game_ad_research_collector` 支持采集游戏市场 RSS、生成广告库搜索记录、发现/下载公开视频广告素材，并把视频和来源文档作为本地 artifact 返回。
+- `autonomous_decision` 是 control/context 技能，负责根据技能目录和 `runPolicies` 决定直接回复、执行已授权技能、请求审批或提出缺失技能草案，不直接执行工具或产生副作用。
 
 ## 当前技术栈
 
@@ -98,5 +99,5 @@
 - LangGraph Python 源码预览、下载和导入校验体验完善。
 - cycles 更高级的终止策略和可视化。
 - 更强的 knowledge base 管理能力。
-- `autonomous_decision`、`companion_agentic_tool_loop` 和 `graphite_skill_builder`。
+- `companion_agentic_tool_loop` 和 `graphite_skill_builder`。
 - 桌宠 Agent 与自动编排图协作层，具体路线见 `docs/future/companion-autonomous-agent-roadmap.md`。
