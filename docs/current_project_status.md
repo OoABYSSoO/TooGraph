@@ -7,7 +7,7 @@
 - Vue 前端迁移已经完成，旧前端迁移计划不再是当前工作主线。
 - 当前首页、编辑器、运行记录、运行详情和设置页都在正式主链上。
 - `node_system` 是唯一正式图协议，`state_schema` 是唯一正式数据源。
-- 当前仍未完成的事项属于产品路线图，不属于迁移遗留缺口。
+- 当前仍未完成的事项属于产品路线图，不属于迁移遗留缺口；桌宠自主 Agent 方向以 `docs/future/companion-autonomous-agent-roadmap.md` 为唯一参考。
 
 ## 当前正式能力
 
@@ -65,7 +65,8 @@
 - knowledge base 可以通过 input 节点进入图。
 - agent 读取 knowledge base state 不再隐式挂载内置知识库 skill；检索能力需要以 `skill/<skill_key>` 文件夹加 `skill.json` manifest 的形式显式安装和绑定。
 - skills catalog/definitions 与 knowledge base catalog 都有真实接口。
-- 当前内置 skill 包括 `web_search`、`web_media_downloader` 和 `game_ad_research_collector`，运行逻辑、manifest、说明文档和脚本都位于各自的 `skill/<skill_key>` 文件夹内，由 manifest 驱动的通用脚本运行器执行。
+- 当前内置 skill 包括 `local_file`、`web_search`、`web_media_downloader` 和 `game_ad_research_collector`，运行逻辑、manifest、说明文档和脚本都位于各自的 `skill/<skill_key>` 文件夹内，由 manifest 驱动的通用脚本运行器执行。
+- `local_file` 是受白名单约束的基础本地文件读写技能，当前用于桌宠人设、策略、记忆和会话摘要的显式图模板读写闭环。
 - `web_search` 支持 Tavily 优先、DuckDuckGo HTML fallback、日期上下文注入、搜索结果引用、网页正文抓取和 source document 本地 artifact 输出。
 - `web_media_downloader` 支持下载公开或用户授权的网页媒体，并返回可由 Output 节点展示的本地 artifact 路径。
 - `game_ad_research_collector` 支持采集游戏市场 RSS、生成广告库搜索记录、发现/下载公开视频广告素材，并把视频和来源文档作为本地 artifact 返回。
@@ -93,4 +94,4 @@
 - cycles 更高级的终止策略和可视化
 - 更强的 knowledge base 管理能力
 - Agent / Companion Skill 的更完整权限、健康检查、测试和图内配置体验
-- 桌宠 Agent 和自动编排图协作层
+- 桌宠 Agent 和自动编排图协作层，具体路线见 `docs/future/companion-autonomous-agent-roadmap.md`
