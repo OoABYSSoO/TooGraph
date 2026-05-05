@@ -60,6 +60,8 @@ test("CompanionPet lets the companion runtime choose its own model", () => {
   assert.match(componentSource, /COMPANION_MODEL_STORAGE_KEY/);
   assert.match(componentSource, /v-model="companionModelRef"/);
   assert.match(componentSource, /@visible-change="handleCompanionModelSelectVisibleChange"/);
+  assert.match(componentSource, /popper-class="graphite-select-popper companion-pet__select-popper"/);
+  assert.match(componentSource, /:global\(\.companion-pet__select-popper\.el-popper\)[\s\S]*z-index:\s*46\d\d\s*!important;/);
   assert.match(componentSource, /companionModelOptions/);
   assert.match(componentSource, /return buildRuntimeModelOptions\(settings\);/);
   assert.match(componentSource, /companionModel:\s*companionModelRef\.value/);

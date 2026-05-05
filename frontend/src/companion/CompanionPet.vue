@@ -41,7 +41,7 @@
               <ElSelect
                 v-model="companionModelRef"
                 class="companion-pet__model-select graphite-select"
-                popper-class="graphite-select-popper"
+                popper-class="graphite-select-popper companion-pet__select-popper"
                 size="small"
                 filterable
                 :placeholder="companionModelPlaceholder"
@@ -63,7 +63,7 @@
               <ElSelect
                 v-model="companionMode"
                 class="companion-pet__mode-select graphite-select"
-                popper-class="graphite-select-popper"
+                popper-class="graphite-select-popper companion-pet__select-popper"
                 size="small"
                 :aria-label="t('companion.modeLabel')"
                 :title="companionModeLabel"
@@ -889,6 +889,10 @@ function isPersistedMessage(value: unknown): value is CompanionChatMessage {
   box-shadow:
     0 0 0 1px rgba(154, 52, 18, 0.22) inset,
     0 0 0 3px rgba(210, 162, 117, 0.22);
+}
+
+:global(.companion-pet__select-popper.el-popper) {
+  z-index: 4600 !important;
 }
 
 .companion-pet__mode-option {
