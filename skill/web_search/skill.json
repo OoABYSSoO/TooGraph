@@ -2,8 +2,8 @@
   "schemaVersion": "graphite.skill/v1",
   "skillKey": "web_search",
   "name": "联网搜索",
-  "description": "当用户需要最新信息、新闻、版本内容、价格、外部事实核验、网页证据或公开资料检索时选择此技能。此技能只负责搜索、可选抓取网页正文、返回引用 URL 与本地 artifact 路径，不负责最终总结。",
-  "agentInstruction": "你已绑定联网搜索技能，因此本节点需要运行它。根据当前输入判断最合适的搜索 query、max_results、search_depth，以及是否需要 fetch_pages。只为技能准备输入并执行技能；不要在本节点整理、评价或总结搜索结果。技能结果会通过绑定 state 透传给下游节点。",
+  "description": "当用户需要最新信息、新闻、版本内容、价格、外部事实核验、网页证据或公开资料检索时选择此技能。此技能只负责执行联网搜索并返回可供下游节点使用的证据上下文、来源网址、本地 artifact 路径和错误列表，不负责最终总结。",
+  "agentInstruction": "你已绑定联网搜索技能，因此本节点需要运行它。根据当前输入生成一个清晰、可检索的 query，并把 query 交给技能执行；不要在本节点整理、评价或总结搜索结果。技能结果会通过绑定 state 透传给下游节点。",
   "version": "1.0.0",
   "runPolicies": {
     "default": {
@@ -30,140 +30,32 @@
       "valueType": "text",
       "required": true,
       "description": "Search query or question to look up on the public web."
-    },
-    {
-      "key": "max_results",
-      "label": "Max Results",
-      "valueType": "text",
-      "required": false,
-      "description": "Number of results to return. Defaults to 5 and is capped at 20."
-    },
-    {
-      "key": "search_depth",
-      "label": "Search Depth",
-      "valueType": "text",
-      "required": false,
-      "description": "Tavily depth: basic, advanced, fast, or ultra-fast. Defaults to basic."
-    },
-    {
-      "key": "include_raw_content",
-      "label": "Include Raw Content",
-      "valueType": "text",
-      "required": false,
-      "description": "When true and Tavily is configured, includes raw extracted content in results."
-    },
-    {
-      "key": "fetch_pages",
-      "label": "Fetch Pages",
-      "valueType": "text",
-      "required": false,
-      "description": "When true, fetch result pages and store extracted article text as local skill artifacts."
-    },
-    {
-      "key": "max_pages",
-      "label": "Max Pages",
-      "valueType": "text",
-      "required": false,
-      "description": "Number of result pages to fetch when fetch_pages is true. Defaults to 5 and is capped at 10."
-    },
-    {
-      "key": "max_chars_per_page",
-      "label": "Max Chars Per Page",
-      "valueType": "text",
-      "required": false,
-      "description": "Maximum extracted characters to store per fetched page. Defaults to 200000 and is capped at 1500000."
     }
   ],
   "outputSchema": [
     {
-      "key": "status",
-      "label": "Status",
-      "valueType": "text",
-      "description": "succeeded or failed."
-    },
-    {
-      "key": "provider",
-      "label": "Provider",
-      "valueType": "text",
-      "description": "Search provider used for this request."
-    },
-    {
-      "key": "query",
-      "label": "Query",
-      "valueType": "text",
-      "description": "Final query string used for search."
-    },
-    {
-      "key": "result_count",
-      "label": "Result Count",
-      "valueType": "text",
-      "description": "Number of normalized search results returned."
-    },
-    {
-      "key": "searched_at",
-      "label": "Searched At",
-      "valueType": "text",
-      "description": "Local timestamp when the search was executed."
-    },
-    {
-      "key": "searched_date",
-      "label": "Searched Date",
-      "valueType": "text",
-      "description": "Local date when the search was executed, useful for recency-sensitive answers."
-    },
-    {
-      "key": "search_brief",
-      "label": "Search Brief",
-      "valueType": "markdown",
-      "description": "Provider answer or compact search-result brief. It is evidence context, not the final user-facing summary."
-    },
-    {
       "key": "context",
       "label": "Context",
       "valueType": "markdown",
-      "description": "Cited result blocks formatted for direct agent reasoning."
-    },
-    {
-      "key": "results",
-      "label": "Results",
-      "valueType": "json",
-      "description": "Structured search results with title, url, content, score, and optional raw content."
-    },
-    {
-      "key": "citations",
-      "label": "Citations",
-      "valueType": "json",
-      "description": "Compact citation list with index, title, and URL."
+      "description": "Final evidence context for downstream agent reasoning."
     },
     {
       "key": "source_urls",
       "label": "Source URLs",
       "valueType": "json",
-      "description": "Flat URL list returned by the search results for downstream state binding."
-    },
-    {
-      "key": "source_documents",
-      "label": "Source Documents",
-      "valueType": "json",
-      "description": "Fetched page document references with local artifact paths, URLs, titles, and fetch status."
+      "description": "Final source URL list returned by the search results."
     },
     {
       "key": "artifact_paths",
       "label": "Artifact Paths",
       "valueType": "json",
-      "description": "Flat local artifact path list for fetched readable page documents."
+      "description": "Final local artifact path list for fetched readable page documents."
     },
     {
       "key": "errors",
       "label": "Errors",
       "valueType": "json",
-      "description": "Structured error list collected during search or page fetch."
-    },
-    {
-      "key": "error",
-      "label": "Error",
-      "valueType": "text",
-      "description": "Error message when status is failed."
+      "description": "Final error list collected during search or page fetch."
     }
   ],
   "supportedValueTypes": ["text", "markdown", "json"],

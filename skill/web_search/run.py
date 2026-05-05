@@ -15,33 +15,20 @@ from bs4 import BeautifulSoup
 TAVILY_SEARCH_URL = "https://api.tavily.com/search"
 DUCKDUCKGO_SEARCH_URL = "https://duckduckgo.com/html/"
 DEFAULT_MAX_RESULTS = 5
-MAX_RESULTS = 20
+DEFAULT_SEARCH_DEPTH = "basic"
+DEFAULT_INCLUDE_RAW_CONTENT = False
 DEFAULT_TIMEOUT_SECONDS = 15.0
-DEFAULT_MAX_PAGES = 5
-MAX_PAGES = 10
+DEFAULT_MAX_PAGES = 3
 DEFAULT_MAX_CHARS_PER_PAGE = 200_000
-MAX_CHARS_PER_PAGE = 1_500_000
 PAGE_FETCH_USER_AGENT = "GraphiteUI/1.0 (+https://github.com/AbyssBadger0/GraphiteUI)"
 
 
 def web_search_skill(**skill_inputs: Any) -> dict[str, Any]:
     query = _compact_text(skill_inputs.get("query"))
     if not query:
-        return _empty_response(query=query, status="failed", error="Search query is required.")
+        return _final_response(context="", source_urls=[], artifact_paths=[], errors=["Search query is required."])
     query = _enrich_time_sensitive_web_search_query(query)
 
-    max_results = _parse_int(skill_inputs.get("max_results"), default=DEFAULT_MAX_RESULTS, minimum=1, maximum=MAX_RESULTS)
-    search_depth = _parse_search_depth(skill_inputs.get("search_depth"))
-    include_raw_content = _parse_bool(skill_inputs.get("include_raw_content"))
-    fetch_pages = _parse_bool(skill_inputs.get("fetch_pages"))
-    max_pages = _parse_int(skill_inputs.get("max_pages"), default=DEFAULT_MAX_PAGES, minimum=1, maximum=MAX_PAGES)
-    max_chars_per_page = _parse_int(
-        skill_inputs.get("max_chars_per_page"),
-        default=DEFAULT_MAX_CHARS_PER_PAGE,
-        minimum=1000,
-        maximum=MAX_CHARS_PER_PAGE,
-    )
-    timeout_seconds = _parse_float(skill_inputs.get("timeout_seconds"), default=DEFAULT_TIMEOUT_SECONDS)
     api_key = _resolve_tavily_api_key(skill_inputs)
     provider = "tavily" if api_key else "duckduckgo"
 
@@ -49,32 +36,27 @@ def web_search_skill(**skill_inputs: Any) -> dict[str, Any]:
         if api_key:
             raw_response = _search_with_tavily(
                 query=query,
-                max_results=max_results,
-                search_depth=search_depth,
-                include_raw_content=include_raw_content,
+                max_results=DEFAULT_MAX_RESULTS,
+                search_depth=DEFAULT_SEARCH_DEPTH,
+                include_raw_content=DEFAULT_INCLUDE_RAW_CONTENT,
                 api_key=api_key,
-                timeout_seconds=timeout_seconds,
+                timeout_seconds=DEFAULT_TIMEOUT_SECONDS,
             )
         else:
             raw_response = _search_with_duckduckgo(
                 query=query,
-                max_results=max_results,
-                timeout_seconds=timeout_seconds,
+                max_results=DEFAULT_MAX_RESULTS,
+                timeout_seconds=DEFAULT_TIMEOUT_SECONDS,
             )
     except Exception as exc:
-        return _empty_response(query=query, provider=provider, status="failed", error=str(exc))
+        return _final_response(context="", source_urls=[], artifact_paths=[], errors=[str(exc)])
 
-    results = _normalize_results(raw_response.get("results", []), max_results=max_results)
-    citations = [
-        {"index": index, "title": result["title"], "url": result["url"]}
-        for index, result in enumerate(results, start=1)
-    ]
+    results = _normalize_results(raw_response.get("results", []), max_results=DEFAULT_MAX_RESULTS)
     source_documents = _fetch_source_documents(
         results,
-        fetch_pages=fetch_pages,
-        max_pages=max_pages,
-        max_chars_per_page=max_chars_per_page,
-        timeout_seconds=timeout_seconds,
+        max_pages=DEFAULT_MAX_PAGES,
+        max_chars_per_page=DEFAULT_MAX_CHARS_PER_PAGE,
+        timeout_seconds=DEFAULT_TIMEOUT_SECONDS,
     )
     source_urls = [result["url"] for result in results if result.get("url")]
     artifact_paths = [
@@ -89,23 +71,15 @@ def web_search_skill(**skill_inputs: Any) -> dict[str, Any]:
     ]
     searched_at = _current_search_timestamp()
     searched_date = searched_at[:10]
-    return {
-        "status": "succeeded",
-        "provider": provider,
-        "query": query,
-        "result_count": len(results),
-        "searched_at": searched_at,
-        "searched_date": searched_date,
-        "search_brief": _build_summary(str(raw_response.get("answer") or ""), results),
-        "context": _build_context(results, source_documents=source_documents, searched_at=searched_at, searched_date=searched_date),
-        "results": results,
-        "citations": citations,
-        "source_urls": source_urls,
-        "source_documents": source_documents,
-        "artifact_paths": artifact_paths,
-        "errors": errors,
-        "error": "",
-    }
+    context = _build_context(
+        results,
+        answer=str(raw_response.get("answer") or ""),
+        provider=provider,
+        source_documents=source_documents,
+        searched_at=searched_at,
+        searched_date=searched_date,
+    )
+    return _final_response(context=context, source_urls=source_urls, artifact_paths=artifact_paths, errors=errors)
 
 
 def _search_with_tavily(
@@ -197,25 +171,16 @@ def _normalize_results(raw_results: object, *, max_results: int) -> list[dict[st
 def _fetch_source_documents(
     results: list[dict[str, Any]],
     *,
-    fetch_pages: bool,
     max_pages: int,
     max_chars_per_page: int,
     timeout_seconds: float,
 ) -> list[dict[str, Any]]:
-    if not fetch_pages or not results:
+    if not results:
         return []
     artifact_dir = _compact_text(os.getenv("GRAPHITE_SKILL_ARTIFACT_DIR"))
     artifact_relative_dir = _compact_text(os.getenv("GRAPHITE_SKILL_ARTIFACT_RELATIVE_DIR")).replace("\\", "/").strip("/")
     if not artifact_dir or not artifact_relative_dir:
-        return [
-            {
-                "index": 1,
-                "title": results[0].get("title", ""),
-                "url": results[0].get("url", ""),
-                "status": "failed",
-                "error": "Skill artifact directory is not configured.",
-            }
-        ]
+        return []
 
     output_dir = Path(artifact_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -342,29 +307,21 @@ def _render_source_document_markdown(*, title: str, url: str, fetched_at: str, c
     )
 
 
-def _build_summary(answer: str, results: list[dict[str, Any]]) -> str:
-    answer = _compact_text(answer)
-    if answer:
-        return answer
-    if not results:
-        return "No web results found."
-    lines = []
-    for index, result in enumerate(results[:3], start=1):
-        content = _compact_text(result.get("content"))
-        lines.append(f"{index}. {result['title']}: {content}" if content else f"{index}. {result['title']}")
-    return "\n".join(lines)
-
-
 def _build_context(
     results: list[dict[str, Any]],
     *,
+    answer: str,
+    provider: str,
     source_documents: list[dict[str, Any]] | None = None,
     searched_at: str,
     searched_date: str,
 ) -> str:
     context_blocks = [
-        f"Search executed at: {searched_at}\nSearch date: {searched_date}",
+        f"Search provider: {provider}\nSearch executed at: {searched_at}\nSearch date: {searched_date}",
     ]
+    answer = _compact_text(answer)
+    if answer:
+        context_blocks.append(f"Provider answer:\n{answer}")
     source_by_url = {
         _compact_text(document.get("url")): document
         for document in source_documents or []
@@ -387,58 +344,23 @@ def _build_context(
     return "\n\n".join(context_blocks)
 
 
-def _empty_response(*, query: str, provider: str = "none", status: str, error: str) -> dict[str, Any]:
-    searched_at = _current_search_timestamp()
+def _final_response(
+    *,
+    context: str,
+    source_urls: list[str],
+    artifact_paths: list[str],
+    errors: list[str],
+) -> dict[str, Any]:
     return {
-        "status": status,
-        "provider": provider,
-        "query": query,
-        "result_count": 0,
-        "searched_at": searched_at,
-        "searched_date": searched_at[:10],
-        "search_brief": "",
-        "context": "",
-        "results": [],
-        "citations": [],
-        "source_urls": [],
-        "source_documents": [],
-        "artifact_paths": [],
-        "errors": [error] if error else [],
-        "error": error,
+        "context": context,
+        "source_urls": source_urls,
+        "artifact_paths": artifact_paths,
+        "errors": errors,
     }
 
 
 def _resolve_tavily_api_key(skill_inputs: dict[str, Any]) -> str:
     return _compact_text(skill_inputs.get("api_key")) or _compact_text(os.getenv("TAVILY_API_KEY"))
-
-
-def _parse_search_depth(value: object) -> str:
-    candidate = _compact_text(value).lower()
-    return candidate if candidate in {"advanced", "basic", "fast", "ultra-fast"} else "basic"
-
-
-def _parse_bool(value: object) -> bool:
-    if isinstance(value, bool):
-        return value
-    if value is None:
-        return False
-    return str(value).strip().lower() in {"1", "true", "yes", "y", "on"}
-
-
-def _parse_int(value: object, *, default: int, minimum: int, maximum: int) -> int:
-    try:
-        parsed = int(value)
-    except (TypeError, ValueError):
-        parsed = default
-    return max(minimum, min(maximum, parsed))
-
-
-def _parse_float(value: object, *, default: float) -> float:
-    try:
-        parsed = float(value)
-    except (TypeError, ValueError):
-        parsed = default
-    return parsed if parsed > 0 else default
 
 
 def _enrich_time_sensitive_web_search_query(query: str, *, now: datetime | None = None) -> str:
