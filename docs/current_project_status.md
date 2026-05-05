@@ -81,6 +81,7 @@
 - `game_ad_research_collector` 支持采集游戏市场 RSS、生成广告库搜索记录、发现/下载公开视频广告素材，并把视频和来源文档作为本地 artifact 返回。
 - `autonomous_decision` 是 control/context 技能，负责根据技能目录和 `runPolicies` 决定直接回复、执行已授权技能、请求审批或提出缺失技能草案，不直接执行工具或产生副作用。
 - `skill` state 可以把 `autonomous_decision` 选出的技能作为显式图状态传给下游 Agent 节点；这些动态技能与 Agent 卡片 skills 一视同仁，执行前仍走 registry、运行时状态和审批校验。
+- `companion_agentic_tool_loop` 模板已进入模板库，串起意图规划、`autonomous_decision`、审批暂停、`skill` state 动态执行、工具结果评估和多轮退出。
 
 ## 当前技术栈
 
@@ -101,5 +102,6 @@
 - LangGraph Python 源码预览、下载和导入校验体验完善。
 - cycles 更高级的终止策略和可视化。
 - 更强的 knowledge base 管理能力。
-- `companion_agentic_tool_loop` 和 `graphite_skill_builder`。
+- 桌宠入口自动接入 `companion_agentic_tool_loop`、真实 skill catalog snapshot 注入和审批恢复 UI。
+- `graphite_skill_builder`。
 - 桌宠 Agent 与自动编排图协作层，具体路线见 `docs/future/companion-autonomous-agent-roadmap.md`。

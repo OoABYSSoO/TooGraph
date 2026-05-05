@@ -1,0 +1,1018 @@
+{
+  "template_id": "companion_agentic_tool_loop",
+  "label": "桌宠自主工具循环",
+  "description": "A companion-origin graph template that plans intent, delegates skill choice to autonomous_decision, passes the selected skill through skill state, pauses for approval when required, executes the allowed skill, evaluates the result, and either loops or replies.",
+  "default_graph_name": "桌宠自主工具循环",
+  "state_schema": {
+    "state_1": {
+      "name": "user_message",
+      "description": "Current message sent by the user to the floating companion.",
+      "type": "text",
+      "value": "帮我判断是否需要使用技能，并完成一次可审计回复。",
+      "color": "#9a3412"
+    },
+    "state_2": {
+      "name": "conversation_history",
+      "description": "Compact transcript of recent companion chat turns.",
+      "type": "markdown",
+      "value": "暂无历史对话。",
+      "color": "#0f766e"
+    },
+    "state_3": {
+      "name": "page_context",
+      "description": "Frontend page context visible to the companion.",
+      "type": "markdown",
+      "value": "当前路径: /",
+      "color": "#2563eb"
+    },
+    "state_4": {
+      "name": "companion_profile",
+      "description": "Prompt-ready companion persona/profile context.",
+      "type": "markdown",
+      "value": "<companion-profile>\n{}\n</companion-profile>",
+      "color": "#a855f7"
+    },
+    "state_5": {
+      "name": "companion_policy",
+      "description": "Prompt-ready companion behavior and permission policy.",
+      "type": "markdown",
+      "value": "<companion-policy>\n{}\n</companion-policy>",
+      "color": "#dc2626"
+    },
+    "state_6": {
+      "name": "companion_memory_context",
+      "description": "Prompt-ready long-term companion memory context.",
+      "type": "markdown",
+      "value": "<memory-context>\n暂无长期记忆。\n</memory-context>",
+      "color": "#059669"
+    },
+    "state_7": {
+      "name": "skill_catalog_snapshot",
+      "description": "Skill catalog snapshot available to autonomous_decision for this run origin.",
+      "type": "json",
+      "value": [
+        {
+          "skillKey": "web_search",
+          "label": "Web Search",
+          "description": "Search the public web and return cited results.",
+          "permissions": ["network", "secret_read"],
+          "sideEffects": ["network", "secret_read"],
+          "supportedValueTypes": ["text", "json", "markdown"],
+          "inputSchema": [
+            {
+              "key": "query",
+              "label": "Query",
+              "valueType": "text",
+              "required": true,
+              "description": "Focused search query."
+            }
+          ],
+          "outputSchema": [
+            {
+              "key": "citations",
+              "label": "Citations",
+              "valueType": "json"
+            }
+          ],
+          "runPolicies": {
+            "default": {
+              "discoverable": true,
+              "autoSelectable": false,
+              "requiresApproval": false
+            },
+            "origins": {
+              "companion": {
+                "discoverable": true,
+                "autoSelectable": true,
+                "requiresApproval": true
+              }
+            }
+          },
+          "runtimeReady": true,
+          "runtimeRegistered": true,
+          "configured": true,
+          "healthy": true,
+          "status": "active",
+          "agentNodeEligibility": "ready",
+          "agentNodeBlockers": []
+        },
+        {
+          "skillKey": "local_file",
+          "label": "Local File",
+          "description": "Read and write allowlisted local files.",
+          "permissions": ["file_read", "file_write"],
+          "sideEffects": ["file_read", "file_write"],
+          "supportedValueTypes": ["text", "json", "markdown"],
+          "runPolicies": {
+            "default": {
+              "discoverable": true,
+              "autoSelectable": false,
+              "requiresApproval": true
+            },
+            "origins": {
+              "companion": {
+                "discoverable": true,
+                "autoSelectable": false,
+                "requiresApproval": true
+              }
+            }
+          },
+          "runtimeReady": true,
+          "runtimeRegistered": true,
+          "configured": true,
+          "healthy": true,
+          "status": "active",
+          "agentNodeEligibility": "ready",
+          "agentNodeBlockers": []
+        },
+        {
+          "skillKey": "web_media_downloader",
+          "label": "Web Media Downloader",
+          "description": "Download public or user-authorized web media and return local artifacts.",
+          "permissions": ["network", "file_write"],
+          "sideEffects": ["network", "file_write"],
+          "supportedValueTypes": ["text", "json", "video", "file"],
+          "runPolicies": {
+            "default": {
+              "discoverable": true,
+              "autoSelectable": false,
+              "requiresApproval": true
+            },
+            "origins": {
+              "companion": {
+                "discoverable": true,
+                "autoSelectable": false,
+                "requiresApproval": true
+              }
+            }
+          },
+          "runtimeReady": true,
+          "runtimeRegistered": true,
+          "configured": true,
+          "healthy": true,
+          "status": "active",
+          "agentNodeEligibility": "ready",
+          "agentNodeBlockers": []
+        }
+      ],
+      "color": "#1d4ed8"
+    },
+    "state_8": {
+      "name": "intent_plan",
+      "description": "Structured intent analysis from the planner agent.",
+      "type": "json",
+      "value": {},
+      "color": "#7c3aed"
+    },
+    "state_9": {
+      "name": "required_capability",
+      "description": "Capability the current task appears to require.",
+      "type": "text",
+      "value": "",
+      "color": "#ca8a04"
+    },
+    "state_10": {
+      "name": "needs_tool",
+      "description": "Whether this turn appears to need an executable skill.",
+      "type": "boolean",
+      "value": false,
+      "color": "#b91c1c"
+    },
+    "state_11": {
+      "name": "decision",
+      "description": "Decision returned by autonomous_decision.",
+      "type": "text",
+      "value": "",
+      "color": "#4f46e5"
+    },
+    "state_12": {
+      "name": "next_action",
+      "description": "Next action returned by autonomous_decision.",
+      "type": "text",
+      "value": "",
+      "color": "#4338ca"
+    },
+    "state_13": {
+      "name": "allowed_skills",
+      "description": "Selected skill descriptor(s) that the downstream Agent node may use.",
+      "type": "skill",
+      "value": [],
+      "color": "#0284c7"
+    },
+    "state_14": {
+      "name": "requires_approval",
+      "description": "Whether skill execution requires explicit user approval.",
+      "type": "boolean",
+      "value": false,
+      "color": "#be123c"
+    },
+    "state_15": {
+      "name": "permission_request",
+      "description": "Structured approval request for the selected skill.",
+      "type": "json",
+      "value": {},
+      "color": "#dc2626"
+    },
+    "state_16": {
+      "name": "approval_prompt",
+      "description": "Human-readable approval prompt shown before the graph resumes.",
+      "type": "markdown",
+      "value": "",
+      "color": "#ea580c"
+    },
+    "state_17": {
+      "name": "approval_granted",
+      "description": "Human review result. Set to true on resume to allow the selected skill.",
+      "type": "boolean",
+      "value": false,
+      "color": "#16a34a"
+    },
+    "state_18": {
+      "name": "missing_skill_proposal",
+      "description": "Capability proposal produced when no skill can be selected.",
+      "type": "json",
+      "value": {},
+      "color": "#9333ea"
+    },
+    "state_19": {
+      "name": "proposed_tool_input",
+      "description": "Planner-proposed input object to pass through autonomous_decision.",
+      "type": "json",
+      "value": {},
+      "color": "#0891b2"
+    },
+    "state_20": {
+      "name": "tool_input",
+      "description": "Tool input returned by autonomous_decision for the selected skill.",
+      "type": "json",
+      "value": {},
+      "color": "#0e7490"
+    },
+    "state_21": {
+      "name": "query",
+      "description": "Common query field read by search-like dynamic skills.",
+      "type": "text",
+      "value": "",
+      "color": "#2563eb"
+    },
+    "state_22": {
+      "name": "tool_result",
+      "description": "Compact result produced after the allowed dynamic skill runs.",
+      "type": "json",
+      "value": {},
+      "color": "#0f766e"
+    },
+    "state_23": {
+      "name": "tool_assessment",
+      "description": "Structured assessment of whether the tool result is sufficient.",
+      "type": "json",
+      "value": {},
+      "color": "#7c2d12"
+    },
+    "state_24": {
+      "name": "needs_more_tools",
+      "description": "Whether the graph should run another tool decision cycle.",
+      "type": "boolean",
+      "value": false,
+      "color": "#b91c1c"
+    },
+    "state_25": {
+      "name": "direct_reply",
+      "description": "Reply used when autonomous_decision says no skill is needed.",
+      "type": "markdown",
+      "value": "",
+      "color": "#d97706"
+    },
+    "state_26": {
+      "name": "denied_reply",
+      "description": "Reply used when the user does not approve a requested skill.",
+      "type": "markdown",
+      "value": "",
+      "color": "#a16207"
+    },
+    "state_27": {
+      "name": "final_reply",
+      "description": "Final companion reply after tool execution and assessment.",
+      "type": "markdown",
+      "value": "",
+      "color": "#4f46e5"
+    }
+  },
+  "nodes": {
+    "input_user_message": {
+      "kind": "input",
+      "name": "input_user_message",
+      "description": "Message sent to the companion.",
+      "ui": {
+        "position": { "x": 80, "y": 80 },
+        "collapsed": false
+      },
+      "writes": [
+        { "state": "state_1", "mode": "replace" }
+      ],
+      "config": {
+        "value": "帮我判断是否需要使用技能，并完成一次可审计回复。",
+        "boundaryType": "text"
+      }
+    },
+    "input_conversation_history": {
+      "kind": "input",
+      "name": "input_conversation_history",
+      "description": "Recent companion chat transcript.",
+      "ui": {
+        "position": { "x": 80, "y": 500 },
+        "collapsed": false
+      },
+      "writes": [
+        { "state": "state_2", "mode": "replace" }
+      ],
+      "config": {
+        "value": "暂无历史对话。",
+        "boundaryType": "markdown"
+      }
+    },
+    "input_page_context": {
+      "kind": "input",
+      "name": "input_page_context",
+      "description": "Current page context supplied by the frontend.",
+      "ui": {
+        "position": { "x": 80, "y": 920 },
+        "collapsed": false
+      },
+      "writes": [
+        { "state": "state_3", "mode": "replace" }
+      ],
+      "config": {
+        "value": "当前路径: /",
+        "boundaryType": "markdown"
+      }
+    },
+    "input_companion_profile": {
+      "kind": "input",
+      "name": "input_companion_profile",
+      "description": "Prompt-ready companion profile context.",
+      "ui": {
+        "position": { "x": 80, "y": 1340 },
+        "collapsed": false
+      },
+      "writes": [
+        { "state": "state_4", "mode": "replace" }
+      ],
+      "config": {
+        "value": "<companion-profile>\n{}\n</companion-profile>",
+        "boundaryType": "markdown"
+      }
+    },
+    "input_companion_policy": {
+      "kind": "input",
+      "name": "input_companion_policy",
+      "description": "Prompt-ready companion policy context.",
+      "ui": {
+        "position": { "x": 80, "y": 1760 },
+        "collapsed": false
+      },
+      "writes": [
+        { "state": "state_5", "mode": "replace" }
+      ],
+      "config": {
+        "value": "<companion-policy>\n{}\n</companion-policy>",
+        "boundaryType": "markdown"
+      }
+    },
+    "input_companion_memory_context": {
+      "kind": "input",
+      "name": "input_companion_memory_context",
+      "description": "Prompt-ready companion memory context.",
+      "ui": {
+        "position": { "x": 80, "y": 2180 },
+        "collapsed": false
+      },
+      "writes": [
+        { "state": "state_6", "mode": "replace" }
+      ],
+      "config": {
+        "value": "<memory-context>\n暂无长期记忆。\n</memory-context>",
+        "boundaryType": "markdown"
+      }
+    },
+    "input_skill_catalog_snapshot": {
+      "kind": "input",
+      "name": "input_skill_catalog_snapshot",
+      "description": "Skill catalog snapshot for autonomous_decision.",
+      "ui": {
+        "position": { "x": 80, "y": 2600 },
+        "collapsed": false
+      },
+      "writes": [
+        { "state": "state_7", "mode": "replace" }
+      ],
+      "config": {
+        "value": [
+          {
+            "skillKey": "web_search",
+            "label": "Web Search",
+            "description": "Search the public web and return cited results.",
+            "permissions": ["network", "secret_read"],
+            "sideEffects": ["network", "secret_read"],
+            "supportedValueTypes": ["text", "json", "markdown"],
+            "inputSchema": [
+              {
+                "key": "query",
+                "label": "Query",
+                "valueType": "text",
+                "required": true,
+                "description": "Focused search query."
+              }
+            ],
+            "runPolicies": {
+              "default": {
+                "discoverable": true,
+                "autoSelectable": false,
+                "requiresApproval": false
+              },
+              "origins": {
+                "companion": {
+                  "discoverable": true,
+                  "autoSelectable": true,
+                  "requiresApproval": true
+                }
+              }
+            },
+            "runtimeReady": true,
+            "runtimeRegistered": true,
+            "configured": true,
+            "healthy": true,
+            "status": "active",
+            "agentNodeEligibility": "ready",
+            "agentNodeBlockers": []
+          }
+        ],
+        "boundaryType": "json"
+      }
+    },
+    "intent_planner": {
+      "kind": "agent",
+      "name": "intent_planner",
+      "description": "Classify the companion turn and prepare a capability request for autonomous_decision.",
+      "ui": {
+        "position": { "x": 760, "y": 80 },
+        "collapsed": false
+      },
+      "reads": [
+        { "state": "state_1", "required": true },
+        { "state": "state_2", "required": false },
+        { "state": "state_3", "required": false },
+        { "state": "state_4", "required": false },
+        { "state": "state_5", "required": false },
+        { "state": "state_6", "required": false },
+        { "state": "state_7", "required": false }
+      ],
+      "writes": [
+        { "state": "state_8", "mode": "replace" },
+        { "state": "state_9", "mode": "replace" },
+        { "state": "state_10", "mode": "replace" },
+        { "state": "state_19", "mode": "replace" },
+        { "state": "state_21", "mode": "replace" }
+      ],
+      "config": {
+        "skills": [],
+        "skillBindings": [],
+        "taskInstruction": "你是桌宠图模板里的意图规划节点。读取 user_message、conversation_history、page_context、companion_profile、companion_policy、companion_memory_context 和 skill_catalog_snapshot，产出 intent_plan、required_capability、needs_tool、proposed_tool_input 和 query。needs_tool 只有在需要联网、读写本地文件、下载媒体、修改图、生成 artifact 或其他显式技能能力时才为 true。query 是给搜索类技能使用的普通文本查询；proposed_tool_input 是对象，搜索场景至少包含 query 字段。不要执行技能，不要声称已经产生副作用。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "medium",
+        "temperature": 0.2
+      }
+    },
+    "decide_next_skill": {
+      "kind": "agent",
+      "name": "decide_next_skill",
+      "description": "Use autonomous_decision to choose a skill, ask for approval, propose a missing skill, or answer directly.",
+      "ui": {
+        "position": { "x": 1440, "y": 80 },
+        "collapsed": false
+      },
+      "reads": [
+        { "state": "state_1", "required": true },
+        { "state": "state_7", "required": false },
+        { "state": "state_8", "required": false },
+        { "state": "state_9", "required": false },
+        { "state": "state_10", "required": false },
+        { "state": "state_19", "required": false }
+      ],
+      "writes": [
+        { "state": "state_11", "mode": "replace" },
+        { "state": "state_12", "mode": "replace" },
+        { "state": "state_13", "mode": "replace" },
+        { "state": "state_14", "mode": "replace" },
+        { "state": "state_15", "mode": "replace" },
+        { "state": "state_18", "mode": "replace" },
+        { "state": "state_20", "mode": "replace" }
+      ],
+      "config": {
+        "skills": ["autonomous_decision"],
+        "skillBindings": [
+          {
+            "skillKey": "autonomous_decision",
+            "trigger": "before_agent",
+            "inputMapping": {
+              "user_message": "state_1",
+              "intent": "state_8",
+              "required_capability": "state_9",
+              "needs_tool": "state_10",
+              "skill_catalog": "state_7",
+              "proposed_tool_input": "state_19"
+            },
+            "outputMapping": {
+              "decision": "state_11",
+              "next_action": "state_12",
+              "selected_skill": "state_13",
+              "requires_approval": "state_14",
+              "permission_request": "state_15",
+              "missing_skill_proposal": "state_18",
+              "tool_input": "state_20"
+            },
+            "config": {
+              "run_origin": "companion"
+            }
+          }
+        ],
+        "taskInstruction": "这是控制节点。autonomous_decision 的结构化输出已经写入状态；不要执行被选中的技能，不要改写权限决策，只补充必要的简短诊断即可。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "off",
+        "temperature": 0
+      }
+    },
+    "missing_skill_check": {
+      "kind": "condition",
+      "name": "missing_skill_check",
+      "description": "Route to missing-skill output when no installed skill can be selected.",
+      "ui": {
+        "position": { "x": 2120, "y": 80 },
+        "collapsed": false
+      },
+      "reads": [
+        { "state": "state_11", "required": true }
+      ],
+      "config": {
+        "branches": ["true", "false", "exhausted"],
+        "loopLimit": 3,
+        "branchMapping": {
+          "true": "true",
+          "false": "false"
+        },
+        "rule": {
+          "source": "state_11",
+          "operator": "==",
+          "value": "missing_skill"
+        }
+      }
+    },
+    "output_missing_skill": {
+      "kind": "output",
+      "name": "output_missing_skill",
+      "description": "Show the missing skill proposal.",
+      "ui": {
+        "position": { "x": 2800, "y": -420 },
+        "collapsed": false
+      },
+      "reads": [
+        { "state": "state_18", "required": false }
+      ],
+      "config": {
+        "displayMode": "json",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    },
+    "direct_reply_check": {
+      "kind": "condition",
+      "name": "direct_reply_check",
+      "description": "Route directly to a companion reply when no skill is needed.",
+      "ui": {
+        "position": { "x": 2800, "y": 80 },
+        "collapsed": false
+      },
+      "reads": [
+        { "state": "state_11", "required": true }
+      ],
+      "config": {
+        "branches": ["true", "false", "exhausted"],
+        "loopLimit": 3,
+        "branchMapping": {
+          "true": "true",
+          "false": "false"
+        },
+        "rule": {
+          "source": "state_11",
+          "operator": "==",
+          "value": "answer_directly"
+        }
+      }
+    },
+    "compose_direct_reply": {
+      "kind": "agent",
+      "name": "compose_direct_reply",
+      "description": "Write the direct companion reply when no tool is needed.",
+      "ui": {
+        "position": { "x": 3480, "y": -200 },
+        "collapsed": false
+      },
+      "reads": [
+        { "state": "state_1", "required": true },
+        { "state": "state_2", "required": false },
+        { "state": "state_3", "required": false },
+        { "state": "state_4", "required": false },
+        { "state": "state_5", "required": false },
+        { "state": "state_6", "required": false },
+        { "state": "state_8", "required": false }
+      ],
+      "writes": [
+        { "state": "state_25", "mode": "replace" }
+      ],
+      "config": {
+        "skills": [],
+        "skillBindings": [],
+        "taskInstruction": "根据用户消息和桌宠上下文，写一条简短、自然、中文的桌宠回复。只把要显示在气泡里的内容写入 direct_reply；不要声称执行了任何工具。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "medium",
+        "temperature": 0.4
+      }
+    },
+    "output_direct_reply": {
+      "kind": "output",
+      "name": "output_direct_reply",
+      "description": "Display the direct companion reply.",
+      "ui": {
+        "position": { "x": 4160, "y": -200 },
+        "collapsed": false
+      },
+      "reads": [
+        { "state": "state_25", "required": true }
+      ],
+      "config": {
+        "displayMode": "markdown",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    },
+    "approval_required_check": {
+      "kind": "condition",
+      "name": "approval_required_check",
+      "description": "Route to approval pause when autonomous_decision requires user approval.",
+      "ui": {
+        "position": { "x": 3480, "y": 360 },
+        "collapsed": false
+      },
+      "reads": [
+        { "state": "state_12", "required": true }
+      ],
+      "config": {
+        "branches": ["true", "false", "exhausted"],
+        "loopLimit": 3,
+        "branchMapping": {
+          "true": "true",
+          "false": "false"
+        },
+        "rule": {
+          "source": "state_12",
+          "operator": "==",
+          "value": "request_approval"
+        }
+      }
+    },
+    "request_approval_agent": {
+      "kind": "agent",
+      "name": "request_approval_agent",
+      "description": "Prepare an approval prompt and pause after this node before running the selected skill.",
+      "ui": {
+        "position": { "x": 4160, "y": 360 },
+        "collapsed": false
+      },
+      "reads": [
+        { "state": "state_1", "required": true },
+        { "state": "state_13", "required": false },
+        { "state": "state_15", "required": false },
+        { "state": "state_20", "required": false }
+      ],
+      "writes": [
+        { "state": "state_16", "mode": "replace" }
+      ],
+      "config": {
+        "skills": [],
+        "skillBindings": [],
+        "taskInstruction": "根据 permission_request、allowed_skills 和 tool_input 写一个给用户确认的审批提示。必须清楚说明将使用哪个 skill、为什么需要、权限和副作用是什么，以及用户同意后会继续执行。只写 approval_prompt，不要执行技能。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "medium",
+        "temperature": 0.2
+      }
+    },
+    "output_permission_request": {
+      "kind": "output",
+      "name": "output_permission_request",
+      "description": "Display the approval prompt.",
+      "ui": {
+        "position": { "x": 4840, "y": 120 },
+        "collapsed": false
+      },
+      "reads": [
+        { "state": "state_16", "required": true }
+      ],
+      "config": {
+        "displayMode": "markdown",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    },
+    "approval_granted_check": {
+      "kind": "condition",
+      "name": "approval_granted_check",
+      "description": "Continue only when the human review state grants approval.",
+      "ui": {
+        "position": { "x": 4840, "y": 620 },
+        "collapsed": false
+      },
+      "reads": [
+        { "state": "state_17", "required": true }
+      ],
+      "config": {
+        "branches": ["true", "false", "exhausted"],
+        "loopLimit": 3,
+        "branchMapping": {
+          "true": "true",
+          "false": "false"
+        },
+        "rule": {
+          "source": "state_17",
+          "operator": "==",
+          "value": true
+        }
+      }
+    },
+    "compose_denied_reply": {
+      "kind": "agent",
+      "name": "compose_denied_reply",
+      "description": "Write the reply shown when approval is not granted.",
+      "ui": {
+        "position": { "x": 5520, "y": 360 },
+        "collapsed": false
+      },
+      "reads": [
+        { "state": "state_1", "required": true },
+        { "state": "state_15", "required": false },
+        { "state": "state_16", "required": false }
+      ],
+      "writes": [
+        { "state": "state_26", "mode": "replace" }
+      ],
+      "config": {
+        "skills": [],
+        "skillBindings": [],
+        "taskInstruction": "用户没有批准这次技能执行。写一条简短中文回复，说明已停止工具调用，并给出可以手动继续或改用无需工具回复的下一步。只写 denied_reply。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "medium",
+        "temperature": 0.3
+      }
+    },
+    "output_denied_reply": {
+      "kind": "output",
+      "name": "output_denied_reply",
+      "description": "Display the approval denied reply.",
+      "ui": {
+        "position": { "x": 6200, "y": 360 },
+        "collapsed": false
+      },
+      "reads": [
+        { "state": "state_26", "required": true }
+      ],
+      "config": {
+        "displayMode": "markdown",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    },
+    "tool_execution_agent": {
+      "kind": "agent",
+      "name": "tool_execution_agent",
+      "description": "Execute the skill supplied by allowed_skills skill state and summarize the result.",
+      "ui": {
+        "position": { "x": 5520, "y": 980 },
+        "collapsed": false
+      },
+      "reads": [
+        { "state": "state_1", "required": true },
+        { "state": "state_13", "required": true },
+        { "state": "state_20", "required": false },
+        { "state": "state_21", "required": false }
+      ],
+      "writes": [
+        { "state": "state_22", "mode": "replace" }
+      ],
+      "config": {
+        "skills": [],
+        "skillBindings": [],
+        "taskInstruction": "本节点的可用技能来自 allowed_skills 这个 skill state。运行时会把 allowed_skills 与卡片 skills 做并集合并。读取动态技能结果、tool_input 和 query，整理为 tool_result；如果技能失败，明确写出失败原因和可恢复建议。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "medium",
+        "temperature": 0.2
+      }
+    },
+    "assess_tool_result": {
+      "kind": "agent",
+      "name": "assess_tool_result",
+      "description": "Assess whether the tool result is enough or another skill loop is needed.",
+      "ui": {
+        "position": { "x": 6200, "y": 980 },
+        "collapsed": false
+      },
+      "reads": [
+        { "state": "state_1", "required": true },
+        { "state": "state_2", "required": false },
+        { "state": "state_3", "required": false },
+        { "state": "state_4", "required": false },
+        { "state": "state_5", "required": false },
+        { "state": "state_6", "required": false },
+        { "state": "state_8", "required": false },
+        { "state": "state_22", "required": true }
+      ],
+      "writes": [
+        { "state": "state_23", "mode": "replace" },
+        { "state": "state_24", "mode": "replace" },
+        { "state": "state_27", "mode": "replace" }
+      ],
+      "config": {
+        "skills": [],
+        "skillBindings": [],
+        "taskInstruction": "评估 tool_result 是否足以回答 user_message。写入 tool_assessment、needs_more_tools 和 final_reply。只有在仍缺少明确能力且还可以通过已授权技能补齐时，needs_more_tools 才为 true；否则输出最终桌宠回复。不要编造工具结果中没有的事实。",
+        "modelSource": "global",
+        "model": "",
+        "thinkingMode": "medium",
+        "temperature": 0.2
+      }
+    },
+    "continue_tool_loop_check": {
+      "kind": "condition",
+      "name": "continue_tool_loop_check",
+      "description": "Loop back to autonomous_decision when the assessor requests one more tool cycle.",
+      "ui": {
+        "position": { "x": 6880, "y": 980 },
+        "collapsed": false
+      },
+      "reads": [
+        { "state": "state_24", "required": true }
+      ],
+      "config": {
+        "branches": ["true", "false", "exhausted"],
+        "loopLimit": 3,
+        "branchMapping": {
+          "true": "true",
+          "false": "false"
+        },
+        "rule": {
+          "source": "state_24",
+          "operator": "==",
+          "value": true
+        }
+      }
+    },
+    "output_final_reply": {
+      "kind": "output",
+      "name": "output_final_reply",
+      "description": "Display the final companion reply after tool execution.",
+      "ui": {
+        "position": { "x": 7560, "y": 980 },
+        "collapsed": false
+      },
+      "reads": [
+        { "state": "state_27", "required": true }
+      ],
+      "config": {
+        "displayMode": "markdown",
+        "persistEnabled": false,
+        "persistFormat": "auto",
+        "fileNameTemplate": ""
+      }
+    }
+  },
+  "edges": [
+    {
+      "source": "input_user_message",
+      "target": "intent_planner"
+    },
+    {
+      "source": "input_conversation_history",
+      "target": "intent_planner"
+    },
+    {
+      "source": "input_page_context",
+      "target": "intent_planner"
+    },
+    {
+      "source": "input_companion_profile",
+      "target": "intent_planner"
+    },
+    {
+      "source": "input_companion_policy",
+      "target": "intent_planner"
+    },
+    {
+      "source": "input_companion_memory_context",
+      "target": "intent_planner"
+    },
+    {
+      "source": "input_skill_catalog_snapshot",
+      "target": "intent_planner"
+    },
+    {
+      "source": "intent_planner",
+      "target": "decide_next_skill"
+    },
+    {
+      "source": "decide_next_skill",
+      "target": "missing_skill_check"
+    },
+    {
+      "source": "compose_direct_reply",
+      "target": "output_direct_reply"
+    },
+    {
+      "source": "request_approval_agent",
+      "target": "output_permission_request"
+    },
+    {
+      "source": "request_approval_agent",
+      "target": "approval_granted_check"
+    },
+    {
+      "source": "compose_denied_reply",
+      "target": "output_denied_reply"
+    },
+    {
+      "source": "tool_execution_agent",
+      "target": "assess_tool_result"
+    },
+    {
+      "source": "assess_tool_result",
+      "target": "continue_tool_loop_check"
+    }
+  ],
+  "conditional_edges": [
+    {
+      "source": "missing_skill_check",
+      "branches": {
+        "true": "output_missing_skill",
+        "false": "direct_reply_check",
+        "exhausted": "output_missing_skill"
+      }
+    },
+    {
+      "source": "direct_reply_check",
+      "branches": {
+        "true": "compose_direct_reply",
+        "false": "approval_required_check",
+        "exhausted": "compose_direct_reply"
+      }
+    },
+    {
+      "source": "approval_required_check",
+      "branches": {
+        "true": "request_approval_agent",
+        "false": "tool_execution_agent",
+        "exhausted": "request_approval_agent"
+      }
+    },
+    {
+      "source": "approval_granted_check",
+      "branches": {
+        "true": "tool_execution_agent",
+        "false": "compose_denied_reply",
+        "exhausted": "compose_denied_reply"
+      }
+    },
+    {
+      "source": "continue_tool_loop_check",
+      "branches": {
+        "true": "decide_next_skill",
+        "false": "output_final_reply",
+        "exhausted": "output_final_reply"
+      }
+    }
+  ],
+  "metadata": {
+    "graphiteui_state_key_counter": 27,
+    "companion_template": true,
+    "interrupt_after": ["request_approval_agent"],
+    "agent_breakpoint_timing": {
+      "request_approval_agent": "after"
+    }
+  }
+}
