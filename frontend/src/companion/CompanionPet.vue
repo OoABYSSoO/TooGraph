@@ -449,6 +449,9 @@ async function processQueuedTurn(turn: CompanionQueuedTurn) {
     const finalReply = resolveCompanionReplyText(runDetail);
     updateAssistantMessage(assistantMessage.id, finalReply || t("companion.emptyReply"));
     mood.value = runDetail.status === "failed" ? "error" : "speaking";
+    if (runDetail.status === "completed") {
+      companionContextStore.notifyCompanionDataChanged();
+    }
     if (runDetail.status === "failed") {
       errorMessage.value = runDetail.errors?.[0] ?? t("companion.runFailed");
     }

@@ -74,6 +74,10 @@ test("CompanionPet builds advisory page context from the shared editor snapshot"
   assert.match(componentSource, /return buildCompanionPageContext\(\{[\s\S]*routePath: route\.fullPath,[\s\S]*editor: companionContextStore\.editorSnapshot,[\s\S]*activeCompanionRunId: activeRunId\.value,[\s\S]*\}\);/);
 });
 
+test("CompanionPet notifies companion pages to refresh after a completed chat graph run", () => {
+  assert.match(componentSource, /if \(runDetail\.status === "completed"\) \{[\s\S]*companionContextStore\.notifyCompanionDataChanged\(\);[\s\S]*\}/);
+});
+
 test("CompanionPet returns speaking replies to idle so the next message can be typed", () => {
   assert.match(
     componentSource,

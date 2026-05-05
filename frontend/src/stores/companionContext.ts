@@ -5,6 +5,7 @@ import type { CompanionEditorContextSnapshot } from "../companion/companionPageC
 
 export const useCompanionContextStore = defineStore("companionContext", () => {
   const editorSnapshot = ref<CompanionEditorContextSnapshot | null>(null);
+  const dataRefreshNonce = ref(0);
 
   function setEditorSnapshot(nextSnapshot: CompanionEditorContextSnapshot | null) {
     editorSnapshot.value = nextSnapshot
@@ -19,9 +20,15 @@ export const useCompanionContextStore = defineStore("companionContext", () => {
     editorSnapshot.value = null;
   }
 
+  function notifyCompanionDataChanged() {
+    dataRefreshNonce.value += 1;
+  }
+
   return {
     editorSnapshot,
+    dataRefreshNonce,
     setEditorSnapshot,
     clearEditorSnapshot,
+    notifyCompanionDataChanged,
   };
 });

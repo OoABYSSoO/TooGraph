@@ -25,3 +25,13 @@ test("CompanionPage manages profile, policy, memories, summary, and revisions", 
   assert.match(source, /name="summary"/);
   assert.match(source, /name="history"/);
 });
+
+test("CompanionPage reloads companion data when the pet reports external updates", () => {
+  assert.match(source, /import \{ computed, onMounted, ref, watch \} from "vue";/);
+  assert.match(source, /import \{ useCompanionContextStore \} from "@\/stores\/companionContext";/);
+  assert.match(source, /const companionContextStore = useCompanionContextStore\(\);/);
+  assert.match(source, /function hasActiveCompanionPageWrite\(\)/);
+  assert.match(source, /watch\(\s*\(\) => companionContextStore\.dataRefreshNonce,/);
+  assert.match(source, /if \(!hasLoaded\.value \|\| hasActiveCompanionPageWrite\(\)\) \{/);
+  assert.match(source, /void loadAll\(\{ silent: true \}\);/);
+});

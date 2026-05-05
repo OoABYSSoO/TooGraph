@@ -42,3 +42,14 @@ test("companion context store keeps the editor snapshot read-only for companion 
 
   assert.equal(store.editorSnapshot, null);
 });
+
+test("companion context store exposes a refresh nonce for companion data updates", () => {
+  setActivePinia(createPinia());
+  const store = useCompanionContextStore();
+
+  assert.equal(store.dataRefreshNonce, 0);
+
+  store.notifyCompanionDataChanged();
+
+  assert.equal(store.dataRefreshNonce, 1);
+});
