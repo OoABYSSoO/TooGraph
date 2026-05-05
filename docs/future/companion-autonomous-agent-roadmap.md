@@ -210,6 +210,7 @@ effective_skills = agent.config.skills ∪ state_schema[type=skill] 输入中的
 当前模板边界：
 
 - 模板已经表达受控路由、多轮循环、审批暂停和记忆整理；桌宠入口已经默认选择该模板并注入真实 skill catalog snapshot。
+- LangGraph runtime 已原生支持 `condition -> condition` 条件链；模板可以直接表达“缺能力判断 -> 直接回复判断 -> 审批判断”等多级路由，不需要插入兼容用的代理 agent。
 - `web_search` 是桌宠默认可自主选择且无需确认的联网检索能力，用于“今天的 AI 新闻”等时效性问题；其他需要审批的技能在 advisory 档不会被自主选择。
 - `final_reply` 是协议级稳定最终回复状态；直接回复、拒绝回复和工具评估等互斥条件分支可以共同写入它，汇合后的记忆整理和输出节点只读取它。
 - 缺能力时只产出 `missing_skill_proposal`，不会静默安装或启用新 skill；后续必须交给 `graphite_skill_builder` 和用户确认路径。
@@ -325,6 +326,7 @@ backend/data/skill_drafts/<skill_key>/
 - 新增 `companion_agentic_tool_loop`。
 - 支持“决策 -> 审批 -> 执行 -> 评估 -> 继续或退出”。
 - 使用 `skill` state 把 `autonomous_decision` 选出的技能传给后续 Agent 节点，并与卡片 skills 并集合并。
+- LangGraph runtime 原生执行多级 condition 条件链，模板不需要为了适配运行时拆出空代理节点或改写控制流。
 - 审批通过 `request_approval_agent` 和 `interrupt_after` 暂停，恢复时由 `approval_granted` 决定继续执行或拒绝回复。
 - 桌宠入口注入真实 skill catalog snapshot；advisory 档允许 `web_search` 这类无需审批的默认能力自主选择，仍禁用需要审批技能的自主选择；approval 档按 manifest 策略允许自主选择并请求审批。
 - 人设、策略、记忆和会话摘要读写融合在同一个模板里，通过 `local_file` 节点保留 revision。

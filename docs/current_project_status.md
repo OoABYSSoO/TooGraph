@@ -66,6 +66,7 @@
 - FastAPI 提供 graphs / runs / templates / presets / settings / skills / knowledge / memories API。
 - validator 负责 `node_system` graph 结构校验。
 - LangGraph runtime 是当前运行主链，并采用 agent-only 语义：只有 agent 注册为 LangGraph node，input / output / condition 作为边界状态、输出 artifact 和条件 route 参与反馈。
+- LangGraph runtime 原生支持 `condition` 分支继续指向另一个 `condition`，用于表达嵌套判断和桌宠自主循环中的多级路由；condition 仍保持纯控制流代理，不注册为 LangGraph node。
 - 控制流分析允许互斥条件分支共同写入同一个汇合状态，例如 `final_reply`；普通并行无序写入仍会被拒绝。
 - 后端支持 LangGraph Python 源码导出接口。
 - 后端具备 interrupt / checkpoint / resume 能力，前端人类在环完整产品闭环仍在路线图中。

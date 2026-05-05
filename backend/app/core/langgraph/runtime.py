@@ -442,67 +442,124 @@ def _build_langgraph_route_callable(
     checkpoint_saver: JsonCheckpointSaver,
     checkpoint_lookup_config: dict[str, Any],
 ):
-    condition_name = route.condition
-    condition_node = graph.nodes[condition_name]
+    conditional_edges_by_source = {
+        conditional_edge.source: conditional_edge
+        for conditional_edge in graph.conditional_edges
+    }
+
+    def _route_key_for_steps(selected_steps: list[tuple[str, str, str]]) -> str:
+        for route_key, planned_steps in route.branch_paths.items():
+            if [
+                (str(step.condition), str(step.branch), str(step.target))
+                for step in planned_steps
+            ] == selected_steps:
+                return str(route_key)
+        rendered_path = " -> ".join(
+            f"{condition_name}.{branch}->{target}"
+            for condition_name, branch, target in selected_steps
+        )
+        raise ValueError(f"Condition route path is not compiled into the LangGraph plan: {rendered_path}")
 
     def _route(current_values: dict[str, Any]) -> str:
         with run_lock:
-            state["node_status_map"][condition_name] = "running"
             state["state_values"] = {
                 **dict(state.get("state_values", {})),
                 **dict(current_values or {}),
             }
-            try:
-                input_values, _state_reads = collect_node_inputs(condition_node, state)
-                body = _execute_node(graph, condition_name, condition_node, input_values, state)
-            except Exception:
-                state["node_status_map"][condition_name] = "failed"
-                raise
-            selected_branch = str(body.get("selected_branch") or "").strip()
-            if not selected_branch:
-                state["node_status_map"][condition_name] = "failed"
-                raise ValueError(f"Condition node '{condition_name}' did not produce a selected branch.")
-            state["node_status_map"][condition_name] = "success"
-            visual_target = route.branch_targets.get(selected_branch, "")
-            selected_edge_ids: set[str] = set()
-            edge_id = conditional_edge_ids.get((condition_name, selected_branch, visual_target))
-            if edge_id:
-                selected_edge_ids.add(edge_id)
             iteration = _current_cycle_iteration(cycle_tracker)
-            loop_limit_violation = _peek_condition_loop_limit_violation(cycle_tracker, sorted(selected_edge_ids))
-            if loop_limit_violation is not None:
-                max_iterations, source_node = loop_limit_violation
-                exhausted_visual_target = route.branch_targets.get("exhausted", "")
-                exhausted_edge_id = conditional_edge_ids.get((condition_name, "exhausted", exhausted_visual_target))
-                if route.branches.get("exhausted") and exhausted_visual_target and exhausted_edge_id:
-                    selected_branch = "exhausted"
-                    selected_edge_ids = {exhausted_edge_id}
-                    _mark_cycle_iteration_stop_reason(cycle_tracker, iteration, "max_iterations_exceeded")
-                    state["loop_limit_exhaustion"] = {
-                        "condition_node": source_node,
-                        "max_iterations": max_iterations,
-                    }
-                else:
-                    _mark_cycle_iteration_stop_reason(cycle_tracker, iteration, "max_iterations_exceeded")
+            selected_edge_ids: set[str] = set()
+            selected_steps: list[tuple[str, str, str]] = []
+            visited_conditions: set[str] = set()
+            condition_name = str(route.condition)
+
+            while True:
+                if condition_name in visited_conditions:
+                    raise ValueError(f"Condition route contains a condition-only cycle at '{condition_name}'.")
+                visited_conditions.add(condition_name)
+
+                condition_node = graph.nodes[condition_name]
+                state["node_status_map"][condition_name] = "running"
+                try:
+                    input_values, _state_reads = collect_node_inputs(condition_node, state)
+                    body = _execute_node(graph, condition_name, condition_node, input_values, state)
+                except Exception:
+                    state["node_status_map"][condition_name] = "failed"
+                    raise
+
+                selected_branch = str(body.get("selected_branch") or "").strip()
+                if not selected_branch:
+                    state["node_status_map"][condition_name] = "failed"
+                    raise ValueError(f"Condition node '{condition_name}' did not produce a selected branch.")
+
+                conditional_edge = conditional_edges_by_source.get(condition_name)
+                if conditional_edge is None:
+                    state["node_status_map"][condition_name] = "failed"
+                    raise ValueError(f"Condition node '{condition_name}' has no conditional edge mapping.")
+
+                visual_target = str(conditional_edge.branches.get(selected_branch) or "")
+                if not visual_target:
+                    state["node_status_map"][condition_name] = "failed"
                     raise ValueError(
-                        f"Cycle execution exceeded loopLimit ({max_iterations}) for condition '{source_node}'. Add an exit branch or raise loopLimit."
+                        f"Condition node '{condition_name}' selected branch '{selected_branch}', but that branch has no target."
                     )
-            active_edge_ids.update(selected_edge_ids)
-            _record_cycle_route_activity(
-                state=state,
-                cycle_tracker=cycle_tracker,
-                iteration=iteration,
-                selected_edge_ids=selected_edge_ids,
-            )
-            if persist_progress:
-                _persist_langgraph_progress(
-                    state,
-                    node_outputs,
-                    active_edge_ids,
-                    started_perf=started_perf,
-                    checkpoint_saver=checkpoint_saver,
-                    checkpoint_lookup_config=checkpoint_lookup_config,
+
+                current_step_edge_ids: set[str] = set()
+                edge_id = conditional_edge_ids.get((condition_name, selected_branch, visual_target))
+                if edge_id:
+                    current_step_edge_ids.add(edge_id)
+
+                loop_limit_violation = _peek_condition_loop_limit_violation(
+                    cycle_tracker,
+                    sorted(current_step_edge_ids),
                 )
-            return selected_branch
+                if loop_limit_violation is not None:
+                    max_iterations, source_node = loop_limit_violation
+                    exhausted_visual_target = str(conditional_edge.branches.get("exhausted") or "")
+                    exhausted_edge_id = conditional_edge_ids.get(
+                        (condition_name, "exhausted", exhausted_visual_target)
+                    )
+                    if exhausted_visual_target and exhausted_edge_id:
+                        selected_branch = "exhausted"
+                        visual_target = exhausted_visual_target
+                        current_step_edge_ids = {exhausted_edge_id}
+                        _mark_cycle_iteration_stop_reason(cycle_tracker, iteration, "max_iterations_exceeded")
+                        state["loop_limit_exhaustion"] = {
+                            "condition_node": source_node,
+                            "max_iterations": max_iterations,
+                        }
+                    else:
+                        state["node_status_map"][condition_name] = "failed"
+                        _mark_cycle_iteration_stop_reason(cycle_tracker, iteration, "max_iterations_exceeded")
+                        raise ValueError(
+                            f"Cycle execution exceeded loopLimit ({max_iterations}) for condition '{source_node}'. Add an exit branch or raise loopLimit."
+                        )
+
+                state["node_status_map"][condition_name] = "success"
+                selected_steps.append((condition_name, selected_branch, visual_target))
+                selected_edge_ids.update(current_step_edge_ids)
+
+                target_node = graph.nodes.get(visual_target)
+                if target_node is not None and target_node.kind == "condition":
+                    condition_name = visual_target
+                    continue
+
+                route_key = _route_key_for_steps(selected_steps)
+                active_edge_ids.update(selected_edge_ids)
+                _record_cycle_route_activity(
+                    state=state,
+                    cycle_tracker=cycle_tracker,
+                    iteration=iteration,
+                    selected_edge_ids=selected_edge_ids,
+                )
+                if persist_progress:
+                    _persist_langgraph_progress(
+                        state,
+                        node_outputs,
+                        active_edge_ids,
+                        started_perf=started_perf,
+                        checkpoint_saver=checkpoint_saver,
+                        checkpoint_lookup_config=checkpoint_lookup_config,
+                    )
+                return route_key
 
     return _route

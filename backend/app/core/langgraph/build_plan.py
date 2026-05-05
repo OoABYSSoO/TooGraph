@@ -25,6 +25,12 @@ class LangGraphConditionalEdgePlan(BaseModel):
     branches: dict[str, str] = Field(default_factory=dict)
 
 
+class LangGraphRuntimeConditionStepPlan(BaseModel):
+    condition: str
+    branch: str
+    target: str
+
+
 class LangGraphBoundaryPlan(BaseModel):
     node: str
     state: str
@@ -35,6 +41,7 @@ class LangGraphRuntimeConditionRoutePlan(BaseModel):
     condition: str
     branches: dict[str, str] = Field(default_factory=dict)
     branch_targets: dict[str, str] = Field(default_factory=dict)
+    branch_paths: dict[str, list[LangGraphRuntimeConditionStepPlan]] = Field(default_factory=dict)
 
 
 class LangGraphRuntimeRequirements(BaseModel):

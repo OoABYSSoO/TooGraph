@@ -305,6 +305,148 @@ class LangGraphMigrationTests(unittest.TestCase):
     @patch("app.core.runtime.node_system_executor._generate_agent_response", _fake_generate_agent_response)
     @patch("app.core.runtime.node_system_executor._invoke_skill", _fake_invoke_skill)
     @patch("app.core.runtime.node_system_executor.get_skill_registry", _fake_skill_registry)
+    def test_langgraph_runtime_supports_condition_branch_target_condition(self):
+        graph = NodeSystemGraphPayload.model_validate(
+            {
+                "name": "Nested Condition Routing",
+                "state_schema": {
+                    "route_one": {"name": "route_one", "type": "boolean", "value": False, "color": "#d97706"},
+                    "route_two": {"name": "route_two", "type": "boolean", "value": True, "color": "#2563eb"},
+                    "answer": {"name": "answer", "type": "text", "value": "", "color": "#0f766e"},
+                },
+                "nodes": {
+                    "input_route": {
+                        "kind": "input",
+                        "name": "input_route",
+                        "description": "",
+                        "ui": {"position": {"x": 0, "y": 0}},
+                        "reads": [],
+                        "writes": [{"state": "route_one", "mode": "replace"}],
+                        "config": {"value": False},
+                    },
+                    "input_route_two": {
+                        "kind": "input",
+                        "name": "input_route_two",
+                        "description": "",
+                        "ui": {"position": {"x": 0, "y": 160}},
+                        "reads": [],
+                        "writes": [{"state": "route_two", "mode": "replace"}],
+                        "config": {"value": True},
+                    },
+                    "first_check": {
+                        "kind": "condition",
+                        "name": "first_check",
+                        "description": "",
+                        "ui": {"position": {"x": 240, "y": 0}},
+                        "reads": [{"state": "route_one", "required": True}],
+                        "writes": [],
+                        "config": {
+                            "branches": ["true", "false", "exhausted"],
+                            "loopLimit": 1,
+                            "branchMapping": {"true": "true", "false": "false"},
+                            "rule": {"source": "route_one", "operator": "==", "value": True},
+                        },
+                    },
+                    "second_check": {
+                        "kind": "condition",
+                        "name": "second_check",
+                        "description": "",
+                        "ui": {"position": {"x": 480, "y": 120}},
+                        "reads": [{"state": "route_two", "required": True}],
+                        "writes": [],
+                        "config": {
+                            "branches": ["true", "false", "exhausted"],
+                            "loopLimit": 1,
+                            "branchMapping": {"true": "true", "false": "false"},
+                            "rule": {"source": "route_two", "operator": "==", "value": True},
+                        },
+                    },
+                    "writer_a": {
+                        "kind": "agent",
+                        "name": "Writer A",
+                        "description": "",
+                        "ui": {"position": {"x": 720, "y": -120}},
+                        "reads": [],
+                        "writes": [{"state": "answer", "mode": "replace"}],
+                        "config": {"skills": [], "taskInstruction": ""},
+                    },
+                    "writer_b": {
+                        "kind": "agent",
+                        "name": "Writer B",
+                        "description": "",
+                        "ui": {"position": {"x": 720, "y": 120}},
+                        "reads": [],
+                        "writes": [{"state": "answer", "mode": "replace"}],
+                        "config": {"skills": [], "taskInstruction": ""},
+                    },
+                    "writer_c": {
+                        "kind": "agent",
+                        "name": "Writer C",
+                        "description": "",
+                        "ui": {"position": {"x": 720, "y": 360}},
+                        "reads": [],
+                        "writes": [{"state": "answer", "mode": "replace"}],
+                        "config": {"skills": [], "taskInstruction": ""},
+                    },
+                    "show_answer": {
+                        "kind": "output",
+                        "name": "show_answer",
+                        "description": "",
+                        "ui": {"position": {"x": 1040, "y": 120}},
+                        "reads": [{"state": "answer", "required": True}],
+                        "writes": [],
+                        "config": {
+                            "displayMode": "auto",
+                            "persistEnabled": False,
+                            "persistFormat": "auto",
+                            "fileNameTemplate": "",
+                        },
+                    },
+                },
+                "edges": [
+                    {"source": "input_route", "target": "first_check"},
+                    {"source": "input_route_two", "target": "first_check"},
+                    {"source": "writer_a", "target": "show_answer"},
+                    {"source": "writer_b", "target": "show_answer"},
+                    {"source": "writer_c", "target": "show_answer"},
+                ],
+                "conditional_edges": [
+                    {
+                        "source": "first_check",
+                        "branches": {
+                            "true": "writer_a",
+                            "false": "second_check",
+                            "exhausted": "writer_a",
+                        },
+                    },
+                    {
+                        "source": "second_check",
+                        "branches": {
+                            "true": "writer_b",
+                            "false": "writer_c",
+                            "exhausted": "writer_c",
+                        },
+                    },
+                ],
+                "metadata": {},
+            }
+        )
+
+        plan = compile_graph_to_langgraph_plan(graph)
+        self.assertEqual(plan.requirements.unsupported_reasons, [])
+
+        result = execute_node_system_graph_langgraph(graph, persist_progress=False)
+
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(result["state_snapshot"]["values"]["answer"], "Writer B")
+        self.assertEqual(result["node_status_map"]["first_check"], "success")
+        self.assertEqual(result["node_status_map"]["second_check"], "success")
+
+    @patch("app.core.langgraph.runtime.save_run", lambda state: None)
+    @patch("app.core.runtime.node_system_executor.save_run", lambda state: None)
+    @patch("app.core.runtime.node_system_executor._generate_agent_response", _fake_generate_agent_response)
+    @patch("app.core.runtime.node_system_executor._invoke_skill", _fake_invoke_skill)
+    @patch("app.core.runtime.node_system_executor.get_skill_registry", _fake_skill_registry)
     def test_hello_world_langgraph_runtime(self):
         graph = _load_hello_world_graph()
         result = execute_node_system_graph_langgraph(graph, persist_progress=False)

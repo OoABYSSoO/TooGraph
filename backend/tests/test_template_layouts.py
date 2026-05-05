@@ -8,6 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.compiler.validator import validate_graph
+from app.core.langgraph.compiler import get_langgraph_runtime_unsupported_reasons
 from app.core.schemas.node_system import NodeSystemGraphDocument, NodeSystemInputNode, NodeSystemTemplate
 from app.templates.loader import list_template_records
 
@@ -416,6 +417,16 @@ class TemplateLayoutTests(unittest.TestCase):
                 "false": "curate_companion_memory",
                 "exhausted": "curate_companion_memory",
             },
+        )
+
+        graph_payload = template.model_dump(mode="json", by_alias=True)
+        graph_payload["graph_id"] = "template_companion_agentic_tool_loop"
+        graph_payload["name"] = template.default_graph_name
+        for template_only_key in ["template_id", "label", "description", "default_graph_name"]:
+            graph_payload.pop(template_only_key, None)
+        self.assertEqual(
+            get_langgraph_runtime_unsupported_reasons(NodeSystemGraphDocument.model_validate(graph_payload)),
+            [],
         )
 
         self.assertEqual(
