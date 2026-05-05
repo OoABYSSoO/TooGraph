@@ -266,7 +266,7 @@ function createSkillDefinition(overrides: Partial<SkillDefinition> = {}): SkillD
     runPolicies: {
       default: { discoverable: true, autoSelectable: false, requiresApproval: false },
       origins: {
-        companion: { discoverable: true, autoSelectable: true, requiresApproval: true },
+        companion: { discoverable: true, autoSelectable: true, requiresApproval: false },
       },
     },
     kind: "atomic",
@@ -345,19 +345,37 @@ test("companion pet defaults to the agentic tool loop template", () => {
   assert.equal(COMPANION_TEMPLATE_ID, "companion_agentic_tool_loop");
 });
 
-test("buildCompanionChatGraph injects the real skill catalog and disables autonomous selection in advisory mode", () => {
+test("buildCompanionChatGraph keeps no-approval web search auto-selectable in advisory mode", () => {
   const graph = buildCompanionChatGraph(createAgenticTemplate(), {
     userMessage: "帮我搜索最新资料",
     history: [],
     pageContext: "当前路径: /editor",
     companionMode: "advisory",
-    skillCatalog: [createSkillDefinition()],
+    skillCatalog: [
+      createSkillDefinition(),
+      createSkillDefinition({
+        skillKey: "web_media_downloader",
+        label: "Web Media Downloader",
+        description: "Download authorized web media.",
+        runPolicies: {
+          default: { discoverable: true, autoSelectable: false, requiresApproval: true },
+          origins: {
+            companion: { discoverable: true, autoSelectable: true, requiresApproval: true },
+          },
+        },
+        permissions: ["network", "file_write"],
+        sideEffects: ["network", "file_write"],
+      }),
+    ],
   });
 
   const catalog = graph.state_schema.state_7.value as SkillDefinition[];
   assert.equal(graph.name, "桌宠自主工具循环");
   assert.equal(catalog[0].skillKey, "web_search");
-  assert.equal(catalog[0].runPolicies.origins.companion.autoSelectable, false);
+  assert.equal(catalog[0].runPolicies.origins.companion.autoSelectable, true);
+  assert.equal(catalog[0].runPolicies.origins.companion.requiresApproval, false);
+  assert.equal(catalog[1].runPolicies.origins.companion.autoSelectable, false);
+  assert.equal(catalog[1].runPolicies.origins.companion.requiresApproval, true);
   assertInputNode(graph.nodes.input_skill_catalog_snapshot);
   assert.deepEqual(graph.nodes.input_skill_catalog_snapshot.config.value, catalog);
 });

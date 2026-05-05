@@ -206,7 +206,7 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertNotIn("targets", catalog_items["web_search"])
                 self.assertTrue(catalog_items["web_search"]["runPolicies"]["default"]["discoverable"])
                 self.assertTrue(catalog_items["web_search"]["runPolicies"]["origins"]["companion"]["autoSelectable"])
-                self.assertTrue(catalog_items["web_search"]["runPolicies"]["origins"]["companion"]["requiresApproval"])
+                self.assertFalse(catalog_items["web_search"]["runPolicies"]["origins"]["companion"]["requiresApproval"])
                 self.assertTrue(catalog_items["web_search"]["runtimeReady"])
                 self.assertTrue(catalog_items["web_search"]["runtimeRegistered"])
                 self.assertTrue(source_path["web_search"].endswith("/skill/web_search/skill.json"))

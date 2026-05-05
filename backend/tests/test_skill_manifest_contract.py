@@ -148,7 +148,7 @@ class SkillManifestContractTests(unittest.TestCase):
         self.assertFalse(definition.run_policies.default.auto_selectable)
         self.assertTrue(definition.run_policies.origins["companion"].discoverable)
         self.assertTrue(definition.run_policies.origins["companion"].auto_selectable)
-        self.assertTrue(definition.run_policies.origins["companion"].requires_approval)
+        self.assertFalse(definition.run_policies.origins["companion"].requires_approval)
         self.assertEqual(definition.runtime.type, "python")
         self.assertEqual(definition.runtime.entrypoint, "run.py")
         self.assertEqual(definition.agent_node_eligibility, SkillAgentNodeEligibility.READY)

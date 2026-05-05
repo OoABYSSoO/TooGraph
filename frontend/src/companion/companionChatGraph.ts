@@ -142,17 +142,18 @@ export function buildCompanionSkillCatalogSnapshot(skills: SkillDefinition[], co
       ...defaultPolicy,
       ...(snapshot.runPolicies?.origins?.companion ?? {}),
     };
+    const companionOriginPolicy =
+      companionMode === "approval" || !companionPolicy.requiresApproval
+        ? companionPolicy
+        : {
+            ...companionPolicy,
+            autoSelectable: false,
+          };
     snapshot.runPolicies = {
       default: defaultPolicy,
       origins: {
         ...(snapshot.runPolicies?.origins ?? {}),
-        companion:
-          companionMode === "approval"
-            ? companionPolicy
-            : {
-                ...companionPolicy,
-                autoSelectable: false,
-              },
+        companion: companionOriginPolicy,
       },
     };
     return snapshot;

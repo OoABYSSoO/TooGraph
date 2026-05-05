@@ -6,8 +6,6 @@ import sys
 from typing import Any
 
 
-HIGH_RISK_PERMISSIONS = {"network", "file_write", "subprocess", "secret_read", "graph_write", "skill_install"}
-HIGH_RISK_SIDE_EFFECTS = {"network", "file_write", "subprocess", "secret_read", "graph_write", "model_call"}
 TOKEN_RE = re.compile(r"[A-Za-z0-9_\-\u4e00-\u9fff]+")
 
 
@@ -241,11 +239,7 @@ def _tokens(value: str) -> set[str]:
 
 
 def _requires_approval(candidate: dict[str, Any]) -> bool:
-    if candidate["requiresApproval"]:
-        return True
-    permissions = {item.lower() for item in candidate["permissions"]}
-    side_effects = {item.lower() for item in candidate["sideEffects"]}
-    return bool(permissions & HIGH_RISK_PERMISSIONS or side_effects & HIGH_RISK_SIDE_EFFECTS)
+    return bool(candidate["requiresApproval"])
 
 
 def _permission_request(candidate: dict[str, Any]) -> dict[str, Any]:

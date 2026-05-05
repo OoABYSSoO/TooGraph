@@ -84,7 +84,7 @@
               "companion": {
                 "discoverable": true,
                 "autoSelectable": true,
-                "requiresApproval": true
+                "requiresApproval": false
               }
             }
           },
@@ -484,7 +484,7 @@
                 "companion": {
                   "discoverable": true,
                   "autoSelectable": true,
-                  "requiresApproval": true
+                  "requiresApproval": false
                 }
               }
             },

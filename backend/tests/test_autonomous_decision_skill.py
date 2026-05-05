@@ -134,6 +134,33 @@ class AutonomousDecisionSkillTests(unittest.TestCase):
         self.assertIn("network", result["permission_request"]["permissions"])
         self.assertEqual(result["next_action"], "request_approval")
 
+    def test_selects_companion_web_search_without_approval_when_policy_allows_it(self) -> None:
+        autonomous_decision = _load_autonomous_decision_module()
+        result = autonomous_decision.autonomous_decision_skill(
+            run_origin="companion",
+            user_message="帮我总结一下今天的 AI 新闻",
+            required_capability="web search latest AI news",
+            skill_catalog=[
+                _catalog_item(
+                    "web_search",
+                    label="Web Search",
+                    description="Search the public web and return cited results.",
+                    auto_selectable=True,
+                    requires_approval=False,
+                    permissions=["network", "secret_read"],
+                    side_effects=["network", "secret_read"],
+                ),
+            ],
+        )
+
+        self.assertEqual(result["status"], "succeeded")
+        self.assertEqual(result["decision"], "use_skill")
+        self.assertEqual(result["next_action"], "execute_skill")
+        self.assertTrue(result["needs_tool"])
+        self.assertEqual(result["selected_skill"]["skillKey"], "web_search")
+        self.assertFalse(result["requires_approval"])
+        self.assertIsNone(result["permission_request"])
+
     def test_reports_missing_skill_when_only_hidden_or_manual_skills_match(self) -> None:
         autonomous_decision = _load_autonomous_decision_module()
         result = autonomous_decision.autonomous_decision_skill(

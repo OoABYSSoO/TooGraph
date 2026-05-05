@@ -308,6 +308,10 @@ class TemplateLayoutTests(unittest.TestCase):
 
         self.assertEqual(template.state_schema[state_by_name["allowed_skills"]].type.value, "skill")
         self.assertEqual(template.state_schema[state_by_name["allowed_skills"]].value, [])
+        skill_catalog = template.state_schema[state_by_name["skill_catalog_snapshot"]].value
+        web_search = next(item for item in skill_catalog if item["skillKey"] == "web_search")
+        self.assertTrue(web_search["runPolicies"]["origins"]["companion"]["autoSelectable"])
+        self.assertFalse(web_search["runPolicies"]["origins"]["companion"]["requiresApproval"])
 
         self.assertIn("intent_planner", template.nodes)
         self.assertIn("decide_next_skill", template.nodes)
