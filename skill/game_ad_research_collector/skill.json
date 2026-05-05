@@ -4,7 +4,20 @@
   "label": "Game Ad Research Collector",
   "description": "Collect game-market RSS context, build public ad-library search URLs, optionally scrape public video media, download authorized videos, and return local artifact paths.",
   "version": "1.0.0",
-  "targets": ["agent_node", "companion"],
+  "runPolicies": {
+    "default": {
+      "discoverable": true,
+      "autoSelectable": false,
+      "requiresApproval": false
+    },
+    "origins": {
+      "companion": {
+        "discoverable": true,
+        "autoSelectable": false,
+        "requiresApproval": true
+      }
+    }
+  },
   "kind": "atomic",
   "mode": "tool",
   "scope": "node",

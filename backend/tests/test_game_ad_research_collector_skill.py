@@ -14,7 +14,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.core.schemas.skills import SkillAgentNodeEligibility, SkillSideEffect, SkillTarget
+from app.core.schemas.skills import SkillAgentNodeEligibility, SkillSideEffect
 from app.skills.definitions import _parse_native_skill_manifest
 from app.skills.registry import get_skill_registry
 
@@ -37,7 +37,10 @@ class GameAdResearchCollectorSkillTests(unittest.TestCase):
         definition = _parse_native_skill_manifest(GAME_AD_MANIFEST_PATH, source_scope="installed").definition
 
         self.assertEqual(definition.skill_key, "game_ad_research_collector")
-        self.assertIn(SkillTarget.AGENT_NODE, definition.targets)
+        self.assertNotIn("targets", definition.model_dump(by_alias=True))
+        self.assertTrue(definition.run_policies.default.discoverable)
+        self.assertFalse(definition.run_policies.default.auto_selectable)
+        self.assertTrue(definition.run_policies.origins["companion"].requires_approval)
         self.assertEqual(definition.runtime.type, "python")
         self.assertEqual(definition.runtime.entrypoint, "run.py")
         self.assertEqual(definition.agent_node_eligibility, SkillAgentNodeEligibility.READY)

@@ -20,7 +20,10 @@ const skills: SkillDefinition[] = [
     agentNodeEligibility: "ready",
     agentNodeBlockers: [],
     version: "1.0.0",
-    targets: ["agent_node"],
+    runPolicies: {
+      default: { discoverable: true, autoSelectable: false, requiresApproval: false },
+      origins: {},
+    },
     kind: "atomic",
     mode: "tool",
     scope: "node",
@@ -49,7 +52,12 @@ const skills: SkillDefinition[] = [
     agentNodeEligibility: "needs_manifest",
     agentNodeBlockers: ["Skill manifest is missing a script runtime entrypoint."],
     version: "0.1.0",
-    targets: ["agent_node", "companion"],
+    runPolicies: {
+      default: { discoverable: true, autoSelectable: false, requiresApproval: false },
+      origins: {
+        companion: { discoverable: true, autoSelectable: true, requiresApproval: true },
+      },
+    },
     kind: "atomic",
     mode: "tool",
     scope: "workspace",
@@ -75,10 +83,15 @@ const skills: SkillDefinition[] = [
     sideEffects: [],
     runtime: { type: "none", entrypoint: "" },
     health: { type: "none" },
-    agentNodeEligibility: "incompatible",
-    agentNodeBlockers: ["Skill target does not include agent_node."],
+    agentNodeEligibility: "needs_manifest",
+    agentNodeBlockers: ["Skill manifest is missing outputSchema."],
     version: "0.1.0",
-    targets: ["companion"],
+    runPolicies: {
+      default: { discoverable: false, autoSelectable: false, requiresApproval: true },
+      origins: {
+        companion: { discoverable: false, autoSelectable: false, requiresApproval: true },
+      },
+    },
     kind: "profile",
     mode: "context",
     scope: "global",
@@ -109,6 +122,14 @@ test("filterSkillsForManagement searches native taxonomy and permission fields",
     ["desktop_companion_profile"],
   );
   assert.deepEqual(
+    filterSkillsForManagement(skills, { query: "requires approval", status: "all" }).map((skill) => skill.skillKey),
+    ["draft_search", "desktop_companion_profile"],
+  );
+  assert.deepEqual(
+    filterSkillsForManagement(skills, { query: "auto selectable", status: "all" }).map((skill) => skill.skillKey),
+    ["draft_search"],
+  );
+  assert.deepEqual(
     filterSkillsForManagement(skills, { query: "run.py python runtime", status: "all" }).map((skill) => skill.skillKey),
     ["rewrite_text"],
   );
@@ -118,14 +139,14 @@ test("filterSkillsForManagement searches native taxonomy and permission fields",
   );
 });
 
-test("filterSkillsForManagement filters by target and attention state", () => {
+test("filterSkillsForManagement filters by run policy and attention state", () => {
   assert.deepEqual(
-    filterSkillsForManagement(skills, { query: "", status: "agent" }).map((skill) => skill.skillKey),
+    filterSkillsForManagement(skills, { query: "", status: "discoverable" }).map((skill) => skill.skillKey),
     ["rewrite_text", "draft_search"],
   );
   assert.deepEqual(
-    filterSkillsForManagement(skills, { query: "", status: "companion" }).map((skill) => skill.skillKey),
-    ["draft_search", "desktop_companion_profile"],
+    filterSkillsForManagement(skills, { query: "", status: "autonomous" }).map((skill) => skill.skillKey),
+    ["draft_search"],
   );
   assert.deepEqual(
     filterSkillsForManagement(skills, { query: "", status: "runtime" }).map((skill) => skill.skillKey),
@@ -141,8 +162,8 @@ test("buildSkillOverview summarizes runtime and management readiness", () => {
   assert.deepEqual(buildSkillOverview(skills), {
     total: 3,
     active: 3,
-    agentSkills: 2,
-    companionSkills: 2,
+    discoverableSkills: 2,
+    autoSelectableSkills: 1,
     runtimeReady: 1,
     runtimeRegistered: 1,
     needsAttention: 2,
@@ -150,5 +171,5 @@ test("buildSkillOverview summarizes runtime and management readiness", () => {
 });
 
 test("buildSkillStatusOptions keeps management filters stable", () => {
-  assert.deepEqual(buildSkillStatusOptions(), ["all", "active", "agent", "companion", "runtime", "attention"]);
+  assert.deepEqual(buildSkillStatusOptions(), ["all", "active", "discoverable", "autonomous", "runtime", "attention"]);
 });

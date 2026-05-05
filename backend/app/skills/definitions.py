@@ -16,12 +16,12 @@ from app.core.schemas.skills import (
     SkillIoField,
     SkillKind,
     SkillMode,
+    SkillRunPolicies,
     SkillRuntimeSpec,
     SkillScope,
     SkillSideEffect,
     SkillSourceFormat,
     SkillSourceScope,
-    SkillTarget,
 )
 from app.core.storage.skill_store import SKILLS_DIR, get_skill_status_map
 from app.skills.runtime import validate_script_runtime_spec
@@ -50,7 +50,6 @@ def is_agent_attachable_skill(definition: SkillDefinition) -> bool:
         and definition.agent_node_eligibility == SkillAgentNodeEligibility.READY
         and definition.runtime_ready
         and definition.runtime_registered
-        and SkillTarget.AGENT_NODE in definition.targets
         and definition.configured
         and definition.healthy
     )
@@ -116,6 +115,7 @@ def _load_managed_skill_records() -> list[SkillDefinitionRecord]:
 
 def _parse_native_skill_manifest(path: Path, source_scope: SkillSourceScope) -> SkillDefinitionRecord:
     payload = json.loads(path.read_text(encoding="utf-8"))
+    _reject_legacy_targets(payload)
     skill_key = str(payload.get("skillKey") or payload.get("skill_key") or path.parent.name)
     label = str(payload.get("label") or payload.get("name") or skill_key)
     definition = SkillDefinition(
@@ -124,7 +124,7 @@ def _parse_native_skill_manifest(path: Path, source_scope: SkillSourceScope) -> 
         description=str(payload.get("description") or "").strip(),
         schemaVersion=str(payload.get("schemaVersion") or payload.get("schema_version") or ""),
         version=str(payload.get("version") or ""),
-        targets=_parse_enum_list(payload.get("targets"), SkillTarget, [SkillTarget.AGENT_NODE]),
+        runPolicies=_parse_run_policies(payload.get("runPolicies") or payload.get("run_policies")),
         kind=_parse_enum(payload.get("kind"), SkillKind, SkillKind.ATOMIC),
         mode=_parse_enum(payload.get("mode"), SkillMode, SkillMode.TOOL),
         scope=_parse_enum(payload.get("scope"), SkillScope, SkillScope.NODE),
@@ -154,6 +154,7 @@ def _parse_skill_file(path: Path, source_format: SkillSourceFormat, source_scope
     frontmatter, body = _split_frontmatter(raw, path)
     payload = yaml.safe_load(frontmatter) or {}
     graphite = payload.get("graphite") or {}
+    _reject_legacy_targets(graphite)
 
     skill_key = str(graphite.get("skill_key") or payload.get("name") or path.stem)
     label = str(payload.get("name") or graphite.get("label") or skill_key)
@@ -169,7 +170,7 @@ def _parse_skill_file(path: Path, source_format: SkillSourceFormat, source_scope
         description=description or body.splitlines()[0].strip() if body.strip() else "",
         schemaVersion=str(graphite.get("schema_version") or graphite.get("schemaVersion") or ""),
         version=str(graphite.get("version") or payload.get("version") or ""),
-        targets=_parse_enum_list(graphite.get("targets"), SkillTarget, [SkillTarget.AGENT_NODE]),
+        runPolicies=_parse_run_policies(graphite.get("runPolicies") or graphite.get("run_policies")),
         kind=_parse_enum(graphite.get("kind"), SkillKind, SkillKind.ATOMIC),
         mode=_parse_enum(graphite.get("mode"), SkillMode, SkillMode.TOOL),
         scope=_parse_enum(graphite.get("scope"), SkillScope, SkillScope.NODE),
@@ -222,6 +223,19 @@ def _parse_health_spec(payload: object) -> SkillHealthSpec:
     return SkillHealthSpec(type=str(payload.get("type") or "none"))
 
 
+def _parse_run_policies(payload: object) -> SkillRunPolicies:
+    if not isinstance(payload, dict):
+        return SkillRunPolicies()
+    return SkillRunPolicies.model_validate(payload)
+
+
+def _reject_legacy_targets(payload: object) -> None:
+    if isinstance(payload, dict) and "targets" in payload:
+        raise ValueError(
+            "Skill manifest field 'targets' is no longer supported. Use runPolicies for run-origin policy."
+        )
+
+
 def _parse_float(value: object, fallback: float) -> float:
     try:
         parsed = float(value)
@@ -232,9 +246,6 @@ def _parse_float(value: object, fallback: float) -> float:
 
 def _resolve_agent_node_eligibility(definition: SkillDefinition, skill_dir: Path) -> tuple[SkillAgentNodeEligibility, list[str]]:
     blockers: list[str] = []
-    if SkillTarget.AGENT_NODE not in definition.targets:
-        return SkillAgentNodeEligibility.INCOMPATIBLE, ["Skill target does not include agent_node."]
-
     blockers.extend(
         validate_script_runtime_spec(
             skill_dir=skill_dir,
@@ -255,12 +266,6 @@ def _parse_enum(value: object, enum_type: type[EnumValue], fallback: EnumValue) 
     if value is None or value == "":
         return fallback
     return enum_type(str(value))
-
-
-def _parse_enum_list(values: object, enum_type: type[EnumValue], fallback: list[EnumValue]) -> list[EnumValue]:
-    if not values:
-        return [*fallback]
-    return [enum_type(str(value)) for value in values]
 
 
 def _split_frontmatter(raw: str, path: Path) -> tuple[str, str]:

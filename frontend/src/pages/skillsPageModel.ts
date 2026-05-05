@@ -1,6 +1,6 @@
-import type { SkillDefinition } from "../types/skills.ts";
+import type { SkillDefinition, SkillRunPolicy } from "../types/skills.ts";
 
-export type SkillStatusFilter = "all" | "active" | "agent" | "companion" | "runtime" | "attention";
+export type SkillStatusFilter = "all" | "active" | "discoverable" | "autonomous" | "runtime" | "attention";
 
 export type SkillManagementFilters = {
   query: string;
@@ -10,15 +10,15 @@ export type SkillManagementFilters = {
 export type SkillOverview = {
   total: number;
   active: number;
-  agentSkills: number;
-  companionSkills: number;
+  discoverableSkills: number;
+  autoSelectableSkills: number;
   runtimeReady: number;
   runtimeRegistered: number;
   needsAttention: number;
 };
 
 export function buildSkillStatusOptions(): SkillStatusFilter[] {
-  return ["all", "active", "agent", "companion", "runtime", "attention"];
+  return ["all", "active", "discoverable", "autonomous", "runtime", "attention"];
 }
 
 export function filterSkillsForManagement(
@@ -42,8 +42,8 @@ export function buildSkillOverview(skills: SkillDefinition[]): SkillOverview {
   return {
     total: skills.length,
     active: skills.filter((skill) => skill.status === "active").length,
-    agentSkills: skills.filter((skill) => skill.targets.includes("agent_node")).length,
-    companionSkills: skills.filter((skill) => skill.targets.includes("companion")).length,
+    discoverableSkills: skills.filter((skill) => skillIsDiscoverable(skill)).length,
+    autoSelectableSkills: skills.filter((skill) => skillIsAutoSelectable(skill)).length,
     runtimeReady: skills.filter((skill) => skill.runtimeReady).length,
     runtimeRegistered: skills.filter((skill) => skill.runtimeRegistered).length,
     needsAttention: skills.filter((skill) => skillNeedsAttention(skill)).length,
@@ -57,11 +57,11 @@ function matchesSkillStatus(skill: SkillDefinition, filter: SkillStatusFilter): 
   if (filter === "runtime") {
     return skill.runtimeReady;
   }
-  if (filter === "agent") {
-    return skill.targets.includes("agent_node");
+  if (filter === "discoverable") {
+    return skillIsDiscoverable(skill);
   }
-  if (filter === "companion") {
-    return skill.targets.includes("companion");
+  if (filter === "autonomous") {
+    return skillIsAutoSelectable(skill);
   }
   if (filter === "attention") {
     return skillNeedsAttention(skill);
@@ -70,7 +70,22 @@ function matchesSkillStatus(skill: SkillDefinition, filter: SkillStatusFilter): 
 }
 
 function skillNeedsAttention(skill: SkillDefinition): boolean {
-  return skill.status !== "active" || !skill.configured || !skill.healthy || (skill.targets.includes("agent_node") && skill.agentNodeEligibility !== "ready");
+  return skill.status !== "active" || !skill.configured || !skill.healthy || skill.agentNodeEligibility !== "ready";
+}
+
+export function listSkillRunPolicies(skill: SkillDefinition): Array<{ origin: string; policy: SkillRunPolicy }> {
+  return [
+    { origin: "default", policy: skill.runPolicies.default },
+    ...Object.entries(skill.runPolicies.origins).map(([origin, policy]) => ({ origin, policy })),
+  ];
+}
+
+function skillIsDiscoverable(skill: SkillDefinition): boolean {
+  return listSkillRunPolicies(skill).some(({ policy }) => policy.discoverable);
+}
+
+function skillIsAutoSelectable(skill: SkillDefinition): boolean {
+  return listSkillRunPolicies(skill).some(({ policy }) => policy.autoSelectable);
 }
 
 function buildSkillSearchText(skill: SkillDefinition): string {
@@ -91,7 +106,14 @@ function buildSkillSearchText(skill: SkillDefinition): string {
     skill.sourceScope,
     skill.sourcePath,
     skill.status,
-    ...skill.targets,
+    ...listSkillRunPolicies(skill).map(({ origin, policy }) =>
+      [
+        origin,
+        policy.discoverable ? "discoverable" : "hidden",
+        policy.autoSelectable ? "auto selectable autonomous" : "manual",
+        policy.requiresApproval ? "requires approval" : "no approval",
+      ].join(" "),
+    ),
     ...skill.permissions,
     ...skill.agentNodeBlockers,
     ...skill.supportedValueTypes,

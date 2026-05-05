@@ -4,7 +4,20 @@
   "label": "Local File",
   "description": "Read and write whitelisted local text or JSON files for graph templates.",
   "version": "1.0.0",
-  "targets": ["agent_node"],
+  "runPolicies": {
+    "default": {
+      "discoverable": false,
+      "autoSelectable": false,
+      "requiresApproval": false
+    },
+    "origins": {
+      "companion": {
+        "discoverable": false,
+        "autoSelectable": false,
+        "requiresApproval": false
+      }
+    }
+  },
   "kind": "atomic",
   "mode": "tool",
   "scope": "node",
