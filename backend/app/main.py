@@ -13,6 +13,7 @@ from app.api.routes_knowledge import router as knowledge_router
 from app.api.routes_local_input_sources import router as local_input_sources_router
 from app.api.routes_memories import router as memories_router
 from app.api.routes_model_logs import router as model_logs_router
+from app.api.routes_operation_journal import router as operation_journal_router
 from app.api.routes_presets import router as presets_router
 from app.api.routes_runs import router as runs_router
 from app.api.routes_settings import router as settings_router
@@ -95,6 +96,7 @@ app.include_router(knowledge_router)
 app.include_router(local_input_sources_router)
 app.include_router(memories_router)
 app.include_router(model_logs_router)
+app.include_router(operation_journal_router)
 app.include_router(presets_router)
 app.include_router(runs_router)
 app.include_router(settings_router)

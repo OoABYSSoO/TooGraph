@@ -1,5 +1,6 @@
 import type { ConditionalEdge, GraphEdge, GraphNode, GraphPayload } from "../types/node-system.ts";
 import type { ActivityEvent, NodeExecutionDetail, RunDetail } from "../types/run.ts";
+import { summarizeVirtualOperationActivity } from "../lib/virtual-operation-activity.ts";
 import type { BuddyPublicOutputBinding } from "./buddyPublicOutput.ts";
 
 export type BuddyOutputTraceRecordKind = "node" | "activity";
@@ -272,6 +273,7 @@ function applyActivityEvent(
   const durationMs = normalizeDurationMs(payload.duration_ms);
   const activityStatus = normalizeActivityStatus(payload.status, payload.error);
   const runtimeKey = buildActivityRecordRuntimeKey(payload, nodeId, subgraphNodeId);
+  const virtualOperation = summarizeVirtualOperationActivity(payload);
   return upsertRecordInSegment(state, segmentId, {
     runtimeKey,
     kind: "activity",
@@ -283,7 +285,7 @@ function applyActivityEvent(
     nodeId,
     nodeType: "activity",
     subgraphNodeId: subgraphNodeId || null,
-    summary: normalizeText(payload.summary),
+    summary: virtualOperation?.summary || normalizeText(payload.summary),
   });
 }
 
@@ -565,6 +567,10 @@ function resolveTraceActivityLabel(
   subgraphNodeId: string,
 ) {
   const nodeLabel = resolveTraceNodePathLabel(graph, nodeId, subgraphNodeId);
+  const virtualOperation = summarizeVirtualOperationActivity(payload);
+  if (virtualOperation) {
+    return `${nodeLabel} / ${virtualOperation.label}`;
+  }
   const capabilityLabel =
     normalizeText(recordFromUnknown(payload.detail)?.skill_key)
     || normalizeText(recordFromUnknown(payload.detail)?.capability_key)

@@ -1,6 +1,7 @@
 import type { ActivityEvent, NodeExecutionDetail, RunDetail } from "../types/run.ts";
 
 import { formatRunDuration } from "../lib/run-display-name.ts";
+import { summarizeVirtualOperationActivity } from "../lib/virtual-operation-activity.ts";
 import { translate } from "../i18n/index.ts";
 
 export type RunOutputArtifactCard = {
@@ -296,11 +297,12 @@ function buildActivityTimelineItem(event: ActivityEvent, index: number, order: n
   const subgraphPath = normalizeTimelinePath(event.subgraph_path);
   const subgraphNodeId = normalizeText(event.subgraph_node_id) || subgraphPath.at(-1) || null;
   const label = buildActivityLabel(event);
+  const virtualOperation = summarizeVirtualOperationActivity(event);
   return {
     key: `activity:${event.sequence ?? index + 1}:${subgraphPath.join("/")}:${nodeId ?? label}`,
     kind: "activity",
     label,
-    summary: normalizeText(event.summary) || label,
+    summary: virtualOperation?.summary || normalizeText(event.summary) || label,
     status: normalizeText(event.status) || (normalizeText(event.error) ? "failed" : "recorded"),
     durationMs: normalizeNumber(event.duration_ms),
     artifactLabels: buildActivityArtifactLabels(event),
@@ -316,6 +318,10 @@ function buildActivityTimelineItem(event: ActivityEvent, index: number, order: n
 }
 
 function buildActivityLabel(event: ActivityEvent) {
+  const virtualOperation = summarizeVirtualOperationActivity(event);
+  if (virtualOperation) {
+    return virtualOperation.label;
+  }
   const kind = normalizeText(event.kind);
   if (kind === "buddy_home_write") {
     return "Buddy Home writeback";
@@ -415,6 +421,10 @@ function buildNodeArtifactLabels(execution: NodeExecutionDetail) {
 function buildActivityArtifactLabels(event: ActivityEvent) {
   const detail = recordFromUnknown(event.detail);
   const labels: string[] = [];
+  const virtualOperation = summarizeVirtualOperationActivity(event);
+  if (virtualOperation) {
+    return virtualOperation.artifactLabels;
+  }
   if (normalizeText(event.kind) === "buddy_home_write") {
     const appliedCount = normalizeNumber(detail.applied_count);
     const skippedCount = normalizeNumber(detail.skipped_count);

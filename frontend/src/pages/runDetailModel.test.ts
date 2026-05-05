@@ -400,6 +400,139 @@ test("buildRunAggregatedTimeline summarizes Buddy Home writeback activity", () =
   assert.match(item?.detailText ?? "", /rev_memory_1/);
 });
 
+test("buildRunAggregatedTimeline summarizes virtual template operation activity", () => {
+  const run = createRunDetail({
+    artifacts: createRunArtifacts({
+      activity_events: [
+        {
+          sequence: 7,
+          kind: "virtual_ui_operation",
+          summary: "Requested virtual template run for 高级联网搜索.",
+          node_id: "run_visible_template_operation",
+          subgraph_node_id: "buddy_capability_loop",
+          subgraph_path: ["buddy_capability_loop"],
+          status: "requested",
+          duration_ms: 12,
+          detail: {
+            skill_key: "toograph_page_operator",
+            operation_request_id: "vop_template1234",
+            operation: {
+              kind: "run_template",
+              target_id: "library.template.advanced_web_research_loop.open",
+              template_id: "advanced_web_research_loop",
+              template_name: "高级联网搜索",
+              search_text: "advanced_web_research_loop",
+              input_text: "研究 TooGraph 页面操作技能的最新差距。",
+            },
+            expected_continuation: {
+              mode: "auto_resume_after_ui_operation",
+              operation_request_id: "vop_template1234",
+              resume_state_keys: ["page_operation_context", "page_context", "operation_result", "operation_report"],
+            },
+          },
+          created_at: "2026-05-12T01:00:02.500Z",
+        },
+      ],
+    }),
+  });
+
+  const [item] = buildRunAggregatedTimeline(run);
+
+  assert.equal(item?.label, "Virtual template run");
+  assert.equal(item?.summary, "Template: 高级联网搜索 · Input: 研究 TooGraph 页面操作技能的最新差距。");
+  assert.deepEqual(item?.artifactLabels, [
+    "operation: run_template",
+    "template: advanced_web_research_loop",
+    "target: library.template.advanced_web_research_loop.open",
+    "request: vop_template1234",
+  ]);
+  assert.match(item?.detailText ?? "", /auto_resume_after_ui_operation/);
+});
+
+test("buildRunAggregatedTimeline summarizes failed virtual operation categories", () => {
+  const run = createRunDetail({
+    artifacts: createRunArtifacts({
+      activity_events: [
+        {
+          sequence: 3,
+          kind: "virtual_ui_operation",
+          summary: "命令不在当前页面操作书中，可能来自过期页面上下文或不可见目标。",
+          node_id: "execute_page_operation",
+          status: "failed",
+          detail: {
+            failure_category: "target_not_found",
+            command: "click app.nav.settings",
+            target_id: "app.nav.settings",
+            error: {
+              code: "command_not_in_operation_book",
+              message: "命令不在当前页面操作书中，可能来自过期页面上下文或不可见目标。",
+              recoverable: true,
+            },
+          },
+          error: "命令不在当前页面操作书中，可能来自过期页面上下文或不可见目标。",
+          created_at: "2026-05-12T01:00:02.500Z",
+        },
+      ],
+    }),
+  });
+
+  const [item] = buildRunAggregatedTimeline(run);
+
+  assert.equal(item?.label, "Virtual UI operation");
+  assert.deepEqual(item?.artifactLabels, [
+    "failure: target_not_found",
+    "target: app.nav.settings",
+  ]);
+  assert.match(item?.detailText ?? "", /command_not_in_operation_book/);
+});
+
+test("buildRunAggregatedTimeline summarizes completed virtual operation triggered runs", () => {
+  const run = createRunDetail({
+    artifacts: createRunArtifacts({
+      activity_events: [
+        {
+          sequence: 8,
+          kind: "virtual_ui_operation",
+          summary: "Virtual run_template succeeded. triggered run run_search completed. request vop_template1234.",
+          node_id: "run_visible_template_operation",
+          subgraph_node_id: "buddy_capability_loop",
+          subgraph_path: ["buddy_capability_loop"],
+          status: "succeeded",
+          detail: {
+            operation_request_id: "vop_template1234",
+            operation: {
+              kind: "run_template",
+              target_id: "library.template.advanced_web_research_loop.open",
+              search_text: "advanced_web_research_loop",
+              input_text: "鸣潮最新资讯",
+            },
+            operation_report: {
+              operation_request_id: "vop_template1234",
+              status: "succeeded",
+              target_id: "library.template.advanced_web_research_loop.open",
+              triggered_run_id: "run_search",
+              triggered_run_status: "completed",
+              triggered_run_result_summary: "已拿到《鸣潮》最新资讯摘要。",
+            },
+          },
+          created_at: "2026-05-12T01:00:03.500Z",
+        },
+      ],
+    }),
+  });
+
+  const [item] = buildRunAggregatedTimeline(run);
+
+  assert.equal(item?.summary, "Template: advanced_web_research_loop · Input: 鸣潮最新资讯 · Run: run_search completed");
+  assert.deepEqual(item?.artifactLabels, [
+    "operation: run_template",
+    "template: advanced_web_research_loop",
+    "target: library.template.advanced_web_research_loop.open",
+    "run: run_search completed",
+    "request: vop_template1234",
+  ]);
+});
+
 test("listRunOutputArtifacts keeps skill artifact document references for paged display", () => {
   const artifacts = listRunOutputArtifacts(
     createRunDetail({

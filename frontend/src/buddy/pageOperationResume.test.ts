@@ -73,6 +73,7 @@ test("buildPageOperationResult captures route, snapshots, commands, and target i
   assert.deepEqual(result, {
     operation_request_id: "vop_1234567890abcdef",
     status: "succeeded",
+    failure_category: null,
     target_id: "app.nav.runs",
     commands: ["click app.nav.runs"],
     route_before: "/",
@@ -90,6 +91,7 @@ test("buildPageOperationResult captures route, snapshots, commands, and target i
     operation_report: {
       operation_request_id: "vop_1234567890abcdef",
       status: "succeeded",
+      failure_category: null,
       target_id: "app.nav.runs",
       commands: ["click app.nav.runs"],
       route_before: "/",
@@ -195,6 +197,58 @@ test("buildPageOperationResult records compact triggered run outputs in the repo
   assert.equal(result.operation_report.triggered_run_result_summary, "已拿到《鸣潮》最新资讯摘要。");
   assert.equal(result.operation_report.triggered_run_final_result, "# 《鸣潮》最新资讯汇总\n\n完整结果正文。");
   assert.equal("page_snapshot_after" in result.operation_report, false);
+});
+
+test("buildPageOperationResult classifies failed and interrupted operation outcomes", () => {
+  const interrupted = buildPageOperationResult({
+    operationPlan: {
+      version: 1,
+      operationRequestId: "vop_interrupted",
+      commands: ["click app.nav.runs"],
+      operations: [{ kind: "click", targetId: "app.nav.runs" }],
+      cursorLifecycle: "return_after_step",
+      expectedContinuation,
+      reason: "打开运行历史。",
+    },
+    status: "interrupted",
+    routeBefore: "/",
+    routeAfter: "/",
+    pageOperationContextBefore,
+    pageOperationContextAfter,
+  });
+  const failedTargetRun = buildPageOperationResult({
+    operationPlan: {
+      version: 1,
+      operationRequestId: "vop_target_failed",
+      commands: ["run_template advanced_web_research_loop"],
+      operations: [
+        {
+          kind: "run_template",
+          targetId: "library.template.advanced_web_research_loop.open",
+          templateId: "advanced_web_research_loop",
+          templateName: "高级联网搜索",
+          searchText: "高级联网搜索",
+          inputText: "鸣潮最新资讯",
+          runTargetId: "editor.action.runActiveGraph",
+        },
+      ],
+      cursorLifecycle: "return_at_end",
+      expectedContinuation,
+      reason: "运行模板。",
+    },
+    status: "failed",
+    routeBefore: "/library",
+    routeAfter: "/editor",
+    pageOperationContextBefore,
+    pageOperationContextAfter,
+    triggeredRunId: "run_failed",
+    triggeredRunStatus: "failed",
+  });
+
+  assert.equal(interrupted.failure_category, "user_interrupted");
+  assert.equal(interrupted.operation_report.failure_category, "user_interrupted");
+  assert.equal(failedTargetRun.failure_category, "target_run_failed");
+  assert.equal(failedTargetRun.operation_report.failure_category, "target_run_failed");
 });
 
 test("buildPageOperationResumePayload writes the required resume state keys", () => {

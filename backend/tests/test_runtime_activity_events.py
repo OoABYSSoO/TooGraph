@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.runtime.activity_events import record_activity_event
+from app.core.storage.operation_journal_store import list_operation_journal_entries
 
 
 class RuntimeActivityEventsTests(unittest.TestCase):
@@ -46,6 +49,58 @@ class RuntimeActivityEventsTests(unittest.TestCase):
         self.assertEqual(event["duration_ms"], 23)
         self.assertEqual(event["detail"], {"skill_key": "web_search"})
         self.assertIsInstance(event["created_at"], str)
+        self.assertEqual(published, [("run-activity", "activity.event", event)])
+
+    def test_record_activity_event_persists_virtual_operation_journal(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            journal_path = Path(temp_dir) / "operation_journal.jsonl"
+            with patch("app.core.storage.operation_journal_store.OPERATION_JOURNAL_PATH", journal_path):
+                parent_state = {"run_id": "run-activity", "activity_events": []}
+
+                record_activity_event(
+                    parent_state,
+                    kind="virtual_ui_operation",
+                    summary="Requested virtual template run.",
+                    node_id="run_visible_template_operation",
+                    status="requested",
+                    detail={
+                        "operation_request_id": "vop_template",
+                        "operation": {
+                            "kind": "run_template",
+                            "target_id": "library.template.advanced_web_research_loop.open",
+                            "input_text": "鸣潮最新资讯",
+                        },
+                    },
+                    publish_run_event_func=lambda *_args: None,
+                )
+
+                result = list_operation_journal_entries(operation_request_id="vop_template")
+
+        self.assertEqual(result["total"], 1)
+        entry = result["entries"][0]
+        self.assertEqual(entry["run_id"], "run-activity")
+        self.assertEqual(entry["stage"], "request")
+        self.assertEqual(entry["operation"]["kind"], "run_template")
+        self.assertEqual(entry["input_text"], "鸣潮最新资讯")
+
+    def test_record_activity_event_does_not_block_on_operation_journal_failure(self) -> None:
+        state = {"run_id": "run-activity"}
+        published: list[tuple[str | None, str, dict | None]] = []
+
+        with patch(
+            "app.core.runtime.activity_events.record_operation_journal_event",
+            side_effect=OSError("journal unavailable"),
+        ):
+            event = record_activity_event(
+                state,
+                kind="virtual_ui_operation",
+                summary="Requested virtual click.",
+                status="requested",
+                detail={"operation_request_id": "vop_click", "operation": {"kind": "click", "target_id": "app.nav.runs"}},
+                publish_run_event_func=lambda *args: published.append(args),
+            )
+
+        self.assertEqual(state["activity_events"], [event])
         self.assertEqual(published, [("run-activity", "activity.event", event)])
 
     def test_record_skill_activity_events_normalizes_skill_payloads(self) -> None:

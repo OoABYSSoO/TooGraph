@@ -405,12 +405,14 @@ def _build_graph_edit_result(
 
 
 def _failed(*, code: str, message: str, recoverable: bool, detail: dict[str, Any] | None = None) -> dict[str, Any]:
+    failure_category = _failure_category_for_error_code(code)
     error = {
         "code": code,
         "message": message,
         "recoverable": recoverable,
+        "failure_category": failure_category,
     }
-    event_detail = {"error": error}
+    event_detail = {"error": error, "failure_category": failure_category}
     if detail:
         event_detail.update(detail)
     return {
@@ -430,6 +432,26 @@ def _failed(*, code: str, message: str, recoverable: bool, detail: dict[str, Any
             }
         ],
     }
+
+
+def _failure_category_for_error_code(code: str) -> str:
+    if code in {"command_not_in_operation_book", "target_unavailable", "graph_edit_requires_editor_page"}:
+        return "target_not_found"
+    if code == "stale_page_operation_book":
+        return "page_snapshot_stale"
+    if code == "forbidden_self_surface":
+        return "permission_blocked"
+    if code in {
+        "missing_template_input_text",
+        "missing_commands",
+        "missing_type_text",
+        "missing_press_key",
+        "missing_graph_edit_intents",
+    }:
+        return "input_binding_failed"
+    if code in {"invalid_command", "unsupported_command_sequence", "unsupported_action", "unsupported_graph_edit_target"}:
+        return "affordance_mismatch"
+    return "operation_failed"
 
 
 def _validate_current_operation_book_command(

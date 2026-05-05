@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from typing import Any, Callable
 
 from app.core.runtime.run_events import publish_run_event
 from app.core.runtime.state import utc_now_iso
+from app.core.storage.operation_journal_store import record_operation_journal_event
+
+LOGGER = logging.getLogger(__name__)
 
 AUTO_RESUME_AFTER_UI_OPERATION = "auto_resume_after_ui_operation"
 PAGE_OPERATION_RESUME_STATE_KEYS = ["page_operation_context", "page_context", "operation_result", "operation_report"]
@@ -55,6 +59,14 @@ def record_activity_event(
         event["error"] = normalized_error
 
     events.append(event)
+    if event["kind"] == "virtual_ui_operation":
+        try:
+            record_operation_journal_event(
+                run_id=_compact_text(root_state.get("run_id") or state.get("run_id")),
+                event=event,
+            )
+        except Exception:
+            LOGGER.warning("Failed to write virtual UI operation journal entry.", exc_info=True)
     publisher = publish_run_event_func or publish_run_event
     publisher(_compact_text(root_state.get("run_id") or state.get("run_id")) or None, "activity.event", event)
     return event

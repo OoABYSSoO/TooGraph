@@ -9,6 +9,10 @@ from fastapi.responses import StreamingResponse
 from pydantic import ValidationError
 
 from app.core.langgraph import execute_node_system_graph_langgraph, get_langgraph_runtime_unsupported_reasons
+from app.core.runtime.page_operation_activity import (
+    find_pending_page_operation_continuation,
+    record_page_operation_resume_activity,
+)
 from app.core.runtime.run_events import publish_run_event, subscribe_run_events
 from app.core.runtime.state import set_run_status, touch_run_lifecycle, utc_now_iso
 from app.core.schemas.node_system import NodeSystemGraphDocument
@@ -226,6 +230,7 @@ def resume_run_endpoint(
         resumed_run["metadata"]["pending_permission_approval"] = copy.deepcopy(previous_metadata["pending_permission_approval"])
         resumed_run["metadata"]["pending_permission_approval_resume_payload"] = copy.deepcopy(payload.get("resume") if payload else {})
     resumed_run["metadata"]["resolved_runtime_backend"] = "langgraph"
+    record_page_operation_resume_activity(resumed_run, previous_metadata, payload, publish_run_event_func=publish_run_event)
     resumed_run["checkpoint_metadata"] = {
         "available": bool(checkpoint_metadata.get("checkpoint_id")),
         "checkpoint_id": checkpoint_metadata.get("checkpoint_id"),
@@ -273,7 +278,7 @@ def _resume_run_worker(graph, resumed_run: dict, resume_payload: Any | None = No
 
 def _validate_page_operation_resume_payload(previous_run: dict[str, Any], payload: dict[str, Any] | None) -> None:
     metadata = previous_run.get("metadata") if isinstance(previous_run.get("metadata"), dict) else {}
-    pending = metadata.get("pending_page_operation_continuation") if isinstance(metadata, dict) else None
+    pending = find_pending_page_operation_continuation(metadata)
     if not isinstance(pending, dict):
         return
     expected_request_id = str(pending.get("operation_request_id") or "").strip()

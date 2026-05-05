@@ -266,6 +266,135 @@ class RunRouteTests(unittest.TestCase):
         resume_worker.assert_called_once()
         self.assertEqual(resume_worker.call_args.args[2], resume_payload)
 
+    def test_resume_run_records_page_operation_completion_activity(self) -> None:
+        run = _paused_run()
+        run["activity_events"] = [
+            {
+                "sequence": 1,
+                "kind": "virtual_ui_operation",
+                "summary": "Requested virtual template run.",
+                "node_id": "run_visible_template_operation",
+                "status": "requested",
+                "detail": {"operation_request_id": "vop_expected"},
+                "created_at": "2026-05-11T07:28:50Z",
+            }
+        ]
+        run["artifacts"] = {"activity_events": list(run["activity_events"])}
+        run["metadata"] = {
+            "origin": "buddy",
+            "pending_page_operation_continuation": {
+                "mode": "auto_resume_after_ui_operation",
+                "operation_request_id": "vop_expected",
+                "resume_state_keys": ["page_operation_context", "page_context", "operation_result", "operation_report"],
+                "node_id": "run_visible_template_operation",
+                "subgraph_node_id": "buddy_capability_loop",
+                "subgraph_path": ["buddy_capability_loop"],
+            },
+        }
+        resume_payload = {
+            "operation_result": {
+                "operation_request_id": "vop_expected",
+                "status": "succeeded",
+                "target_id": "library.template.advanced_web_research_loop.open",
+                "commands": ["run_template advanced_web_research_loop"],
+                "route_before": "/library",
+                "route_after": "/editor",
+                "triggered_run_id": "run_search",
+                "triggered_graph_id": "advanced_web_research_loop",
+                "triggered_run_initial_status": "queued",
+                "triggered_run_status": "completed",
+                "triggered_run_result_summary": "已拿到《鸣潮》最新资讯摘要。",
+                "input_text": "鸣潮最新资讯",
+                "failure_category": None,
+                "error": None,
+            },
+            "operation_report": {
+                "operation_request_id": "vop_expected",
+                "status": "succeeded",
+                "target_id": "library.template.advanced_web_research_loop.open",
+                "commands": ["run_template advanced_web_research_loop"],
+                "route_before": "/library",
+                "route_after": "/editor",
+                "triggered_run_id": "run_search",
+                "triggered_graph_id": "advanced_web_research_loop",
+                "triggered_run_initial_status": "queued",
+                "triggered_run_status": "completed",
+                "triggered_run_result_summary": "已拿到《鸣潮》最新资讯摘要。",
+                "input_text": "鸣潮最新资讯",
+                "failure_category": None,
+                "error": None,
+            },
+            "page_context": "当前路径: /editor",
+            "page_operation_context": {"page_path": "/editor"},
+        }
+
+        with (
+            patch("app.api.routes_runs.load_run", return_value=run),
+            patch("app.api.routes_runs.save_run") as save_run,
+            patch("app.api.routes_runs._resume_run_worker") as resume_worker,
+            patch("app.api.routes_runs.publish_run_event") as publish_run_event,
+        ):
+            with TestClient(app) as client:
+                response = client.post("/api/runs/run_paused/resume", json={"resume": resume_payload})
+
+        self.assertEqual(response.status_code, 200)
+        saved_run = save_run.call_args.args[0]
+        completion_event = saved_run["activity_events"][-1]
+        self.assertEqual(completion_event["sequence"], 2)
+        self.assertEqual(completion_event["kind"], "virtual_ui_operation")
+        self.assertEqual(completion_event["status"], "succeeded")
+        self.assertEqual(completion_event["node_id"], "run_visible_template_operation")
+        self.assertEqual(completion_event["subgraph_node_id"], "buddy_capability_loop")
+        self.assertEqual(completion_event["subgraph_path"], ["buddy_capability_loop"])
+        self.assertEqual(completion_event["detail"]["operation_request_id"], "vop_expected")
+        self.assertEqual(completion_event["detail"]["operation"]["kind"], "run_template")
+        self.assertEqual(completion_event["detail"]["operation"]["search_text"], "advanced_web_research_loop")
+        self.assertEqual(completion_event["detail"]["operation_report"]["triggered_run_id"], "run_search")
+        self.assertEqual(completion_event["detail"]["triggered_run"]["status"], "completed")
+        self.assertEqual(saved_run["artifacts"]["activity_events"][-1], completion_event)
+        publish_run_event.assert_any_call("run_paused", "activity.event", completion_event)
+        resume_worker.assert_called_once()
+
+    def test_resume_run_records_failed_page_operation_completion_category(self) -> None:
+        run = _paused_run()
+        run["metadata"] = {
+            "origin": "buddy",
+            "pending_page_operation_continuation": {
+                "mode": "auto_resume_after_ui_operation",
+                "operation_request_id": "vop_expected",
+                "node_id": "run_visible_template_operation",
+            },
+        }
+        resume_payload = {
+            "operation_result": {
+                "operation_request_id": "vop_expected",
+                "status": "failed",
+                "target_id": "editor.action.runActiveGraph",
+                "commands": ["run_template advanced_web_research_loop"],
+                "triggered_run_id": "run_failed",
+                "triggered_run_status": "failed",
+                "failure_category": "target_run_failed",
+                "error": "目标图运行失败。",
+            },
+            "page_context": "当前路径: /editor",
+            "page_operation_context": {"page_path": "/editor"},
+        }
+
+        with (
+            patch("app.api.routes_runs.load_run", return_value=run),
+            patch("app.api.routes_runs.save_run") as save_run,
+            patch("app.api.routes_runs._resume_run_worker"),
+            patch("app.api.routes_runs.publish_run_event"),
+        ):
+            with TestClient(app) as client:
+                response = client.post("/api/runs/run_paused/resume", json={"resume": resume_payload})
+
+        self.assertEqual(response.status_code, 200)
+        completion_event = save_run.call_args.args[0]["activity_events"][-1]
+        self.assertEqual(completion_event["status"], "failed")
+        self.assertEqual(completion_event["detail"]["failure_category"], "target_run_failed")
+        self.assertEqual(completion_event["error"], "目标图运行失败。")
+
 
 if __name__ == "__main__":
     unittest.main()

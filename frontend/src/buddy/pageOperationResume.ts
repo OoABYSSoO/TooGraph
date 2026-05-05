@@ -7,6 +7,7 @@ export type PageOperationResultStatus = "succeeded" | "failed" | "interrupted";
 export type PageOperationResult = {
   operation_request_id: string;
   status: PageOperationResultStatus;
+  failure_category: PageOperationFailureCategory | null;
   target_id: string | null;
   commands: string[];
   route_before: string;
@@ -28,6 +29,7 @@ export type PageOperationResult = {
 export type PageOperationReport = {
   operation_request_id: string;
   status: PageOperationResultStatus;
+  failure_category: PageOperationFailureCategory | null;
   target_id: string | null;
   commands: string[];
   route_before: string;
@@ -42,6 +44,12 @@ export type PageOperationReport = {
   graph_edit_summary: Record<string, unknown> | null;
   error: string | null;
 };
+
+export type PageOperationFailureCategory =
+  | "target_run_failed"
+  | "user_interrupted"
+  | "frontend_operation_failed"
+  | "operation_failed";
 
 export function buildPageOperationResult(input: {
   operationPlan: BuddyVirtualOperationPlan;
@@ -69,9 +77,15 @@ export function buildPageOperationResult(input: {
   const inputText = firstRunTemplateInputText(input.operationPlan);
   const graphEditSummary = input.graphEditSummary ?? defaultGraphEditSummary(input.operationPlan);
   const error = normalizeNullableText(input.error);
+  const failureCategory = resolvePageOperationFailureCategory({
+    status: input.status,
+    triggeredRunStatus,
+    error,
+  });
   const report: PageOperationReport = {
     operation_request_id: operationRequestId,
     status: input.status,
+    failure_category: failureCategory,
     target_id: targetId,
     commands: [...input.operationPlan.commands],
     route_before: input.routeBefore,
@@ -89,6 +103,7 @@ export function buildPageOperationResult(input: {
   return {
     operation_request_id: operationRequestId,
     status: input.status,
+    failure_category: failureCategory,
     target_id: targetId,
     commands: [...input.operationPlan.commands],
     route_before: input.routeBefore,
@@ -106,6 +121,26 @@ export function buildPageOperationResult(input: {
     operation_report: report,
     error,
   };
+}
+
+function resolvePageOperationFailureCategory(input: {
+  status: PageOperationResultStatus;
+  triggeredRunStatus: string | null;
+  error: string | null;
+}): PageOperationFailureCategory | null {
+  if (input.status === "succeeded") {
+    return null;
+  }
+  if (input.status === "interrupted") {
+    return "user_interrupted";
+  }
+  if (input.triggeredRunStatus === "failed") {
+    return "target_run_failed";
+  }
+  if (input.error) {
+    return "frontend_operation_failed";
+  }
+  return "operation_failed";
 }
 
 export function buildPageOperationResumePayload(input: {

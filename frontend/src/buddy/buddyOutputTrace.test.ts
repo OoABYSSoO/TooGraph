@@ -255,6 +255,87 @@ test("reduceBuddyOutputTraceEvent records skill activity inside the active segme
   assert.equal(segment.records[1].durationMs, 420);
 });
 
+test("reduceBuddyOutputTraceEvent records readable virtual operation activity", () => {
+  const graph = fiveNodeGraph();
+  const plan = buildBuddyOutputTracePlan(graph, buildBuddyPublicOutputBindings(graph));
+  let state = createBuddyOutputTraceRuntimeState(plan);
+
+  state = reduceBuddyOutputTraceEvent(state, plan, graph, "node.started", { node_id: "node_a", node_type: "agent" }, 1000);
+  state = reduceBuddyOutputTraceEvent(
+    state,
+    plan,
+    graph,
+    "activity.event",
+    {
+      sequence: 4,
+      kind: "virtual_ui_operation",
+      summary: "Requested virtual template run for 高级联网搜索.",
+      node_id: "node_a",
+      status: "requested",
+      duration_ms: 10,
+      detail: {
+        skill_key: "toograph_page_operator",
+        operation_request_id: "vop_template1234",
+        operation: {
+          kind: "run_template",
+          target_id: "library.template.advanced_web_research_loop.open",
+          template_id: "advanced_web_research_loop",
+          template_name: "高级联网搜索",
+          input_text: "研究 TooGraph 页面操作技能的最新差距。",
+        },
+      },
+    },
+    1500,
+  );
+
+  const [segment] = listBuddyOutputTraceSegmentsForDisplay(state);
+  assert.equal(segment.records[1].kind, "activity");
+  assert.equal(segment.records[1].label, "A / Virtual template run");
+  assert.equal(segment.records[1].summary, "Template: 高级联网搜索 · Input: 研究 TooGraph 页面操作技能的最新差距。");
+});
+
+test("reduceBuddyOutputTraceEvent includes triggered run status for completed virtual operations", () => {
+  const graph = fiveNodeGraph();
+  const plan = buildBuddyOutputTracePlan(graph, buildBuddyPublicOutputBindings(graph));
+  let state = createBuddyOutputTraceRuntimeState(plan);
+
+  state = reduceBuddyOutputTraceEvent(state, plan, graph, "node.started", { node_id: "node_a", node_type: "agent" }, 1000);
+  state = reduceBuddyOutputTraceEvent(
+    state,
+    plan,
+    graph,
+    "activity.event",
+    {
+      sequence: 5,
+      kind: "virtual_ui_operation",
+      summary: "Virtual run_template succeeded. triggered run run_search completed. request vop_template1234.",
+      node_id: "node_a",
+      status: "succeeded",
+      detail: {
+        operation_request_id: "vop_template1234",
+        operation: {
+          kind: "run_template",
+          target_id: "library.template.advanced_web_research_loop.open",
+          search_text: "advanced_web_research_loop",
+          input_text: "鸣潮最新资讯",
+        },
+        operation_report: {
+          operation_request_id: "vop_template1234",
+          status: "succeeded",
+          target_id: "library.template.advanced_web_research_loop.open",
+          triggered_run_id: "run_search",
+          triggered_run_status: "completed",
+        },
+      },
+    },
+    1600,
+  );
+
+  const [segment] = listBuddyOutputTraceSegmentsForDisplay(state);
+  assert.equal(segment.records[1].label, "A / Virtual template run");
+  assert.equal(segment.records[1].summary, "Template: advanced_web_research_loop · Input: 鸣潮最新资讯 · Run: run_search completed");
+});
+
 test("buildBuddyOutputTraceStateFromRunDetail rebuilds completed segments from run detail", () => {
   const graph = fiveNodeGraph();
   const plan = buildBuddyOutputTracePlan(graph, buildBuddyPublicOutputBindings(graph));

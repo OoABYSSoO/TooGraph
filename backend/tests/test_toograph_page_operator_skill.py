@@ -300,6 +300,8 @@ class TooGraphPageOperatorSkillTests(unittest.TestCase):
 
         self.assertEqual(result["ok"], False)
         self.assertEqual(result["error"]["code"], "missing_template_input_text")
+        self.assertEqual(result["error"]["failure_category"], "input_binding_failed")
+        self.assertEqual(result["activity_events"][0]["detail"]["failure_category"], "input_binding_failed")
 
     def test_after_llm_uses_user_goal_as_template_input_text(self) -> None:
         result = _run_skill_script(
@@ -408,7 +410,9 @@ class TooGraphPageOperatorSkillTests(unittest.TestCase):
 
         self.assertEqual(result["ok"], False)
         self.assertEqual(result["error"]["code"], "command_not_in_operation_book")
+        self.assertEqual(result["error"]["failure_category"], "target_not_found")
         self.assertEqual(result["activity_events"][0]["status"], "failed")
+        self.assertEqual(result["activity_events"][0]["detail"]["failure_category"], "target_not_found")
 
     def test_after_llm_rejects_stale_operation_book_page(self) -> None:
         result = _run_skill_script(
@@ -438,6 +442,8 @@ class TooGraphPageOperatorSkillTests(unittest.TestCase):
 
         self.assertEqual(result["ok"], False)
         self.assertEqual(result["error"]["code"], "stale_page_operation_book")
+        self.assertEqual(result["error"]["failure_category"], "page_snapshot_stale")
+        self.assertEqual(result["activity_events"][0]["detail"]["failure_category"], "page_snapshot_stale")
 
     def test_after_llm_emits_virtual_click_event_for_canvas_targets(self) -> None:
         result = _run_skill_script(
@@ -571,7 +577,9 @@ class TooGraphPageOperatorSkillTests(unittest.TestCase):
 
         self.assertEqual(result["ok"], False)
         self.assertEqual(result["error"]["code"], "graph_edit_requires_editor_page")
+        self.assertEqual(result["error"]["failure_category"], "target_not_found")
         self.assertEqual(result["activity_events"][0]["status"], "failed")
+        self.assertEqual(result["activity_events"][0]["detail"]["failure_category"], "target_not_found")
 
     def test_after_llm_accepts_nested_commands_object_as_compatibility_fallback(self) -> None:
         result = _run_skill_script(
@@ -604,8 +612,10 @@ class TooGraphPageOperatorSkillTests(unittest.TestCase):
         self.assertEqual(result["ok"], False)
         self.assertNotIn("next_page_path", result)
         self.assertEqual(result["error"]["code"], "forbidden_self_surface")
+        self.assertEqual(result["error"]["failure_category"], "permission_blocked")
         self.assertEqual(result["activity_events"][0]["kind"], "virtual_ui_operation")
         self.assertEqual(result["activity_events"][0]["status"], "failed")
+        self.assertEqual(result["activity_events"][0]["detail"]["failure_category"], "permission_blocked")
 
 
 if __name__ == "__main__":
