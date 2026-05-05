@@ -69,3 +69,8 @@
 - 原始 memories 仍可供整理 Agent 读取，prompt-facing memory context 只包含启用且未删除的记录。
 - 自动写回没有变化时不会制造空 revision，但运行结果保留可审计状态。
 - 当前 Phase 1 不假装完成审批档或全权限档，只留下后续实施入口。
+
+## Phase 2 进展
+
+- [x] 已创建独立计划 `docs/superpowers/plans/2026-05-05-companion-command-flow.md`。
+- [x] 第一刀选择 command flow 外壳：Companion 页面手动写入先进入 `/api/companion/commands`，完整审批档 graph draft/patch 仍留到下一阶段。

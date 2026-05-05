@@ -1,0 +1,122 @@
+from __future__ import annotations
+
+from copy import deepcopy
+from typing import Any
+from uuid import uuid4
+
+from app.companion import store
+from app.core.storage.json_file_utils import read_json_file, utc_now_iso, write_json_file
+
+
+COMMANDS_PATH = "commands.json"
+COMMAND_CHANGED_BY = "companion_command"
+
+
+def list_commands() -> list[dict[str, Any]]:
+    value = read_json_file(store.COMPANION_DATA_DIR / COMMANDS_PATH, default=[])
+    return value if isinstance(value, list) else []
+
+
+def execute_command(payload: dict[str, Any]) -> dict[str, Any]:
+    action = _required_text(payload.get("action"), "action")
+    command_payload = payload.get("payload")
+    if command_payload is None:
+        command_payload = {}
+    if not isinstance(command_payload, dict):
+        raise ValueError("payload must be an object.")
+
+    target_id = _optional_text(payload.get("target_id"))
+    change_reason = _optional_text(payload.get("change_reason")) or f"Companion command executed: {action}."
+    previous_revision_ids = {str(revision.get("revision_id")) for revision in store.list_revisions()}
+
+    result, target_type, resolved_target_id = _dispatch_command(
+        action,
+        command_payload,
+        target_id=target_id,
+        change_reason=change_reason,
+    )
+    revision = _latest_new_revision(previous_revision_ids)
+    now = utc_now_iso()
+    command = {
+        "command_id": f"cmd_{uuid4().hex[:12]}",
+        "kind": "companion.manual_write",
+        "action": action,
+        "status": "succeeded",
+        "target_type": target_type,
+        "target_id": resolved_target_id,
+        "revision_id": revision.get("revision_id") if isinstance(revision, dict) else None,
+        "run_id": None,
+        "payload": deepcopy(command_payload),
+        "change_reason": change_reason,
+        "created_at": now,
+        "completed_at": now,
+    }
+    _append_command(command)
+    return {"command": command, "result": result, "revision": revision}
+
+
+def _dispatch_command(
+    action: str,
+    payload: dict[str, Any],
+    *,
+    target_id: str | None,
+    change_reason: str,
+) -> tuple[dict[str, Any], str, str]:
+    if action == "profile.update":
+        return store.save_profile(payload, changed_by=COMMAND_CHANGED_BY, change_reason=change_reason), "profile", "profile"
+    if action == "policy.update":
+        return store.save_policy(payload, changed_by=COMMAND_CHANGED_BY, change_reason=change_reason), "policy", "policy"
+    if action == "memory.create":
+        result = store.create_memory(payload, changed_by=COMMAND_CHANGED_BY, change_reason=change_reason)
+        return result, "memory", str(result.get("id") or "")
+    if action == "memory.update":
+        memory_id = _required_target_id(target_id, action)
+        return store.update_memory(memory_id, payload, changed_by=COMMAND_CHANGED_BY, change_reason=change_reason), "memory", memory_id
+    if action == "memory.delete":
+        memory_id = _required_target_id(target_id, action)
+        return store.delete_memory(memory_id, changed_by=COMMAND_CHANGED_BY, change_reason=change_reason), "memory", memory_id
+    if action == "session_summary.update":
+        return (
+            store.save_session_summary(payload, changed_by=COMMAND_CHANGED_BY, change_reason=change_reason),
+            "session_summary",
+            "session_summary",
+        )
+    if action == "revision.restore":
+        revision_id = _required_target_id(target_id, action)
+        result = store.restore_revision(revision_id, changed_by=COMMAND_CHANGED_BY, change_reason=change_reason)
+        return result, str(result.get("target_type") or ""), str(result.get("target_id") or "")
+    raise ValueError(f"Unsupported companion command action: {action}")
+
+
+def _latest_new_revision(previous_revision_ids: set[str]) -> dict[str, Any] | None:
+    for revision in reversed(store.list_revisions()):
+        revision_id = str(revision.get("revision_id") or "")
+        if revision_id and revision_id not in previous_revision_ids:
+            return revision
+    return None
+
+
+def _append_command(command: dict[str, Any]) -> None:
+    commands = list_commands()
+    commands.append(command)
+    write_json_file(store.COMPANION_DATA_DIR / COMMANDS_PATH, commands)
+
+
+def _required_target_id(value: str | None, action: str) -> str:
+    if not value:
+        raise ValueError(f"{action} requires target_id.")
+    return value
+
+
+def _required_text(value: Any, field_name: str) -> str:
+    text = _optional_text(value)
+    if not text:
+        raise ValueError(f"{field_name} is required.")
+    return text
+
+
+def _optional_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None

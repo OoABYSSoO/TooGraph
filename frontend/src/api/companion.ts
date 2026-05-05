@@ -1,4 +1,5 @@
 import type {
+  CompanionCommandResponse,
   CompanionMemory,
   CompanionPolicy,
   CompanionProfile,
@@ -6,14 +7,28 @@ import type {
   CompanionSessionSummary,
 } from "../types/companion.ts";
 
-import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from "./http.ts";
+import { apiGet, apiPost } from "./http.ts";
+
+function executeCompanionCommand<T>(
+  action: string,
+  payload: Record<string, unknown>,
+  changeReason: string,
+  targetId?: string,
+) {
+  return apiPost<CompanionCommandResponse<T>>("/api/companion/commands", {
+    action,
+    ...(targetId ? { target_id: targetId } : {}),
+    payload,
+    change_reason: changeReason,
+  });
+}
 
 export function fetchCompanionProfile() {
   return apiGet<CompanionProfile>("/api/companion/profile");
 }
 
 export function updateCompanionProfile(payload: Partial<CompanionProfile>, changeReason: string) {
-  return apiPut<CompanionProfile>("/api/companion/profile", { ...payload, change_reason: changeReason });
+  return executeCompanionCommand<CompanionProfile>("profile.update", payload, changeReason);
 }
 
 export function fetchCompanionPolicy() {
@@ -21,7 +36,7 @@ export function fetchCompanionPolicy() {
 }
 
 export function updateCompanionPolicy(payload: Partial<CompanionPolicy>, changeReason: string) {
-  return apiPut<CompanionPolicy>("/api/companion/policy", { ...payload, change_reason: changeReason });
+  return executeCompanionCommand<CompanionPolicy>("policy.update", payload, changeReason);
 }
 
 export function fetchCompanionMemories(includeDeleted = false) {
@@ -29,15 +44,24 @@ export function fetchCompanionMemories(includeDeleted = false) {
 }
 
 export function createCompanionMemory(payload: Pick<CompanionMemory, "type" | "title" | "content">) {
-  return apiPost<CompanionMemory>("/api/companion/memories", payload);
+  return executeCompanionCommand<CompanionMemory>(
+    "memory.create",
+    payload,
+    "User created companion memory from the Companion page.",
+  );
 }
 
 export function updateCompanionMemory(memoryId: string, payload: Partial<CompanionMemory>, changeReason: string) {
-  return apiPatch<CompanionMemory>(`/api/companion/memories/${memoryId}`, { ...payload, change_reason: changeReason });
+  return executeCompanionCommand<CompanionMemory>("memory.update", payload, changeReason, memoryId);
 }
 
 export function deleteCompanionMemory(memoryId: string) {
-  return apiDelete<CompanionMemory>(`/api/companion/memories/${memoryId}`);
+  return executeCompanionCommand<CompanionMemory>(
+    "memory.delete",
+    {},
+    "User deleted companion memory from the Companion page.",
+    memoryId,
+  );
 }
 
 export function fetchCompanionSessionSummary() {
@@ -45,7 +69,7 @@ export function fetchCompanionSessionSummary() {
 }
 
 export function updateCompanionSessionSummary(payload: Partial<CompanionSessionSummary>, changeReason: string) {
-  return apiPut<CompanionSessionSummary>("/api/companion/session-summary", { ...payload, change_reason: changeReason });
+  return executeCompanionCommand<CompanionSessionSummary>("session_summary.update", payload, changeReason);
 }
 
 export function fetchCompanionRevisions(targetType?: string, targetId?: string) {
@@ -61,8 +85,10 @@ export function fetchCompanionRevisions(targetType?: string, targetId?: string) 
 }
 
 export function restoreCompanionRevision(revisionId: string) {
-  return apiPost<{ target_type: string; target_id: string; current_value: Record<string, unknown> }>(
-    `/api/companion/revisions/${revisionId}/restore`,
+  return executeCompanionCommand<{ target_type: string; target_id: string; current_value: Record<string, unknown> }>(
+    "revision.restore",
     {},
+    "User restored a companion revision from the Companion page.",
+    revisionId,
   );
 }

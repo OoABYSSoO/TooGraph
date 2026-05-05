@@ -5,7 +5,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.companion import store
+from app.companion import commands, store
 
 
 router = APIRouter(prefix="/api/companion", tags=["companion"])
@@ -26,6 +26,15 @@ class CompanionMemoryPayload(CompanionUpdatePayload):
     type: str = "fact"
     title: str = Field(min_length=1)
     content: str = Field(min_length=1)
+
+
+class CompanionCommandPayload(BaseModel):
+    action: str = Field(min_length=1)
+    payload: dict[str, Any] = Field(default_factory=dict)
+    target_id: str | None = None
+    change_reason: str = "User requested a companion command."
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
 
 @router.get("/profile")
@@ -98,3 +107,18 @@ def restore_revision_endpoint(revision_id: str) -> dict[str, Any]:
         return store.restore_revision(revision_id, changed_by="user", change_reason="用户恢复历史版本。")
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Revision not found") from exc
+
+
+@router.get("/commands")
+def list_commands_endpoint() -> list[dict[str, Any]]:
+    return commands.list_commands()
+
+
+@router.post("/commands")
+def execute_command_endpoint(payload: CompanionCommandPayload) -> dict[str, Any]:
+    try:
+        return commands.execute_command(payload.model_dump())
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Companion command target not found") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc

@@ -21,6 +21,12 @@
         :closable="false"
         :title="t('common.failedToLoad', { error: errorMessage })"
       />
+      <div v-if="lastCommand" class="companion-page__command-status" role="status">
+        <ElTag type="success" effect="plain">{{ t("common.status") }}: {{ lastCommand.status }}</ElTag>
+        <span>Command {{ lastCommand.command_id }}</span>
+        <span v-if="lastCommand.revision_id">{{ t("common.revision") }} {{ lastCommand.revision_id }}</span>
+        <span v-if="lastCommand.run_id">Run {{ lastCommand.run_id }}</span>
+      </div>
 
       <div v-if="isLoading && !hasLoaded" class="companion-page__empty">{{ t("companionPage.loading") }}</div>
       <ElTabs v-else v-model="activeTab" class="companion-page__tabs">
@@ -236,7 +242,15 @@ import {
   updateCompanionSessionSummary,
 } from "@/api/companion";
 import AppShell from "@/layouts/AppShell.vue";
-import type { CompanionMemory, CompanionPolicy, CompanionProfile, CompanionRevision, CompanionSessionSummary } from "@/types/companion";
+import type {
+  CompanionCommandRecord,
+  CompanionCommandResponse,
+  CompanionMemory,
+  CompanionPolicy,
+  CompanionProfile,
+  CompanionRevision,
+  CompanionSessionSummary,
+} from "@/types/companion";
 
 type MemoryDraft = Pick<CompanionMemory, "type" | "title" | "content">;
 
@@ -259,6 +273,7 @@ const memoryDraft = ref<MemoryDraft>(defaultMemoryDraft());
 const editingMemoryId = ref("");
 const summaryDraft = ref<CompanionSessionSummary>(defaultSummaryDraft());
 const revisions = ref<CompanionRevision[]>([]);
+const lastCommand = ref<CompanionCommandRecord | null>(null);
 
 const policyBoundaryText = computed({
   get: () => listToText(policyDraft.value.behavior_boundaries),
@@ -345,6 +360,11 @@ function setError(error: unknown, fallbackKey = "common.failedToLoad") {
   errorMessage.value = message || t(fallbackKey, { error: "" });
 }
 
+function acceptCommandResult<T>(response: CompanionCommandResponse<T>): T {
+  lastCommand.value = response.command;
+  return response.result;
+}
+
 async function loadAll() {
   try {
     isLoading.value = true;
@@ -378,7 +398,9 @@ async function refreshMutableLists() {
 async function saveProfile() {
   try {
     isSavingProfile.value = true;
-    profileDraft.value = await updateCompanionProfile(profileDraft.value, t("companionPage.changeReasons.profile"));
+    profileDraft.value = acceptCommandResult(
+      await updateCompanionProfile(profileDraft.value, t("companionPage.changeReasons.profile")),
+    );
     revisions.value = await fetchCompanionRevisions();
     errorMessage.value = "";
     ElMessage.success(t("companionPage.saved"));
@@ -392,12 +414,14 @@ async function saveProfile() {
 async function savePolicy() {
   try {
     isSavingPolicy.value = true;
-    policyDraft.value = await updateCompanionPolicy(
-      {
-        ...policyDraft.value,
-        graph_permission_mode: "advisory",
-      },
-      t("companionPage.changeReasons.policy"),
+    policyDraft.value = acceptCommandResult(
+      await updateCompanionPolicy(
+        {
+          ...policyDraft.value,
+          graph_permission_mode: "advisory",
+        },
+        t("companionPage.changeReasons.policy"),
+      ),
     );
     revisions.value = await fetchCompanionRevisions();
     errorMessage.value = "";
@@ -435,9 +459,11 @@ async function saveMemoryDraft() {
   try {
     isSavingMemory.value = true;
     if (editingMemoryId.value) {
-      await updateCompanionMemory(editingMemoryId.value, payload, t("companionPage.changeReasons.memory"));
+      acceptCommandResult(
+        await updateCompanionMemory(editingMemoryId.value, payload, t("companionPage.changeReasons.memory")),
+      );
     } else {
-      await createCompanionMemory(payload);
+      acceptCommandResult(await createCompanionMemory(payload));
     }
     await refreshMutableLists();
     startNewMemory();
@@ -462,7 +488,7 @@ async function removeMemory(memoryId: string) {
   }
   try {
     memoryActionId.value = memoryId;
-    await deleteCompanionMemory(memoryId);
+    acceptCommandResult(await deleteCompanionMemory(memoryId));
     await refreshMutableLists();
     if (editingMemoryId.value === memoryId) {
       startNewMemory();
@@ -479,7 +505,9 @@ async function removeMemory(memoryId: string) {
 async function saveSummary() {
   try {
     isSavingSummary.value = true;
-    summaryDraft.value = await updateCompanionSessionSummary(summaryDraft.value, t("companionPage.changeReasons.summary"));
+    summaryDraft.value = acceptCommandResult(
+      await updateCompanionSessionSummary(summaryDraft.value, t("companionPage.changeReasons.summary")),
+    );
     revisions.value = await fetchCompanionRevisions();
     errorMessage.value = "";
     ElMessage.success(t("companionPage.saved"));
@@ -493,7 +521,7 @@ async function saveSummary() {
 async function restoreRevision(revisionId: string) {
   try {
     restoreActionId.value = revisionId;
-    await restoreCompanionRevision(revisionId);
+    acceptCommandResult(await restoreCompanionRevision(revisionId));
     await loadAll();
     ElMessage.success(t("companionPage.history.restored"));
   } catch (error) {
@@ -567,6 +595,19 @@ onMounted(loadAll);
 
 .companion-page__alert {
   border-radius: 16px;
+}
+
+.companion-page__command-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  border: 1px solid rgba(22, 101, 52, 0.18);
+  border-radius: 16px;
+  background: rgba(240, 253, 244, 0.86);
+  color: rgba(20, 83, 45, 0.86);
+  padding: 10px 12px;
+  font-size: 0.86rem;
 }
 
 .companion-page__tabs {

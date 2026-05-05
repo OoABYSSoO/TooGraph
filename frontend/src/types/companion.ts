@@ -32,12 +32,33 @@ export type CompanionSessionSummary = {
 
 export type CompanionRevision = {
   revision_id: string;
-  target_type: "profile" | "policy" | "memory" | "session_summary";
+  target_type: string;
   target_id: string;
-  operation: "create" | "update" | "delete" | "restore";
+  operation: string;
   previous_value: Record<string, unknown>;
   next_value: Record<string, unknown>;
   changed_by: string;
   change_reason: string;
   created_at: string;
+};
+
+export type CompanionCommandRecord = {
+  command_id: string;
+  kind: string;
+  action: string;
+  status: string;
+  target_type: string;
+  target_id: string;
+  revision_id: string | null;
+  run_id: string | null;
+  payload: Record<string, unknown>;
+  change_reason: string;
+  created_at: string;
+  completed_at: string;
+};
+
+export type CompanionCommandResponse<T> = {
+  command: CompanionCommandRecord;
+  result: T;
+  revision: CompanionRevision | null;
 };

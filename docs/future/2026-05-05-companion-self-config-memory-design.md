@@ -143,6 +143,12 @@
 - 自动写回如果 next value 与 previous value 完全一致，不创建 revision；运行详情仍应返回 `changed: false` 和 `skipped: true`，让这次“无变化”可见但不污染历史版本。
 - 原始 memories 可以继续作为整理 Agent 的输入，用于识别删除记录和负反馈；prompt-facing memory context 必须是过滤后的只读上下文。
 
+建议档第二版命令流规则：
+
+- Companion 页面手动写入 profile、policy、memory、session summary 和 revision restore 时，不再直接调用裸存储写路由，而是提交 `/api/companion/commands`。
+- command 记录必须包含 `command_id`、`action`、`status`、`target_type`、`target_id`、`revision_id`、`run_id` 和时间戳；当前手动命令的 `run_id` 为 `null`，为后续 graph run 接入保留字段。
+- `/api/companion/*` 读接口和底层 store 仍作为存储原语存在；产品级手动写路径应该优先通过 command flow，后续审批档再把同一入口升级为 graph draft/patch。
+
 应该记住：
 
 - 用户稳定偏好，例如回答长短、解释方式、语言偏好。
