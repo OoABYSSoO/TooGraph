@@ -21,7 +21,7 @@
 
 已经完成：
 
-- 桌宠对话通过 `companion_chat_loop` 图模板运行。
+- 桌宠对话入口默认通过 `companion_agentic_tool_loop` 图模板运行。
 - 桌宠模型列表与 Agent 节点模型列表统一。
 - 桌宠对话后会自动刷新人设和记忆。
 - 技能体系已去掉旧的 `targets` 分裂，不再区分 `agent_node` skill 和 `companion` skill。
@@ -29,11 +29,12 @@
 - 前端技能管理页围绕可发现、可自主选择、运行时状态和处理项展示技能。
 - 已新增 `autonomous_decision` control skill 基础纵切，用于根据技能目录和运行策略输出结构化决策、审批请求或缺失能力提案。
 - `state_schema` 支持 `skill` 类型，Agent 节点会把卡片手动添加的 skills 与 state 输入传入的 skill / skill[] 做并集合并。
-- 已新增 `companion_agentic_tool_loop` 图模板，覆盖“意图规划 -> 自主决策 -> 审批暂停 -> 动态技能执行 -> 结果评估 -> 继续循环或回复”的主链。
+- 已新增并接入 `companion_agentic_tool_loop` 图模板，覆盖“读取人设/记忆 -> 意图规划 -> 自主决策 -> 审批暂停 -> 动态技能执行 -> 结果评估 -> 记忆整理 -> 回复”的主链。
+- 桌宠入口会把真实 skill catalog snapshot 注入模板；advisory 档禁用自主选择，approval 档遵循 skill manifest 的 `runPolicies.origins.companion`。
 
 尚未完成：
 
-- 桌宠入口对 `companion_agentic_tool_loop` 的自动接入、真实 skill catalog snapshot 注入和审批恢复 UI。
+- 桌宠审批恢复 UI：把 `approval_prompt` 显示为确认/拒绝操作，并在确认后写入 `approval_granted` 继续 resume。
 - 缺工具时的 `graphite_skill_builder` 草稿生成。
 - 完整 graph patch 预览、协议级校验、用户确认后的 apply、GraphCommandBus、undo 和 run detail 闭环。
 - 全权限档。它是远期目标，当前实现不能假装已经拥有。
@@ -165,7 +166,8 @@ effective_skills = agent.config.skills ∪ state_schema[type=skill] 输入中的
   -> 调用被授权 skill
   -> 评估工具结果
   -> 判断是否继续调用工具
-  -> 整理最终回复
+  -> 互斥分支直接写入 final_reply
+  -> 整理并写回人设、策略、记忆和会话摘要
 ```
 
 关键状态：
@@ -194,13 +196,24 @@ effective_skills = agent.config.skills ∪ state_schema[type=skill] 输入中的
 - `missing_skill_proposal`
 - `denied_reply`
 - `final_reply`
+- `companion_session_summary`
+- `companion_profile_json`
+- `companion_policy_json`
+- `companion_memories_json`
+- `companion_session_summary_json`
+- `companion_profile_next`
+- `companion_policy_next`
+- `companion_memories_next`
+- `companion_session_summary_next`
+- `companion_memory_update_result`
 
 当前模板边界：
 
-- 模板已经表达受控路由、多轮循环和审批暂停，但桌宠入口还需要自动选择该模板并注入真实 skill catalog snapshot。
+- 模板已经表达受控路由、多轮循环、审批暂停和记忆整理；桌宠入口已经默认选择该模板并注入真实 skill catalog snapshot。
+- `final_reply` 是协议级稳定最终回复状态；直接回复、拒绝回复和工具评估等互斥条件分支可以共同写入它，汇合后的记忆整理和输出节点只读取它。
 - 缺能力时只产出 `missing_skill_proposal`，不会静默安装或启用新 skill；后续必须交给 `graphite_skill_builder` 和用户确认路径。
 - 审批恢复通过图状态 `approval_granted` 表达，不引入第二套桌宠运行协议。
-- 当前模板不直接写长期记忆；记忆更新继续由 `companion_chat_loop` 或后续专门的 memory skill/template 处理。
+- 记忆/人设更新作为模板内显式后处理段完成，不新增独立 memory skill。
 
 循环退出条件：
 
@@ -293,6 +306,7 @@ backend/data/skill_drafts/<skill_key>/
 - 删除旧 `targets` 契约。
 - 新增 `runPolicies`。
 - 后端解析、校验、内置 manifest、前端技能页和测试统一到新模型。
+- `node_system` 控制流分析支持互斥条件分支写入同一个汇合状态，例如桌宠模板中的 `final_reply`；普通并行无序写入仍会被 validator 拒绝。
 
 ### Phase 2：自主决策 Skill
 
@@ -305,12 +319,14 @@ backend/data/skill_drafts/<skill_key>/
 
 ### Phase 3：自主工具循环模板
 
-状态：已完成模板纵切。
+状态：已完成模板纵切和桌宠入口接入。
 
 - 新增 `companion_agentic_tool_loop`。
 - 支持“决策 -> 审批 -> 执行 -> 评估 -> 继续或退出”。
 - 使用 `skill` state 把 `autonomous_decision` 选出的技能传给后续 Agent 节点，并与卡片 skills 并集合并。
 - 审批通过 `request_approval_agent` 和 `interrupt_after` 暂停，恢复时由 `approval_granted` 决定继续执行或拒绝回复。
+- 桌宠入口注入真实 skill catalog snapshot；advisory 档禁止自主选择，approval 档按 manifest 策略允许自主选择并请求审批。
+- 人设、策略、记忆和会话摘要读写融合在同一个模板里，通过 `local_file` 节点保留 revision。
 - 选择、输入、输出和退出原因通过 graph state、节点输出和 skill invocation 进入运行记录。
 
 ### Phase 4：Skill Builder

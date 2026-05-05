@@ -1,7 +1,8 @@
 import type { AgentNode, GraphPayload, InputNode, TemplateRecord } from "../types/node-system.ts";
 import type { RunDetail } from "../types/run.ts";
+import type { SkillDefinition } from "../types/skills.ts";
 
-export const COMPANION_TEMPLATE_ID = "companion_chat_loop";
+export const COMPANION_TEMPLATE_ID = "companion_agentic_tool_loop";
 export const COMPANION_USER_MESSAGE_STATE_KEY = "state_1";
 export const COMPANION_HISTORY_STATE_KEY = "state_2";
 export const COMPANION_PAGE_CONTEXT_STATE_KEY = "state_3";
@@ -11,6 +12,7 @@ export const COMPANION_PROFILE_STATE_KEY = "state_6";
 export const COMPANION_POLICY_STATE_KEY = "state_7";
 export const COMPANION_MEMORY_CONTEXT_STATE_KEY = "state_8";
 export const COMPANION_SESSION_SUMMARY_STATE_KEY = "state_9";
+export const COMPANION_AGENTIC_REPLY_STATE_KEYS = ["state_27", "state_25", "state_26", "state_16", "state_18"];
 export const MAX_COMPANION_HISTORY_MESSAGES = 12;
 export const DEFAULT_COMPANION_MODE = "advisory";
 
@@ -57,6 +59,7 @@ export type BuildCompanionChatGraphInput = {
   pageContext: string;
   companionMode?: unknown;
   companionModel?: unknown;
+  skillCatalog?: SkillDefinition[];
 };
 
 export function formatCompanionHistory(messages: CompanionChatMessage[], maxMessages = MAX_COMPANION_HISTORY_MESSAGES) {
@@ -97,16 +100,24 @@ export function buildCompanionChatGraph(template: TemplateRecord, input: BuildCo
   applyCompanionModePolicy(graph, companionMode);
   applyCompanionModelOverride(graph, input.companionModel);
 
-  setStateValue(graph, COMPANION_USER_MESSAGE_STATE_KEY, input.userMessage);
-  setStateValue(graph, COMPANION_HISTORY_STATE_KEY, formatCompanionHistory(input.history));
-  setStateValue(graph, COMPANION_PAGE_CONTEXT_STATE_KEY, input.pageContext.trim() || "当前页面上下文不可用。");
-  setStateValue(graph, COMPANION_REPLY_STATE_KEY, "");
-  setStateValue(graph, COMPANION_MODE_STATE_KEY, companionMode);
+  const historyValue = formatCompanionHistory(input.history);
+  const pageContextValue = input.pageContext.trim() || "当前页面上下文不可用。";
+  const skillCatalogSnapshot = buildCompanionSkillCatalogSnapshot(input.skillCatalog ?? [], companionMode);
 
-  syncInputNodeValue(graph, COMPANION_USER_MESSAGE_STATE_KEY, input.userMessage);
-  syncInputNodeValue(graph, COMPANION_HISTORY_STATE_KEY, graph.state_schema[COMPANION_HISTORY_STATE_KEY]?.value ?? "");
-  syncInputNodeValue(graph, COMPANION_PAGE_CONTEXT_STATE_KEY, graph.state_schema[COMPANION_PAGE_CONTEXT_STATE_KEY]?.value ?? "");
-  syncInputNodeValue(graph, COMPANION_MODE_STATE_KEY, companionMode);
+  setStateValueByNameOrKey(graph, "user_message", COMPANION_USER_MESSAGE_STATE_KEY, input.userMessage);
+  setStateValueByNameOrKey(graph, "conversation_history", COMPANION_HISTORY_STATE_KEY, historyValue);
+  setStateValueByNameOrKey(graph, "page_context", COMPANION_PAGE_CONTEXT_STATE_KEY, pageContextValue);
+  setStateValueByNameOrKey(graph, "companion_mode", COMPANION_MODE_STATE_KEY, companionMode);
+  setStateValueByName(graph, "skill_catalog_snapshot", skillCatalogSnapshot);
+  for (const stateName of ["companion_reply", "final_reply", "direct_reply", "denied_reply", "approval_prompt"]) {
+    setStateValueByName(graph, stateName, "");
+  }
+
+  syncInputNodeValueByNameOrKey(graph, "user_message", COMPANION_USER_MESSAGE_STATE_KEY, input.userMessage);
+  syncInputNodeValueByNameOrKey(graph, "conversation_history", COMPANION_HISTORY_STATE_KEY, historyValue);
+  syncInputNodeValueByNameOrKey(graph, "page_context", COMPANION_PAGE_CONTEXT_STATE_KEY, pageContextValue);
+  syncInputNodeValueByNameOrKey(graph, "companion_mode", COMPANION_MODE_STATE_KEY, companionMode);
+  syncInputNodeValueByName(graph, "skill_catalog_snapshot", skillCatalogSnapshot);
   if (companionMode !== "unrestricted") {
     enforceAdvisoryCompanionGraph(graph);
   }
@@ -118,12 +129,43 @@ export function resolveCompanionMode(value: unknown): CompanionMode {
   return value === "approval" || value === DEFAULT_COMPANION_MODE ? value : DEFAULT_COMPANION_MODE;
 }
 
+export function buildCompanionSkillCatalogSnapshot(skills: SkillDefinition[], companionMode: CompanionMode) {
+  return skills.map((skill) => {
+    const snapshot = cloneJson(skill);
+    const defaultPolicy = {
+      discoverable: true,
+      autoSelectable: false,
+      requiresApproval: false,
+      ...(snapshot.runPolicies?.default ?? {}),
+    };
+    const companionPolicy = {
+      ...defaultPolicy,
+      ...(snapshot.runPolicies?.origins?.companion ?? {}),
+    };
+    snapshot.runPolicies = {
+      default: defaultPolicy,
+      origins: {
+        ...(snapshot.runPolicies?.origins ?? {}),
+        companion:
+          companionMode === "approval"
+            ? companionPolicy
+            : {
+                ...companionPolicy,
+                autoSelectable: false,
+              },
+      },
+    };
+    return snapshot;
+  });
+}
+
 export function resolveCompanionReplyText(run: RunDetail): string {
+  const replyStateKeys = resolveCompanionReplyStateKeys(run.graph_snapshot);
   const candidates = [
-    run.state_snapshot?.values?.[COMPANION_REPLY_STATE_KEY],
-    run.artifacts?.state_values?.[COMPANION_REPLY_STATE_KEY],
-    resolveOutputPreviewValue(run.output_previews),
-    resolveOutputPreviewValue(run.artifacts?.output_previews),
+    ...replyStateKeys.map((stateKey) => run.state_snapshot?.values?.[stateKey]),
+    ...replyStateKeys.map((stateKey) => run.artifacts?.state_values?.[stateKey]),
+    resolveOutputPreviewValue(run.output_previews, replyStateKeys),
+    resolveOutputPreviewValue(run.artifacts?.output_previews, replyStateKeys),
     run.final_result,
   ];
 
@@ -139,18 +181,30 @@ export function resolveCompanionReplyText(run: RunDetail): string {
 
 export function resolveCompanionReplyFromRunEvent(payload: Record<string, unknown>): string {
   const stateKey = typeof payload.state_key === "string" ? payload.state_key.trim() : "";
-  if (stateKey === COMPANION_REPLY_STATE_KEY) {
+  if (isCompanionReplyStateKey(stateKey)) {
     return stringifyCompanionReplyCandidate(payload.value ?? payload.text);
   }
 
   const outputKeys = Array.isArray(payload.output_keys)
     ? payload.output_keys.map((key) => String(key)).filter(Boolean)
     : [];
-  if (outputKeys.includes(COMPANION_REPLY_STATE_KEY)) {
+  if (outputKeys.some(isCompanionReplyStateKey)) {
     return stringifyCompanionReplyCandidate(payload.text ?? payload.value);
   }
 
   return "";
+}
+
+function setStateValueByName(graph: GraphPayload, stateName: string, value: unknown) {
+  const stateKey = findStateKeyByName(graph, stateName);
+  if (!stateKey) {
+    return;
+  }
+  setStateValue(graph, stateKey, value);
+}
+
+function setStateValueByNameOrKey(graph: GraphPayload, stateName: string, fallbackStateKey: string, value: unknown) {
+  setStateValue(graph, findStateKeyByName(graph, stateName) ?? fallbackStateKey, value);
 }
 
 function setStateValue(graph: GraphPayload, stateKey: string, value: unknown) {
@@ -161,6 +215,18 @@ function setStateValue(graph: GraphPayload, stateKey: string, value: unknown) {
     ...graph.state_schema[stateKey],
     value,
   };
+}
+
+function syncInputNodeValueByName(graph: GraphPayload, stateName: string, value: unknown) {
+  const stateKey = findStateKeyByName(graph, stateName);
+  if (!stateKey) {
+    return;
+  }
+  syncInputNodeValue(graph, stateKey, value);
+}
+
+function syncInputNodeValueByNameOrKey(graph: GraphPayload, stateName: string, fallbackStateKey: string, value: unknown) {
+  syncInputNodeValue(graph, findStateKeyByName(graph, stateName) ?? fallbackStateKey, value);
 }
 
 function syncInputNodeValue(graph: GraphPayload, stateKey: string, value: unknown) {
@@ -197,10 +263,11 @@ function applyCompanionModePolicy(graph: GraphPayload, companionMode: CompanionM
   if (companionMode !== "approval") {
     return;
   }
-  graph.metadata.interrupt_after = addUniqueMetadataNodeId(graph.metadata.interrupt_after, "companion_reply_agent");
+  const approvalNodeId = graph.nodes.request_approval_agent ? "request_approval_agent" : "companion_reply_agent";
+  graph.metadata.interrupt_after = addUniqueMetadataNodeId(graph.metadata.interrupt_after, approvalNodeId);
   graph.metadata.agent_breakpoint_timing = {
     ...(isRecord(graph.metadata.agent_breakpoint_timing) ? graph.metadata.agent_breakpoint_timing : {}),
-    companion_reply_agent: "after",
+    [approvalNodeId]: "after",
   };
 }
 
@@ -236,8 +303,36 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function resolveOutputPreviewValue(previews: RunDetail["output_previews"] | undefined) {
-  return previews?.find((preview) => preview.source_key === COMPANION_REPLY_STATE_KEY)?.value;
+function findStateKeyByName(graph: GraphPayload, stateName: string) {
+  return Object.entries(graph.state_schema).find(([, definition]) => definition.name === stateName)?.[0] ?? null;
+}
+
+function resolveCompanionReplyStateKeys(graphSnapshot: Record<string, unknown> | null | undefined) {
+  const stateSchema = isRecord(graphSnapshot?.state_schema) ? graphSnapshot.state_schema : null;
+  const keysFromNames = stateSchema
+    ? Object.entries(stateSchema)
+        .filter(([, definition]) => isRecord(definition) && typeof definition.name === "string")
+        .filter(([, definition]) =>
+          [
+            "companion_reply",
+            "final_reply",
+            "direct_reply",
+            "denied_reply",
+            "approval_prompt",
+            "missing_skill_proposal",
+          ].includes(String((definition as { name: string }).name)),
+        )
+        .map(([stateKey]) => stateKey)
+    : [];
+  return uniqueStrings([...keysFromNames, ...COMPANION_AGENTIC_REPLY_STATE_KEYS, COMPANION_REPLY_STATE_KEY]);
+}
+
+function isCompanionReplyStateKey(stateKey: string) {
+  return stateKey === COMPANION_REPLY_STATE_KEY || COMPANION_AGENTIC_REPLY_STATE_KEYS.includes(stateKey);
+}
+
+function resolveOutputPreviewValue(previews: RunDetail["output_previews"] | undefined, stateKeys: string[]) {
+  return previews?.find((preview) => stateKeys.includes(preview.source_key))?.value;
 }
 
 function stringifyCompanionReplyCandidate(value: unknown): string {
@@ -256,4 +351,8 @@ function stringifyCompanionReplyCandidate(value: unknown): string {
 
 function cloneJson<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function uniqueStrings(values: string[]) {
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
 }

@@ -48,6 +48,7 @@
 - Companion 页面：`/companion`
   - 桌宠对话入口
   - 对话后自动刷新人设和记忆
+  - 桌宠浮窗默认运行 `companion_agentic_tool_loop`，并向图注入真实 skill catalog snapshot
 
 ### 编辑器与运行
 
@@ -65,6 +66,7 @@
 - FastAPI 提供 graphs / runs / templates / presets / settings / skills / knowledge / memories API。
 - validator 负责 `node_system` graph 结构校验。
 - LangGraph runtime 是当前运行主链，并采用 agent-only 语义：只有 agent 注册为 LangGraph node，input / output / condition 作为边界状态、输出 artifact 和条件 route 参与反馈。
+- 控制流分析允许互斥条件分支共同写入同一个汇合状态，例如 `final_reply`；普通并行无序写入仍会被拒绝。
 - 后端支持 LangGraph Python 源码导出接口。
 - 后端具备 interrupt / checkpoint / resume 能力，前端人类在环完整产品闭环仍在路线图中。
 
@@ -81,7 +83,7 @@
 - `game_ad_research_collector` 支持采集游戏市场 RSS、生成广告库搜索记录、发现/下载公开视频广告素材，并把视频和来源文档作为本地 artifact 返回。
 - `autonomous_decision` 是 control/context 技能，负责根据技能目录和 `runPolicies` 决定直接回复、执行已授权技能、请求审批或提出缺失技能草案，不直接执行工具或产生副作用。
 - `skill` state 可以把 `autonomous_decision` 选出的技能作为显式图状态传给下游 Agent 节点；这些动态技能与 Agent 卡片 skills 一视同仁，执行前仍走 registry、运行时状态和审批校验。
-- `companion_agentic_tool_loop` 模板已进入模板库，串起意图规划、`autonomous_decision`、审批暂停、`skill` state 动态执行、工具结果评估和多轮退出。
+- `companion_agentic_tool_loop` 模板已进入桌宠入口主链，串起人设/记忆读取、意图规划、`autonomous_decision`、审批暂停、`skill` state 动态执行、工具结果评估、互斥分支写入 `final_reply`、多轮退出和同模板内记忆整理写回。
 
 ## 当前技术栈
 
@@ -102,6 +104,6 @@
 - LangGraph Python 源码预览、下载和导入校验体验完善。
 - cycles 更高级的终止策略和可视化。
 - 更强的 knowledge base 管理能力。
-- 桌宠入口自动接入 `companion_agentic_tool_loop`、真实 skill catalog snapshot 注入和审批恢复 UI。
+- 桌宠审批恢复 UI：展示 `approval_prompt`，确认后写入 `approval_granted` 并 resume。
 - `graphite_skill_builder`。
 - 桌宠 Agent 与自动编排图协作层，具体路线见 `docs/future/companion-autonomous-agent-roadmap.md`。

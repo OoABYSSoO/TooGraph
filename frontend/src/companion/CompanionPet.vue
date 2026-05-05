@@ -154,6 +154,7 @@ import { useRoute } from "vue-router";
 import { fetchTemplate, runGraph } from "../api/graphs.ts";
 import { fetchRun } from "../api/runs.ts";
 import { fetchSettings } from "../api/settings.ts";
+import { fetchSkillCatalog } from "../api/skills.ts";
 import { buildRuntimeModelOptions } from "../lib/runtimeModelCatalog.ts";
 import { buildRunEventStreamUrl, parseRunEventPayload, shouldPollRunStatus } from "../lib/run-event-stream.ts";
 import { useCompanionContextStore } from "../stores/companionContext.ts";
@@ -434,13 +435,17 @@ async function processQueuedTurn(turn: CompanionQueuedTurn) {
 
   try {
     activeAbortController = new AbortController();
-    const template = await fetchTemplate(COMPANION_TEMPLATE_ID);
+    const [template, skillCatalog] = await Promise.all([
+      fetchTemplate(COMPANION_TEMPLATE_ID),
+      fetchSkillCatalog({ includeDisabled: true }),
+    ]);
     const graph = buildCompanionChatGraph(template, {
       userMessage: turn.userMessage,
       history,
       pageContext: buildPageContext(),
       companionMode: companionMode.value,
       companionModel: companionModelRef.value,
+      skillCatalog,
     });
     const run = await runGraph(graph);
     activeRunId.value = run.run_id;

@@ -980,6 +980,120 @@ class LangGraphMigrationTests(unittest.TestCase):
         plan = compile_graph_to_langgraph_plan(graph)
         self.assertTrue(any("multiple unordered writers" in reason for reason in plan.requirements.unsupported_reasons))
 
+    def test_same_state_exclusive_branch_writers_are_allowed(self):
+        graph = NodeSystemGraphPayload.model_validate(
+            {
+                "name": "Exclusive Branch Final Reply",
+                "state_schema": {
+                    "route_to_a": {
+                        "name": "route_to_a",
+                        "description": "",
+                        "type": "boolean",
+                        "value": True,
+                        "color": "",
+                    },
+                    "final_reply": {
+                        "name": "final_reply",
+                        "description": "",
+                        "type": "text",
+                        "value": "",
+                        "color": "",
+                    },
+                },
+                "nodes": {
+                    "input_route": {
+                        "kind": "input",
+                        "name": "Input Route",
+                        "description": "",
+                        "ui": {"position": {"x": 0, "y": 0}},
+                        "reads": [],
+                        "writes": [{"state": "route_to_a", "mode": "replace"}],
+                        "config": {"value": True},
+                    },
+                    "reply_route": {
+                        "kind": "condition",
+                        "name": "Reply Route",
+                        "description": "",
+                        "ui": {"position": {"x": 240, "y": 0}},
+                        "reads": [{"state": "route_to_a", "required": True}],
+                        "writes": [],
+                        "config": {
+                            "branches": ["true", "false"],
+                            "loopLimit": 1,
+                            "branchMapping": {},
+                            "rule": {"source": "route_to_a", "operator": "==", "value": True},
+                        },
+                    },
+                    "writer_a": {
+                        "kind": "agent",
+                        "name": "Writer A",
+                        "description": "",
+                        "ui": {"position": {"x": 480, "y": -100}},
+                        "reads": [],
+                        "writes": [{"state": "final_reply", "mode": "replace"}],
+                        "config": {
+                            "skills": [],
+                            "taskInstruction": "",
+                            "modelSource": "global",
+                            "model": "",
+                            "thinkingMode": "on",
+                            "temperature": 0.2,
+                        },
+                    },
+                    "writer_b": {
+                        "kind": "agent",
+                        "name": "Writer B",
+                        "description": "",
+                        "ui": {"position": {"x": 480, "y": 100}},
+                        "reads": [],
+                        "writes": [{"state": "final_reply", "mode": "replace"}],
+                        "config": {
+                            "skills": [],
+                            "taskInstruction": "",
+                            "modelSource": "global",
+                            "model": "",
+                            "thinkingMode": "on",
+                            "temperature": 0.2,
+                        },
+                    },
+                    "show_answer": {
+                        "kind": "output",
+                        "name": "Show Answer",
+                        "description": "",
+                        "ui": {"position": {"x": 760, "y": 0}},
+                        "reads": [{"state": "final_reply", "required": True}],
+                        "writes": [],
+                        "config": {
+                            "displayMode": "auto",
+                            "persistEnabled": False,
+                            "persistFormat": "auto",
+                            "fileNameTemplate": "",
+                        },
+                    },
+                },
+                "edges": [
+                    {"source": "input_route", "target": "reply_route"},
+                    {"source": "writer_a", "target": "show_answer"},
+                    {"source": "writer_b", "target": "show_answer"},
+                ],
+                "conditional_edges": [
+                    {
+                        "source": "reply_route",
+                        "branches": {
+                            "true": "writer_a",
+                            "false": "writer_b",
+                        },
+                    }
+                ],
+                "metadata": {},
+            }
+        )
+
+        validation = validate_graph(graph)
+        self.assertTrue(validation.valid, validation.model_dump())
+        plan = compile_graph_to_langgraph_plan(graph)
+        self.assertEqual(plan.requirements.unsupported_reasons, [])
+
     def test_agent_prompt_ignores_legacy_system_instruction_and_keeps_graph_state_inputs(self):
         graph = _load_cycle_counter_demo_graph()
         node = graph.nodes["increment_counter"]

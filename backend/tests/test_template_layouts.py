@@ -289,6 +289,20 @@ class TemplateLayoutTests(unittest.TestCase):
             "direct_reply",
             "denied_reply",
             "final_reply",
+            "companion_session_summary",
+            "companion_profile_json",
+            "companion_policy_json",
+            "companion_memories_json",
+            "companion_session_summary_json",
+            "companion_profile_next",
+            "companion_policy_next",
+            "companion_memories_next",
+            "companion_session_summary_next",
+            "companion_memory_update_result",
+            "companion_profile_write_result",
+            "companion_policy_write_result",
+            "companion_memories_write_result",
+            "companion_session_summary_write_result",
         ]:
             self.assertIn(state_name, state_by_name)
 
@@ -302,6 +316,18 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertIn("tool_execution_agent", template.nodes)
         self.assertIn("assess_tool_result", template.nodes)
         self.assertIn("continue_tool_loop_check", template.nodes)
+        self.assertIn("read_companion_profile", template.nodes)
+        self.assertIn("read_companion_policy", template.nodes)
+        self.assertIn("read_companion_memories", template.nodes)
+        self.assertIn("read_companion_session_summary", template.nodes)
+        self.assertIn("curate_companion_memory", template.nodes)
+        self.assertIn("write_companion_profile", template.nodes)
+        self.assertIn("write_companion_policy", template.nodes)
+        self.assertIn("write_companion_memories", template.nodes)
+        self.assertIn("write_companion_session_summary", template.nodes)
+        self.assertNotIn("input_companion_profile", template.nodes)
+        self.assertNotIn("input_companion_policy", template.nodes)
+        self.assertNotIn("input_companion_memory_context", template.nodes)
         self.assertEqual(template.metadata.get("interrupt_after"), ["request_approval_agent"])
 
         decision_node = template.nodes["decide_next_skill"]
@@ -342,6 +368,10 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertIn(state_by_name["tool_input"], [binding.state for binding in tool_executor.reads])
         self.assertIn(state_by_name["tool_result"], [binding.state for binding in tool_executor.writes])
 
+        self.assertIn(state_by_name["final_reply"], [binding.state for binding in template.nodes["compose_direct_reply"].writes])
+        self.assertIn(state_by_name["final_reply"], [binding.state for binding in template.nodes["compose_denied_reply"].writes])
+        self.assertIn(state_by_name["final_reply"], [binding.state for binding in template.nodes["assess_tool_result"].writes])
+
         conditional_edges = {edge.source: edge.branches for edge in template.conditional_edges}
         self.assertEqual(
             conditional_edges["missing_skill_check"],
@@ -379,8 +409,8 @@ class TemplateLayoutTests(unittest.TestCase):
             conditional_edges["continue_tool_loop_check"],
             {
                 "true": "decide_next_skill",
-                "false": "output_final_reply",
-                "exhausted": "output_final_reply",
+                "false": "curate_companion_memory",
+                "exhausted": "curate_companion_memory",
             },
         )
 
@@ -410,6 +440,19 @@ class TemplateLayoutTests(unittest.TestCase):
         )
         self.assertEqual(template.nodes["continue_tool_loop_check"].config.rule.value, True)
         self.assertEqual(template.nodes["continue_tool_loop_check"].config.loop_limit, 3)
+
+        memory_curator = template.nodes["curate_companion_memory"]
+        self.assertIn(state_by_name["final_reply"], [binding.state for binding in memory_curator.reads])
+        self.assertNotIn(state_by_name["final_reply"], [binding.state for binding in memory_curator.writes])
+        self.assertIn(state_by_name["companion_memory_update_result"], [binding.state for binding in memory_curator.writes])
+        profile_writer = template.nodes["write_companion_profile"]
+        self.assertEqual(profile_writer.config.skills, ["local_file"])
+        self.assertEqual(profile_writer.config.skill_bindings[0].skill_key, "local_file")
+        self.assertEqual(profile_writer.config.skill_bindings[0].config.get("operation"), "write_json")
+        self.assertEqual(
+            profile_writer.config.skill_bindings[0].config.get("changed_by"),
+            "companion_agentic_tool_loop_template",
+        )
 
     def test_web_research_loop_template_models_generic_search_retry_flow(self):
         template = next(

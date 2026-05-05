@@ -5,6 +5,7 @@ import type { RunDetail } from "../types/run.ts";
 import type { AgentNode, InputNode, TemplateRecord } from "../types/node-system.ts";
 
 import {
+  COMPANION_TEMPLATE_ID,
   COMPANION_MODE_OPTIONS,
   COMPANION_MODE_STATE_KEY,
   COMPANION_REPLY_STATE_KEY,
@@ -13,6 +14,7 @@ import {
   resolveCompanionMode,
   resolveCompanionReplyText,
 } from "./companionChatGraph.ts";
+import type { SkillDefinition } from "../types/skills.ts";
 
 function createTemplate(): TemplateRecord {
   return {
@@ -161,6 +163,137 @@ function createTemplate(): TemplateRecord {
   };
 }
 
+function createAgenticTemplate(): TemplateRecord {
+  return {
+    template_id: "companion_agentic_tool_loop",
+    label: "桌宠自主工具循环",
+    description: "Agentic companion loop",
+    default_graph_name: "桌宠自主工具循环",
+    state_schema: {
+      state_1: { name: "user_message", description: "", type: "text", value: "", color: "#9a3412" },
+      state_2: { name: "conversation_history", description: "", type: "markdown", value: "", color: "#0f766e" },
+      state_3: { name: "page_context", description: "", type: "markdown", value: "", color: "#2563eb" },
+      state_7: { name: "skill_catalog_snapshot", description: "", type: "json", value: [], color: "#1d4ed8" },
+      state_16: { name: "approval_prompt", description: "", type: "markdown", value: "", color: "#ea580c" },
+      state_25: { name: "direct_reply", description: "", type: "markdown", value: "", color: "#d97706" },
+      state_26: { name: "denied_reply", description: "", type: "markdown", value: "", color: "#a16207" },
+      state_27: { name: "final_reply", description: "", type: "markdown", value: "", color: "#4f46e5" },
+    },
+    nodes: {
+      input_user_message: {
+        kind: "input",
+        name: "input_user_message",
+        description: "",
+        ui: { position: { x: 80, y: 80 }, collapsed: false },
+        reads: [],
+        writes: [{ state: "state_1", mode: "replace" }],
+        config: { value: "" },
+      },
+      input_conversation_history: {
+        kind: "input",
+        name: "input_conversation_history",
+        description: "",
+        ui: { position: { x: 80, y: 500 }, collapsed: false },
+        reads: [],
+        writes: [{ state: "state_2", mode: "replace" }],
+        config: { value: "" },
+      },
+      input_page_context: {
+        kind: "input",
+        name: "input_page_context",
+        description: "",
+        ui: { position: { x: 80, y: 920 }, collapsed: false },
+        reads: [],
+        writes: [{ state: "state_3", mode: "replace" }],
+        config: { value: "" },
+      },
+      input_skill_catalog_snapshot: {
+        kind: "input",
+        name: "input_skill_catalog_snapshot",
+        description: "",
+        ui: { position: { x: 80, y: 1340 }, collapsed: false },
+        reads: [],
+        writes: [{ state: "state_7", mode: "replace" }],
+        config: { value: [] },
+      },
+      request_approval_agent: {
+        kind: "agent",
+        name: "request_approval_agent",
+        description: "",
+        ui: { position: { x: 760, y: 80 }, collapsed: false },
+        reads: [],
+        writes: [{ state: "state_16", mode: "replace" }],
+        config: {
+          skills: [],
+          skillBindings: [],
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "medium",
+          temperature: 0.2,
+        },
+      },
+      output_final_reply: {
+        kind: "output",
+        name: "output_final_reply",
+        description: "",
+        ui: { position: { x: 1440, y: 80 }, collapsed: false },
+        reads: [{ state: "state_27", required: false }],
+        writes: [],
+        config: {
+          displayMode: "markdown",
+          persistEnabled: false,
+          persistFormat: "auto",
+          fileNameTemplate: "",
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {
+      interrupt_after: ["request_approval_agent"],
+    },
+  };
+}
+
+function createSkillDefinition(overrides: Partial<SkillDefinition> = {}): SkillDefinition {
+  return {
+    skillKey: "web_search",
+    label: "Web Search",
+    description: "Search the public web.",
+    schemaVersion: "graphite.skill/v1",
+    version: "1.0.0",
+    runPolicies: {
+      default: { discoverable: true, autoSelectable: false, requiresApproval: false },
+      origins: {
+        companion: { discoverable: true, autoSelectable: true, requiresApproval: true },
+      },
+    },
+    kind: "atomic",
+    mode: "tool",
+    scope: "node",
+    permissions: ["network", "secret_read"],
+    runtime: { type: "python", entrypoint: "run.py", timeoutSeconds: 10 },
+    health: { type: "none" },
+    inputSchema: [{ key: "query", label: "Query", valueType: "text", required: true, description: "" }],
+    outputSchema: [{ key: "citations", label: "Citations", valueType: "json", required: false, description: "" }],
+    supportedValueTypes: ["text", "json", "markdown"],
+    sideEffects: ["network", "secret_read"],
+    agentNodeEligibility: "ready",
+    agentNodeBlockers: [],
+    sourceFormat: "native",
+    sourceScope: "installed",
+    sourcePath: "skill/web_search/skill.json",
+    runtimeReady: true,
+    runtimeRegistered: true,
+    configured: true,
+    healthy: true,
+    status: "active",
+    canManage: true,
+    ...overrides,
+  };
+}
+
 function assertInputNode(node: TemplateRecord["nodes"][string]): asserts node is InputNode {
   assert.equal(node.kind, "input");
 }
@@ -206,6 +339,42 @@ test("resolveCompanionMode accepts approval and falls back from unavailable tier
   assert.equal(resolveCompanionMode("approval"), "approval");
   assert.equal(resolveCompanionMode("unrestricted"), "advisory");
   assert.equal(resolveCompanionMode("unknown"), "advisory");
+});
+
+test("companion pet defaults to the agentic tool loop template", () => {
+  assert.equal(COMPANION_TEMPLATE_ID, "companion_agentic_tool_loop");
+});
+
+test("buildCompanionChatGraph injects the real skill catalog and disables autonomous selection in advisory mode", () => {
+  const graph = buildCompanionChatGraph(createAgenticTemplate(), {
+    userMessage: "帮我搜索最新资料",
+    history: [],
+    pageContext: "当前路径: /editor",
+    companionMode: "advisory",
+    skillCatalog: [createSkillDefinition()],
+  });
+
+  const catalog = graph.state_schema.state_7.value as SkillDefinition[];
+  assert.equal(graph.name, "桌宠自主工具循环");
+  assert.equal(catalog[0].skillKey, "web_search");
+  assert.equal(catalog[0].runPolicies.origins.companion.autoSelectable, false);
+  assertInputNode(graph.nodes.input_skill_catalog_snapshot);
+  assert.deepEqual(graph.nodes.input_skill_catalog_snapshot.config.value, catalog);
+});
+
+test("buildCompanionChatGraph keeps companion auto-select policy in approval mode and uses the approval breakpoint", () => {
+  const graph = buildCompanionChatGraph(createAgenticTemplate(), {
+    userMessage: "帮我搜索最新资料",
+    history: [],
+    pageContext: "当前路径: /editor",
+    companionMode: "approval",
+    skillCatalog: [createSkillDefinition()],
+  });
+
+  const catalog = graph.state_schema.state_7.value as SkillDefinition[];
+  assert.equal(catalog[0].runPolicies.origins.companion.autoSelectable, true);
+  assert.deepEqual(graph.metadata.interrupt_after, ["request_approval_agent"]);
+  assert.deepEqual(graph.metadata.agent_breakpoint_timing, { request_approval_agent: "after" });
 });
 
 test("buildCompanionChatGraph injects the current message, history, and page context", () => {
