@@ -30,8 +30,9 @@ export type SkillRunPolicies = {
 
 export type SkillDefinition = {
   skillKey: string;
-  label: string;
+  name: string;
   description: string;
+  agentInstruction: string;
   schemaVersion: string;
   version: string;
   runPolicies: SkillRunPolicies;

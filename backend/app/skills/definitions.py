@@ -116,12 +116,14 @@ def _load_managed_skill_records() -> list[SkillDefinitionRecord]:
 def _parse_native_skill_manifest(path: Path, source_scope: SkillSourceScope) -> SkillDefinitionRecord:
     payload = json.loads(path.read_text(encoding="utf-8"))
     _reject_legacy_targets(payload)
+    _reject_legacy_label(payload)
     skill_key = str(payload.get("skillKey") or payload.get("skill_key") or path.parent.name)
-    label = str(payload.get("label") or payload.get("name") or skill_key)
+    name = str(payload.get("name") or skill_key)
     definition = SkillDefinition(
         skillKey=skill_key,
-        label=label,
+        name=name,
         description=str(payload.get("description") or "").strip(),
+        agentInstruction=str(payload.get("agentInstruction") or payload.get("agent_instruction") or "").strip(),
         schemaVersion=str(payload.get("schemaVersion") or payload.get("schema_version") or ""),
         version=str(payload.get("version") or ""),
         runPolicies=_parse_run_policies(payload.get("runPolicies") or payload.get("run_policies")),
@@ -155,9 +157,10 @@ def _parse_skill_file(path: Path, source_format: SkillSourceFormat, source_scope
     payload = yaml.safe_load(frontmatter) or {}
     graphite = payload.get("graphite") or {}
     _reject_legacy_targets(graphite)
+    _reject_legacy_label(graphite)
 
     skill_key = str(graphite.get("skill_key") or payload.get("name") or path.stem)
-    label = str(payload.get("name") or graphite.get("label") or skill_key)
+    name = str(payload.get("name") or graphite.get("name") or skill_key)
     description = str(payload.get("description") or "").strip()
 
     input_schema = _parse_io_fields(graphite.get("input_schema", []))
@@ -166,8 +169,9 @@ def _parse_skill_file(path: Path, source_format: SkillSourceFormat, source_scope
 
     definition = SkillDefinition(
         skillKey=skill_key,
-        label=label,
+        name=name,
         description=description or body.splitlines()[0].strip() if body.strip() else "",
+        agentInstruction=str(graphite.get("agentInstruction") or graphite.get("agent_instruction") or "").strip(),
         schemaVersion=str(graphite.get("schema_version") or graphite.get("schemaVersion") or ""),
         version=str(graphite.get("version") or payload.get("version") or ""),
         runPolicies=_parse_run_policies(graphite.get("runPolicies") or graphite.get("run_policies")),
@@ -233,6 +237,13 @@ def _reject_legacy_targets(payload: object) -> None:
     if isinstance(payload, dict) and "targets" in payload:
         raise ValueError(
             "Skill manifest field 'targets' is no longer supported. Use runPolicies for run-origin policy."
+        )
+
+
+def _reject_legacy_label(payload: object) -> None:
+    if isinstance(payload, dict) and "label" in payload:
+        raise ValueError(
+            "Skill manifest field 'label' is no longer supported. Use 'name' and put selection guidance in 'description'."
         )
 
 

@@ -15,6 +15,7 @@ import {
 import { setTabScopedRecordEntry } from "./editorTabRuntimeModel.ts";
 import { buildBuiltinNodeCreationEntries } from "./nodeCreationBuiltins.ts";
 import { createNodeFromCreationEntry, createNodeFromDroppedFile } from "./nodeCreationExecution.ts";
+import type { UploadedAssetUploadResult } from "../nodes/uploadedAssetModel.ts";
 import type { WorkspaceRunFeedback } from "./useWorkspaceRunVisualState.ts";
 
 type WorkspaceNodeCreationControllerInput = {
@@ -30,6 +31,7 @@ type WorkspaceNodeCreationControllerInput = {
   ) => void;
   importPythonGraphFile: (file: File, options: { fallbackToFileNode: boolean }) => Promise<boolean>;
   isGraphiteUiPythonExportFile: (file: File) => boolean;
+  uploadFile?: (file: File) => Promise<UploadedAssetUploadResult>;
   now?: () => number;
 };
 
@@ -148,6 +150,7 @@ export function useWorkspaceNodeCreationController(input: WorkspaceNodeCreationC
       const result = await createNodeFromDroppedFile(document, {
         file: payload.file,
         position: payload.position,
+        uploadFile: input.uploadFile,
       });
       input.markDocumentDirty(tabId, result.document);
       input.setMessageFeedbackForTab(tabId, {

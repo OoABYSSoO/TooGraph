@@ -80,8 +80,9 @@ function createSettings(baseUrl = "1"): SettingsPayload {
 function createSkillDefinition(): SkillDefinition {
   return {
     skillKey: "skill_a",
-    label: "Skill",
+    name: "Skill",
     description: "",
+    agentInstruction: "",
     schemaVersion: "graphite.skill/v1",
     version: "1",
     kind: "tool",

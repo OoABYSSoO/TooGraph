@@ -72,6 +72,25 @@ class StateWriteMode(str, Enum):
     APPEND = "append"
 
 
+class NodeSystemStateBindingKind(str, Enum):
+    SKILL_OUTPUT = "skill_output"
+
+
+class NodeSystemStateBindingMetadata(BaseModel):
+    kind: NodeSystemStateBindingKind = NodeSystemStateBindingKind.SKILL_OUTPUT
+    skill_key: str = Field(..., min_length=1, alias="skillKey")
+    node_id: str = Field(..., min_length=1, alias="nodeId")
+    field_key: str = Field(..., min_length=1, alias="fieldKey")
+    managed: bool = True
+
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
+
+    @field_validator("skill_key", "node_id", "field_key")
+    @classmethod
+    def validate_binding_identifier(cls, value: str) -> str:
+        return _validate_identifier(value, label="State binding identifier")
+
+
 class AgentModelSource(str, Enum):
     GLOBAL = "global"
     OVERRIDE = "override"
@@ -118,6 +137,8 @@ class NodeSystemStateDefinition(BaseModel):
     type: NodeSystemStateType = NodeSystemStateType.TEXT
     value: Any = Field(default=None)
     color: str = ""
+    prompt_visible: bool = Field(default=True, alias="promptVisible")
+    binding: NodeSystemStateBindingMetadata | None = None
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
@@ -197,9 +218,27 @@ class NodeSystemAgentSkillBinding(BaseModel):
         return normalized
 
 
+class NodeSystemSkillInstructionBlock(BaseModel):
+    skill_key: str = Field(..., min_length=1, alias="skillKey")
+    title: str = ""
+    content: str = ""
+    source: Literal["skill.agentInstruction", "node.override"] = "skill.agentInstruction"
+
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
+
+    @field_validator("skill_key")
+    @classmethod
+    def validate_skill_key(cls, value: str) -> str:
+        return _validate_identifier(value, label="Skill key")
+
+
 class NodeSystemAgentConfig(BaseModel):
     skills: list[str] = Field(default_factory=list)
     skill_bindings: list[NodeSystemAgentSkillBinding] = Field(default_factory=list, alias="skillBindings")
+    skill_instruction_blocks: dict[str, NodeSystemSkillInstructionBlock] = Field(
+        default_factory=dict,
+        alias="skillInstructionBlocks",
+    )
     task_instruction: str = Field(default="", alias="taskInstruction")
     model_source: AgentModelSource = Field(default=AgentModelSource.GLOBAL, alias="modelSource")
     model: str = ""

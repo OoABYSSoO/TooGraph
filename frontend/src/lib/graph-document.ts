@@ -18,7 +18,6 @@ import type { AgentNode, ConditionNode, GraphDocument, GraphNode, GraphPayload, 
 
 export type AgentBreakpointTiming = "before" | "after";
 
-const DEFAULT_EDITOR_SEED_TEMPLATE_ID = "hello_world";
 const STATE_KEY_COUNTER_METADATA_KEY = "graphiteui_state_key_counter";
 const DEFAULT_MATERIALIZED_STATE_COLORS = [
   "#d97706",
@@ -62,12 +61,7 @@ export function resolveEditorSeedTemplate(
   defaultTemplateId?: string | null,
 ): TemplateRecord | null {
   const rawTemplates = templates.map((template) => toRaw(template) as TemplateRecord);
-  return (
-    rawTemplates.find((template) => template.template_id === defaultTemplateId) ??
-    rawTemplates.find((template) => template.template_id === DEFAULT_EDITOR_SEED_TEMPLATE_ID) ??
-    rawTemplates[0] ??
-    null
-  );
+  return rawTemplates.find((template) => template.template_id === defaultTemplateId) ?? rawTemplates[0] ?? null;
 }
 
 export function createEditorSeedDraftGraph(

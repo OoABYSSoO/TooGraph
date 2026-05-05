@@ -120,18 +120,54 @@
     @attach="emit('attach-skill', $event)"
     @remove="emit('remove-skill', $event)"
   />
-  <textarea
-    class="node-card__surface node-card__surface-textarea"
-    :value="body.taskInstruction"
-    :placeholder="t('nodeCard.nodePromptPlaceholder')"
-    @pointerdown.stop
-    @click.stop
-    @input="emit('task-input', $event)"
-  />
+  <div class="node-card__surface node-card__prompt-surface">
+    <div v-if="skillInstructionBlocks.length > 0" class="node-card__skill-instruction-capsules">
+      <ElPopover
+        v-for="block in skillInstructionBlocks"
+        :key="block.skillKey"
+        placement="top-start"
+        :width="380"
+        trigger="click"
+        :show-arrow="false"
+        :popper-style="agentAddPopoverStyle"
+        popper-class="node-card__agent-add-popover-popper"
+      >
+        <template #reference>
+          <button
+            type="button"
+            class="node-card__skill-instruction-capsule"
+            :title="block.title"
+            @pointerdown.stop
+            @click.stop
+          >
+            {{ block.title }}
+          </button>
+        </template>
+        <div class="node-card__skill-instruction-editor" data-node-popup-surface="true" @pointerdown.stop @click.stop>
+          <div class="node-card__skill-instruction-editor-title">{{ block.title }}</div>
+          <ElInput
+            :model-value="block.content"
+            type="textarea"
+            :autosize="{ minRows: 6, maxRows: 10 }"
+            @update:model-value="emit('update-skill-instruction', { skillKey: block.skillKey, content: String($event) })"
+          />
+        </div>
+      </ElPopover>
+    </div>
+    <textarea
+      class="node-card__surface-textarea"
+      :value="body.taskInstruction"
+      :placeholder="t('nodeCard.nodePromptPlaceholder')"
+      @pointerdown.stop
+      @click.stop
+      @input="emit('task-input', $event)"
+    />
+  </div>
 </template>
 
 <script setup lang="ts">
-import { ref, type CSSProperties } from "vue";
+import { computed, ref, type CSSProperties } from "vue";
+import { ElInput, ElPopover } from "element-plus";
 import { useI18n } from "vue-i18n";
 
 import AgentRuntimeControls from "./AgentRuntimeControls.vue";
@@ -155,7 +191,7 @@ type AgentThinkingOption = {
   label: string;
 };
 
-defineProps<{
+const props = defineProps<{
   nodeId: string;
   body: AgentBodyViewModel;
   orderedInputPorts: NodePortViewModel[];
@@ -227,11 +263,15 @@ const emit = defineEmits<{
   (event: "toggle-skill-picker"): void;
   (event: "attach-skill", skillKey: string): void;
   (event: "remove-skill", skillKey: string): void;
+  (event: "update-skill-instruction", payload: { skillKey: string; content: string }): void;
   (event: "task-input", inputEvent: Event): void;
 }>();
 
 const { t } = useI18n();
 const runtimeControlsRef = ref<{ collapseModelSelect?: () => void } | null>(null);
+const skillInstructionBlocks = computed(() =>
+  Object.values(props.body.skillInstructionBlocks ?? {}).filter((block) => block.content.trim() || block.title.trim()),
+);
 
 function collapseModelSelect() {
   runtimeControlsRef.value?.collapseModelSelect?.();
@@ -279,7 +319,76 @@ defineExpose({
   min-height: 0;
   width: 100%;
   height: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
   resize: none;
   font: inherit;
+  color: inherit;
+  outline: none;
+}
+
+.node-card__prompt-surface {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  cursor: text;
+}
+
+.node-card__skill-instruction-capsules {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  cursor: default;
+}
+
+.node-card__skill-instruction-capsule {
+  max-width: 100%;
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  border-radius: 999px;
+  padding: 5px 10px;
+  background: rgba(239, 246, 255, 0.88);
+  color: #2563eb;
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.node-card__skill-instruction-capsule:hover,
+.node-card__skill-instruction-capsule:focus-visible {
+  border-color: rgba(37, 99, 235, 0.34);
+  background: rgba(219, 234, 254, 0.96);
+  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.12);
+  outline: none;
+}
+
+.node-card__skill-instruction-editor {
+  display: grid;
+  gap: 10px;
+  border: 1px solid rgba(154, 52, 18, 0.14);
+  border-radius: 16px;
+  padding: 12px;
+  background: rgba(255, 250, 241, 0.98);
+  box-shadow: 0 18px 36px rgba(60, 41, 20, 0.14);
+}
+
+.node-card__skill-instruction-editor-title {
+  color: #1f2937;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.node-card__skill-instruction-editor :deep(.el-textarea__inner) {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(154, 52, 18, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(154, 52, 18, 0.08);
 }
 </style>

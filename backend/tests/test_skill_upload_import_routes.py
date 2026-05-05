@@ -30,8 +30,9 @@ def _native_skill_manifest(
     manifest = {
         "schemaVersion": "graphite.skill/v1",
         "skillKey": skill_key,
-        "label": "Video Understanding" if skill_key == "video_understanding" else skill_key.replace("_", " ").title(),
+        "name": "Video Understanding" if skill_key == "video_understanding" else skill_key.replace("_", " ").title(),
         "description": "Use frame sampling rules to understand a video with image-only model capability.",
+        "agentInstruction": "Prepare the skill input from bound graph state and run the skill.",
         "version": "0.1.0",
         "runPolicies": run_policies
         or {
@@ -190,10 +191,6 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertEqual(
                     sorted(catalog_items),
                     [
-                        "autonomous_decision",
-                        "game_ad_research_collector",
-                        "local_file",
-                        "web_media_downloader",
                         "web_search",
                     ],
                 )
@@ -211,48 +208,6 @@ class SkillUploadImportRouteTests(unittest.TestCase):
                 self.assertTrue(catalog_items["web_search"]["runtimeRegistered"])
                 self.assertTrue(source_path["web_search"].endswith("/skill/web_search/skill.json"))
                 self.assertNotIn("compatibility", catalog_items["web_search"])
-                self.assertEqual(catalog_items["local_file"]["sourceFormat"], "skill")
-                self.assertEqual(catalog_items["local_file"]["sourceScope"], "installed")
-                self.assertNotIn("targets", catalog_items["local_file"])
-                self.assertFalse(catalog_items["local_file"]["runPolicies"]["default"]["discoverable"])
-                self.assertTrue(catalog_items["local_file"]["runtimeReady"])
-                self.assertTrue(catalog_items["local_file"]["runtimeRegistered"])
-                self.assertTrue(source_path["local_file"].endswith("/skill/local_file/skill.json"))
-                self.assertNotIn("compatibility", catalog_items["local_file"])
-                self.assertEqual(catalog_items["web_media_downloader"]["sourceFormat"], "skill")
-                self.assertEqual(catalog_items["web_media_downloader"]["sourceScope"], "installed")
-                self.assertNotIn("targets", catalog_items["web_media_downloader"])
-                self.assertTrue(catalog_items["web_media_downloader"]["runPolicies"]["default"]["discoverable"])
-                self.assertFalse(
-                    catalog_items["web_media_downloader"]["runPolicies"]["origins"]["companion"]["autoSelectable"]
-                )
-                self.assertTrue(catalog_items["web_media_downloader"]["runtimeReady"])
-                self.assertTrue(catalog_items["web_media_downloader"]["runtimeRegistered"])
-                self.assertTrue(source_path["web_media_downloader"].endswith("/skill/web_media_downloader/skill.json"))
-                self.assertNotIn("compatibility", catalog_items["web_media_downloader"])
-                self.assertEqual(catalog_items["game_ad_research_collector"]["sourceFormat"], "skill")
-                self.assertEqual(catalog_items["game_ad_research_collector"]["sourceScope"], "installed")
-                self.assertNotIn("targets", catalog_items["game_ad_research_collector"])
-                self.assertTrue(catalog_items["game_ad_research_collector"]["runPolicies"]["default"]["discoverable"])
-                self.assertTrue(catalog_items["game_ad_research_collector"]["runtimeReady"])
-                self.assertTrue(catalog_items["game_ad_research_collector"]["runtimeRegistered"])
-                self.assertTrue(
-                    source_path["game_ad_research_collector"].endswith(
-                        "/skill/game_ad_research_collector/skill.json"
-                    )
-                )
-                self.assertNotIn("compatibility", catalog_items["game_ad_research_collector"])
-                self.assertEqual(catalog_items["autonomous_decision"]["sourceFormat"], "skill")
-                self.assertEqual(catalog_items["autonomous_decision"]["sourceScope"], "installed")
-                self.assertNotIn("targets", catalog_items["autonomous_decision"])
-                self.assertFalse(catalog_items["autonomous_decision"]["runPolicies"]["default"]["discoverable"])
-                self.assertFalse(
-                    catalog_items["autonomous_decision"]["runPolicies"]["origins"]["companion"]["autoSelectable"]
-                )
-                self.assertTrue(catalog_items["autonomous_decision"]["runtimeReady"])
-                self.assertTrue(catalog_items["autonomous_decision"]["runtimeRegistered"])
-                self.assertTrue(source_path["autonomous_decision"].endswith("/skill/autonomous_decision/skill.json"))
-                self.assertNotIn("compatibility", catalog_items["autonomous_decision"])
 
     def test_native_skill_json_upload_imports_installed_skill_package(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

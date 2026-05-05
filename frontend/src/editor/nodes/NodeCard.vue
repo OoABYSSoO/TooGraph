@@ -271,6 +271,7 @@
         @toggle-skill-picker="toggleSkillPicker"
         @attach-skill="attachAgentSkill"
         @remove-skill="removeAgentSkill"
+        @update-skill-instruction="handleSkillInstructionInput"
         @task-input="handleAgentTaskInstructionInput"
       />
     </section>
@@ -1091,7 +1092,12 @@ function attachAgentSkill(skillKey: string) {
   if (props.node.kind !== "agent") {
     return;
   }
-  const patch = resolveAttachAgentSkillPatch(props.node.config.skills, skillKey);
+  const patch = resolveAttachAgentSkillPatch(
+    props.node.config.skills,
+    skillKey,
+    props.skillDefinitions,
+    props.node.config.skillInstructionBlocks ?? {},
+  );
   if (!patch) {
     return;
   }
@@ -1106,11 +1112,39 @@ function removeAgentSkill(skillKey: string) {
   if (props.node.kind !== "agent") {
     return;
   }
-  const patch = resolveRemoveAgentSkillPatch(props.node.config.skills, skillKey);
+  const patch = resolveRemoveAgentSkillPatch(
+    props.node.config.skills,
+    skillKey,
+    props.node.config.skillInstructionBlocks ?? {},
+  );
   if (!patch) {
     return;
   }
   emitAgentConfigPatch(patch);
+}
+
+function handleSkillInstructionInput(payload: { skillKey: string; content: string }) {
+  if (guardLockedGraphInteraction()) {
+    return;
+  }
+  if (props.node.kind !== "agent") {
+    return;
+  }
+  const currentBlocks = props.node.config.skillInstructionBlocks ?? {};
+  const currentBlock = currentBlocks[payload.skillKey];
+  if (!currentBlock) {
+    return;
+  }
+  emitAgentConfigPatch({
+    skillInstructionBlocks: {
+      ...currentBlocks,
+      [payload.skillKey]: {
+        ...currentBlock,
+        content: payload.content,
+        source: "node.override",
+      },
+    },
+  });
 }
 
 function openPortStateCreate(side: "input" | "output") {

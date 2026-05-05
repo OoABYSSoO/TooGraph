@@ -68,6 +68,7 @@ export type NodeCardViewModel = {
     | {
         kind: "agent";
         taskInstruction: string;
+        skillInstructionBlocks: NonNullable<Extract<GraphNode, { kind: "agent" }>["config"]["skillInstructionBlocks"]>;
         modelLabel: string;
         thinkingLabel: string;
         skillLabel: string;
@@ -178,6 +179,7 @@ function buildBody(
     return {
       kind: "agent",
       taskInstruction: node.config.taskInstruction?.trim() || "",
+      skillInstructionBlocks: node.config.skillInstructionBlocks ?? {},
       modelLabel: resolveAgentModelLabel(node),
       thinkingLabel: resolveThinkingLabel(node),
       skillLabel: node.config.skills.length > 0 ? `${node.config.skills.length} skill${node.config.skills.length > 1 ? "s" : ""}` : "No skills",

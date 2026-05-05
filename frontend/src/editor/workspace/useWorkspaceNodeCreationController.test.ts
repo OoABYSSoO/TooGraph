@@ -81,6 +81,12 @@ function createHarness(options: { locked?: boolean; importPythonGraph?: boolean 
       return Boolean(options.importPythonGraph);
     },
     isGraphiteUiPythonExportFile: (file) => file.name.endsWith(".py"),
+    uploadFile: async (file) => ({
+      local_path: `uploads/${file.name}`,
+      filename: file.name,
+      content_type: file.type || "application/octet-stream",
+      size: file.size,
+    }),
     now: () => 1234,
   });
 

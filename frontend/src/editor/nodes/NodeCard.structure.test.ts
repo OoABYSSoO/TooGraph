@@ -338,8 +338,8 @@ test("NodeCard keeps skill actions below the agent while creating ports from plu
   assert.match(componentSource, /from "\.\/skillPickerModel";/);
   assert.match(componentSource, /resolveAttachAgentSkillPatch/);
   assert.match(componentSource, /resolveRemoveAgentSkillPatch/);
-  assert.match(componentSource, /const patch = resolveAttachAgentSkillPatch\(props\.node\.config\.skills, skillKey\);/);
-  assert.match(componentSource, /const patch = resolveRemoveAgentSkillPatch\(props\.node\.config\.skills, skillKey\);/);
+  assert.match(componentSource, /const patch = resolveAttachAgentSkillPatch\(\s*props\.node\.config\.skills,\s*skillKey,\s*props\.skillDefinitions,\s*props\.node\.config\.skillInstructionBlocks \?\? \{\},\s*\);/);
+  assert.match(componentSource, /const patch = resolveRemoveAgentSkillPatch\(\s*props\.node\.config\.skills,\s*skillKey,\s*props\.node\.config\.skillInstructionBlocks \?\? \{\},\s*\);/);
   assert.match(componentSource, /function attachAgentSkill\(skillKey: string\) \{[\s\S]*if \(!patch\) \{[\s\S]*return;[\s\S]*\}[\s\S]*emitAgentConfigPatch\(patch\);/);
   assert.match(componentSource, /function removeAgentSkill\(skillKey: string\) \{[\s\S]*if \(!patch\) \{[\s\S]*return;[\s\S]*\}[\s\S]*emitAgentConfigPatch\(patch\);/);
   assert.doesNotMatch(componentSource, /props\.node\.config\.skills\.includes\(skillKey\)/);

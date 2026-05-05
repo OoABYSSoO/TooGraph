@@ -8,8 +8,9 @@ import { buildSkillOverview, buildSkillStatusOptions, filterSkillsForManagement 
 const skills: SkillDefinition[] = [
   {
     skillKey: "rewrite_text",
-    label: "Rewrite Text",
+    name: "Rewrite Text",
     description: "Rewrite text with a specified style.",
+    agentInstruction: "Rewrite the provided text.",
     schemaVersion: "graphite.skill/v1",
     inputSchema: [{ key: "text", label: "Text", valueType: "text", required: true, description: "Source text" }],
     outputSchema: [{ key: "rewritten", label: "Rewritten", valueType: "text", required: false, description: "Result" }],
@@ -40,8 +41,9 @@ const skills: SkillDefinition[] = [
   },
   {
     skillKey: "draft_search",
-    label: "Draft Search",
+    name: "Draft Search",
     description: "Installed skill that still needs a runtime manifest.",
+    agentInstruction: "",
     schemaVersion: "graphite.skill/v1",
     inputSchema: [],
     outputSchema: [],
@@ -74,8 +76,9 @@ const skills: SkillDefinition[] = [
   },
   {
     skillKey: "desktop_companion_profile",
-    label: "Desktop Companion Profile",
+    name: "Desktop Companion Profile",
     description: "A companion context profile.",
+    agentInstruction: "",
     schemaVersion: "graphite.skill/v1",
     inputSchema: [],
     outputSchema: [],

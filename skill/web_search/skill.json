@@ -1,8 +1,9 @@
 {
   "schemaVersion": "graphite.skill/v1",
   "skillKey": "web_search",
-  "label": "Web Search",
-  "description": "Search the public web and return cited results for agent reasoning.",
+  "name": "联网搜索",
+  "description": "当用户需要最新信息、新闻、版本内容、价格、外部事实核验、网页证据或公开资料检索时选择此技能。此技能只负责搜索、可选抓取网页正文、返回引用 URL 与本地 artifact 路径，不负责最终总结。",
+  "agentInstruction": "你已绑定联网搜索技能，因此本节点需要运行它。根据当前输入判断最合适的搜索 query、max_results、search_depth，以及是否需要 fetch_pages。只为技能准备输入并执行技能；不要在本节点整理、评价或总结搜索结果。技能结果会通过绑定 state 透传给下游节点。",
   "version": "1.0.0",
   "runPolicies": {
     "default": {
@@ -111,10 +112,10 @@
       "description": "Local date when the search was executed, useful for recency-sensitive answers."
     },
     {
-      "key": "summary",
-      "label": "Summary",
+      "key": "search_brief",
+      "label": "Search Brief",
       "valueType": "markdown",
-      "description": "Short answer or compact result summary."
+      "description": "Provider answer or compact search-result brief. It is evidence context, not the final user-facing summary."
     },
     {
       "key": "context",
@@ -135,10 +136,28 @@
       "description": "Compact citation list with index, title, and URL."
     },
     {
+      "key": "source_urls",
+      "label": "Source URLs",
+      "valueType": "json",
+      "description": "Flat URL list returned by the search results for downstream state binding."
+    },
+    {
       "key": "source_documents",
       "label": "Source Documents",
       "valueType": "json",
       "description": "Fetched page document references with local artifact paths, URLs, titles, and fetch status."
+    },
+    {
+      "key": "artifact_paths",
+      "label": "Artifact Paths",
+      "valueType": "json",
+      "description": "Flat local artifact path list for fetched readable page documents."
+    },
+    {
+      "key": "errors",
+      "label": "Errors",
+      "valueType": "json",
+      "description": "Structured error list collected during search or page fetch."
     },
     {
       "key": "error",

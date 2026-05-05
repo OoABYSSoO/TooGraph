@@ -9,9 +9,13 @@ const currentDirectory = dirname(currentFilePath);
 const mainSource = readFileSync(resolve(currentDirectory, "../main.ts"), "utf8");
 const basePath = resolve(currentDirectory, "base.css");
 
+function readBaseSource() {
+  return readFileSync(basePath, "utf8").replaceAll("\r\n", "\n");
+}
+
 test("global base styles remove browser chrome gaps around the app shell", () => {
   assert.equal(existsSync(basePath), true);
-  const baseSource = readFileSync(basePath, "utf8");
+  const baseSource = readBaseSource();
   assert.match(mainSource, /import "\.\/styles\/base\.css";/);
   assert.match(baseSource, /html,\nbody,\n#app \{[\s\S]*width:\s*100%;[\s\S]*min-height:\s*100%;/);
   assert.match(baseSource, /body \{[\s\S]*margin:\s*0;/);
@@ -20,7 +24,7 @@ test("global base styles remove browser chrome gaps around the app shell", () =>
 
 test("global base styles define the Graphite visual system tokens", () => {
   assert.equal(existsSync(basePath), true);
-  const baseSource = readFileSync(basePath, "utf8");
+  const baseSource = readBaseSource();
 
   assert.match(baseSource, /--graphite-font-ui:/);
   assert.match(baseSource, /--graphite-font-display:/);
@@ -38,7 +42,7 @@ test("global base styles define the Graphite visual system tokens", () => {
 
 test("global base styles define liquid glass light and lensing layers", () => {
   assert.equal(existsSync(basePath), true);
-  const baseSource = readFileSync(basePath, "utf8");
+  const baseSource = readBaseSource();
   const glassBgDeclaration = baseSource.match(/--graphite-glass-bg:[^;]+;/)?.[0] ?? "";
   const strongGlassBgDeclaration = baseSource.match(/--graphite-glass-bg-strong:[^;]+;/)?.[0] ?? "";
   const lensDeclaration = baseSource.match(/--graphite-glass-lens:[\s\S]*?;/)?.[0] ?? "";
@@ -60,7 +64,7 @@ test("global base styles define liquid glass light and lensing layers", () => {
 
 test("global base styles provide semantic run status badge variables", () => {
   assert.equal(existsSync(basePath), true);
-  const baseSource = readFileSync(basePath, "utf8");
+  const baseSource = readBaseSource();
 
   assert.match(baseSource, /\.graphite-status-badge \{[\s\S]*--graphite-status-bg:/);
   assert.match(baseSource, /\.graphite-status-badge--completed \{[\s\S]*--graphite-status-bg:/);

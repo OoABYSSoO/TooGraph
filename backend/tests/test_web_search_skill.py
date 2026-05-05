@@ -74,9 +74,10 @@ class WebSearchSkillTests(unittest.TestCase):
         )
         self.assertEqual(result["status"], "succeeded")
         self.assertEqual(result["provider"], "tavily")
-        self.assertEqual(result["summary"], "GraphiteUI is a visual workflow studio.")
+        self.assertEqual(result["search_brief"], "GraphiteUI is a visual workflow studio.")
         self.assertEqual(result["result_count"], 1)
         self.assertEqual(result["results"][0]["title"], "GraphiteUI Docs")
+        self.assertEqual(result["source_urls"], ["https://example.com/docs"])
         self.assertEqual(result["citations"], [{"index": 1, "title": "GraphiteUI Docs", "url": "https://example.com/docs"}])
         self.assertIn("[1] GraphiteUI Docs", result["context"])
 
@@ -108,7 +109,8 @@ class WebSearchSkillTests(unittest.TestCase):
         self.assertRegex(result["searched_at"], r"^\d{4}-\d{2}-\d{2}T")
         self.assertRegex(result["searched_date"], r"^\d{4}-\d{2}-\d{2}$")
         self.assertEqual(result["results"][0]["url"], "https://example.org/fallback")
-        self.assertIn("Fallback Result", result["summary"])
+        self.assertEqual(result["source_urls"], ["https://example.org/fallback"])
+        self.assertIn("Fallback Result", result["search_brief"])
         self.assertIn("Search date:", result["context"])
 
     def test_web_search_skill_fetches_pages_to_local_artifacts_when_requested(self) -> None:
@@ -160,6 +162,7 @@ class WebSearchSkillTests(unittest.TestCase):
                 self.assertEqual(len(result["source_documents"]), 1)
                 self.assertEqual(result["source_documents"][0]["local_path"], "run_1/searcher/web_search/invocation_001/doc_001.md")
                 self.assertEqual(result["source_documents"][0]["url"], article_url)
+                self.assertEqual(result["artifact_paths"], ["run_1/searcher/web_search/invocation_001/doc_001.md"])
                 self.assertTrue(document_path.is_file())
                 self.assertIn("Detailed evidence paragraph", document_path.read_text(encoding="utf-8"))
                 self.assertIn("Local document: run_1/searcher/web_search/invocation_001/doc_001.md", result["context"])
@@ -174,6 +177,7 @@ class WebSearchSkillTests(unittest.TestCase):
         self.assertEqual(result["status"], "failed")
         self.assertEqual(result["result_count"], 0)
         self.assertEqual(result["results"], [])
+        self.assertEqual(result["errors"], ["Search query is required."])
         self.assertIn("query", result["error"].lower())
 
     def test_web_search_skill_is_runtime_registered(self) -> None:

@@ -26,17 +26,17 @@ test("resolveEditorRouteInstruction opens a template draft on initial /editor/ne
   const instruction = resolveEditorRouteInstruction({
     routeMode: "new",
     routeGraphId: null,
-    defaultTemplateId: "hello_world",
+    defaultTemplateId: "starter_graph",
     restoreRunId: null,
     restoreSnapshotId: null,
     activeTabRouteSignature: null,
-    routeSignature: "new:hello_world",
+    routeSignature: "new:starter_graph",
     handledRouteSignature: null,
   });
 
   assert.deepEqual(instruction, {
     type: "open-new",
-    templateId: "hello_world",
+    templateId: "starter_graph",
     navigation: "replace",
   });
 });
@@ -104,12 +104,12 @@ test("resolveEditorRouteInstruction does nothing when the route signature was al
   const instruction = resolveEditorRouteInstruction({
     routeMode: "new",
     routeGraphId: null,
-    defaultTemplateId: "hello_world",
+    defaultTemplateId: "starter_graph",
     restoreRunId: null,
     restoreSnapshotId: null,
     activeTabRouteSignature: null,
-    routeSignature: "new:hello_world",
-    handledRouteSignature: "new:hello_world",
+    routeSignature: "new:starter_graph",
+    handledRouteSignature: "new:starter_graph",
   });
 
   assert.deepEqual(instruction, {
@@ -138,11 +138,11 @@ test("resolveEditorRouteInstruction does nothing when the active tab already mat
   const instruction = resolveEditorRouteInstruction({
     routeMode: "new",
     routeGraphId: null,
-    defaultTemplateId: "hello_world",
+    defaultTemplateId: "starter_graph",
     restoreRunId: null,
     restoreSnapshotId: null,
-    activeTabRouteSignature: "new:hello_world",
-    routeSignature: "new:hello_world",
+    activeTabRouteSignature: "new:starter_graph",
+    routeSignature: "new:starter_graph",
     handledRouteSignature: "existing:graph_123",
   });
 

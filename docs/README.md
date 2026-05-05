@@ -7,31 +7,27 @@
 - [current_project_status.md](current_project_status.md)
   - 当前正式能力
   - 当前技术栈
-  - 当前仍在路线图中的事项
-  - GraphiteUI 项目知识库导入源之一
+  - 当前技能和模板状态
+  - 近期仍在路线图中的事项
 
 - [future/companion-autonomous-agent-roadmap.md](future/companion-autonomous-agent-roadmap.md)
-  - 桌宠、自主工具循环、技能生成和长期协作能力的唯一参考文档
-  - 包含 graph-first 运行模型、`runPolicies` 技能契约、自主决策 skill、function call 取舍、缺工具处理和 `graphite_skill_builder` 路线
-  - 后续桌宠 Agent、图操作审批和自主工具循环设计都应先合并进这份文档
+  - 桌宠、自主工具循环、技能生成和长期协作能力的唯一长期参考
+  - 包含 graph-first 运行模型、skill manifest 契约、skill state、技能说明胶囊、技能绑定 state、`autonomous_decision`、`graphite_skill_builder` 和 function call 取舍
 
 ## 已清理
 
 - 迁移闭环记录：`task_plan.md`、`findings.md`、`progress.md`
 - 已完成的 agent-only LangGraph runtime 规划文档
 - 已完成或偏离当前 `skill/<skill_key>` 目录主线的旧 skill 重构文档
-- `docs/superpowers/` 下阶段性实施计划、设计草稿和 TDD 执行记录
-- 已完成的架构拆分路线文档
 - 阶段性的外部 Agent 框架对标和 LangGraph 高级能力基线分析
-- 过期或偏离当前 Vue + Element Plus + node_system + 原生 skill 主线的文档
-- 已被 `companion-autonomous-agent-roadmap.md` 合并和替代的桌宠权限、桌宠记忆、旧 skill 分类文档
+- 被新版桌宠自主 Agent 路线图合并和替代的旧权限、记忆和技能分类文档
+- 旧内置模板和旧技能包的说明
 
 ## 维护原则
 
 - README 是项目文档主入口。
 - 当前状态写在 `docs/current_project_status.md`。
 - 桌宠自主 Agent 方向只维护 `docs/future/companion-autonomous-agent-roadmap.md` 这一份长期参考。
-- 如果某份文档只是某个阶段的临时计划，阶段结束后应删除或折叠进当前状态文档。
+- 阶段结束后，临时计划应删除或折叠进当前状态文档。
+- 文档不能把已经拒绝或删除的实现路线写成当前方案。
 - 如果旧文档和 `AGENTS.md` 中的图优先、skill 自包含、显式权限、artifact 输出、审计和记忆卫生准则冲突，以 `AGENTS.md` 为准，并尽快修正文档。
-- 文档不能把已经拒绝的实现路线写成当前方案；仍有参考价值的旧内容应标为补充、约束或历史背景。
-- 新增长期文档时，应明确它服务于当前正式能力、长期设想，还是被更高优先级文档约束的补充方案。

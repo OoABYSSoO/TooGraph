@@ -14,11 +14,11 @@ test("resolveWorkspaceSelectTriggerLabel prefers selected option label", () => {
       value: "graph-1",
       placeholder: "打开已有图",
       options: [
-        { value: "graph-1", label: "Hello World" },
+        { value: "graph-1", label: "Starter Graph" },
         { value: "graph-2", label: "Knowledge Base" },
       ],
     }),
-    "Hello World",
+    "Starter Graph",
   );
 });
 
@@ -27,7 +27,7 @@ test("resolveWorkspaceSelectTriggerLabel falls back to placeholder when empty", 
     resolveWorkspaceSelectTriggerLabel({
       value: "",
       placeholder: "从模板创建",
-      options: [{ value: "hello_world", label: "Hello World" }],
+      options: [{ value: "starter_graph", label: "Starter Graph" }],
     }),
     "从模板创建",
   );
@@ -36,11 +36,11 @@ test("resolveWorkspaceSelectTriggerLabel falls back to placeholder when empty", 
 test("buildWorkspaceSelectOptions maps records to stable workspace options", () => {
   assert.deepEqual(
     buildWorkspaceSelectOptions([
-      { value: "hello_world", label: "Hello World" },
+      { value: "starter_graph", label: "Starter Graph" },
       { value: "knowledge_base", label: "知识库验证" },
     ]),
     [
-      { value: "hello_world", label: "Hello World" },
+      { value: "starter_graph", label: "Starter Graph" },
       { value: "knowledge_base", label: "知识库验证" },
     ],
   );
@@ -48,7 +48,7 @@ test("buildWorkspaceSelectOptions maps records to stable workspace options", () 
 
 test("hasWorkspaceSelectOptions reports disabled state from option length", () => {
   assert.equal(hasWorkspaceSelectOptions([]), false);
-  assert.equal(hasWorkspaceSelectOptions([{ value: "hello_world", label: "Hello World" }]), true);
+  assert.equal(hasWorkspaceSelectOptions([{ value: "starter_graph", label: "Starter Graph" }]), true);
 });
 
 test("paginateWorkspaceOptions clamps pages and exposes pagination metadata", () => {

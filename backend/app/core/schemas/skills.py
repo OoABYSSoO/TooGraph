@@ -102,8 +102,9 @@ class SkillRunPolicies(BaseModel):
 
 class SkillDefinition(BaseModel):
     skill_key: str = Field(..., min_length=1, alias="skillKey")
-    label: str = Field(..., min_length=1)
+    name: str = Field(..., min_length=1)
     description: str = ""
+    agent_instruction: str = Field(default="", alias="agentInstruction")
     schema_version: str = Field(default="", alias="schemaVersion")
     version: str = ""
     run_policies: SkillRunPolicies = Field(default_factory=SkillRunPolicies, alias="runPolicies")

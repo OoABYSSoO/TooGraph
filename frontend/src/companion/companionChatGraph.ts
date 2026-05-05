@@ -2,7 +2,7 @@ import type { AgentNode, GraphPayload, InputNode, TemplateRecord } from "../type
 import type { RunDetail } from "../types/run.ts";
 import type { SkillDefinition } from "../types/skills.ts";
 
-export const COMPANION_TEMPLATE_ID = "companion_agentic_tool_loop";
+export const COMPANION_TEMPLATE_ID = "companion_autonomous_loop";
 export const COMPANION_USER_MESSAGE_STATE_KEY = "state_1";
 export const COMPANION_HISTORY_STATE_KEY = "state_2";
 export const COMPANION_PAGE_CONTEXT_STATE_KEY = "state_3";
@@ -132,11 +132,12 @@ export function resolveCompanionMode(value: unknown): CompanionMode {
 export function buildCompanionSkillCatalogSnapshot(skills: SkillDefinition[], companionMode: CompanionMode) {
   return skills.map((skill) => {
     const snapshot = cloneJson(skill);
+    const configuredDefaultPolicy = snapshot.runPolicies?.default ?? {};
     const defaultPolicy = {
-      discoverable: true,
-      autoSelectable: false,
-      requiresApproval: false,
-      ...(snapshot.runPolicies?.default ?? {}),
+      ...configuredDefaultPolicy,
+      discoverable: configuredDefaultPolicy.discoverable ?? true,
+      autoSelectable: configuredDefaultPolicy.autoSelectable ?? false,
+      requiresApproval: configuredDefaultPolicy.requiresApproval ?? false,
     };
     const companionPolicy = {
       ...defaultPolicy,

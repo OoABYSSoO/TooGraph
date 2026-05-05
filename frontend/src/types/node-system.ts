@@ -16,6 +16,14 @@ export type StateDefinition = {
   type: string;
   value?: unknown;
   color: string;
+  promptVisible?: boolean;
+  binding?: {
+    kind: "skill_output";
+    skillKey: string;
+    nodeId: string;
+    fieldKey: string;
+    managed?: boolean;
+  } | null;
 };
 
 export type ReadBinding = {
@@ -61,12 +69,20 @@ export type AgentNode = {
   config: {
     skills: string[];
     skillBindings?: unknown[];
+    skillInstructionBlocks?: Record<string, AgentSkillInstructionBlock>;
     taskInstruction: string;
     modelSource: "global" | "override";
     model: string;
     thinkingMode: AgentThinkingMode;
     temperature: number;
   };
+};
+
+export type AgentSkillInstructionBlock = {
+  skillKey: string;
+  title: string;
+  content: string;
+  source: "skill.agentInstruction" | "node.override";
 };
 
 export type ConditionNode = {

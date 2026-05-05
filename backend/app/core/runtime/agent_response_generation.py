@@ -49,11 +49,7 @@ def generate_agent_response(
         skill_context,
         state_schema=state_schema,
     )
-    user_prompt = (
-        node.config.task_instruction
-        if node.config.task_instruction
-        else "根据输入和技能结果完成输出。"
-    )
+    user_prompt = _build_agent_user_prompt(node)
 
     thinking_level = runtime_config.get("resolved_thinking_level")
     if not isinstance(thinking_level, str):
@@ -129,6 +125,25 @@ def _cleanup_prepared_media_paths(paths: Any) -> None:
         if not path:
             continue
         shutil.rmtree(path, ignore_errors=True)
+
+
+def _build_agent_user_prompt(node: NodeSystemAgentNode) -> str:
+    parts = [
+        node.config.task_instruction
+        if node.config.task_instruction
+        else "根据输入和技能结果完成输出。"
+    ]
+    instruction_blocks = [
+        block
+        for skill_key, block in node.config.skill_instruction_blocks.items()
+        if skill_key in node.config.skills and block.content.strip()
+    ]
+    if instruction_blocks:
+        parts.append("\n== Bound Skill Instructions ==")
+        for block in instruction_blocks:
+            title = block.title.strip() or block.skill_key
+            parts.append(f"[{block.skill_key}] {title}\n{block.content.strip()}")
+    return "\n".join(parts).strip()
 
 
 def _resolve_media_runtime_config(

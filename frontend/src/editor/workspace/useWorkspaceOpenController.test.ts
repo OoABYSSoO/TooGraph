@@ -34,7 +34,7 @@ function createTemplate(templateId = "template_a", name = "Template Graph"): Tem
   };
 }
 
-function createSeededTemplate(templateId = "hello_world", name = "Hello World"): TemplateRecord {
+function createSeededTemplate(templateId = "starter_graph", name = "Starter Graph"): TemplateRecord {
   return {
     ...createTemplate(templateId, name),
     state_schema: {

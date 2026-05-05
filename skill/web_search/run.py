@@ -76,6 +76,17 @@ def web_search_skill(**skill_inputs: Any) -> dict[str, Any]:
         max_chars_per_page=max_chars_per_page,
         timeout_seconds=timeout_seconds,
     )
+    source_urls = [result["url"] for result in results if result.get("url")]
+    artifact_paths = [
+        str(document.get("local_path"))
+        for document in source_documents
+        if document.get("status") == "succeeded" and document.get("local_path")
+    ]
+    errors = [
+        str(document.get("error"))
+        for document in source_documents
+        if document.get("status") == "failed" and document.get("error")
+    ]
     searched_at = _current_search_timestamp()
     searched_date = searched_at[:10]
     return {
@@ -85,11 +96,14 @@ def web_search_skill(**skill_inputs: Any) -> dict[str, Any]:
         "result_count": len(results),
         "searched_at": searched_at,
         "searched_date": searched_date,
-        "summary": _build_summary(str(raw_response.get("answer") or ""), results),
+        "search_brief": _build_summary(str(raw_response.get("answer") or ""), results),
         "context": _build_context(results, source_documents=source_documents, searched_at=searched_at, searched_date=searched_date),
         "results": results,
         "citations": citations,
+        "source_urls": source_urls,
         "source_documents": source_documents,
+        "artifact_paths": artifact_paths,
+        "errors": errors,
         "error": "",
     }
 
@@ -382,11 +396,14 @@ def _empty_response(*, query: str, provider: str = "none", status: str, error: s
         "result_count": 0,
         "searched_at": searched_at,
         "searched_date": searched_at[:10],
-        "summary": "",
+        "search_brief": "",
         "context": "",
         "results": [],
         "citations": [],
+        "source_urls": [],
         "source_documents": [],
+        "artifact_paths": [],
+        "errors": [error] if error else [],
         "error": error,
     }
 
