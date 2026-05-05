@@ -37,7 +37,7 @@ export type CompanionRevision = {
   operation: "create" | "update" | "delete" | "restore";
   previous_value: Record<string, unknown>;
   next_value: Record<string, unknown>;
-  changed_by: "user" | "companion" | "memory_curator";
+  changed_by: string;
   change_reason: string;
   created_at: string;
 };

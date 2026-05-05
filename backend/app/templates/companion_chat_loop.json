@@ -341,7 +341,12 @@
               "path": "backend/data/companion/memories.json",
               "default_value": [],
               "section_tag": "memory-context",
-              "empty_message": "暂无长期记忆。"
+              "empty_message": "暂无长期记忆。",
+              "prompt_array_filter": {
+                "enabled": true,
+                "deleted": false
+              },
+              "max_prompt_items": 20
             }
           }
         ],
@@ -489,7 +494,8 @@
               "revision_target_type": "profile",
               "revision_target_id": "profile",
               "changed_by": "companion_chat_loop_template",
-              "change_reason": "桌宠对话循环整理 profile。"
+              "change_reason": "桌宠对话循环整理 profile。",
+              "skip_if_unchanged": true
             }
           }
         ],
@@ -532,7 +538,8 @@
               "revision_target_type": "policy",
               "revision_target_id": "policy",
               "changed_by": "companion_chat_loop_template",
-              "change_reason": "桌宠对话循环整理 policy。"
+              "change_reason": "桌宠对话循环整理 policy。",
+              "skip_if_unchanged": true
             }
           }
         ],
@@ -575,7 +582,8 @@
               "revision_target_type": "memory_collection",
               "revision_target_id": "memories",
               "changed_by": "companion_chat_loop_template",
-              "change_reason": "桌宠对话循环整理 memories。"
+              "change_reason": "桌宠对话循环整理 memories。",
+              "skip_if_unchanged": true
             }
           }
         ],
@@ -618,7 +626,8 @@
               "revision_target_type": "session_summary",
               "revision_target_id": "session_summary",
               "changed_by": "companion_chat_loop_template",
-              "change_reason": "桌宠对话循环整理 session summary。"
+              "change_reason": "桌宠对话循环整理 session summary。",
+              "skip_if_unchanged": true
             }
           }
         ],

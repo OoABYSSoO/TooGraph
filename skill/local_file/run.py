@@ -62,13 +62,16 @@ def read_json_operation(payload: dict[str, Any]) -> dict[str, Any]:
     else:
         value = deepcopy(payload.get("default_value"))
     content = json.dumps(value, ensure_ascii=False, indent=2)
+    prompt_value = build_prompt_value(value, payload)
+    prompt_content = json.dumps(prompt_value, ensure_ascii=False, indent=2)
     return {
         "status": "succeeded",
         "path": normalized_path,
         "exists": exists,
         "content": content,
         "json_content": value,
-        "prompt_section": build_prompt_section(value, content, payload),
+        "prompt_json_content": prompt_value,
+        "prompt_section": build_prompt_section(prompt_value, prompt_content, payload),
         "warnings": [],
     }
 
@@ -86,6 +89,7 @@ def read_text_operation(payload: dict[str, Any]) -> dict[str, Any]:
         "exists": exists,
         "content": content,
         "json_content": None,
+        "prompt_json_content": None,
         "prompt_section": build_prompt_section(content, content, payload),
         "warnings": [],
     }
@@ -95,12 +99,22 @@ def write_json_operation(payload: dict[str, Any]) -> dict[str, Any]:
     target, normalized_path = resolve_target_path(payload.get("path"), payload, for_write=True)
     content = coerce_json_content(payload.get("content"))
     previous_value = read_existing_json(target)
+    serialized_content = json.dumps(content, ensure_ascii=False, indent=2)
+    if truthy(payload.get("skip_if_unchanged")) and previous_value == content:
+        return write_success_result(
+            normalized_path,
+            content=serialized_content,
+            json_content=content,
+            revision=None,
+            changed=False,
+            skipped=True,
+        )
     revision = write_revision_if_requested(payload, previous_value=previous_value, next_value=content)
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(json.dumps(content, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    target.write_text(serialized_content + "\n", encoding="utf-8")
     return write_success_result(
         normalized_path,
-        content=json.dumps(content, ensure_ascii=False, indent=2),
+        content=serialized_content,
         json_content=content,
         revision=revision,
     )
@@ -110,6 +124,15 @@ def write_text_operation(payload: dict[str, Any]) -> dict[str, Any]:
     target, normalized_path = resolve_target_path(payload.get("path"), payload, for_write=True)
     content = "" if payload.get("content") is None else str(payload.get("content"))
     previous_value = target.read_text(encoding="utf-8") if target.is_file() else None
+    if truthy(payload.get("skip_if_unchanged")) and previous_value == content:
+        return write_success_result(
+            normalized_path,
+            content=content,
+            json_content=None,
+            revision=None,
+            changed=False,
+            skipped=True,
+        )
     revision = write_revision_if_requested(payload, previous_value=previous_value, next_value=content)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(content, encoding="utf-8")
@@ -122,10 +145,14 @@ def write_success_result(
     content: str,
     json_content: Any,
     revision: dict[str, Any] | None,
+    changed: bool = True,
+    skipped: bool = False,
 ) -> dict[str, Any]:
     write_result = {
         "path": normalized_path,
         "bytes": len(content.encode("utf-8")),
+        "changed": changed,
+        "skipped": skipped,
         "revision_id": revision.get("revision_id") if isinstance(revision, dict) else None,
     }
     return {
@@ -241,6 +268,49 @@ def prompt_body(value: Any, content: str, payload: dict[str, Any]) -> str:
     return content
 
 
+def build_prompt_value(value: Any, payload: dict[str, Any]) -> Any:
+    prompt_value = deepcopy(value)
+    prompt_filter = parse_prompt_array_filter(payload.get("prompt_array_filter"))
+    if isinstance(prompt_value, list) and prompt_filter:
+        prompt_value = [
+            item
+            for item in prompt_value
+            if isinstance(item, dict) and all(item.get(key) == expected for key, expected in prompt_filter.items())
+        ]
+    max_items = parse_positive_int(payload.get("max_prompt_items"))
+    if isinstance(prompt_value, list) and max_items is not None:
+        prompt_value = prompt_value[:max_items]
+    return prompt_value
+
+
+def parse_prompt_array_filter(value: Any) -> dict[str, Any]:
+    if value is None or value == "":
+        return {}
+    if isinstance(value, dict):
+        return {str(key): expected for key, expected in value.items()}
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError as exc:
+            raise SkillError(f"prompt_array_filter must be a JSON object: {exc}") from exc
+        if not isinstance(parsed, dict):
+            raise SkillError("prompt_array_filter must be a JSON object.")
+        return {str(key): expected for key, expected in parsed.items()}
+    raise SkillError("prompt_array_filter must be an object or JSON object string.")
+
+
+def parse_positive_int(value: Any) -> int | None:
+    if value is None or value == "":
+        return None
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError) as exc:
+        raise SkillError("max_prompt_items must be a positive integer.") from exc
+    if parsed <= 0:
+        raise SkillError("max_prompt_items must be a positive integer.")
+    return parsed
+
+
 def is_empty_value(value: Any) -> bool:
     if value is None:
         return True
@@ -256,6 +326,16 @@ def coerce_json_content(value: Any) -> Any:
         except json.JSONDecodeError as exc:
             raise SkillError(f"write_json content must be valid JSON: {exc}") from exc
     return value
+
+
+def truthy(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+    return bool(value)
 
 
 def read_existing_json(path: Path) -> Any:

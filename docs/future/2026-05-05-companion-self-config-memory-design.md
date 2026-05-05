@@ -137,6 +137,12 @@
 6. 如果用户删除过类似记忆，把删除记录作为强负反馈。
 7. 如果没有长期价值，不写入。
 
+建议档第一版加固规则：
+
+- 记忆注入必须过滤 `enabled: false` 或 `deleted: true` 的记录，并限制单轮 prompt 注入数量，避免把整库长期记忆塞进回复 Agent。
+- 自动写回如果 next value 与 previous value 完全一致，不创建 revision；运行详情仍应返回 `changed: false` 和 `skipped: true`，让这次“无变化”可见但不污染历史版本。
+- 原始 memories 可以继续作为整理 Agent 的输入，用于识别删除记录和负反馈；prompt-facing memory context 必须是过滤后的只读上下文。
+
 应该记住：
 
 - 用户稳定偏好，例如回答长短、解释方式、语言偏好。
@@ -228,6 +234,8 @@ revision 记录结构：
 - 删除 memory 后不出现在默认召回结果里。
 - restore 会创建新的 revision。
 - `local_file` 拒绝读取或写入白名单外路径、settings、日志、构建产物、`.git`、`node_modules` 等不应由图模板触碰的位置。
+- `local_file` 支持 prompt-only array filtering；`companion_chat_loop` 读取记忆时过滤 disabled/deleted 记录，并限制注入数量。
+- `local_file` 在 `skip_if_unchanged` 开启时不会为无变化写回创建 revision。
 - `companion_chat_loop` 整理 Agent 会把“你以后就叫图图吧”路由到 `profile.name`，而不是误写成普通 memory。
 - `companion_chat_loop` 整理 Agent 会把长期回复风格路由到 `policy.communication_preferences`。
 - `companion_chat_loop` 整理 Agent 会拒绝通过对话升级图操作档位，且 `local_file` 只执行模板声明的文件写入。

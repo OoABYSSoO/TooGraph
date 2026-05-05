@@ -465,6 +465,12 @@ class TemplateLayoutTests(unittest.TestCase):
                 "json_content": state_by_name["companion_profile_json"],
             },
         )
+        memory_reader = template.nodes["read_companion_memories"]
+        self.assertEqual(
+            memory_reader.config.skill_bindings[0].config.get("prompt_array_filter"),
+            {"enabled": True, "deleted": False},
+        )
+        self.assertEqual(memory_reader.config.skill_bindings[0].config.get("max_prompt_items"), 20)
         agent = template.nodes["companion_reply_agent"]
         self.assertEqual(agent.kind, "agent")
         self.assertEqual(agent.config.skills, [])
@@ -516,6 +522,13 @@ class TemplateLayoutTests(unittest.TestCase):
         self.assertEqual(writer.config.skill_bindings[0].input_mapping, {"content": state_by_name["companion_profile_next"]})
         self.assertEqual(writer.config.skill_bindings[0].config.get("operation"), "write_json")
         self.assertEqual(writer.config.skill_bindings[0].config.get("path"), "backend/data/companion/profile.json")
+        for node_id in [
+            "write_companion_profile",
+            "write_companion_policy",
+            "write_companion_memories",
+            "write_companion_session_summary",
+        ]:
+            self.assertIs(template.nodes[node_id].config.skill_bindings[0].config.get("skip_if_unchanged"), True)
         self.assertEqual(
             writer.config.skill_bindings[0].output_mapping,
             {"write_result": state_by_name["companion_profile_write_result"]},

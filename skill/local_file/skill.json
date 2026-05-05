@@ -53,6 +53,27 @@
       "description": "Prompt body to use when JSON content is an empty object, array, or blank string."
     },
     {
+      "key": "prompt_array_filter",
+      "label": "Prompt Array Filter",
+      "valueType": "json",
+      "required": false,
+      "description": "Optional exact-match filter applied only to JSON array prompt content, for example {\"enabled\": true, \"deleted\": false}."
+    },
+    {
+      "key": "max_prompt_items",
+      "label": "Max Prompt Items",
+      "valueType": "text",
+      "required": false,
+      "description": "Optional positive integer cap applied only to JSON array prompt content."
+    },
+    {
+      "key": "skip_if_unchanged",
+      "label": "Skip If Unchanged",
+      "valueType": "text",
+      "required": false,
+      "description": "When true, write operations skip file and revision writes if parsed content equals the existing value."
+    },
+    {
       "key": "allowed_roots",
       "label": "Allowed Roots",
       "valueType": "json",
@@ -133,10 +154,16 @@
       "description": "Content optionally wrapped in section_tag for prompt injection."
     },
     {
+      "key": "prompt_json_content",
+      "label": "Prompt JSON Content",
+      "valueType": "json",
+      "description": "JSON content after prompt-only filtering and item caps. Raw json_content remains unchanged."
+    },
+    {
       "key": "write_result",
       "label": "Write Result",
       "valueType": "json",
-      "description": "Structured file write metadata."
+      "description": "Structured file write metadata including changed, skipped, bytes, and optional revision_id."
     },
     {
       "key": "revision",
