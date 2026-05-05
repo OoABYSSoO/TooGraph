@@ -128,6 +128,6 @@ node_modules\.bin\vite.cmd build
 git diff --check
 ```
 
-- [ ] **Step 3: Restart dev, commit, and push**
+- [x] **Step 3: Restart dev, commit, and push**
 
 Run the repository dev restart flow, verify backend `/health` and the frontend URL, then commit with a Chinese message and push.

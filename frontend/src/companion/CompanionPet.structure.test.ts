@@ -45,13 +45,24 @@ test("CompanionPet tracks dragging and click pulses for mascot animation", () =>
   assert.match(componentSource, /tapNonce\.value \+= 1;/);
 });
 
-test("CompanionPet exposes permission tiers with only advisory mode enabled", () => {
+test("CompanionPet exposes advisory and approval permission tiers", () => {
   assert.match(componentSource, /<ElSelect[\s\S]*v-model="companionMode"/);
   assert.match(componentSource, /v-for="option in COMPANION_MODE_OPTIONS"/);
   assert.match(componentSource, /:disabled="option\.disabled"/);
   assert.match(componentSource, /companionModeLabel/);
-  assert.doesNotMatch(componentSource, /companionMode\s*=\s*"approval"/);
   assert.doesNotMatch(componentSource, /companionMode\s*=\s*"unrestricted"/);
+});
+
+test("CompanionPet lets the companion runtime choose its own model", () => {
+  assert.match(componentSource, /import \{ fetchSettings \} from "\.\.\/api\/settings\.ts";/);
+  assert.match(componentSource, /import \{ buildRuntimeModelOptions \} from "\.\.\/lib\/runtimeModelCatalog\.ts";/);
+  assert.match(componentSource, /const companionModelRef = ref\("/);
+  assert.match(componentSource, /COMPANION_MODEL_STORAGE_KEY/);
+  assert.match(componentSource, /v-model="companionModelRef"/);
+  assert.match(componentSource, /@visible-change="handleCompanionModelSelectVisibleChange"/);
+  assert.match(componentSource, /companionModelOptions/);
+  assert.match(componentSource, /return buildRuntimeModelOptions\(settings\);/);
+  assert.match(componentSource, /companionModel:\s*companionModelRef\.value/);
 });
 
 test("CompanionPet builds advisory page context from the shared editor snapshot", () => {
