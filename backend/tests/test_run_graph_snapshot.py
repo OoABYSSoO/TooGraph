@@ -10,8 +10,8 @@ from app.templates.loader import list_template_records
 
 
 class RunGraphSnapshotTests(unittest.TestCase):
-    def test_snapshot_tests_no_longer_depend_on_builtin_templates(self) -> None:
-        self.assertEqual(list_template_records(), [])
+    def test_snapshot_tests_do_not_depend_on_template_fixtures(self) -> None:
+        self.assertEqual([record["template_id"] for record in list_template_records()], ["advanced_web_research_loop"])
 
 
 if __name__ == "__main__":
