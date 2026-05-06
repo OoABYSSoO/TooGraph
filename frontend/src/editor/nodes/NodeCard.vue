@@ -740,7 +740,9 @@ const inputKnowledgeBaseValue = computed(() => {
   return typeof inputStateValue.value === "string" ? inputStateValue.value : "";
 });
 const inputAssetType = computed(() => (view.value.body.kind === "input" ? view.value.body.assetType : null));
-const inputAssetEnvelope = computed(() => (props.node.kind === "input" ? tryParseUploadedAssetEnvelope(inputStateValue.value) : null));
+const inputAssetEnvelope = computed(() =>
+  props.node.kind === "input" ? tryParseUploadedAssetEnvelope(inputStateValue.value, inputAssetType.value) : null,
+);
 const inputAssetAccept = computed(() => resolveUploadedAssetInputAccept(inputAssetType.value));
 const inputStateKey = computed(() =>
   view.value.body.kind === "input" && !view.value.body.primaryOutput?.virtual ? view.value.body.primaryOutput?.key ?? null : null,
@@ -1663,12 +1665,12 @@ async function commitInputAssetFile(file: File | null) {
         type: nextStateType,
         value: defaultValueForStateType(nextStateType),
       });
-      emitInputValuePatch(JSON.stringify(envelope));
+      emitInputValuePatch(envelope.localPath);
       return;
     }
     emitInputConfigPatch({
       boundaryType: envelope.detectedType,
-      value: JSON.stringify(envelope),
+      value: envelope.localPath,
     });
   } catch (error) {
     console.error("Failed to read uploaded asset", error);

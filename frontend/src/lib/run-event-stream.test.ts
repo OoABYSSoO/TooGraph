@@ -204,6 +204,35 @@ test("buildRunEventOutputPreviewUpdate preserves configured document output disp
   );
 });
 
+test("buildRunEventOutputPreviewUpdate auto-displays file state array updates as documents", () => {
+  const document = {
+    state_schema: {
+      artifact_paths: { type: "file" },
+    },
+    nodes: {
+      output_artifacts: {
+        kind: "output",
+        reads: [{ state: "artifact_paths" }],
+        config: { displayMode: "auto" },
+      },
+    },
+  };
+
+  assert.deepEqual(
+    buildRunEventOutputPreviewUpdate(document, {}, {
+      event_type: "state.updated",
+      state_key: "artifact_paths",
+      value: ["run_1/searcher/web_search/invocation_001/doc_001.md"],
+    }),
+    {
+      output_artifacts: {
+        text: '[\n  "run_1/searcher/web_search/invocation_001/doc_001.md"\n]',
+        displayMode: "documents",
+      },
+    },
+  );
+});
+
 test("buildRunEventOutputPreviewUpdate routes multi-state JSON streams to matching Output nodes only", () => {
   const document = {
     nodes: {

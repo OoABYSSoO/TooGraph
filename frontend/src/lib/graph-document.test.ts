@@ -41,11 +41,12 @@ const webSearchSkill: SkillDefinition = {
   health: { type: "none" },
   inputSchema: [{ key: "query", name: "Query", valueType: "text", required: true, description: "" }],
   outputSchema: [
+    { key: "query", name: "Query", valueType: "text", required: false, description: "Search query." },
     { key: "source_urls", name: "Source URLs", valueType: "json", required: false, description: "URLs." },
-    { key: "artifact_paths", name: "Artifact Paths", valueType: "file_list", required: false, description: "Files." },
+    { key: "artifact_paths", name: "Artifact Paths", valueType: "file", required: false, description: "Files." },
     { key: "errors", name: "Errors", valueType: "json", required: false, description: "Errors." },
   ],
-  supportedValueTypes: ["text", "json"],
+  supportedValueTypes: ["text", "json", "file"],
   sideEffects: ["network"],
   agentNodeEligibility: "ready",
   agentNodeBlockers: [],
@@ -370,23 +371,26 @@ test("updateAgentNodeConfigInDocument materializes attached skill outputs as man
 
   const node = nextDocument.nodes.search_agent;
   assert.equal(node.kind, "agent");
-  assert.deepEqual(node.writes.map((binding) => binding.state), ["state_1", "state_2", "state_3"]);
+  assert.deepEqual(node.writes.map((binding) => binding.state), ["state_1", "state_2", "state_3", "state_4"]);
   assert.deepEqual(node.config.skillBindings, [
     {
       skillKey: "web_search",
       outputMapping: {
-        source_urls: "state_1",
-        artifact_paths: "state_2",
-        errors: "state_3",
+        query: "state_1",
+        source_urls: "state_2",
+        artifact_paths: "state_3",
+        errors: "state_4",
       },
     },
   ]);
-  assert.equal(nextDocument.state_schema.state_1?.name, "联网搜索 Source URLs");
-  assert.equal(nextDocument.state_schema.state_1?.type, "json");
+  assert.equal(nextDocument.state_schema.state_1?.name, "联网搜索 Query");
+  assert.equal(nextDocument.state_schema.state_1?.type, "text");
   assert.equal(nextDocument.state_schema.state_1?.promptVisible, false);
-  assert.equal(nextDocument.state_schema.state_2?.type, "file_list");
-  assert.equal(nextDocument.state_schema.state_2?.promptVisible, true);
-  assert.deepEqual(nextDocument.state_schema.state_2?.binding, {
+  assert.equal(nextDocument.state_schema.state_2?.type, "json");
+  assert.equal(nextDocument.state_schema.state_2?.promptVisible, false);
+  assert.equal(nextDocument.state_schema.state_3?.type, "file");
+  assert.equal(nextDocument.state_schema.state_3?.promptVisible, true);
+  assert.deepEqual(nextDocument.state_schema.state_3?.binding, {
     kind: "skill_output",
     skillKey: "web_search",
     nodeId: "search_agent",

@@ -45,11 +45,8 @@ const STATE_FIELD_TYPE_VALUES = new Set([
   "text",
   "number",
   "boolean",
-  "object",
-  "array",
   "markdown",
   "json",
-  "file_list",
   "image",
   "audio",
   "video",
@@ -57,7 +54,7 @@ const STATE_FIELD_TYPE_VALUES = new Set([
   "knowledge_base",
   "skill",
 ]);
-const PROMPT_VISIBLE_SKILL_OUTPUT_TYPES = new Set(["file", "file_list"]);
+const PROMPT_VISIBLE_SKILL_OUTPUT_TYPES = new Set(["file"]);
 
 export function createDraftFromTemplate(template: TemplateRecord): GraphPayload {
   const rawTemplate = toRaw(template) as TemplateRecord;
@@ -189,11 +186,8 @@ function defaultMaterializedStateValueForType(type: string): unknown {
       return 0;
     case "boolean":
       return false;
-    case "object":
     case "json":
       return {};
-    case "array":
-    case "file_list":
     case "skill":
       return [];
     default:

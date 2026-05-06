@@ -26,7 +26,7 @@ PAGE_FETCH_USER_AGENT = "GraphiteUI/1.0 (+https://github.com/AbyssBadger0/Graphi
 def web_search_skill(**skill_inputs: Any) -> dict[str, Any]:
     query = _compact_text(skill_inputs.get("query"))
     if not query:
-        return _final_response(source_urls=[], artifact_paths=[], errors=["Search query is required."])
+        return _final_response(query="", source_urls=[], artifact_paths=[], errors=["Search query is required."])
     query = _enrich_time_sensitive_web_search_query(query)
 
     api_key = _resolve_tavily_api_key(skill_inputs)
@@ -48,7 +48,7 @@ def web_search_skill(**skill_inputs: Any) -> dict[str, Any]:
                 timeout_seconds=DEFAULT_TIMEOUT_SECONDS,
             )
     except Exception as exc:
-        return _final_response(source_urls=[], artifact_paths=[], errors=[str(exc)])
+        return _final_response(query=query, source_urls=[], artifact_paths=[], errors=[str(exc)])
 
     results = _normalize_results(raw_response.get("results", []), max_results=DEFAULT_MAX_RESULTS)
     source_documents = _fetch_source_documents(
@@ -68,7 +68,7 @@ def web_search_skill(**skill_inputs: Any) -> dict[str, Any]:
         for document in source_documents
         if document.get("status") == "failed" and document.get("error")
     ]
-    return _final_response(source_urls=source_urls, artifact_paths=artifact_paths, errors=errors)
+    return _final_response(query=query, source_urls=source_urls, artifact_paths=artifact_paths, errors=errors)
 
 
 def _search_with_tavily(
@@ -273,11 +273,13 @@ def _render_source_document_markdown(*, content: str) -> str:
 
 def _final_response(
     *,
+    query: str,
     source_urls: list[str],
     artifact_paths: list[str],
     errors: list[str],
 ) -> dict[str, Any]:
     return {
+        "query": query,
         "source_urls": source_urls,
         "artifact_paths": artifact_paths,
         "errors": errors,

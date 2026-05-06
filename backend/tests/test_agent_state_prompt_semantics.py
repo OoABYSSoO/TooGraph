@@ -61,7 +61,7 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
             "search_urls": NodeSystemStateDefinition(
                 name="Search URLs",
                 description="Raw URLs returned by the bound web search skill.",
-                type=NodeSystemStateType.FILE_LIST,
+                type=NodeSystemStateType.FILE,
                 value=[],
                 promptVisible=False,
             ),
@@ -115,8 +115,8 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
 
         self.assertIn("output_format: markdown string inside the JSON value", prompt)
         self.assertIn("这个字段的值必须是 Markdown 内容字符串", prompt)
-        self.assertIn("output_format: JSON object inside the JSON value", prompt)
-        self.assertIn("不要把对象再序列化成字符串", prompt)
+        self.assertIn("output_format: JSON value inside the JSON value", prompt)
+        self.assertIn("不要把对象或数组再序列化成字符串", prompt)
 
     def test_auto_prompt_preserves_input_and_output_state_order(self) -> None:
         state_schema = {
@@ -205,7 +205,7 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
                     ),
                     "source_documents": NodeSystemStateDefinition(
                         name="Source documents",
-                        type=NodeSystemStateType.FILE_LIST,
+                        type=NodeSystemStateType.FILE,
                     ),
                     "answer": NodeSystemStateDefinition(type=NodeSystemStateType.MARKDOWN),
                 },
@@ -222,6 +222,34 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
         finally:
             for relative_path in artifact_paths:
                 resolve_skill_artifact_path(relative_path).unlink(missing_ok=True)
+
+    def test_auto_prompt_does_not_read_media_paths_as_text_file_content(self) -> None:
+        image_artifact = create_uploaded_skill_artifact(
+            file_name="reference.png",
+            content_type="image/png",
+            payload=b"fake-png",
+        )
+        try:
+            prompt = build_auto_system_prompt(
+                ["answer"],
+                {"attachments": [image_artifact["local_path"]]},
+                {},
+                state_schema={
+                    "attachments": NodeSystemStateDefinition(
+                        name="Attachments",
+                        type=NodeSystemStateType.FILE,
+                    ),
+                    "answer": NodeSystemStateDefinition(type=NodeSystemStateType.TEXT),
+                },
+            )
+
+            self.assertIn("reference.png", prompt)
+            self.assertIn("image/png", prompt)
+            self.assertIn("model attachment", prompt)
+            self.assertNotIn("fake-png", prompt)
+            self.assertNotIn(image_artifact["local_path"], prompt)
+        finally:
+            resolve_skill_artifact_path(image_artifact["local_path"]).unlink(missing_ok=True)
 
     def test_auto_prompt_does_not_leak_file_paths_when_file_state_cannot_be_read(self) -> None:
         missing_path = "uploads/missing-local-document.md"
@@ -243,7 +271,7 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
         self.assertNotIn(missing_path, prompt)
         self.assertNotIn("Skill artifact", prompt)
 
-    def test_auto_prompt_includes_uploaded_image_local_path_metadata(self) -> None:
+    def test_auto_prompt_describes_uploaded_image_without_leaking_local_path(self) -> None:
         image_payload = {
             "kind": "uploaded_file",
             "name": "reference.png",
@@ -271,9 +299,10 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
 
         self.assertIn("reference.png", prompt)
         self.assertIn("image/png", prompt)
-        self.assertIn("uploads/reference.png", prompt)
+        self.assertIn("model attachment", prompt)
+        self.assertNotIn("uploads/reference.png", prompt)
 
-    def test_auto_prompt_includes_uploaded_video_local_path_metadata(self) -> None:
+    def test_auto_prompt_describes_uploaded_video_without_leaking_local_path(self) -> None:
         video_payload = {
             "kind": "uploaded_file",
             "name": "clip.mp4",
@@ -301,7 +330,8 @@ class AgentStatePromptSemanticTests(unittest.TestCase):
 
         self.assertIn("clip.mp4", prompt)
         self.assertIn("video/mp4", prompt)
-        self.assertIn("uploads/clip.mp4", prompt)
+        self.assertIn("model attachment", prompt)
+        self.assertNotIn("uploads/clip.mp4", prompt)
 
     def test_llm_json_response_can_map_unique_state_name_alias_back_to_output_key(self) -> None:
         parsed = parse_llm_json_response(

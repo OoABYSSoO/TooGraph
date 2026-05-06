@@ -43,8 +43,9 @@
 - Agent 节点提示词区域支持技能说明胶囊，胶囊可编辑、可随技能移除。
 - 旧内置模板已删除，旧模板运行入口兼容修补已删除。
 - 旧技能包已删除，只保留新的 `web_search`。
-- `file` / `file_list` state 已采用路径透传语义；Agent 节点会读取文件并只把文件名与原文全文放入模型上下文。
-- `web_search` 不再输出 `context`，只输出 `source_urls`、`artifact_paths` 和 `errors`。
+- `file` / `image` / `audio` / `video` state 已采用路径透传语义，值可以是本地路径字符串或路径数组；`file_list`、`array`、`object` 不再作为 state 类型存在。
+- Agent 节点会读取 `file` state 中的文本类文件，并只把文件名与原文全文放入模型上下文；图片、音频和视频路径走多模态附件处理。
+- `web_search` 不再输出 `context`，只输出 `query`、`source_urls`、`artifact_paths` 和 `errors`。
 - `skillBindings` 已收束为技能身份和 `outputMapping`，不再包含 `inputMapping`、静态参数 `config` 或无意义的 `trigger`。
 - Agent 节点卡片添加带 `outputSchema` 的 skill 时，会自动创建 managed skill output state、写入节点输出端口，并同步 `skillBindings.outputMapping`。
 - 技能输入由 Agent 节点的 LLM 在运行时根据当前输入 state、技能说明和 `inputSchema` 生成；必填技能输入缺失时由运行时记录可恢复错误。
@@ -205,8 +206,9 @@ Agent 节点提示词区域中，绑定的技能以胶囊展示。
 - 大体量或不适合进 prompt 的内容可以设置 `promptVisible=false`。
 - Output 节点可以展示本地 artifact、网址、错误和摘要。
 - 用户仍能像普通 state 一样查看和编辑这些 state。
-- 如果输出是下游 Agent 需要阅读的正文材料，应绑定为 `file` 或 `file_list`，让 Agent 通过路径读取文件全文。
-- 文件态进入 Agent prompt 时只包含文件名和原文全文；本地路径、来源网址、抓取时间、provider 和运行元数据不进入模型上下文。
+- 如果输出是下游 Agent 需要阅读的正文材料，应绑定为 `file`；它的值可以是单个本地路径，也可以是本地路径数组。
+- `file` 进入 Agent prompt 时只包含文件名和原文全文；本地路径、来源网址、抓取时间、provider 和运行元数据不进入模型上下文。
+- `image` / `audio` / `video` 也使用本地路径或路径数组，但进入 Agent 时应作为多模态附件处理，不作为文本文件读取。
 
 示例：
 
@@ -228,6 +230,16 @@ Agent 节点提示词区域中，绑定的技能以胶囊展示。
 ```json
 [
   {
+    "name": "web_search_query",
+    "type": "text",
+    "promptVisible": false,
+    "binding": {
+      "kind": "skill_output",
+      "skillKey": "web_search",
+      "outputKey": "query"
+    }
+  },
+  {
     "name": "web_search_source_urls",
     "type": "json",
     "promptVisible": false,
@@ -239,7 +251,7 @@ Agent 节点提示词区域中，绑定的技能以胶囊展示。
   },
   {
     "name": "web_search_artifact_paths",
-    "type": "file_list",
+    "type": "file",
     "promptVisible": true,
     "binding": {
       "kind": "skill_output",
@@ -348,7 +360,7 @@ function call 未来可以作为某些模型的适配层，但不能绕过 Graph
 - `approval_granted`
 - `final_reply`
 - `companion_session_summary`
-- 必要的绑定输出 state，例如 `source_urls`、`artifact_paths`、`errors`；其中 `artifact_paths` 应使用 `file_list`。
+- 必要的绑定输出 state，例如 `query`、`source_urls`、`artifact_paths`、`errors`；其中 `artifact_paths` 应使用 `file`，值可以是路径或路径数组。
 
 推荐节点职责：
 

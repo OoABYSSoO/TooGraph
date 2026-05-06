@@ -192,10 +192,12 @@ def format_skill_input_field_lines(field: SkillIoField) -> list[str]:
 
 
 def example_skill_input_value(field: SkillIoField) -> Any:
-    if field.value_type in {"json", "object"}:
+    if field.value_type == "json":
         return {}
-    if field.value_type in {"array", "file_list", "skill"}:
+    if field.value_type == "skill":
         return []
+    if field.value_type in {"file", "image", "audio", "video"}:
+        return f"<local artifact path or path array for {field.key}>"
     if field.value_type == "number":
         return 0
     if field.value_type == "boolean":

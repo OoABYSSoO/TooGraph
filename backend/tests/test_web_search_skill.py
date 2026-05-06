@@ -69,7 +69,8 @@ class WebSearchSkillTests(unittest.TestCase):
             api_key="tvly-test",
             timeout_seconds=15.0,
         )
-        self.assertEqual(set(result), {"source_urls", "artifact_paths", "errors"})
+        self.assertEqual(set(result), {"query", "source_urls", "artifact_paths", "errors"})
+        self.assertEqual(result["query"], "GraphiteUI workflow studio")
         self.assertEqual(result["source_urls"], ["https://example.com/docs"])
         self.assertEqual(result["artifact_paths"], [])
         self.assertEqual(result["errors"], [])
@@ -97,7 +98,8 @@ class WebSearchSkillTests(unittest.TestCase):
             max_results=5,
             timeout_seconds=15.0,
         )
-        self.assertEqual(set(result), {"source_urls", "artifact_paths", "errors"})
+        self.assertEqual(set(result), {"query", "source_urls", "artifact_paths", "errors"})
+        self.assertEqual(result["query"], "fallback search")
         self.assertEqual(result["source_urls"], ["https://example.org/fallback"])
         self.assertEqual(result["artifact_paths"], [])
         self.assertEqual(result["errors"], [])
@@ -147,7 +149,8 @@ class WebSearchSkillTests(unittest.TestCase):
                     result = web_search.web_search_skill(query="full article")
 
                 document_path = artifact_dir / "doc_001.md"
-                self.assertEqual(set(result), {"source_urls", "artifact_paths", "errors"})
+                self.assertEqual(set(result), {"query", "source_urls", "artifact_paths", "errors"})
+                self.assertEqual(result["query"], "full article")
                 self.assertEqual(result["artifact_paths"], ["run_1/searcher/web_search/invocation_001/doc_001.md"])
                 self.assertEqual(result["errors"], [])
                 self.assertTrue(document_path.is_file())
@@ -163,7 +166,8 @@ class WebSearchSkillTests(unittest.TestCase):
         web_search = _load_web_search_module()
         result = web_search.web_search_skill(query="   ")
 
-        self.assertEqual(set(result), {"source_urls", "artifact_paths", "errors"})
+        self.assertEqual(set(result), {"query", "source_urls", "artifact_paths", "errors"})
+        self.assertEqual(result["query"], "")
         self.assertEqual(result["source_urls"], [])
         self.assertEqual(result["artifact_paths"], [])
         self.assertEqual(result["errors"], ["Search query is required."])

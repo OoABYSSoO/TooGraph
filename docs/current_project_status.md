@@ -25,8 +25,8 @@
 - 图运行前不再做旧草稿兼容补齐。提交到运行时的图必须已经符合当前协议。
 - `state_schema` 支持 `promptVisible=false`。这类 state 可以参与图运行和技能输出透传，但不会进入 Agent 的模型提示词上下文。
 - `state_schema` 支持 `binding` 元数据，用来标记某个 state 是否由技能输出自动绑定。
-- `file` / `file_list` 类型 state 的值是本地 artifact 路径或路径列表。Agent 节点接收这类 state 时，会读取文件并只把“文件名 + 原文全文”拼入模型上下文，不暴露本地路径、来源网址、抓取时间或运行元数据。
-- Input 节点输出普通文件时写入本地路径；图片和视频仍保留 uploaded file envelope 以支持多模态附件。
+- `file` / `image` / `audio` / `video` 类型 state 的值是本地 artifact 路径或路径列表，不再有单独的 `file_list`、`array` 或 `object` state 类型。Agent 节点接收 `file` state 时，会读取文本类文件并只把“文件名 + 原文全文”拼入模型上下文；图片、音频和视频路径会走多模态附件处理，不作为文本读取。
+- Input 节点输出文件、图片、音频或视频时都写入本地路径；Output 节点可通过 documents 预览展示这些 artifact。
 
 ## 当前技能
 
@@ -40,8 +40,9 @@
 
 主要输出语义：
 
+- `query`：本次实际用于搜索的查询词。
 - `source_urls`：搜索到的网址列表。
-- `artifact_paths`：成功保存到本地的来源原文文件路径，类型应绑定为 `file_list`。
+- `artifact_paths`：成功保存到本地的来源原文文件路径，类型应绑定为 `file`，值可以是路径字符串或路径数组。
 - `errors`：结构化错误列表。
 
 ## 当前前端能力

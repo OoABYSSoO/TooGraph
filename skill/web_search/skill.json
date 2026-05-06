@@ -34,6 +34,12 @@
   ],
   "outputSchema": [
     {
+      "key": "query",
+      "name": "Query",
+      "valueType": "text",
+      "description": "Actual query sent to the search provider."
+    },
+    {
       "key": "source_urls",
       "name": "Source URLs",
       "valueType": "json",
@@ -42,7 +48,7 @@
     {
       "key": "artifact_paths",
       "name": "Artifact Paths",
-      "valueType": "file_list",
+      "valueType": "file",
       "description": "Final local file path list for fetched readable page documents."
     },
     {
@@ -52,7 +58,7 @@
       "description": "Final error list collected during search or page fetch."
     }
   ],
-  "supportedValueTypes": ["text", "markdown", "json"],
+  "supportedValueTypes": ["text", "markdown", "json", "file"],
   "sideEffects": ["network", "secret_read"],
   "runtime": {
     "type": "python",

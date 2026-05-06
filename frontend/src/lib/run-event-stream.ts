@@ -12,6 +12,7 @@ export type LiveStreamingOutput = {
 };
 
 export type RunEventPreviewDocument = {
+  state_schema?: Record<string, { type?: string | null }>;
   nodes: Record<string, { kind?: string; reads?: Array<{ state?: string | null }>; config?: Record<string, unknown> | null }>;
 };
 
@@ -159,7 +160,16 @@ function resolveOutputNodeIdsForState(document: RunEventPreviewDocument | null |
 function resolveRunEventPreviewDisplayMode(document: RunEventPreviewDocument | null | undefined, nodeId: string) {
   const rawDisplayMode = document?.nodes[nodeId]?.config?.displayMode;
   const displayMode = typeof rawDisplayMode === "string" ? rawDisplayMode.trim() : "";
-  return displayMode && ["plain", "markdown", "json", "documents"].includes(displayMode) ? displayMode : "plain";
+  if (displayMode && displayMode !== "auto" && ["plain", "markdown", "json", "documents"].includes(displayMode)) {
+    return displayMode;
+  }
+  return isDocumentOutputNode(document, nodeId) ? "documents" : "plain";
+}
+
+function isDocumentOutputNode(document: RunEventPreviewDocument | null | undefined, nodeId: string) {
+  const stateKey = document?.nodes[nodeId]?.reads?.[0]?.state?.trim();
+  const stateType = stateKey ? document?.state_schema?.[stateKey]?.type?.trim() : "";
+  return stateType === "file" || stateType === "image" || stateType === "audio" || stateType === "video";
 }
 
 export function buildLiveStreamingOutput(

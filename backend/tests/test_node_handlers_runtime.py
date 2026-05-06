@@ -635,7 +635,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         state_schema = {
             "query": NodeSystemStateDefinition.model_validate({"type": "text"}),
             "search_report": NodeSystemStateDefinition.model_validate({"type": "markdown"}),
-            "source_documents": NodeSystemStateDefinition.model_validate({"type": "array"}),
+            "source_documents": NodeSystemStateDefinition.model_validate({"type": "file"}),
         }
         node = NodeSystemAgentNode.model_validate(
             {

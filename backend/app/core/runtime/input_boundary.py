@@ -19,29 +19,14 @@ def coerce_input_boundary_value(value: Any, state_type: NodeSystemStateType) -> 
 
     try:
         parsed = json.loads(value)
-        if state_type == NodeSystemStateType.FILE:
+        if _is_file_reference_state_type(state_type):
             return _coerce_file_reference(parsed)
-        if state_type == NodeSystemStateType.FILE_LIST:
-            return _coerce_file_reference_list(parsed)
         if state_type in {
             NodeSystemStateType.NUMBER,
             NodeSystemStateType.BOOLEAN,
-            NodeSystemStateType.OBJECT,
-            NodeSystemStateType.ARRAY,
             NodeSystemStateType.JSON,
             NodeSystemStateType.SKILL,
         }:
-            return parsed
-        if (
-            state_type
-            in {
-                NodeSystemStateType.IMAGE,
-                NodeSystemStateType.AUDIO,
-                NodeSystemStateType.VIDEO,
-            }
-            and isinstance(parsed, dict)
-            and parsed.get("kind") == "uploaded_file"
-        ):
             return parsed
         if state_type == NodeSystemStateType.KNOWLEDGE_BASE:
             return value
@@ -51,12 +36,19 @@ def coerce_input_boundary_value(value: Any, state_type: NodeSystemStateType) -> 
 
 
 def _coerce_file_reference(value: Any) -> Any:
+    if isinstance(value, list):
+        return [_coerce_file_reference(item) for item in value]
     if isinstance(value, dict) and value.get("kind") == "uploaded_file":
+        return first_truthy([value.get("localPath"), value.get("local_path"), value.get("path")]) or value
+    if isinstance(value, dict):
         return first_truthy([value.get("localPath"), value.get("local_path"), value.get("path")]) or value
     return value
 
 
-def _coerce_file_reference_list(value: Any) -> Any:
-    if not isinstance(value, list):
-        return value
-    return [_coerce_file_reference(item) for item in value]
+def _is_file_reference_state_type(state_type: NodeSystemStateType) -> bool:
+    return state_type in {
+        NodeSystemStateType.FILE,
+        NodeSystemStateType.IMAGE,
+        NodeSystemStateType.AUDIO,
+        NodeSystemStateType.VIDEO,
+    }

@@ -66,7 +66,7 @@ def prepare_model_input_attachments(
         if not isinstance(attachment, dict):
             continue
         attachment_type = str(attachment.get("type") or "").strip().lower()
-        if attachment_type not in {"image", "video"}:
+        if attachment_type not in {"image", "audio", "video"}:
             continue
 
         filesystem_path = str(attachment.get("filesystem_path") or "").strip()
@@ -152,7 +152,7 @@ def _build_media_attachment(
     envelope = normalize_uploaded_file_envelope(value)
     state_type = definition.type if definition is not None else None
     expected_type = _expected_media_type(state_type, envelope)
-    if expected_type not in {"image", "video"}:
+    if expected_type not in {"image", "audio", "video"}:
         return None
     record = envelope if envelope is not None else value if isinstance(value, dict) else None
     if not isinstance(record, dict) or not _extract_local_path(record):
@@ -194,9 +194,15 @@ def _iter_artifact_candidate_records(
     if (
         isinstance(value, str)
         and definition is not None
-        and definition.type in {NodeSystemStateType.IMAGE, NodeSystemStateType.VIDEO}
+        and definition.type
+        in {
+            NodeSystemStateType.FILE,
+            NodeSystemStateType.IMAGE,
+            NodeSystemStateType.AUDIO,
+            NodeSystemStateType.VIDEO,
+        }
     ):
-        records.append({"local_path": value, "content_type": f"{definition.type.value}/*"})
+        records.append({"local_path": value, "content_type": _declared_file_state_content_type(definition.type)})
     return records
 
 
@@ -220,7 +226,7 @@ def _build_artifact_media_attachment(
         or ""
     ).strip()
     media_type = _resolve_media_type(content_type, str(metadata.get("path") or local_path), definition)
-    if media_type not in {"image", "video"}:
+    if media_type not in {"image", "audio", "video"}:
         return None
 
     name = str(record.get("filename") or record.get("name") or metadata.get("name") or Path(local_path).name).strip()
@@ -254,8 +260,12 @@ def _resolve_media_type(
         return "image"
     if normalized_type.startswith("video/"):
         return "video"
+    if normalized_type.startswith("audio/"):
+        return "audio"
     if definition is not None and definition.type == NodeSystemStateType.IMAGE:
         return "image"
+    if definition is not None and definition.type == NodeSystemStateType.AUDIO:
+        return "audio"
     if definition is not None and definition.type == NodeSystemStateType.VIDEO:
         return "video"
     lower_path = local_path.lower()
@@ -267,6 +277,8 @@ def _resolve_media_type(
         (".3gp", ".avi", ".flv", ".m4v", ".mkv", ".mov", ".mp4", ".mpeg", ".mpg", ".ogv", ".webm")
     ):
         return "video"
+    if lower_path.endswith((".aac", ".flac", ".m4a", ".mp3", ".oga", ".ogg", ".opus", ".wav")):
+        return "audio"
     return ""
 
 
@@ -283,7 +295,11 @@ def _mime_type_for_attachment(media_type: str, filename: str) -> str:
     guessed = mimetypes.guess_type(filename)[0] or ""
     if guessed.startswith(f"{media_type}/"):
         return guessed
-    return "image/png" if media_type == "image" else "video/mp4"
+    if media_type == "image":
+        return "image/png"
+    if media_type == "audio":
+        return "audio/mpeg"
+    return "video/mp4"
 
 
 def _normalize_int(value: Any, fallback: int) -> int:
@@ -311,9 +327,21 @@ def _expected_media_type(
 ) -> str:
     if state_type == NodeSystemStateType.IMAGE:
         return "image"
+    if state_type == NodeSystemStateType.AUDIO:
+        return "audio"
     if state_type == NodeSystemStateType.VIDEO:
         return "video"
     if envelope is None:
         return ""
     detected_type = str(envelope.get("detectedType") if envelope else "").strip().lower()
-    return detected_type if detected_type in {"image", "video"} else ""
+    return detected_type if detected_type in {"image", "audio", "video"} else ""
+
+
+def _declared_file_state_content_type(state_type: NodeSystemStateType) -> str:
+    if state_type == NodeSystemStateType.IMAGE:
+        return "image/*"
+    if state_type == NodeSystemStateType.AUDIO:
+        return "audio/*"
+    if state_type == NodeSystemStateType.VIDEO:
+        return "video/*"
+    return ""

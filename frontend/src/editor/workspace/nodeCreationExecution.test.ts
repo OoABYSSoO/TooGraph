@@ -183,10 +183,9 @@ test("createNodeFromDroppedFile builds an input node from the uploaded asset env
   assert.deepEqual(result.document.nodes.input_file_created.writes, [{ state: "state_1", mode: "replace" }]);
   assert.equal(result.document.state_schema.state_1?.name, "diagram.png");
   assert.equal(result.document.state_schema.state_1?.type, "image");
+  assert.equal(result.document.state_schema.state_1?.value, "uploads/diagram.png");
   assert.equal(result.document.metadata.graphiteui_state_key_counter, 1);
-  assert.match(String(result.document.nodes.input_file_created.config.value), /"kind":"uploaded_file"/);
-  assert.match(String(result.document.nodes.input_file_created.config.value), /"encoding":"local_path"/);
-  assert.match(String(result.document.nodes.input_file_created.config.value), /"localPath":"uploads\/diagram\.png"/);
+  assert.equal(result.document.nodes.input_file_created.config.value, "uploads/diagram.png");
 });
 
 test("createNodeFromDroppedFile stores generic file input nodes as local paths", async () => {
