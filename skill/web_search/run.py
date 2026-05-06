@@ -18,7 +18,6 @@ DEFAULT_MAX_RESULTS = 5
 DEFAULT_SEARCH_DEPTH = "basic"
 DEFAULT_INCLUDE_RAW_CONTENT = False
 DEFAULT_TIMEOUT_SECONDS = 15.0
-DEFAULT_MAX_PAGES = 3
 DEFAULT_MAX_CHARS_PER_PAGE = 200_000
 DEFAULT_RETRY_ATTEMPTS = 5
 PAGE_FETCH_USER_AGENT = "GraphiteUI/1.0 (+https://github.com/AbyssBadger0/GraphiteUI)"
@@ -60,7 +59,6 @@ def web_search_skill(**skill_inputs: Any) -> dict[str, Any]:
     results = _normalize_results(raw_response.get("results", []), max_results=DEFAULT_MAX_RESULTS)
     source_documents = _fetch_source_documents(
         results,
-        max_pages=DEFAULT_MAX_PAGES,
         max_chars_per_page=DEFAULT_MAX_CHARS_PER_PAGE,
         timeout_seconds=DEFAULT_TIMEOUT_SECONDS,
     )
@@ -180,7 +178,6 @@ def _normalize_results(raw_results: object, *, max_results: int) -> list[dict[st
 def _fetch_source_documents(
     results: list[dict[str, Any]],
     *,
-    max_pages: int,
     max_chars_per_page: int,
     timeout_seconds: float,
 ) -> list[dict[str, Any]]:
@@ -194,7 +191,7 @@ def _fetch_source_documents(
     output_dir = Path(artifact_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     documents: list[dict[str, Any]] = []
-    for index, result in enumerate(results[:max_pages], start=1):
+    for index, result in enumerate(results, start=1):
         documents.append(
             _fetch_and_store_source_document(
                 result,
