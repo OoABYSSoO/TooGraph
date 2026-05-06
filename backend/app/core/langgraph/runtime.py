@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 import threading
+import copy
 from typing import Any
 
 from langgraph.graph import END, START, StateGraph
@@ -63,7 +64,7 @@ from app.core.runtime.node_system_executor import (
     _execute_node,
 )
 from app.core.runtime.state import set_run_status, touch_run_lifecycle, utc_now_iso
-from app.core.schemas.node_system import NodeSystemGraphDocument
+from app.core.schemas.node_system import NodeSystemGraphDocument, NodeSystemInputNode, NodeSystemOutputNode, NodeSystemSubgraphNode
 from app.core.storage.run_store import save_run
 
 
@@ -287,7 +288,10 @@ def _build_langgraph_node_callable(
             try:
                 iteration = _current_cycle_iteration(cycle_tracker)
                 input_values, state_reads = collect_node_inputs(node, state)
-                body = _execute_node(graph, node_name, node, input_values, state)
+                if isinstance(node, NodeSystemSubgraphNode):
+                    body = _execute_subgraph_node_runtime(graph, node_name, node, input_values, state)
+                else:
+                    body = _execute_node(graph, node_name, node, input_values, state)
                 outputs = dict(body.get("outputs", {}))
                 selected_edge_ids = select_active_outgoing_edges(outgoing_edges, body)
                 duration_ms = int((time.perf_counter() - node_started_perf) * 1000)
@@ -337,6 +341,7 @@ def _build_langgraph_node_callable(
                             "outputs": outputs,
                             "family": node.kind,
                             "iteration": iteration,
+                            "subgraph": body.get("subgraph"),
                             "selected_branch": body.get("selected_branch"),
                             "response": body.get("response"),
                             "reasoning": body.get("reasoning"),
@@ -425,6 +430,91 @@ def _build_langgraph_node_callable(
                 raise
 
     return _call
+
+
+def _subgraph_input_boundaries(node: NodeSystemSubgraphNode) -> list[tuple[str, str]]:
+    boundaries: list[tuple[str, str]] = []
+    for inner_node_name, inner_node in node.config.graph.nodes.items():
+        if isinstance(inner_node, NodeSystemInputNode) and inner_node.writes:
+            boundaries.append((inner_node_name, inner_node.writes[0].state))
+    return boundaries
+
+
+def _subgraph_output_boundaries(node: NodeSystemSubgraphNode) -> list[tuple[str, str]]:
+    boundaries: list[tuple[str, str]] = []
+    for inner_node_name, inner_node in node.config.graph.nodes.items():
+        if isinstance(inner_node, NodeSystemOutputNode) and inner_node.reads:
+            boundaries.append((inner_node_name, inner_node.reads[0].state))
+    return boundaries
+
+
+def _build_subgraph_document(
+    parent_graph: NodeSystemGraphDocument,
+    node_name: str,
+    node: NodeSystemSubgraphNode,
+    input_values: dict[str, Any],
+) -> NodeSystemGraphDocument:
+    payload = node.config.graph.model_dump(by_alias=True, mode="json")
+    state_schema = dict(payload.get("state_schema") or {})
+    for index, (_inner_node_name, inner_state_key) in enumerate(_subgraph_input_boundaries(node)):
+        external_binding = node.reads[index] if index < len(node.reads) else None
+        if external_binding is None:
+            raise ValueError(f"Subgraph node '{node_name}' is missing required input {index + 1}.")
+        if inner_state_key not in state_schema:
+            raise ValueError(f"Subgraph node '{node_name}' input boundary references unknown state '{inner_state_key}'.")
+        state_schema[inner_state_key] = {
+            **dict(state_schema[inner_state_key]),
+            "value": copy.deepcopy(input_values.get(external_binding.state)),
+        }
+    payload["state_schema"] = state_schema
+    return NodeSystemGraphDocument.model_validate(
+        {
+            **payload,
+            "graph_id": f"{parent_graph.graph_id}_{node_name}_subgraph",
+            "name": node.name or f"{node_name} Subgraph",
+        }
+    )
+
+
+def _execute_subgraph_node_runtime(
+    parent_graph: NodeSystemGraphDocument,
+    node_name: str,
+    node: NodeSystemSubgraphNode,
+    input_values: dict[str, Any],
+    state: dict[str, Any],
+) -> dict[str, Any]:
+    subgraph_document = _build_subgraph_document(parent_graph, node_name, node, input_values)
+    subgraph_state = execute_node_system_graph_langgraph(subgraph_document, persist_progress=False)
+    output_values_by_internal_state = {
+        internal_state_key: copy.deepcopy(subgraph_state.get("state_values", {}).get(internal_state_key))
+        for _inner_node_name, internal_state_key in _subgraph_output_boundaries(node)
+    }
+    parent_outputs: dict[str, Any] = {}
+    for index, (_inner_node_name, internal_state_key) in enumerate(_subgraph_output_boundaries(node)):
+        external_binding = node.writes[index] if index < len(node.writes) else None
+        if external_binding is None:
+            raise ValueError(f"Subgraph node '{node_name}' is missing required output {index + 1}.")
+        parent_outputs[external_binding.state] = copy.deepcopy(output_values_by_internal_state.get(internal_state_key))
+
+    first_value = next((value for value in parent_outputs.values() if value not in (None, "", [], {})), "")
+    return {
+        "outputs": parent_outputs,
+        "final_result": "" if first_value is None else str(first_value),
+        "warnings": list(subgraph_state.get("warnings", [])),
+        "subgraph": {
+            "graph_id": subgraph_document.graph_id,
+            "name": subgraph_document.name,
+            "status": subgraph_state.get("status"),
+            "node_status_map": dict(subgraph_state.get("node_status_map", {})),
+            "input_values": {
+                internal_state_key: copy.deepcopy(subgraph_document.state_schema[internal_state_key].value)
+                for _inner_node_name, internal_state_key in _subgraph_input_boundaries(node)
+            },
+            "output_values": output_values_by_internal_state,
+            "node_executions": list(subgraph_state.get("node_executions", [])),
+            "errors": list(subgraph_state.get("errors", [])),
+        },
+    }
 
 
 def _build_langgraph_route_callable(

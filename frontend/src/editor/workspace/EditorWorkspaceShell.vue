@@ -342,6 +342,7 @@ const {
 });
 
 const graphById = computed(() => new Map(props.graphs.map((graph) => [graph.graph_id, graph])));
+const savedGraphs = computed(() => props.graphs);
 const agentRuntimeCatalog = computed(() => resolveAgentRuntimeCatalog(settings.value));
 const activeTab = computed(() => workspace.value.tabs.find((tab) => tab.tabId === workspace.value.activeTabId) ?? null);
 const pendingCloseTab = computed(() =>
@@ -693,6 +694,7 @@ const {
   dataEdgeStateEditorRequestByTabId,
   nodeCreationMenuByTabId,
   persistedPresets,
+  graphs: savedGraphs,
   guardGraphEditForTab,
   markDocumentDirty,
   setMessageFeedbackForTab,

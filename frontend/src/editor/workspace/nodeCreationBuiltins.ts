@@ -10,6 +10,7 @@ export const NODE_CREATION_FAMILY_PRIORITY: Record<NodeCreationEntry["family"], 
   output: 1,
   agent: 2,
   condition: 3,
+  subgraph: 4,
 };
 
 export function buildBuiltinNodeCreationEntries(): NodeCreationEntry[] {

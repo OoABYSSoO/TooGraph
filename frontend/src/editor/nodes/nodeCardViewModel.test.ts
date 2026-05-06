@@ -811,6 +811,93 @@ test("buildNodeCardViewModel derives condition route target labels for proxy out
   ]);
 });
 
+test("buildNodeCardViewModel derives subgraph boundary and thumbnail summary", () => {
+  const node: GraphNode = {
+    kind: "subgraph",
+    name: "Research Flow Subgraph",
+    description: "Reusable nested graph.",
+    ui: { position: { x: 100, y: 100 } },
+    reads: [{ state: "question", required: true }],
+    writes: [{ state: "answer", mode: "replace" }],
+    config: {
+      graph: {
+        state_schema: {
+          internal_question: {
+            name: "Internal Question",
+            description: "",
+            type: "text",
+            value: "",
+            color: "#d97706",
+          },
+          internal_answer: {
+            name: "Internal Answer",
+            description: "",
+            type: "markdown",
+            value: "",
+            color: "#2563eb",
+          },
+        },
+        nodes: {
+          input_question: {
+            kind: "input",
+            name: "Input",
+            description: "",
+            ui: { position: { x: 0, y: 0 } },
+            reads: [],
+            writes: [{ state: "internal_question", mode: "replace" }],
+            config: { value: "" },
+          },
+          summarize: {
+            kind: "agent",
+            name: "Summarize",
+            description: "",
+            ui: { position: { x: 260, y: 0 } },
+            reads: [{ state: "internal_question", required: true }],
+            writes: [{ state: "internal_answer", mode: "replace" }],
+            config: {
+              skills: ["web_search"],
+              taskInstruction: "",
+              modelSource: "global",
+              model: "",
+              thinkingMode: "high",
+              temperature: 0.2,
+            },
+          },
+          output_answer: {
+            kind: "output",
+            name: "Output",
+            description: "",
+            ui: { position: { x: 520, y: 0 } },
+            reads: [{ state: "internal_answer", required: true }],
+            writes: [],
+            config: {
+              displayMode: "auto",
+              persistEnabled: false,
+              persistFormat: "auto",
+              fileNameTemplate: "",
+            },
+          },
+        },
+        edges: [
+          { source: "input_question", target: "summarize" },
+          { source: "summarize", target: "output_answer" },
+        ],
+        conditional_edges: [],
+        metadata: {},
+      },
+    },
+  };
+
+  const model = buildNodeCardViewModel("research_subgraph", node, stateSchema);
+
+  assert.equal(model.kindLabel, "SUBGRAPH");
+  assert.equal(model.body.kind, "subgraph");
+  assert.deepEqual(model.body.thumbnailNodes.map((item) => item.label), ["Input", "Summarize", "Output"]);
+  assert.equal(model.body.inputCount, 1);
+  assert.equal(model.body.outputCount, 1);
+  assert.deepEqual(model.body.capabilities, ["web_search"]);
+});
+
 test("buildNodeCardViewModel marks exhausted condition routes as neutral", () => {
   const node: GraphNode = {
     kind: "condition",

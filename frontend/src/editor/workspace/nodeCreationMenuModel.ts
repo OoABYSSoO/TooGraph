@@ -1,6 +1,6 @@
 import { NODE_CREATION_FAMILY_PRIORITY } from "./nodeCreationBuiltins.ts";
 
-import type { NodeCreationContext, NodeCreationEntry, PresetDocument } from "@/types/node-system";
+import type { GraphDocument, NodeCreationContext, NodeCreationEntry, PresetDocument } from "@/types/node-system";
 
 type NodeCreationAnchorKind = "flow-out" | "route-out" | "state-out" | "state-in";
 
@@ -27,6 +27,7 @@ type CreatedStateEdgeEditorResult = {
 type BuildNodeCreationEntriesInput = {
   builtins: NodeCreationEntry[];
   presets: PresetDocument[];
+  graphs?: GraphDocument[];
   query: string;
   sourceValueType: string | null;
   sourceAnchorKind?: NodeCreationAnchorKind | null;
@@ -120,6 +121,31 @@ function toPresetEntry(preset: PresetDocument): NodeCreationEntry {
   };
 }
 
+function listGraphAcceptedValueTypes(graph: GraphDocument) {
+  const acceptedTypes = Array.from(
+    new Set(
+      Object.values(graph.nodes)
+        .filter((node) => node.kind === "input" && node.writes.length > 0)
+        .map((node) => graph.state_schema[node.writes[0].state]?.type?.trim() ?? "")
+        .filter((valueType) => valueType.length > 0),
+    ),
+  );
+  return acceptedTypes.length > 0 ? acceptedTypes : null;
+}
+
+function toSubgraphEntry(graph: GraphDocument): NodeCreationEntry {
+  return {
+    id: `graph-${graph.graph_id}`,
+    family: "subgraph",
+    label: `${graph.name.trim() || graph.graph_id} Subgraph`,
+    description: "Use a saved graph as an embedded subgraph instance.",
+    mode: "subgraph",
+    origin: "persisted",
+    graphId: graph.graph_id,
+    acceptsValueTypes: listGraphAcceptedValueTypes(graph),
+  };
+}
+
 function matchesNodeCreationQuery(entry: NodeCreationEntry, query: string) {
   if (!query) {
     return true;
@@ -197,9 +223,10 @@ export function sortNodeCreationEntries(entries: NodeCreationEntry[]) {
 
 export function buildNodeCreationEntries(input: BuildNodeCreationEntriesInput) {
   const presetEntries = input.presets.map(toPresetEntry);
+  const graphEntries = (input.graphs ?? []).map(toSubgraphEntry);
   return sortNodeCreationEntries(
     filterNodeCreationEntries(
-      [...input.builtins, ...presetEntries],
+      [...input.builtins, ...presetEntries, ...graphEntries],
       input.query,
       input.sourceValueType,
       input.sourceAnchorKind ?? null,

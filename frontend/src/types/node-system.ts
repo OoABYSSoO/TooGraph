@@ -8,7 +8,7 @@ export type GraphNodeSize = {
   height: number;
 };
 
-export type NodeFamily = "input" | "output" | "agent" | "condition";
+export type NodeFamily = "input" | "output" | "agent" | "condition" | "subgraph";
 
 export type StateDefinition = {
   name: string;
@@ -124,7 +124,27 @@ export type OutputNode = {
   };
 };
 
-export type GraphNode = InputNode | AgentNode | ConditionNode | OutputNode;
+export type GraphCorePayload = {
+  state_schema: Record<string, StateDefinition>;
+  nodes: Record<string, GraphNode>;
+  edges: GraphEdge[];
+  conditional_edges: ConditionalEdge[];
+  metadata: Record<string, unknown>;
+};
+
+export type SubgraphNode = {
+  kind: "subgraph";
+  name: string;
+  description: string;
+  ui: NodeUi;
+  reads: ReadBinding[];
+  writes: WriteBinding[];
+  config: {
+    graph: GraphCorePayload;
+  };
+};
+
+export type GraphNode = InputNode | AgentNode | ConditionNode | OutputNode | SubgraphNode;
 
 export type GraphEdge = {
   source: string;
@@ -136,14 +156,9 @@ export type ConditionalEdge = {
   branches: Record<string, string>;
 };
 
-export type GraphPayload = {
+export type GraphPayload = GraphCorePayload & {
   graph_id?: string | null;
   name: string;
-  state_schema: Record<string, StateDefinition>;
-  nodes: Record<string, GraphNode>;
-  edges: GraphEdge[];
-  conditional_edges: ConditionalEdge[];
-  metadata: Record<string, unknown>;
 };
 
 export type GraphDocument = GraphPayload & {
@@ -231,10 +246,11 @@ export type NodeCreationEntry = {
   family: NodeFamily;
   label: string;
   description: string;
-  mode: "node" | "preset";
+  mode: "node" | "preset" | "subgraph";
   origin?: "builtin" | "persisted";
   nodeKind?: "input" | "output";
   presetId?: string;
+  graphId?: string;
   acceptsValueTypes?: string[] | null;
 };
 

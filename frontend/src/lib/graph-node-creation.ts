@@ -1,4 +1,4 @@
-import { cloneGraphDocument } from "./graph-document.ts";
+import { cloneGraphDocument, clonePlainValue } from "./graph-document.ts";
 import { buildNextDefaultStateField, rememberDefaultStateKeyIndex, resolveDefaultStateColor } from "../editor/workspace/statePanelFields.ts";
 import { isCreateAgentInputStateKey, isVirtualAnyInputStateKey, isVirtualAnyOutputStateKey } from "./virtual-any-input.ts";
 import { canConnectStateInputSource, filterReplacedStateInputSourceEdges } from "./graph-connections.ts";
@@ -6,6 +6,7 @@ import { resolveInputNodeVirtualOutputType } from "./input-boundary.ts";
 
 import type {
   GraphDocument,
+  GraphCorePayload,
   GraphNode,
   GraphPayload,
   GraphPosition,
@@ -14,6 +15,7 @@ import type {
   OutputNode,
   PresetDocument,
   StateDefinition,
+  SubgraphNode,
 } from "../types/node-system.ts";
 
 type CreatedNodeResult = {
@@ -139,6 +141,102 @@ export function buildNodeFromPreset(preset: PresetDocument, params: { id: string
   };
 }
 
+function listSubgraphInputBoundaries(graph: GraphCorePayload) {
+  return Object.entries(graph.nodes)
+    .filter(([, node]) => node.kind === "input" && node.writes.length > 0)
+    .map(([nodeId, node]) => ({
+      nodeId,
+      stateKey: node.writes[0].state,
+      definition: graph.state_schema[node.writes[0].state],
+    }));
+}
+
+function listSubgraphOutputBoundaries(graph: GraphCorePayload) {
+  return Object.entries(graph.nodes)
+    .filter(([, node]) => node.kind === "output" && node.reads.length > 0)
+    .map(([nodeId, node]) => ({
+      nodeId,
+      stateKey: node.reads[0].state,
+      definition: graph.state_schema[node.reads[0].state],
+    }));
+}
+
+function cloneGraphCoreForSubgraph(sourceGraph: GraphPayload | GraphDocument): GraphCorePayload {
+  const graph = clonePlainValue({
+    state_schema: sourceGraph.state_schema,
+    nodes: sourceGraph.nodes,
+    edges: sourceGraph.edges,
+    conditional_edges: sourceGraph.conditional_edges,
+    metadata: {
+      ...sourceGraph.metadata,
+      sourceGraphId: sourceGraph.graph_id ?? null,
+      sourceGraphName: sourceGraph.name,
+    },
+  });
+  for (const boundary of listSubgraphInputBoundaries(graph)) {
+    const definition = graph.state_schema[boundary.stateKey];
+    if (definition) {
+      definition.value = defaultValueForStateType(definition.type);
+    }
+    const inputNode = graph.nodes[boundary.nodeId];
+    if (inputNode.kind === "input") {
+      inputNode.config.value = definition?.value ?? "";
+    }
+  }
+  return graph;
+}
+
+function createSubgraphPortState(
+  targetDocument: GraphPayload | GraphDocument,
+  stateSchema: Record<string, StateDefinition>,
+  definition: StateDefinition | undefined,
+) {
+  const nextField = buildNextDefaultStateField(targetDocument, {
+    name: definition?.name?.trim() || "",
+    description: definition?.description?.trim() || "",
+    type: definition?.type?.trim() || "text",
+    value: defaultValueForStateType(definition?.type?.trim() || "text"),
+    color: definition?.color?.trim() || undefined,
+  });
+  targetDocument.state_schema[nextField.key] = nextField.definition;
+  stateSchema[nextField.key] = nextField.definition;
+  rememberDefaultStateKeyIndex(targetDocument, nextField.key);
+  return nextField.key;
+}
+
+export function buildSubgraphNodeFromGraph(
+  sourceGraph: GraphPayload | GraphDocument,
+  params: { id: string; position: GraphPosition; targetDocument: GraphPayload | GraphDocument },
+): CreatedNodeResult {
+  const graph = cloneGraphCoreForSubgraph(sourceGraph);
+  const workingDocument = cloneGraphDocument(params.targetDocument);
+  const state_schema: Record<string, StateDefinition> = {};
+  const reads = listSubgraphInputBoundaries(graph).map((boundary) => ({
+    state: createSubgraphPortState(workingDocument, state_schema, boundary.definition),
+    required: true,
+  }));
+  const writes = listSubgraphOutputBoundaries(graph).map((boundary) => ({
+    state: createSubgraphPortState(workingDocument, state_schema, boundary.definition),
+    mode: "replace" as const,
+  }));
+  const node: SubgraphNode = {
+    kind: "subgraph",
+    name: `${sourceGraph.name.trim() || "Graph"} Subgraph`,
+    description: "Embedded graph instance. Double-click to edit this copy.",
+    ui: normalizeCreatedNodeUi(params.position),
+    reads,
+    writes,
+    config: {
+      graph,
+    },
+  };
+  return {
+    id: params.id,
+    node,
+    state_schema,
+  };
+}
+
 export function buildInputNodeFromFile(params: {
   id: string;
   position: GraphPosition;
@@ -201,6 +299,15 @@ function bindCreatedStateToNode(node: GraphNode, stateKey: string) {
     if (!node.reads.some((binding) => binding.state === stateKey)) {
       node.reads = [...node.reads, { state: stateKey, required: true }];
     }
+    return;
+  }
+
+  if (node.kind === "subgraph") {
+    if (node.reads.length > 0) {
+      node.reads = [{ ...node.reads[0], state: stateKey, required: true }, ...node.reads.slice(1)];
+      return;
+    }
+    node.reads = [{ state: stateKey, required: true }];
   }
 }
 
@@ -209,6 +316,14 @@ function bindCreatedStateToSourceNode(node: GraphNode | undefined, stateKey: str
     return;
   }
   if (node.kind === "input") {
+    node.writes = [{ state: stateKey, mode: "replace" }];
+    return;
+  }
+  if (node.kind === "subgraph") {
+    if (node.writes.length > 0) {
+      node.writes = [{ ...node.writes[0], state: stateKey, mode: "replace" }, ...node.writes.slice(1)];
+      return;
+    }
     node.writes = [{ state: stateKey, mode: "replace" }];
     return;
   }
@@ -381,7 +496,13 @@ export function applyNodeCreationResult<T extends GraphPayload | GraphDocument>(
     createdStateKey = sourceStateField.key;
   }
 
-  if (sourceStateKey && (input.createdNode.kind === "output" || input.createdNode.kind === "agent" || input.createdNode.kind === "condition")) {
+  if (
+    sourceStateKey &&
+    (input.createdNode.kind === "output" ||
+      input.createdNode.kind === "agent" ||
+      input.createdNode.kind === "condition" ||
+      input.createdNode.kind === "subgraph")
+  ) {
     ensureStateDefinitionForCreation(nextDocument, sourceStateKey, sourceValueType || "text");
     bindCreatedStateToNode(nextDocument.nodes[input.createdNodeId], sourceStateKey);
     applyStateNameToCreatedOutputNode(nextDocument.nodes[input.createdNodeId], sourceStateKey, nextDocument.state_schema);

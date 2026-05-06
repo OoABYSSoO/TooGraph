@@ -15,6 +15,7 @@ const portReorderComposableSource = readFileSync(resolve(currentDirectory, "useP
 const agentNodeBodySource = readFileSync(resolve(currentDirectory, "AgentNodeBody.vue"), "utf8").replace(/\r\n/g, "\n");
 const inputNodeBodySource = readFileSync(resolve(currentDirectory, "InputNodeBody.vue"), "utf8").replace(/\r\n/g, "\n");
 const outputNodeBodySource = readFileSync(resolve(currentDirectory, "OutputNodeBody.vue"), "utf8").replace(/\r\n/g, "\n");
+const subgraphNodeBodySource = readFileSync(resolve(currentDirectory, "SubgraphNodeBody.vue"), "utf8").replace(/\r\n/g, "\n");
 const conditionNodeBodySource = readFileSync(resolve(currentDirectory, "ConditionNodeBody.vue"), "utf8").replace(/\r\n/g, "\n");
 const topActionsSource = readFileSync(resolve(currentDirectory, "NodeCardTopActions.vue"), "utf8").replace(/\r\n/g, "\n");
 const primaryStatePortSource = readFileSync(resolve(currentDirectory, "PrimaryStatePort.vue"), "utf8").replace(/\r\n/g, "\n");
@@ -90,7 +91,7 @@ test("NodeCard stretches primary editable surfaces when the canvas resizes the n
   assert.match(componentSource, /\.node-card__body \{[\s\S]*flex:\s*1 1 auto;[\s\S]*min-height:\s*0;/);
   assert.match(
     componentSource,
-    /\.node-card__body--input,[\s\S]*\.node-card__body--agent,[\s\S]*\.node-card__body--output \{[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*column;/,
+    /\.node-card__body--input,[\s\S]*\.node-card__body--agent,[\s\S]*\.node-card__body--output,[\s\S]*\.node-card__body--subgraph \{[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*column;/,
   );
   assert.match(inputNodeBodySource, /\.node-card__input-body \{[\s\S]*display:\s*flex;[\s\S]*flex:\s*1 1 auto;[\s\S]*min-height:\s*0;/);
   assert.match(inputNodeBodySource, /\.node-card__surface-textarea \{[\s\S]*flex:\s*1 1 auto;[\s\S]*width:\s*100%;[\s\S]*height:\s*100%;[\s\S]*resize:\s*none;/);
@@ -98,6 +99,7 @@ test("NodeCard stretches primary editable surfaces when the canvas resizes the n
   assert.match(outputNodeBodySource, /\.node-card__output-body \{[\s\S]*display:\s*flex;[\s\S]*flex:\s*1 1 auto;[\s\S]*min-height:\s*0;/);
   assert.match(outputNodeBodySource, /\.node-card__surface--output \{[\s\S]*flex:\s*1 1 auto;[\s\S]*min-height:\s*0;/);
   assert.match(outputNodeBodySource, /\.node-card__preview \{[\s\S]*flex:\s*1 1 auto;[\s\S]*min-height:\s*0;/);
+  assert.match(subgraphNodeBodySource, /\.subgraph-node-body \{[\s\S]*display:\s*grid;/);
 });
 
 test("NodeCard keeps state pill geometry but hides the pill chrome visually", () => {

@@ -13,6 +13,7 @@ from app.core.schemas.node_system import (
     NodeSystemGraphEdge,
     NodeSystemInputNode,
     NodeSystemOutputNode,
+    NodeSystemSubgraphNode,
     ValidationIssue,
 )
 from app.core.schemas.skills import SkillAgentNodeEligibility, SkillCatalogStatus, SkillDefinition
@@ -46,6 +47,8 @@ def validate_graph(graph: NodeSystemGraphDocument) -> GraphValidationResponse:
             issues.extend(_validate_agent_node(node_name, node, state_schema, runtime_skill_keys, skill_catalog))
         elif isinstance(node, NodeSystemConditionNode):
             issues.extend(_validate_condition_node(node_name, node, graph))
+        elif isinstance(node, NodeSystemSubgraphNode):
+            issues.extend(_validate_subgraph_node(node_name, node, runtime_skill_keys, skill_catalog))
 
     for index, edge in enumerate(graph.edges):
         issues.extend(_validate_edge(index, edge, graph))
@@ -129,6 +132,159 @@ def _validate_node_shape(node_name: str, node: object) -> list[ValidationIssue]:
             )
         )
 
+    return issues
+
+
+def _prefix_issues(issues: list[ValidationIssue], path_prefix: str) -> list[ValidationIssue]:
+    return [
+        ValidationIssue(
+            code=issue.code,
+            message=issue.message,
+            path=f"{path_prefix}.{issue.path}" if issue.path else path_prefix,
+        )
+        for issue in issues
+    ]
+
+
+def _validate_embedded_graph(
+    graph: object,
+    *,
+    runtime_skill_keys: set[str],
+    skill_catalog: dict[str, SkillDefinition],
+    path_prefix: str,
+) -> list[ValidationIssue]:
+    issues: list[ValidationIssue] = []
+    for node_name, node in getattr(graph, "nodes", {}).items():
+        issues.extend(_prefix_issues(_validate_node_shape(node_name, node), f"{path_prefix}.nodes.{node_name}"))
+        if isinstance(node, NodeSystemAgentNode):
+            issues.extend(
+                _prefix_issues(
+                    _validate_agent_node(
+                        node_name,
+                        node,
+                        getattr(graph, "state_schema", {}),
+                        runtime_skill_keys,
+                        skill_catalog,
+                    ),
+                    f"{path_prefix}.nodes.{node_name}",
+                )
+            )
+        elif isinstance(node, NodeSystemConditionNode):
+            issues.extend(_prefix_issues(_validate_condition_node(node_name, node, graph), path_prefix))
+        elif isinstance(node, NodeSystemSubgraphNode):
+            issues.extend(
+                _prefix_issues(
+                    _validate_subgraph_node(node_name, node, runtime_skill_keys, skill_catalog),
+                    f"{path_prefix}.nodes.{node_name}",
+                )
+            )
+
+    for index, edge in enumerate(getattr(graph, "edges", [])):
+        issues.extend(_prefix_issues(_validate_edge(index, edge, graph), path_prefix))
+
+    for index, conditional_edge in enumerate(getattr(graph, "conditional_edges", [])):
+        issues.extend(
+            _prefix_issues(
+                _validate_conditional_edge(index, conditional_edge.source, conditional_edge.branches, graph),
+                path_prefix,
+            )
+        )
+
+    for ambiguous_read in find_ambiguous_state_reads(graph):
+        issues.append(
+            ValidationIssue(
+                code="state_writer_order_ambiguous",
+                message=(
+                    f"State '{ambiguous_read.state_key}' reaches reader '{ambiguous_read.node_id}' "
+                    "from multiple unordered writers."
+                ),
+                path=f"{path_prefix}.nodes.{ambiguous_read.node_id}.reads",
+            )
+        )
+    return issues
+
+
+def _subgraph_input_boundaries(node: NodeSystemSubgraphNode) -> list[tuple[str, str]]:
+    boundaries: list[tuple[str, str]] = []
+    for inner_node_name, inner_node in node.config.graph.nodes.items():
+        if isinstance(inner_node, NodeSystemInputNode) and inner_node.writes:
+            boundaries.append((inner_node_name, inner_node.writes[0].state))
+    return boundaries
+
+
+def _subgraph_output_boundaries(node: NodeSystemSubgraphNode) -> list[tuple[str, str]]:
+    boundaries: list[tuple[str, str]] = []
+    for inner_node_name, inner_node in node.config.graph.nodes.items():
+        if isinstance(inner_node, NodeSystemOutputNode) and inner_node.reads:
+            boundaries.append((inner_node_name, inner_node.reads[0].state))
+    return boundaries
+
+
+def _validate_subgraph_node(
+    node_name: str,
+    node: NodeSystemSubgraphNode,
+    runtime_skill_keys: set[str],
+    skill_catalog: dict[str, SkillDefinition],
+) -> list[ValidationIssue]:
+    issues: list[ValidationIssue] = []
+    input_boundaries = _subgraph_input_boundaries(node)
+    output_boundaries = _subgraph_output_boundaries(node)
+
+    if len(node.reads) < len(input_boundaries):
+        missing = input_boundaries[len(node.reads) :]
+        labels = ", ".join(f"{inner_node}.{state_key}" for inner_node, state_key in missing)
+        issues.append(
+            ValidationIssue(
+                code="subgraph_input_binding_missing",
+                message=f"Subgraph node '{node_name}' is missing parent inputs for: {labels}.",
+                path=f"nodes.{node_name}.reads",
+            )
+        )
+    if len(node.reads) > len(input_boundaries):
+        issues.append(
+            ValidationIssue(
+                code="subgraph_input_binding_extra",
+                message=f"Subgraph node '{node_name}' has more parent inputs than embedded input boundaries.",
+                path=f"nodes.{node_name}.reads",
+            )
+        )
+    for index, binding in enumerate(node.reads[: len(input_boundaries)]):
+        if not binding.required:
+            issues.append(
+                ValidationIssue(
+                    code="subgraph_input_binding_not_required",
+                    message=f"Subgraph node '{node_name}' input {index + 1} must be required.",
+                    path=f"nodes.{node_name}.reads.{index}.required",
+                )
+            )
+
+    if len(node.writes) < len(output_boundaries):
+        missing = output_boundaries[len(node.writes) :]
+        labels = ", ".join(f"{inner_node}.{state_key}" for inner_node, state_key in missing)
+        issues.append(
+            ValidationIssue(
+                code="subgraph_output_binding_missing",
+                message=f"Subgraph node '{node_name}' is missing parent outputs for: {labels}.",
+                path=f"nodes.{node_name}.writes",
+            )
+        )
+    if len(node.writes) > len(output_boundaries):
+        issues.append(
+            ValidationIssue(
+                code="subgraph_output_binding_extra",
+                message=f"Subgraph node '{node_name}' has more parent outputs than embedded output boundaries.",
+                path=f"nodes.{node_name}.writes",
+            )
+        )
+
+    issues.extend(
+        _validate_embedded_graph(
+            node.config.graph,
+            runtime_skill_keys=runtime_skill_keys,
+            skill_catalog=skill_catalog,
+            path_prefix=f"nodes.{node_name}.config.graph",
+        )
+    )
     return issues
 
 
@@ -354,7 +510,7 @@ def _validate_edge(index: int, edge: NodeSystemGraphEdge, graph: NodeSystemGraph
         )
         return issues
 
-    if source_node.kind not in {"input", "agent"}:
+    if source_node.kind not in {"input", "agent", "subgraph"}:
         issues.append(
             ValidationIssue(
                 code="edge_source_kind_invalid",
@@ -363,7 +519,7 @@ def _validate_edge(index: int, edge: NodeSystemGraphEdge, graph: NodeSystemGraph
             )
         )
 
-    if target_node.kind not in {"agent", "condition", "output"}:
+    if target_node.kind not in {"agent", "condition", "output", "subgraph"}:
         issues.append(
             ValidationIssue(
                 code="edge_target_kind_invalid",

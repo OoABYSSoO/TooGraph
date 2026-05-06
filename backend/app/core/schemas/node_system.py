@@ -330,6 +330,12 @@ class NodeSystemOutputConfig(BaseModel):
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
 
+class NodeSystemSubgraphConfig(BaseModel):
+    graph: "NodeSystemGraphCore"
+
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True, extra="forbid")
+
+
 class NodeSystemInputNode(BaseModel):
     kind: Literal["input"] = "input"
     name: str = ""
@@ -370,11 +376,22 @@ class NodeSystemOutputNode(BaseModel):
     config: NodeSystemOutputConfig = Field(default_factory=NodeSystemOutputConfig)
 
 
+class NodeSystemSubgraphNode(BaseModel):
+    kind: Literal["subgraph"] = "subgraph"
+    name: str = ""
+    description: str = ""
+    ui: NodeSystemNodeUi
+    reads: list[NodeSystemReadBinding] = Field(default_factory=list)
+    writes: list[NodeSystemWriteBinding] = Field(default_factory=list)
+    config: NodeSystemSubgraphConfig
+
+
 NodeSystemNode = (
     NodeSystemInputNode
     | NodeSystemAgentNode
     | NodeSystemConditionNode
     | NodeSystemOutputNode
+    | NodeSystemSubgraphNode
 )
 
 NodeSystemNodeConfig = NodeSystemNode
@@ -490,3 +507,6 @@ class NodeSystemGraphPayload(NodeSystemGraphCore):
 
 class NodeSystemGraphDocument(NodeSystemGraphPayload):
     graph_id: str = Field(..., min_length=1)
+
+
+NodeSystemSubgraphConfig.model_rebuild()

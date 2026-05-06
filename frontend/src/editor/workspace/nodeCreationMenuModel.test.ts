@@ -9,7 +9,7 @@ import {
   buildUpdatedNodeCreationMenuQuery,
   supportsCreationSourceType,
 } from "./nodeCreationMenuModel.ts";
-import type { NodeCreationContext, NodeCreationEntry, PresetDocument } from "@/types/node-system";
+import type { GraphDocument, NodeCreationContext, NodeCreationEntry, PresetDocument } from "@/types/node-system";
 
 const builtins: NodeCreationEntry[] = [
   {
@@ -135,6 +135,36 @@ const presets: PresetDocument[] = [
   },
 ];
 
+const graphs: GraphDocument[] = [
+  {
+    graph_id: "graph_research",
+    name: "Research Flow",
+    state_schema: {
+      question: {
+        name: "Question",
+        description: "",
+        type: "text",
+        value: "",
+        color: "#d97706",
+      },
+    },
+    nodes: {
+      input_question: {
+        kind: "input",
+        name: "Question Input",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [],
+        writes: [{ state: "question", mode: "replace" }],
+        config: { value: "" },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  },
+];
+
 test("buildNodeCreationEntries keeps node entries ahead of persisted presets within family order", () => {
   const entries = buildNodeCreationEntries({
     builtins: [...builtins],
@@ -165,6 +195,22 @@ test("buildNodeCreationEntries filters creation candidates by query and source t
   });
 
   assert.deepEqual(entries.map((entry) => entry.id), ["preset-preset.agent.lookup_kb"]);
+});
+
+test("buildNodeCreationEntries exposes saved graphs as subgraph creation entries", () => {
+  const entries = buildNodeCreationEntries({
+    builtins: [...builtins],
+    presets: [],
+    graphs,
+    query: "research",
+    sourceValueType: "text",
+  });
+
+  assert.deepEqual(entries.map((entry) => entry.id), ["graph-graph_research"]);
+  assert.equal(entries[0].family, "subgraph");
+  assert.equal(entries[0].mode, "subgraph");
+  assert.equal(entries[0].graphId, "graph_research");
+  assert.deepEqual(entries[0].acceptsValueTypes, ["text"]);
 });
 
 test("buildNodeCreationEntries excludes input nodes when creation starts from a connection", () => {

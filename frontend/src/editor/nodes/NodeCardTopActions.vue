@@ -154,7 +154,7 @@ import { useI18n } from "vue-i18n";
 import type { NodeTopAction } from "./useNodeFloatingPanels";
 import type { OutputNode } from "@/types/node-system";
 
-type BodyKind = "input" | "agent" | "output" | "condition";
+type BodyKind = "input" | "agent" | "output" | "condition" | "subgraph";
 type OutputDisplayModeOption = {
   value: OutputNode["config"]["displayMode"];
   label: string;

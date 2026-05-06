@@ -83,6 +83,16 @@ export type NodeCardViewModel = {
         routeOutputs: NodeConditionRouteOutputViewModel[];
       }
     | {
+        kind: "subgraph";
+        inputCount: number;
+        outputCount: number;
+        thumbnailNodes: { id: string; label: string; kind: GraphNode["kind"] }[];
+        thumbnailEdges: { source: string; target: string }[];
+        capabilities: string[];
+        primaryInput: NodePortViewModel | null;
+        primaryOutput: NodePortViewModel | null;
+      }
+    | {
         kind: "output";
         previewTitle: string;
         displayMode: string;
@@ -197,6 +207,19 @@ function buildBody(
     };
   }
 
+  if (node.kind === "subgraph") {
+    return {
+      kind: "subgraph",
+      inputCount: node.reads.length,
+      outputCount: node.writes.length,
+      thumbnailNodes: listSubgraphThumbnailNodes(node),
+      thumbnailEdges: node.config.graph.edges.map((edge) => ({ source: edge.source, target: edge.target })),
+      capabilities: listSubgraphCapabilities(node),
+      primaryInput: inputs[0] ?? null,
+      primaryOutput: outputs[0] ?? null,
+    };
+  }
+
   const connectedState = node.reads[0]?.state ?? null;
   const runtime = options.runtime;
   const connectedStateType = connectedState ? stateSchema[connectedState]?.type?.trim() || "" : "";
@@ -228,6 +251,33 @@ function buildBody(
     persistLabel: node.config.persistEnabled ? "Save on" : "Save off",
     fileNameTemplate: node.config.fileNameTemplate,
   };
+}
+
+function listSubgraphThumbnailNodes(node: Extract<GraphNode, { kind: "subgraph" }>) {
+  return Object.entries(node.config.graph.nodes).map(([id, innerNode]) => ({
+    id,
+    label: innerNode.name?.trim() || id,
+    kind: innerNode.kind,
+  }));
+}
+
+function listSubgraphCapabilities(node: Extract<GraphNode, { kind: "subgraph" }>) {
+  const capabilities = new Set<string>();
+  for (const innerNode of Object.values(node.config.graph.nodes)) {
+    if (innerNode.kind === "agent") {
+      for (const skillKey of innerNode.config.skills) {
+        if (skillKey.trim()) {
+          capabilities.add(skillKey.trim());
+        }
+      }
+    }
+    if (innerNode.kind === "subgraph") {
+      for (const capability of listSubgraphCapabilities(innerNode)) {
+        capabilities.add(capability);
+      }
+    }
+  }
+  return [...capabilities].sort();
 }
 
 function getStateLabel(stateKey: string, stateSchema: Record<string, StateDefinition>) {

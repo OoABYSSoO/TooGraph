@@ -6,6 +6,7 @@
       'node-card--selected': selected,
       'node-card--hovered': hovered,
       'node-card--condition': view.body.kind === 'condition',
+      'node-card--subgraph': view.body.kind === 'subgraph',
       'node-card--floating-panel-open': hasFloatingPanelOpen,
     }"
     @pointerdown.capture="handleLockedNodeCardInteractionCapture"
@@ -276,6 +277,36 @@
       />
     </section>
 
+    <section v-else-if="view.body.kind === 'subgraph'" class="node-card__body node-card__body--subgraph">
+      <SubgraphNodeBody
+        :node-id="nodeId"
+        :body="view.body"
+        :ordered-input-ports="orderedAgentInputPorts"
+        :ordered-output-ports="orderedAgentOutputPorts"
+        :state-editor-popover-style="stateEditorPopoverStyle"
+        :agent-add-popover-style="agentAddPopoverStyle"
+        :state-editor-draft="stateEditorDraft"
+        :state-editor-error="stateEditorError"
+        :type-options="stateTypeOptions"
+        :color-options="stateColorOptions"
+        :is-state-editor-open="isStateEditorOpen"
+        :is-state-editor-confirm-open="isStateEditorConfirmOpen"
+        :is-remove-port-state-confirm-open="isRemovePortStateConfirmOpen"
+        :is-state-editor-pill-revealed="isStateEditorPillRevealed"
+        :is-port-reordering="isPortReordering"
+        :is-port-reorder-placeholder="isPortReorderPlaceholder"
+        @pointer-enter="handleStateEditorPillPointerEnter"
+        @pointer-leave="handleStateEditorPillPointerLeave"
+        @reorder-pointer-down="handlePortReorderPointerDown"
+        @port-click="handlePortStatePillClick"
+        @remove-click="handleRemovePortStateClick"
+        @update:name="handleStateEditorNameInput"
+        @update:type="handleStateEditorTypeValue"
+        @update:color="handleStateEditorColorInput"
+        @update:description="handleStateEditorDescriptionInput"
+      />
+    </section>
+
     <section v-else-if="view.body.kind === 'output'" class="node-card__body node-card__body--output">
       <OutputNodeBody
         :body="view.body"
@@ -400,6 +431,7 @@ import InputNodeBody from "./InputNodeBody.vue";
 import NodeCardTopActions from "./NodeCardTopActions.vue";
 import OutputNodeBody from "./OutputNodeBody.vue";
 import PrimaryStatePort from "./PrimaryStatePort.vue";
+import SubgraphNodeBody from "./SubgraphNodeBody.vue";
 import type { KnowledgeBaseRecord } from "@/types/knowledge";
 import type { AgentNode, ConditionNode, GraphNode, InputNode, OutputNode, StateDefinition } from "@/types/node-system";
 import type { SkillDefinition } from "@/types/skills";
@@ -592,10 +624,10 @@ const view = computed(() =>
   }),
 );
 const agentInputPorts = computed<NodePortViewModel[]>(() =>
-  view.value.body.kind === "agent" ? view.value.inputs.filter((port) => !port.virtual) : [],
+  view.value.body.kind === "agent" || view.value.body.kind === "subgraph" ? view.value.inputs.filter((port) => !port.virtual) : [],
 );
 const agentOutputPorts = computed<NodePortViewModel[]>(() =>
-  view.value.body.kind === "agent" ? view.value.outputs.filter((port) => !port.virtual) : [],
+  view.value.body.kind === "agent" || view.value.body.kind === "subgraph" ? view.value.outputs.filter((port) => !port.virtual) : [],
 );
 const shouldShowAgentCreateInputPort = computed(() => agentInputPorts.value.length === 0);
 const shouldShowAgentCreateOutputPort = computed(() => agentOutputPorts.value.length === 0);
@@ -1772,6 +1804,10 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
   width: var(--node-card-width, 560px);
 }
 
+.node-card--subgraph {
+  width: var(--node-card-width, 620px);
+}
+
 .node-card--selected {
   border-color: rgba(154, 52, 18, 0.32);
   box-shadow: 0 22px 40px rgba(154, 52, 18, 0.14);
@@ -1934,7 +1970,8 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
 
 .node-card__body--input,
 .node-card__body--agent,
-.node-card__body--output {
+.node-card__body--output,
+.node-card__body--subgraph {
   display: flex;
   flex-direction: column;
 }

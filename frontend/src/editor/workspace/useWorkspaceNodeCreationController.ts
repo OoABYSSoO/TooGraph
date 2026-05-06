@@ -23,6 +23,7 @@ type WorkspaceNodeCreationControllerInput = {
   dataEdgeStateEditorRequestByTabId: Ref<Record<string, CreatedStateEdgeEditorRequest | null>>;
   nodeCreationMenuByTabId: Ref<Record<string, NodeCreationMenuState>>;
   persistedPresets: Ref<PresetDocument[]>;
+  graphs: Ref<GraphDocument[]>;
   guardGraphEditForTab: (tabId: string) => boolean;
   markDocumentDirty: (tabId: string, document: GraphPayload | GraphDocument) => void;
   setMessageFeedbackForTab: (
@@ -46,6 +47,7 @@ export function useWorkspaceNodeCreationController(input: WorkspaceNodeCreationC
     return buildNodeCreationEntries({
       builtins: buildBuiltinNodeCreationEntries(),
       presets: input.persistedPresets.value,
+      graphs: input.graphs.value,
       query: menuState?.query ?? "",
       sourceValueType: context?.sourceValueType ?? context?.targetValueType ?? null,
       sourceAnchorKind: context?.sourceAnchorKind ?? context?.targetAnchorKind ?? null,
@@ -97,6 +99,7 @@ export function useWorkspaceNodeCreationController(input: WorkspaceNodeCreationC
         entry,
         context: menuState.context,
         persistedPresets: input.persistedPresets.value,
+        graphs: input.graphs.value,
       });
       input.markDocumentDirty(tabId, result.document);
       openCreatedStateEdgeEditorForTab(tabId, menuState.context, result);

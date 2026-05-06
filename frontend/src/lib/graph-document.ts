@@ -259,6 +259,12 @@ function bindStateToSourceOutput(node: GraphNode | undefined, stateKey: string) 
     node.writes = [{ state: stateKey, mode: "replace" }];
     return;
   }
+  if (node.kind === "subgraph") {
+    if (!node.writes.some((binding) => binding.state === stateKey)) {
+      node.writes = [...node.writes, { state: stateKey, mode: "replace" }];
+    }
+    return;
+  }
   if (node.kind !== "agent") {
     return;
   }
@@ -770,7 +776,12 @@ export function connectStateBindingInDocument<T extends GraphPayload | GraphDocu
   const nextSourceNode = nextDocument.nodes[sourceNodeId];
   const nextTargetNode = nextDocument.nodes[targetNodeId];
   if (isVirtualAnyOutputStateKey(sourceStateKey)) {
-    if (nextSourceNode.kind === "agent" || isCreateAgentInputStateKey(targetStateKey) || isVirtualAnyInputStateKey(targetStateKey)) {
+    if (
+      nextSourceNode.kind === "agent" ||
+      nextSourceNode.kind === "subgraph" ||
+      isCreateAgentInputStateKey(targetStateKey) ||
+      isVirtualAnyInputStateKey(targetStateKey)
+    ) {
       const materializedState = buildNextMaterializedVirtualStateField(
         nextDocument,
         sourceValueType?.trim() || resolveInputNodeVirtualOutputType(nextSourceNode) || "text",
@@ -788,7 +799,7 @@ export function connectStateBindingInDocument<T extends GraphPayload | GraphDocu
   }
 
   if (isCreateAgentInputStateKey(targetStateKey)) {
-    if (nextTargetNode.kind !== "agent") {
+    if (nextTargetNode.kind !== "agent" && nextTargetNode.kind !== "subgraph") {
       return document;
     }
     nextTargetNode.reads = [...nextTargetNode.reads, { state: resolvedSourceStateKey, required: true }];
@@ -798,7 +809,7 @@ export function connectStateBindingInDocument<T extends GraphPayload | GraphDocu
 
   if (isVirtualAnyInputStateKey(targetStateKey)) {
     nextTargetNode.reads =
-      nextTargetNode.kind === "agent" && nextTargetNode.reads.length > 0
+      (nextTargetNode.kind === "agent" || nextTargetNode.kind === "subgraph") && nextTargetNode.reads.length > 0
         ? [...nextTargetNode.reads, { state: resolvedSourceStateKey, required: true }]
         : [{ state: resolvedSourceStateKey, required: true }];
     if (nextTargetNode.kind === "condition") {

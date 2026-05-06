@@ -50,7 +50,7 @@ function buildEditorContextLines(editor: CompanionEditorContextSnapshot | null):
     `当前图: ${document.name}`,
     "graph_id" in document && document.graph_id ? `图 ID: ${document.graph_id}` : "图 ID: 未保存草稿",
     editor?.activeTabTitle && editor.activeTabTitle !== document.name ? `当前标签: ${editor.activeTabTitle}` : "",
-    `节点统计: input ${nodeCounts.input}, agent ${nodeCounts.agent}, output ${nodeCounts.output}, condition ${nodeCounts.condition}`,
+    `节点统计: input ${nodeCounts.input}, agent ${nodeCounts.agent}, output ${nodeCounts.output}, condition ${nodeCounts.condition}, subgraph ${nodeCounts.subgraph}`,
     `State: ${Object.keys(document.state_schema).length}`,
     `顺序边: ${document.edges.length}`,
     `条件路由: ${conditionRouteCount}`,
@@ -68,6 +68,7 @@ function countNodesByKind(document: GraphPayload | GraphDocument): Record<GraphN
     agent: 0,
     output: 0,
     condition: 0,
+    subgraph: 0,
   };
 
   for (const node of Object.values(document.nodes)) {

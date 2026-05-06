@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { ref } from "vue";
 
-import type { GraphPayload, NodeCreationContext, NodeCreationEntry, PresetDocument } from "@/types/node-system";
+import type { GraphDocument, GraphPayload, NodeCreationContext, NodeCreationEntry, PresetDocument } from "@/types/node-system";
 
 import type { CreatedStateEdgeEditorRequest } from "./nodeCreationMenuModel.ts";
 import { useWorkspaceNodeCreationController } from "./useWorkspaceNodeCreationController.ts";
@@ -59,6 +59,7 @@ function createHarness(options: { locked?: boolean; importPythonGraph?: boolean 
   const dataEdgeStateEditorRequestByTabId = ref<Record<string, CreatedStateEdgeEditorRequest | null>>({});
   const nodeCreationMenuByTabId = ref({});
   const persistedPresets = ref<PresetDocument[]>([]);
+  const graphs = ref<GraphDocument[]>([]);
   const dirtyDocuments: GraphPayload[] = [];
   const feedback: Array<{ tabId: string; feedback: Partial<WorkspaceRunFeedback> }> = [];
   const importedFiles: string[] = [];
@@ -68,6 +69,7 @@ function createHarness(options: { locked?: boolean; importPythonGraph?: boolean 
     dataEdgeStateEditorRequestByTabId,
     nodeCreationMenuByTabId,
     persistedPresets,
+    graphs,
     guardGraphEditForTab: () => Boolean(options.locked),
     markDocumentDirty: (_tabId, document) => {
       dirtyDocuments.push(document as GraphPayload);

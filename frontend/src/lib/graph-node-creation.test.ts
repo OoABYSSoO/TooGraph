@@ -6,10 +6,96 @@ import {
   buildGenericInputNode,
   buildGenericOutputNode,
   buildNodeFromPreset,
+  buildSubgraphNodeFromGraph,
   connectStateInputSourceToTarget,
 } from "./graph-node-creation.ts";
 import { VIRTUAL_ANY_INPUT_STATE_KEY, VIRTUAL_ANY_OUTPUT_STATE_KEY } from "./virtual-any-input.ts";
 import type { GraphPayload, PresetDocument } from "../types/node-system.ts";
+
+test("buildSubgraphNodeFromGraph exposes graph input and output boundaries as required parent ports", () => {
+  const targetDocument: GraphPayload = {
+    graph_id: null,
+    name: "Parent",
+    state_schema: {
+      state_1: {
+        name: "Existing",
+        description: "",
+        type: "text",
+        value: "",
+        color: "#d97706",
+      },
+    },
+    nodes: {},
+    edges: [],
+    conditional_edges: [],
+    metadata: { graphiteui_state_key_counter: 1 },
+  };
+  const sourceGraph: GraphPayload = {
+    graph_id: "graph_research",
+    name: "Research Flow",
+    state_schema: {
+      question: {
+        name: "Question",
+        description: "Original graph input.",
+        type: "text",
+        value: "old default should be cleared",
+        color: "#d97706",
+      },
+      answer: {
+        name: "Answer",
+        description: "Original graph output.",
+        type: "markdown",
+        value: "",
+        color: "#2563eb",
+      },
+    },
+    nodes: {
+      input_question: {
+        kind: "input",
+        name: "Question Input",
+        description: "",
+        ui: { position: { x: 0, y: 0 }, collapsed: false },
+        reads: [],
+        writes: [{ state: "question", mode: "replace" }],
+        config: { value: "old default should be cleared" },
+      },
+      output_answer: {
+        kind: "output",
+        name: "Answer Output",
+        description: "",
+        ui: { position: { x: 320, y: 0 }, collapsed: false },
+        reads: [{ state: "answer", required: true }],
+        writes: [],
+        config: {
+          displayMode: "auto",
+          persistEnabled: false,
+          persistFormat: "auto",
+          fileNameTemplate: "",
+        },
+      },
+    },
+    edges: [{ source: "input_question", target: "output_answer" }],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const result = buildSubgraphNodeFromGraph(sourceGraph, {
+    id: "subgraph_created",
+    position: { x: 120, y: 80 },
+    targetDocument,
+  });
+
+  assert.equal(result.node.kind, "subgraph");
+  assert.equal(result.node.name, "Research Flow Subgraph");
+  assert.deepEqual(result.node.reads, [{ state: "state_2", required: true }]);
+  assert.deepEqual(result.node.writes, [{ state: "state_3", mode: "replace" }]);
+  assert.equal(result.state_schema.state_2.name, "Question");
+  assert.equal(result.state_schema.state_2.value, "");
+  assert.equal(result.state_schema.state_3.name, "Answer");
+  assert.equal(result.state_schema.state_3.type, "markdown");
+  assert.equal(result.node.config.graph.state_schema.question.value, "");
+  assert.equal(result.node.config.graph.metadata.sourceGraphId, "graph_research");
+});
 
 test("buildGenericInputNode creates an expanded input node with an empty virtual output slot", () => {
   const result = buildGenericInputNode({

@@ -6,6 +6,7 @@ import {
   buildGenericOutputNode,
   buildInputNodeFromFile,
   buildNodeFromPreset,
+  buildSubgraphNodeFromGraph,
 } from "../../lib/graph-node-creation.ts";
 import type {
   GraphDocument,
@@ -23,6 +24,7 @@ type CreateNodeFromCreationEntryInput = {
   entry: NodeCreationEntry;
   context?: NodeCreationContext | null;
   persistedPresets: PresetDocument[];
+  graphs?: GraphDocument[];
   createdNodeId?: string;
 };
 
@@ -51,6 +53,13 @@ function resolveCreationPreset(entry: NodeCreationEntry, persistedPresets: Prese
   );
 }
 
+function resolveCreationGraph(entry: NodeCreationEntry, graphs: GraphDocument[] = []) {
+  if (!entry.graphId) {
+    return null;
+  }
+  return graphs.find((graph) => graph.graph_id === entry.graphId) ?? null;
+}
+
 export function createNodeFromCreationEntry<T extends GraphPayload | GraphDocument>(
   document: T,
   input: CreateNodeFromCreationEntryInput,
@@ -76,6 +85,24 @@ export function createNodeFromCreationEntry<T extends GraphPayload | GraphDocume
     const created = buildGenericOutputNode({
       id: createdNodeId,
       position: input.context?.position ?? { x: 0, y: 0 },
+    });
+    return applyNodeCreationResult(document, {
+      createdNodeId,
+      createdNode: created.node,
+      mergedStateSchema: created.state_schema,
+      context: input.context ?? null,
+    });
+  }
+
+  if (input.entry.mode === "subgraph") {
+    const graph = resolveCreationGraph(input.entry, input.graphs);
+    if (!graph) {
+      throw new Error(`Unable to resolve subgraph source for ${input.entry.id}.`);
+    }
+    const created = buildSubgraphNodeFromGraph(graph, {
+      id: createdNodeId,
+      position: input.context?.position ?? { x: 0, y: 0 },
+      targetDocument: document,
     });
     return applyNodeCreationResult(document, {
       createdNodeId,
