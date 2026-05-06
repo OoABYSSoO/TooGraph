@@ -46,6 +46,7 @@
 - `file` / `file_list` state 已采用路径透传语义；Agent 节点会读取文件并只把文件名与原文全文放入模型上下文。
 - `web_search` 不再输出 `context`，只输出 `source_urls`、`artifact_paths` 和 `errors`。
 - Agent 节点卡片添加带 `outputSchema` 的 skill 时，会自动创建 managed skill output state、写入节点输出端口，并同步 `skillBindings.outputMapping`；若该 skill 只有一个必填输入且当前 Agent 只有一个普通输入 state，会同步写入 `skillBindings.inputMapping`。
+- 图运行前会按同一套规则补全当前草稿里的 Agent skill 绑定，并把补全后的图同步回草稿，减少旧草稿残留空绑定造成的运行失败。
 
 尚未完成：
 

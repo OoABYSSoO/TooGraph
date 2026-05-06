@@ -428,7 +428,8 @@ test("EditorWorkspaceShell runs the latest document after async model refresh", 
   assert.match(runControllerSource, /await input\.refreshAgentModels\(\);/);
   assert.match(runControllerSource, /const latestDocument = input\.documentsByTabId\.value\[tab\.tabId\];/);
   assert.match(runControllerSource, /if \(!latestDocument\) \{[\s\S]*?return;[\s\S]*?\}/);
-  assert.match(runControllerSource, /const response = await input\.runGraph\(latestDocument\);/);
+  assert.match(runControllerSource, /const runnableDocument = reconcileAgentSkillBindingsInDocument\(latestDocument, input\.skillDefinitions\.value\);/);
+  assert.match(runControllerSource, /const response = await input\.runGraph\(runnableDocument\);/);
   assert.doesNotMatch(runControllerSource, /const response = await input\.runGraph\(document\);/);
 });
 

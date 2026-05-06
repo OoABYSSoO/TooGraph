@@ -545,6 +545,24 @@ export function updateAgentNodeConfigInDocument<T extends GraphPayload | GraphDo
   return nextDocument;
 }
 
+export function reconcileAgentSkillBindingsInDocument<T extends GraphPayload | GraphDocument>(
+  document: T,
+  skillDefinitions: SkillDefinition[],
+): T {
+  if (skillDefinitions.length === 0) {
+    return document;
+  }
+
+  const nextDocument = cloneGraphDocument(document);
+  for (const [nodeId, node] of Object.entries(nextDocument.nodes)) {
+    if (node.kind === "agent") {
+      reconcileAgentSkillOutputBindings(nextDocument, nodeId, skillDefinitions);
+    }
+  }
+
+  return JSON.stringify(nextDocument) === JSON.stringify(document) ? document : nextDocument;
+}
+
 function reconcileAgentSkillOutputBindings<T extends GraphPayload | GraphDocument>(
   document: T,
   nodeId: string,
