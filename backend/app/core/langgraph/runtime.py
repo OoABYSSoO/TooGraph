@@ -57,13 +57,14 @@ from app.core.runtime.execution_graph import (
     build_execution_edges,
     select_active_outgoing_edges,
 )
+from app.core.runtime.run_artifacts import append_run_snapshot as _append_run_snapshot
 from app.core.runtime.runtime_summaries import summarize_first_value as _summarize_values
 from app.core.runtime.state_io import apply_state_writes, collect_node_inputs
 from app.core.runtime.run_events import publish_run_event
 from app.core.runtime.node_system_executor import (
     _execute_node,
 )
-from app.core.runtime.state import set_run_status, touch_run_lifecycle, utc_now_iso
+from app.core.runtime.state import create_initial_run_state, set_run_status, touch_run_lifecycle, utc_now_iso
 from app.core.schemas.node_system import NodeSystemGraphDocument, NodeSystemInputNode, NodeSystemOutputNode, NodeSystemSubgraphNode
 from app.core.storage.run_store import save_run
 
@@ -75,6 +76,8 @@ def execute_node_system_graph_langgraph(
     persist_progress: bool = False,
     resume_from_checkpoint: bool = False,
     resume_command: Any | None = None,
+    save_final_run: bool = True,
+    emit_lifecycle_events: bool = True,
 ) -> dict[str, Any]:
     build_plan = compile_graph_to_langgraph_plan(graph)
     if build_plan.requirements.unsupported_reasons:
@@ -116,7 +119,8 @@ def execute_node_system_graph_langgraph(
             checkpoint_saver=checkpoint_saver,
             checkpoint_lookup_config=checkpoint_lookup_config,
             append_snapshot=False,
-            save_run_func=save_run,
+            save_run_func=save_run if save_final_run else _noop_save_run,
+            publish_run_event_func=publish_run_event if emit_lifecycle_events else _noop_publish_run_event,
         )
 
     workflow = StateGraph(_build_langgraph_state_schema(graph))
@@ -221,8 +225,9 @@ def execute_node_system_graph_langgraph(
             started_perf=started_perf,
             checkpoint_saver=checkpoint_saver,
             checkpoint_lookup_config=checkpoint_lookup_config,
-            append_snapshot=True,
-            save_run_func=save_run,
+            append_snapshot=save_final_run,
+            save_run_func=save_run if save_final_run else _noop_save_run,
+            publish_run_event_func=publish_run_event if emit_lifecycle_events else _noop_publish_run_event,
         )
     except Exception as exc:  # pragma: no cover - defensive runtime path
         _finalize_failed_langgraph_state(
@@ -233,9 +238,69 @@ def execute_node_system_graph_langgraph(
             started_perf=started_perf,
             checkpoint_saver=checkpoint_saver,
             checkpoint_lookup_config=checkpoint_lookup_config,
-            save_run_func=save_run,
+            save_run_func=save_run if save_final_run else _noop_save_run,
+            publish_run_event_func=publish_run_event if emit_lifecycle_events else _noop_publish_run_event,
+            append_run_snapshot_func=_append_run_snapshot if save_final_run else _noop_append_run_snapshot,
         )
         raise
+
+
+def _noop_save_run(_state: dict[str, Any]) -> None:
+    return None
+
+
+def _noop_publish_run_event(_run_id: str | None, _event_type: str, _payload: dict[str, Any] | None = None) -> None:
+    return None
+
+
+def _noop_append_run_snapshot(*_args: Any, **_kwargs: Any) -> None:
+    return None
+
+
+def _subgraph_context(state: dict[str, Any]) -> dict[str, Any] | None:
+    context = state.get("_subgraph_context")
+    if not isinstance(context, dict):
+        return None
+    node_id = str(context.get("node_id") or "").strip()
+    path = context.get("path")
+    if not node_id or not isinstance(path, list):
+        return None
+    return {
+        "node_id": node_id,
+        "path": [str(item).strip() for item in path if str(item).strip()],
+    }
+
+
+def _subgraph_event_context(state: dict[str, Any]) -> dict[str, Any]:
+    context = _subgraph_context(state)
+    if not context:
+        return {}
+    return {
+        "subgraph_node_id": context["node_id"],
+        "subgraph_path": context["path"],
+    }
+
+
+def _root_parent_run_state(state: dict[str, Any]) -> dict[str, Any]:
+    parent_state = state.get("_parent_run_state")
+    return parent_state if isinstance(parent_state, dict) else state
+
+
+def _record_subgraph_node_status(state: dict[str, Any], node_name: str, status: str) -> None:
+    context = _subgraph_context(state)
+    if not context:
+        return
+    parent_state = _root_parent_run_state(state)
+    subgraph_status_map = parent_state.setdefault("subgraph_status_map", {})
+    if not isinstance(subgraph_status_map, dict):
+        subgraph_status_map = {}
+        parent_state["subgraph_status_map"] = subgraph_status_map
+    current_status_map = dict(subgraph_status_map.get(context["node_id"]) or {})
+    current_status_map[node_name] = status
+    subgraph_status_map[context["node_id"]] = current_status_map
+    if state.get("_subgraph_persist_progress"):
+        touch_run_lifecycle(parent_state)
+        save_run(parent_state)
 
 
 def _build_langgraph_node_callable(
@@ -260,6 +325,7 @@ def _build_langgraph_node_callable(
             node_started_perf = time.perf_counter()
             state["current_node_id"] = node_name
             state["node_status_map"][node_name] = "running"
+            _record_subgraph_node_status(state, node_name, "running")
             touch_run_lifecycle(state)
             state["state_values"] = {
                 **dict(state.get("state_values", {})),
@@ -273,6 +339,7 @@ def _build_langgraph_node_callable(
                     "node_type": node.kind,
                     "status": "running",
                     "started_at": utc_now_iso(),
+                    **_subgraph_event_context(state),
                 },
             )
             if persist_progress:
@@ -289,7 +356,14 @@ def _build_langgraph_node_callable(
                 iteration = _current_cycle_iteration(cycle_tracker)
                 input_values, state_reads = collect_node_inputs(node, state)
                 if isinstance(node, NodeSystemSubgraphNode):
-                    body = _execute_subgraph_node_runtime(graph, node_name, node, input_values, state)
+                    body = _execute_subgraph_node_runtime(
+                        graph,
+                        node_name,
+                        node,
+                        input_values,
+                        state,
+                        persist_parent_progress=persist_progress,
+                    )
                 else:
                     body = _execute_node(graph, node_name, node, input_values, state)
                 outputs = dict(body.get("outputs", {}))
@@ -312,9 +386,11 @@ def _build_langgraph_node_callable(
                             "previous_value": write.get("previous_value"),
                             "changed": bool(write.get("changed")),
                             "sequence": write.get("sequence"),
+                            **_subgraph_event_context(state),
                         },
                     )
                 state["node_status_map"][node_name] = "success"
+                _record_subgraph_node_status(state, node_name, "success")
                 if body.get("selected_skills"):
                     state["selected_skills"] = [*state.get("selected_skills", []), *body["selected_skills"]]
                 if body.get("skill_outputs"):
@@ -371,6 +447,7 @@ def _build_langgraph_node_callable(
                         "status": "success",
                         "duration_ms": duration_ms,
                         "output_keys": list(outputs.keys()),
+                        **_subgraph_event_context(state),
                     },
                 )
                 if persist_progress:
@@ -386,6 +463,7 @@ def _build_langgraph_node_callable(
             except Exception as exc:  # pragma: no cover - defensive runtime path
                 duration_ms = int((time.perf_counter() - node_started_perf) * 1000)
                 state["node_status_map"][node_name] = "failed"
+                _record_subgraph_node_status(state, node_name, "failed")
                 set_run_status(state, "failed")
                 state["errors"] = [*state.get("errors", []), str(exc)]
                 state["node_executions"] = [
@@ -425,6 +503,7 @@ def _build_langgraph_node_callable(
                         "status": "failed",
                         "duration_ms": duration_ms,
                         "error": str(exc),
+                        **_subgraph_event_context(state),
                     },
                 )
                 raise
@@ -482,9 +561,38 @@ def _execute_subgraph_node_runtime(
     node: NodeSystemSubgraphNode,
     input_values: dict[str, Any],
     state: dict[str, Any],
+    *,
+    persist_parent_progress: bool,
 ) -> dict[str, Any]:
     subgraph_document = _build_subgraph_document(parent_graph, node_name, node, input_values)
-    subgraph_state = execute_node_system_graph_langgraph(subgraph_document, persist_progress=False)
+    parent_status_map = _root_parent_run_state(state).setdefault("subgraph_status_map", {})
+    parent_status_map[node_name] = {
+        inner_node_name: "idle"
+        for inner_node_name in subgraph_document.nodes
+    }
+    parent_context = _subgraph_context(state)
+    parent_path = parent_context["path"] if parent_context else []
+    subgraph_initial_state = create_initial_run_state(subgraph_document.graph_id, subgraph_document.name)
+    subgraph_initial_state["run_id"] = str(state.get("run_id") or subgraph_initial_state["run_id"])
+    subgraph_initial_state["subgraph_status_map"] = parent_status_map
+    subgraph_initial_state["_parent_run_state"] = _root_parent_run_state(state)
+    subgraph_initial_state["_subgraph_context"] = {
+        "node_id": node_name,
+        "path": [*parent_path, node_name],
+    }
+    subgraph_initial_state["_subgraph_persist_progress"] = persist_parent_progress
+    subgraph_state = execute_node_system_graph_langgraph(
+        subgraph_document,
+        subgraph_initial_state,
+        persist_progress=False,
+        save_final_run=False,
+        emit_lifecycle_events=False,
+    )
+    parent_status_map[node_name] = dict(subgraph_state.get("node_status_map", {}))
+    _publish_subgraph_final_node_status_events(state, node_name, subgraph_document, parent_status_map[node_name])
+    if persist_parent_progress:
+        touch_run_lifecycle(_root_parent_run_state(state))
+        save_run(_root_parent_run_state(state))
     output_values_by_internal_state = {
         internal_state_key: copy.deepcopy(subgraph_state.get("state_values", {}).get(internal_state_key))
         for _inner_node_name, internal_state_key in _subgraph_output_boundaries(node)
@@ -515,6 +623,38 @@ def _execute_subgraph_node_runtime(
             "errors": list(subgraph_state.get("errors", [])),
         },
     }
+
+
+def _publish_subgraph_final_node_status_events(
+    parent_state: dict[str, Any],
+    subgraph_node_id: str,
+    subgraph_document: NodeSystemGraphDocument,
+    node_status_map: dict[str, str],
+) -> None:
+    run_id = str(parent_state.get("run_id") or "").strip()
+    if not run_id:
+        return
+    parent_context = _subgraph_context(parent_state)
+    parent_path = parent_context["path"] if parent_context else []
+    event_context = {
+        "subgraph_node_id": subgraph_node_id,
+        "subgraph_path": [*parent_path, subgraph_node_id],
+    }
+    for inner_node_id, status in node_status_map.items():
+        inner_node = subgraph_document.nodes.get(inner_node_id)
+        if inner_node is None or inner_node.kind not in {"input", "output"}:
+            continue
+        event_type = "node.failed" if status == "failed" else "node.completed"
+        publish_run_event(
+            run_id,
+            event_type,
+            {
+                "node_id": inner_node_id,
+                "node_type": inner_node.kind,
+                "status": status,
+                **event_context,
+            },
+        )
 
 
 def _build_langgraph_route_callable(
@@ -569,11 +709,24 @@ def _build_langgraph_route_callable(
 
                 condition_node = graph.nodes[condition_name]
                 state["node_status_map"][condition_name] = "running"
+                _record_subgraph_node_status(state, condition_name, "running")
+                publish_run_event(
+                    str(state.get("run_id") or ""),
+                    "node.started",
+                    {
+                        "node_id": condition_name,
+                        "node_type": condition_node.kind,
+                        "status": "running",
+                        "started_at": utc_now_iso(),
+                        **_subgraph_event_context(state),
+                    },
+                )
                 try:
                     input_values, _state_reads = collect_node_inputs(condition_node, state)
                     body = _execute_node(graph, condition_name, condition_node, input_values, state)
                 except Exception:
                     state["node_status_map"][condition_name] = "failed"
+                    _record_subgraph_node_status(state, condition_name, "failed")
                     raise
 
                 selected_branch = str(body.get("selected_branch") or "").strip()
@@ -625,6 +778,18 @@ def _build_langgraph_route_callable(
                         )
 
                 state["node_status_map"][condition_name] = "success"
+                _record_subgraph_node_status(state, condition_name, "success")
+                publish_run_event(
+                    str(state.get("run_id") or ""),
+                    "node.completed",
+                    {
+                        "node_id": condition_name,
+                        "node_type": condition_node.kind,
+                        "status": "success",
+                        "selected_branch": selected_branch,
+                        **_subgraph_event_context(state),
+                    },
+                )
                 selected_steps.append((condition_name, selected_branch, visual_target))
                 selected_edge_ids.update(current_step_edge_ids)
 

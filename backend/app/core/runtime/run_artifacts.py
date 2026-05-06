@@ -81,6 +81,7 @@ def append_run_snapshot(
             "graph_snapshot": copy.deepcopy(state.get("graph_snapshot", {})),
             "artifacts": copy.deepcopy(state.get("artifacts", {})),
             "node_status_map": copy.deepcopy(state.get("node_status_map", {})),
+            "subgraph_status_map": copy.deepcopy(state.get("subgraph_status_map", {})),
             "output_previews": copy.deepcopy(state.get("output_previews", [])),
             "final_result": str(state.get("final_result", "") or ""),
         }

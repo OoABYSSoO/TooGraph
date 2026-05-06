@@ -1,113 +1,122 @@
 <template>
   <div class="subgraph-node-body">
     <div class="subgraph-node-body__ports">
-      <StatePortList
-        side="input"
-        :ports="orderedInputPorts"
-        :node-id="nodeId"
-        :popover-style="stateEditorPopoverStyle"
-        :state-editor-draft="stateEditorDraft"
-        :state-editor-error="stateEditorError"
-        :type-options="typeOptions"
-        :color-options="colorOptions"
-        :is-state-editor-open="isStateEditorOpen"
-        :is-state-editor-confirm-open="isStateEditorConfirmOpen"
-        :is-remove-port-state-confirm-open="isRemovePortStateConfirmOpen"
-        :is-state-editor-pill-revealed="isStateEditorPillRevealed"
-        :is-port-reordering="isPortReordering"
-        :is-port-reorder-placeholder="isPortReorderPlaceholder"
-        :create-visible="false"
-        :create-open="false"
-        create-accent-color="#16a34a"
-        create-label="+ input"
-        create-anchor-state-key=""
-        :create-draft="null"
-        :create-title="''"
-        :create-error="null"
-        :create-hint="''"
-        :create-type-options="typeOptions"
-        :create-popover-style="agentAddPopoverStyle"
-        @pointer-enter="emit('pointer-enter', $event)"
-        @pointer-leave="emit('pointer-leave', $event)"
-        @reorder-pointer-down="(side, stateKey, pointerEvent) => emit('reorder-pointer-down', side, stateKey, pointerEvent)"
-        @port-click="(anchorId, stateKey) => emit('port-click', anchorId, stateKey)"
-        @remove-click="(anchorId, side, stateKey) => emit('remove-click', anchorId, side, stateKey)"
-        @update:name="emit('update:name', $event)"
-        @update:type="emit('update:type', $event)"
-        @update:color="emit('update:color', $event)"
-        @update:description="emit('update:description', $event)"
-      />
+      <div class="subgraph-node-body__port-rail subgraph-node-body__port-rail--input">
+        <StatePortList
+          side="input"
+          :ports="orderedInputPorts"
+          :node-id="nodeId"
+          :popover-style="stateEditorPopoverStyle"
+          :state-editor-draft="stateEditorDraft"
+          :state-editor-error="stateEditorError"
+          :type-options="typeOptions"
+          :color-options="colorOptions"
+          :is-state-editor-open="isStateEditorOpen"
+          :is-state-editor-confirm-open="isStateEditorConfirmOpen"
+          :is-remove-port-state-confirm-open="isRemovePortStateConfirmOpen"
+          :is-state-editor-pill-revealed="isStateEditorPillRevealed"
+          :is-port-reordering="isPortReordering"
+          :is-port-reorder-placeholder="isPortReorderPlaceholder"
+          :create-visible="false"
+          :create-open="false"
+          create-accent-color="#16a34a"
+          create-label="+ input"
+          create-anchor-state-key=""
+          :create-draft="null"
+          :create-title="''"
+          :create-error="null"
+          :create-hint="''"
+          :create-type-options="typeOptions"
+          :create-popover-style="agentAddPopoverStyle"
+          @pointer-enter="emit('pointer-enter', $event)"
+          @pointer-leave="emit('pointer-leave', $event)"
+          @reorder-pointer-down="(side, stateKey, pointerEvent) => emit('reorder-pointer-down', side, stateKey, pointerEvent)"
+          @port-click="(anchorId, stateKey) => emit('port-click', anchorId, stateKey)"
+          @remove-click="(anchorId, side, stateKey) => emit('remove-click', anchorId, side, stateKey)"
+          @update:name="emit('update:name', $event)"
+          @update:type="emit('update:type', $event)"
+          @update:color="emit('update:color', $event)"
+          @update:description="emit('update:description', $event)"
+        />
+      </div>
 
       <div class="subgraph-node-body__thumbnail" aria-label="Subgraph preview">
         <div class="subgraph-node-body__summary">
           <span>{{ body.inputCount }} in</span>
           <span>{{ body.outputCount }} out</span>
-        </div>
-        <div class="subgraph-node-body__mini-flow">
           <span
-            v-for="item in body.thumbnailNodes"
-            :key="item.id"
-            class="subgraph-node-body__mini-node"
-            :class="`subgraph-node-body__mini-node--${item.kind}`"
+            v-if="body.runtimeSummary"
+            class="subgraph-node-body__runtime"
+            :class="`subgraph-node-body__runtime--${body.runtimeSummary.tone}`"
           >
-            {{ item.label }}
+            {{ runtimeSummaryText }}
           </span>
         </div>
+        <SubgraphMiniMap
+          :nodes="body.thumbnailNodes"
+          :edges="body.thumbnailEdges"
+          :column-count="body.thumbnailColumnCount"
+          :row-count="body.thumbnailRowCount"
+        />
         <div v-if="body.capabilities.length > 0" class="subgraph-node-body__capabilities">
           <span v-for="capability in body.capabilities" :key="capability">{{ capability }}</span>
         </div>
       </div>
 
-      <StatePortList
-        side="output"
-        :ports="orderedOutputPorts"
-        :node-id="nodeId"
-        :popover-style="stateEditorPopoverStyle"
-        :state-editor-draft="stateEditorDraft"
-        :state-editor-error="stateEditorError"
-        :type-options="typeOptions"
-        :color-options="colorOptions"
-        :is-state-editor-open="isStateEditorOpen"
-        :is-state-editor-confirm-open="isStateEditorConfirmOpen"
-        :is-remove-port-state-confirm-open="isRemovePortStateConfirmOpen"
-        :is-state-editor-pill-revealed="isStateEditorPillRevealed"
-        :is-port-reordering="isPortReordering"
-        :is-port-reorder-placeholder="isPortReorderPlaceholder"
-        :create-visible="false"
-        :create-open="false"
-        create-accent-color="#9a3412"
-        create-label="+ output"
-        create-anchor-state-key=""
-        :create-draft="null"
-        :create-title="''"
-        :create-error="null"
-        :create-hint="''"
-        :create-type-options="typeOptions"
-        :create-popover-style="agentAddPopoverStyle"
-        @pointer-enter="emit('pointer-enter', $event)"
-        @pointer-leave="emit('pointer-leave', $event)"
-        @reorder-pointer-down="(side, stateKey, pointerEvent) => emit('reorder-pointer-down', side, stateKey, pointerEvent)"
-        @port-click="(anchorId, stateKey) => emit('port-click', anchorId, stateKey)"
-        @remove-click="(anchorId, side, stateKey) => emit('remove-click', anchorId, side, stateKey)"
-        @update:name="emit('update:name', $event)"
-        @update:type="emit('update:type', $event)"
-        @update:color="emit('update:color', $event)"
-        @update:description="emit('update:description', $event)"
-      />
+      <div class="subgraph-node-body__port-rail subgraph-node-body__port-rail--output">
+        <StatePortList
+          side="output"
+          :ports="orderedOutputPorts"
+          :node-id="nodeId"
+          :popover-style="stateEditorPopoverStyle"
+          :state-editor-draft="stateEditorDraft"
+          :state-editor-error="stateEditorError"
+          :type-options="typeOptions"
+          :color-options="colorOptions"
+          :is-state-editor-open="isStateEditorOpen"
+          :is-state-editor-confirm-open="isStateEditorConfirmOpen"
+          :is-remove-port-state-confirm-open="isRemovePortStateConfirmOpen"
+          :is-state-editor-pill-revealed="isStateEditorPillRevealed"
+          :is-port-reordering="isPortReordering"
+          :is-port-reorder-placeholder="isPortReorderPlaceholder"
+          :create-visible="false"
+          :create-open="false"
+          create-accent-color="#9a3412"
+          create-label="+ output"
+          create-anchor-state-key=""
+          :create-draft="null"
+          :create-title="''"
+          :create-error="null"
+          :create-hint="''"
+          :create-type-options="typeOptions"
+          :create-popover-style="agentAddPopoverStyle"
+          @pointer-enter="emit('pointer-enter', $event)"
+          @pointer-leave="emit('pointer-leave', $event)"
+          @reorder-pointer-down="(side, stateKey, pointerEvent) => emit('reorder-pointer-down', side, stateKey, pointerEvent)"
+          @port-click="(anchorId, stateKey) => emit('port-click', anchorId, stateKey)"
+          @remove-click="(anchorId, side, stateKey) => emit('remove-click', anchorId, side, stateKey)"
+          @update:name="emit('update:name', $event)"
+          @update:type="emit('update:type', $event)"
+          @update:color="emit('update:color', $event)"
+          @update:description="emit('update:description', $event)"
+        />
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
 import type { CSSProperties } from "vue";
 
 import StatePortList from "./StatePortList.vue";
+import SubgraphMiniMap from "./SubgraphMiniMap.vue";
 import type { NodeCardViewModel, NodePortViewModel } from "./nodeCardViewModel";
 import type { StateColorOption, StateFieldDraft, StateFieldType } from "@/editor/workspace/statePanelFields";
 
 type SubgraphBodyViewModel = Extract<NodeCardViewModel["body"], { kind: "subgraph" }>;
 
-defineProps<{
+const props = defineProps<{
   nodeId: string;
   body: SubgraphBodyViewModel;
   orderedInputPorts: NodePortViewModel[];
@@ -125,6 +134,24 @@ defineProps<{
   isPortReordering: (side: "input" | "output", stateKey: string) => boolean;
   isPortReorderPlaceholder: (side: "input" | "output", stateKey: string) => boolean;
 }>();
+
+const runtimeSummaryText = computed(() => {
+  const summary = props.body.runtimeSummary;
+  if (!summary) {
+    return "";
+  }
+  const progress = `${summary.completedCount}/${summary.totalCount}`;
+  if (summary.currentNodeLabel) {
+    return `Running ${progress} - ${summary.currentNodeLabel}`;
+  }
+  if (summary.failedCount > 0) {
+    return `Failed ${summary.failedCount} - ${progress}`;
+  }
+  if (summary.tone === "success") {
+    return `Done ${progress}`;
+  }
+  return `Progress ${progress}`;
+});
 
 const emit = defineEmits<{
   (event: "pointer-enter", anchorId: string): void;
@@ -147,24 +174,36 @@ const emit = defineEmits<{
 
 .subgraph-node-body__ports {
   display: grid;
-  grid-template-columns: minmax(120px, 1fr) minmax(180px, 1.4fr) minmax(120px, 1fr);
-  align-items: center;
-  gap: 16px;
+  grid-template-areas:
+    "thumbnail thumbnail"
+    "input output";
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 14px 18px;
+}
+
+.subgraph-node-body__port-rail {
+  min-width: 0;
+  width: min(260px, 100%);
+}
+
+.subgraph-node-body__port-rail--input {
+  grid-area: input;
+  justify-self: start;
+}
+
+.subgraph-node-body__port-rail--output {
+  grid-area: output;
+  justify-self: end;
 }
 
 .subgraph-node-body__thumbnail {
-  min-height: 150px;
-  border: 1px solid rgba(154, 52, 18, 0.14);
-  border-radius: 8px;
-  background:
-    linear-gradient(90deg, rgba(154, 52, 18, 0.055) 1px, transparent 1px),
-    linear-gradient(rgba(154, 52, 18, 0.055) 1px, transparent 1px),
-    rgba(255, 253, 248, 0.78);
-  background-size: 18px 18px;
-  padding: 12px;
+  grid-area: thumbnail;
+  min-height: 210px;
+  padding: 0;
   display: grid;
   align-content: start;
-  gap: 10px;
+  gap: 12px;
   overflow: hidden;
 }
 
@@ -173,6 +212,11 @@ const emit = defineEmits<{
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  justify-content: center;
+}
+
+.subgraph-node-body__summary {
+  justify-content: center;
 }
 
 .subgraph-node-body__summary span,
@@ -187,30 +231,23 @@ const emit = defineEmits<{
   padding: 6px 8px;
 }
 
-.subgraph-node-body__mini-flow {
-  display: grid;
-  gap: 8px;
+.subgraph-node-body__runtime--running {
+  border-color: rgba(37, 99, 235, 0.18);
+  color: #1d4ed8;
 }
 
-.subgraph-node-body__mini-node {
-  min-width: 0;
-  border: 1px solid rgba(180, 83, 9, 0.18);
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.9);
-  color: #3f2a1d;
-  font-size: 12px;
-  line-height: 1.2;
-  padding: 8px 9px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.subgraph-node-body__runtime--success {
+  border-color: rgba(22, 163, 74, 0.18);
+  color: #15803d;
 }
 
-.subgraph-node-body__mini-node--agent {
-  border-color: rgba(37, 99, 235, 0.2);
+.subgraph-node-body__runtime--failed {
+  border-color: rgba(220, 38, 38, 0.18);
+  color: #b91c1c;
 }
 
-.subgraph-node-body__mini-node--condition {
-  border-color: rgba(220, 38, 38, 0.2);
+.subgraph-node-body__runtime--paused {
+  border-color: rgba(217, 119, 6, 0.18);
+  color: #b45309;
 }
 </style>

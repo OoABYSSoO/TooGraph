@@ -14,6 +14,7 @@ function createVisualHarness() {
   const runOutputPreviewByTabId = ref<Record<string, Record<string, { text: string; displayMode: string | null }>>>({});
   const runFailureMessageByTabId = ref<Record<string, Record<string, string>>>({});
   const activeRunEdgeIdsByTabId = ref<Record<string, string[]>>({});
+  const subgraphRunStatusByTabId = ref<Record<string, Record<string, Record<string, string>>>>({});
   const feedbackByTabId = ref<Record<string, WorkspaceRunFeedback | null>>({});
 
   const controller = useWorkspaceRunVisualState({
@@ -23,6 +24,7 @@ function createVisualHarness() {
     runOutputPreviewByTabId,
     runFailureMessageByTabId,
     activeRunEdgeIdsByTabId,
+    subgraphRunStatusByTabId,
     feedbackByTabId,
   });
 
@@ -33,6 +35,7 @@ function createVisualHarness() {
     runOutputPreviewByTabId,
     runFailureMessageByTabId,
     activeRunEdgeIdsByTabId,
+    subgraphRunStatusByTabId,
     feedbackByTabId,
     controller,
   };
@@ -132,6 +135,39 @@ test("useWorkspaceRunVisualState can preserve existing previews while polling ac
 
   assert.deepEqual(harness.runOutputPreviewByTabId.value.tab_a.live_output, { text: "streaming", displayMode: "plain" });
   assert.deepEqual(harness.runOutputPreviewByTabId.value.tab_a.output_a, { text: '{\n  "ok": true\n}', displayMode: "json" });
+});
+
+test("useWorkspaceRunVisualState projects subgraph status from run detail and live events", () => {
+  const harness = createVisualHarness();
+  const run = runDetail("running");
+  run.subgraph_status_map = {
+    research_subgraph: {
+      search_sources: "success",
+      summarize: "running",
+    },
+  };
+
+  harness.controller.applyRunVisualStateToTab("tab_a", run, graphDocument());
+
+  assert.deepEqual(harness.subgraphRunStatusByTabId.value.tab_a, {
+    research_subgraph: {
+      search_sources: "success",
+      summarize: "running",
+    },
+  });
+
+  harness.controller.applyRunEventVisualStateToTab("tab_a", "node.completed", {
+    subgraph_node_id: "research_subgraph",
+    node_id: "summarize",
+    status: "success",
+  });
+
+  assert.deepEqual(harness.subgraphRunStatusByTabId.value.tab_a, {
+    research_subgraph: {
+      search_sources: "success",
+      summarize: "success",
+    },
+  });
 });
 
 test("useWorkspaceRunVisualState exposes direct feedback and message helpers", () => {

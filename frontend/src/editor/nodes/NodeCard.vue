@@ -538,6 +538,7 @@ const props = defineProps<{
   runOutputPreviewText?: string | null;
   runOutputDisplayMode?: string | null;
   runFailureMessage?: string | null;
+  subgraphRunStatusByInnerNodeId?: Record<string, string>;
   pendingStateInputSource?: { stateKey: string; label: string; stateColor: string } | null;
   pendingStateInputTarget?: { stateKey: string; label: string; stateColor: string } | null;
   pendingStateOutputTarget?: { stateKey: string; label: string; stateColor: string } | null;
@@ -620,6 +621,7 @@ const view = computed(() =>
       outputPreviewText: props.runOutputPreviewText ?? null,
       outputDisplayMode: props.runOutputDisplayMode ?? null,
       failedMessage: props.runFailureMessage ?? null,
+      subgraphNodeStatusMap: props.subgraphRunStatusByInnerNodeId ?? {},
     },
   }),
 );

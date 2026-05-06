@@ -26,6 +26,34 @@ export type NodeConditionRouteOutputViewModel = {
   tone: "success" | "danger" | "warning" | "neutral";
 };
 
+export type SubgraphThumbnailStatus = "idle" | "queued" | "running" | "paused" | "success" | "failed";
+
+export type SubgraphThumbnailNodeViewModel = {
+  id: string;
+  label: string;
+  kind: GraphNode["kind"];
+  column: number;
+  row: number;
+  status: SubgraphThumbnailStatus;
+  active: boolean;
+};
+
+export type SubgraphThumbnailEdgeViewModel = {
+  source: string;
+  target: string;
+  active: boolean;
+  status: SubgraphThumbnailStatus;
+};
+
+export type SubgraphRuntimeSummaryViewModel = {
+  tone: "idle" | "running" | "success" | "failed" | "paused";
+  completedCount: number;
+  activeCount: number;
+  failedCount: number;
+  totalCount: number;
+  currentNodeLabel: string | null;
+};
+
 export type BuildNodeCardViewModelOptions = {
   conditionRouteTargets?: Record<string, string | null>;
   runtime?: {
@@ -33,6 +61,7 @@ export type BuildNodeCardViewModelOptions = {
     outputPreviewText?: string | null;
     outputDisplayMode?: string | null;
     failedMessage?: string | null;
+    subgraphNodeStatusMap?: Record<string, string>;
   };
 };
 
@@ -86,8 +115,11 @@ export type NodeCardViewModel = {
         kind: "subgraph";
         inputCount: number;
         outputCount: number;
-        thumbnailNodes: { id: string; label: string; kind: GraphNode["kind"] }[];
-        thumbnailEdges: { source: string; target: string }[];
+        thumbnailNodes: SubgraphThumbnailNodeViewModel[];
+        thumbnailEdges: SubgraphThumbnailEdgeViewModel[];
+        thumbnailColumnCount: number;
+        thumbnailRowCount: number;
+        runtimeSummary: SubgraphRuntimeSummaryViewModel | null;
         capabilities: string[];
         primaryInput: NodePortViewModel | null;
         primaryOutput: NodePortViewModel | null;
@@ -208,12 +240,16 @@ function buildBody(
   }
 
   if (node.kind === "subgraph") {
+    const thumbnail = buildSubgraphThumbnail(node, options.runtime?.subgraphNodeStatusMap ?? {});
     return {
       kind: "subgraph",
       inputCount: node.reads.length,
       outputCount: node.writes.length,
-      thumbnailNodes: listSubgraphThumbnailNodes(node),
-      thumbnailEdges: node.config.graph.edges.map((edge) => ({ source: edge.source, target: edge.target })),
+      thumbnailNodes: thumbnail.nodes,
+      thumbnailEdges: thumbnail.edges,
+      thumbnailColumnCount: thumbnail.columnCount,
+      thumbnailRowCount: thumbnail.rowCount,
+      runtimeSummary: summarizeSubgraphRuntime(thumbnail.nodes),
       capabilities: listSubgraphCapabilities(node),
       primaryInput: inputs[0] ?? null,
       primaryOutput: outputs[0] ?? null,
@@ -253,12 +289,161 @@ function buildBody(
   };
 }
 
-function listSubgraphThumbnailNodes(node: Extract<GraphNode, { kind: "subgraph" }>) {
-  return Object.entries(node.config.graph.nodes).map(([id, innerNode]) => ({
-    id,
-    label: innerNode.name?.trim() || id,
-    kind: innerNode.kind,
-  }));
+function buildSubgraphThumbnail(node: Extract<GraphNode, { kind: "subgraph" }>, statusMap: Record<string, string>) {
+  const entries = Object.entries(node.config.graph.nodes);
+  const edgePairs = [
+    ...node.config.graph.edges,
+    ...node.config.graph.conditional_edges.flatMap((edge) =>
+      Object.values(edge.branches).map((target) => ({
+        source: edge.source,
+        target,
+      })),
+    ),
+  ];
+  const orderedIds = orderSubgraphThumbnailNodeIds(
+    entries.map(([id]) => id),
+    edgePairs,
+  );
+  const columnCount = Math.max(1, Math.min(4, orderedIds.length));
+  const positionById = new Map<string, { column: number; row: number }>();
+  orderedIds.forEach((id, index) => {
+    const row = Math.floor(index / columnCount) + 1;
+    const columnOffset = index % columnCount;
+    const column = row % 2 === 0 ? columnCount - columnOffset : columnOffset + 1;
+    positionById.set(id, { column, row });
+  });
+
+  const nodes = entries.map(([id, innerNode]) => {
+    const position = positionById.get(id) ?? { column: 1, row: 1 };
+    const status = normalizeSubgraphThumbnailStatus(statusMap[id]);
+    return {
+      id,
+      label: innerNode.name?.trim() || id,
+      kind: innerNode.kind,
+      column: position.column,
+      row: position.row,
+      status,
+      active: isActiveSubgraphThumbnailStatus(status),
+    };
+  });
+  const statusByNodeId = new Map(nodes.map((item) => [item.id, item.status]));
+  const seenEdgeKeys = new Set<string>();
+  return {
+    nodes,
+    edges: edgePairs.flatMap((edge) => {
+      const edgeKey = `${edge.source}->${edge.target}`;
+      if (seenEdgeKeys.has(edgeKey)) {
+        return [];
+      }
+      seenEdgeKeys.add(edgeKey);
+      const status = statusByNodeId.get(edge.target) ?? "idle";
+      return [
+        {
+          source: edge.source,
+          target: edge.target,
+          status,
+          active: isActiveSubgraphThumbnailStatus(status) || isActiveSubgraphThumbnailStatus(statusByNodeId.get(edge.source) ?? "idle"),
+        },
+      ];
+    }),
+    columnCount,
+    rowCount: Math.max(1, ...nodes.map((item) => item.row)),
+  };
+}
+
+function orderSubgraphThumbnailNodeIds(nodeIds: string[], edges: Array<{ source: string; target: string }>) {
+  const orderIndex = new Map(nodeIds.map((id, index) => [id, index]));
+  const outgoing = new Map<string, string[]>();
+  const indegree = new Map(nodeIds.map((id) => [id, 0]));
+
+  for (const edge of edges) {
+    if (!orderIndex.has(edge.source) || !orderIndex.has(edge.target)) {
+      continue;
+    }
+    const sourceIndex = orderIndex.get(edge.source) ?? 0;
+    const targetIndex = orderIndex.get(edge.target) ?? 0;
+    if (targetIndex <= sourceIndex) {
+      continue;
+    }
+    outgoing.set(edge.source, [...(outgoing.get(edge.source) ?? []), edge.target]);
+    indegree.set(edge.target, (indegree.get(edge.target) ?? 0) + 1);
+  }
+
+  const queue = nodeIds
+    .filter((id) => (indegree.get(id) ?? 0) === 0)
+    .sort((left, right) => (orderIndex.get(left) ?? 0) - (orderIndex.get(right) ?? 0));
+  const ordered: string[] = [];
+  const visited = new Set<string>();
+
+  while (queue.length > 0) {
+    const next = queue.shift();
+    if (!next || visited.has(next)) {
+      continue;
+    }
+    visited.add(next);
+    ordered.push(next);
+    for (const target of outgoing.get(next) ?? []) {
+      indegree.set(target, (indegree.get(target) ?? 0) - 1);
+      if ((indegree.get(target) ?? 0) === 0) {
+        queue.push(target);
+        queue.sort((left, right) => (orderIndex.get(left) ?? 0) - (orderIndex.get(right) ?? 0));
+      }
+    }
+  }
+
+  return [...ordered, ...nodeIds.filter((id) => !visited.has(id))];
+}
+
+function normalizeSubgraphThumbnailStatus(status: string | null | undefined): SubgraphThumbnailStatus {
+  if (status === "queued") {
+    return "queued";
+  }
+  if (status === "running" || status === "resuming") {
+    return "running";
+  }
+  if (status === "paused" || status === "awaiting_human") {
+    return "paused";
+  }
+  if (status === "success" || status === "completed") {
+    return "success";
+  }
+  if (status === "failed") {
+    return "failed";
+  }
+  return "idle";
+}
+
+function isActiveSubgraphThumbnailStatus(status: SubgraphThumbnailStatus) {
+  return status === "queued" || status === "running" || status === "paused";
+}
+
+function summarizeSubgraphRuntime(nodes: SubgraphThumbnailNodeViewModel[]): SubgraphRuntimeSummaryViewModel | null {
+  const touchedNodes = nodes.filter((item) => item.status !== "idle");
+  if (touchedNodes.length === 0) {
+    return null;
+  }
+  const completedCount = nodes.filter((item) => item.status === "success").length;
+  const activeNodes = nodes.filter((item) => isActiveSubgraphThumbnailStatus(item.status));
+  const failedCount = nodes.filter((item) => item.status === "failed").length;
+  const currentNode = activeNodes[0] ?? null;
+  const tone =
+    failedCount > 0
+      ? "failed"
+      : activeNodes.some((item) => item.status === "paused")
+        ? "paused"
+        : activeNodes.length > 0
+          ? "running"
+          : completedCount === nodes.length
+            ? "success"
+            : "idle";
+  return {
+    tone,
+    completedCount,
+    activeCount: activeNodes.length,
+    failedCount,
+    totalCount: nodes.length,
+    currentNodeLabel: currentNode?.label ?? null,
+  };
 }
 
 function listSubgraphCapabilities(node: Extract<GraphNode, { kind: "subgraph" }>) {

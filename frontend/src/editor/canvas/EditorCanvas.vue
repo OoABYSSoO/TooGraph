@@ -246,6 +246,7 @@
           :run-output-preview-text="runOutputPreviewByNodeId?.[nodeId]?.text ?? null"
           :run-output-display-mode="runOutputPreviewByNodeId?.[nodeId]?.displayMode ?? null"
           :run-failure-message="runFailureMessageByNodeId?.[nodeId] ?? null"
+          :subgraph-run-status-by-inner-node-id="subgraphRunStatusByNodeId?.[nodeId] ?? undefined"
           :pending-state-input-source="pendingAgentInputSourceByNodeId[nodeId] ?? null"
           :pending-state-input-target="pendingStateInputSourceTargetByNodeId[nodeId] ?? null"
           :pending-state-output-target="pendingStateOutputTargetByNodeId[nodeId] ?? null"
@@ -535,6 +536,7 @@ const props = defineProps<{
   latestRunStatus?: string | null;
   runOutputPreviewByNodeId?: Record<string, { text: string; displayMode: string | null }>;
   runFailureMessageByNodeId?: Record<string, string>;
+  subgraphRunStatusByNodeId?: Record<string, Record<string, string>>;
   activeRunEdgeIds?: string[];
   interactionLocked?: boolean;
   initialViewport?: CanvasViewport | null;

@@ -7,6 +7,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.compiler.validator import validate_graph
 from app.core.langgraph.runtime import execute_node_system_graph_langgraph
+from app.core.runtime.state import create_initial_run_state
 from app.core.schemas.node_system import NodeSystemGraphDocument
 
 
@@ -160,3 +161,52 @@ def test_langgraph_runtime_executes_subgraph_with_isolated_input_state() -> None
     assert result["state_values"]["answer"] == "来自父图的明确输入"
     subgraph_execution = next(item for item in result["node_executions"] if item["node_id"] == "nested_research")
     assert subgraph_execution["artifacts"]["subgraph"]["output_values"] == {"internal_question": "来自父图的明确输入"}
+
+
+def test_langgraph_runtime_records_subgraph_internal_status_map() -> None:
+    graph = NodeSystemGraphDocument.model_validate(
+        _parent_graph_payload(
+            subgraph_reads=[{"state": "question", "required": True}],
+            subgraph_writes=[{"state": "answer", "mode": "replace"}],
+        )
+    )
+
+    result = execute_node_system_graph_langgraph(graph)
+
+    assert result["subgraph_status_map"]["nested_research"] == {
+        "inner_input": "success",
+        "inner_output": "success",
+    }
+    subgraph_execution = next(item for item in result["node_executions"] if item["node_id"] == "nested_research")
+    assert subgraph_execution["artifacts"]["subgraph"]["node_status_map"] == {
+        "inner_input": "success",
+        "inner_output": "success",
+    }
+
+
+def test_langgraph_runtime_publishes_subgraph_event_context(monkeypatch) -> None:
+    import app.core.langgraph.runtime as runtime_module
+
+    events: list[tuple[str, str, dict]] = []
+
+    def capture_run_event(run_id: str | None, event_type: str, payload: dict | None = None) -> None:
+        events.append((str(run_id or ""), event_type, dict(payload or {})))
+
+    monkeypatch.setattr(runtime_module, "publish_run_event", capture_run_event)
+    graph = NodeSystemGraphDocument.model_validate(
+        _parent_graph_payload(
+            subgraph_reads=[{"state": "question", "required": True}],
+            subgraph_writes=[{"state": "answer", "mode": "replace"}],
+        )
+    )
+    initial_state = create_initial_run_state(graph.graph_id, graph.name)
+
+    execute_node_system_graph_langgraph(graph, initial_state)
+
+    inner_status_events = [
+        payload
+        for _run_id, event_type, payload in events
+        if event_type in {"node.started", "node.completed", "node.failed"} and payload.get("subgraph_node_id") == "nested_research"
+    ]
+    assert inner_status_events
+    assert inner_status_events[0]["subgraph_path"] == ["nested_research"]

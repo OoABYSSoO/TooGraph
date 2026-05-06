@@ -39,6 +39,7 @@ class RunSnapshot(TypedDict, total=False):
     graph_snapshot: dict[str, Any]
     artifacts: dict[str, Any]
     node_status_map: dict[str, NodeStatus]
+    subgraph_status_map: dict[str, dict[str, NodeStatus]]
     output_previews: list[dict[str, Any]]
     final_result: str
 
@@ -61,6 +62,7 @@ class RunState(TypedDict, total=False):
     evaluation_result: dict[str, Any]
     final_result: str
     node_status_map: dict[str, NodeStatus]
+    subgraph_status_map: dict[str, dict[str, NodeStatus]]
     node_executions: list[dict[str, Any]]
     warnings: list[str]
     errors: list[str]
@@ -191,6 +193,7 @@ def create_initial_run_state(graph_id: str, graph_name: str, max_revision_round:
         evaluation_result={},
         final_result="",
         node_status_map={},
+        subgraph_status_map={},
         node_executions=[],
         warnings=[],
         errors=[],

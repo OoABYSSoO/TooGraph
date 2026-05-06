@@ -47,6 +47,7 @@ type WorkspaceTabLifecycleControllerInput = {
   runOutputPreviewByTabId: TabScopedRecordRef<Record<string, { text: string; displayMode: string | null }>>;
   runFailureMessageByTabId: TabScopedRecordRef<Record<string, string>>;
   activeRunEdgeIdsByTabId: TabScopedRecordRef<string[]>;
+  subgraphRunStatusByTabId: TabScopedRecordRef<Record<string, Record<string, string>>>;
   runActivityByTabId: TabScopedRecordRef<RunActivityState>;
   cancelRunPolling: (tabId: string) => void;
   cancelRunEventStreamForTab: (tabId: string) => void;
@@ -86,6 +87,7 @@ export function useWorkspaceTabLifecycleController(input: WorkspaceTabLifecycleC
     clearRecord(input.runOutputPreviewByTabId, tabId);
     clearRecord(input.runFailureMessageByTabId, tabId);
     clearRecord(input.activeRunEdgeIdsByTabId, tabId);
+    clearRecord(input.subgraphRunStatusByTabId, tabId);
     clearRecord(input.runActivityByTabId, tabId);
   }
 

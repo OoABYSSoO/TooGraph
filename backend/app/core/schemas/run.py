@@ -87,6 +87,7 @@ class RunSnapshot(BaseModel):
     graph_snapshot: dict[str, Any] = Field(default_factory=dict)
     artifacts: dict[str, Any] = Field(default_factory=dict)
     node_status_map: dict[str, str] = Field(default_factory=dict)
+    subgraph_status_map: dict[str, dict[str, str]] = Field(default_factory=dict)
     output_previews: list[OutputPreview] = Field(default_factory=list)
     final_result: str = ""
 
@@ -127,6 +128,7 @@ class NodeExecutionArtifacts(BaseModel):
     outputs: dict[str, Any] = Field(default_factory=dict)
     family: str = ""
     iteration: int | None = None
+    subgraph: dict[str, Any] | None = None
     selected_branch: str | None = None
     response: dict[str, Any] | None = None
     reasoning: str | None = None
@@ -177,6 +179,7 @@ class RunDetail(RunSummary):
     memory_summary: str = ""
     final_result: str = ""
     node_status_map: dict[str, str] = Field(default_factory=dict)
+    subgraph_status_map: dict[str, dict[str, str]] = Field(default_factory=dict)
     node_executions: list[NodeExecutionDetail] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     errors: list[str] = Field(default_factory=list)

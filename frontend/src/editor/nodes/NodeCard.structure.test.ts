@@ -102,6 +102,13 @@ test("NodeCard stretches primary editable surfaces when the canvas resizes the n
   assert.match(subgraphNodeBodySource, /\.subgraph-node-body \{[\s\S]*display:\s*grid;/);
 });
 
+test("SubgraphNodeBody renders a status-aware DAG mini map with node names", () => {
+  assert.match(subgraphNodeBodySource, /import SubgraphMiniMap from "\.\/SubgraphMiniMap\.vue";/);
+  assert.match(subgraphNodeBodySource, /<SubgraphMiniMap[\s\S]*:nodes="body\.thumbnailNodes"[\s\S]*:edges="body\.thumbnailEdges"/);
+  assert.match(subgraphNodeBodySource, /summary\.currentNodeLabel/);
+  assert.doesNotMatch(subgraphNodeBodySource, /v-for="item in body\.thumbnailNodes"[\s\S]*class="subgraph-node-body__mini-node"/);
+});
+
 test("NodeCard keeps state pill geometry but hides the pill chrome visually", () => {
   assert.match(portListSurfaceSource, /\.node-card__port-pill \{[\s\S]*display:\s*inline-flex;/);
   assert.match(portListSurfaceSource, /\.node-card__port-pill \{[\s\S]*align-items:\s*center;/);

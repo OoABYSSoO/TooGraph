@@ -66,6 +66,10 @@ function createLifecycleHarness() {
   });
   const runFailureMessageByTabId = ref<Record<string, Record<string, string>>>({ tab_a: { node_a: "failed" }, tab_b: {} });
   const activeRunEdgeIdsByTabId = ref<Record<string, string[]>>({ tab_a: ["edge_a"], tab_b: [] });
+  const subgraphRunStatusByTabId = ref<Record<string, Record<string, Record<string, string>>>>({
+    tab_a: { subgraph_a: { inner_a: "running" } },
+    tab_b: {},
+  });
   const runActivityByTabId = ref<Record<string, RunActivityState>>({
     tab_a: { entries: [], autoFollow: true },
     tab_b: { entries: [], autoFollow: true },
@@ -99,6 +103,7 @@ function createLifecycleHarness() {
     runOutputPreviewByTabId,
     runFailureMessageByTabId,
     activeRunEdgeIdsByTabId,
+    subgraphRunStatusByTabId,
     runActivityByTabId,
     cancelRunPolling: (tabId) => {
       cancelledPolling.push(tabId);
@@ -150,6 +155,7 @@ function createLifecycleHarness() {
       runOutputPreviewByTabId,
       runFailureMessageByTabId,
       activeRunEdgeIdsByTabId,
+      subgraphRunStatusByTabId,
       runActivityByTabId,
     },
     cancelledPolling,

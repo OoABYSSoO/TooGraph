@@ -96,6 +96,7 @@ function createHarness(options: { fetchRun?: () => Promise<RunDetail> } = {}) {
   const eventSources: FakeEventSource[] = [];
   const feedback: Array<{ tabId: string; feedback: Partial<WorkspaceRunFeedback> }> = [];
   const visualStates: Array<{ tabId: string; status: string; preserveMissing: boolean | undefined }> = [];
+  const liveVisualEvents: Array<{ tabId: string; eventType: string; payload: Record<string, unknown> }> = [];
   const openedHumanReview: Array<{ tabId: string; nodeId: string | null }> = [];
   const persistedRuns: Array<{ tabId: string; runId: string }> = [];
   const clearedRunActivityHints: string[] = [];
@@ -124,6 +125,9 @@ function createHarness(options: { fetchRun?: () => Promise<RunDetail> } = {}) {
     applyRunVisualStateToTab: (tabId, run, _document, _visualRun, options) => {
       visualStates.push({ tabId, status: run.status, preserveMissing: options?.preserveMissing });
     },
+    applyRunEventVisualStateToTab: (tabId, eventType, payload) => {
+      liveVisualEvents.push({ tabId, eventType, payload });
+    },
     openHumanReviewPanelForTab: (tabId, nodeId) => {
       openedHumanReview.push({ tabId, nodeId });
     },
@@ -143,6 +147,7 @@ function createHarness(options: { fetchRun?: () => Promise<RunDetail> } = {}) {
     controller,
     eventSources,
     feedback,
+    liveVisualEvents,
     clearedRunActivityHints,
     openedHumanReview,
     persistedRuns,
@@ -178,6 +183,38 @@ test("useWorkspaceRunLifecycleController streams output preview updates through 
     harness.runActivityByTabId.value.tab_a.entries.map((entry) => ({ kind: entry.kind, nodeId: entry.nodeId, preview: entry.preview })),
     [{ kind: "node-stream", nodeId: "agent_1", preview: "hello world" }],
   );
+});
+
+test("useWorkspaceRunLifecycleController forwards subgraph node events to live visual state", () => {
+  const harness = createHarness();
+
+  harness.controller.startRunEventStreamForTab("tab_a", "run_1");
+  harness.eventSources[0]?.emit(
+    "node.started",
+    new MessageEvent("node.started", {
+      data: JSON.stringify({
+        node_id: "search_sources",
+        node_type: "agent",
+        status: "running",
+        subgraph_node_id: "research_subgraph",
+        subgraph_path: ["research_subgraph"],
+      }),
+    }),
+  );
+
+  assert.deepEqual(harness.liveVisualEvents, [
+    {
+      tabId: "tab_a",
+      eventType: "node.started",
+      payload: {
+        node_id: "search_sources",
+        node_type: "agent",
+        status: "running",
+        subgraph_node_id: "research_subgraph",
+        subgraph_path: ["research_subgraph"],
+      },
+    },
+  ]);
 });
 
 test("useWorkspaceRunLifecycleController appends node and state activity events in stream order", () => {

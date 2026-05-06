@@ -893,9 +893,240 @@ test("buildNodeCardViewModel derives subgraph boundary and thumbnail summary", (
   assert.equal(model.kindLabel, "SUBGRAPH");
   assert.equal(model.body.kind, "subgraph");
   assert.deepEqual(model.body.thumbnailNodes.map((item) => item.label), ["Input", "Summarize", "Output"]);
+  assert.deepEqual(
+    model.body.thumbnailNodes.map((item) => ({ id: item.id, column: item.column, row: item.row, status: item.status, active: item.active })),
+    [
+      { id: "input_question", column: 1, row: 1, status: "idle", active: false },
+      { id: "summarize", column: 2, row: 1, status: "idle", active: false },
+      { id: "output_answer", column: 3, row: 1, status: "idle", active: false },
+    ],
+  );
+  assert.equal(model.body.thumbnailColumnCount, 3);
+  assert.equal(model.body.thumbnailRowCount, 1);
   assert.equal(model.body.inputCount, 1);
   assert.equal(model.body.outputCount, 1);
   assert.deepEqual(model.body.capabilities, ["web_search"]);
+});
+
+test("buildNodeCardViewModel projects subgraph runtime status onto thumbnail nodes", () => {
+  const node: GraphNode = {
+    kind: "subgraph",
+    name: "Research Flow Subgraph",
+    description: "Reusable nested graph.",
+    ui: { position: { x: 100, y: 100 } },
+    reads: [{ state: "question", required: true }],
+    writes: [{ state: "answer", mode: "replace" }],
+    config: {
+      graph: {
+        state_schema: {},
+        nodes: {
+          input_question: {
+            kind: "input",
+            name: "Input",
+            description: "",
+            ui: { position: { x: 0, y: 0 } },
+            reads: [],
+            writes: [],
+            config: { value: "" },
+          },
+          search_sources: {
+            kind: "agent",
+            name: "Search Sources",
+            description: "",
+            ui: { position: { x: 260, y: 0 } },
+            reads: [],
+            writes: [],
+            config: {
+              skills: ["web_search"],
+              taskInstruction: "",
+              modelSource: "global",
+              model: "",
+              thinkingMode: "high",
+              temperature: 0.2,
+            },
+          },
+          summarize: {
+            kind: "agent",
+            name: "Summarize Evidence",
+            description: "",
+            ui: { position: { x: 520, y: 0 } },
+            reads: [],
+            writes: [],
+            config: {
+              skills: [],
+              taskInstruction: "",
+              modelSource: "global",
+              model: "",
+              thinkingMode: "high",
+              temperature: 0.2,
+            },
+          },
+        },
+        edges: [
+          { source: "input_question", target: "search_sources" },
+          { source: "search_sources", target: "summarize" },
+        ],
+        conditional_edges: [],
+        metadata: {},
+      },
+    },
+  };
+
+  const model = buildNodeCardViewModel("research_subgraph", node, stateSchema, {
+    runtime: {
+      subgraphNodeStatusMap: {
+        input_question: "success",
+        search_sources: "success",
+        summarize: "running",
+      },
+    },
+  });
+
+  assert.equal(model.body.kind, "subgraph");
+  assert.deepEqual(
+    model.body.thumbnailNodes.map((item) => ({ id: item.id, label: item.label, status: item.status, active: item.active })),
+    [
+      { id: "input_question", label: "Input", status: "success", active: false },
+      { id: "search_sources", label: "Search Sources", status: "success", active: false },
+      { id: "summarize", label: "Summarize Evidence", status: "running", active: true },
+    ],
+  );
+  assert.deepEqual(model.body.runtimeSummary, {
+    tone: "running",
+    completedCount: 2,
+    activeCount: 1,
+    failedCount: 0,
+    totalCount: 3,
+    currentNodeLabel: "Summarize Evidence",
+  });
+});
+
+test("buildNodeCardViewModel compacts subgraph thumbnails and includes condition branches", () => {
+  const agentConfig = {
+    skills: [],
+    taskInstruction: "",
+    modelSource: "global" as const,
+    model: "",
+    thinkingMode: "high" as const,
+    temperature: 0.2,
+  };
+  const node: GraphNode = {
+    kind: "subgraph",
+    name: "Looping Research Subgraph",
+    description: "Reusable nested graph.",
+    ui: { position: { x: 100, y: 100 } },
+    reads: [{ state: "question", required: true }],
+    writes: [{ state: "answer", mode: "replace" }],
+    config: {
+      graph: {
+        state_schema: {},
+        nodes: {
+          start: {
+            kind: "input",
+            name: "Start",
+            description: "",
+            ui: { position: { x: 0, y: 0 } },
+            reads: [],
+            writes: [],
+            config: { value: "" },
+          },
+          search: {
+            kind: "agent",
+            name: "Search",
+            description: "",
+            ui: { position: { x: 400, y: 0 } },
+            reads: [],
+            writes: [],
+            config: agentConfig,
+          },
+          review: {
+            kind: "condition",
+            name: "Review",
+            description: "",
+            ui: { position: { x: 800, y: 0 } },
+            reads: [],
+            writes: [],
+            config: {
+              branches: ["true", "false", "exhausted"],
+              loopLimit: 5,
+              branchMapping: { true: "true", false: "false" },
+              rule: { source: "answer", operator: "exists", value: null },
+            },
+          },
+          refine: {
+            kind: "agent",
+            name: "Refine Query",
+            description: "",
+            ui: { position: { x: 1200, y: 0 } },
+            reads: [],
+            writes: [],
+            config: agentConfig,
+          },
+          final: {
+            kind: "agent",
+            name: "Final Answer",
+            description: "",
+            ui: { position: { x: 1600, y: 0 } },
+            reads: [],
+            writes: [],
+            config: agentConfig,
+          },
+          done: {
+            kind: "output",
+            name: "Done",
+            description: "",
+            ui: { position: { x: 2000, y: 0 } },
+            reads: [],
+            writes: [],
+            config: {
+              displayMode: "auto",
+              persistEnabled: false,
+              persistFormat: "auto",
+              fileNameTemplate: "",
+            },
+          },
+        },
+        edges: [
+          { source: "start", target: "search" },
+          { source: "search", target: "review" },
+          { source: "refine", target: "search" },
+          { source: "final", target: "done" },
+        ],
+        conditional_edges: [
+          {
+            source: "review",
+            branches: {
+              true: "refine",
+              false: "final",
+              exhausted: "final",
+            },
+          },
+        ],
+        metadata: {},
+      },
+    },
+  };
+
+  const model = buildNodeCardViewModel("research_subgraph", node, stateSchema);
+
+  assert.equal(model.body.kind, "subgraph");
+  assert.equal(model.body.thumbnailColumnCount, 4);
+  assert.equal(model.body.thumbnailRowCount, 2);
+  assert.deepEqual(
+    model.body.thumbnailNodes.map((item) => ({ id: item.id, column: item.column, row: item.row })),
+    [
+      { id: "start", column: 1, row: 1 },
+      { id: "search", column: 2, row: 1 },
+      { id: "review", column: 3, row: 1 },
+      { id: "refine", column: 4, row: 1 },
+      { id: "final", column: 4, row: 2 },
+      { id: "done", column: 3, row: 2 },
+    ],
+  );
+  assert.deepEqual(
+    model.body.thumbnailEdges.map((edge) => `${edge.source}->${edge.target}`),
+    ["start->search", "search->review", "refine->search", "final->done", "review->refine", "review->final"],
+  );
 });
 
 test("buildNodeCardViewModel marks exhausted condition routes as neutral", () => {

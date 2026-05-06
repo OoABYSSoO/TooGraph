@@ -101,6 +101,7 @@
                 :latest-run-status="feedbackForTab(tab.tabId)?.activeRunStatus ?? null"
                 :run-output-preview-by-node-id="runOutputPreviewByTabId[tab.tabId] ?? undefined"
                 :run-failure-message-by-node-id="runFailureMessageByTabId[tab.tabId] ?? undefined"
+                :subgraph-run-status-by-node-id="subgraphRunStatusByTabId[tab.tabId] ?? undefined"
                 :active-run-edge-ids="activeRunEdgeIdsByTabId[tab.tabId] ?? undefined"
                 :interaction-locked="isGraphInteractionLocked(tab.tabId)"
                 :initial-viewport="viewportByTabId[tab.tabId] ?? null"
@@ -329,6 +330,7 @@ const humanReviewErrorByTabId = ref<Record<string, string | null>>({});
 const runOutputPreviewByTabId = ref<Record<string, Record<string, { text: string; displayMode: string | null }>>>({});
 const runFailureMessageByTabId = ref<Record<string, Record<string, string>>>({});
 const activeRunEdgeIdsByTabId = ref<Record<string, string[]>>({});
+const subgraphRunStatusByTabId = ref<Record<string, Record<string, Record<string, string>>>>({});
 const runActivityByTabId = ref<Record<string, RunActivityState>>({});
 const runActivityHintByTabId = ref<Record<string, boolean>>({});
 const feedbackByTabId = ref<Record<string, WorkspaceRunFeedback | null>>({});
@@ -460,6 +462,7 @@ function toggleActiveRunActivityPanelFromActionCapsule() {
 }
 const {
   feedbackForTab,
+  applyRunEventVisualStateToTab,
   applyRunVisualStateToTab,
   setFeedbackForTab,
   setMessageFeedbackForTab,
@@ -470,6 +473,7 @@ const {
   runOutputPreviewByTabId,
   runFailureMessageByTabId,
   activeRunEdgeIdsByTabId,
+  subgraphRunStatusByTabId,
   feedbackByTabId,
 });
 const activeCompanionEditorSnapshot = computed(() => {
@@ -538,6 +542,7 @@ const {
   restoredRunSnapshotIdByTabId,
   fetchRun,
   applyRunVisualStateToTab,
+  applyRunEventVisualStateToTab,
   openHumanReviewPanelForTab,
   persistRunStateValuesForTab,
   clearRunActivityPanelHintForTab,
@@ -755,6 +760,7 @@ const {
   runOutputPreviewByTabId,
   runFailureMessageByTabId,
   activeRunEdgeIdsByTabId,
+  subgraphRunStatusByTabId,
   runActivityByTabId,
   cancelRunPolling,
   cancelRunEventStreamForTab,

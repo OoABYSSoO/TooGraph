@@ -30,11 +30,23 @@ export type NodeStateWriteRecord = {
   changed?: boolean;
 };
 
+export type SubgraphExecutionArtifact = {
+  graph_id?: string | null;
+  name?: string | null;
+  status?: string | null;
+  node_status_map?: Record<string, string>;
+  input_values?: Record<string, unknown>;
+  output_values?: Record<string, unknown>;
+  node_executions?: NodeExecutionDetail[];
+  errors?: string[];
+};
+
 export type NodeExecutionArtifacts = {
   inputs: Record<string, unknown>;
   outputs: Record<string, unknown>;
   family: string;
   iteration?: number | null;
+  subgraph?: SubgraphExecutionArtifact | null;
   selected_branch?: string | null;
   response?: Record<string, unknown> | null;
   reasoning?: string | null;
@@ -132,6 +144,7 @@ export type RunSnapshot = {
   graph_snapshot: Record<string, unknown>;
   artifacts: RunArtifacts;
   node_status_map: Record<string, string>;
+  subgraph_status_map?: Record<string, Record<string, string>>;
   output_previews: OutputPreview[];
   final_result?: string;
 };
@@ -184,6 +197,7 @@ export type RunDetail = RunSummary & {
   memory_summary: string;
   final_result: string;
   node_status_map: Record<string, string>;
+  subgraph_status_map?: Record<string, Record<string, string>>;
   node_executions: NodeExecutionDetail[];
   warnings: string[];
   errors: string[];
