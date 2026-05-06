@@ -63,7 +63,7 @@
   "runtime": {
     "type": "python",
     "entrypoint": "run.py",
-    "timeoutSeconds": 30
+    "timeoutSeconds": 90
   },
   "health": {
     "type": "none"

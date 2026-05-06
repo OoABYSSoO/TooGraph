@@ -196,6 +196,7 @@ class SkillManifestContractTests(unittest.TestCase):
         self.assertFalse(definition.run_policies.origins["companion"].requires_approval)
         self.assertEqual(definition.runtime.type, "python")
         self.assertEqual(definition.runtime.entrypoint, "run.py")
+        self.assertEqual(definition.runtime.timeout_seconds, 90)
         self.assertEqual(definition.agent_node_eligibility, SkillAgentNodeEligibility.READY)
         self.assertEqual([field.key for field in definition.input_schema], ["query"])
         self.assertEqual([field.key for field in definition.output_schema], ["query", "source_urls", "artifact_paths", "errors"])

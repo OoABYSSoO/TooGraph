@@ -104,6 +104,50 @@ class WebSearchSkillTests(unittest.TestCase):
         self.assertEqual(result["artifact_paths"], [])
         self.assertEqual(result["errors"], [])
 
+    def test_web_search_skill_retries_transient_search_errors_five_times(self) -> None:
+        web_search = _load_web_search_module()
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch.object(web_search, "_search_with_duckduckgo") as duckduckgo_search,
+        ):
+            duckduckgo_search.side_effect = [
+                RuntimeError("temporary TLS EOF"),
+                RuntimeError("temporary TLS EOF"),
+                RuntimeError("temporary TLS EOF"),
+                RuntimeError("temporary TLS EOF"),
+                {
+                    "results": [
+                        {
+                            "title": "Retry Result",
+                            "url": "https://example.org/retry",
+                            "content": "Retry recovered the search result.",
+                        }
+                    ]
+                },
+            ]
+
+            result = web_search.web_search_skill(query="retry search")
+
+        self.assertEqual(duckduckgo_search.call_count, 5)
+        self.assertEqual(result["source_urls"], ["https://example.org/retry"])
+        self.assertEqual(result["artifact_paths"], [])
+        self.assertEqual(result["errors"], [])
+
+    def test_web_search_skill_returns_last_error_after_five_failed_search_attempts(self) -> None:
+        web_search = _load_web_search_module()
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch.object(web_search, "_search_with_duckduckgo") as duckduckgo_search,
+        ):
+            duckduckgo_search.side_effect = RuntimeError("persistent TLS EOF")
+
+            result = web_search.web_search_skill(query="retry search")
+
+        self.assertEqual(duckduckgo_search.call_count, 5)
+        self.assertEqual(result["source_urls"], [])
+        self.assertEqual(result["artifact_paths"], [])
+        self.assertEqual(result["errors"], ["persistent TLS EOF"])
+
     def test_web_search_skill_fetches_pages_to_local_artifacts_when_requested(self) -> None:
         web_search = _load_web_search_module()
         server = _start_article_server(

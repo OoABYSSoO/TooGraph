@@ -20,6 +20,7 @@ DEFAULT_INCLUDE_RAW_CONTENT = False
 DEFAULT_TIMEOUT_SECONDS = 15.0
 DEFAULT_MAX_PAGES = 3
 DEFAULT_MAX_CHARS_PER_PAGE = 200_000
+DEFAULT_RETRY_ATTEMPTS = 5
 PAGE_FETCH_USER_AGENT = "GraphiteUI/1.0 (+https://github.com/AbyssBadger0/GraphiteUI)"
 
 
@@ -33,19 +34,25 @@ def web_search_skill(**skill_inputs: Any) -> dict[str, Any]:
 
     try:
         if api_key:
-            raw_response = _search_with_tavily(
-                query=query,
-                max_results=DEFAULT_MAX_RESULTS,
-                search_depth=DEFAULT_SEARCH_DEPTH,
-                include_raw_content=DEFAULT_INCLUDE_RAW_CONTENT,
-                api_key=api_key,
-                timeout_seconds=DEFAULT_TIMEOUT_SECONDS,
+            raw_response = _run_with_retries(
+                lambda: _search_with_tavily(
+                    query=query,
+                    max_results=DEFAULT_MAX_RESULTS,
+                    search_depth=DEFAULT_SEARCH_DEPTH,
+                    include_raw_content=DEFAULT_INCLUDE_RAW_CONTENT,
+                    api_key=api_key,
+                    timeout_seconds=DEFAULT_TIMEOUT_SECONDS,
+                ),
+                attempts=DEFAULT_RETRY_ATTEMPTS,
             )
         else:
-            raw_response = _search_with_duckduckgo(
-                query=query,
-                max_results=DEFAULT_MAX_RESULTS,
-                timeout_seconds=DEFAULT_TIMEOUT_SECONDS,
+            raw_response = _run_with_retries(
+                lambda: _search_with_duckduckgo(
+                    query=query,
+                    max_results=DEFAULT_MAX_RESULTS,
+                    timeout_seconds=DEFAULT_TIMEOUT_SECONDS,
+                ),
+                attempts=DEFAULT_RETRY_ATTEMPTS,
             )
     except Exception as exc:
         return _final_response(query=query, source_urls=[], artifact_paths=[], errors=[str(exc)])
@@ -105,6 +112,19 @@ def _search_with_duckduckgo(*, query: str, max_results: int, timeout_seconds: fl
         response.raise_for_status()
         html = response.text
     return {"results": _parse_duckduckgo_results(html, max_results=max_results)}
+
+
+def _run_with_retries(operation: Any, *, attempts: int) -> Any:
+    normalized_attempts = max(1, attempts)
+    last_error: Exception | None = None
+    for _attempt in range(normalized_attempts):
+        try:
+            return operation()
+        except Exception as exc:
+            last_error = exc
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError("Retry operation failed without an exception.")
 
 
 def _parse_duckduckgo_results(html: str, *, max_results: int) -> list[dict[str, Any]]:
