@@ -222,10 +222,37 @@ test("useWorkspaceGraphPersistenceController saves subgraph tabs back into the p
     tab_subgraph: {
       graph_id: null,
       name: "Edited Subgraph",
-      nodes: {},
+      nodes: {
+        input_question: {
+          kind: "input",
+          name: "Question Input",
+          description: "",
+          reads: [],
+          writes: [{ state: "question", mode: "replace" }],
+          config: { value: "", boundaryType: "text" },
+          ui: { position: { x: 0, y: 0 } },
+        },
+        output_answer: {
+          kind: "output",
+          name: "Answer Output",
+          description: "",
+          reads: [{ state: "answer", required: true }],
+          writes: [],
+          config: {
+            displayMode: "markdown",
+            persistEnabled: false,
+            persistFormat: "md",
+            fileNameTemplate: "",
+          },
+          ui: { position: { x: 320, y: 0 } },
+        },
+      },
       edges: [],
       conditional_edges: [],
-      state_schema: {},
+      state_schema: {
+        question: { name: "Question", description: "Boundary input.", type: "text", value: "", color: "#d97706" },
+        answer: { name: "Answer", description: "Boundary output.", type: "markdown", value: "", color: "#2563eb" },
+      },
       metadata: { version: "edited" },
     },
   };
@@ -239,8 +266,12 @@ test("useWorkspaceGraphPersistenceController saves subgraph tabs back into the p
   assert.equal(committedNode?.kind, "subgraph");
   if (committedNode?.kind === "subgraph") {
     assert.equal(committedNode.name, "Edited Subgraph");
+    assert.deepEqual(committedNode.reads, [{ state: "state_1", required: true }]);
+    assert.deepEqual(committedNode.writes, [{ state: "state_2", mode: "replace" }]);
     assert.deepEqual(committedNode.config.graph.metadata, { version: "edited" });
   }
+  assert.equal(harness.committedDocuments[0]?.document.state_schema.state_1?.name, "Question");
+  assert.equal(harness.committedDocuments[0]?.document.state_schema.state_2?.name, "Answer");
   assert.equal(harness.workspace.value.tabs[1]?.dirty, false);
   assert.equal(harness.workspace.value.tabs[1]?.title, "子图 · Edited Subgraph");
   assert.equal(harness.workspace.value.tabs[1]?.subgraphSource?.nodeName, "Edited Subgraph");

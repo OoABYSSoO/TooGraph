@@ -252,13 +252,13 @@ test("reorderNodePortStateInDocument moves bindings to an insertion index for dr
   assert.deepEqual(nextDocument.nodes.answer_agent.reads.map((binding) => binding.state), ["first", "third", "second"]);
 });
 
-test("updateSubgraphNodeGraphInDocument replaces only the selected subgraph instance graph", () => {
+test("updateSubgraphNodeGraphInDocument syncs subgraph boundary ports into parent state", () => {
   const document: GraphPayload = {
     graph_id: null,
     name: "Parent Graph",
     state_schema: {
-      question: { name: "Question", description: "", type: "text", value: "", color: "#d97706" },
-      answer: { name: "Answer", description: "", type: "markdown", value: "", color: "#2563eb" },
+      question: { name: "Question", description: "Existing parent input.", type: "text", value: "keep me", color: "#d97706" },
+      answer: { name: "Answer", description: "Existing parent output.", type: "markdown", value: "old run", color: "#2563eb" },
     },
     nodes: {
       research_subgraph: {
@@ -272,8 +272,33 @@ test("updateSubgraphNodeGraphInDocument replaces only the selected subgraph inst
           graph: {
             state_schema: {
               inner_question: { name: "Inner Question", description: "", type: "text", value: "", color: "#d97706" },
+              inner_answer: { name: "Inner Answer", description: "", type: "markdown", value: "", color: "#2563eb" },
             },
-            nodes: {},
+            nodes: {
+              inner_input: {
+                kind: "input",
+                name: "Inner Input",
+                description: "",
+                ui: { position: { x: 20, y: 40 } },
+                reads: [],
+                writes: [{ state: "inner_question", mode: "replace" }],
+                config: { value: "", boundaryType: "text" },
+              },
+              inner_output: {
+                kind: "output",
+                name: "Inner Output",
+                description: "",
+                ui: { position: { x: 420, y: 40 } },
+                reads: [{ state: "inner_answer", required: true }],
+                writes: [],
+                config: {
+                  displayMode: "markdown",
+                  persistEnabled: false,
+                  persistFormat: "md",
+                  fileNameTemplate: "",
+                },
+              },
+            },
             edges: [],
             conditional_edges: [],
             metadata: { version: 1 },
@@ -288,7 +313,9 @@ test("updateSubgraphNodeGraphInDocument replaces only the selected subgraph inst
   const nextGraph = {
     state_schema: {
       inner_question: { name: "Edited Question", description: "", type: "text", value: "", color: "#d97706" },
+      inner_topic: { name: "Topic", description: "New required input.", type: "text", value: "", color: "#7c3aed" },
       inner_answer: { name: "Edited Answer", description: "", type: "markdown", value: "", color: "#2563eb" },
+      inner_sources: { name: "Sources", description: "New output.", type: "file", value: "", color: "#10b981" },
     },
     nodes: {
       inner_input: {
@@ -299,6 +326,43 @@ test("updateSubgraphNodeGraphInDocument replaces only the selected subgraph inst
         reads: [],
         writes: [{ state: "inner_question", mode: "replace" }],
         config: { value: "", boundaryType: "text" },
+      },
+      inner_topic_input: {
+        kind: "input",
+        name: "Topic Input",
+        description: "",
+        ui: { position: { x: 20, y: 180 } },
+        reads: [],
+        writes: [{ state: "inner_topic", mode: "replace" }],
+        config: { value: "", boundaryType: "text" },
+      },
+      inner_output: {
+        kind: "output",
+        name: "Inner Output",
+        description: "",
+        ui: { position: { x: 420, y: 40 } },
+        reads: [{ state: "inner_answer", required: true }],
+        writes: [],
+        config: {
+          displayMode: "markdown",
+          persistEnabled: false,
+          persistFormat: "md",
+          fileNameTemplate: "",
+        },
+      },
+      inner_sources_output: {
+        kind: "output",
+        name: "Sources Output",
+        description: "",
+        ui: { position: { x: 420, y: 180 } },
+        reads: [{ state: "inner_sources", required: false }],
+        writes: [],
+        config: {
+          displayMode: "documents",
+          persistEnabled: false,
+          persistFormat: "auto",
+          fileNameTemplate: "",
+        },
       },
     },
     edges: [],
@@ -311,8 +375,22 @@ test("updateSubgraphNodeGraphInDocument replaces only the selected subgraph inst
 
   assert.notEqual(nextDocument, document);
   assert.deepEqual(nextDocument.nodes.research_subgraph.config.graph, nextGraph);
-  assert.deepEqual(nextDocument.nodes.research_subgraph.reads, document.nodes.research_subgraph.reads);
-  assert.deepEqual(nextDocument.nodes.research_subgraph.writes, document.nodes.research_subgraph.writes);
+  assert.deepEqual(nextDocument.nodes.research_subgraph.reads, [
+    { state: "question", required: true },
+    { state: "state_1", required: true },
+  ]);
+  assert.deepEqual(nextDocument.nodes.research_subgraph.writes, [
+    { state: "answer", mode: "replace" },
+    { state: "state_2", mode: "replace" },
+  ]);
+  assert.equal(nextDocument.state_schema.question.name, "Edited Question");
+  assert.equal(nextDocument.state_schema.question.value, "keep me");
+  assert.equal(nextDocument.state_schema.answer.name, "Edited Answer");
+  assert.equal(nextDocument.state_schema.answer.value, "old run");
+  assert.equal(nextDocument.state_schema.state_1.name, "Topic");
+  assert.equal(nextDocument.state_schema.state_1.type, "text");
+  assert.equal(nextDocument.state_schema.state_2.name, "Sources");
+  assert.equal(nextDocument.state_schema.state_2.type, "file");
   assert.deepEqual(document.nodes.research_subgraph.config.graph.metadata, { version: 1 });
   assert.equal(unchangedDocument, document);
 });

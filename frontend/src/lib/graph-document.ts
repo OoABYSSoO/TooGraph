@@ -23,8 +23,10 @@ import type {
   GraphPayload,
   InputNode,
   OutputNode,
+  ReadBinding,
   StateDefinition,
   TemplateRecord,
+  WriteBinding,
 } from "../types/node-system.ts";
 import type { SkillDefinition, SkillIoField } from "../types/skills.ts";
 
@@ -497,10 +499,6 @@ export function updateSubgraphNodeGraphInDocument<T extends GraphPayload | Graph
     return document;
   }
 
-  if (JSON.stringify(node.config.graph) === JSON.stringify(graph)) {
-    return document;
-  }
-
   const nextDocument = cloneGraphDocument(document);
   const nextNode = nextDocument.nodes[nodeId];
   if (nextNode.kind !== "subgraph") {
@@ -508,7 +506,145 @@ export function updateSubgraphNodeGraphInDocument<T extends GraphPayload | Graph
   }
 
   nextNode.config.graph = clonePlainValue(graph);
+  syncSubgraphBoundaryPorts(nextDocument, nodeId, graph);
+
+  if (
+    JSON.stringify(nextDocument.nodes[nodeId]) === JSON.stringify(node) &&
+    JSON.stringify(nextDocument.state_schema) === JSON.stringify(document.state_schema) &&
+    JSON.stringify(nextDocument.metadata) === JSON.stringify(document.metadata)
+  ) {
+    return document;
+  }
+
   return nextDocument;
+}
+
+type SubgraphBoundary = {
+  stateKey: string;
+  definition: StateDefinition | undefined;
+};
+
+function listSubgraphInputBoundaries(graph: GraphCorePayload): SubgraphBoundary[] {
+  return Object.values(graph.nodes)
+    .filter((node): node is InputNode => node.kind === "input" && node.writes.length > 0)
+    .map((node) => {
+      const stateKey = node.writes[0]!.state;
+      return {
+        stateKey,
+        definition: graph.state_schema[stateKey],
+      };
+    });
+}
+
+function listSubgraphOutputBoundaries(graph: GraphCorePayload): SubgraphBoundary[] {
+  return Object.values(graph.nodes)
+    .filter((node): node is OutputNode => node.kind === "output" && node.reads.length > 0)
+    .map((node) => {
+      const stateKey = node.reads[0]!.state;
+      return {
+        stateKey,
+        definition: graph.state_schema[stateKey],
+      };
+    });
+}
+
+function normalizeBoundaryStateType(definition: StateDefinition | undefined, fallbackType = "text") {
+  const rawType = definition?.type?.trim() || fallbackType;
+  return STATE_FIELD_TYPE_VALUES.has(rawType) ? rawType : fallbackType;
+}
+
+function syncSubgraphBoundaryPorts<T extends GraphPayload | GraphDocument>(
+  document: T,
+  nodeId: string,
+  graph: GraphCorePayload,
+) {
+  const node = document.nodes[nodeId];
+  if (!node || node.kind !== "subgraph") {
+    return;
+  }
+
+  node.reads = syncSubgraphReadBindings(document, node.reads, listSubgraphInputBoundaries(graph));
+  node.writes = syncSubgraphWriteBindings(document, node.writes, listSubgraphOutputBoundaries(graph));
+}
+
+function syncSubgraphReadBindings(
+  document: GraphPayload | GraphDocument,
+  currentBindings: ReadBinding[],
+  boundaries: SubgraphBoundary[],
+): ReadBinding[] {
+  return boundaries.map((boundary, index) => {
+    const state = resolveSubgraphBoundaryParentState(document, currentBindings[index]?.state ?? null, boundary);
+    return {
+      state,
+      required: true,
+    };
+  });
+}
+
+function syncSubgraphWriteBindings(
+  document: GraphPayload | GraphDocument,
+  currentBindings: WriteBinding[],
+  boundaries: SubgraphBoundary[],
+): WriteBinding[] {
+  return boundaries.map((boundary, index) => {
+    const state = resolveSubgraphBoundaryParentState(document, currentBindings[index]?.state ?? null, boundary);
+    return {
+      state,
+      mode: "replace" as const,
+    };
+  });
+}
+
+function resolveSubgraphBoundaryParentState(
+  document: GraphPayload | GraphDocument,
+  currentStateKey: string | null,
+  boundary: SubgraphBoundary,
+) {
+  if (currentStateKey) {
+    document.state_schema[currentStateKey] = buildSyncedSubgraphBoundaryStateDefinition(
+      currentStateKey,
+      document.state_schema[currentStateKey],
+      boundary.definition,
+      Object.keys(document.state_schema),
+    );
+    return currentStateKey;
+  }
+
+  const stateType = normalizeBoundaryStateType(boundary.definition);
+  const field = buildNextMaterializedVirtualStateField(document, stateType);
+  document.state_schema[field.key] = buildSyncedSubgraphBoundaryStateDefinition(
+    field.key,
+    undefined,
+    boundary.definition,
+    Object.keys(document.state_schema),
+  );
+  rememberMaterializedStateKeyIndex(document, field.key);
+  return field.key;
+}
+
+function buildSyncedSubgraphBoundaryStateDefinition(
+  stateKey: string,
+  currentDefinition: StateDefinition | undefined,
+  boundaryDefinition: StateDefinition | undefined,
+  existingKeys: string[],
+): StateDefinition {
+  const nextType = normalizeBoundaryStateType(boundaryDefinition, currentDefinition?.type?.trim() || "text");
+  const currentType = currentDefinition?.type?.trim() || nextType;
+  const shouldKeepValue = Boolean(currentDefinition) && currentType === nextType;
+  const nextDefinition: StateDefinition = {
+    name: boundaryDefinition?.name?.trim() || currentDefinition?.name?.trim() || stateKey,
+    description: boundaryDefinition?.description?.trim() ?? currentDefinition?.description ?? "",
+    type: nextType,
+    value: shouldKeepValue ? currentDefinition?.value : defaultMaterializedStateValueForType(nextType),
+    color: boundaryDefinition?.color?.trim() || currentDefinition?.color?.trim() || resolveMaterializedStateColor(stateKey, existingKeys),
+  };
+  if (currentDefinition?.promptVisible !== undefined) {
+    nextDefinition.promptVisible = currentDefinition.promptVisible;
+  }
+  if (currentDefinition?.binding !== undefined) {
+    nextDefinition.binding = currentDefinition.binding;
+  }
+  return nextDefinition;
 }
 
 function normalizeConditionConfig(config: ConditionNode["config"]): ConditionNode["config"] {
