@@ -1110,7 +1110,7 @@ test("buildNodeCardViewModel compacts subgraph thumbnails and includes condition
   const model = buildNodeCardViewModel("research_subgraph", node, stateSchema);
 
   assert.equal(model.body.kind, "subgraph");
-  assert.equal(model.body.thumbnailColumnCount, 4);
+  assert.equal(model.body.thumbnailColumnCount, 3);
   assert.equal(model.body.thumbnailRowCount, 2);
   assert.deepEqual(
     model.body.thumbnailNodes.map((item) => ({ id: item.id, column: item.column, row: item.row })),
@@ -1118,8 +1118,8 @@ test("buildNodeCardViewModel compacts subgraph thumbnails and includes condition
       { id: "start", column: 1, row: 1 },
       { id: "search", column: 2, row: 1 },
       { id: "review", column: 3, row: 1 },
-      { id: "refine", column: 4, row: 1 },
-      { id: "final", column: 4, row: 2 },
+      { id: "refine", column: 1, row: 2 },
+      { id: "final", column: 2, row: 2 },
       { id: "done", column: 3, row: 2 },
     ],
   );

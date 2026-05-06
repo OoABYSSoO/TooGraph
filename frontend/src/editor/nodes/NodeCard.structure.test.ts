@@ -109,6 +109,28 @@ test("SubgraphNodeBody renders a status-aware DAG mini map with node names", () 
   assert.doesNotMatch(subgraphNodeBodySource, /v-for="item in body\.thumbnailNodes"[\s\S]*class="subgraph-node-body__mini-node"/);
 });
 
+test("SubgraphNodeBody places state port rails before the DAG mini map", () => {
+  const inputRailIndex = subgraphNodeBodySource.indexOf('class="subgraph-node-body__port-rail subgraph-node-body__port-rail--input"');
+  const outputRailIndex = subgraphNodeBodySource.indexOf('class="subgraph-node-body__port-rail subgraph-node-body__port-rail--output"');
+  const thumbnailIndex = subgraphNodeBodySource.indexOf('class="subgraph-node-body__thumbnail"');
+
+  assert.ok(inputRailIndex >= 0, "expected the subgraph input rail wrapper");
+  assert.ok(outputRailIndex >= 0, "expected the subgraph output rail wrapper");
+  assert.ok(thumbnailIndex >= 0, "expected the subgraph thumbnail wrapper");
+  assert.ok(inputRailIndex < thumbnailIndex, "expected input state pills to render before the thumbnail");
+  assert.ok(outputRailIndex < thumbnailIndex, "expected output state pills to render before the thumbnail");
+  assert.match(subgraphNodeBodySource, /grid-template-areas:[\s\S]*"input output"[\s\S]*"thumbnail thumbnail"/);
+});
+
+test("SubgraphMiniMap keeps SVG edges and nodes in the same fixed canvas coordinates", () => {
+  const miniMapSource = readFileSync(resolve(currentDirectory, "SubgraphMiniMap.vue"), "utf8").replace(/\r\n/g, "\n");
+
+  assert.doesNotMatch(miniMapSource, /min-width:\s*100%;/);
+  assert.match(miniMapSource, /\.subgraph-mini-map \{[\s\S]*display:\s*grid;[\s\S]*justify-items:\s*center;/);
+  assert.match(miniMapSource, /\.subgraph-mini-map__canvas \{[\s\S]*position:\s*relative;[\s\S]*width:\s*fit-content;/);
+  assert.match(miniMapSource, /\.subgraph-mini-map__edges \{[\s\S]*width:\s*100%;[\s\S]*height:\s*100%;/);
+});
+
 test("NodeCard keeps state pill geometry but hides the pill chrome visually", () => {
   assert.match(portListSurfaceSource, /\.node-card__port-pill \{[\s\S]*display:\s*inline-flex;/);
   assert.match(portListSurfaceSource, /\.node-card__port-pill \{[\s\S]*align-items:\s*center;/);

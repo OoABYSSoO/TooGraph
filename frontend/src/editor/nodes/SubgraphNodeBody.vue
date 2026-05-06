@@ -40,29 +40,6 @@
         />
       </div>
 
-      <div class="subgraph-node-body__thumbnail" aria-label="Subgraph preview">
-        <div class="subgraph-node-body__summary">
-          <span>{{ body.inputCount }} in</span>
-          <span>{{ body.outputCount }} out</span>
-          <span
-            v-if="body.runtimeSummary"
-            class="subgraph-node-body__runtime"
-            :class="`subgraph-node-body__runtime--${body.runtimeSummary.tone}`"
-          >
-            {{ runtimeSummaryText }}
-          </span>
-        </div>
-        <SubgraphMiniMap
-          :nodes="body.thumbnailNodes"
-          :edges="body.thumbnailEdges"
-          :column-count="body.thumbnailColumnCount"
-          :row-count="body.thumbnailRowCount"
-        />
-        <div v-if="body.capabilities.length > 0" class="subgraph-node-body__capabilities">
-          <span v-for="capability in body.capabilities" :key="capability">{{ capability }}</span>
-        </div>
-      </div>
-
       <div class="subgraph-node-body__port-rail subgraph-node-body__port-rail--output">
         <StatePortList
           side="output"
@@ -100,6 +77,29 @@
           @update:color="emit('update:color', $event)"
           @update:description="emit('update:description', $event)"
         />
+      </div>
+
+      <div class="subgraph-node-body__thumbnail" aria-label="Subgraph preview">
+        <div class="subgraph-node-body__summary">
+          <span>{{ body.inputCount }} in</span>
+          <span>{{ body.outputCount }} out</span>
+          <span
+            v-if="body.runtimeSummary"
+            class="subgraph-node-body__runtime"
+            :class="`subgraph-node-body__runtime--${body.runtimeSummary.tone}`"
+          >
+            {{ runtimeSummaryText }}
+          </span>
+        </div>
+        <SubgraphMiniMap
+          :nodes="body.thumbnailNodes"
+          :edges="body.thumbnailEdges"
+          :column-count="body.thumbnailColumnCount"
+          :row-count="body.thumbnailRowCount"
+        />
+        <div v-if="body.capabilities.length > 0" class="subgraph-node-body__capabilities">
+          <span v-for="capability in body.capabilities" :key="capability">{{ capability }}</span>
+        </div>
       </div>
     </div>
   </div>
@@ -175,8 +175,8 @@ const emit = defineEmits<{
 .subgraph-node-body__ports {
   display: grid;
   grid-template-areas:
-    "thumbnail thumbnail"
-    "input output";
+    "input output"
+    "thumbnail thumbnail";
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   align-items: start;
   gap: 14px 18px;

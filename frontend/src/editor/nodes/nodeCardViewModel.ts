@@ -304,12 +304,12 @@ function buildSubgraphThumbnail(node: Extract<GraphNode, { kind: "subgraph" }>, 
     entries.map(([id]) => id),
     edgePairs,
   );
-  const columnCount = Math.max(1, Math.min(4, orderedIds.length));
+  const columnCount = Math.max(1, Math.min(3, orderedIds.length));
   const positionById = new Map<string, { column: number; row: number }>();
   orderedIds.forEach((id, index) => {
     const row = Math.floor(index / columnCount) + 1;
     const columnOffset = index % columnCount;
-    const column = row % 2 === 0 ? columnCount - columnOffset : columnOffset + 1;
+    const column = columnOffset + 1;
     positionById.set(id, { column, row });
   });
 

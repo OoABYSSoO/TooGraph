@@ -148,6 +148,9 @@ function formatStatus(status: SubgraphThumbnailStatus) {
 .subgraph-mini-map {
   min-height: 176px;
   overflow: visible;
+  display: grid;
+  align-items: center;
+  justify-items: center;
   border: 1px solid rgba(154, 52, 18, 0.1);
   border-radius: 8px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 250, 242, 0.72));
@@ -156,7 +159,7 @@ function formatStatus(status: SubgraphThumbnailStatus) {
 
 .subgraph-mini-map__canvas {
   position: relative;
-  min-width: 100%;
+  width: fit-content;
   margin: 0 auto;
 }
 
