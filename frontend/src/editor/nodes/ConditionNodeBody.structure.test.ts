@@ -20,15 +20,17 @@ test("ConditionNodeBody owns condition source and control presentation", () => {
   assert.match(componentSource, /@update:model-value="emit\('update:operator', \$event\)"/);
   assert.match(componentSource, /@input="emit\('rule-value-input', \$event\)"/);
   assert.match(componentSource, /@blur="emit\('commit-rule-value'\)"/);
-  assert.match(componentSource, /@input="emit\('loop-limit-input', \$event\)"/);
-  assert.match(componentSource, /@blur="emit\('commit-loop-limit'\)"/);
+  assert.doesNotMatch(componentSource, /loop-limit-input/);
+  assert.doesNotMatch(componentSource, /commit-loop-limit/);
+  assert.doesNotMatch(componentSource, /conditionLoopLimitDraft/);
+  assert.doesNotMatch(componentSource, /nodeCard\.maxLoops/);
 });
 
 test("ConditionNodeBody carries condition scoped styles that cannot cross the child boundary", () => {
   assert.match(componentSource, /\.node-card__surface--condition \{[\s\S]*display:\s*grid;/);
   assert.match(componentSource, /\.node-card__condition-panel \{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\);/);
-  assert.match(componentSource, /\.node-card__condition-controls-row \{[\s\S]*--node-card-condition-loop-column:\s*clamp\(6\.5rem,\s*22%,\s*8rem\);/);
-  assert.match(componentSource, /\.node-card__condition-controls-row \{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\) minmax\(0,\s*1fr\) var\(--node-card-condition-loop-column\);/);
+  assert.doesNotMatch(componentSource, /--node-card-condition-loop-column/);
+  assert.match(componentSource, /\.node-card__condition-controls-row \{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\) minmax\(0,\s*1fr\);/);
   assert.match(componentSource, /\.node-card__port-pill--condition-source \{[\s\S]*min-width:\s*260px;/);
   assert.doesNotMatch(componentSource, /--node-card-port-pill-max-width/);
   assert.doesNotMatch(componentSource, /text-overflow:\s*ellipsis;/);

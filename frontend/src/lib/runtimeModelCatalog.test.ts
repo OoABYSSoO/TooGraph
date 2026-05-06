@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { buildRuntimeModelOptions, resolveRuntimeModelCatalog } from "./runtimeModelCatalog.ts";
+import { GLOBAL_RUNTIME_MODEL_OPTION_VALUE, buildRuntimeModelOptions, resolveRuntimeModelCatalog } from "./runtimeModelCatalog.ts";
 import type { SettingsPayload } from "../types/settings.ts";
 
 test("buildRuntimeModelOptions uses the same configured catalog rules as agent nodes", () => {
@@ -80,5 +80,8 @@ test("buildRuntimeModelOptions uses the same configured catalog rules as agent n
 
   assert.equal(catalog.globalTextModelRef, "openai-codex/gpt-5.5");
   assert.deepEqual(catalog.availableModelRefs, ["local/lm-local"]);
-  assert.deepEqual(buildRuntimeModelOptions(settings), [{ value: "local/lm-local", label: "lm-local" }]);
+  assert.deepEqual(buildRuntimeModelOptions(settings), [
+    { value: GLOBAL_RUNTIME_MODEL_OPTION_VALUE, label: "全局（gpt-5.5）" },
+    { value: "local/lm-local", label: "lm-local" },
+  ]);
 });

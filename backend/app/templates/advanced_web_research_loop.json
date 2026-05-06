@@ -253,11 +253,11 @@
       "reads": [{ "state": "evidence_review", "required": true }],
       "writes": [],
       "config": {
-        "branches": ["supplement", "finalize", "exhausted"],
-        "loopLimit": 4,
+        "branches": ["true", "false", "exhausted"],
+        "loopLimit": 5,
         "branchMapping": {
-          "true": "supplement",
-          "false": "finalize"
+          "true": "true",
+          "false": "false"
         },
         "rule": {
           "source": "$state.evidence_review.needs_more_search",
@@ -390,8 +390,8 @@
     {
       "source": "should_continue_search",
       "branches": {
-        "supplement": "run_web_search",
-        "finalize": "select_evidence",
+        "true": "run_web_search",
+        "false": "select_evidence",
         "exhausted": "select_evidence"
       }
     }
@@ -399,7 +399,7 @@
   "metadata": {
     "category": "research",
     "templateVersion": "2026-05-06",
-    "maxSearchRounds": 4,
+    "maxSearchRounds": 5,
     "graphProtocol": "node_system"
   }
 }

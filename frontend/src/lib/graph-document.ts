@@ -1,7 +1,6 @@
 import { toRaw } from "vue";
 
-import { normalizeConditionLoopLimit } from "../editor/nodes/conditionLoopLimit.ts";
-import { applyConditionBranchMapping, createConditionBranchKey } from "./condition-branch-mapping.ts";
+import { normalizeFixedConditionConfig } from "./condition-protocol.ts";
 import {
   canConnectConditionRoute,
   canConnectFlowNodes,
@@ -482,10 +481,7 @@ export function updateOutputNodeConfigInDocument<T extends GraphPayload | GraphD
 }
 
 function normalizeConditionConfig(config: ConditionNode["config"]): ConditionNode["config"] {
-  return {
-    ...config,
-    loopLimit: normalizeConditionLoopLimit(config.loopLimit),
-  };
+  return normalizeFixedConditionConfig(config);
 }
 
 export function updateNodeMetadataInDocument<T extends GraphPayload | GraphDocument>(
@@ -729,120 +725,22 @@ export function updateConditionBranchInDocument<T extends GraphPayload | GraphDo
   nextKey: string,
   mappingKeys: string[],
 ): T {
-  const node = document.nodes[nodeId];
-  if (!node || node.kind !== "condition") {
-    return document;
-  }
-
-  const normalizedNextKey = nextKey.trim();
-  if (!normalizedNextKey || !node.config.branches.includes(currentKey)) {
-    return document;
-  }
-  if (normalizedNextKey !== currentKey && node.config.branches.includes(normalizedNextKey)) {
-    return document;
-  }
-
-  const nextBranches =
-    normalizedNextKey === currentKey
-      ? node.config.branches
-      : node.config.branches.map((branchKey) => (branchKey === currentKey ? normalizedNextKey : branchKey));
-  const nextBranchMapping = applyConditionBranchMapping(node.config.branchMapping, currentKey, normalizedNextKey, mappingKeys);
-  const nextConditionalEdges =
-    normalizedNextKey === currentKey
-      ? document.conditional_edges
-      : document.conditional_edges.map((edge) => {
-          if (edge.source !== nodeId || !Object.prototype.hasOwnProperty.call(edge.branches, currentKey)) {
-            return edge;
-          }
-          return {
-            ...edge,
-            branches: Object.fromEntries(
-              Object.entries(edge.branches).map(([branchKey, target]) => [
-                branchKey === currentKey ? normalizedNextKey : branchKey,
-                target,
-              ]),
-            ),
-          };
-        });
-
-  const branchesChanged = JSON.stringify(nextBranches) !== JSON.stringify(node.config.branches);
-  const branchMappingChanged = JSON.stringify(nextBranchMapping) !== JSON.stringify(node.config.branchMapping);
-  const conditionalEdgesChanged = JSON.stringify(nextConditionalEdges) !== JSON.stringify(document.conditional_edges);
-
-  if (!branchesChanged && !branchMappingChanged && !conditionalEdgesChanged) {
-    return document;
-  }
-
-  const nextDocument = cloneGraphDocument(document);
-  const nextNode = nextDocument.nodes[nodeId];
-  if (nextNode.kind !== "condition") {
-    return document;
-  }
-
-  nextNode.config.branches = nextBranches;
-  nextNode.config.branchMapping = nextBranchMapping;
-  nextDocument.conditional_edges = nextConditionalEdges;
-  return nextDocument;
+  void nodeId;
+  void currentKey;
+  void nextKey;
+  void mappingKeys;
+  return document;
 }
 
 export function addConditionBranchToDocument<T extends GraphPayload | GraphDocument>(document: T, nodeId: string): T {
-  const node = document.nodes[nodeId];
-  if (!node || node.kind !== "condition") {
-    return document;
-  }
-
-  const nextBranchKey = createConditionBranchKey(node.config.branches);
-  const nextDocument = cloneGraphDocument(document);
-  const nextNode = nextDocument.nodes[nodeId];
-  if (nextNode.kind !== "condition") {
-    return document;
-  }
-
-  nextNode.config.branches = [...nextNode.config.branches, nextBranchKey];
-  return nextDocument;
+  void nodeId;
+  return document;
 }
 
 export function removeConditionBranchFromDocument<T extends GraphPayload | GraphDocument>(document: T, nodeId: string, branchKey: string): T {
-  const node = document.nodes[nodeId];
-  if (!node || node.kind !== "condition") {
-    return document;
-  }
-
-  if (!node.config.branches.includes(branchKey) || node.config.branches.length <= 1) {
-    return document;
-  }
-
-  const nextBranches = node.config.branches.filter((candidate) => candidate !== branchKey);
-  const nextBranchMapping = Object.fromEntries(
-    Object.entries(node.config.branchMapping).filter(([, mappedBranchKey]) => mappedBranchKey !== branchKey),
-  );
-  const nextConditionalEdges = document.conditional_edges
-    .map((edge) => {
-      if (edge.source !== nodeId || !Object.prototype.hasOwnProperty.call(edge.branches, branchKey)) {
-        return edge;
-      }
-
-      const nextEdgeBranches = Object.fromEntries(
-        Object.entries(edge.branches).filter(([candidateBranchKey]) => candidateBranchKey !== branchKey),
-      );
-
-      return {
-        ...edge,
-        branches: nextEdgeBranches,
-      };
-    })
-    .filter((edge) => Object.keys(edge.branches).length > 0);
-
-  const nextDocument = cloneGraphDocument(document);
-  const nextNode = nextDocument.nodes[nodeId];
-  if (nextNode.kind !== "condition") {
-    return document;
-  }
-
-  nextNode.config.branches = nextBranches;
-  nextNode.config.branchMapping = nextBranchMapping;
-  nextDocument.conditional_edges = nextConditionalEdges;
-  return nextDocument;
+  void nodeId;
+  void branchKey;
+  return document;
 }
 
 export function connectFlowNodesInDocument<T extends GraphPayload | GraphDocument>(document: T, sourceNodeId: string, targetNodeId: string): T {

@@ -1,10 +1,12 @@
 import {
+  GLOBAL_RUNTIME_MODEL_OPTION_VALUE,
   buildRuntimeModelDisplayLookup,
   buildRuntimeModelSelectOptions,
   resolveRuntimeModelCatalog,
 } from "../../lib/runtimeModelCatalog.ts";
 
 export const DEFAULT_AGENT_TEMPERATURE = 0.2;
+export { GLOBAL_RUNTIME_MODEL_OPTION_VALUE };
 
 export type AgentThinkingControlMode = "off" | "low" | "medium" | "high" | "xhigh";
 
@@ -37,16 +39,15 @@ export function normalizeAgentThinkingMode(value: string | null | undefined): Ag
 export const buildAgentModelDisplayLookup = buildRuntimeModelDisplayLookup;
 
 export function buildAgentModelSelectOptions(
-  resolvedModel: string,
+  globalTextModelRef: string,
   availableModelRefs: string[],
   modelDisplayLookup: Record<string, string>,
 ) {
-  void resolvedModel;
-  return buildRuntimeModelSelectOptions(availableModelRefs, modelDisplayLookup);
+  return buildRuntimeModelSelectOptions(globalTextModelRef, availableModelRefs, modelDisplayLookup);
 }
 
-export function resolveAgentModelSelection(nextValue: string, globalTextModelRef: string) {
-  if (nextValue === globalTextModelRef) {
+export function resolveAgentModelSelection(nextValue: string) {
+  if (nextValue === GLOBAL_RUNTIME_MODEL_OPTION_VALUE) {
     return {
       modelSource: "global" as const,
       model: "",

@@ -113,6 +113,19 @@ class ConditionOperator(str, Enum):
     EXISTS = "exists"
 
 
+FIXED_CONDITION_BRANCHES = ("true", "false", "exhausted")
+FIXED_CONDITION_BRANCH_MAPPING = {"true": "true", "false": "false"}
+FIXED_CONDITION_LOOP_LIMIT = 5
+
+
+def _fixed_condition_branches() -> list[str]:
+    return list(FIXED_CONDITION_BRANCHES)
+
+
+def _fixed_condition_branch_mapping() -> dict[str, str]:
+    return dict(FIXED_CONDITION_BRANCH_MAPPING)
+
+
 class DisplayMode(str, Enum):
     AUTO = "auto"
     PLAIN = "plain"
@@ -256,14 +269,14 @@ class NodeSystemConditionRule(BaseModel):
 
 
 class NodeSystemConditionConfig(BaseModel):
-    branches: list[str] = Field(default_factory=list)
-    loop_limit: int = Field(default=5, alias="loopLimit")
-    branch_mapping: dict[str, str] = Field(default_factory=dict, alias="branchMapping")
+    branches: list[str] = Field(default_factory=_fixed_condition_branches)
+    loop_limit: int = Field(default=FIXED_CONDITION_LOOP_LIMIT, alias="loopLimit")
+    branch_mapping: dict[str, str] = Field(default_factory=_fixed_condition_branch_mapping, alias="branchMapping")
     rule: NodeSystemConditionRule = Field(
         default_factory=lambda: NodeSystemConditionRule(source="result", operator=ConditionOperator.EXISTS, value=None)
     )
 
-    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True, extra="forbid")
 
     @model_validator(mode="before")
     @classmethod
@@ -276,13 +289,11 @@ class NodeSystemConditionConfig(BaseModel):
     @classmethod
     def validate_branches(cls, value: list[str]) -> list[str]:
         normalized: list[str] = []
-        seen: set[str] = set()
         for branch in value:
             next_branch = _validate_identifier(branch, label="Condition branch")
-            if next_branch in seen:
-                raise ValueError(f"Duplicate condition branch '{next_branch}' detected.")
-            seen.add(next_branch)
             normalized.append(next_branch)
+        if normalized != list(FIXED_CONDITION_BRANCHES):
+            raise ValueError("Condition branches are fixed to true, false, exhausted.")
         return normalized
 
     @field_validator("branch_mapping")
@@ -294,17 +305,15 @@ class NodeSystemConditionConfig(BaseModel):
             if not next_key:
                 raise ValueError("Condition branch mapping key cannot be empty.")
             normalized[next_key] = _validate_identifier(branch, label="Condition branch")
+        if normalized != FIXED_CONDITION_BRANCH_MAPPING:
+            raise ValueError("Condition branchMapping is fixed to {'true': 'true', 'false': 'false'}.")
         return normalized
 
     @field_validator("loop_limit")
     @classmethod
     def validate_loop_limit(cls, value: int) -> int:
-        if value == -1:
-            return 5
-        if value < 1:
-            raise ValueError("Condition loop limit must be a positive integer.")
-        if value > 10:
-            raise ValueError("Condition loop limit cannot exceed 10.")
+        if value != FIXED_CONDITION_LOOP_LIMIT:
+            raise ValueError("Condition loopLimit is fixed to 5.")
         return value
 
 

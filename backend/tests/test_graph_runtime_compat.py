@@ -29,7 +29,7 @@ def _manual_graph_with_crossed_answer_writes() -> NodeSystemGraphPayload:
                     "reads": [{"state": "state_5", "required": True}],
                     "config": {
                         "branches": ["true", "false", "exhausted"],
-                        "loopLimit": 3,
+                        "loopLimit": 5,
                         "branchMapping": {"true": "true", "false": "false"},
                         "rule": {"source": "state_5", "operator": "==", "value": True},
                     },

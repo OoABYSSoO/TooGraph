@@ -14,7 +14,7 @@
         <ElOption
           v-for="option in modelOptions"
           :key="option.value"
-          :label="option.value === globalModelRef ? `${option.label} (${t('nodeCard.globalModelSuffix')})` : option.label"
+          :label="option.label"
           :value="option.value"
         />
       </ElSelect>

@@ -32,9 +32,6 @@ function canNodeAcceptFlowTarget(
   if (targetNode.kind === "input") {
     return false;
   }
-  if (sourceNode.kind === "condition" && targetNode.kind === "condition") {
-    return false;
-  }
   return true;
 }
 

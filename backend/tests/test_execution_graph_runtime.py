@@ -30,17 +30,19 @@ class ExecutionGraphRuntimeTests(unittest.TestCase):
                         "kind": "condition",
                         "ui": {"position": {"x": 160, "y": 0}},
                         "config": {
-                            "branches": ["true", "false"],
+                            "branches": ["true", "false", "exhausted"],
+                            "loopLimit": 5,
                             "branchMapping": {"true": "true", "false": "false"},
                             "rule": {"source": "result", "operator": "exists", "value": None},
                         },
                     },
                     "yes": {"kind": "output", "ui": {"position": {"x": 320, "y": -80}}},
                     "no": {"kind": "output", "ui": {"position": {"x": 320, "y": 80}}},
+                    "done": {"kind": "output", "ui": {"position": {"x": 320, "y": 160}}},
                 },
                 "edges": [{"source": "start", "target": "judge"}],
                 "conditional_edges": [
-                    {"source": "judge", "branches": {"true": "yes", "false": "no"}},
+                    {"source": "judge", "branches": {"true": "yes", "false": "no", "exhausted": "done"}},
                 ],
             }
         )
@@ -53,6 +55,7 @@ class ExecutionGraphRuntimeTests(unittest.TestCase):
                 build_regular_edge_id("start", "judge"),
                 build_conditional_edge_id("judge", "true", "yes"),
                 build_conditional_edge_id("judge", "false", "no"),
+                build_conditional_edge_id("judge", "exhausted", "done"),
             ],
         )
         self.assertEqual(edges[1].branch, "true")

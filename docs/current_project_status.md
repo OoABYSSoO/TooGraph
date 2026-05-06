@@ -55,16 +55,16 @@
 - 显示名称：`高级联网搜索`
 - 作用：围绕 `web_search` 搭建多轮联网研究流程，适合“总结最新新闻、版本内容、公开资料依据”等需要先搜索再整理的任务。
 - 主要流程：输入问题 -> 制定研究计划与首轮搜索词 -> 运行 `web_search` -> 阅读本地原文并评估证据 -> 需要补搜时由 condition 分支直接回到搜索节点 -> 证据足够或达到上限后筛选依据 -> 生成 `final_reply`。
-- 循环语义：补搜回边是 `should_continue_search` condition 的原生分支，`loopLimit=4`，并提供 `exhausted` 分支在达到上限时用已有资料收束，而不是撞 LangGraph 递归限制。
+- 循环语义：补搜回边是 `should_continue_search` condition 的原生分支。condition 节点协议固定为 `true / false / exhausted` 三个分支，固定 `loopLimit=5`，并提供 `exhausted` 分支在达到上限时用已有资料收束，而不是撞 LangGraph 递归限制。
 - 技能语义：搜索节点绑定 `web_search`，技能输入仍由该 Agent 节点运行时 LLM 生成；模板不使用 `inputMapping` 或静态技能参数。
 - 输出语义：`query`、`source_urls`、`artifact_paths`、`errors` 通过 managed binding state 透传；后续 Agent 读取 `artifact_paths` 对应的本地原文，负责证据筛选和最终总结。
-- 模型语义：模板默认使用全局模型配置，不写死某个 provider。若全局本地网关未启动，运行该模板前需要在 Model Providers 页面选择可用模型，或在图中为 Agent 节点设置 override。
+- 模型语义：模板默认使用全局模型配置，不写死某个 provider。Agent 节点和桌宠模型下拉的第一项是“全局（实时读取当前全局设定的模型）”，后面才是具体模型 override。若全局本地网关未启动，运行该模板前需要在 Model Providers 页面选择可用模型，或在图中为 Agent 节点设置 override。
 
 ## 当前前端能力
 
 - 编辑器支持 `input / agent / condition / output` 四类核心节点。
 - Agent 节点支持模型选择、thinking、temperature、输入输出绑定、skill 添加和技能说明胶囊编辑。
-- condition 节点作为条件边的可视化代理，运行时原生支持 `condition -> condition` 的多级路由。
+- condition 节点作为条件边的可视化代理，只允许编辑条件表达式、节点名称和节点介绍；分支协议固定为 `true / false / exhausted`，JSON 载荷也不能定义其他分支形状。运行时原生支持 `condition -> condition` 的多级路由。
 - output 节点负责展示、预览、导出或链接图运行产物，不拥有隐藏持久化策略。
 - Skills 页面围绕统一 skill catalog 展示、导入、启用、禁用和删除技能。
 - 桌宠浮窗支持模型选择和对话入口，但当前不再假设仓库内置默认桌宠模板；需要用新协议重建桌宠自主循环模板后再接入完整自主循环。

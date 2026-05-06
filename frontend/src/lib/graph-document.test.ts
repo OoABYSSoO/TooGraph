@@ -1901,7 +1901,7 @@ test("connectStateBindingInDocument does not rewrite agent skills for knowledge-
   assert.deepEqual(nextDocument.nodes.research_helper.config.skills, ["markdown_formatter", "custom_retrieval"]);
 });
 
-test("updateConditionNodeConfigInDocument patches condition config immutably and normalizes loop limits", () => {
+test("updateConditionNodeConfigInDocument patches condition rules while preserving the fixed condition protocol", () => {
   assert.equal(typeof graphDocument.updateConditionNodeConfigInDocument, "function");
 
   const document: GraphPayload = {
@@ -1917,11 +1917,11 @@ test("updateConditionNodeConfigInDocument patches condition config immutably and
         reads: [],
         writes: [],
         config: {
-          branches: ["continue", "retry"],
+          branches: ["true", "false", "exhausted"],
           loopLimit: 5,
-          branchMapping: { true: "continue", false: "retry" },
+          branchMapping: { true: "true", false: "false" },
           rule: {
-            source: "",
+            source: "evidence_review",
             operator: "exists",
             value: null,
           },
@@ -1935,7 +1935,14 @@ test("updateConditionNodeConfigInDocument patches condition config immutably and
 
   const nextDocument = graphDocument.updateConditionNodeConfigInDocument(document, "continue_check", (config) => ({
     ...config,
+    branches: ["supplement", "finalize"],
     loopLimit: 99,
+    branchMapping: { true: "supplement", false: "finalize" },
+    rule: {
+      source: "$state.evidence_review.needs_more_search",
+      operator: "==",
+      value: true,
+    },
   }));
 
   assert.notEqual(nextDocument, document);
@@ -1944,7 +1951,14 @@ test("updateConditionNodeConfigInDocument patches condition config immutably and
   if (nextDocument.nodes.continue_check.kind !== "condition" || document.nodes.continue_check.kind !== "condition") {
     throw new Error("Expected continue_check to remain a condition node");
   }
-  assert.equal(nextDocument.nodes.continue_check.config.loopLimit, 10);
+  assert.deepEqual(nextDocument.nodes.continue_check.config.branches, ["true", "false", "exhausted"]);
+  assert.equal(nextDocument.nodes.continue_check.config.loopLimit, 5);
+  assert.deepEqual(nextDocument.nodes.continue_check.config.branchMapping, { true: "true", false: "false" });
+  assert.deepEqual(nextDocument.nodes.continue_check.config.rule, {
+    source: "$state.evidence_review.needs_more_search",
+    operator: "==",
+    value: true,
+  });
   assert.equal(document.nodes.continue_check.config.loopLimit, 5);
 });
 
@@ -1964,9 +1978,9 @@ test("updateConditionNodeConfigInDocument returns original document for non-cond
         reads: [],
         writes: [],
         config: {
-          branches: ["continue", "retry"],
-          loopLimit: 3,
-          branchMapping: { true: "continue", false: "retry" },
+          branches: ["true", "false", "exhausted"],
+          loopLimit: 5,
+          branchMapping: { true: "true", false: "false" },
           rule: {
             source: "",
             operator: "exists",
@@ -2006,276 +2020,14 @@ test("updateConditionNodeConfigInDocument returns original document for non-cond
   assert.equal(unchangedAgent, document);
 });
 
-test("updateConditionBranchInDocument renames branch and syncs conditional edges", () => {
+test("condition branch edit helpers are no-ops because condition branches are protocol fixed", () => {
   assert.equal(typeof graphDocument.updateConditionBranchInDocument, "function");
-
-  const document: GraphPayload = {
-    graph_id: null,
-    name: "Condition Branch Graph",
-    state_schema: {},
-    nodes: {
-      route_result: {
-        kind: "condition",
-        name: "route_result",
-        description: "Route the result",
-        ui: { position: { x: 0, y: 0 } },
-        reads: [],
-        writes: [],
-        config: {
-          branches: ["continue", "retry"],
-          loopLimit: -1,
-          branchMapping: {
-            true: "continue",
-            false: "retry",
-          },
-          rule: {
-            source: "result",
-            operator: "exists",
-            value: null,
-          },
-        },
-      },
-    },
-    edges: [],
-    conditional_edges: [
-      {
-        source: "route_result",
-        branches: {
-          continue: "next_agent",
-          retry: "retry_agent",
-        },
-      },
-    ],
-    metadata: {},
-  };
-
-  const nextDocument = graphDocument.updateConditionBranchInDocument(document, "route_result", "retry", "retry_later", ["false", "maybe"]);
-
-  assert.notEqual(nextDocument, document);
-  assert.equal(nextDocument.nodes.route_result.kind, "condition");
-  assert.equal(document.nodes.route_result.kind, "condition");
-  if (nextDocument.nodes.route_result.kind !== "condition" || document.nodes.route_result.kind !== "condition") {
-    throw new Error("Expected route_result to remain a condition node");
-  }
-  assert.deepEqual(nextDocument.nodes.route_result.config.branches, ["continue", "retry_later"]);
-  assert.deepEqual(nextDocument.nodes.route_result.config.branchMapping, {
-    true: "continue",
-    false: "retry_later",
-    maybe: "retry_later",
-  });
-  assert.deepEqual(nextDocument.conditional_edges, [
-    {
-      source: "route_result",
-      branches: {
-        continue: "next_agent",
-        retry_later: "retry_agent",
-      },
-    },
-  ]);
-  assert.deepEqual(document.nodes.route_result.config.branches, ["continue", "retry"]);
-  assert.deepEqual(document.conditional_edges, [
-    {
-      source: "route_result",
-      branches: {
-        continue: "next_agent",
-        retry: "retry_agent",
-      },
-    },
-  ]);
-});
-
-test("updateConditionBranchInDocument rewrites mapping keys without renaming branch", () => {
-  assert.equal(typeof graphDocument.updateConditionBranchInDocument, "function");
-
-  const document: GraphPayload = {
-    graph_id: null,
-    name: "Condition Branch Mapping Graph",
-    state_schema: {},
-    nodes: {
-      route_result: {
-        kind: "condition",
-        name: "route_result",
-        description: "Route the result",
-        ui: { position: { x: 0, y: 0 } },
-        reads: [],
-        writes: [],
-        config: {
-          branches: ["continue", "retry"],
-          loopLimit: -1,
-          branchMapping: {
-            true: "continue",
-            false: "retry",
-            maybe: "retry",
-          },
-          rule: {
-            source: "result",
-            operator: "exists",
-            value: null,
-          },
-        },
-      },
-    },
-    edges: [],
-    conditional_edges: [],
-    metadata: {},
-  };
-
-  const nextDocument = graphDocument.updateConditionBranchInDocument(document, "route_result", "continue", "continue", ["yes", "true"]);
-
-  assert.notEqual(nextDocument, document);
-  assert.equal(nextDocument.nodes.route_result.kind, "condition");
-  if (nextDocument.nodes.route_result.kind !== "condition") {
-    throw new Error("Expected route_result to remain a condition node");
-  }
-  assert.deepEqual(nextDocument.nodes.route_result.config.branchMapping, {
-    false: "retry",
-    maybe: "retry",
-    yes: "continue",
-    true: "continue",
-  });
-  assert.deepEqual(nextDocument.nodes.route_result.config.branches, ["continue", "retry"]);
-});
-
-test("updateConditionBranchInDocument returns original document for duplicate branch key or non-condition node", () => {
-  assert.equal(typeof graphDocument.updateConditionBranchInDocument, "function");
-
-  const document: GraphPayload = {
-    graph_id: null,
-    name: "Condition Branch No-op Graph",
-    state_schema: {},
-    nodes: {
-      route_result: {
-        kind: "condition",
-        name: "route_result",
-        description: "Route the result",
-        ui: { position: { x: 0, y: 0 } },
-        reads: [],
-        writes: [],
-        config: {
-          branches: ["continue", "retry"],
-          loopLimit: -1,
-          branchMapping: {
-            true: "continue",
-            false: "retry",
-          },
-          rule: {
-            source: "result",
-            operator: "exists",
-            value: null,
-          },
-        },
-      },
-      input_result: {
-        kind: "input",
-        name: "input_result",
-        description: "Provide the result",
-        ui: { position: { x: 120, y: 0 } },
-        reads: [],
-        writes: [],
-        config: {
-          value: "",
-        },
-      },
-    },
-    edges: [],
-    conditional_edges: [],
-    metadata: {},
-  };
-
-  const duplicateBranch = graphDocument.updateConditionBranchInDocument(document, "route_result", "retry", "continue", ["false"]);
-  const nonConditionNode = graphDocument.updateConditionBranchInDocument(document, "input_result", "retry", "retry_later", ["false"]);
-
-  assert.equal(duplicateBranch, document);
-  assert.equal(nonConditionNode, document);
-});
-
-test("addConditionBranchToDocument appends a generated branch key immutably", () => {
   assert.equal(typeof graphDocument.addConditionBranchToDocument, "function");
-
-  const document: GraphPayload = {
-    graph_id: null,
-    name: "Condition Branch Add Graph",
-    state_schema: {},
-    nodes: {
-      route_result: {
-        kind: "condition",
-        name: "route_result",
-        description: "Route the result",
-        ui: { position: { x: 0, y: 0 } },
-        reads: [],
-        writes: [],
-        config: {
-          branches: ["continue", "retry"],
-          loopLimit: -1,
-          branchMapping: {
-            true: "continue",
-            false: "retry",
-          },
-          rule: {
-            source: "result",
-            operator: "exists",
-            value: null,
-          },
-        },
-      },
-    },
-    edges: [],
-    conditional_edges: [],
-    metadata: {},
-  };
-
-  const nextDocument = graphDocument.addConditionBranchToDocument(document, "route_result");
-
-  assert.notEqual(nextDocument, document);
-  assert.equal(nextDocument.nodes.route_result.kind, "condition");
-  assert.equal(document.nodes.route_result.kind, "condition");
-  if (nextDocument.nodes.route_result.kind !== "condition" || document.nodes.route_result.kind !== "condition") {
-    throw new Error("Expected route_result to remain a condition node");
-  }
-  assert.deepEqual(nextDocument.nodes.route_result.config.branches, ["continue", "retry", "branch_3"]);
-  assert.deepEqual(nextDocument.nodes.route_result.config.branchMapping, {
-    true: "continue",
-    false: "retry",
-  });
-  assert.deepEqual(document.nodes.route_result.config.branches, ["continue", "retry"]);
-});
-
-test("addConditionBranchToDocument returns original document for non-condition nodes", () => {
-  assert.equal(typeof graphDocument.addConditionBranchToDocument, "function");
-
-  const document: GraphPayload = {
-    graph_id: null,
-    name: "Condition Branch Add No-op Graph",
-    state_schema: {},
-    nodes: {
-      input_result: {
-        kind: "input",
-        name: "input_result",
-        description: "Provide the result",
-        ui: { position: { x: 120, y: 0 } },
-        reads: [],
-        writes: [],
-        config: {
-          value: "",
-        },
-      },
-    },
-    edges: [],
-    conditional_edges: [],
-    metadata: {},
-  };
-
-  const nextDocument = graphDocument.addConditionBranchToDocument(document, "input_result");
-
-  assert.equal(nextDocument, document);
-});
-
-test("removeConditionBranchFromDocument removes branch mappings and synced conditional edges", () => {
   assert.equal(typeof graphDocument.removeConditionBranchFromDocument, "function");
 
   const document: GraphPayload = {
     graph_id: null,
-    name: "Condition Branch Remove Graph",
+    name: "Fixed Condition Branch Graph",
     state_schema: {},
     nodes: {
       route_result: {
@@ -2286,13 +2038,9 @@ test("removeConditionBranchFromDocument removes branch mappings and synced condi
         reads: [],
         writes: [],
         config: {
-          branches: ["continue", "retry"],
-          loopLimit: -1,
-          branchMapping: {
-            true: "continue",
-            false: "retry",
-            maybe: "retry",
-          },
+          branches: ["true", "false", "exhausted"],
+          loopLimit: 5,
+          branchMapping: { true: "true", false: "false" },
           rule: {
             source: "result",
             operator: "exists",
@@ -2306,136 +2054,21 @@ test("removeConditionBranchFromDocument removes branch mappings and synced condi
       {
         source: "route_result",
         branches: {
-          continue: "next_agent",
-          retry: "retry_agent",
+          true: "next_agent",
+          false: "fallback_agent",
+          exhausted: "fallback_agent",
         },
       },
     ],
     metadata: {},
   };
 
-  const nextDocument = graphDocument.removeConditionBranchFromDocument(document, "route_result", "retry");
-
-  assert.notEqual(nextDocument, document);
-  assert.equal(nextDocument.nodes.route_result.kind, "condition");
-  assert.equal(document.nodes.route_result.kind, "condition");
-  if (nextDocument.nodes.route_result.kind !== "condition" || document.nodes.route_result.kind !== "condition") {
-    throw new Error("Expected route_result to remain a condition node");
-  }
-  assert.deepEqual(nextDocument.nodes.route_result.config.branches, ["continue"]);
-  assert.deepEqual(nextDocument.nodes.route_result.config.branchMapping, {
-    true: "continue",
-  });
-  assert.deepEqual(nextDocument.conditional_edges, [
-    {
-      source: "route_result",
-      branches: {
-        continue: "next_agent",
-      },
-    },
-  ]);
-  assert.deepEqual(document.nodes.route_result.config.branches, ["continue", "retry"]);
-  assert.deepEqual(document.nodes.route_result.config.branchMapping, {
-    true: "continue",
-    false: "retry",
-    maybe: "retry",
-  });
-});
-
-test("removeConditionBranchFromDocument prunes empty conditional edge records and keeps last branch intact", () => {
-  assert.equal(typeof graphDocument.removeConditionBranchFromDocument, "function");
-
-  const routeDocument: GraphPayload = {
-    graph_id: null,
-    name: "Condition Branch Remove Route Graph",
-    state_schema: {},
-    nodes: {
-      route_result: {
-        kind: "condition",
-        name: "route_result",
-        description: "Route the result",
-        ui: { position: { x: 0, y: 0 } },
-        reads: [],
-        writes: [],
-        config: {
-          branches: ["continue", "retry"],
-          loopLimit: -1,
-          branchMapping: {
-            true: "continue",
-            false: "retry",
-          },
-          rule: {
-            source: "result",
-            operator: "exists",
-            value: null,
-          },
-        },
-      },
-    },
-    edges: [],
-    conditional_edges: [
-      {
-        source: "route_result",
-        branches: {
-          retry: "retry_agent",
-        },
-      },
-    ],
-    metadata: {},
-  };
-
-  const nextRouteDocument = graphDocument.removeConditionBranchFromDocument(routeDocument, "route_result", "retry");
-
-  assert.equal(nextRouteDocument.nodes.route_result.kind, "condition");
-  if (nextRouteDocument.nodes.route_result.kind !== "condition") {
-    throw new Error("Expected route_result to remain a condition node");
-  }
-  assert.deepEqual(nextRouteDocument.nodes.route_result.config.branches, ["continue"]);
-  assert.deepEqual(nextRouteDocument.nodes.route_result.config.branchMapping, {
-    true: "continue",
-  });
-  assert.deepEqual(nextRouteDocument.conditional_edges, []);
-
-  const singleBranchDocument: GraphPayload = {
-    graph_id: null,
-    name: "Condition Branch Last Branch Graph",
-    state_schema: {},
-    nodes: {
-      route_result: {
-        kind: "condition",
-        name: "route_result",
-        description: "Route the result",
-        ui: { position: { x: 0, y: 0 } },
-        reads: [],
-        writes: [],
-        config: {
-          branches: ["continue"],
-          loopLimit: -1,
-          branchMapping: {
-            true: "continue",
-          },
-          rule: {
-            source: "result",
-            operator: "exists",
-            value: null,
-          },
-        },
-      },
-    },
-    edges: [],
-    conditional_edges: [
-      {
-        source: "route_result",
-        branches: {
-          continue: "next_agent",
-        },
-      },
-    ],
-    metadata: {},
-  };
-
-  const unchangedLastBranch = graphDocument.removeConditionBranchFromDocument(singleBranchDocument, "route_result", "continue");
-  assert.equal(unchangedLastBranch, singleBranchDocument);
+  assert.equal(
+    graphDocument.updateConditionBranchInDocument(document, "route_result", "false", "fallback", ["false"]),
+    document,
+  );
+  assert.equal(graphDocument.addConditionBranchToDocument(document, "route_result"), document);
+  assert.equal(graphDocument.removeConditionBranchFromDocument(document, "route_result", "false"), document);
 });
 
 test("connectFlowNodesInDocument appends a control-flow edge immutably", () => {

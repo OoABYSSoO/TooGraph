@@ -1,6 +1,5 @@
 import type { UploadedAssetType } from "./uploadedAssetModel.ts";
 import { isUploadedAssetStateType, tryParseUploadedAssetEnvelope } from "./uploadedAssetModel.ts";
-import { normalizeConditionLoopLimit } from "./conditionLoopLimit.ts";
 import { formatOutputDisplayModeLabel, formatOutputPersistFormatLabel } from "./outputConfigModel.ts";
 import { OUTPUT_WAITING_TEXT, resolveOutputPreviewDisplayMode } from "./outputPreviewContentModel.ts";
 import {
@@ -80,7 +79,6 @@ export type NodeCardViewModel = {
         sourceLabel: string;
         operatorLabel: string;
         valueLabel: string;
-        maxLoopsLabel: string;
         primaryInput: NodePortViewModel | null;
         routeOutputs: NodeConditionRouteOutputViewModel[];
       }
@@ -194,7 +192,6 @@ function buildBody(
       sourceLabel: getStateLabel(node.config.rule.source, stateSchema),
       operatorLabel: node.config.rule.operator,
       valueLabel: node.config.rule.value === null ? "null" : String(node.config.rule.value),
-      maxLoopsLabel: String(normalizeConditionLoopLimit(node.config.loopLimit)),
       primaryInput: inputs[0] ?? null,
       routeOutputs: mapConditionRouteOutputs(node, options.conditionRouteTargets ?? {}),
     };

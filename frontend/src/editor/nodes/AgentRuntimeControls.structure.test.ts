@@ -15,7 +15,8 @@ test("AgentRuntimeControls owns agent runtime control presentation and emits par
   assert.match(componentSource, /<div class="node-card__agent-runtime-row">/);
   assert.match(componentSource, /<ElSelect[\s\S]*ref="agentModelSelectRef"[\s\S]*class="node-card__agent-model-select graphite-select"[\s\S]*:model-value="modelValue"[\s\S]*:placeholder="modelOptions\.length === 0 \? t\('nodeCard\.noConfiguredModels'\) : t\('nodeCard\.selectModel'\)"[\s\S]*:disabled="modelOptions\.length === 0"[\s\S]*@visible-change="emit\('model-visible-change', \$event\)"[\s\S]*@update:model-value="emit\('update:model-value', \$event\)"/);
   assert.match(componentSource, /v-for="option in modelOptions"/);
-  assert.match(componentSource, /:label="option\.value === globalModelRef \? `\$\{option\.label\} \(\$\{t\('nodeCard\.globalModelSuffix'\)\}\)` : option\.label"/);
+  assert.match(componentSource, /:label="option\.label"/);
+  assert.doesNotMatch(componentSource, /globalModelSuffix/);
   assert.match(componentSource, /class="node-card__agent-toggle-card node-card__agent-toggle-card--thinking"/);
   assert.match(componentSource, /:class="\{ 'node-card__agent-toggle-card--enabled': thinkingEnabled \}"/);
   assert.match(componentSource, /class="node-card__agent-thinking-icon"/);

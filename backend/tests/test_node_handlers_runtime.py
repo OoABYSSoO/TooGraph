@@ -65,7 +65,9 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "kind": "condition",
                 "ui": {"position": {"x": 0, "y": 0}},
                 "config": {
-                    "branches": ["yes"],
+                    "branches": ["true", "false", "exhausted"],
+                    "loopLimit": 5,
+                    "branchMapping": {"true": "true", "false": "false"},
                     "rule": {"source": "$state.answer", "operator": "==", "value": "ok"},
                 },
             }
@@ -82,7 +84,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             else None,
         )
 
-        self.assertEqual(result, {"outputs": {"yes": True}, "selected_branch": "yes", "final_result": "yes"})
+        self.assertEqual(result, {"outputs": {"true": True}, "selected_branch": "true", "final_result": "true"})
 
         with self.assertRaisesRegex(ValueError, "could not resolve"):
             execute_condition_node(

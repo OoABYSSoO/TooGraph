@@ -1,6 +1,7 @@
 import type { AgentNode, GraphPayload, InputNode, TemplateRecord } from "../types/node-system.ts";
 import type { RunDetail } from "../types/run.ts";
 import type { SkillDefinition } from "../types/skills.ts";
+import { GLOBAL_RUNTIME_MODEL_OPTION_VALUE } from "../lib/runtimeModelCatalog.ts";
 
 export const COMPANION_TEMPLATE_ID = "companion_autonomous_loop";
 export const COMPANION_USER_MESSAGE_STATE_KEY = "state_1";
@@ -275,8 +276,18 @@ function applyCompanionModePolicy(graph: GraphPayload, companionMode: CompanionM
 
 function applyCompanionModelOverride(graph: GraphPayload, value: unknown) {
   const model = typeof value === "string" ? value.trim() : "";
-  if (!model) {
+  if (!model || model === GLOBAL_RUNTIME_MODEL_OPTION_VALUE) {
     delete graph.metadata.companion_model_ref;
+    for (const node of Object.values(graph.nodes)) {
+      if (node.kind !== "agent") {
+        continue;
+      }
+      node.config = {
+        ...node.config,
+        modelSource: "global",
+        model: "",
+      };
+    }
     return;
   }
   graph.metadata.companion_model_ref = model;

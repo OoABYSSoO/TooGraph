@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   DEFAULT_AGENT_TEMPERATURE,
+  GLOBAL_RUNTIME_MODEL_OPTION_VALUE,
   buildAgentModelDisplayLookup,
   buildAgentModelSelectOptions,
   normalizeAgentThinkingMode,
@@ -69,24 +70,25 @@ test("buildAgentModelDisplayLookup disambiguates duplicate concrete model labels
   });
 });
 
-test("buildAgentModelSelectOptions only exposes currently available catalog models", () => {
+test("buildAgentModelSelectOptions exposes the live global model option before concrete catalog models", () => {
   const options = buildAgentModelSelectOptions("custom/provider-model", ["openai/gpt-5.4"], {
     "openai/gpt-5.4": "GPT-5.4",
   });
 
   assert.deepEqual(options, [
+    { value: GLOBAL_RUNTIME_MODEL_OPTION_VALUE, label: "全局（provider-model）" },
     { value: "openai/gpt-5.4", label: "GPT-5.4" },
   ]);
 });
 
-test("resolveAgentModelSelection maps the global model to global source and others to override", () => {
-  assert.deepEqual(resolveAgentModelSelection("openai/gpt-5.4", "openai/gpt-5.4"), {
+test("resolveAgentModelSelection maps only the global sentinel to global source", () => {
+  assert.deepEqual(resolveAgentModelSelection(GLOBAL_RUNTIME_MODEL_OPTION_VALUE), {
     modelSource: "global",
     model: "",
   });
-  assert.deepEqual(resolveAgentModelSelection("azure/gpt-5.4", "openai/gpt-5.4"), {
+  assert.deepEqual(resolveAgentModelSelection("openai/gpt-5.4"), {
     modelSource: "override",
-    model: "azure/gpt-5.4",
+    model: "openai/gpt-5.4",
   });
 });
 

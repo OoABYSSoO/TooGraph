@@ -743,11 +743,11 @@ test("buildNodeCardViewModel derives proxy-style condition routing controls", ()
     reads: [{ state: "answer", required: true }],
     writes: [],
     config: {
-      branches: ["continue", "retry"],
+      branches: ["true", "false", "exhausted"],
       loopLimit: 5,
       branchMapping: {
-        true: "continue",
-        false: "retry",
+        true: "true",
+        false: "false",
       },
       rule: {
         source: "answer",
@@ -760,15 +760,15 @@ test("buildNodeCardViewModel derives proxy-style condition routing controls", ()
   const model = buildNodeCardViewModel("continue_check", node, stateSchema);
 
   assert.equal(model.body.kind, "condition");
-  assert.deepEqual(model.branches.map((branch) => branch.label), ["continue", "retry"]);
+  assert.deepEqual(model.branches.map((branch) => branch.label), ["true", "false", "exhausted"]);
   assert.equal(model.body.sourceLabel, "answer");
   assert.equal(model.body.operatorLabel, "exists");
   assert.equal(model.body.valueLabel, "null");
-  assert.equal(model.body.maxLoopsLabel, "5");
   assert.equal(model.body.primaryInput?.label, "answer");
   assert.deepEqual(model.body.routeOutputs, [
-    { branch: "continue", routeTargetLabel: null, tone: "success" },
-    { branch: "retry", routeTargetLabel: null, tone: "danger" },
+    { branch: "true", routeTargetLabel: null, tone: "success" },
+    { branch: "false", routeTargetLabel: null, tone: "danger" },
+    { branch: "exhausted", routeTargetLabel: null, tone: "neutral" },
   ]);
   assert.deepEqual(model.stateSummary?.reads, ["answer"]);
   assert.deepEqual(model.stateSummary?.writes, []);

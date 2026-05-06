@@ -164,7 +164,7 @@ test("buildHumanReviewResumePayload returns only changed parsed state values", (
 });
 
 test("formatHumanReviewDraftValue keeps structured values readable", () => {
-  assert.equal(formatHumanReviewDraftValue("object", { ok: true }), '{\n  "ok": true\n}');
+  assert.equal(formatHumanReviewDraftValue("json", { ok: true }), '{\n  "ok": true\n}');
 });
 
 test("buildHumanReviewPanelModel promotes downstream missing inputs into requiredNow", () => {

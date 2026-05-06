@@ -331,7 +331,6 @@
         :rule-operator-value="node.kind === 'condition' ? node.config.rule.operator : ''"
         :condition-rule-value-draft="conditionRuleValueDraft"
         :condition-rule-value-disabled="conditionRuleValueDisabled"
-        :condition-loop-limit-draft="conditionLoopLimitDraft"
         :condition-rule-operator-options="conditionRuleOperatorOptions"
         :state-editor-popover-style="stateEditorPopoverStyle"
         :agent-add-popover-style="agentAddPopoverStyle"
@@ -368,9 +367,6 @@
         @rule-value-input="handleConditionRuleValueInput"
         @commit-rule-value="commitConditionRuleValue"
         @rule-value-enter="handleConditionRuleValueEnter"
-        @loop-limit-input="handleConditionLoopLimitInput"
-        @commit-loop-limit="commitConditionLoopLimit"
-        @loop-limit-enter="handleConditionLoopLimitEnter"
       />
     </section>
 
@@ -410,6 +406,7 @@ import { CREATE_AGENT_INPUT_STATE_KEY, VIRTUAL_ANY_INPUT_STATE_KEY, VIRTUAL_ANY_
 
 import {
   DEFAULT_AGENT_TEMPERATURE,
+  GLOBAL_RUNTIME_MODEL_OPTION_VALUE,
   buildAgentModelSelectOptions,
   normalizeAgentThinkingMode,
   normalizeAgentTemperature,
@@ -417,10 +414,6 @@ import {
   resolveAgentModelSelection,
   type AgentThinkingControlMode,
 } from "./agentConfigModel";
-import {
-  resolveConditionLoopLimitDraft,
-  resolveConditionLoopLimitPatch,
-} from "./conditionLoopLimit";
 import {
   CONDITION_RULE_OPERATOR_OPTIONS,
   isConditionRuleValueInputDisabled,
@@ -610,7 +603,6 @@ const outputPreviewContent = computed(() => {
   return resolveOutputPreviewContent(view.value.body.previewText, view.value.body.displayMode);
 });
 const conditionRuleValueDraft = ref("");
-const conditionLoopLimitDraft = ref("");
 const isSkillPickerOpen = ref(false);
 const activePortPickerSide = ref<"input" | "output" | null>(null);
 const portStateDraft = ref<StateFieldDraft | null>(null);
@@ -783,10 +775,10 @@ const selectedKnowledgeBaseDescription = computed(() =>
 const trimmedGlobalTextModelRef = computed(() => props.globalTextModelRef.trim());
 const agentResolvedModelValue = computed(() => {
   if (props.node.kind !== "agent") {
-    return trimmedGlobalTextModelRef.value;
+    return GLOBAL_RUNTIME_MODEL_OPTION_VALUE;
   }
   const overrideModel = props.node.config.model.trim();
-  return props.node.config.modelSource === "override" && overrideModel ? overrideModel : trimmedGlobalTextModelRef.value;
+  return props.node.config.modelSource === "override" && overrideModel ? overrideModel : GLOBAL_RUNTIME_MODEL_OPTION_VALUE;
 });
 const agentThinkingModeValue = computed<AgentThinkingControlMode>(() =>
   props.node.kind === "agent" ? normalizeAgentThinkingMode(props.node.config.thinkingMode) : "off",
@@ -794,7 +786,7 @@ const agentThinkingModeValue = computed<AgentThinkingControlMode>(() =>
 const agentThinkingEnabled = computed(() => props.node.kind === "agent" ? agentThinkingModeValue.value !== "off" : true);
 const agentBreakpointTimingValue = computed(() => props.agentBreakpointTiming ?? "after");
 const agentModelOptions = computed(() =>
-  buildAgentModelSelectOptions(agentResolvedModelValue.value, props.availableAgentModelRefs, props.agentModelDisplayLookup),
+  buildAgentModelSelectOptions(trimmedGlobalTextModelRef.value, props.availableAgentModelRefs, props.agentModelDisplayLookup),
 );
 const attachedSkillBadges = computed(() =>
   props.node.kind === "agent" ? resolveAttachedSkillBadges(props.node.config.skills, props.skillDefinitions) : [],
@@ -845,14 +837,6 @@ watch(
   () => (props.node.kind === "condition" ? props.node.config.rule.value : null),
   (ruleValue) => {
     conditionRuleValueDraft.value = resolveConditionRuleValueDraft(ruleValue);
-  },
-  { immediate: true },
-);
-
-watch(
-  () => (props.node.kind === "condition" ? props.node.config.loopLimit : null),
-  (loopLimit) => {
-    conditionLoopLimitDraft.value = resolveConditionLoopLimitDraft(loopLimit);
   },
   { immediate: true },
 );
@@ -1534,7 +1518,7 @@ function handleAgentModelValueChange(nextValue: string | number | boolean | unde
   if (!normalizedValue) {
     return;
   }
-  emitAgentConfigPatch(resolveAgentModelSelection(normalizedValue, trimmedGlobalTextModelRef.value));
+  emitAgentConfigPatch(resolveAgentModelSelection(normalizedValue));
   collapseAgentModelSelect();
 }
 
@@ -1697,44 +1681,6 @@ function handleInputAssetDrop(event: DragEvent) {
   }
   const file = event.dataTransfer?.files?.[0] ?? null;
   void commitInputAssetFile(file);
-}
-
-function handleConditionLoopLimitInput(event: Event) {
-  if (guardLockedGraphInteraction()) {
-    return;
-  }
-  const target = event.target;
-  if (!(target instanceof HTMLInputElement)) {
-    return;
-  }
-  conditionLoopLimitDraft.value = target.value;
-}
-
-function commitConditionLoopLimit() {
-  if (guardLockedGraphInteraction()) {
-    return;
-  }
-  if (props.node.kind !== "condition") {
-    return;
-  }
-
-  const result = resolveConditionLoopLimitPatch(conditionLoopLimitDraft.value, props.node.config.loopLimit);
-  if (result.kind === "reset") {
-    conditionLoopLimitDraft.value = result.draftValue;
-    return;
-  }
-  if (result.kind === "noop") {
-    return;
-  }
-
-  emitConditionConfigPatch(result.patch);
-}
-
-function handleConditionLoopLimitEnter(event: KeyboardEvent) {
-  const target = event.currentTarget;
-  if (target instanceof HTMLInputElement) {
-    target.blur();
-  }
 }
 
 function updateConditionRule(patch: Partial<ConditionNode["config"]["rule"]>) {

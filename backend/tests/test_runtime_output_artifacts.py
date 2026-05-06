@@ -61,7 +61,8 @@ class RuntimeOutputArtifactTests(unittest.TestCase):
                         "kind": "condition",
                         "ui": {"position": {"x": 160, "y": 0}},
                         "config": {
-                            "branches": ["true", "false"],
+                            "branches": ["true", "false", "exhausted"],
+                            "loopLimit": 5,
                             "branchMapping": {"true": "true", "false": "false"},
                             "rule": {"source": "answer", "operator": "exists", "value": None},
                         },
@@ -81,10 +82,18 @@ class RuntimeOutputArtifactTests(unittest.TestCase):
                         "ui": {"position": {"x": 320, "y": 80}},
                         "reads": [{"state": "answer"}],
                     },
+                    "exhausted_out": {
+                        "kind": "output",
+                        "ui": {"position": {"x": 320, "y": 160}},
+                        "reads": [{"state": "answer"}],
+                    },
                 },
                 "edges": [{"source": "agent", "target": "regular_out"}],
                 "conditional_edges": [
-                    {"source": "judge", "branches": {"true": "true_out", "false": "false_out"}},
+                    {
+                        "source": "judge",
+                        "branches": {"true": "true_out", "false": "false_out", "exhausted": "exhausted_out"},
+                    },
                 ],
             }
         )

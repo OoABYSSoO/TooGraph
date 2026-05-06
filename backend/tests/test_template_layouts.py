@@ -65,19 +65,20 @@ class TemplateLayoutTests(unittest.TestCase):
 
         condition_node = nodes["should_continue_search"]
         self.assertEqual(condition_node["kind"], "condition")
-        self.assertEqual(condition_node["config"]["loopLimit"], 4)
+        self.assertEqual(condition_node["config"]["branches"], ["true", "false", "exhausted"])
+        self.assertEqual(condition_node["config"]["loopLimit"], 5)
         self.assertEqual(condition_node["config"]["rule"]["source"], "$state.evidence_review.needs_more_search")
         self.assertEqual(condition_node["config"]["rule"]["operator"], "==")
         self.assertIs(condition_node["config"]["rule"]["value"], True)
-        self.assertEqual(condition_node["config"]["branchMapping"], {"true": "supplement", "false": "finalize"})
+        self.assertEqual(condition_node["config"]["branchMapping"], {"true": "true", "false": "false"})
         self.assertEqual(
             template["conditional_edges"],
             [
                 {
                     "source": "should_continue_search",
                     "branches": {
-                        "supplement": "run_web_search",
-                        "finalize": "select_evidence",
+                        "true": "run_web_search",
+                        "false": "select_evidence",
                         "exhausted": "select_evidence",
                     },
                 }
@@ -109,7 +110,7 @@ class TemplateLayoutTests(unittest.TestCase):
 
         cycle_tracker = build_langgraph_cycle_tracker(graph, build_execution_edges(graph))
         self.assertTrue(cycle_tracker["has_cycle"])
-        self.assertEqual(cycle_tracker["loop_limits_by_source"], {"should_continue_search": 4})
+        self.assertEqual(cycle_tracker["loop_limits_by_source"], {"should_continue_search": 5})
 
 
 if __name__ == "__main__":

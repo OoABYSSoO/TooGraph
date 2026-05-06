@@ -51,9 +51,12 @@ const document: GraphPayload = {
       reads: [],
       writes: [],
       config: {
-        branches: ["continue", "retry"],
-        loopLimit: -1,
-        branchMapping: {},
+        branches: ["true", "false", "exhausted"],
+        loopLimit: 5,
+        branchMapping: {
+          true: "true",
+          false: "false",
+        },
         rule: {
           source: "question",
           operator: "exists",
@@ -81,7 +84,7 @@ const document: GraphPayload = {
     {
       source: "route_result",
       branches: {
-        continue: "output_answer",
+        true: "output_answer",
       },
     },
   ],
@@ -135,7 +138,7 @@ test("canCompleteGraphConnection allows route-out sources to target valid flow-i
   const pending: PendingGraphConnection = {
     sourceNodeId: "route_result",
     sourceKind: "route-out",
-    branchKey: "retry",
+    branchKey: "false",
   };
 
   assert.equal(
@@ -150,13 +153,13 @@ test("canCompleteGraphConnection allows route-out sources to target valid flow-i
       nodeId: "route_result",
       kind: "flow-in",
     }),
-    false,
+    true,
   );
   assert.equal(
     canCompleteGraphConnection(document, {
       sourceNodeId: "route_result",
       sourceKind: "route-out",
-      branchKey: "continue",
+      branchKey: "true",
     }, {
       nodeId: "output_answer",
       kind: "flow-in",
@@ -200,7 +203,7 @@ test("canCompleteGraphConnection allows reconnecting an existing route edge to a
   const reconnectingRoute: PendingGraphConnection = {
     sourceNodeId: "route_result",
     sourceKind: "route-out",
-    branchKey: "continue",
+    branchKey: "true",
     mode: "reconnect",
     currentTargetNodeId: "output_answer",
   };
