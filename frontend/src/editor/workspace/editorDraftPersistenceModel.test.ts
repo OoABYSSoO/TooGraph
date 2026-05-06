@@ -28,6 +28,7 @@ function createTab(tabId: string): EditorWorkspaceTab {
     dirty: false,
     templateId: null,
     defaultTemplateId: null,
+    subgraphSource: null,
   };
 }
 

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   buildEditorTabHint,
+  resolveEditorTabBadge,
   resolveEditorTabBarSelectPlaceholders,
   resolveEditorTabDropPlacement,
   ZH_EDITOR_TAB_BAR_COPY,
@@ -18,6 +19,7 @@ function buildTab(overrides: Partial<EditorWorkspaceTab> = {}): EditorWorkspaceT
     dirty: false,
     templateId: null,
     defaultTemplateId: null,
+    subgraphSource: null,
     ...overrides,
   };
 }
@@ -25,6 +27,8 @@ function buildTab(overrides: Partial<EditorWorkspaceTab> = {}): EditorWorkspaceT
 test("buildEditorTabHint keeps legacy badge and unsaved cue", () => {
   assert.equal(buildEditorTabHint(buildTab({ kind: "template", dirty: true }), ZH_EDITOR_TAB_BAR_COPY), "template · 未保存");
   assert.equal(buildEditorTabHint(buildTab({ kind: "existing", dirty: false }), ZH_EDITOR_TAB_BAR_COPY), "graph");
+  assert.equal(resolveEditorTabBadge("subgraph"), "subgraph");
+  assert.equal(buildEditorTabHint(buildTab({ kind: "subgraph", dirty: true }), ZH_EDITOR_TAB_BAR_COPY), "subgraph · 未保存");
 });
 
 test("resolveEditorTabBarSelectPlaceholders uses empty-state copy from legacy tab bar", () => {

@@ -22,6 +22,7 @@
                     :ref="(element) => setTabShellRef(tab.tabId, element)"
                     :class="{
                       'editor-tab-bar__tab-shell--active': tab.tabId === activeTabId,
+                      'editor-tab-bar__tab-shell--subgraph': tab.kind === 'subgraph',
                       'editor-tab-bar__tab-shell--dragging': tab.tabId === draggedTabId,
                       'editor-tab-bar__tab-shell--drop-before': tab.tabId === dropTargetTabId && dropPlacement === 'before',
                       'editor-tab-bar__tab-shell--drop-after': tab.tabId === dropTargetTabId && dropPlacement === 'after',
@@ -51,6 +52,7 @@
                       :title="buildEditorTabHint(tab, copy)"
                       @dblclick.stop="startTabRename(tab)"
                     >
+                      <span v-if="tab.kind === 'subgraph'" class="editor-tab-bar__tab-kind">SUB</span>
                       <span class="editor-tab-bar__tab-title">{{ tab.title }}</span>
                     </div>
 
@@ -257,7 +259,7 @@ function handleLauncherOpenGraph(graphId: string) {
 async function startTabRename(tab: EditorWorkspaceTab) {
   emit("activate-tab", tab.tabId);
   editingTabId.value = tab.tabId;
-  draftGraphName.value = tab.title;
+  draftGraphName.value = tab.kind === "subgraph" ? tab.subgraphSource?.nodeName ?? tab.title : tab.title;
   await nextTick();
   tabNameInput.value?.focus();
   tabNameInput.value?.select();
@@ -638,6 +640,22 @@ function resolveTabsMaxScrollLeft(scrollContainer: HTMLElement) {
   transform: none;
 }
 
+.editor-tab-bar__tab-shell--subgraph {
+  border-color: rgba(37, 99, 235, 0.28);
+  background: rgba(239, 246, 255, 0.34);
+  color: rgba(37, 73, 121, 0.94);
+}
+
+.editor-tab-bar__tab-shell--subgraph.editor-tab-bar__tab-shell--active {
+  border-color: rgba(37, 99, 235, 0.44);
+  color: rgba(30, 64, 175, 0.98);
+  box-shadow:
+    inset 0 3px 0 rgba(37, 99, 235, 0.58),
+    inset 0 1px 0 rgba(255, 255, 255, 0.94),
+    inset 0 -1px 0 rgba(37, 99, 235, 0.06),
+    inset 0 0 0 1px rgba(37, 99, 235, 0.1);
+}
+
 .editor-tab-bar__tab-shell--dragging {
   opacity: 0.78;
   transform: scale(0.98);
@@ -660,7 +678,21 @@ function resolveTabsMaxScrollLeft(scrollContainer: HTMLElement) {
   min-width: 0;
   flex: 1;
   align-items: center;
+  gap: 6px;
   cursor: pointer;
+}
+
+.editor-tab-bar__tab-kind {
+  flex: 0 0 auto;
+  border: 1px solid rgba(37, 99, 235, 0.24);
+  border-radius: 999px;
+  padding: 2px 5px;
+  background: rgba(239, 246, 255, 0.72);
+  color: rgba(30, 64, 175, 0.86);
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0;
 }
 
 .editor-tab-bar__tab-name-input {

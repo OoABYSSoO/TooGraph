@@ -88,7 +88,8 @@ test("useWorkspaceRouteController syncs tab routes with push and replace", () =>
     kind: "existing",
     templateId: null,
     defaultTemplateId: null,
-  } satisfies Pick<EditorWorkspaceTab, "graphId" | "kind" | "templateId" | "defaultTemplateId">;
+    subgraphSource: null,
+  } satisfies Pick<EditorWorkspaceTab, "graphId" | "kind" | "templateId" | "defaultTemplateId" | "subgraphSource">;
 
   harness.controller.syncRouteToTab(tab);
   harness.controller.syncRouteToTab(tab, "replace");

@@ -1,8 +1,18 @@
 <template>
   <div class="editor-action-capsule">
     <div class="editor-action-capsule__tools">
-      <ElTooltip :content="t('editor.saveGraph')" placement="bottom">
-        <button type="button" class="editor-action-capsule__icon-button" :aria-label="t('editor.saveGraph')" @click="$emit('save-active-graph')">
+      <ElTooltip :content="resolvedSaveGraphLabel" placement="bottom">
+        <button type="button" class="editor-action-capsule__icon-button" :aria-label="resolvedSaveGraphLabel" @click="$emit('save-active-graph')">
+          <ElIcon aria-hidden="true"><CollectionTag /></ElIcon>
+        </button>
+      </ElTooltip>
+      <ElTooltip v-if="showSaveAsGraph" :content="resolvedSaveAsGraphLabel" placement="bottom">
+        <button
+          type="button"
+          class="editor-action-capsule__icon-button editor-action-capsule__icon-button--save-as"
+          :aria-label="resolvedSaveAsGraphLabel"
+          @click="$emit('save-active-graph-as-new')"
+        >
           <ElIcon aria-hidden="true"><CollectionTag /></ElIcon>
         </button>
       </ElTooltip>
@@ -55,19 +65,24 @@
 <script setup lang="ts">
 import { CircleCheck, CollectionTag, Download, Upload, VideoPlay } from "@element-plus/icons-vue";
 import { ElIcon, ElTooltip } from "element-plus";
+import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 
-defineProps<{
+const props = defineProps<{
   activeStateCount: number;
   isStatePanelOpen: boolean;
   isRunActivityPanelOpen: boolean;
   hasRunActivityHint: boolean;
+  saveGraphLabel?: string;
+  showSaveAsGraph?: boolean;
+  saveAsGraphLabel?: string;
 }>();
 
 defineEmits<{
   (event: "toggle-state-panel"): void;
   (event: "toggle-run-activity-panel"): void;
   (event: "save-active-graph"): void;
+  (event: "save-active-graph-as-new"): void;
   (event: "validate-active-graph"): void;
   (event: "import-python-graph"): void;
   (event: "export-active-graph"): void;
@@ -75,6 +90,8 @@ defineEmits<{
 }>();
 
 const { t } = useI18n();
+const resolvedSaveGraphLabel = computed(() => props.saveGraphLabel ?? t("editor.saveGraph"));
+const resolvedSaveAsGraphLabel = computed(() => props.saveAsGraphLabel ?? t("editor.saveAsGraph"));
 </script>
 
 <style scoped>

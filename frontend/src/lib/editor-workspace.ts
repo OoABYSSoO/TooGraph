@@ -1,7 +1,15 @@
 import { normalizeCanvasViewport, type CanvasViewport } from "../editor/canvas/canvasViewport.ts";
 import type { GraphDocument, GraphPayload } from "../types/node-system.ts";
 
-export type EditorTabKind = "existing" | "new" | "template";
+export type EditorTabKind = "existing" | "new" | "template" | "subgraph";
+
+export type EditorSubgraphTabSource = {
+  parentTabId: string;
+  parentGraphId: string | null;
+  parentTitle: string;
+  nodeId: string;
+  nodeName: string;
+};
 
 export type EditorWorkspaceTab = {
   tabId: string;
@@ -11,6 +19,7 @@ export type EditorWorkspaceTab = {
   dirty: boolean;
   templateId: string | null;
   defaultTemplateId: string | null;
+  subgraphSource: EditorSubgraphTabSource | null;
 };
 
 export type PersistedEditorWorkspace = {
@@ -137,18 +146,48 @@ function normalizeEditorWorkspaceTab(value: unknown): EditorWorkspaceTab | null 
   }
 
   const kind = candidate.kind;
-  if (kind !== "existing" && kind !== "new" && kind !== "template") {
+  if (kind !== "existing" && kind !== "new" && kind !== "template" && kind !== "subgraph") {
+    return null;
+  }
+  const subgraphSource = kind === "subgraph" ? normalizeEditorSubgraphTabSource(candidate.subgraphSource) : null;
+  if (kind === "subgraph" && !subgraphSource) {
     return null;
   }
 
   return {
     tabId,
     kind,
-    graphId: normalizeNullableString(candidate.graphId),
-    title: typeof candidate.title === "string" && candidate.title.trim() ? candidate.title : "Untitled Graph",
+    graphId: kind === "subgraph" ? null : normalizeNullableString(candidate.graphId),
+    title:
+      kind === "subgraph"
+        ? formatSubgraphWorkspaceTabTitle(subgraphSource?.nodeName ?? candidate.title)
+        : typeof candidate.title === "string" && candidate.title.trim()
+          ? candidate.title
+          : "Untitled Graph",
     dirty: Boolean(candidate.dirty),
-    templateId: normalizeNullableString(candidate.templateId),
-    defaultTemplateId: normalizeNullableString(candidate.defaultTemplateId),
+    templateId: kind === "subgraph" ? null : normalizeNullableString(candidate.templateId),
+    defaultTemplateId: kind === "subgraph" ? null : normalizeNullableString(candidate.defaultTemplateId),
+    subgraphSource,
+  };
+}
+
+function normalizeEditorSubgraphTabSource(value: unknown): EditorSubgraphTabSource | null {
+  if (!isPlainRecord(value)) {
+    return null;
+  }
+
+  const parentTabId = normalizeNullableString(value.parentTabId);
+  const nodeId = normalizeNullableString(value.nodeId);
+  if (!parentTabId || !nodeId) {
+    return null;
+  }
+
+  return {
+    parentTabId,
+    parentGraphId: normalizeNullableString(value.parentGraphId),
+    parentTitle: typeof value.parentTitle === "string" && value.parentTitle.trim() ? value.parentTitle : "Untitled Graph",
+    nodeId,
+    nodeName: typeof value.nodeName === "string" && value.nodeName.trim() ? value.nodeName : "Subgraph",
   };
 }
 
@@ -192,6 +231,38 @@ export function createUnsavedWorkspaceTab(params?: {
     dirty: false,
     templateId: normalizeNullableString(params?.templateId),
     defaultTemplateId: normalizeNullableString(params?.defaultTemplateId),
+    subgraphSource: null,
+  };
+}
+
+export function formatSubgraphWorkspaceTabTitle(nodeName: string | null | undefined) {
+  const resolvedNodeName = typeof nodeName === "string" && nodeName.trim() ? nodeName.trim() : "Subgraph";
+  return `子图 · ${resolvedNodeName}`;
+}
+
+export function createSubgraphWorkspaceTab(params: {
+  parentTabId: string;
+  parentGraphId: string | null;
+  parentTitle: string;
+  nodeId: string;
+  nodeName: string;
+}): EditorWorkspaceTab {
+  const nodeName = params.nodeName.trim() || "Subgraph";
+  return {
+    tabId: createNewTabId(),
+    kind: "subgraph",
+    graphId: null,
+    title: formatSubgraphWorkspaceTabTitle(nodeName),
+    dirty: false,
+    templateId: null,
+    defaultTemplateId: null,
+    subgraphSource: {
+      parentTabId: params.parentTabId,
+      parentGraphId: normalizeNullableString(params.parentGraphId),
+      parentTitle: params.parentTitle.trim() || "Untitled Graph",
+      nodeId: params.nodeId,
+      nodeName,
+    },
   };
 }
 
@@ -413,8 +484,12 @@ export function resolveEditorUrl(graphId: string | null): string {
 }
 
 export function resolveWorkspaceTabUrl(
-  tab: Pick<EditorWorkspaceTab, "graphId" | "kind" | "templateId" | "defaultTemplateId">,
+  tab: Pick<EditorWorkspaceTab, "graphId" | "kind" | "templateId" | "defaultTemplateId" | "subgraphSource">,
 ): string {
+  if (tab.kind === "subgraph") {
+    return tab.subgraphSource?.parentGraphId ? resolveEditorUrl(tab.subgraphSource.parentGraphId) : "/editor/new";
+  }
+
   if (tab.graphId) {
     return resolveEditorUrl(tab.graphId);
   }
@@ -463,6 +538,7 @@ export function ensureSavedGraphTab(
     dirty: false,
     templateId: null,
     defaultTemplateId: null,
+    subgraphSource: null,
   };
 
   return {
@@ -488,20 +564,38 @@ export function applyDocumentMetaToWorkspaceTab(
     }
 
     const nextTitle = meta.title.trim() || tab.title;
-    const nextGraphId = meta.graphId ?? tab.graphId;
-    const nextKind = nextGraphId ? "existing" : tab.kind;
+    const isSubgraphTab = tab.kind === "subgraph";
+    const nextGraphId = isSubgraphTab ? null : meta.graphId ?? tab.graphId;
+    const nextKind = isSubgraphTab ? "subgraph" : nextGraphId ? "existing" : tab.kind;
+    const nextSubgraphSource =
+      isSubgraphTab && tab.subgraphSource
+        ? {
+            ...tab.subgraphSource,
+            nodeName: nextTitle,
+          }
+        : tab.subgraphSource;
+    const resolvedTitle = isSubgraphTab ? formatSubgraphWorkspaceTabTitle(nextTitle) : nextTitle;
 
-    if (tab.title === nextTitle && tab.dirty === meta.dirty && tab.graphId === nextGraphId && tab.kind === nextKind) {
+    if (
+      tab.title === resolvedTitle &&
+      tab.dirty === meta.dirty &&
+      tab.graphId === nextGraphId &&
+      tab.kind === nextKind &&
+      JSON.stringify(tab.subgraphSource) === JSON.stringify(nextSubgraphSource)
+    ) {
       return tab;
     }
 
     changed = true;
     return {
       ...tab,
-      title: nextTitle,
+      title: resolvedTitle,
       dirty: meta.dirty,
       graphId: nextGraphId,
       kind: nextKind,
+      templateId: isSubgraphTab ? null : tab.templateId,
+      defaultTemplateId: isSubgraphTab ? null : tab.defaultTemplateId,
+      subgraphSource: nextSubgraphSource,
     };
   });
 

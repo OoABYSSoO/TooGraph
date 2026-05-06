@@ -53,6 +53,14 @@ test("EditorTabBar keeps only the tab strip and a browser-style plus launcher in
   assert.doesNotMatch(componentSource, /copy\.save/);
 });
 
+test("EditorTabBar visually marks subgraph tabs without changing them into normal graph tabs", () => {
+  assert.match(componentSource, /'editor-tab-bar__tab-shell--subgraph': tab\.kind === 'subgraph'/);
+  assert.match(componentSource, /v-if="tab\.kind === 'subgraph'"/);
+  assert.match(componentSource, /class="editor-tab-bar__tab-kind"/);
+  assert.match(componentSource, /\.editor-tab-bar__tab-shell--subgraph \{[\s\S]*border-color:\s*rgba\(37,\s*99,\s*235,\s*0\.28\);/);
+  assert.match(componentSource, /\.editor-tab-bar__tab-kind \{[\s\S]*font-size:\s*0\.62rem;/);
+});
+
 test("EditorTabBar does not declare or reference the retired toolbar boundary", () => {
   assert.doesNotMatch(componentSource, /activeStateCount/);
   assert.doesNotMatch(componentSource, /isStatePanelOpen/);

@@ -38,6 +38,36 @@ function graphDocument(name: string, graphId: string | null = null): GraphPayloa
   } as unknown as GraphPayload | GraphDocument;
 }
 
+function parentGraphWithSubgraph(): GraphPayload {
+  return {
+    graph_id: null,
+    name: "Parent Graph",
+    nodes: {
+      subgraph_node: {
+        kind: "subgraph",
+        name: "Original Subgraph",
+        description: "Embedded graph",
+        reads: [],
+        writes: [],
+        ui: { position: { x: 0, y: 0 } },
+        config: {
+          graph: {
+            state_schema: {},
+            nodes: {},
+            edges: [],
+            conditional_edges: [],
+            metadata: { version: "old" },
+          },
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    state_schema: {},
+    metadata: {},
+  };
+}
+
 function createHarness(options: { locked?: boolean } = {}) {
   const initialTab: EditorWorkspaceTab = {
     tabId: "tab_a",
@@ -47,6 +77,7 @@ function createHarness(options: { locked?: boolean } = {}) {
     dirty: true,
     templateId: "template_a",
     defaultTemplateId: null,
+    subgraphSource: null,
   };
   const activeTab = ref<EditorWorkspaceTab | null>(initialTab);
   const workspace = ref<PersistedEditorWorkspace>({
@@ -151,6 +182,114 @@ test("useWorkspaceGraphPersistenceController saves the active tab as an existing
   assert.deepEqual(harness.routeSyncs, [{ graphId: "graph_saved", mode: "replace" }]);
   assert.equal(harness.graphLoadCount, 1);
   assert.equal(harness.feedback.at(-1)?.feedback.tone, "success");
+});
+
+test("useWorkspaceGraphPersistenceController saves subgraph tabs back into the parent node without saving a standalone graph", async () => {
+  const harness = createHarness();
+  const parentTab: EditorWorkspaceTab = {
+    tabId: "tab_parent",
+    kind: "new",
+    graphId: null,
+    title: "Parent Graph",
+    dirty: false,
+    templateId: null,
+    defaultTemplateId: null,
+    subgraphSource: null,
+  };
+  const subgraphTab: EditorWorkspaceTab = {
+    tabId: "tab_subgraph",
+    kind: "subgraph",
+    graphId: null,
+    title: "子图 · Original Subgraph",
+    dirty: true,
+    templateId: null,
+    defaultTemplateId: null,
+    subgraphSource: {
+      parentTabId: "tab_parent",
+      parentGraphId: null,
+      parentTitle: "Parent Graph",
+      nodeId: "subgraph_node",
+      nodeName: "Original Subgraph",
+    },
+  };
+  harness.workspace.value = {
+    activeTabId: subgraphTab.tabId,
+    tabs: [parentTab, subgraphTab],
+  };
+  harness.activeTab.value = subgraphTab;
+  harness.documentsByTabId.value = {
+    tab_parent: parentGraphWithSubgraph(),
+    tab_subgraph: {
+      graph_id: null,
+      name: "Edited Subgraph",
+      nodes: {},
+      edges: [],
+      conditional_edges: [],
+      state_schema: {},
+      metadata: { version: "edited" },
+    },
+  };
+
+  const saved = await harness.controller.saveTab("tab_subgraph");
+
+  assert.equal(saved, true);
+  assert.equal(harness.savedDocuments.length, 0);
+  assert.equal(harness.committedDocuments[0]?.tabId, "tab_parent");
+  const committedNode = harness.committedDocuments[0]?.document.nodes.subgraph_node;
+  assert.equal(committedNode?.kind, "subgraph");
+  if (committedNode?.kind === "subgraph") {
+    assert.equal(committedNode.name, "Edited Subgraph");
+    assert.deepEqual(committedNode.config.graph.metadata, { version: "edited" });
+  }
+  assert.equal(harness.workspace.value.tabs[1]?.dirty, false);
+  assert.equal(harness.workspace.value.tabs[1]?.title, "子图 · Edited Subgraph");
+  assert.equal(harness.workspace.value.tabs[1]?.subgraphSource?.nodeName, "Edited Subgraph");
+});
+
+test("useWorkspaceGraphPersistenceController can save a subgraph tab as a standalone normal graph", async () => {
+  const harness = createHarness();
+  const subgraphTab: EditorWorkspaceTab = {
+    tabId: "tab_subgraph",
+    kind: "subgraph",
+    graphId: null,
+    title: "子图 · Research Subgraph",
+    dirty: true,
+    templateId: null,
+    defaultTemplateId: null,
+    subgraphSource: {
+      parentTabId: "tab_parent",
+      parentGraphId: null,
+      parentTitle: "Parent Graph",
+      nodeId: "subgraph_node",
+      nodeName: "Research Subgraph",
+    },
+  };
+  harness.workspace.value = {
+    activeTabId: subgraphTab.tabId,
+    tabs: [subgraphTab],
+  };
+  harness.activeTab.value = subgraphTab;
+  harness.documentsByTabId.value = {
+    tab_subgraph: {
+      graph_id: null,
+      name: "Research Subgraph",
+      nodes: {},
+      edges: [],
+      conditional_edges: [],
+      state_schema: {},
+      metadata: {},
+    },
+  };
+
+  await harness.controller.saveActiveGraphAsNewGraph();
+
+  assert.equal(harness.savedDocuments[0]?.name, "Research Subgraph");
+  assert.equal(harness.workspace.value.tabs.length, 2);
+  assert.equal(harness.workspace.value.tabs[0]?.kind, "subgraph");
+  assert.equal(harness.workspace.value.tabs[0]?.dirty, true);
+  assert.equal(harness.activeTab.value?.kind, "existing");
+  assert.equal(harness.activeTab.value?.graphId, "graph_saved");
+  assert.deepEqual(harness.routeSyncs, [{ graphId: "graph_saved", mode: "replace" }]);
 });
 
 test("useWorkspaceGraphPersistenceController renames through dirty commits and honors locked graphs", () => {

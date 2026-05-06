@@ -4,7 +4,7 @@ import { resolveEditorRouteInstruction } from "../../lib/editor-route-sync.ts";
 import { resolveWorkspaceTabUrl, type EditorWorkspaceTab } from "../../lib/editor-workspace.ts";
 
 type WorkspaceRouteMode = "root" | "new" | "existing";
-type WorkspaceRouteTab = Pick<EditorWorkspaceTab, "graphId" | "kind" | "templateId" | "defaultTemplateId">;
+type WorkspaceRouteTab = Pick<EditorWorkspaceTab, "graphId" | "kind" | "templateId" | "defaultTemplateId" | "subgraphSource">;
 type RouteNavigation = "push" | "replace" | "none";
 
 type WorkspaceRouteControllerInput = {

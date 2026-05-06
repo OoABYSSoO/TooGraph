@@ -36,6 +36,7 @@ function createHarness() {
     dirty: false,
     templateId: null,
     defaultTemplateId: null,
+    subgraphSource: null,
   };
   const activeTab = ref<EditorWorkspaceTab | null>(initialTab);
   const workspace = ref<PersistedEditorWorkspace>({

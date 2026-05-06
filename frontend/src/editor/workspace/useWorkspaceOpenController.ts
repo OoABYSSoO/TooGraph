@@ -31,7 +31,7 @@ import { setTabScopedRecordEntry } from "./editorTabRuntimeModel.ts";
 
 type RouteNavigation = "push" | "replace" | "none";
 type GraphDraft = GraphPayload | GraphDocument;
-type WorkspaceRouteTab = Pick<EditorWorkspaceTab, "graphId" | "kind" | "templateId" | "defaultTemplateId">;
+type WorkspaceRouteTab = Pick<EditorWorkspaceTab, "graphId" | "kind" | "templateId" | "defaultTemplateId" | "subgraphSource">;
 
 type WorkspaceOpenControllerInput = {
   workspace: Ref<PersistedEditorWorkspace>;
@@ -207,6 +207,7 @@ export function useWorkspaceOpenController(input: WorkspaceOpenControllerInput) 
           kind: "existing",
           templateId: null,
           defaultTemplateId: null,
+          subgraphSource: null,
         },
         navigation === "replace" ? "replace" : "push",
       );

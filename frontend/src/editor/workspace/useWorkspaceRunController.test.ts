@@ -44,6 +44,7 @@ function createRunHarness() {
     dirty: false,
     templateId: null,
     defaultTemplateId: null,
+    subgraphSource: null,
   });
   const documentsByTabId = ref<Record<string, GraphPayload>>({
     tab_a: graphDocument("Before", ["old_node"]),

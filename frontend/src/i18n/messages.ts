@@ -475,6 +475,8 @@ const baseMessages = {
     },
     editor: {
       saveGraph: "保存图",
+      saveSubgraph: "保存回原子图",
+      saveAsGraph: "另存为普通图",
       validateGraph: "校验图",
       importPythonGraph: "导入 Python 图",
       exportPythonGraph: "导出 Python 图",
@@ -1306,6 +1308,8 @@ const baseMessages = {
     },
     editor: {
       saveGraph: "Save graph",
+      saveSubgraph: "Save back to subgraph",
+      saveAsGraph: "Save as graph",
       validateGraph: "Validate graph",
       importPythonGraph: "Import Python graph",
       exportPythonGraph: "Export Python graph",

@@ -22,7 +22,7 @@ export type WorkspaceTabFocusRequest = {
 };
 
 type TabScopedRecordRef<T> = Ref<Record<string, T>>;
-type WorkspaceRouteTab = Pick<EditorWorkspaceTab, "graphId" | "kind" | "templateId" | "defaultTemplateId">;
+type WorkspaceRouteTab = Pick<EditorWorkspaceTab, "graphId" | "kind" | "templateId" | "defaultTemplateId" | "subgraphSource">;
 
 type WorkspaceTabLifecycleControllerInput = {
   workspace: Ref<PersistedEditorWorkspace>;

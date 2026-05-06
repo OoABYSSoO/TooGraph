@@ -37,6 +37,8 @@ export const ZH_EDITOR_TAB_BAR_COPY: EditorTabBarCopy = buildEditorTabBarCopy();
 
 export function resolveEditorTabBadge(kind: EditorTabKind) {
   switch (kind) {
+    case "subgraph":
+      return "subgraph";
     case "template":
       return "template";
     case "existing":

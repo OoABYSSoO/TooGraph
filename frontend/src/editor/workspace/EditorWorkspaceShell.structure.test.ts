@@ -63,18 +63,48 @@ test("EditorWorkspaceShell wires canvas node-creation intents into a dedicated c
   assert.match(componentSource, /@close="closeNodeCreationMenu\(tab\.tabId\)"/);
 });
 
-test("EditorWorkspaceShell opens the current subgraph instance in an embedded graph editor dialog", () => {
-  assert.match(componentSource, /import EditorSubgraphInstanceDialog from "\.\/EditorSubgraphInstanceDialog\.vue";/);
+test("EditorWorkspaceShell opens the current subgraph instance as a first-class workspace tab", () => {
   assert.match(componentSource, /@open-subgraph-editor="openSubgraphEditorForTab\(tab\.tabId, \$event\.nodeId\)"/);
-  assert.match(componentSource, /<EditorSubgraphInstanceDialog/);
-  assert.match(componentSource, /:open="Boolean\(activeSubgraphEditorByTabId\[tab\.tabId\]\)"/);
-  assert.match(componentSource, /:graph="activeSubgraphEditorGraph\(tab\.tabId\)"/);
-  assert.match(componentSource, /@update:graph="updateSubgraphEditorGraphForTab\(tab\.tabId, \$event\)"/);
+  assert.match(componentSource, /import \{[\s\S]*createSubgraphWorkspaceTab,[\s\S]*\} from "@\/lib\/editor-workspace";/);
   assert.match(componentSource, /function openSubgraphEditorForTab\(tabId: string, nodeId: string\)/);
-  assert.match(componentSource, /function updateSubgraphEditorGraphForTab\(tabId: string, graph: GraphCorePayload\)/);
-  assert.match(subgraphDialogSource, /<EditorCanvas/);
-  assert.match(subgraphDialogSource, /useWorkspaceGraphMutationActions/);
-  assert.match(subgraphDialogSource, /@update:node-position="handleNodePositionUpdate\(SUBGRAPH_EDITOR_TAB_ID, \$event\)"/);
+  assert.match(componentSource, /const existingSubgraphTab = workspace\.value\.tabs\.find\([\s\S]*tab\.kind === "subgraph"[\s\S]*tab\.subgraphSource\?\.parentTabId === tabId[\s\S]*tab\.subgraphSource\?\.nodeId === nodeId/);
+  assert.match(componentSource, /const subgraphTab = createSubgraphWorkspaceTab\(\{[\s\S]*parentTabId: tabId,[\s\S]*parentGraphId: parentTab\.graphId,[\s\S]*parentTitle: parentTab\.title,[\s\S]*nodeId,[\s\S]*nodeName: node\.name,/);
+  assert.match(componentSource, /registerDocumentForTab\(subgraphTab\.tabId, createSubgraphDocumentFromNode\(node\)\);/);
+  assert.match(componentSource, /tabs: \[\.\.\.workspace\.value\.tabs, subgraphTab\]/);
+  assert.doesNotMatch(componentSource, /EditorSubgraphInstanceDialog/);
+  assert.equal(subgraphDialogSource, "");
+});
+
+test("EditorWorkspaceShell gives subgraph tabs save-back and save-as-normal-graph controls", () => {
+  assert.match(componentSource, /:save-graph-label="activeTab\?\.kind === 'subgraph' \? t\('editor\.saveSubgraph'\) : t\('editor\.saveGraph'\)"/);
+  assert.match(componentSource, /:show-save-as-graph="activeTab\?\.kind === 'subgraph'"/);
+  assert.match(componentSource, /:save-as-graph-label="t\('editor\.saveAsGraph'\)"/);
+  assert.match(componentSource, /@save-active-graph-as-new="saveActiveGraphAsNewGraph"/);
+  assert.match(
+    componentSource,
+    /const \{[\s\S]*renameActiveGraph,[\s\S]*saveActiveGraph,[\s\S]*saveActiveGraphAsNewGraph,[\s\S]*saveTab,[\s\S]*validateActiveGraph,[\s\S]*exportActiveGraph,[\s\S]*\} = useWorkspaceGraphPersistenceController\(\{/,
+  );
+});
+
+test("EditorWorkspaceShell shows the subgraph source capsule beside the edge visibility controls", () => {
+  assert.match(componentSource, /:source-context-label="subgraphSourceContextLabel\(tab\)"/);
+  assert.match(componentSource, /function subgraphSourceContextLabel\(tab: EditorWorkspaceTab\)/);
+  assert.match(componentSource, /if \(tab\.kind !== "subgraph" \|\| !tab\.subgraphSource\) \{/);
+  assert.match(componentSource, /const parentTitle = workspace\.value\.tabs\.find\(\(candidate\) => candidate\.tabId === tab\.subgraphSource!\.parentTabId\)\?\.title \?\? tab\.subgraphSource\.parentTitle;/);
+  assert.match(componentSource, /return `来自：\$\{parentTitle\} \/ 节点：\$\{nodeName\}`;/);
+});
+
+test("useWorkspaceGraphPersistenceController saves subgraph tabs back into their parent node and can save them as normal graphs", () => {
+  assert.match(graphPersistenceControllerSource, /import \{[\s\S]*updateSubgraphNodeGraphInDocument,[\s\S]*updateNodeMetadataInDocument[\s\S]*\} from "\.\.\/\.\.\/lib\/graph-document\.ts";/);
+  assert.match(graphPersistenceControllerSource, /if \(tab\.kind === "subgraph"\) \{/);
+  assert.match(graphPersistenceControllerSource, /const source = tab\.subgraphSource;/);
+  assert.match(graphPersistenceControllerSource, /const parentDocument = input\.documentsByTabId\.value\[source\.parentTabId\];/);
+  assert.match(graphPersistenceControllerSource, /updateSubgraphNodeGraphInDocument\(parentDocument, source\.nodeId, extractCoreGraphFromDocument\(documentToSave\)\)/);
+  assert.match(graphPersistenceControllerSource, /updateNodeMetadataInDocument\([\s\S]*source\.nodeId,[\s\S]*name: documentToSave\.name\.trim\(\) \|\| current\.name,/);
+  assert.match(graphPersistenceControllerSource, /input\.commitDirtyDocumentForTab\(source\.parentTabId, nextParentDocument\);/);
+  assert.match(graphPersistenceControllerSource, /async function saveActiveGraphAsNewGraph\(\)/);
+  assert.match(graphPersistenceControllerSource, /async function saveTabAsNewGraph\(tabId: string\)/);
+  assert.match(graphPersistenceControllerSource, /ensureSavedGraphTab\(input\.workspace\.value, \{/);
 });
 
 test("EditorWorkspaceShell refreshes settings when an agent model menu opens", () => {

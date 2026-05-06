@@ -6,6 +6,7 @@ import {
   closeWorkspaceTab,
   closeWorkspaceTabTransition,
   createNewTabId,
+  createSubgraphWorkspaceTab,
   createUnsavedWorkspaceTab,
   EDITOR_WORKSPACE_DOCUMENTS_STORAGE_KEY,
   EDITOR_WORKSPACE_STORAGE_KEY,
@@ -22,6 +23,7 @@ import {
   removePersistedEditorViewportDraft,
   resolveEditorUrl,
   resolveWorkspaceTabUrl,
+  formatSubgraphWorkspaceTabTitle,
   writePersistedEditorDocumentDraft,
   writePersistedEditorViewportDraft,
   writePersistedEditorWorkspace,
@@ -74,6 +76,75 @@ test("writePersistedEditorWorkspace round-trips workspace metadata", () => {
   writePersistedEditorWorkspace(workspace);
 
   assert.deepEqual(readPersistedEditorWorkspace(), workspace);
+});
+
+test("createSubgraphWorkspaceTab records source metadata and labels the tab as a subgraph", () => {
+  const tab = createSubgraphWorkspaceTab({
+    parentTabId: "parent_tab",
+    parentGraphId: "graph_parent",
+    parentTitle: "Untitled Graph",
+    nodeId: "node_subgraph",
+    nodeName: "高级联网搜索 Subgraph",
+  });
+
+  assert.equal(tab.kind, "subgraph");
+  assert.equal(tab.graphId, null);
+  assert.equal(tab.title, "子图 · 高级联网搜索 Subgraph");
+  assert.equal(tab.dirty, false);
+  assert.deepEqual(tab.subgraphSource, {
+    parentTabId: "parent_tab",
+    parentGraphId: "graph_parent",
+    parentTitle: "Untitled Graph",
+    nodeId: "node_subgraph",
+    nodeName: "高级联网搜索 Subgraph",
+  });
+});
+
+test("persisted workspace round-trips subgraph tabs with their parent source", () => {
+  const storage = createStorageMock();
+  Object.assign(globalThis, { localStorage: storage });
+  const tab = createSubgraphWorkspaceTab({
+    parentTabId: "parent_tab",
+    parentGraphId: null,
+    parentTitle: "Parent Draft",
+    nodeId: "node_subgraph",
+    nodeName: "Research Subgraph",
+  });
+  const workspace: PersistedEditorWorkspace = {
+    activeTabId: tab.tabId,
+    tabs: [tab],
+  };
+
+  writePersistedEditorWorkspace(workspace);
+
+  assert.deepEqual(readPersistedEditorWorkspace(), workspace);
+});
+
+test("applyDocumentMetaToWorkspaceTab keeps subgraph tabs attached to the parent node instead of converting them to saved graphs", () => {
+  const tab = createSubgraphWorkspaceTab({
+    parentTabId: "parent_tab",
+    parentGraphId: "graph_parent",
+    parentTitle: "Parent Graph",
+    nodeId: "node_subgraph",
+    nodeName: "Original Subgraph",
+  });
+  const workspace: PersistedEditorWorkspace = {
+    activeTabId: tab.tabId,
+    tabs: [tab],
+  };
+
+  const next = applyDocumentMetaToWorkspaceTab(workspace, tab.tabId, {
+    title: "Renamed Subgraph",
+    dirty: true,
+    graphId: "graph_saved_should_not_attach",
+  });
+
+  assert.notEqual(next, workspace);
+  assert.equal(next.tabs[0]?.kind, "subgraph");
+  assert.equal(next.tabs[0]?.graphId, null);
+  assert.equal(next.tabs[0]?.title, formatSubgraphWorkspaceTabTitle("Renamed Subgraph"));
+  assert.equal(next.tabs[0]?.dirty, true);
+  assert.equal(next.tabs[0]?.subgraphSource?.nodeName, "Renamed Subgraph");
 });
 
 test("persisted editor document drafts preserve agent thinking level exactly", () => {

@@ -6,7 +6,7 @@ import type { GraphPayload } from "../../types/node-system.ts";
 
 import type { WorkspaceRunFeedback } from "./useWorkspaceRunVisualState.ts";
 
-type WorkspaceRouteTab = Pick<EditorWorkspaceTab, "graphId" | "kind" | "templateId" | "defaultTemplateId">;
+type WorkspaceRouteTab = Pick<EditorWorkspaceTab, "graphId" | "kind" | "templateId" | "defaultTemplateId" | "subgraphSource">;
 
 type PythonImportFile = {
   name: string;

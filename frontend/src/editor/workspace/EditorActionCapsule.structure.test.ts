@@ -33,7 +33,14 @@ test("EditorActionCapsule keeps graph tools compact while preserving Run as the 
 test("EditorActionCapsule renders non-primary graph actions as icon buttons with tooltips", () => {
   assert.match(
     componentSource,
-    /<ElTooltip :content="t\('editor\.saveGraph'\)" placement="bottom">[\s\S]*:aria-label="t\('editor\.saveGraph'\)"[\s\S]*@click="\$emit\('save-active-graph'\)"/,
+    /<ElTooltip :content="resolvedSaveGraphLabel" placement="bottom">[\s\S]*:aria-label="resolvedSaveGraphLabel"[\s\S]*@click="\$emit\('save-active-graph'\)"/,
+  );
+  assert.match(componentSource, /const resolvedSaveGraphLabel = computed\(\(\) => props\.saveGraphLabel \?\? t\("editor\.saveGraph"\)\);/);
+  assert.match(componentSource, /showSaveAsGraph\?: boolean;/);
+  assert.match(componentSource, /saveAsGraphLabel\?: string;/);
+  assert.match(
+    componentSource,
+    /v-if="showSaveAsGraph"[\s\S]*:content="resolvedSaveAsGraphLabel"[\s\S]*:aria-label="resolvedSaveAsGraphLabel"[\s\S]*@click="\$emit\('save-active-graph-as-new'\)"/,
   );
   assert.match(
     componentSource,
@@ -47,6 +54,7 @@ test("EditorActionCapsule renders non-primary graph actions as icon buttons with
     componentSource,
     /<ElTooltip :content="t\('editor\.exportPythonGraph'\)" placement="bottom">[\s\S]*:aria-label="t\('editor\.exportPythonGraph'\)"[\s\S]*@click="\$emit\('export-active-graph'\)"/,
   );
+  assert.match(componentSource, /\(event: "save-active-graph-as-new"\): void;/);
   assert.doesNotMatch(componentSource, /copy\.newGraph/);
 });
 
