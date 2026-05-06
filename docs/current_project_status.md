@@ -7,7 +7,8 @@
 - Vue + Element Plus 前端主链已经落地，首页、编辑器、运行记录、设置、技能管理和桌宠浮窗都在当前产品中。
 - `node_system` 是唯一正式图协议，`state_schema` 是节点输入输出的唯一正式数据来源。
 - 桌宠不是独立运行时。桌宠本质也是按图模板发起一次 graph run，并通过运行来源、状态和技能目录表达上下文。
-- 内置图模板目录已清空。旧的 `companion_agentic_tool_loop`、`companion_chat_loop`、`web_research_loop` 等模板不再随仓库提供，也不再通过后端兼容逻辑修补。
+- 旧的 `companion_agentic_tool_loop`、`companion_chat_loop`、`web_research_loop` 等模板不再随仓库提供，也不再通过后端兼容逻辑修补。
+- 当前仓库提供一个新的内置图模板：`advanced_web_research_loop`（高级联网搜索）。它是通用研究模板，不是桌宠专用自主循环模板。
 - 技能系统已收束为统一技能库，不再区分“桌宠技能”和“Agent 节点技能”，也不再使用 `targets` / `executionTargets` 这类旧分流字段。
 - 当前只保留一个内置技能包：`web_search`。其余旧技能包已经删除，后续需要按新结构逐个专门编写。
 
@@ -46,6 +47,19 @@
 - `artifact_paths`：成功保存到本地的来源原文文件路径，类型应绑定为 `file`，值可以是路径字符串或路径数组。
 - `errors`：结构化错误列表。
 
+## 当前内置图模板
+
+### `advanced_web_research_loop`
+
+- 位置：`backend/app/templates/advanced_web_research_loop.json`
+- 显示名称：`高级联网搜索`
+- 作用：围绕 `web_search` 搭建多轮联网研究流程，适合“总结最新新闻、版本内容、公开资料依据”等需要先搜索再整理的任务。
+- 主要流程：输入问题 -> 制定研究计划与首轮搜索词 -> 运行 `web_search` -> 阅读本地原文并评估证据 -> 需要补搜时由 condition 分支直接回到搜索节点 -> 证据足够或达到上限后筛选依据 -> 生成 `final_reply`。
+- 循环语义：补搜回边是 `should_continue_search` condition 的原生分支，`loopLimit=4`，并提供 `exhausted` 分支在达到上限时用已有资料收束，而不是撞 LangGraph 递归限制。
+- 技能语义：搜索节点绑定 `web_search`，技能输入仍由该 Agent 节点运行时 LLM 生成；模板不使用 `inputMapping` 或静态技能参数。
+- 输出语义：`query`、`source_urls`、`artifact_paths`、`errors` 通过 managed binding state 透传；后续 Agent 读取 `artifact_paths` 对应的本地原文，负责证据筛选和最终总结。
+- 模型语义：模板默认使用全局模型配置，不写死某个 provider。若全局本地网关未启动，运行该模板前需要在 Model Providers 页面选择可用模型，或在图中为 Agent 节点设置 override。
+
 ## 当前前端能力
 
 - 编辑器支持 `input / agent / condition / output` 四类核心节点。
@@ -53,7 +67,7 @@
 - condition 节点作为条件边的可视化代理，运行时原生支持 `condition -> condition` 的多级路由。
 - output 节点负责展示、预览、导出或链接图运行产物，不拥有隐藏持久化策略。
 - Skills 页面围绕统一 skill catalog 展示、导入、启用、禁用和删除技能。
-- 桌宠浮窗支持模型选择和对话入口，但当前不再假设仓库内置默认桌宠模板；需要用新协议重建模板后再接入完整自主循环。
+- 桌宠浮窗支持模型选择和对话入口，但当前不再假设仓库内置默认桌宠模板；需要用新协议重建桌宠自主循环模板后再接入完整自主循环。
 
 ## 当前后端能力
 
