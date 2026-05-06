@@ -14,7 +14,8 @@ from bs4 import BeautifulSoup
 
 TAVILY_SEARCH_URL = "https://api.tavily.com/search"
 DUCKDUCKGO_SEARCH_URL = "https://duckduckgo.com/html/"
-DEFAULT_MAX_RESULTS = 5
+DEFAULT_TARGET_DOCUMENTS = 5
+DEFAULT_SEARCH_CANDIDATES = 20
 DEFAULT_SEARCH_DEPTH = "basic"
 DEFAULT_INCLUDE_RAW_CONTENT = False
 DEFAULT_TIMEOUT_SECONDS = 15.0
@@ -36,7 +37,7 @@ def web_search_skill(**skill_inputs: Any) -> dict[str, Any]:
             raw_response = _run_with_retries(
                 lambda: _search_with_tavily(
                     query=query,
-                    max_results=DEFAULT_MAX_RESULTS,
+                    max_results=DEFAULT_SEARCH_CANDIDATES,
                     search_depth=DEFAULT_SEARCH_DEPTH,
                     include_raw_content=DEFAULT_INCLUDE_RAW_CONTENT,
                     api_key=api_key,
@@ -48,7 +49,7 @@ def web_search_skill(**skill_inputs: Any) -> dict[str, Any]:
             raw_response = _run_with_retries(
                 lambda: _search_with_duckduckgo(
                     query=query,
-                    max_results=DEFAULT_MAX_RESULTS,
+                    max_results=DEFAULT_SEARCH_CANDIDATES,
                     timeout_seconds=DEFAULT_TIMEOUT_SECONDS,
                 ),
                 attempts=DEFAULT_RETRY_ATTEMPTS,
@@ -56,20 +57,25 @@ def web_search_skill(**skill_inputs: Any) -> dict[str, Any]:
     except Exception as exc:
         return _final_response(query=query, source_urls=[], artifact_paths=[], errors=[str(exc)])
 
-    results = _normalize_results(raw_response.get("results", []), max_results=DEFAULT_MAX_RESULTS)
+    results = _normalize_results(raw_response.get("results", []), max_results=DEFAULT_SEARCH_CANDIDATES)
     source_documents = _fetch_source_documents(
         results,
+        target_document_count=DEFAULT_TARGET_DOCUMENTS,
         max_chars_per_page=DEFAULT_MAX_CHARS_PER_PAGE,
         timeout_seconds=DEFAULT_TIMEOUT_SECONDS,
     )
-    source_urls = [result["url"] for result in results if result.get("url")]
-    artifact_paths = [
-        str(document.get("local_path"))
+    successful_documents = [
+        document
         for document in source_documents
         if document.get("status") == "succeeded" and document.get("local_path")
     ]
+    source_urls = _resolve_final_source_urls(results=results, successful_documents=successful_documents)
+    artifact_paths = [
+        str(document.get("local_path"))
+        for document in successful_documents
+    ]
     errors = [
-        str(document.get("error"))
+        _format_document_error(document)
         for document in source_documents
         if document.get("status") == "failed" and document.get("error")
     ]
@@ -178,6 +184,7 @@ def _normalize_results(raw_results: object, *, max_results: int) -> list[dict[st
 def _fetch_source_documents(
     results: list[dict[str, Any]],
     *,
+    target_document_count: int,
     max_chars_per_page: int,
     timeout_seconds: float,
 ) -> list[dict[str, Any]]:
@@ -191,17 +198,23 @@ def _fetch_source_documents(
     output_dir = Path(artifact_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     documents: list[dict[str, Any]] = []
-    for index, result in enumerate(results, start=1):
-        documents.append(
-            _fetch_and_store_source_document(
-                result,
-                index=index,
-                output_dir=output_dir,
-                artifact_relative_dir=artifact_relative_dir,
-                max_chars=max_chars_per_page,
-                timeout_seconds=timeout_seconds,
-            )
+    successful_count = 0
+    normalized_target = max(1, target_document_count)
+    for candidate_index, result in enumerate(results, start=1):
+        document = _fetch_and_store_source_document(
+            result,
+            index=candidate_index,
+            file_index=successful_count + 1,
+            output_dir=output_dir,
+            artifact_relative_dir=artifact_relative_dir,
+            max_chars=max_chars_per_page,
+            timeout_seconds=timeout_seconds,
         )
+        documents.append(document)
+        if document.get("status") == "succeeded":
+            successful_count += 1
+        if successful_count >= normalized_target:
+            break
     return documents
 
 
@@ -209,6 +222,7 @@ def _fetch_and_store_source_document(
     result: dict[str, Any],
     *,
     index: int,
+    file_index: int,
     output_dir: Path,
     artifact_relative_dir: str,
     max_chars: int,
@@ -227,17 +241,18 @@ def _fetch_and_store_source_document(
         parsed_url = urlparse(url)
         if parsed_url.scheme not in {"http", "https"}:
             raise ValueError("Only http and https source URLs can be fetched.")
-        extracted_title, page_text = _load_source_page_text(
-            url=url,
-            fallback_title=title,
-            raw_content=_compact_multiline_text(result.get("raw_content")),
-            timeout_seconds=timeout_seconds,
+        extracted_title, page_text = _run_with_retries(
+            lambda: _load_readable_source_page_text(
+                url=url,
+                fallback_title=title,
+                raw_content=_compact_multiline_text(result.get("raw_content")),
+                max_chars=max_chars,
+                timeout_seconds=timeout_seconds,
+            ),
+            attempts=DEFAULT_RETRY_ATTEMPTS,
         )
-        page_text = _truncate_text(page_text, max_chars)
-        if not page_text:
-            raise ValueError("Fetched page did not contain readable text.")
         document_title = extracted_title or title
-        file_name = f"doc_{index:03d}.md"
+        file_name = f"doc_{file_index:03d}.md"
         document_path = output_dir / file_name
         document_path.write_text(_render_source_document_markdown(content=page_text), encoding="utf-8")
         return {
@@ -252,6 +267,97 @@ def _fetch_and_store_source_document(
             **document,
             "error": str(exc),
         }
+
+
+def _resolve_final_source_urls(
+    *,
+    results: list[dict[str, Any]],
+    successful_documents: list[dict[str, Any]],
+) -> list[str]:
+    if successful_documents:
+        return [
+            str(document.get("url"))
+            for document in successful_documents
+            if document.get("url")
+        ]
+    return [
+        str(result.get("url"))
+        for result in results[:DEFAULT_TARGET_DOCUMENTS]
+        if result.get("url")
+    ]
+
+
+def _format_document_error(document: dict[str, Any]) -> str:
+    error = _compact_text(document.get("error"))
+    url = _compact_text(document.get("url"))
+    title = _compact_text(document.get("title"))
+    source_label = url or title
+    if source_label:
+        return f"{source_label}: {error}"
+    return error
+
+
+def _load_readable_source_page_text(
+    *,
+    url: str,
+    fallback_title: str,
+    raw_content: str,
+    max_chars: int,
+    timeout_seconds: float,
+) -> tuple[str, str]:
+    primary_error: Exception | None = None
+    try:
+        return _run_with_retries(
+            lambda: _load_validated_source_page_text(
+                loader=_load_source_page_text,
+                url=url,
+                fallback_title=fallback_title,
+                raw_content=raw_content,
+                max_chars=max_chars,
+                timeout_seconds=timeout_seconds,
+            ),
+            attempts=DEFAULT_RETRY_ATTEMPTS,
+        )
+    except Exception as exc:
+        primary_error = exc
+
+    try:
+        return _run_with_retries(
+            lambda: _load_validated_source_page_text(
+                loader=_load_source_page_text_with_playwright,
+                url=url,
+                fallback_title=fallback_title,
+                raw_content=raw_content,
+                max_chars=max_chars,
+                timeout_seconds=timeout_seconds,
+            ),
+            attempts=DEFAULT_RETRY_ATTEMPTS,
+        )
+    except Exception as exc:
+        if primary_error is not None:
+            raise RuntimeError(f"httpx failed: {primary_error}; playwright failed: {exc}") from exc
+        raise
+
+
+def _load_validated_source_page_text(
+    *,
+    loader: Any,
+    url: str,
+    fallback_title: str,
+    raw_content: str,
+    max_chars: int,
+    timeout_seconds: float,
+) -> tuple[str, str]:
+    extracted_title, page_text = loader(
+        url=url,
+        fallback_title=fallback_title,
+        raw_content=raw_content,
+        timeout_seconds=timeout_seconds,
+    )
+    page_text = _truncate_text(page_text, max_chars)
+    if not page_text:
+        raise ValueError("Fetched page did not contain readable text.")
+    return extracted_title, page_text
 
 
 def _load_source_page_text(
@@ -270,6 +376,41 @@ def _load_source_page_text(
         content_type = response.headers.get("Content-Type", "")
         html = response.text
     return _extract_readable_page_text(html, content_type=content_type, fallback_title=fallback_title)
+
+
+def _load_source_page_text_with_playwright(
+    *,
+    url: str,
+    fallback_title: str,
+    raw_content: str,
+    timeout_seconds: float,
+) -> tuple[str, str]:
+    if raw_content:
+        return fallback_title, raw_content
+    try:
+        from playwright.sync_api import Error as PlaywrightError
+        from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+        from playwright.sync_api import sync_playwright
+    except Exception as exc:
+        raise RuntimeError("Playwright is not installed for browser-rendered page fetches.") from exc
+
+    timeout_ms = max(1, int(timeout_seconds * 1000))
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(headless=True)
+        try:
+            page = browser.new_page(user_agent=PAGE_FETCH_USER_AGENT)
+            page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
+            try:
+                page.wait_for_load_state("networkidle", timeout=min(timeout_ms, 5000))
+            except PlaywrightTimeoutError:
+                pass
+            title = _compact_text(page.title()) or fallback_title
+            html = page.content()
+        except PlaywrightError as exc:
+            raise RuntimeError(str(exc)) from exc
+        finally:
+            browser.close()
+    return _extract_readable_page_text(html, content_type="text/html", fallback_title=title)
 
 
 def _extract_readable_page_text(html: str, *, content_type: str, fallback_title: str) -> tuple[str, str]:

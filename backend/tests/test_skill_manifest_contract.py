@@ -196,13 +196,15 @@ class SkillManifestContractTests(unittest.TestCase):
         self.assertFalse(definition.run_policies.origins["companion"].requires_approval)
         self.assertEqual(definition.runtime.type, "python")
         self.assertEqual(definition.runtime.entrypoint, "run.py")
-        self.assertEqual(definition.runtime.timeout_seconds, 90)
+        self.assertEqual(definition.runtime.timeout_seconds, 300)
         self.assertEqual(definition.agent_node_eligibility, SkillAgentNodeEligibility.READY)
         self.assertEqual([field.key for field in definition.input_schema], ["query"])
         self.assertEqual([field.key for field in definition.output_schema], ["query", "source_urls", "artifact_paths", "errors"])
         self.assertIn("network", definition.permissions)
+        self.assertIn("browser_automation", definition.permissions)
         self.assertIn(SkillSideEffect.NETWORK, definition.side_effects)
         self.assertIn(SkillSideEffect.SECRET_READ, definition.side_effects)
+        self.assertIn(SkillSideEffect.BROWSER_AUTOMATION, definition.side_effects)
 
 
 if __name__ == "__main__":

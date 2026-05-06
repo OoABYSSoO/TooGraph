@@ -15,6 +15,7 @@ class SkillSideEffect(str, Enum):
     FILE_WRITE = "file_write"
     SUBPROCESS = "subprocess"
     SECRET_READ = "secret_read"
+    BROWSER_AUTOMATION = "browser_automation"
 
 
 class SkillSourceFormat(str, Enum):

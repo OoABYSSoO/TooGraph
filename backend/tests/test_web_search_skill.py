@@ -63,7 +63,7 @@ class WebSearchSkillTests(unittest.TestCase):
 
         tavily_search.assert_called_once_with(
             query="GraphiteUI workflow studio",
-            max_results=5,
+            max_results=20,
             search_depth="basic",
             include_raw_content=False,
             api_key="tvly-test",
@@ -95,7 +95,7 @@ class WebSearchSkillTests(unittest.TestCase):
 
         duckduckgo_search.assert_called_once_with(
             query="fallback search",
-            max_results=5,
+            max_results=20,
             timeout_seconds=15.0,
         )
         self.assertEqual(set(result), {"query", "source_urls", "artifact_paths", "errors"})
@@ -261,6 +261,174 @@ class WebSearchSkillTests(unittest.TestCase):
         finally:
             server.shutdown()
             server.server_close()
+
+    def test_web_search_skill_keeps_trying_candidates_until_target_documents_are_saved(self) -> None:
+        web_search = _load_web_search_module()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            artifact_dir = Path(temp_dir) / "run_1" / "searcher" / "web_search" / "invocation_001"
+
+            def load_page_text(*, url: str, fallback_title: str, raw_content: str, timeout_seconds: float) -> tuple[str, str]:
+                failing_suffixes = ("/article-2", "/article-5", "/article-6", "/article-7", "/article-8", "/article-9")
+                if any(url.endswith(suffix) for suffix in failing_suffixes):
+                    return fallback_title, ""
+                return fallback_title, f"Readable article body for {url}."
+
+            with (
+                patch.dict(
+                    os.environ,
+                    {
+                        "GRAPHITE_SKILL_ARTIFACT_DIR": str(artifact_dir),
+                        "GRAPHITE_SKILL_ARTIFACT_RELATIVE_DIR": "run_1/searcher/web_search/invocation_001",
+                    },
+                    clear=True,
+                ),
+                patch.object(web_search, "_search_with_duckduckgo") as duckduckgo_search,
+                patch.object(web_search, "_load_source_page_text", side_effect=load_page_text),
+                patch.object(web_search, "_load_source_page_text_with_playwright", side_effect=load_page_text),
+            ):
+                duckduckgo_search.return_value = {
+                    "results": [
+                        {
+                            "title": f"Search Result {index}",
+                            "url": f"https://example.org/article-{index}",
+                            "content": "Search result snippet.",
+                        }
+                        for index in range(1, 12)
+                    ]
+                }
+
+                result = web_search.web_search_skill(query="candidate replenishment")
+
+            self.assertEqual(
+                result["source_urls"],
+                [
+                    "https://example.org/article-1",
+                    "https://example.org/article-3",
+                    "https://example.org/article-4",
+                    "https://example.org/article-10",
+                    "https://example.org/article-11",
+                ],
+            )
+            self.assertEqual(
+                result["artifact_paths"],
+                [
+                    f"run_1/searcher/web_search/invocation_001/doc_{index:03d}.md"
+                    for index in range(1, 6)
+                ],
+            )
+            self.assertEqual(
+                result["errors"],
+                [
+                    (
+                        "https://example.org/article-2: httpx failed: Fetched page did not contain readable text.; "
+                        "playwright failed: Fetched page did not contain readable text."
+                    ),
+                    (
+                        "https://example.org/article-5: httpx failed: Fetched page did not contain readable text.; "
+                        "playwright failed: Fetched page did not contain readable text."
+                    ),
+                    (
+                        "https://example.org/article-6: httpx failed: Fetched page did not contain readable text.; "
+                        "playwright failed: Fetched page did not contain readable text."
+                    ),
+                    (
+                        "https://example.org/article-7: httpx failed: Fetched page did not contain readable text.; "
+                        "playwright failed: Fetched page did not contain readable text."
+                    ),
+                    (
+                        "https://example.org/article-8: httpx failed: Fetched page did not contain readable text.; "
+                        "playwright failed: Fetched page did not contain readable text."
+                    ),
+                    (
+                        "https://example.org/article-9: httpx failed: Fetched page did not contain readable text.; "
+                        "playwright failed: Fetched page did not contain readable text."
+                    ),
+                ],
+            )
+            for index in range(1, 6):
+                self.assertTrue((artifact_dir / f"doc_{index:03d}.md").is_file())
+
+    def test_web_search_skill_retries_transient_page_fetch_errors_five_times(self) -> None:
+        web_search = _load_web_search_module()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            artifact_dir = Path(temp_dir) / "run_1" / "searcher" / "web_search" / "invocation_001"
+            with (
+                patch.dict(
+                    os.environ,
+                    {
+                        "GRAPHITE_SKILL_ARTIFACT_DIR": str(artifact_dir),
+                        "GRAPHITE_SKILL_ARTIFACT_RELATIVE_DIR": "run_1/searcher/web_search/invocation_001",
+                    },
+                    clear=True,
+                ),
+                patch.object(web_search, "_search_with_duckduckgo") as duckduckgo_search,
+                patch.object(web_search, "_load_source_page_text") as load_page_text,
+            ):
+                duckduckgo_search.return_value = {
+                    "results": [
+                        {
+                            "title": "Retryable Article",
+                            "url": "https://example.org/retryable-article",
+                            "content": "Search result snippet.",
+                        }
+                    ]
+                }
+                load_page_text.side_effect = [
+                    RuntimeError("temporary page decoder failure"),
+                    RuntimeError("temporary page decoder failure"),
+                    RuntimeError("temporary page decoder failure"),
+                    RuntimeError("temporary page decoder failure"),
+                    ("Retryable Article", "Readable body after retry."),
+                ]
+
+                result = web_search.web_search_skill(query="retry page fetch")
+
+            self.assertEqual(load_page_text.call_count, 5)
+            self.assertEqual(result["source_urls"], ["https://example.org/retryable-article"])
+            self.assertEqual(result["artifact_paths"], ["run_1/searcher/web_search/invocation_001/doc_001.md"])
+            self.assertEqual(result["errors"], [])
+
+    def test_web_search_skill_uses_playwright_when_basic_fetch_has_no_readable_text(self) -> None:
+        web_search = _load_web_search_module()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            artifact_dir = Path(temp_dir) / "run_1" / "searcher" / "web_search" / "invocation_001"
+            with (
+                patch.dict(
+                    os.environ,
+                    {
+                        "GRAPHITE_SKILL_ARTIFACT_DIR": str(artifact_dir),
+                        "GRAPHITE_SKILL_ARTIFACT_RELATIVE_DIR": "run_1/searcher/web_search/invocation_001",
+                    },
+                    clear=True,
+                ),
+                patch.object(web_search, "_search_with_duckduckgo") as duckduckgo_search,
+                patch.object(web_search, "_load_source_page_text") as load_page_text,
+                patch.object(web_search, "_load_source_page_text_with_playwright") as load_page_text_with_playwright,
+            ):
+                duckduckgo_search.return_value = {
+                    "results": [
+                        {
+                            "title": "Rendered Article",
+                            "url": "https://example.org/rendered-article",
+                            "content": "Search result snippet.",
+                        }
+                    ]
+                }
+                load_page_text.return_value = ("Rendered Article", "")
+                load_page_text_with_playwright.return_value = (
+                    "Rendered Article",
+                    "Readable article body after browser rendering.",
+                )
+
+                result = web_search.web_search_skill(query="rendered page")
+
+            self.assertEqual(load_page_text.call_count, 5)
+            load_page_text_with_playwright.assert_called_once()
+            self.assertEqual(result["source_urls"], ["https://example.org/rendered-article"])
+            self.assertEqual(result["artifact_paths"], ["run_1/searcher/web_search/invocation_001/doc_001.md"])
+            self.assertEqual(result["errors"], [])
+            document_text = (artifact_dir / "doc_001.md").read_text(encoding="utf-8")
+            self.assertIn("Readable article body after browser rendering.", document_text)
 
     def test_web_search_skill_returns_structured_error_for_missing_query(self) -> None:
         web_search = _load_web_search_module()
