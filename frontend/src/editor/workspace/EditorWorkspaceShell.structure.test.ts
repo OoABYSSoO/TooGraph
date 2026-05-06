@@ -13,6 +13,7 @@ function readWorkspaceSource(fileName: string) {
 }
 
 const componentSource = readWorkspaceSource("EditorWorkspaceShell.vue");
+const subgraphDialogSource = readWorkspaceSource("EditorSubgraphInstanceDialog.vue");
 const graphMutationActionsSource = readWorkspaceSource("useWorkspaceGraphMutationActions.ts");
 const sidePanelControllerSource = readWorkspaceSource("useWorkspaceSidePanelController.ts");
 const runVisualStateSource = readWorkspaceSource("useWorkspaceRunVisualState.ts");
@@ -60,6 +61,20 @@ test("EditorWorkspaceShell wires canvas node-creation intents into a dedicated c
   assert.match(componentSource, /<EditorNodeCreationMenu/);
   assert.match(componentSource, /@select-entry="createNodeFromMenuForTab\(tab\.tabId, \$event\)"/);
   assert.match(componentSource, /@close="closeNodeCreationMenu\(tab\.tabId\)"/);
+});
+
+test("EditorWorkspaceShell opens the current subgraph instance in an embedded graph editor dialog", () => {
+  assert.match(componentSource, /import EditorSubgraphInstanceDialog from "\.\/EditorSubgraphInstanceDialog\.vue";/);
+  assert.match(componentSource, /@open-subgraph-editor="openSubgraphEditorForTab\(tab\.tabId, \$event\.nodeId\)"/);
+  assert.match(componentSource, /<EditorSubgraphInstanceDialog/);
+  assert.match(componentSource, /:open="Boolean\(activeSubgraphEditorByTabId\[tab\.tabId\]\)"/);
+  assert.match(componentSource, /:graph="activeSubgraphEditorGraph\(tab\.tabId\)"/);
+  assert.match(componentSource, /@update:graph="updateSubgraphEditorGraphForTab\(tab\.tabId, \$event\)"/);
+  assert.match(componentSource, /function openSubgraphEditorForTab\(tabId: string, nodeId: string\)/);
+  assert.match(componentSource, /function updateSubgraphEditorGraphForTab\(tabId: string, graph: GraphCorePayload\)/);
+  assert.match(subgraphDialogSource, /<EditorCanvas/);
+  assert.match(subgraphDialogSource, /useWorkspaceGraphMutationActions/);
+  assert.match(subgraphDialogSource, /@update:node-position="handleNodePositionUpdate\(SUBGRAPH_EDITOR_TAB_ID, \$event\)"/);
 });
 
 test("EditorWorkspaceShell refreshes settings when an agent model menu opens", () => {

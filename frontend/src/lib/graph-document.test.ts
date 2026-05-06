@@ -4,7 +4,7 @@ import { reactive } from "vue";
 
 import * as graphDocument from "./graph-document.ts";
 import { CREATE_AGENT_INPUT_STATE_KEY, VIRTUAL_ANY_INPUT_STATE_KEY, VIRTUAL_ANY_OUTPUT_STATE_KEY } from "./virtual-any-input.ts";
-import type { GraphDocument, GraphPayload, TemplateRecord } from "../types/node-system.ts";
+import type { GraphCorePayload, GraphDocument, GraphPayload, TemplateRecord } from "../types/node-system.ts";
 import type { SkillDefinition } from "../types/skills.ts";
 
 const {
@@ -20,6 +20,7 @@ const {
   updateAgentNodeConfigInDocument,
   updateAgentBreakpointInDocument,
   updateAgentBreakpointTimingInDocument,
+  updateSubgraphNodeGraphInDocument,
 } = graphDocument;
 
 const webSearchSkill: SkillDefinition = {
@@ -249,6 +250,71 @@ test("reorderNodePortStateInDocument moves bindings to an insertion index for dr
   const nextDocument = reorderNodePortStateInDocument(document, "answer_agent", "input", "second", 2);
 
   assert.deepEqual(nextDocument.nodes.answer_agent.reads.map((binding) => binding.state), ["first", "third", "second"]);
+});
+
+test("updateSubgraphNodeGraphInDocument replaces only the selected subgraph instance graph", () => {
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Parent Graph",
+    state_schema: {
+      question: { name: "Question", description: "", type: "text", value: "", color: "#d97706" },
+      answer: { name: "Answer", description: "", type: "markdown", value: "", color: "#2563eb" },
+    },
+    nodes: {
+      research_subgraph: {
+        kind: "subgraph",
+        name: "Research Subgraph",
+        description: "",
+        ui: { position: { x: 100, y: 80 } },
+        reads: [{ state: "question", required: true }],
+        writes: [{ state: "answer", mode: "replace" }],
+        config: {
+          graph: {
+            state_schema: {
+              inner_question: { name: "Inner Question", description: "", type: "text", value: "", color: "#d97706" },
+            },
+            nodes: {},
+            edges: [],
+            conditional_edges: [],
+            metadata: { version: 1 },
+          },
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+  const nextGraph = {
+    state_schema: {
+      inner_question: { name: "Edited Question", description: "", type: "text", value: "", color: "#d97706" },
+      inner_answer: { name: "Edited Answer", description: "", type: "markdown", value: "", color: "#2563eb" },
+    },
+    nodes: {
+      inner_input: {
+        kind: "input",
+        name: "Inner Input",
+        description: "",
+        ui: { position: { x: 20, y: 40 } },
+        reads: [],
+        writes: [{ state: "inner_question", mode: "replace" }],
+        config: { value: "", boundaryType: "text" },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: { version: 2 },
+  } satisfies GraphCorePayload;
+
+  const nextDocument = updateSubgraphNodeGraphInDocument(document, "research_subgraph", nextGraph);
+  const unchangedDocument = updateSubgraphNodeGraphInDocument(document, "missing_node", nextGraph);
+
+  assert.notEqual(nextDocument, document);
+  assert.deepEqual(nextDocument.nodes.research_subgraph.config.graph, nextGraph);
+  assert.deepEqual(nextDocument.nodes.research_subgraph.reads, document.nodes.research_subgraph.reads);
+  assert.deepEqual(nextDocument.nodes.research_subgraph.writes, document.nodes.research_subgraph.writes);
+  assert.deepEqual(document.nodes.research_subgraph.config.graph.metadata, { version: 1 });
+  assert.equal(unchangedDocument, document);
 });
 
 test("createDraftFromTemplate accepts Vue reactive template records", () => {

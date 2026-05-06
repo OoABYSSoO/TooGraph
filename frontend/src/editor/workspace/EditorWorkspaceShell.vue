@@ -133,6 +133,7 @@
                 @update:node-size="handleNodeSizeUpdate(tab.tabId, $event)"
                 @update:viewport="updateCanvasViewportForTab(tab.tabId, $event)"
                 @open-node-creation-menu="openNodeCreationMenuForTab(tab.tabId, $event)"
+                @open-subgraph-editor="openSubgraphEditorForTab(tab.tabId, $event.nodeId)"
                 @create-node-from-file="createNodeFromFileForTab(tab.tabId, $event)"
                 @open-human-review="openHumanReviewPanelForTab(tab.tabId, $event.nodeId)"
                 @locked-edit-attempt="showGraphLockedEditToast"
@@ -147,6 +148,23 @@
                 @update:query="updateNodeCreationQuery(tab.tabId, $event)"
                 @select-entry="createNodeFromMenuForTab(tab.tabId, $event)"
                 @close="closeNodeCreationMenu(tab.tabId)"
+              />
+              <EditorSubgraphInstanceDialog
+                :open="Boolean(activeSubgraphEditorByTabId[tab.tabId])"
+                :title="activeSubgraphEditorTitle(tab.tabId)"
+                :graph="activeSubgraphEditorGraph(tab.tabId)"
+                :knowledge-bases="knowledgeBases"
+                :skill-definitions="skillDefinitions"
+                :skill-definitions-loading="skillDefinitionsLoading"
+                :skill-definitions-error="skillDefinitionsError"
+                :available-agent-model-refs="agentRuntimeCatalog.availableModelRefs"
+                :agent-model-display-lookup="agentRuntimeCatalog.modelDisplayLookup"
+                :global-text-model-ref="agentRuntimeCatalog.globalTextModelRef"
+                :persisted-presets="persistedPresets"
+                :graphs="graphs"
+                @update:open="handleSubgraphEditorOpenChange(tab.tabId, $event)"
+                @update:graph="updateSubgraphEditorGraphForTab(tab.tabId, $event)"
+                @refresh-agent-models="refreshAgentModels"
               />
             </div>
 
@@ -220,6 +238,7 @@ import { fetchSkillDefinitions } from "@/api/skills";
 import { exportLangGraphPython, fetchGraph, importGraphFromPythonSource, runGraph, saveGraph, validateGraph } from "@/api/graphs";
 import { resolveAgentRuntimeCatalog } from "@/editor/nodes/agentConfigModel";
 import EditorCanvas from "@/editor/canvas/EditorCanvas.vue";
+import { updateSubgraphNodeGraphInDocument } from "@/lib/graph-document";
 import type { NodeFocusRequest } from "@/editor/canvas/useNodeSelectionFocus";
 import type { CreatedStateEdgeEditorRequest, NodeCreationMenuState } from "@/editor/workspace/nodeCreationMenuModel";
 import {
@@ -237,8 +256,10 @@ import { useCompanionContextStore } from "@/stores/companionContext";
 import { useGraphDocumentStore } from "@/stores/graphDocument";
 import type { RunDetail } from "@/types/run";
 import type {
+  GraphCorePayload,
   GraphDocument,
   GraphPayload,
+  SubgraphNode,
   TemplateRecord,
 } from "@/types/node-system";
 
@@ -248,6 +269,7 @@ import EditorHumanReviewPanel from "./EditorHumanReviewPanel.vue";
 import EditorNodeCreationMenu from "./EditorNodeCreationMenu.vue";
 import EditorRunActivityPanel from "./EditorRunActivityPanel.vue";
 import EditorStatePanel from "./EditorStatePanel.vue";
+import EditorSubgraphInstanceDialog from "./EditorSubgraphInstanceDialog.vue";
 import EditorTabBar from "./EditorTabBar.vue";
 import EditorWelcomeState from "./EditorWelcomeState.vue";
 import {
@@ -325,6 +347,7 @@ const runActivityHintByTabId = ref<Record<string, boolean>>({});
 const feedbackByTabId = ref<Record<string, WorkspaceRunFeedback | null>>({});
 const routeRestoreError = ref<string | null>(null);
 const nodeCreationMenuByTabId = ref<Record<string, NodeCreationMenuState>>({});
+const activeSubgraphEditorByTabId = ref<Record<string, { nodeId: string } | null>>({});
 const {
   knowledgeBases,
   settings,
@@ -833,6 +856,67 @@ const {
   openCreatedStateEdgeEditorForTab,
   translate: t,
 });
+
+function openSubgraphEditorForTab(tabId: string, nodeId: string) {
+  if (guardGraphEditForTab(tabId)) {
+    return;
+  }
+  const node = documentsByTabId.value[tabId]?.nodes[nodeId];
+  if (!node || node.kind !== "subgraph") {
+    return;
+  }
+
+  activeSubgraphEditorByTabId.value = {
+    ...activeSubgraphEditorByTabId.value,
+    [tabId]: { nodeId },
+  };
+  focusNodeForTab(tabId, nodeId);
+}
+
+function activeSubgraphEditorNode(tabId: string): SubgraphNode | null {
+  const nodeId = activeSubgraphEditorByTabId.value[tabId]?.nodeId;
+  if (!nodeId) {
+    return null;
+  }
+  const node = documentsByTabId.value[tabId]?.nodes[nodeId];
+  return node?.kind === "subgraph" ? node : null;
+}
+
+function activeSubgraphEditorGraph(tabId: string) {
+  return activeSubgraphEditorNode(tabId)?.config.graph ?? null;
+}
+
+function activeSubgraphEditorTitle(tabId: string) {
+  return activeSubgraphEditorNode(tabId)?.name ?? "Subgraph";
+}
+
+function handleSubgraphEditorOpenChange(tabId: string, open: boolean) {
+  if (open) {
+    return;
+  }
+  activeSubgraphEditorByTabId.value = {
+    ...activeSubgraphEditorByTabId.value,
+    [tabId]: null,
+  };
+}
+
+function updateSubgraphEditorGraphForTab(tabId: string, graph: GraphCorePayload) {
+  const editor = activeSubgraphEditorByTabId.value[tabId];
+  if (!editor || guardGraphEditForTab(tabId)) {
+    return;
+  }
+  const document = documentsByTabId.value[tabId];
+  if (!document) {
+    return;
+  }
+
+  const nextDocument = updateSubgraphNodeGraphInDocument(document, editor.nodeId, graph);
+  if (nextDocument === document) {
+    return;
+  }
+
+  markDocumentDirty(tabId, nextDocument);
+}
 
 function showPresetSaveToast(type: "success" | "error", message: string) {
   ElMessage({

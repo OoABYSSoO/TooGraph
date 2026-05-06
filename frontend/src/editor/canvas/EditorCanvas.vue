@@ -212,6 +212,7 @@
         @pointerdown.capture="handleLockedNodePointerCapture(nodeId, $event)"
         @pointerdown.stop="handleNodePointerDown(nodeId, $event)"
         @click.capture="handleNodeClickCapture(nodeId, $event)"
+        @dblclick.stop="handleNodeDoubleClick(nodeId, $event)"
       >
         <div
           v-if="resolveRunNodePresentationForNode(nodeId)?.haloClass"
@@ -509,7 +510,7 @@ import { useViewport } from "./useViewport";
 import { isAgentBreakpointEnabledInDocument, resolveAgentBreakpointTimingInDocument } from "@/lib/graph-document";
 import type { KnowledgeBaseRecord } from "@/types/knowledge";
 import type { SkillDefinition } from "@/types/skills";
-import type { AgentNode, ConditionNode, GraphDocument, GraphNodeSize, GraphPayload, GraphPosition, InputNode, OutputNode, StateDefinition } from "@/types/node-system";
+import type { AgentNode, ConditionNode, GraphDocument, GraphNode, GraphNodeSize, GraphPayload, GraphPosition, InputNode, OutputNode, StateDefinition } from "@/types/node-system";
 
 const props = defineProps<{
   document: GraphPayload | GraphDocument;
@@ -543,7 +544,7 @@ const emit = defineEmits<{
   (event: "update:node-position", payload: { nodeId: string; position: GraphPosition }): void;
   (event: "update:node-size", payload: { nodeId: string; position: GraphPosition; size: GraphNodeSize }): void;
   (event: "select-node", nodeId: string | null): void;
-  (event: "update-node-metadata", payload: { nodeId: string; patch: Partial<Pick<InputNode | AgentNode | ConditionNode | OutputNode, "name" | "description">> }): void;
+  (event: "update-node-metadata", payload: { nodeId: string; patch: Partial<Pick<GraphNode, "name" | "description">> }): void;
   (event: "update-input-config", payload: { nodeId: string; patch: Partial<InputNode["config"]> }): void;
   (event: "update-input-state", payload: { stateKey: string; patch: Partial<StateDefinition> }): void;
   (event: "update-state", payload: { stateKey: string; patch: Partial<StateDefinition> }): void;
@@ -574,6 +575,7 @@ const emit = defineEmits<{
   (event: "disconnect-data-edge", payload: { sourceNodeId: string; targetNodeId: string; stateKey: string; mode: "state" | "flow" }): void;
   (event: "remove-route", payload: { sourceNodeId: string; branchKey: string }): void;
   (event: "open-node-creation-menu", payload: CanvasNodeCreationMenuPayload): void;
+  (event: "open-subgraph-editor", payload: { nodeId: string }): void;
   (event: "create-node-from-file", payload: { file: File; position: GraphPosition; clientX: number; clientY: number }): void;
   (event: "update:viewport", payload: CanvasViewport): void;
 }>();
@@ -1268,6 +1270,19 @@ function handleCanvasDoubleClick(event: MouseEvent) {
     case "open-creation-menu":
       emit("open-node-creation-menu", doubleClickCreationAction.payload);
   }
+}
+
+function handleNodeDoubleClick(nodeId: string, event: MouseEvent) {
+  const node = props.document.nodes[nodeId];
+  if (node?.kind !== "subgraph") {
+    return;
+  }
+  event.preventDefault();
+  if (isGraphEditingLocked()) {
+    emit("locked-edit-attempt");
+    return;
+  }
+  emit("open-subgraph-editor", { nodeId });
 }
 
 function isIgnoredCanvasDoubleClickTarget(target: HTMLElement | null) {

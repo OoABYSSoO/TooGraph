@@ -17,6 +17,7 @@ import type {
   AgentNode,
   AgentSkillBinding,
   ConditionNode,
+  GraphCorePayload,
   GraphDocument,
   GraphNode,
   GraphPayload,
@@ -483,6 +484,30 @@ export function updateOutputNodeConfigInDocument<T extends GraphPayload | GraphD
   }
 
   nextNode.config = nextConfig;
+  return nextDocument;
+}
+
+export function updateSubgraphNodeGraphInDocument<T extends GraphPayload | GraphDocument>(
+  document: T,
+  nodeId: string,
+  graph: GraphCorePayload,
+): T {
+  const node = document.nodes[nodeId];
+  if (!node || node.kind !== "subgraph") {
+    return document;
+  }
+
+  if (JSON.stringify(node.config.graph) === JSON.stringify(graph)) {
+    return document;
+  }
+
+  const nextDocument = cloneGraphDocument(document);
+  const nextNode = nextDocument.nodes[nodeId];
+  if (nextNode.kind !== "subgraph") {
+    return document;
+  }
+
+  nextNode.config.graph = clonePlainValue(graph);
   return nextDocument;
 }
 

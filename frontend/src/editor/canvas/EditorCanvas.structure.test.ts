@@ -1099,6 +1099,14 @@ test("EditorCanvas emits node-creation intents for empty-canvas double click and
   assert.match(componentSource, /function isIgnoredCanvasDropTarget\(target: HTMLElement \| null\)/);
 });
 
+test("EditorCanvas emits a subgraph editor request when a subgraph node is double clicked", () => {
+  assert.match(componentSource, /@dblclick\.stop="handleNodeDoubleClick\(nodeId, \$event\)"/);
+  assert.match(componentSource, /\(event: "open-subgraph-editor", payload: \{ nodeId: string \}\): void;/);
+  assert.match(componentSource, /function handleNodeDoubleClick\(nodeId: string, event: MouseEvent\)/);
+  assert.match(componentSource, /if \(node\?\.kind !== "subgraph"\) \{/);
+  assert.match(componentSource, /emit\("open-subgraph-editor", \{ nodeId \}\);/);
+});
+
 test("EditorCanvas forwards node-card state editing and top-action events", () => {
   assert.match(componentSource, /@update-node-metadata="emit\('update-node-metadata', \$event\)"/);
   assert.doesNotMatch(componentSource, /@rename-state="emit\('rename-state', \$event\)"/);
@@ -1106,7 +1114,7 @@ test("EditorCanvas forwards node-card state editing and top-action events", () =
   assert.match(componentSource, /@remove-port-state="emit\('remove-port-state', \$event\)"/);
   assert.match(componentSource, /@delete-node="emit\('delete-node', \$event\)"/);
   assert.match(componentSource, /@save-node-preset="emit\('save-node-preset', \$event\)"/);
-  assert.match(componentSource, /\(event: "update-node-metadata", payload: \{ nodeId: string; patch: Partial<Pick<InputNode \| AgentNode \| ConditionNode \| OutputNode, "name" \| "description">> \}\): void;/);
+  assert.match(componentSource, /\(event: "update-node-metadata", payload: \{ nodeId: string; patch: Partial<Pick<GraphNode, "name" \| "description">> \}\): void;/);
   assert.doesNotMatch(componentSource, /\(event: "rename-state"/);
   assert.match(componentSource, /\(event: "update-state", payload: \{ stateKey: string; patch: Partial<StateDefinition> \}\): void;/);
   assert.match(componentSource, /\(event: "remove-port-state", payload: \{ nodeId: string; side: "input" \| "output"; stateKey: string \}\): void;/);
