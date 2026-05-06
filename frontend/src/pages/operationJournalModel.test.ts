@@ -24,6 +24,7 @@ test("buildOperationJournalDisplayItems summarizes graph edit playback evidence"
           command_count: 3,
           applied_command_count: 3,
           playback_step_count: 12,
+          diff_count: 5,
         },
       },
       operation_report: {
@@ -62,6 +63,7 @@ test("buildOperationJournalDisplayItems summarizes graph edit playback evidence"
           command_count: 3,
           applied_command_count: 3,
           playback_step_count: 12,
+          diff_count: 5,
         },
       },
       page_snapshots: {
@@ -113,6 +115,7 @@ test("buildOperationJournalDisplayItems summarizes graph edit playback evidence"
     "operation: graph_edit",
     "target: editor.canvas.surface",
     "graph commands: 3/3",
+    "graph diff: 5",
     "artifacts: 2",
     "retries: 3",
     "request: vop_graph",

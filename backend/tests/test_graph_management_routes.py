@@ -228,6 +228,36 @@ class GraphManagementRouteTests(unittest.TestCase):
             self.assertEqual(latest["validation"]["valid"], True)
             self.assertIn({"op": "replace", "path": "/name", "previous": "Initial Graph", "next": "Updated Graph"}, latest["diff"])
 
+    def test_graph_revision_restore_reverts_to_previous_graph_and_records_restore_revision(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            graph_dir = Path(temp_dir) / "graphs"
+            with (
+                patch("app.core.storage.database.GRAPH_DATA_DIR", graph_dir),
+                patch("app.core.storage.graph_store.GRAPH_DATA_DIR", graph_dir),
+                TestClient(app) as client,
+            ):
+                self.assertEqual(client.post("/api/graphs/save", json=_graph_payload("graph_restore_target", "Before")).status_code, 200)
+                self.assertEqual(client.post("/api/graphs/save", json=_graph_payload("graph_restore_target", "After")).status_code, 200)
+                revision_to_restore = client.get("/api/graphs/graph_restore_target/revisions").json()[0]["revision_id"]
+
+                restore_response = client.post(f"/api/graphs/graph_restore_target/revisions/{revision_to_restore}/restore")
+                graph_response = client.get("/api/graphs/graph_restore_target")
+                revisions_response = client.get("/api/graphs/graph_restore_target/revisions")
+
+            self.assertEqual(restore_response.status_code, 200)
+            self.assertEqual(restore_response.json()["restored"], True)
+            self.assertEqual(restore_response.json()["graph"]["name"], "Before")
+            self.assertTrue(restore_response.json()["revision"]["revision_id"].startswith("grev_"))
+            self.assertEqual(restore_response.json()["restored_revision_id"], restore_response.json()["revision"]["revision_id"])
+            self.assertNotEqual(restore_response.json()["restored_revision_id"], revision_to_restore)
+            self.assertEqual(graph_response.status_code, 200)
+            self.assertEqual(graph_response.json()["name"], "Before")
+            revisions = revisions_response.json()
+            self.assertEqual(len(revisions), 3)
+            self.assertEqual(revisions[0]["reason"], f"Restore graph revision {revision_to_restore}.")
+            self.assertEqual(revisions[0]["previous_graph"]["name"], "After")
+            self.assertEqual(revisions[0]["next_graph"]["name"], "Before")
+
 
 if __name__ == "__main__":
     unittest.main()

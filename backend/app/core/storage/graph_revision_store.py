@@ -61,6 +61,13 @@ def list_graph_revisions(graph_id: str, *, storage_dir: Path | None = None) -> l
     ]
 
 
+def load_graph_revision(graph_id: str, revision_id: str, *, storage_dir: Path | None = None) -> dict[str, Any]:
+    payload = read_json_file(_revision_path(graph_id, revision_id, storage_dir=storage_dir), default=None)
+    if not isinstance(payload, dict):
+        raise FileNotFoundError(f"Graph revision '{revision_id}' does not exist.")
+    return payload
+
+
 def build_graph_revision_diff(previous_graph: dict[str, Any] | None, next_graph: dict[str, Any] | None) -> list[dict[str, Any]]:
     if previous_graph is None and next_graph is None:
         return []

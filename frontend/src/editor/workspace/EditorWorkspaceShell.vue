@@ -387,6 +387,7 @@ import {
   type GraphEditCommand,
   type GraphEditIntent,
 } from "./graphEditPlaybackModel.ts";
+import { buildGraphEditPlaybackDocumentDiff } from "./graphEditPlaybackDiffModel.ts";
 import {
   buildGraphReplayIntentsFromTargetGraph,
   parseGraphReplayTargetJson,
@@ -1276,6 +1277,7 @@ function handleGraphEditPlaybackApplyCommand(event: Event) {
   }
 
   const nextDocument = applyGraphEditCommandToDocument(document, command);
+  const diff = nextDocument !== document ? buildGraphEditPlaybackDocumentDiff(document, nextDocument) : [];
   if (nextDocument !== document) {
     markDocumentDirty(tab.tabId, nextDocument);
   }
@@ -1283,6 +1285,7 @@ function handleGraphEditPlaybackApplyCommand(event: Event) {
     ok: true,
     applied: nextDocument !== document,
     issues: [],
+    diff,
   };
 }
 

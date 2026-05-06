@@ -3,6 +3,14 @@ export type GraphEditPlaybackAuditApplyResult = {
   ok: boolean;
   applied: boolean;
   issues: string[];
+  diff?: GraphEditPlaybackAuditDiffEntry[];
+};
+
+export type GraphEditPlaybackAuditDiffEntry = {
+  op: "add" | "remove" | "replace";
+  path: string;
+  previous?: unknown;
+  next?: unknown;
 };
 
 export type GraphEditPlaybackAuditSummary = {
@@ -16,6 +24,11 @@ export type GraphEditPlaybackAuditSummary = {
   failed_commands: Array<{
     command_id: string;
     issues: string[];
+  }>;
+  diff_count: number;
+  command_diffs: Array<{
+    command_id: string;
+    diff: GraphEditPlaybackAuditDiffEntry[];
   }>;
 };
 
@@ -36,6 +49,12 @@ export function buildGraphEditPlaybackAuditSummary(input: {
     }));
   const issues = [...input.planIssues, ...failedCommands.flatMap((result) => result.issues)];
   const status = input.interrupted ? "interrupted" : input.planOk && failedCommands.length === 0 ? "succeeded" : "failed";
+  const commandDiffs = input.applyResults
+    .map((result) => ({
+      command_id: result.commandId,
+      diff: Array.isArray(result.diff) ? result.diff.filter((entry) => entry.path.trim()) : [],
+    }))
+    .filter((result) => result.command_id.trim() && result.diff.length > 0);
 
   return {
     request_id: input.requestId,
@@ -46,5 +65,7 @@ export function buildGraphEditPlaybackAuditSummary(input: {
     playback_step_count: Math.max(0, input.playbackStepCount),
     issues,
     failed_commands: failedCommands,
+    diff_count: commandDiffs.reduce((count, result) => count + result.diff.length, 0),
+    command_diffs: commandDiffs,
   };
 }

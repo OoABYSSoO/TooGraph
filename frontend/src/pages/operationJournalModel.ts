@@ -33,6 +33,7 @@ export function buildOperationJournalDisplayItems(entries: OperationJournalEntry
       `operation: ${operationKind}`,
       targetId ? `target: ${targetId}` : "",
       graphEditSummaryLabel(graphEditSummary),
+      graphEditDiffLabel(graphEditSummary),
       artifactRefs.length > 0 ? `artifacts: ${artifactRefs.length}` : "",
       retryCount > 0 ? `retries: ${retryCount}` : "",
       triggeredRunId ? `run: ${triggeredRunId}${triggeredRunStatus ? ` ${triggeredRunStatus}` : ""}` : "",
@@ -96,6 +97,11 @@ function graphEditSummaryLabel(summary: Record<string, unknown>) {
     return "";
   }
   return `graph commands: ${appliedCount ?? 0}/${commandCount ?? 0}`;
+}
+
+function graphEditDiffLabel(summary: Record<string, unknown>) {
+  const diffCount = normalizeNumber(summary.diff_count ?? summary.diffCount);
+  return diffCount !== null && diffCount > 0 ? `graph diff: ${diffCount}` : "";
 }
 
 function firstList(...values: unknown[]) {

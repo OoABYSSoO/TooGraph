@@ -7,6 +7,7 @@ from uuid import uuid4
 from app.core.schemas.node_system import NodeSystemCatalogStatus, NodeSystemGraphDocument, NodeSystemGraphPayload
 from app.core.storage.database import GRAPH_DATA_DIR
 from app.core.storage.graph_revision_store import list_graph_revisions as list_stored_graph_revisions
+from app.core.storage.graph_revision_store import load_graph_revision as load_stored_graph_revision
 from app.core.storage.graph_revision_store import record_graph_revision
 from app.core.storage.json_file_utils import read_json_file, write_json_file
 
@@ -122,6 +123,36 @@ def delete_graph(graph_id: str) -> None:
 
 def list_graph_revisions(graph_id: str) -> list[dict[str, Any]]:
     return list_stored_graph_revisions(graph_id, storage_dir=_graph_revision_data_dir())
+
+
+def restore_graph_revision(graph_id: str, revision_id: str) -> dict[str, Any]:
+    revision = load_stored_graph_revision(graph_id, revision_id, storage_dir=_graph_revision_data_dir())
+    target_payload = revision.get("previous_graph") if isinstance(revision.get("previous_graph"), dict) else None
+    current_payload = read_json_file(_graph_path(graph_id), default=None)
+    current_document = NodeSystemGraphDocument.model_validate(current_payload) if current_payload else None
+    if target_payload is None:
+        _graph_path(graph_id).unlink(missing_ok=True)
+        restored_graph = None
+    else:
+        restored_document = NodeSystemGraphDocument.model_validate(target_payload)
+        write_json_file(_graph_path(graph_id), restored_document.model_dump(by_alias=True, mode="json"))
+        restored_graph = restored_document.model_dump(by_alias=True, mode="json")
+    restore_revision = record_graph_revision(
+        graph_id=graph_id,
+        previous_graph=current_document.model_dump(by_alias=True, mode="json") if current_document else None,
+        next_graph=restored_graph,
+        actor="user",
+        reason=f"Restore graph revision {revision_id}.",
+        validation={"valid": True, "issues": []},
+        storage_dir=_graph_revision_data_dir(),
+    )
+    return {
+        "graph_id": graph_id,
+        "restored": True,
+        "graph": restored_graph,
+        "revision": restore_revision,
+        "restored_revision_id": restore_revision["revision_id"],
+    }
 
 
 def _graph_path(graph_id: str) -> Path:

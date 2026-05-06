@@ -26,6 +26,7 @@ from app.core.storage.graph_store import (
     list_graph_revisions,
     list_graphs,
     load_graph,
+    restore_graph_revision,
     save_graph,
 )
 from app.core.storage.run_store import save_run
@@ -107,6 +108,16 @@ def get_graph_endpoint(graph_id: str) -> NodeSystemGraphDocument:
 @router.get("/{graph_id}/revisions")
 def list_graph_revisions_endpoint(graph_id: str) -> list[dict[str, Any]]:
     return list_graph_revisions(graph_id)
+
+
+@router.post("/{graph_id}/revisions/{revision_id}/restore")
+def restore_graph_revision_endpoint(graph_id: str, revision_id: str) -> dict[str, Any]:
+    try:
+        return restore_graph_revision(graph_id, revision_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.post("/{graph_id}/disable", response_model=NodeSystemGraphDocument)

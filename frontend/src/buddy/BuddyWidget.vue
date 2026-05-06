@@ -529,6 +529,7 @@ import type { BuddyMascotDebugAction } from "./buddyMascotDebug.ts";
 import {
   buildGraphEditPlaybackAuditSummary,
   type GraphEditPlaybackAuditApplyResult,
+  type GraphEditPlaybackAuditDiffEntry,
   type GraphEditPlaybackAuditSummary,
 } from "./graphEditPlaybackAudit.ts";
 import {
@@ -2977,6 +2978,7 @@ type GraphEditPlaybackApplyCommandResponse = {
   ok: boolean;
   applied: boolean;
   issues: string[];
+  diff?: GraphEditPlaybackAuditDiffEntry[];
 };
 
 async function executeBuddyVirtualGraphEditOperation(operation: BuddyVirtualOperation): Promise<GraphEditPlaybackAuditSummary> {
@@ -3090,6 +3092,7 @@ async function executeBuddyVirtualGraphEditOperation(operation: BuddyVirtualOper
           ok: applyResponse?.ok === true,
           applied: applyResponse?.applied === true,
           issues: applyResponse?.issues.length ? applyResponse.issues : applyResponse ? [] : ["Graph edit command did not return a response."],
+          diff: applyResponse?.diff ?? [],
         });
       }
       await waitForVirtualOperation(resolveGraphEditPlaybackStepDelayMs(step));

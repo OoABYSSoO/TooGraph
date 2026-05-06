@@ -4,6 +4,7 @@ import type {
   GraphDocument,
   GraphPayload,
   GraphRevisionRecord,
+  GraphRevisionRestoreResponse,
   GraphRunResponse,
   GraphSaveResponse,
   GraphValidationResponse,
@@ -58,6 +59,10 @@ export async function fetchGraph(graphId: string): Promise<GraphDocument> {
 
 export async function fetchGraphRevisions(graphId: string): Promise<GraphRevisionRecord[]> {
   return apiGet<GraphRevisionRecord[]>(`/api/graphs/${graphId}/revisions`);
+}
+
+export async function restoreGraphRevision(graphId: string, revisionId: string): Promise<GraphRevisionRestoreResponse> {
+  return apiPost<GraphRevisionRestoreResponse>(`/api/graphs/${graphId}/revisions/${revisionId}/restore`, null);
 }
 
 export async function saveGraph(payload: GraphPayload): Promise<GraphSaveResponse> {

@@ -9,6 +9,7 @@ import {
   fetchGraphs,
   fetchTemplates,
   importGraphFromPythonSource,
+  restoreGraphRevision,
   runGraph,
   saveGraphAsTemplate,
   updateGraphStatus,
@@ -205,6 +206,55 @@ test("fetchGraphRevisions requests graph revision history", async () => {
 
     assert.equal(requestedUrl, "/api/graphs/graph_1/revisions");
     assert.equal(revisions[0]?.revision_id, "grev_1");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("restoreGraphRevision posts to the graph revision restore endpoint", async () => {
+  const requests: Array<{ url: string; method: string | undefined; body: string | null }> = [];
+
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    requests.push({
+      url: String(input),
+      method: init?.method,
+      body: typeof init?.body === "string" ? init.body : null,
+    });
+    return new Response(
+      JSON.stringify({
+        graph_id: "graph_1",
+        restored: true,
+        graph: null,
+        revision: {
+          revision_id: "grev_restore",
+          graph_id: "graph_1",
+          previous_graph: null,
+          next_graph: null,
+          diff: [],
+          actor: "user",
+          run_id: "",
+          node_id: "",
+          reason: "Restore graph revision grev_1.",
+          validation: { valid: true, issues: [] },
+          created_at: "2026-05-18T10:00:01Z",
+        },
+        restored_revision_id: "grev_restore",
+      }),
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      },
+    );
+  }) as typeof fetch;
+
+  try {
+    const response = await restoreGraphRevision("graph_1", "grev_1");
+
+    assert.deepEqual(requests, [{ url: "/api/graphs/graph_1/revisions/grev_1/restore", method: "POST", body: "null" }]);
+    assert.equal(response.revision.revision_id, "grev_restore");
+    assert.equal(response.restored_revision_id, "grev_restore");
   } finally {
     globalThis.fetch = originalFetch;
   }

@@ -217,6 +217,14 @@ export type GraphRevisionRecord = {
   created_at: string;
 };
 
+export type GraphRevisionRestoreResponse = {
+  graph_id: string;
+  restored: boolean;
+  graph: GraphDocument | null;
+  revision: GraphRevisionRecord;
+  restored_revision_id: string;
+};
+
 export type GraphDeleteResponse = {
   graph_id: string;
   status: "deleted";

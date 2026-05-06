@@ -12,8 +12,20 @@ test("buildGraphEditPlaybackAuditSummary records applied graph commands", () => 
     playbackStepCount: 12,
     interrupted: false,
     applyResults: [
-      { commandId: "graph-command-1", ok: true, applied: true, issues: [] },
-      { commandId: "graph-command-2", ok: true, applied: true, issues: [] },
+      {
+        commandId: "graph-command-1",
+        ok: true,
+        applied: true,
+        issues: [],
+        diff: [{ op: "add", path: "/nodes/agent", next: { kind: "agent" } }],
+      },
+      {
+        commandId: "graph-command-2",
+        ok: true,
+        applied: true,
+        issues: [],
+        diff: [{ op: "replace", path: "/name", previous: "Draft", next: "Final" }],
+      },
       { commandId: "graph-command-3", ok: true, applied: true, issues: [] },
     ],
   });
@@ -25,8 +37,19 @@ test("buildGraphEditPlaybackAuditSummary records applied graph commands", () => 
     applied_command_count: 3,
     failed_command_count: 0,
     playback_step_count: 12,
+    diff_count: 2,
     issues: [],
     failed_commands: [],
+    command_diffs: [
+      {
+        command_id: "graph-command-1",
+        diff: [{ op: "add", path: "/nodes/agent", next: { kind: "agent" } }],
+      },
+      {
+        command_id: "graph-command-2",
+        diff: [{ op: "replace", path: "/name", previous: "Draft", next: "Final" }],
+      },
+    ],
   });
 });
 
