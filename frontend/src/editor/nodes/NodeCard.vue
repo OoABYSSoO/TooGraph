@@ -331,6 +331,7 @@
         :rule-operator-value="node.kind === 'condition' ? node.config.rule.operator : ''"
         :condition-rule-value-draft="conditionRuleValueDraft"
         :condition-rule-value-disabled="conditionRuleValueDisabled"
+        :condition-loop-limit-value="conditionLoopLimitValue"
         :condition-rule-operator-options="conditionRuleOperatorOptions"
         :state-editor-popover-style="stateEditorPopoverStyle"
         :agent-add-popover-style="agentAddPopoverStyle"
@@ -364,6 +365,7 @@
         @cancel-create="closePortPicker"
         @commit-create="commitPortStateCreate"
         @update:operator="handleConditionRuleOperatorSelect"
+        @update:loop-limit="handleConditionLoopLimitValue"
         @rule-value-input="handleConditionRuleValueInput"
         @commit-rule-value="commitConditionRuleValue"
         @rule-value-enter="handleConditionRuleValueEnter"
@@ -414,6 +416,10 @@ import {
   resolveAgentModelSelection,
   type AgentThinkingControlMode,
 } from "./agentConfigModel";
+import {
+  normalizeConditionLoopLimit,
+  resolveConditionLoopLimitPatch,
+} from "./conditionLoopLimit";
 import {
   CONDITION_RULE_OPERATOR_OPTIONS,
   isConditionRuleValueInputDisabled,
@@ -805,6 +811,9 @@ const portPickerTitle = computed(() => {
 });
 const conditionRuleValueDisabled = computed(
   () => props.node.kind === "condition" && isConditionRuleValueInputDisabled(props.node.config.rule.operator),
+);
+const conditionLoopLimitValue = computed(() =>
+  props.node.kind === "condition" ? normalizeConditionLoopLimit(props.node.config.loopLimit) : 5,
 );
 const agentTemperatureInput = computed(() => {
   if (props.node.kind !== "agent") {
@@ -1700,6 +1709,16 @@ function updateConditionRule(patch: Partial<ConditionNode["config"]["rule"]>) {
 
 function handleConditionRuleOperatorSelect(value: string | number | boolean | undefined) {
   updateConditionRule(resolveConditionRuleOperatorPatch(value));
+}
+
+function handleConditionLoopLimitValue(value: number | undefined) {
+  if (props.node.kind !== "condition") {
+    return;
+  }
+  const result = resolveConditionLoopLimitPatch(String(value ?? ""), props.node.config.loopLimit);
+  if (result.kind === "patch") {
+    emitConditionConfigPatch(result.patch);
+  }
 }
 
 function handleConditionRuleValueInput(event: Event) {

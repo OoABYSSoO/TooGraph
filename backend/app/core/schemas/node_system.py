@@ -115,7 +115,9 @@ class ConditionOperator(str, Enum):
 
 FIXED_CONDITION_BRANCHES = ("true", "false", "exhausted")
 FIXED_CONDITION_BRANCH_MAPPING = {"true": "true", "false": "false"}
-FIXED_CONDITION_LOOP_LIMIT = 5
+CONDITION_LOOP_LIMIT_MIN = 1
+CONDITION_LOOP_LIMIT_MAX = 10
+CONDITION_LOOP_LIMIT_DEFAULT = 5
 
 
 def _fixed_condition_branches() -> list[str]:
@@ -270,7 +272,7 @@ class NodeSystemConditionRule(BaseModel):
 
 class NodeSystemConditionConfig(BaseModel):
     branches: list[str] = Field(default_factory=_fixed_condition_branches)
-    loop_limit: int = Field(default=FIXED_CONDITION_LOOP_LIMIT, alias="loopLimit")
+    loop_limit: int = Field(default=CONDITION_LOOP_LIMIT_DEFAULT, alias="loopLimit")
     branch_mapping: dict[str, str] = Field(default_factory=_fixed_condition_branch_mapping, alias="branchMapping")
     rule: NodeSystemConditionRule = Field(
         default_factory=lambda: NodeSystemConditionRule(source="result", operator=ConditionOperator.EXISTS, value=None)
@@ -312,8 +314,10 @@ class NodeSystemConditionConfig(BaseModel):
     @field_validator("loop_limit")
     @classmethod
     def validate_loop_limit(cls, value: int) -> int:
-        if value != FIXED_CONDITION_LOOP_LIMIT:
-            raise ValueError("Condition loopLimit is fixed to 5.")
+        if value < CONDITION_LOOP_LIMIT_MIN:
+            raise ValueError(f"Condition loopLimit must be at least {CONDITION_LOOP_LIMIT_MIN}.")
+        if value > CONDITION_LOOP_LIMIT_MAX:
+            raise ValueError(f"Condition loopLimit cannot exceed {CONDITION_LOOP_LIMIT_MAX}.")
         return value
 
 

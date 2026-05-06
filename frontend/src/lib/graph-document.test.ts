@@ -1901,7 +1901,7 @@ test("connectStateBindingInDocument does not rewrite agent skills for knowledge-
   assert.deepEqual(nextDocument.nodes.research_helper.config.skills, ["markdown_formatter", "custom_retrieval"]);
 });
 
-test("updateConditionNodeConfigInDocument patches condition rules while preserving the fixed condition protocol", () => {
+test("updateConditionNodeConfigInDocument patches condition rules and loop limits while preserving fixed branches", () => {
   assert.equal(typeof graphDocument.updateConditionNodeConfigInDocument, "function");
 
   const document: GraphPayload = {
@@ -1936,7 +1936,7 @@ test("updateConditionNodeConfigInDocument patches condition rules while preservi
   const nextDocument = graphDocument.updateConditionNodeConfigInDocument(document, "continue_check", (config) => ({
     ...config,
     branches: ["supplement", "finalize"],
-    loopLimit: 99,
+    loopLimit: 8,
     branchMapping: { true: "supplement", false: "finalize" },
     rule: {
       source: "$state.evidence_review.needs_more_search",
@@ -1952,7 +1952,7 @@ test("updateConditionNodeConfigInDocument patches condition rules while preservi
     throw new Error("Expected continue_check to remain a condition node");
   }
   assert.deepEqual(nextDocument.nodes.continue_check.config.branches, ["true", "false", "exhausted"]);
-  assert.equal(nextDocument.nodes.continue_check.config.loopLimit, 5);
+  assert.equal(nextDocument.nodes.continue_check.config.loopLimit, 8);
   assert.deepEqual(nextDocument.nodes.continue_check.config.branchMapping, { true: "true", false: "false" });
   assert.deepEqual(nextDocument.nodes.continue_check.config.rule, {
     source: "$state.evidence_review.needs_more_search",

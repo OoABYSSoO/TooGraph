@@ -64,11 +64,11 @@ class NodeSystemSchemaLegacyFieldRejectionTests(unittest.TestCase):
                 }
             )
 
-    def test_condition_config_accepts_fixed_loop_limit(self) -> None:
+    def test_condition_config_accepts_configurable_loop_limit(self) -> None:
         config = NodeSystemConditionConfig.model_validate(
             {
                 "branches": ["true", "false", "exhausted"],
-                "loopLimit": 5,
+                "loopLimit": 8,
                 "branchMapping": {
                     "true": "true",
                     "false": "false",
@@ -81,9 +81,9 @@ class NodeSystemSchemaLegacyFieldRejectionTests(unittest.TestCase):
             }
         )
 
-        self.assertEqual(config.loop_limit, 5)
+        self.assertEqual(config.loop_limit, 8)
 
-    def test_condition_config_rejects_non_fixed_loop_limits(self) -> None:
+    def test_condition_config_rejects_invalid_loop_limits_and_custom_branch_shapes(self) -> None:
         default_config = NodeSystemConditionConfig.model_validate(
             {
                 "rule": {
@@ -98,7 +98,7 @@ class NodeSystemSchemaLegacyFieldRejectionTests(unittest.TestCase):
         self.assertEqual(default_config.branches, ["true", "false", "exhausted"])
         self.assertEqual(default_config.branch_mapping, {"true": "true", "false": "false"})
 
-        for loop_limit in (-1, 1, 11):
+        for loop_limit in (-1, 0, 11):
             with self.subTest(loop_limit=loop_limit):
                 with self.assertRaises(ValidationError):
                     NodeSystemConditionConfig.model_validate(

@@ -126,6 +126,20 @@
             @keydown.enter.prevent="emit('rule-value-enter', $event)"
           />
         </label>
+        <label class="node-card__control-row node-card__control-row--loop-limit">
+          <span class="node-card__control-label">{{ t("nodeCard.maxLoops") }}</span>
+          <ElInputNumber
+            class="node-card__condition-loop-limit-input"
+            :model-value="conditionLoopLimitValue"
+            :min="CONDITION_LOOP_LIMIT_MIN"
+            :max="CONDITION_LOOP_LIMIT_MAX"
+            :step="1"
+            :controls="false"
+            @pointerdown.stop
+            @click.stop
+            @update:model-value="emit('update:loop-limit', $event)"
+          />
+        </label>
       </div>
     </div>
   </div>
@@ -133,12 +147,13 @@
 
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
-import { ElIcon, ElOption, ElPopover, ElSelect } from "element-plus";
+import { ElIcon, ElInputNumber, ElOption, ElPopover, ElSelect } from "element-plus";
 import { Check, Delete } from "@element-plus/icons-vue";
 import { useI18n } from "vue-i18n";
 
 import StateEditorPopover from "./StateEditorPopover.vue";
 import StatePortCreatePopover from "./StatePortCreatePopover.vue";
+import { CONDITION_LOOP_LIMIT_MAX, CONDITION_LOOP_LIMIT_MIN } from "./conditionLoopLimit";
 import type { NodeCardViewModel } from "./nodeCardViewModel";
 import type { ConditionNode } from "@/types/node-system";
 import type { StateColorOption, StateFieldDraft, StateFieldType } from "@/editor/workspace/statePanelFields";
@@ -155,6 +170,7 @@ const props = defineProps<{
   ruleOperatorValue: ConditionNode["config"]["rule"]["operator"] | "";
   conditionRuleValueDraft: string;
   conditionRuleValueDisabled: boolean;
+  conditionLoopLimitValue: number;
   conditionRuleOperatorOptions: ConditionRuleOperatorOption[];
   stateEditorPopoverStyle: CSSProperties;
   agentAddPopoverStyle: CSSProperties;
@@ -191,6 +207,7 @@ const emit = defineEmits<{
   (event: "cancel-create"): void;
   (event: "commit-create"): void;
   (event: "update:operator", value: string | number | boolean | undefined): void;
+  (event: "update:loop-limit", value: number | undefined): void;
   (event: "rule-value-input", inputEvent: Event): void;
   (event: "commit-rule-value"): void;
   (event: "rule-value-enter", keyboardEvent: KeyboardEvent): void;
@@ -221,8 +238,9 @@ const conditionInputAnchorId = computed(() =>
 }
 
 .node-card__condition-panel {
+  --node-card-condition-loop-column: 104px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) var(--node-card-condition-loop-column);
   gap: 14px;
   align-items: stretch;
 }
@@ -259,8 +277,9 @@ const conditionInputAnchorId = computed(() =>
 }
 
 .node-card__condition-controls-row {
+  grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) var(--node-card-condition-loop-column);
   gap: 12px;
   align-items: end;
 }
@@ -290,6 +309,10 @@ const conditionInputAnchorId = computed(() =>
   background: rgba(255, 255, 255, 0.86);
   color: #1f2937;
   font-size: 0.82rem;
+}
+
+.node-card__condition-loop-limit-input {
+  width: 100%;
 }
 
 .node-card__control-select {

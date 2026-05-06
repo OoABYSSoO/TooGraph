@@ -29,9 +29,18 @@ class ConditionProtocolTests(unittest.TestCase):
                 }
             )
 
-    def test_condition_config_rejects_custom_loop_limit(self) -> None:
-        with self.assertRaises(ValidationError):
-            NodeSystemConditionConfig.model_validate({"loopLimit": 4})
+    def test_condition_config_accepts_custom_loop_limit(self) -> None:
+        config = NodeSystemConditionConfig.model_validate({"loopLimit": 7})
+
+        self.assertEqual(config.loop_limit, 7)
+        self.assertEqual(config.branches, ["true", "false", "exhausted"])
+        self.assertEqual(config.branch_mapping, {"true": "true", "false": "false"})
+
+    def test_condition_config_rejects_out_of_range_loop_limits(self) -> None:
+        for loop_limit in (-1, 0, 11):
+            with self.subTest(loop_limit=loop_limit):
+                with self.assertRaises(ValidationError):
+                    NodeSystemConditionConfig.model_validate({"loopLimit": loop_limit})
 
 
 if __name__ == "__main__":

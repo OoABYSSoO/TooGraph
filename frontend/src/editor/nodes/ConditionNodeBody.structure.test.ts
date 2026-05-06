@@ -20,17 +20,19 @@ test("ConditionNodeBody owns condition source and control presentation", () => {
   assert.match(componentSource, /@update:model-value="emit\('update:operator', \$event\)"/);
   assert.match(componentSource, /@input="emit\('rule-value-input', \$event\)"/);
   assert.match(componentSource, /@blur="emit\('commit-rule-value'\)"/);
-  assert.doesNotMatch(componentSource, /loop-limit-input/);
-  assert.doesNotMatch(componentSource, /commit-loop-limit/);
-  assert.doesNotMatch(componentSource, /conditionLoopLimitDraft/);
-  assert.doesNotMatch(componentSource, /nodeCard\.maxLoops/);
+  assert.match(componentSource, /class="node-card__condition-loop-limit-input"/);
+  assert.match(componentSource, /nodeCard\.maxLoops/);
+  assert.match(componentSource, /:model-value="conditionLoopLimitValue"/);
+  assert.match(componentSource, /:min="CONDITION_LOOP_LIMIT_MIN"/);
+  assert.match(componentSource, /:max="CONDITION_LOOP_LIMIT_MAX"/);
+  assert.match(componentSource, /@update:model-value="emit\('update:loop-limit', \$event\)"/);
 });
 
 test("ConditionNodeBody carries condition scoped styles that cannot cross the child boundary", () => {
   assert.match(componentSource, /\.node-card__surface--condition \{[\s\S]*display:\s*grid;/);
-  assert.match(componentSource, /\.node-card__condition-panel \{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\);/);
-  assert.doesNotMatch(componentSource, /--node-card-condition-loop-column/);
-  assert.match(componentSource, /\.node-card__condition-controls-row \{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\) minmax\(0,\s*1fr\);/);
+  assert.match(componentSource, /\.node-card__condition-panel \{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s+var\(--node-card-condition-loop-column\);/);
+  assert.match(componentSource, /--node-card-condition-loop-column:\s*104px;/);
+  assert.match(componentSource, /\.node-card__condition-controls-row \{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\) minmax\(0,\s*1fr\) var\(--node-card-condition-loop-column\);/);
   assert.match(componentSource, /\.node-card__port-pill--condition-source \{[\s\S]*min-width:\s*260px;/);
   assert.doesNotMatch(componentSource, /--node-card-port-pill-max-width/);
   assert.doesNotMatch(componentSource, /text-overflow:\s*ellipsis;/);

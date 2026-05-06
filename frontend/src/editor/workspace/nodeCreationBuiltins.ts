@@ -1,8 +1,8 @@
 import type { NodeCreationEntry, PresetDocument } from "@/types/node-system";
 import {
+  CONDITION_LOOP_LIMIT_DEFAULT,
   FIXED_CONDITION_BRANCHES,
   FIXED_CONDITION_BRANCH_MAPPING,
-  FIXED_CONDITION_LOOP_LIMIT,
 } from "../../lib/condition-protocol.ts";
 
 export const NODE_CREATION_FAMILY_PRIORITY: Record<NodeCreationEntry["family"], number> = {
@@ -111,7 +111,7 @@ const BUILTIN_EMPTY_CONDITION_PRESET: PresetDocument = {
       writes: [],
       config: {
         branches: [...FIXED_CONDITION_BRANCHES],
-        loopLimit: FIXED_CONDITION_LOOP_LIMIT,
+        loopLimit: CONDITION_LOOP_LIMIT_DEFAULT,
         branchMapping: { ...FIXED_CONDITION_BRANCH_MAPPING },
         rule: {
           source: "",

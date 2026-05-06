@@ -6,7 +6,6 @@ from app.core.control_flow_state_analysis import find_ambiguous_state_reads
 from app.core.schemas.node_system import (
     FIXED_CONDITION_BRANCHES,
     FIXED_CONDITION_BRANCH_MAPPING,
-    FIXED_CONDITION_LOOP_LIMIT,
     GraphValidationResponse,
     NodeSystemAgentNode,
     NodeSystemConditionNode,
@@ -253,15 +252,6 @@ def _validate_condition_node(
                 path=f"nodes.{node_name}.config.branchMapping",
             )
         )
-    if node.config.loop_limit != FIXED_CONDITION_LOOP_LIMIT:
-        issues.append(
-            ValidationIssue(
-                code="condition_loop_limit_not_fixed",
-                message=f"Condition node '{node_name}' must use fixed loopLimit {FIXED_CONDITION_LOOP_LIMIT}.",
-                path=f"nodes.{node_name}.config.loopLimit",
-            )
-        )
-
     conditional_edge = next((item for item in graph.conditional_edges if item.source == node_name), None)
     if conditional_edge is None:
         issues.append(
