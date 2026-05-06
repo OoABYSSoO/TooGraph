@@ -52,14 +52,16 @@
 - 技能输入由 Agent 节点的 LLM 在运行时根据当前输入 state、技能说明和 `inputSchema` 生成；必填技能输入缺失时由运行时记录可恢复错误。
 - 图运行前不再兼容补齐旧绑定。旧草稿、旧模板和旧技能需要按当前协议重建。
 - 已新增通用 `advanced_web_research_loop` 内置模板，用于验证“搜索技能执行 -> 证据评估 -> condition 控制补搜 -> 依据筛选 -> final_reply”的图式工具循环。它不是桌宠自主循环模板，但可作为联网研究子流程和后续桌宠模板的参考构件。
+- 子图缩略图已能投射内部节点运行状态颜色，并在节点卡片上显示当前内部运行摘要。
 
 尚未完成：
 
-- 子图缩略图运行态颜色、子图运行审计聚合和更完整的嵌套可视化能力。
+- 子图运行审计聚合、事件定位、从缩略图点击跳转到内部节点，以及更完整的嵌套可视化能力。
 - 真实的 `autonomous_decision` 技能。
 - 新版桌宠自主循环模板。
 - `graphite_skill_builder`。
-- 审批恢复 UI、图补丁预览、GraphCommandBus、revision、undo 和完整审计闭环。
+- 当前仍残留 `backend/app/companion/commands.py` 中的 `graph_patch.draft` 草案记录 stub。它是历史遗留入口，只能记录待审批草案，不能应用图补丁，也没有接入 GraphCommandBus、graph revision、undo 或完整审计闭环；下一轮应删除它，或按新的图优先命令流重建。
+- 审批恢复 UI、图补丁预览、GraphCommandBus、graph revision、undo 和完整审计闭环。
 
 ## 当前可参考模板
 
@@ -144,7 +146,7 @@ input_question
 - 前端节点创建菜单已能把已保存的整张图作为子图节点加入当前图，创建时自动生成父图输入/输出 state 胶囊。
 - 子图节点卡片已展示左右公开 state 胶囊、内部缩略图和内部技能能力摘要。
 - 双击子图节点会打开当前实例的工作区页签。页签复用主编辑器画布、节点编辑、运行校验和持久化控制器；普通保存会回写父图中该子图节点的 `config.graph`，并同步新增或变化的公开输入/输出 state，不会修改原图或其他实例。子图页签同时提供“另存为普通图”，用于把当前实例保存成新的独立图。
-- 下一步 UI 收束是把子图内部节点运行状态投射到缩略图颜色，并补齐子图运行审计的父子视图聚合。
+- 子图缩略图已能显示内部节点运行状态颜色和当前内部运行摘要。下一步 UI 收束是补齐子图运行审计的父子视图聚合、事件定位和从缩略图跳转到内部节点。
 
 与 LangGraph 子图的关系：
 
@@ -159,6 +161,8 @@ input_question
 只有一种真实执行底座：graph run。
 
 桌宠运行时不是第二套 `companion_run`，Agent 节点运行时也不是另一套 `graph_run`。桌宠只是用 `origin=companion` 这类运行来源元数据启动图模板。运行来源用于策略判断、审计和 UI 展示，不用于创造第二套执行协议。
+
+当前代码里仍有待迁移的旧标记：前端桌宠构图代码会写入 `companion_run`、`companion_permission_tier`、`companion_graph_patch_drafts_enabled` 等元数据。这些字段只代表历史遗留状态，不是目标协议；新一轮实现应迁移到统一的运行来源元数据，例如 `origin=companion`，并避免继续扩展第二套桌宠运行协议。
 
 因此：
 
@@ -436,6 +440,8 @@ backend/data/skill_drafts/<skill_key>/
 function call 未来可以作为某些模型的适配层，但不能绕过 GraphiteUI 的 skill registry、权限检查、审批路径和审计记录。不支持 function call 的本地模型也必须能通过结构化 JSON 输出参与同一套图循环。
 
 ## 新版桌宠自主循环模板
+
+当前仓库尚未创建或注册 `companion_autonomous_loop`。桌宠浮窗 UI 已经存在，并会尝试读取这个模板；在模板按新协议重建前，桌宠对话循环不能作为当前可用能力。下一轮工作的起点应是创建并接入这个模板，而不是增强旧 `companion_chat_loop` 或恢复旧兼容入口。
 
 待手工重建的目标模板应包含：
 

@@ -8,6 +8,7 @@
 - `node_system` 是唯一正式图协议，`state_schema` 是节点输入输出的唯一正式数据来源。
 - 桌宠不是独立运行时。桌宠本质也是按图模板发起一次 graph run，并通过运行来源、状态和技能目录表达上下文。
 - 旧的 `companion_agentic_tool_loop`、`companion_chat_loop`、`web_research_loop` 等模板不再随仓库提供，也不再通过后端兼容逻辑修补。
+- 新版桌宠自主循环模板 `companion_autonomous_loop` 尚未创建和注册。当前桌宠浮窗仍会尝试读取这个模板，因此桌宠对话入口的 UI 已存在，但完整对话循环还不能作为当前可用能力描述。
 - 当前仓库提供一个新的内置图模板：`advanced_web_research_loop`（高级联网搜索）。它是通用研究模板，不是桌宠专用自主循环模板。
 - 技能系统已收束为统一技能库，不再区分“桌宠技能”和“Agent 节点技能”，也不再使用 `targets` / `executionTargets` 这类旧分流字段。
 - 当前只保留一个内置技能包：`web_search`。其余旧技能包已经删除，后续需要按新结构逐个专门编写。
@@ -29,6 +30,7 @@
 - `state_schema` 支持 `binding` 元数据，用来标记某个 state 是否由技能输出自动绑定。
 - `file` / `image` / `audio` / `video` 类型 state 的值是本地 artifact 路径或路径列表，不再有单独的 `file_list`、`array` 或 `object` state 类型。Agent 节点接收 `file` state 时，会读取文本类文件并只把“文件名 + 原文全文”拼入模型上下文；图片、音频和视频路径会走多模态附件处理，不作为文本读取。
 - Input 节点输出文件、图片、音频或视频时都写入本地路径；Output 节点可通过 documents 预览展示这些 artifact。
+- 目标运行来源语义是 `origin=companion`。当前前端桌宠构图代码仍残留 `companion_run`、`companion_permission_tier`、`companion_graph_patch_drafts_enabled` 等旧元数据；这些字段是待迁移标记，不应作为新一轮桌宠架构的设计依据。
 
 ## 当前技能
 
@@ -69,7 +71,7 @@
 - subgraph 节点把一张已保存图复制为当前父图内的独立实例。节点卡片先展示公开输入/输出胶囊，再展示紧凑的内部 DAG 缩略图、内部能力摘要和子图内部运行状态；DAG 缩略图按行优先顺序展示内部节点，默认最多四列，并会根据节点卡片当前宽度自动换行为 `4 / 3 / 2 / 1` 列。缩略图会全量展示内部节点名称、普通连线和条件分支连线；节点位置和连线路径来自同一个响应式布局计算，不再照搬大画布坐标导致横向裁切或因卡片尺寸变化造成连线错位。运行时会把子图内部节点状态投射到缩略图颜色与当前节点提示上。双击节点会打开当前实例的工作区页签，页签内复用正式画布编辑器。子图页签的保存会回写父图中该节点的 `config.graph`，并按内部 `input` / `output` 边界重新同步父图公开 state 端口；也可以另存为普通图。画布左上工具区会显示来源胶囊，例如“来自：Untitled Graph / 节点：高级联网搜索 Subgraph”。
 - output 节点负责展示、预览、导出或链接图运行产物，不拥有隐藏持久化策略。
 - Skills 页面围绕统一 skill catalog 展示、导入、启用、禁用和删除技能。
-- 桌宠浮窗支持模型选择和对话入口，但当前不再假设仓库内置默认桌宠模板；需要用新协议重建桌宠自主循环模板后再接入完整自主循环。
+- 桌宠浮窗支持模型选择和对话入口，但当前没有可运行的内置桌宠自主循环模板；需要先用新协议创建并注册 `companion_autonomous_loop`，再接入完整自主循环。
 
 ## 当前后端能力
 
@@ -78,6 +80,7 @@
 - LangGraph runtime 是当前运行主链。
 - 后端不再在 graph run 入口修补旧模板结构；提交什么图，就按当前协议校验和执行什么图。
 - graph run、run detail、SSE 事件、状态快照和 artifact 输出仍是审计与回放的基础。
+- `backend/app/companion/commands.py` 仍保留 `graph_patch.draft` 草案记录 stub。这是历史遗留入口，只记录待审批草案，不能应用图补丁，也没有接入 GraphCommandBus、图 revision、undo 或完整审计闭环。
 
 ## 当前仍在路线图中
 
@@ -86,5 +89,5 @@
 - 设计并实现真正的 `autonomous_decision` 技能，用于根据技能目录、用户意图和运行策略选择技能，但不直接执行技能。
 - 设计并实现 `graphite_skill_builder`，用于在用户确认后生成符合 GraphiteUI 项目结构的 skill 草案。
 - 完成更完整的图运行展示。
-- 完成桌宠审批恢复 UI、图补丁预览、GraphCommandBus、revision、undo 和审计闭环。
+- 清理或按新命令流重建历史 `graph_patch.draft` stub，并完成图补丁预览、GraphCommandBus、graph revision、undo 和审计闭环。
 - 将人设、记忆、会话摘要等长期状态更新表达为可审计的图模板流程，而不是隐藏产品逻辑。
