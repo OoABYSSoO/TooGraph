@@ -451,9 +451,12 @@ export function applyNodeCreationResult<T extends GraphPayload | GraphDocument>(
   const nextDocument = cloneGraphDocument(document);
   nextDocument.nodes[input.createdNodeId] = input.createdNode;
 
+  const addedMergedStateKeys = new Set<string>();
   for (const [stateKey, definition] of Object.entries(input.mergedStateSchema ?? {})) {
     if (!nextDocument.state_schema[stateKey]) {
       nextDocument.state_schema[stateKey] = definition;
+      addedMergedStateKeys.add(stateKey);
+      rememberDefaultStateKeyIndex(nextDocument, stateKey);
     }
   }
 
@@ -480,20 +483,26 @@ export function applyNodeCreationResult<T extends GraphPayload | GraphDocument>(
   }
 
   if (isVirtualAnyOutputStateKey(rawSourceStateKey)) {
-    const sourceStateField = buildNextVirtualStateField(
-      nextDocument,
-      input.context?.sourceNodeId
-        ? sourceValueType || resolveInputNodeVirtualOutputType(nextDocument.nodes[input.context.sourceNodeId]) || "text"
-        : sourceValueType || "text",
-    );
-    nextDocument.state_schema[sourceStateField.key] = sourceStateField.definition;
-    rememberDefaultStateKeyIndex(nextDocument, sourceStateField.key);
+    const reusableSubgraphInputState = resolveReusableSubgraphInputState(input.createdNode);
+    if (reusableSubgraphInputState) {
+      sourceStateKey = reusableSubgraphInputState;
+      createdStateKey = reusableSubgraphInputState;
+    } else {
+      const sourceStateField = buildNextVirtualStateField(
+        nextDocument,
+        input.context?.sourceNodeId
+          ? sourceValueType || resolveInputNodeVirtualOutputType(nextDocument.nodes[input.context.sourceNodeId]) || "text"
+          : sourceValueType || "text",
+      );
+      nextDocument.state_schema[sourceStateField.key] = sourceStateField.definition;
+      rememberDefaultStateKeyIndex(nextDocument, sourceStateField.key);
+      sourceStateKey = sourceStateField.key;
+      createdStateKey = sourceStateField.key;
+    }
     bindCreatedStateToSourceNode(
       input.context?.sourceNodeId ? nextDocument.nodes[input.context.sourceNodeId] : undefined,
-      sourceStateField.key,
+      sourceStateKey,
     );
-    sourceStateKey = sourceStateField.key;
-    createdStateKey = sourceStateField.key;
   }
 
   if (
@@ -508,6 +517,8 @@ export function applyNodeCreationResult<T extends GraphPayload | GraphDocument>(
     applyStateNameToCreatedOutputNode(nextDocument.nodes[input.createdNodeId], sourceStateKey, nextDocument.state_schema);
   }
 
+  removeUnreferencedAddedStateKeys(nextDocument, addedMergedStateKeys);
+
   if (input.context?.sourceNodeId) {
     buildCreationFlowEdge(nextDocument, input.context.sourceNodeId, input.createdNodeId, input.context);
   }
@@ -517,6 +528,33 @@ export function applyNodeCreationResult<T extends GraphPayload | GraphDocument>(
     createdNodeId: input.createdNodeId,
     createdStateKey,
   };
+}
+
+function resolveReusableSubgraphInputState(node: GraphNode) {
+  return node.kind === "subgraph" ? node.reads[0]?.state ?? null : null;
+}
+
+function removeUnreferencedAddedStateKeys(document: GraphPayload | GraphDocument, stateKeys: Set<string>) {
+  if (stateKeys.size === 0) {
+    return;
+  }
+  const referencedStateKeys = new Set<string>();
+  for (const node of Object.values(document.nodes)) {
+    for (const binding of node.reads) {
+      referencedStateKeys.add(binding.state);
+    }
+    for (const binding of node.writes) {
+      referencedStateKeys.add(binding.state);
+    }
+    if (node.kind === "condition" && node.config.rule.source) {
+      referencedStateKeys.add(node.config.rule.source);
+    }
+  }
+  for (const stateKey of stateKeys) {
+    if (!referencedStateKeys.has(stateKey)) {
+      delete document.state_schema[stateKey];
+    }
+  }
 }
 
 export type { CreatedNodeResult };

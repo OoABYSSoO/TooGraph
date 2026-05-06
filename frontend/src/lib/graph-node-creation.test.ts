@@ -416,6 +416,106 @@ test("applyNodeCreationResult materializes a virtual input output when it spawns
   assert.deepEqual(result.document.edges, [{ source: "empty_input", target: "output_created" }]);
 });
 
+test("applyNodeCreationResult materializes an input virtual output when it spawns a subgraph node", () => {
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Creation Graph",
+    state_schema: {},
+    nodes: {
+      empty_input: {
+        kind: "input",
+        name: "Empty Input",
+        description: "",
+        ui: { position: { x: 0, y: 0 }, collapsed: false },
+        reads: [],
+        writes: [],
+        config: {
+          value: "",
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+  const sourceGraph: GraphPayload = {
+    graph_id: "graph_research",
+    name: "Research Flow",
+    state_schema: {
+      question: {
+        name: "Question",
+        description: "User question.",
+        type: "text",
+        value: "",
+        color: "#d97706",
+      },
+      answer: {
+        name: "Answer",
+        description: "Final answer.",
+        type: "markdown",
+        value: "",
+        color: "#2563eb",
+      },
+    },
+    nodes: {
+      input_question: {
+        kind: "input",
+        name: "Question Input",
+        description: "",
+        ui: { position: { x: 0, y: 0 }, collapsed: false },
+        reads: [],
+        writes: [{ state: "question", mode: "replace" }],
+        config: { value: "", boundaryType: "text" },
+      },
+      output_answer: {
+        kind: "output",
+        name: "Answer Output",
+        description: "",
+        ui: { position: { x: 320, y: 0 }, collapsed: false },
+        reads: [{ state: "answer", required: true }],
+        writes: [],
+        config: {
+          displayMode: "markdown",
+          persistEnabled: false,
+          persistFormat: "md",
+          fileNameTemplate: "",
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const createdSubgraph = buildSubgraphNodeFromGraph(sourceGraph, {
+    id: "subgraph_created",
+    position: { x: 280, y: 0 },
+    targetDocument: document,
+  });
+  const result = applyNodeCreationResult(document, {
+    createdNodeId: createdSubgraph.id,
+    createdNode: createdSubgraph.node,
+    mergedStateSchema: createdSubgraph.state_schema,
+    context: {
+      position: { x: 280, y: 0 },
+      sourceNodeId: "empty_input",
+      sourceAnchorKind: "state-out",
+      sourceStateKey: VIRTUAL_ANY_OUTPUT_STATE_KEY,
+      sourceValueType: "text",
+    },
+  });
+
+  assert.equal(result.createdStateKey, "state_1");
+  assert.deepEqual(result.document.nodes.empty_input.writes, [{ state: "state_1", mode: "replace" }]);
+  assert.deepEqual(result.document.nodes.subgraph_created.reads, [{ state: "state_1", required: true }]);
+  assert.deepEqual(result.document.nodes.subgraph_created.writes, [{ state: "state_2", mode: "replace" }]);
+  assert.equal(result.document.state_schema.state_1?.name, "Question");
+  assert.equal(result.document.state_schema.state_1?.type, "text");
+  assert.equal(result.document.state_schema.state_2?.name, "Answer");
+  assert.equal(result.document.metadata.graphiteui_state_key_counter, 2);
+  assert.deepEqual(result.document.edges, [{ source: "empty_input", target: "subgraph_created" }]);
+});
+
 test("applyNodeCreationResult materializes skill virtual outputs with an empty skill list", () => {
   const document: GraphPayload = {
     graph_id: null,
