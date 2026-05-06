@@ -84,6 +84,7 @@ test("NodeCard accepts canvas-provided real dimensions through CSS variables", (
   assert.match(componentSource, /\.node-card \{[\s\S]*width:\s*var\(--node-card-width,\s*460px\);/);
   assert.match(componentSource, /\.node-card \{[\s\S]*min-height:\s*var\(--node-card-min-height,\s*260px\);/);
   assert.match(componentSource, /\.node-card--condition \{[\s\S]*width:\s*var\(--node-card-width,\s*560px\);/);
+  assert.match(componentSource, /\.node-card--subgraph \{[\s\S]*width:\s*var\(--node-card-width,\s*820px\);/);
 });
 
 test("NodeCard stretches primary editable surfaces when the canvas resizes the node", () => {
@@ -125,10 +126,21 @@ test("SubgraphNodeBody places state port rails before the DAG mini map", () => {
 test("SubgraphMiniMap keeps SVG edges and nodes in the same fixed canvas coordinates", () => {
   const miniMapSource = readFileSync(resolve(currentDirectory, "SubgraphMiniMap.vue"), "utf8").replace(/\r\n/g, "\n");
 
+  assert.match(miniMapSource, /import \{ buildSubgraphMiniMapLayout \} from "\.\/subgraphMiniMapLayout";/);
+  assert.match(miniMapSource, /new ResizeObserver/);
+  assert.match(miniMapSource, /element\.parentElement\?\.clientWidth \?\? element\.clientWidth/);
   assert.doesNotMatch(miniMapSource, /min-width:\s*100%;/);
-  assert.match(miniMapSource, /\.subgraph-mini-map \{[\s\S]*display:\s*grid;[\s\S]*justify-items:\s*center;/);
+  assert.match(miniMapSource, /\.subgraph-mini-map \{[\s\S]*width:\s*100%;[\s\S]*min-width:\s*0;[\s\S]*display:\s*grid;[\s\S]*justify-items:\s*center;/);
   assert.match(miniMapSource, /\.subgraph-mini-map__canvas \{[\s\S]*position:\s*relative;[\s\S]*width:\s*fit-content;/);
   assert.match(miniMapSource, /\.subgraph-mini-map__edges \{[\s\S]*width:\s*100%;[\s\S]*height:\s*100%;/);
+});
+
+test("SubgraphMiniMap uses wider readable nodes and clearer edge styling", () => {
+  const miniMapSource = readFileSync(resolve(currentDirectory, "SubgraphMiniMap.vue"), "utf8").replace(/\r\n/g, "\n");
+
+  assert.match(miniMapSource, /stroke-width:\s*2\.2;/);
+  assert.match(miniMapSource, /stroke-linejoin:\s*round;/);
+  assert.match(miniMapSource, /markerWidth="10"/);
 });
 
 test("NodeCard keeps state pill geometry but hides the pill chrome visually", () => {

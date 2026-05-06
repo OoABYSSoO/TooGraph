@@ -94,8 +94,6 @@
         <SubgraphMiniMap
           :nodes="body.thumbnailNodes"
           :edges="body.thumbnailEdges"
-          :column-count="body.thumbnailColumnCount"
-          :row-count="body.thumbnailRowCount"
         />
         <div v-if="body.capabilities.length > 0" class="subgraph-node-body__capabilities">
           <span v-for="capability in body.capabilities" :key="capability">{{ capability }}</span>

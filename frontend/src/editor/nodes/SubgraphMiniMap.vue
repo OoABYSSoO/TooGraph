@@ -1,20 +1,20 @@
 <template>
-  <div class="subgraph-mini-map" aria-label="Subgraph DAG mini map">
+  <div ref="containerRef" class="subgraph-mini-map" aria-label="Subgraph DAG mini map">
     <div
       class="subgraph-mini-map__canvas"
       :style="{
-        width: `${canvasWidth}px`,
-        height: `${canvasHeight}px`,
+        width: `${layout.canvasWidth}px`,
+        height: `${layout.canvasHeight}px`,
       }"
     >
-      <svg class="subgraph-mini-map__edges" :viewBox="`0 0 ${canvasWidth} ${canvasHeight}`" aria-hidden="true">
+      <svg class="subgraph-mini-map__edges" :viewBox="`0 0 ${layout.canvasWidth} ${layout.canvasHeight}`" aria-hidden="true">
         <defs>
-          <marker id="subgraph-mini-map-arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
-            <path d="M 0 0 L 7 3.5 L 0 7 z" />
+          <marker id="subgraph-mini-map-arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+            <path d="M 0 0 L 10 5 L 0 10 z" />
           </marker>
         </defs>
         <path
-          v-for="edge in edgePaths"
+          v-for="edge in layout.edges"
           :key="`${edge.source}-${edge.target}`"
           class="subgraph-mini-map__edge"
           :class="[
@@ -26,7 +26,7 @@
         />
       </svg>
       <span
-        v-for="node in nodes"
+        v-for="node in layout.nodes"
         :key="node.id"
         class="subgraph-mini-map__node"
         :class="[
@@ -46,82 +46,49 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 
-import type {
-  SubgraphThumbnailEdgeViewModel,
-  SubgraphThumbnailNodeViewModel,
-  SubgraphThumbnailStatus,
-} from "./nodeCardViewModel";
-
-const NODE_WIDTH = 94;
-const NODE_HEIGHT = 32;
-const COLUMN_WIDTH = 108;
-const ROW_HEIGHT = 52;
-const PADDING_X = 18;
-const PADDING_Y = 18;
+import type { SubgraphThumbnailEdgeViewModel, SubgraphThumbnailNodeViewModel, SubgraphThumbnailStatus } from "./nodeCardViewModel";
+import { buildSubgraphMiniMapLayout } from "./subgraphMiniMapLayout";
+import type { SubgraphMiniMapPlacedNode } from "./subgraphMiniMapLayout";
 
 const props = defineProps<{
   nodes: SubgraphThumbnailNodeViewModel[];
   edges: SubgraphThumbnailEdgeViewModel[];
-  columnCount: number;
-  rowCount: number;
 }>();
 
-const canvasWidth = computed(() => Math.max(240, PADDING_X * 2 + Math.max(1, props.columnCount) * COLUMN_WIDTH - (COLUMN_WIDTH - NODE_WIDTH)));
-const canvasHeight = computed(() => Math.max(132, PADDING_Y * 2 + Math.max(1, props.rowCount) * ROW_HEIGHT - (ROW_HEIGHT - NODE_HEIGHT)));
-const nodeById = computed(() => new Map(props.nodes.map((node) => [node.id, node])));
-const edgePaths = computed(() =>
-  props.edges.flatMap((edge) => {
-    const source = nodeById.value.get(edge.source);
-    const target = nodeById.value.get(edge.target);
-    if (!source || !target) {
-      return [];
-    }
-    const sourceSide =
-      source.column === target.column ? (source.row < target.row ? "bottom" : "top") : source.column < target.column ? "end" : "start";
-    const targetSide =
-      source.column === target.column ? (source.row < target.row ? "top" : "bottom") : source.column < target.column ? "start" : "end";
-    const sourcePoint = nodePoint(source, sourceSide);
-    const targetPoint = nodePoint(target, targetSide);
-    const horizontalDistance = Math.abs(targetPoint.x - sourcePoint.x);
-    const verticalDistance = Math.abs(targetPoint.y - sourcePoint.y);
-    const handle = Math.max(24, Math.min(54, (horizontalDistance || verticalDistance) / 2));
-    const path =
-      source.column === target.column
-        ? `M ${sourcePoint.x} ${sourcePoint.y} C ${sourcePoint.x} ${sourcePoint.y + (sourcePoint.y < targetPoint.y ? handle : -handle)}, ${targetPoint.x} ${targetPoint.y + (sourcePoint.y < targetPoint.y ? -handle : handle)}, ${targetPoint.x} ${targetPoint.y}`
-        : `M ${sourcePoint.x} ${sourcePoint.y} C ${sourcePoint.x + (sourcePoint.x < targetPoint.x ? handle : -handle)} ${sourcePoint.y}, ${targetPoint.x + (sourcePoint.x < targetPoint.x ? -handle : handle)} ${targetPoint.y}, ${targetPoint.x} ${targetPoint.y}`;
-    return [
-      {
-        ...edge,
-        path,
-      },
-    ];
-  }),
-);
+const containerRef = ref<HTMLElement | null>(null);
+const containerWidth = ref<number | null>(null);
+let resizeObserver: ResizeObserver | null = null;
 
-function nodeStyle(node: SubgraphThumbnailNodeViewModel) {
-  return {
-    left: `${nodeLeft(node)}px`,
-    top: `${nodeTop(node)}px`,
-    width: `${NODE_WIDTH}px`,
-    height: `${NODE_HEIGHT}px`,
+const layout = computed(() => buildSubgraphMiniMapLayout(props.nodes, props.edges, containerWidth.value ?? Number.POSITIVE_INFINITY));
+
+onMounted(() => {
+  const element = containerRef.value;
+  if (!element) {
+    return;
+  }
+  const observedElement = element.parentElement ?? element;
+  const updateWidth = () => {
+    containerWidth.value = element.parentElement?.clientWidth ?? element.clientWidth;
   };
-}
+  updateWidth();
+  resizeObserver = new ResizeObserver(updateWidth);
+  resizeObserver.observe(observedElement);
+});
 
-function nodePoint(node: SubgraphThumbnailNodeViewModel, side: "start" | "end" | "top" | "bottom") {
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect();
+  resizeObserver = null;
+});
+
+function nodeStyle(node: SubgraphMiniMapPlacedNode) {
   return {
-    x: nodeLeft(node) + (side === "end" ? NODE_WIDTH : side === "start" ? 0 : NODE_WIDTH / 2),
-    y: nodeTop(node) + (side === "bottom" ? NODE_HEIGHT : side === "top" ? 0 : NODE_HEIGHT / 2),
+    left: `${node.x}px`,
+    top: `${node.y}px`,
+    width: `${node.width}px`,
+    height: `${node.height}px`,
   };
-}
-
-function nodeLeft(node: SubgraphThumbnailNodeViewModel) {
-  return PADDING_X + Math.max(0, node.column - 1) * COLUMN_WIDTH;
-}
-
-function nodeTop(node: SubgraphThumbnailNodeViewModel) {
-  return PADDING_Y + Math.max(0, node.row - 1) * ROW_HEIGHT;
 }
 
 function formatStatus(status: SubgraphThumbnailStatus) {
@@ -148,6 +115,8 @@ function formatStatus(status: SubgraphThumbnailStatus) {
 .subgraph-mini-map {
   min-height: 176px;
   overflow: visible;
+  width: 100%;
+  min-width: 0;
   display: grid;
   align-items: center;
   justify-items: center;
@@ -173,42 +142,43 @@ function formatStatus(status: SubgraphThumbnailStatus) {
 
 .subgraph-mini-map__edge {
   fill: none;
-  stroke: rgba(120, 113, 108, 0.34);
-  stroke-width: 1.5;
+  stroke: rgba(87, 83, 78, 0.5);
+  stroke-width: 2.2;
   stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .subgraph-mini-map__edges marker path {
-  fill: rgba(120, 113, 108, 0.5);
+  fill: rgba(87, 83, 78, 0.68);
 }
 
 .subgraph-mini-map__edge--active {
-  stroke: rgba(37, 99, 235, 0.58);
-  stroke-width: 2;
+  stroke: rgba(37, 99, 235, 0.74);
+  stroke-width: 2.6;
 }
 
 .subgraph-mini-map__edge--success {
-  stroke: rgba(20, 120, 78, 0.44);
+  stroke: rgba(20, 120, 78, 0.64);
 }
 
 .subgraph-mini-map__edge--failed {
-  stroke: rgba(220, 38, 38, 0.62);
+  stroke: rgba(220, 38, 38, 0.78);
 }
 
 .subgraph-mini-map__node {
   position: absolute;
   display: grid;
-  grid-template-columns: 4px 8px minmax(0, 1fr);
+  grid-template-columns: 5px 8px minmax(0, 1fr);
   align-items: center;
-  gap: 7px;
+  gap: 9px;
   border: 1px solid rgba(120, 113, 108, 0.22);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.96);
   color: #292524;
   box-shadow: 0 8px 18px rgba(60, 41, 20, 0.06);
-  padding: 0 9px 0 0;
-  font-size: 11px;
-  font-weight: 650;
+  padding: 0 12px 0 0;
+  font-size: 12px;
+  font-weight: 680;
   line-height: 1.2;
 }
 
@@ -227,8 +197,8 @@ function formatStatus(status: SubgraphThumbnailStatus) {
 }
 
 .subgraph-mini-map__node-kind {
-  width: 4px;
-  height: 18px;
+  width: 5px;
+  height: 22px;
   border-radius: 999px;
   background: rgba(120, 113, 108, 0.38);
 }

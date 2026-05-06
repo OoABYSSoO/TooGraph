@@ -304,7 +304,7 @@ function buildSubgraphThumbnail(node: Extract<GraphNode, { kind: "subgraph" }>, 
     entries.map(([id]) => id),
     edgePairs,
   );
-  const columnCount = Math.max(1, Math.min(3, orderedIds.length));
+  const columnCount = Math.max(1, Math.min(4, orderedIds.length));
   const positionById = new Map<string, { column: number; row: number }>();
   orderedIds.forEach((id, index) => {
     const row = Math.floor(index / columnCount) + 1;
@@ -313,18 +313,25 @@ function buildSubgraphThumbnail(node: Extract<GraphNode, { kind: "subgraph" }>, 
     positionById.set(id, { column, row });
   });
 
-  const nodes = entries.map(([id, innerNode]) => {
+  const entryById = new Map(entries);
+  const nodes = orderedIds.flatMap((id) => {
+    const innerNode = entryById.get(id);
+    if (!innerNode) {
+      return [];
+    }
     const position = positionById.get(id) ?? { column: 1, row: 1 };
     const status = normalizeSubgraphThumbnailStatus(statusMap[id]);
-    return {
-      id,
-      label: innerNode.name?.trim() || id,
-      kind: innerNode.kind,
-      column: position.column,
-      row: position.row,
-      status,
-      active: isActiveSubgraphThumbnailStatus(status),
-    };
+    return [
+      {
+        id,
+        label: innerNode.name?.trim() || id,
+        kind: innerNode.kind,
+        column: position.column,
+        row: position.row,
+        status,
+        active: isActiveSubgraphThumbnailStatus(status),
+      },
+    ];
   });
   const statusByNodeId = new Map(nodes.map((item) => [item.id, item.status]));
   const seenEdgeKeys = new Set<string>();

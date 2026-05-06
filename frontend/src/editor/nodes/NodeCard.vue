@@ -1807,7 +1807,7 @@ function handleConditionRuleValueEnter(event: KeyboardEvent) {
 }
 
 .node-card--subgraph {
-  width: var(--node-card-width, 620px);
+  width: var(--node-card-width, 820px);
 }
 
 .node-card--selected {
