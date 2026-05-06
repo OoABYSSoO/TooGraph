@@ -26,7 +26,7 @@
   "inputSchema": [
     {
       "key": "query",
-      "label": "Query",
+      "name": "Query",
       "valueType": "text",
       "required": true,
       "description": "Search query or question to look up on the public web."
@@ -35,19 +35,19 @@
   "outputSchema": [
     {
       "key": "source_urls",
-      "label": "Source URLs",
+      "name": "Source URLs",
       "valueType": "json",
       "description": "Final source URL list returned by the search results."
     },
     {
       "key": "artifact_paths",
-      "label": "Artifact Paths",
+      "name": "Artifact Paths",
       "valueType": "file_list",
       "description": "Final local file path list for fetched readable page documents."
     },
     {
       "key": "errors",
-      "label": "Errors",
+      "name": "Errors",
       "valueType": "json",
       "description": "Final error list collected during search or page fetch."
     }

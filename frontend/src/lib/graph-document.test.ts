@@ -39,11 +39,11 @@ const webSearchSkill: SkillDefinition = {
   permissions: ["network"],
   runtime: { type: "python", entrypoint: "run.py" },
   health: { type: "none" },
-  inputSchema: [{ key: "query", label: "Query", valueType: "text", required: true, description: "" }],
+  inputSchema: [{ key: "query", name: "Query", valueType: "text", required: true, description: "" }],
   outputSchema: [
-    { key: "source_urls", label: "Source URLs", valueType: "json", required: false, description: "URLs." },
-    { key: "artifact_paths", label: "Artifact Paths", valueType: "file_list", required: false, description: "Files." },
-    { key: "errors", label: "Errors", valueType: "json", required: false, description: "Errors." },
+    { key: "source_urls", name: "Source URLs", valueType: "json", required: false, description: "URLs." },
+    { key: "artifact_paths", name: "Artifact Paths", valueType: "file_list", required: false, description: "Files." },
+    { key: "errors", name: "Errors", valueType: "json", required: false, description: "Errors." },
   ],
   supportedValueTypes: ["text", "json"],
   sideEffects: ["network"],
@@ -374,14 +374,11 @@ test("updateAgentNodeConfigInDocument materializes attached skill outputs as man
   assert.deepEqual(node.config.skillBindings, [
     {
       skillKey: "web_search",
-      trigger: "before_agent",
-      inputMapping: {},
       outputMapping: {
         source_urls: "state_1",
         artifact_paths: "state_2",
         errors: "state_3",
       },
-      config: {},
     },
   ]);
   assert.equal(nextDocument.state_schema.state_1?.name, "联网搜索 Source URLs");
@@ -399,7 +396,7 @@ test("updateAgentNodeConfigInDocument materializes attached skill outputs as man
   assert.deepEqual(document.nodes.search_agent.writes, []);
 });
 
-test("updateAgentNodeConfigInDocument maps a single required skill input to the agent input state", () => {
+test("updateAgentNodeConfigInDocument does not create static skill input mappings", () => {
   const document: GraphPayload = {
     graph_id: null,
     name: "Skill Input Binding Graph",
@@ -449,7 +446,7 @@ test("updateAgentNodeConfigInDocument maps a single required skill input to the 
 
   const node = nextDocument.nodes.search_agent;
   assert.equal(node.kind, "agent");
-  assert.deepEqual(node.config.skillBindings?.[0]?.inputMapping, { query: "search_content" });
+  assert.equal("inputMapping" in (node.config.skillBindings?.[0] ?? {}), false);
 });
 
 test("createEmptyDraftGraph creates an empty backend-native payload", () => {

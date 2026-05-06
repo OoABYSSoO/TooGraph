@@ -56,7 +56,7 @@ def _native_skill_manifest(
         "inputSchema": [
             {
                 "key": "video",
-                "label": "Video",
+                "name": "Video",
                 "valueType": "video",
                 "required": True,
                 "description": "Source video file.",
@@ -65,7 +65,7 @@ def _native_skill_manifest(
         "outputSchema": [
             {
                 "key": "summary",
-                "label": "Summary",
+                "name": "Summary",
                 "valueType": "text",
                 "required": True,
                 "description": "Structured video summary.",
@@ -97,13 +97,13 @@ graphite:
   side_effects: []
   input_schema:
     - key: text
-      label: Text
+      name: Text
       valueType: text
       required: true
       description: Source text.
   output_schema:
     - key: result
-      label: Result
+      name: Result
       valueType: text
       description: Imported result.
 ---

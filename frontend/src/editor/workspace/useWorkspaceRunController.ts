@@ -1,10 +1,8 @@
 import type { ComputedRef, Ref } from "vue";
 
 import type { EditorWorkspaceTab } from "../../lib/editor-workspace.ts";
-import { reconcileAgentSkillBindingsInDocument } from "../../lib/graph-document.ts";
 import type { GraphDocument, GraphPayload, GraphRunResponse } from "../../types/node-system.ts";
 import type { RunDetail } from "../../types/run.ts";
-import type { SkillDefinition } from "../../types/skills.ts";
 
 import { setTabScopedRecordEntry } from "./editorTabRuntimeModel.ts";
 import type { RunActivityState } from "./runActivityModel.ts";
@@ -23,7 +21,6 @@ type WorkspaceRunControllerInput = {
   runFailureMessageByTabId: Ref<Record<string, Record<string, string>>>;
   activeRunEdgeIdsByTabId: Ref<Record<string, string[]>>;
   runActivityByTabId: Ref<Record<string, RunActivityState>>;
-  skillDefinitions: Ref<SkillDefinition[]>;
   refreshAgentModels: () => Promise<void>;
   runGraph: (document: GraphPayload | GraphDocument) => Promise<GraphRunResponse>;
   resumeRun: (runId: string, payload: Record<string, unknown>, snapshotId: string | null) => Promise<GraphRunResponse>;
@@ -75,25 +72,21 @@ export function useWorkspaceRunController(input: WorkspaceRunControllerInput) {
       if (!latestDocument) {
         return;
       }
-      const runnableDocument = reconcileAgentSkillBindingsInDocument(latestDocument, input.skillDefinitions.value);
-      if (runnableDocument !== latestDocument) {
-        input.documentsByTabId.value = setTabScopedRecordEntry(input.documentsByTabId.value, tab.tabId, runnableDocument);
-      }
 
-      const response = await input.runGraph(runnableDocument);
+      const response = await input.runGraph(latestDocument);
       clearQueuedRunVisualState(tab.tabId);
       input.markRunActivityPanelHintForTab(tab.tabId);
       input.setFeedbackForTab(tab.tabId, {
         tone: "warning",
         message: input.translate("feedback.runQueued", {
           runId: response.run_id,
-          pending: Object.keys(runnableDocument.nodes).length,
+          pending: Object.keys(latestDocument.nodes).length,
           cycle: "",
         }),
         activeRunId: response.run_id,
         activeRunStatus: response.status,
         summary: {
-          idle: Object.keys(runnableDocument.nodes).length,
+          idle: Object.keys(latestDocument.nodes).length,
           running: 0,
           paused: 0,
           success: 0,

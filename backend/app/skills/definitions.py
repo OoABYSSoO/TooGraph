@@ -198,16 +198,20 @@ def _parse_skill_file(path: Path, source_format: SkillSourceFormat, source_scope
 
 
 def _parse_io_fields(fields: list[dict]) -> list[SkillIoField]:
-    return [
-        SkillIoField(
-            key=str(field["key"]),
-            label=str(field.get("label") or field["key"]),
-            valueType=str(field.get("valueType") or field.get("value_type") or "text"),
-            required=bool(field.get("required", False)),
-            description=str(field.get("description") or ""),
+    parsed_fields: list[SkillIoField] = []
+    for field in fields:
+        if "label" in field:
+            raise ValueError("Skill IO field 'label' is no longer supported. Use 'name'.")
+        parsed_fields.append(
+            SkillIoField(
+                key=str(field["key"]),
+                name=str(field.get("name") or field["key"]),
+                valueType=str(field.get("valueType") or field.get("value_type") or "text"),
+                required=bool(field.get("required", False)),
+                description=str(field.get("description") or ""),
+            )
         )
-        for field in fields
-    ]
+    return parsed_fields
 
 
 def _parse_runtime_spec(payload: object) -> SkillRuntimeSpec:
@@ -237,6 +241,10 @@ def _reject_legacy_targets(payload: object) -> None:
     if isinstance(payload, dict) and "targets" in payload:
         raise ValueError(
             "Skill manifest field 'targets' is no longer supported. Use runPolicies for run-origin policy."
+        )
+    if isinstance(payload, dict) and "executionTargets" in payload:
+        raise ValueError(
+            "Skill manifest field 'executionTargets' is no longer supported. Use runPolicies for run-origin policy."
         )
 
 

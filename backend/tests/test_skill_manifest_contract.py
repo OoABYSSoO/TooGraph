@@ -25,10 +25,10 @@ def _ready_manifest(skill_key: str) -> dict[str, object]:
         "name": skill_key.replace("_", " ").title(),
         "agentInstruction": f"Use {skill_key} only when it is explicitly bound to the agent node.",
         "inputSchema": [
-            {"key": "text", "label": "Text", "valueType": "text", "required": True}
+            {"key": "text", "name": "Text", "valueType": "text", "required": True}
         ],
         "outputSchema": [
-            {"key": "result", "label": "Result", "valueType": "text"}
+            {"key": "result", "name": "Result", "valueType": "text"}
         ],
         "runtime": {"type": "python", "entrypoint": "run.py"},
         "health": {"type": "none"},
@@ -93,10 +93,10 @@ class SkillManifestContractTests(unittest.TestCase):
             skill_dir.mkdir()
             payload = _ready_manifest("normalize_storyboard_shots")
             payload["inputSchema"] = [
-                {"key": "shots", "label": "Shots", "valueType": "json", "required": True}
+                {"key": "shots", "name": "Shots", "valueType": "json", "required": True}
             ]
             payload["outputSchema"] = [
-                {"key": "normalized_shots", "label": "Normalized Shots", "valueType": "json"}
+                {"key": "normalized_shots", "name": "Normalized Shots", "valueType": "json"}
             ]
             manifest = _write_manifest(skill_dir, payload)
             (skill_dir / "run.py").write_text("print('{}')\n", encoding="utf-8")
@@ -125,6 +125,18 @@ class SkillManifestContractTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "targets.*no longer supported"):
                 _parse_native_skill_manifest(manifest, SkillSourceScope.INSTALLED)
 
+    def test_legacy_execution_targets_field_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            skill_dir = Path(temp_dir) / "legacy_execution_targets"
+            skill_dir.mkdir()
+            payload = _ready_manifest("legacy_execution_targets")
+            payload["executionTargets"] = ["agent_node"]
+            manifest = _write_manifest(skill_dir, payload)
+            (skill_dir / "run.py").write_text("print('{}')\n", encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "executionTargets.*no longer supported"):
+                _parse_native_skill_manifest(manifest, SkillSourceScope.INSTALLED)
+
     def test_legacy_top_level_label_field_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             skill_dir = Path(temp_dir) / "legacy_label"
@@ -135,6 +147,20 @@ class SkillManifestContractTests(unittest.TestCase):
             (skill_dir / "run.py").write_text("print('{}')\n", encoding="utf-8")
 
             with self.assertRaisesRegex(ValueError, "label.*no longer supported"):
+                _parse_native_skill_manifest(manifest, SkillSourceScope.INSTALLED)
+
+    def test_legacy_io_field_label_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            skill_dir = Path(temp_dir) / "legacy_io_label"
+            skill_dir.mkdir()
+            payload = _ready_manifest("legacy_io_label")
+            payload["inputSchema"] = [
+                {"key": "text", "label": "Text", "valueType": "text", "required": True}
+            ]
+            manifest = _write_manifest(skill_dir, payload)
+            (skill_dir / "run.py").write_text("print('{}')\n", encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "IO field 'label'.*no longer supported"):
                 _parse_native_skill_manifest(manifest, SkillSourceScope.INSTALLED)
 
     def test_manifest_without_runtime_needs_manifest_before_agent_node_use(self) -> None:

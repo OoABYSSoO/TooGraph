@@ -13,14 +13,16 @@
 
 ## 当前协议
 
-- skill manifest 顶层使用 `name` 表示显示名称，不再使用 `label`。
+- skill manifest 顶层和 `inputSchema` / `outputSchema` 字段都使用 `name` 表示显示名称，不再使用 `label`。
 - “什么时候选择这个技能”写进 `description`。
 - “绑定到 Agent 后应该如何使用这个技能”写进 `agentInstruction`。
 - Agent 节点卡片上手动添加的 skill，与通过 `skill` 类型 state 输入传入的 skill 按并集合并，一视同仁。
 - 添加到 Agent 节点的 skill 会在节点提示词编辑区生成可编辑的技能说明胶囊；移除 skill 时对应胶囊会移除。
 - 胶囊内容是节点级覆盖，不会反向写回技能包原始文档。
-- 在 Agent 节点卡片添加带 `outputSchema` 的 skill 时，前端会自动创建 managed skill output state、添加到该节点输出端口，并写入 `skillBindings.outputMapping`，让运行时能把技能结果透传给下游节点；若该 skill 只有一个必填输入且当前 Agent 只有一个普通输入 state，会同步写入 `skillBindings.inputMapping`。
-- 图运行前会用当前 skill catalog 对 Agent skill 绑定做一次同协议补全，并把补全后的图同步回当前草稿，避免旧草稿中缺失的 `inputMapping` 继续导致运行前校验失败。
+- `skillBindings` 只保存技能身份和 `outputMapping`。它不保存 `inputMapping`、静态参数 `config` 或无意义的 `trigger`。
+- 技能输入由 Agent 节点的 LLM 在运行时根据当前输入 state、技能 `description`、`agentInstruction` 和 `inputSchema` 生成。上游 `skill` state 只传“选择了哪些技能”，不传具体技能参数。
+- 在 Agent 节点卡片添加带 `outputSchema` 的 skill 时，前端会自动创建 managed skill output state、添加到该节点输出端口，并写入 `skillBindings.outputMapping`，让运行时能把技能结果透传给下游节点。
+- 图运行前不再做旧草稿兼容补齐。提交到运行时的图必须已经符合当前协议。
 - `state_schema` 支持 `promptVisible=false`。这类 state 可以参与图运行和技能输出透传，但不会进入 Agent 的模型提示词上下文。
 - `state_schema` 支持 `binding` 元数据，用来标记某个 state 是否由技能输出自动绑定。
 - `file` / `file_list` 类型 state 的值是本地 artifact 路径或路径列表。Agent 节点接收这类 state 时，会读取文件并只把“文件名 + 原文全文”拼入模型上下文，不暴露本地路径、来源网址、抓取时间或运行元数据。
@@ -54,7 +56,7 @@
 ## 当前后端能力
 
 - FastAPI 提供 graphs / runs / templates / presets / settings / skills / knowledge / memories API。
-- validator 负责 `node_system` graph 结构校验。
+- validator 负责 `node_system` graph 结构校验。必填技能输入不再做静态绑定校验，而是在 Agent LLM 生成技能输入后由运行时检查。
 - LangGraph runtime 是当前运行主链。
 - 后端不再在 graph run 入口修补旧模板结构；提交什么图，就按当前协议校验和执行什么图。
 - graph run、run detail、SSE 事件、状态快照和 artifact 输出仍是审计与回放的基础。

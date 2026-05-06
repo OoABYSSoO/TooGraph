@@ -16,6 +16,22 @@ from app.core.schemas.node_system import NodeSystemAgentNode, NodeSystemConditio
 from app.core.schemas.skills import SkillDefinition, SkillIoField
 
 
+def pass_through_skill_inputs_func(**kwargs):
+    return (
+        {resolved.binding.skill_key: dict(kwargs["input_values"]) for resolved in kwargs["bindings"]},
+        "",
+        [],
+        kwargs["runtime_config"],
+    )
+
+
+def fixed_skill_inputs_func(inputs_by_skill: dict[str, dict[str, object]]):
+    def generate(**kwargs):
+        return inputs_by_skill, "", [], kwargs["runtime_config"]
+
+    return generate
+
+
 class NodeHandlersRuntimeTests(unittest.TestCase):
     def test_execute_input_node_coerces_outputs_and_final_result(self) -> None:
         state_schema = {
@@ -107,6 +123,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             resolve_agent_runtime_config_func=lambda agent_node: {"runtime": "initial"},
             build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: "delta",
             callable_accepts_keyword_func=lambda func, keyword: keyword in {"on_delta", "state_schema"},
+            generate_agent_skill_inputs_func=pass_through_skill_inputs_func,
             generate_agent_response_func=lambda agent_node, input_values, skill_context, runtime_config, **kwargs: (
                 {"answer": "value", "summary": "summary"},
                 "reason",
@@ -158,6 +175,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             resolve_agent_runtime_config_func=lambda agent_node: {},
             build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
             callable_accepts_keyword_func=lambda func, keyword: False,
+            generate_agent_skill_inputs_func=pass_through_skill_inputs_func,
             generate_agent_response_func=lambda agent_node, input_values, skill_context, runtime_config, **kwargs: (
                 {"answer": skill_context["custom_retrieval"]["context"]},
                 "",
@@ -215,6 +233,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             resolve_agent_runtime_config_func=lambda agent_node: {},
             build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
             callable_accepts_keyword_func=lambda func, keyword: False,
+            generate_agent_skill_inputs_func=pass_through_skill_inputs_func,
             generate_agent_response_func=lambda agent_node, input_values, skill_context, runtime_config, **kwargs: (
                 {"answer": ",".join(skill_context)},
                 "",
@@ -229,10 +248,76 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         self.assertEqual(result["selected_skills"], ["web_search", "file_reader"])
         self.assertEqual(result["outputs"], {"answer": "web_search,file_reader"})
 
-    def test_execute_agent_node_resolves_dynamic_skill_inputs_from_tool_input(self) -> None:
+    def test_execute_agent_node_uses_llm_generated_skill_inputs(self) -> None:
+        state_schema = {
+            "question": NodeSystemStateDefinition.model_validate({"type": "text"}),
+            "answer": NodeSystemStateDefinition.model_validate({"type": "text"}),
+        }
+        node = NodeSystemAgentNode.model_validate(
+            {
+                "kind": "agent",
+                "name": "searcher",
+                "ui": {"position": {"x": 0, "y": 0}},
+                "reads": [{"state": "question"}],
+                "writes": [{"state": "answer"}],
+                "config": {
+                    "skills": ["web_search"],
+                    "skillBindings": [{"skillKey": "web_search"}],
+                },
+            }
+        )
+        captured_inputs: list[dict[str, object]] = []
+
+        result = execute_agent_node(
+            state_schema,
+            node,
+            {"question": "帮我总结鸣潮最新版本内容"},
+            {"state": {}},
+            node_name="searcher",
+            state={"run_id": "run-1"},
+            get_skill_registry_func=lambda *, include_disabled: {"web_search": "web_search"},
+            get_skill_definition_registry_func=lambda *, include_disabled: {
+                "web_search": SkillDefinition(
+                    skillKey="web_search",
+                    name="Web Search",
+                    inputSchema=[
+                        SkillIoField(key="query", name="Query", valueType="text", required=True),
+                    ],
+                    outputSchema=[SkillIoField(key="summary", name="Summary", valueType="markdown")],
+                    runtimeReady=True,
+                    runtimeRegistered=True,
+                )
+            },
+            generate_agent_skill_inputs_func=lambda **kwargs: (
+                {"web_search": {"query": "鸣潮 最新版本 更新内容"}},
+                "planned skill inputs",
+                [],
+                kwargs["runtime_config"],
+            ),
+            invoke_skill_func=lambda skill_func, skill_inputs: captured_inputs.append(dict(skill_inputs))
+            or {"status": "succeeded", "summary": "searched"},
+            resolve_agent_runtime_config_func=lambda agent_node: {"runtime": "initial"},
+            build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
+            callable_accepts_keyword_func=lambda func, keyword: False,
+            generate_agent_response_func=lambda agent_node, input_values, skill_context, runtime_config, **kwargs: (
+                {"answer": skill_context["web_search"]["summary"]},
+                "",
+                [],
+                runtime_config,
+            ),
+            finalize_agent_stream_delta_func=lambda *, state, node_name, output_values: None,
+            first_truthy_func=lambda values: next((value for value in values if value), None),
+        )
+
+        self.assertEqual(captured_inputs, [{"query": "鸣潮 最新版本 更新内容"}])
+        self.assertEqual(result["skill_outputs"][0]["inputs"], {"query": "鸣潮 最新版本 更新内容"})
+        self.assertEqual(result["skill_outputs"][0]["input_source"], "agent_llm")
+        self.assertEqual(result["reasoning"], "")
+        self.assertEqual(result["outputs"], {"answer": "searched"})
+
+    def test_execute_agent_node_uses_llm_inputs_for_skill_state_selected_skills(self) -> None:
         state_schema = {
             "allowed_skills": NodeSystemStateDefinition.model_validate({"type": "skill"}),
-            "tool_input": NodeSystemStateDefinition.model_validate({"type": "json"}),
             "query": NodeSystemStateDefinition.model_validate({"type": "text"}),
             "answer": NodeSystemStateDefinition.model_validate({"type": "text"}),
         }
@@ -241,7 +326,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "kind": "agent",
                 "name": "tool_executor",
                 "ui": {"position": {"x": 0, "y": 0}},
-                "reads": [{"state": "allowed_skills"}, {"state": "tool_input"}, {"state": "query"}],
+                "reads": [{"state": "allowed_skills"}, {"state": "query"}],
                 "writes": [{"state": "answer"}],
                 "config": {"skills": []},
             }
@@ -253,7 +338,6 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             node,
             {
                 "allowed_skills": {"skillKey": "web_search"},
-                "tool_input": {"query": "Wuthering Waves latest version", "max_results": "8"},
                 "query": "fallback query",
             },
             {"state": {}},
@@ -265,14 +349,17 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                     skillKey="web_search",
                     name="Web Search",
                     inputSchema=[
-                        SkillIoField(key="query", label="Query", valueType="text", required=True),
-                        SkillIoField(key="max_results", label="Max Results", valueType="text"),
+                        SkillIoField(key="query", name="Query", valueType="text", required=True),
+                        SkillIoField(key="max_results", name="Max Results", valueType="text"),
                     ],
-                    outputSchema=[SkillIoField(key="summary", label="Summary", valueType="markdown")],
+                    outputSchema=[SkillIoField(key="summary", name="Summary", valueType="markdown")],
                     runtimeReady=True,
                     runtimeRegistered=True,
                 )
             },
+            generate_agent_skill_inputs_func=fixed_skill_inputs_func(
+                {"web_search": {"query": "Wuthering Waves latest version", "max_results": "8"}}
+            ),
             invoke_skill_func=lambda skill_func, skill_inputs: captured_inputs.append(dict(skill_inputs))
             or {"status": "succeeded", "summary": "searched"},
             resolve_agent_runtime_config_func=lambda agent_node: {},
@@ -296,10 +383,9 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(result["outputs"], {"answer": "searched"})
 
-    def test_execute_agent_node_reports_missing_dynamic_skill_input_without_invoking_script(self) -> None:
+    def test_execute_agent_node_reports_missing_llm_generated_skill_input_without_invoking_script(self) -> None:
         state_schema = {
             "allowed_skills": NodeSystemStateDefinition.model_validate({"type": "skill"}),
-            "tool_input": NodeSystemStateDefinition.model_validate({"type": "json"}),
             "answer": NodeSystemStateDefinition.model_validate({"type": "text"}),
         }
         node = NodeSystemAgentNode.model_validate(
@@ -307,7 +393,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 "kind": "agent",
                 "name": "tool_executor",
                 "ui": {"position": {"x": 0, "y": 0}},
-                "reads": [{"state": "allowed_skills"}, {"state": "tool_input"}],
+                "reads": [{"state": "allowed_skills"}],
                 "writes": [{"state": "answer"}],
                 "config": {"skills": []},
             }
@@ -317,7 +403,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
         result = execute_agent_node(
             state_schema,
             node,
-            {"allowed_skills": {"skillKey": "web_search"}, "tool_input": {}},
+            {"allowed_skills": {"skillKey": "web_search"}},
             {"state": {}},
             node_name="tool_executor",
             state={"run_id": "run-1"},
@@ -327,13 +413,14 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                     skillKey="web_search",
                     name="Web Search",
                     inputSchema=[
-                        SkillIoField(key="query", label="Query", valueType="text", required=True),
+                        SkillIoField(key="query", name="Query", valueType="text", required=True),
                     ],
-                    outputSchema=[SkillIoField(key="error", label="Error", valueType="text")],
+                    outputSchema=[SkillIoField(key="error", name="Error", valueType="text")],
                     runtimeReady=True,
                     runtimeRegistered=True,
                 )
             },
+            generate_agent_skill_inputs_func=fixed_skill_inputs_func({"web_search": {}}),
             invoke_skill_func=lambda skill_func, skill_inputs: invoked.append(str(skill_func)) or {},
             resolve_agent_runtime_config_func=lambda agent_node: {},
             build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
@@ -374,9 +461,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                     "skillBindings": [
                         {
                             "skillKey": "summarize_text",
-                            "inputMapping": {"text": "source_text"},
                             "outputMapping": {"summary": "summary_text"},
-                            "config": {"max_sentences": 2},
                         }
                     ],
                 },
@@ -393,6 +478,9 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             get_skill_registry_func=lambda *, include_disabled: {
                 "summarize_text": object(),
             },
+            generate_agent_skill_inputs_func=fixed_skill_inputs_func(
+                {"summarize_text": {"text": "Long text", "max_sentences": 2}}
+            ),
             invoke_skill_func=lambda skill_func, skill_inputs: {
                 "summary": f"{skill_inputs['text']} / {skill_inputs['max_sentences']}",
                 "key_points": ["one"],
@@ -443,7 +531,6 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                     "skillBindings": [
                         {
                             "skillKey": "load_context",
-                            "inputMapping": {"question": "question"},
                             "outputMapping": {"context": "context", "snapshot": "snapshot"},
                         }
                     ],
@@ -463,6 +550,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             node_name="context_loader",
             state={"run_id": "run-1"},
             get_skill_registry_func=lambda *, include_disabled: {"load_context": object()},
+            generate_agent_skill_inputs_func=fixed_skill_inputs_func({"load_context": {"question": "q"}}),
             invoke_skill_func=lambda skill_func, skill_inputs: {
                 "status": "succeeded",
                 "context": "loaded context",
@@ -500,7 +588,6 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                     "skillBindings": [
                         {
                             "skillKey": "web_search",
-                            "inputMapping": {"query": "query"},
                             "outputMapping": {"source_documents": "source_documents"},
                         }
                     ],
@@ -523,6 +610,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             node_name="web_search_agent",
             state={"run_id": "run-1"},
             get_skill_registry_func=lambda *, include_disabled: {"web_search": object()},
+            generate_agent_skill_inputs_func=fixed_skill_inputs_func({"web_search": {"query": "GraphiteUI"}}),
             invoke_skill_func=lambda skill_func, skill_inputs: {
                 "status": "succeeded",
                 "source_documents": source_documents,
@@ -564,7 +652,6 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                     "skillBindings": [
                         {
                             "skillKey": "web_search",
-                            "inputMapping": {"query": "query"},
                             "outputMapping": {"source_documents": "source_documents"},
                         }
                     ],
@@ -581,6 +668,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             node_name="web_search_agent",
             state={"run_id": "run-1"},
             get_skill_registry_func=lambda *, include_disabled: {"web_search": object()},
+            generate_agent_skill_inputs_func=fixed_skill_inputs_func({"web_search": {"query": "GraphiteUI"}}),
             invoke_skill_func=lambda skill_func, skill_inputs: {
                 "status": "succeeded",
                 "source_documents": source_documents,
@@ -634,6 +722,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             get_skill_registry_func=lambda *, include_disabled: {
                 "web_search": object(),
             },
+            generate_agent_skill_inputs_func=fixed_skill_inputs_func({"web_search": {"query": "Beijing weather today"}}),
             invoke_skill_func=lambda skill_func, skill_inputs: captured_inputs.update(skill_inputs)
             or {"status": "succeeded", "summary": "联网结果", "context": "联网上下文"},
             resolve_agent_runtime_config_func=lambda agent_node: {"runtime": "initial"},
@@ -649,62 +738,30 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             first_truthy_func=lambda values: next((value for value in values if value), None),
         )
 
-        self.assertEqual(captured_inputs, {"name": "GraphiteUI 用户"})
-        self.assertEqual(result["skill_outputs"][0]["inputs"], {"name": "GraphiteUI 用户"})
+        self.assertEqual(captured_inputs, {"query": "Beijing weather today"})
+        self.assertEqual(result["skill_outputs"][0]["inputs"], {"query": "Beijing weather today"})
         self.assertEqual(result["outputs"]["answer"], "联网结果")
 
-    def test_execute_agent_node_keeps_bound_skill_inputs_unchanged(self) -> None:
-        state_schema = {
-            "question": NodeSystemStateDefinition.model_validate({"type": "text"}),
-            "answer": NodeSystemStateDefinition.model_validate({"type": "text"}),
-        }
-        node = NodeSystemAgentNode.model_validate(
-            {
-                "kind": "agent",
-                "name": "writer",
-                "ui": {"position": {"x": 0, "y": 0}},
-                "reads": [{"state": "question"}],
-                "writes": [{"state": "answer"}],
-                "config": {
-                    "skills": ["web_search"],
-                    "skillBindings": [
-                        {
-                            "skillKey": "web_search",
-                            "inputMapping": {"query": "question"},
-                        }
-                    ],
-                },
-            }
-        )
-        captured_inputs: dict[str, object] = {}
-
-        result = execute_agent_node(
-            state_schema,
-            node,
-            {"question": "最新模型发布日期"},
-            {"state": {}},
-            node_name="writer",
-            state={"run_id": "run-1"},
-            get_skill_registry_func=lambda *, include_disabled: {
-                "web_search": object(),
-            },
-            invoke_skill_func=lambda skill_func, skill_inputs: captured_inputs.update(skill_inputs)
-            or {"status": "succeeded", "summary": "联网结果", "context": "联网上下文"},
-            resolve_agent_runtime_config_func=lambda agent_node: {"runtime": "initial"},
-            build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: "delta",
-            callable_accepts_keyword_func=lambda func, keyword: False,
-            generate_agent_response_func=lambda agent_node, input_values, skill_context, runtime_config, **kwargs: (
-                {"answer": skill_context["web_search"]["summary"]},
-                "",
-                [],
-                runtime_config,
-            ),
-            finalize_agent_stream_delta_func=lambda *, state, node_name, output_values: None,
-            first_truthy_func=lambda values: next((value for value in values if value), None),
-        )
-
-        self.assertEqual(captured_inputs["query"], "最新模型发布日期")
-        self.assertEqual(result["skill_outputs"][0]["inputs"]["query"], "最新模型发布日期")
+    def test_execute_agent_node_rejects_static_skill_input_mapping(self) -> None:
+        with self.assertRaisesRegex(ValueError, "inputMapping"):
+            NodeSystemAgentNode.model_validate(
+                {
+                    "kind": "agent",
+                    "name": "writer",
+                    "ui": {"position": {"x": 0, "y": 0}},
+                    "reads": [{"state": "question"}],
+                    "writes": [{"state": "answer"}],
+                    "config": {
+                        "skills": ["web_search"],
+                        "skillBindings": [
+                            {
+                                "skillKey": "web_search",
+                                "inputMapping": {"query": "question"},
+                            }
+                        ],
+                    },
+                }
+            )
 
     def test_execute_agent_node_passes_skill_artifact_invocation_context(self) -> None:
         state_schema = {
@@ -723,7 +780,6 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                     "skillBindings": [
                         {
                             "skillKey": "web_search",
-                            "inputMapping": {"query": "query"},
                         }
                     ],
                 },
@@ -741,6 +797,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             get_skill_registry_func=lambda *, include_disabled: {
                 "web_search": object(),
             },
+            generate_agent_skill_inputs_func=fixed_skill_inputs_func({"web_search": {"query": "GraphiteUI"}}),
             invoke_skill_func=lambda skill_func, skill_inputs, *, context=None: captured_contexts.append(context or {})
             or {"status": "succeeded", "summary": "联网结果"},
             resolve_agent_runtime_config_func=lambda agent_node: {},
@@ -781,7 +838,6 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                     "skillBindings": [
                         {
                             "skillKey": "web_search",
-                            "inputMapping": {"query": "query"},
                         }
                     ],
                 },
@@ -805,6 +861,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
                 get_skill_registry_func=lambda *, include_disabled: {
                     "web_search": object(),
                 },
+                generate_agent_skill_inputs_func=fixed_skill_inputs_func({"web_search": {"query": "GraphiteUI"}}),
                 invoke_skill_func=invoke_skill_func,
                 resolve_agent_runtime_config_func=lambda agent_node: {},
                 build_agent_stream_delta_callback_func=lambda *, state, node_name, output_keys: None,
@@ -857,6 +914,7 @@ class NodeHandlersRuntimeTests(unittest.TestCase):
             get_skill_registry_func=lambda *, include_disabled: {
                 "web_search": object(),
             },
+            generate_agent_skill_inputs_func=fixed_skill_inputs_func({"web_search": {"query": "GraphiteUI"}}),
             invoke_skill_func=lambda skill_func, skill_inputs: {
                 "status": "failed",
                 "error": "Search query is required.",

@@ -29,7 +29,7 @@ test("fetchSkillDefinitions requests the skill definitions endpoint", async () =
           inputSchema: [
             {
               key: "query",
-              label: "Query",
+              name: "Query",
               valueType: "text",
               required: true,
               description: "Web search query.",
@@ -38,7 +38,7 @@ test("fetchSkillDefinitions requests the skill definitions endpoint", async () =
           outputSchema: [
             {
               key: "summary",
-              label: "Summary",
+              name: "Summary",
               valueType: "json",
               required: true,
               description: "Search result summary.",
@@ -92,7 +92,7 @@ test("fetchSkillDefinitions requests the skill definitions endpoint", async () =
       inputSchema: [
         {
           key: "query",
-          label: "Query",
+          name: "Query",
           valueType: "text",
           required: true,
           description: "Web search query.",
@@ -101,7 +101,7 @@ test("fetchSkillDefinitions requests the skill definitions endpoint", async () =
       outputSchema: [
         {
           key: "summary",
-          label: "Summary",
+          name: "Summary",
           valueType: "json",
           required: true,
           description: "Search result summary.",

@@ -194,21 +194,18 @@ class NodeSystemInputConfig(BaseModel):
 
 class NodeSystemAgentSkillBinding(BaseModel):
     skill_key: str = Field(..., min_length=1, alias="skillKey")
-    trigger: Literal["before_agent"] = "before_agent"
-    input_mapping: dict[str, str] = Field(default_factory=dict, alias="inputMapping")
     output_mapping: dict[str, str] = Field(default_factory=dict, alias="outputMapping")
-    config: dict[str, Any] = Field(default_factory=dict)
 
-    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True, extra="forbid")
 
     @field_validator("skill_key")
     @classmethod
     def validate_skill_key(cls, value: str) -> str:
         return _validate_identifier(value, label="Skill key")
 
-    @field_validator("input_mapping", "output_mapping")
+    @field_validator("output_mapping")
     @classmethod
-    def validate_mapping(cls, value: dict[str, str]) -> dict[str, str]:
+    def validate_output_mapping(cls, value: dict[str, str]) -> dict[str, str]:
         normalized: dict[str, str] = {}
         for mapping_key, state_key in value.items():
             next_mapping_key = mapping_key.strip()

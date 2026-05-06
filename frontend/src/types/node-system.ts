@@ -38,10 +38,7 @@ export type WriteBinding = {
 
 export type AgentSkillBinding = {
   skillKey: string;
-  trigger?: "before_agent";
-  inputMapping?: Record<string, string>;
   outputMapping?: Record<string, string>;
-  config?: Record<string, unknown>;
 };
 
 export type AgentThinkingMode = "off" | "low" | "medium" | "high" | "xhigh" | "on";

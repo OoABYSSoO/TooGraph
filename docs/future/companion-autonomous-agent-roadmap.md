@@ -36,7 +36,7 @@
 已经完成：
 
 - 技能系统去掉旧 `targets` / `executionTargets` 分流。
-- skill manifest 顶层从 `label` 收束为 `name`。
+- skill manifest 顶层和 `inputSchema` / `outputSchema` 字段从 `label` 收束为 `name`。
 - `description` 承载选择条件，`agentInstruction` 承载绑定后的使用说明。
 - `state_schema` 增加 `skill` 类型、`promptVisible` 和技能绑定元数据。
 - Agent 节点会合并卡片 skills 与 `skill` state 传入的 skills。
@@ -45,8 +45,10 @@
 - 旧技能包已删除，只保留新的 `web_search`。
 - `file` / `file_list` state 已采用路径透传语义；Agent 节点会读取文件并只把文件名与原文全文放入模型上下文。
 - `web_search` 不再输出 `context`，只输出 `source_urls`、`artifact_paths` 和 `errors`。
-- Agent 节点卡片添加带 `outputSchema` 的 skill 时，会自动创建 managed skill output state、写入节点输出端口，并同步 `skillBindings.outputMapping`；若该 skill 只有一个必填输入且当前 Agent 只有一个普通输入 state，会同步写入 `skillBindings.inputMapping`。
-- 图运行前会按同一套规则补全当前草稿里的 Agent skill 绑定，并把补全后的图同步回草稿，减少旧草稿残留空绑定造成的运行失败。
+- `skillBindings` 已收束为技能身份和 `outputMapping`，不再包含 `inputMapping`、静态参数 `config` 或无意义的 `trigger`。
+- Agent 节点卡片添加带 `outputSchema` 的 skill 时，会自动创建 managed skill output state、写入节点输出端口，并同步 `skillBindings.outputMapping`。
+- 技能输入由 Agent 节点的 LLM 在运行时根据当前输入 state、技能说明和 `inputSchema` 生成；必填技能输入缺失时由运行时记录可恢复错误。
+- 图运行前不再兼容补齐旧绑定。旧草稿、旧模板和旧技能需要按当前协议重建。
 
 尚未完成：
 
@@ -118,7 +120,7 @@
 - `autoSelectable`：自主决策是否能在未被模板显式绑定时选择它。
 - `requiresApproval`：执行前是否必须请求用户确认。
 
-旧字段 `label`、`targets` 和 `executionTargets` 已废弃，出现时应被拒绝或迁移到新结构，而不是悄悄兼容。
+旧字段 `label`、`targets`、`executionTargets`、`inputMapping`、静态技能参数 `config` 和无意义的 `trigger` 已废弃，出现在当前协议载荷中应被拒绝，而不是悄悄兼容。
 
 ## Skill State 契约
 
@@ -198,7 +200,8 @@ Agent 节点提示词区域中，绑定的技能以胶囊展示。
 
 - 技能输出进入图状态，供下游节点读取。
 - 节点卡片添加技能时，系统根据 `outputSchema` 自动创建 managed binding state。
-- 自动创建的 state 会被加入当前 Agent 的输出端口，并写入 `skillBindings.outputMapping`；单必填输入、单普通输入 state 的场景会同时补齐 `skillBindings.inputMapping`。
+- 自动创建的 state 会被加入当前 Agent 的输出端口，并写入 `skillBindings.outputMapping`。
+- `skillBindings` 不表达技能输入。技能输入属于 Agent 节点运行时的 LLM 决策结果，而不是图协议中的静态连线。
 - 大体量或不适合进 prompt 的内容可以设置 `promptVisible=false`。
 - Output 节点可以展示本地 artifact、网址、错误和摘要。
 - 用户仍能像普通 state 一样查看和编辑这些 state。

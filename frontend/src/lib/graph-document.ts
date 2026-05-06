@@ -545,24 +545,6 @@ export function updateAgentNodeConfigInDocument<T extends GraphPayload | GraphDo
   return nextDocument;
 }
 
-export function reconcileAgentSkillBindingsInDocument<T extends GraphPayload | GraphDocument>(
-  document: T,
-  skillDefinitions: SkillDefinition[],
-): T {
-  if (skillDefinitions.length === 0) {
-    return document;
-  }
-
-  const nextDocument = cloneGraphDocument(document);
-  for (const [nodeId, node] of Object.entries(nextDocument.nodes)) {
-    if (node.kind === "agent") {
-      reconcileAgentSkillOutputBindings(nextDocument, nodeId, skillDefinitions);
-    }
-  }
-
-  return JSON.stringify(nextDocument) === JSON.stringify(document) ? document : nextDocument;
-}
-
 function reconcileAgentSkillOutputBindings<T extends GraphPayload | GraphDocument>(
   document: T,
   nodeId: string,
@@ -611,10 +593,7 @@ function reconcileAgentSkillOutputBindings<T extends GraphPayload | GraphDocumen
 
     nextSkillBindings.push({
       skillKey,
-      trigger: existingBinding?.trigger ?? "before_agent",
-      inputMapping: resolveAgentSkillInputMapping(document, node, definition, existingBinding),
       outputMapping,
-      config: existingBinding?.config ?? {},
     });
     processedSkillKeys.add(skillKey);
   }
@@ -636,98 +615,9 @@ function normalizeAgentSkillBindings(value: AgentNode["config"]["skillBindings"]
   return value
     .map((binding) => ({
       skillKey: String(binding.skillKey ?? "").trim(),
-      trigger: binding.trigger ?? "before_agent",
-      inputMapping: { ...(binding.inputMapping ?? {}) },
       outputMapping: { ...(binding.outputMapping ?? {}) },
-      config: { ...(binding.config ?? {}) },
     }))
     .filter((binding) => binding.skillKey);
-}
-
-function resolveAgentSkillInputMapping(
-  document: GraphPayload | GraphDocument,
-  node: AgentNode,
-  definition: SkillDefinition,
-  existingBinding: AgentSkillBinding | undefined,
-) {
-  const inputMapping = { ...(existingBinding?.inputMapping ?? {}) };
-  const config = existingBinding?.config ?? {};
-  const requiredFields = definition.inputSchema.filter((field) => field.required);
-  for (const field of requiredFields) {
-    if (inputMapping[field.key] || Object.prototype.hasOwnProperty.call(config, field.key)) {
-      continue;
-    }
-    const stateKey = findReadableStateForSkillInput(document, node, field, requiredFields);
-    if (stateKey) {
-      inputMapping[field.key] = stateKey;
-    }
-  }
-  return inputMapping;
-}
-
-function findReadableStateForSkillInput(
-  document: GraphPayload | GraphDocument,
-  node: AgentNode,
-  field: SkillIoField,
-  requiredFields: SkillIoField[],
-) {
-  const candidates = collectSkillInputStateCandidates(document, node);
-  const normalizedFieldKey = normalizeSkillInputMatchText(field.key);
-  const normalizedFieldLabel = normalizeSkillInputMatchText(field.label);
-
-  const keyMatch = candidates.find((candidate) => normalizeSkillInputMatchText(candidate.stateKey) === normalizedFieldKey);
-  if (keyMatch) {
-    return keyMatch.stateKey;
-  }
-
-  const nameMatch = candidates.find((candidate) => {
-    const normalizedStateName = normalizeSkillInputMatchText(candidate.definition.name);
-    return normalizedStateName === normalizedFieldKey || (normalizedFieldLabel && normalizedStateName === normalizedFieldLabel);
-  });
-  if (nameMatch) {
-    return nameMatch.stateKey;
-  }
-
-  if (requiredFields.length === 1 && candidates.length === 1 && isSkillInputTypeCompatible(field.valueType, candidates[0].definition.type)) {
-    return candidates[0].stateKey;
-  }
-
-  return null;
-}
-
-function collectSkillInputStateCandidates(document: GraphPayload | GraphDocument, node: AgentNode) {
-  const seen = new Set<string>();
-  return node.reads.flatMap((binding) => {
-    const stateKey = binding.state;
-    if (seen.has(stateKey)) {
-      return [];
-    }
-    seen.add(stateKey);
-    const definition = document.state_schema[stateKey];
-    if (!definition || definition.type === "skill") {
-      return [];
-    }
-    return [{ stateKey, definition }];
-  });
-}
-
-function normalizeSkillInputMatchText(value: string | undefined) {
-  return String(value ?? "").trim().toLowerCase().replace(/[\s_-]+/g, "");
-}
-
-function isSkillInputTypeCompatible(inputType: string, stateType: string) {
-  const normalizedInputType = inputType.trim();
-  const normalizedStateType = stateType.trim();
-  if (!normalizedInputType || normalizedInputType === normalizedStateType) {
-    return true;
-  }
-  if (normalizedInputType === "text") {
-    return ["text", "markdown", "json"].includes(normalizedStateType);
-  }
-  if (normalizedInputType === "json") {
-    return ["json", "object", "array", "text", "markdown"].includes(normalizedStateType);
-  }
-  return false;
 }
 
 function collectRemovedManagedSkillOutputStateKeys(
@@ -789,10 +679,10 @@ function createManagedSkillOutputState(
   const stateType = normalizeSkillOutputStateType(field.valueType);
   const stateField = buildNextMaterializedVirtualStateField(document, stateType);
   const skillName = skill.name.trim() || skill.skillKey;
-  const fieldLabel = field.label.trim() || field.key;
+  const fieldName = field.name.trim() || field.key;
   document.state_schema[stateField.key] = {
     ...stateField.definition,
-    name: `${skillName} ${fieldLabel}`,
+    name: `${skillName} ${fieldName}`,
     description: field.description.trim() || `${skillName} output: ${field.key}`,
     type: stateType,
     promptVisible: PROMPT_VISIBLE_SKILL_OUTPUT_TYPES.has(stateType),
