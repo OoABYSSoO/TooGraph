@@ -19,7 +19,7 @@
 - Agent 节点卡片上手动添加的 skill，与通过 `skill` 类型 state 输入传入的 skill 按并集合并，一视同仁。
 - 添加到 Agent 节点的 skill 会在节点提示词编辑区生成可编辑的技能说明胶囊；移除 skill 时对应胶囊会移除。
 - 胶囊内容是节点级覆盖，不会反向写回技能包原始文档。
-- 在 Agent 节点卡片添加带 `outputSchema` 的 skill 时，前端会自动创建 managed skill output state、添加到该节点输出端口，并写入 `skillBindings.outputMapping`，让运行时能把技能结果透传给下游节点。
+- 在 Agent 节点卡片添加带 `outputSchema` 的 skill 时，前端会自动创建 managed skill output state、添加到该节点输出端口，并写入 `skillBindings.outputMapping`，让运行时能把技能结果透传给下游节点；若该 skill 只有一个必填输入且当前 Agent 只有一个普通输入 state，会同步写入 `skillBindings.inputMapping`。
 - `state_schema` 支持 `promptVisible=false`。这类 state 可以参与图运行和技能输出透传，但不会进入 Agent 的模型提示词上下文。
 - `state_schema` 支持 `binding` 元数据，用来标记某个 state 是否由技能输出自动绑定。
 - `file` / `file_list` 类型 state 的值是本地 artifact 路径或路径列表。Agent 节点接收这类 state 时，会读取文件并只把“文件名 + 原文全文”拼入模型上下文，不暴露本地路径、来源网址、抓取时间或运行元数据。

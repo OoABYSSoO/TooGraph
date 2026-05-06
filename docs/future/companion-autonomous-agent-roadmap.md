@@ -45,7 +45,7 @@
 - 旧技能包已删除，只保留新的 `web_search`。
 - `file` / `file_list` state 已采用路径透传语义；Agent 节点会读取文件并只把文件名与原文全文放入模型上下文。
 - `web_search` 不再输出 `context`，只输出 `source_urls`、`artifact_paths` 和 `errors`。
-- Agent 节点卡片添加带 `outputSchema` 的 skill 时，会自动创建 managed skill output state、写入节点输出端口，并同步 `skillBindings.outputMapping`。
+- Agent 节点卡片添加带 `outputSchema` 的 skill 时，会自动创建 managed skill output state、写入节点输出端口，并同步 `skillBindings.outputMapping`；若该 skill 只有一个必填输入且当前 Agent 只有一个普通输入 state，会同步写入 `skillBindings.inputMapping`。
 
 尚未完成：
 
@@ -197,7 +197,7 @@ Agent 节点提示词区域中，绑定的技能以胶囊展示。
 
 - 技能输出进入图状态，供下游节点读取。
 - 节点卡片添加技能时，系统根据 `outputSchema` 自动创建 managed binding state。
-- 自动创建的 state 会被加入当前 Agent 的输出端口，并写入 `skillBindings.outputMapping`。
+- 自动创建的 state 会被加入当前 Agent 的输出端口，并写入 `skillBindings.outputMapping`；单必填输入、单普通输入 state 的场景会同时补齐 `skillBindings.inputMapping`。
 - 大体量或不适合进 prompt 的内容可以设置 `promptVisible=false`。
 - Output 节点可以展示本地 artifact、网址、错误和摘要。
 - 用户仍能像普通 state 一样查看和编辑这些 state。

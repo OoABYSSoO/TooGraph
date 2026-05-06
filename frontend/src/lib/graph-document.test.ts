@@ -399,6 +399,59 @@ test("updateAgentNodeConfigInDocument materializes attached skill outputs as man
   assert.deepEqual(document.nodes.search_agent.writes, []);
 });
 
+test("updateAgentNodeConfigInDocument maps a single required skill input to the agent input state", () => {
+  const document: GraphPayload = {
+    graph_id: null,
+    name: "Skill Input Binding Graph",
+    state_schema: {
+      search_content: {
+        name: "Search Content",
+        description: "",
+        type: "text",
+        value: "latest release notes",
+        color: "#d97706",
+      },
+    },
+    nodes: {
+      search_agent: {
+        kind: "agent",
+        name: "Search Agent",
+        description: "",
+        ui: { position: { x: 0, y: 0 } },
+        reads: [{ state: "search_content", required: true }],
+        writes: [],
+        config: {
+          skills: [],
+          skillBindings: [],
+          skillInstructionBlocks: {},
+          taskInstruction: "",
+          modelSource: "global",
+          model: "",
+          thinkingMode: "high",
+          temperature: 0.2,
+        },
+      },
+    },
+    edges: [],
+    conditional_edges: [],
+    metadata: {},
+  };
+
+  const nextDocument = updateAgentNodeConfigInDocument(
+    document,
+    "search_agent",
+    (config) => ({
+      ...config,
+      skills: ["web_search"],
+    }),
+    { skillDefinitions: [webSearchSkill] },
+  );
+
+  const node = nextDocument.nodes.search_agent;
+  assert.equal(node.kind, "agent");
+  assert.deepEqual(node.config.skillBindings?.[0]?.inputMapping, { query: "search_content" });
+});
+
 test("createEmptyDraftGraph creates an empty backend-native payload", () => {
   const draft = createEmptyDraftGraph("Untitled Graph");
 

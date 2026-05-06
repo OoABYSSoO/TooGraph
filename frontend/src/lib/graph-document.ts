@@ -594,7 +594,7 @@ function reconcileAgentSkillOutputBindings<T extends GraphPayload | GraphDocumen
     nextSkillBindings.push({
       skillKey,
       trigger: existingBinding?.trigger ?? "before_agent",
-      inputMapping: existingBinding?.inputMapping ?? {},
+      inputMapping: resolveAgentSkillInputMapping(document, node, definition, existingBinding),
       outputMapping,
       config: existingBinding?.config ?? {},
     });
@@ -624,6 +624,92 @@ function normalizeAgentSkillBindings(value: AgentNode["config"]["skillBindings"]
       config: { ...(binding.config ?? {}) },
     }))
     .filter((binding) => binding.skillKey);
+}
+
+function resolveAgentSkillInputMapping(
+  document: GraphPayload | GraphDocument,
+  node: AgentNode,
+  definition: SkillDefinition,
+  existingBinding: AgentSkillBinding | undefined,
+) {
+  const inputMapping = { ...(existingBinding?.inputMapping ?? {}) };
+  const config = existingBinding?.config ?? {};
+  const requiredFields = definition.inputSchema.filter((field) => field.required);
+  for (const field of requiredFields) {
+    if (inputMapping[field.key] || Object.prototype.hasOwnProperty.call(config, field.key)) {
+      continue;
+    }
+    const stateKey = findReadableStateForSkillInput(document, node, field, requiredFields);
+    if (stateKey) {
+      inputMapping[field.key] = stateKey;
+    }
+  }
+  return inputMapping;
+}
+
+function findReadableStateForSkillInput(
+  document: GraphPayload | GraphDocument,
+  node: AgentNode,
+  field: SkillIoField,
+  requiredFields: SkillIoField[],
+) {
+  const candidates = collectSkillInputStateCandidates(document, node);
+  const normalizedFieldKey = normalizeSkillInputMatchText(field.key);
+  const normalizedFieldLabel = normalizeSkillInputMatchText(field.label);
+
+  const keyMatch = candidates.find((candidate) => normalizeSkillInputMatchText(candidate.stateKey) === normalizedFieldKey);
+  if (keyMatch) {
+    return keyMatch.stateKey;
+  }
+
+  const nameMatch = candidates.find((candidate) => {
+    const normalizedStateName = normalizeSkillInputMatchText(candidate.definition.name);
+    return normalizedStateName === normalizedFieldKey || (normalizedFieldLabel && normalizedStateName === normalizedFieldLabel);
+  });
+  if (nameMatch) {
+    return nameMatch.stateKey;
+  }
+
+  if (requiredFields.length === 1 && candidates.length === 1 && isSkillInputTypeCompatible(field.valueType, candidates[0].definition.type)) {
+    return candidates[0].stateKey;
+  }
+
+  return null;
+}
+
+function collectSkillInputStateCandidates(document: GraphPayload | GraphDocument, node: AgentNode) {
+  const seen = new Set<string>();
+  return node.reads.flatMap((binding) => {
+    const stateKey = binding.state;
+    if (seen.has(stateKey)) {
+      return [];
+    }
+    seen.add(stateKey);
+    const definition = document.state_schema[stateKey];
+    if (!definition || definition.type === "skill") {
+      return [];
+    }
+    return [{ stateKey, definition }];
+  });
+}
+
+function normalizeSkillInputMatchText(value: string | undefined) {
+  return String(value ?? "").trim().toLowerCase().replace(/[\s_-]+/g, "");
+}
+
+function isSkillInputTypeCompatible(inputType: string, stateType: string) {
+  const normalizedInputType = inputType.trim();
+  const normalizedStateType = stateType.trim();
+  if (!normalizedInputType || normalizedInputType === normalizedStateType) {
+    return true;
+  }
+  if (normalizedInputType === "text") {
+    return ["text", "markdown", "json"].includes(normalizedStateType);
+  }
+  if (normalizedInputType === "json") {
+    return ["json", "object", "array", "text", "markdown"].includes(normalizedStateType);
+  }
+  return false;
 }
 
 function collectRemovedManagedSkillOutputStateKeys(
