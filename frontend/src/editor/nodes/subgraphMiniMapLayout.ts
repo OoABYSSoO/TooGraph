@@ -128,7 +128,7 @@ function buildCurvedEdgePath(source: SubgraphMiniMapPlacedNode, target: Subgraph
   };
   const secondControl = {
     x: targetPoint.x + targetControlDirection * controlOffset,
-    y: targetPoint.y + rowBow,
+    y: targetPoint.y,
   };
 
   return `M ${sourcePoint.x} ${sourcePoint.y} C ${firstControl.x} ${firstControl.y} ${secondControl.x} ${secondControl.y} ${targetPoint.x} ${targetPoint.y}`;
